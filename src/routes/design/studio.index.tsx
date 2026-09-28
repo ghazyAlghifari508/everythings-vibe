@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { Loader2, Sparkles } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
+import { z } from "zod";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { requireUserServer } from "@/lib/session";
 
@@ -22,20 +23,30 @@ const loadStudioHistory = createServerFn({ method: "GET" }).handler(
 	},
 );
 
+const studioSearchSchema = z.object({
+	prompt: z.string().optional(),
+});
+
 export const Route = createFileRoute("/design/studio/")({
 	head: () => ({
 		meta: [{ title: "Prompt UI Studio | VibeDesign" }],
 	}),
+	validateSearch: (search) => studioSearchSchema.parse(search),
 	loader: async () => loadStudioHistory(),
 	component: StudioPage,
 });
 
 function StudioPage() {
 	const { history } = Route.useLoaderData();
+	const search = Route.useSearch();
 	const navigate = useNavigate();
-	const [prompt, setPrompt] = useState("");
+	const [prompt, setPrompt] = useState(search.prompt ?? "");
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
+
+	useEffect(() => {
+		if (search.prompt !== undefined) setPrompt(search.prompt);
+	}, [search.prompt]);
 
 	async function submit(e: FormEvent) {
 		e.preventDefault();

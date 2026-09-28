@@ -109,11 +109,11 @@ describe("BentoHub copy vs destination reality", () => {
 	it("marks the modules that do not work yet as planned", () => {
 		render(<BentoHub />);
 
-		for (const title of ["VibeDesign", "VibeTemplate"]) {
+		for (const title of ["VibeDesign"]) {
 			expect(within(card(title)).getByText("Direncanakan")).toBeDefined();
 		}
-		// The two modules that do work must not carry the badge.
-		for (const title of ["VibePlan", "VibeBantuan"]) {
+		// The modules that do work must not carry the badge.
+		for (const title of ["VibePlan", "VibeTemplate", "VibeBantuan"]) {
 			expect(within(card(title)).queryByText("Direncanakan")).toBeNull();
 		}
 	});
@@ -124,12 +124,12 @@ describe("BentoHub copy vs destination reality", () => {
 		expect(within(card("VibeDesign")).getByText(/belum aktif/i)).toBeDefined();
 	});
 
-	it("states on the VibeTemplate card that there is no catalog", () => {
+	it("no longer claims the VibeTemplate catalog is missing", () => {
 		render(<BentoHub />);
 
 		expect(
-			within(card("VibeTemplate")).getByText(/belum ada di aplikasi ini/i),
-		).toBeDefined();
+			within(card("VibeTemplate")).queryByText(/belum ada di aplikasi ini/i),
+		).toBeNull();
 	});
 
 	it("still states the purpose of each planned module", () => {

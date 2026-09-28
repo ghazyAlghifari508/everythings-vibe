@@ -40,13 +40,8 @@ const CARDS: readonly HubCard[] = [
 		title: "VibeTemplate",
 		icon: LayoutGrid,
 		description:
-			"Katalog kerangka kerja teruji: preset spesifikasi planning, kit desain antarmuka, dan boilerplate proyek lengkap. Katalognya belum ada di aplikasi ini.",
-		tags: [
-			"Direncanakan",
-			"Template Planning",
-			"Template Design",
-			"Boilerplate Projek",
-		],
+			"Katalog kerangka kerja teruji: preset spesifikasi planning, kit desain antarmuka, dan boilerplate proyek lengkap.",
+		tags: ["Template Planning", "Template Design", "Boilerplate Projek"],
 	},
 	{
 		to: "/bantuan",

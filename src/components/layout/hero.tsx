@@ -5,9 +5,15 @@ import { ChatInput, type HomeProjectMode } from "./chat-input";
 import { CodebaseFeatureGallery } from "./codebase-feature-gallery";
 import { TemplateGallery } from "./template-gallery";
 
-export function HeroContent() {
-	const [prefill, setPrefill] = useState<string | undefined>();
-	const [prefillMobile, setPrefillMobile] = useState(false);
+export function HeroContent({
+	initialPrompt,
+	initialPlatform,
+}: {
+	initialPrompt?: string;
+	initialPlatform?: "web" | "mobile";
+} = {}) {
+	const [prefill, setPrefill] = useState<string | undefined>(initialPrompt);
+	const [prefillMobile, setPrefillMobile] = useState(initialPlatform === "mobile");
 	// ponytail: re-selecting the same template yields the same string, which
 	// React useState bails out on. The tick forces ChatInput's sync effect
 	// to re-run so the textarea re-prefills every click.
