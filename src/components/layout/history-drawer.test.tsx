@@ -112,7 +112,9 @@ function renderOpenDrawer() {
 	);
 }
 
-function renderDrawer(props: Partial<React.ComponentProps<typeof HistoryDrawer>>) {
+function renderDrawer(
+	props: Partial<React.ComponentProps<typeof HistoryDrawer>>,
+) {
 	return render(
 		<QueryClientProvider client={queryClient}>
 			<HistoryDrawer
@@ -126,9 +128,7 @@ function renderDrawer(props: Partial<React.ComponentProps<typeof HistoryDrawer>>
 }
 
 function filterPills() {
-	return within(
-		screen.getByRole("group", { name: "Filter kategori riwayat" }),
-	);
+	return within(screen.getByRole("group", { name: "Filter kategori riwayat" }));
 }
 
 beforeEach(() => {
@@ -164,7 +164,9 @@ describe("HistoryDrawer rendering", () => {
 	it("exposes the drawer as a labelled dialog with an accessible close control", () => {
 		renderDrawer({});
 
-		expect(screen.getByRole("dialog", { name: "Riwayat Projek" })).toBeDefined();
+		expect(
+			screen.getByRole("dialog", { name: "Riwayat Projek" }),
+		).toBeDefined();
 		expect(screen.getByRole("button", { name: "Tutup riwayat" })).toBeDefined();
 	});
 
@@ -552,6 +554,3 @@ describe("toDrawerItems", () => {
 		expect(items[1].url).toBe(`/task/${AIRBNB_ID}`);
 	});
 });
-
-
-
