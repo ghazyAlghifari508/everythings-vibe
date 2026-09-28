@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { GridBackground, HeroContent } from "@/components/layout";
 
-const planNewSearchSchema = z.object({
+export const planNewSearchSchema = z.object({
 	prompt: z.string().optional(),
 	platform: z.enum(["web", "mobile"]).optional(),
 });

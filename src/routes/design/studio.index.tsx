@@ -23,7 +23,7 @@ const loadStudioHistory = createServerFn({ method: "GET" }).handler(
 	},
 );
 
-const studioSearchSchema = z.object({
+export const studioSearchSchema = z.object({
 	prompt: z.string().optional(),
 });
 
