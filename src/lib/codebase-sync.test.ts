@@ -159,7 +159,7 @@ describe("sync prompt payload DTO", () => {
 			syncToken: "placeholder-sync-token",
 			cliMinVersion: "2.0.0",
 			syncCommand:
-				"prdfy codebase sync --project-id proj_123 --sync-token <token>",
+				"vibeeverything codebase sync --project-id proj_123 --sync-token <token>",
 			expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
 		});
 		expect(result.success).toBe(true);
@@ -170,7 +170,7 @@ describe("sync prompt payload DTO", () => {
 			projectId: "proj_123",
 			apiBaseUrl: "https://prdfy.example.com",
 			cliMinVersion: "2.0.0",
-			syncCommand: "prdfy codebase sync",
+			syncCommand: "vibeeverything codebase sync",
 			expiresAt: new Date().toISOString(),
 		});
 		expect(result.success).toBe(false);
@@ -576,7 +576,7 @@ describe("safe sync errors and CLI version gate (Task 4)", () => {
 		const raw = generateSyncToken();
 		const command = buildSyncCommand("proj_123");
 		expect(command).toBe(
-			"prdfy codebase sync --project-id proj_123 --sync-token <token>",
+			"vibeeverything codebase sync --project-id proj_123 --sync-token <token>",
 		);
 		expect(command).not.toContain(raw);
 	});

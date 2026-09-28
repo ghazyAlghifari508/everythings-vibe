@@ -132,3 +132,17 @@ describe("prdfy codebase sync argv wiring", () => {
 		expect(exitSpy).toHaveBeenCalledWith(1);
 	});
 });
+
+describe("CLI branding and commands", () => {
+	it("has name vibeeverything and proper description", () => {
+		expect(program.name()).toBe("vibeeverything");
+		expect(program.description()).toContain("VibeEverything");
+	});
+
+	it("registers codebase sync command", () => {
+		const codebase = program.commands.find((c) => c.name() === "codebase");
+		expect(codebase).toBeDefined();
+		const sync = codebase?.commands.find((c) => c.name() === "sync");
+		expect(sync).toBeDefined();
+	});
+});

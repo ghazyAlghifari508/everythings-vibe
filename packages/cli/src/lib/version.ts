@@ -1,6 +1,6 @@
 /**
  * Single source for the CLI version: read from the package `version` field
- * so `prdfy --version` and the sync handshake floor can never drift apart.
+ * so `vibeeverything --version` and the sync handshake floor can never drift apart.
  * Resolved relative to this module, so it works from both `src/` (vitest)
  * and `dist/` (built/published CLI).
  */

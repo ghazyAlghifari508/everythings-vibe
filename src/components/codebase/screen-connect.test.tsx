@@ -129,7 +129,7 @@ describe("ScreenConnect", () => {
 		const rendered = container.textContent ?? "";
 		expect(rendered).toContain("Sinkronkan codebase repositori lokal ini");
 		expect(rendered).toContain("proj_123");
-		expect(rendered).toContain("prdfy codebase sync --project-id proj_123");
+		expect(rendered).toContain("vibeeverything codebase sync --project-id proj_123");
 		// The required sections are all present.
 		expect(rendered).toContain("## Informasi Project");
 		expect(rendered).toContain("## Prasyarat Eksekusi");
@@ -170,7 +170,7 @@ describe("ScreenConnect", () => {
 		const copied = String(writeText.mock.calls[0]?.[0] ?? "");
 		expect(copied).toContain("tok_123");
 		expect(copied).toContain("Sinkronkan codebase repositori lokal ini");
-		expect(copied).toContain("prdfy codebase sync --project-id proj_123");
+		expect(copied).toContain("vibeeverything codebase sync --project-id proj_123");
 		// The clipboard payload is the complete execution document.
 		expect(copied).toContain("## Format Laporan Akhir");
 		expect(copied).toContain("## Penanganan Kegagalan");

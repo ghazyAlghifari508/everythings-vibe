@@ -541,7 +541,7 @@ export function buildSyncCommand(projectId: string): string {
 	if (!SAFE_PROJECT_ID_PATTERN.test(projectId)) {
 		throw new Error(`Invalid project ID format: "${projectId}"`);
 	}
-	return `prdfy codebase sync --project-id ${projectId} --sync-token <token>`;
+	return `vibeeverything codebase sync --project-id ${projectId} --sync-token <token>`;
 }
 
 // === External-agent prompt ===
@@ -569,7 +569,7 @@ export function buildAgentPrompt(
 	payload: SyncPromptPayload,
 	context?: { projectName?: string },
 ): string {
-	const command = `prdfy codebase sync --project-id ${payload.projectId} --sync-token ${payload.syncToken}`;
+	const command = `vibeeverything codebase sync --project-id ${payload.projectId} --sync-token ${payload.syncToken}`;
 	const infoLines = [
 		`Project ID   : ${payload.projectId}`,
 		`Server       : ${payload.apiBaseUrl}`,
@@ -583,7 +583,7 @@ export function buildAgentPrompt(
 	}
 
 	return [
-		"Sinkronkan codebase repositori lokal ini ke project PrdFy menggunakan CLI resmi.",
+		"Sinkronkan codebase repositori lokal ini ke project VibeEverything menggunakan CLI resmi.",
 		"Fokus hanya pada proses sinkronisasi; jangan melakukan perubahan terhadap source code.",
 		"",
 		"## Informasi Project",
@@ -591,9 +591,9 @@ export function buildAgentPrompt(
 		"",
 		"## Prasyarat Eksekusi",
 		"1. Pastikan kamu berada di root repositori Git.",
-		"2. Gunakan PrdFy CLI untuk menjalankan sinkronisasi.",
-		"3. Jika command `prdfy` tidak tersedia, install dulu:",
-		"   npm i -g @ghazynabiel/prdfy",
+		"2. Gunakan VibeEverything CLI untuk menjalankan sinkronisasi.",
+		"3. Jika command `vibeeverything` tidak tersedia, install dulu:",
+		"   npm i -g @ghazynabiel/vibeeverything",
 		"",
 		"## Perintah Yang Harus Dieksekusi",
 		command,
@@ -1075,7 +1075,7 @@ export class CliVersionError extends Error {
 
 	constructor() {
 		super(
-			`This CLI version is below the required minimum ${CODEBASE_CLI_MIN_VERSION}. Update with: npm i -g @ghazynabiel/prdfy`,
+			`This CLI version is below the required minimum ${CODEBASE_CLI_MIN_VERSION}. Update with: npm i -g @ghazynabiel/vibeeverything`,
 		);
 		this.name = "CliVersionError";
 	}

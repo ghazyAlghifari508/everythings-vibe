@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * prdfy-cli — CLI tool for PrdFy
+ * vibeeverything-cli — CLI tool for VibeEverything
  *
  * Usage:
- *   prdfy login [--api-key <key>] [--api-url <url>]
- *   prdfy project get <id>
- *   prdfy task list <projectId> [--status <status>]
- *   prdfy task next <projectId>
- *   prdfy task update <taskId> --status <status>
- *   prdfy subtask update <taskId> --index <subtaskIndex> --status <status>
- *   prdfy kanban <projectId>
+ *   vibeeverything login [--api-key <key>] [--api-url <url>]
+ *   vibeeverything project get <id>
+ *   vibeeverything task list <projectId> [--status <status>]
+ *   vibeeverything task next <projectId>
+ *   vibeeverything task update <taskId> --status <status>
+ *   vibeeverything subtask update <taskId> --index <subtaskIndex> --status <status>
+ *   vibeeverything kanban <projectId>
  */
 
 import { pathToFileURL } from "node:url";
@@ -34,19 +34,19 @@ import { CLI_VERSION } from "./lib/version.js";
 export const program = new Command();
 
 program
-	.name("prdfy")
-	.description("CLI tool for PrdFy — manage projects and tasks from terminal")
+	.name("vibeeverything")
+	.description("CLI tool for VibeEverything — manage projects and tasks from terminal")
 	.version(CLI_VERSION);
 
-// prdfy login
+// vibeeverything login
 program
 	.command("login")
 	.description("Save API key to local config (interactive if no flag)")
-	.option("--api-key <key>", "PrdFy API key")
+	.option("--api-key <key>", "VibeEverything API key")
 	.option("--api-url <url>", "API base URL (default: http://localhost:3000)")
 	.action(loginCommand);
 
-// prdfy project
+// vibeeverything project
 const projectCmd = program.command("project").description("Project commands");
 projectCmd
 	.command("get")
@@ -54,21 +54,21 @@ projectCmd
 	.description("Get project data as JSON")
 	.action(projectGetCommand);
 
-// prdfy prd
+// vibeeverything prd
 program
 	.command("prd")
 	.argument("<projectId>", "Project UUID")
 	.description("Fetch and print PRD content")
 	.action(prdCommand);
 
-// prdfy ac
+// vibeeverything ac
 program
 	.command("ac")
 	.argument("<projectId>", "Project UUID")
 	.description("Fetch and print Acceptance Criteria content")
 	.action(acCommand);
 
-// prdfy task
+// vibeeverything task
 const taskCmd = program.command("task").description("Task commands");
 taskCmd
 	.command("list")
@@ -94,7 +94,7 @@ taskCmd
 	)
 	.action(taskUpdateCommand);
 
-// prdfy subtask
+// vibeeverything subtask
 const subtaskCmd = program.command("subtask").description("Subtask commands");
 subtaskCmd
 	.command("update")
@@ -107,20 +107,20 @@ subtaskCmd
 	)
 	.action(subtaskUpdateCommand);
 
-// prdfy kanban
+// vibeeverything kanban
 program
 	.command("kanban")
 	.argument("<projectId>", "Project UUID")
 	.description("Show kanban board in terminal")
 	.action(kanbanCommand);
 
-// prdfy codebase
+// vibeeverything codebase
 const codebaseCmd = program
 	.command("codebase")
 	.description("Codebase commands");
 codebaseCmd
 	.command("sync")
-	.description("Sync a filtered local repository snapshot to PrdFy")
+	.description("Sync a filtered local repository snapshot to VibeEverything")
 	.requiredOption("--project-id <id>", "Project UUID")
 	.option(
 		"--sync-token <token>",
@@ -131,7 +131,7 @@ codebaseCmd
 	.option("--api-url <url>", "API base URL")
 	.action(codebaseSyncAction);
 
-// prdfy export
+// vibeeverything export
 const exportCmd = program
 	.command("export")
 	.description("Export project artifacts");

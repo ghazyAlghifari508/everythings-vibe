@@ -1,18 +1,21 @@
-# @ghazynabiel/prdfy
+# @ghazynabiel/vibeeverything
 
-Official command-line interface for [PrdFy](https://github.com/ghazyAlghifari508/prdfy).
+Official command-line interface for [VibeEverything](https://github.com/ghazyAlghifari508/prdfy).
 
 ## Installation
 
 ```bash
-npm install -g @ghazynabiel/prdfy
+npm install -g @ghazynabiel/vibeeverything
 ```
 
 Check version:
 
 ```bash
-prdfy --version
+vibeeverything --version
 ```
+
+The package also installs the `vibe` and `prdfy` binaries as aliases, so existing
+scripts and documentation that call `prdfy <command>` keep working.
 
 Minimum version required for existing codebase sync is **2.0.0**.
 
@@ -20,10 +23,10 @@ Minimum version required for existing codebase sync is **2.0.0**.
 
 ### Codebase Sync
 
-Synchronize a filtered repository snapshot to PrdFy for existing-codebase project planning:
+Synchronize a filtered repository snapshot to VibeEverything for existing-codebase project planning:
 
 ```bash
-prdfy codebase sync --project-id <id> --sync-token <token>
+vibeeverything codebase sync --project-id <id> --sync-token <token>
 ```
 
 #### Options
@@ -32,7 +35,7 @@ prdfy codebase sync --project-id <id> --sync-token <token>
 - `--sync-token <token>`: Project-scoped temporary sync token (required)
 - `--root <path>`: Repository root. Detected automatically when omitted.
 - `--output <mode>`: Output format (`human` or `json`, default: `human`)
-- `--api-url <url>`: PrdFy server base URL (default: `http://localhost:3000`)
+- `--api-url <url>`: VibeEverything server base URL (default: `http://localhost:3000`)
 
 #### Automatic preparation
 
@@ -70,19 +73,19 @@ in its header, so you only add repository-specific patterns.
 For general task and kanban tracking:
 
 ```bash
-prdfy login --api-key <your-api-key>
+vibeeverything login --api-key <your-api-key>
 ```
 
 ### Projects, Tasks, and Kanban
 
 ```bash
-prdfy project get <projectId>
-prdfy prd <projectId>
-prdfy ac <projectId>
-prdfy task list <projectId> [--status <status>]
-prdfy task next <projectId>
-prdfy task update <taskId> --status <status>
-prdfy subtask update <taskId> --index <index> --status <status>
-prdfy kanban <projectId>
-prdfy export rules <projectId> [--format agents|claude|cursor]
+vibeeverything project get <projectId>
+vibeeverything prd <projectId>
+vibeeverything ac <projectId>
+vibeeverything task list <projectId> [--status <status>]
+vibeeverything task next <projectId>
+vibeeverything task update <taskId> --status <status>
+vibeeverything subtask update <taskId> --index <index> --status <status>
+vibeeverything kanban <projectId>
+vibeeverything export rules <projectId> [--format agents|claude|cursor]
 ```
