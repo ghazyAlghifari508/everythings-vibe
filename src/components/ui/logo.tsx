@@ -3,11 +3,11 @@
 import { Link } from "@tanstack/react-router";
 import type { FileRouteTypes } from "@/routeTree.gen";
 
-// PrdFy mark: document outline with terminal cursor block.
+// VibeEverything mark: document outline with terminal cursor block.
 // viewBox is cropped tight to the glyph bbox (content: x 14-47, y 10-48)
 // so the mark fills its box — no dead padding baked into the canvas.
 // fill="currentColor" follows the theme's text color automatically.
-function PrdFyMark({ size }: { size: number }) {
+function VibeEverythingMark({ size }: { size: number }) {
 	return (
 		<svg
 			width={size}
@@ -41,7 +41,7 @@ export function Logo({
 			className={`inline-flex items-center ${className}`}
 			style={{ gap: `${Math.round(height * 0.34)}px` }}
 		>
-			<PrdFyMark size={height} />
+			<VibeEverythingMark size={height} />
 			<span
 				className="font-medium leading-none select-none"
 				style={{
@@ -50,7 +50,7 @@ export function Logo({
 					letterSpacing: "-0.03em",
 				}}
 			>
-				PrdFy
+				VibeEverything
 			</span>
 		</Link>
 	);

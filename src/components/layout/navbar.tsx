@@ -30,7 +30,7 @@ import { isAdmin } from "@/lib/session";
 import { useChatStore, useUIStore } from "@/store";
 import { FlowStepNav, getFlowStepCta, routeToStep } from "./flow-step-nav";
 
-export function Navbar() {
+export function Navbar({ onOpenDrawer }: { onOpenDrawer?: () => void } = {}) {
 	const { data: session, isPending: isLoading } = authClient.useSession();
 	const user =
 		session?.user?.id && session.user.email
@@ -181,6 +181,15 @@ export function Navbar() {
 							<Menu size={16} />
 						</button>
 					)}
+					<button
+						type="button"
+						onClick={onOpenDrawer}
+						className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-graphite/60 bg-transparent text-fog transition-colors hover:border-steel hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						aria-label="Riwayat"
+						title="Riwayat Proyek"
+					>
+						<Menu size={16} />
+					</button>
 					<Logo height={28} />
 				</div>
 
@@ -204,16 +213,6 @@ export function Navbar() {
 					) : (
 						<div className="flex items-center gap-1">
 							<Link
-								to="/"
-								className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-									pathname === "/"
-										? "bg-white/10 text-snow"
-										: "text-fog hover:bg-white/5 hover:text-snow"
-								}`}
-							>
-								Home
-							</Link>
-							<Link
 								to="/pricing"
 								className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
 									pathname.startsWith("/pricing")
@@ -222,26 +221,6 @@ export function Navbar() {
 								}`}
 							>
 								Pricing
-							</Link>
-							<Link
-								to="/faq"
-								className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-									pathname === "/faq"
-										? "bg-white/10 text-snow"
-										: "text-fog hover:bg-white/5 hover:text-snow"
-								}`}
-							>
-								FAQ
-							</Link>
-							<Link
-								to="/history"
-								className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-									pathname === "/history"
-										? "bg-white/10 text-snow"
-										: "text-fog hover:bg-white/5 hover:text-snow"
-								}`}
-							>
-								History
 							</Link>
 						</div>
 					)}

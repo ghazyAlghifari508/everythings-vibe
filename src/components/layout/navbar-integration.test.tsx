@@ -132,3 +132,23 @@ describe("Navbar Paywall Integration Contract", () => {
 		expect(source).toContain("text-amber-400");
 	});
 });
+
+describe("Navbar Rebranding & Layout", () => {
+	it("renders VibeEverything logo and only Pricing navlink", () => {
+		mockPathname = "/";
+		render(<Navbar onOpenDrawer={() => {}} />);
+		expect(screen.getByText("VibeEverything")).toBeDefined();
+		expect(screen.getByRole("link", { name: /Pricing/i })).toBeDefined();
+		expect(screen.queryByRole("link", { name: /Home/i })).toBeNull();
+		expect(screen.queryByRole("link", { name: /FAQ/i })).toBeNull();
+		expect(screen.queryByRole("link", { name: /History/i })).toBeNull();
+		expect(screen.queryByRole("link", { name: /VibePlan/i })).toBeNull();
+		expect(screen.queryByRole("link", { name: /VibeDesign/i })).toBeNull();
+	});
+
+	it("renders hamburger menu button for history drawer", () => {
+		render(<Navbar onOpenDrawer={() => {}} />);
+		const hamburger = screen.getByRole("button", { name: /^Riwayat$/i });
+		expect(hamburger).toBeDefined();
+	});
+});

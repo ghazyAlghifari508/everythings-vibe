@@ -39,7 +39,7 @@ test.describe("Existing Codebase Sync Flow", () => {
 		await page.waitForLoadState("networkidle");
 
 		// Verify title
-		await expect(page).toHaveTitle(/PrdFy/i);
+		await expect(page).toHaveTitle(/VibeEverything/i);
 
 		// Mode toggle buttons
 		const greenfieldBtn = page.getByRole("button", { name: /produk baru/i });

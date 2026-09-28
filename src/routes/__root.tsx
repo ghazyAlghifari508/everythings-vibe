@@ -25,12 +25,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{ charSet: "utf-8" },
 			{ name: "viewport", content: "width=device-width, initial-scale=1" },
 			{
-				title: "PrdFy - AI PRD Generator",
+				title: "VibeEverything - All-in-One AI Vibe-Coding Workspace",
 			},
 			{
 				name: "description",
 				content:
-					"Dari ide ke PRD profesional dalam 5 menit, bukan 5 hari. Generate Product Requirements Document lengkap dengan AI.",
+					"Workspace all-in-one untuk planning, visual design context, template prompt, dan bantuan coding AI.",
 			},
 		],
 		links: [
