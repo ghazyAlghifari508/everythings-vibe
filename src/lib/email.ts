@@ -69,7 +69,7 @@ export async function sendEmail(args: SendEmailArgs): Promise<boolean> {
 		process.env.EMAIL_FROM ||
 		(process.env.NODE_ENV === "production"
 			? null
-			: "PrdFy <onboarding@resend.dev>");
+			: "VibeEverything <onboarding@resend.dev>");
 	if (!from) {
 		console.error("[email] EMAIL_FROM missing in production — skipping send");
 		return false;
@@ -98,7 +98,7 @@ function shell(title: string, bodyHtml: string): string {
 	return `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:auto;padding:24px;color:#1f2937">
 <h2 style="margin:0 0 12px">${title}</h2>
 ${bodyHtml}
-<p style="margin-top:24px;font-size:12px;color:#6b7280">Email otomatis dari PrdFy.</p>
+<p style="margin-top:24px;font-size:12px;color:#6b7280">Email otomatis dari VibeEverything.</p>
 </div>`;
 }
 

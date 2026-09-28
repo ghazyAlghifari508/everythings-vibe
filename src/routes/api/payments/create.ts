@@ -111,7 +111,7 @@ export const Route = createFileRoute("/api/payments/create")({
 					}
 					amount = topUpPkg.priceIdr;
 					planCredits = topUpPkg.credits;
-					itemLabel = `Top Up ${topUpPkg.credits} Kredit PrdFy`;
+					itemLabel = `Top Up ${topUpPkg.credits} Kredit VibeEverything`;
 				} else {
 					const plan = prdFyPlans.find((p) => p.id === planId);
 					if (!plan)

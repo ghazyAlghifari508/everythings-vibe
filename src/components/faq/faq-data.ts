@@ -9,18 +9,18 @@ export interface FaqItem {
 export const FAQ_ITEMS: FaqItem[] = [
 	{
 		id: "product-output",
-		title: "Apa yang bisa dibuat dengan PrdFy?",
+		title: "Apa yang bisa dibuat dengan VibeEverything?",
 		subtitle: "Ubah ide produk menjadi dokumen kerja",
 		content:
-			"PrdFy membantu menyusun PRD, acceptance criteria, task tree, dan Kanban dari satu ide produk. Hasilnya bisa kamu baca, revisi, dan lanjutkan sebagai dasar kerja tim.",
+			"VibeEverything membantu menyusun PRD, acceptance criteria, task tree, dan Kanban dari satu ide produk. Hasilnya bisa kamu baca, revisi, dan lanjutkan sebagai dasar kerja tim.",
 		icon: "spark",
 	},
 	{
 		id: "guided-flow",
-		title: "Bagaimana alur kerja PrdFy?",
+		title: "Bagaimana alur kerja VibeEverything?",
 		subtitle: "Jawab pertanyaan yang menentukan arah produk",
 		content:
-			"Mulai dari ide produk, jawab pertanyaan klarifikasi, lalu PrdFy menyusun PRD dengan delapan bagian. Setelah itu kamu bisa melanjutkan ke acceptance criteria, task tree, dan Kanban.",
+			"Mulai dari ide produk, jawab pertanyaan klarifikasi, lalu VibeEverything menyusun PRD dengan delapan bagian. Setelah itu kamu bisa melanjutkan ke acceptance criteria, task tree, dan Kanban.",
 		icon: "workflow",
 	},
 	{
