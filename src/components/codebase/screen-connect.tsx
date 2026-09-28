@@ -65,7 +65,7 @@ export function ScreenConnect({
 						Hubungkan codebase kamu
 					</h1>
 					<p className="mt-2 text-xs sm:text-sm text-fog max-w-xl leading-relaxed">
-						PrdFy tidak meminta upload ZIP. Jalankan sync langsung dari
+						VibeEverything tidak meminta upload ZIP. Jalankan sync langsung dari
 						repository melalui AI coding agent kamu.
 					</p>
 				</div>
@@ -76,7 +76,7 @@ export function ScreenConnect({
 				{/* Modal Head */}
 				<div className="border-b border-graphite p-5 sm:p-6">
 					<h2 className="font-inter text-lg sm:text-xl font-[600] text-snow">
-						Sync codebase dengan PrdFy
+						Sync codebase dengan VibeEverything
 					</h2>
 					<p className="mt-1.5 text-xs sm:text-sm text-fog leading-relaxed">
 						Salin prompt ini dan paste ke Claude Code, Cursor, Windsurf, atau AI
@@ -164,7 +164,7 @@ export function ScreenConnect({
 								Paste prompt lalu jalankan
 							</div>
 							<p className="text-[11px] text-fog leading-relaxed">
-								PrdFy akan menampilkan status dan berpindah layar ketika CLI
+								VibeEverything akan menampilkan status dan berpindah layar ketika CLI
 								berhasil terhubung.
 							</p>
 						</div>

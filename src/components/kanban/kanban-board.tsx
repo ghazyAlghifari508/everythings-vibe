@@ -356,7 +356,7 @@ export function KanbanBoard({
 										aria-hidden="true"
 									/>
 									<span className="truncate">
-										Belum ada update status · Jalankan PrdFy CLI untuk update
+										Belum ada update status · Jalankan VibeEverything CLI untuk update
 										otomatis
 									</span>
 								</output>

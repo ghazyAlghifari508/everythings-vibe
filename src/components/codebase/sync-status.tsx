@@ -197,7 +197,7 @@ export function SyncStatus({
 						Sync codebase
 					</h1>
 					<p className="mt-2 text-xs sm:text-sm text-fog max-w-xl leading-relaxed">
-						PrdFy CLI menjalankan sync dari repositori lokal kamu. Perintahnya
+						VibeEverything CLI menjalankan sync dari repositori lokal kamu. Perintahnya
 						berjalan di terminal agent — progress di bawah mengikuti status
 						server yang sebenarnya.
 					</p>

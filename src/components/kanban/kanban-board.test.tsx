@@ -159,7 +159,7 @@ describe("KanbanBoard", () => {
 		await vi.waitFor(() => {
 			expect(c.textContent).toContain("Kanban - Test Kanban App");
 			expect(c.textContent).toContain(
-				"Belum ada update status · Jalankan PrdFy CLI untuk update otomatis",
+				"Belum ada update status · Jalankan VibeEverything CLI untuk update otomatis",
 			);
 		});
 
@@ -168,7 +168,7 @@ describe("KanbanBoard", () => {
 		expect(header).toBeDefined();
 		expect(header?.textContent).toContain("Kanban - Test Kanban App");
 		expect(header?.textContent).toContain(
-			"Belum ada update status · Jalankan PrdFy CLI untuk update otomatis",
+			"Belum ada update status · Jalankan VibeEverything CLI untuk update otomatis",
 		);
 	});
 

@@ -83,7 +83,7 @@ export function CodebaseReview({
 						Kami menemukan konteks aplikasimu.
 					</h1>
 					<p className="mt-2 text-xs sm:text-sm text-fog max-w-xl leading-relaxed">
-						Review ringkasan ini sebelum PrdFy membuat pertanyaan. Kamu bisa
+						Review ringkasan ini sebelum VibeEverything membuat pertanyaan. Kamu bisa
 						mengoreksi hasil deteksi yang tidak sesuai.
 					</p>
 				</div>
