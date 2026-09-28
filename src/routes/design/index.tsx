@@ -9,27 +9,29 @@ export const Route = createFileRoute("/design/")({
 			{
 				name: "description",
 				content:
-					"Modul perancangan antarmuka VibeDesign. Fitur scraping dan Prompt UI Studio direncanakan untuk fase berikutnya.",
+					"Scrap website live menjadi index.html + design.md, atau rancang UI dari prompt di studio.",
 			},
 		],
 	}),
 	component: DesignPage,
 });
 
-const PLANNED = [
+const OPTIONS = [
 	{
 		icon: Globe,
 		title: "Scrap HTML & design.md",
 		description:
 			"Ekstrak URL web live menjadi dua file keluaran: design.md (aturan desain dan token) serta index.html (kode HTML utuh beserta preview 1440px desktop).",
+		to: "/design/scrap",
 	},
 	{
 		icon: Sparkles,
 		title: "Prompt UI Studio",
 		description:
 			"Studio antarmuka interaktif: rancang aplikasi web atau mobile hanya lewat prompt teks alami, pilih inspirasi, dan lihat preview interaktif.",
+		to: "/design/studio",
 	},
-];
+] as const;
 
 function DesignPage() {
 	return (
@@ -37,74 +39,46 @@ function DesignPage() {
 			<HubBreadcrumb current="VibeDesign" />
 
 			<header className="mx-auto max-w-2xl text-center">
-				<p className="mb-4 inline-flex items-center gap-2 rounded-full border border-graphite bg-charcoal px-3 py-1 font-mono text-xs text-fog">
-					Belum tersedia
-				</p>
 				<h1 className="text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
 					Rancang antarmuka dari prompt atau website live
 				</h1>
 				<p className="mt-3 text-sm leading-6 text-fog">
-					VibeDesign belum aktif. Tidak ada scraper maupun studio yang bisa
-					dijalankan saat ini, jadi halaman ini tidak menampilkan form, preview,
-					atau proses apa pun yang belum benar-benar jalan.
+					Dua jalur menuju sistem visual yang siap dipakai: serap website
+					existing menjadi design.md, atau generate UI baru dari prompt.
 				</p>
 			</header>
 
-			<section className="flex flex-col gap-4">
-				<h2 className="font-mono text-xs uppercase tracking-widest text-fog">
-					Yang direncanakan untuk fase berikutnya
-				</h2>
-				{PLANNED.map((item) => {
+			<section className="grid gap-4 sm:grid-cols-2">
+				{OPTIONS.map((item) => {
 					const Icon = item.icon;
 					return (
-						<article
+						<Link
 							key={item.title}
-							className="flex flex-col gap-3 rounded-xl border border-dashed border-graphite/60 bg-charcoal/40 p-7 sm:flex-row sm:gap-5"
+							to={item.to}
+							className="group flex flex-col gap-4 rounded-xl border border-graphite bg-charcoal p-7 transition-colors hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 						>
-							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite/60 text-fog">
+							<span className="flex h-10 w-10 items-center justify-center rounded-lg border border-graphite bg-onyx text-snow">
 								<Icon size={20} aria-hidden />
 							</span>
-							<div>
-								<div className="flex flex-wrap items-center gap-2">
-									<h3 className="text-lg font-semibold text-mist">
-										{item.title}
-									</h3>
-									<span className="rounded-md border border-graphite bg-onyx px-2 py-0.5 font-mono text-[11px] text-fog">
-										Direncanakan
-									</span>
-								</div>
-								<p className="mt-1 text-sm leading-6 text-fog">
+							<span>
+								<span className="block text-lg font-semibold text-snow">
+									{item.title}
+								</span>
+								<span className="mt-1 block text-sm leading-6 text-fog">
 									{item.description}
-								</p>
-							</div>
-						</article>
+								</span>
+							</span>
+							<span className="inline-flex items-center gap-1 text-sm font-semibold text-snow">
+								Mulai
+								<ArrowRight
+									size={16}
+									aria-hidden
+									className="transition-transform group-hover:translate-x-1"
+								/>
+							</span>
+						</Link>
 					);
 				})}
-			</section>
-
-			<section className="flex flex-col gap-3 rounded-xl border border-graphite bg-charcoal p-7">
-				<h2 className="font-mono text-xs uppercase tracking-widest text-fog">
-					Yang bisa kamu pakai sekarang
-				</h2>
-				<Link
-					to="/plan"
-					className="group flex items-center justify-between gap-4 rounded-lg border border-graphite bg-obsidian p-4 transition-colors hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					<span>
-						<span className="block text-base font-semibold text-snow">
-							VibePlan
-						</span>
-						<span className="mt-1 block text-sm text-fog">
-							Susun PRD 8 seksi, acceptance criteria, dan task dari ide produk
-							hari ini.
-						</span>
-					</span>
-					<ArrowRight
-						size={18}
-						aria-hidden
-						className="shrink-0 text-snow transition-transform group-hover:translate-x-1"
-					/>
-				</Link>
 			</section>
 		</main>
 	);

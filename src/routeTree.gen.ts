@@ -38,6 +38,8 @@ import { Route as CodebasesIndexRouteImport } from './routes/codebases/index'
 import { Route as CodebasesIdRouteImport } from './routes/codebases/$id'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
 import { Route as DesignIndexRouteImport } from './routes/design/index'
+import { Route as DesignScrapRouteImport } from './routes/design/scrap'
+import { Route as DesignStudioRouteImport } from './routes/design/studio'
 import { Route as KanbanIdRouteImport } from './routes/kanban/$id'
 import { Route as PlanIndexRouteImport } from './routes/plan/index'
 import { Route as PlanNewRouteImport } from './routes/plan/new'
@@ -67,9 +69,14 @@ import { Route as ApiPaymentsWebhookRouteImport } from './routes/api/payments/we
 import { Route as ApiProjectsIndexRouteImport } from './routes/api/projects/index'
 import { Route as ApiProjectsIdRouteImport } from './routes/api/projects/$id'
 import { Route as ApiScrapeAssetRouteImport } from './routes/api/scrape.asset'
+import { Route as ApiStudioGenerateRouteImport } from './routes/api/studio.generate'
 import { Route as ApiTaskProjectIdRouteImport } from './routes/api/task/$projectId'
 import { Route as ApiTaskGenerateRouteImport } from './routes/api/task/generate'
 import { Route as ApiUserPlanRouteImport } from './routes/api/user/plan'
+import { Route as DesignScrapIndexRouteImport } from './routes/design/scrap.index'
+import { Route as DesignScrapIdRouteImport } from './routes/design/scrap.$id'
+import { Route as DesignStudioIndexRouteImport } from './routes/design/studio.index'
+import { Route as DesignStudioIdRouteImport } from './routes/design/studio.$id'
 import { Route as PrdShareTokenRouteImport } from './routes/prd/share/$token'
 import { Route as ApiCodebasesCodebaseIdFeaturesRouteImport } from './routes/api/codebases/$codebaseId/features'
 import { Route as ApiCodebasesCodebaseIdSessionRouteImport } from './routes/api/codebases/$codebaseId/session'
@@ -243,6 +250,16 @@ const DesignIndexRoute = DesignIndexRouteImport.update({
   path: '/design/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DesignScrapRoute = DesignScrapRouteImport.update({
+  id: '/design/scrap',
+  path: '/design/scrap',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignStudioRoute = DesignStudioRouteImport.update({
+  id: '/design/studio',
+  path: '/design/studio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KanbanIdRoute = KanbanIdRouteImport.update({
   id: '/kanban/$id',
   path: '/kanban/$id',
@@ -388,6 +405,11 @@ const ApiScrapeAssetRoute = ApiScrapeAssetRouteImport.update({
   path: '/asset',
   getParentRoute: () => ApiScrapeRoute,
 } as any)
+const ApiStudioGenerateRoute = ApiStudioGenerateRouteImport.update({
+  id: '/api/studio/generate',
+  path: '/api/studio/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTaskProjectIdRoute = ApiTaskProjectIdRouteImport.update({
   id: '/api/task/$projectId',
   path: '/api/task/$projectId',
@@ -402,6 +424,26 @@ const ApiUserPlanRoute = ApiUserPlanRouteImport.update({
   id: '/api/user/plan',
   path: '/api/user/plan',
   getParentRoute: () => rootRouteImport,
+} as any)
+const DesignScrapIndexRoute = DesignScrapIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DesignScrapRoute,
+} as any)
+const DesignScrapIdRoute = DesignScrapIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => DesignScrapRoute,
+} as any)
+const DesignStudioIndexRoute = DesignStudioIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DesignStudioRoute,
+} as any)
+const DesignStudioIdRoute = DesignStudioIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => DesignStudioRoute,
 } as any)
 const PrdShareTokenRoute = PrdShareTokenRouteImport.update({
   id: '/prd/share/$token',
@@ -579,6 +621,8 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/design/scrap': typeof DesignScrapRouteWithChildren
+  '/design/studio': typeof DesignStudioRouteWithChildren
   '/kanban/$id': typeof KanbanIdRoute
   '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
@@ -609,12 +653,17 @@ export interface FileRoutesByFullPath {
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
   '/api/scrape/asset': typeof ApiScrapeAssetRoute
+  '/api/studio/generate': typeof ApiStudioGenerateRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
+  '/design/scrap/$id': typeof DesignScrapIdRoute
+  '/design/studio/$id': typeof DesignStudioIdRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
   '/api/codebases/': typeof ApiCodebasesIndexRoute
   '/api/projects/': typeof ApiProjectsIndexRoute
+  '/design/scrap/': typeof DesignScrapIndexRoute
+  '/design/studio/': typeof DesignStudioIndexRoute
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
@@ -696,12 +745,17 @@ export interface FileRoutesByTo {
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
   '/api/scrape/asset': typeof ApiScrapeAssetRoute
+  '/api/studio/generate': typeof ApiStudioGenerateRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
+  '/design/scrap/$id': typeof DesignScrapIdRoute
+  '/design/studio/$id': typeof DesignStudioIdRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
   '/api/codebases': typeof ApiCodebasesIndexRoute
   '/api/projects': typeof ApiProjectsIndexRoute
+  '/design/scrap': typeof DesignScrapIndexRoute
+  '/design/studio': typeof DesignStudioIndexRoute
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
@@ -757,6 +811,8 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/design/scrap': typeof DesignScrapRouteWithChildren
+  '/design/studio': typeof DesignStudioRouteWithChildren
   '/kanban/$id': typeof KanbanIdRoute
   '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
@@ -787,12 +843,17 @@ export interface FileRoutesById {
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
   '/api/scrape/asset': typeof ApiScrapeAssetRoute
+  '/api/studio/generate': typeof ApiStudioGenerateRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
+  '/design/scrap/$id': typeof DesignScrapIdRoute
+  '/design/studio/$id': typeof DesignStudioIdRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
   '/api/codebases/': typeof ApiCodebasesIndexRoute
   '/api/projects/': typeof ApiProjectsIndexRoute
+  '/design/scrap/': typeof DesignScrapIndexRoute
+  '/design/studio/': typeof DesignStudioIndexRoute
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
@@ -849,6 +910,8 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/codebases/$id'
     | '/demo/tanstack-query'
+    | '/design/scrap'
+    | '/design/studio'
     | '/kanban/$id'
     | '/plan/new'
     | '/prd/$id'
@@ -879,12 +942,17 @@ export interface FileRouteTypes {
     | '/api/payments/webhook'
     | '/api/projects/$id'
     | '/api/scrape/asset'
+    | '/api/studio/generate'
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
+    | '/design/scrap/$id'
+    | '/design/studio/$id'
     | '/prd/share/$token'
     | '/api/codebases/'
     | '/api/projects/'
+    | '/design/scrap/'
+    | '/design/studio/'
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
@@ -966,12 +1034,17 @@ export interface FileRouteTypes {
     | '/api/payments/webhook'
     | '/api/projects/$id'
     | '/api/scrape/asset'
+    | '/api/studio/generate'
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
+    | '/design/scrap/$id'
+    | '/design/studio/$id'
     | '/prd/share/$token'
     | '/api/codebases'
     | '/api/projects'
+    | '/design/scrap'
+    | '/design/studio'
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
@@ -1026,6 +1099,8 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/codebases/$id'
     | '/demo/tanstack-query'
+    | '/design/scrap'
+    | '/design/studio'
     | '/kanban/$id'
     | '/plan/new'
     | '/prd/$id'
@@ -1056,12 +1131,17 @@ export interface FileRouteTypes {
     | '/api/payments/webhook'
     | '/api/projects/$id'
     | '/api/scrape/asset'
+    | '/api/studio/generate'
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
+    | '/design/scrap/$id'
+    | '/design/studio/$id'
     | '/prd/share/$token'
     | '/api/codebases/'
     | '/api/projects/'
+    | '/design/scrap/'
+    | '/design/studio/'
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
@@ -1112,6 +1192,8 @@ export interface RootRouteChildren {
   AskIdRoute: typeof AskIdRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
+  DesignScrapRoute: typeof DesignScrapRouteWithChildren
+  DesignStudioRoute: typeof DesignStudioRouteWithChildren
   KanbanIdRoute: typeof KanbanIdRoute
   PlanNewRoute: typeof PlanNewRoute
   PrdIdRoute: typeof PrdIdRoute
@@ -1132,6 +1214,7 @@ export interface RootRouteChildren {
   ApiPaymentsCreateRoute: typeof ApiPaymentsCreateRoute
   ApiPaymentsWebhookRoute: typeof ApiPaymentsWebhookRoute
   ApiProjectsIdRoute: typeof ApiProjectsIdRouteWithChildren
+  ApiStudioGenerateRoute: typeof ApiStudioGenerateRoute
   ApiTaskProjectIdRoute: typeof ApiTaskProjectIdRoute
   ApiTaskGenerateRoute: typeof ApiTaskGenerateRoute
   ApiUserPlanRoute: typeof ApiUserPlanRoute
@@ -1355,6 +1438,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/design/scrap': {
+      id: '/design/scrap'
+      path: '/design/scrap'
+      fullPath: '/design/scrap'
+      preLoaderRoute: typeof DesignScrapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/studio': {
+      id: '/design/studio'
+      path: '/design/studio'
+      fullPath: '/design/studio'
+      preLoaderRoute: typeof DesignStudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kanban/$id': {
       id: '/kanban/$id'
       path: '/kanban/$id'
@@ -1558,6 +1655,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiScrapeAssetRouteImport
       parentRoute: typeof ApiScrapeRoute
     }
+    '/api/studio/generate': {
+      id: '/api/studio/generate'
+      path: '/api/studio/generate'
+      fullPath: '/api/studio/generate'
+      preLoaderRoute: typeof ApiStudioGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/task/$projectId': {
       id: '/api/task/$projectId'
       path: '/api/task/$projectId'
@@ -1578,6 +1682,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/user/plan'
       preLoaderRoute: typeof ApiUserPlanRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/design/scrap/': {
+      id: '/design/scrap/'
+      path: '/'
+      fullPath: '/design/scrap/'
+      preLoaderRoute: typeof DesignScrapIndexRouteImport
+      parentRoute: typeof DesignScrapRoute
+    }
+    '/design/scrap/$id': {
+      id: '/design/scrap/$id'
+      path: '/$id'
+      fullPath: '/design/scrap/$id'
+      preLoaderRoute: typeof DesignScrapIdRouteImport
+      parentRoute: typeof DesignScrapRoute
+    }
+    '/design/studio/': {
+      id: '/design/studio/'
+      path: '/'
+      fullPath: '/design/studio/'
+      preLoaderRoute: typeof DesignStudioIndexRouteImport
+      parentRoute: typeof DesignStudioRoute
+    }
+    '/design/studio/$id': {
+      id: '/design/studio/$id'
+      path: '/$id'
+      fullPath: '/design/studio/$id'
+      preLoaderRoute: typeof DesignStudioIdRouteImport
+      parentRoute: typeof DesignStudioRoute
     }
     '/prd/share/$token': {
       id: '/prd/share/$token'
@@ -1839,6 +1971,34 @@ const ApiScrapeRouteWithChildren = ApiScrapeRoute._addFileChildren(
   ApiScrapeRouteChildren,
 )
 
+interface DesignScrapRouteChildren {
+  DesignScrapIdRoute: typeof DesignScrapIdRoute
+  DesignScrapIndexRoute: typeof DesignScrapIndexRoute
+}
+
+const DesignScrapRouteChildren: DesignScrapRouteChildren = {
+  DesignScrapIdRoute: DesignScrapIdRoute,
+  DesignScrapIndexRoute: DesignScrapIndexRoute,
+}
+
+const DesignScrapRouteWithChildren = DesignScrapRoute._addFileChildren(
+  DesignScrapRouteChildren,
+)
+
+interface DesignStudioRouteChildren {
+  DesignStudioIdRoute: typeof DesignStudioIdRoute
+  DesignStudioIndexRoute: typeof DesignStudioIndexRoute
+}
+
+const DesignStudioRouteChildren: DesignStudioRouteChildren = {
+  DesignStudioIdRoute: DesignStudioIdRoute,
+  DesignStudioIndexRoute: DesignStudioIndexRoute,
+}
+
+const DesignStudioRouteWithChildren = DesignStudioRoute._addFileChildren(
+  DesignStudioRouteChildren,
+)
+
 interface ApiCodebasesCodebaseIdRouteChildren {
   ApiCodebasesCodebaseIdFeaturesRoute: typeof ApiCodebasesCodebaseIdFeaturesRoute
   ApiCodebasesCodebaseIdSessionRoute: typeof ApiCodebasesCodebaseIdSessionRoute
@@ -1925,6 +2085,8 @@ const rootRouteChildren: RootRouteChildren = {
   AskIdRoute: AskIdRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
+  DesignScrapRoute: DesignScrapRouteWithChildren,
+  DesignStudioRoute: DesignStudioRouteWithChildren,
   KanbanIdRoute: KanbanIdRoute,
   PlanNewRoute: PlanNewRoute,
   PrdIdRoute: PrdIdRoute,
@@ -1945,6 +2107,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPaymentsCreateRoute: ApiPaymentsCreateRoute,
   ApiPaymentsWebhookRoute: ApiPaymentsWebhookRoute,
   ApiProjectsIdRoute: ApiProjectsIdRouteWithChildren,
+  ApiStudioGenerateRoute: ApiStudioGenerateRoute,
   ApiTaskProjectIdRoute: ApiTaskProjectIdRoute,
   ApiTaskGenerateRoute: ApiTaskGenerateRoute,
   ApiUserPlanRoute: ApiUserPlanRoute,
