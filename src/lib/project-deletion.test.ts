@@ -81,7 +81,7 @@ describe("project deletion contract", () => {
 
 describe("read paths exclude tombstoned projects", () => {
 	const files = [
-		"src/routes/history.tsx",
+		"src/lib/history.ts",
 		"src/routes/prd/$id.tsx",
 		"src/routes/ac/$id.tsx",
 		"src/routes/task/$id.tsx",

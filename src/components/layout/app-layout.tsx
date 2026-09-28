@@ -1,12 +1,14 @@
 "use client";
 
 import { useLocation } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { HistoryDrawer } from "./history-drawer";
 import { Navbar } from "./navbar";
 import { SubscriptionBanner } from "./subscription-banner";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
 	const pathname = useLocation({ select: (l) => l.pathname });
+	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
 	// Hide navbar on auth pages and PRD index page (has its own back button)
 	// Show navbar everywhere except bare auth/minimal pages.
@@ -24,7 +26,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 		pathname.startsWith("/settings/") ||
 		pathname.startsWith("/admin/");
 
-	// Lock body scroll on workspace pages (Ask, PRD, AC, Task, Kanban)
+	// Lock body scroll on workspace pages (Ask, PRD, AC, Task, Kanban) and while
+	// the history drawer overlays the page. Both writers must stay in this one
+	// effect: two competing effects would each clear the lock on cleanup.
 	const isWorkspace =
 		pathname.startsWith("/ask/") ||
 		(pathname.startsWith("/prd/") && !pathname.startsWith("/prd/share/")) ||
@@ -32,8 +36,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 		pathname.startsWith("/task/") ||
 		pathname.startsWith("/kanban/");
 
+	const shouldLockScroll = isWorkspace || isDrawerOpen;
+
 	useEffect(() => {
-		if (isWorkspace) {
+		if (shouldLockScroll) {
 			document.body.style.overflow = "hidden";
 			document.body.style.overscrollBehavior = "contain";
 		} else {
@@ -44,11 +50,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 			document.body.style.overflow = "";
 			document.body.style.overscrollBehavior = "";
 		};
-	}, [isWorkspace]);
+	}, [shouldLockScroll]);
+
+	// The drawer is opened from the navbar, which persists across navigation.
+	// Without this it would stay open over the destination page. Comparing
+	// against the previous path also skips the redundant reset on first mount.
+	const previousPathname = useRef(pathname);
+	useEffect(() => {
+		if (previousPathname.current !== pathname) {
+			previousPathname.current = pathname;
+			setIsDrawerOpen(false);
+		}
+	}, [pathname]);
 
 	return (
 		<>
-			{!hideNavbar && <Navbar />}
+			{!hideNavbar && <Navbar onOpenDrawer={() => setIsDrawerOpen(true)} />}
 			<div
 				data-workspace-shell={isWorkspace ? "" : undefined}
 				className={
@@ -75,6 +92,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 				{!hideNavbar && <SubscriptionBanner />}
 				{children}
 			</div>
+
+			<HistoryDrawer
+				isOpen={isDrawerOpen}
+				onClose={() => setIsDrawerOpen(false)}
+			/>
 		</>
 	);
 }

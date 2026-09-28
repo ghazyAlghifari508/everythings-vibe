@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { DeleteProjectModal } from "@/components/prd/delete-project-modal";
 import { useUserPlan } from "@/hooks/use-user-plan";
 import { HISTORY_PAGE_SIZE } from "@/lib/constants";
-import { resolveHistoryUrl } from "@/lib/flow-progress";
+import { resolveHistoryUrl, parseHistoryHref } from "@/lib/flow-progress";
 import { filterHistory, paginate } from "@/lib/history-filter";
 import { saveSuppressAutoGen } from "@/lib/prompt-handoff";
 import type { HistoryItem } from "@/routes/history";
@@ -24,29 +24,6 @@ const STEP_BADGE: Record<string, { label: string; className: string }> = {
 	ac: { label: "AC", className: "bg-amber/15 text-amber" },
 	task: { label: "Task", className: "bg-violet/15 text-violet" },
 };
-
-// ponytail: parse concrete history href like "/ask/<uuid>" into typed TanStack route.
-// Link's `to` expects the pattern "/ask/$id" + params, not the concrete string.
-// Using `to={href as never}` would bypass typing and do a full reload; this keeps SPA.
-function parseHistoryHref(
-	href: string,
-):
-	| { to: "/ask/$id"; params: { id: string } }
-	| { to: "/prd/$id"; params: { id: string } }
-	| { to: "/ac/$id"; params: { id: string } }
-	| { to: "/task/$id"; params: { id: string } }
-	| { to: "/kanban/$id"; params: { id: string } }
-	| null {
-	const m = href.match(/^\/(ask|prd|ac|task|kanban)\/([^/]+)$/);
-	if (!m) return null;
-	const [, seg, id] = m;
-	if (seg === "ask") return { to: "/ask/$id", params: { id } };
-	if (seg === "prd") return { to: "/prd/$id", params: { id } };
-	if (seg === "ac") return { to: "/ac/$id", params: { id } };
-	if (seg === "task") return { to: "/task/$id", params: { id } };
-	if (seg === "kanban") return { to: "/kanban/$id", params: { id } };
-	return null;
-}
 
 export function HistoryPage({ items }: { items: HistoryItem[] }) {
 	// ponytail: shared TanStack Query hook — deduped across all components.

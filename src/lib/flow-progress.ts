@@ -104,3 +104,30 @@ export function resolveHistoryUrl(item: {
 	}
 	return stepToRoute(item.step, item.id);
 }
+
+/** A project workspace route, split into the typed shape `navigate` needs. */
+export type HistoryRouteTarget =
+	| { to: "/ask/$id"; params: { id: string } }
+	| { to: "/prd/$id"; params: { id: string } }
+	| { to: "/ac/$id"; params: { id: string } }
+	| { to: "/task/$id"; params: { id: string } }
+	| { to: "/kanban/$id"; params: { id: string } };
+
+/**
+ * Parse a concrete history href like "/ask/<uuid>" into a typed TanStack route.
+ * `Link`/`navigate` expect the pattern "/ask/$id" plus params, not the
+ * concrete string; handing them the raw href would need an unchecked cast and
+ * would degrade into a full page reload. Shared here so every surface that
+ * links to a history row (history cards, the drawer) resolves the same way.
+ */
+export function parseHistoryHref(href: string): HistoryRouteTarget | null {
+	const m = href.match(/^\/(ask|prd|ac|task|kanban)\/([^/]+)$/);
+	if (!m) return null;
+	const [, seg, id] = m;
+	if (seg === "ask") return { to: "/ask/$id", params: { id } };
+	if (seg === "prd") return { to: "/prd/$id", params: { id } };
+	if (seg === "ac") return { to: "/ac/$id", params: { id } };
+	if (seg === "task") return { to: "/task/$id", params: { id } };
+	if (seg === "kanban") return { to: "/kanban/$id", params: { id } };
+	return null;
+}
