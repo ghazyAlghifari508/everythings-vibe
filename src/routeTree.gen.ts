@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as BantuanRouteImport } from './routes/bantuan'
 import { Route as CodebasesRouteImport } from './routes/codebases'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as HistoryRouteImport } from './routes/history'
@@ -20,6 +21,7 @@ import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as AcIdRouteImport } from './routes/ac/$id'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
@@ -34,7 +36,10 @@ import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as CodebasesIndexRouteImport } from './routes/codebases/index'
 import { Route as CodebasesIdRouteImport } from './routes/codebases/$id'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
+import { Route as DesignIndexRouteImport } from './routes/design/index'
 import { Route as KanbanIdRouteImport } from './routes/kanban/$id'
+import { Route as PlanIndexRouteImport } from './routes/plan/index'
+import { Route as PlanNewRouteImport } from './routes/plan/new'
 import { Route as PrdIdRouteImport } from './routes/prd/$id'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsAccountRouteImport } from './routes/settings/account'
@@ -106,6 +111,11 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BantuanRoute = BantuanRouteImport.update({
+  id: '/bantuan',
+  path: '/bantuan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CodebasesRoute = CodebasesRouteImport.update({
   id: '/codebases',
   path: '/codebases',
@@ -144,6 +154,11 @@ const PricingRoute = PricingRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplatesRoute = TemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AcIdRoute = AcIdRouteImport.update({
@@ -216,9 +231,24 @@ const DemoTanstackQueryRoute = DemoTanstackQueryRouteImport.update({
   path: '/demo/tanstack-query',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DesignIndexRoute = DesignIndexRouteImport.update({
+  id: '/design/',
+  path: '/design/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KanbanIdRoute = KanbanIdRouteImport.update({
   id: '/kanban/$id',
   path: '/kanban/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlanIndexRoute = PlanIndexRouteImport.update({
+  id: '/plan/',
+  path: '/plan/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlanNewRoute = PlanNewRouteImport.update({
+  id: '/plan/new',
+  path: '/plan/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrdIdRoute = PrdIdRouteImport.update({
@@ -514,6 +544,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
+  '/bantuan': typeof BantuanRoute
   '/codebases': typeof CodebasesRouteWithChildren
   '/faq': typeof FaqRoute
   '/history': typeof HistoryRoute
@@ -522,6 +553,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/templates': typeof TemplatesRoute
   '/ac/$id': typeof AcIdRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/projects': typeof AdminProjectsRoute
@@ -535,6 +567,7 @@ export interface FileRoutesByFullPath {
   '/codebases/$id': typeof CodebasesIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/kanban/$id': typeof KanbanIdRoute
+  '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
   '/settings/account': typeof SettingsAccountRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
@@ -545,6 +578,8 @@ export interface FileRoutesByFullPath {
   '/task/$id': typeof TaskIdRoute
   '/admin/': typeof AdminIndexRoute
   '/codebases/': typeof CodebasesIndexRoute
+  '/design/': typeof DesignIndexRoute
+  '/plan/': typeof PlanIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/ac/generate': typeof ApiAcGenerateRoute
   '/api/ac/save': typeof ApiAcSaveRoute
@@ -596,12 +631,14 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/bantuan': typeof BantuanRoute
   '/faq': typeof FaqRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
   '/maintenance': typeof MaintenanceRoute
   '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
+  '/templates': typeof TemplatesRoute
   '/ac/$id': typeof AcIdRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/projects': typeof AdminProjectsRoute
@@ -615,6 +652,7 @@ export interface FileRoutesByTo {
   '/codebases/$id': typeof CodebasesIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/kanban/$id': typeof KanbanIdRoute
+  '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
   '/settings/account': typeof SettingsAccountRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
@@ -625,6 +663,8 @@ export interface FileRoutesByTo {
   '/task/$id': typeof TaskIdRoute
   '/admin': typeof AdminIndexRoute
   '/codebases': typeof CodebasesIndexRoute
+  '/design': typeof DesignIndexRoute
+  '/plan': typeof PlanIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/ac/generate': typeof ApiAcGenerateRoute
   '/api/ac/save': typeof ApiAcSaveRoute
@@ -678,6 +718,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
+  '/bantuan': typeof BantuanRoute
   '/codebases': typeof CodebasesRouteWithChildren
   '/faq': typeof FaqRoute
   '/history': typeof HistoryRoute
@@ -686,6 +727,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/templates': typeof TemplatesRoute
   '/ac/$id': typeof AcIdRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/projects': typeof AdminProjectsRoute
@@ -699,6 +741,7 @@ export interface FileRoutesById {
   '/codebases/$id': typeof CodebasesIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/kanban/$id': typeof KanbanIdRoute
+  '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
   '/settings/account': typeof SettingsAccountRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
@@ -709,6 +752,8 @@ export interface FileRoutesById {
   '/task/$id': typeof TaskIdRoute
   '/admin/': typeof AdminIndexRoute
   '/codebases/': typeof CodebasesIndexRoute
+  '/design/': typeof DesignIndexRoute
+  '/plan/': typeof PlanIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/ac/generate': typeof ApiAcGenerateRoute
   '/api/ac/save': typeof ApiAcSaveRoute
@@ -763,6 +808,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin'
+    | '/bantuan'
     | '/codebases'
     | '/faq'
     | '/history'
@@ -771,6 +817,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pricing'
     | '/settings'
+    | '/templates'
     | '/ac/$id'
     | '/admin/feedback'
     | '/admin/projects'
@@ -784,6 +831,7 @@ export interface FileRouteTypes {
     | '/codebases/$id'
     | '/demo/tanstack-query'
     | '/kanban/$id'
+    | '/plan/new'
     | '/prd/$id'
     | '/settings/account'
     | '/settings/api-keys'
@@ -794,6 +842,8 @@ export interface FileRouteTypes {
     | '/task/$id'
     | '/admin/'
     | '/codebases/'
+    | '/design/'
+    | '/plan/'
     | '/settings/'
     | '/api/ac/generate'
     | '/api/ac/save'
@@ -845,12 +895,14 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/bantuan'
     | '/faq'
     | '/history'
     | '/login'
     | '/maintenance'
     | '/onboarding'
     | '/pricing'
+    | '/templates'
     | '/ac/$id'
     | '/admin/feedback'
     | '/admin/projects'
@@ -864,6 +916,7 @@ export interface FileRouteTypes {
     | '/codebases/$id'
     | '/demo/tanstack-query'
     | '/kanban/$id'
+    | '/plan/new'
     | '/prd/$id'
     | '/settings/account'
     | '/settings/api-keys'
@@ -874,6 +927,8 @@ export interface FileRouteTypes {
     | '/task/$id'
     | '/admin'
     | '/codebases'
+    | '/design'
+    | '/plan'
     | '/settings'
     | '/api/ac/generate'
     | '/api/ac/save'
@@ -926,6 +981,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin'
+    | '/bantuan'
     | '/codebases'
     | '/faq'
     | '/history'
@@ -934,6 +990,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pricing'
     | '/settings'
+    | '/templates'
     | '/ac/$id'
     | '/admin/feedback'
     | '/admin/projects'
@@ -947,6 +1004,7 @@ export interface FileRouteTypes {
     | '/codebases/$id'
     | '/demo/tanstack-query'
     | '/kanban/$id'
+    | '/plan/new'
     | '/prd/$id'
     | '/settings/account'
     | '/settings/api-keys'
@@ -957,6 +1015,8 @@ export interface FileRouteTypes {
     | '/task/$id'
     | '/admin/'
     | '/codebases/'
+    | '/design/'
+    | '/plan/'
     | '/settings/'
     | '/api/ac/generate'
     | '/api/ac/save'
@@ -1010,6 +1070,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRouteWithChildren
+  BantuanRoute: typeof BantuanRoute
   CodebasesRoute: typeof CodebasesRouteWithChildren
   FaqRoute: typeof FaqRoute
   HistoryRoute: typeof HistoryRoute
@@ -1018,6 +1079,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   PricingRoute: typeof PricingRoute
   SettingsRoute: typeof SettingsRouteWithChildren
+  TemplatesRoute: typeof TemplatesRoute
   AcIdRoute: typeof AcIdRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiFeedbackRoute: typeof ApiFeedbackRoute
@@ -1026,8 +1088,11 @@ export interface RootRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
   KanbanIdRoute: typeof KanbanIdRoute
+  PlanNewRoute: typeof PlanNewRoute
   PrdIdRoute: typeof PrdIdRoute
   TaskIdRoute: typeof TaskIdRoute
+  DesignIndexRoute: typeof DesignIndexRoute
+  PlanIndexRoute: typeof PlanIndexRoute
   ApiAcGenerateRoute: typeof ApiAcGenerateRoute
   ApiAcSaveRoute: typeof ApiAcSaveRoute
   ApiAskOptionsRoute: typeof ApiAskOptionsRoute
@@ -1081,6 +1146,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bantuan': {
+      id: '/bantuan'
+      path: '/bantuan'
+      fullPath: '/bantuan'
+      preLoaderRoute: typeof BantuanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/codebases': {
@@ -1137,6 +1209,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates': {
+      id: '/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ac/$id': {
@@ -1237,11 +1316,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoTanstackQueryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/design/': {
+      id: '/design/'
+      path: '/design'
+      fullPath: '/design/'
+      preLoaderRoute: typeof DesignIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kanban/$id': {
       id: '/kanban/$id'
       path: '/kanban/$id'
       fullPath: '/kanban/$id'
       preLoaderRoute: typeof KanbanIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plan/': {
+      id: '/plan/'
+      path: '/plan'
+      fullPath: '/plan/'
+      preLoaderRoute: typeof PlanIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plan/new': {
+      id: '/plan/new'
+      path: '/plan/new'
+      fullPath: '/plan/new'
+      preLoaderRoute: typeof PlanNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/prd/$id': {
@@ -1756,6 +1856,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AdminRoute: AdminRouteWithChildren,
+  BantuanRoute: BantuanRoute,
   CodebasesRoute: CodebasesRouteWithChildren,
   FaqRoute: FaqRoute,
   HistoryRoute: HistoryRoute,
@@ -1764,6 +1865,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   PricingRoute: PricingRoute,
   SettingsRoute: SettingsRouteWithChildren,
+  TemplatesRoute: TemplatesRoute,
   AcIdRoute: AcIdRoute,
   ApiChatRoute: ApiChatRoute,
   ApiFeedbackRoute: ApiFeedbackRoute,
@@ -1772,8 +1874,11 @@ const rootRouteChildren: RootRouteChildren = {
   AuthCallbackRoute: AuthCallbackRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
   KanbanIdRoute: KanbanIdRoute,
+  PlanNewRoute: PlanNewRoute,
   PrdIdRoute: PrdIdRoute,
   TaskIdRoute: TaskIdRoute,
+  DesignIndexRoute: DesignIndexRoute,
+  PlanIndexRoute: PlanIndexRoute,
   ApiAcGenerateRoute: ApiAcGenerateRoute,
   ApiAcSaveRoute: ApiAcSaveRoute,
   ApiAskOptionsRoute: ApiAskOptionsRoute,

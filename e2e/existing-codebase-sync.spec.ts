@@ -35,7 +35,7 @@ test.describe("Existing Codebase Sync Flow", () => {
 	test("UI: Home page defaults to greenfield mode and toggles to existing codebase", async ({
 		page,
 	}) => {
-		await page.goto("/");
+		await page.goto("/plan/new");
 		await page.waitForLoadState("networkidle");
 
 		// Verify title
@@ -86,7 +86,7 @@ test.describe("Existing Codebase Sync Flow", () => {
 	test("UI: Switching mode clears user prompt and shows codebase feature templates", async ({
 		page,
 	}) => {
-		await page.goto("/");
+		await page.goto("/plan/new");
 		await page.waitForLoadState("networkidle");
 
 		const greenfieldBtn = page.getByRole("button", { name: /produk baru/i });
