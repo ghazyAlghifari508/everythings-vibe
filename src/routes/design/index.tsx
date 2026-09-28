@@ -9,7 +9,7 @@ export const Route = createFileRoute("/design/")({
 			{
 				name: "description",
 				content:
-					"Modul perancangan antarmuka VibeDesign..fitur scraping dan Prompt UI Studio direncanakan untuk fase berikutnya.",
+					"Modul perancangan antarmuka VibeDesign. Fitur scraping dan Prompt UI Studio direncanakan untuk fase berikutnya.",
 			},
 		],
 	}),
@@ -59,9 +59,9 @@ function DesignPage() {
 					return (
 						<article
 							key={item.title}
-							className="flex flex-col gap-3 rounded-xl border border-graphite bg-charcoal p-7 sm:flex-row sm:gap-5"
+							className="flex flex-col gap-3 rounded-xl border border-dashed border-graphite/60 bg-charcoal/40 p-7 sm:flex-row sm:gap-5"
 						>
-							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
+							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite/60 text-fog">
 								<Icon size={20} aria-hidden />
 							</span>
 							<div>

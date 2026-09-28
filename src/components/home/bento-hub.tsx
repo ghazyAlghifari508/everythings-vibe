@@ -8,8 +8,10 @@ import {
 	type LucideIcon,
 } from "lucide-react";
 
+type HubDestination = "/plan" | "/design" | "/templates" | "/bantuan";
+
 interface HubCard {
-	readonly to: string;
+	readonly to: HubDestination;
 	readonly title: string;
 	readonly icon: LucideIcon;
 	readonly description: React.ReactNode;
@@ -53,7 +55,7 @@ const CARDS: readonly HubCard[] = [
 		icon: CircleQuestionMark,
 		description:
 			"Pusat bantuan pengguna, pelaporan bug kendala teknis, dan feedback langsung ke antarmuka admin menggunakan formulir bawaan VibeEverything.",
-		tags: ["Feedback & Bug Report", "Admin Sync (/admin/feedback)"],
+		tags: ["Feedback & Bug Report", "Triage Admin"],
 	},
 ];
 
@@ -65,7 +67,7 @@ export function BentoHub() {
 					<span aria-hidden className="h-1.5 w-1.5 rounded-full bg-indigo" />
 					VibeEverything Developer Console
 				</span>
-				<h1 className="text-4xl font-semibold tracking-tight text-snow md:text-5xl">
+				<h1 className="text-4xl font-bold tracking-tight text-snow sm:text-5xl lg:text-6xl">
 					Mau ngapain hari ini?
 				</h1>
 				<p className="mt-3 text-sm leading-6 text-fog md:text-base">
@@ -88,7 +90,7 @@ function HubCardLink({ card }: { card: HubCard }) {
 	return (
 		<Link
 			to={card.to}
-			className="group flex flex-col rounded-xl border border-graphite bg-charcoal p-7 transition-colors hover:border-steel hover:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+			className="group flex flex-col rounded-xl border border-graphite bg-charcoal p-7 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 		>
 			<div className="mb-4 flex items-start justify-between gap-4">
 				<span className="flex h-10 w-10 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow transition-colors group-hover:border-steel">

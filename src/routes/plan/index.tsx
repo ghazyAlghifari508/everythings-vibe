@@ -37,7 +37,7 @@ const OPTIONS = [
 	},
 ] as const;
 
-function PlanOptionsPage() {
+export function PlanOptionsPage() {
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
 			<HubBreadcrumb current="VibePlan" />
@@ -59,7 +59,7 @@ function PlanOptionsPage() {
 						<Link
 							key={option.to}
 							to={option.to}
-							className="group flex flex-col justify-between rounded-xl border border-graphite bg-charcoal p-8 transition-colors hover:border-steel hover:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							className="group flex flex-col justify-between rounded-xl border border-graphite bg-charcoal p-8 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 						>
 							<div>
 								<span className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow">

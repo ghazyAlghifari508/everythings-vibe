@@ -18,10 +18,8 @@ export const Route = createFileRoute("/bantuan")({
 	component: BantuanPage,
 });
 
-function BantuanPage() {
-	// Same client-side label gate the navbar uses. The real authorization lives
-	// in the /admin parent route, so this only decides what to show, never what
-	// to allow.
+export function BantuanPage() {
+	// Display-only gate mirroring navbar.tsx; /admin's beforeLoad is the real authorization.
 	const { data: session } = authClient.useSession();
 	const canTriage = Boolean(session?.user && isAdmin(session.user));
 
@@ -42,7 +40,7 @@ function BantuanPage() {
 			<section className="flex flex-col gap-3">
 				<Link
 					to="/faq"
-					className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					<span className="flex items-start gap-4">
 						<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
@@ -67,7 +65,7 @@ function BantuanPage() {
 
 				<Link
 					to="/settings/feedback"
-					className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					<span className="flex items-start gap-4">
 						<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
@@ -93,7 +91,7 @@ function BantuanPage() {
 				{canTriage && (
 					<Link
 						to="/admin/feedback"
-						className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
 						<span className="flex items-start gap-4">
 							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">

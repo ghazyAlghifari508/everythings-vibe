@@ -83,12 +83,19 @@ describe("BentoHub", () => {
 		).toBe("/bantuan");
 	});
 
-	// A card rendered as a div with an onClick handler has no implicit link
-	// role, no href, and is unreachable by keyboard. Counting roles instead of
-	// titles is what catches a regression back to that pattern.
+	// A div with an onClick has no implicit link role, so this count catches that regression.
 	it("renders exactly four real links so no card is a click-only div", () => {
 		render(<BentoHub />);
 
 		expect(screen.getAllByRole("link")).toHaveLength(4);
+	});
+
+	// Sorting before comparing would let a reordered CARDS array pass, so assert DOM sequence.
+	it("orders the cards as VibePlan, VibeDesign, VibeTemplate, VibeBantuan", () => {
+		render(<BentoHub />);
+
+		expect(
+			screen.getAllByRole("link").map((link) => link.getAttribute("href")),
+		).toEqual(["/plan", "/design", "/templates", "/bantuan"]);
 	});
 });

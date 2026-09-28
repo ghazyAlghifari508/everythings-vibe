@@ -65,9 +65,9 @@ function TemplatesPage() {
 						return (
 							<article
 								key={item.title}
-								className="flex flex-col gap-3 rounded-xl border border-graphite bg-charcoal p-6"
+								className="flex flex-col gap-3 rounded-xl border border-dashed border-graphite/60 bg-charcoal/40 p-6"
 							>
-								<span className="flex h-10 w-10 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
+								<span className="flex h-10 w-10 items-center justify-center rounded-lg border border-graphite/60 text-fog">
 									<Icon size={20} aria-hidden />
 								</span>
 								<div>

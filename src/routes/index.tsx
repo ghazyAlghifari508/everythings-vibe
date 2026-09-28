@@ -19,11 +19,11 @@ export const Route = createFileRoute("/")({
 function HomePage() {
 	return (
 		<main
-			className="relative flex flex-col"
+			className="relative flex min-h-[calc(100vh-3.5rem)] flex-col"
 			style={{ background: "var(--bg-page)" }}
 		>
 			<GridBackground />
-			<div className="relative z-10 flex flex-1 flex-col items-center pt-14 sm:pt-20">
+			<div className="relative z-10 flex flex-1 flex-col items-center pt-8 sm:pt-16">
 				<BentoHub />
 			</div>
 		</main>
