@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Clock, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { authClient } from "@/lib/auth-client";
 import { APP_TIME_ZONE } from "@/lib/constants";
 import { parseHistoryHref, resolveHistoryUrl } from "@/lib/flow-progress";
 import { type HistoryItem, loadHistory } from "@/lib/history";
@@ -71,6 +72,25 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const RELATIVE_WINDOW_MS = 7 * DAY_MS;
+
+/** Key segment for a drawer opened before any session has resolved. */
+const ANONYMOUS_VIEWER = "anonymous";
+
+/**
+ * Why the history read failed, in the terms the user can act on. A retry only
+ * helps a transport/server failure: a lost session needs a sign-in, and a
+ * blocked account needs an admin. Matches the `"Unauthorized"` / `"Forbidden"`
+ * that `requireUser` throws, the same way every guarded route in this app
+ * detects them.
+ */
+type HistoryFailure = "session" | "blocked" | "server";
+
+function classifyHistoryFailure(error: unknown): HistoryFailure {
+	if (!(error instanceof Error)) return "server";
+	if (error.message === "Unauthorized") return "session";
+	if (error.message === "Forbidden") return "blocked";
+	return "server";
+}
 
 export function toDrawerItems(items: WireHistoryItem[]): DrawerHistoryItem[] {
 	return items.map((item) => ({
@@ -165,11 +185,17 @@ export function HistoryDrawer({ isOpen, onClose, override }: HistoryDrawerProps)
 	const [query, setQuery] = useState("");
 	const [category, setCategory] = useState<CategoryFilter>("all");
 	const navigate = useNavigate();
+	const { data: session } = authClient.useSession();
+
+	// Scope the cache to the signed-in user. This client cache outlives
+	// signOut(), so a global key would hand the next session on this tab the
+	// previous user's project names and AI summaries.
+	const viewerId = session?.user?.id ?? ANONYMOUS_VIEWER;
 
 	// `enabled: isOpen` is what keeps the history query off every unrelated
 	// page view; the override path must not fetch either.
 	const historyQuery = useQuery({
-		queryKey: ["drawer-history"],
+		queryKey: ["drawer-history", viewerId],
 		queryFn: () => loadHistory(),
 		enabled: isOpen && !override,
 		staleTime: 30_000,
@@ -186,7 +212,15 @@ export function HistoryDrawer({ isOpen, onClose, override }: HistoryDrawerProps)
 	const loading = override
 		? (override.isLoading ?? false)
 		: isOpen && historyQuery.isLoading;
-	const failed = !override && historyQuery.isError;
+	// `isError` alone also goes true when a background refetch fails over rows
+	// that already loaded. Replacing that list with the error panel made one
+	// panel assert three contradictory things at once, so the failure state is
+	// gated on the absence of data.
+	const failed =
+		!override && historyQuery.isError && historyQuery.data === undefined;
+	const staleAfterFailure =
+		!override && historyQuery.isError && historyQuery.data !== undefined;
+	const failure = failed ? classifyHistoryFailure(historyQuery.error) : null;
 
 	const visibleItems = useMemo(() => {
 		const term = query.trim().toLowerCase();
@@ -200,7 +234,7 @@ export function HistoryDrawer({ isOpen, onClose, override }: HistoryDrawerProps)
 	const openItem = (item: DrawerHistoryItem) => {
 		const target = parseHistoryHref(item.url);
 		onClose();
-		if (target) navigate({ to: target.to, params: target.params });
+		if (target) navigate(target);
 	};
 
 	const emptyMessage =
@@ -301,21 +335,49 @@ export function HistoryDrawer({ isOpen, onClose, override }: HistoryDrawerProps)
 						</div>
 
 						<div className="custom-scrollbar flex flex-1 flex-col gap-2.5 overflow-y-auto p-4">
+							{staleAfterFailure && (
+								<p className="border-b border-graphite/60 pb-2 text-[11px] leading-relaxed text-fog">
+									Menampilkan data tersimpan. Pembaruan dari server gagal.
+								</p>
+							)}
 							{failed ? (
 								<div className="flex flex-col items-center gap-3 px-2 py-8 text-center">
-									<p className="text-[11px] leading-relaxed text-crimson">
-										Gagal memuat riwayat. Periksa koneksi lalu coba lagi.
-									</p>
-									<button
-										type="button"
-										onClick={() => {
-											void historyQuery.refetch();
-										}}
-										disabled={historyQuery.isFetching}
-										className="rounded-md border border-graphite bg-charcoal/40 px-3 py-1.5 text-[11px] text-snow transition-colors hover:border-steel hover:bg-charcoal/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-40"
-									>
-										{historyQuery.isFetching ? "Memuat..." : "Coba lagi"}
-									</button>
+									{failure === "session" ? (
+										<>
+											<p className="text-[11px] leading-relaxed text-fog">
+												Sesi kamu sudah berakhir, jadi riwayat tidak bisa dimuat. Masuk
+												untuk melanjutkan.
+											</p>
+											<Link
+												to="/login"
+												onClick={onClose}
+												className="rounded-md border border-graphite bg-charcoal/40 px-3 py-1.5 text-[11px] text-snow transition-colors hover:border-steel hover:bg-charcoal/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											>
+												Masuk
+											</Link>
+										</>
+									) : failure === "blocked" ? (
+										<p className="text-[11px] leading-relaxed text-fog">
+											Akun kamu diblokir, jadi riwayat tidak bisa diakses. Hubungi
+											admin untuk membuka akses.
+										</p>
+									) : (
+										<>
+											<p className="text-[11px] leading-relaxed text-crimson">
+												Gagal memuat riwayat dari server. Coba lagi.
+											</p>
+											<button
+												type="button"
+												onClick={() => {
+													void historyQuery.refetch();
+												}}
+												disabled={historyQuery.isFetching}
+												className="rounded-md border border-graphite bg-charcoal/40 px-3 py-1.5 text-[11px] text-snow transition-colors hover:border-steel hover:bg-charcoal/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-40"
+											>
+												{historyQuery.isFetching ? "Memuat..." : "Coba lagi"}
+											</button>
+										</>
+									)}
 								</div>
 							) : loading ? (
 								<p className="px-1 py-6 text-center text-[11px] text-fog">
@@ -359,7 +421,9 @@ export function HistoryDrawer({ isOpen, onClose, override }: HistoryDrawerProps)
 
 						<footer className="flex shrink-0 items-center justify-between border-t border-graphite bg-onyx/40 px-4 py-3">
 							<span className="font-mono text-[11px] text-fog">
-								{visibleItems.length} ditampilkan
+								{failed
+									? "Riwayat tidak ditampilkan"
+									: `${visibleItems.length} ditampilkan`}
 							</span>
 							<Link
 								to="/history"

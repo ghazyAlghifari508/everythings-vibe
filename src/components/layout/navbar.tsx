@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
 	Link,
 	useLocation,
@@ -30,12 +31,13 @@ import { isAdmin } from "@/lib/session";
 import { useChatStore, useUIStore } from "@/store";
 import { FlowStepNav, getFlowStepCta, routeToStep } from "./flow-step-nav";
 
-export function Navbar({ onOpenDrawer }: { onOpenDrawer?: () => void } = {}) {
+export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	const { data: session, isPending: isLoading } = authClient.useSession();
 	const user =
 		session?.user?.id && session.user.email
 			? { id: session.user.id, email: session.user.email }
 			: null;
+	const queryClient = useQueryClient();
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 	const [isStepLoading, setIsStepLoading] = useState(false);
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -157,6 +159,11 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer?: () => void } = {}) {
 	const handleLogout = async () => {
 		try {
 			await authClient.signOut();
+			// The QueryClient is created once per router instance and survives
+			// client-side navigation, so signing out does not dispose of it.
+			// Every cached query here is user-scoped, so without this clear the
+			// next person to sign in on this tab can read the previous user's rows.
+			queryClient.clear();
 			navigate({ to: "/login" });
 			router.invalidate();
 		} catch (err) {
@@ -181,15 +188,20 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer?: () => void } = {}) {
 							<Menu size={16} />
 						</button>
 					)}
-					<button
-						type="button"
-						onClick={onOpenDrawer}
-						className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-graphite/60 bg-transparent text-fog transition-colors hover:border-steel hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						aria-label="Riwayat"
-						title="Riwayat Proyek"
-					>
-						<Menu size={16} />
-					</button>
+					{/* History is a signed-in read: loadHistory rejects a visitor with
+					    no session, so offering the trigger would only produce an error
+					    panel whose retry can never succeed. */}
+					{user && (
+						<button
+							type="button"
+							onClick={onOpenDrawer}
+							className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-graphite/60 bg-transparent text-fog transition-colors hover:border-steel hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							aria-label="Riwayat"
+							title="Riwayat Proyek"
+						>
+							<Menu size={16} />
+						</button>
+					)}
 					<Logo height={28} />
 				</div>
 

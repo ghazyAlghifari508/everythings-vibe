@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 import { readFile } from "node:fs/promises";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUIStore } from "@/store";
 import { Navbar } from "./navbar";
@@ -33,13 +40,20 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
+const sessionState = vi.hoisted(() => ({
+	user: { id: "user-1", email: "user@test.com" } as {
+		id: string;
+		email: string;
+	} | null,
+}));
+
 vi.mock("@/lib/auth-client", () => ({
 	authClient: {
 		useSession: () => ({
-			data: { user: { id: "user-1", email: "user@test.com" } },
+			data: sessionState.user ? { user: sessionState.user } : null,
 			isPending: false,
 		}),
-		signOut: vi.fn(),
+		signOut: vi.fn(async () => {}),
 	},
 }));
 
@@ -65,15 +79,39 @@ vi.mock("@/components/ui/theme-toggle", () => ({
 	ThemeToggle: () => null,
 }));
 
+let queryClient: QueryClient;
+
+/**
+ * Production mounts the Navbar inside `Providers`, which owns the
+ * QueryClientProvider. The render helper reproduces that so `useQueryClient`
+ * resolves exactly as it does in the running app.
+ */
+function renderNavbar() {
+	return render(
+		<QueryClientProvider client={queryClient}>
+			<Navbar onOpenDrawer={() => {}} />
+		</QueryClientProvider>,
+	);
+}
+
+function openUserMenu() {
+	fireEvent.click(screen.getByRole("button", { name: "User menu" }));
+}
+
 beforeEach(() => {
 	mockPathname = "/prd/test-project-1";
 	mockPlanData.plan = "free";
 	mockPlanData.topUpEligible = false;
+	sessionState.user = { id: "user-1", email: "user@test.com" };
+	queryClient = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
 	useUIStore.getState().closePaywallModal();
 });
 
 afterEach(() => {
 	cleanup();
+	queryClient.clear();
 	vi.restoreAllMocks();
 });
 
@@ -109,7 +147,7 @@ describe("Navbar TopUp Integration Contract", () => {
 describe("Navbar Paywall Integration Contract", () => {
 	it("triggers openPaywallModal('ac') when free user clicks Upgrade on PRD step", () => {
 		mockPathname = "/prd/test-project-1";
-		render(<Navbar />);
+		renderNavbar();
 
 		const upgradeButton = screen.getByRole("button", {
 			name: /Upgrade ke Pro/i,
@@ -136,7 +174,7 @@ describe("Navbar Paywall Integration Contract", () => {
 describe("Navbar Rebranding & Layout", () => {
 	it("renders VibeEverything logo and only Pricing navlink", () => {
 		mockPathname = "/";
-		render(<Navbar onOpenDrawer={() => {}} />);
+		renderNavbar();
 		expect(screen.getByText("VibeEverything")).toBeDefined();
 		expect(screen.getByRole("link", { name: /Pricing/i })).toBeDefined();
 		expect(screen.queryByRole("link", { name: /Home/i })).toBeNull();
@@ -147,8 +185,53 @@ describe("Navbar Rebranding & Layout", () => {
 	});
 
 	it("renders hamburger menu button for history drawer", () => {
-		render(<Navbar onOpenDrawer={() => {}} />);
+		renderNavbar();
 		const hamburger = screen.getByRole("button", { name: /^Riwayat$/i });
 		expect(hamburger).toBeDefined();
+	});
+});
+
+describe("Navbar session boundary", () => {
+	// A signed-out visitor can never load history, so the trigger must not be
+	// offered: it would only lead to an error panel with a dead "Coba lagi".
+	it("hides the history trigger when there is no session", () => {
+		sessionState.user = null;
+		mockPathname = "/";
+
+		renderNavbar();
+
+		expect(screen.queryByRole("button", { name: /^Riwayat$/i })).toBeNull();
+	});
+
+	it("offers the history trigger once a session exists", () => {
+		renderNavbar();
+		expect(screen.getByRole("button", { name: /^Riwayat$/i })).toBeDefined();
+	});
+
+	// The blocker: the QueryClient is created once per router instance and
+	// survives client-side navigation, so without an explicit clear() the next
+	// signed-in user can read the previous user's cached rows.
+	it("clears the user-scoped query cache on logout", async () => {
+		// The user dropdown only exists outside the workspace step routes.
+		mockPathname = "/";
+		queryClient.setQueryData(["drawer-history", "user-1"], {
+			items: [{ name: "Proyek Milik User Satu" }],
+		});
+		queryClient.setQueryData(["user-plan", "user-1"], { plan: "pro" });
+		expect(
+			queryClient.getQueryData(["drawer-history", "user-1"]),
+		).not.toBeUndefined();
+
+		renderNavbar();
+		openUserMenu();
+		fireEvent.click(screen.getByRole("button", { name: /Log Out/i }));
+
+		await waitFor(() => {
+			expect(
+				queryClient.getQueryData(["drawer-history", "user-1"]),
+			).toBeUndefined();
+		});
+		// The whole user-scoped cache goes, not just one hand-picked key.
+		expect(queryClient.getQueryData(["user-plan", "user-1"])).toBeUndefined();
 	});
 });

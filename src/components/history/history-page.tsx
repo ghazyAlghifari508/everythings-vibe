@@ -267,7 +267,7 @@ export function HistoryPage({ items }: { items: HistoryItem[] }) {
 									{link ? (
 										<Link
 											to={link.to}
-											params={link.params}
+											{...("params" in link ? { params: link.params } : {})}
 											onClick={handleClick}
 											className="flex min-w-0 flex-1 items-center gap-4"
 										>

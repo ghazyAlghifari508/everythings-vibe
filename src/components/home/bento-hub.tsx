@@ -31,23 +31,22 @@ const CARDS: readonly HubCard[] = [
 		to: "/design",
 		title: "VibeDesign",
 		icon: Sparkles,
-		description: (
-			<>
-				Rancang UI interaktif langsung lewat prompt teks, atau ekstrak website
-				live langsung menjadi 2 file:{" "}
-				<code className="font-mono text-mist">design.md</code> &amp;{" "}
-				<code className="font-mono text-mist">index.html</code>.
-			</>
-		),
-		tags: ["Scrap HTML & design.md", "Prompt UI Studio"],
+		description:
+			"Modul perancangan antarmuka: merancang antarmuka lewat prompt teks, atau ekstrak website live menjadi design.md dan index.html. Modul ini belum aktif.",
+		tags: ["Direncanakan", "Scrap HTML + design.md", "Prompt UI"],
 	},
 	{
 		to: "/templates",
 		title: "VibeTemplate",
 		icon: LayoutGrid,
 		description:
-			"Koleksi kerangka kerja teruji: preset spesifikasi planning, kit desain antarmuka, dan boilerplate proyek lengkap (Rumah Sakit, SaaS, E-Commerce).",
-		tags: ["Template Planning", "Template Design", "Boilerplate Projek"],
+			"Katalog kerangka kerja teruji: preset spesifikasi planning, kit desain antarmuka, dan boilerplate proyek lengkap. Katalognya belum ada di aplikasi ini.",
+		tags: [
+			"Direncanakan",
+			"Template Planning",
+			"Template Design",
+			"Boilerplate Projek",
+		],
 	},
 	{
 		to: "/bantuan",

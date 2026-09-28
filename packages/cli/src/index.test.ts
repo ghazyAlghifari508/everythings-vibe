@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -144,5 +144,19 @@ describe("CLI branding and commands", () => {
 		expect(codebase).toBeDefined();
 		const sync = codebase?.commands.find((c) => c.name() === "sync");
 		expect(sync).toBeDefined();
+	});
+
+	// `program.description()` is what `--help` prints, so it must name every
+	// command group the CLI actually registers. packages/cli/package.json:4 is
+	// the wording the approved plan dictated for exactly this string.
+	it("describes the codebases command group it registers", () => {
+		expect(program.description()).toContain("codebases");
+	});
+
+	it("keeps the --help description identical to the published package description", async () => {
+		const pkg = JSON.parse(
+			readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8"),
+		) as { description: string };
+		expect(program.description()).toBe(pkg.description);
 	});
 });

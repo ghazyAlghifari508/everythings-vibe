@@ -4,6 +4,7 @@ import {
 	isPrdLocked,
 	isTruncatedGeneration,
 	isValidHistoryUrl,
+	parseHistoryHref,
 	resolveHistoryUrl,
 	shouldMarkQuestionStep,
 	stepRank,
@@ -149,6 +150,64 @@ describe("isValidHistoryUrl", () => {
 		expect(isValidHistoryUrl("/ac/", id)).toBe(false);
 		expect(isValidHistoryUrl("/ac", id)).toBe(false);
 		expect(isValidHistoryUrl("javascript:alert(1)", id)).toBe(false);
+	});
+});
+
+describe("parseHistoryHref", () => {
+	const id = "fca689ff-e194-45eb-b6fa-0188cc327759";
+
+	it("splits every project-internal route into a typed target", () => {
+		expect(parseHistoryHref(`/ask/${id}`)).toEqual({
+			to: "/ask/$id",
+			params: { id },
+		});
+		expect(parseHistoryHref(`/prd/${id}`)).toEqual({
+			to: "/prd/$id",
+			params: { id },
+		});
+		expect(parseHistoryHref(`/ac/${id}`)).toEqual({
+			to: "/ac/$id",
+			params: { id },
+		});
+		expect(parseHistoryHref(`/task/${id}`)).toEqual({
+			to: "/task/$id",
+			params: { id },
+		});
+		expect(parseHistoryHref(`/kanban/${id}`)).toEqual({
+			to: "/kanban/$id",
+			params: { id },
+		});
+	});
+
+	// The drawer's openItem used to no-op on null, so any URL the allowlist
+	// permits but this parser cannot type became a dead click. Every value
+	// isValidHistoryUrl accepts must resolve here, or nowhere.
+	it("resolves the codebase list, the one non-project URL the allowlist permits", () => {
+		expect(parseHistoryHref("/codebases")).toEqual({ to: "/codebases" });
+	});
+
+	it("stays null for URLs outside the allowlist so callers can fall back safely", () => {
+		expect(parseHistoryHref("/history")).toBeNull();
+		expect(parseHistoryHref("/settings")).toBeNull();
+		expect(parseHistoryHref("/codebase/whatever")).toBeNull();
+		expect(parseHistoryHref("javascript:alert(1)")).toBeNull();
+		expect(parseHistoryHref("")).toBeNull();
+	});
+
+	// The property that makes the drawer dead-click impossible: this parser is
+	// total over the allowlist's accepted set.
+	it("is total over every URL isValidHistoryUrl accepts", () => {
+		for (const url of [
+			"/codebases",
+			`/ask/${id}`,
+			`/prd/${id}`,
+			`/ac/${id}`,
+			`/task/${id}`,
+			`/kanban/${id}`,
+		]) {
+			expect(isValidHistoryUrl(url, id)).toBe(true);
+			expect(parseHistoryHref(url)).not.toBeNull();
+		}
 	});
 });
 

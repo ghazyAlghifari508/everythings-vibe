@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -11,8 +12,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HistoryDrawer, toDrawerItems } from "./history-drawer";
 
+const navigateSpy = vi.hoisted(() => vi.fn());
+
 vi.mock("@tanstack/react-router", () => ({
-	useNavigate: () => vi.fn(),
+	useNavigate: () => navigateSpy,
 	Link: ({
 		children,
 		to,
@@ -34,6 +37,18 @@ vi.mock("@/lib/history", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@/lib/history")>();
 	return { ...actual, loadHistory: loadHistorySpy };
 });
+
+/** The session the drawer scopes its cache key to. Mirrors the userPlan hook. */
+const sessionState = vi.hoisted(() => ({ userId: "user-1" as string | null }));
+
+vi.mock("@/lib/auth-client", () => ({
+	authClient: {
+		useSession: () => ({
+			data: sessionState.userId ? { user: { id: sessionState.userId } } : null,
+			isPending: false,
+		}),
+	},
+}));
 
 const SIMRS_ID = "11111111-1111-4111-8111-111111111111";
 const AIRBNB_ID = "22222222-2222-4222-8222-222222222222";
@@ -63,7 +78,39 @@ const mockItems = [
 	},
 ];
 
+/** Wire shape the real server fn returns, unlike `mockItems` above. */
+const wireItems = [
+	{
+		id: SIMRS_ID,
+		name: "Proyek Milik User Satu",
+		step: "prd",
+		lastUrl: `/prd/${SIMRS_ID}`,
+		updatedAt: "2026-09-28T04:00:00.000Z",
+		preview: "Ringkasan AI milik user pertama.",
+		acStatus: null,
+		taskStatus: null,
+	},
+	{
+		id: AIRBNB_ID,
+		name: "Proyek Milik User Dua",
+		step: "ac",
+		lastUrl: `/ac/${AIRBNB_ID}`,
+		updatedAt: "2026-09-20T04:00:00.000Z",
+		preview: null,
+		acStatus: "completed",
+		taskStatus: null,
+	},
+];
+
 let queryClient: QueryClient;
+
+function renderOpenDrawer() {
+	return render(
+		<QueryClientProvider client={queryClient}>
+			<HistoryDrawer isOpen onClose={() => {}} />
+		</QueryClientProvider>,
+	);
+}
 
 function renderDrawer(props: Partial<React.ComponentProps<typeof HistoryDrawer>>) {
 	return render(
@@ -89,6 +136,8 @@ beforeEach(() => {
 		defaultOptions: { queries: { retry: false } },
 	});
 	loadHistorySpy.mockReset();
+	navigateSpy.mockReset();
+	sessionState.userId = "user-1";
 });
 
 afterEach(() => {
@@ -283,14 +332,12 @@ describe("HistoryDrawer global side effects", () => {
 });
 
 describe("HistoryDrawer query failure", () => {
+	// The failure fixture is a transport/server error, because that is the only
+	// class a retry can actually fix. An auth failure gets its own cases below.
 	it("reports the failure and retries instead of claiming there is no history", async () => {
-		loadHistorySpy.mockRejectedValue(new Error("Unauthorized"));
+		loadHistorySpy.mockRejectedValue(new Error("Failed to fetch"));
 
-		render(
-			<QueryClientProvider client={queryClient}>
-				<HistoryDrawer isOpen onClose={() => {}} />
-			</QueryClientProvider>,
-		);
+		renderOpenDrawer();
 
 		const retry = await screen.findByRole("button", { name: /Coba lagi/i });
 		expect(retry).toBeDefined();
@@ -305,6 +352,124 @@ describe("HistoryDrawer query failure", () => {
 			expect(loadHistorySpy).toHaveBeenCalledTimes(2);
 		});
 		await screen.findByText(/Belum ada riwayat projek/i);
+	});
+
+	it("does not blame the connection when the session is gone", async () => {
+		loadHistorySpy.mockRejectedValue(new Error("Unauthorized"));
+
+		renderOpenDrawer();
+
+		const signIn = await screen.findByRole("link", { name: /Masuk/i });
+		expect(signIn.getAttribute("href")).toBe("/login");
+		expect(screen.queryByText(/Periksa koneksi/i)).toBeNull();
+		// A retry can never succeed once the session is gone.
+		expect(screen.queryByRole("button", { name: /Coba lagi/i })).toBeNull();
+	});
+
+	it("does not offer a retry when the account is blocked", async () => {
+		loadHistorySpy.mockRejectedValue(new Error("Forbidden"));
+
+		renderOpenDrawer();
+
+		await screen.findByText(/diblokir/i);
+		expect(screen.queryByRole("button", { name: /Coba lagi/i })).toBeNull();
+	});
+
+	// The three contradictory statements F6 reported: an error panel drawn over
+	// a loaded list, a "—" item badge, and a footer still reporting the real count.
+	it("keeps the loaded list when a background refetch fails afterwards", async () => {
+		loadHistorySpy.mockResolvedValue({ items: wireItems });
+		renderOpenDrawer();
+		await screen.findByText("Proyek Milik User Satu");
+
+		loadHistorySpy.mockRejectedValue(new Error("Failed to fetch"));
+		await act(async () => {
+			await queryClient.refetchQueries();
+		});
+
+		// The notice lands with the observer notification that follows the
+		// refetch, so wait for it rather than assuming a synchronous re-render.
+		await screen.findByText(/data tersimpan/i);
+		expect(screen.getByText("Proyek Milik User Satu")).toBeDefined();
+		expect(screen.getByText("2 Item")).toBeDefined();
+		expect(screen.getByText("2 ditampilkan")).toBeDefined();
+		expect(screen.queryByRole("button", { name: /Coba lagi/i })).toBeNull();
+		// The loaded rows must not be replaced by the failure panel.
+		expect(screen.queryByText(/Gagal memuat riwayat/i)).toBeNull();
+	});
+
+	it("does not report a row count while the very first load has failed", async () => {
+		loadHistorySpy.mockRejectedValue(new Error("Failed to fetch"));
+		renderOpenDrawer();
+
+		await screen.findByRole("button", { name: /Coba lagi/i });
+
+		expect(screen.queryByText(/0 ditampilkan/i)).toBeNull();
+		expect(screen.getByText("—")).toBeDefined();
+	});
+});
+
+describe("HistoryDrawer session scoping", () => {
+	// The query cache outlives signOut, so a global key would let the next
+	// signed-in user read the previous user's cached rows.
+	it("keeps each session's history under its own cache key", async () => {
+		loadHistorySpy.mockResolvedValue({ items: wireItems });
+
+		const { rerender } = renderOpenDrawer();
+		await screen.findByText("Proyek Milik User Satu");
+
+		expect(
+			queryClient.getQueryData(["drawer-history", "user-1"]),
+		).not.toBeUndefined();
+
+		sessionState.userId = "user-2";
+		loadHistorySpy.mockResolvedValue({
+			items: [
+				{
+					...wireItems[0],
+					id: "33333333-3333-4333-8333-333333333333",
+					name: "Proyek Milik User Dua",
+				},
+			],
+		});
+		rerender(
+			<QueryClientProvider client={queryClient}>
+				<HistoryDrawer isOpen onClose={() => {}} />
+			</QueryClientProvider>,
+		);
+
+		await screen.findByText("Proyek Milik User Dua");
+		expect(screen.queryByText("Proyek Milik User Satu")).toBeNull();
+		expect(
+			queryClient.getQueryData(["drawer-history", "user-2"]),
+		).not.toBeUndefined();
+	});
+});
+
+describe("HistoryDrawer item navigation", () => {
+	it("navigates a parsed project route through the router", async () => {
+		renderDrawer({ override: { items: [mockItems[0]] } });
+
+		fireEvent.click(screen.getByText("E-Commerce SIMRS"));
+
+		expect(navigateSpy).toHaveBeenCalledWith({
+			to: "/prd/$id",
+			params: { id: SIMRS_ID },
+		});
+	});
+
+	// F8: the allowlist permits lastUrl = "/codebases", but parseHistoryHref
+	// returned null for it, so the drawer closed and did nothing at all.
+	it("navigates the codebase list instead of silently doing nothing", () => {
+		renderDrawer({
+			override: {
+				items: [{ ...mockItems[0], url: "/codebases", name: "Basis Kode" }],
+			},
+		});
+
+		fireEvent.click(screen.getByText("Basis Kode"));
+
+		expect(navigateSpy).toHaveBeenCalledWith({ to: "/codebases" });
 	});
 });
 
@@ -387,3 +552,6 @@ describe("toDrawerItems", () => {
 		expect(items[1].url).toBe(`/task/${AIRBNB_ID}`);
 	});
 });
+
+
+

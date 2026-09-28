@@ -35,7 +35,9 @@ export const program = new Command();
 
 program
 	.name("vibeeverything")
-	.description("CLI tool for VibeEverything — manage projects and tasks from terminal")
+	.description(
+		"CLI tool for VibeEverything — manage projects, codebases, and tasks from terminal",
+	)
 	.version(CLI_VERSION);
 
 // vibeeverything login

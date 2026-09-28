@@ -111,16 +111,23 @@ export type HistoryRouteTarget =
 	| { to: "/prd/$id"; params: { id: string } }
 	| { to: "/ac/$id"; params: { id: string } }
 	| { to: "/task/$id"; params: { id: string } }
-	| { to: "/kanban/$id"; params: { id: string } };
+	| { to: "/kanban/$id"; params: { id: string } }
+	| { to: "/codebases" };
 
 /**
- * Parse a concrete history href like "/ask/<uuid>" into a typed TanStack route.
+ * Parse a concrete history href into a typed TanStack route.
  * `Link`/`navigate` expect the pattern "/ask/$id" plus params, not the
  * concrete string; handing them the raw href would need an unchecked cast and
  * would degrade into a full page reload. Shared here so every surface that
  * links to a history row (history cards, the drawer) resolves the same way.
+ *
+ * Total over the set `isValidHistoryUrl` accepts: every href that can reach
+ * history is either a project route below or the codebase list, which is the
+ * one non-project URL the allowlist permits. A caller may therefore treat a
+ * null result as "not a history URL at all" instead of a dead navigation.
  */
 export function parseHistoryHref(href: string): HistoryRouteTarget | null {
+	if (href === CODEBASES_LIST_URL) return { to: "/codebases" };
 	const m = href.match(/^\/(ask|prd|ac|task|kanban)\/([^/]+)$/);
 	if (!m) return null;
 	const [, seg, id] = m;

@@ -1,8 +1,8 @@
-import { createHash, randomBytes } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { db } from "@/db";
 import { apiKeys } from "@/db/schema";
+import { mintApiKey } from "@/lib/api-key-mint";
 import { requireUser } from "@/lib/session";
 
 const ALL_SCOPES = [
@@ -21,9 +21,7 @@ export const Route = createFileRoute("/api/settings/api-keys/auto")({
 				// return an old one; keeping previous keys avoids 401 for in-flight agents.
 				// ponytail: auto-keys accumulate per click; cleanup by expiry if this grows.
 
-				const rawKey = `prdfy_${randomBytes(32).toString("hex")}`;
-				const keyHash = createHash("sha256").update(rawKey).digest("hex");
-				const keyPrefix = rawKey.slice(0, 10);
+				const { rawKey, keyHash, keyPrefix } = mintApiKey();
 
 				const [inserted] = await db
 					.insert(apiKeys)

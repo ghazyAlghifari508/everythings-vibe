@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BentoHub } from "./bento-hub";
 
@@ -97,5 +97,49 @@ describe("BentoHub", () => {
 		expect(
 			screen.getAllByRole("link").map((link) => link.getAttribute("href")),
 		).toEqual(["/plan", "/design", "/templates", "/bantuan"]);
+	});
+});
+
+// A card must not advertise a capability its own destination page denies.
+describe("BentoHub copy vs destination reality", () => {
+	function card(title: string): HTMLElement {
+		return screen.getByRole("link", { name: new RegExp(title) });
+	}
+
+	it("marks the modules that do not work yet as planned", () => {
+		render(<BentoHub />);
+
+		for (const title of ["VibeDesign", "VibeTemplate"]) {
+			expect(within(card(title)).getByText("Direncanakan")).toBeDefined();
+		}
+		// The two modules that do work must not carry the badge.
+		for (const title of ["VibePlan", "VibeBantuan"]) {
+			expect(within(card(title)).queryByText("Direncanakan")).toBeNull();
+		}
+	});
+
+	it("states on the VibeDesign card that the module is not active", () => {
+		render(<BentoHub />);
+
+		expect(within(card("VibeDesign")).getByText(/belum aktif/i)).toBeDefined();
+	});
+
+	it("states on the VibeTemplate card that there is no catalog", () => {
+		render(<BentoHub />);
+
+		expect(
+			within(card("VibeTemplate")).getByText(/belum ada di aplikasi ini/i),
+		).toBeDefined();
+	});
+
+	it("still states the purpose of each planned module", () => {
+		render(<BentoHub />);
+
+		expect(
+			within(card("VibeDesign")).getByText(/merancang antarmuka/i),
+		).toBeDefined();
+		expect(
+			within(card("VibeTemplate")).getByText(/kerangka kerja/i),
+		).toBeDefined();
 	});
 });
