@@ -3,6 +3,7 @@ import { getRequestHeaders } from "@tanstack/react-start/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
+import { EXPORT_FILENAME_PREFIX } from "@/lib/constants";
 import { getLatestAcMarkdown } from "@/lib/services/ac-service";
 import {
 	formatAcMarkdown,
@@ -64,7 +65,7 @@ export const Route = createFileRoute("/api/export/zip")({
 				return new Response(new Uint8Array(zipBuffer), {
 					headers: {
 						"Content-Type": "application/zip",
-						"Content-Disposition": `attachment; filename="prdfy-${safeName}.zip"`,
+						"Content-Disposition": `attachment; filename="${EXPORT_FILENAME_PREFIX}-${safeName}.zip"`,
 						"Content-Length": String(zipBuffer.length),
 					},
 				});

@@ -17,6 +17,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EXPORT_FILENAME_PREFIX } from "@/lib/constants";
 import { useUIStore } from "@/store";
 
 type ImplementationChoice = "copy_prd" | "download_zip" | "prompt_ai" | null;
@@ -290,7 +291,7 @@ export function ImplementationOptions({
 			const safeMatch = rawMatch?.replace(/[^a-zA-Z0-9._-]/g, "_");
 			a.download = safeMatch?.endsWith(".zip")
 				? safeMatch
-				: `prdfy-${projectId}.zip`;
+				: `${EXPORT_FILENAME_PREFIX}-${projectId}.zip`;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);

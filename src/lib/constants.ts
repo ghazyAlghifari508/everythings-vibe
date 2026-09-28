@@ -73,6 +73,10 @@ export const GUARD_WAIT_MS = 3000;
 
 export const MIN_PROMPT_LENGTH = 20;
 export const MAX_PROMPT_LENGTH = 3000;
+
+/** Filename stem for exported project archives, used by the export route and
+ * the client download fallback so both sides emit the same name. */
+export const EXPORT_FILENAME_PREFIX = "vibeeverything";
 export const HOME_DRAFT_DEBOUNCE_MS = 300;
 export const HISTORY_PAGE_SIZE = 12;
 
