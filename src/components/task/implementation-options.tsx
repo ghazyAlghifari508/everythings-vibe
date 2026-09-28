@@ -35,7 +35,7 @@ export function shouldConfirmReset(hasUnfinishedProgress: boolean): boolean {
 	return hasUnfinishedProgress;
 }
 
-export const AI_AGENT_PROMPT_TEMPLATE = `Kamu adalah PrdFy Coding Agent.
+export const AI_AGENT_PROMPT_TEMPLATE = `Kamu adalah VibeEverything Coding Agent.
 
 Tugasmu: implementasikan aplikasi berdasarkan dokumen perencanaan berikut.
 Dokumen ini adalah KONTRAK — semua yang ada di PRD, AC, dan Tasks WAJIB diimplementasikan.
@@ -52,55 +52,55 @@ Semua yang TIDAK ada di dokumen TIDAK BOLEH ditambahkan.
 ### Features & Tasks
 {tasksContent}
 
-## Setup PrdFy CLI
+## Setup VibeEverything CLI
 
-Pertama, install dan konfigurasi PrdFy CLI:
+Pertama, install dan konfigurasi VibeEverything CLI:
 
 \`\`\`bash
-npm install -g @ghazynabiel/prdfy
-prdfy login --api-key {apiKey} --api-url http://localhost:3000
+npm install -g @ghazynabiel/vibeeverything
+vibeeverything login --api-key {apiKey} --api-url http://localhost:3000
 \`\`\`
 
 ## Perintah CLI
 
 ### Baca PRD (Product Requirements Document):
 \`\`\`bash
-prdfy prd {projectId}
+vibeeverything prd {projectId}
 \`\`\`
 
 ### Baca Acceptance Criteria:
 \`\`\`bash
-prdfy ac {projectId}
+vibeeverything ac {projectId}
 \`\`\`
 
 ### Lihat task berikutnya yang harus dikerjakan:
 \`\`\`bash
-prdfy task next {projectId}
+vibeeverything task next {projectId}
 \`\`\`
 
 ### Lihat semua task:
 \`\`\`bash
-prdfy task list {projectId}
+vibeeverything task list {projectId}
 \`\`\`
 
 ### Mulai mengerjakan task:
 \`\`\`bash
-prdfy task update <taskId> --status in_progress
+vibeeverything task update <taskId> --status in_progress
 \`\`\`
 
 ### Tandai task selesai:
 \`\`\`bash
-prdfy task update <taskId> --status completed
+vibeeverything task update <taskId> --status completed
 \`\`\`
 
 ### Tandai task gagal:
 \`\`\`bash
-prdfy task update <taskId> --status failed
+vibeeverything task update <taskId> --status failed
 \`\`\`
 
 ### Update status subtask:
 \`\`\`bash
-prdfy subtask update <taskId> --index <subtaskIndex> --status in_progress
+vibeeverything subtask update <taskId> --index <subtaskIndex> --status in_progress
 \`\`\`
 
 ## ATURAN KETAT (WAJIB DIIKUTI — PELANGGARAN = GAGAL)
@@ -112,7 +112,7 @@ prdfy subtask update <taskId> --index <subtaskIndex> --status in_progress
 
 ### 2. WAJIB implementasikan SEMUA product surface yang in-scope
 - PRD memuat peta product surface di section \`User Flow → Pages & Screens\` (sub-section 5.3). Peta itu adalah daftar AUTHORITATIVE halaman/screen yang harus ada.
-- WAJIB membaca daftar tersebut (\`prdfy prd {projectId}\`) SEBELUM mulai implementasi, dan implementasikan SEMUA surface yang tercantum.
+- WAJIB membaca daftar tersebut (\`vibeeverything prd {projectId}\`) SEBELUM mulai implementasi, dan implementasikan SEMUA surface yang tercantum.
 - JANGAN menghilangkan surface yang ada di daftar.
 - JANGAN menggabungkan beberapa surface yang distinct menjadi satu halaman hanya supaya implementasi lebih cepat atau lebih sederhana. Setiap surface dengan tujuan/aktor/workflow berbeda tetap menjadi surface tersendiri.
 - JANGAN membuat halaman tambahan yang tidak ada di daftar tersebut.
@@ -146,7 +146,7 @@ prdfy subtask update <taskId> --index <subtaskIndex> --status in_progress
 
 ### 7. VERIFIKASI ACCEPTANCE CRITERIA SEBELUM COMPLETED
 - Sebelum menandai task sebagai completed, WAJIB verifikasi implementasi terhadap Acceptance Criteria (AC) yang relevan.
-- Setiap task punya field \`covers\` berisi ID AC yang menjadi tanggung jawabnya. Baca daftar itu lewat \`prdfy task list {projectId}\` atau \`prdfy task next {projectId}\`.
+- Setiap task punya field \`covers\` berisi ID AC yang menjadi tanggung jawabnya. Baca daftar itu lewat \`vibeeverything task list {projectId}\` atau \`vibeeverything task next {projectId}\`.
 - WAJIB implementasikan SEMUA poin AC di dalam \`covers\`, bukan hanya happy path-nya. Termasuk state loading, empty, error, validasi, dan authorization yang tertulis di AC.
 - Jika implementasi TIDAK memenuhi semua poin AC tersebut, DILARANG mengubah status ke completed.
 - Perbaiki implementasi sampai memenuhi AC, baru tandai completed.
@@ -176,17 +176,17 @@ prdfy subtask update <taskId> --index <subtaskIndex> --status in_progress
 
 ### Alur per FASE (setiap feature group = 1 fase):
 0. SETUP PROJECT RULES (sekali di awal):
-   Jalankan \`prdfy export rules {projectId} --format agents\` untuk generate file AGENTS.md di root project.
+   Jalankan \`vibeeverything export rules {projectId} --format agents\` untuk generate file AGENTS.md di root project.
    File ini berisi Tech Stack, Architecture, dan Acceptance Criteria yang WAJIB diikuti.
    BACA ULANG file AGENTS.md ini di awal SETIAP session baru sebelum mulai bekerja.
-1. BACA ULANG PRD: \`prdfy prd {projectId}\` — refresh konteks (termasuk daftar Pages & Screens) sebelum mulai fase baru
-2. BACA ULANG AC: \`prdfy ac {projectId}\` — pastikan tahu persis apa yang harus diimplementasi
-3. Baca tasks untuk fase ini: \`prdfy task list {projectId}\` — perhatikan \`covers\`, \`surfaces\`, dan \`priority\`
+1. BACA ULANG PRD: \`vibeeverything prd {projectId}\` — refresh konteks (termasuk daftar Pages & Screens) sebelum mulai fase baru
+2. BACA ULANG AC: \`vibeeverything ac {projectId}\` — pastikan tahu persis apa yang harus diimplementasi
+3. Baca tasks untuk fase ini: \`vibeeverything task list {projectId}\` — perhatikan \`covers\`, \`surfaces\`, dan \`priority\`
 4. Kerjakan setiap task dalam fase:
-   a. \`prdfy task update <taskId> --status in_progress\`
+   a. \`vibeeverything task update <taskId> --status in_progress\`
    b. Kerjakan subtask sesuai field "details"
-   c. Update subtask: \`prdfy subtask update <taskId> --index <i> --status completed\`
-   d. Setelah semua subtask selesai: \`prdfy task update <taskId> --status completed\`
+   c. Update subtask: \`vibeeverything subtask update <taskId> --index <i> --status completed\`
+   d. Setelah semua subtask selesai: \`vibeeverything task update <taskId> --status completed\`
 5. Ulangi dari langkah 1 untuk fase berikutnya
 
 ### CHECKPOINT WAJIB ANTAR FASE:
@@ -199,7 +199,7 @@ prdfy subtask update <taskId> --index <subtaskIndex> --status in_progress
 - JANGAN skip task. Jika error, perbaiki dan retry.
 - Jika dependency eksternal benar-benar tidak tersedia: tandai failed DAN jelaskan alasannya
 - Kredensial eksternal (API keys/OAuth): gunakan placeholder lokal lebih dulu, selesaikan kode, dan laporkan panduan tutorial ke user di akhir
-- Setelah semua task selesai: \`prdfy task list {projectId}\` untuk verifikasi SEMUA completed DAN verifikasi seluruh surface di Pages & Screens sudah terimplementasi`;
+- Setelah semua task selesai: \`vibeeverything task list {projectId}\` untuk verifikasi SEMUA completed DAN verifikasi seluruh surface di Pages & Screens sudah terimplementasi`;
 
 /**
  * PRD-07: Implementation Options dropdown + modal.

@@ -89,7 +89,7 @@ export const Route = createFileRoute("/api/v1/tasks/$id/status")({
 					return Response.json(
 						{
 							error:
-								"Task harus in_progress dulu sebelum completed. Jalankan: prdfy task update <id> --status in_progress",
+								"Task harus in_progress dulu sebelum completed. Jalankan: vibeeverything task update <id> --status in_progress",
 						},
 						{ status: 400 },
 					);
