@@ -63,7 +63,7 @@ export const Route = createFileRoute("/history")({
 			throw e;
 		}
 	},
-	head: () => ({ meta: [{ title: "History | PrdFy" }] }),
+	head: () => ({ meta: [{ title: "History | VibeEverything" }] }),
 	component: HistoryRoutePage,
 });
 

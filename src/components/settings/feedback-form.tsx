@@ -83,7 +83,7 @@ export const FeedbackForm = memo(function FeedbackForm() {
 							? "Jelaskan bug yang kamu temui..."
 							: type === "feature"
 								? "Jelaskan fitur yang ingin kamu minta..."
-								: "Ceritakan pengalamanmu menggunakan PrdFy..."
+								: "Ceritakan pengalamanmu menggunakan VibeEverything..."
 					}
 					rows={4}
 					className="w-full rounded-lg border border-(--border-subtle) bg-(--bg-card) px-4 py-3 text-sm placeholder:text-(--text-secondary)/50 focus:border-primary-black focus:outline-none focus:ring-2 focus:ring-primary-black/5"

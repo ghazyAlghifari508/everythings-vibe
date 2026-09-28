@@ -20,7 +20,7 @@ function FeedbackPage() {
 				Feedback & Bug Report
 			</h2>
 			<p className="mb-6 text-sm text-(--text-secondary)">
-				Bantu kami meningkatkan PrdFy dengan memberikan feedback, melaporkan
+				Bantu kami meningkatkan VibeEverything dengan memberikan feedback, melaporkan
 				bug, atau meminta fitur baru.
 			</p>
 			<FeedbackForm />

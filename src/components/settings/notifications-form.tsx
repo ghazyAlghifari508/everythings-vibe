@@ -70,7 +70,7 @@ export const NotificationsForm = memo(function NotificationsForm({
 					<div>
 						<p className="font-medium text-sm">Update Produk</p>
 						<p className="text-xs text-(--text-secondary) mt-0.5">
-							Info fitur baru dan update PrdFy
+							Info fitur baru dan update VibeEverything
 						</p>
 					</div>
 				</label>

@@ -118,7 +118,7 @@ export const Route = createFileRoute("/codebases/")({
 			throw error;
 		}
 	},
-	head: () => ({ meta: [{ title: "Codebase | PrdFy" }] }),
+	head: () => ({ meta: [{ title: "Codebase | VibeEverything" }] }),
 	component: CodebasesPage,
 	pendingComponent: CodebasesPending,
 	errorComponent: ({ reset }) => (

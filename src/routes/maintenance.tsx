@@ -32,7 +32,7 @@ function MaintenancePage() {
 					color: "#ffffff",
 				}}
 			>
-				PrdFy Sedang Dalam Perbaikan
+				VibeEverything Sedang Dalam Perbaikan
 			</h1>
 			<p
 				style={{

@@ -29,7 +29,7 @@ export function Footer() {
 						</Link>
 					</div>
 					<p className="font-inter text-[14px] text-slate">
-						&copy; {new Date().getFullYear()} PrdFy. All rights reserved.
+						&copy; {new Date().getFullYear()} VibeEverything. All rights reserved.
 					</p>
 				</div>
 			</div>
