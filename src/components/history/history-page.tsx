@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { DeleteProjectModal } from "@/components/prd/delete-project-modal";
 import { useUserPlan } from "@/hooks/use-user-plan";
 import { HISTORY_PAGE_SIZE } from "@/lib/constants";
-import { resolveHistoryUrl, parseHistoryHref } from "@/lib/flow-progress";
+import { parseHistoryHref, resolveHistoryUrl } from "@/lib/flow-progress";
 import { filterHistory, paginate } from "@/lib/history-filter";
 import { saveSuppressAutoGen } from "@/lib/prompt-handoff";
 import type { HistoryItem } from "@/routes/history";
@@ -250,48 +250,48 @@ export function HistoryPage({ items }: { items: HistoryItem[] }) {
 										</p>
 									</div>
 
-								<ArrowRight
-									size={16}
-									className="shrink-0 text-fog opacity-0 transition-opacity group-hover:opacity-100"
-									aria-hidden
-								/>
-							</>
-						);
+									<ArrowRight
+										size={16}
+										className="shrink-0 text-fog opacity-0 transition-opacity group-hover:opacity-100"
+										aria-hidden
+									/>
+								</>
+							);
 
-						return (
-							<li
-								key={item.id}
-								data-project-id={item.id}
-								className="group flex items-center gap-4 rounded-xl border border-graphite bg-charcoal/60 p-4 transition-colors hover:border-fog/40 hover:bg-charcoal"
-							>
-								{link ? (
-									<Link
-										to={link.to}
-										params={link.params}
-										onClick={handleClick}
-										className="flex min-w-0 flex-1 items-center gap-4"
-									>
-										{cardInner}
-									</Link>
-								) : (
-									<a
-										href={href}
-										onClick={handleClick}
-										className="flex min-w-0 flex-1 items-center gap-4"
-									>
-										{cardInner}
-									</a>
-								)}
-								<button
-									type="button"
-									onClick={() => openDelete(item.id)}
-									className="shrink-0 rounded-md p-1.5 text-crimson transition-colors hover:bg-crimson/10"
-									aria-label={`Hapus proyek ${item.name}`}
+							return (
+								<li
+									key={item.id}
+									data-project-id={item.id}
+									className="group flex items-center gap-4 rounded-xl border border-graphite bg-charcoal/60 p-4 transition-colors hover:border-fog/40 hover:bg-charcoal"
 								>
-									<Trash2 size={16} />
-								</button>
-							</li>
-						);
+									{link ? (
+										<Link
+											to={link.to}
+											params={link.params}
+											onClick={handleClick}
+											className="flex min-w-0 flex-1 items-center gap-4"
+										>
+											{cardInner}
+										</Link>
+									) : (
+										<a
+											href={href}
+											onClick={handleClick}
+											className="flex min-w-0 flex-1 items-center gap-4"
+										>
+											{cardInner}
+										</a>
+									)}
+									<button
+										type="button"
+										onClick={() => openDelete(item.id)}
+										className="shrink-0 rounded-md p-1.5 text-crimson transition-colors hover:bg-crimson/10"
+										aria-label={`Hapus proyek ${item.name}`}
+									>
+										<Trash2 size={16} />
+									</button>
+								</li>
+							);
 						})}
 					</ul>
 				)}

@@ -3,9 +3,9 @@ import {
 	ArrowRight,
 	CircleQuestionMark,
 	LayoutGrid,
+	type LucideIcon,
 	Pencil,
 	Sparkles,
-	type LucideIcon,
 } from "lucide-react";
 
 type HubDestination = "/plan" | "/design" | "/templates" | "/bantuan";
