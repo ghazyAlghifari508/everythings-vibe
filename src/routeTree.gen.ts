@@ -31,6 +31,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiFeedbackRouteImport } from './routes/api/feedback'
 import { Route as ApiReportErrorRouteImport } from './routes/api/report-error'
+import { Route as ApiScrapeRouteImport } from './routes/api/scrape'
 import { Route as AskIdRouteImport } from './routes/ask/$id'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as CodebasesIndexRouteImport } from './routes/codebases/index'
@@ -207,6 +208,11 @@ const ApiReportErrorRoute = ApiReportErrorRouteImport.update({
   path: '/api/report-error',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiScrapeRoute = ApiScrapeRouteImport.update({
+  id: '/api/scrape',
+  path: '/api/scrape',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AskIdRoute = AskIdRouteImport.update({
   id: '/ask/$id',
   path: '/ask/$id',
@@ -378,9 +384,9 @@ const ApiProjectsIdRoute = ApiProjectsIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiScrapeAssetRoute = ApiScrapeAssetRouteImport.update({
-  id: '/api/scrape/asset',
-  path: '/api/scrape/asset',
-  getParentRoute: () => rootRouteImport,
+  id: '/asset',
+  path: '/asset',
+  getParentRoute: () => ApiScrapeRoute,
 } as any)
 const ApiTaskProjectIdRoute = ApiTaskProjectIdRouteImport.update({
   id: '/api/task/$projectId',
@@ -568,6 +574,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/feedback': typeof ApiFeedbackRoute
   '/api/report-error': typeof ApiReportErrorRoute
+  '/api/scrape': typeof ApiScrapeRouteWithChildren
   '/ask/$id': typeof AskIdRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
@@ -654,6 +661,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/feedback': typeof ApiFeedbackRoute
   '/api/report-error': typeof ApiReportErrorRoute
+  '/api/scrape': typeof ApiScrapeRouteWithChildren
   '/ask/$id': typeof AskIdRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
@@ -744,6 +752,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/feedback': typeof ApiFeedbackRoute
   '/api/report-error': typeof ApiReportErrorRoute
+  '/api/scrape': typeof ApiScrapeRouteWithChildren
   '/ask/$id': typeof AskIdRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
@@ -835,6 +844,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/feedback'
     | '/api/report-error'
+    | '/api/scrape'
     | '/ask/$id'
     | '/auth/callback'
     | '/codebases/$id'
@@ -921,6 +931,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/feedback'
     | '/api/report-error'
+    | '/api/scrape'
     | '/ask/$id'
     | '/auth/callback'
     | '/codebases/$id'
@@ -1010,6 +1021,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/feedback'
     | '/api/report-error'
+    | '/api/scrape'
     | '/ask/$id'
     | '/auth/callback'
     | '/codebases/$id'
@@ -1096,6 +1108,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiFeedbackRoute: typeof ApiFeedbackRoute
   ApiReportErrorRoute: typeof ApiReportErrorRoute
+  ApiScrapeRoute: typeof ApiScrapeRouteWithChildren
   AskIdRoute: typeof AskIdRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
@@ -1119,7 +1132,6 @@ export interface RootRouteChildren {
   ApiPaymentsCreateRoute: typeof ApiPaymentsCreateRoute
   ApiPaymentsWebhookRoute: typeof ApiPaymentsWebhookRoute
   ApiProjectsIdRoute: typeof ApiProjectsIdRouteWithChildren
-  ApiScrapeAssetRoute: typeof ApiScrapeAssetRoute
   ApiTaskProjectIdRoute: typeof ApiTaskProjectIdRoute
   ApiTaskGenerateRoute: typeof ApiTaskGenerateRoute
   ApiUserPlanRoute: typeof ApiUserPlanRoute
@@ -1292,6 +1304,13 @@ declare module '@tanstack/react-router' {
       path: '/api/report-error'
       fullPath: '/api/report-error'
       preLoaderRoute: typeof ApiReportErrorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/scrape': {
+      id: '/api/scrape'
+      path: '/api/scrape'
+      fullPath: '/api/scrape'
+      preLoaderRoute: typeof ApiScrapeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ask/$id': {
@@ -1534,10 +1553,10 @@ declare module '@tanstack/react-router' {
     }
     '/api/scrape/asset': {
       id: '/api/scrape/asset'
-      path: '/api/scrape/asset'
+      path: '/asset'
       fullPath: '/api/scrape/asset'
       preLoaderRoute: typeof ApiScrapeAssetRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiScrapeRoute
     }
     '/api/task/$projectId': {
       id: '/api/task/$projectId'
@@ -1808,6 +1827,18 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
 
+interface ApiScrapeRouteChildren {
+  ApiScrapeAssetRoute: typeof ApiScrapeAssetRoute
+}
+
+const ApiScrapeRouteChildren: ApiScrapeRouteChildren = {
+  ApiScrapeAssetRoute: ApiScrapeAssetRoute,
+}
+
+const ApiScrapeRouteWithChildren = ApiScrapeRoute._addFileChildren(
+  ApiScrapeRouteChildren,
+)
+
 interface ApiCodebasesCodebaseIdRouteChildren {
   ApiCodebasesCodebaseIdFeaturesRoute: typeof ApiCodebasesCodebaseIdFeaturesRoute
   ApiCodebasesCodebaseIdSessionRoute: typeof ApiCodebasesCodebaseIdSessionRoute
@@ -1890,6 +1921,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiFeedbackRoute: ApiFeedbackRoute,
   ApiReportErrorRoute: ApiReportErrorRoute,
+  ApiScrapeRoute: ApiScrapeRouteWithChildren,
   AskIdRoute: AskIdRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
@@ -1913,7 +1945,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPaymentsCreateRoute: ApiPaymentsCreateRoute,
   ApiPaymentsWebhookRoute: ApiPaymentsWebhookRoute,
   ApiProjectsIdRoute: ApiProjectsIdRouteWithChildren,
-  ApiScrapeAssetRoute: ApiScrapeAssetRoute,
   ApiTaskProjectIdRoute: ApiTaskProjectIdRoute,
   ApiTaskGenerateRoute: ApiTaskGenerateRoute,
   ApiUserPlanRoute: ApiUserPlanRoute,
