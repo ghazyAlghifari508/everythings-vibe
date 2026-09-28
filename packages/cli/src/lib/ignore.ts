@@ -27,11 +27,11 @@ const IGNORE_FILENAME = ".prdfyignore";
  * out: built-in exclusions already cover secrets, build output, and binaries,
  * and an active pattern here would silently change which files get uploaded.
  */
-export const PRDFY_IGNORE_TEMPLATE = `# .prdfyignore — exclusions untuk sync codebase PrdFy.
+export const PRDFY_IGNORE_TEMPLATE = `# .prdfyignore — exclusions untuk sync codebase VibeEverything.
 #
 # File ini bersifat lokal. JANGAN commit ke repositori.
 #
-# PrdFy CLI sudah mengecualikan hal berikut secara otomatis, jadi tidak perlu
+# VibeEverything CLI sudah mengecualikan hal berikut secara otomatis, jadi tidak perlu
 # ditulis ulang di sini:
 #   - file rahasia      : .env*, *.pem, *.key, *.p12, *.pfx, sertifikat
 #   - dependensi & build: node_modules/, dist/, build/, coverage/, .git/

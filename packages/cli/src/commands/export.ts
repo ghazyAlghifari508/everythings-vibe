@@ -113,7 +113,7 @@ export async function exportRulesCommand(
 			`## Product Surfaces (Pages & Screens)`,
 			``,
 			productSurfaces ||
-				`PRD ini belum memuat sub-section "Pages & Screens" pada User Flow. Baca PRD lengkap (\`prdfy prd ${projectId}\`) dan turunkan seluruh surface yang dibutuhkan requirement sebelum mulai implementasi.`,
+				`PRD ini belum memuat sub-section "Pages & Screens" pada User Flow. Baca PRD lengkap (\`vibeeverything prd ${projectId}\`) dan turunkan seluruh surface yang dibutuhkan requirement sebelum mulai implementasi.`,
 			``,
 			`## Acceptance Criteria`,
 			``,
@@ -122,7 +122,7 @@ export async function exportRulesCommand(
 			`## Strict Rules`,
 			`- ONLY implement features explicitly listed in Acceptance Criteria above`,
 			`- DO NOT add features, pages, endpoints, or roles not mentioned in AC`,
-			`- Implement EVERY product surface listed under "Product Surfaces (Pages & Screens)" above. Read the PRD (\`prdfy prd ${projectId}\`) for each surface's purpose, actor, responsibilities, and states.`,
+			`- Implement EVERY product surface listed under "Product Surfaces (Pages & Screens)" above. Read the PRD (\`vibeeverything prd ${projectId}\`) for each surface's purpose, actor, responsibilities, and states.`,
 			`- DO NOT drop a required page/screen, and DO NOT merge several distinct surfaces into one page to finish faster. A modal/drawer/inline interaction is valid when the PRD defines it that way or when the interaction semantics genuinely fit better.`,
 			`- DO NOT create pages outside the listed surfaces.`,
 			`- Product surfaces define WHAT users must be able to reach; the folder structure defines HOW the source code is organized. Satisfy both.`,
@@ -131,7 +131,7 @@ export async function exportRulesCommand(
 			`- DO NOT reduce the product to a minimal prototype: finish every in-scope surface, state, and validation before reporting done.`,
 			`- Follow the Tech Stack and folder structure exactly as specified`,
 			`- For external credentials/services (API keys, OAuth, Webhooks) that only users can obtain: use clear placeholders in environment files (.env.example/.env.local), complete all integration code and unit tests with mocks, and DO NOT block or fail tasks due to missing real keys. Upon completion, report a structured "External Configuration & Credentials Action Items" guide to the user with official dashboard URLs and exact step-by-step instructions on how to obtain and configure them.`,
-			`- All tasks must be tracked via prdfy CLI commands`,
+			`- All tasks must be tracked via VibeEverything CLI commands`,
 			``,
 		].join("\n");
 

@@ -88,7 +88,7 @@ export const CODEBASE_SYNC_SESSION_EXPIRY_MS = 30 * 60 * 1000;
 export const CODEBASE_MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
 export const CODEBASE_MAX_FILE_BYTES = 1024 * 1024;
 export const CODEBASE_MAX_CHUNK_BYTES = 256 * 1024;
-// Minimum supported CLI version for `prdfy codebase sync`.
+// Minimum supported CLI version for `vibeeverything codebase sync`.
 export const CODEBASE_CLI_MIN_VERSION = "2.0.0";
 // A pending idempotency claim older than this is treated as abandoned by a
 // crashed request and may be atomically stolen by a retry. Bound from the

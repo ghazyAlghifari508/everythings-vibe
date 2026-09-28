@@ -281,7 +281,7 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 		const minVersion = res.cliMinVersion ?? CODEBASE_CLI_MIN_VERSION;
 		if (compareCliVersions(CODEBASE_CLI_VERSION, minVersion) < 0) {
 			throw new ApiError(
-				`prdfy CLI ${CODEBASE_CLI_VERSION} is below the required version ${minVersion}. Update with: npm i -g @ghazynabiel/prdfy`,
+				`VibeEverything CLI ${CODEBASE_CLI_VERSION} is below the required version ${minVersion}. Update with: npm i -g @ghazynabiel/vibeeverything`,
 				{ code: "CLI_UPDATE_REQUIRED", retryable: false },
 			);
 		}

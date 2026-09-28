@@ -83,7 +83,7 @@ export function saveConfig(config: CliConfig): void {
 export function getApiKey(): string {
 	const config = getConfig();
 	if (!config.apiKey) {
-		throw new Error("API key not configured. Run: prdfy login");
+		throw new Error("API key not configured. Run: vibeeverything login");
 	}
 	return config.apiKey;
 }

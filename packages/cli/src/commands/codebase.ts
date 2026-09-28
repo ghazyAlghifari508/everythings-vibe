@@ -149,7 +149,7 @@ function printResult(result: SyncResult, output: SyncOutputMode): void {
 		lines.push(
 			`Ignore file  : ${
 				result.ignoreCreated
-					? ".prdfyignore dibuat dari template PrdFy (lokal, jangan di-commit)"
+					? ".prdfyignore dibuat dari template VibeEverything (lokal, jangan di-commit)"
 					: ".prdfyignore sudah ada (tidak diubah)"
 			}`,
 		);
@@ -161,7 +161,7 @@ function printResult(result: SyncResult, output: SyncOutputMode): void {
 	}
 	if (result.cliUpdate) {
 		lines.push(
-			`Update CLI   : versi ${result.cliUpdate.current} di bawah minimum ${result.cliUpdate.minimum}. Jalankan: npm i -g @ghazynabiel/prdfy`,
+			`Update CLI   : versi ${result.cliUpdate.current} di bawah minimum ${result.cliUpdate.minimum}. Jalankan: npm i -g @ghazynabiel/vibeeverything`,
 		);
 	}
 	if (result.ok) {
