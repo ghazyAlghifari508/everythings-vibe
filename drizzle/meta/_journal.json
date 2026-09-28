@@ -197,6 +197,13 @@
       "when": 1790172000000,
       "tag": "0027_drop_project_id_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1790598838471,
+      "tag": "0028_slimy_serpent_society",
+      "breakpoints": true
     }
   ]
 }

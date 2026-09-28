@@ -799,3 +799,110 @@ export const payments = pgTable(
 	},
 	(t) => [index("payments_user_id_idx").on(t.userId)],
 );
+// === VIBEDESIGN TABLES ===
+// Scrapes (Opsi 1): user-owned URL captures. IDs and user_id are text to
+// match Better Auth users.id (uuid would cause PG type mismatch).
+export interface ScrapeMetadata {
+	attempt?: number;
+	capturedAt?: string;
+	finalUrl?: string;
+	viewport?: { width: number; height: number };
+	captureMode?: string;
+	htmlBytes?: number;
+	previewHtmlBytes?: number;
+}
+
+export const scrapes = pgTable(
+	"scrapes",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		sourceUrl: text("source_url").notNull(),
+		domain: text("domain").notNull(),
+		title: text("title"),
+		status: text("status", {
+			enum: ["queued", "processing", "completed", "failed"],
+		})
+			.notNull()
+			.default("queued"),
+		html: text("html"),
+		previewHtml: text("preview_html"),
+		metadata: jsonb("metadata").$type<ScrapeMetadata>(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [index("scrapes_user_id_idx").on(t.userId)],
+);
+
+export const scrapeDocuments = pgTable(
+	"scrape_documents",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		scrapeId: text("scrape_id")
+			.notNull()
+			.references(() => scrapes.id, { onDelete: "cascade" }),
+		designMd: text("design_md").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [index("scrape_documents_scrape_id_idx").on(t.scrapeId)],
+);
+
+export const studioProjects = pgTable(
+	"studio_projects",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		title: text("title").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [index("studio_projects_user_id_idx").on(t.userId)],
+);
+
+export const studioRevisions = pgTable(
+	"studio_revisions",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => studioProjects.id, { onDelete: "cascade" }),
+		prompt: text("prompt").notNull(),
+		htmlCode: text("html_code").notNull(),
+		version: integer("version").notNull().default(1),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [index("studio_revisions_project_id_idx").on(t.projectId)],
+);
+
+export type ScrapeRow = typeof scrapes.$inferSelect;
+export type InsertScrapeRow = typeof scrapes.$inferInsert;
+export type ScrapeDocumentRow = typeof scrapeDocuments.$inferSelect;
+export type InsertScrapeDocumentRow = typeof scrapeDocuments.$inferInsert;
+export type StudioProjectRow = typeof studioProjects.$inferSelect;
+export type InsertStudioProjectRow = typeof studioProjects.$inferInsert;
+export type StudioRevisionRow = typeof studioRevisions.$inferSelect;
+export type InsertStudioRevisionRow = typeof studioRevisions.$inferInsert;
