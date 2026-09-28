@@ -32,7 +32,9 @@ describe("parseFeedbackBody", () => {
 			parseFeedbackBody({ message: "<sample>", type: "admin" }),
 		).toThrow();
 		expect(() =>
-			parseFeedbackBody({ message: "x".repeat(FEEDBACK_MAX_MESSAGE_CHARS + 1) }),
+			parseFeedbackBody({
+				message: "x".repeat(FEEDBACK_MAX_MESSAGE_CHARS + 1),
+			}),
 		).toThrow();
 	});
 });

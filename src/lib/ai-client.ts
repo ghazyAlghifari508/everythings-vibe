@@ -6,7 +6,7 @@
  * ignores it - send a dummy. If a key is ever required, set 9ROUTER_API_KEY.
  */
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateText, streamText } from "ai";
+import { streamText } from "ai";
 import {
 	AI_STALL_TIMEOUT_MS,
 	AI_TOTAL_TIMEOUT_MS,

@@ -1001,6 +1001,7 @@ export const ChatPanel = memo(function ChatPanel({
 										<div key={section} className="flex items-center gap-2.5">
 											{isCompleted ? (
 												<svg
+													aria-hidden="true"
 													width="10"
 													height="10"
 													viewBox="0 0 16 16"
@@ -1011,6 +1012,7 @@ export const ChatPanel = memo(function ChatPanel({
 												</svg>
 											) : isCurrent ? (
 												<svg
+													aria-hidden="true"
 													width="12"
 													height="12"
 													viewBox="0 0 24 24"
@@ -1034,6 +1036,7 @@ export const ChatPanel = memo(function ChatPanel({
 												</svg>
 											) : (
 												<svg
+													aria-hidden="true"
 													width="10"
 													height="10"
 													viewBox="0 0 16 16"
@@ -1084,6 +1087,7 @@ export const ChatPanel = memo(function ChatPanel({
 					</details>
 				)}
 				{isStreaming && streamingContent && (
+					// biome-ignore lint/a11y/useValidAriaRole: role is the chat-message domain prop, never rendered to the DOM (see chat-bubble.tsx)
 					<ChatBubble role="assistant" content={streamingContent} isStreaming />
 				)}
 				{isStreaming && !streamingContent && !thinkingText && (
@@ -1094,8 +1098,7 @@ export const ChatPanel = memo(function ChatPanel({
 			{/* Input Area */}
 			<div className="border-t border-graphite p-4">
 				{isReadOnly ? (
-					<div
-						role="status"
+					<output
 						aria-label="PRD dikunci"
 						className="flex items-start gap-3 rounded-md border border-graphite/60 bg-charcoal/80 p-3.5 text-xs text-fog"
 					>
@@ -1110,7 +1113,7 @@ export const ChatPanel = memo(function ChatPanel({
 								revisi dinonaktifkan untuk menjaga konsistensi alur proyek.
 							</span>
 						</div>
-					</div>
+					</output>
 				) : (
 					<div className="relative flex flex-col rounded-md bg-charcoal shadow-[var(--shadow-inset)] transition-shadow duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] focus-within:shadow-[inset_0_0_0_1px_rgba(94,106,210,0.85)]">
 						<textarea
@@ -1143,6 +1146,7 @@ export const ChatPanel = memo(function ChatPanel({
 						/>
 						<div className="flex items-center justify-between px-3 pb-3 pt-1">
 							<button
+								type="button"
 								onClick={isStreaming ? handleCancel : () => handleSend()}
 								disabled={
 									!isStreaming &&
@@ -1166,6 +1170,7 @@ export const ChatPanel = memo(function ChatPanel({
 							>
 								{isStreaming ? (
 									<svg
+										aria-hidden="true"
 										width="12"
 										height="12"
 										viewBox="0 0 16 16"
@@ -1174,7 +1179,13 @@ export const ChatPanel = memo(function ChatPanel({
 										<rect x="3" y="3" width="10" height="10" rx="1" />
 									</svg>
 								) : (
-									<svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 16 16"
+										fill="none"
+										aria-hidden="true"
+									>
 										<path
 											d="M2 8L14 8M10 4L14 8L10 12"
 											stroke="currentColor"

@@ -19,7 +19,8 @@ export function parseErrorReportBody(body: unknown): ErrorReportPayload {
 
 	let errorMessage = "Unknown error";
 	if (error !== undefined && error !== null) {
-		if (typeof error !== "string") throw new Error("Invalid error report payload");
+		if (typeof error !== "string")
+			throw new Error("Invalid error report payload");
 		const trimmed = error.trim();
 		if (trimmed.length > ERROR_REPORT_MAX_MESSAGE_CHARS) {
 			throw new Error("Invalid error report payload");

@@ -21,7 +21,10 @@ import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
 import { depthDirective } from "@/lib/prompt-depth";
 import { PRD_REVISION_PROMPT, PRD_SYSTEM_PROMPT } from "@/lib/prompts";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { buildRevisionAssistantReply, stripSectionMarkers } from "@/lib/revision-reply";
+import {
+	buildRevisionAssistantReply,
+	stripSectionMarkers,
+} from "@/lib/revision-reply";
 import {
 	selectModels,
 	tryStreamWithFallback,
@@ -664,9 +667,7 @@ export const Route = createFileRoute("/api/chat")({
 											// The stored document's section markers are written by
 											// the merge below; strip any the model repeated inside
 											// its own payload so they cannot double per revision.
-											const newSectionContent = stripSectionMarkers(
-												match[2],
-											);
+											const newSectionContent = stripSectionMarkers(match[2]);
 											const escapedSectionName = sectionName.replace(
 												/[.*+?^${}()|[\]\\]/g,
 												"\\$&",

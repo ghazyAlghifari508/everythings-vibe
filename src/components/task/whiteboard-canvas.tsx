@@ -446,7 +446,7 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 	);
 
 	return (
-		<div
+		<section
 			ref={containerRef}
 			className="relative h-full w-full touch-none select-none overflow-hidden overscroll-none bg-onyx outline-none focus-visible:ring-2 focus-visible:ring-indigo/40 cursor-grab active:cursor-grabbing"
 			style={{
@@ -460,7 +460,6 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 			onPointerLeave={endPan}
 			onWheel={handleWheel}
 			onKeyDown={handleKeyDown}
-			role="region"
 			aria-label="Kanvas diagram task"
 		>
 			{isEmpty ? (
@@ -531,7 +530,7 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 					/>,
 					document.body,
 				)}
-		</div>
+		</section>
 	);
 });
 
@@ -843,7 +842,7 @@ function SkeletonDiagram() {
 const Edges = memo(function Edges({ edges }: { edges: LayoutEdge[] }) {
 	return (
 		<svg
-			aria-hidden
+			aria-hidden="true"
 			className="pointer-events-none absolute left-0 top-0"
 			width="100%"
 			height="100%"
@@ -915,43 +914,56 @@ const DetailNode = memo(function DetailNode({
 }) {
 	const color = COLORS[node.colorIdx];
 	return (
-		<div
-			className={`absolute overflow-hidden rounded-md border ${color.border} bg-obsidian shadow-sm animate-fadeIn cursor-pointer`}
-			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
-			onClick={(e) => {
-				e.stopPropagation();
-				onOpen(node);
-			}}
-			onPointerDown={(e) => e.stopPropagation()}
-		>
-			<div className="px-3 pt-2 pb-1.5">
-				<p
-					className="truncate text-[9px] uppercase tracking-wide text-fog/60"
-					title={node.parentSubtask}
-				>
-					{node.parentSubtask}
-				</p>
-			</div>
-			<ul className="px-3">
-				{(node.details ?? []).slice(0, MAX_VISIBLE_DETAILS).map((d) => (
-					<li
-						key={d}
-						className="flex items-start gap-1.5 truncate font-inter text-[11px] leading-5 text-snow"
-						title={d}
+		<>
+			{/* biome-ignore lint/a11y/useSemanticElements: node hosts a nested list, invalid inside a native button; keyboard operable via Enter/Space handler below */}
+			<div
+				className={`absolute overflow-hidden rounded-md border ${color.border} bg-obsidian shadow-sm animate-fadeIn cursor-pointer`}
+				style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
+				role="button"
+				tabIndex={0}
+				aria-label={`Buka detail ${node.parentSubtask}`}
+				onClick={(e) => {
+					e.stopPropagation();
+					onOpen(node);
+				}}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						e.stopPropagation();
+						onOpen(node);
+					}
+				}}
+				onPointerDown={(e) => e.stopPropagation()}
+			>
+				<div className="px-3 pt-2 pb-1.5">
+					<p
+						className="truncate text-[9px] uppercase tracking-wide text-fog/60"
+						title={node.parentSubtask}
 					>
-						<span
-							className={`mt-[7px] size-1 shrink-0 rounded-full ${color.badge}`}
-						/>
-						<span className="truncate">{d}</span>
-					</li>
-				))}
-			</ul>
-			{(node.totalDetails ?? 0) > MAX_VISIBLE_DETAILS && (
-				<p className="px-3 pt-1 text-[10px] font-[510] text-indigo">
-					+{(node.totalDetails ?? 0) - MAX_VISIBLE_DETAILS} lainnya
-				</p>
-			)}
-		</div>
+						{node.parentSubtask}
+					</p>
+				</div>
+				<ul className="px-3">
+					{(node.details ?? []).slice(0, MAX_VISIBLE_DETAILS).map((d) => (
+						<li
+							key={d}
+							className="flex items-start gap-1.5 truncate font-inter text-[11px] leading-5 text-snow"
+							title={d}
+						>
+							<span
+								className={`mt-[7px] size-1 shrink-0 rounded-full ${color.badge}`}
+							/>
+							<span className="truncate">{d}</span>
+						</li>
+					))}
+				</ul>
+				{(node.totalDetails ?? 0) > MAX_VISIBLE_DETAILS && (
+					<p className="px-3 pt-1 text-[10px] font-[510] text-indigo">
+						+{(node.totalDetails ?? 0) - MAX_VISIBLE_DETAILS} lainnya
+					</p>
+				)}
+			</div>
+		</>
 	);
 });
 
@@ -967,44 +979,51 @@ function DetailModal({
 }) {
 	const color = COLORS[node.colorIdx];
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-in fade-in duration-200"
-			onClick={onClose}
-		>
+		<>
+			{/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop click is a mouse shortcut; keyboard dismiss via the close button */}
+			{/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click is a mouse shortcut; keyboard dismiss via the close button */}
 			<div
-				className={`w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border ${color.border} bg-obsidian p-5 shadow-[var(--shadow-overlay)] animate-in zoom-in-95 duration-200`}
-				onClick={(e) => e.stopPropagation()}
+				className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-in fade-in duration-200"
+				onClick={onClose}
 			>
-				<div className="mb-4 flex items-start justify-between gap-3">
-					<div className="min-w-0">
-						<p className="text-[10px] uppercase tracking-wide text-fog/60">
-							Detail subtask
-						</p>
-						<p className="font-inter text-sm font-[510] text-snow">
-							{node.parentSubtask}
-						</p>
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation only, no action to keyboard-activate */}
+				{/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only, no action to keyboard-activate */}
+				<div
+					className={`w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border ${color.border} bg-obsidian p-5 shadow-[var(--shadow-overlay)] animate-in zoom-in-95 duration-200`}
+					onClick={(e) => e.stopPropagation()}
+				>
+					<div className="mb-4 flex items-start justify-between gap-3">
+						<div className="min-w-0">
+							<p className="text-[10px] uppercase tracking-wide text-fog/60">
+								Detail subtask
+							</p>
+							<p className="font-inter text-sm font-[510] text-snow">
+								{node.parentSubtask}
+							</p>
+						</div>
+						<button
+							type="button"
+							onClick={onClose}
+							className="ml-auto shrink-0 text-fog transition-colors hover:text-snow"
+						>
+							<X size={18} />
+						</button>
 					</div>
-					<button
-						onClick={onClose}
-						className="ml-auto shrink-0 text-fog transition-colors hover:text-snow"
-					>
-						<X size={18} />
-					</button>
+					<ul className="space-y-2">
+						{(node.details ?? []).map((d) => (
+							<li key={d} className="flex items-start gap-2">
+								<span
+									className={`mt-1.5 size-1.5 shrink-0 rounded-full ${color.badge}`}
+								/>
+								<span className="font-inter text-sm leading-relaxed text-snow">
+									{d}
+								</span>
+							</li>
+						))}
+					</ul>
 				</div>
-				<ul className="space-y-2">
-					{(node.details ?? []).map((d) => (
-						<li key={d} className="flex items-start gap-2">
-							<span
-								className={`mt-1.5 size-1.5 shrink-0 rounded-full ${color.badge}`}
-							/>
-							<span className="font-inter text-sm leading-relaxed text-snow">
-								{d}
-							</span>
-						</li>
-					))}
-				</ul>
 			</div>
-		</div>
+		</>
 	);
 }
 
@@ -1019,41 +1038,48 @@ function TaskSubtasksModal({
 	const color = COLORS[node.colorIdx];
 	const allSubtasks = node.subtasks ?? [];
 	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-in fade-in duration-200"
-			onClick={onClose}
-		>
+		<>
+			{/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop click is a mouse shortcut; keyboard dismiss via the close button */}
+			{/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click is a mouse shortcut; keyboard dismiss via the close button */}
 			<div
-				className={`w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border ${color.border} bg-obsidian p-5 shadow-[var(--shadow-overlay)] animate-in zoom-in-95 duration-200`}
-				onClick={(e) => e.stopPropagation()}
+				className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-in fade-in duration-200"
+				onClick={onClose}
 			>
-				<div className="mb-4 flex items-center gap-2">
-					<div className={`h-2 w-2 shrink-0 rounded-full ${color.badge}`} />
-					<p className="truncate font-inter text-sm font-[510] text-snow">
-						{node.label}
-					</p>
-					<span className="ml-auto shrink-0 text-xs text-fog">
-						{allSubtasks.length} subtask
-					</span>
-					<button
-						onClick={onClose}
-						className="shrink-0 text-fog transition-colors hover:text-snow"
-					>
-						<X size={18} />
-					</button>
-				</div>
-				<ul className="space-y-2">
-					{allSubtasks.map((s) => (
-						<li
-							key={s.name}
-							className="rounded-lg border border-graphite/60 bg-charcoal/40 px-3 py-2"
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation only, no action to keyboard-activate */}
+				{/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only, no action to keyboard-activate */}
+				<div
+					className={`w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border ${color.border} bg-obsidian p-5 shadow-[var(--shadow-overlay)] animate-in zoom-in-95 duration-200`}
+					onClick={(e) => e.stopPropagation()}
+				>
+					<div className="mb-4 flex items-center gap-2">
+						<div className={`h-2 w-2 shrink-0 rounded-full ${color.badge}`} />
+						<p className="truncate font-inter text-sm font-[510] text-snow">
+							{node.label}
+						</p>
+						<span className="ml-auto shrink-0 text-xs text-fog">
+							{allSubtasks.length} subtask
+						</span>
+						<button
+							type="button"
+							onClick={onClose}
+							className="shrink-0 text-fog transition-colors hover:text-snow"
 						>
-							<p className="font-inter text-sm text-snow">{s.name}</p>
-						</li>
-					))}
-				</ul>
+							<X size={18} />
+						</button>
+					</div>
+					<ul className="space-y-2">
+						{allSubtasks.map((s) => (
+							<li
+								key={s.name}
+								className="rounded-lg border border-graphite/60 bg-charcoal/40 px-3 py-2"
+							>
+								<p className="font-inter text-sm text-snow">{s.name}</p>
+							</li>
+						))}
+					</ul>
+				</div>
 			</div>
-		</div>
+		</>
 	);
 }
 

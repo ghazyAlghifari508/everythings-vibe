@@ -65,7 +65,9 @@ afterEach(() => {
 	queryClient.clear();
 });
 
-function renderViewer(overrides: Partial<Parameters<typeof PrdViewer>[0]> = {}) {
+function renderViewer(
+	overrides: Partial<Parameters<typeof PrdViewer>[0]> = {},
+) {
 	act(() => {
 		root?.render(
 			<QueryClientProvider client={queryClient}>
@@ -157,10 +159,7 @@ describe("Export PDF removal", () => {
 					continue;
 				}
 				if (!/\.(ts|tsx)$/.test(entry.name)) continue;
-				const rel = full
-					.slice(repoRoot.length)
-					.split(/[\\/]/)
-					.join("/");
+				const rel = full.slice(repoRoot.length).split(/[\\/]/).join("/");
 				// This test names the feature on purpose; the prompt templates are
 				// example product ideas a user may pick, not a PrdFy export feature.
 				if (allowlist.has(rel)) continue;

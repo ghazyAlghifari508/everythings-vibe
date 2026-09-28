@@ -20,6 +20,7 @@ export function PrdDiffViewer({
 		<div className="font-mono text-xs overflow-auto">
 			{diff.map((l, idx) => (
 				<div
+					// biome-ignore lint/suspicious/noArrayIndexKey: diff lines are positional; identical context lines repeat
 					key={idx}
 					className={
 						l.type === "added"

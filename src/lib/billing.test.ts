@@ -11,8 +11,8 @@ import {
 	isFreeRolloverDue,
 	remainingTopUpQuota,
 	resolveSubscriptionState,
-	shouldTopUpInsteadOfResubscribe,
 	type SubscriptionRowLike,
+	shouldTopUpInsteadOfResubscribe,
 } from "./billing";
 
 const NOW = new Date("2026-08-25T00:00:00Z");
@@ -228,7 +228,12 @@ describe("shouldTopUpInsteadOfResubscribe", () => {
 		expect(
 			shouldTopUpInsteadOfResubscribe(
 				resolveSubscriptionState(
-					row({ plan: "hengker", credits: 105, creditsUsed: 105, currentPeriodEnd: null }),
+					row({
+						plan: "hengker",
+						credits: 105,
+						creditsUsed: 105,
+						currentPeriodEnd: null,
+					}),
 					NOW,
 				),
 			),
@@ -258,19 +263,26 @@ describe("shouldTopUpInsteadOfResubscribe", () => {
 		expect(
 			shouldTopUpInsteadOfResubscribe(
 				resolveSubscriptionState(
-					row({ credits: 30, creditsUsed: 30, currentPeriodEnd: addDays(NOW, -1) }),
+					row({
+						credits: 30,
+						creditsUsed: 30,
+						currentPeriodEnd: addDays(NOW, -1),
+					}),
 					NOW,
 				),
 			),
 		).toBe(false);
 		expect(
 			shouldTopUpInsteadOfResubscribe(
-				resolveSubscriptionState(row({ plan: "free", credits: 2, creditsUsed: 2 }), NOW),
+				resolveSubscriptionState(
+					row({ plan: "free", credits: 2, creditsUsed: 2 }),
+					NOW,
+				),
 			),
 		).toBe(false);
-		expect(shouldTopUpInsteadOfResubscribe(resolveSubscriptionState(undefined, NOW))).toBe(
-			false,
-		);
+		expect(
+			shouldTopUpInsteadOfResubscribe(resolveSubscriptionState(undefined, NOW)),
+		).toBe(false);
 	});
 });
 

@@ -71,7 +71,12 @@ export function LoginForm() {
 				provider,
 				callbackURL: redirectTo,
 			});
-			if (result && typeof result === "object" && "error" in result && result.error) {
+			if (
+				result &&
+				typeof result === "object" &&
+				"error" in result &&
+				result.error
+			) {
 				setError("Gagal login. Coba lagi.");
 				setLoading(null);
 			}

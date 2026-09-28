@@ -33,8 +33,10 @@ function renderPanel(props: React.ComponentProps<typeof ChatPanel>) {
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
+	const r = root;
+	if (!r) throw new Error("test root not initialized");
 	act(() => {
-		root!.render(
+		r.render(
 			<QueryClientProvider client={queryClient}>
 				<ChatPanel {...props} />
 			</QueryClientProvider>,

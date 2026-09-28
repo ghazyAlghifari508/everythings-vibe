@@ -49,6 +49,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
 		<html lang="id" suppressHydrationWarning>
 			<head>
+				{/* biome-ignore lint/security/noDangerouslySetInnerHtml: first-party constant theme init script prevents FOUC */}
 				<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 				<HeadContent />
 			</head>

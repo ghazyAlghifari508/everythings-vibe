@@ -272,11 +272,6 @@ export function StackDropdown({
 					aria-haspopup="listbox"
 					aria-expanded={open}
 					aria-controls={`${selectId}-listbox`}
-					aria-activedescendant={
-						open && highlightIdx >= 0
-							? `${selectId}-opt-${highlightIdx}`
-							: undefined
-					}
 					disabled={disabled || Boolean(skipped)}
 					onClick={() => {
 						if (disabled || skipped) return;
@@ -372,20 +367,18 @@ export function StackDropdown({
 							const selected = opt === value;
 							const iconUrl = stackIconUrl(opt);
 							return (
-							<div
-								// Index-qualified key: labels are caller data and
-								// may repeat; a bare label key would confuse
-								// reconciliation for duplicates.
-								key={`${i}:${opt}`}
-								id={`${selectId}-opt-${i}`}
-								role="option"
-								tabIndex={0}
-								aria-selected={selected}
-								onPointerDown={(e) => {
-									e.preventDefault();
-									selectOption(opt);
-								}}
-								onKeyDown={(e) => handleOptionKeyDown(e, opt)}
+								<div
+									// biome-ignore lint/suspicious/noArrayIndexKey: labels are caller data and may repeat; index qualifies duplicates
+									key={`${i}:${opt}`}
+									id={`${selectId}-opt-${i}`}
+									role="option"
+									tabIndex={0}
+									aria-selected={selected}
+									onPointerDown={(e) => {
+										e.preventDefault();
+										selectOption(opt);
+									}}
+									onKeyDown={(e) => handleOptionKeyDown(e, opt)}
 									className={cn(
 										"flex cursor-pointer items-center justify-between gap-2 px-4 py-2.5 min-h-[44px] font-inter text-sm transition-colors",
 										i === highlightIdx
@@ -422,17 +415,17 @@ export function StackDropdown({
 									type="text"
 									value={customDraft}
 									onChange={(e) => setCustomDraft(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") {
-										e.preventDefault();
-										commitCustom();
-									}
-									if (e.key === "Escape") {
-										e.preventDefault();
-										cancelCustom();
-									}
-								}}
-								onBlur={commitCustom}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") {
+											e.preventDefault();
+											commitCustom();
+										}
+										if (e.key === "Escape") {
+											e.preventDefault();
+											cancelCustom();
+										}
+									}}
+									onBlur={commitCustom}
 									placeholder="Tulis pilihanmu..."
 									className="w-full rounded-md border border-(--border-subtle) px-3 py-2 font-inter text-sm outline-none"
 									style={{

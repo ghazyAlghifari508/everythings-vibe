@@ -14,16 +14,16 @@ export const Route = createFileRoute("/api/payments/webhook")({
 				const { order_id, transaction_status, status_code, gross_amount } =
 					body;
 
-			let serverKey: string;
-			try {
-				serverKey = getMidtransConfig().serverKey;
-			} catch {
-				return Response.json(
-					{ error: "Server misconfiguration" },
-					{ status: 500 },
-				);
-			}
-			const signatureKey = `${order_id}${status_code}${gross_amount}${serverKey}`;
+				let serverKey: string;
+				try {
+					serverKey = getMidtransConfig().serverKey;
+				} catch {
+					return Response.json(
+						{ error: "Server misconfiguration" },
+						{ status: 500 },
+					);
+				}
+				const signatureKey = `${order_id}${status_code}${gross_amount}${serverKey}`;
 				const expected = createHash("sha512")
 					.update(signatureKey)
 					.digest("hex");
@@ -69,31 +69,31 @@ export const Route = createFileRoute("/api/payments/webhook")({
 					}
 				}
 
-			// Terminal non-success states, including post-settlement
-			// reversals (deny/refund/chargeback). Only non-success rows move,
-			// so a delayed reversal can never overwrite a settled grant's
-			// success marker; grant compensation stays a manual step.
-			if (
-				[
-					"expire",
-					"cancel",
-					"deny",
-					"refund",
-					"chargeback",
-					"partial_refund",
-					"partial_chargeback",
-				].includes(transaction_status)
-			) {
-				await db
-					.update(payments)
-					.set({ status: "failed" })
-					.where(
-						and(
-							eq(payments.orderId, order_id),
-							ne(payments.status, "success"),
-						),
-					);
-			}
+				// Terminal non-success states, including post-settlement
+				// reversals (deny/refund/chargeback). Only non-success rows move,
+				// so a delayed reversal can never overwrite a settled grant's
+				// success marker; grant compensation stays a manual step.
+				if (
+					[
+						"expire",
+						"cancel",
+						"deny",
+						"refund",
+						"chargeback",
+						"partial_refund",
+						"partial_chargeback",
+					].includes(transaction_status)
+				) {
+					await db
+						.update(payments)
+						.set({ status: "failed" })
+						.where(
+							and(
+								eq(payments.orderId, order_id),
+								ne(payments.status, "success"),
+							),
+						);
+				}
 
 				return Response.json({ status: "ok" });
 			},

@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { OnboardingForm } from "./onboarding-form";
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+	const actual =
+		await importOriginal<typeof import("@tanstack/react-router")>();
 	return {
 		...actual,
 		useNavigate: () => vi.fn(),

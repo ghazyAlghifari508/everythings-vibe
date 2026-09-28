@@ -246,20 +246,24 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 					</DialogHeader>
 					<div className="space-y-4">
 						<div>
-							<label className="text-xs font-[510] text-snow mb-1 block">
+							<label
+								htmlFor="api-key-name"
+								className="text-xs font-[510] text-snow mb-1 block"
+							>
 								Nama
 							</label>
 							<input
+								id="api-key-name"
 								value={newKeyName}
 								onChange={(e) => setNewKeyName(e.target.value)}
 								placeholder="Claude Code, Cursor, dll"
 								className="w-full rounded-md border border-graphite bg-onyx px-3 py-2 text-sm text-snow focus:border-indigo focus:outline-none"
 							/>
 						</div>
-						<div>
-							<label className="text-xs font-[510] text-snow mb-1 block">
+						<fieldset>
+							<legend className="text-xs font-[510] text-snow mb-1 block">
 								Scope
-							</label>
+							</legend>
 							<div className="space-y-2">
 								{SCOPE_OPTIONS.map((opt) => (
 									<label
@@ -283,7 +287,7 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 									</label>
 								))}
 							</div>
-						</div>
+						</fieldset>
 					</div>
 					<DialogFooter>
 						<Button variant="ghost" onClick={() => setShowCreate(false)}>

@@ -164,8 +164,8 @@ export function ScreenConnect({
 								Paste prompt lalu jalankan
 							</div>
 							<p className="text-[11px] text-fog leading-relaxed">
-								VibeEverything akan menampilkan status dan berpindah layar ketika CLI
-								berhasil terhubung.
+								VibeEverything akan menampilkan status dan berpindah layar
+								ketika CLI berhasil terhubung.
 							</p>
 						</div>
 					</div>

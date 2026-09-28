@@ -72,7 +72,7 @@ export const Route = createFileRoute("/prd/share/$token")({
 });
 
 function SharedPrdPage() {
-	const { content, projectName } = Route.useLoaderData();
+	const { content } = Route.useLoaderData();
 	return (
 		<div className="min-h-screen bg-(--bg-card)">
 			<div className="border-b border-(--border-subtle) px-6 py-4">

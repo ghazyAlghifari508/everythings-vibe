@@ -83,8 +83,8 @@ export function CodebaseReview({
 						Kami menemukan konteks aplikasimu.
 					</h1>
 					<p className="mt-2 text-xs sm:text-sm text-fog max-w-xl leading-relaxed">
-						Review ringkasan ini sebelum VibeEverything membuat pertanyaan. Kamu bisa
-						mengoreksi hasil deteksi yang tidak sesuai.
+						Review ringkasan ini sebelum VibeEverything membuat pertanyaan. Kamu
+						bisa mengoreksi hasil deteksi yang tidak sesuai.
 					</p>
 				</div>
 				<span className="inline-flex items-center gap-1.5 rounded-md border border-graphite bg-charcoal px-2.5 py-1 text-xs font-[510] text-fog self-start sm:self-auto">

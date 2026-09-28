@@ -41,8 +41,10 @@ export const FeedbackForm = memo(function FeedbackForm() {
 
 	return (
 		<form onSubmit={handleSubmit} className="space-y-4">
-			<div>
-				<label className="mb-1 block text-sm font-medium">Tipe Feedback</label>
+			<fieldset>
+				<legend className="mb-1 block text-sm font-medium">
+					Tipe Feedback
+				</legend>
 				<div className="flex gap-2">
 					{(["general", "bug", "feature"] as const).map((t) => (
 						<button
@@ -71,11 +73,17 @@ export const FeedbackForm = memo(function FeedbackForm() {
 						</button>
 					))}
 				</div>
-			</div>
+			</fieldset>
 
 			<div>
-				<label className="mb-1 block text-sm font-medium">Pesan Feedback</label>
+				<label
+					htmlFor="feedback-message"
+					className="mb-1 block text-sm font-medium"
+				>
+					Pesan Feedback
+				</label>
 				<textarea
+					id="feedback-message"
 					value={message}
 					onChange={(e) => setMessage(e.target.value)}
 					placeholder={

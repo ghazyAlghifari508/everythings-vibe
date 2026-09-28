@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { HistoryPage } from "./history-page";
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+	const actual =
+		await importOriginal<typeof import("@tanstack/react-router")>();
 	return {
 		...actual,
 		Link: ({ children, ...rest }: { children: React.ReactNode }) => (

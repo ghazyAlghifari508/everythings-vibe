@@ -21,8 +21,7 @@ export function filterHistory(
 export function paginate<T>(items: T[], page: number, pageSize: number): T[] {
 	// Normalize invalid pagination into the first page of a sane size:
 	// zero/negative/fractional inputs must not produce wrong-end slices.
-	const safePage =
-		Number.isSafeInteger(page) && page > 0 ? page : 1;
+	const safePage = Number.isSafeInteger(page) && page > 0 ? page : 1;
 	const safeSize =
 		Number.isSafeInteger(pageSize) && pageSize > 0
 			? Math.min(pageSize, 100)

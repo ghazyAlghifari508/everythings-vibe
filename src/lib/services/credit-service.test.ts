@@ -529,7 +529,12 @@ describe("credit service lifecycle", () => {
 
 describe("reservation lifecycle", () => {
 	it("treats live attempts as active and finished ones as terminal", () => {
-		for (const state of ["quoted", "reserved", "running", "settling"] as const) {
+		for (const state of [
+			"quoted",
+			"reserved",
+			"running",
+			"settling",
+		] as const) {
 			expect(reservationLifecycle(state)).toBe("active");
 		}
 		for (const state of [

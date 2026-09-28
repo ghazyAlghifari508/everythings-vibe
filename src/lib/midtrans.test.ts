@@ -59,9 +59,10 @@ describe("midtransAuthHeader", () => {
 
 	it("base64-encodes the server key with a trailing colon and blank password", () => {
 		const header = midtransAuthHeader("abc");
-		const decoded = Buffer.from(header.replace("Basic ", ""), "base64").toString(
-			"utf8",
-		);
+		const decoded = Buffer.from(
+			header.replace("Basic ", ""),
+			"base64",
+		).toString("utf8");
 		expect(decoded).toBe("abc:");
 	});
 });

@@ -1,6 +1,5 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { MAX_CREDIT_AMOUNT } from "@/lib/constants";
 import type { db } from "@/db";
 import type {
 	CreditLedgerMetadata,
@@ -17,6 +16,7 @@ import type {
 	CreditPricingVersion,
 	CreditQuote,
 } from "@/lib/adaptive-credit";
+import { MAX_CREDIT_AMOUNT } from "@/lib/constants";
 
 export type CreditOperationInsert = typeof creditOperations.$inferInsert;
 export type CreditOperationRow = typeof creditOperations.$inferSelect;
@@ -142,10 +142,7 @@ export function createCreditLedgerPersistence(
 				.insert(creditOperations)
 				.values(operation)
 				.onConflictDoNothing({
-					target: [
-						creditOperations.userId,
-						creditOperations.idempotencyKey,
-					],
+					target: [creditOperations.userId, creditOperations.idempotencyKey],
 				})
 				.returning();
 			if (inserted) return inserted;

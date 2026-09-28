@@ -197,9 +197,9 @@ export function SyncStatus({
 						Sync codebase
 					</h1>
 					<p className="mt-2 text-xs sm:text-sm text-fog max-w-xl leading-relaxed">
-						VibeEverything CLI menjalankan sync dari repositori lokal kamu. Perintahnya
-						berjalan di terminal agent — progress di bawah mengikuti status
-						server yang sebenarnya.
+						VibeEverything CLI menjalankan sync dari repositori lokal kamu.
+						Perintahnya berjalan di terminal agent — progress di bawah mengikuti
+						status server yang sebenarnya.
 					</p>
 				</div>
 			</div>

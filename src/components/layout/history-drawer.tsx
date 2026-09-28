@@ -42,7 +42,10 @@ const CATEGORY_LABEL: Record<DrawerCategory, string> = {
 	scrap: "Scrap",
 };
 
-const CATEGORY_FILTERS: ReadonlyArray<{ value: CategoryFilter; label: string }> = [
+const CATEGORY_FILTERS: ReadonlyArray<{
+	value: CategoryFilter;
+	label: string;
+}> = [
 	{ value: "all", label: "Semua" },
 	{ value: "plan", label: CATEGORY_LABEL.plan },
 	{ value: "design", label: CATEGORY_LABEL.design },
@@ -100,7 +103,9 @@ export function toDrawerItems(items: WireHistoryItem[]): DrawerHistoryItem[] {
 		// anything else would render a filter that matches fake rows.
 		type: "plan",
 		updatedAt:
-			item.updatedAt instanceof Date ? item.updatedAt : new Date(item.updatedAt),
+			item.updatedAt instanceof Date
+				? item.updatedAt
+				: new Date(item.updatedAt),
 		url: resolveHistoryUrl({
 			id: item.id,
 			step: item.step,
@@ -181,7 +186,11 @@ interface HistoryDrawerProps {
 	override?: { items: DrawerHistoryItem[]; isLoading?: boolean };
 }
 
-export function HistoryDrawer({ isOpen, onClose, override }: HistoryDrawerProps) {
+export function HistoryDrawer({
+	isOpen,
+	onClose,
+	override,
+}: HistoryDrawerProps) {
 	const [query, setQuery] = useState("");
 	const [category, setCategory] = useState<CategoryFilter>("all");
 	const navigate = useNavigate();
@@ -238,7 +247,9 @@ export function HistoryDrawer({ isOpen, onClose, override }: HistoryDrawerProps)
 	};
 
 	const emptyMessage =
-		query.trim().length > 0 ? NO_MATCH_MESSAGE : EMPTY_STATE_BY_FILTER[category];
+		query.trim().length > 0
+			? NO_MATCH_MESSAGE
+			: EMPTY_STATE_BY_FILTER[category];
 
 	return (
 		<DialogPrimitive.Root
@@ -312,9 +323,7 @@ export function HistoryDrawer({ isOpen, onClose, override }: HistoryDrawerProps)
 							</div>
 
 							<fieldset className="mt-3 flex min-w-0 flex-wrap items-center gap-1">
-								<legend className="sr-only">
-									Filter kategori riwayat
-								</legend>
+								<legend className="sr-only">Filter kategori riwayat</legend>
 								{CATEGORY_FILTERS.map((filter) => (
 									<button
 										key={filter.value}
@@ -345,8 +354,8 @@ export function HistoryDrawer({ isOpen, onClose, override }: HistoryDrawerProps)
 									{failure === "session" ? (
 										<>
 											<p className="text-[11px] leading-relaxed text-fog">
-												Sesi kamu sudah berakhir, jadi riwayat tidak bisa dimuat. Masuk
-												untuk melanjutkan.
+												Sesi kamu sudah berakhir, jadi riwayat tidak bisa
+												dimuat. Masuk untuk melanjutkan.
 											</p>
 											<Link
 												to="/login"
@@ -358,8 +367,8 @@ export function HistoryDrawer({ isOpen, onClose, override }: HistoryDrawerProps)
 										</>
 									) : failure === "blocked" ? (
 										<p className="text-[11px] leading-relaxed text-fog">
-											Akun kamu diblokir, jadi riwayat tidak bisa diakses. Hubungi
-											admin untuk membuka akses.
+											Akun kamu diblokir, jadi riwayat tidak bisa diakses.
+											Hubungi admin untuk membuka akses.
 										</p>
 									) : (
 										<>

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildRevisionAssistantReply, stripSectionMarkers } from "./revision-reply";
+import {
+	buildRevisionAssistantReply,
+	stripSectionMarkers,
+} from "./revision-reply";
 
 const MARKER = ":::UPDATE_SECTION";
 

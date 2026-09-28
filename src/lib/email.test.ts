@@ -36,9 +36,9 @@ describe("email template safety", () => {
 		expect(resolveAppUrl()).toBeNull();
 		vi.stubEnv("APP_URL", "https://prdfy.example/");
 		expect(resolveAppUrl()).toBe("https://prdfy.example");
-		expect(
-			pausedReminderEmail("pro", 3).html,
-		).toContain('href="https://prdfy.example/settings/billing"');
+		expect(pausedReminderEmail("pro", 3).html).toContain(
+			'href="https://prdfy.example/settings/billing"',
+		);
 		vi.unstubAllEnvs();
 	});
 });

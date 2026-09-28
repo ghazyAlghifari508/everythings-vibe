@@ -21,12 +21,59 @@ interface KanbanColumns {
 	failed: TaskCard[];
 }
 
+const ESC_CODE = 27;
+const BEL_CODE = 7;
+const BACKSLASH_CODE = 92;
+const OPEN_BRACKET_CODE = 91;
+const CLOSE_BRACKET_CODE = 93;
+
+function stripAnsiSequences(input: string): string {
+	let out = "";
+	let i = 0;
+	while (i < input.length) {
+		if (input.charCodeAt(i) !== ESC_CODE) {
+			out += input[i];
+			i += 1;
+			continue;
+		}
+		i += 1;
+		if (input.charCodeAt(i) === OPEN_BRACKET_CODE) {
+			i += 1;
+			while (i < input.length) {
+				const code = input.charCodeAt(i);
+				i += 1;
+				if (code >= 64 && code <= 126) break;
+			}
+		} else if (input.charCodeAt(i) === CLOSE_BRACKET_CODE) {
+			i += 1;
+			while (i < input.length) {
+				if (input.charCodeAt(i) === BEL_CODE) {
+					i += 1;
+					break;
+				}
+				if (
+					input.charCodeAt(i) === ESC_CODE &&
+					input.charCodeAt(i + 1) === BACKSLASH_CODE
+				) {
+					i += 2;
+					break;
+				}
+				i += 1;
+			}
+		}
+	}
+	return out;
+}
+
 export function sanitizeTerminalString(input: unknown): string {
 	if (typeof input !== "string") return "";
-	return input
-		.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
-		.replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)?/g, "")
-		.replace(/[\u0000-\u001f\u007f-\u009f]/g, "");
+	return stripAnsiSequences(input)
+		.split("")
+		.filter((ch) => {
+			const code = ch.charCodeAt(0);
+			return (code >= 32 && code <= 126) || code >= 160;
+		})
+		.join("");
 }
 
 export async function kanbanCommand(projectId: string) {

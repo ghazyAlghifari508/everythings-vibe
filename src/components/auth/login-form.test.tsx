@@ -4,7 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+	const actual =
+		await importOriginal<typeof import("@tanstack/react-router")>();
 	return {
 		...actual,
 		useLocation: () => "?redirect=/ask/1",
@@ -14,7 +15,9 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
 const socialMock = vi.fn();
 
 vi.mock("@/lib/auth-client", () => ({
-	authClient: { signIn: { social: (...args: unknown[]) => socialMock(...args) } },
+	authClient: {
+		signIn: { social: (...args: unknown[]) => socialMock(...args) },
+	},
 }));
 
 vi.mock("@/components/ui/logo", () => ({

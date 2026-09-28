@@ -46,8 +46,7 @@ export function GenerationProgress({
 	useEffect(() => {
 		const el = thinkingRef.current;
 		if (!el) return;
-		const nearBottom =
-			el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+		const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
 		followRef.current = nearBottom;
 		if (nearBottom) {
 			el.scrollTop = el.scrollHeight;

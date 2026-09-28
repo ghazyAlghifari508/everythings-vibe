@@ -52,10 +52,7 @@ export const Route = createFileRoute("/api/v1/projects/$id/ac")({
 					});
 				} catch (e) {
 					console.error("v1 AC detail failed:", e);
-					return Response.json(
-						{ error: "Failed to load AC" },
-						{ status: 500 },
-					);
+					return Response.json({ error: "Failed to load AC" }, { status: 500 });
 				}
 			},
 		},

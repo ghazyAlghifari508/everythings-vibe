@@ -10,7 +10,12 @@ import { requireUserServer } from "@/lib/session";
 const loadSettings = createServerFn({ method: "GET" }).handler(async () => {
 	const user = await requireUserServer();
 	const [profile] = await db
-		.select({ id: users.id, name: users.name, email: users.email, image: users.image })
+		.select({
+			id: users.id,
+			name: users.name,
+			email: users.email,
+			image: users.image,
+		})
 		.from(users)
 		.where(eq(users.id, user.id))
 		.limit(1);

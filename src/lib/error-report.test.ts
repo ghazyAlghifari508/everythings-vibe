@@ -41,7 +41,9 @@ describe("parseErrorReportBody", () => {
 
 	it("rejects oversized error and context values", () => {
 		expect(() =>
-			parseErrorReportBody({ error: "x".repeat(ERROR_REPORT_MAX_MESSAGE_CHARS + 1) }),
+			parseErrorReportBody({
+				error: "x".repeat(ERROR_REPORT_MAX_MESSAGE_CHARS + 1),
+			}),
 		).toThrow();
 		expect(() =>
 			parseErrorReportBody({

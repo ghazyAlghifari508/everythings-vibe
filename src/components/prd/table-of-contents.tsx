@@ -47,11 +47,13 @@ export function TableOfContents({
 	return (
 		<div className={cn("space-y-1", className)}>
 			<button
+				type="button"
 				onClick={() => setCollapsed(!collapsed)}
 				className="mb-2 flex w-full items-center justify-between text-sm font-medium text-(--text-secondary) hover:text-(--text-primary) dark:hover:text-[#F0F0F0]"
 			>
 				<span>Table of Contents</span>
 				<svg
+					aria-hidden="true"
 					className={`h-4 w-4 transition-transform ${collapsed ? "" : "rotate-90"}`}
 					fill="none"
 					viewBox="0 0 16 16"

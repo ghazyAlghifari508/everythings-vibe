@@ -92,6 +92,13 @@ export const Route = createFileRoute("/api/kanban/update-status")({
 						{ status: 400 },
 					);
 
+				// Both auth branches above return early on failure, so the actor
+				// is set here; copy to a const because the transaction closure
+				// below resets narrowing of the outer let.
+				const userId = actingUserId;
+				if (!userId)
+					return Response.json({ error: "Unauthorized" }, { status: 401 });
+
 				// Ownership check and status write run in one transaction on
 				// the locked project row so the authorization cannot go stale
 				// between the check and the update.
@@ -102,7 +109,7 @@ export const Route = createFileRoute("/api/kanban/update-status")({
 						.where(
 							and(
 								eq(projects.id, projectId),
-								eq(projects.userId, actingUserId!),
+								eq(projects.userId, userId),
 								isNull(projects.deletedAt),
 							),
 						)

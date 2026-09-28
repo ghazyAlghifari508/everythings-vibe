@@ -7,7 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppLayout } from "./app-layout";
 
 vi.mock("@tanstack/react-router", () => ({
-	useLocation: ({ select }: { select?: (l: { pathname: string }) => unknown }) =>
+	useLocation: ({
+		select,
+	}: {
+		select?: (l: { pathname: string }) => unknown;
+	}) =>
 		select ? select({ pathname: "/ask/proj-1" }) : { pathname: "/ask/proj-1" },
 	Link: ({ children }: { children: React.ReactNode }) => children,
 	useNavigate: () => () => {},

@@ -277,10 +277,7 @@ export const listUsers = createServerFn({ method: "GET" })
 			.leftJoin(subscriptions, eq(subscriptions.userId, users.id))
 			.where(
 				data.search
-					? or(
-							ilike(users.email, pattern),
-							ilike(users.name, pattern),
-						)
+					? or(ilike(users.email, pattern), ilike(users.name, pattern))
 					: undefined,
 			)
 			.orderBy(desc(users.createdAt))

@@ -46,6 +46,7 @@ export function useTypingPlaceholder(
 	const charRef = useRef(0);
 	const phaseRef = useRef<"typing" | "pausing" | "deleting">("typing");
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: reset typing animation when the prompt set changes; the dep is the trigger, not a read value
 	useEffect(() => {
 		indexRef.current = 0;
 		charRef.current = 0;

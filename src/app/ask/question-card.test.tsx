@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { QuestionCard, type NonTechAnswer } from "./question-card";
+import { type NonTechAnswer, QuestionCard } from "./question-card";
 
 let container: HTMLDivElement;
 let root: Root | null = null;
@@ -104,7 +104,12 @@ describe("QuestionCard", () => {
 
 		act(() => {
 			root?.render(
-				<QuestionCard question="Pick one?" type="text" answer={current} onAnswer={onAnswer} />,
+				<QuestionCard
+					question="Pick one?"
+					type="text"
+					answer={current}
+					onAnswer={onAnswer}
+				/>,
 			);
 		});
 		const undoButton = Array.from(rendered.querySelectorAll("button")).find(

@@ -56,7 +56,9 @@ describe("StackDropdown", () => {
 		expect(options.length).toBeGreaterThan(0);
 		const first = options[0] as HTMLElement;
 		act(() => {
-			first.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+			first.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
 		});
 
 		expect(onChange).toHaveBeenCalledWith("<option a>");
@@ -73,7 +75,9 @@ describe("StackDropdown", () => {
 		const options = rendered.querySelectorAll('[role="option"]');
 		const second = options[1] as HTMLElement;
 		act(() => {
-			second.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+			second.dispatchEvent(
+				new KeyboardEvent("keydown", { key: " ", bubbles: true }),
+			);
 		});
 
 		expect(onChange).toHaveBeenCalledWith("<option b>");

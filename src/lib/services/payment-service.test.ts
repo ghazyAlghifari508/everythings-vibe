@@ -375,19 +375,13 @@ describe("payments timezone migration contract", () => {
 			"utf8",
 		);
 		// created_at came from SQL now() in the app's Jakarta session.
-		expect(migration).toContain(
-			`"created_at" AT TIME ZONE 'Asia/Jakarta'`,
-		);
+		expect(migration).toContain(`"created_at" AT TIME ZONE 'Asia/Jakarta'`);
 		// updated_at came from a JS Date (UTC digits) once the row was rewritten,
 		// but still carried the Jakarta insert default while untouched.
 		expect(migration).toContain(`"updated_at" AT TIME ZONE 'UTC'`);
-		expect(migration).toContain(
-			`WHEN "updated_at" = "created_at" THEN`,
-		);
+		expect(migration).toContain(`WHEN "updated_at" = "created_at" THEN`);
 		// Guard so re-applying the file cannot shift the rows twice.
-		expect(migration).toContain(
-			`data_type = 'timestamp without time zone'`,
-		);
+		expect(migration).toContain(`data_type = 'timestamp without time zone'`);
 
 		const journal = await readFile(
 			new URL("../../../drizzle/meta/_journal.json", import.meta.url),

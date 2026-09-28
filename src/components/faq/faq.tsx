@@ -93,8 +93,8 @@ export function Faq() {
 						Cara kerja VibeEverything
 					</h1>
 					<p className="mx-auto mt-3 max-w-md font-inter text-sm leading-6 text-fog sm:text-base">
-						Jawaban singkat tentang cara VibeEverything mengubah ide menjadi rencana
-						produk yang bisa dikerjakan.
+						Jawaban singkat tentang cara VibeEverything mengubah ide menjadi
+						rencana produk yang bisa dikerjakan.
 					</p>
 				</header>
 

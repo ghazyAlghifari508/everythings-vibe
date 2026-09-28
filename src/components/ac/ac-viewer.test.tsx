@@ -22,8 +22,10 @@ function renderViewer(props: React.ComponentProps<typeof AcViewer>) {
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
+	const r = root;
+	if (!r) throw new Error("test root not initialized");
 	act(() => {
-		root!.render(<AcViewer {...props} />);
+		r.render(<AcViewer {...props} />);
 	});
 	return container;
 }

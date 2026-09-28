@@ -34,9 +34,9 @@ export function Providers({
 			disableTransitionOnChange
 		>
 			<QueryClientProvider client={client}>
-			<ThemeAttributeSync />
-			{children}
-		</QueryClientProvider>
+				<ThemeAttributeSync />
+				{children}
+			</QueryClientProvider>
 		</ThemeProvider>
 	);
 }

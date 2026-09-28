@@ -49,6 +49,7 @@ export function HistoryPage({ items }: { items: HistoryItem[] }) {
 		setLocalItems(items);
 	}, [items]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: reset to first page whenever the filter changes; deps are the trigger, not read values
 	useEffect(() => {
 		setPage(1);
 	}, [query, stepFilter]);

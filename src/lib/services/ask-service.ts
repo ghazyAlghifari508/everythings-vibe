@@ -59,7 +59,9 @@ export function parseAskOptionsJson(jsonString: string): AskQuestion[] | null {
 				if (
 					!q.options.every(
 						(o: unknown) =>
-							typeof o === "string" && !!o.trim() && o.length <= MAX_OPTION_CHARS,
+							typeof o === "string" &&
+							!!o.trim() &&
+							o.length <= MAX_OPTION_CHARS,
 					)
 				)
 					return null;

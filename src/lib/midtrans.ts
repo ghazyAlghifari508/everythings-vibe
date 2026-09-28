@@ -46,7 +46,9 @@ export function getMidtransConfig(): MidtransConfig {
 				? PRODUCTION_SNAP_BASE_URL
 				: SANDBOX_SNAP_BASE_URL,
 		apiBaseUrl:
-			environment === "production" ? PRODUCTION_API_BASE_URL : SANDBOX_API_BASE_URL,
+			environment === "production"
+				? PRODUCTION_API_BASE_URL
+				: SANDBOX_API_BASE_URL,
 	};
 }
 
