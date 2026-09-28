@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRDFY — Vibe Workspace Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            onyx: '#08090a',
+            charcoal: '#0f1011',
+            obsidian: '#161718',
+            graphite: '#23252a',
+            iron: '#323334',
+            steel: '#383b3f',
+            slate: '#62666d',
+            fog: '#8a8f98',
+            snow: '#f7f8f8',
+            brand: '#3b82f6',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    .bg-grid-pattern {
+      background-size: 32px 32px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    }
+    .light .bg-grid-pattern {
+      background-image: 
+        linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+    }
+    .hairline-border {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .light .hairline-border {
+      border: 1px solid rgba(0, 0, 0, 0.08);
+    }
+    .card-hover {
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .card-hover:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .light .card-hover:hover {
+      border-color: rgba(0, 0, 0, 0.25);
+    }
+    .page-screen {
+      animation: fadeIn 0.2s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* Sidebar Slide Transition */
+    .sidebar-drawer {
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(140, 140, 140, 0.2); border-radius: 9999px; }
+  </style>
+</head>
+<body class="bg-[#09090b] text-[#f4f4f5] min-h-screen flex flex-col selection:bg-zinc-800 selection:text-white">
+
+  <!-- Background Subtle Grid -->
+  <div class="fixed inset-0 pointer-events-none bg-grid-pattern z-0 opacity-80"></div>
+
+  <!-- ========================================================================= -->
+  <!-- SIDEBAR DRAWER: HISTORY PROJEK (PLAN, DESIGN, SCRAP, DLL)                 -->
+  <!-- ========================================================================= -->
+  <div id="sidebar-backdrop" onclick="toggleSidebar(false)" class="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 hidden opacity-0 transition-opacity duration-200"></div>
+
+  <aside id="sidebar-drawer" class="fixed top-0 left-0 bottom-0 w-80 md:w-96 bg-[#0c0d10] hairline-border border-r z-50 transform -translate-x-full sidebar-drawer flex flex-col justify-between shadow-2xl">
+    <!-- Sidebar Header -->
+    <div class="flex flex-col">
+      <div class="h-14 px-5 border-b border-zinc-800/80 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span class="font-bold text-sm text-white font-mono">Riwayat Projek</span>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400">12 Item</span>
+        </div>
+        <button onclick="toggleSidebar(false)" class="w-7 h-7 rounded-lg border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-900 transition">
+          ✕
+        </button>
+      </div>
+
+      <!-- Quick Search inside History -->
+      <div class="p-4 border-b border-zinc-800/60">
+        <div class="relative">
+          <input type="text" id="history-search" oninput="filterHistoryItems(this.value)" placeholder="Cari nama projek, PRD, atau desain..." class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 pl-9 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-zinc-600">
+          <svg class="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </div>
+
+        <!-- History Category Filter Pills -->
+        <div class="flex items-center gap-1 mt-3 text-[11px] font-mono">
+          <button onclick="filterHistoryCategory('all')" id="hfilter-all" class="px-2.5 py-1 rounded-md bg-zinc-800 text-white">Semua</button>
+          <button onclick="filterHistoryCategory('plan')" id="hfilter-plan" class="px-2.5 py-1 rounded-md text-zinc-400 hover:text-white">Plan (5)</button>
+          <button onclick="filterHistoryCategory('design')" id="hfilter-design" class="px-2.5 py-1 rounded-md text-zinc-400 hover:text-white">Design (4)</button>
+          <button onclick="filterHistoryCategory('scrap')" id="hfilter-scrap" class="px-2.5 py-1 rounded-md text-zinc-400 hover:text-white">Scrap (3)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Items Scroll List -->
+    <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5" id="history-items-container">
+      
+      <!-- ITEM 1: PLAN -->
+      <div onclick="selectHistoryItem('Vet Telecare Mobile App', 'plan')" class="hist-card p-3 rounded-xl hairline-border bg-zinc-900/40 hover:bg-zinc-900 card-hover cursor-pointer flex flex-col gap-1.5 transition" data-cat="plan" data-title="vet telecare mobile app">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">VibePlan</span>
+          <span class="text-[10px] font-mono text-zinc-500">2 jam lalu</span>
+        </div>
+        <div class="text-xs font-semibold text-zinc-200">Vet Telecare Mobile App</div>
+        <div class="text-[11px] text-zinc-400 flex items-center justify-between">
+          <span>PRD 8-Seksi • 14 Tasks</span>
+          <span class="text-emerald-400 font-mono text-[10px]">● Kanban Ready</span>
+        </div>
+      </div>
+
+      <!-- ITEM 2: DESIGN -->
+      <div onclick="selectHistoryItem('Modern E-Commerce Checkout', 'design')" class="hist-card p-3 rounded-xl hairline-border bg-zinc-900/40 hover:bg-zinc-900 card-hover cursor-pointer flex flex-col gap-1.5 transition" data-cat="design" data-title="modern e-commerce checkout">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">VibeDesign</span>
+          <span class="text-[10px] font-mono text-zinc-500">Kemarin</span>
+        </div>
+        <div class="text-xs font-semibold text-zinc-200">Modern E-Commerce Checkout</div>
+        <div class="text-[11px] text-zinc-400 flex items-center justify-between">
+          <span>Web 1440px Sandbox</span>
+          <span class="text-blue-400 font-mono text-[10px]">Prompt Studio</span>
+        </div>
+      </div>
+
+      <!-- ITEM 3: SCRAP -->
+      <div onclick="selectHistoryItem('linear.app Snapshot', 'scrap')" class="hist-card p-3 rounded-xl hairline-border bg-zinc-900/40 hover:bg-zinc-900 card-hover cursor-pointer flex flex-col gap-1.5 transition" data-cat="scrap" data-title="linear.app snapshot">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Scrap HTML</span>
+          <span class="text-[10px] font-mono text-zinc-500">28 Sep 2026</span>
+        </div>
+        <div class="text-xs font-semibold text-zinc-200">linear.app Snapshot</div>
+        <div class="text-[11px] text-zinc-400 flex items-center justify-between">
+          <span>design.md + index.html</span>
+          <span class="text-emerald-400 font-mono text-[10px]">2 File Siap</span>
+        </div>
+      </div>
+
+      <!-- ITEM 4: PLAN -->
+      <div onclick="selectHistoryItem('Sistem Rawat Inap SIMRS', 'plan')" class="hist-card p-3 rounded-xl hairline-border bg-zinc-900/40 hover:bg-zinc-900 card-hover cursor-pointer flex flex-col gap-1.5 transition" data-cat="plan" data-title="sistem rawat inap simrs">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">VibePlan</span>
+          <span class="text-[10px] font-mono text-zinc-500">25 Sep 2026</span>
+        </div>
+        <div class="text-xs font-semibold text-zinc-200">Sistem Rawat Inap SIMRS</div>
+        <div class="text-[11px] text-zinc-400 flex items-center justify-between">
+          <span>PRD + Acceptance Criteria</span>
+          <span class="text-zinc-500 font-mono text-[10px]">v1.4 Archive</span>
+        </div>
+      </div>
+
+      <!-- ITEM 5: DESIGN -->
+      <div onclick="selectHistoryItem('Fleet Management Dashboard', 'design')" class="hist-card p-3 rounded-xl hairline-border bg-zinc-900/40 hover:bg-zinc-900 card-hover cursor-pointer flex flex-col gap-1.5 transition" data-cat="design" data-title="fleet management dashboard">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">VibeDesign</span>
+          <span class="text-[10px] font-mono text-zinc-500">24 Sep 2026</span>
+        </div>
+        <div class="text-xs font-semibold text-zinc-200">Fleet Management Dashboard</div>
+        <div class="text-[11px] text-zinc-400 flex items-center justify-between">
+          <span>Dark Obsidian UI Kit</span>
+          <span class="text-blue-400 font-mono text-[10px]">Prompt Studio</span>
+        </div>
+      </div>
+
+      <!-- ITEM 6: SCRAP -->
+      <div onclick="selectHistoryItem('stripe.com/pricing Extraction', 'scrap')" class="hist-card p-3 rounded-xl hairline-border bg-zinc-900/40 hover:bg-zinc-900 card-hover cursor-pointer flex flex-col gap-1.5 transition" data-cat="scrap" data-title="stripe.com/pricing extraction">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Scrap HTML</span>
+          <span class="text-[10px] font-mono text-zinc-500">20 Sep 2026</span>
+        </div>
+        <div class="text-xs font-semibold text-zinc-200">stripe.com/pricing Extraction</div>
+        <div class="text-[11px] text-zinc-400 flex items-center justify-between">
+          <span>design.md + index.html</span>
+          <span class="text-emerald-400 font-mono text-[10px]">2 File Siap</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Sidebar Footer -->
+    <div class="p-4 border-t border-zinc-800/80 bg-zinc-950/60 flex items-center justify-between text-xs">
+      <span class="text-zinc-500 font-mono text-[11px]">Akun: Pro Plan</span>
+      <button onclick="toggleSidebar(false); navigateTo('page-home')" class="text-zinc-400 hover:text-white font-mono text-[11px] underline">
+        Semua History →
+      </button>
+    </div>
+  </aside>
+
+  <!-- ========================================================================= -->
+  <!-- TOP GLOBAL NAVBAR (HAMBURGER DI SEBELAH KIRI LOGO PRDFY)                   -->
+  <!-- ========================================================================= -->
+  <header class="sticky top-0 z-40 w-full hairline-border border-b bg-[#09090b]/85 backdrop-blur-md px-5 h-14 flex items-center justify-between">
+    <div class="flex items-center gap-3 md:gap-4">
+      <!-- HAMBURGER MENU BUTTON (SEBELAH KIRI LOGO PRDFY) -->
+      <button onclick="toggleSidebar(true)" title="Buka Riwayat Projek" class="w-8 h-8 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 hover:border-zinc-700 flex items-center justify-center text-zinc-300 hover:text-white transition">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" x2="20" y1="12" y2="12"/>
+          <line x1="4" x2="20" y1="6" y2="6"/>
+          <line x1="4" x2="20" y1="18" y2="18"/>
+        </svg>
+      </button>
+
+      <!-- LOGO PRDFY -->
+      <div class="flex items-center gap-2.5 cursor-pointer" onclick="navigateTo('page-home')">
+        <div class="w-6 h-6 rounded-md bg-white text-black flex items-center justify-center font-bold text-xs">P</div>
+        <span class="font-bold tracking-tight text-sm font-mono">PRDFY</span>
+        <span class="text-[11px] font-mono uppercase px-1.5 py-0.5 rounded border border-zinc-800 text-zinc-400 bg-zinc-900/60 hidden sm:inline-block">Console</span>
+      </div>
+
+      <!-- NAVLINK: HANYA PRICING (BERSIH TANPA DOUBLE ROUTE) -->
+      <nav class="flex items-center gap-1 text-xs font-medium text-zinc-400 ml-2">
+        <button onclick="navigateTo('page-pricing')" class="px-3 py-1.5 rounded-md hover:text-white hover:bg-zinc-900 transition flex items-center gap-1.5">
+          Pricing
+        </button>
+      </nav>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <!-- Credit Badge -->
+      <div class="flex items-center gap-2 px-2.5 py-1 rounded-full border border-zinc-800 bg-zinc-900/80 text-xs font-mono">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        <span class="text-zinc-400">Kredit:</span>
+        <span class="font-semibold text-white">30</span>
+      </div>
+
+      <!-- Theme Switch -->
+      <button onclick="toggleTheme()" title="Toggle Dark/Light Mode" class="w-8 h-8 rounded-md border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-900 transition">
+        <svg id="theme-icon-sun" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg id="theme-icon-moon" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+
+      <!-- User Avatar -->
+      <div class="w-8 h-8 rounded-full border border-zinc-700 bg-zinc-800 flex items-center justify-center text-xs font-medium font-mono text-zinc-200">
+        GA
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="relative z-10 flex-1 flex flex-col w-full">
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 1: HOMEPAGE (4 Bento Cards - "Mau ngapain hari ini?")              -->
+    <!-- Route: /                                                                  -->
+    <!-- ========================================================================= -->
+    <div id="page-home" class="page-screen flex flex-col items-center max-w-6xl w-full mx-auto px-6 py-12">
+      <!-- Title & Greeting -->
+      <div class="max-w-2xl mb-12 text-center">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-800 bg-zinc-900/80 text-xs text-zinc-400 mb-4 font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+          PRDFY Developer Console v2.0
+        </div>
+        <h1 class="text-4xl md:text-5xl font-bold tracking-tight text-white mb-3">
+          Mau ngapain hari ini?
+        </h1>
+        <p class="text-zinc-400 text-sm md:text-base leading-relaxed">
+          Pilih workspace untuk mulai menyusun requirements produk, merancang antarmuka UI, memilih template proyek, atau meminta bantuan teknis.
+        </p>
+      </div>
+
+      <!-- 4 Core Bento Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 w-full text-left">
+        
+        <!-- CARD 1: VIBEPLAN -->
+        <div onclick="navigateTo('page-plan-options')" class="group relative rounded-2xl hairline-border bg-zinc-900/50 hover:bg-zinc-900/80 p-7 card-hover cursor-pointer overflow-hidden">
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-10 h-10 rounded-xl border border-zinc-800 bg-zinc-800/80 flex items-center justify-center text-zinc-100 group-hover:border-zinc-600 transition">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            </div>
+            <span class="text-xs font-mono text-zinc-500 group-hover:text-zinc-300 transition flex items-center gap-1">
+              Buka /plan <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </span>
+          </div>
+
+          <h2 class="text-xl font-bold text-white mb-2 group-hover:text-blue-400 transition">
+            VibePlan
+          </h2>
+          <p class="text-sm text-zinc-400 leading-relaxed mb-6">
+            Ubah ide produk jadi PRD 8-seksi lengkap, Acceptance Criteria (AC), dan breakdown task Kanban terstruktur secara otomatis.
+          </p>
+
+          <div class="flex flex-wrap gap-2 pt-2 border-t border-zinc-800/70">
+            <span class="text-[11px] font-mono px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-950/60 text-zinc-400">Projek Baru</span>
+            <span class="text-[11px] font-mono px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-950/60 text-zinc-400">Codebase Existing</span>
+          </div>
+        </div>
+
+        <!-- CARD 2: VIBEDESIGN -->
+        <div onclick="navigateTo('page-design-options')" class="group relative rounded-2xl hairline-border bg-zinc-900/50 hover:bg-zinc-900/80 p-7 card-hover cursor-pointer overflow-hidden">
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-10 h-10 rounded-xl border border-zinc-800 bg-zinc-800/80 flex items-center justify-center text-zinc-100 group-hover:border-zinc-600 transition">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+            </div>
+            <span class="text-xs font-mono text-zinc-500 group-hover:text-zinc-300 transition flex items-center gap-1">
+              Buka /design <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </span>
+          </div>
+
+          <h2 class="text-xl font-bold text-white mb-2 group-hover:text-blue-400 transition">
+            VibeDesign
+          </h2>
+          <p class="text-sm text-zinc-400 leading-relaxed mb-6">
+            Rancang UI interaktif langsung lewat prompt teks, atau ekstrak website live langsung menjadi 2 file: <code class="text-xs font-mono text-zinc-200">design.md</code> & <code class="text-xs font-mono text-zinc-200">index.html</code>.
+          </p>
+
+          <div class="flex flex-wrap gap-2 pt-2 border-t border-zinc-800/70">
+            <span class="text-[11px] font-mono px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-950/60 text-zinc-400">Scrap HTML & design.md</span>
+            <span class="text-[11px] font-mono px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-950/60 text-zinc-400">Prompt UI Studio</span>
+          </div>
+        </div>
+
+        <!-- CARD 3: VIBETEMPLATE -->
+        <div onclick="navigateTo('page-templates')" class="group relative rounded-2xl hairline-border bg-zinc-900/50 hover:bg-zinc-900/80 p-7 card-hover cursor-pointer overflow-hidden">
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-10 h-10 rounded-xl border border-zinc-800 bg-zinc-800/80 flex items-center justify-center text-zinc-100 group-hover:border-zinc-600 transition">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+            </div>
+            <span class="text-xs font-mono text-zinc-500 group-hover:text-zinc-300 transition flex items-center gap-1">
+              Buka /templates <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </span>
+          </div>
+
+          <h2 class="text-xl font-bold text-white mb-2 group-hover:text-blue-400 transition">
+            VibeTemplate
+          </h2>
+          <p class="text-sm text-zinc-400 leading-relaxed mb-6">
+            Koleksi kerangka kerja teruji: preset spesifikasi planning, kit desain antarmuka, dan boilerplate proyek lengkap (Rumah Sakit, SaaS, E-Commerce).
+          </p>
+
+          <div class="flex flex-wrap gap-2 pt-2 border-t border-zinc-800/70">
+            <span class="text-[11px] font-mono px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-950/60 text-zinc-400">Template Planning</span>
+            <span class="text-[11px] font-mono px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-950/60 text-zinc-400">Template Design</span>
+            <span class="text-[11px] font-mono px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-950/60 text-zinc-400">Boilerplate Projek</span>
+          </div>
+        </div>
+
+        <!-- CARD 4: VIBEBANTUAN -->
+        <div onclick="navigateTo('page-bantuan')" class="group relative rounded-2xl hairline-border bg-zinc-900/50 hover:bg-zinc-900/80 p-7 card-hover cursor-pointer overflow-hidden">
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-10 h-10 rounded-xl border border-zinc-800 bg-zinc-800/80 flex items-center justify-center text-zinc-100 group-hover:border-zinc-600 transition">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+            </div>
+            <span class="text-xs font-mono text-zinc-500 group-hover:text-zinc-300 transition flex items-center gap-1">
+              Buka Bantuan <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </span>
+          </div>
+
+          <h2 class="text-xl font-bold text-white mb-2 group-hover:text-blue-400 transition">
+            VibeBantuan
+          </h2>
+          <p class="text-sm text-zinc-400 leading-relaxed mb-6">
+            Pusat bantuan pengguna, pelaporan bug kendala teknis, dan feedback langsung ke antarmuka admin menggunakan formulir bawaan PRDFY.
+          </p>
+
+          <div class="flex flex-wrap gap-2 pt-2 border-t border-zinc-800/70">
+            <span class="text-[11px] font-mono px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-950/60 text-zinc-400">Feedback & Bug Report</span>
+            <span class="text-[11px] font-mono px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-950/60 text-zinc-400">Admin Sync (/admin/feedback)</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 2: VIBEPLAN OPTIONS PAGE                                           -->
+    <!-- Route: /plan                                                              -->
+    <!-- ========================================================================= -->
+    <div id="page-plan-options" class="page-screen hidden flex-col max-w-5xl w-full mx-auto px-6 py-10">
+      <div class="flex items-center gap-2 text-xs font-mono text-zinc-400 mb-8">
+        <button onclick="navigateTo('page-home')" class="hover:text-white flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg> Home
+        </button>
+        <span>/</span>
+        <span class="text-white">VibePlan</span>
+      </div>
+
+      <div class="text-center max-w-xl mx-auto mb-10">
+        <h1 class="text-3xl font-bold text-white mb-2">Pilih Metode Perencanaan</h1>
+        <p class="text-sm text-zinc-400">Apakah Anda ingin merancang produk baru dari awal atau menyambungkan proyek yang sudah ada?</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+        <!-- OPSI 1: PROJEK BARU -->
+        <div onclick="navigateTo('page-plan-greenfield')" class="group p-8 rounded-2xl hairline-border bg-zinc-900/60 hover:bg-zinc-900 card-hover cursor-pointer flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-6">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            </div>
+            <div class="text-xs font-mono uppercase tracking-wider text-blue-400 font-semibold mb-2">Opsi 1</div>
+            <h2 class="text-2xl font-bold text-white mb-3 group-hover:text-blue-400 transition">Projek Baru (Greenfield)</h2>
+            <p class="text-sm text-zinc-400 leading-relaxed mb-6">
+              Mulai dari ide mentah. Ketik instruksi produk Anda di halaman chat input, ikuti sesi tanya jawab terstruktur, lalu biarkan AI men-generate PRD 8-seksi lengkap.
+            </p>
+          </div>
+          <div class="pt-6 border-t border-zinc-800 flex items-center justify-between text-xs font-mono">
+            <span class="text-zinc-500">Membuka Halaman Chat Input</span>
+            <span class="text-white flex items-center gap-1 group-hover:translate-x-1 transition">Lanjut →</span>
+          </div>
+        </div>
+
+        <!-- OPSI 2: CODEBASE EXISTING -->
+        <div onclick="navigateTo('page-plan-codebase')" class="group p-8 rounded-2xl hairline-border bg-zinc-900/60 hover:bg-zinc-900 card-hover cursor-pointer flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-6">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+            </div>
+            <div class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-semibold mb-2">Opsi 2</div>
+            <h2 class="text-2xl font-bold text-white mb-3 group-hover:text-emerald-400 transition">Codebase Existing</h2>
+            <p class="text-sm text-zinc-400 leading-relaxed mb-6">
+              Sudah punya repositori? Dapatkan prompt CLI untuk menghubungkan folder proyek lokal Anda. AI akan menganalisis manifest file dan menyusun fitur baru di atas kode yang ada.
+            </p>
+          </div>
+          <div class="pt-6 border-t border-zinc-800 flex items-center justify-between text-xs font-mono">
+            <span class="text-zinc-500">Membuka Halaman Koneksi Codebase</span>
+            <span class="text-white flex items-center gap-1 group-hover:translate-x-1 transition">Lanjut →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 3: PLAN - PROJEK BARU (CHAT INPUT SCREEN)                         -->
+    <!-- Route: /plan/new                                                          -->
+    <!-- ========================================================================= -->
+    <div id="page-plan-greenfield" class="page-screen hidden flex-col max-w-4xl w-full mx-auto px-6 py-10">
+      <div class="flex items-center gap-2 text-xs font-mono text-zinc-400 mb-6">
+        <button onclick="navigateTo('page-home')" class="hover:text-white">Home</button>
+        <span>/</span>
+        <button onclick="navigateTo('page-plan-options')" class="hover:text-white">VibePlan</button>
+        <span>/</span>
+        <span class="text-white">Projek Baru</span>
+      </div>
+
+      <div class="text-center max-w-2xl mx-auto mb-8">
+        <h1 class="text-3xl font-bold text-white mb-2">Dari ide produk ke PRD siap eksekusi</h1>
+        <p class="text-sm text-zinc-400">Describe produk kamu secara natural dan AI akan generate Product Requirements Document lengkap, terstruktur, dan profesional.</p>
+      </div>
+
+      <div class="rounded-2xl hairline-border bg-zinc-900/80 p-6 flex flex-col gap-4 shadow-xl">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-mono uppercase text-zinc-400 flex items-center gap-2">
+            <svg class="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Deskripsi Kebutuhan Produk
+          </span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-zinc-500 font-mono">Platform Target:</span>
+            <select class="bg-zinc-950 border border-zinc-800 text-zinc-300 rounded-lg px-2.5 py-1 text-xs outline-none font-mono">
+              <option>Web App</option>
+              <option>Mobile App</option>
+            </select>
+          </div>
+        </div>
+
+        <textarea rows="5" class="w-full bg-zinc-950 border border-zinc-800 focus:border-blue-500 rounded-xl p-4 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none resize-none transition" placeholder="Contoh: Buatkan PRD untuk aplikasi telemedicine khusus hewan peliharaan (Vet Telecare). Fitur: konsultasi video langsung dengan dokter hewan, resep digital, pengantaran obat sameday, dan catatan medis vaksinasi..."></textarea>
+
+        <div class="flex items-center justify-between pt-2">
+          <span class="text-xs font-mono text-zinc-500">Draft tersimpan otomatis</span>
+          <button onclick="alert('Mengarahkan ke /ask/proj_new_812 untuk sesi klarifikasi!')" class="px-5 py-2.5 rounded-xl bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition flex items-center gap-2">
+            <span>Generate PRD & Lanjut</span>
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 4: PLAN - CODEBASE EXISTING (CONNECT SCREEN)                       -->
+    <!-- Route: /plan/codebase                                                     -->
+    <!-- ========================================================================= -->
+    <div id="page-plan-codebase" class="page-screen hidden flex-col max-w-3xl w-full mx-auto px-6 py-10">
+      <div class="flex items-center gap-2 text-xs font-mono text-zinc-400 mb-6">
+        <button onclick="navigateTo('page-home')" class="hover:text-white">Home</button>
+        <span>/</span>
+        <button onclick="navigateTo('page-plan-options')" class="hover:text-white">VibePlan</button>
+        <span>/</span>
+        <span class="text-white">Codebase Existing</span>
+      </div>
+
+      <div class="rounded-2xl hairline-border bg-zinc-900/60 p-8 flex flex-col gap-6">
+        <div>
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs mb-3">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            Screen 02 — Codebase Connect
+          </div>
+          <h1 class="text-2xl font-bold text-white mb-2">Hubungkan dengan Codebase Lokal</h1>
+          <p class="text-sm text-zinc-400">Buka terminal di root direktori proyek Anda, lalu salin dan jalankan prompt agent berikut.</p>
+        </div>
+
+        <div class="p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs flex flex-col gap-3">
+          <div class="flex items-center justify-between text-zinc-500 border-b border-zinc-900 pb-2">
+            <span>PRDFY Sync Command</span>
+            <button onclick="copyBtn(this)" class="px-3 py-1 rounded border border-zinc-800 hover:border-zinc-600 bg-zinc-900 text-zinc-200 text-xs transition">
+              Salin Prompt
+            </button>
+          </div>
+          <div class="text-emerald-400 break-all leading-relaxed">
+            npx @prdfy/agent sync --key="prdfy_sec_991823abce" --project="my-awesome-repo" --endpoint="https://prdfy.app/api/v1/codebases/sync"
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl border border-zinc-800 bg-zinc-950/40 text-xs text-zinc-400 flex items-center gap-3">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+          <span>Menunggu sinyal koneksi dari CLI agent... Begitu tersambung, Anda akan diarahkan ke halaman tinjauan arsitektur codebase.</span>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 5: VIBEDESIGN OPTIONS PAGE                                         -->
+    <!-- Route: /design                                                            -->
+    <!-- ========================================================================= -->
+    <div id="page-design-options" class="page-screen hidden flex-col max-w-5xl w-full mx-auto px-6 py-10">
+      <div class="flex items-center gap-2 text-xs font-mono text-zinc-400 mb-8">
+        <button onclick="navigateTo('page-home')" class="hover:text-white flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg> Home
+        </button>
+        <span>/</span>
+        <span class="text-white">VibeDesign</span>
+      </div>
+
+      <div class="text-center max-w-xl mx-auto mb-10">
+        <h1 class="text-3xl font-bold text-white mb-2">Pilih Workspace Desain</h1>
+        <p class="text-sm text-zinc-400">Ekstrak desain dari website live menjadi 2 file (design.md & index.html) atau rancang UI interaktif dengan AI studio.</p>
+      </div>
+
+      <!-- 2 Option Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+        <!-- OPSI 1: SCRAP HTML & DESIGN.MD (DOCRIVO) -->
+        <div onclick="navigateTo('page-design-scrap')" class="group p-8 rounded-2xl hairline-border bg-zinc-900/60 hover:bg-zinc-900 card-hover cursor-pointer flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mb-6">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+            </div>
+            <div class="text-xs font-mono uppercase tracking-wider text-purple-400 font-semibold mb-2">Opsi 1</div>
+            <h2 class="text-2xl font-bold text-white mb-3 group-hover:text-purple-400 transition">Scrap HTML & design.md</h2>
+            <p class="text-sm text-zinc-400 leading-relaxed mb-6">
+              Ekstrak URL web live dan langsung hasilkan 2 file keluaran otomatis: <strong class="text-zinc-200">design.md</strong> (aturan desain & token) serta <strong class="text-zinc-200">index.html</strong> (kode HTML utuh & preview 1440px desktop).
+            </p>
+          </div>
+          <div class="pt-6 border-t border-zinc-800 flex items-center justify-between text-xs font-mono">
+            <span class="text-zinc-500">Otomatis Generate 2 File</span>
+            <span class="text-white flex items-center gap-1 group-hover:translate-x-1 transition">Buka Scraper →</span>
+          </div>
+        </div>
+
+        <!-- OPSI 2: PROMPT UI STUDIO -->
+        <div onclick="navigateTo('page-design-stitch')" class="group p-8 rounded-2xl hairline-border bg-zinc-900/60 hover:bg-zinc-900 card-hover cursor-pointer flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-6">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+            </div>
+            <div class="text-xs font-mono uppercase tracking-wider text-blue-400 font-semibold mb-2">Opsi 2</div>
+            <h2 class="text-2xl font-bold text-white mb-3 group-hover:text-blue-400 transition">Prompt UI Studio</h2>
+            <p class="text-sm text-zinc-400 leading-relaxed mb-6">
+              Studio antarmuka interaktif. Rancang aplikasi native mobile atau web hanya lewat prompt teks alami, pilih inspirasi, dan render preview interaktif secara instan.
+            </p>
+          </div>
+          <div class="pt-6 border-t border-zinc-800 flex items-center justify-between text-xs font-mono">
+            <span class="text-zinc-500">Membuka UI Studio</span>
+            <span class="text-white flex items-center gap-1 group-hover:translate-x-1 transition">Buka Studio →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 6: DESIGN - SCRAP HTML & GENERATE 2 FILE (design.md & index.html)  -->
+    <!-- Route: /design/scrap                                                      -->
+    <!-- ========================================================================= -->
+    <div id="page-design-scrap" class="page-screen hidden flex-col max-w-5xl w-full mx-auto px-6 py-10">
+      <div class="flex items-center gap-2 text-xs font-mono text-zinc-400 mb-6">
+        <button onclick="navigateTo('page-home')" class="hover:text-white">Home</button>
+        <span>/</span>
+        <button onclick="navigateTo('page-design-options')" class="hover:text-white">VibeDesign</button>
+        <span>/</span>
+        <span class="text-white">Scrap HTML & design.md</span>
+      </div>
+
+      <div class="text-center max-w-xl mx-auto mb-8">
+        <span class="text-[10px] font-mono uppercase px-2.5 py-1 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">Dual Artifact Generator</span>
+        <h1 class="text-3xl font-bold text-white mt-2 mb-2">Scrape Web ke 2 File</h1>
+        <p class="text-sm text-zinc-400">Masukkan link website publik untuk otomatis men-generate file <code class="text-zinc-200 font-mono">design.md</code> dan file <code class="text-zinc-200 font-mono">index.html</code>.</p>
+      </div>
+
+      <!-- Scraper Form Box -->
+      <div class="rounded-2xl hairline-border bg-zinc-900/60 p-6 flex flex-col gap-6">
+        <div class="flex flex-col sm:flex-row gap-3">
+          <div class="flex-1 flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm">
+            <svg class="w-5 h-5 text-zinc-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+            <input type="url" id="scrap-url" value="https://linear.app" placeholder="https://example.com" class="bg-transparent flex-1 outline-none text-zinc-100 placeholder:text-zinc-600 font-mono text-xs">
+          </div>
+          <button onclick="runDualScrape()" class="px-6 py-3 rounded-xl bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition flex items-center justify-center gap-2 whitespace-nowrap">
+            <span>Scrape & Generate 2 File</span>
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+
+        <!-- 2 GENERATED FILES SECTION (JELAS DITAMPILKAN KE USER) -->
+        <div class="flex flex-col gap-4 pt-4 border-t border-zinc-800">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span> 2 File Hasil Scraping Berhasil Digenerate:
+            </h3>
+            <button onclick="alert('Mengunduh paket bundle ZIP berisi index.html dan design.md!')" class="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-xs font-mono text-zinc-300 hover:text-white flex items-center gap-1.5 transition">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Unduh Keduanya (ZIP)
+            </button>
+          </div>
+
+          <!-- Cards of the 2 Generated Files -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- FILE 1: design.md CARD -->
+            <div class="p-5 rounded-xl border border-zinc-800 bg-zinc-950 flex flex-col justify-between gap-4">
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
+                    File 1: design.md
+                  </span>
+                  <span class="text-[11px] font-mono text-zinc-500">12.4 KB Markdown</span>
+                </div>
+                <h4 class="text-sm font-semibold text-white">Spesifikasi Desain & Token</h4>
+                <p class="text-xs text-zinc-400 leading-relaxed">
+                  Berisi Color Palette hex, Typography rules, spacing scale, corner radius, dan hierarki komponen UI dari target.
+                </p>
+                <!-- Mini Markdown Spec Preview -->
+                <div class="p-3 rounded-lg bg-zinc-900/80 border border-zinc-800 font-mono text-[11px] text-zinc-300 leading-relaxed overflow-x-auto">
+                  <code># Design Guidelines<br>## Color Tokens<br>--canvas: #08090A<br>--accent: #5E6AD2<br>## Typography: Inter, 14px body</code>
+                </div>
+              </div>
+
+              <div class="pt-2 flex items-center justify-between">
+                <button onclick="toggleScrapPreview('design-md')" class="text-xs text-zinc-400 hover:text-white underline font-mono">Lihat Isi Penuh</button>
+                <button onclick="alert('Mengunduh design.md!')" class="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-medium text-white hover:bg-zinc-800 transition flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                  Download design.md
+                </button>
+              </div>
+            </div>
+
+            <!-- FILE 2: index.html CARD -->
+            <div class="p-5 rounded-xl border border-zinc-800 bg-zinc-950 flex flex-col justify-between gap-4">
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    File 2: index.html
+                  </span>
+                  <span class="text-[11px] font-mono text-zinc-500">428 KB Clean HTML</span>
+                </div>
+                <h4 class="text-sm font-semibold text-white">Struktur Dokumen HTML Utuh</h4>
+                <p class="text-xs text-zinc-400 leading-relaxed">
+                  Source code HTML bersih yang siap dibuka langsung di browser dengan layout desktop 1440px terisolasi sandbox.
+                </p>
+                <!-- Mini HTML Code Snippet Preview -->
+                <div class="p-3 rounded-lg bg-zinc-900/80 border border-zinc-800 font-mono text-[11px] text-zinc-300 leading-relaxed overflow-x-auto">
+                  <code>&lt;!DOCTYPE html&gt;&lt;html&gt;<br>&lt;body class="bg-obsidian"&gt;<br>&lt;header class="h-14 flex..."&gt;</code>
+                </div>
+              </div>
+
+              <div class="pt-2 flex items-center justify-between">
+                <button onclick="toggleScrapPreview('index-html')" class="text-xs text-zinc-400 hover:text-white underline font-mono">Lihat Live Sandbox</button>
+                <button onclick="alert('Mengunduh index.html!')" class="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-medium text-white hover:bg-zinc-800 transition flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                  Download index.html
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Collapsible Full Viewer Container -->
+          <div id="scrap-preview-drawer" class="mt-4 p-5 rounded-xl border border-zinc-800 bg-zinc-950 flex flex-col gap-3">
+            <div class="flex items-center justify-between text-xs text-zinc-400 border-b border-zinc-900 pb-2">
+              <span id="preview-drawer-title" class="font-mono text-zinc-200">Live Preview: index.html (1440px Scaled Sandbox)</span>
+              <span class="text-emerald-400 font-mono text-[11px]">● Rendered View</span>
+            </div>
+            <div class="w-full rounded-lg bg-black border border-zinc-900 p-8 text-center text-xs text-zinc-400 min-h-[160px] flex flex-col items-center justify-center">
+              <p class="font-mono text-zinc-200">Interactive Preview Sandbox</p>
+              <p class="text-[11px] text-zinc-500 mt-1">Komponen visual halaman hasil scraping terisolasi di dalam iframe 1440px desktop</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 7: DESIGN - PROMPT UI STUDIO                                       -->
+    <!-- Route: /design/studio                                                     -->
+    <!-- ========================================================================= -->
+    <div id="page-design-stitch" class="page-screen hidden flex-1 flex w-full">
+      <!-- Left Studio Sidebar -->
+      <aside class="w-72 shrink-0 hairline-border border-r bg-[#0d0e11] p-4 flex flex-col justify-between hidden md:flex">
+        <div class="flex flex-col gap-5">
+          <!-- Logo & Breadcrumb -->
+          <div class="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-white tracking-wide text-sm font-mono">UI Studio</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-300">PROMPT</span>
+            </div>
+            <button onclick="navigateTo('page-design-options')" class="text-xs text-zinc-400 hover:text-white">✕ Keluar</button>
+          </div>
+
+          <!-- Project View Tabs -->
+          <div class="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs">
+            <button class="flex-1 py-1.5 rounded-lg bg-zinc-800 text-white font-medium text-[11px] flex items-center justify-center gap-1.5">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+              My Projects
+            </button>
+            <button class="flex-1 py-1.5 rounded-lg text-zinc-400 hover:text-white text-[11px] flex items-center justify-center gap-1.5">
+              Shared with me
+            </button>
+          </div>
+
+          <!-- Search projects input -->
+          <div class="relative">
+            <input type="text" placeholder="Search projects" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 pl-9 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none">
+            <svg class="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </div>
+
+          <!-- Examples List -->
+          <div class="flex flex-col gap-1">
+            <span class="text-[11px] font-mono uppercase text-zinc-500 px-1 mb-1">Examples</span>
+
+            <div class="p-2 rounded-xl hover:bg-zinc-900/60 cursor-pointer flex items-center gap-3 transition">
+              <div class="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 shrink-0 flex items-center justify-center text-[10px] text-zinc-400">UI</div>
+              <div class="min-w-0">
+                <div class="text-xs font-medium text-zinc-200 truncate">Main Dashboard</div>
+                <div class="text-[10px] text-zinc-500">Aug 21, 2026 • Shared</div>
+              </div>
+            </div>
+
+            <div class="p-2 rounded-xl hover:bg-zinc-900/60 cursor-pointer flex items-center gap-3 transition">
+              <div class="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 shrink-0 flex items-center justify-center text-[10px] text-zinc-400">HL</div>
+              <div class="min-w-0">
+                <div class="text-xs font-medium text-zinc-200 truncate">Home Lookbook</div>
+                <div class="text-[10px] text-zinc-500">Aug 15, 2026 • Shared</div>
+              </div>
+            </div>
+
+            <div class="p-2 rounded-xl hover:bg-zinc-900/60 cursor-pointer flex items-center gap-3 transition">
+              <div class="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 shrink-0 flex items-center justify-center text-[10px] text-zinc-400">VF</div>
+              <div class="min-w-0">
+                <div class="text-xs font-medium text-zinc-200 truncate">Vertical Feed</div>
+                <div class="text-[10px] text-zinc-500">Sep 1, 2026 • Shared</div>
+              </div>
+            </div>
+
+            <div class="p-2 rounded-xl hover:bg-zinc-900/60 cursor-pointer flex items-center gap-3 transition">
+              <div class="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 shrink-0 flex items-center justify-center text-[10px] text-zinc-400">DB</div>
+              <div class="min-w-0">
+                <div class="text-xs font-medium text-zinc-200 truncate">Fleet Admin Dashboard</div>
+                <div class="text-[10px] text-zinc-500">Jul 21, 2026 • Shared</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-[11px] text-zinc-500 font-mono pt-4 border-t border-zinc-800">
+          PRDFY UI Generator
+        </div>
+      </aside>
+
+      <!-- Studio Main Canvas -->
+      <div class="flex-1 flex flex-col p-8 max-w-4xl mx-auto w-full">
+        <!-- Top Action Bar -->
+        <div class="flex items-center justify-between mb-12">
+          <div class="md:hidden flex items-center gap-2">
+            <button onclick="navigateTo('page-design-options')" class="text-xs text-zinc-400 hover:text-white">← Kembali</button>
+            <span class="font-bold text-white font-mono">UI Studio</span>
+          </div>
+          <div class="hidden md:block"></div>
+          <div class="flex items-center gap-2">
+            <button class="px-3.5 py-1.5 rounded-full border border-zinc-800 hover:border-zinc-700 text-xs font-medium text-zinc-300 transition flex items-center gap-1.5">
+              <span>+ Mulai Desain Baru</span>
+            </button>
+            <button class="px-3.5 py-1.5 rounded-full border border-zinc-800 hover:border-zinc-700 text-xs font-medium text-zinc-300 transition flex items-center gap-1.5">
+              <span>+ Proyek Kosong</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Center Welcome & Prompt Box -->
+        <div class="flex flex-col items-center justify-center text-center my-auto w-full">
+          <h1 class="text-4xl md:text-5xl font-light tracking-tight text-white mb-8">
+            Rancang UI Impian Anda..
+          </h1>
+
+          <!-- Big Prompt Container -->
+          <div class="w-full rounded-2xl hairline-border bg-[#121316] p-5 text-left flex flex-col gap-4 shadow-2xl focus-within:border-zinc-700 transition">
+            <textarea rows="3" class="w-full bg-transparent text-zinc-100 placeholder:text-zinc-500 text-base outline-none resize-none" placeholder="Aplikasi native mobile atau web apa yang ingin kita rancang hari ini?"></textarea>
+
+            <!-- Bottom Toolbar inside prompt box -->
+            <div class="flex items-center justify-between pt-2 border-t border-zinc-800/80">
+              <!-- Left controls -->
+              <div class="flex items-center gap-3">
+                <button class="w-7 h-7 rounded-full border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition">+</button>
+                <div class="flex items-center gap-1 bg-zinc-950 p-1 rounded-full border border-zinc-800 text-xs">
+                  <button class="px-3 py-1 rounded-full bg-zinc-800 text-white font-medium text-xs">App</button>
+                  <button class="px-3 py-1 rounded-full text-zinc-400 hover:text-white font-medium text-xs">Web</button>
+                </div>
+              </div>
+
+              <!-- Right controls -->
+              <div class="flex items-center gap-2">
+                <button class="w-7 h-7 rounded-full text-zinc-400 hover:text-white flex items-center justify-center">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+                </button>
+                <div class="flex items-center gap-1 px-2.5 py-1 rounded-full border border-zinc-800 bg-zinc-950 text-xs text-zinc-300">
+                  <span>✨ Balanced</span>
+                  <svg class="w-3 h-3 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                </div>
+                <button onclick="alert('AI Design Studio: Men-generate UI screen interaktif...')" class="w-8 h-8 rounded-full bg-zinc-800 hover:bg-white hover:text-black flex items-center justify-center text-zinc-200 transition">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 7-7 7 7M12 19V5"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Suggestion Pills -->
+          <div class="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs">
+            <button class="px-4 py-2 rounded-full hairline-border bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-white transition">
+              Social feed komunitas dog shelter...
+            </button>
+            <button class="px-4 py-2 rounded-full hairline-border bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-white transition">
+              Daily tarot & horoscope reading app...
+            </button>
+            <button class="px-4 py-2 rounded-full hairline-border bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-white transition">
+              Catalog page seasonal home decoration...
+            </button>
+          </div>
+
+          <!-- Need inspiration section -->
+          <div class="w-full text-left mt-16">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-semibold text-zinc-200">Butuh inspirasi desain?</h3>
+              <div class="flex gap-2">
+                <button class="w-6 h-6 rounded-full border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">‹</button>
+                <button class="w-6 h-6 rounded-full border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">›</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="h-32 rounded-xl hairline-border bg-zinc-900/50 p-4 flex flex-col justify-end card-hover cursor-pointer">
+                <span class="text-xs font-medium text-white">Fitness Ring Tracker</span>
+                <span class="text-[10px] text-zinc-500">Mobile Native</span>
+              </div>
+              <div class="h-32 rounded-xl hairline-border bg-zinc-900/50 p-4 flex flex-col justify-end card-hover cursor-pointer">
+                <span class="text-xs font-medium text-white">Dark Minimalist Checkout</span>
+                <span class="text-[10px] text-zinc-500">Web App</span>
+              </div>
+              <div class="h-32 rounded-xl hairline-border bg-zinc-900/50 p-4 flex flex-col justify-end card-hover cursor-pointer">
+                <span class="text-xs font-medium text-white">Crypto Wallet Portfolio</span>
+                <span class="text-[10px] text-zinc-500">Mobile Native</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 8: VIBETEMPLATE (CATALOG HUB)                                      -->
+    <!-- Route: /templates                                                         -->
+    <!-- ========================================================================= -->
+    <div id="page-templates" class="page-screen hidden flex-col max-w-6xl w-full mx-auto px-6 py-10">
+      <div class="flex items-center gap-2 text-xs font-mono text-zinc-400 mb-6">
+        <button onclick="navigateTo('page-home')" class="hover:text-white flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg> Home
+        </button>
+        <span>/</span>
+        <span class="text-white">VibeTemplate</span>
+      </div>
+
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-5 mb-8">
+        <div>
+          <h1 class="text-2xl font-bold text-white mb-1">Kumpulan Template Proyek</h1>
+          <p class="text-sm text-zinc-400">Pilih dari katalog spesifikasi planning, kit desain, atau starter boilerplate proyek siap jalan.</p>
+        </div>
+
+        <div class="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-xs">
+          <button onclick="filterTemplates('all')" id="tab-tpl-all" class="px-3 py-1.5 rounded-lg bg-zinc-800 text-white font-medium">Semua</button>
+          <button onclick="filterTemplates('planning')" id="tab-tpl-planning" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white font-medium">1. Planning</button>
+          <button onclick="filterTemplates('design')" id="tab-tpl-design" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white font-medium">2. Design</button>
+          <button onclick="filterTemplates('boilerplate')" id="tab-tpl-boilerplate" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white font-medium">3. Boilerplate</button>
+        </div>
+      </div>
+
+      <!-- Templates Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- SIMRS Boilerplate -->
+        <div class="tpl-card group p-6 rounded-2xl hairline-border bg-zinc-900/50 hover:bg-zinc-900/80 card-hover flex flex-col justify-between" data-category="boilerplate">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Boilerplate Projek</span>
+              <span class="text-xs text-zinc-500 font-mono">Full-Stack</span>
+            </div>
+            <h3 class="text-lg font-bold text-white group-hover:text-blue-400 transition mb-2">Sistem Informasi Rumah Sakit (SIMRS)</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed mb-4">
+              Arsitektur lengkap manajemen rawat inap, antrian poli dokter, rekam medis elektronik (RME), dan billing apotek.
+            </p>
+          </div>
+          <div class="pt-4 border-t border-zinc-800 flex items-center justify-between">
+            <span class="text-[11px] font-mono text-zinc-500">Postgres + React</span>
+            <button onclick="alert('Menggunakan template SIMRS')" class="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition">Pakai Boilerplate</button>
+          </div>
+        </div>
+
+        <!-- B2B SaaS Planning -->
+        <div class="tpl-card group p-6 rounded-2xl hairline-border bg-zinc-900/50 hover:bg-zinc-900/80 card-hover flex flex-col justify-between" data-category="planning">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">Template Planning</span>
+              <span class="text-xs text-zinc-500 font-mono">PRD Spec</span>
+            </div>
+            <h3 class="text-lg font-bold text-white group-hover:text-blue-400 transition mb-2">B2B SaaS Multi-Tenant & Billing</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed mb-4">
+              Spesifikasi PRD 8-seksi untuk aplikasi SaaS enterprise: isolasi data tenant, langganan credit/tier, dan role-based access.
+            </p>
+          </div>
+          <div class="pt-4 border-t border-zinc-800 flex items-center justify-between">
+            <span class="text-[11px] font-mono text-zinc-500">8 Seksi + AC</span>
+            <button onclick="navigateTo('page-plan-greenfield')" class="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition">Buka di VibePlan</button>
+          </div>
+        </div>
+
+        <!-- Design Kit -->
+        <div class="tpl-card group p-6 rounded-2xl hairline-border bg-zinc-900/50 hover:bg-zinc-900/80 card-hover flex flex-col justify-between" data-category="design">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">Template Design</span>
+              <span class="text-xs text-zinc-500 font-mono">UI Kit</span>
+            </div>
+            <h3 class="text-lg font-bold text-white group-hover:text-blue-400 transition mb-2">Linear Developer Console Kit</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed mb-4">
+              Set komponen antarmuka bergaya dark obsidian dengan 1px hairline border, tabel data tabular, dan status badges.
+            </p>
+          </div>
+          <div class="pt-4 border-t border-zinc-800 flex items-center justify-between">
+            <span class="text-[11px] font-mono text-zinc-500">Tailwind + Radix</span>
+            <button onclick="navigateTo('page-design-stitch')" class="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition">Buka di Studio</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 9: VIBEBANTUAN (EXISTING PRDFY FEEDBACK UI)                         -->
+    <!-- Route: /settings/feedback                                                 -->
+    <!-- ========================================================================= -->
+    <div id="page-bantuan" class="page-screen hidden flex-col max-w-3xl w-full mx-auto px-6 py-10">
+      <div class="flex items-center gap-2 text-xs font-mono text-zinc-400 mb-6">
+        <button onclick="navigateTo('page-home')" class="hover:text-white flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg> Home
+        </button>
+        <span>/</span>
+        <span class="text-white">Bantuan</span>
+      </div>
+
+      <div class="rounded-xl border border-zinc-800 bg-[#0f1011] p-6">
+        <h2 class="mb-2 font-inter text-xl font-bold text-white">
+          Feedback & Bug Report
+        </h2>
+        <p class="mb-6 text-sm text-zinc-400">
+          Bantu kami meningkatkan PrdFy dengan memberikan feedback, melaporkan bug, atau meminta fitur baru.
+        </p>
+
+        <!-- FeedbackForm Component -->
+        <form onsubmit="handleFeedbackSubmit(event)" class="space-y-4">
+          <div>
+            <label class="mb-1 block text-sm font-medium text-zinc-300">Tipe Feedback</label>
+            <div class="flex gap-2">
+              <button type="button" onclick="setFeedbackType('general')" id="fb-type-general" class="rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors flex items-center gap-1.5 border-white bg-white text-black">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                General
+              </button>
+              <button type="button" onclick="setFeedbackType('bug')" id="fb-type-bug" class="rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors flex items-center gap-1.5 border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 2 1.88 1.88M14.12 3.88 16 2M9 7.13v-1a3.003 3.003 0 1 1 6 0v1M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9M6.53 9C4.6 8.8 3 7.1 3 5M6 13H2M3 21c0-2.1 1.7-3.9 3.8-4M20.97 5c0 2.1-1.6 3.8-3.5 4M18 13h4M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg>
+                Bug Report
+              </button>
+              <button type="button" onclick="setFeedbackType('feature')" id="fb-type-feature" class="rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors flex items-center gap-1.5 border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+                Feature Request
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-zinc-300">Pesan</label>
+            <textarea id="feedback-msg" rows="4" required placeholder="Tuliskan feedback, bug yang Anda temui, atau ide fitur baru di sini..." class="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-600 resize-none"></textarea>
+          </div>
+
+          <div class="flex items-center justify-between pt-2">
+            <span class="text-xs text-zinc-500 font-mono">Diteruskan langsung ke /admin/feedback</span>
+            <button type="submit" class="px-5 py-2.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition">
+              Kirim Feedback
+            </button>
+          </div>
+        </form>
+
+        <div id="feedback-success-banner" class="hidden mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 font-mono flex items-center gap-2">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+          Feedback terkirim! Terima kasih telah membantu meningkatkan PRDFY.
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 10: PRICING PAGE                                                   -->
+    <!-- Route: /pricing                                                           -->
+    <!-- ========================================================================= -->
+    <div id="page-pricing" class="page-screen hidden flex-col max-w-5xl w-full mx-auto px-6 py-10">
+      <div class="flex items-center gap-2 text-xs font-mono text-zinc-400 mb-6">
+        <button onclick="navigateTo('page-home')" class="hover:text-white flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg> Home
+        </button>
+        <span>/</span>
+        <span class="text-white">Pricing</span>
+      </div>
+
+      <div class="text-center max-w-xl mx-auto mb-10">
+        <h1 class="text-3xl font-bold text-white mb-2">Pilihan Paket & Kredit PRDFY</h1>
+        <p class="text-sm text-zinc-400">Bayar sekali, kredit berlaku selamanya tanpa masa kedaluwarsa. Gratis revisi sepuasnya.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Free Plan -->
+        <div class="p-6 rounded-2xl hairline-border bg-zinc-900/50 flex flex-col justify-between">
+          <div>
+            <span class="text-xs font-mono uppercase text-zinc-400">Free</span>
+            <div class="text-2xl font-bold text-white mt-2">Rp 0</div>
+            <p class="text-xs text-zinc-500 mt-1">Untuk mencoba fitur awal</p>
+            <ul class="mt-6 space-y-2.5 text-xs text-zinc-300">
+              <li class="flex items-center gap-2">✓ 2 Kredit awal</li>
+              <li class="flex items-center gap-2">✓ PRD Generation</li>
+              <li class="flex items-center gap-2 text-zinc-600">✕ Full AC & Task Tree</li>
+            </ul>
+          </div>
+          <button class="w-full mt-6 py-2 rounded-xl border border-zinc-800 text-xs font-medium text-white hover:bg-zinc-800 transition">Paket Aktif</button>
+        </div>
+
+        <!-- Pro Plan -->
+        <div class="p-6 rounded-2xl border border-blue-500/40 bg-zinc-900 flex flex-col justify-between shadow-xl relative">
+          <div class="absolute -top-3 right-5 text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500 text-white font-semibold">POPULAR</div>
+          <div>
+            <span class="text-xs font-mono uppercase text-blue-400">Pro</span>
+            <div class="text-2xl font-bold text-white mt-2">Rp 49.000</div>
+            <p class="text-xs text-zinc-400 mt-1">One-time payment</p>
+            <ul class="mt-6 space-y-2.5 text-xs text-zinc-200">
+              <li class="flex items-center gap-2">✓ 30 Kredit PRDFY</li>
+              <li class="flex items-center gap-2">✓ Full AC, Task & Kanban</li>
+              <li class="flex items-center gap-2">✓ Scrap HTML & UI Studio</li>
+              <li class="flex items-center gap-2">✓ Akses Template Lengkap</li>
+            </ul>
+          </div>
+          <button onclick="alert('Membuka Midtrans Snap Payment...')" class="w-full mt-6 py-2 rounded-xl bg-white text-black text-xs font-semibold hover:bg-zinc-200 transition">Beli Pro</button>
+        </div>
+
+        <!-- Hengker Plan -->
+        <div class="p-6 rounded-2xl hairline-border bg-zinc-900/50 flex flex-col justify-between">
+          <div>
+            <span class="text-xs font-mono uppercase text-emerald-400">Hengker</span>
+            <div class="text-2xl font-bold text-white mt-2">Rp 149.000</div>
+            <p class="text-xs text-zinc-500 mt-1">One-time payment</p>
+            <ul class="mt-6 space-y-2.5 text-xs text-zinc-300">
+              <li class="flex items-center gap-2">✓ 105 Kredit PRDFY</li>
+              <li class="flex items-center gap-2">✓ Model DeepSeek V4 Flash</li>
+              <li class="flex items-center gap-2">✓ Unlimited Version History</li>
+              <li class="flex items-center gap-2">✓ Prioritas Dukungan Admin</li>
+            </ul>
+          </div>
+          <button onclick="alert('Membuka Midtrans Snap Payment...')" class="w-full mt-6 py-2 rounded-xl border border-zinc-800 text-xs font-medium text-white hover:bg-zinc-800 transition">Beli Hengker</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Router Script Engine -->
+  <script>
+    const allScreens = [
+      'page-home',
+      'page-plan-options',
+      'page-plan-greenfield',
+      'page-plan-codebase',
+      'page-design-options',
+      'page-design-scrap',
+      'page-design-stitch',
+      'page-templates',
+      'page-bantuan',
+      'page-pricing'
+    ];
+
+    function navigateTo(screenId) {
+      allScreens.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          if (id === screenId) {
+            el.classList.remove('hidden');
+            el.classList.add('flex');
+          } else {
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+          }
+        }
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Sidebar Toggle
+    function toggleSidebar(open) {
+      const drawer = document.getElementById('sidebar-drawer');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (open) {
+        backdrop.classList.remove('hidden');
+        setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+        drawer.classList.remove('-translate-x-full');
+      } else {
+        backdrop.classList.add('opacity-0');
+        drawer.classList.add('-translate-x-full');
+        setTimeout(() => backdrop.classList.add('hidden'), 200);
+      }
+    }
+
+    // Filter History Items by Category
+    function filterHistoryCategory(cat) {
+      const tabs = ['all', 'plan', 'design', 'scrap'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`hfilter-${t}`);
+        if (t === cat) {
+          btn.className = "px-2.5 py-1 rounded-md bg-zinc-800 text-white";
+        } else {
+          btn.className = "px-2.5 py-1 rounded-md text-zinc-400 hover:text-white";
+        }
+      });
+
+      const cards = document.querySelectorAll('.hist-card');
+      cards.forEach(card => {
+        if (cat === 'all' || card.dataset.cat === cat) {
+          card.classList.remove('hidden');
+          card.classList.add('flex');
+        } else {
+          card.classList.add('hidden');
+          card.classList.remove('flex');
+        }
+      });
+    }
+
+    // Search in History
+    function filterHistoryItems(query) {
+      const q = query.toLowerCase().trim();
+      const cards = document.querySelectorAll('.hist-card');
+      cards.forEach(card => {
+        const title = card.dataset.title || '';
+        if (!q || title.includes(q)) {
+          card.classList.remove('hidden');
+          card.classList.add('flex');
+        } else {
+          card.classList.add('hidden');
+          card.classList.remove('flex');
+        }
+      });
+    }
+
+    // Select History Item
+    function selectHistoryItem(title, cat) {
+      toggleSidebar(false);
+      if (cat === 'plan') {
+        navigateTo('page-plan-greenfield');
+      } else if (cat === 'design') {
+        navigateTo('page-design-stitch');
+      } else if (cat === 'scrap') {
+        navigateTo('page-design-scrap');
+      }
+    }
+
+    function runDualScrape() {
+      const url = document.getElementById('scrap-url').value;
+      alert(`Scraping ${url} selesai!\n2 File dihasilkan:\n1. design.md (aturan styling & token)\n2. index.html (kode HTML bersih & snapshot 1440px)`);
+    }
+
+    function toggleScrapPreview(type) {
+      const title = document.getElementById('preview-drawer-title');
+      if (type === 'design-md') {
+        title.innerText = 'Preview: design.md (Markdown Design System Specification)';
+      } else {
+        title.innerText = 'Live Preview: index.html (1440px Scaled Sandbox)';
+      }
+    }
+
+    function filterTemplates(category) {
+      const cards = document.querySelectorAll('.tpl-card');
+      const tabs = ['all', 'planning', 'design', 'boilerplate'];
+
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tab-tpl-${t}`);
+        if (t === category) {
+          btn.classList.add('bg-zinc-800', 'text-white');
+          btn.classList.remove('text-zinc-400');
+        } else {
+          btn.classList.remove('bg-zinc-800', 'text-white');
+          btn.classList.add('text-zinc-400');
+        }
+      });
+
+      cards.forEach(c => {
+        if (category === 'all' || c.dataset.category === category) {
+          c.classList.remove('hidden');
+          c.classList.add('flex');
+        } else {
+          c.classList.add('hidden');
+          c.classList.remove('flex');
+        }
+      });
+    }
+
+    function setFeedbackType(type) {
+      const types = ['general', 'bug', 'feature'];
+      types.forEach(t => {
+        const btn = document.getElementById(`fb-type-${t}`);
+        if (t === type) {
+          btn.className = "rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors flex items-center gap-1.5 border-white bg-white text-black";
+        } else {
+          btn.className = "rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors flex items-center gap-1.5 border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700";
+        }
+      });
+    }
+
+    function handleFeedbackSubmit(e) {
+      e.preventDefault();
+      const banner = document.getElementById('feedback-success-banner');
+      banner.classList.remove('hidden');
+      document.getElementById('feedback-msg').value = '';
+      setTimeout(() => banner.classList.add('hidden'), 4000);
+    }
+
+    function copyBtn(btn) {
+      const old = btn.innerText;
+      btn.innerText = "Tersalin!";
+      setTimeout(() => btn.innerText = old, 2000);
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      document.documentElement.classList.toggle('light', !isDark);
+      document.getElementById('theme-icon-sun').classList.toggle('hidden', isDark);
+      document.getElementById('theme-icon-moon').classList.toggle('hidden', !isDark);
+      document.body.style.backgroundColor = isDark ? '#09090b' : '#ffffff';
+      document.body.style.color = isDark ? '#f4f4f5' : '#09090b';
+    }
+  </script>
+</body>
+</html>
