@@ -23,9 +23,9 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
+	searchTemplates,
 	type TemplateCategory,
 	type VibeTemplateEntry,
-	searchTemplates,
 } from "@/lib/template-gallery";
 
 const ICON_MAP: Record<string, typeof BarChart3> = {
@@ -55,7 +55,9 @@ export function TemplateCatalog({
 	onCopyPrompt?: (prompt: string) => void;
 }) {
 	const navigate = useNavigate();
-	const [activeCategory, setActiveCategory] = useState<TemplateCategory | "all">("all");
+	const [activeCategory, setActiveCategory] = useState<
+		TemplateCategory | "all"
+	>("all");
 	const [searchQuery, setSearchQuery] = useState("");
 	const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -140,7 +142,9 @@ export function TemplateCatalog({
 			{/* Template Cards Grid */}
 			{filteredTemplates.length === 0 ? (
 				<div className="rounded-2xl border border-graphite bg-charcoal/50 p-12 text-center">
-					<p className="text-sm text-fog">Tidak ada template yang cocok dengan pencarian kamu.</p>
+					<p className="text-sm text-fog">
+						Tidak ada template yang cocok dengan pencarian kamu.
+					</p>
 				</div>
 			) : (
 				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -210,7 +214,11 @@ export function TemplateCatalog({
 										onClick={() => handleNavigate(template)}
 										className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-graphite bg-obsidian px-3 py-2 text-xs font-semibold text-snow hover:border-steel hover:bg-white/5 transition"
 									>
-										<span>{template.category === "design" ? "Rancang di Studio" : "Gunakan di VibePlan"}</span>
+										<span>
+											{template.category === "design"
+												? "Rancang di Studio"
+												: "Gunakan di VibePlan"}
+										</span>
 										<ArrowRight size={14} />
 									</button>
 									<button
@@ -220,7 +228,11 @@ export function TemplateCatalog({
 										onClick={() => handleCopy(template.id, template.prompt)}
 										className="flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-xl border border-graphite bg-obsidian text-fog hover:border-steel hover:text-snow transition"
 									>
-										{isCopied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+										{isCopied ? (
+											<Check size={14} className="text-emerald-400" />
+										) : (
+											<Copy size={14} />
+										)}
 									</button>
 								</div>
 							</div>

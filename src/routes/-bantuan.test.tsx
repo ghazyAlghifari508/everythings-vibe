@@ -85,6 +85,10 @@ describe("BantuanPage Hub", () => {
 		const question = screen.getByText(/Bagaimana cara kerja VibeDesign Scrap/i);
 		fireEvent.click(question);
 
-		expect(screen.getByText(/menghasilkan 2 file langsung: index.html dan design.md/i)).toBeDefined();
+		expect(
+			screen.getByText(
+				/menghasilkan 2 file langsung: index.html dan design.md/i,
+			),
+		).toBeDefined();
 	});
 });

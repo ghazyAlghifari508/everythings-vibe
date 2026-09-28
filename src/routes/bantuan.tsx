@@ -29,15 +29,15 @@ export function BantuanPage() {
 		<main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
 			<HubBreadcrumb current="Bantuan" />
 
-		<header>
-			<h1 className="text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
-				Pusat Bantuan
-			</h1>
-			<p className="mt-3 max-w-2xl text-sm leading-6 text-fog">
-				Pelajari cara memakai setiap modul, temukan jawaban cepat, dan
-				kirim masukan langsung ke tim admin.
-			</p>
-		</header>
+			<header>
+				<h1 className="text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
+					Pusat Bantuan
+				</h1>
+				<p className="mt-3 max-w-2xl text-sm leading-6 text-fog">
+					Pelajari cara memakai setiap modul, temukan jawaban cepat, dan kirim
+					masukan langsung ke tim admin.
+				</p>
+			</header>
 
 			<section className="flex flex-col gap-4">
 				<h2 className="font-mono text-xs uppercase tracking-widest text-fog">

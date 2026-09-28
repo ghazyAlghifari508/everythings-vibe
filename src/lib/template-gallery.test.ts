@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-	type TemplateCategory,
-	type VibeTemplateEntry,
-	VIBE_TEMPLATES,
 	getTemplatesByCategory,
 	searchTemplates,
+	type TemplateCategory,
+	VIBE_TEMPLATES,
+	type VibeTemplateEntry,
 } from "./template-gallery";
 
 describe("VIBE_TEMPLATES Catalog", () => {

@@ -13,7 +13,9 @@ export function HeroContent({
 	initialPlatform?: "web" | "mobile";
 } = {}) {
 	const [prefill, setPrefill] = useState<string | undefined>(initialPrompt);
-	const [prefillMobile, setPrefillMobile] = useState(initialPlatform === "mobile");
+	const [prefillMobile, setPrefillMobile] = useState(
+		initialPlatform === "mobile",
+	);
 	// ponytail: re-selecting the same template yields the same string, which
 	// React useState bails out on. The tick forces ChatInput's sync effect
 	// to re-run so the textarea re-prefills every click.
