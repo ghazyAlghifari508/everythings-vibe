@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, MessageSquare, Shield } from "lucide-react";
+import { ArrowRight, MessageSquare, Shield } from "lucide-react";
+import { FaqAccordion } from "@/components/bantuan/faq-accordion";
+import { WorkflowGuides } from "@/components/bantuan/workflow-guides";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { authClient } from "@/lib/auth-client";
 import { isAdmin } from "@/lib/session";
@@ -27,42 +29,31 @@ export function BantuanPage() {
 		<main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
 			<HubBreadcrumb current="Bantuan" />
 
-			<header>
-				<h1 className="text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
-					Pusat Bantuan
-				</h1>
-				<p className="mt-3 max-w-2xl text-sm leading-6 text-fog">
-					Semua laporan yang kamu kirim masuk ke satu antrean yang ditinjau tim
-					admin. Pilih tujuan yang paling sesuai dengan kebutuhanmu.
-				</p>
-			</header>
+		<header>
+			<h1 className="text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
+				Pusat Bantuan
+			</h1>
+			<p className="mt-3 max-w-2xl text-sm leading-6 text-fog">
+				Pelajari cara memakai setiap modul, temukan jawaban cepat, dan
+				kirim masukan langsung ke tim admin.
+			</p>
+		</header>
+
+			<section className="flex flex-col gap-4">
+				<h2 className="font-mono text-xs uppercase tracking-widest text-fog">
+					Panduan Alur Kerja
+				</h2>
+				<WorkflowGuides />
+			</section>
+
+			<section className="flex flex-col gap-4">
+				<h2 className="font-mono text-xs uppercase tracking-widest text-fog">
+					Pertanyaan Umum (FAQ)
+				</h2>
+				<FaqAccordion />
+			</section>
 
 			<section className="flex flex-col gap-3">
-				<Link
-					to="/faq"
-					className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					<span className="flex items-start gap-4">
-						<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
-							<BookOpen size={20} aria-hidden />
-						</span>
-						<span>
-							<span className="block text-base font-semibold text-snow">
-								FAQ
-							</span>
-							<span className="mt-1 block text-sm text-fog">
-								Pertanyaan yang sering diajukan soal akun, kredit, dan alur
-								kerja.
-							</span>
-						</span>
-					</span>
-					<ArrowRight
-						size={18}
-						aria-hidden
-						className="shrink-0 text-fog transition-all group-hover:translate-x-1 group-hover:text-snow"
-					/>
-				</Link>
-
 				<Link
 					to="/settings/feedback"
 					className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"

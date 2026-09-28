@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BantuanPage } from "./bantuan";
 
@@ -60,12 +60,31 @@ describe("BantuanPage admin triage gate", () => {
 		expect(linkHrefs()).toContain("/admin/feedback");
 	});
 
-	it("keeps the public help routes reachable for every visitor", () => {
+	it("keeps the feedback and home routes reachable for every visitor", () => {
 		render(<BantuanPage />);
 
 		const hrefs = linkHrefs();
-		expect(hrefs).toContain("/faq");
 		expect(hrefs).toContain("/settings/feedback");
 		expect(hrefs).toContain("/");
+	});
+});
+
+describe("BantuanPage Hub", () => {
+	it("renders workflow guides, FAQs, and feedback links", () => {
+		sessionUser = { id: "u1", email: "user@example.invalid", isAdmin: false };
+		render(<BantuanPage />);
+		expect(screen.getByText("Pusat Bantuan")).toBeDefined();
+		expect(screen.getByText(/Panduan Alur Kerja/i)).toBeDefined();
+		expect(screen.getByText(/Pertanyaan Umum \(FAQ\)/i)).toBeDefined();
+		expect(screen.getByText(/Feedback & Bug Report/i)).toBeDefined();
+	});
+
+	it("expands FAQ answer when question accordion is clicked", () => {
+		sessionUser = { id: "u1", email: "user@example.invalid", isAdmin: false };
+		render(<BantuanPage />);
+		const question = screen.getByText(/Bagaimana cara kerja VibeDesign Scrap/i);
+		fireEvent.click(question);
+
+		expect(screen.getByText(/menghasilkan 2 file langsung: index.html dan design.md/i)).toBeDefined();
 	});
 });
