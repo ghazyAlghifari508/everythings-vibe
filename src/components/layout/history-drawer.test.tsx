@@ -46,6 +46,7 @@ const mockItems = [
 		updatedAt: new Date("2026-09-28T04:00:00.000Z"),
 		url: `/prd/${SIMRS_ID}`,
 		step: "prd",
+		preview: "Ringkasan produk yang sudah digenerate AI.",
 		acStatus: null,
 		taskStatus: null,
 	},
@@ -56,6 +57,7 @@ const mockItems = [
 		updatedAt: new Date("2026-09-20T04:00:00.000Z"),
 		url: `/prd/${AIRBNB_ID}`,
 		step: "task",
+		preview: null,
 		acStatus: "completed",
 		taskStatus: "completed",
 	},
@@ -69,7 +71,7 @@ function renderDrawer(props: Partial<React.ComponentProps<typeof HistoryDrawer>>
 			<HistoryDrawer
 				isOpen
 				onClose={() => {}}
-				items={mockItems}
+				override={{ items: mockItems }}
 				{...props}
 			/>
 		</QueryClientProvider>,
@@ -182,7 +184,7 @@ describe("HistoryDrawer lazy fetching", () => {
 
 describe("HistoryDrawer empty states", () => {
 	it("explains an empty history instead of rendering a blank panel", () => {
-		renderDrawer({ items: [] });
+		renderDrawer({ override: { items: [] } });
 
 		expect(screen.getByText(/Belum ada riwayat projek/i)).toBeDefined();
 	});
@@ -193,7 +195,7 @@ describe("HistoryDrawer empty states", () => {
 	const phaseOneItems = [mockItems[0]];
 
 	it("reports an honest empty state for the VibeDesign category", () => {
-		renderDrawer({ items: phaseOneItems });
+		renderDrawer({ override: { items: phaseOneItems } });
 
 		fireEvent.click(filterPills().getByRole("button", { name: "VibeDesign" }));
 
@@ -201,11 +203,153 @@ describe("HistoryDrawer empty states", () => {
 	});
 
 	it("reports an honest empty state for the Scrap category", () => {
-		renderDrawer({ items: phaseOneItems });
+		renderDrawer({ override: { items: phaseOneItems } });
 
 		fireEvent.click(filterPills().getByRole("button", { name: "Scrap" }));
 
 		expect(screen.getByText("Belum ada hasil scrap.")).toBeDefined();
+	});
+});
+
+describe("HistoryDrawer global side effects", () => {
+	// Regression: the drawer is mounted on every route by AppLayout. When its
+	// Radix parts are force-mounted, RemoveScrollBar never unmounts (so
+	// body[data-scroll-locked] + an `overflow: hidden !important` stylesheet
+	// stick for the whole session) and hideOthers() never cleans up (so every
+	// element outside the drawer stays aria-hidden from assistive tech). A
+	// closed drawer must have zero global footprint.
+	const renderWithAppRoot = (isOpen: boolean) =>
+		render(
+			<QueryClientProvider client={queryClient}>
+				<div data-testid="app-root">
+					<HistoryDrawer isOpen={isOpen} onClose={() => {}} />
+				</div>
+			</QueryClientProvider>,
+		);
+
+	it("leaves no scroll lock on the body while closed", () => {
+		renderWithAppRoot(false);
+
+		expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
+	});
+
+	it("leaves the rest of the app visible to assistive tech while closed", () => {
+		const { container } = renderWithAppRoot(false);
+
+		// `container` is the app's own mount element, the direct <body> child
+		// that hideOthers() shields once the drawer is open. It is the real-app
+		// analogue of the #root div, so it is where the regression shows.
+		expect(container.getAttribute("aria-hidden")).not.toBe("true");
+	});
+
+	it("does not paint a closed drawer panel (no initial slide-out flash)", () => {
+		const { container } = renderWithAppRoot(false);
+
+		expect(container.querySelector(".drawer-content")).toBeNull();
+		expect(document.querySelector(".drawer-content")).toBeNull();
+	});
+
+	it("releases the scroll lock and the aria-hidden shield after open then close", async () => {
+		loadHistorySpy.mockResolvedValue({ items: [] });
+		const { container, rerender } = renderWithAppRoot(false);
+
+		rerender(
+			<QueryClientProvider client={queryClient}>
+				<div data-testid="app-root">
+					<HistoryDrawer isOpen onClose={() => {}} />
+				</div>
+			</QueryClientProvider>,
+		);
+		await screen.findByRole("dialog", { name: "Riwayat Projek" });
+
+		// Sanity: while open the shield is legitimately applied, otherwise the
+		// assertions after close would pass for the wrong reason.
+		expect(container.getAttribute("aria-hidden")).toBe("true");
+
+		rerender(
+			<QueryClientProvider client={queryClient}>
+				<div data-testid="app-root">
+					<HistoryDrawer isOpen={false} onClose={() => {}} />
+				</div>
+			</QueryClientProvider>,
+		);
+		await waitFor(() => {
+			expect(document.querySelector(".drawer-content")).toBeNull();
+		});
+
+		expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
+		expect(container.getAttribute("aria-hidden")).not.toBe("true");
+	});
+});
+
+describe("HistoryDrawer query failure", () => {
+	it("reports the failure and retries instead of claiming there is no history", async () => {
+		loadHistorySpy.mockRejectedValue(new Error("Unauthorized"));
+
+		render(
+			<QueryClientProvider client={queryClient}>
+				<HistoryDrawer isOpen onClose={() => {}} />
+			</QueryClientProvider>,
+		);
+
+		const retry = await screen.findByRole("button", { name: /Coba lagi/i });
+		expect(retry).toBeDefined();
+		// The fabricated empty state must not stand in for a failed load.
+		expect(screen.queryByText(/Belum ada riwayat projek/i)).toBeNull();
+		expect(loadHistorySpy).toHaveBeenCalledTimes(1);
+
+		loadHistorySpy.mockResolvedValue({ items: [] });
+		fireEvent.click(retry);
+
+		await waitFor(() => {
+			expect(loadHistorySpy).toHaveBeenCalledTimes(2);
+		});
+		await screen.findByText(/Belum ada riwayat projek/i);
+	});
+});
+
+describe("HistoryDrawer status line", () => {
+	it("does not claim a generated project is still waiting for its PRD", () => {
+		renderDrawer({
+			override: {
+				items: [
+					{
+						...mockItems[0],
+						step: "prd",
+						preview: "Ringkasan produk yang sudah digenerate AI.",
+					},
+				],
+			},
+		});
+
+		expect(screen.getByText("Tahap PRD · Ringkasan tersimpan")).toBeDefined();
+		expect(screen.queryByText("Menunggu PRD")).toBeNull();
+	});
+
+	it("reports a missing summary instead of inventing progress", () => {
+		renderDrawer({
+			override: { items: [{ ...mockItems[0], step: "prd", preview: null }] },
+		});
+
+		expect(screen.getByText("Tahap PRD · Belum ada ringkasan")).toBeDefined();
+	});
+
+	it("only claims completion when the real status says completed", () => {
+		renderDrawer({
+			override: {
+				items: [
+					{ ...mockItems[0], step: "ac", acStatus: "completed" },
+					{
+						...mockItems[1],
+						step: "ac",
+						acStatus: "pending",
+					},
+				],
+			},
+		});
+
+		expect(screen.getByText("Tahap AC · AC selesai")).toBeDefined();
+		expect(screen.getByText("Tahap AC · AC belum selesai")).toBeDefined();
 	});
 });
 
