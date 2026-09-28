@@ -168,7 +168,9 @@ export async function fetchHtml(
 				}
 				if (!HTML_CONTENT_TYPE.test(responseContentType(res))) {
 					res.resume();
-					reject(new ScrapeError("NO_ANALYZABLE_CONTENT", "Konten bukan HTML."));
+					reject(
+						new ScrapeError("NO_ANALYZABLE_CONTENT", "Konten bukan HTML."),
+					);
 					return;
 				}
 				const chunks: Buffer[] = [];
@@ -243,10 +245,9 @@ function htmlAttr(tag: string, name: string): string {
 	);
 	if (!match) return "";
 	const value = match[1];
-	return (value[0] === '"' || value[0] === "'" ? value.slice(1, -1) : value).replace(
-		/&(amp|#38|#x26);/gi,
-		"&",
-	);
+	return (
+		value[0] === '"' || value[0] === "'" ? value.slice(1, -1) : value
+	).replace(/&(amp|#38|#x26);/gi, "&");
 }
 
 export function stylesheetHrefs(html: string, pageUrl: string): string[] {
@@ -306,6 +307,9 @@ export function withBaseHref(html: string, pageUrl: string): string {
 export function extractPageTitle(html: string): string | null {
 	const match = html.match(/<title[^>]*>([\s\S]*?)<\/title\s*>/i);
 	if (!match) return null;
-	const title = match[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+	const title = match[1]
+		.replace(/<[^>]+>/g, "")
+		.replace(/\s+/g, " ")
+		.trim();
 	return title.length > 0 ? title.slice(0, 300) : null;
 }

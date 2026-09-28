@@ -1,22 +1,26 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { Loader2, Sparkles } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { type FormEvent, useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { requireUserServer } from "@/lib/session";
 
-const loadStudioHistory = createServerFn({ method: "GET" }).handler(async () => {
-	const user = await requireUserServer();
-	const { listStudioProjects } = await import("@/lib/services/studio-service");
-	const rows = await listStudioProjects(user.id);
-	return {
-		history: rows.map((row) => ({
-			id: row.id,
-			title: row.title,
-			createdAt: row.createdAt.toISOString(),
-		})),
-	};
-});
+const loadStudioHistory = createServerFn({ method: "GET" }).handler(
+	async () => {
+		const user = await requireUserServer();
+		const { listStudioProjects } = await import(
+			"@/lib/services/studio-service"
+		);
+		const rows = await listStudioProjects(user.id);
+		return {
+			history: rows.map((row) => ({
+				id: row.id,
+				title: row.title,
+				createdAt: row.createdAt.toISOString(),
+			})),
+		};
+	},
+);
 
 export const Route = createFileRoute("/design/studio/")({
 	head: () => ({
@@ -75,8 +79,8 @@ function StudioPage() {
 				</h1>
 				<p className="mt-3 text-sm leading-6 text-fog">
 					Tulis kebutuhan antarmukamu dalam Bahasa Indonesia. Studio
-					men-generate halaman HTML interaktif lengkap dengan Tailwind dan
-					data realistis, siap direvisi lewat chat.
+					men-generate halaman HTML interaktif lengkap dengan Tailwind dan data
+					realistis, siap direvisi lewat chat.
 				</p>
 			</header>
 

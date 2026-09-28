@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { ScrapeError } from "@/lib/design-errors";
+
 const BLOCKED_HOSTNAMES: Record<string, true> = {
 	localhost: true,
 	"ip6-localhost": true,

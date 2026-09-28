@@ -1,5 +1,8 @@
-import { selectModels, tryStreamWithFallback } from "@/lib/services/ai-orchestrator";
 import { ScrapeError } from "@/lib/design-errors";
+import {
+	selectModels,
+	tryStreamWithFallback,
+} from "@/lib/services/ai-orchestrator";
 
 export const DESIGN_MIN_CHARS = 12_000;
 
@@ -91,7 +94,10 @@ function sanitizeHtmlExcerpt(html: string): string {
 	return html
 		.replace(/<script\b[^>]*>[\s\S]*?(?:<\/script\s*>|$)/gi, "")
 		.replace(/<style\b[^>]*>[\s\S]*?(?:<\/style\s*>|$)/gi, "")
-		.replace(/ignore (all )?(previous|system|developer) instructions?/gi, "[removed]")
+		.replace(
+			/ignore (all )?(previous|system|developer) instructions?/gi,
+			"[removed]",
+		)
 		.replace(/system prompt/gi, "[removed]")
 		.replace(/\s+/g, " ")
 		.trim()
@@ -108,11 +114,20 @@ export function designIssues(text: string): string[] {
 	).map((heading) => `missing ${heading}`);
 	if (text.length < DESIGN_MIN_CHARS)
 		issues.push(`too short (${text.length}/${DESIGN_MIN_CHARS} chars)`);
-	if (countTableRows(designSection(text, "## Tokens - Colors", "## Tokens - Typography")) < 8)
+	if (
+		countTableRows(
+			designSection(text, "## Tokens - Colors", "## Tokens - Typography"),
+		) < 8
+	)
 		issues.push("needs 8+ color rows");
-	if (countHeadings(designSection(text, "## Components", "## Do's and Don'ts")) < 8)
+	if (
+		countHeadings(designSection(text, "## Components", "## Do's and Don'ts")) <
+		8
+	)
 		issues.push("needs 8+ component specs");
-	if (countBullets(designSection(text, "## Do's and Don'ts", "## Surfaces")) < 12)
+	if (
+		countBullets(designSection(text, "## Do's and Don'ts", "## Surfaces")) < 12
+	)
 		issues.push("needs 6+ do and 6+ don't bullets");
 	if (
 		countPrompts(
@@ -130,7 +145,10 @@ export function normalizeDesign(text: string): string {
 		.replace(/[""�]/g, '"')
 		.replace(/^## Tokens\s*-\s*Colors$/gim, "## Tokens - Colors")
 		.replace(/^## Tokens\s*-\s*Typography$/gim, "## Tokens - Typography")
-		.replace(/^## Tokens\s*-\s*Spacing & Shapes$/gim, "## Tokens - Spacing & Shapes")
+		.replace(
+			/^## Tokens\s*-\s*Spacing & Shapes$/gim,
+			"## Tokens - Spacing & Shapes",
+		)
 		.replace(/^## Do's and Don'ts$/gim, "## Do's and Don'ts")
 		.replace(/^### .*Component Prompts?.*$/gim, "### Example Component Prompts")
 		.replace(
@@ -139,7 +157,11 @@ export function normalizeDesign(text: string): string {
 		);
 }
 
-export function designSection(text: string, start: string, end: string): string {
+export function designSection(
+	text: string,
+	start: string,
+	end: string,
+): string {
 	const from = text.indexOf(start);
 	if (from === -1) return "";
 	const to = text.indexOf(end, from + start.length);
@@ -156,8 +178,9 @@ export function countTableRows(text: string): number {
 }
 
 export function countHeadings(text: string, level = 3): number {
-	return text.split("\n").filter((line) => line.startsWith(`${"#".repeat(level)} `))
-		.length;
+	return text
+		.split("\n")
+		.filter((line) => line.startsWith(`${"#".repeat(level)} `)).length;
 }
 
 export function countBullets(text: string): number {

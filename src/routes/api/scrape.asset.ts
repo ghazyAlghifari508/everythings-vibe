@@ -32,9 +32,7 @@ export type AssetRouteDeps = {
 
 function assetWindowStart(now: Date): Date {
 	const windowMs = SCRAPE_ASSET_RATE_WINDOW_S * 1000;
-	return new Date(
-		Math.floor(now.getTime() / windowMs) * windowMs,
-	);
+	return new Date(Math.floor(now.getTime() / windowMs) * windowMs);
 }
 
 export async function allowAssetRequest(key: string): Promise<boolean> {
@@ -64,7 +62,6 @@ export async function shapeAssetResponse(
 	target: string,
 	deps: AssetRouteDeps = {},
 ): Promise<Response> {
-	const checkRateLimit = deps.checkRateLimit ?? allowAssetRequest;
 	const loadAsset = deps.fetchAsset ?? fetchAsset;
 	const { body, status, contentType } = await loadAsset(target);
 	const isCss = /text\/css/i.test(contentType);

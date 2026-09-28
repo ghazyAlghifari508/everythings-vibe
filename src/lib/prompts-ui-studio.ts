@@ -30,7 +30,10 @@ export function validateStudioPrompt(raw: unknown): StudioPromptValidation {
 	return { ok: true, prompt: raw.trim() };
 }
 
-export function buildStudioUserPrompt(prompt: string, previousHtml?: string): string {
+export function buildStudioUserPrompt(
+	prompt: string,
+	previousHtml?: string,
+): string {
 	if (previousHtml && previousHtml.trim().length > 0)
 		return `Revise the existing page below according to this request: ${prompt}\n\n<EXISTING_HTML>\n${previousHtml.trim().slice(0, 60_000)}\n</EXISTING_HTML>\n\nReturn the FULL revised single-file HTML document.`;
 	return `Build a complete single-file HTML page for this request: ${prompt}\n\nReturn the FULL single-file HTML document.`;

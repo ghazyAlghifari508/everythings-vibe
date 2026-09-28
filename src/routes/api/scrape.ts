@@ -42,7 +42,11 @@ export const Route = createFileRoute("/api/scrape")({
 	},
 });
 
-export async function GET({ request }: { request: Request }): Promise<Response> {
+export async function GET({
+	request,
+}: {
+	request: Request;
+}): Promise<Response> {
 	try {
 		const user = await requireUser(getRequestHeaders());
 		const url = new URL(request.url);
@@ -106,9 +110,7 @@ export async function DELETE({
 	}
 }
 
-export async function listScrapesForRoute(
-	request: Request,
-): Promise<Response> {
+export async function listScrapesForRoute(request: Request): Promise<Response> {
 	try {
 		const user = await requireUser(request.headers);
 		const items = await listScrapes(user.id);

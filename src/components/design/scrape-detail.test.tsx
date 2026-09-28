@@ -19,8 +19,6 @@ describe("ScrapeDetail 2-File Output Viewer", () => {
 		expect(
 			screen.getByRole("button", { name: /Salin DESIGN.md/i }),
 		).toBeDefined();
-		expect(
-			screen.getByRole("button", { name: /Download ZIP/i }),
-		).toBeDefined();
+		expect(screen.getByRole("button", { name: /Download ZIP/i })).toBeDefined();
 	});
 });

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	buildStudioUserPrompt,
 	STUDIO_MAX_PROMPT_CHARS,
 	STUDIO_MIN_PROMPT_CHARS,
 	STUDIO_SYSTEM_PROMPT,
-	buildStudioUserPrompt,
 	validateStudioPrompt,
 } from "./prompts-ui-studio";
 
@@ -27,7 +27,10 @@ describe("Studio Prompt Builder", () => {
 	});
 
 	it("embeds revision context for iterative refinement", () => {
-		const prompt = buildStudioUserPrompt("Ubah tombol jadi hijau", "<html></html>");
+		const prompt = buildStudioUserPrompt(
+			"Ubah tombol jadi hijau",
+			"<html></html>",
+		);
 		expect(prompt).toContain("Ubah tombol jadi hijau");
 		expect(prompt).toContain("<html></html>");
 	});

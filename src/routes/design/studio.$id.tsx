@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { ArrowLeft, Loader2, Send } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { type FormEvent, useState } from "react";
 import { StudioCanvas } from "@/components/design/studio-canvas";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { requireUserServer } from "@/lib/session";
@@ -10,9 +10,7 @@ const loadStudioDetail = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
 	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
-		const { getStudioProject } = await import(
-			"@/lib/services/studio-service"
-		);
+		const { getStudioProject } = await import("@/lib/services/studio-service");
 		const project = await getStudioProject(id, user.id);
 		return {
 			id: project.id,
@@ -112,7 +110,11 @@ function StudioDetailPage() {
 			</header>
 
 			{htmlCode ? (
-				<StudioCanvas title={detail.title} htmlCode={htmlCode} version={version} />
+				<StudioCanvas
+					title={detail.title}
+					htmlCode={htmlCode}
+					version={version}
+				/>
 			) : (
 				<div className="rounded-xl border border-graphite bg-charcoal p-8 text-center">
 					<p className="text-sm font-semibold text-mist">

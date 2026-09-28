@@ -28,7 +28,11 @@ async function copyText(value: string): Promise<boolean> {
 	}
 }
 
-async function downloadZip(domain: string, previewHtml: string, designMd: string) {
+async function downloadZip(
+	domain: string,
+	previewHtml: string,
+	designMd: string,
+) {
 	const zip = new JSZip();
 	zip.file("index.html", previewHtml);
 	zip.file("design.md", designMd);
@@ -52,7 +56,9 @@ export function ScrapeDetail({
 }: ScrapeDetailProps) {
 	const [tab, setTab] = useState<DetailTab>("preview");
 	const [notice, setNotice] = useState("");
-	const [busy, setBusy] = useState<"copy-html" | "copy-md" | "zip" | null>(null);
+	const [busy, setBusy] = useState<"copy-html" | "copy-md" | "zip" | null>(
+		null,
+	);
 
 	async function handleCopy(kind: "copy-html" | "copy-md") {
 		setBusy(kind);
@@ -88,7 +94,9 @@ export function ScrapeDetail({
 						<Globe size={14} aria-hidden />
 						{domain}
 					</span>
-					<span className="truncate font-mono text-xs text-fog">{sourceUrl}</span>
+					<span className="truncate font-mono text-xs text-fog">
+						{sourceUrl}
+					</span>
 					{capturedAt ? (
 						<span className="font-mono text-xs text-fog">{capturedAt}</span>
 					) : null}
@@ -123,9 +131,7 @@ export function ScrapeDetail({
 					</button>
 				</div>
 				{notice ? (
-					<p role="status" className="text-xs text-fog">
-						{notice}
-					</p>
+					<output className="block text-xs text-fog">{notice}</output>
 				) : null}
 			</header>
 
@@ -153,7 +159,9 @@ export function ScrapeDetail({
 					aria-selected={tab === "design"}
 					onClick={() => setTab("design")}
 					className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
-						tab === "design" ? "bg-charcoal text-snow" : "text-fog hover:text-mist"
+						tab === "design"
+							? "bg-charcoal text-snow"
+							: "text-fog hover:text-mist"
 					}`}
 				>
 					design.md
@@ -188,8 +196,7 @@ function DesktopPreview({ title, srcDoc }: { title: string; srcDoc: string }) {
 	useEffect(() => {
 		const el = wrapRef.current;
 		if (!el || typeof ResizeObserver === "undefined") return;
-		const measure = () =>
-			setScale(Math.min(1, el.clientWidth / PREVIEW_WIDTH));
+		const measure = () => setScale(Math.min(1, el.clientWidth / PREVIEW_WIDTH));
 		measure();
 		const observer = new ResizeObserver(measure);
 		observer.observe(el);

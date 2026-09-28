@@ -92,10 +92,9 @@ export function StudioCanvas({
 	return (
 		<section className="flex flex-col gap-3">
 			<div className="flex flex-wrap items-center gap-2 rounded-xl border border-graphite bg-charcoal p-3">
-				<div
-					role="group"
+				<fieldset
 					aria-label="Pilih viewport"
-					className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
+					className="m-0 flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
 				>
 					{(Object.keys(VIEWPORT_WIDTH) as StudioViewport[]).map((key) => (
 						<button
@@ -112,7 +111,7 @@ export function StudioCanvas({
 							{VIEWPORT_LABEL[key]}
 						</button>
 					))}
-				</div>
+				</fieldset>
 				<div
 					role="tablist"
 					aria-label="Mode canvas"
@@ -138,7 +137,9 @@ export function StudioCanvas({
 						aria-selected={tab === "code"}
 						onClick={() => setTab("code")}
 						className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-mono text-[11px] font-semibold transition-colors ${
-							tab === "code" ? "bg-charcoal text-snow" : "text-fog hover:text-mist"
+							tab === "code"
+								? "bg-charcoal text-snow"
+								: "text-fog hover:text-mist"
 						}`}
 					>
 						<Code2 size={13} aria-hidden />
@@ -167,9 +168,7 @@ export function StudioCanvas({
 				</div>
 			</div>
 			{notice ? (
-				<p role="status" className="text-xs text-fog">
-					{notice}
-				</p>
+				<output className="block text-xs text-fog">{notice}</output>
 			) : null}
 
 			{tab === "preview" ? (

@@ -40,7 +40,9 @@ describe("fetch-html helpers", () => {
 
 	it("extracts the page title", () => {
 		expect(
-			extractPageTitle(`<html><head><title>  Linear  —  App </title></head></html>`),
+			extractPageTitle(
+				`<html><head><title>  Linear  —  App </title></head></html>`,
+			),
 		).toBe("Linear — App");
 		expect(extractPageTitle(`<html><head></head></html>`)).toBeNull();
 	});

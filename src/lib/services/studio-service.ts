@@ -8,14 +8,17 @@ import {
 	studioProjects,
 	studioRevisions,
 } from "@/db/schema";
-import { ScrapeError } from "@/lib/design-errors";
 import { extractCleanHtml } from "@/lib/clean-html";
+import { ScrapeError } from "@/lib/design-errors";
 import {
 	buildStudioUserPrompt,
 	STUDIO_SYSTEM_PROMPT,
 	validateStudioPrompt,
 } from "@/lib/prompts-ui-studio";
-import { selectModels, tryStreamWithFallback } from "@/lib/services/ai-orchestrator";
+import {
+	selectModels,
+	tryStreamWithFallback,
+} from "@/lib/services/ai-orchestrator";
 
 export interface StudioProjectDetail extends StudioProjectRow {
 	revisions: StudioRevisionRow[];
@@ -85,9 +88,12 @@ export async function getStudioProject(
 	const [project] = await db
 		.select()
 		.from(studioProjects)
-		.where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, userId)))
+		.where(
+			and(eq(studioProjects.id, projectId), eq(studioProjects.userId, userId)),
+		)
 		.limit(1);
-	if (!project) throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+	if (!project)
+		throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
 	const revisions = await db
 		.select()
 		.from(studioRevisions)
@@ -125,6 +131,9 @@ export async function generateStudioHtml(
 	for await (const chunk of generator) raw += chunk;
 	const cleaned = extractCleanHtml(raw);
 	if (cleaned.trim().length === 0)
-		throw new ScrapeError("AI_GENERATION_FAILED", "Studio gagal menghasilkan HTML.");
+		throw new ScrapeError(
+			"AI_GENERATION_FAILED",
+			"Studio gagal menghasilkan HTML.",
+		);
 	return cleaned;
 }

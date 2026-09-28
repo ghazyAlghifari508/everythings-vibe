@@ -30,7 +30,11 @@ export const Route = createFileRoute("/api/studio/generate")({
 	},
 });
 
-export async function GET({ request }: { request: Request }): Promise<Response> {
+export async function GET({
+	request,
+}: {
+	request: Request;
+}): Promise<Response> {
 	try {
 		const user = await requireUser(getRequestHeaders());
 		const url = new URL(request.url);
@@ -70,7 +74,11 @@ export async function POST({
 		if (!checked.ok)
 			return Response.json({ error: checked.error }, { status: 400 });
 		if (typeof projectId === "string" && projectId.length > 0) {
-			const revision = await reviseStudioProject(projectId, user.id, checked.prompt);
+			const revision = await reviseStudioProject(
+				projectId,
+				user.id,
+				checked.prompt,
+			);
 			return Response.json(
 				{ projectId, version: revision.version, htmlCode: revision.htmlCode },
 				{ status: 201 },

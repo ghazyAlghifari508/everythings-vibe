@@ -79,7 +79,10 @@ function rewriteTag(tag: string, base: string): string {
 	if (!name || !RESOURCE_TAGS.has(name)) return tag;
 
 	return tag
-		.replace(/\s(?:crossorigin|integrity|nonce)(?:=("[^"]*"|'[^']*'|[^\s>]+))?/gi, "")
+		.replace(
+			/\s(?:crossorigin|integrity|nonce)(?:=("[^"]*"|'[^']*'|[^\s>]+))?/gi,
+			"",
+		)
 		.replace(ATTR, (match, attr, raw) => {
 			const key = attr.toLowerCase();
 			if (SRCSET_ATTRS.has(key))

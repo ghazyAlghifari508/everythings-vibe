@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { ArrowLeft } from "lucide-react";
-import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
+import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { requireUserServer } from "@/lib/session";
 
 const loadScrapeDetail = createServerFn({ method: "GET" })
@@ -26,8 +26,7 @@ const loadScrapeDetail = createServerFn({ method: "GET" })
 					? scrape.metadata.capturedAt
 					: scrape.createdAt.toISOString(),
 		};
-	},
-);
+	});
 
 export const Route = createFileRoute("/design/scrap/$id")({
 	head: () => ({

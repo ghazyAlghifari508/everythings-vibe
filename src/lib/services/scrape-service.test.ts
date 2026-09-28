@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	buildDesignMdPrompt,
 	DESIGN_MIN_CHARS,
 	DESIGN_REQUIRED_HEADINGS,
 	DESIGN_SYSTEM_PROMPT,
-	buildDesignMdPrompt,
 	designIssues,
 } from "@/lib/prompts-design-md";
 
@@ -27,8 +27,6 @@ describe("Scrape Prompt Builder", () => {
 	});
 
 	it("rejects thin DESIGN.md output", () => {
-		expect(designIssues("# Tipis")).toContain(
-			"missing ## Tokens - Colors",
-		);
+		expect(designIssues("# Tipis")).toContain("missing ## Tokens - Colors");
 	});
 });

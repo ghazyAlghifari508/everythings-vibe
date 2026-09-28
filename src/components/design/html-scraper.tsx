@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Globe, Loader2 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { type FormEvent, useState } from "react";
 import { DESIGN_ERROR_CODES } from "@/lib/design-errors";
 
 export interface ScrapeHistoryItem {
@@ -63,10 +63,7 @@ export function HtmlScraper({ history }: { history: ScrapeHistoryItem[] }) {
 				onSubmit={(e) => void submit(e)}
 				className="flex flex-col gap-3 rounded-xl border border-graphite bg-charcoal p-5"
 			>
-				<label
-					htmlFor="scrape-url"
-					className="text-sm font-semibold text-snow"
-				>
+				<label htmlFor="scrape-url" className="text-sm font-semibold text-snow">
 					URL website live
 				</label>
 				<div className="flex flex-col gap-2 sm:flex-row">

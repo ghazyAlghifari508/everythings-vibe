@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import {
 	HtmlScraper,
 	type ScrapeHistoryItem,
 } from "@/components/design/html-scraper";
+import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { requireUserServer } from "@/lib/session";
 
 const loadScrapeHistory = createServerFn({ method: "GET" }).handler(
@@ -43,9 +43,9 @@ function ScrapPage() {
 					Scrap website menjadi 2 file siap pakai
 				</h1>
 				<p className="mt-3 text-sm leading-6 text-fog">
-					Masukkan URL website live. Sistem menyerap HTML-nya, menulis
-					design.md setara audit desainer senior, dan menyiapkan preview
-					desktop 1440px yang bisa disalin atau diunduh sebagai ZIP.
+					Masukkan URL website live. Sistem menyerap HTML-nya, menulis design.md
+					setara audit desainer senior, dan menyiapkan preview desktop 1440px
+					yang bisa disalin atau diunduh sebagai ZIP.
 				</p>
 			</header>
 			<HtmlScraper history={history} />
