@@ -268,3 +268,19 @@ export const ADAPTIVE_CREDIT_PRICING = {
 		task_generation: { baseCredits: 1, maximumCredits: 8 },
 	} as const,
 } as const;
+
+// === VibeDesign scrape bounds (Opsi 1) ===
+// SSRF-safe fetch limits ported from Docrivo: single source of truth so the
+// fetcher, asset proxy, and services never scatter magic numbers.
+export const SCRAPE_BROWSER_UA =
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+export const SCRAPE_FETCH_TIMEOUT_MS = 25_000;
+export const SCRAPE_MAX_HTML_BYTES = 5_000_000;
+export const SCRAPE_MAX_ASSET_BYTES = 15_000_000;
+export const SCRAPE_MAX_REDIRECTS = 3;
+export const SCRAPE_MAX_STYLESHEETS = 8;
+export const SCRAPE_MAX_INLINE_CSS_BYTES = 512_000;
+export const SCRAPE_DESKTOP_WIDTH = 1440;
+export const SCRAPE_DESKTOP_HEIGHT = 900;
+export const SCRAPE_ASSET_RATE_LIMIT = 1000;
+export const SCRAPE_ASSET_RATE_WINDOW_S = 60;

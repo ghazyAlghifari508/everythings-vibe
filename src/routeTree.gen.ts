@@ -65,6 +65,7 @@ import { Route as ApiPaymentsCreateRouteImport } from './routes/api/payments/cre
 import { Route as ApiPaymentsWebhookRouteImport } from './routes/api/payments/webhook'
 import { Route as ApiProjectsIndexRouteImport } from './routes/api/projects/index'
 import { Route as ApiProjectsIdRouteImport } from './routes/api/projects/$id'
+import { Route as ApiScrapeAssetRouteImport } from './routes/api/scrape.asset'
 import { Route as ApiTaskProjectIdRouteImport } from './routes/api/task/$projectId'
 import { Route as ApiTaskGenerateRouteImport } from './routes/api/task/generate'
 import { Route as ApiUserPlanRouteImport } from './routes/api/user/plan'
@@ -376,6 +377,11 @@ const ApiProjectsIdRoute = ApiProjectsIdRouteImport.update({
   path: '/api/projects/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiScrapeAssetRoute = ApiScrapeAssetRouteImport.update({
+  id: '/api/scrape/asset',
+  path: '/api/scrape/asset',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTaskProjectIdRoute = ApiTaskProjectIdRouteImport.update({
   id: '/api/task/$projectId',
   path: '/api/task/$projectId',
@@ -595,6 +601,7 @@ export interface FileRoutesByFullPath {
   '/api/payments/create': typeof ApiPaymentsCreateRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
+  '/api/scrape/asset': typeof ApiScrapeAssetRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
@@ -680,6 +687,7 @@ export interface FileRoutesByTo {
   '/api/payments/create': typeof ApiPaymentsCreateRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
+  '/api/scrape/asset': typeof ApiScrapeAssetRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
@@ -769,6 +777,7 @@ export interface FileRoutesById {
   '/api/payments/create': typeof ApiPaymentsCreateRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
+  '/api/scrape/asset': typeof ApiScrapeAssetRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
@@ -859,6 +868,7 @@ export interface FileRouteTypes {
     | '/api/payments/create'
     | '/api/payments/webhook'
     | '/api/projects/$id'
+    | '/api/scrape/asset'
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
@@ -944,6 +954,7 @@ export interface FileRouteTypes {
     | '/api/payments/create'
     | '/api/payments/webhook'
     | '/api/projects/$id'
+    | '/api/scrape/asset'
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
@@ -1032,6 +1043,7 @@ export interface FileRouteTypes {
     | '/api/payments/create'
     | '/api/payments/webhook'
     | '/api/projects/$id'
+    | '/api/scrape/asset'
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
@@ -1107,6 +1119,7 @@ export interface RootRouteChildren {
   ApiPaymentsCreateRoute: typeof ApiPaymentsCreateRoute
   ApiPaymentsWebhookRoute: typeof ApiPaymentsWebhookRoute
   ApiProjectsIdRoute: typeof ApiProjectsIdRouteWithChildren
+  ApiScrapeAssetRoute: typeof ApiScrapeAssetRoute
   ApiTaskProjectIdRoute: typeof ApiTaskProjectIdRoute
   ApiTaskGenerateRoute: typeof ApiTaskGenerateRoute
   ApiUserPlanRoute: typeof ApiUserPlanRoute
@@ -1519,6 +1532,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProjectsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/scrape/asset': {
+      id: '/api/scrape/asset'
+      path: '/api/scrape/asset'
+      fullPath: '/api/scrape/asset'
+      preLoaderRoute: typeof ApiScrapeAssetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/task/$projectId': {
       id: '/api/task/$projectId'
       path: '/api/task/$projectId'
@@ -1893,6 +1913,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPaymentsCreateRoute: ApiPaymentsCreateRoute,
   ApiPaymentsWebhookRoute: ApiPaymentsWebhookRoute,
   ApiProjectsIdRoute: ApiProjectsIdRouteWithChildren,
+  ApiScrapeAssetRoute: ApiScrapeAssetRoute,
   ApiTaskProjectIdRoute: ApiTaskProjectIdRoute,
   ApiTaskGenerateRoute: ApiTaskGenerateRoute,
   ApiUserPlanRoute: ApiUserPlanRoute,
@@ -1913,12 +1934,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
