@@ -27,7 +27,7 @@ const OPTIONS = [
 		footer: "Membuka halaman chat input",
 	},
 	{
-		to: "/codebases",
+		to: "/plan/codebase",
 		icon: FolderGit2,
 		label: "Opsi 2",
 		title: "Codebase Existing",

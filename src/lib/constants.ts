@@ -82,6 +82,11 @@ export const HISTORY_PAGE_SIZE = 12;
 
 export const KANBAN_SSE_INTERVAL_MS = 3_000;
 export const KANBAN_POLL_INTERVAL_MS = 10_000;
+// Reconciliation poll while a generation is in flight but its SSE owner is
+// gone (user navigated away and back). Fires router.invalidate() so the
+// loader — the single source of truth — refreshes from Postgres. Reused by
+// Task/AC/PRD detail views; 2.5s balances freshness vs loader pressure.
+export const GENERATION_STATUS_POLL_INTERVAL_MS = 2_500;
 
 // === Existing codebase sync (MVP locked decisions) ===
 // Browser polls the persisted sync status; no sync SSE endpoint in MVP.

@@ -91,7 +91,7 @@ export function AskFlow({
 }: AskFlowProps) {
 	const navigate = useNavigate();
 	const promptRef = useRef("");
-	const hasFetched = useRef(false);
+	const hasFetched = useRef<string | null>(null);
 	// Server restore must win over a stale local snapshot: autosave stays
 	// off until the initial load settles, and submit cancels any autosave
 	// still in flight so an older write cannot land after the final one.
@@ -145,8 +145,8 @@ export function AskFlow({
 	// mount; hasFetched menjaga StrictMode double-invoke.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: lihat catatan di atas
 	useEffect(() => {
-		if (hasFetched.current) return;
-		hasFetched.current = true;
+		if (hasFetched.current === projectId) return;
+		hasFetched.current = projectId;
 
 		// Restore state persisted across refresh/hard-refresh. If a saved set
 		// exists for THIS project, replay it and skip regenerating questions.

@@ -2,7 +2,6 @@
 // Grounds AI generation on up-to-date Context7 docs for the user's stack.
 // Label source is STACK_ICONS keys (existing stack-data) — no hardcoded list.
 // Never throws: any failure returns "" so generation is byte-for-byte unchanged.
-import "@tanstack/react-start/server-only";
 
 import { queryDocs, resolveLibraryId } from "@/lib/context7-client";
 import { STACK_ICONS } from "@/lib/stack-data";

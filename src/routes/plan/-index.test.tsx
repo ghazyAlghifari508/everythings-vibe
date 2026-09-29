@@ -35,9 +35,9 @@ describe("PlanOptionsPage", () => {
 		render(<PlanOptionsPage />);
 
 		const planDestinations = linkHrefs().filter(
-			(href) => href === "/plan/new" || href === "/codebases",
+			(href) => href === "/plan/new" || href === "/plan/codebase",
 		);
-		expect(planDestinations).toEqual(["/plan/new", "/codebases"]);
+		expect(planDestinations).toEqual(["/plan/new", "/plan/codebase"]);
 	});
 
 	it("keeps each option label on its own destination", () => {
@@ -47,7 +47,7 @@ describe("PlanOptionsPage", () => {
 			"/plan/new",
 		);
 		expect(screen.getByText("Opsi 2").closest("a")?.getAttribute("href")).toBe(
-			"/codebases",
+			"/plan/codebase",
 		);
 	});
 

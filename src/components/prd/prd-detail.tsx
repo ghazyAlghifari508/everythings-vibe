@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { ArrowRight, X } from "lucide-react";
 import {
 	useCallback,
@@ -14,6 +14,7 @@ import { ChatPanel } from "@/components/chat";
 import { CreditExhaustedModal } from "@/components/chat/credit-exhausted-modal";
 import { GenerationProgress } from "@/components/shared/generation-progress";
 import { usePanelResize } from "@/hooks/use-panel-resize";
+import { GENERATION_STATUS_POLL_INTERVAL_MS } from "@/lib/constants";
 import { isPrdLocked } from "@/lib/flow-progress";
 import { getPendingPrdPrompt } from "@/lib/prompt-handoff";
 import { cn } from "@/lib/utils";
@@ -82,6 +83,7 @@ export function PrdDetail({
 	// ── Hooks ──
 	const { rightWidth, onStartDragRight, isDraggingRight } = usePanelResize();
 	const navigate = useNavigate();
+	const router = useRouter();
 	const search = useLocation({ select: (l) => l.search });
 	const [, startTransition] = useTransition();
 	const {
@@ -167,6 +169,23 @@ export function PrdDetail({
 	useEffect(() => {
 		if (latestVersion) setCurrentContent(latestVersion.content);
 	}, [latestVersion]);
+	// Return recovery: a loader that missed the save lands with global
+	// generating flags but no streamed bytes. Revalidate once; when the
+	// saved version arrives, latestVersion paints the PRD and the effect
+	// above clears the generating flags — no manual refresh.
+	useEffect(() => {
+		if (latestVersion?.content || streamingPRDContent || !isGeneratingPRD)
+			return;
+		let cancelled = false;
+		const timer = setInterval(() => {
+			if (cancelled) return;
+			void router.invalidate();
+		}, GENERATION_STATUS_POLL_INTERVAL_MS);
+		return () => {
+			cancelled = true;
+			clearInterval(timer);
+		};
+	}, [latestVersion, streamingPRDContent, isGeneratingPRD, router]);
 
 	// Clear streaming state when mounted with saved PRD, and when navigating
 	// between projects so stale Zustand globals from a prior streaming session

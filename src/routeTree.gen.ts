@@ -42,6 +42,7 @@ import { Route as DesignScrapRouteImport } from './routes/design/scrap'
 import { Route as DesignStudioRouteImport } from './routes/design/studio'
 import { Route as KanbanIdRouteImport } from './routes/kanban/$id'
 import { Route as PlanIndexRouteImport } from './routes/plan/index'
+import { Route as PlanCodebaseRouteImport } from './routes/plan/codebase'
 import { Route as PlanNewRouteImport } from './routes/plan/new'
 import { Route as PrdIdRouteImport } from './routes/prd/$id'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
@@ -268,6 +269,11 @@ const KanbanIdRoute = KanbanIdRouteImport.update({
 const PlanIndexRoute = PlanIndexRouteImport.update({
   id: '/plan/',
   path: '/plan/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlanCodebaseRoute = PlanCodebaseRouteImport.update({
+  id: '/plan/codebase',
+  path: '/plan/codebase',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlanNewRoute = PlanNewRouteImport.update({
@@ -624,6 +630,7 @@ export interface FileRoutesByFullPath {
   '/design/scrap': typeof DesignScrapRouteWithChildren
   '/design/studio': typeof DesignStudioRouteWithChildren
   '/kanban/$id': typeof KanbanIdRoute
+  '/plan/codebase': typeof PlanCodebaseRoute
   '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
   '/settings/account': typeof SettingsAccountRoute
@@ -716,6 +723,7 @@ export interface FileRoutesByTo {
   '/codebases/$id': typeof CodebasesIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/kanban/$id': typeof KanbanIdRoute
+  '/plan/codebase': typeof PlanCodebaseRoute
   '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
   '/settings/account': typeof SettingsAccountRoute
@@ -814,6 +822,7 @@ export interface FileRoutesById {
   '/design/scrap': typeof DesignScrapRouteWithChildren
   '/design/studio': typeof DesignStudioRouteWithChildren
   '/kanban/$id': typeof KanbanIdRoute
+  '/plan/codebase': typeof PlanCodebaseRoute
   '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
   '/settings/account': typeof SettingsAccountRoute
@@ -913,6 +922,7 @@ export interface FileRouteTypes {
     | '/design/scrap'
     | '/design/studio'
     | '/kanban/$id'
+    | '/plan/codebase'
     | '/plan/new'
     | '/prd/$id'
     | '/settings/account'
@@ -1005,6 +1015,7 @@ export interface FileRouteTypes {
     | '/codebases/$id'
     | '/demo/tanstack-query'
     | '/kanban/$id'
+    | '/plan/codebase'
     | '/plan/new'
     | '/prd/$id'
     | '/settings/account'
@@ -1102,6 +1113,7 @@ export interface FileRouteTypes {
     | '/design/scrap'
     | '/design/studio'
     | '/kanban/$id'
+    | '/plan/codebase'
     | '/plan/new'
     | '/prd/$id'
     | '/settings/account'
@@ -1195,6 +1207,7 @@ export interface RootRouteChildren {
   DesignScrapRoute: typeof DesignScrapRouteWithChildren
   DesignStudioRoute: typeof DesignStudioRouteWithChildren
   KanbanIdRoute: typeof KanbanIdRoute
+  PlanCodebaseRoute: typeof PlanCodebaseRoute
   PlanNewRoute: typeof PlanNewRoute
   PrdIdRoute: typeof PrdIdRoute
   TaskIdRoute: typeof TaskIdRoute
@@ -1464,6 +1477,13 @@ declare module '@tanstack/react-router' {
       path: '/plan'
       fullPath: '/plan/'
       preLoaderRoute: typeof PlanIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plan/codebase': {
+      id: '/plan/codebase'
+      path: '/plan/codebase'
+      fullPath: '/plan/codebase'
+      preLoaderRoute: typeof PlanCodebaseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plan/new': {
@@ -2088,6 +2108,7 @@ const rootRouteChildren: RootRouteChildren = {
   DesignScrapRoute: DesignScrapRouteWithChildren,
   DesignStudioRoute: DesignStudioRouteWithChildren,
   KanbanIdRoute: KanbanIdRoute,
+  PlanCodebaseRoute: PlanCodebaseRoute,
   PlanNewRoute: PlanNewRoute,
   PrdIdRoute: PrdIdRoute,
   TaskIdRoute: TaskIdRoute,

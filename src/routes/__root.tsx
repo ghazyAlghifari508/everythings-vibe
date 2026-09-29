@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { AppLayout } from "@/components/layout";
+import { NotFoundComponent } from "@/components/layout/not-found";
 import { Toast } from "@/components/ui";
 import appLayoutCss from "../app/globals.css?url";
 import { Providers } from "../app/providers";
@@ -41,6 +42,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		],
 	}),
 	shellComponent: RootDocument,
+	notFoundComponent: NotFoundComponent,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {

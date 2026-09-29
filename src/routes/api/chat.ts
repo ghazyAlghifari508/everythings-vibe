@@ -421,8 +421,11 @@ export const Route = createFileRoute("/api/chat")({
 				try {
 					const { groundStack } = await import("@/lib/grounding");
 					systemPrompt += await groundStack(groundingSource);
-				} catch {
-					/* ponytail: optional grounding must never block generation */
+				} catch (err) {
+					console.warn(
+						"[grounding] failed to ground stack with Context7:",
+						err,
+					);
 				}
 				// Task 8: same grounding boundary — "" for greenfield (no-op).
 				systemPrompt += codebaseBlock;

@@ -16,7 +16,6 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTypingPlaceholder } from "@/hooks/use-typing-placeholder";
 import { useUserPlan } from "@/hooks/use-user-plan";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -51,6 +50,12 @@ export const HOME_PROJECT_MODE_OPTIONS = [
 
 export type HomeProjectMode = (typeof HOME_PROJECT_MODE_OPTIONS)[number]["id"];
 
+// Static greenfield placeholder; language-aware only, no animation.
+const GREENFIELD_PLACEHOLDER_ID =
+	"Deskripsikan ide produk Anda — target pengguna, fitur utama, dan alur kerja yang diinginkan...";
+const GREENFIELD_PLACEHOLDER_EN =
+	"Describe your product idea — target users, key features, and the desired workflow...";
+
 type HomePostCreationTarget =
 	| { to: "/ask/$id"; params: { id: string } }
 	| { to: "/codebases/$id"; params: { id: string } };
@@ -82,6 +87,7 @@ interface ChatInputProps {
 	initialMobile?: boolean;
 	prefillKey?: number;
 	onModeChange?: (mode: HomeProjectMode) => void;
+	hideModeSelector?: boolean;
 }
 
 export function ChatInput({
@@ -90,6 +96,7 @@ export function ChatInput({
 	initialMobile,
 	prefillKey,
 	onModeChange,
+	hideModeSelector,
 }: ChatInputProps) {
 	const [message, setMessage] = useState(() => getHomeDraft());
 	const [focused, setFocused] = useState(false);
@@ -276,45 +283,48 @@ export function ChatInput({
 		}
 	};
 
-	const typingPlaceholder = useTypingPlaceholder(isMobileMode, language);
+	const greenfieldPlaceholder =
+		language === "en" ? GREENFIELD_PLACEHOLDER_EN : GREENFIELD_PLACEHOLDER_ID;
 
 	return (
 		<>
 			<div className="mx-auto flex w-full max-w-[728px] flex-col items-center gap-3">
 				{/* Project mode selector: Produk baru | Codebase existing (di atas box chat) */}
-				<div className="flex items-center gap-1 rounded-lg bg-charcoal p-1 shadow-[var(--shadow-inset)]">
-					{HOME_PROJECT_MODE_OPTIONS.map((option) => {
-						const active = projectMode === option.id;
-						const Icon = option.id === "greenfield" ? Plus : FolderGit2;
-						return (
-							<button
-								key={option.id}
-								type="button"
-								id={
-									option.id === "greenfield"
-										? "home-mode-greenfield"
-										: "home-mode-existing-codebase"
-								}
-								onClick={() => handleModeChange(option.id)}
-								title={
-									option.id === "greenfield"
-										? "Buat PRD dari ide produk baru"
-										: "Rencanakan fitur untuk codebase yang sudah ada"
-								}
-								aria-pressed={active}
-								className={cn(
-									"flex items-center gap-1.5 rounded-md px-3 py-1.5 font-inter text-[12px] font-[510] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-pointer",
-									active
-										? "border border-iron/50 bg-iron text-snow shadow-sm"
-										: "border border-transparent text-fog hover:text-snow",
-								)}
-							>
-								<Icon size={13} />
-								{option.label}
-							</button>
-						);
-					})}
-				</div>
+				{!hideModeSelector && (
+					<div className="flex items-center gap-1 rounded-lg bg-charcoal p-1 shadow-[var(--shadow-inset)]">
+						{HOME_PROJECT_MODE_OPTIONS.map((option) => {
+							const active = projectMode === option.id;
+							const Icon = option.id === "greenfield" ? Plus : FolderGit2;
+							return (
+								<button
+									key={option.id}
+									type="button"
+									id={
+										option.id === "greenfield"
+											? "home-mode-greenfield"
+											: "home-mode-existing-codebase"
+									}
+									onClick={() => handleModeChange(option.id)}
+									title={
+										option.id === "greenfield"
+											? "Buat PRD dari ide produk baru"
+											: "Rencanakan fitur untuk codebase yang sudah ada"
+									}
+									aria-pressed={active}
+									className={cn(
+										"flex items-center gap-1.5 rounded-md px-3 py-1.5 font-inter text-[12px] font-[510] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-pointer",
+										active
+											? "border border-iron/50 bg-iron text-snow shadow-sm"
+											: "border border-transparent text-fog hover:text-snow",
+									)}
+								>
+									<Icon size={13} />
+									{option.label}
+								</button>
+							);
+						})}
+					</div>
+				)}
 
 				{/* Main chat box */}
 				<div
@@ -415,7 +425,7 @@ export function ChatInput({
 										? language === "en"
 											? "Describe the feature you want to add to your existing codebase (e.g. Add a wishlist feature with database persistence and user session check)..."
 											: "Deskripsikan fitur yang ingin kamu tambahkan ke aplikasi (misal: Tambahkan fitur wishlist di halaman detail produk yang terhubung ke session user)..."
-										: typingPlaceholder
+										: greenfieldPlaceholder
 								}
 								className="w-full resize-none border-none bg-transparent px-3 pb-2 pt-3 font-inter text-[15px] text-snow outline-none placeholder:text-slate"
 								style={{ caretColor: "var(--text-primary)" }}

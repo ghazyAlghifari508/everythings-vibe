@@ -8,9 +8,11 @@ import { TemplateGallery } from "./template-gallery";
 export function HeroContent({
 	initialPrompt,
 	initialPlatform,
+	hideModeSelector,
 }: {
 	initialPrompt?: string;
 	initialPlatform?: "web" | "mobile";
+	hideModeSelector?: boolean;
 } = {}) {
 	const [prefill, setPrefill] = useState<string | undefined>(initialPrompt);
 	const [prefillMobile, setPrefillMobile] = useState(
@@ -22,23 +24,24 @@ export function HeroContent({
 	const [prefillTick, setPrefillTick] = useState(0);
 	const [projectMode, setProjectMode] = useState<HomeProjectMode>("greenfield");
 	return (
-		<div className="relative z-10 flex w-full flex-col items-center px-6 text-center animate-hero-fade-in">
-			<div className="flex w-full max-w-[1200px] flex-col items-center gap-8 pt-16 md:pt-20">
-				<h1 className="max-w-[860px] font-inter text-[48px] font-light leading-none text-snow md:text-[64px] lg:text-[72px] animate-hero-title">
+		<div className="relative z-10 flex w-full flex-col items-center px-6 text-center">
+			<div className="flex w-full max-w-[1200px] flex-col items-center gap-4 sm:gap-6 pt-2 sm:pt-4">
+				<h1 className="max-w-[860px] font-inter text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-snow">
 					Dari ide produk ke PRD yang siap dieksekusi
 				</h1>
 
-				<p className="max-w-[650px] font-inter text-[17px] font-normal leading-[1.6] text-fog animate-hero-subtitle">
+				<p className="max-w-[650px] font-inter text-[17px] font-normal leading-[1.6] text-fog">
 					Describe produk kamu secara natural dan AI akan generate Product
 					Requirements Document yang lengkap, terstruktur, dan profesional.
 				</p>
 
-				<div className="w-full animate-hero-chat">
+				<div className="w-full">
 					<ChatInput
 						initialValue={prefill}
 						initialMobile={prefillMobile}
 						prefillKey={prefillTick}
 						onModeChange={setProjectMode}
+						hideModeSelector={hideModeSelector}
 					/>
 					{projectMode === "greenfield" ? (
 						<TemplateGallery

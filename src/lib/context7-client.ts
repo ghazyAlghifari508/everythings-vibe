@@ -3,7 +3,6 @@
 // Context7 serves SSE-framed JSON-RPC responses (event: message / data: {...}).
 // Optional CONTEXT7_API_KEY sent as Bearer auth for higher rate limits
 // (Context7 streamable-HTTP MCP docs: Authorization: Bearer <key>).
-import "@tanstack/react-start/server-only";
 
 // ponytail: URL only from env — no hardcoded endpoint, no fallback string.
 function getMcpUrl(): string | null {

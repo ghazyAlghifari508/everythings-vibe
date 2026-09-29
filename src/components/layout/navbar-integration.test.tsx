@@ -184,7 +184,8 @@ describe("Navbar Rebranding & Layout", () => {
 		expect(screen.queryByRole("link", { name: /VibeDesign/i })).toBeNull();
 	});
 
-	it("renders hamburger menu button for history drawer", () => {
+	it("renders hamburger menu button for history drawer on home", () => {
+		mockPathname = "/";
 		renderNavbar();
 		const hamburger = screen.getByRole("button", { name: /^Riwayat$/i });
 		expect(hamburger).toBeDefined();
@@ -203,9 +204,16 @@ describe("Navbar session boundary", () => {
 		expect(screen.queryByRole("button", { name: /^Riwayat$/i })).toBeNull();
 	});
 
-	it("offers the history trigger once a session exists", () => {
+	it("offers the history trigger once a session exists on home", () => {
+		mockPathname = "/";
 		renderNavbar();
 		expect(screen.getByRole("button", { name: /^Riwayat$/i })).toBeDefined();
+	});
+
+	it("hides the history trigger on workspace routes even when session exists", () => {
+		mockPathname = "/prd/test-project-1";
+		renderNavbar();
+		expect(screen.queryByRole("button", { name: /^Riwayat$/i })).toBeNull();
 	});
 
 	// The blocker: the QueryClient is created once per router instance and

@@ -29,6 +29,13 @@ import { sanitizeModelOutput } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 import type { Plan } from "@/types/database";
 
+// A cancelled request has no receiver, so it stays silent (499), never logged as a 500.
+function isClientAbort(err: unknown, signal: AbortSignal): boolean {
+	if (signal.aborted) return true;
+	if (err instanceof DOMException) return err.name === "AbortError";
+	return err instanceof Error && err.name === "AbortError";
+}
+
 export const Route = createFileRoute("/api/ask/options")({
 	server: {
 		handlers: {
@@ -258,10 +265,10 @@ export const Route = createFileRoute("/api/ask/options")({
 							}
 						}
 					} catch (e) {
-						if (e instanceof Error && e.name === "AbortError") {
+						if (isClientAbort(e, request.signal)) {
 							return Response.json(
 								{ error: "Generasi pertanyaan dibatalkan." },
-								{ status: 500 },
+								{ status: 499 },
 							);
 						}
 						throw e;
@@ -344,6 +351,12 @@ export const Route = createFileRoute("/api/ask/options")({
 
 					return Response.json({ questions });
 				} catch (err: unknown) {
+					if (isClientAbort(err, request.signal)) {
+						return Response.json(
+							{ error: "Generasi pertanyaan dibatalkan." },
+							{ status: 499 },
+						);
+					}
 					console.error("Ask options generate error:", err);
 					return Response.json(
 						{ error: sanitizeErrorForClient(err) },

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { GridBackground, HeroContent } from "@/components/layout";
+import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { HeroContent } from "@/components/layout";
 
 export const planNewSearchSchema = z.object({
 	prompt: z.string().optional(),
@@ -15,17 +16,16 @@ export const Route = createFileRoute("/plan/new")({
 function PlanNewPage() {
 	const search = Route.useSearch();
 	return (
-		<main className="flex flex-col">
-			<section
-				className="relative flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center overflow-hidden pb-32 md:pb-40"
-				style={{ background: "var(--bg-page)" }}
-			>
-				<GridBackground />
-				<HeroContent
-					initialPrompt={search.prompt}
-					initialPlatform={search.platform}
-				/>
-			</section>
+		<main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+			<HubBreadcrumb
+				current="Projek Baru (Greenfield)"
+				parent={{ label: "VibePlan", to: "/plan" }}
+			/>
+			<HeroContent
+				initialPrompt={search.prompt}
+				initialPlatform={search.platform}
+				hideModeSelector
+			/>
 		</main>
 	);
 }

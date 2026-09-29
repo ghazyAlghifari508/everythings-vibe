@@ -190,8 +190,9 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					)}
 					{/* History is a signed-in read: loadHistory rejects a visitor with
 					    no session, so offering the trigger would only produce an error
-					    panel whose retry can never succeed. */}
-					{user && (
+					    panel whose retry can never succeed. History drawer trigger is
+					    only offered on home ("/") to prevent double hamburger on workspace. */}
+					{user && pathname === "/" && (
 						<button
 							type="button"
 							onClick={onOpenDrawer}
