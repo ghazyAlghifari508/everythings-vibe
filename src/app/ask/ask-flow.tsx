@@ -17,7 +17,7 @@ import {
 	inferTechAnswersFromCodebase,
 } from "@/lib/codebase-analysis";
 import { CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS } from "@/lib/constants";
-import { getFlowStepCta, stepToRoute } from "@/lib/flow-step";
+import { getFlowStepCta, stepToRouteTarget } from "@/lib/flow-step";
 import {
 	getAskLanguage,
 	getAskPlatform,
@@ -104,7 +104,7 @@ export function AskFlow({
 
 	const handleReturnToStage = () => {
 		const targetStep = flowCta?.targetStep ?? "prd";
-		navigate({ to: stepToRoute(targetStep, projectId) as never });
+		navigate(stepToRouteTarget(targetStep, projectId));
 	};
 	const [session, setSession] = useState<1 | 2>(1);
 	const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);

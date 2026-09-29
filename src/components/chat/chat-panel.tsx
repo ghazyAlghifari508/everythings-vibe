@@ -18,6 +18,7 @@ import {
 	consumeResumeIntent,
 	getPendingPrdPrompt,
 	getPrdDraft,
+	getSetupPrompt,
 	savePendingPrdPrompt,
 	savePrdDraft,
 } from "@/lib/prompt-handoff";
@@ -911,8 +912,15 @@ export const ChatPanel = memo(function ChatPanel({
 		)
 			return;
 
-		const pending = getPendingPrdPrompt();
-		if (!pending) return;
+		let pending = getPendingPrdPrompt();
+		if (!pending) {
+			const setup = getSetupPrompt();
+			if (setup) {
+				pending = { prompt: setup, mode: "auto", createdAt: Date.now() };
+			} else {
+				return;
+			}
+		}
 
 		autoSubmitAttemptedRef.current = true;
 		clearPendingPrdPrompt();

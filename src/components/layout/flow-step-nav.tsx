@@ -10,7 +10,14 @@ import { useChatStore } from "@/store";
 // ponytail: pure step<->route logic extracted to @/lib/flow-step so server
 // code + tests can use it without next/navigation. Re-export keeps existing
 // `import { routeToStep } from "./flow-step-nav"` call sites working.
-export { type FlowStep, getFlowStepCta, routeToStep } from "@/lib/flow-step";
+export {
+	type FlowStep,
+	getFlowStepCta,
+	routeToStep,
+	type StepRouteTarget,
+	stepToRoute,
+	stepToRouteTarget,
+} from "@/lib/flow-step";
 
 export type StepId = FlowStep;
 

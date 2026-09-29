@@ -29,7 +29,12 @@ import { useUserPlan } from "@/hooks/use-user-plan";
 import { authClient } from "@/lib/auth-client";
 import { isAdmin } from "@/lib/session";
 import { useChatStore, useUIStore } from "@/store";
-import { FlowStepNav, getFlowStepCta, routeToStep } from "./flow-step-nav";
+import {
+	FlowStepNav,
+	getFlowStepCta,
+	routeToStep,
+	stepToRouteTarget,
+} from "./flow-step-nav";
 
 export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	const { data: session, isPending: isLoading } = authClient.useSession();
@@ -311,13 +316,9 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 											type="button"
 											onClick={() => {
 												startTransition(() => {
-													navigate({
-														to:
-															flowCta.targetStep === "task"
-																? "/task/$id"
-																: "/ac/$id",
-														params: { id: projectId },
-													});
+													navigate(
+														stepToRouteTarget(flowCta.targetStep, projectId),
+													);
 												});
 											}}
 											className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"

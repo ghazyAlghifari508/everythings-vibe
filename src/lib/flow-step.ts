@@ -167,3 +167,28 @@ export function stepToRoute(
 			return `/prd/${id}`;
 	}
 }
+
+export type StepRouteTarget =
+	| { to: "/ask/$id"; params: { id: string } }
+	| { to: "/fitur/$id"; params: { id: string } }
+	| { to: "/prd/$id"; params: { id: string } }
+	| { to: "/ac/$id"; params: { id: string } }
+	| { to: "/task/$id"; params: { id: string } };
+
+export function stepToRouteTarget(
+	step: string | null | undefined,
+	projectId: string,
+): StepRouteTarget {
+	switch (step) {
+		case "question":
+			return { to: "/ask/$id", params: { id: projectId } };
+		case "fitur":
+			return { to: "/fitur/$id", params: { id: projectId } };
+		case "ac":
+			return { to: "/ac/$id", params: { id: projectId } };
+		case "task":
+			return { to: "/task/$id", params: { id: projectId } };
+		default:
+			return { to: "/prd/$id", params: { id: projectId } };
+	}
+}

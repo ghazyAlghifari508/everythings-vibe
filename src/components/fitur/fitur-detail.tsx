@@ -9,13 +9,18 @@ import {
 	GENERATION_STATUS_POLL_INTERVAL_MS,
 	GUARD_WAIT_MS,
 } from "@/lib/constants";
+import { featureTreeSchema } from "@/lib/feature-tree";
 import {
 	isBackgroundGeneration,
 	isStaleCompletedLoader,
 	resolveInitialGenerating,
 } from "@/lib/generation-recovery";
-import { consumeSuppressAutoGen } from "@/lib/prompt-handoff";
-import { featureTreeSchema } from "@/lib/services/feature-service";
+import {
+	consumeSuppressAutoGen,
+	getPendingPrdPrompt,
+	getSetupPrompt,
+	savePendingPrdPrompt,
+} from "@/lib/prompt-handoff";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store";
 import { FeatureMapCanvas } from "./feature-map-canvas";
@@ -278,6 +283,14 @@ export function FiturDetail({
 							<Link
 								to="/prd/$id"
 								params={{ id: projectId }}
+								onClick={() => {
+									if (!getPendingPrdPrompt()) {
+										const setup = getSetupPrompt();
+										if (setup) {
+											savePendingPrdPrompt(setup, "auto", projectName);
+										}
+									}
+								}}
 								className="btn-primary rounded-md px-3 py-1.5 text-xs font-[510]"
 							>
 								Generate PRD
