@@ -31,6 +31,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 	// effect: two competing effects would each clear the lock on cleanup.
 	const isWorkspace =
 		pathname.startsWith("/ask/") ||
+		pathname.startsWith("/fitur/") ||
 		(pathname.startsWith("/prd/") && !pathname.startsWith("/prd/share/")) ||
 		pathname.startsWith("/ac/") ||
 		pathname.startsWith("/task/") ||

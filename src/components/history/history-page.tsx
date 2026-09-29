@@ -20,6 +20,7 @@ function isHaltedByCredits(item: HistoryItem): boolean {
 
 const STEP_BADGE: Record<string, { label: string; className: string }> = {
 	question: { label: "Pertanyaan", className: "bg-indigo/15 text-indigo" },
+	fitur: { label: "Fitur", className: "bg-cyan/15 text-cyan" },
 	prd: { label: "PRD", className: "bg-emerald/15 text-emerald" },
 	ac: { label: "AC", className: "bg-amber/15 text-amber" },
 	task: { label: "Task", className: "bg-violet/15 text-violet" },

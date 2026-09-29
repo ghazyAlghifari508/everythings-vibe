@@ -26,11 +26,29 @@ export interface TaskPromptInput {
 	/** Existing-codebase context block, already framed. "" for greenfield. */
 	codebaseBlock: string;
 	language: OutputLanguage;
+	/**
+	 * Fitur SSOT block (formatFeatureTreeBlock output), already framed.
+	 * "" when the project predates the Fitur stage. When present, every task
+	 * must anchor to a subfeature id from the block.
+	 */
+	featureTreeBlock?: string;
 }
 
 /** Maximum repair rounds. One is the intended path; the second absorbs a
  *  partially-useful repair answer without allowing an unbounded retry loop. */
 export const MAX_TASK_COVERAGE_REPAIR_ATTEMPTS = 2;
+
+/**
+ * Fitur SSOT instruction appended after the feature tree block. Structural
+ * contract only: anchors every task to a tree subfeature and demands
+ * agent-handoff-ready titles. No example product content.
+ */
+export const TASK_FEATURE_SSOT_INSTRUCTION = `=== DAFTAR FITUR SSOT (WAJIB) ===
+Setiap task WAJIB punya "subfeatureId" berisi ID subfitur dari daftar di atas (format subfeat-N.M). ID yang tidak ada di daftar = output GAGAL.
+Isi "subfeatureName" dengan nama subfitur yang SAMA PERSIS seperti di daftar.
+Nama feature WAJIB sama dengan nama feature di daftar (yang juga sama dengan section AC).
+Judul task memakai verba imperatif yang spesifik (aksi + objek + konteks), bukan label generik — setiap task harus bisa diserahkan ke coding agent apa adanya.
+Setiap subtask "details" adalah checklist langkah granular yang bisa dieksekusi langsung tanpa menebak-nebak.`;
 
 /**
  * Compose the Task system prompt.
@@ -53,6 +71,10 @@ export function buildTaskSystemPrompt(input: TaskPromptInput): string {
 	parts.push(
 		`\n\n--- ACCEPTANCE CRITERIA (AUTHORITATIVE SCOPE + IDs) ---\n${input.acMarkdown}`,
 	);
+	if (input.featureTreeBlock?.trim())
+		parts.push(
+			`\n\n${input.featureTreeBlock}\n\n${TASK_FEATURE_SSOT_INSTRUCTION}`,
+		);
 	return parts.filter((part) => part.trim()).join("\n");
 }
 

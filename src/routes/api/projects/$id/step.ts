@@ -9,7 +9,7 @@ import { requireUser } from "@/lib/session";
 // ponytail: no DB CHECK constraint on projects.step (migration 0000), so valid
 // values live here. "question" added so ask-options success can mark a project
 // mid-question-stage server-side - drives History visibility without migration.
-const ALLOWED_STEPS = new Set(["question", "prd", "ac", "task"]);
+const ALLOWED_STEPS = new Set(["question", "fitur", "prd", "ac", "task"]);
 
 export const Route = createFileRoute("/api/projects/$id/step")({
 	server: {

@@ -295,6 +295,26 @@ export const quotas = pgTable(
 );
 
 // Projects
+export interface SubfeatureNode {
+	id: string;
+	name: string;
+	description: string;
+}
+
+export interface FeatureNode {
+	id: string;
+	name: string;
+	phase: number;
+	description: string;
+	subfeatures: SubfeatureNode[];
+}
+
+export interface ProjectFeatureTree {
+	productName: string;
+	features: FeatureNode[];
+	createdAt: string;
+}
+
 export const projects = pgTable(
 	"projects",
 	{
@@ -316,7 +336,9 @@ export const projects = pgTable(
 			onDelete: "set null",
 		}),
 		language: text("language").default("id"),
-		step: text("step").default("prd"), // prd, ac, task
+		step: text("step").default("prd"), // question, fitur, prd, ac, task
+		featuresStatus: text("features_status").default("pending"),
+		featureTree: jsonb("feature_tree").$type<ProjectFeatureTree>(),
 		acStatus: text("ac_status").default("pending"),
 		taskStatus: text("task_status").default("pending"),
 		shareToken: text("share_token"),
@@ -460,6 +482,8 @@ export const tasks = pgTable(
 		position: jsonb("position"), // { x, y } for kanban
 		order: integer("order").default(0),
 		featureName: text("feature_name"),
+		subfeatureId: text("subfeature_id"),
+		subfeatureName: text("subfeature_name"),
 		startedAt: timestamp("started_at"),
 		completedAt: timestamp("completed_at"),
 		createdAt: timestamp("created_at").defaultNow(),

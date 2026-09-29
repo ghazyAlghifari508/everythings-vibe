@@ -48,6 +48,9 @@ export const MAX_CREDIT_AMOUNT = 10_000_000;
 // carries streamed PRD text (tens of KB); preferences is a small JSON bag.
 export const MAX_RESUME_CONTENT_CHARS = 200_000;
 export const MAX_PREFERENCES_CHARS = 10_000;
+// Bounded accumulation for the Fitur JSON generation: abort the upstream
+// generation past what the parser could ever need.
+export const MAX_FEATURE_RESPONSE_CHARS = 200_000;
 
 // Pre-byte-retry for AI generation: if the upstream router drops/errors before
 // any text-delta leaves the server, retry once before failing the whole request.

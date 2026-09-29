@@ -48,6 +48,14 @@ export interface TaskTree {
 			 * inventory). Definitions stay in the PRD; this is a reference only.
 			 */
 			surfaces: string[];
+			/**
+			 * Subfeature this task implements, referencing the project feature
+			 * tree (`subfeat-N.M`). Required on freshly generated trees when
+			 * the caller passes the tree's id set; absent on legacy trees
+			 * generated before the Fitur stage existed.
+			 */
+			subfeatureId?: string;
+			subfeatureName?: string;
 			subtasks: Array<{ name: string; description: string; details: string[] }>;
 		}>;
 	}>;
@@ -107,7 +115,10 @@ function isNonEmptyString(value: unknown, max: number): value is string {
 	return typeof value === "string" && !!value.trim() && value.length <= max;
 }
 
-export function parseTaskJson(jsonString: string): TaskTree | null {
+export function parseTaskJson(
+	jsonString: string,
+	validSubfeatureIds?: ReadonlySet<string>,
+): TaskTree | null {
 	try {
 		const parsed: unknown = JSON.parse(jsonString);
 		if (!isRecord(parsed)) return null;
@@ -141,6 +152,27 @@ export function parseTaskJson(jsonString: string): TaskTree | null {
 				if (!priority) return null;
 				const surfacesResult = parseSurfaces(task.surfaces);
 				if (!surfacesResult.ok) return null;
+				// Fitur SSOT: a fresh generation must anchor every task to a
+				// subfeature from the project feature tree. An absent set means
+				// a legacy path (old tests, stored trees) where the field
+				// stays absent instead of failing.
+				let subfeatureId: string | undefined;
+				let subfeatureName: string | undefined;
+				if (validSubfeatureIds) {
+					if (
+						typeof task.subfeatureId !== "string" ||
+						!validSubfeatureIds.has(task.subfeatureId.trim())
+					)
+						return null;
+					subfeatureId = task.subfeatureId.trim();
+					if (
+						task.subfeatureName !== undefined &&
+						typeof task.subfeatureName === "string" &&
+						task.subfeatureName.trim().length > 0 &&
+						task.subfeatureName.length <= MAX_TASK_NAME_CHARS
+					)
+						subfeatureName = task.subfeatureName.trim();
+				}
 				// Coverage is structural when present. A legacy tree without the
 				// field falls back to prose references so it stays readable.
 				let covers: string[];
@@ -177,6 +209,8 @@ export function parseTaskJson(jsonString: string): TaskTree | null {
 					priority,
 					covers,
 					surfaces: surfacesResult.surfaces,
+					...(subfeatureId ? { subfeatureId } : {}),
+					...(subfeatureName ? { subfeatureName } : {}),
 					subtasks: [],
 				};
 				for (const subtask of task.subtasks) {
@@ -274,6 +308,8 @@ export async function saveTaskTree(
 				title: task.name,
 				description: task.description || null,
 				featureName: feature.name,
+				subfeatureId: task.subfeatureId ?? null,
+				subfeatureName: task.subfeatureName ?? null,
 				status: "pending",
 				priority: task.priority,
 				covers: task.covers,
@@ -331,6 +367,8 @@ export async function getTaskTree(projectId: string): Promise<TaskTree | null> {
 				description: tasks.description,
 				status: tasks.status,
 				featureName: tasks.featureName,
+				subfeatureId: tasks.subfeatureId,
+				subfeatureName: tasks.subfeatureName,
 				priority: tasks.priority,
 				covers: tasks.covers,
 				surfaces: tasks.surfaces,
@@ -401,6 +439,12 @@ export async function getTaskTree(projectId: string): Promise<TaskTree | null> {
 							.map((surface) => normalizeSurfaceName(surface))
 							.filter((surface): surface is string => surface !== null)
 					: [],
+				...(typeof row.subfeatureId === "string" && row.subfeatureId
+					? { subfeatureId: row.subfeatureId }
+					: {}),
+				...(typeof row.subfeatureName === "string" && row.subfeatureName
+					? { subfeatureName: row.subfeatureName }
+					: {}),
 				subtasks,
 			});
 		}

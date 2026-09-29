@@ -26,6 +26,11 @@ import {
 } from "@/lib/services/ai-orchestrator";
 import type { CreditOperationResult } from "@/lib/services/credit-service";
 import { sanitizeErrorForClient } from "@/lib/services/error-sanitizer";
+import {
+	FEATURE_TREE_MISSING_MESSAGE,
+	featureTreeSchema,
+	formatFeatureTreeBlock,
+} from "@/lib/services/feature-service";
 import { extractJson } from "@/lib/services/json-extract";
 import {
 	getLatestPrdContent,
@@ -123,6 +128,7 @@ export const Route = createFileRoute("/api/task/generate")({
 						id: projects.id,
 						language: projects.language,
 						projectMode: projects.projectMode,
+						featureTree: projects.featureTree,
 					})
 					.from(projects)
 					.where(
@@ -135,6 +141,26 @@ export const Route = createFileRoute("/api/task/generate")({
 					.limit(1);
 				if (!project)
 					return Response.json({ error: "Project not found" }, { status: 404 });
+
+				// Fitur SSOT: every task anchors to a tree subfeature. Fail
+				// closed with an actionable message instead of generating
+				// unanchored tasks that later stages cannot trace.
+				const parsedTree = featureTreeSchema.safeParse(project.featureTree);
+				if (!parsedTree.success)
+					return Response.json(
+						{
+							error: FEATURE_TREE_MISSING_MESSAGE,
+							code: "FEATURE_TREE_MISSING",
+						},
+						{ status: 409 },
+					);
+				const featureTree = parsedTree.data;
+				const featureTreeBlock = formatFeatureTreeBlock(featureTree);
+				const validSubfeatureIds = new Set(
+					featureTree.features.flatMap((feature) =>
+						feature.subfeatures.map((sub) => sub.id),
+					),
+				);
 
 				const acMarkdown = await getLatestAcMarkdown(projectId);
 				if (!acMarkdown)
@@ -468,11 +494,12 @@ export const Route = createFileRoute("/api/task/generate")({
 							try {
 								const firstPass = parseTaskJson(
 									extractJson(sanitizeModelOutput(fullResponse)),
+									validSubfeatureIds,
 								);
 								if (!firstPass) {
 									await safeRelease("invalid task json");
 									await safeError(
-										"AI menghasilkan JSON tidak valid. Coba lagi.",
+										"AI menghasilkan task yang tidak valid (JSON rusak atau subfitur di luar daftar fitur). Coba lagi.",
 									);
 									return;
 								}
@@ -486,7 +513,10 @@ export const Route = createFileRoute("/api/task/generate")({
 									initialTree: firstPass,
 									requestRepair,
 									parse: (raw) =>
-										parseTaskJson(extractJson(sanitizeModelOutput(raw))),
+										parseTaskJson(
+											extractJson(sanitizeModelOutput(raw)),
+											validSubfeatureIds,
+										),
 									maxAttempts: MAX_TASK_COVERAGE_REPAIR_ATTEMPTS,
 									isAborted: () => request.signal.aborted,
 									onRepair: (attempt, missing) => {
@@ -699,6 +729,7 @@ export const Route = createFileRoute("/api/task/generate")({
 								grounded,
 								codebaseBlock,
 								language: projectLanguage,
+								featureTreeBlock,
 							});
 							const messages: Array<{
 								role: "system" | "user" | "assistant";

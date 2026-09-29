@@ -3,7 +3,12 @@
 import { ChevronRight, X } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+	groupTasksBySubfeature,
+	type TaskSubfeatureGroup,
+} from "@/components/fitur/feature-view";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
+import { getTaskPriorityConfig, TASK_STATUS_LABELS } from "@/lib/kanban-utils";
 import type { TaskTree } from "@/lib/services/task-service";
 import { ZoomControls } from "./zoom-controls";
 
@@ -25,11 +30,14 @@ const DETAIL_FOOTER_H = 24;
 const MAX_VISIBLE_DETAILS = 3;
 const DETAIL_GAP_Y = 12;
 
-const LEVEL_GAP_X = 120;
-const SIBLING_GAP_Y = 24;
+const SUBFEATURE_W = 220;
+const SUBFEATURE_H = 60;
+
+export const LEVEL_GAP_X = 120;
+export const SIBLING_GAP_Y = 24;
 
 // Color palette per feature
-const COLORS = [
+export const COLORS = [
 	{
 		bg: "bg-indigo/10",
 		border: "border-indigo/40",
@@ -68,9 +76,9 @@ const COLORS = [
 	},
 ];
 
-interface LayoutNode {
+export interface LayoutNode {
 	id: string;
-	type: "root" | "feature" | "task" | "detail";
+	type: "root" | "feature" | "subfeature" | "task" | "detail";
 	label: string;
 	x: number;
 	y: number;
@@ -79,6 +87,11 @@ interface LayoutNode {
 	colorIdx: number;
 	phase?: number;
 	taskCount?: number;
+	subfeatureName?: string | null;
+	description?: string | null;
+	ownerFeature?: string;
+	status?: string;
+	priority?: string | null;
 	subtasks?: Array<{ name: string }>;
 	totalSubtasks?: number;
 	parentSubtask?: string;
@@ -86,7 +99,7 @@ interface LayoutNode {
 	totalDetails?: number;
 }
 
-interface LayoutEdge {
+export interface LayoutEdge {
 	x1: number;
 	y1: number;
 	x2: number;
@@ -94,7 +107,7 @@ interface LayoutEdge {
 	color: string;
 }
 
-function layoutGraph(
+export function layoutTaskGraph(
 	tree: TaskTree,
 	projectName: string,
 ): { nodes: LayoutNode[]; edges: LayoutEdge[]; width: number; height: number } {
@@ -137,26 +150,44 @@ function layoutGraph(
 		);
 	}
 
-	// Pass 1: compute feature subtree heights (sum of its task cards + gaps)
+	// Pass 1: compute feature subtree heights across subfeature rows.
+	// Tasks branch from their owning subfeature group (groupTasksBySubfeature):
+	// tasks sharing one subfeatureId stack as sibling rows under a single
+	// subfeature node; legacy tasks without a link each keep their own row and
+	// branch straight from the feature so historical projects render unchanged.
 	// ownH = task card's real visual height (content-driven). slotH = space reserved
 	// for the task's row (may be taller than ownH when its details stack exceeds the
 	// card height), the task card is centered within slotH so edges targeting the
 	// slot's vertical center always line up with the card, not empty space.
 	const featureHeights: number[] = [];
+	const featureGroups: TaskSubfeatureGroup[][] = [];
 	const featureTaskOwnHeights: number[][] = [];
 	const featureTaskSlotHeights: number[][] = [];
+	const featureGroupHeights: number[][] = [];
 	for (const feature of features) {
+		const groups = groupTasksBySubfeature(feature.tasks);
 		const ownHs = feature.tasks.map((t) =>
 			Math.max(TASK_MIN_H, taskCardH(t.subtasks.length)),
 		);
 		const slotHs = feature.tasks.map((t, ti) =>
 			Math.max(ownHs[ti], detailStackH(detailGroups(t))),
 		);
+		const groupHs = groups.map((g) => {
+			const rowsH =
+				g.taskIndexes.reduce((s, ti) => s + slotHs[ti], 0) +
+				Math.max(0, g.taskIndexes.length - 1) * SIBLING_GAP_Y;
+			// Legacy groups (no subfeature link) keep the flat row height with no
+			// subfeature node; linked groups reserve at least the node height.
+			if (!g.subfeatureName) return rowsH;
+			return Math.max(SUBFEATURE_H, rowsH);
+		});
+		featureGroups.push(groups);
 		featureTaskOwnHeights.push(ownHs);
 		featureTaskSlotHeights.push(slotHs);
+		featureGroupHeights.push(groupHs);
 		const total =
-			slotHs.reduce((s, h) => s + h, 0) +
-			Math.max(0, slotHs.length - 1) * SIBLING_GAP_Y;
+			groupHs.reduce((s, h) => s + h, 0) +
+			Math.max(0, groupHs.length - 1) * SIBLING_GAP_Y;
 		featureHeights.push(Math.max(FEATURE_H, total));
 	}
 
@@ -210,85 +241,133 @@ function layoutGraph(
 			color: COLORS[colorIdx].accent,
 		});
 
-		// Tasks
-		const taskX = featureX + FEATURE_W + LEVEL_GAP_X;
+		// Subfeature column: one node per owning group, then tasks stack under it.
+		// Legacy single-task groups reuse the same geometry with a "Tugas fitur"
+		// label so historical projects render without crashing.
+		const subX = featureX + FEATURE_W + LEVEL_GAP_X;
+		const taskX = subX + SUBFEATURE_W + LEVEL_GAP_X;
 		const ownHs = featureTaskOwnHeights[fi];
 		const slotHs = featureTaskSlotHeights[fi];
-		const totalTaskH =
-			slotHs.reduce((s, h) => s + h, 0) +
-			Math.max(0, slotHs.length - 1) * SIBLING_GAP_Y;
-		let taskCursorY = featureCursorY + fh / 2 - totalTaskH / 2;
+		const subGroups = featureGroups[fi];
+		const subGroupHs = featureGroupHeights[fi];
+		const totalGroupsH =
+			subGroupHs.reduce((s, h) => s + h, 0) +
+			Math.max(0, subGroupHs.length - 1) * SIBLING_GAP_Y;
+		let groupCursorY = featureCursorY + fh / 2 - totalGroupsH / 2;
 
-		for (let ti = 0; ti < feature.tasks.length; ti++) {
-			const task = feature.tasks[ti];
-			const ownH = ownHs[ti];
-			const slotH = slotHs[ti];
-			// Card centered within its slot so its true visual midpoint (cardY + ownH/2)
-			// equals the slot midpoint (taskCursorY + slotH/2), edges target the slot
-			// midpoint, so this keeps them landing on the actual rendered card, not
-			// empty space below it when the detail stack makes the slot taller than the card.
-			const cardY = taskCursorY + slotH / 2 - ownH / 2;
-			const slotMidY = taskCursorY + slotH / 2;
+		for (let gi = 0; gi < subGroups.length; gi++) {
+			const subGroup = subGroups[gi];
+			const gh = subGroupHs[gi];
+			const groupMidY = groupCursorY + gh / 2;
+			const isLegacy = !subGroup.subfeatureName;
+			// Legacy: no subfeature node, task branches straight from the feature
+			// so trees generated before the Fitur stage keep their old geometry.
+			const branchX1 = isLegacy ? featureX + FEATURE_W : subX + SUBFEATURE_W;
+			const branchY1 = isLegacy ? featureY + FEATURE_H / 2 : groupMidY;
 
-			nodes.push({
-				id: `f-${fi}-t-${ti}`,
-				type: "task",
-				label: task.name,
-				x: taskX,
-				y: cardY,
-				w: TASK_W,
-				h: ownH,
-				colorIdx,
-				subtasks: task.subtasks,
-				totalSubtasks: task.subtasks.length,
-			});
+			if (!isLegacy) {
+				nodes.push({
+					id: `f-${fi}-s-${gi}`,
+					type: "subfeature",
+					label: subGroup.subfeatureName ?? "Tugas fitur",
+					x: subX,
+					y: groupMidY - SUBFEATURE_H / 2,
+					w: SUBFEATURE_W,
+					h: SUBFEATURE_H,
+					colorIdx,
+					description: subGroup.subfeatureName,
+					ownerFeature: feature.name,
+				});
 
-			// Edge: feature → task
-			edges.push({
-				x1: featureX + FEATURE_W,
-				y1: featureY + FEATURE_H / 2,
-				x2: taskX,
-				y2: slotMidY,
-				color: COLORS[colorIdx].accent,
-			});
-
-			// Details: one node per detail item, flattened across this task's subtasks
-			const groups = detailGroups(task);
-			if (groups.length > 0) {
-				const detailX = taskX + TASK_W + LEVEL_GAP_X;
-				let detailCursorY = slotMidY - detailStackH(groups) / 2;
-
-				for (let di = 0; di < groups.length; di++) {
-					const group = groups[di];
-					const h = detailNodeH(group.items.length);
-
-					nodes.push({
-						id: `f-${fi}-t-${ti}-d-${di}`,
-						type: "detail",
-						label: group.parentSubtask,
-						parentSubtask: group.parentSubtask,
-						details: group.items,
-						totalDetails: group.items.length,
-						x: detailX,
-						y: detailCursorY,
-						w: DETAIL_W,
-						h,
-						colorIdx,
-					});
-
-					edges.push({
-						x1: taskX + TASK_W,
-						y1: slotMidY,
-						x2: detailX,
-						y2: detailCursorY + h / 2,
-						color: COLORS[colorIdx].accent,
-					});
-
-					detailCursorY += h + DETAIL_GAP_Y;
-				}
+				// Edge: feature → subfeature
+				edges.push({
+					x1: featureX + FEATURE_W,
+					y1: featureY + FEATURE_H / 2,
+					x2: subX,
+					y2: groupMidY,
+					color: COLORS[colorIdx].accent,
+				});
 			}
 
-			taskCursorY += slotH + SIBLING_GAP_Y;
+			let taskCursorY = groupCursorY;
+
+			for (const ti of subGroup.taskIndexes) {
+				const task = feature.tasks[ti];
+				const ownH = ownHs[ti];
+				const slotH = slotHs[ti];
+				// Card centered within its slot so its true visual midpoint
+				// (cardY + ownH/2) equals the slot midpoint, keeping branch
+				// edges on the rendered card, not empty space.
+				const cardY = taskCursorY + slotH / 2 - ownH / 2;
+				const slotMidY = taskCursorY + slotH / 2;
+
+				nodes.push({
+					id: `f-${fi}-t-${ti}`,
+					type: "task",
+					label: task.name,
+					x: isLegacy ? subX : taskX,
+					y: cardY,
+					w: TASK_W,
+					h: ownH,
+					colorIdx,
+					subfeatureName: subGroup.subfeatureName,
+					status: task.status,
+					priority: task.priority,
+					subtasks: task.subtasks,
+					totalSubtasks: task.subtasks.length,
+				});
+
+				// Edge: feature/subfeature → task
+				edges.push({
+					x1: branchX1,
+					y1: branchY1,
+					x2: isLegacy ? subX : taskX,
+					y2: slotMidY,
+					color: COLORS[colorIdx].accent,
+				});
+				// Details: one node per detail item, flattened across this task's subtasks
+				const taskDetailGroups = detailGroups(task);
+				if (taskDetailGroups.length > 0) {
+					// Legacy tasks sit in the subfeature column, so details shift one
+					// level right of the actual card, not the nominal task column.
+					const cardX = isLegacy ? subX : taskX;
+					const detailX = cardX + TASK_W + LEVEL_GAP_X;
+					let detailCursorY = slotMidY - detailStackH(taskDetailGroups) / 2;
+
+					for (let di = 0; di < taskDetailGroups.length; di++) {
+						const detailGroup = taskDetailGroups[di];
+						const h = detailNodeH(detailGroup.items.length);
+
+						nodes.push({
+							id: `f-${fi}-t-${ti}-d-${di}`,
+							type: "detail",
+							label: detailGroup.parentSubtask,
+							parentSubtask: detailGroup.parentSubtask,
+							details: detailGroup.items,
+							totalDetails: detailGroup.items.length,
+							x: detailX,
+							y: detailCursorY,
+							w: DETAIL_W,
+							h,
+							colorIdx,
+						});
+
+						edges.push({
+							x1: cardX + TASK_W,
+							y1: slotMidY,
+							x2: detailX,
+							y2: detailCursorY + h / 2,
+							color: COLORS[colorIdx].accent,
+						});
+
+						detailCursorY += h + DETAIL_GAP_Y;
+					}
+				}
+
+				taskCursorY += slotH + SIBLING_GAP_Y;
+			}
+
+			groupCursorY += gh + SIBLING_GAP_Y;
 		}
 
 		featureCursorY += fh + SIBLING_GAP_Y;
@@ -301,7 +380,7 @@ function layoutGraph(
 }
 
 // Dot-grid CSS: thicker, more visible
-const DOT_BG_IMAGE =
+export const DOT_BG_IMAGE =
 	"radial-gradient(circle, var(--color-graphite) 1.5px, transparent 1.5px)";
 const _DOT_BG_SIZE = "20px 20px";
 
@@ -344,7 +423,7 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 	} = useMemo(
 		() =>
 			taskTree && !isEmpty
-				? layoutGraph(taskTree, projectName)
+				? layoutTaskGraph(taskTree, projectName)
 				: { nodes: [], edges: [], width: 0, height: 0 },
 		[taskTree, projectName, isEmpty],
 	);
@@ -352,7 +431,7 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 	// While loading, the same layout engine sizes the skeleton, so the board
 	// auto-fits a representative tree instead of a fixed empty canvas.
 	const skeletonLayout = useMemo(
-		() => (isEmpty ? layoutGraph(SKELETON_TREE, projectName) : null),
+		() => (isEmpty ? layoutTaskGraph(SKELETON_TREE, projectName) : null),
 		[isEmpty, projectName],
 	);
 	const effectiveWidth = skeletonLayout?.width ?? canvasWidth;
@@ -492,6 +571,8 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 								return <RootNode key={node.id} node={node} />;
 							if (node.type === "feature")
 								return <FeatureNode key={node.id} node={node} />;
+							if (node.type === "subfeature")
+								return <SubfeatureNode key={node.id} node={node} />;
 							if (node.type === "detail")
 								return (
 									<DetailNode
@@ -538,7 +619,7 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 
 /**
  * Loading representation only. It mirrors the real tree's spatial language by
- * running a fixed, synthetic tree through the SAME `layoutGraph` the actual
+ * running a fixed, synthetic tree through the SAME `layoutTaskGraph` the actual
  * tasks use, so node geometry, depth, and edge routing can never drift from the
  * rendered board. Labels are never rendered (only shimmer bars), so no fake task
  * data is shown, and the shape is deliberately irregular — varied feature
@@ -728,7 +809,7 @@ const SKELETON_BAR = "rounded bg-fog/10";
 /** Ghost shells mirroring the real node types, sized by the shared layout. */
 function SkeletonDiagram() {
 	const { nodes, edges } = useMemo(
-		() => layoutGraph(SKELETON_TREE, "Project"),
+		() => layoutTaskGraph(SKELETON_TREE, "Project"),
 		[],
 	);
 
@@ -837,9 +918,9 @@ function SkeletonDiagram() {
 /* ── Node components ── */
 
 // ponytail: memoized so per-frame pan/zoom renders of WhiteboardCanvas skip
-// re-rendering every node (props are stable: layoutGraph is useMemo'd and
+// re-rendering every node (props are stable: layoutTaskGraph is useMemo'd and
 // openers are stable setState wrappers).
-const Edges = memo(function Edges({ edges }: { edges: LayoutEdge[] }) {
+export const Edges = memo(function Edges({ edges }: { edges: LayoutEdge[] }) {
 	return (
 		<svg
 			aria-hidden="true"
@@ -896,6 +977,33 @@ const FeatureNode = memo(function FeatureNode({ node }: { node: LayoutNode }) {
 				</div>
 				<p
 					className="truncate font-inter text-sm font-[510] text-snow"
+					title={node.label}
+				>
+					{node.label}
+				</p>
+			</div>
+		</div>
+	);
+});
+
+const SubfeatureNode = memo(function SubfeatureNode({
+	node,
+}: {
+	node: LayoutNode;
+}) {
+	return (
+		<div
+			className="absolute rounded-xl border border-graphite bg-obsidian"
+			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
+			role="img"
+			aria-label={`Subfitur ${node.label} dari ${node.ownerFeature ?? "fitur"}`}
+		>
+			<div className="flex h-full items-center gap-2 px-3">
+				<div
+					className={`h-2 w-2 shrink-0 rounded-full ${COLORS[node.colorIdx].badge}`}
+				/>
+				<p
+					className="truncate font-inter text-xs font-[510] text-snow"
 					title={node.label}
 				>
 					{node.label}
@@ -1095,6 +1203,11 @@ const TaskCard = memo(function TaskCard({
 	const total = node.totalSubtasks ?? allSubtasks.length;
 	const hasMore = total > MAX_VISIBLE_SUBTASKS;
 	const visibleSubtasks = allSubtasks.slice(0, MAX_VISIBLE_SUBTASKS);
+	const statusLabel =
+		node.status && node.status in TASK_STATUS_LABELS
+			? TASK_STATUS_LABELS[node.status as keyof typeof TASK_STATUS_LABELS]
+			: null;
+	const priorityConfig = getTaskPriorityConfig(node.priority);
 
 	return (
 		<div
@@ -1110,6 +1223,18 @@ const TaskCard = memo(function TaskCard({
 				>
 					{node.label}
 				</p>
+			</div>
+			{/* Subfeature owner + status/priority meta */}
+			<div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-2 text-[10px] text-fog">
+				{node.subfeatureName ? (
+					<span className="truncate" title={node.subfeatureName}>
+						{node.subfeatureName}
+					</span>
+				) : null}
+				{statusLabel ? <span>{statusLabel}</span> : null}
+				<span className={priorityConfig.textClassName}>
+					{priorityConfig.label}
+				</span>
 			</div>
 
 			{/* Subtask checklist (collapsed preview, max 3) */}

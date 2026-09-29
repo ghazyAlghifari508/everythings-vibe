@@ -16,6 +16,7 @@ export type StepId = FlowStep;
 
 const STEPS: Array<{ id: FlowStep; label: string }> = [
 	{ id: "question", label: "Question" },
+	{ id: "fitur", label: "Fitur" },
 	{ id: "prd", label: "PRD" },
 	{ id: "ac", label: "AC" },
 	{ id: "task", label: "Task" },

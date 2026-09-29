@@ -40,6 +40,7 @@ import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-qu
 import { Route as DesignIndexRouteImport } from './routes/design/index'
 import { Route as DesignScrapRouteImport } from './routes/design/scrap'
 import { Route as DesignStudioRouteImport } from './routes/design/studio'
+import { Route as FiturIdRouteImport } from './routes/fitur/$id'
 import { Route as KanbanIdRouteImport } from './routes/kanban/$id'
 import { Route as PlanIndexRouteImport } from './routes/plan/index'
 import { Route as PlanCodebaseRouteImport } from './routes/plan/codebase'
@@ -62,6 +63,7 @@ import { Route as ApiCodebasesCodebaseIdRouteImport } from './routes/api/codebas
 import { Route as ApiCronBillingRouteImport } from './routes/api/cron/billing'
 import { Route as ApiExportPrdRouteImport } from './routes/api/export/prd'
 import { Route as ApiExportZipRouteImport } from './routes/api/export/zip'
+import { Route as ApiFeaturesGenerateRouteImport } from './routes/api/features/generate'
 import { Route as ApiKanbanPidRouteImport } from './routes/api/kanban/$pid'
 import { Route as ApiKanbanStreamRouteImport } from './routes/api/kanban/stream'
 import { Route as ApiKanbanUpdateStatusRouteImport } from './routes/api/kanban/update-status'
@@ -261,6 +263,11 @@ const DesignStudioRoute = DesignStudioRouteImport.update({
   path: '/design/studio',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FiturIdRoute = FiturIdRouteImport.update({
+  id: '/fitur/$id',
+  path: '/fitur/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KanbanIdRoute = KanbanIdRouteImport.update({
   id: '/kanban/$id',
   path: '/kanban/$id',
@@ -369,6 +376,11 @@ const ApiExportPrdRoute = ApiExportPrdRouteImport.update({
 const ApiExportZipRoute = ApiExportZipRouteImport.update({
   id: '/api/export/zip',
   path: '/api/export/zip',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFeaturesGenerateRoute = ApiFeaturesGenerateRouteImport.update({
+  id: '/api/features/generate',
+  path: '/api/features/generate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiKanbanPidRoute = ApiKanbanPidRouteImport.update({
@@ -629,6 +641,7 @@ export interface FileRoutesByFullPath {
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/design/scrap': typeof DesignScrapRouteWithChildren
   '/design/studio': typeof DesignStudioRouteWithChildren
+  '/fitur/$id': typeof FiturIdRoute
   '/kanban/$id': typeof KanbanIdRoute
   '/plan/codebase': typeof PlanCodebaseRoute
   '/plan/new': typeof PlanNewRoute
@@ -653,6 +666,7 @@ export interface FileRoutesByFullPath {
   '/api/cron/billing': typeof ApiCronBillingRoute
   '/api/export/prd': typeof ApiExportPrdRoute
   '/api/export/zip': typeof ApiExportZipRoute
+  '/api/features/generate': typeof ApiFeaturesGenerateRoute
   '/api/kanban/$pid': typeof ApiKanbanPidRoute
   '/api/kanban/stream': typeof ApiKanbanStreamRoute
   '/api/kanban/update-status': typeof ApiKanbanUpdateStatusRoute
@@ -722,6 +736,7 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/fitur/$id': typeof FiturIdRoute
   '/kanban/$id': typeof KanbanIdRoute
   '/plan/codebase': typeof PlanCodebaseRoute
   '/plan/new': typeof PlanNewRoute
@@ -746,6 +761,7 @@ export interface FileRoutesByTo {
   '/api/cron/billing': typeof ApiCronBillingRoute
   '/api/export/prd': typeof ApiExportPrdRoute
   '/api/export/zip': typeof ApiExportZipRoute
+  '/api/features/generate': typeof ApiFeaturesGenerateRoute
   '/api/kanban/$pid': typeof ApiKanbanPidRoute
   '/api/kanban/stream': typeof ApiKanbanStreamRoute
   '/api/kanban/update-status': typeof ApiKanbanUpdateStatusRoute
@@ -821,6 +837,7 @@ export interface FileRoutesById {
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/design/scrap': typeof DesignScrapRouteWithChildren
   '/design/studio': typeof DesignStudioRouteWithChildren
+  '/fitur/$id': typeof FiturIdRoute
   '/kanban/$id': typeof KanbanIdRoute
   '/plan/codebase': typeof PlanCodebaseRoute
   '/plan/new': typeof PlanNewRoute
@@ -845,6 +862,7 @@ export interface FileRoutesById {
   '/api/cron/billing': typeof ApiCronBillingRoute
   '/api/export/prd': typeof ApiExportPrdRoute
   '/api/export/zip': typeof ApiExportZipRoute
+  '/api/features/generate': typeof ApiFeaturesGenerateRoute
   '/api/kanban/$pid': typeof ApiKanbanPidRoute
   '/api/kanban/stream': typeof ApiKanbanStreamRoute
   '/api/kanban/update-status': typeof ApiKanbanUpdateStatusRoute
@@ -921,6 +939,7 @@ export interface FileRouteTypes {
     | '/demo/tanstack-query'
     | '/design/scrap'
     | '/design/studio'
+    | '/fitur/$id'
     | '/kanban/$id'
     | '/plan/codebase'
     | '/plan/new'
@@ -945,6 +964,7 @@ export interface FileRouteTypes {
     | '/api/cron/billing'
     | '/api/export/prd'
     | '/api/export/zip'
+    | '/api/features/generate'
     | '/api/kanban/$pid'
     | '/api/kanban/stream'
     | '/api/kanban/update-status'
@@ -1014,6 +1034,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/codebases/$id'
     | '/demo/tanstack-query'
+    | '/fitur/$id'
     | '/kanban/$id'
     | '/plan/codebase'
     | '/plan/new'
@@ -1038,6 +1059,7 @@ export interface FileRouteTypes {
     | '/api/cron/billing'
     | '/api/export/prd'
     | '/api/export/zip'
+    | '/api/features/generate'
     | '/api/kanban/$pid'
     | '/api/kanban/stream'
     | '/api/kanban/update-status'
@@ -1112,6 +1134,7 @@ export interface FileRouteTypes {
     | '/demo/tanstack-query'
     | '/design/scrap'
     | '/design/studio'
+    | '/fitur/$id'
     | '/kanban/$id'
     | '/plan/codebase'
     | '/plan/new'
@@ -1136,6 +1159,7 @@ export interface FileRouteTypes {
     | '/api/cron/billing'
     | '/api/export/prd'
     | '/api/export/zip'
+    | '/api/features/generate'
     | '/api/kanban/$pid'
     | '/api/kanban/stream'
     | '/api/kanban/update-status'
@@ -1206,6 +1230,7 @@ export interface RootRouteChildren {
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
   DesignScrapRoute: typeof DesignScrapRouteWithChildren
   DesignStudioRoute: typeof DesignStudioRouteWithChildren
+  FiturIdRoute: typeof FiturIdRoute
   KanbanIdRoute: typeof KanbanIdRoute
   PlanCodebaseRoute: typeof PlanCodebaseRoute
   PlanNewRoute: typeof PlanNewRoute
@@ -1221,6 +1246,7 @@ export interface RootRouteChildren {
   ApiCronBillingRoute: typeof ApiCronBillingRoute
   ApiExportPrdRoute: typeof ApiExportPrdRoute
   ApiExportZipRoute: typeof ApiExportZipRoute
+  ApiFeaturesGenerateRoute: typeof ApiFeaturesGenerateRoute
   ApiKanbanPidRoute: typeof ApiKanbanPidRoute
   ApiKanbanStreamRoute: typeof ApiKanbanStreamRoute
   ApiKanbanUpdateStatusRoute: typeof ApiKanbanUpdateStatusRoute
@@ -1465,6 +1491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignStudioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/fitur/$id': {
+      id: '/fitur/$id'
+      path: '/fitur/$id'
+      fullPath: '/fitur/$id'
+      preLoaderRoute: typeof FiturIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kanban/$id': {
       id: '/kanban/$id'
       path: '/kanban/$id'
@@ -1617,6 +1650,13 @@ declare module '@tanstack/react-router' {
       path: '/api/export/zip'
       fullPath: '/api/export/zip'
       preLoaderRoute: typeof ApiExportZipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/features/generate': {
+      id: '/api/features/generate'
+      path: '/api/features/generate'
+      fullPath: '/api/features/generate'
+      preLoaderRoute: typeof ApiFeaturesGenerateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/kanban/$pid': {
@@ -2107,6 +2147,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
   DesignScrapRoute: DesignScrapRouteWithChildren,
   DesignStudioRoute: DesignStudioRouteWithChildren,
+  FiturIdRoute: FiturIdRoute,
   KanbanIdRoute: KanbanIdRoute,
   PlanCodebaseRoute: PlanCodebaseRoute,
   PlanNewRoute: PlanNewRoute,
@@ -2122,6 +2163,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCronBillingRoute: ApiCronBillingRoute,
   ApiExportPrdRoute: ApiExportPrdRoute,
   ApiExportZipRoute: ApiExportZipRoute,
+  ApiFeaturesGenerateRoute: ApiFeaturesGenerateRoute,
   ApiKanbanPidRoute: ApiKanbanPidRoute,
   ApiKanbanStreamRoute: ApiKanbanStreamRoute,
   ApiKanbanUpdateStatusRoute: ApiKanbanUpdateStatusRoute,

@@ -15,6 +15,10 @@ describe("stepToRoute", () => {
 		expect(stepToRoute("prd", "p1")).toBe("/prd/p1");
 	});
 
+	it("maps fitur step to /fitur route", () => {
+		expect(stepToRoute("fitur", "p1")).toBe("/fitur/p1");
+	});
+
 	it("maps ac step to /ac route", () => {
 		expect(stepToRoute("ac", "p1")).toBe("/ac/p1");
 	});
@@ -46,6 +50,11 @@ describe("routeToStep", () => {
 		expect(routeToStep("/ac/x")).toBe("ac");
 	});
 
+	it("detects fitur", () => {
+		expect(routeToStep("/fitur/x")).toBe("fitur");
+		expect(routeToStep("/fitur")).toBe("fitur");
+	});
+
 	it("detects task and kanban as task", () => {
 		expect(routeToStep("/task/x")).toBe("task");
 		expect(routeToStep("/kanban/x")).toBe("task");
@@ -59,25 +68,34 @@ describe("routeToStep", () => {
 
 describe("round-trip", () => {
 	it("stepToRoute is the inverse of routeToStep for every flow step", () => {
-		const routes = ["/ask/x", "/prd/x", "/ac/x", "/task/x"];
+		const routes = ["/ask/x", "/fitur/x", "/prd/x", "/ac/x", "/task/x"];
 		for (const r of routes) {
 			expect(stepToRoute(routeToStep(r), "x")).toBe(r);
 		}
 	});
 
-	it("FlowStep covers exactly question|prd|ac|task", () => {
-		const steps: FlowStep[] = ["question", "prd", "ac", "task"];
-		expect(steps).toHaveLength(4);
+	it("FlowStep covers exactly question|fitur|prd|ac|task", () => {
+		const steps: FlowStep[] = ["question", "fitur", "prd", "ac", "task"];
+		expect(steps).toHaveLength(5);
 	});
 });
 
 describe("getFlowStepCta", () => {
-	it("returns Generate PRD on question route when project has no PRD", () => {
+	it("returns Lihat Fitur on question route when the tree is not generated yet", () => {
 		const cta = getFlowStepCta("question", "question", false);
 		expect(cta).toEqual({
 			kind: "generate",
-			label: "Generate PRD",
-			targetStep: "prd",
+			label: "Lihat Fitur",
+			targetStep: "fitur",
+		});
+	});
+
+	it("returns Lihat Fitur navigate on question route when the tree exists", () => {
+		const cta = getFlowStepCta("question", "fitur", false);
+		expect(cta).toEqual({
+			kind: "navigate",
+			label: "Lihat Fitur",
+			targetStep: "fitur",
 		});
 	});
 
@@ -155,5 +173,40 @@ describe("getFlowStepCta", () => {
 
 	it("returns null for task route", () => {
 		expect(getFlowStepCta("task", "task")).toBeNull();
+	});
+
+	it("returns Generate PRD on fitur route when only the tree exists", () => {
+		const cta = getFlowStepCta("fitur", "fitur");
+		expect(cta).toEqual({
+			kind: "generate",
+			label: "Generate PRD",
+			targetStep: "prd",
+		});
+	});
+
+	it("navigates forward from fitur route once the project progressed", () => {
+		expect(getFlowStepCta("fitur", "prd")).toEqual({
+			kind: "navigate",
+			label: "Lanjut ke PRD",
+			targetStep: "prd",
+		});
+		expect(getFlowStepCta("fitur", "ac")).toEqual({
+			kind: "navigate",
+			label: "Lanjut ke AC",
+			targetStep: "ac",
+		});
+		expect(getFlowStepCta("fitur", "task")).toEqual({
+			kind: "navigate",
+			label: "Kembali ke Task",
+			targetStep: "task",
+		});
+	});
+
+	it("never offers Generate AC on PRD route before the tree reaches PRD", () => {
+		expect(getFlowStepCta("prd", "fitur")).toEqual({
+			kind: "navigate",
+			label: "Kembali ke Fitur",
+			targetStep: "fitur",
+		});
 	});
 });

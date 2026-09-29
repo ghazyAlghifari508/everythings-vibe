@@ -7,6 +7,13 @@ export type TaskCardStatus = "pending" | "in_progress" | "completed" | "failed";
 
 export type TaskPriorityLevel = "utama" | "penting" | "pendukung";
 
+export const TASK_STATUS_LABELS: Record<TaskCardStatus, string> = {
+	pending: "Belum Mulai",
+	in_progress: "Dikerjakan",
+	completed: "Selesai",
+	failed: "Gagal",
+};
+
 export interface PriorityConfig {
 	label: "Utama" | "Penting" | "Pendukung";
 	level: TaskPriorityLevel;

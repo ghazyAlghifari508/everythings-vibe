@@ -96,6 +96,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	// FlowStepNav pages = PRD/AC/Task/Kanban (workspace)
 	const isFlowStepRoute =
 		pathname.startsWith("/ask/") ||
+		pathname.startsWith("/fitur/") ||
 		pathname.startsWith("/prd/") ||
 		pathname.startsWith("/ac/") ||
 		pathname.startsWith("/task/") ||
@@ -267,7 +268,9 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 														? "/task/$id"
 														: flowCta.targetStep === "ac"
 															? "/ac/$id"
-															: "/prd/$id";
+															: flowCta.targetStep === "fitur"
+																? "/fitur/$id"
+																: "/prd/$id";
 												navigate({
 													to: targetPath,
 													params: { id: projectId },

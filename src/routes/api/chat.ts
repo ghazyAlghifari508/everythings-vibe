@@ -39,6 +39,11 @@ import {
 import type { CreditOperationResult } from "@/lib/services/credit-service";
 import { sanitizeErrorForClient } from "@/lib/services/error-sanitizer";
 import {
+	FEATURE_TREE_MISSING_MESSAGE,
+	featureTreeSchema,
+	formatFeatureTreeBlock,
+} from "@/lib/services/feature-service";
+import {
 	deriveProjectName,
 	deriveProjectNameSync,
 	getLatestPrdContent,
@@ -210,6 +215,8 @@ export const Route = createFileRoute("/api/chat")({
 				let codebaseBlock = "";
 				let codebaseSnapshotId: string | undefined;
 				let codebaseAnalysisId: string | undefined;
+				// Fitur SSOT block for PRD generation (mode === "generate").
+				let featureTreeBlock = "";
 				let codebaseSnapshotInfo:
 					| { fileCount?: number; sourceBytes?: number }
 					| undefined;
@@ -221,6 +228,7 @@ export const Route = createFileRoute("/api/chat")({
 							language: projects.language,
 							projectMode: projects.projectMode,
 							step: projects.step,
+							featureTree: projects.featureTree,
 						})
 						.from(projects)
 						.where(
@@ -237,6 +245,25 @@ export const Route = createFileRoute("/api/chat")({
 							{ error: "Project not found or unauthorized" },
 							{ status: 403 },
 						);
+					}
+
+					// Fitur SSOT: Bab 4-5 PRD disusun 1:1 dari daftar fitur.
+					// Fail closed with an actionable message instead of
+					// generating a PRD whose features later stages must discard.
+					if (mode === "generate") {
+						const parsedTree = featureTreeSchema.safeParse(
+							projCheck?.featureTree,
+						);
+						if (!parsedTree.success) {
+							return Response.json(
+								{
+									error: FEATURE_TREE_MISSING_MESSAGE,
+									code: "FEATURE_TREE_MISSING",
+								},
+								{ status: 409 },
+							);
+						}
+						featureTreeBlock = formatFeatureTreeBlock(parsedTree.data);
 					}
 
 					if (mode === "revise") {
@@ -429,6 +456,8 @@ export const Route = createFileRoute("/api/chat")({
 				}
 				// Task 8: same grounding boundary — "" for greenfield (no-op).
 				systemPrompt += codebaseBlock;
+				// Fitur SSOT: "" except for mode === "generate" (gate above).
+				if (featureTreeBlock) systemPrompt += `\n${featureTreeBlock}`;
 
 				let fullMessages: Array<{
 					role: "system" | "user" | "assistant";

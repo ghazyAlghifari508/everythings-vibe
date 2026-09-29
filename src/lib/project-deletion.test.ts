@@ -101,6 +101,8 @@ describe("read paths exclude tombstoned projects", () => {
 		"src/routes/api/projects/$id/step.ts",
 		"src/routes/api/projects/$id/last-route.ts",
 		"src/routes/api/ask/options.ts",
+		"src/routes/api/features/generate.ts",
+		"src/lib/services/feature-service.ts",
 		"src/routes/api/export/prd.ts",
 		"src/routes/api/export/zip.ts",
 		"src/routes/api/codebases/$codebaseId/status.ts",

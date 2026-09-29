@@ -17,6 +17,11 @@ describe("stepRank", () => {
 		expect(stepRank("ac")).toBeLessThan(stepRank("task"));
 	});
 
+	it("ranks fitur between question and prd", () => {
+		expect(stepRank("question")).toBeLessThan(stepRank("fitur"));
+		expect(stepRank("fitur")).toBeLessThan(stepRank("prd"));
+	});
+
 	it("treats null/unknown as prd, matching stepToRoute's fallback", () => {
 		expect(stepRank(null)).toBe(stepRank("prd"));
 		expect(stepRank(undefined)).toBe(stepRank("prd"));
@@ -128,6 +133,7 @@ describe("isValidHistoryUrl", () => {
 		expect(isValidHistoryUrl(`/ac/${id}`, id)).toBe(true);
 		expect(isValidHistoryUrl(`/task/${id}`, id)).toBe(true);
 		expect(isValidHistoryUrl(`/ask/${id}`, id)).toBe(true);
+		expect(isValidHistoryUrl(`/fitur/${id}`, id)).toBe(true);
 		expect(isValidHistoryUrl(`/kanban/${id}`, id)).toBe(true);
 		expect(isValidHistoryUrl(`/codebase/${id}`, id)).toBe(false);
 	});
@@ -159,6 +165,10 @@ describe("parseHistoryHref", () => {
 	it("splits every project-internal route into a typed target", () => {
 		expect(parseHistoryHref(`/ask/${id}`)).toEqual({
 			to: "/ask/$id",
+			params: { id },
+		});
+		expect(parseHistoryHref(`/fitur/${id}`)).toEqual({
+			to: "/fitur/$id",
 			params: { id },
 		});
 		expect(parseHistoryHref(`/prd/${id}`)).toEqual({
@@ -200,6 +210,7 @@ describe("parseHistoryHref", () => {
 		for (const url of [
 			"/codebases",
 			`/ask/${id}`,
+			`/fitur/${id}`,
 			`/prd/${id}`,
 			`/ac/${id}`,
 			`/task/${id}`,

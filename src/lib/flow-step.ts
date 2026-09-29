@@ -4,10 +4,11 @@
 
 import { stepRank } from "@/lib/flow-progress";
 
-export type FlowStep = "question" | "prd" | "ac" | "task";
+export type FlowStep = "question" | "fitur" | "prd" | "ac" | "task";
 
 export function routeToStep(pathname: string): FlowStep {
 	if (pathname.startsWith("/ask/") || pathname === "/ask") return "question";
+	if (pathname.startsWith("/fitur/") || pathname === "/fitur") return "fitur";
 	if (pathname.startsWith("/ac/") || pathname === "/ac") return "ac";
 	if (pathname.startsWith("/task/") || pathname === "/task") return "task";
 	if (pathname.startsWith("/kanban/") || pathname === "/kanban") return "task";
@@ -54,10 +55,17 @@ export function getFlowStepCta(
 				targetStep: "prd",
 			};
 		}
+		if (dbRank >= stepRank("fitur")) {
+			return {
+				kind: "navigate",
+				label: "Lihat Fitur",
+				targetStep: "fitur",
+			};
+		}
 		return {
 			kind: "generate",
-			label: "Generate PRD",
-			targetStep: "prd",
+			label: "Lihat Fitur",
+			targetStep: "fitur",
 		};
 	}
 
@@ -76,6 +84,13 @@ export function getFlowStepCta(
 				targetStep: "ac",
 			};
 		}
+		if (dbRank < stepRank("prd")) {
+			return {
+				kind: "navigate",
+				label: "Kembali ke Fitur",
+				targetStep: "fitur",
+			};
+		}
 		return {
 			kind: "generate",
 			label: "Generate AC",
@@ -83,6 +98,34 @@ export function getFlowStepCta(
 		};
 	}
 
+	if (currentRouteStep === "fitur") {
+		if (dbRank >= stepRank("task")) {
+			return {
+				kind: "navigate",
+				label: "Kembali ke Task",
+				targetStep: "task",
+			};
+		}
+		if (dbRank >= stepRank("ac")) {
+			return {
+				kind: "navigate",
+				label: "Lanjut ke AC",
+				targetStep: "ac",
+			};
+		}
+		if (dbRank >= stepRank("prd")) {
+			return {
+				kind: "navigate",
+				label: "Lanjut ke PRD",
+				targetStep: "prd",
+			};
+		}
+		return {
+			kind: "generate",
+			label: "Generate PRD",
+			targetStep: "prd",
+		};
+	}
 	if (currentRouteStep === "ac") {
 		if (dbRank >= stepRank("task")) {
 			return {
@@ -114,6 +157,8 @@ export function stepToRoute(
 	switch (step) {
 		case "question":
 			return `/ask/${id}`;
+		case "fitur":
+			return `/fitur/${id}`;
 		case "ac":
 			return `/ac/${id}`;
 		case "task":

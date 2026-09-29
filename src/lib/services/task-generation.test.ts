@@ -122,6 +122,35 @@ describe("buildTaskSystemPrompt", () => {
 		// No empty PRD frame should be emitted.
 		expect(prompt).not.toContain("--- PRD (PRODUCT CONTEXT) ---");
 	});
+
+	it("anchors tasks to the feature tree when the SSOT block is provided", () => {
+		const block = [
+			"--- DAFTAR FITUR & SUBFITUR WAJIB (SSOT) ---",
+			"- feat-1 Katalog",
+			"  - subfeat-1.1 Daftar",
+		].join("\n");
+		const prompt = buildTaskSystemPrompt({
+			acMarkdown: AC,
+			prdContent: "",
+			grounded: "",
+			codebaseBlock: "",
+			language: "id",
+			featureTreeBlock: block,
+		});
+		expect(prompt).toContain(block);
+		expect(prompt).toContain("subfeatureId");
+	});
+
+	it("omits the SSOT instruction when no feature block is given", () => {
+		const prompt = buildTaskSystemPrompt({
+			acMarkdown: AC,
+			prdContent: "",
+			grounded: "",
+			codebaseBlock: "",
+			language: "id",
+		});
+		expect(prompt).not.toContain("subfeatureId");
+	});
 });
 
 describe("repairTaskCoverage", () => {

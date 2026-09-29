@@ -24,6 +24,11 @@ import {
 } from "@/lib/services/ai-orchestrator";
 import type { CreditOperationResult } from "@/lib/services/credit-service";
 import { sanitizeErrorForClient } from "@/lib/services/error-sanitizer";
+import {
+	FEATURE_TREE_MISSING_MESSAGE,
+	featureTreeSchema,
+	formatFeatureTreeBlock,
+} from "@/lib/services/feature-service";
 import { getLatestPrdContent } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 
@@ -109,6 +114,7 @@ export const Route = createFileRoute("/api/ac/generate")({
 						id: projects.id,
 						language: projects.language,
 						projectMode: projects.projectMode,
+						featureTree: projects.featureTree,
 					})
 					.from(projects)
 					.where(
@@ -121,6 +127,20 @@ export const Route = createFileRoute("/api/ac/generate")({
 					.limit(1);
 				if (!project)
 					return Response.json({ error: "Project not found" }, { status: 404 });
+
+				// Fitur SSOT: every AC chapter maps 1:1 to a Feature/Subfeature.
+				// Fail closed with an actionable message instead of generating
+				// from the PRD alone and drifting out of sync.
+				const parsedTree = featureTreeSchema.safeParse(project.featureTree);
+				if (!parsedTree.success)
+					return Response.json(
+						{
+							error: FEATURE_TREE_MISSING_MESSAGE,
+							code: "FEATURE_TREE_MISSING",
+						},
+						{ status: 409 },
+					);
+				const featureTreeBlock = formatFeatureTreeBlock(parsedTree.data);
 
 				const prdContent = await getLatestPrdContent(projectId);
 				if (!prdContent)
@@ -566,7 +586,7 @@ export const Route = createFileRoute("/api/ac/generate")({
 								}
 							}
 							const projectLanguage = normalizeLanguage(project.language);
-							const systemPrompt = `${AC_GENERATION_PROMPT(projectLanguage)}\n${depthDirective("ac")}\n${getLanguageDirective(projectLanguage, "ac")}\n${grounded}${codebaseBlock}\n\n--- PRD CONTENT ---\n${prdContent}`;
+							const systemPrompt = `${AC_GENERATION_PROMPT(projectLanguage)}\n${depthDirective("ac")}\n${getLanguageDirective(projectLanguage, "ac")}\n${grounded}${codebaseBlock}\n${featureTreeBlock}\n\n--- PRD CONTENT ---\n${prdContent}`;
 							const messages: Array<{
 								role: "system" | "user" | "assistant";
 								content: string;

@@ -142,6 +142,8 @@ function describeStatus(item: DrawerHistoryItem): string {
 	switch (item.step) {
 		case "question":
 			return "Tahap Pertanyaan";
+		case "fitur":
+			return "Tahap Fitur · Daftar fitur tersusun";
 		case "prd":
 			return item.preview
 				? "Tahap PRD · Ringkasan tersimpan"

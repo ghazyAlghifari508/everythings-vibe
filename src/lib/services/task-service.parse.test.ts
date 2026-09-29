@@ -209,4 +209,77 @@ describe("parseTaskJson", () => {
 		);
 		expect(parsed?.features[0].tasks[0].subtasks[0].details).toEqual([]);
 	});
+
+	it("accepts a task anchored to a known subfeature when the id set is given", () => {
+		const parsed = parseTaskJson(
+			JSON.stringify({
+				features: [
+					{
+						name: "Katalog",
+						tasks: [
+							{
+								name: "Tampilkan daftar item",
+								description: "d",
+								priority: "medium",
+								covers: ["AC-2.1"],
+								subfeatureId: "subfeat-2.1",
+								subfeatureName: "Daftar",
+								subtasks: [],
+							},
+						],
+					},
+				],
+			}),
+			new Set(["subfeat-2.1", "subfeat-2.2"]),
+		);
+		expect(parsed?.features[0].tasks[0].subfeatureId).toBe("subfeat-2.1");
+		expect(parsed?.features[0].tasks[0].subfeatureName).toBe("Daftar");
+	});
+
+	it("rejects a task with an unknown subfeature id when the id set is given", () => {
+		const parsed = parseTaskJson(
+			JSON.stringify({
+				features: [
+					{
+						name: "Katalog",
+						tasks: [
+							{
+								name: "Tampilkan daftar item",
+								description: "d",
+								priority: "medium",
+								covers: ["AC-2.1"],
+								subfeatureId: "subfeat-9.9",
+								subtasks: [],
+							},
+						],
+					},
+				],
+			}),
+			new Set(["subfeat-2.1", "subfeat-2.2"]),
+		);
+		expect(parsed).toBeNull();
+	});
+
+	it("rejects a task missing subfeatureId when the id set is given", () => {
+		const parsed = parseTaskJson(
+			JSON.stringify({
+				features: [
+					{
+						name: "Katalog",
+						tasks: [
+							{
+								name: "Tampilkan daftar item",
+								description: "d",
+								priority: "medium",
+								covers: ["AC-2.1"],
+								subtasks: [],
+							},
+						],
+					},
+				],
+			}),
+			new Set(["subfeat-2.1"]),
+		);
+		expect(parsed).toBeNull();
+	});
 });

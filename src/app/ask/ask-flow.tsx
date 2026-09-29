@@ -503,7 +503,7 @@ export function AskFlow({
 		} finally {
 			clearTimeout(timer);
 		}
-		navigate({ to: "/prd/$id", params: { id: projectId } });
+		navigate({ to: "/fitur/$id", params: { id: projectId } });
 	};
 
 	if (isLoadingQuestions) {
@@ -727,7 +727,7 @@ export function AskFlow({
 									onClick={() => void submit(techAnswers)}
 									className="btn-primary rounded-md px-6 py-2.5 font-inter text-sm font-[510] disabled:opacity-40 disabled:cursor-not-allowed"
 								>
-									Generate PRD
+									Lihat Fitur
 								</button>
 							)}
 						</div>

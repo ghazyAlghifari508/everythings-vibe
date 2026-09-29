@@ -9,7 +9,7 @@
 import { type FlowStep, stepToRoute } from "@/lib/flow-step";
 
 /** Flow order. Index = progress rank; higher wins. */
-const STEP_ORDER: FlowStep[] = ["question", "prd", "ac", "task"];
+const STEP_ORDER: FlowStep[] = ["question", "fitur", "prd", "ac", "task"];
 
 export function stepRank(step: string | null | undefined): number {
 	const i = STEP_ORDER.indexOf(step as FlowStep);
@@ -72,13 +72,13 @@ export function isTruncatedGeneration(
 
 /**
  * True when a URL is a project-internal route for the given project, i.e. a
- * route in the /(ask|prd|ac|task|kanban)/<projectId> namespace. History stores
+ * route in the /(ask|fitur|prd|ac|task|kanban)/<projectId> namespace. History stores
  * last_url so it can send users back to where they were; this guard makes sure
  * that never lands on an arbitrary path or another project's page (anti-spoof).
  * Rejects non-project routes and `javascript:`/malformed URLs outright.
  */
 const HISTORY_URL_RE =
-	/^\/(?:ask|prd|ac|task|kanban)\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/;
+	/^\/(?:ask|fitur|prd|ac|task|kanban)\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/;
 const CODEBASES_LIST_URL = "/codebases";
 
 export function isValidHistoryUrl(url: string, projectId: string): boolean {
@@ -108,6 +108,7 @@ export function resolveHistoryUrl(item: {
 /** A project workspace route, split into the typed shape `navigate` needs. */
 export type HistoryRouteTarget =
 	| { to: "/ask/$id"; params: { id: string } }
+	| { to: "/fitur/$id"; params: { id: string } }
 	| { to: "/prd/$id"; params: { id: string } }
 	| { to: "/ac/$id"; params: { id: string } }
 	| { to: "/task/$id"; params: { id: string } }
@@ -128,10 +129,11 @@ export type HistoryRouteTarget =
  */
 export function parseHistoryHref(href: string): HistoryRouteTarget | null {
 	if (href === CODEBASES_LIST_URL) return { to: "/codebases" };
-	const m = href.match(/^\/(ask|prd|ac|task|kanban)\/([^/]+)$/);
+	const m = href.match(/^\/(ask|fitur|prd|ac|task|kanban)\/([^/]+)$/);
 	if (!m) return null;
 	const [, seg, id] = m;
 	if (seg === "ask") return { to: "/ask/$id", params: { id } };
+	if (seg === "fitur") return { to: "/fitur/$id", params: { id } };
 	if (seg === "prd") return { to: "/prd/$id", params: { id } };
 	if (seg === "ac") return { to: "/ac/$id", params: { id } };
 	if (seg === "task") return { to: "/task/$id", params: { id } };
