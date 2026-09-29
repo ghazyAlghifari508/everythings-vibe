@@ -35,6 +35,25 @@ export interface StreamOutcome {
 	finishReason?: string;
 }
 
+// 9router streams thought tokens as choices[0].delta.reasoning_content, which
+// the OpenAI provider schema drops; raw chunks carry the unvalidated payload.
+function extractReasoningContent(rawValue: unknown): string | undefined {
+	if (typeof rawValue !== "object" || rawValue === null) return undefined;
+	if (!("choices" in rawValue)) return undefined;
+	const choices: unknown = rawValue.choices;
+	if (!Array.isArray(choices) || choices.length === 0) return undefined;
+	const first: unknown = choices[0];
+	if (typeof first !== "object" || first === null) return undefined;
+	if (!("delta" in first)) return undefined;
+	const delta: unknown = first.delta;
+	if (typeof delta !== "object" || delta === null) return undefined;
+	if (!("reasoning_content" in delta)) return undefined;
+	const content: unknown = delta.reasoning_content;
+	return typeof content === "string" && content.length > 0
+		? content
+		: undefined;
+}
+
 /**
  * Stream chat completion as an AsyncGenerator<string>.
  * Preserves the old raw-fetch streamChat signature so ai-orchestrator + all
@@ -66,6 +85,8 @@ export async function* streamChat(
 		model: provider.chat(model || "oc/big-pickle"),
 		system: systemMessages || undefined,
 		messages: nonSystemMessages,
+		// Raw chunks carry reasoning_content the provider schema drops.
+		include: { rawChunks: true },
 		abortSignal: signal,
 		maxOutputTokens: maxTokens,
 		stopSequences: ["<|eot_id|>", "<|end_of_text|>", "===DONE==="],
@@ -128,41 +149,40 @@ export async function* streamChat(
 				if (totalId !== undefined) clearTimeout(totalId);
 			}
 			if (next.done) break;
-			const chunk = next.value as unknown as {
-				type: string;
-				text?: string;
-				error?: unknown;
-			};
-			if (chunk.type === "reasoning-delta") {
+			const part = next.value;
+			if (part.type === "reasoning-delta") {
 				lastProgress = Date.now();
-				onThinking?.(
-					(chunk as { type: "reasoning-delta"; text: string }).text ?? "",
-				);
+				onThinking?.(part.text);
 				continue;
 			}
-			if (chunk.type === "text-delta") {
-				if (!chunk.text) continue;
+			if (part.type === "raw") {
+				const thinking = extractReasoningContent(part.rawValue);
+				if (!thinking) continue;
+				lastProgress = Date.now();
+				onThinking?.(thinking);
+				continue;
+			}
+			if (part.type === "text-delta") {
+				if (!part.text) continue;
 				lastProgress = Date.now();
 				yieldedText = true;
-				yield chunk.text;
+				yield part.text;
 				continue;
 			}
-			if (chunk.type === "error") {
+			if (part.type === "error") {
 				if (outcome) outcome.finishReason = "error";
-				throw (chunk as { error: unknown }).error;
+				throw part.error;
 			}
-			if (chunk.type === "abort") {
+			if (part.type === "abort") {
 				if (outcome) outcome.finishReason = "aborted";
 				throw new Error("AI stream aborted");
 			}
-			if (chunk.type === "finish") {
+			if (part.type === "finish") {
 				// Capture the provider's terminal reason while consuming so
 				// an early consumer exit still leaves an observable outcome.
 				// Never clobber an explicit error recorded above.
-				const reason = (chunk as { finishReason?: unknown }).finishReason;
 				if (outcome && outcome.finishReason === undefined) {
-					outcome.finishReason =
-						typeof reason === "string" && reason ? reason : "unknown";
+					outcome.finishReason = part.finishReason || "unknown";
 				}
 			}
 			// Other part types (start, finish, etc.) don't count as progress — stall

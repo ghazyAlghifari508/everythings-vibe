@@ -9,6 +9,24 @@ describe("PRD_SYSTEM_PROMPT", () => {
 		expect(prompt).toMatch(/dilarang keras mengalihkan/i);
 	});
 
+	it("extends the zero-assumption stack lock beyond frontend", () => {
+		const prompt = PRD_SYSTEM_PROMPT("id");
+		const start = prompt.indexOf("ZERO-ASSUMPTION STACK LOCK");
+		const end = prompt.indexOf("STRICT LATEST STABLE", start);
+		const rule = prompt.slice(start, end);
+		expect(rule).toMatch(/database/i);
+		expect(rule).toMatch(/backend/i);
+		expect(rule).toMatch(/deployment/i);
+		expect(rule).toMatch(/dilarang keras menambah/i);
+		expect(rule).toMatch(/kurung|garis miring/i);
+	});
+
+	it("constrains mermaid technology labels to the exact stack name", () => {
+		const prompt = PRD_SYSTEM_PROMPT("id");
+		expect(prompt).toMatch(/nama stack persis/i);
+		expect(prompt).toMatch(/alternatif dalam kurung|dipisah garis miring/i);
+	});
+
 	it("contains adaptive section 7 anti-hallucination database rules", () => {
 		const prompt = PRD_SYSTEM_PROMPT("id");
 		expect(prompt).toContain("SECTION 7 ADAPTIF");

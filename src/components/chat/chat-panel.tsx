@@ -22,6 +22,7 @@ import {
 	savePrdDraft,
 } from "@/lib/prompt-handoff";
 import { stripSectionMarkers } from "@/lib/revision-reply";
+import { parseStreamEvent, type StreamEvent } from "@/lib/sse-events";
 import { readSseStream } from "@/lib/sse-stream";
 import { cn } from "@/lib/utils";
 import { useChatStore, useUIStore } from "@/store";
@@ -457,19 +458,23 @@ export const ChatPanel = memo(function ChatPanel({
 				}
 
 				for await (const data of readSseStream(response.body)) {
+					const parsed: StreamEvent | null = parseStreamEvent(data);
+					// Unknown or malformed frames are skipped — the stream stays live.
+					if (!parsed) continue;
 					try {
-						const parsed = JSON.parse(data);
-
 						if (parsed.type === "started") {
 							// no-op: heartbeat from server, just lets the client know
 							// generation is in flight.
 						} else if (parsed.type === "thinking") {
 							setThinkingText((prev) => prev + parsed.content);
+						} else if (parsed.type === "thinking_reset") {
+							// A failed upstream attempt already streamed reasoning;
+							// the retry starts fresh instead of appending a duplicate.
+							setThinkingText("");
 						} else if (parsed.type === "delta") {
 							if (thinkingTextRef.current) setThinkingText("");
 							_sawAnyDelta = true;
 							fullContent += parsed.content;
-
 							// ponytail: batch state commits via rAF throttle (scheduleFlush).
 							// Per-token setStreamingPRDContent caused full markdown re-parse
 							// + Navbar re-render hundreds of times per second. Now coalesced
@@ -1079,7 +1084,7 @@ export const ChatPanel = memo(function ChatPanel({
 				{isStreaming && thinkingText && !streamingContent && (
 					<details className="text-xs text-fog/60 mb-2 px-4" open>
 						<summary className="cursor-pointer select-none">
-							🤔 AI sedang berpikir...
+							AI sedang berpikir...
 						</summary>
 						<pre className="mt-1 whitespace-pre-wrap text-xs text-fog/40 max-h-40 overflow-y-auto custom-scrollbar">
 							{thinkingText}

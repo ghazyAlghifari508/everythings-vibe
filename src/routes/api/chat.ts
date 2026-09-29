@@ -516,6 +516,15 @@ export const Route = createFileRoute("/api/chat")({
 								);
 							} catch {}
 						};
+						const enqueueThinkingReset = () => {
+							try {
+								controller.enqueue(
+									encoder.encode(
+										`data: ${JSON.stringify({ type: "thinking_reset" })}\n\n`,
+									),
+								);
+							} catch {}
+						};
 						const enqueueThinking = (text: string) => {
 							try {
 								controller.enqueue(
@@ -592,6 +601,7 @@ export const Route = createFileRoute("/api/chat")({
 									request.signal,
 									undefined,
 									enqueueThinking,
+									enqueueThinkingReset,
 								);
 
 							if (!conversationIdToUse) {

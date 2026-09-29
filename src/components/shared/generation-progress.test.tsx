@@ -34,7 +34,7 @@ describe("GenerationProgress", () => {
 	it("renders label, elapsed timer, and natural waiting message without reasoning", () => {
 		const c = renderProgress({ label: "PRD" });
 		expect(c.textContent).toContain("Menyusun PRD");
-		expect(c.textContent).toContain("0:00");
+		expect(c.textContent).toContain("0.0s");
 		expect(c.textContent).toContain(
 			"Sedang menganalisis kebutuhan dan menyusun dokumen",
 		);

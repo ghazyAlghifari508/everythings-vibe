@@ -398,10 +398,10 @@ export function KanbanBoard({
 							Roadmap
 						</Link>
 						<Link
-							to="/"
+							to="/plan/new"
 							className="px-3 py-1.5 rounded-md text-xs font-[510] flex items-center gap-1.5 border border-snow/40 text-snow hover:border-snow/70 transition-colors bg-transparent"
 						>
-							Kembali ke Beranda
+							Kembali ke Chat
 						</Link>
 					</div>
 				</div>

@@ -359,7 +359,7 @@ export function PrdDetail({
 						    has been silent a few seconds. Real content replaces it. */}
 						{isGeneratingPRD && !streamingPRDContent && !latestVersion && (
 							<div className="absolute inset-0 z-10 overflow-y-auto bg-onyx">
-								<GenerationProgress label="PRD" />
+								<GenerationProgress label="PRD" isStreaming={isGeneratingPRD} />
 							</div>
 						)}
 						<PrdViewer

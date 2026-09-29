@@ -225,6 +225,18 @@ describe("KanbanBoard", () => {
 			useUIStore.getState().setProjectDrawerOpen(false);
 		});
 	});
+
+	it("renders 'Kembali ke Chat' link directing to /plan/new", async () => {
+		const c = renderBoard();
+
+		await vi.waitFor(() => {
+			expect(c.textContent).toContain("Test Kanban App");
+		});
+
+		const chatLink = c.querySelector('a[to="/plan/new"]');
+		expect(chatLink).not.toBeNull();
+		expect(chatLink?.textContent).toContain("Kembali ke Chat");
+	});
 });
 
 describe("canResetProgress", () => {

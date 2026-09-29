@@ -32,6 +32,7 @@ import {
 	consumeSuppressAutoGen,
 } from "@/lib/prompt-handoff";
 import type { TaskTree } from "@/lib/services/task-service";
+import { parseStreamEvent, type StreamEvent } from "@/lib/sse-events";
 import { readSseStream } from "@/lib/sse-stream";
 import { cn } from "@/lib/utils";
 import { useChatStore, useUIStore } from "@/store";
@@ -265,20 +266,15 @@ export function TaskDetail({
 			// The shared parser flushes the trailing buffer so a final done/error
 			// frame without a newline is never dropped.
 			for await (const data of readSseStream(response.body)) {
-				let event: {
-					type?: string;
-					content?: string;
-					error?: string;
-					taskTree?: unknown;
-				};
-				try {
-					event = JSON.parse(data);
-				} catch {
-					console.warn("SSE parse failed:", data.slice(0, 80));
-					continue;
-				}
+				const event: StreamEvent | null = parseStreamEvent(data);
+				// Unknown or malformed frames are skipped — the stream stays live.
+				if (!event) continue;
 				if (event.type === "thinking") {
-					setThinkingText((prev) => prev + (event.content ?? ""));
+					setThinkingText((prev) => prev + event.content);
+				} else if (event.type === "thinking_reset") {
+					// A failed upstream attempt already streamed reasoning; the
+					// retry starts fresh instead of appending a duplicate.
+					setThinkingText("");
 				} else if (event.type === "delta") {
 					// Real output flowing — reasoning display has served its purpose.
 					setThinkingText("");

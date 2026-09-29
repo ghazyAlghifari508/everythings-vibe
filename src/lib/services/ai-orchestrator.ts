@@ -17,6 +17,7 @@ export async function tryStreamWithFallback(
 	externalSignal?: AbortSignal,
 	maxTokens?: number,
 	onThinking?: (text: string) => void,
+	onThinkingReset?: () => void,
 ): Promise<{
 	generator: AsyncGenerator<string, void, undefined>;
 	firstChunk: string;
@@ -48,12 +49,11 @@ export async function tryStreamWithFallback(
 				else externalSignal.addEventListener("abort", propagateAbort);
 			}
 			const outcome: StreamOutcome = {};
-			// Buffer attempt-local thinking callbacks: a failed gen.next()
-			// may already have invoked onThinking, and retrying would replay
-			// the same reasoning into the UI a second time. The gate flips
-			// only for the winning attempt, so later chunks stream live.
-			const bufferedThinking: string[] = [];
-			let publishThinking = false;
+			// Thinking streams live: reasoning tokens reach the client during the
+			// 30-80s reasoning phase instead of waiting for the first text-delta.
+			// A failed attempt that already emitted thinking triggers a reset so
+			// the retry streams fresh reasoning instead of appending a duplicate.
+			let attemptThinking = false;
 			const gen = streamChat(
 				messages,
 				modelToTry,
@@ -62,8 +62,8 @@ export async function tryStreamWithFallback(
 				outcome,
 				onThinking
 					? (text) => {
-							if (publishThinking) onThinking(text);
-							else bufferedThinking.push(text);
+							attemptThinking = true;
+							onThinking(text);
 						}
 					: undefined,
 			);
@@ -75,12 +75,6 @@ export async function tryStreamWithFallback(
 					throw new Error("Respons kosong dari chunk model.");
 				}
 
-				// Attempt won: publish buffered thinking exactly once, then
-				// stream the remainder live.
-				if (onThinking) {
-					for (const text of bufferedThinking) onThinking(text);
-				}
-				publishThinking = true;
 				return {
 					generator: gen,
 					firstChunk: first.value,
@@ -97,6 +91,8 @@ export async function tryStreamWithFallback(
 				if (externalSignal?.aborted) break;
 				// Only loop if a retry is still available; otherwise fall through
 				// to the next model (or the final throw below).
+				const willRetry = attempt < attemptCeiling - 1 || i < models.length - 1;
+				if (attemptThinking && willRetry) onThinkingReset?.();
 				if (attempt < attemptCeiling - 1) continue;
 			} finally {
 				externalSignal?.removeEventListener("abort", propagateAbort);

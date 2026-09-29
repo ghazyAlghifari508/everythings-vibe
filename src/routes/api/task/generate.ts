@@ -610,6 +610,15 @@ export const Route = createFileRoute("/api/task/generate")({
 							} catch {}
 						};
 
+						const enqueueThinkingReset = () => {
+							try {
+								controller.enqueue(
+									encoder.encode(
+										`data: ${JSON.stringify({ type: "thinking_reset" })}\n\n`,
+									),
+								);
+							} catch {}
+						};
 						const enqueueThinking = (text: string) => {
 							try {
 								controller.enqueue(
@@ -657,13 +666,14 @@ export const Route = createFileRoute("/api/task/generate")({
 
 							let grounded = "";
 							try {
-								const { groundStack } = await import("@/lib/grounding");
+								const { extractTechStackSection, groundStack } = await import(
+									"@/lib/grounding"
+								);
 								const { raceWithAbort } = await import("@/lib/abort-utils");
-								// Ground on PRD + AC: the stack/architecture the
-								// implementation must follow lives in the PRD, so
-								// detecting it from AC alone under-grounds the model.
+								// Ground on the PRD's declared stack table (section 6.2),
+								// not prose mentions across PRD+AC that widen fan-out.
 								grounded = await raceWithAbort(
-									groundStack(`${prdContext}\n\n${acMarkdown}`),
+									groundStack(extractTechStackSection(prdContext)),
 									request.signal,
 								);
 							} catch (e) {
@@ -708,6 +718,7 @@ export const Route = createFileRoute("/api/task/generate")({
 									request.signal,
 									64000,
 									enqueueThinking,
+									enqueueThinkingReset,
 								);
 
 							fullResponse += firstChunk;

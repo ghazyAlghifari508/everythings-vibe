@@ -129,6 +129,7 @@ export const AcViewer = memo(function AcViewer({
 				<GenerationProgress
 					label="Acceptance Criteria"
 					thinkingText={thinkingText}
+					isStreaming={isStreaming}
 				/>
 			</div>
 		);
@@ -183,6 +184,7 @@ export const AcViewer = memo(function AcViewer({
 				<GenerationProgress
 					label="Acceptance Criteria"
 					thinkingText={thinkingText}
+					isStreaming={isStreaming}
 				/>
 			</div>
 		);

@@ -485,6 +485,15 @@ export const Route = createFileRoute("/api/ac/generate")({
 							} catch {}
 						};
 
+						const enqueueThinkingReset = () => {
+							try {
+								controller.enqueue(
+									encoder.encode(
+										`data: ${JSON.stringify({ type: "thinking_reset" })}\n\n`,
+									),
+								);
+							} catch {}
+						};
 						const enqueueThinking = (text: string) => {
 							try {
 								controller.enqueue(
@@ -532,10 +541,12 @@ export const Route = createFileRoute("/api/ac/generate")({
 
 							let grounded = "";
 							try {
-								const { groundStack } = await import("@/lib/grounding");
+								const { extractTechStackSection, groundStack } = await import(
+									"@/lib/grounding"
+								);
 								const { raceWithAbort } = await import("@/lib/abort-utils");
 								grounded = await raceWithAbort(
-									groundStack(prdContent),
+									groundStack(extractTechStackSection(prdContent)),
 									request.signal,
 								);
 							} catch (e) {
@@ -575,6 +586,7 @@ export const Route = createFileRoute("/api/ac/generate")({
 									request.signal,
 									64000,
 									enqueueThinking,
+									enqueueThinkingReset,
 								);
 
 							fullResponse += firstChunk;

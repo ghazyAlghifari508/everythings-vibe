@@ -71,3 +71,114 @@ describe("tryStreamWithFallback abort fast-path", () => {
 		vi.useRealTimers();
 	});
 });
+
+describe("tryStreamWithFallback thinking", () => {
+	beforeEach(() => {
+		streamChatMock.mockReset();
+	});
+
+	function isThinkingCallback(value: unknown): value is (text: string) => void {
+		return typeof value === "function";
+	}
+
+	function textGen(chunks: string[]) {
+		let i = 0;
+		return {
+			next: async () =>
+				i < chunks.length
+					? { value: chunks[i++], done: false }
+					: { value: undefined, done: true },
+			return: async () => ({ value: undefined, done: true }),
+			[Symbol.asyncIterator]() {
+				return this;
+			},
+		};
+	}
+
+	function failingGen() {
+		return {
+			next: async () => {
+				throw new Error("upstream 503");
+			},
+			return: async () => ({ value: undefined, done: true }),
+			[Symbol.asyncIterator]() {
+				return this;
+			},
+		};
+	}
+
+	it("streams reasoning tokens live before the first text chunk", async () => {
+		const seen: string[] = [];
+		streamChatMock.mockImplementation((...args: Array<unknown>) => {
+			const thinking = args[5];
+			expect(isThinkingCallback(thinking)).toBe(true);
+			if (isThinkingCallback(thinking)) thinking("live reasoning");
+			return textGen(["AC "]);
+		});
+
+		const result = await tryStreamWithFallback(
+			["prdfy-combo"],
+			[{ role: "user", content: "hi" }],
+			undefined,
+			100,
+			(t) => seen.push(t),
+		);
+		expect(seen).toEqual(["live reasoning"]);
+		expect(result.firstChunk).toBe("AC ");
+	});
+
+	it("emits a thinking reset before retrying a failed attempt that already streamed reasoning", async () => {
+		const seen: string[] = [];
+		let resets = 0;
+		let calls = 0;
+		streamChatMock.mockImplementation((...args: Array<unknown>) => {
+			calls++;
+			const thinking = args[5];
+			if (calls === 1) {
+				if (isThinkingCallback(thinking)) thinking("stale reasoning");
+				return failingGen();
+			}
+			if (isThinkingCallback(thinking)) thinking("live reasoning");
+			return textGen(["AC "]);
+		});
+
+		const result = await tryStreamWithFallback(
+			["prdfy-combo"],
+			[{ role: "user", content: "hi" }],
+			undefined,
+			100,
+			(t) => seen.push(t),
+			() => {
+				resets++;
+				seen.length = 0;
+			},
+		);
+		expect(streamChatMock).toHaveBeenCalledTimes(2);
+		expect(resets).toBe(1);
+		expect(seen).toEqual(["live reasoning"]);
+		expect(result.firstChunk).toBe("AC ");
+	});
+
+	it("skips the reset when the failed attempt never streamed reasoning", async () => {
+		let calls = 0;
+		let resets = 0;
+		streamChatMock.mockImplementation(() => {
+			calls++;
+			if (calls === 1) return failingGen();
+			return textGen(["AC "]);
+		});
+
+		const result = await tryStreamWithFallback(
+			["prdfy-combo"],
+			[{ role: "user", content: "hi" }],
+			undefined,
+			100,
+			() => {},
+			() => {
+				resets++;
+			},
+		);
+		expect(resets).toBe(0);
+		expect(result.firstChunk).toBe("AC ");
+	});
+});

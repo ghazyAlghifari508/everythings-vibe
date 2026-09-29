@@ -39,12 +39,52 @@ const BLOCK_START =
 const BLOCK_END = "--- AKHIR FAKTA EKSTERNAL ---";
 
 /**
- * Detect stack labels (STACK_ICONS keys) present in text, case-insensitive.
- * Every occurrence of every key is scanned. When a short key is a substring of
- * a longer key, only the longest non-overlapping matched spans are kept, so a
- * short key nested inside a longer key is never double-grounded. Output keeps
- * each label once, in earliest text-occurrence order.
+ * Slice `text` from the first line matching `startRe` up to (not including)
+ * the next line matching `endRe`. Returns null when no start line matches.
+ * The start line itself never counts as the end (headings match both).
  */
+function sliceFromHeading(
+	text: string,
+	startRe: RegExp,
+	endRe: RegExp,
+): string | null {
+	const start = text.search(startRe);
+	if (start === -1) return null;
+	const after = text.slice(start);
+	const firstNl = after.indexOf("\n");
+	const rest = firstNl === -1 ? "" : after.slice(firstNl + 1);
+	const end = rest.search(endRe);
+	return end === -1 ? after : after.slice(0, firstNl + 1 + end);
+}
+
+/**
+ * Narrow a full PRD down to its declared tech stack for grounding.
+ * The AC/task generators need the stack table (section 6.2), not prose
+ * mentions of library names scattered across requirements and features —
+ * those false positives widen the Context7 fan-out to the full 6s budget
+ * before the first SSE token. Falls back to the full text for legacy PRDs
+ * without section structure, so their grounding is byte-identical.
+ */
+export function extractTechStackSection(prdContent: string): string {
+	if (!prdContent.trim()) return "";
+	const section =
+		sliceFromHeading(
+			prdContent,
+			/<!--\s*SECTION:\s*Architecture & Tech Stack\s*-->/i,
+			/<!--\s*\/\s*SECTION\s*-->/i,
+		) ??
+		sliceFromHeading(
+			prdContent,
+			/^##\s+6\.\s+Architecture & Tech Stack/im,
+			/^##\s+/m,
+		) ??
+		prdContent;
+	const scoped =
+		sliceFromHeading(section, /^###\s+6\.2\b/im, /^#{2,3}\s+/m) ?? section;
+	const out = scoped.trim();
+	return out || prdContent;
+}
+
 export function extractStackLabels(text: string): string[] {
 	const lower = text.toLowerCase();
 	const matches: { label: string; start: number; end: number }[] = [];
