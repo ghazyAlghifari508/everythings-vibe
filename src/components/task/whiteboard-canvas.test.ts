@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
+import type { ProjectFeatureTree } from "@/db/schema";
 import type { TaskTree } from "@/lib/services/task-service";
 import {
 	containerH,
@@ -201,6 +202,105 @@ describe("layoutTaskGraph modular 4 kolom", () => {
 		expect(taskNode).toBeDefined();
 		expect(taskNode?.rows).toHaveLength(1);
 		expect(taskNode?.rows?.[0]?.name).toBe("Implementasi RBAC");
+	});
+});
+
+describe("progressive skeleton dari featureTree saat taskTree kosong", () => {
+	const GREENFIELD_TREE: ProjectFeatureTree = {
+		productName: "Kasir Pintar",
+		createdAt: "2026-09-30T00:00:00.000Z",
+		features: [
+			{
+				id: "feat-1",
+				name: "Manajemen Produk",
+				phase: 1,
+				description: "",
+				subfeatures: [
+					{ id: "subfeat-1.1", name: "Katalog Produk", description: "" },
+					{ id: "subfeat-1.2", name: "Stok Gudang", description: "" },
+				],
+			},
+			{
+				id: "feat-2",
+				name: "Checkout Pembayaran",
+				phase: 2,
+				description: "",
+				subfeatures: [
+					{ id: "subfeat-2.1", name: "Keranjang Belanja", description: "" },
+					{ id: "subfeat-2.2", name: "Pembayaran Digital", description: "" },
+				],
+			},
+		],
+	};
+
+	it("merender root, fitur, dan subfitur riil meski taskTree kosong", () => {
+		const { nodes } = layoutTaskGraph(
+			{ features: [] },
+			"Kasir Pintar",
+			GREENFIELD_TREE,
+		);
+
+		const root = nodes.find((n) => n.type === "root");
+		expect(root?.label).toBe("Kasir Pintar");
+
+		const features = nodes.filter((n) => n.type === "feature");
+		expect(features).toHaveLength(2);
+		expect(features.map((n) => n.label)).toEqual([
+			"Manajemen Produk",
+			"Checkout Pembayaran",
+		]);
+		expect(features.map((n) => n.phase)).toEqual([1, 2]);
+
+		const subs = nodes.filter((n) => n.type === "subfeature");
+		expect(subs).toHaveLength(2);
+		expect(subs[0]?.rows?.map((r) => r.name)).toEqual([
+			"Katalog Produk",
+			"Stok Gudang",
+		]);
+		expect(subs[1]?.rows?.map((r) => r.name)).toEqual([
+			"Keranjang Belanja",
+			"Pembayaran Digital",
+		]);
+	});
+
+	it("container TASKS jadi skeleton bersisi 3 baris tanpa merusak kabel", () => {
+		const { nodes, edges } = layoutTaskGraph(
+			{ features: [] },
+			"Kasir Pintar",
+			GREENFIELD_TREE,
+		);
+
+		const tasks = nodes.filter((n) => n.type === "task");
+		expect(tasks).toHaveLength(2);
+		for (const task of tasks) {
+			expect(task.isSkeleton).toBe(true);
+			expect(task.rows).toEqual([]);
+			expect(task.totalRows).toBe(0);
+			expect(task.doneRows).toBe(0);
+			expect(task.h).toBe(containerH(MAX_VISIBLE_CONTAINER_ROWS));
+		}
+
+		// Root->Fitur, Fitur->SUB FITUR, SUB FITUR->TASKS: 3 kabel per fitur.
+		expect(edges).toHaveLength(6);
+		const subs = nodes.filter((n) => n.type === "subfeature");
+		for (const sub of subs) {
+			// Semua container SUB FITUR satu kolom, jadi y asal jadi pembeda.
+			const outgoing = edges.filter(
+				(e) =>
+					Math.abs(e.x1 - (sub.x + sub.w)) < 1 &&
+					Math.abs(e.y1 - (sub.y + sub.h / 2)) < 1,
+			);
+			expect(outgoing).toHaveLength(1);
+			expect(outgoing[0]?.dashed).toBe(true);
+		}
+	});
+
+	it("fallback kosong hanya saat featureTree dan taskTree keduanya kosong", () => {
+		const empty = layoutTaskGraph({ features: [] }, "Kasir Pintar");
+		expect(empty.nodes).toHaveLength(0);
+		expect(empty.edges).toHaveLength(0);
+		expect(empty.width).toBe(0);
+		expect(empty.height).toBe(0);
 	});
 });
 

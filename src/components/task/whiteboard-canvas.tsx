@@ -247,6 +247,7 @@ export interface LayoutNode {
 	doneRows?: number;
 	containerKind?: "subfeatures" | "tasks";
 	tasks?: TaskContainerTask[];
+	isSkeleton?: boolean;
 }
 
 export interface LayoutEdge {
@@ -267,8 +268,12 @@ export function layoutTaskGraph(
 	const edges: LayoutEdge[] = [];
 
 	const features = tree.features;
-	if (features.length === 0) return { nodes, edges, width: 0, height: 0 };
 	const ssotFeatures = featureTree?.features ?? [];
+	// Greenfield projects reach /task with a filled featureTree but no generated
+	// tasks yet: lay out the real product/feature/subfeature columns and let only
+	// the TASKS containers shimmer. Empty result only when both sources are empty.
+	if (features.length === 0 && ssotFeatures.length === 0)
+		return { nodes, edges, width: 0, height: 0 };
 
 	function isTaskDone(status: string | undefined): boolean {
 		return status === "completed" || status === "done";
@@ -327,6 +332,7 @@ export function layoutTaskGraph(
 		subH: number;
 		taskH: number;
 		height: number;
+		isSkeleton: boolean;
 	}
 
 	const plans: FeaturePlan[] = displayFeatures.map((feature) => {
@@ -400,8 +406,13 @@ export function layoutTaskGraph(
 			done: isTaskDone(t.status),
 		}));
 		const taskDone = taskRows.filter((r) => r.done).length;
+		const isSkeleton = feature.tasks.length === 0;
 		const subH = containerH(subRows.length);
-		const taskH = containerH(taskRows.length);
+		// Skeleton containers reserve room for the max visible rows so the swap to
+		// real tasks (up to 3) does not jump the layout.
+		const taskH = isSkeleton
+			? containerH(MAX_VISIBLE_CONTAINER_ROWS)
+			: containerH(taskRows.length);
 		return {
 			subRows,
 			subDone,
@@ -411,6 +422,7 @@ export function layoutTaskGraph(
 			subH,
 			taskH,
 			height: Math.max(FEATURE_H, subH, taskH),
+			isSkeleton,
 		};
 	});
 
@@ -507,6 +519,7 @@ export function layoutTaskGraph(
 			doneRows: plan.taskDone,
 			containerKind: "tasks",
 			tasks: plan.taskPayloads,
+			isSkeleton: plan.isSkeleton,
 		});
 		edges.push({
 			x1: subX + SUBFEATURE_CONTAINER_W,
@@ -559,8 +572,14 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 	} = useCanvasZoom();
 	const [openContainer, setOpenContainer] = useState<LayoutNode | null>(null);
 
-	const features = taskTree?.features ?? [];
-	const isEmpty = features.length === 0;
+	const hasFeatureTree = Boolean(
+		featureTree?.features && featureTree.features.length > 0,
+	);
+	const hasTaskTree = Boolean(
+		taskTree?.features && taskTree.features.length > 0,
+	);
+	// Legacy fallback only when neither source holds any structure.
+	const isEmpty = !hasTaskTree && !hasFeatureTree;
 
 	const {
 		nodes,
@@ -569,9 +588,13 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 		height: canvasHeight,
 	} = useMemo(
 		() =>
-			taskTree && !isEmpty
-				? layoutTaskGraph(taskTree, projectName, featureTree)
-				: { nodes: [], edges: [], width: 0, height: 0 },
+			isEmpty
+				? { nodes: [], edges: [], width: 0, height: 0 }
+				: layoutTaskGraph(
+						taskTree ?? { features: [] },
+						projectName,
+						featureTree,
+					),
 		[taskTree, projectName, featureTree, isEmpty],
 	);
 
@@ -1121,6 +1144,13 @@ export const FeatureNode = memo(function FeatureNode({
 	);
 });
 
+// ponytail: stable keys for the fixed-length skeleton rows so the shimmer list
+// never needs array-index keys; length stays tied to MAX_VISIBLE_CONTAINER_ROWS.
+const TASK_SKELETON_KEYS = Array.from(
+	{ length: MAX_VISIBLE_CONTAINER_ROWS },
+	(_, i) => `task-skeleton-${i}`,
+);
+
 export const ContainerNode = memo(function ContainerNode({
 	node,
 	onOpen,
@@ -1129,16 +1159,22 @@ export const ContainerNode = memo(function ContainerNode({
 	onOpen: (node: LayoutNode) => void;
 }) {
 	const isTasks = node.containerKind === "tasks";
+	const isSkeleton = node.isSkeleton === true;
 	const rows = node.rows ?? [];
 	const total = node.totalRows ?? rows.length;
 	const visible = rows.slice(0, MAX_VISIBLE_CONTAINER_ROWS);
-	const hasMore = total > MAX_VISIBLE_CONTAINER_ROWS;
+	const hasMore = !isSkeleton && total > MAX_VISIBLE_CONTAINER_ROWS;
+	const owner = node.ownerFeature ?? node.subfeatureName ?? "";
 	return (
 		<div
 			className="absolute flex flex-col rounded-xl border border-graphite bg-charcoal/90 p-3 shadow-sm animate-fadeIn"
 			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
 			role="img"
-			aria-label={`${node.label} ${node.ownerFeature ?? node.subfeatureName ?? ""}, ${node.doneRows ?? 0} dari ${total} selesai`}
+			aria-label={
+				isSkeleton
+					? `${node.label} ${owner}, sedang diproses`
+					: `${node.label} ${owner}, ${node.doneRows ?? 0} dari ${total} selesai`
+			}
 		>
 			<BoardHandle className="-left-[5px]" />
 			<div className="flex items-center justify-between px-1 pb-2">
@@ -1150,49 +1186,73 @@ export const ContainerNode = memo(function ContainerNode({
 					)}
 					{node.label}
 				</span>
-				<span className="text-[11px] tabular-nums text-fog">
-					{node.doneRows ?? 0}/{total}
-				</span>
+				{isSkeleton ? (
+					<span
+						aria-hidden
+						className="h-2.5 w-8 animate-pulse rounded bg-fog/10"
+					/>
+				) : (
+					<span className="text-[11px] tabular-nums text-fog">
+						{node.doneRows ?? 0}/{total}
+					</span>
+				)}
 			</div>
-			<ul className="flex flex-1 flex-col justify-center gap-1.5">
-				{visible.map((row) => (
-					<li
-						key={row.id}
-						title={row.description ?? row.name}
-						className="flex items-center gap-2 rounded-md border border-white/5 bg-onyx/60 px-3 py-2"
-					>
-						{isTasks ? (
+			{isSkeleton ? (
+				<div
+					className="flex flex-1 animate-pulse flex-col justify-center gap-1.5"
+					aria-hidden
+				>
+					{TASK_SKELETON_KEYS.map((key) => (
+						<div
+							key={key}
+							className="flex items-center gap-2 rounded-md border border-white/5 bg-onyx/40 px-3 py-2"
+						>
+							<span className="h-3.5 w-3.5 shrink-0 rounded-[3px] border border-fog/20 bg-fog/5" />
+							<div className="h-2.5 flex-1 rounded bg-fog/10" />
+						</div>
+					))}
+				</div>
+			) : (
+				<ul className="flex flex-1 flex-col justify-center gap-1.5">
+					{visible.map((row) => (
+						<li
+							key={row.id}
+							title={row.description ?? row.name}
+							className="flex items-center gap-2 rounded-md border border-white/5 bg-onyx/60 px-3 py-2"
+						>
+							{isTasks ? (
+								<span
+									aria-hidden
+									className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors ${
+										row.done
+											? "border-emerald/60 bg-emerald/15 text-emerald"
+											: "border-fog/40 bg-onyx/40 text-transparent"
+									}`}
+								>
+									{row.done ? <Check size={10} className="stroke-[3]" /> : null}
+								</span>
+							) : (
+								<span
+									aria-hidden
+									className={`h-1.5 w-1.5 shrink-0 rounded-[2px] ${row.done ? "bg-emerald" : "bg-fog/50"}`}
+								/>
+							)}
 							<span
-								aria-hidden
-								className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors ${
-									row.done
-										? "border-emerald/60 bg-emerald/15 text-emerald"
-										: "border-fog/40 bg-onyx/40 text-transparent"
+								className={`min-w-0 flex-1 truncate font-inter text-xs ${
+									isTasks && row.done ? "text-snow/75" : "text-snow"
 								}`}
 							>
-								{row.done ? <Check size={10} className="stroke-[3]" /> : null}
+								{row.name}
 							</span>
-						) : (
-							<span
-								aria-hidden
-								className={`h-1.5 w-1.5 shrink-0 rounded-[2px] ${row.done ? "bg-emerald" : "bg-fog/50"}`}
-							/>
-						)}
-						<span
-							className={`min-w-0 flex-1 truncate font-inter text-xs ${
-								isTasks && row.done ? "text-snow/75" : "text-snow"
-							}`}
-						>
-							{row.name}
-						</span>
-						{row.done ? (
-							<span className="shrink-0 text-[10px] font-medium text-emerald/90">
-								Selesai
-							</span>
-						) : null}
-					</li>
-				))}
-			</ul>
+							{row.done ? (
+								<span className="shrink-0 text-[10px] font-medium text-emerald/90">
+									Selesai
+								</span>
+							) : null}
+						</li>
+					))}
+				</ul>
+			)}
 			{hasMore ? (
 				<div className="flex justify-end pt-1.5">
 					<button
