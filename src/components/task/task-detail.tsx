@@ -9,6 +9,7 @@ import {
 import {
 	AlertTriangle,
 	ArrowRight,
+	Check,
 	ChevronDown,
 	Circle,
 	FileText,
@@ -530,45 +531,71 @@ export function TaskDetail({
 												</p>
 											) : (
 												<ul className="space-y-2">
-													{feature.tasks.map((task) => (
-														<li key={`${feature.name}-${task.name}`}>
-															<p className="text-sm font-[510] text-snow">
-																{task.name}
-															</p>
-															{task.subtasks && task.subtasks.length > 0 && (
-																<ul className="mt-1 space-y-1 pl-3">
-																	{task.subtasks.map((sub) => (
-																		<li
-																			key={`${task.name}-${sub.name}`}
-																			className="text-xs text-fog"
-																		>
-																			<div className="flex items-center gap-1.5">
-																				<Circle
-																					size={5}
-																					className="shrink-0 fill-fog/40"
-																				/>{" "}
-																				{sub.name}
-																			</div>
-																			{sub.details &&
-																				sub.details.length > 0 && (
-																					<ul className="mt-0.5 space-y-0.5 pl-4">
-																						{sub.details.map((detail, di) => (
-																							<li
-																								// biome-ignore lint/suspicious/noArrayIndexKey: detail strings can duplicate; index as tiebreaker
-																								key={`${detail.substring(0, 30)}-${di}`}
-																								className="text-[11px] text-fog/70"
-																							>
-																								– {detail}
-																							</li>
-																						))}
-																					</ul>
-																				)}
-																		</li>
-																	))}
-																</ul>
-															)}
-														</li>
-													))}
+													{feature.tasks.map((task) => {
+														const isDone =
+															task.status === "completed" ||
+															task.status === "done";
+														return (
+															<li key={`${feature.name}-${task.name}`}>
+																<div className="flex items-center gap-2">
+																	<span
+																		aria-hidden
+																		className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors ${
+																			isDone
+																				? "border-emerald/60 bg-emerald/15 text-emerald"
+																				: "border-fog/40 bg-onyx/40 text-transparent"
+																		}`}
+																	>
+																		{isDone ? (
+																			<Check size={10} className="stroke-[3]" />
+																		) : null}
+																	</span>
+																	<p
+																		className={`text-sm font-[510] ${isDone ? "text-snow/75" : "text-snow"}`}
+																	>
+																		{task.name}
+																	</p>
+																	{isDone ? (
+																		<span className="ml-auto shrink-0 text-[10px] font-medium text-emerald/90">
+																			Selesai
+																		</span>
+																	) : null}
+																</div>
+																{task.subtasks && task.subtasks.length > 0 && (
+																	<ul className="mt-1 space-y-1 pl-3">
+																		{task.subtasks.map((sub) => (
+																			<li
+																				key={`${task.name}-${sub.name}`}
+																				className="text-xs text-fog"
+																			>
+																				<div className="flex items-center gap-1.5">
+																					<Circle
+																						size={5}
+																						className="shrink-0 fill-fog/40"
+																					/>{" "}
+																					{sub.name}
+																				</div>
+																				{sub.details &&
+																					sub.details.length > 0 && (
+																						<ul className="mt-0.5 space-y-0.5 pl-4">
+																							{sub.details.map((detail, di) => (
+																								<li
+																									// biome-ignore lint/suspicious/noArrayIndexKey: detail strings can duplicate; index as tiebreaker
+																									key={`${detail.substring(0, 30)}-${di}`}
+																									className="text-[11px] text-fog/70"
+																								>
+																									– {detail}
+																								</li>
+																							))}
+																						</ul>
+																					)}
+																			</li>
+																		))}
+																	</ul>
+																)}
+															</li>
+														);
+													})}
 												</ul>
 											)}
 										</div>

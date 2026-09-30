@@ -83,4 +83,9 @@ describe("WhiteboardCanvas modular", () => {
 		expect(screen.getByText("Ambil total")).toBeDefined();
 		expect(screen.getByText(/Via API/)).toBeDefined();
 	});
+
+	it("merender indikator checklist selesai pada task yang completed", () => {
+		render(<WhiteboardCanvas projectName="Kurir Tracking" taskTree={TREE} />);
+		expect(screen.getAllByText("Selesai").length).toBeGreaterThanOrEqual(1);
+	});
 });

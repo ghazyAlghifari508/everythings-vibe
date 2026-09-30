@@ -4,6 +4,7 @@ import {
 	Bell,
 	Box,
 	Calendar,
+	Check,
 	ChevronRight,
 	CreditCard,
 	FileText,
@@ -1160,15 +1161,34 @@ export const ContainerNode = memo(function ContainerNode({
 						title={row.description ?? row.name}
 						className="flex items-center gap-2 rounded-md border border-white/5 bg-onyx/60 px-3 py-2"
 					>
+						{isTasks ? (
+							<span
+								aria-hidden
+								className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors ${
+									row.done
+										? "border-emerald/60 bg-emerald/15 text-emerald"
+										: "border-fog/40 bg-onyx/40 text-transparent"
+								}`}
+							>
+								{row.done ? <Check size={10} className="stroke-[3]" /> : null}
+							</span>
+						) : (
+							<span
+								aria-hidden
+								className={`h-1.5 w-1.5 shrink-0 rounded-[2px] ${row.done ? "bg-emerald" : "bg-fog/50"}`}
+							/>
+						)}
 						<span
-							aria-hidden
-							className={`h-1.5 w-1.5 shrink-0 rounded-[2px] ${row.done ? "bg-emerald" : "bg-fog/50"}`}
-						/>
-						<span className="min-w-0 flex-1 truncate font-inter text-xs text-snow">
+							className={`min-w-0 flex-1 truncate font-inter text-xs ${
+								isTasks && row.done ? "text-snow/75" : "text-snow"
+							}`}
+						>
 							{row.name}
 						</span>
 						{row.done ? (
-							<span className="shrink-0 text-[10px] text-fog">Selesai</span>
+							<span className="shrink-0 text-[10px] font-medium text-emerald/90">
+								Selesai
+							</span>
 						) : null}
 					</li>
 				))}
@@ -1243,44 +1263,61 @@ export function ContainerModal({
 					</div>
 					{isTasks ? (
 						<ul className="space-y-3">
-							{tasks.map((t) => (
-								<li
-									key={t.name}
-									className="rounded-lg border border-graphite/60 bg-charcoal/40 px-3 py-2"
-								>
-									<p className="flex items-center gap-2 font-inter text-sm text-snow">
-										<span
-											aria-hidden
-											className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border border-graphite bg-charcoal"
-										>
-											{t.status === "completed" || t.status === "done" ? (
-												<span className="h-1.5 w-1.5 rounded-sm bg-emerald" />
-											) : (
-												<span className="h-1.5 w-1.5 rounded-sm bg-fog/30" />
-											)}
-										</span>
-										<span className="truncate">{t.name}</span>
-									</p>
-									{t.subtasks.length > 0 ? (
-										<ul className="mt-1.5 space-y-1 pl-5">
-											{t.subtasks.map((s) => (
-												<li key={s.name} className="text-xs text-fog">
-													{s.name}
-													{s.details.length > 0 ? (
-														<ul className="mt-0.5 space-y-0.5 pl-3">
-															{s.details.map((d) => (
-																<li key={d} className="text-[11px] text-fog/70">
-																	– {d}
-																</li>
-															))}
-														</ul>
-													) : null}
-												</li>
-											))}
-										</ul>
-									) : null}
-								</li>
-							))}
+							{tasks.map((t) => {
+								const isDone = t.status === "completed" || t.status === "done";
+								return (
+									<li
+										key={t.name}
+										className="rounded-lg border border-graphite/60 bg-charcoal/40 px-3 py-2.5"
+									>
+										<div className="flex items-center gap-2.5 font-inter text-sm text-snow">
+											<span
+												aria-hidden
+												className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
+													isDone
+														? "border-emerald/60 bg-emerald/15 text-emerald"
+														: "border-fog/40 bg-onyx/40 text-transparent"
+												}`}
+											>
+												{isDone ? (
+													<Check size={11} className="stroke-[3]" />
+												) : null}
+											</span>
+											<span
+												className={`truncate ${isDone ? "text-snow/75" : "text-snow"}`}
+											>
+												{t.name}
+											</span>
+											{isDone ? (
+												<span className="ml-auto shrink-0 rounded bg-emerald/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald">
+													Selesai
+												</span>
+											) : null}
+										</div>
+										{t.subtasks.length > 0 ? (
+											<ul className="mt-1.5 space-y-1 pl-5">
+												{t.subtasks.map((s) => (
+													<li key={s.name} className="text-xs text-fog">
+														{s.name}
+														{s.details.length > 0 ? (
+															<ul className="mt-0.5 space-y-0.5 pl-3">
+																{s.details.map((d) => (
+																	<li
+																		key={d}
+																		className="text-[11px] text-fog/70"
+																	>
+																		– {d}
+																	</li>
+																))}
+															</ul>
+														) : null}
+													</li>
+												))}
+											</ul>
+										) : null}
+									</li>
+								);
+							})}
 						</ul>
 					) : (
 						<ul className="space-y-2">

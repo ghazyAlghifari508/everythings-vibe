@@ -8,12 +8,14 @@ import {
 	ChevronDown,
 	Info,
 	KanbanSquare,
+	Layers,
 	Loader2,
 	RotateCcw,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DocumentReviewModal } from "@/components/project/document-review-modal";
 import { ProjectDocumentsDrawer } from "@/components/project/project-documents-drawer";
+import { FeatureIcon } from "@/components/task/whiteboard-canvas";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -447,11 +449,20 @@ export function KanbanBoard({
 										className="inline-flex items-center justify-between gap-2 rounded-md border border-graphite bg-charcoal px-3 py-1.5 text-xs font-medium text-snow hover:border-steel hover:bg-steel/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo transition-colors cursor-pointer"
 										aria-label="Filter berdasarkan fase project"
 									>
-										<span
-											className="max-w-[160px] sm:max-w-[200px] truncate"
-											title={selectedPhaseLabel}
-										>
-											{selectedPhaseLabel}
+										<span className="flex items-center gap-1.5 min-w-0">
+											<span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-fog">
+												{selectedPhase ? (
+													<FeatureIcon label={selectedPhase} size={13} />
+												) : (
+													<Layers size={13} aria-hidden="true" />
+												)}
+											</span>
+											<span
+												className="max-w-[150px] sm:max-w-[190px] truncate"
+												title={selectedPhaseLabel}
+											>
+												{selectedPhaseLabel}
+											</span>
 										</span>
 										<ChevronDown
 											size={13}
@@ -465,10 +476,11 @@ export function KanbanBoard({
 									className="w-56 sm:w-64 max-h-72 overflow-y-auto custom-scrollbar p-1"
 								>
 									{[
-										{ id: null, label: "Semua" },
+										{ id: null, label: "Semua", name: "Semua" },
 										...phases.map((phase) => ({
 											id: phase.id,
 											label: phase.label,
+											name: phase.name,
 										})),
 									].map((item) => {
 										const isSelected = selectedPhase === item.id;
@@ -490,6 +502,13 @@ export function KanbanBoard({
 															className="text-snow shrink-0"
 															aria-hidden="true"
 														/>
+													)}
+												</span>
+												<span className="flex h-4 w-4 shrink-0 items-center justify-center text-fog">
+													{item.id === null ? (
+														<Layers size={13} aria-hidden="true" />
+													) : (
+														<FeatureIcon label={item.name} size={13} />
 													)}
 												</span>
 												<span className="truncate" title={item.label}>
