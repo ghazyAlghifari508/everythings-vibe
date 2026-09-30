@@ -31,7 +31,7 @@ import { ZoomControls } from "./zoom-controls";
 const ROOT_W = 200;
 const ROOT_H = 56;
 const FEATURE_W = 260;
-const FEATURE_H = 64;
+const FEATURE_H = 76;
 
 export const LEVEL_GAP_X = 120;
 export const SIBLING_GAP_Y = 24;
@@ -1017,11 +1017,10 @@ export const FeatureNode = memo(function FeatureNode({
 			aria-label={`Fitur ${node.label}, fase ${node.phase ?? "-"}, ${done} dari ${total} selesai`}
 		>
 			<BoardHandle className="-left-[5px]" />
-			<div className="flex h-full flex-col justify-center gap-1.5 px-4">
-				<div className="flex items-center justify-between gap-2">
-					<span className="text-[10px] text-fog">Direncanakan</span>
+			<div className="flex h-full flex-col justify-between py-2 px-3.5">
+				<div className="flex items-center justify-end">
 					<span
-						className={`rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase ${faseBadgeClass(node.phase)}`}
+						className={`rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none ${faseBadgeClass(node.phase)}`}
 					>
 						Fase {node.phase ?? "-"}
 					</span>
@@ -1039,10 +1038,7 @@ export const FeatureNode = memo(function FeatureNode({
 					<ChevronRight size={14} className="shrink-0 text-fog" aria-hidden />
 				</div>
 				<div className="flex items-center justify-between text-[11px] text-fog">
-					<span className="flex items-center gap-1.5">
-						<span className="h-1.5 w-1.5 rounded-full bg-fog/60" aria-hidden />
-						Direncanakan
-					</span>
+					<span>Direncanakan</span>
 					<span className="tabular-nums">
 						{done}/{total}
 					</span>

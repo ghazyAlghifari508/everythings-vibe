@@ -12,11 +12,10 @@ import {
 } from "react";
 import { syncPaymentStatus } from "@/app/actions/payment";
 import {
-	clearPendingPrdPrompt,
 	clearPrdDraft,
+	clearSetupPrompt,
 	consumePendingPrdPrompt,
 	consumeResumeIntent,
-	getPendingPrdPrompt,
 	getPrdDraft,
 	getSetupPrompt,
 	savePendingPrdPrompt,
@@ -32,6 +31,10 @@ import { ChatBubble } from "./chat-bubble";
 import { CreditExhaustedModal } from "./credit-exhausted-modal";
 import { ResumeErrorModal } from "./resume-error-modal";
 import { TypingIndicator } from "./typing-indicator";
+
+// Module-level guard to prevent concurrent duplicate auto-submit calls
+// for the same project across re-renders or StrictMode remounts.
+const autoSubmittedProjectIds = new Set<string>();
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -196,7 +199,17 @@ export const ChatPanel = memo(function ChatPanel({
 }: ChatPanelProps) {
 	// ── Local State ──
 	const draftKey = projectId ?? "new";
-	const [input, setInput] = useState(() => getPrdDraft(projectId ?? "new"));
+	const [input, setInput] = useState(() => {
+		const draft = getPrdDraft(projectId ?? "new");
+		if (
+			draft.startsWith("[Platform:") ||
+			draft.includes("Generate PRD lengkap")
+		) {
+			clearPrdDraft();
+			return "";
+		}
+		return draft;
+	});
 	// ponytail: keep follow-up draft in sessionStorage so refresh mid-typing
 	// doesn't wipe a half-typed PRD revision question.
 	useEffect(() => {
@@ -586,15 +599,17 @@ export const ChatPanel = memo(function ChatPanel({
 							}
 
 							showToast(errorMsg, "error");
-							addMessage({
-								id: crypto.randomUUID(),
-								role: "assistant",
-								content: `❌ **Pengiriman Gagal**\n\n${errorMsg}\n\n*Pesan kamu telah dikembalikan ke kotak input. Silakan coba kirim ulang.*`,
-								timestamp: Date.now(),
-							});
-
-							setGeneratingPRD(false);
-							setInput(originalMessage);
+							if (chatMode === "revise" || chatMode === "chat") {
+								addMessage({
+									id: crypto.randomUUID(),
+									role: "assistant",
+									content: `❌ **Pengiriman Gagal**\n\n${errorMsg}\n\n*Pesan kamu telah dikembalikan ke kotak input. Silakan coba kirim ulang.*`,
+									timestamp: Date.now(),
+								});
+								setInput(originalMessage);
+							} else {
+								setGeneratingPRD(false);
+							}
 							return;
 						}
 					} catch {
@@ -905,25 +920,31 @@ export const ChatPanel = memo(function ChatPanel({
 	useEffect(() => {
 		if (
 			autoSubmitAttemptedRef.current ||
+			(projectId && autoSubmittedProjectIds.has(projectId)) ||
 			isReadOnly ||
 			!enableAutoSubmit ||
 			isStreaming ||
+			isGeneratingPRD ||
+			Boolean(currentPrdContent) ||
 			messages.length > 0
 		)
 			return;
 
-		let pending = getPendingPrdPrompt();
+		let pending = consumePendingPrdPrompt();
 		if (!pending) {
 			const setup = getSetupPrompt();
 			if (setup) {
 				pending = { prompt: setup, mode: "auto", createdAt: Date.now() };
+				clearSetupPrompt();
 			} else {
 				return;
 			}
+		} else {
+			clearSetupPrompt();
 		}
 
 		autoSubmitAttemptedRef.current = true;
-		clearPendingPrdPrompt();
+		if (projectId) autoSubmittedProjectIds.add(projectId);
 
 		if (pending.mode === "auto") {
 			setGeneratingPRD(true);
@@ -935,11 +956,14 @@ export const ChatPanel = memo(function ChatPanel({
 			void handleSendWithMessage(pending.prompt, "chat");
 		}
 	}, [
+		currentPrdContent,
 		enableAutoSubmit,
 		handleSendWithMessage,
+		isGeneratingPRD,
 		isReadOnly,
 		isStreaming,
 		messages.length,
+		projectId,
 		setGeneratingPRD,
 	]);
 

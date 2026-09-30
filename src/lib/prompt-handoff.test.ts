@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	clearSetupPrompt,
 	consumePendingPrdPrompt,
 	consumeResumeIntent,
 	getAskState,
@@ -7,6 +8,7 @@ import {
 	getPrdDraft,
 	getSetupPrompt,
 	savePrdDraft,
+	saveSetupPrompt,
 } from "./prompt-handoff";
 
 function installMemoryStorage() {
@@ -44,6 +46,13 @@ describe("prompt-handoff storage trust boundary", () => {
 			"prdfy:setup-prompt",
 			JSON.stringify({ prompt: "x", createdAt: Date.now() + 3600_000 }),
 		);
+		expect(getSetupPrompt()).toBe("");
+	});
+
+	it("saves and clears setup prompt correctly", () => {
+		saveSetupPrompt("E-commerce lokal");
+		expect(getSetupPrompt()).toBe("E-commerce lokal");
+		clearSetupPrompt();
 		expect(getSetupPrompt()).toBe("");
 	});
 

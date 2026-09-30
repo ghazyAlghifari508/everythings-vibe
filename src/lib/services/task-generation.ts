@@ -46,6 +46,7 @@ export const MAX_TASK_COVERAGE_REPAIR_ATTEMPTS = 2;
 export const TASK_FEATURE_SSOT_INSTRUCTION = `=== DAFTAR FITUR SSOT (WAJIB) ===
 Setiap task WAJIB punya "subfeatureId" berisi ID subfitur dari daftar di atas (format subfeat-N.M). ID yang tidak ada di daftar = output GAGAL.
 Isi "subfeatureName" dengan nama subfitur yang SAMA PERSIS seperti di daftar.
+Khusus untuk task pada Feature "Inisialisasi & Fondasi Infrastruktur" (Fase 0), isi "subfeatureId": null dan "subfeatureName": null karena Fase 0 adalah fondasi infrastruktur teknis di luar daftar subfitur produk.
 Nama feature WAJIB sama dengan nama feature di daftar (yang juga sama dengan section AC).
 Judul task memakai verba imperatif yang spesifik (aksi + objek + konteks), bukan label generik — setiap task harus bisa diserahkan ke coding agent apa adanya.
 Setiap subtask "details" adalah checklist langkah granular yang bisa dieksekusi langsung tanpa menebak-nebak.`;
@@ -173,6 +174,8 @@ function mergeRepair(
 				priority: task.priority,
 				covers: [...task.covers],
 				surfaces: [...task.surfaces],
+				...(task.subfeatureId ? { subfeatureId: task.subfeatureId } : {}),
+				...(task.subfeatureName ? { subfeatureName: task.subfeatureName } : {}),
 				subtasks: task.subtasks.map((subtask) => ({
 					name: subtask.name,
 					description: subtask.description,
@@ -220,6 +223,12 @@ function mergeRepair(
 				priority: incomingTask.priority,
 				covers: [...incomingTask.covers],
 				surfaces: [...incomingTask.surfaces],
+				...(incomingTask.subfeatureId
+					? { subfeatureId: incomingTask.subfeatureId }
+					: {}),
+				...(incomingTask.subfeatureName
+					? { subfeatureName: incomingTask.subfeatureName }
+					: {}),
 				subtasks: incomingTask.subtasks.map((subtask) => ({
 					name: subtask.name,
 					description: subtask.description,

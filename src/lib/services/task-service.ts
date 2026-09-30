@@ -115,6 +115,18 @@ function isNonEmptyString(value: unknown, max: number): value is string {
 	return typeof value === "string" && !!value.trim() && value.length <= max;
 }
 
+/**
+ * Checks whether a feature name represents Phase 0 infrastructure foundation.
+ */
+export function isPhase0Feature(featureName: string): boolean {
+	const lower = featureName.toLowerCase();
+	return (
+		lower.includes("inisialisasi & fondasi") ||
+		lower.includes("fase 0") ||
+		lower.includes("phase 0")
+	);
+}
+
 export function parseTaskJson(
 	jsonString: string,
 	validSubfeatureIds?: ReadonlySet<string>,
@@ -155,15 +167,48 @@ export function parseTaskJson(
 				// Fitur SSOT: a fresh generation must anchor every task to a
 				// subfeature from the project feature tree. An absent set means
 				// a legacy path (old tests, stored trees) where the field
-				// stays absent instead of failing.
+				// stays absent instead of failing. Phase 0 is infrastructure
+				// foundation outside the product feature SSOT, so its tasks
+				// are exempt from subfeatureId enforcement.
 				let subfeatureId: string | undefined;
 				let subfeatureName: string | undefined;
+				const isPhase0 = isPhase0Feature(feature.name);
 				if (validSubfeatureIds) {
-					if (
-						typeof task.subfeatureId !== "string" ||
-						!validSubfeatureIds.has(task.subfeatureId.trim())
-					)
-						return null;
+					if (isPhase0) {
+						if (
+							typeof task.subfeatureId === "string" &&
+							task.subfeatureId.trim().length > 0 &&
+							validSubfeatureIds.has(task.subfeatureId.trim())
+						) {
+							subfeatureId = task.subfeatureId.trim();
+						}
+						if (
+							task.subfeatureName !== undefined &&
+							typeof task.subfeatureName === "string" &&
+							task.subfeatureName.trim().length > 0 &&
+							task.subfeatureName.length <= MAX_TASK_NAME_CHARS
+						) {
+							subfeatureName = task.subfeatureName.trim();
+						}
+					} else {
+						if (
+							typeof task.subfeatureId !== "string" ||
+							!validSubfeatureIds.has(task.subfeatureId.trim())
+						)
+							return null;
+						subfeatureId = task.subfeatureId.trim();
+						if (
+							task.subfeatureName !== undefined &&
+							typeof task.subfeatureName === "string" &&
+							task.subfeatureName.trim().length > 0 &&
+							task.subfeatureName.length <= MAX_TASK_NAME_CHARS
+						)
+							subfeatureName = task.subfeatureName.trim();
+					}
+				} else if (
+					typeof task.subfeatureId === "string" &&
+					task.subfeatureId.trim().length > 0
+				) {
 					subfeatureId = task.subfeatureId.trim();
 					if (
 						task.subfeatureName !== undefined &&

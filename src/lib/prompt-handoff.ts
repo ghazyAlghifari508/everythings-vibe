@@ -120,6 +120,10 @@ export function getSetupPrompt(): string {
 	}
 }
 
+export function clearSetupPrompt(): void {
+	getStorage()?.removeItem(SETUP_PROMPT_KEY);
+}
+
 export function savePendingPrdPrompt(
 	prompt: string,
 	mode: PendingPrdPromptMode,
