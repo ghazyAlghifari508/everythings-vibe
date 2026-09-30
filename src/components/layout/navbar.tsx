@@ -27,6 +27,7 @@ import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useUserPlan } from "@/hooks/use-user-plan";
 import { authClient } from "@/lib/auth-client";
+import { historyFilterSchema } from "@/lib/history";
 import {
 	getPendingPrdPrompt,
 	getSetupPrompt,
@@ -58,6 +59,14 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	const router = useRouter();
 	const navigate = useNavigate();
 	const pathname = useLocation({ select: (l) => l.pathname });
+	const routeSearch = useLocation({ select: (l) => l.search });
+	const historyWorkspace =
+		historyFilterSchema.safeParse(routeSearch).data?.workspace;
+	// Greenfield workspace links to /plan/new and its scoped history; every
+	// other route keeps the global nav.
+	const showGreenfieldHistory =
+		pathname === "/plan/new" ||
+		(pathname === "/history" && historyWorkspace === "greenfield");
 	const [, startTransition] = useTransition();
 	// Single source of truth: reuse routeToStep for route-based actions
 	const routeStep = routeToStep(pathname);
@@ -242,6 +251,19 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						/>
 					) : (
 						<div className="flex items-center gap-1">
+							{showGreenfieldHistory && (
+								<Link
+									to="/history"
+									search={{ workspace: "greenfield" }}
+									className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+										pathname === "/history"
+											? "bg-white/10 text-snow"
+											: "text-fog hover:bg-white/5 hover:text-snow"
+									}`}
+								>
+									Riwayat
+								</Link>
+							)}
 							<Link
 								to="/pricing"
 								className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
@@ -604,6 +626,16 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					>
 						Home
 					</Link>
+					{showGreenfieldHistory && (
+						<Link
+							to="/history"
+							search={{ workspace: "greenfield" }}
+							className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
+							onClick={() => setIsMobileMenuOpen(false)}
+						>
+							Riwayat
+						</Link>
+					)}
 					<Link
 						to="/pricing"
 						className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
