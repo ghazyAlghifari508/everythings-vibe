@@ -130,6 +130,78 @@ describe("layoutTaskGraph modular 4 kolom", () => {
 		expect(containerH(MAX_VISIBLE_CONTAINER_ROWS + 5)).toBeGreaterThan(h3);
 		expect(containerH(0)).toBe(containerH(1));
 	});
+
+	it("sinkronisasi SSOT dengan featureTree: nama bersih, fase sesuai, dan render seluruh subfitur", () => {
+		const ssotTree = {
+			productName: "Inventory POS",
+			createdAt: "2026-09-30T00:00:00.000Z",
+			features: [
+				{
+					id: "feat-1",
+					name: "Manajemen Akun Tenant",
+					phase: 1,
+					description: "",
+					subfeatures: [
+						{ id: "subfeat-1.1", name: "Setup Akun", description: "" },
+						{ id: "subfeat-1.2", name: "RBAC Role", description: "" },
+						{ id: "subfeat-1.3", name: "Multi-Outlet", description: "" },
+						{ id: "subfeat-1.4", name: "Audit Log", description: "" },
+					],
+				},
+			],
+		};
+
+		const taskTreeWithPrefixAndFase0: TaskTree = {
+			features: [
+				{
+					name: "Inisialisasi & Fondasi Infrastruktur",
+					tasks: [makeTask("Setup DB", { status: "completed" })],
+				},
+				{
+					name: "feat-1 Manajemen Akun Tenant",
+					tasks: [
+						makeTask("Implementasi RBAC", {
+							subfeatureId: "subfeat-1.2",
+							subfeatureName: "RBAC Role",
+							status: "completed",
+						}),
+					],
+				},
+			],
+		};
+
+		const { nodes } = layoutTaskGraph(
+			taskTreeWithPrefixAndFase0,
+			"Inventory POS",
+			ssotTree,
+		);
+
+		const features = nodes.filter((n) => n.type === "feature");
+		expect(features).toHaveLength(1);
+		expect(features[0]?.label).toBe("Manajemen Akun Tenant");
+		expect(features[0]?.phase).toBe(1);
+
+		const subfeatureNode = nodes.find((n) => n.type === "subfeature");
+		expect(subfeatureNode).toBeDefined();
+		expect(subfeatureNode?.rows).toHaveLength(4);
+		expect(subfeatureNode?.rows?.map((r) => r.name)).toEqual([
+			"Setup Akun",
+			"RBAC Role",
+			"Multi-Outlet",
+			"Audit Log",
+		]);
+		expect(
+			subfeatureNode?.rows?.find((r) => r.id === "subfeat-1.2")?.done,
+		).toBe(true);
+		expect(
+			subfeatureNode?.rows?.find((r) => r.id === "subfeat-1.1")?.done,
+		).toBe(false);
+
+		const taskNode = nodes.find((n) => n.type === "task");
+		expect(taskNode).toBeDefined();
+		expect(taskNode?.rows).toHaveLength(1);
+		expect(taskNode?.rows?.[0]?.name).toBe("Implementasi RBAC");
+	});
 });
 
 describe("featureIconName kontekstual tanpa sparkle", () => {

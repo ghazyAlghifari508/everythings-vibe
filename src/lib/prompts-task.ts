@@ -9,7 +9,7 @@ FORMAT OUTPUT (JSON, tanpa penjelasan tambahan):
 {
   "features": [
     {
-      "name": "Nama Fitur (sama dengan section AC, kecuali fitur pertama yang wajib Fase 0)",
+      "name": "Nama Fitur (sama dengan section AC)",
       "tasks": [
         {
           "name": "Actionable verb + object",
@@ -30,16 +30,8 @@ FORMAT OUTPUT (JSON, tanpa penjelasan tambahan):
   ]
 }
 
-=== FASE 0: INISIALISASI & FONDASI INFRASTRUKTUR (WAJIB) ===
-Feature group PERTAMA pada output task tree WAJIB bernama "Inisialisasi & Fondasi Infrastruktur" (FASE 0: INISIALISASI & FONDASI INFRASTRUKTUR) sebelum fitur-fitur fungsional lainnya. Feature group ini memuat fondasi teknis:
-1. Scaffolding Repositori & Konfigurasi Environtment: project setup, package management, runtime & build config, linter/formatter, TypeScript strict config, serta template environment variables (.env.example).
-2. Koneksi Database & Migrasi Awal: setup database connection client/pool, konfigurasi ORM, schema migration harness, seed data dasar, dan tenant isolation baseline.
-3. Base Application Shell & Routing Layout: root layout, sistem navigasi utama, theme provider, auth session wrapper, dan global error boundary.
-4. Testing Harness & Verification Setup: konfigurasi test runner, mocking utilities, test environment setup, dan CI pipeline verification checks.
-Jika task Fase 0 tidak terkait langsung dengan nomor ID Acceptance Criteria tertentu, isi "covers": [].
-
 === ATURAN SCOPE (JANGAN DILANGGAR) ===
-1. HANYA fitur yang EKSPLISIT ada di AC (ditambah Fase 0 untuk inisialisasi infrastruktur). JANGAN menambah fitur, halaman, endpoint, role, atau integrasi baru di luar spesifikasi.
+1. HANYA fitur yang EKSPLISIT ada di AC. JANGAN menambah fitur, halaman, endpoint, role, atau integrasi baru di luar spesifikasi.
 2. Gunakan PRD sebagai sumber behavior, data, arsitektur, dan constraint. Jika PRD dan AC berbeda detail, AC menentukan definisi "benar" untuk fitur tersebut.
 3. JANGAN mengurangi scope PRD/AC menjadi versi yang lebih sederhana.
 
@@ -90,7 +82,7 @@ Setiap screen yang dibangun pada Layer UI dan UI States WAJIB membagi deliverabl
     - Edge cases, aturan authorization/permission (WHERE user_id = ?), dan ekspektasi verifikasi/unit test yang relevan
 
 === ATURAN TRACEABILITY (WAJIB, DIVALIDASI SERVER) ===
-18. Setiap task WAJIB punya field "covers": array berisi ID Acceptance Criteria yang benar-benar diselesaikan task itu, contoh ["AC-1.1","AC-1.2"]. Untuk task infrastruktur Fase 0 atau task pendukung tanpa AC langsung, isi [].
+18. Setiap task WAJIB punya field "covers": array berisi ID Acceptance Criteria yang benar-benar diselesaikan task itu, contoh ["AC-1.1","AC-1.2"]. Untuk task pendukung tanpa AC langsung, isi [].
 19. "covers" HANYA boleh berisi ID yang benar-benar ADA di AC. Menyebut ID yang tidak ada = output GAGAL.
 20. SETIAP ID AC pada input WAJIB muncul minimal sekali di salah satu "covers" di seluruh output. Ada AC yang tidak ter-cover = output GAGAL.
 21. JANGAN menaruh referensi AC hanya di dalam teks description — gunakan field "covers".

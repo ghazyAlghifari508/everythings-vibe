@@ -4,7 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { useEffect } from "react";
 import { TaskDetail } from "@/components/task/task-detail";
 import { db } from "@/db";
-import { projects } from "@/db/schema";
+import { type ProjectFeatureTree, projects } from "@/db/schema";
 import { getLatestAcContent } from "@/lib/services/ac-service";
 import { getLatestPrdContent } from "@/lib/services/prd-service";
 import { getTaskTree } from "@/lib/services/task-service";
@@ -27,14 +27,15 @@ const loadTask = createServerFn({ method: "GET" })
 			});
 		}
 		const [project, prdContent, acContent, taskTree] = await Promise.all([
-			// ponytail: select only needed cols — name + taskStatus used downstream.
-			// Avoids pulling description/shareToken/lastUrl jsonb on every Task page load.
+			// ponytail: select only needed cols — name + statuses + SSOT featureTree.
+			// Avoids pulling description/shareToken/lastUrl on every Task page load.
 			db
 				.select({
 					id: projects.id,
 					name: projects.name,
 					taskStatus: projects.taskStatus,
 					step: projects.step,
+					featureTree: projects.featureTree,
 				})
 				.from(projects)
 				.where(
@@ -51,11 +52,14 @@ const loadTask = createServerFn({ method: "GET" })
 		]);
 
 		if (!project[0]) throw new Error("NOT_FOUND");
+		const featureTree: ProjectFeatureTree | null =
+			project[0].featureTree ?? null;
 		return {
 			projectId: id,
 			projectName: project[0].name,
-			step: (project[0] as { step?: string | null }).step ?? null,
+			step: project[0].step ?? null,
 			taskTree,
+			featureTree,
 			hasAc: Boolean(acContent),
 			taskStatus: project[0].taskStatus,
 			latestPrdContent: prdContent ?? null,
@@ -108,7 +112,8 @@ function TaskPage() {
 		<TaskDetail
 			projectId={d.projectId}
 			projectName={d.projectName}
-			taskTree={d.taskTree as never}
+			taskTree={d.taskTree}
+			featureTree={d.featureTree}
 			hasAc={d.hasAc}
 			taskStatus={d.taskStatus}
 			latestPrdContent={d.latestPrdContent}

@@ -18,6 +18,7 @@ import { syncPaymentStatus } from "@/app/actions/payment";
 import { CreditExhaustedModal } from "@/components/chat/credit-exhausted-modal";
 import { DocumentReviewModal } from "@/components/project/document-review-modal";
 import { ProjectDocumentsDrawer } from "@/components/project/project-documents-drawer";
+import type { ProjectFeatureTree } from "@/db/schema";
 import {
 	GENERATION_STATUS_POLL_INTERVAL_MS,
 	GUARD_WAIT_MS,
@@ -44,6 +45,7 @@ interface TaskDetailProps {
 	projectId: string;
 	projectName: string;
 	taskTree: TaskTree | null;
+	featureTree: ProjectFeatureTree | null;
 	hasAc: boolean;
 	taskStatus?: string | null;
 	latestPrdContent?: string | null;
@@ -86,6 +88,7 @@ export function TaskDetail({
 	projectId,
 	projectName,
 	taskTree,
+	featureTree,
 	hasAc,
 	taskStatus,
 	latestPrdContent,
@@ -593,6 +596,7 @@ export function TaskDetail({
 							<WhiteboardCanvas
 								projectName={projectName}
 								taskTree={visibleTaskTree}
+								featureTree={featureTree}
 							/>
 						)}
 					</div>

@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { TASK_GENERATION_PROMPT } from "./prompts-task";
 
 describe("TASK_GENERATION_PROMPT", () => {
-	it("mandates Phase 0 scaffolding as the first feature group", () => {
-		expect(TASK_GENERATION_PROMPT).toContain(
-			"FASE 0: INISIALISASI & FONDASI INFRASTRUKTUR",
+	it("derives feature groups directly from AC sections without infrastructure scaffolding", () => {
+		expect(TASK_GENERATION_PROMPT).not.toContain(
+			"Inisialisasi & Fondasi Infrastruktur",
 		);
-		expect(TASK_GENERATION_PROMPT).toContain(
+		expect(TASK_GENERATION_PROMPT).not.toContain(
 			"Scaffolding Repositori & Konfigurasi Environtment",
 		);
-		expect(TASK_GENERATION_PROMPT).toContain("Koneksi Database");
+		expect(TASK_GENERATION_PROMPT).not.toContain("Koneksi Database");
 	});
 
 	it("enforces 5-layer decomposition per feature", () => {

@@ -31,6 +31,6 @@ describe("depthDirective('task')", () => {
 			"JANGAN mengurangi task atau menggabungkan requirement berbeda",
 		);
 		expect(directive).toContain("5-layer");
-		expect(directive).toContain("Fase 0");
+		expect(directive).not.toContain("Fase 0");
 	});
 });

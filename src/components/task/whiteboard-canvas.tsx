@@ -23,6 +23,7 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { groupTasksBySubfeature } from "@/components/fitur/feature-view";
+import type { ProjectFeatureTree } from "@/db/schema";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import type { TaskTree } from "@/lib/services/task-service";
 import { ZoomControls } from "./zoom-controls";
@@ -259,16 +260,62 @@ export interface LayoutEdge {
 export function layoutTaskGraph(
 	tree: TaskTree,
 	projectName: string,
+	featureTree?: ProjectFeatureTree | null,
 ): { nodes: LayoutNode[]; edges: LayoutEdge[]; width: number; height: number } {
 	const nodes: LayoutNode[] = [];
 	const edges: LayoutEdge[] = [];
 
 	const features = tree.features;
 	if (features.length === 0) return { nodes, edges, width: 0, height: 0 };
+	const ssotFeatures = featureTree?.features ?? [];
 
 	function isTaskDone(status: string | undefined): boolean {
 		return status === "completed" || status === "done";
 	}
+
+	function cleanFeatureName(name: string): string {
+		return name
+			.replace(/^feat(?:ure)?[-_\s]*\d+[:.\s-]*/i, "")
+			.trim()
+			.toLowerCase();
+	}
+
+	interface DisplayFeature {
+		name: string;
+		phase: number;
+		subfeatures: Array<{ id: string; name: string; description?: string }>;
+		tasks: TaskTree["features"][number]["tasks"];
+	}
+
+	const displayFeatures: DisplayFeature[] =
+		ssotFeatures.length > 0
+			? ssotFeatures.map((ssot) => {
+					const ssotSubIds = new Set(ssot.subfeatures.map((s) => s.id));
+					const cleanedSsot = cleanFeatureName(ssot.name);
+					const tasks = features.flatMap((tf) => {
+						const nameMatch = cleanFeatureName(tf.name) === cleanedSsot;
+						return tf.tasks.filter((t) => {
+							if (t.subfeatureId && ssotSubIds.has(t.subfeatureId)) return true;
+							if (!t.subfeatureId && nameMatch) return true;
+							return false;
+						});
+					});
+					return {
+						name: ssot.name,
+						phase: ssot.phase,
+						subfeatures: ssot.subfeatures,
+						tasks,
+					};
+				})
+			: features.map((feature, fi) => ({
+					name: feature.name,
+					phase: fi + 1,
+					subfeatures: [],
+					tasks: feature.tasks,
+				}));
+
+	if (displayFeatures.length === 0)
+		return { nodes, edges, width: 0, height: 0 };
 
 	interface FeaturePlan {
 		subRows: ContainerRow[];
@@ -281,37 +328,62 @@ export function layoutTaskGraph(
 		height: number;
 	}
 
-	const plans: FeaturePlan[] = features.map((feature) => {
+	const plans: FeaturePlan[] = displayFeatures.map((feature) => {
+		const officialIds = new Set(feature.subfeatures.map((s) => s.id));
 		const groups = groupTasksBySubfeature(feature.tasks);
-		const subRows: ContainerRow[] = [];
-		let subDone = 0;
-		const legacyIndexes: number[] = [];
-		for (const g of groups) {
-			if (!g.subfeatureName) {
-				legacyIndexes.push(...g.taskIndexes);
-				continue;
+		// Shared done rule: a subfeature is done only when it owns at least
+		// one task and every owned task is done. Empty official rows stay pending.
+		const isDone = (indexes: readonly number[]) =>
+			indexes.length > 0 &&
+			indexes.every((ti) => isTaskDone(feature.tasks[ti]?.status));
+
+		// Official SSOT rows first, in official order with official names,
+		// so the SUB FITUR column renders the full official list even when
+		// a subfeature has zero tasks yet.
+		const subRows: ContainerRow[] =
+			feature.subfeatures.length > 0
+				? feature.subfeatures.map((s) => {
+						const linked = groups.find((g) => g.key === s.id);
+						return {
+							id: s.id,
+							name: s.name,
+							description: s.description,
+							done: linked ? isDone(linked.taskIndexes) : false,
+						};
+					})
+				: [];
+		let subDone = subRows.filter((r) => r.done).length;
+
+		if (feature.subfeatures.length === 0) {
+			for (const g of groups) {
+				if (!g.subfeatureName) continue;
+				const done = isDone(g.taskIndexes);
+				if (done) subDone += 1;
+				subRows.push({ id: g.key, name: g.subfeatureName, done });
 			}
-			const done =
-				g.taskIndexes.length > 0 &&
-				g.taskIndexes.every((ti) => isTaskDone(feature.tasks[ti]?.status));
-			if (done) subDone += 1;
-			subRows.push({ id: g.key, name: g.subfeatureName, done });
-		}
-		if (legacyIndexes.length > 0) {
-			const done = legacyIndexes.every((ti) =>
-				isTaskDone(feature.tasks[ti]?.status),
-			);
-			if (done) subDone += 1;
-			const [first] = legacyIndexes;
-			subRows.push({
-				id: "__legacy",
-				name:
+			// Unlinked tasks (legacy trees) keep one honest fallback row.
+			const legacyIndexes = groups
+				.filter((g) => !g.subfeatureName)
+				.flatMap((g) => g.taskIndexes);
+			if (legacyIndexes.length > 0) {
+				const done = isDone(legacyIndexes);
+				if (done) subDone += 1;
+				const [first] = legacyIndexes;
+				const name =
 					legacyIndexes.length > 1
 						? `Tugas fitur (${legacyIndexes.length})`
 						: (first !== undefined && feature.tasks[first]?.name) ||
-							"Tugas fitur",
-				done,
-			});
+							"Tugas fitur";
+				subRows.push({ id: "__legacy", name, done });
+			}
+		} else {
+			// AI-only leftovers: named groups with no official id keep their label.
+			for (const g of groups) {
+				if (!g.subfeatureName || officialIds.has(g.key)) continue;
+				const done = isDone(g.taskIndexes);
+				if (done) subDone += 1;
+				subRows.push({ id: g.key, name: g.subfeatureName, done });
+			}
 		}
 		const taskPayloads: TaskContainerTask[] = feature.tasks.map((t) => ({
 			name: t.name,
@@ -363,8 +435,8 @@ export function layoutTaskGraph(
 	const taskX = subX + SUBFEATURE_CONTAINER_W + LEVEL_GAP_X;
 	let featureCursorY = 40;
 
-	for (let fi = 0; fi < features.length; fi++) {
-		const feature = features[fi];
+	for (let fi = 0; fi < displayFeatures.length; fi++) {
+		const feature = displayFeatures[fi];
 		const plan = plans[fi];
 		if (!feature || !plan) continue;
 		const colorIdx = fi % COLORS.length;
@@ -380,7 +452,7 @@ export function layoutTaskGraph(
 			w: FEATURE_W,
 			h: FEATURE_H,
 			colorIdx,
-			phase: fi + 1,
+			phase: feature.phase,
 			taskCount: feature.tasks.length,
 			totalRows: feature.tasks.length,
 			doneRows: plan.taskDone,
@@ -460,11 +532,13 @@ export const DOT_BG_IMAGE =
 interface WhiteboardCanvasProps {
 	projectName?: string;
 	taskTree?: TaskTree | null;
+	featureTree?: ProjectFeatureTree | null;
 }
 
 export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 	projectName = "Project",
 	taskTree,
+	featureTree,
 }: WhiteboardCanvasProps) {
 	const {
 		zoom,
@@ -495,9 +569,9 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 	} = useMemo(
 		() =>
 			taskTree && !isEmpty
-				? layoutTaskGraph(taskTree, projectName)
+				? layoutTaskGraph(taskTree, projectName, featureTree)
 				: { nodes: [], edges: [], width: 0, height: 0 },
-		[taskTree, projectName, isEmpty],
+		[taskTree, projectName, featureTree, isEmpty],
 	);
 
 	// While loading, the same layout engine sizes the skeleton, so the board
@@ -536,10 +610,10 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 		setPan({ x: offsetX, y: offsetY });
 	}, [effectiveWidth, effectiveHeight, setZoom, setPan, minZoom, maxZoom]);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: taskTree triggers hasFittedRef reset
+	// biome-ignore lint/correctness/useExhaustiveDependencies: taskTree/featureTree identity resets fit
 	useEffect(() => {
 		hasFittedRef.current = false;
-	}, [taskTree]);
+	}, [taskTree, featureTree]);
 
 	// Modal open freezes the board: pan/zoom/keyboard-nudge all no-op until closed.
 	const handleKeyDown = useCallback(
@@ -1017,32 +1091,29 @@ export const FeatureNode = memo(function FeatureNode({
 			aria-label={`Fitur ${node.label}, fase ${node.phase ?? "-"}, ${done} dari ${total} selesai`}
 		>
 			<BoardHandle className="-left-[5px]" />
-			<div className="flex h-full flex-col justify-between py-2 px-3.5">
-				<div className="flex items-center justify-end">
+			<div className="flex h-full items-center gap-2.5 px-3.5">
+				<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow">
+					<FeatureIcon label={node.label} size={16} />
+				</span>
+				<span className="min-w-0 flex-1">
 					<span
-						className={`rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none ${faseBadgeClass(node.phase)}`}
-					>
-						Fase {node.phase ?? "-"}
-					</span>
-				</div>
-				<div className="flex items-center gap-2.5">
-					<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow">
-						<FeatureIcon label={node.label} size={16} />
-					</span>
-					<p
-						className="min-w-0 flex-1 truncate font-inter text-sm font-[510] text-snow"
+						className="block truncate font-inter text-sm font-[510] leading-snug text-snow"
 						title={node.label}
 					>
 						{node.label}
-					</p>
-					<ChevronRight size={14} className="shrink-0 text-fog" aria-hidden />
-				</div>
-				<div className="flex items-center justify-between text-[11px] text-fog">
-					<span>Direncanakan</span>
-					<span className="tabular-nums">
-						{done}/{total}
 					</span>
-				</div>
+					<span className="block text-[11px] leading-tight text-fog">
+						Direncanakan ·{" "}
+						<span className="tabular-nums">
+							{done}/{total}
+						</span>
+					</span>
+				</span>
+				<span
+					className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none ${faseBadgeClass(node.phase)}`}
+				>
+					Fase {node.phase ?? "-"}
+				</span>
 			</div>
 			<BoardHandle className="-right-[5px]" />
 		</div>

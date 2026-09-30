@@ -27,7 +27,6 @@ Struktur dokumen tetap sama, tapi jumlah AC per fitur proporsional terhadap komp
 const TASK = `
 ## MODE KEDALAMAN: ADAPTIF & DETAIL LENGKAP
 Sesuaikan jumlah task, subtask, dan detail dengan KOMPLEKSITAS requirement di PRD + AC:
-- Wajib menyertakan Fase 0 (Inisialisasi & Fondasi Infrastruktur) sebelum masuk ke fitur fungsional.
 - Setiap fitur pada AC wajib dipecah ke dalam 5-layer teknis (Data/Storage, Domain/Service Logic, API Contract, Dedicated Screen Layout, UI States & Interaction).
 - Fitur simpel → sedikit task per layer tapi tetap modular, detail secukupnya.
 - Fitur kompleks (banyak state, aturan bisnis, integrasi, async lifecycle) → banyak task dan subtask, detail mendalam per sub-komponen.
