@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseTaskJson } from "./task-service";
+import type { ProjectFeatureTree } from "@/db/schema";
+import { parseTaskJson, resolveKanbanFeatureName } from "./task-service";
 
 const validTree = {
 	features: [
@@ -121,5 +122,105 @@ describe("parseTaskJson", () => {
 		(bad.features[0].tasks[0] as { surfaces?: unknown }).surfaces =
 			"Product List";
 		expect(parseTaskJson(JSON.stringify(bad))).toBeNull();
+	});
+});
+
+describe("resolveKanbanFeatureName", () => {
+	const ssotFeatures: ProjectFeatureTree["features"] = [
+		{
+			id: "feat-1",
+			name: "Manajemen Akun Tenant",
+			phase: 1,
+			description: "Akun dan peran pengguna.",
+			subfeatures: [
+				{ id: "subfeat-1.1", name: "Setup Akun", description: "Buat akun." },
+				{ id: "subfeat-1.2", name: "RBAC Role", description: "Peran akses." },
+			],
+		},
+		{
+			id: "feat-2",
+			name: "Katalog",
+			phase: 2,
+			description: "Jelajah produk.",
+			subfeatures: [
+				{ id: "subfeat-2.1", name: "Daftar", description: "Daftar item." },
+				{ id: "subfeat-2.2", name: "Cari", description: "Cari item." },
+			],
+		},
+	];
+
+	it("drops the legacy Phase-0 card with no SSOT link", () => {
+		expect(
+			resolveKanbanFeatureName(
+				{
+					featureName: "Inisialisasi & Fondasi Infrastruktur",
+					subfeatureId: null,
+				},
+				ssotFeatures,
+			),
+		).toBeNull();
+	});
+
+	it("drops orphan feat-N rows with unknown subfeature links", () => {
+		expect(
+			resolveKanbanFeatureName(
+				{ featureName: "feat-9 Ghost", subfeatureId: "subfeat-9.9" },
+				ssotFeatures,
+			),
+		).toBeNull();
+		expect(
+			resolveKanbanFeatureName(
+				{ featureName: "feat-9 Ghost", subfeatureId: null },
+				ssotFeatures,
+			),
+		).toBeNull();
+	});
+
+	it("renames cards to the official owner via subfeatureId", () => {
+		expect(
+			resolveKanbanFeatureName(
+				{
+					featureName: "feat-1 Manajemen Akun Tenant",
+					subfeatureId: "subfeat-1.2",
+				},
+				ssotFeatures,
+			),
+		).toBe("Manajemen Akun Tenant");
+		expect(
+			resolveKanbanFeatureName(
+				{ featureName: "Katalog", subfeatureId: "subfeat-1.1" },
+				ssotFeatures,
+			),
+		).toBe("Manajemen Akun Tenant");
+	});
+
+	it("renames via cleaned-name match when no subfeature link exists", () => {
+		expect(
+			resolveKanbanFeatureName(
+				{ featureName: "feat-2 Katalog", subfeatureId: null },
+				ssotFeatures,
+			),
+		).toBe("Katalog");
+		expect(
+			resolveKanbanFeatureName(
+				{ featureName: "Katalog", subfeatureId: null },
+				ssotFeatures,
+			),
+		).toBe("Katalog");
+	});
+
+	it("falls back to the stored name or Umum when the tree is empty", () => {
+		expect(
+			resolveKanbanFeatureName(
+				{
+					featureName: "Inisialisasi & Fondasi Infrastruktur",
+					subfeatureId: null,
+				},
+				[],
+			),
+		).toBe("Inisialisasi & Fondasi Infrastruktur");
+		expect(
+			resolveKanbanFeatureName({ featureName: null, subfeatureId: null }, []),
+		).toBe("Umum");
 	});
 });

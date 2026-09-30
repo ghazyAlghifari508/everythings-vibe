@@ -13,7 +13,12 @@
  */
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { acVersions, projects, tasks } from "@/db/schema";
+import {
+	acVersions,
+	type ProjectFeatureTree,
+	projects,
+	tasks,
+} from "@/db/schema";
 import {
 	type AcCoverageReport,
 	buildCoverageReport,
@@ -21,7 +26,9 @@ import {
 	extractAcIds,
 	extractReferencedAcIds,
 } from "@/lib/ac-coverage";
+import { featureTreeSchema } from "@/lib/feature-tree";
 import { advanceStep } from "@/lib/flow-progress";
+import { cleanFeatureName } from "@/lib/kanban-utils";
 import {
 	normalizeTaskPriority,
 	storedTaskPriority,
@@ -468,6 +475,41 @@ export async function getTaskTree(projectId: string): Promise<TaskTree | null> {
 	}
 }
 
+export interface KanbanSsotTaskRef {
+	readonly featureName: string | null;
+	readonly subfeatureId: string | null;
+}
+
+/**
+ * SSOT owner for one kanban row. Returns the official feature name, or null
+ * when the row links to nothing in the tree (Phase-0/orphan rows are dropped
+ * by the caller). Empty tree means legacy project: stored name or "Umum".
+ */
+export function resolveKanbanFeatureName(
+	task: KanbanSsotTaskRef,
+	ssotFeatures: ProjectFeatureTree["features"],
+): string | null {
+	if (ssotFeatures.length === 0) return task.featureName || "Umum";
+	if (typeof task.subfeatureId === "string" && task.subfeatureId) {
+		for (const feature of ssotFeatures) {
+			for (const sub of feature.subfeatures) {
+				if (sub.id === task.subfeatureId) return feature.name;
+			}
+		}
+	}
+	// Single regex source (@/lib/kanban-utils); lowercase for case-insensitive
+	// key. whiteboard-canvas.tsx keeps its own display-local copy (out of scope).
+	const cleaned = cleanFeatureName(
+		typeof task.featureName === "string" ? task.featureName : "",
+	).toLowerCase();
+	if (!cleaned) return null;
+	for (const feature of ssotFeatures) {
+		if (cleanFeatureName(feature.name).toLowerCase() === cleaned)
+			return feature.name;
+	}
+	return null;
+}
+
 /**
  * Kanban board data — shared between polling GET (`/api/kanban/$pid`)
  * and SSE push (`/api/kanban/stream`). Single DB source so both transports
@@ -497,7 +539,10 @@ export async function getKanbanData(projectId: string): Promise<{
 	taskStatus: string | null;
 }> {
 	const [project] = await db
-		.select({ taskStatus: projects.taskStatus })
+		.select({
+			taskStatus: projects.taskStatus,
+			featureTree: projects.featureTree,
+		})
 		.from(projects)
 		.where(eq(projects.id, projectId))
 		.limit(1);
@@ -510,6 +555,7 @@ export async function getKanbanData(projectId: string): Promise<{
 			status: tasks.status,
 			priority: tasks.priority,
 			featureName: tasks.featureName,
+			subfeatureId: tasks.subfeatureId,
 			dependencies: tasks.dependencies,
 			subtasks: tasks.subtasks,
 			startedAt: tasks.startedAt,
@@ -521,8 +567,8 @@ export async function getKanbanData(projectId: string): Promise<{
 		.orderBy(asc(tasks.order));
 
 	// acChanged: whether an AC version is newer than the oldest task creation.
-	// Mirrors /api/v1/projects/$id/kanban.ts logic; polling route currently
-	// returned false statically but SSE deserves the real signal.
+	// Single source of truth: UI polling, SSE, and v1 REST all read through
+	// getKanbanData, so the signal is computed once here.
 	const [acRow] = await db
 		.select({ createdAt: acVersions.createdAt })
 		.from(acVersions)
@@ -569,7 +615,28 @@ export async function getKanbanData(projectId: string): Promise<{
 		return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
 	};
 
+	// SSOT sync: keep only tasks linked to featureTree; rename cards to official owner.
+	const parsedTree = featureTreeSchema.safeParse(project?.featureTree ?? null);
+	const ssotFeatures: ProjectFeatureTree["features"] = parsedTree.success
+		? parsedTree.data.features
+		: [];
+	let oldestTaskAt: Date | null = null;
 	for (const t of taskRows) {
+		if (t.createdAt) {
+			const created =
+				t.createdAt instanceof Date ? t.createdAt : new Date(t.createdAt);
+			if (
+				Number.isFinite(created.getTime()) &&
+				(!oldestTaskAt || created < oldestTaskAt)
+			) {
+				oldestTaskAt = created;
+			}
+		}
+		const featureName = resolveKanbanFeatureName(
+			{ featureName: t.featureName, subfeatureId: t.subfeatureId },
+			ssotFeatures,
+		);
+		if (featureName === null) continue;
 		// Normalize DB values into the declared card shape instead of
 		// casting: invalid statuses fall back to pending, malformed subtask
 		// entries are dropped, non-string dependencies are filtered out.
@@ -587,7 +654,7 @@ export async function getKanbanData(projectId: string): Promise<{
 		const card = {
 			id: t.id,
 			type: "task" as const,
-			featureName: t.featureName || "Umum",
+			featureName,
 			name: t.title,
 			description: t.description ?? "",
 			status,
@@ -611,17 +678,7 @@ export async function getKanbanData(projectId: string): Promise<{
 		};
 		(columns[card.status] ?? columns.pending).push(card);
 	}
-
 	const latestAcAt = acRow?.createdAt ?? null;
-	// Minimum creation timestamp across rows — display order is by `order`,
-	// so row[0] is not necessarily the oldest task.
-	let oldestTaskAt: Date | null = null;
-	for (const t of taskRows) {
-		if (!t.createdAt) continue;
-		const d = t.createdAt instanceof Date ? t.createdAt : new Date(t.createdAt);
-		if (!Number.isFinite(d.getTime())) continue;
-		if (!oldestTaskAt || d < oldestTaskAt) oldestTaskAt = d;
-	}
 	const acChanged = Boolean(
 		latestAcAt &&
 			oldestTaskAt &&

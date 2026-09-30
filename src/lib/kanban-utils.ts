@@ -109,6 +109,13 @@ export function groupCardsByStatus(
 }
 
 /**
+ * Strip feat-N or feature-N prefix from a feature name.
+ */
+export function cleanFeatureName(name: string): string {
+	return name.replace(/^feat(?:ure)?[-_\s]*\d+[:.\s-]*/i, "").trim();
+}
+
+/**
  * Group cards by feature name within a column.
  */
 export function groupCardsByFeature(
@@ -118,7 +125,8 @@ export function groupCardsByFeature(
 	// keys such as __proto__ must resolve as own groups, never the prototype.
 	const groups: Record<string, TaskCard[]> = Object.create(null);
 	for (const card of cards) {
-		const name = card.featureName || "Umum";
+		const rawName = card.featureName?.trim() || "Umum";
+		const name = cleanFeatureName(rawName) || "Umum";
 		if (!groups[name]) groups[name] = [];
 		groups[name].push(card);
 	}
@@ -185,7 +193,8 @@ export function extractPhases(
 	const phases: KanbanPhase[] = [];
 
 	for (const card of allCards) {
-		const name = card.featureName?.trim() || "Umum";
+		const rawName = card.featureName?.trim() || "Umum";
+		const name = cleanFeatureName(rawName) || "Umum";
 		if (!seen.has(name)) {
 			seen.add(name);
 			const phaseNumber = phases.length + 1;
@@ -213,19 +222,17 @@ export function filterColumnsByPhase(
 		return columns;
 	}
 
+	const matches = (c: TaskCard) => {
+		const rawName = c.featureName?.trim() || "Umum";
+		const name = cleanFeatureName(rawName) || "Umum";
+		return name === selectedPhaseId;
+	};
+
 	return {
-		pending: columns.pending.filter(
-			(c) => (c.featureName?.trim() || "Umum") === selectedPhaseId,
-		),
-		in_progress: columns.in_progress.filter(
-			(c) => (c.featureName?.trim() || "Umum") === selectedPhaseId,
-		),
-		completed: columns.completed.filter(
-			(c) => (c.featureName?.trim() || "Umum") === selectedPhaseId,
-		),
-		failed: columns.failed.filter(
-			(c) => (c.featureName?.trim() || "Umum") === selectedPhaseId,
-		),
+		pending: columns.pending.filter(matches),
+		in_progress: columns.in_progress.filter(matches),
+		completed: columns.completed.filter(matches),
+		failed: columns.failed.filter(matches),
 	};
 }
 

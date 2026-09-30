@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	cleanFeatureName,
 	computeKanbanProgress,
 	computeStatusCounts,
 	detectAcChanged,
@@ -25,6 +26,27 @@ const mockCard = (overrides: Partial<TaskCard> = {}): TaskCard => ({
 });
 
 describe("kanban-utils", () => {
+	describe("cleanFeatureName", () => {
+		it("strips feat-N, feature-N, and variants from feature names", () => {
+			expect(cleanFeatureName("feat-1 Autentikasi")).toBe("Autentikasi");
+			expect(cleanFeatureName("feat_02: Dashboard")).toBe("Dashboard");
+			expect(cleanFeatureName("feature-3. Pembayaran")).toBe("Pembayaran");
+			expect(cleanFeatureName("feature 4 - Laporan")).toBe("Laporan");
+			expect(cleanFeatureName("FEATURE 12: Profil")).toBe("Profil");
+			expect(cleanFeatureName("feat05: Settings")).toBe("Settings");
+		});
+
+		it("preserves already-cleaned feature names", () => {
+			expect(cleanFeatureName("Autentikasi User")).toBe("Autentikasi User");
+			expect(cleanFeatureName("Dashboard Utama")).toBe("Dashboard Utama");
+		});
+
+		it("returns empty string when name contains only prefix", () => {
+			expect(cleanFeatureName("feat-1")).toBe("");
+			expect(cleanFeatureName("feature-02:")).toBe("");
+		});
+	});
+
 	describe("groupCardsByStatus", () => {
 		it("groups cards by their status column", () => {
 			const cards = [
@@ -176,6 +198,53 @@ describe("kanban-utils", () => {
 			expect(phases[0]?.label).toBe("Fase 1: Umum");
 		});
 
+		it("strips feat-N/feature-N prefixes and numbers phases starting at Fase 1", () => {
+			const cards = [
+				mockCard({ id: "1", featureName: "feat-1 Manajemen Akun" }),
+				mockCard({ id: "2", featureName: "feat_02: Dashboard Analitik" }),
+				mockCard({ id: "3", featureName: "feature-3. Billing System" }),
+			];
+			const phases = extractPhases(cards);
+			expect(phases).toHaveLength(3);
+			expect(phases[0]).toEqual({
+				id: "Manajemen Akun",
+				name: "Manajemen Akun",
+				phaseNumber: 1,
+				label: "Fase 1: Manajemen Akun",
+			});
+			expect(phases[1]).toEqual({
+				id: "Dashboard Analitik",
+				name: "Dashboard Analitik",
+				phaseNumber: 2,
+				label: "Fase 2: Dashboard Analitik",
+			});
+			expect(phases[2]).toEqual({
+				id: "Billing System",
+				name: "Billing System",
+				phaseNumber: 3,
+				label: "Fase 3: Billing System",
+			});
+		});
+
+		it("deduplicates cards when some have feat-N prefix and others are clean", () => {
+			const cards = [
+				mockCard({ id: "1", featureName: "feat-1 Autentikasi" }),
+				mockCard({ id: "2", featureName: "Autentikasi" }),
+			];
+			const phases = extractPhases(cards);
+			expect(phases).toHaveLength(1);
+			expect(phases[0]?.name).toBe("Autentikasi");
+			expect(phases[0]?.label).toBe("Fase 1: Autentikasi");
+		});
+
+		it("falls back to 'Umum' when featureName contains only prefix", () => {
+			const cards = [mockCard({ id: "1", featureName: "feat-1" })];
+			const phases = extractPhases(cards);
+			expect(phases).toHaveLength(1);
+			expect(phases[0]?.name).toBe("Umum");
+			expect(phases[0]?.label).toBe("Fase 1: Umum");
+		});
+
 		it("returns empty array when there are no tasks", () => {
 			expect(extractPhases([])).toEqual([]);
 		});
@@ -218,6 +287,33 @@ describe("kanban-utils", () => {
 			expect(filtered.in_progress).toHaveLength(0);
 			expect(filtered.completed).toHaveLength(0);
 			expect(filtered.failed).toHaveLength(0);
+		});
+
+		it("matches cards with feat-N prefixes when filtering by cleaned phase id", () => {
+			const columnsWithPrefix = {
+				pending: [
+					mockCard({ id: "1", status: "pending", featureName: "feat-1 Auth" }),
+					mockCard({
+						id: "2",
+						status: "pending",
+						featureName: "feature-2 Dashboard",
+					}),
+				],
+				in_progress: [
+					mockCard({
+						id: "3",
+						status: "in_progress",
+						featureName: "feat-1 Auth",
+					}),
+				],
+				completed: [],
+				failed: [],
+			};
+			const filtered = filterColumnsByPhase(columnsWithPrefix, "Auth");
+			expect(filtered.pending).toHaveLength(1);
+			expect(filtered.pending[0]?.id).toBe("1");
+			expect(filtered.in_progress).toHaveLength(1);
+			expect(filtered.in_progress[0]?.id).toBe("3");
 		});
 	});
 
