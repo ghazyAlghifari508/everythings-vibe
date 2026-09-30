@@ -5,6 +5,7 @@ import type { TaskTree } from "@/lib/services/task-service";
 import {
 	containerH,
 	featureIconName,
+	getCanvasDotStyle,
 	layoutTaskGraph,
 	MAX_VISIBLE_CONTAINER_ROWS,
 } from "./whiteboard-canvas";
@@ -314,5 +315,34 @@ describe("featureIconName kontekstual tanpa sparkle", () => {
 		expect(featureIconName("Admin Panel")).toBe("shield");
 		expect(featureIconName("Lacak Pengiriman")).toBe("truck");
 		expect(featureIconName("Pencarian Produk")).toBe("search");
+	});
+});
+
+describe("getCanvasDotStyle scaling proporsional terhadap zoom", () => {
+	it("menghasilkan dotRadius yang membesar saat zoom in dan mengecil saat zoom out", () => {
+		const pan = { x: 100, y: -50 };
+		const styleZoomOut = getCanvasDotStyle(0.54, pan);
+		const styleNormal = getCanvasDotStyle(1.0, pan);
+		const styleZoomIn = getCanvasDotStyle(1.4, pan);
+
+		expect(styleZoomOut.backgroundSize).toBe("10.8px 10.8px");
+		expect(styleNormal.backgroundSize).toBe("20px 20px");
+		expect(styleZoomIn.backgroundSize).toBe("28px 28px");
+
+		expect(styleZoomOut.backgroundPosition).toBe("100px -50px");
+
+		// Extract radius from radial-gradient string
+		const extractRadius = (bgImage: string | undefined) => {
+			const match = bgImage?.match(/rgba\(15, 23, 42, 0.16\)\)\s+([\d.]+)px/);
+			return match ? parseFloat(match[1]) : 0;
+		};
+
+		const rOut = extractRadius(styleZoomOut.backgroundImage as string);
+		const rNorm = extractRadius(styleNormal.backgroundImage as string);
+		const rIn = extractRadius(styleZoomIn.backgroundImage as string);
+
+		expect(rOut).toBeLessThan(rNorm);
+		expect(rIn).toBeGreaterThan(rNorm);
+		expect(rOut).toBeGreaterThanOrEqual(0.75); // clamped minimum
 	});
 });
