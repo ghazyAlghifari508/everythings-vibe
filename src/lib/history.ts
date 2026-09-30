@@ -5,6 +5,7 @@
 // ownership boundary lives here so every history read shares one filter.
 import { createServerFn } from "@tanstack/react-start";
 import { and, desc, eq, isNull } from "drizzle-orm";
+import { z } from "zod";
 import { requireUserServer } from "@/lib/session";
 
 export interface HistoryItem {
@@ -18,11 +19,27 @@ export interface HistoryItem {
 	taskStatus: string | null;
 }
 
-export const loadHistory = createServerFn({ method: "GET" }).handler(
-	async () => {
+// Workspace scope for the history list. "greenfield" hides existing-codebase
+// projects so each workspace gets its own history; undefined/"all" keeps the
+// global list the history drawer still reads.
+export const historyFilterSchema = z.object({
+	workspace: z.enum(["greenfield", "all"]).optional(),
+});
+
+export const loadHistory = createServerFn({ method: "GET" })
+	.validator((data: unknown) => historyFilterSchema.parse(data))
+	.handler(async ({ data }) => {
 		const user = await requireUserServer();
 		const { db } = await import("@/db");
 		const { projects } = await import("@/db/schema");
+
+		const conditions = [
+			eq(projects.userId, user.id),
+			isNull(projects.deletedAt),
+		];
+		if (data?.workspace === "greenfield") {
+			conditions.push(eq(projects.projectMode, "greenfield"));
+		}
 
 		const projectRows = await db
 			.select({
@@ -36,7 +53,7 @@ export const loadHistory = createServerFn({ method: "GET" }).handler(
 				description: projects.description,
 			})
 			.from(projects)
-			.where(and(eq(projects.userId, user.id), isNull(projects.deletedAt)))
+			.where(and(...conditions))
 			.orderBy(desc(projects.updatedAt));
 
 		// ponytail: preview is the AI-written project summary (projects.description,
@@ -55,5 +72,4 @@ export const loadHistory = createServerFn({ method: "GET" }).handler(
 		}));
 
 		return { items };
-	},
-);
+	});
