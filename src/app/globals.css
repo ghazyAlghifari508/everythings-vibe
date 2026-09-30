@@ -82,6 +82,9 @@
 	/* Borders */
 	--border-subtle: #e5e7eb;
 	--border-medium: #d4d4d8;
+	/* Canvas dot grid */
+	--canvas-dot-color: rgba(15, 23, 42, 0.16);
+
 	/* Scrollbar */
 	--scrollbar-thumb: rgba(9, 9, 11, 0.18);
 	--scrollbar-thumb-hover: rgba(9, 9, 11, 0.3);
@@ -133,6 +136,8 @@
 	/* Borders */
 	--border-subtle: #23252a;
 	--border-medium: #383b3f;
+	/* Canvas dot grid */
+	--canvas-dot-color: rgba(255, 255, 255, 0.15);
 	/* Scrollbar */
 	--scrollbar-thumb: rgba(138, 143, 152, 0.28);
 	--scrollbar-thumb-hover: rgba(208, 214, 224, 0.4);

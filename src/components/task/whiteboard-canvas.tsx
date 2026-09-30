@@ -453,9 +453,9 @@ export function layoutTaskGraph(
 	return { nodes, edges, width: maxX + 80, height: maxY + 80 };
 }
 
-// Dot grid: subtle blueprint dots on the dark canvas.
+// Dot grid: subtle blueprint dots on canvas, adaptive to light and dark theme.
 export const DOT_BG_IMAGE =
-	"radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)";
+	"radial-gradient(circle, var(--canvas-dot-color, rgba(15, 23, 42, 0.16)) 1.25px, transparent 1.25px)";
 
 interface WhiteboardCanvasProps {
 	projectName?: string;
