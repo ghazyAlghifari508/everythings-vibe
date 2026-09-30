@@ -9,9 +9,9 @@ import {
 	ContainerModal,
 	ContainerNode,
 	containerH,
-	DOT_BG_IMAGE,
 	Edges,
 	FeatureNode,
+	getCanvasDotStyle,
 	type LayoutEdge,
 	type LayoutNode,
 	LEVEL_GAP_X,
@@ -301,11 +301,7 @@ export const FeatureMapCanvas = memo(function FeatureMapCanvas({
 		<section
 			ref={containerRef}
 			className="relative h-full w-full touch-none select-none overflow-hidden overscroll-none bg-onyx outline-none focus-visible:ring-2 focus-visible:ring-indigo/40 cursor-grab active:cursor-grabbing"
-			style={{
-				backgroundImage: DOT_BG_IMAGE,
-				backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
-				backgroundPosition: `${pan.x}px ${pan.y}px`,
-			}}
+			style={getCanvasDotStyle(zoom, pan)}
 			onPointerDown={(e) => {
 				if (openContainer) return;
 				if (e.pointerType === "mouse") e.preventDefault();

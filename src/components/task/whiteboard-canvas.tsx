@@ -541,7 +541,28 @@ export function layoutTaskGraph(
 
 // Dot grid: subtle blueprint dots on canvas, adaptive to light and dark theme.
 export const DOT_BG_IMAGE =
-	"radial-gradient(circle, var(--canvas-dot-color, rgba(15, 23, 42, 0.16)) 1.25px, transparent 1.25px)";
+	"radial-gradient(circle, var(--canvas-dot-color, rgba(15, 23, 42, 0.16)) 1.25px, transparent 1.75px)";
+
+/**
+ * Dynamic dot grid background for whiteboard canvases.
+ * Scales the dot radius and anti-aliasing feathering proportionally with zoom
+ * so the dots never look disproportionately massive on zoom-out or faint on zoom-in.
+ */
+export function getCanvasDotStyle(
+	zoom: number,
+	pan: { x: number; y: number },
+): React.CSSProperties {
+	const dotRadius = Math.max(
+		0.75,
+		Math.min(2.5, Number((1.25 * zoom).toFixed(2))),
+	);
+	const feather = 0.5;
+	return {
+		backgroundImage: `radial-gradient(circle, var(--canvas-dot-color, rgba(15, 23, 42, 0.16)) ${dotRadius}px, transparent ${Number((dotRadius + feather).toFixed(2))}px)`,
+		backgroundSize: `${Number((20 * zoom).toFixed(2))}px ${Number((20 * zoom).toFixed(2))}px`,
+		backgroundPosition: `${pan.x}px ${pan.y}px`,
+	};
+}
 
 interface WhiteboardCanvasProps {
 	projectName?: string;
@@ -693,11 +714,7 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 		<section
 			ref={containerRef}
 			className="relative h-full w-full touch-none select-none overflow-hidden overscroll-none bg-onyx outline-none focus-visible:ring-2 focus-visible:ring-indigo/40 cursor-grab active:cursor-grabbing"
-			style={{
-				backgroundImage: DOT_BG_IMAGE,
-				backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
-				backgroundPosition: `${pan.x}px ${pan.y}px`,
-			}}
+			style={getCanvasDotStyle(zoom, pan)}
 			onPointerDown={handlePointerDown}
 			onPointerMove={handlePointerMove}
 			onPointerUp={endPan}
