@@ -93,6 +93,7 @@
 | `shadcn-component-discovery`          | Before a custom table/form/modal/popover/tabs           | Search the component registry before building a custom control                         |
 | `vercel-react-best-practices`         | React rendering/performance work                        | Streaming chat panel, typewriter animation, large Kanban canvas                        |
 | `webapp-testing`                      | E2E, responsive, console, browser flow                  | End-to-end user generation journey, Kanban drag-and-drop                               |
+| `chrome-devtools-qa`                  | Live frontend QA, interactive verification, end-to-end journey | Run user flows, verify DOM/console/screenshots; if bug found, fix root cause and restart from Flow 1 (no DB tampering) |
 | `playwright-best-practices`           | Writing/debugging Playwright                            | Accessibility, API/browser, no arbitrary sleep, trace cleanup                          |
 | `web-design-guidelines`               | Reviewing UI against interface/accessibility guidelines | Audit a UI route/component against an explicit file or pattern                         |
 | `frontend-design`                     | Designing new UI or reshaping visuals                   | Deciding visual direction, type, layout, motion, and self-critique before implementing |
@@ -120,7 +121,7 @@ OpenCode is the skill path and OpenCode's status in the install output.
 | MCP                  | When                                                              | PRDFY Example                                                               |
 | -------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `context7`           | Before using a version-sensitive library/framework/SDK/cloud API  | Query TanStack Start, TanStack Router, Drizzle, Better Auth, AI SDK, Midtrans|
-| `chrome-devtools`    | Debugging UI, progress, streaming, console/network, screenshot    | Check responsive dashboard, chat streaming, typewriter, console error       |
+| `chrome-devtools`    | Debugging UI, progress, streaming, console/network, screenshot, live QA | Check responsive dashboard, chat streaming, typewriter, console error, live journey QA via `chrome-devtools-qa` |
 | `sequentialthinking` | Complex debugging, architecture, multi-step planning              | Deep analysis before choosing architecture or refactoring pipeline          |
 
 Connection status at the time this rule was audited: `context7`, `chrome-devtools`,
@@ -176,13 +177,13 @@ harness.
   step monotonic advancement (`step = 'ac'`), acceptance criteria markdown generation, 1 credit burn.
 - **Flow 06 Task Breakdown & Kanban Board:** `shadcn-component-discovery` -> evaluate ready-made
   components from the repository, shadcn/ui, 21st.dev, HeroUI, or Magic UI -> `ui-design-system` +
-  `webapp-testing` -> flat task table with JSON subtask tree, drag-and-drop, 10s polling reconciliation.
+  `webapp-testing` / `chrome-devtools-qa` -> flat task table with JSON subtask tree, drag-and-drop, 10s polling reconciliation.
 - **Flow 07 Billing & Midtrans:** `integrate-midtrans-payments` + security/TDD ->
   Snap token creation, SHA512 signature verification, atomic credit top-up, settlement idempotency.
 - **Flow 08 Export & Sharing:** `document-pdf` + `context7` ->
   markdown/PDF export, JSZip bundle, public read-only share token (`/prd/share/$token`).
 - **Flow 09 Hardening & Hard Mode:** `better-auth-security-best-practices` +
-  `vercel-react-best-practices` + `webapp-testing` +
+  `vercel-react-best-practices` + `webapp-testing` + `chrome-devtools-qa` +
   `verification-before-completion` -> tenant security, performance, CI verification.
 
 ---
@@ -200,6 +201,9 @@ harness.
 - FORBIDDEN to run a long-lived server without a readiness check and process cleanup.
 - FORBIDDEN to bypass a test, authorization (`WHERE user_id = ?`), schema validation,
   or idempotency check just because a feature appears to work on the happy path.
+- FORBIDDEN to manipulate the database (e.g. updating `projects.step`, altering `taskStatus`,
+  or faking DB state) to artificially fast-forward or resume a failed QA run; any QA failure
+  requires a root-cause code fix and a complete restart from Flow 1.
 
 ---
 
