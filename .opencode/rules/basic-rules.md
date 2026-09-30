@@ -7,6 +7,7 @@ Boot instructions for AI agents working on **PRDFY**.
 - `AGENTS.md` -> repository-wide product, architecture, phase, and safety rules
 - `.opencode/rules/prdfy-context.md` -> product definition, architecture, and locked stack
 - `.opencode/rules/no-assumptions.md` -> strict fact verification and zero assumptions
+- `.opencode/rules/atomic-commit.md` -> atomic commits per logical change and mandatory git push before handoff
 - `.opencode/rules/no-hardcode.md` -> configuration, provider, and constants discipline
 - `.opencode/rules/no-type-bypass.md` -> strict type safety (`as never`, `as any`, and `@ts-ignore` are forbidden)
 - `.opencode/rules/anti-ai-slop.md` -> PRDFY design constraints and UI standards

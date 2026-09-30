@@ -17,6 +17,7 @@ Before doing project work, fully load and obey all of these files:
 ```
 C:/Coding/Web Development/Tanstack-start/prdfy/.agents/rules/anti-ai-slop.md
 C:/Coding/Web Development/Tanstack-start/prdfy/.agents/rules/anti-satisficing.md
+C:/Coding/Web Development/Tanstack-start/prdfy/.agents/rules/atomic-commit.md
 C:/Coding/Web Development/Tanstack-start/prdfy/.agents/rules/basic-rules.md
 C:/Coding/Web Development/Tanstack-start/prdfy/.agents/rules/no-assumptions.md
 C:/Coding/Web Development/Tanstack-start/prdfy/.agents/rules/no-hardcode.md
