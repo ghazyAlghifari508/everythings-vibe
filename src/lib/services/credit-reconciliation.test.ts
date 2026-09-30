@@ -711,7 +711,9 @@ describe("Credit Reconciliation & Full-System Integration", () => {
 				harness;
 
 			const pastDate = new Date("2026-09-01T00:00:00.000Z");
-			const futureDate = new Date("2026-09-30T00:00:00.000Z");
+			// ponytail: matches the harness futurePeriodEnd so user-2's period
+			// stays valid at reserve time regardless of wall-clock date.
+			const futureDate = new Date("2099-01-01T00:00:00.000Z");
 			const sweepTime = new Date("2026-09-20T12:00:00.000Z");
 
 			// Operation A: Normal expired reservation
