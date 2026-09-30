@@ -170,6 +170,35 @@ describe("Navbar Paywall Integration Contract", () => {
 		expect(source).toContain("text-amber-400");
 	});
 });
+describe("Navbar Fitur Generate PRD Contract", () => {
+	it("renders Generate PRD action on the fitur step", () => {
+		mockPathname = "/fitur/test-project-1";
+		renderNavbar();
+		const cta = screen.getByRole("button", { name: /Generate PRD/i });
+		expect(cta).toBeDefined();
+		expect(cta.hasAttribute("disabled")).toBe(false);
+	});
+
+	it("shows no Task, Kanban, or document drawer trigger on the fitur step", () => {
+		mockPathname = "/fitur/test-project-1";
+		renderNavbar();
+		expect(screen.queryByRole("button", { name: /Kanban/i })).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /Menu dokumen proyek/i }),
+		).toBeNull();
+		expect(screen.queryByRole("button", { name: /^Task$/i })).toBeNull();
+	});
+
+	it("wires the fitur CTA through savePendingPrdPrompt into /prd/$id source", async () => {
+		const source = await readFile(
+			`${process.cwd()}/src/components/layout/navbar.tsx`,
+			"utf8",
+		);
+		expect(source).toContain('routeStep === "fitur"');
+		expect(source).toContain("savePendingPrdPrompt");
+		expect(source).toContain('to: "/prd/$id"');
+	});
+});
 
 describe("Navbar Rebranding & Layout", () => {
 	it("renders VibeEverything logo and only Pricing navlink", () => {

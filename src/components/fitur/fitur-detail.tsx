@@ -1,6 +1,6 @@
 "use client";
 
-import { Link, useRouter } from "@tanstack/react-router";
+import { useRouter } from "@tanstack/react-router";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ThoughtLine } from "@/components/ui/thought-line";
@@ -15,13 +15,7 @@ import {
 	isStaleCompletedLoader,
 	resolveInitialGenerating,
 } from "@/lib/generation-recovery";
-import {
-	consumeSuppressAutoGen,
-	getPendingPrdPrompt,
-	getSetupPrompt,
-	savePendingPrdPrompt,
-} from "@/lib/prompt-handoff";
-import { cn } from "@/lib/utils";
+import { consumeSuppressAutoGen } from "@/lib/prompt-handoff";
 import { useUIStore } from "@/store";
 import { FeatureMapCanvas } from "./feature-map-canvas";
 import { featureTreeHasContent } from "./feature-view";
@@ -243,82 +237,31 @@ export function FiturDetail({
 			? featureTree
 			: null;
 	const hasContent = featureTreeHasContent(displayTree);
-	const featureCount = displayTree?.features.length ?? 0;
-	const subfeatureCount =
-		displayTree?.features.reduce((s, f) => s + f.subfeatures.length, 0) ?? 0;
-	const prdDisabled = isGenerating || !hasContent;
-	const prdDisabledReason = isGenerating
-		? "Daftar fitur masih disusun. Tunggu hingga selesai."
-		: "Generate daftar fitur terlebih dahulu sebelum lanjut ke PRD.";
 
 	return (
-		<div className="flex h-dvh flex-col bg-onyx text-snow">
-			<div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-				<header className="flex flex-wrap items-start justify-between gap-3 border-b border-graphite py-4">
-					<div className="min-w-0">
-						<p className="font-inter text-xs uppercase tracking-wide text-fog">
-							Tahap Fitur
-						</p>
-						<h1 className="truncate font-inter text-lg font-[510] text-snow">
-							{projectName}
-						</h1>
-						<p className="mt-1 text-sm text-fog">
-							{hasContent
-								? `${featureCount} fitur · ${subfeatureCount} subfitur tersusun dari jawaban Anda.`
-								: "Daftar fitur & subfitur disusun AI dari jawaban Anda."}
-						</p>
-					</div>
-					<div className="flex shrink-0 flex-col items-end gap-1">
-						{prdDisabled ? (
-							<button
-								type="button"
-								disabled
-								title={prdDisabledReason}
-								aria-disabled="true"
-								className="btn-primary rounded-md px-3 py-1.5 text-xs font-[510] opacity-40"
-							>
-								Generate PRD
-							</button>
-						) : (
-							<Link
-								to="/prd/$id"
-								params={{ id: projectId }}
-								onClick={() => {
-									if (!getPendingPrdPrompt()) {
-										const setup = getSetupPrompt();
-										if (setup) {
-											savePendingPrdPrompt(setup, "auto", projectName);
-										}
-									}
-								}}
-								className="btn-primary rounded-md px-3 py-1.5 text-xs font-[510]"
-							>
-								Generate PRD
-							</Link>
-						)}
-						{prdDisabled ? (
-							<p className="max-w-[220px] text-right text-[11px] leading-snug text-fog">
-								{prdDisabledReason}
-							</p>
-						) : null}
-					</div>
-				</header>
+		<div className="flex h-full flex-col bg-onyx text-snow">
+			<div className="flex items-center justify-between border-b border-graphite bg-obsidian px-4 py-3">
+				<h1 className="truncate font-inter text-lg font-[510]">
+					{isGenerating ? "AI sedang menyusun daftar fitur..." : projectName}
+				</h1>
 			</div>
 
-			<div className="mx-auto flex w-full max-w-5xl flex-1 min-h-0 flex-col px-4 sm:px-6 py-4">
+			<div className="relative flex-1 overflow-hidden">
 				{isGenerating && !hasContent ? (
-					<div className="flex flex-1 min-h-0 flex-col gap-4">
-						<ThoughtLine
-							working
-							label={IDLE_FITUR_TITLE}
-							doneLabel="Daftar fitur selesai"
-						/>
-						<div className="relative min-h-[420px] flex-1 overflow-hidden rounded-xl border border-graphite">
+					<div className="flex h-full flex-col">
+						<div className="px-4 pt-3">
+							<ThoughtLine
+								working
+								label={IDLE_FITUR_TITLE}
+								doneLabel="Daftar fitur selesai"
+							/>
+						</div>
+						<div className="relative min-h-0 flex-1">
 							<FeatureMapCanvas productName={projectName} featureTree={null} />
 						</div>
 					</div>
 				) : hasError && !hasContent ? (
-					<div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-graphite bg-obsidian p-8 text-center">
+					<div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
 						<AlertTriangle size={40} className="text-crimson" />
 						<h2 className="font-inter text-lg font-[510] text-snow">
 							Gagal menyusun daftar fitur
@@ -336,7 +279,7 @@ export function FiturDetail({
 						</button>
 					</div>
 				) : !hasContent ? (
-					<div className="flex flex-1 flex-col items-center justify-center gap-5 rounded-xl border border-graphite bg-obsidian p-8 text-center">
+					<div className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
 						<div className="max-w-md">
 							<h2 className="font-inter text-lg font-[510] text-snow">
 								Belum ada daftar fitur
@@ -390,16 +333,10 @@ export function FiturDetail({
 						</button>
 					</div>
 				) : (
-					<div
-						className={cn(
-							"relative min-h-[420px] flex-1 overflow-hidden rounded-xl border border-graphite",
-						)}
-					>
-						<FeatureMapCanvas
-							productName={displayTree?.productName ?? projectName}
-							featureTree={displayTree}
-						/>
-					</div>
+					<FeatureMapCanvas
+						productName={displayTree?.productName ?? projectName}
+						featureTree={displayTree}
+					/>
 				)}
 			</div>
 		</div>

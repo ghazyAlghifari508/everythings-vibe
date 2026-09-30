@@ -1,16 +1,23 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import {
 	COLORS,
+	ContainerModal,
+	ContainerNode,
+	containerH,
 	DOT_BG_IMAGE,
 	Edges,
+	FeatureNode,
 	type LayoutEdge,
 	type LayoutNode,
 	LEVEL_GAP_X,
+	RootNode,
 	SIBLING_GAP_Y,
+	SUBFEATURE_CONTAINER_W,
 } from "../task/whiteboard-canvas";
 import { ZoomControls } from "../task/zoom-controls";
 import { featureTreeHasContent } from "./feature-view";
@@ -19,8 +26,6 @@ const ROOT_W = 200;
 const ROOT_H = 56;
 const FEATURE_W = 260;
 const FEATURE_H = 76;
-const SUBFEATURE_W = 260;
-const SUBFEATURE_H = 68;
 
 export interface FeatureGraphLayout {
 	nodes: LayoutNode[];
@@ -30,10 +35,10 @@ export interface FeatureGraphLayout {
 }
 
 /**
- * Pure 3-level layout: Produk root -> Fitur (+ Fase badge + description)
- * -> Subfitur. Mirrors whiteboard-canvas geometry language (same gaps,
- * same bezier edge routing) so the two boards read as one product.
- * Feature vertical center aligns with its subfeature stack midpoint.
+ * Modular 3-column layout: Produk root -> Card Fitur -> SATU card container
+ * SUB FITUR per fitur (single dotted cable, never fan-out). Shares node
+ * visuals, gaps, and edge routing with the task board so both read as one
+ * product. Feature vertical center aligns with its container midpoint.
  */
 export function layoutFeatureGraph(
 	tree: ProjectFeatureTree,
@@ -43,11 +48,9 @@ export function layoutFeatureGraph(
 	const features = tree.features ?? [];
 	if (features.length === 0) return { nodes, edges, width: 0, height: 0 };
 
-	const subStackH = (count: number): number =>
-		count === 0 ? 0 : count * SUBFEATURE_H + (count - 1) * SIBLING_GAP_Y;
-
-	const featureHeights = features.map((f) =>
-		Math.max(FEATURE_H, subStackH(f.subfeatures.length)),
+	const containerHs = features.map((f) => containerH(f.subfeatures.length));
+	const featureHeights = features.map((_f, i) =>
+		Math.max(FEATURE_H, containerHs[i] ?? FEATURE_H),
 	);
 	const totalFeatureHeight =
 		featureHeights.reduce((s, h) => s + h, 0) +
@@ -71,9 +74,10 @@ export function layoutFeatureGraph(
 	let cursorY = 40;
 
 	features.forEach((feature, fi) => {
-		const fh = featureHeights[fi];
-		const featureY = cursorY + fh / 2 - FEATURE_H / 2;
+		const fh = featureHeights[fi] ?? FEATURE_H;
+		const ch = containerHs[fi] ?? FEATURE_H;
 		const colorIdx = fi % COLORS.length;
+		const featureY = cursorY + fh / 2 - FEATURE_H / 2;
 
 		nodes.push({
 			id: `f-${fi}`,
@@ -87,38 +91,44 @@ export function layoutFeatureGraph(
 			phase: feature.phase,
 			description: feature.description,
 			taskCount: feature.subfeatures.length,
+			totalRows: feature.subfeatures.length,
+			doneRows: 0,
 		});
 		edges.push({
 			x1: rootX + ROOT_W,
 			y1: rootY + ROOT_H / 2,
 			x2: featureX,
 			y2: featureY + FEATURE_H / 2,
-			color: COLORS[colorIdx].accent,
+			color: "#6366f1",
 		});
 
-		const count = feature.subfeatures.length;
-		let subCursorY = cursorY + fh / 2 - subStackH(count) / 2;
-		feature.subfeatures.forEach((sub, si) => {
-			nodes.push({
-				id: `f-${fi}-s-${si}`,
-				type: "subfeature",
-				label: sub.name,
-				x: subX,
-				y: subCursorY,
-				w: SUBFEATURE_W,
-				h: SUBFEATURE_H,
-				colorIdx,
+		const subY = cursorY + fh / 2 - ch / 2;
+		nodes.push({
+			id: `f-${fi}-sub`,
+			type: "subfeature",
+			label: "SUB FITUR",
+			x: subX,
+			y: subY,
+			w: SUBFEATURE_CONTAINER_W,
+			h: ch,
+			colorIdx,
+			ownerFeature: feature.name,
+			rows: feature.subfeatures.map((sub) => ({
+				id: sub.id,
+				name: sub.name,
 				description: sub.description,
-				ownerFeature: feature.name,
-			});
-			edges.push({
-				x1: featureX + FEATURE_W,
-				y1: featureY + FEATURE_H / 2,
-				x2: subX,
-				y2: subCursorY + SUBFEATURE_H / 2,
-				color: COLORS[colorIdx].accent,
-			});
-			subCursorY += SUBFEATURE_H + SIBLING_GAP_Y;
+			})),
+			totalRows: feature.subfeatures.length,
+			doneRows: 0,
+			containerKind: "subfeatures",
+		});
+		edges.push({
+			x1: featureX + FEATURE_W,
+			y1: featureY + FEATURE_H / 2,
+			x2: subX,
+			y2: subY + ch / 2,
+			color: "#6366f1",
+			dashed: true,
 		});
 
 		cursorY += fh + SIBLING_GAP_Y;
@@ -189,113 +199,15 @@ function SkeletonDiagram() {
 	);
 }
 
-const CanvasRootNode = memo(function CanvasRootNode({
-	node,
-}: {
-	node: LayoutNode;
-}) {
-	return (
-		<div
-			className="absolute flex items-center justify-center rounded-xl border-2 border-indigo/60 bg-indigo/10"
-			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
-			role="img"
-			aria-label={`Produk ${node.label}`}
-		>
-			<span className="truncate px-4 font-inter text-sm font-semibold text-snow">
-				{node.label}
-			</span>
-		</div>
-	);
-});
-
-const CanvasFeatureNode = memo(function CanvasFeatureNode({
-	node,
-}: {
-	node: LayoutNode;
-}) {
-	const color = COLORS[node.colorIdx];
-	return (
-		<div
-			className={`absolute rounded-xl border ${color.border} ${color.bg}`}
-			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
-			role="img"
-			aria-label={`Fitur ${node.label}, fase ${node.phase ?? "-"}. ${node.description ?? ""}`}
-		>
-			<div className="flex h-full flex-col justify-center px-4">
-				<div className="mb-1 flex items-center gap-2">
-					<span
-						className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase text-white ${color.badge}`}
-					>
-						Fase {node.phase ?? "-"}
-					</span>
-					<span className="text-[10px] text-fog">
-						{node.taskCount ?? 0} subfitur
-					</span>
-				</div>
-				<p
-					className="truncate font-inter text-sm font-[510] text-snow"
-					title={node.label}
-				>
-					{node.label}
-				</p>
-				{node.description ? (
-					<p
-						className="mt-0.5 truncate text-xs text-fog"
-						title={node.description}
-					>
-						{node.description}
-					</p>
-				) : null}
-			</div>
-		</div>
-	);
-});
-
-const CanvasSubfeatureNode = memo(function CanvasSubfeatureNode({
-	node,
-}: {
-	node: LayoutNode;
-}) {
-	const color = COLORS[node.colorIdx];
-	return (
-		<div
-			className="absolute rounded-xl border border-graphite bg-obsidian"
-			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
-			role="img"
-			aria-label={`Subfitur ${node.label} dari ${node.ownerFeature ?? "fitur"}. ${node.description ?? ""}`}
-		>
-			<div className="flex h-full items-center gap-2.5 px-4">
-				<div className={`h-2 w-2 shrink-0 rounded-full ${color.badge}`} />
-				<div className="min-w-0">
-					<p
-						className="truncate font-inter text-xs font-[510] text-snow"
-						title={node.label}
-					>
-						{node.label}
-					</p>
-					{node.description ? (
-						<p
-							className="truncate text-[11px] text-fog"
-							title={node.description}
-						>
-							{node.description}
-						</p>
-					) : null}
-				</div>
-			</div>
-		</div>
-	);
-});
-
 interface FeatureMapCanvasProps {
 	productName?: string;
 	featureTree?: ProjectFeatureTree | null;
 }
 
 /**
- * Readonly feature map: Produk -> Fitur (+ Fase badge + description)
- * -> Subfitur with bezier edges. Pan/zoom via the shared canvas hook;
- * no node editing, no drag-create. Nodes are focusable for keyboard users.
+ * Readonly feature board: Produk -> Fitur -> SUB FITUR container with bezier
+ * edges. Pan/zoom via the shared canvas hook; no node editing, no
+ * drag-create. Container overflow opens a modal with full descriptions.
  */
 export const FeatureMapCanvas = memo(function FeatureMapCanvas({
 	productName = "Produk",
@@ -317,6 +229,7 @@ export const FeatureMapCanvas = memo(function FeatureMapCanvas({
 		minZoom,
 		maxZoom,
 	} = useCanvasZoom();
+	const [openContainer, setOpenContainer] = useState<LayoutNode | null>(null);
 
 	const hasContent = featureTreeHasContent(featureTree);
 	const layout = useMemo(
@@ -367,12 +280,21 @@ export const FeatureMapCanvas = memo(function FeatureMapCanvas({
 
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
+			if (openContainer) {
+				if (e.key === "Escape") setOpenContainer(null);
+				return;
+			}
 			if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
 				e.preventDefault();
 				nudgePan(e.key, 40);
 			}
 		},
-		[nudgePan],
+		[nudgePan, openContainer],
+	);
+
+	const handleOpenContainer = useCallback(
+		(node: LayoutNode) => setOpenContainer(node),
+		[],
 	);
 
 	return (
@@ -385,13 +307,20 @@ export const FeatureMapCanvas = memo(function FeatureMapCanvas({
 				backgroundPosition: `${pan.x}px ${pan.y}px`,
 			}}
 			onPointerDown={(e) => {
+				if (openContainer) return;
 				if (e.pointerType === "mouse") e.preventDefault();
 				startPan(e);
 			}}
-			onPointerMove={updatePan}
+			onPointerMove={(e) => {
+				if (openContainer) return;
+				updatePan(e);
+			}}
 			onPointerUp={endPan}
 			onPointerLeave={endPan}
-			onWheel={onWheel}
+			onWheel={(e) => {
+				if (openContainer) return;
+				onWheel(e);
+			}}
 			onKeyDown={handleKeyDown}
 			aria-label={`Kanvas peta fitur ${productName}`}
 		>
@@ -419,10 +348,16 @@ export const FeatureMapCanvas = memo(function FeatureMapCanvas({
 						<Edges edges={layout.edges} />
 						{layout.nodes.map((node) => {
 							if (node.type === "root")
-								return <CanvasRootNode key={node.id} node={node} />;
+								return <RootNode key={node.id} node={node} />;
 							if (node.type === "feature")
-								return <CanvasFeatureNode key={node.id} node={node} />;
-							return <CanvasSubfeatureNode key={node.id} node={node} />;
+								return <FeatureNode key={node.id} node={node} />;
+							return (
+								<ContainerNode
+									key={node.id}
+									node={node}
+									onOpen={handleOpenContainer}
+								/>
+							);
 						})}
 					</div>
 					<ZoomControls
@@ -434,6 +369,15 @@ export const FeatureMapCanvas = memo(function FeatureMapCanvas({
 					/>
 				</>
 			)}
+			{openContainer && typeof document !== "undefined"
+				? createPortal(
+						<ContainerModal
+							node={openContainer}
+							onClose={() => setOpenContainer(null)}
+						/>,
+						document.body,
+					)
+				: null}
 		</section>
 	);
 });

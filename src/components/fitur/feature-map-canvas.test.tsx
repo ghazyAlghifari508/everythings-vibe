@@ -48,20 +48,46 @@ const TREE: ProjectFeatureTree = {
 	],
 };
 
-describe("layoutFeatureGraph", () => {
-	it("memetakan root, fitur, dan subfitur menjadi node dan edge yang tersambung", () => {
+describe("layoutFeatureGraph modular", () => {
+	it("satu container SUB FITUR per fitur dengan 1 kabel putus-putus", () => {
 		const { nodes, edges } = layoutFeatureGraph(TREE);
 		const roots = nodes.filter((n) => n.type === "root");
 		const features = nodes.filter((n) => n.type === "feature");
 		const subs = nodes.filter((n) => n.type === "subfeature");
 		expect(roots).toHaveLength(1);
-		expect(roots[0].label).toBe("Toko Saya");
+		expect(roots[0]?.label).toBe("Toko Saya");
 		expect(features).toHaveLength(3);
 		expect(subs).toHaveLength(3);
-		expect(edges).toHaveLength(3 + 3);
+		for (const sub of subs) {
+			expect(sub.label).toBe("SUB FITUR");
+			expect(sub.containerKind).toBe("subfeatures");
+		}
+		const auth = features.find((f) => f.label === "Autentikasi");
+		if (!auth) return;
+		const outgoing = edges.filter(
+			(e) =>
+				Math.abs(e.x1 - (auth.x + auth.w)) < 1 &&
+				e.y1 >= auth.y - 1 &&
+				e.y1 <= auth.y + auth.h + 1,
+		);
+		expect(outgoing).toHaveLength(1);
+		expect(outgoing[0]?.dashed).toBe(true);
+	});
+	it("baris container memuat id, nama, dan deskripsi subfitur", () => {
+		const { nodes } = layoutFeatureGraph(TREE);
+		const auth = nodes.find(
+			(n) => n.type === "subfeature" && n.ownerFeature === "Autentikasi",
+		);
+		expect(auth?.rows?.map((r) => r.name).sort()).toEqual(
+			["Login OAuth", "Manajemen sesi"].sort(),
+		);
+		const login = auth?.rows?.find((r) => r.name === "Login OAuth");
+		expect(login?.id).toBe("subfeat-1.1");
+		expect(login?.description).toBe("Google dan GitHub");
+		expect(auth?.totalRows).toBe(2);
 	});
 
-	it("menjaga urutan kolom root di kiri, fitur di tengah, subfitur di kanan", () => {
+	it("menjaga urutan kolom root di kiri, fitur di tengah, container di kanan", () => {
 		const { nodes } = layoutFeatureGraph(TREE);
 		const root = nodes.find((n) => n.type === "root");
 		const features = nodes.filter((n) => n.type === "feature");
@@ -79,23 +105,20 @@ describe("layoutFeatureGraph", () => {
 		}
 	});
 
-	it("memusatkan fitur terhadap tumpukan subfiturnya", () => {
+	it("memusatkan fitur terhadap container subfiturnya", () => {
 		const { nodes } = layoutFeatureGraph(TREE);
 		const feature = nodes.find(
 			(n) => n.type === "feature" && n.label === "Autentikasi",
 		);
-		const subs = nodes.filter(
+		const sub = nodes.find(
 			(n) => n.type === "subfeature" && n.ownerFeature === "Autentikasi",
 		);
 		expect(feature).toBeDefined();
-		expect(subs).toHaveLength(2);
-		if (!feature) return;
+		expect(sub).toBeDefined();
+		if (!feature || !sub) return;
 		const featureMid = feature.y + feature.h / 2;
-		const stackMid =
-			(Math.min(...subs.map((s) => s.y)) +
-				Math.max(...subs.map((s) => s.y + s.h))) /
-			2;
-		expect(Math.abs(featureMid - stackMid)).toBeLessThan(1);
+		const subMid = sub.y + sub.h / 2;
+		expect(Math.abs(featureMid - subMid)).toBeLessThan(1);
 	});
 
 	it("mempertahankan fase dan deskripsi backend pada node fitur", () => {
@@ -111,16 +134,7 @@ describe("layoutFeatureGraph", () => {
 		expect(autentikasi?.phase).toBe(1);
 	});
 
-	it("mempertahankan id dan deskripsi subfitur pada node", () => {
-		const { nodes } = layoutFeatureGraph(TREE);
-		const pencarian = nodes.find(
-			(n) => n.type === "subfeature" && n.label === "Pencarian",
-		);
-		expect(pencarian?.description).toBe("Cari dan filter");
-		expect(pencarian?.ownerFeature).toBe("Katalog");
-	});
-
-	it("merender fitur tanpa subfitur sebagai node tunggal tanpa edge lanjutan", () => {
+	it("fitur tanpa subfitur tetap satu container kosong tanpa putus kabel", () => {
 		const { nodes, edges } = layoutFeatureGraph(TREE);
 		const pengaturan = nodes.find(
 			(n) => n.type === "feature" && n.label === "Pengaturan",
@@ -133,12 +147,12 @@ describe("layoutFeatureGraph", () => {
 				e.y1 >= pengaturan.y - 1 &&
 				e.y1 <= pengaturan.y + pengaturan.h + 1,
 		);
-		expect(outgoing).toHaveLength(0);
+		expect(outgoing).toHaveLength(1);
 		expect(
 			nodes.filter(
 				(n) => n.type === "subfeature" && n.ownerFeature === "Pengaturan",
 			),
-		).toHaveLength(0);
+		).toHaveLength(1);
 	});
 
 	it("mengembalikan kanvas kosong untuk tree tanpa fitur", () => {

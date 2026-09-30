@@ -27,6 +27,11 @@ import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useUserPlan } from "@/hooks/use-user-plan";
 import { authClient } from "@/lib/auth-client";
+import {
+	getPendingPrdPrompt,
+	getSetupPrompt,
+	savePendingPrdPrompt,
+} from "@/lib/prompt-handoff";
 import { isAdmin } from "@/lib/session";
 import { useChatStore, useUIStore } from "@/store";
 import {
@@ -56,33 +61,37 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	const [, startTransition] = useTransition();
 	// Single source of truth: reuse routeToStep for route-based actions
 	const routeStep = routeToStep(pathname);
-	const _isWorkspace = routeStep !== "prd";
-	// Honest stepper: DB step via loader when available, fallback to route
 	const projectNavData = useMatches({
 		select: (matches) => {
 			for (let i = matches.length - 1; i >= 0; i--) {
 				const data = matches[i].loaderData as
 					| {
+							projectName?: string;
 							step?: string | null;
 							taskStatus?: string | null;
 							acStatus?: string | null;
+							featuresStatus?: string | null;
 							latestAcContent?: string | null;
 							hasAc?: boolean;
 					  }
 					| undefined;
 				if (
 					data &&
-					(typeof data.step === "string" ||
+					(typeof data.projectName === "string" ||
+						typeof data.step === "string" ||
 						typeof data.taskStatus === "string" ||
 						typeof data.acStatus === "string" ||
+						typeof data.featuresStatus === "string" ||
 						typeof data.latestAcContent === "string" ||
 						typeof data.hasAc === "boolean" ||
 						data.step === null)
 				) {
 					return {
+						projectName: data.projectName ?? null,
 						step: data.step ?? null,
 						taskStatus: data.taskStatus ?? null,
 						acStatus: data.acStatus ?? null,
+						featuresStatus: data.featuresStatus ?? null,
 						hasAc: Boolean(
 							data.latestAcContent ||
 								data.hasAc ||
@@ -98,6 +107,8 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	const { data: planData } = useUserPlan();
 	const plan = planData?.plan ?? "free";
 	const isFree = plan === "free";
+	const isGeneratingFeatures =
+		routeStep === "fitur" && projectNavData?.featuresStatus === "generating";
 	// FlowStepNav pages = PRD/AC/Task/Kanban (workspace)
 	const isFlowStepRoute =
 		pathname.startsWith("/ask/") ||
@@ -288,6 +299,44 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 										<ArrowRight size={12} />
 									</button>
 								)}
+							{routeStep === "fitur" && projectId && (
+								<button
+									type="button"
+									disabled={isGeneratingFeatures || isStepLoading}
+									title={
+										isGeneratingFeatures
+											? "Daftar fitur masih disusun. Tunggu hingga selesai."
+											: "Lanjut ke PRD"
+									}
+									onClick={() => {
+										if (!projectId || isGeneratingFeatures || isStepLoading)
+											return;
+										if (!getPendingPrdPrompt()) {
+											const setup = getSetupPrompt();
+											if (setup) {
+												savePendingPrdPrompt(
+													setup,
+													"auto",
+													projectNavData?.projectName ?? undefined,
+												);
+											}
+										}
+										startTransition(() => {
+											navigate({ to: "/prd/$id", params: { id: projectId } });
+										});
+									}}
+									className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-40 disabled:bg-graphite/40 disabled:text-fog/50"
+								>
+									{isGeneratingFeatures ? (
+										"Menyusun fitur..."
+									) : (
+										<>
+											<span className="whitespace-nowrap">Generate PRD</span>
+											<ArrowRight size={12} />
+										</>
+									)}
+								</button>
+							)}
 							{routeStep === "prd" && projectId && (
 								<>
 									<button

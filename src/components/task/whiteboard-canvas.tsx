@@ -1,14 +1,29 @@
 "use client";
 
-import { ChevronRight, X } from "lucide-react";
+import {
+	Bell,
+	Box,
+	Calendar,
+	ChevronRight,
+	CreditCard,
+	FileText,
+	LayoutGrid,
+	ListChecks,
+	MapPin,
+	MessageSquare,
+	Package,
+	Search,
+	Settings,
+	Shield,
+	ShoppingCart,
+	Truck,
+	Users,
+	X,
+} from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-	groupTasksBySubfeature,
-	type TaskSubfeatureGroup,
-} from "@/components/fitur/feature-view";
+import { groupTasksBySubfeature } from "@/components/fitur/feature-view";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
-import { getTaskPriorityConfig, TASK_STATUS_LABELS } from "@/lib/kanban-utils";
 import type { TaskTree } from "@/lib/services/task-service";
 import { ZoomControls } from "./zoom-controls";
 
@@ -17,21 +32,6 @@ const ROOT_W = 200;
 const ROOT_H = 56;
 const FEATURE_W = 260;
 const FEATURE_H = 64;
-const TASK_W = 280;
-const TASK_MIN_H = 80;
-const SUBTASK_LINE_H = 24;
-const TASK_HEADER_H = 44;
-const TASK_FOOTER_H = 32;
-const MAX_VISIBLE_SUBTASKS = 3;
-const DETAIL_W = 260;
-const DETAIL_HEADER_H = 34;
-const DETAIL_LINE_H = 20;
-const DETAIL_FOOTER_H = 24;
-const MAX_VISIBLE_DETAILS = 3;
-const DETAIL_GAP_Y = 12;
-
-const SUBFEATURE_W = 220;
-const SUBFEATURE_H = 60;
 
 export const LEVEL_GAP_X = 120;
 export const SIBLING_GAP_Y = 24;
@@ -75,6 +75,149 @@ export const COLORS = [
 		accent: "#d946ef",
 	},
 ];
+export const MAX_VISIBLE_CONTAINER_ROWS = 3;
+export const SUBFEATURE_CONTAINER_W = 280;
+const CONTAINER_HEADER_H = 36;
+const CONTAINER_ROW_H = 36;
+const CONTAINER_FOOTER_H = 28;
+const CONTAINER_PAD = 20;
+
+export function containerH(rowCount: number): number {
+	const visible = Math.min(Math.max(rowCount, 1), MAX_VISIBLE_CONTAINER_ROWS);
+	const footer = rowCount > MAX_VISIBLE_CONTAINER_ROWS ? CONTAINER_FOOTER_H : 0;
+	return (
+		CONTAINER_HEADER_H + visible * CONTAINER_ROW_H + footer + CONTAINER_PAD
+	);
+}
+
+type FeatureIconName =
+	| "dashboard"
+	| "package"
+	| "cart"
+	| "users"
+	| "chat"
+	| "shield"
+	| "truck"
+	| "search"
+	| "settings"
+	| "bell"
+	| "calendar"
+	| "card"
+	| "file"
+	| "map";
+
+const FEATURE_ICON_RULES: Array<{ match: RegExp; icon: FeatureIconName }> = [
+	{
+		match: /dash|analit|statistik|laporan|overview|ringkas/i,
+		icon: "dashboard",
+	},
+	{ match: /cari|search|filter|temu/i, icon: "search" },
+	{ match: /stok|barang|invent|gudang|produk|katalog/i, icon: "package" },
+	{
+		match: /checkout|pesan|order|beli|bayar|transaksi|cart|keranjang/i,
+		icon: "cart",
+	},
+	{ match: /akun|profil|user|pengguna|member|anggota/i, icon: "users" },
+	{ match: /notif|peringatan|pengingat|reminder|alert/i, icon: "bell" },
+	{
+		match: /chat|komentar|diskusi|broadcast/i,
+		icon: "chat",
+	},
+	{ match: /admin|keamanan|izin|role|otoris/i, icon: "shield" },
+	{
+		match: /kirim|antar|kurir|pengiriman|logistik|tracking|lacak/i,
+		icon: "truck",
+	},
+	{ match: /pengatur|setting|konfig|preferensi/i, icon: "settings" },
+	{ match: /jadwal|agenda|kalender|booking|reserv/i, icon: "calendar" },
+	{
+		match: /langgan|tagih|invoice|bayar|kredit|topup|harga|paket/i,
+		icon: "card",
+	},
+	{
+		match: /artikel|berita|konten|dokumen|file|upload|media|galeri/i,
+		icon: "file",
+	},
+	{ match: /lokasi|alamat|peta|maps|wilayah|cabang|toko/i, icon: "map" },
+];
+
+export type FeatureIconComponent =
+	| typeof LayoutGrid
+	| typeof Package
+	| typeof ShoppingCart
+	| typeof Users
+	| typeof MessageSquare
+	| typeof Shield
+	| typeof Truck
+	| typeof Search
+	| typeof Settings
+	| typeof Bell
+	| typeof Calendar
+	| typeof CreditCard
+	| typeof FileText
+	| typeof MapPin;
+
+const FEATURE_ICON_COMPONENTS: Record<FeatureIconName, FeatureIconComponent> = {
+	dashboard: LayoutGrid,
+	package: Package,
+	cart: ShoppingCart,
+	users: Users,
+	chat: MessageSquare,
+	shield: Shield,
+	truck: Truck,
+	search: Search,
+	settings: Settings,
+	bell: Bell,
+	calendar: Calendar,
+	card: CreditCard,
+	file: FileText,
+	map: MapPin,
+};
+
+export function featureIconName(label: string): FeatureIconName {
+	for (const rule of FEATURE_ICON_RULES) {
+		if (rule.match.test(label)) return rule.icon;
+	}
+	return "dashboard";
+}
+
+export function FeatureIcon({
+	label,
+	size = 16,
+}: {
+	label: string;
+	size?: number;
+}) {
+	const Icon = FEATURE_ICON_COMPONENTS[featureIconName(label)];
+	return <Icon size={size} aria-hidden />;
+}
+
+const FASE_STYLES: Record<number, string> = {
+	1: "bg-orange-500/15 text-orange-300 border-orange-500/30",
+	2: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+	3: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+};
+
+export function faseBadgeClass(phase: number | undefined): string {
+	return FASE_STYLES[phase ?? 0] ?? FASE_STYLES[3] ?? FASE_STYLES[1] ?? "";
+}
+
+export interface ContainerRow {
+	readonly id: string;
+	readonly name: string;
+	readonly description?: string;
+	readonly done?: boolean;
+}
+export interface TaskContainerSubtask {
+	readonly name: string;
+	readonly details: readonly string[];
+}
+
+export interface TaskContainerTask {
+	readonly name: string;
+	readonly status?: string;
+	readonly subtasks: readonly TaskContainerSubtask[];
+}
 
 export interface LayoutNode {
 	id: string;
@@ -97,6 +240,11 @@ export interface LayoutNode {
 	parentSubtask?: string;
 	details?: string[];
 	totalDetails?: number;
+	rows?: ContainerRow[];
+	totalRows?: number;
+	doneRows?: number;
+	containerKind?: "subfeatures" | "tasks";
+	tasks?: TaskContainerTask[];
 }
 
 export interface LayoutEdge {
@@ -105,6 +253,7 @@ export interface LayoutEdge {
 	x2: number;
 	y2: number;
 	color: string;
+	dashed?: boolean;
 }
 
 export function layoutTaskGraph(
@@ -117,86 +266,85 @@ export function layoutTaskGraph(
 	const features = tree.features;
 	if (features.length === 0) return { nodes, edges, width: 0, height: 0 };
 
-	function taskCardH(subtaskCount: number): number {
-		const visible = Math.min(subtaskCount, MAX_VISIBLE_SUBTASKS);
-		return (
-			TASK_HEADER_H +
-			visible * SUBTASK_LINE_H +
-			(subtaskCount > MAX_VISIBLE_SUBTASKS ? TASK_FOOTER_H : 12)
-		);
+	function isTaskDone(status: string | undefined): boolean {
+		return status === "completed" || status === "done";
 	}
 
-	// ponytail: one detail node per subtask (was one per detail item).
-	function detailGroups(task: TaskTree["features"][number]["tasks"][number]) {
-		return task.subtasks
-			.map((sub) => ({ parentSubtask: sub.name, items: sub.details ?? [] }))
-			.filter((g) => g.items.length > 0);
+	interface FeaturePlan {
+		subRows: ContainerRow[];
+		subDone: number;
+		taskRows: ContainerRow[];
+		taskPayloads: TaskContainerTask[];
+		taskDone: number;
+		subH: number;
+		taskH: number;
+		height: number;
 	}
 
-	function detailNodeH(itemCount: number): number {
-		const visible = Math.min(itemCount, MAX_VISIBLE_DETAILS);
-		return (
-			DETAIL_HEADER_H +
-			visible * DETAIL_LINE_H +
-			(itemCount > MAX_VISIBLE_DETAILS ? DETAIL_FOOTER_H : 10)
-		);
-	}
-
-	function detailStackH(groups: ReturnType<typeof detailGroups>): number {
-		if (groups.length === 0) return 0;
-		return (
-			groups.reduce((s, g) => s + detailNodeH(g.items.length), 0) +
-			(groups.length - 1) * DETAIL_GAP_Y
-		);
-	}
-
-	// Pass 1: compute feature subtree heights across subfeature rows.
-	// Tasks branch from their owning subfeature group (groupTasksBySubfeature):
-	// tasks sharing one subfeatureId stack as sibling rows under a single
-	// subfeature node; legacy tasks without a link each keep their own row and
-	// branch straight from the feature so historical projects render unchanged.
-	// ownH = task card's real visual height (content-driven). slotH = space reserved
-	// for the task's row (may be taller than ownH when its details stack exceeds the
-	// card height), the task card is centered within slotH so edges targeting the
-	// slot's vertical center always line up with the card, not empty space.
-	const featureHeights: number[] = [];
-	const featureGroups: TaskSubfeatureGroup[][] = [];
-	const featureTaskOwnHeights: number[][] = [];
-	const featureTaskSlotHeights: number[][] = [];
-	const featureGroupHeights: number[][] = [];
-	for (const feature of features) {
+	const plans: FeaturePlan[] = features.map((feature) => {
 		const groups = groupTasksBySubfeature(feature.tasks);
-		const ownHs = feature.tasks.map((t) =>
-			Math.max(TASK_MIN_H, taskCardH(t.subtasks.length)),
-		);
-		const slotHs = feature.tasks.map((t, ti) =>
-			Math.max(ownHs[ti], detailStackH(detailGroups(t))),
-		);
-		const groupHs = groups.map((g) => {
-			const rowsH =
-				g.taskIndexes.reduce((s, ti) => s + slotHs[ti], 0) +
-				Math.max(0, g.taskIndexes.length - 1) * SIBLING_GAP_Y;
-			// Legacy groups (no subfeature link) keep the flat row height with no
-			// subfeature node; linked groups reserve at least the node height.
-			if (!g.subfeatureName) return rowsH;
-			return Math.max(SUBFEATURE_H, rowsH);
-		});
-		featureGroups.push(groups);
-		featureTaskOwnHeights.push(ownHs);
-		featureTaskSlotHeights.push(slotHs);
-		featureGroupHeights.push(groupHs);
-		const total =
-			groupHs.reduce((s, h) => s + h, 0) +
-			Math.max(0, groupHs.length - 1) * SIBLING_GAP_Y;
-		featureHeights.push(Math.max(FEATURE_H, total));
-	}
+		const subRows: ContainerRow[] = [];
+		let subDone = 0;
+		const legacyIndexes: number[] = [];
+		for (const g of groups) {
+			if (!g.subfeatureName) {
+				legacyIndexes.push(...g.taskIndexes);
+				continue;
+			}
+			const done =
+				g.taskIndexes.length > 0 &&
+				g.taskIndexes.every((ti) => isTaskDone(feature.tasks[ti]?.status));
+			if (done) subDone += 1;
+			subRows.push({ id: g.key, name: g.subfeatureName, done });
+		}
+		if (legacyIndexes.length > 0) {
+			const done = legacyIndexes.every((ti) =>
+				isTaskDone(feature.tasks[ti]?.status),
+			);
+			if (done) subDone += 1;
+			const [first] = legacyIndexes;
+			subRows.push({
+				id: "__legacy",
+				name:
+					legacyIndexes.length > 1
+						? `Tugas fitur (${legacyIndexes.length})`
+						: (first !== undefined && feature.tasks[first]?.name) ||
+							"Tugas fitur",
+				done,
+			});
+		}
+		const taskPayloads: TaskContainerTask[] = feature.tasks.map((t) => ({
+			name: t.name,
+			status: t.status,
+			subtasks: t.subtasks.map((s) => ({
+				name: s.name,
+				details: s.details ?? [],
+			})),
+		}));
+		const taskRows: ContainerRow[] = feature.tasks.map((t, ti) => ({
+			id: `t-${ti}`,
+			name: t.name,
+			done: isTaskDone(t.status),
+		}));
+		const taskDone = taskRows.filter((r) => r.done).length;
+		const subH = containerH(subRows.length);
+		const taskH = containerH(taskRows.length);
+		return {
+			subRows,
+			subDone,
+			taskRows,
+			taskPayloads,
+			taskDone,
+			subH,
+			taskH,
+			height: Math.max(FEATURE_H, subH, taskH),
+		};
+	});
 
-	// Pass 2: position features vertically, centered
 	const totalFeatureHeight =
-		featureHeights.reduce((s, h) => s + h, 0) +
-		(features.length - 1) * SIBLING_GAP_Y;
+		plans.reduce((s, p) => s + p.height, 0) +
+		(plans.length - 1) * SIBLING_GAP_Y;
 
-	// Root node
 	const rootX = 40;
 	const rootY = totalFeatureHeight / 2 - ROOT_H / 2 + 40;
 	nodes.push({
@@ -211,14 +359,18 @@ export function layoutTaskGraph(
 	});
 
 	const featureX = rootX + ROOT_W + LEVEL_GAP_X;
+	const subX = featureX + FEATURE_W + LEVEL_GAP_X;
+	const taskX = subX + SUBFEATURE_CONTAINER_W + LEVEL_GAP_X;
 	let featureCursorY = 40;
 
 	for (let fi = 0; fi < features.length; fi++) {
 		const feature = features[fi];
-		const fh = featureHeights[fi];
-		const featureY = featureCursorY + fh / 2 - FEATURE_H / 2;
+		const plan = plans[fi];
+		if (!feature || !plan) continue;
 		const colorIdx = fi % COLORS.length;
+		const accent = COLORS[colorIdx]?.accent ?? "#6366f1";
 
+		const featureY = featureCursorY + plan.height / 2 - FEATURE_H / 2;
 		nodes.push({
 			id: `f-${fi}`,
 			type: "feature",
@@ -230,147 +382,69 @@ export function layoutTaskGraph(
 			colorIdx,
 			phase: fi + 1,
 			taskCount: feature.tasks.length,
+			totalRows: feature.tasks.length,
+			doneRows: plan.taskDone,
 		});
-
-		// Edge: root → feature
 		edges.push({
 			x1: rootX + ROOT_W,
 			y1: rootY + ROOT_H / 2,
 			x2: featureX,
 			y2: featureY + FEATURE_H / 2,
-			color: COLORS[colorIdx].accent,
+			color: accent,
 		});
 
-		// Subfeature column: one node per owning group, then tasks stack under it.
-		// Legacy single-task groups reuse the same geometry with a "Tugas fitur"
-		// label so historical projects render without crashing.
-		const subX = featureX + FEATURE_W + LEVEL_GAP_X;
-		const taskX = subX + SUBFEATURE_W + LEVEL_GAP_X;
-		const ownHs = featureTaskOwnHeights[fi];
-		const slotHs = featureTaskSlotHeights[fi];
-		const subGroups = featureGroups[fi];
-		const subGroupHs = featureGroupHeights[fi];
-		const totalGroupsH =
-			subGroupHs.reduce((s, h) => s + h, 0) +
-			Math.max(0, subGroupHs.length - 1) * SIBLING_GAP_Y;
-		let groupCursorY = featureCursorY + fh / 2 - totalGroupsH / 2;
+		const subY = featureCursorY + plan.height / 2 - plan.subH / 2;
+		nodes.push({
+			id: `f-${fi}-sub`,
+			type: "subfeature",
+			label: "SUB FITUR",
+			x: subX,
+			y: subY,
+			w: SUBFEATURE_CONTAINER_W,
+			h: plan.subH,
+			colorIdx,
+			ownerFeature: feature.name,
+			rows: plan.subRows,
+			totalRows: plan.subRows.length,
+			doneRows: plan.subDone,
+			containerKind: "subfeatures",
+		});
+		edges.push({
+			x1: featureX + FEATURE_W,
+			y1: featureY + FEATURE_H / 2,
+			x2: subX,
+			y2: subY + plan.subH / 2,
+			color: accent,
+			dashed: true,
+		});
 
-		for (let gi = 0; gi < subGroups.length; gi++) {
-			const subGroup = subGroups[gi];
-			const gh = subGroupHs[gi];
-			const groupMidY = groupCursorY + gh / 2;
-			const isLegacy = !subGroup.subfeatureName;
-			// Legacy: no subfeature node, task branches straight from the feature
-			// so trees generated before the Fitur stage keep their old geometry.
-			const branchX1 = isLegacy ? featureX + FEATURE_W : subX + SUBFEATURE_W;
-			const branchY1 = isLegacy ? featureY + FEATURE_H / 2 : groupMidY;
+		const taskY = featureCursorY + plan.height / 2 - plan.taskH / 2;
+		nodes.push({
+			id: `f-${fi}-tasks`,
+			type: "task",
+			label: "TASKS",
+			x: taskX,
+			y: taskY,
+			w: SUBFEATURE_CONTAINER_W,
+			h: plan.taskH,
+			colorIdx,
+			subfeatureName: feature.name,
+			rows: plan.taskRows,
+			totalRows: plan.taskRows.length,
+			doneRows: plan.taskDone,
+			containerKind: "tasks",
+			tasks: plan.taskPayloads,
+		});
+		edges.push({
+			x1: subX + SUBFEATURE_CONTAINER_W,
+			y1: subY + plan.subH / 2,
+			x2: taskX,
+			y2: taskY + plan.taskH / 2,
+			color: accent,
+			dashed: true,
+		});
 
-			if (!isLegacy) {
-				nodes.push({
-					id: `f-${fi}-s-${gi}`,
-					type: "subfeature",
-					label: subGroup.subfeatureName ?? "Tugas fitur",
-					x: subX,
-					y: groupMidY - SUBFEATURE_H / 2,
-					w: SUBFEATURE_W,
-					h: SUBFEATURE_H,
-					colorIdx,
-					description: subGroup.subfeatureName,
-					ownerFeature: feature.name,
-				});
-
-				// Edge: feature → subfeature
-				edges.push({
-					x1: featureX + FEATURE_W,
-					y1: featureY + FEATURE_H / 2,
-					x2: subX,
-					y2: groupMidY,
-					color: COLORS[colorIdx].accent,
-				});
-			}
-
-			let taskCursorY = groupCursorY;
-
-			for (const ti of subGroup.taskIndexes) {
-				const task = feature.tasks[ti];
-				const ownH = ownHs[ti];
-				const slotH = slotHs[ti];
-				// Card centered within its slot so its true visual midpoint
-				// (cardY + ownH/2) equals the slot midpoint, keeping branch
-				// edges on the rendered card, not empty space.
-				const cardY = taskCursorY + slotH / 2 - ownH / 2;
-				const slotMidY = taskCursorY + slotH / 2;
-
-				nodes.push({
-					id: `f-${fi}-t-${ti}`,
-					type: "task",
-					label: task.name,
-					x: isLegacy ? subX : taskX,
-					y: cardY,
-					w: TASK_W,
-					h: ownH,
-					colorIdx,
-					subfeatureName: subGroup.subfeatureName,
-					status: task.status,
-					priority: task.priority,
-					subtasks: task.subtasks,
-					totalSubtasks: task.subtasks.length,
-				});
-
-				// Edge: feature/subfeature → task
-				edges.push({
-					x1: branchX1,
-					y1: branchY1,
-					x2: isLegacy ? subX : taskX,
-					y2: slotMidY,
-					color: COLORS[colorIdx].accent,
-				});
-				// Details: one node per detail item, flattened across this task's subtasks
-				const taskDetailGroups = detailGroups(task);
-				if (taskDetailGroups.length > 0) {
-					// Legacy tasks sit in the subfeature column, so details shift one
-					// level right of the actual card, not the nominal task column.
-					const cardX = isLegacy ? subX : taskX;
-					const detailX = cardX + TASK_W + LEVEL_GAP_X;
-					let detailCursorY = slotMidY - detailStackH(taskDetailGroups) / 2;
-
-					for (let di = 0; di < taskDetailGroups.length; di++) {
-						const detailGroup = taskDetailGroups[di];
-						const h = detailNodeH(detailGroup.items.length);
-
-						nodes.push({
-							id: `f-${fi}-t-${ti}-d-${di}`,
-							type: "detail",
-							label: detailGroup.parentSubtask,
-							parentSubtask: detailGroup.parentSubtask,
-							details: detailGroup.items,
-							totalDetails: detailGroup.items.length,
-							x: detailX,
-							y: detailCursorY,
-							w: DETAIL_W,
-							h,
-							colorIdx,
-						});
-
-						edges.push({
-							x1: cardX + TASK_W,
-							y1: slotMidY,
-							x2: detailX,
-							y2: detailCursorY + h / 2,
-							color: COLORS[colorIdx].accent,
-						});
-
-						detailCursorY += h + DETAIL_GAP_Y;
-					}
-				}
-
-				taskCursorY += slotH + SIBLING_GAP_Y;
-			}
-
-			groupCursorY += gh + SIBLING_GAP_Y;
-		}
-
-		featureCursorY += fh + SIBLING_GAP_Y;
+		featureCursorY += plan.height + SIBLING_GAP_Y;
 	}
 
 	const maxX = nodes.reduce((m, n) => Math.max(m, n.x + n.w), 0);
@@ -379,10 +453,9 @@ export function layoutTaskGraph(
 	return { nodes, edges, width: maxX + 80, height: maxY + 80 };
 }
 
-// Dot-grid CSS: thicker, more visible
+// Dot grid: subtle blueprint dots on the dark canvas.
 export const DOT_BG_IMAGE =
-	"radial-gradient(circle, var(--color-graphite) 1.5px, transparent 1.5px)";
-const _DOT_BG_SIZE = "20px 20px";
+	"radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)";
 
 interface WhiteboardCanvasProps {
 	projectName?: string;
@@ -409,8 +482,7 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 		minZoom,
 		maxZoom,
 	} = useCanvasZoom();
-	const [openDetail, setOpenDetail] = useState<LayoutNode | null>(null);
-	const [openTask, setOpenTask] = useState<LayoutNode | null>(null);
+	const [openContainer, setOpenContainer] = useState<LayoutNode | null>(null);
 
 	const features = taskTree?.features ?? [];
 	const isEmpty = features.length === 0;
@@ -472,10 +544,9 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 	// Modal open freezes the board: pan/zoom/keyboard-nudge all no-op until closed.
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
-			if (openDetail || openTask) {
+			if (openContainer) {
 				if (e.key === "Escape") {
-					setOpenDetail(null);
-					setOpenTask(null);
+					setOpenContainer(null);
 				}
 				return;
 			}
@@ -484,43 +555,39 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 				nudgePan(e.key, 40);
 			}
 		},
-		[nudgePan, openDetail, openTask],
+		[nudgePan, openContainer],
 	);
 
 	const handlePointerDown = useCallback(
 		(e: React.PointerEvent) => {
-			if (openDetail || openTask) return;
+			if (openContainer) return;
 			// ponytail: blocks native text-selection drag that fought panning.
 			if (e.pointerType === "mouse") e.preventDefault();
 			startPan(e);
 		},
-		[openDetail, openTask, startPan],
+		[openContainer, startPan],
 	);
 
 	const handlePointerMove = useCallback(
 		(e: React.PointerEvent) => {
-			if (openDetail || openTask) return;
+			if (openContainer) return;
 			updatePan(e);
 		},
-		[openDetail, openTask, updatePan],
+		[openContainer, updatePan],
 	);
 
 	const handleWheel = useCallback(
 		(e: React.WheelEvent) => {
-			if (openDetail || openTask) return;
+			if (openContainer) return;
 			onWheel(e);
 		},
-		[openDetail, openTask, onWheel],
+		[openContainer, onWheel],
 	);
 
-	// Stable openers keep memoized node components from re-rendering while
+	// Stable opener keeps memoized node components from re-rendering while
 	// panning/zooming recreates this component's render output every frame.
-	const handleOpenDetail = useCallback(
-		(node: LayoutNode) => setOpenDetail(node),
-		[],
-	);
-	const handleOpenTask = useCallback(
-		(node: LayoutNode) => setOpenTask(node),
+	const handleOpenContainer = useCallback(
+		(node: LayoutNode) => setOpenContainer(node),
 		[],
 	);
 
@@ -571,18 +638,12 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 								return <RootNode key={node.id} node={node} />;
 							if (node.type === "feature")
 								return <FeatureNode key={node.id} node={node} />;
-							if (node.type === "subfeature")
-								return <SubfeatureNode key={node.id} node={node} />;
-							if (node.type === "detail")
-								return (
-									<DetailNode
-										key={node.id}
-										node={node}
-										onOpen={handleOpenDetail}
-									/>
-								);
 							return (
-								<TaskCard key={node.id} node={node} onOpen={handleOpenTask} />
+								<ContainerNode
+									key={node.id}
+									node={node}
+									onOpen={handleOpenContainer}
+								/>
 							);
 						})}
 					</div>
@@ -596,18 +657,12 @@ export const WhiteboardCanvas = memo(function WhiteboardCanvas({
 					/>
 				</>
 			)}
-			{openDetail &&
+			{openContainer &&
 				typeof document !== "undefined" &&
 				createPortal(
-					<DetailModal node={openDetail} onClose={() => setOpenDetail(null)} />,
-					document.body,
-				)}
-			{openTask &&
-				typeof document !== "undefined" &&
-				createPortal(
-					<TaskSubtasksModal
-						node={openTask}
-						onClose={() => setOpenTask(null)}
+					<ContainerModal
+						node={openContainer}
+						onClose={() => setOpenContainer(null)}
 					/>,
 					document.body,
 				)}
@@ -837,7 +892,7 @@ function SkeletonDiagram() {
 					return (
 						<div
 							key={node.id}
-							className="absolute animate-pulse rounded-lg border border-fog/15 bg-fog/5"
+							className="absolute animate-pulse rounded-xl border border-fog/15 bg-fog/5"
 							style={{
 								left: node.x,
 								top: node.y,
@@ -852,32 +907,10 @@ function SkeletonDiagram() {
 						</div>
 					);
 				}
-				if (node.type === "detail") {
-					return (
-						<div
-							key={node.id}
-							className="absolute animate-pulse rounded-md border border-fog/10 bg-fog/[0.03]"
-							style={{
-								left: node.x,
-								top: node.y,
-								width: node.w,
-								height: node.h,
-							}}
-						>
-							<div className="px-3 pt-2 pb-1.5">
-								<div className={`h-2.5 w-16 ${SKELETON_BAR}`} />
-							</div>
-							<div className="space-y-1.5 px-3 pb-2">
-								<div className={`h-2.5 w-32 ${SKELETON_BAR}`} />
-								<div className={`h-2.5 w-24 ${SKELETON_BAR}`} />
-							</div>
-						</div>
-					);
-				}
 				return (
 					<div
 						key={node.id}
-						className="absolute animate-pulse rounded-lg border border-fog/10 bg-fog/[0.03]"
+						className="absolute animate-pulse rounded-xl border border-fog/10 bg-fog/[0.03]"
 						style={{
 							left: node.x,
 							top: node.y,
@@ -885,28 +918,13 @@ function SkeletonDiagram() {
 							height: node.h,
 						}}
 					>
-						<div className="border-b border-fog/10 px-3 py-2.5">
-							<div className={`h-3 w-28 ${SKELETON_BAR}`} />
+						<div className="px-3 pt-2 pb-1.5">
+							<div className={`h-2.5 w-16 ${SKELETON_BAR}`} />
 						</div>
-						<div className="space-y-2 px-3 py-2">
-							{Array.from(
-								{
-									length: Math.min(
-										node.subtasks?.length ?? 0,
-										MAX_VISIBLE_SUBTASKS,
-									),
-								},
-								(_, index) => (
-									<div
-										// biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows are positional
-										key={index}
-										className="flex items-center gap-2"
-									>
-										<div className="h-3.5 w-3.5 shrink-0 rounded border border-fog/15" />
-										<div className={`h-2.5 w-24 ${SKELETON_BAR}`} />
-									</div>
-								),
-							)}
+						<div className="space-y-1.5 px-3 pb-2">
+							<div className={`h-2.5 w-32 ${SKELETON_BAR}`} />
+							<div className={`h-2.5 w-24 ${SKELETON_BAR}`} />
+							<div className={`h-2.5 w-28 ${SKELETON_BAR}`} />
 						</div>
 					</div>
 				);
@@ -938,7 +956,8 @@ export const Edges = memo(function Edges({ edges }: { edges: LayoutEdge[] }) {
 						fill="none"
 						stroke={e.color}
 						strokeWidth={1.5}
-						strokeOpacity={0.5}
+						strokeOpacity={e.dashed ? 0.65 : 0.5}
+						strokeDasharray={e.dashed ? "5 5" : undefined}
 					/>
 				);
 			})}
@@ -946,317 +965,149 @@ export const Edges = memo(function Edges({ edges }: { edges: LayoutEdge[] }) {
 	);
 });
 
-const RootNode = memo(function RootNode({ node }: { node: LayoutNode }) {
-	return (
-		<div
-			className="absolute flex items-center justify-center rounded-xl border-2 border-indigo/60 bg-indigo/10 shadow-lg shadow-indigo/10 animate-fadeIn"
-			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
-		>
-			<span className="truncate px-4 font-inter text-sm font-semibold text-snow">
-				{node.label}
-			</span>
-		</div>
-	);
-});
-
-const FeatureNode = memo(function FeatureNode({ node }: { node: LayoutNode }) {
-	const color = COLORS[node.colorIdx];
-	return (
-		<div
-			className={`absolute rounded-lg border ${color.border} ${color.bg} shadow-md animate-fadeIn`}
-			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
-		>
-			<div className="flex h-full flex-col justify-center px-4">
-				<div className="mb-1 flex items-center gap-2">
-					<span
-						className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase text-white ${color.badge}`}
-					>
-						Fase {node.phase}
-					</span>
-					<span className="text-[10px] text-fog">Direncanakan</span>
-				</div>
-				<p
-					className="truncate font-inter text-sm font-[510] text-snow"
-					title={node.label}
-				>
-					{node.label}
-				</p>
-			</div>
-		</div>
-	);
-});
-
-const SubfeatureNode = memo(function SubfeatureNode({
-	node,
+export const BoardHandle = memo(function BoardHandle({
+	className = "",
 }: {
-	node: LayoutNode;
+	className?: string;
 }) {
 	return (
+		<span
+			aria-hidden
+			className={`pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border-2 border-onyx bg-fog ${className}`}
+		/>
+	);
+});
+
+export const RootNode = memo(function RootNode({ node }: { node: LayoutNode }) {
+	return (
 		<div
-			className="absolute rounded-xl border border-graphite bg-obsidian"
+			className="absolute rounded-xl border border-graphite bg-charcoal/90 p-4 shadow-sm animate-fadeIn"
 			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
 			role="img"
-			aria-label={`Subfitur ${node.label} dari ${node.ownerFeature ?? "fitur"}`}
+			aria-label={`Produk ${node.label}`}
 		>
-			<div className="flex h-full items-center gap-2 px-3">
-				<div
-					className={`h-2 w-2 shrink-0 rounded-full ${COLORS[node.colorIdx].badge}`}
-				/>
-				<p
-					className="truncate font-inter text-xs font-[510] text-snow"
-					title={node.label}
-				>
-					{node.label}
-				</p>
+			<div className="flex h-full items-center gap-3">
+				<span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow">
+					<Box size={18} aria-hidden />
+				</span>
+				<span className="min-w-0">
+					<span className="block truncate font-inter text-sm font-semibold text-snow">
+						{node.label}
+					</span>
+					<span className="block text-[11px] text-fog">Perencanaan</span>
+				</span>
 			</div>
+			<BoardHandle className="-right-[5px]" />
 		</div>
 	);
 });
 
-const DetailNode = memo(function DetailNode({
+export const FeatureNode = memo(function FeatureNode({
 	node,
-	onOpen,
 }: {
 	node: LayoutNode;
-	onOpen: (node: LayoutNode) => void;
 }) {
-	const color = COLORS[node.colorIdx];
+	const done = node.doneRows ?? 0;
+	const total = node.totalRows ?? node.taskCount ?? 0;
 	return (
-		<>
-			{/* biome-ignore lint/a11y/useSemanticElements: node hosts a nested list, invalid inside a native button; keyboard operable via Enter/Space handler below */}
-			<div
-				className={`absolute overflow-hidden rounded-md border ${color.border} bg-obsidian shadow-sm animate-fadeIn cursor-pointer`}
-				style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
-				role="button"
-				tabIndex={0}
-				aria-label={`Buka detail ${node.parentSubtask}`}
-				onClick={(e) => {
-					e.stopPropagation();
-					onOpen(node);
-				}}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						e.preventDefault();
-						e.stopPropagation();
-						onOpen(node);
-					}
-				}}
-				onPointerDown={(e) => e.stopPropagation()}
-			>
-				<div className="px-3 pt-2 pb-1.5">
-					<p
-						className="truncate text-[9px] uppercase tracking-wide text-fog/60"
-						title={node.parentSubtask}
+		<div
+			className="absolute rounded-xl border border-graphite bg-charcoal/90 shadow-sm animate-fadeIn"
+			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
+			role="img"
+			aria-label={`Fitur ${node.label}, fase ${node.phase ?? "-"}, ${done} dari ${total} selesai`}
+		>
+			<BoardHandle className="-left-[5px]" />
+			<div className="flex h-full flex-col justify-center gap-1.5 px-4">
+				<div className="flex items-center justify-between gap-2">
+					<span className="text-[10px] text-fog">Direncanakan</span>
+					<span
+						className={`rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase ${faseBadgeClass(node.phase)}`}
 					>
-						{node.parentSubtask}
-					</p>
+						Fase {node.phase ?? "-"}
+					</span>
 				</div>
-				<ul className="px-3">
-					{(node.details ?? []).slice(0, MAX_VISIBLE_DETAILS).map((d) => (
-						<li
-							key={d}
-							className="flex items-start gap-1.5 truncate font-inter text-[11px] leading-5 text-snow"
-							title={d}
-						>
-							<span
-								className={`mt-[7px] size-1 shrink-0 rounded-full ${color.badge}`}
-							/>
-							<span className="truncate">{d}</span>
-						</li>
-					))}
-				</ul>
-				{(node.totalDetails ?? 0) > MAX_VISIBLE_DETAILS && (
-					<p className="px-3 pt-1 text-[10px] font-[510] text-indigo">
-						+{(node.totalDetails ?? 0) - MAX_VISIBLE_DETAILS} lainnya
+				<div className="flex items-center gap-2.5">
+					<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow">
+						<FeatureIcon label={node.label} size={16} />
+					</span>
+					<p
+						className="min-w-0 flex-1 truncate font-inter text-sm font-[510] text-snow"
+						title={node.label}
+					>
+						{node.label}
 					</p>
-				)}
+					<ChevronRight size={14} className="shrink-0 text-fog" aria-hidden />
+				</div>
+				<div className="flex items-center justify-between text-[11px] text-fog">
+					<span className="flex items-center gap-1.5">
+						<span className="h-1.5 w-1.5 rounded-full bg-fog/60" aria-hidden />
+						Direncanakan
+					</span>
+					<span className="tabular-nums">
+						{done}/{total}
+					</span>
+				</div>
 			</div>
-		</>
+			<BoardHandle className="-right-[5px]" />
+		</div>
 	);
 });
 
-// Rendered via portal to document.body, must not live under the canvas's
-// panned/scaled wrapper, since `fixed` positioning is relative to the nearest
-// transformed ancestor, not the viewport, and would render mispositioned.
-function DetailModal({
-	node,
-	onClose,
-}: {
-	node: LayoutNode;
-	onClose: () => void;
-}) {
-	const color = COLORS[node.colorIdx];
-	return (
-		<>
-			{/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop click is a mouse shortcut; keyboard dismiss via the close button */}
-			{/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click is a mouse shortcut; keyboard dismiss via the close button */}
-			<div
-				className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-in fade-in duration-200"
-				onClick={onClose}
-			>
-				{/* biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation only, no action to keyboard-activate */}
-				{/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only, no action to keyboard-activate */}
-				<div
-					className={`w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border ${color.border} bg-obsidian p-5 shadow-[var(--shadow-overlay)] animate-in zoom-in-95 duration-200`}
-					onClick={(e) => e.stopPropagation()}
-				>
-					<div className="mb-4 flex items-start justify-between gap-3">
-						<div className="min-w-0">
-							<p className="text-[10px] uppercase tracking-wide text-fog/60">
-								Detail subtask
-							</p>
-							<p className="font-inter text-sm font-[510] text-snow">
-								{node.parentSubtask}
-							</p>
-						</div>
-						<button
-							type="button"
-							onClick={onClose}
-							className="ml-auto shrink-0 text-fog transition-colors hover:text-snow"
-						>
-							<X size={18} />
-						</button>
-					</div>
-					<ul className="space-y-2">
-						{(node.details ?? []).map((d) => (
-							<li key={d} className="flex items-start gap-2">
-								<span
-									className={`mt-1.5 size-1.5 shrink-0 rounded-full ${color.badge}`}
-								/>
-								<span className="font-inter text-sm leading-relaxed text-snow">
-									{d}
-								</span>
-							</li>
-						))}
-					</ul>
-				</div>
-			</div>
-		</>
-	);
-}
-
-// Modal daftar subtask: UI match DetailModal (portal, overlay, color border, X close).
-function TaskSubtasksModal({
-	node,
-	onClose,
-}: {
-	node: LayoutNode;
-	onClose: () => void;
-}) {
-	const color = COLORS[node.colorIdx];
-	const allSubtasks = node.subtasks ?? [];
-	return (
-		<>
-			{/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop click is a mouse shortcut; keyboard dismiss via the close button */}
-			{/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click is a mouse shortcut; keyboard dismiss via the close button */}
-			<div
-				className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-in fade-in duration-200"
-				onClick={onClose}
-			>
-				{/* biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation only, no action to keyboard-activate */}
-				{/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only, no action to keyboard-activate */}
-				<div
-					className={`w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border ${color.border} bg-obsidian p-5 shadow-[var(--shadow-overlay)] animate-in zoom-in-95 duration-200`}
-					onClick={(e) => e.stopPropagation()}
-				>
-					<div className="mb-4 flex items-center gap-2">
-						<div className={`h-2 w-2 shrink-0 rounded-full ${color.badge}`} />
-						<p className="truncate font-inter text-sm font-[510] text-snow">
-							{node.label}
-						</p>
-						<span className="ml-auto shrink-0 text-xs text-fog">
-							{allSubtasks.length} subtask
-						</span>
-						<button
-							type="button"
-							onClick={onClose}
-							className="shrink-0 text-fog transition-colors hover:text-snow"
-						>
-							<X size={18} />
-						</button>
-					</div>
-					<ul className="space-y-2">
-						{allSubtasks.map((s) => (
-							<li
-								key={s.name}
-								className="rounded-lg border border-graphite/60 bg-charcoal/40 px-3 py-2"
-							>
-								<p className="font-inter text-sm text-snow">{s.name}</p>
-							</li>
-						))}
-					</ul>
-				</div>
-			</div>
-		</>
-	);
-}
-
-const TaskCard = memo(function TaskCard({
+export const ContainerNode = memo(function ContainerNode({
 	node,
 	onOpen,
 }: {
 	node: LayoutNode;
 	onOpen: (node: LayoutNode) => void;
 }) {
-	const color = COLORS[node.colorIdx];
-	const allSubtasks = node.subtasks ?? [];
-	const total = node.totalSubtasks ?? allSubtasks.length;
-	const hasMore = total > MAX_VISIBLE_SUBTASKS;
-	const visibleSubtasks = allSubtasks.slice(0, MAX_VISIBLE_SUBTASKS);
-	const statusLabel =
-		node.status && node.status in TASK_STATUS_LABELS
-			? TASK_STATUS_LABELS[node.status as keyof typeof TASK_STATUS_LABELS]
-			: null;
-	const priorityConfig = getTaskPriorityConfig(node.priority);
-
+	const isTasks = node.containerKind === "tasks";
+	const rows = node.rows ?? [];
+	const total = node.totalRows ?? rows.length;
+	const visible = rows.slice(0, MAX_VISIBLE_CONTAINER_ROWS);
+	const hasMore = total > MAX_VISIBLE_CONTAINER_ROWS;
 	return (
 		<div
-			className="absolute rounded-lg border border-graphite bg-obsidian shadow-md animate-fadeIn"
-			style={{ left: node.x, top: node.y, width: node.w }}
+			className="absolute flex flex-col rounded-xl border border-graphite bg-charcoal/90 p-3 shadow-sm animate-fadeIn"
+			style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
+			role="img"
+			aria-label={`${node.label} ${node.ownerFeature ?? node.subfeatureName ?? ""}, ${node.doneRows ?? 0} dari ${total} selesai`}
 		>
-			{/* Header */}
-			<div className="flex items-center gap-2 border-b border-graphite/60 px-3 py-2.5">
-				<div className={`h-2 w-2 shrink-0 rounded-full ${color.badge}`} />
-				<p
-					className="truncate font-inter text-xs font-[510] text-snow"
-					title={node.label}
-				>
+			<BoardHandle className="-left-[5px]" />
+			<div className="flex items-center justify-between px-1 pb-2">
+				<span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-fog">
+					{isTasks ? (
+						<ListChecks size={12} aria-hidden />
+					) : (
+						<LayoutGrid size={12} aria-hidden />
+					)}
 					{node.label}
-				</p>
-			</div>
-			{/* Subfeature owner + status/priority meta */}
-			<div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-2 text-[10px] text-fog">
-				{node.subfeatureName ? (
-					<span className="truncate" title={node.subfeatureName}>
-						{node.subfeatureName}
-					</span>
-				) : null}
-				{statusLabel ? <span>{statusLabel}</span> : null}
-				<span className={priorityConfig.textClassName}>
-					{priorityConfig.label}
+				</span>
+				<span className="text-[11px] tabular-nums text-fog">
+					{node.doneRows ?? 0}/{total}
 				</span>
 			</div>
-
-			{/* Subtask checklist (collapsed preview, max 3) */}
-			{visibleSubtasks.length > 0 && (
-				<ul className="px-3 py-2 space-y-1">
-					{visibleSubtasks.map((s) => (
-						<li
-							key={s.name}
-							className="flex items-center gap-2 text-xs text-fog"
-						>
-							<span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border border-graphite bg-charcoal">
-								<span className="h-1.5 w-1.5 rounded-sm bg-fog/30" />
-							</span>
-							<span className="truncate">{s.name}</span>
-						</li>
-					))}
-				</ul>
-			)}
-
-			{/* "Lihat semua" → modal */}
-			{hasMore && (
-				<div className="border-t border-graphite/40 px-3 py-1.5">
+			<ul className="flex flex-1 flex-col justify-center gap-1.5">
+				{visible.map((row) => (
+					<li
+						key={row.id}
+						title={row.description ?? row.name}
+						className="flex items-center gap-2 rounded-md border border-white/5 bg-onyx/60 px-3 py-2"
+					>
+						<span
+							aria-hidden
+							className={`h-1.5 w-1.5 shrink-0 rounded-[2px] ${row.done ? "bg-emerald" : "bg-fog/50"}`}
+						/>
+						<span className="min-w-0 flex-1 truncate font-inter text-xs text-snow">
+							{row.name}
+						</span>
+						{row.done ? (
+							<span className="shrink-0 text-[10px] text-fog">Selesai</span>
+						) : null}
+					</li>
+				))}
+			</ul>
+			{hasMore ? (
+				<div className="flex justify-end pt-1.5">
 					<button
 						type="button"
 						onClick={(e) => {
@@ -1264,12 +1115,125 @@ const TaskCard = memo(function TaskCard({
 							onOpen(node);
 						}}
 						onPointerDown={(e) => e.stopPropagation()}
-						className="flex items-center gap-1 text-[10px] font-[510] text-indigo hover:text-indigo/80 transition-colors"
+						className="flex items-center gap-0.5 text-[11px] font-[510] text-indigo transition-colors hover:text-indigo/80"
 					>
-						Lihat semua ({total}) <ChevronRight size={10} />
+						Lihat semua ({total}) <ChevronRight size={11} aria-hidden />
 					</button>
 				</div>
-			)}
+			) : null}
+			<BoardHandle className="-right-[5px]" />
 		</div>
 	);
 });
+
+export function ContainerModal({
+	node,
+	onClose,
+}: {
+	node: LayoutNode;
+	onClose: () => void;
+}) {
+	const color = COLORS[node.colorIdx];
+	const rows = node.rows ?? [];
+	const isTasks = node.containerKind === "tasks";
+	const tasks = node.tasks ?? [];
+	return (
+		<>
+			{/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop click is a mouse shortcut; keyboard dismiss via the close button */}
+			{/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click is a mouse shortcut; keyboard dismiss via the close button */}
+			<div
+				className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-in fade-in duration-200"
+				onClick={onClose}
+			>
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation only, no action to keyboard-activate */}
+				{/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only, no action to keyboard-activate */}
+				<div
+					className={`w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border ${color?.border ?? "border-graphite"} bg-obsidian p-5 shadow-[var(--shadow-overlay)] animate-in zoom-in-95 duration-200`}
+					onClick={(e) => e.stopPropagation()}
+				>
+					<div className="mb-4 flex items-center gap-2">
+						<div
+							className={`h-2 w-2 shrink-0 rounded-full ${color?.badge ?? "bg-fog"}`}
+						/>
+						<p className="truncate font-inter text-sm font-[510] text-snow">
+							{node.label}
+							{node.ownerFeature ? ` · ${node.ownerFeature}` : ""}
+							{!isTasks && node.subfeatureName
+								? ` · ${node.subfeatureName}`
+								: ""}
+						</p>
+						<span className="ml-auto shrink-0 text-xs tabular-nums text-fog">
+							{node.doneRows ?? 0}/{node.totalRows ?? rows.length}
+						</span>
+						<button
+							type="button"
+							onClick={onClose}
+							aria-label="Tutup daftar"
+							className="shrink-0 text-fog transition-colors hover:text-snow"
+						>
+							<X size={18} />
+						</button>
+					</div>
+					{isTasks ? (
+						<ul className="space-y-3">
+							{tasks.map((t) => (
+								<li
+									key={t.name}
+									className="rounded-lg border border-graphite/60 bg-charcoal/40 px-3 py-2"
+								>
+									<p className="flex items-center gap-2 font-inter text-sm text-snow">
+										<span
+											aria-hidden
+											className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border border-graphite bg-charcoal"
+										>
+											{t.status === "completed" || t.status === "done" ? (
+												<span className="h-1.5 w-1.5 rounded-sm bg-emerald" />
+											) : (
+												<span className="h-1.5 w-1.5 rounded-sm bg-fog/30" />
+											)}
+										</span>
+										<span className="truncate">{t.name}</span>
+									</p>
+									{t.subtasks.length > 0 ? (
+										<ul className="mt-1.5 space-y-1 pl-5">
+											{t.subtasks.map((s) => (
+												<li key={s.name} className="text-xs text-fog">
+													{s.name}
+													{s.details.length > 0 ? (
+														<ul className="mt-0.5 space-y-0.5 pl-3">
+															{s.details.map((d) => (
+																<li key={d} className="text-[11px] text-fog/70">
+																	– {d}
+																</li>
+															))}
+														</ul>
+													) : null}
+												</li>
+											))}
+										</ul>
+									) : null}
+								</li>
+							))}
+						</ul>
+					) : (
+						<ul className="space-y-2">
+							{rows.map((r) => (
+								<li
+									key={r.id}
+									className="rounded-lg border border-graphite/60 bg-charcoal/40 px-3 py-2"
+								>
+									<p className="font-inter text-sm text-snow">{r.name}</p>
+									{r.description ? (
+										<p className="mt-0.5 text-xs leading-relaxed text-fog">
+											{r.description}
+										</p>
+									) : null}
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+			</div>
+		</>
+	);
+}
