@@ -1,7 +1,7 @@
 "use client";
 
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { ArrowRight, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DeleteProjectModal } from "@/components/prd/delete-project-modal";
 import { useUserPlan } from "@/hooks/use-user-plan";
@@ -26,7 +26,13 @@ const STEP_BADGE: Record<string, { label: string; className: string }> = {
 	task: { label: "Task", className: "bg-violet/15 text-violet" },
 };
 
-export function HistoryPage({ items }: { items: HistoryItem[] }) {
+export function HistoryPage({
+	items,
+	workspace,
+}: {
+	items: HistoryItem[];
+	workspace?: "greenfield" | "all";
+}) {
 	// ponytail: shared TanStack Query hook — deduped across all components.
 	const { refetch: refetchPlan } = useUserPlan();
 	const router = useRouter();
@@ -106,21 +112,25 @@ export function HistoryPage({ items }: { items: HistoryItem[] }) {
 		}
 	};
 
+	const isGreenfield = workspace === "greenfield";
+
 	if (localItems.length === 0) {
 		return (
 			<main className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center bg-onyx px-6">
 				<h1 className="font-inter text-2xl font-[510] text-snow">
-					Riwayat Proyek
+					{isGreenfield ? "Riwayat VibePlan Greenfield" : "Riwayat Proyek"}
 				</h1>
-				<p className="mt-2 font-inter text-sm text-fog">
-					Belum ada proyek. Mulai dari Home untuk membuat PRD pertama Anda.
+				<p className="mt-2 max-w-md text-center font-inter text-sm text-fog">
+					{isGreenfield
+						? "Belum ada proyek Greenfield. Mulai dari VibePlan untuk membuat PRD pertama Anda."
+						: "Belum ada proyek. Mulai dari Home untuk membuat PRD pertama Anda."}
 				</p>
 				<button
 					type="button"
-					onClick={() => navigate({ to: "/" })}
+					onClick={() => navigate({ to: isGreenfield ? "/plan/new" : "/" })}
 					className="btn-primary mt-6 rounded-md px-5 py-2.5 font-inter text-sm font-[510]"
 				>
-					Buat Proyek
+					{isGreenfield ? "Buat Projek Baru" : "Buat Proyek"}
 				</button>
 			</main>
 		);
@@ -130,11 +140,22 @@ export function HistoryPage({ items }: { items: HistoryItem[] }) {
 		<main className="min-h-[calc(100vh-3.5rem)] bg-onyx px-6 py-10">
 			<div className="mx-auto max-w-4xl">
 				<header className="mb-8">
+					{isGreenfield && (
+						<Link
+							to="/plan/new"
+							className="mb-3 inline-flex items-center gap-1.5 font-inter text-sm text-fog transition-colors hover:text-snow"
+						>
+							<ArrowLeft size={14} aria-hidden />
+							Buat Projek Baru
+						</Link>
+					)}
 					<h1 className="font-inter text-2xl font-[510] text-snow">
-						Riwayat Proyek
+						{isGreenfield ? "Riwayat VibePlan Greenfield" : "Riwayat Proyek"}
 					</h1>
 					<p className="mt-1 font-inter text-sm text-fog">
-						Lanjutkan dari titik terakhir Anda tinggalkan.
+						{isGreenfield
+							? "Lanjutkan proyek ide produk Greenfield yang pernah Anda buat."
+							: "Lanjutkan dari titik terakhir Anda tinggalkan."}
 					</p>
 				</header>
 

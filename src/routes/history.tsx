@@ -1,13 +1,19 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { HistoryPage } from "@/components/history/history-page";
-import { type HistoryItem, loadHistory } from "@/lib/history";
+import {
+	type HistoryItem,
+	historyFilterSchema,
+	loadHistory,
+} from "@/lib/history";
 
 export type { HistoryItem };
 
 export const Route = createFileRoute("/history")({
-	loader: async () => {
+	validateSearch: (search) => historyFilterSchema.parse(search),
+	loaderDeps: ({ search }) => ({ workspace: search.workspace }),
+	loader: async ({ deps }) => {
 		try {
-			return await loadHistory();
+			return await loadHistory({ data: { workspace: deps.workspace } });
 		} catch (e) {
 			if ((e as Error).message === "Unauthorized")
 				throw redirect({ to: "/login" });
@@ -20,5 +26,6 @@ export const Route = createFileRoute("/history")({
 
 function HistoryRoutePage() {
 	const { items } = Route.useLoaderData();
-	return <HistoryPage items={items} />;
+	const search = Route.useSearch();
+	return <HistoryPage items={items} workspace={search.workspace} />;
 }
