@@ -489,31 +489,31 @@ export function KanbanBoard({
 												key={item.id ?? "all"}
 												onClick={() => setSelectedPhase(item.id)}
 												className={cn(
-													"flex items-center gap-2 px-2.5 py-1.5 text-xs rounded cursor-pointer transition-colors",
+													"flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs rounded cursor-pointer transition-colors",
 													isSelected
 														? "bg-steel/15 text-snow font-semibold dark:bg-steel/25"
 														: "text-mist hover:text-snow hover:bg-steel/10",
 												)}
 											>
-												<span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-													{isSelected && (
-														<Check
-															size={13}
-															className="text-snow shrink-0"
-															aria-hidden="true"
-														/>
-													)}
-												</span>
-												<span className="flex h-4 w-4 shrink-0 items-center justify-center text-fog">
-													{item.id === null ? (
-														<Layers size={13} aria-hidden="true" />
-													) : (
-														<FeatureIcon label={item.name} size={13} />
-													)}
-												</span>
-												<span className="truncate" title={item.label}>
-													{item.label}
-												</span>
+												<div className="flex items-center gap-2 min-w-0 flex-1">
+													<span className="flex h-4 w-4 shrink-0 items-center justify-center text-fog">
+														{item.id === null ? (
+															<Layers size={13} aria-hidden="true" />
+														) : (
+															<FeatureIcon label={item.name} size={13} />
+														)}
+													</span>
+													<span className="truncate" title={item.label}>
+														{item.label}
+													</span>
+												</div>
+												{isSelected && (
+													<Check
+														size={13}
+														className="text-snow shrink-0 ml-auto"
+														aria-hidden="true"
+													/>
+												)}
 											</DropdownMenuItem>
 										);
 									})}
