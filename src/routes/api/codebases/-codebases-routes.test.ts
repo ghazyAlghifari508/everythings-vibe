@@ -39,11 +39,22 @@ describe("validateCodebaseNameInput", () => {
 		});
 	});
 
-	it("rejects when both name and message are missing or too short", () => {
+	it("falls back to the default name when name is missing or blank", () => {
 		expect(validateCodebaseNameInput(null)).toEqual({
-			ok: false,
-			error: "Nama codebase harus diisi minimal 3 karakter",
+			ok: true,
+			name: "Repository Lokal",
 		});
+		expect(validateCodebaseNameInput({})).toEqual({
+			ok: true,
+			name: "Repository Lokal",
+		});
+		expect(validateCodebaseNameInput({ name: "   " })).toEqual({
+			ok: true,
+			name: "Repository Lokal",
+		});
+	});
+
+	it("rejects when a message is present but too short to derive from", () => {
 		expect(validateCodebaseNameInput({ message: "hi" })).toEqual({
 			ok: false,
 			error: "Nama codebase harus diisi minimal 3 karakter",

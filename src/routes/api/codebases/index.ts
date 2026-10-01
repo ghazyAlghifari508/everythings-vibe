@@ -18,6 +18,8 @@ import {
 import { deriveProjectNameSync } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 
+export const DEFAULT_CODEBASE_NAME = "Repository Lokal";
+
 export function validateCodebaseNameInput(
 	body:
 		| {
@@ -30,23 +32,24 @@ export function validateCodebaseNameInput(
 	const rawName = typeof body?.name === "string" ? body.name.trim() : "";
 	const rawMessage = typeof body?.message === "string" ? body.message : "";
 
-	let codebaseName = rawName;
-	if (!codebaseName) {
-		if (!rawMessage || rawMessage.length < 3) {
+	if (!rawName) {
+		if (rawMessage) {
+			const derived = deriveProjectNameSync(rawMessage);
+			if (derived && derived.length >= 3) return { ok: true, name: derived };
 			return {
 				ok: false,
 				error: "Nama codebase harus diisi minimal 3 karakter",
 			};
 		}
-		codebaseName = deriveProjectNameSync(rawMessage);
+		return { ok: true, name: DEFAULT_CODEBASE_NAME };
 	}
-	if (!codebaseName || codebaseName.length < 3) {
+	if (rawName.length < 3) {
 		return {
 			ok: false,
 			error: "Nama codebase harus diisi minimal 3 karakter",
 		};
 	}
-	return { ok: true, name: codebaseName };
+	return { ok: true, name: rawName };
 }
 
 export const Route = createFileRoute("/api/codebases/")({

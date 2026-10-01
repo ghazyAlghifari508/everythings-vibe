@@ -181,9 +181,12 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 					}
 
 					// Artifacts are only attached for usable or successfully-ready
-					// sessions. A failed/expired session must not serve a stale
-					// snapshot or a ready analysis that polling could mistake for
-					// the current sync's success.
+					// sessions. A failed session must not serve a stale snapshot
+					// that polling could mistake for the current sync's success.
+					// Deliberate exception: an expired session still serves the
+					// latest stored codebase snapshot (not the session's own) so
+					// the frontend can open the workspace directly instead of
+					// blocking the user on an expired session.
 					const showArtifacts = status !== "failed" && status !== "expired";
 					const [snapshot] = showArtifacts
 						? await db
@@ -197,7 +200,19 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 								.where(eq(codebaseSnapshots.syncSessionId, session.id))
 								.orderBy(desc(codebaseSnapshots.createdAt))
 								.limit(1)
-						: [];
+						: status === "expired"
+							? await db
+									.select({
+										id: codebaseSnapshots.id,
+										fileCount: codebaseSnapshots.fileCount,
+										excludedCount: codebaseSnapshots.excludedCount,
+										createdAt: codebaseSnapshots.createdAt,
+									})
+									.from(codebaseSnapshots)
+									.where(eq(codebaseSnapshots.codebaseId, codebaseId))
+									.orderBy(desc(codebaseSnapshots.createdAt))
+									.limit(1)
+							: [];
 
 					let analysisId: string | null = null;
 					let analysisStatus: "pending" | "ready" | "failed" | undefined;
