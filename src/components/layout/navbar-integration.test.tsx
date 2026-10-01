@@ -272,3 +272,23 @@ describe("Navbar session boundary", () => {
 		expect(queryClient.getQueryData(["user-plan", "user-1"])).toBeUndefined();
 	});
 });
+
+describe("Navbar Greenfield History Navlink", () => {
+	it("renders Riwayat on /plan/new without duplicate History link in mobile menu", () => {
+		mockPathname = "/plan/new";
+		renderNavbar();
+
+		// Desktop navlink exists
+		const desktopRiwayat = screen.getByRole("link", { name: /^Riwayat$/i });
+		expect(desktopRiwayat).toBeDefined();
+
+		// Open mobile menu
+		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
+		fireEvent.click(toggleBtn);
+
+		// Mobile menu should render Riwayat and never duplicate History
+		const allRiwayatLinks = screen.getAllByRole("link", { name: /^Riwayat$/i });
+		expect(allRiwayatLinks).toHaveLength(2); // 1 desktop + 1 mobile
+		expect(screen.queryByRole("link", { name: /^History$/i })).toBeNull();
+	});
+});

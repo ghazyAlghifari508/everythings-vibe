@@ -251,6 +251,16 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						/>
 					) : (
 						<div className="flex items-center gap-1">
+							<Link
+								to="/pricing"
+								className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+									pathname.startsWith("/pricing")
+										? "bg-white/10 text-snow"
+										: "text-fog hover:bg-white/5 hover:text-snow"
+								}`}
+							>
+								Pricing
+							</Link>
 							{showGreenfieldHistory && (
 								<Link
 									to="/history"
@@ -264,16 +274,6 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 									Riwayat
 								</Link>
 							)}
-							<Link
-								to="/pricing"
-								className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-									pathname.startsWith("/pricing")
-										? "bg-white/10 text-snow"
-										: "text-fog hover:bg-white/5 hover:text-snow"
-								}`}
-							>
-								Pricing
-							</Link>
 						</div>
 					)}
 				</div>
@@ -626,16 +626,6 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					>
 						Home
 					</Link>
-					{showGreenfieldHistory && (
-						<Link
-							to="/history"
-							search={{ workspace: "greenfield" }}
-							className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
-							onClick={() => setIsMobileMenuOpen(false)}
-						>
-							Riwayat
-						</Link>
-					)}
 					<Link
 						to="/pricing"
 						className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
@@ -645,10 +635,13 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					</Link>
 					<Link
 						to="/history"
+						{...(showGreenfieldHistory
+							? { search: { workspace: "greenfield" } }
+							: {})}
 						className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
 						onClick={() => setIsMobileMenuOpen(false)}
 					>
-						History
+						Riwayat
 					</Link>
 					<Link
 						to="/faq"
