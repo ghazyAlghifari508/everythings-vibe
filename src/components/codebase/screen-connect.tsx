@@ -3,6 +3,7 @@
 import { Check, Copy, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { buildAgentPrompt, type SyncPromptPayload } from "@/lib/codebase-sync";
+import { AiHarnessLogos } from "./ai-harness-logos";
 
 interface ScreenConnectProps {
 	projectName: string;
@@ -131,14 +132,17 @@ export function ScreenConnect({
 						<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron text-xs font-mono text-mist">
 							2
 						</span>
-						<div className="flex flex-col gap-1">
-							<div className="text-xs font-semibold text-mist">
-								Buka AI coding agent di repository kamu
+						<div className="flex flex-col gap-2.5 w-full">
+							<div>
+								<div className="text-xs font-semibold text-mist">
+									Buka AI coding agent di repository kamu
+								</div>
+								<p className="text-[11px] text-fog leading-relaxed">
+									Pastikan agent berjalan dari root folder project yang ingin
+									dianalisis.
+								</p>
 							</div>
-							<p className="text-[11px] text-fog leading-relaxed">
-								Pastikan agent berjalan dari root folder project yang ingin
-								dianalisis.
-							</p>
+							<AiHarnessLogos className="pt-0.5" />
 						</div>
 					</div>
 

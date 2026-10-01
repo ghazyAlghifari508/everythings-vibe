@@ -220,4 +220,48 @@ describe("ScreenConnect", () => {
 			"Sudah menjalankan prompt di terminal agent?",
 		);
 	});
+
+	it("renders the AI coding agent / harness logos in Step 2", () => {
+		act(() => {
+			root?.render(
+				<ScreenConnect
+					projectName="Test App"
+					payload={samplePayload}
+					onAgentStarted={() => {}}
+				/>,
+			);
+		});
+
+		const harnessContainer = container.querySelector(
+			'[data-testid="ai-harness-logos"]',
+		);
+		expect(harnessContainer).not.toBeNull();
+		const harnessText = harnessContainer?.textContent ?? "";
+		expect(harnessText).toContain("Codex");
+		expect(harnessText).toContain("Claude Code");
+		expect(harnessText).toContain("OpenCode");
+		expect(harnessText).toContain("Antigravity");
+		expect(harnessText).toContain("Pi");
+		expect(harnessText).toContain("Cursor");
+
+		// Confirm each harness renders an SVG icon
+		const svgs = harnessContainer?.querySelectorAll("svg");
+		expect(svgs?.length).toBe(6);
+	});
+
+	it("instructs agent to verify and install Node.js/npm in execution prerequisites", () => {
+		act(() => {
+			root?.render(
+				<ScreenConnect
+					projectName="Test App"
+					payload={samplePayload}
+					onAgentStarted={() => {}}
+				/>,
+			);
+		});
+
+		const rendered = container.textContent ?? "";
+		expect(rendered).toContain("Node.js dan npm");
+		expect(rendered).toContain("https://nodejs.org");
+	});
 });
