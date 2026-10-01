@@ -6,6 +6,11 @@ import { CodebaseChatWorkspace } from "@/components/codebase/codebase-chat-works
 import { CodebaseExplorerSidebar } from "@/components/codebase/codebase-explorer-sidebar";
 import type { CodebaseArtifactRef } from "@/components/codebase/codebase-file-card";
 import { CodebaseKanbanBoard } from "@/components/codebase/codebase-kanban-board";
+import {
+	CodebaseMarkdown,
+	parsePrdVersions,
+	selectLatestPrdContent,
+} from "@/components/codebase/codebase-markdown";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { SyncStatus } from "@/components/codebase/sync-status";
@@ -363,6 +368,9 @@ function CodebaseDetailPage() {
 	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
 		"kanban",
 	);
+	const [prdContent, setPrdContent] = useState<string | null>(null);
+	const [prdLoading, setPrdLoading] = useState(false);
+	const [prdError, setPrdError] = useState<string | null>(null);
 
 	const kanban = useKanbanTasks({
 		projectId: feature?.id ?? "",
@@ -374,6 +382,44 @@ function CodebaseDetailPage() {
 	}, [kanban.data]);
 
 	const analysisOutput = analysis?.output ?? null;
+
+	const loadPrd = useCallback(async () => {
+		if (!snapshotReady || !feature?.id) {
+			setPrdContent(null);
+			setPrdError(null);
+			setPrdLoading(false);
+			return;
+		}
+		setPrdLoading(true);
+		setPrdError(null);
+		try {
+			const response = await fetch(
+				`/api/projects/${encodeURIComponent(feature.id)}/versions`,
+			);
+			const body: unknown = await response.json().catch(() => null);
+			if (!response.ok) {
+				setPrdError("Dokumen PRD tidak dapat dimuat.");
+				setPrdContent(null);
+				return;
+			}
+			const rows = parsePrdVersions(body);
+			if (!rows) {
+				setPrdError("Dokumen PRD tidak valid.");
+				setPrdContent(null);
+				return;
+			}
+			setPrdContent(selectLatestPrdContent(rows));
+		} catch {
+			setPrdError("Server tidak dapat dihubungi.");
+			setPrdContent(null);
+		} finally {
+			setPrdLoading(false);
+		}
+	}, [snapshotReady, feature?.id]);
+
+	useEffect(() => {
+		void loadPrd();
+	}, [loadPrd]);
 	const explorerFiles = useMemo(() => {
 		if (!analysisOutput) return [];
 		const seen = new Set<string>();
@@ -438,13 +484,26 @@ function CodebaseDetailPage() {
 				fileName: `tasks-${featureSlug}.json`,
 				fileSizeBytes: null,
 				badge: "KANBAN LIVE",
-				description: `Task tree dan papan Kanban live`,
+				description: "Task tree dan papan Kanban live",
+			});
+		}
+		if (prdContent) {
+			list.splice(1, 0, {
+				id: `prd-${feature.id}`,
+				fileName: `PRD-${featureSlug}.md`,
+				fileSizeBytes: null,
+				badge: "MARKDOWN",
+				description: "Dokumen PRD 8 seksi",
 			});
 		}
 		return list;
-	}, [feature, featureSlug, kanbanProgress]);
+	}, [feature, featureSlug, kanbanProgress, prdContent]);
 	const activeArtifact =
 		artifacts.find((item) => item.id === activeArtifactId) ?? null;
+	const isPrdArtifactActive =
+		Boolean(activeArtifact) &&
+		feature != null &&
+		activeArtifact?.id === `prd-${feature.id}`;
 	const isTasksArtifactActive =
 		Boolean(activeArtifact) &&
 		feature != null &&
@@ -623,6 +682,9 @@ function CodebaseDetailPage() {
 								fileName={activeArtifact?.fileName ?? "Preview artefak"}
 								badge={activeArtifact?.badge ?? "PRATINJAU"}
 								onClose={() => setCanvasOpen(false)}
+								isLoading={isPrdArtifactActive && prdLoading}
+								error={isPrdArtifactActive ? prdError : null}
+								onRetry={isPrdArtifactActive ? () => void loadPrd() : undefined}
 								subnav={
 									isTasksArtifactActive ? (
 										<>
@@ -703,6 +765,10 @@ function CodebaseDetailPage() {
 											</div>
 										) : null}
 									</div>
+								) : isPrdArtifactActive ? (
+									prdContent ? (
+										<CodebaseMarkdown content={prdContent} />
+									) : null
 								) : isTasksArtifactActive ? (
 									canvasView === "kanban" ? (
 										<CodebaseKanbanBoard
