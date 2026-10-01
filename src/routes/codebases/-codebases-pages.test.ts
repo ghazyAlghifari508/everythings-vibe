@@ -3,6 +3,7 @@ import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
 import { selectLatestCodebaseSnapshots } from "../codebases/index";
 import {
+	buildAskHandoffAnswers,
 	canRenderCodebaseReview,
 	decideCodebaseDetailEntry,
 	getCodebaseSessionRequestBody,
@@ -109,5 +110,33 @@ describe("codebase list snapshot selection", () => {
 			id: "snapshot-new",
 			status: "failed",
 		});
+	});
+});
+
+describe("buildAskHandoffAnswers", () => {
+	it("maps answer map to question title and answer list conforming to askHandoffAnswerSchema", () => {
+		const questions = [
+			{ id: "q1", title: "Bagaimana arsitekturnya?", options: [] },
+			{ id: "q2", title: "Bagaimana UI feedback?", options: [] },
+		];
+		const answers = {
+			q1: "Postgres",
+			q2: "Toast",
+		};
+		const result = buildAskHandoffAnswers(answers, questions);
+		expect(result).toEqual([
+			{ question: "Bagaimana arsitekturnya?", answer: "Postgres" },
+			{ question: "Bagaimana UI feedback?", answer: "Toast" },
+		]);
+	});
+
+	it("falls back to questionId if not found in questions list", () => {
+		const result = buildAskHandoffAnswers({ customQ: "My answer" }, []);
+		expect(result).toEqual([{ question: "customQ", answer: "My answer" }]);
+	});
+
+	it("filters out empty answers", () => {
+		const result = buildAskHandoffAnswers({ q1: "   ", q2: "Valid" }, []);
+		expect(result).toEqual([{ question: "q2", answer: "Valid" }]);
 	});
 });

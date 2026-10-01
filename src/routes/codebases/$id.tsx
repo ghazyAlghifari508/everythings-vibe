@@ -56,6 +56,22 @@ export function getCodebaseSessionRequestBody(
 	return action === "retry" ? { action: "retry" } : {};
 }
 
+export function buildAskHandoffAnswers(
+	chatAnswers: Record<string, string>,
+	questions: Array<{ id: string; title: string }>,
+): Array<{ question: string; answer: string }> {
+	return Object.entries(chatAnswers)
+		.map(([questionId, answer]) => {
+			const questionText =
+				questions.find((q) => q.id === questionId)?.title ?? questionId;
+			return {
+				question: questionText.trim() || questionId,
+				answer: answer.trim(),
+			};
+		})
+		.filter((entry) => entry.answer.length > 0 && entry.question.length > 0);
+}
+
 export function canRenderCodebaseReview(
 	analysis: Pick<AnalysisResponse, "snapshotId" | "output"> | null,
 	status: Pick<SyncStatusResponse, "status" | "snapshotId"> | null,
@@ -84,7 +100,11 @@ const loadCodebase = createServerFn({ method: "GET" })
 			.limit(1);
 		if (!codebase) throw new Error("NOT_FOUND");
 		const featureProjects = await db
-			.select({ id: projects.id, name: projects.name })
+			.select({
+				id: projects.id,
+				name: projects.name,
+				featuresStatus: projects.featuresStatus,
+			})
 			.from(projects)
 			.where(
 				and(
@@ -481,10 +501,12 @@ function CodebaseDetailPage() {
 	const [activeFeature, setActiveFeature] = useState<{
 		id: string;
 		name: string;
+		featuresStatus?: string | null;
 	} | null>(null);
-	const resolvedFeature = feature ?? activeFeature;
+	const resolvedFeature = activeFeature ?? feature;
 	const effectiveFeatureId = resolvedFeature?.id ?? null;
-	const [canvasOpen, setCanvasOpen] = useState(true);
+	const [canvasOpen, setCanvasOpen] = useState(false);
+	const [specGenerated, setSpecGenerated] = useState(false);
 	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
 		"kanban",
@@ -504,6 +526,15 @@ function CodebaseDetailPage() {
 		if (!kanban.data?.columns) return null;
 		return computeKanbanProgress(kanban.data.columns);
 	}, [kanban.data]);
+
+	const hasExistingSpec = Boolean(
+		!activeFeature &&
+			(prdContent ||
+				acContent ||
+				(kanbanProgress && kanbanProgress.total > 0) ||
+				feature?.featuresStatus === "completed"),
+	);
+	const isSpecReady = specGenerated || hasExistingSpec;
 
 	const analysisOutput = analysis?.output ?? null;
 
@@ -644,7 +675,7 @@ function CodebaseDetailPage() {
 		return base || "fitur";
 	}, [resolvedFeature?.name, codebase.name]);
 	const artifacts = useMemo<CodebaseArtifactRef[]>(() => {
-		if (!resolvedFeature) return [];
+		if (!resolvedFeature || !isSpecReady) return [];
 		const list: CodebaseArtifactRef[] = [
 			{
 				id: `feature-${resolvedFeature.id}`,
@@ -682,7 +713,14 @@ function CodebaseDetailPage() {
 			});
 		}
 		return list;
-	}, [resolvedFeature, featureSlug, kanbanProgress, prdContent, acContent]);
+	}, [
+		resolvedFeature,
+		isSpecReady,
+		featureSlug,
+		kanbanProgress,
+		prdContent,
+		acContent,
+	]);
 	const activeArtifact =
 		artifacts.find((item) => item.id === activeArtifactId) ?? null;
 	const isPrdArtifactActive =
@@ -777,7 +815,6 @@ function CodebaseDetailPage() {
 		async (message: string): Promise<string | null> => {
 			const trimmed = message.trim();
 			if (!snapshotReady || trimmed.length < 3 || isWorking) return null;
-			if (effectiveFeatureId) return effectiveFeatureId;
 			setIsWorking(true);
 			setError(null);
 			try {
@@ -801,13 +838,17 @@ function CodebaseDetailPage() {
 					return null;
 				}
 				const created = body as { projectId: string; name?: unknown };
-				setActiveFeature({
+				const newFeature = {
 					id: created.projectId,
 					name:
 						typeof created.name === "string" && created.name.trim()
 							? created.name.trim()
 							: codebase.name,
-				});
+					featuresStatus: "pending",
+				};
+				setActiveFeature(newFeature);
+				setSpecGenerated(false);
+				setChatAnswers({});
 				return created.projectId;
 			} catch {
 				setError("Server tidak dapat dihubungi.");
@@ -816,7 +857,7 @@ function CodebaseDetailPage() {
 				setIsWorking(false);
 			}
 		},
-		[snapshotReady, isWorking, effectiveFeatureId, codebase.id, codebase.name],
+		[snapshotReady, isWorking, codebase.id, codebase.name],
 	);
 
 	const handleSendMessage = useCallback(
@@ -854,12 +895,7 @@ function CodebaseDetailPage() {
 		setIsConfirming(true);
 		setSpecError(null);
 		try {
-			const answersList = Object.entries(chatAnswers)
-				.map(([questionId, answer]) => ({
-					questionId,
-					answer: answer.trim(),
-				}))
-				.filter((entry) => entry.answer.length > 0);
+			const answersList = buildAskHandoffAnswers(chatAnswers, aiQuestions);
 			try {
 				await fetch("/api/ask/options", {
 					method: "POST",
@@ -871,7 +907,10 @@ function CodebaseDetailPage() {
 							projectId: effectiveFeatureId,
 							answers: answersList,
 							state: {
-								prompt: lastFeaturePrompt || resolvedFeature?.name || "",
+								prompt:
+									lastFeaturePrompt.trim() ||
+									resolvedFeature?.name ||
+									"Fitur baru",
 								platform: "web",
 								session: 1,
 								questions: [],
@@ -897,6 +936,7 @@ function CodebaseDetailPage() {
 				setSpecError("Spesifikasi fitur gagal dibuat. Coba lagi.");
 				return;
 			}
+			setSpecGenerated(true);
 			const specMessage = buildFeatureMessage(
 				resolvedFeature?.name ?? codebase.name,
 				chatAnswers,
@@ -908,8 +948,8 @@ function CodebaseDetailPage() {
 					role: "assistant" as const,
 					content:
 						specResponse.status === 409
-							? `Spesifikasi ${resolvedFeature?.name ?? "fitur"} sedang disusun. FileCard spesifikasi tersedia di bawah dan preview dokumen tampil di kanvas kanan.`
-							: `Spesifikasi ${resolvedFeature?.name ?? "fitur"} tersusun dari jawaban Anda: ${specMessage}. FileCard spesifikasi tersedia di bawah dan preview dokumen tampil di kanvas kanan.`,
+							? `Spesifikasi ${resolvedFeature?.name ?? "fitur"} sedang disusun. Klik file spesifikasi di bawah untuk melihat pratinjau dokumen.`
+							: `Spesifikasi ${resolvedFeature?.name ?? "fitur"} berhasil dibuat dari jawaban Anda: ${specMessage}. Klik file spesifikasi di bawah untuk melihat pratinjau dokumen.`,
 				},
 			]);
 			await loadPrd();
@@ -922,6 +962,7 @@ function CodebaseDetailPage() {
 		effectiveFeatureId,
 		isConfirming,
 		chatAnswers,
+		aiQuestions,
 		lastFeaturePrompt,
 		resolvedFeature?.name,
 		codebase.name,
@@ -995,7 +1036,7 @@ function CodebaseDetailPage() {
 								questionsError={questionsError}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
-								projectIdForHandoff={effectiveFeatureId}
+								projectIdForHandoff={isSpecReady ? effectiveFeatureId : null}
 								isSending={isWorking}
 								isConfirming={isConfirming}
 								specError={specError}
