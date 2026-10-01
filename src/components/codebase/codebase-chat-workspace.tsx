@@ -3,6 +3,10 @@
 import { Check, Copy, Send } from "lucide-react";
 import { useState } from "react";
 import {
+	areAllQuestionsAnswered,
+	nextQuestionIndex,
+} from "@/lib/codebase-chat-flow";
+import {
 	type CodebaseArtifactRef,
 	CodebaseFileCard,
 } from "./codebase-file-card";
@@ -20,19 +24,32 @@ export interface AdaptiveQuestion {
 	customPlaceholder?: string;
 }
 
+export interface ChatStreamMessage {
+	id: string;
+	role: "user" | "assistant";
+	content: string;
+}
+
 interface CodebaseChatWorkspaceProps {
 	codebaseName: string;
 	featureName: string;
 	contextFiles?: string[];
 	kanbanProgress?: { done: number; total: number; pct: number } | null;
+	messages: ChatStreamMessage[];
 	questions: AdaptiveQuestion[];
+	answers: Record<string, string>;
+	questionsLoading?: boolean;
+	questionsError?: string | null;
 	artifacts: CodebaseArtifactRef[];
 	activeArtifactId?: string | null;
 	projectIdForHandoff?: string | null;
 	isSending?: boolean;
+	isConfirming?: boolean;
 	onOpenArtifact?: (artifact: CodebaseArtifactRef) => void;
-	onSubmitAnswers?: (answers: Record<string, string>) => void;
+	onSubmitAnswer?: (questionId: string, answer: string) => void;
 	onSendMessage?: (message: string) => void;
+	onConfirmGenerate?: () => void;
+	onRetryQuestions?: () => void;
 }
 
 export function buildHandoffCommand(projectId: string): string {
@@ -45,19 +62,27 @@ export function CodebaseChatWorkspace({
 	featureName,
 	contextFiles = [],
 	kanbanProgress = null,
+	messages,
 	questions,
+	answers,
+	questionsLoading = false,
+	questionsError = null,
 	artifacts,
 	activeArtifactId = null,
 	projectIdForHandoff = null,
 	isSending = false,
+	isConfirming = false,
 	onOpenArtifact,
-	onSubmitAnswers,
+	onSubmitAnswer,
 	onSendMessage,
+	onConfirmGenerate,
+	onRetryQuestions,
 }: CodebaseChatWorkspaceProps) {
 	const [selected, setSelected] = useState<Record<string, string>>({});
 	const [customAnswers, setCustomAnswers] = useState<Record<string, string>>(
 		{},
 	);
+	const [customOpen, setCustomOpen] = useState<Record<string, boolean>>({});
 	const [draft, setDraft] = useState("");
 	const [copiedCmd, setCopiedCmd] = useState(false);
 
@@ -77,23 +102,33 @@ export function CodebaseChatWorkspace({
 		}
 	};
 
-	const handleSubmitAnswers = () => {
-		const merged: Record<string, string> = {};
-		for (const question of questions) {
-			const custom = (customAnswers[question.id] ?? "").trim();
-			const picked = selected[question.id];
-			if (custom) merged[question.id] = custom;
-			else if (picked) merged[question.id] = picked;
-		}
-		onSubmitAnswers?.(merged);
-	};
-
 	const handleSend = () => {
 		const message = draft.trim();
-		if (message.length < 3 || isSending) return;
+		if (message.length < 3 || isSending || questionsLoading) return;
 		onSendMessage?.(message);
 		setDraft("");
 	};
+
+	const handleSubmitOne = (question: AdaptiveQuestion) => {
+		const custom = (customAnswers[question.id] ?? "").trim();
+		const pickedId = selected[question.id];
+		const picked = question.options.find((option) => option.id === pickedId);
+		const answer = custom || picked?.label || "";
+		if (!answer.trim()) return;
+		onSubmitAnswer?.(question.id, answer.trim());
+	};
+
+	const currentIndex = nextQuestionIndex(answers, questions);
+	const visibleQuestions =
+		questions.length === 0
+			? []
+			: currentIndex === -1
+				? questions
+				: questions.slice(0, currentIndex + 1);
+	const flowComplete = areAllQuestionsAnswered(answers, questions);
+	const hasLiveData = kanbanProgress !== null && kanbanProgress.total > 0;
+	const isPristine =
+		messages.length === 0 && questions.length === 0 && artifacts.length === 0;
 
 	return (
 		<div
@@ -117,17 +152,17 @@ export function CodebaseChatWorkspace({
 						data-testid="codebase-kanban-badge"
 						className="flex shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 py-1 font-mono text-[11px] text-fog"
 					>
-						<span
-							aria-hidden="true"
-							className={`h-1.5 w-1.5 rounded-full ${
-								kanbanProgress && kanbanProgress.total > 0
-									? "bg-emerald"
-									: "bg-slate"
-							}`}
-						/>
-						{kanbanProgress && kanbanProgress.total > 0
-							? `Kanban Live: ${kanbanProgress.done}/${kanbanProgress.total} Selesai (${kanbanProgress.pct}%)`
-							: "Kanban Live: Belum ada data"}
+						{hasLiveData ? (
+							<>
+								<span
+									aria-hidden="true"
+									className="h-1.5 w-1.5 rounded-full bg-emerald"
+								/>
+								{`Kanban Live: ${kanbanProgress.done}/${kanbanProgress.total} Selesai (${kanbanProgress.pct}%)`}
+							</>
+						) : (
+							"Kanban Live: Belum ada data"
+						)}
 					</span>
 				</div>
 			</div>
@@ -135,204 +170,306 @@ export function CodebaseChatWorkspace({
 				data-testid="codebase-chat-messages"
 				className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
 			>
-				<div className="flex flex-col gap-1">
-					<p className="text-[11px] font-semibold text-fog">
-						VibeEverything Assistant
-					</p>
-					<div className="max-w-2xl rounded-xl border border-graphite bg-charcoal p-3 text-[13px] leading-6 text-mist">
-						Codebase <code className="font-mono text-snow">{codebaseName}</code>{" "}
-						siap dirancang.
-						{contextFiles.length > 0 ? (
-							<>
-								{" "}
-								Saya membaca arsitektur Anda di{" "}
-								{contextFiles.map((file, index) => (
-									<span key={file}>
-										<code className="font-mono text-snow">{file}</code>
-										{index < contextFiles.length - 1 ? " dan " : ""}
-									</span>
-								))}
-								.
-							</>
-						) : (
-							" Snapshot codebase sudah terverifikasi."
-						)}{" "}
-						Fitur apa yang ingin Anda bangun?
-					</div>
-				</div>
-				{questions.length > 0 ? (
-					<div className="mt-4 max-w-2xl rounded-xl border border-graphite bg-charcoal p-3">
-						<p className="text-[13px] font-semibold text-snow">
-							Samakan spesifikasi dengan {questions.length} pertanyaan adaptif
-							berikut:
-						</p>
-						<div className="mt-3 flex flex-col gap-3">
-							{questions.map((question, qIndex) => (
-								<div
-									key={question.id}
-									data-testid={`adaptive-question-${question.id}`}
-									className="rounded-lg border border-graphite bg-obsidian p-3"
-								>
-									<p className="text-[13px] font-semibold text-snow">
-										<span className="mr-2 rounded bg-indigo/15 px-1.5 py-0.5 font-mono text-[11px] text-indigo">
-											Q{qIndex + 1}
-										</span>
-										{question.title}
-									</p>
-									<div className="mt-2 flex flex-col gap-2">
-										{question.options.map((option) => {
-											const isSelected = selected[question.id] === option.id;
-											return (
-												<button
-													key={option.id}
-													type="button"
-													onClick={() =>
-														setSelected((current) => ({
-															...current,
-															[question.id]: option.id,
-														}))
-													}
-													aria-pressed={isSelected}
-													className={`flex min-h-11 items-start gap-2 rounded-lg border p-2.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-														isSelected
-															? "border-indigo bg-indigo/10 text-snow"
-															: "border-graphite bg-charcoal text-mist hover:border-steel"
-													}`}
-												>
-													<span
-														aria-hidden="true"
-														className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] ${
-															isSelected
-																? "border-indigo bg-indigo"
-																: "border-slate"
-														}`}
-													/>
-													<span>
-														{option.label}
-														{option.recommended ? (
-															<span className="ml-1.5 rounded-full border border-emerald/30 bg-emerald/10 px-1.5 py-px text-[10px] font-semibold text-emerald">
-																Rekomendasi
-															</span>
-														) : null}
-													</span>
-												</button>
-											);
-										})}
-									</div>
-									<label htmlFor={`custom-${question.id}`} className="sr-only">
-										Preferensi khusus {question.title}
-									</label>
-									<input
-										id={`custom-${question.id}`}
-										type="text"
-										value={customAnswers[question.id] ?? ""}
-										onChange={(event) =>
-											setCustomAnswers((current) => ({
-												...current,
-												[question.id]: event.target.value,
-											}))
-										}
-										placeholder={
-											question.customPlaceholder ??
-											"Atau ketik preferensi sendiri..."
-										}
-										className="mt-2 w-full rounded-lg border border-graphite bg-onyx px-3 py-2 text-xs text-snow outline-none placeholder:text-slate focus-visible:ring-2 focus-visible:ring-indigo"
-									/>
-								</div>
-							))}
-						</div>
-						<div className="mt-3 flex justify-end">
-							<button
-								type="button"
-								onClick={handleSubmitAnswers}
-								className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								Kirim Jawaban dan Buat Spesifikasi
-							</button>
-						</div>
-					</div>
-				) : null}
-				<div className="mt-4">
-					{artifacts.length === 0 ? (
-						<p
-							data-testid="codebase-artifacts-empty"
-							className="max-w-2xl rounded-xl border border-dashed border-graphite bg-charcoal/50 p-3 text-xs leading-5 text-fog"
-						>
-							Belum ada artefak. Jawab pertanyaan adaptif lalu buat spesifikasi
-							agar FileCard (feature, PRD, AC, tasks) muncul di sini.
-						</p>
-					) : (
-						artifacts.map((artifact) => (
-							<CodebaseFileCard
-								key={artifact.id}
-								artifact={artifact}
-								active={artifact.id === activeArtifactId}
-								onOpen={onOpenArtifact}
-							/>
-						))
-					)}
-				</div>
-				{handoffCmd ? (
-					<div
-						data-testid="codebase-handoff-card"
-						className="mt-4 max-w-2xl rounded-xl border border-emerald/30 bg-obsidian p-4"
-					>
-						<div className="flex items-center justify-between gap-2">
-							<p className="text-[13px] font-semibold text-emerald">
-								Handoff ke AI Coding Agent
+				<div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+					{isPristine && !questionsLoading ? (
+						<div className="flex flex-col items-center gap-3 py-10 text-center">
+							<p className="max-w-md text-sm font-semibold leading-6 text-snow">
+								Halo! Fitur apa yang ingin kamu bangun di repositori ini?
 							</p>
-							<button
-								type="button"
-								onClick={handleCopyCmd}
-								className="inline-flex min-h-9 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							{contextFiles.length > 0 ? (
+								<p className="max-w-md text-xs leading-5 text-fog">
+									Saya membaca arsitektur Anda di{" "}
+									{contextFiles.map((file, index) => (
+										<span key={file}>
+											<code className="font-mono text-snow">{file}</code>
+											{index < contextFiles.length - 1 ? " dan " : ""}
+										</span>
+									))}
+									.
+								</p>
+							) : null}
+						</div>
+					) : null}
+					{messages.map((message) =>
+						message.role === "user" ? (
+							<div key={message.id} className="flex justify-end">
+								<div className="max-w-[85%] rounded-xl bg-snow px-3 py-2 text-[13px] leading-6 text-onyx">
+									{message.content}
+								</div>
+							</div>
+						) : (
+							<div key={message.id} className="flex flex-col gap-1">
+								<p className="text-[11px] font-semibold text-fog">
+									VibeEverything Assistant
+								</p>
+								<div className="rounded-xl border border-graphite bg-charcoal p-3 text-[13px] leading-6 text-mist">
+									{message.content}
+								</div>
+							</div>
+						),
+					)}
+					{questionsLoading ? (
+						<div
+							data-testid="codebase-questions-loading"
+							className="flex flex-col gap-2 rounded-xl border border-graphite bg-charcoal p-3"
+							aria-busy="true"
+						>
+							<div className="h-4 w-2/3 animate-pulse rounded bg-graphite" />
+							<div className="h-3 w-full animate-pulse rounded bg-graphite" />
+							<div className="h-3 w-5/6 animate-pulse rounded bg-graphite" />
+							<p className="text-xs text-fog">
+								Menyusun pertanyaan klarifikasi dari konteks repositori...
+							</p>
+						</div>
+					) : null}
+					{questionsError ? (
+						<div
+							role="alert"
+							data-testid="codebase-questions-error"
+							className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+						>
+							<span>{questionsError}</span>
+							{onRetryQuestions ? (
+								<button
+									type="button"
+									onClick={onRetryQuestions}
+									className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									Coba lagi
+								</button>
+							) : null}
+						</div>
+					) : null}
+					{visibleQuestions.map((question, qIndex) => {
+						const submitted = (answers[question.id] ?? "").trim();
+						const isCurrent = qIndex === currentIndex;
+						const custom = (customAnswers[question.id] ?? "").trim();
+						const pickedId = selected[question.id];
+						const canSubmit =
+							!submitted && (custom.length > 0 || Boolean(pickedId));
+						return (
+							<div
+								key={question.id}
+								data-testid={`adaptive-question-${question.id}`}
+								className="rounded-xl border border-graphite bg-charcoal p-3"
 							>
-								{copiedCmd ? (
-									<>
-										<Check
-											size={12}
-											aria-hidden="true"
-											className="text-emerald"
-										/>
-										<span className="text-emerald">Tersalin</span>
-									</>
+								<p className="text-[13px] font-semibold text-snow">
+									<span className="mr-2 rounded bg-indigo/15 px-1.5 py-0.5 font-mono text-[11px] text-indigo">
+										Q{qIndex + 1}
+									</span>
+									{question.title}
+								</p>
+								{submitted ? (
+									<p className="mt-2 rounded-lg border border-emerald/30 bg-emerald/10 px-3 py-2 text-xs leading-5 text-emerald">
+										Jawaban: {submitted}
+									</p>
 								) : (
 									<>
-										<Copy size={12} aria-hidden="true" />
-										<span>Salin perintah CLI</span>
+										<div className="mt-2 flex flex-col gap-2">
+											{question.options.map((option) => {
+												const isSelected = pickedId === option.id;
+												const isCustomMode = customOpen[question.id] === true;
+												return (
+													<button
+														key={option.id}
+														type="button"
+														disabled={!isCurrent}
+														onClick={() => {
+															setSelected((current) => ({
+																...current,
+																[question.id]: option.id,
+															}));
+															setCustomOpen((current) => ({
+																...current,
+																[question.id]: false,
+															}));
+														}}
+														aria-pressed={isSelected}
+														className={`flex min-h-11 items-start gap-2 rounded-lg border p-2.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+															isSelected
+																? "border-indigo bg-indigo/10 text-snow"
+																: "border-graphite bg-obsidian text-mist hover:border-steel"
+														} ${isCurrent ? "" : "opacity-60"} ${isCustomMode ? "opacity-60" : ""}`}
+													>
+														<span
+															aria-hidden="true"
+															className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] ${
+																isSelected
+																	? "border-indigo bg-indigo"
+																	: "border-slate"
+															}`}
+														/>
+														<span>
+															{option.label}
+															{option.recommended ? (
+																<span className="ml-1.5 rounded-full border border-emerald/30 bg-emerald/10 px-1.5 py-px text-[10px] font-semibold text-emerald">
+																	Rekomendasi
+																</span>
+															) : null}
+														</span>
+													</button>
+												);
+											})}
+											<button
+												type="button"
+												disabled={!isCurrent}
+												onClick={() =>
+													setCustomOpen((current) => ({
+														...current,
+														[question.id]: !current[question.id],
+													}))
+												}
+												aria-expanded={customOpen[question.id] === true}
+												className={`inline-flex min-h-9 w-fit items-center rounded-md border px-2.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+													customOpen[question.id] === true
+														? "border-indigo text-snow"
+														: "border-graphite text-fog hover:text-snow"
+												}`}
+											>
+												Lainnya
+											</button>
+										</div>
+										{customOpen[question.id] === true ? (
+											<>
+												<label
+													htmlFor={`custom-${question.id}`}
+													className="sr-only"
+												>
+													Jawaban khusus {question.title}
+												</label>
+												<input
+													id={`custom-${question.id}`}
+													type="text"
+													disabled={!isCurrent}
+													value={customAnswers[question.id] ?? ""}
+													onChange={(event) =>
+														setCustomAnswers((current) => ({
+															...current,
+															[question.id]: event.target.value,
+														}))
+													}
+													placeholder={
+														question.customPlaceholder ??
+														"Atau ketik preferensi sendiri..."
+													}
+													className="mt-2 w-full rounded-lg border border-graphite bg-onyx px-3 py-2 text-xs text-snow outline-none placeholder:text-slate focus-visible:ring-2 focus-visible:ring-indigo"
+												/>
+											</>
+										) : null}
+										{isCurrent ? (
+											<div className="mt-3 flex justify-end">
+												<button
+													type="button"
+													disabled={!canSubmit}
+													onClick={() => handleSubmitOne(question)}
+													className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+												>
+													Kirim Jawaban
+												</button>
+											</div>
+										) : null}
 									</>
 								)}
-							</button>
+							</div>
+						);
+					})}
+					{flowComplete ? (
+						<div
+							data-testid="codebase-questions-complete"
+							className="rounded-xl border border-emerald/30 bg-obsidian p-4"
+						>
+							<p className="text-[13px] font-semibold leading-6 text-snow">
+								Pertanyaan sudah dijawab semua dan informasi kebutuhan sudah
+								lengkap. Siap membuat spesifikasi fitur?
+							</p>
+							<div className="mt-3 flex justify-end">
+								<button
+									type="button"
+									disabled={isConfirming}
+									onClick={() => onConfirmGenerate?.()}
+									className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									{isConfirming
+										? "Membuat spesifikasi..."
+										: "Lanjut Bikin Fitur"}
+								</button>
+							</div>
 						</div>
-						<p className="mt-1.5 text-xs leading-5 text-fog">
-							Agent lokal cukup mengeksekusi perintah berikut di root
-							repository. Agent mengambil spesifikasi dan mengerjakan task
-							bertahap:
-						</p>
-						<div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
-							<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
-								{handoffCmd}
-							</code>
+					) : null}
+					{artifacts.length > 0 ? (
+						<div className="flex flex-col">
+							{artifacts.map((artifact) => (
+								<CodebaseFileCard
+									key={artifact.id}
+									artifact={artifact}
+									active={artifact.id === activeArtifactId}
+									onOpen={onOpenArtifact}
+								/>
+							))}
 						</div>
-						<p className="mt-2 text-[11px] leading-5 text-slate">
-							Mekanisme progres: saat agent menyelesaikan task via CLI, kartu di
-							Papan Kanban kanan berpindah kolom secara real-time melalui
-							polling.
-						</p>
-					</div>
-				) : null}
+					) : null}
+					{handoffCmd ? (
+						<div
+							data-testid="codebase-handoff-card"
+							className="rounded-xl border border-emerald/30 bg-obsidian p-4"
+						>
+							<div className="flex items-center justify-between gap-2">
+								<p className="text-[13px] font-semibold text-emerald">
+									Handoff ke AI Coding Agent
+								</p>
+								<button
+									type="button"
+									onClick={handleCopyCmd}
+									className="inline-flex min-h-9 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									{copiedCmd ? (
+										<>
+											<Check
+												size={12}
+												aria-hidden="true"
+												className="text-emerald"
+											/>
+											<span className="text-emerald">Tersalin</span>
+										</>
+									) : (
+										<>
+											<Copy size={12} aria-hidden="true" />
+											<span>Salin perintah CLI</span>
+										</>
+									)}
+								</button>
+							</div>
+							<p className="mt-1.5 text-xs leading-5 text-fog">
+								Agent lokal cukup mengeksekusi perintah berikut di root
+								repository. Agent mengambil spesifikasi dan mengerjakan task
+								bertahap:
+							</p>
+							<div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
+								<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
+									{handoffCmd}
+								</code>
+							</div>
+							<p className="mt-2 text-[11px] leading-5 text-slate">
+								Mekanisme progres: saat agent menyelesaikan task via CLI, kartu
+								di Papan Kanban kanan berpindah kolom secara real-time melalui
+								polling.
+							</p>
+						</div>
+					) : null}
+				</div>
 			</div>
 			<div className="shrink-0 border-t border-graphite bg-charcoal p-3">
-				<div className="rounded-lg border border-graphite bg-obsidian p-2">
+				<div className="mx-auto w-full max-w-2xl rounded-lg border border-graphite bg-obsidian p-2">
 					<label htmlFor="codebase-chat-composer" className="sr-only">
-						Ketik instruksi tambahan atau revisi fitur
+						Jelaskan fitur yang ingin dibangun di repositori ini
 					</label>
 					<textarea
 						id="codebase-chat-composer"
 						value={draft}
 						onChange={(event) => setDraft(event.target.value)}
 						rows={2}
-						placeholder="Ketik instruksi tambahan atau revisi fitur..."
-						disabled={isSending}
+						placeholder="Jelaskan fitur yang ingin kamu bangun di repositori ini..."
+						disabled={isSending || questionsLoading}
 						className="w-full resize-none bg-transparent text-[13px] text-snow outline-none placeholder:text-slate disabled:opacity-50"
 					/>
 					<div className="flex items-center justify-between border-t border-graphite/60 pt-2">
@@ -342,7 +479,9 @@ export function CodebaseChatWorkspace({
 						<button
 							type="button"
 							onClick={handleSend}
-							disabled={draft.trim().length < 3 || isSending}
+							disabled={
+								draft.trim().length < 3 || isSending || questionsLoading
+							}
 							className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 						>
 							<Send size={13} aria-hidden="true" />

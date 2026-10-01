@@ -1,8 +1,12 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodebaseArtifactCanvas } from "@/components/codebase/codebase-artifact-canvas";
-import { CodebaseChatWorkspace } from "@/components/codebase/codebase-chat-workspace";
+import {
+	type AdaptiveQuestion,
+	type ChatStreamMessage,
+	CodebaseChatWorkspace,
+} from "@/components/codebase/codebase-chat-workspace";
 import { CodebaseExplorerSidebar } from "@/components/codebase/codebase-explorer-sidebar";
 import type { CodebaseArtifactRef } from "@/components/codebase/codebase-file-card";
 import { CodebaseKanbanBoard } from "@/components/codebase/codebase-kanban-board";
@@ -19,6 +23,12 @@ import {
 	type AnalysisResponse,
 	safeParseCodebaseAnalysis,
 } from "@/lib/codebase-analysis";
+import { buildFeatureMessage } from "@/lib/codebase-chat-flow";
+import {
+	detectStackFromPackageJsonText,
+	manifestToExplorerFiles,
+	mergeStackWithFallback,
+} from "@/lib/codebase-stack";
 import {
 	getPendingSyncPayloadKey,
 	SNAPSHOT_CONTEXT_STATUSES,
@@ -134,6 +144,80 @@ const loadCodebase = createServerFn({ method: "GET" })
 		return { codebase, feature, analysis, hasStoredSnapshot };
 	});
 
+const loadSnapshotManifest = createServerFn({ method: "GET" })
+	.validator((id: string) => id)
+	.handler(async ({ data: id }) => {
+		const user = await requireUserServer();
+		const { db } = await import("@/db");
+		const { codebases, codebaseSnapshotFiles, codebaseSnapshots } =
+			await import("@/db/schema");
+		const { manifestEntrySchema } = await import("@/lib/codebase-sync");
+		const { SNAPSHOT_CONTEXT_STATUSES } = await import("@/lib/codebase-sync");
+		const { and, asc, desc, eq, inArray } = await import("drizzle-orm");
+		const [codebase] = await db
+			.select({ id: codebases.id })
+			.from(codebases)
+			.where(and(eq(codebases.id, id), eq(codebases.userId, user.id)))
+			.limit(1);
+		if (!codebase) throw new Error("NOT_FOUND");
+		const [snapshot] = await db
+			.select({
+				id: codebaseSnapshots.id,
+				manifest: codebaseSnapshots.manifest,
+				fileCount: codebaseSnapshots.fileCount,
+			})
+			.from(codebaseSnapshots)
+			.where(
+				and(
+					eq(codebaseSnapshots.codebaseId, id),
+					inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES]),
+				),
+			)
+			.orderBy(desc(codebaseSnapshots.createdAt))
+			.limit(1);
+		if (!snapshot) return { files: [], fileCount: 0, packageJsonText: null };
+		const parsed = manifestEntrySchema.array().safeParse(snapshot.manifest);
+		const manifest = parsed.success ? parsed.data : [];
+		const rows = await db
+			.select({
+				path: codebaseSnapshotFiles.path,
+				chunkIndex: codebaseSnapshotFiles.chunkIndex,
+				data: codebaseSnapshotFiles.data,
+			})
+			.from(codebaseSnapshotFiles)
+			.where(eq(codebaseSnapshotFiles.snapshotId, snapshot.id))
+			.orderBy(
+				asc(codebaseSnapshotFiles.path),
+				asc(codebaseSnapshotFiles.chunkIndex),
+			);
+		const chunksByPath = new Map<string, string[]>();
+		for (const row of rows) {
+			const group = chunksByPath.get(row.path) ?? [];
+			group[row.chunkIndex] = row.data;
+			chunksByPath.set(row.path, group);
+		}
+		let packageJsonText: string | null = null;
+		for (const entry of manifest) {
+			if (
+				entry.path === "package.json" ||
+				entry.path.endsWith("/package.json")
+			) {
+				const group = chunksByPath.get(entry.path);
+				if (!group) continue;
+				try {
+					const text = Buffer.from(group.join(""), "base64").toString("utf8");
+					packageJsonText = text.slice(0, 20000);
+					break;
+				} catch {}
+			}
+		}
+		return {
+			files: manifest.map((entry) => ({ path: entry.path })),
+			fileCount: snapshot.fileCount ?? manifest.length,
+			packageJsonText,
+		};
+	});
+
 export const Route = createFileRoute("/codebases/$id")({
 	loader: async ({ params }) => {
 		if (decideCodebaseDetailEntry(params.id) === "deny")
@@ -200,8 +284,21 @@ function CodebaseDetailPage() {
 		analysis: initialAnalysis,
 		hasStoredSnapshot,
 	} = Route.useLoaderData();
-	const navigate = useNavigate();
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
+	const [manifestFiles, setManifestFiles] = useState<Array<{ path: string }>>(
+		[],
+	);
+	const [manifestFileCount, setManifestFileCount] = useState<number | null>(
+		null,
+	);
+	const [packageJsonText, setPackageJsonText] = useState<string | null>(null);
+	const [chatMessages, setChatMessages] = useState<ChatStreamMessage[]>([]);
+	const [aiQuestions, setAiQuestions] = useState<AdaptiveQuestion[]>([]);
+	const [chatAnswers, setChatAnswers] = useState<Record<string, string>>({});
+	const [questionsLoading, setQuestionsLoading] = useState(false);
+	const [questionsError, setQuestionsError] = useState<string | null>(null);
+	const [lastFeaturePrompt, setLastFeaturePrompt] = useState("");
+	const [isConfirming, setIsConfirming] = useState(false);
 	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
 	const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
 	const [screen, setScreen] = useState<1 | 2 | 3>(1);
@@ -380,7 +477,12 @@ function CodebaseDetailPage() {
 		Boolean(
 			status?.snapshotId && SNAPSHOT_CONTEXT_STATUSES.includes(status.status),
 		) || hasStoredSnapshot;
-	const [canvasOpen, setCanvasOpen] = useState(true);
+	const [activeFeature, setActiveFeature] = useState<{
+		id: string;
+		name: string;
+	} | null>(null);
+	const resolvedFeature = feature ?? activeFeature;
+	const effectiveFeatureId = resolvedFeature?.id ?? null;
 	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
 		"kanban",
@@ -393,8 +495,8 @@ function CodebaseDetailPage() {
 	const [acError, setAcError] = useState<string | null>(null);
 
 	const kanban = useKanbanTasks({
-		projectId: feature?.id ?? "",
-		enabled: snapshotReady && Boolean(feature?.id),
+		projectId: effectiveFeatureId ?? "",
+		enabled: snapshotReady && Boolean(effectiveFeatureId),
 	});
 	const kanbanProgress = useMemo(() => {
 		if (!kanban.data?.columns) return null;
@@ -404,7 +506,7 @@ function CodebaseDetailPage() {
 	const analysisOutput = analysis?.output ?? null;
 
 	const loadPrd = useCallback(async () => {
-		if (!snapshotReady || !feature?.id) {
+		if (!snapshotReady || !effectiveFeatureId) {
 			setPrdContent(null);
 			setPrdError(null);
 			setPrdLoading(false);
@@ -414,7 +516,7 @@ function CodebaseDetailPage() {
 		setPrdError(null);
 		try {
 			const response = await fetch(
-				`/api/projects/${encodeURIComponent(feature.id)}/versions`,
+				`/api/projects/${encodeURIComponent(effectiveFeatureId)}/versions`,
 			);
 			const body: unknown = await response.json().catch(() => null);
 			if (!response.ok) {
@@ -435,14 +537,14 @@ function CodebaseDetailPage() {
 		} finally {
 			setPrdLoading(false);
 		}
-	}, [snapshotReady, feature?.id]);
+	}, [snapshotReady, effectiveFeatureId]);
 
 	useEffect(() => {
 		void loadPrd();
 	}, [loadPrd]);
 
 	const loadAc = useCallback(async () => {
-		if (!snapshotReady || !feature?.id) {
+		if (!snapshotReady || !effectiveFeatureId) {
 			setAcContent(null);
 			setAcError(null);
 			setAcLoading(false);
@@ -452,7 +554,7 @@ function CodebaseDetailPage() {
 		setAcError(null);
 		try {
 			const response = await fetch(
-				`/api/projects/${encodeURIComponent(feature.id)}/ac-versions`,
+				`/api/projects/${encodeURIComponent(effectiveFeatureId)}/ac-versions`,
 			);
 			const body: unknown = await response.json().catch(() => null);
 			if (!response.ok) {
@@ -473,72 +575,86 @@ function CodebaseDetailPage() {
 		} finally {
 			setAcLoading(false);
 		}
-	}, [snapshotReady, feature?.id]);
+	}, [snapshotReady, effectiveFeatureId]);
 
 	useEffect(() => {
 		void loadAc();
 	}, [loadAc]);
+
+	useEffect(() => {
+		if (!snapshotReady) return;
+		let cancelled = false;
+		void (async () => {
+			try {
+				const data = await loadSnapshotManifest({ data: codebase.id });
+				if (cancelled) return;
+				setManifestFiles(data.files ?? []);
+				setManifestFileCount(
+					typeof data.fileCount === "number" ? data.fileCount : null,
+				);
+				setPackageJsonText(data.packageJsonText ?? null);
+			} catch {
+				if (!cancelled) {
+					setManifestFiles([]);
+					setManifestFileCount(null);
+					setPackageJsonText(null);
+				}
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [snapshotReady, codebase.id]);
+
 	const explorerFiles = useMemo(() => {
-		if (!analysisOutput) return [];
-		const seen = new Set<string>();
-		const entries: Array<{ path: string; summary?: string }> = [];
-		for (const item of analysisOutput.moduleMap ?? []) {
-			if (!seen.has(item.path)) {
-				seen.add(item.path);
-				entries.push({ path: item.path, summary: item.summary });
-			}
-		}
-		for (const path of analysisOutput.relevantFiles ?? []) {
-			if (!seen.has(path)) {
-				seen.add(path);
-				entries.push({ path });
-			}
-		}
-		return entries;
-	}, [analysisOutput]);
+		if (manifestFiles.length > 0) return manifestFiles;
+		return manifestToExplorerFiles(analysisOutput?.relevantFiles ?? []);
+	}, [manifestFiles, analysisOutput]);
 	const explorerStack = useMemo(() => {
-		if (!analysisOutput) return [];
-		const raw = [
-			analysisOutput.framework,
-			analysisOutput.language,
-			analysisOutput.database,
-			analysisOutput.auth,
-			analysisOutput.packageManager,
-			...(analysisOutput.dependencies ?? []).slice(0, 5),
-		];
-		return raw.filter(
-			(value): value is string =>
-				typeof value === "string" &&
-				value.trim().length > 0 &&
-				value.trim() !== "Tidak terdeteksi",
-		);
-	}, [analysisOutput]);
+		const fromPackageJson = detectStackFromPackageJsonText(packageJsonText);
+		const raw = analysisOutput
+			? [
+					analysisOutput.framework,
+					analysisOutput.language,
+					analysisOutput.database,
+					analysisOutput.auth,
+					analysisOutput.packageManager,
+					...(analysisOutput.dependencies ?? []).slice(0, 5),
+				].filter(
+					(value): value is string =>
+						typeof value === "string" &&
+						value.trim().length > 0 &&
+						value.trim() !== "Tidak terdeteksi",
+				)
+			: [];
+		return mergeStackWithFallback(fromPackageJson, raw);
+	}, [packageJsonText, analysisOutput]);
 	const contextFiles = useMemo(
 		() => (analysisOutput?.relevantFiles ?? []).slice(0, 2),
 		[analysisOutput],
 	);
 	const featureSlug = useMemo(() => {
-		const base = (feature?.name ?? codebase.name)
+		const base = (resolvedFeature?.name ?? codebase.name)
 			.toLowerCase()
 			.replace(/[^a-z0-9]+/g, "-")
 			.replace(/^-+|-+$/g, "")
 			.slice(0, 40);
 		return base || "fitur";
-	}, [feature?.name, codebase.name]);
+	}, [resolvedFeature?.name, codebase.name]);
 	const artifacts = useMemo<CodebaseArtifactRef[]>(() => {
-		if (!feature) return [];
+		if (!resolvedFeature) return [];
 		const list: CodebaseArtifactRef[] = [
 			{
-				id: `feature-${feature.id}`,
+				id: `feature-${resolvedFeature.id}`,
 				fileName: `feature-${featureSlug}.json`,
 				fileSizeBytes: null,
 				badge: "FITUR",
-				description: `Spesifikasi fitur ${feature.name}`,
+				description: `Spesifikasi fitur ${resolvedFeature.name}`,
 			},
 		];
 		if (prdContent) {
 			list.push({
-				id: `prd-${feature.id}`,
+				id: `prd-${resolvedFeature.id}`,
 				fileName: `PRD-${featureSlug}.md`,
 				fileSizeBytes: null,
 				badge: "MARKDOWN",
@@ -547,7 +663,7 @@ function CodebaseDetailPage() {
 		}
 		if (acContent) {
 			list.push({
-				id: `ac-${feature.id}`,
+				id: `ac-${resolvedFeature.id}`,
 				fileName: `AC-${featureSlug}.md`,
 				fileSizeBytes: null,
 				badge: "MARKDOWN",
@@ -556,7 +672,7 @@ function CodebaseDetailPage() {
 		}
 		if (kanbanProgress && kanbanProgress.total > 0) {
 			list.push({
-				id: `tasks-${feature.id}`,
+				id: `tasks-${resolvedFeature.id}`,
 				fileName: `tasks-${featureSlug}.json`,
 				fileSizeBytes: null,
 				badge: "KANBAN LIVE",
@@ -564,70 +680,232 @@ function CodebaseDetailPage() {
 			});
 		}
 		return list;
-	}, [feature, featureSlug, kanbanProgress, prdContent, acContent]);
+	}, [resolvedFeature, featureSlug, kanbanProgress, prdContent, acContent]);
 	const activeArtifact =
 		artifacts.find((item) => item.id === activeArtifactId) ?? null;
 	const isPrdArtifactActive =
 		Boolean(activeArtifact) &&
-		feature != null &&
-		activeArtifact?.id === `prd-${feature.id}`;
+		resolvedFeature != null &&
+		activeArtifact?.id === `prd-${resolvedFeature.id}`;
 	const isAcArtifactActive =
 		Boolean(activeArtifact) &&
-		feature != null &&
-		activeArtifact?.id === `ac-${feature.id}`;
+		resolvedFeature != null &&
+		activeArtifact?.id === `ac-${resolvedFeature.id}`;
 	const isTasksArtifactActive =
 		Boolean(activeArtifact) &&
-		feature != null &&
-		activeArtifact?.id === `tasks-${feature.id}`;
+		resolvedFeature != null &&
+		activeArtifact?.id === `tasks-${resolvedFeature.id}`;
 
-	const ensureFeatureAndGo = async (message: string) => {
-		const trimmed = message.trim();
-		if (!snapshotReady || trimmed.length < 3 || isWorking) return;
-		if (feature?.id) {
-			await navigate({ to: "/ask/$id", params: { id: feature.id } });
-			return;
-		}
-		setIsWorking(true);
-		setError(null);
-		try {
-			const response = await fetch(
-				`/api/codebases/${encodeURIComponent(codebase.id)}/features`,
-				{
+	const fetchAiQuestions = useCallback(
+		async (projectId: string, prompt: string) => {
+			setQuestionsLoading(true);
+			setQuestionsError(null);
+			try {
+				const response = await fetch("/api/ask/options", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ message: trimmed }),
+					body: JSON.stringify({ projectId, prompt, platform: "web" }),
+				});
+				const body: unknown = await response.json().catch(() => null);
+				if (!response.ok) {
+					setQuestionsError(
+						"Pertanyaan klarifikasi tidak dapat dibuat. Coba lagi.",
+					);
+					return;
+				}
+				const rawQuestions =
+					typeof body === "object" && body !== null && "questions" in body
+						? (body as { questions: unknown }).questions
+						: null;
+				if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+					setQuestionsError(
+						"AI menghasilkan respons kosong. Coba kirim ulang fitur.",
+					);
+					return;
+				}
+				const mapped: AdaptiveQuestion[] = rawQuestions
+					.slice(0, 3)
+					.flatMap((item, index): AdaptiveQuestion[] => {
+						if (typeof item !== "object" || item === null) return [];
+						const record = item as Record<string, unknown>;
+						const id =
+							typeof record.id === "string" && record.id.trim()
+								? record.id.trim()
+								: `q${index + 1}`;
+						const title =
+							typeof record.question === "string" && record.question.trim()
+								? record.question.trim()
+								: null;
+						if (!title) return [];
+						const rawOptions = Array.isArray(record.options)
+							? record.options
+							: [];
+						const options = rawOptions
+							.filter(
+								(option): option is string =>
+									typeof option === "string" && option.trim().length > 0,
+							)
+							.slice(0, 4)
+							.map((option, optionIndex) => ({
+								id: `${id}-opt${optionIndex + 1}`,
+								label: option.trim(),
+								recommended: optionIndex === 0,
+							}));
+						if (record.type !== "text" && options.length === 0) return [];
+						return [{ id, title, options }];
+					});
+				if (mapped.length === 0) {
+					setQuestionsError(
+						"AI menghasilkan format tidak valid. Coba kirim ulang fitur.",
+					);
+					return;
+				}
+				setAiQuestions(mapped);
+				setChatAnswers({});
+			} catch {
+				setQuestionsError("Server tidak dapat dihubungi. Coba lagi.");
+			} finally {
+				setQuestionsLoading(false);
+			}
+		},
+		[],
+	);
+
+	const ensureFeatureInWorkspace = useCallback(
+		async (message: string): Promise<string | null> => {
+			const trimmed = message.trim();
+			if (!snapshotReady || trimmed.length < 3 || isWorking) return null;
+			if (effectiveFeatureId) return effectiveFeatureId;
+			setIsWorking(true);
+			setError(null);
+			try {
+				const response = await fetch(
+					`/api/codebases/${encodeURIComponent(codebase.id)}/features`,
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ message: trimmed }),
+					},
+				);
+				const body: unknown = await response.json().catch(() => null);
+				if (
+					!response.ok ||
+					typeof body !== "object" ||
+					body === null ||
+					!("projectId" in body) ||
+					typeof body.projectId !== "string"
+				) {
+					setError("Fitur gagal dibuat. Coba lagi.");
+					return null;
+				}
+				const created = body as { projectId: string; name?: unknown };
+				setActiveFeature({
+					id: created.projectId,
+					name:
+						typeof created.name === "string" && created.name.trim()
+							? created.name.trim()
+							: codebase.name,
+				});
+				return created.projectId;
+			} catch {
+				setError("Server tidak dapat dihubungi.");
+				return null;
+			} finally {
+				setIsWorking(false);
+			}
+		},
+		[snapshotReady, isWorking, effectiveFeatureId, codebase.id, codebase.name],
+	);
+
+	const handleSendMessage = useCallback(
+		async (message: string) => {
+			const trimmed = message.trim();
+			if (!trimmed || trimmed.length < 3) return;
+			setChatMessages((current) => [
+				...current,
+				{
+					id: `user-${Date.now()}`,
+					role: "user" as const,
+					content: trimmed,
 				},
-			);
-			const body: unknown = await response.json().catch(() => null);
-			if (
-				!response.ok ||
-				typeof body !== "object" ||
-				body === null ||
-				!("projectId" in body) ||
-				typeof body.projectId !== "string"
-			) {
-				setError("Fitur gagal dibuat. Coba lagi.");
+			]);
+			setLastFeaturePrompt(trimmed);
+			const projectId = await ensureFeatureInWorkspace(trimmed);
+			if (projectId) void fetchAiQuestions(projectId, trimmed);
+		},
+		[ensureFeatureInWorkspace, fetchAiQuestions],
+	);
+
+	const handleSubmitAnswer = useCallback(
+		(questionId: string, answer: string) => {
+			const trimmed = answer.trim();
+			if (!trimmed) return;
+			setChatAnswers((current) => ({ ...current, [questionId]: trimmed }));
+		},
+		[],
+	);
+
+	const handleConfirmGenerate = useCallback(async () => {
+		if (!effectiveFeatureId || isConfirming) return;
+		setIsConfirming(true);
+		try {
+			const answersList = Object.entries(chatAnswers)
+				.map(([questionId, answer]) => ({
+					questionId,
+					answer: answer.trim(),
+				}))
+				.filter((entry) => entry.answer.length > 0);
+			try {
+				await fetch("/api/ask/options", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						projectId: effectiveFeatureId,
+						action: "save-handoff",
+						handoff: {
+							projectId: effectiveFeatureId,
+							answers: answersList,
+							state: {
+								prompt: lastFeaturePrompt || resolvedFeature?.name || "",
+								platform: "web",
+								session: 1,
+								questions: [],
+							},
+						},
+					}),
+				});
+			} catch {
 				return;
 			}
-			await navigate({ to: "/ask/$id", params: { id: body.projectId } });
-		} catch {
-			setError("Server tidak dapat dihubungi.");
+			const specMessage = buildFeatureMessage(
+				resolvedFeature?.name ?? codebase.name,
+				chatAnswers,
+			);
+			setChatMessages((current) => [
+				...current,
+				{
+					id: `assistant-${Date.now()}`,
+					role: "assistant" as const,
+					content: `Spesifikasi ${resolvedFeature?.name ?? "fitur"} tersusun dari jawaban Anda: ${specMessage}. FileCard spesifikasi tersedia di bawah dan preview dokumen tampil di kanvas kanan.`,
+				},
+			]);
+			await loadPrd();
+			await loadAc();
+			await kanban.refetch();
 		} finally {
-			setIsWorking(false);
+			setIsConfirming(false);
 		}
-	};
-
-	const handleSubmitAnswers = (answers: Record<string, string>) => {
-		const message = Object.values(answers)
-			.map((value) => value.trim())
-			.filter((value) => value.length > 0)
-			.join(" ");
-		void ensureFeatureAndGo(
-			message.length >= 3
-				? `Rencanakan fitur ${feature?.name ?? codebase.name}: ${message}`
-				: `Rencanakan fitur ${feature?.name ?? codebase.name}`,
-		);
-	};
+	}, [
+		effectiveFeatureId,
+		isConfirming,
+		chatAnswers,
+		lastFeaturePrompt,
+		resolvedFeature?.name,
+		codebase.name,
+		loadPrd,
+		loadAc,
+		kanban,
+	]);
 
 	if (snapshotReady) {
 		const kanbanColumns = kanban.data?.columns ?? null;
@@ -655,14 +933,15 @@ function CodebaseDetailPage() {
 							<span className="truncate">{codebase.name}</span>
 						</span>
 					</div>
-					<button
-						type="button"
-						onClick={() => setCanvasOpen((current) => !current)}
-						aria-expanded={canvasOpen}
-						className="inline-flex min-h-9 shrink-0 items-center rounded-md border border-graphite bg-obsidian px-3 text-xs font-medium text-mist transition hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					<span
+						data-testid="codebase-sync-badge"
+						className="shrink-0 rounded-md border border-graphite bg-obsidian px-2.5 py-1 font-mono text-[11px] text-fog"
 					>
-						{canvasOpen ? "Tutup Preview" : "Buka Preview"}
-					</button>
+						{typeof (status?.fileCount ?? manifestFileCount) === "number" &&
+						(status?.fileCount ?? manifestFileCount ?? 0) > 0
+							? `${status?.fileCount ?? manifestFileCount} file tersinkron`
+							: "Menunggu snapshot"}
+					</span>
 				</header>
 				{error && (
 					<div
@@ -681,11 +960,11 @@ function CodebaseDetailPage() {
 				)}
 				<div className="min-h-0 flex-1">
 					<CodebaseWorkspaceShell
-						canvasOpen={canvasOpen}
+						canvasOpen={true}
 						leftPane={
 							<CodebaseExplorerSidebar
 								codebaseName={codebase.name}
-								fileCount={status?.fileCount}
+								fileCount={status?.fileCount ?? manifestFileCount ?? undefined}
 								files={explorerFiles}
 								stack={explorerStack}
 							/>
@@ -693,66 +972,45 @@ function CodebaseDetailPage() {
 						chatPane={
 							<CodebaseChatWorkspace
 								codebaseName={codebase.name}
-								featureName={feature?.name ?? codebase.name}
+								featureName={resolvedFeature?.name ?? codebase.name}
 								contextFiles={contextFiles}
 								kanbanProgress={kanbanProgress}
-								questions={[
-									{
-										id: "storage",
-										title:
-											"Bagaimana mekanisme penyimpanan data fitur yang Anda inginkan?",
-										options: [
-											{
-												id: "local",
-												label: "Penyimpanan lokal di browser tanpa akun login.",
-											},
-											{
-												id: "database",
-												label:
-													"Database PostgreSQL terautentikasi berelasi user_id.",
-												recommended: true,
-											},
-										],
-										customPlaceholder:
-											"Atau ketik preferensi penyimpanan sendiri...",
-									},
-									{
-										id: "feedback",
-										title: "Bagaimana feedback UI saat aksi utama berhasil?",
-										options: [
-											{
-												id: "toast",
-												label:
-													"Toast notification interaktif dengan tombol Undo.",
-												recommended: true,
-											},
-											{
-												id: "inline",
-												label: "Indikator inline berubah tanpa popup banner.",
-											},
-										],
-									},
-								]}
+								messages={chatMessages}
+								questions={aiQuestions}
+								answers={chatAnswers}
+								questionsLoading={questionsLoading}
+								questionsError={questionsError}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
-								projectIdForHandoff={feature?.id ?? null}
+								projectIdForHandoff={effectiveFeatureId}
 								isSending={isWorking}
+								isConfirming={isConfirming}
 								onOpenArtifact={(artifact) => {
 									setActiveArtifactId(artifact.id);
-									if (feature && artifact.id === `tasks-${feature.id}`) {
+									if (
+										resolvedFeature &&
+										artifact.id === `tasks-${resolvedFeature.id}`
+									) {
 										setCanvasView("kanban");
 									}
-									setCanvasOpen(true);
 								}}
-								onSubmitAnswers={handleSubmitAnswers}
-								onSendMessage={(message) => void ensureFeatureAndGo(message)}
+								onSubmitAnswer={handleSubmitAnswer}
+								onSendMessage={(message) => void handleSendMessage(message)}
+								onConfirmGenerate={() => void handleConfirmGenerate()}
+								onRetryQuestions={() => {
+									if (effectiveFeatureId && lastFeaturePrompt)
+										void fetchAiQuestions(
+											effectiveFeatureId,
+											lastFeaturePrompt,
+										);
+								}}
 							/>
 						}
 						canvasPane={
 							<CodebaseArtifactCanvas
 								fileName={activeArtifact?.fileName ?? "Preview artefak"}
 								badge={activeArtifact?.badge ?? "PRATINJAU"}
-								onClose={() => setCanvasOpen(false)}
+								onClose={() => setActiveArtifactId(null)}
 								isLoading={
 									(isPrdArtifactActive && prdLoading) ||
 									(isAcArtifactActive && acLoading)
@@ -813,43 +1071,15 @@ function CodebaseDetailPage() {
 									) : undefined
 								}
 							>
-								{!activeArtifact || !feature ? (
+								{!activeArtifact || !resolvedFeature ? (
 									<div className="flex h-full flex-col items-start justify-center gap-3 p-2">
 										<p className="text-sm font-semibold text-snow">
 											Belum ada artefak terpilih
 										</p>
 										<p className="max-w-sm text-xs leading-5 text-fog">
-											Pilih FileCard di kolom chat untuk preview, atau lanjutkan
-											ke tahap berikut setelah fitur dibuat.
+											Pilih FileCard di kolom chat untuk preview dokumen atau
+											papan Kanban langsung di sini.
 										</p>
-										{feature ? (
-											<div className="flex flex-wrap gap-2">
-												<button
-													type="button"
-													onClick={() =>
-														void navigate({
-															to: "/ask/$id",
-															params: { id: feature.id },
-														})
-													}
-													className="inline-flex min-h-11 items-center rounded-md bg-snow px-3 text-xs font-semibold text-onyx hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-												>
-													Buka tanya jawab
-												</button>
-												<button
-													type="button"
-													onClick={() =>
-														void navigate({
-															to: "/kanban/$id",
-															params: { id: feature.id },
-														})
-													}
-													className="inline-flex min-h-11 items-center rounded-md border border-graphite bg-charcoal px-3 text-xs font-medium text-snow hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-												>
-													Buka board penuh
-												</button>
-											</div>
-										) : null}
 									</div>
 								) : isPrdArtifactActive ? (
 									prdContent ? (
@@ -862,7 +1092,7 @@ function CodebaseDetailPage() {
 								) : isTasksArtifactActive ? (
 									canvasView === "kanban" ? (
 										<CodebaseKanbanBoard
-											projectId={feature.id}
+											projectId={resolvedFeature.id}
 											columns={kanbanColumns}
 											staleness={kanban.staleness}
 											isLoadingExternal={kanban.isLoading}
@@ -941,10 +1171,10 @@ function CodebaseDetailPage() {
 												Fitur
 											</p>
 											<p className="mt-1 text-sm font-semibold text-snow">
-												{feature.name}
+												{resolvedFeature.name}
 											</p>
 											<p className="mt-1 font-mono text-[11px] text-fog">
-												Project: {feature.id}
+												Project: {resolvedFeature.id}
 											</p>
 											{status?.snapshotId ? (
 												<p className="mt-1 font-mono text-[11px] text-fog">
@@ -965,32 +1195,10 @@ function CodebaseDetailPage() {
 												</ul>
 											</div>
 										) : null}
-										<div className="flex flex-wrap gap-2">
-											<button
-												type="button"
-												onClick={() =>
-													void navigate({
-														to: "/ask/$id",
-														params: { id: feature.id },
-													})
-												}
-												className="inline-flex min-h-11 items-center rounded-md bg-snow px-3 text-xs font-semibold text-onyx hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-											>
-												Buka tanya jawab
-											</button>
-											<button
-												type="button"
-												onClick={() =>
-													void navigate({
-														to: "/kanban/$id",
-														params: { id: feature.id },
-													})
-												}
-												className="inline-flex min-h-11 items-center rounded-md border border-graphite bg-charcoal px-3 text-xs font-medium text-snow hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-											>
-												Buka board penuh
-											</button>
-										</div>
+										<p className="text-xs leading-5 text-fog">
+											Jawab pertanyaan klarifikasi di kolom chat, lalu pilih
+											Lanjut Bikin Fitur untuk menyusun spesifikasi.
+										</p>
 									</div>
 								)}
 							</CodebaseArtifactCanvas>
