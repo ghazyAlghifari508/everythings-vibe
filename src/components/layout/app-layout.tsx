@@ -21,21 +21,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 		"/settings",
 		"/admin",
 	];
+	const isCodebaseWorkspace = pathname.startsWith("/codebases/");
 	const hideNavbar =
 		hideNavbarRoutes.includes(pathname) ||
 		pathname.startsWith("/settings/") ||
-		pathname.startsWith("/admin/");
+		pathname.startsWith("/admin/") ||
+		isCodebaseWorkspace;
 
-	// Lock body scroll on workspace pages (Ask, PRD, AC, Task, Kanban) and while
-	// the history drawer overlays the page. Both writers must stay in this one
-	// effect: two competing effects would each clear the lock on cleanup.
+	// Lock body scroll on workspace pages (Ask, PRD, AC, Task, Kanban, Codebases)
+	// and while the history drawer overlays the page. Both writers must stay in
+	// this one effect: two competing effects would each clear the lock on cleanup.
 	const isWorkspace =
 		pathname.startsWith("/ask/") ||
 		pathname.startsWith("/fitur/") ||
 		(pathname.startsWith("/prd/") && !pathname.startsWith("/prd/share/")) ||
 		pathname.startsWith("/ac/") ||
 		pathname.startsWith("/task/") ||
-		pathname.startsWith("/kanban/");
+		pathname.startsWith("/kanban/") ||
+		isCodebaseWorkspace;
 
 	const shouldLockScroll = isWorkspace || isDrawerOpen;
 
@@ -70,17 +73,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 			<div
 				data-workspace-shell={isWorkspace ? "" : undefined}
 				className={
-					hideNavbar
-						? "flex flex-col min-h-screen"
-						: isWorkspace
-							? // h-dvh, not h-screen: 100vh resolves to the LARGE mobile
-								// viewport (browser chrome hidden), so a full-height shell
-								// overflows the visible area. Body scroll is locked here, so
-								// nothing could compensate and the bottom of the route — where
-								// the Next button lives — sank out of reach. The dynamic unit
-								// tracks the visible viewport instead.
-								"pt-14 flex flex-col h-dvh overflow-hidden"
-							: "pt-14 flex flex-col min-h-screen"
+					isCodebaseWorkspace
+						? "flex flex-col h-dvh overflow-hidden"
+						: hideNavbar
+							? "flex flex-col min-h-screen"
+							: isWorkspace
+								? // h-dvh, not h-screen: 100vh resolves to the LARGE mobile
+									// viewport (browser chrome hidden), so a full-height shell
+									// overflows the visible area. Body scroll is locked here, so
+									// nothing could compensate and the bottom of the route — where
+									// the Next button lives — sank out of reach. The dynamic unit
+									// tracks the visible viewport instead.
+									"pt-14 flex flex-col h-dvh overflow-hidden"
+								: "pt-14 flex flex-col min-h-screen"
 				}
 			>
 				{/* The shell is a fixed-height flex column that owns no scrolling.
