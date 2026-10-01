@@ -10,24 +10,24 @@ const Mermaid = lazy(() =>
 	import("@/components/prd/mermaid").then((m) => ({ default: m.Mermaid })),
 );
 
-const prdVersionRowSchema = z.object({
+const versionRowSchema = z.object({
 	version: z.number(),
 	content: z.string(),
 });
 
-const prdVersionsSchema = z.array(prdVersionRowSchema);
+const versionsSchema = z.array(versionRowSchema);
 
-export type PrdVersionRow = z.infer<typeof prdVersionRowSchema>;
+export type VersionRow = z.infer<typeof versionRowSchema>;
 
-export function parsePrdVersions(input: unknown): PrdVersionRow[] | null {
-	const parsed = prdVersionsSchema.safeParse(input);
+export function parseVersionRows(input: unknown): VersionRow[] | null {
+	const parsed = versionsSchema.safeParse(input);
 	return parsed.success ? parsed.data : null;
 }
 
-export function selectLatestPrdContent(
-	rows: readonly PrdVersionRow[],
+export function selectLatestVersionContent(
+	rows: readonly VersionRow[],
 ): string | null {
-	let latest: PrdVersionRow | null = null;
+	let latest: VersionRow | null = null;
 	for (const row of rows) {
 		if (!latest || row.version > latest.version) latest = row;
 	}

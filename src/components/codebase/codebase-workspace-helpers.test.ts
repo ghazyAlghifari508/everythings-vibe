@@ -6,7 +6,10 @@ import {
 } from "./codebase-explorer-sidebar";
 import { formatFileSize } from "./codebase-file-card";
 import { getCodebaseKanbanProgress } from "./codebase-kanban-board";
-import { parsePrdVersions, selectLatestPrdContent } from "./codebase-markdown";
+import {
+	parseVersionRows,
+	selectLatestVersionContent,
+} from "./codebase-markdown";
 
 describe("formatFileSize", () => {
 	test("formats bytes below 1 KB", () => {
@@ -91,10 +94,10 @@ describe("getCodebaseKanbanProgress", () => {
 	});
 });
 
-describe("parsePrdVersions", () => {
+describe("parseVersionRows", () => {
 	test("accepts rows with version and content", () => {
 		expect(
-			parsePrdVersions([
+			parseVersionRows([
 				{ version: 1, content: "a" },
 				{ version: 2, content: "b" },
 			]),
@@ -105,15 +108,15 @@ describe("parsePrdVersions", () => {
 	});
 
 	test("rejects rows with missing content", () => {
-		expect(parsePrdVersions([{ version: 1 }])).toBeNull();
-		expect(parsePrdVersions(null)).toBeNull();
+		expect(parseVersionRows([{ version: 1 }])).toBeNull();
+		expect(parseVersionRows(null)).toBeNull();
 	});
 });
 
-describe("selectLatestPrdContent", () => {
+describe("selectLatestVersionContent", () => {
 	test("selects the content of the highest version", () => {
 		expect(
-			selectLatestPrdContent([
+			selectLatestVersionContent([
 				{ version: 1, content: "lama" },
 				{ version: 3, content: "baru" },
 				{ version: 2, content: "tengah" },
@@ -122,7 +125,9 @@ describe("selectLatestPrdContent", () => {
 	});
 
 	test("returns null when there are no rows or only blank content", () => {
-		expect(selectLatestPrdContent([])).toBeNull();
-		expect(selectLatestPrdContent([{ version: 1, content: "   " }])).toBeNull();
+		expect(selectLatestVersionContent([])).toBeNull();
+		expect(
+			selectLatestVersionContent([{ version: 1, content: "   " }]),
+		).toBeNull();
 	});
 });

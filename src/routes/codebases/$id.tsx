@@ -8,8 +8,8 @@ import type { CodebaseArtifactRef } from "@/components/codebase/codebase-file-ca
 import { CodebaseKanbanBoard } from "@/components/codebase/codebase-kanban-board";
 import {
 	CodebaseMarkdown,
-	parsePrdVersions,
-	selectLatestPrdContent,
+	parseVersionRows,
+	selectLatestVersionContent,
 } from "@/components/codebase/codebase-markdown";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
@@ -371,6 +371,9 @@ function CodebaseDetailPage() {
 	const [prdContent, setPrdContent] = useState<string | null>(null);
 	const [prdLoading, setPrdLoading] = useState(false);
 	const [prdError, setPrdError] = useState<string | null>(null);
+	const [acContent, setAcContent] = useState<string | null>(null);
+	const [acLoading, setAcLoading] = useState(false);
+	const [acError, setAcError] = useState<string | null>(null);
 
 	const kanban = useKanbanTasks({
 		projectId: feature?.id ?? "",
@@ -402,13 +405,13 @@ function CodebaseDetailPage() {
 				setPrdContent(null);
 				return;
 			}
-			const rows = parsePrdVersions(body);
+			const rows = parseVersionRows(body);
 			if (!rows) {
 				setPrdError("Dokumen PRD tidak valid.");
 				setPrdContent(null);
 				return;
 			}
-			setPrdContent(selectLatestPrdContent(rows));
+			setPrdContent(selectLatestVersionContent(rows));
 		} catch {
 			setPrdError("Server tidak dapat dihubungi.");
 			setPrdContent(null);
@@ -420,6 +423,44 @@ function CodebaseDetailPage() {
 	useEffect(() => {
 		void loadPrd();
 	}, [loadPrd]);
+
+	const loadAc = useCallback(async () => {
+		if (!snapshotReady || !feature?.id) {
+			setAcContent(null);
+			setAcError(null);
+			setAcLoading(false);
+			return;
+		}
+		setAcLoading(true);
+		setAcError(null);
+		try {
+			const response = await fetch(
+				`/api/projects/${encodeURIComponent(feature.id)}/ac-versions`,
+			);
+			const body: unknown = await response.json().catch(() => null);
+			if (!response.ok) {
+				setAcError("Dokumen AC tidak dapat dimuat.");
+				setAcContent(null);
+				return;
+			}
+			const rows = parseVersionRows(body);
+			if (!rows) {
+				setAcError("Dokumen AC tidak valid.");
+				setAcContent(null);
+				return;
+			}
+			setAcContent(selectLatestVersionContent(rows));
+		} catch {
+			setAcError("Server tidak dapat dihubungi.");
+			setAcContent(null);
+		} finally {
+			setAcLoading(false);
+		}
+	}, [snapshotReady, feature?.id]);
+
+	useEffect(() => {
+		void loadAc();
+	}, [loadAc]);
 	const explorerFiles = useMemo(() => {
 		if (!analysisOutput) return [];
 		const seen = new Set<string>();
@@ -478,6 +519,24 @@ function CodebaseDetailPage() {
 				description: `Spesifikasi fitur ${feature.name}`,
 			},
 		];
+		if (prdContent) {
+			list.push({
+				id: `prd-${feature.id}`,
+				fileName: `PRD-${featureSlug}.md`,
+				fileSizeBytes: null,
+				badge: "MARKDOWN",
+				description: "Dokumen PRD 8 seksi",
+			});
+		}
+		if (acContent) {
+			list.push({
+				id: `ac-${feature.id}`,
+				fileName: `AC-${featureSlug}.md`,
+				fileSizeBytes: null,
+				badge: "MARKDOWN",
+				description: "Kriteria penerimaan formal",
+			});
+		}
 		if (kanbanProgress && kanbanProgress.total > 0) {
 			list.push({
 				id: `tasks-${feature.id}`,
@@ -487,23 +546,18 @@ function CodebaseDetailPage() {
 				description: "Task tree dan papan Kanban live",
 			});
 		}
-		if (prdContent) {
-			list.splice(1, 0, {
-				id: `prd-${feature.id}`,
-				fileName: `PRD-${featureSlug}.md`,
-				fileSizeBytes: null,
-				badge: "MARKDOWN",
-				description: "Dokumen PRD 8 seksi",
-			});
-		}
 		return list;
-	}, [feature, featureSlug, kanbanProgress, prdContent]);
+	}, [feature, featureSlug, kanbanProgress, prdContent, acContent]);
 	const activeArtifact =
 		artifacts.find((item) => item.id === activeArtifactId) ?? null;
 	const isPrdArtifactActive =
 		Boolean(activeArtifact) &&
 		feature != null &&
 		activeArtifact?.id === `prd-${feature.id}`;
+	const isAcArtifactActive =
+		Boolean(activeArtifact) &&
+		feature != null &&
+		activeArtifact?.id === `ac-${feature.id}`;
 	const isTasksArtifactActive =
 		Boolean(activeArtifact) &&
 		feature != null &&
@@ -682,9 +736,24 @@ function CodebaseDetailPage() {
 								fileName={activeArtifact?.fileName ?? "Preview artefak"}
 								badge={activeArtifact?.badge ?? "PRATINJAU"}
 								onClose={() => setCanvasOpen(false)}
-								isLoading={isPrdArtifactActive && prdLoading}
-								error={isPrdArtifactActive ? prdError : null}
-								onRetry={isPrdArtifactActive ? () => void loadPrd() : undefined}
+								isLoading={
+									(isPrdArtifactActive && prdLoading) ||
+									(isAcArtifactActive && acLoading)
+								}
+								error={
+									isPrdArtifactActive
+										? prdError
+										: isAcArtifactActive
+											? acError
+											: null
+								}
+								onRetry={
+									isPrdArtifactActive
+										? () => void loadPrd()
+										: isAcArtifactActive
+											? () => void loadAc()
+											: undefined
+								}
 								subnav={
 									isTasksArtifactActive ? (
 										<>
@@ -768,6 +837,10 @@ function CodebaseDetailPage() {
 								) : isPrdArtifactActive ? (
 									prdContent ? (
 										<CodebaseMarkdown content={prdContent} />
+									) : null
+								) : isAcArtifactActive ? (
+									acContent ? (
+										<CodebaseMarkdown content={acContent} />
 									) : null
 								) : isTasksArtifactActive ? (
 									canvasView === "kanban" ? (
