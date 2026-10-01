@@ -58,23 +58,7 @@ export function ScreenConnect({
 	};
 
 	return (
-		<div className="w-full animate-enter flex flex-col gap-8">
-			{/* Page Head from existing-codebase-flow.html screen 02 */}
-			<div className="flex flex-col gap-3">
-				<div>
-					<div className="text-[11px] font-mono tracking-widest uppercase text-fog mb-2">
-						NEW PROJECT · EXISTING CODEBASE
-					</div>
-					<h1 className="font-inter text-2xl sm:text-3xl font-[620] tracking-tight text-snow leading-tight">
-						Hubungkan codebase kamu
-					</h1>
-					<p className="mt-2 text-xs sm:text-sm text-fog max-w-xl leading-relaxed">
-						VibeEverything tidak meminta upload ZIP. Jalankan sync langsung dari
-						repository melalui AI coding agent kamu.
-					</p>
-				</div>
-			</div>
-
+		<div className="w-full animate-enter">
 			{/* Modal-style Container from existing-codebase-flow.html */}
 			<div className="mx-auto w-full max-w-2xl rounded-xl border border-iron bg-obsidian/90 shadow-2xl backdrop-blur-xl overflow-hidden">
 				{/* Modal Head */}
