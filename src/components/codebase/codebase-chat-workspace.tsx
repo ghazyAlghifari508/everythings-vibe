@@ -467,8 +467,8 @@ export function CodebaseChatWorkspace({
 					) : null}
 				</div>
 			</div>
-			<div className="shrink-0 border-t border-graphite bg-charcoal p-3">
-				<div className="mx-auto w-full max-w-2xl rounded-lg border border-graphite bg-obsidian p-2">
+			<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
+				<div className="mx-auto w-full max-w-2xl rounded-xl border border-graphite bg-charcoal/80 p-3 transition-colors focus-within:border-indigo/50">
 					<label htmlFor="codebase-chat-composer" className="sr-only">
 						Jelaskan fitur yang ingin dibangun di repositori ini
 					</label>
@@ -481,7 +481,7 @@ export function CodebaseChatWorkspace({
 						disabled={isSending || questionsLoading}
 						className="w-full resize-none bg-transparent text-[13px] text-snow outline-none placeholder:text-slate disabled:opacity-50"
 					/>
-					<div className="flex items-center justify-end border-t border-graphite/60 pt-2">
+					<div className="flex items-center justify-end border-t border-graphite/40 pt-2">
 						<button
 							type="button"
 							onClick={handleSend}

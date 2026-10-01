@@ -335,4 +335,42 @@ describe("CodebaseChatWorkspace artifacts", () => {
 			id: "feature-abc",
 		});
 	});
+
+	it("does not render handoff card or FileCards during question flow", () => {
+		renderWorkspace({
+			questions: sampleQuestions,
+			answers: { q1: "Database relasional" },
+			artifacts: [],
+			projectIdForHandoff: null,
+		});
+
+		expect(
+			container.querySelector("[data-testid='codebase-handoff-card']"),
+		).toBeNull();
+		expect(container.textContent).not.toContain("Handoff ke AI Coding Agent");
+		expect(container.textContent).not.toContain(".json");
+	});
+
+	it("renders handoff card when projectIdForHandoff is provided", () => {
+		renderWorkspace({
+			projectIdForHandoff: "proj-123",
+		});
+
+		expect(
+			container.querySelector("[data-testid='codebase-handoff-card']"),
+		).not.toBeNull();
+		expect(container.textContent).toContain(
+			"npx vibeeverything export rules proj-123",
+		);
+	});
+
+	it("renders sleek transparent composer container", () => {
+		renderWorkspace();
+
+		const composer = container.querySelector("#codebase-chat-composer");
+		expect(composer).not.toBeNull();
+		const composerWrapper = composer?.closest(".shrink-0");
+		expect(composerWrapper?.className).toContain("bg-transparent");
+		expect(composerWrapper?.className).not.toContain("bg-charcoal");
+	});
 });
