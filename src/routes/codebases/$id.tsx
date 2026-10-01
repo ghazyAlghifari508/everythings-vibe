@@ -845,9 +845,12 @@ function CodebaseDetailPage() {
 		[],
 	);
 
+	const [specError, setSpecError] = useState<string | null>(null);
+
 	const handleConfirmGenerate = useCallback(async () => {
 		if (!effectiveFeatureId || isConfirming) return;
 		setIsConfirming(true);
+		setSpecError(null);
 		try {
 			const answersList = Object.entries(chatAnswers)
 				.map(([questionId, answer]) => ({
@@ -877,6 +880,21 @@ function CodebaseDetailPage() {
 			} catch {
 				return;
 			}
+			let specResponse: Response;
+			try {
+				specResponse = await fetch("/api/features/generate", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ projectId: effectiveFeatureId }),
+				});
+			} catch {
+				setSpecError("Server tidak dapat dihubungi. Coba lagi.");
+				return;
+			}
+			if (!specResponse.ok && specResponse.status !== 409) {
+				setSpecError("Spesifikasi fitur gagal dibuat. Coba lagi.");
+				return;
+			}
 			const specMessage = buildFeatureMessage(
 				resolvedFeature?.name ?? codebase.name,
 				chatAnswers,
@@ -886,7 +904,10 @@ function CodebaseDetailPage() {
 				{
 					id: `assistant-${Date.now()}`,
 					role: "assistant" as const,
-					content: `Spesifikasi ${resolvedFeature?.name ?? "fitur"} tersusun dari jawaban Anda: ${specMessage}. FileCard spesifikasi tersedia di bawah dan preview dokumen tampil di kanvas kanan.`,
+					content:
+						specResponse.status === 409
+							? `Spesifikasi ${resolvedFeature?.name ?? "fitur"} sedang disusun. FileCard spesifikasi tersedia di bawah dan preview dokumen tampil di kanvas kanan.`
+							: `Spesifikasi ${resolvedFeature?.name ?? "fitur"} tersusun dari jawaban Anda: ${specMessage}. FileCard spesifikasi tersedia di bawah dan preview dokumen tampil di kanvas kanan.`,
 				},
 			]);
 			await loadPrd();
@@ -985,6 +1006,7 @@ function CodebaseDetailPage() {
 								projectIdForHandoff={effectiveFeatureId}
 								isSending={isWorking}
 								isConfirming={isConfirming}
+								specError={specError}
 								onOpenArtifact={(artifact) => {
 									setActiveArtifactId(artifact.id);
 									if (
@@ -997,6 +1019,7 @@ function CodebaseDetailPage() {
 								onSubmitAnswer={handleSubmitAnswer}
 								onSendMessage={(message) => void handleSendMessage(message)}
 								onConfirmGenerate={() => void handleConfirmGenerate()}
+								onRetryGenerate={() => void handleConfirmGenerate()}
 								onRetryQuestions={() => {
 									if (effectiveFeatureId && lastFeaturePrompt)
 										void fetchAiQuestions(
