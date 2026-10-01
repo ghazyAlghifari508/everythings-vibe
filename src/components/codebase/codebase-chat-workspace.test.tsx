@@ -247,6 +247,7 @@ describe("CodebaseChatWorkspace confirmation and spec errors", () => {
 		renderWorkspace({
 			questions: sampleQuestions,
 			answers: completeAnswers,
+			stage: "questions",
 			onConfirmGenerate,
 		});
 
@@ -265,6 +266,19 @@ describe("CodebaseChatWorkspace confirmation and spec errors", () => {
 			cta?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onConfirmGenerate).toHaveBeenCalledTimes(1);
+	});
+
+	it("hides Lanjut Bikin Fitur once the pipeline advances past questions", () => {
+		renderWorkspace({
+			questions: sampleQuestions,
+			answers: completeAnswers,
+			stage: "feature",
+			onConfirmGenerate: vi.fn(),
+		});
+
+		expect(
+			container.querySelector("[data-testid='codebase-questions-complete']"),
+		).toBeNull();
 	});
 
 	it("shows busy state on the CTA while generating", () => {
@@ -372,5 +386,111 @@ describe("CodebaseChatWorkspace artifacts", () => {
 		const composerWrapper = composer?.closest(".shrink-0");
 		expect(composerWrapper?.className).toContain("bg-transparent");
 		expect(composerWrapper?.className).not.toContain("bg-charcoal");
+	});
+});
+
+describe("CodebaseChatWorkspace pipeline stages", () => {
+	it("offers Lanjut Buat PRD only at the feature stage", () => {
+		const onGeneratePrd = vi.fn();
+		renderWorkspace({ stage: "feature", onGeneratePrd });
+
+		const cta = container.querySelector("[data-testid='codebase-stage-prd']");
+		expect(cta).not.toBeNull();
+		expect(cta?.textContent).toContain(
+			"Fitur berhasil disusun. Lanjut susun PRD 8 seksi?",
+		);
+
+		const button = [...(cta?.querySelectorAll("button") ?? [])].find((b) =>
+			/Lanjut Buat PRD/.test(b.textContent ?? ""),
+		);
+		act(() => {
+			button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onGeneratePrd).toHaveBeenCalledTimes(1);
+	});
+
+	it("hides the PRD CTA at other stages", () => {
+		renderWorkspace({ stage: "prd", onGeneratePrd: vi.fn() });
+		expect(
+			container.querySelector("[data-testid='codebase-stage-prd']"),
+		).toBeNull();
+	});
+
+	it("offers Lanjut Buat AC at the prd stage with busy state", () => {
+		renderWorkspace({
+			stage: "prd",
+			stageBusy: "ac",
+			onGenerateAc: vi.fn(),
+		});
+
+		const cta = container.querySelector("[data-testid='codebase-stage-ac']");
+		expect(cta).not.toBeNull();
+		expect(cta?.textContent).toContain(
+			"PRD siap. Lanjut generate Acceptance Criteria (AC)?",
+		);
+		const button = [...(cta?.querySelectorAll("button") ?? [])].find((b) =>
+			/Membuat AC/.test(b.textContent ?? ""),
+		);
+		expect(button?.disabled).toBe(true);
+	});
+
+	it("offers Lanjut Breakdown Task at the ac stage", () => {
+		const onGenerateTask = vi.fn();
+		renderWorkspace({ stage: "ac", onGenerateTask });
+
+		const cta = container.querySelector("[data-testid='codebase-stage-task']");
+		expect(cta).not.toBeNull();
+		expect(cta?.textContent).toContain(
+			"Acceptance Criteria siap. Lanjut breakdown Task & Papan Kanban?",
+		);
+
+		const button = [...(cta?.querySelectorAll("button") ?? [])].find((b) =>
+			/Lanjut Breakdown Task/.test(b.textContent ?? ""),
+		);
+		act(() => {
+			button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onGenerateTask).toHaveBeenCalledTimes(1);
+	});
+
+	it("renders stage errors with retry", () => {
+		const onRetryStage = vi.fn();
+		renderWorkspace({
+			stage: "prd",
+			stageError: "Generate AC hanya tersedia di paket Pro dan Hengker.",
+			onRetryStage,
+		});
+
+		const alert = container.querySelector(
+			"[data-testid='codebase-stage-error']",
+		);
+		expect(alert).not.toBeNull();
+		expect(alert?.textContent).toContain(
+			"Generate AC hanya tersedia di paket Pro dan Hengker.",
+		);
+
+		const retry = [...(alert?.querySelectorAll("button") ?? [])].find((b) =>
+			/Coba lagi/.test(b.textContent ?? ""),
+		);
+		act(() => {
+			retry?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onRetryStage).toHaveBeenCalledTimes(1);
+	});
+
+	it("renders the comprehensive handoff with both CLI commands", () => {
+		renderWorkspace({ projectIdForHandoff: "proj-123" });
+
+		const card = container.querySelector(
+			"[data-testid='codebase-handoff-card']",
+		);
+		expect(card).not.toBeNull();
+		expect(card?.textContent).toContain(
+			"npx vibeeverything export rules proj-123",
+		);
+		expect(card?.textContent).toContain(
+			"npx vibeeverything task next proj-123",
+		);
+		expect(card?.textContent).toContain("polling");
 	});
 });
