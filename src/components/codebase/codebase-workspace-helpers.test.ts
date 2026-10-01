@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { buildHandoffCommand } from "./codebase-chat-workspace";
 import {
-	filterExplorerFiles,
 	type ExplorerFileEntry,
+	filterExplorerFiles,
 } from "./codebase-explorer-sidebar";
 import { formatFileSize } from "./codebase-file-card";
 import { getCodebaseKanbanProgress } from "./codebase-kanban-board";
+import { parsePrdVersions, selectLatestPrdContent } from "./codebase-markdown";
 
 describe("formatFileSize", () => {
 	test("formats bytes below 1 KB", () => {
@@ -87,5 +88,41 @@ describe("getCodebaseKanbanProgress", () => {
 			total: 4,
 			pct: 100,
 		});
+	});
+});
+
+describe("parsePrdVersions", () => {
+	test("accepts rows with version and content", () => {
+		expect(
+			parsePrdVersions([
+				{ version: 1, content: "a" },
+				{ version: 2, content: "b" },
+			]),
+		).toEqual([
+			{ version: 1, content: "a" },
+			{ version: 2, content: "b" },
+		]);
+	});
+
+	test("rejects rows with missing content", () => {
+		expect(parsePrdVersions([{ version: 1 }])).toBeNull();
+		expect(parsePrdVersions(null)).toBeNull();
+	});
+});
+
+describe("selectLatestPrdContent", () => {
+	test("selects the content of the highest version", () => {
+		expect(
+			selectLatestPrdContent([
+				{ version: 1, content: "lama" },
+				{ version: 3, content: "baru" },
+				{ version: 2, content: "tengah" },
+			]),
+		).toBe("baru");
+	});
+
+	test("returns null when there are no rows or only blank content", () => {
+		expect(selectLatestPrdContent([])).toBeNull();
+		expect(selectLatestPrdContent([{ version: 1, content: "   " }])).toBeNull();
 	});
 });
