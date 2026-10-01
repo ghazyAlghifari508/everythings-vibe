@@ -84,6 +84,7 @@ import { Route as PrdShareTokenRouteImport } from './routes/prd/share/$token'
 import { Route as ApiCodebasesCodebaseIdFeaturesRouteImport } from './routes/api/codebases/$codebaseId/features'
 import { Route as ApiCodebasesCodebaseIdSessionRouteImport } from './routes/api/codebases/$codebaseId/session'
 import { Route as ApiCodebasesCodebaseIdStatusRouteImport } from './routes/api/codebases/$codebaseId/status'
+import { Route as ApiProjectsIdAcVersionsRouteImport } from './routes/api/projects/$id/ac-versions'
 import { Route as ApiProjectsIdLastRouteRouteImport } from './routes/api/projects/$id/last-route'
 import { Route as ApiProjectsIdResetProgressRouteImport } from './routes/api/projects/$id/reset-progress'
 import { Route as ApiProjectsIdStepRouteImport } from './routes/api/projects/$id/step'
@@ -486,6 +487,11 @@ const ApiCodebasesCodebaseIdStatusRoute =
     path: '/status',
     getParentRoute: () => ApiCodebasesCodebaseIdRoute,
   } as any)
+const ApiProjectsIdAcVersionsRoute = ApiProjectsIdAcVersionsRouteImport.update({
+  id: '/ac-versions',
+  path: '/ac-versions',
+  getParentRoute: () => ApiProjectsIdRoute,
+} as any)
 const ApiProjectsIdLastRouteRoute = ApiProjectsIdLastRouteRouteImport.update({
   id: '/last-route',
   path: '/last-route',
@@ -688,6 +694,7 @@ export interface FileRoutesByFullPath {
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
+  '/api/projects/$id/ac-versions': typeof ApiProjectsIdAcVersionsRoute
   '/api/projects/$id/last-route': typeof ApiProjectsIdLastRouteRoute
   '/api/projects/$id/reset-progress': typeof ApiProjectsIdResetProgressRoute
   '/api/projects/$id/step': typeof ApiProjectsIdStepRoute
@@ -783,6 +790,7 @@ export interface FileRoutesByTo {
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
+  '/api/projects/$id/ac-versions': typeof ApiProjectsIdAcVersionsRoute
   '/api/projects/$id/last-route': typeof ApiProjectsIdLastRouteRoute
   '/api/projects/$id/reset-progress': typeof ApiProjectsIdResetProgressRoute
   '/api/projects/$id/step': typeof ApiProjectsIdStepRoute
@@ -884,6 +892,7 @@ export interface FileRoutesById {
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
+  '/api/projects/$id/ac-versions': typeof ApiProjectsIdAcVersionsRoute
   '/api/projects/$id/last-route': typeof ApiProjectsIdLastRouteRoute
   '/api/projects/$id/reset-progress': typeof ApiProjectsIdResetProgressRoute
   '/api/projects/$id/step': typeof ApiProjectsIdStepRoute
@@ -986,6 +995,7 @@ export interface FileRouteTypes {
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
+    | '/api/projects/$id/ac-versions'
     | '/api/projects/$id/last-route'
     | '/api/projects/$id/reset-progress'
     | '/api/projects/$id/step'
@@ -1081,6 +1091,7 @@ export interface FileRouteTypes {
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
+    | '/api/projects/$id/ac-versions'
     | '/api/projects/$id/last-route'
     | '/api/projects/$id/reset-progress'
     | '/api/projects/$id/step'
@@ -1181,6 +1192,7 @@ export interface FileRouteTypes {
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
+    | '/api/projects/$id/ac-versions'
     | '/api/projects/$id/last-route'
     | '/api/projects/$id/reset-progress'
     | '/api/projects/$id/step'
@@ -1799,6 +1811,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCodebasesCodebaseIdStatusRouteImport
       parentRoute: typeof ApiCodebasesCodebaseIdRoute
     }
+    '/api/projects/$id/ac-versions': {
+      id: '/api/projects/$id/ac-versions'
+      path: '/ac-versions'
+      fullPath: '/api/projects/$id/ac-versions'
+      preLoaderRoute: typeof ApiProjectsIdAcVersionsRouteImport
+      parentRoute: typeof ApiProjectsIdRoute
+    }
     '/api/projects/$id/last-route': {
       id: '/api/projects/$id/last-route'
       path: '/last-route'
@@ -2078,6 +2097,7 @@ const ApiCodebasesCodebaseIdRouteWithChildren =
   )
 
 interface ApiProjectsIdRouteChildren {
+  ApiProjectsIdAcVersionsRoute: typeof ApiProjectsIdAcVersionsRoute
   ApiProjectsIdLastRouteRoute: typeof ApiProjectsIdLastRouteRoute
   ApiProjectsIdResetProgressRoute: typeof ApiProjectsIdResetProgressRoute
   ApiProjectsIdStepRoute: typeof ApiProjectsIdStepRoute
@@ -2085,6 +2105,7 @@ interface ApiProjectsIdRouteChildren {
 }
 
 const ApiProjectsIdRouteChildren: ApiProjectsIdRouteChildren = {
+  ApiProjectsIdAcVersionsRoute: ApiProjectsIdAcVersionsRoute,
   ApiProjectsIdLastRouteRoute: ApiProjectsIdLastRouteRoute,
   ApiProjectsIdResetProgressRoute: ApiProjectsIdResetProgressRoute,
   ApiProjectsIdStepRoute: ApiProjectsIdStepRoute,
