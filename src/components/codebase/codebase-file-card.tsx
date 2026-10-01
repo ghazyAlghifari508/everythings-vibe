@@ -15,6 +15,7 @@ interface CodebaseFileCardProps {
 	artifact: CodebaseArtifactRef;
 	active?: boolean;
 	onOpen?: (artifact: CodebaseArtifactRef) => void;
+	onDownload?: (artifact: CodebaseArtifactRef) => void;
 }
 
 export function formatFileSize(bytes: number): string {
@@ -29,6 +30,7 @@ export function CodebaseFileCard({
 	artifact,
 	active = false,
 	onOpen,
+	onDownload,
 }: CodebaseFileCardProps) {
 	const openArtifact = () => onOpen?.(artifact);
 
@@ -38,8 +40,9 @@ export function CodebaseFileCard({
 		openArtifact();
 	};
 
-	const stopDownloadPropagation = (event: MouseEvent<HTMLButtonElement>) => {
+	const handleDownloadClick = (event: MouseEvent<HTMLButtonElement>) => {
 		event.stopPropagation();
+		onDownload?.(artifact);
 	};
 
 	const content = (
@@ -99,14 +102,15 @@ export function CodebaseFileCard({
 					{content}
 				</div>
 			)}
-			<button
-				type="button"
-				onClick={stopDownloadPropagation}
-				aria-label={`Unduh ${artifact.fileName}`}
-				title="Unduh file"
-				data-testid="codebase-file-download"
-				className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-graphite bg-obsidian px-3 py-1.5 text-[13px] font-medium text-snow transition-colors hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-			>
+		<button
+			type="button"
+			onClick={handleDownloadClick}
+			aria-label={`Unduh ${artifact.fileName}`}
+			title="Unduh file"
+			data-testid="codebase-file-download"
+			disabled={!onDownload}
+			className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-graphite bg-obsidian px-3 py-1.5 text-[13px] font-medium text-snow transition-colors hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
+		>
 				<Download size={15} strokeWidth={1.75} aria-hidden="true" />
 				<span>Unduh</span>
 			</button>
