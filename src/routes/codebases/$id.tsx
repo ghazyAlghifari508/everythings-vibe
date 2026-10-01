@@ -1,15 +1,15 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import {
-	type FormEvent,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
-import { CodebaseReview } from "@/components/codebase/codebase-review";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CodebaseArtifactCanvas } from "@/components/codebase/codebase-artifact-canvas";
+import { CodebaseChatWorkspace } from "@/components/codebase/codebase-chat-workspace";
+import { CodebaseExplorerSidebar } from "@/components/codebase/codebase-explorer-sidebar";
+import type { CodebaseArtifactRef } from "@/components/codebase/codebase-file-card";
+import { CodebaseKanbanBoard } from "@/components/codebase/codebase-kanban-board";
+import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { SyncStatus } from "@/components/codebase/sync-status";
+import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
 	type AnalysisResponse,
 	safeParseCodebaseAnalysis,
@@ -23,6 +23,7 @@ import {
 	syncStatusResponseSchema,
 } from "@/lib/codebase-sync";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
+import { computeKanbanProgress } from "@/lib/kanban-utils";
 import { requireUserServer } from "@/lib/session";
 
 export function decideCodebaseDetailEntry(
@@ -183,7 +184,6 @@ function CodebaseDetailPage() {
 	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
 	const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
 	const [screen, setScreen] = useState<1 | 2 | 3>(1);
-	const [prompt, setPrompt] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [isStarting, setIsStarting] = useState(false);
 	const [isWorking, setIsWorking] = useState(false);
@@ -358,9 +358,105 @@ function CodebaseDetailPage() {
 	const snapshotReady = Boolean(
 		status?.snapshotId && SNAPSHOT_CONTEXT_STATUSES.includes(status.status),
 	);
-	const submitFeature = async (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault();
-		if (!snapshotReady || prompt.trim().length < 3) return;
+	const [canvasOpen, setCanvasOpen] = useState(true);
+	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
+	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
+		"kanban",
+	);
+
+	const kanban = useKanbanTasks({
+		projectId: feature?.id ?? "",
+		enabled: snapshotReady && Boolean(feature?.id),
+	});
+	const kanbanProgress = useMemo(() => {
+		if (!kanban.data?.columns) return null;
+		return computeKanbanProgress(kanban.data.columns);
+	}, [kanban.data]);
+
+	const analysisOutput = analysis?.output ?? null;
+	const explorerFiles = useMemo(() => {
+		if (!analysisOutput) return [];
+		const seen = new Set<string>();
+		const entries: Array<{ path: string; summary?: string }> = [];
+		for (const item of analysisOutput.moduleMap ?? []) {
+			if (!seen.has(item.path)) {
+				seen.add(item.path);
+				entries.push({ path: item.path, summary: item.summary });
+			}
+		}
+		for (const path of analysisOutput.relevantFiles ?? []) {
+			if (!seen.has(path)) {
+				seen.add(path);
+				entries.push({ path });
+			}
+		}
+		return entries;
+	}, [analysisOutput]);
+	const explorerStack = useMemo(() => {
+		if (!analysisOutput) return [];
+		const raw = [
+			analysisOutput.framework,
+			analysisOutput.language,
+			analysisOutput.database,
+			analysisOutput.auth,
+			analysisOutput.packageManager,
+			...(analysisOutput.dependencies ?? []).slice(0, 5),
+		];
+		return raw.filter(
+			(value): value is string =>
+				typeof value === "string" &&
+				value.trim().length > 0 &&
+				value.trim() !== "Tidak terdeteksi",
+		);
+	}, [analysisOutput]);
+	const contextFiles = useMemo(
+		() => (analysisOutput?.relevantFiles ?? []).slice(0, 2),
+		[analysisOutput],
+	);
+	const featureSlug = useMemo(() => {
+		const base = (feature?.name ?? codebase.name)
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 40);
+		return base || "fitur";
+	}, [feature?.name, codebase.name]);
+	const artifacts = useMemo<CodebaseArtifactRef[]>(() => {
+		if (!feature) return [];
+		const list: CodebaseArtifactRef[] = [
+			{
+				id: `feature-${feature.id}`,
+				fileName: `feature-${featureSlug}.json`,
+				fileSizeBytes: null,
+				badge: "FITUR",
+				description: `Spesifikasi fitur ${feature.name}`,
+			},
+		];
+		if (kanbanProgress && kanbanProgress.total > 0) {
+			list.push({
+				id: `tasks-${feature.id}`,
+				fileName: `tasks-${featureSlug}.json`,
+				fileSizeBytes: null,
+				badge: "KANBAN LIVE",
+				description: `Task tree dan papan Kanban live`,
+			});
+		}
+		return list;
+	}, [feature, featureSlug, kanbanProgress]);
+	const activeArtifact =
+		artifacts.find((item) => item.id === activeArtifactId) ?? null;
+	const isTasksArtifactActive =
+		Boolean(activeArtifact) &&
+		feature != null &&
+		activeArtifact?.id === `tasks-${feature.id}`;
+
+	const ensureFeatureAndGo = async (message: string) => {
+		const trimmed = message.trim();
+		if (!snapshotReady || trimmed.length < 3 || isWorking) return;
+		if (feature?.id) {
+			await navigate({ to: "/ask/$id", params: { id: feature.id } });
+			return;
+		}
 		setIsWorking(true);
 		setError(null);
 		try {
@@ -369,7 +465,7 @@ function CodebaseDetailPage() {
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ message: prompt.trim() }),
+					body: JSON.stringify({ message: trimmed }),
 				},
 			);
 			const body: unknown = await response.json().catch(() => null);
@@ -378,9 +474,7 @@ function CodebaseDetailPage() {
 				typeof body !== "object" ||
 				body === null ||
 				!("projectId" in body) ||
-				typeof body.projectId !== "string" ||
-				!("name" in body) ||
-				typeof body.name !== "string"
+				typeof body.projectId !== "string"
 			) {
 				setError("Fitur gagal dibuat. Coba lagi.");
 				return;
@@ -392,6 +486,364 @@ function CodebaseDetailPage() {
 			setIsWorking(false);
 		}
 	};
+
+	const handleSubmitAnswers = (answers: Record<string, string>) => {
+		const message = Object.values(answers)
+			.map((value) => value.trim())
+			.filter((value) => value.length > 0)
+			.join(" ");
+		void ensureFeatureAndGo(
+			message.length >= 3
+				? `Rencanakan fitur ${feature?.name ?? codebase.name}: ${message}`
+				: `Rencanakan fitur ${feature?.name ?? codebase.name}`,
+		);
+	};
+
+	if (snapshotReady) {
+		const kanbanColumns = kanban.data?.columns ?? null;
+		return (
+			<main
+				data-testid="codebase-workspace-page"
+				className="flex h-dvh flex-col overflow-hidden bg-onyx text-snow"
+			>
+				<header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-graphite bg-charcoal px-4">
+					<div className="flex min-w-0 items-center gap-2">
+						<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-snow text-xs font-extrabold text-onyx">
+							V
+						</span>
+						<span className="shrink-0 text-[13px] font-semibold">
+							VibeEverything
+						</span>
+						<span aria-hidden="true" className="shrink-0 text-slate">
+							/
+						</span>
+						<span className="flex min-w-0 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 py-1 font-mono text-xs text-mist">
+							<span
+								aria-hidden="true"
+								className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald"
+							/>
+							<span className="truncate">{codebase.name}</span>
+						</span>
+					</div>
+					<button
+						type="button"
+						onClick={() => setCanvasOpen((current) => !current)}
+						aria-expanded={canvasOpen}
+						className="inline-flex min-h-9 shrink-0 items-center rounded-md border border-graphite bg-obsidian px-3 text-xs font-medium text-mist transition hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						{canvasOpen ? "Tutup Preview" : "Buka Preview"}
+					</button>
+				</header>
+				{error && (
+					<div
+						role="alert"
+						className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-crimson/40 bg-crimson/10 px-4 py-2 text-xs text-crimson"
+					>
+						<span>{error}</span>
+						<button
+							type="button"
+							onClick={() => void readStatus()}
+							className="min-h-9 rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							Coba lagi
+						</button>
+					</div>
+				)}
+				<div className="min-h-0 flex-1">
+					<CodebaseWorkspaceShell
+						canvasOpen={canvasOpen}
+						leftPane={
+							<CodebaseExplorerSidebar
+								codebaseName={codebase.name}
+								fileCount={status?.fileCount}
+								files={explorerFiles}
+								stack={explorerStack}
+							/>
+						}
+						chatPane={
+							<CodebaseChatWorkspace
+								codebaseName={codebase.name}
+								featureName={feature?.name ?? codebase.name}
+								contextFiles={contextFiles}
+								kanbanProgress={kanbanProgress}
+								questions={[
+									{
+										id: "storage",
+										title:
+											"Bagaimana mekanisme penyimpanan data fitur yang Anda inginkan?",
+										options: [
+											{
+												id: "local",
+												label: "Penyimpanan lokal di browser tanpa akun login.",
+											},
+											{
+												id: "database",
+												label:
+													"Database PostgreSQL terautentikasi berelasi user_id.",
+												recommended: true,
+											},
+										],
+										customPlaceholder:
+											"Atau ketik preferensi penyimpanan sendiri...",
+									},
+									{
+										id: "feedback",
+										title: "Bagaimana feedback UI saat aksi utama berhasil?",
+										options: [
+											{
+												id: "toast",
+												label:
+													"Toast notification interaktif dengan tombol Undo.",
+												recommended: true,
+											},
+											{
+												id: "inline",
+												label: "Indikator inline berubah tanpa popup banner.",
+											},
+										],
+									},
+								]}
+								artifacts={artifacts}
+								activeArtifactId={activeArtifactId}
+								projectIdForHandoff={feature?.id ?? null}
+								isSending={isWorking}
+								onOpenArtifact={(artifact) => {
+									setActiveArtifactId(artifact.id);
+									if (feature && artifact.id === `tasks-${feature.id}`) {
+										setCanvasView("kanban");
+									}
+									setCanvasOpen(true);
+								}}
+								onSubmitAnswers={handleSubmitAnswers}
+								onSendMessage={(message) => void ensureFeatureAndGo(message)}
+							/>
+						}
+						canvasPane={
+							<CodebaseArtifactCanvas
+								fileName={activeArtifact?.fileName ?? "Preview artefak"}
+								badge={activeArtifact?.badge ?? "PRATINJAU"}
+								onClose={() => setCanvasOpen(false)}
+								subnav={
+									isTasksArtifactActive ? (
+										<>
+											<fieldset
+												aria-label="Mode tampilan task"
+												className="flex rounded-md border border-graphite bg-obsidian p-0.5"
+											>
+												<legend className="sr-only">Mode tampilan task</legend>
+												<button
+													type="button"
+													onClick={() => setCanvasView("kanban")}
+													aria-pressed={canvasView === "kanban"}
+													className={`min-h-8 rounded px-2.5 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+														canvasView === "kanban"
+															? "bg-steel/40 text-snow"
+															: "text-fog hover:text-snow"
+													}`}
+												>
+													Papan Kanban
+												</button>
+												<button
+													type="button"
+													onClick={() => setCanvasView("checklist")}
+													aria-pressed={canvasView === "checklist"}
+													className={`min-h-8 rounded px-2.5 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+														canvasView === "checklist"
+															? "bg-steel/40 text-snow"
+															: "text-fog hover:text-snow"
+													}`}
+												>
+													Checklist Tree
+												</button>
+											</fieldset>
+											<span className="font-mono text-[10px] text-slate">
+												{kanban.staleness === "live"
+													? "Live dari database"
+													: "Data terakhir"}
+											</span>
+										</>
+									) : undefined
+								}
+							>
+								{!activeArtifact || !feature ? (
+									<div className="flex h-full flex-col items-start justify-center gap-3 p-2">
+										<p className="text-sm font-semibold text-snow">
+											Belum ada artefak terpilih
+										</p>
+										<p className="max-w-sm text-xs leading-5 text-fog">
+											Pilih FileCard di kolom chat untuk preview, atau lanjutkan
+											ke tahap berikut setelah fitur dibuat.
+										</p>
+										{feature ? (
+											<div className="flex flex-wrap gap-2">
+												<button
+													type="button"
+													onClick={() =>
+														void navigate({
+															to: "/ask/$id",
+															params: { id: feature.id },
+														})
+													}
+													className="inline-flex min-h-11 items-center rounded-md bg-snow px-3 text-xs font-semibold text-onyx hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+												>
+													Buka tanya jawab
+												</button>
+												<button
+													type="button"
+													onClick={() =>
+														void navigate({
+															to: "/kanban/$id",
+															params: { id: feature.id },
+														})
+													}
+													className="inline-flex min-h-11 items-center rounded-md border border-graphite bg-charcoal px-3 text-xs font-medium text-snow hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+												>
+													Buka board penuh
+												</button>
+											</div>
+										) : null}
+									</div>
+								) : isTasksArtifactActive ? (
+									canvasView === "kanban" ? (
+										<CodebaseKanbanBoard
+											projectId={feature.id}
+											columns={kanbanColumns}
+											staleness={kanban.staleness}
+											isLoadingExternal={kanban.isLoading}
+											isErrorExternal={kanban.isError}
+											onRetryExternal={() => void kanban.refetch()}
+										/>
+									) : (
+										<div
+											data-testid="codebase-checklist-tree"
+											className="flex flex-col gap-4"
+										>
+											{kanbanColumns &&
+											(kanbanColumns.pending.length > 0 ||
+												kanbanColumns.in_progress.length > 0 ||
+												kanbanColumns.completed.length > 0) ? (
+												(
+													[
+														["pending", "To Do", kanbanColumns.pending],
+														[
+															"in_progress",
+															"In Progress",
+															kanbanColumns.in_progress,
+														],
+														["completed", "Done", kanbanColumns.completed],
+													] as const
+												).map(([key, label, cards]) => (
+													<div key={key} className="flex flex-col gap-2">
+														<p className="font-mono text-[11px] font-semibold uppercase text-indigo">
+															{label} ({cards.length})
+														</p>
+														{cards.length === 0 ? (
+															<p className="text-[11px] italic text-slate">
+																Tidak ada task pada status ini.
+															</p>
+														) : (
+															cards.map((card) => (
+																<label
+																	key={card.id}
+																	className="flex cursor-default items-start gap-2.5 rounded-lg border border-graphite bg-charcoal p-2.5"
+																>
+																	<input
+																		type="checkbox"
+																		checked={card.status === "completed"}
+																		disabled
+																		readOnly
+																		aria-label={card.name}
+																		className="mt-0.5 h-4 w-4 shrink-0 rounded border border-graphite align-middle"
+																	/>
+																	<span
+																		className={`min-w-0 flex-1 text-xs leading-5 ${
+																			card.status === "completed"
+																				? "text-slate line-through"
+																				: "text-mist"
+																		}`}
+																	>
+																		{card.name}
+																	</span>
+																</label>
+															))
+														)}
+													</div>
+												))
+											) : (
+												<p className="text-xs text-fog">
+													{kanban.isLoading
+														? "Memuat task..."
+														: "Belum ada task pada project ini."}
+												</p>
+											)}
+										</div>
+									)
+								) : (
+									<div className="flex flex-col gap-3">
+										<div className="rounded-lg border border-graphite bg-charcoal p-3">
+											<p className="font-mono text-[11px] uppercase tracking-wider text-slate">
+												Fitur
+											</p>
+											<p className="mt-1 text-sm font-semibold text-snow">
+												{feature.name}
+											</p>
+											<p className="mt-1 font-mono text-[11px] text-fog">
+												Project: {feature.id}
+											</p>
+											{status?.snapshotId ? (
+												<p className="mt-1 font-mono text-[11px] text-fog">
+													Snapshot: {status.snapshotId}
+												</p>
+											) : null}
+										</div>
+										{analysisOutput?.impactAreas &&
+										analysisOutput.impactAreas.length > 0 ? (
+											<div className="rounded-lg border border-graphite bg-charcoal p-3">
+												<p className="font-mono text-[11px] uppercase tracking-wider text-slate">
+													Area dampak terdeteksi
+												</p>
+												<ul className="mt-1.5 flex list-disc flex-col gap-1 pl-5 text-xs leading-5 text-fog">
+													{analysisOutput.impactAreas.map((area) => (
+														<li key={area}>{area}</li>
+													))}
+												</ul>
+											</div>
+										) : null}
+										<div className="flex flex-wrap gap-2">
+											<button
+												type="button"
+												onClick={() =>
+													void navigate({
+														to: "/ask/$id",
+														params: { id: feature.id },
+													})
+												}
+												className="inline-flex min-h-11 items-center rounded-md bg-snow px-3 text-xs font-semibold text-onyx hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											>
+												Buka tanya jawab
+											</button>
+											<button
+												type="button"
+												onClick={() =>
+													void navigate({
+														to: "/kanban/$id",
+														params: { id: feature.id },
+													})
+												}
+												className="inline-flex min-h-11 items-center rounded-md border border-graphite bg-charcoal px-3 text-xs font-medium text-snow hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											>
+												Buka board penuh
+											</button>
+										</div>
+									</div>
+								)}
+							</CodebaseArtifactCanvas>
+						}
+					/>
+				</div>
+			</main>
+		);
+	}
 
 	return (
 		<main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14">
@@ -435,37 +887,6 @@ function CodebaseDetailPage() {
 					</button>
 				</div>
 			)}
-			<nav
-				className="flex flex-wrap gap-2 border-b border-graphite pb-3"
-				aria-label="Tahap codebase"
-			>
-				<button
-					type="button"
-					onClick={() => setScreen(1)}
-					aria-current={screen === 1 ? "step" : undefined}
-					className="min-h-11 rounded-md border border-graphite px-3 text-xs text-fog hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					01 Hubungkan
-				</button>
-				<button
-					type="button"
-					disabled={!status?.snapshotId}
-					onClick={() => setScreen(2)}
-					aria-current={screen === 2 ? "step" : undefined}
-					className="min-h-11 rounded-md border border-graphite px-3 text-xs text-fog disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					02 Sync
-				</button>
-				<button
-					type="button"
-					disabled={!canRenderCodebaseReview(analysis, status)}
-					onClick={() => setScreen(3)}
-					aria-current={screen === 3 ? "step" : undefined}
-					className="min-h-11 rounded-md border border-graphite px-3 text-xs text-fog disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					03 Review
-				</button>
-			</nav>
 			{screen === 1 && (
 				<ScreenConnect
 					projectName={codebase.name}
@@ -490,87 +911,8 @@ function CodebaseDetailPage() {
 								}
 							: undefined
 					}
-					onViewReview={
-						canRenderCodebaseReview(analysis, status)
-							? () => setScreen(3)
-							: undefined
-					}
 				/>
 			)}
-			{screen === 3 &&
-				analysis?.output &&
-				canRenderCodebaseReview(analysis, status) &&
-				status?.snapshotId && (
-					<CodebaseReview
-						analysis={analysis.output}
-						snapshotId={status.snapshotId}
-						snapshotCreatedAt={status.snapshotCreatedAt}
-						fileCount={status.fileCount}
-						excludedCount={status.excludedCount}
-						isWorking={isWorking}
-						errorMessage={error}
-						onRetrySync={() => void startSession("retry")}
-						onRetryAnalysis={
-							feature && status?.snapshotId
-								? () => {
-										const snapshotId = status.snapshotId;
-										if (snapshotId) void triggerAnalysis(snapshotId);
-									}
-								: undefined
-						}
-						onBackToSync={() => setScreen(2)}
-						onContinue={() => setScreen(2)}
-					/>
-				)}
-			<section className="rounded-xl border border-graphite bg-charcoal p-5 sm:p-6">
-				<div className="flex flex-col gap-2">
-					<h2 className="text-lg font-semibold text-snow">
-						Rencanakan fitur baru
-					</h2>
-					<p className="text-sm leading-6 text-fog">
-						Form aktif setelah snapshot selesai diupload. Tanpa snapshot,
-						halaman ini hanya menampilkan status sync yang sebenarnya.
-					</p>
-				</div>
-				<form
-					onSubmit={(event) => void submitFeature(event)}
-					className="mt-5 flex flex-col gap-3"
-				>
-					<label
-						htmlFor="feature-prompt"
-						className="text-sm font-medium text-snow"
-					>
-						Prompt fitur
-					</label>
-					<textarea
-						id="feature-prompt"
-						value={prompt}
-						onChange={(event) => setPrompt(event.target.value)}
-						disabled={!snapshotReady || isWorking}
-						rows={4}
-						placeholder={
-							snapshotReady
-								? "Fitur apa yang ingin direncanakan?"
-								: "Tunggu snapshot selesai disinkronkan"
-						}
-						className="resize-y rounded-lg border border-graphite bg-obsidian p-3 text-sm text-snow outline-none placeholder:text-slate focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
-					/>
-					<div className="flex flex-wrap items-center justify-between gap-3">
-						<span className="text-xs text-fog">
-							{snapshotReady
-								? "Snapshot siap menjadi konteks fitur."
-								: "Snapshot belum siap."}
-						</span>
-						<button
-							type="submit"
-							disabled={!snapshotReady || prompt.trim().length < 3 || isWorking}
-							className="min-h-11 rounded-md bg-snow px-4 text-sm font-semibold text-onyx disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							{isWorking ? "Memproses..." : "Buat fitur"}
-						</button>
-					</div>
-				</form>
-			</section>
 		</main>
 	);
 }
