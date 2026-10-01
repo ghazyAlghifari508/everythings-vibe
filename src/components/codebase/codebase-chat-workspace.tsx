@@ -64,6 +64,7 @@ interface CodebaseChatWorkspaceProps {
 	onConfirmGenerate?: () => void;
 	onRetryQuestions?: () => void;
 	onRetryGenerate?: () => void;
+	onRetryStage?: () => void;
 	onGeneratePrd?: () => void;
 	onGenerateAc?: () => void;
 	onGenerateTask?: () => void;
@@ -108,6 +109,7 @@ export function CodebaseChatWorkspace({
 	onConfirmGenerate,
 	onRetryQuestions,
 	onRetryGenerate,
+	onRetryStage,
 	onGeneratePrd,
 	onGenerateAc,
 	onGenerateTask,
@@ -436,7 +438,7 @@ export function CodebaseChatWorkspace({
 							) : null}
 						</div>
 					) : null}
-					{flowComplete ? (
+					{flowComplete && stage === "questions" ? (
 						<div
 							data-testid="codebase-questions-complete"
 							className="rounded-xl border border-emerald/30 bg-obsidian p-4"
@@ -459,189 +461,190 @@ export function CodebaseChatWorkspace({
 							</div>
 						</div>
 					) : null}
-				{artifacts.length > 0 ? (
-					<div className="flex flex-col">
-						{artifacts.map((artifact) => (
-							<CodebaseFileCard
-								key={artifact.id}
-								artifact={artifact}
-								active={artifact.id === activeArtifactId}
-								onOpen={onOpenArtifact}
-								onDownload={onDownloadArtifact}
-							/>
-						))}
-					</div>
-				) : null}
-				{stageError ? (
-					<div
-						role="alert"
-						data-testid="codebase-stage-error"
-						className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
-					>
-						<span>{stageError}</span>
-						{onRetryGenerate ? (
-							<button
-								type="button"
-								onClick={onRetryGenerate}
-								className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								Coba lagi
-							</button>
-						) : null}
-					</div>
-				) : null}
-				{stage === "feature" && onGeneratePrd ? (
-					<StageCta
-						testId="codebase-stage-prd"
-						message="Fitur berhasil disusun. Lanjut susun PRD 8 seksi?"
-						buttonLabel="Lanjut Buat PRD"
-						busyLabel="Menyusun PRD..."
-						busy={stageBusy === "prd"}
-						onAction={onGeneratePrd}
-					/>
-				) : null}
-				{stage === "prd" && onGenerateAc ? (
-					<StageCta
-						testId="codebase-stage-ac"
-						message="PRD siap. Lanjut generate Acceptance Criteria (AC)?"
-						buttonLabel="Lanjut Buat AC"
-						busyLabel="Membuat AC..."
-						busy={stageBusy === "ac"}
-						onAction={onGenerateAc}
-					/>
-				) : null}
-				{stage === "ac" && onGenerateTask ? (
-					<StageCta
-						testId="codebase-stage-task"
-						message="Acceptance Criteria siap. Lanjut breakdown Task & Papan Kanban?"
-						buttonLabel="Lanjut Breakdown Task"
-						busyLabel="Membagi task..."
-						busy={stageBusy === "task"}
-						onAction={onGenerateTask}
-					/>
-				) : null}
-				{handoffCmd && exportCmd && taskCmd ? (
-					<div
-						data-testid="codebase-handoff-card"
-						className="rounded-xl border border-emerald/30 bg-obsidian p-4"
-					>
-						<div className="flex items-center justify-between gap-2">
-							<p className="text-[13px] font-semibold text-emerald">
-								Handoff ke AI Coding Agent
+					{artifacts.length > 0 ? (
+						<div className="flex flex-col">
+							{artifacts.map((artifact) => (
+								<CodebaseFileCard
+									key={artifact.id}
+									artifact={artifact}
+									active={artifact.id === activeArtifactId}
+									onOpen={onOpenArtifact}
+									onDownload={onDownloadArtifact}
+								/>
+							))}
+						</div>
+					) : null}
+					{stageError ? (
+						<div
+							role="alert"
+							data-testid="codebase-stage-error"
+							className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+						>
+							<span>{stageError}</span>
+							{onRetryStage ? (
+								<button
+									type="button"
+									onClick={onRetryStage}
+									className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									Coba lagi
+								</button>
+							) : null}
+						</div>
+					) : null}
+					{stage === "feature" && onGeneratePrd ? (
+						<StageCta
+							testId="codebase-stage-prd"
+							message="Fitur berhasil disusun. Lanjut susun PRD 8 seksi?"
+							buttonLabel="Lanjut Buat PRD"
+							busyLabel="Menyusun PRD..."
+							busy={stageBusy === "prd"}
+							onAction={onGeneratePrd}
+						/>
+					) : null}
+					{stage === "prd" && onGenerateAc ? (
+						<StageCta
+							testId="codebase-stage-ac"
+							message="PRD siap. Lanjut generate Acceptance Criteria (AC)?"
+							buttonLabel="Lanjut Buat AC"
+							busyLabel="Membuat AC..."
+							busy={stageBusy === "ac"}
+							onAction={onGenerateAc}
+						/>
+					) : null}
+					{stage === "ac" && onGenerateTask ? (
+						<StageCta
+							testId="codebase-stage-task"
+							message="Acceptance Criteria siap. Lanjut breakdown Task & Papan Kanban?"
+							buttonLabel="Lanjut Breakdown Task"
+							busyLabel="Membagi task..."
+							busy={stageBusy === "task"}
+							onAction={onGenerateTask}
+						/>
+					) : null}
+					{handoffCmd && exportCmd && taskCmd ? (
+						<div
+							data-testid="codebase-handoff-card"
+							className="rounded-xl border border-emerald/30 bg-obsidian p-4"
+						>
+							<div className="flex items-center justify-between gap-2">
+								<p className="text-[13px] font-semibold text-emerald">
+									Handoff ke AI Coding Agent
+								</p>
+								<button
+									type="button"
+									onClick={handleCopyCmd}
+									className="inline-flex min-h-9 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									{copiedCmd ? (
+										<>
+											<Check
+												size={12}
+												aria-hidden="true"
+												className="text-emerald"
+											/>
+											<span className="text-emerald">Tersalin</span>
+										</>
+									) : (
+										<>
+											<Copy size={12} aria-hidden="true" />
+											<span>Salin perintah lengkap</span>
+										</>
+									)}
+								</button>
+							</div>
+							<p className="mt-1.5 text-xs leading-5 text-fog">
+								Seluruh tahap selesai: pohon fitur, PRD 8 seksi, Acceptance
+								Criteria, dan task sudah tersimpan. Salin blok perintah berikut
+								ke AI Coding Agent eksternal (Cursor, Claude Code, Windsurf,
+								dll.) dan jalankan di root repository
+								{codebaseName ? ` ${codebaseName}` : ""}.
 							</p>
-							<button
-								type="button"
-								onClick={handleCopyCmd}
-								className="inline-flex min-h-9 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								{copiedCmd ? (
-									<>
-										<Check
-											size={12}
-											aria-hidden="true"
-											className="text-emerald"
-										/>
-										<span className="text-emerald">Tersalin</span>
-									</>
-								) : (
-									<>
-										<Copy size={12} aria-hidden="true" />
-										<span>Salin perintah lengkap</span>
-									</>
-								)}
-							</button>
-						</div>
-						<p className="mt-1.5 text-xs leading-5 text-fog">
-							Seluruh tahap selesai: pohon fitur, PRD 8 seksi, Acceptance
-							Criteria, dan task sudah tersimpan. Salin blok perintah berikut
-							ke AI Coding Agent eksternal (Cursor, Claude Code, Windsurf, dll.)
-							dan jalankan di root repository{codebaseName ? ` ${codebaseName}` : ""}.
-						</p>
-						<div className="mt-3 flex flex-col gap-2.5">
-							<div>
-								<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
-									Langkah 1 — Ekspor aturan proyek
-								</p>
-								<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
-									<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
-										{exportCmd}
-									</code>
-									<button
-										type="button"
-										onClick={() =>
-											handleCopy(exportCmd, (value) => setCopiedExport(value))
-										}
-										aria-label="Salin perintah export rules"
-										className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										{copiedExport ? (
-											<>
-												<Check
-													size={11}
-													aria-hidden="true"
-													className="text-emerald"
-												/>
-												<span className="text-emerald">Tersalin</span>
-											</>
-										) : (
-											<>
-												<Copy size={11} aria-hidden="true" />
-												<span>Salin</span>
-											</>
-										)}
-									</button>
+							<div className="mt-3 flex flex-col gap-2.5">
+								<div>
+									<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
+										Langkah 1 — Ekspor aturan proyek
+									</p>
+									<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
+										<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
+											{exportCmd}
+										</code>
+										<button
+											type="button"
+											onClick={() =>
+												handleCopy(exportCmd, (value) => setCopiedExport(value))
+											}
+											aria-label="Salin perintah export rules"
+											className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+										>
+											{copiedExport ? (
+												<>
+													<Check
+														size={11}
+														aria-hidden="true"
+														className="text-emerald"
+													/>
+													<span className="text-emerald">Tersalin</span>
+												</>
+											) : (
+												<>
+													<Copy size={11} aria-hidden="true" />
+													<span>Salin</span>
+												</>
+											)}
+										</button>
+									</div>
+									<p className="mt-1 text-[10.5px] leading-4 text-slate">
+										Menulis file aturan proyek (AGENTS.md dan setara) berisi
+										konteks codebase, skema, dan konvensi yang dipakai agent.
+									</p>
 								</div>
-								<p className="mt-1 text-[10.5px] leading-4 text-slate">
-									Menulis file aturan proyek (AGENTS.md dan setara) berisi
-									konteks codebase, skema, dan konvensi yang dipakai agent.
-								</p>
-							</div>
-							<div>
-								<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
-									Langkah 2 — Kerjakan task bertahap
-								</p>
-								<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
-									<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
-										{taskCmd}
-									</code>
-									<button
-										type="button"
-										onClick={() =>
-											handleCopy(taskCmd, (value) => setCopiedTask(value))
-										}
-										aria-label="Salin perintah task next"
-										className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										{copiedTask ? (
-											<>
-												<Check
-													size={11}
-													aria-hidden="true"
-													className="text-emerald"
-												/>
-												<span className="text-emerald">Tersalin</span>
-											</>
-										) : (
-											<>
-												<Copy size={11} aria-hidden="true" />
-												<span>Salin</span>
-											</>
-										)}
-									</button>
+								<div>
+									<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
+										Langkah 2 — Kerjakan task bertahap
+									</p>
+									<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
+										<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
+											{taskCmd}
+										</code>
+										<button
+											type="button"
+											onClick={() =>
+												handleCopy(taskCmd, (value) => setCopiedTask(value))
+											}
+											aria-label="Salin perintah task next"
+											className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+										>
+											{copiedTask ? (
+												<>
+													<Check
+														size={11}
+														aria-hidden="true"
+														className="text-emerald"
+													/>
+													<span className="text-emerald">Tersalin</span>
+												</>
+											) : (
+												<>
+													<Copy size={11} aria-hidden="true" />
+													<span>Salin</span>
+												</>
+											)}
+										</button>
+									</div>
+									<p className="mt-1 text-[10.5px] leading-4 text-slate">
+										Mengambil task prioritas berikutnya dari papan Kanban
+										beserta konteks PRD dan AC yang relevan.
+									</p>
 								</div>
-								<p className="mt-1 text-[10.5px] leading-4 text-slate">
-									Mengambil task prioritas berikutnya dari papan Kanban beserta
-									konteks PRD dan AC yang relevan.
-								</p>
 							</div>
+							<p className="mt-3 text-[11px] leading-5 text-slate">
+								Mekanisme progres: saat agent menyelesaikan task via CLI, kartu
+								di Papan Kanban kanan berpindah kolom secara real-time melalui
+								polling. Tidak perlu me-refresh manual.
+							</p>
 						</div>
-						<p className="mt-3 text-[11px] leading-5 text-slate">
-							Mekanisme progres: saat agent menyelesaikan task via CLI, kartu di
-							Papan Kanban kanan berpindah kolom secara real-time melalui
-							polling. Tidak perlu me-refresh manual.
-						</p>
-					</div>
-				) : null}
+					) : null}
 				</div>
 			</div>
 			<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
