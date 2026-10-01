@@ -6,25 +6,30 @@ import {
 	type AdaptiveQuestion,
 	type ChatStreamMessage,
 	CodebaseChatWorkspace,
+	type PipelineStage,
 } from "@/components/codebase/codebase-chat-workspace";
+import { CodebaseDocPreview } from "@/components/codebase/codebase-doc-preview";
 import { CodebaseExplorerSidebar } from "@/components/codebase/codebase-explorer-sidebar";
 import type { CodebaseArtifactRef } from "@/components/codebase/codebase-file-card";
 import { CodebaseKanbanBoard } from "@/components/codebase/codebase-kanban-board";
 import {
-	CodebaseMarkdown,
 	parseVersionRows,
 	selectLatestVersionContent,
 } from "@/components/codebase/codebase-markdown";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { SyncStatus } from "@/components/codebase/sync-status";
+import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
+import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
+import type { ProjectFeatureTree } from "@/db/schema";
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
 	type AnalysisResponse,
 	safeParseCodebaseAnalysis,
 } from "@/lib/codebase-analysis";
 import { buildFeatureMessage } from "@/lib/codebase-chat-flow";
+import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
 	detectStackFromPackageJsonText,
 	manifestToExplorerFiles,
@@ -40,6 +45,7 @@ import {
 } from "@/lib/codebase-sync";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
+import type { TaskTree } from "@/lib/services/task-service";
 import { requireUserServer } from "@/lib/session";
 
 export function decideCodebaseDetailEntry(
@@ -237,6 +243,55 @@ const loadSnapshotManifest = createServerFn({ method: "GET" })
 			fileCount: snapshot.fileCount ?? manifest.length,
 			packageJsonText,
 		};
+	});
+
+const loadFeatureTree = createServerFn({ method: "GET" })
+	.validator((id: string) => id)
+	.handler(async ({ data: id }) => {
+		const user = await requireUserServer();
+		const { db } = await import("@/db");
+		const { projects } = await import("@/db/schema");
+		const { and, eq, isNull } = await import("drizzle-orm");
+		const { featureTreeSchema } = await import(
+			"@/lib/services/feature-service"
+		);
+		const [row] = await db
+			.select({ featureTree: projects.featureTree })
+			.from(projects)
+			.where(
+				and(
+					eq(projects.id, id),
+					eq(projects.userId, user.id),
+					isNull(projects.deletedAt),
+				),
+			)
+			.limit(1);
+		if (!row) return { featureTree: null };
+		const parsed = featureTreeSchema.safeParse(row.featureTree);
+		return { featureTree: parsed.success ? parsed.data : null };
+	});
+
+const loadTaskTree = createServerFn({ method: "GET" })
+	.validator((id: string) => id)
+	.handler(async ({ data: id }) => {
+		const user = await requireUserServer();
+		const { db } = await import("@/db");
+		const { projects } = await import("@/db/schema");
+		const { and, eq, isNull } = await import("drizzle-orm");
+		const { getTaskTree } = await import("@/lib/services/task-service");
+		const [row] = await db
+			.select({ id: projects.id })
+			.from(projects)
+			.where(
+				and(
+					eq(projects.id, id),
+					eq(projects.userId, user.id),
+					isNull(projects.deletedAt),
+				),
+			)
+			.limit(1);
+		if (!row) return { taskTree: null };
+		return { taskTree: await getTaskTree(id) };
 	});
 
 export const Route = createFileRoute("/codebases/$id")({
@@ -506,7 +561,6 @@ function CodebaseDetailPage() {
 	const resolvedFeature = activeFeature ?? feature;
 	const effectiveFeatureId = resolvedFeature?.id ?? null;
 	const [canvasOpen, setCanvasOpen] = useState(false);
-	const [specGenerated, setSpecGenerated] = useState(false);
 	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
 		"kanban",
@@ -517,6 +571,14 @@ function CodebaseDetailPage() {
 	const [acContent, setAcContent] = useState<string | null>(null);
 	const [acLoading, setAcLoading] = useState(false);
 	const [acError, setAcError] = useState<string | null>(null);
+	const [featureTree, setFeatureTree] = useState<ProjectFeatureTree | null>(
+		null,
+	);
+	const [taskTree, setTaskTree] = useState<TaskTree | null>(null);
+	const [pipelineStage, setPipelineStage] =
+		useState<PipelineStage>("questions");
+	const [stageBusy, setStageBusy] = useState<PipelineStage | null>(null);
+	const [stageError, setStageError] = useState<string | null>(null);
 
 	const kanban = useKanbanTasks({
 		projectId: effectiveFeatureId ?? "",
@@ -527,14 +589,27 @@ function CodebaseDetailPage() {
 		return computeKanbanProgress(kanban.data.columns);
 	}, [kanban.data]);
 
-	const hasExistingSpec = Boolean(
-		!activeFeature &&
-			(prdContent ||
-				acContent ||
-				(kanbanProgress && kanbanProgress.total > 0) ||
-				feature?.featuresStatus === "completed"),
+	const hasTasksInDb = Boolean(
+		(kanbanProgress && kanbanProgress.total > 0) || taskTree !== null,
 	);
-	const isSpecReady = specGenerated || hasExistingSpec;
+
+	const derivedStage: PipelineStage = hasTasksInDb
+		? "handoff"
+		: acContent
+			? "ac"
+			: prdContent
+				? "prd"
+				: featureTree
+					? "feature"
+					: "questions";
+	const stage = pipelineStage;
+	useEffect(() => {
+		setPipelineStage((current) =>
+			current === "questions" && derivedStage !== "questions"
+				? derivedStage
+				: current,
+		);
+	}, [derivedStage]);
 
 	const analysisOutput = analysis?.output ?? null;
 
@@ -614,6 +689,37 @@ function CodebaseDetailPage() {
 		void loadAc();
 	}, [loadAc]);
 
+	const refreshFeatureTree = useCallback(async (projectId: string | null) => {
+		if (!projectId) {
+			setFeatureTree(null);
+			return;
+		}
+		try {
+			const data = await loadFeatureTree({ data: projectId });
+			setFeatureTree(data.featureTree);
+		} catch {
+			setFeatureTree(null);
+		}
+	}, []);
+
+	const refreshTaskTree = useCallback(async (projectId: string | null) => {
+		if (!projectId) {
+			setTaskTree(null);
+			return;
+		}
+		try {
+			const data = await loadTaskTree({ data: projectId });
+			setTaskTree(data.taskTree);
+		} catch {
+			setTaskTree(null);
+		}
+	}, []);
+
+	useEffect(() => {
+		void refreshFeatureTree(effectiveFeatureId);
+		void refreshTaskTree(effectiveFeatureId);
+	}, [effectiveFeatureId, refreshFeatureTree, refreshTaskTree]);
+
 	useEffect(() => {
 		if (!snapshotReady) return;
 		let cancelled = false;
@@ -675,16 +781,17 @@ function CodebaseDetailPage() {
 		return base || "fitur";
 	}, [resolvedFeature?.name, codebase.name]);
 	const artifacts = useMemo<CodebaseArtifactRef[]>(() => {
-		if (!resolvedFeature || !isSpecReady) return [];
-		const list: CodebaseArtifactRef[] = [
-			{
+		if (!resolvedFeature) return [];
+		const list: CodebaseArtifactRef[] = [];
+		if (featureTree) {
+			list.push({
 				id: `feature-${resolvedFeature.id}`,
 				fileName: `feature-${featureSlug}.json`,
 				fileSizeBytes: null,
 				badge: "FITUR",
 				description: `Spesifikasi fitur ${resolvedFeature.name}`,
-			},
-		];
+			});
+		}
 		if (prdContent) {
 			list.push({
 				id: `prd-${resolvedFeature.id}`,
@@ -703,7 +810,7 @@ function CodebaseDetailPage() {
 				description: "Kriteria penerimaan formal",
 			});
 		}
-		if (kanbanProgress && kanbanProgress.total > 0) {
+		if (hasTasksInDb) {
 			list.push({
 				id: `tasks-${resolvedFeature.id}`,
 				fileName: `tasks-${featureSlug}.json`,
@@ -715,9 +822,9 @@ function CodebaseDetailPage() {
 		return list;
 	}, [
 		resolvedFeature,
-		isSpecReady,
+		featureTree,
 		featureSlug,
-		kanbanProgress,
+		hasTasksInDb,
 		prdContent,
 		acContent,
 	]);
@@ -731,6 +838,10 @@ function CodebaseDetailPage() {
 		Boolean(activeArtifact) &&
 		resolvedFeature != null &&
 		activeArtifact?.id === `ac-${resolvedFeature.id}`;
+	const isFeatureArtifactActive =
+		Boolean(activeArtifact) &&
+		resolvedFeature != null &&
+		activeArtifact?.id === `feature-${resolvedFeature.id}`;
 	const isTasksArtifactActive =
 		Boolean(activeArtifact) &&
 		resolvedFeature != null &&
@@ -763,9 +874,8 @@ function CodebaseDetailPage() {
 					);
 					return;
 				}
-				const mapped: AdaptiveQuestion[] = rawQuestions
-					.slice(0, 3)
-					.flatMap((item, index): AdaptiveQuestion[] => {
+				const mapped: AdaptiveQuestion[] = rawQuestions.flatMap(
+					(item, index): AdaptiveQuestion[] => {
 						if (typeof item !== "object" || item === null) return [];
 						const record = item as Record<string, unknown>;
 						const id =
@@ -785,15 +895,27 @@ function CodebaseDetailPage() {
 								(option): option is string =>
 									typeof option === "string" && option.trim().length > 0,
 							)
-							.slice(0, 4)
+							.slice(0, 6)
 							.map((option, optionIndex) => ({
 								id: `${id}-opt${optionIndex + 1}`,
 								label: option.trim(),
 								recommended: optionIndex === 0,
 							}));
 						if (record.type !== "text" && options.length === 0) return [];
-						return [{ id, title, options }];
-					});
+						return [
+							{
+								id,
+								title,
+								options,
+								customPlaceholder:
+									typeof record.customPlaceholder === "string" &&
+									record.customPlaceholder.trim()
+										? record.customPlaceholder.trim()
+										: undefined,
+							},
+						];
+					},
+				);
 				if (mapped.length === 0) {
 					setQuestionsError(
 						"AI menghasilkan format tidak valid. Coba kirim ulang fitur.",
@@ -847,7 +969,11 @@ function CodebaseDetailPage() {
 					featuresStatus: "pending",
 				};
 				setActiveFeature(newFeature);
-				setSpecGenerated(false);
+				setPipelineStage("questions");
+				setFeatureTree(null);
+				setTaskTree(null);
+				setPrdContent(null);
+				setAcContent(null);
 				setChatAnswers({});
 				return created.projectId;
 			} catch {
@@ -890,10 +1016,22 @@ function CodebaseDetailPage() {
 
 	const [specError, setSpecError] = useState<string | null>(null);
 
+	const pushAssistantMessage = useCallback((content: string) => {
+		setChatMessages((current) => [
+			...current,
+			{
+				id: `assistant-${Date.now()}`,
+				role: "assistant" as const,
+				content,
+			},
+		]);
+	}, []);
+
 	const handleConfirmGenerate = useCallback(async () => {
 		if (!effectiveFeatureId || isConfirming) return;
 		setIsConfirming(true);
 		setSpecError(null);
+		setStageError(null);
 		try {
 			const answersList = buildAskHandoffAnswers(chatAnswers, aiQuestions);
 			try {
@@ -936,25 +1074,17 @@ function CodebaseDetailPage() {
 				setSpecError("Spesifikasi fitur gagal dibuat. Coba lagi.");
 				return;
 			}
-			setSpecGenerated(true);
+			await refreshFeatureTree(effectiveFeatureId);
+			setPipelineStage("feature");
 			const specMessage = buildFeatureMessage(
 				resolvedFeature?.name ?? codebase.name,
 				chatAnswers,
 			);
-			setChatMessages((current) => [
-				...current,
-				{
-					id: `assistant-${Date.now()}`,
-					role: "assistant" as const,
-					content:
-						specResponse.status === 409
-							? `Spesifikasi ${resolvedFeature?.name ?? "fitur"} sedang disusun. Klik file spesifikasi di bawah untuk melihat pratinjau dokumen.`
-							: `Spesifikasi ${resolvedFeature?.name ?? "fitur"} berhasil dibuat dari jawaban Anda: ${specMessage}. Klik file spesifikasi di bawah untuk melihat pratinjau dokumen.`,
-				},
-			]);
-			await loadPrd();
-			await loadAc();
-			await kanban.refetch();
+			pushAssistantMessage(
+				specResponse.status === 409
+					? `Pohon fitur ${resolvedFeature?.name ?? "fitur"} sedang disusun. Klik file feature-*.json di bawah untuk melihat diagram pohon fitur.`
+					: `Pohon fitur ${resolvedFeature?.name ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}. Klik file feature-*.json di bawah untuk melihat diagram pohon fitur.`,
+			);
 		} finally {
 			setIsConfirming(false);
 		}
@@ -966,10 +1096,236 @@ function CodebaseDetailPage() {
 		lastFeaturePrompt,
 		resolvedFeature?.name,
 		codebase.name,
-		loadPrd,
-		loadAc,
-		kanban,
+		refreshFeatureTree,
+		pushAssistantMessage,
 	]);
+
+	const consumeSseStream = useCallback(
+		async (response: Response): Promise<{ error: string | null }> => {
+			if (!response.ok) {
+				const body: unknown = await response.json().catch(() => null);
+				const message =
+					typeof body === "object" &&
+					body !== null &&
+					"error" in body &&
+					typeof (body as { error: unknown }).error === "string"
+						? (body as { error: string }).error
+						: null;
+				return { error: message ?? "Generator gagal. Coba lagi." };
+			}
+			const reader = response.body?.getReader();
+			if (!reader) return { error: null };
+			const decoder = new TextDecoder();
+			let buffer = "";
+			for (;;) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				buffer += decoder.decode(value, { stream: true });
+				const events = buffer.split("\n\n");
+				buffer = events.pop() ?? "";
+				for (const event of events) {
+					const payload = event.trim();
+					if (!payload.startsWith("data:")) continue;
+					let parsed: unknown;
+					try {
+						parsed = JSON.parse(payload.slice(5).trim());
+					} catch {
+						continue;
+					}
+					if (
+						typeof parsed === "object" &&
+						parsed !== null &&
+						"type" in parsed &&
+						(parsed as { type: unknown }).type === "error" &&
+						"error" in parsed &&
+						typeof (parsed as { error: unknown }).error === "string"
+					) {
+						return { error: (parsed as { error: string }).error };
+					}
+				}
+			}
+			return { error: null };
+		},
+		[],
+	);
+
+	const runPipelineStage = useCallback(
+		async (
+			target: PipelineStage,
+			url: string,
+			init: RequestInit,
+			onSuccess: () => Promise<void>,
+		) => {
+			if (!effectiveFeatureId || stageBusy) return;
+			setStageBusy(target);
+			setStageError(null);
+			try {
+				const response = await fetch(url, init);
+				const result = await consumeSseStream(response);
+				if (result.error) {
+					setStageError(result.error);
+					return;
+				}
+				await onSuccess();
+			} catch {
+				setStageError("Server tidak dapat dihubungi. Coba lagi.");
+			} finally {
+				setStageBusy(null);
+			}
+		},
+		[effectiveFeatureId, stageBusy, consumeSseStream],
+	);
+
+	const handleGeneratePrd = useCallback(() => {
+		if (!effectiveFeatureId) return;
+		const message = buildFeatureMessage(
+			resolvedFeature?.name ?? codebase.name,
+			chatAnswers,
+		);
+		void runPipelineStage(
+			"prd",
+			"/api/chat",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					projectId: effectiveFeatureId,
+					mode: "generate",
+					message,
+				}),
+			},
+			async () => {
+				await loadPrd();
+				setPipelineStage("prd");
+				pushAssistantMessage(
+					`PRD 8 seksi untuk ${resolvedFeature?.name ?? "fitur"} siap. Klik file PRD-*.md di bawah untuk membaca dokumen lengkap.`,
+				);
+			},
+		);
+	}, [
+		effectiveFeatureId,
+		resolvedFeature?.name,
+		codebase.name,
+		chatAnswers,
+		runPipelineStage,
+		loadPrd,
+		pushAssistantMessage,
+	]);
+
+	const handleGenerateAc = useCallback(() => {
+		if (!effectiveFeatureId) return;
+		void runPipelineStage(
+			"ac",
+			"/api/ac/generate",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ projectId: effectiveFeatureId }),
+			},
+			async () => {
+				await loadAc();
+				setPipelineStage("ac");
+				pushAssistantMessage(
+					`Acceptance Criteria untuk ${resolvedFeature?.name ?? "fitur"} siap. Klik file AC-*.md di bawah untuk membaca dokumen lengkap.`,
+				);
+			},
+		);
+	}, [
+		effectiveFeatureId,
+		resolvedFeature?.name,
+		runPipelineStage,
+		loadAc,
+		pushAssistantMessage,
+	]);
+
+	const handleGenerateTask = useCallback(() => {
+		if (!effectiveFeatureId) return;
+		void runPipelineStage(
+			"task",
+			"/api/task/generate",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ projectId: effectiveFeatureId }),
+			},
+			async () => {
+				await kanban.refetch();
+				await refreshTaskTree(effectiveFeatureId);
+				setPipelineStage("handoff");
+				pushAssistantMessage(
+					`Task untuk ${resolvedFeature?.name ?? "fitur"} sudah tersimpan dan papan Kanban aktif. Klik file tasks-*.json di bawah untuk melihat diagram task, atau salin perintah handoff untuk mulai mengerjakan dengan AI Coding Agent.`,
+				);
+			},
+		);
+	}, [
+		effectiveFeatureId,
+		resolvedFeature?.name,
+		runPipelineStage,
+		kanban,
+		refreshTaskTree,
+		pushAssistantMessage,
+	]);
+
+	const handleRetryStage = useCallback(() => {
+		if (pipelineStage === "prd") {
+			handleGeneratePrd();
+			return;
+		}
+		if (pipelineStage === "ac") {
+			handleGenerateAc();
+			return;
+		}
+		if (pipelineStage === "task" || pipelineStage === "handoff") {
+			handleGenerateTask();
+			return;
+		}
+		void handleConfirmGenerate();
+	}, [
+		pipelineStage,
+		handleGeneratePrd,
+		handleGenerateAc,
+		handleGenerateTask,
+		handleConfirmGenerate,
+	]);
+
+	const handleDownloadArtifact = useCallback(
+		(artifact: CodebaseArtifactRef) => {
+			if (!resolvedFeature) return;
+			const isJson = artifact.fileName.toLowerCase().endsWith(".json");
+			if (isJson) {
+				if (artifact.id.startsWith("feature-") && featureTree) {
+					downloadArtifact({
+						fileName: artifact.fileName,
+						content: JSON.stringify(featureTree, null, 2),
+						mimeType: artifactMimeTypeFor(artifact.fileName),
+					});
+				}
+				if (artifact.id.startsWith("tasks-") && taskTree) {
+					downloadArtifact({
+						fileName: artifact.fileName,
+						content: JSON.stringify(taskTree, null, 2),
+						mimeType: artifactMimeTypeFor(artifact.fileName),
+					});
+				}
+				return;
+			}
+			if (artifact.id.startsWith("prd-") && prdContent) {
+				downloadArtifact({
+					fileName: artifact.fileName,
+					content: prdContent,
+					mimeType: artifactMimeTypeFor(artifact.fileName),
+				});
+			}
+			if (artifact.id.startsWith("ac-") && acContent) {
+				downloadArtifact({
+					fileName: artifact.fileName,
+					content: acContent,
+					mimeType: artifactMimeTypeFor(artifact.fileName),
+				});
+			}
+		},
+		[resolvedFeature, featureTree, taskTree, prdContent, acContent],
+	);
 
 	if (snapshotReady) {
 		const kanbanColumns = kanban.data?.columns ?? null;
@@ -1036,7 +1392,11 @@ function CodebaseDetailPage() {
 								questionsError={questionsError}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
-								projectIdForHandoff={isSpecReady ? effectiveFeatureId : null}
+								projectIdForHandoff={hasTasksInDb ? effectiveFeatureId : null}
+								stage={stage}
+								stageBusy={stageBusy}
+								stageError={stageError}
+								codebaseName={codebase.name}
 								isSending={isWorking}
 								isConfirming={isConfirming}
 								specError={specError}
@@ -1050,10 +1410,15 @@ function CodebaseDetailPage() {
 									}
 									setCanvasOpen(true);
 								}}
+								onDownloadArtifact={handleDownloadArtifact}
 								onSubmitAnswer={handleSubmitAnswer}
 								onSendMessage={(message) => void handleSendMessage(message)}
 								onConfirmGenerate={() => void handleConfirmGenerate()}
 								onRetryGenerate={() => void handleConfirmGenerate()}
+								onRetryStage={() => void handleRetryStage()}
+								onGeneratePrd={() => void handleGeneratePrd()}
+								onGenerateAc={() => void handleGenerateAc()}
+								onGenerateTask={() => void handleGenerateTask()}
 								onRetryQuestions={() => {
 									if (effectiveFeatureId && lastFeaturePrompt)
 										void fetchAiQuestions(
@@ -1068,6 +1433,11 @@ function CodebaseDetailPage() {
 								fileName={activeArtifact?.fileName ?? "Preview artefak"}
 								badge={activeArtifact?.badge ?? "PRATINJAU"}
 								onClose={() => setCanvasOpen(false)}
+								onDownload={
+									activeArtifact
+										? () => handleDownloadArtifact(activeArtifact)
+										: undefined
+								}
 								isLoading={
 									(isPrdArtifactActive && prdLoading) ||
 									(isAcArtifactActive && acLoading)
@@ -1140,11 +1510,11 @@ function CodebaseDetailPage() {
 									</div>
 								) : isPrdArtifactActive ? (
 									prdContent ? (
-										<CodebaseMarkdown content={prdContent} />
+										<CodebaseDocPreview content={prdContent} />
 									) : null
 								) : isAcArtifactActive ? (
 									acContent ? (
-										<CodebaseMarkdown content={acContent} />
+										<CodebaseDocPreview content={acContent} />
 									) : null
 								) : isTasksArtifactActive ? (
 									canvasView === "kanban" ? (
@@ -1159,68 +1529,22 @@ function CodebaseDetailPage() {
 									) : (
 										<div
 											data-testid="codebase-checklist-tree"
-											className="flex flex-col gap-4"
+											className="h-full min-h-0"
 										>
-											{kanbanColumns &&
-											(kanbanColumns.pending.length > 0 ||
-												kanbanColumns.in_progress.length > 0 ||
-												kanbanColumns.completed.length > 0) ? (
-												(
-													[
-														["pending", "To Do", kanbanColumns.pending],
-														[
-															"in_progress",
-															"In Progress",
-															kanbanColumns.in_progress,
-														],
-														["completed", "Done", kanbanColumns.completed],
-													] as const
-												).map(([key, label, cards]) => (
-													<div key={key} className="flex flex-col gap-2">
-														<p className="font-mono text-[11px] font-semibold uppercase text-indigo">
-															{label} ({cards.length})
-														</p>
-														{cards.length === 0 ? (
-															<p className="text-[11px] italic text-slate">
-																Tidak ada task pada status ini.
-															</p>
-														) : (
-															cards.map((card) => (
-																<label
-																	key={card.id}
-																	className="flex cursor-default items-start gap-2.5 rounded-lg border border-graphite bg-charcoal p-2.5"
-																>
-																	<input
-																		type="checkbox"
-																		checked={card.status === "completed"}
-																		disabled
-																		readOnly
-																		aria-label={card.name}
-																		className="mt-0.5 h-4 w-4 shrink-0 rounded border border-graphite align-middle"
-																	/>
-																	<span
-																		className={`min-w-0 flex-1 text-xs leading-5 ${
-																			card.status === "completed"
-																				? "text-slate line-through"
-																				: "text-mist"
-																		}`}
-																	>
-																		{card.name}
-																	</span>
-																</label>
-															))
-														)}
-													</div>
-												))
-											) : (
-												<p className="text-xs text-fog">
-													{kanban.isLoading
-														? "Memuat task..."
-														: "Belum ada task pada project ini."}
-												</p>
-											)}
+											<WhiteboardCanvas
+												projectName={resolvedFeature.name}
+												taskTree={taskTree}
+												featureTree={featureTree}
+											/>
 										</div>
 									)
+								) : isFeatureArtifactActive ? (
+									<div className="h-full min-h-0">
+										<FeatureMapCanvas
+											productName={resolvedFeature.name}
+											featureTree={featureTree}
+										/>
+									</div>
 								) : (
 									<div className="flex flex-col gap-3">
 										<div className="rounded-lg border border-graphite bg-charcoal p-3">
