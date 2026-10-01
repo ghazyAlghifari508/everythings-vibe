@@ -203,6 +203,24 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 		}
 	};
 
+	const isTopUpEligible = canShowNavbarTopUp({
+		user,
+		plan: planData?.plan,
+		topUpEligible: planData?.topUpEligible,
+	});
+
+	const topUpButton = isTopUpEligible ? (
+		<button
+			type="button"
+			onClick={() => setIsTopUpOpen(true)}
+			aria-label="Isi ulang kredit"
+			className="flex h-8 items-center gap-1.5 rounded-md border border-graphite bg-transparent px-2.5 font-inter text-xs font-[510] text-fog transition-colors hover:border-fog/50 hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40"
+		>
+			<CreditCard size={13} aria-hidden />
+			<span>Top Up</span>
+		</button>
+	) : null;
+
 	return (
 		<nav className="fixed left-0 right-0 top-0 z-40 h-14 border-b border-graphite bg-charcoal/95">
 			<div className="mx-auto flex h-full max-w-[1200px] items-center px-6">
@@ -517,135 +535,108 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						</>
 					) : null}
 
-					{/* Desktop-only items */}
-					<div className="hidden md:flex items-center gap-2">
-						{!isFlowStepRoute && (
-							<>
-								{canShowNavbarTopUp({
-									user,
-									plan: planData?.plan,
-									topUpEligible: planData?.topUpEligible,
-								}) && (
+					{/* Codebase sync flow: show only Top Up button (if eligible) */}
+					{isCodebaseSyncRoute && topUpButton}
+
+					{/* Desktop-only items for standard routes */}
+					{!isFlowStepRoute && !isCodebaseSyncRoute && (
+						<div className="hidden md:flex items-center gap-2">
+							{topUpButton}
+							<ThemeToggle />
+							{isLoading ? (
+								<div className="ml-1 flex items-center gap-2 sm:gap-3">
+									<div className="h-8 w-[72px] animate-pulse rounded-md bg-white/5" />
+									<div className="h-8 w-[84px] animate-pulse rounded-md bg-white/5" />
+								</div>
+							) : !user ? (
+								<Link
+									to="/login"
+									className="btn-primary flex h-8 items-center justify-center rounded-md px-4 font-inter text-sm font-[510] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:brightness-105 active:scale-[0.98]"
+								>
+									Log In
+								</Link>
+							) : (
+								<div className="relative">
 									<button
 										type="button"
-										onClick={() => setIsTopUpOpen(true)}
-										aria-label="Isi ulang kredit"
-										className="flex h-8 items-center gap-1.5 rounded-md border border-graphite bg-transparent px-2.5 font-inter text-xs font-[510] text-fog transition-colors hover:border-fog/50 hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40"
+										onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+										aria-label="User menu"
+										aria-haspopup="true"
+										aria-expanded={isDropdownOpen}
+										className="flex h-8 w-8 items-center justify-center rounded-full bg-obsidian text-fog shadow-[var(--shadow-inset)] transition-colors duration-300 hover:text-snow"
 									>
-										<CreditCard size={13} aria-hidden />
-										<span>Top Up</span>
+										<User size={16} />
 									</button>
-								)}
-								<ThemeToggle />
-								{isLoading ? (
-									<div className="ml-1 flex items-center gap-2 sm:gap-3">
-										<div className="h-8 w-[72px] animate-pulse rounded-md bg-white/5" />
-										<div className="h-8 w-[84px] animate-pulse rounded-md bg-white/5" />
-									</div>
-								) : !user ? (
-									<Link
-										to="/login"
-										className="btn-primary flex h-8 items-center justify-center rounded-md px-4 font-inter text-sm font-[510] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:brightness-105 active:scale-[0.98]"
-									>
-										Log In
-									</Link>
-								) : (
-									<div className="relative">
-										<button
-											type="button"
-											onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-											aria-label="User menu"
-											aria-haspopup="true"
-											aria-expanded={isDropdownOpen}
-											className="flex h-8 w-8 items-center justify-center rounded-full bg-obsidian text-fog shadow-[var(--shadow-inset)] transition-colors duration-300 hover:text-snow"
-										>
-											<User size={16} />
-										</button>
-										{isDropdownOpen && (
-											<>
+									{isDropdownOpen && (
+										<>
+											<button
+												type="button"
+												aria-label="Tutup menu pengguna"
+												className="fixed inset-0 z-40 cursor-default bg-transparent border-0"
+												onClick={() => setIsDropdownOpen(false)}
+											/>
+											<div className="absolute right-0 top-full z-50 mt-2 flex w-56 flex-col overflow-hidden rounded-xl bg-obsidian py-2 font-inter shadow-[var(--shadow-overlay)]">
+												<div className="px-4 py-2 mb-1">
+													<p className="truncate text-sm font-[510] text-snow">
+														{user?.email}
+													</p>
+												</div>
+												<div className="mb-1 h-px w-full bg-graphite" />
+												<Link
+													to="/settings/profile"
+													onClick={() => setIsDropdownOpen(false)}
+													className="flex items-center gap-3 px-4 py-2.5 text-sm font-[510] text-mist transition-colors hover:bg-white/5 hover:text-snow"
+												>
+													<Settings size={16} className="text-fog" />
+													Setting
+												</Link>
+												{session?.user && isAdmin(session.user) && (
+													<Link
+														to="/admin"
+														onClick={() => setIsDropdownOpen(false)}
+														className="flex items-center gap-3 px-4 py-2.5 text-sm font-[510] text-mist transition-colors hover:bg-white/5 hover:text-snow"
+													>
+														<Shield size={16} className="text-fog" />
+														Admin
+													</Link>
+												)}
+												<Link
+													to="/settings/feedback"
+													onClick={() => setIsDropdownOpen(false)}
+													className="flex items-center gap-3 px-4 py-2.5 text-sm font-[510] text-mist transition-colors hover:bg-white/5 hover:text-snow"
+												>
+													<MessageSquare size={16} className="text-fog" />
+													Bantuan & Feedback
+												</Link>
+												<div className="my-1 h-px w-full bg-graphite" />
 												<button
 													type="button"
-													aria-label="Tutup menu pengguna"
-													className="fixed inset-0 z-40 cursor-default bg-transparent border-0"
-													onClick={() => setIsDropdownOpen(false)}
-												/>
-												<div className="absolute right-0 top-full z-50 mt-2 flex w-56 flex-col overflow-hidden rounded-xl bg-obsidian py-2 font-inter shadow-[var(--shadow-overlay)]">
-													<div className="px-4 py-2 mb-1">
-														<p className="truncate text-sm font-[510] text-snow">
-															{user?.email}
-														</p>
-													</div>
-													<div className="mb-1 h-px w-full bg-graphite" />
-													<Link
-														to="/settings/profile"
-														onClick={() => setIsDropdownOpen(false)}
-														className="flex items-center gap-3 px-4 py-2.5 text-sm font-[510] text-mist transition-colors hover:bg-white/5 hover:text-snow"
-													>
-														<Settings size={16} className="text-fog" />
-														Setting
-													</Link>
-													{session?.user && isAdmin(session.user) && (
-														<Link
-															to="/admin"
-															onClick={() => setIsDropdownOpen(false)}
-															className="flex items-center gap-3 px-4 py-2.5 text-sm font-[510] text-mist transition-colors hover:bg-white/5 hover:text-snow"
-														>
-															<Shield size={16} className="text-fog" />
-															Admin
-														</Link>
-													)}
-													<Link
-														to="/settings/feedback"
-														onClick={() => setIsDropdownOpen(false)}
-														className="flex items-center gap-3 px-4 py-2.5 text-sm font-[510] text-mist transition-colors hover:bg-white/5 hover:text-snow"
-													>
-														<MessageSquare size={16} className="text-fog" />
-														Bantuan & Feedback
-													</Link>
-													<div className="my-1 h-px w-full bg-graphite" />
-													<button
-														type="button"
-														onClick={() => {
-															setIsDropdownOpen(false);
-															handleLogout();
-														}}
-														className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-[510] text-crimson transition-colors hover:bg-crimson/10"
-													>
-														<LogOut size={16} />
-														Log Out
-													</button>
-												</div>
-											</>
-										)}
-									</div>
-								)}
-							</>
-						)}
-					</div>
+													onClick={() => {
+														setIsDropdownOpen(false);
+														handleLogout();
+													}}
+													className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-[510] text-crimson transition-colors hover:bg-crimson/10"
+												>
+													<LogOut size={16} />
+													Log Out
+												</button>
+											</div>
+										</>
+									)}
+								</div>
+							)}
+						</div>
+					)}
 				</div>
 			</div>
 
 			{/* Mobile Menu Drawer */}
-			{isMobileMenuOpen && (
+			{isMobileMenuOpen && !isCodebaseSyncRoute && (
 				<div className="md:hidden border-t border-graphite bg-obsidian px-6 py-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
 					<div className="flex items-center justify-between">
 						<span className="text-sm font-[510] text-fog">Tampilan</span>
 						<div className="flex items-center gap-2">
-							{canShowNavbarTopUp({
-								user,
-								plan: planData?.plan,
-								topUpEligible: planData?.topUpEligible,
-							}) && (
-								<button
-									type="button"
-									onClick={() => setIsTopUpOpen(true)}
-									aria-label="Isi ulang kredit"
-									className="flex h-8 items-center gap-1.5 rounded-md border border-graphite bg-transparent px-2.5 font-inter text-xs font-[510] text-fog transition-colors hover:border-fog/50 hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40"
-								>
-									<CreditCard size={13} aria-hidden />
-									<span>Top Up</span>
-								</button>
-							)}
+							{topUpButton}
 							<ThemeToggle />
 						</div>
 					</div>

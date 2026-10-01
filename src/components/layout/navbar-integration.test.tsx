@@ -82,7 +82,11 @@ vi.mock("@/components/billing/top-up-modal", () => ({
 }));
 
 vi.mock("@/components/ui/theme-toggle", () => ({
-	ThemeToggle: () => null,
+	ThemeToggle: () => (
+		<button type="button" aria-label="Toggle dark mode">
+			Theme
+		</button>
+	),
 }));
 
 let queryClient: QueryClient;
@@ -349,5 +353,64 @@ describe("Navbar Greenfield Workspace Navlinks", () => {
 		});
 		expect(steppers.length).toBeGreaterThanOrEqual(1);
 		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
+	});
+
+	it("hides theme toggle, user profile menu, and mobile hamburger on /plan/codebase route", () => {
+		mockPathname = "/plan/codebase";
+		mockSearch = {};
+		sessionState.user = { id: "user-1", email: "user@test.com" };
+		renderNavbar();
+
+		expect(
+			screen.queryByRole("button", { name: /Toggle dark mode/i }),
+		).toBeNull();
+		expect(screen.queryByRole("button", { name: "User menu" })).toBeNull();
+		expect(screen.queryByRole("link", { name: /Log In/i })).toBeNull();
+		expect(screen.queryByRole("button", { name: /Toggle menu/i })).toBeNull();
+	});
+
+	it("renders Top Up button on /plan/codebase route only when user is eligible", () => {
+		mockPathname = "/plan/codebase";
+		mockSearch = {};
+		sessionState.user = { id: "user-1", email: "user@test.com" };
+		mockPlanData.plan = "pro";
+		mockPlanData.topUpEligible = true;
+
+		renderNavbar();
+
+		expect(
+			screen.getByRole("button", { name: /Isi ulang kredit/i }),
+		).toBeDefined();
+
+		// Still no theme toggle or profile menu
+		expect(
+			screen.queryByRole("button", { name: /Toggle dark mode/i }),
+		).toBeNull();
+		expect(screen.queryByRole("button", { name: "User menu" })).toBeNull();
+	});
+
+	it("hides Top Up button on /plan/codebase route when user is not eligible", () => {
+		mockPathname = "/plan/codebase";
+		mockSearch = {};
+		sessionState.user = { id: "user-1", email: "user@test.com" };
+		mockPlanData.plan = "free";
+		mockPlanData.topUpEligible = false;
+
+		renderNavbar();
+
+		expect(
+			screen.queryByRole("button", { name: /Isi ulang kredit/i }),
+		).toBeNull();
+	});
+
+	it("renders theme toggle and user menu on standard home route", () => {
+		mockPathname = "/";
+		sessionState.user = { id: "user-1", email: "user@test.com" };
+		renderNavbar();
+
+		expect(
+			screen.getByRole("button", { name: /Toggle dark mode/i }),
+		).toBeDefined();
+		expect(screen.getByRole("button", { name: "User menu" })).toBeDefined();
 	});
 });
