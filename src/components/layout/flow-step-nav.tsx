@@ -115,3 +115,89 @@ export function FlowStepNav(props?: {
 		</ol>
 	);
 }
+
+export type CodebasePlanStep = "prompt" | "syncing" | "summary";
+
+const CODEBASE_STEPS: Array<{ id: CodebasePlanStep; label: string }> = [
+	{ id: "prompt", label: "Prompt Sync" },
+	{ id: "syncing", label: "Pantau Sync" },
+	{ id: "summary", label: "Kesimpulan Codebase" },
+];
+
+export function CodebaseStepNav(props: {
+	step?: CodebasePlanStep;
+	onSelectStep?: (step: CodebasePlanStep) => void;
+}) {
+	const currentStep = props.step ?? "prompt";
+	const currentIdx =
+		currentStep === "summary" ? 2 : currentStep === "syncing" ? 1 : 0;
+
+	return (
+		<ol
+			aria-label="Tahapan sinkronisasi codebase"
+			className="flex items-center gap-1.5 md:gap-2 select-none"
+		>
+			{CODEBASE_STEPS.map((s, idx) => {
+				const isCompleted = currentIdx > idx;
+				const isActive = currentIdx === idx;
+				const isLocked = currentIdx < idx;
+				const connectorActive = idx <= currentIdx;
+
+				return (
+					<li
+						key={s.id}
+						className="flex items-center gap-1.5 md:gap-2"
+						aria-current={isActive ? "step" : undefined}
+					>
+						{idx > 0 && (
+							<span
+								aria-hidden
+								className={cn(
+									"hidden h-px w-4 transition-colors duration-300 md:block",
+									connectorActive ? "bg-indigo/60" : "bg-graphite",
+								)}
+							/>
+						)}
+						<button
+							type="button"
+							disabled={isLocked || !props.onSelectStep}
+							onClick={() => props.onSelectStep?.(s.id)}
+							className={cn(
+								"flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo rounded transition",
+								isLocked || !props.onSelectStep
+									? "cursor-default"
+									: "cursor-pointer hover:opacity-80",
+							)}
+						>
+							<span
+								className={cn(
+									"flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-[510] transition-colors duration-300",
+									isCompleted && "bg-emerald text-charcoal",
+									isActive && "bg-indigo text-white",
+									isLocked && "border border-graphite text-fog",
+								)}
+								aria-hidden="true"
+							>
+								{isCompleted ? <Check size={12} strokeWidth={3} /> : idx + 1}
+							</span>
+							<span
+								className={cn(
+									"hidden font-inter text-sm transition-colors duration-300 md:block",
+									isActive
+										? "font-[510] text-snow"
+										: isCompleted
+											? "font-normal text-snow"
+											: "font-normal text-fog",
+								)}
+							>
+								{s.label}
+								{isCompleted && <span className="sr-only"> (Selesai)</span>}
+								{isActive && <span className="sr-only"> (Tahap saat ini)</span>}
+							</span>
+						</button>
+					</li>
+				);
+			})}
+		</ol>
+	);
+}

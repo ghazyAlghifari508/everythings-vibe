@@ -36,6 +36,7 @@ import {
 import { isAdmin } from "@/lib/session";
 import { useChatStore, useUIStore } from "@/store";
 import {
+	CodebaseStepNav,
 	FlowStepNav,
 	getFlowStepCta,
 	routeToStep,
@@ -126,6 +127,10 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 		pathname.startsWith("/ac/") ||
 		pathname.startsWith("/task/") ||
 		pathname.startsWith("/kanban/");
+
+	const isCodebaseSyncRoute = pathname === "/plan/codebase";
+	const codebasePlanStep = useUIStore((s) => s.codebasePlanStep);
+	const setCodebasePlanStep = useUIStore((s) => s.setCodebasePlanStep);
 
 	const showToast = useUIStore((s) => s.showToast);
 
@@ -232,19 +237,31 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					<Logo height={28} />
 				</div>
 
-				{/* Mobile: step dots (flow routes only) */}
-				{isFlowStepRoute && (
+				{/* Mobile: step dots (flow routes or codebase sync) */}
+				{isCodebaseSyncRoute ? (
+					<div className="flex md:hidden flex-1 items-center justify-center">
+						<CodebaseStepNav
+							step={codebasePlanStep}
+							onSelectStep={setCodebasePlanStep}
+						/>
+					</div>
+				) : isFlowStepRoute ? (
 					<div className="flex md:hidden flex-1 items-center justify-center">
 						<FlowStepNav
 							step={projectNavData?.step}
 							taskStatus={projectNavData?.taskStatus}
 						/>
 					</div>
-				)}
+				) : null}
 
 				{/* Center: navlinks - Desktop */}
 				<div className="hidden md:flex flex-1 items-center justify-center">
-					{isFlowStepRoute ? (
+					{isCodebaseSyncRoute ? (
+						<CodebaseStepNav
+							step={codebasePlanStep}
+							onSelectStep={setCodebasePlanStep}
+						/>
+					) : isFlowStepRoute ? (
 						<FlowStepNav
 							step={projectNavData?.step}
 							taskStatus={projectNavData?.taskStatus}
@@ -294,7 +311,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 				{/* Right: actions */}
 				<div className="flex md:w-[220px] shrink-0 items-center justify-end gap-2 ml-auto md:ml-0">
 					{/* Mobile hamburger */}
-					{!isFlowStepRoute && (
+					{!isFlowStepRoute && !isCodebaseSyncRoute && (
 						<button
 							type="button"
 							className="md:hidden p-2 text-fog hover:text-snow transition-colors shrink-0"

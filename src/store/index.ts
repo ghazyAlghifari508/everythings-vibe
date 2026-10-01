@@ -104,6 +104,7 @@ interface UIState {
 	activeReviewModal: "prd" | "ac" | null;
 	isPaywallOpen: boolean;
 	paywallStage: string | null;
+	codebasePlanStep: "prompt" | "syncing" | "summary";
 	toggleChatPanel: () => void;
 	setPRDLoading: (loading: boolean) => void;
 	showToast: (message: string, type: "success" | "error" | "info") => void;
@@ -112,6 +113,7 @@ interface UIState {
 	setActiveReviewModal: (modal: "prd" | "ac" | null) => void;
 	openPaywallModal: (stage?: string) => void;
 	closePaywallModal: () => void;
+	setCodebasePlanStep: (step: "prompt" | "syncing" | "summary") => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -123,6 +125,7 @@ export const useUIStore = create<UIState>((set) => ({
 	activeReviewModal: null,
 	isPaywallOpen: false,
 	paywallStage: null,
+	codebasePlanStep: "prompt",
 	toggleChatPanel: () =>
 		set((state) => ({ isChatPanelOpen: !state.isChatPanelOpen })),
 	setPRDLoading: (loading) => set({ isPRDLoading: loading }),
@@ -133,4 +136,5 @@ export const useUIStore = create<UIState>((set) => ({
 	openPaywallModal: (stage = "ac") =>
 		set({ isPaywallOpen: true, paywallStage: stage }),
 	closePaywallModal: () => set({ isPaywallOpen: false, paywallStage: null }),
+	setCodebasePlanStep: (step) => set({ codebasePlanStep: step }),
 }));

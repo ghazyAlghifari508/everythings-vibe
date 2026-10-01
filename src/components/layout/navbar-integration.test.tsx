@@ -337,4 +337,17 @@ describe("Navbar Greenfield Workspace Navlinks", () => {
 		expect(screen.getAllByRole("link", { name: /^Pricing$/i })).toHaveLength(2);
 		expect(screen.queryByRole("link", { name: /^Chat$/i })).toBeNull();
 	});
+
+	it("renders CodebaseStepNav on /plan/codebase route", () => {
+		mockPathname = "/plan/codebase";
+		mockSearch = {};
+		useUIStore.getState().setCodebasePlanStep("prompt");
+		renderNavbar();
+
+		const steppers = screen.getAllByRole("list", {
+			name: /Tahapan sinkronisasi codebase/i,
+		});
+		expect(steppers.length).toBeGreaterThanOrEqual(1);
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
+	});
 });
