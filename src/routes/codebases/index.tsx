@@ -173,23 +173,17 @@ function CodebasesPending() {
 function CodebasesPage() {
 	const { codebases: items } = Route.useLoaderData();
 	const navigate = useNavigate();
-	const [isCreating, setIsCreating] = useState(false);
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [name, setName] = useState("");
 	const [error, setError] = useState<string | null>(null);
 
 	const createCodebase = async () => {
-		if (name.trim().length < 3) {
-			setError("Nama codebase harus diisi minimal 3 karakter.");
-			return;
-		}
 		setError(null);
 		setIsSubmitting(true);
 		try {
 			const response = await fetch("/api/codebases", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ name: name.trim() }),
+				body: JSON.stringify({}),
 			});
 			if (response.status === 401) {
 				window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
@@ -255,48 +249,20 @@ function CodebasesPage() {
 				</div>
 				<button
 					type="button"
-					onClick={() => setIsCreating((current) => !current)}
-					className="min-h-11 rounded-md bg-snow px-4 text-sm font-semibold text-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					onClick={() => void createCodebase()}
+					disabled={isSubmitting}
+					className="min-h-11 rounded-md bg-snow px-4 text-sm font-semibold text-onyx disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
-					{isCreating ? "Batal" : "Hubungkan repository"}
+					{isSubmitting ? "Menyiapkan..." : "Hubungkan repository"}
 				</button>
 			</header>
-			{isCreating && (
-				<form
-					onSubmit={(event) => {
-						event.preventDefault();
-						void createCodebase();
-					}}
-					className="rounded-xl border border-graphite bg-charcoal p-5 sm:p-6"
+			{error && (
+				<div
+					role="alert"
+					className="rounded-xl border border-crimson/40 bg-crimson/10 p-4 text-sm text-crimson"
 				>
-					<label
-						htmlFor="codebase-name"
-						className="text-sm font-medium text-snow"
-					>
-						Nama repository
-					</label>
-					<div className="mt-3 flex flex-col gap-3 sm:flex-row">
-						<input
-							id="codebase-name"
-							value={name}
-							onChange={(event) => setName(event.target.value)}
-							placeholder="Contoh: Aplikasi marketplace"
-							className="min-h-11 min-w-0 flex-1 rounded-lg border border-graphite bg-obsidian px-3 text-sm text-snow outline-none placeholder:text-slate focus-visible:ring-2 focus-visible:ring-indigo"
-						/>
-						<button
-							type="submit"
-							disabled={isSubmitting || name.trim().length < 3}
-							className="min-h-11 rounded-md bg-snow px-4 text-sm font-semibold text-onyx disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							Hubungkan
-						</button>
-					</div>
-					{error && (
-						<p role="alert" className="mt-3 text-sm text-crimson">
-							{error}
-						</p>
-					)}
-				</form>
+					{error}
+				</div>
 			)}
 			{items.length === 0 ? (
 				<section className="rounded-xl border border-dashed border-graphite bg-charcoal p-8 sm:p-10">

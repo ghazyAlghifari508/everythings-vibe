@@ -63,6 +63,7 @@ const loadCodebase = createServerFn({ method: "GET" })
 		const user = await requireUserServer();
 		const { db } = await import("@/db");
 		const { codebases, codebaseAnalyses } = await import("@/db/schema");
+		const { codebaseSnapshots } = await import("@/db/schema");
 		const { projects } = await import("@/db/schema");
 		const { and, desc, eq, isNull } = await import("drizzle-orm");
 		const [codebase] = await db
@@ -116,7 +117,21 @@ const loadCodebase = createServerFn({ method: "GET" })
 				};
 			}
 		}
-		return { codebase, feature, analysis };
+		// Stored snapshot independent of any sync session: an expired
+		// session must never block the workspace when files exist in DB.
+		const [storedSnapshot] = await db
+			.select({
+				id: codebaseSnapshots.id,
+				fileCount: codebaseSnapshots.fileCount,
+			})
+			.from(codebaseSnapshots)
+			.where(eq(codebaseSnapshots.codebaseId, id))
+			.orderBy(desc(codebaseSnapshots.createdAt))
+			.limit(1);
+		const hasStoredSnapshot = Boolean(
+			storedSnapshot && (storedSnapshot.fileCount ?? 0) > 0,
+		);
+		return { codebase, feature, analysis, hasStoredSnapshot };
 	});
 
 export const Route = createFileRoute("/codebases/$id")({
@@ -183,6 +198,7 @@ function CodebaseDetailPage() {
 		codebase,
 		feature,
 		analysis: initialAnalysis,
+		hasStoredSnapshot,
 	} = Route.useLoaderData();
 	const navigate = useNavigate();
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
@@ -360,9 +376,10 @@ function CodebaseDetailPage() {
 		}
 	};
 
-	const snapshotReady = Boolean(
-		status?.snapshotId && SNAPSHOT_CONTEXT_STATUSES.includes(status.status),
-	);
+	const snapshotReady =
+		Boolean(
+			status?.snapshotId && SNAPSHOT_CONTEXT_STATUSES.includes(status.status),
+		) || hasStoredSnapshot;
 	const [canvasOpen, setCanvasOpen] = useState(true);
 	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
