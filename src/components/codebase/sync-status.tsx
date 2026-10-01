@@ -147,10 +147,11 @@ export function SyncStatus({
 	const showRetry = isReady || isFailed || isExpired;
 	const showAnalysisRetry = analysisFailed;
 
-	type StageState = "done" | "active" | "failed" | "pending";
+	type StageState = "done" | "active" | "idle" | "failed" | "pending";
 	const stageClass: Record<StageState, string> = {
 		done: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
 		active: "border-blue-500/25 bg-blue-500/10 text-blue-200",
+		idle: "border-graphite bg-obsidian/70 text-fog",
 		failed: "border-crimson/30 bg-crimson/10 text-crimson",
 		pending: "border-graphite text-slate",
 	};
@@ -159,6 +160,11 @@ export function SyncStatus({
 			<Check size={14} className="text-emerald-400 font-bold shrink-0" />
 		) : state === "active" ? (
 			<Loader2 size={14} className="text-blue-400 animate-spin shrink-0" />
+		) : state === "idle" ? (
+			<Circle
+				size={14}
+				className="text-amber-400/90 shrink-0 fill-amber-400/30"
+			/>
 		) : state === "failed" ? (
 			<AlertCircle size={14} className="text-crimson shrink-0" />
 		) : (
@@ -169,7 +175,9 @@ export function SyncStatus({
 		? "failed"
 		: isConnected
 			? "done"
-			: "active";
+			: s === "waiting_for_cli"
+				? "idle"
+				: "active";
 	const uploadStage: StageState = !isConnected
 		? "pending"
 		: uploadDone
@@ -233,12 +241,43 @@ export function SyncStatus({
 											? "Mengupload"
 											: isConnected
 												? "Terhubung"
-												: "Menunggu"}
+												: "Standby"}
 					</span>
 				</div>
 
 				{/* Panel Body */}
 				<div className="p-5 sm:p-6 flex flex-col gap-5">
+					{/* Standby notification when CLI is waiting for first command */}
+					{s === "waiting_for_cli" && (
+						<div
+							data-testid="cli-waiting-alert"
+							className="rounded-lg border border-graphite/80 bg-obsidian p-4 text-xs text-fog flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+						>
+							<div className="flex items-start gap-2.5">
+								<span className="flex h-2 w-2 rounded-full bg-amber-400 mt-1.5 shrink-0" />
+								<div className="flex flex-col gap-0.5">
+									<span className="font-semibold text-snow">
+										CLI Agent Belum Terhubung
+									</span>
+									<p className="text-[11px] text-fog leading-relaxed">
+										Buka terminal lokal Anda di root repositori, lalu paste dan
+										jalankan prompt sync. Halaman ini akan otomatis mendeteksi
+										progress ketika agent mulai mengirim file.
+									</p>
+								</div>
+							</div>
+							{onBackToInstructions && (
+								<button
+									type="button"
+									onClick={onBackToInstructions}
+									className="shrink-0 inline-flex items-center gap-1.5 rounded border border-graphite bg-charcoal px-3 py-1.5 text-xs text-snow hover:bg-steel transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									Lihat Prompt Lagi
+								</button>
+							)}
+						</div>
+					)}
+
 					{/* Status List — three stages, each backed by a real signal */}
 					<div className="flex flex-col gap-2.5">
 						{/* Stage 1: CLI handshake (session left waiting_for_cli) */}
@@ -251,7 +290,7 @@ export function SyncStatus({
 									? "CLI terhubung dan repository root terdeteksi"
 									: isExpired
 										? "Sesi kedaluwarsa sebelum CLI terhubung"
-										: "Menunggu CLI dari terminal lokal"}
+										: "Menunggu perintah sync dijalankan di terminal"}
 							</span>
 						</div>
 

@@ -94,6 +94,19 @@ describe("SyncStatus", () => {
 		expect(c.textContent).not.toContain("%");
 	});
 
+	it("shows honest idle standby state without spinning loader when waiting for CLI", async () => {
+		mockFetchSequence([statusResponse({ status: "waiting_for_cli" })]);
+		const c = renderStatus();
+		await settle();
+		expect(c.textContent).toContain("CLI Agent Belum Terhubung");
+		expect(c.textContent).toContain("Standby");
+		expect(c.textContent).toContain(
+			"Menunggu perintah sync dijalankan di terminal",
+		);
+		// No spinning loaders should be present while in idle standby
+		expect(c.querySelector(".animate-spin")).toBeNull();
+	});
+
 	it("displays real counts and timestamps from the server", async () => {
 		mockFetchSequence([
 			statusResponse({
