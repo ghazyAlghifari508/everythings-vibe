@@ -62,9 +62,9 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	const routeSearch = useLocation({ select: (l) => l.search });
 	const historyWorkspace =
 		historyFilterSchema.safeParse(routeSearch).data?.workspace;
-	// Greenfield workspace links to /plan/new and its scoped history; every
-	// other route keeps the global nav.
-	const showGreenfieldHistory =
+	// Greenfield workspace links to /plan/new ("Chat") and its scoped history ("Riwayat");
+	// every other route keeps the global nav (with "Pricing").
+	const isGreenfieldWorkspace =
 		pathname === "/plan/new" ||
 		(pathname === "/history" && historyWorkspace === "greenfield");
 	const [, startTransition] = useTransition();
@@ -251,27 +251,40 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						/>
 					) : (
 						<div className="flex items-center gap-1">
-							<Link
-								to="/pricing"
-								className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-									pathname.startsWith("/pricing")
-										? "bg-white/10 text-snow"
-										: "text-fog hover:bg-white/5 hover:text-snow"
-								}`}
-							>
-								Pricing
-							</Link>
-							{showGreenfieldHistory && (
+							{isGreenfieldWorkspace ? (
+								<>
+									<Link
+										to="/plan/new"
+										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+											pathname === "/plan/new"
+												? "bg-white/10 text-snow"
+												: "text-fog hover:bg-white/5 hover:text-snow"
+										}`}
+									>
+										Chat
+									</Link>
+									<Link
+										to="/history"
+										search={{ workspace: "greenfield" }}
+										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+											pathname === "/history"
+												? "bg-white/10 text-snow"
+												: "text-fog hover:bg-white/5 hover:text-snow"
+										}`}
+									>
+										Riwayat
+									</Link>
+								</>
+							) : (
 								<Link
-									to="/history"
-									search={{ workspace: "greenfield" }}
-									className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-										pathname === "/history"
+									to="/pricing"
+									className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+										pathname.startsWith("/pricing")
 											? "bg-white/10 text-snow"
 											: "text-fog hover:bg-white/5 hover:text-snow"
 									}`}
 								>
-									Riwayat
+									Pricing
 								</Link>
 							)}
 						</div>
@@ -626,16 +639,26 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					>
 						Home
 					</Link>
-					<Link
-						to="/pricing"
-						className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
-						onClick={() => setIsMobileMenuOpen(false)}
-					>
-						Pricing
-					</Link>
+					{isGreenfieldWorkspace ? (
+						<Link
+							to="/plan/new"
+							className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
+							onClick={() => setIsMobileMenuOpen(false)}
+						>
+							Chat
+						</Link>
+					) : (
+						<Link
+							to="/pricing"
+							className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
+							onClick={() => setIsMobileMenuOpen(false)}
+						>
+							Pricing
+						</Link>
+					)}
 					<Link
 						to="/history"
-						{...(showGreenfieldHistory
+						{...(isGreenfieldWorkspace
 							? { search: { workspace: "greenfield" } }
 							: {})}
 						className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"

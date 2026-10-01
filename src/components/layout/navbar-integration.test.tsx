@@ -14,14 +14,20 @@ import { Navbar } from "./navbar";
 import { canShowNavbarTopUp } from "./navbar-topup-helper";
 
 let mockPathname = "/prd/test-project-1";
+let mockSearch: Record<string, unknown> = {};
 
 vi.mock("@tanstack/react-router", () => ({
 	useLocation: ({
 		select,
 	}: {
-		select?: (l: { pathname: string }) => unknown;
+		select?: (l: {
+			pathname: string;
+			search: Record<string, unknown>;
+		}) => unknown;
 	} = {}) =>
-		select ? select({ pathname: mockPathname }) : { pathname: mockPathname },
+		select
+			? select({ pathname: mockPathname, search: mockSearch })
+			: { pathname: mockPathname, search: mockSearch },
 	useMatches: () => [],
 	useNavigate: () => vi.fn(),
 	useRouter: () => ({ invalidate: vi.fn() }),
@@ -100,6 +106,7 @@ function openUserMenu() {
 
 beforeEach(() => {
 	mockPathname = "/prd/test-project-1";
+	mockSearch = {};
 	mockPlanData.plan = "free";
 	mockPlanData.topUpEligible = false;
 	sessionState.user = { id: "user-1", email: "user@test.com" };
@@ -273,22 +280,61 @@ describe("Navbar session boundary", () => {
 	});
 });
 
-describe("Navbar Greenfield History Navlink", () => {
-	it("renders Riwayat on /plan/new without duplicate History link in mobile menu", () => {
+describe("Navbar Greenfield Workspace Navlinks", () => {
+	it("renders Chat and Riwayat on /plan/new without Pricing link in desktop and mobile", () => {
 		mockPathname = "/plan/new";
 		renderNavbar();
 
-		// Desktop navlink exists
-		const desktopRiwayat = screen.getByRole("link", { name: /^Riwayat$/i });
-		expect(desktopRiwayat).toBeDefined();
+		// Desktop navlinks
+		expect(screen.getByRole("link", { name: /^Chat$/i })).toBeDefined();
+		expect(screen.getByRole("link", { name: /^Riwayat$/i })).toBeDefined();
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 
 		// Open mobile menu
 		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
 		fireEvent.click(toggleBtn);
 
-		// Mobile menu should render Riwayat and never duplicate History
+		// Mobile menu renders Chat and Riwayat; zero Pricing or duplicate History
+		const allChatLinks = screen.getAllByRole("link", { name: /^Chat$/i });
 		const allRiwayatLinks = screen.getAllByRole("link", { name: /^Riwayat$/i });
+		expect(allChatLinks).toHaveLength(2); // 1 desktop + 1 mobile
 		expect(allRiwayatLinks).toHaveLength(2); // 1 desktop + 1 mobile
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 		expect(screen.queryByRole("link", { name: /^History$/i })).toBeNull();
+	});
+
+	it("renders Chat and Riwayat on /history?workspace=greenfield without Pricing", () => {
+		mockPathname = "/history";
+		mockSearch = { workspace: "greenfield" };
+		renderNavbar();
+
+		// Desktop navlinks
+		expect(screen.getByRole("link", { name: /^Chat$/i })).toBeDefined();
+		expect(screen.getByRole("link", { name: /^Riwayat$/i })).toBeDefined();
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
+
+		// Open mobile menu
+		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
+		fireEvent.click(toggleBtn);
+
+		expect(screen.getAllByRole("link", { name: /^Chat$/i })).toHaveLength(2);
+		expect(screen.getAllByRole("link", { name: /^Riwayat$/i })).toHaveLength(2);
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
+	});
+
+	it("renders Pricing on home route / and does not render Chat", () => {
+		mockPathname = "/";
+		renderNavbar();
+
+		// Desktop navlinks
+		expect(screen.getByRole("link", { name: /^Pricing$/i })).toBeDefined();
+		expect(screen.queryByRole("link", { name: /^Chat$/i })).toBeNull();
+
+		// Open mobile menu
+		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
+		fireEvent.click(toggleBtn);
+
+		expect(screen.getAllByRole("link", { name: /^Pricing$/i })).toHaveLength(2);
+		expect(screen.queryByRole("link", { name: /^Chat$/i })).toBeNull();
 	});
 });
