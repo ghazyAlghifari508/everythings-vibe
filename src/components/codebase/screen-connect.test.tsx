@@ -193,8 +193,31 @@ describe("ScreenConnect", () => {
 		});
 
 		const agentStartedBtn = [...container.querySelectorAll("button")].find(
-			(b) => /Saya sudah menjalankan agent/i.test(b.textContent ?? ""),
+			(b) =>
+				/Lanjut ke Pantau Sync|Saya sudah menjalankan agent/i.test(
+					b.textContent ?? "",
+				),
 		);
 		expect(agentStartedBtn).toBeUndefined();
+	});
+
+	it("renders right-aligned next button inside footer by default", () => {
+		act(() => {
+			root?.render(
+				<ScreenConnect
+					projectName="Test App"
+					payload={samplePayload}
+					onAgentStarted={() => {}}
+				/>,
+			);
+		});
+
+		const nextBtn = [...container.querySelectorAll("button")].find((b) =>
+			/Lanjut ke Pantau Sync/i.test(b.textContent ?? ""),
+		);
+		expect(nextBtn).toBeDefined();
+		expect(container.textContent).toContain(
+			"Sudah menjalankan prompt di terminal agent?",
+		);
 	});
 });
