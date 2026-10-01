@@ -1,10 +1,12 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { SyncStatus } from "@/components/codebase/sync-status";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import {
+	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
+	type SyncStatusResponse,
 	syncPromptPayloadSchema,
 } from "@/lib/codebase-sync";
 
@@ -27,29 +29,27 @@ type CreatedCodebase = {
 	name: string;
 };
 
+type PlanStep = "prompt" | "syncing" | "summary";
+
 export function PlanCodebasePage() {
 	const navigate = useNavigate();
-	const [name, setName] = useState("");
 	const [error, setError] = useState<string | null>(null);
-	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [isStarting, setIsStarting] = useState(false);
 	const [codebase, setCodebase] = useState<CreatedCodebase | null>(null);
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
-	const [agentStarted, setAgentStarted] = useState(false);
+	const [step, setStep] = useState<PlanStep>("prompt");
+	const [lastStatus, setLastStatus] = useState<SyncStatusResponse | null>(null);
 	const [sessionNonce, setSessionNonce] = useState(0);
+	const autoInitAttempted = useRef(false);
 
-	const createCodebase = async () => {
-		const trimmed = name.trim();
-		if (trimmed.length < 3) {
-			setError("Nama codebase harus diisi minimal 3 karakter.");
-			return;
-		}
+	const createCodebase = useCallback(async () => {
 		setError(null);
-		setIsSubmitting(true);
+		setIsStarting(true);
 		try {
 			const response = await fetch("/api/codebases", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ name: trimmed }),
+				body: JSON.stringify({}),
 			});
 			if (response.status === 401) {
 				window.location.href = `/login?redirect=${encodeURIComponent("/plan/codebase")}`;
@@ -81,22 +81,31 @@ export function PlanCodebasePage() {
 			setCodebase({
 				id: body.id,
 				name:
-					"name" in body && typeof body.name === "string" ? body.name : trimmed,
+					"name" in body && typeof body.name === "string"
+						? body.name
+						: "Repository Lokal",
 			});
 			setPayload(sync.data);
-			setAgentStarted(false);
+			setLastStatus(null);
+			setStep("prompt");
 			setSessionNonce((current) => current + 1);
 		} catch {
 			setError("Server tidak dapat dihubungi.");
 		} finally {
-			setIsSubmitting(false);
+			setIsStarting(false);
 		}
-	};
+	}, []);
+
+	useEffect(() => {
+		if (autoInitAttempted.current) return;
+		autoInitAttempted.current = true;
+		void createCodebase();
+	}, [createCodebase]);
 
 	const retrySession = async () => {
 		if (!codebase) return;
 		setError(null);
-		setIsSubmitting(true);
+		setIsStarting(true);
 		try {
 			const response = await fetch(
 				`/api/codebases/${encodeURIComponent(codebase.id)}/session`,
@@ -114,12 +123,23 @@ export function PlanCodebasePage() {
 				return;
 			}
 			setPayload(parsed.data);
-			setAgentStarted(false);
+			setLastStatus(null);
+			setStep("prompt");
 			setSessionNonce((current) => current + 1);
 		} catch {
 			setError("Server tidak dapat dihubungi.");
 		} finally {
-			setIsSubmitting(false);
+			setIsStarting(false);
+		}
+	};
+
+	const handleStatus = (status: SyncStatusResponse | null) => {
+		setLastStatus(status);
+		if (
+			status?.snapshotId &&
+			SNAPSHOT_CONTEXT_STATUSES.includes(status.status)
+		) {
+			setStep("summary");
 		}
 	};
 
@@ -138,8 +158,8 @@ export function PlanCodebasePage() {
 					Hubungkan codebase yang sudah ada
 				</h1>
 				<p className="mt-3 text-sm leading-6 text-fog">
-					Beri nama repository, salin prompt sync ke AI coding agent, lalu
-					pantau status koneksi sampai snapshot terverifikasi.
+					Salin prompt sync ke AI coding agent, pantau status koneksi sampai
+					snapshot terverifikasi, lalu masuk ke workspace.
 				</p>
 			</header>
 
@@ -152,86 +172,104 @@ export function PlanCodebasePage() {
 				</div>
 			)}
 
-			{!codebase ? (
-				<form
-					onSubmit={(event) => {
-						event.preventDefault();
-						void createCodebase();
-					}}
-					className="rounded-xl border border-graphite bg-charcoal p-5 sm:p-6"
-				>
-					<label
-						htmlFor="codebase-name"
-						className="text-sm font-medium text-snow"
-					>
-						Nama repository
-					</label>
-					<div className="mt-3 flex flex-col gap-3 sm:flex-row">
-						<input
-							id="codebase-name"
-							value={name}
-							onChange={(event) => setName(event.target.value)}
-							placeholder="Contoh: Aplikasi marketplace"
-							className="min-h-11 min-w-0 flex-1 rounded-lg border border-graphite bg-obsidian px-3 text-sm text-snow outline-none placeholder:text-slate focus-visible:ring-2 focus-visible:ring-indigo"
-						/>
-						<button
-							type="submit"
-							disabled={isSubmitting || name.trim().length < 3}
-							className="min-h-11 rounded-md bg-snow px-4 text-sm font-semibold text-onyx disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							{isSubmitting ? "Membuat..." : "Hubungkan"}
-						</button>
-					</div>
-					<p className="mt-3 text-xs text-fog">
-						Nama minimal 3 karakter. Sesi sync pertama dibuat otomatis bersama
-						codebase.
+			{!codebase || !payload ? (
+				<output className="flex flex-col items-center gap-3 rounded-xl border border-graphite bg-charcoal p-8 text-center">
+					<div className="h-8 w-8 animate-spin rounded-full border-2 border-graphite border-t-indigo" />
+					<p className="text-sm text-fog">
+						{isStarting ? "Menyiapkan sesi sync..." : "Menunggu sesi sync..."}
 					</p>
-				</form>
+					{error && !isStarting && (
+						<button
+							type="button"
+							onClick={() => void createCodebase()}
+							className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-sm font-semibold text-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							Coba lagi
+						</button>
+					)}
+				</output>
 			) : (
-				<section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-graphite bg-charcoal p-5 sm:p-6">
-					<div>
-						<p className="font-mono text-xs uppercase tracking-widest text-fog">
-							Codebase / {codebase.name}
-						</p>
-						<p className="mt-1 text-sm text-fog">
-							Sesi sync aktif. Lanjutkan di halaman detail untuk review analisis
-							dan perencanaan fitur.
-						</p>
-					</div>
-					<Link
-						to="/codebases/$id"
-						params={{ id: codebase.id }}
-						className="inline-flex min-h-11 items-center rounded-md border border-graphite px-4 text-sm font-semibold text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						Buka detail codebase
-					</Link>
-				</section>
-			)}
+				<>
+					{step === "prompt" && (
+						<ScreenConnect
+							projectName={codebase.name}
+							payload={payload}
+							isStarting={isStarting}
+							onAgentStarted={() => setStep("syncing")}
+						/>
+					)}
 
-			{codebase && (
-				<ScreenConnect
-					projectName={codebase.name}
-					payload={payload}
-					isStarting={isSubmitting}
-					onAgentStarted={() => setAgentStarted(true)}
-				/>
-			)}
+					{step === "syncing" && (
+						<SyncStatus
+							key={sessionNonce}
+							projectId={codebase.id}
+							projectName={codebase.name}
+							status={lastStatus}
+							statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
+							onStatus={handleStatus}
+							onRetrySync={() => void retrySession()}
+							onBackToInstructions={() => setStep("prompt")}
+							onViewReview={() =>
+								void navigate({
+									to: "/codebases/$id",
+									params: { id: codebase.id },
+								})
+							}
+						/>
+					)}
 
-			{codebase && agentStarted && (
-				<SyncStatus
-					key={sessionNonce}
-					projectId={codebase.id}
-					projectName={codebase.name}
-					statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
-					onRetrySync={() => void retrySession()}
-					onBackToInstructions={() => setAgentStarted(false)}
-					onViewReview={() =>
-						void navigate({
-							to: "/codebases/$id",
-							params: { id: codebase.id },
-						})
-					}
-				/>
+					{step === "summary" && (
+						<section
+							data-testid="codebase-sync-summary"
+							className="mx-auto w-full max-w-2xl rounded-xl border border-emerald/30 bg-charcoal p-5 sm:p-6"
+						>
+							<p className="font-mono text-[11px] uppercase tracking-widest text-emerald">
+								Sync selesai
+							</p>
+							<h2 className="mt-2 text-xl font-semibold text-snow">
+								Snapshot codebase terverifikasi
+							</h2>
+							<dl className="mt-4 flex flex-col gap-2 text-sm">
+								<div className="flex items-center justify-between gap-3 rounded-lg border border-graphite bg-obsidian px-3 py-2">
+									<dt className="text-fog">File tersinkron</dt>
+									<dd className="font-mono text-snow">
+										{lastStatus?.fileCount ?? "-"} file
+										{typeof lastStatus?.excludedCount === "number"
+											? ` (${lastStatus.excludedCount} dikecualikan)`
+											: ""}
+									</dd>
+								</div>
+								<div className="flex items-center justify-between gap-3 rounded-lg border border-graphite bg-obsidian px-3 py-2">
+									<dt className="text-fog">Snapshot</dt>
+									<dd className="truncate font-mono text-xs text-snow">
+										{lastStatus?.snapshotId ?? "-"}
+									</dd>
+								</div>
+							</dl>
+							<div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+								<button
+									type="button"
+									onClick={() => setStep("syncing")}
+									className="inline-flex min-h-11 items-center rounded-md border border-graphite px-4 text-sm font-medium text-fog transition hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									Pantau sync
+								</button>
+								<button
+									type="button"
+									onClick={() =>
+										void navigate({
+											to: "/codebases/$id",
+											params: { id: codebase.id },
+										})
+									}
+									className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-sm font-semibold text-onyx transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									Masuk ke Workspace
+								</button>
+							</div>
+						</section>
+					)}
+				</>
 			)}
 		</main>
 	);
