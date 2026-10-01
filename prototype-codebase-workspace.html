@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VibeEverything · Existing Codebase AI Workspace Prototype</title>
+  <title>VibeEverything · Existing Codebase AI Workspace Prototype (v2)</title>
   <style>
     :root {
       --onyx: #0a0b0d;
@@ -39,7 +39,7 @@
       overflow: hidden;
     }
 
-    /* Top Shell Nav */
+    /* Top Navigation Shell */
     .topbar {
       height: 48px;
       background: var(--charcoal);
@@ -94,7 +94,7 @@
       gap: 10px;
     }
     .btn-toggle-canvas {
-      padding: 5px 11px;
+      padding: 5px 12px;
       background: var(--obsidian);
       border: 1px solid var(--graphite);
       color: var(--mist);
@@ -115,15 +115,15 @@
     /* Layout Workspace: 3 Columns */
     .workspace {
       display: grid;
-      grid-template-columns: 260px 1fr var(--canvas-width, 540px);
+      grid-template-columns: 280px 1fr var(--canvas-width, 580px);
       height: calc(100vh - 48px);
       transition: grid-template-columns 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .workspace.canvas-collapsed {
-      grid-template-columns: 260px 1fr 0px;
+      grid-template-columns: 280px 1fr 0px;
     }
 
-    /* Left Sidebar: Folder Tree & Conversations */
+    /* Left Sidebar: Pure Codebase Focus */
     .sidebar-left {
       background: var(--charcoal);
       border-right: 1px solid var(--graphite);
@@ -131,40 +131,61 @@
       flex-direction: column;
       overflow: hidden;
     }
-    .side-header {
-      padding: 12px 14px;
+    .repo-info-card {
+      padding: 14px 16px;
       border-bottom: 1px solid var(--graphite);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--obsidian);
+    }
+    .repo-name-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-    .btn-new-feature {
-      width: 100%;
-      padding: 7px 12px;
-      background: var(--indigo);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
+    .repo-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--snow);
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 6px;
-      transition: background 0.15s ease;
     }
-    .btn-new-feature:hover {
-      background: #3f55e0;
+    .repo-stats-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--slate);
+      font-family: var(--font-mono);
+    }
+    .search-file-box {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--graphite);
+    }
+    .search-input {
+      width: 100%;
+      padding: 6px 10px;
+      background: var(--onyx);
+      border: 1px solid var(--graphite);
+      border-radius: 6px;
+      font-size: 11.5px;
+      color: var(--snow);
+      outline: none;
+      font-family: inherit;
+    }
+    .search-input:focus {
+      border-color: var(--indigo);
     }
 
     .side-scroll {
       flex: 1;
       overflow-y: auto;
-      padding: 12px;
+      padding: 12px 14px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
     }
     .section-label {
       font-size: 11px;
@@ -172,16 +193,16 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--slate);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
-    /* Tree View */
+    /* File Tree */
     .tree-node {
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--fog);
       display: flex;
       flex-direction: column;
@@ -191,7 +212,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 3px 6px;
+      padding: 4px 6px;
       border-radius: 4px;
       cursor: pointer;
       user-select: none;
@@ -203,44 +224,34 @@
     .tree-item.nested-1 { padding-left: 18px; }
     .tree-item.nested-2 { padding-left: 32px; }
     .tree-icon {
-      font-size: 12px;
+      font-size: 11px;
       width: 14px;
       text-align: center;
       color: var(--slate);
     }
 
-    /* Conversations List */
-    .convo-list {
+    /* Stack Summary Card at bottom of Left Sidebar */
+    .side-footer {
+      padding: 12px 14px;
+      border-top: 1px solid var(--graphite);
+      background: var(--obsidian);
       display: flex;
       flex-direction: column;
-      gap: 2px;
-    }
-    .convo-item {
-      padding: 7px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
       gap: 8px;
-      color: var(--fog);
-      font-size: 12px;
-      transition: all 0.15s ease;
     }
-    .convo-item:hover {
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--snow);
+    .stack-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
     }
-    .convo-item.active {
-      background: var(--obsidian);
+    .stack-pill {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--charcoal);
       border: 1px solid var(--graphite);
-      color: var(--snow);
-      font-weight: 550;
-    }
-    .convo-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--indigo);
+      color: var(--fog);
     }
 
     /* Middle Column: Chat */
@@ -267,6 +278,19 @@
     .chat-header-subtitle {
       font-size: 11px;
       color: var(--slate);
+      font-family: var(--font-mono);
+    }
+    .live-progress-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      background: var(--indigo-bg);
+      border: 1px solid rgba(79, 104, 245, 0.3);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #8da2fb;
       font-family: var(--font-mono);
     }
 
@@ -411,7 +435,6 @@
       border-radius: 12px;
       font-size: 10px;
       font-weight: 650;
-      letter-spacing: 0.02em;
     }
     .custom-answer-input {
       width: 100%;
@@ -423,9 +446,6 @@
       font-family: inherit;
       font-size: 12px;
       outline: none;
-    }
-    .custom-answer-input:focus {
-      border-color: var(--indigo);
     }
 
     /* Interactive File Card */
@@ -537,6 +557,53 @@
       background: #3f55e0;
     }
 
+    /* Handoff to AI Agent Card */
+    .handoff-box {
+      margin-top: 18px;
+      padding: 16px;
+      background: var(--obsidian);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .handoff-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .handoff-title {
+      font-size: 13px;
+      font-weight: 650;
+      color: var(--emerald);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .handoff-cli-cmd {
+      background: var(--onyx);
+      border: 1px solid var(--graphite);
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--mist);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: all;
+    }
+    .btn-copy-cmd {
+      background: var(--iron);
+      color: var(--snow);
+      border: none;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
     /* Chat Composer Bar */
     .chat-composer {
       padding: 16px 30px;
@@ -576,9 +643,6 @@
       font-size: 11px;
       color: var(--slate);
       font-family: var(--font-mono);
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
     .btn-send {
       padding: 5px 12px;
@@ -654,6 +718,37 @@
       color: var(--snow);
     }
 
+    /* Sub-header inside Canvas for View Mode toggle (Tree vs Kanban) */
+    .canvas-subnav {
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--graphite);
+      background: var(--charcoal);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .view-toggle-group {
+      display: flex;
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      border-radius: 6px;
+      padding: 2px;
+    }
+    .view-toggle-btn {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: var(--fog);
+      cursor: pointer;
+    }
+    .view-toggle-btn.active {
+      background: var(--iron);
+      color: var(--snow);
+    }
+
     .canvas-content {
       flex: 1;
       overflow-y: auto;
@@ -663,7 +758,7 @@
       gap: 18px;
     }
 
-    /* Mermaid Diagram Canvas Presentation */
+    /* Architecture Diagram Presentation */
     .diagram-viewport {
       background: var(--onyx);
       border: 1px solid var(--graphite);
@@ -673,7 +768,6 @@
       flex-direction: column;
       align-items: center;
       position: relative;
-      overflow-x: auto;
     }
     .diagram-box {
       border: 1px solid var(--steel);
@@ -684,16 +778,15 @@
       font-size: 12px;
       color: var(--snow);
       text-align: center;
-      min-width: 170px;
+      min-width: 190px;
     }
     .diagram-box.highlight {
       border-color: var(--indigo);
       background: var(--indigo-bg);
-      color: var(--snow);
       box-shadow: 0 0 12px var(--indigo-glow);
     }
     .diagram-arrow {
-      height: 24px;
+      height: 22px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -703,7 +796,7 @@
 
     /* Markdown Document Presentation */
     .markdown-view h2 {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 650;
       color: var(--snow);
       border-bottom: 1px solid var(--graphite);
@@ -712,7 +805,7 @@
       margin-bottom: 10px;
     }
     .markdown-view h3 {
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 600;
       color: var(--mist);
       margin-top: 14px;
@@ -720,26 +813,24 @@
     }
     .markdown-view p {
       color: var(--fog);
-      font-size: 12.5px;
+      font-size: 12px;
       margin-bottom: 10px;
       line-height: 1.6;
     }
     .markdown-view ul {
       margin-left: 20px;
       color: var(--fog);
-      font-size: 12.5px;
+      font-size: 12px;
       margin-bottom: 10px;
     }
-    .markdown-view li {
-      margin-bottom: 4px;
-    }
+    .markdown-view li { margin-bottom: 4px; }
     .markdown-view code {
       background: var(--obsidian);
       border: 1px solid var(--graphite);
       padding: 1px 5px;
       border-radius: 4px;
       font-family: var(--font-mono);
-      font-size: 11.5px;
+      font-size: 11px;
       color: var(--mist);
     }
 
@@ -765,12 +856,117 @@
       background: var(--obsidian);
       border: 1px solid var(--graphite);
       border-radius: 6px;
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--mist);
     }
     .task-checkbox {
       margin-top: 2px;
       cursor: pointer;
+    }
+
+    /* Codebase Existing KANBAN BOARD VIEW */
+    .kanban-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      min-width: 500px;
+    }
+    .kanban-col {
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      min-height: 380px;
+    }
+    .kanban-col-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--graphite);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      font-weight: 650;
+      color: var(--mist);
+    }
+    .kanban-count-pill {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: var(--charcoal);
+      color: var(--slate);
+    }
+    .kanban-cards-box {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+    .kanban-card {
+      background: var(--charcoal);
+      border: 1px solid var(--graphite);
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: grab;
+      transition: all 0.15s ease;
+    }
+    .kanban-card:hover {
+      border-color: var(--steel);
+      transform: translateY(-1px);
+    }
+    .kanban-card.in-progress-active {
+      border-color: rgba(79, 104, 245, 0.4);
+      background: rgba(79, 104, 245, 0.04);
+    }
+    .kanban-tag {
+      font-size: 9.5px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      padding: 1px 5px;
+      border-radius: 3px;
+      width: fit-content;
+    }
+    .tag-db { background: rgba(16, 185, 129, 0.1); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.2); }
+    .tag-api { background: rgba(79, 104, 245, 0.1); color: var(--indigo); border: 1px solid rgba(79, 104, 245, 0.2); }
+    .tag-ui { background: rgba(245, 158, 11, 0.1); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.2); }
+    .kanban-card-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--snow);
+      line-height: 1.4;
+    }
+    .kanban-card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--slate);
+      font-family: var(--font-mono);
+      margin-top: 4px;
+    }
+    .agent-working-pulse {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--indigo);
+      font-size: 10px;
+    }
+    .pulse-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--indigo);
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.3; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.2); }
+      100% { opacity: 0.3; transform: scale(0.9); }
     }
   </style>
 </head>
@@ -785,7 +981,7 @@
       <div class="repo-pill">
         <span class="status-dot"></span>
         <span>movieworld-web</span>
-        <span style="color:var(--slate); font-size:10px;">(git:main)</span>
+        <span style="color:var(--slate); font-size:10px;">(git:main · 142 file)</span>
       </div>
     </div>
     <div class="top-actions">
@@ -799,72 +995,78 @@
   <!-- Workspace Shell: 3 Columns -->
   <div class="workspace" id="workspaceShell">
 
-    <!-- LEFT SIDEBAR: Codebase Tree & Conversations -->
+    <!-- LEFT SIDEBAR: PURE REPO FOCUS (No New Workspace, No Chat History) -->
     <aside class="sidebar-left">
-      <div class="side-header">
-        <button class="btn-new-feature" onclick="resetFlow()">
-          <span>+</span>
-          <span>Rancang Fitur Baru</span>
-        </button>
+      <!-- Repo Card -->
+      <div class="repo-info-card">
+        <div class="repo-name-row">
+          <span class="repo-title">📦 movieworld-web</span>
+          <span style="font-size:10px; color:var(--emerald); background:var(--emerald-bg); padding:1px 6px; border-radius:4px; font-weight:600;">Synced</span>
+        </div>
+        <div class="repo-stats-row">
+          <span>Branch: main</span>
+          <span>•</span>
+          <span>142 files</span>
+          <span>•</span>
+          <span>1.8 MB</span>
+        </div>
       </div>
 
-      <div class="side-scroll">
-        <!-- Tree View -->
-        <div>
-          <div class="section-label">
-            <span>Folder Codebase</span>
-            <span style="font-family:var(--font-mono); font-size:10px;">142 file</span>
-          </div>
-          <div class="tree-node">
-            <div class="tree-item"><span class="tree-icon">▼</span> 📁 src</div>
-            <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 components</div>
-            <div class="tree-item nested-2"><span class="tree-icon">📄</span> Navbar.tsx</div>
-            <div class="tree-item nested-2"><span class="tree-icon">📄</span> MovieCard.tsx</div>
-            <div class="tree-item nested-2"><span class="tree-icon">📄</span> HeroBanner.tsx</div>
-            <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 routes</div>
-            <div class="tree-item nested-2"><span class="tree-icon">📄</span> index.tsx</div>
-            <div class="tree-item nested-2"><span class="tree-icon">📄</span> movie.$id.tsx</div>
-            <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 services</div>
-            <div class="tree-item nested-2"><span class="tree-icon">📄</span> tmdb-api.ts</div>
-            <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 db</div>
-            <div class="tree-item nested-2"><span class="tree-icon">📄</span> schema.ts</div>
-            <div class="tree-item"><span class="tree-icon">📄</span> package.json</div>
-            <div class="tree-item"><span class="tree-icon">📄</span> tsconfig.json</div>
-          </div>
-        </div>
+      <!-- File Search Filter -->
+      <div class="search-file-box">
+        <input type="text" class="search-input" placeholder="🔍 Cari file dalam repository..." oninput="filterTree(this.value)" />
+      </div>
 
-        <!-- Conversations History -->
-        <div>
-          <div class="section-label">
-            <span>Riwayat Perencanaan</span>
-          </div>
-          <div class="convo-list">
-            <div class="convo-item active">
-              <span class="convo-dot"></span>
-              <span>Fitur Watchlist Film</span>
-            </div>
-            <div class="convo-item">
-              <span style="width:6px;"></span>
-              <span>Integrasi Rating IMDB</span>
-            </div>
-            <div class="convo-item">
-              <span style="width:6px;"></span>
-              <span>Dark Mode Toggle</span>
-            </div>
-          </div>
+      <!-- File Tree Container -->
+      <div class="side-scroll">
+        <div class="section-label">
+          <span>Struktur Direktori Codebase</span>
+        </div>
+        <div class="tree-node" id="fileTree">
+          <div class="tree-item"><span class="tree-icon">▼</span> 📁 src</div>
+          <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 components</div>
+          <div class="tree-item nested-2"><span class="tree-icon">📄</span> Navbar.tsx</div>
+          <div class="tree-item nested-2"><span class="tree-icon">📄</span> MovieCard.tsx</div>
+          <div class="tree-item nested-2"><span class="tree-icon">📄</span> HeroBanner.tsx</div>
+          <div class="tree-item nested-2"><span class="tree-icon">📄</span> ToastNotification.tsx</div>
+          <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 routes</div>
+          <div class="tree-item nested-2"><span class="tree-icon">📄</span> index.tsx</div>
+          <div class="tree-item nested-2"><span class="tree-icon">📄</span> movie.$id.tsx</div>
+          <div class="tree-item nested-2"><span class="tree-icon">📄</span> api/watchlist.ts</div>
+          <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 services</div>
+          <div class="tree-item nested-2"><span class="tree-icon">📄</span> tmdb-api.ts</div>
+          <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 db</div>
+          <div class="tree-item nested-2"><span class="tree-icon">📄</span> schema.ts</div>
+          <div class="tree-item nested-2"><span class="tree-icon">📄</span> index.ts</div>
+          <div class="tree-item"><span class="tree-icon">📄</span> package.json</div>
+          <div class="tree-item"><span class="tree-icon">📄</span> tsconfig.json</div>
+          <div class="tree-item"><span class="tree-icon">📄</span> drizzle.config.ts</div>
+        </div>
+      </div>
+
+      <!-- Stack Summary Footer -->
+      <div class="side-footer">
+        <span style="font-size:10px; font-weight:600; color:var(--slate); text-transform:uppercase;">Stack Codebase Terdeteksi</span>
+        <div class="stack-tags">
+          <span class="stack-pill">Next.js 15</span>
+          <span class="stack-pill">React 19</span>
+          <span class="stack-pill">Drizzle ORM</span>
+          <span class="stack-pill">PostgreSQL</span>
+          <span class="stack-pill">Tailwind 4</span>
         </div>
       </div>
     </aside>
 
-    <!-- CENTER COLUMN: Interactive Chat & Clarification Flow -->
+    <!-- CENTER COLUMN: Interactive Chat & Handoff Pipeline -->
     <main class="chat-column">
       <div class="chat-header">
         <div>
-          <div class="chat-header-title">Perencanaan Fitur: Watchlist Film</div>
-          <div class="chat-header-subtitle">Konteks: movieworld-web (PostgreSQL, Drizzle, React 19)</div>
+          <div class="chat-header-title">Perancangan Fitur: Watchlist Film</div>
+          <div class="chat-header-subtitle">Konteks Repositori: movieworld-web</div>
         </div>
-        <div style="font-size:11px; color:var(--fog); font-family:var(--font-mono);">
-          Model: Claude 3.7 Sonnet
+        <div class="live-progress-badge" id="liveProgressBadge">
+          <span>● Kanban Live:</span>
+          <span id="progressRatioText">2/5 Selesai (40%)</span>
         </div>
       </div>
 
@@ -877,7 +1079,7 @@
             <span>VibeEverything Assistant</span>
           </div>
           <div class="msg-body">
-            Codebase <code>movieworld-web</code> berhasil disinkronkan dan dianalisis. Stack terdeteksi: <strong>Next.js 15, React 19, Tailwind CSS, PostgreSQL via Drizzle ORM</strong>. Fitur baru apa yang ingin Anda rancang hari ini?
+            Codebase <code>movieworld-web</code> siap dirancang. Saya membaca arsitektur Anda di <code>src/db/schema.ts</code> dan <code>src/components/MovieCard.tsx</code>. Fitur apa yang ingin Anda bangun?
           </div>
         </div>
 
@@ -892,14 +1094,14 @@
           </div>
         </div>
 
-        <!-- 3. AI Adaptive Clarification Question -->
+        <!-- 3. Adaptive Clarification -->
         <div class="msg-group" id="blockQuestions">
           <div class="msg-header">
             <div class="avatar-ai">AI</div>
             <span>VibeEverything Assistant</span>
           </div>
           <div class="msg-body">
-            Ide yang sangat bagus untuk <code>movieworld-web</code>! Agar arsitektur dan PRD yang saya rancang presisi dengan kode Anda, mohon jawab 2 pertanyaan adaptif berikut:
+            Ide yang sangat tepat untuk <code>movieworld-web</code>. Mari kita samakan spesifikasi implementasi dengan 2 pertanyaan adaptif berikut:
 
             <!-- Question 1 -->
             <div class="question-card">
@@ -910,12 +1112,12 @@
               <div class="options-grid">
                 <div class="option-btn" onclick="selectOption(this, 'q1')">
                   <span class="radio-circle"></span>
-                  <div>Penyimpanan lokal di browser (localStorage / client state) tanpa perlu login user.</div>
+                  <div>Penyimpanan lokal di browser (localStorage) tanpa akun login.</div>
                 </div>
                 <div class="option-btn selected" onclick="selectOption(this, 'q1')">
                   <span class="radio-circle"></span>
                   <div>
-                    Tersimpan di PostgreSQL database terautentikasi (tabel <code>watchlists</code> dengan relasi <code>user_id</code>).
+                    Database PostgreSQL terautentikasi (tabel <code>watchlists</code> berelasi dengan <code>user_id</code>).
                     <span class="badge-rekomendasi">Rekomendasi</span>
                   </div>
                 </div>
@@ -927,39 +1129,39 @@
             <div class="question-card">
               <div class="question-title">
                 <span class="question-title-num">Q2</span>
-                <span>Bagaimana umpan balik UI saat film ditambahkan ke watchlist?</span>
+                <span>Bagaimana feedback UI saat film berhasil disimpan?</span>
               </div>
               <div class="options-grid">
                 <div class="option-btn selected" onclick="selectOption(this, 'q2')">
                   <span class="radio-circle"></span>
                   <div>
-                    Toast banner interaktif di sudut kanan dengan tombol Undo pembatalan.
+                    Toast notification interaktif di sudut kanan dengan tombol Undo.
                     <span class="badge-rekomendasi">Rekomendasi</span>
                   </div>
                 </div>
                 <div class="option-btn" onclick="selectOption(this, 'q2')">
                   <span class="radio-circle"></span>
-                  <div>Ikon bookmark berubah solid/aktif secara instan tanpa popup tambahan.</div>
+                  <div>Ikon bookmark berubah warna tanpa popup banner.</div>
                 </div>
               </div>
             </div>
 
             <div style="margin-top:14px; display:flex; justify-content:flex-end;">
               <button class="btn-step-action" id="btnSubmitAnswers" onclick="submitAnswers()">
-                Kirim Jawaban & Generate Fitur Diagram ➔
+                Kirim Jawaban & Buat Spesifikasi ➔
               </button>
             </div>
           </div>
         </div>
 
-        <!-- 4. Generated Feature & Diagram Block (Appears after answer) -->
+        <!-- 4. Generated Feature & Diagram Block -->
         <div class="msg-group" id="blockFeatureGenerated" style="display:none;">
           <div class="msg-header">
             <div class="avatar-ai">AI</div>
             <span>VibeEverything Assistant</span>
           </div>
           <div class="msg-body">
-            Terima kasih! Berdasarkan preferensi Anda dan skema Drizzle di <code>src/db/schema.ts</code>, saya telah menyusun spesifikasi fitur dan diagram arsitektur watchlist.
+            Spesifikasi fitur dan diagram arsitektur alur data telah disusun.
 
             <!-- FileCard 1 -->
             <div class="file-card active-preview" id="cardFeature" onclick="openArtifact('feature')">
@@ -971,15 +1173,14 @@
                 </div>
               </div>
               <div style="display:flex; align-items:center; gap:10px;">
-                <span class="file-badge">DIAGRAM & FITUR</span>
+                <span class="file-badge">DIAGRAM</span>
                 <span class="btn-preview-pill">Buka Preview ➔</span>
               </div>
             </div>
 
-            <!-- Step prompt: PRD -->
             <div class="step-prompt-card" id="promptPrd">
               <div class="step-prompt-text">
-                Diagram arsitektur telah siap. Apakah Anda ingin melanjutkan ke pembuatan <strong>Product Requirements Document (PRD) 8-seksi</strong>?
+                Diagram siap. Lanjut membuat <strong>Product Requirements Document (PRD) 8-seksi</strong>?
               </div>
               <button class="btn-step-action" onclick="generatePrd()">
                 📄 Generate PRD ➔
@@ -995,7 +1196,7 @@
             <span>VibeEverything Assistant</span>
           </div>
           <div class="msg-body">
-            Dokumen PRD 8-seksi untuk fitur watchlist telah berhasil dibuat dengan format standar industri.
+            Dokumen PRD 8-seksi lengkap siap eksekusi telah selesai dibuat.
 
             <!-- FileCard 2 -->
             <div class="file-card" id="cardPrd" onclick="openArtifact('prd')">
@@ -1012,10 +1213,9 @@
               </div>
             </div>
 
-            <!-- Step prompt: AC -->
             <div class="step-prompt-card" id="promptAc">
               <div class="step-prompt-text">
-                PRD telah diverifikasi. Lanjut men-generate <strong>Acceptance Criteria (AC)</strong> terstruktur (Given/When/Then)?
+                Lanjut membuat <strong>Acceptance Criteria (AC)</strong> skenario pengujian formal?
               </div>
               <button class="btn-step-action" onclick="generateAc()">
                 🧪 Generate AC ➔
@@ -1031,7 +1231,7 @@
             <span>VibeEverything Assistant</span>
           </div>
           <div class="msg-body">
-            Acceptance Criteria dengan skenario pengujian positif, negatif, dan boundary test telah dikompilasi.
+            Acceptance Criteria (Given / When / Then) dan validasi batas telah dikompilasi.
 
             <!-- FileCard 3 -->
             <div class="file-card" id="cardAc" onclick="openArtifact('ac')">
@@ -1048,26 +1248,25 @@
               </div>
             </div>
 
-            <!-- Step prompt: Task -->
             <div class="step-prompt-card" id="promptTask">
               <div class="step-prompt-text">
-                Kriteria penerimaan selesai. Lanjut memecah ke <strong>Task Breakdown Teknis</strong>?
+                Lanjut memecah ke <strong>Task Breakdown Teknis & Papan Kanban</strong>?
               </div>
               <button class="btn-step-action" onclick="generateTask()">
-                📋 Generate Task Breakdown ➔
+                📋 Generate Task & Kanban ➔
               </button>
             </div>
           </div>
         </div>
 
-        <!-- 7. Generated Task Block -->
+        <!-- 7. Generated Task Block & AI AGENT HANDOFF -->
         <div class="msg-group" id="blockTaskGenerated" style="display:none;">
           <div class="msg-header">
             <div class="avatar-ai">AI</div>
             <span>VibeEverything Assistant</span>
           </div>
           <div class="msg-body">
-            Rincian tugas implementasi (DB schema, API route, client components, dan test) telah disusun dalam pohon tugas ber-checklist.
+            Task breakdown implementasi teknis dan Papan Kanban berhasil dibuat!
 
             <!-- FileCard 4 -->
             <div class="file-card" id="cardTask" onclick="openArtifact('task')">
@@ -1075,18 +1274,36 @@
                 <div class="file-icon-box">📋</div>
                 <div>
                   <div class="file-meta-title">tasks-watchlist.json</div>
-                  <div class="file-meta-desc">Rincian checklist task implementasi teknis • 5.1 KB</div>
+                  <div class="file-meta-desc">Task tree & papan Kanban live • 5.1 KB</div>
                 </div>
               </div>
               <div style="display:flex; align-items:center; gap:10px;">
-                <span class="file-badge">TASK TREE</span>
-                <span class="btn-preview-pill">Buka Preview ➔</span>
+                <span class="file-badge" style="color:var(--emerald); border-color:rgba(16,185,129,0.3);">KANBAN LIVE</span>
+                <span class="btn-preview-pill">Buka Kanban di Kanan ➔</span>
               </div>
             </div>
 
-            <div style="margin-top:12px; font-size:12px; color:var(--emerald);">
-              ✓ Seluruh siklus perancangan fitur selesai. Anda dapat mengekspor atau membagikan spesifikasi ini ke coding agent lokal Anda.
+            <!-- HANDOFF TO AI AGENT CARD -->
+            <div class="handoff-box">
+              <div class="handoff-header">
+                <div class="handoff-title">
+                  <span>🚀</span>
+                  <span>Handoff ke AI Coding Agent (Cursor / Claude Code / Windsurf)</span>
+                </div>
+                <button class="btn-copy-cmd" onclick="copyHandoffPrompt()">Salin Prompt Handoff</button>
+              </div>
+              <p style="font-size:12px; color:var(--fog); line-height:1.5;">
+                Agent lokal Anda cukup mengeksekusi perintah CLI berikut di root repository. Agent akan otomatis mengambil spesifikasi dan mengerjakan task secara bertahap:
+              </p>
+              <div class="handoff-cli-cmd">
+                <code>npx vibeeverything export rules prj_watchlist_982 && npx vibeeverything task next prj_watchlist_982</code>
+                <button class="btn-copy-cmd" onclick="copyCmd(this)">Salin</button>
+              </div>
+              <div style="font-size:11px; color:var(--slate); line-height:1.5;">
+                💡 <strong>Mekanisme Progres:</strong> Saat agent menyelesaikan task di lokal via <code>task update &lt;id&gt; --status completed</code>, kartu di <strong>Papan Kanban sebelah kanan</strong> akan otomatis berpindah kolom secara real-time!
+              </div>
             </div>
+
           </div>
         </div>
 
@@ -1095,12 +1312,12 @@
       <!-- Chat Composer -->
       <div class="chat-composer">
         <div class="composer-box">
-          <textarea class="composer-input" placeholder="Ketik instruksi tambahan atau revisi spesifikasi fitur..."></textarea>
+          <textarea class="composer-input" placeholder="Ketik instruksi tambahan atau revisi fitur..."></textarea>
           <div class="composer-foot">
             <div class="composer-pill">
               <span>⚡ Model: Claude 3.7</span>
               <span>•</span>
-              <span>Fokus: Codebase Existing</span>
+              <span>Fokus: movieworld-web</span>
             </div>
             <button class="btn-send">Kirim</button>
           </div>
@@ -1108,39 +1325,48 @@
       </div>
     </main>
 
-    <!-- RIGHT SIDEBAR: Collapsible Artifact Canvas -->
+    <!-- RIGHT SIDEBAR: Collapsible Artifact Canvas with Kanban Toggle -->
     <aside class="canvas-column" id="canvasColumn">
       <div class="canvas-header">
         <div class="canvas-title-group">
           <span style="color:var(--slate);">📄</span>
-          <span class="canvas-file-name" id="canvasFileName">feature-watchlist.json</span>
-          <span class="file-badge" id="canvasBadge">DIAGRAM</span>
+          <span class="canvas-file-name" id="canvasFileName">tasks-watchlist.json</span>
+          <span class="file-badge" id="canvasBadge">KANBAN</span>
         </div>
         <div class="canvas-tools">
-          <button class="btn-tool" onclick="alert('Konten disalin ke clipboard!')">Salin</button>
+          <button class="btn-tool" onclick="alert('Konten disalin!')">Salin</button>
           <button class="btn-tool" onclick="alert('Mengunduh file...')">Unduh</button>
           <button class="btn-close-canvas" onclick="toggleCanvas()" title="Tutup Preview">✕</button>
         </div>
       </div>
 
+      <!-- Canvas Sub-Navbar: Active on Task View to Switch Checklist vs Kanban -->
+      <div class="canvas-subnav" id="canvasSubNav">
+        <div class="view-toggle-group">
+          <button class="view-toggle-btn active" id="btnViewKanban" onclick="switchTaskView('kanban')">📊 Papan Kanban</button>
+          <button class="view-toggle-btn" id="btnViewChecklist" onclick="switchTaskView('checklist')">📋 Checklist Tree</button>
+        </div>
+        <button class="btn-tool" style="font-size:10px; color:var(--indigo);" onclick="simulateAgentProgress()">
+          ⚡ Simulasikan Progres Agent
+        </button>
+      </div>
+
       <div class="canvas-content" id="canvasContent">
 
-        <!-- VIEW 1: Feature & Diagram (Default) -->
-        <div id="viewFeature">
+        <!-- VIEW 1: Feature Diagram -->
+        <div id="viewFeature" style="display:none;">
           <div style="margin-bottom:14px;">
-            <h2 style="font-size:16px; font-weight:650; color:var(--snow);">Spesifikasi Fitur: Watchlist</h2>
-            <p style="font-size:12px; color:var(--fog); margin-top:4px;">
-              Koneksi antarmuka pengguna dengan API PostgreSQL Drizzle <code>movieworld-web</code>.
+            <h2 style="font-size:15px; font-weight:650; color:var(--snow);">Spesifikasi Fitur: Watchlist</h2>
+            <p style="font-size:12px; color:var(--fog); margin-top:2px;">
+              Diagram alur data & koneksi arsitektur <code>movieworld-web</code>.
             </p>
           </div>
 
-          <!-- Architecture Diagram Viewport -->
           <div class="diagram-viewport">
-            <div style="font-family:var(--font-mono); font-size:11px; color:var(--slate); margin-bottom:12px; align-self:flex-start;">
-              ARQUITECTURE FLOW DIAGRAM (MERMAID)
+            <div style="font-family:var(--font-mono); font-size:10px; color:var(--slate); margin-bottom:12px; align-self:flex-start;">
+              ARCHITECTURE FLOW DIAGRAM (MERMAID)
             </div>
 
-            <!-- Flow Diagram Box 1 -->
             <div class="diagram-box">
               <div style="font-size:10px; color:var(--slate);">CLIENT UI</div>
               <div style="font-weight:600;">MovieCard Component</div>
@@ -1149,7 +1375,6 @@
 
             <div class="diagram-arrow">↓ POST /api/watchlist</div>
 
-            <!-- Flow Diagram Box 2 -->
             <div class="diagram-box highlight">
               <div style="font-size:10px; color:var(--slate);">SERVER HANDLER</div>
               <div style="font-weight:600;">routes/api/watchlist.ts</div>
@@ -1158,16 +1383,14 @@
 
             <div class="diagram-arrow">↓ Drizzle ORM Insert / Delete</div>
 
-            <!-- Flow Diagram Box 3 -->
             <div class="diagram-box">
               <div style="font-size:10px; color:var(--slate);">POSTGRESQL DATABASE</div>
               <div style="font-weight:600;">Table: watchlists</div>
-              <div style="font-size:10px; color:var(--fog);">userId (FK) · movieId (FK) · createdAt</div>
+              <div style="font-size:10px; color:var(--fog);">userId (FK) · movieId (FK)</div>
             </div>
 
             <div class="diagram-arrow">↓ Optimistic UI Update & Toast</div>
 
-            <!-- Flow Diagram Box 4 -->
             <div class="diagram-box">
               <div style="font-size:10px; color:var(--slate);">FEEDBACK UI</div>
               <div style="font-weight:600;">ToastNotification Component</div>
@@ -1180,27 +1403,25 @@
         <div id="viewPrd" class="markdown-view" style="display:none;">
           <h2>1. Ringkasan Eksekutif</h2>
           <p>
-            Fitur Watchlist memungkinkan pengguna terdaftar di platform <code>movieworld-web</code> untuk menandai dan mengelompokkan film yang ingin ditonton di masa mendatang, meningkatkan retensi dan keterlibatan pengguna.
+            Fitur Watchlist memungkinkan pengguna terdaftar di platform <code>movieworld-web</code> untuk menandai film yang ingin ditonton di masa mendatang dengan sinkronisasi database akun.
           </p>
 
           <h2>2. Masalah & Solusi</h2>
           <p>
-            <strong>Masalah:</strong> Pengguna kesulitan mencatat film menarik yang mereka temukan saat browsing katalog film tanpa harus langsung menontonnya.
+            <strong>Masalah:</strong> Pengguna sering lupa judul film menarik yang mereka temukan di aplikasi saat browsing.
           </p>
           <p>
-            <strong>Solusi:</strong> Menyediakan tombol bookmark satu-klik di setiap kartu film dan halaman detail dengan persistensi multi-device melalui akun terautentikasi.
+            <strong>Solusi:</strong> Tombol bookmark satu-klik di setiap kartu film dengan persistensi PostgreSQL via Drizzle ORM.
           </p>
 
           <h2>3. Kebutuhan Fungsional</h2>
           <ul>
             <li>Tombol bookmark toggle di <code>MovieCard.tsx</code> dan <code>movie.$id.tsx</code>.</li>
-            <li>Endpoint REST <code>/api/watchlist</code> dengan dukungan mutasi idempotensi.</li>
-            <li>Dukungan filter watchlist pada halaman profil pengguna.</li>
-            <li>Toast feedback dengan durasi 4 detik dan opsi pembatalan instan (Undo).</li>
+            <li>Endpoint REST <code>/api/watchlist</code> dengan tenant isolation <code>WHERE user_id = ?</code>.</li>
+            <li>Toast feedback dengan durasi 4 detik dan aksi Undo.</li>
           </ul>
 
           <h2>4. Skema Data (Drizzle ORM)</h2>
-          <p>Penambahan tabel relasional pada <code>src/db/schema.ts</code>:</p>
           <pre style="background:var(--onyx); border:1px solid var(--graphite); padding:10px; border-radius:6px; font-family:var(--font-mono); font-size:11px; overflow-x:auto;">export const watchlists = pgTable("watchlists", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
@@ -1213,43 +1434,113 @@
         <div id="viewAc" class="markdown-view" style="display:none;">
           <h2>Acceptance Criteria (AC)</h2>
           
-          <h3>Skenario 1: Sukses Menambahkan Film ke Watchlist</h3>
+          <h3>Skenario 1: Menambah Film ke Watchlist</h3>
           <p>
             <code>GIVEN</code> Pengguna telah login ke aplikasi<br />
-            <code>WHEN</code> Pengguna mengklik ikon bookmark pada kartu film yang belum ada di watchlist<br />
-            <code>THEN</code> Sistem membuat baris baru di tabel <code>watchlists</code>, ikon berubah menjadi aktif, dan toast sukses muncul dengan opsi Undo.
+            <code>WHEN</code> Pengguna mengklik ikon bookmark pada kartu film<br />
+            <code>THEN</code> Sistem membuat baris baru di tabel <code>watchlists</code>, ikon aktif, dan toast sukses muncul dengan tombol Undo.
           </p>
 
           <h3>Skenario 2: Menghapus Film dari Watchlist</h3>
           <p>
-            <code>GIVEN</code> Film sudah berada di dalam daftar watchlist pengguna<br />
+            <code>GIVEN</code> Film sudah tersimpan di watchlist<br />
             <code>WHEN</code> Pengguna mengklik kembali ikon bookmark<br />
-            <code>THEN</code> Sistem menghapus relasi film dari tabel <code>watchlists</code> dan mengembalikan status ikon ke default.
-          </p>
-
-          <h3>Skenario 3: Penanganan Pengguna Belum Login</h3>
-          <p>
-            <code>GIVEN</code> Pengunjung anonim (belum login)<br />
-            <code>WHEN</code> Pengunjung mencoba mengklik tombol watchlist<br />
-            <code>THEN</code> Sistem menampilkan modal autentikasi login tanpa menghilangkan status halaman saat ini.
+            <code>THEN</code> Sistem menghapus row dari tabel <code>watchlists</code>.
           </p>
         </div>
 
-        <!-- VIEW 4: Task Breakdown Checklist -->
-        <div id="viewTask" style="display:none;">
-          <h2 style="font-size:16px; font-weight:650; color:var(--snow); margin-bottom:12px;">
-            Task Breakdown Implementasi
+        <!-- VIEW 4: TASK KANBAN BOARD (Default for Task view) -->
+        <div id="viewTaskKanban">
+          <div style="margin-bottom:12px; display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <h2 style="font-size:15px; font-weight:650; color:var(--snow);">Papan Kanban Progres Fitur</h2>
+              <p style="font-size:11.5px; color:var(--fog);">Status tersinkronisasi otomatis dengan CLI AI agent lokal.</p>
+            </div>
+          </div>
+
+          <div class="kanban-board">
+            <!-- TO DO -->
+            <div class="kanban-col">
+              <div class="kanban-col-head">
+                <span>To Do</span>
+                <span class="kanban-count-pill" id="todoCount">1</span>
+              </div>
+              <div class="kanban-cards-box" id="colTodo">
+                <div class="kanban-card" id="taskCard4">
+                  <span class="kanban-tag tag-ui">UI</span>
+                  <div class="kanban-card-title">Halaman koleksi watchlist di /routes/watchlist.tsx</div>
+                  <div class="kanban-card-meta">
+                    <span>Task #4</span>
+                    <span>0/2 subtasks</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- IN PROGRESS -->
+            <div class="kanban-col">
+              <div class="kanban-col-head">
+                <span style="color:var(--indigo);">In Progress</span>
+                <span class="kanban-count-pill" id="inProgCount" style="color:var(--indigo); border-color:var(--indigo);">1</span>
+              </div>
+              <div class="kanban-cards-box" id="colInProg">
+                <div class="kanban-card in-progress-active" id="taskCard3">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="kanban-tag tag-ui">UI</span>
+                    <span class="agent-working-pulse"><span class="pulse-dot"></span> Agent coding...</span>
+                  </div>
+                  <div class="kanban-card-title">WatchlistToggle button di MovieCard.tsx</div>
+                  <div class="kanban-card-meta">
+                    <span>Task #3</span>
+                    <span style="color:var(--indigo);">1/2 subtasks</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- DONE -->
+            <div class="kanban-col">
+              <div class="kanban-col-head">
+                <span style="color:var(--emerald);">Done</span>
+                <span class="kanban-count-pill" id="doneCount" style="color:var(--emerald);">2</span>
+              </div>
+              <div class="kanban-cards-box" id="colDone">
+                <div class="kanban-card" id="taskCard1">
+                  <span class="kanban-tag tag-db">Database</span>
+                  <div class="kanban-card-title">Tabel watchlists di src/db/schema.ts</div>
+                  <div class="kanban-card-meta">
+                    <span>Task #1</span>
+                    <span style="color:var(--emerald);">✓ 2/2 Selesai</span>
+                  </div>
+                </div>
+                <div class="kanban-card" id="taskCard2">
+                  <span class="kanban-tag tag-api">Backend</span>
+                  <div class="kanban-card-title">Route handler /api/watchlist.ts</div>
+                  <div class="kanban-card-meta">
+                    <span>Task #2</span>
+                    <span style="color:var(--emerald);">✓ 2/2 Selesai</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 5: TASK TREE CHECKLIST VIEW -->
+        <div id="viewTaskChecklist" style="display:none;">
+          <h2 style="font-size:15px; font-weight:650; color:var(--snow); margin-bottom:12px;">
+            Checklist Task Tree
           </h2>
 
           <div class="task-phase">
             <div class="phase-badge">Fase 1: Basis Data & Schema</div>
             <div class="task-item">
               <input type="checkbox" class="task-checkbox" checked />
-              <div>Tambah tabel <code>watchlists</code> di <code>src/db/schema.ts</code> dengan foreign key <code>users.id</code>.</div>
+              <div>Tambah tabel <code>watchlists</code> di <code>src/db/schema.ts</code>.</div>
             </div>
             <div class="task-item">
               <input type="checkbox" class="task-checkbox" checked />
-              <div>Jalankan migrasi database via <code>drizzle-kit push</code>.</div>
+              <div>Migrasi database via <code>drizzle-kit push</code>.</div>
             </div>
           </div>
 
@@ -1257,10 +1548,10 @@
             <div class="phase-badge">Fase 2: Backend Handlers</div>
             <div class="task-item">
               <input type="checkbox" class="task-checkbox" checked />
-              <div>Buat route handler <code>src/routes/api/watchlist.ts</code> (GET, POST, DELETE).</div>
+              <div>Buat route handler <code>src/routes/api/watchlist.ts</code>.</div>
             </div>
             <div class="task-item">
-              <input type="checkbox" class="task-checkbox" />
+              <input type="checkbox" class="task-checkbox" checked />
               <div>Tambahkan tenant security filter <code>WHERE user_id = ?</code>.</div>
             </div>
           </div>
@@ -1268,7 +1559,7 @@
           <div class="task-phase">
             <div class="phase-badge">Fase 3: Antarmuka Komponen</div>
             <div class="task-item">
-              <input type="checkbox" class="task-checkbox" />
+              <input type="checkbox" class="task-checkbox" checked />
               <div>Integrasikan tombol toggle di <code>src/components/MovieCard.tsx</code>.</div>
             </div>
             <div class="task-item">
@@ -1284,7 +1575,6 @@
   </div>
 
   <script>
-    // State
     let isCanvasOpen = true;
 
     function toggleCanvas() {
@@ -1359,7 +1649,9 @@
       document.getElementById("viewFeature").style.display = "none";
       document.getElementById("viewPrd").style.display = "none";
       document.getElementById("viewAc").style.display = "none";
-      document.getElementById("viewTask").style.display = "none";
+      document.getElementById("viewTaskKanban").style.display = "none";
+      document.getElementById("viewTaskChecklist").style.display = "none";
+      document.getElementById("canvasSubNav").style.display = "none";
 
       const titleEl = document.getElementById("canvasFileName");
       const badgeEl = document.getElementById("canvasBadge");
@@ -1380,20 +1672,92 @@
         titleEl.textContent = "AC-watchlist.md";
         badgeEl.textContent = "AC";
       } else if (type === 'task') {
-        document.getElementById("viewTask").style.display = "block";
+        document.getElementById("canvasSubNav").style.display = "flex";
         document.getElementById("cardTask").classList.add("active-preview");
         titleEl.textContent = "tasks-watchlist.json";
-        badgeEl.textContent = "TASK TREE";
+        badgeEl.textContent = "KANBAN LIVE";
+        switchTaskView('kanban');
       }
+    }
+
+    function switchTaskView(mode) {
+      if (mode === 'kanban') {
+        document.getElementById("viewTaskKanban").style.display = "block";
+        document.getElementById("viewTaskChecklist").style.display = "none";
+        document.getElementById("btnViewKanban").classList.add("active");
+        document.getElementById("btnViewChecklist").classList.remove("active");
+      } else {
+        document.getElementById("viewTaskKanban").style.display = "none";
+        document.getElementById("viewTaskChecklist").style.display = "block";
+        document.getElementById("btnViewChecklist").classList.add("active");
+        document.getElementById("btnViewKanban").classList.remove("active");
+      }
+    }
+
+    function simulateAgentProgress() {
+      const card3 = document.getElementById("taskCard3");
+      const colDone = document.getElementById("colDone");
+      const inProgCount = document.getElementById("inProgCount");
+      const doneCount = document.getElementById("doneCount");
+      const progressText = document.getElementById("progressRatioText");
+
+      if (!card3 || card3.parentElement.id === "colDone") {
+        alert("Simulasi: Seluruh task aktif telah selesai dikerjakan AI agent!");
+        return;
+      }
+
+      // Move card 3 to Done
+      card3.classList.remove("in-progress-active");
+      card3.querySelector(".agent-working-pulse").innerHTML = "<span style='color:var(--emerald);'>✓ Selesai</span>";
+      colDone.appendChild(card3);
+
+      inProgCount.textContent = "0";
+      doneCount.textContent = "3";
+      progressText.textContent = "3/5 Selesai (60%)";
+
+      // Move card 4 from Todo to In Progress
+      const card4 = document.getElementById("taskCard4");
+      const colInProg = document.getElementById("colInProg");
+      const todoCount = document.getElementById("todoCount");
+      if (card4) {
+        colInProg.appendChild(card4);
+        card4.classList.add("in-progress-active");
+        todoCount.textContent = "0";
+        inProgCount.textContent = "1";
+      }
+
+      alert("⚡ Notifikasi Sistem: AI Coding Agent di terminal baru saja menyelesaikan Task #3! Kartu otomatis bergeser ke kolom 'Done' dan Task #4 mulai dikerjakan.");
+    }
+
+    function copyCmd(btn) {
+      navigator.clipboard.writeText("npx vibeeverything export rules prj_watchlist_982 && npx vibeeverything task next prj_watchlist_982");
+      btn.textContent = "Tersalin!";
+      setTimeout(() => btn.textContent = "Salin", 2000);
+    }
+
+    function copyHandoffPrompt() {
+      const prompt = `Kerjakan task implementasi fitur watchlist untuk project ID prj_watchlist_982 di repository ini.
+1. Jalankan 'npx vibeeverything export rules prj_watchlist_982' untuk membuat context spec.
+2. Jalankan 'npx vibeeverything task next prj_watchlist_982' untuk melihat task yang harus dikerjakan.
+3. Tulis kodenya, jalankan test, lalu update status task via 'npx vibeeverything task update <id> --status completed'.`;
+      navigator.clipboard.writeText(prompt);
+      alert("Prompt handoff lengkap berhasil disalin ke clipboard! Siap di-paste ke Cursor / Claude Code.");
+    }
+
+    function filterTree(query) {
+      const q = query.toLowerCase().trim();
+      document.querySelectorAll(".tree-item").forEach(item => {
+        if (!q || item.textContent.toLowerCase().includes(q)) {
+          item.style.display = "flex";
+        } else {
+          item.style.display = "none";
+        }
+      });
     }
 
     function scrollChatToBottom() {
       const container = document.getElementById("chatMessages");
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-    }
-
-    function resetFlow() {
-      location.reload();
     }
   </script>
 </body>
