@@ -182,62 +182,26 @@ export function PlanCodebasePage() {
 			) : (
 				<>
 					{step === "prompt" && (
-						<div className="flex flex-col gap-6">
-							<ScreenConnect
-								projectName={codebase.name}
-								payload={payload}
-								isStarting={isStarting}
-								hideFooter={true}
-								onAgentStarted={() => setStep("syncing")}
-							/>
-							<div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-2 border-t border-graphite/60 pt-6">
-								<button
-									type="button"
-									onClick={() => setStep("syncing")}
-									disabled={!payload || isStarting}
-									className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center rounded-md bg-snow px-6 text-sm font-semibold text-onyx hover:brightness-110 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-								>
-									Lanjut ke Pantau Sync →
-								</button>
-								<p className="text-center text-xs text-fog max-w-md">
-									Sudah menyalin prompt dan menjalankannya di terminal agent?
-									Klik Lanjut untuk memantau proses sinkronisasi secara
-									real-time.
-								</p>
-							</div>
-						</div>
+						<ScreenConnect
+							projectName={codebase.name}
+							payload={payload}
+							isStarting={isStarting}
+							onAgentStarted={() => setStep("syncing")}
+						/>
 					)}
 
 					{step === "syncing" && (
-						<div className="flex flex-col gap-6">
-							<SyncStatus
-								key={sessionNonce}
-								projectId={codebase.id}
-								projectName={codebase.name}
-								status={lastStatus}
-								statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
-								onStatus={handleStatus}
-								onRetrySync={() => void retrySession()}
-								onBackToInstructions={() => setStep("prompt")}
-								onViewReview={() => setStep("summary")}
-							/>
-							<div className="mx-auto flex w-full max-w-2xl items-center justify-between border-t border-graphite/60 pt-4">
-								<button
-									type="button"
-									onClick={() => setStep("prompt")}
-									className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									← Kembali ke Prompt Sync
-								</button>
-								<button
-									type="button"
-									onClick={() => setStep("summary")}
-									className="inline-flex min-h-10 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx hover:brightness-110 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									Lanjut ke Kesimpulan Codebase →
-								</button>
-							</div>
-						</div>
+						<SyncStatus
+							key={sessionNonce}
+							projectId={codebase.id}
+							projectName={codebase.name}
+							status={lastStatus}
+							statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
+							onStatus={handleStatus}
+							onRetrySync={() => void retrySession()}
+							onBackToInstructions={() => setStep("prompt")}
+							onViewReview={() => setStep("summary")}
+						/>
 					)}
 
 					{step === "summary" && (
