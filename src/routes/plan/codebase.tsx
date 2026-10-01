@@ -148,7 +148,7 @@ export function PlanCodebasePage() {
 	};
 
 	return (
-		<main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
+		<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
 			<HubBreadcrumb
 				current="Codebase Existing"
 				parent={{ label: "VibePlan", to: "/plan" }}
@@ -164,21 +164,33 @@ export function PlanCodebasePage() {
 			)}
 
 			{!codebase || !payload ? (
-				<output className="flex flex-col items-center gap-3 rounded-xl border border-graphite bg-charcoal p-8 text-center">
-					<div className="h-8 w-8 animate-spin rounded-full border-2 border-graphite border-t-indigo" />
-					<p className="text-sm text-fog">
-						{isStarting ? "Menyiapkan sesi sync..." : "Menunggu sesi sync..."}
-					</p>
-					{error && !isStarting && (
-						<button
-							type="button"
-							onClick={() => void createCodebase()}
-							className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-sm font-semibold text-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							Coba lagi
-						</button>
-					)}
-				</output>
+				<div className="flex flex-1 items-center justify-center min-h-[50vh] py-12">
+					<output className="flex flex-col items-center gap-4 rounded-xl border border-graphite bg-charcoal p-8 sm:p-10 text-center max-w-sm w-full shadow-lg">
+						<div
+							className="h-9 w-9 animate-spin rounded-full border-2 border-graphite border-t-indigo"
+							aria-hidden="true"
+						/>
+						<div className="space-y-1">
+							<p className="text-sm font-medium text-snow">
+								{isStarting
+									? "Menyiapkan sesi sync..."
+									: "Menunggu sesi sync..."}
+							</p>
+							<p className="text-xs text-fog">
+								Menghubungkan repository dan menginisialisasi instruksi CLI
+							</p>
+						</div>
+						{error && !isStarting && (
+							<button
+								type="button"
+								onClick={() => void createCodebase()}
+								className="mt-2 inline-flex min-h-10 items-center justify-center rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								Coba lagi
+							</button>
+						)}
+					</output>
+				</div>
 			) : (
 				<>
 					{step === "prompt" && (
