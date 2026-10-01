@@ -1,0 +1,1400 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VibeEverything · Existing Codebase AI Workspace Prototype</title>
+  <style>
+    :root {
+      --onyx: #0a0b0d;
+      --charcoal: #121418;
+      --obsidian: #181b21;
+      --graphite: #242932;
+      --iron: #323946;
+      --steel: #434c5c;
+      --slate: #717d91;
+      --fog: #9aa4b5;
+      --mist: #d9e0ea;
+      --snow: #f8fafc;
+      --indigo: #4f68f5;
+      --indigo-bg: rgba(79, 104, 245, 0.12);
+      --indigo-glow: rgba(79, 104, 245, 0.25);
+      --emerald: #10b981;
+      --emerald-bg: rgba(16, 185, 129, 0.12);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.12);
+      --crimson: #ef4444;
+      --font-mono: "JetBrains Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--onyx);
+      color: var(--snow);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.5;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Top Shell Nav */
+    .topbar {
+      height: 48px;
+      background: var(--charcoal);
+      border-bottom: 1px solid var(--graphite);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      user-select: none;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+    }
+    .brand-mark {
+      width: 22px;
+      height: 22px;
+      background: var(--indigo);
+      border-radius: 5px;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: white;
+    }
+    .repo-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--mist);
+      font-family: var(--font-mono);
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--emerald);
+    }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-toggle-canvas {
+      padding: 5px 11px;
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      color: var(--mist);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-toggle-canvas:hover {
+      background: var(--iron);
+      color: var(--snow);
+      border-color: var(--steel);
+    }
+
+    /* Layout Workspace: 3 Columns */
+    .workspace {
+      display: grid;
+      grid-template-columns: 260px 1fr var(--canvas-width, 540px);
+      height: calc(100vh - 48px);
+      transition: grid-template-columns 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .workspace.canvas-collapsed {
+      grid-template-columns: 260px 1fr 0px;
+    }
+
+    /* Left Sidebar: Folder Tree & Conversations */
+    .sidebar-left {
+      background: var(--charcoal);
+      border-right: 1px solid var(--graphite);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .side-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--graphite);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .btn-new-feature {
+      width: 100%;
+      padding: 7px 12px;
+      background: var(--indigo);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s ease;
+    }
+    .btn-new-feature:hover {
+      background: #3f55e0;
+    }
+
+    .side-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--slate);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Tree View */
+    .tree-node {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--fog);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .tree-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .tree-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--snow);
+    }
+    .tree-item.nested-1 { padding-left: 18px; }
+    .tree-item.nested-2 { padding-left: 32px; }
+    .tree-icon {
+      font-size: 12px;
+      width: 14px;
+      text-align: center;
+      color: var(--slate);
+    }
+
+    /* Conversations List */
+    .convo-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .convo-item {
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--fog);
+      font-size: 12px;
+      transition: all 0.15s ease;
+    }
+    .convo-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--snow);
+    }
+    .convo-item.active {
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      color: var(--snow);
+      font-weight: 550;
+    }
+    .convo-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--indigo);
+    }
+
+    /* Middle Column: Chat */
+    .chat-column {
+      background: var(--onyx);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .chat-header {
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--graphite);
+      background: var(--charcoal);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .chat-header-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--snow);
+    }
+    .chat-header-subtitle {
+      font-size: 11px;
+      color: var(--slate);
+      font-family: var(--font-mono);
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    /* Message Bubbles */
+    .msg-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-width: 820px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .msg-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--slate);
+      font-weight: 600;
+    }
+    .avatar-ai {
+      width: 18px;
+      height: 18px;
+      background: var(--indigo);
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 9px;
+      font-weight: 800;
+    }
+    .avatar-user {
+      width: 18px;
+      height: 18px;
+      background: var(--slate);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 9px;
+    }
+    .msg-body {
+      background: var(--charcoal);
+      border: 1px solid var(--graphite);
+      border-radius: 10px;
+      padding: 14px 18px;
+      color: var(--mist);
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
+    .msg-user .msg-body {
+      background: #141822;
+      border-color: rgba(79, 104, 245, 0.25);
+      color: var(--snow);
+    }
+
+    /* Adaptive Questions Box */
+    .question-card {
+      margin-top: 14px;
+      padding: 16px;
+      border-radius: 8px;
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .question-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--snow);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .question-title-num {
+      background: var(--iron);
+      color: var(--mist);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .option-btn {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--charcoal);
+      border: 1px solid var(--graphite);
+      border-radius: 6px;
+      color: var(--mist);
+      cursor: pointer;
+      text-align: left;
+      font-size: 12.5px;
+      transition: all 0.15s ease;
+    }
+    .option-btn:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: var(--steel);
+      color: var(--snow);
+    }
+    .option-btn.selected {
+      background: var(--indigo-bg);
+      border-color: var(--indigo);
+      color: var(--snow);
+    }
+    .radio-circle {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1.5px solid var(--slate);
+      margin-top: 2px;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+    }
+    .option-btn.selected .radio-circle {
+      border-color: var(--indigo);
+      background: var(--indigo);
+    }
+    .badge-rekomendasi {
+      margin-left: 6px;
+      padding: 2px 7px;
+      background: var(--emerald-bg);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--emerald);
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+    }
+    .custom-answer-input {
+      width: 100%;
+      background: var(--onyx);
+      border: 1px solid var(--graphite);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--snow);
+      font-family: inherit;
+      font-size: 12px;
+      outline: none;
+    }
+    .custom-answer-input:focus {
+      border-color: var(--indigo);
+    }
+
+    /* Interactive File Card */
+    .file-card {
+      margin-top: 14px;
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .file-card:hover {
+      background: var(--iron);
+      border-color: var(--steel);
+      transform: translateY(-1px);
+    }
+    .file-card.active-preview {
+      border-color: var(--indigo);
+      background: var(--indigo-bg);
+    }
+    .file-card-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+    .file-icon-box {
+      width: 36px;
+      height: 36px;
+      background: var(--charcoal);
+      border: 1px solid var(--graphite);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      color: var(--indigo);
+      flex-shrink: 0;
+    }
+    .file-meta-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--snow);
+      font-family: var(--font-mono);
+    }
+    .file-meta-desc {
+      font-size: 11px;
+      color: var(--slate);
+      margin-top: 1px;
+    }
+    .file-badge {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--graphite);
+      border-radius: 4px;
+      color: var(--fog);
+    }
+    .btn-preview-pill {
+      font-size: 11.5px;
+      color: var(--indigo);
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* Next Step Prompt Card in Chat */
+    .step-prompt-card {
+      margin-top: 16px;
+      padding: 14px 16px;
+      background: rgba(79, 104, 245, 0.05);
+      border: 1px dashed rgba(79, 104, 245, 0.3);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .step-prompt-text {
+      font-size: 12.5px;
+      color: var(--mist);
+      font-weight: 500;
+    }
+    .btn-step-action {
+      background: var(--indigo);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s ease;
+    }
+    .btn-step-action:hover {
+      background: #3f55e0;
+    }
+
+    /* Chat Composer Bar */
+    .chat-composer {
+      padding: 16px 30px;
+      background: var(--charcoal);
+      border-top: 1px solid var(--graphite);
+    }
+    .composer-box {
+      max-width: 820px;
+      margin: 0 auto;
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .composer-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--snow);
+      font-size: 13px;
+      font-family: inherit;
+      resize: none;
+      min-height: 48px;
+    }
+    .composer-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 4px;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .composer-pill {
+      font-size: 11px;
+      color: var(--slate);
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-send {
+      padding: 5px 12px;
+      background: var(--snow);
+      color: var(--onyx);
+      border: none;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Right Sidebar: Collapsible Artifact Canvas */
+    .canvas-column {
+      background: var(--charcoal);
+      border-left: 1px solid var(--graphite);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .canvas-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--graphite);
+      background: var(--obsidian);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .canvas-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .canvas-file-name {
+      font-size: 13px;
+      font-weight: 650;
+      color: var(--snow);
+      font-family: var(--font-mono);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .canvas-tools {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-tool {
+      background: transparent;
+      border: 1px solid var(--graphite);
+      color: var(--fog);
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .btn-tool:hover {
+      background: var(--iron);
+      color: var(--snow);
+    }
+    .btn-close-canvas {
+      background: transparent;
+      border: none;
+      color: var(--slate);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+    .btn-close-canvas:hover {
+      color: var(--snow);
+    }
+
+    .canvas-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* Mermaid Diagram Canvas Presentation */
+    .diagram-viewport {
+      background: var(--onyx);
+      border: 1px solid var(--graphite);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      overflow-x: auto;
+    }
+    .diagram-box {
+      border: 1px solid var(--steel);
+      border-radius: 6px;
+      background: var(--charcoal);
+      padding: 10px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--snow);
+      text-align: center;
+      min-width: 170px;
+    }
+    .diagram-box.highlight {
+      border-color: var(--indigo);
+      background: var(--indigo-bg);
+      color: var(--snow);
+      box-shadow: 0 0 12px var(--indigo-glow);
+    }
+    .diagram-arrow {
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--slate);
+      font-size: 11px;
+    }
+
+    /* Markdown Document Presentation */
+    .markdown-view h2 {
+      font-size: 16px;
+      font-weight: 650;
+      color: var(--snow);
+      border-bottom: 1px solid var(--graphite);
+      padding-bottom: 6px;
+      margin-top: 18px;
+      margin-bottom: 10px;
+    }
+    .markdown-view h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--mist);
+      margin-top: 14px;
+      margin-bottom: 6px;
+    }
+    .markdown-view p {
+      color: var(--fog);
+      font-size: 12.5px;
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+    .markdown-view ul {
+      margin-left: 20px;
+      color: var(--fog);
+      font-size: 12.5px;
+      margin-bottom: 10px;
+    }
+    .markdown-view li {
+      margin-bottom: 4px;
+    }
+    .markdown-view code {
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--mist);
+    }
+
+    /* Task Checklist View */
+    .task-phase {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .phase-badge {
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      color: var(--indigo);
+      text-transform: uppercase;
+    }
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 12px;
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      border-radius: 6px;
+      font-size: 12.5px;
+      color: var(--mist);
+    }
+    .task-checkbox {
+      margin-top: 2px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Shell -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">V</div>
+      <span>VibeEverything</span>
+      <span style="color:var(--slate);">/</span>
+      <div class="repo-pill">
+        <span class="status-dot"></span>
+        <span>movieworld-web</span>
+        <span style="color:var(--slate); font-size:10px;">(git:main)</span>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn-toggle-canvas" id="btnToggleCanvas" onclick="toggleCanvas()">
+        <span id="canvasToggleIcon">◫</span>
+        <span id="canvasToggleText">Tutup Preview</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Workspace Shell: 3 Columns -->
+  <div class="workspace" id="workspaceShell">
+
+    <!-- LEFT SIDEBAR: Codebase Tree & Conversations -->
+    <aside class="sidebar-left">
+      <div class="side-header">
+        <button class="btn-new-feature" onclick="resetFlow()">
+          <span>+</span>
+          <span>Rancang Fitur Baru</span>
+        </button>
+      </div>
+
+      <div class="side-scroll">
+        <!-- Tree View -->
+        <div>
+          <div class="section-label">
+            <span>Folder Codebase</span>
+            <span style="font-family:var(--font-mono); font-size:10px;">142 file</span>
+          </div>
+          <div class="tree-node">
+            <div class="tree-item"><span class="tree-icon">▼</span> 📁 src</div>
+            <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 components</div>
+            <div class="tree-item nested-2"><span class="tree-icon">📄</span> Navbar.tsx</div>
+            <div class="tree-item nested-2"><span class="tree-icon">📄</span> MovieCard.tsx</div>
+            <div class="tree-item nested-2"><span class="tree-icon">📄</span> HeroBanner.tsx</div>
+            <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 routes</div>
+            <div class="tree-item nested-2"><span class="tree-icon">📄</span> index.tsx</div>
+            <div class="tree-item nested-2"><span class="tree-icon">📄</span> movie.$id.tsx</div>
+            <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 services</div>
+            <div class="tree-item nested-2"><span class="tree-icon">📄</span> tmdb-api.ts</div>
+            <div class="tree-item nested-1"><span class="tree-icon">▼</span> 📁 db</div>
+            <div class="tree-item nested-2"><span class="tree-icon">📄</span> schema.ts</div>
+            <div class="tree-item"><span class="tree-icon">📄</span> package.json</div>
+            <div class="tree-item"><span class="tree-icon">📄</span> tsconfig.json</div>
+          </div>
+        </div>
+
+        <!-- Conversations History -->
+        <div>
+          <div class="section-label">
+            <span>Riwayat Perencanaan</span>
+          </div>
+          <div class="convo-list">
+            <div class="convo-item active">
+              <span class="convo-dot"></span>
+              <span>Fitur Watchlist Film</span>
+            </div>
+            <div class="convo-item">
+              <span style="width:6px;"></span>
+              <span>Integrasi Rating IMDB</span>
+            </div>
+            <div class="convo-item">
+              <span style="width:6px;"></span>
+              <span>Dark Mode Toggle</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER COLUMN: Interactive Chat & Clarification Flow -->
+    <main class="chat-column">
+      <div class="chat-header">
+        <div>
+          <div class="chat-header-title">Perencanaan Fitur: Watchlist Film</div>
+          <div class="chat-header-subtitle">Konteks: movieworld-web (PostgreSQL, Drizzle, React 19)</div>
+        </div>
+        <div style="font-size:11px; color:var(--fog); font-family:var(--font-mono);">
+          Model: Claude 3.7 Sonnet
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chatMessages">
+
+        <!-- 1. AI Welcome -->
+        <div class="msg-group">
+          <div class="msg-header">
+            <div class="avatar-ai">AI</div>
+            <span>VibeEverything Assistant</span>
+          </div>
+          <div class="msg-body">
+            Codebase <code>movieworld-web</code> berhasil disinkronkan dan dianalisis. Stack terdeteksi: <strong>Next.js 15, React 19, Tailwind CSS, PostgreSQL via Drizzle ORM</strong>. Fitur baru apa yang ingin Anda rancang hari ini?
+          </div>
+        </div>
+
+        <!-- 2. User Prompt -->
+        <div class="msg-group msg-user">
+          <div class="msg-header" style="justify-content: flex-end;">
+            <span>Developer</span>
+            <div class="avatar-user">U</div>
+          </div>
+          <div class="msg-body">
+            Saya ingin membuat fitur watchlist pada aplikasi movie saya. Pengguna bisa menyimpan film favorit mereka dan mengaksesnya kapan saja.
+          </div>
+        </div>
+
+        <!-- 3. AI Adaptive Clarification Question -->
+        <div class="msg-group" id="blockQuestions">
+          <div class="msg-header">
+            <div class="avatar-ai">AI</div>
+            <span>VibeEverything Assistant</span>
+          </div>
+          <div class="msg-body">
+            Ide yang sangat bagus untuk <code>movieworld-web</code>! Agar arsitektur dan PRD yang saya rancang presisi dengan kode Anda, mohon jawab 2 pertanyaan adaptif berikut:
+
+            <!-- Question 1 -->
+            <div class="question-card">
+              <div class="question-title">
+                <span class="question-title-num">Q1</span>
+                <span>Bagaimana mekanisme penyimpanan data watchlist yang Anda inginkan?</span>
+              </div>
+              <div class="options-grid">
+                <div class="option-btn" onclick="selectOption(this, 'q1')">
+                  <span class="radio-circle"></span>
+                  <div>Penyimpanan lokal di browser (localStorage / client state) tanpa perlu login user.</div>
+                </div>
+                <div class="option-btn selected" onclick="selectOption(this, 'q1')">
+                  <span class="radio-circle"></span>
+                  <div>
+                    Tersimpan di PostgreSQL database terautentikasi (tabel <code>watchlists</code> dengan relasi <code>user_id</code>).
+                    <span class="badge-rekomendasi">Rekomendasi</span>
+                  </div>
+                </div>
+              </div>
+              <input type="text" class="custom-answer-input" placeholder="Atau ketik preferensi penyimpanan sendiri..." />
+            </div>
+
+            <!-- Question 2 -->
+            <div class="question-card">
+              <div class="question-title">
+                <span class="question-title-num">Q2</span>
+                <span>Bagaimana umpan balik UI saat film ditambahkan ke watchlist?</span>
+              </div>
+              <div class="options-grid">
+                <div class="option-btn selected" onclick="selectOption(this, 'q2')">
+                  <span class="radio-circle"></span>
+                  <div>
+                    Toast banner interaktif di sudut kanan dengan tombol Undo pembatalan.
+                    <span class="badge-rekomendasi">Rekomendasi</span>
+                  </div>
+                </div>
+                <div class="option-btn" onclick="selectOption(this, 'q2')">
+                  <span class="radio-circle"></span>
+                  <div>Ikon bookmark berubah solid/aktif secara instan tanpa popup tambahan.</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+              <button class="btn-step-action" id="btnSubmitAnswers" onclick="submitAnswers()">
+                Kirim Jawaban & Generate Fitur Diagram ➔
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Generated Feature & Diagram Block (Appears after answer) -->
+        <div class="msg-group" id="blockFeatureGenerated" style="display:none;">
+          <div class="msg-header">
+            <div class="avatar-ai">AI</div>
+            <span>VibeEverything Assistant</span>
+          </div>
+          <div class="msg-body">
+            Terima kasih! Berdasarkan preferensi Anda dan skema Drizzle di <code>src/db/schema.ts</code>, saya telah menyusun spesifikasi fitur dan diagram arsitektur watchlist.
+
+            <!-- FileCard 1 -->
+            <div class="file-card active-preview" id="cardFeature" onclick="openArtifact('feature')">
+              <div class="file-card-left">
+                <div class="file-icon-box">📊</div>
+                <div>
+                  <div class="file-meta-title">feature-watchlist.json</div>
+                  <div class="file-meta-desc">Spesifikasi fitur & diagram alur watchlist • 4.2 KB</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="file-badge">DIAGRAM & FITUR</span>
+                <span class="btn-preview-pill">Buka Preview ➔</span>
+              </div>
+            </div>
+
+            <!-- Step prompt: PRD -->
+            <div class="step-prompt-card" id="promptPrd">
+              <div class="step-prompt-text">
+                Diagram arsitektur telah siap. Apakah Anda ingin melanjutkan ke pembuatan <strong>Product Requirements Document (PRD) 8-seksi</strong>?
+              </div>
+              <button class="btn-step-action" onclick="generatePrd()">
+                📄 Generate PRD ➔
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Generated PRD Block -->
+        <div class="msg-group" id="blockPrdGenerated" style="display:none;">
+          <div class="msg-header">
+            <div class="avatar-ai">AI</div>
+            <span>VibeEverything Assistant</span>
+          </div>
+          <div class="msg-body">
+            Dokumen PRD 8-seksi untuk fitur watchlist telah berhasil dibuat dengan format standar industri.
+
+            <!-- FileCard 2 -->
+            <div class="file-card" id="cardPrd" onclick="openArtifact('prd')">
+              <div class="file-card-left">
+                <div class="file-icon-box">📄</div>
+                <div>
+                  <div class="file-meta-title">PRD-watchlist.md</div>
+                  <div class="file-meta-desc">Dokumen PRD 8-seksi lengkap siap eksekusi • 11.8 KB</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="file-badge">MARKDOWN</span>
+                <span class="btn-preview-pill">Buka Preview ➔</span>
+              </div>
+            </div>
+
+            <!-- Step prompt: AC -->
+            <div class="step-prompt-card" id="promptAc">
+              <div class="step-prompt-text">
+                PRD telah diverifikasi. Lanjut men-generate <strong>Acceptance Criteria (AC)</strong> terstruktur (Given/When/Then)?
+              </div>
+              <button class="btn-step-action" onclick="generateAc()">
+                🧪 Generate AC ➔
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Generated AC Block -->
+        <div class="msg-group" id="blockAcGenerated" style="display:none;">
+          <div class="msg-header">
+            <div class="avatar-ai">AI</div>
+            <span>VibeEverything Assistant</span>
+          </div>
+          <div class="msg-body">
+            Acceptance Criteria dengan skenario pengujian positif, negatif, dan boundary test telah dikompilasi.
+
+            <!-- FileCard 3 -->
+            <div class="file-card" id="cardAc" onclick="openArtifact('ac')">
+              <div class="file-card-left">
+                <div class="file-icon-box">🧪</div>
+                <div>
+                  <div class="file-meta-title">AC-watchlist.md</div>
+                  <div class="file-meta-desc">Kriteria penerimaan & skenario pengujian formal • 6.4 KB</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="file-badge">MARKDOWN</span>
+                <span class="btn-preview-pill">Buka Preview ➔</span>
+              </div>
+            </div>
+
+            <!-- Step prompt: Task -->
+            <div class="step-prompt-card" id="promptTask">
+              <div class="step-prompt-text">
+                Kriteria penerimaan selesai. Lanjut memecah ke <strong>Task Breakdown Teknis</strong>?
+              </div>
+              <button class="btn-step-action" onclick="generateTask()">
+                📋 Generate Task Breakdown ➔
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. Generated Task Block -->
+        <div class="msg-group" id="blockTaskGenerated" style="display:none;">
+          <div class="msg-header">
+            <div class="avatar-ai">AI</div>
+            <span>VibeEverything Assistant</span>
+          </div>
+          <div class="msg-body">
+            Rincian tugas implementasi (DB schema, API route, client components, dan test) telah disusun dalam pohon tugas ber-checklist.
+
+            <!-- FileCard 4 -->
+            <div class="file-card" id="cardTask" onclick="openArtifact('task')">
+              <div class="file-card-left">
+                <div class="file-icon-box">📋</div>
+                <div>
+                  <div class="file-meta-title">tasks-watchlist.json</div>
+                  <div class="file-meta-desc">Rincian checklist task implementasi teknis • 5.1 KB</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="file-badge">TASK TREE</span>
+                <span class="btn-preview-pill">Buka Preview ➔</span>
+              </div>
+            </div>
+
+            <div style="margin-top:12px; font-size:12px; color:var(--emerald);">
+              ✓ Seluruh siklus perancangan fitur selesai. Anda dapat mengekspor atau membagikan spesifikasi ini ke coding agent lokal Anda.
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Chat Composer -->
+      <div class="chat-composer">
+        <div class="composer-box">
+          <textarea class="composer-input" placeholder="Ketik instruksi tambahan atau revisi spesifikasi fitur..."></textarea>
+          <div class="composer-foot">
+            <div class="composer-pill">
+              <span>⚡ Model: Claude 3.7</span>
+              <span>•</span>
+              <span>Fokus: Codebase Existing</span>
+            </div>
+            <button class="btn-send">Kirim</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT SIDEBAR: Collapsible Artifact Canvas -->
+    <aside class="canvas-column" id="canvasColumn">
+      <div class="canvas-header">
+        <div class="canvas-title-group">
+          <span style="color:var(--slate);">📄</span>
+          <span class="canvas-file-name" id="canvasFileName">feature-watchlist.json</span>
+          <span class="file-badge" id="canvasBadge">DIAGRAM</span>
+        </div>
+        <div class="canvas-tools">
+          <button class="btn-tool" onclick="alert('Konten disalin ke clipboard!')">Salin</button>
+          <button class="btn-tool" onclick="alert('Mengunduh file...')">Unduh</button>
+          <button class="btn-close-canvas" onclick="toggleCanvas()" title="Tutup Preview">✕</button>
+        </div>
+      </div>
+
+      <div class="canvas-content" id="canvasContent">
+
+        <!-- VIEW 1: Feature & Diagram (Default) -->
+        <div id="viewFeature">
+          <div style="margin-bottom:14px;">
+            <h2 style="font-size:16px; font-weight:650; color:var(--snow);">Spesifikasi Fitur: Watchlist</h2>
+            <p style="font-size:12px; color:var(--fog); margin-top:4px;">
+              Koneksi antarmuka pengguna dengan API PostgreSQL Drizzle <code>movieworld-web</code>.
+            </p>
+          </div>
+
+          <!-- Architecture Diagram Viewport -->
+          <div class="diagram-viewport">
+            <div style="font-family:var(--font-mono); font-size:11px; color:var(--slate); margin-bottom:12px; align-self:flex-start;">
+              ARQUITECTURE FLOW DIAGRAM (MERMAID)
+            </div>
+
+            <!-- Flow Diagram Box 1 -->
+            <div class="diagram-box">
+              <div style="font-size:10px; color:var(--slate);">CLIENT UI</div>
+              <div style="font-weight:600;">MovieCard Component</div>
+              <div style="font-size:10px; color:var(--emerald);">WatchlistToggle Button</div>
+            </div>
+
+            <div class="diagram-arrow">↓ POST /api/watchlist</div>
+
+            <!-- Flow Diagram Box 2 -->
+            <div class="diagram-box highlight">
+              <div style="font-size:10px; color:var(--slate);">SERVER HANDLER</div>
+              <div style="font-weight:600;">routes/api/watchlist.ts</div>
+              <div style="font-size:10px; color:var(--mist);">Auth Session + Zod Validation</div>
+            </div>
+
+            <div class="diagram-arrow">↓ Drizzle ORM Insert / Delete</div>
+
+            <!-- Flow Diagram Box 3 -->
+            <div class="diagram-box">
+              <div style="font-size:10px; color:var(--slate);">POSTGRESQL DATABASE</div>
+              <div style="font-weight:600;">Table: watchlists</div>
+              <div style="font-size:10px; color:var(--fog);">userId (FK) · movieId (FK) · createdAt</div>
+            </div>
+
+            <div class="diagram-arrow">↓ Optimistic UI Update & Toast</div>
+
+            <!-- Flow Diagram Box 4 -->
+            <div class="diagram-box">
+              <div style="font-size:10px; color:var(--slate);">FEEDBACK UI</div>
+              <div style="font-weight:600;">ToastNotification Component</div>
+              <div style="font-size:10px; color:var(--amber);">"Ditambahkan ke Watchlist" + Undo</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 2: PRD Markdown -->
+        <div id="viewPrd" class="markdown-view" style="display:none;">
+          <h2>1. Ringkasan Eksekutif</h2>
+          <p>
+            Fitur Watchlist memungkinkan pengguna terdaftar di platform <code>movieworld-web</code> untuk menandai dan mengelompokkan film yang ingin ditonton di masa mendatang, meningkatkan retensi dan keterlibatan pengguna.
+          </p>
+
+          <h2>2. Masalah & Solusi</h2>
+          <p>
+            <strong>Masalah:</strong> Pengguna kesulitan mencatat film menarik yang mereka temukan saat browsing katalog film tanpa harus langsung menontonnya.
+          </p>
+          <p>
+            <strong>Solusi:</strong> Menyediakan tombol bookmark satu-klik di setiap kartu film dan halaman detail dengan persistensi multi-device melalui akun terautentikasi.
+          </p>
+
+          <h2>3. Kebutuhan Fungsional</h2>
+          <ul>
+            <li>Tombol bookmark toggle di <code>MovieCard.tsx</code> dan <code>movie.$id.tsx</code>.</li>
+            <li>Endpoint REST <code>/api/watchlist</code> dengan dukungan mutasi idempotensi.</li>
+            <li>Dukungan filter watchlist pada halaman profil pengguna.</li>
+            <li>Toast feedback dengan durasi 4 detik dan opsi pembatalan instan (Undo).</li>
+          </ul>
+
+          <h2>4. Skema Data (Drizzle ORM)</h2>
+          <p>Penambahan tabel relasional pada <code>src/db/schema.ts</code>:</p>
+          <pre style="background:var(--onyx); border:1px solid var(--graphite); padding:10px; border-radius:6px; font-family:var(--font-mono); font-size:11px; overflow-x:auto;">export const watchlists = pgTable("watchlists", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  movieId: text("movie_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow()
+});</pre>
+        </div>
+
+        <!-- VIEW 3: Acceptance Criteria -->
+        <div id="viewAc" class="markdown-view" style="display:none;">
+          <h2>Acceptance Criteria (AC)</h2>
+          
+          <h3>Skenario 1: Sukses Menambahkan Film ke Watchlist</h3>
+          <p>
+            <code>GIVEN</code> Pengguna telah login ke aplikasi<br />
+            <code>WHEN</code> Pengguna mengklik ikon bookmark pada kartu film yang belum ada di watchlist<br />
+            <code>THEN</code> Sistem membuat baris baru di tabel <code>watchlists</code>, ikon berubah menjadi aktif, dan toast sukses muncul dengan opsi Undo.
+          </p>
+
+          <h3>Skenario 2: Menghapus Film dari Watchlist</h3>
+          <p>
+            <code>GIVEN</code> Film sudah berada di dalam daftar watchlist pengguna<br />
+            <code>WHEN</code> Pengguna mengklik kembali ikon bookmark<br />
+            <code>THEN</code> Sistem menghapus relasi film dari tabel <code>watchlists</code> dan mengembalikan status ikon ke default.
+          </p>
+
+          <h3>Skenario 3: Penanganan Pengguna Belum Login</h3>
+          <p>
+            <code>GIVEN</code> Pengunjung anonim (belum login)<br />
+            <code>WHEN</code> Pengunjung mencoba mengklik tombol watchlist<br />
+            <code>THEN</code> Sistem menampilkan modal autentikasi login tanpa menghilangkan status halaman saat ini.
+          </p>
+        </div>
+
+        <!-- VIEW 4: Task Breakdown Checklist -->
+        <div id="viewTask" style="display:none;">
+          <h2 style="font-size:16px; font-weight:650; color:var(--snow); margin-bottom:12px;">
+            Task Breakdown Implementasi
+          </h2>
+
+          <div class="task-phase">
+            <div class="phase-badge">Fase 1: Basis Data & Schema</div>
+            <div class="task-item">
+              <input type="checkbox" class="task-checkbox" checked />
+              <div>Tambah tabel <code>watchlists</code> di <code>src/db/schema.ts</code> dengan foreign key <code>users.id</code>.</div>
+            </div>
+            <div class="task-item">
+              <input type="checkbox" class="task-checkbox" checked />
+              <div>Jalankan migrasi database via <code>drizzle-kit push</code>.</div>
+            </div>
+          </div>
+
+          <div class="task-phase">
+            <div class="phase-badge">Fase 2: Backend Handlers</div>
+            <div class="task-item">
+              <input type="checkbox" class="task-checkbox" checked />
+              <div>Buat route handler <code>src/routes/api/watchlist.ts</code> (GET, POST, DELETE).</div>
+            </div>
+            <div class="task-item">
+              <input type="checkbox" class="task-checkbox" />
+              <div>Tambahkan tenant security filter <code>WHERE user_id = ?</code>.</div>
+            </div>
+          </div>
+
+          <div class="task-phase">
+            <div class="phase-badge">Fase 3: Antarmuka Komponen</div>
+            <div class="task-item">
+              <input type="checkbox" class="task-checkbox" />
+              <div>Integrasikan tombol toggle di <code>src/components/MovieCard.tsx</code>.</div>
+            </div>
+            <div class="task-item">
+              <input type="checkbox" class="task-checkbox" />
+              <div>Buat halaman grid koleksi watchlist di <code>src/routes/watchlist.tsx</code>.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    // State
+    let isCanvasOpen = true;
+
+    function toggleCanvas() {
+      const shell = document.getElementById("workspaceShell");
+      const icon = document.getElementById("canvasToggleIcon");
+      const text = document.getElementById("canvasToggleText");
+
+      isCanvasOpen = !isCanvasOpen;
+      if (isCanvasOpen) {
+        shell.classList.remove("canvas-collapsed");
+        icon.textContent = "◫";
+        text.textContent = "Tutup Preview";
+      } else {
+        shell.classList.add("canvas-collapsed");
+        icon.textContent = "◫";
+        text.textContent = "Buka Preview";
+      }
+    }
+
+    function selectOption(el, group) {
+      const parent = el.closest(".options-grid");
+      parent.querySelectorAll(".option-btn").forEach(btn => btn.classList.remove("selected"));
+      el.classList.add("selected");
+    }
+
+    function submitAnswers() {
+      document.getElementById("btnSubmitAnswers").disabled = true;
+      document.getElementById("btnSubmitAnswers").textContent = "✓ Jawaban Terkirim";
+      document.getElementById("btnSubmitAnswers").style.background = "var(--iron)";
+
+      setTimeout(() => {
+        document.getElementById("blockFeatureGenerated").style.display = "flex";
+        openArtifact('feature');
+        scrollChatToBottom();
+      }, 400);
+    }
+
+    function generatePrd() {
+      document.getElementById("promptPrd").style.display = "none";
+      setTimeout(() => {
+        document.getElementById("blockPrdGenerated").style.display = "flex";
+        openArtifact('prd');
+        scrollChatToBottom();
+      }, 500);
+    }
+
+    function generateAc() {
+      document.getElementById("promptAc").style.display = "none";
+      setTimeout(() => {
+        document.getElementById("blockAcGenerated").style.display = "flex";
+        openArtifact('ac');
+        scrollChatToBottom();
+      }, 500);
+    }
+
+    function generateTask() {
+      document.getElementById("promptTask").style.display = "none";
+      setTimeout(() => {
+        document.getElementById("blockTaskGenerated").style.display = "flex";
+        openArtifact('task');
+        scrollChatToBottom();
+      }, 500);
+    }
+
+    function openArtifact(type) {
+      if (!isCanvasOpen) toggleCanvas();
+
+      // Reset card highlights
+      document.querySelectorAll(".file-card").forEach(c => c.classList.remove("active-preview"));
+
+      // Hide all views
+      document.getElementById("viewFeature").style.display = "none";
+      document.getElementById("viewPrd").style.display = "none";
+      document.getElementById("viewAc").style.display = "none";
+      document.getElementById("viewTask").style.display = "none";
+
+      const titleEl = document.getElementById("canvasFileName");
+      const badgeEl = document.getElementById("canvasBadge");
+
+      if (type === 'feature') {
+        document.getElementById("viewFeature").style.display = "block";
+        document.getElementById("cardFeature").classList.add("active-preview");
+        titleEl.textContent = "feature-watchlist.json";
+        badgeEl.textContent = "DIAGRAM";
+      } else if (type === 'prd') {
+        document.getElementById("viewPrd").style.display = "block";
+        document.getElementById("cardPrd").classList.add("active-preview");
+        titleEl.textContent = "PRD-watchlist.md";
+        badgeEl.textContent = "PRD";
+      } else if (type === 'ac') {
+        document.getElementById("viewAc").style.display = "block";
+        document.getElementById("cardAc").classList.add("active-preview");
+        titleEl.textContent = "AC-watchlist.md";
+        badgeEl.textContent = "AC";
+      } else if (type === 'task') {
+        document.getElementById("viewTask").style.display = "block";
+        document.getElementById("cardTask").classList.add("active-preview");
+        titleEl.textContent = "tasks-watchlist.json";
+        badgeEl.textContent = "TASK TREE";
+      }
+    }
+
+    function scrollChatToBottom() {
+      const container = document.getElementById("chatMessages");
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    }
+
+    function resetFlow() {
+      location.reload();
+    }
+  </script>
+</body>
+</html>
