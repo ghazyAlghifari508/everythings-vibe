@@ -105,6 +105,9 @@ describe("SyncStatus", () => {
 		);
 		// No spinning loaders should be present while in idle standby
 		expect(c.querySelector(".animate-spin")).toBeNull();
+		const alertEl = c.querySelector('[data-testid="cli-waiting-alert"]');
+		expect(alertEl).not.toBeNull();
+		expect(alertEl?.querySelector("svg")).not.toBeNull();
 	});
 
 	it("displays real counts and timestamps from the server", async () => {

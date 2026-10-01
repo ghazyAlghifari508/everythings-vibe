@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Check, Circle, Loader2 } from "lucide-react";
+import { AlertCircle, Check, Circle, Info, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
 	isTerminalSyncStatus,
@@ -253,7 +253,11 @@ export function SyncStatus({
 							data-testid="cli-waiting-alert"
 							className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-4 text-xs text-fog flex items-start gap-3"
 						>
-							<span className="flex h-2 w-2 rounded-full bg-amber-400 mt-1 shrink-0" />
+							<Info
+								size={16}
+								className="mt-0.5 shrink-0 text-amber-400"
+								aria-hidden="true"
+							/>
 							<div className="flex flex-col gap-0.5">
 								<span className="font-semibold text-snow">
 									CLI Agent Belum Terhubung
