@@ -1,13 +1,15 @@
 "use client";
 
-import { memo, type ComponentPropsWithoutRef } from "react";
+import { type ComponentPropsWithoutRef, memo } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { TableOfContents } from "@/components/prd/table-of-contents";
 import { cn } from "@/lib/utils";
 
-function headingId(children: ComponentPropsWithoutRef<"h2">["children"]): string {
+function headingId(
+	children: ComponentPropsWithoutRef<"h2">["children"],
+): string {
 	return String(children)
 		.replace(/<[^>]*>/g, "")
 		.toLowerCase()
@@ -16,24 +18,25 @@ function headingId(children: ComponentPropsWithoutRef<"h2">["children"]): string
 
 // Heading ids must mirror TableOfContents' id algorithm exactly so anchor
 // navigation lands on the right section (same contract as prd-viewer.tsx).
-const markdownComponents: ComponentPropsWithoutRef<typeof Markdown>["components"] =
-	{
-		h2: ({ children, ...props }) => (
-			<h2 id={headingId(children)} {...props}>
-				{children}
-			</h2>
-		),
-		h3: ({ children, ...props }) => (
-			<h3 id={headingId(children)} {...props}>
-				{children}
-			</h3>
-		),
-		h4: ({ children, ...props }) => (
-			<h4 id={headingId(children)} {...props}>
-				{children}
-			</h4>
-		),
-	};
+const markdownComponents: ComponentPropsWithoutRef<
+	typeof Markdown
+>["components"] = {
+	h2: ({ children, ...props }) => (
+		<h2 id={headingId(children)} {...props}>
+			{children}
+		</h2>
+	),
+	h3: ({ children, ...props }) => (
+		<h3 id={headingId(children)} {...props}>
+			{children}
+		</h3>
+	),
+	h4: ({ children, ...props }) => (
+		<h4 id={headingId(children)} {...props}>
+			{children}
+		</h4>
+	),
+};
 
 const remarkPlugins = [remarkGfm];
 const rehypePlugins = [rehypeHighlight];

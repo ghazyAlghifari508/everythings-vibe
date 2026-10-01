@@ -228,13 +228,13 @@ export const Route = createFileRoute("/api/ask/options")({
 					}
 				}
 				// Existing-codebase projects need TECHNICAL questions grounded in the
-			// snapshot analysis; the greenfield prompt forbids stack questions
-			// and would starve the codebase flow of architectural context.
-			const basePrompt =
-				project.projectMode === "existing_codebase"
-					? ASK_CODEBASE_OPTIONS_GENERATION_PROMPT
-					: ASK_OPTIONS_GENERATION_PROMPT;
-			const systemPrompt = `${basePrompt}\n${getLanguageDirective(projectLanguage, "ask")}${codebaseBlock}`;
+				// snapshot analysis; the greenfield prompt forbids stack questions
+				// and would starve the codebase flow of architectural context.
+				const basePrompt =
+					project.projectMode === "existing_codebase"
+						? ASK_CODEBASE_OPTIONS_GENERATION_PROMPT
+						: ASK_OPTIONS_GENERATION_PROMPT;
+				const systemPrompt = `${basePrompt}\n${getLanguageDirective(projectLanguage, "ask")}${codebaseBlock}`;
 				const messages: Array<{
 					role: "system" | "user" | "assistant";
 					content: string;

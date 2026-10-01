@@ -32,7 +32,8 @@ export function downloadArtifact({
 	content,
 	mimeType,
 }: DownloadArtifactInput): boolean {
-	if (typeof document === "undefined" || typeof URL === "undefined") return false;
+	if (typeof document === "undefined" || typeof URL === "undefined")
+		return false;
 	const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
 	const anchor = buildAnchor(fileName, blob);
 	document.body.append(anchor);
@@ -50,7 +51,10 @@ export function downloadJsonArtifact(fileName: string, data: unknown): boolean {
 	});
 }
 
-export function downloadMarkdownArtifact(fileName: string, content: string): boolean {
+export function downloadMarkdownArtifact(
+	fileName: string,
+	content: string,
+): boolean {
 	return downloadArtifact({
 		fileName,
 		content,

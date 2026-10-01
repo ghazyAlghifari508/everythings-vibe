@@ -81,27 +81,27 @@ export function CodebaseArtifactCanvas({
 								<Copy size={14} strokeWidth={1.75} aria-hidden="true" />
 							)}
 						</button>
-					{onDownload ? (
-						<button
-							type="button"
-							onClick={onDownload}
-							aria-label={`Unduh ${fileName}`}
-							title="Unduh file"
-							data-testid="codebase-canvas-download"
-							className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							<Download size={14} strokeWidth={1.75} aria-hidden="true" />
-						</button>
-					) : (
-						<span
-							title="Unduh via panel konten"
-							data-testid="codebase-canvas-download-hint"
-							aria-hidden="true"
-							className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-slate"
-						>
-							<Download size={14} strokeWidth={1.75} aria-hidden="true" />
-						</span>
-					)}
+						{onDownload ? (
+							<button
+								type="button"
+								onClick={onDownload}
+								aria-label={`Unduh ${fileName}`}
+								title="Unduh file"
+								data-testid="codebase-canvas-download"
+								className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								<Download size={14} strokeWidth={1.75} aria-hidden="true" />
+							</button>
+						) : (
+							<span
+								title="Unduh via panel konten"
+								data-testid="codebase-canvas-download-hint"
+								aria-hidden="true"
+								className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-slate"
+							>
+								<Download size={14} strokeWidth={1.75} aria-hidden="true" />
+							</span>
+						)}
 						<button
 							type="button"
 							onClick={onClose}
