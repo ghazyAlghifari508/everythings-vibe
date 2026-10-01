@@ -7,7 +7,8 @@ import { expect, test } from "@playwright/test";
  * 1. Greenfield page (/plan/new) is permanent greenfield: no mode toggle,
  *    two-level breadcrumb, template gallery, static placeholder.
  * 2. Plan options (/plan) link Opsi 1 to /plan/new and Opsi 2 to /plan/codebase.
- * 3. Codebase connect page (/plan/codebase) breadcrumb + header.
+ * 3. Codebase connect page (/plan/codebase) auto-inits sync without any
+ *    repository name form; unauthenticated visits redirect to /login.
  * 4. Security guards: unauthenticated access to /codebases/$id redirects to /login.
  * 5. API guards: unauthenticated project creation rejected with 401.
  * 6. API guards: invalid project mode rejected with 400.
@@ -102,24 +103,21 @@ test.describe("Existing Codebase Sync Flow", () => {
 		await expect(opsi2).toHaveAttribute("href", "/plan/codebase");
 	});
 
-	test("UI: /plan/codebase renders breadcrumb and connect header", async ({
+	test("UI: /plan/codebase auto-inits sync with no name form", async ({
 		page,
 	}) => {
 		await page.goto("/plan/codebase");
-		await page.waitForLoadState("networkidle");
 
-		// Two-level breadcrumb: Home > VibePlan > Codebase Existing
-		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
-		await expect(breadcrumb.getByRole("link", { name: "Home" })).toBeVisible();
-		await expect(
-			breadcrumb.getByRole("link", { name: "VibePlan" }),
-		).toHaveAttribute("href", "/plan");
-		await expect(breadcrumb).toContainText("Codebase Existing");
+		// No repository name form may ever appear on this route: the page
+		// creates the codebase with a server default and shows the sync
+		// prompt instead.
+		await expect(page.getByLabel(/Nama repository/i)).toHaveCount(0);
+		await expect(page.locator("#codebase-name")).toHaveCount(0);
 
-		await expect(
-			page.getByRole("heading", { name: /Hubungkan codebase yang sudah ada/i }),
-		).toBeVisible();
-		await expect(page.getByLabel(/Nama repository/i)).toBeVisible();
+		// Unauthenticated auto-init cannot create a session, so the page
+		// redirects to login instead of stranding the user on a dead form.
+		await page.waitForURL(/\/login/);
+		await expect(page).toHaveURL(/\/login/);
 	});
 
 	test("UI: Unauthenticated visit to /codebases/:id redirects to /login", async ({
