@@ -222,6 +222,18 @@ describe("SyncStatus", () => {
 		expect(c.textContent).toMatch(/siap/i);
 	});
 
+	it("polls internally when the parent passes null status", async () => {
+		const fetchMock = mockFetchSequence([
+			statusResponse({ status: "uploading" }),
+		]);
+		const c = renderStatus({ status: null });
+		await settle();
+		expect(fetchMock).toHaveBeenCalled();
+		expect(c.textContent).toMatch(
+			/mengupload|memindai|menghubungkan|menunggu/i,
+		);
+	});
+
 	it("does not report ready for a failed session with a stale ready analysis", async () => {
 		mockFetchSequence([
 			statusResponse({ status: "failed", analysisStatus: "ready" }),

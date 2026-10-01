@@ -39,15 +39,15 @@ export function SyncStatus({
 	const [polledStatus, setPolledStatus] = useState<SyncStatusResponse | null>(
 		propStatus ?? null,
 	);
-	const status = propStatus !== undefined ? propStatus : polledStatus;
+	const status = polledStatus ?? propStatus ?? null;
 	const [error, setError] = useState<string | null>(null);
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const inFlightRef = useRef(false);
 	const onStatusRef = useRef(onStatus);
 	onStatusRef.current = onStatus;
-	// A controlled parent owns polling and passes every update down; an
-	// internal poller here would double every request.
-	const pollInternally = propStatus === undefined;
+	// Poll internally unless the parent provided an already-terminal status.
+	const pollInternally =
+		!propStatus || !isTerminalSyncStatus(propStatus.status);
 
 	useEffect(() => {
 		if (!pollInternally) return;
