@@ -187,23 +187,23 @@ export function PlanCodebasePage() {
 								projectName={codebase.name}
 								payload={payload}
 								isStarting={isStarting}
+								hideFooter={true}
 								onAgentStarted={() => setStep("syncing")}
 							/>
-							<div className="mx-auto flex w-full max-w-2xl items-center justify-between border-t border-graphite/60 pt-4">
-								<button
-									type="button"
-									onClick={() => void navigate({ to: "/plan" })}
-									className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									← Kembali ke Pilihan Metode
-								</button>
+							<div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-2 border-t border-graphite/60 pt-6">
 								<button
 									type="button"
 									onClick={() => setStep("syncing")}
-									className="inline-flex min-h-10 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx hover:brightness-110 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									disabled={!payload || isStarting}
+									className="inline-flex min-h-11 w-full sm:w-auto items-center justify-center rounded-md bg-snow px-6 text-sm font-semibold text-onyx hover:brightness-110 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
 								>
 									Lanjut ke Pantau Sync →
 								</button>
+								<p className="text-center text-xs text-fog max-w-md">
+									Sudah menyalin prompt dan menjalankannya di terminal agent?
+									Klik Lanjut untuk memantau proses sinkronisasi secara
+									real-time.
+								</p>
 							</div>
 						</div>
 					)}

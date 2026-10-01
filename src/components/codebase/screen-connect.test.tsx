@@ -179,4 +179,22 @@ describe("ScreenConnect", () => {
 		expect(copied).toContain("## Format Laporan Akhir");
 		expect(copied).toContain("## Penanganan Kegagalan");
 	});
+
+	it("omits the modal footer when hideFooter is true", () => {
+		act(() => {
+			root?.render(
+				<ScreenConnect
+					projectName="Test App"
+					payload={samplePayload}
+					hideFooter={true}
+					onAgentStarted={() => {}}
+				/>,
+			);
+		});
+
+		const agentStartedBtn = [...container.querySelectorAll("button")].find(
+			(b) => /Saya sudah menjalankan agent/i.test(b.textContent ?? ""),
+		);
+		expect(agentStartedBtn).toBeUndefined();
+	});
 });
