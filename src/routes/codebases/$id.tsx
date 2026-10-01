@@ -18,6 +18,7 @@ import {
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { SyncStatus } from "@/components/codebase/sync-status";
+import { Logo } from "@/components/ui/logo";
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
 	type AnalysisResponse,
@@ -483,6 +484,7 @@ function CodebaseDetailPage() {
 	} | null>(null);
 	const resolvedFeature = feature ?? activeFeature;
 	const effectiveFeatureId = resolvedFeature?.id ?? null;
+	const [canvasOpen, setCanvasOpen] = useState(true);
 	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
 		"kanban",
@@ -937,20 +939,11 @@ function CodebaseDetailPage() {
 			>
 				<header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-graphite bg-charcoal px-4">
 					<div className="flex min-w-0 items-center gap-2">
-						<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-snow text-xs font-extrabold text-onyx">
-							V
-						</span>
-						<span className="shrink-0 text-[13px] font-semibold">
-							VibeEverything
-						</span>
+						<Logo height={22} />
 						<span aria-hidden="true" className="shrink-0 text-slate">
 							/
 						</span>
 						<span className="flex min-w-0 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 py-1 font-mono text-xs text-mist">
-							<span
-								aria-hidden="true"
-								className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald"
-							/>
 							<span className="truncate">{codebase.name}</span>
 						</span>
 					</div>
@@ -981,7 +974,7 @@ function CodebaseDetailPage() {
 				)}
 				<div className="min-h-0 flex-1">
 					<CodebaseWorkspaceShell
-						canvasOpen={true}
+						canvasOpen={canvasOpen}
 						leftPane={
 							<CodebaseExplorerSidebar
 								codebaseName={codebase.name}
@@ -992,7 +985,6 @@ function CodebaseDetailPage() {
 						}
 						chatPane={
 							<CodebaseChatWorkspace
-								codebaseName={codebase.name}
 								featureName={resolvedFeature?.name ?? codebase.name}
 								contextFiles={contextFiles}
 								kanbanProgress={kanbanProgress}
@@ -1015,6 +1007,7 @@ function CodebaseDetailPage() {
 									) {
 										setCanvasView("kanban");
 									}
+									setCanvasOpen(true);
 								}}
 								onSubmitAnswer={handleSubmitAnswer}
 								onSendMessage={(message) => void handleSendMessage(message)}
@@ -1033,7 +1026,7 @@ function CodebaseDetailPage() {
 							<CodebaseArtifactCanvas
 								fileName={activeArtifact?.fileName ?? "Preview artefak"}
 								badge={activeArtifact?.badge ?? "PRATINJAU"}
-								onClose={() => setActiveArtifactId(null)}
+								onClose={() => setCanvasOpen(false)}
 								isLoading={
 									(isPrdArtifactActive && prdLoading) ||
 									(isAcArtifactActive && acLoading)

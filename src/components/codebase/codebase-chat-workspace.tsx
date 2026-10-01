@@ -31,7 +31,6 @@ export interface ChatStreamMessage {
 }
 
 interface CodebaseChatWorkspaceProps {
-	codebaseName: string;
 	featureName: string;
 	contextFiles?: string[];
 	kanbanProgress?: { done: number; total: number; pct: number } | null;
@@ -60,7 +59,6 @@ export function buildHandoffCommand(projectId: string): string {
 }
 
 export function CodebaseChatWorkspace({
-	codebaseName,
 	featureName,
 	contextFiles = [],
 	kanbanProgress = null,
@@ -148,26 +146,15 @@ export function CodebaseChatWorkspace({
 						>
 							Perancangan Fitur: {featureName}
 						</p>
-						<p className="mt-0.5 truncate font-mono text-[11px] text-fog">
-							Konteks Repositori: {codebaseName}
-						</p>
 					</div>
-					<span
-						data-testid="codebase-kanban-badge"
-						className="flex shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 py-1 font-mono text-[11px] text-fog"
-					>
-						{hasLiveData ? (
-							<>
-								<span
-									aria-hidden="true"
-									className="h-1.5 w-1.5 rounded-full bg-emerald"
-								/>
-								{`Kanban Live: ${kanbanProgress.done}/${kanbanProgress.total} Selesai (${kanbanProgress.pct}%)`}
-							</>
-						) : (
-							"Kanban Live: Belum ada data"
-						)}
-					</span>
+					{hasLiveData && kanbanProgress ? (
+						<span
+							data-testid="codebase-kanban-badge"
+							className="shrink-0 rounded-md border border-graphite bg-obsidian px-2 py-1 font-mono text-[11px] text-fog"
+						>
+							{`Kanban Live: ${kanbanProgress.done}/${kanbanProgress.total} Selesai (${kanbanProgress.pct}%)`}
+						</span>
+					) : null}
 				</div>
 			</div>
 			<div
@@ -494,10 +481,7 @@ export function CodebaseChatWorkspace({
 						disabled={isSending || questionsLoading}
 						className="w-full resize-none bg-transparent text-[13px] text-snow outline-none placeholder:text-slate disabled:opacity-50"
 					/>
-					<div className="flex items-center justify-between border-t border-graphite/60 pt-2">
-						<span className="font-mono text-[11px] text-slate">
-							Fokus: {codebaseName}
-						</span>
+					<div className="flex items-center justify-end border-t border-graphite/60 pt-2">
 						<button
 							type="button"
 							onClick={handleSend}
