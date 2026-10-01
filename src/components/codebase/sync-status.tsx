@@ -251,30 +251,19 @@ export function SyncStatus({
 					{s === "waiting_for_cli" && (
 						<div
 							data-testid="cli-waiting-alert"
-							className="rounded-lg border border-graphite/80 bg-obsidian p-4 text-xs text-fog flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+							className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-4 text-xs text-fog flex items-start gap-3"
 						>
-							<div className="flex items-start gap-2.5">
-								<span className="flex h-2 w-2 rounded-full bg-amber-400 mt-1.5 shrink-0" />
-								<div className="flex flex-col gap-0.5">
-									<span className="font-semibold text-snow">
-										CLI Agent Belum Terhubung
-									</span>
-									<p className="text-[11px] text-fog leading-relaxed">
-										Buka terminal lokal Anda di root repositori, lalu paste dan
-										jalankan prompt sync. Halaman ini akan otomatis mendeteksi
-										progress ketika agent mulai mengirim file.
-									</p>
-								</div>
+							<span className="flex h-2 w-2 rounded-full bg-amber-400 mt-1 shrink-0" />
+							<div className="flex flex-col gap-0.5">
+								<span className="font-semibold text-snow">
+									CLI Agent Belum Terhubung
+								</span>
+								<p className="text-[11px] text-fog leading-relaxed">
+									Buka terminal lokal Anda di root repositori, lalu paste dan
+									jalankan prompt sync. Halaman ini akan otomatis mendeteksi
+									progress ketika agent mulai mengirim file.
+								</p>
 							</div>
-							{onBackToInstructions && (
-								<button
-									type="button"
-									onClick={onBackToInstructions}
-									className="shrink-0 inline-flex items-center gap-1.5 rounded border border-graphite bg-charcoal px-3 py-1.5 text-xs text-snow hover:bg-steel transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									Lihat Prompt Lagi
-								</button>
-							)}
 						</div>
 					)}
 
@@ -348,47 +337,60 @@ export function SyncStatus({
 						</div>
 					)}
 
-					{/* Footer Bar */}
-					<div className="flex flex-wrap items-center justify-end gap-2 border-t border-graphite pt-4 text-xs text-fog">
-						{onBackToInstructions && (
-							<button
-								type="button"
-								onClick={onBackToInstructions}
-								className="rounded border border-iron bg-obsidian px-3 py-1.5 text-xs text-mist hover:text-snow transition hover:bg-steel"
-							>
-								Kembali ke instruksi
-							</button>
-						)}
+					{/* Footer Bar: Unified navigation inside the card */}
+					<div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-graphite pt-4 text-xs">
+						<div className="flex flex-wrap items-center gap-2">
+							{onBackToInstructions && (
+								<button
+									type="button"
+									onClick={onBackToInstructions}
+									className="inline-flex items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-3.5 py-2 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									← Kembali ke Prompt Sync
+								</button>
+							)}
 
-						{showRetry && onRetrySync && (
-							<button
-								type="button"
-								onClick={onRetrySync}
-								className="rounded border border-iron bg-obsidian px-3 py-1.5 text-xs text-mist hover:text-snow transition hover:bg-steel"
-							>
-								Sync ulang
-							</button>
-						)}
+							{showRetry && onRetrySync && (
+								<button
+									type="button"
+									onClick={onRetrySync}
+									className="rounded-md border border-iron bg-obsidian px-3 py-2 text-xs text-mist hover:text-snow transition hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									Sync ulang
+								</button>
+							)}
 
-						{showAnalysisRetry && onRetryAnalysis && (
-							<button
-								type="button"
-								onClick={onRetryAnalysis}
-								className="rounded border border-iron bg-obsidian px-3 py-1.5 text-xs text-mist hover:text-snow transition hover:bg-steel"
-							>
-								Analisis ulang
-							</button>
-						)}
+							{showAnalysisRetry && onRetryAnalysis && (
+								<button
+									type="button"
+									onClick={onRetryAnalysis}
+									className="rounded-md border border-iron bg-obsidian px-3 py-2 text-xs text-mist hover:text-snow transition hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									Analisis ulang
+								</button>
+							)}
+						</div>
 
-						{isReady && onViewReview && (
-							<button
-								type="button"
-								onClick={onViewReview}
-								className="inline-flex items-center gap-1.5 rounded bg-snow px-3.5 py-1.5 font-inter text-xs font-semibold text-onyx shadow-sm hover:brightness-110 transition"
-							>
-								<span>Lihat hasil analisis</span>
-								<span className="font-mono text-xs">-&gt;</span>
-							</button>
+						{onViewReview && (
+							<div className="flex items-center justify-end sm:ml-auto">
+								<button
+									type="button"
+									onClick={onViewReview}
+									disabled={!isReady}
+									title={
+										isReady
+											? "Lanjut ke kesimpulan codebase"
+											: "Tunggu hingga sinkronisasi dan analisis selesai"
+									}
+									className={`inline-flex items-center justify-center gap-1.5 rounded-md px-5 py-2 font-inter text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+										isReady
+											? "bg-snow text-onyx shadow-sm hover:brightness-110 cursor-pointer"
+											: "border border-graphite bg-charcoal/50 text-fog/40 cursor-not-allowed"
+									}`}
+								>
+									<span>Lanjut ke Kesimpulan Codebase →</span>
+								</button>
+							</div>
 						)}
 					</div>
 				</div>

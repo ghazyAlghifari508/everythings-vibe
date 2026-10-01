@@ -330,4 +330,57 @@ describe("SyncStatus", () => {
 		expect(withCount.textContent).toContain("7");
 		expect(withCount.textContent).toMatch(/dikecualikan otomatis/i);
 	});
+
+	it("disables next button until sync and analysis are fully ready", async () => {
+		const onViewReview = vi.fn();
+		mockFetchSequence([statusResponse({ status: "uploading" })]);
+		const c = renderStatus({ onViewReview });
+		await settle();
+
+		const nextBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Lanjut ke Kesimpulan Codebase/i.test(b.textContent ?? ""),
+		) as HTMLButtonElement | undefined;
+
+		expect(nextBtn).toBeDefined();
+		expect(nextBtn?.disabled).toBe(true);
+		act(() => {
+			nextBtn?.click();
+		});
+		expect(onViewReview).not.toHaveBeenCalled();
+	});
+
+	it("enables next button when sync and analysis are ready and invokes onViewReview", async () => {
+		const onViewReview = vi.fn();
+		mockFetchSequence([statusResponse({ status: "ready" })]);
+		const c = renderStatus({ onViewReview });
+		await settle();
+
+		const nextBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Lanjut ke Kesimpulan Codebase/i.test(b.textContent ?? ""),
+		) as HTMLButtonElement | undefined;
+
+		expect(nextBtn).toBeDefined();
+		expect(nextBtn?.disabled).toBe(false);
+		act(() => {
+			nextBtn?.click();
+		});
+		expect(onViewReview).toHaveBeenCalledTimes(1);
+	});
+
+	it("invokes onBackToInstructions when previous button in footer is clicked", async () => {
+		const onBackToInstructions = vi.fn();
+		mockFetchSequence([statusResponse({ status: "uploading" })]);
+		const c = renderStatus({ onBackToInstructions });
+		await settle();
+
+		const backBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Kembali ke Prompt Sync/i.test(b.textContent ?? ""),
+		);
+
+		expect(backBtn).toBeDefined();
+		act(() => {
+			backBtn?.click();
+		});
+		expect(onBackToInstructions).toHaveBeenCalledTimes(1);
+	});
 });
