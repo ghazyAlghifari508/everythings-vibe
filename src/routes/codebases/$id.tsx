@@ -1074,6 +1074,12 @@ function CodebaseDetailPage() {
 				setSpecError("Spesifikasi fitur gagal dibuat. Coba lagi.");
 				return;
 			}
+			if (specResponse.status === 409) {
+				pushAssistantMessage(
+					`Pohon fitur ${resolvedFeature?.name ?? "fitur"} sedang disusun. Tunggu sebentar lalu klik Lanjut Bikin Fitur lagi untuk memuat hasilnya.`,
+				);
+				return;
+			}
 			await refreshFeatureTree(effectiveFeatureId);
 			setPipelineStage("feature");
 			const specMessage = buildFeatureMessage(
@@ -1081,9 +1087,7 @@ function CodebaseDetailPage() {
 				chatAnswers,
 			);
 			pushAssistantMessage(
-				specResponse.status === 409
-					? `Pohon fitur ${resolvedFeature?.name ?? "fitur"} sedang disusun. Klik file feature-*.json di bawah untuk melihat diagram pohon fitur.`
-					: `Pohon fitur ${resolvedFeature?.name ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}. Klik file feature-*.json di bawah untuk melihat diagram pohon fitur.`,
+				`Pohon fitur ${resolvedFeature?.name ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}. Klik file feature-*.json di bawah untuk melihat diagram pohon fitur.`,
 			);
 		} finally {
 			setIsConfirming(false);
