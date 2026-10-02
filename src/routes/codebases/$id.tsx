@@ -47,6 +47,7 @@ import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import type { TaskTree } from "@/lib/services/task-service";
 import { requireUserServer } from "@/lib/session";
+import { consumeSseStream } from "@/lib/sse-consume";
 
 export function decideCodebaseDetailEntry(
 	codebaseId: string | undefined,
@@ -1104,55 +1105,6 @@ function CodebaseDetailPage() {
 		pushAssistantMessage,
 	]);
 
-	const consumeSseStream = useCallback(
-		async (response: Response): Promise<{ error: string | null }> => {
-			if (!response.ok) {
-				const body: unknown = await response.json().catch(() => null);
-				const message =
-					typeof body === "object" &&
-					body !== null &&
-					"error" in body &&
-					typeof (body as { error: unknown }).error === "string"
-						? (body as { error: string }).error
-						: null;
-				return { error: message ?? "Generator gagal. Coba lagi." };
-			}
-			const reader = response.body?.getReader();
-			if (!reader) return { error: null };
-			const decoder = new TextDecoder();
-			let buffer = "";
-			for (;;) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				buffer += decoder.decode(value, { stream: true });
-				const events = buffer.split("\n\n");
-				buffer = events.pop() ?? "";
-				for (const event of events) {
-					const payload = event.trim();
-					if (!payload.startsWith("data:")) continue;
-					let parsed: unknown;
-					try {
-						parsed = JSON.parse(payload.slice(5).trim());
-					} catch {
-						continue;
-					}
-					if (
-						typeof parsed === "object" &&
-						parsed !== null &&
-						"type" in parsed &&
-						(parsed as { type: unknown }).type === "error" &&
-						"error" in parsed &&
-						typeof (parsed as { error: unknown }).error === "string"
-					) {
-						return { error: (parsed as { error: string }).error };
-					}
-				}
-			}
-			return { error: null };
-		},
-		[],
-	);
-
 	const runPipelineStage = useCallback(
 		async (
 			target: PipelineStage,
@@ -1177,7 +1129,7 @@ function CodebaseDetailPage() {
 				setStageBusy(null);
 			}
 		},
-		[effectiveFeatureId, stageBusy, consumeSseStream],
+		[effectiveFeatureId, stageBusy],
 	);
 
 	const handleGeneratePrd = useCallback(() => {
