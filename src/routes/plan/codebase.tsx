@@ -4,12 +4,49 @@ import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { SyncStatus } from "@/components/codebase/sync-status";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import {
+	PLAN_CODEBASE_ID_STORAGE_KEY,
+	PLAN_CODEBASE_NAME_STORAGE_KEY,
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
 	syncPromptPayloadSchema,
+	syncStatusResponseSchema,
 } from "@/lib/codebase-sync";
 import { useUIStore } from "@/store";
+
+function readStoredPlanCodebase(): { id: string; name: string } | null {
+	try {
+		if (typeof sessionStorage === "undefined") return null;
+		const id = sessionStorage.getItem(PLAN_CODEBASE_ID_STORAGE_KEY);
+		if (!id) return null;
+		const name =
+			sessionStorage.getItem(PLAN_CODEBASE_NAME_STORAGE_KEY) ??
+			"Repository Lokal";
+		return { id, name };
+	} catch {
+		return null;
+	}
+}
+
+function storePlanCodebase(id: string, name: string): void {
+	try {
+		if (typeof sessionStorage === "undefined") return;
+		sessionStorage.setItem(PLAN_CODEBASE_ID_STORAGE_KEY, id);
+		sessionStorage.setItem(PLAN_CODEBASE_NAME_STORAGE_KEY, name);
+	} catch {
+		// Storage is a best-effort pointer only; server remains source of truth.
+	}
+}
+
+function clearStoredPlanCodebase(): void {
+	try {
+		if (typeof sessionStorage === "undefined") return;
+		sessionStorage.removeItem(PLAN_CODEBASE_ID_STORAGE_KEY);
+		sessionStorage.removeItem(PLAN_CODEBASE_NAME_STORAGE_KEY);
+	} catch {
+		// Best-effort only.
+	}
+}
 
 export const Route = createFileRoute("/plan/codebase")({
 	head: () => ({
@@ -82,13 +119,15 @@ export function PlanCodebasePage() {
 				setError("Codebase dibuat, tetapi instruksi sync tidak valid.");
 				return;
 			}
+			const codebaseName =
+				"name" in body && typeof body.name === "string"
+					? body.name
+					: "Repository Lokal";
 			setCodebase({
 				id: body.id,
-				name:
-					"name" in body && typeof body.name === "string"
-						? body.name
-						: "Repository Lokal",
+				name: codebaseName,
 			});
+			storePlanCodebase(body.id, codebaseName);
 			setPayload(sync.data);
 			setLastStatus(null);
 			setStep("prompt");
@@ -100,11 +139,96 @@ export function PlanCodebasePage() {
 		}
 	}, [setStep]);
 
+	// Refresh recovery: the stored id is only a pointer. Authoritative sync
+	// state comes from GET status. A missing token after refresh is never
+	// restored from storage; waiting sessions mint a fresh credential via
+	// retry, while in-flight/uploaded sessions resume polling without
+	// disturbing the active attempt.
+	const recoverCodebase = useCallback(async (): Promise<boolean> => {
+		const stored = readStoredPlanCodebase();
+		if (!stored) return false;
+		setError(null);
+		setIsStarting(true);
+		try {
+			const statusResponse = await fetch(
+				`/api/codebases/${encodeURIComponent(stored.id)}/status`,
+			);
+			if (statusResponse.status === 401) {
+				window.location.href = `/login?redirect=${encodeURIComponent("/plan/codebase")}`;
+				return true;
+			}
+			const statusParsed = syncStatusResponseSchema.safeParse(
+				await statusResponse.json().catch(() => null),
+			);
+			if (!statusResponse.ok || !statusParsed.success) {
+				clearStoredPlanCodebase();
+				return false;
+			}
+			const recovered = statusParsed.data;
+			setCodebase({ id: stored.id, name: stored.name });
+			setLastStatus(recovered);
+			setSessionNonce((current) => current + 1);
+			// Codebase-scoped sessions stay uploaded after sync; analysis runs
+			// per-feature later, so uploaded already means snapshot ready.
+			if (
+				recovered.snapshotId &&
+				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status)
+			) {
+				setPayload(null);
+				setStep("summary");
+				return true;
+			}
+			if (
+				recovered.status === "waiting_for_cli" ||
+				recovered.status === "failed" ||
+				recovered.status === "expired"
+			) {
+				const retryResponse = await fetch(
+					`/api/codebases/${encodeURIComponent(stored.id)}/session`,
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ action: "retry" }),
+					},
+				);
+				const retryParsed = syncPromptPayloadSchema.safeParse(
+					await retryResponse.json().catch(() => null),
+				);
+				if (retryResponse.ok && retryParsed.success) {
+					setPayload(retryParsed.data);
+					setLastStatus(null);
+					setStep("prompt");
+					return true;
+				}
+				clearStoredPlanCodebase();
+				return false;
+			}
+			setPayload(null);
+			setStep("syncing");
+			return true;
+		} catch {
+			clearStoredPlanCodebase();
+			return false;
+		} finally {
+			setIsStarting(false);
+		}
+	}, [setStep]);
+
 	useEffect(() => {
 		if (autoInitAttempted.current) return;
 		autoInitAttempted.current = true;
-		void createCodebase();
-	}, [createCodebase]);
+		// Fast path preserves the original timing: no stored pointer means
+		// create immediately (synchronously sets loading state). Only stored
+		// pointers pay for the async recovery round-trip.
+		if (!readStoredPlanCodebase()) {
+			void createCodebase();
+			return;
+		}
+		void (async () => {
+			const recovered = await recoverCodebase();
+			if (!recovered) await createCodebase();
+		})();
+	}, [createCodebase, recoverCodebase]);
 
 	const retrySession = async () => {
 		if (!codebase) return;
@@ -138,9 +262,17 @@ export function PlanCodebasePage() {
 	};
 
 	const handleStatus = (status: SyncStatusResponse | null) => {
+		// SyncStatus no longer reports null on polling errors, so null here
+		// means no successful response yet — keep the last known good state.
+		if (status === null) return;
 		setLastStatus(status);
+		// Plan-page summary triggers on uploaded (not ready): codebase-scoped
+		// sessions stay uploaded after sync by design
+		// (codebase-analysis.server.ts keeps the shared snapshot uploaded while
+		// per-feature analyses run later). Requiring ready here would never
+		// fire in this flow.
 		if (
-			status?.snapshotId &&
+			status.snapshotId &&
 			SNAPSHOT_CONTEXT_STATUSES.includes(status.status)
 		) {
 			setStep("summary");
@@ -163,7 +295,7 @@ export function PlanCodebasePage() {
 				</div>
 			)}
 
-			{!codebase || !payload ? (
+			{!codebase || (!payload && !lastStatus) ? (
 				<div className="flex flex-1 items-center justify-center min-h-[50vh] py-12">
 					<output className="flex flex-col items-center gap-4 rounded-xl border border-graphite bg-charcoal p-8 sm:p-10 text-center max-w-sm w-full shadow-lg">
 						<div
@@ -193,14 +325,43 @@ export function PlanCodebasePage() {
 				</div>
 			) : (
 				<>
-					{step === "prompt" && (
-						<ScreenConnect
-							projectName={codebase.name}
-							payload={payload}
-							isStarting={isStarting}
-							onAgentStarted={() => setStep("syncing")}
-						/>
-					)}
+					{step === "prompt" &&
+						(payload ? (
+							<ScreenConnect
+								projectName={codebase.name}
+								payload={payload}
+								isStarting={isStarting}
+								onAgentStarted={() => setStep("syncing")}
+							/>
+						) : (
+							<div className="mx-auto w-full max-w-2xl rounded-xl border border-graphite bg-charcoal p-5 sm:p-6 text-center">
+								<p className="text-sm font-medium text-snow">
+									Sesi sync dipulihkan dari server
+								</p>
+								<p className="mt-1 text-xs text-fog">
+									Token sync sekali-pakai tidak tersimpan di browser. Buat token
+									baru untuk menjalankan CLI, atau lanjut pantau status yang
+									sudah berjalan.
+								</p>
+								<div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+									<button
+										type="button"
+										onClick={() => void retrySession()}
+										disabled={isStarting}
+										className="inline-flex min-h-10 items-center rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									>
+										{isStarting ? "Menyiapkan..." : "Dapatkan token baru"}
+									</button>
+									<button
+										type="button"
+										onClick={() => setStep("syncing")}
+										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									>
+										Lanjut ke Pantau Sync →
+									</button>
+								</div>
+							</div>
+						))}
 
 					{step === "syncing" && (
 						<SyncStatus

@@ -28,11 +28,21 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 	beforeEach(() => {
 		useUIStore.getState().setCodebasePlanStep("prompt");
 		mockNavigate.mockReset();
+		try {
+			sessionStorage.clear();
+		} catch {
+			// jsdom without storage still runs the fresh-create path.
+		}
 	});
 
 	afterEach(() => {
 		cleanup();
 		vi.restoreAllMocks();
+		try {
+			sessionStorage.clear();
+		} catch {
+			// Best-effort only.
+		}
 	});
 
 	it("renders vertically and horizontally centered loading spinner before prompt sync arrives", () => {
@@ -113,5 +123,96 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		});
 
 		expect(screen.getByRole("button", { name: "Coba lagi" })).toBeDefined();
+	});
+
+	it("recovers uploaded persisted state after refresh without creating a new codebase", async () => {
+		try {
+			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-recover-1");
+			sessionStorage.setItem("prdfy:plan-codebase-name", "Recovered Repo");
+		} catch {
+			// Storage unavailable still exercises the fresh path below.
+		}
+		const fetchMock = vi.fn(async (input: unknown) => {
+			const url = String(input);
+			if (url.endsWith("/status")) {
+				return {
+					ok: true,
+					status: 200,
+					json: async () => ({
+						projectId: "cb-recover-1",
+						sessionId: "sess-recover-1",
+						status: "uploaded",
+						snapshotId: "snap-recover-1",
+						fileCount: 37,
+						excludedCount: 5,
+					}),
+				};
+			}
+			throw new Error(`unexpected fetch ${url}`);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		render(<PlanCodebasePage />);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("codebase-sync-summary")).toBeDefined();
+		});
+		expect(screen.getByText("snap-recover-1")).toBeDefined();
+		expect(fetchMock).not.toHaveBeenCalledWith(
+			expect.stringContaining("/api/codebases"),
+			expect.objectContaining({ method: "POST" }),
+		);
+	});
+
+	it("mints a fresh token when recovering a waiting session without a payload", async () => {
+		try {
+			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-wait-1");
+			sessionStorage.setItem("prdfy:plan-codebase-name", "Waiting Repo");
+		} catch {
+			// Best-effort only.
+		}
+		const freshPayload = {
+			projectId: "cb-wait-1",
+			apiBaseUrl: "http://localhost:3000",
+			syncToken: "fresh-token-xyz",
+			syncCommand:
+				"vibeeverything codebase sync --project-id cb-wait-1 --sync-token <token>",
+			expiresAt: new Date(Date.now() + 3600000).toISOString(),
+		};
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: unknown, init?: { method?: string }) => {
+				const url = String(input);
+				if (url.endsWith("/status")) {
+					return {
+						ok: true,
+						status: 200,
+						json: async () => ({
+							projectId: "cb-wait-1",
+							sessionId: "sess-wait-1",
+							status: "waiting_for_cli",
+							snapshotId: null,
+						}),
+					};
+				}
+				if (url.endsWith("/session") && init?.method === "POST") {
+					return {
+						ok: true,
+						status: 200,
+						json: async () => freshPayload,
+					};
+				}
+				throw new Error(`unexpected fetch ${url}`);
+			}),
+		);
+
+		render(<PlanCodebasePage />);
+
+		await waitFor(() => {
+			expect(
+				screen.getByText("Sync codebase dengan VibeEverything"),
+			).toBeDefined();
+		});
+		expect(screen.getByText(/fresh-token-xyz/)).toBeDefined();
 	});
 });
