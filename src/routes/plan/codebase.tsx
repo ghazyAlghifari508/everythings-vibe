@@ -683,7 +683,7 @@ export function PlanCodebasePage() {
 									excludedCount={lastStatus.excludedCount}
 									isWorking={analysisWorking}
 									errorMessage={analysisError}
-									continueLabel="Masuk ke Workspace →"
+									continueLabel="Masuk ke Workspace"
 									onRetrySync={() => void retrySession()}
 									onRetryAnalysis={retryAnalysis}
 									onContinue={() =>

@@ -303,7 +303,7 @@ describe("PlanCodebasePage navigation policy", () => {
 		await waitFor(() => {
 			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
-		screen.getByRole("button", { name: /Lihat log sync/i }).click();
+		screen.getByRole("button", { name: /Kembali ke Sinkronisasi/i }).click();
 		await waitFor(() => {
 			expect(screen.getByText("Sync codebase")).toBeDefined();
 		});
@@ -329,7 +329,7 @@ describe("PlanCodebasePage navigation policy", () => {
 		await waitFor(() => {
 			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
-		screen.getByRole("button", { name: /Lihat log sync/i }).click();
+		screen.getByRole("button", { name: /Kembali ke Sinkronisasi/i }).click();
 		await waitForEnabledReviewCta();
 		clickReviewCta();
 		await waitFor(() => {

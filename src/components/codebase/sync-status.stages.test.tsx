@@ -135,6 +135,25 @@ describe("SyncStatus three user-facing stages", () => {
 		expect(onViewReview).not.toHaveBeenCalled();
 	});
 
+	it("completed stages keep a semantic success marker with normal copy", async () => {
+		mockStatusSequence([
+			statusResponse({
+				status: "uploaded",
+				snapshotId: "snap_stage_done",
+				fileCount: 37,
+			}),
+		]);
+		const c = renderStatus();
+		await settle();
+		const doneRow = c.querySelector('[data-testid="sync-stage-upload"]');
+		expect(doneRow?.getAttribute("data-stage-state")).toBe("done");
+		// Success meaning comes from state + a single check icon, not from
+		// a full-surface color treatment (visual tone is human-verified).
+		expect(doneRow?.querySelectorAll("svg")).toHaveLength(1);
+		expect(doneRow?.textContent).toContain("Source code tersinkron");
+		expect(doneRow?.textContent).toContain("37 file siap diproses.");
+	});
+
 	it("pending analysis activates the analysis stage with analysis copy", async () => {
 		mockStatusSequence([
 			statusResponse({

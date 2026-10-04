@@ -385,7 +385,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		await waitFor(() => {
 			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
-		screen.getByRole("button", { name: /Lihat log sync/i }).click();
+		screen.getByRole("button", { name: /Kembali ke Sinkronisasi/i }).click();
 		await waitFor(() => {
 			expect(screen.getByText("Sync codebase")).toBeDefined();
 		});

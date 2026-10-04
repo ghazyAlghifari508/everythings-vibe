@@ -221,8 +221,12 @@ export function SyncStatus({
 	const showAnalysisRetry = analysisFailed;
 
 	type StageState = "done" | "active" | "idle" | "failed" | "pending";
+	// Success is an accent, not a full surface: light mode stays on the
+	// neutral theme-aware surface (white/graphite/dark text) with only the
+	// check icon carrying green, while dark mode keeps its subtle emerald
+	// tint. No full mint block in either mode.
 	const stageClass: Record<StageState, string> = {
-		done: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
+		done: "border-graphite bg-obsidian text-snow dark:border-emerald-500/25 dark:bg-emerald-500/10",
 		active: "border-blue-500/25 bg-blue-500/10 text-blue-200",
 		idle: "border-graphite bg-obsidian/70 text-fog",
 		failed: "border-crimson/30 bg-crimson/10 text-crimson",
@@ -230,7 +234,10 @@ export function SyncStatus({
 	};
 	const StageIcon = ({ state }: { state: StageState }) =>
 		state === "done" ? (
-			<Check size={14} className="text-emerald-400 font-bold shrink-0" />
+			<Check
+				size={14}
+				className="text-emerald-600 dark:text-emerald-400 font-bold shrink-0"
+			/>
 		) : state === "active" ? (
 			<Loader2 size={14} className="text-blue-400 animate-spin shrink-0" />
 		) : state === "idle" ? (
