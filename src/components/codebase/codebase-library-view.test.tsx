@@ -8,6 +8,12 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CodebaseLibraryItem } from "@/lib/codebase-library";
+import {
+	readPlanCodebasePointer,
+	readPlanCodebaseProjectPointer,
+	storePlanCodebasePointer,
+	storePlanCodebaseProjectPointer,
+} from "@/lib/codebase-plan-storage";
 import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/lib/constants";
 import { useUIStore } from "@/store";
 import { CodebaseLibraryView } from "./codebase-library-view";
@@ -147,12 +153,14 @@ function openActionsMenu(index = 0) {
 beforeEach(() => {
 	mockCodebaseApi();
 	installRadixDomPolyfills();
+	sessionStorage.clear();
 });
 
 afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
+	sessionStorage.clear();
 });
 
 describe("CodebaseLibraryView", () => {
@@ -382,6 +390,86 @@ describe("CodebaseLibraryView delete", () => {
 			expect(useUIStore.getState().toastType).toBe("error");
 		});
 		expect(screen.getByText("<sample codebase>")).toBeDefined();
+	});
+
+	it("clears the onboarding pointers of the codebase it just deleted", async () => {
+		// The delete invalidates any /plan/codebase pointer to this codebase.
+		// Leaving it behind makes the next onboarding visit poll a status
+		// endpoint for a codebase that no longer exists.
+		storePlanCodebasePointer("cb-1", "<sample codebase>");
+		storePlanCodebaseProjectPointer("proj-1");
+		render(<CodebaseLibraryView items={[makeItem({ id: "cb-1" })]} />);
+
+		openActionsMenu();
+		fireEvent.click(screen.getByRole("menuitem", { name: /Hapus project/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^Hapus project$/i }));
+
+		await waitFor(() => {
+			expect(readPlanCodebasePointer()).toBeNull();
+		});
+		expect(readPlanCodebaseProjectPointer()).toBeNull();
+	});
+
+	it("keeps onboarding pointers that belong to a different codebase", async () => {
+		storePlanCodebasePointer("cb-2", "<sample other>");
+		storePlanCodebaseProjectPointer("proj-2");
+		render(<CodebaseLibraryView items={[makeItem({ id: "cb-1" })]} />);
+
+		openActionsMenu();
+		fireEvent.click(screen.getByRole("menuitem", { name: /Hapus project/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^Hapus project$/i }));
+
+		await waitFor(() => {
+			expect(screen.queryByText("<sample codebase>")).toBeNull();
+		});
+		expect(readPlanCodebasePointer()).toEqual({
+			id: "cb-2",
+			name: "<sample other>",
+		});
+		expect(readPlanCodebaseProjectPointer()).toBe("proj-2");
+	});
+
+	it("keeps the onboarding pointers when the deletion is rejected", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => ({
+				ok: false,
+				status: 409,
+				json: async () => ({ error: "Konfirmasi diperlukan." }),
+			})),
+		);
+		storePlanCodebasePointer("cb-1", "<sample codebase>");
+		storePlanCodebaseProjectPointer("proj-1");
+		render(<CodebaseLibraryView items={[makeItem({ id: "cb-1" })]} />);
+
+		openActionsMenu();
+		fireEvent.click(screen.getByRole("menuitem", { name: /Hapus project/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^Hapus project$/i }));
+
+		await waitFor(() => {
+			expect(useUIStore.getState().toastType).toBe("error");
+		});
+		// The row still exists server-side, so its pointer must survive.
+		expect(readPlanCodebasePointer()).toEqual({
+			id: "cb-1",
+			name: "<sample codebase>",
+		});
+		expect(readPlanCodebaseProjectPointer()).toBe("proj-1");
+	});
+
+	it("never touches unrelated application storage on delete", async () => {
+		sessionStorage.setItem("unrelated:key", "keep-me");
+		storePlanCodebasePointer("cb-1", "<sample codebase>");
+		render(<CodebaseLibraryView items={[makeItem({ id: "cb-1" })]} />);
+
+		openActionsMenu();
+		fireEvent.click(screen.getByRole("menuitem", { name: /Hapus project/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^Hapus project$/i }));
+
+		await waitFor(() => {
+			expect(readPlanCodebasePointer()).toBeNull();
+		});
+		expect(sessionStorage.getItem("unrelated:key")).toBe("keep-me");
 	});
 });
 

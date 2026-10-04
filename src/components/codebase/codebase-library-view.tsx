@@ -16,6 +16,7 @@ import {
 	mapLibraryStatus,
 	NEW_REPOSITORY_HREF,
 } from "@/lib/codebase-library";
+import { clearPlanCodebasePointerIfMatches } from "@/lib/codebase-plan-storage";
 import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/lib/constants";
 import { paginate } from "@/lib/history-filter";
 import { useUIStore } from "@/store";
@@ -94,6 +95,11 @@ export function CodebaseLibraryView({
 				);
 				return;
 			}
+			// The row is gone server-side, so an onboarding pointer to THIS
+			// codebase is now stale and must not survive: the next /plan/codebase
+			// visit would otherwise poll a status endpoint that 404s. A pointer to
+			// a different codebase, and every unrelated storage key, are untouched.
+			clearPlanCodebasePointerIfMatches(item.id);
 			showToast("Project dihapus.", "success");
 			router.invalidate();
 		} catch {

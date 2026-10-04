@@ -9,9 +9,14 @@ import {
 	analysisResponseSchema,
 } from "@/lib/codebase-analysis";
 import {
-	PLAN_CODEBASE_ID_STORAGE_KEY,
-	PLAN_CODEBASE_NAME_STORAGE_KEY,
-	PLAN_CODEBASE_PROJECT_STORAGE_KEY,
+	clearPlanCodebasePointer,
+	clearPlanCodebaseProjectPointer,
+	readPlanCodebasePointer,
+	readPlanCodebaseProjectPointer,
+	storePlanCodebasePointer,
+	storePlanCodebaseProjectPointer,
+} from "@/lib/codebase-plan-storage";
+import {
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
@@ -19,71 +24,6 @@ import {
 	syncStatusResponseSchema,
 } from "@/lib/codebase-sync";
 import { useUIStore } from "@/store";
-
-function readStoredPlanCodebase(): { id: string; name: string | null } | null {
-	try {
-		if (typeof sessionStorage === "undefined") return null;
-		const id = sessionStorage.getItem(PLAN_CODEBASE_ID_STORAGE_KEY);
-		if (!id) return null;
-		// Stored under its own key or absent: the server status response is the
-		// authority, so a missing name is never backfilled with a guess.
-		const storedName = sessionStorage.getItem(PLAN_CODEBASE_NAME_STORAGE_KEY);
-		return {
-			id,
-			name: storedName && storedName.length > 0 ? storedName : null,
-		};
-	} catch {
-		return null;
-	}
-}
-
-function storePlanCodebase(id: string, name: string): void {
-	try {
-		if (typeof sessionStorage === "undefined") return;
-		sessionStorage.setItem(PLAN_CODEBASE_ID_STORAGE_KEY, id);
-		sessionStorage.setItem(PLAN_CODEBASE_NAME_STORAGE_KEY, name);
-	} catch {
-		// Storage is a best-effort pointer only; server remains source of truth.
-	}
-}
-
-function clearStoredPlanCodebase(): void {
-	try {
-		if (typeof sessionStorage === "undefined") return;
-		sessionStorage.removeItem(PLAN_CODEBASE_ID_STORAGE_KEY);
-		sessionStorage.removeItem(PLAN_CODEBASE_NAME_STORAGE_KEY);
-	} catch {
-		// Best-effort only.
-	}
-}
-
-function readStoredPlanProject(): string | null {
-	try {
-		if (typeof sessionStorage === "undefined") return null;
-		const id = sessionStorage.getItem(PLAN_CODEBASE_PROJECT_STORAGE_KEY);
-		return id && id.trim().length > 0 ? id : null;
-	} catch {
-		return null;
-	}
-}
-
-function storePlanProject(id: string): void {
-	try {
-		if (typeof sessionStorage === "undefined") return;
-		sessionStorage.setItem(PLAN_CODEBASE_PROJECT_STORAGE_KEY, id);
-	} catch {
-		// Storage is a best-effort pointer only; server remains source of truth.
-	}
-}
-
-function clearStoredPlanProject(): void {
-	try {
-		if (typeof sessionStorage === "undefined") return;
-		sessionStorage.removeItem(PLAN_CODEBASE_PROJECT_STORAGE_KEY);
-	} catch {
-		// Best-effort only.
-	}
-}
 
 export const Route = createFileRoute("/plan/codebase")({
 	head: () => ({
@@ -177,7 +117,7 @@ export function PlanCodebasePage() {
 				id: body.id,
 				name: codebaseName,
 			});
-			clearStoredPlanProject();
+			clearPlanCodebaseProjectPointer();
 			setFeatureProjectId(null);
 			setAnalysis(null);
 			setAnalysisError(null);
@@ -202,7 +142,7 @@ export function PlanCodebasePage() {
 			codebaseId: string,
 			fallbackName: string,
 		): Promise<string | null> => {
-			const stored = readStoredPlanProject();
+			const stored = readPlanCodebaseProjectPointer();
 			if (stored) {
 				setFeatureProjectId(stored);
 				return stored;
@@ -245,7 +185,7 @@ export function PlanCodebasePage() {
 					);
 					return null;
 				}
-				storePlanProject(projectId);
+				storePlanCodebaseProjectPointer(projectId);
 				setFeatureProjectId(projectId);
 				return projectId;
 			} catch {
@@ -340,7 +280,7 @@ export function PlanCodebasePage() {
 	// retry, while in-flight/uploaded sessions resume polling without
 	// disturbing the active attempt.
 	const recoverCodebase = useCallback(async (): Promise<boolean> => {
-		const stored = readStoredPlanCodebase();
+		const stored = readPlanCodebasePointer();
 		if (!stored) return false;
 		setError(null);
 		setIsStarting(true);
@@ -356,13 +296,13 @@ export function PlanCodebasePage() {
 				await statusResponse.json().catch(() => null),
 			);
 			if (!statusResponse.ok || !statusParsed.success) {
-				clearStoredPlanCodebase();
+				clearPlanCodebasePointer();
 				return false;
 			}
 			const recovered = statusParsed.data;
 			const recoveredName = recovered.codebaseName ?? stored.name;
 			if (!recoveredName) {
-				clearStoredPlanCodebase();
+				clearPlanCodebasePointer();
 				return false;
 			}
 			setCodebase({ id: stored.id, name: recoveredName });
@@ -377,7 +317,7 @@ export function PlanCodebasePage() {
 				recovered.snapshotId &&
 				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status)
 			) {
-				const storedProject = readStoredPlanProject();
+				const storedProject = readPlanCodebaseProjectPointer();
 				if (storedProject) {
 					setFeatureProjectId(storedProject);
 					const existing = await fetchAnalysisOutput(
@@ -424,14 +364,14 @@ export function PlanCodebasePage() {
 					setStep("prompt");
 					return true;
 				}
-				clearStoredPlanCodebase();
+				clearPlanCodebasePointer();
 				return false;
 			}
 			setPayload(null);
 			setStep("syncing");
 			return true;
 		} catch {
-			clearStoredPlanCodebase();
+			clearPlanCodebasePointer();
 			return false;
 		} finally {
 			setIsStarting(false);
@@ -444,7 +384,7 @@ export function PlanCodebasePage() {
 		// Fast path preserves the original timing: no stored pointer means
 		// create immediately (synchronously sets loading state). Only stored
 		// pointers pay for the async recovery round-trip.
-		if (!readStoredPlanCodebase()) {
+		if (!readPlanCodebasePointer()) {
 			void createCodebase();
 			return;
 		}
@@ -498,11 +438,11 @@ export function PlanCodebasePage() {
 	// Domain state and UI navigation are separate concepts. Polling only
 	// records the latest server state here; step changes are explicit user
 	// actions (or refresh restoration). An `uploaded` snapshot means the
-	// transport finished — it is not an analysis conclusion, so it must never
+	// transport finished â€” it is not an analysis conclusion, so it must never
 	// auto-navigate away from the screen the user chose to look at.
 	const handleStatus = (status: SyncStatusResponse | null) => {
 		// SyncStatus no longer reports null on polling errors, so null here
-		// means no successful response yet — keep the last known good state.
+		// means no successful response yet â€” keep the last known good state.
 		if (status === null) return;
 		setLastStatus(status);
 		// The server owns the name: once the CLI has handshaken it holds the
@@ -521,7 +461,7 @@ export function PlanCodebasePage() {
 	// repaint the placeholder before the first status poll lands.
 	useEffect(() => {
 		if (!codebase) return;
-		storePlanCodebase(codebase.id, codebase.name);
+		storePlanCodebasePointer(codebase.id, codebase.name);
 	}, [codebase]);
 
 	// The final review reuses the canonical CodebaseReview only when validated
@@ -662,7 +602,7 @@ export function PlanCodebasePage() {
 										onClick={() => setStep("syncing")}
 										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 									>
-										Lanjut ke Pantau Sync →
+										Lanjut ke Pantau Sync â†’
 									</button>
 								</div>
 							</div>
@@ -744,7 +684,7 @@ export function PlanCodebasePage() {
 										onClick={() => setStep("syncing")}
 										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 									>
-										← Kembali ke Pantau Sync
+										â† Kembali ke Pantau Sync
 									</button>
 								</div>
 							</section>
