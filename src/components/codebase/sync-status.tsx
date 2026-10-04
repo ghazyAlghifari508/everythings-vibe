@@ -40,6 +40,7 @@ export function SyncStatus({
 		propStatus ?? null,
 	);
 	const status = polledStatus ?? propStatus ?? null;
+	const hasStatus = status !== null;
 	const [error, setError] = useState<string | null>(null);
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const inFlightRef = useRef(false);
@@ -48,6 +49,15 @@ export function SyncStatus({
 	// Poll internally unless the parent provided an already-terminal status.
 	const pollInternally =
 		!propStatus || !isTerminalSyncStatus(propStatus.status);
+	// Pin subsequent polls to the session observed from the server so a
+	// concurrent retry (new latest session) cannot silently retarget polling.
+	// Explicit sessionId prop wins; otherwise reuse the last successful
+	// sessionId. A ref (not state) ensures the very next tick in the same
+	// effect run already uses the pinned id without waiting for a restart.
+	const pinnedSessionRef = useRef<string | null>(
+		sessionId ?? polledStatus?.sessionId ?? propStatus?.sessionId ?? null,
+	);
+	if (sessionId) pinnedSessionRef.current = sessionId;
 
 	useEffect(() => {
 		if (!pollInternally) return;
@@ -60,11 +70,13 @@ export function SyncStatus({
 			inFlightRef.current = true;
 			let isTerminal = false;
 			try {
-				const query = sessionId
-					? `?sessionId=${encodeURIComponent(sessionId)}`
+				const activeSessionId = sessionId ?? pinnedSessionRef.current;
+				const query = activeSessionId
+					? `?sessionId=${encodeURIComponent(activeSessionId)}`
 					: "";
 				const path =
-					statusPath ?? `/api/codebase/${encodeURIComponent(projectId)}/status`;
+					statusPath ??
+					`/api/codebases/${encodeURIComponent(projectId)}/status`;
 				const res = await fetch(`${path}${query}`);
 				const json = (await res.json().catch(() => null)) as unknown;
 				if (cancelled) return;
@@ -77,15 +89,14 @@ export function SyncStatus({
 							? json.error
 							: "Gagal membaca status sync.";
 					setError(message);
-					onStatusRef.current?.(null);
 					return;
 				}
 				const parsed = syncStatusResponseSchema.safeParse(json);
 				if (!parsed.success) {
 					setError("Gagal membaca status sync.");
-					onStatusRef.current?.(null);
 					return;
 				}
+				pinnedSessionRef.current = parsed.data.sessionId;
 				setPolledStatus(parsed.data);
 				setError(null);
 				onStatusRef.current?.(parsed.data);
@@ -95,7 +106,6 @@ export function SyncStatus({
 			} catch {
 				if (cancelled) return;
 				setError("Gagal menghubungi server.");
-				onStatusRef.current?.(null);
 			} finally {
 				inFlightRef.current = false;
 				if (!cancelled && !isTerminal) {
@@ -116,20 +126,25 @@ export function SyncStatus({
 		};
 	}, [projectId, statusPath, sessionId, pollIntervalMs, pollInternally]);
 
-	const s = status?.status ?? "waiting_for_cli";
+	const s = status?.status;
 	const isFailed = s === "failed";
 	const isExpired = s === "expired";
 	// Ready means the sync session itself completed with a usable
 	// analysis: a ready analysis attached to a failed/expired session is
 	// stale, not a success.
 	const isReady =
+		hasStatus &&
 		!isFailed &&
 		!isExpired &&
 		(s === "ready" ||
 			(status?.analysisStatus === "ready" && s !== "waiting_for_cli"));
-	const isAnalyzing = s === "analyzing" || status?.analysisStatus === "pending";
-	const isUploading = s === "uploading";
-	const isConnected = s !== "waiting_for_cli" && !isFailed && !isExpired;
+	const isAnalyzing =
+		hasStatus && (s === "analyzing" || status?.analysisStatus === "pending");
+	const isUploading = hasStatus && s === "uploading";
+	const isConnected =
+		hasStatus && s !== "waiting_for_cli" && !isFailed && !isExpired;
+	const isLoadingInitial = !hasStatus && error === null;
+	const hasPollError = error !== null;
 
 	// Three stages, each driven by a signal this client can actually observe.
 	// `scanning` and `filtering` are deliberately NOT shown: the CLI never
@@ -171,13 +186,17 @@ export function SyncStatus({
 			<Circle size={14} className="text-slate shrink-0" />
 		);
 
-	const connectionStage: StageState = isExpired
+	const connectionStage: StageState = isFailed
 		? "failed"
-		: isConnected
-			? "done"
-			: s === "waiting_for_cli"
-				? "idle"
-				: "active";
+		: isExpired
+			? "failed"
+			: isConnected
+				? "done"
+				: !hasStatus
+					? "pending"
+					: s === "waiting_for_cli"
+						? "idle"
+						: "active";
 	const uploadStage: StageState = !isConnected
 		? "pending"
 		: uploadDone
@@ -241,14 +260,66 @@ export function SyncStatus({
 											? "Mengupload"
 											: isConnected
 												? "Terhubung"
-												: "Standby"}
+												: hasStatus
+													? "Standby"
+													: hasPollError
+														? "Gagal memuat"
+														: "Menghubungi..."}
 					</span>
 				</div>
 
 				{/* Panel Body */}
 				<div className="p-5 sm:p-6 flex flex-col gap-5">
-					{/* Standby notification when CLI is waiting for first command */}
-					{s === "waiting_for_cli" && (
+					{/* Loading: browser has not yet received any server state. This is
+					distinct from waiting_for_cli (server says no CLI yet). Never show
+					the waiting copy while status is null. */}
+					{isLoadingInitial && (
+						<div
+							data-testid="sync-loading"
+							className="rounded-lg border border-graphite bg-obsidian/70 p-4 text-xs text-fog flex items-center gap-3"
+						>
+							<Loader2
+								size={16}
+								className="shrink-0 animate-spin text-fog"
+								aria-hidden="true"
+							/>
+							<div className="flex flex-col gap-0.5">
+								<span className="font-semibold text-snow">
+									Menghubungi server...
+								</span>
+								<p className="text-[11px] text-fog leading-relaxed">
+									Memuat status sync terbaru dari server.
+								</p>
+							</div>
+						</div>
+					)}
+					{/* Polling error with no successful state yet: honest server
+					error, never disguised as waiting_for_cli. */}
+					{!hasStatus && hasPollError && (
+						<div
+							data-testid="sync-poll-error"
+							className="rounded-lg border border-crimson/30 bg-crimson/10 p-4 text-xs text-fog flex items-start gap-3"
+						>
+							<AlertCircle
+								size={16}
+								className="mt-0.5 shrink-0 text-crimson"
+								aria-hidden="true"
+							/>
+							<div className="flex flex-col gap-0.5">
+								<span className="font-semibold text-snow">
+									Gagal memuat status sync
+								</span>
+								<p className="text-[11px] text-fog leading-relaxed">
+									Browser belum berhasil mendapatkan status dari server. Polling
+									akan mencoba lagi otomatis.
+								</p>
+							</div>
+						</div>
+					)}
+					{/* Standby notification when the server explicitly reports
+					waiting for the first CLI command. Requires hasStatus so a
+					null/error state never renders this copy. */}
+					{hasStatus && s === "waiting_for_cli" && (
 						<div
 							data-testid="cli-waiting-alert"
 							className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-4 text-xs text-fog flex items-start gap-3"
@@ -283,7 +354,9 @@ export function SyncStatus({
 									? "CLI terhubung dan repository root terdeteksi"
 									: isExpired
 										? "Sesi kedaluwarsa sebelum CLI terhubung"
-										: "Menunggu perintah sync dijalankan di terminal"}
+										: !hasStatus
+											? "Menghubungi server untuk membaca status sync..."
+											: "Menunggu perintah sync dijalankan di terminal"}
 							</span>
 						</div>
 

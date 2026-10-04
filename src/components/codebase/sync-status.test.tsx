@@ -80,8 +80,146 @@ describe("SyncStatus", () => {
 		await settle();
 		expect(fetchMock).toHaveBeenCalled();
 		expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
-			"/api/codebase/proj_123/status",
+			"/api/codebases/proj_123/status",
 		);
+	});
+
+	it("uses an explicit statusPath when provided", async () => {
+		const fetchMock = mockFetchSequence([statusResponse()]);
+		renderStatus({ statusPath: "/api/codebases/cb_123/status" });
+		await settle();
+		expect(fetchMock).toHaveBeenCalled();
+		expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+			"/api/codebases/cb_123/status",
+		);
+	});
+
+	it("does not show waiting copy while initial status is null/loading", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => new Promise(() => {})),
+		);
+		const c = renderStatus();
+		await settle(30);
+		expect(c.textContent).toContain("Menghubungi server...");
+		expect(c.textContent).not.toContain("CLI Agent Belum Terhubung");
+		expect(c.querySelector('[data-testid="cli-waiting-alert"]')).toBeNull();
+		expect(c.querySelector('[data-testid="sync-loading"]')).not.toBeNull();
+	});
+
+	it("shows polling error instead of waiting when status fetch fails", async () => {
+		const onStatus = vi.fn();
+		mockFetchSequence([
+			{ http: 500, body: { error: "Gagal membaca status sync" } },
+		]);
+		const c = renderStatus({ onStatus });
+		await settle();
+		expect(c.textContent).toContain("Gagal memuat status sync");
+		expect(c.textContent).not.toContain("CLI Agent Belum Terhubung");
+		expect(c.querySelector('[data-testid="cli-waiting-alert"]')).toBeNull();
+		expect(c.querySelector('[data-testid="sync-poll-error"]')).not.toBeNull();
+		expect(onStatus).not.toHaveBeenCalledWith(null);
+	});
+
+	it("shows rate-limit error honestly instead of waiting", async () => {
+		mockFetchSequence([
+			{ http: 429, body: { error: "Terlalu banyak permintaan" } },
+		]);
+		const c = renderStatus();
+		await settle();
+		expect(c.textContent).toContain("Terlalu banyak permintaan");
+		expect(c.textContent).not.toContain("CLI Agent Belum Terhubung");
+		expect(c.textContent).toContain("Gagal memuat");
+	});
+
+	it("recovers on the next poll after a transient error", async () => {
+		const onStatus = vi.fn();
+		mockFetchSequence([
+			{ http: 500, body: { error: "Gagal membaca status sync" } },
+			statusResponse({ status: "connected", sessionId: "sess_rec_1" }),
+		]);
+		const c = renderStatus({ onStatus, pollIntervalMs: 15 });
+		await settle(80);
+		expect(onStatus).toHaveBeenCalledWith(
+			expect.objectContaining({ status: "connected" }),
+		);
+		expect(c.textContent).toContain("CLI terhubung");
+		expect(c.textContent).not.toContain("CLI Agent Belum Terhubung");
+	});
+
+	it("transitions waiting to connected without manual refresh", async () => {
+		const onStatus = vi.fn();
+		let calls = 0;
+		const fetchMock = vi.fn(async () => {
+			calls += 1;
+			const payload =
+				calls === 1
+					? statusResponse({
+							status: "waiting_for_cli",
+							sessionId: "sess_tr_1",
+						})
+					: statusResponse({ status: "connected", sessionId: "sess_tr_1" });
+			return { ok: true, status: 200, json: async () => payload };
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const c = renderStatus({ onStatus, pollIntervalMs: 15 });
+		await settle(80);
+		expect(c.textContent).toContain("CLI terhubung");
+	});
+
+	it("pins polling to the observed sessionId", async () => {
+		const fetchMock = mockFetchSequence([
+			statusResponse({ status: "uploading", sessionId: "sess_pin_9" }),
+			statusResponse({ status: "uploading", sessionId: "sess_pin_9" }),
+		]);
+		renderStatus({ pollIntervalMs: 15 });
+		await settle(80);
+		expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+		const secondUrl = String(fetchMock.mock.calls[1]?.[0] ?? "");
+		expect(secondUrl).toContain("sessionId=sess_pin_9");
+	});
+
+	it("shows uploading then uploaded snapshot stages", async () => {
+		let calls = 0;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				calls += 1;
+				const payload =
+					calls === 1
+						? statusResponse({ status: "uploading", sessionId: "sess_up_1" })
+						: statusResponse({
+								status: "uploaded",
+								sessionId: "sess_up_1",
+								snapshotId: "snap_up_1",
+								fileCount: 37,
+								excludedCount: 5,
+							});
+				return { ok: true, status: 200, json: async () => payload };
+			}),
+		);
+		const c = renderStatus({ pollIntervalMs: 15 });
+		await settle(90);
+		expect(c.textContent).toContain("Snapshot terkirim dan terverifikasi");
+		expect(c.textContent).toContain("37");
+	});
+
+	it("keeps uploaded with pending analysis out of conclusion", async () => {
+		const onViewReview = vi.fn();
+		mockFetchSequence([
+			statusResponse({
+				status: "uploaded",
+				snapshotId: "snap_an_1",
+				analysisStatus: "pending",
+			}),
+		]);
+		const c = renderStatus({ onViewReview });
+		await settle();
+		expect(c.textContent).toContain("Menyusun analisis codebase");
+		const nextBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Lanjut ke Kesimpulan Codebase/i.test(b.textContent ?? ""),
+		) as HTMLButtonElement | undefined;
+		expect(nextBtn?.disabled).toBe(true);
 	});
 
 	it("shows indeterminate loading without fabricated percentages while active", async () => {
