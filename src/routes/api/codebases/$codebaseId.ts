@@ -74,9 +74,15 @@ export const Route = createFileRoute("/api/codebases/$codebaseId")({
 				}
 
 				try {
+					// A rename is a person choosing the name, so the row is marked
+					// user-sourced: later CLI auto-detection must leave it alone.
 					const [renamed] = await db
 						.update(codebases)
-						.set({ name: parsed.data.name, updatedAt: deletionTimestamp() })
+						.set({
+							name: parsed.data.name,
+							nameSource: "user",
+							updatedAt: deletionTimestamp(),
+						})
 						.where(
 							and(eq(codebases.id, codebaseId), eq(codebases.userId, user.id)),
 						)

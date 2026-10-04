@@ -9,6 +9,7 @@ import {
 	codebaseSyncSessions,
 	codebases,
 } from "@/db/schema";
+import type { CodebaseNameSource } from "@/lib/codebase-library";
 import { buildSyncCommand, type SyncPromptPayload } from "@/lib/codebase-sync";
 import { generateSyncToken, hashSyncToken } from "@/lib/codebase-sync.server";
 import {
@@ -20,6 +21,15 @@ import { requireUser } from "@/lib/session";
 
 export const DEFAULT_CODEBASE_NAME = "Repository Lokal";
 
+/**
+ * Decide a codebase's display name and where that name came from.
+ *
+ * Provenance matters because the CLI later reports the repository folder name at
+ * sync handshake and may replace a name only while the system chose it. A name
+ * the user supplied — typed directly, derived from their composer message, or
+ * later set through the rename endpoint — is marked `user` and never
+ * auto-detected over. Only the untouched placeholder is marked `auto`.
+ */
 export function validateCodebaseNameInput(
 	body:
 		| {
@@ -28,20 +38,23 @@ export function validateCodebaseNameInput(
 		  }
 		| null
 		| undefined,
-): { ok: true; name: string } | { ok: false; error: string } {
+):
+	| { ok: true; name: string; nameSource: CodebaseNameSource }
+	| { ok: false; error: string } {
 	const rawName = typeof body?.name === "string" ? body.name.trim() : "";
 	const rawMessage = typeof body?.message === "string" ? body.message : "";
 
 	if (!rawName) {
 		if (rawMessage) {
 			const derived = deriveProjectNameSync(rawMessage);
-			if (derived && derived.length >= 3) return { ok: true, name: derived };
+			if (derived && derived.length >= 3)
+				return { ok: true, name: derived, nameSource: "user" };
 			return {
 				ok: false,
 				error: "Nama codebase harus diisi minimal 3 karakter",
 			};
 		}
-		return { ok: true, name: DEFAULT_CODEBASE_NAME };
+		return { ok: true, name: DEFAULT_CODEBASE_NAME, nameSource: "auto" };
 	}
 	if (rawName.length < 3) {
 		return {
@@ -49,7 +62,7 @@ export function validateCodebaseNameInput(
 			error: "Nama codebase harus diisi minimal 3 karakter",
 		};
 	}
-	return { ok: true, name: rawName };
+	return { ok: true, name: rawName, nameSource: "user" };
 }
 
 export const Route = createFileRoute("/api/codebases/")({
@@ -165,6 +178,7 @@ export const Route = createFileRoute("/api/codebases/")({
 							id,
 							userId: user.id,
 							name: codebaseName,
+							nameSource: nameCheck.nameSource,
 						})
 						.returning({ id: codebases.id, name: codebases.name });
 					if (!codebase) return null;

@@ -504,9 +504,17 @@ export function sanitizeSyncErrorCode(code: unknown): SyncSafeErrorCode {
 // with the sync token as Bearer auth and expects the bound session/attempt/
 // snapshot identity plus the minimum CLI version (the CLI enforces the gate
 // client-side via `CLI_UPDATE_REQUIRED`).
+//
+// `repositoryName` is optional and advisory: a CLI older than this contract
+// omits it and keeps working. The field stays `unknown` on purpose — it is
+// untrusted cosmetic metadata, so its full validation lives in
+// `normalizeRepositoryName` and an unusable value is ignored rather than
+// rejected. A malformed repository name must never fail an otherwise valid
+// repository upload.
 
 export const cliHandshakeRequestSchema = z.object({
 	cliVersion: z.string().min(1).max(64),
+	repositoryName: z.unknown().optional(),
 });
 
 export type CliHandshakeRequest = z.infer<typeof cliHandshakeRequestSchema>;
@@ -1117,6 +1125,20 @@ export function requireSupportedCliVersion(
 	}
 }
 
+// === Control characters ===
+// C0 controls and DEL never belong in user-facing text or in an identifier.
+// One rule backs both `sanitizeSyncErrorMessage` (strip them) and repository
+// name validation (reject the name), so it lives here instead of in two
+// ad-hoc regexes — and is expressed over code points rather than a literal, so
+// it stays lint-clean.
+
+export function hasControlCharacters(value: string): boolean {
+	return [...value].some((ch) => {
+		const code = ch.codePointAt(0) ?? 0;
+		return code < 0x20 || code === 0x7f;
+	});
+}
+
 // === Safe sync error messages (Task 5 carry-over) ===
 // Analysis writers (Task 6) must store only safe user-facing strings in
 // `errorMessage`. As defense-in-depth, the status read boundary passes stored
@@ -1127,10 +1149,7 @@ export function requireSupportedCliVersion(
 export function sanitizeSyncErrorMessage(message: unknown): string | null {
 	if (typeof message !== "string") return null;
 	const stripped = [...message]
-		.filter((ch) => {
-			const code = ch.codePointAt(0) ?? 0;
-			return code >= 0x20 && code !== 0x7f;
-		})
+		.filter((ch) => !hasControlCharacters(ch))
 		.join("")
 		.trim();
 	if (!stripped) return null;

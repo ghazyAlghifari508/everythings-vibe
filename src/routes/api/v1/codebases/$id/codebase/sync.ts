@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	codebaseSnapshots,
@@ -7,6 +7,7 @@ import {
 	codebases,
 	subscriptions,
 } from "@/db/schema";
+import { normalizeRepositoryName } from "@/lib/codebase-library";
 import {
 	assertSyncTransition,
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
@@ -150,6 +151,15 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 					);
 				}
 
+				// The CLI reports the repository folder name as soon as it has
+				// resolved the local root. Validation happens in exactly one
+				// place; `null` means "no usable name" (a CLI older than this
+				// contract, or a value that is not a single safe path segment)
+				// and the sync continues with the existing name untouched.
+				const repositoryName = normalizeRepositoryName(
+					parsedBody.data.repositoryName,
+				);
+
 				const [sub] = await db
 					.select({ plan: subscriptions.plan })
 					.from(subscriptions)
@@ -202,10 +212,34 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 						.update(codebaseSyncSessions)
 						.set({
 							status,
-							metadata: { ...metadata, cliVersion: parsedBody.data.cliVersion },
+							metadata: {
+								...metadata,
+								cliVersion: parsedBody.data.cliVersion,
+								...(repositoryName ? { repositoryName } : {}),
+							},
 							updatedAt: new Date(),
 						})
 						.where(eq(codebaseSyncSessions.id, session.id));
+
+					// Auto-name the codebase from the repository folder name, but
+					// only while the stored name is still one the system chose. A
+					// name the user picked (or renamed) carries `nameSource = 'user'`
+					// and is never overwritten. Ownership is repeated in the
+					// predicate, and the name inequality makes a repeat sync a
+					// no-op for naming instead of a second write.
+					if (repositoryName) {
+						await tx
+							.update(codebases)
+							.set({ name: repositoryName, updatedAt: new Date() })
+							.where(
+								and(
+									eq(codebases.id, codebaseId),
+									eq(codebases.userId, session.userId),
+									eq(codebases.nameSource, "auto"),
+									ne(codebases.name, repositoryName),
+								),
+							);
+					}
 
 					// One snapshot per session: the handshake binds (not creates
 					// duplicates on retry) the uploading snapshot for Task 5.

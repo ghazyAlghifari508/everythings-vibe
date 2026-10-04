@@ -28,6 +28,7 @@ describe("validateCodebaseNameInput", () => {
 		expect(validateCodebaseNameInput({ name: "my-repo" })).toEqual({
 			ok: true,
 			name: "my-repo",
+			nameSource: "user",
 		});
 	});
 
@@ -36,21 +37,35 @@ describe("validateCodebaseNameInput", () => {
 			validateCodebaseNameInput({ message: "Buat fitur billing checkout" }),
 		).toMatchObject({
 			ok: true,
+			nameSource: "user",
 		});
 	});
 
-	it("falls back to the default name when name is missing or blank", () => {
+	it("marks only the untouched placeholder as auto-named", () => {
+		// A name the user supplied is never eligible for CLI auto-naming, while
+		// the placeholder is exactly what auto-detection exists to replace.
 		expect(validateCodebaseNameInput(null)).toEqual({
 			ok: true,
 			name: "Repository Lokal",
+			nameSource: "auto",
 		});
 		expect(validateCodebaseNameInput({})).toEqual({
 			ok: true,
 			name: "Repository Lokal",
+			nameSource: "auto",
 		});
 		expect(validateCodebaseNameInput({ name: "   " })).toEqual({
 			ok: true,
 			name: "Repository Lokal",
+			nameSource: "auto",
+		});
+	});
+
+	it("protects a user-chosen name that happens to equal the placeholder", () => {
+		expect(validateCodebaseNameInput({ name: "Repository Lokal" })).toEqual({
+			ok: true,
+			name: "Repository Lokal",
+			nameSource: "user",
 		});
 	});
 
@@ -86,6 +101,29 @@ describe("decideCodebaseDeletion", () => {
 		expect(decideCodebaseDeletion({ featureCount: 3, confirm: true })).toEqual({
 			allow: true,
 		});
+	});
+});
+
+describe("codebase name provenance persistence contract", () => {
+	const source = readFileSync(
+		"src/routes/api/codebases/$codebaseId.ts",
+		"utf8",
+	);
+	const renameHandler = source.slice(
+		source.indexOf("PATCH: async"),
+		source.indexOf("DELETE: async"),
+	);
+
+	it("marks a rename as user-sourced so auto-detection cannot revert it", () => {
+		expect(renameHandler).toContain('nameSource: "user"');
+	});
+
+	it("persists the name source chosen at creation", () => {
+		const createSource = readFileSync(
+			"src/routes/api/codebases/index.ts",
+			"utf8",
+		);
+		expect(createSource).toContain("nameSource: nameCheck.nameSource");
 	});
 });
 
