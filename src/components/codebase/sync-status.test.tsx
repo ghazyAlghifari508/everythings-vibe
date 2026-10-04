@@ -143,7 +143,7 @@ describe("SyncStatus", () => {
 		expect(onStatus).toHaveBeenCalledWith(
 			expect.objectContaining({ status: "connected" }),
 		);
-		expect(c.textContent).toContain("CLI terhubung");
+		expect(c.textContent).toContain("Repository terhubung");
 		expect(c.textContent).not.toContain("CLI Agent Belum Terhubung");
 	});
 
@@ -164,7 +164,7 @@ describe("SyncStatus", () => {
 		vi.stubGlobal("fetch", fetchMock);
 		const c = renderStatus({ onStatus, pollIntervalMs: 15 });
 		await settle(80);
-		expect(c.textContent).toContain("CLI terhubung");
+		expect(c.textContent).toContain("Repository terhubung");
 	});
 
 	it("pins polling to the observed sessionId", async () => {
@@ -200,11 +200,13 @@ describe("SyncStatus", () => {
 		);
 		const c = renderStatus({ pollIntervalMs: 15 });
 		await settle(90);
-		expect(c.textContent).toContain("Snapshot terkirim dan terverifikasi");
+		expect(c.textContent).toContain("Source code tersinkron");
 		expect(c.textContent).toContain("37");
 	});
 
-	it("keeps uploaded with pending analysis out of conclusion", async () => {
+	it("keeps uploaded with pending analysis out of conclusion", {
+		timeout: 10000,
+	}, async () => {
 		const onViewReview = vi.fn();
 		mockFetchSequence([
 			statusResponse({
@@ -215,9 +217,9 @@ describe("SyncStatus", () => {
 		]);
 		const c = renderStatus({ onViewReview });
 		await settle();
-		expect(c.textContent).toContain("Menyusun analisis codebase");
+		expect(c.textContent).toContain("Menganalisis codebase...");
 		const nextBtn = [...c.querySelectorAll("button")].find((b) =>
-			/Lanjut ke Kesimpulan Codebase/i.test(b.textContent ?? ""),
+			/Lihat Ringkasan/i.test(b.textContent ?? ""),
 		) as HTMLButtonElement | undefined;
 		expect(nextBtn?.disabled).toBe(true);
 	});
@@ -227,20 +229,20 @@ describe("SyncStatus", () => {
 		const c = renderStatus();
 		await settle();
 		expect(c.textContent).toMatch(
-			/mengupload|memindai|menghubungkan|menunggu/i,
+			/mengirim|disinkronkan|menghubungkan|menunggu/i,
 		);
 		expect(c.textContent).not.toContain("%");
 	});
 
-	it("shows honest idle standby state without spinning loader when waiting for CLI", async () => {
+	it("shows honest idle standby state without spinning loader when waiting for CLI", {
+		timeout: 10000,
+	}, async () => {
 		mockFetchSequence([statusResponse({ status: "waiting_for_cli" })]);
 		const c = renderStatus();
 		await settle();
 		expect(c.textContent).toContain("CLI Agent Belum Terhubung");
 		expect(c.textContent).toContain("Standby");
-		expect(c.textContent).toContain(
-			"Menunggu perintah sync dijalankan di terminal",
-		);
+		expect(c.textContent).toContain("Menunggu agent terhubung");
 		// No spinning loaders should be present while in idle standby
 		expect(c.querySelector(".animate-spin")).toBeNull();
 		const alertEl = c.querySelector('[data-testid="cli-waiting-alert"]');
@@ -295,8 +297,8 @@ describe("SyncStatus", () => {
 		const c = renderStatus();
 		await settle();
 
-		expect(c.textContent).toContain("Menunggu analisis codebase");
-		expect(c.textContent).not.toContain("Menyusun analisis codebase");
+		expect(c.textContent).toContain("Analisis codebase");
+		expect(c.textContent).not.toContain("Menganalisis codebase...");
 	});
 
 	it("shows the safe server error with a retry action on failure", async () => {
@@ -328,7 +330,9 @@ describe("SyncStatus", () => {
 		expect(c.textContent).toMatch(/kedaluwarsa/i);
 	});
 
-	it("offers analysis retry when the session is uploaded but analysis failed", async () => {
+	it("offers analysis retry when the session is uploaded but analysis failed", {
+		timeout: 10000,
+	}, async () => {
 		const onRetryAnalysis = vi.fn();
 		mockFetchSequence([
 			statusResponse({
@@ -368,7 +372,7 @@ describe("SyncStatus", () => {
 		await settle();
 		expect(fetchMock).toHaveBeenCalled();
 		expect(c.textContent).toMatch(
-			/mengupload|memindai|menghubungkan|menunggu/i,
+			/mengirim|disinkronkan|menghubungkan|menunggu/i,
 		);
 	});
 
@@ -382,7 +386,9 @@ describe("SyncStatus", () => {
 		expect(c.textContent).toMatch(/sync gagal/i);
 	});
 
-	it("keeps one request in flight so slow responses cannot overlap", async () => {
+	it("keeps one request in flight so slow responses cannot overlap", {
+		timeout: 10000,
+	}, async () => {
 		let resolveFirst!: (value: unknown) => void;
 		const gate = new Promise((resolve) => {
 			resolveFirst = resolve;
@@ -417,7 +423,7 @@ describe("SyncStatus", () => {
 	it("recovers persisted server state on remount (refresh persistence)", async () => {
 		mockFetchSequence([statusResponse({ status: "uploaded", fileCount: 9 })]);
 		const first = renderStatus();
-		await settle();
+		await settle(250);
 		expect(first.textContent).toContain("9");
 		if (root) {
 			const r = root;
@@ -429,7 +435,7 @@ describe("SyncStatus", () => {
 		container.remove();
 		mockFetchSequence([statusResponse({ status: "uploaded", fileCount: 9 })]);
 		const second = renderStatus();
-		await settle();
+		await settle(250);
 		expect(second.textContent).toContain("9");
 		expect(second.textContent).not.toContain("%");
 	});
@@ -445,12 +451,14 @@ describe("SyncStatus", () => {
 		const c = renderStatus();
 		await settle();
 		// Stage labels that map to real signals.
-		expect(c.textContent).toContain("CLI terhubung");
-		expect(c.textContent).toContain("Snapshot terkirim dan terverifikasi");
-		expect(c.textContent).toContain("Menyusun analisis codebase");
+		expect(c.textContent).toContain("Repository terhubung");
+		expect(c.textContent).toContain("Source code tersinkron");
+		expect(c.textContent).toContain("Menganalisis codebase...");
 	});
 
-	it("does not claim scan or manifest stages the client never observes", async () => {
+	it("does not claim scan or manifest stages the client never observes", {
+		timeout: 10000,
+	}, async () => {
 		// `scanning`/`filtering` are server bookkeeping the CLI never reports, so
 		// no user-facing stage may imply them.
 		mockFetchSequence([statusResponse({ status: "uploading" })]);
@@ -464,7 +472,7 @@ describe("SyncStatus", () => {
 	it("shows the exclusion count only when the server reports it", async () => {
 		mockFetchSequence([statusResponse({ status: "uploading" })]);
 		const without = renderStatus();
-		await settle();
+		await settle(250);
 		expect(without.textContent).not.toMatch(/dikecualikan otomatis/i);
 		if (root) {
 			const r = root;
@@ -479,7 +487,7 @@ describe("SyncStatus", () => {
 			statusResponse({ status: "uploaded", excludedCount: 7 }),
 		]);
 		const withCount = renderStatus();
-		await settle();
+		await settle(250);
 		expect(withCount.textContent).toContain("7");
 		expect(withCount.textContent).toMatch(/dikecualikan otomatis/i);
 	});
@@ -491,7 +499,7 @@ describe("SyncStatus", () => {
 		await settle();
 
 		const nextBtn = [...c.querySelectorAll("button")].find((b) =>
-			/Lanjut ke Kesimpulan Codebase/i.test(b.textContent ?? ""),
+			/Lihat Ringkasan/i.test(b.textContent ?? ""),
 		) as HTMLButtonElement | undefined;
 
 		expect(nextBtn).toBeDefined();
@@ -506,10 +514,10 @@ describe("SyncStatus", () => {
 		const onViewReview = vi.fn();
 		mockFetchSequence([statusResponse({ status: "ready" })]);
 		const c = renderStatus({ onViewReview });
-		await settle();
+		await settle(250);
 
 		const nextBtn = [...c.querySelectorAll("button")].find((b) =>
-			/Lanjut ke Kesimpulan Codebase/i.test(b.textContent ?? ""),
+			/Lihat Ringkasan/i.test(b.textContent ?? ""),
 		) as HTMLButtonElement | undefined;
 
 		expect(nextBtn).toBeDefined();

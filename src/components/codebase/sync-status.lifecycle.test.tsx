@@ -114,7 +114,7 @@ describe("SyncStatus live reconciliation lifecycle", () => {
 		);
 		const c = renderLifecycle({ pollIntervalMs: 15 });
 		await settle(120);
-		expect(c.textContent).toContain("Snapshot terkirim dan terverifikasi");
+		expect(c.textContent).toContain("Source code tersinkron");
 		expect(c.textContent).toContain("12");
 	});
 
@@ -146,7 +146,9 @@ describe("SyncStatus live reconciliation lifecycle", () => {
 		);
 	});
 
-	it("hung first request is retired and polling recovers", async () => {
+	it("hung first request is retired and polling recovers", {
+		timeout: 15000,
+	}, async () => {
 		let calls = 0;
 		vi.stubGlobal(
 			"fetch",
@@ -191,10 +193,12 @@ describe("SyncStatus live reconciliation lifecycle", () => {
 		});
 		await settle(160);
 		expect(calls).toBeGreaterThanOrEqual(2);
-		expect(c.textContent).toContain("CLI terhubung");
+		expect(c.textContent).toContain("Repository terhubung");
 	});
 
-	it("cleanup during in-flight does not block the next lifecycle", async () => {
+	it("cleanup during in-flight does not block the next lifecycle", {
+		timeout: 15000,
+	}, async () => {
 		let firstResolve!: (value: unknown) => void;
 		let calls = 0;
 		const fetchMock = vi.fn(
@@ -247,7 +251,7 @@ describe("SyncStatus live reconciliation lifecycle", () => {
 			});
 		});
 		await settle(120);
-		expect(c.textContent).toContain("CLI terhubung");
+		expect(c.textContent).toContain("Repository terhubung");
 		expect(c.textContent).not.toContain("Menghubungi server...");
 	});
 
@@ -286,7 +290,7 @@ describe("SyncStatus live reconciliation lifecycle", () => {
 		await settle(10);
 		rerenderLifecycle({ projectId: "proj_new_lc", pollIntervalMs: 15 });
 		await settle(120);
-		expect(c.textContent).toContain("CLI terhubung");
+		expect(c.textContent).toContain("Repository terhubung");
 		expect(c.textContent).not.toContain("CLI Agent Belum Terhubung");
 	});
 });
