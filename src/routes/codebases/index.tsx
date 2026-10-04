@@ -38,6 +38,48 @@ export function selectLatestCodebaseSnapshots<
 
 export type CodebaseLibraryRow = CodebaseLibraryItem;
 
+export interface CodebaseLibrarySnapshotInput {
+	id: string;
+	codebaseId: string | null;
+	createdAt: Date | null;
+}
+
+export interface CodebaseLibraryFeatureInput {
+	id: string;
+	codebaseId: string | null;
+}
+
+export interface CodebaseLibraryAnalysisInput {
+	projectId: string;
+	snapshotId: string;
+}
+
+export function selectNewestFeatureProjectIdPerCodebase<
+	TProject extends CodebaseLibraryFeatureInput,
+>(projects: readonly TProject[]): Map<string, string> {
+	const newest = new Map<string, string>();
+	for (const project of projects) {
+		if (!project.codebaseId) continue;
+		if (!newest.has(project.codebaseId)) {
+			newest.set(project.codebaseId, project.id);
+		}
+	}
+	return newest;
+}
+
+export function selectLibraryAnalysisSlice<
+	TAnalysis extends CodebaseLibraryAnalysisInput,
+>(
+	latestSnapshotId: string | null,
+	analyses: readonly TAnalysis[],
+): TAnalysis | null {
+	if (!latestSnapshotId) return null;
+	return (
+		analyses.find((analysis) => analysis.snapshotId === latestSnapshotId) ??
+		null
+	);
+}
+
 const loadCodebases = createServerFn({ method: "GET" }).handler(async () => {
 	const user = await requireUserServer();
 	const rows = await dbSelectCodebases(user.id);
@@ -94,16 +136,9 @@ async function dbSelectCodebases(
 				)
 				.orderBy(desc(projects.updatedAt))
 		: [];
-	const latestProjectByCodebase = new Map<string, { id: string }>();
-	for (const project of featureRows) {
-		if (!project.codebaseId) continue;
-		if (!latestProjectByCodebase.has(project.codebaseId)) {
-			latestProjectByCodebase.set(project.codebaseId, { id: project.id });
-		}
-	}
-	const projectIds = [...latestProjectByCodebase.values()].map(
-		(project) => project.id,
-	);
+	const latestProjectByCodebase =
+		selectNewestFeatureProjectIdPerCodebase(featureRows);
+	const projectIds = [...latestProjectByCodebase.values()];
 	const analysisRows = projectIds.length
 		? await db
 				.select({
@@ -122,30 +157,29 @@ async function dbSelectCodebases(
 				)
 				.orderBy(desc(codebaseAnalyses.createdAt))
 		: [];
-	const latestAnalysisByProject = new Map<
+	const analysisOutputByProject = new Map<
 		string,
-		{ snapshotId: string; analysis: ReturnType<typeof pickLibraryAnalysis> }
+		ReturnType<typeof pickLibraryAnalysis>
 	>();
 	for (const row of analysisRows) {
-		if (latestAnalysisByProject.has(row.projectId)) continue;
+		if (analysisOutputByProject.has(row.projectId)) continue;
 		const parsed = safeParseCodebaseAnalysis(row.output);
 		if (!parsed.success || !parsed.data) continue;
-		latestAnalysisByProject.set(row.projectId, {
-			snapshotId: row.snapshotId,
-			analysis: pickLibraryAnalysis(parsed.data),
-		});
+		analysisOutputByProject.set(
+			row.projectId,
+			pickLibraryAnalysis(parsed.data),
+		);
 	}
 	return rows.map((row) => {
 		const snapshot = latest.get(row.id) ?? null;
-		const project = latestProjectByCodebase.get(row.id) ?? null;
-		const stored = project
-			? (latestAnalysisByProject.get(project.id) ?? null)
+		const projectId = latestProjectByCodebase.get(row.id) ?? null;
+		const matched = selectLibraryAnalysisSlice(
+			snapshot?.id ?? null,
+			analysisRows.filter((analysisRow) => analysisRow.projectId === projectId),
+		);
+		const analysis = matched
+			? (analysisOutputByProject.get(matched.projectId) ?? null)
 			: null;
-		const matchesLatest =
-			Boolean(stored) &&
-			Boolean(snapshot) &&
-			stored?.snapshotId === snapshot?.id;
-		const analysis = matchesLatest && stored ? stored.analysis : null;
 		return {
 			id: row.id,
 			name: row.name,
@@ -157,7 +191,7 @@ async function dbSelectCodebases(
 			framework: analysis?.framework ?? null,
 			language: analysis?.language ?? null,
 			packageManager: analysis?.packageManager ?? null,
-			hasReadyAnalysis: matchesLatest,
+			hasReadyAnalysis: Boolean(matched && analysis),
 		};
 	});
 }

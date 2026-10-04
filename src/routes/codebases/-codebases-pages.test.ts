@@ -1,7 +1,12 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
-import { selectLatestCodebaseSnapshots } from "../codebases/index";
+import {
+	selectLatestCodebaseSnapshots,
+	selectLibraryAnalysisSlice,
+	selectNewestFeatureProjectIdPerCodebase,
+} from "../codebases/index";
 import {
 	buildAskHandoffAnswers,
 	canRenderCodebaseReview,
@@ -85,6 +90,25 @@ describe("codebase review snapshot pairing", () => {
 	});
 });
 
+describe("codebase list ownership boundary", () => {
+	const source = readFileSync("src/routes/codebases/index.tsx", "utf8");
+
+	it("scopes the library loader to the authenticated user", () => {
+		expect(source).toContain("requireUserServer()");
+		expect(source).toContain("eq(codebases.userId, userId)");
+	});
+
+	it("scopes snapshot and feature lookups to the same owner", () => {
+		expect(source).toContain("eq(projects.userId, userId)");
+		expect(source).toContain("isNull(projects.deletedAt)");
+	});
+
+	it("renders the persisted library instead of minting a codebase on mount", () => {
+		expect(source).toContain("CodebaseLibraryView");
+		expect(source).not.toContain('fetch("/api/codebases"');
+	});
+});
+
 describe("codebase list snapshot selection", () => {
 	it("keeps the newest failed snapshot visible instead of using an older usable one", () => {
 		const latest = selectLatestCodebaseSnapshots([
@@ -110,6 +134,115 @@ describe("codebase list snapshot selection", () => {
 			id: "snapshot-new",
 			status: "failed",
 		});
+	});
+
+	it("ignores snapshots that are not bound to a codebase", () => {
+		const latest = selectLatestCodebaseSnapshots([
+			{
+				id: "snapshot-legacy",
+				codebaseId: null,
+				createdAt: new Date("2026-09-22T10:00:00.000Z"),
+				commitSha: "legacy",
+				fileCount: 4,
+				status: "uploaded",
+			},
+		]);
+
+		expect(latest.size).toBe(0);
+	});
+
+	it("returns no latest snapshot for a codebase that never synced", () => {
+		const latest = selectLatestCodebaseSnapshots([]);
+		expect(latest.size).toBe(0);
+	});
+});
+
+describe("existing-codebase workspace re-entry", () => {
+	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+
+	it("keeps ownership enforced on the workspace read", () => {
+		expect(workspaceSource).toContain("eq(codebases.userId, user.id)");
+	});
+
+	it("recovers stored snapshot context instead of requiring a new sync session", () => {
+		expect(workspaceSource).toContain("hasStoredSnapshot");
+		expect(workspaceSource).toContain("storedSnapshot");
+	});
+
+	it("opens the workspace without minting a new sync session on load", () => {
+		const loaderStart = workspaceSource.indexOf(
+			'createFileRoute("/codebases/$id")',
+		);
+		const loaderEnd = workspaceSource.indexOf("head:", loaderStart);
+		expect(loaderStart).toBeGreaterThan(-1);
+		expect(loaderEnd).toBeGreaterThan(loaderStart);
+		expect(workspaceSource.slice(loaderStart, loaderEnd)).not.toContain(
+			"/session",
+		);
+	});
+});
+
+describe("greenfield history separation", () => {
+	const historySource = readFileSync("src/lib/history.ts", "utf8");
+
+	it("keeps history scoped to projects and never reads codebase rows", () => {
+		expect(historySource).toContain("projects");
+		expect(historySource).not.toContain("codebases");
+	});
+
+	it("keeps the greenfield workspace filter intact", () => {
+		expect(historySource).toContain('eq(projects.projectMode, "greenfield")');
+	});
+});
+
+describe("selectNewestFeatureProjectIdPerCodebase", () => {
+	it("keeps the newest feature project per codebase", () => {
+		const map = selectNewestFeatureProjectIdPerCodebase([
+			{ id: "feature-new", codebaseId: "cb-1" },
+			{ id: "feature-old", codebaseId: "cb-1" },
+			{ id: "feature-other", codebaseId: "cb-2" },
+		]);
+
+		expect(map.get("cb-1")).toBe("feature-new");
+		expect(map.get("cb-2")).toBe("feature-other");
+	});
+
+	it("skips projects not bound to a codebase", () => {
+		const map = selectNewestFeatureProjectIdPerCodebase([
+			{ id: "greenfield", codebaseId: null },
+		]);
+
+		expect(map.size).toBe(0);
+	});
+});
+
+describe("selectLibraryAnalysisSlice", () => {
+	it("pairs analysis only with the newest snapshot", () => {
+		const analyses = [
+			{ projectId: "p1", snapshotId: "snap-old" },
+			{ projectId: "p1", snapshotId: "snap-new" },
+		];
+
+		expect(selectLibraryAnalysisSlice("snap-new", analyses)).toEqual({
+			projectId: "p1",
+			snapshotId: "snap-new",
+		});
+	});
+
+	it("returns null when the newest snapshot has no analysis", () => {
+		expect(
+			selectLibraryAnalysisSlice("snap-new", [
+				{ projectId: "p1", snapshotId: "snap-old" },
+			]),
+		).toBeNull();
+	});
+
+	it("returns null when no snapshot exists", () => {
+		expect(
+			selectLibraryAnalysisSlice(null, [
+				{ projectId: "p1", snapshotId: "snap-old" },
+			]),
+		).toBeNull();
 	});
 });
 
