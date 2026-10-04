@@ -1,8 +1,18 @@
 import { z } from "zod";
 import type { CodebaseAnalysis } from "./codebase-analysis";
+import { hasControlCharacters, isSafeRelativePath } from "./codebase-sync";
 import { CODEBASE_NAME_MAX_CHARS, CODEBASE_NAME_MIN_CHARS } from "./constants";
 
 export const NEW_REPOSITORY_HREF = "/plan/codebase";
+
+/**
+ * Provenance of `codebases.name`. `auto` means the system chose the name (the
+ * `POST /api/codebases` placeholder, later replaced by the repository folder
+ * name the CLI reports at handshake). `user` means a person chose it — through
+ * an explicit name input, a composer message, or the rename endpoint — so
+ * auto-detection must never write over it.
+ */
+export type CodebaseNameSource = "auto" | "user";
 
 export const codebaseRenameSchema = z.object({
 	name: z
@@ -17,6 +27,34 @@ export type CodebaseRenameInput = z.infer<typeof codebaseRenameSchema>;
 export const CODEBASE_NAME_MIN_ERROR =
 	"Nama project minimal 3 karakter dan tidak boleh kosong.";
 export const CODEBASE_NAME_MAX_ERROR = "Nama project terlalu panjang.";
+
+/**
+ * Normalize an untrusted repository name reported by the CLI into a value that
+ * is safe to persist as a codebase display name.
+ *
+ * A repository name is exactly one path segment — the local repository folder's
+ * basename — so the manifest path-safety guard is reused verbatim: it already
+ * rejects absolute roots (`/home/user/project`), drive and UNC prefixes
+ * (`C:\Coding\project`), backslash traversal, and `.`/`..` segments. On top of
+ * it, the canonical codebase name bounds are enforced so an auto-named row can
+ * never hold a value the rename endpoint would later reject.
+ *
+ * Returns `null` for anything unusable. Callers must treat that as "no name
+ * supplied" and continue with the existing name: cosmetic metadata must never
+ * fail a repository upload.
+ */
+export function normalizeRepositoryName(value: unknown): string | null {
+	if (typeof value !== "string") return null;
+	const trimmed = value.trim();
+	if (trimmed.length < CODEBASE_NAME_MIN_CHARS) return null;
+	if (trimmed.length > CODEBASE_NAME_MAX_CHARS) return null;
+	if (hasControlCharacters(trimmed)) return null;
+	// A repository name is one segment, never a nested path, so any separator is
+	// rejected outright before the path-safety guard runs.
+	if (trimmed.includes("/") || trimmed.includes("\\")) return null;
+	if (!isSafeRelativePath(trimmed)) return null;
+	return trimmed;
+}
 
 export interface CodebaseLibraryItem {
 	id: string;

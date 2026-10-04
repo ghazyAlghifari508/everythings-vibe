@@ -20,6 +20,7 @@ import type {
 	CreditOperationState,
 	CreditPricingVersion,
 } from "@/lib/adaptive-credit";
+import type { CodebaseNameSource } from "@/lib/codebase-library";
 
 // === TABLES ===
 // ponytail: RLS policies dropped - app-level ownership filters (eq(userId, user.id))
@@ -591,6 +592,17 @@ export const codebases = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		name: text("name").notNull(),
+		// Provenance of `name`. "auto" means the system chose it (the create
+		// placeholder, later replaced by the repository folder name the CLI
+		// reports at handshake); "user" means a person chose it via a name input,
+		// a composer message, or the rename endpoint. Auto-naming may only write
+		// rows still marked "auto", so a custom name is never overwritten.
+		// Defaults to "user" so a writer that forgets the column is protected
+		// rather than clobbered.
+		nameSource: text("name_source")
+			.$type<CodebaseNameSource>()
+			.notNull()
+			.default("user"),
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at").defaultNow(),
 	},
