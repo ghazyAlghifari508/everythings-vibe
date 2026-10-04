@@ -55,22 +55,32 @@ describe("codebase rename route contract", () => {
 		"src/routes/api/codebases/$codebaseId.ts",
 		"utf8",
 	);
+	const patchHandler = source.slice(
+		source.indexOf("PATCH: async"),
+		source.indexOf("DELETE: async"),
+	);
 
 	it("exposes a PATCH handler on the codebase resource", () => {
-		expect(source).toContain("PATCH: async");
+		expect(patchHandler.length).toBeGreaterThan(0);
 	});
 
-	it("scopes the update to the authenticated owner", () => {
-		expect(source).toContain("eq(codebases.userId, user.id)");
+	it("scopes the rename UPDATE to the authenticated owner", () => {
+		expect(patchHandler).toContain("update(codebases)");
+		expect(patchHandler).toContain("eq(codebases.userId, user.id)");
 	});
 
 	it("validates the incoming name at the server boundary", () => {
-		expect(source).toContain("codebaseRenameSchema");
+		expect(patchHandler).toContain("codebaseRenameSchema");
 	});
 
-	it("updates the canonical codebases.name field and its recency marker", () => {
-		expect(source).toContain("name:");
-		expect(source).toContain("updatedAt:");
+	it("updates the canonical name field and its recency marker", () => {
+		expect(patchHandler).toContain("name: parsed.data.name");
+		expect(patchHandler).toContain("updatedAt:");
+	});
+
+	it("reports a foreign codebase as not found instead of renaming it", () => {
+		expect(patchHandler).toContain("CODEBASE_NOT_FOUND");
+		expect(patchHandler).toContain("404");
 	});
 });
 
