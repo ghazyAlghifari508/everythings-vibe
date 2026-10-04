@@ -175,6 +175,22 @@ describe("CodebaseReview", () => {
 		expect(c.textContent).toContain("schema.ts");
 	});
 
+	it("renders a custom continue label when provided", () => {
+		const onContinue = vi.fn();
+		const c = renderReview({
+			continueLabel: "Masuk ke Workspace →",
+			onContinue,
+		});
+		const continueBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Masuk ke Workspace/i.test(b.textContent ?? ""),
+		);
+		expect(continueBtn).toBeDefined();
+		act(() => {
+			continueBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onContinue).toHaveBeenCalledTimes(1);
+	});
+
 	it("disables actions and shows indeterminate state while working", () => {
 		const c = renderReview({ isWorking: true });
 		const buttons = [...c.querySelectorAll("button")];

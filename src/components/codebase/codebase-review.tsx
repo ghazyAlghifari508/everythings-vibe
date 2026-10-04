@@ -40,6 +40,9 @@ interface CodebaseReviewProps {
 	excludedCount?: number;
 	isWorking?: boolean;
 	errorMessage?: string | null;
+	// Optional action labels so new consumers (e.g. /plan/codebase onboarding)
+	// can reuse this canonical review without duplicating its markup.
+	continueLabel?: string;
 	onRetrySync?: () => void;
 	onRetryAnalysis?: () => void;
 	onContinue: () => void;
@@ -54,6 +57,7 @@ export function CodebaseReview({
 	excludedCount,
 	isWorking = false,
 	errorMessage,
+	continueLabel = "Lanjut ke Pertanyaan",
 	onRetrySync,
 	onRetryAnalysis,
 	onContinue,
@@ -392,7 +396,7 @@ export function CodebaseReview({
 								disabled={isWorking}
 								className="inline-flex items-center gap-1.5 rounded-lg bg-snow px-4 py-1.5 font-inter text-xs font-semibold text-onyx shadow-sm hover:brightness-105 active:scale-[0.98] transition disabled:opacity-50 cursor-pointer"
 							>
-								<span>Lanjut ke Pertanyaan</span>
+								<span>{continueLabel}</span>
 								<span className="font-mono text-xs" aria-hidden="true">
 									-&gt;
 								</span>
