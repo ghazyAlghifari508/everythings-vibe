@@ -115,7 +115,10 @@ WHERE "name" = 'Repository Lokal';`,
 			prevId: string;
 			tables: {
 				"public.codebases": {
-					columns: Record<string, { name: string; type: string; notNull: boolean; default?: string }>;
+					columns: Record<
+						string,
+						{ name: string; type: string; notNull: boolean; default?: string }
+					>;
 				};
 			};
 		};
