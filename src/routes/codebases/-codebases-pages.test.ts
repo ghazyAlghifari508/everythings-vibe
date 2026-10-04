@@ -107,6 +107,17 @@ describe("codebase list ownership boundary", () => {
 		expect(source).toContain("CodebaseLibraryView");
 		expect(source).not.toContain('fetch("/api/codebases"');
 	});
+
+	it("renders the persisted codebase name so an auto-named project shows its repository", () => {
+		// `codebases.name` is the canonical display name: once the CLI has
+		// replaced the placeholder at handshake, the library must show that
+		// value with no page-specific alias or second naming source.
+		expect(source).toContain("name: codebases.name");
+	});
+
+	it("keeps the library off any client-side placeholder fallback", () => {
+		expect(source).not.toContain("Repository Lokal");
+	});
 });
 
 describe("codebase list snapshot selection", () => {

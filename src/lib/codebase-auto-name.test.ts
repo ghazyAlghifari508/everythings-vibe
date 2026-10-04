@@ -35,8 +35,27 @@ vi.mock("drizzle-orm", () => ({
 	sql: Object.assign(() => ({ op: "sql" }), { raw: () => ({ op: "sql" }) }),
 }));
 
+type HandshakeHandler = (args: {
+	request: Request;
+	params: { id: string };
+}) => Promise<Response>;
+
+const captured = vi.hoisted(() => ({
+	post: null as
+		| ((args: {
+				request: Request;
+				params: { id: string };
+		  }) => Promise<Response>)
+		| null,
+}));
+
 vi.mock("@tanstack/react-router", () => ({
-	createFileRoute: () => (options: unknown) => ({ options }),
+	createFileRoute:
+		() =>
+		(options: { server: { handlers: { POST: typeof captured.post } } }) => {
+			captured.post = options.server.handlers.POST;
+			return options;
+		},
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -148,18 +167,12 @@ vi.mock("@/db", () => {
 });
 
 import { codebases } from "@/db/schema";
-import { Route } from "../routes/api/v1/codebases/$id/codebase/sync";
+import "../routes/api/v1/codebases/$id/codebase/sync";
 
-type HandshakeHandler = (args: {
-	request: Request;
-	params: { id: string };
-}) => Promise<Response>;
-
-const handlers = (
-	Route as unknown as {
-		options: { server: { handlers: { POST: HandshakeHandler } } };
-	}
-).options.server.handlers;
+function handshake(): HandshakeHandler {
+	if (!captured.post) throw new Error("handshake route was not registered");
+	return captured.post;
+}
 
 const OWNED_CODEBASE = { id: "cb-1", userId: "user-1" };
 
@@ -191,7 +204,7 @@ function handshakeRequest(body: unknown, token = "raw-sync-token"): Request {
 }
 
 function invoke(body: unknown, codebaseId = "cb-1"): Promise<Response> {
-	return handlers.POST({
+	return handshake()({
 		request: handshakeRequest(body),
 		params: { id: codebaseId },
 	});
@@ -313,7 +326,7 @@ describe("handshake repository auto-naming", () => {
 	it("does not rename anything without a sync credential", async () => {
 		recorder.dbQueue.push([], [], []);
 
-		const res = await handlers.POST({
+		const res = await handshake()({
 			request: handshakeRequest({ cliVersion: "3.0.0" }, ""),
 			params: { id: "cb-1" },
 		});

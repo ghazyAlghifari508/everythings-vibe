@@ -127,6 +127,22 @@ describe("codebase name provenance persistence contract", () => {
 	});
 });
 
+describe("codebase status route contract", () => {
+	const source = readFileSync(
+		"src/routes/api/codebases/$codebaseId/status.ts",
+		"utf8",
+	);
+
+	it("serves the canonical persisted name so an open page drops the placeholder", () => {
+		expect(source).toContain("codebaseName: codebase.name");
+	});
+
+	it("reads the name from the ownership-scoped codebase lookup", () => {
+		expect(source).toContain("name: codebases.name");
+		expect(source).toContain("eq(codebases.userId, user.id)");
+	});
+});
+
 describe("codebase deletion route contract", () => {
 	const source = readFileSync(
 		"src/routes/api/codebases/$codebaseId.ts",

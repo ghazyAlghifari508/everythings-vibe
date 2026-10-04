@@ -261,6 +261,42 @@ describe("sync status response DTO", () => {
 		});
 		expect(result.success).toBe(false);
 	});
+
+	it("surfaces the canonical persisted codebase name when the server sends one", () => {
+		const result = syncStatusResponseSchema.safeParse({
+			projectId: "cb_123",
+			sessionId: "sess_123",
+			status: "connected",
+			codebaseName: "react-movie-app",
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.codebaseName).toBe("react-movie-app");
+		}
+	});
+
+	it("still accepts a status response without a codebase name", () => {
+		// Older rows and any caller that cannot resolve a name must keep working.
+		const result = syncStatusResponseSchema.safeParse({
+			projectId: "cb_123",
+			sessionId: "sess_123",
+			status: "connected",
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.codebaseName).toBeUndefined();
+		}
+	});
+
+	it("rejects an empty codebase name rather than rendering a blank title", () => {
+		const result = syncStatusResponseSchema.safeParse({
+			projectId: "cb_123",
+			sessionId: "sess_123",
+			status: "connected",
+			codebaseName: "",
+		});
+		expect(result.success).toBe(false);
+	});
 });
 
 describe("snapshot context DTO", () => {
@@ -598,6 +634,35 @@ describe("CLI handshake DTOs (Task 4)", () => {
 			cliVersion: "2.0.0",
 		});
 		expect(result.success).toBe(true);
+	});
+
+	it("carries an optional repository name alongside the CLI version", () => {
+		const result = cliHandshakeRequestSchema.safeParse({
+			cliVersion: "3.0.0",
+			repositoryName: "react-movie-app",
+		});
+		expect(result.success).toBe(true);
+	});
+
+	it("accepts an unusable repository name so cosmetic metadata cannot fail a sync", () => {
+		// Validation is deliberately not the schema's job here: an absolute path
+		// or a non-string is ignored by the server rather than rejected, so a
+		// repository upload is never blocked by a display name.
+		for (const repositoryName of [
+			"C:\\Coding\\project",
+			"/home/user/project",
+			"..",
+			"",
+			42,
+			{ root: "/home/user/project" },
+		]) {
+			expect(
+				cliHandshakeRequestSchema.safeParse({
+					cliVersion: "3.0.0",
+					repositoryName,
+				}).success,
+			).toBe(true);
+		}
 	});
 
 	it("rejects a handshake body without a CLI version", () => {
