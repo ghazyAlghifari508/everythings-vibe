@@ -31,23 +31,21 @@ afterEach(() => {
 });
 
 describe("PlanOptionsPage", () => {
-	it("offers greenfield and existing-codebase as the only two planning paths", () => {
+	it("opens existing-codebase from VibePlan into the saved-project library", () => {
 		render(<PlanOptionsPage />);
 
-		const planDestinations = linkHrefs().filter(
-			(href) => href === "/plan/new" || href === "/plan/codebase",
+		expect(screen.getByText("Opsi 2").closest("a")?.getAttribute("href")).toBe(
+			"/codebases",
 		);
-		expect(planDestinations).toEqual(["/plan/new", "/plan/codebase"]);
+		expect(linkHrefs()).toContain("/plan/new");
+		expect(linkHrefs()).not.toContain("/plan/codebase");
 	});
 
-	it("keeps each option label on its own destination", () => {
+	it("keeps the greenfield option on its own destination", () => {
 		render(<PlanOptionsPage />);
 
 		expect(screen.getByText("Opsi 1").closest("a")?.getAttribute("href")).toBe(
 			"/plan/new",
-		);
-		expect(screen.getByText("Opsi 2").closest("a")?.getAttribute("href")).toBe(
-			"/plan/codebase",
 		);
 	});
 

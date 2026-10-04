@@ -535,6 +535,18 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						</>
 					) : null}
 
+					{/* Codebase sync flow: this wizard mints a new codebase on mount and
+					    hides the global nav, so the saved-project library is the only
+					    way back into work that already exists. */}
+					{isCodebaseSyncRoute && (
+						<Link
+							to="/codebases"
+							className="flex h-8 items-center rounded-md border border-graphite px-2.5 text-xs font-[510] text-fog transition-colors hover:border-fog/50 hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							Project Tersimpan
+						</Link>
+					)}
+
 					{/* Codebase sync flow: show only Top Up button (if eligible) */}
 					{isCodebaseSyncRoute && topUpButton}
 

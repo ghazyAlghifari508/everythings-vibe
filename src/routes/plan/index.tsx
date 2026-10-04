@@ -27,13 +27,13 @@ const OPTIONS = [
 		footer: "Membuka halaman chat input",
 	},
 	{
-		to: "/plan/codebase",
+		to: "/codebases",
 		icon: FolderGit2,
 		label: "Opsi 2",
 		title: "Codebase Existing",
 		description:
-			"Sudah punya repositori? Hubungkan folder proyek lokal untuk mendapatkan prompt CLI, lalu susun fitur baru di atas kode yang sudah ada.",
-		footer: "Membuka halaman koneksi codebase",
+			"Hubungkan repository baru atau lanjutkan project yang pernah kamu sinkronkan.",
+		footer: "Membuka daftar project tersimpan",
 	},
 ] as const;
 

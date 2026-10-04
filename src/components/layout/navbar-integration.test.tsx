@@ -342,6 +342,30 @@ describe("Navbar Greenfield Workspace Navlinks", () => {
 		expect(screen.queryByRole("link", { name: /^Chat$/i })).toBeNull();
 	});
 
+	it("offers the saved-project library on the codebase sync wizard route", () => {
+		mockPathname = "/plan/codebase";
+		mockSearch = {};
+		renderNavbar();
+
+		const libraryLink = screen.getByRole("link", {
+			name: /Project Tersimpan/i,
+		});
+		expect(libraryLink.getAttribute("href")).toBe("/codebases");
+	});
+
+	it("keeps the global nav clean on the saved-project library route", () => {
+		mockPathname = "/codebases";
+		mockSearch = {};
+		renderNavbar();
+
+		// The library is reached from VibePlan, so the global nav stays as-is
+		// instead of duplicating a workspace-specific nav everywhere.
+		expect(screen.getByRole("link", { name: /^Pricing$/i })).toBeDefined();
+		expect(
+			screen.queryByRole("link", { name: /Project Tersimpan/i }),
+		).toBeNull();
+	});
+
 	it("renders CodebaseStepNav on /plan/codebase route", () => {
 		mockPathname = "/plan/codebase";
 		mockSearch = {};
