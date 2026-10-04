@@ -171,36 +171,58 @@ export const Route = createFileRoute("/api/codebases/")({
 				const expiresAt = new Date(
 					Date.now() + CODEBASE_SYNC_SESSION_EXPIRY_MS,
 				);
-				const created = await db.transaction(async (tx) => {
-					const [codebase] = await tx
-						.insert(codebases)
-						.values({
-							id,
-							userId: user.id,
-							name: codebaseName,
-							nameSource: nameCheck.nameSource,
-						})
-						.returning({ id: codebases.id, name: codebases.name });
-					if (!codebase) return null;
-					const [session] = await tx
-						.insert(codebaseSyncSessions)
-						.values({
-							id: crypto.randomUUID(),
-							codebaseId: id,
-							userId: user.id,
-							credentialHash: hashSyncToken(rawCredential),
-							status: "waiting_for_cli",
-							expiresAt,
-							cliMinVersion: CODEBASE_CLI_MIN_VERSION,
-							attempt: 1,
-						})
-						.returning({
-							expiresAt: codebaseSyncSessions.expiresAt,
-							cliMinVersion: codebaseSyncSessions.cliMinVersion,
-						});
-					if (!session) return null;
-					return { codebase, session };
-				});
+				let created: {
+					codebase: { id: string; name: string };
+					session: { expiresAt: Date; cliMinVersion: string };
+				} | null;
+				try {
+					created = await db.transaction(async (tx) => {
+						const [codebase] = await tx
+							.insert(codebases)
+							.values({
+								id,
+								userId: user.id,
+								name: codebaseName,
+								nameSource: nameCheck.nameSource,
+							})
+							.returning({ id: codebases.id, name: codebases.name });
+						if (!codebase) return null;
+						const [session] = await tx
+							.insert(codebaseSyncSessions)
+							.values({
+								id: crypto.randomUUID(),
+								codebaseId: id,
+								userId: user.id,
+								credentialHash: hashSyncToken(rawCredential),
+								status: "waiting_for_cli",
+								expiresAt,
+								cliMinVersion: CODEBASE_CLI_MIN_VERSION,
+								attempt: 1,
+							})
+							.returning({
+								expiresAt: codebaseSyncSessions.expiresAt,
+								cliMinVersion: codebaseSyncSessions.cliMinVersion,
+							});
+						if (!session) return null;
+						return { codebase, session };
+					});
+				} catch (error) {
+					// A storage failure must not surface SQL, column names, or the
+					// driver message to the browser. The technical cause is logged
+					// server-side; the client gets the same safe message it gets for
+					// any other failed create, and the sync protocol is untouched.
+					console.error(
+						`[codebases/create] failed for user ${user.id}:`,
+						error,
+					);
+					return Response.json(
+						{
+							error: "Gagal membuat codebase",
+							code: "CODEBASE_CREATE_FAILED",
+						},
+						{ status: 500 },
+					);
+				}
 
 				if (!created)
 					return Response.json(
