@@ -261,23 +261,26 @@ export function PlanCodebasePage() {
 		}
 	};
 
+	// Domain state and UI navigation are separate concepts. Polling only
+	// records the latest server state here; step changes are explicit user
+	// actions (or refresh restoration). An `uploaded` snapshot means the
+	// transport finished — it is not an analysis conclusion, so it must never
+	// auto-navigate away from the screen the user chose to look at.
 	const handleStatus = (status: SyncStatusResponse | null) => {
 		// SyncStatus no longer reports null on polling errors, so null here
 		// means no successful response yet — keep the last known good state.
 		if (status === null) return;
 		setLastStatus(status);
-		// Plan-page summary triggers on uploaded (not ready): codebase-scoped
-		// sessions stay uploaded after sync by design
-		// (codebase-analysis.server.ts keeps the shared snapshot uploaded while
-		// per-feature analyses run later). Requiring ready here would never
-		// fire in this flow.
-		if (
-			status.snapshotId &&
-			SNAPSHOT_CONTEXT_STATUSES.includes(status.status)
-		) {
-			setStep("summary");
-		}
 	};
+
+	// Snapshot handoff is available once the server persisted a snapshot for
+	// the current attempt. Analysis readiness is a different state owned by
+	// the per-feature analysis flow in the workspace, never implied here.
+	const snapshotReady = Boolean(
+		lastStatus?.snapshotId &&
+			lastStatus &&
+			SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status),
+	);
 
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
@@ -364,17 +367,38 @@ export function PlanCodebasePage() {
 						))}
 
 					{step === "syncing" && (
-						<SyncStatus
-							key={sessionNonce}
-							projectId={codebase.id}
-							projectName={codebase.name}
-							status={lastStatus}
-							statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
-							onStatus={handleStatus}
-							onRetrySync={() => void retrySession()}
-							onBackToInstructions={() => setStep("prompt")}
-							onViewReview={() => setStep("summary")}
-						/>
+						<>
+							<SyncStatus
+								key={sessionNonce}
+								projectId={codebase.id}
+								projectName={codebase.name}
+								status={lastStatus}
+								statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
+								onStatus={handleStatus}
+								onRetrySync={() => void retrySession()}
+								onBackToInstructions={() => setStep("prompt")}
+							/>
+							{snapshotReady && (
+								<div className="mx-auto w-full max-w-2xl rounded-xl border border-graphite bg-charcoal p-5 sm:p-6 text-center">
+									<p className="text-sm font-medium text-snow">Snapshot siap</p>
+									<p className="mt-1 text-xs text-fog">
+										Snapshot terverifikasi
+										{typeof lastStatus?.fileCount === "number"
+											? ` (${lastStatus.fileCount} file)`
+											: ""}
+										. Lanjut untuk melihat ringkasan dan masuk ke workspace.
+									</p>
+									<button
+										type="button"
+										data-testid="plan-continue-to-summary"
+										onClick={() => setStep("summary")}
+										className="mt-4 inline-flex min-h-10 items-center rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									>
+										Lanjut ke Ringkasan →
+									</button>
+								</div>
+							)}
+						</>
 					)}
 
 					{step === "summary" && (
@@ -391,11 +415,12 @@ export function PlanCodebasePage() {
 								</span>
 							</div>
 							<h2 className="mt-2 text-xl font-semibold text-snow">
-								Kesimpulan Analisis Codebase & Stack
+								Sync Selesai — Snapshot Siap
 							</h2>
 							<p className="mt-1 text-xs text-fog">
-								Codebase telah siap. Anda dapat melanjutkan ke ruang kerja
-								3-pane untuk merancang fitur secara adaptif.
+								Snapshot codebase sudah tersimpan dan terverifikasi di server.
+								Analisis codebase berjalan per fitur di workspace — buka
+								workspace untuk merancang fitur di atas codebase ini.
 							</p>
 
 							<dl className="mt-5 flex flex-col gap-2.5 text-sm">

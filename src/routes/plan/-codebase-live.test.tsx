@@ -42,7 +42,7 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 		}
 	});
 
-	it("mounted Pantau Sync receives uploaded snapshot and shows summary without refresh", async () => {
+	it("mounted Pantau Sync detects the uploaded snapshot without refresh and waits for explicit continue", async () => {
 		const syncPayload = {
 			projectId: "cb-live-1",
 			apiBaseUrl: "http://localhost:3000",
@@ -124,11 +124,18 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 
 		await waitFor(
 			() => {
-				expect(screen.getByTestId("codebase-sync-summary")).toBeDefined();
+				expect(
+					screen.getByText("Snapshot terkirim dan terverifikasi"),
+				).toBeDefined();
 			},
 			{ timeout: 6000, interval: 100 },
 		);
-		expect(screen.getByText("snap-live-1")).toBeDefined();
 		expect(statusCalls).toBeGreaterThanOrEqual(2);
+		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
+		screen.getByTestId("plan-continue-to-summary").click();
+		await waitFor(() => {
+			expect(screen.getByTestId("codebase-sync-summary")).toBeDefined();
+		});
+		expect(screen.getByText("snap-live-1")).toBeDefined();
 	});
 });
