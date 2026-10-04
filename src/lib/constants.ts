@@ -126,6 +126,10 @@ export const CODEBASE_ANALYSIS_MAX_TOKENS = 12_000;
 // Maximum manifest entries listed in the analysis prompt. Overflow is marked
 // explicitly so the model never mistakes a truncated list for the full tree.
 export const CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES = 500;
+// Maximum characters for the model-generated application summary stored in
+// the analysis output. Two to three Indonesian sentences fit comfortably;
+// longer prose belongs in findings, not in the review header card.
+export const CODEBASE_ANALYSIS_SUMMARY_MAX_CHARS = 1000;
 // === Existing-codebase generation grounding (Task 8) ===
 // Bounded snapshot-bound context injected into Ask/PRD/AC/Task prompts via
 // one formatting boundary (buildCodebasePromptBlock). Null context (greenfield)

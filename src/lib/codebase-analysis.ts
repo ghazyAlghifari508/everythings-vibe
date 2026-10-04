@@ -3,6 +3,7 @@ import { codebaseAnalysisStatusSchema } from "./codebase-sync";
 import {
 	CODEBASE_ANALYSIS_MAX_CONTEXT_CHARS,
 	CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES,
+	CODEBASE_ANALYSIS_SUMMARY_MAX_CHARS,
 } from "./constants";
 import { extractJson } from "./services/json-extract";
 
@@ -24,6 +25,15 @@ export type CodebaseAnalysisFinding = z.infer<
 export const codebaseAnalysisSchema = z.object({
 	projectId: z.string().min(1),
 	snapshotId: z.string().min(1),
+	// Model-generated application summary: what the app is and does, in two
+	// to three Indonesian sentences. Optional so legacy rows stored before
+	// this field existed keep parsing; the review UI renders an honest
+	// fallback when it is absent instead of fabricating one.
+	summary: z
+		.string()
+		.min(1)
+		.max(CODEBASE_ANALYSIS_SUMMARY_MAX_CHARS)
+		.optional(),
 	framework: z.string().min(1).optional(),
 	language: z.string().min(1).optional(),
 	packageManager: z.string().min(1).optional(),
@@ -109,6 +119,7 @@ export const CODEBASE_ANALYSIS_SYSTEM_PROMPT = `Kamu adalah PrdFy AI. Analisis s
 
 FORMAT JSON (output HANYA JSON, tanpa teks lain):
 {
+  "summary": "Ringkasan 2-3 kalimat tentang aplikasi ini: apa fungsinya, alur utama, dan bagaimana data dikelola. Kosongkan bila bukti snapshot tidak cukup — jangan mengarang",
   "framework": "Framework yang terdeteksi, atau null bila tidak terdeteksi",
   "language": "Bahasa utama, atau null bila tidak terdeteksi",
   "packageManager": "Package manager, atau null bila tidak terdeteksi",
@@ -127,7 +138,8 @@ ATURAN:
 2. JANGAN mengarang jalur file, perilaku framework, atau detail arsitektur yang tidak ada di snapshot. Gunakan HANYA jalur dari manifest.
 3. Setiap temuan yang tidak pasti WAJIB mencantumkan field "uncertainty" berisi hal yang perlu diverifikasi.
 4. Field yang tidak terdeteksi diisi null atau array kosong — jangan ditebak.
-5. Tulis ringkasan dan temuan dalam Bahasa Indonesia.`;
+5. Tulis ringkasan dan temuan dalam Bahasa Indonesia.
+6. Summary menjawab "aplikasi ini tentang apa" (fungsi, alur utama, pengelolaan data) — bukan sekadar menyebut ulang tech stack.`;
 
 // Manifest entries come from `manifestEntrySchema` (Task 5); this structural
 // subset keeps the prompt builder decoupled from the sync DTO module.

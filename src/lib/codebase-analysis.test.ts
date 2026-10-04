@@ -96,6 +96,33 @@ describe("codebase analysis schema", () => {
 		});
 		expect(result.success).toBe(false);
 	});
+
+	it("accepts a model-generated application summary", () => {
+		const result = codebaseAnalysisSchema.safeParse({
+			...validAnalysis,
+			summary: "Aplikasi kasir web untuk UMKM dengan alur penjualan dan stok.",
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.summary).toContain("kasir");
+		}
+	});
+
+	it("accepts legacy output without an application summary", () => {
+		const { summary: _omitted, ...legacy } = {
+			...validAnalysis,
+			summary: "Aplikasi kasir web untuk UMKM.",
+		};
+		expect(codebaseAnalysisSchema.safeParse(legacy).success).toBe(true);
+	});
+
+	it("rejects an application summary beyond the documented bound", () => {
+		const result = codebaseAnalysisSchema.safeParse({
+			...validAnalysis,
+			summary: "x".repeat(1001),
+		});
+		expect(result.success).toBe(false);
+	});
 });
 
 describe("parseCodebaseAnalysis", () => {
@@ -117,6 +144,10 @@ describe("codebase analysis system prompt", () => {
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(
 			/jangan.*(mengarang|invent)/i,
 		);
+	});
+
+	it("requests an application summary describing what the app does", () => {
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/summary/i);
 	});
 });
 
