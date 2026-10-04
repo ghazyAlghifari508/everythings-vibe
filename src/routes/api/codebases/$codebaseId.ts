@@ -2,6 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { codebases, projects } from "@/db/schema";
+import {
+	CODEBASE_NAME_MAX_ERROR,
+	CODEBASE_NAME_MIN_ERROR,
+	codebaseRenameSchema,
+} from "@/lib/codebase-library";
 import { deletionTimestamp } from "@/lib/project-deletion";
 import { requireUser } from "@/lib/session";
 import { purgeProjectArtifacts } from "@/routes/api/projects/$id";
@@ -16,9 +21,97 @@ export function decideCodebaseDeletion(input: {
 	return { allow: true };
 }
 
+export function describeRenameValidationIssue(issue: {
+	code: string;
+	path: PropertyKey[];
+}): string {
+	return issue.code === "too_big"
+		? CODEBASE_NAME_MAX_ERROR
+		: CODEBASE_NAME_MIN_ERROR;
+}
+
 export const Route = createFileRoute("/api/codebases/$codebaseId")({
 	server: {
 		handlers: {
+			// Rename the saved project's display name. Ownership is part of the
+			// UPDATE predicate, so a foreign codebase id matches zero rows and is
+			// reported as not-found rather than leaking another tenant's data.
+			PATCH: async ({
+				request,
+				params,
+			}: {
+				request: Request;
+				params: { codebaseId: string };
+			}) => {
+				let user: { id: string };
+				try {
+					user = await requireUser(request.headers);
+				} catch {
+					return Response.json({ error: "Unauthorized" }, { status: 401 });
+				}
+
+				const { codebaseId } = params;
+				if (!codebaseId) {
+					return Response.json(
+						{ error: "Codebase ID is required", code: "CODEBASE_NOT_FOUND" },
+						{ status: 400 },
+					);
+				}
+
+				const body: unknown = await request.json().catch(() => null);
+				const parsed = codebaseRenameSchema.safeParse(body);
+				if (!parsed.success) {
+					const issue = parsed.error.issues[0];
+					return Response.json(
+						{
+							error: issue
+								? describeRenameValidationIssue(issue)
+								: CODEBASE_NAME_MIN_ERROR,
+							code: "CODEBASE_NAME_INVALID",
+						},
+						{ status: 400 },
+					);
+				}
+
+				try {
+					const [renamed] = await db
+						.update(codebases)
+						.set({ name: parsed.data.name, updatedAt: deletionTimestamp() })
+						.where(
+							and(eq(codebases.id, codebaseId), eq(codebases.userId, user.id)),
+						)
+						.returning({ id: codebases.id, name: codebases.name });
+
+					if (!renamed) {
+						return Response.json(
+							{
+								error: "Codebase tidak ditemukan",
+								code: "CODEBASE_NOT_FOUND",
+							},
+							{ status: 404 },
+						);
+					}
+
+					return Response.json({
+						success: true,
+						id: renamed.id,
+						name: renamed.name,
+					});
+				} catch (error) {
+					console.error(
+						`[codebases/rename] failed for codebase ${codebaseId} (user ${user.id}):`,
+						error,
+					);
+					return Response.json(
+						{
+							error: "Gagal mengganti nama project.",
+							code: "CODEBASE_RENAME_FAILED",
+						},
+						{ status: 500 },
+					);
+				}
+			},
+
 			DELETE: async ({
 				request,
 				params,

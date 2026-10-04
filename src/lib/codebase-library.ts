@@ -1,6 +1,22 @@
+import { z } from "zod";
 import type { CodebaseAnalysis } from "./codebase-analysis";
+import { CODEBASE_NAME_MAX_CHARS, CODEBASE_NAME_MIN_CHARS } from "./constants";
 
 export const NEW_REPOSITORY_HREF = "/plan/codebase";
+
+export const codebaseRenameSchema = z.object({
+	name: z
+		.string()
+		.trim()
+		.min(CODEBASE_NAME_MIN_CHARS)
+		.max(CODEBASE_NAME_MAX_CHARS),
+});
+
+export type CodebaseRenameInput = z.infer<typeof codebaseRenameSchema>;
+
+export const CODEBASE_NAME_MIN_ERROR =
+	"Nama project minimal 3 karakter dan tidak boleh kosong.";
+export const CODEBASE_NAME_MAX_ERROR = "Nama project terlalu panjang.";
 
 export interface CodebaseLibraryItem {
 	id: string;

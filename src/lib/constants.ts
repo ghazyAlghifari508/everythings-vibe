@@ -82,6 +82,14 @@ export const MAX_PROMPT_LENGTH = 3000;
 export const EXPORT_FILENAME_PREFIX = "vibeeverything";
 export const HOME_DRAFT_DEBOUNCE_MS = 300;
 export const HISTORY_PAGE_SIZE = 12;
+// Existing-codebase library page size. Separate from HISTORY_PAGE_SIZE: the
+// two lists show different entity types with different card density, so they
+// must be able to diverge without coupling the Greenfield history list.
+export const CODEBASE_LIBRARY_PAGE_SIZE = 10;
+// Codebase name bounds shared by create and rename so the same project cannot
+// be named inconsistently through two entry points.
+export const CODEBASE_NAME_MIN_CHARS = 3;
+export const CODEBASE_NAME_MAX_CHARS = 100;
 
 export const KANBAN_SSE_INTERVAL_MS = 3_000;
 export const KANBAN_POLL_INTERVAL_MS = 10_000;
