@@ -13,9 +13,11 @@ import {
 	isAbsolute,
 	join,
 	parse,
+	posix,
 	relative,
 	resolve,
 	sep,
+	win32,
 } from "node:path";
 import {
 	type IgnoreRules,
@@ -79,6 +81,59 @@ export interface RepositoryScan {
 	files: ScannedFile[];
 	/** Excluded paths with reasons, sorted by path. */
 	excluded: ExcludedEntry[];
+}
+
+const WINDOWS_ROOT_PATTERN = /^[a-zA-Z]:[\\/]/;
+/**
+ * Control-character guard duplicated from the web app
+ * (`src/lib/codebase-sync.ts`) so the standalone CLI package never imports from
+ * `src/`. A repository name is a single path segment, so C0 controls and DEL are
+ * rejected outright. Expressed over code points, so the pattern carries no
+ * control-character literal.
+ */
+function hasControlCharacters(value: string): boolean {
+	return [...value].some((ch) => {
+		const code = ch.codePointAt(0) ?? 0;
+		return code < 0x20 || code === 0x7f;
+	});
+}
+
+/**
+ * The one rule for a value that will leave this machine as a repository name:
+ * it must be a single path segment with no control characters.
+ *
+ * Kept canonical here so both the derivation (`getRepositoryName`) and the
+ * transport (`sync-client`) enforce the same shape instead of each trusting the
+ * other. The server validates the same boundary independently, since a sync
+ * request can come from any client, not only this package.
+ */
+export function isSafeRepositoryName(candidate: string): boolean {
+	if (typeof candidate !== "string") return false;
+	if (candidate.trim().length === 0) return false;
+	if (hasControlCharacters(candidate)) return false;
+	return isSafeRelativePath(candidate);
+}
+
+/**
+ * Derive the repository's display name from a resolved repository root.
+ *
+ * Returns the folder's basename only — never a parent segment and never the
+ * root itself — so the value is safe to put in an API payload. The absolute
+ * root stays local (human output only); this is the single piece of repository
+ * identity the CLI is allowed to disclose.
+ *
+ * The path flavor is chosen from the root's own shape rather than from
+ * `process.platform`, so an `--root` captured on one machine still derives the
+ * same name when it is read back elsewhere. An unusable root returns `null`
+ * rather than a guess.
+ */
+export function getRepositoryName(root: string): string | null {
+	if (typeof root !== "string" || root.trim().length === 0) return null;
+	const flavor =
+		WINDOWS_ROOT_PATTERN.test(root) || root.includes("\\") ? win32 : posix;
+	const candidate = flavor.basename(root).trim();
+	if (!isSafeRepositoryName(candidate)) return null;
+	return candidate;
 }
 
 /**

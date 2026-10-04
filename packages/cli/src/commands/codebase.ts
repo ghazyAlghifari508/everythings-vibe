@@ -21,7 +21,11 @@ import {
 	ManifestTooLargeError,
 	type RepositoryManifest,
 } from "../lib/manifest.js";
-import { resolveRepositoryRoot, scanRepository } from "../lib/repository.js";
+import {
+	getRepositoryName,
+	resolveRepositoryRoot,
+	scanRepository,
+} from "../lib/repository.js";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_CLI_VERSION,
@@ -57,6 +61,11 @@ export interface SyncResult {
 	uploadedBytes: number;
 	/** Resolved repository root; human output only, never in JSON payloads. */
 	root?: string;
+	/**
+	 * Repository folder name (the resolved root's basename). Safe to disclose:
+	 * it is the only piece of repository identity that leaves this machine.
+	 */
+	repositoryName?: string;
 	/** True when this run created `.prdfyignore` from the default template. */
 	ignoreCreated?: boolean;
 	/** `.prdfyignore` negation lines ignored because built-ins cannot be lifted. */
@@ -244,9 +253,13 @@ export async function syncCodebase(
 
 	// Non-fatal preparation context, present on every subsequent exit path.
 	// The root is carried in the result (never in JSON output) so warnings
-	// survive both the failure and success printers below.
+	// survive both the failure and success printers below. `repositoryName` is the
+	// basename only: the server can label the project without learning where the
+	// repository lives.
+	const repositoryName = getRepositoryName(root) ?? undefined;
 	const preparation = {
 		root,
+		...(repositoryName ? { repositoryName } : {}),
 		ignoreCreated,
 		droppedNegations: rules.droppedNegations,
 	};
@@ -277,7 +290,10 @@ export async function syncCodebase(
 
 	try {
 		const client = createClient(syncToken, options.apiUrl ?? resolveApiUrl());
-		const handshake = await client.handshakeWithRetry(projectId);
+		const handshake = await client.handshakeWithRetry(
+			projectId,
+			repositoryName,
+		);
 		// Update notice comes from the server's advertised minimum only: no
 		// registry lookup, no invented urgency. The handshake already fails
 		// closed for an unsupported version, so this is purely informational

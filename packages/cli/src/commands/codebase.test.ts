@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../lib/sync-client.js", async (importOriginal) => {
@@ -296,5 +296,63 @@ describe("syncCodebase happy path", () => {
 			| { syncToken?: string }
 			| undefined;
 		expect(clientOptions?.syncToken).toBe("super-secret-token");
+	});
+});
+
+describe("syncCodebase repository naming", () => {
+	it("handshakes with the repository folder name, never the absolute root", async () => {
+		const client = mockClient();
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(true);
+		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
+			"p1",
+			basename(root),
+		);
+	});
+
+	it("reports the repository name in machine-readable output without the root", async () => {
+		mockClient();
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.repositoryName).toBe(basename(root));
+		const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+		expect(printed).toContain(basename(root));
+		expect(printed).not.toContain(root);
+		expect(printed).not.toContain("root");
+		logSpy.mockRestore();
+	});
+
+	it("still completes the sync when no repository name can be derived", async () => {
+		const client = mockClient();
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(true);
+		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
+			"p1",
+			basename(root),
+		);
 	});
 });

@@ -18,6 +18,7 @@
  */
 
 import { ApiError, apiRequest } from "./api-client.js";
+import { isSafeRepositoryName } from "./repository.js";
 import { CLI_VERSION } from "./version.js";
 
 /** Maximum serialized JSON per upload request (locked MVP bound). */
@@ -236,8 +237,14 @@ export function compareCliVersions(a: string, b: string): number {
 }
 
 export interface SyncClient {
-	handshake(projectId: string): Promise<HandshakeResponse>;
-	handshakeWithRetry(projectId: string): Promise<HandshakeResponse>;
+	handshake(
+		projectId: string,
+		repositoryName?: string,
+	): Promise<HandshakeResponse>;
+	handshakeWithRetry(
+		projectId: string,
+		repositoryName?: string,
+	): Promise<HandshakeResponse>;
 	uploadManifestWithRetry(
 		projectId: string,
 		session: SyncSession,
@@ -274,9 +281,22 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 		});
 	}
 
-	async function handshake(projectId: string): Promise<HandshakeResponse> {
+	async function handshake(
+		projectId: string,
+		repositoryName?: string,
+	): Promise<HandshakeResponse> {
 		const res = await post<HandshakeResponse>(projectId, "sync", {
 			cliVersion: CODEBASE_CLI_VERSION,
+			// The repository folder name is the only repository identity that
+			// leaves this machine. The absolute root stays local, so the server can
+			// replace its own placeholder name without ever learning where the
+			// repository lives. Re-checked here as the last step before the network:
+			// a value that is not a single safe path segment is dropped rather than
+			// transmitted, and omitting it keeps the request identical to the older
+			// contract.
+			...(repositoryName && isSafeRepositoryName(repositoryName)
+				? { repositoryName }
+				: {}),
 		});
 		const minVersion = res.cliMinVersion ?? CODEBASE_CLI_MIN_VERSION;
 		if (compareCliVersions(CODEBASE_CLI_VERSION, minVersion) < 0) {
@@ -364,8 +384,8 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 
 	return {
 		handshake,
-		handshakeWithRetry: (projectId) =>
-			withSyncRetry(() => handshake(projectId)),
+		handshakeWithRetry: (projectId, repositoryName) =>
+			withSyncRetry(() => handshake(projectId, repositoryName)),
 		uploadManifestWithRetry: (projectId, session, entries) =>
 			withSyncRetry(() => uploadManifest(projectId, session, entries)),
 		uploadFileChunksWithRetry: (projectId, session, chunks, startIndex = 0) =>

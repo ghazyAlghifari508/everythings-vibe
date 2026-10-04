@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api-client.js";
 import {
 	buildCodebaseSyncUrl,
+	CODEBASE_CLI_VERSION,
 	CODEBASE_MAX_CHUNK_BYTES,
 	createSyncClient,
 	makeIdempotencyKey,
@@ -89,6 +90,62 @@ describe("session handshake", () => {
 		const res = await client.handshake("proj-1");
 
 		expect(res.snapshotId).toBe("snap-1");
+	});
+
+	it("sends the repository name so the server can drop its placeholder", async () => {
+		const fetchMock = stubFetch(async () =>
+			jsonResponse(200, {
+				sessionId: "sess-1",
+				attemptId: "att-1",
+				status: "connected",
+			}),
+		);
+
+		await createSyncClient(OPTIONS).handshake("proj-1", "react-movie-app");
+
+		const { init } = callUrlAndInit(fetchMock, 0);
+		expect(JSON.parse(requestBody(init))).toEqual({
+			cliVersion: CODEBASE_CLI_VERSION,
+			repositoryName: "react-movie-app",
+		});
+	});
+
+	it("omits the repository name when the CLI could not derive one", async () => {
+		const fetchMock = stubFetch(async () =>
+			jsonResponse(200, {
+				sessionId: "sess-1",
+				attemptId: "att-1",
+				status: "connected",
+			}),
+		);
+
+		await createSyncClient(OPTIONS).handshake("proj-1", undefined);
+
+		const { init } = callUrlAndInit(fetchMock, 0);
+		expect(JSON.parse(requestBody(init))).toEqual({
+			cliVersion: CODEBASE_CLI_VERSION,
+		});
+	});
+
+	it("never sends the absolute repository root to the server", async () => {
+		const fetchMock = stubFetch(async () =>
+			jsonResponse(200, {
+				sessionId: "sess-1",
+				attemptId: "att-1",
+				status: "connected",
+			}),
+		);
+
+		await createSyncClient(OPTIONS).handshake(
+			"proj-1",
+			"C:\\Coding\\React\\react-movie-app",
+		);
+
+		const { url, init } = callUrlAndInit(fetchMock, 0);
+		const body = requestBody(init);
+		expect(url).not.toContain("Coding");
+		expect(body).not.toContain("Coding");
+		expect(body).not.toContain("react-movie-app");
 	});
 
 	it("rejects a CLI that is older than the server minimum with update guidance", async () => {
