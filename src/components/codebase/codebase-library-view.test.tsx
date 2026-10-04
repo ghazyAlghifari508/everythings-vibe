@@ -291,6 +291,15 @@ describe("CodebaseLibraryView", () => {
 		expect(crumbs.querySelector('a[href="/plan"]')).not.toBeNull();
 		expect(crumbs.textContent).toContain("Project Tersimpan");
 	});
+
+	it("stops the breadcrumb at Project Tersimpan, not at the onboarding step", () => {
+		// The library is the landing page for existing codebases; the onboarding
+		// step is its child and must not appear as an ancestor here.
+		render(<CodebaseLibraryView items={[]} />);
+		const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
+		expect(crumbs.textContent).not.toContain("Hubungkan Repository");
+		expect(crumbs.querySelectorAll("a")).toHaveLength(2);
+	});
 });
 
 describe("CodebaseLibraryView rename", () => {

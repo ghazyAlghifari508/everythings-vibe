@@ -10,6 +10,7 @@ import {
 } from "@/components/codebase/project-actions-menu";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import {
+	CODEBASE_LIBRARY_LABEL,
 	type CodebaseLibraryItem,
 	filterLibraryItems,
 	libraryAnalysisLabels,
@@ -111,8 +112,8 @@ export function CodebaseLibraryView({
 	return (
 		<div className="flex flex-col gap-6">
 			<HubBreadcrumb
-				current="Project Tersimpan"
-				parent={{ label: "VibePlan", to: "/plan" }}
+				current={CODEBASE_LIBRARY_LABEL}
+				ancestors={[{ label: "VibePlan", to: "/plan" }]}
 			/>
 
 			<header className="flex flex-col gap-4 border-b border-graphite pb-6 sm:flex-row sm:items-end sm:justify-between">
