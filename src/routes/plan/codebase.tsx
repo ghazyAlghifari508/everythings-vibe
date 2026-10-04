@@ -9,8 +9,13 @@ import {
 	analysisResponseSchema,
 } from "@/lib/codebase-analysis";
 import {
-	clearPlanCodebasePointer,
+	CODEBASE_LIBRARY_HREF,
+	CODEBASE_LIBRARY_LABEL,
+	CODEBASE_ONBOARDING_LABEL,
+} from "@/lib/codebase-library";
+import {
 	clearPlanCodebaseProjectPointer,
+	clearPlanOnboardingPointers,
 	readPlanCodebasePointer,
 	readPlanCodebaseProjectPointer,
 	storePlanCodebasePointer,
@@ -25,10 +30,15 @@ import {
 } from "@/lib/codebase-sync";
 import { useUIStore } from "@/store";
 
+/** Terminal create-failure heading; the body carries the safe server message. */
+const CODEBASE_ONBOARDING_ERROR_TITLE = "Gagal menyiapkan repository";
+
 export const Route = createFileRoute("/plan/codebase")({
 	head: () => ({
 		meta: [
-			{ title: "Codebase Existing | VibeEverything" },
+			{
+				title: `${CODEBASE_ONBOARDING_LABEL} | VibeEverything`,
+			},
 			{
 				name: "description",
 				content:
@@ -66,12 +76,18 @@ export function PlanCodebasePage() {
 	const [analysisWorking, setAnalysisWorking] = useState(false);
 	const [analysisError, setAnalysisError] = useState<string | null>(null);
 	const analysisAttemptedFor = useRef<string | null>(null);
+	// Create is a mutating POST: two overlapping calls would mint two codebases
+	// and two sync sessions for one onboarding attempt. State updates are async,
+	// so a ref is what actually closes the window.
+	const createInFlight = useRef(false);
 
 	useEffect(() => {
 		setStep("prompt");
 	}, [setStep]);
 
 	const createCodebase = useCallback(async () => {
+		if (createInFlight.current) return;
+		createInFlight.current = true;
 		setError(null);
 		setIsStarting(true);
 		try {
@@ -129,6 +145,7 @@ export function PlanCodebasePage() {
 		} catch {
 			setError("Server tidak dapat dihubungi.");
 		} finally {
+			createInFlight.current = false;
 			setIsStarting(false);
 		}
 	}, [setStep]);
@@ -296,13 +313,13 @@ export function PlanCodebasePage() {
 				await statusResponse.json().catch(() => null),
 			);
 			if (!statusResponse.ok || !statusParsed.success) {
-				clearPlanCodebasePointer();
+				clearPlanOnboardingPointers();
 				return false;
 			}
 			const recovered = statusParsed.data;
 			const recoveredName = recovered.codebaseName ?? stored.name;
 			if (!recoveredName) {
-				clearPlanCodebasePointer();
+				clearPlanOnboardingPointers();
 				return false;
 			}
 			setCodebase({ id: stored.id, name: recoveredName });
@@ -364,14 +381,14 @@ export function PlanCodebasePage() {
 					setStep("prompt");
 					return true;
 				}
-				clearPlanCodebasePointer();
+				clearPlanOnboardingPointers();
 				return false;
 			}
 			setPayload(null);
 			setStep("syncing");
 			return true;
 		} catch {
-			clearPlanCodebasePointer();
+			clearPlanOnboardingPointers();
 			return false;
 		} finally {
 			setIsStarting(false);
@@ -438,11 +455,11 @@ export function PlanCodebasePage() {
 	// Domain state and UI navigation are separate concepts. Polling only
 	// records the latest server state here; step changes are explicit user
 	// actions (or refresh restoration). An `uploaded` snapshot means the
-	// transport finished â€” it is not an analysis conclusion, so it must never
+	// transport finished Ã¢â‚¬â€ it is not an analysis conclusion, so it must never
 	// auto-navigate away from the screen the user chose to look at.
 	const handleStatus = (status: SyncStatusResponse | null) => {
 		// SyncStatus no longer reports null on polling errors, so null here
-		// means no successful response yet â€” keep the last known good state.
+		// means no successful response yet Ã¢â‚¬â€ keep the last known good state.
 		if (status === null) return;
 		setLastStatus(status);
 		// The server owns the name: once the CLI has handshaken it holds the
@@ -524,48 +541,82 @@ export function PlanCodebasePage() {
 		void fetchAnalysisOutput(featureProjectId, snapshotId);
 	}, [featureProjectId, lastStatus, analysis, fetchAnalysisOutput]);
 
+	// Onboarding states are mutually exclusive. A terminal create failure must
+	// never render beside a "waiting for session" spinner: the spinner claims a
+	// request is still in flight after it has already failed, which is exactly
+	// the state the user cannot act on. Derived from `codebase` first so the
+	// ready branch keeps its non-null narrowing.
+	const onboardingFailed = !codebase && !isStarting && error !== null;
+
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
 			<HubBreadcrumb
-				current="Codebase Existing"
-				parent={{ label: "VibePlan", to: "/plan" }}
+				current={CODEBASE_ONBOARDING_LABEL}
+				ancestors={[
+					{ label: "VibePlan", to: "/plan" },
+					{ label: CODEBASE_LIBRARY_LABEL, to: CODEBASE_LIBRARY_HREF },
+				]}
 			/>
 
-			{error && (
-				<div
-					role="alert"
-					className="rounded-xl border border-crimson/40 bg-crimson/10 p-4 text-sm text-crimson"
-				>
-					{error}
-				</div>
-			)}
-
-			{!codebase || (!payload && !lastStatus) ? (
-				<div className="flex flex-1 items-center justify-center min-h-[50vh] py-12">
-					<output className="flex flex-col items-center gap-4 rounded-xl border border-graphite bg-charcoal p-8 sm:p-10 text-center max-w-sm w-full shadow-lg">
+			{!codebase ? (
+				onboardingFailed ? (
+					<div className="flex min-h-[50vh] flex-1 items-center justify-center py-12">
+						<div
+							role="alert"
+							className="flex w-full max-w-sm flex-col items-center gap-4 rounded-xl border border-crimson/40 bg-crimson/10 p-8 text-center sm:p-10"
+						>
+							<div className="space-y-1">
+								<p className="text-sm font-medium text-snow">
+									{CODEBASE_ONBOARDING_ERROR_TITLE}
+								</p>
+								<p className="text-xs text-fog">{error}</p>
+							</div>
+							<button
+								type="button"
+								onClick={() => void createCodebase()}
+								className="inline-flex min-h-10 items-center justify-center rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								Coba lagi
+							</button>
+						</div>
+					</div>
+				) : (
+					<div className="flex min-h-[50vh] flex-1 items-center justify-center py-12">
+						<output className="flex w-full max-w-sm flex-col items-center gap-4 rounded-xl border border-graphite bg-charcoal p-8 text-center sm:p-10">
+							<div
+								className="h-9 w-9 animate-spin rounded-full border-2 border-graphite border-t-indigo"
+								aria-hidden="true"
+							/>
+							<div className="space-y-1">
+								<p className="text-sm font-medium text-snow">
+									{isStarting
+										? "Menyiapkan sesi sync..."
+										: "Menunggu sesi sync..."}
+								</p>
+								<p className="text-xs text-fog">
+									Menghubungkan repository dan menginisialisasi instruksi CLI
+								</p>
+							</div>
+						</output>
+					</div>
+				)
+			) : !payload && !lastStatus ? (
+				// A codebase exists but neither its prompt payload nor a polled
+				// status has landed yet. Still initializing, not an error.
+				<div className="flex min-h-[50vh] flex-1 items-center justify-center py-12">
+					<output className="flex w-full max-w-sm flex-col items-center gap-4 rounded-xl border border-graphite bg-charcoal p-8 text-center sm:p-10">
 						<div
 							className="h-9 w-9 animate-spin rounded-full border-2 border-graphite border-t-indigo"
 							aria-hidden="true"
 						/>
 						<div className="space-y-1">
 							<p className="text-sm font-medium text-snow">
-								{isStarting
-									? "Menyiapkan sesi sync..."
-									: "Menunggu sesi sync..."}
+								Menyiapkan instruksi CLI...
 							</p>
 							<p className="text-xs text-fog">
 								Menghubungkan repository dan menginisialisasi instruksi CLI
 							</p>
 						</div>
-						{error && !isStarting && (
-							<button
-								type="button"
-								onClick={() => void createCodebase()}
-								className="mt-2 inline-flex min-h-10 items-center justify-center rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								Coba lagi
-							</button>
-						)}
 					</output>
 				</div>
 			) : (
@@ -602,7 +653,7 @@ export function PlanCodebasePage() {
 										onClick={() => setStep("syncing")}
 										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 									>
-										Lanjut ke Pantau Sync â†’
+										Lanjut ke Pantau Sync Ã¢â€ â€™
 									</button>
 								</div>
 							</div>
@@ -684,7 +735,7 @@ export function PlanCodebasePage() {
 										onClick={() => setStep("syncing")}
 										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 									>
-										â† Kembali ke Pantau Sync
+										Ã¢â€ Â Kembali ke Pantau Sync
 									</button>
 								</div>
 							</section>

@@ -91,6 +91,19 @@ export function clearPlanCodebaseProjectPointer(): void {
 }
 
 /**
+ * Drop every onboarding pointer.
+ *
+ * The three keys form one set: the project pointer only means anything next to
+ * the codebase pointer it belongs to. Clearing the codebase pointer alone would
+ * leave a half-state that no other code path produces, so recovery — where the
+ * pointer is proven stale — clears the whole set.
+ */
+export function clearPlanOnboardingPointers(): void {
+	clearPlanCodebasePointer();
+	clearPlanCodebaseProjectPointer();
+}
+
+/**
  * Drop the onboarding pointers only when they belong to `codebaseId`.
  *
  * Deleting a saved project invalidates any `/plan/codebase` pointer to it: the
@@ -106,7 +119,6 @@ export function clearPlanCodebaseProjectPointer(): void {
 export function clearPlanCodebasePointerIfMatches(codebaseId: string): boolean {
 	const stored = readPlanCodebasePointer();
 	if (!stored || stored.id !== codebaseId) return false;
-	clearPlanCodebasePointer();
-	clearPlanCodebaseProjectPointer();
+	clearPlanOnboardingPointers();
 	return true;
 }

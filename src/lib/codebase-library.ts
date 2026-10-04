@@ -6,6 +6,18 @@ import { CODEBASE_NAME_MAX_CHARS, CODEBASE_NAME_MIN_CHARS } from "./constants";
 export const NEW_REPOSITORY_HREF = "/plan/codebase";
 
 /**
+ * Existing-codebase information architecture.
+ *
+ * `/codebases` is the library (Project Tersimpan) and `/plan/codebase` is the
+ * onboarding step reached from it, so the onboarding page is a child of the
+ * library rather than a sibling of it. Both pages read these labels from here so
+ * the trail cannot drift apart.
+ */
+export const CODEBASE_LIBRARY_HREF = "/codebases";
+export const CODEBASE_LIBRARY_LABEL = "Project Tersimpan";
+export const CODEBASE_ONBOARDING_LABEL = "Hubungkan Repository";
+
+/**
  * Provenance of `codebases.name`. `auto` means the system chose the name (the
  * `POST /api/codebases` placeholder, later replaced by the repository folder
  * name the CLI reports at handshake). `user` means a person chose it — through
