@@ -387,6 +387,16 @@ export function getPendingSyncPayloadKey(projectId: string): string {
 	return `prdfy:sync-payload:${projectId}`;
 }
 
+// Plan-page recovery pointer: /plan/codebase creates a codebase without a
+// route param, so a refresh would otherwise orphan the in-flight sync and mint
+// a new codebase. The stored value is only the codebase id/name pointer —
+// never the sync token or sync state. Authoritative sync state always comes
+// from GET /api/codebases/:id/status; a missing token after refresh is
+// replaced via POST /session retry (new credential), never restored from
+// storage.
+export const PLAN_CODEBASE_ID_STORAGE_KEY = "prdfy:plan-codebase-id";
+export const PLAN_CODEBASE_NAME_STORAGE_KEY = "prdfy:plan-codebase-name";
+
 // One usable credential per project: this predicate is advisory only; session
 // creation must re-check under a per-project transaction/advisory lock
 // (`pg_advisory_xact_lock(hashtext(projectId))` in `/api/codebase/$projectId/session`)
