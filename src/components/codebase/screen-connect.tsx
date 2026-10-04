@@ -156,8 +156,8 @@ export function ScreenConnect({
 								Paste prompt lalu jalankan
 							</div>
 							<p className="text-[11px] text-fog leading-relaxed">
-								VibeEverything akan menampilkan status dan berpindah layar
-								ketika CLI berhasil terhubung.
+								VibeEverything akan mendeteksi progress sync secara otomatis
+								setelah agent mulai terhubung.
 							</p>
 						</div>
 					</div>
@@ -167,8 +167,8 @@ export function ScreenConnect({
 				{!hideFooter && onAgentStarted && (
 					<div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-graphite bg-charcoal/60 px-5 py-4 sm:px-6">
 						<p className="text-[11px] text-fog leading-relaxed text-center sm:text-left">
-							Sudah menjalankan prompt di terminal agent? Klik tombol untuk
-							memantau status secara langsung.
+							Buka Pantau Sync untuk melihat kapan agent mulai terhubung dan
+							mengirim repository.
 						</p>
 						<button
 							type="button"

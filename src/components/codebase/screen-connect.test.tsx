@@ -217,8 +217,80 @@ describe("ScreenConnect", () => {
 		);
 		expect(nextBtn).toBeDefined();
 		expect(container.textContent).toContain(
-			"Sudah menjalankan prompt di terminal agent?",
+			"Buka Pantau Sync untuk melihat kapan agent mulai terhubung dan mengirim repository.",
 		);
+	});
+
+	it("never promises automatic screen switching on CLI connect", () => {
+		act(() => {
+			root?.render(
+				<ScreenConnect
+					projectName="Test App"
+					payload={samplePayload}
+					onAgentStarted={() => {}}
+				/>,
+			);
+		});
+
+		const rendered = container.textContent ?? "";
+		expect(rendered).not.toContain("berpindah layar");
+		expect(rendered).toContain(
+			"VibeEverything akan mendeteksi progress sync secara otomatis setelah agent mulai terhubung.",
+		);
+	});
+
+	it("enables Pantau Sync without requiring the Copy button first", () => {
+		const onAgentStarted = vi.fn();
+		act(() => {
+			root?.render(
+				<ScreenConnect
+					projectName="Test App"
+					payload={samplePayload}
+					onAgentStarted={onAgentStarted}
+				/>,
+			);
+		});
+
+		const nextBtn = [...container.querySelectorAll("button")].find((b) =>
+			/Lanjut ke Pantau Sync/i.test(b.textContent ?? ""),
+		) as HTMLButtonElement | undefined;
+		expect(nextBtn).toBeDefined();
+		expect(nextBtn?.disabled).toBe(false);
+		act(() => {
+			nextBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onAgentStarted).toHaveBeenCalledTimes(1);
+	});
+
+	it("treats copy state as feedback only, never as workflow authorization", async () => {
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		vi.stubGlobal("navigator", {
+			...navigator,
+			clipboard: { writeText },
+		});
+		const onAgentStarted = vi.fn();
+		act(() => {
+			root?.render(
+				<ScreenConnect
+					projectName="Test App"
+					payload={samplePayload}
+					onAgentStarted={onAgentStarted}
+				/>,
+			);
+		});
+
+		const nextBtn = [...container.querySelectorAll("button")].find((b) =>
+			/Lanjut ke Pantau Sync/i.test(b.textContent ?? ""),
+		) as HTMLButtonElement | undefined;
+		expect(nextBtn?.disabled).toBe(false);
+		const copyBtn = [...container.querySelectorAll("button")].find((b) =>
+			/salin/i.test(b.textContent ?? ""),
+		);
+		await act(async () => {
+			copyBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(container.textContent).toContain("Tersalin");
+		expect(nextBtn?.disabled).toBe(false);
 	});
 
 	it("renders the AI coding agent / harness logos in Step 2", () => {
