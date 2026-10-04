@@ -8,6 +8,8 @@ import { CodebaseReview } from "./codebase-review";
 const analysis: CodebaseAnalysis = {
 	projectId: "proj_123",
 	snapshotId: "snap_123",
+	summary:
+		"Aplikasi web pemutar film berbasis React dengan alur penjelajahan katalog dan detail.",
 	framework: "TanStack Start",
 	language: "TypeScript",
 	packageManager: "pnpm",
@@ -123,12 +125,13 @@ describe("CodebaseReview", () => {
 		expect(c.textContent).not.toContain("Analisis ulang");
 
 		// Secondary action and primary CTA are present and callable
-		const syncLogBtn = [...c.querySelectorAll("button")].find((b) =>
-			/lihat log sync/i.test(b.textContent ?? ""),
+		const backBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Kembali ke Sinkronisasi/i.test(b.textContent ?? ""),
 		);
-		expect(syncLogBtn).toBeDefined();
+		expect(backBtn).toBeDefined();
+		expect(c.textContent).not.toMatch(/lihat log sync/i);
 		act(() => {
-			syncLogBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+			backBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onBackToSync).toHaveBeenCalledTimes(1);
 
@@ -175,10 +178,59 @@ describe("CodebaseReview", () => {
 		expect(c.textContent).toContain("schema.ts");
 	});
 
+	it("renders the application summary from the analysis contract", () => {
+		const c = renderReview();
+		expect(c.textContent).toContain("Ringkasan aplikasi");
+		expect(c.textContent).toContain("pemutar film berbasis React");
+	});
+
+	it("renders an honest fallback instead of fabricating a missing summary", () => {
+		const { summary: _omitted, ...withoutSummary } = analysis;
+		const c = renderReview({ analysis: withoutSummary });
+		expect(c.textContent).toContain("Ringkasan aplikasi");
+		expect(c.textContent).not.toContain("pemutar film");
+		expect(c.textContent).toMatch(/belum tersedia/i);
+	});
+
+	it("keeps previous and next navigation as separate ordered actions", () => {
+		const c = renderReview({ onContinue: () => {}, onBackToSync: () => {} });
+		const nav = c.querySelector('[data-testid="review-nav"]');
+		expect(nav).not.toBeNull();
+		const buttons = [...(nav?.querySelectorAll("button") ?? [])];
+		expect(buttons).toHaveLength(2);
+		expect(buttons[0]?.textContent).toMatch(/Kembali ke Sinkronisasi/i);
+		expect(buttons[1]?.textContent).toMatch(/lanjut|workspace/i);
+	});
+
+	it("renders a single arrow affordance on the primary CTA", () => {
+		const c = renderReview({
+			continueLabel: "Masuk ke Workspace",
+			onContinue: () => {},
+		});
+		const continueBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Masuk ke Workspace/i.test(b.textContent ?? ""),
+		);
+		expect(continueBtn).toBeDefined();
+		expect(continueBtn?.querySelectorAll("svg")).toHaveLength(1);
+		expect(continueBtn?.textContent).not.toContain("→");
+		expect(continueBtn?.textContent).not.toContain("->");
+	});
+
+	it("renders a single arrow affordance on the previous action", () => {
+		const c = renderReview({ onContinue: () => {}, onBackToSync: () => {} });
+		const backBtn = [...c.querySelectorAll("button")].find((b) =>
+			/Kembali ke Sinkronisasi/i.test(b.textContent ?? ""),
+		);
+		expect(backBtn).toBeDefined();
+		expect(backBtn?.querySelectorAll("svg")).toHaveLength(1);
+		expect(backBtn?.textContent).not.toContain("→");
+		expect(backBtn?.textContent).not.toContain("->");
+	});
+
 	it("renders a custom continue label when provided", () => {
 		const onContinue = vi.fn();
 		const c = renderReview({
-			continueLabel: "Masuk ke Workspace →",
+			continueLabel: "Masuk ke Workspace",
 			onContinue,
 		});
 		const continueBtn = [...c.querySelectorAll("button")].find((b) =>

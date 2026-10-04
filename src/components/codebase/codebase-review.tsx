@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, FileCode, Folder } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FileCode, Folder } from "lucide-react";
 import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
 
 function valueOrUnknown(value?: string | null): string {
@@ -94,6 +94,32 @@ export function CodebaseReview({
 				<span className="inline-flex items-center gap-1.5 rounded-md border border-graphite bg-charcoal px-2.5 py-1 text-xs font-[510] text-fog self-start sm:self-auto">
 					Sync selesai
 				</span>
+			</div>
+
+			{/* Application summary: what the app is about, from the validated
+		analysis contract. Never fabricated: legacy output without a summary
+		renders an honest fallback instead. */}
+			<div
+				data-testid="review-app-summary"
+				className="rounded-xl border border-graphite bg-charcoal overflow-hidden shadow-sm"
+			>
+				<div className="border-b border-graphite p-4 sm:p-5">
+					<h3 className="font-inter text-sm font-[600] text-snow">
+						Ringkasan aplikasi
+					</h3>
+				</div>
+				<div className="p-4 sm:p-5">
+					{analysis.summary && analysis.summary.trim().length > 0 ? (
+						<p className="text-xs sm:text-sm text-mist leading-relaxed">
+							{analysis.summary}
+						</p>
+					) : (
+						<p className="text-xs text-slate italic leading-relaxed">
+							Ringkasan aplikasi belum tersedia untuk analisis ini. Jalankan
+							analisis ulang untuk menghasilkan ringkasan.
+						</p>
+					)}
+				</div>
 			</div>
 
 			{/* Summary Grid (2 Columns: Detected Environment + Repository Map) */}
@@ -372,36 +398,40 @@ export function CodebaseReview({
 					)}
 
 					{/* Screen Nav / Actions */}
-					<div className="flex flex-wrap items-center justify-between gap-3 border-t border-graphite pt-4 text-xs">
-						<div className="flex items-center gap-3 text-fog text-[11px]">
-							<span>
-								ID: <span className="font-mono text-snow">{snapshotId}</span>
-							</span>
-							<span>· {formatTimestamp(snapshotCreatedAt)}</span>
-						</div>
+					<div className="flex flex-wrap items-center gap-3 text-fog text-[11px] border-t border-graphite pt-4">
+						<span>
+							ID: <span className="font-mono text-snow">{snapshotId}</span>
+						</span>
+						<span>· {formatTimestamp(snapshotCreatedAt)}</span>
+					</div>
 
-						<div className="flex items-center gap-3">
-							{onBackToSync && (
-								<button
-									type="button"
-									onClick={onBackToSync}
-									className="rounded-lg border border-graphite bg-transparent px-3 py-1.5 text-xs font-medium text-fog hover:text-snow hover:border-iron hover:bg-steel/10 transition cursor-pointer"
-								>
-									Lihat log sync
-								</button>
-							)}
+					{/* Prev/next navigation: previous aligns left, primary aligns
+				right on desktop; stacked full-width actions on mobile. */}
+					<div
+						data-testid="review-nav"
+						className="flex flex-col items-stretch gap-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+					>
+						{onBackToSync ? (
 							<button
 								type="button"
-								onClick={onContinue}
-								disabled={isWorking}
-								className="inline-flex items-center gap-1.5 rounded-lg bg-snow px-4 py-1.5 font-inter text-xs font-semibold text-onyx shadow-sm hover:brightness-105 active:scale-[0.98] transition disabled:opacity-50 cursor-pointer"
+								onClick={onBackToSync}
+								className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-graphite bg-transparent px-4 py-2 text-xs font-medium text-fog hover:text-snow hover:border-iron hover:bg-steel/10 transition cursor-pointer sm:justify-start"
 							>
-								<span>{continueLabel}</span>
-								<span className="font-mono text-xs" aria-hidden="true">
-									-&gt;
-								</span>
+								<ArrowLeft size={14} aria-hidden="true" />
+								<span>Kembali ke Sinkronisasi</span>
 							</button>
-						</div>
+						) : (
+							<span aria-hidden="true" />
+						)}
+						<button
+							type="button"
+							onClick={onContinue}
+							disabled={isWorking}
+							className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-snow px-4 py-2 font-inter text-xs font-semibold text-onyx shadow-sm hover:brightness-105 active:scale-[0.98] transition disabled:opacity-50 cursor-pointer sm:ml-auto"
+						>
+							<span>{continueLabel}</span>
+							<ArrowRight size={14} aria-hidden="true" />
+						</button>
 					</div>
 				</div>
 			</div>
