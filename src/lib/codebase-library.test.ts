@@ -3,7 +3,7 @@ import {
 	type CodebaseLibraryItem,
 	filterLibraryItems,
 	getLibraryItemHref,
-	hasLibraryAnalysis,
+	libraryAnalysisLabels,
 	mapLibraryStatus,
 	NEW_REPOSITORY_HREF,
 	pickLibraryAnalysis,
@@ -23,6 +23,7 @@ function makeItem(
 		framework: null,
 		language: null,
 		packageManager: null,
+		hasReadyAnalysis: false,
 		...overrides,
 	};
 }
@@ -108,13 +109,21 @@ describe("getLibraryItemHref", () => {
 	});
 });
 
-describe("hasLibraryAnalysis", () => {
-	it("is false when no persisted analysis fields exist", () => {
-		expect(hasLibraryAnalysis(makeItem())).toBe(false);
+describe("libraryAnalysisLabels", () => {
+	it("is empty when no persisted analysis fields exist", () => {
+		expect(libraryAnalysisLabels(makeItem())).toEqual([]);
 	});
 
-	it("is true when any persisted analysis field exists", () => {
-		expect(hasLibraryAnalysis(makeItem({ framework: "React" }))).toBe(true);
+	it("lists persisted framework, language and package manager in order", () => {
+		expect(
+			libraryAnalysisLabels(
+				makeItem({
+					framework: "React",
+					language: "TypeScript",
+					packageManager: "pnpm",
+				}),
+			),
+		).toEqual(["React", "TypeScript", "pnpm"]);
 	});
 });
 

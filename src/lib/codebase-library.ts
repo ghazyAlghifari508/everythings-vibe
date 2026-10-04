@@ -13,6 +13,10 @@ export interface CodebaseLibraryItem {
 	framework: string | null;
 	language: string | null;
 	packageManager: string | null;
+	// True only when validated analysis exists for the codebases newest
+	// snapshot. A ready analysis bound to an older snapshot must never make a
+	// re-synced codebase look finished.
+	hasReadyAnalysis: boolean;
 }
 
 export interface LibraryAnalysisSlice {
@@ -41,14 +45,14 @@ export function pickLibraryAnalysis(
 	};
 }
 
-export function hasLibraryAnalysis(
+export function libraryAnalysisLabels(
 	item: Pick<
 		CodebaseLibraryItem,
 		"summary" | "framework" | "language" | "packageManager"
 	>,
-): boolean {
-	return Boolean(
-		item.summary ?? item.framework ?? item.language ?? item.packageManager,
+): string[] {
+	return [item.framework, item.language, item.packageManager].filter(
+		(label): label is string => Boolean(label),
 	);
 }
 

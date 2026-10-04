@@ -1,15 +1,11 @@
-import {
-	createFileRoute,
-	Link,
-	redirect,
-	useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { CodebaseLibraryView } from "@/components/codebase/codebase-library-view";
+import { safeParseCodebaseAnalysis } from "@/lib/codebase-analysis";
 import {
-	getPendingSyncPayloadKey,
-	syncPromptPayloadSchema,
-} from "@/lib/codebase-sync";
+	type CodebaseLibraryItem,
+	pickLibraryAnalysis,
+} from "@/lib/codebase-library";
 import { requireUserServer } from "@/lib/session";
 
 export function decideCodebaseListEntry(): "allow" {
@@ -40,17 +36,7 @@ export function selectLatestCodebaseSnapshots<
 	return latest;
 }
 
-function formatSnapshotStatus(status: string): string {
-	const labels: Record<string, string> = {
-		uploading: "Mengupload",
-		uploaded: "Terkirim",
-		analyzing: "Menganalisis",
-		ready: "Siap",
-		failed: "Gagal",
-		expired: "Kedaluwarsa",
-	};
-	return labels[status] ?? "Status tidak dikenal";
-}
+export type CodebaseLibraryRow = CodebaseLibraryItem;
 
 const loadCodebases = createServerFn({ method: "GET" }).handler(async () => {
 	const user = await requireUserServer();
@@ -58,15 +44,19 @@ const loadCodebases = createServerFn({ method: "GET" }).handler(async () => {
 	return { codebases: rows };
 });
 
-async function dbSelectCodebases(userId: string) {
+async function dbSelectCodebases(
+	userId: string,
+): Promise<CodebaseLibraryRow[]> {
 	const { db } = await import("@/db");
-	const { codebaseSnapshots, codebases } = await import("@/db/schema");
-	const { desc, eq, inArray } = await import("drizzle-orm");
+	const { codebaseAnalyses, codebaseSnapshots, codebases, projects } =
+		await import("@/db/schema");
+	const { and, desc, eq, inArray, isNull } = await import("drizzle-orm");
 	const rows = await db
 		.select({
 			id: codebases.id,
 			name: codebases.name,
 			createdAt: codebases.createdAt,
+			updatedAt: codebases.updatedAt,
 		})
 		.from(codebases)
 		.where(eq(codebases.userId, userId))
@@ -87,25 +77,89 @@ async function dbSelectCodebases(userId: string) {
 				.orderBy(desc(codebaseSnapshots.createdAt))
 		: [];
 	const latest = selectLatestCodebaseSnapshots(snapshots);
-	return rows.map((row) => ({
-		id: row.id,
-		name: row.name,
-		createdAt: row.createdAt?.toISOString() ?? null,
-		latestSnapshot: latest.get(row.id)
-			? (() => {
-					const snapshot = latest.get(row.id);
-					return snapshot
-						? {
-								id: snapshot.id,
-								createdAt: snapshot.createdAt?.toISOString() ?? null,
-								commitSha: snapshot.commitSha ?? null,
-								fileCount: snapshot.fileCount ?? 0,
-								status: snapshot.status,
-							}
-						: null;
-				})()
-			: null,
-	}));
+	const featureRows = ids.length
+		? await db
+				.select({
+					id: projects.id,
+					codebaseId: projects.codebaseId,
+					updatedAt: projects.updatedAt,
+				})
+				.from(projects)
+				.where(
+					and(
+						inArray(projects.codebaseId, ids),
+						eq(projects.userId, userId),
+						isNull(projects.deletedAt),
+					),
+				)
+				.orderBy(desc(projects.updatedAt))
+		: [];
+	const latestProjectByCodebase = new Map<string, { id: string }>();
+	for (const project of featureRows) {
+		if (!project.codebaseId) continue;
+		if (!latestProjectByCodebase.has(project.codebaseId)) {
+			latestProjectByCodebase.set(project.codebaseId, { id: project.id });
+		}
+	}
+	const projectIds = [...latestProjectByCodebase.values()].map(
+		(project) => project.id,
+	);
+	const analysisRows = projectIds.length
+		? await db
+				.select({
+					id: codebaseAnalyses.id,
+					projectId: codebaseAnalyses.projectId,
+					snapshotId: codebaseAnalyses.snapshotId,
+					output: codebaseAnalyses.output,
+					createdAt: codebaseAnalyses.createdAt,
+				})
+				.from(codebaseAnalyses)
+				.where(
+					and(
+						inArray(codebaseAnalyses.projectId, projectIds),
+						eq(codebaseAnalyses.status, "ready"),
+					),
+				)
+				.orderBy(desc(codebaseAnalyses.createdAt))
+		: [];
+	const latestAnalysisByProject = new Map<
+		string,
+		{ snapshotId: string; analysis: ReturnType<typeof pickLibraryAnalysis> }
+	>();
+	for (const row of analysisRows) {
+		if (latestAnalysisByProject.has(row.projectId)) continue;
+		const parsed = safeParseCodebaseAnalysis(row.output);
+		if (!parsed.success || !parsed.data) continue;
+		latestAnalysisByProject.set(row.projectId, {
+			snapshotId: row.snapshotId,
+			analysis: pickLibraryAnalysis(parsed.data),
+		});
+	}
+	return rows.map((row) => {
+		const snapshot = latest.get(row.id) ?? null;
+		const project = latestProjectByCodebase.get(row.id) ?? null;
+		const stored = project
+			? (latestAnalysisByProject.get(project.id) ?? null)
+			: null;
+		const matchesLatest =
+			Boolean(stored) &&
+			Boolean(snapshot) &&
+			stored?.snapshotId === snapshot?.id;
+		const analysis = matchesLatest && stored ? stored.analysis : null;
+		return {
+			id: row.id,
+			name: row.name,
+			updatedAt: row.updatedAt?.toISOString() ?? null,
+			fileCount: snapshot?.fileCount ?? null,
+			snapshotCreatedAt: snapshot?.createdAt?.toISOString() ?? null,
+			snapshotStatus: snapshot?.status ?? null,
+			summary: analysis?.summary ?? null,
+			framework: analysis?.framework ?? null,
+			language: analysis?.language ?? null,
+			packageManager: analysis?.packageManager ?? null,
+			hasReadyAnalysis: matchesLatest,
+		};
+	});
 }
 
 export const Route = createFileRoute("/codebases/")({
@@ -118,7 +172,16 @@ export const Route = createFileRoute("/codebases/")({
 			throw error;
 		}
 	},
-	head: () => ({ meta: [{ title: "Codebase | VibeEverything" }] }),
+	head: () => ({
+		meta: [
+			{ title: "Project Tersimpan | VibeEverything" },
+			{
+				name: "description",
+				content:
+					"Repository yang pernah kamu hubungkan akan tersimpan di sini. Lanjutkan dari konteks dan workspace sebelumnya.",
+			},
+		],
+	}),
 	component: CodebasesPage,
 	pendingComponent: CodebasesPending,
 	errorComponent: ({ reset }) => (
@@ -127,9 +190,11 @@ export const Route = createFileRoute("/codebases/")({
 				role="alert"
 				className="rounded-xl border border-crimson/40 bg-crimson/10 p-5 text-crimson"
 			>
-				<h1 className="text-lg font-semibold">Codebase gagal dimuat</h1>
+				<h1 className="text-lg font-semibold">
+					Project tersimpan gagal dimuat
+				</h1>
 				<p className="mt-1 text-sm">
-					Periksa koneksi lalu coba muat ulang daftar codebase.
+					Periksa koneksi lalu coba muat ulang daftar project tersimpan.
 				</p>
 				<button
 					type="button"
@@ -149,182 +214,32 @@ function CodebasesPending() {
 			className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14"
 			aria-busy="true"
 		>
-			<header className="border-b border-graphite pb-6">
-				<div className="h-3 w-36 animate-pulse rounded bg-graphite" />
-				<div className="mt-3 h-10 w-48 animate-pulse rounded bg-graphite" />
-				<div className="mt-3 h-4 max-w-xl animate-pulse rounded bg-graphite" />
-			</header>
-			<div className="overflow-hidden rounded-xl border border-graphite bg-charcoal">
-				<div className="h-12 border-b border-graphite bg-graphite/30" />
-				<div className="space-y-1 p-5">
-					{["one", "two", "three"].map((row) => (
-						<div
-							key={row}
-							className="h-14 animate-pulse rounded bg-graphite/40"
-						/>
-					))}
+			<header className="flex flex-col gap-4 border-b border-graphite pb-6 sm:flex-row sm:items-end sm:justify-between">
+				<div>
+					<div className="h-3 w-36 animate-pulse rounded bg-graphite" />
+					<div className="mt-3 h-10 w-64 animate-pulse rounded bg-graphite" />
+					<div className="mt-3 h-4 max-w-xl animate-pulse rounded bg-graphite" />
 				</div>
+				<div className="h-11 w-44 animate-pulse rounded-md bg-graphite/40" />
+			</header>
+			<div className="flex flex-col gap-3">
+				{["one", "two", "three"].map((row) => (
+					<div
+						key={row}
+						className="h-32 animate-pulse rounded-xl border border-graphite bg-charcoal/60"
+					/>
+				))}
 			</div>
-			<p className="text-sm text-fog">Memuat daftar codebase...</p>
+			<p className="text-sm text-fog">Memuat project tersimpan...</p>
 		</main>
 	);
 }
 
 function CodebasesPage() {
 	const { codebases: items } = Route.useLoaderData();
-	const navigate = useNavigate();
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const createCodebase = async () => {
-		setError(null);
-		setIsSubmitting(true);
-		try {
-			const response = await fetch("/api/codebases", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({}),
-			});
-			if (response.status === 401) {
-				window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
-				return;
-			}
-			const body: unknown = await response.json().catch(() => null);
-			let serverError: string | undefined;
-			if (
-				typeof body === "object" &&
-				body !== null &&
-				"error" in body &&
-				typeof body.error === "string"
-			) {
-				serverError = body.error;
-			}
-			if (
-				!response.ok ||
-				typeof body !== "object" ||
-				body === null ||
-				!("id" in body) ||
-				typeof body.id !== "string"
-			) {
-				setError(serverError || "Codebase gagal dibuat. Coba lagi.");
-				return;
-			}
-			const sync =
-				"sync" in body ? syncPromptPayloadSchema.safeParse(body.sync) : null;
-			if (!sync?.success) {
-				setError("Codebase dibuat, tetapi instruksi sync tidak valid.");
-				return;
-			}
-			try {
-				sessionStorage.setItem(
-					getPendingSyncPayloadKey(body.id),
-					JSON.stringify(sync.data),
-				);
-			} catch {
-				// The server already created the codebase; detail status can recover
-				// the session without turning this into a server failure.
-			}
-			await navigate({ to: "/codebases/$id", params: { id: body.id } });
-		} catch {
-			setError("Server tidak dapat dihubungi.");
-		} finally {
-			setIsSubmitting(false);
-		}
-	};
-
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
-			<header className="flex flex-col gap-4 border-b border-graphite pb-6 sm:flex-row sm:items-end sm:justify-between">
-				<div>
-					<p className="font-mono text-xs uppercase tracking-widest text-fog">
-						Workspace / Konteks repository
-					</p>
-					<h1 className="mt-2 text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
-						Codebase
-					</h1>
-					<p className="mt-2 max-w-2xl text-sm leading-6 text-fog">
-						Simpan repository yang sudah disinkronkan untuk merencanakan fitur
-						berikutnya dengan konteks yang sama.
-					</p>
-				</div>
-				<button
-					type="button"
-					onClick={() => void createCodebase()}
-					disabled={isSubmitting}
-					className="min-h-11 rounded-md bg-snow px-4 text-sm font-semibold text-onyx disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					{isSubmitting ? "Menyiapkan..." : "Hubungkan repository"}
-				</button>
-			</header>
-			{error && (
-				<div
-					role="alert"
-					className="rounded-xl border border-crimson/40 bg-crimson/10 p-4 text-sm text-crimson"
-				>
-					{error}
-				</div>
-			)}
-			{items.length === 0 ? (
-				<section className="rounded-xl border border-dashed border-graphite bg-charcoal p-8 sm:p-10">
-					<h2 className="text-xl font-semibold text-snow">
-						Belum ada repository tersimpan
-					</h2>
-					<p className="mt-2 max-w-xl text-sm leading-6 text-fog">
-						Hubungkan repository lokal kamu untuk mendapatkan prompt sync yang
-						bisa dijalankan langsung dari terminal.
-					</p>
-				</section>
-			) : (
-				<div className="overflow-x-auto rounded-xl border border-graphite bg-charcoal">
-					<table className="w-full min-w-[640px] text-left text-sm">
-						<caption className="caption-bottom px-5 py-3 text-left text-xs normal-case tracking-normal text-fog">
-							Snapshot terbaru per codebase, termasuk status sync terakhir.
-						</caption>
-						<thead className="border-b border-graphite text-xs uppercase tracking-wide text-fog">
-							<tr>
-								<th className="px-5 py-4">Nama</th>
-								<th className="px-5 py-4">Sync terakhir</th>
-								<th className="px-5 py-4">Commit</th>
-								<th className="px-5 py-4">File</th>
-								<th className="px-5 py-4">Status</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-graphite/70">
-							{items.map((item) => (
-								<tr key={item.id} className="hover:bg-white/5">
-									<td className="px-5 py-4">
-										<Link
-											to="/codebases/$id"
-											params={{ id: item.id }}
-											className="font-medium text-snow underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-										>
-											{item.name}
-										</Link>
-									</td>
-									<td className="px-5 py-4 text-fog">
-										{item.latestSnapshot?.createdAt
-											? new Date(item.latestSnapshot.createdAt).toLocaleString(
-													"id-ID",
-												)
-											: "Belum pernah sync"}
-									</td>
-									<td className="px-5 py-4 font-mono text-xs text-fog">
-										{item.latestSnapshot?.commitSha ?? "-"}
-									</td>
-									<td className="px-5 py-4 font-mono text-xs text-fog">
-										{item.latestSnapshot?.fileCount ?? "-"}
-									</td>
-									<td className="px-5 py-4 text-fog">
-										{item.latestSnapshot
-											? formatSnapshotStatus(item.latestSnapshot.status)
-											: "-"}
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			)}
+			<CodebaseLibraryView items={items} />
 		</main>
 	);
 }
