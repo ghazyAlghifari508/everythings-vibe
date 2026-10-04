@@ -396,6 +396,14 @@ export function getPendingSyncPayloadKey(projectId: string): string {
 // storage.
 export const PLAN_CODEBASE_ID_STORAGE_KEY = "prdfy:plan-codebase-id";
 export const PLAN_CODEBASE_NAME_STORAGE_KEY = "prdfy:plan-codebase-name";
+// Onboarding analysis project pointer: /plan/codebase ensures one
+// existing-codebase feature project per codebase so the initial analysis can
+// run through the existing per-feature analysis boundary. The value is only
+// the project id — never sync state, which always comes from GET status and
+// GET analysis. Stored alongside the codebase pointer above so refresh
+// recovery reuses the project instead of minting duplicates.
+export const PLAN_CODEBASE_PROJECT_STORAGE_KEY =
+	"prdfy:plan-codebase-project-id";
 
 // One usable credential per project: this predicate is advisory only; session
 // creation must re-check under a per-project transaction/advisory lock

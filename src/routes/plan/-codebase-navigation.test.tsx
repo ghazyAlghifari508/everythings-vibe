@@ -31,6 +31,32 @@ const SYNC_PAYLOAD = {
 	expiresAt: new Date(Date.now() + 3600000).toISOString(),
 };
 
+const ANALYSIS_OUTPUT = {
+	projectId: "proj-nav-1",
+	snapshotId: "snap-nav-1",
+	framework: "TanStack Start",
+	language: "TypeScript",
+	packageManager: "pnpm",
+	dependencies: ["react"],
+	database: "PostgreSQL",
+	auth: "Better Auth",
+	moduleMap: [{ path: "src/routes", summary: "File-based routes" }],
+	relevantFiles: ["src/db/schema.ts"],
+	impactAreas: ["src/routes/api"],
+	limitations: [],
+	findings: [],
+};
+
+function analysisReadyPayload() {
+	return {
+		id: "ana-nav-1",
+		projectId: "proj-nav-1",
+		snapshotId: "snap-nav-1",
+		status: "ready",
+		output: ANALYSIS_OUTPUT,
+	};
+}
+
 function waitingPayload() {
 	return {
 		projectId: "cb-nav-1",
@@ -51,10 +77,15 @@ function uploadedPayload() {
 	};
 }
 
-function mockPlanFlow(statuses: Array<Record<string, unknown>>) {
+function mockPlanFlow(
+	statuses: Array<Record<string, unknown>>,
+	options?: { withAnalysis?: boolean },
+) {
 	let statusCalls = 0;
-	const fetchMock = vi.fn(async (input: unknown) => {
+	let analysisTriggered = false;
+	const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
 		const url = String(input);
+		const method = init?.method ?? "GET";
 		if (url === "/api/codebases") {
 			return {
 				ok: true,
@@ -69,9 +100,56 @@ function mockPlanFlow(statuses: Array<Record<string, unknown>>) {
 		if (url.includes("/api/codebases/cb-nav-1/status")) {
 			statusCalls += 1;
 			const payload = statuses[Math.min(statusCalls - 1, statuses.length - 1)];
+			if (
+				options?.withAnalysis &&
+				analysisTriggered &&
+				typeof payload === "object" &&
+				payload !== null &&
+				"snapshotId" in payload &&
+				typeof payload.snapshotId === "string"
+			) {
+				return {
+					ok: true,
+					status: 200,
+					json: async () => ({ ...payload, analysisStatus: "ready" }),
+				};
+			}
 			return { ok: true, status: 200, json: async () => payload };
 		}
-		throw new Error(`unexpected fetch ${url}`);
+		if (
+			options?.withAnalysis &&
+			url === "/api/codebases/cb-nav-1/features" &&
+			method === "POST"
+		) {
+			return {
+				ok: true,
+				status: 200,
+				json: async () => ({ projectId: "proj-nav-1", name: "Nav Repo" }),
+			};
+		}
+		if (
+			options?.withAnalysis &&
+			url === "/api/v1/projects/proj-nav-1/codebase/analysis" &&
+			method === "POST"
+		) {
+			analysisTriggered = true;
+			return {
+				ok: true,
+				status: 200,
+				json: async () => analysisReadyPayload(),
+			};
+		}
+		if (
+			options?.withAnalysis &&
+			url.startsWith("/api/v1/projects/proj-nav-1/codebase/analysis")
+		) {
+			return {
+				ok: true,
+				status: 200,
+				json: async () => analysisReadyPayload(),
+			};
+		}
+		throw new Error(`unexpected fetch ${method} ${url}`);
 	});
 	vi.stubGlobal("fetch", fetchMock);
 	return {
@@ -91,6 +169,29 @@ async function startSyncing() {
 	await waitFor(() => {
 		expect(screen.getByText("Sync codebase")).toBeDefined();
 	});
+}
+
+async function waitForEnabledReviewCta() {
+	await waitFor(
+		() => {
+			const card = screen.queryByTestId("sync-card");
+			const cta = card?.querySelector(
+				'[data-testid="plan-continue-to-summary"]',
+			) as HTMLButtonElement | null;
+			expect(cta?.disabled).toBe(false);
+		},
+		{ timeout: 15000, interval: 100 },
+	);
+}
+
+function clickReviewCta() {
+	(
+		screen
+			.getByTestId("sync-card")
+			.querySelector(
+				'[data-testid="plan-continue-to-summary"]',
+			) as HTMLButtonElement
+	).click();
 }
 
 describe("PlanCodebasePage navigation policy", () => {
@@ -113,14 +214,14 @@ describe("PlanCodebasePage navigation policy", () => {
 		}
 	});
 
-	it("uploaded observed live does not auto-advance away from Pantau Sync", async () => {
+	it("uploaded observed live does not auto-advance away from Pantau Sync", {
+		timeout: 20000,
+	}, async () => {
 		const flow = mockPlanFlow([waitingPayload(), uploadedPayload()]);
 		await startSyncing();
 		await waitFor(
 			() => {
-				expect(
-					screen.getByText("Snapshot terkirim dan terverifikasi"),
-				).toBeDefined();
+				expect(screen.getByText("Source code tersinkron")).toBeDefined();
 			},
 			{ timeout: 6000, interval: 100 },
 		);
@@ -128,7 +229,9 @@ describe("PlanCodebasePage navigation policy", () => {
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 	});
 
-	it("analyzing observed live does not auto-advance away from Pantau Sync", async () => {
+	it("analyzing observed live does not auto-advance away from Pantau Sync", {
+		timeout: 20000,
+	}, async () => {
 		mockPlanFlow([
 			waitingPayload(),
 			{
@@ -142,14 +245,16 @@ describe("PlanCodebasePage navigation policy", () => {
 		await startSyncing();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Menyusun analisis codebase")).toBeDefined();
+				expect(screen.getByText("Menganalisis codebase...")).toBeDefined();
 			},
 			{ timeout: 6000, interval: 100 },
 		);
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 	});
 
-	it("ready without analysis output does not render the analysis review", async () => {
+	it("ready without analysis output does not render the analysis review", {
+		timeout: 20000,
+	}, async () => {
 		mockPlanFlow([
 			waitingPayload(),
 			{
@@ -171,90 +276,85 @@ describe("PlanCodebasePage navigation policy", () => {
 		expect(screen.queryByText("Detected environment")).toBeNull();
 	});
 
-	it("explicit snapshot-ready continue advances sync to the snapshot handoff", async () => {
-		mockPlanFlow([waitingPayload(), uploadedPayload()]);
+	it("explicit review continue advances sync to the validated analysis review", {
+		timeout: 20000,
+	}, async () => {
+		mockPlanFlow([waitingPayload(), uploadedPayload()], {
+			withAnalysis: true,
+		});
 		await startSyncing();
-		await waitFor(
-			() => {
-				expect(screen.getByTestId("plan-continue-to-summary")).toBeDefined();
-			},
-			{ timeout: 6000, interval: 100 },
-		);
-		screen.getByTestId("plan-continue-to-summary").click();
+		await waitForEnabledReviewCta();
+		clickReviewCta();
 		await waitFor(() => {
-			expect(screen.getByTestId("codebase-sync-summary")).toBeDefined();
+			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
 		expect(screen.getByText("snap-nav-1")).toBeDefined();
 	});
 
-	it("manual Back to Pantau Sync sticks across later polls without flicker", async () => {
-		mockPlanFlow([waitingPayload(), uploadedPayload()]);
-		await startSyncing();
-		await waitFor(
-			() => {
-				expect(screen.getByTestId("plan-continue-to-summary")).toBeDefined();
-			},
-			{ timeout: 6000, interval: 100 },
-		);
-		screen.getByTestId("plan-continue-to-summary").click();
-		await waitFor(() => {
-			expect(screen.getByTestId("codebase-sync-summary")).toBeDefined();
+	it("manual Back to Pantau Sync sticks across later polls without flicker", {
+		timeout: 20000,
+	}, async () => {
+		mockPlanFlow([waitingPayload(), uploadedPayload()], {
+			withAnalysis: true,
 		});
-		screen.getByRole("button", { name: /Kembali ke Pantau Sync/i }).click();
+		await startSyncing();
+		await waitForEnabledReviewCta();
+		clickReviewCta();
+		await waitFor(() => {
+			expect(screen.getByText("Detected environment")).toBeDefined();
+		});
+		screen.getByRole("button", { name: /Lihat log sync/i }).click();
 		await waitFor(() => {
 			expect(screen.getByText("Sync codebase")).toBeDefined();
 		});
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 		await waitFor(
 			() => {
-				expect(
-					screen.getByText("Snapshot terkirim dan terverifikasi"),
-				).toBeDefined();
+				expect(screen.getByText("Source code tersinkron")).toBeDefined();
 			},
 			{ timeout: 6000, interval: 100 },
 		);
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 	});
 
-	it("explicit return from sync to the handoff stays allowed while the snapshot is valid", async () => {
-		mockPlanFlow([waitingPayload(), uploadedPayload()]);
+	it("explicit return from sync to the review stays allowed while the analysis is valid", {
+		timeout: 20000,
+	}, async () => {
+		mockPlanFlow([waitingPayload(), uploadedPayload()], {
+			withAnalysis: true,
+		});
 		await startSyncing();
-		await waitFor(
-			() => {
-				expect(screen.getByTestId("plan-continue-to-summary")).toBeDefined();
-			},
-			{ timeout: 6000, interval: 100 },
-		);
-		screen.getByTestId("plan-continue-to-summary").click();
+		await waitForEnabledReviewCta();
+		clickReviewCta();
 		await waitFor(() => {
-			expect(screen.getByTestId("codebase-sync-summary")).toBeDefined();
+			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
-		screen.getByRole("button", { name: /Kembali ke Pantau Sync/i }).click();
+		screen.getByRole("button", { name: /Lihat log sync/i }).click();
+		await waitForEnabledReviewCta();
+		clickReviewCta();
 		await waitFor(() => {
-			expect(screen.getByTestId("plan-continue-to-summary")).toBeDefined();
-		});
-		screen.getByTestId("plan-continue-to-summary").click();
-		await waitFor(() => {
-			expect(screen.getByTestId("codebase-sync-summary")).toBeDefined();
+			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
 	});
 
-	it("snapshot handoff never claims to be the analysis conclusion", async () => {
-		mockPlanFlow([waitingPayload(), uploadedPayload()]);
-		await startSyncing();
-		await waitFor(
-			() => {
-				expect(screen.getByTestId("plan-continue-to-summary")).toBeDefined();
-			},
-			{ timeout: 6000, interval: 100 },
-		);
-		screen.getByTestId("plan-continue-to-summary").click();
-		await waitFor(() => {
-			expect(screen.getByTestId("codebase-sync-summary")).toBeDefined();
+	it("final review renders validated analysis, never a snapshot-only table", {
+		timeout: 20000,
+	}, async () => {
+		mockPlanFlow([waitingPayload(), uploadedPayload()], {
+			withAnalysis: true,
 		});
+		await startSyncing();
+		await waitForEnabledReviewCta();
+		clickReviewCta();
+		await waitFor(() => {
+			expect(screen.getByText("Detected environment")).toBeDefined();
+		});
+		expect(screen.queryByText("Snapshot siap")).toBeNull();
+		expect(screen.queryByText("Sync Selesai — Snapshot Siap")).toBeNull();
 		expect(
 			screen.queryByText("Kesimpulan Analisis Codebase & Stack"),
 		).toBeNull();
+		expect(screen.getByText("TanStack Start")).toBeDefined();
 		expect(screen.getByText("snap-nav-1")).toBeDefined();
 	});
 });

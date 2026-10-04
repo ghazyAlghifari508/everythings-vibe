@@ -125,16 +125,22 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		expect(screen.getByRole("button", { name: "Coba lagi" })).toBeDefined();
 	});
 
-	it("recovers uploaded persisted state after refresh without creating a new codebase", async () => {
+	it("recovers uploaded persisted state after refresh without creating a new codebase", {
+		timeout: 20000,
+	}, async () => {
 		try {
 			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-recover-1");
 			sessionStorage.setItem("prdfy:plan-codebase-name", "Recovered Repo");
 		} catch {
 			// Storage unavailable still exercises the fresh path below.
 		}
-		const fetchMock = vi.fn(async (input: unknown) => {
+		let statusCalls = 0;
+		let analysisTriggered = false;
+		const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
 			const url = String(input);
+			const method = init?.method ?? "GET";
 			if (url.endsWith("/status")) {
+				statusCalls += 1;
 				return {
 					ok: true,
 					status: 200,
@@ -145,21 +151,148 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 						snapshotId: "snap-recover-1",
 						fileCount: 37,
 						excludedCount: 5,
+						...(analysisTriggered ? { analysisStatus: "ready" as const } : {}),
 					}),
 				};
 			}
-			throw new Error(`unexpected fetch ${url}`);
+			if (url.endsWith("/features") && method === "POST") {
+				return {
+					ok: true,
+					status: 200,
+					json: async () => ({
+						projectId: "proj-recover-1",
+						name: "Recovered Repo",
+					}),
+				};
+			}
+			if (url.endsWith("/codebase/analysis") && method === "POST") {
+				analysisTriggered = true;
+				return {
+					ok: true,
+					status: 200,
+					json: async () => ({
+						id: "ana-recover-1",
+						projectId: "proj-recover-1",
+						snapshotId: "snap-recover-1",
+						status: "ready",
+						output: {
+							projectId: "proj-recover-1",
+							snapshotId: "snap-recover-1",
+							framework: "TanStack Start",
+							language: "TypeScript",
+						},
+					}),
+				};
+			}
+			if (url.includes("/codebase/analysis")) {
+				return {
+					ok: true,
+					status: 200,
+					json: async () => ({
+						id: "ana-recover-1",
+						projectId: "proj-recover-1",
+						snapshotId: "snap-recover-1",
+						status: "ready",
+						output: {
+							projectId: "proj-recover-1",
+							snapshotId: "snap-recover-1",
+							framework: "TanStack Start",
+							language: "TypeScript",
+						},
+					}),
+				};
+			}
+			throw new Error(`unexpected fetch ${method} ${url}`);
 		});
 		vi.stubGlobal("fetch", fetchMock);
 
 		render(<PlanCodebasePage />);
 
-		await waitFor(() => {
-			expect(screen.getByTestId("codebase-sync-summary")).toBeDefined();
-		});
-		expect(screen.getByText("snap-recover-1")).toBeDefined();
+		// Uploaded transport alone never jumps to the review: sync resumes
+		// first, then the real analysis runs through the existing boundary.
+		await waitFor(
+			() => {
+				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+			},
+			{ timeout: 10000, interval: 100 },
+		);
+		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 		expect(fetchMock).not.toHaveBeenCalledWith(
-			expect.stringContaining("/api/codebases"),
+			"/api/codebases",
+			expect.objectContaining({ method: "POST" }),
+		);
+		await waitFor(
+			() => {
+				expect(analysisTriggered).toBe(true);
+			},
+			{ timeout: 10000, interval: 100 },
+		);
+		expect(statusCalls).toBeGreaterThanOrEqual(1);
+	});
+
+	it("recovers directly to the validated review when analysis output is already stored", {
+		timeout: 20000,
+	}, async () => {
+		try {
+			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-recover-2");
+			sessionStorage.setItem("prdfy:plan-codebase-name", "Recovered Repo");
+			sessionStorage.setItem(
+				"prdfy:plan-codebase-project-id",
+				"proj-recover-2",
+			);
+		} catch {
+			// Best-effort only.
+		}
+		const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
+			const url = String(input);
+			const method = init?.method ?? "GET";
+			if (url.endsWith("/status")) {
+				return {
+					ok: true,
+					status: 200,
+					json: async () => ({
+						projectId: "cb-recover-2",
+						sessionId: "sess-recover-2",
+						status: "uploaded",
+						snapshotId: "snap-recover-2",
+						fileCount: 12,
+						excludedCount: 1,
+					}),
+				};
+			}
+			if (url.includes("/codebase/analysis")) {
+				return {
+					ok: true,
+					status: 200,
+					json: async () => ({
+						id: "ana-recover-2",
+						projectId: "proj-recover-2",
+						snapshotId: "snap-recover-2",
+						status: "ready",
+						output: {
+							projectId: "proj-recover-2",
+							snapshotId: "snap-recover-2",
+							framework: "TanStack Start",
+							language: "TypeScript",
+						},
+					}),
+				};
+			}
+			throw new Error(`unexpected fetch ${method} ${url}`);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		render(<PlanCodebasePage />);
+
+		await waitFor(
+			() => {
+				expect(screen.getByText("Detected environment")).toBeDefined();
+			},
+			{ timeout: 10000, interval: 100 },
+		);
+		expect(screen.getByText("TanStack Start")).toBeDefined();
+		expect(fetchMock).not.toHaveBeenCalledWith(
+			"/api/codebases",
 			expect.objectContaining({ method: "POST" }),
 		);
 	});

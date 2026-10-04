@@ -1,11 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CodebaseReview } from "@/components/codebase/codebase-review";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { SyncStatus } from "@/components/codebase/sync-status";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import {
+	type AnalysisResponse,
+	analysisResponseSchema,
+} from "@/lib/codebase-analysis";
+import {
 	PLAN_CODEBASE_ID_STORAGE_KEY,
 	PLAN_CODEBASE_NAME_STORAGE_KEY,
+	PLAN_CODEBASE_PROJECT_STORAGE_KEY,
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
@@ -48,6 +54,34 @@ function clearStoredPlanCodebase(): void {
 	}
 }
 
+function readStoredPlanProject(): string | null {
+	try {
+		if (typeof sessionStorage === "undefined") return null;
+		const id = sessionStorage.getItem(PLAN_CODEBASE_PROJECT_STORAGE_KEY);
+		return id && id.trim().length > 0 ? id : null;
+	} catch {
+		return null;
+	}
+}
+
+function storePlanProject(id: string): void {
+	try {
+		if (typeof sessionStorage === "undefined") return;
+		sessionStorage.setItem(PLAN_CODEBASE_PROJECT_STORAGE_KEY, id);
+	} catch {
+		// Storage is a best-effort pointer only; server remains source of truth.
+	}
+}
+
+function clearStoredPlanProject(): void {
+	try {
+		if (typeof sessionStorage === "undefined") return;
+		sessionStorage.removeItem(PLAN_CODEBASE_PROJECT_STORAGE_KEY);
+	} catch {
+		// Best-effort only.
+	}
+}
+
 export const Route = createFileRoute("/plan/codebase")({
 	head: () => ({
 		meta: [
@@ -78,6 +112,17 @@ export function PlanCodebasePage() {
 	const [lastStatus, setLastStatus] = useState<SyncStatusResponse | null>(null);
 	const [sessionNonce, setSessionNonce] = useState(0);
 	const autoInitAttempted = useRef(false);
+	// Onboarding analysis context: one existing-codebase feature project per
+	// codebase, so the initial analysis runs through the existing per-feature
+	// analysis boundary (features -> analysis trigger -> analysis read) and
+	// the summary can reuse the canonical CodebaseReview with real output.
+	// The project id is only a pointer; authoritative state always comes from
+	// GET status (analysisStatus) and GET analysis (validated output).
+	const [featureProjectId, setFeatureProjectId] = useState<string | null>(null);
+	const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+	const [analysisWorking, setAnalysisWorking] = useState(false);
+	const [analysisError, setAnalysisError] = useState<string | null>(null);
+	const analysisAttemptedFor = useRef<string | null>(null);
 
 	useEffect(() => {
 		setStep("prompt");
@@ -128,6 +173,11 @@ export function PlanCodebasePage() {
 				name: codebaseName,
 			});
 			storePlanCodebase(body.id, codebaseName);
+			clearStoredPlanProject();
+			setFeatureProjectId(null);
+			setAnalysis(null);
+			setAnalysisError(null);
+			analysisAttemptedFor.current = null;
 			setPayload(sync.data);
 			setLastStatus(null);
 			setStep("prompt");
@@ -138,6 +188,147 @@ export function PlanCodebasePage() {
 			setIsStarting(false);
 		}
 	}, [setStep]);
+
+	// Ensure the single onboarding analysis project for this codebase via the
+	// existing features boundary. The stored pointer is reused so refresh and
+	// remount never mint duplicate projects; the server still owns validation
+	// (CODEBASE_NOT_SYNCED races surface as an honest error below).
+	const ensureFeatureProject = useCallback(
+		async (
+			codebaseId: string,
+			fallbackName: string,
+		): Promise<string | null> => {
+			const stored = readStoredPlanProject();
+			if (stored) {
+				setFeatureProjectId(stored);
+				return stored;
+			}
+			const message =
+				fallbackName.trim().length >= 3
+					? fallbackName.trim()
+					: "Ringkasan codebase awal";
+			try {
+				const response = await fetch(
+					`/api/codebases/${encodeURIComponent(codebaseId)}/features`,
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ message }),
+					},
+				);
+				if (response.status === 401) {
+					window.location.href = `/login?redirect=${encodeURIComponent("/plan/codebase")}`;
+					return null;
+				}
+				const body: unknown = await response.json().catch(() => null);
+				const projectId =
+					typeof body === "object" &&
+					body !== null &&
+					"projectId" in body &&
+					typeof body.projectId === "string"
+						? body.projectId
+						: null;
+				const serverError =
+					typeof body === "object" &&
+					body !== null &&
+					"error" in body &&
+					typeof body.error === "string"
+						? body.error
+						: null;
+				if (!response.ok || !projectId) {
+					setAnalysisError(
+						serverError ?? "Konteks analisis gagal disiapkan. Coba lagi.",
+					);
+					return null;
+				}
+				storePlanProject(projectId);
+				setFeatureProjectId(projectId);
+				return projectId;
+			} catch {
+				setAnalysisError("Server tidak dapat dihubungi.");
+				return null;
+			}
+		},
+		[],
+	);
+
+	// Run the real per-feature analysis through the existing trigger boundary.
+	// The call is synchronous server-side (model thinking included) and
+	// idempotent: a pending or ready row is reused, only failure mints a new
+	// attempt. Credit and validation failures surface as honest errors, never
+	// as fabricated output.
+	const triggerOnboardingAnalysis = useCallback(
+		async (projectId: string, snapshotId: string): Promise<void> => {
+			setAnalysisWorking(true);
+			setAnalysisError(null);
+			try {
+				const response = await fetch(
+					`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ snapshotId }),
+					},
+				);
+				if (response.status === 401) {
+					window.location.href = `/login?redirect=${encodeURIComponent("/plan/codebase")}`;
+					return;
+				}
+				const body: unknown = await response.json().catch(() => null);
+				const serverError =
+					typeof body === "object" &&
+					body !== null &&
+					"error" in body &&
+					typeof body.error === "string"
+						? body.error
+						: null;
+				if (response.status === 403) {
+					setAnalysisError(
+						serverError ?? "Kredit tidak mencukupi untuk analisis codebase.",
+					);
+					return;
+				}
+				const parsed = analysisResponseSchema.safeParse(body);
+				if (!response.ok || !parsed.success) {
+					setAnalysisError(
+						serverError ?? "Analisis codebase gagal. Coba analisis ulang.",
+					);
+					return;
+				}
+				setAnalysis(parsed.data);
+			} catch {
+				setAnalysisError("Server tidak dapat dihubungi.");
+			} finally {
+				setAnalysisWorking(false);
+			}
+		},
+		[],
+	);
+
+	// Read the validated analysis output through the existing read boundary.
+	// Returns null when no row exists yet (trigger effect owns creation).
+	const fetchAnalysisOutput = useCallback(
+		async (
+			projectId: string,
+			snapshotId: string,
+		): Promise<AnalysisResponse | null> => {
+			try {
+				const response = await fetch(
+					`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis?snapshotId=${encodeURIComponent(snapshotId)}`,
+				);
+				if (!response.ok) return null;
+				const parsed = analysisResponseSchema.safeParse(
+					await response.json().catch(() => null),
+				);
+				if (!parsed.success) return null;
+				setAnalysis(parsed.data);
+				return parsed.data;
+			} catch {
+				return null;
+			}
+		},
+		[],
+	);
 
 	// Refresh recovery: the stored id is only a pointer. Authoritative sync
 	// state comes from GET status. A missing token after refresh is never
@@ -168,14 +359,38 @@ export function PlanCodebasePage() {
 			setCodebase({ id: stored.id, name: stored.name });
 			setLastStatus(recovered);
 			setSessionNonce((current) => current + 1);
-			// Codebase-scoped sessions stay uploaded after sync; analysis runs
-			// per-feature later, so uploaded already means snapshot ready.
+			// An uploaded snapshot is transport-complete, not analysis-complete.
+			// Resume the onboarding review only when validated analysis output for
+			// this exact snapshot is already stored; anything less lands on
+			// syncing, where live polling and the trigger effect take over
+			// honestly instead of showing a snapshot-only summary.
 			if (
 				recovered.snapshotId &&
 				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status)
 			) {
+				const storedProject = readStoredPlanProject();
+				if (storedProject) {
+					setFeatureProjectId(storedProject);
+					const existing = await fetchAnalysisOutput(
+						storedProject,
+						recovered.snapshotId,
+					);
+					if (
+						existing?.output &&
+						existing.snapshotId === recovered.snapshotId &&
+						existing.status === "ready"
+					) {
+						analysisAttemptedFor.current = recovered.snapshotId;
+						setPayload(null);
+						setStep("summary");
+						return true;
+					}
+					if (existing) {
+						analysisAttemptedFor.current = recovered.snapshotId;
+					}
+				}
 				setPayload(null);
-				setStep("summary");
+				setStep("syncing");
 				return true;
 			}
 			if (
@@ -212,7 +427,7 @@ export function PlanCodebasePage() {
 		} finally {
 			setIsStarting(false);
 		}
-	}, [setStep]);
+	}, [setStep, fetchAnalysisOutput]);
 
 	useEffect(() => {
 		if (autoInitAttempted.current) return;
@@ -252,6 +467,9 @@ export function PlanCodebasePage() {
 			}
 			setPayload(parsed.data);
 			setLastStatus(null);
+			setAnalysis(null);
+			setAnalysisError(null);
+			analysisAttemptedFor.current = null;
 			setStep("prompt");
 			setSessionNonce((current) => current + 1);
 		} catch {
@@ -260,6 +478,13 @@ export function PlanCodebasePage() {
 			setIsStarting(false);
 		}
 	};
+
+	const retryAnalysis = useCallback(() => {
+		if (!featureProjectId || !lastStatus?.snapshotId) return;
+		analysisAttemptedFor.current = null;
+		setAnalysisError(null);
+		void triggerOnboardingAnalysis(featureProjectId, lastStatus.snapshotId);
+	}, [featureProjectId, lastStatus, triggerOnboardingAnalysis]);
 
 	// Domain state and UI navigation are separate concepts. Polling only
 	// records the latest server state here; step changes are explicit user
@@ -273,14 +498,65 @@ export function PlanCodebasePage() {
 		setLastStatus(status);
 	};
 
-	// Snapshot handoff is available once the server persisted a snapshot for
-	// the current attempt. Analysis readiness is a different state owned by
-	// the per-feature analysis flow in the workspace, never implied here.
-	const snapshotReady = Boolean(
-		lastStatus?.snapshotId &&
-			lastStatus &&
+	// The final review reuses the canonical CodebaseReview only when validated
+	// analysis output for the exact current snapshot is in hand. This mirrors
+	// the workspace canRenderCodebaseReview predicate; a snapshot alone never
+	// counts as a review.
+	const reviewReady = Boolean(
+		analysis?.output &&
+			lastStatus?.snapshotId &&
+			analysis.snapshotId === lastStatus.snapshotId &&
 			SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status),
 	);
+
+	// Onboarding analysis trigger: once the server persisted a snapshot for
+	// the current attempt, ensure the onboarding feature project and run the
+	// real analysis through the existing boundary. Single-flight per snapshot;
+	// the trigger is idempotent server-side, so refresh and remount are safe.
+	// Never auto-navigates: reaching "summary" stays an explicit user action
+	// on the in-card review CTA.
+	useEffect(() => {
+		const snapshotId = lastStatus?.snapshotId;
+		if (!codebase || !lastStatus || !snapshotId) return;
+		if (!SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status)) return;
+		if (reviewReady) return;
+		if (analysisAttemptedFor.current === snapshotId) return;
+		analysisAttemptedFor.current = snapshotId;
+		void (async () => {
+			const projectId =
+				featureProjectId ??
+				(await ensureFeatureProject(codebase.id, codebase.name));
+			if (!projectId) return;
+			await triggerOnboardingAnalysis(projectId, snapshotId);
+		})();
+	}, [
+		codebase,
+		lastStatus,
+		featureProjectId,
+		reviewReady,
+		ensureFeatureProject,
+		triggerOnboardingAnalysis,
+	]);
+
+	// Pull validated analysis output once status reports it. The status
+	// endpoint only attaches analysisStatus when the analysis project query
+	// is present (wired via SyncStatus analysisProjectId below), so this
+	// effect only ever renders server-persisted output, never a fabrication.
+	useEffect(() => {
+		const snapshotId = lastStatus?.snapshotId;
+		if (!featureProjectId || !snapshotId) return;
+		if (
+			lastStatus.analysisStatus !== "ready" &&
+			lastStatus.analysisStatus !== "failed"
+		)
+			return;
+		if (
+			analysis?.snapshotId === snapshotId &&
+			analysis.status === lastStatus.analysisStatus
+		)
+			return;
+		void fetchAnalysisOutput(featureProjectId, snapshotId);
+	}, [featureProjectId, lastStatus, analysis, fetchAnalysisOutput]);
 
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
@@ -368,106 +644,85 @@ export function PlanCodebasePage() {
 
 					{step === "syncing" && (
 						<>
+							{analysisError && (
+								<div
+									role="alert"
+									className="mx-auto w-full max-w-2xl rounded-xl border border-crimson/40 bg-crimson/10 p-4 text-xs text-crimson"
+								>
+									{analysisError}
+								</div>
+							)}
 							<SyncStatus
 								key={sessionNonce}
 								projectId={codebase.id}
 								projectName={codebase.name}
 								status={lastStatus}
 								statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
+								analysisProjectId={featureProjectId ?? undefined}
 								onStatus={handleStatus}
 								onRetrySync={() => void retrySession()}
+								onRetryAnalysis={
+									featureProjectId && lastStatus?.snapshotId
+										? retryAnalysis
+										: undefined
+								}
 								onBackToInstructions={() => setStep("prompt")}
+								onViewReview={() => setStep("summary")}
 							/>
-							{snapshotReady && (
-								<div className="mx-auto w-full max-w-2xl rounded-xl border border-graphite bg-charcoal p-5 sm:p-6 text-center">
-									<p className="text-sm font-medium text-snow">Snapshot siap</p>
-									<p className="mt-1 text-xs text-fog">
-										Snapshot terverifikasi
-										{typeof lastStatus?.fileCount === "number"
-											? ` (${lastStatus.fileCount} file)`
-											: ""}
-										. Lanjut untuk melihat ringkasan dan masuk ke workspace.
-									</p>
-									<button
-										type="button"
-										data-testid="plan-continue-to-summary"
-										onClick={() => setStep("summary")}
-										className="mt-4 inline-flex min-h-10 items-center rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										Lanjut ke Ringkasan →
-									</button>
-								</div>
-							)}
 						</>
 					)}
 
-					{step === "summary" && (
-						<section
-							data-testid="codebase-sync-summary"
-							className="mx-auto w-full max-w-2xl rounded-xl border border-emerald/30 bg-charcoal p-5 sm:p-6"
-						>
-							<div className="flex items-center justify-between">
-								<p className="font-mono text-[11px] uppercase tracking-widest text-emerald">
-									✓ Snapshot Terverifikasi
-								</p>
-								<span className="rounded bg-emerald-bg px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald border border-emerald/30">
-									Siap Digunakan
-								</span>
-							</div>
-							<h2 className="mt-2 text-xl font-semibold text-snow">
-								Sync Selesai — Snapshot Siap
-							</h2>
-							<p className="mt-1 text-xs text-fog">
-								Snapshot codebase sudah tersimpan dan terverifikasi di server.
-								Analisis codebase berjalan per fitur di workspace — buka
-								workspace untuk merancang fitur di atas codebase ini.
-							</p>
-
-							<dl className="mt-5 flex flex-col gap-2.5 text-sm">
-								<div className="flex items-center justify-between gap-3 rounded-lg border border-graphite bg-obsidian px-3.5 py-2.5">
-									<dt className="text-fog">Repository</dt>
-									<dd className="font-semibold text-snow">{codebase.name}</dd>
-								</div>
-								<div className="flex items-center justify-between gap-3 rounded-lg border border-graphite bg-obsidian px-3.5 py-2.5">
-									<dt className="text-fog">File tersinkron</dt>
-									<dd className="font-mono text-snow">
-										{lastStatus?.fileCount ?? "-"} file
-										{typeof lastStatus?.excludedCount === "number"
-											? ` (${lastStatus.excludedCount} dikecualikan)`
-											: ""}
-									</dd>
-								</div>
-								<div className="flex items-center justify-between gap-3 rounded-lg border border-graphite bg-obsidian px-3.5 py-2.5">
-									<dt className="text-fog">Snapshot ID</dt>
-									<dd className="truncate font-mono text-xs text-mist max-w-[280px]">
-										{lastStatus?.snapshotId ?? "-"}
-									</dd>
-								</div>
-							</dl>
-
-							<div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-graphite/60 pt-4">
-								<button
-									type="button"
-									onClick={() => setStep("syncing")}
-									className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									← Kembali ke Pantau Sync
-								</button>
-								<button
-									type="button"
-									onClick={() =>
+					{step === "summary" &&
+						(reviewReady && analysis?.output && lastStatus?.snapshotId ? (
+							<section data-testid="codebase-sync-summary">
+								<CodebaseReview
+									analysis={analysis.output}
+									snapshotId={lastStatus.snapshotId}
+									snapshotCreatedAt={lastStatus.snapshotCreatedAt}
+									fileCount={lastStatus.fileCount}
+									excludedCount={lastStatus.excludedCount}
+									isWorking={analysisWorking}
+									errorMessage={analysisError}
+									continueLabel="Masuk ke Workspace →"
+									onRetrySync={() => void retrySession()}
+									onRetryAnalysis={retryAnalysis}
+									onContinue={() =>
 										void navigate({
 											to: "/codebases/$id",
 											params: { id: codebase.id },
 										})
 									}
-									className="inline-flex min-h-10 items-center rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									Masuk ke 3-Pane Workspace →
-								</button>
-							</div>
-						</section>
-					)}
+									onBackToSync={() => setStep("syncing")}
+								/>
+							</section>
+						) : (
+							<section
+								data-testid="codebase-sync-summary"
+								className="mx-auto w-full max-w-2xl rounded-xl border border-graphite bg-charcoal p-5 sm:p-6 text-center"
+							>
+								<p className="text-sm font-medium text-snow">
+									Menyiapkan ringkasan analisis...
+								</p>
+								<p className="mt-1 text-xs text-fog">
+									Hasil analisis yang tervalidasi sedang dimuat dari server.
+									Ringkasan hanya tampil setelah analisis benar-benar selesai.
+								</p>
+								{analysisError && (
+									<p role="alert" className="mt-3 text-xs text-crimson">
+										{analysisError}
+									</p>
+								)}
+								<div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+									<button
+										type="button"
+										onClick={() => setStep("syncing")}
+										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									>
+										← Kembali ke Pantau Sync
+									</button>
+								</div>
+							</section>
+						))}
 				</>
 			)}
 		</main>
