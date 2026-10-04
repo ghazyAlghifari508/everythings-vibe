@@ -73,7 +73,10 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 							{ status: 429 },
 						);
 					const [codebase] = await db
-						.select({ id: codebases.id })
+						.select({
+							id: codebases.id,
+							name: codebases.name,
+						})
 						.from(codebases)
 						.where(
 							and(eq(codebases.id, codebaseId), eq(codebases.userId, user.id)),
@@ -265,6 +268,11 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 						projectId: codebaseId,
 						sessionId: session.id,
 						status,
+						// The canonical persisted name. A CLI that has already
+						// handshaken has replaced the creation placeholder, so an open
+						// onboarding page learns the real repository name from polling
+						// rather than holding a stale one.
+						codebaseName: codebase.name,
 						snapshotId: snapshot?.id ?? null,
 						snapshotCreatedAt: toIso(snapshot?.createdAt),
 						fileCount: snapshot?.fileCount ?? undefined,

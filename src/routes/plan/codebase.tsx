@@ -20,15 +20,18 @@ import {
 } from "@/lib/codebase-sync";
 import { useUIStore } from "@/store";
 
-function readStoredPlanCodebase(): { id: string; name: string } | null {
+function readStoredPlanCodebase(): { id: string; name: string | null } | null {
 	try {
 		if (typeof sessionStorage === "undefined") return null;
 		const id = sessionStorage.getItem(PLAN_CODEBASE_ID_STORAGE_KEY);
 		if (!id) return null;
-		const name =
-			sessionStorage.getItem(PLAN_CODEBASE_NAME_STORAGE_KEY) ??
-			"Repository Lokal";
-		return { id, name };
+		// Stored under its own key or absent: the server status response is the
+		// authority, so a missing name is never backfilled with a guess.
+		const storedName = sessionStorage.getItem(PLAN_CODEBASE_NAME_STORAGE_KEY);
+		return {
+			id,
+			name: storedName && storedName.length > 0 ? storedName : null,
+		};
 	} catch {
 		return null;
 	}
@@ -165,14 +168,15 @@ export function PlanCodebasePage() {
 				return;
 			}
 			const codebaseName =
-				"name" in body && typeof body.name === "string"
-					? body.name
-					: "Repository Lokal";
+				"name" in body && typeof body.name === "string" ? body.name : null;
+			if (!codebaseName) {
+				setError("Codebase dibuat, tetapi nama tidak diterima. Coba lagi.");
+				return;
+			}
 			setCodebase({
 				id: body.id,
 				name: codebaseName,
 			});
-			storePlanCodebase(body.id, codebaseName);
 			clearStoredPlanProject();
 			setFeatureProjectId(null);
 			setAnalysis(null);
@@ -356,7 +360,12 @@ export function PlanCodebasePage() {
 				return false;
 			}
 			const recovered = statusParsed.data;
-			setCodebase({ id: stored.id, name: stored.name });
+			const recoveredName = recovered.codebaseName ?? stored.name;
+			if (!recoveredName) {
+				clearStoredPlanCodebase();
+				return false;
+			}
+			setCodebase({ id: stored.id, name: recoveredName });
 			setLastStatus(recovered);
 			setSessionNonce((current) => current + 1);
 			// An uploaded snapshot is transport-complete, not analysis-complete.
@@ -496,7 +505,24 @@ export function PlanCodebasePage() {
 		// means no successful response yet — keep the last known good state.
 		if (status === null) return;
 		setLastStatus(status);
+		// The server owns the name: once the CLI has handshaken it holds the
+		// repository folder name, so the open onboarding page must not keep
+		// showing the creation placeholder it started with.
+		const serverName = status.codebaseName;
+		if (!serverName) return;
+		setCodebase((current) =>
+			current && current.name !== serverName
+				? { ...current, name: serverName }
+				: current,
+		);
 	};
+
+	// Persist the pointer whenever the name changes so a refresh does not
+	// repaint the placeholder before the first status poll lands.
+	useEffect(() => {
+		if (!codebase) return;
+		storePlanCodebase(codebase.id, codebase.name);
+	}, [codebase]);
 
 	// The final review reuses the canonical CodebaseReview only when validated
 	// analysis output for the exact current snapshot is in hand. This mirrors

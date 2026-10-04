@@ -193,6 +193,12 @@ export const syncStatusResponseSchema = z.object({
 	projectId: z.string().min(1),
 	sessionId: z.string().min(1),
 	status: codebaseSyncStatusSchema,
+	// Canonical persisted display name for the codebase. Polling surfaces it so
+	// an open onboarding page can drop the creation placeholder once the CLI has
+	// reported the real repository name, instead of keeping a stale name on
+	// screen. Omitted only when a caller reads a status for a codebase whose
+	// name it could not resolve.
+	codebaseName: z.string().min(1).optional(),
 	fileCount: z.number().int().nonnegative().optional(),
 	excludedCount: z.number().int().nonnegative().optional(),
 	errorCode: z.string().min(1).nullable().optional(),
