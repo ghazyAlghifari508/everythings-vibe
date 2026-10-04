@@ -1,8 +1,14 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { ArrowRight, Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { LibraryPagination } from "@/components/codebase/library-pagination";
+import {
+	ProjectActionsMenu,
+	readServerErrorMessage,
+} from "@/components/codebase/project-actions-menu";
+import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import {
 	type CodebaseLibraryItem,
 	filterLibraryItems,
@@ -10,6 +16,9 @@ import {
 	mapLibraryStatus,
 	NEW_REPOSITORY_HREF,
 } from "@/lib/codebase-library";
+import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/lib/constants";
+import { paginate } from "@/lib/history-filter";
+import { useUIStore } from "@/store";
 
 function formatLibraryDate(value: string | null): string | null {
 	if (!value) return null;
@@ -29,11 +38,77 @@ export function CodebaseLibraryView({
 }: {
 	items: CodebaseLibraryItem[];
 }) {
+	const router = useRouter();
+	const showToast = useUIStore((s) => s.showToast);
+	const [localItems, setLocalItems] = useState(items);
 	const [query, setQuery] = useState("");
-	const filtered = filterLibraryItems(items, query);
+	const [page, setPage] = useState(1);
+
+	useEffect(() => {
+		setLocalItems(items);
+	}, [items]);
+
+	const filtered = filterLibraryItems(localItems, query);
+	const totalPages = Math.max(
+		1,
+		Math.ceil(filtered.length / CODEBASE_LIBRARY_PAGE_SIZE),
+	);
+	const clampedPage = Math.min(page, totalPages);
+	const paged = paginate(filtered, clampedPage, CODEBASE_LIBRARY_PAGE_SIZE);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: reset to the first page whenever the query changes; the dependency is the trigger, not a read
+	useEffect(() => {
+		setPage(1);
+	}, [query]);
+
+	useEffect(() => {
+		if (page > totalPages) setPage(totalPages);
+	}, [page, totalPages]);
+
+	const applyRename = (id: string, name: string) => {
+		setLocalItems((current) =>
+			current.map((item) => (item.id === id ? { ...item, name } : item)),
+		);
+		showToast("Nama project diperbarui.", "success");
+		router.invalidate();
+	};
+
+	const removeProject = async (item: CodebaseLibraryItem) => {
+		const previous = localItems;
+		setLocalItems((current) => current.filter((row) => row.id !== item.id));
+		try {
+			const response = await fetch(
+				`/api/codebases/${encodeURIComponent(item.id)}`,
+				{
+					method: "DELETE",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ confirm: true }),
+				},
+			);
+			const body: unknown = await response.json().catch(() => null);
+			if (!response.ok) {
+				setLocalItems(previous);
+				showToast(
+					readServerErrorMessage(body, "Gagal menghapus project."),
+					"error",
+				);
+				return;
+			}
+			showToast("Project dihapus.", "success");
+			router.invalidate();
+		} catch {
+			setLocalItems(previous);
+			showToast("Server tidak dapat dihubungi.", "error");
+		}
+	};
 
 	return (
 		<div className="flex flex-col gap-6">
+			<HubBreadcrumb
+				current="Project Tersimpan"
+				parent={{ label: "VibePlan", to: "/plan" }}
+			/>
+
 			<header className="flex flex-col gap-4 border-b border-graphite pb-6 sm:flex-row sm:items-end sm:justify-between">
 				<div>
 					<p className="font-mono text-xs uppercase tracking-widest text-fog">
@@ -49,7 +124,7 @@ export function CodebaseLibraryView({
 				</div>
 				<Link
 					to={NEW_REPOSITORY_HREF}
-					className="inline-flex min-h-11 items-center justify-center rounded-md bg-snow px-4 text-sm font-semibold text-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					className="btn-primary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					+ Hubungkan repository
 				</Link>
@@ -84,7 +159,7 @@ export function CodebaseLibraryView({
 					</p>
 					<Link
 						to={NEW_REPOSITORY_HREF}
-						className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md bg-snow px-4 text-sm font-semibold text-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						className="btn-primary mt-6 inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
 						Hubungkan repository
 					</Link>
@@ -94,8 +169,8 @@ export function CodebaseLibraryView({
 					Tidak ada project yang cocok dengan pencarian.
 				</p>
 			) : (
-				<ul className="flex flex-col gap-3">
-					{filtered.map((item) => {
+				<ul data-testid="codebase-library-list" className="flex flex-col gap-3">
+					{paged.map((item) => {
 						const stack = libraryAnalysisLabels(item);
 						const displayDate =
 							formatLibraryDate(item.snapshotCreatedAt) ??
@@ -108,56 +183,66 @@ export function CodebaseLibraryView({
 						return (
 							<li
 								key={item.id}
-								className="group rounded-xl border border-graphite bg-charcoal/60 transition-colors hover:border-fog/40 hover:bg-charcoal"
+								className="group flex items-start gap-1 rounded-xl border border-graphite bg-charcoal/60 transition-colors hover:border-fog/40 hover:bg-charcoal"
 							>
 								<Link
 									to="/codebases/$id"
 									params={{ id: item.id }}
-									className="flex items-start justify-between gap-4 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									className="flex min-w-0 flex-1 flex-col gap-2 rounded-xl p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 								>
-									<span className="flex min-w-0 flex-1 flex-col gap-2">
-										<span className="flex items-center justify-between gap-3">
-											<span className="truncate text-base font-medium text-snow">
-												{item.name}
-											</span>
-											<span
-												className={`shrink-0 text-xs ${isAttention ? "text-crimson" : "text-fog"}`}
-											>
-												{status}
-											</span>
+									<span className="flex items-center justify-between gap-3">
+										<span className="truncate text-base font-medium text-snow">
+											{item.name}
 										</span>
-										{item.summary ? (
-											<span className="line-clamp-2 text-sm leading-6 text-fog">
-												{item.summary}
-											</span>
-										) : null}
-										{stack.length > 0 ? (
-											<span className="text-xs text-slate">
-												{stack.join(" · ")}
-											</span>
-										) : null}
-										<span className="text-[11px] text-slate">
-											{item.fileCount !== null
-												? `${item.fileCount} file`
-												: "Belum ada sync"}
-											{displayDate
-												? ` · Terakhir diperbarui ${displayDate}`
-												: ""}
-										</span>
-										<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
-											Buka Workspace
-											<ArrowRight
-												size={14}
-												aria-hidden
-												className="transition-transform group-hover:translate-x-0.5"
-											/>
+										<span
+											className={`shrink-0 text-xs ${isAttention ? "text-crimson" : "text-fog"}`}
+										>
+											{status}
 										</span>
 									</span>
+									{item.summary ? (
+										<span className="line-clamp-2 text-sm leading-6 text-fog">
+											{item.summary}
+										</span>
+									) : null}
+									{stack.length > 0 ? (
+										<span className="text-xs text-slate">
+											{stack.join(" · ")}
+										</span>
+									) : null}
+									<span className="text-[11px] text-slate">
+										{item.fileCount !== null
+											? `${item.fileCount} file`
+											: "Belum ada sync"}
+										{displayDate ? ` · Terakhir diperbarui ${displayDate}` : ""}
+									</span>
+									<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
+										Buka Workspace
+										<ArrowRight
+											size={14}
+											aria-hidden
+											className="transition-transform group-hover:translate-x-0.5"
+										/>
+									</span>
 								</Link>
+								<ProjectActionsMenu
+									item={item}
+									onRename={applyRename}
+									onDelete={removeProject}
+								/>
 							</li>
 						);
 					})}
 				</ul>
+			)}
+
+			{filtered.length > 0 && (
+				<LibraryPagination
+					clampedPage={clampedPage}
+					totalPages={totalPages}
+					totalItems={filtered.length}
+					onPageChange={setPage}
+				/>
 			)}
 		</div>
 	);
