@@ -82,4 +82,55 @@ WHERE "name" = 'Repository Lokal';`,
 		expect(migration).not.toContain("LIKE");
 		expect(migration).not.toContain("ILIKE");
 	});
+
+	it("is registered in the Drizzle journal so the migrator actually applies it", () => {
+		// Regression: a hand-written .sql file that is missing from the journal is
+		// never read by `readMigrationFiles`, so it never runs and the app then
+		// fails at runtime with Postgres 42703 on every insert.
+		const journal = JSON.parse(
+			readFileSync("drizzle/meta/_journal.json", "utf8"),
+		) as { entries: Array<{ idx: number; when: number; tag: string }> };
+		const tags = journal.entries.map((entry) => entry.tag);
+		expect(tags).toContain("0030_codebase_name_source");
+
+		const entry = journal.entries.find(
+			(candidate) => candidate.tag === "0030_codebase_name_source",
+		);
+		const previous = journal.entries.find(
+			(candidate) => candidate.tag === "0029_fitur-stage",
+		);
+		expect(entry?.idx).toBe(previous ? previous.idx + 1 : 30);
+		// `migrate` only applies an entry whose `when` is greater than the newest
+		// applied `created_at`, so an out-of-order timestamp is silently skipped.
+		expect(entry?.when).toBeGreaterThan(previous?.when ?? 0);
+	});
+
+	it("ships a snapshot carrying the new column so the next generate is drift-free", () => {
+		// `preparePrevSnapshot` diffs against the newest snapshot file, not the
+		// journal. Without a 0030 snapshot the next `db:generate` would re-emit
+		// this ALTER and the following migrate would fail on a duplicate column.
+		const snapshot = JSON.parse(
+			readFileSync("drizzle/meta/0030_snapshot.json", "utf8"),
+		) as {
+			prevId: string;
+			tables: {
+				"public.codebases": {
+					columns: Record<string, { name: string; type: string; notNull: boolean; default?: string }>;
+				};
+			};
+		};
+		const previousSnapshot = JSON.parse(
+			readFileSync("drizzle/meta/0029_snapshot.json", "utf8"),
+		) as { id: string };
+		expect(snapshot.prevId).toBe(previousSnapshot.id);
+
+		const column = snapshot.tables["public.codebases"].columns.name_source;
+		expect(column).toEqual({
+			name: "name_source",
+			type: "text",
+			primaryKey: false,
+			notNull: true,
+			default: "'user'",
+		});
+	});
 });
