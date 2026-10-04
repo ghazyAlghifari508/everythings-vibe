@@ -7,7 +7,10 @@ import {
 	type SyncStatusResponse,
 	syncStatusResponseSchema,
 } from "@/lib/codebase-sync";
-import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
+import {
+	CODEBASE_SYNC_POLL_INTERVAL_MS,
+	CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
+} from "@/lib/constants";
 
 interface SyncStatusProps {
 	projectId: string;
@@ -16,6 +19,7 @@ interface SyncStatusProps {
 	projectName?: string;
 	status?: SyncStatusResponse | null;
 	pollIntervalMs?: number;
+	requestTimeoutMs?: number;
 	onStatus?: (status: SyncStatusResponse | null) => void;
 	onRetrySync?: () => void;
 	onRetryAnalysis?: () => void;
@@ -30,6 +34,7 @@ export function SyncStatus({
 	projectName = "Project",
 	status: propStatus,
 	pollIntervalMs = CODEBASE_SYNC_POLL_INTERVAL_MS,
+	requestTimeoutMs = CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
 	onStatus,
 	onRetrySync,
 	onRetryAnalysis,
@@ -44,6 +49,8 @@ export function SyncStatus({
 	const [error, setError] = useState<string | null>(null);
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const inFlightRef = useRef(false);
+	const abortRef = useRef<AbortController | null>(null);
+	const seqRef = useRef(0);
 	const onStatusRef = useRef(onStatus);
 	onStatusRef.current = onStatus;
 	// Poll internally unless the parent provided an already-terminal status.
@@ -61,13 +68,30 @@ export function SyncStatus({
 
 	useEffect(() => {
 		if (!pollInternally) return;
+		seqRef.current += 1;
+		const seq = seqRef.current;
 		let cancelled = false;
 
+		const scheduleNext = (fn: () => void) => {
+			if (cancelled || seq !== seqRef.current) return;
+			timeoutRef.current = setTimeout(fn, pollIntervalMs);
+		};
+
 		const fetchStatus = async () => {
-			// One request at a time: a slow response must never be
-			// overwritten by (or overwrite) a newer tick out of order.
-			if (inFlightRef.current || cancelled) return;
+			if (cancelled || seq !== seqRef.current) return;
+			if (inFlightRef.current) {
+				scheduleNext(() => {
+					void fetchStatus();
+				});
+				return;
+			}
 			inFlightRef.current = true;
+			const controller = new AbortController();
+			abortRef.current = controller;
+			const abortTimeout = setTimeout(
+				() => controller.abort(),
+				requestTimeoutMs,
+			);
 			let isTerminal = false;
 			try {
 				const activeSessionId = sessionId ?? pinnedSessionRef.current;
@@ -77,9 +101,13 @@ export function SyncStatus({
 				const path =
 					statusPath ??
 					`/api/codebases/${encodeURIComponent(projectId)}/status`;
-				const res = await fetch(`${path}${query}`);
+				const res = await fetch(`${path}${query}`, {
+					signal: controller.signal,
+				});
+				if (cancelled || seq !== seqRef.current) return;
+				if (controller.signal.aborted) return;
 				const json = (await res.json().catch(() => null)) as unknown;
-				if (cancelled) return;
+				if (cancelled || seq !== seqRef.current) return;
 				if (!res.ok) {
 					const message =
 						typeof json === "object" &&
@@ -96,6 +124,7 @@ export function SyncStatus({
 					setError("Gagal membaca status sync.");
 					return;
 				}
+				if (cancelled || seq !== seqRef.current) return;
 				pinnedSessionRef.current = parsed.data.sessionId;
 				setPolledStatus(parsed.data);
 				setError(null);
@@ -104,14 +133,19 @@ export function SyncStatus({
 					isTerminal = true;
 				}
 			} catch {
-				if (cancelled) return;
+				if (cancelled || seq !== seqRef.current) return;
+				if (controller.signal.aborted) return;
 				setError("Gagal menghubungi server.");
 			} finally {
-				inFlightRef.current = false;
-				if (!cancelled && !isTerminal) {
-					timeoutRef.current = setTimeout(() => {
+				clearTimeout(abortTimeout);
+				if (seq === seqRef.current) {
+					inFlightRef.current = false;
+					if (abortRef.current === controller) abortRef.current = null;
+				}
+				if (!cancelled && seq === seqRef.current && !isTerminal) {
+					scheduleNext(() => {
 						void fetchStatus();
-					}, pollIntervalMs);
+					});
 				}
 			}
 		};
@@ -119,12 +153,22 @@ export function SyncStatus({
 		void fetchStatus();
 		return () => {
 			cancelled = true;
+			abortRef.current?.abort();
+			abortRef.current = null;
+			inFlightRef.current = false;
 			if (timeoutRef.current) {
 				clearTimeout(timeoutRef.current);
 				timeoutRef.current = null;
 			}
 		};
-	}, [projectId, statusPath, sessionId, pollIntervalMs, pollInternally]);
+	}, [
+		projectId,
+		statusPath,
+		sessionId,
+		pollIntervalMs,
+		pollInternally,
+		requestTimeoutMs,
+	]);
 
 	const s = status?.status;
 	const isFailed = s === "failed";

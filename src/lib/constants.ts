@@ -94,6 +94,10 @@ export const GENERATION_STATUS_POLL_INTERVAL_MS = 2_500;
 // === Existing codebase sync (MVP locked decisions) ===
 // Browser polls the persisted sync status; no sync SSE endpoint in MVP.
 export const CODEBASE_SYNC_POLL_INTERVAL_MS = 2_000;
+// Bounded lifetime for one browser status request. A hung fetch must never
+// wedge polling: the request is aborted past this budget and the next poll
+// is scheduled. Real network failures stay honest errors; aborts stay silent.
+export const CODEBASE_SYNC_REQUEST_TIMEOUT_MS = 10_000;
 // A sync session (and its credential) expires after 30 minutes.
 export const CODEBASE_SYNC_SESSION_EXPIRY_MS = 30 * 60 * 1000;
 // Transport bounds enforced by both CLI and server.
