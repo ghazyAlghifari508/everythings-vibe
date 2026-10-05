@@ -149,6 +149,11 @@ describe("codebase analysis system prompt", () => {
 	it("requests an application summary describing what the app does", () => {
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/summary/i);
 	});
+
+	it("declares the repository name identity metadata, never a feature request", () => {
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/metadata/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/bukan permintaan fitur/i);
+	});
 });
 
 describe("buildAnalysisUserPrompt", () => {
@@ -182,6 +187,22 @@ describe("buildAnalysisUserPrompt", () => {
 		});
 		expect(prompt.length).toBeLessThan(5000);
 		expect(prompt).toMatch(/dipotong|truncat/i);
+	});
+
+	it("labels repository metadata separately from user feature intent", () => {
+		const prompt = buildAnalysisUserPrompt({
+			...baseInput,
+			repositoryName: "react-movie-app",
+		});
+		expect(prompt).toContain("react-movie-app");
+		expect(prompt).toMatch(/metadata/i);
+		expect(prompt).toContain("Permintaan fitur user:");
+	});
+
+	it("omits the repository line when no repository name is known", () => {
+		const prompt = buildAnalysisUserPrompt(baseInput);
+		expect(prompt).not.toMatch(/Repository:/);
+		expect(prompt).toContain("Permintaan fitur user:");
 	});
 });
 

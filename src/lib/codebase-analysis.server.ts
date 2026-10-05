@@ -29,6 +29,7 @@ import {
 	codebaseSnapshotFiles,
 	codebaseSnapshots,
 	codebaseSyncSessions,
+	codebases,
 	projects,
 } from "@/db/schema";
 import {
@@ -40,6 +41,7 @@ import {
 	resolveAnalysisFeaturePrompt,
 	toSafeAnalysisErrorMessage,
 } from "./codebase-analysis";
+import { resolveCodebaseDisplayName } from "./codebase-naming";
 import {
 	assertSyncTransition,
 	canTransitionSyncStatus,
@@ -170,6 +172,18 @@ export async function requestCodebaseAnalysis(
 		projectName: project?.name?.trim() || "",
 		projectId,
 	});
+	// Repository identity is metadata for the model, never user intent: only
+	// a resolved name is passed, so a provisional placeholder can never leak
+	// into analysis input when the handshake has not renamed the row yet.
+	let repositoryName: string | null = null;
+	if (scope.codebaseId) {
+		const [codebase] = await db
+			.select({ name: codebases.name })
+			.from(codebases)
+			.where(eq(codebases.id, scope.codebaseId))
+			.limit(1);
+		repositoryName = resolveCodebaseDisplayName(codebase?.name);
+	}
 
 	// Fresh record per attempt: terminal rows are never mutated.
 	const analysisId = crypto.randomUUID();
@@ -288,6 +302,7 @@ export async function requestCodebaseAnalysis(
 					excludedCount: snapshot.excludedCount ?? 0,
 					branch: snapshot.branch,
 					commitSha: snapshot.commitSha,
+					repositoryName,
 				}),
 			},
 		];

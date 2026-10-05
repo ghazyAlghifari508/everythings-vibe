@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	buildFeatureProjectValues,
 	resolveAnalysisFeaturePrompt,
+	resolveFeaturePromptMessage,
 } from "./$codebaseId/features";
 
 describe("buildFeatureProjectValues", () => {
@@ -71,5 +72,44 @@ describe("resolveAnalysisFeaturePrompt", () => {
 				projectId: "p1",
 			}),
 		).toBe("p1");
+	});
+
+	it("never resolves the provisional placeholder as user intent", () => {
+		expect(
+			resolveAnalysisFeaturePrompt({
+				handoffPrompt: "Repository Lokal",
+				projectName: "Repository Lokal",
+				projectId: "p1",
+			}),
+		).toBe("p1");
+		expect(
+			resolveAnalysisFeaturePrompt({
+				handoffPrompt: null,
+				projectName: "Repository Lokal",
+				projectId: "p1",
+			}),
+		).toBe("p1");
+	});
+});
+
+describe("resolveFeaturePromptMessage", () => {
+	it("replaces the provisional placeholder with the neutral onboarding intent", () => {
+		expect(resolveFeaturePromptMessage("Repository Lokal")).toBe(
+			"Ringkasan codebase awal",
+		);
+	});
+
+	it("keeps real repository names and user prompts untouched", () => {
+		expect(resolveFeaturePromptMessage("react-movie-app")).toBe(
+			"react-movie-app",
+		);
+		expect(resolveFeaturePromptMessage("  tambahkan dark mode  ")).toBe(
+			"tambahkan dark mode",
+		);
+	});
+
+	it("passes through blank input so the route still rejects it", () => {
+		expect(resolveFeaturePromptMessage("  ")).toBe("");
+		expect(resolveFeaturePromptMessage(null)).toBe("");
 	});
 });

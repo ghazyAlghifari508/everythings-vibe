@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isProvisionalCodebaseName } from "./codebase-naming";
 import { codebaseAnalysisStatusSchema } from "./codebase-sync";
 import {
 	CODEBASE_ANALYSIS_MAX_CONTEXT_CHARS,
@@ -62,10 +63,19 @@ export function resolveAnalysisFeaturePrompt(input: {
 	projectId: string;
 }): string {
 	const prompt = input.handoffPrompt?.trim();
-	if (prompt) return prompt;
+	if (prompt && !isProvisionalCodebaseName(prompt)) return prompt;
 	const name = input.projectName.trim();
-	return name || input.projectId;
+	if (name && !isProvisionalCodebaseName(name)) return name;
+	return input.projectId;
 }
+
+/**
+ * Neutral onboarding intent for the initial codebase analysis. Used whenever
+ * no explicit feature request exists yet — in particular, a provisional
+ * repository placeholder must never stand in for it. The analysis then
+ * describes the repository instead of speculating about a feature name.
+ */
+export const ONBOARDING_FEATURE_MESSAGE = "Ringkasan codebase awal";
 
 export interface AnalysisScopeInput {
 	projectId: string;
@@ -139,7 +149,8 @@ ATURAN:
 3. Setiap temuan yang tidak pasti WAJIB mencantumkan field "uncertainty" berisi hal yang perlu diverifikasi.
 4. Field yang tidak terdeteksi diisi null atau array kosong — jangan ditebak.
 5. Tulis ringkasan dan temuan dalam Bahasa Indonesia.
-6. Summary menjawab "aplikasi ini tentang apa" (fungsi, alur utama, pengelolaan data) — bukan sekadar menyebut ulang tech stack.`;
+6. Summary menjawab "aplikasi ini tentang apa" (fungsi, alur utama, pengelolaan data) — bukan sekadar menyebut ulang tech stack.
+7. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.`;
 
 // Manifest entries come from `manifestEntrySchema` (Task 5); this structural
 // subset keeps the prompt builder decoupled from the sync DTO module.
@@ -164,6 +175,11 @@ export interface AnalysisPromptInput {
 	excludedCount: number;
 	branch?: string | null;
 	commitSha?: string | null;
+	/**
+	 * Resolved repository display name (identity metadata, never user
+	 * intent). Omitted when unknown — no name is ever invented here.
+	 */
+	repositoryName?: string | null;
 	maxContextChars?: number;
 	maxManifestEntries?: number;
 }
@@ -212,6 +228,7 @@ export function buildAnalysisUserPrompt(input: AnalysisPromptInput): string {
 		excludedCount,
 		branch,
 		commitSha,
+		repositoryName,
 		maxContextChars = CODEBASE_ANALYSIS_MAX_CONTEXT_CHARS,
 		maxManifestEntries = CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES,
 	} = input;
@@ -233,6 +250,11 @@ export function buildAnalysisUserPrompt(input: AnalysisPromptInput): string {
 		`Project: ${projectId}`,
 		`Snapshot: ${snapshotId}${branch ? ` (branch ${branch}${commitSha ? `, commit ${commitSha}` : ""})` : ""}`,
 		`File: ${fileCount} terupload, ${excludedCount} dieksklusi (isi file yang dieksklusi TIDAK disertakan).`,
+		...(repositoryName
+			? [
+					`Repository: ${repositoryName} (metadata identitas repositori — bukan permintaan fitur user).`,
+				]
+			: []),
 		"",
 		`Permintaan fitur user: ${featurePrompt}`,
 		"",

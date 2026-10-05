@@ -7,12 +7,14 @@ import { useCodebaseSyncStatus } from "@/hooks/use-codebase-sync-status";
 import {
 	type AnalysisResponse,
 	analysisResponseSchema,
+	ONBOARDING_FEATURE_MESSAGE,
 } from "@/lib/codebase-analysis";
 import {
 	CODEBASE_LIBRARY_HREF,
 	CODEBASE_LIBRARY_LABEL,
 	CODEBASE_ONBOARDING_LABEL,
 } from "@/lib/codebase-library";
+import { isProvisionalCodebaseName } from "@/lib/codebase-naming";
 import {
 	clearPlanCodebaseProjectPointer,
 	clearPlanOnboardingPointers,
@@ -192,10 +194,15 @@ export function PlanCodebasePage() {
 				setFeatureProjectId(stored);
 				return stored;
 			}
+			// A provisional creation name is storage-only: it must never be sent
+			// as the feature message, or the analysis would read the placeholder
+			// as user intent. The neutral onboarding intent asks for an initial
+			// repository summary instead.
+			const trimmed = fallbackName.trim();
 			const message =
-				fallbackName.trim().length >= 3
-					? fallbackName.trim()
-					: "Ringkasan codebase awal";
+				trimmed.length >= 3 && !isProvisionalCodebaseName(trimmed)
+					? trimmed
+					: ONBOARDING_FEATURE_MESSAGE;
 			try {
 				const response = await fetch(
 					`/api/codebases/${encodeURIComponent(codebaseId)}/features`,

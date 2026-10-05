@@ -7,7 +7,9 @@ import {
 	projects,
 	subscriptions,
 } from "@/db/schema";
+import { ONBOARDING_FEATURE_MESSAGE } from "@/lib/codebase-analysis";
 import { saveAskHandoff } from "@/lib/codebase-generation-context";
+import { isProvisionalCodebaseName } from "@/lib/codebase-naming";
 import {
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	SNAPSHOT_CONTEXT_STATUSES,
@@ -19,6 +21,18 @@ import { requireUser } from "@/lib/session";
 import type { Plan } from "@/types/database";
 
 export { resolveAnalysisFeaturePrompt } from "@/lib/codebase-analysis";
+
+/**
+ * Normalize an onboarding feature message at the trust boundary. A
+ * provisional repository placeholder is storage-only and must never become
+ * the feature prompt — it is replaced with the neutral onboarding intent.
+ * Blank input passes through so the route still rejects it below.
+ */
+export function resolveFeaturePromptMessage(message: unknown): string {
+	const prompt = typeof message === "string" ? message.trim() : "";
+	if (isProvisionalCodebaseName(prompt)) return ONBOARDING_FEATURE_MESSAGE;
+	return prompt;
+}
 
 export function buildFeatureProjectValues(input: {
 	id: string;
@@ -122,7 +136,7 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/features")({
 					typeof body === "object" && body !== null && "message" in body
 						? body.message
 						: undefined;
-				const prompt = typeof message === "string" ? message.trim() : "";
+				const prompt = resolveFeaturePromptMessage(message);
 				if (prompt.length < 3) {
 					return Response.json(
 						{ error: "Prompt harus diisi minimal 3 karakter" },
