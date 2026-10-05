@@ -127,6 +127,33 @@ export function isTerminalSyncStatus(status: CodebaseSyncStatus): boolean {
 	);
 }
 
+// === Sync completion (transport-only capability) ===
+// Sync is complete the moment a usable snapshot exists and the transport
+// chain finished: `uploaded` (codebase-scoped sessions stay here while the
+// model runs), `analyzing` (legacy project-scoped sessions), and `ready`.
+// AI analysis status is deliberately NOT part of this predicate: an uploaded
+// snapshot is a finished sync whether or not the model has run yet, and an
+// analysis failure must never invalidate a usable snapshot. Session creation
+// reuses the same set to decide which sessions no longer hold the transport
+// open, so the two readings cannot drift.
+export const CODEBASE_SYNC_COMPLETE_STATUSES: readonly CodebaseSyncStatus[] = [
+	"uploaded",
+	"analyzing",
+	"ready",
+] as const;
+
+export function isSyncStatusComplete(
+	status:
+		| Pick<SyncStatusResponse, "status" | "snapshotId" | "analysisStatus">
+		| null
+		| undefined,
+): boolean {
+	if (!status || !status.snapshotId) return false;
+	return (CODEBASE_SYNC_COMPLETE_STATUSES as readonly string[]).includes(
+		status.status,
+	);
+}
+
 export function canTransitionSyncStatus(
 	from: CodebaseSyncStatus,
 	to: CodebaseSyncStatus,

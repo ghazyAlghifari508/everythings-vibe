@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { codebaseSyncSessions, codebases, subscriptions } from "@/db/schema";
 import {
 	buildSyncCommand,
+	CODEBASE_SYNC_COMPLETE_STATUSES,
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	CODEBASE_SYNC_TERMINAL_STATUSES,
 	getSessionUsability,
@@ -196,7 +197,9 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/session")({
 						const now = new Date();
 						for (const row of existing) {
 							if (
-								!["uploaded", "analyzing", "ready"].includes(row.status) &&
+								!(
+									CODEBASE_SYNC_COMPLETE_STATUSES as readonly string[]
+								).includes(row.status) &&
 								getSessionUsability({ ...row, projectId: codebaseId }, now)
 									.usable
 							) {
@@ -217,7 +220,9 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/session")({
 					) {
 						const active = existing.find(
 							(row) =>
-								!["uploaded", "analyzing", "ready"].includes(row.status) &&
+								!(
+									CODEBASE_SYNC_COMPLETE_STATUSES as readonly string[]
+								).includes(row.status) &&
 								getSessionUsability({ ...row, projectId: codebaseId }).usable,
 						);
 						if (active) {

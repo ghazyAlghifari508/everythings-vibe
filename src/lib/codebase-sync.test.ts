@@ -29,6 +29,7 @@ import {
 	isSlotIdempotencyKey,
 	isSupportedCliVersion,
 	isSyncCapableProject,
+	isSyncStatusComplete,
 	isTerminalSyncStatus,
 	manifestBatchRequestSchema,
 	manifestEntrySchema,
@@ -148,6 +149,64 @@ describe("sync state transitions", () => {
 		for (const from of active) {
 			expect(canTransitionSyncStatus(from, "failed")).toBe(true);
 		}
+	});
+});
+
+describe("sync completion capability (transport only, never analysis)", () => {
+	it("treats every post-upload state with a snapshot as complete sync", () => {
+		for (const status of ["uploaded", "analyzing", "ready"] as const) {
+			expect(isSyncStatusComplete({ status, snapshotId: "snap_1" })).toBe(true);
+		}
+	});
+
+	it("requires a snapshot before sync can be complete", () => {
+		expect(isSyncStatusComplete({ status: "uploaded" })).toBe(false);
+		expect(isSyncStatusComplete({ status: "uploaded", snapshotId: null })).toBe(
+			false,
+		);
+		expect(isSyncStatusComplete(null)).toBe(false);
+		expect(isSyncStatusComplete(undefined)).toBe(false);
+	});
+
+	it("never reports complete sync while the transport is still running", () => {
+		for (const status of [
+			"waiting_for_cli",
+			"connected",
+			"scanning",
+			"filtering",
+			"uploading",
+		] as const) {
+			expect(isSyncStatusComplete({ status, snapshotId: "snap_1" })).toBe(
+				false,
+			);
+		}
+	});
+
+	it("keeps a failed or expired session incomplete even with a snapshot", () => {
+		// The status endpoint serves the latest stored snapshot for an expired
+		// session; that snapshot must not turn a dead session into a finished
+		// sync, and an analysis failure rolls back to `uploaded`, never to
+		// `failed`.
+		expect(
+			isSyncStatusComplete({ status: "failed", snapshotId: "snap_1" }),
+		).toBe(false);
+		expect(
+			isSyncStatusComplete({ status: "expired", snapshotId: "snap_1" }),
+		).toBe(false);
+	});
+
+	it("ignores analysis status entirely", () => {
+		const base = { status: "uploaded" as const, snapshotId: "snap_1" };
+		expect(isSyncStatusComplete(base)).toBe(true);
+		expect(isSyncStatusComplete({ ...base, analysisStatus: "pending" })).toBe(
+			true,
+		);
+		expect(isSyncStatusComplete({ ...base, analysisStatus: "failed" })).toBe(
+			true,
+		);
+		expect(isSyncStatusComplete({ ...base, analysisStatus: "ready" })).toBe(
+			true,
+		);
 	});
 });
 
