@@ -141,6 +141,17 @@ describe("codebase status route contract", () => {
 		expect(source).toContain("name: codebases.name");
 		expect(source).toContain("eq(codebases.userId, user.id)");
 	});
+
+	it("budgets polling separately from the CLI transport it observes", () => {
+		// Polling and the upload transport drawing on one budget let the browser
+		// starve the very uploads it is reporting on.
+		expect(source).toContain("CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION");
+		expect(source).not.toContain("CODEBASE_SYNC_RATE_LIMIT_ACTION");
+	});
+
+	it("reports a persisted CLI preparation failure to the browser", () => {
+		expect(source).toContain("readSyncFailureMetadata(session.metadata)");
+	});
 });
 
 describe("codebase deletion route contract", () => {

@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+	isSyncStatusInFlight,
 	isTerminalSyncStatus,
 	type SyncStatusResponse,
 	syncStatusResponseSchema,
 } from "@/lib/codebase-sync";
 import {
+	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
 } from "@/lib/constants";
@@ -27,7 +29,17 @@ export interface UseCodebaseSyncStatusOptions {
 	 * attaches `analysisStatus` when this query is present.
 	 */
 	analysisProjectId?: string | null;
+	/**
+	 * Cadence for a session that is still `waiting_for_cli`. Nothing the server
+	 * reports can change until the user runs the CLI, so this may be slow.
+	 */
 	pollIntervalMs?: number;
+	/**
+	 * Cadence once an attempt is genuinely in flight (`connected` through
+	 * `uploading`), where real persisted states can pass in a short window.
+	 * Defaults to the active constant; only tests override it.
+	 */
+	activePollIntervalMs?: number;
 	requestTimeoutMs?: number;
 	/** False keeps the loop dormant (no codebase yet, or the caller unmounted). */
 	enabled?: boolean;
@@ -51,7 +63,12 @@ export interface UseCodebaseSyncStatusOptions {
  *   response cannot overlap the next tick;
  * - a per-request abort timeout retires a hung request instead of stalling the
  *   loop forever;
- * - the pinned session id keeps the loop on the attempt the user is watching.
+ * - the pinned session id keeps the loop on the attempt the user is watching;
+ * - the cadence is chosen from the last SERVER-REPORTED status, so the loop
+ *   reconciles quickly while a real attempt is in flight and slowly while the
+ *   session is still waiting for the CLI. This changes only how often the
+ *   browser asks — never what it renders, which always comes from the polled
+ *   status — so it cannot manufacture a stage the server never reported.
  */
 export function useCodebaseSyncStatus({
 	codebaseId,
@@ -59,6 +76,7 @@ export function useCodebaseSyncStatus({
 	sessionId,
 	analysisProjectId,
 	pollIntervalMs = CODEBASE_SYNC_POLL_INTERVAL_MS,
+	activePollIntervalMs = CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
 	requestTimeoutMs = CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
 	enabled = true,
 	initialStatus = null,
@@ -70,6 +88,12 @@ export function useCodebaseSyncStatus({
 		initialStatus,
 	);
 	const [error, setError] = useState<string | null>(null);
+	// The cadence is chosen from the last status the SERVER reported, never from
+	// a timer or a local guess, so a faster loop can only ever occur while the
+	// server has actually told us an attempt is in flight.
+	const activeRef = useRef(
+		initialStatus ? isSyncStatusInFlight(initialStatus.status) : false,
+	);
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const inFlightRef = useRef(false);
 	const abortRef = useRef<AbortController | null>(null);
@@ -87,6 +111,7 @@ export function useCodebaseSyncStatus({
 	// snapshot always wins, so a late recovery read can never rewind the screen.
 	useEffect(() => {
 		if (!initialStatus) return;
+		activeRef.current = isSyncStatusInFlight(initialStatus.status);
 		setStatus((current) => (current === null ? initialStatus : current));
 	}, [initialStatus]);
 
@@ -96,9 +121,12 @@ export function useCodebaseSyncStatus({
 		const seq = seqRef.current;
 		let cancelled = false;
 
+		const nextInterval = () =>
+			activeRef.current ? activePollIntervalMs : pollIntervalMs;
+
 		const scheduleNext = (fn: () => void) => {
 			if (cancelled || seq !== seqRef.current) return;
-			timeoutRef.current = setTimeout(fn, pollIntervalMs);
+			timeoutRef.current = setTimeout(fn, nextInterval());
 		};
 
 		const fetchStatus = async () => {
@@ -151,6 +179,7 @@ export function useCodebaseSyncStatus({
 				}
 				if (cancelled || seq !== seqRef.current) return;
 				pinnedSessionRef.current = parsed.data.sessionId;
+				activeRef.current = isSyncStatusInFlight(parsed.data.status);
 				setStatus(parsed.data);
 				setError(null);
 				if (isTerminalSyncStatus(parsed.data.status)) isTerminal = true;
@@ -188,6 +217,7 @@ export function useCodebaseSyncStatus({
 		statusPath,
 		sessionId,
 		pollIntervalMs,
+		activePollIntervalMs,
 		requestTimeoutMs,
 		enabled,
 		analysisProjectId,

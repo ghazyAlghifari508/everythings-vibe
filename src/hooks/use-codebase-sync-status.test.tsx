@@ -2,7 +2,10 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SyncStatusResponse } from "@/lib/codebase-sync";
+import {
+	resolveSyncStageView,
+	type SyncStatusResponse,
+} from "@/lib/codebase-sync";
 import { useCodebaseSyncStatus } from "./use-codebase-sync-status";
 
 let container: HTMLDivElement;
@@ -77,6 +80,11 @@ async function settle(ms = 60) {
 	});
 }
 
+interface CadenceOptions extends HookOptions {
+	/** Active-attempt cadence, so a test can make both cadences measurable. */
+	activePollIntervalMs?: number;
+}
+
 describe("useCodebaseSyncStatus", () => {
 	it("stays idle and issues no request while disabled", async () => {
 		const fetchMock = vi.fn();
@@ -135,7 +143,11 @@ describe("useCodebaseSyncStatus", () => {
 				statusResponse({ status: "uploading", sessionId: "sess_pin_hook" }),
 		}));
 		vi.stubGlobal("fetch", fetchMock);
-		renderProbe({ codebaseId: "cb_hook_1", pollIntervalMs: 15 });
+		renderProbe({
+			codebaseId: "cb_hook_1",
+			pollIntervalMs: 15,
+			activePollIntervalMs: 15,
+		} satisfies CadenceOptions);
 		await settle(80);
 		expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
 		expect(String(fetchMock.mock.calls[1]?.[0] ?? "")).toContain(
@@ -291,6 +303,94 @@ describe("useCodebaseSyncStatus", () => {
 		const afterTerminal = fetchMock.mock.calls.length;
 		await settle(90);
 		expect(fetchMock.mock.calls.length).toBe(afterTerminal);
+	});
+
+	it("reconciles on the active cadence once the server reports an in-flight attempt", async () => {
+		// The server holds `connected` (the CLI is preparing source code after
+		// the handshake). The browser must poll fast enough to be able to
+		// observe the states that follow.
+		let calls = 0;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				calls += 1;
+				return {
+					ok: true,
+					status: 200,
+					json: async () => statusResponse({ status: "connected" }),
+				};
+			}),
+		);
+		renderProbe({
+			codebaseId: "cb_hook_1",
+			pollIntervalMs: 400,
+			activePollIntervalMs: 15,
+		} satisfies CadenceOptions);
+		await settle(160);
+		// With the 400ms standby cadence this window would allow at most one
+		// request; the in-flight cadence produces several.
+		expect(calls).toBeGreaterThanOrEqual(4);
+	});
+
+	it("reconciles on the standby cadence while the session is still waiting for the CLI", async () => {
+		let calls = 0;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				calls += 1;
+				return {
+					ok: true,
+					status: 200,
+					json: async () => statusResponse({ status: "waiting_for_cli" }),
+				};
+			}),
+		);
+		renderProbe({
+			codebaseId: "cb_hook_1",
+			pollIntervalMs: 400,
+			activePollIntervalMs: 15,
+		} satisfies CadenceOptions);
+		await settle(160);
+		// Nothing on the server can change until the user runs the CLI, so the
+		// fast cadence must NOT be used here.
+		expect(calls).toBeLessThanOrEqual(2);
+	});
+
+	it("does not paint a stage the server never reported", async () => {
+		// A fast cadence must not become a way to display progress the server
+		// has not recorded. Every rendered state must trace to a polled status.
+		const seen: string[] = [];
+		let calls = 0;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				calls += 1;
+				// First poll lands on the handshake, second completes the upload.
+				const next = calls === 1 ? "connected" : "uploaded";
+				seen.push(next);
+				return {
+					ok: true,
+					status: 200,
+					json: async () =>
+						statusResponse({
+							status: next,
+							...(next === "uploaded" ? { snapshotId: "snap_1" } : {}),
+						}),
+				};
+			}),
+		);
+		const probe = renderProbe({
+			codebaseId: "cb_hook_1",
+			pollIntervalMs: 15,
+			activePollIntervalMs: 15,
+		} satisfies CadenceOptions);
+		await settle(80);
+		// No intermediate status was ever invented: the hook only ever held a
+		// status the server actually sent.
+		expect(new Set(seen)).toEqual(new Set(["connected", "uploaded"]));
+		const rendered = resolveSyncStageView(probe.latest);
+		expect(rendered.stages.every((row) => row.state === "done")).toBe(true);
+		expect(rendered.syncComplete).toBe(true);
 	});
 
 	it("seeds from a recovered status without a second source of truth", async () => {

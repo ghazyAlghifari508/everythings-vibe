@@ -60,6 +60,7 @@ import {
 	CODEBASE_MAX_CHUNK_BYTES,
 	CODEBASE_MAX_FILE_BYTES,
 	CODEBASE_MAX_SNAPSHOT_BYTES,
+	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
 } from "./constants";
@@ -67,6 +68,15 @@ import {
 describe("codebase sync boundary constants (Locked MVP Decisions)", () => {
 	it("polls browser status every 2000ms", () => {
 		expect(CODEBASE_SYNC_POLL_INTERVAL_MS).toBe(2000);
+	});
+
+	it("reconciles faster only while a real attempt is in flight", () => {
+		// The standby cadence must stay the slower one: `waiting_for_cli`
+		// cannot change until the user runs the CLI.
+		expect(CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS).toBeGreaterThan(0);
+		expect(CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS).toBeLessThan(
+			CODEBASE_SYNC_POLL_INTERVAL_MS,
+		);
 	});
 
 	it("expires a sync session after 30 minutes", () => {

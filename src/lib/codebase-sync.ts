@@ -127,6 +127,31 @@ export function isTerminalSyncStatus(status: CodebaseSyncStatus): boolean {
 	);
 }
 
+// === Active-attempt detection ===
+// `waiting_for_cli` is the normal resting state of a session for its entire
+// 30-minute life: the user is copying a prompt into a terminal, and no server
+// state can change until they do. Every status past it is a state the CLI
+// reached by doing real work, and the window between two of them can be short,
+// so this is what tells the browser to reconcile quickly.
+//
+// The CLI handshakes before it prepares source code, so `connected` now spans
+// the whole preparation window (see the CLI's sync command) — that window is
+// exactly what this predicate makes observable.
+const CODEBASE_SYNC_IN_FLIGHT_STATUSES: readonly CodebaseSyncStatus[] = [
+	"connected",
+	"scanning",
+	"filtering",
+	"uploading",
+	"uploaded",
+	"analyzing",
+] as const;
+
+export function isSyncStatusInFlight(status: CodebaseSyncStatus): boolean {
+	return (CODEBASE_SYNC_IN_FLIGHT_STATUSES as readonly string[]).includes(
+		status,
+	);
+}
+
 // === Sync completion (transport-only capability) ===
 // Sync is complete the moment a usable snapshot exists and the transport
 // chain finished: `uploaded` (codebase-scoped sessions stay here while the
@@ -687,10 +712,21 @@ export function hasSyncCapability(
 }
 
 // === Sync rate-limit convention (Task 4) ===
-// Sync endpoints reuse the neighboring `api_call` action from
-// `src/lib/rate-limit.ts` (same convention as `/api/ask/options`).
+// CLI transport endpoints (handshake, manifest, files, complete, failure) reuse
+// the neighboring `api_call` action from `src/lib/rate-limit.ts` (same
+// convention as `/api/ask/options`).
 
 export const CODEBASE_SYNC_RATE_LIMIT_ACTION = "api_call" as const;
+
+// Browser status polling gets a SEPARATE action from the CLI transport. Sharing
+// one budget made the observer compete with the observed: `waiting_for_cli` is
+// the normal state for a whole session, so a browser tab polling on a 2s
+// cadence burned half the shared `general` allowance (60/min) before the CLI
+// could upload anything. Reconciliation must be bounded on its own terms and
+// must never throttle the transport it reports on.
+
+export const CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION =
+	"sync_status_read" as const;
 
 // === Sync session lifecycle (Task 4; pure, DB-agnostic) ===
 // Row shapes are structural so these helpers stay unit-testable without a

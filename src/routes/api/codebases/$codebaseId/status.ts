@@ -13,7 +13,7 @@ import {
 	subscriptions,
 } from "@/db/schema";
 import {
-	CODEBASE_SYNC_RATE_LIMIT_ACTION,
+	CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION,
 	type CodebaseSyncStatus,
 	getSessionUsability,
 	readCliHandshakeAt,
@@ -64,10 +64,13 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 						? (rawPlan as Plan)
 						: "free";
 
+					// Browser reconciliation uses its own budget, not the CLI
+					// transport's, so polling can never throttle the uploads it is
+					// watching.
 					const rateCheck = await checkRateLimit(
 						user.id,
 						plan,
-						CODEBASE_SYNC_RATE_LIMIT_ACTION,
+						CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION,
 					);
 					if (!rateCheck.allowed)
 						return Response.json(

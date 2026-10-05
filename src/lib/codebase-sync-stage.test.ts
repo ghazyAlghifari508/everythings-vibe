@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+	CODEBASE_SYNC_RATE_LIMIT_ACTION,
+	CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION,
+	isSyncStatusInFlight,
 	resolveSyncStageView,
 	SYNC_STAGE_ORDER,
 	SYNC_STAGE_TEST_IDS,
 	type SyncStageRow,
 	type SyncStatusResponse,
 } from "./codebase-sync";
+import {
+	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
+	CODEBASE_SYNC_POLL_INTERVAL_MS,
+	RATE_LIMIT_WINDOW_MS,
+	RATE_LIMITS,
+} from "./constants";
 
 function status(
 	overrides: Partial<SyncStatusResponse> = {},
@@ -57,6 +66,61 @@ function userFacingCopy(view: ReturnType<typeof resolveSyncStageView>): string {
 		.map((row) => `${row.title} ${row.detail ?? ""} ${row.meta ?? ""}`)
 		.join(" ");
 }
+
+describe("active attempt detection drives the reconciliation cadence", () => {
+	it("treats waiting_for_cli as idle because no server state can change yet", () => {
+		expect(isSyncStatusInFlight("waiting_for_cli")).toBe(false);
+	});
+
+	it("treats the preparation window the CLI reports as in flight", () => {
+		// `connected` now spans the whole local-preparation window because the
+		// CLI handshakes before it prepares source code.
+		expect(isSyncStatusInFlight("connected")).toBe(true);
+		expect(isSyncStatusInFlight("scanning")).toBe(true);
+		expect(isSyncStatusInFlight("filtering")).toBe(true);
+	});
+
+	it("treats the upload and its verified completion as in flight", () => {
+		expect(isSyncStatusInFlight("uploading")).toBe(true);
+		expect(isSyncStatusInFlight("uploaded")).toBe(true);
+		expect(isSyncStatusInFlight("analyzing")).toBe(true);
+	});
+
+	it("treats a dead attempt as idle so polling settles down", () => {
+		expect(isSyncStatusInFlight("failed")).toBe(false);
+		expect(isSyncStatusInFlight("expired")).toBe(false);
+		expect(isSyncStatusInFlight("ready")).toBe(false);
+	});
+});
+
+describe("browser reconciliation must not starve the CLI transport", () => {
+	it("budgets status reads separately from the general API-call budget", () => {
+		expect(CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION).toBe("sync_status_read");
+		expect(CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION).not.toBe(
+			CODEBASE_SYNC_RATE_LIMIT_ACTION,
+		);
+	});
+
+	it("leaves headroom for a full active-attempt window inside one rate-limit window", () => {
+		const activeRequestsPerWindow =
+			RATE_LIMIT_WINDOW_MS / CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS;
+		expect(activeRequestsPerWindow).toBeLessThan(RATE_LIMITS.syncStatusRead);
+	});
+
+	it("shows why one shared budget could not carry both readers and the upload", () => {
+		// A session stays `waiting_for_cli` for up to its whole 30-minute life.
+		// At the standby cadence a single browser tab already claims half of the
+		// general allowance, and the CLI's manifest/file batches draw from that
+		// same bucket — so a second open tab exhausted it before the CLI could
+		// upload anything.
+		const standbyRequestsPerWindow =
+			RATE_LIMIT_WINDOW_MS / CODEBASE_SYNC_POLL_INTERVAL_MS;
+		expect(standbyRequestsPerWindow * 2).toBeGreaterThanOrEqual(
+			RATE_LIMITS.general,
+		);
+		expect(standbyRequestsPerWindow).toBeLessThan(RATE_LIMITS.general);
+	});
+});
 
 describe("sync stage vocabulary", () => {
 	it("exposes exactly three product stages in a stable order", () => {

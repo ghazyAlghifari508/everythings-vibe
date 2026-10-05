@@ -35,6 +35,14 @@ export const RATE_LIMITS = {
 	general: 60,
 	// Unauthenticated API-key guesses per key-fingerprint per minute.
 	apiKeyAuth: 30,
+	// Browser sync-status reconciliation gets its own budget, separate from
+	// `general`. Sharing one budget meant the browser's own polling competed
+	// with the CLI upload transport it was watching: `waiting_for_cli` is the
+	// normal state for a session's full 30-minute life, so a single tab at the
+	// standby cadence consumed half the `general` allowance before the CLI
+	// could send a single manifest batch. Observation must never starve the
+	// observed.
+	syncStatusRead: 240,
 } as const;
 
 export const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -101,7 +109,19 @@ export const GENERATION_STATUS_POLL_INTERVAL_MS = 2_500;
 
 // === Existing codebase sync (MVP locked decisions) ===
 // Browser polls the persisted sync status; no sync SSE endpoint in MVP.
+//
+// Cadence follows what the server is actually doing. While an attempt is in
+// flight the CLI is moving between real persisted states and the browser has a
+// short window in which to observe each one, so it reconciles faster. While the
+// session is still `waiting_for_cli` nothing on the server can change until the
+// user runs the CLI, so a slower cadence loses no information and stops
+// spending the status-read budget on an idle session (which lasts up to the
+// full 30-minute session expiry).
 export const CODEBASE_SYNC_POLL_INTERVAL_MS = 2_000;
+// Active-attempt cadence: the window in which `connected` -> `uploading` ->
+// `uploaded` transitions can be missed is bounded by the CLI's own upload time,
+// so this is the reconciliation budget for a genuinely in-flight attempt.
+export const CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS = 500;
 // Bounded lifetime for one browser status request. A hung fetch must never
 // wedge polling: the request is aborted past this budget and the next poll
 // is scheduled. Real network failures stay honest errors; aborts stay silent.
