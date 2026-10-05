@@ -66,7 +66,7 @@ function seedStalePointer() {
 }
 
 beforeEach(() => {
-	useUIStore.getState().setCodebasePlanStep("prompt");
+	useUIStore.getState().setCodebasePlanStep("sync");
 	sessionStorage.clear();
 });
 

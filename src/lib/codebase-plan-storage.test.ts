@@ -6,13 +6,16 @@ import {
 	clearPlanCodebaseProjectPointer,
 	readPlanCodebasePointer,
 	readPlanCodebaseProjectPointer,
+	readPlanCodebaseStepPointer,
 	storePlanCodebasePointer,
 	storePlanCodebaseProjectPointer,
+	storePlanCodebaseStepPointer,
 } from "./codebase-plan-storage";
 import {
 	PLAN_CODEBASE_ID_STORAGE_KEY,
 	PLAN_CODEBASE_NAME_STORAGE_KEY,
 	PLAN_CODEBASE_PROJECT_STORAGE_KEY,
+	PLAN_CODEBASE_STEP_STORAGE_KEY,
 } from "./codebase-sync";
 
 beforeEach(() => {
@@ -78,6 +81,37 @@ describe("plan codebase project pointer", () => {
 			id: "cb-1",
 			name: "react-movie-app",
 		});
+	});
+});
+
+describe("plan codebase step pointer", () => {
+	it("round-trips both onboarding steps", () => {
+		storePlanCodebaseStepPointer("sync");
+		expect(readPlanCodebaseStepPointer()).toBe("sync");
+
+		storePlanCodebaseStepPointer("summary");
+		expect(readPlanCodebaseStepPointer()).toBe("summary");
+	});
+
+	it("returns null when nothing is stored", () => {
+		expect(readPlanCodebaseStepPointer()).toBeNull();
+	});
+
+	it("maps the retired three-step values onto the step that replaced them", () => {
+		// `prompt` and `syncing` were two screens of one responsibility, so a
+		// session stored before the collapse resumes on the single sync step
+		// instead of being treated as unknown.
+		sessionStorage.setItem(PLAN_CODEBASE_STEP_STORAGE_KEY, "prompt");
+		expect(readPlanCodebaseStepPointer()).toBe("sync");
+
+		sessionStorage.setItem(PLAN_CODEBASE_STEP_STORAGE_KEY, "syncing");
+		expect(readPlanCodebaseStepPointer()).toBe("sync");
+	});
+
+	it("treats a genuinely unknown value as absent rather than defaulting it", () => {
+		sessionStorage.setItem(PLAN_CODEBASE_STEP_STORAGE_KEY, "not-a-step");
+
+		expect(readPlanCodebaseStepPointer()).toBeNull();
 	});
 });
 

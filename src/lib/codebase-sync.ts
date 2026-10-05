@@ -243,35 +243,29 @@ export function hasCliHandshake(status: {
 }
 
 /**
- * Whether the prompt screen may advance to "Pantau Sync".
+ * Whether the conclusion step may be opened.
  *
- * Read straight off the last polled server status, so a refresh reconstructs the
- * gate from persisted evidence instead of React memory.
+ * Transport-only: an uploaded snapshot is a finished sync whether or not the
+ * model has run, so "Kesimpulan Codebase" is reachable while analysis is still
+ * pending — that step owns the pending state itself.
+ *
+ * This is also the ONLY thing that unlocks the instruction screen's continue
+ * action. Copying the prompt is browser-local feedback and proves nothing about
+ * whether the agent ran, so it has no influence here.
  */
-export function canContinueToSync(
+export function canOpenSummary(
 	status:
 		| {
 				status: CodebaseSyncStatus;
+				snapshotId?: string | null;
 				cliConnectedAt?: string | null;
 		  }
 		| null
 		| undefined,
 ): boolean {
+	// No status at all means the browser has not heard from the server, which is
+	// never evidence that a snapshot exists.
 	if (!status) return false;
-	return hasCliHandshake(status);
-}
-
-/**
- * Whether the conclusion screen may be opened.
- *
- * Transport-only: an uploaded snapshot is a finished sync whether or not the
- * model has run, so "Kesimpulan Codebase" is reachable while analysis is still
- * pending — that screen owns the pending state itself.
- */
-export function canOpenSummary(status: {
-	status: CodebaseSyncStatus;
-	snapshotId?: string | null;
-}): boolean {
 	if (!status.snapshotId) return false;
 	if (!hasCliHandshake(status)) return false;
 	return (CODEBASE_SYNC_COMPLETE_STATUSES as readonly string[]).includes(

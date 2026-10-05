@@ -116,11 +116,18 @@ export function FlowStepNav(props?: {
 	);
 }
 
-export type CodebasePlanStep = "prompt" | "syncing" | "summary";
+/**
+ * The existing-codebase onboarding is two steps, not three.
+ *
+ * Copying the prompt, watching the agent connect, and watching the upload land
+ * are all part of one instruction screen, so a separate "watch the sync" step
+ * would only repeat the same status the user is already looking at. The
+ * conclusion step is the only place after it.
+ */
+export type CodebasePlanStep = "sync" | "summary";
 
 const CODEBASE_STEPS: Array<{ id: CodebasePlanStep; label: string }> = [
-	{ id: "prompt", label: "Prompt Sync" },
-	{ id: "syncing", label: "Pantau Sync" },
+	{ id: "sync", label: "Sync Codebase" },
 	{ id: "summary", label: "Kesimpulan Codebase" },
 ];
 
@@ -128,9 +135,14 @@ export function CodebaseStepNav(props: {
 	step?: CodebasePlanStep;
 	onSelectStep?: (step: CodebasePlanStep) => void;
 }) {
-	const currentStep = props.step ?? "prompt";
-	const currentIdx =
-		currentStep === "summary" ? 2 : currentStep === "syncing" ? 1 : 0;
+	const currentStep = props.step ?? "sync";
+	// Derived from the list rather than hand-indexed, so adding or removing a
+	// step cannot leave the connector and the completed marks disagreeing with
+	// the labels.
+	const currentIdx = Math.max(
+		0,
+		CODEBASE_STEPS.findIndex((s) => s.id === currentStep),
+	);
 
 	return (
 		<ol

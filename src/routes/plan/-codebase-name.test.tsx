@@ -1,11 +1,5 @@
 // @vitest-environment jsdom
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUIStore } from "@/store";
 import { PlanCodebasePage } from "./codebase";
@@ -42,24 +36,9 @@ function syncPayload() {
 	};
 }
 
-async function advanceToSyncScreen() {
-	// The prompt CTA is gated on real CLI handshake evidence, so wait for the
-	// canonical poll to report one before advancing.
-	await waitFor(
-		() => {
-			const cta = screen.getByTestId("prompt-continue-to-sync");
-			expect((cta as HTMLButtonElement).disabled).toBe(false);
-		},
-		{ timeout: 15000, interval: 50 },
-	);
-	fireEvent.click(screen.getByTestId("prompt-continue-to-sync"));
-	await waitFor(() => {
-		expect(screen.getByText("Sync codebase")).toBeDefined();
-	});
-}
 describe("PlanCodebasePage repository name", () => {
 	beforeEach(() => {
-		useUIStore.getState().setCodebasePlanStep("prompt");
+		useUIStore.getState().setCodebasePlanStep("sync");
 		try {
 			sessionStorage.clear();
 		} catch {
@@ -77,9 +56,7 @@ describe("PlanCodebasePage repository name", () => {
 		}
 	});
 
-	it("shows the placeholder until the CLI reports the real repository name", {
-		timeout: 20000,
-	}, async () => {
+	it("shows the placeholder until the CLI reports the real repository name", async () => {
 		let statusCalls = 0;
 		vi.stubGlobal(
 			"fetch",
@@ -121,29 +98,29 @@ describe("PlanCodebasePage repository name", () => {
 
 		render(<PlanCodebasePage />);
 
+		// The prompt carries the placeholder, because that is all the server
+		// knows before the agent runs.
 		await waitFor(() => {
 			expect(
 				screen.getByText("Sync codebase dengan VibeEverything"),
 			).toBeDefined();
 		});
+		expect(document.body.textContent).toContain(PLACEHOLDER);
 
-		await advanceToSyncScreen();
-
+		// Once the handshake lands, the live status on the SAME screen adopts the
+		// detected folder name instead of keeping the creation placeholder.
 		await waitFor(
 			() => {
 				expect(document.body.textContent).toContain(
-					`PROJECT / ${DETECTED_NAME.toUpperCase()}`,
+					`Project / ${DETECTED_NAME}`,
 				);
 			},
 			{ timeout: 15000, interval: 100 },
 		);
 		expect(statusCalls).toBeGreaterThanOrEqual(2);
-		expect(document.body.textContent).not.toContain(PLACEHOLDER.toUpperCase());
-	});
+	}, 20000);
 
-	it("keeps showing a user-renamed name reported by the server", {
-		timeout: 20000,
-	}, async () => {
+	it("keeps showing a user-renamed name reported by the server", async () => {
 		let statusCalls = 0;
 		vi.stubGlobal(
 			"fetch",
@@ -187,17 +164,15 @@ describe("PlanCodebasePage repository name", () => {
 			).toBeDefined();
 		});
 
-		await advanceToSyncScreen();
-
 		await waitFor(
 			() => {
 				expect(document.body.textContent).toContain(
-					"PROJECT / MOVIE APP PORTFOLIO",
+					"Project / Movie App Portfolio",
 				);
 			},
 			{ timeout: 15000, interval: 100 },
 		);
 		expect(statusCalls).toBeGreaterThanOrEqual(1);
-		expect(document.body.textContent).not.toContain(PLACEHOLDER.toUpperCase());
-	});
+		expect(document.body.textContent).not.toContain(`Project / ${PLACEHOLDER}`);
+	}, 20000);
 });

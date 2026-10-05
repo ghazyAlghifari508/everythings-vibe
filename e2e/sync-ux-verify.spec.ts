@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Browser verification for the sync UX rework.
+ * Browser verification for the merged existing-codebase onboarding step.
  *
  * Loads the REAL app document (so Vite injects the `@vitejs/plugin-react`
  * preamble and the app's module graph is live), then mounts the shipped
@@ -18,12 +18,7 @@ const MOUNT_SCRIPT = `(async () => {
   const React = (await import("/@id/react")).default;
   // CJS interop: the namespace is exposed on \`default\`.
   const { createRoot } = (await import("/@id/react-dom/client")).default;
-  const { SyncStatus } = await import("/src/components/codebase/sync-status.tsx");
   const { ScreenConnect } = await import("/src/components/codebase/screen-connect.tsx");
-
-  const statusRoot = document.createElement("div");
-  statusRoot.id = "verify-status";
-  document.body.appendChild(statusRoot);
 
   const connectRoot = document.createElement("div");
   connectRoot.id = "verify-connect";
@@ -38,10 +33,12 @@ const MOUNT_SCRIPT = `(async () => {
     expiresAt: new Date(Date.now() + 60000).toISOString(),
   };
 
-  createRoot(statusRoot).render(
-    React.createElement(SyncStatus, {
-      projectId: "proj_verify_123",
+  createRoot(connectRoot).render(
+    React.createElement(ScreenConnect, {
       projectName: "Wishlist Fitur",
+      payload,
+      // The reconciled status the owning screen polled: a finished upload for
+      // the current attempt.
       status: {
         projectId: "proj_verify_123",
         sessionId: "sess_verify_123",
@@ -51,14 +48,8 @@ const MOUNT_SCRIPT = `(async () => {
         snapshotId: "snap_1",
         analysisStatus: "pending",
       },
-    }),
-  );
-
-  createRoot(connectRoot).render(
-    React.createElement(ScreenConnect, {
-      projectName: "Wishlist Fitur",
-      payload,
-      onAgentStarted: () => {},
+      canContinueToSummary: true,
+      onContinueToSummary: () => {},
     }),
   );
 
@@ -71,37 +62,36 @@ async function mountComponents(page: import("@playwright/test").Page) {
 	return page.evaluate(MOUNT_SCRIPT);
 }
 
-test.describe("sync UX rework — real browser render", () => {
-	test("sync status renders two real-signal sync stages, no fabricated ones", async ({
+test.describe("existing-codebase onboarding — real browser render", () => {
+	test("the instruction screen reports both sync stages from real server signals", async ({
 		page,
 	}) => {
 		const errors: string[] = [];
 		page.on("pageerror", (e) => errors.push(e.message));
 
 		await mountComponents(page);
-		const status = page.locator("#verify-status");
-		await expect(status).toContainText("Repository terhubung", {
+		const connect = page.locator("#verify-connect");
+		await expect(connect).toContainText("Repository terhubung", {
 			timeout: 20000,
 		});
 
-		const text = (await status.innerText()) ?? "";
+		const text = (await connect.innerText()) ?? "";
+		expect(text).toContain("Repository terhubung");
 		expect(text).toContain("Source code tersinkron");
 		// Real counts straight from the server payload.
 		expect(text).toContain("12");
 		expect(text).toContain("3");
-		// AI analysis is a separate capability, never a third sync stage.
+		// AI analysis is a separate capability, never a sync stage.
 		expect(text).not.toMatch(/menganalisis codebase/i);
 		expect(text).not.toMatch(/analisis codebase selesai/i);
 		expect(
-			await status
-				.locator('[data-testid="sync-stage-analysis"]')
-				.count(),
+			await connect.locator('[data-testid="sync-stage-analysis"]').count(),
 		).toBe(0);
 		expect(
-			await status.locator('[data-testid="sync-stage-connection"]').count(),
+			await connect.locator('[data-testid="sync-stage-connection"]').count(),
 		).toBe(1);
 		expect(
-			await status.locator('[data-testid="sync-stage-upload"]').count(),
+			await connect.locator('[data-testid="sync-stage-upload"]').count(),
 		).toBe(1);
 		// Never the bookkeeping stages the client cannot observe.
 		expect(text).not.toMatch(/memindai/i);
@@ -109,10 +99,26 @@ test.describe("sync UX rework — real browser render", () => {
 		expect(text).not.toMatch(/package manifest dan framework dibaca/i);
 		// No fabricated percentage.
 		expect(text).not.toContain("%");
+		// There is exactly one progress surface in the whole step.
+		expect(await connect.locator('[data-testid="sync-card"]').count()).toBe(0);
+		expect(text).not.toMatch(/Pantau Sync/i);
+		expect(text).not.toMatch(/Prompt Sync/i);
 		expect(errors).toEqual([]);
 	});
 
-	test("connect screen renders the self-contained execution prompt", async ({
+	test("a finished upload unlocks the conclusion step", async ({ page }) => {
+		const errors: string[] = [];
+		page.on("pageerror", (e) => errors.push(e.message));
+
+		await mountComponents(page);
+		const cta = page.locator('[data-testid="sync-continue-to-summary"]');
+		await expect(cta).toBeVisible({ timeout: 20000 });
+		await expect(cta).toBeEnabled();
+		await expect(cta).toContainText("Lanjut ke Kesimpulan");
+		expect(errors).toEqual([]);
+	});
+
+	test("instruction screen renders the self-contained execution prompt", async ({
 		page,
 	}) => {
 		const errors: string[] = [];

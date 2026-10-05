@@ -40,7 +40,7 @@ const ANALYSIS_OUTPUT = {
 
 describe("PlanCodebasePage live sync reconciliation", () => {
 	beforeEach(() => {
-		useUIStore.getState().setCodebasePlanStep("prompt");
+		useUIStore.getState().setCodebasePlanStep("sync");
 		try {
 			sessionStorage.clear();
 		} catch {
@@ -58,9 +58,7 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 		}
 	});
 
-	it("mounted Pantau Sync detects the uploaded snapshot without refresh and waits for explicit continue", {
-		timeout: 20000,
-	}, async () => {
+	it("step 1 detects the uploaded snapshot without a refresh and waits for an explicit continue", async () => {
 		const syncPayload = {
 			projectId: "cb-live-1",
 			apiBaseUrl: "http://localhost:3000",
@@ -76,18 +74,7 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 			vi.fn(async (input: unknown, init?: { method?: string }) => {
 				const url = String(input);
 				const method = init?.method ?? "GET";
-				if (url === "/api/codebases" && (!init || !init.method)) {
-					return {
-						ok: true,
-						status: 200,
-						json: async () => ({
-							id: "cb-live-1",
-							name: "Live Repo",
-							sync: syncPayload,
-						}),
-					};
-				}
-				if (url === "/api/codebases" && init?.method === "POST") {
+				if (url === "/api/codebases") {
 					return {
 						ok: true,
 						status: 200,
@@ -180,23 +167,15 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 			).toBeDefined();
 		});
 
-		// The gate waits for the canonical poll interval, so allow for it.
-		const monitorButton = await waitFor(
+		// The prompt is waiting on the agent first.
+		await waitFor(
 			() => {
-				const cta = screen.getByTestId(
-					"prompt-continue-to-sync",
-				) as HTMLButtonElement;
-				expect(cta.disabled).toBe(false);
-				return cta;
+				expect(screen.getByText("Menunggu agent terhubung")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		monitorButton.click();
 
-		await waitFor(() => {
-			expect(screen.getByText("Sync codebase")).toBeDefined();
-		});
-
+		// The same screen picks the finished upload up live and reports it.
 		await waitFor(
 			() => {
 				expect(screen.getByText("Source code tersinkron")).toBeDefined();
@@ -206,26 +185,22 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 		expect(statusCalls).toBeGreaterThanOrEqual(2);
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 		expect(screen.queryByText("Snapshot siap")).toBeNull();
+
 		await waitFor(
 			() => {
-				const card = screen.queryByTestId("sync-card");
-				const cta = card?.querySelector(
-					'[data-testid="plan-continue-to-summary"]',
-				) as HTMLButtonElement | null;
-				expect(cta?.disabled).toBe(false);
+				const cta = screen.getByTestId(
+					"sync-continue-to-summary",
+				) as HTMLButtonElement;
+				expect(cta.disabled).toBe(false);
 			},
 			{ timeout: 15000, interval: 100 },
 		);
 		(
-			screen
-				.getByTestId("sync-card")
-				.querySelector(
-					'[data-testid="plan-continue-to-summary"]',
-				) as HTMLButtonElement
+			screen.getByTestId("sync-continue-to-summary") as HTMLButtonElement
 		).click();
 		await waitFor(() => {
 			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
 		expect(screen.getByText("snap-live-1")).toBeDefined();
-	});
+	}, 20000);
 });

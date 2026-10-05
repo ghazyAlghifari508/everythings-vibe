@@ -19,7 +19,6 @@ import {
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { ScreenIncompleteSync } from "@/components/codebase/screen-incomplete-sync";
-import { SyncStatus } from "@/components/codebase/sync-status";
 import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
 import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
@@ -379,7 +378,6 @@ function CodebaseDetailPage() {
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
 	const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
-	const [screen, setScreen] = useState<1 | 2 | 3>(1);
 	const [error, setError] = useState<string | null>(null);
 	const [isStarting, setIsStarting] = useState(false);
 	const [isWorking, setIsWorking] = useState(false);
@@ -417,7 +415,6 @@ function CodebaseDetailPage() {
 					return;
 				}
 				setAnalysis(parsed);
-				if (parsed.output) setScreen(3);
 			} catch {
 				setError("Server tidak dapat dihubungi.");
 			} finally {
@@ -478,12 +475,10 @@ function CodebaseDetailPage() {
 				analysisAttemptedFor.current = parsed.data.snapshotId;
 				void triggerAnalysis(parsed.data.snapshotId);
 			}
-			setScreen((current) => {
-				if (matchingInitialAnalysis) return 3;
-				if (hasUsableSnapshot) return current === 1 ? 2 : current;
-				if (current === 1 && parsed.data.status !== "waiting_for_cli") return 2;
-				return current;
-			});
+			// No screen bookkeeping: `snapshotReady` already decides between the
+			// workspace and the sync screen, and the sync screen reports the live
+			// upload itself. Advancing a separate "monitor" screen only repeated
+			// the same status the user was already watching.
 		} catch {
 			setError("Server tidak dapat dihubungi. Coba lagi.");
 		} finally {
@@ -543,7 +538,9 @@ function CodebaseDetailPage() {
 			setPayload(parsed.data);
 			setStatus(null);
 			setAnalysis(null);
-			setScreen(1);
+			// A fresh session resets the visible attempt: the prompt returns and the
+			// stage list drops the previous attempt's state.
+			analysisAttemptedFor.current = null;
 		} catch {
 			setError("Server tidak dapat dihubungi.");
 		} finally {
@@ -1589,29 +1586,20 @@ function CodebaseDetailPage() {
 					</button>
 				</div>
 			)}
-			{screen === 1 &&
-				(payload !== null || isStarting ? (
-					<ScreenConnect
-						projectName={codebase.name}
-						payload={payload}
-						isStarting={isStarting}
-						onAgentStarted={() => setScreen(2)}
-					/>
-				) : (
-					<ScreenIncompleteSync
-						projectName={codebase.name}
-						isStarting={isStarting}
-						onStartSync={() => void startSession("retry")}
-					/>
-				))}
-			{screen === 2 && (
-				<SyncStatus
-					projectId={codebase.id}
+			{payload !== null || isStarting ? (
+				<ScreenConnect
 					projectName={codebase.name}
+					payload={payload}
+					isStarting={isStarting}
 					status={status}
-					statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
-					statusPolling="parent"
+					onRequestNewToken={() => void startSession("retry")}
 					onRetrySync={() => void startSession("retry")}
+				/>
+			) : (
+				<ScreenIncompleteSync
+					projectName={codebase.name}
+					isStarting={isStarting}
+					onStartSync={() => void startSession("retry")}
 				/>
 			)}
 		</main>

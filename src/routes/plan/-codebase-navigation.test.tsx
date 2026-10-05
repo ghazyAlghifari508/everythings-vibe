@@ -164,60 +164,31 @@ function mockPlanFlow(
 	};
 }
 
-async function advanceToSyncScreen() {
-	// The prompt CTA is gated on real CLI handshake evidence, so wait for the
-	// canonical poll to report one before advancing.
-	await waitFor(
-		() => {
-			const cta = screen.getByTestId("prompt-continue-to-sync");
-			expect((cta as HTMLButtonElement).disabled).toBe(false);
-		},
-		{ timeout: 15000, interval: 50 },
-	);
-	fireEvent.click(screen.getByTestId("prompt-continue-to-sync"));
-	await waitFor(() => {
-		expect(screen.getByText("Sync codebase")).toBeDefined();
-	});
-}
-async function startSyncing() {
+async function startSyncStep() {
 	render(<PlanCodebasePage />);
 	await waitFor(() => {
 		expect(
 			screen.getByText("Sync codebase dengan VibeEverything"),
 		).toBeDefined();
 	});
-	await advanceToSyncScreen();
-	await waitFor(() => {
-		expect(screen.getByText("Sync codebase")).toBeDefined();
-	});
 }
 
-async function waitForEnabledReviewCta() {
+function summaryCta(): HTMLButtonElement {
+	return screen.getByTestId("sync-continue-to-summary") as HTMLButtonElement;
+}
+
+async function waitForEnabledSummaryCta() {
 	await waitFor(
 		() => {
-			const card = screen.queryByTestId("sync-card");
-			const cta = card?.querySelector(
-				'[data-testid="plan-continue-to-summary"]',
-			) as HTMLButtonElement | null;
-			expect(cta?.disabled).toBe(false);
+			expect(summaryCta().disabled).toBe(false);
 		},
 		{ timeout: 15000, interval: 100 },
 	);
 }
 
-function clickReviewCta() {
-	(
-		screen
-			.getByTestId("sync-card")
-			.querySelector(
-				'[data-testid="plan-continue-to-summary"]',
-			) as HTMLButtonElement
-	).click();
-}
-
-describe("PlanCodebasePage navigation policy", () => {
+describe("PlanCodebasePage two-step navigation policy", () => {
 	beforeEach(() => {
-		useUIStore.getState().setCodebasePlanStep("prompt");
+		useUIStore.getState().setCodebasePlanStep("sync");
 		try {
 			sessionStorage.clear();
 		} catch {
@@ -235,24 +206,41 @@ describe("PlanCodebasePage navigation policy", () => {
 		}
 	});
 
-	it("uploaded observed live does not auto-advance away from Pantau Sync", {
-		timeout: 20000,
-	}, async () => {
+	it("renders the whole sync lifecycle on step 1 and never navigates away from it", async () => {
 		const flow = mockPlanFlow([waitingPayload(), uploadedPayload()]);
-		await startSyncing();
+		await startSyncStep();
+
+		// The upload landing while the user still watches step 1 updates that same
+		// screen in place. There is no separate monitor screen to be pushed onto.
 		await waitFor(
 			() => {
 				expect(screen.getByText("Source code tersinkron")).toBeDefined();
 			},
-			{ timeout: 6000, interval: 100 },
+			{ timeout: 10000, interval: 100 },
 		);
 		expect(flow.getStatusCalls()).toBeGreaterThanOrEqual(2);
+		expect(
+			screen.getByText("Sync codebase dengan VibeEverything"),
+		).toBeDefined();
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
-	});
+	}, 20000);
 
-	it("analyzing observed live does not auto-advance away from Pantau Sync", {
-		timeout: 20000,
-	}, async () => {
+	it("shows exactly one sync progress surface on step 1", async () => {
+		mockPlanFlow([waitingPayload(), uploadedPayload()]);
+		await startSyncStep();
+		await waitForEnabledSummaryCta();
+
+		// Handshake and upload, rendered once each. A duplicated monitor screen is
+		// exactly what this asserts cannot happen.
+		expect(screen.getAllByTestId("sync-stage-connection")).toHaveLength(1);
+		expect(screen.getAllByTestId("sync-stage-upload")).toHaveLength(1);
+		expect(screen.queryByTestId("sync-card")).toBeNull();
+		expect(screen.queryByText(/Lanjut ke Pantau Sync/i)).toBeNull();
+		expect(screen.queryByText(/Kembali ke Prompt Sync/i)).toBeNull();
+		expect(screen.queryByText(/CLI Agent Belum Terhubung/i)).toBeNull();
+	}, 20000);
+
+	it("keeps a legacy analyzing session reported as a finished sync", async () => {
 		mockPlanFlow([
 			waitingPayload(),
 			{
@@ -263,125 +251,122 @@ describe("PlanCodebasePage navigation policy", () => {
 				fileCount: 37,
 			},
 		]);
-		await startSyncing();
+		await startSyncStep();
 		await waitFor(
 			() => {
 				expect(screen.getByText("Source code tersinkron")).toBeDefined();
 			},
-			{ timeout: 6000, interval: 100 },
+			{ timeout: 10000, interval: 100 },
 		);
-		// A finished transport is a finished sync; the model running behind it
-		// is never rendered as a third stage.
+		// A finished transport is a finished sync; the model running behind it is
+		// never rendered as a sync stage.
 		expect(screen.queryByText(/Menganalisis codebase/i)).toBeNull();
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
-	});
+	}, 20000);
 
-	it("ready without analysis output does not render the analysis review", {
-		timeout: 20000,
-	}, async () => {
-		mockPlanFlow([
-			waitingPayload(),
-			{
-				projectId: "cb-nav-1",
-				sessionId: "sess-nav-1",
-				status: "ready",
-				snapshotId: "snap-nav-1",
-				fileCount: 37,
-			},
-		]);
-		await startSyncing();
-		await waitFor(
-			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
-			},
-			{ timeout: 6000, interval: 100 },
-		);
-		// Reaching `ready` never auto-opens the review, and no analysis stage
-		// claims the work is done on the user's behalf.
-		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
-		expect(screen.queryByText("Detected environment")).toBeNull();
-		expect(screen.queryByText(/Analisis codebase selesai/i)).toBeNull();
-	});
-
-	it("explicit review continue advances sync to the validated analysis review", {
-		timeout: 20000,
-	}, async () => {
+	it("opens the conclusion step directly from the snapshot CTA", async () => {
 		mockPlanFlow([waitingPayload(), uploadedPayload()], {
 			withAnalysis: true,
 		});
-		await startSyncing();
-		await waitForEnabledReviewCta();
-		clickReviewCta();
+		await startSyncStep();
+		await waitForEnabledSummaryCta();
+		fireEvent.click(summaryCta());
+
 		await waitFor(() => {
 			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
 		expect(screen.getByText("snap-nav-1")).toBeDefined();
-	});
+		// One hop, straight to the conclusion step.
+		expect(
+			screen.queryByText("Sync codebase dengan VibeEverything"),
+		).toBeNull();
+	}, 25000);
 
-	it("manual Back to Pantau Sync sticks across later polls without flicker", {
-		timeout: 20000,
-	}, async () => {
+	it("never auto-opens the conclusion step while the analysis is still pending", async () => {
+		const flow = mockPlanFlow([waitingPayload(), uploadedPayload()], {
+			withAnalysis: true,
+		});
+		await startSyncStep();
+		await waitForEnabledSummaryCta();
+		await waitFor(
+			() => {
+				expect(
+					flow.fetchMock.mock.calls.some(
+						(call) =>
+							call[1]?.method === "POST" &&
+							String(call[0]).includes(
+								"/api/v1/projects/proj-nav-1/codebase/analysis",
+							),
+					),
+				).toBe(true);
+			},
+			{ timeout: 10000, interval: 100 },
+		);
+		// The snapshot being analysed does not pull the user forward on its own.
+		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
+	}, 25000);
+
+	it("keeps review-to-sync back navigation available and stable across later polls", async () => {
 		mockPlanFlow([waitingPayload(), uploadedPayload()], {
 			withAnalysis: true,
 		});
-		await startSyncing();
-		await waitForEnabledReviewCta();
-		clickReviewCta();
+		await startSyncStep();
+		await waitForEnabledSummaryCta();
+		fireEvent.click(summaryCta());
 		await waitFor(() => {
 			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
+
 		screen.getByRole("button", { name: /Kembali ke Sinkronisasi/i }).click();
 		await waitFor(() => {
-			expect(screen.getByText("Sync codebase")).toBeDefined();
+			expect(
+				screen.getByText("Sync codebase dengan VibeEverything"),
+			).toBeDefined();
 		});
-		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
+		// Going back lands on a completed sync, and it stays there: a later poll
+		// reporting a ready analysis must not drag the user forward again.
 		await waitFor(
 			() => {
 				expect(screen.getByText("Source code tersinkron")).toBeDefined();
 			},
-			{ timeout: 6000, interval: 100 },
+			{ timeout: 10000, interval: 100 },
 		);
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
-	});
+	}, 25000);
 
-	it("explicit return from sync to the review stays allowed while the analysis is valid", {
-		timeout: 20000,
-	}, async () => {
+	it("allows returning to the conclusion step while the analysis stays valid", async () => {
 		mockPlanFlow([waitingPayload(), uploadedPayload()], {
 			withAnalysis: true,
 		});
-		await startSyncing();
-		await waitForEnabledReviewCta();
-		clickReviewCta();
+		await startSyncStep();
+		await waitForEnabledSummaryCta();
+		fireEvent.click(summaryCta());
 		await waitFor(() => {
 			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
 		screen.getByRole("button", { name: /Kembali ke Sinkronisasi/i }).click();
-		await waitForEnabledReviewCta();
-		clickReviewCta();
+		await waitForEnabledSummaryCta();
+		fireEvent.click(summaryCta());
 		await waitFor(() => {
 			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
-	});
+	}, 25000);
 
-	it("final review renders validated analysis, never a snapshot-only table", {
-		timeout: 20000,
-	}, async () => {
+	it("renders validated analysis values, never a snapshot-only summary", async () => {
 		mockPlanFlow([waitingPayload(), uploadedPayload()], {
 			withAnalysis: true,
 		});
-		await startSyncing();
-		await waitForEnabledReviewCta();
-		clickReviewCta();
+		await startSyncStep();
+		await waitForEnabledSummaryCta();
+		fireEvent.click(summaryCta());
 		await waitFor(() => {
 			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
 		expect(screen.queryByText("Snapshot siap")).toBeNull();
-		expect(screen.queryByText("Sync Selesai — Snapshot Siap")).toBeNull();
 		expect(
-			screen.queryByText("Kesimpulan Analisis Codebase & Stack"),
+			screen.queryByText(/Kesimpulan Analisis Codebase & Stack/),
 		).toBeNull();
 		expect(screen.getByText("TanStack Start")).toBeDefined();
 		expect(screen.getByText("snap-nav-1")).toBeDefined();
-	});
+	}, 25000);
 });

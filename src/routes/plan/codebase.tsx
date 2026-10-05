@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CodebaseConclusion } from "@/components/codebase/codebase-conclusion";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
-import { SyncStatus } from "@/components/codebase/sync-status";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { useCodebaseSyncStatus } from "@/hooks/use-codebase-sync-status";
 import {
@@ -26,7 +25,7 @@ import {
 	storePlanCodebaseStepPointer,
 } from "@/lib/codebase-plan-storage";
 import {
-	canContinueToSync,
+	canOpenSummary,
 	isSyncStatusComplete,
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
@@ -72,7 +71,6 @@ export function PlanCodebasePage() {
 	// already reflects persisted server state instead of an empty loading card.
 	const [recoveredStatus, setRecoveredStatus] =
 		useState<SyncStatusResponse | null>(null);
-	const [sessionNonce, setSessionNonce] = useState(0);
 	const autoInitAttempted = useRef(false);
 	// Onboarding analysis context: one existing-codebase feature project per
 	// codebase, so the initial analysis runs through the existing per-feature
@@ -92,7 +90,7 @@ export function PlanCodebasePage() {
 
 	// One canonical reconciliation loop for the whole onboarding flow. The
 	// prompt screen needs the CLI handshake, the sync screen needs the transport
-	// stages, and the conclusion screen needs the persisted analysis status — all
+	// stages, and the conclusion screen needs the persisted analysis status â€” all
 	// three read this single snapshot, so no two screens can disagree and no
 	// second poller races this one.
 	const { status: lastStatus, error: statusPollError } = useCodebaseSyncStatus({
@@ -103,7 +101,7 @@ export function PlanCodebasePage() {
 	});
 
 	useEffect(() => {
-		setStep("prompt");
+		setStep("sync");
 	}, [setStep]);
 
 	// Persist the navigation intent, never the domain state: a refresh returns
@@ -171,8 +169,7 @@ export function PlanCodebasePage() {
 			// A brand new session has no server history: clear the seed so the
 			// poller cannot paint the previous attempt's state onto this one.
 			setRecoveredStatus(null);
-			setStep("prompt");
-			setSessionNonce((current) => current + 1);
+			setStep("sync");
 		} catch {
 			setError("Server tidak dapat dihubungi.");
 		} finally {
@@ -323,9 +320,14 @@ export function PlanCodebasePage() {
 	);
 
 	// Restore the step the user was on, validated against real server evidence.
-	// A stored intent is a preference, not a fact: the conclusion step needs a
-	// snapshot, and the prompt step is always reachable because it reports the
-	// handshake itself.
+	// A stored intent is a preference, not a fact, and it is only ever consulted
+	// AFTER the server has confirmed the precondition for the step it names:
+	// the conclusion step needs a usable current snapshot, and without one there
+	// is nothing to analyse, so a refresh always lands back on the sync step
+	// rather than faking a summary. When the snapshot does exist, the stored
+	// intent still matters — a user who refreshed while the upload was landing
+	// should come back to the completed sync state they were watching, not to a
+	// conclusion step they never reached.
 	const resolveRecoveredStep = useCallback(
 		(
 			recovered: SyncStatusResponse,
@@ -334,9 +336,8 @@ export function PlanCodebasePage() {
 			const hasSnapshot =
 				Boolean(recovered.snapshotId) &&
 				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status);
-			if (hasSnapshot) return "summary";
-			if (storedStep === "prompt") return "prompt";
-			return canContinueToSync(recovered) ? "syncing" : "prompt";
+			if (!hasSnapshot) return "sync";
+			return storedStep === "sync" ? "sync" : "summary";
 		},
 		[],
 	);
@@ -374,13 +375,11 @@ export function PlanCodebasePage() {
 			}
 			setCodebase({ id: stored.id, name: recoveredName });
 			setRecoveredStatus(recovered);
-			setSessionNonce((current) => current + 1);
 			const storedStep = readPlanCodebaseStepPointer();
-			// The conclusion step owns every analysis state, so a refresh on a
-			// finished upload resumes there and lets it render ANALYZING or READY
-			// from persisted evidence. Landing on the sync screen instead would
-			// show a completed sync the user already moved past, and landing on
-			// the review alone would need a manual Next.
+			// A usable snapshot is the precondition for the conclusion step, so the
+			// onboarding analysis context is restored only here. Which of the two
+			// steps the user lands on is then decided by `resolveRecoveredStep`,
+			// which keeps the stored intent from overriding this evidence.
 			if (
 				recovered.snapshotId &&
 				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status)
@@ -389,7 +388,7 @@ export function PlanCodebasePage() {
 				if (storedProject) {
 					setFeatureProjectId(storedProject);
 					// Only a ready analysis short-circuits the trigger below; a
-					// pending or failed row is left for the conclusion screen to
+					// pending or failed row is left for the conclusion step to
 					// render honestly.
 					const existing = await fetchAnalysisOutput(
 						storedProject,
@@ -431,7 +430,7 @@ export function PlanCodebasePage() {
 					setAnalysis(null);
 					setAnalysisError(null);
 					analysisAttemptedFor.current = null;
-					setStep("prompt");
+					setStep("sync");
 					return true;
 				}
 				clearPlanOnboardingPointers();
@@ -491,8 +490,7 @@ export function PlanCodebasePage() {
 			setAnalysis(null);
 			setAnalysisError(null);
 			analysisAttemptedFor.current = null;
-			setStep("prompt");
-			setSessionNonce((current) => current + 1);
+			setStep("sync");
 		} catch {
 			setError("Server tidak dapat dihubungi.");
 		} finally {
@@ -544,10 +542,22 @@ export function PlanCodebasePage() {
 			analysis.snapshotId === lastStatus.snapshotId &&
 			SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status),
 	);
-	// The prompt screen advances only on server evidence that the CLI started
-	// this attempt. Copying the prompt is browser feedback and never reaches
-	// this predicate.
-	const canContinueToMonitor = canContinueToSync(lastStatus);
+	// The sync step's continue action is gated on transport completion alone: a
+	// valid current snapshot plus a finished upload chain. Copying the prompt is
+	// browser feedback and never reaches this predicate, and neither is the
+	// analysis state — the conclusion step owns that from the moment it opens.
+	const canContinueToSummary = canOpenSummary(lastStatus);
+
+	// The conclusion step is never rendered without a usable current snapshot for
+	// this attempt. Without this guard a stale step pointer or a direct jump
+	// would show a summary for work that cannot start; the user is returned to
+	// the sync step, which reports the real state instead.
+	const snapshotReady = Boolean(
+		lastStatus?.snapshotId &&
+			SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status),
+	);
+	const activeStep: PlanCodebaseStep =
+		step === "summary" && !snapshotReady ? "sync" : step;
 
 	// Onboarding analysis trigger: once the server persisted a snapshot for
 	// the current attempt, ensure the onboarding feature project and run the
@@ -678,115 +688,46 @@ export function PlanCodebasePage() {
 				</div>
 			) : (
 				<>
-					{step === "prompt" &&
-						(payload ? (
-							<ScreenConnect
-								projectName={codebase.name}
-								payload={payload}
-								isStarting={isStarting}
-								canContinue={canContinueToMonitor}
-								onAgentStarted={() => setStep("syncing")}
-							/>
-						) : (
-							<div className="mx-auto w-full max-w-2xl rounded-xl border border-graphite bg-charcoal p-5 sm:p-6 text-center">
-								<p className="text-sm font-medium text-snow">
-									Sesi sync dipulihkan dari server
-								</p>
-								<p className="mt-1 text-xs text-fog">
-									Token sync sekali-pakai tidak tersimpan di browser. Buat token
-									baru untuk menjalankan CLI, atau lanjut pantau status yang
-									sudah berjalan.
-								</p>
-								{statusPollError && (
-									<p role="alert" className="mt-2 text-xs text-crimson">
-										{statusPollError}
-									</p>
-								)}
-								<div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-									<button
-										type="button"
-										onClick={() => void retrySession()}
-										disabled={isStarting}
-										className="inline-flex min-h-10 items-center rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										{isStarting ? "Menyiapkan..." : "Dapatkan token baru"}
-									</button>
-									<button
-										type="button"
-										data-testid="recovered-continue-to-sync"
-										onClick={() => setStep("syncing")}
-										// The same handshake gate as the prompt screen: a
-										// recovered session without CLI evidence stays put.
-										disabled={!canContinueToMonitor}
-										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										Lanjut ke Pantau Sync
-									</button>
-								</div>
-							</div>
-						))}
-
-					{step === "syncing" && (
-						<SyncStatus
-							key={sessionNonce}
-							projectId={codebase.id}
+					{/* Step 1 owns the whole sync lifecycle: the prompt, the agent, and
+					the live server status of the upload it started. There is no second
+					screen to navigate to in order to see the same progress. */}
+					{activeStep === "sync" && (
+						<ScreenConnect
 							projectName={codebase.name}
+							payload={payload}
+							isStarting={isStarting}
 							status={lastStatus}
-							statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
-							analysisProjectId={featureProjectId ?? undefined}
-							statusPolling="parent"
+							statusError={statusPollError}
+							onRequestNewToken={() => void retrySession()}
 							onRetrySync={() => void retrySession()}
+							canContinueToSummary={canContinueToSummary}
 							onContinueToSummary={() => setStep("summary")}
-							onBackToInstructions={() => setStep("prompt")}
 						/>
 					)}
 
-					{step === "summary" &&
-						(lastStatus?.snapshotId ? (
-							<section data-testid="codebase-sync-summary">
-								<CodebaseConclusion
-									snapshot={lastStatus}
-									analysis={analysis}
-									isAnalyzing={analysisWorking}
-									errorMessage={analysisError}
-									onRetryAnalysis={retryAnalysis}
-									onEnterWorkspace={() => {
-										if (!canOpenWorkspace) return;
-										void navigate({
-											to: "/codebases/$id",
-											params: { id: codebase.id },
-										});
-									}}
-									onBackToSync={() => setStep("syncing")}
-								/>
-							</section>
-						) : (
-							// No usable snapshot for the current attempt, so there is
-							// nothing to analyze yet. Report the real state and send the
-							// user back to monitoring instead of showing an analysis
-							// loader for work that cannot start.
-							<section
-								data-testid="codebase-sync-summary"
-								className="mx-auto w-full max-w-2xl rounded-xl border border-graphite bg-charcoal p-5 text-center"
-							>
-								<p className="text-sm font-medium text-snow">
-									Belum ada snapshot untuk dianalisis
-								</p>
-								<p className="mt-1 text-xs text-fog">
-									Kesimpulan codebase muncul setelah source code selesai
-									tersinkron.
-								</p>
-								<div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-									<button
-										type="button"
-										onClick={() => setStep("syncing")}
-										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										Kembali ke Pantau Sync
-									</button>
-								</div>
-							</section>
-						))}
+					{/* Step 2 owns every analysis state. Pending becomes the canonical
+					review in this same region once the server reports it, so there is
+					no manual step between the two. */}
+					{activeStep === "summary" && lastStatus && (
+						<section data-testid="codebase-sync-summary">
+							<CodebaseConclusion
+								snapshot={lastStatus}
+								analysis={analysis}
+								isAnalyzing={analysisWorking}
+								errorMessage={analysisError}
+								onRetryAnalysis={retryAnalysis}
+								onRetrySync={() => void retrySession()}
+								onEnterWorkspace={() => {
+									if (!canOpenWorkspace) return;
+									void navigate({
+										to: "/codebases/$id",
+										params: { id: codebase.id },
+									});
+								}}
+								onBackToSync={() => setStep("sync")}
+							/>
+						</section>
+					)}
 				</>
 			)}
 		</main>

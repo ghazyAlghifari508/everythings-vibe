@@ -167,37 +167,30 @@ function mockOnboardingFlow() {
 	};
 }
 
-async function advanceToSyncScreen() {
-	// The prompt CTA is gated on real CLI handshake evidence, so wait for the
-	// canonical poll to report one before advancing.
-	await waitFor(
-		() => {
-			const cta = screen.getByTestId("prompt-continue-to-sync");
-			expect((cta as HTMLButtonElement).disabled).toBe(false);
-		},
-		{ timeout: 15000, interval: 50 },
-	);
-	fireEvent.click(screen.getByTestId("prompt-continue-to-sync"));
-	await waitFor(() => {
-		expect(screen.getByText("Sync codebase")).toBeDefined();
-	});
-}
-async function startSyncing() {
+async function startSyncStep() {
 	render(<PlanCodebasePage />);
 	await waitFor(() => {
 		expect(
 			screen.getByText("Sync codebase dengan VibeEverything"),
 		).toBeDefined();
 	});
-	await advanceToSyncScreen();
-	await waitFor(() => {
-		expect(screen.getByText("Sync codebase")).toBeDefined();
-	});
+}
+
+async function waitForEnabledSummaryCta() {
+	await waitFor(
+		() => {
+			const cta = screen.getByTestId(
+				"sync-continue-to-summary",
+			) as HTMLButtonElement;
+			expect(cta.disabled).toBe(false);
+		},
+		{ timeout: 15000, interval: 100 },
+	);
 }
 
 describe("PlanCodebasePage onboarding analysis", () => {
 	beforeEach(() => {
-		useUIStore.getState().setCodebasePlanStep("prompt");
+		useUIStore.getState().setCodebasePlanStep("sync");
 		try {
 			sessionStorage.clear();
 		} catch {
@@ -215,11 +208,9 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		}
 	});
 
-	it("runs a real analysis through the existing feature/analysis boundary once the snapshot lands", {
-		timeout: 20000,
-	}, async () => {
+	it("runs a real analysis through the existing feature/analysis boundary once the snapshot lands", async () => {
 		const flow = mockOnboardingFlow();
-		await startSyncing();
+		await startSyncStep();
 		await waitFor(
 			() => {
 				expect(flow.wasAnalysisTriggered()).toBe(true);
@@ -236,13 +227,11 @@ describe("PlanCodebasePage onboarding analysis", () => {
 				call.includes("/api/v1/projects/proj-onboard-1/codebase/analysis"),
 			),
 		).toBe(true);
-	});
+	}, 20000);
 
-	it("never renders a separate snapshot-ready sibling card below the sync card", {
-		timeout: 20000,
-	}, async () => {
+	it("never renders a separate snapshot-ready sibling card below the sync status", async () => {
 		mockOnboardingFlow();
-		await startSyncing();
+		await startSyncStep();
 		await waitFor(
 			() => {
 				expect(screen.getByText("Source code tersinkron")).toBeDefined();
@@ -251,70 +240,44 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		);
 		expect(screen.queryByText("Snapshot siap")).toBeNull();
 		expect(screen.queryByText("Snapshot Siap")).toBeNull();
-	});
+	}, 20000);
 
-	it("keeps the review CTA inside the sync card and disabled until real analysis is ready", {
-		timeout: 20000,
-	}, async () => {
+	it("keeps the conclusion CTA disabled until a real snapshot exists", async () => {
 		mockOnboardingFlow();
-		await startSyncing();
+		await startSyncStep();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByText("Menunggu agent terhubung")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		const card = screen.getByTestId("sync-card");
-		expect(card).not.toBeNull();
-		const cta = card.querySelector(
-			'[data-testid="plan-continue-to-summary"]',
-		) as HTMLButtonElement | null;
-		expect(cta).not.toBeNull();
-		await waitFor(
-			() => {
-				expect(cta?.disabled).toBe(false);
-			},
-			{ timeout: 10000, interval: 100 },
-		);
-	});
+		const cta = screen.getByTestId(
+			"sync-continue-to-summary",
+		) as HTMLButtonElement;
+		expect(cta.disabled).toBe(true);
+		await waitForEnabledSummaryCta();
+	}, 20000);
 
-	it("renders the canonical CodebaseReview with real analysis values in the final step", {
-		timeout: 20000,
-	}, async () => {
+	it("renders the canonical CodebaseReview with real analysis values in the conclusion step", async () => {
 		mockOnboardingFlow();
-		await startSyncing();
-		await waitFor(
-			() => {
-				const card = screen.queryByTestId("sync-card");
-				const cta = card?.querySelector(
-					'[data-testid="plan-continue-to-summary"]',
-				) as HTMLButtonElement | null;
-				expect(cta?.disabled).toBe(false);
-			},
-			{ timeout: 12000, interval: 100 },
+		await startSyncStep();
+		await waitForEnabledSummaryCta();
+		fireEvent.click(
+			screen.getByTestId("sync-continue-to-summary") as HTMLButtonElement,
 		);
-		(
-			screen
-				.getByTestId("sync-card")
-				.querySelector(
-					'[data-testid="plan-continue-to-summary"]',
-				) as HTMLButtonElement
-		).click();
 		await waitFor(
 			() => {
 				expect(screen.getByText("Detected environment")).toBeDefined();
 			},
-			{ timeout: 6000, interval: 100 },
+			{ timeout: 10000, interval: 100 },
 		);
 		expect(screen.getByText("TanStack Start")).toBeDefined();
 		expect(screen.getByText("TypeScript")).toBeDefined();
 		expect(screen.getByText("PostgreSQL")).toBeDefined();
 		expect(screen.queryByText("Snapshot siap")).toBeNull();
-	});
+	}, 25000);
 
-	it("recovers an uploaded snapshot with a pending analysis into the pending conclusion state, never a snapshot-only review", {
-		timeout: 20000,
-	}, async () => {
+	it("recovers an uploaded snapshot with a pending analysis into the pending conclusion state, never a snapshot-only review", async () => {
 		try {
 			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-onboard-1");
 			sessionStorage.setItem("prdfy:plan-codebase-name", "Onboard Repo");
@@ -382,36 +345,23 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		// honest analyzing state is all the user may see.
 		expect(screen.queryByText("Detected environment")).toBeNull();
 		expect(screen.queryByText("Snapshot siap")).toBeNull();
-	});
+	}, 20000);
 
-	it("review-to-sync back navigation stays on sync despite server already ready", {
-		timeout: 20000,
-	}, async () => {
+	it("review-to-sync back navigation stays on the sync step despite a ready server", async () => {
 		mockOnboardingFlow();
-		await startSyncing();
-		await waitFor(
-			() => {
-				const card = screen.queryByTestId("sync-card");
-				const cta = card?.querySelector(
-					'[data-testid="plan-continue-to-summary"]',
-				) as HTMLButtonElement | null;
-				expect(cta?.disabled).toBe(false);
-			},
-			{ timeout: 12000, interval: 100 },
+		await startSyncStep();
+		await waitForEnabledSummaryCta();
+		fireEvent.click(
+			screen.getByTestId("sync-continue-to-summary") as HTMLButtonElement,
 		);
-		(
-			screen
-				.getByTestId("sync-card")
-				.querySelector(
-					'[data-testid="plan-continue-to-summary"]',
-				) as HTMLButtonElement
-		).click();
 		await waitFor(() => {
 			expect(screen.getByText("Detected environment")).toBeDefined();
 		});
 		screen.getByRole("button", { name: /Kembali ke Sinkronisasi/i }).click();
 		await waitFor(() => {
-			expect(screen.getByText("Sync codebase")).toBeDefined();
+			expect(
+				screen.getByText("Sync codebase dengan VibeEverything"),
+			).toBeDefined();
 		});
 		expect(screen.queryByText("Detected environment")).toBeNull();
 		await waitFor(
@@ -421,5 +371,5 @@ describe("PlanCodebasePage onboarding analysis", () => {
 			{ timeout: 10000, interval: 100 },
 		);
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
-	});
+	}, 25000);
 });

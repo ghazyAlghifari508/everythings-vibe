@@ -1,12 +1,5 @@
 // @vitest-environment jsdom
-import {
-	act,
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-} from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUIStore } from "@/store";
 import { PlanCodebasePage } from "./codebase";
@@ -47,20 +40,19 @@ function uploadedStatus() {
 	};
 }
 
-async function settleIntoConclusion() {
-	// The first attempt fails, so the conclusion step resolves from the pending
-	// state it starts in to the persisted failure.
-	await waitFor(
-		() => {
-			expect(screen.getByTestId("codebase-sync-summary")).not.toBeNull();
-		},
-		{ timeout: 15000, interval: 100 },
-	);
+function freshTokenPayload(projectId: string) {
+	return {
+		projectId,
+		apiBaseUrl: "http://localhost:3000",
+		syncToken: `fresh-${projectId}`,
+		syncCommand: "vibeeverything codebase sync",
+		expiresAt: new Date(Date.now() + 3600000).toISOString(),
+	};
 }
 
 describe("PlanCodebasePage conclusion step recovery and retry", () => {
 	beforeEach(() => {
-		useUIStore.getState().setCodebasePlanStep("prompt");
+		useUIStore.getState().setCodebasePlanStep("sync");
 		try {
 			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-retry-1");
 			sessionStorage.setItem("prdfy:plan-codebase-name", "Retry Repo");
@@ -79,16 +71,14 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		}
 	});
 
-	it("rebuilds the prompt gate as enabled from persisted handshake evidence after a refresh", {
-		timeout: 20000,
-	}, async () => {
+	it("rebuilds the live status from persisted handshake evidence after a refresh", async () => {
 		try {
 			// Mid-attempt session: the browser never observed `connected`, but the
 			// handshake timestamp is persisted on the server row.
 			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-live-gate-1");
 			sessionStorage.setItem("prdfy:plan-codebase-name", "Live Gate Repo");
-			// The user was reading Prompt Sync when they refreshed.
-			sessionStorage.setItem("prdfy:plan-codebase-step", "prompt");
+			// The user was reading the sync step when they refreshed.
+			sessionStorage.setItem("prdfy:plan-codebase-step", "sync");
 		} catch {
 			// Best-effort only.
 		}
@@ -103,7 +93,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 						projectId: "cb-live-gate-1",
 						sessionId: "sess-live-gate-1",
 						status: "uploading",
-						snapshotId: "snap-live-gate-1",
+						snapshotId: null,
 						cliConnectedAt: "2026-09-19T10:00:00.000Z",
 					}),
 				};
@@ -112,13 +102,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 				return {
 					ok: true,
 					status: 200,
-					json: async () => ({
-						projectId: "cb-live-gate-1",
-						apiBaseUrl: "http://localhost:3000",
-						syncToken: "tok-live-gate",
-						syncCommand: "vibeeverything codebase sync",
-						expiresAt: new Date(Date.now() + 3600000).toISOString(),
-					}),
+					json: async () => freshTokenPayload("cb-live-gate-1"),
 				};
 			}
 			throw new Error(`unexpected fetch ${method} ${url}`);
@@ -127,33 +111,36 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 
 		render(<PlanCodebasePage />);
 
-		// The gate is reconstructed from the server row, not from React memory
-		// and not from a copy click. The one-time sync token is deliberately not
-		// restorable, so recovery renders its own prompt-step card — and it uses
-		// the same handshake capability as the token screen.
-		const cta = await waitFor(
+		// The gate is reconstructed from the server row, not from React memory and
+		// not from a copy click. The one-time sync token is deliberately not
+		// restorable, so the prompt area offers a fresh one instead.
+		await waitFor(
 			() => {
-				const button = screen.getByTestId(
-					"recovered-continue-to-sync",
-				) as HTMLButtonElement;
-				expect(button.disabled).toBe(false);
-				return button;
+				expect(screen.getByText("Repository terhubung")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		fireEvent.click(cta);
-		await waitFor(() => {
-			expect(screen.getByText("Sync codebase")).toBeDefined();
-		});
-	});
+		expect(
+			screen.getByText(
+				"Token sync hanya berlaku sekali dan tidak disimpan di browser.",
+			),
+		).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: /Dapatkan token baru/i }),
+		).toBeDefined();
+		// Handshake evidence alone is not a finished transport: no snapshot exists
+		// yet, so the conclusion step stays shut.
+		expect(
+			(screen.getByTestId("sync-continue-to-summary") as HTMLButtonElement)
+				.disabled,
+		).toBe(true);
+	}, 20000);
 
-	it("keeps the prompt gate disabled on refresh while the server still waits for the CLI", {
-		timeout: 20000,
-	}, async () => {
+	it("keeps the conclusion step shut on refresh while the server still waits for the CLI", async () => {
 		try {
 			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-wait-gate-1");
 			sessionStorage.setItem("prdfy:plan-codebase-name", "Waiting Gate Repo");
-			sessionStorage.setItem("prdfy:plan-codebase-step", "syncing");
+			sessionStorage.setItem("prdfy:plan-codebase-step", "summary");
 		} catch {
 			// Best-effort only.
 		}
@@ -178,13 +165,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 					return {
 						ok: true,
 						status: 200,
-						json: async () => ({
-							projectId: "cb-wait-gate-1",
-							apiBaseUrl: "http://localhost:3000",
-							syncToken: "tok-wait-gate",
-							syncCommand: "vibeeverything codebase sync",
-							expiresAt: new Date(Date.now() + 3600000).toISOString(),
-						}),
+						json: async () => freshTokenPayload("cb-wait-gate-1"),
 					};
 				}
 				throw new Error(`unexpected fetch ${method} ${url}`);
@@ -193,24 +174,33 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 
 		render(<PlanCodebasePage />);
 
-		// A fresh token is minted, but the gate stays shut: no handshake exists.
-		const cta = await waitFor(
+		// A fresh token is minted, but there is still no handshake and no
+		// snapshot. A stored "summary" intent cannot manufacture either one.
+		await waitFor(
 			() => {
-				const button = screen.getByTestId(
-					"prompt-continue-to-sync",
-				) as HTMLButtonElement;
-				expect(button).toBeDefined();
-				return button;
+				expect(screen.getByTestId("sync-continue-to-summary")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		expect(cta.disabled).toBe(true);
-		expect(screen.getByText("Menunggu agent terhubung")).toBeDefined();
-	});
+		expect(
+			(screen.getByTestId("sync-continue-to-summary") as HTMLButtonElement)
+				.disabled,
+		).toBe(true);
+		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
+		// The server's own verdict is what the step reports: idle, waiting.
+		await waitFor(
+			() => {
+				expect(
+					document
+						.querySelector('[data-testid="sync-stage-connection"]')
+						?.getAttribute("data-stage-state"),
+				).toBe("idle");
+			},
+			{ timeout: 15000, interval: 100 },
+		);
+	}, 20000);
 
-	it("retries a failed analysis through the real boundary and shows the result", {
-		timeout: 25000,
-	}, async () => {
+	it("retries a failed analysis through the real boundary and shows the result", async () => {
 		let analysisPosts = 0;
 		let analysisFailed = true;
 		const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
@@ -276,7 +266,12 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		vi.stubGlobal("fetch", fetchMock);
 
 		render(<PlanCodebasePage />);
-		await settleIntoConclusion();
+		await waitFor(
+			() => {
+				expect(screen.getByTestId("codebase-sync-summary")).not.toBeNull();
+			},
+			{ timeout: 15000, interval: 100 },
+		);
 
 		await waitFor(
 			() => {
@@ -306,5 +301,5 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		// The pending state replaced the failure in place — no extra step.
 		expect(screen.queryByTestId("codebase-analysis-failed")).toBeNull();
 		expect(screen.getByText("Next.js")).toBeDefined();
-	});
+	}, 25000);
 });

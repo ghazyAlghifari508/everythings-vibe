@@ -46,7 +46,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 	beforeEach(() => {
-		useUIStore.getState().setCodebasePlanStep("prompt");
+		useUIStore.getState().setCodebasePlanStep("sync");
 		mockNavigate.mockReset();
 		try {
 			sessionStorage.clear();
@@ -206,7 +206,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 
 		// Refresh on a finished upload resumes the conclusion step, which owns
 		// the pending state and turns it into the review when the server is
-		// ready — no extra manual step.
+		// ready â€” no extra manual step.
 		await waitFor(
 			() => {
 				expect(screen.getByTestId("codebase-analysis-pending")).not.toBeNull();

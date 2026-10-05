@@ -369,7 +369,7 @@ describe("Navbar Greenfield Workspace Navlinks", () => {
 	it("renders CodebaseStepNav on /plan/codebase route", () => {
 		mockPathname = "/plan/codebase";
 		mockSearch = {};
-		useUIStore.getState().setCodebasePlanStep("prompt");
+		useUIStore.getState().setCodebasePlanStep("sync");
 		renderNavbar();
 
 		const steppers = screen.getAllByRole("list", {

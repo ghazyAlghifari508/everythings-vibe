@@ -99,14 +99,27 @@ export function clearPlanCodebaseProjectPointer(): void {
  * before honouring it. An unrecognised stored value reads as "unknown" rather
  * than defaulting the user onto a screen they may have left.
  */
-export type PlanCodebaseStep = "prompt" | "syncing" | "summary";
+export type PlanCodebaseStep = "sync" | "summary";
+
+// Sessions stored before the onboarding collapsed from three steps to two.
+// `prompt` and `syncing` were two screens of the same responsibility — copy the
+// prompt, then watch the same agent — so both resolve to the single step that
+// now owns them. Keeping them mappable means a refresh mid-onboarding resumes
+// where the user actually was instead of silently restarting the flow.
+//
+// This mapping only recovers *intent*. It can never manufacture eligibility: the
+// caller re-validates the result against GET /status, and a conclusion step with
+// no real snapshot is rejected there regardless of what was stored.
+const LEGACY_PLAN_CODEBASE_STEPS: Readonly<Record<string, PlanCodebaseStep>> = {
+	prompt: "sync",
+	syncing: "sync",
+};
 
 export function readPlanCodebaseStepPointer(): PlanCodebaseStep | null {
 	const stored = readItem(PLAN_CODEBASE_STEP_STORAGE_KEY);
-	if (stored === "prompt" || stored === "syncing" || stored === "summary") {
-		return stored;
-	}
-	return null;
+	if (!stored) return null;
+	if (stored === "sync" || stored === "summary") return stored;
+	return LEGACY_PLAN_CODEBASE_STEPS[stored] ?? null;
 }
 
 export function storePlanCodebaseStepPointer(step: PlanCodebaseStep): void {

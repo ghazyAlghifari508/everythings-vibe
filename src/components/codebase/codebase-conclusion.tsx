@@ -16,6 +16,7 @@ interface CodebaseConclusionProps {
 	isAnalyzing: boolean;
 	errorMessage: string | null;
 	onRetryAnalysis: () => void;
+	onRetrySync?: () => void;
 	onEnterWorkspace: () => void;
 	onBackToSync: () => void;
 }
@@ -71,6 +72,7 @@ export function CodebaseConclusion({
 	isAnalyzing,
 	errorMessage,
 	onRetryAnalysis,
+	onRetrySync,
 	onEnterWorkspace,
 	onBackToSync,
 }: CodebaseConclusionProps) {
@@ -91,6 +93,7 @@ export function CodebaseConclusion({
 				excludedCount={snapshot.excludedCount}
 				continueLabel="Masuk ke Workspace"
 				onRetryAnalysis={onRetryAnalysis}
+				onRetrySync={onRetrySync}
 				onContinue={onEnterWorkspace}
 				onBackToSync={onBackToSync}
 			/>

@@ -50,7 +50,7 @@ describe("ScreenConnect", () => {
 				<ScreenConnect
 					projectName="Test App"
 					payload={samplePayload}
-					onAgentStarted={() => {}}
+					status={null}
 				/>,
 			);
 		});
@@ -80,7 +80,7 @@ describe("ScreenConnect", () => {
 				<ScreenConnect
 					projectName="Test App"
 					payload={samplePayload}
-					onAgentStarted={() => {}}
+					status={null}
 				/>,
 			);
 		});
@@ -96,32 +96,13 @@ describe("ScreenConnect", () => {
 		expect(container.textContent).toContain("Gagal menyalin otomatis");
 	});
 
-	it("disables the agent started button when payload is null or isStarting", () => {
-		act(() => {
-			root?.render(
-				<ScreenConnect
-					projectName="Test App"
-					payload={null}
-					isStarting={true}
-					onAgentStarted={() => {}}
-				/>,
-			);
-		});
-
-		const actionBtn = container.querySelector<HTMLButtonElement>(
-			'button[type="button"]:disabled',
-		);
-		expect(actionBtn).toBeDefined();
-		expect(actionBtn?.disabled).toBe(true);
-	});
-
 	it("renders the self-contained execution prompt with session details", () => {
 		act(() => {
 			root?.render(
 				<ScreenConnect
 					projectName="Test App"
 					payload={samplePayload}
-					onAgentStarted={() => {}}
+					status={null}
 				/>,
 			);
 		});
@@ -157,7 +138,7 @@ describe("ScreenConnect", () => {
 				<ScreenConnect
 					projectName="Test App"
 					payload={samplePayload}
-					onAgentStarted={() => {}}
+					status={null}
 				/>,
 			);
 		});
@@ -180,131 +161,13 @@ describe("ScreenConnect", () => {
 		expect(copied).toContain("## Penanganan Kegagalan");
 	});
 
-	it("omits the modal footer when hideFooter is true", () => {
-		act(() => {
-			root?.render(
-				<ScreenConnect
-					projectName="Test App"
-					payload={samplePayload}
-					hideFooter={true}
-					onAgentStarted={() => {}}
-				/>,
-			);
-		});
-
-		const agentStartedBtn = [...container.querySelectorAll("button")].find(
-			(b) =>
-				/Lanjut ke Pantau Sync|Saya sudah menjalankan agent/i.test(
-					b.textContent ?? "",
-				),
-		);
-		expect(agentStartedBtn).toBeUndefined();
-	});
-
-	it("renders right-aligned next button inside footer by default", () => {
-		act(() => {
-			root?.render(
-				<ScreenConnect
-					projectName="Test App"
-					payload={samplePayload}
-					canContinue
-					onAgentStarted={() => {}}
-				/>,
-			);
-		});
-
-		const nextBtn = [...container.querySelectorAll("button")].find((b) =>
-			/Lanjut ke Pantau Sync/i.test(b.textContent ?? ""),
-		);
-		expect(nextBtn).toBeDefined();
-		expect(container.textContent).toContain(
-			"Agent sudah terhubung. Buka Pantau Sync untuk memantau pengiriman source code.",
-		);
-	});
-
-	it("never promises automatic screen switching on CLI connect", () => {
-		act(() => {
-			root?.render(
-				<ScreenConnect
-					projectName="Test App"
-					payload={samplePayload}
-					canContinue
-					onAgentStarted={() => {}}
-				/>,
-			);
-		});
-
-		const rendered = container.textContent ?? "";
-		expect(rendered).not.toContain("berpindah layar");
-		expect(rendered).toContain(
-			"VibeEverything sudah menerima koneksi dari agent.",
-		);
-	});
-
-	it("enables Pantau Sync only after the server reports a CLI handshake", () => {
-		const onAgentStarted = vi.fn();
-		act(() => {
-			root?.render(
-				<ScreenConnect
-					projectName="Test App"
-					payload={samplePayload}
-					canContinue
-					onAgentStarted={onAgentStarted}
-				/>,
-			);
-		});
-
-		const nextBtn = [...container.querySelectorAll("button")].find((b) =>
-			/Lanjut ke Pantau Sync/i.test(b.textContent ?? ""),
-		) as HTMLButtonElement | undefined;
-		expect(nextBtn).toBeDefined();
-		expect(nextBtn?.disabled).toBe(false);
-		act(() => {
-			nextBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-		expect(onAgentStarted).toHaveBeenCalledTimes(1);
-	});
-
-	it("treats copy state as feedback only, never as workflow authorization", async () => {
-		const writeText = vi.fn().mockResolvedValue(undefined);
-		vi.stubGlobal("navigator", {
-			...navigator,
-			clipboard: { writeText },
-		});
-		const onAgentStarted = vi.fn();
-		act(() => {
-			root?.render(
-				<ScreenConnect
-					projectName="Test App"
-					payload={samplePayload}
-					canContinue={false}
-					onAgentStarted={onAgentStarted}
-				/>,
-			);
-		});
-
-		const nextBtn = [...container.querySelectorAll("button")].find((b) =>
-			/Lanjut ke Pantau Sync/i.test(b.textContent ?? ""),
-		) as HTMLButtonElement | undefined;
-		expect(nextBtn?.disabled).toBe(true);
-		const copyBtn = [...container.querySelectorAll("button")].find((b) =>
-			/salin/i.test(b.textContent ?? ""),
-		);
-		await act(async () => {
-			copyBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-		expect(container.textContent).toContain("Tersalin");
-		expect(nextBtn?.disabled).toBe(true);
-		expect(onAgentStarted).not.toHaveBeenCalled();
-	});
-
 	it("renders the AI coding agent / harness logos in Step 2", () => {
 		act(() => {
 			root?.render(
 				<ScreenConnect
 					projectName="Test App"
 					payload={samplePayload}
-					onAgentStarted={() => {}}
+					status={null}
 				/>,
 			);
 		});
@@ -332,7 +195,7 @@ describe("ScreenConnect", () => {
 				<ScreenConnect
 					projectName="Test App"
 					payload={samplePayload}
-					onAgentStarted={() => {}}
+					status={null}
 				/>,
 			);
 		});

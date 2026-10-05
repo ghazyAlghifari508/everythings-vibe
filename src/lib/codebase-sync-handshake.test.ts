@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
 	buildHandshakeMetadata,
 	CLI_HANDSHAKE_METADATA_KEY,
-	canContinueToSync,
 	canOpenSummary,
 	hasCliHandshake,
 	readCliHandshakeAt,
@@ -127,35 +126,12 @@ describe("hasCliHandshake", () => {
 	});
 });
 
-describe("canContinueToSync", () => {
-	it("stays false without any server state at all", () => {
-		expect(canContinueToSync(null)).toBe(false);
-		expect(canContinueToSync(undefined)).toBe(false);
-	});
-
-	it("follows the persisted session progression", () => {
-		expect(canContinueToSync({ status: "waiting_for_cli" })).toBe(false);
-		expect(canContinueToSync({ status: "connected" })).toBe(true);
-	});
-
-	it("survives a fast CLI that the browser never observed as connected", () => {
-		// The first poll already sees `uploading` or `uploaded`. The CLI
-		// definitely ran, so the prompt screen must be able to advance.
-		expect(canContinueToSync({ status: "uploading" })).toBe(true);
-		expect(canContinueToSync({ status: "uploaded" })).toBe(true);
-	});
-
-	it("reconstructs as true after a refresh from persisted handshake evidence", () => {
-		expect(
-			canContinueToSync({
-				status: "uploaded",
-				cliConnectedAt: "2026-09-19T10:00:00.000Z",
-			}),
-		).toBe(true);
-	});
-});
-
 describe("canOpenSummary", () => {
+	it("stays false without any server state at all", () => {
+		expect(canOpenSummary(null)).toBe(false);
+		expect(canOpenSummary(undefined)).toBe(false);
+	});
+
 	it("requires a snapshot bound to the current session", () => {
 		expect(canOpenSummary({ status: "uploaded", snapshotId: null })).toBe(
 			false,
@@ -187,6 +163,36 @@ describe("canOpenSummary", () => {
 		] as const) {
 			expect(canOpenSummary({ status, snapshotId: "snap_1" })).toBe(false);
 		}
+	});
+
+	it("survives a fast CLI that the browser never observed as connected", () => {
+		// The first poll already sees the finished upload. The CLI definitely ran,
+		// so the conclusion step must be openable without an intermediate
+		// `connected` having been rendered.
+		expect(
+			canOpenSummary({ status: "uploaded", snapshotId: "snap_fast" }),
+		).toBe(true);
+	});
+
+	it("reconstructs as true after a refresh from persisted handshake evidence", () => {
+		expect(
+			canOpenSummary({
+				status: "uploaded",
+				snapshotId: "snap_refresh",
+				cliConnectedAt: "2026-09-19T10:00:00.000Z",
+			}),
+		).toBe(true);
+	});
+
+	it("never opens on a session that never handshaked", () => {
+		// `failed` and `expired` are reachable straight from `waiting_for_cli`
+		// without any CLI contact, so a terminal status alone proves nothing.
+		expect(canOpenSummary({ status: "failed", snapshotId: "snap_x" })).toBe(
+			false,
+		);
+		expect(canOpenSummary({ status: "expired", snapshotId: "snap_x" })).toBe(
+			false,
+		);
 	});
 });
 
