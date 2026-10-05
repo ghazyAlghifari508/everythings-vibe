@@ -161,6 +161,124 @@ export function canTransitionSyncStatus(
 	return SYNC_TRANSITIONS[from].includes(to);
 }
 
+// === CLI handshake evidence ===
+// "May the user leave the prompt screen?" is a question only the server can
+// answer. A copy click is browser-local UI feedback: it proves nothing about
+// whether the agent ran, so it can never gate navigation.
+//
+// The persisted facts that DO prove a handshake are:
+// 1. the session left `waiting_for_cli` — the transition map makes
+//    `waiting_for_cli -> connected` reachable ONLY through the CLI handshake
+//    route (see `/api/v1/codebases/$id/codebase/sync`), and
+// 2. `codebase_sync_sessions.metadata.handshakeAt`, written by that same route
+//    inside its handshake transaction.
+//
+// (1) alone is ambiguous for `failed`/`expired`: both are reachable directly
+// from `waiting_for_cli` without any CLI contact, so a terminal status must NOT
+// imply a handshake. `metadata.cliVersion` is not proof either — a session can
+// expire before the CLI ever runs. That is why the handshake persists its own
+// timestamp rather than relying on a status or a version field.
+//
+// Fast CLI case: a browser whose first poll already observes `uploading` or
+// `uploaded` still satisfies (1), so the gate stays correct without ever having
+// polled the intermediate `connected` state.
+
+export const CLI_HANDSHAKE_METADATA_KEY = "handshakeAt" as const;
+
+// Reachable from `waiting_for_cli` with no CLI contact (see SYNC_TRANSITIONS),
+// so neither one proves a handshake on its own.
+const CODEBASE_SYNC_PRE_HANDSHAKE_STATUSES: readonly CodebaseSyncStatus[] = [
+	"waiting_for_cli",
+	"failed",
+	"expired",
+] as const;
+
+export function readCliHandshakeAt(metadata: unknown): string | null {
+	if (typeof metadata !== "object" || metadata === null) return null;
+	const raw = (metadata as Record<string, unknown>)[CLI_HANDSHAKE_METADATA_KEY];
+	const parsed = z.string().datetime().safeParse(raw);
+	return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Metadata patch persisted by a successful CLI handshake. The first
+ * handshakeAt wins so an idempotent retry cannot push the evidence forward and
+ * make a stale session look freshly connected.
+ */
+export function buildHandshakeMetadata(input: {
+	previous: unknown;
+	cliVersion: string;
+	repositoryName?: string;
+	handshakeAt: Date;
+}): Record<string, unknown> {
+	const previous =
+		typeof input.previous === "object" && input.previous !== null
+			? (input.previous as Record<string, unknown>)
+			: {};
+	const existingHandshakeAt = readCliHandshakeAt(previous);
+	return {
+		...previous,
+		cliVersion: input.cliVersion,
+		...(input.repositoryName ? { repositoryName: input.repositoryName } : {}),
+		[CLI_HANDSHAKE_METADATA_KEY]:
+			existingHandshakeAt ?? input.handshakeAt.toISOString(),
+	};
+}
+
+/**
+ * "Has the server observed the CLI actually starting this sync attempt?"
+ *
+ * True when the session advanced past the pre-handshake states, or when the
+ * handshake transaction persisted its timestamp. A terminal session that never
+ * handshaked stays false; one that did stays true.
+ */
+export function hasCliHandshake(status: {
+	status: CodebaseSyncStatus;
+	cliConnectedAt?: string | null;
+}): boolean {
+	if (status.cliConnectedAt) return true;
+	return !(CODEBASE_SYNC_PRE_HANDSHAKE_STATUSES as readonly string[]).includes(
+		status.status,
+	);
+}
+
+/**
+ * Whether the prompt screen may advance to "Pantau Sync".
+ *
+ * Read straight off the last polled server status, so a refresh reconstructs the
+ * gate from persisted evidence instead of React memory.
+ */
+export function canContinueToSync(
+	status:
+		| {
+				status: CodebaseSyncStatus;
+				cliConnectedAt?: string | null;
+		  }
+		| null
+		| undefined,
+): boolean {
+	if (!status) return false;
+	return hasCliHandshake(status);
+}
+
+/**
+ * Whether the conclusion screen may be opened.
+ *
+ * Transport-only: an uploaded snapshot is a finished sync whether or not the
+ * model has run, so "Kesimpulan Codebase" is reachable while analysis is still
+ * pending — that screen owns the pending state itself.
+ */
+export function canOpenSummary(status: {
+	status: CodebaseSyncStatus;
+	snapshotId?: string | null;
+}): boolean {
+	if (!status.snapshotId) return false;
+	if (!hasCliHandshake(status)) return false;
+	return (CODEBASE_SYNC_COMPLETE_STATUSES as readonly string[]).includes(
+		status.status,
+	);
+}
+
 export function assertSyncTransition(
 	from: CodebaseSyncStatus,
 	to: CodebaseSyncStatus,
@@ -234,6 +352,11 @@ export const syncStatusResponseSchema = z.object({
 	// review page scope its analysis read to the current attempt so a
 	// retry-sync never renders a stale review from a previous session.
 	snapshotId: z.string().min(1).nullable().optional(),
+	// Timestamp the CLI handshake transaction persisted for this session
+	// (`codebase_sync_sessions.metadata.handshakeAt`). Present only when the
+	// agent actually contacted the server, so it stays meaningful even for a
+	// session that failed or expired afterwards. Drives `canContinueToSync`.
+	cliConnectedAt: z.string().datetime().optional(),
 	// Snapshot creation timestamp ("Waktu sync" in the review page).
 	snapshotCreatedAt: z.string().datetime().optional(),
 	analysisId: z.string().min(1).nullable().optional(),

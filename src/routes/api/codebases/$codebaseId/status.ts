@@ -16,6 +16,7 @@ import {
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	type CodebaseSyncStatus,
 	getSessionUsability,
+	readCliHandshakeAt,
 	type SyncStatusResponse,
 	sanitizeSyncErrorCode,
 	sanitizeSyncErrorMessage,
@@ -262,6 +263,12 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 						}
 					}
 
+					// Persisted handshake evidence for THIS session. Read straight
+					// from the row the handshake transaction wrote, so the prompt
+					// screen gates on real CLI contact — and keeps that evidence
+					// even when the attempt later failed or expired.
+					const cliConnectedAt = readCliHandshakeAt(session.metadata);
+
 					const toIso = (value: Date | null | undefined): string | undefined =>
 						value ? value.toISOString() : undefined;
 					const response: SyncStatusResponse = {
@@ -273,6 +280,7 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 						// onboarding page learns the real repository name from polling
 						// rather than holding a stale one.
 						codebaseName: codebase.name,
+						cliConnectedAt: cliConnectedAt ?? undefined,
 						snapshotId: snapshot?.id ?? null,
 						snapshotCreatedAt: toIso(snapshot?.createdAt),
 						fileCount: snapshot?.fileCount ?? undefined,

@@ -10,6 +10,7 @@ import {
 import { normalizeRepositoryName } from "@/lib/codebase-library";
 import {
 	assertSyncTransition,
+	buildHandshakeMetadata,
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	type CodebaseSyncStatus,
 	cliHandshakeRequestSchema,
@@ -204,19 +205,22 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 						assertSyncTransition(status, "connected");
 						status = "connected";
 					}
-					const metadata =
-						(currentSession?.metadata as Record<string, unknown> | null) ??
-						(session.metadata as Record<string, unknown> | null) ??
-						{};
+					// handshakeAt is the persisted proof that the CLI actually
+					// contacted the server for this session. It is written here,
+					// inside the handshake transaction, and survives a later failure
+					// or expiry so the prompt screen can still tell a handshaked
+					// session from one the CLI never reached.
+					const metadata = buildHandshakeMetadata({
+						previous: currentSession?.metadata ?? session.metadata ?? null,
+						cliVersion: parsedBody.data.cliVersion,
+						...(repositoryName ? { repositoryName } : {}),
+						handshakeAt: new Date(),
+					});
 					await tx
 						.update(codebaseSyncSessions)
 						.set({
 							status,
-							metadata: {
-								...metadata,
-								cliVersion: parsedBody.data.cliVersion,
-								...(repositoryName ? { repositoryName } : {}),
-							},
+							metadata,
 							updatedAt: new Date(),
 						})
 						.where(eq(codebaseSyncSessions.id, session.id));
