@@ -1,8 +1,16 @@
 "use client";
 
-import { AlertCircle, Check, Circle, Info, Loader2 } from "lucide-react";
+import {
+	AlertCircle,
+	ArrowRight,
+	Check,
+	Circle,
+	Info,
+	Loader2,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
+	isSyncStatusComplete,
 	isTerminalSyncStatus,
 	type SyncStatusResponse,
 	syncStatusResponseSchema,
@@ -20,15 +28,16 @@ interface SyncStatusProps {
 	status?: SyncStatusResponse | null;
 	pollIntervalMs?: number;
 	requestTimeoutMs?: number;
-	// Onboarding/analysis project that owns the per-feature analysis rows.
-	// The status endpoint only attaches `analysisStatus` when this project
-	// query is present, so Stage 3 and the review CTA stay honestly pending
-	// without it. The legacy transport `projectId` above is untouched.
+	// Onboarding/analysis project that owns the per-feature analysis record. The
+	// status endpoint only attaches `analysisStatus` when this project query is
+	// present. It never affects the two sync stages: analysis is a separate
+	// capability surfaced next to the review action, not a sync step.
 	analysisProjectId?: string;
 	onStatus?: (status: SyncStatusResponse | null) => void;
 	onRetrySync?: () => void;
 	onRetryAnalysis?: () => void;
 	onViewReview?: () => void;
+	onEnterWorkspace?: () => void;
 	onBackToInstructions?: () => void;
 }
 
@@ -45,6 +54,7 @@ export function SyncStatus({
 	onRetrySync,
 	onRetryAnalysis,
 	onViewReview,
+	onEnterWorkspace,
 	onBackToInstructions,
 }: SyncStatusProps) {
 	const [polledStatus, setPolledStatus] = useState<SyncStatusResponse | null>(
@@ -181,44 +191,42 @@ export function SyncStatus({
 	const s = status?.status;
 	const isFailed = s === "failed";
 	const isExpired = s === "expired";
-	// Ready means the sync session itself completed with a usable
-	// analysis: a ready analysis attached to a failed/expired session is
-	// stale, not a success.
-	const isReady =
-		hasStatus &&
-		!isFailed &&
-		!isExpired &&
-		(s === "ready" ||
-			(status?.analysisStatus === "ready" && s !== "waiting_for_cli"));
-	const isAnalyzing =
-		hasStatus && (s === "analyzing" || status?.analysisStatus === "pending");
-	const isUploading = hasStatus && s === "uploading";
 	const isConnected =
 		hasStatus && s !== "waiting_for_cli" && !isFailed && !isExpired;
+	const isUploading = hasStatus && s === "uploading";
 	const isLoadingInitial = !hasStatus && error === null;
 	const hasPollError = error !== null;
 
-	// Three user-facing stages, each driven by a signal this client can
-	// actually observe. Backend domain states map onto them honestly:
-	// connected -> stage 1 done; scanning/filtering/uploading are the live
-	// transport chain the server persists and polling observes, so all three
-	// drive stage 2 active; uploaded completes stage 2 but never implies
-	// analysis; analyzing/ready (or a per-feature analysisStatus) drives
-	// stage 3. No fabricated percentages or invented sequences.
+	// Sync completion is transport-only: a usable current snapshot plus a
+	// finished upload chain. `analyzing` is a session state used by legacy
+	// project-scoped sessions while the model runs — codebase-scoped sessions
+	// stay on `uploaded` — and both mean the transport is already done.
+	// Analysis status is deliberately excluded, so a pending or failed analysis
+	// can never make a completed sync look unfinished.
+	const syncComplete = isSyncStatusComplete(status);
+
+	// Analysis is a separate capability. It never gates the sync stages and
+	// never gates workspace entry; it only decides whether the review
+	// conclusion may be opened and whether a retry is offered.
+	const analysisState = status?.analysisStatus;
+	const analysisReady = analysisState === "ready" || s === "ready";
+	const analysisFailed = analysisState === "failed";
+	const canViewReview = syncComplete && analysisReady;
+
 	const transportActive =
 		hasStatus && (s === "scanning" || s === "filtering" || s === "uploading");
-	const uploadStarted =
-		transportActive ||
-		isUploading ||
-		isAnalyzing ||
-		isReady ||
-		(status?.fileCount !== undefined && s !== "uploaded");
-	const uploadDone = isAnalyzing || isReady || status?.status === "uploaded";
-	const analysisDone = isReady;
-	const analysisFailed = status?.analysisStatus === "failed";
 
-	const showRetry = isReady || isFailed || isExpired;
+	const showRetry = syncComplete || isFailed || isExpired;
 	const showAnalysisRetry = analysisFailed;
+
+	// Review availability is a secondary capability line, not a third stage:
+	// it sits beside the conclusion action and never claims the sync is still
+	// running.
+	const reviewStatusLabel = analysisReady
+		? "Ringkasan siap."
+		: analysisFailed
+			? "Ringkasan belum berhasil disiapkan."
+			: "Ringkasan sedang disiapkan.";
 
 	type StageState = "done" | "active" | "idle" | "failed" | "pending";
 	// Success is an accent, not a full surface: light mode stays on the
@@ -264,16 +272,9 @@ export function SyncStatus({
 						: "active";
 	const uploadStage: StageState = !isConnected
 		? "pending"
-		: uploadDone
+		: syncComplete
 			? "done"
-			: uploadStarted
-				? "active"
-				: "pending";
-	const analysisStage: StageState = analysisFailed
-		? "failed"
-		: analysisDone
-			? "done"
-			: isAnalyzing
+			: transportActive
 				? "active"
 				: "pending";
 
@@ -321,19 +322,17 @@ export function SyncStatus({
 							? "Sync gagal"
 							: isExpired
 								? "Sesi kedaluwarsa"
-								: isReady
-									? "Siap"
-									: isAnalyzing
-										? "Menganalisis"
-										: isUploading
-											? "Mengupload"
-											: isConnected
-												? "Terhubung"
-												: hasStatus
-													? "Standby"
-													: hasPollError
-														? "Gagal memuat"
-														: "Menghubungi..."}
+								: syncComplete
+									? "Sync selesai"
+									: isUploading
+										? "Mengupload"
+										: isConnected
+											? "Terhubung"
+											: hasStatus
+												? "Standby"
+												: hasPollError
+													? "Gagal memuat"
+													: "Menghubungi..."}
 					</span>
 				</div>
 
@@ -411,7 +410,9 @@ export function SyncStatus({
 						</div>
 					)}
 
-					{/* Status List — three user-facing stages backed by real signals */}
+					{/* Status List — two user-facing sync stages backed by real
+					transport signals. AI analysis is not a sync step, so it never
+					appears here. */}
 					<div className="flex flex-col gap-2.5">
 						{/* Stage 1: agent handshake (session left waiting_for_cli) */}
 						<div
@@ -432,19 +433,21 @@ export function SyncStatus({
 												? "Sesi kedaluwarsa sebelum CLI terhubung"
 												: !hasStatus
 													? "Menghubungi server untuk membaca status sync..."
-													: "Menunggu agent terhubung"}
+													: "Repository belum terhubung"}
 								</span>
 								{isConnected || s === "waiting_for_cli" ? (
 									<span className="text-[11px] leading-relaxed opacity-80">
 										{isConnected
 											? "Agent berhasil tersambung ke VibeEverything."
-											: "Jalankan prompt sync di terminal agent dari root repository."}
+											: "Menunggu agent terhubung ke VibeEverything."}
 									</span>
 								) : null}
 							</span>
 						</div>
 
-						{/* Stage 2: source sync (scanning/filtering/uploading/uploaded) */}
+						{/* Stage 2: source sync (scanning/filtering/uploading, then the
+					completed snapshot). Done means the upload finished and the
+					snapshot is usable — never that analysis ran. */}
 						<div
 							data-testid="sync-stage-upload"
 							data-stage-state={uploadStage}
@@ -455,58 +458,27 @@ export function SyncStatus({
 							</span>
 							<span className="flex flex-1 flex-col gap-0.5">
 								<span className="font-medium">
-									{uploadDone
+									{syncComplete
 										? "Source code tersinkron"
-										: uploadStarted
-											? "Source code sedang disinkronkan"
-											: "Menunggu source code disinkronkan"}
+										: transportActive
+											? "Menyinkronkan source code..."
+											: "Source code belum tersinkron"}
 								</span>
 								<span className="text-[11px] leading-relaxed opacity-80">
-									{uploadDone
+									{syncComplete
 										? typeof status?.fileCount === "number"
-											? `${status.fileCount} file siap diproses.`
+											? `${status.fileCount} file berhasil diterima.`
 											: "Repository berhasil diterima."
-										: uploadStarted
-											? "Agent sedang mengirim file repository."
+										: transportActive
+											? "Repository sedang dikirim ke VibeEverything."
 											: "Tahap ini berjalan setelah agent terhubung."}
 								</span>
 							</span>
-							{status?.fileCount !== undefined && !uploadDone && (
+							{status?.fileCount !== undefined && !syncComplete && (
 								<span className="ml-auto font-mono text-[11px] opacity-80">
 									{status.fileCount} file
 								</span>
 							)}
-						</div>
-
-						{/* Stage 3: codebase analysis (analyzing/ready or analysisStatus) */}
-						<div
-							data-testid="sync-stage-analysis"
-							data-stage-state={analysisStage}
-							className={`flex items-start gap-2.5 rounded-md border p-3 text-xs transition-colors ${stageClass[analysisStage]}`}
-						>
-							<span className="mt-0.5">
-								<StageIcon state={analysisStage} />
-							</span>
-							<span className="flex flex-1 flex-col gap-0.5">
-								<span className="font-medium">
-									{analysisFailed
-										? "Analisis codebase gagal"
-										: analysisDone
-											? "Analisis codebase selesai"
-											: isAnalyzing
-												? "Menganalisis codebase..."
-												: "Analisis codebase"}
-								</span>
-								<span className="text-[11px] leading-relaxed opacity-80">
-									{analysisFailed
-										? "Periksa pesan error lalu coba analisis ulang."
-										: analysisDone
-											? "Konteks project siap direview."
-											: isAnalyzing
-												? "Mendeteksi teknologi, struktur project, dan modul utama."
-												: "Berjalan otomatis setelah source code tersinkron."}
-								</span>
-							</span>
 						</div>
 					</div>
 
@@ -530,8 +502,11 @@ export function SyncStatus({
 						</div>
 					)}
 
-					{/* Footer Bar: Unified navigation inside the card */}
-					<div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-graphite pt-4 text-xs">
+					{/* Footer Bar: unified navigation inside the card. Left holds the
+				reverse path and sync retry; the right cluster is ordered so the
+				workspace is the primary action and the review conclusion is the
+				secondary one. */}
+					<div className="flex flex-col items-stretch gap-3 border-t border-graphite pt-4 text-xs sm:flex-row sm:items-center sm:justify-between">
 						<div className="flex flex-wrap items-center gap-2">
 							{onBackToInstructions && (
 								<button
@@ -552,38 +527,78 @@ export function SyncStatus({
 									Sync ulang
 								</button>
 							)}
-
-							{showAnalysisRetry && onRetryAnalysis && (
-								<button
-									type="button"
-									onClick={onRetryAnalysis}
-									className="rounded-md border border-iron bg-obsidian px-3 py-2 text-xs text-mist hover:text-snow transition hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									Analisis ulang
-								</button>
-							)}
 						</div>
 
-						{onViewReview && (
-							<div className="flex items-center justify-end sm:ml-auto">
-								<button
-									type="button"
-									data-testid="plan-continue-to-summary"
-									onClick={onViewReview}
-									disabled={!isReady}
-									title={
-										isReady
-											? "Lanjut ke kesimpulan codebase"
-											: "Tunggu hingga sinkronisasi dan analisis selesai"
-									}
-									className={`inline-flex items-center justify-center gap-1.5 rounded-md px-5 py-2 font-inter text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-										isReady
-											? "bg-snow text-onyx shadow-sm hover:brightness-110 cursor-pointer"
-											: "border border-graphite bg-charcoal/50 text-fog/40 cursor-not-allowed"
-									}`}
-								>
-									<span>Lihat Ringkasan →</span>
-								</button>
+						{(onViewReview || onEnterWorkspace || onRetryAnalysis) && (
+							<div className="flex flex-col items-stretch gap-2 sm:ml-auto sm:items-end">
+								{/* Analysis is a secondary capability, never a sync stage: a
+								single status line beside the conclusion action. */}
+								{syncComplete && (onViewReview || onRetryAnalysis) && (
+									<span
+										data-testid="sync-review-status"
+										className="font-mono text-[11px] text-fog sm:text-right"
+									>
+										{reviewStatusLabel}
+									</span>
+								)}
+
+								<div className="flex flex-wrap items-center gap-2 sm:justify-end">
+									{showAnalysisRetry && syncComplete && onRetryAnalysis && (
+										<button
+											type="button"
+											onClick={onRetryAnalysis}
+											className="rounded-md border border-iron bg-obsidian px-3 py-2 text-xs text-mist hover:text-snow transition hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+										>
+											Coba analisis lagi
+										</button>
+									)}
+
+									{onViewReview && (
+										<button
+											type="button"
+											data-testid="plan-continue-to-summary"
+											onClick={onViewReview}
+											disabled={!canViewReview}
+											title={
+												analysisReady
+													? "Lihat kesimpulan codebase"
+													: "Ringkasan belum siap — sync sudah selesai"
+											}
+											className={`inline-flex items-center justify-center gap-1.5 rounded-md border px-4 py-2 font-inter text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+												canViewReview
+													? "border-graphite bg-obsidian text-snow hover:border-steel hover:bg-steel cursor-pointer"
+													: "border-graphite bg-charcoal/50 text-fog/40 cursor-not-allowed"
+											}`}
+										>
+											<span>Lihat Kesimpulan</span>
+											{analysisReady && (
+												<ArrowRight size={14} aria-hidden="true" />
+											)}
+										</button>
+									)}
+
+									{onEnterWorkspace && (
+										<button
+											type="button"
+											data-testid="sync-enter-workspace"
+											onClick={onEnterWorkspace}
+											disabled={!syncComplete}
+											title={
+												syncComplete
+													? "Buka workspace codebase"
+													: "Tunggu hingga source code selesai tersinkron"
+											}
+											className={`inline-flex items-center justify-center gap-1.5 rounded-md px-5 py-2 font-inter text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+												syncComplete
+													? "bg-snow text-onyx shadow-sm hover:brightness-110 cursor-pointer"
+													: "border border-graphite bg-charcoal/50 text-fog/40 cursor-not-allowed"
+											}`}
+										>
+											<span>Masuk ke Workspace</span>
+											<ArrowRight size={14} aria-hidden="true" />
+										</button>
+									)}
+								</div>
 							</div>
 						)}
 					</div>

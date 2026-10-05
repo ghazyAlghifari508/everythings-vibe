@@ -204,10 +204,11 @@ describe("SyncStatus", () => {
 		expect(c.textContent).toContain("37");
 	});
 
-	it("keeps uploaded with pending analysis out of conclusion", {
+	it("keeps sync complete while analysis is pending and unlocks workspace entry", {
 		timeout: 10000,
 	}, async () => {
 		const onViewReview = vi.fn();
+		const onEnterWorkspace = vi.fn();
 		mockFetchSequence([
 			statusResponse({
 				status: "uploaded",
@@ -215,13 +216,25 @@ describe("SyncStatus", () => {
 				analysisStatus: "pending",
 			}),
 		]);
-		const c = renderStatus({ onViewReview });
+		const c = renderStatus({ onViewReview, onEnterWorkspace });
 		await settle();
-		expect(c.textContent).toContain("Menganalisis codebase...");
-		const nextBtn = [...c.querySelectorAll("button")].find((b) =>
-			/Lihat Ringkasan/i.test(b.textContent ?? ""),
-		) as HTMLButtonElement | undefined;
-		expect(nextBtn?.disabled).toBe(true);
+		// Sync is finished; analysis is a separate capability, not a stage.
+		expect(c.textContent).toContain("Source code tersinkron");
+		expect(c.textContent).not.toMatch(/menganalisis codebase/i);
+		expect(c.querySelector('[data-testid="sync-stage-analysis"]')).toBeNull();
+		const reviewBtn = c.querySelector(
+			'[data-testid="plan-continue-to-summary"]',
+		) as HTMLButtonElement | null;
+		expect(reviewBtn?.disabled).toBe(true);
+		const workspaceBtn = c.querySelector(
+			'[data-testid="sync-enter-workspace"]',
+		) as HTMLButtonElement | null;
+		expect(workspaceBtn?.disabled).toBe(false);
+		act(() => {
+			workspaceBtn?.click();
+		});
+		expect(onEnterWorkspace).toHaveBeenCalledTimes(1);
+		expect(onViewReview).not.toHaveBeenCalled();
 	});
 
 	it("shows indeterminate loading without fabricated percentages while active", async () => {
@@ -229,7 +242,7 @@ describe("SyncStatus", () => {
 		const c = renderStatus();
 		await settle();
 		expect(c.textContent).toMatch(
-			/mengirim|disinkronkan|menghubungkan|menunggu/i,
+			/dikirim|menyinkronkan|menghubungkan|menunggu/i,
 		);
 		expect(c.textContent).not.toContain("%");
 	});
@@ -242,7 +255,9 @@ describe("SyncStatus", () => {
 		await settle();
 		expect(c.textContent).toContain("CLI Agent Belum Terhubung");
 		expect(c.textContent).toContain("Standby");
-		expect(c.textContent).toContain("Menunggu agent terhubung");
+		expect(c.textContent).toContain(
+			"Menunggu agent terhubung ke VibeEverything.",
+		);
 		// No spinning loaders should be present while in idle standby
 		expect(c.querySelector(".animate-spin")).toBeNull();
 		const alertEl = c.querySelector('[data-testid="cli-waiting-alert"]');
@@ -265,11 +280,13 @@ describe("SyncStatus", () => {
 		expect(c.textContent).toContain("7");
 	});
 
-	it("shows the ready state and stops polling on terminal status", async () => {
-		const fetchMock = mockFetchSequence([statusResponse({ status: "ready" })]);
+	it("shows the completed sync state and stops polling on terminal status", async () => {
+		const fetchMock = mockFetchSequence([
+			statusResponse({ status: "ready", snapshotId: "snap_ready_1" }),
+		]);
 		const c = renderStatus();
 		await settle();
-		expect(c.textContent).toMatch(/siap/i);
+		expect(c.textContent).toMatch(/sync selesai/i);
 		const callsAfterReady = fetchMock.mock.calls.length;
 		await settle(60);
 		expect(fetchMock.mock.calls.length).toBe(callsAfterReady);
@@ -278,7 +295,7 @@ describe("SyncStatus", () => {
 	it("offers and invokes sync retry from the ready state", () => {
 		const onRetrySync = vi.fn();
 		const c = renderStatus({
-			status: statusResponse({ status: "ready" }),
+			status: statusResponse({ status: "ready", snapshotId: "snap_retry_1" }),
 			onRetrySync,
 		});
 		const retryButton = [...c.querySelectorAll("button")].find((b) =>
@@ -292,13 +309,58 @@ describe("SyncStatus", () => {
 		expect(onRetrySync).toHaveBeenCalledTimes(1);
 	});
 
-	it("keeps analysis pending until the server reports a real analysis signal", async () => {
+	it("never renders an analysis stage or its copy inside the sync checklist", async () => {
 		mockFetchSequence([statusResponse({ status: "uploaded" })]);
 		const c = renderStatus();
 		await settle();
 
-		expect(c.textContent).toContain("Analisis codebase");
-		expect(c.textContent).not.toContain("Menganalisis codebase...");
+		expect(c.querySelector('[data-testid="sync-stage-analysis"]')).toBeNull();
+		expect(c.textContent).not.toMatch(/analisis codebase/i);
+	});
+
+	it("offers analysis retry when the session is uploaded but analysis failed", {
+		timeout: 10000,
+	}, async () => {
+		const onRetryAnalysis = vi.fn();
+		const onEnterWorkspace = vi.fn();
+		const onViewReview = vi.fn();
+		mockFetchSequence([
+			statusResponse({
+				status: "uploaded",
+				snapshotId: "snap_123",
+				analysisId: "analysis_123",
+				analysisStatus: "failed",
+				errorMessage: "Analisis codebase gagal. Coba analisis ulang.",
+			}),
+		]);
+		const c = renderStatus({ onRetryAnalysis, onEnterWorkspace, onViewReview });
+		await settle();
+		// Analysis failure never converts a finished sync back into a failure.
+		expect(c.textContent).toContain("Source code tersinkron");
+		expect(c.textContent).not.toMatch(/sync gagal/i);
+		expect(
+			c.querySelector('[data-testid="sync-review-status"]')?.textContent,
+		).toBe("Ringkasan belum berhasil disiapkan.");
+		const retryButton = [...c.querySelectorAll("button")].find((b) =>
+			/coba analisis lagi/i.test(b.textContent ?? ""),
+		);
+		expect(retryButton).toBeDefined();
+		act(() => {
+			retryButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onRetryAnalysis).toHaveBeenCalledTimes(1);
+		// A failed analysis still leaves the workspace openable.
+		const workspaceBtn = c.querySelector(
+			'[data-testid="sync-enter-workspace"]',
+		) as HTMLButtonElement | null;
+		expect(workspaceBtn?.disabled).toBe(false);
+		expect(
+			(
+				c.querySelector(
+					'[data-testid="plan-continue-to-summary"]',
+				) as HTMLButtonElement | null
+			)?.disabled,
+		).toBe(true);
 	});
 
 	it("shows the safe server error with a retry action on failure", async () => {
@@ -330,38 +392,14 @@ describe("SyncStatus", () => {
 		expect(c.textContent).toMatch(/kedaluwarsa/i);
 	});
 
-	it("offers analysis retry when the session is uploaded but analysis failed", {
-		timeout: 10000,
-	}, async () => {
-		const onRetryAnalysis = vi.fn();
-		mockFetchSequence([
-			statusResponse({
-				status: "uploaded",
-				snapshotId: "snap_123",
-				analysisId: "analysis_123",
-				analysisStatus: "failed",
-				errorMessage: "Analisis codebase gagal. Coba analisis ulang.",
-			}),
-		]);
-		const c = renderStatus({ onRetryAnalysis });
-		await settle();
-		expect(c.textContent).toContain("Analisis codebase gagal.");
-		const retryButton = [...c.querySelectorAll("button")].find((b) =>
-			/analisis ulang/i.test(b.textContent ?? ""),
-		);
-		expect(retryButton).toBeDefined();
-		act(() => {
-			retryButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-		expect(onRetryAnalysis).toHaveBeenCalledTimes(1);
-	});
-
 	it("does not poll when the parent controls the status", async () => {
 		const fetchMock = mockFetchSequence([statusResponse()]);
-		const c = renderStatus({ status: statusResponse({ status: "ready" }) });
+		const c = renderStatus({
+			status: statusResponse({ status: "ready", snapshotId: "snap_parent_1" }),
+		});
 		await settle();
 		expect(fetchMock).not.toHaveBeenCalled();
-		expect(c.textContent).toMatch(/siap/i);
+		expect(c.textContent).toMatch(/sync selesai/i);
 	});
 
 	it("polls internally when the parent passes null status", async () => {
@@ -372,11 +410,11 @@ describe("SyncStatus", () => {
 		await settle();
 		expect(fetchMock).toHaveBeenCalled();
 		expect(c.textContent).toMatch(
-			/mengirim|disinkronkan|menghubungkan|menunggu/i,
+			/dikirim|menyinkronkan|menghubungkan|menunggu/i,
 		);
 	});
 
-	it("does not report ready for a failed session with a stale ready analysis", async () => {
+	it("does not report sync complete for a failed session with a stale ready analysis", async () => {
 		mockFetchSequence([
 			statusResponse({ status: "failed", analysisStatus: "ready" }),
 		]);
@@ -384,6 +422,31 @@ describe("SyncStatus", () => {
 		await settle();
 		expect(c.textContent).not.toMatch(/sync selesai/i);
 		expect(c.textContent).toMatch(/sync gagal/i);
+	});
+
+	it("does not open review or workspace for a failed session holding a snapshot", {
+		timeout: 10000,
+	}, async () => {
+		mockFetchSequence([
+			statusResponse({
+				status: "failed",
+				analysisStatus: "ready",
+				snapshotId: "snap_failed_1",
+			}),
+		]);
+		const c = renderStatus({
+			onViewReview: vi.fn(),
+			onEnterWorkspace: vi.fn(),
+		});
+		await settle();
+		const reviewBtn = c.querySelector(
+			'[data-testid="plan-continue-to-summary"]',
+		) as HTMLButtonElement | null;
+		const workspaceBtn = c.querySelector(
+			'[data-testid="sync-enter-workspace"]',
+		) as HTMLButtonElement | null;
+		expect(reviewBtn?.disabled).toBe(true);
+		expect(workspaceBtn?.disabled).toBe(true);
 	});
 
 	it("keeps one request in flight so slow responses cannot overlap", {
@@ -440,20 +503,26 @@ describe("SyncStatus", () => {
 		expect(second.textContent).not.toContain("%");
 	});
 
-	it("renders exactly three stages, each backed by an observable signal", async () => {
+	it("renders only two sync stages, each backed by an observable signal", async () => {
 		mockFetchSequence([
 			statusResponse({
 				status: "analyzing",
+				snapshotId: "snap_two_stage",
 				fileCount: 12,
 				excludedCount: 3,
 			}),
 		]);
 		const c = renderStatus();
 		await settle();
-		// Stage labels that map to real signals.
+		// Stage labels that map to real transport signals.
 		expect(c.textContent).toContain("Repository terhubung");
 		expect(c.textContent).toContain("Source code tersinkron");
-		expect(c.textContent).toContain("Menganalisis codebase...");
+		expect(c.textContent).not.toMatch(/menganalisis codebase/i);
+		expect(
+			c.querySelector('[data-testid="sync-stage-connection"]'),
+		).not.toBeNull();
+		expect(c.querySelector('[data-testid="sync-stage-upload"]')).not.toBeNull();
+		expect(c.querySelector('[data-testid="sync-stage-analysis"]')).toBeNull();
 	});
 
 	it("does not claim scan or manifest stages the client never observes", {
@@ -492,17 +561,17 @@ describe("SyncStatus", () => {
 		expect(withCount.textContent).toMatch(/dikecualikan otomatis/i);
 	});
 
-	it("disables next button until sync and analysis are fully ready", async () => {
+	it("disables the review action while the transport is still uploading", async () => {
 		const onViewReview = vi.fn();
 		mockFetchSequence([statusResponse({ status: "uploading" })]);
 		const c = renderStatus({ onViewReview });
 		await settle();
 
-		const nextBtn = [...c.querySelectorAll("button")].find((b) =>
-			/Lihat Ringkasan/i.test(b.textContent ?? ""),
+		const nextBtn = c.querySelector(
+			'[data-testid="plan-continue-to-summary"]',
 		) as HTMLButtonElement | undefined;
 
-		expect(nextBtn).toBeDefined();
+		expect(nextBtn).not.toBeNull();
 		expect(nextBtn?.disabled).toBe(true);
 		act(() => {
 			nextBtn?.click();
@@ -510,22 +579,58 @@ describe("SyncStatus", () => {
 		expect(onViewReview).not.toHaveBeenCalled();
 	});
 
-	it("enables next button when sync and analysis are ready and invokes onViewReview", async () => {
+	it("enables the review action only once validated analysis is ready", async () => {
 		const onViewReview = vi.fn();
-		mockFetchSequence([statusResponse({ status: "ready" })]);
+		mockFetchSequence([
+			statusResponse({
+				status: "uploaded",
+				snapshotId: "snap_review_ok",
+				analysisStatus: "ready",
+			}),
+		]);
 		const c = renderStatus({ onViewReview });
 		await settle(250);
 
-		const nextBtn = [...c.querySelectorAll("button")].find((b) =>
-			/Lihat Ringkasan/i.test(b.textContent ?? ""),
+		const nextBtn = c.querySelector(
+			'[data-testid="plan-continue-to-summary"]',
 		) as HTMLButtonElement | undefined;
 
-		expect(nextBtn).toBeDefined();
+		expect(nextBtn).not.toBeNull();
 		expect(nextBtn?.disabled).toBe(false);
 		act(() => {
 			nextBtn?.click();
 		});
 		expect(onViewReview).toHaveBeenCalledTimes(1);
+	});
+
+	it("enables the workspace action as soon as the snapshot is synced", async () => {
+		const onEnterWorkspace = vi.fn();
+		mockFetchSequence([statusResponse({ status: "uploading" })]);
+		const pending = renderStatus({ onEnterWorkspace });
+		await settle();
+		const pendingBtn = pending.querySelector(
+			'[data-testid="sync-enter-workspace"]',
+		) as HTMLButtonElement | null;
+		expect(pendingBtn?.disabled).toBe(true);
+
+		const fetchMock = mockFetchSequence([
+			statusResponse({
+				status: "uploaded",
+				snapshotId: "snap_ws_ok",
+				fileCount: 37,
+			}),
+		]);
+		const ready = renderStatus({ onEnterWorkspace });
+		await settle();
+		const readyBtn = ready.querySelector(
+			'[data-testid="sync-enter-workspace"]',
+		) as HTMLButtonElement | null;
+		expect(fetchMock).toHaveBeenCalled();
+		expect(readyBtn?.disabled).toBe(false);
+		act(() => {
+			readyBtn?.click();
+		});
+		expect(onEnterWorkspace).toHaveBeenCalledTimes(1);
 	});
 
 	it("invokes onBackToInstructions when previous button in footer is clicked", async () => {

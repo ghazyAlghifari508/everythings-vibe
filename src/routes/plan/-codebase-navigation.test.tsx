@@ -245,10 +245,13 @@ describe("PlanCodebasePage navigation policy", () => {
 		await startSyncing();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Menganalisis codebase...")).toBeDefined();
+				expect(screen.getByText("Source code tersinkron")).toBeDefined();
 			},
 			{ timeout: 6000, interval: 100 },
 		);
+		// A finished transport is a finished sync; the model running behind it
+		// is never rendered as a third stage.
+		expect(screen.queryByText(/Menganalisis codebase/i)).toBeNull();
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 	});
 
@@ -268,12 +271,15 @@ describe("PlanCodebasePage navigation policy", () => {
 		await startSyncing();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Analisis codebase selesai")).toBeDefined();
+				expect(screen.getByText("Source code tersinkron")).toBeDefined();
 			},
 			{ timeout: 6000, interval: 100 },
 		);
+		// Reaching `ready` never auto-opens the review, and no analysis stage
+		// claims the work is done on the user's behalf.
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 		expect(screen.queryByText("Detected environment")).toBeNull();
+		expect(screen.queryByText(/Analisis codebase selesai/i)).toBeNull();
 	});
 
 	it("explicit review continue advances sync to the validated analysis review", {

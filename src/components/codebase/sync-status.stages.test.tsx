@@ -73,15 +73,17 @@ function stageState(c: HTMLDivElement, testid: string): string | null {
 	);
 }
 
-describe("SyncStatus three user-facing stages", () => {
-	it("waiting_for_cli keeps every stage pending with a user-friendly waiting state", async () => {
+describe("SyncStatus two sync stages", () => {
+	it("waiting_for_cli keeps both sync stages unstarted with an honest waiting state", async () => {
 		mockStatusSequence([statusResponse({ status: "waiting_for_cli" })]);
 		const c = renderStatus();
 		await settle();
 		expect(stageState(c, "sync-stage-connection")).toBe("idle");
 		expect(stageState(c, "sync-stage-upload")).toBe("pending");
-		expect(stageState(c, "sync-stage-analysis")).toBe("pending");
-		expect(c.textContent).toContain("Menunggu agent terhubung");
+		expect(c.textContent).toContain("Repository belum terhubung");
+		expect(c.textContent).toContain(
+			"Menunggu agent terhubung ke VibeEverything.",
+		);
 		expect(c.querySelector('[data-testid="cli-waiting-alert"]')).not.toBeNull();
 	});
 
@@ -92,6 +94,9 @@ describe("SyncStatus three user-facing stages", () => {
 		expect(stageState(c, "sync-stage-connection")).toBe("done");
 		expect(stageState(c, "sync-stage-upload")).toBe("pending");
 		expect(c.textContent).toContain("Repository terhubung");
+		expect(c.textContent).toContain(
+			"Agent berhasil tersambung ke VibeEverything.",
+		);
 	});
 
 	it("scanning, filtering, and uploading all drive the same active sync stage", async () => {
@@ -100,7 +105,10 @@ describe("SyncStatus three user-facing stages", () => {
 			const c = renderStatus();
 			await settle();
 			expect(stageState(c, "sync-stage-upload")).toBe("active");
-			expect(c.textContent).toContain("Source code sedang disinkronkan");
+			expect(c.textContent).toContain("Menyinkronkan source code...");
+			expect(c.textContent).toContain(
+				"Repository sedang dikirim ke VibeEverything.",
+			);
 			if (root) {
 				const r = root;
 				act(() => {
@@ -126,13 +134,54 @@ describe("SyncStatus three user-facing stages", () => {
 		await settle();
 		expect(stageState(c, "sync-stage-upload")).toBe("done");
 		expect(c.textContent).toContain("Source code tersinkron");
-		expect(stageState(c, "sync-stage-analysis")).toBe("pending");
+		expect(c.textContent).toContain("37 file berhasil diterima.");
 		const nextBtn = c.querySelector(
 			'[data-testid="plan-continue-to-summary"]',
 		) as HTMLButtonElement | null;
 		expect(nextBtn).not.toBeNull();
 		expect(nextBtn?.disabled).toBe(true);
 		expect(onViewReview).not.toHaveBeenCalled();
+	});
+
+	it("renders only two sync stages and never an analysis stage", async () => {
+		for (const status of [
+			"waiting_for_cli",
+			"connected",
+			"uploading",
+			"uploaded",
+			"analyzing",
+			"ready",
+			"failed",
+		] as const) {
+			mockStatusSequence([
+				statusResponse({
+					status,
+					snapshotId: "snap_two_stage",
+					fileCount: 12,
+					analysisStatus: "pending",
+				}),
+			]);
+			const c = renderStatus();
+			await settle();
+			expect(
+				c.querySelector('[data-testid="sync-stage-connection"]'),
+			).not.toBeNull();
+			expect(
+				c.querySelector('[data-testid="sync-stage-upload"]'),
+			).not.toBeNull();
+			expect(c.querySelector('[data-testid="sync-stage-analysis"]')).toBeNull();
+			expect(c.textContent).not.toMatch(/menganalisis codebase/i);
+			expect(c.textContent).not.toMatch(/analisis codebase selesai/i);
+			if (root) {
+				const r = root;
+				act(() => {
+					r.unmount();
+				});
+				root = null;
+			}
+			container.remove();
+			vi.unstubAllGlobals();
+		}
 	});
 
 	it("completed stages keep a semantic success marker with normal copy", async () => {
@@ -151,10 +200,12 @@ describe("SyncStatus three user-facing stages", () => {
 		// a full-surface color treatment (visual tone is human-verified).
 		expect(doneRow?.querySelectorAll("svg")).toHaveLength(1);
 		expect(doneRow?.textContent).toContain("Source code tersinkron");
-		expect(doneRow?.textContent).toContain("37 file siap diproses.");
+		expect(doneRow?.textContent).toContain("37 file berhasil diterima.");
 	});
 
-	it("pending analysis activates the analysis stage with analysis copy", async () => {
+	it("keeps sync complete while analysis is still pending", async () => {
+		const onViewReview = vi.fn();
+		const onEnterWorkspace = vi.fn();
 		mockStatusSequence([
 			statusResponse({
 				status: "uploaded",
@@ -162,13 +213,29 @@ describe("SyncStatus three user-facing stages", () => {
 				analysisStatus: "pending",
 			}),
 		]);
-		const c = renderStatus();
+		const c = renderStatus({ onViewReview, onEnterWorkspace });
 		await settle();
-		expect(stageState(c, "sync-stage-analysis")).toBe("active");
-		expect(c.textContent).toContain("Menganalisis codebase...");
+		// The pending analysis never reverts the sync stage to active.
+		expect(stageState(c, "sync-stage-upload")).toBe("done");
+		expect(c.textContent).toContain("Source code tersinkron");
+		expect(c.textContent).not.toContain("Menyinkronkan source code...");
+		// It is reported as a secondary capability, not a sync step.
+		expect(
+			c.querySelector('[data-testid="sync-review-status"]')?.textContent,
+		).toBe("Ringkasan sedang disiapkan.");
+		// Workspace entry does not wait for analysis.
+		const workspaceBtn = c.querySelector(
+			'[data-testid="sync-enter-workspace"]',
+		) as HTMLButtonElement | null;
+		expect(workspaceBtn?.disabled).toBe(false);
+		const reviewBtn = c.querySelector(
+			'[data-testid="plan-continue-to-summary"]',
+		) as HTMLButtonElement | null;
+		expect(reviewBtn?.disabled).toBe(true);
+		expect(onViewReview).not.toHaveBeenCalled();
 	});
 
-	it("ready analysis completes the analysis stage and enables the in-card review CTA", async () => {
+	it("ready analysis enables the in-card review CTA", async () => {
 		const onViewReview = vi.fn();
 		mockStatusSequence([
 			statusResponse({
@@ -179,8 +246,10 @@ describe("SyncStatus three user-facing stages", () => {
 		]);
 		const c = renderStatus({ onViewReview });
 		await settle();
-		expect(stageState(c, "sync-stage-analysis")).toBe("done");
-		expect(c.textContent).toContain("Analisis codebase selesai");
+		expect(c.querySelector('[data-testid="sync-stage-analysis"]')).toBeNull();
+		expect(
+			c.querySelector('[data-testid="sync-review-status"]')?.textContent,
+		).toBe("Ringkasan siap.");
 		const card = c.querySelector('[data-testid="sync-card"]');
 		expect(card).not.toBeNull();
 		const nextBtn = card?.querySelector(

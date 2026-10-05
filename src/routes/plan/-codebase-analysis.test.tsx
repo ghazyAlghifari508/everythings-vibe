@@ -392,10 +392,10 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		expect(screen.queryByText("Detected environment")).toBeNull();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Analisis codebase selesai")).toBeDefined();
+				expect(screen.getByText("Source code tersinkron")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		expect(screen.queryByText("Detected environment")).toBeNull();
+		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 	});
 });
