@@ -560,6 +560,12 @@ export const PLAN_CODEBASE_NAME_STORAGE_KEY = "prdfy:plan-codebase-name";
 // recovery reuses the project instead of minting duplicates.
 export const PLAN_CODEBASE_PROJECT_STORAGE_KEY =
 	"prdfy:plan-codebase-project-id";
+// Onboarding step pointer: which of the three steps the user was last on.
+// The step is a navigation intent, not domain state — sync and analysis state
+// always come from GET status and GET analysis. Storing it is what lets a
+// refresh return the user to the screen they were reading instead of guessing
+// a screen from the server snapshot alone.
+export const PLAN_CODEBASE_STEP_STORAGE_KEY = "prdfy:plan-codebase-step";
 
 // One usable credential per project: this predicate is advisory only; session
 // creation must re-check under a per-project transaction/advisory lock

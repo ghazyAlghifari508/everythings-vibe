@@ -13,6 +13,7 @@ import {
 	PLAN_CODEBASE_ID_STORAGE_KEY,
 	PLAN_CODEBASE_NAME_STORAGE_KEY,
 	PLAN_CODEBASE_PROJECT_STORAGE_KEY,
+	PLAN_CODEBASE_STEP_STORAGE_KEY,
 } from "./codebase-sync";
 
 export interface PlanCodebasePointer {
@@ -91,6 +92,28 @@ export function clearPlanCodebaseProjectPointer(): void {
 }
 
 /**
+ * Which onboarding step the user was last on.
+ *
+ * A navigation intent only: it carries no sync, snapshot, or analysis state,
+ * and every caller still has to re-validate it against the server snapshot
+ * before honouring it. An unrecognised stored value reads as "unknown" rather
+ * than defaulting the user onto a screen they may have left.
+ */
+export type PlanCodebaseStep = "prompt" | "syncing" | "summary";
+
+export function readPlanCodebaseStepPointer(): PlanCodebaseStep | null {
+	const stored = readItem(PLAN_CODEBASE_STEP_STORAGE_KEY);
+	if (stored === "prompt" || stored === "syncing" || stored === "summary") {
+		return stored;
+	}
+	return null;
+}
+
+export function storePlanCodebaseStepPointer(step: PlanCodebaseStep): void {
+	writeItem(PLAN_CODEBASE_STEP_STORAGE_KEY, step);
+}
+
+/**
  * Drop every onboarding pointer.
  *
  * The three keys form one set: the project pointer only means anything next to
@@ -101,6 +124,7 @@ export function clearPlanCodebaseProjectPointer(): void {
 export function clearPlanOnboardingPointers(): void {
 	clearPlanCodebasePointer();
 	clearPlanCodebaseProjectPointer();
+	removeItem(PLAN_CODEBASE_STEP_STORAGE_KEY);
 }
 
 /**

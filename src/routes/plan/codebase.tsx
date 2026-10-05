@@ -17,10 +17,13 @@ import {
 import {
 	clearPlanCodebaseProjectPointer,
 	clearPlanOnboardingPointers,
+	type PlanCodebaseStep,
 	readPlanCodebasePointer,
 	readPlanCodebaseProjectPointer,
+	readPlanCodebaseStepPointer,
 	storePlanCodebasePointer,
 	storePlanCodebaseProjectPointer,
+	storePlanCodebaseStepPointer,
 } from "@/lib/codebase-plan-storage";
 import {
 	canContinueToSync,
@@ -102,6 +105,14 @@ export function PlanCodebasePage() {
 	useEffect(() => {
 		setStep("prompt");
 	}, [setStep]);
+
+	// Persist the navigation intent, never the domain state: a refresh returns
+	// the user to the screen they were reading, and recovery re-validates it
+	// against the server snapshot instead of trusting it.
+	useEffect(() => {
+		if (!codebase) return;
+		storePlanCodebaseStepPointer(step);
+	}, [codebase, step]);
 
 	const createCodebase = useCallback(async () => {
 		if (createInFlight.current) return;
@@ -311,6 +322,25 @@ export function PlanCodebasePage() {
 		[],
 	);
 
+	// Restore the step the user was on, validated against real server evidence.
+	// A stored intent is a preference, not a fact: the conclusion step needs a
+	// snapshot, and the prompt step is always reachable because it reports the
+	// handshake itself.
+	const resolveRecoveredStep = useCallback(
+		(
+			recovered: SyncStatusResponse,
+			storedStep: PlanCodebaseStep | null,
+		): PlanCodebaseStep => {
+			const hasSnapshot =
+				Boolean(recovered.snapshotId) &&
+				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status);
+			if (hasSnapshot) return "summary";
+			if (storedStep === "prompt") return "prompt";
+			return canContinueToSync(recovered) ? "syncing" : "prompt";
+		},
+		[],
+	);
+
 	// Refresh recovery: the stored id is only a pointer. Authoritative sync
 	// state comes from GET status. A missing token after refresh is never
 	// restored from storage; waiting sessions mint a fresh credential via
@@ -345,11 +375,12 @@ export function PlanCodebasePage() {
 			setCodebase({ id: stored.id, name: recoveredName });
 			setRecoveredStatus(recovered);
 			setSessionNonce((current) => current + 1);
+			const storedStep = readPlanCodebaseStepPointer();
 			// The conclusion step owns every analysis state, so a refresh on a
-			// finished upload always resumes at step 3 and lets it render
-			// ANALYZING or READY from persisted evidence. Landing on the sync
-			// screen instead would show a completed sync the user already moved
-			// past, and landing on the review alone would need a manual Next.
+			// finished upload resumes there and lets it render ANALYZING or READY
+			// from persisted evidence. Landing on the sync screen instead would
+			// show a completed sync the user already moved past, and landing on
+			// the review alone would need a manual Next.
 			if (
 				recovered.snapshotId &&
 				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status)
@@ -373,7 +404,7 @@ export function PlanCodebasePage() {
 					}
 				}
 				setPayload(null);
-				setStep("summary");
+				setStep(resolveRecoveredStep(recovered, storedStep));
 				return true;
 			}
 			if (
@@ -406,10 +437,10 @@ export function PlanCodebasePage() {
 				clearPlanOnboardingPointers();
 				return false;
 			}
-			// The CLI is mid-attempt. Stay on whichever step the handshake
-			// evidence supports instead of assuming the transport is the thing
-			// the user came back to check.
-			setStep(canContinueToSync(recovered) ? "syncing" : "prompt");
+			// The CLI is mid-attempt. Return the user to the screen they left, and
+			// let the prompt screen report the handshake rather than assuming the
+			// transport is what they came back to check.
+			setStep(resolveRecoveredStep(recovered, storedStep));
 			return true;
 		} catch {
 			clearPlanOnboardingPointers();
@@ -417,7 +448,7 @@ export function PlanCodebasePage() {
 		} finally {
 			setIsStarting(false);
 		}
-	}, [setStep, fetchAnalysisOutput]);
+	}, [setStep, fetchAnalysisOutput, resolveRecoveredStep]);
 
 	useEffect(() => {
 		if (autoInitAttempted.current) return;
@@ -469,12 +500,15 @@ export function PlanCodebasePage() {
 		}
 	};
 
+	// Retry resets the per-snapshot guard and clears the previous attempt, then
+	// lets the single trigger effect below perform the request. Calling the
+	// boundary directly as well would POST twice for one user action.
 	const retryAnalysis = useCallback(() => {
 		if (!featureProjectId || !lastStatus?.snapshotId) return;
 		analysisAttemptedFor.current = null;
+		setAnalysis(null);
 		setAnalysisError(null);
-		void triggerOnboardingAnalysis(featureProjectId, lastStatus.snapshotId);
-	}, [featureProjectId, lastStatus, triggerOnboardingAnalysis]);
+	}, [featureProjectId, lastStatus]);
 
 	// The server owns the name: once the CLI has handshaken it holds the
 	// repository folder name, so the open onboarding page must not keep showing
