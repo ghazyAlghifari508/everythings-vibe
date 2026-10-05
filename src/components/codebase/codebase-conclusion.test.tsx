@@ -251,13 +251,13 @@ describe("CodebaseConclusion failed analysis state", () => {
 		expect(onEnterWorkspace).toHaveBeenCalledTimes(1);
 	});
 
-	it("never sends the user back to Pantau Sync as the only way out", () => {
+	it("never makes a return to the sync step the only way out", () => {
 		const c = renderConclusion({
 			snapshot: status({ analysisStatus: "failed" }),
 			analysis: null,
 			errorMessage: "Analisis codebase gagal.",
 		});
-		expect(clickByLabel(c, /kembali ke pantau sync/i)).toBeUndefined();
+		expect(clickByLabel(c, /kembali ke/i)).toBeUndefined();
 	});
 
 	it("falls back to the analyzing state while a retry is in flight", () => {

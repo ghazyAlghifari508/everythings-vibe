@@ -523,7 +523,7 @@ export const syncStatusResponseSchema = z.object({
 	// Timestamp the CLI handshake transaction persisted for this session
 	// (`codebase_sync_sessions.metadata.handshakeAt`). Present only when the
 	// agent actually contacted the server, so it stays meaningful even for a
-	// session that failed or expired afterwards. Drives `canContinueToSync`.
+	// session that failed or expired afterwards. Drives `canOpenSummary`.
 	cliConnectedAt: z.string().datetime().optional(),
 	// Snapshot creation timestamp ("Waktu sync" in the review page).
 	snapshotCreatedAt: z.string().datetime().optional(),
