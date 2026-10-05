@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUIStore } from "@/store";
 import { PlanCodebasePage } from "./codebase";
@@ -161,6 +167,21 @@ function mockOnboardingFlow() {
 	};
 }
 
+async function advanceToSyncScreen() {
+	// The prompt CTA is gated on real CLI handshake evidence, so wait for the
+	// canonical poll to report one before advancing.
+	await waitFor(
+		() => {
+			const cta = screen.getByTestId("prompt-continue-to-sync");
+			expect((cta as HTMLButtonElement).disabled).toBe(false);
+		},
+		{ timeout: 15000, interval: 50 },
+	);
+	fireEvent.click(screen.getByTestId("prompt-continue-to-sync"));
+	await waitFor(() => {
+		expect(screen.getByText("Sync codebase")).toBeDefined();
+	});
+}
 async function startSyncing() {
 	render(<PlanCodebasePage />);
 	await waitFor(() => {
@@ -168,7 +189,7 @@ async function startSyncing() {
 			screen.getByText("Sync codebase dengan VibeEverything"),
 		).toBeDefined();
 	});
-	screen.getByRole("button", { name: /Lanjut ke Pantau Sync/i }).click();
+	await advanceToSyncScreen();
 	await waitFor(() => {
 		expect(screen.getByText("Sync codebase")).toBeDefined();
 	});
@@ -291,7 +312,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		expect(screen.queryByText("Snapshot siap")).toBeNull();
 	});
 
-	it("recovered uploaded state without ready analysis stays on sync instead of jumping to summary", {
+	it("recovers an uploaded snapshot with a pending analysis into the pending conclusion state, never a snapshot-only review", {
 		timeout: 20000,
 	}, async () => {
 		try {
@@ -353,11 +374,14 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		render(<PlanCodebasePage />);
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByTestId("codebase-analysis-pending")).not.toBeNull();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
+		// An uploaded snapshot with no validated output is not a review: the
+		// honest analyzing state is all the user may see.
+		expect(screen.queryByText("Detected environment")).toBeNull();
+		expect(screen.queryByText("Snapshot siap")).toBeNull();
 	});
 
 	it("review-to-sync back navigation stays on sync despite server already ready", {

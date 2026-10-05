@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUIStore } from "@/store";
 import { PlanCodebasePage } from "./codebase";
@@ -158,6 +164,21 @@ function mockPlanFlow(
 	};
 }
 
+async function advanceToSyncScreen() {
+	// The prompt CTA is gated on real CLI handshake evidence, so wait for the
+	// canonical poll to report one before advancing.
+	await waitFor(
+		() => {
+			const cta = screen.getByTestId("prompt-continue-to-sync");
+			expect((cta as HTMLButtonElement).disabled).toBe(false);
+		},
+		{ timeout: 15000, interval: 50 },
+	);
+	fireEvent.click(screen.getByTestId("prompt-continue-to-sync"));
+	await waitFor(() => {
+		expect(screen.getByText("Sync codebase")).toBeDefined();
+	});
+}
 async function startSyncing() {
 	render(<PlanCodebasePage />);
 	await waitFor(() => {
@@ -165,7 +186,7 @@ async function startSyncing() {
 			screen.getByText("Sync codebase dengan VibeEverything"),
 		).toBeDefined();
 	});
-	screen.getByRole("button", { name: /Lanjut ke Pantau Sync/i }).click();
+	await advanceToSyncScreen();
 	await waitFor(() => {
 		expect(screen.getByText("Sync codebase")).toBeDefined();
 	});

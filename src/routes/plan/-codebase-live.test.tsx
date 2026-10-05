@@ -180,10 +180,22 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 			).toBeDefined();
 		});
 
-		const monitorButton = screen.getByRole("button", {
-			name: /Lanjut ke Pantau Sync/i,
-		});
+		// The gate waits for the canonical poll interval, so allow for it.
+		const monitorButton = await waitFor(
+			() => {
+				const cta = screen.getByTestId(
+					"prompt-continue-to-sync",
+				) as HTMLButtonElement;
+				expect(cta.disabled).toBe(false);
+				return cta;
+			},
+			{ timeout: 15000, interval: 100 },
+		);
 		monitorButton.click();
+
+		await waitFor(() => {
+			expect(screen.getByText("Sync codebase")).toBeDefined();
+		});
 
 		await waitFor(
 			() => {

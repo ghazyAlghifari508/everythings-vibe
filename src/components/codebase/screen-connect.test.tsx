@@ -207,6 +207,7 @@ describe("ScreenConnect", () => {
 				<ScreenConnect
 					projectName="Test App"
 					payload={samplePayload}
+					canContinue
 					onAgentStarted={() => {}}
 				/>,
 			);
@@ -217,7 +218,7 @@ describe("ScreenConnect", () => {
 		);
 		expect(nextBtn).toBeDefined();
 		expect(container.textContent).toContain(
-			"Buka Pantau Sync untuk melihat kapan agent mulai terhubung dan mengirim repository.",
+			"Agent sudah terhubung. Buka Pantau Sync untuk memantau pengiriman source code.",
 		);
 	});
 
@@ -227,6 +228,7 @@ describe("ScreenConnect", () => {
 				<ScreenConnect
 					projectName="Test App"
 					payload={samplePayload}
+					canContinue
 					onAgentStarted={() => {}}
 				/>,
 			);
@@ -235,17 +237,18 @@ describe("ScreenConnect", () => {
 		const rendered = container.textContent ?? "";
 		expect(rendered).not.toContain("berpindah layar");
 		expect(rendered).toContain(
-			"VibeEverything akan mendeteksi progress sync secara otomatis setelah agent mulai terhubung.",
+			"VibeEverything sudah menerima koneksi dari agent.",
 		);
 	});
 
-	it("enables Pantau Sync without requiring the Copy button first", () => {
+	it("enables Pantau Sync only after the server reports a CLI handshake", () => {
 		const onAgentStarted = vi.fn();
 		act(() => {
 			root?.render(
 				<ScreenConnect
 					projectName="Test App"
 					payload={samplePayload}
+					canContinue
 					onAgentStarted={onAgentStarted}
 				/>,
 			);
@@ -274,6 +277,7 @@ describe("ScreenConnect", () => {
 				<ScreenConnect
 					projectName="Test App"
 					payload={samplePayload}
+					canContinue={false}
 					onAgentStarted={onAgentStarted}
 				/>,
 			);
@@ -282,7 +286,7 @@ describe("ScreenConnect", () => {
 		const nextBtn = [...container.querySelectorAll("button")].find((b) =>
 			/Lanjut ke Pantau Sync/i.test(b.textContent ?? ""),
 		) as HTMLButtonElement | undefined;
-		expect(nextBtn?.disabled).toBe(false);
+		expect(nextBtn?.disabled).toBe(true);
 		const copyBtn = [...container.querySelectorAll("button")].find((b) =>
 			/salin/i.test(b.textContent ?? ""),
 		);
@@ -290,7 +294,8 @@ describe("ScreenConnect", () => {
 			copyBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(container.textContent).toContain("Tersalin");
-		expect(nextBtn?.disabled).toBe(false);
+		expect(nextBtn?.disabled).toBe(true);
+		expect(onAgentStarted).not.toHaveBeenCalled();
 	});
 
 	it("renders the AI coding agent / harness logos in Step 2", () => {

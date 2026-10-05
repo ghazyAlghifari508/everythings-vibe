@@ -121,8 +121,8 @@ describe("SyncStatus two sync stages", () => {
 		}
 	});
 
-	it("uploaded completes the sync stage but never implies analysis is done", async () => {
-		const onViewReview = vi.fn();
+	it("uploaded completes the sync stage and opens the conclusion step", async () => {
+		const onContinueToSummary = vi.fn();
 		mockStatusSequence([
 			statusResponse({
 				status: "uploaded",
@@ -130,7 +130,7 @@ describe("SyncStatus two sync stages", () => {
 				fileCount: 37,
 			}),
 		]);
-		const c = renderStatus({ onViewReview });
+		const c = renderStatus({ onContinueToSummary });
 		await settle();
 		expect(stageState(c, "sync-stage-upload")).toBe("done");
 		expect(c.textContent).toContain("Source code tersinkron");
@@ -139,8 +139,11 @@ describe("SyncStatus two sync stages", () => {
 			'[data-testid="plan-continue-to-summary"]',
 		) as HTMLButtonElement | null;
 		expect(nextBtn).not.toBeNull();
-		expect(nextBtn?.disabled).toBe(true);
-		expect(onViewReview).not.toHaveBeenCalled();
+		expect(nextBtn?.textContent).toContain("Lanjut ke Kesimpulan");
+		// Transport completion alone opens step 3: analysis pending is that
+		// screen's own state, not a reason to keep the user here.
+		expect(nextBtn?.disabled).toBe(false);
+		expect(onContinueToSummary).not.toHaveBeenCalled();
 	});
 
 	it("renders only two sync stages and never an analysis stage", async () => {
@@ -204,8 +207,7 @@ describe("SyncStatus two sync stages", () => {
 	});
 
 	it("keeps sync complete while analysis is still pending", async () => {
-		const onViewReview = vi.fn();
-		const onEnterWorkspace = vi.fn();
+		const onContinueToSummary = vi.fn();
 		mockStatusSequence([
 			statusResponse({
 				status: "uploaded",
@@ -213,30 +215,30 @@ describe("SyncStatus two sync stages", () => {
 				analysisStatus: "pending",
 			}),
 		]);
-		const c = renderStatus({ onViewReview, onEnterWorkspace });
+		const c = renderStatus({ onContinueToSummary });
 		await settle();
 		// The pending analysis never reverts the sync stage to active.
 		expect(stageState(c, "sync-stage-upload")).toBe("done");
 		expect(c.textContent).toContain("Source code tersinkron");
 		expect(c.textContent).not.toContain("Menyinkronkan source code...");
-		// It is reported as a secondary capability, not a sync step.
+		// Analysis is not part of this screen at all: no stage, no capability
+		// line, no analysis retry.
+		expect(c.querySelector('[data-testid="sync-review-status"]')).toBeNull();
 		expect(
-			c.querySelector('[data-testid="sync-review-status"]')?.textContent,
-		).toBe("Ringkasan sedang disiapkan.");
-		// Workspace entry does not wait for analysis.
-		const workspaceBtn = c.querySelector(
-			'[data-testid="sync-enter-workspace"]',
-		) as HTMLButtonElement | null;
-		expect(workspaceBtn?.disabled).toBe(false);
+			[...c.querySelectorAll("button")].some((b) =>
+				/coba analisis lagi/i.test(b.textContent ?? ""),
+			),
+		).toBe(false);
+		// The conclusion step opens on transport completion alone.
 		const reviewBtn = c.querySelector(
 			'[data-testid="plan-continue-to-summary"]',
 		) as HTMLButtonElement | null;
-		expect(reviewBtn?.disabled).toBe(true);
-		expect(onViewReview).not.toHaveBeenCalled();
+		expect(reviewBtn?.disabled).toBe(false);
+		expect(onContinueToSummary).not.toHaveBeenCalled();
 	});
 
-	it("ready analysis enables the in-card review CTA", async () => {
-		const onViewReview = vi.fn();
+	it("ready analysis leaves the conclusion step enabled", async () => {
+		const onContinueToSummary = vi.fn();
 		mockStatusSequence([
 			statusResponse({
 				status: "uploaded",
@@ -244,12 +246,9 @@ describe("SyncStatus two sync stages", () => {
 				analysisStatus: "ready",
 			}),
 		]);
-		const c = renderStatus({ onViewReview });
+		const c = renderStatus({ onContinueToSummary });
 		await settle();
 		expect(c.querySelector('[data-testid="sync-stage-analysis"]')).toBeNull();
-		expect(
-			c.querySelector('[data-testid="sync-review-status"]')?.textContent,
-		).toBe("Ringkasan siap.");
 		const card = c.querySelector('[data-testid="sync-card"]');
 		expect(card).not.toBeNull();
 		const nextBtn = card?.querySelector(
@@ -260,7 +259,7 @@ describe("SyncStatus two sync stages", () => {
 		act(() => {
 			nextBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
-		expect(onViewReview).toHaveBeenCalledTimes(1);
+		expect(onContinueToSummary).toHaveBeenCalledTimes(1);
 	});
 
 	it("never renders fabricated percentages", { timeout: 10000 }, async () => {

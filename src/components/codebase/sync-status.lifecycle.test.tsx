@@ -118,8 +118,8 @@ describe("SyncStatus live reconciliation lifecycle", () => {
 		expect(c.textContent).toContain("12");
 	});
 
-	it("forwards uploaded snapshot to onStatus for parent transition", async () => {
-		const onStatus = vi.fn();
+	it("surfaces the uploaded snapshot from the screen's own loop", async () => {
+		const onContinueToSummary = vi.fn();
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () => ({
@@ -135,15 +135,14 @@ describe("SyncStatus live reconciliation lifecycle", () => {
 					}),
 			})),
 		);
-		renderLifecycle({ onStatus, pollIntervalMs: 15 });
+		const c = renderLifecycle({ onContinueToSummary });
 		await settle(60);
-		expect(onStatus).toHaveBeenCalledWith(
-			expect.objectContaining({
-				status: "uploaded",
-				snapshotId: "snap_fwd_lc",
-				fileCount: 37,
-			}),
-		);
+		expect(c.textContent).toContain("Source code tersinkron");
+		expect(c.textContent).toContain("37");
+		const nextBtn = c.querySelector(
+			'[data-testid="plan-continue-to-summary"]',
+		) as HTMLButtonElement | null;
+		expect(nextBtn?.disabled).toBe(false);
 	});
 
 	it("hung first request is retired and polling recovers", {

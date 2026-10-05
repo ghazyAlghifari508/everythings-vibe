@@ -55,6 +55,15 @@ function mockFetchSequence(
 function renderStatus(
 	props: Partial<React.ComponentProps<typeof SyncStatus>> = {},
 ) {
+	// Several tests render twice in one case; unmount the previous root first so
+	// a leftover loop cannot poll against the next case's mocked fetch.
+	if (root) {
+		const previous = root;
+		act(() => {
+			previous.unmount();
+		});
+		root = null;
+	}
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	const nextRoot = createRoot(container);
@@ -108,17 +117,15 @@ describe("SyncStatus", () => {
 	});
 
 	it("shows polling error instead of waiting when status fetch fails", async () => {
-		const onStatus = vi.fn();
 		mockFetchSequence([
 			{ http: 500, body: { error: "Gagal membaca status sync" } },
 		]);
-		const c = renderStatus({ onStatus });
+		const c = renderStatus();
 		await settle();
 		expect(c.textContent).toContain("Gagal memuat status sync");
 		expect(c.textContent).not.toContain("CLI Agent Belum Terhubung");
 		expect(c.querySelector('[data-testid="cli-waiting-alert"]')).toBeNull();
 		expect(c.querySelector('[data-testid="sync-poll-error"]')).not.toBeNull();
-		expect(onStatus).not.toHaveBeenCalledWith(null);
 	});
 
 	it("shows rate-limit error honestly instead of waiting", async () => {
@@ -133,22 +140,17 @@ describe("SyncStatus", () => {
 	});
 
 	it("recovers on the next poll after a transient error", async () => {
-		const onStatus = vi.fn();
 		mockFetchSequence([
 			{ http: 500, body: { error: "Gagal membaca status sync" } },
 			statusResponse({ status: "connected", sessionId: "sess_rec_1" }),
 		]);
-		const c = renderStatus({ onStatus, pollIntervalMs: 15 });
+		const c = renderStatus({ pollIntervalMs: 15 });
 		await settle(80);
-		expect(onStatus).toHaveBeenCalledWith(
-			expect.objectContaining({ status: "connected" }),
-		);
 		expect(c.textContent).toContain("Repository terhubung");
 		expect(c.textContent).not.toContain("CLI Agent Belum Terhubung");
 	});
 
 	it("transitions waiting to connected without manual refresh", async () => {
-		const onStatus = vi.fn();
 		let calls = 0;
 		const fetchMock = vi.fn(async () => {
 			calls += 1;
@@ -162,7 +164,7 @@ describe("SyncStatus", () => {
 			return { ok: true, status: 200, json: async () => payload };
 		});
 		vi.stubGlobal("fetch", fetchMock);
-		const c = renderStatus({ onStatus, pollIntervalMs: 15 });
+		const c = renderStatus({ pollIntervalMs: 15 });
 		await settle(80);
 		expect(c.textContent).toContain("Repository terhubung");
 	});
@@ -204,11 +206,10 @@ describe("SyncStatus", () => {
 		expect(c.textContent).toContain("37");
 	});
 
-	it("keeps sync complete while analysis is pending and unlocks workspace entry", {
+	it("keeps sync complete while analysis is pending and opens the conclusion step", {
 		timeout: 10000,
 	}, async () => {
-		const onViewReview = vi.fn();
-		const onEnterWorkspace = vi.fn();
+		const onContinueToSummary = vi.fn();
 		mockFetchSequence([
 			statusResponse({
 				status: "uploaded",
@@ -216,25 +217,17 @@ describe("SyncStatus", () => {
 				analysisStatus: "pending",
 			}),
 		]);
-		const c = renderStatus({ onViewReview, onEnterWorkspace });
+		const c = renderStatus({ onContinueToSummary });
 		await settle();
-		// Sync is finished; analysis is a separate capability, not a stage.
+		// Sync is finished; analysis belongs to the conclusion step.
 		expect(c.textContent).toContain("Source code tersinkron");
 		expect(c.textContent).not.toMatch(/menganalisis codebase/i);
 		expect(c.querySelector('[data-testid="sync-stage-analysis"]')).toBeNull();
 		const reviewBtn = c.querySelector(
 			'[data-testid="plan-continue-to-summary"]',
 		) as HTMLButtonElement | null;
-		expect(reviewBtn?.disabled).toBe(true);
-		const workspaceBtn = c.querySelector(
-			'[data-testid="sync-enter-workspace"]',
-		) as HTMLButtonElement | null;
-		expect(workspaceBtn?.disabled).toBe(false);
-		act(() => {
-			workspaceBtn?.click();
-		});
-		expect(onEnterWorkspace).toHaveBeenCalledTimes(1);
-		expect(onViewReview).not.toHaveBeenCalled();
+		expect(reviewBtn?.disabled).toBe(false);
+		expect(onContinueToSummary).not.toHaveBeenCalled();
 	});
 
 	it("shows indeterminate loading without fabricated percentages while active", async () => {
@@ -318,49 +311,33 @@ describe("SyncStatus", () => {
 		expect(c.textContent).not.toMatch(/analisis codebase/i);
 	});
 
-	it("offers analysis retry when the session is uploaded but analysis failed", {
+	it("never renders an analysis stage, copy, or retry inside the sync screen", {
 		timeout: 10000,
 	}, async () => {
-		const onRetryAnalysis = vi.fn();
-		const onEnterWorkspace = vi.fn();
-		const onViewReview = vi.fn();
 		mockFetchSequence([
 			statusResponse({
 				status: "uploaded",
-				snapshotId: "snap_123",
-				analysisId: "analysis_123",
+				snapshotId: "snap_fa_1",
 				analysisStatus: "failed",
+				analysisId: "analysis_fa_1",
 				errorMessage: "Analisis codebase gagal. Coba analisis ulang.",
 			}),
 		]);
-		const c = renderStatus({ onRetryAnalysis, onEnterWorkspace, onViewReview });
+		const c = renderStatus({ onContinueToSummary: vi.fn() });
 		await settle();
-		// Analysis failure never converts a finished sync back into a failure.
+		// A failed analysis never converts a finished sync into a failure, and
+		// its retry belongs to the conclusion step, not to transport monitoring.
 		expect(c.textContent).toContain("Source code tersinkron");
 		expect(c.textContent).not.toMatch(/sync gagal/i);
+		expect(c.textContent).not.toMatch(/analisis codebase/i);
 		expect(
-			c.querySelector('[data-testid="sync-review-status"]')?.textContent,
-		).toBe("Ringkasan belum berhasil disiapkan.");
-		const retryButton = [...c.querySelectorAll("button")].find((b) =>
-			/coba analisis lagi/i.test(b.textContent ?? ""),
-		);
-		expect(retryButton).toBeDefined();
-		act(() => {
-			retryButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-		expect(onRetryAnalysis).toHaveBeenCalledTimes(1);
-		// A failed analysis still leaves the workspace openable.
-		const workspaceBtn = c.querySelector(
-			'[data-testid="sync-enter-workspace"]',
-		) as HTMLButtonElement | null;
-		expect(workspaceBtn?.disabled).toBe(false);
+			[...c.querySelectorAll("button")].some((b) =>
+				/coba analisis lagi|analisis ulang/i.test(b.textContent ?? ""),
+			),
+		).toBe(false);
 		expect(
-			(
-				c.querySelector(
-					'[data-testid="plan-continue-to-summary"]',
-				) as HTMLButtonElement | null
-			)?.disabled,
-		).toBe(true);
+			c.querySelector('[data-testid="plan-continue-to-summary"]'),
+		).not.toBeNull();
 	});
 
 	it("shows the safe server error with a retry action on failure", async () => {
@@ -424,7 +401,7 @@ describe("SyncStatus", () => {
 		expect(c.textContent).toMatch(/sync gagal/i);
 	});
 
-	it("does not open review or workspace for a failed session holding a snapshot", {
+	it("does not open the conclusion step for a failed session holding a snapshot", {
 		timeout: 10000,
 	}, async () => {
 		mockFetchSequence([
@@ -434,19 +411,12 @@ describe("SyncStatus", () => {
 				snapshotId: "snap_failed_1",
 			}),
 		]);
-		const c = renderStatus({
-			onViewReview: vi.fn(),
-			onEnterWorkspace: vi.fn(),
-		});
+		const c = renderStatus({ onContinueToSummary: vi.fn() });
 		await settle();
 		const reviewBtn = c.querySelector(
 			'[data-testid="plan-continue-to-summary"]',
 		) as HTMLButtonElement | null;
-		const workspaceBtn = c.querySelector(
-			'[data-testid="sync-enter-workspace"]',
-		) as HTMLButtonElement | null;
 		expect(reviewBtn?.disabled).toBe(true);
-		expect(workspaceBtn?.disabled).toBe(true);
 	});
 
 	it("keeps one request in flight so slow responses cannot overlap", {
@@ -470,17 +440,18 @@ describe("SyncStatus", () => {
 		await settle();
 	});
 
-	it("notifies the parent of status updates for analysis wiring", async () => {
-		const onStatus = vi.fn();
-		mockFetchSequence([statusResponse({ status: "analyzing" })]);
-		renderStatus({ onStatus });
+	it("keeps rendering live status from its own loop without a parent callback", async () => {
+		mockFetchSequence([
+			statusResponse({
+				status: "analyzing",
+				snapshotId: "snap_an_own",
+			}),
+		]);
+		const c = renderStatus();
 		await settle();
-		expect(onStatus).toHaveBeenCalled();
-		const firstCall = onStatus.mock.calls[0]?.[0] as
-			| SyncStatusResponse
-			| null
-			| undefined;
-		expect(firstCall?.status).toBe("analyzing");
+		// `analyzing` is transport-complete for legacy project-scoped sessions,
+		// so it still reports a synced source stage.
+		expect(c.textContent).toContain("Source code tersinkron");
 	});
 
 	it("recovers persisted server state on remount (refresh persistence)", async () => {
@@ -561,10 +532,10 @@ describe("SyncStatus", () => {
 		expect(withCount.textContent).toMatch(/dikecualikan otomatis/i);
 	});
 
-	it("disables the review action while the transport is still uploading", async () => {
-		const onViewReview = vi.fn();
+	it("disables the conclusion action while the transport is still uploading", async () => {
+		const onContinueToSummary = vi.fn();
 		mockFetchSequence([statusResponse({ status: "uploading" })]);
-		const c = renderStatus({ onViewReview });
+		const c = renderStatus({ onContinueToSummary });
 		await settle();
 
 		const nextBtn = c.querySelector(
@@ -576,61 +547,53 @@ describe("SyncStatus", () => {
 		act(() => {
 			nextBtn?.click();
 		});
-		expect(onViewReview).not.toHaveBeenCalled();
+		expect(onContinueToSummary).not.toHaveBeenCalled();
 	});
 
-	it("enables the review action only once validated analysis is ready", async () => {
-		const onViewReview = vi.fn();
-		mockFetchSequence([
-			statusResponse({
-				status: "uploaded",
-				snapshotId: "snap_review_ok",
-				analysisStatus: "ready",
-			}),
-		]);
-		const c = renderStatus({ onViewReview });
-		await settle(250);
-
-		const nextBtn = c.querySelector(
-			'[data-testid="plan-continue-to-summary"]',
-		) as HTMLButtonElement | undefined;
-
-		expect(nextBtn).not.toBeNull();
-		expect(nextBtn?.disabled).toBe(false);
-		act(() => {
-			nextBtn?.click();
-		});
-		expect(onViewReview).toHaveBeenCalledTimes(1);
-	});
-
-	it("enables the workspace action as soon as the snapshot is synced", async () => {
-		const onEnterWorkspace = vi.fn();
+	it("enables the conclusion action as soon as the snapshot is synced", async () => {
+		const onContinueToSummary = vi.fn();
 		mockFetchSequence([statusResponse({ status: "uploading" })]);
-		const pending = renderStatus({ onEnterWorkspace });
+		const pending = renderStatus({ onContinueToSummary });
 		await settle();
-		const pendingBtn = pending.querySelector(
-			'[data-testid="sync-enter-workspace"]',
-		) as HTMLButtonElement | null;
-		expect(pendingBtn?.disabled).toBe(true);
+		expect(
+			(
+				pending.querySelector(
+					'[data-testid="plan-continue-to-summary"]',
+				) as HTMLButtonElement | null
+			)?.disabled,
+		).toBe(true);
 
-		const fetchMock = mockFetchSequence([
+		mockFetchSequence([
 			statusResponse({
 				status: "uploaded",
 				snapshotId: "snap_ws_ok",
 				fileCount: 37,
 			}),
 		]);
-		const ready = renderStatus({ onEnterWorkspace });
+		const ready = renderStatus({ onContinueToSummary });
 		await settle();
 		const readyBtn = ready.querySelector(
-			'[data-testid="sync-enter-workspace"]',
+			'[data-testid="plan-continue-to-summary"]',
 		) as HTMLButtonElement | null;
-		expect(fetchMock).toHaveBeenCalled();
 		expect(readyBtn?.disabled).toBe(false);
 		act(() => {
 			readyBtn?.click();
 		});
-		expect(onEnterWorkspace).toHaveBeenCalledTimes(1);
+		expect(onContinueToSummary).toHaveBeenCalledTimes(1);
+	});
+
+	it("never polls when the parent owns the reconciliation loop", async () => {
+		const fetchMock = mockFetchSequence([
+			statusResponse({ status: "connected" }),
+		]);
+		const c = renderStatus({
+			status: statusResponse({ status: "connected", sessionId: "sess_own" }),
+			statusPolling: "parent",
+		});
+		await settle(120);
+		// Exactly one loop must exist for this screen: the parent's.
+		expect(fetchMock).not.toHaveBeenCalled();
+		expect(c.textContent).toContain("Repository terhubung");
 	});
 
 	it("invokes onBackToInstructions when previous button in footer is clicked", async () => {

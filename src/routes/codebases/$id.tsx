@@ -1610,16 +1610,8 @@ function CodebaseDetailPage() {
 					projectName={codebase.name}
 					status={status}
 					statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
-					onStatus={setStatus}
+					statusPolling="parent"
 					onRetrySync={() => void startSession("retry")}
-					onRetryAnalysis={
-						feature && status?.snapshotId
-							? () => {
-									const snapshotId = status.snapshotId;
-									if (snapshotId) void triggerAnalysis(snapshotId);
-								}
-							: undefined
-					}
 				/>
 			)}
 		</main>

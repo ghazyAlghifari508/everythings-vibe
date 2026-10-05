@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CodebaseReview } from "@/components/codebase/codebase-review";
+import { CodebaseConclusion } from "@/components/codebase/codebase-conclusion";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { SyncStatus } from "@/components/codebase/sync-status";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { useCodebaseSyncStatus } from "@/hooks/use-codebase-sync-status";
 import {
 	type AnalysisResponse,
 	analysisResponseSchema,
@@ -22,6 +23,7 @@ import {
 	storePlanCodebaseProjectPointer,
 } from "@/lib/codebase-plan-storage";
 import {
+	canContinueToSync,
 	isSyncStatusComplete,
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
@@ -63,7 +65,10 @@ export function PlanCodebasePage() {
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
 	const step = useUIStore((s) => s.codebasePlanStep);
 	const setStep = useUIStore((s) => s.setCodebasePlanStep);
-	const [lastStatus, setLastStatus] = useState<SyncStatusResponse | null>(null);
+	// Recovered status is the poller's seed, so the first paint after a refresh
+	// already reflects persisted server state instead of an empty loading card.
+	const [recoveredStatus, setRecoveredStatus] =
+		useState<SyncStatusResponse | null>(null);
 	const [sessionNonce, setSessionNonce] = useState(0);
 	const autoInitAttempted = useRef(false);
 	// Onboarding analysis context: one existing-codebase feature project per
@@ -81,6 +86,18 @@ export function PlanCodebasePage() {
 	// and two sync sessions for one onboarding attempt. State updates are async,
 	// so a ref is what actually closes the window.
 	const createInFlight = useRef(false);
+
+	// One canonical reconciliation loop for the whole onboarding flow. The
+	// prompt screen needs the CLI handshake, the sync screen needs the transport
+	// stages, and the conclusion screen needs the persisted analysis status — all
+	// three read this single snapshot, so no two screens can disagree and no
+	// second poller races this one.
+	const { status: lastStatus, error: statusPollError } = useCodebaseSyncStatus({
+		codebaseId: codebase?.id ?? null,
+		analysisProjectId: featureProjectId,
+		initialStatus: recoveredStatus,
+		enabled: codebase !== null,
+	});
 
 	useEffect(() => {
 		setStep("prompt");
@@ -140,7 +157,9 @@ export function PlanCodebasePage() {
 			setAnalysisError(null);
 			analysisAttemptedFor.current = null;
 			setPayload(sync.data);
-			setLastStatus(null);
+			// A brand new session has no server history: clear the seed so the
+			// poller cannot paint the previous attempt's state onto this one.
+			setRecoveredStatus(null);
 			setStep("prompt");
 			setSessionNonce((current) => current + 1);
 		} catch {
@@ -324,13 +343,13 @@ export function PlanCodebasePage() {
 				return false;
 			}
 			setCodebase({ id: stored.id, name: recoveredName });
-			setLastStatus(recovered);
+			setRecoveredStatus(recovered);
 			setSessionNonce((current) => current + 1);
-			// An uploaded snapshot is transport-complete, not analysis-complete.
-			// Resume the onboarding review only when validated analysis output for
-			// this exact snapshot is already stored; anything less lands on
-			// syncing, where live polling and the trigger effect take over
-			// honestly instead of showing a snapshot-only summary.
+			// The conclusion step owns every analysis state, so a refresh on a
+			// finished upload always resumes at step 3 and lets it render
+			// ANALYZING or READY from persisted evidence. Landing on the sync
+			// screen instead would show a completed sync the user already moved
+			// past, and landing on the review alone would need a manual Next.
 			if (
 				recovered.snapshotId &&
 				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status)
@@ -338,6 +357,9 @@ export function PlanCodebasePage() {
 				const storedProject = readPlanCodebaseProjectPointer();
 				if (storedProject) {
 					setFeatureProjectId(storedProject);
+					// Only a ready analysis short-circuits the trigger below; a
+					// pending or failed row is left for the conclusion screen to
+					// render honestly.
 					const existing = await fetchAnalysisOutput(
 						storedProject,
 						recovered.snapshotId,
@@ -348,16 +370,10 @@ export function PlanCodebasePage() {
 						existing.status === "ready"
 					) {
 						analysisAttemptedFor.current = recovered.snapshotId;
-						setPayload(null);
-						setStep("summary");
-						return true;
-					}
-					if (existing) {
-						analysisAttemptedFor.current = recovered.snapshotId;
 					}
 				}
 				setPayload(null);
-				setStep("syncing");
+				setStep("summary");
 				return true;
 			}
 			if (
@@ -378,15 +394,22 @@ export function PlanCodebasePage() {
 				);
 				if (retryResponse.ok && retryParsed.success) {
 					setPayload(retryParsed.data);
-					setLastStatus(null);
+					// The fresh session starts from scratch: drop the previous
+					// attempt's state so the poller cannot resurrect it.
+					setRecoveredStatus(null);
+					setAnalysis(null);
+					setAnalysisError(null);
+					analysisAttemptedFor.current = null;
 					setStep("prompt");
 					return true;
 				}
 				clearPlanOnboardingPointers();
 				return false;
 			}
-			setPayload(null);
-			setStep("syncing");
+			// The CLI is mid-attempt. Stay on whichever step the handshake
+			// evidence supports instead of assuming the transport is the thing
+			// the user came back to check.
+			setStep(canContinueToSync(recovered) ? "syncing" : "prompt");
 			return true;
 		} catch {
 			clearPlanOnboardingPointers();
@@ -433,7 +456,7 @@ export function PlanCodebasePage() {
 				return;
 			}
 			setPayload(parsed.data);
-			setLastStatus(null);
+			setRecoveredStatus(null);
 			setAnalysis(null);
 			setAnalysisError(null);
 			analysisAttemptedFor.current = null;
@@ -453,27 +476,18 @@ export function PlanCodebasePage() {
 		void triggerOnboardingAnalysis(featureProjectId, lastStatus.snapshotId);
 	}, [featureProjectId, lastStatus, triggerOnboardingAnalysis]);
 
-	// Domain state and UI navigation are separate concepts. Polling only
-	// records the latest server state here; step changes are explicit user
-	// actions (or refresh restoration). An `uploaded` snapshot means the
-	// transport finished Ã¢â‚¬â€ it is not an analysis conclusion, so it must never
-	// auto-navigate away from the screen the user chose to look at.
-	const handleStatus = (status: SyncStatusResponse | null) => {
-		// SyncStatus no longer reports null on polling errors, so null here
-		// means no successful response yet Ã¢â‚¬â€ keep the last known good state.
-		if (status === null) return;
-		setLastStatus(status);
-		// The server owns the name: once the CLI has handshaken it holds the
-		// repository folder name, so the open onboarding page must not keep
-		// showing the creation placeholder it started with.
-		const serverName = status.codebaseName;
+	// The server owns the name: once the CLI has handshaken it holds the
+	// repository folder name, so the open onboarding page must not keep showing
+	// the creation placeholder it started with.
+	useEffect(() => {
+		const serverName = lastStatus?.codebaseName;
 		if (!serverName) return;
 		setCodebase((current) =>
 			current && current.name !== serverName
 				? { ...current, name: serverName }
 				: current,
 		);
-	};
+	}, [lastStatus]);
 
 	// Persist the pointer whenever the name changes so a refresh does not
 	// repaint the placeholder before the first status poll lands.
@@ -496,6 +510,10 @@ export function PlanCodebasePage() {
 			analysis.snapshotId === lastStatus.snapshotId &&
 			SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status),
 	);
+	// The prompt screen advances only on server evidence that the CLI started
+	// this attempt. Copying the prompt is browser feedback and never reaches
+	// this predicate.
+	const canContinueToMonitor = canContinueToSync(lastStatus);
 
 	// Onboarding analysis trigger: once the server persisted a snapshot for
 	// the current attempt, ensure the onboarding feature project and run the
@@ -632,6 +650,7 @@ export function PlanCodebasePage() {
 								projectName={codebase.name}
 								payload={payload}
 								isStarting={isStarting}
+								canContinue={canContinueToMonitor}
 								onAgentStarted={() => setStep("syncing")}
 							/>
 						) : (
@@ -644,6 +663,11 @@ export function PlanCodebasePage() {
 									baru untuk menjalankan CLI, atau lanjut pantau status yang
 									sudah berjalan.
 								</p>
+								{statusPollError && (
+									<p role="alert" className="mt-2 text-xs text-crimson">
+										{statusPollError}
+									</p>
+								)}
 								<div className="mt-4 flex flex-wrap items-center justify-center gap-3">
 									<button
 										type="button"
@@ -655,99 +679,76 @@ export function PlanCodebasePage() {
 									</button>
 									<button
 										type="button"
+										data-testid="recovered-continue-to-sync"
 										onClick={() => setStep("syncing")}
-										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+										// The same handshake gate as the prompt screen: a
+										// recovered session without CLI evidence stays put.
+										disabled={!canContinueToMonitor}
+										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 									>
-										Lanjut ke Pantau Sync Ã¢â€ â€™
+										Lanjut ke Pantau Sync
 									</button>
 								</div>
 							</div>
 						))}
 
 					{step === "syncing" && (
-						<>
-							{analysisError && (
-								<div
-									role="alert"
-									className="mx-auto w-full max-w-2xl rounded-xl border border-crimson/40 bg-crimson/10 p-4 text-xs text-crimson"
-								>
-									{analysisError}
-								</div>
-							)}
-							<SyncStatus
-								key={sessionNonce}
-								projectId={codebase.id}
-								projectName={codebase.name}
-								status={lastStatus}
-								statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
-								analysisProjectId={featureProjectId ?? undefined}
-								onStatus={handleStatus}
-								onRetrySync={() => void retrySession()}
-								onRetryAnalysis={
-									featureProjectId && lastStatus?.snapshotId
-										? retryAnalysis
-										: undefined
-								}
-								onBackToInstructions={() => setStep("prompt")}
-								onViewReview={() => setStep("summary")}
-								onEnterWorkspace={() => {
-									if (!canOpenWorkspace) return;
-									void navigate({
-										to: "/codebases/$id",
-										params: { id: codebase.id },
-									});
-								}}
-							/>
-						</>
+						<SyncStatus
+							key={sessionNonce}
+							projectId={codebase.id}
+							projectName={codebase.name}
+							status={lastStatus}
+							statusPath={`/api/codebases/${encodeURIComponent(codebase.id)}/status`}
+							analysisProjectId={featureProjectId ?? undefined}
+							statusPolling="parent"
+							onRetrySync={() => void retrySession()}
+							onContinueToSummary={() => setStep("summary")}
+							onBackToInstructions={() => setStep("prompt")}
+						/>
 					)}
 
 					{step === "summary" &&
-						(reviewReady && analysis?.output && lastStatus?.snapshotId ? (
+						(lastStatus?.snapshotId ? (
 							<section data-testid="codebase-sync-summary">
-								<CodebaseReview
-									analysis={analysis.output}
-									snapshotId={lastStatus.snapshotId}
-									snapshotCreatedAt={lastStatus.snapshotCreatedAt}
-									fileCount={lastStatus.fileCount}
-									excludedCount={lastStatus.excludedCount}
-									isWorking={analysisWorking}
+								<CodebaseConclusion
+									snapshot={lastStatus}
+									analysis={analysis}
+									isAnalyzing={analysisWorking}
 									errorMessage={analysisError}
-									continueLabel="Masuk ke Workspace"
-									onRetrySync={() => void retrySession()}
 									onRetryAnalysis={retryAnalysis}
-									onContinue={() =>
+									onEnterWorkspace={() => {
+										if (!canOpenWorkspace) return;
 										void navigate({
 											to: "/codebases/$id",
 											params: { id: codebase.id },
-										})
-									}
+										});
+									}}
 									onBackToSync={() => setStep("syncing")}
 								/>
 							</section>
 						) : (
+							// No usable snapshot for the current attempt, so there is
+							// nothing to analyze yet. Report the real state and send the
+							// user back to monitoring instead of showing an analysis
+							// loader for work that cannot start.
 							<section
 								data-testid="codebase-sync-summary"
-								className="mx-auto w-full max-w-2xl rounded-xl border border-graphite bg-charcoal p-5 sm:p-6 text-center"
+								className="mx-auto w-full max-w-2xl rounded-xl border border-graphite bg-charcoal p-5 text-center"
 							>
 								<p className="text-sm font-medium text-snow">
-									Menyiapkan ringkasan analisis...
+									Belum ada snapshot untuk dianalisis
 								</p>
 								<p className="mt-1 text-xs text-fog">
-									Hasil analisis yang tervalidasi sedang dimuat dari server.
-									Ringkasan hanya tampil setelah analisis benar-benar selesai.
+									Kesimpulan codebase muncul setelah source code selesai
+									tersinkron.
 								</p>
-								{analysisError && (
-									<p role="alert" className="mt-3 text-xs text-crimson">
-										{analysisError}
-									</p>
-								)}
 								<div className="mt-4 flex flex-wrap items-center justify-center gap-3">
 									<button
 										type="button"
 										onClick={() => setStep("syncing")}
 										className="inline-flex min-h-10 items-center rounded-md border border-graphite bg-obsidian px-3.5 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 									>
-										Ã¢â€ Â Kembali ke Pantau Sync
+										Kembali ke Pantau Sync
 									</button>
 								</div>
 							</section>

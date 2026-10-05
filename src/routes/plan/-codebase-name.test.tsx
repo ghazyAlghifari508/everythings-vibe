@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUIStore } from "@/store";
 import { PlanCodebasePage } from "./codebase";
@@ -36,6 +42,21 @@ function syncPayload() {
 	};
 }
 
+async function advanceToSyncScreen() {
+	// The prompt CTA is gated on real CLI handshake evidence, so wait for the
+	// canonical poll to report one before advancing.
+	await waitFor(
+		() => {
+			const cta = screen.getByTestId("prompt-continue-to-sync");
+			expect((cta as HTMLButtonElement).disabled).toBe(false);
+		},
+		{ timeout: 15000, interval: 50 },
+	);
+	fireEvent.click(screen.getByTestId("prompt-continue-to-sync"));
+	await waitFor(() => {
+		expect(screen.getByText("Sync codebase")).toBeDefined();
+	});
+}
 describe("PlanCodebasePage repository name", () => {
 	beforeEach(() => {
 		useUIStore.getState().setCodebasePlanStep("prompt");
@@ -84,10 +105,10 @@ describe("PlanCodebasePage repository name", () => {
 						json: async () => ({
 							projectId: "cb-name-1",
 							sessionId: "sess-name-1",
-							status: "waiting_for_cli",
+							// The server can only learn the name once the CLI has
+							// handshaken, so the session advances before it reports one.
+							status: statusCalls > 1 ? "connected" : "waiting_for_cli",
 							snapshotId: null,
-							// The server learns the name only once the CLI has
-							// resolved the repository root and handshaken.
 							...(statusCalls > 1
 								? { codebaseName: DETECTED_NAME }
 								: { codebaseName: PLACEHOLDER }),
@@ -106,7 +127,7 @@ describe("PlanCodebasePage repository name", () => {
 			).toBeDefined();
 		});
 
-		screen.getByRole("button", { name: /Lanjut ke Pantau Sync/i }).click();
+		await advanceToSyncScreen();
 
 		await waitFor(
 			() => {
@@ -148,7 +169,7 @@ describe("PlanCodebasePage repository name", () => {
 						json: async () => ({
 							projectId: "cb-name-1",
 							sessionId: "sess-name-1",
-							status: "waiting_for_cli",
+							status: "connected",
 							snapshotId: null,
 							codebaseName: "Movie App Portfolio",
 						}),
@@ -166,7 +187,7 @@ describe("PlanCodebasePage repository name", () => {
 			).toBeDefined();
 		});
 
-		screen.getByRole("button", { name: /Lanjut ke Pantau Sync/i }).click();
+		await advanceToSyncScreen();
 
 		await waitFor(
 			() => {

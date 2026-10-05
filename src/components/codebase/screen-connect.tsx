@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Loader2 } from "lucide-react";
+import { Check, Circle, Copy, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { buildAgentPrompt, type SyncPromptPayload } from "@/lib/codebase-sync";
 import { AiHarnessLogos } from "./ai-harness-logos";
@@ -11,6 +11,15 @@ interface ScreenConnectProps {
 	isStarting?: boolean;
 	hideFooter?: boolean;
 	nextLabel?: string;
+	/**
+	 * Whether the server has evidence the CLI actually started this sync
+	 * attempt (`canContinueToSync` over the last polled status).
+	 *
+	 * This is the ONLY thing that unlocks the next step. Copying the prompt is
+	 * browser-local feedback and proves nothing about whether the agent ran, so
+	 * it deliberately has no influence here.
+	 */
+	canContinue?: boolean;
 	onAgentStarted?: () => void;
 }
 
@@ -19,7 +28,8 @@ export function ScreenConnect({
 	payload,
 	isStarting = false,
 	hideFooter = false,
-	nextLabel = "Lanjut ke Pantau Sync →",
+	nextLabel = "Lanjut ke Pantau Sync",
+	canContinue = false,
 	onAgentStarted,
 }: ScreenConnectProps) {
 	const [copied, setCopied] = useState(false);
@@ -36,6 +46,8 @@ export function ScreenConnect({
 	}, []);
 
 	const promptText = payload ? buildAgentPrompt(payload, { projectName }) : "";
+	const agentConnected = canContinue && payload !== null;
+	const canAdvance = agentConnected && !isStarting;
 
 	const handleCopy = async () => {
 		if (!promptText) return;
@@ -151,14 +163,55 @@ export function ScreenConnect({
 						<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron text-xs font-mono text-mist">
 							3
 						</span>
-						<div className="flex flex-col gap-1">
+						<div className="flex flex-col gap-2">
 							<div className="text-xs font-semibold text-mist">
 								Paste prompt lalu jalankan
 							</div>
 							<p className="text-[11px] text-fog leading-relaxed">
-								VibeEverything akan mendeteksi progress sync secara otomatis
-								setelah agent mulai terhubung.
+								{agentConnected
+									? "VibeEverything sudah menerima koneksi dari agent. Buka Pantau Sync untuk melihat progress pengiriman file."
+									: "VibeEverything mendeteksi koneksi agent otomatis. Halaman ini akan berubah sendiri begitu agent terhubung."}
 							</p>
+							{/* The single live handshake indicator: it mirrors the polled
+						server status, so it can only ever report what the server
+						actually observed. */}
+							<div
+								data-testid="prompt-agent-connection"
+								data-connected={agentConnected ? "true" : "false"}
+								className={`flex items-start gap-2.5 rounded-md border p-3 text-[11px] ${
+									agentConnected
+										? "border-emerald-500/25 bg-emerald-500/10 text-mist"
+										: "border-graphite bg-obsidian/70 text-fog"
+								}`}
+							>
+								<span className="mt-0.5 shrink-0">
+									{agentConnected ? (
+										<Check
+											size={14}
+											className="font-bold text-emerald-600 dark:text-emerald-400"
+											aria-hidden="true"
+										/>
+									) : (
+										<Circle
+											size={14}
+											className="shrink-0 fill-amber-400/30 text-amber-400/90"
+											aria-hidden="true"
+										/>
+									)}
+								</span>
+								<span className="flex flex-col gap-0.5">
+									<span className="font-semibold text-snow">
+										{agentConnected
+											? "Agent terhubung"
+											: "Menunggu agent terhubung"}
+									</span>
+									<span className="leading-relaxed opacity-80">
+										{agentConnected
+											? "Repository berhasil terdeteksi."
+											: "Jalankan prompt dari root repository."}
+									</span>
+								</span>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -167,13 +220,15 @@ export function ScreenConnect({
 				{!hideFooter && onAgentStarted && (
 					<div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-graphite bg-charcoal/60 px-5 py-4 sm:px-6">
 						<p className="text-[11px] text-fog leading-relaxed text-center sm:text-left">
-							Buka Pantau Sync untuk melihat kapan agent mulai terhubung dan
-							mengirim repository.
+							{agentConnected
+								? "Agent sudah terhubung. Buka Pantau Sync untuk memantau pengiriman source code."
+								: "Tombol lanjut aktif setelah agent benar-benar terhubung ke VibeEverything."}
 						</p>
 						<button
 							type="button"
+							data-testid="prompt-continue-to-sync"
 							onClick={onAgentStarted}
-							disabled={!payload || isStarting}
+							disabled={!canAdvance}
 							className="inline-flex items-center justify-center shrink-0 rounded-md bg-snow px-5 py-2 font-inter text-xs font-semibold text-onyx shadow-sm hover:brightness-110 transition disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ml-auto"
 						>
 							{nextLabel}

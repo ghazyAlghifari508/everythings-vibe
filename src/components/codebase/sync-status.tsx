@@ -8,12 +8,13 @@ import {
 	Info,
 	Loader2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCodebaseSyncStatus } from "@/hooks/use-codebase-sync-status";
 import {
+	canOpenSummary,
+	hasCliHandshake,
 	isSyncStatusComplete,
 	isTerminalSyncStatus,
 	type SyncStatusResponse,
-	syncStatusResponseSchema,
 } from "@/lib/codebase-sync";
 import {
 	CODEBASE_SYNC_POLL_INTERVAL_MS,
@@ -28,16 +29,19 @@ interface SyncStatusProps {
 	status?: SyncStatusResponse | null;
 	pollIntervalMs?: number;
 	requestTimeoutMs?: number;
-	// Onboarding/analysis project that owns the per-feature analysis record. The
-	// status endpoint only attaches `analysisStatus` when this project query is
-	// present. It never affects the two sync stages: analysis is a separate
-	// capability surfaced next to the review action, not a sync step.
+	/**
+	 * Who owns the status reconciliation loop.
+	 *
+	 * `self` (default) keeps this component the single owner for callers that
+	 * have no poller of their own. `parent` makes it a pure reader of the
+	 * `status` prop — required whenever an ancestor already polls, because two
+	 * concurrent loops would race each other into contradictory states.
+	 */
+	statusPolling?: "self" | "parent";
+	/** Project owning the per-feature analysis record; reported by the server. */
 	analysisProjectId?: string;
-	onStatus?: (status: SyncStatusResponse | null) => void;
 	onRetrySync?: () => void;
-	onRetryAnalysis?: () => void;
-	onViewReview?: () => void;
-	onEnterWorkspace?: () => void;
+	onContinueToSummary?: () => void;
 	onBackToInstructions?: () => void;
 }
 
@@ -49,150 +53,38 @@ export function SyncStatus({
 	status: propStatus,
 	pollIntervalMs = CODEBASE_SYNC_POLL_INTERVAL_MS,
 	requestTimeoutMs = CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
+	statusPolling = "self",
 	analysisProjectId,
-	onStatus,
 	onRetrySync,
-	onRetryAnalysis,
-	onViewReview,
-	onEnterWorkspace,
+	onContinueToSummary,
 	onBackToInstructions,
 }: SyncStatusProps) {
-	const [polledStatus, setPolledStatus] = useState<SyncStatusResponse | null>(
-		propStatus ?? null,
-	);
-	const status = polledStatus ?? propStatus ?? null;
-	const hasStatus = status !== null;
-	const [error, setError] = useState<string | null>(null);
-	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const inFlightRef = useRef(false);
-	const abortRef = useRef<AbortController | null>(null);
-	const seqRef = useRef(0);
-	const onStatusRef = useRef(onStatus);
-	onStatusRef.current = onStatus;
-	// Poll internally unless the parent provided an already-terminal status.
+	// Self-polling only when this component is the owner. A parent-owned loop
+	// feeds `status` instead, so this hook stays dormant and the screen renders
+	// exactly one reconciled snapshot.
 	const pollInternally =
-		!propStatus || !isTerminalSyncStatus(propStatus.status);
-	// Pin subsequent polls to the session observed from the server so a
-	// concurrent retry (new latest session) cannot silently retarget polling.
-	// Explicit sessionId prop wins; otherwise reuse the last successful
-	// sessionId. A ref (not state) ensures the very next tick in the same
-	// effect run already uses the pinned id without waiting for a restart.
-	const pinnedSessionRef = useRef<string | null>(
-		sessionId ?? polledStatus?.sessionId ?? propStatus?.sessionId ?? null,
-	);
-	if (sessionId) pinnedSessionRef.current = sessionId;
-
-	useEffect(() => {
-		if (!pollInternally) return;
-		seqRef.current += 1;
-		const seq = seqRef.current;
-		let cancelled = false;
-
-		const scheduleNext = (fn: () => void) => {
-			if (cancelled || seq !== seqRef.current) return;
-			timeoutRef.current = setTimeout(fn, pollIntervalMs);
-		};
-
-		const fetchStatus = async () => {
-			if (cancelled || seq !== seqRef.current) return;
-			if (inFlightRef.current) {
-				scheduleNext(() => {
-					void fetchStatus();
-				});
-				return;
-			}
-			inFlightRef.current = true;
-			const controller = new AbortController();
-			abortRef.current = controller;
-			const abortTimeout = setTimeout(
-				() => controller.abort(),
-				requestTimeoutMs,
-			);
-			let isTerminal = false;
-			try {
-				const activeSessionId = sessionId ?? pinnedSessionRef.current;
-				const queryParams = new URLSearchParams();
-				if (activeSessionId) queryParams.set("sessionId", activeSessionId);
-				if (analysisProjectId) queryParams.set("projectId", analysisProjectId);
-				const query = queryParams.toString() ? `?${queryParams}` : "";
-				const path =
-					statusPath ??
-					`/api/codebases/${encodeURIComponent(projectId)}/status`;
-				const res = await fetch(`${path}${query}`, {
-					signal: controller.signal,
-				});
-				if (cancelled || seq !== seqRef.current) return;
-				if (controller.signal.aborted) return;
-				const json = (await res.json().catch(() => null)) as unknown;
-				if (cancelled || seq !== seqRef.current) return;
-				if (!res.ok) {
-					const message =
-						typeof json === "object" &&
-						json !== null &&
-						"error" in json &&
-						typeof json.error === "string"
-							? json.error
-							: "Gagal membaca status sync.";
-					setError(message);
-					return;
-				}
-				const parsed = syncStatusResponseSchema.safeParse(json);
-				if (!parsed.success) {
-					setError("Gagal membaca status sync.");
-					return;
-				}
-				if (cancelled || seq !== seqRef.current) return;
-				pinnedSessionRef.current = parsed.data.sessionId;
-				setPolledStatus(parsed.data);
-				setError(null);
-				onStatusRef.current?.(parsed.data);
-				if (isTerminalSyncStatus(parsed.data.status)) {
-					isTerminal = true;
-				}
-			} catch {
-				if (cancelled || seq !== seqRef.current) return;
-				if (controller.signal.aborted) return;
-				setError("Gagal menghubungi server.");
-			} finally {
-				clearTimeout(abortTimeout);
-				if (seq === seqRef.current) {
-					inFlightRef.current = false;
-					if (abortRef.current === controller) abortRef.current = null;
-				}
-				if (!cancelled && seq === seqRef.current && !isTerminal) {
-					scheduleNext(() => {
-						void fetchStatus();
-					});
-				}
-			}
-		};
-
-		void fetchStatus();
-		return () => {
-			cancelled = true;
-			abortRef.current?.abort();
-			abortRef.current = null;
-			inFlightRef.current = false;
-			if (timeoutRef.current) {
-				clearTimeout(timeoutRef.current);
-				timeoutRef.current = null;
-			}
-		};
-	}, [
-		projectId,
+		statusPolling === "self" &&
+		(!propStatus || !isTerminalSyncStatus(propStatus.status));
+	const { status: polledStatus, error } = useCodebaseSyncStatus({
+		codebaseId: pollInternally ? projectId : null,
 		statusPath,
 		sessionId,
+		analysisProjectId: analysisProjectId ?? null,
 		pollIntervalMs,
-		pollInternally,
 		requestTimeoutMs,
-		analysisProjectId,
-	]);
+		enabled: pollInternally,
+		initialStatus: propStatus ?? null,
+	});
+	const status = polledStatus ?? propStatus ?? null;
+	const hasStatus = status !== null;
 
 	const s = status?.status;
 	const isFailed = s === "failed";
 	const isExpired = s === "expired";
+	// Connection is read from the same server evidence the prompt screen gates
+	// on, so the two screens can never disagree about whether the CLI ran.
 	const isConnected =
-		hasStatus && s !== "waiting_for_cli" && !isFailed && !isExpired;
+		hasStatus && hasCliHandshake(status ?? { status: "waiting_for_cli" });
 	const isUploading = hasStatus && s === "uploading";
 	const isLoadingInitial = !hasStatus && error === null;
 	const hasPollError = error !== null;
@@ -205,28 +97,17 @@ export function SyncStatus({
 	// can never make a completed sync look unfinished.
 	const syncComplete = isSyncStatusComplete(status);
 
-	// Analysis is a separate capability. It never gates the sync stages and
-	// never gates workspace entry; it only decides whether the review
-	// conclusion may be opened and whether a retry is offered.
-	const analysisState = status?.analysisStatus;
-	const analysisReady = analysisState === "ready" || s === "ready";
-	const analysisFailed = analysisState === "failed";
-	const canViewReview = syncComplete && analysisReady;
+	// The conclusion step is entered on transport completion alone: an uploaded
+	// snapshot is a finished sync, and step 3 owns the analysis pending state
+	// itself instead of making the user wait for a fourth navigation.
+	const summaryReady = canOpenSummary(
+		status ?? { status: "waiting_for_cli", snapshotId: null },
+	);
 
 	const transportActive =
 		hasStatus && (s === "scanning" || s === "filtering" || s === "uploading");
 
 	const showRetry = syncComplete || isFailed || isExpired;
-	const showAnalysisRetry = analysisFailed;
-
-	// Review availability is a secondary capability line, not a third stage:
-	// it sits beside the conclusion action and never claims the sync is still
-	// running.
-	const reviewStatusLabel = analysisReady
-		? "Ringkasan siap."
-		: analysisFailed
-			? "Ringkasan belum berhasil disiapkan."
-			: "Ringkasan sedang disiapkan.";
 
 	type StageState = "done" | "active" | "idle" | "failed" | "pending";
 	// Success is an accent, not a full surface: light mode stays on the
@@ -490,8 +371,11 @@ export function SyncStatus({
 						</p>
 					)}
 
-					{/* Error Message if any */}
-					{status?.errorMessage && (
+					{/* A stored message is only this screen's business while the sync
+					itself is unfinished. The status endpoint sources this field from
+					the analysis record, so on a finished sync it describes a
+					conclusion problem — which the conclusion step owns. */}
+					{!syncComplete && status?.errorMessage && (
 						<div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-xs text-crimson">
 							{status.errorMessage}
 						</div>
@@ -502,10 +386,9 @@ export function SyncStatus({
 						</div>
 					)}
 
-					{/* Footer Bar: unified navigation inside the card. Left holds the
-				reverse path and sync retry; the right cluster is ordered so the
-				workspace is the primary action and the review conclusion is the
-				secondary one. */}
+					{/* Footer: step navigation only. This screen reports transport
+					and nothing else — the conclusion step owns analysis, so no
+					analysis status line or retry belongs here. */}
 					<div className="flex flex-col items-stretch gap-3 border-t border-graphite pt-4 text-xs sm:flex-row sm:items-center sm:justify-between">
 						<div className="flex flex-wrap items-center gap-2">
 							{onBackToInstructions && (
@@ -514,7 +397,7 @@ export function SyncStatus({
 									onClick={onBackToInstructions}
 									className="inline-flex items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-3.5 py-2 text-xs font-medium text-fog hover:border-steel hover:text-snow transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 								>
-									← Kembali ke Prompt Sync
+									Kembali ke Prompt Sync
 								</button>
 							)}
 
@@ -529,77 +412,26 @@ export function SyncStatus({
 							)}
 						</div>
 
-						{(onViewReview || onEnterWorkspace || onRetryAnalysis) && (
-							<div className="flex flex-col items-stretch gap-2 sm:ml-auto sm:items-end">
-								{/* Analysis is a secondary capability, never a sync stage: a
-								single status line beside the conclusion action. */}
-								{syncComplete && (onViewReview || onRetryAnalysis) && (
-									<span
-										data-testid="sync-review-status"
-										className="font-mono text-[11px] text-fog sm:text-right"
-									>
-										{reviewStatusLabel}
-									</span>
-								)}
-
-								<div className="flex flex-wrap items-center gap-2 sm:justify-end">
-									{showAnalysisRetry && syncComplete && onRetryAnalysis && (
-										<button
-											type="button"
-											onClick={onRetryAnalysis}
-											className="rounded-md border border-iron bg-obsidian px-3 py-2 text-xs text-mist hover:text-snow transition hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-										>
-											Coba analisis lagi
-										</button>
-									)}
-
-									{onViewReview && (
-										<button
-											type="button"
-											data-testid="plan-continue-to-summary"
-											onClick={onViewReview}
-											disabled={!canViewReview}
-											title={
-												analysisReady
-													? "Lihat kesimpulan codebase"
-													: "Ringkasan belum siap — sync sudah selesai"
-											}
-											className={`inline-flex items-center justify-center gap-1.5 rounded-md border px-4 py-2 font-inter text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-												canViewReview
-													? "border-graphite bg-obsidian text-snow hover:border-steel hover:bg-steel cursor-pointer"
-													: "border-graphite bg-charcoal/50 text-fog/40 cursor-not-allowed"
-											}`}
-										>
-											<span>Lihat Kesimpulan</span>
-											{analysisReady && (
-												<ArrowRight size={14} aria-hidden="true" />
-											)}
-										</button>
-									)}
-
-									{onEnterWorkspace && (
-										<button
-											type="button"
-											data-testid="sync-enter-workspace"
-											onClick={onEnterWorkspace}
-											disabled={!syncComplete}
-											title={
-												syncComplete
-													? "Buka workspace codebase"
-													: "Tunggu hingga source code selesai tersinkron"
-											}
-											className={`inline-flex items-center justify-center gap-1.5 rounded-md px-5 py-2 font-inter text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-												syncComplete
-													? "bg-snow text-onyx shadow-sm hover:brightness-110 cursor-pointer"
-													: "border border-graphite bg-charcoal/50 text-fog/40 cursor-not-allowed"
-											}`}
-										>
-											<span>Masuk ke Workspace</span>
-											<ArrowRight size={14} aria-hidden="true" />
-										</button>
-									)}
-								</div>
-							</div>
+						{onContinueToSummary && (
+							<button
+								type="button"
+								data-testid="plan-continue-to-summary"
+								onClick={onContinueToSummary}
+								disabled={!summaryReady}
+								title={
+									summaryReady
+										? "Buka kesimpulan codebase"
+										: "Tunggu hingga source code selesai tersinkron"
+								}
+								className={`inline-flex items-center justify-center gap-1.5 rounded-md border px-4 py-2 font-inter text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo sm:ml-auto ${
+									summaryReady
+										? "border-graphite bg-obsidian text-snow hover:border-steel hover:bg-steel cursor-pointer"
+										: "border-graphite bg-charcoal/50 text-fog/40 cursor-not-allowed"
+								}`}
+							>
+								<span>Lanjut ke Kesimpulan</span>
+								<ArrowRight size={14} aria-hidden="true" />
+							</button>
 						)}
 					</div>
 				</div>

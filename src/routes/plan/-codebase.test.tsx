@@ -6,6 +6,26 @@ import { PlanCodebasePage } from "./codebase";
 
 const mockNavigate = vi.fn();
 
+const RECOVER_OUTPUT = {
+	projectId: "proj-recover-1",
+	snapshotId: "snap-recover-1",
+	framework: "TanStack Start",
+	language: "TypeScript",
+};
+
+function readyAnalysis(
+	overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+	return {
+		id: "ana-recover-1",
+		projectId: "proj-recover-1",
+		snapshotId: "snap-recover-1",
+		status: "ready",
+		output: RECOVER_OUTPUT,
+		...overrides,
+	};
+}
+
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
 	useNavigate: () => mockNavigate,
@@ -134,13 +154,11 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		} catch {
 			// Storage unavailable still exercises the fresh path below.
 		}
-		let statusCalls = 0;
 		let analysisTriggered = false;
 		const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
 			const url = String(input);
 			const method = init?.method ?? "GET";
-			if (url.endsWith("/status")) {
-				statusCalls += 1;
+			if (url.includes("/status")) {
 				return {
 					ok: true,
 					status: 200,
@@ -170,36 +188,14 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 				return {
 					ok: true,
 					status: 200,
-					json: async () => ({
-						id: "ana-recover-1",
-						projectId: "proj-recover-1",
-						snapshotId: "snap-recover-1",
-						status: "ready",
-						output: {
-							projectId: "proj-recover-1",
-							snapshotId: "snap-recover-1",
-							framework: "TanStack Start",
-							language: "TypeScript",
-						},
-					}),
+					json: async () => readyAnalysis(),
 				};
 			}
 			if (url.includes("/codebase/analysis")) {
 				return {
 					ok: true,
 					status: 200,
-					json: async () => ({
-						id: "ana-recover-1",
-						projectId: "proj-recover-1",
-						snapshotId: "snap-recover-1",
-						status: "ready",
-						output: {
-							projectId: "proj-recover-1",
-							snapshotId: "snap-recover-1",
-							framework: "TanStack Start",
-							language: "TypeScript",
-						},
-					}),
+					json: async () => readyAnalysis(),
 				};
 			}
 			throw new Error(`unexpected fetch ${method} ${url}`);
@@ -208,15 +204,15 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 
 		render(<PlanCodebasePage />);
 
-		// Uploaded transport alone never jumps to the review: sync resumes
-		// first, then the real analysis runs through the existing boundary.
+		// Refresh on a finished upload resumes the conclusion step, which owns
+		// the pending state and turns it into the review when the server is
+		// ready — no extra manual step.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByTestId("codebase-analysis-pending")).not.toBeNull();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 		expect(fetchMock).not.toHaveBeenCalledWith(
 			"/api/codebases",
 			expect.objectContaining({ method: "POST" }),
@@ -227,7 +223,12 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		expect(statusCalls).toBeGreaterThanOrEqual(1);
+		await waitFor(
+			() => {
+				expect(screen.getByText("Detected environment")).toBeDefined();
+			},
+			{ timeout: 10000, interval: 100 },
+		);
 	});
 
 	it("recovers directly to the validated review when analysis output is already stored", {
@@ -246,7 +247,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
 			const url = String(input);
 			const method = init?.method ?? "GET";
-			if (url.endsWith("/status")) {
+			if (url.includes("/status")) {
 				return {
 					ok: true,
 					status: 200,
@@ -309,7 +310,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
 			const url = String(input);
 			const method = init?.method ?? "GET";
-			if (url.endsWith("/status")) {
+			if (url.includes("/status")) {
 				return {
 					ok: true,
 					status: 200,
@@ -354,32 +355,23 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 
 		render(<PlanCodebasePage />);
 
-		// Sync is complete, so the workspace action is live even though the
-		// conclusion is still being prepared.
+		// A valid uploaded snapshot means the workspace is openable while the
+		// analysis is still running: navigation must not wait on the model.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByTestId("codebase-analysis-pending")).not.toBeNull();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		const reviewCta = screen
-			.getByTestId("sync-card")
-			.querySelector(
-				'[data-testid="plan-continue-to-summary"]',
-			) as HTMLButtonElement | null;
-		expect(reviewCta?.disabled).toBe(true);
-
 		const workspaceCta = await waitFor(() => {
-			const cta = screen
-				.getByTestId("sync-card")
-				.querySelector(
-					'[data-testid="sync-enter-workspace"]',
-				) as HTMLButtonElement | null;
-			expect(cta?.disabled).toBe(false);
+			const cta = screen.getByTestId(
+				"conclusion-enter-workspace",
+			) as HTMLButtonElement;
+			expect(cta.disabled).toBe(false);
 			return cta;
 		});
 		act(() => {
-			workspaceCta?.click();
+			workspaceCta.click();
 		});
 
 		await waitFor(() => {
@@ -388,9 +380,9 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 				params: { id: "cb-ws-1" },
 			});
 		});
-		// The pending analysis never dragged the sync view back to an
-		// unfinished state.
-		expect(screen.queryByText(/Menganalisis codebase/i)).toBeNull();
+		// A pending analysis never repaints the screen as a failed sync.
+		expect(screen.queryByText(/Sync gagal/i)).toBeNull();
+		expect(screen.queryByText(/Menganalisis codebase/i)).not.toBeNull();
 	});
 
 	it("mints a fresh token when recovering a waiting session without a payload", async () => {
@@ -412,7 +404,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			"fetch",
 			vi.fn(async (input: unknown, init?: { method?: string }) => {
 				const url = String(input);
-				if (url.endsWith("/status")) {
+				if (url.includes("/status")) {
 					return {
 						ok: true,
 						status: 200,
