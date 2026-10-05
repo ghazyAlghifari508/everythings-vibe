@@ -279,6 +279,180 @@ export function canOpenSummary(status: {
 	);
 }
 
+// === User-facing sync stage mapping ===
+// The two sync stages the user can actually observe are the CLI handshake and
+// the source upload. AI analysis is a separate capability owned by the summary
+// step, so it never becomes a third stage here.
+//
+// This is the ONE mapping from domain status to user-facing stage copy. It lives
+// next to the status vocabulary rather than inside a component so the surfaces
+// that render sync progress cannot drift apart: the onboarding step, the
+// workspace re-sync step, and any future reader all describe the same server
+// state with the same words.
+
+export type SyncStageState = "done" | "active" | "idle" | "pending" | "failed";
+
+export interface SyncStageRow {
+	state: SyncStageState;
+	title: string;
+	detail: string;
+	/** Optional short qualifier rendered beside the row (e.g. a live count). */
+	meta?: string;
+}
+
+export interface SyncStageView {
+	/** False until the browser has received any server state at all. */
+	hasStatus: boolean;
+	/** The CLI handshake: waiting, then linked for the rest of the attempt. */
+	repository: SyncStageRow;
+	/** The source upload: unstarted, in flight, then the received snapshot. */
+	source: SyncStageRow;
+	/** Reported only once the server actually has it. */
+	excludedCount?: number;
+	/**
+	 * Server-sourced failure text, safe to render verbatim.
+	 *
+	 * The status endpoint sources this field from the analysis record as well as
+	 * from sync failures, so it is suppressed once the transport finished: on a
+	 * completed sync it describes a conclusion problem the summary step owns.
+	 */
+	errorMessage: string | null;
+	/** A failed or expired session cannot resume; it needs a fresh credential. */
+	canRetry: boolean;
+	/** Transport finished: a usable current snapshot exists. */
+	syncComplete: boolean;
+}
+
+// `connected` is excluded on purpose: the handshake alone is not upload work,
+// so a linked-but-idle agent must not claim files are moving.
+const CODEBASE_SYNC_TRANSPORT_ACTIVE: readonly CodebaseSyncStatus[] = [
+	"scanning",
+	"filtering",
+	"uploading",
+] as const;
+
+export function isSyncTransportActive(status: CodebaseSyncStatus): boolean {
+	return (CODEBASE_SYNC_TRANSPORT_ACTIVE as readonly string[]).includes(status);
+}
+
+const EXPIRED_STAGE_DETAIL =
+	"Sesi sync kedaluwarsa. Buat token baru untuk melanjutkan.";
+
+export function resolveSyncStageView(
+	status:
+		| Pick<
+				SyncStatusResponse,
+				| "status"
+				| "snapshotId"
+				| "fileCount"
+				| "excludedCount"
+				| "errorMessage"
+				| "cliConnectedAt"
+		  >
+		| null
+		| undefined,
+): SyncStageView {
+	// No server state yet is not "waiting for the CLI": the browser has not
+	// asked. Reporting standby here would be a claim the server never made.
+	if (!status) {
+		return {
+			hasStatus: false,
+			repository: {
+				state: "pending",
+				title: "Menghubungkan server",
+				detail: "Memuat status sinkron terbaru dari server.",
+			},
+			source: {
+				state: "pending",
+				title: "Menunggu status sinkron",
+				detail: "Tahap ini berjalan setelah agent terhubung.",
+			},
+			errorMessage: null,
+			canRetry: false,
+			syncComplete: false,
+		};
+	}
+
+	const syncComplete = isSyncStatusComplete(status);
+	const errorMessage = syncComplete ? null : (status.errorMessage ?? null);
+
+	if (status.status === "failed" || status.status === "expired") {
+		return {
+			hasStatus: true,
+			repository: {
+				state: "failed",
+				title: "Sinkronisasi belum berhasil",
+				detail:
+					status.status === "expired"
+						? EXPIRED_STAGE_DETAIL
+						: (status.errorMessage ?? "Repository gagal dikirim."),
+			},
+			source: {
+				state: "failed",
+				title: "Source code gagal dikirim",
+				detail: "Perbaiki masalah di terminal, lalu jalankan ulang prompt.",
+			},
+			errorMessage,
+			canRetry: true,
+			syncComplete: false,
+		};
+	}
+
+	const linked = hasCliHandshake(status);
+	const inFlight = isSyncTransportActive(status.status);
+	// A completed-status row without a snapshot is not a usable sync, so it
+	// keeps reporting transport work rather than claiming a snapshot exists.
+	const source: SyncStageRow = syncComplete
+		? {
+				state: "done",
+				title: "Source code tersinkron",
+				detail:
+					typeof status.fileCount === "number"
+						? `${status.fileCount} file berhasil diterima.`
+						: "Repository berhasil diterima.",
+			}
+		: inFlight
+			? {
+					state: "active",
+					title: "Menyinkronkan source code...",
+					detail: "Repository sedang dikirim.",
+				}
+			: {
+					state: "pending",
+					title: "Source code belum tersinkron",
+					detail: "Tahap ini berjalan setelah agent terhubung.",
+				};
+
+	// The received count is real server data, so it stays visible for as long as
+	// the server reports it. On a finished sync it is already part of the detail
+	// line; before that it is the only concrete progress the user can be given.
+	if (!syncComplete && typeof status.fileCount === "number") {
+		source.meta = `${status.fileCount} file`;
+	}
+
+	return {
+		hasStatus: true,
+		repository: linked
+			? {
+					state: "done",
+					title: "Repository terhubung",
+					detail: "Agent berhasil tersambung ke VibeEverything.",
+				}
+			: {
+					state: "idle",
+					title: "Menunggu agent terhubung",
+					detail: "Jalankan prompt dari root repository.",
+				},
+		source,
+		...(status.excludedCount !== undefined
+			? { excludedCount: status.excludedCount }
+			: {}),
+		errorMessage,
+		canRetry: false,
+		syncComplete,
+	};
+}
+
 export function assertSyncTransition(
 	from: CodebaseSyncStatus,
 	to: CodebaseSyncStatus,

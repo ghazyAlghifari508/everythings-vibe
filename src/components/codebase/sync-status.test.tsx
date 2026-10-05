@@ -248,9 +248,8 @@ describe("SyncStatus", () => {
 		await settle();
 		expect(c.textContent).toContain("CLI Agent Belum Terhubung");
 		expect(c.textContent).toContain("Standby");
-		expect(c.textContent).toContain(
-			"Menunggu agent terhubung ke VibeEverything.",
-		);
+		expect(c.textContent).toContain("Menunggu agent terhubung");
+		expect(c.textContent).toContain("Jalankan prompt dari root repository.");
 		// No spinning loaders should be present while in idle standby
 		expect(c.querySelector(".animate-spin")).toBeNull();
 		const alertEl = c.querySelector('[data-testid="cli-waiting-alert"]');

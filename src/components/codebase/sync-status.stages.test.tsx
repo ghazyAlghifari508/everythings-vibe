@@ -80,10 +80,8 @@ describe("SyncStatus two sync stages", () => {
 		await settle();
 		expect(stageState(c, "sync-stage-connection")).toBe("idle");
 		expect(stageState(c, "sync-stage-upload")).toBe("pending");
-		expect(c.textContent).toContain("Repository belum terhubung");
-		expect(c.textContent).toContain(
-			"Menunggu agent terhubung ke VibeEverything.",
-		);
+		expect(c.textContent).toContain("Menunggu agent terhubung");
+		expect(c.textContent).toContain("Jalankan prompt dari root repository.");
 		expect(c.querySelector('[data-testid="cli-waiting-alert"]')).not.toBeNull();
 	});
 
@@ -106,9 +104,7 @@ describe("SyncStatus two sync stages", () => {
 			await settle();
 			expect(stageState(c, "sync-stage-upload")).toBe("active");
 			expect(c.textContent).toContain("Menyinkronkan source code...");
-			expect(c.textContent).toContain(
-				"Repository sedang dikirim ke VibeEverything.",
-			);
+			expect(c.textContent).toContain("Repository sedang dikirim.");
 			if (root) {
 				const r = root;
 				act(() => {

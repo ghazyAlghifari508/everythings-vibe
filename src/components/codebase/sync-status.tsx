@@ -1,25 +1,19 @@
 "use client";
 
-import {
-	AlertCircle,
-	ArrowRight,
-	Check,
-	Circle,
-	Info,
-	Loader2,
-} from "lucide-react";
+import { AlertCircle, ArrowRight, Info, Loader2 } from "lucide-react";
 import { useCodebaseSyncStatus } from "@/hooks/use-codebase-sync-status";
 import {
 	canOpenSummary,
-	hasCliHandshake,
 	isSyncStatusComplete,
 	isTerminalSyncStatus,
+	resolveSyncStageView,
 	type SyncStatusResponse,
 } from "@/lib/codebase-sync";
 import {
 	CODEBASE_SYNC_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
 } from "@/lib/constants";
+import { SyncStageList } from "./sync-stage-list";
 
 interface SyncStatusProps {
 	projectId: string;
@@ -81,10 +75,6 @@ export function SyncStatus({
 	const s = status?.status;
 	const isFailed = s === "failed";
 	const isExpired = s === "expired";
-	// Connection is read from the same server evidence the prompt screen gates
-	// on, so the two screens can never disagree about whether the CLI ran.
-	const isConnected =
-		hasStatus && hasCliHandshake(status ?? { status: "waiting_for_cli" });
 	const isUploading = hasStatus && s === "uploading";
 	const isLoadingInitial = !hasStatus && error === null;
 	const hasPollError = error !== null;
@@ -98,66 +88,19 @@ export function SyncStatus({
 	const syncComplete = isSyncStatusComplete(status);
 
 	// The conclusion step is entered on transport completion alone: an uploaded
-	// snapshot is a finished sync, and step 3 owns the analysis pending state
-	// itself instead of making the user wait for a fourth navigation.
+	// snapshot is a finished sync, and the summary step owns the analysis
+	// pending state itself instead of making the user wait for another hop.
 	const summaryReady = canOpenSummary(
 		status ?? { status: "waiting_for_cli", snapshotId: null },
 	);
 
-	const transportActive =
-		hasStatus && (s === "scanning" || s === "filtering" || s === "uploading");
-
-	const showRetry = syncComplete || isFailed || isExpired;
-
-	type StageState = "done" | "active" | "idle" | "failed" | "pending";
-	// Success is an accent, not a full surface: light mode stays on the
-	// neutral theme-aware surface (white/graphite/dark text) with only the
-	// check icon carrying green, while dark mode keeps its subtle emerald
-	// tint. No full mint block in either mode.
-	const stageClass: Record<StageState, string> = {
-		done: "border-graphite bg-obsidian text-snow dark:border-emerald-500/25 dark:bg-emerald-500/10",
-		active: "border-blue-500/25 bg-blue-500/10 text-blue-200",
-		idle: "border-graphite bg-obsidian/70 text-fog",
-		failed: "border-crimson/30 bg-crimson/10 text-crimson",
-		pending: "border-graphite text-slate",
-	};
-	const StageIcon = ({ state }: { state: StageState }) =>
-		state === "done" ? (
-			<Check
-				size={14}
-				className="text-emerald-600 dark:text-emerald-400 font-bold shrink-0"
-			/>
-		) : state === "active" ? (
-			<Loader2 size={14} className="text-blue-400 animate-spin shrink-0" />
-		) : state === "idle" ? (
-			<Circle
-				size={14}
-				className="text-amber-400/90 shrink-0 fill-amber-400/30"
-			/>
-		) : state === "failed" ? (
-			<AlertCircle size={14} className="text-crimson shrink-0" />
-		) : (
-			<Circle size={14} className="text-slate shrink-0" />
-		);
-
-	const connectionStage: StageState = isFailed
-		? "failed"
-		: isExpired
-			? "failed"
-			: isConnected
-				? "done"
-				: !hasStatus
-					? "pending"
-					: s === "waiting_for_cli"
-						? "idle"
-						: "active";
-	const uploadStage: StageState = !isConnected
-		? "pending"
-		: syncComplete
-			? "done"
-			: transportActive
-				? "active"
-				: "pending";
+	// One shared mapping decides every word below, including which stages are
+	// done. Deriving copy from a second set of local booleans is how two
+	// screens end up telling the user two different stories.
+	const stageView = resolveSyncStageView(status);
+	// A finished sync can be re-run on request, and a failed or expired one has
+	// no other way forward — both offer the retry that mints a fresh credential.
+	const showRetry = stageView.canRetry || stageView.syncComplete;
 
 	return (
 		<div className="w-full animate-enter flex flex-col gap-6">
@@ -207,7 +150,7 @@ export function SyncStatus({
 									? "Sync selesai"
 									: isUploading
 										? "Mengupload"
-										: isConnected
+										: stageView.repository.state === "done"
 											? "Terhubung"
 											: hasStatus
 												? "Standby"
@@ -292,92 +235,17 @@ export function SyncStatus({
 					)}
 
 					{/* Status List — two user-facing sync stages backed by real
-					transport signals. AI analysis is not a sync step, so it never
-					appears here. */}
-					<div className="flex flex-col gap-2.5">
-						{/* Stage 1: agent handshake (session left waiting_for_cli) */}
-						<div
-							data-testid="sync-stage-connection"
-							data-stage-state={connectionStage}
-							className={`flex items-start gap-2.5 rounded-md border p-3 text-xs transition-colors ${stageClass[connectionStage]}`}
-						>
-							<span className="mt-0.5">
-								<StageIcon state={connectionStage} />
-							</span>
-							<span className="flex flex-1 flex-col gap-0.5">
-								<span className="font-medium">
-									{isConnected
-										? "Repository terhubung"
-										: isFailed
-											? "Sync gagal"
-											: isExpired
-												? "Sesi kedaluwarsa sebelum CLI terhubung"
-												: !hasStatus
-													? "Menghubungi server untuk membaca status sync..."
-													: "Repository belum terhubung"}
-								</span>
-								{isConnected || s === "waiting_for_cli" ? (
-									<span className="text-[11px] leading-relaxed opacity-80">
-										{isConnected
-											? "Agent berhasil tersambung ke VibeEverything."
-											: "Menunggu agent terhubung ke VibeEverything."}
-									</span>
-								) : null}
-							</span>
-						</div>
-
-						{/* Stage 2: source sync (scanning/filtering/uploading, then the
-					completed snapshot). Done means the upload finished and the
-					snapshot is usable — never that analysis ran. */}
-						<div
-							data-testid="sync-stage-upload"
-							data-stage-state={uploadStage}
-							className={`flex items-start gap-2.5 rounded-md border p-3 text-xs transition-colors ${stageClass[uploadStage]}`}
-						>
-							<span className="mt-0.5">
-								<StageIcon state={uploadStage} />
-							</span>
-							<span className="flex flex-1 flex-col gap-0.5">
-								<span className="font-medium">
-									{syncComplete
-										? "Source code tersinkron"
-										: transportActive
-											? "Menyinkronkan source code..."
-											: "Source code belum tersinkron"}
-								</span>
-								<span className="text-[11px] leading-relaxed opacity-80">
-									{syncComplete
-										? typeof status?.fileCount === "number"
-											? `${status.fileCount} file berhasil diterima.`
-											: "Repository berhasil diterima."
-										: transportActive
-											? "Repository sedang dikirim ke VibeEverything."
-											: "Tahap ini berjalan setelah agent terhubung."}
-								</span>
-							</span>
-							{status?.fileCount !== undefined && !syncComplete && (
-								<span className="ml-auto font-mono text-[11px] opacity-80">
-									{status.fileCount} file
-								</span>
-							)}
-						</div>
-					</div>
-
-					{/* Exclusion count is reported only once the server has it */}
-					{status?.excludedCount !== undefined && (
-						<p className="font-mono text-[11px] text-fog">
-							{status.excludedCount} file dikecualikan otomatis (rahasia,
-							dependensi, build, binary)
-						</p>
-					)}
+					transport signals, mapped once by `resolveSyncStageView`. AI
+					analysis is not a sync step, so it never appears here. */}
+					<SyncStageList status={status} />
 
 					{/* A stored message is only this screen's business while the sync
 					itself is unfinished. The status endpoint sources this field from
 					the analysis record, so on a finished sync it describes a
 					conclusion problem — which the conclusion step owns. */}
-					{!syncComplete && status?.errorMessage && (
+					{stageView.errorMessage && (
 						<div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-xs text-crimson">
-							{status.errorMessage}
+							{stageView.errorMessage}
 						</div>
 					)}
 					{error && (
