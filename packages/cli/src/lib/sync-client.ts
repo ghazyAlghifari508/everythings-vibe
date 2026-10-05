@@ -108,6 +108,22 @@ export interface CompletionResponse {
 	errorMessage?: string;
 }
 
+export interface FailureReportInput extends SyncSession {
+	/**
+	 * Whitelisted failure category only. No message, no path, no source content
+	 * crosses this boundary: the server resolves the user-facing copy itself so
+	 * an absolute local path can never be persisted or rendered.
+	 */
+	errorCode?: string;
+}
+
+export interface FailureReportResponse {
+	status: string;
+	snapshotId?: string;
+	errorCode?: string;
+	errorMessage?: string;
+}
+
 export interface RetryOptions {
 	maxAttempts?: number;
 }
@@ -119,7 +135,7 @@ export interface RetryOptions {
  */
 export function makeIdempotencyKey(
 	attemptId: string,
-	kind: "manifest" | "file" | "complete",
+	kind: "manifest" | "file" | "complete" | "failure",
 	index: number,
 ): string {
 	return `${attemptId}:${kind}:${index}`;
@@ -260,6 +276,10 @@ export interface SyncClient {
 		projectId: string,
 		input: CompletionInput,
 	): Promise<CompletionResponse>;
+	reportFailureWithRetry(
+		projectId: string,
+		input: FailureReportInput,
+	): Promise<FailureReportResponse>;
 }
 
 export function createSyncClient(options: SyncClientOptions): SyncClient {
@@ -267,7 +287,7 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 
 	function post<T>(
 		projectId: string,
-		suffix: "sync" | "manifest" | "files" | "complete",
+		suffix: "sync" | "manifest" | "files" | "complete" | "failure",
 		body: unknown,
 	): Promise<T> {
 		const endpoint = new URL(buildCodebaseSyncUrl(apiUrl, projectId, suffix));
@@ -382,6 +402,18 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 		});
 	}
 
+	async function reportFailure(
+		projectId: string,
+		input: FailureReportInput,
+	): Promise<FailureReportResponse> {
+		return post<FailureReportResponse>(projectId, "failure", {
+			sessionId: input.sessionId,
+			attemptId: input.attemptId,
+			...(input.errorCode ? { errorCode: input.errorCode } : {}),
+			idempotencyKey: makeIdempotencyKey(input.attemptId, "failure", 0),
+		});
+	}
+
 	return {
 		handshake,
 		handshakeWithRetry: (projectId, repositoryName) =>
@@ -394,5 +426,7 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 			),
 		completeWithRetry: (projectId, input) =>
 			withSyncRetry(() => complete(projectId, input)),
+		reportFailureWithRetry: (projectId, input) =>
+			withSyncRetry(() => reportFailure(projectId, input)),
 	};
 }

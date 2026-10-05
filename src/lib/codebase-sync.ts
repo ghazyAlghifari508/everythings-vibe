@@ -890,6 +890,12 @@ export const SYNC_SAFE_ERROR_CODES = [
 	"SNAPSHOT_CONFLICT",
 	"SNAPSHOT_HASH_MISMATCH",
 	"ANALYSIS_FAILED",
+	// The CLI handshakes BEFORE it prepares source code, so these two describe
+	// a real window that begins only after the server already persisted
+	// `connected`. Without them the browser would sit on a stale "preparing"
+	// row until the session expired.
+	"SCAN_FAILED",
+	"BLOCKED_CONTENT",
 ] as const;
 
 export type SyncSafeErrorCode = (typeof SYNC_SAFE_ERROR_CODES)[number];
@@ -902,6 +908,77 @@ export function sanitizeSyncErrorCode(code: unknown): SyncSafeErrorCode {
 		return code as SyncSafeErrorCode;
 	}
 	return "SYNC_FAILED";
+}
+
+// === Server-owned failure copy (local preparation window) ===
+// The CLI reports only an attempt identity plus a whitelisted code. Every
+// user-facing sentence is owned here, because the CLI's own error text embeds
+// absolute local paths (`Cannot scan repository root: <abs path>`) and blocked
+// file paths. A server-owned string is the only shape that can be persisted
+// and rendered without leaking where the repository lives or which files it
+// contains.
+const SYNC_FAILURE_MESSAGES: Readonly<Record<string, string>> = {
+	SYNC_FAILED:
+		"Sinkronisasi gagal. Periksa output terminal lalu jalankan ulang prompt.",
+	SCAN_FAILED:
+		"CLI gagal membaca repository. Pastikan folder ini adalah root repository Git yang bisa dibaca.",
+	BLOCKED_CONTENT:
+		"Sebagian file ditolak karena terdeteksi konten rahasia. Redaksi atau kecualikan file tersebut lewat .prdfyignore, lalu jalankan ulang.",
+	SNAPSHOT_TOO_LARGE:
+		"Ukuran snapshot melebihi batas server. Kurangi file yang ikut disinkronkan, lalu jalankan ulang.",
+};
+
+export function resolveSyncFailureMessage(code: unknown): string {
+	const sanitized = sanitizeSyncErrorCode(code);
+	return SYNC_FAILURE_MESSAGES[sanitized] ?? SYNC_FAILURE_MESSAGES.SYNC_FAILED;
+}
+
+// === Persisted failure evidence ===
+// Stored in `codebase_sync_sessions.metadata` beside the handshake evidence:
+// both are facts about this attempt that must outlive the attempt itself so a
+// failed session stays explicable after a refresh. The client-supplied message
+// is deliberately discarded — only the sanitized code and the server's own
+// copy are written.
+
+const SYNC_FAILURE_CODE_KEY = "failureCode" as const;
+const SYNC_FAILURE_MESSAGE_KEY = "failureMessage" as const;
+const SYNC_FAILURE_AT_KEY = "failedAt" as const;
+
+export interface SyncFailureEvidence {
+	code: SyncSafeErrorCode;
+	message: string;
+}
+
+export function readSyncFailureMetadata(
+	metadata: unknown,
+): SyncFailureEvidence | null {
+	if (typeof metadata !== "object" || metadata === null) return null;
+	const record = metadata as Record<string, unknown>;
+	const rawCode = record[SYNC_FAILURE_CODE_KEY];
+	if (typeof rawCode !== "string") return null;
+	const code = sanitizeSyncErrorCode(rawCode);
+	return {
+		code,
+		message: resolveSyncFailureMessage(code),
+	};
+}
+
+export function buildFailureMetadata(input: {
+	previous: unknown;
+	rawCode: unknown;
+	failedAt: Date;
+}): Record<string, unknown> {
+	const previous =
+		typeof input.previous === "object" && input.previous !== null
+			? (input.previous as Record<string, unknown>)
+			: {};
+	const code = sanitizeSyncErrorCode(input.rawCode);
+	return {
+		...previous,
+		[SYNC_FAILURE_CODE_KEY]: code,
+		[SYNC_FAILURE_MESSAGE_KEY]: resolveSyncFailureMessage(code),
+		[SYNC_FAILURE_AT_KEY]: input.failedAt.toISOString(),
+	};
 }
 
 // === CLI handshake DTOs (Task 4) ===
@@ -1169,13 +1246,34 @@ export type SnapshotCompleteRequest = z.infer<
 	typeof snapshotCompleteRequestSchema
 >;
 
+// === Local preparation failure report (CLI -> server) ===
+// Sent when the CLI fails AFTER the handshake already persisted `connected`:
+// root/ignore preparation, the repository walk, hashing, or the blocked-content
+// refusal. The payload is deliberately the narrowest possible shape — attempt
+// identity plus an idempotency key.
+//
+// `errorCode` is accepted and then ignored. Zod's default object behavior
+// strips unknown keys, so the server derives the persisted code and message
+// from the attempt itself. That is what guarantees no client-supplied string
+// (a local absolute path, a blocked file path, source content) can reach
+// `codebase_sync_sessions` or the browser. The key stays declared so a newer
+// CLI may send it without being rejected by a strict schema.
+export const syncFailureRequestSchema = z.object({
+	sessionId: z.string().min(1),
+	attemptId: z.string().min(1),
+	idempotencyKey: idempotencyKeySchema,
+	errorCode: z.string().min(1).optional(),
+});
+
+export type SyncFailureRequest = z.infer<typeof syncFailureRequestSchema>;
+
 // === Idempotency key binding (Task 5) ===
 // Keys mirror the CLI `makeIdempotencyKey` format
 // (`${attemptId}:${kind}:${index}`) and carry no credentials. A retry reuses
 // the same key for the same slot, so replay returns the stored response
 // without duplicating records. Key reuse across slots is rejected fail-closed.
 
-export type SyncIdempotencyKind = "manifest" | "file" | "complete";
+export type SyncIdempotencyKind = "manifest" | "file" | "complete" | "failure";
 
 export function buildIdempotencyKey(
 	attemptId: string,

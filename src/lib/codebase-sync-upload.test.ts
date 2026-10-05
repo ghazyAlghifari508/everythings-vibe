@@ -29,6 +29,10 @@ describe("idempotent claim protocol surface", () => {
 			"../routes/api/v1/projects/$id/codebase/manifest.ts",
 			"../routes/api/v1/projects/$id/codebase/files.ts",
 			"../routes/api/v1/projects/$id/codebase/complete.ts",
+			"../routes/api/v1/codebases/$id/codebase/manifest.ts",
+			"../routes/api/v1/codebases/$id/codebase/files.ts",
+			"../routes/api/v1/codebases/$id/codebase/complete.ts",
+			"../routes/api/v1/codebases/$id/codebase/failure.ts",
 		]) {
 			const source = await readFile(new URL(route, import.meta.url), "utf8");
 			const claimIndex = source.indexOf("await claimIdempotency(");
@@ -162,6 +166,67 @@ describe("handshake snapshot serialization contract", () => {
 		expect(lockIndex).toBeGreaterThan(-1);
 		expect(txUpdateSessionIndex).toBeGreaterThan(lockIndex);
 		expect(txInsertSnapshotIndex).toBeGreaterThan(txUpdateSessionIndex);
+	});
+});
+
+describe("preparation failure reporting route contract", () => {
+	async function readFailureRoute(): Promise<string> {
+		return readFile(
+			new URL(
+				"../routes/api/v1/codebases/$id/codebase/failure.ts",
+				import.meta.url,
+			),
+			"utf8",
+		);
+	}
+
+	it("authenticates through the same narrow sync guard as the upload routes", async () => {
+		const source = await readFailureRoute();
+		// Reusing `guardSyncUpload` is what keeps the credential hash, codebase
+		// binding, attempt binding, ownership check, usability check, and the
+		// fail-closed CLI version gate identical to the upload boundary. An
+		// ordinary API key must never be accepted here.
+		expect(source).toContain("guardSyncUpload(request, codebaseId, body)");
+		expect(source).not.toContain("apiKeyAuth");
+		expect(source).not.toContain("hasScope");
+	});
+
+	it("keeps attempt binding on the shared guard the failure route calls", async () => {
+		// `assertAttemptBinding` lives inside `guardSyncUpload`, so asserting it
+		// on the guard module proves the failure route inherits attempt binding
+		// instead of re-implementing (or skipping) it.
+		const guardSource = await readFile(
+			new URL("./codebase-sync-upload.server.ts", import.meta.url),
+			"utf8",
+		);
+		expect(guardSource).toContain(
+			"assertAttemptBinding(body.sessionId, body.attemptId)",
+		);
+		expect(guardSource).toContain("hashSyncToken(rawToken)");
+		expect(guardSource).toContain("requireSupportedCliVersion");
+	});
+
+	it("validates the attempted transition instead of writing unconditionally", async () => {
+		const source = await readFailureRoute();
+		expect(source).toContain("assertSyncTransition(");
+		expect(source).toContain('"failed"');
+	});
+
+	it("persists only server-resolved failure copy, never the request body text", async () => {
+		const source = await readFailureRoute();
+		// `body.errorCode` is the sole client-supplied value and it is run
+		// through the whitelist sanitizer before anything is written.
+		expect(source).toContain("sanitizeSyncErrorCode(body.errorCode)");
+		expect(source).toContain("buildFailureMetadata(");
+		expect(source).not.toContain("body.errorMessage");
+	});
+
+	it("replays rather than errors when the session already failed", async () => {
+		const source = await readFailureRoute();
+		// `failed` has no outgoing transitions, so the CLI's bounded retry would
+		// otherwise surface a spurious error for an already-reported failure.
+		expect(source).toContain('session.status === "failed"');
+		expect(source).toContain("readSyncFailureMetadata");
 	});
 });
 

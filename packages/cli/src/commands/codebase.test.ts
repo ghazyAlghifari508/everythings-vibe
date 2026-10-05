@@ -3,6 +3,21 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const repositoryMocks = vi.hoisted(() => ({
+	realScanRepository: null as
+		| typeof import("../lib/repository.js").scanRepository
+		| null,
+}));
+
+vi.mock("../lib/repository.js", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../lib/repository.js")>();
+	repositoryMocks.realScanRepository = actual.scanRepository;
+	return {
+		...actual,
+		scanRepository: vi.fn(actual.scanRepository),
+	};
+});
+
 vi.mock("../lib/sync-client.js", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../lib/sync-client.js")>();
 	return {
@@ -21,6 +36,7 @@ vi.mock("../lib/config.js", async (importOriginal) => {
 });
 
 import { saveConfig } from "../lib/config.js";
+import { scanRepository } from "../lib/repository.js";
 import { createSyncClient } from "../lib/sync-client.js";
 import { syncCodebase } from "./codebase.js";
 
@@ -46,7 +62,13 @@ afterEach(() => {
 	repos = [];
 	vi.restoreAllMocks();
 	vi.mocked(createSyncClient).mockReset();
+	vi.mocked(scanRepository).mockReset();
 });
+
+function restoreScanRepository(): void {
+	const real = repositoryMocks.realScanRepository;
+	if (real) vi.mocked(scanRepository).mockImplementation(real);
+}
 
 const SESSION = { sessionId: "sess-1", attemptId: "att-1" };
 
@@ -91,6 +113,11 @@ function mockClient(overrides: Record<string, unknown> = {}) {
 				excludedCount: input.excludedCount,
 			}),
 		),
+		reportFailureWithRetry: vi.fn(async () => ({
+			status: "failed",
+			errorCode: "SYNC_FAILED",
+			errorMessage: "Sinkronisasi gagal.",
+		})),
 		...overrides,
 	};
 	vi.mocked(createSyncClient).mockReturnValue(client as never);
@@ -99,6 +126,7 @@ function mockClient(overrides: Record<string, unknown> = {}) {
 
 describe("syncCodebase validation", () => {
 	beforeEach(() => {
+		restoreScanRepository();
 		mockClient();
 	});
 
@@ -148,12 +176,178 @@ describe("syncCodebase blocked content", () => {
 
 		expect(res.ok).toBe(false);
 		expect(res.errorCode).toBe("BLOCKED_CONTENT");
+		// The blocked path is safe metadata for the local terminal report, and the
+		// matched value never surfaces.
 		expect(res.errorMessage).toContain("src/leak.ts");
 		expect(res.errorMessage).not.toContain("<placeholder-value>");
-		expect(client.handshakeWithRetry).not.toHaveBeenCalled();
 		expect(client.uploadManifestWithRetry).not.toHaveBeenCalled();
 		expect(client.uploadFileChunksWithRetry).not.toHaveBeenCalled();
 		expect(client.completeWithRetry).not.toHaveBeenCalled();
+	});
+});
+
+describe("handshake precedes local preparation", () => {
+	it("performs the handshake before any repository walk so the server can observe preparation", async () => {
+		const client = mockClient();
+		const order: string[] = [];
+		client.handshakeWithRetry.mockImplementation(async () => {
+			order.push("handshake");
+			return { ...SESSION, status: "connected" };
+		});
+		client.uploadManifestWithRetry.mockImplementation(async () => {
+			order.push("manifest");
+			return { status: "uploading" };
+		});
+		client.completeWithRetry.mockImplementation(async () => {
+			order.push("complete");
+			return { status: "uploaded", fileCount: 2, excludedCount: 1 };
+		});
+		const root = trackRepo(
+			makeRepo({
+				"src/app.ts": "export const app = 1;\n",
+				"README.md": "# demo\n",
+			}),
+		);
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(true);
+		// The first server contact is the handshake, so `connected` is persisted
+		// while the CLI is still preparing source locally.
+		expect(order[0]).toBe("handshake");
+		expect(order).toEqual(["handshake", "manifest", "complete"]);
+	});
+
+	it("reports a preparation failure instead of leaving the session connected", async () => {
+		const client = mockClient();
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(true);
+		expect(client.reportFailureWithRetry).not.toHaveBeenCalled();
+	});
+
+	it("reports the blocked-content failure to the server so the browser converges", async () => {
+		const client = mockClient();
+		const root = trackRepo(
+			makeRepo({
+				"src/app.ts": "export const app = 1;\n",
+				// Placeholder-shaped match, not a real credential.
+				"src/leak.ts": "const api_key = '<placeholder-value>';\n",
+			}),
+		);
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(false);
+		// The refusal now happens after the handshake, so the session would sit
+		// at `connected` without this report.
+		expect(client.handshakeWithRetry).toHaveBeenCalledOnce();
+		expect(client.reportFailureWithRetry).toHaveBeenCalledWith("p1", {
+			sessionId: "sess-1",
+			attemptId: "att-1",
+			errorCode: "BLOCKED_CONTENT",
+		});
+	});
+
+	it("never sends the blocked path or the repository root in the failure report", async () => {
+		const client = mockClient();
+		const root = trackRepo(
+			makeRepo({
+				"src/leak.ts": "const api_key = '<placeholder-value>';\n",
+			}),
+		);
+
+		await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		const serialized = JSON.stringify(client.reportFailureWithRetry.mock.calls);
+		expect(serialized).not.toContain("src/leak.ts");
+		expect(serialized).not.toContain("<placeholder-value>");
+		expect(serialized).not.toContain(root);
+	});
+
+	it("keeps the local failure as the result when the failure report itself fails", async () => {
+		mockClient({
+			reportFailureWithRetry: vi.fn(async () => {
+				throw new Error("network down");
+			}),
+		});
+		const root = trackRepo(
+			makeRepo({ "src/leak.ts": "const api_key = '<placeholder-value>';\n" }),
+		);
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(false);
+		expect(res.errorCode).toBe("BLOCKED_CONTENT");
+		expect(res.errorMessage).toContain("src/leak.ts");
+	});
+
+	it("reports a scan failure under its own code", async () => {
+		const client = mockClient();
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+		vi.mocked(scanRepository).mockRejectedValueOnce(
+			new Error("Cannot scan repository root"),
+		);
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(false);
+		expect(res.errorCode).toBe("SCAN_FAILED");
+		expect(client.handshakeWithRetry).toHaveBeenCalledOnce();
+		expect(client.reportFailureWithRetry).toHaveBeenCalledWith("p1", {
+			sessionId: "sess-1",
+			attemptId: "att-1",
+			errorCode: "SCAN_FAILED",
+		});
+	});
+
+	it("succeeds without reporting a failure once preparation is restored", async () => {
+		const client = mockClient();
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+		restoreScanRepository();
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(true);
+		expect(res.status).toBe("uploaded");
+		expect(client.reportFailureWithRetry).not.toHaveBeenCalled();
 	});
 });
 

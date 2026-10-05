@@ -17,6 +17,7 @@ import {
 	type CodebaseSyncStatus,
 	getSessionUsability,
 	readCliHandshakeAt,
+	readSyncFailureMetadata,
 	type SyncStatusResponse,
 	sanitizeSyncErrorCode,
 	sanitizeSyncErrorMessage,
@@ -218,10 +219,18 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 									.limit(1)
 							: [];
 
+					// A sync failure is reported by the CLI through the
+					// `/codebase/failure` boundary and persisted on the session
+					// itself, so it is read from session metadata rather than from
+					// the analysis record. It must be reported for exactly the
+					// states where the analysis branch is skipped (failed/expired),
+					// otherwise the browser would show a retry with no reason.
+					const syncFailure = readSyncFailureMetadata(session.metadata);
+
 					let analysisId: string | null = null;
 					let analysisStatus: "pending" | "ready" | "failed" | undefined;
-					let errorCode: string | null = null;
-					let errorMessage: string | null = null;
+					let errorCode: string | null = syncFailure?.code ?? null;
+					let errorMessage: string | null = syncFailure?.message ?? null;
 					if (snapshot && analysisProjectId) {
 						const [analysis] = await db
 							.select({

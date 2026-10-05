@@ -143,6 +143,28 @@ function failure(
 	};
 }
 
+/**
+ * Handshake failure: nothing was persisted beyond the handshake, so the session
+ * keeps whatever it already held and there is no attempt to report against.
+ */
+function handshakeFailure(
+	projectId: string,
+	repositoryName: string | undefined,
+	err: unknown,
+): SyncResult {
+	return {
+		...failure(
+			projectId,
+			"failed",
+			err instanceof ApiError
+				? (err.code ?? `HTTP_${err.status ?? "UNKNOWN"}`)
+				: "SYNC_FAILED",
+			err instanceof Error ? err.message : String(err),
+		),
+		...(repositoryName ? { repositoryName } : {}),
+	};
+}
+
 function printResult(result: SyncResult, output: SyncOutputMode): void {
 	if (output === "json") {
 		// Local filesystem paths stay out of the JSON contract; `manifest.ts`
@@ -229,6 +251,83 @@ export async function syncCodebase(
 		return res;
 	}
 
+	// `repositoryName` is the basename of the resolved root and is the only
+	// repository identity that leaves this machine. It is derived before the
+	// handshake so the server can label the project from the first contact.
+	const repositoryName = getRepositoryName(root) ?? undefined;
+
+	const createClient =
+		deps.createClient ??
+		((token: string, apiUrl: string) =>
+			createSyncClient({
+				apiUrl,
+				syncToken: token,
+				timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+			}));
+
+	const client = createClient(syncToken, options.apiUrl ?? resolveApiUrl());
+
+	// The handshake happens BEFORE local preparation. `connected` therefore
+	// spans the whole real preparation window (ignore setup, the repository
+	// walk, hashing, the blocked-content refusal), so the browser can observe
+	// "Menyiapkan source code" while the work is actually happening instead of
+	// only after it finished. Root resolution stays ahead of it so the
+	// repository identity is already verified.
+	let handshake: Awaited<ReturnType<SyncClient["handshakeWithRetry"]>>;
+	try {
+		handshake = await client.handshakeWithRetry(projectId, repositoryName);
+	} catch (err) {
+		const res = handshakeFailure(projectId, repositoryName, err);
+		printResult(res, output);
+		return res;
+	}
+
+	// Update notice comes from the server's advertised minimum only: no
+	// registry lookup, no invented urgency. The handshake already fails closed
+	// for an unsupported version, so this is purely informational.
+	const minimum = handshake.cliMinVersion ?? CODEBASE_CLI_MIN_VERSION;
+	const cliUpdate =
+		compareCliVersions(CODEBASE_CLI_VERSION, minimum) < 0
+			? { current: CODEBASE_CLI_VERSION, minimum }
+			: undefined;
+	if (output === "human") {
+		console.log(`Session ${handshake.sessionId}: ${handshake.status}`);
+	}
+
+	const attempt = {
+		sessionId: handshake.sessionId,
+		attemptId: handshake.attemptId,
+	};
+
+	// Preparation failed after the server already persisted `connected`. Report
+	// it so the browser converges on a real failure instead of waiting out the
+	// session expiry. The report carries a code only — the server owns the
+	// message — and its own failure must never mask the real cause.
+	const reportPreparationFailure = async (
+		res: SyncResult,
+		errorCode: string,
+	): Promise<SyncResult> => {
+		try {
+			await client.reportFailureWithRetry(projectId, {
+				...attempt,
+				errorCode,
+			});
+		} catch {
+			// The local failure is the real outcome and is already fully
+			// described in `res`; a failed report only means the browser keeps
+			// polling until expiry.
+		}
+		return res;
+	};
+
+	// Non-fatal preparation context, present on every subsequent exit path.
+	// The root is carried in the result (never in JSON output) so warnings
+	// survive both the failure and success printers below.
+	const preparation = {
+		root,
+		...(repositoryName ? { repositoryName } : {}),
+	};
+
 	let ignoreCreated: boolean;
 	let rules: Awaited<ReturnType<typeof readPrdfyIgnore>>;
 	let manifest: RepositoryManifest;
@@ -247,19 +346,14 @@ export async function syncCodebase(
 						"SCAN_FAILED",
 						err instanceof Error ? err.message : String(err),
 					);
-		printResult({ ...res, root }, output);
-		return res;
+		return await reportPreparationFailure(
+			{ ...res, ...preparation },
+			err instanceof ManifestTooLargeError ? err.code : "SCAN_FAILED",
+		);
 	}
 
-	// Non-fatal preparation context, present on every subsequent exit path.
-	// The root is carried in the result (never in JSON output) so warnings
-	// survive both the failure and success printers below. `repositoryName` is the
-	// basename only: the server can label the project without learning where the
-	// repository lives.
-	const repositoryName = getRepositoryName(root) ?? undefined;
-	const preparation = {
-		root,
-		...(repositoryName ? { repositoryName } : {}),
+	const preparationWithIgnore = {
+		...preparation,
 		ignoreCreated,
 		droppedNegations: rules.droppedNegations,
 	};
@@ -273,40 +367,12 @@ export async function syncCodebase(
 				fileCount: manifest.fileCount,
 				excludedCount: manifest.excludedCount,
 			}),
-			...preparation,
+			...preparationWithIgnore,
 		};
-		printResult(res, output);
-		return res;
+		return await reportPreparationFailure(res, blocked.code);
 	}
 
-	const createClient =
-		deps.createClient ??
-		((token: string, apiUrl: string) =>
-			createSyncClient({
-				apiUrl,
-				syncToken: token,
-				timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
-			}));
-
 	try {
-		const client = createClient(syncToken, options.apiUrl ?? resolveApiUrl());
-		const handshake = await client.handshakeWithRetry(
-			projectId,
-			repositoryName,
-		);
-		// Update notice comes from the server's advertised minimum only: no
-		// registry lookup, no invented urgency. The handshake already fails
-		// closed for an unsupported version, so this is purely informational
-		// and rides along with whatever result the run produces.
-		const minimum = handshake.cliMinVersion ?? CODEBASE_CLI_MIN_VERSION;
-		const cliUpdate =
-			compareCliVersions(CODEBASE_CLI_VERSION, minimum) < 0
-				? { current: CODEBASE_CLI_VERSION, minimum }
-				: undefined;
-		if (output === "human") {
-			console.log(`Session ${handshake.sessionId}: ${handshake.status}`);
-		}
-
 		// The server's manifest is the upload contract: every stored entry must
 		// have matching chunks at completion. Keep ineligible metadata local in
 		// `manifest.excluded`; sending it as a manifest entry would make a valid
@@ -364,8 +430,7 @@ export async function syncCodebase(
 		}
 
 		const completion = await client.completeWithRetry(projectId, {
-			sessionId: handshake.sessionId,
-			attemptId: handshake.attemptId,
+			...attempt,
 			fileCount: manifest.fileCount,
 			excludedCount: manifest.excludedCount,
 		});
@@ -379,7 +444,7 @@ export async function syncCodebase(
 			excludedCount: completion.excludedCount ?? manifest.excludedCount,
 			uploadedFiles: ok ? eligible.length : 0,
 			uploadedBytes: ok ? uploadedBytes : 0,
-			...preparation,
+			...preparationWithIgnore,
 			...(cliUpdate ? { cliUpdate } : {}),
 			...(completion.snapshotId ? { snapshotId: completion.snapshotId } : {}),
 			...(!ok
@@ -394,34 +459,26 @@ export async function syncCodebase(
 		printResult(res, output);
 		return res;
 	} catch (err) {
-		const res =
+		const transportCode =
 			err instanceof ApiError
-				? {
-						...failure(
-							projectId,
-							"failed",
-							err.code ?? `HTTP_${err.status ?? "UNKNOWN"}`,
-							err.message,
-							{
-								fileCount: manifest.fileCount,
-								excludedCount: manifest.excludedCount,
-							},
-						),
-						...preparation,
-					}
-				: {
-						...failure(
-							projectId,
-							"failed",
-							"SYNC_FAILED",
-							err instanceof Error ? err.message : String(err),
-							{
-								fileCount: manifest.fileCount,
-								excludedCount: manifest.excludedCount,
-							},
-						),
-						...preparation,
-					};
+				? (err.code ?? `HTTP_${err.status ?? "UNKNOWN"}`)
+				: "SYNC_FAILED";
+		const res = await reportPreparationFailure(
+			{
+				...failure(
+					projectId,
+					"failed",
+					transportCode,
+					err instanceof Error ? err.message : String(err),
+					{
+						fileCount: manifest.fileCount,
+						excludedCount: manifest.excludedCount,
+					},
+				),
+				...preparationWithIgnore,
+			},
+			transportCode,
+		);
 		printResult(res, output);
 		return res;
 	}
