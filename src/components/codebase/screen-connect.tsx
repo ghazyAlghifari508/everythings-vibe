@@ -2,6 +2,7 @@
 
 import { AlertCircle, ArrowRight, Check, Copy, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { resolveCodebaseDisplayName } from "@/lib/codebase-naming";
 import {
 	buildAgentPrompt,
 	resolveSyncStageView,
@@ -71,6 +72,10 @@ export function ScreenConnect({
 	}, []);
 
 	const promptText = payload ? buildAgentPrompt(payload, { projectName }) : "";
+	// A provisional creation name is storage-only: the eyebrow shows neutral
+	// copy until the CLI handshake reports the real repository folder name.
+	const displayName =
+		resolveCodebaseDisplayName(projectName) ?? "Repository belum terdeteksi";
 	const stageView = resolveSyncStageView(status);
 	const canAdvance =
 		canContinueToSummary && !isStarting && Boolean(onContinueToSummary);
@@ -105,7 +110,7 @@ export function ScreenConnect({
 					eyebrow drops the creation placeholder and shows the detected
 					repository folder. */}
 					<div className="mb-2 font-mono text-[11px] uppercase tracking-widest text-fog">
-						Project / {projectName}
+						Project / {displayName}
 					</div>
 					<h2 className="font-inter text-lg font-[600] text-snow sm:text-xl">
 						Sync codebase dengan VibeEverything

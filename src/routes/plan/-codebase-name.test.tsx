@@ -98,14 +98,16 @@ describe("PlanCodebasePage repository name", () => {
 
 		render(<PlanCodebasePage />);
 
-		// The prompt carries the placeholder, because that is all the server
-		// knows before the agent runs.
+		// The prompt carries no repository identity yet, because the server only
+		// knows the provisional creation placeholder before the agent runs —
+		// and a placeholder is never presented as the repository.
 		await waitFor(() => {
 			expect(
 				screen.getByText("Sync codebase dengan VibeEverything"),
 			).toBeDefined();
 		});
-		expect(document.body.textContent).toContain(PLACEHOLDER);
+		expect(document.body.textContent).toContain("Repository belum terdeteksi");
+		expect(document.body.textContent).not.toContain(PLACEHOLDER);
 
 		// Once the handshake lands, the live status on the SAME screen adopts the
 		// detected folder name instead of keeping the creation placeholder.

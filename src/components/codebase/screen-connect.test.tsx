@@ -114,7 +114,7 @@ describe("ScreenConnect", () => {
 			"vibeeverything codebase sync --project-id proj_123",
 		);
 		// The required sections are all present.
-		expect(rendered).toContain("## Informasi Project");
+		expect(rendered).toContain("## Informasi Sinkronisasi");
 		expect(rendered).toContain("## Prasyarat Eksekusi");
 		expect(rendered).toContain("## Perintah Yang Harus Dieksekusi");
 		expect(rendered).toContain("## Yang Dilakukan CLI Otomatis");
@@ -203,5 +203,38 @@ describe("ScreenConnect", () => {
 		const rendered = container.textContent ?? "";
 		expect(rendered).toContain("Node.js dan npm");
 		expect(rendered).toContain("https://nodejs.org");
+	});
+
+	it("shows neutral copy instead of the provisional creation name", () => {
+		act(() => {
+			root?.render(
+				<ScreenConnect
+					projectName="Repository Lokal"
+					payload={samplePayload}
+					status={null}
+				/>,
+			);
+		});
+
+		const rendered = container.textContent ?? "";
+		expect(rendered).toContain("Repository belum terdeteksi");
+		expect(rendered).not.toContain("Nama Fitur");
+		expect(rendered).not.toContain("Repository Lokal");
+	});
+
+	it("shows the detected repository name once the CLI has reported it", () => {
+		act(() => {
+			root?.render(
+				<ScreenConnect
+					projectName="react-movie-app"
+					payload={samplePayload}
+					status={null}
+				/>,
+			);
+		});
+
+		const rendered = container.textContent ?? "";
+		expect(rendered).toContain("Project / react-movie-app");
+		expect(rendered).toContain("react-movie-app");
 	});
 });

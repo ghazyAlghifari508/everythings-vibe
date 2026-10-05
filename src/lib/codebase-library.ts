@@ -20,6 +20,12 @@ export const CODEBASE_LIBRARY_HREF = "/codebases";
 export const CODEBASE_LIBRARY_LABEL = "Project Tersimpan";
 export const CODEBASE_ONBOARDING_LABEL = "Hubungkan Repository";
 
+export {
+	isProvisionalCodebaseName,
+	PROVISIONAL_CODEBASE_NAME,
+	resolveCodebaseDisplayName,
+} from "./codebase-naming";
+
 /**
  * Provenance of `codebases.name`. `auto` means the system chose the name (the
  * `POST /api/codebases` placeholder, later replaced by the repository folder

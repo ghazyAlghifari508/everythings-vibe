@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resolveCodebaseDisplayName } from "./codebase-naming";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_MAX_CHUNK_BYTES,
@@ -1116,23 +1117,25 @@ export function buildAgentPrompt(
 	context?: { projectName?: string },
 ): string {
 	const command = `vibeeverything codebase sync --project-id ${payload.projectId} --sync-token ${payload.syncToken}`;
+	// The repository name is genuinely unknown until the CLI handshakes: a
+	// provisional creation placeholder is storage-only and must never be
+	// presented as repository identity, so no name is invented here.
+	const repositoryName = resolveCodebaseDisplayName(context?.projectName);
 	const infoLines = [
 		`Project ID   : ${payload.projectId}`,
 		`Server       : ${payload.apiBaseUrl}`,
 		`Sync Token   : ${payload.syncToken}`,
 		`Expired At   : ${payload.expiresAt}`,
 	];
-	// "Nama Fitur" is only rendered when the name is actually known; an empty
-	// placeholder would read as a missing value the agent might try to fill in.
-	if (context?.projectName) {
-		infoLines.unshift(`Nama Fitur   : ${context.projectName}`);
+	if (repositoryName) {
+		infoLines.unshift(`Repository   : ${repositoryName}`);
 	}
 
 	return [
 		"Sinkronkan codebase repositori lokal ini ke project VibeEverything menggunakan CLI resmi.",
 		"Fokus hanya pada proses sinkronisasi; jangan melakukan perubahan terhadap source code.",
 		"",
-		"## Informasi Project",
+		"## Informasi Sinkronisasi",
 		...infoLines,
 		"",
 		"## Prasyarat Eksekusi",

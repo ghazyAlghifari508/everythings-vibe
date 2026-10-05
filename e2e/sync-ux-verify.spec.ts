@@ -165,7 +165,7 @@ test.describe("existing-codebase onboarding — real browser render", () => {
 		expect(text).toContain("Wishlist Fitur");
 		// Every required section renders in the real browser.
 		for (const heading of [
-			"## Informasi Project",
+			"## Informasi Sinkronisasi",
 			"## Prasyarat Eksekusi",
 			"## Perintah Yang Harus Dieksekusi",
 			"## Yang Dilakukan CLI Otomatis",

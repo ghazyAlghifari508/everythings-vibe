@@ -10,6 +10,7 @@ import {
 	codebases,
 } from "@/db/schema";
 import type { CodebaseNameSource } from "@/lib/codebase-library";
+import { PROVISIONAL_CODEBASE_NAME } from "@/lib/codebase-library";
 import { buildSyncCommand, type SyncPromptPayload } from "@/lib/codebase-sync";
 import { generateSyncToken, hashSyncToken } from "@/lib/codebase-sync.server";
 import {
@@ -19,7 +20,7 @@ import {
 import { deriveProjectNameSync } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 
-export const DEFAULT_CODEBASE_NAME = "Repository Lokal";
+export const DEFAULT_CODEBASE_NAME = PROVISIONAL_CODEBASE_NAME;
 
 /**
  * Decide a codebase's display name and where that name came from.
