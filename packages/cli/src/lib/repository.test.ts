@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readPrdfyIgnore } from "./ignore.js";
+import { readCodebaseIgnore } from "./ignore.js";
 import { scanRepository } from "./repository.js";
 
 async function makeTempRoot(): Promise<string> {
@@ -29,7 +29,7 @@ describe("scanRepository", () => {
 		await writeRepoFile(root, ".env", "PLACEHOLDER=1\n");
 		await writeRepoFile(root, ".env.local", "PLACEHOLDER=1\n");
 		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		expect(scan.files.map((f) => f.path)).toEqual(["src/app.ts"]);
 		const paths = excludedPaths(scan);
@@ -49,7 +49,7 @@ describe("scanRepository", () => {
 		await writeRepoFile(root, "certs/server.key", "placeholder-key\n");
 		await writeRepoFile(root, "certs/bundle.p12", "placeholder-p12\n");
 		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		expect(scan.files.map((f) => f.path)).toEqual(["src/app.ts"]);
 		const paths = excludedPaths(scan);
@@ -66,7 +66,7 @@ describe("scanRepository", () => {
 		await writeRepoFile(root, "build/out.js", "x\n");
 		await writeRepoFile(root, "coverage/lcov.info", "x\n");
 		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		expect(scan.files.map((f) => f.path)).toEqual(["src/app.ts"]);
 		const paths = excludedPaths(scan);
@@ -77,23 +77,50 @@ describe("scanRepository", () => {
 		expect(paths).toContain("coverage/lcov.info");
 	});
 
-	it("applies .prdfyignore custom exclusions", async () => {
+	it("applies canonical ignore custom exclusions", async () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, "internal/notes.md", "notes\n");
 		await writeRepoFile(root, "debug.log", "log\n");
 		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
-		await writeFile(join(root, ".prdfyignore"), "internal/\n*.log\n", "utf-8");
-		const rules = await readPrdfyIgnore(root);
+		await writeFile(
+			join(root, ".everythingsvibeignore"),
+			"internal/\n*.log\n",
+			"utf-8",
+		);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		expect(scan.files.map((f) => f.path)).toEqual(["src/app.ts"]);
 		expect(excludedPaths(scan)).toContain("internal/notes.md");
 		expect(excludedPaths(scan)).toContain("debug.log");
 	});
 
+	it("still honors a legacy .prdfyignore when the canonical file is absent", async () => {
+		const root = await makeTempRoot();
+		await writeRepoFile(root, "legacy-only/notes.md", "notes\n");
+		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
+		await writeFile(join(root, ".prdfyignore"), "legacy-only/\n", "utf-8");
+		const rules = await readCodebaseIgnore(root);
+		const scan = await scanRepository(root, rules);
+		expect(scan.files.map((f) => f.path)).toEqual(["src/app.ts"]);
+		expect(excludedPaths(scan)).toContain("legacy-only/notes.md");
+	});
+
+	it("never uploads either ignore control file", async () => {
+		const root = await makeTempRoot();
+		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
+		await writeFile(join(root, ".everythingsvibeignore"), "*.log\n", "utf-8");
+		await writeFile(join(root, ".prdfyignore"), "*.tmp\n", "utf-8");
+		const rules = await readCodebaseIgnore(root);
+		const scan = await scanRepository(root, rules);
+		expect(scan.files.map((f) => f.path)).toEqual(["src/app.ts"]);
+		expect(excludedPaths(scan)).toContain(".everythingsvibeignore");
+		expect(excludedPaths(scan)).toContain(".prdfyignore");
+	});
+
 	it("returns repository-relative forward-slash paths and rejects escapes", async () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, "src/nested/app.ts", "export const x = 1;\n");
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		for (const file of scan.files) {
 			expect(file.path).not.toContain("\\");
@@ -114,7 +141,7 @@ describe("scanRepository", () => {
 			// Windows without developer mode cannot create symlinks; skip.
 			return;
 		}
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		expect(scan.files.map((f) => f.path)).toEqual(["src/app.ts"]);
 		expect(excludedPaths(scan)).toContain("link-out.txt");
@@ -123,7 +150,7 @@ describe("scanRepository", () => {
 	it("exposes only repository-relative paths in scan output", async () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		for (const file of scan.files) {
 			expect(file.path.startsWith("/")).toBe(false);
@@ -150,7 +177,7 @@ describe("scanRepository", () => {
 		} catch {
 			// Expected on POSIX: file is genuinely unreadable.
 		}
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		expect(scan.files.map((f) => f.path)).toEqual(["src/app.ts"]);
 		expect(excludedPaths(scan)).toContain("src/locked.ts");

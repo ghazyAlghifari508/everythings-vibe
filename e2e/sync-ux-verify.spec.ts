@@ -175,7 +175,7 @@ test.describe("existing-codebase onboarding — real browser render", () => {
 		]) {
 			expect(text, `missing section: ${heading}`).toContain(heading);
 		}
-		expect(text).toContain(".prdfyignore");
+		expect(text).toContain(".everythingsvibeignore");
 		// Robotic scaffolding, version gate, and path-pattern ignore lists are gone.
 		expect(text).not.toMatch(/Langkah \d/);
 		expect(text).not.toContain("2.0.0");

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readPrdfyIgnore } from "./ignore.js";
+import { readCodebaseIgnore } from "./ignore.js";
 import {
 	buildManifest,
 	CODEBASE_MAX_CHUNK_BYTES,
@@ -39,7 +39,7 @@ describe("buildManifest", () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, "b.ts", "export const b = 2;\n");
 		await writeRepoFile(root, "a.ts", "export const a = 1;\n");
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		const first = await buildManifest(scan);
 		const second = await buildManifest(scan);
@@ -58,7 +58,7 @@ describe("buildManifest", () => {
 	it("classifies language and marks text files eligible", async () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		const manifest = await buildManifest(scan);
 		expect(manifest.entries).toHaveLength(1);
@@ -73,7 +73,7 @@ describe("buildManifest", () => {
 			"assets/logo.png",
 			Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0x00, 0x10]),
 		);
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		const manifest = await buildManifest(scan);
 		expect(manifest.entries).toHaveLength(1);
@@ -85,7 +85,7 @@ describe("buildManifest", () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, "src/empty.ts", "");
 		await writeRepoFile(root, "src/real.ts", "export const x = 1;\n");
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		const manifest = await buildManifest(scan);
 		const emptyEntry = manifest.entries.find((e) => e.path === "src/empty.ts");
@@ -98,7 +98,7 @@ describe("buildManifest", () => {
 	it("marks oversized files ineligible when exceeding the file limit", async () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, "big.txt", "x".repeat(64));
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		const manifest = await buildManifest(scan, { maxFileBytes: 16 });
 		expect(manifest.entries).toHaveLength(1);
@@ -110,7 +110,7 @@ describe("buildManifest", () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, "a.txt", "a".repeat(32));
 		await writeRepoFile(root, "b.txt", "b".repeat(32));
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		await expect(buildManifest(scan, { maxSnapshotBytes: 16 })).rejects.toThrow(
 			/snapshot/i,
@@ -125,7 +125,7 @@ describe("buildManifest", () => {
 			"src/config.ts",
 			`export const apiKey = "${marker}";\n`,
 		);
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		const manifest = await buildManifest(scan);
 		expect(manifest.entries).toHaveLength(1);
@@ -146,7 +146,7 @@ describe("buildManifest", () => {
 				"const config = { api_key: import.meta.env.VITE_KEY };",
 			].join("\n"),
 		);
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		const manifest = await buildManifest(scan);
 		expect(manifest.entries).toHaveLength(1);
@@ -176,7 +176,7 @@ describe("buildManifest", () => {
 	it("keeps absolute local paths out of the uploadable manifest output", async () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
-		const rules = await readPrdfyIgnore(root);
+		const rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		const manifest = await buildManifest(scan);
 		const payload = JSON.stringify({

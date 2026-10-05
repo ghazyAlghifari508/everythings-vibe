@@ -15,7 +15,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ApiError, DEFAULT_REQUEST_TIMEOUT_MS } from "../lib/api-client.js";
 import { resolveApiUrl } from "../lib/config.js";
-import { ensurePrdfyIgnore, readPrdfyIgnore } from "../lib/ignore.js";
+import { ensureCodebaseIgnore, readCodebaseIgnore } from "../lib/ignore.js";
 import {
 	buildManifest,
 	ManifestTooLargeError,
@@ -66,9 +66,15 @@ export interface SyncResult {
 	 * it is the only piece of repository identity that leaves this machine.
 	 */
 	repositoryName?: string;
-	/** True when this run created `.prdfyignore` from the default template. */
+	/** True when this run created `.everythingsvibeignore` from the default template. */
 	ignoreCreated?: boolean;
-	/** `.prdfyignore` negation lines ignored because built-ins cannot be lifted. */
+	/**
+	 * Which custom ignore file is in effect: the canonical
+	 * `.everythingsvibeignore`, or a legacy `.prdfyignore` honored for
+	 * compatibility when the canonical file is absent.
+	 */
+	ignoreSource?: "canonical" | "legacy";
+	/** Custom ignore negation lines ignored because built-ins cannot be lifted. */
 	droppedNegations?: string[];
 	/** Set when the server requires a newer CLI than this one. */
 	cliUpdate?: { current: string; minimum: string };
@@ -79,7 +85,7 @@ export interface SyncResult {
 
 /**
  * Thrown when the manifest contains secret-matched content. The sync refuses
- * to continue: redacting or excluding the file (via `.prdfyignore`) and
+ * to continue: redacting or excluding the file (via `.everythingsvibeignore`) and
  * re-running is required. Paths are safe metadata; matched values never
  * surface.
  */
@@ -177,13 +183,19 @@ function printResult(result: SyncResult, output: SyncOutputMode): void {
 	const lines: string[] = [];
 	if (result.root) lines.push(`Repository   : ${result.root}`);
 	if (result.ignoreCreated !== undefined) {
-		lines.push(
-			`Ignore file  : ${
-				result.ignoreCreated
-					? ".prdfyignore dibuat dari template VibeEverything (lokal, jangan di-commit)"
-					: ".prdfyignore sudah ada (tidak diubah)"
-			}`,
-		);
+		if (result.ignoreCreated) {
+			lines.push(
+				"Ignore file  : .everythingsvibeignore dibuat dari template VibeEverything (lokal, jangan di-commit)",
+			);
+		} else if (result.ignoreSource === "legacy") {
+			lines.push(
+				"Ignore file  : Menggunakan .prdfyignore lama untuk kompatibilitas (tidak diubah)",
+			);
+		} else {
+			lines.push(
+				"Ignore file  : .everythingsvibeignore sudah ada (tidak diubah)",
+			);
+		}
 	}
 	for (const negation of result.droppedNegations ?? []) {
 		lines.push(
@@ -329,11 +341,13 @@ export async function syncCodebase(
 	};
 
 	let ignoreCreated: boolean;
-	let rules: Awaited<ReturnType<typeof readPrdfyIgnore>>;
+	let ignoreSource: "canonical" | "legacy";
+	let rules: Awaited<ReturnType<typeof readCodebaseIgnore>>;
 	let manifest: RepositoryManifest;
 	try {
-		({ created: ignoreCreated } = await ensurePrdfyIgnore(root));
-		rules = await readPrdfyIgnore(root);
+		({ created: ignoreCreated, source: ignoreSource } =
+			await ensureCodebaseIgnore(root));
+		rules = await readCodebaseIgnore(root);
 		const scan = await scanRepository(root, rules);
 		manifest = await buildManifest(scan);
 	} catch (err) {
@@ -355,6 +369,7 @@ export async function syncCodebase(
 	const preparationWithIgnore = {
 		...preparation,
 		ignoreCreated,
+		ignoreSource,
 		droppedNegations: rules.droppedNegations,
 	};
 

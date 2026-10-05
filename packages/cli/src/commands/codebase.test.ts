@@ -385,8 +385,8 @@ describe("syncCodebase happy path", () => {
 		expect(res.sessionId).toBe("sess-1");
 		expect(res.status).toBe("uploaded");
 		// fileCount = eligible entries, excludedCount = all exclusions (Task 2).
-		// The run bootstraps `.prdfyignore`, and the scanner excludes its own
-		// control file, so one exclusion is expected here.
+		// The run bootstraps `.everythingsvibeignore`, and the scanner excludes
+		// its own control file, so one exclusion is expected here.
 		expect(res.fileCount).toBe(2);
 		expect(res.excludedCount).toBe(1);
 		expect(res.uploadedFiles).toBe(2);
@@ -397,7 +397,7 @@ describe("syncCodebase happy path", () => {
 				(call[2] as Array<{ path: string }> | undefined)?.map((c) => c.path) ??
 				[],
 		);
-		expect(uploadedPaths).not.toContain(".prdfyignore");
+		expect(uploadedPaths).not.toContain(".everythingsvibeignore");
 		expect(uploadedPaths).toEqual(["README.md", "src/app.ts"]);
 
 		const logged = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
@@ -525,6 +525,57 @@ describe("syncCodebase happy path", () => {
 			| { syncToken?: string }
 			| undefined;
 		expect(clientOptions?.syncToken).toBe("super-secret-token");
+	});
+});
+
+describe("syncCodebase ignore file output", () => {
+	it("creates the canonical ignore file and says so on a fresh repository", async () => {
+		mockClient();
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "human",
+		});
+
+		expect(res.ok).toBe(true);
+		expect(res.ignoreCreated).toBe(true);
+		expect(res.ignoreSource).toBe("canonical");
+		const logged = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+		expect(logged).toContain(".everythingsvibeignore dibuat dari template");
+		expect(logged).not.toContain(".prdfyignore");
+		logSpy.mockRestore();
+	});
+
+	it("truthfully reports legacy fallback without claiming the canonical file", async () => {
+		mockClient();
+		const root = trackRepo(
+			makeRepo({
+				"src/app.ts": "export const x = 1;\n",
+				".prdfyignore": "legacy-only/\n",
+			}),
+		);
+		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "human",
+		});
+
+		expect(res.ok).toBe(true);
+		expect(res.ignoreCreated).toBe(false);
+		expect(res.ignoreSource).toBe("legacy");
+		const logged = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+		expect(logged).toContain(
+			"Menggunakan .prdfyignore lama untuk kompatibilitas",
+		);
+		expect(logged).not.toContain("dibuat dari template");
+		logSpy.mockRestore();
 	});
 });
 

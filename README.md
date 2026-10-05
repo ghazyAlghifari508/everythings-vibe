@@ -327,14 +327,14 @@ Available flags:
 - `--output <mode>`: Output format (`human` by default, or `json` for agent-to-agent piping). The resolved root is printed in `human` output only and is never added to the JSON payload.
 - `--api-url <url>`: Override API base URL (defaults to `http://localhost:3000`).
 
-### 3. Exclusions & `.prdfyignore`
+### 3. Exclusions & `.everythingsvibeignore`
 
 The CLI enforces **built-in exclusions** that can never be overridden by user configuration:
 - Secrets and credentials: `.env`, `.env.*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `secrets/`, `credentials/`
 - Build outputs & dependencies: `node_modules/`, `dist/`, `build/`, `.git/`, `coverage/`
 - Local database dumps & binaries: `.sqlite`, `.db`, image/media binary files
 
-`.prdfyignore` is created automatically on the first sync, so you never have to
+`.everythingsvibeignore` is created automatically on the first sync, so you never have to
 write it by hand. The generated template documents the built-in coverage above
 and ships with every pattern commented out — exclusions are already handled, and
 an active pattern in the seed file would silently change what gets uploaded.
@@ -350,7 +350,7 @@ fixtures/
 The file is local sync configuration and is never committed or pushed
 automatically. It is also excluded from the upload itself.
 
-*Note: Negation patterns (`!pattern`) in `.prdfyignore` are inert to prevent accidental leakage of protected paths, and the CLI warns about each one it ignores.*
+*Note: Negation patterns (`!pattern`) in `.everythingsvibeignore` are inert to prevent accidental leakage of protected paths, and the CLI warns about each one it ignores. A legacy `.prdfyignore` is still honored when the canonical file is absent.*
 
 ### 4. Privacy & Data Retention Policy
 
@@ -365,8 +365,8 @@ automatically. It is also excluded from the upload itself.
 | `CLI_UPDATE_REQUIRED` | CLI version is older than 2.0.0 | Run `npm install -g @ghazynabiel/prdfy` to update |
 | `INVALID_SYNC_CREDENTIAL` | Token expired (30 min) or wrong codebase | Click "Sync ulang" on the codebase page or open "Codebase" in the navbar to find a codebase |
 | `SYNC_SESSION_ACTIVE` (409) | A sync session is already active in another tab | Wait for the active sync session to finish, or click "Sync ulang" on the codebase page to issue a fresh session |
-| `SNAPSHOT_BLOCKED` | A file matching high-risk secret patterns was found | Add the file to `.prdfyignore` or redact sensitive tokens before syncing |
-| `SNAPSHOT_TOO_LARGE` | Repository exceeds 50 MiB or file exceeds 1 MiB | Add large assets or directories to `.prdfyignore` |
+| `SNAPSHOT_BLOCKED` | A file matching high-risk secret patterns was found | Add the file to `.everythingsvibeignore` or redact sensitive tokens before syncing |
+| `SNAPSHOT_TOO_LARGE` | Repository exceeds 50 MiB or file exceeds 1 MiB | Add large assets or directories to `.everythingsvibeignore` |
 | `Network / 5xx error` | Temporary connection or server timeout | The CLI automatically retries up to 3 times with identical idempotency keys |
 
 ## Testing

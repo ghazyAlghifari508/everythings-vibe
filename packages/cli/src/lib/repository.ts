@@ -3,7 +3,7 @@
  *
  * Walks the repository without following symlinks, normalizes every path to
  * a safe repository-relative `/`-separated form, applies built-in exclusions
- * plus `.prdfyignore` custom rules, and returns exclusion metadata without
+ * plus custom ignore rules, and returns exclusion metadata without
  * file contents. Source content loading happens later in `manifest.ts`.
  */
 
@@ -291,7 +291,7 @@ export async function scanRepository(
 			return;
 		}
 		if (matchesCustomIgnore(normalized, false, rules.patterns)) {
-			excluded.push({ path: normalized, reason: "custom:prdfyignore" });
+			excluded.push({ path: normalized, reason: "custom:ignore" });
 			return;
 		}
 		files.push({ path: normalized, size: entryStat.size });

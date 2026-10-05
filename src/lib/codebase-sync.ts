@@ -962,7 +962,7 @@ const SYNC_FAILURE_MESSAGES: Readonly<Record<string, string>> = {
 	SCAN_FAILED:
 		"CLI gagal membaca repository. Pastikan folder ini adalah root repository Git yang bisa dibaca.",
 	BLOCKED_CONTENT:
-		"Sebagian file ditolak karena terdeteksi konten rahasia. Redaksi atau kecualikan file tersebut lewat .prdfyignore, lalu jalankan ulang.",
+		"Sebagian file ditolak karena terdeteksi konten rahasia. Redaksi atau kecualikan file tersebut lewat .everythingsvibeignore, lalu jalankan ulang.",
 	SNAPSHOT_TOO_LARGE:
 		"Ukuran snapshot melebihi batas server. Kurangi file yang ikut disinkronkan, lalu jalankan ulang.",
 };
@@ -1094,7 +1094,7 @@ export function buildSyncCommand(projectId: string): string {
 // === External-agent prompt ===
 // Self-contained execution document for a local AI coding agent (Claude Code,
 // Codex CLI, Gemini CLI, OpenCode, …). The agent must not have to guess where
-// it runs, when to install, whether to create `.prdfyignore`, what the CLI
+// it runs, when to install, whether to create `.everythingsvibeignore`, what the CLI
 // already handles, what is forbidden, or how to report. Sections follow a fixed
 // order: tujuan → project info → prasyarat → command → CLI-otomatis → aturan →
 // kegagalan → format laporan.
@@ -1153,7 +1153,8 @@ export function buildAgentPrompt(
 		"Bagian ini bersifat informasi. Jangan kerjakan ulang secara manual.",
 		"- Deteksi root repository.",
 		"- Validasi versi minimum CLI.",
-		"- Pembuatan `.prdfyignore` jika belum ada.",
+		"- Pembuatan `.everythingsvibeignore` otomatis jika belum ada file ignore kustom.",
+		"- `.prdfyignore` lama tetap dihormati bila `.everythingsvibeignore` belum ada.",
 		"- Penggunaan ignore bawaan.",
 		"- Pengecualian file rahasia (termasuk `.env`), secret, dependency, build, dan cache.",
 		"- Hashing dan upload hanya file yang diizinkan.",
@@ -1165,7 +1166,7 @@ export function buildAgentPrompt(
 		"- [ ] Jangan mengedit `.gitignore`.",
 		"- [ ] Jangan menulis Sync Token ke file proyek.",
 		"- [ ] Jangan menyimpan token ke konfigurasi permanen.",
-		"- [ ] Jangan memodifikasi `.prdfyignore` kecuali diminta user.",
+		"- [ ] Jangan memodifikasi `.everythingsvibeignore` kecuali diminta user.",
 		"- [ ] Jangan mengklaim sinkronisasi berhasil tanpa output CLI.",
 		"",
 		"## Penanganan Kegagalan",
@@ -1275,7 +1276,7 @@ export const snapshotCompleteRequestSchema = z.object({
 	sessionId: z.string().min(1),
 	attemptId: z.string().min(1),
 	// Locked count definition: fileCount = eligible manifest entries,
-	// excludedCount = ALL exclusions (built-in + secret + .prdfyignore +
+	// excludedCount = ALL exclusions (built-in + secret + custom ignore +
 	// unreadable + binary). The server verifies fileCount against the stored
 	// manifest; excludedCount is CLI-reported and stored as-is.
 	fileCount: z.number().int().nonnegative(),

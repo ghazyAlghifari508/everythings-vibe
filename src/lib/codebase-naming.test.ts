@@ -3,7 +3,11 @@ import {
 	isProvisionalCodebaseName,
 	resolveCodebaseDisplayName,
 } from "./codebase-library";
-import { buildAgentPrompt, type SyncPromptPayload } from "./codebase-sync";
+import {
+	buildAgentPrompt,
+	resolveSyncFailureMessage,
+	type SyncPromptPayload,
+} from "./codebase-sync";
 
 function syncPayload(): SyncPromptPayload {
 	return {
@@ -80,5 +84,23 @@ describe("buildAgentPrompt repository identity", () => {
 		});
 		expect(prompt).toContain("react-movie-app");
 		expect(prompt).not.toContain("Nama Fitur");
+	});
+});
+
+describe("generated sync copy ignore branding", () => {
+	it("centers the agent prompt on the canonical ignore file", () => {
+		const prompt = buildAgentPrompt(syncPayload(), {
+			projectName: "react-movie-app",
+		});
+		expect(prompt).toContain(".everythingsvibeignore");
+		expect(prompt).toContain(
+			"Jangan memodifikasi `.everythingsvibeignore` kecuali diminta user.",
+		);
+	});
+
+	it("points blocked-content recovery at the canonical ignore file", () => {
+		const message = resolveSyncFailureMessage("BLOCKED_CONTENT");
+		expect(message).toContain(".everythingsvibeignore");
+		expect(message).not.toContain(".prdfyignore");
 	});
 });

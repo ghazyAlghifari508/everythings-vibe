@@ -1,33 +1,46 @@
 /**
- * `.prdfyignore` parsing and built-in exclusion rules for codebase sync.
+ * Codebase ignore parsing and built-in exclusion rules for codebase sync.
  *
- * `.prdfyignore` supplements built-in protection; it can never override
- * secret or unsafe-path exclusions. Built-ins are enforced independently
- * by the repository scanner.
+ * The canonical custom ignore file is `.everythingsvibeignore`. A legacy
+ * `.prdfyignore` is still honored when the canonical file is absent, so
+ * previously excluded paths are never silently re-included. Custom rules
+ * supplement built-in protection; they can never override secret or
+ * unsafe-path exclusions. Built-ins are enforced independently by the
+ * repository scanner.
  */
 
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+export type IgnoreFileSource = "canonical" | "legacy" | "none";
+
 export interface IgnoreRules {
 	/** Absolute repository root the rules were read from. */
 	root: string;
-	/** Custom patterns from `.prdfyignore` (negations dropped, see below). */
+	/** Custom patterns from the active ignore file (negations dropped, see below). */
 	patterns: string[];
-	/** Raw file content (`""` when the file is absent). */
+	/** Raw file content (`""` when no ignore file is present). */
 	raw: string;
 	/** Negation lines that were dropped because user rules cannot lift built-ins. */
 	droppedNegations: string[];
+	/** Which control file supplied the rules. */
+	source: IgnoreFileSource;
+	/** Active control filename, or null when no ignore file exists. */
+	filename: string | null;
 }
 
-const IGNORE_FILENAME = ".prdfyignore";
+/** Canonical custom ignore filename created by new syncs. */
+export const CODEBASE_IGNORE_FILENAME = ".everythingsvibeignore";
+/** Legacy filename honored only when the canonical file is absent. */
+export const LEGACY_IGNORE_FILENAME = ".prdfyignore";
 
 /**
- * Default `.prdfyignore` written on first sync. Every pattern is commented
- * out: built-in exclusions already cover secrets, build output, and binaries,
- * and an active pattern here would silently change which files get uploaded.
+ * Default `.everythingsvibeignore` written on first sync. Every pattern is
+ * commented out: built-in exclusions already cover secrets, build output, and
+ * binaries, and an active pattern here would silently change which files get
+ * uploaded.
  */
-export const PRDFY_IGNORE_TEMPLATE = `# .prdfyignore — exclusions untuk sync codebase VibeEverything.
+export const CODEBASE_IGNORE_TEMPLATE = `# .everythingsvibeignore — exclusions untuk sync codebase VibeEverything.
 #
 # File ini bersifat lokal. JANGAN commit ke repositori.
 #
@@ -93,65 +106,88 @@ export type BuiltInExclusionReason =
 	| "built-in:ignore-file";
 
 /**
- * Read `.prdfyignore` from the repository root without mutating the repo.
- * Missing file yields empty patterns. Negation rules (`!...`) are dropped:
- * user rules cannot lift built-in secret/unsafe-path protection. Dropped
- * negations are reported so the caller can warn instead of failing silently.
+ * Read the active custom ignore file from the repository root without
+ * mutating the repo. The canonical `.everythingsvibeignore` takes precedence
+ * when present; a legacy `.prdfyignore` is honored only as a fallback so its
+ * exclusions are never silently lost. Missing files yield empty patterns.
+ * Negation rules (`!...`) are dropped: user rules cannot lift built-in
+ * secret/unsafe-path protection. Dropped negations are reported so the caller
+ * can warn instead of failing silently.
  */
-export async function readPrdfyIgnore(root: string): Promise<IgnoreRules> {
-	const filePath = join(root, IGNORE_FILENAME);
-	let raw = "";
-	try {
-		raw = await readFile(filePath, "utf-8");
-	} catch (err) {
-		if ((err as NodeJS.ErrnoException)?.code === "ENOENT") {
-			return { root, patterns: [], raw: "", droppedNegations: [] };
+export async function readCodebaseIgnore(root: string): Promise<IgnoreRules> {
+	for (const [filename, source] of [
+		[CODEBASE_IGNORE_FILENAME, "canonical"],
+		[LEGACY_IGNORE_FILENAME, "legacy"],
+	] as const) {
+		let raw: string;
+		try {
+			raw = await readFile(join(root, filename), "utf-8");
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException)?.code === "ENOENT") continue;
+			throw err;
 		}
-		throw err;
-	}
-	const patterns: string[] = [];
-	const droppedNegations: string[] = [];
-	for (const line of raw.split("\n")) {
-		const trimmed = line.trim();
-		if (trimmed === "" || trimmed.startsWith("#")) continue;
-		// Negations are inert: they must never re-include built-in exclusions.
-		if (trimmed.startsWith("!")) {
-			droppedNegations.push(trimmed);
-			continue;
+		const patterns: string[] = [];
+		const droppedNegations: string[] = [];
+		for (const line of raw.split("\n")) {
+			const trimmed = line.trim();
+			if (trimmed === "" || trimmed.startsWith("#")) continue;
+			// Negations are inert: they must never re-include built-in exclusions.
+			if (trimmed.startsWith("!")) {
+				droppedNegations.push(trimmed);
+				continue;
+			}
+			patterns.push(trimmed);
 		}
-		patterns.push(trimmed);
+		return { root, patterns, raw, droppedNegations, source, filename };
 	}
-	return { root, patterns, raw, droppedNegations };
+	return {
+		root,
+		patterns: [],
+		raw: "",
+		droppedNegations: [],
+		source: "none",
+		filename: null,
+	};
 }
 
 /**
- * Create `.prdfyignore` from the default template when it does not exist.
- * Idempotent: an existing file is never read-modified or overwritten, so user
- * rules always survive. Returns whether the file was created by this call.
+ * Create the canonical ignore file from the default template when no custom
+ * ignore file exists. Idempotent: an existing canonical or legacy file is
+ * never read-modified or overwritten, so user rules always survive. Returns
+ * whether the file was created by this call and which file is now in effect.
  * The file is local sync configuration; this module never invokes git, so it
  * can never be committed or pushed automatically.
  */
-export async function ensurePrdfyIgnore(
-	root: string,
-): Promise<{ created: boolean }> {
-	const filePath = join(root, IGNORE_FILENAME);
-	try {
-		await readFile(filePath, "utf-8");
-		return { created: false };
-	} catch (err) {
-		if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") throw err;
+export async function ensureCodebaseIgnore(root: string): Promise<{
+	created: boolean;
+	source: Exclude<IgnoreFileSource, "none">;
+}> {
+	for (const [filename, source] of [
+		[CODEBASE_IGNORE_FILENAME, "canonical"],
+		[LEGACY_IGNORE_FILENAME, "legacy"],
+	] as const) {
+		try {
+			await readFile(join(root, filename), "utf-8");
+			return { created: false, source };
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") throw err;
+		}
 	}
 	// "wx" fails if the path appeared concurrently, so two runs cannot clobber
 	// each other and an existing file is never truncated.
 	try {
-		await writeFile(filePath, PRDFY_IGNORE_TEMPLATE, {
-			encoding: "utf-8",
-			flag: "wx",
-		});
-		return { created: true };
+		await writeFile(
+			join(root, CODEBASE_IGNORE_FILENAME),
+			CODEBASE_IGNORE_TEMPLATE,
+			{
+				encoding: "utf-8",
+				flag: "wx",
+			},
+		);
+		return { created: true, source: "canonical" };
 	} catch (err) {
 		if ((err as NodeJS.ErrnoException)?.code === "EEXIST") {
-			return { created: false };
+			return { created: false, source: "canonical" };
 		}
 		throw err;
 	}
@@ -238,7 +274,7 @@ export function matchesCustomIgnore(
 }
 
 /**
- * Built-in exclusion check. Independent of `.prdfyignore`: custom rules
+ * Built-in exclusion check. Independent of custom ignore files: custom rules
  * cannot override these. Returns the category reason when excluded.
  */
 export function isBuiltInExcluded(
@@ -265,8 +301,12 @@ export function isBuiltInExcluded(
 		}
 	}
 	const basename = segments[segments.length - 1];
-	// The CLI's own control file is local config, never source content.
-	if (basename === IGNORE_FILENAME) {
+	// The CLI's own control files are local config, never source content. Both
+	// the canonical file and a legacy file from an older sync are excluded.
+	if (
+		basename === CODEBASE_IGNORE_FILENAME ||
+		basename === LEGACY_IGNORE_FILENAME
+	) {
 		return { excluded: true, reason: "built-in:ignore-file" };
 	}
 	if (basename === ".env" || basename.startsWith(".env.")) {
