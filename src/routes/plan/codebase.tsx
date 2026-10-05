@@ -22,6 +22,7 @@ import {
 	storePlanCodebaseProjectPointer,
 } from "@/lib/codebase-plan-storage";
 import {
+	isSyncStatusComplete,
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
@@ -481,10 +482,14 @@ export function PlanCodebasePage() {
 		storePlanCodebasePointer(codebase.id, codebase.name);
 	}, [codebase]);
 
-	// The final review reuses the canonical CodebaseReview only when validated
-	// analysis output for the exact current snapshot is in hand. This mirrors
-	// the workspace canRenderCodebaseReview predicate; a snapshot alone never
-	// counts as a review.
+	// Two independent capabilities, deliberately not collapsed into one
+	// `isReady`: the workspace opens as soon as sync produced a usable
+	// snapshot, while the review conclusion additionally requires validated
+	// analysis output for that exact snapshot.
+	//
+	// `reviewReady` mirrors the workspace canRenderCodebaseReview predicate; a
+	// snapshot alone never counts as a review.
+	const canOpenWorkspace = isSyncStatusComplete(lastStatus);
 	const reviewReady = Boolean(
 		analysis?.output &&
 			lastStatus?.snapshotId &&
@@ -685,6 +690,13 @@ export function PlanCodebasePage() {
 								}
 								onBackToInstructions={() => setStep("prompt")}
 								onViewReview={() => setStep("summary")}
+								onEnterWorkspace={() => {
+									if (!canOpenWorkspace) return;
+									void navigate({
+										to: "/codebases/$id",
+										params: { id: codebase.id },
+									});
+								}}
 							/>
 						</>
 					)}

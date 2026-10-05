@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
+import { buildCodebaseLibraryItems } from "@/lib/codebase-library";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
 import {
 	selectLatestCodebaseSnapshots,
@@ -191,6 +192,29 @@ describe("existing-codebase workspace re-entry", () => {
 			"/session",
 		);
 	});
+
+	it("derives workspace entry from the snapshot, never from analysis", () => {
+		// Sync completion is transport-only: a usable snapshot opens the
+		// workspace. AI analysis must never gate entry, so no analysis status
+		// may appear in the snapshotReady derivation.
+		const start = workspaceSource.indexOf("const snapshotReady");
+		const end = workspaceSource.indexOf("const [activeFeature", start);
+		expect(start).toBeGreaterThan(-1);
+		expect(end).toBeGreaterThan(start);
+		const derivation = workspaceSource.slice(start, end);
+		expect(derivation).toContain("hasStoredSnapshot");
+		expect(derivation).not.toContain("analysisStatus");
+		expect(derivation).not.toContain("analysis");
+	});
+
+	it("does not gate workspace rendering on validated analysis output", () => {
+		// `if (snapshotReady)` selects the workspace; analysis output only
+		// feeds optional panels inside it.
+		const branch = workspaceSource.indexOf("if (snapshotReady) {");
+		expect(branch).toBeGreaterThan(-1);
+		const branchSlice = workspaceSource.slice(branch, branch + 400);
+		expect(branchSlice).not.toContain("analysisOutput");
+	});
 });
 
 describe("greenfield history separation", () => {
@@ -268,6 +292,87 @@ describe("codebase list filtering gate", () => {
 	it("pulls analysis status into the row so the readiness helper can inspect it", () => {
 		expect(source).toContain("status: codebaseAnalyses.status");
 		expect(source).not.toContain('eq(codebaseAnalyses.status, "ready")');
+	});
+});
+
+describe("codebase library readiness vs workspace availability", () => {
+	// Known product inconsistency (not a bug in this task's scope): the library
+	// lists a codebase only once validated analysis exists for its newest
+	// snapshot, while the workspace opens as soon as the snapshot is synced. A
+	// codebase can therefore be usable at /codebases/:id yet absent from
+	// Project Tersimpan while analysis is still pending or failed. This test
+	// pins the current behavior so a future decision to relax it is a
+	// deliberate, visible change rather than an accident.
+	it("still hides a synced-but-unanalyzed codebase from the library", () => {
+		const items = buildCodebaseLibraryItems({
+			codebases: [
+				{
+					id: "cb-pending",
+					name: "Pending Repo",
+					createdAt: new Date("2026-09-23T10:00:00.000Z"),
+					updatedAt: new Date("2026-09-23T10:00:00.000Z"),
+				},
+			],
+			snapshots: [
+				{
+					id: "snap-pending",
+					codebaseId: "cb-pending",
+					createdAt: new Date("2026-09-23T10:00:00.000Z"),
+					fileCount: 37,
+					status: "uploaded",
+				},
+			],
+			projects: [{ id: "proj-pending", codebaseId: "cb-pending" }],
+			analyses: [
+				{
+					projectId: "proj-pending",
+					snapshotId: "snap-pending",
+					status: "pending",
+					output: null,
+				},
+			],
+		});
+
+		expect(items).toHaveLength(0);
+	});
+
+	it("lists the codebase once validated analysis for that snapshot exists", () => {
+		const items = buildCodebaseLibraryItems({
+			codebases: [
+				{
+					id: "cb-ready",
+					name: "Ready Repo",
+					createdAt: new Date("2026-09-23T10:00:00.000Z"),
+					updatedAt: new Date("2026-09-23T10:00:00.000Z"),
+				},
+			],
+			snapshots: [
+				{
+					id: "snap-ready",
+					codebaseId: "cb-ready",
+					createdAt: new Date("2026-09-23T10:00:00.000Z"),
+					fileCount: 37,
+					status: "uploaded",
+				},
+			],
+			projects: [{ id: "proj-ready", codebaseId: "cb-ready" }],
+			analyses: [
+				{
+					projectId: "proj-ready",
+					snapshotId: "snap-ready",
+					status: "ready",
+					output: {
+						projectId: "proj-ready",
+						snapshotId: "snap-ready",
+						framework: "TanStack Start",
+						language: "TypeScript",
+					},
+				},
+			],
+		});
+
+		expect(items).toHaveLength(1);
+		expect(items[0]?.hasReadyAnalysis).toBe(true);
 	});
 });
 

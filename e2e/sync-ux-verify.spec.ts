@@ -72,7 +72,7 @@ async function mountComponents(page: import("@playwright/test").Page) {
 }
 
 test.describe("sync UX rework — real browser render", () => {
-	test("sync status renders three real-signal stages, no fabricated ones", async ({
+	test("sync status renders two real-signal sync stages, no fabricated ones", async ({
 		page,
 	}) => {
 		const errors: string[] = [];
@@ -80,14 +80,29 @@ test.describe("sync UX rework — real browser render", () => {
 
 		await mountComponents(page);
 		const status = page.locator("#verify-status");
-		await expect(status).toContainText("CLI terhubung", { timeout: 20000 });
+		await expect(status).toContainText("Repository terhubung", {
+			timeout: 20000,
+		});
 
 		const text = (await status.innerText()) ?? "";
-		expect(text).toContain("Snapshot");
-		expect(text).toContain("analisis codebase");
+		expect(text).toContain("Source code tersinkron");
 		// Real counts straight from the server payload.
 		expect(text).toContain("12");
 		expect(text).toContain("3");
+		// AI analysis is a separate capability, never a third sync stage.
+		expect(text).not.toMatch(/menganalisis codebase/i);
+		expect(text).not.toMatch(/analisis codebase selesai/i);
+		expect(
+			await status
+				.locator('[data-testid="sync-stage-analysis"]')
+				.count(),
+		).toBe(0);
+		expect(
+			await status.locator('[data-testid="sync-stage-connection"]').count(),
+		).toBe(1);
+		expect(
+			await status.locator('[data-testid="sync-stage-upload"]').count(),
+		).toBe(1);
 		// Never the bookkeeping stages the client cannot observe.
 		expect(text).not.toMatch(/memindai/i);
 		expect(text).not.toMatch(/filtering/i);
