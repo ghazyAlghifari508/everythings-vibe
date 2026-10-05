@@ -194,6 +194,15 @@ describe("handshake precedes local preparation", () => {
 			order.push("handshake");
 			return { ...SESSION, status: "connected" };
 		});
+		// The repository walk is the real local preparation work. Recording it
+		// alongside the server calls is what proves the ORDER, rather than only
+		// proving that both happened.
+		const realScan = repositoryMocks.realScanRepository;
+		vi.mocked(scanRepository).mockImplementation(async (...args) => {
+			order.push("prepare");
+			if (!realScan) throw new Error("scan fixture unavailable");
+			return realScan(...args);
+		});
 		client.uploadManifestWithRetry.mockImplementation(async () => {
 			order.push("manifest");
 			return { status: "uploading" };
@@ -217,10 +226,12 @@ describe("handshake precedes local preparation", () => {
 		});
 
 		expect(res.ok).toBe(true);
-		// The first server contact is the handshake, so `connected` is persisted
-		// while the CLI is still preparing source locally.
-		expect(order[0]).toBe("handshake");
-		expect(order).toEqual(["handshake", "manifest", "complete"]);
+		// The handshake precedes the repository walk, so the server persists
+		// `connected` while the CLI is still preparing source code — which is
+		// the window the browser can actually observe.
+		expect(order.indexOf("handshake")).toBeGreaterThanOrEqual(0);
+		expect(order.indexOf("handshake")).toBeLessThan(order.indexOf("prepare"));
+		expect(order).toEqual(["handshake", "prepare", "manifest", "complete"]);
 	});
 
 	it("reports a preparation failure instead of leaving the session connected", async () => {
@@ -448,6 +459,30 @@ describe("syncCodebase happy path", () => {
 		const logged = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
 		expect(logged).toContain("uploaded");
 		expect(logged).not.toContain("%");
+		logSpy.mockRestore();
+	});
+
+	it("never claims a preparation stage the server never persisted", async () => {
+		// The CLI has no `scanning`/`filtering` report to print, and it must not
+		// invent one. `Session ... connected` is the real persisted handshake;
+		// the manifest and content lines quote real server responses.
+		mockClient();
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+		await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "human",
+		});
+
+		const logged = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+		expect(logged).toContain("Session sess-1: connected");
+		expect(logged).toContain("(uploading)");
+		expect(logged).not.toMatch(/\bscanning\b/);
+		expect(logged).not.toMatch(/\bfiltering\b/);
+		expect(logged).not.toMatch(/\bpreparing\b/i);
 		logSpy.mockRestore();
 	});
 

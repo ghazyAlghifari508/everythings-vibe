@@ -173,7 +173,7 @@ describe("waiting_for_cli", () => {
 });
 
 describe("connected, scanning and filtering", () => {
-	it("share one preparing stage instead of three enum-specific stages", () => {
+	it("still share one preparing stage instead of three enum-specific stages", () => {
 		for (const value of ["connected", "scanning", "filtering"] as const) {
 			const view = resolveSyncStageView(status({ status: value }));
 			expect(states(view)).toEqual(["done", "active", "waiting"]);

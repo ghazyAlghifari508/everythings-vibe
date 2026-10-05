@@ -313,7 +313,7 @@ export function canOpenSummary(
  * How far the real sync lifecycle has actually progressed, in product terms.
  *
  * - `waiting`  the agent has not contacted the server yet
- * - `preparing` the agent is linked and the CLI is walking the project tree
+ * - `preparing` the agent is linked and the CLI is preparing source code
  * - `syncing`   files are on the wire
  * - `done`      the server holds a verified snapshot
  *
@@ -329,10 +329,12 @@ export type SyncStageProgress = "waiting" | "preparing" | "syncing" | "done";
  * The backend lifecycle expressed as product stages.
  *
  * `connected`, `scanning` and `filtering` are all one user-visible moment — the
- * agent is connected and the CLI is reading the project — so they share the
+ * agent is connected and the CLI is preparing source code — so they share the
  * `preparing` stage instead of leaking three enum names into the UI. The CLI
- * reports no `scanning`/`filtering` state of its own; the upload endpoints walk
- * the session through them, which is why they carry the same meaning here.
+ * persists no `scanning`/`filtering` state; `connected` is what genuinely spans
+ * that local work, because the CLI now handshakes before it prepares. `scanning`
+ * and `filtering` remain transition vocabulary, so they are mapped here for a
+ * reader that holds one, never written as a durable state.
  */
 const SYNC_STAGE_PROGRESS: Readonly<
 	Record<CodebaseSyncStatus, SyncStageProgress>
@@ -1459,11 +1461,20 @@ export function assertAttemptBinding(
 }
 
 // === Upload session advancement (Task 5) ===
-// The CLI reports no scanning/filtering states itself — it handshakes
-// (waiting_for_cli -> connected) then uploads. Upload endpoints walk the
-// session through the remaining valid chain steps so the persisted history
-// never skips a transition. Uploads before handshake or after completion are
-// rejected; completion has its own uploaded transition.
+// The CLI persists no `scanning`/`filtering` state of its own: it handshakes
+// (waiting_for_cli -> connected), spends `connected` preparing source code
+// locally, and then starts the upload. `scanning` and `filtering` remain
+// transition-validation vocabulary — nothing writes them, because preparation
+// is a single continuous local operation with no server-observable boundary
+// inside it, and inventing a network call per phase would report a stage that
+// does not exist.
+//
+// Upload endpoints therefore walk the session through the remaining valid chain
+// steps so the persisted history never skips a transition, and persist only
+// `uploading`. The browser's real observation of the preparation work is the
+// `connected` window itself, which now spans that work (see the CLI sync
+// command). Uploads before handshake or after completion are rejected;
+// completion has its own uploaded transition.
 
 export function uploadTransitionSteps(
 	from: CodebaseSyncStatus,
