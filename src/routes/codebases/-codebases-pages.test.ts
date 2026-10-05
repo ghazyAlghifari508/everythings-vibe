@@ -271,6 +271,26 @@ describe("codebase list filtering gate", () => {
 	});
 });
 
+describe("codebase detail incomplete sync handling", () => {
+	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+
+	it("renders ScreenConnect only when a payload or loading state exists", () => {
+		expect(detailSource).toContain("payload !== null || isStarting");
+		expect(detailSource).toContain("ScreenIncompleteSync");
+	});
+
+	it("exposes a restart-sync recovery control wired to the canonical session endpoint", () => {
+		expect(detailSource).toContain('startSession("retry")');
+		expect(detailSource).toContain("ScreenIncompleteSync");
+		const component = readFileSync(
+			"src/components/codebase/screen-incomplete-sync.tsx",
+			"utf8",
+		);
+		expect(component).toContain("Repository belum selesai disinkronkan");
+		expect(component).toContain("Mulai ulang sync");
+	});
+});
+
 describe("buildAskHandoffAnswers", () => {
 	it("maps answer map to question title and answer list conforming to askHandoffAnswerSchema", () => {
 		const questions = [

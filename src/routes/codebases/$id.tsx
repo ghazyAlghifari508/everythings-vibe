@@ -18,6 +18,7 @@ import {
 } from "@/components/codebase/codebase-markdown";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
+import { ScreenIncompleteSync } from "@/components/codebase/screen-incomplete-sync";
 import { SyncStatus } from "@/components/codebase/sync-status";
 import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
 import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
@@ -1588,14 +1589,21 @@ function CodebaseDetailPage() {
 					</button>
 				</div>
 			)}
-			{screen === 1 && (
-				<ScreenConnect
-					projectName={codebase.name}
-					payload={payload}
-					isStarting={isStarting}
-					onAgentStarted={() => setScreen(2)}
-				/>
-			)}
+			{screen === 1 &&
+				(payload !== null || isStarting ? (
+					<ScreenConnect
+						projectName={codebase.name}
+						payload={payload}
+						isStarting={isStarting}
+						onAgentStarted={() => setScreen(2)}
+					/>
+				) : (
+					<ScreenIncompleteSync
+						projectName={codebase.name}
+						isStarting={isStarting}
+						onStartSync={() => void startSession("retry")}
+					/>
+				))}
 			{screen === 2 && (
 				<SyncStatus
 					projectId={codebase.id}

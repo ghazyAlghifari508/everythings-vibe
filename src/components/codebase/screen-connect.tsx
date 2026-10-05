@@ -120,7 +120,7 @@ export function ScreenConnect({
 									</div>
 								) : (
 									<div className="flex items-center justify-center py-6 text-xs text-fog font-sans">
-										<span>Memuat instruksi sync...</span>
+										<span>Prompt sync belum tersedia.</span>
 									</div>
 								)}
 							</div>
