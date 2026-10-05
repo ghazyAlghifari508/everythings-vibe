@@ -89,8 +89,8 @@ Before implementing ANY change related to features, bugs, errors, design, or UX:
 
 ## Rule 4: Use Relevant Skills & MCP (Single Source of Truth)
 
-Seluruh aturan pemilihan skill, alur proses (`brainstorming` -> `writing-plans` -> `executing-plans`), registry MCP, dan matriks tools PRDFY dikelola secara terpusat (Single Source of Truth) di:
-- [skills-mcp.md](file:///C:/Coding/Web%20Development/Tanstack-start/prdfy/.opencode/rules/skills-mcp.md)
+Seluruh aturan pemilihan skill, alur proses (`brainstorming` -> `prototype` (opsional: validasi state logic / eksperimen layout UI) -> `writing-plans` -> `executing-plans`), registry MCP, dan matriks tools PRDFY dikelola secara terpusat (Single Source of Truth) di:
+- [skills-mcp.md](.opencode/rules/skills-mcp.md)
 
 **Prinsip Utama:**
 1. Sebelum melakukan tindakan apa pun (eksplorasi, klarifikasi, refaktor, coding, atau live QA), cek dan jalankan skill yang relevan melalui file aturan di atas.

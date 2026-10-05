@@ -15,6 +15,7 @@
    relevant, or there is even a 1% chance it is relevant, it MUST be
    invoked.
 2. **Process skills first, implementation skills after** - `brainstorming` ->
+   `prototype` (optional/when validating ambiguous state transitions or exploring radically different UI layouts) ->
    `writing-plans` -> `dispatching-parallel-agents`/`executing-plans` -> then
    the domain/UI implementation skill.
 3. **Do not rationalize skipping** - thoughts like "this is simple", "I need
@@ -107,12 +108,45 @@
 | `9router`                             | 9router gateway/provider adapter                        | Model discovery, OpenAI-compatible request, key handling, retry/error classification   |
 | `integrate-midtrans-payments`         | Billing/Midtrans operation                              | Snap token creation, signature verification, webhook handler, settlement idempotency   |
 | `document-pdf`                        | PDF generation/parsing and export                       | PRD export to PDF and bundle archive creation                                          |
+| `prototype`                           | Sanity-checking state models/logic or exploring UI layouts | Throwaway logic demos (HTML state machine / reducer walkthroughs) or multi-variant UI switchers (`?variant=`) before writing full specs |
 
 Skills listed above as installed have been verified via `npx skills list -g`
 and the local `SKILL.md` file. A skill that has not been verified must not be
 treated as available. A global install from the CLI may print a warning that
 PromptScript does not support global install; the evidence that matters for
 OpenCode is the skill path and OpenCode's status in the install output.
+
+### 3.1. Rules & Boundaries for `prototype`
+
+A prototype is **throwaway code that answers a question**. It serves to explore and validate ideas before committing to full specifications, schemas, and tests.
+
+#### Two Distinct Branches:
+1. **Logic Prototype (`LOGIC.md`)**:
+   - **Shape:** A single, self-contained HTML file (a shareable demo) with inline styles and vanilla JS (no bundler/framework/server needed, double-clickable by non-engineers).
+   - **Core Engine:** The logic under test must be isolated in a pure module (pure reducer, state machine, or pure functions) without touching DOM or globals.
+   - **Interactive Surfaces:**
+     - Prominent problem statement at top.
+     - Live state panel rendered in human/domain language (re-rendered on every action).
+     - Free-play action buttons (poke state in any order).
+     - Tabbed guided scenario walkthroughs (each step has a button executing the action and advancing the scenario).
+   - **Target:** Complex state machines, edge cases, awkward transitions, or API surface design (e.g. section patch protocol, credit deductions, multi-step sync).
+
+2. **UI Prototype (`UI.md`)**:
+   - **Shape:** 3 radically different structural UI variations on a single route, switchable via URL search param `?variant=A|B|C` with a fixed bottom floating switcher (`PrototypeSwitcher`).
+   - **Structural Diversity:** Variants must differ in layout structure, information hierarchy, and primary affordances—never mere color tweaks or wallpaper changes.
+   - **Two sub-shapes:**
+     - **Sub-shape A (Strongly Preferred):** Adjusting an existing page or mounting inside an existing host page/drawer/card. Preserves existing route loader, params, auth, and layout.
+     - **Sub-shape B (Last Resort):** Throwaway route under `/prototype/<name>` when no plausible host page exists.
+   - **Switcher requirements:**
+     - Cycles previous/next variant with arrows and keyboard (`←`/`→`, ignoring inputs).
+     - Strictly gated: must NOT be visible or bundled in production (`process.env.NODE_ENV !== 'production'`).
+
+#### Mandatory Constraints & Invariants:
+1. **Throwaway from Day 1:** Clearly marked in path/component name (e.g. `VariantA`, `VariantB`, `prototype-*`).
+2. **No Persistence or Live Mutation:** State is in-memory or points to stubs/scratch files. NEVER wire prototype UI to real database mutations, live payments, or actual credit burning.
+3. **No Polish During Prototype:** Skip formal tests, complex error boundaries, and abstractions during prototyping. Focus purely on rapid learning.
+4. **Never Direct-to-Production:** Once a variant or logic is validated, **rewrite/fold it into production code under full production rigor**: complete TypeScript types (`no-type-bypass.md`), Zod schemas, tests (`test-driven-development`), and accessibility (`anti-ai-slop.md`).
+5. **No Prototypes in Main:** Losing variants, temporary routes, and the prototype switcher must be moved to a throwaway branch as a primary source reference. Never leave prototype artifacts rotting in `main`.
 
 ---
 
@@ -164,6 +198,7 @@ harness.
 
 ## 7. Example PRDFY Combinations per Feature / Flow
 
+- **Flow 00 Exploratory Prototyping (State & UI):** `brainstorming` -> `prototype` (Logic Demo HTML or UI Multi-Variant Switcher on existing route) -> human/team review & verdict -> `writing-plans` -> production implementation.
 - **Flow 01 Landing & Auth:** `better-auth-authentication` + `better-auth-security-best-practices` ->
   OAuth login (Google/GitHub), session creation, safe redirect, and protected route check.
 - **Flow 02 Guided Question Flow (Ask):** `tanstack-router-best-practices` +
@@ -204,6 +239,14 @@ harness.
 - FORBIDDEN to manipulate the database (e.g. updating `projects.step`, altering `taskStatus`,
   or faking DB state) to artificially fast-forward or resume a failed QA run; any QA failure
   requires a root-cause code fix and a complete restart from Flow 1.
+- FORBIDDEN to promote prototype code directly to production without rewriting under full
+  production constraints (types, tests, error handling, accessibility).
+- FORBIDDEN to ship prototype switchers (`PrototypeSwitcher`), losing UI variants, or
+  throwaway routes to production or merge them into `main` without isolation.
+- FORBIDDEN to wire UI prototypes to real mutations, live DB, or real credit deduction.
+- FORBIDDEN to reduce production feature scope to a "minimal prototype" (per `anti-satisficing.md`
+  and `AGENTS.md`). A prototype is strictly an exploratory tool to answer a question, not a shortcut
+  for incomplete deliverables.
 
 ---
 

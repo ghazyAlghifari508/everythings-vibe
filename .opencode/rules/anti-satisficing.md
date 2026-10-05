@@ -235,6 +235,11 @@ When a task touches UI, check first:
 the easiest?
 - Will I call this "production-ready" or only "functional"?
 
+Untuk surface UI baru atau perombakan visual yang signifikan, jangan langsung terpaku pada satu layout default yang pertama kali terpikirkan. Manfaatkan skill `prototype` (cabang UI Prototype) untuk membuat 3 variasi layout struktural yang berbeda secara radikal (dapat diganti via `?variant=` dan switcher mengambang), lalu evaluasi opsi terbaik bersama user sebelum implementasi penuh.
+
+**Peringatan Batasan (Prototype vs Production):**
+DILARANG menyederhanakan deliverable fitur produksi menjadi sekadar "prototype minimal". Sebuah prototype strictly bersifat *throwaway* untuk menjawab pertanyaan desain/logika. Ketika variasi terbaik sudah diputuskan, kode tersebut wajib ditulis ulang/diintegrasikan secara disiplin dengan tipe data TypeScript lengkap, validasi Zod, penanganan error, dan test suite yang solid sebelum masuk ke branch utama (`main`).
+
 The full visual standard (hierarchy, spacing, states, responsive behavior,
 accessibility, and redesigning existing surfaces from zero) is the domain of
 `anti-ai-slop.md`, not repeated here. This file only covers the part
