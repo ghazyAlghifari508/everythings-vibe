@@ -677,6 +677,14 @@ describe("safe sync errors and CLI version gate (Task 4)", () => {
 		expect(isSupportedCliVersion("not-a-version", "2.0.0")).toBe(false);
 	});
 
+	it("keeps older CLIs accepted so syncs without repository naming still work", () => {
+		// The floor stays 2.0.0 on purpose: a CLI that omits repositoryName is
+		// advisory-tolerated (the handshake keeps the existing name), so
+		// raising the minimum would break working syncs for no transport need.
+		expect(isSupportedCliVersion("3.0.0", CODEBASE_CLI_MIN_VERSION)).toBe(true);
+		expect(isSupportedCliVersion("3.1.0", CODEBASE_CLI_MIN_VERSION)).toBe(true);
+	});
+
 	it("builds the locked sync command with a placeholder, never a raw token", () => {
 		const raw = generateSyncToken();
 		const command = buildSyncCommand("proj_123");

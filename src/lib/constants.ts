@@ -132,7 +132,11 @@ export const CODEBASE_SYNC_SESSION_EXPIRY_MS = 30 * 60 * 1000;
 export const CODEBASE_MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
 export const CODEBASE_MAX_FILE_BYTES = 1024 * 1024;
 export const CODEBASE_MAX_CHUNK_BYTES = 256 * 1024;
-// Minimum supported CLI version for `vibeeverything codebase sync`.
+// Minimum supported CLI version for `vibeeverything codebase sync`. The floor
+// stays 2.0.0 on purpose: capabilities added later (repositoryName handshake
+// identity, canonical ignore file, preparation-failure reporting) are
+// advisory — the server tolerates their absence and keeps the existing name —
+// so raising the minimum would break working syncs for no transport need.
 export const CODEBASE_CLI_MIN_VERSION = "2.0.0";
 // A pending idempotency claim older than this is treated as abandoned by a
 // crashed request and may be atomically stolen by a retry. Bound from the
