@@ -257,6 +257,20 @@ describe("selectLibraryAnalysisSlice", () => {
 	});
 });
 
+describe("codebase list filtering gate", () => {
+	const source = readFileSync("src/routes/codebases/index.tsx", "utf8");
+
+	it("builds library rows through the canonical readiness helper instead of mapping every owned row", () => {
+		expect(source).toContain("buildCodebaseLibraryItems");
+		expect(source).not.toContain("analysisOutputByProject");
+	});
+
+	it("pulls analysis status into the row so the readiness helper can inspect it", () => {
+		expect(source).toContain("status: codebaseAnalyses.status");
+		expect(source).not.toContain('eq(codebaseAnalyses.status, "ready")');
+	});
+});
+
 describe("buildAskHandoffAnswers", () => {
 	it("maps answer map to question title and answer list conforming to askHandoffAnswerSchema", () => {
 		const questions = [

@@ -1,5 +1,8 @@
 import { z } from "zod";
-import type { CodebaseAnalysis } from "./codebase-analysis";
+import {
+	type CodebaseAnalysis,
+	safeParseCodebaseAnalysis,
+} from "./codebase-analysis";
 import { hasControlCharacters, isSafeRelativePath } from "./codebase-sync";
 import { CODEBASE_NAME_MAX_CHARS, CODEBASE_NAME_MIN_CHARS } from "./constants";
 
@@ -39,6 +42,162 @@ export type CodebaseRenameInput = z.infer<typeof codebaseRenameSchema>;
 export const CODEBASE_NAME_MIN_ERROR =
 	"Nama project minimal 3 karakter dan tidak boleh kosong.";
 export const CODEBASE_NAME_MAX_ERROR = "Nama project terlalu panjang.";
+
+interface LibrarySnapshotLike {
+	id: string;
+	codebaseId: string | null;
+	createdAt: Date | null;
+}
+
+interface LibraryFeatureLike {
+	id: string;
+	codebaseId: string | null;
+}
+
+interface LibraryAnalysisLike {
+	projectId: string;
+	snapshotId: string;
+}
+
+export function selectLatestCodebaseSnapshots<
+	TSnapshot extends LibrarySnapshotLike,
+>(snapshots: readonly TSnapshot[]): Map<string, TSnapshot> {
+	const latest = new Map<string, TSnapshot>();
+	for (const snapshot of snapshots) {
+		if (!snapshot.codebaseId) continue;
+		const current = latest.get(snapshot.codebaseId);
+		if (
+			!current ||
+			(snapshot.createdAt?.getTime() ?? Number.NEGATIVE_INFINITY) >
+				(current.createdAt?.getTime() ?? Number.NEGATIVE_INFINITY)
+		) {
+			latest.set(snapshot.codebaseId, snapshot);
+		}
+	}
+	return latest;
+}
+
+export function selectNewestFeatureProjectIdPerCodebase<
+	TProject extends LibraryFeatureLike,
+>(projects: readonly TProject[]): Map<string, string> {
+	const newest = new Map<string, string>();
+	for (const project of projects) {
+		if (!project.codebaseId) continue;
+		if (!newest.has(project.codebaseId)) {
+			newest.set(project.codebaseId, project.id);
+		}
+	}
+	return newest;
+}
+
+export function selectLibraryAnalysisSlice<
+	TAnalysis extends LibraryAnalysisLike,
+>(
+	latestSnapshotId: string | null,
+	analyses: readonly TAnalysis[],
+): TAnalysis | null {
+	if (!latestSnapshotId) return null;
+	return (
+		analyses.find((analysis) => analysis.snapshotId === latestSnapshotId) ??
+		null
+	);
+}
+
+export interface LibraryAssemblyCodebase {
+	id: string;
+	name: string;
+	createdAt: Date | null;
+	updatedAt: Date | null;
+}
+
+export interface LibraryAssemblySnapshot extends LibrarySnapshotLike {
+	fileCount: number | null;
+	status: string | null;
+}
+
+export interface LibraryAssemblyAnalysis extends LibraryAnalysisLike {
+	status: string | null;
+	output: unknown;
+}
+
+export interface CodebaseLibraryReadiness {
+	latestSnapshotId: string | null;
+	matchedAnalysis: {
+		snapshotId: string;
+		status: string | null;
+		outputParsed: boolean;
+	} | null;
+}
+
+export function isCodebaseLibraryReady(
+	input: CodebaseLibraryReadiness,
+): boolean {
+	if (!input.latestSnapshotId) return false;
+	const { matchedAnalysis } = input;
+	if (!matchedAnalysis) return false;
+	if (matchedAnalysis.snapshotId !== input.latestSnapshotId) return false;
+	if (matchedAnalysis.status !== "ready") return false;
+	return matchedAnalysis.outputParsed;
+}
+
+export function buildCodebaseLibraryItems(input: {
+	codebases: readonly LibraryAssemblyCodebase[];
+	snapshots: readonly LibraryAssemblySnapshot[];
+	projects: readonly LibraryFeatureLike[];
+	analyses: readonly LibraryAssemblyAnalysis[];
+}): CodebaseLibraryItem[] {
+	const { codebases, snapshots, projects, analyses } = input;
+	const latest = selectLatestCodebaseSnapshots(snapshots);
+	const latestProjectByCodebase =
+		selectNewestFeatureProjectIdPerCodebase(projects);
+	const analysesByProject = new Map<string, LibraryAssemblyAnalysis[]>();
+	for (const analysis of analyses) {
+		const list = analysesByProject.get(analysis.projectId) ?? [];
+		list.push(analysis);
+		analysesByProject.set(analysis.projectId, list);
+	}
+	const items: CodebaseLibraryItem[] = [];
+	for (const row of codebases) {
+		const snapshot = latest.get(row.id) ?? null;
+		const projectId = latestProjectByCodebase.get(row.id) ?? null;
+		const latestSnapshotId = snapshot?.id ?? null;
+		const matched = projectId
+			? selectLibraryAnalysisSlice(
+					latestSnapshotId,
+					analysesByProject.get(projectId) ?? [],
+				)
+			: null;
+		const parsedResult = matched
+			? safeParseCodebaseAnalysis(matched.output)
+			: null;
+		const parsedData = parsedResult?.success ? parsedResult.data : null;
+		const hasReadyAnalysis = isCodebaseLibraryReady({
+			latestSnapshotId,
+			matchedAnalysis: matched
+				? {
+						snapshotId: matched.snapshotId,
+						status: matched.status ?? null,
+						outputParsed: parsedData !== null,
+					}
+				: null,
+		});
+		const slice = parsedData ? pickLibraryAnalysis(parsedData) : null;
+		items.push({
+			id: row.id,
+			name: row.name,
+			updatedAt: row.updatedAt?.toISOString() ?? null,
+			fileCount: snapshot?.fileCount ?? null,
+			snapshotCreatedAt: snapshot?.createdAt?.toISOString() ?? null,
+			snapshotStatus: snapshot?.status ?? null,
+			summary: slice?.summary ?? null,
+			framework: slice?.framework ?? null,
+			language: slice?.language ?? null,
+			packageManager: slice?.packageManager ?? null,
+			hasReadyAnalysis,
+		});
+	}
+	return items.filter((item) => item.hasReadyAnalysis);
+}
 
 /**
  * Normalize an untrusted repository name reported by the CLI into a value that
