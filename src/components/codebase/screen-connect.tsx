@@ -212,13 +212,13 @@ export function ScreenConnect({
 								Paste prompt lalu jalankan
 							</div>
 							<p className="text-[11px] leading-relaxed text-fog">
-								Status di bawah mengikuti server secara langsung. Halaman ini
-								tidak berpindah sendiri; progresses sampai source code selesai
-								tersinkron.
+								Jalankan prompt dari root repository untuk mulai menyinkronkan
+								codebase.
 							</p>
 
-							{/* Attempt identity, so the reported status can be tied to the
-							session the user actually started. */}
+							{/* Attempt identity, so a reported status can be tied to the
+							session the user actually started. Kept as quiet metadata and
+							out of the progress narrative. */}
 							{status?.sessionId && (
 								<p className="font-mono text-[11px] text-fog">
 									Sync ID: {status.sessionId.slice(0, 12)}...
@@ -228,8 +228,17 @@ export function ScreenConnect({
 								</p>
 							)}
 
-							{/* The one live sync presentation for this flow: handshake and
-							upload, both mapped from the same polled server status. */}
+							{/* The browser has not heard from the server yet, so no stage
+							can honestly be claimed. */}
+							{!stageView.hasStatus && !stageView.failed && (
+								<p className="text-[11px] leading-relaxed text-fog">
+									Menghubungkan server...
+								</p>
+							)}
+
+							{/* The one live sync presentation for this flow: agent, source
+							preparation, and upload, all mapped from the same polled
+							server status. */}
 							<SyncStageList status={status} />
 
 							{statusError && (
@@ -244,7 +253,10 @@ export function ScreenConnect({
 							{/* Retry belongs here, contextually, instead of on a screen the
 							user has to navigate to in order to find it. */}
 							{canRetry && (
-								<div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px] text-mist">
+								<div
+									role="alert"
+									className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px]"
+								>
 									<div className="flex items-start gap-2.5">
 										<AlertCircle
 											size={14}
@@ -255,8 +267,13 @@ export function ScreenConnect({
 											<span className="font-semibold text-snow">
 												Sinkronisasi belum berhasil
 											</span>
-											<span className="leading-relaxed opacity-80">
-												{stageView.repository.detail}
+											{stageView.errorMessage && (
+												<span className="leading-relaxed text-fog">
+													{stageView.errorMessage}
+												</span>
+											)}
+											<span className="leading-relaxed text-fog">
+												{stageView.retryHint}
 											</span>
 											<button
 												type="button"
@@ -278,8 +295,8 @@ export function ScreenConnect({
 					<div className="flex flex-col items-center justify-between gap-3 border-t border-graphite bg-charcoal/60 px-5 py-4 sm:flex-row sm:px-6">
 						<p className="text-center text-[11px] leading-relaxed text-fog sm:text-left">
 							{canAdvance
-								? "Source code sudah tersinkron. Lanjutkan untuk melihat ringkasan codebase."
-								: "Tombol lanjut aktif setelah source code selesai tersinkron ke server."}
+								? "Sinkronisasi selesai. Lanjutkan untuk melihat ringkasan codebase."
+								: "Tombol lanjut aktif setelah sinkronisasi selesai."}
 						</p>
 						<button
 							type="button"

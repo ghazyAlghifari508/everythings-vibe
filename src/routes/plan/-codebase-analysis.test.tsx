@@ -234,7 +234,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		await startSyncStep();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByText("Sinkronisasi selesai")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
@@ -247,7 +247,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		await startSyncStep();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Menunggu agent terhubung")).toBeDefined();
+				expect(screen.getByText("Menunggu agent")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
@@ -366,7 +366,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		expect(screen.queryByText("Detected environment")).toBeNull();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByText("Sinkronisasi selesai")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);

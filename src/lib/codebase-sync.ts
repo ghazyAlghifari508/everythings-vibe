@@ -284,12 +284,57 @@ export function canOpenSummary(
 // workspace re-sync step, and any future reader all describe the same server
 // state with the same words.
 
-export type SyncStageState = "done" | "active" | "idle" | "pending" | "failed";
+/**
+ * How far the real sync lifecycle has actually progressed, in product terms.
+ *
+ * - `waiting`  the agent has not contacted the server yet
+ * - `preparing` the agent is linked and the CLI is walking the project tree
+ * - `syncing`   files are on the wire
+ * - `done`      the server holds a verified snapshot
+ *
+ * Every one of these is a real step the server already records. Nothing here is
+ * a stage invented to make the list look busier, and none of them is a
+ * fabricated delay: a fast CLI can legitimately jump straight from `waiting` to
+ * `done`, and the view then renders three completed rows with no replayed
+ * intermediate.
+ */
+export type SyncStageProgress = "waiting" | "preparing" | "syncing" | "done";
+
+/**
+ * The backend lifecycle expressed as product stages.
+ *
+ * `connected`, `scanning` and `filtering` are all one user-visible moment — the
+ * agent is connected and the CLI is reading the project — so they share the
+ * `preparing` stage instead of leaking three enum names into the UI. The CLI
+ * reports no `scanning`/`filtering` state of its own; the upload endpoints walk
+ * the session through them, which is why they carry the same meaning here.
+ */
+const SYNC_STAGE_PROGRESS: Readonly<
+	Record<CodebaseSyncStatus, SyncStageProgress>
+> = {
+	waiting_for_cli: "waiting",
+	connected: "preparing",
+	scanning: "preparing",
+	filtering: "preparing",
+	uploading: "syncing",
+	uploaded: "done",
+	analyzing: "done",
+	ready: "done",
+	failed: "waiting",
+	expired: "waiting",
+};
+
+export type SyncStageState = "done" | "active" | "waiting" | "failed";
 
 export interface SyncStageRow {
 	state: SyncStageState;
 	title: string;
-	detail: string;
+	/**
+	 * Present only when the row has something worth reading. An inactive stage
+	 * gets no description: "this step has not started yet" is filler, and the
+	 * user learns nothing from it.
+	 */
+	detail?: string;
 	/** Optional short qualifier rendered beside the row (e.g. a live count). */
 	meta?: string;
 }
@@ -297,10 +342,14 @@ export interface SyncStageRow {
 export interface SyncStageView {
 	/** False until the browser has received any server state at all. */
 	hasStatus: boolean;
-	/** The CLI handshake: waiting, then linked for the rest of the attempt. */
-	repository: SyncStageRow;
-	/** The source upload: unstarted, in flight, then the received snapshot. */
-	source: SyncStageRow;
+	/** True when the attempt ended without finishing. */
+	failed: boolean;
+	/**
+	 * The three product stages, in order. Empty while the state is unknown and
+	 * after a failed attempt: on failure the server cannot say how far it got,
+	 * so claiming a completed stage would be inventing progress.
+	 */
+	stages: SyncStageRow[];
 	/** Reported only once the server actually has it. */
 	excludedCount?: number;
 	/**
@@ -311,26 +360,93 @@ export interface SyncStageView {
 	 * completed sync it describes a conclusion problem the summary step owns.
 	 */
 	errorMessage: string | null;
+	/** What the user can do about a failed or expired attempt. */
+	retryHint: string;
 	/** A failed or expired session cannot resume; it needs a fresh credential. */
 	canRetry: boolean;
 	/** Transport finished: a usable current snapshot exists. */
 	syncComplete: boolean;
 }
 
-// `connected` is excluded on purpose: the handshake alone is not upload work,
-// so a linked-but-idle agent must not claim files are moving.
-const CODEBASE_SYNC_TRANSPORT_ACTIVE: readonly CodebaseSyncStatus[] = [
-	"scanning",
-	"filtering",
-	"uploading",
-] as const;
+/** Stable, user-facing row order. Presentation only; the copy is mapped above. */
+export const SYNC_STAGE_ORDER = ["agent", "preparing", "syncing"] as const;
 
-export function isSyncTransportActive(status: CodebaseSyncStatus): boolean {
-	return (CODEBASE_SYNC_TRANSPORT_ACTIVE as readonly string[]).includes(status);
+export type SyncStageKey = (typeof SYNC_STAGE_ORDER)[number];
+
+export const SYNC_STAGE_TEST_IDS: Readonly<Record<SyncStageKey, string>> = {
+	agent: "sync-stage-agent",
+	preparing: "sync-stage-preparing",
+	syncing: "sync-stage-sync",
+};
+
+const AGENT_TITLE = "Menunggu agent";
+const AGENT_HINT = "Jalankan prompt dari root repository.";
+const PREPARE_TITLE = "Menyiapkan source code";
+const SYNC_TITLE = "Menyinkronkan codebase";
+
+function buildAgentRow(progress: SyncStageProgress): SyncStageRow {
+	if (progress === "waiting") {
+		return { state: "waiting", title: AGENT_TITLE, detail: AGENT_HINT };
+	}
+	return {
+		state: "done",
+		title: "Agent terhubung",
+		detail: "Agent berhasil tersambung ke VibeEverything.",
+	};
 }
 
-const EXPIRED_STAGE_DETAIL =
-	"Sesi sync kedaluwarsa. Buat token baru untuk melanjutkan.";
+function buildPreparingRow(progress: SyncStageProgress): SyncStageRow {
+	if (progress === "preparing") {
+		return {
+			state: "active",
+			title: `${PREPARE_TITLE}...`,
+			detail: "Memeriksa file project yang akan disinkronkan.",
+		};
+	}
+	if (progress === "syncing" || progress === "done") {
+		return {
+			state: "done",
+			title: "Source code siap",
+			detail: "File project yang relevan sudah disiapkan.",
+		};
+	}
+	return { state: "waiting", title: PREPARE_TITLE };
+}
+
+function buildSyncingRow(
+	progress: SyncStageProgress,
+	fileCount: number | undefined,
+): SyncStageRow {
+	if (progress === "done") {
+		return {
+			state: "done",
+			title: "Sinkronisasi selesai",
+			detail:
+				typeof fileCount === "number"
+					? `${fileCount} file berhasil diterima.`
+					: "Source code berhasil diterima.",
+		};
+	}
+	if (progress === "syncing") {
+		const row: SyncStageRow = {
+			state: "active",
+			title: `${SYNC_TITLE}...`,
+			detail: "Mengirim source code ke VibeEverything.",
+		};
+		// The count is real server data, so it is shown as soon as there is one
+		// rather than inventing a percentage the server never reports.
+		if (typeof fileCount === "number") {
+			row.meta = `${fileCount} file sedang dikirim.`;
+		}
+		return row;
+	}
+	return { state: "waiting", title: SYNC_TITLE };
+}
+
+const EXPIRED_RETRY_HINT =
+	"Sesi sync sudah kedaluwarsa. Buat token baru untuk melanjutkan.";
+const FAILED_RETRY_HINT =
+	"Perbaiki masalah di terminal, lalu jalankan ulang prompt.";
 
 export function resolveSyncStageView(
 	status:
@@ -346,22 +462,16 @@ export function resolveSyncStageView(
 		| null
 		| undefined,
 ): SyncStageView {
-	// No server state yet is not "waiting for the CLI": the browser has not
-	// asked. Reporting standby here would be a claim the server never made.
+	// No server state yet is not "waiting for the agent": the browser has not
+	// asked. Rendering the stage list here would claim the server reported
+	// something it never did.
 	if (!status) {
 		return {
 			hasStatus: false,
-			repository: {
-				state: "pending",
-				title: "Menghubungkan server",
-				detail: "Memuat status sinkron terbaru dari server.",
-			},
-			source: {
-				state: "pending",
-				title: "Menunggu status sinkron",
-				detail: "Tahap ini berjalan setelah agent terhubung.",
-			},
+			failed: false,
+			stages: [],
 			errorMessage: null,
+			retryHint: "",
 			canRetry: false,
 			syncComplete: false,
 		};
@@ -371,77 +481,42 @@ export function resolveSyncStageView(
 	const errorMessage = syncComplete ? null : (status.errorMessage ?? null);
 
 	if (status.status === "failed" || status.status === "expired") {
+		// A failed attempt can break at any step, and the status alone does not
+		// record which one. Showing completed checkmarks here would be invented
+		// progress, so the stage list is withheld and the failure is reported
+		// once, with the way out.
 		return {
 			hasStatus: true,
-			repository: {
-				state: "failed",
-				title: "Sinkronisasi belum berhasil",
-				detail:
-					status.status === "expired"
-						? EXPIRED_STAGE_DETAIL
-						: (status.errorMessage ?? "Repository gagal dikirim."),
-			},
-			source: {
-				state: "failed",
-				title: "Source code gagal dikirim",
-				detail: "Perbaiki masalah di terminal, lalu jalankan ulang prompt.",
-			},
+			failed: true,
+			stages: [],
 			errorMessage,
+			retryHint:
+				status.status === "expired" ? EXPIRED_RETRY_HINT : FAILED_RETRY_HINT,
 			canRetry: true,
 			syncComplete: false,
 		};
 	}
 
-	const linked = hasCliHandshake(status);
-	const inFlight = isSyncTransportActive(status.status);
-	// A completed-status row without a snapshot is not a usable sync, so it
-	// keeps reporting transport work rather than claiming a snapshot exists.
-	const source: SyncStageRow = syncComplete
-		? {
-				state: "done",
-				title: "Source code tersinkron",
-				detail:
-					typeof status.fileCount === "number"
-						? `${status.fileCount} file berhasil diterima.`
-						: "Repository berhasil diterima.",
-			}
-		: inFlight
-			? {
-					state: "active",
-					title: "Menyinkronkan source code...",
-					detail: "Repository sedang dikirim.",
-				}
-			: {
-					state: "pending",
-					title: "Source code belum tersinkron",
-					detail: "Tahap ini berjalan setelah agent terhubung.",
-				};
-
-	// The received count is real server data, so it stays visible for as long as
-	// the server reports it. On a finished sync it is already part of the detail
-	// line; before that it is the only concrete progress the user can be given.
-	if (!syncComplete && typeof status.fileCount === "number") {
-		source.meta = `${status.fileCount} file`;
-	}
+	// A `done` status with no snapshot cannot back a finished claim: the upload
+	// was never verified, so the attempt is still treated as in flight.
+	const progress =
+		SYNC_STAGE_PROGRESS[status.status] === "done" && !status.snapshotId
+			? "syncing"
+			: SYNC_STAGE_PROGRESS[status.status];
 
 	return {
 		hasStatus: true,
-		repository: linked
-			? {
-					state: "done",
-					title: "Repository terhubung",
-					detail: "Agent berhasil tersambung ke VibeEverything.",
-				}
-			: {
-					state: "idle",
-					title: "Menunggu agent terhubung",
-					detail: "Jalankan prompt dari root repository.",
-				},
-		source,
+		failed: false,
+		stages: [
+			buildAgentRow(progress),
+			buildPreparingRow(progress),
+			buildSyncingRow(progress, status.fileCount),
+		],
 		...(status.excludedCount !== undefined
 			? { excludedCount: status.excludedCount }
 			: {}),
 		errorMessage,
+		retryHint: "",
 		canRetry: false,
 		syncComplete,
 	};

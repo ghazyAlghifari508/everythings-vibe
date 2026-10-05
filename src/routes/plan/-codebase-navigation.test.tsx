@@ -214,7 +214,7 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 		// screen in place. There is no separate monitor screen to be pushed onto.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByText("Sinkronisasi selesai")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
@@ -232,8 +232,8 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 
 		// Handshake and upload, rendered once each. A duplicated monitor screen is
 		// exactly what this asserts cannot happen.
-		expect(screen.getAllByTestId("sync-stage-connection")).toHaveLength(1);
-		expect(screen.getAllByTestId("sync-stage-upload")).toHaveLength(1);
+		expect(screen.getAllByTestId("sync-stage-agent")).toHaveLength(1);
+		expect(screen.getAllByTestId("sync-stage-sync")).toHaveLength(1);
 		expect(screen.queryByTestId("sync-card")).toBeNull();
 		expect(screen.queryByText(/Lanjut ke Pantau Sync/i)).toBeNull();
 		expect(screen.queryByText(/Kembali ke Prompt Sync/i)).toBeNull();
@@ -254,7 +254,7 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 		await startSyncStep();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByText("Sinkronisasi selesai")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
@@ -327,7 +327,7 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 		// reporting a ready analysis must not drag the user forward again.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByText("Sinkronisasi selesai")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);

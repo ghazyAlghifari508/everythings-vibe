@@ -165,11 +165,11 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 
 		await waitFor(
 			() => {
-				expect(screen.getByText("Repository terhubung")).toBeDefined();
+				expect(screen.getByText("Agent terhubung")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		expect(screen.getByText("Menyinkronkan source code...")).toBeDefined();
+		expect(screen.getByText("Menyinkronkan codebase...")).toBeDefined();
 		expect(
 			(screen.getByTestId("sync-continue-to-summary") as HTMLButtonElement)
 				.disabled,
@@ -201,7 +201,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 		// sync state they were watching, not to a step they never reached.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByText("Sinkronisasi selesai")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
@@ -305,7 +305,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Menunggu agent terhubung")).toBeDefined();
+				expect(screen.getByText("Menunggu agent")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);

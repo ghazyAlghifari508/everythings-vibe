@@ -116,7 +116,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		// restorable, so the prompt area offers a fresh one instead.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Repository terhubung")).toBeDefined();
+				expect(screen.getByText("Agent terhubung")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
@@ -187,14 +187,14 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 				.disabled,
 		).toBe(true);
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
-		// The server's own verdict is what the step reports: idle, waiting.
+		// The server's own verdict is what the step reports: waiting on the agent.
 		await waitFor(
 			() => {
 				expect(
 					document
-						.querySelector('[data-testid="sync-stage-connection"]')
+						.querySelector('[data-testid="sync-stage-agent"]')
 						?.getAttribute("data-stage-state"),
-				).toBe("idle");
+				).toBe("waiting");
 			},
 			{ timeout: 15000, interval: 100 },
 		);

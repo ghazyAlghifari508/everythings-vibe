@@ -170,7 +170,7 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 		// The prompt is waiting on the agent first.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Menunggu agent terhubung")).toBeDefined();
+				expect(screen.getByText("Menunggu agent")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
@@ -178,7 +178,7 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 		// The same screen picks the finished upload up live and reports it.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Source code tersinkron")).toBeDefined();
+				expect(screen.getByText("Sinkronisasi selesai")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);

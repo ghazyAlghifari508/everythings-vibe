@@ -29,6 +29,12 @@ function status(
 	};
 }
 
+const STAGE_TEST_IDS = [
+	"sync-stage-agent",
+	"sync-stage-preparing",
+	"sync-stage-sync",
+] as const;
+
 let container: HTMLDivElement;
 let root: Root | null = null;
 
@@ -90,63 +96,117 @@ function stageState(testId: string): string | null {
 	);
 }
 
+function allStageStates(): Array<string | null> {
+	return STAGE_TEST_IDS.map((testId) => stageState(testId));
+}
+
+describe("Step 1 instruction copy", () => {
+	it("tells the user what to do, without describing the mechanism", () => {
+		renderConnect();
+		expect(container.textContent).toContain(
+			"Jalankan prompt dari root repository untuk mulai menyinkronkan codebase.",
+		);
+	});
+
+	it("no longer explains polling, reconciliation, or navigation behaviour", () => {
+		renderConnect();
+		const copy = container.textContent ?? "";
+		expect(copy).not.toMatch(/mengikuti server/i);
+		expect(copy).not.toMatch(/tidak berpindah sendiri/i);
+		expect(copy).not.toMatch(/progresses/i);
+		expect(copy).not.toMatch(/status di bawah/i);
+	});
+});
+
 describe("Step 1 live sync status", () => {
-	it("reports an honest standby while the server waits for the CLI", () => {
+	it("renders exactly the three product stages", () => {
+		renderConnect();
+		for (const testId of STAGE_TEST_IDS) {
+			expect(
+				container.querySelectorAll(`[data-testid="${testId}"]`),
+			).toHaveLength(1);
+		}
+		const stageTitles = STAGE_TEST_IDS.map(
+			(testId) =>
+				container.querySelector(`[data-testid="${testId}"]`)?.textContent ?? "",
+		);
+		expect(stageTitles[0]).toContain("Menunggu agent");
+		expect(stageTitles[1]).toContain("Menyiapkan source code");
+		expect(stageTitles[2]).toContain("Menyinkronkan codebase");
+	});
+
+	it("reports an honest standby while the server waits for the agent", () => {
 		renderConnect({ status: status() });
-		expect(container.textContent).toContain("Menunggu agent terhubung");
+		expect(container.textContent).toContain("Menunggu agent");
 		expect(container.textContent).toContain(
 			"Jalankan prompt dari root repository.",
 		);
-		expect(stageState("sync-stage-connection")).toBe("idle");
-		expect(stageState("sync-stage-upload")).toBe("pending");
+		expect(allStageStates()).toEqual(["waiting", "waiting", "waiting"]);
 	});
 
-	it("never claims a linked repository before a handshake exists", () => {
+	it("keeps inactive rows free of filler descriptions", () => {
 		renderConnect({ status: status() });
-		expect(container.textContent).not.toContain("Repository terhubung");
-		expect(container.textContent).not.toContain("Source code tersinkron");
-	});
-
-	it("marks the repository linked and the upload active on a handshake", () => {
-		renderConnect({ status: status({ status: "connected" }) });
-		expect(stageState("sync-stage-connection")).toBe("done");
-		expect(container.textContent).toContain("Repository terhubung");
-		expect(container.textContent).toContain(
-			"Agent berhasil tersambung ke VibeEverything.",
-		);
-		// A handshake is not upload progress.
-		expect(stageState("sync-stage-upload")).toBe("pending");
-	});
-
-	it("shows active source sync across the whole upload chain", () => {
-		for (const statusValue of ["scanning", "filtering", "uploading"] as const) {
-			renderConnect({ status: status({ status: statusValue }) });
-			expect(stageState("sync-stage-connection")).toBe("done");
-			expect(stageState("sync-stage-upload")).toBe("active");
-			expect(container.textContent).toContain("Menyinkronkan source code...");
-			expect(container.textContent).toContain("Repository sedang dikirim.");
+		const inactive = [
+			container.querySelector('[data-testid="sync-stage-preparing"]')
+				?.textContent ?? "",
+			container.querySelector('[data-testid="sync-stage-sync"]')?.textContent ??
+				"",
+		];
+		for (const row of inactive) {
+			expect(row).not.toMatch(/tahap ini berjalan setelah/i);
+			expect(row).not.toMatch(/belum tersinkron/i);
 		}
 	});
 
-	it("completes both stages once the snapshot lands", () => {
+	it("never claims a linked agent or a finished sync before the server says so", () => {
+		renderConnect({ status: status() });
+		expect(container.textContent).not.toContain("Agent terhubung");
+		expect(container.textContent).not.toContain("Sinkronisasi selesai");
+	});
+
+	it("shows source preparation as the active stage once the agent is linked", () => {
+		for (const value of ["connected", "scanning", "filtering"] as const) {
+			renderConnect({ status: status({ status: value }) });
+			expect(allStageStates()).toEqual(["done", "active", "waiting"]);
+			expect(container.textContent).toContain("Agent terhubung");
+			expect(container.textContent).toContain(
+				"Agent berhasil tersambung ke VibeEverything.",
+			);
+			expect(container.textContent).toContain("Menyiapkan source code...");
+			expect(container.textContent).toContain(
+				"Memeriksa file project yang akan disinkronkan.",
+			);
+		}
+	});
+
+	it("shows the sync stage as active with a live count while files are sent", () => {
+		renderConnect({
+			status: status({ status: "uploading", fileCount: 37 }),
+		});
+		expect(allStageStates()).toEqual(["done", "done", "active"]);
+		expect(container.textContent).toContain("Source code siap");
+		expect(container.textContent).toContain("Menyinkronkan codebase...");
+		expect(container.textContent).toContain("37 file sedang dikirim.");
+		expect(container.textContent).not.toContain("%");
+	});
+
+	it("completes all three stages once the snapshot lands", () => {
 		renderConnect({
 			status: status({
 				status: "uploaded",
 				snapshotId: "snap_gate_1",
 				fileCount: 37,
-				excludedCount: 6,
 			}),
 		});
-		expect(stageState("sync-stage-connection")).toBe("done");
-		expect(stageState("sync-stage-upload")).toBe("done");
-		expect(container.textContent).toContain("Source code tersinkron");
+		expect(allStageStates()).toEqual(["done", "done", "done"]);
+		expect(container.textContent).toContain("Agent terhubung");
+		expect(container.textContent).toContain("Source code siap");
+		expect(container.textContent).toContain("Sinkronisasi selesai");
 		expect(container.textContent).toContain("37 file berhasil diterima.");
 	});
 
-	it("renders correctly when a fast CLI upload is first seen already finished", () => {
-		// The browser is not required to observe any intermediate state: the very
-		// first poll may already report `uploaded`. Both stages must then read as
-		// complete with no fabricated delay or intermediate replay.
+	it("renders the finished state directly when a fast CLI is first seen complete", () => {
+		// No intermediate stage may be replayed to look busier than the run was.
 		renderConnect({
 			status: status({
 				status: "uploaded",
@@ -154,22 +214,16 @@ describe("Step 1 live sync status", () => {
 				fileCount: 12,
 			}),
 		});
-		expect(container.textContent).toContain("Repository terhubung");
-		expect(container.textContent).toContain("Source code tersinkron");
-		expect(container.textContent).not.toContain("Menyinkronkan source code...");
+		expect(allStageStates()).toEqual(["done", "done", "done"]);
+		expect(container.textContent).not.toContain("Menyiapkan source code...");
+		expect(container.textContent).not.toContain("Menyinkronkan codebase...");
 	});
 
-	it("distinguishes an unanswered server from a server that says no CLI", () => {
+	it("says it is connecting instead of claiming a stage the server never reported", () => {
 		renderConnect({ status: null });
-		expect(container.textContent).toContain("Menghubungkan server");
-		expect(container.textContent).not.toContain("Menunggu agent terhubung");
-		expect(stageState("sync-stage-connection")).toBe("pending");
-	});
-
-	it("never renders a fabricated percentage or stage delay", () => {
-		renderConnect({ status: status({ status: "uploading", fileCount: 5 }) });
-		expect(container.textContent).not.toContain("%");
-		expect(container.textContent).not.toMatch(/estimasi|perkiraan|sisanya/i);
+		expect(container.textContent).toContain("Menghubungkan server...");
+		expect(container.textContent).not.toContain("Menunggu agent");
+		expect(container.querySelectorAll("[data-stage-state]")).toHaveLength(0);
 	});
 
 	it("never presents analysis as part of the sync step", () => {
@@ -187,30 +241,45 @@ describe("Step 1 live sync status", () => {
 		).toBeNull();
 	});
 
-	it("ties the reported status to the session it describes", () => {
+	it("keeps the attempt identifier as quiet metadata, outside the progress copy", () => {
 		renderConnect({
-			status: status({
-				sessionId: "sess-abcdef012345",
-				status: "uploading",
-			}),
+			status: status({ sessionId: "sess-abcdef012345", status: "uploading" }),
 		});
-		expect(container.textContent).toContain("Sync ID: sess-abcdef0...");
+		const syncIdLine = [...container.querySelectorAll("p")].find((p) =>
+			/Sync ID: sess-abcdef0/.test(p.textContent ?? ""),
+		);
+		expect(syncIdLine).toBeDefined();
+		expect(syncIdLine?.className).toContain("text-fog");
+		// It must not be mistaken for a stage description.
+		for (const testId of STAGE_TEST_IDS) {
+			expect(
+				container.querySelector(`[data-testid="${testId}"]`)?.textContent,
+			).not.toContain("Sync ID");
+		}
 	});
 });
 
 describe("Step 1 continue gating", () => {
-	it("keeps the conclusion action disabled while the server waits for the CLI", () => {
+	it("keeps the conclusion action disabled while the server waits for the agent", () => {
 		renderConnect({ status: status() });
 		expect(summaryButton()?.disabled).toBe(true);
 	});
 
-	it("keeps it disabled on a handshake alone, because no snapshot exists yet", () => {
+	it("keeps it disabled on a linked agent alone, because no snapshot exists yet", () => {
 		renderConnect({ status: status({ status: "connected" }) });
 		expect(summaryButton()?.disabled).toBe(true);
 	});
 
 	it("keeps it disabled while the upload is still running", () => {
 		renderConnect({ status: status({ status: "uploading" }) });
+		expect(summaryButton()?.disabled).toBe(true);
+	});
+
+	it("does not unlock on source preparation completing either", () => {
+		// Preparation finishing is not transport completion.
+		renderConnect({
+			status: status({ status: "uploading", fileCount: 12 }),
+		});
 		expect(summaryButton()?.disabled).toBe(true);
 	});
 
@@ -239,7 +308,6 @@ describe("Step 1 continue gating", () => {
 			copyButton()?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 
-		// Copy feedback is honest UI feedback, not proof the agent executed.
 		expect(container.textContent).toContain("Tersalin");
 		expect(summaryButton()?.disabled).toBe(true);
 		expect(onContinueToSummary).not.toHaveBeenCalled();
@@ -299,8 +367,6 @@ describe("Step 1 continue gating", () => {
 	});
 
 	it("stays disabled without a payload even when a snapshot exists", () => {
-		// Without a token the user cannot start an attempt, so a stale completed
-		// snapshot must not read as an invitation to move on silently.
 		renderConnect({
 			payload: null,
 			status: status({
@@ -314,8 +380,6 @@ describe("Step 1 continue gating", () => {
 	});
 
 	it("stays disabled while a session is being minted", () => {
-		// The snapshot is already there, but the page is mid-request: advancing
-		// during a pending transition would race the state it is reading.
 		renderConnect({
 			status: status({
 				status: "uploaded",
@@ -333,9 +397,6 @@ describe("Step 1 recovery affordances", () => {
 	it("offers a fresh token when the one-time credential cannot be restored", () => {
 		const onRequestNewToken = vi.fn();
 		renderConnect({ payload: null, onRequestNewToken });
-		expect(container.textContent).toContain(
-			"Token sync hanya berlaku sekali dan tidak disimpan di browser.",
-		);
 		const button = [...container.querySelectorAll("button")].find((b) =>
 			/Dapatkan token baru/i.test(b.textContent ?? ""),
 		);
@@ -346,17 +407,7 @@ describe("Step 1 recovery affordances", () => {
 		expect(onRequestNewToken).toHaveBeenCalledTimes(1);
 	});
 
-	it("offers no token action when no handler is supplied", () => {
-		renderConnect({ payload: null });
-		expect(container.textContent).toContain("Token sync hanya berlaku sekali");
-		expect(
-			[...container.querySelectorAll("button")].some((b) =>
-				/Dapatkan token baru/i.test(b.textContent ?? ""),
-			),
-		).toBe(false);
-	});
-
-	it("puts retry contextually inside the step instead of on another screen", () => {
+	it("reports a failed attempt once, with the way out, and no invented stages", () => {
 		const onRetrySync = vi.fn();
 		renderConnect({
 			status: status({
@@ -367,6 +418,8 @@ describe("Step 1 recovery affordances", () => {
 		});
 		expect(container.textContent).toContain("Sinkronisasi belum berhasil");
 		expect(container.textContent).toContain("Snapshot tidak lengkap.");
+		// The server does not record which step broke, so no stage may be claimed.
+		expect(container.querySelectorAll("[data-stage-state]")).toHaveLength(0);
 		const retry = [...container.querySelectorAll("button")].find((b) =>
 			/^Coba lagi$/i.test(b.textContent?.trim() ?? ""),
 		);
@@ -378,13 +431,13 @@ describe("Step 1 recovery affordances", () => {
 	});
 
 	it("never offers retry for a session that is still waiting or running", () => {
-		for (const statusValue of [
+		for (const value of [
 			"waiting_for_cli",
 			"connected",
 			"uploading",
 		] as const) {
 			renderConnect({
-				status: status({ status: statusValue }),
+				status: status({ status: value }),
 				onRetrySync: vi.fn(),
 			});
 			expect(

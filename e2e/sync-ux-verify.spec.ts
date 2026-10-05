@@ -63,7 +63,7 @@ async function mountComponents(page: import("@playwright/test").Page) {
 }
 
 test.describe("existing-codebase onboarding — real browser render", () => {
-	test("the instruction screen reports both sync stages from real server signals", async ({
+	test("the instruction screen reports three real sync stages and nothing invented", async ({
 		page,
 	}) => {
 		const errors: string[] = [];
@@ -71,13 +71,12 @@ test.describe("existing-codebase onboarding — real browser render", () => {
 
 		await mountComponents(page);
 		const connect = page.locator("#verify-connect");
-		await expect(connect).toContainText("Repository terhubung", {
-			timeout: 20000,
-		});
+		await expect(connect).toContainText("Agent terhubung", { timeout: 20000 });
 
 		const text = (await connect.innerText()) ?? "";
-		expect(text).toContain("Repository terhubung");
-		expect(text).toContain("Source code tersinkron");
+		expect(text).toContain("Agent terhubung");
+		expect(text).toContain("Source code siap");
+		expect(text).toContain("Sinkronisasi selesai");
 		// Real counts straight from the server payload.
 		expect(text).toContain("12");
 		expect(text).toContain("3");
@@ -87,16 +86,29 @@ test.describe("existing-codebase onboarding — real browser render", () => {
 		expect(
 			await connect.locator('[data-testid="sync-stage-analysis"]').count(),
 		).toBe(0);
-		expect(
-			await connect.locator('[data-testid="sync-stage-connection"]').count(),
-		).toBe(1);
-		expect(
-			await connect.locator('[data-testid="sync-stage-upload"]').count(),
-		).toBe(1);
-		// Never the bookkeeping stages the client cannot observe.
-		expect(text).not.toMatch(/memindai/i);
-		expect(text).not.toMatch(/filtering/i);
-		expect(text).not.toMatch(/package manifest dan framework dibaca/i);
+		// Exactly the three product stages, rendered once each.
+		for (const stage of [
+			"sync-stage-agent",
+			"sync-stage-preparing",
+			"sync-stage-sync",
+		]) {
+			expect(
+				await connect.locator(`[data-testid="${stage}"]`).count(),
+				`missing stage ${stage}`,
+			).toBe(1);
+		}
+		// No backend enum name or transport jargon in the user-facing copy.
+		for (const internal of [
+			"waiting_for_cli",
+			"handshake",
+			"polling",
+			"manifest",
+			"filtering",
+			"uploading",
+			"snapshot",
+		]) {
+			expect(text, `leaked ${internal}`).not.toContain(internal);
+		}
 		// No fabricated percentage.
 		expect(text).not.toContain("%");
 		// There is exactly one progress surface in the whole step.
@@ -104,6 +116,20 @@ test.describe("existing-codebase onboarding — real browser render", () => {
 		expect(text).not.toMatch(/Pantau Sync/i);
 		expect(text).not.toMatch(/Prompt Sync/i);
 		expect(errors).toEqual([]);
+	});
+
+	test("substep 3 instructs the user instead of describing the mechanism", async ({
+		page,
+	}) => {
+		await mountComponents(page);
+		const text =
+			(await page.locator("#verify-connect").innerText()) ?? "";
+		expect(text).toContain(
+			"Jalankan prompt dari root repository untuk mulai menyinkronkan codebase.",
+		);
+		expect(text).not.toMatch(/mengikuti server/i);
+		expect(text).not.toMatch(/tidak berpindah sendiri/i);
+		expect(text).not.toMatch(/progresses/i);
 	});
 
 	test("a finished upload unlocks the conclusion step", async ({ page }) => {

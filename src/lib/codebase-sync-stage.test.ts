@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-	isSyncTransportActive,
 	resolveSyncStageView,
+	SYNC_STAGE_ORDER,
+	SYNC_STAGE_TEST_IDS,
+	type SyncStageRow,
 	type SyncStatusResponse,
 } from "./codebase-sync";
 
@@ -17,118 +19,164 @@ function status(
 	};
 }
 
-describe("isSyncTransportActive", () => {
-	it("counts only the upload chain as transport work", () => {
-		expect(isSyncTransportActive("scanning")).toBe(true);
-		expect(isSyncTransportActive("filtering")).toBe(true);
-		expect(isSyncTransportActive("uploading")).toBe(true);
+function states(view: ReturnType<typeof resolveSyncStageView>): string[] {
+	return view.stages.map((row) => row.state);
+}
+
+function stage(
+	view: ReturnType<typeof resolveSyncStageView>,
+	index: number,
+): SyncStageRow {
+	const row = view.stages[index];
+	if (!row) throw new Error(`missing stage at index ${index}`);
+	return row;
+}
+
+// Backend enum names and the transport vocabulary behind them. None of these may
+// reach the user as a label or a description.
+const INTERNAL_WORDS = [
+	"waiting_for_cli",
+	"connected",
+	"scanning",
+	"filtering",
+	"uploading",
+	"uploaded",
+	"analyzing",
+	"failed",
+	"expired",
+	"handshake",
+	"polling",
+	"manifest",
+	"snapshot",
+	"server",
+	"state machine",
+];
+
+function userFacingCopy(view: ReturnType<typeof resolveSyncStageView>): string {
+	return view.stages
+		.map((row) => `${row.title} ${row.detail ?? ""} ${row.meta ?? ""}`)
+		.join(" ");
+}
+
+describe("sync stage vocabulary", () => {
+	it("exposes exactly three product stages in a stable order", () => {
+		expect(SYNC_STAGE_ORDER).toEqual(["agent", "preparing", "syncing"]);
+		expect(Object.keys(SYNC_STAGE_TEST_IDS)).toEqual([
+			"agent",
+			"preparing",
+			"syncing",
+		]);
 	});
 
-	it("never counts the handshake or a finished snapshot as transport work", () => {
-		// `connected` is the trap: the handshake alone is not upload progress, so
-		// treating it as active would claim files are moving before any do.
-		expect(isSyncTransportActive("connected")).toBe(false);
-		expect(isSyncTransportActive("waiting_for_cli")).toBe(false);
-		expect(isSyncTransportActive("uploaded")).toBe(false);
-		expect(isSyncTransportActive("analyzing")).toBe(false);
-		expect(isSyncTransportActive("ready")).toBe(false);
-		expect(isSyncTransportActive("failed")).toBe(false);
-		expect(isSyncTransportActive("expired")).toBe(false);
-	});
-});
-
-describe("resolveSyncStageView waiting", () => {
-	it("reports an honest standby when the server waits for the CLI", () => {
-		const view = resolveSyncStageView(status());
-		expect(view.hasStatus).toBe(true);
-		expect(view.repository.state).toBe("idle");
-		expect(view.repository.title).toBe("Menunggu agent terhubung");
-		expect(view.repository.detail).toBe(
-			"Jalankan prompt dari root repository.",
-		);
-		expect(view.source.state).toBe("pending");
-		expect(view.syncComplete).toBe(false);
-		expect(view.canRetry).toBe(false);
-	});
-
-	it("does not claim a linked repository before any handshake", () => {
-		const view = resolveSyncStageView(status({ status: "failed" }));
-		expect(view.repository.state).toBe("failed");
-	});
-
-	it("separates 'browser has not asked yet' from 'server says no CLI'", () => {
-		const view = resolveSyncStageView(null);
-		expect(view.hasStatus).toBe(false);
-		expect(view.repository.state).toBe("pending");
-		expect(view.repository.title).not.toContain("Menunggu agent terhubung");
-		expect(view.syncComplete).toBe(false);
-	});
-});
-
-describe("resolveSyncStageView connected", () => {
-	it("marks the repository linked as soon as the handshake is observed", () => {
-		const view = resolveSyncStageView(status({ status: "connected" }));
-		expect(view.repository.state).toBe("done");
-		expect(view.repository.title).toBe("Repository terhubung");
-		expect(view.repository.detail).toBe(
-			"Agent berhasil tersambung ke VibeEverything.",
-		);
-		// A handshake is not upload work.
-		expect(view.source.state).toBe("pending");
-		expect(view.syncComplete).toBe(false);
-	});
-
-	it("accepts a persisted handshake timestamp with no intermediate poll", () => {
-		const view = resolveSyncStageView(
-			status({
-				status: "uploading",
-				cliConnectedAt: "2026-09-19T10:00:00.000Z",
-				fileCount: 12,
-			}),
-		);
-		expect(view.repository.state).toBe("done");
-		expect(view.source.state).toBe("active");
-		expect(view.source.title).toBe("Menyinkronkan source code...");
-		expect(view.source.detail).toBe("Repository sedang dikirim.");
-		expect(view.source.meta).toBe("12 file");
-	});
-
-	it("drives the same active source stage across the whole upload chain", () => {
-		for (const statusValue of ["scanning", "filtering", "uploading"] as const) {
-			const view = resolveSyncStageView(status({ status: statusValue }));
-			expect(view.repository.state).toBe("done");
-			expect(view.source.state).toBe("active");
-			expect(view.source.title).toBe("Menyinkronkan source code...");
+	it("never leaks a backend enum or transport term into user-facing copy", () => {
+		const cases: SyncStatusResponse[] = [
+			status(),
+			status({ status: "connected" }),
+			status({ status: "scanning" }),
+			status({ status: "filtering" }),
+			status({ status: "uploading", fileCount: 37 }),
+			status({ status: "uploaded", snapshotId: "snap_1", fileCount: 37 }),
+			status({ status: "analyzing", snapshotId: "snap_1" }),
+			status({ status: "ready", snapshotId: "snap_1" }),
+		];
+		for (const input of cases) {
+			const copy = userFacingCopy(resolveSyncStageView(input)).toLowerCase();
+			for (const word of INTERNAL_WORDS) {
+				expect(copy, `${word} leaked for ${input.status}`).not.toContain(word);
+			}
 		}
 	});
 });
 
-describe("resolveSyncStageView complete", () => {
-	it("completes both stages on an uploaded snapshot and reports the count", () => {
-		const view = resolveSyncStageView(
-			status({
-				status: "uploaded",
-				snapshotId: "snap_done",
-				fileCount: 37,
-				excludedCount: 6,
-			}),
+describe("waiting_for_cli", () => {
+	it("puts the agent first and leaves both later stages untouched", () => {
+		const view = resolveSyncStageView(status());
+		expect(states(view)).toEqual(["waiting", "waiting", "waiting"]);
+		expect(stage(view, 0).title).toBe("Menunggu agent");
+		expect(stage(view, 0).detail).toBe("Jalankan prompt dari root repository.");
+		expect(view.syncComplete).toBe(false);
+		expect(view.canRetry).toBe(false);
+	});
+
+	it("gives the inactive stages no filler description", () => {
+		const view = resolveSyncStageView(status());
+		// "This step has not started yet" teaches the user nothing.
+		expect(stage(view, 1).detail).toBeUndefined();
+		expect(stage(view, 2).detail).toBeUndefined();
+		expect(userFacingCopy(view)).not.toMatch(/tahap ini berjalan setelah/i);
+		expect(userFacingCopy(view)).not.toMatch(/belum tersinkron/i);
+	});
+});
+
+describe("connected, scanning and filtering", () => {
+	it("share one preparing stage instead of three enum-specific stages", () => {
+		for (const value of ["connected", "scanning", "filtering"] as const) {
+			const view = resolveSyncStageView(status({ status: value }));
+			expect(states(view)).toEqual(["done", "active", "waiting"]);
+			expect(stage(view, 0).title).toBe("Agent terhubung");
+			expect(stage(view, 1).title).toBe("Menyiapkan source code...");
+			expect(stage(view, 1).detail).toBe(
+				"Memeriksa file project yang akan disinkronkan.",
+			);
+			expect(stage(view, 2).title).toBe("Menyinkronkan codebase");
+			expect(view.syncComplete).toBe(false);
+		}
+	});
+
+	it("does not claim files are moving while the project is still being read", () => {
+		for (const value of ["connected", "scanning", "filtering"] as const) {
+			const view = resolveSyncStageView(status({ status: value }));
+			expect(stage(view, 2).state).not.toBe("active");
+		}
+	});
+});
+
+describe("uploading", () => {
+	it("completes preparation and moves the sync stage to active", () => {
+		const view = resolveSyncStageView(status({ status: "uploading" }));
+		expect(states(view)).toEqual(["done", "done", "active"]);
+		expect(stage(view, 1).title).toBe("Source code siap");
+		expect(stage(view, 1).detail).toBe(
+			"File project yang relevan sudah disiapkan.",
 		);
-		expect(view.repository.state).toBe("done");
-		expect(view.source.state).toBe("done");
-		expect(view.source.title).toBe("Source code tersinkron");
-		expect(view.source.detail).toBe("37 file berhasil diterima.");
-		expect(view.excludedCount).toBe(6);
+		expect(stage(view, 2).title).toBe("Menyinkronkan codebase...");
+		expect(stage(view, 2).detail).toBe(
+			"Mengirim source code ke VibeEverything.",
+		);
+	});
+
+	it("shows the real count while files are in flight, and nothing invented", () => {
+		const view = resolveSyncStageView(
+			status({ status: "uploading", fileCount: 37 }),
+		);
+		expect(stage(view, 2).meta).toBe("37 file sedang dikirim.");
+		expect(userFacingCopy(view)).not.toContain("%");
+	});
+
+	it("omits the count when the server has not reported one", () => {
+		const view = resolveSyncStageView(status({ status: "uploading" }));
+		expect(stage(view, 2).meta).toBeUndefined();
+	});
+});
+
+describe("completed sync", () => {
+	it("marks all three stages done with the received count", () => {
+		const view = resolveSyncStageView(
+			status({ status: "uploaded", snapshotId: "snap_done", fileCount: 37 }),
+		);
+		expect(states(view)).toEqual(["done", "done", "done"]);
+		expect(stage(view, 2).title).toBe("Sinkronisasi selesai");
+		expect(stage(view, 2).detail).toBe("37 file berhasil diterima.");
 		expect(view.syncComplete).toBe(true);
-		expect(view.errorMessage).toBeNull();
 	});
 
 	it("completes without a count when the server never reported one", () => {
 		const view = resolveSyncStageView(
 			status({ status: "uploaded", snapshotId: "snap_nocount" }),
 		);
-		expect(view.source.state).toBe("done");
-		expect(view.source.detail).toBe("Repository berhasil diterima.");
-		expect(view.source.meta).toBeUndefined();
+		expect(states(view)).toEqual(["done", "done", "done"]);
+		expect(stage(view, 2).detail).toBe("Source code berhasil diterima.");
+		expect(stage(view, 2).meta).toBeUndefined();
 	});
 
 	it("keeps transport complete while a legacy analyzing session runs", () => {
@@ -139,24 +187,52 @@ describe("resolveSyncStageView complete", () => {
 				analysisStatus: "pending",
 			}),
 		);
-		expect(view.source.state).toBe("done");
+		expect(states(view)).toEqual(["done", "done", "done"]);
 		expect(view.syncComplete).toBe(true);
 	});
 
-	it("does not complete on an uploaded row that carries no snapshot", () => {
-		// `uploaded` without a snapshot id is a contradictory server row. Claiming
-		// a finished sync there would hand the user a step that cannot be opened.
+	it("does not complete on a done status that carries no snapshot", () => {
+		// The upload was never verified, so claiming a finished sync would offer
+		// a conclusion step that cannot open.
 		const view = resolveSyncStageView(
 			status({ status: "uploaded", fileCount: 9 }),
 		);
 		expect(view.syncComplete).toBe(false);
-		expect(view.source.state).not.toBe("done");
-		expect(view.source.meta).toBe("9 file");
+		expect(states(view)).toEqual(["done", "done", "active"]);
 	});
 });
 
-describe("resolveSyncStageView failure", () => {
-	it("reports a failed transport as a failure on both stages", () => {
+describe("fast transition", () => {
+	it("renders three completed rows with no replayed intermediate state", () => {
+		// The browser is not required to observe `connected`, `scanning`,
+		// `filtering` or `uploading`; a fast CLI can be first seen as finished.
+		const before = resolveSyncStageView(status());
+		const after = resolveSyncStageView(
+			status({ status: "uploaded", snapshotId: "snap_fast", fileCount: 12 }),
+		);
+		expect(states(before)).toEqual(["waiting", "waiting", "waiting"]);
+		expect(states(after)).toEqual(["done", "done", "done"]);
+		expect(stage(after, 0).title).toBe("Agent terhubung");
+		expect(stage(after, 1).title).toBe("Source code siap");
+		expect(stage(after, 2).title).toBe("Sinkronisasi selesai");
+		// Nothing from an intermediate stage survives in the finished copy.
+		expect(userFacingCopy(after)).not.toMatch(/Menyiapkan source code\.\.\./);
+		expect(userFacingCopy(after)).not.toMatch(/Menyinkronkan codebase\.\.\./);
+	});
+});
+
+describe("unknown and failed attempts", () => {
+	it("withholds the stage list until the server has actually reported", () => {
+		const view = resolveSyncStageView(null);
+		expect(view.hasStatus).toBe(false);
+		expect(view.stages).toEqual([]);
+		expect(view.failed).toBe(false);
+		expect(view.canRetry).toBe(false);
+	});
+
+	it("withholds the stage list on failure instead of inventing progress", () => {
+		// The status does not record which step broke, so any completed checkmark
+		// here would be a claim the server never made.
 		const view = resolveSyncStageView(
 			status({
 				status: "failed",
@@ -164,60 +240,46 @@ describe("resolveSyncStageView failure", () => {
 				errorMessage: "Snapshot tidak lengkap.",
 			}),
 		);
-		expect(view.repository.state).toBe("failed");
-		expect(view.repository.title).toBe("Sinkronisasi belum berhasil");
-		expect(view.repository.detail).toBe("Snapshot tidak lengkap.");
-		expect(view.source.state).toBe("failed");
+		expect(view.failed).toBe(true);
+		expect(view.stages).toEqual([]);
 		expect(view.canRetry).toBe(true);
-		expect(view.syncComplete).toBe(false);
 		expect(view.errorMessage).toBe("Snapshot tidak lengkap.");
-	});
-
-	it("falls back to generic copy when the server sent no safe message", () => {
-		const view = resolveSyncStageView(status({ status: "failed" }));
-		expect(view.repository.detail).toBe("Repository gagal dikirim.");
+		expect(view.retryHint).toContain("jalankan ulang prompt");
 	});
 
 	it("gives expiry its own recovery guidance", () => {
 		const view = resolveSyncStageView(status({ status: "expired" }));
-		expect(view.repository.state).toBe("failed");
-		expect(view.repository.detail).toContain("kedaluwarsa");
+		expect(view.failed).toBe(true);
+		expect(view.retryHint).toContain("kedaluwarsa");
 		expect(view.canRetry).toBe(true);
 	});
 
-	it("suppresses an analysis-sourced message once the transport finished", () => {
-		// The status endpoint reuses `errorMessage` for analysis failures. On a
-		// completed sync that is a conclusion problem, not a transport one.
-		const view = resolveSyncStageView(
-			status({
-				status: "uploaded",
-				snapshotId: "snap_an_err",
-				analysisStatus: "failed",
-				errorMessage: "Analisis codebase gagal.",
-			}),
-		);
-		expect(view.syncComplete).toBe(true);
-		expect(view.errorMessage).toBeNull();
-	});
-
-	it("never fabricates an analysis stage", () => {
-		for (const statusValue of [
+	it("never presents analysis as part of the sync stages", () => {
+		for (const value of [
 			"waiting_for_cli",
 			"connected",
 			"uploading",
 			"uploaded",
 			"analyzing",
 			"ready",
-			"failed",
-			"expired",
 		] as const) {
 			const view = resolveSyncStageView(
-				status({ status: statusValue, snapshotId: "snap_none" }),
+				status({ status: value, snapshotId: "snap_none" }),
 			);
-			const rendered = `${view.repository.title} ${view.source.title}`;
-			expect(rendered).not.toMatch(/menganalisis codebase/i);
-			expect(rendered).not.toMatch(/analisis codebase selesai/i);
-			expect(rendered).not.toContain("%");
+			expect(userFacingCopy(view)).not.toMatch(/menganalisis codebase/i);
+			expect(userFacingCopy(view)).not.toMatch(/analisis codebase selesai/i);
+			expect(userFacingCopy(view)).not.toContain("%");
 		}
+	});
+});
+
+describe("exclusion count", () => {
+	it("is reported only once the server has it", () => {
+		expect(resolveSyncStageView(status()).excludedCount).toBeUndefined();
+		expect(
+			resolveSyncStageView(
+				status({ status: "uploaded", snapshotId: "snap_x", excludedCount: 6 }),
+			).excludedCount,
+		).toBe(6);
 	});
 });
