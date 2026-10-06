@@ -98,7 +98,7 @@ PrdFy is a full-stack TypeScript app. The same codebase serves both the interact
 | State | TanStack Query + Zustand |
 | Rendering | Mermaid for diagrams, react-markdown + remark-gfm, DOMPurify |
 | Lint / Format | Biome |
-| Tests | Playwright, unit tests with Node's built-in test runner |
+| Tests | Vitest, Playwright |
 | Package Manager | pnpm |
 
 ## Architecture
@@ -178,8 +178,8 @@ The table below documents every variable the app reads. Sensitive values must be
 ### Quick start
 
 ```bash
-git clone https://github.com/ghazyAlghifari508/prdfy.git
-cd prdfy
+git clone https://github.com/ghazyAlghifari508/everythings-vibe.git
+cd everythings-vibe
 cp .env.example .env   # fill DATABASE_URL, BETTER_AUTH_SECRET, NINE_ROUTER_URL
 pnpm install
 pnpm db:push
@@ -224,13 +224,18 @@ The Postgres schema is defined in `src/db/schema.ts` with Drizzle. There are two
 
 PrdFy does not call a hosted model API directly. It talks to a local [9router](https://9router.com)-style OpenAI-compatible server at `NINE_ROUTER_URL`. Point it at any server exposing `/v1/chat/completions` and the app works unchanged.
 
+Two things to check when a router is reachable but generations come back empty:
+
+- `NINE_ROUTER_URL` keeps any path it is given and only appends `/v1`, so a router that serves its OpenAI-compatible routes under a prefix needs that prefix in the value (for example `http://localhost:20128/api` for a build whose routes are `/api/v1/chat/completions`).
+- Gateways with login enabled answer unauthenticated completion requests with 404 or 401 even though the process is listening. Authenticate the router (or disable its auth mode) before debugging the app.
+
 ### Start the database
 
 Install PostgreSQL 17 natively. Create the user and database:
 
 ```sql
-CREATE USER prdfy WITH PASSWORD 'prdfy_local';
-CREATE DATABASE prdfy OWNER prdfy;
+CREATE USER novaplan WITH PASSWORD 'novaplan_local';
+CREATE DATABASE novaplan OWNER novaplan;
 ```
 
 ### Push the schema and run
@@ -266,6 +271,7 @@ pnpm db:studio    # open Drizzle Studio
 pnpm lint         # Biome lint
 pnpm format       # Biome format
 pnpm check        # Biome check
+pnpm test         # Vitest unit tests
 ```
 
 ## Project Structure
@@ -289,10 +295,11 @@ src/
 
 PrdFy exposes a public REST API under `/api/v1`. All endpoints are JSON and session-authenticated where the action mutates data. Endpoints cover:
 
-- Projects: `GET/POST /api/v1/projects`, `GET /api/v1/projects/:id`
+- Projects: `GET /api/v1/projects/:id`, `GET /api/v1/projects/:id/prd`, `GET /api/v1/projects/:id/ac`
 - Tasks: `GET /api/v1/projects/:id/tasks`
 - Status: `PATCH /api/v1/tasks/:id/status`, `PATCH /api/v1/subtasks/:id/status`
 - Kanban: `GET /api/v1/projects/:id/kanban`
+- Codebase sync: `POST /api/v1/projects/:id/codebase/sync`, `/manifest`, `/files`, `/complete`
 
 ## Existing Codebase Sync
 
@@ -371,10 +378,10 @@ automatically. It is also excluded from the upload itself.
 
 ## Testing
 
-Unit tests live next to the code they cover and use Node's built-in test runner (no extra framework):
+Unit tests live next to the code they cover and run on Vitest:
 
 ```bash
-node --test src/lib/*.test.ts src/lib/**/*.test.ts
+pnpm test
 ```
 
 End-to-end flows are covered with Playwright. Run them with:
@@ -440,7 +447,7 @@ Open the project, pick the stage, and re-generate. Every version is kept in hist
 
 ## Contributing
 
-Contributions are welcome. The project uses Biome for linting and formatting and Node's built-in test runner for unit tests.
+Contributions are welcome. The project uses Biome for linting and formatting and Vitest for unit tests.
 
 1. Fork the repository and create a feature branch.
 2. Run `pnpm install` and `pnpm dev` to get a working local setup.
