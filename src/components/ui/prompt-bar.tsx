@@ -173,7 +173,7 @@ export function PromptBar({
 	const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
 		const isComposing =
 			Boolean(e.nativeEvent?.isComposing) ||
-			Boolean((e as unknown as { isComposing?: boolean }).isComposing);
+			("isComposing" in e && Boolean(e.isComposing));
 
 		if (e.key === "Enter" && !e.shiftKey && !isComposing) {
 			e.preventDefault();
