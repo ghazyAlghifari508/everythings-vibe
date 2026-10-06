@@ -40,6 +40,40 @@ export type PipelineStage =
 	| "task"
 	| "handoff";
 
+export interface IntentStarter {
+	id: string;
+	title: string;
+	description: string;
+	prefill: string;
+}
+
+export const GENERIC_INTENT_STARTERS: IntentStarter[] = [
+	{
+		id: "feature",
+		title: "Tambah fitur baru",
+		description: "Rancang alur, spesifikasi, dan kebutuhan modul baru",
+		prefill: "Tambahkan fitur ",
+	},
+	{
+		id: "bugfix",
+		title: "Perbaiki bug atau alur",
+		description: "Identifikasi anomali logika atau perbaikan flow pengguna",
+		prefill: "Perbaiki bug atau alur pada ",
+	},
+	{
+		id: "refactor",
+		title: "Refactor kode",
+		description: "Tingkatkan struktur arsitektur tanpa mengubah perilaku",
+		prefill: "Refactor bagian ",
+	},
+	{
+		id: "ui",
+		title: "Improve UI",
+		description: "Poles tampilan, layout responsif, atau interaksi visual",
+		prefill: "Improve UI pada ",
+	},
+];
+
 interface CodebaseChatWorkspaceProps {
 	featureName: string;
 	contextFiles?: string[];
@@ -173,6 +207,18 @@ export function CodebaseChatWorkspace({
 		setDraft("");
 	};
 
+	const handlePrefillDraft = (text: string) => {
+		setDraft(text);
+		const composerEl = document.getElementById(
+			"codebase-chat-composer",
+		) as HTMLTextAreaElement | null;
+		if (composerEl) {
+			composerEl.focus();
+			const len = text.length;
+			composerEl.setSelectionRange?.(len, len);
+		}
+	};
+
 	const handleSubmitOne = (question: AdaptiveQuestion) => {
 		const custom = (customAnswers[question.id] ?? "").trim();
 		const pickedId = selected[question.id];
@@ -298,6 +344,33 @@ export function CodebaseChatWorkspace({
 							{renderComposer(2, "p-3.5 sm:p-4")}
 						</div>
 
+						<div
+							data-testid="codebase-intent-starters"
+							className="flex w-full flex-col gap-2.5 pt-1 text-left"
+						>
+							<p className="text-[11px] font-semibold uppercase tracking-wider text-slate">
+								Mulai dari
+							</p>
+							<div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+								{GENERIC_INTENT_STARTERS.map((item) => (
+									<button
+										key={item.id}
+										type="button"
+										onClick={() => handlePrefillDraft(item.prefill)}
+										data-testid={`intent-starter-${item.id}`}
+										className="group flex flex-col items-start justify-center rounded-lg border border-graphite bg-charcoal/40 p-3 text-left transition hover:border-slate/70 hover:bg-charcoal/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									>
+										<span className="text-xs font-medium text-snow group-hover:text-white">
+											{item.title}
+										</span>
+										<span className="mt-0.5 line-clamp-1 text-[11px] text-fog">
+											{item.description}
+										</span>
+									</button>
+								))}
+							</div>
+						</div>
+
 						{starterSuggestions && starterSuggestions.length > 0 ? (
 							<div
 								data-testid="codebase-starter-suggestions"
@@ -307,7 +380,7 @@ export function CodebaseChatWorkspace({
 									<button
 										key={suggestion}
 										type="button"
-										onClick={() => setDraft(suggestion)}
+										onClick={() => handlePrefillDraft(suggestion)}
 										className="inline-flex items-center rounded-lg border border-graphite bg-charcoal/60 px-3 py-1.5 text-left text-xs text-fog transition hover:border-slate/60 hover:bg-charcoal hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 									>
 										{suggestion}
