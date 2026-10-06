@@ -204,7 +204,7 @@ export function PromptBar({
 				aria-label={ariaLabel}
 				className="block w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-[22px] text-snow outline-none placeholder:text-slate disabled:cursor-not-allowed disabled:opacity-50"
 			/>
-			<div className="flex items-center justify-end border-t border-graphite/40 pt-2">
+			<div className="flex items-center justify-end pt-2">
 				<button
 					type="button"
 					onClick={handleSend}

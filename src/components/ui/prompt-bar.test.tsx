@@ -236,4 +236,16 @@ describe("PromptBar Component", () => {
 		expect(textarea).not.toBeNull();
 		expect(textarea?.style.height).toBeDefined();
 	});
+
+	it("does not render internal horizontal divider line between textarea and footer", () => {
+		act(() => {
+			root?.render(<PromptBar />);
+		});
+
+		expect(container.querySelector(".border-t")).toBeNull();
+		const promptBarContainer = container.querySelector(
+			"[data-testid='prompt-bar']",
+		);
+		expect(promptBarContainer?.classList.contains("border")).toBe(true);
+	});
 });
