@@ -302,6 +302,11 @@ export function CodebaseChatWorkspace({
 						>
 							{headerTitle}
 						</p>
+						{resolvedDisplayName ? (
+							<p className="truncate text-[11px] text-fog">
+								Planning workspace
+							</p>
+						) : null}
 					</div>
 					{hasLiveData && kanbanProgress ? (
 						<span
@@ -394,22 +399,22 @@ export function CodebaseChatWorkspace({
 				<>
 					<div
 						data-testid="codebase-chat-messages"
-						className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+						className="min-h-0 flex-1 overflow-y-auto px-4 py-5"
 					>
-						<div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+						<div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
 							{messages.map((message) =>
 								message.role === "user" ? (
 									<div key={message.id} className="flex justify-end">
-										<div className="max-w-[85%] rounded-xl bg-snow px-3 py-2 text-[13px] leading-6 text-onyx">
+										<div className="max-w-[82%] sm:max-w-[75%] rounded-2xl rounded-tr-sm bg-snow px-4 py-2.5 text-[13.5px] sm:text-sm leading-relaxed text-onyx">
 											{message.content}
 										</div>
 									</div>
 								) : (
-									<div key={message.id} className="flex flex-col gap-1">
-										<p className="text-[11px] font-semibold text-fog">
+									<div key={message.id} className="flex flex-col gap-1.5 py-1">
+										<p className="text-[11px] font-semibold uppercase tracking-wider text-fog">
 											VibeEverything Assistant
 										</p>
-										<div className="rounded-xl border border-graphite bg-charcoal p-3 text-[13px] leading-6 text-mist">
+										<div className="text-[13.5px] sm:text-sm leading-relaxed text-snow/90 whitespace-pre-wrap">
 											{message.content}
 										</div>
 									</div>
@@ -812,7 +817,9 @@ export function CodebaseChatWorkspace({
 						</div>
 					</div>
 					<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
-						<div className="mx-auto w-full max-w-2xl">{renderComposer()}</div>
+						<div className="mx-auto w-full max-w-3xl">
+							{renderComposer(2, "p-3 sm:p-3.5")}
+						</div>
 					</div>
 				</>
 			)}
