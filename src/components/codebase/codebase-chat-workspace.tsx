@@ -1,7 +1,8 @@
 "use client";
 
-import { Check, Copy, Send } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
+import { PromptBar } from "@/components/ui/prompt-bar";
 import {
 	areAllQuestionsAnswered,
 	nextQuestionIndex,
@@ -160,8 +161,8 @@ export function CodebaseChatWorkspace({
 		}
 	};
 
-	const handleSend = () => {
-		const message = draft.trim();
+	const handleSend = (text?: string) => {
+		const message = (text ?? draft).trim();
 		if (message.length < 3 || isSending || questionsLoading) return;
 		onSendMessage?.(message);
 		setDraft("");
@@ -648,32 +649,19 @@ export function CodebaseChatWorkspace({
 				</div>
 			</div>
 			<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
-				<div className="mx-auto w-full max-w-2xl rounded-xl border border-graphite bg-charcoal/80 p-3 transition-colors focus-within:border-indigo/50">
-					<label htmlFor="codebase-chat-composer" className="sr-only">
-						Jelaskan fitur yang ingin dibangun di repositori ini
-					</label>
-					<textarea
+				<div className="mx-auto w-full max-w-2xl">
+					<PromptBar
 						id="codebase-chat-composer"
 						value={draft}
-						onChange={(event) => setDraft(event.target.value)}
-						rows={2}
-						placeholder="Jelaskan fitur yang ingin kamu bangun di repositori ini..."
+						onValueChange={setDraft}
+						onSend={handleSend}
 						disabled={isSending || questionsLoading}
-						className="w-full resize-none bg-transparent text-[13px] text-snow outline-none placeholder:text-slate disabled:opacity-50"
+						isSending={isSending}
+						minCharsToSend={3}
+						maxRows={6}
+						placeholder="Jelaskan fitur yang ingin kamu bangun di repositori ini..."
+						ariaLabel="Jelaskan fitur yang ingin dibangun di repositori ini"
 					/>
-					<div className="flex items-center justify-end border-t border-graphite/40 pt-2">
-						<button
-							type="button"
-							onClick={handleSend}
-							disabled={
-								draft.trim().length < 3 || isSending || questionsLoading
-							}
-							className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							<Send size={13} aria-hidden="true" />
-							{isSending ? "Mengirim..." : "Kirim"}
-						</button>
-					</div>
 				</div>
 			</div>
 		</div>

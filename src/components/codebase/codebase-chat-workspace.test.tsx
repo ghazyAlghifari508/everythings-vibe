@@ -128,6 +128,91 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(composer?.value).toBe("");
 	});
 
+	it("renders PromptBar primitive and sends on Enter but not Shift+Enter", () => {
+		const onSendMessage = vi.fn();
+		renderWorkspace({ onSendMessage });
+
+		expect(
+			container.querySelector("[data-testid='prompt-bar']"),
+		).not.toBeNull();
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+
+		act(() => {
+			if (composer) setTextareaValue(composer, "Baris satu");
+		});
+
+		// Shift+Enter does not trigger onSendMessage
+		act(() => {
+			composer?.dispatchEvent(
+				new KeyboardEvent("keydown", {
+					key: "Enter",
+					shiftKey: true,
+					bubbles: true,
+				}),
+			);
+		});
+		expect(onSendMessage).not.toHaveBeenCalled();
+
+		// Enter sends
+		act(() => {
+			composer?.dispatchEvent(
+				new KeyboardEvent("keydown", {
+					key: "Enter",
+					shiftKey: false,
+					bubbles: true,
+				}),
+			);
+		});
+		expect(onSendMessage).toHaveBeenCalledWith("Baris satu");
+		expect(composer?.value).toBe("");
+	});
+
+	it("blocks sending and disables composer during questionsLoading or isSending", () => {
+		const onSendMessage = vi.fn();
+		renderWorkspace({
+			questionsLoading: true,
+			onSendMessage,
+		});
+
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		const sendButton = [...container.querySelectorAll("button")].find((b) =>
+			/Kirim|Mengirim/.test(b.textContent ?? ""),
+		);
+
+		expect(composer?.disabled).toBe(true);
+		expect(sendButton?.disabled).toBe(true);
+
+		// Now render with isSending
+		renderWorkspace({
+			isSending: true,
+			onSendMessage,
+		});
+
+		const isSendingComposer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		const isSendingButton = [...container.querySelectorAll("button")].find(
+			(b) => /Kirim|Mengirim/.test(b.textContent ?? ""),
+		);
+		expect(isSendingComposer?.disabled).toBe(true);
+		expect(isSendingButton?.disabled).toBe(true);
+		expect(isSendingButton?.textContent).toContain("Mengirim...");
+	});
+
+	it("does not render fake demo controls in codebase chat workspace", () => {
+		renderWorkspace();
+
+		expect(container.querySelector('[aria-label="Choose model"]')).toBeNull();
+		expect(container.querySelector('[aria-label="Dictate"]')).toBeNull();
+		expect(container.querySelector('[aria-label="Add files"]')).toBeNull();
+		expect(container.querySelector('[role="slider"]')).toBeNull();
+		expect(container.querySelector("canvas")).toBeNull();
+	});
+
 	it("shows the kanban badge only when live progress exists", () => {
 		renderWorkspace({
 			kanbanProgress: { done: 2, total: 5, pct: 40 },
