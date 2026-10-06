@@ -225,7 +225,7 @@ export function CodebaseChatWorkspace({
 		!isSending &&
 		stage === "questions";
 
-	const renderComposer = () => (
+	const renderComposer = (minRows = 1, className = "") => (
 		<PromptBar
 			id="codebase-chat-composer"
 			value={draft}
@@ -234,7 +234,9 @@ export function CodebaseChatWorkspace({
 			disabled={isSending || questionsLoading}
 			isSending={isSending}
 			minCharsToSend={3}
+			minRows={minRows}
 			maxRows={6}
+			className={className}
 			placeholder="Jelaskan fitur atau perubahan yang kamu inginkan..."
 			ariaLabel="Jelaskan fitur atau perubahan yang kamu inginkan"
 		/>
@@ -268,21 +270,24 @@ export function CodebaseChatWorkspace({
 			{isPristine ? (
 				<div
 					data-testid="codebase-chat-pristine"
-					className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8"
+					className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-10 pb-8 sm:pt-14 md:pt-16 lg:pt-20"
 				>
-					<div className="flex w-full max-w-2xl -translate-y-4 flex-col items-center gap-5 text-center sm:-translate-y-6">
-						<div className="flex flex-col items-center gap-2">
-							<span
+					<div className="flex w-full max-w-3xl flex-col items-center gap-6 text-center">
+						<div className="flex flex-col items-center gap-2.5">
+							<div
 								data-testid="codebase-context-signal"
-								className="inline-flex items-center gap-1.5 rounded-full border border-graphite/60 bg-charcoal/70 px-2.5 py-0.5 text-[11px] font-medium text-fog"
+								className="flex items-center gap-2 text-xs font-medium text-fog/90"
 							>
-								<span className="h-1.5 w-1.5 rounded-full bg-emerald-500/80" />
-								{contextSignal}
-							</span>
-							<h2 className="text-xl font-bold tracking-tight text-snow sm:text-2xl">
+								<span
+									className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+									aria-hidden="true"
+								/>
+								<span>{contextSignal}</span>
+							</div>
+							<h2 className="text-2xl font-bold tracking-tight text-snow sm:text-3xl lg:text-[32px]">
 								Apa yang ingin kamu bangun?
 							</h2>
-							<p className="max-w-lg text-xs leading-relaxed text-fog sm:text-sm">
+							<p className="max-w-xl text-sm leading-relaxed text-fog sm:text-[15px]">
 								Jelaskan fitur, perubahan, atau masalah yang ingin kamu
 								kerjakan. VibeEverything akan menyesuaikannya dengan struktur
 								codebase ini.
@@ -290,7 +295,7 @@ export function CodebaseChatWorkspace({
 						</div>
 
 						<div className="w-full shrink-0 bg-transparent text-left">
-							{renderComposer()}
+							{renderComposer(2, "p-3.5 sm:p-4")}
 						</div>
 
 						{starterSuggestions && starterSuggestions.length > 0 ? (
