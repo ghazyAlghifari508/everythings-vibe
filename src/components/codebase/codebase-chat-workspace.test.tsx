@@ -93,14 +93,11 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(text).toContain(
 			"VibeEverything akan menyesuaikannya dengan struktur codebase ini.",
 		);
-		// 4. Context signal is present as subtle metadata line (not a pill badge)
-		const contextEl = container.querySelector(
-			"[data-testid='codebase-context-signal']",
-		);
-		expect(contextEl).not.toBeNull();
-		expect(contextEl?.className).not.toContain("rounded-full");
-		expect(contextEl?.className).not.toContain("bg-charcoal/70");
-		expect(text).toContain("everythings-vibe · 37 file tersinkron");
+		// 4. Context signal / pill is removed completely
+		expect(
+			container.querySelector("[data-testid='codebase-context-signal']"),
+		).toBeNull();
+		expect(text).not.toContain("Konteks repository siap");
 
 		// 5. Header title uses neutral repository-centric format with subtitle
 		const titleEl = container.querySelector(

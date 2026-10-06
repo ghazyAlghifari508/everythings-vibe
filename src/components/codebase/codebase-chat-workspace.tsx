@@ -123,8 +123,8 @@ export function buildTaskNextCommand(projectId: string): string {
 
 export function CodebaseChatWorkspace({
 	featureName,
-	contextFiles = [],
-	fileCount,
+	contextFiles: _contextFiles = [],
+	fileCount: _fileCount,
 	kanbanProgress = null,
 	messages,
 	questions,
@@ -245,22 +245,6 @@ export function CodebaseChatWorkspace({
 		? `Workspace · ${resolvedDisplayName}`
 		: "Workspace · Perencanaan codebase";
 
-	const contextSignal = (() => {
-		if (resolvedRepoName && typeof fileCount === "number" && fileCount > 0) {
-			return `${resolvedRepoName} · ${fileCount} file tersinkron`;
-		}
-		if (resolvedRepoName) {
-			return `${resolvedRepoName} · Konteks repository siap`;
-		}
-		if (typeof fileCount === "number" && fileCount > 0) {
-			return `${fileCount} file tersinkron · Konteks repository siap`;
-		}
-		if (contextFiles.length > 0) {
-			return `${contextFiles.length} file utama terdeteksi · Konteks repository siap`;
-		}
-		return "Konteks repository siap";
-	})();
-
 	const isPristine =
 		messages.length === 0 &&
 		questions.length === 0 &&
@@ -325,16 +309,6 @@ export function CodebaseChatWorkspace({
 				>
 					<div className="flex w-full max-w-3xl flex-col items-center gap-6 text-center">
 						<div className="flex flex-col items-center gap-2.5">
-							<div
-								data-testid="codebase-context-signal"
-								className="flex items-center gap-2 text-xs font-medium text-fog/90"
-							>
-								<span
-									className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
-									aria-hidden="true"
-								/>
-								<span>{contextSignal}</span>
-							</div>
 							<h2 className="text-2xl font-bold tracking-tight text-snow sm:text-3xl lg:text-[32px]">
 								Apa yang ingin kamu bangun?
 							</h2>
