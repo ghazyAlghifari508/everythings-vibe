@@ -35,6 +35,11 @@
 -- Idempotent by column type: if the column is already timestamptz the block
 -- returns early, so re-applying the file cannot shift rows twice.
 
+-- `cancelled_at` only ever reached the running databases through `db:push` and
+-- was never recorded as an ADD COLUMN, so a database rebuilt from this folder
+-- has to get it before the conversion below can touch it.
+ALTER TABLE "subscriptions" ADD COLUMN IF NOT EXISTS "cancelled_at" timestamp;--> statement-breakpoint
+
 DO $$
 DECLARE
 	needs_conversion boolean;

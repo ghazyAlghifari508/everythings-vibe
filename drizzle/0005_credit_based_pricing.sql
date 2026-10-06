@@ -6,6 +6,4 @@ UPDATE "subscriptions" SET "credits" = CASE "plan"
   WHEN 'pro' THEN 10
   ELSE 2
 END WHERE "credits" = 0;--> statement-breakpoint
-ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "subscription_type";--> statement-breakpoint
-ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "current_period_start";--> statement-breakpoint
-ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "current_period_end";
+ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "subscription_type";
