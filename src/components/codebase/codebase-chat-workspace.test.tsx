@@ -93,17 +93,21 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(text).toContain(
 			"VibeEverything akan menyesuaikannya dengan struktur codebase ini.",
 		);
-		// 4. Context signal is present
-		expect(
-			container.querySelector("[data-testid='codebase-context-signal']"),
-		).not.toBeNull();
+		// 4. Context signal is present as subtle metadata line (not a pill badge)
+		const contextEl = container.querySelector(
+			"[data-testid='codebase-context-signal']",
+		);
+		expect(contextEl).not.toBeNull();
+		expect(contextEl?.className).not.toContain("rounded-full");
+		expect(contextEl?.className).not.toContain("bg-charcoal/70");
 		expect(text).toContain("everythings-vibe · 37 file tersinkron");
 
-		// 5. Header title uses neutral repository-centric format
+		// 5. Header title uses neutral repository-centric format with subtitle
 		const titleEl = container.querySelector(
 			"[data-testid='codebase-chat-title']",
 		);
 		expect(titleEl?.textContent).toBe("Workspace · everythings-vibe");
+		expect(text).toContain("Planning workspace");
 
 		// 6. Pristine composition contains PromptBar
 		expect(
@@ -178,6 +182,75 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(
 			container.querySelector("[data-testid='codebase-starter-suggestions']"),
 		).toBeNull();
+	});
+
+	it("renders generic intent starters in pristine mode with 4 shortcuts", () => {
+		renderWorkspace();
+
+		const startersContainer = container.querySelector(
+			"[data-testid='codebase-intent-starters']",
+		);
+		expect(startersContainer).not.toBeNull();
+		expect(startersContainer?.textContent).toContain("Mulai dari");
+
+		expect(
+			container.querySelector("[data-testid='intent-starter-feature']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='intent-starter-bugfix']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='intent-starter-refactor']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='intent-starter-ui']"),
+		).not.toBeNull();
+
+		expect(startersContainer?.textContent).toContain("Tambah fitur baru");
+		expect(startersContainer?.textContent).toContain("Perbaiki bug atau alur");
+		expect(startersContainer?.textContent).toContain("Refactor kode");
+		expect(startersContainer?.textContent).toContain("Improve UI");
+	});
+
+	it("prefills composer draft from intent starter shortcut without calling onSendMessage", () => {
+		const onSendMessage = vi.fn();
+		renderWorkspace({ onSendMessage });
+
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		expect(composer?.value).toBe("");
+
+		const featureBtn = container.querySelector<HTMLButtonElement>(
+			"[data-testid='intent-starter-feature']",
+		);
+		expect(featureBtn).not.toBeNull();
+
+		act(() => {
+			featureBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(composer?.value).toBe("Tambahkan fitur ");
+		expect(onSendMessage).not.toHaveBeenCalled();
+	});
+
+	it("does not render intent starters or context eyebrow once conversation is active", () => {
+		renderWorkspace({
+			messages: [{ id: "m1", role: "user", content: "Halo dari user" }],
+		});
+
+		expect(
+			container.querySelector("[data-testid='codebase-intent-starters']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-context-signal']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-chat-pristine']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-chat-messages']"),
+		).not.toBeNull();
 	});
 
 	it("exits pristine state when questionsLoading is true", () => {
