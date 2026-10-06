@@ -75,28 +75,173 @@ function setTextareaValue(textarea: HTMLTextAreaElement, value: string) {
 }
 
 describe("CodebaseChatWorkspace pristine standby", () => {
-	it("shows clean welcome with composer and no pre-generated questions", () => {
-		renderWorkspace();
+	it("shows clean centered pristine onboarding with single PromptBar and no duplicate composer", () => {
+		renderWorkspace({
+			codebaseName: "everythings-vibe",
+			fileCount: 37,
+		});
 
 		const text = container.textContent ?? "";
+		// 1. Heading renders "Apa yang ingin kamu bangun?"
+		expect(text).toContain("Apa yang ingin kamu bangun?");
+		// 2. Old "Halo!" copy is gone
+		expect(text).not.toContain("Halo!");
+		// 3. Supporting copy covers broad intent
 		expect(text).toContain(
-			"Halo! Fitur apa yang ingin kamu bangun di repositori ini?",
+			"Jelaskan fitur, perubahan, atau masalah yang ingin kamu kerjakan.",
 		);
+		expect(text).toContain(
+			"VibeEverything akan menyesuaikannya dengan struktur codebase ini.",
+		);
+		// 4. Context signal is present
 		expect(
-			container.querySelector("[data-testid^='adaptive-question-']"),
-		).toBeNull();
-		expect(text).not.toContain("Belum ada artefak");
-		expect(text).not.toContain("Kanban Live");
+			container.querySelector("[data-testid='codebase-context-signal']"),
+		).not.toBeNull();
+		expect(text).toContain("everythings-vibe · 37 file tersinkron");
+
+		// 5. Header title uses neutral repository-centric format
+		const titleEl = container.querySelector(
+			"[data-testid='codebase-chat-title']",
+		);
+		expect(titleEl?.textContent).toBe("Workspace · everythings-vibe");
+
+		// 6. Pristine composition contains PromptBar
 		expect(
-			container.querySelector("[data-testid='codebase-kanban-badge']"),
+			container.querySelector(
+				"[data-testid='codebase-chat-pristine'] [data-testid='prompt-bar']",
+			),
+		).not.toBeNull();
+		// 7. Exactly ONE PromptBar exists in DOM (no duplicate at bottom)
+		expect(
+			container.querySelectorAll("[data-testid='prompt-bar']"),
+		).toHaveLength(1);
+		// Active message container is NOT rendered during pristine
+		expect(
+			container.querySelector("[data-testid='codebase-chat-messages']"),
 		).toBeNull();
 
+		// 8. Composer placeholder
 		const composer = container.querySelector<HTMLTextAreaElement>(
 			"#codebase-chat-composer",
 		);
 		expect(composer?.placeholder).toBe(
-			"Jelaskan fitur yang ingin kamu bangun di repositori ini...",
+			"Jelaskan fitur atau perubahan yang kamu inginkan...",
 		);
+	});
+
+	it("resolves provisional codebase name to neutral Workspace · Perencanaan codebase", () => {
+		renderWorkspace({
+			codebaseName: "Repository Lokal",
+			featureName: "Repository Lokal",
+		});
+
+		const titleEl = container.querySelector(
+			"[data-testid='codebase-chat-title']",
+		);
+		expect(titleEl?.textContent).toBe("Workspace · Perencanaan codebase");
+		expect(container.textContent).not.toContain("Repository Lokal");
+	});
+
+	it("prefills draft from starter suggestion without auto-sending", () => {
+		const onSendMessage = vi.fn();
+		renderWorkspace({
+			starterSuggestions: ["Tambah filter genre", "Perbaiki cache film"],
+			onSendMessage,
+		});
+
+		const suggestionsContainer = container.querySelector(
+			"[data-testid='codebase-starter-suggestions']",
+		);
+		expect(suggestionsContainer).not.toBeNull();
+		const buttons = suggestionsContainer?.querySelectorAll("button");
+		expect(buttons).toHaveLength(2);
+		expect(buttons?.[0]?.textContent).toBe("Tambah filter genre");
+
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		expect(composer?.value).toBe("");
+
+		// Click suggestion
+		act(() => {
+			buttons?.[0]?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		// Draft is prefilled
+		expect(composer?.value).toBe("Tambah filter genre");
+		// Crucial: NOT auto-submitted
+		expect(onSendMessage).not.toHaveBeenCalled();
+	});
+
+	it("omits starter suggestions container when none provided", () => {
+		renderWorkspace();
+		expect(
+			container.querySelector("[data-testid='codebase-starter-suggestions']"),
+		).toBeNull();
+	});
+
+	it("exits pristine state when questionsLoading is true", () => {
+		renderWorkspace({ questionsLoading: true });
+		expect(
+			container.querySelector("[data-testid='codebase-chat-pristine']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-chat-messages']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-questions-loading']"),
+		).not.toBeNull();
+		expect(
+			container.querySelectorAll("[data-testid='prompt-bar']"),
+		).toHaveLength(1);
+	});
+
+	it("exits pristine state when questions are present", () => {
+		renderWorkspace({ questions: sampleQuestions });
+		expect(
+			container.querySelector("[data-testid='codebase-chat-pristine']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-chat-messages']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='adaptive-question-q1']"),
+		).not.toBeNull();
+		expect(
+			container.querySelectorAll("[data-testid='prompt-bar']"),
+		).toHaveLength(1);
+	});
+
+	it("exits pristine state when artifacts are present or stage progresses", () => {
+		renderWorkspace({
+			artifacts: [
+				{
+					id: "art-1",
+					fileName: "prd-spec.md",
+					fileSizeBytes: 1024,
+					badge: "PRD",
+					description: "Dokumen spesifikasi PRD",
+				},
+			],
+		});
+		expect(
+			container.querySelector("[data-testid='codebase-chat-pristine']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-chat-messages']"),
+		).not.toBeNull();
+		expect(
+			container.querySelectorAll("[data-testid='prompt-bar']"),
+		).toHaveLength(1);
+
+		// Stage progresses to "prd"
+		renderWorkspace({ stage: "prd" });
+		expect(
+			container.querySelector("[data-testid='codebase-chat-pristine']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-chat-messages']"),
+		).not.toBeNull();
 	});
 
 	it("keeps Kirim disabled until a valid feature message is typed", () => {
@@ -230,9 +375,17 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		});
 
 		expect(container.textContent).toContain("Tambah mode gelap");
-		expect(container.textContent).not.toContain(
-			"Halo! Fitur apa yang ingin kamu bangun di repositori ini?",
-		);
+		expect(container.textContent).not.toContain("Apa yang ingin kamu bangun?");
+		expect(container.textContent).not.toContain("Halo!");
+		expect(
+			container.querySelector("[data-testid='codebase-chat-pristine']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-chat-messages']"),
+		).not.toBeNull();
+		expect(
+			container.querySelectorAll("[data-testid='prompt-bar']"),
+		).toHaveLength(1);
 	});
 });
 

@@ -1338,6 +1338,7 @@ function CodebaseDetailPage() {
 							<CodebaseChatWorkspace
 								featureName={resolvedFeature?.name ?? codebase.name}
 								contextFiles={contextFiles}
+								fileCount={status?.fileCount ?? manifestFileCount ?? undefined}
 								kanbanProgress={kanbanProgress}
 								messages={chatMessages}
 								questions={aiQuestions}

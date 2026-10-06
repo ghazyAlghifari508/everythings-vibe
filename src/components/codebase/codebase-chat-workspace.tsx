@@ -7,6 +7,7 @@ import {
 	areAllQuestionsAnswered,
 	nextQuestionIndex,
 } from "@/lib/codebase-chat-flow";
+import { resolveCodebaseDisplayName } from "@/lib/codebase-naming";
 import {
 	type CodebaseArtifactRef,
 	CodebaseFileCard,
@@ -42,6 +43,7 @@ export type PipelineStage =
 interface CodebaseChatWorkspaceProps {
 	featureName: string;
 	contextFiles?: string[];
+	fileCount?: number;
 	kanbanProgress?: { done: number; total: number; pct: number } | null;
 	messages: ChatStreamMessage[];
 	questions: AdaptiveQuestion[];
@@ -55,6 +57,7 @@ interface CodebaseChatWorkspaceProps {
 	stageBusy?: PipelineStage | null;
 	stageError?: string | null;
 	codebaseName?: string;
+	starterSuggestions?: string[];
 	isSending?: boolean;
 	isConfirming?: boolean;
 	specError?: string | null;
@@ -87,6 +90,7 @@ export function buildTaskNextCommand(projectId: string): string {
 export function CodebaseChatWorkspace({
 	featureName,
 	contextFiles = [],
+	fileCount,
 	kanbanProgress = null,
 	messages,
 	questions,
@@ -100,6 +104,7 @@ export function CodebaseChatWorkspace({
 	stageBusy = null,
 	stageError = null,
 	codebaseName,
+	starterSuggestions,
 	isSending = false,
 	isConfirming = false,
 	specError = null,
@@ -186,8 +191,54 @@ export function CodebaseChatWorkspace({
 				: questions.slice(0, currentIndex + 1);
 	const flowComplete = areAllQuestionsAnswered(answers, questions);
 	const hasLiveData = kanbanProgress !== null && kanbanProgress.total > 0;
+
+	const resolvedRepoName = resolveCodebaseDisplayName(codebaseName);
+	const resolvedFeatureName = resolveCodebaseDisplayName(featureName);
+	const resolvedDisplayName = resolvedRepoName ?? resolvedFeatureName;
+	const headerTitle = resolvedDisplayName
+		? `Workspace · ${resolvedDisplayName}`
+		: "Workspace · Perencanaan codebase";
+
+	const contextSignal = (() => {
+		if (resolvedRepoName && typeof fileCount === "number" && fileCount > 0) {
+			return `${resolvedRepoName} · ${fileCount} file tersinkron`;
+		}
+		if (resolvedRepoName) {
+			return `${resolvedRepoName} · Konteks repository siap`;
+		}
+		if (typeof fileCount === "number" && fileCount > 0) {
+			return `${fileCount} file tersinkron · Konteks repository siap`;
+		}
+		if (contextFiles.length > 0) {
+			return `${contextFiles.length} file utama terdeteksi · Konteks repository siap`;
+		}
+		return "Konteks repository siap";
+	})();
+
 	const isPristine =
-		messages.length === 0 && questions.length === 0 && artifacts.length === 0;
+		messages.length === 0 &&
+		questions.length === 0 &&
+		artifacts.length === 0 &&
+		projectIdForHandoff === null &&
+		!questionsLoading &&
+		!questionsError &&
+		!isSending &&
+		stage === "questions";
+
+	const renderComposer = () => (
+		<PromptBar
+			id="codebase-chat-composer"
+			value={draft}
+			onValueChange={setDraft}
+			onSend={handleSend}
+			disabled={isSending || questionsLoading}
+			isSending={isSending}
+			minCharsToSend={3}
+			maxRows={6}
+			placeholder="Jelaskan fitur atau perubahan yang kamu inginkan..."
+			ariaLabel="Jelaskan fitur atau perubahan yang kamu inginkan"
+		/>
+	);
 
 	return (
 		<div
@@ -201,7 +252,7 @@ export function CodebaseChatWorkspace({
 							data-testid="codebase-chat-title"
 							className="truncate text-sm font-semibold text-snow"
 						>
-							Perancangan Fitur: {featureName}
+							{headerTitle}
 						</p>
 					</div>
 					{hasLiveData && kanbanProgress ? (
@@ -214,456 +265,479 @@ export function CodebaseChatWorkspace({
 					) : null}
 				</div>
 			</div>
-			<div
-				data-testid="codebase-chat-messages"
-				className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
-			>
-				<div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-					{isPristine && !questionsLoading ? (
-						<div className="flex flex-col items-center gap-3 py-10 text-center">
-							<p className="max-w-md text-sm font-semibold leading-6 text-snow">
-								Halo! Fitur apa yang ingin kamu bangun di repositori ini?
-							</p>
-							{contextFiles.length > 0 ? (
-								<p className="max-w-md text-xs leading-5 text-fog">
-									Saya membaca arsitektur Anda di{" "}
-									{contextFiles.map((file, index) => (
-										<span key={file}>
-											<code className="font-mono text-snow">{file}</code>
-											{index < contextFiles.length - 1 ? " dan " : ""}
-										</span>
-									))}
-									.
-								</p>
-							) : null}
-						</div>
-					) : null}
-					{messages.map((message) =>
-						message.role === "user" ? (
-							<div key={message.id} className="flex justify-end">
-								<div className="max-w-[85%] rounded-xl bg-snow px-3 py-2 text-[13px] leading-6 text-onyx">
-									{message.content}
-								</div>
-							</div>
-						) : (
-							<div key={message.id} className="flex flex-col gap-1">
-								<p className="text-[11px] font-semibold text-fog">
-									VibeEverything Assistant
-								</p>
-								<div className="rounded-xl border border-graphite bg-charcoal p-3 text-[13px] leading-6 text-mist">
-									{message.content}
-								</div>
-							</div>
-						),
-					)}
-					{questionsLoading ? (
-						<div
-							data-testid="codebase-questions-loading"
-							className="flex flex-col gap-2 rounded-xl border border-graphite bg-charcoal p-3"
-							aria-busy="true"
-						>
-							<div className="h-4 w-2/3 animate-pulse rounded bg-graphite" />
-							<div className="h-3 w-full animate-pulse rounded bg-graphite" />
-							<div className="h-3 w-5/6 animate-pulse rounded bg-graphite" />
-							<p className="text-xs text-fog">
-								Menyusun pertanyaan klarifikasi dari konteks repositori...
-							</p>
-						</div>
-					) : null}
-					{questionsError ? (
-						<div
-							role="alert"
-							data-testid="codebase-questions-error"
-							className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
-						>
-							<span>{questionsError}</span>
-							{onRetryQuestions ? (
-								<button
-									type="button"
-									onClick={onRetryQuestions}
-									className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									Coba lagi
-								</button>
-							) : null}
-						</div>
-					) : null}
-					{visibleQuestions.map((question, qIndex) => {
-						const submitted = (answers[question.id] ?? "").trim();
-						const isCurrent = qIndex === currentIndex;
-						const custom = (customAnswers[question.id] ?? "").trim();
-						const pickedId = selected[question.id];
-						const canSubmit =
-							!submitted && (custom.length > 0 || Boolean(pickedId));
-						return (
-							<div
-								key={question.id}
-								data-testid={`adaptive-question-${question.id}`}
-								className="rounded-xl border border-graphite bg-charcoal p-3"
+			{isPristine ? (
+				<div
+					data-testid="codebase-chat-pristine"
+					className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8"
+				>
+					<div className="flex w-full max-w-2xl -translate-y-4 flex-col items-center gap-5 text-center sm:-translate-y-6">
+						<div className="flex flex-col items-center gap-2">
+							<span
+								data-testid="codebase-context-signal"
+								className="inline-flex items-center gap-1.5 rounded-full border border-graphite/60 bg-charcoal/70 px-2.5 py-0.5 text-[11px] font-medium text-fog"
 							>
-								<p className="text-[13px] font-semibold text-snow">
-									<span className="mr-2 rounded bg-indigo/15 px-1.5 py-0.5 font-mono text-[11px] text-indigo">
-										Q{qIndex + 1}
-									</span>
-									{question.title}
-								</p>
-								{submitted ? (
-									<p className="mt-2 rounded-lg border border-emerald/30 bg-emerald/10 px-3 py-2 text-xs leading-5 text-emerald">
-										Jawaban: {submitted}
-									</p>
+								<span className="h-1.5 w-1.5 rounded-full bg-emerald-500/80" />
+								{contextSignal}
+							</span>
+							<h2 className="text-xl font-bold tracking-tight text-snow sm:text-2xl">
+								Apa yang ingin kamu bangun?
+							</h2>
+							<p className="max-w-lg text-xs leading-relaxed text-fog sm:text-sm">
+								Jelaskan fitur, perubahan, atau masalah yang ingin kamu
+								kerjakan. VibeEverything akan menyesuaikannya dengan struktur
+								codebase ini.
+							</p>
+						</div>
+
+						<div className="w-full shrink-0 bg-transparent text-left">
+							{renderComposer()}
+						</div>
+
+						{starterSuggestions && starterSuggestions.length > 0 ? (
+							<div
+								data-testid="codebase-starter-suggestions"
+								className="flex w-full flex-wrap items-center justify-center gap-2 pt-1"
+							>
+								{starterSuggestions.slice(0, 3).map((suggestion) => (
+									<button
+										key={suggestion}
+										type="button"
+										onClick={() => setDraft(suggestion)}
+										className="inline-flex items-center rounded-lg border border-graphite bg-charcoal/60 px-3 py-1.5 text-left text-xs text-fog transition hover:border-slate/60 hover:bg-charcoal hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									>
+										{suggestion}
+									</button>
+								))}
+							</div>
+						) : null}
+					</div>
+				</div>
+			) : (
+				<>
+					<div
+						data-testid="codebase-chat-messages"
+						className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+					>
+						<div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+							{messages.map((message) =>
+								message.role === "user" ? (
+									<div key={message.id} className="flex justify-end">
+										<div className="max-w-[85%] rounded-xl bg-snow px-3 py-2 text-[13px] leading-6 text-onyx">
+											{message.content}
+										</div>
+									</div>
 								) : (
-									<>
-										<div className="mt-2 flex flex-col gap-2">
-											{question.options.map((option) => {
-												const isSelected = pickedId === option.id;
-												const isCustomMode = customOpen[question.id] === true;
-												return (
+									<div key={message.id} className="flex flex-col gap-1">
+										<p className="text-[11px] font-semibold text-fog">
+											VibeEverything Assistant
+										</p>
+										<div className="rounded-xl border border-graphite bg-charcoal p-3 text-[13px] leading-6 text-mist">
+											{message.content}
+										</div>
+									</div>
+								),
+							)}
+							{questionsLoading ? (
+								<div
+									data-testid="codebase-questions-loading"
+									className="flex flex-col gap-2 rounded-xl border border-graphite bg-charcoal p-3"
+									aria-busy="true"
+								>
+									<div className="h-4 w-2/3 animate-pulse rounded bg-graphite" />
+									<div className="h-3 w-full animate-pulse rounded bg-graphite" />
+									<div className="h-3 w-5/6 animate-pulse rounded bg-graphite" />
+									<p className="text-xs text-fog">
+										Menyusun pertanyaan klarifikasi dari konteks repositori...
+									</p>
+								</div>
+							) : null}
+							{questionsError ? (
+								<div
+									role="alert"
+									data-testid="codebase-questions-error"
+									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+								>
+									<span>{questionsError}</span>
+									{onRetryQuestions ? (
+										<button
+											type="button"
+											onClick={onRetryQuestions}
+											className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+										>
+											Coba lagi
+										</button>
+									) : null}
+								</div>
+							) : null}
+							{visibleQuestions.map((question, qIndex) => {
+								const submitted = (answers[question.id] ?? "").trim();
+								const isCurrent = qIndex === currentIndex;
+								const custom = (customAnswers[question.id] ?? "").trim();
+								const pickedId = selected[question.id];
+								const canSubmit =
+									!submitted && (custom.length > 0 || Boolean(pickedId));
+								return (
+									<div
+										key={question.id}
+										data-testid={`adaptive-question-${question.id}`}
+										className="rounded-xl border border-graphite bg-charcoal p-3"
+									>
+										<p className="text-[13px] font-semibold text-snow">
+											<span className="mr-2 rounded bg-indigo/15 px-1.5 py-0.5 font-mono text-[11px] text-indigo">
+												Q{qIndex + 1}
+											</span>
+											{question.title}
+										</p>
+										{submitted ? (
+											<p className="mt-2 rounded-lg border border-emerald/30 bg-emerald/10 px-3 py-2 text-xs leading-5 text-emerald">
+												Jawaban: {submitted}
+											</p>
+										) : (
+											<>
+												<div className="mt-2 flex flex-col gap-2">
+													{question.options.map((option) => {
+														const isSelected = pickedId === option.id;
+														const isCustomMode =
+															customOpen[question.id] === true;
+														return (
+															<button
+																key={option.id}
+																type="button"
+																disabled={!isCurrent}
+																onClick={() => {
+																	setSelected((current) => ({
+																		...current,
+																		[question.id]: option.id,
+																	}));
+																	setCustomOpen((current) => ({
+																		...current,
+																		[question.id]: false,
+																	}));
+																}}
+																aria-pressed={isSelected}
+																className={`flex min-h-11 items-start gap-2 rounded-lg border p-2.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+																	isSelected
+																		? "border-indigo bg-indigo/10 text-snow"
+																		: "border-graphite bg-obsidian text-mist hover:border-steel"
+																} ${isCurrent ? "" : "opacity-60"} ${isCustomMode ? "opacity-60" : ""}`}
+															>
+																<span
+																	aria-hidden="true"
+																	className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] ${
+																		isSelected
+																			? "border-indigo bg-indigo"
+																			: "border-slate"
+																	}`}
+																/>
+																<span>
+																	{option.label}
+																	{option.recommended ? (
+																		<span className="ml-1.5 rounded-full border border-emerald/30 bg-emerald/10 px-1.5 py-px text-[10px] font-semibold text-emerald">
+																			Rekomendasi
+																		</span>
+																	) : null}
+																</span>
+															</button>
+														);
+													})}
 													<button
-														key={option.id}
 														type="button"
 														disabled={!isCurrent}
-														onClick={() => {
-															setSelected((current) => ({
-																...current,
-																[question.id]: option.id,
-															}));
+														onClick={() =>
 															setCustomOpen((current) => ({
 																...current,
-																[question.id]: false,
-															}));
-														}}
-														aria-pressed={isSelected}
-														className={`flex min-h-11 items-start gap-2 rounded-lg border p-2.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-															isSelected
-																? "border-indigo bg-indigo/10 text-snow"
-																: "border-graphite bg-obsidian text-mist hover:border-steel"
-														} ${isCurrent ? "" : "opacity-60"} ${isCustomMode ? "opacity-60" : ""}`}
+																[question.id]: !current[question.id],
+															}))
+														}
+														aria-expanded={customOpen[question.id] === true}
+														className={`inline-flex min-h-9 w-fit items-center rounded-md border px-2.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+															customOpen[question.id] === true
+																? "border-indigo text-snow"
+																: "border-graphite text-fog hover:text-snow"
+														}`}
 													>
-														<span
-															aria-hidden="true"
-															className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] ${
-																isSelected
-																	? "border-indigo bg-indigo"
-																	: "border-slate"
-															}`}
-														/>
-														<span>
-															{option.label}
-															{option.recommended ? (
-																<span className="ml-1.5 rounded-full border border-emerald/30 bg-emerald/10 px-1.5 py-px text-[10px] font-semibold text-emerald">
-																	Rekomendasi
-																</span>
-															) : null}
-														</span>
+														Lainnya
 													</button>
-												);
-											})}
-											<button
-												type="button"
-												disabled={!isCurrent}
-												onClick={() =>
-													setCustomOpen((current) => ({
-														...current,
-														[question.id]: !current[question.id],
-													}))
-												}
-												aria-expanded={customOpen[question.id] === true}
-												className={`inline-flex min-h-9 w-fit items-center rounded-md border px-2.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-													customOpen[question.id] === true
-														? "border-indigo text-snow"
-														: "border-graphite text-fog hover:text-snow"
-												}`}
-											>
-												Lainnya
-											</button>
-										</div>
-										{customOpen[question.id] === true ? (
-											<>
-												<label
-													htmlFor={`custom-${question.id}`}
-													className="sr-only"
-												>
-													Jawaban khusus {question.title}
-												</label>
-												<input
-													id={`custom-${question.id}`}
-													type="text"
-													disabled={!isCurrent}
-													value={customAnswers[question.id] ?? ""}
-													onChange={(event) =>
-														setCustomAnswers((current) => ({
-															...current,
-															[question.id]: event.target.value,
-														}))
-													}
-													placeholder={
-														question.customPlaceholder ??
-														"Atau ketik preferensi sendiri..."
-													}
-													className="mt-2 w-full rounded-lg border border-graphite bg-onyx px-3 py-2 text-xs text-snow outline-none placeholder:text-slate focus-visible:ring-2 focus-visible:ring-indigo"
-												/>
+												</div>
+												{customOpen[question.id] === true ? (
+													<>
+														<label
+															htmlFor={`custom-${question.id}`}
+															className="sr-only"
+														>
+															Jawaban khusus {question.title}
+														</label>
+														<input
+															id={`custom-${question.id}`}
+															type="text"
+															disabled={!isCurrent}
+															value={customAnswers[question.id] ?? ""}
+															onChange={(event) =>
+																setCustomAnswers((current) => ({
+																	...current,
+																	[question.id]: event.target.value,
+																}))
+															}
+															placeholder={
+																question.customPlaceholder ??
+																"Atau ketik preferensi sendiri..."
+															}
+															className="mt-2 w-full rounded-lg border border-graphite bg-onyx px-3 py-2 text-xs text-snow outline-none placeholder:text-slate focus-visible:ring-2 focus-visible:ring-indigo"
+														/>
+													</>
+												) : null}
+												{isCurrent ? (
+													<div className="mt-3 flex justify-end">
+														<button
+															type="button"
+															disabled={!canSubmit}
+															onClick={() => handleSubmitOne(question)}
+															className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+														>
+															Kirim Jawaban
+														</button>
+													</div>
+												) : null}
 											</>
-										) : null}
-										{isCurrent ? (
-											<div className="mt-3 flex justify-end">
+										)}
+									</div>
+								);
+							})}
+							{specError ? (
+								<div
+									role="alert"
+									data-testid="codebase-spec-error"
+									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+								>
+									<span>{specError}</span>
+									{onRetryGenerate ? (
+										<button
+											type="button"
+											onClick={onRetryGenerate}
+											className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+										>
+											Coba lagi
+										</button>
+									) : null}
+								</div>
+							) : null}
+							{flowComplete && stage === "questions" ? (
+								<div
+									data-testid="codebase-questions-complete"
+									className="rounded-xl border border-emerald/30 bg-obsidian p-4"
+								>
+									<p className="text-[13px] font-semibold leading-6 text-snow">
+										Pertanyaan sudah dijawab semua dan informasi kebutuhan sudah
+										lengkap. Siap membuat spesifikasi fitur?
+									</p>
+									<div className="mt-3 flex justify-end">
+										<button
+											type="button"
+											disabled={isConfirming}
+											onClick={() => onConfirmGenerate?.()}
+											className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+										>
+											{isConfirming
+												? "Membuat spesifikasi..."
+												: "Lanjut Bikin Fitur"}
+										</button>
+									</div>
+								</div>
+							) : null}
+							{artifacts.length > 0 ? (
+								<div className="flex flex-col">
+									{artifacts.map((artifact) => (
+										<CodebaseFileCard
+											key={artifact.id}
+											artifact={artifact}
+											active={artifact.id === activeArtifactId}
+											onOpen={onOpenArtifact}
+											onDownload={onDownloadArtifact}
+										/>
+									))}
+								</div>
+							) : null}
+							{stageError ? (
+								<div
+									role="alert"
+									data-testid="codebase-stage-error"
+									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+								>
+									<span>{stageError}</span>
+									{onRetryStage ? (
+										<button
+											type="button"
+											onClick={onRetryStage}
+											className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+										>
+											Coba lagi
+										</button>
+									) : null}
+								</div>
+							) : null}
+							{stage === "feature" && onGeneratePrd ? (
+								<StageCta
+									testId="codebase-stage-prd"
+									message="Fitur berhasil disusun. Lanjut susun PRD 8 seksi?"
+									buttonLabel="Lanjut Buat PRD"
+									busyLabel="Menyusun PRD..."
+									busy={stageBusy === "prd"}
+									onAction={onGeneratePrd}
+								/>
+							) : null}
+							{stage === "prd" && onGenerateAc ? (
+								<StageCta
+									testId="codebase-stage-ac"
+									message="PRD siap. Lanjut generate Acceptance Criteria (AC)?"
+									buttonLabel="Lanjut Buat AC"
+									busyLabel="Membuat AC..."
+									busy={stageBusy === "ac"}
+									onAction={onGenerateAc}
+								/>
+							) : null}
+							{stage === "ac" && onGenerateTask ? (
+								<StageCta
+									testId="codebase-stage-task"
+									message="Acceptance Criteria siap. Lanjut breakdown Task & Papan Kanban?"
+									buttonLabel="Lanjut Breakdown Task"
+									busyLabel="Membagi task..."
+									busy={stageBusy === "task"}
+									onAction={onGenerateTask}
+								/>
+							) : null}
+							{handoffCmd && exportCmd && taskCmd ? (
+								<div
+									data-testid="codebase-handoff-card"
+									className="rounded-xl border border-emerald/30 bg-obsidian p-4"
+								>
+									<div className="flex items-center justify-between gap-2">
+										<p className="text-[13px] font-semibold text-emerald">
+											Handoff ke AI Coding Agent
+										</p>
+										<button
+											type="button"
+											onClick={handleCopyCmd}
+											className="inline-flex min-h-9 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+										>
+											{copiedCmd ? (
+												<>
+													<Check
+														size={12}
+														aria-hidden="true"
+														className="text-emerald"
+													/>
+													<span className="text-emerald">Tersalin</span>
+												</>
+											) : (
+												<>
+													<Copy size={12} aria-hidden="true" />
+													<span>Salin perintah lengkap</span>
+												</>
+											)}
+										</button>
+									</div>
+									<p className="mt-1.5 text-xs leading-5 text-fog">
+										Seluruh tahap selesai: pohon fitur, PRD 8 seksi, Acceptance
+										Criteria, dan task sudah tersimpan. Salin blok perintah
+										berikut ke AI Coding Agent eksternal (Cursor, Claude Code,
+										Windsurf, dll.) dan jalankan di root repository
+										{codebaseName ? ` ${codebaseName}` : ""}.
+									</p>
+									<div className="mt-3 flex flex-col gap-2.5">
+										<div>
+											<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
+												Langkah 1 — Ekspor aturan proyek
+											</p>
+											<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
+												<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
+													{exportCmd}
+												</code>
 												<button
 													type="button"
-													disabled={!canSubmit}
-													onClick={() => handleSubmitOne(question)}
-													className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+													onClick={() =>
+														handleCopy(exportCmd, (value) =>
+															setCopiedExport(value),
+														)
+													}
+													aria-label="Salin perintah export rules"
+													className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 												>
-													Kirim Jawaban
+													{copiedExport ? (
+														<>
+															<Check
+																size={11}
+																aria-hidden="true"
+																className="text-emerald"
+															/>
+															<span className="text-emerald">Tersalin</span>
+														</>
+													) : (
+														<>
+															<Copy size={11} aria-hidden="true" />
+															<span>Salin</span>
+														</>
+													)}
 												</button>
 											</div>
-										) : null}
-									</>
-								)}
-							</div>
-						);
-					})}
-					{specError ? (
-						<div
-							role="alert"
-							data-testid="codebase-spec-error"
-							className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
-						>
-							<span>{specError}</span>
-							{onRetryGenerate ? (
-								<button
-									type="button"
-									onClick={onRetryGenerate}
-									className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									Coba lagi
-								</button>
-							) : null}
-						</div>
-					) : null}
-					{flowComplete && stage === "questions" ? (
-						<div
-							data-testid="codebase-questions-complete"
-							className="rounded-xl border border-emerald/30 bg-obsidian p-4"
-						>
-							<p className="text-[13px] font-semibold leading-6 text-snow">
-								Pertanyaan sudah dijawab semua dan informasi kebutuhan sudah
-								lengkap. Siap membuat spesifikasi fitur?
-							</p>
-							<div className="mt-3 flex justify-end">
-								<button
-									type="button"
-									disabled={isConfirming}
-									onClick={() => onConfirmGenerate?.()}
-									className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									{isConfirming
-										? "Membuat spesifikasi..."
-										: "Lanjut Bikin Fitur"}
-								</button>
-							</div>
-						</div>
-					) : null}
-					{artifacts.length > 0 ? (
-						<div className="flex flex-col">
-							{artifacts.map((artifact) => (
-								<CodebaseFileCard
-									key={artifact.id}
-									artifact={artifact}
-									active={artifact.id === activeArtifactId}
-									onOpen={onOpenArtifact}
-									onDownload={onDownloadArtifact}
-								/>
-							))}
-						</div>
-					) : null}
-					{stageError ? (
-						<div
-							role="alert"
-							data-testid="codebase-stage-error"
-							className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
-						>
-							<span>{stageError}</span>
-							{onRetryStage ? (
-								<button
-									type="button"
-									onClick={onRetryStage}
-									className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									Coba lagi
-								</button>
-							) : null}
-						</div>
-					) : null}
-					{stage === "feature" && onGeneratePrd ? (
-						<StageCta
-							testId="codebase-stage-prd"
-							message="Fitur berhasil disusun. Lanjut susun PRD 8 seksi?"
-							buttonLabel="Lanjut Buat PRD"
-							busyLabel="Menyusun PRD..."
-							busy={stageBusy === "prd"}
-							onAction={onGeneratePrd}
-						/>
-					) : null}
-					{stage === "prd" && onGenerateAc ? (
-						<StageCta
-							testId="codebase-stage-ac"
-							message="PRD siap. Lanjut generate Acceptance Criteria (AC)?"
-							buttonLabel="Lanjut Buat AC"
-							busyLabel="Membuat AC..."
-							busy={stageBusy === "ac"}
-							onAction={onGenerateAc}
-						/>
-					) : null}
-					{stage === "ac" && onGenerateTask ? (
-						<StageCta
-							testId="codebase-stage-task"
-							message="Acceptance Criteria siap. Lanjut breakdown Task & Papan Kanban?"
-							buttonLabel="Lanjut Breakdown Task"
-							busyLabel="Membagi task..."
-							busy={stageBusy === "task"}
-							onAction={onGenerateTask}
-						/>
-					) : null}
-					{handoffCmd && exportCmd && taskCmd ? (
-						<div
-							data-testid="codebase-handoff-card"
-							className="rounded-xl border border-emerald/30 bg-obsidian p-4"
-						>
-							<div className="flex items-center justify-between gap-2">
-								<p className="text-[13px] font-semibold text-emerald">
-									Handoff ke AI Coding Agent
-								</p>
-								<button
-									type="button"
-									onClick={handleCopyCmd}
-									className="inline-flex min-h-9 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									{copiedCmd ? (
-										<>
-											<Check
-												size={12}
-												aria-hidden="true"
-												className="text-emerald"
-											/>
-											<span className="text-emerald">Tersalin</span>
-										</>
-									) : (
-										<>
-											<Copy size={12} aria-hidden="true" />
-											<span>Salin perintah lengkap</span>
-										</>
-									)}
-								</button>
-							</div>
-							<p className="mt-1.5 text-xs leading-5 text-fog">
-								Seluruh tahap selesai: pohon fitur, PRD 8 seksi, Acceptance
-								Criteria, dan task sudah tersimpan. Salin blok perintah berikut
-								ke AI Coding Agent eksternal (Cursor, Claude Code, Windsurf,
-								dll.) dan jalankan di root repository
-								{codebaseName ? ` ${codebaseName}` : ""}.
-							</p>
-							<div className="mt-3 flex flex-col gap-2.5">
-								<div>
-									<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
-										Langkah 1 — Ekspor aturan proyek
-									</p>
-									<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
-										<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
-											{exportCmd}
-										</code>
-										<button
-											type="button"
-											onClick={() =>
-												handleCopy(exportCmd, (value) => setCopiedExport(value))
-											}
-											aria-label="Salin perintah export rules"
-											className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-										>
-											{copiedExport ? (
-												<>
-													<Check
-														size={11}
-														aria-hidden="true"
-														className="text-emerald"
-													/>
-													<span className="text-emerald">Tersalin</span>
-												</>
-											) : (
-												<>
-													<Copy size={11} aria-hidden="true" />
-													<span>Salin</span>
-												</>
-											)}
-										</button>
+											<p className="mt-1 text-[10.5px] leading-4 text-slate">
+												Menulis file aturan proyek (AGENTS.md dan setara) berisi
+												konteks codebase, skema, dan konvensi yang dipakai
+												agent.
+											</p>
+										</div>
+										<div>
+											<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
+												Langkah 2 — Kerjakan task bertahap
+											</p>
+											<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
+												<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
+													{taskCmd}
+												</code>
+												<button
+													type="button"
+													onClick={() =>
+														handleCopy(taskCmd, (value) => setCopiedTask(value))
+													}
+													aria-label="Salin perintah task next"
+													className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+												>
+													{copiedTask ? (
+														<>
+															<Check
+																size={11}
+																aria-hidden="true"
+																className="text-emerald"
+															/>
+															<span className="text-emerald">Tersalin</span>
+														</>
+													) : (
+														<>
+															<Copy size={11} aria-hidden="true" />
+															<span>Salin</span>
+														</>
+													)}
+												</button>
+											</div>
+											<p className="mt-1 text-[10.5px] leading-4 text-slate">
+												Mengambil task prioritas berikutnya dari papan Kanban
+												beserta konteks PRD dan AC yang relevan.
+											</p>
+										</div>
 									</div>
-									<p className="mt-1 text-[10.5px] leading-4 text-slate">
-										Menulis file aturan proyek (AGENTS.md dan setara) berisi
-										konteks codebase, skema, dan konvensi yang dipakai agent.
+									<p className="mt-3 text-[11px] leading-5 text-slate">
+										Mekanisme progres: saat agent menyelesaikan task via CLI,
+										kartu di Papan Kanban kanan berpindah kolom secara real-time
+										melalui polling. Tidak perlu me-refresh manual.
 									</p>
 								</div>
-								<div>
-									<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
-										Langkah 2 — Kerjakan task bertahap
-									</p>
-									<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
-										<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
-											{taskCmd}
-										</code>
-										<button
-											type="button"
-											onClick={() =>
-												handleCopy(taskCmd, (value) => setCopiedTask(value))
-											}
-											aria-label="Salin perintah task next"
-											className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-										>
-											{copiedTask ? (
-												<>
-													<Check
-														size={11}
-														aria-hidden="true"
-														className="text-emerald"
-													/>
-													<span className="text-emerald">Tersalin</span>
-												</>
-											) : (
-												<>
-													<Copy size={11} aria-hidden="true" />
-													<span>Salin</span>
-												</>
-											)}
-										</button>
-									</div>
-									<p className="mt-1 text-[10.5px] leading-4 text-slate">
-										Mengambil task prioritas berikutnya dari papan Kanban
-										beserta konteks PRD dan AC yang relevan.
-									</p>
-								</div>
-							</div>
-							<p className="mt-3 text-[11px] leading-5 text-slate">
-								Mekanisme progres: saat agent menyelesaikan task via CLI, kartu
-								di Papan Kanban kanan berpindah kolom secara real-time melalui
-								polling. Tidak perlu me-refresh manual.
-							</p>
+							) : null}
 						</div>
-					) : null}
-				</div>
-			</div>
-			<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
-				<div className="mx-auto w-full max-w-2xl">
-					<PromptBar
-						id="codebase-chat-composer"
-						value={draft}
-						onValueChange={setDraft}
-						onSend={handleSend}
-						disabled={isSending || questionsLoading}
-						isSending={isSending}
-						minCharsToSend={3}
-						maxRows={6}
-						placeholder="Jelaskan fitur yang ingin kamu bangun di repositori ini..."
-						ariaLabel="Jelaskan fitur yang ingin dibangun di repositori ini"
-					/>
-				</div>
-			</div>
+					</div>
+					<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
+						<div className="mx-auto w-full max-w-2xl">{renderComposer()}</div>
+					</div>
+				</>
+			)}
 		</div>
 	);
 }
