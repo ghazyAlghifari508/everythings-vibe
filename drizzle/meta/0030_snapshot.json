@@ -1857,27 +1857,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "credit_operations_user_id_id_unique": {
-          "name": "credit_operations_user_id_id_unique",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -1952,7 +1931,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "credit_operations_user_id_id_unique": {
+          "name": "credit_operations_user_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "user_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "credit_operations_credit_bounds_check": {
@@ -2660,27 +2648,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "projects_user_id_id_unique": {
-          "name": "projects_user_id_id_unique",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -2712,7 +2679,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "projects_user_id_id_unique": {
+          "name": "projects_user_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "user_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3464,8 +3440,8 @@
           "name": "subscriptions_user_id_id_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "user_id",
-            "id"
+            "id",
+            "user_id"
           ]
         }
       },
