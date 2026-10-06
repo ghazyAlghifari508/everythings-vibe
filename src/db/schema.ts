@@ -129,7 +129,10 @@ export const subscriptions = pgTable(
 		// Hot path: credits.ts getCreditBalance/consumeCredit query
 		// WHERE user_id = ? ORDER BY created_at DESC LIMIT 1
 		index("subscriptions_user_id_created_at_idx").on(t.userId, t.createdAt),
-		unique("subscriptions_user_id_id_unique").on(t.userId, t.id),
+		// Composite unique/FK targets keep `id` first: drizzle-kit introspects
+		// multi-column unique constraints in physical column order, and any other
+		// order makes `db:push` plan a DROP that Postgres refuses (FK dependency).
+		unique("subscriptions_user_id_id_unique").on(t.id, t.userId),
 		check(
 			"subscriptions_credits_reserved_non_negative_check",
 			sql`credits_reserved >= 0`,
@@ -226,7 +229,7 @@ export const creditOperations = pgTable(
 			"credit_operations_credit_bounds_check",
 			sql`estimated_credits >= 0 AND reserved_credits >= 0 AND maximum_credits >= 0 AND estimated_credits <= maximum_credits AND reserved_credits <= maximum_credits AND (final_charge IS NULL OR (final_charge >= 0 AND final_charge <= maximum_credits))`,
 		),
-		uniqueIndex("credit_operations_user_id_id_unique").on(t.userId, t.id),
+		unique("credit_operations_user_id_id_unique").on(t.id, t.userId),
 		foreignKey({
 			columns: [t.userId, t.projectId],
 			foreignColumns: [projects.userId, projects.id],
@@ -358,7 +361,7 @@ export const projects = pgTable(
 		// Active-project listing (History, admin, lookups) filters on both.
 		index("projects_user_id_deleted_at_idx").on(t.userId, t.deletedAt),
 		index("projects_codebase_id_idx").on(t.codebaseId),
-		uniqueIndex("projects_user_id_id_unique").on(t.userId, t.id),
+		unique("projects_user_id_id_unique").on(t.id, t.userId),
 	],
 );
 
