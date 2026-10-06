@@ -33,7 +33,7 @@ export function filterExplorerFiles(
 	return files.filter((file) => file.path.toLowerCase().includes(normalized));
 }
 
-interface TreeNode {
+export interface TreeNode {
 	name: string;
 	fullPath: string;
 	isFile: boolean;
@@ -41,11 +41,30 @@ interface TreeNode {
 	children: TreeNode[];
 }
 
-function isFilePath(path: string): boolean {
-	return /\.[a-z0-9]+$/i.test(path.trim());
+const canonicalCollator = new Intl.Collator("en", {
+	numeric: true,
+	sensitivity: "base",
+});
+
+export function compareExplorerTreeNodes(a: TreeNode, b: TreeNode): number {
+	if (a.isFile !== b.isFile) {
+		return a.isFile ? 1 : -1;
+	}
+	const primary = canonicalCollator.compare(a.name, b.name);
+	if (primary !== 0) return primary;
+	if (a.name < b.name) return -1;
+	if (a.name > b.name) return 1;
+	return a.fullPath.localeCompare(b.fullPath, "en");
 }
 
-function buildTree(files: ExplorerFileEntry[]): TreeNode[] {
+export function sortTreeNodes(nodes: TreeNode[]): TreeNode[] {
+	return [...nodes].sort(compareExplorerTreeNodes).map((node) => ({
+		...node,
+		children: node.children.length > 0 ? sortTreeNodes(node.children) : [],
+	}));
+}
+
+export function buildTree(files: ExplorerFileEntry[]): TreeNode[] {
 	const roots: TreeNode[] = [];
 	const dirMap = new Map<string, TreeNode>();
 	const ensureDir = (segments: string[]): TreeNode | null => {
@@ -76,7 +95,7 @@ function buildTree(files: ExplorerFileEntry[]): TreeNode[] {
 			roots.push({
 				name: segments[0],
 				fullPath: segments[0],
-				isFile: isFilePath(segments[0]),
+				isFile: true,
 				summary: file.summary,
 				children: [],
 			});
@@ -94,7 +113,7 @@ function buildTree(files: ExplorerFileEntry[]): TreeNode[] {
 		if (parent) parent.children.push(node);
 		else roots.push(node);
 	}
-	return roots;
+	return sortTreeNodes(roots);
 }
 
 function TreeRow({
