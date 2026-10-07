@@ -120,7 +120,7 @@ export const Route = createFileRoute("/codebases/")({
 	component: CodebasesPage,
 	pendingComponent: CodebasesPending,
 	errorComponent: ({ reset }) => (
-		<main className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-12 sm:px-6">
+		<main className="mx-auto flex max-w-5xl flex-1 flex-col gap-4 px-4 py-12 sm:px-6">
 			<div
 				role="alert"
 				className="rounded-xl border border-crimson/40 bg-crimson/10 p-5 text-crimson"
@@ -146,7 +146,7 @@ export const Route = createFileRoute("/codebases/")({
 function CodebasesPending() {
 	return (
 		<main
-			className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14"
+			className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14"
 			aria-busy="true"
 		>
 			<header className="flex flex-col gap-4 border-b border-graphite pb-6 sm:flex-row sm:items-end sm:justify-between">
@@ -173,7 +173,7 @@ function CodebasesPending() {
 function CodebasesPage() {
 	const { codebases: items } = Route.useLoaderData();
 	return (
-		<main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
+		<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
 			<CodebaseLibraryView items={items} />
 		</main>
 	);

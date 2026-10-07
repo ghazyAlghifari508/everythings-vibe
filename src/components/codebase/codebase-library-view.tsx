@@ -118,7 +118,7 @@ export function CodebaseLibraryView({
 	};
 
 	return (
-		<div className="flex flex-col gap-6">
+		<div className="flex flex-1 flex-col gap-6">
 			<HubBreadcrumb
 				current={CODEBASE_LIBRARY_LABEL}
 				ancestors={[{ label: "VibePlan", to: "/plan" }]}
@@ -168,7 +168,7 @@ export function CodebaseLibraryView({
 			{!hasProjects ? (
 				<section
 					aria-labelledby="empty-codebase-heading"
-					className="mx-auto flex w-full max-w-xl flex-col items-center py-10 text-center sm:py-14"
+					className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center py-6 text-center"
 				>
 					<div
 						className="flex h-12 w-12 items-center justify-center rounded-xl border border-graphite bg-charcoal/60 text-snow"
