@@ -2,7 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { ArrowLeft } from "lucide-react";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
+import { ScrapeProgress } from "@/components/design/scrape-progress";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import type { ScrapeStatus } from "@/db/schema";
+import { useScrapeStatus } from "@/hooks/use-scrape-status";
 import { requireUserServer } from "@/lib/session";
 
 const loadScrapeDetail = createServerFn({ method: "GET" })
@@ -12,12 +15,14 @@ const loadScrapeDetail = createServerFn({ method: "GET" })
 		const { getScrapeById } = await import("@/lib/services/scrape-service");
 		const scrape = await getScrapeById(id, user.id);
 		return {
+			id: scrape.id,
 			sourceUrl: scrape.sourceUrl,
 			domain: scrape.domain,
 			title: scrape.title,
 			status: scrape.status,
 			previewHtml: scrape.previewHtml ?? "",
 			designMd: scrape.document?.designMd ?? "",
+			metadata: scrape.metadata,
 			capturedAt:
 				scrape.metadata &&
 				typeof scrape.metadata === "object" &&
@@ -54,11 +59,36 @@ export const Route = createFileRoute("/design/scrap/$id")({
 });
 
 function ScrapeDetailPage() {
-	const detail = Route.useLoaderData();
-	if (!detail) throw new Error("NOT_FOUND");
+	const initial = Route.useLoaderData();
+	const { id } = Route.useParams();
+	const { data, status: polledStatus, isRetrying, retry } = useScrapeStatus(id);
+
+	if (!initial) throw new Error("NOT_FOUND");
+
+	const currentStatus = (polledStatus ??
+		data?.status ??
+		initial.status) as ScrapeStatus;
+	const sourceUrl = data?.sourceUrl ?? initial.sourceUrl;
+	const domain = data?.domain ?? initial.domain;
+	const title = data?.title ?? initial.title;
+	const previewHtml = data?.previewHtml ?? initial.previewHtml;
+	const designMd = data?.document?.designMd ?? initial.designMd;
+
+	const metadata = (data?.metadata ?? initial.metadata) as Record<
+		string,
+		unknown
+	> | null;
+	const errorMessage =
+		metadata && typeof metadata === "object" && "errorMessage" in metadata
+			? String(metadata.errorMessage)
+			: null;
+
+	const isCompleted =
+		currentStatus === "completed" && Boolean(previewHtml && designMd);
+
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14">
-			<HubBreadcrumb current={detail.title || detail.domain} />
+			<HubBreadcrumb current={title || domain} />
 			<Link
 				to="/design/scrap"
 				className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-fog transition-colors hover:text-snow"
@@ -68,30 +98,27 @@ function ScrapeDetailPage() {
 			</Link>
 			<header className="max-w-2xl">
 				<h1 className="text-3xl font-semibold tracking-tight text-snow">
-					{detail.title || detail.domain}
+					{title || domain}
 				</h1>
-				<p className="mt-2 font-mono text-xs text-fog">
-					Status: {detail.status}
-				</p>
 			</header>
-			{detail.previewHtml && detail.designMd ? (
+
+			{isCompleted ? (
 				<ScrapeDetail
-					sourceUrl={detail.sourceUrl}
-					domain={detail.domain}
-					previewHtml={detail.previewHtml}
-					designMd={detail.designMd}
-					capturedAt={detail.capturedAt}
+					sourceUrl={sourceUrl}
+					domain={domain}
+					previewHtml={previewHtml}
+					designMd={designMd}
+					capturedAt={initial.capturedAt}
 				/>
 			) : (
-				<div className="rounded-xl border border-graphite bg-charcoal p-8 text-center">
-					<p className="text-sm font-semibold text-mist">
-						Scrape ini belum selesai diproses.
-					</p>
-					<p className="mt-1 text-xs leading-5 text-fog">
-						Status saat ini: {detail.status}. Tunggu beberapa saat lalu muat
-						ulang halaman.
-					</p>
-				</div>
+				<ScrapeProgress
+					status={currentStatus}
+					sourceUrl={sourceUrl}
+					domain={domain}
+					errorMessage={errorMessage}
+					isRetrying={isRetrying}
+					onRetry={retry}
+				/>
 			)}
 		</main>
 	);

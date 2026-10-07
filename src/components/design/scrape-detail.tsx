@@ -106,7 +106,7 @@ export function ScrapeDetail({
 						type="button"
 						onClick={() => void handleCopy("copy-md")}
 						disabled={busy !== null}
-						className="inline-flex items-center gap-1.5 rounded-full bg-snow px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-mist disabled:opacity-50"
+						className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
 					>
 						<Copy size={14} aria-hidden />
 						{busy === "copy-md" ? "Menyalin…" : "Salin DESIGN.md"}
@@ -115,7 +115,7 @@ export function ScrapeDetail({
 						type="button"
 						onClick={() => void handleCopy("copy-html")}
 						disabled={busy !== null}
-						className="inline-flex items-center gap-1.5 rounded-full border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-onyx disabled:opacity-50"
+						className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
 					>
 						<FileCode2 size={14} aria-hidden />
 						{busy === "copy-html" ? "Menyalin…" : "Salin HTML"}
@@ -124,7 +124,7 @@ export function ScrapeDetail({
 						type="button"
 						onClick={() => void handleZip()}
 						disabled={busy !== null}
-						className="inline-flex items-center gap-1.5 rounded-full border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-onyx disabled:opacity-50"
+						className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
 					>
 						<Download size={14} aria-hidden />
 						{busy === "zip" ? "Menyiapkan…" : "Download ZIP (2 File)"}
