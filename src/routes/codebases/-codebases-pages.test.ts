@@ -423,3 +423,21 @@ describe("buildAskHandoffAnswers", () => {
 		expect(result).toEqual([{ question: "q2", answer: "Valid" }]);
 	});
 });
+
+describe("codebase detail pending skeleton fidelity", () => {
+	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+
+	it("uses CodebaseDetailPending as pendingComponent and renders CodebaseWorkspaceSkeleton", () => {
+		expect(detailSource).toContain("pendingComponent: CodebaseDetailPending");
+		expect(detailSource).toContain("CodebaseWorkspaceSkeleton");
+	});
+
+	it("does not render generic max-w-4xl centered card or h-64 box in pending skeleton", () => {
+		const skeletonSource = readFileSync(
+			"src/components/codebase/codebase-workspace-skeleton.tsx",
+			"utf8",
+		);
+		expect(skeletonSource).not.toContain("max-w-4xl");
+		expect(skeletonSource).not.toContain("h-64");
+	});
+});
