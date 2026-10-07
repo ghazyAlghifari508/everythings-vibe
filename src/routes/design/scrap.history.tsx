@@ -36,7 +36,17 @@ export const Route = createFileRoute("/design/scrap/history")({
 	head: () => ({
 		meta: [{ title: "Riwayat Scrape | VibeDesign" }],
 	}),
-	loader: async () => loadScrapesHistory(),
+	loader: async () => {
+		try {
+			return await loadScrapesHistory();
+		} catch (e) {
+			if (e instanceof Error && e.message === "Unauthorized") {
+				const { redirect } = await import("@tanstack/react-router");
+				throw redirect({ to: "/login" });
+			}
+			throw e;
+		}
+	},
 	component: ScrapHistoryPage,
 });
 
@@ -56,7 +66,8 @@ function ScrapHistoryPage() {
 					Riwayat Scrape
 				</h1>
 				<p className="mt-2 text-sm leading-6 text-fog">
-					Daftar website yang pernah kamu scrap menjadi index.html dan design.md.
+					Daftar website yang pernah kamu scrap menjadi index.html dan
+					design.md.
 				</p>
 			</header>
 
