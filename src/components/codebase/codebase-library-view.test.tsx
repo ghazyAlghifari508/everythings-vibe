@@ -169,15 +169,39 @@ describe("CodebaseLibraryView", () => {
 		const ctas = screen.getAllByRole("link", {
 			name: /Hubungkan repository/i,
 		});
-		expect(ctas.length).toBeGreaterThan(0);
-		for (const cta of ctas) {
-			expect(cta.getAttribute("href")).toBe("/plan/codebase");
-		}
+		expect(ctas).toHaveLength(1);
+		expect(ctas[0].getAttribute("href")).toBe("/plan/codebase");
 	});
 
-	it("explains projects persist automatically in the empty state", () => {
+	it("renders dedicated onboarding empty state with single CTA and capabilities when there are zero projects", () => {
 		render(<CodebaseLibraryView items={[]} />);
-		expect(screen.getByText(/otomatis muncul di sini/i)).toBeDefined();
+		expect(screen.getByText("Belum ada repository terhubung")).toBeDefined();
+		expect(
+			screen.getByText(
+				/Hubungkan repository lokal untuk membaca struktur codebase/i,
+			),
+		).toBeDefined();
+		expect(screen.getByText("Codebase terbaca")).toBeDefined();
+		expect(screen.getByText("Konteks tersimpan")).toBeDefined();
+		expect(screen.getByText("Workspace siap")).toBeDefined();
+		expect(screen.queryByPlaceholderText(/Cari project/i)).toBeNull();
+		expect(
+			screen.queryByRole("link", { name: /\+ Hubungkan repository/i }),
+		).toBeNull();
+		const ctas = screen.getAllByRole("link", {
+			name: /Hubungkan repository/i,
+		});
+		expect(ctas).toHaveLength(1);
+	});
+
+	it("renders header CTA and search input while omitting onboarding empty state when projects exist", () => {
+		render(<CodebaseLibraryView items={[makeItem({ id: "cb-1" })]} />);
+		expect(
+			screen.getByRole("link", { name: /\+ Hubungkan repository/i }),
+		).toBeDefined();
+		expect(screen.getByPlaceholderText(/Cari project/i)).toBeDefined();
+		expect(screen.queryByText("Belum ada repository terhubung")).toBeNull();
+		expect(screen.queryByText("Codebase terbaca")).toBeNull();
 	});
 
 	it("links each existing project card to its workspace", () => {
