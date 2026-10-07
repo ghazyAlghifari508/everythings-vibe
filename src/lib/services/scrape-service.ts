@@ -266,7 +266,7 @@ export async function saveScrapeDocument(
 	if (existing) {
 		const [updated] = await db
 			.update(scrapeDocuments)
-			.set({ designMd, updatedAt: new Date() })
+			.set({ designMd })
 			.where(eq(scrapeDocuments.id, existing.id))
 			.returning();
 		return updated;
