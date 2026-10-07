@@ -55,11 +55,7 @@ export function HtmlScraper() {
 			<form onSubmit={(e) => void submit(e)} className="mx-auto max-w-2xl">
 				<div className="flex flex-col gap-3 sm:flex-row">
 					<div className="flex h-14 flex-1 items-center gap-3 rounded-xl border border-graphite bg-charcoal px-4 transition-colors focus-within:border-slate">
-						<Globe
-							size={20}
-							className="shrink-0 text-fog"
-							aria-hidden="true"
-						/>
+						<Globe size={20} className="shrink-0 text-fog" aria-hidden="true" />
 						<label htmlFor="scrape-url" className="sr-only">
 							Website yang ingin di-scrape
 						</label>
@@ -87,7 +83,11 @@ export function HtmlScraper() {
 					>
 						{loading ? (
 							<>
-								<Loader2 size={18} className="animate-spin" aria-hidden="true" />
+								<Loader2
+									size={18}
+									className="animate-spin"
+									aria-hidden="true"
+								/>
 								<span>Menyiapkan…</span>
 							</>
 						) : (
@@ -110,7 +110,10 @@ export function HtmlScraper() {
 							{error}
 						</p>
 					) : (
-						<p id="scrape-help" className="text-center text-xs text-fog sm:text-left">
+						<p
+							id="scrape-help"
+							className="text-center text-xs text-fog sm:text-left"
+						>
 							Website publik · Preview HTML · DESIGN.md
 						</p>
 					)}

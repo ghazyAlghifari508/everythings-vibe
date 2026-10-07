@@ -16,8 +16,8 @@ function ScrapIndexPage() {
 					Scrap website
 				</h1>
 				<p className="mt-3 text-sm leading-6 text-fog">
-					Masukkan URL website yang ingin kamu ambil struktur visual dan
-					design system-nya.
+					Masukkan URL website yang ingin kamu ambil struktur visual dan design
+					system-nya.
 				</p>
 			</div>
 
