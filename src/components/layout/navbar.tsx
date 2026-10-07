@@ -692,7 +692,11 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					</div>
 					<Link
 						to="/"
-						className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
+						className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
+							pathname === "/"
+								? "bg-white/10 text-snow"
+								: "text-snow hover:bg-white/5"
+						}`}
 						onClick={() => setIsMobileMenuOpen(false)}
 					>
 						Home
@@ -738,7 +742,11 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							{isGreenfieldWorkspace ? (
 								<Link
 									to="/plan/new"
-									className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
+									className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
+										pathname === "/plan/new"
+											? "bg-white/10 text-snow"
+											: "text-snow hover:bg-white/5"
+									}`}
 									onClick={() => setIsMobileMenuOpen(false)}
 								>
 									Chat
@@ -746,7 +754,11 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							) : (
 								<Link
 									to="/pricing"
-									className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
+									className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
+										pathname.startsWith("/pricing")
+											? "bg-white/10 text-snow"
+											: "text-snow hover:bg-white/5"
+									}`}
 									onClick={() => setIsMobileMenuOpen(false)}
 								>
 									Pricing
@@ -757,27 +769,39 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 								{...(isGreenfieldWorkspace
 									? { search: { workspace: "greenfield" } }
 									: {})}
-								className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
+								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
+									pathname === "/history"
+										? "bg-white/10 text-snow"
+										: "text-snow hover:bg-white/5"
+								}`}
 								onClick={() => setIsMobileMenuOpen(false)}
 							>
 								Riwayat
 							</Link>
+							<Link
+								to="/faq"
+								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
+									pathname.startsWith("/faq")
+										? "bg-white/10 text-snow"
+										: "text-snow hover:bg-white/5"
+								}`}
+								onClick={() => setIsMobileMenuOpen(false)}
+							>
+								FAQ
+							</Link>
+							<Link
+								to="/settings"
+								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
+									pathname.startsWith("/settings")
+										? "bg-white/10 text-snow"
+										: "text-snow hover:bg-white/5"
+								}`}
+								onClick={() => setIsMobileMenuOpen(false)}
+							>
+								Settings
+							</Link>
 						</>
 					)}
-					<Link
-						to="/faq"
-						className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
-						onClick={() => setIsMobileMenuOpen(false)}
-					>
-						FAQ
-					</Link>
-					<Link
-						to="/settings"
-						className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
-						onClick={() => setIsMobileMenuOpen(false)}
-					>
-						Settings
-					</Link>
 				</div>
 			)}
 
