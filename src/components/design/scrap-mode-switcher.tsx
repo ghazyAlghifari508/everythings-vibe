@@ -36,7 +36,7 @@ export function ScrapModeSwitcher() {
 			<div
 				role="tablist"
 				aria-label="Pilih mode"
-				className="mb-8 inline-flex rounded-xl border border-graphite bg-onyx p-1"
+				className="mb-8 inline-flex max-w-full overflow-x-auto rounded-xl border border-graphite bg-onyx p-1"
 			>
 				<button
 					id="design-tab"
@@ -47,14 +47,14 @@ export function ScrapModeSwitcher() {
 					tabIndex={mode === "design" ? 0 : -1}
 					onClick={() => setMode("design")}
 					onKeyDown={onTabKeyDown}
-					className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-colors sm:text-sm ${
+					className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors sm:px-4 sm:text-sm ${
 						mode === "design"
 							? "bg-charcoal text-snow shadow-xs"
 							: "text-fog hover:text-mist"
 					}`}
 				>
-					<FileText size={16} aria-hidden="true" />
-					<span>Generate DESIGN.md</span>
+					<FileText size={16} aria-hidden="true" className="shrink-0" />
+					<span className="whitespace-nowrap">Generate DESIGN.md</span>
 				</button>
 				<button
 					id="html-tab"
@@ -65,14 +65,14 @@ export function ScrapModeSwitcher() {
 					tabIndex={mode === "html" ? 0 : -1}
 					onClick={() => setMode("html")}
 					onKeyDown={onTabKeyDown}
-					className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-colors sm:text-sm ${
+					className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors sm:px-4 sm:text-sm ${
 						mode === "html"
 							? "bg-charcoal text-snow shadow-xs"
 							: "text-fog hover:text-mist"
 					}`}
 				>
-					<Code size={16} aria-hidden="true" />
-					<span>Scrape HTML</span>
+					<Code size={16} aria-hidden="true" className="shrink-0" />
+					<span className="whitespace-nowrap">Scrape HTML</span>
 				</button>
 			</div>
 

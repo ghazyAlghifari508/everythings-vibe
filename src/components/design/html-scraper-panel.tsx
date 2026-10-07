@@ -53,9 +53,12 @@ export function HtmlScraperPanel() {
 
 	return (
 		<div className="w-full">
-			<form onSubmit={(e) => void submit(e)} className="mx-auto max-w-2xl">
+			<form
+				onSubmit={(e) => void submit(e)}
+				className="mx-auto w-full max-w-2xl"
+			>
 				<div className="flex flex-col gap-3 sm:flex-row">
-					<div className="flex h-14 flex-1 items-center gap-3 rounded-xl border border-graphite bg-charcoal px-4 transition-colors focus-within:border-slate">
+					<div className="flex h-14 min-h-[56px] w-full items-center gap-3 rounded-xl border border-graphite bg-charcoal px-4 transition-all focus-within:border-slate focus-within:ring-1 focus-within:ring-slate/20 sm:h-14 sm:flex-1">
 						<Globe size={20} className="shrink-0 text-fog" aria-hidden="true" />
 						<label htmlFor="html-url" className="sr-only">
 							Website yang ingin di-scrape HTML
@@ -73,14 +76,14 @@ export function HtmlScraperPanel() {
 							required
 							aria-invalid={!!error}
 							aria-describedby="html-help"
-							className="h-full min-w-0 flex-1 bg-transparent text-sm text-snow outline-none placeholder:text-fog/70 disabled:opacity-60"
+							className="h-full min-w-0 flex-1 bg-transparent text-base sm:text-sm font-medium text-snow outline-none placeholder:text-fog/70 disabled:opacity-60"
 						/>
 					</div>
 
 					<button
 						type="submit"
 						disabled={loading || !url.trim()}
-						className="inline-flex h-14 items-center justify-center gap-2 rounded-xl border border-transparent bg-zinc-900 px-6 text-sm font-semibold text-white shadow-sm transition-all hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+						className="inline-flex h-14 min-h-[56px] sm:h-14 w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-xl border border-transparent bg-zinc-900 px-6 text-base sm:text-sm font-semibold text-white shadow-sm transition-all hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
 					>
 						{loading ? (
 							<>

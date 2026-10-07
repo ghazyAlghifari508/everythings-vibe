@@ -217,4 +217,44 @@ describe("ScrapModeSwitcher UI and Accessible Tabs", () => {
 			params: { id: "scrape-html-456" },
 		});
 	});
+
+	it("renders balanced mobile form proportions across both modes", () => {
+		render(<ScrapModeSwitcher />);
+
+		const tablist = screen.getByRole("tablist", { name: /Pilih mode/i });
+		expect(tablist.className).toContain("overflow-x-auto");
+
+		const designInput = screen.getByLabelText(
+			/Website yang ingin di-generate DESIGN\.md/i,
+		);
+		expect(designInput.className).toContain("text-base");
+		expect(designInput.className).toContain("sm:text-sm");
+		expect(designInput.parentElement?.className).toContain("min-h-[56px]");
+		expect(designInput.parentElement?.className).toContain("h-14");
+
+		const designSubmit = screen.getByRole("button", {
+			name: /Buat DESIGN\.md/i,
+		});
+		expect(designSubmit.className).toContain("min-h-[56px]");
+		expect(designSubmit.className).toContain("h-14");
+		expect(designSubmit.className).toContain("w-full");
+		expect(designSubmit.className).toContain("sm:w-auto");
+
+		const htmlTab = screen.getByRole("tab", { name: /Scrape HTML/i });
+		fireEvent.click(htmlTab);
+
+		const htmlInput = screen.getByLabelText(
+			/Website yang ingin di-scrape HTML/i,
+		);
+		expect(htmlInput.className).toContain("text-base");
+		expect(htmlInput.className).toContain("sm:text-sm");
+		expect(htmlInput.parentElement?.className).toContain("min-h-[56px]");
+		expect(htmlInput.parentElement?.className).toContain("h-14");
+
+		const htmlSubmit = screen.getByRole("button", { name: /Scrape HTML/i });
+		expect(htmlSubmit.className).toContain("min-h-[56px]");
+		expect(htmlSubmit.className).toContain("h-14");
+		expect(htmlSubmit.className).toContain("w-full");
+		expect(htmlSubmit.className).toContain("sm:w-auto");
+	});
 });
