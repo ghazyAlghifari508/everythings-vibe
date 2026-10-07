@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
+import type { ScrapeMode } from "@/db/schema";
 import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
 import {
 	createScrape,
@@ -81,13 +82,16 @@ export async function POST({
 			}
 
 			const rawUrl = candidate.url;
+			const rawMode = candidate.mode;
+			const mode: ScrapeMode = rawMode === "html" ? "html" : "design";
 			if (typeof rawUrl === "string" && rawUrl.trim().length > 0) {
-				const scrape = await createScrape(user.id, rawUrl.trim());
+				const scrape = await createScrape(user.id, rawUrl.trim(), mode);
 				void runScrapePipeline(scrape.id, user.id);
 				return Response.json(
 					{
 						scrapeId: scrape.id,
 						sourceUrl: scrape.sourceUrl,
+						mode: scrape.mode,
 						status: scrape.status,
 					},
 					{ status: 201 },

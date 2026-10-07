@@ -4,6 +4,7 @@ import {
 	type InsertScrapeDocumentRow,
 	type InsertScrapeRow,
 	type ScrapeDocumentRow,
+	type ScrapeMode,
 	type ScrapeRow,
 	scrapeDocuments,
 	scrapeProgressForStatus,
@@ -20,6 +21,7 @@ export interface ScrapeSummary {
 	sourceUrl: string;
 	domain: string;
 	title: string | null;
+	mode: ScrapeMode;
 	status: string;
 	createdAt: Date;
 }
@@ -35,6 +37,7 @@ function domainOf(sourceUrl: string): string {
 export async function createScrape(
 	userId: string,
 	rawUrl: string,
+	mode: ScrapeMode = "design",
 ): Promise<ScrapeRow> {
 	let normalized: string;
 	try {
@@ -50,8 +53,10 @@ export async function createScrape(
 			userId,
 			sourceUrl: normalized,
 			domain: domainOf(normalized),
+			mode,
 			status: "queued",
 			metadata: {
+				mode,
 				stage: "queued",
 				progress: 0,
 			},
@@ -72,6 +77,9 @@ export async function runScrapePipeline(
 		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
 		.limit(1);
 	if (!scrape) return;
+	const mode: ScrapeMode = (scrape.mode ??
+		scrape.metadata?.mode ??
+		"design") as ScrapeMode;
 
 	try {
 		// Stage 1: Capturing HTML
@@ -83,8 +91,9 @@ export async function runScrapePipeline(
 					...(typeof scrape.metadata === "object" && scrape.metadata !== null
 						? scrape.metadata
 						: {}),
+					mode,
 					stage: "capturing",
-					progress: scrapeProgressForStatus("capturing"),
+					progress: scrapeProgressForStatus("capturing", mode),
 				},
 				updatedAt: new Date(),
 			})
@@ -92,6 +101,60 @@ export async function runScrapePipeline(
 
 		const captured: ScrapeCapture = await scrapeHtml(scrape.sourceUrl);
 
+		if (mode === "html") {
+			// Stage 2: Menyiapkan preview
+			await db
+				.update(scrapes)
+				.set({
+					status: "extracting",
+					sourceUrl: captured.sourceUrl,
+					domain: captured.domain,
+					title: captured.title,
+					html: captured.html,
+					previewHtml: captured.previewHtml,
+					metadata: {
+						...captured.metadata,
+						mode: "html",
+						stage: "extracting",
+						progress: scrapeProgressForStatus("extracting", "html"),
+					},
+					updatedAt: new Date(),
+				})
+				.where(eq(scrapes.id, scrapeId));
+
+			// Stage 3: Menyimpan index.html
+			await db
+				.update(scrapes)
+				.set({
+					status: "saving",
+					metadata: {
+						...captured.metadata,
+						mode: "html",
+						stage: "saving",
+						progress: scrapeProgressForStatus("saving", "html"),
+					},
+					updatedAt: new Date(),
+				})
+				.where(eq(scrapes.id, scrapeId));
+
+			// Stage 4: Selesai
+			await db
+				.update(scrapes)
+				.set({
+					status: "completed",
+					metadata: {
+						...captured.metadata,
+						mode: "html",
+						stage: "completed",
+						progress: scrapeProgressForStatus("completed", "html"),
+					},
+					updatedAt: new Date(),
+				})
+				.where(eq(scrapes.id, scrapeId));
+			return;
+		}
+
+		// DESIGN.md Pipeline:
 		// Stage 2: Extracting design tokens
 		await db
 			.update(scrapes)
@@ -104,8 +167,9 @@ export async function runScrapePipeline(
 				previewHtml: captured.previewHtml,
 				metadata: {
 					...captured.metadata,
+					mode: "design",
 					stage: "extracting",
-					progress: scrapeProgressForStatus("extracting"),
+					progress: scrapeProgressForStatus("extracting", "design"),
 				},
 				updatedAt: new Date(),
 			})
@@ -120,8 +184,9 @@ export async function runScrapePipeline(
 				status: "generating",
 				metadata: {
 					...captured.metadata,
+					mode: "design",
 					stage: "generating",
-					progress: scrapeProgressForStatus("generating"),
+					progress: scrapeProgressForStatus("generating", "design"),
 				},
 				updatedAt: new Date(),
 			})
@@ -136,8 +201,9 @@ export async function runScrapePipeline(
 				status: "saving",
 				metadata: {
 					...captured.metadata,
+					mode: "design",
 					stage: "saving",
-					progress: scrapeProgressForStatus("saving"),
+					progress: scrapeProgressForStatus("saving", "design"),
 				},
 				updatedAt: new Date(),
 			})
@@ -152,8 +218,9 @@ export async function runScrapePipeline(
 				status: "completed",
 				metadata: {
 					...captured.metadata,
+					mode: "design",
 					stage: "completed",
-					progress: scrapeProgressForStatus("completed"),
+					progress: scrapeProgressForStatus("completed", "design"),
 				},
 				updatedAt: new Date(),
 			})
@@ -162,7 +229,9 @@ export async function runScrapePipeline(
 		const errorMessage =
 			error instanceof ScrapeError
 				? error.message
-				: "Gagal memproses visual website.";
+				: mode === "html"
+					? "Gagal memproses HTML website."
+					: "Gagal memproses visual website.";
 		const errorDetail =
 			error instanceof ScrapeError ? error.code : "WEBSITE_BLOCKED";
 
@@ -174,6 +243,7 @@ export async function runScrapePipeline(
 					...(typeof scrape.metadata === "object" && scrape.metadata !== null
 						? scrape.metadata
 						: {}),
+					mode,
 					stage: "failed",
 					progress: 0,
 					errorMessage,
@@ -197,11 +267,18 @@ export async function retryScrape(
 	if (!scrape)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
 
+	const mode: ScrapeMode = (scrape.mode ??
+		scrape.metadata?.mode ??
+		"design") as ScrapeMode;
 	await db
 		.update(scrapes)
 		.set({
 			status: "queued",
 			metadata: {
+				...(typeof scrape.metadata === "object" && scrape.metadata !== null
+					? scrape.metadata
+					: {}),
+				mode,
 				stage: "queued",
 				progress: 0,
 			},
@@ -235,12 +312,14 @@ export async function listScrapes(
 	userId: string,
 	limit = 50,
 ): Promise<ScrapeSummary[]> {
-	return db
+	const rows = await db
 		.select({
 			id: scrapes.id,
 			sourceUrl: scrapes.sourceUrl,
 			domain: scrapes.domain,
 			title: scrapes.title,
+			mode: scrapes.mode,
+			metadata: scrapes.metadata,
 			status: scrapes.status,
 			createdAt: scrapes.createdAt,
 		})
@@ -248,6 +327,16 @@ export async function listScrapes(
 		.where(eq(scrapes.userId, userId))
 		.orderBy(desc(scrapes.createdAt))
 		.limit(limit);
+
+	return rows.map((r) => ({
+		id: r.id,
+		sourceUrl: r.sourceUrl,
+		domain: r.domain,
+		title: r.title,
+		mode: (r.mode ?? r.metadata?.mode ?? "design") as ScrapeMode,
+		status: r.status,
+		createdAt: r.createdAt,
+	}));
 }
 
 export async function saveScrapeDocument(
