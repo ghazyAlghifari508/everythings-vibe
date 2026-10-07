@@ -504,6 +504,30 @@ describe("CodebaseLibraryView delete", () => {
 		});
 		expect(sessionStorage.getItem("unrelated:key")).toBe("keep-me");
 	});
+
+	it("transitions immediately to onboarding empty state when deleting the final project", async () => {
+		render(<CodebaseLibraryView items={[makeItem({ id: "cb-1" })]} />);
+		expect(
+			screen.getByRole("link", { name: /\+ Hubungkan repository/i }),
+		).toBeDefined();
+		expect(screen.queryByText("Belum ada repository terhubung")).toBeNull();
+
+		openActionsMenu();
+		fireEvent.click(screen.getByRole("menuitem", { name: /Hapus project/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^Hapus project$/i }));
+
+		await waitFor(() => {
+			expect(screen.getByText("Belum ada repository terhubung")).toBeDefined();
+		});
+		expect(
+			screen.queryByRole("link", { name: /\+ Hubungkan repository/i }),
+		).toBeNull();
+		expect(screen.queryByPlaceholderText(/Cari project/i)).toBeNull();
+		const emptyCtas = screen.getAllByRole("link", {
+			name: /Hubungkan repository/i,
+		});
+		expect(emptyCtas).toHaveLength(1);
+	});
 });
 
 describe("CodebaseLibraryView pagination", () => {
@@ -597,12 +621,18 @@ describe("CodebaseLibraryView pagination", () => {
 		});
 	});
 
-	it("shows a search-specific empty state without offering pagination", () => {
+	it("shows a search-specific empty state without offering pagination and does not render onboarding empty state", () => {
 		render(<CodebaseLibraryView items={makeItems(3)} />);
 		fireEvent.change(screen.getByPlaceholderText(/Cari project/i), {
 			target: { value: "tidak-ada-hasil" },
 		});
-		expect(screen.getByText(/Tidak ada project yang cocok/i)).toBeDefined();
+		expect(
+			screen.getByText("Tidak ada project yang cocok dengan pencarian."),
+		).toBeDefined();
+		expect(screen.queryByText("Belum ada repository terhubung")).toBeNull();
+		expect(
+			screen.getByRole("link", { name: /\+ Hubungkan repository/i }),
+		).toBeDefined();
 		expect(
 			screen.queryByRole("navigation", { name: /Pagination/i }),
 		).toBeNull();
