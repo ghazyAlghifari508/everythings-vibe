@@ -59,7 +59,7 @@ describe("codebase name provenance migration", () => {
 	const migration = readFileSync(
 		"drizzle/0030_codebase_name_source.sql",
 		"utf8",
-	);
+	).replace(/\r\n/g, "\n");
 
 	it("adds the column with a fail-safe default", () => {
 		expect(migration).toContain('ADD COLUMN "name_source" text');
