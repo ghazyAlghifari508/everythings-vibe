@@ -849,7 +849,51 @@ export interface ScrapeMetadata {
 	captureMode?: string;
 	htmlBytes?: number;
 	previewHtmlBytes?: number;
+	stage?: ScrapeStatus;
+	progress?: number;
+	errorMessage?: string;
+	errorDetail?: string;
 }
+
+export type ScrapeStatus =
+	| "queued"
+	| "capturing"
+	| "extracting"
+	| "generating"
+	| "saving"
+	| "completed"
+	| "failed";
+
+export function scrapeProgressForStatus(status: ScrapeStatus | string): number {
+	switch (status) {
+		case "queued":
+			return 10;
+		case "capturing":
+			return 30;
+		case "extracting":
+			return 55;
+		case "generating":
+			return 80;
+		case "saving":
+			return 95;
+		case "completed":
+			return 100;
+		case "failed":
+			return 0;
+		default:
+			return 0;
+	}
+}
+
+export const SCRAPE_STATUS_LABELS: Record<string, string> = {
+	queued: "Menunggu",
+	capturing: "Mengambil halaman",
+	extracting: "Menganalisis visual",
+	generating: "Menyusun DESIGN.md",
+	saving: "Menyimpan hasil",
+	completed: "Selesai",
+	failed: "Gagal",
+};
 
 export const scrapes = pgTable(
 	"scrapes",
@@ -864,7 +908,15 @@ export const scrapes = pgTable(
 		domain: text("domain").notNull(),
 		title: text("title"),
 		status: text("status", {
-			enum: ["queued", "processing", "completed", "failed"],
+			enum: [
+				"queued",
+				"capturing",
+				"extracting",
+				"generating",
+				"saving",
+				"completed",
+				"failed",
+			],
 		})
 			.notNull()
 			.default("queued"),
