@@ -27,6 +27,11 @@ import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useUserPlan } from "@/hooks/use-user-plan";
 import { authClient } from "@/lib/auth-client";
+import {
+	isVibeDesignHistoryActive,
+	isVibeDesignScrapActive,
+	isVibeDesignScrapRoute,
+} from "@/lib/design-nav";
 import { historyFilterSchema } from "@/lib/history";
 import {
 	getPendingPrdPrompt,
@@ -286,7 +291,40 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						/>
 					) : (
 						<div className="flex items-center gap-1">
-							{isGreenfieldWorkspace ? (
+							{isVibeDesignScrapRoute(pathname) ? (
+								<>
+									<Link
+										to="/design/scrap"
+										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+											isVibeDesignScrapActive(pathname)
+												? "bg-white/10 text-snow"
+												: "text-fog hover:bg-white/5 hover:text-snow"
+										}`}
+									>
+										Scrap
+									</Link>
+									<Link
+										to="/design/scrap/history"
+										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+											isVibeDesignHistoryActive(pathname)
+												? "bg-white/10 text-snow"
+												: "text-fog hover:bg-white/5 hover:text-snow"
+										}`}
+									>
+										History
+									</Link>
+									<Link
+										to="/pricing"
+										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+											pathname.startsWith("/pricing")
+												? "bg-white/10 text-snow"
+												: "text-fog hover:bg-white/5 hover:text-snow"
+										}`}
+									>
+										Pricing
+									</Link>
+								</>
+							) : isGreenfieldWorkspace ? (
 								<>
 									<Link
 										to="/plan/new"
@@ -659,33 +697,73 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					>
 						Home
 					</Link>
-					{isGreenfieldWorkspace ? (
-						<Link
-							to="/plan/new"
-							className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
-							onClick={() => setIsMobileMenuOpen(false)}
-						>
-							Chat
-						</Link>
+					{isVibeDesignScrapRoute(pathname) ? (
+						<>
+							<Link
+								to="/design/scrap"
+								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
+									isVibeDesignScrapActive(pathname)
+										? "bg-white/10 text-snow"
+										: "text-snow hover:bg-white/5"
+								}`}
+								onClick={() => setIsMobileMenuOpen(false)}
+							>
+								Scrap
+							</Link>
+							<Link
+								to="/design/scrap/history"
+								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
+									isVibeDesignHistoryActive(pathname)
+										? "bg-white/10 text-snow"
+										: "text-snow hover:bg-white/5"
+								}`}
+								onClick={() => setIsMobileMenuOpen(false)}
+							>
+								History
+							</Link>
+							<Link
+								to="/pricing"
+								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
+									pathname.startsWith("/pricing")
+										? "bg-white/10 text-snow"
+										: "text-snow hover:bg-white/5"
+								}`}
+								onClick={() => setIsMobileMenuOpen(false)}
+							>
+								Pricing
+							</Link>
+						</>
 					) : (
-						<Link
-							to="/pricing"
-							className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
-							onClick={() => setIsMobileMenuOpen(false)}
-						>
-							Pricing
-						</Link>
+						<>
+							{isGreenfieldWorkspace ? (
+								<Link
+									to="/plan/new"
+									className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
+									onClick={() => setIsMobileMenuOpen(false)}
+								>
+									Chat
+								</Link>
+							) : (
+								<Link
+									to="/pricing"
+									className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
+									onClick={() => setIsMobileMenuOpen(false)}
+								>
+									Pricing
+								</Link>
+							)}
+							<Link
+								to="/history"
+								{...(isGreenfieldWorkspace
+									? { search: { workspace: "greenfield" } }
+									: {})}
+								className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
+								onClick={() => setIsMobileMenuOpen(false)}
+							>
+								Riwayat
+							</Link>
+						</>
 					)}
-					<Link
-						to="/history"
-						{...(isGreenfieldWorkspace
-							? { search: { workspace: "greenfield" } }
-							: {})}
-						className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
-						onClick={() => setIsMobileMenuOpen(false)}
-					>
-						Riwayat
-					</Link>
 					<Link
 						to="/faq"
 						className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] text-snow hover:bg-white/5"
