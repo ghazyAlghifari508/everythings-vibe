@@ -6,9 +6,11 @@ import {
 	type ScrapeDocumentRow,
 	type ScrapeRow,
 	scrapeDocuments,
+	scrapeProgressForStatus,
 	scrapes,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
+import { extractDesignFromHtml } from "@/lib/design-extraction";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
 import { parseAndValidateFormat } from "@/lib/url-validator";
@@ -49,37 +51,166 @@ export async function createScrape(
 			sourceUrl: normalized,
 			domain: domainOf(normalized),
 			status: "queued",
+			metadata: {
+				stage: "queued",
+				progress: 0,
+			},
 		} satisfies InsertScrapeRow)
 		.returning();
 
-	let captured: ScrapeCapture;
+	if (!pending) throw new ScrapeError("STORAGE_FAILED");
+	return pending;
+}
+
+export async function runScrapePipeline(
+	scrapeId: string,
+	userId: string,
+): Promise<void> {
+	const [scrape] = await db
+		.select()
+		.from(scrapes)
+		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
+		.limit(1);
+	if (!scrape) return;
+
 	try {
-		captured = await scrapeHtml(normalized);
-	} catch (error) {
+		// Stage 1: Capturing HTML
 		await db
 			.update(scrapes)
-			.set({ status: "failed", updatedAt: new Date() })
-			.where(eq(scrapes.id, pending.id));
-		if (error instanceof ScrapeError) throw error;
-		throw new ScrapeError("WEBSITE_BLOCKED");
-	}
+			.set({
+				status: "capturing",
+				metadata: {
+					...(typeof scrape.metadata === "object" && scrape.metadata !== null
+						? scrape.metadata
+						: {}),
+					stage: "capturing",
+					progress: scrapeProgressForStatus("capturing"),
+				},
+				updatedAt: new Date(),
+			})
+			.where(eq(scrapes.id, scrapeId));
 
-	const [completed] = await db
+		const captured: ScrapeCapture = await scrapeHtml(scrape.sourceUrl);
+
+		// Stage 2: Extracting design tokens
+		await db
+			.update(scrapes)
+			.set({
+				status: "extracting",
+				sourceUrl: captured.sourceUrl,
+				domain: captured.domain,
+				title: captured.title,
+				html: captured.html,
+				previewHtml: captured.previewHtml,
+				metadata: {
+					...captured.metadata,
+					stage: "extracting",
+					progress: scrapeProgressForStatus("extracting"),
+				},
+				updatedAt: new Date(),
+			})
+			.where(eq(scrapes.id, scrapeId));
+
+		const extraction = extractDesignFromHtml(captured.html, captured.sourceUrl);
+
+		// Stage 3: Generating DESIGN.md
+		await db
+			.update(scrapes)
+			.set({
+				status: "generating",
+				metadata: {
+					...captured.metadata,
+					stage: "generating",
+					progress: scrapeProgressForStatus("generating"),
+				},
+				updatedAt: new Date(),
+			})
+			.where(eq(scrapes.id, scrapeId));
+
+		const designMd = await generateDesignMd(captured.sourceUrl, extraction);
+
+		// Stage 4: Saving dual-artifact documents
+		await db
+			.update(scrapes)
+			.set({
+				status: "saving",
+				metadata: {
+					...captured.metadata,
+					stage: "saving",
+					progress: scrapeProgressForStatus("saving"),
+				},
+				updatedAt: new Date(),
+			})
+			.where(eq(scrapes.id, scrapeId));
+
+		await saveScrapeDocument(scrapeId, designMd);
+
+		// Stage 5: Completed
+		await db
+			.update(scrapes)
+			.set({
+				status: "completed",
+				metadata: {
+					...captured.metadata,
+					stage: "completed",
+					progress: scrapeProgressForStatus("completed"),
+				},
+				updatedAt: new Date(),
+			})
+			.where(eq(scrapes.id, scrapeId));
+	} catch (error) {
+		const errorMessage =
+			error instanceof ScrapeError
+				? error.message
+				: "Gagal memproses visual website.";
+		const errorDetail =
+			error instanceof ScrapeError ? error.code : "WEBSITE_BLOCKED";
+
+		await db
+			.update(scrapes)
+			.set({
+				status: "failed",
+				metadata: {
+					...(typeof scrape.metadata === "object" && scrape.metadata !== null
+						? scrape.metadata
+						: {}),
+					stage: "failed",
+					progress: 0,
+					errorMessage,
+					errorDetail,
+				},
+				updatedAt: new Date(),
+			})
+			.where(eq(scrapes.id, scrapeId));
+	}
+}
+
+export async function retryScrape(
+	scrapeId: string,
+	userId: string,
+): Promise<{ ok: true }> {
+	const [scrape] = await db
+		.select()
+		.from(scrapes)
+		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
+		.limit(1);
+	if (!scrape)
+		throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
+
+	await db
 		.update(scrapes)
 		.set({
-			sourceUrl: captured.sourceUrl,
-			domain: captured.domain,
-			title: captured.title,
-			status: "completed",
-			html: captured.html,
-			previewHtml: captured.previewHtml,
-			metadata: captured.metadata,
+			status: "queued",
+			metadata: {
+				stage: "queued",
+				progress: 0,
+			},
 			updatedAt: new Date(),
 		})
-		.where(eq(scrapes.id, pending.id))
-		.returning();
-	if (!completed) throw new ScrapeError("STORAGE_FAILED");
-	return completed;
+		.where(eq(scrapes.id, scrapeId));
+
+	void runScrapePipeline(scrapeId, userId);
+	return { ok: true };
 }
 
 export async function getScrapeById(
@@ -125,6 +256,22 @@ export async function saveScrapeDocument(
 ): Promise<ScrapeDocumentRow> {
 	if (!designMd || designMd.trim().length === 0)
 		throw new ScrapeError("AI_GENERATION_FAILED", "DESIGN.md kosong.");
+
+	const [existing] = await db
+		.select()
+		.from(scrapeDocuments)
+		.where(eq(scrapeDocuments.scrapeId, scrapeId))
+		.limit(1);
+
+	if (existing) {
+		const [updated] = await db
+			.update(scrapeDocuments)
+			.set({ designMd, updatedAt: new Date() })
+			.where(eq(scrapeDocuments.id, existing.id))
+			.returning();
+		return updated;
+	}
+
 	const [document] = await db
 		.insert(scrapeDocuments)
 		.values({
