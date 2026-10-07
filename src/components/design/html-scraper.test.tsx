@@ -33,9 +33,9 @@ describe("HtmlScraper Action-First UI", () => {
 		const input = screen.getByPlaceholderText(/https:\/\/example\.com/i);
 		expect(input).toBeDefined();
 
-		const button = screen.getByRole("button", { name: /Scrap website/i });
+		const button = screen.getByRole("button", { name: /Scrape HTML/i });
 		expect(button).toBeDefined();
-		expect(button.textContent).toContain("Scrap website");
+		expect(button.textContent).toContain("Scrape HTML");
 	});
 
 	it("does not render any history rows or riwayat section", () => {
@@ -49,7 +49,7 @@ describe("HtmlScraper Action-First UI", () => {
 	it("disables submit button when URL is empty", () => {
 		render(<HtmlScraper />);
 
-		const button = screen.getByRole("button", { name: /Scrap website/i });
+		const button = screen.getByRole("button", { name: /Scrape HTML/i });
 		expect(button.hasAttribute("disabled")).toBe(true);
 	});
 
@@ -59,7 +59,7 @@ describe("HtmlScraper Action-First UI", () => {
 		const input = screen.getByPlaceholderText(/https:\/\/example\.com/i);
 		fireEvent.change(input, { target: { value: "https://example.com" } });
 
-		const button = screen.getByRole("button", { name: /Scrap website/i });
+		const button = screen.getByRole("button", { name: /Scrape HTML/i });
 		expect(button.hasAttribute("disabled")).toBe(false);
 	});
 });

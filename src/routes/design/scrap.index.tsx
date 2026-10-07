@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HtmlScraper } from "@/components/design/html-scraper";
+import { ScrapModeSwitcher } from "@/components/design/scrap-mode-switcher";
 
 export const Route = createFileRoute("/design/scrap/")({
 	head: () => ({
@@ -16,13 +16,12 @@ function ScrapIndexPage() {
 					Scrap website
 				</h1>
 				<p className="mt-3 text-sm leading-6 text-fog">
-					Masukkan URL website yang ingin kamu ambil struktur visual dan design
-					system-nya.
+					Ambil design system atau HTML dari website publik.
 				</p>
 			</div>
 
 			<div className="mt-8 w-full">
-				<HtmlScraper />
+				<ScrapModeSwitcher />
 			</div>
 		</main>
 	);
