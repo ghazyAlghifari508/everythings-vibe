@@ -75,7 +75,7 @@ export function ScrapeHistoryList({
 	onDelete,
 }: {
 	initialItems: ScrapeHistoryItem[];
-	onDelete?: (id: string) => Promise<boolean | undefined>;
+	onDelete?: (id: string) => Promise<unknown>;
 }) {
 	const [items, setItems] = useState<ScrapeHistoryItem[]>(initialItems);
 	const [deletingId, setDeletingId] = useState<string | null>(null);
