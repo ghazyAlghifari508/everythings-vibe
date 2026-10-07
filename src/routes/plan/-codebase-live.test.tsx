@@ -170,10 +170,11 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 		// The prompt is waiting on the agent first.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Menunggu agent")).toBeDefined();
+				expect(screen.getByText("Paste prompt lalu jalankan")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
+		expect(screen.queryByText("Menunggu agent")).toBeNull();
 
 		// The same screen picks the finished upload up live and reports it.
 		await waitFor(
