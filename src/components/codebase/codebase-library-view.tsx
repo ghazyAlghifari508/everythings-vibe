@@ -124,28 +124,28 @@ export function CodebaseLibraryView({
 				ancestors={[{ label: "VibePlan", to: "/plan" }]}
 			/>
 
-			<header className="flex flex-col gap-4 border-b border-graphite pb-6 sm:flex-row sm:items-end sm:justify-between">
-				<div>
-					<p className="font-mono text-xs uppercase tracking-widest text-fog">
-						Existing Codebase
-					</p>
-					<h1 className="mt-2 text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
-						Project Tersimpan
-					</h1>
-					<p className="mt-2 max-w-2xl text-sm leading-6 text-fog">
-						Repository yang pernah kamu hubungkan akan tersimpan di sini.
-						Lanjutkan dari konteks dan workspace sebelumnya.
-					</p>
-				</div>
-				{hasProjects && (
+			{hasProjects && (
+				<header className="flex flex-col gap-4 border-b border-graphite pb-6 sm:flex-row sm:items-end sm:justify-between">
+					<div>
+						<p className="font-mono text-xs uppercase tracking-widest text-fog">
+							Existing Codebase
+						</p>
+						<h1 className="mt-2 text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
+							Project Tersimpan
+						</h1>
+						<p className="mt-2 max-w-2xl text-sm leading-6 text-fog">
+							Repository yang pernah kamu hubungkan akan tersimpan di sini.
+							Lanjutkan dari konteks dan workspace sebelumnya.
+						</p>
+					</div>
 					<Link
 						to={NEW_REPOSITORY_HREF}
 						className="btn-primary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
 						+ Hubungkan repository
 					</Link>
-				)}
-			</header>
+				</header>
+			)}
 
 			{hasProjects && (
 				<div className="relative">
