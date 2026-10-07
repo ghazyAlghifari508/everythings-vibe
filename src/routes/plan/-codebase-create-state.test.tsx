@@ -236,7 +236,7 @@ describe("PlanCodebasePage create failure state", () => {
 });
 
 describe("PlanCodebasePage breadcrumb hierarchy", () => {
-	it("nests the onboarding step under Project Tersimpan", async () => {
+	it("treats the onboarding step as a direct child of VibePlan", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async (input: unknown, init?: { method?: string }) => {
@@ -257,13 +257,14 @@ describe("PlanCodebasePage breadcrumb hierarchy", () => {
 		);
 
 		const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
-		// Home > VibePlan > Project Tersimpan > Hubungkan Repository
+		// Home > VibePlan > Hubungkan Repository
 		expect(crumbs.querySelector('a[href="/"]')).not.toBeNull();
 		expect(crumbs.querySelector('a[href="/plan"]')).not.toBeNull();
-		// The onboarding page is a child of the library, so the library is a
-		// real link back to it rather than a dead end on VibePlan.
-		expect(crumbs.querySelector('a[href="/codebases"]')).not.toBeNull();
-		expect(crumbs.querySelectorAll("a")).toHaveLength(3);
+		// /plan/codebase is the connect-repository flow directly under VibePlan,
+		// not a child page of Project Tersimpan (/codebases).
+		expect(crumbs.querySelector('a[href="/codebases"]')).toBeNull();
+		expect(crumbs.querySelectorAll("a")).toHaveLength(2);
+		expect(crumbs.textContent).not.toContain("Project Tersimpan");
 		expect(crumbs.textContent).toContain("Hubungkan Repository");
 		expect(crumbs.querySelector('[aria-current="page"]')?.textContent).toBe(
 			"Hubungkan Repository",

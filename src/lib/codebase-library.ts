@@ -12,9 +12,8 @@ export const NEW_REPOSITORY_HREF = "/plan/codebase";
  * Existing-codebase information architecture.
  *
  * `/codebases` is the library (Project Tersimpan) and `/plan/codebase` is the
- * onboarding step reached from it, so the onboarding page is a child of the
- * library rather than a sibling of it. Both pages read these labels from here so
- * the trail cannot drift apart.
+ * VibePlan connect-repository onboarding flow (`Home > VibePlan > Hubungkan Repository`).
+ * Both pages read these labels from here so the naming cannot drift apart.
  */
 export const CODEBASE_LIBRARY_HREF = "/codebases";
 export const CODEBASE_LIBRARY_LABEL = "Project Tersimpan";

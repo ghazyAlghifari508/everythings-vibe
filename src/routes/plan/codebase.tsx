@@ -9,11 +9,7 @@ import {
 	analysisResponseSchema,
 	ONBOARDING_FEATURE_MESSAGE,
 } from "@/lib/codebase-analysis";
-import {
-	CODEBASE_LIBRARY_HREF,
-	CODEBASE_LIBRARY_LABEL,
-	CODEBASE_ONBOARDING_LABEL,
-} from "@/lib/codebase-library";
+import { CODEBASE_ONBOARDING_LABEL } from "@/lib/codebase-library";
 import { isProvisionalCodebaseName } from "@/lib/codebase-naming";
 import {
 	clearPlanCodebaseProjectPointer,
@@ -626,10 +622,7 @@ export function PlanCodebasePage() {
 		<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
 			<HubBreadcrumb
 				current={CODEBASE_ONBOARDING_LABEL}
-				ancestors={[
-					{ label: "VibePlan", to: "/plan" },
-					{ label: CODEBASE_LIBRARY_LABEL, to: CODEBASE_LIBRARY_HREF },
-				]}
+				ancestors={[{ label: "VibePlan", to: "/plan" }]}
 			/>
 
 			{!codebase ? (
