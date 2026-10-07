@@ -1,12 +1,15 @@
 import { AlertCircle, Check, Loader2, RotateCcw } from "lucide-react";
 import {
+	HTML_SCRAPE_STATUS_LABELS,
 	SCRAPE_STATUS_LABELS,
+	type ScrapeMode,
 	type ScrapeStatus,
 	scrapeProgressForStatus,
 } from "@/db/schema";
 
 export interface ScrapeProgressProps {
 	status: ScrapeStatus;
+	mode?: ScrapeMode;
 	sourceUrl?: string;
 	domain?: string;
 	errorMessage?: string | null;
@@ -14,7 +17,7 @@ export interface ScrapeProgressProps {
 	onRetry?: () => void;
 }
 
-const ORDERED_STAGES: ScrapeStatus[] = [
+const ORDERED_DESIGN_STAGES: ScrapeStatus[] = [
 	"queued",
 	"capturing",
 	"extracting",
@@ -23,28 +26,61 @@ const ORDERED_STAGES: ScrapeStatus[] = [
 	"completed",
 ];
 
-const STAGE_DESCRIPTIONS: Record<ScrapeStatus, string> = {
+const ORDERED_HTML_STAGES: ScrapeStatus[] = [
+	"queued",
+	"capturing",
+	"extracting",
+	"saving",
+	"completed",
+];
+
+const DESIGN_STAGE_DESCRIPTIONS: Record<ScrapeStatus, string> = {
 	queued: "Menunggu antrean pemrosesan visual…",
 	capturing: "Mengambil HTML dan aset visual dari halaman publik…",
 	extracting: "Membaca palet warna, tipografi, dan pola komponen…",
 	generating: "AI sedang menyusun dokumentasi sistem desain lengkap…",
-	saving: "Menyimpan bundle dual-artifact HTML & DESIGN.md…",
-	completed: "Hasil scraping dan panduan desain siap digunakan.",
-	failed: "Proses berhenti sebelum selesai.",
+	saving: "Menyimpan dokumen DESIGN.md…",
+	completed: "Panduan desain DESIGN.md siap digunakan.",
+	failed: "Proses pembuatan DESIGN.md terhenti sebelum selesai.",
+};
+
+const HTML_STAGE_DESCRIPTIONS: Record<ScrapeStatus, string> = {
+	queued: "Menunggu antrean scrape HTML…",
+	capturing: "Mengambil HTML dan aset dari halaman publik…",
+	extracting: "Memproses resource dan menyiapkan preview…",
+	generating: "Memproses resource dan menyiapkan preview…",
+	saving: "Menyimpan index.html…",
+	completed: "Hasil scraping index.html siap digunakan.",
+	failed: "Proses scraping HTML terhenti sebelum selesai.",
 };
 
 export function ScrapeProgress({
 	status,
+	mode = "design",
 	sourceUrl,
 	domain,
 	errorMessage,
 	isRetrying = false,
 	onRetry,
 }: ScrapeProgressProps) {
-	const progress = scrapeProgressForStatus(status);
+	const progress = scrapeProgressForStatus(status, mode);
 	const isFailed = status === "failed";
 	const isDone = status === "completed";
-	const currentIndex = ORDERED_STAGES.indexOf(status);
+
+	const orderedStages =
+		mode === "html" ? ORDERED_HTML_STAGES : ORDERED_DESIGN_STAGES;
+	const stageLabels =
+		mode === "html" ? HTML_SCRAPE_STATUS_LABELS : SCRAPE_STATUS_LABELS;
+	const stageDescriptions =
+		mode === "html" ? HTML_STAGE_DESCRIPTIONS : DESIGN_STAGE_DESCRIPTIONS;
+	const currentIndex = orderedStages.indexOf(status);
+
+	const progressLabel =
+		mode === "html" ? "Progres scraping HTML" : "Progres pembuatan DESIGN.md";
+	const defaultError =
+		mode === "html"
+			? "Scrape HTML belum bisa diselesaikan. Coba ulangi dari link yang sama."
+			: "DESIGN.md belum bisa dibuat. Coba ulangi dari link yang sama.";
 
 	return (
 		<div className="w-full rounded-2xl border border-graphite bg-charcoal p-6 sm:p-8">
@@ -52,7 +88,7 @@ export function ScrapeProgress({
 			<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					<span className="font-mono text-xs uppercase tracking-wider text-fog">
-						Status Pemrosesan
+						Status Pemrosesan {mode === "html" ? "(HTML)" : "(DESIGN.md)"}
 					</span>
 					<h2 className="text-xl font-semibold text-snow">
 						{domain || (sourceUrl ? new URL(sourceUrl).hostname : "Website")}
@@ -68,7 +104,7 @@ export function ScrapeProgress({
 					{!isDone && !isFailed ? (
 						<Loader2 size={14} className="animate-spin text-mist" />
 					) : null}
-					<span>{SCRAPE_STATUS_LABELS[status] ?? status}</span>
+					<span>{stageLabels[status] ?? status}</span>
 					<span className="text-fog">{`(${progress}%)`}</span>
 				</div>
 			</div>
@@ -80,7 +116,7 @@ export function ScrapeProgress({
 					aria-valuemin={0}
 					aria-valuemax={100}
 					aria-valuenow={progress}
-					aria-label="Progres pembuatan visual dan DESIGN.md"
+					aria-label={progressLabel}
 					className="h-2 w-full overflow-hidden rounded-full bg-onyx"
 				>
 					<div
@@ -96,9 +132,8 @@ export function ScrapeProgress({
 				</div>
 				<p aria-live="polite" className="mt-2.5 text-xs text-fog">
 					{isFailed
-						? errorMessage ||
-							"Proses terhenti. Coba ulangi dari link yang sama."
-						: (STAGE_DESCRIPTIONS[status] ?? "Sedang memproses website…")}
+						? errorMessage || defaultError
+						: (stageDescriptions[status] ?? "Sedang memproses website…")}
 				</p>
 			</div>
 
@@ -113,8 +148,7 @@ export function ScrapeProgress({
 						/>
 						<div className="flex-1">
 							<p className="text-sm font-semibold text-rose-200">
-								{errorMessage ||
-									"DESIGN.md belum bisa dibuat. Coba ulangi dari link yang sama."}
+								{errorMessage || defaultError}
 							</p>
 							<p className="mt-1 text-xs text-rose-300/80">
 								Pastikan website publik dapat diakses tanpa login atau bot
@@ -141,8 +175,12 @@ export function ScrapeProgress({
 			) : (
 				/* Stage Tracker */
 				<div className="mt-8 border-t border-graphite/60 pt-6">
-					<ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-						{ORDERED_STAGES.map((s, idx) => {
+					<ol
+						className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${
+							mode === "html" ? "lg:grid-cols-5" : "lg:grid-cols-6"
+						}`}
+					>
+						{orderedStages.map((s, idx) => {
 							const isStageDone =
 								isDone || (currentIndex >= 0 && idx < currentIndex);
 							const isStageCurrent = currentIndex === idx && !isDone;
@@ -169,9 +207,7 @@ export function ScrapeProgress({
 									) : (
 										<span className="size-2 rounded-full bg-graphite mx-1.5" />
 									)}
-									<span className="truncate">
-										{SCRAPE_STATUS_LABELS[s] ?? s}
-									</span>
+									<span className="truncate">{stageLabels[s] ?? s}</span>
 								</li>
 							);
 						})}

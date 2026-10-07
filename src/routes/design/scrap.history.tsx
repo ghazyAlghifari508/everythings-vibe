@@ -4,6 +4,7 @@ import {
 	type ScrapeHistoryItem,
 	ScrapeHistoryList,
 } from "@/components/design/scrape-history-list";
+import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { requireUserServer } from "@/lib/session";
 
 const loadScrapesHistory = createServerFn({ method: "GET" }).handler(
@@ -18,6 +19,7 @@ const loadScrapesHistory = createServerFn({ method: "GET" }).handler(
 				domain: row.domain,
 				title: row.title,
 				status: row.status,
+				mode: row.mode,
 				createdAt: row.createdAt.toISOString(),
 			})),
 		};
@@ -61,13 +63,14 @@ function ScrapHistoryPage() {
 
 	return (
 		<div className="flex w-full flex-col gap-6 py-4">
+			<HubBreadcrumb current="Riwayat Scrape" />
 			<header className="max-w-2xl">
 				<h1 className="text-2xl font-semibold tracking-tight text-snow sm:text-3xl">
 					Riwayat Scrape
 				</h1>
 				<p className="mt-2 text-sm leading-6 text-fog">
-					Daftar website yang pernah kamu scrap menjadi index.html dan
-					design.md.
+					Daftar website yang pernah kamu generate DESIGN.md atau scrape
+					HTML-nya.
 				</p>
 			</header>
 

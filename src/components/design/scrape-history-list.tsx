@@ -10,6 +10,7 @@ import {
 	Trash2,
 } from "lucide-react";
 import { useState } from "react";
+import type { ScrapeMode } from "@/db/schema";
 
 export interface ScrapeHistoryItem {
 	id: string;
@@ -17,6 +18,7 @@ export interface ScrapeHistoryItem {
 	domain: string;
 	title: string | null;
 	status: string;
+	mode?: ScrapeMode;
 	createdAt: string;
 }
 
@@ -42,6 +44,21 @@ export function formatTimeAgo(dateString: string): string {
 	if (hours < 24) return `${hours} jam lalu`;
 	const days = Math.floor(hours / 24);
 	return `${days} hari lalu`;
+}
+
+function modeBadge(mode?: ScrapeMode) {
+	if (mode === "html") {
+		return (
+			<span className="inline-flex items-center rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-mono text-[11px] font-medium text-sky-400">
+				HTML
+			</span>
+		);
+	}
+	return (
+		<span className="inline-flex items-center rounded-md border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 font-mono text-[11px] font-medium text-purple-400">
+			DESIGN.md
+		</span>
+	);
 }
 
 function statusBadge(status: string) {
@@ -112,8 +129,8 @@ export function ScrapeHistoryList({
 					Belum ada riwayat scrape
 				</h3>
 				<p className="mt-1 max-w-md text-xs leading-5 text-fog">
-					Scrap website publik terlebih dahulu untuk mengekstrak struktur HTML
-					dan design system-nya.
+					Scrap website publik terlebih dahulu untuk membuat DESIGN.md atau
+					mengambil HTML-nya.
 				</p>
 				<Link
 					to="/design/scrap"
@@ -156,6 +173,7 @@ export function ScrapeHistoryList({
 								<span className="truncate text-sm font-semibold text-snow group-hover:text-white">
 									{item.title || item.domain}
 								</span>
+								{modeBadge(item.mode)}
 								{statusBadge(item.status)}
 							</div>
 							<div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-fog">

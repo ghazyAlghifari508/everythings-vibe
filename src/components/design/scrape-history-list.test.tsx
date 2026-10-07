@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ScrapeHistoryItem } from "./scrape-history-list";
 import {
 	SCRAPE_STATUS_INDONESIAN_LABELS,
 	ScrapeHistoryList,
@@ -28,13 +29,14 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
-const sampleItems = [
+const sampleItems: ScrapeHistoryItem[] = [
 	{
 		id: "scrape-1",
 		sourceUrl: "https://linear.app",
 		domain: "linear.app",
 		title: "Linear — Issue Tracking",
 		status: "completed",
+		mode: "design",
 		createdAt: new Date().toISOString(),
 	},
 	{
@@ -43,6 +45,7 @@ const sampleItems = [
 		domain: "stripe.com",
 		title: "Stripe Payment Infrastructure",
 		status: "failed",
+		mode: "html",
 		createdAt: new Date(Date.now() - 3600 * 1000).toISOString(),
 	},
 	{
@@ -56,36 +59,54 @@ const sampleItems = [
 ];
 
 describe("ScrapeHistoryList Component", () => {
-	it("renders list of scrape records with domain, title, and Indonesian status", () => {
+	it("renders list of scrape records with domain, title, mode badge, and Indonesian status", () => {
 		render(<ScrapeHistoryList initialItems={sampleItems} onDelete={vi.fn()} />);
 
 		expect(screen.getByText("Linear — Issue Tracking")).toBeDefined();
 		expect(screen.getByText("https://linear.app")).toBeDefined();
-		expect(screen.getByText(SCRAPE_STATUS_INDONESIAN_LABELS.completed)).toBeDefined();
+		expect(
+			screen.getByText(SCRAPE_STATUS_INDONESIAN_LABELS.completed),
+		).toBeDefined();
+
+		// Mode badges
+		expect(screen.getAllByText("DESIGN.md").length).toBeGreaterThanOrEqual(1);
+		expect(screen.getByText("HTML")).toBeDefined();
 
 		expect(screen.getByText("Stripe Payment Infrastructure")).toBeDefined();
-		expect(screen.getByText(SCRAPE_STATUS_INDONESIAN_LABELS.failed)).toBeDefined();
+		expect(
+			screen.getByText(SCRAPE_STATUS_INDONESIAN_LABELS.failed),
+		).toBeDefined();
 
 		expect(screen.getByText("example.com")).toBeDefined();
-		expect(screen.getByText(SCRAPE_STATUS_INDONESIAN_LABELS.generating)).toBeDefined();
+		expect(
+			screen.getByText(SCRAPE_STATUS_INDONESIAN_LABELS.generating),
+		).toBeDefined();
 	});
 
 	it("shows empty state when no items exist", () => {
 		render(<ScrapeHistoryList initialItems={[]} onDelete={vi.fn()} />);
 
 		expect(screen.getByText(/Belum ada riwayat scrape/i)).toBeDefined();
-		expect(screen.getByRole("link", { name: /Mulai Scrap Sekarang/i })).toBeDefined();
+		expect(
+			screen.getByRole("link", { name: /Mulai Scrap Sekarang/i }),
+		).toBeDefined();
 	});
 
 	it("triggers delete confirmation and calls onDelete handler", async () => {
 		const onDeleteMock = vi.fn().mockResolvedValue(true);
-		render(<ScrapeHistoryList initialItems={sampleItems} onDelete={onDeleteMock} />);
+		render(
+			<ScrapeHistoryList initialItems={sampleItems} onDelete={onDeleteMock} />,
+		);
 
-		const deleteButtons = screen.getAllByRole("button", { name: /Hapus riwayat/i });
+		const deleteButtons = screen.getAllByRole("button", {
+			name: /Hapus riwayat/i,
+		});
 		fireEvent.click(deleteButtons[0]);
 
 		// Confirm delete dialog button
-		const confirmBtn = screen.getByRole("button", { name: /Konfirmasi Hapus/i });
+		const confirmBtn = screen.getByRole("button", {
+			name: /Konfirmasi Hapus/i,
+		});
 		fireEvent.click(confirmBtn);
 
 		expect(onDeleteMock).toHaveBeenCalledWith("scrape-1");

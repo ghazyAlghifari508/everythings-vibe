@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
-import type { ScrapeStatus } from "@/db/schema";
+import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
 import { useScrapeStatus } from "@/hooks/use-scrape-status";
 import { requireUserServer } from "@/lib/session";
 
@@ -20,6 +20,7 @@ const loadScrapeDetail = createServerFn({ method: "GET" })
 			domain: scrape.domain,
 			title: scrape.title,
 			status: scrape.status,
+			mode: scrape.mode,
 			previewHtml: scrape.previewHtml ?? "",
 			designMd: scrape.document?.designMd ?? "",
 			metadata: scrape.metadata,
@@ -68,6 +69,9 @@ function ScrapeDetailPage() {
 	const currentStatus = (polledStatus ??
 		data?.status ??
 		initial.status) as ScrapeStatus;
+	const mode: ScrapeMode = (data?.mode ??
+		initial.mode ??
+		"design") as ScrapeMode;
 	const sourceUrl = data?.sourceUrl ?? initial.sourceUrl;
 	const domain = data?.domain ?? initial.domain;
 	const title = data?.title ?? initial.title;
@@ -84,7 +88,8 @@ function ScrapeDetailPage() {
 			: null;
 
 	const isCompleted =
-		currentStatus === "completed" && Boolean(previewHtml && designMd);
+		currentStatus === "completed" &&
+		(mode === "html" ? Boolean(previewHtml) : Boolean(designMd));
 
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14">
@@ -104,6 +109,7 @@ function ScrapeDetailPage() {
 
 			{isCompleted ? (
 				<ScrapeDetail
+					mode={mode}
 					sourceUrl={sourceUrl}
 					domain={domain}
 					previewHtml={previewHtml}
@@ -112,6 +118,7 @@ function ScrapeDetailPage() {
 				/>
 			) : (
 				<ScrapeProgress
+					mode={mode}
 					status={currentStatus}
 					sourceUrl={sourceUrl}
 					domain={domain}

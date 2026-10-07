@@ -1,22 +1,30 @@
 import JSZip from "jszip";
 import { Copy, Download, FileCode2, Globe } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import type { ScrapeMode } from "@/db/schema";
 
 export interface ScrapeDetailProps {
+	mode?: ScrapeMode;
 	sourceUrl: string;
 	domain: string;
-	previewHtml: string;
-	designMd: string;
+	previewHtml?: string;
+	designMd?: string;
 	capturedAt?: string;
 }
 
 type DetailTab = "preview" | "design";
+type HtmlViewTab = "preview" | "code";
 
 const PREVIEW_WIDTH = 1440;
 
 function zipFilename(domain: string): string {
 	const safe = domain.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
 	return `design-system-${safe || "site"}.zip`;
+}
+
+function safeFilename(domain: string, ext: string): string {
+	const safe = domain.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
+	return `${safe || "site"}.${ext}`;
 }
 
 async function copyText(value: string): Promise<boolean> {
@@ -26,6 +34,18 @@ async function copyText(value: string): Promise<boolean> {
 	} catch {
 		return false;
 	}
+}
+
+function downloadFile(filename: string, content: string, mimeType: string) {
+	const blob = new Blob([content], { type: mimeType });
+	const url = URL.createObjectURL(blob);
+	const anchor = document.createElement("a");
+	anchor.href = url;
+	anchor.download = filename;
+	document.body.appendChild(anchor);
+	anchor.click();
+	anchor.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function downloadZip(
@@ -48,22 +68,30 @@ async function downloadZip(
 }
 
 export function ScrapeDetail({
+	mode,
 	sourceUrl,
 	domain,
-	previewHtml,
-	designMd,
+	previewHtml = "",
+	designMd = "",
 	capturedAt,
 }: ScrapeDetailProps) {
 	const [tab, setTab] = useState<DetailTab>("preview");
+	const [htmlViewTab, setHtmlViewTab] = useState<HtmlViewTab>("preview");
 	const [notice, setNotice] = useState("");
-	const [busy, setBusy] = useState<"copy-html" | "copy-md" | "zip" | null>(
-		null,
-	);
+	const [busy, setBusy] = useState<
+		"copy-html" | "copy-md" | "zip" | "download-html" | "download-md" | null
+	>(null);
+
+	// Derive effective mode: if explicitly passed, honor it; otherwise infer from artifact presence
+	const effectiveMode: ScrapeMode | "dual" =
+		mode ??
+		(previewHtml && designMd ? "dual" : previewHtml ? "html" : "design");
 
 	async function handleCopy(kind: "copy-html" | "copy-md") {
 		setBusy(kind);
 		setNotice("");
-		const ok = await copyText(kind === "copy-html" ? previewHtml : designMd);
+		const text = kind === "copy-html" ? previewHtml : designMd;
+		const ok = await copyText(text);
 		setNotice(
 			ok
 				? kind === "copy-html"
@@ -72,6 +100,32 @@ export function ScrapeDetail({
 				: "Gagal menyalin. Blokir clipboard oleh browser.",
 		);
 		setBusy(null);
+	}
+
+	async function handleDownloadSingle(kind: "download-html" | "download-md") {
+		setBusy(kind);
+		setNotice("");
+		try {
+			if (kind === "download-html") {
+				downloadFile(
+					safeFilename(domain, "html"),
+					previewHtml,
+					"text/html;charset=utf-8",
+				);
+				setNotice("index.html mulai diunduh.");
+			} else {
+				downloadFile(
+					safeFilename(domain, "md"),
+					designMd,
+					"text/markdown;charset=utf-8",
+				);
+				setNotice("DESIGN.md mulai diunduh.");
+			}
+		} catch {
+			setNotice("Gagal mengunduh file. Coba lagi.");
+		} finally {
+			setBusy(null);
+		}
 	}
 
 	async function handleZip() {
@@ -101,89 +155,212 @@ export function ScrapeDetail({
 						<span className="font-mono text-xs text-fog">{capturedAt}</span>
 					) : null}
 				</div>
+
 				<div className="flex flex-wrap gap-2">
-					<button
-						type="button"
-						onClick={() => void handleCopy("copy-md")}
-						disabled={busy !== null}
-						className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-					>
-						<Copy size={14} aria-hidden />
-						{busy === "copy-md" ? "Menyalin…" : "Salin DESIGN.md"}
-					</button>
-					<button
-						type="button"
-						onClick={() => void handleCopy("copy-html")}
-						disabled={busy !== null}
-						className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
-					>
-						<FileCode2 size={14} aria-hidden />
-						{busy === "copy-html" ? "Menyalin…" : "Salin HTML"}
-					</button>
-					<button
-						type="button"
-						onClick={() => void handleZip()}
-						disabled={busy !== null}
-						className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
-					>
-						<Download size={14} aria-hidden />
-						{busy === "zip" ? "Menyiapkan…" : "Download ZIP (2 File)"}
-					</button>
+					{effectiveMode === "design" ? (
+						<>
+							<button
+								type="button"
+								onClick={() => void handleCopy("copy-md")}
+								disabled={busy !== null}
+								className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+							>
+								<Copy size={14} aria-hidden />
+								{busy === "copy-md" ? "Menyalin…" : "Salin DESIGN.md"}
+							</button>
+							<button
+								type="button"
+								onClick={() => void handleDownloadSingle("download-md")}
+								disabled={busy !== null}
+								className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3.5 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
+							>
+								<Download size={14} aria-hidden />
+								{busy === "download-md" ? "Menyiapkan…" : "Download DESIGN.md"}
+							</button>
+						</>
+					) : effectiveMode === "html" ? (
+						<>
+							<button
+								type="button"
+								onClick={() => void handleCopy("copy-html")}
+								disabled={busy !== null}
+								className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+							>
+								<FileCode2 size={14} aria-hidden />
+								{busy === "copy-html" ? "Menyalin…" : "Salin HTML"}
+							</button>
+							<button
+								type="button"
+								onClick={() => void handleDownloadSingle("download-html")}
+								disabled={busy !== null}
+								className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3.5 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
+							>
+								<Download size={14} aria-hidden />
+								{busy === "download-html"
+									? "Menyiapkan…"
+									: "Download index.html"}
+							</button>
+						</>
+					) : (
+						<>
+							<button
+								type="button"
+								onClick={() => void handleCopy("copy-md")}
+								disabled={busy !== null}
+								className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+							>
+								<Copy size={14} aria-hidden />
+								{busy === "copy-md" ? "Menyalin…" : "Salin DESIGN.md"}
+							</button>
+							<button
+								type="button"
+								onClick={() => void handleCopy("copy-html")}
+								disabled={busy !== null}
+								className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3.5 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
+							>
+								<FileCode2 size={14} aria-hidden />
+								{busy === "copy-html" ? "Menyalin…" : "Salin HTML"}
+							</button>
+							<button
+								type="button"
+								onClick={() => void handleZip()}
+								disabled={busy !== null}
+								className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3.5 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
+							>
+								<Download size={14} aria-hidden />
+								{busy === "zip" ? "Menyiapkan…" : "Download ZIP (2 File)"}
+							</button>
+						</>
+					)}
 				</div>
+
 				{notice ? (
 					<output className="block text-xs text-fog">{notice}</output>
 				) : null}
 			</header>
 
-			<div
-				role="tablist"
-				aria-label="File hasil scrape"
-				className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
-			>
-				<button
-					type="button"
-					role="tab"
-					aria-selected={tab === "preview"}
-					onClick={() => setTab("preview")}
-					className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
-						tab === "preview"
-							? "bg-charcoal text-snow"
-							: "text-fog hover:text-mist"
-					}`}
-				>
-					index.html
-				</button>
-				<button
-					type="button"
-					role="tab"
-					aria-selected={tab === "design"}
-					onClick={() => setTab("design")}
-					className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
-						tab === "design"
-							? "bg-charcoal text-snow"
-							: "text-fog hover:text-mist"
-					}`}
-				>
-					design.md
-				</button>
-			</div>
-
-			{tab === "preview" ? (
-				<div role="tabpanel" aria-label="Preview index.html">
-					<p className="mb-2 font-mono text-[11px] text-fog">
-						Preview index.html (1440px Desktop, skala menyesuaikan layar)
-					</p>
-					<DesktopPreview title={`Preview ${domain}`} srcDoc={previewHtml} />
-				</div>
-			) : (
-				<div role="tabpanel" aria-label="Isi design.md">
+			{/* Mode-specific content rendering */}
+			{effectiveMode === "design" ? (
+				<section aria-label="Isi design.md">
 					<p className="mb-2 font-mono text-[11px] text-fog">
 						design.md (Tokens &amp; System)
 					</p>
 					<pre className="max-h-[720px] overflow-auto rounded-xl border border-graphite bg-onyx p-5 font-mono text-xs leading-5 text-mist">
 						{designMd}
 					</pre>
+				</section>
+			) : effectiveMode === "html" ? (
+				<div className="flex flex-col gap-3">
+					<div
+						role="tablist"
+						aria-label="Tampilan HTML"
+						className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
+					>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={htmlViewTab === "preview"}
+							onClick={() => setHtmlViewTab("preview")}
+							className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
+								htmlViewTab === "preview"
+									? "bg-charcoal text-snow"
+									: "text-fog hover:text-mist"
+							}`}
+						>
+							Preview
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={htmlViewTab === "code"}
+							onClick={() => setHtmlViewTab("code")}
+							className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
+								htmlViewTab === "code"
+									? "bg-charcoal text-snow"
+									: "text-fog hover:text-mist"
+							}`}
+						>
+							Source HTML
+						</button>
+					</div>
+
+					{htmlViewTab === "preview" ? (
+						<div role="tabpanel" aria-label="Preview index.html">
+							<p className="mb-2 font-mono text-[11px] text-fog">
+								Preview index.html (1440px Desktop, skala menyesuaikan layar)
+							</p>
+							<DesktopPreview
+								title={`Preview ${domain}`}
+								srcDoc={previewHtml}
+							/>
+						</div>
+					) : (
+						<div role="tabpanel" aria-label="Source code index.html">
+							<p className="mb-2 font-mono text-[11px] text-fog">
+								index.html source code
+							</p>
+							<pre className="max-h-[720px] overflow-auto rounded-xl border border-graphite bg-onyx p-5 font-mono text-xs leading-5 text-mist">
+								{previewHtml}
+							</pre>
+						</div>
+					)}
 				</div>
+			) : (
+				<>
+					<div
+						role="tablist"
+						aria-label="File hasil scrape"
+						className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
+					>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={tab === "preview"}
+							onClick={() => setTab("preview")}
+							className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
+								tab === "preview"
+									? "bg-charcoal text-snow"
+									: "text-fog hover:text-mist"
+							}`}
+						>
+							index.html
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={tab === "design"}
+							onClick={() => setTab("design")}
+							className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
+								tab === "design"
+									? "bg-charcoal text-snow"
+									: "text-fog hover:text-mist"
+							}`}
+						>
+							design.md
+						</button>
+					</div>
+
+					{tab === "preview" ? (
+						<div role="tabpanel" aria-label="Preview index.html">
+							<p className="mb-2 font-mono text-[11px] text-fog">
+								Preview index.html (1440px Desktop, skala menyesuaikan layar)
+							</p>
+							<DesktopPreview
+								title={`Preview ${domain}`}
+								srcDoc={previewHtml}
+							/>
+						</div>
+					) : (
+						<div role="tabpanel" aria-label="Isi design.md">
+							<p className="mb-2 font-mono text-[11px] text-fog">
+								design.md (Tokens &amp; System)
+							</p>
+							<pre className="max-h-[720px] overflow-auto rounded-xl border border-graphite bg-onyx p-5 font-mono text-xs leading-5 text-mist">
+								{designMd}
+							</pre>
+						</div>
+					)}
+				</>
 			)}
 		</section>
 	);
