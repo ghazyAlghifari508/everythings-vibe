@@ -12,7 +12,7 @@ import {
 	SCRAPE_MAX_STYLESHEETS,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
-import { cleanPreviewHtml } from "./preview-html";
+import { rewritePreviewAssets } from "./preview-html";
 import { validateUrl } from "./url-validator";
 
 export const DESKTOP_WIDTH = SCRAPE_DESKTOP_WIDTH;
@@ -220,7 +220,7 @@ export async function scrapeHtml(
 		forceDesktopViewport(await inlineStyles(rendered.html, rendered.finalUrl)),
 		rendered.finalUrl,
 	);
-	const previewHtml = cleanPreviewHtml(html, rendered.finalUrl);
+	const previewHtml = rewritePreviewAssets(html, rendered.finalUrl);
 	const domain = new URL(rendered.finalUrl).hostname.toLowerCase();
 	return {
 		sourceUrl: rendered.finalUrl,
