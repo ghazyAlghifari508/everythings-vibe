@@ -1,19 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ScrapeHistoryItem } from "./scrape-history-list";
-import {
-	SCRAPE_STATUS_INDONESIAN_LABELS,
-	ScrapeHistoryList,
-} from "./scrape-history-list";
-
-afterEach(() => {
-	cleanup();
-});
+import { ScrapeHistoryList } from "./scrape-history-list";
 
 vi.mock("@tanstack/react-router", () => ({
-	useNavigate: () => vi.fn(),
-	useRouter: () => ({ invalidate: vi.fn() }),
 	Link: ({
 		children,
 		to,
@@ -29,86 +19,71 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
-const sampleItems: ScrapeHistoryItem[] = [
-	{
-		id: "scrape-1",
-		sourceUrl: "https://linear.app",
-		domain: "linear.app",
-		title: "Linear — Issue Tracking",
-		status: "completed",
-		mode: "design",
-		createdAt: new Date().toISOString(),
-	},
-	{
-		id: "scrape-2",
-		sourceUrl: "https://stripe.com",
-		domain: "stripe.com",
-		title: "Stripe Payment Infrastructure",
-		status: "failed",
-		mode: "html",
-		createdAt: new Date(Date.now() - 3600 * 1000).toISOString(),
-	},
-	{
-		id: "scrape-3",
-		sourceUrl: "https://example.com",
-		domain: "example.com",
-		title: null,
-		status: "generating",
-		createdAt: new Date(Date.now() - 1000 * 60).toISOString(),
-	},
-];
+afterEach(() => {
+	cleanup();
+});
 
-describe("ScrapeHistoryList Component", () => {
-	it("renders list of scrape records with domain, title, mode badge, and Indonesian status", () => {
-		render(<ScrapeHistoryList initialItems={sampleItems} onDelete={vi.fn()} />);
-
-		expect(screen.getByText("Linear — Issue Tracking")).toBeDefined();
-		expect(screen.getByText("https://linear.app")).toBeDefined();
+describe("ScrapeHistoryList", () => {
+	it("renders an empty state with a contrast-safe CTA and no dashed dropzone", () => {
+		const { container } = render(<ScrapeHistoryList initialItems={[]} />);
 		expect(
-			screen.getByText(SCRAPE_STATUS_INDONESIAN_LABELS.completed),
+			screen.getByRole("heading", { name: /Belum ada riwayat scrape/i }),
 		).toBeDefined();
-
-		// Mode badges
-		expect(screen.getAllByText("DESIGN.md").length).toBeGreaterThanOrEqual(1);
-		expect(screen.getByText("HTML")).toBeDefined();
-
-		expect(screen.getByText("Stripe Payment Infrastructure")).toBeDefined();
-		expect(
-			screen.getByText(SCRAPE_STATUS_INDONESIAN_LABELS.failed),
-		).toBeDefined();
-
-		expect(screen.getByText("example.com")).toBeDefined();
-		expect(
-			screen.getByText(SCRAPE_STATUS_INDONESIAN_LABELS.generating),
-		).toBeDefined();
+		const cta = screen.getByRole("link", { name: /Mulai Scrap Sekarang/i });
+		expect(cta.className).toContain("btn-primary");
+		expect(container.innerHTML).not.toContain("border-dashed");
 	});
 
-	it("shows empty state when no items exist", () => {
-		render(<ScrapeHistoryList initialItems={[]} onDelete={vi.fn()} />);
-
-		expect(screen.getByText(/Belum ada riwayat scrape/i)).toBeDefined();
-		expect(
-			screen.getByRole("link", { name: /Mulai Scrap Sekarang/i }),
-		).toBeDefined();
-	});
-
-	it("triggers delete confirmation and calls onDelete handler", async () => {
-		const onDeleteMock = vi.fn().mockResolvedValue(true);
-		render(
-			<ScrapeHistoryList initialItems={sampleItems} onDelete={onDeleteMock} />,
+	it("uses the website name instead of the SEO page title with plain metadata", () => {
+		const { container } = render(
+			<ScrapeHistoryList
+				initialItems={[
+					{
+						id: "id-1",
+						sourceUrl: "https://www.notion.com/",
+						domain: "www.notion.com",
+						title: "The AI workspace that works for you. | Notion",
+						status: "completed",
+						mode: "design",
+						createdAt: new Date().toISOString(),
+					},
+				]}
+			/>,
 		);
+		expect(screen.getByText("Notion")).toBeDefined();
+		expect(
+			screen.queryByText("The AI workspace that works for you. | Notion"),
+		).toBeNull();
+		expect(screen.getByText(/DESIGN\.md · Selesai/)).toBeDefined();
+		expect(screen.queryByRole("link", { name: /^Buka$/i })).toBeNull();
+		expect(
+			screen.getByRole("button", { name: /Hapus riwayat/i }),
+		).toBeDefined();
+		const html = container.innerHTML;
+		expect(html).not.toContain("rounded-full");
+		expect(html).not.toContain("bg-emerald-400");
+		expect(html).not.toContain("bg-sky-500");
+		expect(html).not.toContain("bg-purple-500");
+	});
 
-		const deleteButtons = screen.getAllByRole("button", {
-			name: /Hapus riwayat/i,
-		});
-		fireEvent.click(deleteButtons[0]);
-
-		// Confirm delete dialog button
-		const confirmBtn = screen.getByRole("button", {
-			name: /Konfirmasi Hapus/i,
-		});
-		fireEvent.click(confirmBtn);
-
-		expect(onDeleteMock).toHaveBeenCalledWith("scrape-1");
+	it("makes the whole row the open target pointing at the result route", () => {
+		render(
+			<ScrapeHistoryList
+				initialItems={[
+					{
+						id: "id-2",
+						sourceUrl: "https://www.notion.com/",
+						domain: "www.notion.com",
+						title: null,
+						status: "completed",
+						mode: "html",
+						createdAt: new Date().toISOString(),
+					},
+				]}
+			/>,
+		);
+		const rowLink = screen.getByRole("link", { name: /Notion/i });
+		expect(rowLink.getAttribute("href")).toBe("/design/scrap/$id");
+		expect(screen.getByText(/HTML · Selesai/)).toBeDefined();
 	});
 });
