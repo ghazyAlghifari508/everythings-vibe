@@ -313,16 +313,6 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 									>
 										History
 									</Link>
-									<Link
-										to="/pricing"
-										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-											pathname.startsWith("/pricing")
-												? "bg-white/10 text-snow"
-												: "text-fog hover:bg-white/5 hover:text-snow"
-										}`}
-									>
-										Pricing
-									</Link>
 								</>
 							) : isGreenfieldWorkspace ? (
 								<>
@@ -724,17 +714,6 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 								onClick={() => setIsMobileMenuOpen(false)}
 							>
 								History
-							</Link>
-							<Link
-								to="/pricing"
-								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
-									pathname.startsWith("/pricing")
-										? "bg-white/10 text-snow"
-										: "text-snow hover:bg-white/5"
-								}`}
-								onClick={() => setIsMobileMenuOpen(false)}
-							>
-								Pricing
 							</Link>
 						</>
 					) : (

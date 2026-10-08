@@ -449,23 +449,21 @@ describe("Navbar Greenfield Workspace Navlinks", () => {
 });
 
 describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
-	it("renders Scrap, History, and Pricing on /design/scrap with Scrap active", () => {
+	it("renders only Scrap and History on /design/scrap with Scrap active and no Pricing", () => {
 		mockPathname = "/design/scrap";
 		renderNavbar();
 
-		// Desktop navlinks
+		// Desktop navlinks: scoped VibeDesign nav is Scrap + History only
 		const scrapLink = screen.getByRole("link", { name: /^Scrap$/i });
 		const historyLink = screen.getByRole("link", { name: /^History$/i });
-		const pricingLink = screen.getByRole("link", { name: /^Pricing$/i });
 
 		expect(scrapLink).toBeDefined();
 		expect(historyLink).toBeDefined();
-		expect(pricingLink).toBeDefined();
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 
 		// Scrap active state: has bg-white/10; History does not
 		expect(scrapLink.className).toContain("bg-white/10");
 		expect(historyLink.className).not.toContain("bg-white/10");
-		expect(pricingLink.className).not.toContain("bg-white/10");
 
 		// Open mobile menu
 		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
@@ -473,11 +471,10 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 
 		const allScrapLinks = screen.getAllByRole("link", { name: /^Scrap$/i });
 		const allHistoryLinks = screen.getAllByRole("link", { name: /^History$/i });
-		const allPricingLinks = screen.getAllByRole("link", { name: /^Pricing$/i });
 
 		expect(allScrapLinks).toHaveLength(2); // 1 desktop + 1 mobile
 		expect(allHistoryLinks).toHaveLength(2); // 1 desktop + 1 mobile
-		expect(allPricingLinks).toHaveLength(2); // 1 desktop + 1 mobile
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 
 		// Mobile history link points to /design/scrap/history, NOT generic /history
 		expect(allHistoryLinks[1].getAttribute("href")).toBe(
@@ -489,21 +486,21 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		expect(screen.queryByRole("link", { name: /^Settings$/i })).toBeNull();
 	});
 
-	it("renders Scrap, History, and Pricing on /design/scrap/history with History active and Scrap inactive", () => {
+	it("renders only Scrap and History on /design/scrap/history with History active and Scrap inactive", () => {
 		mockPathname = "/design/scrap/history";
 		renderNavbar();
 
 		const scrapLink = screen.getByRole("link", { name: /^Scrap$/i });
 		const historyLink = screen.getByRole("link", { name: /^History$/i });
-		const pricingLink = screen.getByRole("link", { name: /^Pricing$/i });
+
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 
 		// History is active; Scrap is NOT active
 		expect(historyLink.className).toContain("bg-white/10");
 		expect(scrapLink.className).not.toContain("bg-white/10");
-		expect(pricingLink.className).not.toContain("bg-white/10");
 	});
 
-	it("keeps Scrap context active on /design/scrap/$id result/processing subroute", () => {
+	it("keeps Scrap context active on /design/scrap/$id result/processing subroute without Pricing", () => {
 		mockPathname = "/design/scrap/job-xyz-123";
 		renderNavbar();
 
@@ -512,9 +509,10 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 
 		expect(scrapLink.className).toContain("bg-white/10");
 		expect(historyLink.className).not.toContain("bg-white/10");
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 	});
 
-	it("exclusively scopes mobile drawer on VibeDesign routes to Home, Scrap, History, Pricing and closes on click", () => {
+	it("exclusively scopes mobile drawer on VibeDesign routes to Home, Scrap, History and closes on click", () => {
 		mockPathname = "/design/scrap/history";
 		renderNavbar();
 
@@ -524,12 +522,11 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		const homeLink = screen.getByRole("link", { name: /^Home$/i });
 		const allScrapLinks = screen.getAllByRole("link", { name: /^Scrap$/i });
 		const allHistoryLinks = screen.getAllByRole("link", { name: /^History$/i });
-		const allPricingLinks = screen.getAllByRole("link", { name: /^Pricing$/i });
 
 		expect(homeLink).toBeDefined();
 		expect(allScrapLinks).toHaveLength(2);
 		expect(allHistoryLinks).toHaveLength(2);
-		expect(allPricingLinks).toHaveLength(2);
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 
 		expect(screen.queryByRole("link", { name: /^FAQ$/i })).toBeNull();
 		expect(screen.queryByRole("link", { name: /^Settings$/i })).toBeNull();
