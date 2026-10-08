@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseDesignMd } from "./design-md-inspector";
+import {
+	firstCssLength,
+	normalizeFontWeight,
+	parseDesignMd,
+} from "./design-md-inspector";
 
 const FIXTURE = `# Acme - Style Reference
 > A crisp ledger console under morning light.
@@ -202,6 +206,73 @@ describe("parseDesignMd", () => {
 			token: "--color-canvas",
 			role: "Base",
 		});
+	});
+
+	it("strips code ticks and bold markers from table cells", () => {
+		const model = parseDesignMd(
+			[
+				"# Acme - Style Reference",
+				"",
+				"## Tokens - Colors",
+				"| Name | Value | Token | Role |",
+				"| :--- | :--- | :--- | :--- |",
+				"| **Canvas** | `#f9f9f8` | `--color-canvas` | Base |",
+				"",
+				"## Tokens - Typography",
+				"| Role | Family | Weight | Size | Line Height |",
+				"| :--- | :--- | :--- | :--- | :--- |",
+				"| Display | `Inter` | 700 (Bold) | `2em` (fluid) | 1.1 |",
+				"",
+			].join("\n"),
+		);
+		expect(model.colors[0]).toEqual({
+			name: "Canvas",
+			value: "#f9f9f8",
+			token: "--color-canvas",
+			role: "Base",
+		});
+		expect(model.typography[0]).toMatchObject({
+			label: "Display",
+			family: "Inter",
+			weight: "700 (Bold)",
+		});
+		expect(model.fonts[0]).toMatchObject({
+			family: "Inter",
+			weights: ["700"],
+		});
+	});
+
+	it("parses bullet spacing scales and bold base-unit lines", () => {
+		const model = parseDesignMd(
+			[
+				"# Acme - Style Reference",
+				"",
+				"## Tokens - Spacing & Shapes",
+				"*   **Base Unit:** `4px` (inferred from tokens)",
+				"*   `--box-space-1`: `4px` (`0.25rem`) - micro margins",
+				"*   `--box-space-4`: `16px` (`1rem`) - default gutter",
+				"",
+				"| Radius Token | Computed Value |",
+				"| :--- | :--- |",
+				"| `--radius-md` | `8px` |",
+				"",
+			].join("\n"),
+		);
+		expect(model.baseUnit).toBe("4px");
+		expect(model.spacing).toEqual([
+			{ label: "--box-space-1", value: "4px" },
+			{ label: "--box-space-4", value: "16px" },
+		]);
+		expect(model.radii).toEqual([{ label: "--radius-md", value: "8px" }]);
+	});
+
+	it("extracts the first usable CSS length and font weight", () => {
+		expect(firstCssLength("`2em` (clamp(40px, 5.5vw, 68px))")).toBe("2em");
+		expect(firstCssLength("32px (2rem)")).toBe("32px");
+		expect(firstCssLength("none")).toBe("");
+		expect(normalizeFontWeight("700 (Bold)")).toBe("700");
+		expect(normalizeFontWeight("600")).toBe("600");
+		expect(normalizeFontWeight("Regular")).toBe("");
 	});
 
 	it("ignores non-canonical sections instead of leaking them", () => {

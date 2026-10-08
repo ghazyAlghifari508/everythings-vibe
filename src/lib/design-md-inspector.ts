@@ -64,7 +64,18 @@ const EMPTY_MODEL: DesignInspectorModel = {
 };
 
 function cleanCell(value: string): string {
-	return value.replace(/\*\*/g, "").trim();
+	return value.replace(/`/g, "").replace(/\*\*/g, "").trim();
+}
+
+export function firstCssLength(value: string): string {
+	return value.match(/[\d.]+(?:px|rem|em|%)/)?.[0] ?? "";
+}
+
+export function normalizeFontWeight(value: string): string {
+	const digits = value.match(/^(\d{3})\b/)?.[1];
+	if (digits) return digits;
+	const keyword = value.match(/^(bold|normal)\b/i)?.[1]?.toLowerCase();
+	return keyword ?? "";
 }
 
 function splitRow(line: string): string[] {
@@ -244,8 +255,9 @@ function deriveFonts(entries: InspectorTypeEntry[]): InspectorFont[] {
 			weights: [],
 			roles: [],
 		};
-		if (entry.weight && !existing.weights.includes(entry.weight)) {
-			existing.weights.push(entry.weight);
+		const weight = normalizeFontWeight(entry.weight);
+		if (weight && !existing.weights.includes(weight)) {
+			existing.weights.push(weight);
 		}
 		if (entry.label && !existing.roles.includes(entry.label)) {
 			existing.roles.push(entry.label);
@@ -264,9 +276,13 @@ function parseSpacingShapes(lines: string[]): {
 	const radii: InspectorToken[] = [];
 	let baseUnit = "";
 	const baseMatch = lines
-		.map((line) => line.match(/base\s*(?:unit)?\s*[:=]\s*(\S+)/i))
+		.map((line) =>
+			line
+				.replace(/[*`]/g, "")
+				.match(/base\s*(?:unit)?\s*[:=]\s*([\d.]+px)/i),
+		)
 		.find((match) => match !== null);
-	if (baseMatch?.[1]) baseUnit = baseMatch[1].replace(/[.,;]$/, "");
+	if (baseMatch?.[1]) baseUnit = baseMatch[1];
 	for (const table of parseTables(lines)) {
 		const headerText = table.headers.join(" ").toLowerCase();
 		const isRadii = /radius|radii|round|shape/.test(headerText);
@@ -280,6 +296,16 @@ function parseSpacingShapes(lines: string[]): {
 			const value = row[1] ?? "";
 			if (label || value) target.push({ label, value });
 		}
+	}
+	const seen = new Set(spacing.map((token) => token.label));
+	for (const rawLine of lines) {
+		if (spacing.length >= 24) break;
+		const bullet = rawLine.match(/^\s*(?:[-*]|\d+[.)])\s+(.*)$/)?.[1];
+		if (!bullet) continue;
+		const token = bullet.match(/`?(--[\w-]+)`?\s*:\s*`?([\d.]+px)`?/);
+		if (!token?.[1] || !token[2] || seen.has(token[1])) continue;
+		seen.add(token[1]);
+		spacing.push({ label: token[1], value: token[2] });
 	}
 	return { spacing, radii, baseUnit };
 }

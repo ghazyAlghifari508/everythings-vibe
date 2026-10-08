@@ -4,6 +4,10 @@ import type {
 	InspectorFont,
 	InspectorTypeEntry,
 } from "@/lib/design-md-inspector";
+import {
+	firstCssLength,
+	normalizeFontWeight,
+} from "@/lib/design-md-inspector";
 
 export interface DesignSystemInspectorProps {
 	siteName: string;
@@ -20,15 +24,6 @@ function isCssLength(value: string): boolean {
 
 function isSafeFontFamily(value: string): boolean {
 	return /^[\w\s-]+$/.test(value.trim());
-}
-
-function isSafeFontWeight(value: string): boolean {
-	const normalized = value.trim().toLowerCase();
-	return (
-		/^[1-9]00$/.test(normalized) ||
-		normalized === "bold" ||
-		normalized === "normal"
-	);
 }
 
 function isSafeLineHeight(value: string): boolean {
@@ -67,8 +62,10 @@ function themeLabel(theme: DesignInspectorModel["theme"]): string | null {
 
 function TypePreview({ entry }: { entry: InspectorTypeEntry }) {
 	const style: React.CSSProperties = {};
-	if (isCssLength(entry.size)) style.fontSize = `min(${entry.size}, 2.5rem)`;
-	if (isSafeFontWeight(entry.weight)) style.fontWeight = entry.weight;
+	const size = firstCssLength(entry.size);
+	if (size) style.fontSize = `min(${size}, 2.5rem)`;
+	const weight = normalizeFontWeight(entry.weight);
+	if (weight) style.fontWeight = weight;
 	if (isSafeLineHeight(entry.lineHeight))
 		style.lineHeight = entry.lineHeight;
 	if (entry.family && isSafeFontFamily(entry.family)) {
