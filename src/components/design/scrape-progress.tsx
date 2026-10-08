@@ -215,14 +215,19 @@ export function ScrapeProgress({
 									key={s}
 									className={`flex items-center gap-2 font-mono text-xs ${
 										isStageDone
-											? "text-emerald-400"
+											? "text-fog"
 											: isStageCurrent
 												? "font-semibold text-snow"
 												: "text-fog/60"
 									}`}
 								>
 									{isStageDone ? (
-										<Check size={12} strokeWidth={3} aria-hidden="true" />
+										<Check
+											size={12}
+											strokeWidth={3}
+											aria-hidden="true"
+											className="text-emerald-500/80"
+										/>
 									) : isStageCurrent ? (
 										<Loader2 size={12} className="animate-spin" />
 									) : (

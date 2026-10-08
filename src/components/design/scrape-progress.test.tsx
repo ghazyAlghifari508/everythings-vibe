@@ -318,6 +318,31 @@ describe("ScrapeProgress", () => {
 		).toBeNull();
 	});
 
+	it("keeps completed stage labels muted while the active stage stays strongest", () => {
+		const { container } = render(
+			<ScrapeProgress
+				mode="design"
+				status="extracting"
+				sourceUrl="https://www.notion.com/"
+				domain="www.notion.com"
+			/>,
+		);
+		const items = container.querySelectorAll("ol li");
+		expect(items.length).toBeGreaterThanOrEqual(4);
+		for (const done of [items[0], items[1]]) {
+			expect(done.className).toContain("text-fog");
+			expect(done.className).not.toContain("emerald");
+			const icon = done.querySelector("svg");
+			expect(icon?.getAttribute("class") ?? "").toContain("text-emerald-500");
+		}
+		const active = items[2];
+		expect(active.className).toContain("text-snow");
+		expect(active.className).toContain("font-semibold");
+		const future = items[3];
+		expect(future.className).toContain("text-fog/60");
+		expect(future.className).not.toContain("emerald");
+	});
+
 	it("uses the website name as the progress heading, not the raw domain", () => {
 		render(
 			<ScrapeProgress
