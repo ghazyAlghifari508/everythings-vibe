@@ -56,10 +56,52 @@ const MOUNT_SCRIPT = `(async () => {
   return true;
 })()`;
 
+const MOUNT_PRESTART_SCRIPT = `(async () => {
+  const React = (await import("/@id/react")).default;
+  const { createRoot } = (await import("/@id/react-dom/client")).default;
+  const { ScreenConnect } = await import("/src/components/codebase/screen-connect.tsx");
+
+  const connectRoot = document.createElement("div");
+  connectRoot.id = "verify-prestart";
+  document.body.appendChild(connectRoot);
+
+  const payload = {
+    projectId: "proj_verify_prestart",
+    apiBaseUrl: "https://prdfy.example.com",
+    syncToken: "tok_verify",
+    cliMinVersion: "2.0.0",
+    syncCommand: "vibeeverything codebase sync --project-id proj_verify_prestart --sync-token <token>",
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+  };
+
+  createRoot(connectRoot).render(
+    React.createElement(ScreenConnect, {
+      projectName: "Wishlist Fitur",
+      payload,
+      status: {
+        projectId: "proj_verify_prestart",
+        sessionId: "sess_verify_prestart",
+        status: "waiting_for_cli",
+        snapshotId: null,
+      },
+      canContinueToSummary: false,
+      onContinueToSummary: () => {},
+    }),
+  );
+
+  return true;
+})()`;
+
 async function mountComponents(page: import("@playwright/test").Page) {
 	await page.goto("/");
 	await page.waitForLoadState("domcontentloaded");
 	return page.evaluate(MOUNT_SCRIPT);
+}
+
+async function mountPrestart(page: import("@playwright/test").Page) {
+	await page.goto("/");
+	await page.waitForLoadState("domcontentloaded");
+	return page.evaluate(MOUNT_PRESTART_SCRIPT);
 }
 
 test.describe("existing-codebase onboarding — real browser render", () => {
@@ -180,6 +222,31 @@ test.describe("existing-codebase onboarding — real browser render", () => {
 		expect(text).not.toMatch(/Langkah \d/);
 		expect(text).not.toContain("2.0.0");
 		expect(text).not.toContain("node_modules");
+		expect(errors).toEqual([]);
+	});
+
+	test("pre-start state during waiting_for_cli displays only instructions with zero progress stages and no Sync ID", async ({
+		page,
+	}) => {
+		const errors: string[] = [];
+		page.on("pageerror", (e) => errors.push(e.message));
+
+		await mountPrestart(page);
+		const connect = page.locator("#verify-prestart");
+		await expect(connect).toContainText("Paste prompt lalu jalankan", {
+			timeout: 20000,
+		});
+
+		const text = (await connect.innerText()) ?? "";
+		expect(text).toContain(
+			"Jalankan prompt dari root repository untuk mulai menyinkronkan codebase.",
+		);
+		expect(text).not.toContain("Menunggu agent");
+		expect(text).not.toContain("Menyiapkan source code");
+		expect(text).not.toContain("Menyinkronkan codebase");
+		expect(text).not.toContain("Sync ID");
+		expect(text).not.toContain("Menghubungkan server...");
+		expect(await connect.locator("[data-stage-state]").count()).toBe(0);
 		expect(errors).toEqual([]);
 	});
 });

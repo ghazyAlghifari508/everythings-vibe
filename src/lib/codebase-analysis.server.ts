@@ -307,7 +307,11 @@ export async function requestCodebaseAnalysis(
 			},
 		];
 		const raw = await generate(messages);
-		const analysis = parseAnalysisOutput(raw, { projectId, snapshotId });
+		const analysis = parseAnalysisOutput(
+			raw,
+			{ projectId, snapshotId },
+			new Set(storedManifest.data.map((entry) => entry.path)),
+		);
 
 		await db.transaction(async (tx) => {
 			await tx

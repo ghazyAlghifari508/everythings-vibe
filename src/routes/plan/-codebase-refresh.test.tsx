@@ -305,10 +305,12 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Menunggu agent")).toBeDefined();
+				expect(screen.getByText("Paste prompt lalu jalankan")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
+		expect(screen.queryByText("Menunggu agent")).toBeNull();
+		expect(document.querySelectorAll("[data-stage-state]")).toHaveLength(0);
 	}, 20000);
 
 	it("maps a retired three-step pointer onto the sync step", async () => {

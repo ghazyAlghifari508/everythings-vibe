@@ -153,22 +153,16 @@ describe("sync stage vocabulary", () => {
 });
 
 describe("waiting_for_cli", () => {
-	it("puts the agent first and leaves both later stages untouched", () => {
+	it("treats waiting_for_cli as pre-start and yields no stages", () => {
 		const view = resolveSyncStageView(status());
-		expect(states(view)).toEqual(["waiting", "waiting", "waiting"]);
-		expect(stage(view, 0).title).toBe("Menunggu agent");
-		expect(stage(view, 0).detail).toBe("Jalankan prompt dari root repository.");
+		expect(view.stages).toEqual([]);
+		expect(view.hasStatus).toBe(true);
+		expect(view.hasStarted).toBe(false);
 		expect(view.syncComplete).toBe(false);
 		expect(view.canRetry).toBe(false);
-	});
-
-	it("gives the inactive stages no filler description", () => {
-		const view = resolveSyncStageView(status());
-		// "This step has not started yet" teaches the user nothing.
-		expect(stage(view, 1).detail).toBeUndefined();
-		expect(stage(view, 2).detail).toBeUndefined();
-		expect(userFacingCopy(view)).not.toMatch(/tahap ini berjalan setelah/i);
-		expect(userFacingCopy(view)).not.toMatch(/belum tersinkron/i);
+		expect(userFacingCopy(view)).not.toContain("Menunggu agent");
+		expect(userFacingCopy(view)).not.toContain("Menyiapkan source code");
+		expect(userFacingCopy(view)).not.toContain("Menyinkronkan codebase");
 	});
 });
 
@@ -274,7 +268,8 @@ describe("fast transition", () => {
 		const after = resolveSyncStageView(
 			status({ status: "uploaded", snapshotId: "snap_fast", fileCount: 12 }),
 		);
-		expect(states(before)).toEqual(["waiting", "waiting", "waiting"]);
+		expect(before.stages).toEqual([]);
+		expect(before.hasStarted).toBe(false);
 		expect(states(after)).toEqual(["done", "done", "done"]);
 		expect(stage(after, 0).title).toBe("Agent terhubung");
 		expect(stage(after, 1).title).toBe("Source code siap");

@@ -17,6 +17,7 @@ import {
 	selectLatestVersionContent,
 } from "@/components/codebase/codebase-markdown";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
+import { CodebaseWorkspaceSkeleton } from "@/components/codebase/codebase-workspace-skeleton";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { ScreenIncompleteSync } from "@/components/codebase/screen-incomplete-sync";
 import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
@@ -336,22 +337,8 @@ export const Route = createFileRoute("/codebases/$id")({
 	),
 });
 
-function CodebaseDetailPending() {
-	return (
-		<main
-			className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14"
-			aria-busy="true"
-		>
-			<header className="border-b border-graphite pb-6">
-				<div className="h-3 w-44 animate-pulse rounded bg-graphite" />
-				<div className="mt-3 h-10 w-64 animate-pulse rounded bg-graphite" />
-				<div className="mt-3 h-4 max-w-2xl animate-pulse rounded bg-graphite" />
-			</header>
-			<div className="h-12 animate-pulse rounded-xl border border-graphite bg-charcoal" />
-			<div className="h-64 animate-pulse rounded-xl border border-graphite bg-charcoal" />
-			<p className="text-sm text-fog">Memuat detail codebase...</p>
-		</main>
-	);
+export function CodebaseDetailPending() {
+	return <CodebaseWorkspaceSkeleton />;
 }
 
 function CodebaseDetailPage() {
@@ -1352,6 +1339,7 @@ function CodebaseDetailPage() {
 								stageBusy={stageBusy}
 								stageError={stageError}
 								codebaseName={codebase.name}
+								starterSuggestions={analysisOutput?.starterSuggestions}
 								isSending={isWorking}
 								isConfirming={isConfirming}
 								specError={specError}

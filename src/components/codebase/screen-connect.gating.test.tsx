@@ -119,43 +119,21 @@ describe("Step 1 instruction copy", () => {
 });
 
 describe("Step 1 live sync status", () => {
-	it("renders exactly the three product stages", () => {
-		renderConnect();
-		for (const testId of STAGE_TEST_IDS) {
-			expect(
-				container.querySelectorAll(`[data-testid="${testId}"]`),
-			).toHaveLength(1);
-		}
-		const stageTitles = STAGE_TEST_IDS.map(
-			(testId) =>
-				container.querySelector(`[data-testid="${testId}"]`)?.textContent ?? "",
-		);
-		expect(stageTitles[0]).toContain("Menunggu agent");
-		expect(stageTitles[1]).toContain("Menyiapkan source code");
-		expect(stageTitles[2]).toContain("Menyinkronkan codebase");
-	});
-
-	it("reports an honest standby while the server waits for the agent", () => {
+	it("shows only instruction copy and zero progress rows during waiting_for_cli", () => {
 		renderConnect({ status: status() });
-		expect(container.textContent).toContain("Menunggu agent");
+		expect(container.textContent).toContain("Paste prompt lalu jalankan");
 		expect(container.textContent).toContain(
-			"Jalankan prompt dari root repository.",
+			"Jalankan prompt dari root repository untuk mulai menyinkronkan codebase.",
 		);
-		expect(allStageStates()).toEqual(["waiting", "waiting", "waiting"]);
-	});
-
-	it("keeps inactive rows free of filler descriptions", () => {
-		renderConnect({ status: status() });
-		const inactive = [
-			container.querySelector('[data-testid="sync-stage-preparing"]')
-				?.textContent ?? "",
-			container.querySelector('[data-testid="sync-stage-sync"]')?.textContent ??
-				"",
-		];
-		for (const row of inactive) {
-			expect(row).not.toMatch(/tahap ini berjalan setelah/i);
-			expect(row).not.toMatch(/belum tersinkron/i);
+		expect(container.querySelectorAll("[data-stage-state]")).toHaveLength(0);
+		for (const testId of STAGE_TEST_IDS) {
+			expect(container.querySelector(`[data-testid="${testId}"]`)).toBeNull();
 		}
+		expect(container.textContent).not.toContain("Menunggu agent");
+		expect(container.textContent).not.toContain("Menyiapkan source code");
+		expect(container.textContent).not.toContain("Menyinkronkan codebase");
+		expect(container.textContent).not.toContain("Sync ID");
+		expect(container.textContent).not.toContain("Menghubungkan server...");
 	});
 
 	it("never claims a linked agent or a finished sync before the server says so", () => {
@@ -166,7 +144,9 @@ describe("Step 1 live sync status", () => {
 
 	it("shows source preparation as the active stage once the agent is linked", () => {
 		for (const value of ["connected", "scanning", "filtering"] as const) {
-			renderConnect({ status: status({ status: value }) });
+			renderConnect({
+				status: status({ status: value, sessionId: "sess-connected-1" }),
+			});
 			expect(allStageStates()).toEqual(["done", "active", "waiting"]);
 			expect(container.textContent).toContain("Agent terhubung");
 			expect(container.textContent).toContain(
@@ -176,6 +156,8 @@ describe("Step 1 live sync status", () => {
 			expect(container.textContent).toContain(
 				"Memeriksa file project yang akan disinkronkan.",
 			);
+			expect(container.textContent).toContain("Menyinkronkan codebase");
+			expect(container.textContent).toContain("Sync ID: sess-connect...");
 		}
 	});
 

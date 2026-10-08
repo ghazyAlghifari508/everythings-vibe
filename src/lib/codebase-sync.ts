@@ -370,12 +370,18 @@ export interface SyncStageRow {
 export interface SyncStageView {
 	/** False until the browser has received any server state at all. */
 	hasStatus: boolean;
+	/**
+	 * True only once real sync activity has begun (CLI has progressed beyond
+	 * `waiting_for_cli`).
+	 */
+	hasStarted: boolean;
 	/** True when the attempt ended without finishing. */
 	failed: boolean;
 	/**
-	 * The three product stages, in order. Empty while the state is unknown and
-	 * after a failed attempt: on failure the server cannot say how far it got,
-	 * so claiming a completed stage would be inventing progress.
+	 * The three product stages, in order. Empty while the state is unknown,
+	 * before the sync has started (waiting_for_cli), and after a failed attempt:
+	 * on failure the server cannot say how far it got, so claiming a completed stage
+	 * would be inventing progress.
 	 */
 	stages: SyncStageRow[];
 	/** Reported only once the server actually has it. */
@@ -496,6 +502,7 @@ export function resolveSyncStageView(
 	if (!status) {
 		return {
 			hasStatus: false,
+			hasStarted: false,
 			failed: false,
 			stages: [],
 			errorMessage: null,
@@ -515,12 +522,29 @@ export function resolveSyncStageView(
 		// once, with the way out.
 		return {
 			hasStatus: true,
+			hasStarted: false,
 			failed: true,
 			stages: [],
 			errorMessage,
 			retryHint:
 				status.status === "expired" ? EXPIRED_RETRY_HINT : FAILED_RETRY_HINT,
 			canRetry: true,
+			syncComplete: false,
+		};
+	}
+
+	if (status.status === "waiting_for_cli") {
+		// Pre-start standby: the user is copying the prompt into their terminal
+		// or agent. No real sync activity has started, so rendering stages would
+		// fake a running progress timeline before any work exists.
+		return {
+			hasStatus: true,
+			hasStarted: false,
+			failed: false,
+			stages: [],
+			errorMessage: null,
+			retryHint: "",
+			canRetry: false,
 			syncComplete: false,
 		};
 	}
@@ -534,6 +558,7 @@ export function resolveSyncStageView(
 
 	return {
 		hasStatus: true,
+		hasStarted: true,
 		failed: false,
 		stages: [
 			buildAgentRow(progress),

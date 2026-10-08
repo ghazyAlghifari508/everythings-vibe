@@ -1,7 +1,14 @@
 "use client";
 
 import { Link, useRouter } from "@tanstack/react-router";
-import { ArrowRight, Search } from "lucide-react";
+import {
+	ArrowRight,
+	Database,
+	FileCode2,
+	FolderGit2,
+	Search,
+	Terminal,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { LibraryPagination } from "@/components/codebase/library-pagination";
 import {
@@ -50,6 +57,7 @@ export function CodebaseLibraryView({
 		setLocalItems(items);
 	}, [items]);
 
+	const hasProjects = localItems.length > 0;
 	const filtered = filterLibraryItems(localItems, query);
 	const totalPages = Math.max(
 		1,
@@ -110,34 +118,36 @@ export function CodebaseLibraryView({
 	};
 
 	return (
-		<div className="flex flex-col gap-6">
+		<div className="flex flex-1 flex-col gap-6">
 			<HubBreadcrumb
 				current={CODEBASE_LIBRARY_LABEL}
 				ancestors={[{ label: "VibePlan", to: "/plan" }]}
 			/>
 
-			<header className="flex flex-col gap-4 border-b border-graphite pb-6 sm:flex-row sm:items-end sm:justify-between">
-				<div>
-					<p className="font-mono text-xs uppercase tracking-widest text-fog">
-						Existing Codebase
-					</p>
-					<h1 className="mt-2 text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
-						Project Tersimpan
-					</h1>
-					<p className="mt-2 max-w-2xl text-sm leading-6 text-fog">
-						Repository yang pernah kamu hubungkan akan tersimpan di sini.
-						Lanjutkan dari konteks dan workspace sebelumnya.
-					</p>
-				</div>
-				<Link
-					to={NEW_REPOSITORY_HREF}
-					className="btn-primary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					+ Hubungkan repository
-				</Link>
-			</header>
+			{hasProjects && (
+				<header className="flex flex-col gap-4 border-b border-graphite pb-6 sm:flex-row sm:items-end sm:justify-between">
+					<div>
+						<p className="font-mono text-xs uppercase tracking-widest text-fog">
+							Existing Codebase
+						</p>
+						<h1 className="mt-2 text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
+							Project Tersimpan
+						</h1>
+						<p className="mt-2 max-w-2xl text-sm leading-6 text-fog">
+							Repository yang pernah kamu hubungkan akan tersimpan di sini.
+							Lanjutkan dari konteks dan workspace sebelumnya.
+						</p>
+					</div>
+					<Link
+						to={NEW_REPOSITORY_HREF}
+						className="btn-primary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						+ Hubungkan repository
+					</Link>
+				</header>
+			)}
 
-			{items.length > 0 && (
+			{hasProjects && (
 				<div className="relative">
 					<Search
 						size={16}
@@ -155,21 +165,49 @@ export function CodebaseLibraryView({
 				</div>
 			)}
 
-			{items.length === 0 ? (
-				<section className="rounded-xl border border-dashed border-graphite bg-charcoal p-8 sm:p-10">
-					<h2 className="text-xl font-semibold text-snow">
-						Belum ada project tersimpan
+			{!hasProjects ? (
+				<section
+					aria-labelledby="empty-codebase-heading"
+					className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center py-6 text-center"
+				>
+					<div
+						className="flex h-12 w-12 items-center justify-center rounded-xl border border-graphite bg-charcoal/60 text-snow"
+						aria-hidden
+					>
+						<FolderGit2 size={24} className="text-fog" />
+					</div>
+					<h2
+						id="empty-codebase-heading"
+						className="mt-5 text-xl font-semibold tracking-tight text-snow sm:text-2xl"
+					>
+						Belum ada repository terhubung
 					</h2>
-					<p className="mt-2 max-w-xl text-sm leading-6 text-fog">
-						Hubungkan repository lokal pertamamu. Setelah sync selesai, project
-						akan otomatis muncul di sini.
+					<p className="mt-2.5 text-sm leading-6 text-fog">
+						Hubungkan repository lokal untuk membaca struktur codebase dan
+						menyiapkan workspace perencanaan yang bisa kamu lanjutkan kapan
+						saja.
 					</p>
 					<Link
 						to={NEW_REPOSITORY_HREF}
-						className="btn-primary mt-6 inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						className="btn-primary mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
 						Hubungkan repository
+						<ArrowRight size={16} aria-hidden />
 					</Link>
+					<div className="mt-10 flex w-full flex-col items-center justify-center gap-4 border-t border-graphite/40 pt-8 sm:mt-12 sm:flex-row sm:gap-8">
+						<div className="flex items-center gap-2 text-xs text-fog">
+							<FileCode2 size={16} className="text-slate" aria-hidden />
+							<span>Codebase terbaca</span>
+						</div>
+						<div className="flex items-center gap-2 text-xs text-fog">
+							<Database size={16} className="text-slate" aria-hidden />
+							<span>Konteks tersimpan</span>
+						</div>
+						<div className="flex items-center gap-2 text-xs text-fog">
+							<Terminal size={16} className="text-slate" aria-hidden />
+							<span>Workspace siap</span>
+						</div>
+					</div>
 				</section>
 			) : filtered.length === 0 ? (
 				<p className="py-12 text-center text-sm text-fog">

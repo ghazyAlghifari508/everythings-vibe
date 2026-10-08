@@ -3,6 +3,7 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { PromptBar } from "@/components/ui/prompt-bar";
+import type { CodebaseStarterSuggestion } from "@/lib/codebase-analysis";
 import {
 	areAllQuestionsAnswered,
 	nextQuestionIndex,
@@ -57,7 +58,7 @@ interface CodebaseChatWorkspaceProps {
 	stageBusy?: PipelineStage | null;
 	stageError?: string | null;
 	codebaseName?: string;
-	starterSuggestions?: string[];
+	starterSuggestions?: CodebaseStarterSuggestion[];
 	isSending?: boolean;
 	isConfirming?: boolean;
 	specError?: string | null;
@@ -89,8 +90,8 @@ export function buildTaskNextCommand(projectId: string): string {
 
 export function CodebaseChatWorkspace({
 	featureName,
-	contextFiles = [],
-	fileCount,
+	contextFiles: _contextFiles = [],
+	fileCount: _fileCount,
 	kanbanProgress = null,
 	messages,
 	questions,
@@ -173,6 +174,18 @@ export function CodebaseChatWorkspace({
 		setDraft("");
 	};
 
+	const handlePrefillDraft = (text: string) => {
+		setDraft(text);
+		const composerEl = document.getElementById(
+			"codebase-chat-composer",
+		) as HTMLTextAreaElement | null;
+		if (composerEl) {
+			composerEl.focus();
+			const len = text.length;
+			composerEl.setSelectionRange?.(len, len);
+		}
+	};
+
 	const handleSubmitOne = (question: AdaptiveQuestion) => {
 		const custom = (customAnswers[question.id] ?? "").trim();
 		const pickedId = selected[question.id];
@@ -199,22 +212,6 @@ export function CodebaseChatWorkspace({
 		? `Workspace · ${resolvedDisplayName}`
 		: "Workspace · Perencanaan codebase";
 
-	const contextSignal = (() => {
-		if (resolvedRepoName && typeof fileCount === "number" && fileCount > 0) {
-			return `${resolvedRepoName} · ${fileCount} file tersinkron`;
-		}
-		if (resolvedRepoName) {
-			return `${resolvedRepoName} · Konteks repository siap`;
-		}
-		if (typeof fileCount === "number" && fileCount > 0) {
-			return `${fileCount} file tersinkron · Konteks repository siap`;
-		}
-		if (contextFiles.length > 0) {
-			return `${contextFiles.length} file utama terdeteksi · Konteks repository siap`;
-		}
-		return "Konteks repository siap";
-	})();
-
 	const isPristine =
 		messages.length === 0 &&
 		questions.length === 0 &&
@@ -225,7 +222,7 @@ export function CodebaseChatWorkspace({
 		!isSending &&
 		stage === "questions";
 
-	const renderComposer = () => (
+	const renderComposer = (minRows = 1, className = "") => (
 		<PromptBar
 			id="codebase-chat-composer"
 			value={draft}
@@ -234,7 +231,9 @@ export function CodebaseChatWorkspace({
 			disabled={isSending || questionsLoading}
 			isSending={isSending}
 			minCharsToSend={3}
+			minRows={minRows}
 			maxRows={6}
+			className={className}
 			placeholder="Jelaskan fitur atau perubahan yang kamu inginkan..."
 			ariaLabel="Jelaskan fitur atau perubahan yang kamu inginkan"
 		/>
@@ -254,6 +253,11 @@ export function CodebaseChatWorkspace({
 						>
 							{headerTitle}
 						</p>
+						{resolvedDisplayName ? (
+							<p className="truncate text-[11px] text-fog">
+								Planning workspace
+							</p>
+						) : null}
 					</div>
 					{hasLiveData && kanbanProgress ? (
 						<span
@@ -268,21 +272,14 @@ export function CodebaseChatWorkspace({
 			{isPristine ? (
 				<div
 					data-testid="codebase-chat-pristine"
-					className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8"
+					className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-10 pb-8 sm:pt-14 md:pt-16 lg:pt-20"
 				>
-					<div className="flex w-full max-w-2xl -translate-y-4 flex-col items-center gap-5 text-center sm:-translate-y-6">
-						<div className="flex flex-col items-center gap-2">
-							<span
-								data-testid="codebase-context-signal"
-								className="inline-flex items-center gap-1.5 rounded-full border border-graphite/60 bg-charcoal/70 px-2.5 py-0.5 text-[11px] font-medium text-fog"
-							>
-								<span className="h-1.5 w-1.5 rounded-full bg-emerald-500/80" />
-								{contextSignal}
-							</span>
-							<h2 className="text-xl font-bold tracking-tight text-snow sm:text-2xl">
+					<div className="flex w-full max-w-3xl flex-col items-center gap-6 text-center">
+						<div className="flex flex-col items-center gap-2.5">
+							<h2 className="text-2xl font-bold tracking-tight text-snow sm:text-3xl lg:text-[32px]">
 								Apa yang ingin kamu bangun?
 							</h2>
-							<p className="max-w-lg text-xs leading-relaxed text-fog sm:text-sm">
+							<p className="max-w-xl text-sm leading-relaxed text-fog sm:text-[15px]">
 								Jelaskan fitur, perubahan, atau masalah yang ingin kamu
 								kerjakan. VibeEverything akan menyesuaikannya dengan struktur
 								codebase ini.
@@ -290,24 +287,35 @@ export function CodebaseChatWorkspace({
 						</div>
 
 						<div className="w-full shrink-0 bg-transparent text-left">
-							{renderComposer()}
+							{renderComposer(2, "p-3.5 sm:p-4")}
 						</div>
 
-						{starterSuggestions && starterSuggestions.length > 0 ? (
+						{starterSuggestions?.length === 4 ? (
 							<div
-								data-testid="codebase-starter-suggestions"
-								className="flex w-full flex-wrap items-center justify-center gap-2 pt-1"
+								data-testid="codebase-intent-starters"
+								className="flex w-full flex-col gap-2.5 pt-1 text-left"
 							>
-								{starterSuggestions.slice(0, 3).map((suggestion) => (
-									<button
-										key={suggestion}
-										type="button"
-										onClick={() => setDraft(suggestion)}
-										className="inline-flex items-center rounded-lg border border-graphite bg-charcoal/60 px-3 py-1.5 text-left text-xs text-fog transition hover:border-slate/60 hover:bg-charcoal hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										{suggestion}
-									</button>
-								))}
+								<p className="text-[11px] font-semibold uppercase tracking-wider text-slate">
+									Mulai dari
+								</p>
+								<div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+									{starterSuggestions.map((item) => (
+										<button
+											key={item.id}
+											type="button"
+											onClick={() => handlePrefillDraft(item.prompt)}
+											data-testid={`intent-starter-${item.id}`}
+											className="flex min-h-[62px] flex-col items-start justify-center rounded-lg border border-slate bg-charcoal/40 p-3 text-left text-snow transition-colors hover:bg-obsidian active:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+										>
+											<span className="line-clamp-1 text-xs font-medium text-snow">
+												{item.title}
+											</span>
+											<span className="mt-0.5 line-clamp-1 text-[11px] text-fog">
+												{item.description}
+											</span>
+										</button>
+									))}
+								</div>
 							</div>
 						) : null}
 					</div>
@@ -316,22 +324,22 @@ export function CodebaseChatWorkspace({
 				<>
 					<div
 						data-testid="codebase-chat-messages"
-						className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+						className="min-h-0 flex-1 overflow-y-auto px-4 py-5"
 					>
-						<div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+						<div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
 							{messages.map((message) =>
 								message.role === "user" ? (
 									<div key={message.id} className="flex justify-end">
-										<div className="max-w-[85%] rounded-xl bg-snow px-3 py-2 text-[13px] leading-6 text-onyx">
+										<div className="max-w-[82%] sm:max-w-[75%] rounded-2xl rounded-tr-sm bg-snow px-4 py-2.5 text-[13.5px] sm:text-sm leading-relaxed text-onyx">
 											{message.content}
 										</div>
 									</div>
 								) : (
-									<div key={message.id} className="flex flex-col gap-1">
-										<p className="text-[11px] font-semibold text-fog">
+									<div key={message.id} className="flex flex-col gap-1.5 py-1">
+										<p className="text-[11px] font-semibold uppercase tracking-wider text-fog">
 											VibeEverything Assistant
 										</p>
-										<div className="rounded-xl border border-graphite bg-charcoal p-3 text-[13px] leading-6 text-mist">
+										<div className="text-[13.5px] sm:text-sm leading-relaxed text-snow/90 whitespace-pre-wrap">
 											{message.content}
 										</div>
 									</div>
@@ -734,7 +742,9 @@ export function CodebaseChatWorkspace({
 						</div>
 					</div>
 					<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
-						<div className="mx-auto w-full max-w-2xl">{renderComposer()}</div>
+						<div className="mx-auto w-full max-w-3xl">
+							{renderComposer(2, "p-3 sm:p-3.5")}
+						</div>
 					</div>
 				</>
 			)}

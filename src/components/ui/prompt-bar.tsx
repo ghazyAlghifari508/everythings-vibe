@@ -23,6 +23,7 @@ export interface PromptBarProps {
 	disabled?: boolean;
 	isSending?: boolean;
 	minCharsToSend?: number;
+	minRows?: number;
 	maxRows?: number;
 	onSend?: (text: string) => void;
 	className?: string;
@@ -120,6 +121,7 @@ export function PromptBar({
 	disabled = false,
 	isSending = false,
 	minCharsToSend = 3,
+	minRows = 1,
 	maxRows = 6,
 	onSend,
 	className = "",
@@ -143,20 +145,21 @@ export function PromptBar({
 		onValueChange?.(next);
 	};
 
-	// Autosize height calculation bounded by maxRows
+	// Autosize height calculation bounded by minRows and maxRows
 	useEffect(() => {
 		void draft;
 		const el = inputRef.current;
 		if (!el) return;
 		el.style.height = "0px";
+		const minHeight = LINE_HEIGHT_PX * minRows;
 		const maxHeight = LINE_HEIGHT_PX * maxRows;
 		const computedHeight = Math.max(
-			LINE_HEIGHT_PX,
+			minHeight,
 			Math.min(el.scrollHeight, maxHeight),
 		);
 		el.style.height = `${computedHeight}px`;
 		el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
-	}, [draft, maxRows]);
+	}, [draft, minRows, maxRows]);
 
 	const canSend = !disabled && draft.trim().length >= minCharsToSend;
 
@@ -200,7 +203,7 @@ export function PromptBar({
 				onKeyDown={onKeyDown}
 				placeholder={placeholder}
 				disabled={disabled}
-				rows={1}
+				rows={minRows}
 				aria-label={ariaLabel}
 				className="block w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-[22px] text-snow outline-none placeholder:text-slate disabled:cursor-not-allowed disabled:opacity-50"
 			/>

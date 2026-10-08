@@ -247,10 +247,11 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		await startSyncStep();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Menunggu agent")).toBeDefined();
+				expect(screen.getByText("Paste prompt lalu jalankan")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
+		expect(screen.queryByText("Menunggu agent")).toBeNull();
 		const cta = screen.getByTestId(
 			"sync-continue-to-summary",
 		) as HTMLButtonElement;

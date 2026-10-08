@@ -223,8 +223,9 @@ export function ScreenConnect({
 
 							{/* Attempt identity, so a reported status can be tied to the
 							session the user actually started. Kept as quiet metadata and
-							out of the progress narrative. */}
-							{status?.sessionId && (
+							out of the progress narrative. Only shown once real sync
+							activity has started. */}
+							{stageView.hasStarted && status?.sessionId && (
 								<p className="font-mono text-[11px] text-fog">
 									Sync ID: {status.sessionId.slice(0, 12)}...
 									{status.updatedAt

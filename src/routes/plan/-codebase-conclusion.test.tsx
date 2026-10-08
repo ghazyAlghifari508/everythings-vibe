@@ -187,17 +187,17 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 				.disabled,
 		).toBe(true);
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
-		// The server's own verdict is what the step reports: waiting on the agent.
+		// The server's own verdict is what the step reports: waiting on the agent, with instructions only.
 		await waitFor(
 			() => {
-				expect(
-					document
-						.querySelector('[data-testid="sync-stage-agent"]')
-						?.getAttribute("data-stage-state"),
-				).toBe("waiting");
+				expect(screen.getByText("Paste prompt lalu jalankan")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
+		expect(
+			document.querySelector('[data-testid="sync-stage-agent"]'),
+		).toBeNull();
+		expect(document.querySelectorAll("[data-stage-state]")).toHaveLength(0);
 	}, 20000);
 
 	it("retries a failed analysis through the real boundary and shows the result", async () => {

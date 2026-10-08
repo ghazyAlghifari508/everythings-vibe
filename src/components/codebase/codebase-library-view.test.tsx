@@ -169,15 +169,65 @@ describe("CodebaseLibraryView", () => {
 		const ctas = screen.getAllByRole("link", {
 			name: /Hubungkan repository/i,
 		});
-		expect(ctas.length).toBeGreaterThan(0);
-		for (const cta of ctas) {
-			expect(cta.getAttribute("href")).toBe("/plan/codebase");
-		}
+		expect(ctas).toHaveLength(1);
+		expect(ctas[0].getAttribute("href")).toBe("/plan/codebase");
 	});
 
-	it("explains projects persist automatically in the empty state", () => {
+	it("renders dedicated onboarding empty state with single CTA and capabilities when there are zero projects", () => {
 		render(<CodebaseLibraryView items={[]} />);
-		expect(screen.getByText(/otomatis muncul di sini/i)).toBeDefined();
+		expect(
+			screen.getByRole("navigation", { name: "Breadcrumb" }),
+		).toBeDefined();
+		expect(
+			screen.queryByRole("heading", { name: "Project Tersimpan" }),
+		).toBeNull();
+		expect(screen.queryByText("Existing Codebase")).toBeNull();
+		expect(
+			screen.queryByText(
+				/Repository yang pernah kamu hubungkan akan tersimpan di sini/i,
+			),
+		).toBeNull();
+		expect(
+			screen.queryByRole("link", { name: /\+ Hubungkan repository/i }),
+		).toBeNull();
+		expect(screen.getByText("Belum ada repository terhubung")).toBeDefined();
+		expect(
+			screen.getByText(
+				/Hubungkan repository lokal untuk membaca struktur codebase/i,
+			),
+		).toBeDefined();
+		expect(screen.getByText("Codebase terbaca")).toBeDefined();
+		expect(screen.getByText("Konteks tersimpan")).toBeDefined();
+		expect(screen.getByText("Workspace siap")).toBeDefined();
+		expect(screen.queryByPlaceholderText(/Cari project/i)).toBeNull();
+		const ctas = screen.getAllByRole("link", {
+			name: /Hubungkan repository/i,
+		});
+		expect(ctas).toHaveLength(1);
+	});
+
+	it("renders header CTA and search input while omitting onboarding empty state when projects exist", () => {
+		render(<CodebaseLibraryView items={[makeItem({ id: "cb-1" })]} />);
+		expect(
+			screen.getByRole("heading", { name: "Project Tersimpan" }),
+		).toBeDefined();
+		expect(screen.getByText("Existing Codebase")).toBeDefined();
+		expect(
+			screen.getByText(
+				/Repository yang pernah kamu hubungkan akan tersimpan di sini/i,
+			),
+		).toBeDefined();
+		expect(
+			screen.getByRole("link", { name: /\+ Hubungkan repository/i }),
+		).toBeDefined();
+		expect(screen.getByPlaceholderText(/Cari project/i)).toBeDefined();
+		expect(screen.queryByText("Belum ada repository terhubung")).toBeNull();
+		expect(screen.queryByText("Codebase terbaca")).toBeNull();
+		const ctas = screen.getAllByRole("link", {
+			name: /Hubungkan repository/i,
+		});
+		expect(ctas).toHaveLength(1);
+		expect(ctas[0].textContent).toContain("+ Hubungkan repository");
 	});
 
 	it("links each existing project card to its workspace", () => {
@@ -480,6 +530,43 @@ describe("CodebaseLibraryView delete", () => {
 		});
 		expect(sessionStorage.getItem("unrelated:key")).toBe("keep-me");
 	});
+
+	it("transitions immediately to onboarding empty state when deleting the final project", async () => {
+		render(<CodebaseLibraryView items={[makeItem({ id: "cb-1" })]} />);
+		expect(
+			screen.getByRole("heading", { name: "Project Tersimpan" }),
+		).toBeDefined();
+		expect(screen.getByText("Existing Codebase")).toBeDefined();
+		expect(
+			screen.getByRole("link", { name: /\+ Hubungkan repository/i }),
+		).toBeDefined();
+		expect(screen.queryByText("Belum ada repository terhubung")).toBeNull();
+
+		openActionsMenu();
+		fireEvent.click(screen.getByRole("menuitem", { name: /Hapus project/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^Hapus project$/i }));
+
+		await waitFor(() => {
+			expect(screen.getByText("Belum ada repository terhubung")).toBeDefined();
+		});
+		expect(
+			screen.queryByRole("heading", { name: "Project Tersimpan" }),
+		).toBeNull();
+		expect(screen.queryByText("Existing Codebase")).toBeNull();
+		expect(
+			screen.queryByText(
+				/Repository yang pernah kamu hubungkan akan tersimpan di sini/i,
+			),
+		).toBeNull();
+		expect(
+			screen.queryByRole("link", { name: /\+ Hubungkan repository/i }),
+		).toBeNull();
+		expect(screen.queryByPlaceholderText(/Cari project/i)).toBeNull();
+		const emptyCtas = screen.getAllByRole("link", {
+			name: /Hubungkan repository/i,
+		});
+		expect(emptyCtas).toHaveLength(1);
+	});
 });
 
 describe("CodebaseLibraryView pagination", () => {
@@ -573,12 +660,27 @@ describe("CodebaseLibraryView pagination", () => {
 		});
 	});
 
-	it("shows a search-specific empty state without offering pagination", () => {
+	it("shows a search-specific empty state without offering pagination and does not render onboarding empty state", () => {
 		render(<CodebaseLibraryView items={makeItems(3)} />);
 		fireEvent.change(screen.getByPlaceholderText(/Cari project/i), {
 			target: { value: "tidak-ada-hasil" },
 		});
-		expect(screen.getByText(/Tidak ada project yang cocok/i)).toBeDefined();
+		expect(
+			screen.getByRole("heading", { name: "Project Tersimpan" }),
+		).toBeDefined();
+		expect(screen.getByText("Existing Codebase")).toBeDefined();
+		expect(
+			screen.getByText(
+				/Repository yang pernah kamu hubungkan akan tersimpan di sini/i,
+			),
+		).toBeDefined();
+		expect(
+			screen.getByText("Tidak ada project yang cocok dengan pencarian."),
+		).toBeDefined();
+		expect(screen.queryByText("Belum ada repository terhubung")).toBeNull();
+		expect(
+			screen.getByRole("link", { name: /\+ Hubungkan repository/i }),
+		).toBeDefined();
 		expect(
 			screen.queryByRole("navigation", { name: /Pagination/i }),
 		).toBeNull();
