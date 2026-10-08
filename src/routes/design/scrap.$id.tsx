@@ -11,7 +11,6 @@ import {
 	useScrapeStatus,
 } from "@/hooks/use-scrape-status";
 import { requireUserServer } from "@/lib/session";
-import { displaySiteName } from "@/lib/site-name";
 
 const loadScrapeDetail = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
@@ -121,7 +120,6 @@ function ScrapeDetailPage() {
 		designMd,
 	});
 
-	const siteName = displaySiteName(domain);
 	const wideResult = view === "result-design";
 
 	return (
@@ -139,13 +137,6 @@ function ScrapeDetailPage() {
 				<ArrowLeft size={16} aria-hidden />
 				Kembali ke scraper
 			</Link>
-			<header className="max-w-2xl">
-				<h1 className="text-3xl font-semibold tracking-tight text-snow">
-					{siteName}
-				</h1>
-				<p className="mt-1 truncate font-mono text-xs text-fog">{domain}</p>
-			</header>
-
 			{view === "result-design" ? (
 				<DesignResult
 					sourceUrl={sourceUrl}
