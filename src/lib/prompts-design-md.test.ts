@@ -235,6 +235,13 @@ Brand one`;
 		expect(designIssues(buildCompleteDesign({}))).toEqual([]);
 	});
 
+	it("requires six Do bullets and six Don't bullets independently", () => {
+		const unbalanced = buildCompleteDesign({ doBullets: 12, dontBullets: 0 });
+		expect(designIssues(unbalanced)).toContain(
+			"needs 6+ do and 6+ don't bullets",
+		);
+	});
+
 	it("repairs without injecting brand-specific values", () => {
 		const raw = `## Do's and Don'ts\n- Do one thing\n\n## Surfaces\nx\n\n## Similar Brands\ny`;
 		const repaired = repairDesign(raw);
@@ -308,6 +315,9 @@ describe("generateDesignMd targeted repair", () => {
 		expect(mockedAI.requests[1]?.messages[1]?.content).toContain(
 			"## Components",
 		);
+		expect(mockedAI.requests[1]?.messages[1]?.content).toContain(
+			"### <component name>",
+		);
 		expect(mockedAI.requests[1]?.messages[1]?.content).not.toContain(
 			"Rewrite from scratch",
 		);
@@ -368,6 +378,9 @@ describe("generateDesignMd targeted repair", () => {
 		expect(mockedAI.requests).toHaveLength(2);
 		expect(mockedAI.requests[1]?.messages[1]?.content).toContain(
 			"## Do's and Don'ts",
+		);
+		expect(mockedAI.requests[1]?.messages[1]?.content).toContain(
+			"at least six Markdown bullets beginning `- Do ` and six beginning `- Don't `",
 		);
 		expect(mockedAI.requests[1]?.messages[1]?.content).not.toContain(
 			"## Components\n",
@@ -456,6 +469,7 @@ describe("generateDesignMd targeted repair", () => {
 			"finalValidation",
 		]);
 		expect(activities).toContain("Memperbaiki DESIGN.md secara menyeluruh");
+		expect(activities).toContain("Belum terpenuhi: 8+ spesifikasi Components");
 		expect(activities.at(-1)).toBe("Memvalidasi hasil perbaikan");
 	});
 });
@@ -464,11 +478,15 @@ function buildCompleteDesign({
 	colorRows = 8,
 	components = 8,
 	bullets = 12,
+	doBullets,
+	dontBullets,
 	prompts = 5,
 }: {
 	colorRows?: number;
 	components?: number;
 	bullets?: number;
+	doBullets?: number;
+	dontBullets?: number;
 	prompts?: number;
 }): string {
 	const colors = [
@@ -483,10 +501,18 @@ function buildCompleteDesign({
 		{ length: components },
 		(_, i) => `### Component ${i}\nRole and anatomy for component ${i}.`,
 	).join("\n\n");
-	const rules = Array.from(
-		{ length: bullets },
-		(_, i) => `- Rule ${i} about the observed system.`,
-	).join("\n");
+	const resolvedDoBullets = doBullets ?? Math.ceil(bullets / 2);
+	const resolvedDontBullets = dontBullets ?? bullets - resolvedDoBullets;
+	const rules = [
+		...Array.from(
+			{ length: resolvedDoBullets },
+			(_, i) => `- Do rule ${i} about the observed system.`,
+		),
+		...Array.from(
+			{ length: resolvedDontBullets },
+			(_, i) => `- Don't rule ${i} about the observed system.`,
+		),
+	].join("\n");
 	const examples = Array.from(
 		{ length: prompts },
 		(_, i) => `${i + 1}. Prompt ${i} for building with observed tokens.`,

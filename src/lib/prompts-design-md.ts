@@ -232,6 +232,17 @@ export function countBullets(text: string): number {
 	return text.split("\n").filter((line) => /^\s*[-*] /.test(line)).length;
 }
 
+export function countDoBullets(text: string): number {
+	return text.split("\n").filter((line) => /^\s*[-*]\s+Do(?:\s|:)/i.test(line))
+		.length;
+}
+
+export function countDontBullets(text: string): number {
+	return text
+		.split("\n")
+		.filter((line) => /^\s*[-*]\s+Don['’]t(?:\s|:)/i.test(line)).length;
+}
+
 export function countPrompts(text: string): number {
 	return text.split("\n").filter((line) => /^\s*(?:\d+\.|[-*]|>)\s+/.test(line))
 		.length;
@@ -254,8 +265,14 @@ export function designIssues(text: string): string[] {
 		8
 	)
 		issues.push("needs 8+ component specs");
+	const doAndDontSection = designSection(
+		text,
+		"## Do's and Don'ts",
+		"## Surfaces",
+	);
 	if (
-		countBullets(designSection(text, "## Do's and Don'ts", "## Surfaces")) < 12
+		countDoBullets(doAndDontSection) < 6 ||
+		countDontBullets(doAndDontSection) < 6
 	)
 		issues.push("needs 6+ do and 6+ don't bullets");
 	if (
@@ -378,6 +395,20 @@ function repairTargetsForIssues(
 	);
 }
 
+function safeIssueSummary(issue: string): string {
+	if (issue.startsWith("missing ## "))
+		return `Bagian ${issue.slice("missing ## ".length)} belum tersedia`;
+	if (issue.startsWith("too short"))
+		return "Panjang DESIGN.md masih di bawah batas";
+	if (issue === "needs 8+ color rows")
+		return "Jumlah baris warna belum memenuhi ketentuan";
+	if (issue === "needs 8+ component specs") return "8+ spesifikasi Components";
+	if (issue === "needs 6+ do and 6+ don't bullets") return "6+ Do dan 6+ Don't";
+	if (issue === "needs 5 example component prompts")
+		return "5 example component prompts";
+	return "Kontrak DESIGN.md belum terpenuhi";
+}
+
 function headingLineStart(text: string, heading: string, after = 0): number {
 	let offset = 0;
 	for (const line of text.split("\n")) {
@@ -478,10 +509,25 @@ function targetedRepairPrompt(
 	const sectionGuidance = targets
 		.map(
 			(target) =>
-				`### Required guidance for ${target.heading}\n${promptGuidanceForTarget(target)}`,
+				`### Required guidance for ${target.heading}\n${promptGuidanceForTarget(target)}\n${targetRepairRequirements(target)}`,
 		)
 		.join("\n\n");
 	return `${extractionContext}\n\nThe current document has these incomplete sections:\n${existingSections}\n\nCanonical requirements for the requested sections:\n${sectionGuidance}\n\nReturn only the requested markdown sections, each starting with its exact heading. Do not rewrite or include any other section. Use only the observed extraction, preserve fidelity-critical values, and mark cautious inferences. Requested sections:\n${targets.map((target) => target.heading).join("\n")}`;
+}
+
+function targetRepairRequirements(target: DesignRepairTarget): string {
+	switch (target.heading) {
+		case "## Tokens - Colors":
+			return "Return 8-18 distinct semantic color rows in a Markdown table with columns Name | Value | Token | Role. Use observed values; label tonal derivations as inferred.";
+		case "## Components":
+			return "Return 8-14 component specs. Each spec must start with a `### <component name>` heading and include Role, anatomy, visual treatment, spacing/shape/type/color details, interaction/state notes when applicable, and usage rules.";
+		case "## Do's and Don'ts":
+			return "Return at least six Markdown bullets beginning `- Do ` and six beginning `- Don't `. Both groups must be specific to the observed visual system.";
+		case "### Example Component Prompts":
+			return "Return five detailed numbered implementation prompts grounded in the observed extraction.";
+		default:
+			return "Return the complete requested section with its canonical heading and the detailed implementation guidance specified above.";
+	}
 }
 
 export async function generateDesignMd(
@@ -563,9 +609,10 @@ export async function generateDesignMd(
 			}
 		}
 
-		await instrumentation?.onActivity?.(
-			`${issues.length} masalah belum terpenuhi`,
-		);
+		for (const issue of issues)
+			await instrumentation?.onActivity?.(
+				`Belum terpenuhi: ${safeIssueSummary(issue)}`,
+			);
 		await instrumentation?.onActivity?.(
 			"Memperbaiki DESIGN.md secara menyeluruh",
 		);
