@@ -8,7 +8,7 @@ import {
 
 afterAll(async () => {
 	await closeRenderBrowser();
-});
+}, 60_000);
 
 describe("isBlockedRequestUrl", () => {
 	it("blocks localhost and loopback targets", async () => {
