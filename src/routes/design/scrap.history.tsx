@@ -61,18 +61,20 @@ function ScrapHistoryPage() {
 	}
 
 	return (
-		<div className="flex w-full flex-col gap-6 py-4">
-			<header className="max-w-2xl">
-				<h1 className="text-2xl font-semibold tracking-tight text-snow sm:text-3xl">
-					Riwayat Scrape
-				</h1>
-				<p className="mt-2 text-sm leading-6 text-fog">
-					Daftar website yang pernah kamu generate DESIGN.md atau scrape
-					HTML-nya.
-				</p>
-			</header>
+		<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
+			<div className="flex w-full flex-col gap-6 py-4">
+				<header className="max-w-2xl">
+					<h1 className="text-2xl font-semibold tracking-tight text-snow sm:text-3xl">
+						Riwayat Scrape
+					</h1>
+					<p className="mt-2 text-sm leading-6 text-fog">
+						Daftar website yang pernah kamu generate DESIGN.md atau scrape
+						HTML-nya.
+					</p>
+				</header>
 
-			<ScrapeHistoryList initialItems={items} onDelete={handleDelete} />
+				<ScrapeHistoryList initialItems={items} onDelete={handleDelete} />
+			</div>
 		</div>
 	);
 }
