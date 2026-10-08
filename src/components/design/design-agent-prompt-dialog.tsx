@@ -103,6 +103,7 @@ export function DesignAgentPromptDialog({
 
 				<textarea
 					readOnly
+					name="design-agent-prompt"
 					aria-label="Prompt implementasi design system"
 					value={prompt}
 					onFocus={(e) => e.target.select()}
