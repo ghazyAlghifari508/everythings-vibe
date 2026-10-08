@@ -36,6 +36,9 @@ interface ThoughtLineProps {
 	rotationKey?: string | number;
 	rotationIntervalMs?: number;
 	startedAt?: number | string | Date;
+	// Backend-backed single activity line. When provided (even null), it
+	// overrides rotatingMessages and never rotates.
+	activity?: string | null;
 }
 
 function resolveStartEpoch(
@@ -109,7 +112,8 @@ function RotatingActivity({
 	className,
 }: RotatingActivityProps) {
 	const reduceMotion = useReducedMotion();
-	const hint = messages.length > 0 ? (messages[index % messages.length] ?? "") : "";
+	const hint =
+		messages.length > 0 ? (messages[index % messages.length] ?? "") : "";
 	const messageTone = bare ? "text-snow" : "text-[#0f0f0f]";
 	const glyphTone = bare ? "text-mist" : "text-[#0f0f0f]";
 	const timerTone = bare ? "text-fog" : "text-[#606060]";
@@ -154,10 +158,7 @@ function RotatingActivity({
 				<span
 					role="timer"
 					aria-label="Waktu proses"
-					className={cn(
-						"shrink-0 font-mono text-xs tabular-nums",
-						timerTone,
-					)}
+					className={cn("shrink-0 font-mono text-xs tabular-nums", timerTone)}
 				>
 					{elapsed.toFixed(1)}s
 				</span>
@@ -186,27 +187,30 @@ export function ThoughtLine({
 	rotationIntervalMs = THOUGHT_LINE_ROTATION_INTERVAL_MS,
 	startedAt,
 	bare = false,
+	activity,
 }: ThoughtLineProps) {
 	const [elapsed, setElapsed] = useState(0);
 	const [open, setOpen] = useState(true);
 	const [hintIndex, setHintIndex] = useState(0);
-	const startedAtRef = useRef<number>(
-		resolveStartEpoch(startedAt, Date.now()),
-	);
+	const startedAtRef = useRef<number>(resolveStartEpoch(startedAt, Date.now()));
 	const settledRef = useRef<boolean>(false);
 	const traceId = useId();
+
+	const isActivityDriven = activity !== undefined;
+	const activityMessages = isActivityDriven
+		? activity
+			? ([activity] as const)
+			: ([] as readonly string[])
+		: rotatingMessages;
 
 	const isRotating =
 		presentation === "rotating" &&
 		working &&
-		(rotatingMessages?.length ?? 0) > 0;
+		(activityMessages?.length ?? 0) > 0;
 
 	useEffect(() => {
 		if (startedAt === undefined) return;
-		startedAtRef.current = resolveStartEpoch(
-			startedAt,
-			startedAtRef.current,
-		);
+		startedAtRef.current = resolveStartEpoch(startedAt, startedAtRef.current);
 		setElapsed(Math.max(0, (Date.now() - startedAtRef.current) / 1000));
 	}, [startedAt]);
 
@@ -215,9 +219,9 @@ export function ThoughtLine({
 		setHintIndex(0);
 	}, [rotationKey]);
 
-	const messageCount = rotatingMessages?.length ?? 0;
-	const messagesRef = useRef(rotatingMessages);
-	messagesRef.current = rotatingMessages;
+	const messageCount = activityMessages?.length ?? 0;
+	const messagesRef = useRef(activityMessages);
+	messagesRef.current = activityMessages;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation survives equivalent parent rerenders; only a real stage change (rotationKey) or set-size change restarts the cycle by design
 	useEffect(() => {
@@ -263,7 +267,7 @@ export function ThoughtLine({
 		steps && steps.length > 0
 			? Math.min(Math.max(activeStep, 0), steps.length - 1)
 			: 0;
-	const hintList = rotatingMessages ?? [];
+	const hintList = activityMessages ?? [];
 
 	if (bare) {
 		return (

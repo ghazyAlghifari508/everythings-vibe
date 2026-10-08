@@ -6,7 +6,6 @@ import {
 	type ScrapeMode,
 	type ScrapeStatus,
 } from "@/db/schema";
-import { scrapeActivityHints } from "@/lib/scrape-activity-hints";
 import { displaySiteName } from "@/lib/site-name";
 
 export interface ScrapeProgressProps {
@@ -18,6 +17,8 @@ export interface ScrapeProgressProps {
 	isRetrying?: boolean;
 	onRetry?: () => void;
 	stageStartedAt?: string | null;
+	activity?: string | null;
+	activityStartedAt?: string | null;
 }
 
 const ORDERED_DESIGN_STAGES: ScrapeStatus[] = [
@@ -68,6 +69,8 @@ export function ScrapeProgress({
 	isRetrying = false,
 	onRetry,
 	stageStartedAt,
+	activity,
+	activityStartedAt,
 }: ScrapeProgressProps) {
 	const isFailed = status === "failed";
 	const isDone = status === "completed";
@@ -139,26 +142,26 @@ export function ScrapeProgress({
 					/>
 				</div>
 				{isFailed || isDone ? (
-				<p aria-live="polite" className="mt-2.5 text-xs text-fog">
-					{isFailed
-						? errorMessage || defaultError
-						: (stageDescriptions[status] ?? "Sedang memproses website…")}
-				</p>
-			) : (
-				<div className="mt-2.5">
-					<ThoughtLine
-						working
-						bare
-						label={currentLabel}
-						doneLabel={currentLabel}
-						presentation="rotating"
-						rotatingMessages={scrapeActivityHints(mode, status)}
-						rotationKey={status}
-						startedAt={stageStartedAt ?? undefined}
-						fontSize="xs"
-					/>
-				</div>
-			)}
+					<p aria-live="polite" className="mt-2.5 text-xs text-fog">
+						{isFailed
+							? errorMessage || defaultError
+							: (stageDescriptions[status] ?? "Sedang memproses website…")}
+					</p>
+				) : (
+					<div className="mt-2.5">
+						<ThoughtLine
+							working
+							bare
+							label={currentLabel}
+							doneLabel={currentLabel}
+							presentation="rotating"
+							activity={activity ?? null}
+							rotationKey={activity ?? status}
+							startedAt={activityStartedAt ?? stageStartedAt ?? undefined}
+							fontSize="xs"
+						/>
+					</div>
+				)}
 			</div>
 
 			{isFailed ? (

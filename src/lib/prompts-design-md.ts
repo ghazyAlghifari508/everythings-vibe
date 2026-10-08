@@ -3,6 +3,7 @@ import {
 	type DesignExtraction,
 	extractDesignFromHtml,
 } from "@/lib/design-extraction";
+import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import {
 	selectModels,
 	tryStreamWithFallback,
@@ -266,6 +267,7 @@ export async function generateDesignMd(
 	sourceUrl: string,
 	extractionOrHtml: DesignExtraction | string,
 	maxTokens = 12_000,
+	instrumentation?: ScrapeInstrumentation,
 ): Promise<string> {
 	const extraction: DesignExtraction =
 		typeof extractionOrHtml === "string"
@@ -290,21 +292,35 @@ export async function generateDesignMd(
 	};
 
 	try {
+		await instrumentation?.onActivity?.("Menghasilkan draft DESIGN.md");
 		let text = await collect(userPrompt);
+		await instrumentation?.onActivity?.("Draft DESIGN.md selesai");
+		await instrumentation?.onActivity?.("Memvalidasi DESIGN.md");
+		let issues = designIssues(text);
 		for (let attempt = 0; attempt < 2; attempt += 1) {
-			const issues = designIssues(text);
-			if (issues.length === 0) return text;
+			if (issues.length === 0) {
+				await instrumentation?.onActivity?.("DESIGN.md lolos validasi");
+				return text;
+			}
+			await instrumentation?.onActivity?.(
+				`${issues.length} bagian belum lengkap`,
+			);
+			await instrumentation?.onActivity?.(
+				"Memperbaiki bagian DESIGN.md yang belum lengkap",
+			);
 			text = await collect(
 				`${userPrompt}\n\nYour previous DESIGN.md was unacceptable:\n- ${issues.join("\n- ")}\n\nRewrite from scratch. Produce a complete, professional, implementation-ready DESIGN.md. Minimum ${DESIGN_MIN_CHARS} characters. No thin summaries. Include all required headings exactly.`,
 			);
+			await instrumentation?.onActivity?.("Memvalidasi hasil perbaikan");
+			issues = designIssues(text);
 		}
-		const issues = designIssues(text);
 		if (issues.length > 0) {
 			throw new ScrapeError(
 				"AI_GENERATION_FAILED",
 				`DESIGN.md terlalu tipis: ${issues.join(", ")}`,
 			);
 		}
+		await instrumentation?.onActivity?.("DESIGN.md lolos validasi");
 		return text;
 	} catch (err) {
 		if (err instanceof ScrapeError) throw err;

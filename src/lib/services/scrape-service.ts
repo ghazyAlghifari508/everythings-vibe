@@ -4,8 +4,10 @@ import {
 	type InsertScrapeDocumentRow,
 	type InsertScrapeRow,
 	type ScrapeDocumentRow,
+	type ScrapeMetadata,
 	type ScrapeMode,
 	type ScrapeRow,
+	type ScrapeStatus,
 	scrapeDocuments,
 	scrapeProgressForStatus,
 	scrapes,
@@ -14,6 +16,7 @@ import { ScrapeError } from "@/lib/design-errors";
 import { extractDesignFromHtml } from "@/lib/design-extraction";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
+import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { parseAndValidateFormat } from "@/lib/url-validator";
 
 export interface ScrapeSummary {
@@ -82,158 +85,97 @@ export async function runScrapePipeline(
 		scrape.metadata?.mode ??
 		"design") as ScrapeMode;
 
-	try {
-		// Stage 1: Capturing HTML
+	let meta: ScrapeMetadata = {
+		...(typeof scrape.metadata === "object" && scrape.metadata !== null
+			? scrape.metadata
+			: {}),
+		mode,
+	};
+
+	const persist = async (
+		status: ScrapeStatus,
+		patch: Partial<ScrapeMetadata> = {},
+		columns: Record<string, unknown> = {},
+	): Promise<void> => {
+		meta = {
+			...meta,
+			...patch,
+			mode,
+			stage: status,
+			progress: scrapeProgressForStatus(status, mode),
+			stageStartedAt: new Date().toISOString(),
+		};
 		await db
 			.update(scrapes)
-			.set({
-				status: "capturing",
-				metadata: {
-					...(typeof scrape.metadata === "object" && scrape.metadata !== null
-						? scrape.metadata
-						: {}),
-					mode,
-					stage: "capturing",
-					progress: scrapeProgressForStatus("capturing", mode),
-					stageStartedAt: new Date().toISOString(),
-				},
-				updatedAt: new Date(),
-			})
+			.set({ status, metadata: meta, updatedAt: new Date(), ...columns })
 			.where(eq(scrapes.id, scrapeId));
+	};
 
-		const captured: ScrapeCapture = await scrapeHtml(scrape.sourceUrl);
-
-		if (mode === "html") {
-			// Stage 2: Menyiapkan preview
+	const instrumentation: ScrapeInstrumentation = {
+		onActivity: async (activity) => {
+			meta = { ...meta, activity, activityStartedAt: new Date().toISOString() };
 			await db
 				.update(scrapes)
-				.set({
-					status: "extracting",
+				.set({ metadata: meta, updatedAt: new Date() })
+				.where(eq(scrapes.id, scrapeId));
+		},
+	};
+
+	try {
+		await persist("capturing");
+
+		const captured: ScrapeCapture = await scrapeHtml(scrape.sourceUrl, 1, {
+			...instrumentation,
+			mode,
+		});
+		meta = { ...meta, ...captured.metadata };
+
+		if (mode === "html") {
+			await persist(
+				"extracting",
+				{},
+				{
 					sourceUrl: captured.sourceUrl,
 					domain: captured.domain,
 					title: captured.title,
 					html: captured.html,
 					previewHtml: captured.previewHtml,
-					metadata: {
-						...captured.metadata,
-						mode: "html",
-						stage: "extracting",
-						progress: scrapeProgressForStatus("extracting", "html"),
-						stageStartedAt: new Date().toISOString(),
-					},
-					updatedAt: new Date(),
-				})
-				.where(eq(scrapes.id, scrapeId));
-
-			// Stage 3: Menyimpan index.html
-			await db
-				.update(scrapes)
-				.set({
-					status: "saving",
-					metadata: {
-						...captured.metadata,
-						mode: "html",
-						stage: "saving",
-						progress: scrapeProgressForStatus("saving", "html"),
-						stageStartedAt: new Date().toISOString(),
-					},
-					updatedAt: new Date(),
-				})
-				.where(eq(scrapes.id, scrapeId));
-
-			// Stage 4: Selesai
-			await db
-				.update(scrapes)
-				.set({
-					status: "completed",
-					metadata: {
-						...captured.metadata,
-						mode: "html",
-						stage: "completed",
-						progress: scrapeProgressForStatus("completed", "html"),
-						stageStartedAt: new Date().toISOString(),
-					},
-					updatedAt: new Date(),
-				})
-				.where(eq(scrapes.id, scrapeId));
+				},
+			);
+			await persist("saving");
+			await instrumentation.onActivity?.("Menyimpan index.html");
+			await persist("completed");
 			return;
 		}
 
-		// DESIGN.md Pipeline:
-		// Stage 2: Extracting design tokens
-		await db
-			.update(scrapes)
-			.set({
-				status: "extracting",
+		await persist(
+			"extracting",
+			{},
+			{
 				sourceUrl: captured.sourceUrl,
 				domain: captured.domain,
 				title: captured.title,
 				html: captured.html,
 				previewHtml: captured.previewHtml,
-				metadata: {
-					...captured.metadata,
-					mode: "design",
-					stage: "extracting",
-					progress: scrapeProgressForStatus("extracting", "design"),
-					stageStartedAt: new Date().toISOString(),
-				},
-				updatedAt: new Date(),
-			})
-			.where(eq(scrapes.id, scrapeId));
-
+			},
+		);
+		await instrumentation.onActivity?.("Menganalisis design system");
 		const extraction = extractDesignFromHtml(captured.html, captured.sourceUrl);
+		await instrumentation.onActivity?.("Analisis visual selesai");
 
-		// Stage 3: Generating DESIGN.md
-		await db
-			.update(scrapes)
-			.set({
-				status: "generating",
-				metadata: {
-					...captured.metadata,
-					mode: "design",
-					stage: "generating",
-					progress: scrapeProgressForStatus("generating", "design"),
-					stageStartedAt: new Date().toISOString(),
-				},
-				updatedAt: new Date(),
-			})
-			.where(eq(scrapes.id, scrapeId));
+		await persist("generating");
+		const designMd = await generateDesignMd(
+			captured.sourceUrl,
+			extraction,
+			undefined,
+			instrumentation,
+		);
 
-		const designMd = await generateDesignMd(captured.sourceUrl, extraction);
-
-		// Stage 4: Saving dual-artifact documents
-		await db
-			.update(scrapes)
-			.set({
-				status: "saving",
-				metadata: {
-					...captured.metadata,
-					mode: "design",
-					stage: "saving",
-					progress: scrapeProgressForStatus("saving", "design"),
-					stageStartedAt: new Date().toISOString(),
-				},
-				updatedAt: new Date(),
-			})
-			.where(eq(scrapes.id, scrapeId));
-
+		await persist("saving");
+		await instrumentation.onActivity?.("Menyimpan hasil");
 		await saveScrapeDocument(scrapeId, designMd);
 
-		// Stage 5: Completed
-		await db
-			.update(scrapes)
-			.set({
-				status: "completed",
-				metadata: {
-					...captured.metadata,
-					mode: "design",
-					stage: "completed",
-					progress: scrapeProgressForStatus("completed", "design"),
-					stageStartedAt: new Date().toISOString(),
-				},
-				updatedAt: new Date(),
-			})
-			.where(eq(scrapes.id, scrapeId));
+		await persist("completed");
 	} catch (error) {
 		const errorMessage =
 			error instanceof ScrapeError
@@ -249,9 +191,7 @@ export async function runScrapePipeline(
 			.set({
 				status: "failed",
 				metadata: {
-					...(typeof scrape.metadata === "object" && scrape.metadata !== null
-						? scrape.metadata
-						: {}),
+					...meta,
 					mode,
 					stage: "failed",
 					progress: 0,
@@ -292,6 +232,8 @@ export async function retryScrape(
 				stage: "queued",
 				progress: 0,
 				stageStartedAt: new Date().toISOString(),
+				activity: undefined,
+				activityStartedAt: undefined,
 			},
 			updatedAt: new Date(),
 		})

@@ -67,22 +67,24 @@ function ScrapeDetailPage() {
 	const initial = Route.useLoaderData();
 	const { id } = Route.useParams();
 
-	const { data, status: polledStatus, isRetrying, retry } = useScrapeStatus(
-		id,
-		{
-			initialData: initial
-				? toScrapeStatusSnapshot({
-						status: initial.status,
-						mode: initial.mode,
-						sourceUrl: initial.sourceUrl,
-						domain: initial.domain,
-						previewHtml: initial.previewHtml,
-						designMd: initial.designMd,
-						metadata: initial.metadata,
-					})
-				: null,
-		},
-	);
+	const {
+		data,
+		status: polledStatus,
+		isRetrying,
+		retry,
+	} = useScrapeStatus(id, {
+		initialData: initial
+			? toScrapeStatusSnapshot({
+					status: initial.status,
+					mode: initial.mode,
+					sourceUrl: initial.sourceUrl,
+					domain: initial.domain,
+					previewHtml: initial.previewHtml,
+					designMd: initial.designMd,
+					metadata: initial.metadata,
+				})
+			: null,
+	});
 
 	if (!initial) throw new Error("NOT_FOUND");
 
@@ -112,6 +114,20 @@ function ScrapeDetailPage() {
 		typeof metadata.stageStartedAt === "string"
 			? metadata.stageStartedAt
 			: null;
+	const activity =
+		metadata &&
+		typeof metadata === "object" &&
+		"activity" in metadata &&
+		typeof metadata.activity === "string"
+			? metadata.activity
+			: null;
+	const activityStartedAt =
+		metadata &&
+		typeof metadata === "object" &&
+		"activityStartedAt" in metadata &&
+		typeof metadata.activityStartedAt === "string"
+			? metadata.activityStartedAt
+			: null;
 
 	const view = resolveScrapeView({
 		status: currentStatus,
@@ -125,9 +141,7 @@ function ScrapeDetailPage() {
 	return (
 		<main
 			className={`flex w-full flex-col gap-6 py-10 sm:py-14 ${
-				wideResult
-					? "px-6 sm:px-8 lg:px-10"
-					: "mx-auto max-w-5xl px-4 sm:px-6"
+				wideResult ? "px-6 sm:px-8 lg:px-10" : "mx-auto max-w-5xl px-4 sm:px-6"
 			}`}
 		>
 			<Link
@@ -155,6 +169,8 @@ function ScrapeDetailPage() {
 					isRetrying={isRetrying}
 					onRetry={retry}
 					stageStartedAt={stageStartedAt}
+					activity={activity}
+					activityStartedAt={activityStartedAt}
 				/>
 			)}
 		</main>

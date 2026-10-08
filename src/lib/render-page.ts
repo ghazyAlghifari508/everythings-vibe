@@ -9,7 +9,12 @@ import {
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
 import { fetchAsset } from "@/lib/fetch-html";
+import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { isPrivateIp } from "@/lib/url-validator";
+
+export interface RenderPageOptions extends ScrapeInstrumentation {
+	mode?: "design" | "html";
+}
 
 export const DESKTOP_VIEWPORT = {
 	width: SCRAPE_DESKTOP_WIDTH,
@@ -188,7 +193,11 @@ export interface RenderedPage {
 	finalUrl: string;
 }
 
-export async function renderPage(url: string): Promise<RenderedPage> {
+export async function renderPage(
+	url: string,
+	options: RenderPageOptions = {},
+): Promise<RenderedPage> {
+	const { onActivity, mode = "design" } = options;
 	const browser = await getBrowser();
 	const context = await browser.newContext({
 		viewport: DESKTOP_VIEWPORT,
@@ -203,19 +212,28 @@ export async function renderPage(url: string): Promise<RenderedPage> {
 		const page = await context.newPage();
 		let status = 0;
 		try {
+			await onActivity?.("Membuka website");
 			const res = await page.goto(url, {
 				waitUntil: "domcontentloaded",
 				timeout: NAV_TIMEOUT_MS,
 			});
 			status = res?.status() ?? 0;
+			await onActivity?.("Halaman berhasil dimuat");
+			await onActivity?.("Menunggu resource halaman");
 			await page
 				.waitForLoadState("networkidle", { timeout: IDLE_TIMEOUT_MS })
 				.catch(() => {});
+			await onActivity?.("Memuat konten lazy-load");
 			await autoScroll(page).catch(() => {});
 			await page
 				.waitForLoadState("networkidle", { timeout: IDLE_TIMEOUT_MS })
 				.catch(() => {});
 			await page.waitForTimeout(SETTLE_MS);
+			await onActivity?.(
+				mode === "html"
+					? "Menangkap DOM hasil render"
+					: "Capture halaman selesai",
+			);
 		} catch (err) {
 			if (err instanceof ScrapeError) throw err;
 		}

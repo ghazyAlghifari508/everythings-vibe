@@ -1,5 +1,6 @@
 import http from "node:http";
 import https from "node:https";
+import type { ScrapeMode } from "@/db/schema";
 import {
 	SCRAPE_BROWSER_UA,
 	SCRAPE_DESKTOP_HEIGHT,
@@ -12,6 +13,7 @@ import {
 	SCRAPE_MAX_STYLESHEETS,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
+import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { rewritePreviewAssets } from "./preview-html";
 import { validateUrl } from "./url-validator";
 
@@ -211,15 +213,18 @@ export async function fetchHtml(
 export async function scrapeHtml(
 	rawUrl: string,
 	attemptNumber = 1,
+	instrumentation?: ScrapeInstrumentation & { mode?: ScrapeMode },
 ): Promise<ScrapeCapture> {
 	const { url } = await validateUrl(rawUrl);
 	const { renderPage } = await import("./render-page");
-	const rendered = await renderPage(url.href);
+	const rendered = await renderPage(url.href, instrumentation);
 	const capturedAt = new Date().toISOString();
+	await instrumentation?.onActivity?.("Menyiapkan HTML standalone");
 	const html = withBaseHref(
 		forceDesktopViewport(await inlineStyles(rendered.html, rendered.finalUrl)),
 		rendered.finalUrl,
 	);
+	await instrumentation?.onActivity?.("Menyiapkan resource preview");
 	const previewHtml = rewritePreviewAssets(html, rendered.finalUrl);
 	const domain = new URL(rendered.finalUrl).hostname.toLowerCase();
 	return {
