@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ScrapeError } from "@/lib/design-errors";
 import type { DesignExtraction } from "./design-extraction";
 import {
 	buildDesignMdPrompt,
@@ -7,10 +8,66 @@ import {
 	DESIGN_SYSTEM_PROMPT,
 	designIssues,
 	designSection,
+	generateDesignMd,
 	normalizeDesign,
 	repairDesign,
 	sanitizeExtraction,
 } from "./prompts-design-md";
+
+const mockedAI = vi.hoisted(() => {
+	const responses: string[] = [];
+	const requests: Array<{
+		messages: Array<{
+			role: "system" | "user" | "assistant";
+			content: string;
+		}>;
+		maxTokens?: number;
+	}> = [];
+	return { responses, requests };
+});
+
+vi.mock("@/lib/services/ai-orchestrator", () => ({
+	selectModels: () => ["test-model"],
+	tryStreamWithFallback: async (
+		_models: string[],
+		messages: Array<{
+			role: "system" | "user" | "assistant";
+			content: string;
+		}>,
+		_signal?: AbortSignal,
+		maxTokens?: number,
+	) => {
+		const response = mockedAI.responses.shift();
+		if (response === undefined)
+			throw new Error("No mocked AI response queued.");
+		mockedAI.requests.push({ messages, maxTokens });
+		const stream = async function* (
+			text: string,
+		): AsyncGenerator<string, void, undefined> {
+			yield text;
+		};
+		return {
+			generator: stream(response),
+			firstChunk: "",
+			abortController: new AbortController(),
+			outcome: {},
+		};
+	},
+}));
+
+const generationExtraction: DesignExtraction = {
+	colors: [{ role: "primary", value: "#123456" }],
+	typography: [{ family: "Observed Sans" }],
+	layout_patterns: ["responsive grid"],
+	components: ["button", "card"],
+	metadata: { pagesAnalyzed: ["https://example.test"], pagesFailed: 0 },
+	confidence_score: 0.8,
+};
+
+beforeEach(() => {
+	mockedAI.responses.length = 0;
+	mockedAI.requests.length = 0;
+});
 
 describe("prompts-design-md", () => {
 	it("normalizes markdown typography and heading casing", () => {
@@ -188,6 +245,218 @@ Brand one`;
 	it("keeps the generator prompt free of brand-specific hardcoding", () => {
 		expect(DESIGN_SYSTEM_PROMPT).not.toContain("Notion");
 		expect(DESIGN_MIN_CHARS).toBe(12_000);
+	});
+});
+
+describe("generateDesignMd targeted repair", () => {
+	it("does not generate a repair when the first draft passes the full contract", async () => {
+		mockedAI.responses.push(buildCompleteDesign({}));
+
+		const result = await generateDesignMd(
+			"https://example.test",
+			generationExtraction,
+		);
+
+		expect(designIssues(result)).toEqual([]);
+		expect(mockedAI.requests).toHaveLength(1);
+	});
+
+	it("repairs only Components and preserves the valid Colors section", async () => {
+		const original = buildCompleteDesign({ components: 7 });
+		const originalColors = designSection(
+			original,
+			"## Tokens - Colors",
+			"## Tokens - Typography",
+		);
+		const replacement = [
+			"## Components",
+			...Array.from(
+				{ length: 8 },
+				(_, index) =>
+					`### Repaired Component ${index}\nRole and usage ${index}.`,
+			),
+		].join("\n\n");
+		const activities: string[] = [];
+		const timings: string[] = [];
+		mockedAI.responses.push(original, replacement);
+
+		const result = await generateDesignMd(
+			"https://example.test",
+			generationExtraction,
+			undefined,
+			{
+				onActivity: (activity) => {
+					activities.push(activity);
+				},
+				onTiming: (label) => {
+					timings.push(label);
+				},
+			},
+		);
+
+		expect(designIssues(result)).toEqual([]);
+		expect(
+			designSection(result, "## Tokens - Colors", "## Tokens - Typography"),
+		).toBe(originalColors);
+		expect(mockedAI.requests).toHaveLength(2);
+		expect(mockedAI.requests.map((request) => request.maxTokens)).toEqual([
+			12_000, 12_000,
+		]);
+		expect(mockedAI.requests[1]?.messages[1]?.content).toContain(
+			"Return only the requested markdown sections",
+		);
+		expect(mockedAI.requests[1]?.messages[1]?.content).toContain(
+			"## Components",
+		);
+		expect(mockedAI.requests[1]?.messages[1]?.content).not.toContain(
+			"Rewrite from scratch",
+		);
+		expect(mockedAI.requests[1]?.messages[1]?.content).not.toContain(
+			"Write the full professional DESIGN.md now",
+		);
+		expect(activities).toEqual([
+			"Menghasilkan draft DESIGN.md",
+			"Draft DESIGN.md selesai",
+			"Memvalidasi DESIGN.md",
+			"1 bagian belum lengkap",
+			"Memperbaiki Components",
+			"Memvalidasi hasil perbaikan",
+			"DESIGN.md lolos validasi",
+		]);
+		expect(timings).toEqual([
+			"aiGeneration",
+			"validation",
+			"repairGeneration",
+			"repairValidation",
+		]);
+	});
+
+	it("repairs only Do/Don't when that section misses the required bullet count", async () => {
+		const original = buildCompleteDesign({ bullets: 10 });
+		const originalComponents = designSection(
+			original,
+			"## Components",
+			"## Do's and Don'ts",
+		);
+		const replacement = `## Do's and Don'ts
+### Do
+- Do preserve observed color roles.
+- Do maintain the captured type hierarchy.
+- Do keep CTA treatments consistent with the reference.
+- Do use the observed spacing rhythm.
+- Do mark inferred values explicitly.
+- Do verify responsive behavior.
+
+### Don't
+- Don't invent palette values.
+- Don't flatten distinct typography roles.
+- Don't replace the captured CTA treatment.
+- Don't use unrelated spacing scales.
+- Don't copy protected brand assets.
+- Don't imply confidence beyond the captured evidence.`;
+		mockedAI.responses.push(original, replacement);
+
+		const result = await generateDesignMd(
+			"https://example.test",
+			generationExtraction,
+		);
+
+		expect(designIssues(result)).toEqual([]);
+		expect(designSection(result, "## Components", "## Do's and Don'ts")).toBe(
+			originalComponents,
+		);
+		expect(mockedAI.requests).toHaveLength(2);
+		expect(mockedAI.requests[1]?.messages[1]?.content).toContain(
+			"## Do's and Don'ts",
+		);
+		expect(mockedAI.requests[1]?.messages[1]?.content).not.toContain(
+			"## Components\n",
+		);
+	});
+
+	it("inserts a missing required heading without changing its valid neighbor", async () => {
+		const original = buildCompleteDesign({});
+		const withoutImagery = original.replace(
+			"## Imagery\nImage and icon style notes.\n\n",
+			"",
+		);
+		const originalLayout = designSection(
+			withoutImagery,
+			"## Layout",
+			"## Agent Prompt Guide",
+		);
+		mockedAI.responses.push(
+			withoutImagery,
+			"## Imagery\nObserved editorial photography and line-icon assets.",
+		);
+
+		const result = await generateDesignMd(
+			"https://example.test",
+			generationExtraction,
+		);
+
+		expect(designIssues(result)).toEqual([]);
+		expect(designSection(result, "## Imagery", "## Layout").trimEnd()).toBe(
+			"## Imagery\nObserved editorial photography and line-icon assets.",
+		);
+		expect(designSection(result, "## Layout", "## Agent Prompt Guide")).toBe(
+			originalLayout,
+		);
+		expect(mockedAI.requests).toHaveLength(2);
+	});
+
+	it("uses a full rewrite after an unsuccessful targeted repair and accepts a valid result", async () => {
+		const invalid = buildCompleteDesign({ components: 7 });
+		const complete = buildCompleteDesign({});
+		mockedAI.responses.push(invalid, invalid, complete);
+
+		const result = await generateDesignMd(
+			"https://example.test",
+			generationExtraction,
+		);
+
+		expect(designIssues(result)).toEqual([]);
+		expect(mockedAI.requests).toHaveLength(3);
+		expect(mockedAI.requests[2]?.messages[1]?.content).toContain(
+			"Rewrite from scratch",
+		);
+	});
+
+	it("validates repaired output and bounds generation to one last-resort rewrite", async () => {
+		const invalid = buildCompleteDesign({ components: 7 });
+		const activities: string[] = [];
+		const timings: string[] = [];
+		mockedAI.responses.push(invalid, invalid, invalid);
+
+		const generation = generateDesignMd(
+			"https://example.test",
+			generationExtraction,
+			undefined,
+			{
+				onActivity: (activity) => {
+					activities.push(activity);
+				},
+				onTiming: (label) => {
+					timings.push(label);
+				},
+			},
+		);
+		await expect(generation).rejects.toBeInstanceOf(ScrapeError);
+		await expect(generation).rejects.toMatchObject({
+			code: "AI_GENERATION_FAILED",
+		});
+
+		expect(mockedAI.requests).toHaveLength(3);
+		expect(timings).toEqual([
+			"aiGeneration",
+			"validation",
+			"repairGeneration",
+			"repairValidation",
+			"fullRewriteGeneration",
+			"finalValidation",
+		]);
+		expect(activities).toContain("Memperbaiki DESIGN.md secara menyeluruh");
+		expect(activities.at(-1)).toBe("Memvalidasi hasil perbaikan");
 	});
 });
 
