@@ -197,8 +197,9 @@ export async function renderPage(
 	url: string,
 	options: RenderPageOptions = {},
 ): Promise<RenderedPage> {
-	const { onActivity, mode = "design" } = options;
+	const { onActivity, onTiming, mode = "design" } = options;
 	const browser = await getBrowser();
+	const contextStart = Date.now();
 	const context = await browser.newContext({
 		viewport: DESKTOP_VIEWPORT,
 		userAgent: SCRAPE_BROWSER_UA,
@@ -207,28 +208,39 @@ export async function renderPage(
 		ignoreHTTPSErrors: true,
 		serviceWorkers: "block",
 	});
+	onTiming?.("browserContext", Date.now() - contextStart);
 	try {
 		await guardContext(context);
 		const page = await context.newPage();
 		let status = 0;
 		try {
 			await onActivity?.("Membuka website");
+			const navStart = Date.now();
 			const res = await page.goto(url, {
 				waitUntil: "domcontentloaded",
 				timeout: NAV_TIMEOUT_MS,
 			});
+			onTiming?.("navigation", Date.now() - navStart);
 			status = res?.status() ?? 0;
 			await onActivity?.("Halaman berhasil dimuat");
 			await onActivity?.("Menunggu resource halaman");
+			let t = Date.now();
 			await page
 				.waitForLoadState("networkidle", { timeout: IDLE_TIMEOUT_MS })
 				.catch(() => {});
+			onTiming?.("firstNetworkIdle", Date.now() - t);
 			await onActivity?.("Memuat konten lazy-load");
+			t = Date.now();
 			await autoScroll(page).catch(() => {});
+			onTiming?.("autoScroll", Date.now() - t);
+			t = Date.now();
 			await page
 				.waitForLoadState("networkidle", { timeout: IDLE_TIMEOUT_MS })
 				.catch(() => {});
+			onTiming?.("secondNetworkIdle", Date.now() - t);
+			t = Date.now();
 			await page.waitForTimeout(SETTLE_MS);
+			onTiming?.("settle", Date.now() - t);
 			await onActivity?.(
 				mode === "html"
 					? "Menangkap DOM hasil render"
@@ -237,10 +249,12 @@ export async function renderPage(
 		} catch (err) {
 			if (err instanceof ScrapeError) throw err;
 		}
+		const contentStart = Date.now();
 		const html = (await page.content().catch(() => "")).slice(
 			0,
 			SCRAPE_MAX_HTML_BYTES,
 		);
+		onTiming?.("pageContent", Date.now() - contentStart);
 		if (!html || html.length < MIN_ANALYZABLE_HTML_BYTES)
 			throw new ScrapeError(
 				"NO_ANALYZABLE_CONTENT",

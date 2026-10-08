@@ -220,12 +220,16 @@ export async function scrapeHtml(
 	const rendered = await renderPage(url.href, instrumentation);
 	const capturedAt = new Date().toISOString();
 	await instrumentation?.onActivity?.("Menyiapkan HTML standalone");
+	const inlineStart = Date.now();
 	const html = withBaseHref(
 		forceDesktopViewport(await inlineStyles(rendered.html, rendered.finalUrl)),
 		rendered.finalUrl,
 	);
+	instrumentation?.onTiming?.("inlineStyles", Date.now() - inlineStart);
 	await instrumentation?.onActivity?.("Menyiapkan resource preview");
+	const previewStart = Date.now();
 	const previewHtml = rewritePreviewAssets(html, rendered.finalUrl);
+	instrumentation?.onTiming?.("previewRewrite", Date.now() - previewStart);
 	const domain = new URL(rendered.finalUrl).hostname.toLowerCase();
 	return {
 		sourceUrl: rendered.finalUrl,

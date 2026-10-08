@@ -856,6 +856,7 @@ export interface ScrapeMetadata {
 	stageStartedAt?: string;
 	activity?: string;
 	activityStartedAt?: string;
+	timings?: Record<string, number>;
 	errorMessage?: string;
 	errorDetail?: string;
 	mode?: ScrapeMode;

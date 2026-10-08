@@ -111,6 +111,7 @@ export async function runScrapePipeline(
 			.where(eq(scrapes.id, scrapeId));
 	};
 
+	const timings: Record<string, number> = {};
 	const instrumentation: ScrapeInstrumentation = {
 		onActivity: async (activity) => {
 			meta = { ...meta, activity, activityStartedAt: new Date().toISOString() };
@@ -118,6 +119,10 @@ export async function runScrapePipeline(
 				.update(scrapes)
 				.set({ metadata: meta, updatedAt: new Date() })
 				.where(eq(scrapes.id, scrapeId));
+		},
+		onTiming: (label, durationMs) => {
+			timings[label] = (timings[label] ?? 0) + durationMs;
+			meta = { ...meta, timings: { ...timings } };
 		},
 	};
 
@@ -145,6 +150,15 @@ export async function runScrapePipeline(
 			await persist("saving");
 			await instrumentation.onActivity?.("Menyimpan index.html");
 			await persist("completed");
+			console.info(
+				JSON.stringify({
+					scrapeTimings: true,
+					scrapeId,
+					mode,
+					totalMs: Object.values(timings).reduce((a, b) => a + b, 0),
+					timings,
+				}),
+			);
 			return;
 		}
 
@@ -160,7 +174,9 @@ export async function runScrapePipeline(
 			},
 		);
 		await instrumentation.onActivity?.("Menganalisis design system");
+		const extractionStart = Date.now();
 		const extraction = extractDesignFromHtml(captured.html, captured.sourceUrl);
+		instrumentation.onTiming?.("extraction", Date.now() - extractionStart);
 		await instrumentation.onActivity?.("Analisis visual selesai");
 
 		await persist("generating");
@@ -173,9 +189,21 @@ export async function runScrapePipeline(
 
 		await persist("saving");
 		await instrumentation.onActivity?.("Menyimpan hasil");
+		const saveStart = Date.now();
 		await saveScrapeDocument(scrapeId, designMd);
+		instrumentation.onTiming?.("save", Date.now() - saveStart);
 
 		await persist("completed");
+		console.info(
+			JSON.stringify({
+				scrapeTimings: true,
+				scrapeId,
+				mode,
+				totalMs: Object.values(timings).reduce((a, b) => a + b, 0),
+				timings,
+			}),
+		);
+		return;
 	} catch (error) {
 		const errorMessage =
 			error instanceof ScrapeError
