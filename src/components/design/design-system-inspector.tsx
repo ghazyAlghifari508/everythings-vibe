@@ -1,6 +1,10 @@
-import { Check, X } from "lucide-react";
+"use client";
+
+import { Check, Copy, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type {
 	DesignInspectorModel,
+	InspectorColorToken,
 	InspectorFont,
 	InspectorTypeEntry,
 } from "@/lib/design-md-inspector";
@@ -29,6 +33,169 @@ function isSafeFontFamily(value: string): boolean {
 function isSafeLineHeight(value: string): boolean {
 	const normalized = value.trim();
 	return /^[\d.]+$/.test(normalized) || isCssLength(normalized);
+}
+
+export type PaletteGroupKey =
+	| "brand"
+	| "accent"
+	| "neutral"
+	| "semantic"
+	| "other";
+
+export interface PaletteGroup {
+	key: PaletteGroupKey;
+	label: string;
+	colors: InspectorColorToken[];
+}
+
+const PALETTE_GROUP_LABELS: Record<PaletteGroupKey, string> = {
+	brand: "Brand",
+	accent: "Aksen",
+	neutral: "Netral",
+	semantic: "Semantik",
+	other: "Lainnya",
+};
+
+const PALETTE_GROUP_ORDER: PaletteGroupKey[] = [
+	"brand",
+	"accent",
+	"neutral",
+	"semantic",
+	"other",
+];
+
+// Surface/what-signals (semantic usage, surface/text roles) are checked before
+// priority modifiers (brand/primary, accent), so "Primary text" stays neutral
+// while "Primary CTA" stays brand.
+const PALETTE_GROUP_PATTERNS: { key: PaletteGroupKey; pattern: RegExp }[] = [
+	{ key: "semantic", pattern: /\b(success|warning|error|info)\b/ },
+	{ key: "neutral", pattern: /\b(canvas|surface|text|neutral|border|ghost)\b/ },
+	{ key: "brand", pattern: /\b(brand|primary)\b/ },
+	{ key: "accent", pattern: /\b(accent|decorative|highlight)\b/ },
+];
+
+export function classifyPaletteGroup(
+	color: InspectorColorToken,
+): PaletteGroupKey {
+	const haystack = `${color.name} ${color.role} ${color.token}`.toLowerCase();
+	for (const { key, pattern } of PALETTE_GROUP_PATTERNS) {
+		if (pattern.test(haystack)) return key;
+	}
+	return "other";
+}
+
+export function groupPaletteColors(
+	colors: InspectorColorToken[],
+): PaletteGroup[] {
+	const buckets = new Map<PaletteGroupKey, InspectorColorToken[]>();
+	for (const color of colors) {
+		const key = classifyPaletteGroup(color);
+		const bucket = buckets.get(key) ?? [];
+		bucket.push(color);
+		buckets.set(key, bucket);
+	}
+	return PALETTE_GROUP_ORDER.filter((key) => buckets.has(key)).map((key) => ({
+		key,
+		label: PALETTE_GROUP_LABELS[key],
+		colors: buckets.get(key) ?? [],
+	}));
+}
+
+function PaletteColorCard({
+	color,
+	featured,
+}: {
+	color: InspectorColorToken;
+	featured: boolean;
+}) {
+	const [copied, setCopied] = useState(false);
+	const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(() => {
+		return () => {
+			if (copiedTimer.current) clearTimeout(copiedTimer.current);
+		};
+	}, []);
+
+	async function handleCopy() {
+		try {
+			await navigator.clipboard.writeText(color.value);
+		} catch {
+			return;
+		}
+		setCopied(true);
+		if (copiedTimer.current) clearTimeout(copiedTimer.current);
+		copiedTimer.current = setTimeout(() => setCopied(false), 2000);
+	}
+
+	const idleLabel = `Salin warna ${color.value}`;
+	const doneLabel = `Tersalin ${color.value}`;
+
+	return (
+		<div className={featured ? "min-w-0 sm:col-span-2" : "min-w-0"}>
+			<div className="group relative">
+				<div
+					role="img"
+					aria-label={`Swatch warna ${color.name} ${color.value}`}
+					className={
+						featured
+							? "h-36 w-full rounded-lg border border-graphite sm:h-44"
+							: "h-24 w-full rounded-lg border border-graphite sm:h-28"
+					}
+					style={{ backgroundColor: color.value }}
+				/>
+				<button
+					type="button"
+					onClick={() => void handleCopy()}
+					aria-label={copied ? doneLabel : idleLabel}
+					className="absolute top-2 right-2 inline-flex size-8 items-center justify-center rounded-md border border-graphite bg-obsidian/90 text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 sm:focus-visible:opacity-100"
+				>
+					{copied ? (
+						<Check size={15} aria-hidden="true" />
+					) : (
+						<Copy size={15} aria-hidden="true" />
+					)}
+				</button>
+			</div>
+			<div className="mt-2 min-w-0">
+				<p
+					className="truncate text-sm font-semibold text-snow"
+					title={color.name}
+				>
+					{color.name}
+				</p>
+				<p
+					className="truncate font-mono text-xs text-fog tabular-nums"
+					title={color.value}
+				>
+					{color.value}
+				</p>
+				{color.role ? (
+					<p className="mt-0.5 line-clamp-4 text-xs leading-relaxed text-fog">
+						{color.role}
+					</p>
+				) : null}
+			</div>
+		</div>
+	);
+}
+
+function PaletteGroupSection({ group }: { group: PaletteGroup }) {
+	const featured = group.key === "brand" && group.colors.length === 1;
+	return (
+		<section aria-label={group.label} className="min-w-0">
+			<h4 className="text-sm font-semibold text-mist">{group.label}</h4>
+			<div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 xl:grid-cols-4">
+				{group.colors.map((color) => (
+					<PaletteColorCard
+						key={`${color.name}-${color.value}`}
+						color={color}
+						featured={featured}
+					/>
+				))}
+			</div>
+		</section>
+	);
 }
 
 function SectionHeading({ children }: { children: string }) {
@@ -203,31 +370,11 @@ export function DesignSystemInspector({
 			<div className="mt-6 flex flex-col gap-6">
 				{model.colors.length > 0 ? (
 					<InspectorSection label="Palet Warna">
-						<ul className="flex flex-col gap-4">
-							{model.colors.map((color) => (
-								<li key={`${color.name}-${color.value}`} className="flex gap-3">
-									<div
-										role="img"
-										aria-label={`Swatch warna ${color.name} ${color.value}`}
-										className="h-12 w-12 shrink-0 rounded-lg border border-graphite"
-										style={{ backgroundColor: color.value }}
-									/>
-									<div className="min-w-0">
-										<p className="truncate text-sm font-semibold text-snow">
-											{color.name}
-										</p>
-										<p className="truncate font-mono text-xs text-fog">
-											{color.value}
-										</p>
-										{color.role ? (
-											<p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-fog">
-												{color.role}
-											</p>
-										) : null}
-									</div>
-								</li>
+						<div className="flex min-w-0 flex-col gap-6">
+							{groupPaletteColors(model.colors).map((group) => (
+								<PaletteGroupSection key={group.key} group={group} />
 							))}
-						</ul>
+						</div>
 					</InspectorSection>
 				) : null}
 

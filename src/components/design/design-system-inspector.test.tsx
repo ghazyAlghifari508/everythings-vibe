@@ -1,11 +1,26 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import type { DesignInspectorModel } from "@/lib/design-md-inspector";
-import { DesignSystemInspector } from "./design-system-inspector";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	within,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type {
+	DesignInspectorModel,
+	InspectorColorToken,
+} from "@/lib/design-md-inspector";
+import { parseDesignMd } from "@/lib/design-md-inspector";
+import {
+	classifyPaletteGroup,
+	DesignSystemInspector,
+	groupPaletteColors,
+} from "./design-system-inspector";
 
 afterEach(() => {
 	cleanup();
+	vi.unstubAllGlobals();
 });
 
 const MODEL: DesignInspectorModel = {
@@ -155,5 +170,237 @@ describe("DesignSystemInspector", () => {
 		expect(container.textContent).not.toMatch(/css variables/i);
 		expect(container.textContent).not.toMatch(/design tokens/i);
 		expect(container.textContent).not.toMatch(/compact|extended/i);
+	});
+});
+
+const BRAND_COLOR: InspectorColorToken = {
+	name: "Primary",
+	value: "#155eef",
+	token: "--color-primary",
+	role: "Primary action",
+};
+
+const ACCENT_COLOR: InspectorColorToken = {
+	name: "Highlight",
+	value: "#f5b301",
+	token: "--color-highlight",
+	role: "Decorative highlight",
+};
+
+const NEUTRAL_COLOR: InspectorColorToken = {
+	name: "Canvas",
+	value: "#ffffff",
+	token: "--color-canvas",
+	role: "Page background",
+};
+
+const SEMANTIC_COLOR: InspectorColorToken = {
+	name: "Success",
+	value: "#16a34a",
+	token: "--color-success",
+	role: "Success state",
+};
+
+const AMBIGUOUS_COLOR: InspectorColorToken = {
+	name: "Nebula",
+	value: "#123456",
+	token: "--color-nebula",
+	role: "Khusus",
+};
+
+function paletteModel(colors: InspectorColorToken[]): DesignInspectorModel {
+	return { ...EMPTY_MODEL, colors };
+}
+
+describe("classifyPaletteGroup", () => {
+	it("maps brand, accent, neutral, and semantic signals deterministically", () => {
+		expect(classifyPaletteGroup(BRAND_COLOR)).toBe("brand");
+		expect(classifyPaletteGroup(ACCENT_COLOR)).toBe("accent");
+		expect(classifyPaletteGroup(NEUTRAL_COLOR)).toBe("neutral");
+		expect(classifyPaletteGroup(SEMANTIC_COLOR)).toBe("semantic");
+	});
+
+	it("returns the same group on repeated calls", () => {
+		const colors = [
+			BRAND_COLOR,
+			ACCENT_COLOR,
+			NEUTRAL_COLOR,
+			SEMANTIC_COLOR,
+			AMBIGUOUS_COLOR,
+		];
+		expect(groupPaletteColors(colors)).toEqual(groupPaletteColors(colors));
+	});
+
+	it("falls back to other for ambiguous colors", () => {
+		expect(classifyPaletteGroup(AMBIGUOUS_COLOR)).toBe("other");
+		const groups = groupPaletteColors([AMBIGUOUS_COLOR]);
+		expect(groups).toHaveLength(1);
+		expect(groups[0]?.key).toBe("other");
+		expect(groups[0]?.colors).toEqual([AMBIGUOUS_COLOR]);
+	});
+
+	it("keeps surface-bound primary colors neutral instead of brand", () => {
+		expect(
+			classifyPaletteGroup({
+				name: "Ink",
+				value: "#0f0f0f",
+				token: "--color-ink",
+				role: "Primary text",
+			}),
+		).toBe("neutral");
+	});
+});
+
+describe("palette gallery", () => {
+	it("renders colors as grouped gallery sections", () => {
+		renderInspector(
+			paletteModel([
+				BRAND_COLOR,
+				NEUTRAL_COLOR,
+				SEMANTIC_COLOR,
+				AMBIGUOUS_COLOR,
+			]),
+		);
+		const brand = screen.getByRole("region", { name: "Brand" });
+		expect(within(brand).getByText("Primary")).toBeDefined();
+		const neutral = screen.getByRole("region", { name: "Netral" });
+		expect(within(neutral).getByText("Canvas")).toBeDefined();
+		const semantic = screen.getByRole("region", { name: "Semantik" });
+		expect(within(semantic).getByText("Success")).toBeDefined();
+		const other = screen.getByRole("region", { name: "Lainnya" });
+		expect(within(other).getByText("Nebula")).toBeDefined();
+	});
+
+	it("keeps actual parsed color values unchanged on swatches", () => {
+		renderInspector(paletteModel([BRAND_COLOR, NEUTRAL_COLOR]));
+		const reference = document.createElement("div");
+		for (const color of [BRAND_COLOR, NEUTRAL_COLOR]) {
+			const swatch = screen.getByRole("img", {
+				name: `Swatch warna ${color.name} ${color.value}`,
+			});
+			reference.style.backgroundColor = color.value;
+			expect(swatch.style.backgroundColor).toBe(
+				reference.style.backgroundColor,
+			);
+			expect(screen.getByText(color.value)).toBeDefined();
+		}
+	});
+
+	it("shows a brand group only when parsed data supports it", () => {
+		const { rerender } = renderInspector(paletteModel([NEUTRAL_COLOR]));
+		expect(screen.queryByRole("region", { name: "Brand" })).toBeNull();
+		rerender(
+			<DesignSystemInspector
+				siteName="Acme"
+				domain="acme.example"
+				sourceUrl="https://acme.example/"
+				model={paletteModel([NEUTRAL_COLOR, BRAND_COLOR])}
+			/>,
+		);
+		expect(screen.getByRole("region", { name: "Brand" })).toBeDefined();
+	});
+
+	it("never promotes the first item to brand without evidence", () => {
+		renderInspector(paletteModel([NEUTRAL_COLOR, SEMANTIC_COLOR]));
+		expect(screen.queryByRole("region", { name: "Brand" })).toBeNull();
+		expect(screen.getByRole("region", { name: "Netral" })).toBeDefined();
+	});
+
+	it("renders no hardcoded site-specific palette content", () => {
+		const { container } = renderInspector(
+			paletteModel([BRAND_COLOR, NEUTRAL_COLOR]),
+		);
+		expect(container.textContent).not.toMatch(/notion/i);
+		expect(container.textContent).not.toMatch(/insforge/i);
+	});
+
+	it("renders many colors without dropping any or fixing widths", () => {
+		const colors: InspectorColorToken[] = Array.from(
+			{ length: 12 },
+			(_, index) => ({
+				name: `Warna ${index + 1}`,
+				value: `#${(index + 1).toString(16).padStart(6, "0")}`,
+				token: `--color-contoh-${index + 1}`,
+				role: `Contoh peran ${index + 1}`,
+			}),
+		);
+		const { container } = renderInspector(paletteModel(colors));
+		const swatches = within(container).getAllByRole("img");
+		expect(swatches).toHaveLength(colors.length);
+		for (const swatch of swatches) {
+			expect(swatch.style.width).toBe("");
+		}
+	});
+
+	it("copies the exact source value with an accessible action", async () => {
+		const writeText = vi.fn(async () => {});
+		vi.stubGlobal("navigator", { clipboard: { writeText } });
+		renderInspector(paletteModel([BRAND_COLOR]));
+		fireEvent.click(
+			screen.getByRole("button", { name: `Salin warna ${BRAND_COLOR.value}` }),
+		);
+		expect(writeText).toHaveBeenCalledWith(BRAND_COLOR.value);
+		expect(
+			await screen.findByRole("button", {
+				name: `Tersalin ${BRAND_COLOR.value}`,
+			}),
+		).toBeDefined();
+	});
+
+	it("renders a realistic parsed DESIGN.md as a grouped gallery", () => {
+		const designMd = [
+			"# Acme - Style Reference",
+			"> A crisp ledger console under morning light.",
+			"",
+			"**Theme:** light",
+			"",
+			"Acme pairs a paper canvas with ink typography.",
+			"",
+			"## Tokens - Colors",
+			"| Name | Value | Token | Role |",
+			"| --- | --- | --- | --- |",
+			"| Canvas | #ffffff | --color-canvas | Page background |",
+			"| Surface | #f7f8f8 | --color-surface | Card surface |",
+			"| Ink | #0f0f0f | --color-ink | Primary text |",
+			"| Muted | #606060 | --color-muted | Muted text |",
+			"| Hairline | #d3d3d3 | --color-hairline | Hairline border |",
+			"| Cobalt | #155eef | --color-cobalt | Primary CTA |",
+			"| Accent | #6ee7b7 | --color-accent | Decorative highlight |",
+			"| Success | #16a34a | --color-success | Success state |",
+			"| Warning | #d97706 | --color-warning | Warning state |",
+			"| Error | #dc2626 | --color-error | Error state |",
+			"| Nebula | #123456 | --color-nebula | Khusus |",
+		].join("\n");
+		const model = parseDesignMd(designMd);
+		expect(model.colors).toHaveLength(11);
+		renderInspector(model);
+		for (const label of ["Brand", "Aksen", "Netral", "Semantik", "Lainnya"]) {
+			expect(screen.getByRole("region", { name: label })).toBeDefined();
+		}
+		expect(
+			within(screen.getByRole("region", { name: "Brand" })).getByText(
+				"Cobalt",
+			),
+		).toBeDefined();
+		expect(
+			within(screen.getByRole("region", { name: "Lainnya" })).getByText(
+				"Nebula",
+			),
+		).toBeDefined();
+		for (const value of [
+			"#ffffff",
+			"#f7f8f8",
+			"#0f0f0f",
+			"#606060",
+			"#d3d3d3",
+			"#155eef",
+			"#6ee7b7",
+			"#16a34a",
+			"#d97706",
+			"#dc2626",
+			"#123456",
+		]) {
+			expect(screen.getByText(value)).toBeDefined();
+		}
 	});
 });
