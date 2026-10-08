@@ -2,6 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { CodebaseStarterSuggestion } from "@/lib/codebase-analysis";
 import {
 	type AdaptiveQuestion,
 	CodebaseChatWorkspace,
@@ -54,6 +55,41 @@ const sampleQuestions: AdaptiveQuestion[] = [
 			{ id: "q2-opt1", label: "Toast notifikasi", recommended: true },
 			{ id: "q2-opt2", label: "Indikator inline" },
 		],
+	},
+];
+
+const starterSuggestions: CodebaseStarterSuggestion[] = [
+	{
+		id: "feature",
+		title: "Tambah ekspor ringkasan",
+		description: "Ekspor hasil ringkasan yang dibuat di aplikasi.",
+		prompt:
+			"Tambahkan opsi ekspor untuk ringkasan yang dibuat di aplikasi ini. Gunakan pola komponen dan alur data yang terlihat di repository.",
+		relevantPaths: ["src/features/summary.tsx"],
+	},
+	{
+		id: "bugfix",
+		title: "Perbaiki validasi unggahan",
+		description: "Tinjau feedback ketika berkas tidak lolos validasi.",
+		prompt:
+			"Periksa alur validasi unggahan pada modul yang relevan dan rapikan penanganan kegagalan tanpa mengubah perilaku valid yang sudah ada.",
+		relevantPaths: ["src/features/upload.ts"],
+	},
+	{
+		id: "refactor",
+		title: "Pisahkan parsing konfigurasi",
+		description: "Pisahkan parsing dari komponen yang menggunakannya.",
+		prompt:
+			"Refactor parsing konfigurasi agar terpisah dari komponen pemakainya, mengikuti pembagian tanggung jawab yang sudah terlihat dan mempertahankan perilaku saat ini.",
+		relevantPaths: ["src/config/parse.ts"],
+	},
+	{
+		id: "ui",
+		title: "Perjelas status formulir",
+		description: "Rapikan hierarki status pada formulir yang ada.",
+		prompt:
+			"Perjelas hierarchy status loading, success, dan error pada formulir yang ada dengan mengikuti komponen dan token responsive yang sudah digunakan di repository.",
+		relevantPaths: ["src/components/forms/editor.tsx"],
 	},
 ];
 
@@ -143,92 +179,71 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(container.textContent).not.toContain("Repository Lokal");
 	});
 
-	it("prefills draft from starter suggestion without auto-sending", () => {
+	it("renders exactly the supplied repository-aware starters in one section", () => {
 		const onSendMessage = vi.fn();
 		renderWorkspace({
-			starterSuggestions: ["Tambah filter genre", "Perbaiki cache film"],
+			starterSuggestions,
 			onSendMessage,
 		});
-
-		const suggestionsContainer = container.querySelector(
-			"[data-testid='codebase-starter-suggestions']",
-		);
-		expect(suggestionsContainer).not.toBeNull();
-		const buttons = suggestionsContainer?.querySelectorAll("button");
-		expect(buttons).toHaveLength(2);
-		expect(buttons?.[0]?.textContent).toBe("Tambah filter genre");
-
-		const composer = container.querySelector<HTMLTextAreaElement>(
-			"#codebase-chat-composer",
-		);
-		expect(composer?.value).toBe("");
-
-		// Click suggestion
-		act(() => {
-			buttons?.[0]?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-
-		// Draft is prefilled
-		expect(composer?.value).toBe("Tambah filter genre");
-		// Crucial: NOT auto-submitted
-		expect(onSendMessage).not.toHaveBeenCalled();
-	});
-
-	it("omits starter suggestions container when none provided", () => {
-		renderWorkspace();
-		expect(
-			container.querySelector("[data-testid='codebase-starter-suggestions']"),
-		).toBeNull();
-	});
-
-	it("renders generic intent starters in pristine mode with 4 shortcuts", () => {
-		renderWorkspace();
 
 		const startersContainer = container.querySelector(
 			"[data-testid='codebase-intent-starters']",
 		);
 		expect(startersContainer).not.toBeNull();
 		expect(startersContainer?.textContent).toContain("Mulai dari");
-
+		expect(startersContainer?.querySelectorAll("button")).toHaveLength(4);
 		expect(
-			container.querySelector("[data-testid='intent-starter-feature']"),
-		).not.toBeNull();
+			container.querySelectorAll("[data-testid='codebase-intent-starters']"),
+		).toHaveLength(1);
+		for (const suggestion of starterSuggestions) {
+			expect(startersContainer?.textContent).toContain(suggestion.title);
+			expect(startersContainer?.textContent).toContain(suggestion.description);
+		}
+		expect(container.textContent).not.toContain("Tambah fitur baru");
+		expect(container.textContent).not.toContain("Tambahkan fitur ");
+		expect(container.textContent).not.toContain("Perbaiki bug atau alur pada ");
+		expect(container.textContent).not.toContain("Refactor bagian ");
+		expect(container.textContent).not.toContain("Improve UI pada ");
 		expect(
-			container.querySelector("[data-testid='intent-starter-bugfix']"),
-		).not.toBeNull();
-		expect(
-			container.querySelector("[data-testid='intent-starter-refactor']"),
-		).not.toBeNull();
-		expect(
-			container.querySelector("[data-testid='intent-starter-ui']"),
-		).not.toBeNull();
-
-		expect(startersContainer?.textContent).toContain("Tambah fitur baru");
-		expect(startersContainer?.textContent).toContain("Perbaiki bug atau alur");
-		expect(startersContainer?.textContent).toContain("Refactor kode");
-		expect(startersContainer?.textContent).toContain("Improve UI");
+			container.querySelector("[data-testid='codebase-starter-suggestions']"),
+		).toBeNull();
+		expect(onSendMessage).not.toHaveBeenCalled();
 	});
 
-	it("prefills composer draft from intent starter shortcut without calling onSendMessage", () => {
+	it("prefills the complete prompt, focuses the composer, and does not auto-send", () => {
 		const onSendMessage = vi.fn();
-		renderWorkspace({ onSendMessage });
+		renderWorkspace({ starterSuggestions, onSendMessage });
 
+		const buttons = container.querySelectorAll<HTMLButtonElement>(
+			"[data-testid='codebase-intent-starters'] button",
+		);
 		const composer = container.querySelector<HTMLTextAreaElement>(
 			"#codebase-chat-composer",
 		);
-		expect(composer?.value).toBe("");
-
-		const featureBtn = container.querySelector<HTMLButtonElement>(
-			"[data-testid='intent-starter-feature']",
-		);
-		expect(featureBtn).not.toBeNull();
+		const featureSuggestion = starterSuggestions[0];
+		const featureButton = buttons[0];
+		expect(featureButton?.textContent).toContain(featureSuggestion?.title);
+		expect(composer).not.toBeNull();
 
 		act(() => {
-			featureBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+			featureButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 
-		expect(composer?.value).toBe("Tambahkan fitur ");
+		expect(composer?.value).toBe(featureSuggestion?.prompt);
+		expect(document.activeElement).toBe(composer);
+		expect(composer?.selectionStart).toBe(featureSuggestion?.prompt.length);
+		expect(composer?.selectionEnd).toBe(featureSuggestion?.prompt.length);
 		expect(onSendMessage).not.toHaveBeenCalled();
+	});
+
+	it("hides the entire starter section when legacy analysis has no suggestions", () => {
+		renderWorkspace();
+		expect(
+			container.querySelector("[data-testid='codebase-intent-starters']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-starter-suggestions']"),
+		).toBeNull();
 	});
 
 	it("does not render intent starters or context eyebrow once conversation is active", () => {

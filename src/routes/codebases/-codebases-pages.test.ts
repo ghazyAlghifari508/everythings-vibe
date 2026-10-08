@@ -441,3 +441,13 @@ describe("codebase detail pending skeleton fidelity", () => {
 		expect(skeletonSource).not.toContain("h-64");
 	});
 });
+
+describe("codebase starter suggestions route wiring", () => {
+	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+
+	it("passes validated suggestions from the loaded analysis output to the workspace", () => {
+		expect(detailSource).toContain(
+			"starterSuggestions={analysisOutput?.starterSuggestions}",
+		);
+	});
+});

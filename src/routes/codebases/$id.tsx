@@ -1339,6 +1339,7 @@ function CodebaseDetailPage() {
 								stageBusy={stageBusy}
 								stageError={stageError}
 								codebaseName={codebase.name}
+								starterSuggestions={analysisOutput?.starterSuggestions}
 								isSending={isWorking}
 								isConfirming={isConfirming}
 								specError={specError}
