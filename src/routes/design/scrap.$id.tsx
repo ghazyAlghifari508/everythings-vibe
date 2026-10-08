@@ -3,10 +3,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { ArrowLeft } from "lucide-react";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
-import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
 import { useScrapeStatus } from "@/hooks/use-scrape-status";
 import { requireUserServer } from "@/lib/session";
+import { displaySiteName } from "@/lib/site-name";
 
 const loadScrapeDetail = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
@@ -74,7 +74,6 @@ function ScrapeDetailPage() {
 		"design") as ScrapeMode;
 	const sourceUrl = data?.sourceUrl ?? initial.sourceUrl;
 	const domain = data?.domain ?? initial.domain;
-	const title = data?.title ?? initial.title;
 	const previewHtml = data?.previewHtml ?? initial.previewHtml;
 	const designMd = data?.document?.designMd ?? initial.designMd;
 
@@ -91,9 +90,10 @@ function ScrapeDetailPage() {
 		currentStatus === "completed" &&
 		(mode === "html" ? Boolean(previewHtml) : Boolean(designMd));
 
+	const siteName = displaySiteName(domain);
+
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14">
-			<HubBreadcrumb current={title || domain} />
 			<Link
 				to="/design/scrap"
 				className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-fog transition-colors hover:text-snow"
@@ -103,8 +103,9 @@ function ScrapeDetailPage() {
 			</Link>
 			<header className="max-w-2xl">
 				<h1 className="text-3xl font-semibold tracking-tight text-snow">
-					{title || domain}
+					{siteName}
 				</h1>
+				<p className="mt-1 truncate font-mono text-xs text-fog">{domain}</p>
 			</header>
 
 			{isCompleted ? (
@@ -114,7 +115,6 @@ function ScrapeDetailPage() {
 					domain={domain}
 					previewHtml={previewHtml}
 					designMd={designMd}
-					capturedAt={initial.capturedAt}
 				/>
 			) : (
 				<ScrapeProgress

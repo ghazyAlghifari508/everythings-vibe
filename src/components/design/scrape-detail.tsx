@@ -1,5 +1,4 @@
-import JSZip from "jszip";
-import { Copy, Download, FileCode2, Globe } from "lucide-react";
+import { Check, Copy, Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ScrapeMode } from "@/db/schema";
 
@@ -9,18 +8,11 @@ export interface ScrapeDetailProps {
 	domain: string;
 	previewHtml?: string;
 	designMd?: string;
-	capturedAt?: string;
 }
 
-type DetailTab = "preview" | "design";
 type HtmlViewTab = "preview" | "code";
 
 const PREVIEW_WIDTH = 1440;
-
-function zipFilename(domain: string): string {
-	const safe = domain.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
-	return `design-system-${safe || "site"}.zip`;
-}
 
 function safeFilename(domain: string, ext: string): string {
 	const safe = domain.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
@@ -48,65 +40,101 @@ function downloadFile(filename: string, content: string, mimeType: string) {
 	setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function downloadZip(
-	domain: string,
-	previewHtml: string,
-	designMd: string,
-) {
-	const zip = new JSZip();
-	zip.file("index.html", previewHtml);
-	zip.file("design.md", designMd);
-	const blob = await zip.generateAsync({ type: "blob" });
-	const url = URL.createObjectURL(blob);
-	const anchor = document.createElement("a");
-	anchor.href = url;
-	anchor.download = zipFilename(domain);
-	document.body.appendChild(anchor);
-	anchor.click();
-	anchor.remove();
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
+const ICON_BUTTON_CLASS =
+	"inline-flex size-8 items-center justify-center rounded-md border border-transparent text-fog transition-colors hover:border-graphite hover:bg-onyx hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50";
+
+function OutputToolbar({
+	title,
+	copyLabel,
+	downloadLabel,
+	copied,
+	busy,
+	onCopy,
+	onDownload,
+}: {
+	title: string;
+	copyLabel: string;
+	downloadLabel: string;
+	copied: boolean;
+	busy: boolean;
+	onCopy: () => void;
+	onDownload: () => void;
+}) {
+	return (
+		<div className="flex items-center justify-between gap-2 border-b border-graphite bg-charcoal px-3 py-2">
+			<span className="truncate font-mono text-xs font-semibold text-mist">
+				{title}
+			</span>
+			<div className="flex shrink-0 items-center gap-1">
+				<button
+					type="button"
+					onClick={onCopy}
+					disabled={busy}
+					aria-label={copyLabel}
+					title={copyLabel}
+					className={ICON_BUTTON_CLASS}
+				>
+					{copied ? (
+						<Check size={15} aria-hidden className="text-emerald-400" />
+					) : (
+						<Copy size={15} aria-hidden />
+					)}
+				</button>
+				<button
+					type="button"
+					onClick={onDownload}
+					disabled={busy}
+					aria-label={downloadLabel}
+					title={downloadLabel}
+					className={ICON_BUTTON_CLASS}
+				>
+					<Download size={15} aria-hidden />
+				</button>
+			</div>
+		</div>
+	);
 }
 
 export function ScrapeDetail({
 	mode,
-	sourceUrl,
 	domain,
 	previewHtml = "",
 	designMd = "",
-	capturedAt,
 }: ScrapeDetailProps) {
-	const [tab, setTab] = useState<DetailTab>("preview");
 	const [htmlViewTab, setHtmlViewTab] = useState<HtmlViewTab>("preview");
 	const [notice, setNotice] = useState("");
-	const [busy, setBusy] = useState<
-		"copy-html" | "copy-md" | "zip" | "download-html" | "download-md" | null
-	>(null);
+	const [busy, setBusy] = useState(false);
+	const [copied, setCopied] = useState(false);
+	const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	// Derive effective mode: if explicitly passed, honor it; otherwise infer from artifact presence
-	const effectiveMode: ScrapeMode | "dual" =
-		mode ??
-		(previewHtml && designMd ? "dual" : previewHtml ? "html" : "design");
+	useEffect(() => {
+		return () => {
+			if (copiedTimer.current) clearTimeout(copiedTimer.current);
+		};
+	}, []);
 
-	async function handleCopy(kind: "copy-html" | "copy-md") {
-		setBusy(kind);
+	const effectiveMode: ScrapeMode = mode ?? (designMd ? "design" : "html");
+
+	async function handleCopy(text: string, successMessage: string) {
+		setBusy(true);
 		setNotice("");
-		const text = kind === "copy-html" ? previewHtml : designMd;
 		const ok = await copyText(text);
 		setNotice(
-			ok
-				? kind === "copy-html"
-					? "HTML tersalin ke clipboard."
-					: "DESIGN.md tersalin ke clipboard."
-				: "Gagal menyalin. Blokir clipboard oleh browser.",
+			ok ? successMessage : "Gagal menyalin. Blokir clipboard oleh browser.",
 		);
-		setBusy(null);
+		setBusy(false);
+		if (ok) {
+			setCopied(true);
+			if (copiedTimer.current) clearTimeout(copiedTimer.current);
+			copiedTimer.current = setTimeout(() => setCopied(false), 2000);
+		}
 	}
 
-	async function handleDownloadSingle(kind: "download-html" | "download-md") {
-		setBusy(kind);
+	function handleDownload(kind: "html" | "md") {
+		setBusy(true);
 		setNotice("");
 		try {
-			if (kind === "download-html") {
+			if (kind === "html") {
 				downloadFile(
 					safeFilename(domain, "html"),
 					previewHtml,
@@ -124,133 +152,19 @@ export function ScrapeDetail({
 		} catch {
 			setNotice("Gagal mengunduh file. Coba lagi.");
 		} finally {
-			setBusy(null);
+			setBusy(false);
 		}
 	}
 
-	async function handleZip() {
-		setBusy("zip");
-		setNotice("");
-		try {
-			await downloadZip(domain, previewHtml, designMd);
-			setNotice("ZIP berisi 2 file mulai diunduh.");
-		} catch {
-			setNotice("Gagal membuat ZIP. Coba lagi.");
-		}
-		setBusy(null);
-	}
-
-	return (
-		<section className="flex flex-col gap-4">
-			<header className="flex flex-col gap-3 rounded-xl border border-graphite bg-charcoal p-5">
-				<div className="flex flex-wrap items-center gap-2">
-					<span className="inline-flex items-center gap-1.5 rounded-md border border-graphite bg-onyx px-2 py-1 font-mono text-xs text-mist">
-						<Globe size={14} aria-hidden />
-						{domain}
-					</span>
-					<span className="truncate font-mono text-xs text-fog">
-						{sourceUrl}
-					</span>
-					{capturedAt ? (
-						<span className="font-mono text-xs text-fog">{capturedAt}</span>
-					) : null}
-				</div>
-
-				<div className="flex flex-wrap gap-2">
-					{effectiveMode === "design" ? (
-						<>
-							<button
-								type="button"
-								onClick={() => void handleCopy("copy-md")}
-								disabled={busy !== null}
-								className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-							>
-								<Copy size={14} aria-hidden />
-								{busy === "copy-md" ? "Menyalin…" : "Salin DESIGN.md"}
-							</button>
-							<button
-								type="button"
-								onClick={() => void handleDownloadSingle("download-md")}
-								disabled={busy !== null}
-								className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3.5 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
-							>
-								<Download size={14} aria-hidden />
-								{busy === "download-md" ? "Menyiapkan…" : "Download DESIGN.md"}
-							</button>
-						</>
-					) : effectiveMode === "html" ? (
-						<>
-							<button
-								type="button"
-								onClick={() => void handleCopy("copy-html")}
-								disabled={busy !== null}
-								className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-							>
-								<FileCode2 size={14} aria-hidden />
-								{busy === "copy-html" ? "Menyalin…" : "Salin HTML"}
-							</button>
-							<button
-								type="button"
-								onClick={() => void handleDownloadSingle("download-html")}
-								disabled={busy !== null}
-								className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3.5 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
-							>
-								<Download size={14} aria-hidden />
-								{busy === "download-html"
-									? "Menyiapkan…"
-									: "Download index.html"}
-							</button>
-						</>
-					) : (
-						<>
-							<button
-								type="button"
-								onClick={() => void handleCopy("copy-md")}
-								disabled={busy !== null}
-								className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-							>
-								<Copy size={14} aria-hidden />
-								{busy === "copy-md" ? "Menyalin…" : "Salin DESIGN.md"}
-							</button>
-							<button
-								type="button"
-								onClick={() => void handleCopy("copy-html")}
-								disabled={busy !== null}
-								className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3.5 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
-							>
-								<FileCode2 size={14} aria-hidden />
-								{busy === "copy-html" ? "Menyalin…" : "Salin HTML"}
-							</button>
-							<button
-								type="button"
-								onClick={() => void handleZip()}
-								disabled={busy !== null}
-								className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3.5 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-slate hover:bg-onyx disabled:opacity-50"
-							>
-								<Download size={14} aria-hidden />
-								{busy === "zip" ? "Menyiapkan…" : "Download ZIP (2 File)"}
-							</button>
-						</>
-					)}
-				</div>
-
-				{notice ? (
-					<output className="block text-xs text-fog">{notice}</output>
-				) : null}
-			</header>
-
-			{/* Mode-specific content rendering */}
-			{effectiveMode === "design" ? (
-				<section aria-label="Isi design.md">
-					<p className="mb-2 font-mono text-[11px] text-fog">
-						design.md (Tokens &amp; System)
-					</p>
-					<pre className="max-h-[720px] overflow-auto rounded-xl border border-graphite bg-onyx p-5 font-mono text-xs leading-5 text-mist">
-						{designMd}
-					</pre>
-				</section>
-			) : effectiveMode === "html" ? (
-				<div className="flex flex-col gap-3">
+	if (effectiveMode === "html") {
+		const copyLabel = "Salin HTML";
+		const downloadLabel = "Download index.html";
+		return (
+			<section
+				aria-label="Hasil HTML"
+				className="overflow-hidden rounded-xl border border-graphite bg-charcoal"
+			>
+				<div className="flex items-center justify-between gap-2 border-b border-graphite px-3 py-2">
 					<div
 						role="tablist"
 						aria-label="Tampilan HTML"
@@ -261,7 +175,7 @@ export function ScrapeDetail({
 							role="tab"
 							aria-selected={htmlViewTab === "preview"}
 							onClick={() => setHtmlViewTab("preview")}
-							className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
+							className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
 								htmlViewTab === "preview"
 									? "bg-charcoal text-snow"
 									: "text-fog hover:text-mist"
@@ -274,7 +188,7 @@ export function ScrapeDetail({
 							role="tab"
 							aria-selected={htmlViewTab === "code"}
 							onClick={() => setHtmlViewTab("code")}
-							className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
+							className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
 								htmlViewTab === "code"
 									? "bg-charcoal text-snow"
 									: "text-fog hover:text-mist"
@@ -283,85 +197,83 @@ export function ScrapeDetail({
 							Source HTML
 						</button>
 					</div>
-
-					{htmlViewTab === "preview" ? (
-						<div role="tabpanel" aria-label="Preview index.html">
-							<p className="mb-2 font-mono text-[11px] text-fog">
-								Preview index.html (1440px Desktop, skala menyesuaikan layar)
-							</p>
-							<DesktopPreview
-								title={`Preview ${domain}`}
-								srcDoc={previewHtml}
-							/>
-						</div>
-					) : (
-						<div role="tabpanel" aria-label="Source code index.html">
-							<p className="mb-2 font-mono text-[11px] text-fog">
-								index.html source code
-							</p>
-							<pre className="max-h-[720px] overflow-auto rounded-xl border border-graphite bg-onyx p-5 font-mono text-xs leading-5 text-mist">
-								{previewHtml}
-							</pre>
-						</div>
-					)}
-				</div>
-			) : (
-				<>
-					<div
-						role="tablist"
-						aria-label="File hasil scrape"
-						className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
-					>
+					<div className="flex shrink-0 items-center gap-1">
 						<button
 							type="button"
-							role="tab"
-							aria-selected={tab === "preview"}
-							onClick={() => setTab("preview")}
-							className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
-								tab === "preview"
-									? "bg-charcoal text-snow"
-									: "text-fog hover:text-mist"
-							}`}
+							onClick={() =>
+								void handleCopy(previewHtml, "HTML tersalin ke clipboard.")
+							}
+							disabled={busy}
+							aria-label={copyLabel}
+							title={copyLabel}
+							className={ICON_BUTTON_CLASS}
 						>
-							index.html
+							{copied ? (
+								<Check size={15} aria-hidden className="text-emerald-400" />
+							) : (
+								<Copy size={15} aria-hidden />
+							)}
 						</button>
 						<button
 							type="button"
-							role="tab"
-							aria-selected={tab === "design"}
-							onClick={() => setTab("design")}
-							className={`flex-1 rounded-md px-3 py-2 font-mono text-xs font-semibold transition-colors ${
-								tab === "design"
-									? "bg-charcoal text-snow"
-									: "text-fog hover:text-mist"
-							}`}
+							onClick={() => handleDownload("html")}
+							disabled={busy}
+							aria-label={downloadLabel}
+							title={downloadLabel}
+							className={ICON_BUTTON_CLASS}
 						>
-							design.md
+							<Download size={15} aria-hidden />
 						</button>
 					</div>
+				</div>
 
-					{tab === "preview" ? (
-						<div role="tabpanel" aria-label="Preview index.html">
-							<p className="mb-2 font-mono text-[11px] text-fog">
-								Preview index.html (1440px Desktop, skala menyesuaikan layar)
-							</p>
-							<DesktopPreview
-								title={`Preview ${domain}`}
-								srcDoc={previewHtml}
-							/>
-						</div>
-					) : (
-						<div role="tabpanel" aria-label="Isi design.md">
-							<p className="mb-2 font-mono text-[11px] text-fog">
-								design.md (Tokens &amp; System)
-							</p>
-							<pre className="max-h-[720px] overflow-auto rounded-xl border border-graphite bg-onyx p-5 font-mono text-xs leading-5 text-mist">
-								{designMd}
-							</pre>
-						</div>
-					)}
-				</>
-			)}
+				{htmlViewTab === "preview" ? (
+					<div role="tabpanel" aria-label="Preview index.html">
+						<DesktopPreview title={`Preview ${domain}`} srcDoc={previewHtml} />
+					</div>
+				) : (
+					<div role="tabpanel" aria-label="Source code index.html">
+						<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
+							{previewHtml}
+						</pre>
+					</div>
+				)}
+
+				{notice ? (
+					<output className="block border-t border-graphite px-3 py-2 text-xs text-fog">
+						{notice}
+					</output>
+				) : null}
+			</section>
+		);
+	}
+
+	return (
+		<section
+			aria-label="Hasil DESIGN.md"
+			className="overflow-hidden rounded-xl border border-graphite bg-charcoal"
+		>
+			<OutputToolbar
+				title="DESIGN.md"
+				copyLabel="Salin DESIGN.md"
+				downloadLabel="Download DESIGN.md"
+				copied={copied}
+				busy={busy}
+				onCopy={() =>
+					void handleCopy(designMd, "DESIGN.md tersalin ke clipboard.")
+				}
+				onDownload={() => handleDownload("md")}
+			/>
+
+			<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
+				{designMd}
+			</pre>
+
+			{notice ? (
+				<output className="block border-t border-graphite px-3 py-2 text-xs text-fog">
+					{notice}
+				</output>
+			) : null}
 		</section>
 	);
 }
@@ -388,7 +300,7 @@ function DesktopPreview({ title, srcDoc }: { title: string; srcDoc: string }) {
 	return (
 		<div
 			ref={wrapRef}
-			className="w-full overflow-hidden rounded-xl border border-graphite bg-white"
+			className="w-full overflow-hidden bg-white"
 			style={{ height: Math.max(1, Math.round(frameHeight * scale)) }}
 		>
 			<iframe
