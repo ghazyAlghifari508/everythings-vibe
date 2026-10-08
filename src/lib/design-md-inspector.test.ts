@@ -266,6 +266,36 @@ describe("parseDesignMd", () => {
 		expect(model.radii).toEqual([{ label: "--radius-md", value: "8px" }]);
 	});
 
+	it("classifies bold-prefixed detailed rules without leaking markers", () => {
+		const model = parseDesignMd(
+			[
+				"# Acme - Style Reference",
+				"> A **crisp** console.",
+				"",
+				"**Theme:** light",
+				"",
+				"Overview with **bold** emphasis.",
+				"",
+				"## Do's and Don'ts",
+				"- Do keep it simple.",
+				"1.  **Do** use warm bases for layouts.",
+				"2.  **Don't** use neon glow effects.",
+				"- Don't copy the logo.",
+				"",
+			].join("\n"),
+		);
+		expect(model.essence).toBe("A crisp console.");
+		expect(model.overview).toBe("Overview with bold emphasis.");
+		expect(model.dos).toEqual([
+			"Do keep it simple.",
+			"Do use warm bases for layouts.",
+		]);
+		expect(model.donts).toEqual([
+			"Don't use neon glow effects.",
+			"Don't copy the logo.",
+		]);
+	});
+
 	it("extracts the first usable CSS length and font weight", () => {
 		expect(firstCssLength("`2em` (clamp(40px, 5.5vw, 68px))")).toBe("2em");
 		expect(firstCssLength("32px (2rem)")).toBe("32px");

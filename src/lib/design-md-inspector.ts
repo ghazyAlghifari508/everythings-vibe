@@ -176,7 +176,7 @@ function parseHeaderBlock(prelude: string[]): {
 		}
 		const quoteMatch = line.match(/^>\s?(.*)$/);
 		if (quoteMatch && !essence) {
-			essence = quoteMatch[1].trim();
+			essence = quoteMatch[1].replace(/\*\*/g, "").trim();
 			continue;
 		}
 		const themeMatch = line
@@ -188,7 +188,8 @@ function parseHeaderBlock(prelude: string[]): {
 			themeSeen = true;
 			continue;
 		}
-		if (themeSeen && line.length > 0) overviewLines.push(line);
+		if (themeSeen && line.length > 0)
+			overviewLines.push(line.replace(/\*\*/g, ""));
 	}
 	return { title, essence, theme, overview: overviewLines.join("\n").trim() };
 }
@@ -316,8 +317,9 @@ function parseGuidelines(lines: string[]): { dos: string[]; donts: string[] } {
 	for (const rawLine of lines) {
 		const bullet = rawLine.match(/^\s*(?:[-*]|\d+[.)])\s+(.*)$/);
 		if (!bullet?.[1]) continue;
-		const text = bullet[1].trim();
-		if (!text) continue;
+		const raw = bullet[1].trim();
+		if (!raw) continue;
+		const text = raw.replace(/\*\*/g, "").trim();
 		if (/^(don't|dont|do\s+not)\b/i.test(text)) donts.push(text);
 		else dos.push(text);
 	}
