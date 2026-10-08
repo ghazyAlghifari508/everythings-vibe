@@ -3,11 +3,17 @@
 import {
 	type AnimationPlaybackControls,
 	animate,
+	motion,
 	useReducedMotion,
 } from "framer-motion";
 import { Check, ChevronDown, Sparkles } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+
+export const THOUGHT_LINE_ROTATION_INTERVAL_MS = 3000;
+const ROTATING_SLOT_LABEL = "Aktivitas berlangsung";
+
+export type ThoughtLinePresentation = "stacked" | "rotating";
 
 interface ThoughtLineProps {
 	label?: string;
@@ -23,6 +29,25 @@ interface ThoughtLineProps {
 	glyph?: ReactNode;
 	onSettle?: (elapsedSec: number) => void;
 	className?: string;
+	presentation?: ThoughtLinePresentation;
+	rotatingMessages?: string[];
+	rotationKey?: string | number;
+	rotationIntervalMs?: number;
+	startedAt?: number | string | Date;
+}
+
+function resolveStartEpoch(
+	value: number | string | Date | undefined,
+	fallback: number,
+): number {
+	if (value === undefined) return fallback;
+	const epoch =
+		value instanceof Date
+			? value.getTime()
+			: typeof value === "number"
+				? value
+				: Date.parse(value);
+	return Number.isFinite(epoch) ? epoch : fallback;
 }
 
 const MAX_THINKING_CHARS = 8000;
@@ -72,12 +97,50 @@ export function ThoughtLine({
 	glyph,
 	onSettle,
 	className,
+	presentation = "stacked",
+	rotatingMessages,
+	rotationKey,
+	rotationIntervalMs = THOUGHT_LINE_ROTATION_INTERVAL_MS,
+	startedAt,
 }: ThoughtLineProps) {
 	const [elapsed, setElapsed] = useState(0);
 	const [open, setOpen] = useState(true);
-	const startedAtRef = useRef<number>(Date.now());
+	const [hintIndex, setHintIndex] = useState(0);
+	const reduceMotion = useReducedMotion();
+	const startedAtRef = useRef<number>(
+		resolveStartEpoch(startedAt, Date.now()),
+	);
 	const settledRef = useRef<boolean>(false);
 	const traceId = useId();
+
+	const isRotating =
+		presentation === "rotating" &&
+		working &&
+		(rotatingMessages?.length ?? 0) > 0;
+
+	useEffect(() => {
+		if (startedAt === undefined) return;
+		startedAtRef.current = resolveStartEpoch(
+			startedAt,
+			startedAtRef.current,
+		);
+		setElapsed(Math.max(0, (Date.now() - startedAtRef.current) / 1000));
+	}, [startedAt]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: cycle restarts when the parent signals a real stage change via rotationKey by design
+	useEffect(() => {
+		setHintIndex(0);
+	}, [rotationKey]);
+
+	useEffect(() => {
+		if (!isRotating) return;
+		const count = rotatingMessages?.length ?? 0;
+		if (count <= 1) return;
+		const t = setInterval(() => {
+			setHintIndex((index) => (index + 1) % count);
+		}, rotationIntervalMs);
+		return () => clearInterval(t);
+	}, [isRotating, rotatingMessages, rotationIntervalMs]);
 
 	useEffect(() => {
 		if (!working) return;
@@ -113,6 +176,11 @@ export function ThoughtLine({
 		steps && steps.length > 0
 			? Math.min(Math.max(activeStep, 0), steps.length - 1)
 			: 0;
+	const hintCount = rotatingMessages?.length ?? 0;
+	const activeHint =
+		hintCount > 0
+			? (rotatingMessages?.[hintIndex % hintCount] ?? "")
+			: "";
 
 	return (
 		<div
@@ -157,7 +225,45 @@ export function ThoughtLine({
 				) : null}
 			</div>
 
-			{steps && steps.length > 0 ? (
+			{presentation === "rotating" ? (
+			isRotating ? (
+				<div className="mt-3 flex min-w-0 items-center gap-2.5">
+					{glyph ?? (
+						<Sparkles
+							className="size-4 shrink-0 text-[#0f0f0f]"
+							aria-hidden="true"
+						/>
+					)}
+					{reduceMotion ? (
+						<output
+							aria-label={ROTATING_SLOT_LABEL}
+							aria-live="polite"
+							className={cn(
+								"min-w-0 flex-1 truncate text-sm leading-snug text-[#0f0f0f]",
+								fontSize === "xs" && "text-xs",
+							)}
+						>
+							{activeHint}
+						</output>
+					) : (
+						<motion.output
+							key={`${String(rotationKey ?? "slot")}:${hintIndex}`}
+							aria-label={ROTATING_SLOT_LABEL}
+							aria-live="polite"
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.35, ease: "easeOut" }}
+							className={cn(
+								"min-w-0 flex-1 truncate text-sm leading-snug text-[#0f0f0f]",
+								fontSize === "xs" && "text-xs",
+							)}
+						>
+							{activeHint}
+						</motion.output>
+					)}
+				</div>
+			) : null
+		) : steps && steps.length > 0 ? (
 				<ol className="mt-3 space-y-1.5" aria-label="Tahapan proses">
 					{steps.map((step, index) => {
 						const done =
