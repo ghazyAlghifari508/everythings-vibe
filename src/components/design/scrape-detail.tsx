@@ -1,13 +1,9 @@
 import { Check, Copy, Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { ScrapeMode } from "@/db/schema";
 
 export interface ScrapeDetailProps {
-	mode?: ScrapeMode;
-	sourceUrl: string;
 	domain: string;
 	previewHtml?: string;
-	designMd?: string;
 }
 
 type HtmlViewTab = "preview" | "code";
@@ -43,64 +39,7 @@ function downloadFile(filename: string, content: string, mimeType: string) {
 const ICON_BUTTON_CLASS =
 	"inline-flex size-8 items-center justify-center rounded-md border border-transparent text-fog transition-colors hover:border-graphite hover:bg-onyx hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50";
 
-function OutputToolbar({
-	title,
-	copyLabel,
-	downloadLabel,
-	copied,
-	busy,
-	onCopy,
-	onDownload,
-}: {
-	title: string;
-	copyLabel: string;
-	downloadLabel: string;
-	copied: boolean;
-	busy: boolean;
-	onCopy: () => void;
-	onDownload: () => void;
-}) {
-	return (
-		<div className="flex items-center justify-between gap-2 border-b border-graphite bg-charcoal px-3 py-2">
-			<span className="truncate font-mono text-xs font-semibold text-mist">
-				{title}
-			</span>
-			<div className="flex shrink-0 items-center gap-1">
-				<button
-					type="button"
-					onClick={onCopy}
-					disabled={busy}
-					aria-label={copyLabel}
-					title={copyLabel}
-					className={ICON_BUTTON_CLASS}
-				>
-					{copied ? (
-						<Check size={15} aria-hidden className="text-emerald-400" />
-					) : (
-						<Copy size={15} aria-hidden />
-					)}
-				</button>
-				<button
-					type="button"
-					onClick={onDownload}
-					disabled={busy}
-					aria-label={downloadLabel}
-					title={downloadLabel}
-					className={ICON_BUTTON_CLASS}
-				>
-					<Download size={15} aria-hidden />
-				</button>
-			</div>
-		</div>
-	);
-}
-
-export function ScrapeDetail({
-	mode,
-	domain,
-	previewHtml = "",
-	designMd = "",
-}: ScrapeDetailProps) {
+export function ScrapeDetail({ domain, previewHtml = "" }: ScrapeDetailProps) {
 	const [htmlViewTab, setHtmlViewTab] = useState<HtmlViewTab>("preview");
 	const [notice, setNotice] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -112,8 +51,6 @@ export function ScrapeDetail({
 			if (copiedTimer.current) clearTimeout(copiedTimer.current);
 		};
 	}, []);
-
-	const effectiveMode: ScrapeMode = mode ?? (designMd ? "design" : "html");
 
 	async function handleCopy(text: string, successMessage: string) {
 		setBusy(true);
@@ -130,25 +67,16 @@ export function ScrapeDetail({
 		}
 	}
 
-	function handleDownload(kind: "html" | "md") {
+	function handleDownload() {
 		setBusy(true);
 		setNotice("");
 		try {
-			if (kind === "html") {
-				downloadFile(
-					safeFilename(domain, "html"),
-					previewHtml,
-					"text/html;charset=utf-8",
-				);
-				setNotice("index.html mulai diunduh.");
-			} else {
-				downloadFile(
-					safeFilename(domain, "md"),
-					designMd,
-					"text/markdown;charset=utf-8",
-				);
-				setNotice("DESIGN.md mulai diunduh.");
-			}
+			downloadFile(
+				safeFilename(domain, "html"),
+				previewHtml,
+				"text/html;charset=utf-8",
+			);
+			setNotice("index.html mulai diunduh.");
 		} catch {
 			setNotice("Gagal mengunduh file. Coba lagi.");
 		} finally {
@@ -156,14 +84,13 @@ export function ScrapeDetail({
 		}
 	}
 
-	if (effectiveMode === "html") {
-		const copyLabel = "Salin HTML";
-		const downloadLabel = "Download index.html";
-		return (
-			<section
-				aria-label="Hasil HTML"
-				className="overflow-hidden rounded-xl border border-graphite bg-charcoal"
-			>
+	const copyLabel = "Salin HTML";
+	const downloadLabel = "Download index.html";
+	return (
+		<section
+			aria-label="Hasil HTML"
+			className="overflow-hidden rounded-xl border border-graphite bg-charcoal"
+		>
 				<div className="flex items-center justify-between gap-2 border-b border-graphite px-3 py-2">
 					<div
 						role="tablist"
@@ -216,7 +143,7 @@ export function ScrapeDetail({
 						</button>
 						<button
 							type="button"
-							onClick={() => handleDownload("html")}
+							onClick={handleDownload}
 							disabled={busy}
 							aria-label={downloadLabel}
 							title={downloadLabel}
@@ -238,36 +165,6 @@ export function ScrapeDetail({
 						</pre>
 					</div>
 				)}
-
-				{notice ? (
-					<output className="block border-t border-graphite px-3 py-2 text-xs text-fog">
-						{notice}
-					</output>
-				) : null}
-			</section>
-		);
-	}
-
-	return (
-		<section
-			aria-label="Hasil DESIGN.md"
-			className="overflow-hidden rounded-xl border border-graphite bg-charcoal"
-		>
-			<OutputToolbar
-				title="DESIGN.md"
-				copyLabel="Salin DESIGN.md"
-				downloadLabel="Download DESIGN.md"
-				copied={copied}
-				busy={busy}
-				onCopy={() =>
-					void handleCopy(designMd, "DESIGN.md tersalin ke clipboard.")
-				}
-				onDownload={() => handleDownload("md")}
-			/>
-
-			<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
-				{designMd}
-			</pre>
 
 			{notice ? (
 				<output className="block border-t border-graphite px-3 py-2 text-xs text-fog">

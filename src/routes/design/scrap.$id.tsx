@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { ArrowLeft } from "lucide-react";
+import { DesignResult } from "@/components/design/design-result";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
@@ -98,9 +99,14 @@ function ScrapeDetailPage() {
 		(mode === "html" ? Boolean(previewHtml) : Boolean(designMd));
 
 	const siteName = displaySiteName(domain);
+	const wideResult = isCompleted && mode === "design";
 
 	return (
-		<main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14">
+		<main
+			className={`mx-auto flex w-full flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14 ${
+				wideResult ? "max-w-7xl" : "max-w-5xl"
+			}`}
+		>
 			<Link
 				to="/design/scrap"
 				className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-fog transition-colors hover:text-snow"
@@ -116,13 +122,15 @@ function ScrapeDetailPage() {
 			</header>
 
 			{isCompleted ? (
-				<ScrapeDetail
-					mode={mode}
-					sourceUrl={sourceUrl}
-					domain={domain}
-					previewHtml={previewHtml}
-					designMd={designMd}
-				/>
+				mode === "html" ? (
+					<ScrapeDetail domain={domain} previewHtml={previewHtml} />
+				) : (
+					<DesignResult
+						sourceUrl={sourceUrl}
+						domain={domain}
+						designMd={designMd}
+					/>
+				)
 			) : (
 				<ScrapeProgress
 					mode={mode}

@@ -9,34 +9,9 @@ afterEach(() => {
 });
 
 describe("ScrapeDetail", () => {
-	it("renders DESIGN.md with icon toolbar actions instead of text buttons", () => {
-		render(
-			<ScrapeDetail
-				mode="design"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				designMd="# Notion - Style Reference"
-			/>,
-		);
-		expect(screen.getByText("DESIGN.md")).toBeDefined();
-		expect(
-			screen.getByRole("button", { name: /Salin DESIGN\.md/i }),
-		).toBeDefined();
-		expect(
-			screen.getByRole("button", { name: /Download DESIGN\.md/i }),
-		).toBeDefined();
-		expect(screen.queryByRole("button", { name: /^Salin HTML$/i })).toBeNull();
-		expect(
-			screen.queryByRole("button", { name: /Download index\.html/i }),
-		).toBeNull();
-		expect(screen.queryByRole("button", { name: /ZIP/i })).toBeNull();
-	});
-
 	it("renders HTML result with Preview and Source HTML views plus icon actions", () => {
 		render(
 			<ScrapeDetail
-				mode="html"
-				sourceUrl="https://www.notion.com/"
 				domain="www.notion.com"
 				previewHtml="<html><body>hi</body></html>"
 			/>,
@@ -52,18 +27,22 @@ describe("ScrapeDetail", () => {
 		).toBeNull();
 	});
 
-	it("does not expose dual-artifact tabs for mode-specific jobs", () => {
-		render(
+	it("shows no design inspector sections in the HTML result", () => {
+		const { container } = render(
 			<ScrapeDetail
-				mode="design"
-				sourceUrl="https://www.notion.com/"
 				domain="www.notion.com"
 				previewHtml="<html><body>hi</body></html>"
-				designMd="# Notion - Style Reference"
 			/>,
 		);
-		expect(screen.queryByRole("tab", { name: /^index\.html$/i })).toBeNull();
-		expect(screen.queryByRole("tab", { name: /^design\.md$/i })).toBeNull();
+		expect(
+			screen.queryByRole("heading", { name: /palet warna/i }),
+		).toBeNull();
+		expect(screen.queryByRole("heading", { name: /tipografi/i })).toBeNull();
+		expect(screen.queryByRole("heading", { name: /panduan/i })).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /implement ke ai agent/i }),
+		).toBeNull();
+		expect(container.textContent).not.toMatch(/DESIGN\.md selesai/i);
 	});
 
 	it("shows copy feedback without replacing the toolbar layout", async () => {
@@ -72,19 +51,17 @@ describe("ScrapeDetail", () => {
 		});
 		render(
 			<ScrapeDetail
-				mode="design"
-				sourceUrl="https://www.notion.com/"
 				domain="www.notion.com"
-				designMd="# Notion - Style Reference"
+				previewHtml="<html><body>hi</body></html>"
 			/>,
 		);
 		const copyButton = screen.getByRole("button", {
-			name: /Salin DESIGN\.md/i,
+			name: /Salin HTML/i,
 		});
 		fireEvent.click(copyButton);
 		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
 		expect(
-			screen.getByRole("button", { name: /Download DESIGN\.md/i }),
+			screen.getByRole("button", { name: /Download index\.html/i }),
 		).toBeDefined();
 	});
 });
