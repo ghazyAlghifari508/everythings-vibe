@@ -95,7 +95,9 @@ export async function runScrapePipeline(
 	const persist = async (
 		status: ScrapeStatus,
 		patch: Partial<ScrapeMetadata> = {},
-		columns: Record<string, unknown> = {},
+		columns: Partial<
+			Pick<ScrapeRow, "sourceUrl" | "domain" | "title" | "html" | "previewHtml">
+		> = {},
 	): Promise<void> => {
 		meta = {
 			...meta,
@@ -136,9 +138,14 @@ export async function runScrapePipeline(
 		meta = { ...meta, ...captured.metadata };
 
 		if (mode === "html") {
+			await persist("extracting");
+			const saveStart = Date.now();
 			await persist(
-				"extracting",
-				{},
+				"saving",
+				{
+					activity: "Menyimpan index.html",
+					activityStartedAt: new Date().toISOString(),
+				},
 				{
 					sourceUrl: captured.sourceUrl,
 					domain: captured.domain,
@@ -147,8 +154,7 @@ export async function runScrapePipeline(
 					previewHtml: captured.previewHtml,
 				},
 			);
-			await persist("saving");
-			await instrumentation.onActivity?.("Menyimpan index.html");
+			instrumentation.onTiming?.("save", Date.now() - saveStart);
 			await persist("completed");
 			console.info(
 				JSON.stringify({
@@ -187,9 +193,11 @@ export async function runScrapePipeline(
 			instrumentation,
 		);
 
-		await persist("saving");
-		await instrumentation.onActivity?.("Menyimpan hasil");
 		const saveStart = Date.now();
+		await persist("saving", {
+			activity: "Menyimpan hasil",
+			activityStartedAt: new Date().toISOString(),
+		});
 		await saveScrapeDocument(scrapeId, designMd);
 		instrumentation.onTiming?.("save", Date.now() - saveStart);
 

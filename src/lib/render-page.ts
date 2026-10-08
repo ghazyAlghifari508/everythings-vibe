@@ -23,7 +23,12 @@ export const DESKTOP_VIEWPORT = {
 
 const NAV_TIMEOUT_MS = 35_000;
 const IDLE_TIMEOUT_MS = 8_000;
+const POST_SCROLL_IDLE_TIMEOUT_MS = 3_000;
 const SETTLE_MS = 600;
+const AUTO_SCROLL_STEP_PX = 600;
+const AUTO_SCROLL_DELAY_MS = 100;
+const AUTO_SCROLL_MAX_STEPS = 60;
+const AUTO_SCROLL_STABLE_STEPS = 2;
 const MIN_ANALYZABLE_HTML_BYTES = 200;
 const BLOCK_HOSTS = new Set(["localhost", "ip6-localhost", "ip6-loopback"]);
 
@@ -150,6 +155,7 @@ export async function guardContext(context: BrowserContext): Promise<void> {
 		const req = route.request();
 		const method = req.method();
 		if (method !== "GET" && method !== "HEAD") return route.abort();
+		if (shouldSkipCaptureResourceType(req.resourceType())) return route.abort();
 		if (await isBlockedRequestUrl(req.url())) return route.abort();
 		try {
 			const { body, status, contentType } = await fetchAsset(req.url());
@@ -164,27 +170,53 @@ export async function guardContext(context: BrowserContext): Promise<void> {
 	});
 }
 
+export function shouldSkipCaptureResourceType(resourceType: string): boolean {
+	return resourceType === "media";
+}
+
 async function autoScroll(page: import("playwright").Page): Promise<void> {
-	await page.evaluate(async () => {
-		const step = 600;
-		const delay = 100;
-		const maxSteps = 60;
-		await new Promise<void>((resolve) => {
-			let steps = 0;
-			const timer = setInterval(() => {
-				window.scrollBy(0, step);
-				steps += 1;
-				if (
-					steps >= maxSteps ||
-					window.scrollY + window.innerHeight >= document.body.scrollHeight
-				) {
-					clearInterval(timer);
-					window.scrollTo(0, 0);
-					resolve();
-				}
-			}, delay);
-		});
-	});
+	await page.evaluate(
+		async ({ step, delay, maxSteps, stableSteps }) => {
+			await new Promise<void>((resolve) => {
+				let steps = 0;
+				let stableHeightSteps = 0;
+				let previousHeight = Math.max(
+					document.documentElement.scrollHeight,
+					document.body.scrollHeight,
+				);
+				const timer = setInterval(() => {
+					window.scrollBy(0, step);
+					steps += 1;
+					requestAnimationFrame(() => {
+						const height = Math.max(
+							document.documentElement.scrollHeight,
+							document.body.scrollHeight,
+						);
+						const atBottom = window.scrollY + window.innerHeight >= height;
+						stableHeightSteps =
+							height === previousHeight ? stableHeightSteps + 1 : 0;
+						previousHeight = height;
+						if (
+							steps >= maxSteps ||
+							(atBottom && stableHeightSteps >= stableSteps)
+						) {
+							clearInterval(timer);
+							requestAnimationFrame(() => {
+								window.scrollTo(0, 0);
+								resolve();
+							});
+						}
+					});
+				}, delay);
+			});
+		},
+		{
+			step: AUTO_SCROLL_STEP_PX,
+			delay: AUTO_SCROLL_DELAY_MS,
+			maxSteps: AUTO_SCROLL_MAX_STEPS,
+			stableSteps: AUTO_SCROLL_STABLE_STEPS,
+		},
+	);
 }
 
 export interface RenderedPage {
@@ -193,13 +225,19 @@ export interface RenderedPage {
 	finalUrl: string;
 }
 
+export async function closeRenderBrowser(): Promise<void> {
+	const browser = await browserPromise?.catch(() => null);
+	browserPromise = null;
+	await browser?.close();
+}
+
 export async function renderPage(
 	url: string,
 	options: RenderPageOptions = {},
 ): Promise<RenderedPage> {
 	const { onActivity, onTiming, mode = "design" } = options;
+	const setupStart = Date.now();
 	const browser = await getBrowser();
-	const contextStart = Date.now();
 	const context = await browser.newContext({
 		viewport: DESKTOP_VIEWPORT,
 		userAgent: SCRAPE_BROWSER_UA,
@@ -208,10 +246,10 @@ export async function renderPage(
 		ignoreHTTPSErrors: true,
 		serviceWorkers: "block",
 	});
-	onTiming?.("browserContext", Date.now() - contextStart);
 	try {
 		await guardContext(context);
 		const page = await context.newPage();
+		onTiming?.("browserContext", Date.now() - setupStart);
 		let status = 0;
 		try {
 			await onActivity?.("Membuka website");
@@ -235,17 +273,15 @@ export async function renderPage(
 			onTiming?.("autoScroll", Date.now() - t);
 			t = Date.now();
 			await page
-				.waitForLoadState("networkidle", { timeout: IDLE_TIMEOUT_MS })
+				.waitForLoadState("networkidle", {
+					timeout: POST_SCROLL_IDLE_TIMEOUT_MS,
+				})
 				.catch(() => {});
 			onTiming?.("secondNetworkIdle", Date.now() - t);
 			t = Date.now();
 			await page.waitForTimeout(SETTLE_MS);
 			onTiming?.("settle", Date.now() - t);
-			await onActivity?.(
-				mode === "html"
-					? "Menangkap DOM hasil render"
-					: "Capture halaman selesai",
-			);
+			if (mode === "html") await onActivity?.("Menangkap DOM hasil render");
 		} catch (err) {
 			if (err instanceof ScrapeError) throw err;
 		}
@@ -255,6 +291,7 @@ export async function renderPage(
 			SCRAPE_MAX_HTML_BYTES,
 		);
 		onTiming?.("pageContent", Date.now() - contentStart);
+		if (mode === "design") await onActivity?.("Capture halaman selesai");
 		if (!html || html.length < MIN_ANALYZABLE_HTML_BYTES)
 			throw new ScrapeError(
 				"NO_ANALYZABLE_CONTENT",

@@ -1,5 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { DESKTOP_VIEWPORT, isBlockedRequestUrl } from "./render-page";
+import { afterAll, describe, expect, it } from "vitest";
+import {
+	closeRenderBrowser,
+	DESKTOP_VIEWPORT,
+	isBlockedRequestUrl,
+	shouldSkipCaptureResourceType,
+} from "./render-page";
+
+afterAll(async () => {
+	await closeRenderBrowser();
+});
 
 describe("isBlockedRequestUrl", () => {
 	it("blocks localhost and loopback targets", async () => {
@@ -45,15 +54,64 @@ describe("DESKTOP_VIEWPORT", () => {
 	});
 });
 
+describe("shouldSkipCaptureResourceType", () => {
+	it("skips media streams without skipping visual resources", () => {
+		expect(shouldSkipCaptureResourceType("media")).toBe(true);
+		expect(shouldSkipCaptureResourceType("stylesheet")).toBe(false);
+		expect(shouldSkipCaptureResourceType("font")).toBe(false);
+		expect(shouldSkipCaptureResourceType("image")).toBe(false);
+	});
+});
+
 describe("renderPage", () => {
 	it("returns rendered DOM with client JavaScript executed", async () => {
 		const { renderPage } = await import("./render-page");
 		const filler = "<p>lorem ipsum dolor sit amet</p>".repeat(20);
+		const activities: string[] = [];
 		const target = `data:text/html,${encodeURIComponent(
 			`<html><head><title>smoke</title></head><body><div id="root"></div>${filler}<script>document.getElementById("root").textContent = "rendered-by-js";</script></body></html>`,
 		)}`;
-		const rendered = await renderPage(target);
+		const rendered = await renderPage(target, {
+			mode: "html",
+			onActivity: (activity) => {
+				activities.push(activity);
+			},
+		});
 		expect(rendered.html).toContain("rendered-by-js");
 		expect(rendered.status).toBe(200);
+		expect(activities).toEqual([
+			"Membuka website",
+			"Halaman berhasil dimuat",
+			"Menunggu resource halaman",
+			"Memuat konten lazy-load",
+			"Menangkap DOM hasil render",
+		]);
+	}, 60_000);
+
+	it("captures content appended by a lazy-load handler near the document bottom", async () => {
+		const { renderPage } = await import("./render-page");
+		const target = `data:text/html,${encodeURIComponent(
+			`<html><head><style>body{margin:0}.spacer{height:2600px}</style></head><body><div class="spacer"></div><script>let loaded=false;window.addEventListener('scroll',()=>{if(!loaded&&window.scrollY+window.innerHeight>=document.documentElement.scrollHeight){loaded=true;const item=document.createElement('p');item.id='lazy-loaded';item.textContent='loaded after scrolling';document.body.appendChild(item);document.body.style.paddingBottom='600px';}});</script></body></html>`,
+		)}`;
+		const timings: Record<string, number> = {};
+		const rendered = await renderPage(target, {
+			onTiming: (label, durationMs) => {
+				timings[label] = durationMs;
+			},
+		});
+		expect(rendered.html).toContain('id="lazy-loaded"');
+		expect(rendered.html).toContain("loaded after scrolling");
+		expect(Object.keys(timings)).toEqual(
+			expect.arrayContaining([
+				"browserContext",
+				"navigation",
+				"firstNetworkIdle",
+				"autoScroll",
+				"secondNetworkIdle",
+				"settle",
+				"pageContent",
+			]),
+		);
+		expect(timings.secondNetworkIdle).toBeLessThanOrEqual(3_000);
 	}, 60_000);
 });
