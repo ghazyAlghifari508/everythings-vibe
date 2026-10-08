@@ -162,6 +162,9 @@ export const CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES = 500;
 // the analysis output. Two to three Indonesian sentences fit comfortably;
 // longer prose belongs in findings, not in the review header card.
 export const CODEBASE_ANALYSIS_SUMMARY_MAX_CHARS = 1000;
+export const CODEBASE_STARTER_TITLE_MAX_CHARS = 80;
+export const CODEBASE_STARTER_DESCRIPTION_MAX_CHARS = 180;
+export const CODEBASE_STARTER_PROMPT_MAX_CHARS = 1500;
 // === Existing-codebase generation grounding (Task 8) ===
 // Bounded snapshot-bound context injected into Ask/PRD/AC/Task prompts via
 // one formatting boundary (buildCodebasePromptBlock). Null context (greenfield)

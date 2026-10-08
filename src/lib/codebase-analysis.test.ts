@@ -15,7 +15,9 @@ import {
 	buildAnalysisUserPrompt,
 	CODEBASE_ANALYSIS_SYSTEM_PROMPT,
 	type CodebaseAnalysis,
+	codebaseAnalysisGenerationSchema,
 	codebaseAnalysisSchema,
+	codebaseStarterSuggestionsSchema,
 	decideAnalysisRequest,
 	inferTechAnswersFromCodebase,
 	parseAnalysisOutput,
@@ -25,6 +27,11 @@ import {
 	toSafeAnalysisErrorMessage,
 } from "./codebase-analysis";
 import { AnalysisServiceError } from "./codebase-analysis.server";
+import {
+	CODEBASE_STARTER_DESCRIPTION_MAX_CHARS,
+	CODEBASE_STARTER_PROMPT_MAX_CHARS,
+	CODEBASE_STARTER_TITLE_MAX_CHARS,
+} from "./constants";
 import {
 	type CreditServiceStore,
 	createCreditService,
@@ -52,10 +59,99 @@ const validAnalysis = {
 	],
 } satisfies CodebaseAnalysis;
 
+const validStarterSuggestions = [
+	{
+		id: "feature",
+		title: "Feature task",
+		description: "A focused task description.",
+		prompt:
+			"Implement a focused feature using patterns evidenced in the snapshot.",
+		relevantPaths: ["src/feature.ts"],
+	},
+	{
+		id: "bugfix",
+		title: "Bugfix task",
+		description: "A focused bugfix description.",
+		prompt: "Fix a behavior supported by evidence in the snapshot.",
+		relevantPaths: ["src/bugfix.ts"],
+	},
+	{
+		id: "refactor",
+		title: "Refactor task",
+		description: "A focused refactor description.",
+		prompt: "Refactor a proven module without changing its behavior.",
+		relevantPaths: ["src/refactor.ts"],
+	},
+	{
+		id: "ui",
+		title: "UI task",
+		description: "A focused UI description.",
+		prompt:
+			"Improve an existing interface using the snapshot's established patterns.",
+		relevantPaths: ["src/ui.ts"],
+	},
+] as const;
+
 describe("codebase analysis schema", () => {
 	it("accepts a complete advisory analysis", () => {
 		const result = codebaseAnalysisSchema.safeParse(validAnalysis);
 		expect(result.success).toBe(true);
+	});
+
+	it("accepts exactly one suggestion for each starter category", () => {
+		const result = codebaseStarterSuggestionsSchema.safeParse(
+			validStarterSuggestions,
+		);
+		expect(result.success).toBe(true);
+	});
+
+	it("rejects a missing starter category", () => {
+		expect(
+			codebaseStarterSuggestionsSchema.safeParse(
+				validStarterSuggestions.slice(1),
+			).success,
+		).toBe(false);
+	});
+
+	it("rejects a duplicated starter category even when four items are present", () => {
+		const duplicated = [
+			...validStarterSuggestions.slice(0, 3),
+			{ ...validStarterSuggestions[3], id: validStarterSuggestions[0].id },
+		];
+		expect(codebaseStarterSuggestionsSchema.safeParse(duplicated).success).toBe(
+			false,
+		);
+	});
+
+	it("rejects malformed starter suggestion fields and category ids", () => {
+		const emptyTitle = validStarterSuggestions.map((suggestion, index) =>
+			index === 0 ? { ...suggestion, title: "" } : suggestion,
+		);
+		const invalidId = validStarterSuggestions.map((suggestion, index) =>
+			index === 0 ? { ...suggestion, id: "other" } : suggestion,
+		);
+		expect(codebaseStarterSuggestionsSchema.safeParse(emptyTitle).success).toBe(
+			false,
+		);
+		expect(codebaseStarterSuggestionsSchema.safeParse(invalidId).success).toBe(
+			false,
+		);
+	});
+
+	it("keeps starter suggestions optional for legacy analysis rows", () => {
+		expect(codebaseAnalysisSchema.safeParse(validAnalysis).success).toBe(true);
+	});
+
+	it("requires the complete starter set for newly generated analysis", () => {
+		expect(
+			codebaseAnalysisGenerationSchema.safeParse({
+				...validAnalysis,
+				starterSuggestions: validStarterSuggestions,
+			}).success,
+		).toBe(true);
+		expect(
+			codebaseAnalysisGenerationSchema.safeParse(validAnalysis).success,
+		).toBe(false);
 	});
 
 	it("rejects analysis missing project identity", () => {
@@ -154,6 +250,16 @@ describe("codebase analysis system prompt", () => {
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/metadata/i);
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/bukan permintaan fitur/i);
 	});
+
+	it("requires all starter categories and repository evidence without stack-based domain guesses", () => {
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toContain("starterSuggestions");
+		for (const category of ["feature", "bugfix", "refactor", "ui"]) {
+			expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toContain(`"id": "${category}"`);
+		}
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/snapshot|manifest/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/tidak menggandakan/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/migrasi stack/i);
+	});
 });
 
 describe("buildAnalysisUserPrompt", () => {
@@ -233,20 +339,31 @@ describe("selectSourceExcerpts", () => {
 
 describe("parseAnalysisOutput", () => {
 	const ids = { projectId: "proj_123", snapshotId: "snap_123" };
+	const trustedManifestPaths = new Set([
+		"src/feature.ts",
+		"src/bugfix.ts",
+		"src/refactor.ts",
+		"src/ui.ts",
+	]);
 	const modelJson = JSON.stringify({
 		framework: "TanStack Start",
 		language: "TypeScript",
+		starterSuggestions: validStarterSuggestions,
 	});
 
 	it("validates bare model JSON and injects server identities", () => {
-		const result = parseAnalysisOutput(modelJson, ids);
+		const result = parseAnalysisOutput(modelJson, ids, trustedManifestPaths);
 		expect(result.projectId).toBe("proj_123");
 		expect(result.snapshotId).toBe("snap_123");
 		expect(result.framework).toBe("TanStack Start");
 	});
 
 	it("validates fenced model JSON", () => {
-		const result = parseAnalysisOutput(`\`\`\`json\n${modelJson}\n\`\`\``, ids);
+		const result = parseAnalysisOutput(
+			`\`\`json\n${modelJson}\n\`\`\``,
+			ids,
+			trustedManifestPaths,
+		);
 		expect(result.language).toBe("TypeScript");
 	});
 
@@ -256,8 +373,10 @@ describe("parseAnalysisOutput", () => {
 				projectId: "proj_evil",
 				snapshotId: "snap_evil",
 				framework: "X",
+				starterSuggestions: validStarterSuggestions,
 			}),
 			ids,
+			trustedManifestPaths,
 		);
 		expect(result.projectId).toBe("proj_123");
 		expect(result.snapshotId).toBe("snap_123");
@@ -266,7 +385,7 @@ describe("parseAnalysisOutput", () => {
 	it("throws a typed error without leaking model text on invalid JSON", () => {
 		const raw = "{ not json at all {{{";
 		try {
-			parseAnalysisOutput(raw, ids);
+			parseAnalysisOutput(raw, ids, trustedManifestPaths);
 			expect.unreachable("expected AnalysisValidationError");
 		} catch (error) {
 			expect(error).toBeInstanceOf(AnalysisValidationError);
@@ -277,12 +396,32 @@ describe("parseAnalysisOutput", () => {
 
 	it("throws a typed error when the shape fails validation", () => {
 		try {
-			parseAnalysisOutput(JSON.stringify({ framework: 42 }), ids);
+			parseAnalysisOutput(
+				JSON.stringify({ framework: 42 }),
+				ids,
+				trustedManifestPaths,
+			);
 			expect.unreachable("expected AnalysisValidationError");
 		} catch (error) {
 			expect(error).toBeInstanceOf(AnalysisValidationError);
 			expect((error as AnalysisValidationError).code).toBe("ANALYSIS_FAILED");
 		}
+	});
+
+	it("rejects a suggestion path that is not present in the trusted snapshot manifest", () => {
+		const suggestionsWithUntrustedPath = validStarterSuggestions.map(
+			(suggestion, index) =>
+				index === 0
+					? { ...suggestion, relevantPaths: ["src/not-in-manifest.ts"] }
+					: suggestion,
+		);
+		expect(() =>
+			parseAnalysisOutput(
+				JSON.stringify({ starterSuggestions: suggestionsWithUntrustedPath }),
+				ids,
+				trustedManifestPaths,
+			),
+		).toThrow(AnalysisValidationError);
 	});
 });
 
@@ -363,6 +502,46 @@ describe("analysis trigger/read DTOs", () => {
 				status: "analyzing",
 			}).success,
 		).toBe(false);
+	});
+
+	it("enforces the configured starter text bounds", () => {
+		const tooLongTitle = validStarterSuggestions.map((suggestion, index) =>
+			index === 0
+				? {
+						...suggestion,
+						title: "x".repeat(CODEBASE_STARTER_TITLE_MAX_CHARS + 1),
+					}
+				: suggestion,
+		);
+		const tooLongDescription = validStarterSuggestions.map(
+			(suggestion, index) =>
+				index === 0
+					? {
+							...suggestion,
+							description: "x".repeat(
+								CODEBASE_STARTER_DESCRIPTION_MAX_CHARS + 1,
+							),
+						}
+					: suggestion,
+		);
+		const tooLongPrompt = validStarterSuggestions.map((suggestion, index) =>
+			index === 0
+				? {
+						...suggestion,
+						prompt: "x".repeat(CODEBASE_STARTER_PROMPT_MAX_CHARS + 1),
+					}
+				: suggestion,
+		);
+
+		for (const suggestions of [
+			tooLongTitle,
+			tooLongDescription,
+			tooLongPrompt,
+		]) {
+			expect(
+				codebaseStarterSuggestionsSchema.safeParse(suggestions).success,
+			).toBe(false);
+		}
 	});
 });
 

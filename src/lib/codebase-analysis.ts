@@ -5,6 +5,9 @@ import {
 	CODEBASE_ANALYSIS_MAX_CONTEXT_CHARS,
 	CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES,
 	CODEBASE_ANALYSIS_SUMMARY_MAX_CHARS,
+	CODEBASE_STARTER_DESCRIPTION_MAX_CHARS,
+	CODEBASE_STARTER_PROMPT_MAX_CHARS,
+	CODEBASE_STARTER_TITLE_MAX_CHARS,
 } from "./constants";
 import { extractJson } from "./services/json-extract";
 
@@ -23,7 +26,36 @@ export type CodebaseAnalysisFinding = z.infer<
 	typeof codebaseAnalysisFindingSchema
 >;
 
-export const codebaseAnalysisSchema = z.object({
+export const CODEBASE_STARTER_IDS = [
+	"feature",
+	"bugfix",
+	"refactor",
+	"ui",
+] as const;
+
+export const codebaseStarterSuggestionSchema = z.object({
+	id: z.enum(CODEBASE_STARTER_IDS),
+	title: z.string().min(1).max(CODEBASE_STARTER_TITLE_MAX_CHARS),
+	description: z.string().min(1).max(CODEBASE_STARTER_DESCRIPTION_MAX_CHARS),
+	prompt: z.string().min(1).max(CODEBASE_STARTER_PROMPT_MAX_CHARS),
+	relevantPaths: z.array(z.string().min(1)).optional(),
+});
+
+export type CodebaseStarterSuggestion = z.infer<
+	typeof codebaseStarterSuggestionSchema
+>;
+
+export const codebaseStarterSuggestionsSchema = z
+	.array(codebaseStarterSuggestionSchema)
+	.length(CODEBASE_STARTER_IDS.length)
+	.refine((suggestions) =>
+		CODEBASE_STARTER_IDS.every(
+			(id) =>
+				suggestions.filter((suggestion) => suggestion.id === id).length === 1,
+		),
+	);
+
+const codebaseAnalysisBaseSchema = z.object({
 	projectId: z.string().min(1),
 	snapshotId: z.string().min(1),
 	// Model-generated application summary: what the app is and does, in two
@@ -54,6 +86,15 @@ export const codebaseAnalysisSchema = z.object({
 	limitations: z.array(z.string().min(1)).optional(),
 	findings: z.array(codebaseAnalysisFindingSchema).optional(),
 });
+
+export const codebaseAnalysisSchema = codebaseAnalysisBaseSchema.extend({
+	starterSuggestions: codebaseStarterSuggestionsSchema.optional(),
+});
+
+export const codebaseAnalysisGenerationSchema =
+	codebaseAnalysisBaseSchema.extend({
+		starterSuggestions: codebaseStarterSuggestionsSchema,
+	});
 
 export type CodebaseAnalysis = z.infer<typeof codebaseAnalysisSchema>;
 
@@ -140,7 +181,13 @@ FORMAT JSON (output HANYA JSON, tanpa teks lain):
   "relevantFiles": ["jalur file yang relevan"],
   "impactAreas": ["area yang terdampak fitur baru"],
   "limitations": ["keterbatasan snapshot/analisis"],
-  "findings": [{ "title": "...", "detail": "...", "uncertainty": "hal yang belum pasti (wajib diisi bila ragu)" }]
+  "findings": [{ "title": "...", "detail": "...", "uncertainty": "hal yang belum pasti (wajib diisi bila ragu)" }],
+  "starterSuggestions": [
+    { "id": "feature", "title": "judul tugas yang konkret", "description": "ringkasan singkat", "prompt": "instruksi lengkap dan siap diedit", "relevantPaths": ["jalur dari manifest bila relevan"] },
+    { "id": "bugfix", "title": "judul tugas yang konkret", "description": "ringkasan singkat", "prompt": "instruksi lengkap dan siap diedit", "relevantPaths": ["jalur dari manifest bila relevan"] },
+    { "id": "refactor", "title": "judul tugas yang konkret", "description": "ringkasan singkat", "prompt": "instruksi lengkap dan siap diedit", "relevantPaths": ["jalur dari manifest bila relevan"] },
+    { "id": "ui", "title": "judul tugas yang konkret", "description": "ringkasan singkat", "prompt": "instruksi lengkap dan siap diedit", "relevantPaths": ["jalur dari manifest bila relevan"] }
+  ]
 }
 
 ATURAN:
@@ -150,7 +197,12 @@ ATURAN:
 4. Field yang tidak terdeteksi diisi null atau array kosong — jangan ditebak.
 5. Tulis ringkasan dan temuan dalam Bahasa Indonesia.
 6. Summary menjawab "aplikasi ini tentang apa" (fungsi, alur utama, pengelolaan data) — bukan sekadar menyebut ulang tech stack.
-7. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.`;
+7. starterSuggestions wajib berisi tepat satu saran untuk setiap id: feature, bugfix, refactor, dan ui. Setiap saran harus spesifik, kecil, berguna, dan diturunkan dari summary, moduleMap, relevantFiles, impactAreas, findings, atau isi source snapshot.
+8. Jangan menyimpulkan domain aplikasi dari framework, bahasa, dependency, atau nama repository. Identifikasi fitur yang sudah terbukti ada agar saran tidak menggandakan kemampuan yang sudah tersedia.
+9. Untuk kategori feature, usulkan kemampuan yang masuk akal dari bukti tentang fungsi aplikasi. Untuk bugfix, sebutkan kondisi yang benar-benar tampak bermasalah; bila belum ada bukti bug, pilih perbaikan alur konservatif dan jangan menyatakan bug pasti ada. Untuk refactor, pilih modul atau pola yang terlihat dan pertahankan stack/perilaku. Jangan usulkan migrasi stack kecuali findings secara eksplisit membuktikan kebutuhan. Untuk ui, rujuk antarmuka yang benar-benar terlihat dalam source snapshot.
+10. Prompt harus berupa instruksi lengkap dan siap diedit/dikirim, bukan fragmen atau template kosong. Title dan description singkat dan spesifik. Jangan membuat klaim behavior yang tidak dibuktikan snapshot.
+11. relevantPaths hanya boleh berisi jalur yang benar-benar ada dalam manifest. Sertakan jalur saat saran menyebut modul tertentu; bila tidak dapat membuktikan jalurnya, jangan mengarangnya.
+12. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.`;
 
 // Manifest entries come from `manifestEntrySchema` (Task 5); this structural
 // subset keeps the prompt builder decoupled from the sync DTO module.
@@ -290,6 +342,7 @@ export class AnalysisValidationError extends Error {
 export function parseAnalysisOutput(
 	raw: string,
 	ids: { projectId: string; snapshotId: string },
+	trustedManifestPaths: ReadonlySet<string>,
 ): CodebaseAnalysis {
 	let parsed: unknown;
 	try {
@@ -311,12 +364,21 @@ export function parseAnalysisOutput(
 		snapshotId: _droppedSnapshot,
 		...rest
 	} = parsed as Record<string, unknown>;
-	const result = codebaseAnalysisSchema.safeParse({
+	const result = codebaseAnalysisGenerationSchema.safeParse({
 		...rest,
 		projectId: ids.projectId,
 		snapshotId: ids.snapshotId,
 	});
 	if (!result.success) {
+		throw new AnalysisValidationError(
+			"AI menghasilkan output yang tidak valid. Coba analisis ulang.",
+		);
+	}
+	if (
+		result.data.starterSuggestions.some((suggestion) =>
+			suggestion.relevantPaths?.some((path) => !trustedManifestPaths.has(path)),
+		)
+	) {
 		throw new AnalysisValidationError(
 			"AI menghasilkan output yang tidak valid. Coba analisis ulang.",
 		);
