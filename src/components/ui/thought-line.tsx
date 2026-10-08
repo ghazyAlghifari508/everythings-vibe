@@ -29,6 +29,8 @@ interface ThoughtLineProps {
 	glyph?: ReactNode;
 	onSettle?: (elapsedSec: number) => void;
 	className?: string;
+	// bare embeds one inline activity line in a parent card instead of its own card + header.
+	bare?: boolean;
 	presentation?: ThoughtLinePresentation;
 	rotatingMessages?: string[];
 	rotationKey?: string | number;
@@ -83,6 +85,87 @@ function PulsingStepIcon() {
 	);
 }
 
+interface RotatingActivityProps {
+	messages: string[];
+	index: number;
+	rotationKeyValue: string | number | undefined;
+	glyph: ReactNode;
+	fontSize: "sm" | "xs";
+	showTimer: boolean;
+	elapsed: number;
+	bare: boolean;
+	className?: string;
+}
+
+function RotatingActivity({
+	messages,
+	index,
+	rotationKeyValue,
+	glyph,
+	fontSize,
+	showTimer,
+	elapsed,
+	bare,
+	className,
+}: RotatingActivityProps) {
+	const reduceMotion = useReducedMotion();
+	const hint = messages.length > 0 ? (messages[index % messages.length] ?? "") : "";
+	const messageTone = bare ? "text-snow" : "text-[#0f0f0f]";
+	const glyphTone = bare ? "text-mist" : "text-[#0f0f0f]";
+	const timerTone = bare ? "text-fog" : "text-[#606060]";
+	return (
+		<div className={cn("flex min-w-0 items-center gap-2.5", className)}>
+			{glyph ?? (
+				<Sparkles
+					className={cn("size-4 shrink-0", glyphTone)}
+					aria-hidden="true"
+				/>
+			)}
+			{reduceMotion ? (
+				<output
+					aria-label={ROTATING_SLOT_LABEL}
+					aria-live="polite"
+					className={cn(
+						"min-w-0 flex-1 truncate text-sm leading-snug",
+						messageTone,
+						fontSize === "xs" && "text-xs",
+					)}
+				>
+					{hint}
+				</output>
+			) : (
+				<motion.output
+					key={`${String(rotationKeyValue ?? "slot")}:${index}`}
+					aria-label={ROTATING_SLOT_LABEL}
+					aria-live="polite"
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					transition={{ duration: 0.35, ease: "easeOut" }}
+					className={cn(
+						"min-w-0 flex-1 truncate text-sm leading-snug",
+						messageTone,
+						fontSize === "xs" && "text-xs",
+					)}
+				>
+					{hint}
+				</motion.output>
+			)}
+			{showTimer ? (
+				<span
+					role="timer"
+					aria-label="Waktu proses"
+					className={cn(
+						"shrink-0 font-mono text-xs tabular-nums",
+						timerTone,
+					)}
+				>
+					{elapsed.toFixed(1)}s
+				</span>
+			) : null}
+		</div>
+	);
+}
+
 export function ThoughtLine({
 	label = "Thinking",
 	doneLabel = "Thought",
@@ -102,11 +185,11 @@ export function ThoughtLine({
 	rotationKey,
 	rotationIntervalMs = THOUGHT_LINE_ROTATION_INTERVAL_MS,
 	startedAt,
+	bare = false,
 }: ThoughtLineProps) {
 	const [elapsed, setElapsed] = useState(0);
 	const [open, setOpen] = useState(true);
 	const [hintIndex, setHintIndex] = useState(0);
-	const reduceMotion = useReducedMotion();
 	const startedAtRef = useRef<number>(
 		resolveStartEpoch(startedAt, Date.now()),
 	);
@@ -176,11 +259,26 @@ export function ThoughtLine({
 		steps && steps.length > 0
 			? Math.min(Math.max(activeStep, 0), steps.length - 1)
 			: 0;
-	const hintCount = rotatingMessages?.length ?? 0;
-	const activeHint =
-		hintCount > 0
-			? (rotatingMessages?.[hintIndex % hintCount] ?? "")
-			: "";
+	const hintList = rotatingMessages ?? [];
+
+	if (bare) {
+		return (
+			<div className={cn("min-w-0", className)}>
+				{isRotating ? (
+					<RotatingActivity
+						messages={hintList}
+						index={hintIndex}
+						rotationKeyValue={rotationKey}
+						glyph={glyph}
+						fontSize={fontSize}
+						showTimer={showTimer}
+						elapsed={elapsed}
+						bare
+					/>
+				) : null}
+			</div>
+		);
+	}
 
 	return (
 		<div
@@ -226,44 +324,20 @@ export function ThoughtLine({
 			</div>
 
 			{presentation === "rotating" ? (
-			isRotating ? (
-				<div className="mt-3 flex min-w-0 items-center gap-2.5">
-					{glyph ?? (
-						<Sparkles
-							className="size-4 shrink-0 text-[#0f0f0f]"
-							aria-hidden="true"
-						/>
-					)}
-					{reduceMotion ? (
-						<output
-							aria-label={ROTATING_SLOT_LABEL}
-							aria-live="polite"
-							className={cn(
-								"min-w-0 flex-1 truncate text-sm leading-snug text-[#0f0f0f]",
-								fontSize === "xs" && "text-xs",
-							)}
-						>
-							{activeHint}
-						</output>
-					) : (
-						<motion.output
-							key={`${String(rotationKey ?? "slot")}:${hintIndex}`}
-							aria-label={ROTATING_SLOT_LABEL}
-							aria-live="polite"
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							transition={{ duration: 0.35, ease: "easeOut" }}
-							className={cn(
-								"min-w-0 flex-1 truncate text-sm leading-snug text-[#0f0f0f]",
-								fontSize === "xs" && "text-xs",
-							)}
-						>
-							{activeHint}
-						</motion.output>
-					)}
-				</div>
-			) : null
-		) : steps && steps.length > 0 ? (
+				isRotating ? (
+					<RotatingActivity
+						messages={hintList}
+						index={hintIndex}
+						rotationKeyValue={rotationKey}
+						glyph={glyph}
+						fontSize={fontSize}
+						showTimer={false}
+						elapsed={elapsed}
+						bare={false}
+						className="mt-3"
+					/>
+				) : null
+			) : steps && steps.length > 0 ? (
 				<ol className="mt-3 space-y-1.5" aria-label="Tahapan proses">
 					{steps.map((step, index) => {
 						const done =

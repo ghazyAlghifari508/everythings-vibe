@@ -1,10 +1,12 @@
 import { AlertCircle, Check, Loader2, RotateCcw } from "lucide-react";
+import { ThoughtLine } from "@/components/ui/thought-line";
 import {
 	HTML_SCRAPE_STATUS_LABELS,
 	SCRAPE_STATUS_LABELS,
 	type ScrapeMode,
 	type ScrapeStatus,
 } from "@/db/schema";
+import { scrapeActivityHints } from "@/lib/scrape-activity-hints";
 import { displaySiteName } from "@/lib/site-name";
 
 export interface ScrapeProgressProps {
@@ -15,6 +17,7 @@ export interface ScrapeProgressProps {
 	errorMessage?: string | null;
 	isRetrying?: boolean;
 	onRetry?: () => void;
+	stageStartedAt?: string | null;
 }
 
 const ORDERED_DESIGN_STAGES: ScrapeStatus[] = [
@@ -64,6 +67,7 @@ export function ScrapeProgress({
 	errorMessage,
 	isRetrying = false,
 	onRetry,
+	stageStartedAt,
 }: ScrapeProgressProps) {
 	const isFailed = status === "failed";
 	const isDone = status === "completed";
@@ -134,11 +138,27 @@ export function ScrapeProgress({
 						style={{ width: `${stageFill}%` }}
 					/>
 				</div>
+				{isFailed || isDone ? (
 				<p aria-live="polite" className="mt-2.5 text-xs text-fog">
 					{isFailed
 						? errorMessage || defaultError
 						: (stageDescriptions[status] ?? "Sedang memproses website…")}
 				</p>
+			) : (
+				<div className="mt-2.5">
+					<ThoughtLine
+						working
+						bare
+						label={currentLabel}
+						doneLabel={currentLabel}
+						presentation="rotating"
+						rotatingMessages={scrapeActivityHints(mode, status)}
+						rotationKey={status}
+						startedAt={stageStartedAt ?? undefined}
+						fontSize="xs"
+					/>
+				</div>
+			)}
 			</div>
 
 			{isFailed ? (

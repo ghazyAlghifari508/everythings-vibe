@@ -59,6 +59,7 @@ export async function createScrape(
 				mode,
 				stage: "queued",
 				progress: 0,
+				stageStartedAt: new Date().toISOString(),
 			},
 		} satisfies InsertScrapeRow)
 		.returning();
@@ -94,6 +95,7 @@ export async function runScrapePipeline(
 					mode,
 					stage: "capturing",
 					progress: scrapeProgressForStatus("capturing", mode),
+					stageStartedAt: new Date().toISOString(),
 				},
 				updatedAt: new Date(),
 			})
@@ -117,6 +119,7 @@ export async function runScrapePipeline(
 						mode: "html",
 						stage: "extracting",
 						progress: scrapeProgressForStatus("extracting", "html"),
+						stageStartedAt: new Date().toISOString(),
 					},
 					updatedAt: new Date(),
 				})
@@ -132,6 +135,7 @@ export async function runScrapePipeline(
 						mode: "html",
 						stage: "saving",
 						progress: scrapeProgressForStatus("saving", "html"),
+						stageStartedAt: new Date().toISOString(),
 					},
 					updatedAt: new Date(),
 				})
@@ -147,6 +151,7 @@ export async function runScrapePipeline(
 						mode: "html",
 						stage: "completed",
 						progress: scrapeProgressForStatus("completed", "html"),
+						stageStartedAt: new Date().toISOString(),
 					},
 					updatedAt: new Date(),
 				})
@@ -170,6 +175,7 @@ export async function runScrapePipeline(
 					mode: "design",
 					stage: "extracting",
 					progress: scrapeProgressForStatus("extracting", "design"),
+					stageStartedAt: new Date().toISOString(),
 				},
 				updatedAt: new Date(),
 			})
@@ -187,6 +193,7 @@ export async function runScrapePipeline(
 					mode: "design",
 					stage: "generating",
 					progress: scrapeProgressForStatus("generating", "design"),
+					stageStartedAt: new Date().toISOString(),
 				},
 				updatedAt: new Date(),
 			})
@@ -204,6 +211,7 @@ export async function runScrapePipeline(
 					mode: "design",
 					stage: "saving",
 					progress: scrapeProgressForStatus("saving", "design"),
+					stageStartedAt: new Date().toISOString(),
 				},
 				updatedAt: new Date(),
 			})
@@ -221,6 +229,7 @@ export async function runScrapePipeline(
 					mode: "design",
 					stage: "completed",
 					progress: scrapeProgressForStatus("completed", "design"),
+					stageStartedAt: new Date().toISOString(),
 				},
 				updatedAt: new Date(),
 			})
@@ -246,6 +255,7 @@ export async function runScrapePipeline(
 					mode,
 					stage: "failed",
 					progress: 0,
+					stageStartedAt: new Date().toISOString(),
 					errorMessage,
 					errorDetail,
 				},
@@ -281,6 +291,7 @@ export async function retryScrape(
 				mode,
 				stage: "queued",
 				progress: 0,
+				stageStartedAt: new Date().toISOString(),
 			},
 			updatedAt: new Date(),
 		})

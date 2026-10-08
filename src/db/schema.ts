@@ -853,6 +853,7 @@ export interface ScrapeMetadata {
 	previewHtmlBytes?: number;
 	stage?: ScrapeStatus;
 	progress?: number;
+	stageStartedAt?: string;
 	errorMessage?: string;
 	errorDetail?: string;
 	mode?: ScrapeMode;

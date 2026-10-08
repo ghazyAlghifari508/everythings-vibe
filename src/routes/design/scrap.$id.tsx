@@ -85,6 +85,13 @@ function ScrapeDetailPage() {
 		metadata && typeof metadata === "object" && "errorMessage" in metadata
 			? String(metadata.errorMessage)
 			: null;
+	const stageStartedAt =
+		metadata &&
+		typeof metadata === "object" &&
+		"stageStartedAt" in metadata &&
+		typeof metadata.stageStartedAt === "string"
+			? metadata.stageStartedAt
+			: null;
 
 	const isCompleted =
 		currentStatus === "completed" &&
@@ -125,6 +132,7 @@ function ScrapeDetailPage() {
 					errorMessage={errorMessage}
 					isRetrying={isRetrying}
 					onRetry={retry}
+					stageStartedAt={stageStartedAt}
 				/>
 			)}
 		</main>
