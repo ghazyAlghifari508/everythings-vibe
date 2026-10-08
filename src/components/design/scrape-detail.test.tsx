@@ -1,24 +1,65 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScrapeDetail } from "./scrape-detail";
 
-describe("ScrapeDetail 2-File Output Viewer", () => {
-	it("renders both index.html preview and design.md tabs with copy actions", () => {
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+});
+
+describe("ScrapeDetail", () => {
+	it("renders HTML result with Preview and Source HTML views plus icon actions", () => {
 		render(
 			<ScrapeDetail
-				sourceUrl="https://example.com"
-				domain="example.com"
-				previewHtml="<div>Mock Preview</div>"
-				designMd="# Example Design System"
+				domain="www.notion.com"
+				previewHtml="<html><body>hi</body></html>"
 			/>,
 		);
-
-		expect(screen.getByText("index.html")).toBeDefined();
-		expect(screen.getByText("design.md")).toBeDefined();
+		expect(screen.getByRole("tab", { name: /^Preview$/i })).toBeDefined();
+		expect(screen.getByRole("tab", { name: /Source HTML/i })).toBeDefined();
+		expect(screen.getByRole("button", { name: /Salin HTML/i })).toBeDefined();
 		expect(
-			screen.getByRole("button", { name: /Salin DESIGN.md/i }),
+			screen.getByRole("button", { name: /Download index\.html/i }),
 		).toBeDefined();
-		expect(screen.getByRole("button", { name: /Download ZIP/i })).toBeDefined();
+		expect(
+			screen.queryByRole("button", { name: /Salin DESIGN\.md/i }),
+		).toBeNull();
+	});
+
+	it("shows no design inspector sections in the HTML result", () => {
+		const { container } = render(
+			<ScrapeDetail
+				domain="www.notion.com"
+				previewHtml="<html><body>hi</body></html>"
+			/>,
+		);
+		expect(screen.queryByRole("heading", { name: /palet warna/i })).toBeNull();
+		expect(screen.queryByRole("heading", { name: /tipografi/i })).toBeNull();
+		expect(screen.queryByRole("heading", { name: /panduan/i })).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /implement ke ai agent/i }),
+		).toBeNull();
+		expect(container.textContent).not.toMatch(/DESIGN\.md selesai/i);
+	});
+
+	it("shows copy feedback without replacing the toolbar layout", async () => {
+		vi.stubGlobal("navigator", {
+			clipboard: { writeText: vi.fn(async () => {}) },
+		});
+		render(
+			<ScrapeDetail
+				domain="www.notion.com"
+				previewHtml="<html><body>hi</body></html>"
+			/>,
+		);
+		const copyButton = screen.getByRole("button", {
+			name: /Salin HTML/i,
+		});
+		fireEvent.click(copyButton);
+		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: /Download index\.html/i }),
+		).toBeDefined();
 	});
 });

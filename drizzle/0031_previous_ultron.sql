@@ -1,0 +1,1 @@
+ALTER TABLE "scrapes" ADD COLUMN "mode" text DEFAULT 'design' NOT NULL;

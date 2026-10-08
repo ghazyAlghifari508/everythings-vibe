@@ -841,6 +841,8 @@ export const payments = pgTable(
 // === VIBEDESIGN TABLES ===
 // Scrapes (Opsi 1): user-owned URL captures. IDs and user_id are text to
 // match Better Auth users.id (uuid would cause PG type mismatch).
+export type ScrapeMode = "design" | "html";
+
 export interface ScrapeMetadata {
 	attempt?: number;
 	capturedAt?: string;
@@ -849,7 +851,86 @@ export interface ScrapeMetadata {
 	captureMode?: string;
 	htmlBytes?: number;
 	previewHtmlBytes?: number;
+	stage?: ScrapeStatus;
+	progress?: number;
+	stageStartedAt?: string;
+	activity?: string;
+	activityStartedAt?: string;
+	timings?: Record<string, number>;
+	errorMessage?: string;
+	errorDetail?: string;
+	mode?: ScrapeMode;
 }
+
+export type ScrapeStatus =
+	| "queued"
+	| "capturing"
+	| "extracting"
+	| "generating"
+	| "saving"
+	| "completed"
+	| "failed";
+
+export function scrapeProgressForStatus(
+	status: ScrapeStatus | string,
+	mode: ScrapeMode = "design",
+): number {
+	if (mode === "html") {
+		switch (status) {
+			case "queued":
+				return 15;
+			case "capturing":
+				return 40;
+			case "extracting":
+				return 75;
+			case "saving":
+				return 95;
+			case "completed":
+				return 100;
+			case "failed":
+				return 0;
+			default:
+				return 0;
+		}
+	}
+	switch (status) {
+		case "queued":
+			return 10;
+		case "capturing":
+			return 30;
+		case "extracting":
+			return 55;
+		case "generating":
+			return 80;
+		case "saving":
+			return 95;
+		case "completed":
+			return 100;
+		case "failed":
+			return 0;
+		default:
+			return 0;
+	}
+}
+
+export const SCRAPE_STATUS_LABELS: Record<string, string> = {
+	queued: "Menunggu",
+	capturing: "Mengambil halaman",
+	extracting: "Menganalisis visual",
+	generating: "Menyusun DESIGN.md",
+	saving: "Menyimpan hasil",
+	completed: "Selesai",
+	failed: "Gagal",
+};
+
+export const HTML_SCRAPE_STATUS_LABELS: Record<string, string> = {
+	queued: "Menunggu",
+	capturing: "Mengambil halaman",
+	extracting: "Menyiapkan preview",
+	saving: "Menyimpan index.html",
+	completed: "Selesai",
+	failed: "Gagal",
+};
 
 export const scrapes = pgTable(
 	"scrapes",
@@ -863,8 +944,19 @@ export const scrapes = pgTable(
 		sourceUrl: text("source_url").notNull(),
 		domain: text("domain").notNull(),
 		title: text("title"),
+		mode: text("mode", { enum: ["design", "html"] })
+			.notNull()
+			.default("design"),
 		status: text("status", {
-			enum: ["queued", "processing", "completed", "failed"],
+			enum: [
+				"queued",
+				"capturing",
+				"extracting",
+				"generating",
+				"saving",
+				"completed",
+				"failed",
+			],
 		})
 			.notNull()
 			.default("queued"),

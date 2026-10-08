@@ -18,4 +18,22 @@ describe("VibeDesign Schema Definitions", () => {
 		expect(studioProjects.userId.dataType).toBe("string");
 		expect(studioRevisions.projectId.dataType).toBe("string");
 	});
+
+	it("supports canonical scrape statuses across pipeline lifecycle", () => {
+		const expectedStatuses = [
+			"queued",
+			"capturing",
+			"extracting",
+			"generating",
+			"saving",
+			"completed",
+			"failed",
+		];
+		expect(scrapes.status.enumValues).toEqual(expectedStatuses);
+	});
+
+	it("defines canonical scrape modes with design as default", () => {
+		expect(scrapes.mode.enumValues).toEqual(["design", "html"]);
+		expect(scrapes.mode.default).toBe("design");
+	});
 });

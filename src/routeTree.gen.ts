@@ -78,6 +78,7 @@ import { Route as ApiTaskGenerateRouteImport } from './routes/api/task/generate'
 import { Route as ApiUserPlanRouteImport } from './routes/api/user/plan'
 import { Route as DesignScrapIndexRouteImport } from './routes/design/scrap.index'
 import { Route as DesignScrapIdRouteImport } from './routes/design/scrap.$id'
+import { Route as DesignScrapHistoryRouteImport } from './routes/design/scrap.history'
 import { Route as DesignStudioIndexRouteImport } from './routes/design/studio.index'
 import { Route as DesignStudioIdRouteImport } from './routes/design/studio.$id'
 import { Route as PrdShareTokenRouteImport } from './routes/prd/share/$token'
@@ -455,6 +456,11 @@ const DesignScrapIdRoute = DesignScrapIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => DesignScrapRoute,
 } as any)
+const DesignScrapHistoryRoute = DesignScrapHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => DesignScrapRoute,
+} as any)
 const DesignStudioIndexRoute = DesignStudioIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -692,6 +698,7 @@ export interface FileRoutesByFullPath {
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
+  '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/design/studio/$id': typeof DesignStudioIdRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
   '/api/codebases/': typeof ApiCodebasesIndexRoute
@@ -789,6 +796,7 @@ export interface FileRoutesByTo {
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
+  '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/design/studio/$id': typeof DesignStudioIdRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
   '/api/codebases': typeof ApiCodebasesIndexRoute
@@ -892,6 +900,7 @@ export interface FileRoutesById {
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
+  '/design/scrap/history': typeof DesignScrapHistoryRoute
   '/design/studio/$id': typeof DesignStudioIdRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
   '/api/codebases/': typeof ApiCodebasesIndexRoute
@@ -996,6 +1005,7 @@ export interface FileRouteTypes {
     | '/api/task/generate'
     | '/api/user/plan'
     | '/design/scrap/$id'
+    | '/design/scrap/history'
     | '/design/studio/$id'
     | '/prd/share/$token'
     | '/api/codebases/'
@@ -1093,6 +1103,7 @@ export interface FileRouteTypes {
     | '/api/task/generate'
     | '/api/user/plan'
     | '/design/scrap/$id'
+    | '/design/scrap/history'
     | '/design/studio/$id'
     | '/prd/share/$token'
     | '/api/codebases'
@@ -1195,6 +1206,7 @@ export interface FileRouteTypes {
     | '/api/task/generate'
     | '/api/user/plan'
     | '/design/scrap/$id'
+    | '/design/scrap/history'
     | '/design/studio/$id'
     | '/prd/share/$token'
     | '/api/codebases/'
@@ -1783,6 +1795,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignScrapIdRouteImport
       parentRoute: typeof DesignScrapRoute
     }
+    '/design/scrap/history': {
+      id: '/design/scrap/history'
+      path: '/history'
+      fullPath: '/design/scrap/history'
+      preLoaderRoute: typeof DesignScrapHistoryRouteImport
+      parentRoute: typeof DesignScrapRoute
+    }
     '/design/studio/': {
       id: '/design/studio/'
       path: '/'
@@ -2073,11 +2092,13 @@ const ApiScrapeRouteWithChildren = ApiScrapeRoute._addFileChildren(
 
 interface DesignScrapRouteChildren {
   DesignScrapIdRoute: typeof DesignScrapIdRoute
+  DesignScrapHistoryRoute: typeof DesignScrapHistoryRoute
   DesignScrapIndexRoute: typeof DesignScrapIndexRoute
 }
 
 const DesignScrapRouteChildren: DesignScrapRouteChildren = {
   DesignScrapIdRoute: DesignScrapIdRoute,
+  DesignScrapHistoryRoute: DesignScrapHistoryRoute,
   DesignScrapIndexRoute: DesignScrapIndexRoute,
 }
 

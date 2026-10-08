@@ -35,12 +35,21 @@ vi.mock("@tanstack/react-router", () => ({
 		children,
 		to,
 		className,
+		onClick,
 	}: {
 		children: React.ReactNode;
 		to: string;
 		className?: string;
+		onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 	}) => (
-		<a href={to} className={className}>
+		<a
+			href={to}
+			className={className}
+			onClick={(e) => {
+				e.preventDefault();
+				onClick?.(e);
+			}}
+		>
 			{children}
 		</a>
 	),
@@ -436,5 +445,112 @@ describe("Navbar Greenfield Workspace Navlinks", () => {
 			screen.getByRole("button", { name: /Toggle dark mode/i }),
 		).toBeDefined();
 		expect(screen.getByRole("button", { name: "User menu" })).toBeDefined();
+	});
+});
+
+describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
+	it("renders only Scrap and History on /design/scrap with Scrap active and no Pricing", () => {
+		mockPathname = "/design/scrap";
+		renderNavbar();
+
+		// Desktop navlinks: scoped VibeDesign nav is Scrap + History only
+		const scrapLink = screen.getByRole("link", { name: /^Scrap$/i });
+		const historyLink = screen.getByRole("link", { name: /^History$/i });
+
+		expect(scrapLink).toBeDefined();
+		expect(historyLink).toBeDefined();
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
+
+		// Scrap active state: has bg-white/10; History does not
+		expect(scrapLink.className).toContain("bg-white/10");
+		expect(historyLink.className).not.toContain("bg-white/10");
+
+		// Open mobile menu
+		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
+		fireEvent.click(toggleBtn);
+
+		const allScrapLinks = screen.getAllByRole("link", { name: /^Scrap$/i });
+		const allHistoryLinks = screen.getAllByRole("link", { name: /^History$/i });
+
+		expect(allScrapLinks).toHaveLength(2); // 1 desktop + 1 mobile
+		expect(allHistoryLinks).toHaveLength(2); // 1 desktop + 1 mobile
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
+
+		// Mobile history link points to /design/scrap/history, NOT generic /history
+		expect(allHistoryLinks[1].getAttribute("href")).toBe(
+			"/design/scrap/history",
+		);
+		expect(screen.queryByRole("link", { name: /^Riwayat$/i })).toBeNull();
+		// Mobile drawer on VibeDesign routes must NOT include FAQ or Settings
+		expect(screen.queryByRole("link", { name: /^FAQ$/i })).toBeNull();
+		expect(screen.queryByRole("link", { name: /^Settings$/i })).toBeNull();
+	});
+
+	it("renders only Scrap and History on /design/scrap/history with History active and Scrap inactive", () => {
+		mockPathname = "/design/scrap/history";
+		renderNavbar();
+
+		const scrapLink = screen.getByRole("link", { name: /^Scrap$/i });
+		const historyLink = screen.getByRole("link", { name: /^History$/i });
+
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
+
+		// History is active; Scrap is NOT active
+		expect(historyLink.className).toContain("bg-white/10");
+		expect(scrapLink.className).not.toContain("bg-white/10");
+	});
+
+	it("keeps Scrap context active on /design/scrap/$id result/processing subroute without Pricing", () => {
+		mockPathname = "/design/scrap/job-xyz-123";
+		renderNavbar();
+
+		const scrapLink = screen.getByRole("link", { name: /^Scrap$/i });
+		const historyLink = screen.getByRole("link", { name: /^History$/i });
+
+		expect(scrapLink.className).toContain("bg-white/10");
+		expect(historyLink.className).not.toContain("bg-white/10");
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
+	});
+
+	it("exclusively scopes mobile drawer on VibeDesign routes to Home, Scrap, History and closes on click", () => {
+		mockPathname = "/design/scrap/history";
+		renderNavbar();
+
+		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
+		fireEvent.click(toggleBtn);
+
+		const homeLink = screen.getByRole("link", { name: /^Home$/i });
+		const allScrapLinks = screen.getAllByRole("link", { name: /^Scrap$/i });
+		const allHistoryLinks = screen.getAllByRole("link", { name: /^History$/i });
+
+		expect(homeLink).toBeDefined();
+		expect(allScrapLinks).toHaveLength(2);
+		expect(allHistoryLinks).toHaveLength(2);
+		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
+
+		expect(screen.queryByRole("link", { name: /^FAQ$/i })).toBeNull();
+		expect(screen.queryByRole("link", { name: /^Settings$/i })).toBeNull();
+		expect(screen.queryByRole("link", { name: /^Riwayat$/i })).toBeNull();
+
+		expect(allHistoryLinks[1].className).toContain("bg-white/10");
+		expect(allScrapLinks[1].className).not.toContain("bg-white/10");
+
+		fireEvent.click(allScrapLinks[1]);
+		expect(screen.queryAllByRole("link", { name: /^Scrap$/i })).toHaveLength(1);
+	});
+
+	it("does not show VibeDesign navlinks on unrelated routes and renders FAQ/Settings in mobile menu", () => {
+		mockPathname = "/";
+		renderNavbar();
+
+		expect(screen.queryByRole("link", { name: /^Scrap$/i })).toBeNull();
+		expect(screen.queryByRole("link", { name: /^History$/i })).toBeNull();
+		expect(screen.getByRole("link", { name: /^Pricing$/i })).toBeDefined();
+
+		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
+		fireEvent.click(toggleBtn);
+
+		expect(screen.getByRole("link", { name: /^FAQ$/i })).toBeDefined();
+		expect(screen.getByRole("link", { name: /^Settings$/i })).toBeDefined();
 	});
 });

@@ -5,7 +5,8 @@ export const DESIGN_ERROR_CODES = {
 	WEBSITE_BLOCKED: "Website tidak dapat diakses oleh sistem.",
 	NO_ANALYZABLE_CONTENT:
 		"Sistem tidak menemukan konten yang cukup untuk dianalisis.",
-	AI_GENERATION_FAILED: "Generate DESIGN.md gagal. Coba ulangi proses.",
+	AI_GENERATION_FAILED:
+		"DESIGN.md belum bisa dibuat. Coba ulangi dari link yang sama.",
 	STORAGE_FAILED: "Terjadi kendala saat menyimpan hasil.",
 } as const;
 

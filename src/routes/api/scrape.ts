@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
+import type { ScrapeMode } from "@/db/schema";
 import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
 import {
 	createScrape,
 	deleteScrape,
-	generateAndSaveDesignMd,
 	getScrapeById,
 	listScrapes,
+	retryScrape,
+	runScrapePipeline,
 } from "@/lib/services/scrape-service";
 import { requireUser } from "@/lib/session";
 
@@ -68,24 +70,38 @@ export async function POST({
 	try {
 		const user = await requireUser(getRequestHeaders());
 		const body: unknown = await request.json().catch(() => null);
-		const rawUrl =
-			body !== null && typeof body === "object" && "url" in body
-				? body.url
-				: undefined;
-		if (typeof rawUrl !== "string" || rawUrl.trim().length === 0)
-			return Response.json(
-				{ error: DESIGN_ERROR_CODES.INVALID_URL },
-				{ status: 400 },
-			);
-		const scrape = await createScrape(user.id, rawUrl.trim());
-		const document = await generateAndSaveDesignMd(scrape.id, user.id);
+
+		if (body !== null && typeof body === "object") {
+			const candidate = body as Record<string, unknown>;
+			if (
+				candidate.action === "retry" &&
+				typeof candidate.scrapeId === "string"
+			) {
+				await retryScrape(candidate.scrapeId, user.id);
+				return Response.json({ ok: true, scrapeId: candidate.scrapeId });
+			}
+
+			const rawUrl = candidate.url;
+			const rawMode = candidate.mode;
+			const mode: ScrapeMode = rawMode === "html" ? "html" : "design";
+			if (typeof rawUrl === "string" && rawUrl.trim().length > 0) {
+				const scrape = await createScrape(user.id, rawUrl.trim(), mode);
+				void runScrapePipeline(scrape.id, user.id);
+				return Response.json(
+					{
+						scrapeId: scrape.id,
+						sourceUrl: scrape.sourceUrl,
+						mode: scrape.mode,
+						status: scrape.status,
+					},
+					{ status: 201 },
+				);
+			}
+		}
+
 		return Response.json(
-			{
-				scrapeId: scrape.id,
-				sourceUrl: scrape.sourceUrl,
-				designMd: document.designMd,
-			},
-			{ status: 201 },
+			{ error: DESIGN_ERROR_CODES.INVALID_URL },
+			{ status: 400 },
 		);
 	} catch (error) {
 		return scrapeErrorResponse(error);

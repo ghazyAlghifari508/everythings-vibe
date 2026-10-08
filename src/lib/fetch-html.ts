@@ -1,5 +1,6 @@
 import http from "node:http";
 import https from "node:https";
+import type { ScrapeMode } from "@/db/schema";
 import {
 	SCRAPE_BROWSER_UA,
 	SCRAPE_DESKTOP_HEIGHT,
@@ -12,7 +13,8 @@ import {
 	SCRAPE_MAX_STYLESHEETS,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
-import { cleanPreviewHtml } from "./preview-html";
+import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
+import { rewritePreviewAssets } from "./preview-html";
 import { validateUrl } from "./url-validator";
 
 export const DESKTOP_WIDTH = SCRAPE_DESKTOP_WIDTH;
@@ -211,28 +213,37 @@ export async function fetchHtml(
 export async function scrapeHtml(
 	rawUrl: string,
 	attemptNumber = 1,
+	instrumentation?: ScrapeInstrumentation & { mode?: ScrapeMode },
 ): Promise<ScrapeCapture> {
-	const { html: raw, status, finalUrl } = await fetchHtml(rawUrl);
+	const { url } = await validateUrl(rawUrl);
+	const { renderPage } = await import("./render-page");
+	const rendered = await renderPage(url.href, instrumentation);
 	const capturedAt = new Date().toISOString();
+	await instrumentation?.onActivity?.("Menyiapkan HTML standalone");
+	const inlineStart = Date.now();
 	const html = withBaseHref(
-		forceDesktopViewport(await inlineStyles(raw, finalUrl)),
-		finalUrl,
+		forceDesktopViewport(await inlineStyles(rendered.html, rendered.finalUrl)),
+		rendered.finalUrl,
 	);
-	const previewHtml = cleanPreviewHtml(html, finalUrl);
-	const domain = new URL(finalUrl).hostname.toLowerCase();
+	instrumentation?.onTiming?.("inlineStyles", Date.now() - inlineStart);
+	await instrumentation?.onActivity?.("Menyiapkan resource preview");
+	const previewStart = Date.now();
+	const previewHtml = rewritePreviewAssets(html, rendered.finalUrl);
+	instrumentation?.onTiming?.("previewRewrite", Date.now() - previewStart);
+	const domain = new URL(rendered.finalUrl).hostname.toLowerCase();
 	return {
-		sourceUrl: finalUrl,
-		status,
+		sourceUrl: rendered.finalUrl,
+		status: rendered.status,
 		html,
 		previewHtml,
 		domain,
-		title: extractPageTitle(raw),
+		title: extractPageTitle(rendered.html),
 		metadata: {
 			attempt: attemptNumber,
 			capturedAt,
-			finalUrl,
+			finalUrl: rendered.finalUrl,
 			viewport: { width: SCRAPE_DESKTOP_WIDTH, height: SCRAPE_DESKTOP_HEIGHT },
-			captureMode: "server-fetch",
+			captureMode: "desktop-browser",
 			htmlBytes: Buffer.byteLength(html, "utf8"),
 			previewHtmlBytes: Buffer.byteLength(previewHtml, "utf8"),
 		},
