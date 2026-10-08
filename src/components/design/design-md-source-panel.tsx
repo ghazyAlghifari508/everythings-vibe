@@ -62,7 +62,9 @@ export function DesignMdSourcePanel({
 		setNotice("");
 		const ok = await copyText(designMd);
 		setNotice(
-			ok ? "DESIGN.md tersalin ke clipboard." : "Gagal menyalin. Blokir clipboard oleh browser.",
+			ok
+				? "DESIGN.md tersalin ke clipboard."
+				: "Gagal menyalin. Blokir clipboard oleh browser.",
 		);
 		setBusy(false);
 		if (ok) {
@@ -76,7 +78,11 @@ export function DesignMdSourcePanel({
 		setBusy(true);
 		setNotice("");
 		try {
-			downloadFile(safeFilename(domain), designMd, "text/markdown;charset=utf-8");
+			downloadFile(
+				safeFilename(domain),
+				designMd,
+				"text/markdown;charset=utf-8",
+			);
 			setNotice("DESIGN.md mulai diunduh.");
 		} catch {
 			setNotice("Gagal mengunduh file. Coba lagi.");

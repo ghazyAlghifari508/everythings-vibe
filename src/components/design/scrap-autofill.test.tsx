@@ -1,13 +1,21 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScrapModeSwitcher } from "./scrap-mode-switcher";
 
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(),
-	Link: ({ children, to, className }: { children: React.ReactNode; to: string; className?: string }) => (
+	Link: ({
+		children,
+		to,
+		className,
+	}: {
+		children: React.ReactNode;
+		to: string;
+		className?: string;
+	}) => (
 		<a href={to} className={className}>
 			{children}
 		</a>
@@ -22,11 +30,15 @@ describe("VibeDesign Scrap Autofill Styling & Contract", () => {
 	it("ensures URL inputs declare autocomplete and token-bound autofill background", () => {
 		render(<ScrapModeSwitcher />);
 
-		const designInput = screen.getByLabelText(/Website yang ingin di-generate DESIGN\.md/i);
+		const designInput = screen.getByLabelText(
+			/Website yang ingin di-generate DESIGN\.md/i,
+		);
 		expect(designInput.getAttribute("type")).toBe("url");
 		expect(designInput.getAttribute("autoComplete")).toBe("url");
 		expect(designInput.getAttribute("name")).toBe("url");
-		expect(designInput.className).toContain("[--autofill-bg:var(--color-charcoal)]");
+		expect(designInput.className).toContain(
+			"[--autofill-bg:var(--color-charcoal)]",
+		);
 	});
 
 	it("verifies global stylesheet defines comprehensive Chromium WebKit autofill rules", () => {

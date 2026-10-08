@@ -44,13 +44,7 @@ describe("buildDesignAgentPrompt", () => {
 
 describe("DesignAgentPromptDialog", () => {
 	it("opens with the handoff title, description, and prompt", () => {
-		render(
-			<DesignAgentPromptDialog
-				open
-				onOpenChange={() => {}}
-				{...PROPS}
-			/>,
-		);
+		render(<DesignAgentPromptDialog open onOpenChange={() => {}} {...PROPS} />);
 		expect(
 			screen.getByRole("heading", { name: "Implement ke AI Agent" }),
 		).toBeDefined();
@@ -69,11 +63,7 @@ describe("DesignAgentPromptDialog", () => {
 		vi.stubGlobal("navigator", { clipboard: { writeText } });
 		const onOpenChange = vi.fn();
 		render(
-			<DesignAgentPromptDialog
-				open
-				onOpenChange={onOpenChange}
-				{...PROPS}
-			/>,
+			<DesignAgentPromptDialog open onOpenChange={onOpenChange} {...PROPS} />,
 		);
 		await act(async () => {
 			fireEvent.click(screen.getByRole("button", { name: /salin prompt/i }));
@@ -93,11 +83,7 @@ describe("DesignAgentPromptDialog", () => {
 		});
 		const onOpenChange = vi.fn();
 		render(
-			<DesignAgentPromptDialog
-				open
-				onOpenChange={onOpenChange}
-				{...PROPS}
-			/>,
+			<DesignAgentPromptDialog open onOpenChange={onOpenChange} {...PROPS} />,
 		);
 		await act(async () => {
 			fireEvent.click(screen.getByRole("button", { name: /salin prompt/i }));

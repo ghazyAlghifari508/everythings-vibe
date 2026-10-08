@@ -96,8 +96,8 @@ export function DesignAgentPromptDialog({
 						Implement ke AI Agent
 					</DialogTitle>
 					<DialogDescription>
-						Salin prompt ini ke coding agent untuk menerapkan design system
-						ke project kamu.
+						Salin prompt ini ke coding agent untuk menerapkan design system ke
+						project kamu.
 					</DialogDescription>
 				</DialogHeader>
 

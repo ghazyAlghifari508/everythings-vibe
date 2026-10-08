@@ -38,9 +38,7 @@ describe("DesignMdSourcePanel", () => {
 
 	it("exposes no framework tabs or density modes", () => {
 		const { container } = renderPanel();
-		expect(
-			screen.queryByRole("tab", { name: /tailwind/i }),
-		).toBeNull();
+		expect(screen.queryByRole("tab", { name: /tailwind/i })).toBeNull();
 		expect(container.textContent).not.toMatch(/css variables/i);
 		expect(container.textContent).not.toMatch(/design tokens/i);
 		expect(container.textContent).not.toMatch(/compact|extended/i);
@@ -67,9 +65,7 @@ describe("DesignMdSourcePanel", () => {
 			revokeObjectURL: vi.fn(),
 		});
 		renderPanel();
-		fireEvent.click(
-			screen.getByRole("button", { name: "Download DESIGN.md" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Download DESIGN.md" }));
 		expect(await screen.findByText(/mulai diunduh/i)).toBeDefined();
 	});
 

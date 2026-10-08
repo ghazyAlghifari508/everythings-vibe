@@ -8,10 +8,7 @@ import type {
 	InspectorFont,
 	InspectorTypeEntry,
 } from "@/lib/design-md-inspector";
-import {
-	firstCssLength,
-	normalizeFontWeight,
-} from "@/lib/design-md-inspector";
+import { firstCssLength, normalizeFontWeight } from "@/lib/design-md-inspector";
 
 export interface DesignSystemInspectorProps {
 	siteName: string;
@@ -233,8 +230,7 @@ function TypePreview({ entry }: { entry: InspectorTypeEntry }) {
 	if (size) style.fontSize = `min(${size}, 2.5rem)`;
 	const weight = normalizeFontWeight(entry.weight);
 	if (weight) style.fontWeight = weight;
-	if (isSafeLineHeight(entry.lineHeight))
-		style.lineHeight = entry.lineHeight;
+	if (isSafeLineHeight(entry.lineHeight)) style.lineHeight = entry.lineHeight;
 	if (entry.family && isSafeFontFamily(entry.family)) {
 		style.fontFamily = `${entry.family}, sans-serif`;
 	}
@@ -246,7 +242,9 @@ function TypePreview({ entry }: { entry: InspectorTypeEntry }) {
 			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
 				<span className="text-sm font-semibold text-snow">{entry.label}</span>
 				{meta ? (
-					<span className="font-mono text-xs text-fog tabular-nums">{meta}</span>
+					<span className="font-mono text-xs text-fog tabular-nums">
+						{meta}
+					</span>
 				) : null}
 			</div>
 			<p className="mt-1.5 truncate text-mist" style={style}>
@@ -302,9 +300,7 @@ function FontCard({ font, sizes }: { font: InspectorFont; sizes: string[] }) {
 function SpacingRow({ label, value }: { label: string; value: string }) {
 	const px = value.trim().match(/^([\d.]+)px$/);
 	const width =
-		px?.[1] !== undefined
-			? Math.min(160, Math.max(4, Number(px[1])))
-			: null;
+		px?.[1] !== undefined ? Math.min(160, Math.max(4, Number(px[1]))) : null;
 	return (
 		<div className="flex items-center gap-3">
 			<div className="min-w-0 flex-1">

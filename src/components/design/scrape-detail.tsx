@@ -91,80 +91,80 @@ export function ScrapeDetail({ domain, previewHtml = "" }: ScrapeDetailProps) {
 			aria-label="Hasil HTML"
 			className="overflow-hidden rounded-xl border border-graphite bg-charcoal"
 		>
-				<div className="flex items-center justify-between gap-2 border-b border-graphite px-3 py-2">
-					<div
-						role="tablist"
-						aria-label="Tampilan HTML"
-						className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
+			<div className="flex items-center justify-between gap-2 border-b border-graphite px-3 py-2">
+				<div
+					role="tablist"
+					aria-label="Tampilan HTML"
+					className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
+				>
+					<button
+						type="button"
+						role="tab"
+						aria-selected={htmlViewTab === "preview"}
+						onClick={() => setHtmlViewTab("preview")}
+						className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
+							htmlViewTab === "preview"
+								? "bg-charcoal text-snow"
+								: "text-fog hover:text-mist"
+						}`}
 					>
-						<button
-							type="button"
-							role="tab"
-							aria-selected={htmlViewTab === "preview"}
-							onClick={() => setHtmlViewTab("preview")}
-							className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
-								htmlViewTab === "preview"
-									? "bg-charcoal text-snow"
-									: "text-fog hover:text-mist"
-							}`}
-						>
-							Preview
-						</button>
-						<button
-							type="button"
-							role="tab"
-							aria-selected={htmlViewTab === "code"}
-							onClick={() => setHtmlViewTab("code")}
-							className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
-								htmlViewTab === "code"
-									? "bg-charcoal text-snow"
-									: "text-fog hover:text-mist"
-							}`}
-						>
-							Source HTML
-						</button>
-					</div>
-					<div className="flex shrink-0 items-center gap-1">
-						<button
-							type="button"
-							onClick={() =>
-								void handleCopy(previewHtml, "HTML tersalin ke clipboard.")
-							}
-							disabled={busy}
-							aria-label={copyLabel}
-							title={copyLabel}
-							className={ICON_BUTTON_CLASS}
-						>
-							{copied ? (
-								<Check size={15} aria-hidden className="text-emerald-400" />
-							) : (
-								<Copy size={15} aria-hidden />
-							)}
-						</button>
-						<button
-							type="button"
-							onClick={handleDownload}
-							disabled={busy}
-							aria-label={downloadLabel}
-							title={downloadLabel}
-							className={ICON_BUTTON_CLASS}
-						>
-							<Download size={15} aria-hidden />
-						</button>
-					</div>
+						Preview
+					</button>
+					<button
+						type="button"
+						role="tab"
+						aria-selected={htmlViewTab === "code"}
+						onClick={() => setHtmlViewTab("code")}
+						className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
+							htmlViewTab === "code"
+								? "bg-charcoal text-snow"
+								: "text-fog hover:text-mist"
+						}`}
+					>
+						Source HTML
+					</button>
 				</div>
+				<div className="flex shrink-0 items-center gap-1">
+					<button
+						type="button"
+						onClick={() =>
+							void handleCopy(previewHtml, "HTML tersalin ke clipboard.")
+						}
+						disabled={busy}
+						aria-label={copyLabel}
+						title={copyLabel}
+						className={ICON_BUTTON_CLASS}
+					>
+						{copied ? (
+							<Check size={15} aria-hidden className="text-emerald-400" />
+						) : (
+							<Copy size={15} aria-hidden />
+						)}
+					</button>
+					<button
+						type="button"
+						onClick={handleDownload}
+						disabled={busy}
+						aria-label={downloadLabel}
+						title={downloadLabel}
+						className={ICON_BUTTON_CLASS}
+					>
+						<Download size={15} aria-hidden />
+					</button>
+				</div>
+			</div>
 
-				{htmlViewTab === "preview" ? (
-					<div role="tabpanel" aria-label="Preview index.html">
-						<DesktopPreview title={`Preview ${domain}`} srcDoc={previewHtml} />
-					</div>
-				) : (
-					<div role="tabpanel" aria-label="Source code index.html">
-						<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
-							{previewHtml}
-						</pre>
-					</div>
-				)}
+			{htmlViewTab === "preview" ? (
+				<div role="tabpanel" aria-label="Preview index.html">
+					<DesktopPreview title={`Preview ${domain}`} srcDoc={previewHtml} />
+				</div>
+			) : (
+				<div role="tabpanel" aria-label="Source code index.html">
+					<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
+						{previewHtml}
+					</pre>
+				</div>
+			)}
 
 			{notice ? (
 				<output className="block border-t border-graphite px-3 py-2 text-xs text-fog">

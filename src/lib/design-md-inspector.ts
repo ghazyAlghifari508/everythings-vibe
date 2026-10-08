@@ -101,11 +101,7 @@ function parseTables(lines: string[]): ParsedTable[] {
 	while (index < lines.length) {
 		const line = lines[index].trim();
 		const next = (lines[index + 1] ?? "").trim();
-		if (
-			line.startsWith("|") &&
-			next.startsWith("|") &&
-			isAlignmentRow(next)
-		) {
+		if (line.startsWith("|") && next.startsWith("|") && isAlignmentRow(next)) {
 			const headers = splitRow(line);
 			const rows: string[][] = [];
 			index += 2;
@@ -128,7 +124,10 @@ interface DocSection {
 	lines: string[];
 }
 
-function splitSections(text: string): { prelude: string[]; sections: DocSection[] } {
+function splitSections(text: string): {
+	prelude: string[];
+	sections: DocSection[];
+} {
 	const prelude: string[] = [];
 	const sections: DocSection[] = [];
 	let current: DocSection | null = null;
@@ -179,9 +178,7 @@ function parseHeaderBlock(prelude: string[]): {
 			essence = quoteMatch[1].replace(/\*\*/g, "").trim();
 			continue;
 		}
-		const themeMatch = line
-			.replace(/\*\*/g, "")
-			.match(/^theme\s*:\s*(\w+)/i);
+		const themeMatch = line.replace(/\*\*/g, "").match(/^theme\s*:\s*(\w+)/i);
 		if (themeMatch) {
 			const value = themeMatch[1].toLowerCase();
 			theme = value === "light" || value === "dark" ? value : "unknown";
@@ -233,8 +230,7 @@ function parseTypography(lines: string[]): InspectorTypeEntry[] {
 	const lineHeightIdx = headerIndex(table.headers, /line/);
 	const entries: InspectorTypeEntry[] = [];
 	for (const row of table.rows) {
-		const label =
-			labelIdx >= 0 ? (row[labelIdx] ?? "") : (row[0] ?? "");
+		const label = labelIdx >= 0 ? (row[labelIdx] ?? "") : (row[0] ?? "");
 		if (!label && row.every((cell) => cell.length === 0)) continue;
 		entries.push({
 			label,
@@ -278,18 +274,15 @@ function parseSpacingShapes(lines: string[]): {
 	let baseUnit = "";
 	const baseMatch = lines
 		.map((line) =>
-			line
-				.replace(/[*`]/g, "")
-				.match(/base\s*(?:unit)?\s*[:=]\s*([\d.]+px)/i),
+			line.replace(/[*`]/g, "").match(/base\s*(?:unit)?\s*[:=]\s*([\d.]+px)/i),
 		)
 		.find((match) => match !== null);
 	if (baseMatch?.[1]) baseUnit = baseMatch[1];
 	for (const table of parseTables(lines)) {
 		const headerText = table.headers.join(" ").toLowerCase();
 		const isRadii = /radius|radii|round|shape/.test(headerText);
-		const isSpacing = /spac|gap|padding|margin|unit|size|scale|token|value/.test(
-			headerText,
-		);
+		const isSpacing =
+			/spac|gap|padding|margin|unit|size|scale|token|value/.test(headerText);
 		if (!isRadii && !isSpacing) continue;
 		const target = isRadii ? radii : spacing;
 		for (const row of table.rows) {

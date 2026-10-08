@@ -13,7 +13,11 @@ export interface DesignResultProps {
 	designMd: string;
 }
 
-export function DesignResult({ sourceUrl, domain, designMd }: DesignResultProps) {
+export function DesignResult({
+	sourceUrl,
+	domain,
+	designMd,
+}: DesignResultProps) {
 	const [agentOpen, setAgentOpen] = useState(false);
 	const siteName = displaySiteName(domain);
 	const model = useMemo(() => parseDesignMd(designMd), [designMd]);

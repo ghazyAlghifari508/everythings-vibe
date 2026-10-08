@@ -62,12 +62,9 @@ describe("ThoughtLine bare presentation", () => {
 		);
 		expect(screen.getAllByRole("status").length).toBe(1);
 		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" })
-				.textContent,
+			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
 		).toContain(HINTS[0]);
-		expect(container.querySelector('[role="timer"]')?.textContent).toBe(
-			"0.0s",
-		);
+		expect(container.querySelector('[role="timer"]')?.textContent).toBe("0.0s");
 		expect(container.querySelectorAll("ol, ul, li").length).toBe(0);
 	});
 
@@ -86,8 +83,7 @@ describe("ThoughtLine bare presentation", () => {
 			vi.advanceTimersByTime(3200);
 		});
 		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" })
-				.textContent,
+			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
 		).toContain(HINTS[1]);
 		rerender(
 			<ThoughtLine
@@ -146,16 +142,14 @@ describe("ThoughtLine rotation stability", () => {
 			vi.advanceTimersByTime(1200);
 		});
 		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" })
-				.textContent,
+			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
 		).toContain(HINTS[1]);
 		rerenderClone();
 		act(() => {
 			vi.advanceTimersByTime(3200);
 		});
 		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" })
-				.textContent,
+			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
 		).toContain(HINTS[2]);
 	});
 
@@ -190,11 +184,15 @@ describe("ThoughtLine rotating presentation", () => {
 		act(() => {
 			vi.advanceTimersByTime(3200);
 		});
-		expect(screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent).toContain(HINTS[1]);
+		expect(
+			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
+		).toContain(HINTS[1]);
 		act(() => {
 			vi.advanceTimersByTime(3200);
 		});
-		expect(screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent).toContain(HINTS[2]);
+		expect(
+			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
+		).toContain(HINTS[2]);
 	});
 
 	it("restarts the message cycle when the rotation key changes", () => {
@@ -202,7 +200,9 @@ describe("ThoughtLine rotating presentation", () => {
 		act(() => {
 			vi.advanceTimersByTime(6400);
 		});
-		expect(screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent).toContain(HINTS[2]);
+		expect(
+			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
+		).toContain(HINTS[2]);
 		rerender(
 			<ThoughtLine
 				working
@@ -213,7 +213,9 @@ describe("ThoughtLine rotating presentation", () => {
 				rotationKey="extracting"
 			/>,
 		);
-		expect(screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent).toContain(HINTS[0]);
+		expect(
+			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
+		).toContain(HINTS[0]);
 	});
 
 	it("stops rotation and freezes the timer once work settles", () => {
@@ -232,14 +234,14 @@ describe("ThoughtLine rotating presentation", () => {
 				rotatingMessages={HINTS}
 			/>,
 		);
-		expect(screen.queryByRole("status", { name: "Aktivitas berlangsung" })).toBeNull();
+		expect(
+			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
+		).toBeNull();
 		expect(screen.getByText(/ScrapeLabel selesai/i)).toBeDefined();
 		act(() => {
 			vi.advanceTimersByTime(10000);
 		});
-		expect(container.querySelector('[role="timer"]')?.textContent).toBe(
-			frozen,
-		);
+		expect(container.querySelector('[role="timer"]')?.textContent).toBe(frozen);
 		expect(container.querySelectorAll("ol, ul, li").length).toBe(0);
 	});
 
@@ -268,10 +270,14 @@ describe("ThoughtLine rotating presentation", () => {
 		}));
 		const { container } = renderRotating();
 		expect(container.querySelectorAll("ol, ul, li").length).toBe(0);
-		expect(screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent).toContain(HINTS[0]);
+		expect(
+			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
+		).toContain(HINTS[0]);
 		act(() => {
 			vi.advanceTimersByTime(3200);
 		});
-		expect(screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent).toContain(HINTS[1]);
+		expect(
+			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
+		).toContain(HINTS[1]);
 	});
 });

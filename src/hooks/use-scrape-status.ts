@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-	ScrapeMetadata,
-	ScrapeMode,
-	ScrapeStatus,
-} from "@/db/schema";
+import type { ScrapeMetadata, ScrapeMode, ScrapeStatus } from "@/db/schema";
 import type { ScrapeDetail } from "@/lib/services/scrape-service";
 
 export interface ScrapeStatusSnapshot {

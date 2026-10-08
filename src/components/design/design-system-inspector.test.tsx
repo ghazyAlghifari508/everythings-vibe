@@ -58,7 +58,9 @@ const MODEL: DesignInspectorModel = {
 			lineHeight: "1.5",
 		},
 	],
-	fonts: [{ family: "Inter", weights: ["700", "400"], roles: ["Display", "Body"] }],
+	fonts: [
+		{ family: "Inter", weights: ["700", "400"], roles: ["Display", "Body"] },
+	],
 	spacing: [
 		{ label: "space-1", value: "4px" },
 		{ label: "section-gap", value: "64px" },
@@ -107,9 +109,7 @@ describe("DesignSystemInspector", () => {
 
 	it("renders the parsed color palette with values", () => {
 		renderInspector();
-		expect(
-			screen.getByRole("heading", { name: /palet warna/i }),
-		).toBeDefined();
+		expect(screen.getByRole("heading", { name: /palet warna/i })).toBeDefined();
 		expect(screen.getByText("#155eef")).toBeDefined();
 		expect(screen.getByText("Cobalt")).toBeDefined();
 		expect(screen.getByText("Primary CTA")).toBeDefined();
@@ -152,9 +152,7 @@ describe("DesignSystemInspector", () => {
 
 	it("omits sections without data instead of inventing values", () => {
 		const { container } = renderInspector(EMPTY_MODEL);
-		expect(
-			screen.queryByRole("heading", { name: /palet warna/i }),
-		).toBeNull();
+		expect(screen.queryByRole("heading", { name: /palet warna/i })).toBeNull();
 		expect(screen.queryByRole("heading", { name: /tipografi/i })).toBeNull();
 		expect(screen.queryByRole("heading", { name: /^font$/i })).toBeNull();
 		expect(
@@ -378,9 +376,7 @@ describe("palette gallery", () => {
 			expect(screen.getByRole("region", { name: label })).toBeDefined();
 		}
 		expect(
-			within(screen.getByRole("region", { name: "Brand" })).getByText(
-				"Cobalt",
-			),
+			within(screen.getByRole("region", { name: "Brand" })).getByText("Cobalt"),
 		).toBeDefined();
 		expect(
 			within(screen.getByRole("region", { name: "Lainnya" })).getByText(

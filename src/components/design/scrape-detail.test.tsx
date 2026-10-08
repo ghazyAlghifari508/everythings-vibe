@@ -34,9 +34,7 @@ describe("ScrapeDetail", () => {
 				previewHtml="<html><body>hi</body></html>"
 			/>,
 		);
-		expect(
-			screen.queryByRole("heading", { name: /palet warna/i }),
-		).toBeNull();
+		expect(screen.queryByRole("heading", { name: /palet warna/i })).toBeNull();
 		expect(screen.queryByRole("heading", { name: /tipografi/i })).toBeNull();
 		expect(screen.queryByRole("heading", { name: /panduan/i })).toBeNull();
 		expect(
