@@ -259,6 +259,10 @@ describe("codebase analysis system prompt", () => {
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/snapshot|manifest/i);
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/tidak menggandakan/i);
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/migrasi stack/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/Bahasa Indonesia/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).not.toContain(
+			"jalur dari manifest bila relevan",
+		);
 	});
 });
 

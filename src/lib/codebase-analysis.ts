@@ -183,10 +183,10 @@ FORMAT JSON (output HANYA JSON, tanpa teks lain):
   "limitations": ["keterbatasan snapshot/analisis"],
   "findings": [{ "title": "...", "detail": "...", "uncertainty": "hal yang belum pasti (wajib diisi bila ragu)" }],
   "starterSuggestions": [
-    { "id": "feature", "title": "judul tugas yang konkret", "description": "ringkasan singkat", "prompt": "instruksi lengkap dan siap diedit", "relevantPaths": ["jalur dari manifest bila relevan"] },
-    { "id": "bugfix", "title": "judul tugas yang konkret", "description": "ringkasan singkat", "prompt": "instruksi lengkap dan siap diedit", "relevantPaths": ["jalur dari manifest bila relevan"] },
-    { "id": "refactor", "title": "judul tugas yang konkret", "description": "ringkasan singkat", "prompt": "instruksi lengkap dan siap diedit", "relevantPaths": ["jalur dari manifest bila relevan"] },
-    { "id": "ui", "title": "judul tugas yang konkret", "description": "ringkasan singkat", "prompt": "instruksi lengkap dan siap diedit", "relevantPaths": ["jalur dari manifest bila relevan"] }
+    { "id": "feature", "title": "judul tugas konkret dalam Bahasa Indonesia", "description": "ringkasan singkat dalam Bahasa Indonesia", "prompt": "instruksi lengkap dalam Bahasa Indonesia dan siap diedit" },
+    { "id": "bugfix", "title": "judul tugas konkret dalam Bahasa Indonesia", "description": "ringkasan singkat dalam Bahasa Indonesia", "prompt": "instruksi lengkap dalam Bahasa Indonesia dan siap diedit" },
+    { "id": "refactor", "title": "judul tugas konkret dalam Bahasa Indonesia", "description": "ringkasan singkat dalam Bahasa Indonesia", "prompt": "instruksi lengkap dalam Bahasa Indonesia dan siap diedit" },
+    { "id": "ui", "title": "judul tugas konkret dalam Bahasa Indonesia", "description": "ringkasan singkat dalam Bahasa Indonesia", "prompt": "instruksi lengkap dalam Bahasa Indonesia dan siap diedit" }
   ]
 }
 
@@ -200,7 +200,7 @@ ATURAN:
 7. starterSuggestions wajib berisi tepat satu saran untuk setiap id: feature, bugfix, refactor, dan ui. Setiap saran harus spesifik, kecil, berguna, dan diturunkan dari summary, moduleMap, relevantFiles, impactAreas, findings, atau isi source snapshot.
 8. Jangan menyimpulkan domain aplikasi dari framework, bahasa, dependency, atau nama repository. Identifikasi fitur yang sudah terbukti ada agar saran tidak menggandakan kemampuan yang sudah tersedia.
 9. Untuk kategori feature, usulkan kemampuan yang masuk akal dari bukti tentang fungsi aplikasi. Untuk bugfix, sebutkan kondisi yang benar-benar tampak bermasalah; bila belum ada bukti bug, pilih perbaikan alur konservatif dan jangan menyatakan bug pasti ada. Untuk refactor, pilih modul atau pola yang terlihat dan pertahankan stack/perilaku. Jangan usulkan migrasi stack kecuali findings secara eksplisit membuktikan kebutuhan. Untuk ui, rujuk antarmuka yang benar-benar terlihat dalam source snapshot.
-10. Prompt harus berupa instruksi lengkap dan siap diedit/dikirim, bukan fragmen atau template kosong. Title dan description singkat dan spesifik. Jangan membuat klaim behavior yang tidak dibuktikan snapshot.
+10. Title, description, dan prompt harus ditulis dalam Bahasa Indonesia. Pertahankan istilah teknis baku dalam Bahasa Inggris. Prompt harus berupa instruksi lengkap dan siap diedit/dikirim, bukan fragmen atau template kosong. Title dan description singkat dan spesifik. Jangan membuat klaim behavior yang tidak dibuktikan snapshot.
 11. relevantPaths hanya boleh berisi jalur yang benar-benar ada dalam manifest. Sertakan jalur saat saran menyebut modul tertentu; bila tidak dapat membuktikan jalurnya, jangan mengarangnya.
 12. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.`;
 
