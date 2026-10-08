@@ -83,13 +83,7 @@ export function ScrapeProgress({
 		mode === "html" ? HTML_STAGE_DESCRIPTIONS : DESIGN_STAGE_DESCRIPTIONS;
 	const currentIndex = orderedStages.indexOf(status);
 	const currentLabel = stageLabels[status] ?? status;
-	const stageFill =
-		currentIndex >= 0
-			? Math.round(((currentIndex + 1) / orderedStages.length) * 100)
-			: 0;
 
-	const progressLabel =
-		mode === "html" ? "Progres scraping HTML" : "Progres pembuatan DESIGN.md";
 	const defaultError =
 		mode === "html"
 			? "Scrape HTML belum bisa diselesaikan. Coba ulangi dari link yang sama."
@@ -124,23 +118,6 @@ export function ScrapeProgress({
 			</div>
 
 			<div className="mt-6">
-				<div
-					role="progressbar"
-					aria-label={progressLabel}
-					aria-valuetext={currentLabel}
-					className="h-2 w-full overflow-hidden rounded-full bg-onyx"
-				>
-					<div
-						className={`h-full transition-all duration-500 ease-out ${
-							isFailed
-								? "bg-rose-500"
-								: isDone
-									? "bg-emerald-500"
-									: "bg-indigo-500"
-						}`}
-						style={{ width: `${stageFill}%` }}
-					/>
-				</div>
 				{isFailed || isDone ? (
 					<p aria-live="polite" className="mt-2.5 text-xs text-fog">
 						{isFailed
@@ -213,6 +190,7 @@ export function ScrapeProgress({
 							return (
 								<li
 									key={s}
+									aria-current={isStageCurrent ? "step" : undefined}
 									className={`flex items-center gap-2 font-mono text-xs ${
 										isStageDone
 											? "text-fog"

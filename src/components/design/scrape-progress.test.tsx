@@ -19,14 +19,6 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-function progressbarFill(container: HTMLElement): string {
-	return (
-		container
-			.querySelector('[role="progressbar"] > div')
-			?.getAttribute("style") ?? ""
-	);
-}
-
 function activeSlotText(): string {
 	return (
 		screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent ??
@@ -35,11 +27,7 @@ function activeSlotText(): string {
 }
 
 function authoritativeStage(container: HTMLElement): string {
-	return (
-		container
-			.querySelector('[role="progressbar"]')
-			?.getAttribute("aria-valuetext") ?? ""
-	);
+	return container.querySelector('[aria-current="step"]')?.textContent ?? "";
 }
 
 describe("ScrapeProgress", () => {
@@ -54,6 +42,7 @@ describe("ScrapeProgress", () => {
 			/>,
 		);
 		expect(activeSlotText()).toContain("Memvalidasi DESIGN.md");
+		expect(screen.queryByRole("progressbar")).toBeNull();
 	});
 
 	it("does not rotate synthetic activity text while polling", () => {
@@ -176,7 +165,6 @@ describe("ScrapeProgress", () => {
 			/>,
 		);
 		const stageBefore = authoritativeStage(container);
-		const fillBefore = progressbarFill(container);
 		rerender(
 			<ScrapeProgress
 				mode="design"
@@ -187,7 +175,6 @@ describe("ScrapeProgress", () => {
 			/>,
 		);
 		expect(authoritativeStage(container)).toBe(stageBefore);
-		expect(progressbarFill(container)).toBe(fillBefore);
 	});
 
 	it("advances the stage tracker only from real status changes", () => {
@@ -275,7 +262,7 @@ describe("ScrapeProgress", () => {
 		).toBeNull();
 		expect(screen.queryByRole("timer")).toBeNull();
 		expect(screen.getByText(/siap digunakan/i)).toBeDefined();
-		expect(authoritativeStage(container)).toBe("Selesai");
+		expect(screen.getAllByText("Selesai")).toHaveLength(2);
 		const settled = container.textContent;
 		act(() => {
 			vi.advanceTimersByTime(10000);
@@ -299,7 +286,7 @@ describe("ScrapeProgress", () => {
 	});
 
 	it("still shows browser captures through the same real activity path", () => {
-		const { container } = render(
+		render(
 			<ScrapeProgress
 				mode="html"
 				status="capturing"
@@ -311,11 +298,7 @@ describe("ScrapeProgress", () => {
 		expect(activeSlotText()).toContain("Menangkap DOM hasil render");
 		expect(screen.queryByText(/Menyusun DESIGN\.md/i)).toBeNull();
 		expect(screen.queryByText(/\(\d+%/)).toBeNull();
-		expect(
-			container
-				.querySelector('[role="progressbar"]')
-				?.getAttribute("aria-valuenow"),
-		).toBeNull();
+		expect(screen.queryByRole("progressbar")).toBeNull();
 	});
 
 	it("keeps completed stage labels muted while the active stage stays strongest", () => {
