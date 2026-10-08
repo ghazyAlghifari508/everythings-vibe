@@ -200,6 +200,87 @@ a {
 	box-shadow: var(--shadow-linear-button);
 }
 
+/* ============================================
+   Autofill / Browser Saved Info Styling
+   Neutralizes Chromium default blue background on autofill/preview
+   while preserving browser suggestions, text contrast, and tokens.
+   ============================================ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+input:autofill,
+input:autofill:hover,
+input:autofill:focus,
+input:autofill:active {
+	-webkit-text-fill-color: var(--autofill-text, var(--color-snow, var(--text-primary))) !important;
+	caret-color: var(--autofill-text, var(--color-snow, var(--text-primary))) !important;
+	-webkit-box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), inset 0 0 0 1000px var(--autofill-bg, var(--bg-input)) !important;
+	box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), inset 0 0 0 1000px var(--autofill-bg, var(--bg-input)) !important;
+	transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Surface-aware autofill backgrounds matching VibeEverything container tokens */
+.bg-charcoal input:-webkit-autofill,
+.bg-charcoal input:-webkit-autofill:hover,
+.bg-charcoal input:-webkit-autofill:focus,
+.bg-charcoal input:-webkit-autofill:active,
+.bg-charcoal input:autofill,
+.bg-charcoal input:autofill:hover,
+.bg-charcoal input:autofill:focus,
+.bg-charcoal input:autofill:active,
+input.bg-charcoal:-webkit-autofill,
+input.bg-charcoal:-webkit-autofill:hover,
+input.bg-charcoal:-webkit-autofill:focus,
+input.bg-charcoal:-webkit-autofill:active,
+input.bg-charcoal:autofill,
+input.bg-charcoal:autofill:hover,
+input.bg-charcoal:autofill:focus,
+input.bg-charcoal:autofill:active {
+	-webkit-box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), inset 0 0 0 1000px var(--color-charcoal) !important;
+	box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), inset 0 0 0 1000px var(--color-charcoal) !important;
+}
+
+.bg-onyx input:-webkit-autofill,
+.bg-onyx input:-webkit-autofill:hover,
+.bg-onyx input:-webkit-autofill:focus,
+.bg-onyx input:-webkit-autofill:active,
+.bg-onyx input:autofill,
+.bg-onyx input:autofill:hover,
+.bg-onyx input:autofill:focus,
+.bg-onyx input:autofill:active,
+input.bg-onyx:-webkit-autofill,
+input.bg-onyx:-webkit-autofill:hover,
+input.bg-onyx:-webkit-autofill:focus,
+input.bg-onyx:-webkit-autofill:active,
+input.bg-onyx:autofill,
+input.bg-onyx:autofill:hover,
+input.bg-onyx:autofill:focus,
+input.bg-onyx:autofill:active {
+	-webkit-box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), inset 0 0 0 1000px var(--color-onyx) !important;
+	box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), inset 0 0 0 1000px var(--color-onyx) !important;
+}
+
+.bg-steel input:-webkit-autofill,
+.bg-steel input:-webkit-autofill:hover,
+.bg-steel input:-webkit-autofill:focus,
+.bg-steel input:-webkit-autofill:active,
+.bg-steel input:autofill,
+.bg-steel input:autofill:hover,
+.bg-steel input:autofill:focus,
+.bg-steel input:autofill:active,
+input.bg-steel:-webkit-autofill,
+input.bg-steel:-webkit-autofill:hover,
+input.bg-steel:-webkit-autofill:focus,
+input.bg-steel:-webkit-autofill:active,
+input.bg-steel:autofill,
+input.bg-steel:autofill:hover,
+input.bg-steel:autofill:focus,
+input.bg-steel:autofill:active {
+	-webkit-box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), inset 0 0 0 1px rgba(0, 0, 0, 0.2), inset 0 0 0 1000px var(--color-steel) !important;
+	box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), inset 0 0 0 1px rgba(0, 0, 0, 0.2), inset 0 0 0 1000px var(--color-steel) !important;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
 	width: 6px;

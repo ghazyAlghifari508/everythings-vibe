@@ -76,7 +76,7 @@ export function DesignGeneratorPanel() {
 							required
 							aria-invalid={!!error}
 							aria-describedby="design-help"
-							className="h-full min-w-0 flex-1 bg-transparent text-base sm:text-sm font-medium text-snow outline-none placeholder:text-fog/70 disabled:opacity-60"
+							className="h-full min-w-0 flex-1 bg-transparent text-base sm:text-sm font-medium text-snow outline-none placeholder:text-fog/70 disabled:opacity-60 [--autofill-bg:var(--color-charcoal)]"
 						/>
 					</div>
 
