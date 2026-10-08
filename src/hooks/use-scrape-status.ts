@@ -1,9 +1,47 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ScrapeStatus } from "@/db/schema";
+import type {
+	ScrapeMetadata,
+	ScrapeMode,
+	ScrapeStatus,
+} from "@/db/schema";
 import type { ScrapeDetail } from "@/lib/services/scrape-service";
 
+export interface ScrapeStatusSnapshot {
+	status: string;
+	mode?: ScrapeMode | null;
+	sourceUrl: string;
+	domain: string;
+	previewHtml?: string | null;
+	document?: { designMd: string } | null;
+	metadata?: ScrapeMetadata | null;
+}
+
+export interface ScrapeStatusSeedInput {
+	status: string;
+	mode?: ScrapeMode | null;
+	sourceUrl: string;
+	domain: string;
+	previewHtml?: string | null;
+	designMd?: string;
+	metadata?: ScrapeMetadata | null;
+}
+
+export function toScrapeStatusSnapshot(
+	input: ScrapeStatusSeedInput,
+): ScrapeStatusSnapshot {
+	return {
+		status: input.status,
+		mode: input.mode ?? null,
+		sourceUrl: input.sourceUrl,
+		domain: input.domain,
+		previewHtml: input.previewHtml ?? null,
+		document: input.designMd ? { designMd: input.designMd } : null,
+		metadata: input.metadata ?? null,
+	};
+}
+
 export interface UseScrapeStatusOptions {
-	initialData?: ScrapeDetail | null;
+	initialData?: ScrapeStatusSnapshot | null;
 	pollIntervalMs?: number;
 }
 
@@ -16,7 +54,9 @@ export function useScrapeStatus(
 	options: UseScrapeStatusOptions = {},
 ) {
 	const { initialData = null, pollIntervalMs = 1500 } = options;
-	const [data, setData] = useState<ScrapeDetail | null>(initialData);
+	const [data, setData] = useState<ScrapeDetail | ScrapeStatusSnapshot | null>(
+		initialData,
+	);
 	const [error, setError] = useState<string | null>(null);
 	const [isRetrying, setIsRetrying] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

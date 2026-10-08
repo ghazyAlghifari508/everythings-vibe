@@ -4,8 +4,12 @@ import { ArrowLeft } from "lucide-react";
 import { DesignResult } from "@/components/design/design-result";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
+import { resolveScrapeView } from "@/components/design/scrape-view-state";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
-import { useScrapeStatus } from "@/hooks/use-scrape-status";
+import {
+	toScrapeStatusSnapshot,
+	useScrapeStatus,
+} from "@/hooks/use-scrape-status";
 import { requireUserServer } from "@/lib/session";
 import { displaySiteName } from "@/lib/site-name";
 
@@ -63,7 +67,23 @@ export const Route = createFileRoute("/design/scrap/$id")({
 function ScrapeDetailPage() {
 	const initial = Route.useLoaderData();
 	const { id } = Route.useParams();
-	const { data, status: polledStatus, isRetrying, retry } = useScrapeStatus(id);
+
+	const { data, status: polledStatus, isRetrying, retry } = useScrapeStatus(
+		id,
+		{
+			initialData: initial
+				? toScrapeStatusSnapshot({
+						status: initial.status,
+						mode: initial.mode,
+						sourceUrl: initial.sourceUrl,
+						domain: initial.domain,
+						previewHtml: initial.previewHtml,
+						designMd: initial.designMd,
+						metadata: initial.metadata,
+					})
+				: null,
+		},
+	);
 
 	if (!initial) throw new Error("NOT_FOUND");
 
@@ -94,12 +114,15 @@ function ScrapeDetailPage() {
 			? metadata.stageStartedAt
 			: null;
 
-	const isCompleted =
-		currentStatus === "completed" &&
-		(mode === "html" ? Boolean(previewHtml) : Boolean(designMd));
+	const view = resolveScrapeView({
+		status: currentStatus,
+		mode,
+		previewHtml,
+		designMd,
+	});
 
 	const siteName = displaySiteName(domain);
-	const wideResult = isCompleted && mode === "design";
+	const wideResult = view === "result-design";
 
 	return (
 		<main
@@ -121,16 +144,14 @@ function ScrapeDetailPage() {
 				<p className="mt-1 truncate font-mono text-xs text-fog">{domain}</p>
 			</header>
 
-			{isCompleted ? (
-				mode === "html" ? (
-					<ScrapeDetail domain={domain} previewHtml={previewHtml} />
-				) : (
-					<DesignResult
-						sourceUrl={sourceUrl}
-						domain={domain}
-						designMd={designMd}
-					/>
-				)
+			{view === "result-design" ? (
+				<DesignResult
+					sourceUrl={sourceUrl}
+					domain={domain}
+					designMd={designMd}
+				/>
+			) : view === "result-html" ? (
+				<ScrapeDetail domain={domain} previewHtml={previewHtml} />
 			) : (
 				<ScrapeProgress
 					mode={mode}
