@@ -19,7 +19,7 @@ export function DesignResult({ sourceUrl, domain, designMd }: DesignResultProps)
 	const model = useMemo(() => parseDesignMd(designMd), [designMd]);
 
 	return (
-		<div className="grid w-full grid-cols-1 items-start gap-6 lg:grid-cols-2">
+		<div className="grid w-full grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] lg:gap-8">
 			<DesignSystemInspector
 				siteName={siteName}
 				domain={domain}

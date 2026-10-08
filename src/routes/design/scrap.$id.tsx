@@ -126,8 +126,8 @@ function ScrapeDetailPage() {
 
 	return (
 		<main
-			className={`mx-auto flex w-full flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14 ${
-				wideResult ? "max-w-7xl" : "max-w-5xl"
+			className={`flex w-full flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14 ${
+				wideResult ? "lg:px-10" : "mx-auto max-w-5xl"
 			}`}
 		>
 			<Link
