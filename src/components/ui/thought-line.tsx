@@ -32,7 +32,7 @@ interface ThoughtLineProps {
 	// bare embeds one inline activity line in a parent card instead of its own card + header.
 	bare?: boolean;
 	presentation?: ThoughtLinePresentation;
-	rotatingMessages?: string[];
+	rotatingMessages?: readonly string[];
 	rotationKey?: string | number;
 	rotationIntervalMs?: number;
 	startedAt?: number | string | Date;
@@ -86,7 +86,7 @@ function PulsingStepIcon() {
 }
 
 interface RotatingActivityProps {
-	messages: string[];
+	messages: readonly string[];
 	index: number;
 	rotationKeyValue: string | number | undefined;
 	glyph: ReactNode;
@@ -215,15 +215,19 @@ export function ThoughtLine({
 		setHintIndex(0);
 	}, [rotationKey]);
 
+	const messageCount = rotatingMessages?.length ?? 0;
+	const messagesRef = useRef(rotatingMessages);
+	messagesRef.current = rotatingMessages;
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation survives equivalent parent rerenders; only a real stage change (rotationKey) or set-size change restarts the cycle by design
 	useEffect(() => {
-		if (!isRotating) return;
-		const count = rotatingMessages?.length ?? 0;
-		if (count <= 1) return;
+		if (!isRotating || messageCount <= 1) return;
 		const t = setInterval(() => {
-			setHintIndex((index) => (index + 1) % count);
+			const count = messagesRef.current?.length ?? 0;
+			if (count > 0) setHintIndex((index) => (index + 1) % count);
 		}, rotationIntervalMs);
 		return () => clearInterval(t);
-	}, [isRotating, rotatingMessages, rotationIntervalMs]);
+	}, [isRotating, rotationKey, messageCount, rotationIntervalMs]);
 
 	useEffect(() => {
 		if (!working) return;

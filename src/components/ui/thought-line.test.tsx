@@ -109,6 +109,72 @@ describe("ThoughtLine bare presentation", () => {
 	});
 });
 
+describe("ThoughtLine rotation stability", () => {
+	it("keeps rotating across equivalent rerenders without restarting the cycle", () => {
+		const renderRotatingClone = () =>
+			render(
+				<ThoughtLine
+					working
+					label="ScrapeLabel"
+					doneLabel="ScrapeLabel selesai"
+					presentation="rotating"
+					rotatingMessages={[...HINTS]}
+					rotationKey="generating"
+				/>,
+			);
+		const { rerender } = renderRotatingClone();
+		const rerenderClone = () =>
+			rerender(
+				<ThoughtLine
+					working
+					label="ScrapeLabel"
+					doneLabel="ScrapeLabel selesai"
+					presentation="rotating"
+					rotatingMessages={[...HINTS]}
+					rotationKey="generating"
+				/>,
+			);
+		act(() => {
+			vi.advanceTimersByTime(1000);
+		});
+		rerenderClone();
+		act(() => {
+			vi.advanceTimersByTime(1000);
+		});
+		rerenderClone();
+		act(() => {
+			vi.advanceTimersByTime(1200);
+		});
+		expect(
+			screen.getByRole("status", { name: "Aktivitas berlangsung" })
+				.textContent,
+		).toContain(HINTS[1]);
+		rerenderClone();
+		act(() => {
+			vi.advanceTimersByTime(3200);
+		});
+		expect(
+			screen.getByRole("status", { name: "Aktivitas berlangsung" })
+				.textContent,
+		).toContain(HINTS[2]);
+	});
+
+	it("renders no activity slot when work never starts", () => {
+		render(
+			<ThoughtLine
+				working={false}
+				label="ScrapeLabel"
+				doneLabel="ScrapeLabel selesai"
+				presentation="rotating"
+				rotatingMessages={HINTS}
+			/>,
+		);
+		expect(
+			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
+		).toBeNull();
+	});
+});
+
 describe("ThoughtLine rotating presentation", () => {
 	it("renders exactly one activity slot and never a vertical list", () => {
 		const { container } = renderRotating();

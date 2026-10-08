@@ -59,6 +59,8 @@ const HTML_SAVING_HINTS = [
 	"Menyiapkan hasil preview...",
 ];
 
+const EMPTY_HINTS: readonly string[] = [];
+
 const DESIGN_HINTS: Record<string, readonly string[]> = {
 	queued: DESIGN_QUEUED_HINTS,
 	capturing: DESIGN_CAPTURING_HINTS,
@@ -78,7 +80,7 @@ const HTML_HINTS: Record<string, readonly string[]> = {
 export function scrapeActivityHints(
 	mode: ScrapeMode,
 	status: ScrapeStatus | string,
-): string[] {
+): readonly string[] {
 	const table = mode === "html" ? HTML_HINTS : DESIGN_HINTS;
-	return [...(table[status] ?? [])];
+	return table[status] ?? EMPTY_HINTS;
 }

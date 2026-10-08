@@ -34,6 +34,15 @@ describe("scrapeActivityHints", () => {
 		}
 	});
 
+	it("returns referentially stable canonical arrays", () => {
+		expect(scrapeActivityHints("design", "generating")).toBe(
+			scrapeActivityHints("design", "generating"),
+		);
+		expect(scrapeActivityHints("html", "capturing")).toBe(
+			scrapeActivityHints("html", "capturing"),
+		);
+	});
+
 	it("keeps DESIGN and HTML capturing hints distinct", () => {
 		const design = scrapeActivityHints("design", "capturing");
 		const html = scrapeActivityHints("html", "capturing");
