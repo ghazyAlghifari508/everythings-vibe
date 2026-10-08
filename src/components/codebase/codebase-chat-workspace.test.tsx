@@ -236,6 +236,18 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(onSendMessage).not.toHaveBeenCalled();
 	});
 
+	it("keeps starter cards keyboard-focusable buttons", () => {
+		renderWorkspace({ starterSuggestions });
+
+		const buttons = container.querySelectorAll<HTMLButtonElement>(
+			"[data-testid='codebase-intent-starters'] button",
+		);
+		for (const button of buttons) {
+			expect(button.type).toBe("button");
+			expect(button.disabled).toBe(false);
+		}
+	});
+
 	it("hides the entire starter section when legacy analysis has no suggestions", () => {
 		renderWorkspace();
 		expect(

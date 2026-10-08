@@ -305,7 +305,7 @@ export function CodebaseChatWorkspace({
 											type="button"
 											onClick={() => handlePrefillDraft(item.prompt)}
 											data-testid={`intent-starter-${item.id}`}
-											className="flex min-h-[62px] flex-col items-start justify-center rounded-lg border border-graphite bg-charcoal/40 p-3 text-left text-snow transition-colors hover:border-slate hover:bg-obsidian active:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											className="flex min-h-[62px] flex-col items-start justify-center rounded-lg border border-slate bg-charcoal/40 p-3 text-left text-snow transition-colors hover:bg-obsidian active:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 										>
 											<span className="line-clamp-1 text-xs font-medium text-snow">
 												{item.title}
