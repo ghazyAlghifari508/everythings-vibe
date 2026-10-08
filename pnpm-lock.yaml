@@ -86,6 +86,9 @@ importers:
       pg:
         specifier: ^8.16.3
         version: 8.22.0
+      playwright:
+        specifier: 1.62.0
+        version: 1.62.0
       react:
         specifier: ^19.2.0
         version: 19.2.8

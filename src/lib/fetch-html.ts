@@ -212,27 +212,29 @@ export async function scrapeHtml(
 	rawUrl: string,
 	attemptNumber = 1,
 ): Promise<ScrapeCapture> {
-	const { html: raw, status, finalUrl } = await fetchHtml(rawUrl);
+	const { url } = await validateUrl(rawUrl);
+	const { renderPage } = await import("./render-page");
+	const rendered = await renderPage(url.href);
 	const capturedAt = new Date().toISOString();
 	const html = withBaseHref(
-		forceDesktopViewport(await inlineStyles(raw, finalUrl)),
-		finalUrl,
+		forceDesktopViewport(await inlineStyles(rendered.html, rendered.finalUrl)),
+		rendered.finalUrl,
 	);
-	const previewHtml = cleanPreviewHtml(html, finalUrl);
-	const domain = new URL(finalUrl).hostname.toLowerCase();
+	const previewHtml = cleanPreviewHtml(html, rendered.finalUrl);
+	const domain = new URL(rendered.finalUrl).hostname.toLowerCase();
 	return {
-		sourceUrl: finalUrl,
-		status,
+		sourceUrl: rendered.finalUrl,
+		status: rendered.status,
 		html,
 		previewHtml,
 		domain,
-		title: extractPageTitle(raw),
+		title: extractPageTitle(rendered.html),
 		metadata: {
 			attempt: attemptNumber,
 			capturedAt,
-			finalUrl,
+			finalUrl: rendered.finalUrl,
 			viewport: { width: SCRAPE_DESKTOP_WIDTH, height: SCRAPE_DESKTOP_HEIGHT },
-			captureMode: "server-fetch",
+			captureMode: "desktop-browser",
 			htmlBytes: Buffer.byteLength(html, "utf8"),
 			previewHtmlBytes: Buffer.byteLength(previewHtml, "utf8"),
 		},
