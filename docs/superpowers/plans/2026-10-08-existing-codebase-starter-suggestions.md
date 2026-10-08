@@ -30,6 +30,7 @@
 ## File Map
 
 - `src/lib/codebase-analysis.ts`: typed suggestion IDs/objects, optional stored-analysis field, required generation schema, prompt instructions, parser validation against trusted manifest paths.
+- `src/lib/constants.ts`: centralized title, description, and prompt character bounds for model-generated starter content.
 - `src/lib/codebase-analysis.server.ts`: pass exact paths from the validated uploaded snapshot manifest into the existing parser call; keep the single model invocation and existing persistence lifecycle.
 - `src/lib/codebase-analysis.test.ts`: schema compatibility, exact category uniqueness, parser path allowlist, and prompt contract tests.
 - `src/routes/codebases/$id.tsx`: pass the validated analysis suggestions to the workspace.
@@ -45,6 +46,7 @@ No database schema, migration, dependency, API route, or unrelated generation pi
 
 **Files:**
 - Modify: `src/lib/codebase-analysis.ts`
+- Modify: `src/lib/constants.ts`
 - Modify: `src/lib/codebase-analysis.server.ts`
 - Test: `src/lib/codebase-analysis.test.ts`
 
@@ -75,7 +77,7 @@ expect(codebaseAnalysisGenerationSchema.safeParse({
 expect(codebaseAnalysisGenerationSchema.safeParse(validAnalysis).success).toBe(false);
 ```
 
-Also reject an invalid ID and empty required text field. Do not assert exact generated model prose.
+Also reject an invalid ID, empty required text field, and title/description/prompt values beyond the exported constants. Do not assert exact generated model prose.
 
 - [ ] **Step 2: Run the focused test and verify expected RED**
 
@@ -97,7 +99,7 @@ Expected: FAIL because parser signature, required generation schema, and new pro
 
 - [ ] **Step 5: Implement typed suggestion contracts and exact category validation**
 
-In `src/lib/codebase-analysis.ts`, define an enum schema for the four category IDs and a bounded object schema for each suggestion. Use a four-item array schema plus a refinement that verifies every union member occurs once. Add this field as optional to `codebaseAnalysisSchema`, then derive a generated-analysis schema where it is required.
+In `src/lib/constants.ts`, add named maximum character constants for starter titles, descriptions, and prompts, reusing an existing prompt limit if its current semantic scope fits. In `src/lib/codebase-analysis.ts`, define an enum schema for the four category IDs and a bounded object schema that uses those constants. Use a four-item array schema plus a refinement that verifies every union member occurs once. Add this field as optional to `codebaseAnalysisSchema`, then derive a generated-analysis schema where it is required.
 
 Keep title, description, prompt, and paths structurally constrained. Do not add domain examples, assumed stack migrations, or hardcoded product capabilities to production prompt output.
 
@@ -117,7 +119,7 @@ Run:
 
 ```powershell
 pnpm test src/lib/codebase-analysis.test.ts
-pnpm exec biome check src/lib/codebase-analysis.ts src/lib/codebase-analysis.server.ts src/lib/codebase-analysis.test.ts
+pnpm exec biome check src/lib/constants.ts src/lib/codebase-analysis.ts src/lib/codebase-analysis.server.ts src/lib/codebase-analysis.test.ts
 pnpm exec tsc --noEmit
 ```
 
@@ -125,10 +127,10 @@ Expected: all pass. Inspect test output to confirm malformed/missing/duplicate c
 
 - [ ] **Step 9: Inspect and commit the analysis milestone**
 
-Run `git status --short --branch` and `git diff -- src/lib/codebase-analysis.ts src/lib/codebase-analysis.server.ts src/lib/codebase-analysis.test.ts`; review the complete diff and `git diff --check`. Stage only those three files and commit:
+Run `git status --short --branch` and `git diff -- src/lib/constants.ts src/lib/codebase-analysis.ts src/lib/codebase-analysis.server.ts src/lib/codebase-analysis.test.ts`; review the complete diff and `git diff --check`. Stage only those four files and commit:
 
 ```powershell
-git add src/lib/codebase-analysis.ts src/lib/codebase-analysis.server.ts src/lib/codebase-analysis.test.ts
+git add src/lib/constants.ts src/lib/codebase-analysis.ts src/lib/codebase-analysis.server.ts src/lib/codebase-analysis.test.ts
 git commit -m "feat(codebase): generate validated repository starters"
 ```
 
