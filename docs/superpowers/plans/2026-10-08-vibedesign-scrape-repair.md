@@ -151,7 +151,7 @@
 - Produces:
   - `runScrapePipeline(scrapeId: string, userId: string): Promise<void>` transitioning DB rows through `queued` -> `capturing` -> `extracting` -> `generating` -> `saving` -> `completed`
   - `POST /api/scrape` immediately returns `scrapeId` and queues pipeline
-  - `ScrapeProgress` component rendering real stages and a stage-aligned indeterminate bar based on persisted status, with no estimated percentage or ETA
+  - `ScrapeProgress` component rendering real stages and deterministically calculated progress bar
 
 - [ ] **Step 1: Write tests for async pipeline transitions and polling hook**
 - [ ] **Step 2: Refactor `scrape-service.ts` with `runScrapePipeline` executing real stages and updating DB**

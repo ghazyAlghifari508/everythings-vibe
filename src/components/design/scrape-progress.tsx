@@ -109,47 +109,13 @@ export function ScrapeProgress({
 					) : null}
 				</div>
 
-				<p className="font-mono text-xs font-semibold text-snow">
+				<p className="flex items-center gap-2 font-mono text-xs font-semibold text-snow">
+					{!isDone && !isFailed ? (
+						<Loader2 size={14} className="animate-spin text-mist" />
+					) : null}
 					<span aria-live="polite">{currentLabel}</span>
 				</p>
 			</div>
-
-			{!isFailed && !isDone ? (
-				<div
-					role="progressbar"
-					aria-label="Kemajuan pemrosesan"
-					className="mt-6 flex gap-1.5"
-				>
-					{orderedStages.map((stage, index) => {
-						const isStageDone =
-							isDone || (currentIndex >= 0 && index < currentIndex);
-						const isStageCurrent = currentIndex === index && !isDone;
-
-						return (
-							<span
-								key={stage}
-								data-segment-state={
-									isStageDone
-										? "complete"
-										: isStageCurrent
-											? "active"
-											: "upcoming"
-								}
-								className="h-1.5 flex-1 overflow-hidden rounded-full bg-graphite"
-							>
-								{isStageDone ? (
-									<span className="block size-full rounded-full bg-mist" />
-								) : isStageCurrent ? (
-									<span
-										data-stage-motion
-										className="block size-full rounded-full bg-indigo motion-safe:animate-pulse motion-reduce:animate-none"
-									/>
-								) : null}
-							</span>
-						);
-					})}
-				</div>
-			) : null}
 
 			<div className="mt-6">
 				{isFailed || isDone ? (
@@ -159,7 +125,7 @@ export function ScrapeProgress({
 							: (stageDescriptions[status] ?? "Sedang memproses website…")}
 					</p>
 				) : (
-					<div className="mt-2.5 flex min-w-0 items-center gap-2">
+					<div className="mt-2.5">
 						<ThoughtLine
 							working
 							bare
@@ -167,28 +133,10 @@ export function ScrapeProgress({
 							doneLabel={currentLabel}
 							presentation="rotating"
 							activity={activity ?? null}
+							rotationKey={activity ?? status}
 							startedAt={activityStartedAt ?? stageStartedAt ?? undefined}
 							fontSize="xs"
 						/>
-						{activity ? (
-							<span
-								aria-hidden="true"
-								className="flex shrink-0 items-center gap-1"
-							>
-								<span
-									data-activity-dot
-									className="size-1 rounded-full bg-mist motion-safe:animate-pulse motion-reduce:animate-none"
-								/>
-								<span
-									data-activity-dot
-									className="size-1 rounded-full bg-mist motion-safe:animate-pulse [animation-delay:150ms] motion-reduce:animate-none"
-								/>
-								<span
-									data-activity-dot
-									className="size-1 rounded-full bg-mist motion-safe:animate-pulse [animation-delay:300ms] motion-reduce:animate-none"
-								/>
-							</span>
-						) : null}
 					</div>
 				)}
 			</div>
@@ -217,10 +165,7 @@ export function ScrapeProgress({
 									className="btn-primary mt-4 inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition-all hover:brightness-105 disabled:opacity-50"
 								>
 									{isRetrying ? (
-										<Loader2
-											size={14}
-											className="motion-safe:animate-spin motion-reduce:animate-none"
-										/>
+										<Loader2 size={14} className="animate-spin" />
 									) : (
 										<RotateCcw size={14} />
 									)}
@@ -246,13 +191,6 @@ export function ScrapeProgress({
 								<li
 									key={s}
 									aria-current={isStageCurrent ? "step" : undefined}
-									data-stage-state={
-										isStageDone
-											? "complete"
-											: isStageCurrent
-												? "active"
-												: "upcoming"
-									}
 									className={`flex items-center gap-2 font-mono text-xs ${
 										isStageDone
 											? "text-fog"
@@ -269,11 +207,7 @@ export function ScrapeProgress({
 											className="text-emerald-500/80"
 										/>
 									) : isStageCurrent ? (
-										<Loader2
-											size={12}
-											data-stage-motion
-											className="motion-safe:animate-spin motion-reduce:animate-none"
-										/>
+										<Loader2 size={12} className="animate-spin" />
 									) : (
 										<span
 											aria-hidden="true"

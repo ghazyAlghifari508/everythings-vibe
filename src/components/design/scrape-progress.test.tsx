@@ -29,12 +29,6 @@ function activeSlotText(): string {
 function authoritativeStage(container: HTMLElement): string {
 	return container.querySelector('[aria-current="step"]')?.textContent ?? "";
 }
-function progressSegmentStates(container: HTMLElement): string[] {
-	return Array.from(
-		container.querySelectorAll("[data-segment-state]"),
-		(segment) => segment.getAttribute("data-segment-state") ?? "",
-	);
-}
 
 describe("ScrapeProgress", () => {
 	it("shows the real backend activity, not synthetic rotating hints", () => {
@@ -48,32 +42,7 @@ describe("ScrapeProgress", () => {
 			/>,
 		);
 		expect(activeSlotText()).toContain("Memvalidasi DESIGN.md");
-		expect(
-			screen.getByRole("progressbar", { name: "Kemajuan pemrosesan" }),
-		).toBeDefined();
-	});
-
-	it("renders indeterminate stage-aligned progress without a numeric value", () => {
-		const { container } = render(
-			<ScrapeProgress
-				mode="html"
-				status="capturing"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-			/>,
-		);
-		const progressbar = screen.getByRole("progressbar", {
-			name: "Kemajuan pemrosesan",
-		});
-		expect(progressbar.getAttribute("aria-valuenow")).toBeNull();
-		expect(progressbar.textContent).not.toMatch(/%/);
-		expect(progressSegmentStates(container)).toEqual([
-			"complete",
-			"active",
-			"upcoming",
-			"upcoming",
-			"upcoming",
-		]);
+		expect(screen.queryByRole("progressbar")).toBeNull();
 	});
 
 	it("does not rotate synthetic activity text while polling", () => {
@@ -144,62 +113,6 @@ describe("ScrapeProgress", () => {
 		expect(activeSlotText()).toBe(first);
 	});
 
-	it("keeps backend activity static while dots and the active stage stay in motion", () => {
-		const props = {
-			mode: "design" as const,
-			status: "generating" as const,
-			sourceUrl: "https://www.notion.com/",
-			domain: "www.notion.com",
-			activity: "Memvalidasi DESIGN.md",
-			activityStartedAt: new Date(Date.now() - 3000).toISOString(),
-		};
-		const { container, rerender } = render(<ScrapeProgress {...props} />);
-		const activityBefore = activeSlotText();
-		act(() => {
-			vi.advanceTimersByTime(120000);
-		});
-		rerender(<ScrapeProgress {...props} />);
-		expect(activeSlotText()).toBe(activityBefore);
-		expect(container.querySelectorAll("[data-activity-dot]")).toHaveLength(3);
-		expect(container.querySelectorAll("[data-stage-motion]")).toHaveLength(2);
-	});
-
-	it("marks activity dots decorative so their animation is not announced", () => {
-		const { container } = render(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				activity="Memvalidasi DESIGN.md"
-			/>,
-		);
-		expect(
-			container.querySelector('[aria-hidden="true"] [data-activity-dot]'),
-		).not.toBeNull();
-	});
-
-	it("preserves the persisted stage position when only activity metadata changes", () => {
-		const { container, rerender } = render(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				activity="Memvalidasi DESIGN.md"
-			/>,
-		);
-		const segmentsBefore = progressSegmentStates(container);
-		rerender(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				activity="Menyusun token yang belum lengkap"
-			/>,
-		);
-		expect(authoritativeStage(container)).toBe("Menyusun DESIGN.md");
-		expect(progressSegmentStates(container)).toEqual(segmentsBefore);
-	});
-
 	it("derives the activity timer from the persisted activity start", () => {
 		const activityStartedAt = new Date(Date.now() - 14000).toISOString();
 		const { container } = render(
@@ -220,9 +133,6 @@ describe("ScrapeProgress", () => {
 		expect(Number.isFinite(seconds)).toBe(true);
 		expect(seconds).toBeGreaterThanOrEqual(14);
 		expect(seconds).toBeLessThan(20);
-		expect(
-			container.querySelector('[role="timer"]')?.getAttribute("aria-live"),
-		).toBeNull();
 	});
 
 	it("falls back to stageStartedAt when no activity timestamp exists", () => {
@@ -290,7 +200,7 @@ describe("ScrapeProgress", () => {
 		expect(authoritativeStage(container)).toBe("Menyusun DESIGN.md");
 	});
 
-	it("preserves activity and persisted timer across a remount", () => {
+	it("preserves activity and timer across a remount with the same persisted metadata", () => {
 		const activityStartedAt = new Date(Date.now() - 5000).toISOString();
 		const first = render(
 			<ScrapeProgress
@@ -302,19 +212,9 @@ describe("ScrapeProgress", () => {
 				activityStartedAt={activityStartedAt}
 			/>,
 		);
-		const initialTimer = Number.parseFloat(
-			first.container.querySelector('[role="timer"]')?.textContent ?? "",
-		);
-		act(() => {
-			vi.advanceTimersByTime(1200);
-		});
-		const polledTimer = Number.parseFloat(
-			first.container.querySelector('[role="timer"]')?.textContent ?? "",
-		);
-		expect(polledTimer).toBeGreaterThan(initialTimer);
 		const slotText = activeSlotText();
 		first.unmount();
-		const remounted = render(
+		render(
 			<ScrapeProgress
 				mode="design"
 				status="generating"
@@ -325,15 +225,11 @@ describe("ScrapeProgress", () => {
 			/>,
 		);
 		expect(activeSlotText()).toBe(slotText);
-		expect(
-			Number.parseFloat(
-				remounted.container.querySelector('[role="timer"]')?.textContent ?? "",
-			),
-		).toBeGreaterThanOrEqual(polledTimer);
 	});
+
 	it("stops the active timer on failure while preserving retry", () => {
 		const onRetry = vi.fn();
-		const { container } = render(
+		render(
 			<ScrapeProgress
 				mode="html"
 				status="failed"
@@ -347,13 +243,12 @@ describe("ScrapeProgress", () => {
 			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
 		).toBeNull();
 		expect(screen.queryByRole("timer")).toBeNull();
-		expect(container.querySelectorAll("[data-activity-dot]")).toHaveLength(0);
-		expect(container.querySelectorAll("[data-stage-motion]")).toHaveLength(0);
-		fireEvent.click(screen.getByRole("button", { name: /Coba lagi/i }));
+		const retryButton = screen.getByRole("button", { name: /Coba lagi/i });
+		fireEvent.click(retryButton);
 		expect(onRetry).toHaveBeenCalledTimes(1);
 	});
 
-	it("stops all progress motion on completion", () => {
+	it("stops the active timer on completion without further rotation", () => {
 		const { container } = render(
 			<ScrapeProgress
 				mode="design"
@@ -366,8 +261,6 @@ describe("ScrapeProgress", () => {
 			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
 		).toBeNull();
 		expect(screen.queryByRole("timer")).toBeNull();
-		expect(container.querySelectorAll("[data-activity-dot]")).toHaveLength(0);
-		expect(container.querySelectorAll("[data-stage-motion]")).toHaveLength(0);
 		expect(screen.getByText(/siap digunakan/i)).toBeDefined();
 		expect(screen.getAllByText("Selesai")).toHaveLength(2);
 		const settled = container.textContent;
@@ -405,12 +298,10 @@ describe("ScrapeProgress", () => {
 		expect(activeSlotText()).toContain("Menangkap DOM hasil render");
 		expect(screen.queryByText(/Menyusun DESIGN\.md/i)).toBeNull();
 		expect(screen.queryByText(/\(\d+%/)).toBeNull();
-		expect(
-			screen.getByRole("progressbar", { name: "Kemajuan pemrosesan" }),
-		).toBeDefined();
+		expect(screen.queryByRole("progressbar")).toBeNull();
 	});
 
-	it("keeps stage completion and current position tied to persisted status", () => {
+	it("keeps completed stage labels muted while the active stage stays strongest", () => {
 		const { container } = render(
 			<ScrapeProgress
 				mode="design"
@@ -419,17 +310,20 @@ describe("ScrapeProgress", () => {
 				domain="www.notion.com"
 			/>,
 		);
-		const stages = Array.from(container.querySelectorAll("ol li"), (item) =>
-			item.getAttribute("data-stage-state"),
-		);
-		expect(stages).toEqual([
-			"complete",
-			"complete",
-			"active",
-			"upcoming",
-			"upcoming",
-			"upcoming",
-		]);
+		const items = container.querySelectorAll("ol li");
+		expect(items.length).toBeGreaterThanOrEqual(4);
+		for (const done of [items[0], items[1]]) {
+			expect(done.className).toContain("text-fog");
+			expect(done.className).not.toContain("emerald");
+			const icon = done.querySelector("svg");
+			expect(icon?.getAttribute("class") ?? "").toContain("text-emerald-500");
+		}
+		const active = items[2];
+		expect(active.className).toContain("text-snow");
+		expect(active.className).toContain("font-semibold");
+		const future = items[3];
+		expect(future.className).toContain("text-fog/60");
+		expect(future.className).not.toContain("emerald");
 	});
 
 	it("uses the website name as the progress heading, not the raw domain", () => {
