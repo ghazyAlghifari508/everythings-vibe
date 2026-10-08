@@ -4,8 +4,8 @@ import {
 	SCRAPE_STATUS_LABELS,
 	type ScrapeMode,
 	type ScrapeStatus,
-	scrapeProgressForStatus,
 } from "@/db/schema";
+import { displaySiteName } from "@/lib/site-name";
 
 export interface ScrapeProgressProps {
 	status: ScrapeStatus;
@@ -35,21 +35,23 @@ const ORDERED_HTML_STAGES: ScrapeStatus[] = [
 ];
 
 const DESIGN_STAGE_DESCRIPTIONS: Record<ScrapeStatus, string> = {
-	queued: "Menunggu antrean pemrosesan visual…",
-	capturing: "Mengambil HTML dan aset visual dari halaman publik…",
-	extracting: "Membaca palet warna, tipografi, dan pola komponen…",
-	generating: "AI sedang menyusun dokumentasi sistem desain lengkap…",
-	saving: "Menyimpan dokumen DESIGN.md…",
+	queued: "Menunggu giliran pemrosesan.",
+	capturing:
+		"Membuka website di browser dan menunggu tampilan serta aset selesai dimuat.",
+	extracting: "Membaca warna, tipografi, spacing, komponen, dan pola layout.",
+	generating:
+		"AI sedang menyusun DESIGN.md lengkap dari hasil analisis visual.",
+	saving: "Menyimpan DESIGN.md yang sudah selesai.",
 	completed: "Panduan desain DESIGN.md siap digunakan.",
 	failed: "Proses pembuatan DESIGN.md terhenti sebelum selesai.",
 };
 
 const HTML_STAGE_DESCRIPTIONS: Record<ScrapeStatus, string> = {
-	queued: "Menunggu antrean scrape HTML…",
-	capturing: "Mengambil HTML dan aset dari halaman publik…",
-	extracting: "Memproses resource dan menyiapkan preview…",
-	generating: "Memproses resource dan menyiapkan preview…",
-	saving: "Menyimpan index.html…",
+	queued: "Menunggu giliran pemrosesan.",
+	capturing: "Membuka website di browser dan menjalankan JavaScript halaman.",
+	extracting: "Menyiapkan HTML standalone dan resource untuk preview.",
+	generating: "Menyiapkan HTML standalone dan resource untuk preview.",
+	saving: "Menyimpan index.html yang sudah selesai.",
 	completed: "Hasil scraping index.html siap digunakan.",
 	failed: "Proses scraping HTML terhenti sebelum selesai.",
 };
@@ -63,7 +65,6 @@ export function ScrapeProgress({
 	isRetrying = false,
 	onRetry,
 }: ScrapeProgressProps) {
-	const progress = scrapeProgressForStatus(status, mode);
 	const isFailed = status === "failed";
 	const isDone = status === "completed";
 
@@ -74,6 +75,11 @@ export function ScrapeProgress({
 	const stageDescriptions =
 		mode === "html" ? HTML_STAGE_DESCRIPTIONS : DESIGN_STAGE_DESCRIPTIONS;
 	const currentIndex = orderedStages.indexOf(status);
+	const currentLabel = stageLabels[status] ?? status;
+	const stageFill =
+		currentIndex >= 0
+			? Math.round(((currentIndex + 1) / orderedStages.length) * 100)
+			: 0;
 
 	const progressLabel =
 		mode === "html" ? "Progres scraping HTML" : "Progres pembuatan DESIGN.md";
@@ -81,18 +87,20 @@ export function ScrapeProgress({
 		mode === "html"
 			? "Scrape HTML belum bisa diselesaikan. Coba ulangi dari link yang sama."
 			: "DESIGN.md belum bisa dibuat. Coba ulangi dari link yang sama.";
+	const siteName = domain
+		? displaySiteName(domain)
+		: sourceUrl
+			? displaySiteName(new URL(sourceUrl).hostname)
+			: "Website";
 
 	return (
 		<div className="w-full rounded-2xl border border-graphite bg-charcoal p-6 sm:p-8">
-			{/* Header */}
 			<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					<span className="font-mono text-xs uppercase tracking-wider text-fog">
 						Status Pemrosesan {mode === "html" ? "(HTML)" : "(DESIGN.md)"}
 					</span>
-					<h2 className="text-xl font-semibold text-snow">
-						{domain || (sourceUrl ? new URL(sourceUrl).hostname : "Website")}
-					</h2>
+					<h2 className="text-xl font-semibold text-snow">{siteName}</h2>
 					{sourceUrl ? (
 						<p className="mt-0.5 truncate font-mono text-xs text-fog max-w-xl">
 							{sourceUrl}
@@ -100,23 +108,19 @@ export function ScrapeProgress({
 					) : null}
 				</div>
 
-				<div className="flex items-center gap-2 self-start rounded-full border border-graphite bg-onyx px-3.5 py-1.5 font-mono text-xs font-semibold text-snow sm:self-auto">
+				<p className="flex items-center gap-2 font-mono text-xs font-semibold text-snow">
 					{!isDone && !isFailed ? (
 						<Loader2 size={14} className="animate-spin text-mist" />
 					) : null}
-					<span>{stageLabels[status] ?? status}</span>
-					<span className="text-fog">{`(${progress}%)`}</span>
-				</div>
+					<span aria-live="polite">{currentLabel}</span>
+				</p>
 			</div>
 
-			{/* Progress Bar */}
 			<div className="mt-6">
 				<div
 					role="progressbar"
-					aria-valuemin={0}
-					aria-valuemax={100}
-					aria-valuenow={progress}
 					aria-label={progressLabel}
+					aria-valuetext={currentLabel}
 					className="h-2 w-full overflow-hidden rounded-full bg-onyx"
 				>
 					<div
@@ -127,7 +131,7 @@ export function ScrapeProgress({
 									? "bg-emerald-500"
 									: "bg-indigo-500"
 						}`}
-						style={{ width: `${progress}%` }}
+						style={{ width: `${stageFill}%` }}
 					/>
 				</div>
 				<p aria-live="polite" className="mt-2.5 text-xs text-fog">
@@ -137,7 +141,6 @@ export function ScrapeProgress({
 				</p>
 			</div>
 
-			{/* Error and Retry */}
 			{isFailed ? (
 				<div className="mt-6 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4">
 					<div className="flex items-start gap-3">
@@ -159,7 +162,7 @@ export function ScrapeProgress({
 									type="button"
 									onClick={onRetry}
 									disabled={isRetrying}
-									className="mt-4 inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-xs font-semibold text-white shadow transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+									className="btn-primary mt-4 inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition-all hover:brightness-105 disabled:opacity-50"
 								>
 									{isRetrying ? (
 										<Loader2 size={14} className="animate-spin" />
@@ -173,7 +176,6 @@ export function ScrapeProgress({
 					</div>
 				</div>
 			) : (
-				/* Stage Tracker */
 				<div className="mt-8 border-t border-graphite/60 pt-6">
 					<ol
 						className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${
@@ -188,24 +190,23 @@ export function ScrapeProgress({
 							return (
 								<li
 									key={s}
-									className={`flex items-center gap-2 rounded-lg p-2 font-mono text-xs ${
+									className={`flex items-center gap-2 font-mono text-xs ${
 										isStageDone
 											? "text-emerald-400"
 											: isStageCurrent
-												? "bg-onyx font-semibold text-snow"
+												? "font-semibold text-snow"
 												: "text-fog/60"
 									}`}
 								>
 									{isStageDone ? (
-										<span className="grid size-5 place-items-center rounded-full bg-emerald-500/20 text-emerald-400">
-											<Check size={12} strokeWidth={3} />
-										</span>
+										<Check size={12} strokeWidth={3} aria-hidden="true" />
 									) : isStageCurrent ? (
-										<span className="grid size-5 place-items-center rounded-full bg-indigo-500/20 text-indigo-400">
-											<Loader2 size={12} className="animate-spin" />
-										</span>
+										<Loader2 size={12} className="animate-spin" />
 									) : (
-										<span className="size-2 rounded-full bg-graphite mx-1.5" />
+										<span
+											aria-hidden="true"
+											className="size-1.5 rounded-full bg-graphite"
+										/>
 									)}
 									<span className="truncate">{stageLabels[s] ?? s}</span>
 								</li>

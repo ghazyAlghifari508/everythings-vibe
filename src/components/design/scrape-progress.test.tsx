@@ -8,81 +8,93 @@ afterEach(() => {
 });
 
 describe("ScrapeProgress", () => {
-	it("renders capturing stage for DESIGN.md mode with deterministic progress bar and stage tracker", () => {
-		render(
+	it("shows honest browser activity copy for DESIGN capturing without a fake percentage", () => {
+		const { container } = render(
 			<ScrapeProgress
+				mode="design"
 				status="capturing"
-				mode="design"
-				sourceUrl="https://example.com"
-				domain="example.com"
+				sourceUrl="https://www.notion.com/"
+				domain="www.notion.com"
 			/>,
 		);
-
-		expect(screen.getByText("example.com")).toBeDefined();
-		expect(screen.getAllByText("Mengambil halaman").length).toBeGreaterThan(0);
-		expect(screen.getByText("(30%)")).toBeDefined();
-
-		const progressBar = screen.getByRole("progressbar");
-		expect(progressBar.getAttribute("aria-valuenow")).toBe("30");
-		expect(progressBar.getAttribute("aria-label")).toContain("DESIGN.md");
+		expect(screen.getByText(/Membuka website di browser/i)).toBeDefined();
+		expect(screen.queryByText(/\(\d+%/)).toBeNull();
+		expect(
+			container
+				.querySelector('[role="progressbar"]')
+				?.getAttribute("aria-valuenow"),
+		).toBeNull();
 	});
 
-	it("renders extracting stage for DESIGN.md mode with 55% progress", () => {
+	it("shows honest visual-analysis copy for DESIGN extracting", () => {
 		render(
 			<ScrapeProgress
-				status="extracting"
 				mode="design"
-				sourceUrl="https://example.com"
-				domain="example.com"
+				status="extracting"
+				sourceUrl="https://www.notion.com/"
+				domain="www.notion.com"
 			/>,
 		);
-
-		expect(screen.getByText("(55%)")).toBeDefined();
-		const progressBar = screen.getByRole("progressbar");
-		expect(progressBar.getAttribute("aria-valuenow")).toBe("55");
+		expect(screen.getByText(/Membaca warna, tipografi/i)).toBeDefined();
 	});
 
-	it("renders extracting stage for HTML mode with 75% progress and HTML-specific stages", () => {
+	it("shows honest AI-generation copy for DESIGN generating", () => {
 		render(
 			<ScrapeProgress
-				status="extracting"
+				mode="design"
+				status="generating"
+				sourceUrl="https://www.notion.com/"
+				domain="www.notion.com"
+			/>,
+		);
+		expect(screen.getByText(/AI sedang menyusun DESIGN\.md/i)).toBeDefined();
+	});
+
+	it("shows browser-rendering copy for HTML capturing and no generating stage", () => {
+		const { container } = render(
+			<ScrapeProgress
 				mode="html"
-				sourceUrl="https://example.com"
-				domain="example.com"
+				status="capturing"
+				sourceUrl="https://www.notion.com/"
+				domain="www.notion.com"
 			/>,
 		);
-
-		expect(screen.getByText("(75%)")).toBeDefined();
-		const progressBar = screen.getByRole("progressbar");
-		expect(progressBar.getAttribute("aria-valuenow")).toBe("75");
-		expect(progressBar.getAttribute("aria-label")).toContain("HTML");
-
-		// HTML mode does not include "Menyusun DESIGN.md"
-		expect(screen.queryByText("Menyusun DESIGN.md")).toBeNull();
-		// HTML mode includes "Menyiapkan preview"
-		expect(screen.getAllByText("Menyiapkan preview").length).toBeGreaterThan(0);
+		expect(screen.getByText(/menjalankan JavaScript halaman/i)).toBeDefined();
+		expect(screen.queryByText(/Menyusun DESIGN\.md/i)).toBeNull();
+		expect(screen.queryByText(/\(\d+%/)).toBeNull();
+		expect(
+			container
+				.querySelector('[role="progressbar"]')
+				?.getAttribute("aria-valuenow"),
+		).toBeNull();
 	});
 
-	it("renders failed state with error message and retry button", () => {
+	it("exposes retry on failure while preserving the mode context", () => {
 		const onRetry = vi.fn();
 		render(
 			<ScrapeProgress
+				mode="html"
 				status="failed"
-				mode="design"
-				sourceUrl="https://example.com"
-				domain="example.com"
-				errorMessage="Koneksi ke website gagal."
+				sourceUrl="https://www.notion.com/"
+				domain="www.notion.com"
+				errorMessage="Gagal memproses HTML website."
 				onRetry={onRetry}
 			/>,
 		);
-
-		expect(
-			screen.getAllByText("Koneksi ke website gagal.").length,
-		).toBeGreaterThan(0);
-		const retryBtn = screen.getByRole("button", { name: /coba lagi/i });
-		expect(retryBtn).toBeDefined();
-
-		fireEvent.click(retryBtn);
+		const retryButton = screen.getByRole("button", { name: /Coba lagi/i });
+		fireEvent.click(retryButton);
 		expect(onRetry).toHaveBeenCalledTimes(1);
+	});
+
+	it("uses the website name as the progress heading, not the raw domain", () => {
+		render(
+			<ScrapeProgress
+				mode="design"
+				status="queued"
+				sourceUrl="https://www.notion.com/"
+				domain="www.notion.com"
+			/>,
+		);
+		expect(screen.getByRole("heading", { name: "Notion" })).toBeDefined();
 	});
 });
