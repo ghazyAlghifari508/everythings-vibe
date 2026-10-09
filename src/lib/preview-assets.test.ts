@@ -236,6 +236,30 @@ describe("inlinePreviewAssets", () => {
 			),
 		).toBe(true);
 	});
+	it("inlines the 256th font and stops at the finite 256-resource cap", async () => {
+		expect(SCRAPE_PREVIEW_ASSET_MAX_RESOURCES).toBe(256);
+		const fontUrls = Array.from(
+			{ length: 257 },
+			(_, index) => `https://assets.example/font-${index}.woff2`,
+		);
+		const html = `<style data-framer-font-css>${fontUrls
+			.map(
+				(url, index) =>
+					`@font-face{font-family:F${index};src:url(${proxy(url)})}`,
+			)
+			.join("")}</style>`;
+		const fetchAsset = vi.fn(async () => ({
+			body: Buffer.from("x"),
+			status: 200,
+			contentType: "font/woff2",
+		}));
+
+		const preview = await inlinePreviewAssets(html, { fetchAsset });
+
+		expect(fetchAsset).toHaveBeenCalledTimes(256);
+		expect(preview).toContain("data:font/woff2;base64,eA==");
+		expect(preview).toContain(proxy(fontUrls[256] ?? ""));
+	});
 
 	it("stops after the unique resource cap", async () => {
 		const html = Array.from(
