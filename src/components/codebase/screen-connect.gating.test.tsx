@@ -285,6 +285,24 @@ describe("Step 1 live sync status", () => {
 			status: status({
 				status: "uploaded",
 				snapshotId: "snap_1",
+				analysisStatus: "ready",
+			}),
+			canContinueToSummary: false,
+		});
+		const legacyRow = container.querySelector(
+			'[data-testid="sync-stage-analysis"]',
+		);
+		expect(legacyRow).not.toBeNull();
+		expect(legacyRow?.getAttribute("data-stage-state")).toBe("done");
+		expect(legacyRow?.textContent).toContain("Analisis selesai");
+		expect(legacyRow?.textContent).toContain(
+			"Perlu pembaruan rekomendasi task awal",
+		);
+
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_1",
 			}),
 		});
 		expect(

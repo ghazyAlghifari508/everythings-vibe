@@ -142,9 +142,9 @@ export function SyncStageList({
 				};
 			} else {
 				analysisRow = {
-					state: "active",
-					title: "Menganalisis codebase",
-					detail: "Menyiapkan rekomendasi task awal",
+					state: "done",
+					title: "Analisis selesai",
+					detail: "Perlu pembaruan rekomendasi task awal untuk melanjutkan",
 				};
 			}
 		}
