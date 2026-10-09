@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
+import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface TestResponse {
@@ -8,24 +9,53 @@ interface TestResponse {
 	status: number;
 	json: () => Promise<unknown>;
 }
+interface WorkspaceLoaderData {
+	codebase: { id: string; name: string };
+	feature: { id: string; name: string; featuresStatus?: string | null } | null;
+	onboardingFeature: { id: string; name: string } | null;
+	currentSnapshotId: string | null;
+	analysis: null;
+	hasStoredSnapshot: boolean;
+}
+
+interface WorkspaceRouteOptions {
+	component: ComponentType;
+}
+
+interface WorkspaceServerFunctionResult {
+	files: Array<{ path: string }>;
+	fileCount: number;
+	packageJsonText: string | null;
+	featureTree: null;
+	taskTree: null;
+}
+
+interface WorkspaceRouteHarness {
+	loaderData: WorkspaceLoaderData | null;
+	options: WorkspaceRouteOptions | null;
+	serverFn: Mock<(data?: unknown) => Promise<WorkspaceServerFunctionResult>>;
+}
 
 const PROJECT_ID = "project-workspace";
 const OLD_SNAPSHOT_ID = "snapshot-old";
 const CURRENT_SNAPSHOT_ID = "snapshot-current";
-const routeHarness = vi.hoisted(() => ({
-	loaderData: null as unknown,
-	options: null as Record<string, unknown> | null,
-	serverFn: vi.fn(async () => ({
-		files: [],
-		fileCount: 0,
-		packageJsonText: null,
-		featureTree: null,
-		taskTree: null,
-	})),
-}));
+const routeHarness = vi.hoisted(() => {
+	const harness: WorkspaceRouteHarness = {
+		loaderData: null,
+		options: null,
+		serverFn: vi.fn(async (_data?: unknown) => ({
+			files: [],
+			fileCount: 0,
+			packageJsonText: null,
+			featureTree: null,
+			taskTree: null,
+		})),
+	};
+	return harness;
+});
 
 vi.mock("@tanstack/react-router", () => ({
-	createFileRoute: () => (options: Record<string, unknown>) => {
+	createFileRoute: () => (options: WorkspaceRouteOptions) => {
 		routeHarness.options = options;
 		return {
 			...options,
@@ -131,11 +161,12 @@ function setLoaderData(snapshotId: string) {
 		currentSnapshotId: snapshotId,
 		analysis: null,
 		hasStoredSnapshot: false,
-	} as never;
+	};
 }
 
 function renderWorkspaceRoute() {
-	const Page = routeHarness.options?.component as ComponentType;
+	const Page = routeHarness.options?.component;
+	if (!Page) throw new Error("workspace route component was not registered");
 	return render(<Page />);
 }
 
