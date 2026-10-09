@@ -314,10 +314,11 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		expect(screen.queryByText("Snapshot siap")).toBeNull();
 	}, 25000);
 
-	it("recovers an uploaded snapshot with a pending analysis into Sync waiting state, enabling when ready", async () => {
+	it("recovers an uploaded snapshot with a pending analysis into Sync waiting state with Next disabled, even with summary intent", async () => {
 		try {
 			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-onboard-1");
 			sessionStorage.setItem("prdfy:plan-codebase-name", "Onboard Repo");
+			sessionStorage.setItem("prdfy:plan-codebase-step", "summary");
 		} catch {
 			// Best-effort only.
 		}

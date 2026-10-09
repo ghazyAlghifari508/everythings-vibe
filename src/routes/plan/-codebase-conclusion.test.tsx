@@ -304,29 +304,44 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		vi.stubGlobal("fetch", fetchMock);
 
 		render(<PlanCodebasePage />);
+
+		// Recovers to Sync screen when analysis is not ready
 		await waitFor(
 			() => {
-				expect(screen.getByTestId("codebase-sync-summary")).not.toBeNull();
+				expect(
+					screen.getByText("Sync codebase dengan VibeEverything"),
+				).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
 
 		await waitFor(
 			() => {
-				expect(screen.getByTestId("codebase-analysis-failed")).not.toBeNull();
+				expect(screen.getByTestId("analysis-failure-alert")).not.toBeNull();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		// The failure never becomes a sync failure and never blocks the workspace.
+		// The failure never becomes a sync failure.
 		expect(screen.queryByText(/Sync gagal/i)).toBeNull();
-		expect(
-			(screen.getByTestId("conclusion-enter-workspace") as HTMLButtonElement)
-				.disabled,
-		).toBe(false);
 
-		const retry = screen.getByRole("button", { name: /Coba analisis lagi/i });
+		const retry = screen.getByTestId("retry-analysis-button");
 		act(() => {
 			retry.click();
+		});
+
+		await waitFor(
+			() => {
+				const cta = screen.getByTestId(
+					"sync-continue-to-summary",
+				) as HTMLButtonElement;
+				expect(cta.disabled).toBe(false);
+			},
+			{ timeout: 15000, interval: 100 },
+		);
+
+		const cta = screen.getByTestId("sync-continue-to-summary");
+		act(() => {
+			cta.click();
 		});
 
 		await waitFor(
@@ -336,8 +351,6 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 			{ timeout: 15000, interval: 100 },
 		);
 		expect(analysisPosts).toBe(2);
-		// The pending state replaced the failure in place — no extra step.
-		expect(screen.queryByTestId("codebase-analysis-failed")).toBeNull();
 		expect(screen.getByText("Next.js")).toBeDefined();
 	}, 25000);
 });

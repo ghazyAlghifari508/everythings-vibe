@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUIStore } from "@/store";
 import { PlanCodebasePage } from "./codebase";
@@ -347,7 +347,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		);
 	});
 
-	it("opens the workspace while analysis is still pending", {
+	it("recovers an uploaded session with pending analysis into Sync screen with Next disabled", {
 		timeout: 20000,
 	}, async () => {
 		try {
@@ -405,34 +405,21 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 
 		render(<PlanCodebasePage />);
 
-		// A valid uploaded snapshot means the workspace is openable while the
-		// analysis is still running: navigation must not wait on the model.
+		// An uploaded snapshot with pending analysis recovers to Sync screen
 		await waitFor(
 			() => {
-				expect(screen.getByTestId("codebase-analysis-pending")).not.toBeNull();
+				expect(
+					screen.getByText("Sync codebase dengan VibeEverything"),
+				).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		const workspaceCta = await waitFor(() => {
-			const cta = screen.getByTestId(
-				"conclusion-enter-workspace",
-			) as HTMLButtonElement;
-			expect(cta.disabled).toBe(false);
-			return cta;
-		});
-		act(() => {
-			workspaceCta.click();
-		});
-
-		await waitFor(() => {
-			expect(mockNavigate).toHaveBeenCalledWith({
-				to: "/codebases/$id",
-				params: { id: "cb-ws-1" },
-			});
-		});
-		// A pending analysis never repaints the screen as a failed sync.
+		const cta = screen.getByTestId(
+			"sync-continue-to-summary",
+		) as HTMLButtonElement;
+		expect(cta.disabled).toBe(true);
+		expect(screen.queryByTestId("codebase-analysis-pending")).toBeNull();
 		expect(screen.queryByText(/Sync gagal/i)).toBeNull();
-		expect(screen.queryByText(/Menganalisis codebase/i)).not.toBeNull();
 	});
 
 	it("mints a fresh token when recovering a waiting session without a payload", async () => {

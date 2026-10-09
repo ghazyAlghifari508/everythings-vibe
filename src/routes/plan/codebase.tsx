@@ -367,12 +367,15 @@ export function PlanCodebasePage() {
 		(
 			recovered: SyncStatusResponse,
 			storedStep: PlanCodebaseStep | null,
+			isAnalysisReady?: boolean,
 		): PlanCodebaseStep => {
 			const hasSnapshot =
 				Boolean(recovered.snapshotId) &&
 				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status);
 			if (!hasSnapshot) return "sync";
-			return storedStep === "summary" ? "summary" : "sync";
+			return storedStep === "summary" && Boolean(isAnalysisReady)
+				? "summary"
+				: "sync";
 		},
 		[],
 	);
@@ -435,8 +438,14 @@ export function PlanCodebasePage() {
 						analysisAttemptedFor.current = recovered.snapshotId;
 					}
 				}
+				const isAnalysisReady = canContinueToCodebaseConclusion({
+					status: recovered,
+					analysis: existingAnalysis,
+					codebaseId: stored.id,
+					analysisProjectId: storedProject,
+				});
 				setPayload(null);
-				setStep(resolveRecoveredStep(recovered, storedStep));
+				setStep(resolveRecoveredStep(recovered, storedStep, isAnalysisReady));
 				return true;
 			}
 			if (
@@ -604,12 +613,8 @@ export function PlanCodebasePage() {
 	// this attempt. Without this guard a stale step pointer or a direct jump
 	// would show a summary for work that cannot start; the user is returned to
 	// the sync step, which reports the real state instead.
-	const snapshotReady = Boolean(
-		lastStatus?.snapshotId &&
-			SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status),
-	);
 	const activeStep: PlanCodebaseStep =
-		step === "summary" && !snapshotReady ? "sync" : step;
+		step === "summary" && !canContinueToSummary ? "sync" : step;
 
 	// Onboarding analysis trigger: once the server persisted a snapshot for
 	// the current attempt, ensure the onboarding feature project and run the
