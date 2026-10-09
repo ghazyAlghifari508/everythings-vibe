@@ -36,6 +36,36 @@ const SYNC_PAYLOAD = {
 		"vibeeverything codebase sync --project-id cb-nav-1 --sync-token nav-token-1",
 	expiresAt: new Date(Date.now() + 3600000).toISOString(),
 };
+const VALID_STARTER_SUGGESTIONS = [
+	{
+		id: "feature",
+		title: "Feature task",
+		description: "A focused task description.",
+		prompt: "Implement a feature.",
+		relevantPaths: ["src/feature.ts"],
+	},
+	{
+		id: "bugfix",
+		title: "Bugfix task",
+		description: "A focused bugfix description.",
+		prompt: "Fix a bug.",
+		relevantPaths: ["src/bugfix.ts"],
+	},
+	{
+		id: "refactor",
+		title: "Refactor task",
+		description: "A focused refactor description.",
+		prompt: "Refactor a module.",
+		relevantPaths: ["src/refactor.ts"],
+	},
+	{
+		id: "ui",
+		title: "UI task",
+		description: "A focused UI description.",
+		prompt: "Improve UI.",
+		relevantPaths: ["src/ui.ts"],
+	},
+];
 
 const ANALYSIS_OUTPUT = {
 	projectId: "proj-nav-1",
@@ -51,6 +81,7 @@ const ANALYSIS_OUTPUT = {
 	impactAreas: ["src/routes/api"],
 	limitations: [],
 	findings: [],
+	starterSuggestions: VALID_STARTER_SUGGESTIONS,
 };
 
 function analysisReadyPayload() {
@@ -78,6 +109,7 @@ function uploadedPayload() {
 		sessionId: "sess-nav-1",
 		status: "uploaded",
 		snapshotId: "snap-nav-1",
+		cliConnectedAt: "2026-10-09T10:00:00.000Z",
 		fileCount: 37,
 		excludedCount: 6,
 	};
@@ -117,7 +149,11 @@ function mockPlanFlow(
 				return {
 					ok: true,
 					status: 200,
-					json: async () => ({ ...payload, analysisStatus: "ready" }),
+					json: async () => ({
+						...payload,
+						analysisId: "ana-nav-1",
+						analysisStatus: "ready",
+					}),
 				};
 			}
 			return { ok: true, status: 200, json: async () => payload };
@@ -228,7 +264,14 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 	it("shows exactly one sync progress surface on step 1", async () => {
 		mockPlanFlow([waitingPayload(), uploadedPayload()]);
 		await startSyncStep();
-		await waitForEnabledSummaryCta();
+		await waitFor(
+			() => {
+				expect(screen.getByText("Sinkronisasi selesai")).toBeDefined();
+			},
+			{ timeout: 10000, interval: 100 },
+		);
+		// CTA stays disabled when analysis is not ready
+		expect(summaryCta().disabled).toBe(true);
 
 		// Handshake and upload, rendered once each. A duplicated monitor screen is
 		// exactly what this asserts cannot happen.
@@ -239,7 +282,6 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 		expect(screen.queryByText(/Kembali ke Prompt Sync/i)).toBeNull();
 		expect(screen.queryByText(/CLI Agent Belum Terhubung/i)).toBeNull();
 	}, 20000);
-
 	it("keeps a legacy analyzing session reported as a finished sync", async () => {
 		mockPlanFlow([
 			waitingPayload(),
@@ -287,7 +329,6 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 			withAnalysis: true,
 		});
 		await startSyncStep();
-		await waitForEnabledSummaryCta();
 		await waitFor(
 			() => {
 				expect(
@@ -302,7 +343,9 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		// The snapshot being analysed does not pull the user forward on its own.
+		// The snapshot being analysed keeps the CTA disabled and does not pull the user forward on its own.
+		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
+		await waitForEnabledSummaryCta();
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 	}, 25000);
 
