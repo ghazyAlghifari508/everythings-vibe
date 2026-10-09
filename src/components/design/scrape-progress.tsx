@@ -111,12 +111,49 @@ export function ScrapeProgress({
 
 				<p className="flex items-center gap-2 font-mono text-xs font-semibold text-snow">
 					{!isDone && !isFailed ? (
-						<Loader2 size={14} className="animate-spin text-mist" />
+						<Loader2
+							size={14}
+							className="motion-safe:animate-spin motion-reduce:animate-none text-mist"
+						/>
 					) : null}
 					<span aria-live="polite">{currentLabel}</span>
 				</p>
 			</div>
 
+			{!isFailed ? (
+				<div
+					role="progressbar"
+					aria-label="Tahap pemrosesan scraping"
+					aria-valuemin={1}
+					aria-valuemax={orderedStages.length}
+					aria-valuenow={isDone ? orderedStages.length : currentIndex + 1}
+					aria-valuetext={`Tahap ${isDone ? orderedStages.length : currentIndex + 1} dari ${orderedStages.length}: ${currentLabel}`}
+					className="mt-6 grid h-2 gap-1"
+					style={{
+						gridTemplateColumns: `repeat(${orderedStages.length}, minmax(0, 1fr))`,
+					}}
+				>
+					{orderedStages.map((stage, index) => {
+						const isStageDone = isDone || index < currentIndex;
+						const isStageCurrent = index === currentIndex && !isDone;
+
+						return (
+							<span
+								key={stage}
+								aria-hidden="true"
+								className={`relative min-w-0 overflow-hidden rounded-sm ${isStageDone ? "bg-mist" : "bg-slate"}`}
+							>
+								{isStageCurrent ? (
+									<span
+										data-active-stage-segment
+										className="absolute inset-y-0 left-0 w-1/3 bg-mist motion-safe:animate-scrape-progress motion-reduce:animate-none"
+									/>
+								) : null}
+							</span>
+						);
+					})}
+				</div>
+			) : null}
 			<div className="mt-6">
 				{isFailed || isDone ? (
 					<p aria-live="polite" className="mt-2.5 text-xs text-fog">
@@ -125,19 +162,31 @@ export function ScrapeProgress({
 							: (stageDescriptions[status] ?? "Sedang memproses website…")}
 					</p>
 				) : (
-					<div className="mt-2.5">
-						<ThoughtLine
-							working
-							bare
-							label={currentLabel}
-							doneLabel={currentLabel}
-							presentation="rotating"
-							activity={activity ?? null}
-							rotationKey={activity ?? status}
-							startedAt={activityStartedAt ?? stageStartedAt ?? undefined}
-							fontSize="xs"
-						/>
-					</div>
+					<ThoughtLine
+						working
+						bare
+						label={currentLabel}
+						doneLabel={currentLabel}
+						presentation="rotating"
+						activity={activity ?? null}
+						rotationKey={activity ?? status}
+						startedAt={activityStartedAt ?? stageStartedAt ?? undefined}
+						fontSize="xs"
+						className="mt-2.5"
+						glyph={
+							activity ? (
+								<span
+									aria-hidden="true"
+									data-testid="scrape-active-indicator"
+									className="inline-flex shrink-0 items-center gap-1.5"
+								>
+									<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none" />
+									<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none animate-delay-200" />
+									<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none animate-delay-400" />
+								</span>
+							) : undefined
+						}
+					/>
 				)}
 			</div>
 
@@ -165,7 +214,10 @@ export function ScrapeProgress({
 									className="btn-primary mt-4 inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition-all hover:brightness-105 disabled:opacity-50"
 								>
 									{isRetrying ? (
-										<Loader2 size={14} className="animate-spin" />
+										<Loader2
+											size={14}
+											className="motion-safe:animate-spin motion-reduce:animate-none"
+										/>
 									) : (
 										<RotateCcw size={14} />
 									)}
@@ -207,7 +259,10 @@ export function ScrapeProgress({
 											className="text-emerald-500/80"
 										/>
 									) : isStageCurrent ? (
-										<Loader2 size={12} className="animate-spin" />
+										<Loader2
+											size={12}
+											className="motion-safe:animate-spin motion-reduce:animate-none"
+										/>
 									) : (
 										<span
 											aria-hidden="true"

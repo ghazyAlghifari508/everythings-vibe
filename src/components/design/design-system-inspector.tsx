@@ -12,7 +12,6 @@ import { firstCssLength, normalizeFontWeight } from "@/lib/design-md-inspector";
 
 export interface DesignSystemInspectorProps {
 	siteName: string;
-	domain: string;
 	sourceUrl: string;
 	model: DesignInspectorModel;
 }
@@ -320,11 +319,22 @@ function SpacingRow({ label, value }: { label: string; value: string }) {
 
 export function DesignSystemInspector({
 	siteName,
-	domain,
 	sourceUrl,
 	model,
 }: DesignSystemInspectorProps) {
 	const theme = themeLabel(model.theme);
+	let canonicalSourceUrl: string | null = null;
+	try {
+		const parsedSourceUrl = new URL(sourceUrl);
+		if (
+			parsedSourceUrl.protocol === "http:" ||
+			parsedSourceUrl.protocol === "https:"
+		) {
+			canonicalSourceUrl = sourceUrl;
+		}
+	} catch {
+		canonicalSourceUrl = null;
+	}
 	const sizesByFamily = new Map<string, string[]>();
 	for (const entry of model.typography) {
 		if (!entry.family || !entry.size) continue;
@@ -342,9 +352,23 @@ export function DesignSystemInspector({
 				<h2 className="mt-1 text-2xl font-bold tracking-tight text-snow">
 					{siteName}
 				</h2>
-				<p className="mt-1 truncate font-mono text-xs text-fog">{domain}</p>
-				{sourceUrl ? (
-					<p className="mt-0.5 truncate font-mono text-xs text-fog/70">
+				{canonicalSourceUrl ? (
+					<p className="mt-1 min-w-0 font-mono text-xs text-fog/70">
+						<a
+							href={canonicalSourceUrl}
+							target="_blank"
+							rel="noreferrer noopener"
+							className="text-indigo underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							style={{ overflowWrap: "anywhere" }}
+						>
+							{canonicalSourceUrl}
+						</a>
+					</p>
+				) : sourceUrl ? (
+					<p
+						className="mt-1 min-w-0 font-mono text-xs text-fog/70"
+						style={{ overflowWrap: "anywhere" }}
+					>
 						{sourceUrl}
 					</p>
 				) : null}

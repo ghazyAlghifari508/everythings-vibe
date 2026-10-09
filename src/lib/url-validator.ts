@@ -38,11 +38,41 @@ function isPrivateIPv6(ip: string): boolean {
 	if (first >= 0xfe80 && first <= 0xfebf) return true;
 	if (first >= 0xfc00 && first <= 0xfdff) return true;
 
-	if (s.includes("::ffff:")) {
-		const tail = s.slice(s.lastIndexOf(":") + 1);
-		if (tail.includes(".")) return isPrivateIPv4(tail);
-		const mapped = Number.parseInt(tail || "0", 16);
-		if (mapped >> 8 === 127) return true;
+	const normalized = s.replace(/(\d+\.\d+\.\d+\.\d+)$/, (ipv4) => {
+		const [a, b, c, d] = ipv4.split(".").map(Number);
+		return `${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+	});
+	const separator = normalized.indexOf("::");
+	const left = normalized
+		.slice(0, separator < 0 ? undefined : separator)
+		.split(":")
+		.filter(Boolean);
+	const right =
+		separator < 0
+			? []
+			: normalized
+					.slice(separator + 2)
+					.split(":")
+					.filter(Boolean);
+	const groups = [
+		...left,
+		...Array(Math.max(0, 8 - left.length - right.length)).fill("0"),
+		...right,
+	];
+	if (
+		groups.length === 8 &&
+		Number.parseInt(groups[0], 16) === 0 &&
+		Number.parseInt(groups[1], 16) === 0 &&
+		Number.parseInt(groups[2], 16) === 0 &&
+		Number.parseInt(groups[3], 16) === 0 &&
+		Number.parseInt(groups[4], 16) === 0 &&
+		Number.parseInt(groups[5], 16) === 0xffff
+	) {
+		const high = Number.parseInt(groups[6], 16);
+		const low = Number.parseInt(groups[7], 16);
+		return isPrivateIPv4(
+			`${high >>> 8}.${high & 255}.${low >>> 8}.${low & 255}`,
+		);
 	}
 	return false;
 }

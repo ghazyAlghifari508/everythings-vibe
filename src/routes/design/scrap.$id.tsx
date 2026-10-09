@@ -4,7 +4,10 @@ import { ArrowLeft } from "lucide-react";
 import { DesignResult } from "@/components/design/design-result";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
-import { resolveScrapeView } from "@/components/design/scrape-view-state";
+import {
+	resolveScrapeContentWidth,
+	resolveScrapeView,
+} from "@/components/design/scrape-view-state";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
 import {
 	toScrapeStatusSnapshot,
@@ -12,12 +15,43 @@ import {
 } from "@/hooks/use-scrape-status";
 import { requireUserServer } from "@/lib/session";
 
-const loadScrapeDetail = createServerFn({ method: "GET" })
+export const loadScrapeDetail = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
 	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
 		const { getScrapeById } = await import("@/lib/services/scrape-service");
 		const scrape = await getScrapeById(id, user.id);
+		const { buildPreviewSrcDoc } = await import("@/lib/preview-capabilities");
+		const { SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS } = await import(
+			"@/lib/constants"
+		);
+		let appOrigin = "http://localhost:3000";
+		try {
+			const { getRequestHeaders, getRequestUrl } = await import(
+				"@tanstack/react-start/server"
+			);
+			const headers = getRequestHeaders();
+			const host =
+				headers.get("x-forwarded-host") ?? headers.get("host") ?? "localhost";
+			const proto = headers.get("x-forwarded-proto") ?? "http";
+			appOrigin =
+				typeof getRequestUrl === "function"
+					? getRequestUrl({ xForwardedHost: true }).origin
+					: `${proto}://${host}`;
+		} catch {
+			// Fallback when called outside of start server request context
+		}
+		const previewHtml = scrape.previewHtml ?? "";
+		const previewSrcDoc =
+			scrape.status === "completed" && scrape.mode === "html"
+				? buildPreviewSrcDoc(scrape.html ?? "", {
+						baseUrl: scrape.sourceUrl,
+						appOrigin,
+						scrapeId: scrape.id,
+						ownerId: user.id,
+						expiresAt: Date.now() + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS,
+					})
+				: previewHtml;
 		return {
 			id: scrape.id,
 			sourceUrl: scrape.sourceUrl,
@@ -25,7 +59,8 @@ const loadScrapeDetail = createServerFn({ method: "GET" })
 			title: scrape.title,
 			status: scrape.status,
 			mode: scrape.mode,
-			previewHtml: scrape.previewHtml ?? "",
+			previewHtml,
+			previewSrcDoc,
 			designMd: scrape.document?.designMd ?? "",
 			metadata: scrape.metadata,
 			capturedAt:
@@ -96,6 +131,7 @@ function ScrapeDetailPage() {
 		"design") as ScrapeMode;
 	const sourceUrl = data?.sourceUrl ?? initial.sourceUrl;
 	const domain = data?.domain ?? initial.domain;
+	const previewSrcDoc = initial.previewSrcDoc;
 	const previewHtml = data?.previewHtml ?? initial.previewHtml;
 	const designMd = data?.document?.designMd ?? initial.designMd;
 
@@ -136,12 +172,14 @@ function ScrapeDetailPage() {
 		designMd,
 	});
 
-	const wideResult = view === "result-design";
+	const contentWidth = resolveScrapeContentWidth(view);
 
 	return (
 		<main
 			className={`flex w-full flex-col gap-6 py-10 sm:py-14 ${
-				wideResult ? "px-6 sm:px-8 lg:px-10" : "mx-auto max-w-5xl px-4 sm:px-6"
+				contentWidth === "wide"
+					? "px-6 sm:px-8 lg:px-10"
+					: "mx-auto max-w-5xl px-4 sm:px-6"
 			}`}
 		>
 			<Link
@@ -158,7 +196,11 @@ function ScrapeDetailPage() {
 					designMd={designMd}
 				/>
 			) : view === "result-html" ? (
-				<ScrapeDetail domain={domain} previewHtml={previewHtml} />
+				<ScrapeDetail
+					domain={domain}
+					previewHtml={previewHtml}
+					previewSrcDoc={previewSrcDoc}
+				/>
 			) : (
 				<ScrapeProgress
 					mode={mode}

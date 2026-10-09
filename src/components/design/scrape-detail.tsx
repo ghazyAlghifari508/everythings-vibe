@@ -1,14 +1,19 @@
 import { Check, Copy, Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { SCRAPE_DESKTOP_HEIGHT } from "@/lib/constants";
 
 export interface ScrapeDetailProps {
 	domain: string;
 	previewHtml?: string;
+	previewSrcDoc?: string;
 }
 
 type HtmlViewTab = "preview" | "code";
 
 const PREVIEW_WIDTH = 1440;
+const MIN_PREVIEW_SCALE = 0.75;
+const PREVIEW_HEIGHT_RATIO = 0.75;
+const PREVIEW_MAX_HEIGHT = 760;
 
 function safeFilename(domain: string, ext: string): string {
 	const safe = domain.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
@@ -39,7 +44,11 @@ function downloadFile(filename: string, content: string, mimeType: string) {
 const ICON_BUTTON_CLASS =
 	"inline-flex size-8 items-center justify-center rounded-md border border-transparent text-fog transition-colors hover:border-graphite hover:bg-onyx hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50";
 
-export function ScrapeDetail({ domain, previewHtml = "" }: ScrapeDetailProps) {
+export function ScrapeDetail({
+	domain,
+	previewHtml = "",
+	previewSrcDoc = previewHtml,
+}: ScrapeDetailProps) {
 	const [htmlViewTab, setHtmlViewTab] = useState<HtmlViewTab>("preview");
 	const [notice, setNotice] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -156,7 +165,7 @@ export function ScrapeDetail({ domain, previewHtml = "" }: ScrapeDetailProps) {
 
 			{htmlViewTab === "preview" ? (
 				<div role="tabpanel" aria-label="Preview index.html">
-					<DesktopPreview title={`Preview ${domain}`} srcDoc={previewHtml} />
+					<DesktopPreview title={`Preview ${domain}`} srcDoc={previewSrcDoc} />
 				</div>
 			) : (
 				<div role="tabpanel" aria-label="Source code index.html">
@@ -178,41 +187,75 @@ export function ScrapeDetail({ domain, previewHtml = "" }: ScrapeDetailProps) {
 function DesktopPreview({ title, srcDoc }: { title: string; srcDoc: string }) {
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const [scale, setScale] = useState(1);
+	const [frameHeight, setFrameHeight] = useState(() =>
+		Math.min(
+			PREVIEW_MAX_HEIGHT,
+			Math.round(SCRAPE_DESKTOP_HEIGHT * PREVIEW_HEIGHT_RATIO),
+		),
+	);
 
 	useEffect(() => {
 		const el = wrapRef.current;
-		if (!el || typeof ResizeObserver === "undefined") return;
-		const measure = () => setScale(Math.min(1, el.clientWidth / PREVIEW_WIDTH));
+		if (!el) return;
+
+		const measure = () =>
+			setScale(
+				Math.min(
+					1,
+					Math.max(MIN_PREVIEW_SCALE, el.clientWidth / PREVIEW_WIDTH),
+				),
+			);
+		const resizeFrame = () =>
+			setFrameHeight(
+				Math.min(
+					PREVIEW_MAX_HEIGHT,
+					Math.round(window.innerHeight * PREVIEW_HEIGHT_RATIO),
+				),
+			);
+		const observer =
+			typeof ResizeObserver === "undefined"
+				? null
+				: new ResizeObserver(measure);
+
 		measure();
-		const observer = new ResizeObserver(measure);
-		observer.observe(el);
-		return () => observer.disconnect();
+		resizeFrame();
+		observer?.observe(el);
+		window.addEventListener("resize", resizeFrame);
+		return () => {
+			observer?.disconnect();
+			window.removeEventListener("resize", resizeFrame);
+		};
 	}, []);
 
-	const frameHeight =
-		Math.round(
-			(typeof window !== "undefined" ? window.innerHeight : 900) * 0.82,
-		) || 738;
+	const canvasWidth = Math.max(1, Math.round(PREVIEW_WIDTH * scale));
+	const canvasHeight = Math.max(1, Math.round(frameHeight * scale));
 
 	return (
-		<div
-			ref={wrapRef}
-			className="w-full overflow-hidden bg-white"
-			style={{ height: Math.max(1, Math.round(frameHeight * scale)) }}
-		>
-			<iframe
-				title={title}
-				srcDoc={srcDoc}
-				sandbox="allow-scripts"
-				referrerPolicy="no-referrer"
-				className="border-0"
+		<div ref={wrapRef} className="w-full overflow-x-auto bg-white">
+			<div
 				style={{
-					width: PREVIEW_WIDTH,
-					height: frameHeight,
-					transform: `scale(${scale})`,
-					transformOrigin: "top left",
+					position: "relative",
+					width: canvasWidth,
+					height: canvasHeight,
 				}}
-			/>
+			>
+				<iframe
+					title={title}
+					srcDoc={srcDoc}
+					sandbox="allow-scripts"
+					referrerPolicy="no-referrer"
+					className="border-0"
+					style={{
+						position: "absolute",
+						top: 0,
+						left: 0,
+						width: PREVIEW_WIDTH,
+						height: frameHeight,
+						transform: `scale(${scale})`,
+						transformOrigin: "top left",
+					}}
+				/>
+			</div>
 		</div>
 	);
 }
