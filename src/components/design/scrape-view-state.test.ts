@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveScrapeView } from "./scrape-view-state";
+import {
+	resolveScrapeContentWidth,
+	resolveScrapeView,
+} from "./scrape-view-state";
 
 describe("resolveScrapeView", () => {
 	it("resolves completed design with content to the design result", () => {
@@ -61,5 +64,10 @@ describe("resolveScrapeView", () => {
 				}),
 			).toBe("progress");
 		}
+	});
+	it("uses a wide canvas only for successful result views", () => {
+		expect(resolveScrapeContentWidth("result-design")).toBe("wide");
+		expect(resolveScrapeContentWidth("result-html")).toBe("wide");
+		expect(resolveScrapeContentWidth("progress")).toBe("bounded");
 	});
 });

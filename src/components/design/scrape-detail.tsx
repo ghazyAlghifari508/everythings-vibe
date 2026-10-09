@@ -9,6 +9,9 @@ export interface ScrapeDetailProps {
 type HtmlViewTab = "preview" | "code";
 
 const PREVIEW_WIDTH = 1440;
+const MIN_PREVIEW_SCALE = 0.75;
+const PREVIEW_HEIGHT_RATIO = 0.75;
+const PREVIEW_MAX_HEIGHT = 760;
 
 function safeFilename(domain: string, ext: string): string {
 	const safe = domain.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
@@ -178,26 +181,53 @@ export function ScrapeDetail({ domain, previewHtml = "" }: ScrapeDetailProps) {
 function DesktopPreview({ title, srcDoc }: { title: string; srcDoc: string }) {
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const [scale, setScale] = useState(1);
+	const [frameHeight, setFrameHeight] = useState(() =>
+		Math.min(
+			PREVIEW_MAX_HEIGHT,
+			Math.round(
+				(typeof window !== "undefined" ? window.innerHeight : 900) *
+					PREVIEW_HEIGHT_RATIO,
+			),
+		),
+	);
 
 	useEffect(() => {
 		const el = wrapRef.current;
-		if (!el || typeof ResizeObserver === "undefined") return;
-		const measure = () => setScale(Math.min(1, el.clientWidth / PREVIEW_WIDTH));
-		measure();
-		const observer = new ResizeObserver(measure);
-		observer.observe(el);
-		return () => observer.disconnect();
-	}, []);
+		if (!el) return;
 
-	const frameHeight =
-		Math.round(
-			(typeof window !== "undefined" ? window.innerHeight : 900) * 0.82,
-		) || 738;
+		const measure = () =>
+			setScale(
+				Math.min(
+					1,
+					Math.max(MIN_PREVIEW_SCALE, el.clientWidth / PREVIEW_WIDTH),
+				),
+			);
+		const resizeFrame = () =>
+			setFrameHeight(
+				Math.min(
+					PREVIEW_MAX_HEIGHT,
+					Math.round(window.innerHeight * PREVIEW_HEIGHT_RATIO),
+				),
+			);
+		const observer =
+			typeof ResizeObserver === "undefined"
+				? null
+				: new ResizeObserver(measure);
+
+		measure();
+		resizeFrame();
+		observer?.observe(el);
+		window.addEventListener("resize", resizeFrame);
+		return () => {
+			observer?.disconnect();
+			window.removeEventListener("resize", resizeFrame);
+		};
+	}, []);
 
 	return (
 		<div
 			ref={wrapRef}
-			className="w-full overflow-hidden bg-white"
+			className="w-full overflow-x-auto overflow-y-hidden bg-white"
 			style={{ height: Math.max(1, Math.round(frameHeight * scale)) }}
 		>
 			<iframe

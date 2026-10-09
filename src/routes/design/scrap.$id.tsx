@@ -4,7 +4,10 @@ import { ArrowLeft } from "lucide-react";
 import { DesignResult } from "@/components/design/design-result";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
-import { resolveScrapeView } from "@/components/design/scrape-view-state";
+import {
+	resolveScrapeContentWidth,
+	resolveScrapeView,
+} from "@/components/design/scrape-view-state";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
 import {
 	toScrapeStatusSnapshot,
@@ -136,12 +139,14 @@ function ScrapeDetailPage() {
 		designMd,
 	});
 
-	const wideResult = view === "result-design";
+	const contentWidth = resolveScrapeContentWidth(view);
 
 	return (
 		<main
 			className={`flex w-full flex-col gap-6 py-10 sm:py-14 ${
-				wideResult ? "px-6 sm:px-8 lg:px-10" : "mx-auto max-w-5xl px-4 sm:px-6"
+				contentWidth === "wide"
+					? "px-6 sm:px-8 lg:px-10"
+					: "mx-auto max-w-5xl px-4 sm:px-6"
 			}`}
 		>
 			<Link
