@@ -467,4 +467,11 @@ describe("workspace onboarding analysis selection", () => {
 			"eq(codebaseAnalyses.snapshotId, currentSnapshot.id)",
 		);
 	});
+
+	it("selects the latest usable snapshot regardless of file count", () => {
+		expect(detailSource).toContain(
+			"inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES])",
+		);
+		expect(detailSource).not.toContain("gt(codebaseSnapshots.fileCount, 0)");
+	});
 });

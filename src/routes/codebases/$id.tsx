@@ -105,7 +105,7 @@ const loadCodebase = createServerFn({ method: "GET" })
 		const { db } = await import("@/db");
 		const { codebases, codebaseAnalyses, codebaseSnapshots, projects } =
 			await import("@/db/schema");
-		const { and, desc, eq, gt, inArray, isNull } = await import("drizzle-orm");
+		const { and, desc, eq, inArray, isNull } = await import("drizzle-orm");
 		const [codebase] = await db
 			.select({
 				id: codebases.id,
@@ -138,16 +138,12 @@ const loadCodebase = createServerFn({ method: "GET" })
 			expectedCodebaseId: id,
 		});
 		const [currentSnapshot] = await db
-			.select({
-				id: codebaseSnapshots.id,
-				fileCount: codebaseSnapshots.fileCount,
-			})
+			.select({ id: codebaseSnapshots.id })
 			.from(codebaseSnapshots)
 			.where(
 				and(
 					eq(codebaseSnapshots.codebaseId, id),
 					inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES]),
-					gt(codebaseSnapshots.fileCount, 0),
 				),
 			)
 			.orderBy(desc(codebaseSnapshots.createdAt))
