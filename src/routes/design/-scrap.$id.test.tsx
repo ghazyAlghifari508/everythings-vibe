@@ -2,9 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
 	getScrapeById: vi.fn(),
-	inlinePreviewAssets: vi.fn(),
+	buildPreviewSrcDoc: vi.fn(),
 	requireUserServer: vi.fn(),
-	rewritePreviewAssets: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -22,11 +21,8 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/services/scrape-service", () => ({
 	getScrapeById: mocks.getScrapeById,
 }));
-vi.mock("@/lib/preview-assets", () => ({
-	inlinePreviewAssets: mocks.inlinePreviewAssets,
-}));
-vi.mock("@/lib/preview-html", () => ({
-	rewritePreviewAssets: mocks.rewritePreviewAssets,
+vi.mock("@/lib/preview-capabilities", () => ({
+	buildPreviewSrcDoc: mocks.buildPreviewSrcDoc,
 }));
 
 import { Route } from "./scrap.$id";
@@ -37,11 +33,8 @@ beforeEach(() => {
 		id: "owner-1",
 		email: "owner@example.invalid",
 	});
-	mocks.rewritePreviewAssets.mockReturnValue(
-		'<img src="/api/scrape/asset?url=https%3A%2F%2Fassets.example%2Fimage.png">',
-	);
-	mocks.inlinePreviewAssets.mockResolvedValue(
-		'<img src="data:image/png;base64,cHJldmlldw==">',
+	mocks.buildPreviewSrcDoc.mockReturnValue(
+		'<img src="https://app.example/api/scrape/asset?cap=preview">',
 	);
 	mocks.getScrapeById.mockResolvedValue({
 		id: "scrape-1",
@@ -72,18 +65,16 @@ describe("scrape detail route preview loading", () => {
 
 		expect(mocks.requireUserServer).toHaveBeenCalledOnce();
 		expect(mocks.getScrapeById).toHaveBeenCalledWith("scrape-1", "owner-1");
-		expect(mocks.rewritePreviewAssets).toHaveBeenCalledWith(
+		expect(mocks.buildPreviewSrcDoc).toHaveBeenCalledWith(
 			'<img srcset="data:image/png;base64,AAAA 1x, /asset.png 2x">',
-			"https://example.invalid/final",
-		);
-		expect(mocks.inlinePreviewAssets).toHaveBeenCalledWith(
-			'<img src="/api/scrape/asset?url=https%3A%2F%2Fassets.example%2Fimage.png">',
+			expect.objectContaining({
+				baseUrl: "https://example.invalid/final",
+				scrapeId: "scrape-1",
+				ownerId: "owner-1",
+			}),
 		);
 		expect(mocks.getScrapeById.mock.invocationCallOrder[0]).toBeLessThan(
-			mocks.rewritePreviewAssets.mock.invocationCallOrder[0],
-		);
-		expect(mocks.rewritePreviewAssets.mock.invocationCallOrder[0]).toBeLessThan(
-			mocks.inlinePreviewAssets.mock.invocationCallOrder[0],
+			mocks.buildPreviewSrcDoc.mock.invocationCallOrder[0],
 		);
 		if (typeof result !== "object" || result === null)
 			throw new Error("Loader returned no data");
@@ -91,7 +82,7 @@ describe("scrape detail route preview loading", () => {
 			'<img src="/api/scrape/asset?url=https%3A%2F%2Fassets.example%2Fcorrupted.png">',
 		);
 		expect("previewSrcDoc" in result ? result.previewSrcDoc : undefined).toBe(
-			'<img src="data:image/png;base64,cHJldmlldw==">',
+			'<img src="https://app.example/api/scrape/asset?cap=preview">',
 		);
 	});
 });

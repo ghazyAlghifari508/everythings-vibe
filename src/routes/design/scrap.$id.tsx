@@ -21,14 +21,36 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 		const user = await requireUserServer();
 		const { getScrapeById } = await import("@/lib/services/scrape-service");
 		const scrape = await getScrapeById(id, user.id);
-		const { inlinePreviewAssets } = await import("@/lib/preview-assets");
-		const { rewritePreviewAssets } = await import("@/lib/preview-html");
+		const { buildPreviewSrcDoc } = await import("@/lib/preview-capabilities");
+		const { SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS } = await import(
+			"@/lib/constants"
+		);
+		let appOrigin = "http://localhost:3000";
+		try {
+			const { getRequestHeaders, getRequestUrl } = await import(
+				"@tanstack/react-start/server"
+			);
+			const headers = getRequestHeaders();
+			const host =
+				headers.get("x-forwarded-host") ?? headers.get("host") ?? "localhost";
+			const proto = headers.get("x-forwarded-proto") ?? "http";
+			appOrigin =
+				typeof getRequestUrl === "function"
+					? getRequestUrl({ xForwardedHost: true }).origin
+					: `${proto}://${host}`;
+		} catch {
+			// Fallback when called outside of start server request context
+		}
 		const previewHtml = scrape.previewHtml ?? "";
 		const previewSrcDoc =
 			scrape.status === "completed" && scrape.mode === "html"
-				? await inlinePreviewAssets(
-						rewritePreviewAssets(scrape.html ?? "", scrape.sourceUrl),
-					)
+				? buildPreviewSrcDoc(scrape.html ?? "", {
+						baseUrl: scrape.sourceUrl,
+						appOrigin,
+						scrapeId: scrape.id,
+						ownerId: user.id,
+						expiresAt: Date.now() + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS,
+					})
 				: previewHtml;
 		return {
 			id: scrape.id,
