@@ -79,9 +79,12 @@ describe("ScrapeDetail", () => {
 		const serverContainer = document.createElement("div");
 		serverContainer.innerHTML = serverMarkup;
 		const serverIframe = serverContainer.querySelector("iframe");
+		const serverCanvas = serverIframe?.parentElement;
+		expect(serverIframe?.style.position).toBe("absolute");
+		expect(serverCanvas?.style.position).toBe("relative");
+		expect(serverCanvas?.style.width).toBe("1440px");
+		expect(serverCanvas?.style.height).toBe("675px");
 		expect(serverIframe?.style.height).toBe("675px");
-		expect(serverIframe?.parentElement?.style.height).toBe("675px");
-
 		const hydrationErrors: unknown[][] = [];
 		const hydrationMismatch =
 			/hydration failed|hydration mismatch|did not match|didn't match/i;
@@ -96,10 +99,12 @@ describe("ScrapeDetail", () => {
 
 		const hydrationContainer = document.createElement("div");
 		hydrationContainer.innerHTML = serverMarkup;
-		const hydrationWrapper =
-			hydrationContainer.querySelector("iframe")?.parentElement;
-		if (!hydrationWrapper) throw new Error("Preview wrapper was not rendered");
-		Object.defineProperty(hydrationWrapper, "clientWidth", {
+		const hydrationIframe = hydrationContainer.querySelector("iframe");
+		const hydrationCanvas = hydrationIframe?.parentElement;
+		const hydrationOuter = hydrationCanvas?.parentElement;
+		if (!hydrationOuter)
+			throw new Error("Preview outer wrapper was not rendered");
+		Object.defineProperty(hydrationOuter, "clientWidth", {
 			configurable: true,
 			value: 1440,
 		});
@@ -118,13 +123,14 @@ describe("ScrapeDetail", () => {
 
 			const hydratedIframe = hydrationContainer.querySelector("iframe");
 			if (!hydratedIframe) throw new Error("Preview iframe was not hydrated");
+			const hydratedCanvas = hydratedIframe.parentElement;
 			expect(hydrationErrors).toEqual([]);
 			expect(hydratedIframe.style.height).toBe("633px");
-			expect(hydratedIframe.parentElement?.style.height).toBe("633px");
+			expect(hydratedCanvas?.style.height).toBe("633px");
 			window.innerHeight = 700;
 			act(() => window.dispatchEvent(new Event("resize")));
 			expect(hydratedIframe.style.height).toBe("525px");
-			expect(hydratedIframe.parentElement?.style.height).toBe("525px");
+			expect(hydratedCanvas?.style.height).toBe("525px");
 		} finally {
 			if (root) act(() => root?.unmount());
 			hydrationContainer.remove();
@@ -144,13 +150,19 @@ describe("ScrapeDetail", () => {
 		await waitFor(() =>
 			expect(iframe.style.transform).toBe("scale(0.8333333333333334)"),
 		);
+		const canvas = iframe.parentElement;
+		expect(iframe.style.position).toBe("absolute");
+		expect(iframe.style.top).toBe("0px");
+		expect(iframe.style.left).toBe("0px");
+		expect(canvas?.style.position).toBe("relative");
+		expect(canvas?.style.width).toBe("1200px");
+		expect(canvas?.style.height).toBe("563px");
 		expect(iframe.style.width).toBe("1440px");
 		expect(iframe.style.height).toBe("675px");
-		expect(iframe.parentElement?.style.height).toBe("563px");
-
 		window.innerHeight = 700;
 		act(() => window.dispatchEvent(new Event("resize")));
 		await waitFor(() => expect(iframe.style.height).toBe("525px"));
+		expect(canvas?.style.height).toBe("438px");
 
 		const container = resizeObservers[0]?.target;
 		expect(container).not.toBeNull();
@@ -165,7 +177,8 @@ describe("ScrapeDetail", () => {
 		});
 		await waitFor(() => expect(iframe.style.transform).toBe("scale(0.75)"));
 		expect(iframe.style.width).toBe("1440px");
-		expect(iframe.parentElement?.style.height).toBe("394px");
+		expect(canvas?.style.width).toBe("1080px");
+		expect(canvas?.style.height).toBe("394px");
 		expect(container.classList.contains("overflow-x-auto")).toBe(true);
 	});
 

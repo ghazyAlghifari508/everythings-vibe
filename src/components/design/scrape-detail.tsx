@@ -227,25 +227,35 @@ function DesktopPreview({ title, srcDoc }: { title: string; srcDoc: string }) {
 		};
 	}, []);
 
+	const canvasWidth = Math.max(1, Math.round(PREVIEW_WIDTH * scale));
+	const canvasHeight = Math.max(1, Math.round(frameHeight * scale));
+
 	return (
-		<div
-			ref={wrapRef}
-			className="w-full overflow-x-auto overflow-y-hidden bg-white"
-			style={{ height: Math.max(1, Math.round(frameHeight * scale)) }}
-		>
-			<iframe
-				title={title}
-				srcDoc={srcDoc}
-				sandbox="allow-scripts"
-				referrerPolicy="no-referrer"
-				className="border-0"
+		<div ref={wrapRef} className="w-full overflow-x-auto bg-white">
+			<div
 				style={{
-					width: PREVIEW_WIDTH,
-					height: frameHeight,
-					transform: `scale(${scale})`,
-					transformOrigin: "top left",
+					position: "relative",
+					width: canvasWidth,
+					height: canvasHeight,
 				}}
-			/>
+			>
+				<iframe
+					title={title}
+					srcDoc={srcDoc}
+					sandbox="allow-scripts"
+					referrerPolicy="no-referrer"
+					className="border-0"
+					style={{
+						position: "absolute",
+						top: 0,
+						left: 0,
+						width: PREVIEW_WIDTH,
+						height: frameHeight,
+						transform: `scale(${scale})`,
+						transformOrigin: "top left",
+					}}
+				/>
+			</div>
 		</div>
 	);
 }

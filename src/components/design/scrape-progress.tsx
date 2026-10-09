@@ -162,29 +162,31 @@ export function ScrapeProgress({
 							: (stageDescriptions[status] ?? "Sedang memproses website…")}
 					</p>
 				) : (
-					<div className="mt-2.5 flex min-w-0 items-center gap-3">
-						<ThoughtLine
-							working
-							bare
-							label={currentLabel}
-							doneLabel={currentLabel}
-							presentation="rotating"
-							activity={activity ?? null}
-							rotationKey={activity ?? status}
-							startedAt={activityStartedAt ?? stageStartedAt ?? undefined}
-							fontSize="xs"
-							className="min-w-0 flex-1"
-						/>
-						<span
-							aria-hidden="true"
-							data-testid="scrape-active-indicator"
-							className="inline-flex shrink-0 items-center gap-1.5"
-						>
-							<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none" />
-							<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none animate-delay-200" />
-							<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none animate-delay-400" />
-						</span>
-					</div>
+					<ThoughtLine
+						working
+						bare
+						label={currentLabel}
+						doneLabel={currentLabel}
+						presentation="rotating"
+						activity={activity ?? null}
+						rotationKey={activity ?? status}
+						startedAt={activityStartedAt ?? stageStartedAt ?? undefined}
+						fontSize="xs"
+						className="mt-2.5"
+						glyph={
+							activity ? (
+								<span
+									aria-hidden="true"
+									data-testid="scrape-active-indicator"
+									className="inline-flex shrink-0 items-center gap-1.5"
+								>
+									<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none" />
+									<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none animate-delay-200" />
+									<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none animate-delay-400" />
+								</span>
+							) : undefined
+						}
+					/>
 				)}
 			</div>
 

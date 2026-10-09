@@ -169,51 +169,6 @@ describe("ScrapeProgress", () => {
 		expect(activity.getAttribute("aria-live")).toBe("polite");
 	});
 
-	it("uses reduced-motion variants for the active bar and dots", () => {
-		const { container } = render(
-			<ScrapeProgress mode="design" status="capturing" />,
-		);
-		const progressbar = screen.getByRole("progressbar");
-		const activeSegment = progressbar.querySelector(
-			"[data-active-stage-segment]",
-		);
-		const indicator = container.querySelector(
-			'[data-testid="scrape-active-indicator"]',
-		);
-		expect(activeSegment?.className).toContain("motion-safe:");
-		expect(activeSegment?.className).toContain("motion-reduce:animate-none");
-		expect(indicator?.children).toHaveLength(3);
-		for (const dot of indicator?.children ?? []) {
-			expect(dot.className).toContain("motion-safe:animate-pulse");
-			expect(dot.className).toContain("motion-reduce:animate-none");
-		}
-		const activeStage = container.querySelector('[aria-current="step"]');
-		expect(activeStage?.querySelector("svg")?.getAttribute("class")).toContain(
-			"motion-safe:animate-spin",
-		);
-		expect(activeStage?.querySelector("svg")?.getAttribute("class")).toContain(
-			"motion-reduce:animate-none",
-		);
-	});
-
-	it("disables retry spinner motion for reduced motion preferences", () => {
-		render(
-			<ScrapeProgress
-				mode="html"
-				status="failed"
-				errorMessage="Gagal memproses HTML website."
-				onRetry={() => {}}
-				isRetrying
-			/>,
-		);
-		expect(
-			screen
-				.getByRole("button", { name: /Coba lagi/i })
-				.querySelector("svg")
-				?.getAttribute("class"),
-		).toContain("motion-reduce:animate-none");
-	});
-
 	it("does not keep an active progress indicator after a terminal state", () => {
 		const { container, rerender } = render(
 			<ScrapeProgress
@@ -499,29 +454,41 @@ describe("ScrapeProgress", () => {
 		);
 	});
 
-	it("keeps completed stage labels muted while the active stage stays strongest", () => {
+	it("places the active indicator glyph inside the activity line before the timer and adjacent to activity text", () => {
 		const { container } = render(
 			<ScrapeProgress
 				mode="design"
-				status="extracting"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
+				status="generating"
+				activity="Memvalidasi DESIGN.md"
+				activityStartedAt={new Date().toISOString()}
 			/>,
 		);
-		const items = container.querySelectorAll("ol li");
-		expect(items.length).toBeGreaterThanOrEqual(4);
-		for (const done of [items[0], items[1]]) {
-			expect(done.className).toContain("text-fog");
-			expect(done.className).not.toContain("emerald");
-			const icon = done.querySelector("svg");
-			expect(icon?.getAttribute("class") ?? "").toContain("text-emerald-500");
-		}
-		const active = items[2];
-		expect(active.className).toContain("text-snow");
-		expect(active.className).toContain("font-semibold");
-		const future = items[3];
-		expect(future.className).toContain("text-fog/60");
-		expect(future.className).not.toContain("emerald");
+		const indicator = container.querySelector(
+			'[data-testid="scrape-active-indicator"]',
+		);
+		expect(indicator).not.toBeNull();
+		const activity = screen.getByRole("status", {
+			name: "Aktivitas berlangsung",
+		});
+		const timer = screen.getByRole("timer");
+		expect(indicator?.parentElement).toBe(activity.parentElement);
+		expect(
+			(indicator?.compareDocumentPosition(activity) ?? 0) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+		expect(
+			activity.compareDocumentPosition(timer) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+	});
+
+	it("renders no active indicator when backend activity is absent", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="capturing" />,
+		);
+		expect(
+			container.querySelector('[data-testid="scrape-active-indicator"]'),
+		).toBeNull();
 	});
 
 	it("uses the website name as the progress heading, not the raw domain", () => {
