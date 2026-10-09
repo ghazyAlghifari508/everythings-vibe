@@ -907,23 +907,28 @@ describe("requestCodebaseAnalysis atomic claim contract", () => {
 			"utf8",
 		);
 		const source = raw.replace(/\r\n/g, "\n");
-		const claimIndex = source.indexOf("db.transaction(async (tx) => {");
-		const legacyClaimIndex = source.indexOf(
-			"const [updated] = await tx\n\t\t\t.update(codebaseSyncSessions)",
+		const requestStartIndex = source.indexOf(
+			"export async function requestCodebaseAnalysis(",
 		);
-		const conditionalUpdateIndex = source.indexOf(
+		const requestSource = source.slice(requestStartIndex);
+		const claimIndex = requestSource.indexOf("db.transaction(async (tx) => {");
+		const legacyClaimIndex = requestSource.indexOf(
+			"const [updated] = await tx",
+		);
+		const conditionalUpdateIndex = requestSource.indexOf(
 			'eq(codebaseSyncSessions.status, "uploaded")',
 			legacyClaimIndex,
 		);
-		const insertAnalysisIndex = source.indexOf(
+		const insertAnalysisIndex = requestSource.indexOf(
 			"tx.insert(codebaseAnalyses)",
 			legacyClaimIndex,
 		);
-		const generateIndex = source.indexOf("await generate(messages)");
+		const generateIndex = requestSource.indexOf("await generate(messages)");
 
+		expect(requestStartIndex).toBeGreaterThan(-1);
 		expect(claimIndex).toBeGreaterThan(-1);
 		expect(legacyClaimIndex).toBeGreaterThan(claimIndex);
-		expect(conditionalUpdateIndex).toBeGreaterThan(claimIndex);
+		expect(conditionalUpdateIndex).toBeGreaterThan(legacyClaimIndex);
 		expect(insertAnalysisIndex).toBeGreaterThan(conditionalUpdateIndex);
 		expect(generateIndex).toBeGreaterThan(insertAnalysisIndex);
 	});
@@ -934,14 +939,19 @@ describe("requestCodebaseAnalysis atomic claim contract", () => {
 			"utf8",
 		);
 		const source = raw.replace(/\r\n/g, "\n");
-		const scopedClaimIndex = source.indexOf("if (scope.codebaseId) {");
-		const scopedReadyIndex = source.indexOf(
+		const requestStartIndex = source.indexOf(
+			"export async function requestCodebaseAnalysis(",
+		);
+		const requestSource = source.slice(requestStartIndex);
+		const scopedClaimIndex = requestSource.indexOf("if (scope.codebaseId) {");
+		const scopedReadyIndex = requestSource.indexOf(
 			"if (!isCodebaseScoped) {\n\t\t\t\t// The snapshot stays `uploaded`",
 		);
 
+		expect(requestStartIndex).toBeGreaterThan(-1);
 		expect(scopedClaimIndex).toBeGreaterThan(-1);
 		expect(scopedReadyIndex).toBeGreaterThan(scopedClaimIndex);
-		expect(source.slice(scopedClaimIndex, scopedReadyIndex)).toContain(
+		expect(requestSource.slice(scopedClaimIndex, scopedReadyIndex)).toContain(
 			"tx.insert(codebaseAnalyses)",
 		);
 	});
