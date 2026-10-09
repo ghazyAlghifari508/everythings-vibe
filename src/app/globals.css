@@ -435,6 +435,20 @@ input.bg-steel:autofill:active {
 	color: var(--text-secondary);
 }
 
+@keyframes scrapeProgressIndeterminate {
+	from {
+		transform: translateX(-110%);
+	}
+	to {
+		transform: translateX(320%);
+	}
+}
+
+@utility animate-scrape-progress {
+	animation: scrapeProgressIndeterminate 1.8s ease-in-out infinite;
+}
+
+/* Deliberate progress motion marks the live scrape stage; reduced motion disables it. */
 @keyframes fadeSlideIn {
 	to {
 		opacity: 1;

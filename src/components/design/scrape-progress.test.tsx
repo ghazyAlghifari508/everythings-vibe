@@ -42,7 +42,203 @@ describe("ScrapeProgress", () => {
 			/>,
 		);
 		expect(activeSlotText()).toContain("Memvalidasi DESIGN.md");
+		expect(screen.queryByText(/\(\d+%/)).toBeNull();
+	});
+	const stageCases = [
+		{
+			mode: "design",
+			status: "queued",
+			position: "1",
+			total: "6",
+			label: "Menunggu",
+		},
+		{
+			mode: "design",
+			status: "capturing",
+			position: "2",
+			total: "6",
+			label: "Mengambil halaman",
+		},
+		{
+			mode: "design",
+			status: "extracting",
+			position: "3",
+			total: "6",
+			label: "Menganalisis visual",
+		},
+		{
+			mode: "design",
+			status: "generating",
+			position: "4",
+			total: "6",
+			label: "Menyusun DESIGN.md",
+		},
+		{
+			mode: "design",
+			status: "saving",
+			position: "5",
+			total: "6",
+			label: "Menyimpan hasil",
+		},
+		{
+			mode: "html",
+			status: "queued",
+			position: "1",
+			total: "5",
+			label: "Menunggu",
+		},
+		{
+			mode: "html",
+			status: "capturing",
+			position: "2",
+			total: "5",
+			label: "Mengambil halaman",
+		},
+		{
+			mode: "html",
+			status: "extracting",
+			position: "3",
+			total: "5",
+			label: "Menyiapkan preview",
+		},
+		{
+			mode: "html",
+			status: "saving",
+			position: "4",
+			total: "5",
+			label: "Menyimpan index.html",
+		},
+	] as const;
+
+	it.each(
+		stageCases,
+	)("reports the persisted $mode stage $status as position $position of $total", ({
+		mode,
+		status,
+		position,
+		total,
+		label,
+	}) => {
+		render(<ScrapeProgress mode={mode} status={status} />);
+		const progressbar = screen.getByRole("progressbar");
+		expect(progressbar.getAttribute("aria-valuenow")).toBe(position);
+		expect(progressbar.getAttribute("aria-valuemax")).toBe(total);
+		expect(progressbar.getAttribute("aria-valuemin")).toBe("1");
+		expect(
+			screen.getByText(label, { selector: 'li[aria-current="step"] span' }),
+		).toBeDefined();
+	});
+
+	it("keeps the active dots and persisted timer through long unchanged activity", () => {
+		const activityStartedAt = new Date(Date.now() - 12_000).toISOString();
+		const { container, rerender } = render(
+			<ScrapeProgress
+				mode="design"
+				status="generating"
+				activity="Memvalidasi DESIGN.md"
+				activityStartedAt={activityStartedAt}
+			/>,
+		);
+		const activity = screen.getByRole("status", {
+			name: "Aktivitas berlangsung",
+		});
+		const indicator = container.querySelector(
+			'[data-testid="scrape-active-indicator"]',
+		);
+		expect(activity.textContent).toBe("Memvalidasi DESIGN.md");
+		expect(indicator?.children).toHaveLength(3);
+		expect(indicator?.getAttribute("aria-hidden")).toBe("true");
+		act(() => vi.advanceTimersByTime(60_000));
+		rerender(
+			<ScrapeProgress
+				mode="design"
+				status="generating"
+				activity="Memvalidasi DESIGN.md"
+				activityStartedAt={activityStartedAt}
+			/>,
+		);
+		expect(
+			container.querySelector('[data-testid="scrape-active-indicator"]')
+				?.children,
+		).toHaveLength(3);
+		const timer = screen.getByRole("timer");
+		expect(Number.parseFloat(timer.textContent ?? "")).toBeGreaterThanOrEqual(
+			72,
+		);
+		expect(timer.getAttribute("aria-live")).toBeNull();
+		expect(activity.getAttribute("aria-live")).toBe("polite");
+	});
+
+	it("uses reduced-motion variants for the active bar and dots", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="capturing" />,
+		);
+		const progressbar = screen.getByRole("progressbar");
+		const activeSegment = progressbar.querySelector(
+			"[data-active-stage-segment]",
+		);
+		const indicator = container.querySelector(
+			'[data-testid="scrape-active-indicator"]',
+		);
+		expect(activeSegment?.className).toContain("motion-safe:");
+		expect(activeSegment?.className).toContain("motion-reduce:animate-none");
+		expect(indicator?.children).toHaveLength(3);
+		for (const dot of indicator?.children ?? []) {
+			expect(dot.className).toContain("motion-safe:animate-pulse");
+			expect(dot.className).toContain("motion-reduce:animate-none");
+		}
+		const activeStage = container.querySelector('[aria-current="step"]');
+		expect(activeStage?.querySelector("svg")?.getAttribute("class")).toContain(
+			"motion-safe:animate-spin",
+		);
+		expect(activeStage?.querySelector("svg")?.getAttribute("class")).toContain(
+			"motion-reduce:animate-none",
+		);
+	});
+
+	it("disables retry spinner motion for reduced motion preferences", () => {
+		render(
+			<ScrapeProgress
+				mode="html"
+				status="failed"
+				errorMessage="Gagal memproses HTML website."
+				onRetry={() => {}}
+				isRetrying
+			/>,
+		);
+		expect(
+			screen
+				.getByRole("button", { name: /Coba lagi/i })
+				.querySelector("svg")
+				?.getAttribute("class"),
+		).toContain("motion-reduce:animate-none");
+	});
+
+	it("does not keep an active progress indicator after a terminal state", () => {
+		const { container, rerender } = render(
+			<ScrapeProgress
+				mode="design"
+				status="generating"
+				activity="Menyusun dokumen"
+				activityStartedAt={new Date().toISOString()}
+			/>,
+		);
+		rerender(<ScrapeProgress mode="design" status="completed" />);
+		const progressbar = screen.getByRole("progressbar");
+		expect(progressbar.getAttribute("aria-valuenow")).toBe(
+			progressbar.getAttribute("aria-valuemax"),
+		);
+		expect(progressbar.querySelector("[data-active-stage-segment]")).toBeNull();
+		expect(
+			container.querySelector('[data-testid="scrape-active-indicator"]'),
+		).toBeNull();
+		expect(screen.queryByRole("timer")).toBeNull();
+		rerender(<ScrapeProgress mode="design" status="failed" />);
 		expect(screen.queryByRole("progressbar")).toBeNull();
+		expect(
+			container.querySelector('[data-testid="scrape-active-indicator"]'),
+		).toBeNull();
+		expect(screen.queryByRole("timer")).toBeNull();
 	});
 
 	it("does not rotate synthetic activity text while polling", () => {
@@ -298,7 +494,9 @@ describe("ScrapeProgress", () => {
 		expect(activeSlotText()).toContain("Menangkap DOM hasil render");
 		expect(screen.queryByText(/Menyusun DESIGN\.md/i)).toBeNull();
 		expect(screen.queryByText(/\(\d+%/)).toBeNull();
-		expect(screen.queryByRole("progressbar")).toBeNull();
+		expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
+			"2",
+		);
 	});
 
 	it("keeps completed stage labels muted while the active stage stays strongest", () => {
