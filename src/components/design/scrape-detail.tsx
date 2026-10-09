@@ -1,5 +1,6 @@
 import { Check, Copy, Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { SCRAPE_DESKTOP_HEIGHT } from "@/lib/constants";
 
 export interface ScrapeDetailProps {
 	domain: string;
@@ -184,10 +185,7 @@ function DesktopPreview({ title, srcDoc }: { title: string; srcDoc: string }) {
 	const [frameHeight, setFrameHeight] = useState(() =>
 		Math.min(
 			PREVIEW_MAX_HEIGHT,
-			Math.round(
-				(typeof window !== "undefined" ? window.innerHeight : 900) *
-					PREVIEW_HEIGHT_RATIO,
-			),
+			Math.round(SCRAPE_DESKTOP_HEIGHT * PREVIEW_HEIGHT_RATIO),
 		),
 	);
 

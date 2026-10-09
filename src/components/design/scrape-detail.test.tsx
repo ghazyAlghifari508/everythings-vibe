@@ -7,6 +7,8 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
+import { hydrateRoot, type Root } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScrapeDetail } from "./scrape-detail";
 
@@ -57,6 +59,76 @@ describe("ScrapeDetail", () => {
 		expect(
 			screen.queryByRole("button", { name: /Salin DESIGN\.md/i }),
 		).toBeNull();
+	});
+	it("hydrates the desktop preview before resizing it to the viewport", () => {
+		const browserWindow = window;
+		window.innerHeight = 844;
+		vi.stubGlobal("window", undefined);
+		let serverMarkup: string;
+		try {
+			serverMarkup = renderToString(
+				<ScrapeDetail
+					domain="example.com"
+					previewHtml="<main>preview</main>"
+				/>,
+			);
+		} finally {
+			vi.stubGlobal("window", browserWindow);
+		}
+
+		const serverContainer = document.createElement("div");
+		serverContainer.innerHTML = serverMarkup;
+		const serverIframe = serverContainer.querySelector("iframe");
+		expect(serverIframe?.style.height).toBe("675px");
+		expect(serverIframe?.parentElement?.style.height).toBe("675px");
+
+		const hydrationErrors: unknown[][] = [];
+		const hydrationMismatch =
+			/hydration failed|hydration mismatch|did not match|didn't match/i;
+		const originalConsoleError = console.error;
+		vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+			if (args.some((argument) => hydrationMismatch.test(String(argument)))) {
+				hydrationErrors.push(args);
+			} else {
+				originalConsoleError(...args);
+			}
+		});
+
+		const hydrationContainer = document.createElement("div");
+		hydrationContainer.innerHTML = serverMarkup;
+		const hydrationWrapper =
+			hydrationContainer.querySelector("iframe")?.parentElement;
+		if (!hydrationWrapper) throw new Error("Preview wrapper was not rendered");
+		Object.defineProperty(hydrationWrapper, "clientWidth", {
+			configurable: true,
+			value: 1440,
+		});
+		document.body.appendChild(hydrationContainer);
+		let root: Root | undefined;
+		try {
+			act(() => {
+				root = hydrateRoot(
+					hydrationContainer,
+					<ScrapeDetail
+						domain="example.com"
+						previewHtml="<main>preview</main>"
+					/>,
+				);
+			});
+
+			const hydratedIframe = hydrationContainer.querySelector("iframe");
+			if (!hydratedIframe) throw new Error("Preview iframe was not hydrated");
+			expect(hydrationErrors).toEqual([]);
+			expect(hydratedIframe.style.height).toBe("633px");
+			expect(hydratedIframe.parentElement?.style.height).toBe("633px");
+			window.innerHeight = 700;
+			act(() => window.dispatchEvent(new Event("resize")));
+			expect(hydratedIframe.style.height).toBe("525px");
+			expect(hydratedIframe.parentElement?.style.height).toBe("525px");
+		} finally {
+			if (root) act(() => root?.unmount());
+			hydrationContainer.remove();
+		}
 	});
 	it("resizes from the measured container and viewport while preserving readable preview scale", async () => {
 		window.innerHeight = 900;
