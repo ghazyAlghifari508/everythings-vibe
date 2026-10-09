@@ -12,8 +12,8 @@ const config = defineConfig({
 	},
 	optimizeDeps: {
 		include: [
-			"@tanstack/react-store",
-			"use-sync-external-store/shim/with-selector",
+			"@tanstack/react-router > @tanstack/react-store",
+			"@tanstack/react-router > @tanstack/react-store > use-sync-external-store/shim/with-selector",
 		],
 	},
 	plugins: [
