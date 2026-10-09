@@ -451,3 +451,20 @@ describe("codebase starter suggestions route wiring", () => {
 		);
 	});
 });
+
+describe("workspace onboarding analysis selection", () => {
+	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+
+	it("loads analysis by the immutable onboarding anchor and active snapshot", () => {
+		expect(detailSource).toContain(
+			"onboardingProjectId: codebases.onboardingProjectId",
+		);
+		expect(detailSource).toContain("resolveOnboardingAnchorProject");
+		expect(detailSource).toContain(
+			"eq(codebaseAnalyses.projectId, onboardingFeature.id)",
+		);
+		expect(detailSource).toContain(
+			"eq(codebaseAnalyses.snapshotId, currentSnapshot.id)",
+		);
+	});
+});

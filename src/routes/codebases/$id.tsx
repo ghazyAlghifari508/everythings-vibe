@@ -27,8 +27,10 @@ import type { ProjectFeatureTree } from "@/db/schema";
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
 	type AnalysisResponse,
+	codebaseStarterSuggestionsSchema,
 	safeParseCodebaseAnalysis,
 } from "@/lib/codebase-analysis";
+import { resolveOnboardingAnchorProject } from "@/lib/codebase-anchor";
 import { buildFeatureMessage } from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
@@ -44,6 +46,10 @@ import {
 	syncPromptPayloadSchema,
 	syncStatusResponseSchema,
 } from "@/lib/codebase-sync";
+import {
+	matchesWorkspaceAnalysis,
+	shouldFetchWorkspaceAnalysis,
+} from "@/lib/codebase-workspace-analysis";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import type { TaskTree } from "@/lib/services/task-service";
@@ -97,12 +103,15 @@ const loadCodebase = createServerFn({ method: "GET" })
 	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
 		const { db } = await import("@/db");
-		const { codebases, codebaseAnalyses } = await import("@/db/schema");
-		const { codebaseSnapshots } = await import("@/db/schema");
-		const { projects } = await import("@/db/schema");
-		const { and, desc, eq, isNull } = await import("drizzle-orm");
+		const { codebases, codebaseAnalyses, codebaseSnapshots, projects } =
+			await import("@/db/schema");
+		const { and, desc, eq, gt, inArray, isNull } = await import("drizzle-orm");
 		const [codebase] = await db
-			.select({ id: codebases.id, name: codebases.name })
+			.select({
+				id: codebases.id,
+				name: codebases.name,
+				onboardingProjectId: codebases.onboardingProjectId,
+			})
 			.from(codebases)
 			.where(and(eq(codebases.id, id), eq(codebases.userId, user.id)))
 			.limit(1);
@@ -123,15 +132,35 @@ const loadCodebase = createServerFn({ method: "GET" })
 			)
 			.orderBy(desc(projects.updatedAt));
 		const feature = featureProjects[0] ?? null;
+		const onboardingFeature = resolveOnboardingAnchorProject({
+			onboardingProjectId: codebase.onboardingProjectId,
+			projects: featureProjects,
+			expectedCodebaseId: id,
+		});
+		const [currentSnapshot] = await db
+			.select({
+				id: codebaseSnapshots.id,
+				fileCount: codebaseSnapshots.fileCount,
+			})
+			.from(codebaseSnapshots)
+			.where(
+				and(
+					eq(codebaseSnapshots.codebaseId, id),
+					inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES]),
+					gt(codebaseSnapshots.fileCount, 0),
+				),
+			)
+			.orderBy(desc(codebaseSnapshots.createdAt))
+			.limit(1);
 		let analysis: AnalysisResponse | null = null;
-		if (feature) {
+		if (onboardingFeature && currentSnapshot) {
 			const [row] = await db
 				.select()
 				.from(codebaseAnalyses)
 				.where(
 					and(
-						eq(codebaseAnalyses.projectId, feature.id),
-						eq(codebaseAnalyses.status, "ready"),
+						eq(codebaseAnalyses.projectId, onboardingFeature.id),
+						eq(codebaseAnalyses.snapshotId, currentSnapshot.id),
 					),
 				)
 				.orderBy(desc(codebaseAnalyses.createdAt))
@@ -170,7 +199,14 @@ const loadCodebase = createServerFn({ method: "GET" })
 		const hasStoredSnapshot = Boolean(
 			storedSnapshot && (storedSnapshot.fileCount ?? 0) > 0,
 		);
-		return { codebase, feature, analysis, hasStoredSnapshot };
+		return {
+			codebase,
+			feature,
+			onboardingFeature,
+			currentSnapshotId: currentSnapshot?.id ?? null,
+			analysis,
+			hasStoredSnapshot,
+		};
 	});
 
 const loadSnapshotManifest = createServerFn({ method: "GET" })
@@ -345,6 +381,8 @@ function CodebaseDetailPage() {
 	const {
 		codebase,
 		feature,
+		onboardingFeature,
+		currentSnapshotId,
 		analysis: initialAnalysis,
 		hasStoredSnapshot,
 	} = Route.useLoaderData();
@@ -364,21 +402,37 @@ function CodebaseDetailPage() {
 	const [lastFeaturePrompt, setLastFeaturePrompt] = useState("");
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
-	const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+	const [analysis, setAnalysis] = useState<AnalysisResponse | null>(() =>
+		matchesWorkspaceAnalysis(
+			initialAnalysis,
+			onboardingFeature?.id ?? "",
+			currentSnapshotId ?? "",
+		)
+			? initialAnalysis
+			: null,
+	);
 	const [error, setError] = useState<string | null>(null);
 	const [isStarting, setIsStarting] = useState(false);
 	const [isWorking, setIsWorking] = useState(false);
 	const inFlight = useRef(false);
 	const analysisAttemptedFor = useRef<string | null>(null);
+	const analysisReadInFlight = useRef(new Set<string>());
+	const analysisRefreshInFlight = useRef(false);
+	const analysisIdentity = `${onboardingFeature?.id ?? ""}:${status?.snapshotId ?? currentSnapshotId ?? ""}`;
+	const analysisIdentityRef = useRef(analysisIdentity);
+	analysisIdentityRef.current = analysisIdentity;
 
 	const triggerAnalysis = useCallback(
 		async (snapshotId: string) => {
-			if (!feature?.id) return;
+			if (!onboardingFeature?.id) return;
+			const requestIdentity = `${onboardingFeature.id}:${snapshotId}`;
+			if (analysisAttemptedFor.current === requestIdentity) return;
+			analysisAttemptedFor.current = requestIdentity;
 			setIsWorking(true);
 			setError(null);
 			try {
 				const response = await fetch(
-					`/api/v1/projects/${encodeURIComponent(feature.id)}/codebase/analysis`,
+					`/api/v1/projects/${encodeURIComponent(onboardingFeature.id)}/codebase/analysis`,
 					{
 						method: "POST",
 						headers: { "Content-Type": "application/json" },
@@ -386,29 +440,66 @@ function CodebaseDetailPage() {
 					},
 				);
 				const body: unknown = await response.json().catch(() => null);
+				const parsed = safeParseAnalysisResponse(body);
 				if (
 					!response.ok ||
-					typeof body !== "object" ||
-					body === null ||
-					!("id" in body) ||
-					typeof body.id !== "string"
+					!parsed ||
+					!matchesWorkspaceAnalysis(parsed, onboardingFeature.id, snapshotId)
 				) {
-					setError("Analisis codebase gagal. Coba analisis ulang.");
+					if (analysisIdentityRef.current === requestIdentity) {
+						setError("Analisis codebase gagal. Coba analisis ulang.");
+					}
 					return;
 				}
-				const parsed = safeParseAnalysisResponse(body);
-				if (!parsed) {
-					setError("Hasil analisis tidak valid.");
-					return;
-				}
-				setAnalysis(parsed);
+				if (analysisIdentityRef.current === requestIdentity)
+					setAnalysis(parsed);
 			} catch {
-				setError("Server tidak dapat dihubungi.");
+				if (analysisIdentityRef.current === requestIdentity) {
+					setError("Server tidak dapat dihubungi.");
+				}
 			} finally {
 				setIsWorking(false);
 			}
 		},
-		[feature?.id],
+		[onboardingFeature?.id],
+	);
+
+	const readWorkspaceAnalysis = useCallback(
+		async (projectId: string, snapshotId: string) => {
+			const key = `${projectId}:${snapshotId}`;
+			if (analysisReadInFlight.current.has(key)) return;
+			analysisReadInFlight.current.add(key);
+			try {
+				const response = await fetch(
+					`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis?snapshotId=${encodeURIComponent(snapshotId)}`,
+				);
+				const body: unknown = await response.json().catch(() => null);
+				if (
+					!response.ok ||
+					!matchesWorkspaceAnalysis(body, projectId, snapshotId)
+				) {
+					if (analysisIdentityRef.current === key) {
+						setError("Analisis codebase tidak dapat dibaca. Coba lagi.");
+					}
+					return;
+				}
+				const parsed = safeParseAnalysisResponse(body);
+				if (!parsed) {
+					if (analysisIdentityRef.current === key) {
+						setError("Hasil analisis tidak valid.");
+					}
+					return;
+				}
+				if (analysisIdentityRef.current === key) setAnalysis(parsed);
+			} catch {
+				if (analysisIdentityRef.current === key) {
+					setError("Server tidak dapat dihubungi. Coba lagi.");
+				}
+			} finally {
+				analysisReadInFlight.current.delete(key);
+			}
+		},
+		[],
 	);
 
 	const readStatus = useCallback(async () => {
@@ -417,7 +508,8 @@ function CodebaseDetailPage() {
 		try {
 			const queryParams = new URLSearchParams();
 			if (status?.sessionId) queryParams.set("sessionId", status.sessionId);
-			if (feature?.id) queryParams.set("projectId", feature.id);
+			if (onboardingFeature?.id)
+				queryParams.set("projectId", onboardingFeature.id);
 			const query = queryParams.toString() ? `?${queryParams}` : "";
 			const response = await fetch(
 				`/api/codebases/${encodeURIComponent(codebase.id)}/status${query}`,
@@ -433,52 +525,143 @@ function CodebaseDetailPage() {
 				);
 				return;
 			}
+			analysisIdentityRef.current = `${onboardingFeature?.id ?? ""}:${parsed.data.snapshotId ?? ""}`;
 			setStatus(parsed.data);
+			const snapshotId = parsed.data.snapshotId;
 			const hasUsableSnapshot = Boolean(
-				parsed.data.snapshotId &&
-					SNAPSHOT_CONTEXT_STATUSES.includes(parsed.data.status),
+				snapshotId && SNAPSHOT_CONTEXT_STATUSES.includes(parsed.data.status),
 			);
-			const matchingInitialAnalysis =
-				hasUsableSnapshot &&
-				initialAnalysis?.output &&
-				parsed.data.snapshotId === initialAnalysis.snapshotId
-					? initialAnalysis
-					: null;
-			setAnalysis((current) =>
-				!hasUsableSnapshot ||
-				(current &&
-					parsed.data.snapshotId &&
-					current.snapshotId !== parsed.data.snapshotId)
-					? null
-					: (current ?? matchingInitialAnalysis),
-			);
-			if (
-				feature?.id &&
-				parsed.data.snapshotId &&
-				SNAPSHOT_CONTEXT_STATUSES.includes(parsed.data.status) &&
-				!parsed.data.analysisId &&
-				analysisAttemptedFor.current !== parsed.data.snapshotId
-			) {
-				analysisAttemptedFor.current = parsed.data.snapshotId;
-				void triggerAnalysis(parsed.data.snapshotId);
+			if (!hasUsableSnapshot || !snapshotId) {
+				setAnalysis(null);
+				return;
 			}
-			// No screen bookkeeping: `snapshotReady` already decides between the
-			// workspace and the sync screen, and the sync screen reports the live
-			// upload itself. Advancing a separate "monitor" screen only repeated
-			// the same status the user was already watching.
+			const projectId = onboardingFeature?.id;
+			const analysisMatchesCurrent = Boolean(
+				projectId &&
+					(matchesWorkspaceAnalysis(analysis, projectId, snapshotId) ||
+						matchesWorkspaceAnalysis(initialAnalysis, projectId, snapshotId)),
+			);
+			if (!analysisMatchesCurrent) setAnalysis(null);
+			if (
+				projectId &&
+				shouldFetchWorkspaceAnalysis({
+					projectId,
+					snapshotId,
+					analysisStatus: parsed.data.analysisStatus,
+					analysis,
+				})
+			) {
+				void readWorkspaceAnalysis(projectId, snapshotId);
+			}
+			if (
+				projectId &&
+				!parsed.data.analysisId &&
+				!parsed.data.analysisStatus &&
+				analysisAttemptedFor.current !== `${projectId}:${snapshotId}`
+			) {
+				void triggerAnalysis(snapshotId);
+			}
 		} catch {
 			setError("Server tidak dapat dihubungi. Coba lagi.");
 		} finally {
 			inFlight.current = false;
 		}
 	}, [
+		analysis,
 		codebase.id,
-		feature?.id,
+		initialAnalysis,
+		onboardingFeature?.id,
+		readWorkspaceAnalysis,
 		status?.sessionId,
 		triggerAnalysis,
-		initialAnalysis,
 	]);
 
+	const [isRefreshingStarterSuggestions, setIsRefreshingStarterSuggestions] =
+		useState(false);
+	const [starterRefreshError, setStarterRefreshError] = useState<string | null>(
+		null,
+	);
+	const refreshStarterSuggestions = useCallback(
+		async (analysisId: string, snapshotId: string) => {
+			if (
+				!onboardingFeature?.id ||
+				!analysis ||
+				analysis.id !== analysisId ||
+				analysis.snapshotId !== snapshotId ||
+				!matchesWorkspaceAnalysis(analysis, onboardingFeature.id, snapshotId) ||
+				analysisRefreshInFlight.current
+			) {
+				return;
+			}
+			analysisRefreshInFlight.current = true;
+			setIsRefreshingStarterSuggestions(true);
+			setStarterRefreshError(null);
+			try {
+				const response = await fetch(
+					`/api/v1/projects/${encodeURIComponent(onboardingFeature.id)}/codebase/analysis`,
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							snapshotId,
+							refreshStarterSuggestionsForAnalysisId: analysisId,
+						}),
+					},
+				);
+				const body: unknown = await response.json().catch(() => null);
+				const parsed = safeParseAnalysisResponse(body);
+				const parsedSuggestions = codebaseStarterSuggestionsSchema.safeParse(
+					parsed?.output?.starterSuggestions,
+				);
+				if (
+					!response.ok ||
+					!parsed ||
+					!matchesWorkspaceAnalysis(parsed, onboardingFeature.id, snapshotId) ||
+					!parsedSuggestions.success
+				) {
+					setStarterRefreshError("Pembaruan saran gagal. Coba lagi.");
+					return;
+				}
+				if (
+					analysisIdentityRef.current ===
+					`${onboardingFeature.id}:${snapshotId}`
+				) {
+					setAnalysis(parsed);
+				}
+			} catch {
+				if (
+					analysisIdentityRef.current ===
+					`${onboardingFeature?.id ?? ""}:${snapshotId}`
+				) {
+					setStarterRefreshError("Server tidak dapat dihubungi. Coba lagi.");
+				}
+			} finally {
+				analysisRefreshInFlight.current = false;
+				setIsRefreshingStarterSuggestions(false);
+			}
+		},
+		[analysis, onboardingFeature?.id],
+	);
+	useEffect(() => {
+		setAnalysis((current) => {
+			if (
+				matchesWorkspaceAnalysis(
+					current,
+					onboardingFeature?.id ?? "",
+					currentSnapshotId ?? "",
+				)
+			) {
+				return current;
+			}
+			return matchesWorkspaceAnalysis(
+				initialAnalysis,
+				onboardingFeature?.id ?? "",
+				currentSnapshotId ?? "",
+			)
+				? initialAnalysis
+				: null;
+		});
+	}, [currentSnapshotId, initialAnalysis, onboardingFeature?.id]);
 	useEffect(() => {
 		try {
 			const raw = sessionStorage.getItem(getPendingSyncPayloadKey(codebase.id));
@@ -1340,6 +1523,24 @@ function CodebaseDetailPage() {
 								stageError={stageError}
 								codebaseName={codebase.name}
 								starterSuggestions={analysisOutput?.starterSuggestions}
+								starterRefresh={
+									analysis?.status === "ready" &&
+									analysis.output &&
+									!codebaseStarterSuggestionsSchema.safeParse(
+										analysis.output.starterSuggestions,
+									).success &&
+									analysis.projectId === onboardingFeature?.id &&
+									analysis.snapshotId === status?.snapshotId
+										? {
+												analysisId: analysis.id,
+												snapshotId: analysis.snapshotId,
+												status: analysis.status,
+												isRefreshing: isRefreshingStarterSuggestions,
+												error: starterRefreshError,
+											}
+										: undefined
+								}
+								onRefreshStarterSuggestions={refreshStarterSuggestions}
 								isSending={isWorking}
 								isConfirming={isConfirming}
 								specError={specError}
@@ -1595,7 +1796,8 @@ function CodebaseDetailPage() {
 	);
 }
 
-function safeParseAnalysisResponse(input: object): AnalysisResponse | null {
+function safeParseAnalysisResponse(input: unknown): AnalysisResponse | null {
+	if (typeof input !== "object" || input === null) return null;
 	if (
 		!("id" in input) ||
 		!("projectId" in input) ||
