@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { codebaseSyncSessions, codebases, projects } from "@/db/schema";
 import { saveAskHandoff } from "@/lib/codebase-generation-context";
@@ -99,41 +99,74 @@ export const Route = createFileRoute("/api/projects/")({
 							{ status: 400 },
 						);
 					}
-					const [codebase] = await db
-						.select({ id: codebases.id })
-						.from(codebases)
-						.where(
-							and(eq(codebases.id, codebaseId), eq(codebases.userId, user.id)),
-						)
-						.limit(1);
-					if (!codebase) {
+					const result = await db.transaction(async (tx) => {
+						const [lockedCodebase] = await tx
+							.select({
+								id: codebases.id,
+								onboardingProjectId: codebases.onboardingProjectId,
+							})
+							.from(codebases)
+							.where(
+								and(
+									eq(codebases.id, codebaseId),
+									eq(codebases.userId, user.id),
+								),
+							)
+							.for("update")
+							.limit(1);
+
+						if (!lockedCodebase) return { kind: "not_found" as const };
+
+						const [createdProject] = await tx
+							.insert(projects)
+							.values({
+								id,
+								userId: user.id,
+								name: projectName,
+								status: "draft",
+								mode: "ai_auto",
+								projectMode,
+								codebaseId: lockedCodebase.id,
+								language,
+							})
+							.returning({ id: projects.id, name: projects.name });
+						if (!createdProject) return { kind: "error" as const };
+
+						if (!lockedCodebase.onboardingProjectId) {
+							await tx
+								.update(codebases)
+								.set({
+									onboardingProjectId: createdProject.id,
+									updatedAt: new Date(),
+								})
+								.where(
+									and(
+										eq(codebases.id, lockedCodebase.id),
+										eq(codebases.userId, user.id),
+										isNull(codebases.onboardingProjectId),
+									),
+								);
+						}
+
+						return { kind: "ok" as const, project: createdProject };
+					});
+
+					if (result.kind === "not_found") {
 						return Response.json(
 							{ error: "Codebase tidak ditemukan" },
 							{ status: 404 },
 						);
 					}
-					const [project] = await db
-						.insert(projects)
-						.values({
-							id,
-							userId: user.id,
-							name: projectName,
-							status: "draft",
-							mode: "ai_auto",
-							projectMode,
-							codebaseId: codebase.id,
-							language,
-						})
-						.returning({ id: projects.id, name: projects.name });
-					if (!project)
+					if (result.kind === "error" || !result.project) {
 						return Response.json(
 							{ error: "Gagal membuat project" },
 							{ status: 500 },
 						);
-					await initHandoff(project.id);
+					}
+					await initHandoff(result.project.id);
 					return Response.json({
-						id: project.id,
-						name: project.name,
+						id: result.project.id,
+						name: result.project.name,
 						projectMode,
 					});
 				}
