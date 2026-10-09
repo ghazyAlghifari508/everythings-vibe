@@ -325,4 +325,41 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 			),
 		).toBe(false);
 	});
+
+	it("opens workspace with 0 file tersinkron badge when session is expired but usable empty snapshot exists", async () => {
+		routeHarness.loaderData = {
+			codebase: { id: "codebase-1", name: "Workspace repo" },
+			feature: { id: PROJECT_ID, name: "Workspace feature" },
+			onboardingFeature: { id: PROJECT_ID, name: "Workspace feature" },
+			currentSnapshotId: "snapshot-empty",
+			analysis: null,
+			hasStoredSnapshot: true,
+		};
+		const fetchMock = vi.fn(
+			async (input: RequestInfo | URL, _init?: RequestInit) => {
+				const url = String(input);
+				if (url.startsWith("/api/codebases/codebase-1/status")) {
+					return response({
+						projectId: PROJECT_ID,
+						sessionId: "expired-session",
+						status: "expired",
+						snapshotId: "snapshot-empty",
+						fileCount: 0,
+					});
+				}
+				if (url.endsWith("/versions") || url.endsWith("/ac-versions")) {
+					return response([]);
+				}
+				throw new Error(`unexpected fetch GET ${url}`);
+			},
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		renderWorkspaceRoute();
+		await waitFor(() => {
+			expect(screen.getByTestId("codebase-workspace-page")).toBeDefined();
+		});
+		const badge = screen.getByTestId("codebase-sync-badge");
+		expect(badge.textContent).toBe("0 file tersinkron");
+	});
 });

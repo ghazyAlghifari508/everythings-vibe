@@ -98,6 +98,26 @@ export function canRenderCodebaseReview(
 	);
 }
 
+export function formatCodebaseSyncBadge(
+	fileCount: number | null | undefined,
+): string {
+	return typeof fileCount === "number"
+		? `${fileCount} file tersinkron`
+		: "Menunggu snapshot";
+}
+
+export function resolveWorkspaceSnapshotReady(input: {
+	status?: Pick<SyncStatusResponse, "status" | "snapshotId"> | null;
+	hasStoredSnapshot: boolean;
+}): boolean {
+	return (
+		Boolean(
+			input.status?.snapshotId &&
+				SNAPSHOT_CONTEXT_STATUSES.includes(input.status.status),
+		) || input.hasStoredSnapshot
+	);
+}
+
 const loadCodebase = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
 	.handler(async ({ data: id }) => {
@@ -181,20 +201,10 @@ const loadCodebase = createServerFn({ method: "GET" })
 				};
 			}
 		}
-		// Stored snapshot independent of any sync session: an expired
-		// session must never block the workspace when files exist in DB.
-		const [storedSnapshot] = await db
-			.select({
-				id: codebaseSnapshots.id,
-				fileCount: codebaseSnapshots.fileCount,
-			})
-			.from(codebaseSnapshots)
-			.where(eq(codebaseSnapshots.codebaseId, id))
-			.orderBy(desc(codebaseSnapshots.createdAt))
-			.limit(1);
-		const hasStoredSnapshot = Boolean(
-			storedSnapshot && (storedSnapshot.fileCount ?? 0) > 0,
-		);
+		// Stored snapshot derived from usable current snapshot independent of sync session expiry
+		// (including empty repositories).
+		const storedSnapshot = currentSnapshot;
+		const hasStoredSnapshot = Boolean(storedSnapshot);
 		return {
 			codebase,
 			feature,
@@ -714,10 +724,10 @@ function CodebaseDetailPage() {
 		}
 	};
 
-	const snapshotReady =
-		Boolean(
-			status?.snapshotId && SNAPSHOT_CONTEXT_STATUSES.includes(status.status),
-		) || hasStoredSnapshot;
+	const snapshotReady = resolveWorkspaceSnapshotReady({
+		status,
+		hasStoredSnapshot,
+	});
 	const [activeFeature, setActiveFeature] = useState<{
 		id: string;
 		name: string;
@@ -1468,10 +1478,7 @@ function CodebaseDetailPage() {
 						data-testid="codebase-sync-badge"
 						className="shrink-0 rounded-md border border-graphite bg-obsidian px-2.5 py-1 font-mono text-[11px] text-fog"
 					>
-						{typeof (status?.fileCount ?? manifestFileCount) === "number" &&
-						(status?.fileCount ?? manifestFileCount ?? 0) > 0
-							? `${status?.fileCount ?? manifestFileCount} file tersinkron`
-							: "Menunggu snapshot"}
+						{formatCodebaseSyncBadge(status?.fileCount ?? manifestFileCount)}
 					</span>
 				</header>
 				{error && (
