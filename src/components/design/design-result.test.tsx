@@ -81,21 +81,24 @@ Theme here.
 Single page analyzed.
 `;
 
-function renderResult() {
+function renderResult(designMd = DESIGN_MD) {
 	return render(
 		<DesignResult
 			sourceUrl="https://acme.example/"
 			domain="acme.example"
-			designMd={DESIGN_MD}
+			designMd={designMd}
 		/>,
 	);
 }
 
 describe("DesignResult", () => {
-	it("renders site identity from the domain, not the SEO title", () => {
+	it("renders the site name and canonical source link", () => {
 		renderResult();
 		expect(screen.getByRole("heading", { name: "Acme" })).toBeDefined();
-		expect(screen.getByText("acme.example")).toBeDefined();
+		expect(screen.queryByText("acme.example", { exact: true })).toBeNull();
+		expect(
+			screen.getByRole("link", { name: "https://acme.example/" }),
+		).toBeDefined();
 	});
 
 	it("pairs the visual inspector with the raw DESIGN.md source", () => {
@@ -128,8 +131,10 @@ describe("DesignResult", () => {
 		expect(container.textContent).not.toMatch(/compact|extended/i);
 	});
 
-	it("opens the AI agent handoff with the live document", () => {
-		renderResult();
+	it("opens the AI agent handoff with the exact raw source", () => {
+		const longUrl = `https://source.example/${"path-segment-".repeat(16)}`;
+		const rawSource = `${DESIGN_MD}\n\n| url | ${longUrl} |\n\n\`\`\`css\n--source-url: url(${longUrl});\n\`\`\`  \n`;
+		renderResult(rawSource);
 		fireEvent.click(
 			screen.getByRole("button", { name: /implement ke ai agent/i }),
 		);
@@ -137,11 +142,9 @@ describe("DesignResult", () => {
 			screen.getByRole("heading", { name: "Implement ke AI Agent" }),
 		).toBeDefined();
 		const prompt = screen.getByLabelText(/prompt implementasi/i);
-		expect((prompt as HTMLTextAreaElement).value).toContain(
-			"https://acme.example/",
-		);
-		expect((prompt as HTMLTextAreaElement).value).toContain(
-			"# Acme - Style Reference",
-		);
+		if (!(prompt instanceof HTMLTextAreaElement)) {
+			throw new Error("Expected the prompt control to be a textarea");
+		}
+		expect(prompt.value.endsWith(`## DESIGN.md\n\n${rawSource}`)).toBe(true);
 	});
 });

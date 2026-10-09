@@ -9,7 +9,18 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-const DESIGN_MD = "# Acme - Style Reference\n\n## Tokens - Colors\nBody here.";
+const LONG_SOURCE_URL = `https://source.example/${"path-segment-".repeat(16)}`;
+const DESIGN_MD = `# Acme - Style Reference
+
+## Tokens - Colors
+Body here.
+| Name | Value |
+| --- | --- |
+| Source URL | ${LONG_SOURCE_URL} |
+
+\`\`\`css
+--source-url: url(${LONG_SOURCE_URL});
+\`\`\`  \n`;
 
 function renderPanel(onImplementAgent: () => void = vi.fn()) {
 	return render(
@@ -44,10 +55,12 @@ describe("DesignMdSourcePanel", () => {
 		expect(container.textContent).not.toMatch(/compact|extended/i);
 	});
 
-	it("renders the authoritative DESIGN.md source", () => {
+	it("renders the authoritative source without changing whitespace", () => {
 		renderPanel();
-		expect(screen.getByText(/Acme - Style Reference/)).toBeDefined();
-		expect(screen.getByText(/Body here/)).toBeDefined();
+		const source = screen
+			.getByRole("region", { name: "Sumber DESIGN.md" })
+			.querySelector("pre");
+		expect(source?.textContent).toBe(DESIGN_MD);
 	});
 
 	it("copies DESIGN.md to the clipboard with feedback", async () => {
@@ -59,13 +72,17 @@ describe("DesignMdSourcePanel", () => {
 		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
 	});
 
-	it("downloads DESIGN.md with feedback", async () => {
+	it("downloads the exact DESIGN.md source with feedback", async () => {
+		const blobSpy = vi.spyOn(globalThis, "Blob");
 		vi.stubGlobal("URL", {
 			createObjectURL: vi.fn(() => "blob:mock"),
 			revokeObjectURL: vi.fn(),
 		});
 		renderPanel();
 		fireEvent.click(screen.getByRole("button", { name: "Download DESIGN.md" }));
+		expect(blobSpy).toHaveBeenCalledWith([DESIGN_MD], {
+			type: "text/markdown;charset=utf-8",
+		});
 		expect(await screen.findByText(/mulai diunduh/i)).toBeDefined();
 	});
 

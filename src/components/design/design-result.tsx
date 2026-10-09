@@ -23,10 +23,9 @@ export function DesignResult({
 	const model = useMemo(() => parseDesignMd(designMd), [designMd]);
 
 	return (
-		<div className="grid w-full grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] lg:gap-8">
+		<div className="grid min-w-0 w-full grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] lg:gap-8">
 			<DesignSystemInspector
 				siteName={siteName}
-				domain={domain}
 				sourceUrl={sourceUrl}
 				model={model}
 			/>

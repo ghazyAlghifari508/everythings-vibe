@@ -86,25 +86,43 @@ const EMPTY_MODEL: DesignInspectorModel = {
 	donts: [],
 };
 
-function renderInspector(model: DesignInspectorModel = MODEL) {
+function renderInspector(
+	model: DesignInspectorModel = MODEL,
+	sourceUrl = "https://acme.example/",
+) {
 	return render(
 		<DesignSystemInspector
 			siteName="Acme"
-			domain="acme.example"
-			sourceUrl="https://acme.example/"
+			sourceUrl={sourceUrl}
 			model={model}
 		/>,
 	);
 }
 
 describe("DesignSystemInspector", () => {
-	it("renders site identity from props, not from hardcoded brand data", () => {
+	it("renders site identity once with a canonical external source link", () => {
 		renderInspector();
 		expect(screen.getByRole("heading", { name: "Acme" })).toBeDefined();
-		expect(screen.getByText("acme.example")).toBeDefined();
+		expect(screen.queryByText("acme.example", { exact: true })).toBeNull();
+		const sourceLink = screen.getByRole("link", {
+			name: "https://acme.example/",
+		});
+		expect(sourceLink.getAttribute("href")).toBe("https://acme.example/");
+		expect(sourceLink.getAttribute("target")).toBe("_blank");
+		expect(sourceLink.getAttribute("rel")).toBe("noreferrer noopener");
+		expect(sourceLink.textContent).toBe("https://acme.example/");
+		expect(
+			screen.getAllByText("https://acme.example/", { exact: true }),
+		).toHaveLength(1);
 		expect(
 			screen.getByText("A crisp ledger console under morning light."),
 		).toBeDefined();
+	});
+
+	it("does not link a source URL outside the HTTP protocols", () => {
+		renderInspector(MODEL, "javascript:alert(1)");
+		expect(screen.queryByRole("link")).toBeNull();
+		expect(screen.getByText("javascript:alert(1)")).toBeDefined();
 	});
 
 	it("renders the parsed color palette with values", () => {
@@ -290,7 +308,6 @@ describe("palette gallery", () => {
 		rerender(
 			<DesignSystemInspector
 				siteName="Acme"
-				domain="acme.example"
 				sourceUrl="https://acme.example/"
 				model={paletteModel([NEUTRAL_COLOR, BRAND_COLOR])}
 			/>,
