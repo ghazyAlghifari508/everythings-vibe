@@ -431,9 +431,11 @@ export function PlanCodebasePage() {
 						recovered.snapshotId,
 					);
 					if (
-						existingAnalysis?.output &&
-						existingAnalysis.snapshotId === recovered.snapshotId &&
-						existingAnalysis.status === "ready"
+						(existingAnalysis?.output &&
+							existingAnalysis.snapshotId === recovered.snapshotId &&
+							existingAnalysis.status === "ready") ||
+						recovered.analysisStatus === "pending" ||
+						existingAnalysis?.status === "pending"
 					) {
 						analysisAttemptedFor.current = recovered.snapshotId;
 					}
@@ -627,7 +629,12 @@ export function PlanCodebasePage() {
 		if (!codebase || !lastStatus || !snapshotId) return;
 		if (!SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status)) return;
 		if (reviewReady) return;
-		if (analysisAttemptedFor.current === snapshotId) return;
+		if (
+			lastStatus.analysisStatus === "pending" ||
+			analysisAttemptedFor.current === snapshotId
+		) {
+			return;
+		}
 		analysisAttemptedFor.current = snapshotId;
 		void (async () => {
 			const projectId =

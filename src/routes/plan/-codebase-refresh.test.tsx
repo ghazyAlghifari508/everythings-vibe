@@ -247,7 +247,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 			step: "summary",
 			projectId: "proj-refresh-1",
 		});
-		mockRecovery({
+		const fetchMock = mockRecovery({
 			codebaseId: "cb-refresh-pending",
 			status: {
 				projectId: "cb-refresh-pending",
@@ -282,6 +282,15 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 		expect(cta.disabled).toBe(true);
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 		expect(screen.queryByTestId("codebase-analysis-pending")).toBeNull();
+
+		// Proves refresh does not POST another analysis request when already pending
+		expect(
+			fetchMock.mock.calls.filter(
+				([url, init]) =>
+					String(url).includes("/codebase/analysis") &&
+					(init as RequestInit | undefined)?.method === "POST",
+			),
+		).toHaveLength(0);
 	}, 20000);
 
 	it("recovers a ready analysis straight into the review", async () => {
