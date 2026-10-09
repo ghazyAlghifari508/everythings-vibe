@@ -208,16 +208,27 @@ describe("Step 1 live sync status", () => {
 		expect(container.querySelectorAll("[data-stage-state]")).toHaveLength(0);
 	});
 
-	it("never presents analysis as part of the sync step", () => {
+	it("presents analysis status truthfully once a snapshot exists and analysisStatus is reported", () => {
 		renderConnect({
 			status: status({
 				status: "uploaded",
 				snapshotId: "snap_an",
 				analysisStatus: "pending",
 			}),
-			canContinueToSummary: true,
+			canContinueToSummary: false,
 		});
-		expect(container.textContent).not.toMatch(/menganalisis codebase/i);
+		expect(container.textContent).toMatch(/menganalisis codebase/i);
+		expect(
+			container.querySelector('[data-testid="sync-stage-analysis"]'),
+		).not.toBeNull();
+	});
+
+	it("does not present analysis when analysisStatus is absent or snapshot is missing", () => {
+		renderConnect({
+			status: status({
+				status: "uploading",
+			}),
+		});
 		expect(
 			container.querySelector('[data-testid="sync-stage-analysis"]'),
 		).toBeNull();
@@ -238,6 +249,65 @@ describe("Step 1 live sync status", () => {
 				container.querySelector(`[data-testid="${testId}"]`)?.textContent,
 			).not.toContain("Sync ID");
 		}
+	});
+
+	it("renders analysis stage row when snapshot is uploaded and analysisStatus exists", () => {
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_1",
+				analysisStatus: "pending",
+			}),
+		});
+		const pendingRow = container.querySelector(
+			'[data-testid="sync-stage-analysis"]',
+		);
+		expect(pendingRow).not.toBeNull();
+		expect(pendingRow?.getAttribute("data-stage-state")).toBe("active");
+		expect(pendingRow?.textContent).toContain("Menganalisis codebase");
+
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_1",
+				analysisStatus: "ready",
+			}),
+			canContinueToSummary: true,
+		});
+		const readyRow = container.querySelector(
+			'[data-testid="sync-stage-analysis"]',
+		);
+		expect(readyRow).not.toBeNull();
+		expect(readyRow?.getAttribute("data-stage-state")).toBe("done");
+		expect(readyRow?.textContent).toContain("Kesimpulan siap");
+
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_1",
+				analysisStatus: "ready",
+			}),
+			canContinueToSummary: false,
+		});
+		const legacyRow = container.querySelector(
+			'[data-testid="sync-stage-analysis"]',
+		);
+		expect(legacyRow).not.toBeNull();
+		expect(legacyRow?.getAttribute("data-stage-state")).toBe("done");
+		expect(legacyRow?.textContent).toContain("Analisis selesai");
+		expect(legacyRow?.textContent).toContain(
+			"Perlu pembaruan rekomendasi task awal",
+		);
+
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_1",
+			}),
+		});
+		expect(
+			container.querySelector('[data-testid="sync-stage-analysis"]'),
+		).toBeNull();
 	});
 });
 
@@ -275,6 +345,72 @@ describe("Step 1 continue gating", () => {
 			canContinueToSummary: true,
 		});
 		expect(summaryButton()?.disabled).toBe(false);
+	});
+	it("shows exact readiness criteria in disabled helper copy", () => {
+		renderConnect({ canContinueToSummary: false });
+		expect(container.textContent).toContain(
+			"Tombol lanjut aktif setelah sinkronisasi dan analisis codebase selesai.",
+		);
+	});
+
+	it("shows analysis failure alert and retry button inside Sync when analysis fails", () => {
+		const onRetryAnalysis = vi.fn();
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_1",
+				analysisStatus: "failed",
+			}),
+			analysisError: "Model timeout during analysis.",
+			onRetryAnalysis,
+		});
+		const alert = container.querySelector(
+			'[data-testid="analysis-failure-alert"]',
+		);
+		expect(alert).not.toBeNull();
+		expect(alert?.textContent).toContain("Analisis codebase belum berhasil");
+		expect(alert?.textContent).toContain("Model timeout during analysis.");
+
+		const retryBtn = container.querySelector(
+			'[data-testid="retry-analysis-button"]',
+		) as HTMLButtonElement | null;
+		expect(retryBtn).not.toBeNull();
+		act(() => {
+			retryBtn?.click();
+		});
+		expect(onRetryAnalysis).toHaveBeenCalledTimes(1);
+	});
+	it("shows legacy analysis warning and refresh button when legacy analysis is missing suggestions", () => {
+		const onRefreshLegacySuggestions = vi.fn();
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_1",
+				analysisStatus: "ready",
+			}),
+			isLegacyAnalysisMissingSuggestions: true,
+			onRefreshLegacySuggestions,
+		});
+		const warning = container.querySelector(
+			'[data-testid="legacy-analysis-warning"]',
+		);
+		expect(warning).not.toBeNull();
+		expect(warning?.textContent).toContain(
+			"Rekomendasi task awal belum tersedia",
+		);
+
+		const refreshBtn = container.querySelector(
+			'[data-testid="refresh-legacy-suggestions-button"]',
+		) as HTMLButtonElement | null;
+		expect(refreshBtn).not.toBeNull();
+		act(() => {
+			refreshBtn?.click();
+		});
+		expect(onRefreshLegacySuggestions).toHaveBeenCalledTimes(1);
+
+		expect(container.textContent).toContain(
+			"Perbarui rekomendasi task awal untuk melanjutkan ke kesimpulan.",
+		);
 	});
 
 	it("never lets clicking Salin unlock the conclusion action", async () => {

@@ -19,6 +19,7 @@ describe("codebases schema", () => {
 				"id",
 				"name",
 				"name_source",
+				"onboarding_project_id",
 				"updated_at",
 				"user_id",
 			].sort(),

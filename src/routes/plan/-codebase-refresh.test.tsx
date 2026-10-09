@@ -27,14 +27,44 @@ vi.mock("@tanstack/react-router", () => ({
 		</a>
 	),
 }));
+const VALID_STARTER_SUGGESTIONS = [
+	{
+		id: "feature",
+		title: "Feature task",
+		description: "A focused task description.",
+		prompt: "Implement a feature.",
+		relevantPaths: ["src/feature.ts"],
+	},
+	{
+		id: "bugfix",
+		title: "Bugfix task",
+		description: "A focused bugfix description.",
+		prompt: "Fix a bug.",
+		relevantPaths: ["src/bugfix.ts"],
+	},
+	{
+		id: "refactor",
+		title: "Refactor task",
+		description: "A focused refactor description.",
+		prompt: "Refactor a module.",
+		relevantPaths: ["src/refactor.ts"],
+	},
+	{
+		id: "ui",
+		title: "UI task",
+		description: "A focused UI description.",
+		prompt: "Improve UI.",
+		relevantPaths: ["src/ui.ts"],
+	},
+];
 
 const OUTPUT = {
 	projectId: "proj-refresh-1",
 	snapshotId: "snap-refresh-1",
 	framework: "TanStack Start",
 	language: "TypeScript",
+	starterSuggestions: VALID_STARTER_SUGGESTIONS,
 };
-
 interface RecoveryCase {
 	codebaseId: string;
 	/** Persisted navigation intent, absent when the user never chose one. */
@@ -208,16 +238,16 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 		expect(
 			(screen.getByTestId("sync-continue-to-summary") as HTMLButtonElement)
 				.disabled,
-		).toBe(false);
+		).toBe(true);
 	}, 20000);
 
-	it("recovers a pending analysis on the conclusion step", async () => {
+	it("recovers a pending analysis on the conclusion step into Sync screen with Next disabled", async () => {
 		seed({
 			codebaseId: "cb-refresh-pending",
 			step: "summary",
 			projectId: "proj-refresh-1",
 		});
-		mockRecovery({
+		const fetchMock = mockRecovery({
 			codebaseId: "cb-refresh-pending",
 			status: {
 				projectId: "cb-refresh-pending",
@@ -233,15 +263,34 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 
 		await waitFor(
 			() => {
-				expect(screen.getByTestId("codebase-analysis-pending")).not.toBeNull();
+				expect(
+					screen.getByText("Sync codebase dengan VibeEverything"),
+				).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		// The workspace opens on the snapshot, without waiting for the model.
+		// Existing Sync prompt and analysis stage pending
+		expect(screen.getByText("Copy prompt untuk AI agent")).toBeDefined();
+		const analysisStage = screen.getByTestId("sync-stage-analysis");
+		expect(analysisStage.getAttribute("data-stage-state")).toBe("active");
+		expect(analysisStage.textContent).toContain("Menganalisis codebase");
+
+		// Next disabled and no conclusion test ID
+		const cta = screen.getByTestId(
+			"sync-continue-to-summary",
+		) as HTMLButtonElement;
+		expect(cta.disabled).toBe(true);
+		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
+		expect(screen.queryByTestId("codebase-analysis-pending")).toBeNull();
+
+		// Proves refresh does not POST another analysis request when already pending
 		expect(
-			(screen.getByTestId("conclusion-enter-workspace") as HTMLButtonElement)
-				.disabled,
-		).toBe(false);
+			fetchMock.mock.calls.filter(
+				([url, init]) =>
+					String(url).includes("/codebase/analysis") &&
+					(init as RequestInit | undefined)?.method === "POST",
+			),
+		).toHaveLength(0);
 	}, 20000);
 
 	it("recovers a ready analysis straight into the review", async () => {
@@ -258,6 +307,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 				status: "uploaded",
 				snapshotId: "snap-refresh-1",
 				fileCount: 42,
+				analysisId: "ana-refresh-1",
 				analysisStatus: "ready",
 			},
 			analysis: {

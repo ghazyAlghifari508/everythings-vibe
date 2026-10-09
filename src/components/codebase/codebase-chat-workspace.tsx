@@ -3,7 +3,10 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { PromptBar } from "@/components/ui/prompt-bar";
-import type { CodebaseStarterSuggestion } from "@/lib/codebase-analysis";
+import {
+	type CodebaseStarterSuggestion,
+	codebaseStarterSuggestionsSchema,
+} from "@/lib/codebase-analysis";
 import {
 	areAllQuestionsAnswered,
 	nextQuestionIndex,
@@ -59,6 +62,13 @@ interface CodebaseChatWorkspaceProps {
 	stageError?: string | null;
 	codebaseName?: string;
 	starterSuggestions?: CodebaseStarterSuggestion[];
+	starterRefresh?: {
+		analysisId: string;
+		snapshotId: string;
+		status: "pending" | "ready" | "failed";
+		isRefreshing?: boolean;
+		error?: string | null;
+	};
 	isSending?: boolean;
 	isConfirming?: boolean;
 	specError?: string | null;
@@ -73,6 +83,10 @@ interface CodebaseChatWorkspaceProps {
 	onGeneratePrd?: () => void;
 	onGenerateAc?: () => void;
 	onGenerateTask?: () => void;
+	onRefreshStarterSuggestions?: (
+		analysisId: string,
+		snapshotId: string,
+	) => void;
 }
 
 export function buildHandoffCommand(projectId: string): string {
@@ -120,6 +134,8 @@ export function CodebaseChatWorkspace({
 	onGeneratePrd,
 	onGenerateAc,
 	onGenerateTask,
+	starterRefresh,
+	onRefreshStarterSuggestions,
 }: CodebaseChatWorkspaceProps) {
 	const [selected, setSelected] = useState<Record<string, string>>({});
 	const [customAnswers, setCustomAnswers] = useState<Record<string, string>>(
@@ -130,6 +146,11 @@ export function CodebaseChatWorkspace({
 	const [copiedCmd, setCopiedCmd] = useState(false);
 	const [copiedExport, setCopiedExport] = useState(false);
 	const [copiedTask, setCopiedTask] = useState(false);
+	const parsedStarterSuggestions =
+		codebaseStarterSuggestionsSchema.safeParse(starterSuggestions);
+	const validStarterSuggestions = parsedStarterSuggestions.success
+		? parsedStarterSuggestions.data
+		: null;
 
 	const exportCmd = projectIdForHandoff
 		? buildExportRulesCommand(projectIdForHandoff)
@@ -290,7 +311,7 @@ export function CodebaseChatWorkspace({
 							{renderComposer(2, "p-3.5 sm:p-4")}
 						</div>
 
-						{starterSuggestions?.length === 4 ? (
+						{validStarterSuggestions ? (
 							<div
 								data-testid="codebase-intent-starters"
 								className="flex w-full flex-col gap-2.5 pt-1 text-left"
@@ -299,7 +320,7 @@ export function CodebaseChatWorkspace({
 									Mulai dari
 								</p>
 								<div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-									{starterSuggestions.map((item) => (
+									{validStarterSuggestions.map((item) => (
 										<button
 											key={item.id}
 											type="button"
@@ -316,6 +337,34 @@ export function CodebaseChatWorkspace({
 										</button>
 									))}
 								</div>
+							</div>
+						) : starterRefresh?.status === "ready" &&
+							onRefreshStarterSuggestions ? (
+							<div className="flex w-full flex-col items-start gap-2 pt-1 text-left">
+								{starterRefresh.error ? (
+									<p role="alert" className="text-sm text-red-400">
+										{starterRefresh.error}
+									</p>
+								) : null}
+								<button
+									type="button"
+									disabled={starterRefresh.isRefreshing}
+									aria-busy={starterRefresh.isRefreshing ?? false}
+									data-testid="codebase-refresh-starters"
+									className="rounded-md border border-graphite px-3 py-2 text-sm text-snow hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-wait disabled:opacity-60"
+									onClick={() =>
+										onRefreshStarterSuggestions(
+											starterRefresh.analysisId,
+											starterRefresh.snapshotId,
+										)
+									}
+								>
+									{starterRefresh.isRefreshing
+										? "Memperbarui saran..."
+										: starterRefresh.error
+											? "Coba perbarui saran"
+											: "Buat saran tugas dari analisis codebase"}
+								</button>
 							</div>
 						) : null}
 					</div>

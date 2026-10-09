@@ -106,13 +106,49 @@ function StageRow({ testId, row }: { testId: string; row: SyncStageRow }) {
 export function SyncStageList({
 	status,
 	className,
+	isAnalysisReady = false,
 }: {
 	status: SyncStatusResponse | null;
 	className?: string;
+	isAnalysisReady?: boolean;
 }) {
 	const view = resolveSyncStageView(status);
 
 	if (view.stages.length === 0) return null;
+
+	const hasAnalysisStage = Boolean(
+		status?.snapshotId && status?.analysisStatus,
+	);
+	let analysisRow: SyncStageRow | null = null;
+	if (hasAnalysisStage && status?.analysisStatus) {
+		if (status.analysisStatus === "pending") {
+			analysisRow = {
+				state: "active",
+				title: "Menganalisis codebase",
+				detail: "AI sedang membaca arsitektur dan menyiapkan rekomendasi",
+			};
+		} else if (status.analysisStatus === "failed") {
+			analysisRow = {
+				state: "failed",
+				title: "Menganalisis codebase",
+				detail: "Analisis belum berhasil diselesaikan",
+			};
+		} else if (status.analysisStatus === "ready") {
+			if (isAnalysisReady) {
+				analysisRow = {
+					state: "done",
+					title: "Kesimpulan siap",
+					detail: "Ringkasan arsitektur dan rekomendasi task awal tersedia",
+				};
+			} else {
+				analysisRow = {
+					state: "done",
+					title: "Analisis selesai",
+					detail: "Perlu pembaruan rekomendasi task awal untuk melanjutkan",
+				};
+			}
+		}
+	}
 
 	return (
 		<div className={cn("flex flex-col gap-2.5", className)}>
@@ -122,6 +158,9 @@ export function SyncStageList({
 					<StageRow key={key} testId={SYNC_STAGE_TEST_IDS[key]} row={row} />
 				) : null;
 			})}
+			{analysisRow && (
+				<StageRow testId="sync-stage-analysis" row={analysisRow} />
+			)}
 			{view.excludedCount !== undefined && (
 				<p className="font-mono text-[11px] text-fog">
 					{view.excludedCount} file tidak ikut dikirim (rahasia, dependensi,

@@ -258,6 +258,140 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		).toBeNull();
 	});
 
+	it("hides starters unless persisted suggestions contain all four unique categories", () => {
+		renderWorkspace({
+			starterSuggestions: [
+				starterSuggestions[0],
+				starterSuggestions[1],
+				starterSuggestions[2],
+				{ ...starterSuggestions[3], id: "feature" },
+			],
+		});
+
+		expect(
+			container.querySelector("[data-testid='codebase-intent-starters']"),
+		).toBeNull();
+	});
+	it("offers an explicit persisted-analysis refresh for legacy starterless output", () => {
+		const onRefreshStarterSuggestions = vi.fn();
+		const onSendMessage = vi.fn();
+		renderWorkspace({
+			starterRefresh: {
+				analysisId: "analysis-legacy",
+				snapshotId: "snapshot-current",
+				status: "ready",
+			},
+			onRefreshStarterSuggestions,
+			onSendMessage,
+		});
+		expect(
+			container.querySelector("[data-testid='codebase-intent-starters']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='intent-starter-feature']"),
+		).toBeNull();
+		expect(
+			container.querySelector<HTMLTextAreaElement>("#codebase-chat-composer")
+				?.disabled,
+		).toBe(false);
+		const refreshButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-refresh-starters']",
+		);
+		expect(refreshButton).not.toBeNull();
+		act(() => {
+			refreshButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(onRefreshStarterSuggestions).toHaveBeenCalledWith(
+			"analysis-legacy",
+			"snapshot-current",
+		);
+		expect(onSendMessage).not.toHaveBeenCalled();
+	});
+	it("disables the refresh action while the persisted refresh request is pending", () => {
+		renderWorkspace({
+			starterRefresh: {
+				analysisId: "analysis-legacy",
+				snapshotId: "snapshot-current",
+				status: "ready",
+				isRefreshing: true,
+			},
+			onRefreshStarterSuggestions: vi.fn(),
+		});
+
+		const refreshButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-refresh-starters']",
+		);
+		expect(refreshButton?.disabled).toBe(true);
+		expect(refreshButton?.getAttribute("aria-busy")).toBe("true");
+	});
+
+	it("does not offer refresh for pending or failed persisted analysis", () => {
+		for (const status of ["pending", "failed"] as const) {
+			renderWorkspace({
+				starterRefresh: {
+					analysisId: "analysis-legacy",
+					snapshotId: "snapshot-current",
+					status,
+				},
+			});
+			expect(
+				container.querySelector("[data-testid='codebase-refresh-starters']"),
+			).toBeNull();
+		}
+	});
+
+	it("shows refresh errors and lets the user retry explicitly", () => {
+		const onRefreshStarterSuggestions = vi.fn();
+		renderWorkspace({
+			starterRefresh: {
+				analysisId: "analysis-legacy",
+				snapshotId: "snapshot-current",
+				status: "ready",
+				error: "Pembaruan saran gagal.",
+			},
+			onRefreshStarterSuggestions,
+		});
+
+		const error = container.querySelector("[role='alert']");
+		expect(error?.textContent).toContain("Pembaruan saran gagal.");
+		const retryButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-refresh-starters']",
+		);
+		expect(retryButton?.disabled).toBe(false);
+		act(() => {
+			retryButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onRefreshStarterSuggestions).toHaveBeenCalledWith(
+			"analysis-legacy",
+			"snapshot-current",
+		);
+	});
+
+	it("keeps refreshed persisted cards and prompts stable across rerenders", () => {
+		const refreshedSuggestions = starterSuggestions.map((suggestion) => ({
+			...suggestion,
+			title: `Updated ${suggestion.title}`,
+			prompt: `Updated prompt: ${suggestion.prompt}`,
+		}));
+		renderWorkspace({ starterSuggestions });
+		renderWorkspace({ starterSuggestions: refreshedSuggestions });
+
+		const featureButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='intent-starter-feature']",
+		);
+		expect(featureButton?.textContent).toContain(
+			refreshedSuggestions[0]?.title,
+		);
+		act(() => {
+			featureButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(
+			container.querySelector<HTMLTextAreaElement>("#codebase-chat-composer")
+				?.value,
+		).toBe(refreshedSuggestions[0]?.prompt);
+	});
+
 	it("does not render intent starters or context eyebrow once conversation is active", () => {
 		renderWorkspace({
 			messages: [{ id: "m1", role: "user", content: "Halo dari user" }],

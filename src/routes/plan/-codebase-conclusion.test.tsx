@@ -22,11 +22,43 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
+const VALID_STARTER_SUGGESTIONS = [
+	{
+		id: "feature",
+		title: "Feature task",
+		description: "A focused task description.",
+		prompt: "Implement a feature.",
+		relevantPaths: ["src/feature.ts"],
+	},
+	{
+		id: "bugfix",
+		title: "Bugfix task",
+		description: "A focused bugfix description.",
+		prompt: "Fix a bug.",
+		relevantPaths: ["src/bugfix.ts"],
+	},
+	{
+		id: "refactor",
+		title: "Refactor task",
+		description: "A focused refactor description.",
+		prompt: "Refactor a module.",
+		relevantPaths: ["src/refactor.ts"],
+	},
+	{
+		id: "ui",
+		title: "UI task",
+		description: "A focused UI description.",
+		prompt: "Improve UI.",
+		relevantPaths: ["src/ui.ts"],
+	},
+];
+
 const OUTPUT = {
 	projectId: "proj-retry-1",
 	snapshotId: "snap-retry-1",
 	framework: "Next.js",
 	language: "TypeScript",
+	starterSuggestions: VALID_STARTER_SUGGESTIONS,
 };
 
 function uploadedStatus() {
@@ -56,6 +88,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		try {
 			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-retry-1");
 			sessionStorage.setItem("prdfy:plan-codebase-name", "Retry Repo");
+			sessionStorage.setItem("prdfy:plan-codebase-step", "summary");
 		} catch {
 			// Storage unavailable still exercises the fresh path below.
 		}
@@ -212,7 +245,12 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 					status: 200,
 					json: async () => ({
 						...uploadedStatus(),
-						...(analysisFailed ? { analysisStatus: "failed" } : {}),
+						...(analysisFailed
+							? { analysisStatus: "failed" }
+							: {
+									analysisStatus: "ready",
+									analysisId: "ana-retry-1",
+								}),
 					}),
 				};
 			}
@@ -266,29 +304,44 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		vi.stubGlobal("fetch", fetchMock);
 
 		render(<PlanCodebasePage />);
+
+		// Recovers to Sync screen when analysis is not ready
 		await waitFor(
 			() => {
-				expect(screen.getByTestId("codebase-sync-summary")).not.toBeNull();
+				expect(
+					screen.getByText("Sync codebase dengan VibeEverything"),
+				).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
 
 		await waitFor(
 			() => {
-				expect(screen.getByTestId("codebase-analysis-failed")).not.toBeNull();
+				expect(screen.getByTestId("analysis-failure-alert")).not.toBeNull();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		// The failure never becomes a sync failure and never blocks the workspace.
+		// The failure never becomes a sync failure.
 		expect(screen.queryByText(/Sync gagal/i)).toBeNull();
-		expect(
-			(screen.getByTestId("conclusion-enter-workspace") as HTMLButtonElement)
-				.disabled,
-		).toBe(false);
 
-		const retry = screen.getByRole("button", { name: /Coba analisis lagi/i });
+		const retry = screen.getByTestId("retry-analysis-button");
 		act(() => {
 			retry.click();
+		});
+
+		await waitFor(
+			() => {
+				const cta = screen.getByTestId(
+					"sync-continue-to-summary",
+				) as HTMLButtonElement;
+				expect(cta.disabled).toBe(false);
+			},
+			{ timeout: 15000, interval: 100 },
+		);
+
+		const cta = screen.getByTestId("sync-continue-to-summary");
+		act(() => {
+			cta.click();
 		});
 
 		await waitFor(
@@ -298,8 +351,6 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 			{ timeout: 15000, interval: 100 },
 		);
 		expect(analysisPosts).toBe(2);
-		// The pending state replaced the failure in place — no extra step.
-		expect(screen.queryByTestId("codebase-analysis-failed")).toBeNull();
 		expect(screen.getByText("Next.js")).toBeDefined();
 	}, 25000);
 });

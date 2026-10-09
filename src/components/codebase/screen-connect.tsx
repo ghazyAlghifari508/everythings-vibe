@@ -2,6 +2,7 @@
 
 import { AlertCircle, ArrowRight, Check, Copy, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import type { AnalysisResponse } from "@/lib/codebase-analysis";
 import { resolveCodebaseDisplayName } from "@/lib/codebase-naming";
 import {
 	buildAgentPrompt,
@@ -45,6 +46,12 @@ interface ScreenConnectProps {
 	 * rather than offering a button that goes nowhere.
 	 */
 	onContinueToSummary?: () => void;
+	analysis?: AnalysisResponse | null;
+	analysisError?: string | null;
+	isAnalyzing?: boolean;
+	onRetryAnalysis?: () => void;
+	isLegacyAnalysisMissingSuggestions?: boolean;
+	onRefreshLegacySuggestions?: () => void;
 }
 
 export function ScreenConnect({
@@ -57,6 +64,12 @@ export function ScreenConnect({
 	onRetrySync,
 	canContinueToSummary = false,
 	onContinueToSummary,
+	analysis = null,
+	analysisError = null,
+	isAnalyzing = false,
+	onRetryAnalysis,
+	isLegacyAnalysisMissingSuggestions = false,
+	onRefreshLegacySuggestions,
 }: ScreenConnectProps) {
 	const [copied, setCopied] = useState(false);
 	const [copyError, setCopyError] = useState<string | null>(null);
@@ -245,7 +258,10 @@ export function ScreenConnect({
 							{/* The one live sync presentation for this flow: agent, source
 							preparation, and upload, all mapped from the same polled
 							server status. */}
-							<SyncStageList status={status} />
+							<SyncStageList
+								status={status}
+								isAnalysisReady={canContinueToSummary}
+							/>
 
 							{statusError && (
 								<p
@@ -293,6 +309,89 @@ export function ScreenConnect({
 									</div>
 								</div>
 							)}
+							{isLegacyAnalysisMissingSuggestions &&
+								Boolean(onRefreshLegacySuggestions) && (
+									<div
+										role="alert"
+										data-testid="legacy-analysis-warning"
+										className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-[11px]"
+									>
+										<div className="flex items-start gap-2.5">
+											<AlertCircle
+												size={14}
+												className="mt-0.5 shrink-0 text-amber-400"
+												aria-hidden="true"
+											/>
+											<span className="flex flex-1 flex-col gap-1">
+												<span className="font-semibold text-snow">
+													Rekomendasi task awal belum tersedia
+												</span>
+												<span className="leading-relaxed text-fog">
+													Analisis codebase telah selesai tetapi memerlukan
+													pembaruan rekomendasi task awal sebelum dapat
+													dilanjutkan.
+												</span>
+												{analysisError && (
+													<span className="leading-relaxed text-crimson">
+														{analysisError}
+													</span>
+												)}
+												<button
+													type="button"
+													data-testid="refresh-legacy-suggestions-button"
+													onClick={onRefreshLegacySuggestions}
+													disabled={isStarting || isAnalyzing}
+													className="mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+												>
+													Perbarui rekomendasi
+												</button>
+											</span>
+										</div>
+									</div>
+								)}
+
+							{!isLegacyAnalysisMissingSuggestions &&
+								(Boolean(analysisError) ||
+									status?.analysisStatus === "failed" ||
+									analysis?.status === "failed") &&
+								Boolean(onRetryAnalysis) && (
+									<div
+										role="alert"
+										data-testid="analysis-failure-alert"
+										className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px]"
+									>
+										<div className="flex items-start gap-2.5">
+											<AlertCircle
+												size={14}
+												className="mt-0.5 shrink-0 text-crimson"
+												aria-hidden="true"
+											/>
+											<span className="flex flex-1 flex-col gap-1">
+												<span className="font-semibold text-snow">
+													Analisis codebase belum berhasil
+												</span>
+												{analysisError && (
+													<span className="leading-relaxed text-fog">
+														{analysisError}
+													</span>
+												)}
+												<span className="leading-relaxed text-fog">
+													Analisis dapat dicoba ulang tanpa perlu mengunggah
+													ulang snapshot.
+												</span>
+												<button
+													type="button"
+													data-testid="retry-analysis-button"
+													onClick={onRetryAnalysis}
+													disabled={isStarting || isAnalyzing}
+													className="mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+												>
+													Coba lagi analisis
+												</button>
+											</span>
+										</div>
+									</div>
+								)}
 						</div>
 					</div>
 				</div>
@@ -302,7 +401,9 @@ export function ScreenConnect({
 						<p className="text-center text-[11px] leading-relaxed text-fog sm:text-left">
 							{canAdvance
 								? "Sinkronisasi selesai. Lanjutkan untuk melihat ringkasan codebase."
-								: "Tombol lanjut aktif setelah sinkronisasi selesai."}
+								: isLegacyAnalysisMissingSuggestions
+									? "Perbarui rekomendasi task awal untuk melanjutkan ke kesimpulan."
+									: "Tombol lanjut aktif setelah sinkronisasi dan analisis codebase selesai."}
 						</p>
 						<button
 							type="button"

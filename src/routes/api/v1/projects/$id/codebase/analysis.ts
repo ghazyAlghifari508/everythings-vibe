@@ -21,8 +21,13 @@ import {
 } from "@/lib/codebase-analysis";
 import {
 	AnalysisServiceError,
+	claimStarterSuggestionRefresh,
 	requestCodebaseAnalysis,
 } from "@/lib/codebase-analysis.server";
+import {
+	analysisRefreshRequestSchema,
+	decideStarterSuggestionRefresh,
+} from "@/lib/codebase-analysis-refresh";
 import {
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	isSyncCapableProject,
@@ -122,6 +127,24 @@ function toResponse(row: AnalysisRow): AnalysisResponse | null {
 	};
 	const parsed = analysisResponseSchema.safeParse(response);
 	return parsed.success ? parsed.data : null;
+}
+
+async function failRefreshClaim(analysisId: string): Promise<void> {
+	await db
+		.update(codebaseAnalyses)
+		.set({
+			status: "failed",
+			errorCode: "ANALYSIS_FAILED",
+			errorMessage:
+				"Analisis codebase gagal. Coba analisis ulang dalam beberapa menit.",
+			updatedAt: new Date(),
+		})
+		.where(
+			and(
+				eq(codebaseAnalyses.id, analysisId),
+				eq(codebaseAnalyses.status, "pending"),
+			),
+		);
 }
 
 async function resolvePlan(userId: string): Promise<Plan> {
@@ -363,10 +386,29 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 					);
 
 				const raw = (await request.json().catch(() => ({}))) as unknown;
-				const body = analysisRequestSchema.safeParse(raw);
-				if (!body.success)
+				const refreshRequested =
+					typeof raw === "object" &&
+					raw !== null &&
+					Object.hasOwn(raw, "refreshStarterSuggestionsForAnalysisId");
+				const parsedRequest = refreshRequested
+					? analysisRefreshRequestSchema.safeParse(raw)
+					: analysisRequestSchema.safeParse(raw);
+				if (!parsedRequest.success)
 					return Response.json(
 						{ error: "Request analisis tidak valid", code: "SYNC_FAILED" },
+						{ status: 400 },
+					);
+				const refreshRequest = refreshRequested
+					? analysisRefreshRequestSchema.parse(raw)
+					: null;
+				const snapshotId =
+					refreshRequest?.snapshotId ?? parsedRequest.data.snapshotId;
+				if (refreshRequested && !snapshotId)
+					return Response.json(
+						{
+							error: "Refresh requests must pin a snapshot",
+							code: "ANALYSIS_REFRESH_NOT_ALLOWED",
+						},
 						{ status: 400 },
 					);
 
@@ -388,7 +430,16 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 					fileCount: number;
 					contentSize: number;
 				} | null = null;
-				if (body.data.snapshotId) {
+				if (refreshRequest || snapshotId) {
+					const requestedSnapshotId = refreshRequest?.snapshotId ?? snapshotId;
+					if (!requestedSnapshotId)
+						return Response.json(
+							{
+								error: "Snapshot tidak ditemukan",
+								code: "SNAPSHOT_INCOMPLETE",
+							},
+							{ status: refreshRequest ? 409 : 404 },
+						);
 					const [pinned] = await db
 						.select({
 							id: codebaseSnapshots.id,
@@ -399,7 +450,7 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 						.from(codebaseSnapshots)
 						.where(
 							and(
-								eq(codebaseSnapshots.id, body.data.snapshotId),
+								eq(codebaseSnapshots.id, requestedSnapshotId),
 								inArray(codebaseSnapshots.syncSessionId, sessionIds),
 							),
 						)
@@ -407,8 +458,11 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 					snapshot = pinned ?? null;
 					if (!snapshot)
 						return Response.json(
-							{ error: "Snapshot tidak ditemukan" },
-							{ status: 404 },
+							{
+								error: "Snapshot tidak ditemukan",
+								code: "SNAPSHOT_INCOMPLETE",
+							},
+							{ status: refreshRequest ? 409 : 404 },
 						);
 				} else {
 					const [latest] = await db
@@ -434,7 +488,7 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 				}
 
 				const existing = await db
-					.select({ id: codebaseAnalyses.id, status: codebaseAnalyses.status })
+					.select()
 					.from(codebaseAnalyses)
 					.where(
 						and(
@@ -443,28 +497,78 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 						),
 					)
 					.orderBy(desc(codebaseAnalyses.createdAt));
-				const decision = decideAnalysisRequest(
-					{ id: snapshot.id, status: snapshot.status },
-					existing,
-				);
-				if (decision.action === "reject")
-					return Response.json(
-						{ error: decision.message, code: "SNAPSHOT_INCOMPLETE" },
-						{ status: 409 },
+				if (refreshRequest) {
+					const target = existing.find(
+						(row) =>
+							row.id === refreshRequest.refreshStarterSuggestionsForAnalysisId,
 					);
-				if (decision.action === "reuse") {
-					const [row] = await db
-						.select()
-						.from(codebaseAnalyses)
-						.where(eq(codebaseAnalyses.id, decision.analysisId))
-						.limit(1);
-					const response = row ? toResponse(row) : null;
-					if (!response)
+					if (!target)
 						return Response.json(
-							{ error: "Hasil analisis rusak", code: "SYNC_FAILED" },
-							{ status: 500 },
+							{
+								error: "Analisis tidak ditemukan",
+								code: "ANALYSIS_REFRESH_NOT_ALLOWED",
+							},
+							{ status: 404 },
 						);
-					return Response.json(response);
+					const decision = decideStarterSuggestionRefresh({
+						projectId,
+						snapshotId: refreshRequest.snapshotId,
+						targetAnalysisId:
+							refreshRequest.refreshStarterSuggestionsForAnalysisId,
+						snapshotStatus: snapshot.status,
+						target: target ?? null,
+						analyses: existing,
+					});
+					if (decision.action === "reject")
+						return Response.json(
+							{
+								error:
+									"Starter suggestions cannot be refreshed for this analysis.",
+								code:
+									decision.reason === "snapshot_not_uploaded"
+										? "SNAPSHOT_INCOMPLETE"
+										: "ANALYSIS_REFRESH_NOT_ALLOWED",
+							},
+							{ status: 409 },
+						);
+					if (decision.action === "reuse") {
+						const [row] = await db
+							.select()
+							.from(codebaseAnalyses)
+							.where(eq(codebaseAnalyses.id, decision.analysisId))
+							.limit(1);
+						const response = row ? toResponse(row) : null;
+						return response
+							? Response.json(response)
+							: Response.json(
+									{ error: "Hasil analisis rusak", code: "SYNC_FAILED" },
+									{ status: 500 },
+								);
+					}
+				} else {
+					const decision = decideAnalysisRequest(
+						{ id: snapshot.id, status: snapshot.status },
+						existing,
+					);
+					if (decision.action === "reject")
+						return Response.json(
+							{ error: decision.message, code: "SNAPSHOT_INCOMPLETE" },
+							{ status: 409 },
+						);
+					if (decision.action === "reuse") {
+						const [row] = await db
+							.select()
+							.from(codebaseAnalyses)
+							.where(eq(codebaseAnalyses.id, decision.analysisId))
+							.limit(1);
+						const response = row ? toResponse(row) : null;
+						if (!response)
+							return Response.json(
+								{ error: "Hasil analisis rusak", code: "SYNC_FAILED" },
+								{ status: 500 },
+							);
+						return Response.json(response);
+					}
 				}
 
 				const [sub] = await db
@@ -525,6 +629,51 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 						{ status: 403 },
 					);
 				}
+				let claimedAnalysisId: string | undefined;
+				if (refreshRequest) {
+					try {
+						const refreshClaim = await claimStarterSuggestionRefresh({
+							projectId,
+							snapshotId: snapshot.id,
+							targetAnalysisId:
+								refreshRequest.refreshStarterSuggestionsForAnalysisId,
+							scope:
+								scope.kind === "codebase"
+									? { codebaseId: scope.codebaseId }
+									: {},
+						});
+						if (refreshClaim.action === "reuse") {
+							const [row] = await db
+								.select()
+								.from(codebaseAnalyses)
+								.where(eq(codebaseAnalyses.id, refreshClaim.analysisId))
+								.limit(1);
+							const response = row ? toResponse(row) : null;
+							return response
+								? Response.json(response)
+								: Response.json(
+										{ error: "Hasil analisis rusak", code: "SYNC_FAILED" },
+										{ status: 500 },
+									);
+						}
+						claimedAnalysisId = refreshClaim.analysisId;
+					} catch (error) {
+						if (error instanceof AnalysisServiceError) {
+							const snapshotUnavailable =
+								error.code === "SNAPSHOT_NOT_UPLOADED";
+							return Response.json(
+								{
+									error: error.message,
+									code: snapshotUnavailable
+										? "SNAPSHOT_INCOMPLETE"
+										: error.code,
+								},
+								{ status: 409 },
+							);
+						}
+						throw error;
+					}
+				}
 
 				const idempotencyKey = `${projectId}:codebase_analysis:${snapshot.id}:${existing.length + 1}`;
 
@@ -548,6 +697,7 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 						"[codebase/analysis] reserveCreditOperation failed:",
 						err,
 					);
+					if (claimedAnalysisId) await failRefreshClaim(claimedAnalysisId);
 					return Response.json(
 						formatInsufficientCreditsError({
 							quote,
@@ -578,6 +728,7 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 							reason: "Analysis reservation not runnable",
 						}).catch(() => {});
 					}
+					if (claimedAnalysisId) await failRefreshClaim(claimedAnalysisId);
 					return Response.json(
 						{ error: "Analisis sedang berjalan. Tunggu hingga selesai." },
 						{ status: 409 },
@@ -589,9 +740,12 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 						projectId,
 						snapshot.id,
 						{},
-						scope.kind === "codebase"
-							? { codebaseId: scope.codebaseId }
-							: undefined,
+						{
+							...(scope.kind === "codebase"
+								? { codebaseId: scope.codebaseId }
+								: {}),
+							...(claimedAnalysisId ? { claimedAnalysisId } : {}),
+						},
 					);
 					const [row] = await db
 						.select()
@@ -612,14 +766,12 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 							{ status: 500 },
 						);
 					}
-
 					await settleCreditOperation({
 						userId: user.id,
 						operationId: reservation.id,
 						artifactId: analysis.id,
 						actualMetrics: metrics,
 					});
-
 					return Response.json(response);
 				} catch (error) {
 					const failureReason =

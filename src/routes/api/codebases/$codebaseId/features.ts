@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	codebaseSnapshots,
@@ -150,6 +150,19 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/features")({
 				const name = deriveProjectNameSync(prompt);
 				const id = crypto.randomUUID();
 				const project = await db.transaction(async (tx) => {
+					const [lockedCodebase] = await tx
+						.select({
+							id: codebases.id,
+							onboardingProjectId: codebases.onboardingProjectId,
+						})
+						.from(codebases)
+						.where(
+							and(eq(codebases.id, codebase.id), eq(codebases.userId, user.id)),
+						)
+						.for("update")
+						.limit(1);
+					if (!lockedCodebase) return null;
+
 					const [createdProject] = await tx
 						.insert(projects)
 						.values(
@@ -157,12 +170,29 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/features")({
 								id,
 								userId: user.id,
 								name,
-								codebaseId: codebase.id,
+								codebaseId: lockedCodebase.id,
 								language,
 							}),
 						)
 						.returning({ id: projects.id, name: projects.name });
 					if (!createdProject) return null;
+
+					if (!lockedCodebase.onboardingProjectId) {
+						await tx
+							.update(codebases)
+							.set({
+								onboardingProjectId: createdProject.id,
+								updatedAt: new Date(),
+							})
+							.where(
+								and(
+									eq(codebases.id, lockedCodebase.id),
+									eq(codebases.userId, user.id),
+									isNull(codebases.onboardingProjectId),
+								),
+							);
+					}
+
 					await saveAskHandoff(
 						user.id,
 						{

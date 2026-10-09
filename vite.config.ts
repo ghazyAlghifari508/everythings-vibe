@@ -10,6 +10,12 @@ const config = defineConfig({
 	resolve: {
 		tsconfigPaths: true,
 	},
+	optimizeDeps: {
+		include: [
+			"@tanstack/react-router > @tanstack/react-store",
+			"@tanstack/react-router > @tanstack/react-store > use-sync-external-store/shim/with-selector",
+		],
+	},
 	plugins: [
 		devtools({ consolePiping: { enabled: false } }),
 		tailwindcss(),

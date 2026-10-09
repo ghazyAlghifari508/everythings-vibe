@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+	type AnyPgColumn,
 	boolean,
 	check,
 	foreignKey,
@@ -336,9 +337,12 @@ export const projects = pgTable(
 		projectMode: text("project_mode").notNull().default("greenfield"),
 		// Existing-codebase projects belong to a codebase; greenfield stays null.
 		// Nullable so greenfield rows and pre-migration rows remain valid.
-		codebaseId: text("codebase_id").references(() => codebases.id, {
-			onDelete: "set null",
-		}),
+		codebaseId: text("codebase_id").references(
+			(): AnyPgColumn => codebases.id,
+			{
+				onDelete: "set null",
+			},
+		),
 		language: text("language").default("id"),
 		step: text("step").default("prd"), // question, fitur, prd, ac, task
 		featuresStatus: text("features_status").default("pending"),
@@ -606,6 +610,13 @@ export const codebases = pgTable(
 			.$type<CodebaseNameSource>()
 			.notNull()
 			.default("user"),
+		// Anchor onboarding project created during initial repository setup.
+		// Immutable once assigned; subsequent feature projects never overwrite it.
+		// Nullable until the first feature is planned or if no safe candidate exists.
+		onboardingProjectId: text("onboarding_project_id").references(
+			(): AnyPgColumn => projects.id,
+			{ onDelete: "set null" },
+		),
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at").defaultNow(),
 	},

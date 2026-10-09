@@ -9,12 +9,15 @@ import {
 	formatSubscriptionPausedError,
 } from "./adaptive-credit";
 import {
+	type AnalysisResponse,
 	AnalysisValidationError,
 	analysisRequestSchema,
 	analysisResponseSchema,
 	buildAnalysisUserPrompt,
 	CODEBASE_ANALYSIS_SYSTEM_PROMPT,
 	type CodebaseAnalysis,
+	type CodebaseStarterSuggestion,
+	canContinueToCodebaseConclusion,
 	codebaseAnalysisGenerationSchema,
 	codebaseAnalysisSchema,
 	codebaseStarterSuggestionsSchema,
@@ -27,6 +30,7 @@ import {
 	toSafeAnalysisErrorMessage,
 } from "./codebase-analysis";
 import { AnalysisServiceError } from "./codebase-analysis.server";
+import type { SyncStatusResponse } from "./codebase-sync";
 import {
 	CODEBASE_STARTER_DESCRIPTION_MAX_CHARS,
 	CODEBASE_STARTER_PROMPT_MAX_CHARS,
@@ -903,23 +907,28 @@ describe("requestCodebaseAnalysis atomic claim contract", () => {
 			"utf8",
 		);
 		const source = raw.replace(/\r\n/g, "\n");
-		const claimIndex = source.indexOf("db.transaction(async (tx) => {");
-		const legacyClaimIndex = source.indexOf(
-			"const [updated] = await tx\n\t\t\t.update(codebaseSyncSessions)",
+		const requestStartIndex = source.indexOf(
+			"export async function requestCodebaseAnalysis(",
 		);
-		const conditionalUpdateIndex = source.indexOf(
+		const requestSource = source.slice(requestStartIndex);
+		const claimIndex = requestSource.indexOf("db.transaction(async (tx) => {");
+		const legacyClaimIndex = requestSource.indexOf(
+			"const [updated] = await tx",
+		);
+		const conditionalUpdateIndex = requestSource.indexOf(
 			'eq(codebaseSyncSessions.status, "uploaded")',
 			legacyClaimIndex,
 		);
-		const insertAnalysisIndex = source.indexOf(
+		const insertAnalysisIndex = requestSource.indexOf(
 			"tx.insert(codebaseAnalyses)",
 			legacyClaimIndex,
 		);
-		const generateIndex = source.indexOf("await generate(messages)");
+		const generateIndex = requestSource.indexOf("await generate(messages)");
 
+		expect(requestStartIndex).toBeGreaterThan(-1);
 		expect(claimIndex).toBeGreaterThan(-1);
 		expect(legacyClaimIndex).toBeGreaterThan(claimIndex);
-		expect(conditionalUpdateIndex).toBeGreaterThan(claimIndex);
+		expect(conditionalUpdateIndex).toBeGreaterThan(legacyClaimIndex);
 		expect(insertAnalysisIndex).toBeGreaterThan(conditionalUpdateIndex);
 		expect(generateIndex).toBeGreaterThan(insertAnalysisIndex);
 	});
@@ -930,14 +939,19 @@ describe("requestCodebaseAnalysis atomic claim contract", () => {
 			"utf8",
 		);
 		const source = raw.replace(/\r\n/g, "\n");
-		const scopedClaimIndex = source.indexOf("if (scope.codebaseId) {");
-		const scopedReadyIndex = source.indexOf(
+		const requestStartIndex = source.indexOf(
+			"export async function requestCodebaseAnalysis(",
+		);
+		const requestSource = source.slice(requestStartIndex);
+		const scopedClaimIndex = requestSource.indexOf("if (scope.codebaseId) {");
+		const scopedReadyIndex = requestSource.indexOf(
 			"if (!isCodebaseScoped) {\n\t\t\t\t// The snapshot stays `uploaded`",
 		);
 
+		expect(requestStartIndex).toBeGreaterThan(-1);
 		expect(scopedClaimIndex).toBeGreaterThan(-1);
 		expect(scopedReadyIndex).toBeGreaterThan(scopedClaimIndex);
-		expect(source.slice(scopedClaimIndex, scopedReadyIndex)).toContain(
+		expect(requestSource.slice(scopedClaimIndex, scopedReadyIndex)).toContain(
 			"tx.insert(codebaseAnalyses)",
 		);
 	});
@@ -966,5 +980,326 @@ describe("decideAnalysisRequest with an already-analyzed uploaded snapshot", () 
 			[],
 		);
 		expect(decision.action).toBe("reject");
+	});
+});
+
+describe("canContinueToCodebaseConclusion", () => {
+	const validSuggestions: CodebaseStarterSuggestion[] =
+		validStarterSuggestions.map((suggestion) => ({
+			id: suggestion.id,
+			title: suggestion.title,
+			description: suggestion.description,
+			prompt: suggestion.prompt,
+			relevantPaths: [...suggestion.relevantPaths],
+		}));
+
+	const validAnalysisOutput: CodebaseAnalysis = {
+		...validAnalysis,
+		projectId: "proj_123",
+		snapshotId: "snap_123",
+		starterSuggestions: [...validSuggestions],
+	};
+
+	const validReadyAnalysis: AnalysisResponse = {
+		id: "an_123",
+		projectId: "proj_123",
+		snapshotId: "snap_123",
+		status: "ready",
+		output: validAnalysisOutput,
+	};
+
+	const validReadySyncStatus: SyncStatusResponse = {
+		projectId: "cb_123",
+		sessionId: "sess_123",
+		status: "uploaded",
+		snapshotId: "snap_123",
+		cliConnectedAt: "2026-10-09T10:00:00.000Z",
+		analysisId: "an_123",
+		analysisStatus: "ready",
+	};
+
+	const defaultInput = {
+		status: validReadySyncStatus,
+		analysis: validReadyAnalysis,
+		codebaseId: "cb_123",
+		analysisProjectId: "proj_123",
+	};
+
+	it("returns false when analysis is still pending on an uploaded snapshot", () => {
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				status: {
+					...validReadySyncStatus,
+					analysisStatus: "pending",
+				},
+				analysis: {
+					...validReadyAnalysis,
+					status: "pending",
+				},
+			}),
+		).toBe(false);
+
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				status: {
+					...validReadySyncStatus,
+					analysisStatus: "pending",
+				},
+			}),
+		).toBe(false);
+	});
+
+	it("returns true when analysis is ready for current project, snapshot, and id with exactly 4 valid suggestions", () => {
+		expect(canContinueToCodebaseConclusion(defaultInput)).toBe(true);
+
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				status: {
+					...validReadySyncStatus,
+					status: "ready",
+				},
+			}),
+		).toBe(true);
+	});
+
+	it("returns false when analysis status is ready but belongs to an old snapshot", () => {
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				status: {
+					...validReadySyncStatus,
+					snapshotId: "snap_new",
+				},
+				analysis: {
+					...validReadyAnalysis,
+					snapshotId: "snap_old",
+				},
+			}),
+		).toBe(false);
+
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysis: {
+					...validReadyAnalysis,
+					output: {
+						...validAnalysisOutput,
+						snapshotId: "snap_old",
+					},
+				},
+			}),
+		).toBe(false);
+	});
+
+	it("returns false for wrong project or id", () => {
+		// Wrong codebaseId
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				codebaseId: "cb_other",
+			}),
+		).toBe(false);
+
+		// Wrong analysisProjectId
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysisProjectId: "proj_other",
+			}),
+		).toBe(false);
+
+		// Absent analysisProjectId
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysisProjectId: null,
+			}),
+		).toBe(false);
+
+		// Analysis response belongs to different project
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysis: {
+					...validReadyAnalysis,
+					projectId: "proj_other",
+				},
+			}),
+		).toBe(false);
+
+		// Analysis output belongs to different project
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysis: {
+					...validReadyAnalysis,
+					output: {
+						...validAnalysisOutput,
+						projectId: "proj_other",
+					},
+				},
+			}),
+		).toBe(false);
+
+		// Analysis id mismatch between status and analysis
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				status: {
+					...validReadySyncStatus,
+					analysisId: "an_different",
+				},
+			}),
+		).toBe(false);
+
+		// Absent analysisId on status
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				status: {
+					...validReadySyncStatus,
+					analysisId: undefined,
+				},
+			}),
+		).toBe(false);
+	});
+
+	it("returns false when analysis output is absent", () => {
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysis: {
+					...validReadyAnalysis,
+					output: null,
+				},
+			}),
+		).toBe(false);
+
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysis: {
+					...validReadyAnalysis,
+					output: undefined,
+				},
+			}),
+		).toBe(false);
+	});
+
+	it("returns false when suggestions are absent or invalid (keeps legacy output parse-compatible but not ready)", () => {
+		// Legacy output: valid against codebaseAnalysisSchema, but has no starterSuggestions
+		const legacyOutput: CodebaseAnalysis = {
+			...validAnalysis,
+			projectId: "proj_123",
+			snapshotId: "snap_123",
+		};
+		expect(codebaseAnalysisSchema.safeParse(legacyOutput).success).toBe(true);
+
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysis: {
+					...validReadyAnalysis,
+					output: legacyOutput,
+				},
+			}),
+		).toBe(false);
+
+		// Invalid suggestions: empty array
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysis: {
+					...validReadyAnalysis,
+					output: {
+						...validAnalysisOutput,
+						starterSuggestions: [],
+					},
+				},
+			}),
+		).toBe(false);
+
+		// Invalid suggestions: missing a required category (only 3)
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysis: {
+					...validReadyAnalysis,
+					output: {
+						...validAnalysisOutput,
+						starterSuggestions: validSuggestions.slice(1),
+					},
+				},
+			}),
+		).toBe(false);
+
+		// Invalid suggestions: duplicate category
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysis: {
+					...validReadyAnalysis,
+					output: {
+						...validAnalysisOutput,
+						starterSuggestions: [
+							...validSuggestions.slice(0, 3),
+							{
+								...validSuggestions[3],
+								id: validSuggestions[0].id,
+							},
+						],
+					},
+				},
+			}),
+		).toBe(false);
+	});
+
+	it("returns false when sync transport or handshake is incomplete", () => {
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				status: null,
+			}),
+		).toBe(false);
+
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				analysis: null,
+			}),
+		).toBe(false);
+
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				status: {
+					...validReadySyncStatus,
+					snapshotId: null,
+				},
+			}),
+		).toBe(false);
+
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				status: {
+					...validReadySyncStatus,
+					status: "uploading",
+				},
+			}),
+		).toBe(false);
+
+		expect(
+			canContinueToCodebaseConclusion({
+				...defaultInput,
+				status: {
+					...validReadySyncStatus,
+					status: "waiting_for_cli",
+				},
+			}),
+		).toBe(false);
 	});
 });

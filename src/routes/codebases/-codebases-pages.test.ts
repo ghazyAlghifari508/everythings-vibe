@@ -12,7 +12,9 @@ import {
 	buildAskHandoffAnswers,
 	canRenderCodebaseReview,
 	decideCodebaseDetailEntry,
+	formatCodebaseSyncBadge,
 	getCodebaseSessionRequestBody,
+	resolveWorkspaceSnapshotReady,
 } from "./$id";
 
 describe("decideCodebaseDetailEntry", () => {
@@ -449,5 +451,94 @@ describe("codebase starter suggestions route wiring", () => {
 		expect(detailSource).toContain(
 			"starterSuggestions={analysisOutput?.starterSuggestions}",
 		);
+	});
+});
+
+describe("workspace onboarding analysis selection", () => {
+	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+
+	it("loads analysis by the immutable onboarding anchor and active snapshot", () => {
+		expect(detailSource).toContain(
+			"onboardingProjectId: codebases.onboardingProjectId",
+		);
+		expect(detailSource).toContain("resolveOnboardingAnchorProject");
+		expect(detailSource).toContain(
+			"eq(codebaseAnalyses.projectId, onboardingFeature.id)",
+		);
+		expect(detailSource).toContain(
+			"eq(codebaseAnalyses.snapshotId, currentSnapshot.id)",
+		);
+	});
+
+	it("selects the latest usable snapshot regardless of file count", () => {
+		expect(detailSource).toContain(
+			"inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES])",
+		);
+		expect(detailSource).not.toContain("gt(codebaseSnapshots.fileCount, 0)");
+	});
+});
+
+describe("formatCodebaseSyncBadge", () => {
+	it("formats 0 files as '0 file tersinkron'", () => {
+		expect(formatCodebaseSyncBadge(0)).toBe("0 file tersinkron");
+	});
+
+	it("formats positive file counts", () => {
+		expect(formatCodebaseSyncBadge(42)).toBe("42 file tersinkron");
+	});
+
+	it("falls back to 'Menunggu snapshot' when count is null or undefined", () => {
+		expect(formatCodebaseSyncBadge(null)).toBe("Menunggu snapshot");
+		expect(formatCodebaseSyncBadge(undefined)).toBe("Menunggu snapshot");
+	});
+});
+
+describe("resolveWorkspaceSnapshotReady", () => {
+	it("opens workspace on expired session when usable stored snapshot exists (including empty snapshots)", () => {
+		expect(
+			resolveWorkspaceSnapshotReady({
+				status: { status: "expired", snapshotId: "snap-empty" },
+				hasStoredSnapshot: true,
+			}),
+		).toBe(true);
+	});
+
+	it("blocks workspace when expired session has no stored snapshot", () => {
+		expect(
+			resolveWorkspaceSnapshotReady({
+				status: { status: "expired", snapshotId: "snap-empty" },
+				hasStoredSnapshot: false,
+			}),
+		).toBe(false);
+	});
+
+	it("opens workspace when session status is in SNAPSHOT_CONTEXT_STATUSES regardless of stored snapshot", () => {
+		expect(
+			resolveWorkspaceSnapshotReady({
+				status: { status: "uploaded", snapshotId: "snap-1" },
+				hasStoredSnapshot: false,
+			}),
+		).toBe(true);
+		expect(
+			resolveWorkspaceSnapshotReady({
+				status: { status: "ready", snapshotId: "snap-1" },
+				hasStoredSnapshot: false,
+			}),
+		).toBe(true);
+	});
+
+	it("handles missing status cleanly", () => {
+		expect(
+			resolveWorkspaceSnapshotReady({
+				status: null,
+				hasStoredSnapshot: true,
+			}),
+		).toBe(true);
+		expect(
+			resolveWorkspaceSnapshotReady({
+				status: null,
+				hasStoredSnapshot: false,
+			}),
+		).toBe(false);
 	});
 });

@@ -103,9 +103,12 @@ async function mountPrestart(page: import("@playwright/test").Page) {
 	await page.waitForLoadState("domcontentloaded");
 	return page.evaluate(MOUNT_PRESTART_SCRIPT);
 }
+test.use({
+	baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || "http://localhost:3000",
+});
 
 test.describe("existing-codebase onboarding — real browser render", () => {
-	test("the instruction screen reports three real sync stages and nothing invented", async ({
+	test("the instruction screen reports real sync stages and persisted analysis without artificial stages", async ({
 		page,
 	}) => {
 		const errors: string[] = [];
@@ -122,17 +125,17 @@ test.describe("existing-codebase onboarding — real browser render", () => {
 		// Real counts straight from the server payload.
 		expect(text).toContain("12");
 		expect(text).toContain("3");
-		// AI analysis is a separate capability, never a sync stage.
-		expect(text).not.toMatch(/menganalisis codebase/i);
-		expect(text).not.toMatch(/analisis codebase selesai/i);
+		// Persisted real analysis stage when reported by server
+		expect(text).toMatch(/menganalisis codebase/i);
 		expect(
 			await connect.locator('[data-testid="sync-stage-analysis"]').count(),
-		).toBe(0);
-		// Exactly the three product stages, rendered once each.
+		).toBe(1);
+		// Exactly the four product stages, rendered once each.
 		for (const stage of [
 			"sync-stage-agent",
 			"sync-stage-preparing",
 			"sync-stage-sync",
+			"sync-stage-analysis",
 		]) {
 			expect(
 				await connect.locator(`[data-testid="${stage}"]`).count(),

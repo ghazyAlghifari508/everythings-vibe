@@ -1,16 +1,48 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUIStore } from "@/store";
 import { PlanCodebasePage } from "./codebase";
 
 const mockNavigate = vi.fn();
 
+const VALID_STARTER_SUGGESTIONS = [
+	{
+		id: "feature",
+		title: "Feature task",
+		description: "A focused task description.",
+		prompt: "Implement a feature.",
+		relevantPaths: ["src/feature.ts"],
+	},
+	{
+		id: "bugfix",
+		title: "Bugfix task",
+		description: "A focused bugfix description.",
+		prompt: "Fix a bug.",
+		relevantPaths: ["src/bugfix.ts"],
+	},
+	{
+		id: "refactor",
+		title: "Refactor task",
+		description: "A focused refactor description.",
+		prompt: "Refactor a module.",
+		relevantPaths: ["src/refactor.ts"],
+	},
+	{
+		id: "ui",
+		title: "UI task",
+		description: "A focused UI description.",
+		prompt: "Improve UI.",
+		relevantPaths: ["src/ui.ts"],
+	},
+];
+
 const RECOVER_OUTPUT = {
 	projectId: "proj-recover-1",
 	snapshotId: "snap-recover-1",
 	framework: "TanStack Start",
 	language: "TypeScript",
+	starterSuggestions: VALID_STARTER_SUGGESTIONS,
 };
 
 function readyAnalysis(
@@ -169,7 +201,12 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 						snapshotId: "snap-recover-1",
 						fileCount: 37,
 						excludedCount: 5,
-						...(analysisTriggered ? { analysisStatus: "ready" as const } : {}),
+						...(analysisTriggered
+							? {
+									analysisStatus: "ready" as const,
+									analysisId: "ana-recover-1",
+								}
+							: {}),
 					}),
 				};
 			}
@@ -204,15 +241,19 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 
 		render(<PlanCodebasePage />);
 
-		// Refresh on a finished upload resumes the conclusion step, which owns
-		// the pending state and turns it into the review when the server is
-		// ready â€” no extra manual step.
 		await waitFor(
 			() => {
-				expect(screen.getByTestId("codebase-analysis-pending")).not.toBeNull();
+				expect(
+					screen.getByText("Sync codebase dengan VibeEverything"),
+				).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
+		const cta = screen.getByTestId(
+			"sync-continue-to-summary",
+		) as HTMLButtonElement;
+		expect(cta.disabled).toBe(true);
+		expect(screen.queryByTestId("codebase-analysis-pending")).toBeNull();
 		expect(fetchMock).not.toHaveBeenCalledWith(
 			"/api/codebases",
 			expect.objectContaining({ method: "POST" }),
@@ -223,6 +264,10 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			},
 			{ timeout: 10000, interval: 100 },
 		);
+		await waitFor(() => {
+			expect(cta.disabled).toBe(false);
+		});
+		cta.click();
 		await waitFor(
 			() => {
 				expect(screen.getByText("Detected environment")).toBeDefined();
@@ -241,6 +286,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 				"prdfy:plan-codebase-project-id",
 				"proj-recover-2",
 			);
+			sessionStorage.setItem("prdfy:plan-codebase-step", "summary");
 		} catch {
 			// Best-effort only.
 		}
@@ -256,6 +302,8 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 						sessionId: "sess-recover-2",
 						status: "uploaded",
 						snapshotId: "snap-recover-2",
+						analysisId: "ana-recover-2",
+						analysisStatus: "ready" as const,
 						fileCount: 12,
 						excludedCount: 1,
 					}),
@@ -275,6 +323,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 							snapshotId: "snap-recover-2",
 							framework: "TanStack Start",
 							language: "TypeScript",
+							starterSuggestions: VALID_STARTER_SUGGESTIONS,
 						},
 					}),
 				};
@@ -298,12 +347,13 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		);
 	});
 
-	it("opens the workspace while analysis is still pending", {
+	it("recovers an uploaded session with pending analysis into Sync screen with Next disabled", {
 		timeout: 20000,
 	}, async () => {
 		try {
 			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-ws-1");
 			sessionStorage.setItem("prdfy:plan-codebase-name", "Workspace Repo");
+			sessionStorage.setItem("prdfy:plan-codebase-step", "summary");
 		} catch {
 			// Storage unavailable still exercises the fresh path below.
 		}
@@ -355,34 +405,21 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 
 		render(<PlanCodebasePage />);
 
-		// A valid uploaded snapshot means the workspace is openable while the
-		// analysis is still running: navigation must not wait on the model.
+		// An uploaded snapshot with pending analysis recovers to Sync screen
 		await waitFor(
 			() => {
-				expect(screen.getByTestId("codebase-analysis-pending")).not.toBeNull();
+				expect(
+					screen.getByText("Sync codebase dengan VibeEverything"),
+				).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		const workspaceCta = await waitFor(() => {
-			const cta = screen.getByTestId(
-				"conclusion-enter-workspace",
-			) as HTMLButtonElement;
-			expect(cta.disabled).toBe(false);
-			return cta;
-		});
-		act(() => {
-			workspaceCta.click();
-		});
-
-		await waitFor(() => {
-			expect(mockNavigate).toHaveBeenCalledWith({
-				to: "/codebases/$id",
-				params: { id: "cb-ws-1" },
-			});
-		});
-		// A pending analysis never repaints the screen as a failed sync.
+		const cta = screen.getByTestId(
+			"sync-continue-to-summary",
+		) as HTMLButtonElement;
+		expect(cta.disabled).toBe(true);
+		expect(screen.queryByTestId("codebase-analysis-pending")).toBeNull();
 		expect(screen.queryByText(/Sync gagal/i)).toBeNull();
-		expect(screen.queryByText(/Menganalisis codebase/i)).not.toBeNull();
 	});
 
 	it("mints a fresh token when recovering a waiting session without a payload", async () => {
