@@ -213,6 +213,44 @@ describe("ScrapeDetail", () => {
 		expect(iframe.getAttribute("referrerpolicy")).toBe("no-referrer");
 	});
 
+	it("uses ephemeral srcDoc while keeping source and download on persisted HTML", async () => {
+		const source =
+			'<img src="/api/scrape/asset?url=https%3A%2F%2Fassets.example%2Fimage.png">';
+		const preview = '<img src="data:image/png;base64,cHJldmlldw==">';
+		const writeText = vi.fn(async (_value: string) => {});
+		vi.stubGlobal("navigator", { clipboard: { writeText } });
+		const click = vi
+			.spyOn(HTMLAnchorElement.prototype, "click")
+			.mockImplementation(() => {});
+		const createObjectURL = vi.fn((_blob: Blob) => "blob:preview");
+		vi.stubGlobal("URL", { createObjectURL, revokeObjectURL: vi.fn() });
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml={source}
+				previewSrcDoc={preview}
+			/>,
+		);
+
+		expect(
+			screen.getByTitle("Preview example.com").getAttribute("srcdoc"),
+		).toBe(preview);
+		fireEvent.click(screen.getByRole("tab", { name: /Source HTML/i }));
+		expect(
+			screen.getByRole("tabpanel", { name: /Source code index\.html/i })
+				.textContent,
+		).toBe(source);
+		fireEvent.click(screen.getByRole("button", { name: /Salin HTML/i }));
+		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
+		expect(writeText).toHaveBeenCalledWith(source);
+		fireEvent.click(
+			screen.getByRole("button", { name: /Download index\.html/i }),
+		);
+		await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+		expect(click).toHaveBeenCalledOnce();
+		expect(await createObjectURL.mock.calls[0]?.[0].text()).toBe(source);
+	});
+
 	it("switches between Preview and exact Source HTML", () => {
 		const source = "<html><body>Original source</body></html>";
 		render(<ScrapeDetail domain="example.com" previewHtml={source} />);

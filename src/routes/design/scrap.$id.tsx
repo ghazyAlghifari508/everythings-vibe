@@ -15,12 +15,21 @@ import {
 } from "@/hooks/use-scrape-status";
 import { requireUserServer } from "@/lib/session";
 
-const loadScrapeDetail = createServerFn({ method: "GET" })
+export const loadScrapeDetail = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
 	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
 		const { getScrapeById } = await import("@/lib/services/scrape-service");
 		const scrape = await getScrapeById(id, user.id);
+		const { inlinePreviewAssets } = await import("@/lib/preview-assets");
+		const { rewritePreviewAssets } = await import("@/lib/preview-html");
+		const previewHtml = scrape.previewHtml ?? "";
+		const previewSrcDoc =
+			scrape.status === "completed" && scrape.mode === "html"
+				? await inlinePreviewAssets(
+						rewritePreviewAssets(scrape.html ?? "", scrape.sourceUrl),
+					)
+				: previewHtml;
 		return {
 			id: scrape.id,
 			sourceUrl: scrape.sourceUrl,
@@ -28,7 +37,8 @@ const loadScrapeDetail = createServerFn({ method: "GET" })
 			title: scrape.title,
 			status: scrape.status,
 			mode: scrape.mode,
-			previewHtml: scrape.previewHtml ?? "",
+			previewHtml,
+			previewSrcDoc,
 			designMd: scrape.document?.designMd ?? "",
 			metadata: scrape.metadata,
 			capturedAt:
@@ -99,6 +109,7 @@ function ScrapeDetailPage() {
 		"design") as ScrapeMode;
 	const sourceUrl = data?.sourceUrl ?? initial.sourceUrl;
 	const domain = data?.domain ?? initial.domain;
+	const previewSrcDoc = initial.previewSrcDoc;
 	const previewHtml = data?.previewHtml ?? initial.previewHtml;
 	const designMd = data?.document?.designMd ?? initial.designMd;
 
@@ -163,7 +174,11 @@ function ScrapeDetailPage() {
 					designMd={designMd}
 				/>
 			) : view === "result-html" ? (
-				<ScrapeDetail domain={domain} previewHtml={previewHtml} />
+				<ScrapeDetail
+					domain={domain}
+					previewHtml={previewHtml}
+					previewSrcDoc={previewSrcDoc}
+				/>
 			) : (
 				<ScrapeProgress
 					mode={mode}

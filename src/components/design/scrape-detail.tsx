@@ -5,6 +5,7 @@ import { SCRAPE_DESKTOP_HEIGHT } from "@/lib/constants";
 export interface ScrapeDetailProps {
 	domain: string;
 	previewHtml?: string;
+	previewSrcDoc?: string;
 }
 
 type HtmlViewTab = "preview" | "code";
@@ -43,7 +44,11 @@ function downloadFile(filename: string, content: string, mimeType: string) {
 const ICON_BUTTON_CLASS =
 	"inline-flex size-8 items-center justify-center rounded-md border border-transparent text-fog transition-colors hover:border-graphite hover:bg-onyx hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50";
 
-export function ScrapeDetail({ domain, previewHtml = "" }: ScrapeDetailProps) {
+export function ScrapeDetail({
+	domain,
+	previewHtml = "",
+	previewSrcDoc = previewHtml,
+}: ScrapeDetailProps) {
 	const [htmlViewTab, setHtmlViewTab] = useState<HtmlViewTab>("preview");
 	const [notice, setNotice] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -160,7 +165,7 @@ export function ScrapeDetail({ domain, previewHtml = "" }: ScrapeDetailProps) {
 
 			{htmlViewTab === "preview" ? (
 				<div role="tabpanel" aria-label="Preview index.html">
-					<DesktopPreview title={`Preview ${domain}`} srcDoc={previewHtml} />
+					<DesktopPreview title={`Preview ${domain}`} srcDoc={previewSrcDoc} />
 				</div>
 			) : (
 				<div role="tabpanel" aria-label="Source code index.html">

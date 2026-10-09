@@ -67,13 +67,25 @@ function responseContentType(res: http.IncomingMessage): string {
 	return raw ?? "application/octet-stream";
 }
 
+export interface FetchAssetOptions {
+	signal?: AbortSignal;
+	maxBytes?: number;
+}
+
 export async function fetchAsset(
 	rawUrl: string,
 	redirects = 0,
+	options: FetchAssetOptions = {},
 ): Promise<{ body: Buffer; status: number; contentType: string }> {
+	const maxBytes = Math.min(
+		options.maxBytes ?? SCRAPE_MAX_ASSET_BYTES,
+		SCRAPE_MAX_ASSET_BYTES,
+	);
+	if (options.signal?.aborted) throw new ScrapeError("FETCH_TIMEOUT");
 	if (redirects > SCRAPE_MAX_REDIRECTS)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Redirect terlalu banyak.");
 	const { url, ip } = await validateUrl(rawUrl);
+	if (options.signal?.aborted) throw new ScrapeError("FETCH_TIMEOUT");
 	const isHttps = url.protocol === "https:";
 	const requestOptions = {
 		protocol: url.protocol,
@@ -96,8 +108,7 @@ export async function fetchAsset(
 			const onResponse = (res: http.IncomingMessage) => {
 				const next = redirectTarget(res, url);
 				if (next) {
-					res.resume();
-					fetchAsset(next, redirects + 1).then(resolve, reject);
+					fetchAsset(next, redirects + 1, options).then(resolve, reject);
 					return;
 				}
 				const chunks: Buffer[] = [];
@@ -106,7 +117,7 @@ export async function fetchAsset(
 				res.on("data", (chunk: Buffer) => {
 					if (failed) return;
 					size += chunk.length;
-					if (size > SCRAPE_MAX_ASSET_BYTES) {
+					if (size > maxBytes) {
 						failed = true;
 						req.destroy(
 							new ScrapeError("NO_ANALYZABLE_CONTENT", "Asset terlalu besar."),
@@ -129,6 +140,11 @@ export async function fetchAsset(
 					)
 				: http.request(requestOptions, onResponse);
 			req.on("timeout", () => req.destroy(new ScrapeError("FETCH_TIMEOUT")));
+			const abort = () => req.destroy(new ScrapeError("FETCH_TIMEOUT"));
+			options.signal?.addEventListener("abort", abort, { once: true });
+			req.on("close", () =>
+				options.signal?.removeEventListener("abort", abort),
+			);
 			req.on("error", reject);
 			req.end();
 		},
