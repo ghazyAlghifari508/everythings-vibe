@@ -7,6 +7,8 @@ import { useCodebaseSyncStatus } from "@/hooks/use-codebase-sync-status";
 import {
 	type AnalysisResponse,
 	analysisResponseSchema,
+	canContinueToCodebaseConclusion,
+	codebaseStarterSuggestionsSchema,
 	ONBOARDING_FEATURE_MESSAGE,
 } from "@/lib/codebase-analysis";
 import { CODEBASE_ONBOARDING_LABEL } from "@/lib/codebase-library";
@@ -23,7 +25,6 @@ import {
 	storePlanCodebaseStepPointer,
 } from "@/lib/codebase-plan-storage";
 import {
-	canOpenSummary,
 	isSyncStatusComplete,
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
@@ -81,7 +82,7 @@ export function PlanCodebasePage() {
 	const [analysisWorking, setAnalysisWorking] = useState(false);
 	const [analysisError, setAnalysisError] = useState<string | null>(null);
 	const analysisAttemptedFor = useRef<string | null>(null);
-	// Create is a mutating POST: two overlapping calls would mint two codebases
+	const analysisRequestGeneration = useRef(0);
 	// and two sync sessions for one onboarding attempt. State updates are async,
 	// so a ref is what actually closes the window.
 	const createInFlight = useRef(false);
@@ -250,23 +251,38 @@ export function PlanCodebasePage() {
 	// attempt. Credit and validation failures surface as honest errors, never
 	// as fabricated output.
 	const triggerOnboardingAnalysis = useCallback(
-		async (projectId: string, snapshotId: string): Promise<void> => {
+		async (
+			projectId: string,
+			snapshotId: string,
+			refreshStarterSuggestionsForAnalysisId?: string,
+		): Promise<void> => {
+			const generation = ++analysisRequestGeneration.current;
 			setAnalysisWorking(true);
 			setAnalysisError(null);
 			try {
+				const bodyPayload: {
+					snapshotId: string;
+					refreshStarterSuggestionsForAnalysisId?: string;
+				} = { snapshotId };
+				if (refreshStarterSuggestionsForAnalysisId) {
+					bodyPayload.refreshStarterSuggestionsForAnalysisId =
+						refreshStarterSuggestionsForAnalysisId;
+				}
 				const response = await fetch(
 					`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
 					{
 						method: "POST",
 						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ snapshotId }),
+						body: JSON.stringify(bodyPayload),
 					},
 				);
+				if (generation !== analysisRequestGeneration.current) return;
 				if (response.status === 401) {
 					window.location.href = `/login?redirect=${encodeURIComponent("/plan/codebase")}`;
 					return;
 				}
 				const body: unknown = await response.json().catch(() => null);
+				if (generation !== analysisRequestGeneration.current) return;
 				const serverError =
 					typeof body === "object" &&
 					body !== null &&
@@ -287,11 +303,21 @@ export function PlanCodebasePage() {
 					);
 					return;
 				}
+				if (
+					parsed.data.snapshotId !== snapshotId ||
+					parsed.data.projectId !== projectId
+				) {
+					return;
+				}
 				setAnalysis(parsed.data);
 			} catch {
-				setAnalysisError("Server tidak dapat dihubungi.");
+				if (generation === analysisRequestGeneration.current) {
+					setAnalysisError("Server tidak dapat dihubungi.");
+				}
 			} finally {
-				setAnalysisWorking(false);
+				if (generation === analysisRequestGeneration.current) {
+					setAnalysisWorking(false);
+				}
 			}
 		},
 		[],
@@ -313,6 +339,12 @@ export function PlanCodebasePage() {
 					await response.json().catch(() => null),
 				);
 				if (!parsed.success) return null;
+				if (
+					parsed.data.snapshotId !== snapshotId ||
+					parsed.data.projectId !== projectId
+				) {
+					return null;
+				}
 				setAnalysis(parsed.data);
 				return parsed.data;
 			} catch {
@@ -340,7 +372,7 @@ export function PlanCodebasePage() {
 				Boolean(recovered.snapshotId) &&
 				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status);
 			if (!hasSnapshot) return "sync";
-			return storedStep === "sync" ? "sync" : "summary";
+			return storedStep === "summary" ? "summary" : "sync";
 		},
 		[],
 	);
@@ -388,19 +420,17 @@ export function PlanCodebasePage() {
 				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status)
 			) {
 				const storedProject = readPlanCodebaseProjectPointer();
+				let existingAnalysis: AnalysisResponse | null = null;
 				if (storedProject) {
 					setFeatureProjectId(storedProject);
-					// Only a ready analysis short-circuits the trigger below; a
-					// pending or failed row is left for the conclusion step to
-					// render honestly.
-					const existing = await fetchAnalysisOutput(
+					existingAnalysis = await fetchAnalysisOutput(
 						storedProject,
 						recovered.snapshotId,
 					);
 					if (
-						existing?.output &&
-						existing.snapshotId === recovered.snapshotId &&
-						existing.status === "ready"
+						existingAnalysis?.output &&
+						existingAnalysis.snapshotId === recovered.snapshotId &&
+						existingAnalysis.status === "ready"
 					) {
 						analysisAttemptedFor.current = recovered.snapshotId;
 					}
@@ -502,14 +532,23 @@ export function PlanCodebasePage() {
 	};
 
 	// Retry resets the per-snapshot guard and clears the previous attempt, then
-	// lets the single trigger effect below perform the request. Calling the
-	// boundary directly as well would POST twice for one user action.
+	// triggers analysis directly.
 	const retryAnalysis = useCallback(() => {
 		if (!featureProjectId || !lastStatus?.snapshotId) return;
-		analysisAttemptedFor.current = null;
+		analysisAttemptedFor.current = lastStatus.snapshotId;
 		setAnalysis(null);
 		setAnalysisError(null);
-	}, [featureProjectId, lastStatus]);
+		void triggerOnboardingAnalysis(featureProjectId, lastStatus.snapshotId);
+	}, [featureProjectId, lastStatus, triggerOnboardingAnalysis]);
+	const refreshLegacySuggestions = useCallback(() => {
+		if (!featureProjectId || !lastStatus?.snapshotId || !analysis?.id) return;
+		setAnalysisError(null);
+		void triggerOnboardingAnalysis(
+			featureProjectId,
+			lastStatus.snapshotId,
+			analysis.id,
+		);
+	}, [featureProjectId, lastStatus, analysis, triggerOnboardingAnalysis]);
 
 	// The server owns the name: once the CLI has handshaken it holds the
 	// repository folder name, so the open onboarding page must not keep showing
@@ -545,12 +584,22 @@ export function PlanCodebasePage() {
 			analysis.snapshotId === lastStatus.snapshotId &&
 			SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status),
 	);
-	// The sync step's continue action is gated on transport completion alone: a
-	// valid current snapshot plus a finished upload chain. Copying the prompt is
-	// browser feedback and never reaches this predicate, and neither is the
-	// analysis state — the conclusion step owns that from the moment it opens.
-	const canContinueToSummary = canOpenSummary(lastStatus);
-
+	const isLegacyAnalysisMissingSuggestions = Boolean(
+		analysis?.output &&
+			lastStatus?.snapshotId &&
+			analysis.snapshotId === lastStatus.snapshotId &&
+			(analysis.status === "ready" || lastStatus.analysisStatus === "ready") &&
+			(!analysis.output.starterSuggestions ||
+				!codebaseStarterSuggestionsSchema.safeParse(
+					analysis.output.starterSuggestions,
+				).success),
+	);
+	const canContinueToSummary = canContinueToCodebaseConclusion({
+		status: lastStatus,
+		analysis,
+		codebaseId: codebase?.id ?? "",
+		analysisProjectId: featureProjectId,
+	});
 	// The conclusion step is never rendered without a usable current snapshot for
 	// this attempt. Without this guard a stale step pointer or a direct jump
 	// would show a summary for work that cannot start; the user is returned to
@@ -702,9 +751,16 @@ export function PlanCodebasePage() {
 							onRetrySync={() => void retrySession()}
 							canContinueToSummary={canContinueToSummary}
 							onContinueToSummary={() => setStep("summary")}
+							analysis={analysis}
+							analysisError={analysisError}
+							isAnalyzing={analysisWorking}
+							onRetryAnalysis={retryAnalysis}
+							isLegacyAnalysisMissingSuggestions={
+								isLegacyAnalysisMissingSuggestions
+							}
+							onRefreshLegacySuggestions={refreshLegacySuggestions}
 						/>
 					)}
-
 					{/* Step 2 owns every analysis state. Pending becomes the canonical
 					review in this same region once the server reports it, so there is
 					no manual step between the two. */}

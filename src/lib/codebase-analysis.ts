@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { isProvisionalCodebaseName } from "./codebase-naming";
-import { codebaseAnalysisStatusSchema } from "./codebase-sync";
+import {
+	canOpenSummary,
+	codebaseAnalysisStatusSchema,
+	type SyncStatusResponse,
+} from "./codebase-sync";
 import {
 	CODEBASE_ANALYSIS_MAX_CONTEXT_CHARS,
 	CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES,
@@ -443,6 +447,94 @@ export const analysisResponseSchema = z.object({
 });
 
 export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;
+
+export interface CanContinueToCodebaseConclusionInput {
+	status: SyncStatusResponse | null | undefined;
+	analysis: AnalysisResponse | null | undefined;
+	codebaseId: string;
+	analysisProjectId: string | null | undefined;
+}
+
+/**
+ * Authoritative pure predicate determining whether codebase onboarding
+ * can advance from sync to conclusion.
+ */
+export function canContinueToCodebaseConclusion(
+	input: CanContinueToCodebaseConclusionInput,
+): boolean {
+	if (!input.status || !input.analysis) {
+		return false;
+	}
+
+	if (!canOpenSummary(input.status)) {
+		return false;
+	}
+
+	if (
+		input.status.analysisStatus !== "ready" ||
+		input.analysis.status !== "ready"
+	) {
+		return false;
+	}
+
+	if (
+		!input.status.analysisId ||
+		!input.analysis.id ||
+		input.status.analysisId !== input.analysis.id
+	) {
+		return false;
+	}
+
+	if (!input.codebaseId || input.status.projectId !== input.codebaseId) {
+		return false;
+	}
+
+	if (
+		!input.analysisProjectId ||
+		input.analysis.projectId !== input.analysisProjectId
+	) {
+		return false;
+	}
+
+	if (
+		!input.status.snapshotId ||
+		input.analysis.snapshotId !== input.status.snapshotId
+	) {
+		return false;
+	}
+
+	if (!input.analysis.output) {
+		return false;
+	}
+
+	const parsedAnalysis = codebaseAnalysisSchema.safeParse(
+		input.analysis.output,
+	);
+	if (!parsedAnalysis.success) {
+		return false;
+	}
+
+	const output = parsedAnalysis.data;
+	if (
+		output.projectId !== input.analysisProjectId ||
+		output.snapshotId !== input.status.snapshotId
+	) {
+		return false;
+	}
+
+	if (!output.starterSuggestions) {
+		return false;
+	}
+
+	const parsedSuggestions = codebaseStarterSuggestionsSchema.safeParse(
+		output.starterSuggestions,
+	);
+	if (!parsedSuggestions.success) {
+		return false;
+	}
+
+	return true;
+}
 
 // === Tech stack inference from codebase analysis (for /ask auto-select) ===
 

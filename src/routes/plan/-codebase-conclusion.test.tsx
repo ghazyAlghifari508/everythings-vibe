@@ -22,11 +22,43 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
+const VALID_STARTER_SUGGESTIONS = [
+	{
+		id: "feature",
+		title: "Feature task",
+		description: "A focused task description.",
+		prompt: "Implement a feature.",
+		relevantPaths: ["src/feature.ts"],
+	},
+	{
+		id: "bugfix",
+		title: "Bugfix task",
+		description: "A focused bugfix description.",
+		prompt: "Fix a bug.",
+		relevantPaths: ["src/bugfix.ts"],
+	},
+	{
+		id: "refactor",
+		title: "Refactor task",
+		description: "A focused refactor description.",
+		prompt: "Refactor a module.",
+		relevantPaths: ["src/refactor.ts"],
+	},
+	{
+		id: "ui",
+		title: "UI task",
+		description: "A focused UI description.",
+		prompt: "Improve UI.",
+		relevantPaths: ["src/ui.ts"],
+	},
+];
+
 const OUTPUT = {
 	projectId: "proj-retry-1",
 	snapshotId: "snap-retry-1",
 	framework: "Next.js",
 	language: "TypeScript",
+	starterSuggestions: VALID_STARTER_SUGGESTIONS,
 };
 
 function uploadedStatus() {
@@ -56,6 +88,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		try {
 			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-retry-1");
 			sessionStorage.setItem("prdfy:plan-codebase-name", "Retry Repo");
+			sessionStorage.setItem("prdfy:plan-codebase-step", "summary");
 		} catch {
 			// Storage unavailable still exercises the fresh path below.
 		}
@@ -212,7 +245,12 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 					status: 200,
 					json: async () => ({
 						...uploadedStatus(),
-						...(analysisFailed ? { analysisStatus: "failed" } : {}),
+						...(analysisFailed
+							? { analysisStatus: "failed" }
+							: {
+									analysisStatus: "ready",
+									analysisId: "ana-retry-1",
+								}),
 					}),
 				};
 			}
