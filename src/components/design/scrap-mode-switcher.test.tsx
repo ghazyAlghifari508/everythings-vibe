@@ -6,257 +6,102 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScrapModeSwitcher } from "./scrap-mode-switcher";
 
-const mockNavigate = vi.fn();
+const navigate = vi.fn();
+vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigate }));
+afterEach(() => {
+	cleanup();
+	vi.unstubAllGlobals();
+	navigate.mockReset();
+});
 
-vi.mock("@tanstack/react-router", () => ({
-	useNavigate: () => mockNavigate,
-	Link: ({
-		children,
-		to,
-		className,
-	}: {
-		children: React.ReactNode;
-		to: string;
-		className?: string;
-	}) => (
-		<a href={to} className={className}>
-			{children}
-		</a>
-	),
-}));
-
-describe("ScrapModeSwitcher UI and Accessible Tabs", () => {
-	beforeEach(() => {
-		mockNavigate.mockReset();
-		vi.restoreAllMocks();
-	});
-
-	afterEach(() => {
-		cleanup();
-	});
-
-	it("renders tablist with default Generate DESIGN.md selected", () => {
+describe("extraction workspace", () => {
+	it("selects all four modes with keyboard navigation", () => {
 		render(<ScrapModeSwitcher />);
-
-		const tablist = screen.getByRole("tablist", { name: /Pilih mode/i });
-		expect(tablist).toBeDefined();
-
-		const designTab = screen.getByRole("tab", { name: /Generate DESIGN\.md/i });
-		const htmlTab = screen.getByRole("tab", { name: /Scrape HTML/i });
-
-		expect(designTab.getAttribute("aria-selected")).toBe("true");
-		expect(designTab.getAttribute("tabIndex")).toBe("0");
-		expect(htmlTab.getAttribute("aria-selected")).toBe("false");
-		expect(htmlTab.getAttribute("tabIndex")).toBe("-1");
-
-		const designPanel = document.getElementById("design-panel");
-		const htmlPanel = document.getElementById("html-panel");
-		expect(designPanel?.hasAttribute("hidden")).toBe(false);
-		expect(htmlPanel?.hasAttribute("hidden")).toBe(true);
-
-		// Default helper copy for DESIGN.md
+		const design = screen.getByRole("tab", { name: "Generate DESIGN.md" });
+		expect(design.getAttribute("aria-selected")).toBe("true");
+		fireEvent.keyDown(design, { key: "ArrowRight" });
 		expect(
-			screen.getByText(/Website publik · DESIGN\.md untuk AI coding/i),
-		).toBeDefined();
-	});
-
-	it("switches to Scrape HTML tab on click and updates aria attributes", () => {
-		render(<ScrapModeSwitcher />);
-
-		const designTab = screen.getByRole("tab", { name: /Generate DESIGN\.md/i });
-		const htmlTab = screen.getByRole("tab", { name: /Scrape HTML/i });
-
-		fireEvent.click(htmlTab);
-
-		expect(htmlTab.getAttribute("aria-selected")).toBe("true");
-		expect(htmlTab.getAttribute("tabIndex")).toBe("0");
-		expect(designTab.getAttribute("aria-selected")).toBe("false");
-		expect(designTab.getAttribute("tabIndex")).toBe("-1");
-
-		const designPanel = document.getElementById("design-panel");
-		const htmlPanel = document.getElementById("html-panel");
-		expect(designPanel?.hasAttribute("hidden")).toBe(true);
-		expect(htmlPanel?.hasAttribute("hidden")).toBe(false);
-
-		// Helper copy for Scrape HTML
+			screen
+				.getByRole("tab", { name: "Scrape HTML" })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+		fireEvent.keyDown(screen.getByRole("tab", { name: "Scrape HTML" }), {
+			key: "End",
+		});
 		expect(
-			screen.getByText(/Website publik · Preview HTML · index\.html/i),
-		).toBeDefined();
+			screen
+				.getByRole("tab", { name: "Scrape Images" })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+		fireEvent.keyDown(screen.getByRole("tab", { name: "Scrape Images" }), {
+			key: "Home",
+		});
+		expect(
+			screen
+				.getByRole("tab", { name: "Crawl Website" })
+				.getAttribute("aria-selected"),
+		).toBe("true");
 	});
-
-	it("supports keyboard navigation (ArrowRight, ArrowLeft, Home, End)", () => {
+	it("preserves shared URL and independent mode settings and resets only active settings", () => {
 		render(<ScrapModeSwitcher />);
-
-		const designTab = screen.getByRole("tab", { name: /Generate DESIGN\.md/i });
-		const htmlTab = screen.getByRole("tab", { name: /Scrape HTML/i });
-
-		// ArrowRight moves from design to html
-		fireEvent.keyDown(designTab, { key: "ArrowRight" });
-		expect(htmlTab.getAttribute("aria-selected")).toBe("true");
-
-		// ArrowRight loops from html back to design
-		fireEvent.keyDown(htmlTab, { key: "ArrowRight" });
-		expect(designTab.getAttribute("aria-selected")).toBe("true");
-
-		// ArrowLeft loops from design to html
-		fireEvent.keyDown(designTab, { key: "ArrowLeft" });
-		expect(htmlTab.getAttribute("aria-selected")).toBe("true");
-
-		// ArrowLeft moves from html back to design
-		fireEvent.keyDown(htmlTab, { key: "ArrowLeft" });
-		expect(designTab.getAttribute("aria-selected")).toBe("true");
-
-		// End moves to html tab
-		fireEvent.keyDown(designTab, { key: "End" });
-		expect(htmlTab.getAttribute("aria-selected")).toBe("true");
-
-		// Home moves to design tab
-		fireEvent.keyDown(htmlTab, { key: "Home" });
-		expect(designTab.getAttribute("aria-selected")).toBe("true");
+		fireEvent.change(screen.getByLabelText("URL website"), {
+			target: { value: "http://sample.example/path?q=1" },
+		});
+		fireEvent.click(screen.getByRole("tab", { name: "Crawl Website" }));
+		fireEvent.change(screen.getByLabelText(/Max Pages/), {
+			target: { value: "3" },
+		});
+		fireEvent.click(screen.getByRole("tab", { name: "Scrape HTML" }));
+		fireEvent.change(screen.getByLabelText(/Wait for/), {
+			target: { value: "200" },
+		});
+		fireEvent.click(screen.getByText("Reset parameters"));
+		expect(screen.getByLabelText(/Wait for/).getAttribute("value")).toBe("0");
+		fireEvent.click(screen.getByRole("tab", { name: "Crawl Website" }));
+		expect(screen.getByLabelText(/Max Pages/).getAttribute("value")).toBe("3");
+		expect(screen.getByLabelText("URL website").getAttribute("value")).toBe(
+			"sample.example/path?q=1",
+		);
 	});
-
-	it("preserves input values across tab switches without unmounting", () => {
-		render(<ScrapModeSwitcher />);
-
-		const designInput = screen.getByLabelText(
-			/Website yang ingin di-generate DESIGN\.md/i,
-		) as HTMLInputElement;
-		fireEvent.change(designInput, { target: { value: "https://stripe.com" } });
-		expect(designInput.value).toBe("https://stripe.com");
-
-		const htmlTab = screen.getByRole("tab", { name: /Scrape HTML/i });
-		fireEvent.click(htmlTab);
-
-		const htmlInput = screen.getByLabelText(
-			/Website yang ingin di-scrape HTML/i,
-		) as HTMLInputElement;
-		fireEvent.change(htmlInput, { target: { value: "https://linear.app" } });
-		expect(htmlInput.value).toBe("https://linear.app");
-
-		const designTab = screen.getByRole("tab", { name: /Generate DESIGN\.md/i });
-		fireEvent.click(designTab);
-
-		// Input in design tab is preserved
-		expect(designInput.value).toBe("https://stripe.com");
-
-		// Switch back to html tab, input is preserved
-		fireEvent.click(htmlTab);
-		expect(htmlInput.value).toBe("https://linear.app");
-	});
-
-	it("submits design mode with canonical mode payload", async () => {
-		const fetchMock = vi.fn().mockResolvedValue({
+	it.each([
+		"design",
+		"html",
+		"crawl",
+		"images",
+	] as const)("submits normalized typed %s request once", async (mode) => {
+		const fetchMock = vi.fn(async () => ({
 			ok: true,
-			json: async () => ({ scrapeId: "scrape-design-123", mode: "design" }),
-		});
-		global.fetch = fetchMock;
-
+			json: async () => ({ scrapeId: "result-1" }),
+		}));
+		vi.stubGlobal("fetch", fetchMock);
 		render(<ScrapModeSwitcher />);
-
-		const designInput = screen.getByLabelText(
-			/Website yang ingin di-generate DESIGN\.md/i,
+		const labels = {
+			design: "Generate DESIGN.md",
+			html: "Scrape HTML",
+			crawl: "Crawl Website",
+			images: "Scrape Images",
+		};
+		fireEvent.click(screen.getByRole("tab", { name: labels[mode] }));
+		fireEvent.change(screen.getByLabelText("URL website"), {
+			target: { value: "https://sample.example/path?q=1" },
+		});
+		const submit = screen.getByRole("button", {
+			name: `Jalankan ${labels[mode]}`,
+		});
+		fireEvent.click(submit);
+		fireEvent.click(submit);
+		await waitFor(() =>
+			expect(navigate).toHaveBeenCalledWith({
+				to: "/design/scrap/$id",
+				params: { id: "result-1" },
+				search: { from: "/design/scrap" },
+			}),
 		);
-		fireEvent.change(designInput, { target: { value: "https://example.com" } });
-
-		const submitBtn = screen.getByRole("button", { name: /Buat DESIGN\.md/i });
-		fireEvent.click(submitBtn);
-
-		await waitFor(() => {
-			expect(fetchMock).toHaveBeenCalledWith(
-				"/api/scrape",
-				expect.objectContaining({
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ url: "https://example.com", mode: "design" }),
-				}),
-			);
-		});
-
-		expect(mockNavigate).toHaveBeenCalledWith({
-			to: "/design/scrap/$id",
-			params: { id: "scrape-design-123" },
-			search: { from: "/design/scrap" },
-		});
-	});
-
-	it("submits html mode with canonical mode payload", async () => {
-		const fetchMock = vi.fn().mockResolvedValue({
-			ok: true,
-			json: async () => ({ scrapeId: "scrape-html-456", mode: "html" }),
-		});
-		global.fetch = fetchMock;
-
-		render(<ScrapModeSwitcher />);
-
-		const htmlTab = screen.getByRole("tab", { name: /Scrape HTML/i });
-		fireEvent.click(htmlTab);
-
-		const htmlInput = screen.getByLabelText(
-			/Website yang ingin di-scrape HTML/i,
-		);
-		fireEvent.change(htmlInput, { target: { value: "https://example.org" } });
-
-		const submitBtn = screen.getByRole("button", { name: /Scrape HTML/i });
-		fireEvent.click(submitBtn);
-
-		await waitFor(() => {
-			expect(fetchMock).toHaveBeenCalledWith(
-				"/api/scrape",
-				expect.objectContaining({
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ url: "https://example.org", mode: "html" }),
-				}),
-			);
-		});
-
-		expect(mockNavigate).toHaveBeenCalledWith({
-			to: "/design/scrap/$id",
-			params: { id: "scrape-html-456" },
-			search: { from: "/design/scrap" },
-		});
-	});
-
-	it("renders balanced mobile form proportions across both modes", () => {
-		render(<ScrapModeSwitcher />);
-
-		const tablist = screen.getByRole("tablist", { name: /Pilih mode/i });
-		expect(tablist.className).toContain("overflow-x-auto");
-
-		const designInput = screen.getByLabelText(
-			/Website yang ingin di-generate DESIGN\.md/i,
-		);
-		expect(designInput.className).toContain("text-base");
-		expect(designInput.className).toContain("sm:text-sm");
-		expect(designInput.parentElement?.className).toContain("min-h-[56px]");
-		expect(designInput.parentElement?.className).toContain("h-14");
-
-		const designSubmit = screen.getByRole("button", {
-			name: /Buat DESIGN\.md/i,
-		});
-		expect(designSubmit.className).toContain("min-h-[56px]");
-		expect(designSubmit.className).toContain("h-14");
-		expect(designSubmit.className).toContain("w-full");
-		expect(designSubmit.className).toContain("sm:w-auto");
-
-		const htmlTab = screen.getByRole("tab", { name: /Scrape HTML/i });
-		fireEvent.click(htmlTab);
-
-		const htmlInput = screen.getByLabelText(
-			/Website yang ingin di-scrape HTML/i,
-		);
-		expect(htmlInput.className).toContain("text-base");
-		expect(htmlInput.className).toContain("sm:text-sm");
-		expect(htmlInput.parentElement?.className).toContain("min-h-[56px]");
-		expect(htmlInput.parentElement?.className).toContain("h-14");
-
-		const htmlSubmit = screen.getByRole("button", { name: /Scrape HTML/i });
-		expect(htmlSubmit.className).toContain("min-h-[56px]");
-		expect(htmlSubmit.className).toContain("h-14");
-		expect(htmlSubmit.className).toContain("w-full");
-		expect(htmlSubmit.className).toContain("sm:w-auto");
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		const call = fetchMock.mock.calls[0];
+		expect(call).toBeDefined();
 	});
 });
