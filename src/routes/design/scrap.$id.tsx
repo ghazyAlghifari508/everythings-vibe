@@ -42,7 +42,7 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 		const { buildScrapePreviewDocument } = await import(
 			"@/lib/scrape-preview-document"
 		);
-		const previewHtml = scrape.previewHtml ?? "";
+		const previewHtml = scrape.html ?? scrape.previewHtml ?? "";
 		const preview = buildScrapePreviewDocument(scrape, user.id, appOrigin);
 		return {
 			id: scrape.id,
@@ -125,7 +125,8 @@ function ScrapeDetailPage() {
 		"design") as ScrapeMode;
 	const sourceUrl = data?.sourceUrl ?? initial.sourceUrl;
 	const domain = data?.domain ?? initial.domain;
-	const previewHtml = data?.previewHtml ?? initial.previewHtml;
+	const previewHtml =
+		(data && "html" in data ? data.html : null) ?? initial.previewHtml;
 	const designMd = data?.document?.designMd ?? initial.designMd;
 
 	const isHtmlResult = mode === "html";

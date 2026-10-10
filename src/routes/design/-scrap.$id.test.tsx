@@ -82,7 +82,7 @@ describe("scrape detail route preview loading", () => {
 		if (typeof result !== "object" || result === null)
 			throw new Error("Loader returned no data");
 		expect("previewHtml" in result ? result.previewHtml : undefined).toBe(
-			'<img src="/api/scrape/asset?url=https%3A%2F%2Fassets.example%2Fcorrupted.png">',
+			'<img srcset="data:image/png;base64,AAAA 1x, /asset.png 2x">',
 		);
 		expect("preview" in result ? result.preview : undefined).toEqual({
 			srcDoc: '<img src="https://app.example/api/scrape/asset?cap=preview">',
