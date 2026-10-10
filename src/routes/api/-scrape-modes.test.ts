@@ -48,13 +48,11 @@ describe("Scrape API Route Modes", () => {
 		expect(json.mode).toBe("design");
 		expect(mockCreateScrape).toHaveBeenCalledWith(
 			"user-123",
-			"https://example.com",
+			"https://example.com/",
 			"design",
+			{ url: "https://example.com/", mode: "design" },
 		);
-		expect(mockRunScrapePipeline).toHaveBeenCalledWith(
-			"sc-design-1",
-			"user-123",
-		);
+		expect(mockRunScrapePipeline).not.toHaveBeenCalled();
 	});
 
 	it("creates a scrape in html mode when explicitly requested", async () => {
@@ -79,10 +77,15 @@ describe("Scrape API Route Modes", () => {
 		expect(json.mode).toBe("html");
 		expect(mockCreateScrape).toHaveBeenCalledWith(
 			"user-123",
-			"https://example.com",
+			"https://example.com/",
 			"html",
+			{
+				url: "https://example.com/",
+				mode: "html",
+				settings: { waitMs: 0, includeIframes: false },
+			},
 		);
-		expect(mockRunScrapePipeline).toHaveBeenCalledWith("sc-html-1", "user-123");
+		expect(mockRunScrapePipeline).not.toHaveBeenCalled();
 	});
 
 	it("returns mode in GET /api/scrape?id=...", async () => {

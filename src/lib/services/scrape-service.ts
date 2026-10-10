@@ -16,6 +16,7 @@ import { ScrapeError } from "@/lib/design-errors";
 import { extractDesignFromHtml } from "@/lib/design-extraction";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
+import { type ScrapeRequest, scrapeRequestSchema } from "@/lib/scrape-contract";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { parseAndValidateFormat } from "@/lib/url-validator";
 import {
@@ -45,6 +46,7 @@ export async function createScrape(
 	userId: string,
 	rawUrl: string,
 	mode: ScrapeMode = "design",
+	request?: ScrapeRequest,
 ): Promise<ScrapeRow> {
 	let normalized: string;
 	try {
@@ -61,6 +63,7 @@ export async function createScrape(
 			sourceUrl: normalized,
 			domain: domainOf(normalized),
 			mode,
+			request: request ?? scrapeRequestSchema.parse({ url: normalized, mode }),
 			status: "queued",
 			metadata: {
 				mode,
@@ -141,6 +144,16 @@ export async function runScrapePipeline(
 	};
 
 	try {
+		if (mode === "crawl" || mode === "images") {
+			if (!claim)
+				throw new ScrapeError(
+					"STORAGE_FAILED",
+					"Job harus diproses oleh worker.",
+				);
+			const { runExtractionJob } = await import("./scrape-extraction-service");
+			await runExtractionJob(scrape, claim);
+			return;
+		}
 		await persist("capturing");
 
 		const captured: ScrapeCapture = await scrapeHtml(scrape.sourceUrl, 1, {
@@ -285,9 +298,13 @@ export async function retryScrape(
 			},
 			updatedAt: new Date(),
 		})
-		.where(eq(scrapes.id, scrapeId));
-
-	void runScrapePipeline(scrapeId, userId);
+		.where(
+			and(
+				eq(scrapes.id, scrapeId),
+				eq(scrapes.userId, userId),
+				eq(scrapes.status, "failed"),
+			),
+		);
 	return { ok: true };
 }
 
