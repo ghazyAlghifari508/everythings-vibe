@@ -1,206 +1,109 @@
-import JSZip from "jszip";
-import { Code2, Copy, Download, Eye } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { extractCleanHtml } from "@/lib/clean-html";
+import { memo, useRef } from "react";
+import { ZoomControls } from "@/components/task/zoom-controls";
+import { getCanvasDotStyle } from "@/components/task/whiteboard-canvas";
+import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
+import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
+import { StudioFrame } from "./studio-frame";
 
-export type StudioViewport = "desktop" | "tablet" | "mobile";
-
-const VIEWPORT_WIDTH: Record<StudioViewport, number> = {
-	desktop: 1440,
-	tablet: 768,
-	mobile: 375,
-};
-
-const VIEWPORT_LABEL: Record<StudioViewport, string> = {
-	desktop: "Desktop 1440px",
-	tablet: "Tablet 768px",
-	mobile: "Mobile 375px",
-};
-
-type CanvasTab = "preview" | "code";
-
-async function copyText(value: string): Promise<boolean> {
-	try {
-		await navigator.clipboard.writeText(value);
-		return true;
-	} catch {
-		return false;
-	}
+export interface StudioCanvasProps {
+	project: StudioProjectRow;
+	frames: StudioFrameRow[];
+	selectedFrameId?: string | null;
+	onSelectFrame?: (frameId: string | null) => void;
+	onRetryFrame?: (frameId: string) => void;
+	className?: string;
 }
 
-export function StudioCanvas({
-	title,
-	htmlCode,
-	version,
-	initialViewport = "desktop",
-}: {
-	title: string;
-	htmlCode: string;
-	version: number;
-	initialViewport?: StudioViewport;
-}) {
-	const [viewport, setViewport] = useState<StudioViewport>(initialViewport);
-	const [tab, setTab] = useState<CanvasTab>("preview");
-	const [scale, setScale] = useState(1);
-	const [notice, setNotice] = useState("");
-	const [busy, setBusy] = useState<"copy" | "download" | null>(null);
-	const wrapRef = useRef<HTMLDivElement>(null);
+export const StudioCanvas = memo(function StudioCanvas({
+	project,
+	frames,
+	selectedFrameId = null,
+	onSelectFrame,
+	onRetryFrame,
+	className = "",
+}: StudioCanvasProps) {
+	const canvasRef = useRef<HTMLDivElement>(null);
 
-	const cleanHtml = extractCleanHtml(htmlCode);
-	const frameWidth = VIEWPORT_WIDTH[viewport];
+	const {
+		zoom,
+		pan,
+		zoomIn,
+		zoomOut,
+		resetZoom,
+		startPan,
+		updatePan,
+		endPan,
+		nudgePan,
+		onWheel,
+	} = useCanvasZoom({
+		minZoom: 0.25,
+		maxZoom: 2.0,
+		initialZoom: project.designMode === "mobile" ? 0.9 : 0.65,
+	});
 
-	useEffect(() => {
-		const el = wrapRef.current;
-		if (!el || typeof ResizeObserver === "undefined") return;
-		const measure = () => setScale(Math.min(1, el.clientWidth / frameWidth));
-		measure();
-		const observer = new ResizeObserver(measure);
-		observer.observe(el);
-		return () => observer.disconnect();
-	}, [frameWidth]);
-
-	async function handleCopy() {
-		setBusy("copy");
-		setNotice("");
-		const ok = await copyText(cleanHtml);
-		setNotice(ok ? "HTML tersalin ke clipboard." : "Gagal menyalin HTML.");
-		setBusy(null);
-	}
-
-	async function handleDownload() {
-		setBusy("download");
-		setNotice("");
-		try {
-			const zip = new JSZip();
-			zip.file("index.html", cleanHtml);
-			const blob = await zip.generateAsync({ type: "blob" });
-			const url = URL.createObjectURL(blob);
-			const anchor = document.createElement("a");
-			anchor.href = url;
-			anchor.download = "studio-index-html.zip";
-			document.body.appendChild(anchor);
-			anchor.click();
-			anchor.remove();
-			setTimeout(() => URL.revokeObjectURL(url), 1000);
-			setNotice("File HTML mulai diunduh.");
-		} catch {
-			setNotice("Gagal menyiapkan unduhan.");
-		}
-		setBusy(null);
-	}
-
-	const frameHeight = 720;
+	const isPanning = false; // Transient pointer tracking in hook
 
 	return (
-		<section className="flex flex-col gap-3">
-			<div className="flex flex-wrap items-center gap-2 rounded-xl border border-graphite bg-charcoal p-3">
-				<fieldset
-					aria-label="Pilih viewport"
-					className="m-0 flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
-				>
-					{(Object.keys(VIEWPORT_WIDTH) as StudioViewport[]).map((key) => (
-						<button
-							key={key}
-							type="button"
-							aria-pressed={viewport === key}
-							onClick={() => setViewport(key)}
-							className={`rounded-md px-3 py-1.5 font-mono text-[11px] font-semibold transition-colors ${
-								viewport === key
-									? "bg-charcoal text-snow"
-									: "text-fog hover:text-mist"
-							}`}
-						>
-							{VIEWPORT_LABEL[key]}
-						</button>
-					))}
-				</fieldset>
-				<div
-					role="tablist"
-					aria-label="Mode canvas"
-					className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
-				>
-					<button
-						type="button"
-						role="tab"
-						aria-selected={tab === "preview"}
-						onClick={() => setTab("preview")}
-						className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-mono text-[11px] font-semibold transition-colors ${
-							tab === "preview"
-								? "bg-charcoal text-snow"
-								: "text-fog hover:text-mist"
-						}`}
-					>
-						<Eye size={13} aria-hidden />
-						Canvas Preview
-					</button>
-					<button
-						type="button"
-						role="tab"
-						aria-selected={tab === "code"}
-						onClick={() => setTab("code")}
-						className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-mono text-[11px] font-semibold transition-colors ${
-							tab === "code"
-								? "bg-charcoal text-snow"
-								: "text-fog hover:text-mist"
-						}`}
-					>
-						<Code2 size={13} aria-hidden />
-						Inspect Code
-					</button>
-				</div>
-				<div className="ml-auto flex gap-2">
-					<button
-						type="button"
-						onClick={() => void handleCopy()}
-						disabled={busy !== null}
-						className="inline-flex items-center gap-1.5 rounded-full border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-onyx disabled:opacity-50"
-					>
-						<Copy size={14} aria-hidden />
-						{busy === "copy" ? "Menyalin…" : "Salin HTML"}
-					</button>
-					<button
-						type="button"
-						onClick={() => void handleDownload()}
-						disabled={busy !== null}
-						className="inline-flex items-center gap-1.5 rounded-full bg-snow px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-mist disabled:opacity-50"
-					>
-						<Download size={14} aria-hidden />
-						{busy === "download" ? "Menyiapkan…" : "Download HTML"}
-					</button>
-				</div>
-			</div>
-			{notice ? (
-				<output className="block text-xs text-fog">{notice}</output>
-			) : null}
-
-			{tab === "preview" ? (
-				<div role="tabpanel" aria-label={`Preview ${title} v${version}`}>
-					<div
-						ref={wrapRef}
-						className="w-full overflow-hidden rounded-xl border border-graphite bg-white"
-						style={{ height: Math.max(1, Math.round(frameHeight * scale)) }}
-					>
-						<iframe
-							title={`${title} v${version} (${VIEWPORT_LABEL[viewport]})`}
-							srcDoc={cleanHtml}
-							sandbox="allow-scripts"
-							className="border-0"
-							style={{
-								width: frameWidth,
-								height: frameHeight,
-								transform: `scale(${scale})`,
-								transformOrigin: "top left",
-							}}
+		<div
+			ref={canvasRef}
+			data-testid="studio-canvas"
+			tabIndex={0}
+			role="region"
+			aria-label={`Canvas Desain ${project.title}`}
+			onPointerDown={startPan}
+			onPointerMove={updatePan}
+			onPointerUp={endPan}
+			onPointerCancel={endPan}
+			onWheel={onWheel}
+			onKeyDown={(e) => nudgePan(e.key)}
+			onClick={(e) => {
+				if (e.target === e.currentTarget) {
+					onSelectFrame?.(null);
+				}
+			}}
+			className={`relative size-full overflow-hidden select-none touch-none bg-[#0a0a0c] text-snow focus:outline-none ${className}`}
+			style={getCanvasDotStyle(zoom, pan)}
+		>
+			{/* Transformed Canvas Surface holding frames */}
+			<div
+				className="absolute top-0 left-0 flex items-start gap-14 p-24"
+				style={{
+					transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+					transformOrigin: "0 0",
+				}}
+			>
+				{frames.length > 0 ? (
+					frames.map((frame) => (
+						<StudioFrame
+							key={frame.id}
+							frame={frame}
+							isSelected={selectedFrameId === frame.id}
+							onSelect={(id) => onSelectFrame?.(id)}
+							onRetry={(id) => onRetryFrame?.(id)}
+							isCanvasPanning={isPanning}
 						/>
+					))
+				) : (
+					<div className="flex h-96 w-96 flex-col items-center justify-center rounded-2xl border border-dashed border-graphite bg-charcoal/50 p-8 text-center">
+						<p className="text-sm font-semibold text-snow">
+							Menyiapkan Kanvas...
+						</p>
+						<p className="mt-1 text-xs text-fog">
+							Layar sedang direncanakan oleh AI.
+						</p>
 					</div>
-				</div>
-			) : (
-				<div role="tabpanel" aria-label="Kode HTML studio">
-					<pre className="max-h-[720px] overflow-auto rounded-xl border border-graphite bg-onyx p-5 font-mono text-xs leading-5 text-mist">
-						{cleanHtml}
-					</pre>
-				</div>
-			)}
-		</section>
+				)}
+			</div>
+
+			{/* Floating Canvas Zoom Controls (Bottom Right) */}
+			<div className="fixed bottom-6 right-6 z-20">
+				<ZoomControls
+					zoom={zoom}
+					onZoomIn={zoomIn}
+					onZoomOut={zoomOut}
+					onReset={resetZoom}
+				/>
+			</div>
+		</div>
 	);
-}
+});
