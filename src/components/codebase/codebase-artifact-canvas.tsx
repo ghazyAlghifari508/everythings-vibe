@@ -1,11 +1,22 @@
 "use client";
 
 import { Check, Copy, Download, X } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 interface CodebaseArtifactCanvasProps {
 	fileName: string;
 	badge: string;
+	/**
+	 * The active artifact's real content to copy. `null` means no complete
+	 * content is available (loading, failed, or a truncated source preview):
+	 * the copy action is disabled rather than copying a filename or a partial
+	 * file as though it were whole.
+	 */
+	copyValue: string | null;
+	/** Accessible label for the copy action; defaults to the artifact name. */
+	copyLabel?: string;
+	/** Explains why copy is unavailable when `copyValue` is null. */
+	copyUnavailableReason?: string;
 	subnav?: ReactNode;
 	isLoading?: boolean;
 	error?: string | null;
@@ -18,6 +29,9 @@ interface CodebaseArtifactCanvasProps {
 export function CodebaseArtifactCanvas({
 	fileName,
 	badge,
+	copyValue,
+	copyLabel,
+	copyUnavailableReason,
 	subnav,
 	isLoading = false,
 	error,
@@ -26,20 +40,49 @@ export function CodebaseArtifactCanvas({
 	onClose,
 	children,
 }: CodebaseArtifactCanvasProps) {
-	const [copied, setCopied] = useState(false);
+	const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
+		"idle",
+	);
 	const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	const handleCopyFileName = async () => {
-		try {
-			if (!navigator.clipboard?.writeText) return;
-			await navigator.clipboard.writeText(fileName);
-			setCopied(true);
+	useEffect(
+		() => () => {
 			if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-			copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+		},
+		[],
+	);
+
+	const scheduleReset = () => {
+		if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+		copyTimeoutRef.current = setTimeout(() => setCopyState("idle"), 2000);
+	};
+
+	const handleCopy = async () => {
+		if (copyValue === null) return;
+		try {
+			if (!navigator.clipboard?.writeText) {
+				setCopyState("failed");
+				scheduleReset();
+				return;
+			}
+			await navigator.clipboard.writeText(copyValue);
+			setCopyState("copied");
+			scheduleReset();
 		} catch {
-			return;
+			setCopyState("failed");
+			scheduleReset();
 		}
 	};
+
+	const copyDisabled = copyValue === null;
+	const resolvedLabel = copyLabel ?? `Salin isi ${fileName}`;
+	const copyTitle = copyDisabled
+		? (copyUnavailableReason ?? "Isi belum tersedia untuk disalin")
+		: copyState === "copied"
+			? "Tersalin"
+			: copyState === "failed"
+				? "Gagal menyalin"
+				: resolvedLabel;
 
 	return (
 		<section
@@ -64,13 +107,14 @@ export function CodebaseArtifactCanvas({
 					<div className="flex shrink-0 items-center gap-1.5">
 						<button
 							type="button"
-							onClick={handleCopyFileName}
-							aria-label={`Salin nama file ${fileName}`}
-							title={copied ? "Tersalin" : "Salin nama file"}
+							onClick={handleCopy}
+							disabled={copyDisabled}
+							aria-label={resolvedLabel}
+							title={copyTitle}
 							data-testid="codebase-canvas-copy"
-							className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-graphite disabled:hover:text-fog"
 						>
-							{copied ? (
+							{copyState === "copied" ? (
 								<Check
 									size={14}
 									strokeWidth={1.75}
@@ -78,9 +122,25 @@ export function CodebaseArtifactCanvas({
 									className="text-emerald"
 								/>
 							) : (
-								<Copy size={14} strokeWidth={1.75} aria-hidden="true" />
+								<Copy
+									size={14}
+									strokeWidth={1.75}
+									aria-hidden="true"
+									className={
+										copyState === "failed" ? "text-crimson" : undefined
+									}
+								/>
 							)}
 						</button>
+						{copyState === "failed" ? (
+							<span
+								role="status"
+								data-testid="codebase-canvas-copy-error"
+								className="font-mono text-[10px] text-crimson"
+							>
+								Gagal menyalin
+							</span>
+						) : null}
 						{onDownload ? (
 							<button
 								type="button"

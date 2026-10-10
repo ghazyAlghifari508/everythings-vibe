@@ -257,44 +257,11 @@ describe("CodebaseSourcePreview original and formatted views", () => {
 });
 
 describe("CodebaseSourcePreview copying and safety", () => {
-	it("copies the original file content even while showing the formatted view", async () => {
-		const writeText = vi.fn().mockResolvedValue(undefined);
-		Object.defineProperty(navigator, "clipboard", {
-			configurable: true,
-			value: { writeText },
-		});
-		const minified = "<div><p>x</p></div>";
-		render({ path: "ok.html", content: minified });
-		click("codebase-source-mode-formatted");
-
-		const copyButton = container.querySelector<HTMLButtonElement>(
-			"[data-testid='codebase-source-copy']",
-		);
-		expect(copyButton?.getAttribute("aria-label")).toBe(
-			"Salin isi asli ok.html",
-		);
-		await act(async () => {
-			copyButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-		expect(writeText).toHaveBeenCalledWith(minified);
-	});
-
-	it("copies a code file byte for byte", async () => {
-		const writeText = vi.fn().mockResolvedValue(undefined);
-		Object.defineProperty(navigator, "clipboard", {
-			configurable: true,
-			value: { writeText },
-		});
-		const content = "const a = 1;\r\n\tconst b = 2;\n";
-		render({ path: "src/app.ts", content });
-
-		const copyButton = container.querySelector<HTMLButtonElement>(
-			"[data-testid='codebase-source-copy']",
-		);
-		await act(async () => {
-			copyButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-		expect(writeText).toHaveBeenCalledWith(content);
+	it("offers no copy action of its own — copying lives in the canvas header", () => {
+		render({ path: "ok.html", content: "<div><p>x</p></div>" });
+		expect(
+			container.querySelector("[data-testid='codebase-source-copy']"),
+		).toBeNull();
 	});
 
 	it("renders repository content as inert text, never as executable markup", () => {

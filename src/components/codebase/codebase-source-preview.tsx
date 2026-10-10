@@ -1,8 +1,6 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { sourceFileName } from "@/lib/codebase-source-preview";
+import { useMemo, useState } from "react";
 import {
 	buildSourceViewRows,
 	type SourceToken,
@@ -25,63 +23,6 @@ function formatSize(sizeBytes: number | null): string | null {
 	}
 	if (sizeBytes < 1024) return `${sizeBytes} B`;
 	return `${(sizeBytes / 1024).toFixed(1)} KB`;
-}
-
-function CopyAction({
-	label,
-	value,
-	testId,
-}: {
-	label: string;
-	value: string;
-	testId: string;
-}) {
-	const [copied, setCopied] = useState(false);
-	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	useEffect(
-		() => () => {
-			if (timeoutRef.current) clearTimeout(timeoutRef.current);
-		},
-		[],
-	);
-
-	const handleCopy = async () => {
-		try {
-			if (!navigator.clipboard?.writeText) return;
-			await navigator.clipboard.writeText(value);
-			setCopied(true);
-			if (timeoutRef.current) clearTimeout(timeoutRef.current);
-			timeoutRef.current = setTimeout(() => setCopied(false), 2000);
-		} catch {
-			return;
-		}
-	};
-
-	return (
-		<button
-			type="button"
-			onClick={() => void handleCopy()}
-			aria-label={label}
-			title={label}
-			data-testid={testId}
-			className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2 text-[11px] text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-		>
-			{copied ? (
-				<Check
-					size={12}
-					strokeWidth={1.75}
-					aria-hidden="true"
-					className="text-emerald"
-				/>
-			) : (
-				<Copy size={12} strokeWidth={1.75} aria-hidden="true" />
-			)}
-			<span className={copied ? "text-emerald" : undefined}>
-				{copied ? "Tersalin" : "Salin"}
-			</span>
-		</button>
-	);
 }
 
 /**
@@ -130,7 +71,6 @@ export function CodebaseSourcePreview({
 		[content, path, mode],
 	);
 	const sizeLabel = formatSize(sizeBytes);
-	const name = sourceFileName(path);
 	const isClipped = truncated || view.truncatedLines;
 
 	return (
@@ -146,34 +86,27 @@ export function CodebaseSourcePreview({
 						{view.totalLines.toLocaleString("id-ID")} baris
 					</span>
 				</p>
-				<div className="flex items-center gap-1.5">
-					{view.formattedAvailable ? (
-						<fieldset className="flex rounded-md border border-graphite bg-obsidian p-0.5">
-							<legend className="sr-only">Tampilan isi file</legend>
-							{(["original", "formatted"] as const).map((option) => (
-								<button
-									key={option}
-									type="button"
-									onClick={() => setMode(option)}
-									aria-pressed={view.mode === option}
-									data-testid={`codebase-source-mode-${option}`}
-									className={`min-h-7 rounded px-2 text-[11px] font-medium capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-										view.mode === option
-											? "bg-steel/40 text-snow"
-											: "text-fog hover:text-snow"
-									}`}
-								>
-									{option === "original" ? "Asli" : "Terformat"}
-								</button>
-							))}
-						</fieldset>
-					) : null}
-					<CopyAction
-						label={`Salin isi asli ${name}`}
-						value={content}
-						testId="codebase-source-copy"
-					/>
-				</div>
+				{view.formattedAvailable ? (
+					<fieldset className="flex rounded-md border border-graphite bg-obsidian p-0.5">
+						<legend className="sr-only">Tampilan isi file</legend>
+						{(["original", "formatted"] as const).map((option) => (
+							<button
+								key={option}
+								type="button"
+								onClick={() => setMode(option)}
+								aria-pressed={view.mode === option}
+								data-testid={`codebase-source-mode-${option}`}
+								className={`min-h-7 rounded px-2 text-[11px] font-medium capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+									view.mode === option
+										? "bg-steel/40 text-snow"
+										: "text-fog hover:text-snow"
+								}`}
+							>
+								{option === "original" ? "Asli" : "Terformat"}
+							</button>
+						))}
+					</fieldset>
+				) : null}
 			</div>
 			{isClipped ? (
 				<output

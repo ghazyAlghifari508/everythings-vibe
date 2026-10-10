@@ -1,4 +1,5 @@
-import { isValidElement } from "react";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import { buildHandoffCommand } from "./codebase-chat-workspace";
 import {
@@ -8,31 +9,31 @@ import {
 import { formatFileSize } from "./codebase-file-card";
 import { getCodebaseKanbanProgress } from "./codebase-kanban-board";
 import {
-	codebaseMarkdownComponents,
+	CodebaseMarkdown,
 	parseVersionRows,
 	selectLatestVersionContent,
 } from "./codebase-markdown";
 
-describe("codebaseMarkdownComponents", () => {
-	test("renders a mermaid fence as a diagram element, not raw code text", () => {
-		const code = codebaseMarkdownComponents.code;
-		expect(code).toBeDefined();
-		const rendered = code?.({
-			className: "language-mermaid",
-			children: "graph TD;\n  A-->B;",
-		});
-		expect(isValidElement(rendered)).toBe(true);
-		expect(rendered?.type).not.toBe("code");
+function renderMarkdown(content: string): string {
+	return renderToStaticMarkup(createElement(CodebaseMarkdown, { content }));
+}
+
+describe("CodebaseMarkdown mermaid handling", () => {
+	test("intercepts a mermaid fence instead of emitting it as a code block", () => {
+		const html = renderMarkdown("```mermaid\ngraph TD;\n  A-->B;\n```");
+		expect(html).not.toContain("language-mermaid");
+		expect(html).not.toContain("graph TD");
 	});
 
-	test("keeps an ordinary fenced block as a code element", () => {
-		const code = codebaseMarkdownComponents.code;
-		const rendered = code?.({
-			className: "language-ts",
-			children: "const a = 1;",
-		});
-		expect(isValidElement(rendered)).toBe(true);
-		expect(rendered?.type).toBe("code");
+	test("keeps an ordinary fenced block as a highlighted code block", () => {
+		const html = renderMarkdown("```ts\nconst a = 1;\n```");
+		expect(html).toContain("language-ts");
+		expect(html).toContain("hljs-keyword");
+	});
+
+	test("anchors headings so the table of contents can navigate to them", () => {
+		const html = renderMarkdown("## Tujuan Produk\n\nisi");
+		expect(html).toContain('id="tujuan-produk"');
 	});
 });
 

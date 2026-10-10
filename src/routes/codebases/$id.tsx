@@ -1320,6 +1320,52 @@ function CodebaseDetailPage() {
 		resolvedFeature != null &&
 		activeArtifact?.id === `tasks-${resolvedFeature.id}`;
 
+	// One canonical copy target for the header toolbar. A truncated source
+	// preview has no complete content to copy, so it resolves to null and the
+	// action is disabled rather than copying a partial file as though it were
+	// whole.
+	const canvasCopy = useMemo((): {
+		value: string | null;
+		label?: string;
+		unavailableReason?: string;
+	} => {
+		if (isSourcePreviewOpen) {
+			if (sourcePreview.kind === "ready") {
+				return sourcePreview.truncated
+					? {
+							value: null,
+							label: "Salin isi sumber",
+							unavailableReason:
+								"Pratinjau dipotong — buka file di repository lokal untuk menyalin isi lengkap.",
+						}
+					: { value: sourcePreview.content, label: "Salin isi sumber" };
+			}
+			return { value: null };
+		}
+		if (!activeArtifact) return { value: null };
+		if (activeArtifact.id.startsWith("feature-") && featureTree) {
+			return { value: JSON.stringify(featureTree, null, 2) };
+		}
+		if (activeArtifact.id.startsWith("prd-") && prdContent) {
+			return { value: prdContent };
+		}
+		if (activeArtifact.id.startsWith("ac-") && acContent) {
+			return { value: acContent };
+		}
+		if (activeArtifact.id.startsWith("tasks-") && taskTree) {
+			return { value: JSON.stringify(taskTree, null, 2) };
+		}
+		return { value: null };
+	}, [
+		isSourcePreviewOpen,
+		sourcePreview,
+		activeArtifact,
+		featureTree,
+		prdContent,
+		acContent,
+		taskTree,
+	]);
+
 	const fetchAiQuestions = useCallback(
 		async (projectId: string, prompt: string) => {
 			setQuestionsLoading(true);
@@ -1894,6 +1940,9 @@ function CodebaseDetailPage() {
 										? "SUMBER"
 										: (activeArtifact?.badge ?? "PRATINJAU")
 								}
+								copyValue={canvasCopy.value}
+								copyLabel={canvasCopy.label}
+								copyUnavailableReason={canvasCopy.unavailableReason}
 								onClose={() => setCanvasOpen(false)}
 								onDownload={
 									!isSourcePreviewOpen && activeArtifact
