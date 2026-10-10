@@ -18,6 +18,10 @@ import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { parseAndValidateFormat } from "@/lib/url-validator";
+import {
+	type ScrapeJobClaim,
+	scrapeClaimPredicate,
+} from "./scrape-job-service";
 
 export interface ScrapeSummary {
 	id: string;
@@ -74,6 +78,7 @@ export async function createScrape(
 export async function runScrapePipeline(
 	scrapeId: string,
 	userId: string,
+	claim?: ScrapeJobClaim,
 ): Promise<void> {
 	const [scrape] = await db
 		.select()
@@ -81,6 +86,10 @@ export async function runScrapePipeline(
 		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
 		.limit(1);
 	if (!scrape) return;
+	const writePredicate = () =>
+		claim
+			? scrapeClaimPredicate(claim)
+			: and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId));
 	const mode: ScrapeMode = (scrape.mode ??
 		scrape.metadata?.mode ??
 		"design") as ScrapeMode;
@@ -107,10 +116,13 @@ export async function runScrapePipeline(
 			progress: scrapeProgressForStatus(status, mode),
 			stageStartedAt: new Date().toISOString(),
 		};
-		await db
+		const saved = await db
 			.update(scrapes)
 			.set({ status, metadata: meta, updatedAt: new Date(), ...columns })
-			.where(eq(scrapes.id, scrapeId));
+			.where(writePredicate())
+			.returning({ id: scrapes.id });
+		if (!saved.length)
+			throw new ScrapeError("STORAGE_FAILED", "Job lease sudah tidak berlaku.");
 	};
 
 	const timings: Record<string, number> = {};
@@ -120,7 +132,7 @@ export async function runScrapePipeline(
 			await db
 				.update(scrapes)
 				.set({ metadata: meta, updatedAt: new Date() })
-				.where(eq(scrapes.id, scrapeId));
+				.where(writePredicate());
 		},
 		onTiming: (label, durationMs) => {
 			timings[label] = (timings[label] ?? 0) + durationMs;
@@ -198,7 +210,7 @@ export async function runScrapePipeline(
 			activity: "Menyimpan hasil",
 			activityStartedAt: new Date().toISOString(),
 		});
-		await saveScrapeDocument(scrapeId, designMd);
+		await saveScrapeDocument(scrapeId, designMd, userId, claim);
 		instrumentation.onTiming?.("save", Date.now() - saveStart);
 
 		await persist("completed");
@@ -237,7 +249,7 @@ export async function runScrapePipeline(
 				},
 				updatedAt: new Date(),
 			})
-			.where(eq(scrapes.id, scrapeId));
+			.where(writePredicate());
 	}
 }
 
@@ -331,9 +343,20 @@ export async function listScrapes(
 export async function saveScrapeDocument(
 	scrapeId: string,
 	designMd: string,
+	userId?: string,
+	claim?: ScrapeJobClaim,
 ): Promise<ScrapeDocumentRow> {
 	if (!designMd || designMd.trim().length === 0)
 		throw new ScrapeError("AI_GENERATION_FAILED", "DESIGN.md kosong.");
+	if (claim) {
+		const [owner] = await db
+			.select({ id: scrapes.id })
+			.from(scrapes)
+			.where(scrapeClaimPredicate(claim))
+			.limit(1);
+		if (!owner || owner.id !== scrapeId || claim.userId !== userId)
+			throw new ScrapeError("STORAGE_FAILED", "Job lease sudah tidak berlaku.");
+	}
 
 	const [existing] = await db
 		.select()
