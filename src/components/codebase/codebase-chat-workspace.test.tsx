@@ -179,6 +179,31 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(container.textContent).not.toContain("Repository Lokal");
 	});
 
+	it("keeps the starter cards and reports a newer failed attempt beside them", () => {
+		renderWorkspace({
+			starterSuggestions,
+			newerAttemptFailure: { errorMessage: "Model timeout" },
+		});
+
+		const notice = container.querySelector(
+			"[data-testid='codebase-newer-attempt-failed']",
+		);
+		expect(notice?.textContent).toContain("Analisis terbaru gagal");
+		expect(notice?.textContent).toContain("Model timeout");
+		expect(
+			container.querySelectorAll(
+				"[data-testid='codebase-intent-starters'] button",
+			),
+		).toHaveLength(4);
+	});
+
+	it("shows no failure notice when the newest attempt did not fail", () => {
+		renderWorkspace({ starterSuggestions, newerAttemptFailure: null });
+		expect(
+			container.querySelector("[data-testid='codebase-newer-attempt-failed']"),
+		).toBeNull();
+	});
+
 	it("renders exactly the supplied repository-aware starters in one section", () => {
 		const onSendMessage = vi.fn();
 		renderWorkspace({

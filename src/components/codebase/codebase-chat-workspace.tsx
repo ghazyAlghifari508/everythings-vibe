@@ -69,6 +69,12 @@ interface CodebaseChatWorkspaceProps {
 		isRefreshing?: boolean;
 		error?: string | null;
 	};
+	/**
+	 * A newer analysis attempt for the same snapshot failed while the starter
+	 * cards still come from an earlier ready analysis. Shown so the failure is
+	 * not hidden by the cards.
+	 */
+	newerAttemptFailure?: { errorMessage: string | null } | null;
 	isSending?: boolean;
 	isConfirming?: boolean;
 	specError?: string | null;
@@ -135,6 +141,7 @@ export function CodebaseChatWorkspace({
 	onGenerateAc,
 	onGenerateTask,
 	starterRefresh,
+	newerAttemptFailure,
 	onRefreshStarterSuggestions,
 }: CodebaseChatWorkspaceProps) {
 	const [selected, setSelected] = useState<Record<string, string>>({});
@@ -311,6 +318,20 @@ export function CodebaseChatWorkspace({
 						<div className="w-full shrink-0 bg-transparent text-left">
 							{renderComposer(2, "p-3.5 sm:p-4")}
 						</div>
+
+						{newerAttemptFailure ? (
+							<output
+								data-testid="codebase-newer-attempt-failed"
+								className="block w-full text-left text-xs leading-5 text-crimson"
+							>
+								Analisis terbaru gagal
+								{newerAttemptFailure.errorMessage
+									? `: ${newerAttemptFailure.errorMessage}`
+									: "."}{" "}
+								Saran di bawah berasal dari analisis sebelumnya untuk snapshot
+								yang sama.
+							</output>
+						) : null}
 
 						{validStarterSuggestions ? (
 							<div

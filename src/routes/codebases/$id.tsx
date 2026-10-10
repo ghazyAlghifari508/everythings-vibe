@@ -1841,6 +1841,14 @@ function CodebaseDetailPage() {
 											}
 										: undefined
 								}
+								newerAttemptFailure={
+									analysis &&
+									status?.analysisAttemptStatus === "failed" &&
+									status.snapshotId === analysis.snapshotId &&
+									status.analysisAttemptId !== analysis.id
+										? { errorMessage: status.errorMessage ?? null }
+										: null
+								}
 								onRefreshStarterSuggestions={refreshStarterSuggestions}
 								isSending={isWorking}
 								isConfirming={isConfirming}
