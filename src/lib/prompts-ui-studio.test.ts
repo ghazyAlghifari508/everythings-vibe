@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+	buildStudioFramePrompt,
+	buildStudioPlanningPrompt,
 	buildStudioUserPrompt,
+	parseStudioScreenPlan,
 	STUDIO_MAX_PROMPT_CHARS,
 	STUDIO_MIN_PROMPT_CHARS,
+	STUDIO_PLAN_SYSTEM_PROMPT,
 	STUDIO_SYSTEM_PROMPT,
 	sanitizeStudioDesignMd,
 	validateStudioDesignMd,
@@ -101,5 +105,116 @@ describe("Studio Prompt Builder", () => {
 		expect(prompt).toContain(
 			'<img src="/api/studio/asset?id=logo-123&cap=sig456"',
 		);
+	});
+
+	describe("Multi-Screen Planning and Frame Prompts", () => {
+		it("defines STUDIO_PLAN_SYSTEM_PROMPT requiring structured JSON output", () => {
+			expect(STUDIO_PLAN_SYSTEM_PROMPT).toContain("JSON");
+			expect(STUDIO_PLAN_SYSTEM_PROMPT).toContain("screens");
+		});
+
+		it("parses valid JSON screen plan into StudioScreenPlan", () => {
+			const json = JSON.stringify({
+				projectTitle: "Finance Mobile App",
+				screens: [
+					{
+						name: "Dashboard",
+						description: "Ringkasan saldo dan kartu transfer",
+						viewport: "mobile",
+						order: 0,
+					},
+					{
+						name: "Transactions",
+						description: "Daftar riwayat transaksi",
+						viewport: "mobile",
+						order: 1,
+					},
+				],
+			});
+			const res = parseStudioScreenPlan(json);
+			expect(res.ok).toBe(true);
+			if (res.ok) {
+				expect(res.plan.projectTitle).toBe("Finance Mobile App");
+				expect(res.plan.screens).toHaveLength(2);
+				expect(res.plan.screens[0].name).toBe("Dashboard");
+				expect(res.plan.screens[0].viewport).toBe("mobile");
+			}
+		});
+
+		it("parses JSON wrapped inside markdown code fences", () => {
+			const wrapped = `Berikut rencananya:
+\`\`\`json
+{
+  "projectTitle": "E-Commerce Web",
+  "screens": [
+    {
+      "name": "Catalog",
+      "description": "Daftar produk",
+      "viewport": "web",
+      "order: 0
+    }
+  ]
+}
+\`\`\``;
+			// Clean json inside fence
+			const cleanWrapped = `\`\`\`json
+{
+  "projectTitle": "E-Commerce Web",
+  "screens": [
+    {
+      "name": "Catalog",
+      "description": "Daftar produk",
+      "viewport": "web",
+      "order": 0
+    }
+  ]
+}
+\`\`\``;
+			const res = parseStudioScreenPlan(cleanWrapped);
+			expect(res.ok).toBe(true);
+			if (res.ok) {
+				expect(res.plan.projectTitle).toBe("E-Commerce Web");
+				expect(res.plan.screens[0].name).toBe("Catalog");
+			}
+		});
+
+		it("rejects invalid JSON or empty screens in parseStudioScreenPlan", () => {
+			expect(parseStudioScreenPlan("bukan json").ok).toBe(false);
+			expect(
+				parseStudioScreenPlan(
+					JSON.stringify({ projectTitle: "Kosong", screens: [] }),
+				).ok,
+			).toBe(false);
+		});
+
+		it("builds planning prompt incorporating prompt and design mode", () => {
+			const prompt = buildStudioPlanningPrompt(
+				"Aplikasi manajemen gym",
+				"mobile",
+				"## Theme\nPrimary: #107c41",
+			);
+			expect(prompt).toContain("Aplikasi manajemen gym");
+			expect(prompt).toContain("mobile");
+			expect(prompt).toContain("Primary: #107c41");
+		});
+
+		it("builds frame generation prompt with shared design context and logo", () => {
+			const prompt = buildStudioFramePrompt({
+				screenName: "Dashboard",
+				screenDescription: "Ringkasan metrik dan grafik penjualan",
+				allScreens: ["Dashboard", "Transactions", "Settings"],
+				projectPrompt: "Sistem kasir toko ritel",
+				designMode: "web",
+				designMd: "## Colors\nPrimary: #000000",
+				logoUrl: "/api/studio/asset?id=logo-1",
+			});
+			expect(prompt).toContain("Dashboard");
+			expect(prompt).toContain("Ringkasan metrik dan grafik penjualan");
+			expect(prompt).toContain("Transactions");
+			expect(prompt).toContain("Settings");
+			expect(prompt).toContain("Sistem kasir toko ritel");
+			expect(prompt).toContain("/api/studio/asset?id=logo-1");
+			expect(prompt).toContain("Primary: #000000");
+		});
 	});
 });
