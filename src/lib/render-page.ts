@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { type Browser, type BrowserContext, chromium } from "playwright";
+import type { ScrapeMode } from "@/db/schema";
 import {
 	SCRAPE_BROWSER_UA,
 	SCRAPE_DESKTOP_HEIGHT,
@@ -13,7 +14,7 @@ import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { isPrivateIp } from "@/lib/url-validator";
 
 export interface RenderPageOptions extends ScrapeInstrumentation {
-	mode?: "design" | "html";
+	mode?: ScrapeMode;
 }
 
 export const DESKTOP_VIEWPORT = {
