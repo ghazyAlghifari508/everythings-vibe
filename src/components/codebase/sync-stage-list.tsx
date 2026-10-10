@@ -107,10 +107,25 @@ export function SyncStageList({
 	status,
 	className,
 	isAnalysisReady = false,
+	showAnalysisFailure = false,
+	analysisError = null,
+	onRetryAnalysis,
+	isAnalyzing = false,
 }: {
 	status: SyncStatusResponse | null;
 	className?: string;
 	isAnalysisReady?: boolean;
+	/**
+	 * Render the failed analysis as one integrated error area inside the
+	 * analysis row itself (message + retry), instead of a second alert
+	 * below the stage list. Owned by the screen: it combines the trigger
+	 * error, the polled analysis status, and the persisted analysis record.
+	 */
+	showAnalysisFailure?: boolean;
+	/** Safe user-facing analysis message, rendered only inside the row. */
+	analysisError?: string | null;
+	onRetryAnalysis?: () => void;
+	isAnalyzing?: boolean;
 }) {
 	const view = resolveSyncStageView(status);
 
@@ -150,6 +165,15 @@ export function SyncStageList({
 		}
 	}
 
+	const formatCount = (value: number): string => value.toLocaleString("id-ID");
+	const summaryParts: string[] = [];
+	if (view.syncComplete && status?.fileCount !== undefined) {
+		summaryParts.push(`${formatCount(status.fileCount)} file tersinkron`);
+	}
+	if (view.syncComplete && view.excludedCount !== undefined) {
+		summaryParts.push(`${formatCount(view.excludedCount)} file dikecualikan`);
+	}
+
 	return (
 		<div className={cn("flex flex-col gap-2.5", className)}>
 			{view.stages.map((row, index) => {
@@ -158,13 +182,56 @@ export function SyncStageList({
 					<StageRow key={key} testId={SYNC_STAGE_TEST_IDS[key]} row={row} />
 				) : null;
 			})}
-			{analysisRow && (
-				<StageRow testId="sync-stage-analysis" row={analysisRow} />
+			{showAnalysisFailure && onRetryAnalysis ? (
+				<div
+					data-testid="sync-stage-analysis"
+					data-stage-state="failed"
+					className={cn(
+						"flex items-start gap-2.5 rounded-md border p-3 text-[11px] transition-colors",
+						STAGE_SURFACE.failed,
+					)}
+				>
+					<span className="mt-0.5 shrink-0">
+						<StageIcon state="failed" />
+					</span>
+					<span className="flex min-w-0 flex-1 flex-col gap-1">
+						<span
+							data-testid="analysis-failure-alert"
+							role="alert"
+							className="flex flex-col gap-1"
+						>
+							<span className={STAGE_TITLE.failed}>
+								Analisis codebase belum berhasil
+							</span>
+							{analysisError && (
+								<span className="leading-relaxed text-fog">
+									{analysisError}
+								</span>
+							)}
+							<span className="leading-relaxed text-fog">
+								Snapshot yang sudah diunggah tetap tersimpan — analisis dapat
+								dicoba ulang tanpa mengunggah ulang.
+							</span>
+							<button
+								type="button"
+								data-testid="retry-analysis-button"
+								onClick={onRetryAnalysis}
+								disabled={isAnalyzing}
+								className="mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								{isAnalyzing ? "Menganalisis..." : "Coba lagi analisis"}
+							</button>
+						</span>
+					</span>
+				</div>
+			) : (
+				analysisRow && (
+					<StageRow testId="sync-stage-analysis" row={analysisRow} />
+				)
 			)}
-			{view.excludedCount !== undefined && (
-				<p className="font-mono text-[11px] text-fog">
-					{view.excludedCount} file tidak ikut dikirim (rahasia, dependensi,
-					build, binary)
+			{summaryParts.length > 0 && (
+				<p className="font-mono text-[11px] tabular-nums text-fog">
+					{summaryParts.join(" · ")}
 				</p>
 			)}
 		</div>
