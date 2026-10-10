@@ -7,7 +7,15 @@ import {
 	Folder,
 	Search,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
+import {
+	collectFolderPaths,
+	explorerExpansionStorageKey,
+	parseExplorerExpansion,
+	pruneExplorerExpansion,
+	serializeExplorerExpansion,
+} from "@/lib/codebase-explorer-expansion";
 
 export interface ExplorerFileEntry {
 	path: string;
@@ -17,6 +25,8 @@ export interface ExplorerFileEntry {
 interface CodebaseExplorerSidebarProps {
 	files: ExplorerFileEntry[];
 	stack: string[];
+	/** Scopes the stored expansion preference; repositories never share one. */
+	codebaseId?: string;
 	onSelectFile?: (path: string) => void;
 }
 
@@ -112,22 +122,36 @@ export function buildTree(files: ExplorerFileEntry[]): TreeNode[] {
 	return sortTreeNodes(roots);
 }
 
+/**
+ * Collects every folder path a tree can contain, including folders that only
+ * appear once their parent is expanded.
+ */
+export function collectTreeFolderPaths(
+	nodes: readonly TreeNode[],
+): Set<string> {
+	return collectFolderPaths(nodes);
+}
+
 function TreeRow({
 	node,
 	depth,
+	expandedPaths,
+	onToggleFolder,
 	onSelectFile,
 }: {
 	node: TreeNode;
 	depth: number;
+	expandedPaths: ReadonlySet<string>;
+	onToggleFolder: (path: string) => void;
 	onSelectFile?: (path: string) => void;
 }) {
-	const [expanded, setExpanded] = useState(depth < 2);
+	const expanded = expandedPaths.has(node.fullPath);
 	if (!node.isFile && node.children.length > 0) {
 		return (
 			<div>
 				<button
 					type="button"
-					onClick={() => setExpanded((current) => !current)}
+					onClick={() => onToggleFolder(node.fullPath)}
 					aria-expanded={expanded}
 					className="flex min-h-9 w-full items-center gap-1.5 rounded-md px-2 text-left font-mono text-[12px] text-mist hover:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					style={{ paddingLeft: `${8 + depth * 12}px` }}
@@ -159,6 +183,8 @@ function TreeRow({
 								key={child.fullPath}
 								node={child}
 								depth={depth + 1}
+								expandedPaths={expandedPaths}
+								onToggleFolder={onToggleFolder}
 								onSelectFile={onSelectFile}
 							/>
 						))}
@@ -195,14 +221,72 @@ function TreeRow({
 export function CodebaseExplorerSidebar({
 	files,
 	stack,
+	codebaseId,
 	onSelectFile,
 }: CodebaseExplorerSidebarProps) {
 	const [query, setQuery] = useState("");
+	const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(
+		() => new Set<string>(),
+	);
 	const filtered = useMemo(
 		() => filterExplorerFiles(files, query),
 		[files, query],
 	);
 	const tree = useMemo(() => buildTree(filtered), [filtered]);
+	// Pruning uses the unfiltered tree: a search that hides a folder must never
+	// look like the folder was removed.
+	const allFolders = useMemo(() => buildTree(files), [files]);
+	const storageKey = explorerExpansionStorageKey(codebaseId ?? "");
+	const restoredKeyRef = useRef<string | null>(null);
+
+	const persist = useCallback(
+		(paths: Iterable<string>) => {
+			if (!storageKey) return;
+			try {
+				localStorage.setItem(storageKey, serializeExplorerExpansion(paths));
+			} catch {
+				return;
+			}
+		},
+		[storageKey],
+	);
+
+	// Restored before the browser paints so a returning folder does not flash
+	// collapsed first; on the server the passive effect runs instead, which
+	// keeps the first client render identical to the server markup.
+	useIsomorphicLayoutEffect(() => {
+		if (!storageKey) return;
+		if (restoredKeyRef.current === storageKey) return;
+		restoredKeyRef.current = storageKey;
+		let stored: string[] = [];
+		try {
+			stored = parseExplorerExpansion(localStorage.getItem(storageKey));
+		} catch {
+			stored = [];
+		}
+		// Restoring is also the moment stale paths are dropped: writing the
+		// pruned list back keeps storage bounded and self-healing instead of
+		// carrying dead entries from an older snapshot forever.
+		const kept = pruneExplorerExpansion(
+			stored,
+			collectTreeFolderPaths(allFolders),
+		);
+		if (kept.length !== stored.length) persist(kept);
+		setExpandedPaths(new Set(kept));
+	}, [allFolders, persist, storageKey]);
+
+	const toggleFolder = useCallback(
+		(path: string) => {
+			setExpandedPaths((current) => {
+				const next = new Set(current);
+				if (next.has(path)) next.delete(path);
+				else next.add(path);
+				persist(next);
+				return next;
+			});
+		},
+		[persist],
+	);
 
 	return (
 		<div
@@ -252,6 +336,8 @@ export function CodebaseExplorerSidebar({
 								key={node.fullPath}
 								node={node}
 								depth={0}
+								expandedPaths={expandedPaths}
+								onToggleFolder={toggleFolder}
 								onSelectFile={onSelectFile}
 							/>
 						))}

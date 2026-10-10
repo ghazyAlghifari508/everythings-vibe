@@ -1801,6 +1801,7 @@ function CodebaseDetailPage() {
 							<CodebaseExplorerSidebar
 								files={explorerFiles}
 								stack={explorerStack}
+								codebaseId={codebase.id}
 								onSelectFile={selectSourceFile}
 							/>
 						}
