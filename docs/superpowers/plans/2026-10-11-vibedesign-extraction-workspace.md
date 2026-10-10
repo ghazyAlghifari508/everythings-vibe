@@ -20,7 +20,7 @@
 - Use no new runtime dependencies without approval.
 - Every coherent milestone requires affected tests, typecheck, changed-file Biome, diff/status review, and an atomic commit.
 - Before final delivery run full tests/check/build, type-bypass and security scans, authenticated application QA, push, and clean/upstream/outgoing verification.
-- Previous documentation records a request not to restart the dev server. Obtain authorization before starting application QA services.
+- The user explicitly declined starting the dev server and worker on 2026-10-11. Do not start either service; report application browser and managed worker runtime QA as blocked.
 
 ## Rule obligations
 
@@ -41,12 +41,12 @@
 
 **Interfaces:** Consume `resolveScrapeReturnPath(from: unknown): string`; preserve `ScrapeBackLink({ from?: unknown })`.
 
-- [ ] Read existing tests, return-path validation, form/history origin consumers, and recent navigation changes.
-- [ ] Replace the old expectation that history Back wins with a regression asserting the allowlisted target wins, including when unrelated history entries exist. Keep direct-link and unsafe-origin fallback coverage.
-- [ ] Run `pnpm test src/components/design/scrape-back-link.test.tsx src/lib/scrape-return-path.test.ts` and confirm the current interception violates that contract.
-- [ ] Remove the history interception and render the existing router Link with `to={target}` and `replace`, preserving modified-click native behavior.
-- [ ] Run the affected tests, `pnpm exec tsc --noEmit`, and `pnpm check src/components/design/scrape-back-link.tsx src/components/design/scrape-back-link.test.tsx`.
-- [ ] Inspect diff/status and commit `fix(design): honor validated scrape return destinations`.
+- [x] Read existing tests, return-path validation, form/history origin consumers, and recent navigation changes.
+- [x] Replace the old expectation that history Back wins with a regression asserting the allowlisted target wins, including when unrelated history entries exist. Keep direct-link and unsafe-origin fallback coverage.
+- [x] Run `pnpm test src/components/design/scrape-back-link.test.tsx src/lib/scrape-return-path.test.ts` and confirm the current interception violates that contract.
+- [x] Remove the history interception and render the existing router Link with `to={target}` and `replace`, preserving modified-click native behavior.
+- [x] Run the affected tests, `pnpm exec tsc --noEmit`, and `pnpm check src/components/design/scrape-back-link.tsx src/components/design/scrape-back-link.test.tsx`.
+- [x] Inspect diff/status and commit `fix(design): honor validated scrape return destinations` (`f585e61`).
 
 ## Task 2: Typed settings, persistence and queue
 
@@ -124,3 +124,11 @@
 - [ ] Review desktop/mobile 320–1440 widths, light/dark contrast, keyboard/focus, reduced motion, empty/error/pending states; fix issues and restart affected journeys.
 - [ ] Commit verified cleanup, push exact feature upstream, verify clean working tree and `git rev-list --left-right --count HEAD...@{upstream}` equals `0 0`.
 - [ ] Report actual changes, backend parameter effects, security/test/browser evidence, hashes, push and status. Do not call full feature Complete with missing runtime QA or modes.
+
+## Verified checkpoints
+
+- `addd373`: spec and plan; database-backed direction and uncharged Crawl/Images decision documented.
+- `f585e61`: contextual Back fix; regression demonstrated failure before fix, then 17 tests passed. Typecheck and changed-file Biome passed. Authenticated browser behavior remains unverified.
+- `130bd85`: browser-safe request/settings contract, not yet wired to API. Sixteen contract tests, typecheck, and changed-file Biome passed. Existing server DNS/private-IP protections remain the authoritative fetch boundary.
+- Baseline `pnpm test`: 223 files passed, two tests timed out under full-suite parallel load (2169 tests passed). Rerunning the two affected files passed all 10 tests. Do not characterize the full baseline suite as passed.
+- Full four-mode implementation remains pending. Written spec review is required before persistence/worker implementation proceeds.

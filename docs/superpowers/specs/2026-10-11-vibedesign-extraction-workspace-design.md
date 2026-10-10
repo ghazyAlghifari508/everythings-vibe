@@ -18,7 +18,7 @@ Implement real `design`, `html`, `crawl`, and `images` operations in the existin
 - `src/lib/scrape-return-path.ts` allowlists `/design/scrap` and `/design/scrap/history`. `scrape-back-link.tsx` overrides that target with history Back whenever possible, which makes return navigation depend on unrelated history entries.
 - `src/lib/adaptive-credit.ts` and `constants.ts` define codebase analysis, PRD, AC, and Task pricing. The inspected scrape API/service do not invoke credit accounting. The credit-service contract requires a planning project ID; a scrape must not masquerade as a planning project.
 - `vercel.json` configures a daily billing cron. `package.json` supplies pnpm scripts and installed Playwright, Drizzle, Zod, React, and TanStack dependencies.
-- `docs/vibedesign-preview-verification.md` records a previous request to stop the dev server. Respect that constraint until the user authorizes a new managed runtime for application QA.
+- `docs/vibedesign-preview-verification.md` records a previous request to stop the dev server. The user reaffirmed on 2026-10-11 that neither dev server nor worker may be started. Application browser QA and managed worker runtime QA are blocked by this explicit constraint; static and isolated fixture checks remain permitted.
 
 ## Architecture and alternatives
 
