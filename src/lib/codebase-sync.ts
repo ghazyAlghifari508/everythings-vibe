@@ -1224,7 +1224,7 @@ export function buildAgentPrompt(
 		"<output CLI asli secara lengkap>",
 		"",
 		"Tindakan Untuk User:",
-		"<Jika berhasil: 'Sinkronisasi berhasil! Kembali ke tab browser VibeEverything untuk melihat ringkasan analisis codebase.'>",
+		"<Jika berhasil: 'Sinkronisasi repository berhasil. Sebutkan jumlah file dan snapshot dari output CLI asli. Snapshot sudah tersimpan di VibeEverything. Analisis codebase berjalan terpisah di website dan mungkin belum selesai — arahkan user kembali ke VibeEverything untuk memantau status analisis sampai kesimpulan siap. Jangan menyatakan analisis selesai.'>",
 		"<Jika gagal: sampaikan arahan solusi sesuai diagnosa di atas.>",
 	].join("\n");
 }

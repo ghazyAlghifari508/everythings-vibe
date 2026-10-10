@@ -87,6 +87,18 @@ describe("buildAgentPrompt repository identity", () => {
 	});
 });
 
+describe("buildAgentPrompt completion semantics", () => {
+	it("distinguishes a stored snapshot from a ready analysis", () => {
+		const prompt = buildAgentPrompt(syncPayload(), {
+			projectName: "react-movie-app",
+		});
+		expect(prompt).toContain("Snapshot sudah tersimpan");
+		expect(prompt).toContain("terpisah");
+		expect(prompt).toContain("Jangan menyatakan analisis selesai");
+		expect(prompt).not.toContain("untuk melihat ringkasan analisis codebase");
+	});
+});
+
 describe("generated sync copy ignore branding", () => {
 	it("centers the agent prompt on the canonical ignore file", () => {
 		const prompt = buildAgentPrompt(syncPayload(), {
