@@ -29,6 +29,8 @@ These are one-run diagnostic measurements, not repeated performance benchmarks o
 
 A static external website was also replayed: the snapshot issued zero requests and no page errors. Its visible text differed from replay; full visual fidelity for that site needs further investigation before treating that case as passed.
 
+The static CERN World Wide Web page was subsequently compared: both strategies had 983 body-text characters, zero requests, zero page errors, and identical heading geometry. Snapshot TaskDuration was 0.057740 versus replay 0.073378 seconds in this one run.
+
 The module-heavy `https://vite.dev/` was tested with the same diagnostic. Replay reported `Failed to construct 'URL': Invalid base URL`; snapshot had no page error. Both had 3,339 body-text characters and identical heading rectangles (x=41, y=197, width=400, height=134.40625). Requests were 40 versus 33; ScriptDuration 0.022490 versus 0.001991 seconds; heap 5,140,232 versus 3,202,184 bytes. TaskDuration increased from 0.320482 to 0.371411 seconds, so reduced requests/script execution do not establish universally faster rendering.
 
 Chromium fixture integration also verifies four authorized module responses spanning relative static imports, export-from, literal dynamic imports, nested dependencies, and original `import.meta.url` resolution in an opaque-origin iframe. A separate browser case verifies that removed telemetry makes no request and a broken image produces degraded rather than empty readiness when text remains visible. Full repository tests passed (225 files, 2,168 tests) before these two additional browser cases; those cases passed separately. Typecheck and changed-file Biome checks passed. Production build passed with existing browser externalization and large-chunk warnings.
@@ -44,7 +46,9 @@ The iframe retains `sandbox="allow-scripts"` without same-origin. Snapshot CSP a
 - Authenticated application E2E, including full-resolution fonts/images through the actual proxy.
 - Broader visual checks below the fold, canvas/video preservation, and responsive capture limitations.
 - Readiness false-positive cases: decorative SVG, background-only content, transparent media, occlusion, and application-rendered fatal text.
-- Source tab retained iframe: website JavaScript is absent, but media activity still needs lifecycle verification.
+- Source tab clears iframe srcDoc, stopping captured-document activity; returning to Preview restores the same iframe element with a new document. Component regression verifies this lifecycle; authenticated browser media verification remains outstanding.
 - Repeat CPU/heap measurements and quantify long tasks.
 
 Do not describe this verification as pixel-perfect or a completed end-to-end delivery.
+
+Local authenticated QA reached `ERR_CONNECTION_REFUSED` on port 3000. The briefly started dev process was stopped at the user's request; no further dev server will be started. Headless Chromium diagnostic and fixture checks do not replace that application-level QA.
