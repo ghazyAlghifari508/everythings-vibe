@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertScrapeDocumentRow,
@@ -11,6 +11,7 @@ import {
 	scrapeDocuments,
 	scrapeProgressForStatus,
 	scrapes,
+	users,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
 import { extractDesignFromHtml } from "@/lib/design-extraction";
@@ -56,26 +57,64 @@ export async function createScrape(
 		throw new ScrapeError("INVALID_URL");
 	}
 
-	const [pending] = await db
-		.insert(scrapes)
-		.values({
-			userId,
-			sourceUrl: normalized,
-			domain: domainOf(normalized),
-			mode,
-			request: request ?? scrapeRequestSchema.parse({ url: normalized, mode }),
-			status: "queued",
-			metadata: {
+	return db.transaction(async (tx) => {
+		const [owner] = await tx
+			.select({ id: users.id })
+			.from(users)
+			.where(eq(users.id, userId))
+			.for("update")
+			.limit(1);
+		if (!owner) throw new ScrapeError("STORAGE_FAILED");
+		const validated =
+			request ?? scrapeRequestSchema.parse({ url: normalized, mode });
+		const active = await tx
+			.select()
+			.from(scrapes)
+			.where(
+				and(
+					eq(scrapes.userId, userId),
+					inArray(scrapes.status, [
+						"queued",
+						"capturing",
+						"extracting",
+						"generating",
+						"saving",
+					]),
+				),
+			);
+		const existing = active.find(
+			(row) =>
+				row.sourceUrl === normalized &&
+				row.mode === mode &&
+				JSON.stringify(row.request) === JSON.stringify(validated),
+		);
+		if (existing) return existing;
+		if (active.length >= 2)
+			throw new ScrapeError(
+				"WEBSITE_BLOCKED",
+				"Tunggu proses aktif selesai sebelum memulai ekstraksi baru.",
+			);
+		const [pending] = await tx
+			.insert(scrapes)
+			.values({
+				userId,
+				sourceUrl: normalized,
+				domain: domainOf(normalized),
 				mode,
-				stage: "queued",
-				progress: 0,
-				stageStartedAt: new Date().toISOString(),
-			},
-		} satisfies InsertScrapeRow)
-		.returning();
+				request: validated,
+				status: "queued",
+				metadata: {
+					mode,
+					stage: "queued",
+					progress: 0,
+					stageStartedAt: new Date().toISOString(),
+				},
+			} satisfies InsertScrapeRow)
+			.returning();
 
-	if (!pending) throw new ScrapeError("STORAGE_FAILED");
-	return pending;
+		if (!pending) throw new ScrapeError("STORAGE_FAILED");
+		return pending;
+	});
 }
 
 export async function runScrapePipeline(
@@ -156,10 +195,36 @@ export async function runScrapePipeline(
 		}
 		await persist("capturing");
 
-		const captured: ScrapeCapture = await scrapeHtml(scrape.sourceUrl, 1, {
-			...instrumentation,
-			mode,
-		});
+		const settings =
+			scrape.request?.mode === "html" ? scrape.request.settings : undefined;
+		const captured: ScrapeCapture =
+			scrape.html && scrape.previewHtml
+				? {
+						sourceUrl: scrape.sourceUrl,
+						domain: scrape.domain,
+						title: scrape.title,
+						html: scrape.html,
+						previewHtml: scrape.previewHtml,
+						status: 200,
+						metadata: {
+							attempt: scrape.jobAttempts,
+							capturedAt:
+								scrape.metadata?.capturedAt ?? scrape.createdAt.toISOString(),
+							finalUrl: scrape.sourceUrl,
+							viewport: scrape.metadata?.viewport ?? {
+								width: 1440,
+								height: 900,
+							},
+							captureMode: "persisted",
+							htmlBytes: Buffer.byteLength(scrape.html),
+							previewHtmlBytes: Buffer.byteLength(scrape.previewHtml),
+						},
+					}
+				: await scrapeHtml(scrape.sourceUrl, scrape.jobAttempts, {
+						...instrumentation,
+						mode,
+						...settings,
+					});
 		meta = { ...meta, ...captured.metadata };
 
 		if (mode === "html") {

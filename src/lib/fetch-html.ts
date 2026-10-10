@@ -258,7 +258,11 @@ export async function fetchHtml(
 export async function scrapeHtml(
 	rawUrl: string,
 	attemptNumber = 1,
-	instrumentation?: ScrapeInstrumentation & { mode?: ScrapeMode },
+	instrumentation?: ScrapeInstrumentation & {
+		mode?: ScrapeMode;
+		waitMs?: number;
+		includeIframes?: boolean;
+	},
 ): Promise<ScrapeCapture> {
 	const { url } = await validateUrl(rawUrl);
 	const { renderPage } = await import("./render-page");

@@ -18,6 +18,7 @@ export interface RenderPageOptions extends ScrapeInstrumentation {
 	mode?: ScrapeMode;
 	waitMs?: number;
 	measureResolution?: boolean;
+	includeIframes?: boolean;
 }
 
 export const DESKTOP_VIEWPORT = {
@@ -374,6 +375,36 @@ export async function renderPage(
 						return result;
 					}, options.measureResolution ?? true)
 				: undefined;
+		if (options.includeIframes) {
+			const origin = new URL(page.url()).origin;
+			let capturedFrames = 0;
+			for (const frame of page.frames().slice(1, 11)) {
+				if (capturedFrames >= 10) break;
+				try {
+					if (new URL(frame.url()).origin !== origin) {
+						await onActivity?.("Iframe cross-origin dilewati");
+						continue;
+					}
+					const content = await frame.content();
+					if (Buffer.byteLength(content) > SCRAPE_MAX_HTML_BYTES / 10) {
+						await onActivity?.("Iframe terlalu besar dilewati");
+						continue;
+					}
+					const element = await frame.frameElement();
+					await element.evaluate((node, source) => {
+						if (!(node instanceof Element)) return;
+						node.setAttribute("srcdoc", source);
+						node.removeAttribute("src");
+					}, content);
+					capturedFrames += 1;
+				} catch {
+					await onActivity?.("Iframe tidak dapat diakses, dilewati");
+				}
+			}
+		} else
+			await page.evaluate(() => {
+				for (const frame of document.querySelectorAll("iframe")) frame.remove();
+			});
 		const html = (await page.content().catch(() => "")).slice(
 			0,
 			SCRAPE_MAX_HTML_BYTES,
