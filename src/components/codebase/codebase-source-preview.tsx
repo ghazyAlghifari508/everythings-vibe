@@ -165,7 +165,9 @@ export function CodebaseSourcePreview({
 							components={{
 								pre: ({ children }) => <>{children}</>,
 								code: ({ className, children }) => (
-									<code className={className}>{children}</code>
+									<code className={`font-mono ${className ?? ""}`}>
+										{children}
+									</code>
 								),
 							}}
 						>
