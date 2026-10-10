@@ -6,7 +6,6 @@ import {
 	render,
 	screen,
 } from "@testing-library/react";
-import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScrapeDetail } from "./scrape-detail";
 
@@ -83,7 +82,29 @@ describe("ScrapeDetail preview readiness", () => {
 			/>,
 		);
 		act(() => report("ready", 0));
-		expect(screen.getByRole("status").textContent).toMatch(/siap dimuat/i);
+		expect(screen.queryByText(/menyiapkan preview website/i)).toBeNull();
+		expect(screen.queryByRole("status")).toBeNull();
+		expect(screen.getByTitle("Preview example.com")).toBeDefined();
+	});
+
+	it("shows preparing feedback inside the preview canvas, not below it", () => {
+		const { container } = render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc="<html><body>signed</body></html>"
+				previewState="ready"
+			/>,
+		);
+		const status = screen.getByRole("status");
+		expect(status.textContent).toMatch(/menyiapkan preview website/i);
+		const panel = screen.getByRole("tabpanel", {
+			name: /Preview index\.html/i,
+		});
+		expect(panel.contains(status)).toBe(true);
+		expect(
+			container.querySelector("output")?.parentElement?.className,
+		).not.toMatch(/border-t/);
 	});
 
 	it("distinguishes an empty framed document from a ready one", () => {
@@ -166,7 +187,8 @@ describe("ScrapeDetail preview readiness", () => {
 		});
 		seen.push(document.querySelector("output")?.textContent ?? "");
 
-		expect(seen[0]).toMatch(/siap dimuat/i);
+		expect(seen[0] ?? "").not.toMatch(/menyiapkan preview website/i);
+		expect(screen.queryByRole("status")).toBeNull();
 		expect(frame).toBeDefined();
 	});
 
@@ -206,7 +228,8 @@ describe("ScrapeDetail preview readiness", () => {
 				vi.advanceTimersByTime(2000);
 			});
 			expect(posted.length).toBe(afterSettle);
-			expect(screen.getByRole("status").textContent).toMatch(/siap dimuat/i);
+			expect(screen.queryByText(/menyiapkan preview website/i)).toBeNull();
+			expect(screen.queryByRole("status")).toBeNull();
 		} finally {
 			vi.useRealTimers();
 		}

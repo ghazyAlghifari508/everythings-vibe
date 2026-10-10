@@ -36,9 +36,9 @@ const READINESS_MESSAGE: Record<
 	{ label: string; tone: "pending" | "ok" | "warn"; detail: string }
 > = {
 	preparing: {
-		label: "Menyiapkan preview",
+		label: "Menyiapkan preview website",
 		tone: "pending",
-		detail: "Memuat dokumen dan resource website.",
+		detail: "Memuat tampilan dan resource halaman.",
 	},
 	ready: {
 		label: "Preview siap dimuat",
@@ -113,10 +113,14 @@ export function ScrapeDetail({
 	}, []);
 
 	const [frameSrcDoc, setFrameSrcDoc] = useState(previewSrcDoc);
-	if (frameSrcDoc !== previewSrcDoc) {
-		setFrameSrcDoc(previewSrcDoc);
-		setFrameReport("preparing");
-	}
+	const prevSrcDocRef = useRef(previewSrcDoc);
+	useEffect(() => {
+		if (prevSrcDocRef.current !== previewSrcDoc) {
+			prevSrcDocRef.current = previewSrcDoc;
+			setFrameSrcDoc(previewSrcDoc);
+			setFrameReport("preparing");
+		}
+	}, [previewSrcDoc]);
 
 	async function handleCopy(text: string, successMessage: string) {
 		setBusy(true);
@@ -233,13 +237,15 @@ export function ScrapeDetail({
 								: "Preview belum tersedia."
 						}
 						isRetryable={previewState === "failed"}
+						isLoading={previewState === "loading"}
 						onRetry={onRetryPreview}
 					/>
 				) : (
 					<DesktopPreview
 						title={`Preview ${domain}`}
-						srcDoc={previewSrcDoc}
+						srcDoc={frameSrcDoc}
 						report={frameReport}
+						active={htmlViewTab === "preview"}
 						onReport={handleFrameReport}
 					/>
 				)}
@@ -266,15 +272,25 @@ export function ScrapeDetail({
 function PreviewUnavailable({
 	message,
 	isRetryable,
+	isLoading = false,
 	onRetry,
 }: {
 	message: string;
 	isRetryable: boolean;
+	isLoading?: boolean;
 	onRetry?: () => void;
 }) {
 	return (
 		<div className="flex min-h-[280px] flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
-			<AlertTriangle size={20} aria-hidden className="text-amber-400" />
+			{isLoading ? (
+				<Loader2
+					size={20}
+					aria-hidden
+					className="text-fog motion-safe:animate-spin motion-reduce:animate-none"
+				/>
+			) : (
+				<AlertTriangle size={20} aria-hidden className="text-amber-400" />
+			)}
 			<output className="text-sm font-semibold text-snow">{message}</output>
 			<p className="max-w-md text-xs leading-5 text-fog">
 				Source HTML asli tetap tersedia di tab Source HTML.
@@ -293,28 +309,38 @@ function PreviewUnavailable({
 	);
 }
 
-function PreviewReadinessBanner({ report }: { report: FrameReport }) {
-	const { label, tone, detail } = READINESS_MESSAGE[report];
+function PreviewCanvasOverlay({ report }: { report: FrameReport }) {
+	const { label, detail } = READINESS_MESSAGE[report];
+	if (report === "ready") return null;
+	if (report === "degraded") {
+		return (
+			<div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-graphite bg-obsidian/95 px-2.5 py-1.5 text-xs">
+				<AlertTriangle
+					size={14}
+					aria-hidden
+					className="shrink-0 text-amber-400"
+				/>
+				<output className="truncate font-semibold text-snow">
+					{label}
+					<span className="font-normal text-fog"> {detail}</span>
+				</output>
+			</div>
+		);
+	}
 	return (
-		<output
-			className={`flex items-center gap-2 border-t border-graphite px-3 py-2 text-xs ${
-				tone === "ok"
-					? "text-emerald-400"
-					: tone === "warn"
-						? "text-amber-400"
-						: "text-fog"
-			}`}
-		>
-			{tone === "pending" ? (
-				<Loader2 size={14} aria-hidden className="animate-spin" />
-			) : tone === "ok" ? (
-				<Check size={14} aria-hidden />
+		<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
+			{report === "preparing" ? (
+				<Loader2
+					size={20}
+					aria-hidden
+					className="text-fog motion-safe:animate-spin motion-reduce:animate-none"
+				/>
 			) : (
-				<AlertTriangle size={14} aria-hidden />
+				<AlertTriangle size={20} aria-hidden className="text-amber-400" />
 			)}
-			<span className="font-semibold">{label}</span>
-			<span className="text-fog">{detail}</span>
-		</output>
+			<output className="text-sm font-semibold text-snow">{label}</output>
+			<p className="max-w-md text-xs leading-5 text-fog">{detail}</p>
+		</div>
 	);
 }
 
@@ -322,11 +348,13 @@ function DesktopPreview({
 	title,
 	srcDoc,
 	report,
+	active = true,
 	onReport,
 }: {
 	title: string;
 	srcDoc: string;
 	report: FrameReport;
+	active?: boolean;
 	onReport?: (report: FrameReport) => void;
 }) {
 	const wrapRef = useRef<HTMLDivElement>(null);
@@ -413,6 +441,7 @@ function DesktopPreview({
 	}, []);
 
 	const handleFrameLoad = useCallback(() => {
+		if (!active) return;
 		const frame = frameRef.current?.contentWindow;
 		if (!frame) return;
 		try {
@@ -420,12 +449,15 @@ function DesktopPreview({
 		} catch {
 			// Frame navigated away or is not reachable; readiness stays preparing.
 		}
-	}, []);
+	}, [active]);
 
 	// The framed document reports on its own load, but that can land before the
 	// listener above is attached, so keep asking until a report arrives.
 	useEffect(() => {
-		if (!onReport || !srcDoc) return;
+		if (!onReport || !srcDoc || !active) {
+			if (pingTimer.current) clearTimeout(pingTimer.current);
+			return;
+		}
 		settledRef.current = false;
 		let attempts = 0;
 		const ask = () => {
@@ -454,15 +486,16 @@ function DesktopPreview({
 		return () => {
 			if (pingTimer.current) clearTimeout(pingTimer.current);
 		};
-	}, [onReport, srcDoc]);
+	}, [onReport, srcDoc, active]);
 
 	const canvasWidth = Math.max(1, Math.round(PREVIEW_WIDTH * scale));
 	const canvasHeight = Math.max(1, Math.round(frameHeight * scale));
 
 	return (
 		<div className="flex flex-col">
-			<div ref={wrapRef} className="w-full overflow-x-auto bg-white">
+			<div ref={wrapRef} className="relative w-full overflow-x-auto bg-white">
 				<div
+					className="min-h-[280px]"
 					style={{
 						position: "relative",
 						width: canvasWidth,
@@ -487,9 +520,9 @@ function DesktopPreview({
 							transformOrigin: "top left",
 						}}
 					/>
+					<PreviewCanvasOverlay report={report} />
 				</div>
 			</div>
-			{onReport ? <PreviewReadinessBanner report={report} /> : null}
 		</div>
 	);
 }
