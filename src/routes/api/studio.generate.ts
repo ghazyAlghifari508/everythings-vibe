@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
+import { z } from "zod";
+import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
 import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
 import { validateStudioPrompt } from "@/lib/prompts-ui-studio";
 import {
@@ -30,6 +32,22 @@ export const Route = createFileRoute("/api/studio/generate")({
 	},
 });
 
+export const studioGenerateBodySchema = z.object({
+	prompt: z.string(),
+	title: z.string().optional(),
+	projectId: z.string().optional(),
+	designMode: z.enum(["web", "mobile"]).optional(),
+	designMd: z.string().max(STUDIO_DESIGN_MD_MAX_CHARS).nullable().optional(),
+	logo: z
+		.object({
+			filename: z.string().max(255),
+			mimeType: z.string(),
+			data: z.string(),
+		})
+		.nullable()
+		.optional(),
+});
+
 export async function GET({
 	request,
 }: {
@@ -57,38 +75,44 @@ export async function POST({
 }): Promise<Response> {
 	try {
 		const user = await requireUser(getRequestHeaders());
-		const body: unknown = await request.json().catch(() => null);
-		const prompt =
-			body !== null && typeof body === "object" && "prompt" in body
-				? body.prompt
-				: undefined;
-		const projectId =
-			body !== null && typeof body === "object" && "projectId" in body
-				? body.projectId
-				: undefined;
-		const title =
-			body !== null && typeof body === "object" && "title" in body
-				? body.title
-				: undefined;
-		const checked = validateStudioPrompt(prompt);
+		const rawBody: unknown = await request.json().catch(() => null);
+		const parseRes = studioGenerateBodySchema.safeParse(rawBody);
+		if (!parseRes.success) {
+			return Response.json(
+				{ error: "Payload generate tidak valid." },
+				{ status: 400 },
+			);
+		}
+		const body = parseRes.data;
+
+		const checked = validateStudioPrompt(body.prompt);
 		if (!checked.ok)
 			return Response.json({ error: checked.error }, { status: 400 });
-		if (typeof projectId === "string" && projectId.length > 0) {
+
+		if (typeof body.projectId === "string" && body.projectId.length > 0) {
 			const revision = await reviseStudioProject(
-				projectId,
+				body.projectId,
 				user.id,
 				checked.prompt,
 			);
 			return Response.json(
-				{ projectId, version: revision.version, htmlCode: revision.htmlCode },
+				{
+					projectId: body.projectId,
+					version: revision.version,
+					htmlCode: revision.htmlCode,
+				},
 				{ status: 201 },
 			);
 		}
-		const { project, revision } = await createStudioProject(
-			user.id,
-			typeof title === "string" ? title : checked.prompt.slice(0, 80),
-			checked.prompt,
-		);
+
+		const { project, revision } = await createStudioProject(user.id, {
+			title: body.title,
+			prompt: checked.prompt,
+			designMode: body.designMode,
+			designMd: body.designMd,
+			logo: body.logo,
+		});
+
 		return Response.json(
 			{
 				projectId: project.id,
