@@ -183,6 +183,34 @@ describe("validation failure reasons", () => {
 		}
 	});
 
+	it("labels implementation detail in user-facing starter copy as technical_leak", () => {
+		const raw = validPayload({
+			starterSuggestions: [
+				suggestion("feature", {
+					title: "Rapikan lib/widgets/panel.tsx",
+					description: "Perbaiki widget.",
+					prompt:
+						"Buka lib/widgets/panel.tsx dan pindahkan state ke useMemo agar lebih cepat.",
+				}),
+				suggestion("bugfix"),
+				suggestion("refactor"),
+				suggestion("ui"),
+			],
+		});
+		try {
+			parseAnalysisOutput(raw, ids, trustedManifestPaths);
+			expect.unreachable("expected AnalysisValidationError");
+		} catch (error) {
+			if (!(error instanceof AnalysisValidationError)) throw error;
+			expect(error.reason).toBe("technical_leak");
+			// Locations only: the diagnostics log must never echo model text.
+			expect(error.issuePaths).toEqual([
+				"starterSuggestions.feature.title",
+				"starterSuggestions.feature.prompt",
+			]);
+		}
+	});
+
 	it("tolerates prompt-declared nulls in advisory fields", () => {
 		const raw = validPayload({
 			summary: null,
@@ -222,6 +250,7 @@ describe("validation failure reasons", () => {
 			"invalid_json",
 			"schema",
 			"untrusted_paths",
+			"technical_leak",
 		];
 		for (const reason of reasons) {
 			const error = new AnalysisValidationError({ reason, rawLength: 12 });

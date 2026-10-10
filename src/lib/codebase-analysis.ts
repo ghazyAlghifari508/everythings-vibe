@@ -203,11 +203,13 @@ ATURAN:
 5. Tulis ringkasan dan temuan dalam Bahasa Indonesia.
 6. Summary menjawab "aplikasi ini tentang apa" (fungsi, alur utama, pengelolaan data) — bukan sekadar menyebut ulang tech stack.
 7. starterSuggestions wajib berisi tepat satu saran untuk setiap id: feature, bugfix, refactor, dan ui. Setiap saran harus spesifik, kecil, berguna, dan diturunkan dari summary, moduleMap, relevantFiles, impactAreas, findings, atau isi source snapshot.
-8. Jangan menyimpulkan domain aplikasi dari framework, bahasa, dependency, atau nama repository. Identifikasi fitur yang sudah terbukti ada agar saran tidak menggandakan kemampuan yang sudah tersedia.
-9. Untuk kategori feature, usulkan kemampuan yang masuk akal dari bukti tentang fungsi aplikasi. Untuk bugfix, sebutkan kondisi yang benar-benar tampak bermasalah; bila belum ada bukti bug, pilih perbaikan alur konservatif dan jangan menyatakan bug pasti ada. Untuk refactor, pilih modul atau pola yang terlihat dan pertahankan stack/perilaku. Jangan usulkan migrasi stack kecuali findings secara eksplisit membuktikan kebutuhan. Untuk ui, rujuk antarmuka yang benar-benar terlihat dalam source snapshot.
-10. Title, description, dan prompt harus ditulis dalam Bahasa Indonesia. Pertahankan istilah teknis baku dalam Bahasa Inggris. Prompt harus berupa instruksi lengkap dan siap diedit/dikirim, bukan fragmen atau template kosong. Title dan description singkat dan spesifik: title maksimal 80 karakter, description maksimal 180 karakter, prompt maksimal 1500 karakter. Jangan membuat klaim behavior yang tidak dibuktikan snapshot.
-11. relevantPaths hanya boleh berisi jalur yang benar-benar ada dalam manifest. Sertakan jalur saat saran menyebut modul tertentu; bila tidak dapat membuktikan jalurnya, jangan mengarangnya.
-12. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.`;
+8. Saran ditulis sebagai permintaan perbaikan produk, bukan instruksi kerja untuk coding agent. Title, description, dan prompt harus menyatakan tujuan, perilaku yang diharapkan, dan manfaat bagi pengguna. Saran harus tetap bisa dibaca dan bernilai bagi pemilik produk yang tidak mengenal isi repository.
+9. DILARANG menulis di title, description, dan prompt: nama file, jalur file, nama folder source, nama fungsi/komponen/property, hook, tipe data, nama variabel, nama class, dan penjelasan algoritma atau struktur data. Jangan memberi instruksi membuka atau mengubah berkas tertentu. Bukti teknis tentang lokasi dan modul disimpan di field relevantPaths, bukan di teks yang dibaca pengguna. Detail implementasi diputuskan oleh tahap perencanaan yang berjalan setelah ini, dengan membaca repository secara langsung.
+10. Jangan menyimpulkan domain aplikasi dari framework, bahasa, dependency, atau nama repository. Identifikasi fitur yang sudah terbukti ada agar saran tidak menggandakan kemampuan yang sudah tersedia.
+11. Untuk kategori feature, usulkan kemampuan yang masuk akal dari bukti tentang fungsi aplikasi. Untuk bugfix, sebutkan kondisi yang benar-benar tampak bermasalah; bila belum ada bukti bug, pilih perbaikan alur konservatif dan jangan menyatakan bug pasti ada. Untuk refactor, pilih modul atau pola yang terlihat dan pertahankan stack/perilaku. Jangan usulkan migrasi stack kecuali findings secara eksplisit membuktikan kebutuhan. Untuk ui, rujuk antarmuka yang benar-benar terlihat dalam source snapshot.
+12. Title, description, dan prompt harus ditulis dalam Bahasa Indonesia. Gunakan istilah baku hanya bila istilah itu benar-benar dikenal pengguna (mis. Kanban, checkout, onboarding); istilah internal repository tidak boleh muncul di title, description, dan prompt. Prompt harus berupa permintaan lengkap dan siap diedit/dikirim, bukan fragmen atau template kosong. Title dan description singkat dan spesifik: title maksimal 80 karakter, description maksimal 180 karakter, prompt maksimal 1500 karakter. Jangan membuat klaim behavior yang tidak dibuktikan snapshot.
+13. relevantPaths hanya boleh berisi jalur yang benar-benar ada dalam manifest. Sertakan jalur saat saran menyentuh modul tertentu, karena jalur ini dipakai tahap perencanaan sebagai konteks teknis; bila tidak dapat membuktikan jalurnya, jangan mengarangnya.
+14. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.`;
 
 // Manifest entries come from `manifestEntrySchema` (Task 5); this structural
 // subset keeps the prompt builder decoupled from the sync DTO module.
@@ -335,10 +337,54 @@ export function buildAnalysisUserPrompt(input: AnalysisPromptInput): string {
 // snapshotId are discarded so a rogue completion cannot rebind the analysis
 // to another project or snapshot.
 
+// === User-facing starter copy guard ===
+// A starter card is read by someone deciding WHAT to improve, not by an agent
+// deciding HOW to patch files. The technical evidence stays in `relevantPaths`
+// and the rest of the analysis, so the fields the user reads must stay in
+// product language. The rules below match token SHAPES (a source-file path, a
+// framework hook identifier), never a fixed list of words, so they hold for any
+// repository domain and any wording.
+//
+// This guard runs only on freshly generated output. Persisted analyses from
+// earlier runs are parsed with the plain schema, so tightening the contract
+// never invalidates history the user already sees.
+const SOURCE_FILE_TOKEN =
+	/\.(?:tsx?|jsx?|mts|cts|mjs|cjs|vue|svelte|astro|py|rb|go|rs|java|kt|kts|swift|php|cs|css|scss|sass|less|styl|sql|prisma|graphql|gql|ex|exs|erl|clj)$/i;
+const REACT_HOOK_TOKEN = /\buse[A-Z][A-Za-z0-9]*\b/;
+const TOKEN_SPLIT = /[\s"'`(),;:[\]{}<>|]+/;
+
+/**
+ * Report the user-facing starter fields that leak repository implementation
+ * detail. Locations only (`starterSuggestions.<id>.<field>`) — never the
+ * offending token — so callers can log and repair without echoing model text.
+ */
+export function findStarterTechnicalLeaks(
+	suggestions: readonly CodebaseStarterSuggestion[],
+): string[] {
+	const leaks: string[] = [];
+	for (const suggestion of suggestions) {
+		const fields: Array<[string, string]> = [
+			["title", suggestion.title],
+			["description", suggestion.description],
+			["prompt", suggestion.prompt],
+		];
+		for (const [field, value] of fields) {
+			const tokens = value.split(TOKEN_SPLIT).filter(Boolean);
+			const leaked = tokens.some(
+				(token) =>
+					SOURCE_FILE_TOKEN.test(token) || REACT_HOOK_TOKEN.test(token),
+			);
+			if (leaked) leaks.push(`starterSuggestions.${suggestion.id}.${field}`);
+		}
+	}
+	return leaks;
+}
+
 export type AnalysisValidationReason =
 	| "invalid_json"
 	| "schema"
-	| "untrusted_paths";
+	| "untrusted_paths"
+	| "technical_leak";
 
 export const ANALYSIS_VALIDATION_MESSAGE =
 	"AI menghasilkan output yang tidak valid. Coba analisis ulang.";
@@ -460,6 +506,14 @@ export function parseAnalysisOutput(
 				.map((path) => toDiagnosticPath(path)),
 		});
 	}
+	const leaks = findStarterTechnicalLeaks(result.data.starterSuggestions);
+	if (leaks.length > 0) {
+		throw new AnalysisValidationError({
+			reason: "technical_leak",
+			rawLength: raw.length,
+			issuePaths: leaks.slice(0, MAX_DIAGNOSTIC_ISSUE_PATHS),
+		});
+	}
 	return result.data;
 }
 
@@ -500,7 +554,8 @@ export function buildAnalysisRepairPrompt(
 		"3. starterSuggestions wajib tepat satu untuk setiap id: feature, bugfix, refactor, dan ui.",
 		`4. Batas panjang: title maksimal ${CODEBASE_STARTER_TITLE_MAX_CHARS} karakter, description maksimal ${CODEBASE_STARTER_DESCRIPTION_MAX_CHARS} karakter, prompt maksimal ${CODEBASE_STARTER_PROMPT_MAX_CHARS} karakter.`,
 		"5. Field opsional yang tidak terbukti: hilangkan field atau isi array kosong — jangan tulis null kecuali database/auth.",
-		"6. Jangan mengubah fakta arsitektur dari output sebelumnya; hanya perbaiki bentuknya.",
+		"6. Title, description, dan prompt ditulis sebagai permintaan perbaikan produk: tujuan, perilaku yang diharapkan, dan manfaat bagi pengguna. Jangan menyebut nama file, jalur file, hook, tipe data, atau algoritme di tiga field ini; pindahkan bukti teknis ke relevantPaths.",
+		"7. Jangan mengubah fakta arsitektur dari output sebelumnya; hanya perbaiki bentuknya.",
 	].join("\n");
 }
 
@@ -564,6 +619,7 @@ export const ANALYSIS_FAILURE_CATEGORIES = [
 	"invalid_json",
 	"schema",
 	"untrusted_paths",
+	"technical_leak",
 	"persistence",
 	"unknown",
 ] as const;

@@ -22,6 +22,7 @@ import {
 	codebaseAnalysisSchema,
 	codebaseStarterSuggestionsSchema,
 	decideAnalysisRequest,
+	findStarterTechnicalLeaks,
 	inferTechAnswersFromCodebase,
 	parseAnalysisOutput,
 	parseCodebaseAnalysis,
@@ -235,6 +236,90 @@ describe("parseCodebaseAnalysis", () => {
 	});
 });
 
+describe("findStarterTechnicalLeaks", () => {
+	function starter(
+		id: CodebaseStarterSuggestion["id"],
+		overrides: Partial<CodebaseStarterSuggestion> = {},
+	): CodebaseStarterSuggestion {
+		return {
+			id,
+			title: "Perbaiki alur pencarian",
+			description: "Bantu pengguna menemukan data lebih cepat.",
+			prompt: "Buat alur pencarian yang lebih cepat di halaman utama.",
+			relevantPaths: [`src/${id}.ts`],
+			...overrides,
+		};
+	}
+
+	it("accepts product-oriented copy and keeps repository paths in relevantPaths", () => {
+		const suggestions = [
+			starter("feature"),
+			starter("bugfix"),
+			starter("refactor"),
+			starter("ui"),
+		];
+		expect(findStarterTechnicalLeaks(suggestions)).toEqual([]);
+	});
+
+	it("flags source-file paths written into user-facing fields", () => {
+		const cases = [
+			"src/pages/profil.tsx",
+			"PanelWidget.tsx",
+			"app/routes/settings.py",
+			"packages/ui/dist/index.js",
+			"db/schema.sql",
+			"internal/worker.go",
+		];
+		for (const token of cases) {
+			expect(
+				findStarterTechnicalLeaks([starter("feature", { prompt: token })]),
+			).toEqual(["starterSuggestions.feature.prompt"]);
+		}
+	});
+
+	it("flags framework hook identifiers in user-facing fields", () => {
+		for (const token of [
+			"gunakan useState",
+			"panggil useEffect setelah render",
+			"React.useMemo untuk cache",
+			"extract useProjectFilter",
+		]) {
+			expect(
+				findStarterTechnicalLeaks([starter("ui", { title: token })]),
+			).toEqual(["starterSuggestions.ui.title"]);
+		}
+	});
+
+	it("does not flag ordinary product words, deployment config, or versions", () => {
+		for (const token of [
+			"gunakan Kanban dan checkout",
+			"perbaiki onboarding di mobile",
+			"vercel.json tetap ikut ter-sync",
+			"Naikkan batas 3.11 menjadi 4.2",
+			"README dan LICENSE diperbarui",
+			"username dan nama profile",
+		]) {
+			expect(
+				findStarterTechnicalLeaks([starter("feature", { prompt: token })]),
+			).toEqual([]);
+		}
+	});
+
+	it("reports every offending field and category independently", () => {
+		expect(
+			findStarterTechnicalLeaks([
+				starter("feature", { title: "Perbaiki panel.tsx" }),
+				starter("bugfix", { description: "Bug di useEffect" }),
+				starter("refactor"),
+				starter("ui", { prompt: "Bagus untuk pengguna." }),
+			]),
+		).toEqual([
+			"starterSuggestions.feature.title",
+			"starterSuggestions.bugfix.description",
+		]);
+	});
+});
+
 describe("codebase analysis system prompt", () => {
 	it("requires JSON-only output and forbids inventing paths", () => {
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/JSON/i);
@@ -267,6 +352,24 @@ describe("codebase analysis system prompt", () => {
 		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).not.toContain(
 			"jalur dari manifest bila relevan",
 		);
+	});
+
+	it("separates product-facing suggestion copy from repository evidence", () => {
+		// The user-facing fields carry goals, behavior, and user value...
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/manfaat bagi pengguna/i);
+		// ...and never implementation detail.
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/DILARANG/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/hook/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(
+			/Bukti teknis.*relevantPaths/is,
+		);
+		// Implementation detail is decided downstream by reading the repository.
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/tahap perencanaan/i);
+	});
+
+	it("keeps the four starter categories repository-grounded and not stack-guessed", () => {
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/tidak menggandakan/i);
+		expect(CODEBASE_ANALYSIS_SYSTEM_PROMPT).toMatch(/migrasi stack/i);
 	});
 });
 
@@ -430,6 +533,48 @@ describe("parseAnalysisOutput", () => {
 				trustedManifestPaths,
 			),
 		).toThrow(AnalysisValidationError);
+	});
+
+	it("rejects generated starter copy that leaks repository implementation detail", () => {
+		const suggestionsWithLeak = validStarterSuggestions.map((suggestion) =>
+			suggestion.id === "feature"
+				? {
+						...suggestion,
+						prompt:
+							"Edit src/feature.ts dan pindahkan state ke useState supaya cepat.",
+					}
+				: suggestion,
+		);
+		try {
+			parseAnalysisOutput(
+				JSON.stringify({ starterSuggestions: suggestionsWithLeak }),
+				ids,
+				trustedManifestPaths,
+			);
+			expect.unreachable("expected AnalysisValidationError");
+		} catch (error) {
+			if (!(error instanceof AnalysisValidationError)) throw error;
+			expect(error.reason).toBe("technical_leak");
+		}
+	});
+
+	it("keeps the four starter categories valid and unique through generation", () => {
+		const result = parseAnalysisOutput(modelJson, ids, trustedManifestPaths);
+		const parsed = codebaseStarterSuggestionsSchema.parse(
+			result.starterSuggestions,
+		);
+		expect(parsed.map((item) => item.id)).toEqual([
+			"feature",
+			"bugfix",
+			"refactor",
+			"ui",
+		]);
+		expect(new Set(parsed.map((item) => item.id)).size).toBe(4);
+		// Every suggestion stays editable product copy a user can send as-is.
+		for (const suggestion of parsed) {
+			expect(suggestion.prompt.length).toBeGreaterThan(0);
+			expect(suggestion.title.length).toBeGreaterThan(0);
+		}
 	});
 });
 
