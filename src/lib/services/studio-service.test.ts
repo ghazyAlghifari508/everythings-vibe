@@ -85,8 +85,8 @@ describe("Studio Service", () => {
 		it("rejects unsupported mime types", () => {
 			expect(() =>
 				validateAndProcessLogo({
-					filename: "doc.pdf",
-					mimeType: "application/pdf",
+					filename: "doc.txt",
+					mimeType: "text/plain",
 					data: Buffer.from("abc").toString("base64"),
 				}),
 			).toThrow(/tidak didukung/i);
