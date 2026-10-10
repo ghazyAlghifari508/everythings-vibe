@@ -106,6 +106,7 @@ export function ScrapeDetail({
 	const [busy, setBusy] = useState(false);
 	const [copied, setCopied] = useState(false);
 	const [frameReport, setFrameReport] = useState<FrameReport>("preparing");
+	const [previewAttempt, setPreviewAttempt] = useState(0);
 	const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -252,12 +253,17 @@ export function ScrapeDetail({
 					/>
 				) : (
 					<DesktopPreview
+						key={previewAttempt}
 						title={`Preview ${domain}`}
 						srcDoc={frameSrcDoc}
 						report={frameReport}
 						active={htmlViewTab === "preview"}
 						onReport={handleFrameReport}
-						onRetry={onRetryPreview}
+						onRetry={() => {
+							setFrameReport("preparing");
+							setPreviewAttempt((attempt) => attempt + 1);
+							onRetryPreview?.();
+						}}
 					/>
 				)}
 			</div>
