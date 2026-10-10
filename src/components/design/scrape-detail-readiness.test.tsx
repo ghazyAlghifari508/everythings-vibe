@@ -27,6 +27,21 @@ afterEach(() => {
 });
 
 describe("ScrapeDetail preview readiness", () => {
+	it("shows a retry for fatal rendering reports without hiding source", () => {
+		const retry = vi.fn();
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="original"
+				previewSrcDoc="<html></html>"
+				onRetryPreview={retry}
+			/>,
+		);
+		act(() => report("failed"));
+		fireEvent.click(screen.getByRole("button", { name: /coba lagi/i }));
+		expect(retry).toHaveBeenCalledOnce();
+		expect(screen.getByRole("tab", { name: /Source HTML/i })).toBeDefined();
+	});
 	it("shows a preparing state until the preview document arrives", () => {
 		render(
 			<ScrapeDetail

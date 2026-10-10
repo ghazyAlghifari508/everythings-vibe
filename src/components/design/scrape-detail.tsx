@@ -24,7 +24,7 @@ export interface ScrapeDetailProps {
 }
 
 type HtmlViewTab = "preview" | "code";
-type FrameReport = "preparing" | "ready" | "empty" | "degraded";
+type FrameReport = "preparing" | "ready" | "empty" | "degraded" | "failed";
 
 const PREVIEW_WIDTH = 1440;
 const MIN_PREVIEW_SCALE = 0.75;
@@ -35,6 +35,12 @@ const READINESS_MESSAGE: Record<
 	FrameReport,
 	{ label: string; tone: "pending" | "ok" | "warn"; detail: string }
 > = {
+	failed: {
+		label: "Preview gagal ditampilkan",
+		tone: "warn",
+		detail:
+			"Tampilan website tidak berhasil dimuat. Coba lagi atau buka Source HTML.",
+	},
 	preparing: {
 		label: "Menyiapkan preview website",
 		tone: "pending",
@@ -229,6 +235,10 @@ export function ScrapeDetail({
 				aria-label="Preview index.html"
 				hidden={htmlViewTab !== "preview"}
 			>
+				<p className="border-b border-graphite px-3 py-2 text-xs text-fog">
+					Snapshot visual hasil scrape. Interaksi aplikasi website tidak
+					dijalankan ulang.
+				</p>
 				{previewState === "failed" || !previewSrcDoc ? (
 					<PreviewUnavailable
 						message={
@@ -247,6 +257,7 @@ export function ScrapeDetail({
 						report={frameReport}
 						active={htmlViewTab === "preview"}
 						onReport={handleFrameReport}
+						onRetry={onRetryPreview}
 					/>
 				)}
 			</div>
@@ -309,7 +320,13 @@ function PreviewUnavailable({
 	);
 }
 
-function PreviewCanvasOverlay({ report }: { report: FrameReport }) {
+function PreviewCanvasOverlay({
+	report,
+	onRetry,
+}: {
+	report: FrameReport;
+	onRetry?: () => void;
+}) {
 	const { label, detail } = READINESS_MESSAGE[report];
 	if (report === "ready") return null;
 	if (report === "degraded") {
@@ -340,6 +357,15 @@ function PreviewCanvasOverlay({ report }: { report: FrameReport }) {
 			)}
 			<output className="text-sm font-semibold text-snow">{label}</output>
 			<p className="max-w-md text-xs leading-5 text-fog">{detail}</p>
+			{(report === "failed" || report === "empty") && onRetry ? (
+				<button
+					type="button"
+					onClick={onRetry}
+					className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+				>
+					Coba lagi
+				</button>
+			) : null}
 		</div>
 	);
 }
@@ -350,12 +376,14 @@ function DesktopPreview({
 	report,
 	active = true,
 	onReport,
+	onRetry,
 }: {
 	title: string;
 	srcDoc: string;
 	report: FrameReport;
 	active?: boolean;
 	onReport?: (report: FrameReport) => void;
+	onRetry?: () => void;
 }) {
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const [scale, setScale] = useState(1);
@@ -427,7 +455,7 @@ function DesktopPreview({
 				state === "failed"
 			) {
 				stopPinging();
-				onReport(state === "failed" ? "degraded" : state);
+				onReport(state);
 			}
 		};
 		window.addEventListener("message", handleMessage);
@@ -461,8 +489,11 @@ function DesktopPreview({
 		settledRef.current = false;
 		let attempts = 0;
 		const ask = () => {
-			if (settledRef.current || attempts >= SCRAPE_PREVIEW_READY_MAX_PINGS)
+			if (settledRef.current) return;
+			if (attempts >= SCRAPE_PREVIEW_READY_MAX_PINGS) {
+				onReport("failed");
 				return;
+			}
 			attempts += 1;
 			const frame = frameRef.current?.contentWindow;
 			if (!frame) {
@@ -520,7 +551,7 @@ function DesktopPreview({
 							transformOrigin: "top left",
 						}}
 					/>
-					<PreviewCanvasOverlay report={report} />
+					<PreviewCanvasOverlay report={report} onRetry={onRetry} />
 				</div>
 			</div>
 		</div>
