@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	addStudioFrame,
 	createStudioProject,
+	createStudioProjectWithJob,
+	getStudioProjectDetail,
+	retryStudioFrame,
+	reviseStudioFrame,
 	reviseStudioProject,
 	sanitizeSvg,
 	validateAndProcessLogo,
@@ -12,6 +17,35 @@ const mockDb = {
 	select: vi.fn(),
 	update: vi.fn(),
 };
+
+function setupDefaultDb() {
+	mockDb.insert.mockReturnValue({
+		values: vi.fn().mockReturnValue({
+			returning: vi.fn().mockResolvedValue([]),
+		}),
+	});
+	mockDb.update.mockReturnValue({
+		set: vi.fn().mockReturnValue({
+			where: vi.fn().mockReturnValue({
+				returning: vi.fn().mockResolvedValue([]),
+			}),
+		}),
+	});
+	mockDb.select.mockReturnValue({
+		from: vi.fn().mockReturnValue({
+			where: vi.fn().mockReturnValue({
+				orderBy: vi.fn().mockReturnValue({
+					limit: vi.fn().mockResolvedValue([]),
+				}),
+				limit: vi.fn().mockResolvedValue([]),
+			}),
+			orderBy: vi.fn().mockReturnValue({
+				limit: vi.fn().mockResolvedValue([]),
+			}),
+			limit: vi.fn().mockResolvedValue([]),
+		}),
+	});
+}
 
 vi.mock("@/db", () => ({
 	db: {
@@ -32,6 +66,7 @@ vi.mock("./ai-orchestrator", () => ({
 describe("Studio Service", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		setupDefaultDb();
 	});
 
 	describe("validateAndProcessLogo", () => {
@@ -301,6 +336,124 @@ describe("Studio Service", () => {
 			);
 
 			expect(revision.version).toBe(2);
+		});
+	});
+
+	describe("createStudioProjectWithJob and Multi-Screen Pipeline", () => {
+		it("creates project and queued job immediately without blocking on HTML", async () => {
+			const mockProject = {
+				id: "proj-10",
+				userId: "user-1",
+				title: "POS App",
+				designMode: "mobile",
+				designMd: null,
+				logoAssetId: null,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			};
+			const mockJob = {
+				id: "job-10",
+				projectId: "proj-10",
+				userId: "user-1",
+				prompt: "Buat aplikasi POS",
+				jobType: "initial",
+				targetFrameId: null,
+				status: "queued",
+				error: null,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			};
+
+			mockDb.insert
+				.mockReturnValueOnce({
+					values: vi.fn().mockReturnValue({
+						returning: vi.fn().mockResolvedValue([mockProject]),
+					}),
+				})
+				.mockReturnValueOnce({
+					values: vi.fn().mockReturnValue({
+						returning: vi.fn().mockResolvedValue([mockJob]),
+					}),
+				});
+
+			const result = await createStudioProjectWithJob("user-1", {
+				title: "POS App",
+				prompt: "Buatkan aplikasi POS kasir mobile dengan 3 layar",
+				designMode: "mobile",
+			});
+
+			expect(result.project.id).toBe("proj-10");
+			expect(result.job.id).toBe("job-10");
+			expect(result.job.status).toBe("queued");
+		});
+
+		it("synthesizes legacy single-HTML project into one ready frame", async () => {
+			const mockProject = {
+				id: "proj-legacy",
+				userId: "user-1",
+				title: "Legacy Single Page",
+				designMode: "web",
+				designMd: null,
+				logoAssetId: null,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			};
+			const mockRevisions = [
+				{
+					id: "rev-legacy-1",
+					projectId: "proj-legacy",
+					prompt: "Old prompt",
+					htmlCode: "<html><body>Legacy Content</body></html>",
+					version: 1,
+					createdAt: new Date(),
+				},
+			];
+
+			mockDb.select
+				// project
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							limit: vi.fn().mockResolvedValue([mockProject]),
+						}),
+					}),
+				})
+				// frames (empty!)
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							orderBy: vi.fn().mockResolvedValue([]),
+						}),
+					}),
+				})
+				// revisions
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							orderBy: vi.fn().mockResolvedValue(mockRevisions),
+						}),
+					}),
+				})
+				// active job (none)
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValue({
+						where: vi.fn().mockReturnValue({
+							orderBy: vi.fn().mockReturnValue({
+								limit: vi.fn().mockResolvedValue([]),
+							}),
+						}),
+					}),
+				});
+
+			const detail = await getStudioProjectDetail("proj-legacy", "user-1");
+
+			expect(detail.project.id).toBe("proj-legacy");
+			expect(detail.frames).toHaveLength(1);
+			expect(detail.frames[0].status).toBe("ready");
+			expect(detail.frames[0].name).toBe("Legacy Single Page");
+			expect(detail.frames[0].htmlCode).toBe(
+				"<html><body>Legacy Content</body></html>",
+			);
 		});
 	});
 });
