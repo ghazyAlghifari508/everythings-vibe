@@ -12,16 +12,23 @@ vi.mock("@tanstack/react-router", () => ({
 	Link: ({
 		to,
 		children,
+		replace,
 		...rest
 	}: {
 		to: string;
 		children?: ReactNode;
+		replace?: boolean;
 		onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 	}) => {
 		const anchorProps: Record<string, unknown> = { ...rest };
 		return createElement(
 			"a",
-			{ href: to, "data-to": to, ...anchorProps },
+			{
+				href: to,
+				"data-to": to,
+				"data-replace": String(replace),
+				...anchorProps,
+			},
 			children,
 		);
 	},
@@ -62,11 +69,15 @@ describe("ScrapeBackLink", () => {
 		expect(screen.getByRole("link").textContent).toMatch(/^Kembali$/);
 	});
 
-	it("does not push duplicate history entries when a real back entry exists", () => {
+	it("honors the recorded origin even when an unrelated back entry exists", () => {
 		routerMock.history.canGoBack.mockReturnValue(true);
 		render(<ScrapeBackLink from="/design/scrap/history" />);
 		fireEvent.click(screen.getByRole("link"));
-		expect(routerMock.history.back).toHaveBeenCalledOnce();
+		expect(routerMock.history.back).not.toHaveBeenCalled();
+		expect(screen.getByRole("link").getAttribute("href")).toBe(
+			"/design/scrap/history",
+		);
+		expect(screen.getByRole("link").dataset.replace).toBe("true");
 	});
 
 	it("navigates to the resolved route when no back entry exists", () => {
