@@ -1,45 +1,14 @@
 "use client";
 
-import { type ComponentPropsWithoutRef, memo } from "react";
+import { memo } from "react";
 import Markdown from "react-markdown";
-import rehypeHighlight from "rehype-highlight";
-import remarkGfm from "remark-gfm";
 import { TableOfContents } from "@/components/prd/table-of-contents";
 import { cn } from "@/lib/utils";
-
-function headingId(
-	children: ComponentPropsWithoutRef<"h2">["children"],
-): string {
-	return String(children)
-		.replace(/<[^>]*>/g, "")
-		.toLowerCase()
-		.replace(/[^\w]+/g, "-");
-}
-
-// Heading ids must mirror TableOfContents' id algorithm exactly so anchor
-// navigation lands on the right section (same contract as prd-viewer.tsx).
-const markdownComponents: ComponentPropsWithoutRef<
-	typeof Markdown
->["components"] = {
-	h2: ({ children, ...props }) => (
-		<h2 id={headingId(children)} {...props}>
-			{children}
-		</h2>
-	),
-	h3: ({ children, ...props }) => (
-		<h3 id={headingId(children)} {...props}>
-			{children}
-		</h3>
-	),
-	h4: ({ children, ...props }) => (
-		<h4 id={headingId(children)} {...props}>
-			{children}
-		</h4>
-	),
-};
-
-const remarkPlugins = [remarkGfm];
-const rehypePlugins = [rehypeHighlight];
+import {
+	codebaseMarkdownComponents,
+	codebaseRehypePlugins,
+	codebaseRemarkPlugins,
+} from "./codebase-markdown";
 
 export interface CodebaseDocPreviewProps {
 	content: string;
@@ -60,9 +29,9 @@ export const CodebaseDocPreview = memo(function CodebaseDocPreview({
 			</aside>
 			<article className="prd-content min-w-0 flex-1 self-start text-sm leading-7 text-mist">
 				<Markdown
-					remarkPlugins={remarkPlugins}
-					rehypePlugins={rehypePlugins}
-					components={markdownComponents}
+					remarkPlugins={codebaseRemarkPlugins}
+					rehypePlugins={codebaseRehypePlugins}
+					components={codebaseMarkdownComponents}
 				>
 					{content}
 				</Markdown>
