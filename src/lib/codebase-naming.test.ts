@@ -92,7 +92,7 @@ describe("buildAgentPrompt completion semantics", () => {
 		const prompt = buildAgentPrompt(syncPayload(), {
 			projectName: "react-movie-app",
 		});
-		expect(prompt).toContain("Snapshot sudah tersimpan");
+		expect(prompt).toContain("Hasil upload sudah tersimpan");
 		expect(prompt).toContain("terpisah");
 		expect(prompt).toContain("Jangan menyatakan analisis selesai");
 		expect(prompt).not.toContain("untuk melihat ringkasan analisis codebase");

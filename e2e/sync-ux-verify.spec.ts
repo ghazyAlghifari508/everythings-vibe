@@ -103,6 +103,59 @@ async function mountPrestart(page: import("@playwright/test").Page) {
 	await page.waitForLoadState("domcontentloaded");
 	return page.evaluate(MOUNT_PRESTART_SCRIPT);
 }
+
+const MOUNT_FAILED_SCRIPT = `(async () => {
+  const React = (await import("/@id/react")).default;
+  const { createRoot } = (await import("/@id/react-dom/client")).default;
+  const { ScreenConnect } = await import("/src/components/codebase/screen-connect.tsx");
+
+  const connectRoot = document.createElement("div");
+  connectRoot.id = "verify-failed";
+  document.body.appendChild(connectRoot);
+
+  const payload = {
+    projectId: "proj_verify_failed",
+    apiBaseUrl: "https://prdfy.example.com",
+    syncToken: "tok_verify",
+    cliMinVersion: "2.0.0",
+    syncCommand: "vibeeverything codebase sync --project-id proj_verify_failed --sync-token <token>",
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+  };
+
+  window.__analysisRetried = false;
+
+  createRoot(connectRoot).render(
+    React.createElement(ScreenConnect, {
+      projectName: "Wishlist Fitur",
+      payload,
+      // A finished upload whose AI analysis failed: sync stages stay done,
+      // the analysis row itself carries the single error + retry.
+      status: {
+        projectId: "proj_verify_failed",
+        sessionId: "sess_verify_failed",
+        status: "uploaded",
+        fileCount: 68,
+        excludedCount: 42178,
+        snapshotId: "snap_failed_1",
+        analysisStatus: "failed",
+      },
+      canContinueToSummary: false,
+      onContinueToSummary: () => {},
+      analysisError: "Analisis codebase gagal. Coba analisis ulang.",
+      onRetryAnalysis: () => {
+        window.__analysisRetried = true;
+      },
+    }),
+  );
+
+  return true;
+})()`;
+
+async function mountFailed(page: import("@playwright/test").Page) {
+	await page.goto("/");
+	await page.waitForLoadState("domcontentloaded");
+	return page.evaluate(MOUNT_FAILED_SCRIPT);
+}
 test.use({
 	baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || "http://localhost:3000",
 });
@@ -225,6 +278,60 @@ test.describe("existing-codebase onboarding — real browser render", () => {
 		expect(text).not.toMatch(/Langkah \d/);
 		expect(text).not.toContain("2.0.0");
 		expect(text).not.toContain("node_modules");
+		expect(errors).toEqual([]);
+	});
+
+	test("failed analysis renders one integrated error with successful sync stages", async ({
+		page,
+	}) => {
+		const errors: string[] = [];
+		page.on("pageerror", (e) => errors.push(e.message));
+
+		await mountFailed(page);
+		const connect = page.locator("#verify-failed");
+		await expect(connect).toContainText("Analisis codebase belum berhasil", {
+			timeout: 20000,
+		});
+
+		// Completed sync stages stay visibly successful.
+		for (const stage of [
+			"sync-stage-agent",
+			"sync-stage-preparing",
+			"sync-stage-sync",
+		]) {
+			const row = connect.locator(`[data-testid="${stage}"]`);
+			await expect(row).toHaveCount(1);
+			await expect(row).toHaveAttribute("data-stage-state", "done");
+		}
+		// Exactly one failed surface carrying message and retry.
+		await expect(
+			connect.locator('[data-stage-state="failed"]'),
+		).toHaveCount(1);
+		await expect(
+			connect.locator('[data-testid="analysis-failure-alert"]'),
+		).toHaveCount(1);
+		const retry = connect.locator('[data-testid="retry-analysis-button"]');
+		await expect(retry).toHaveCount(1);
+		await expect(retry).toBeEnabled();
+
+		const text = (await connect.innerText()) ?? "";
+		expect(text).toContain("Analisis codebase gagal. Coba analisis ulang.");
+		expect(text).toContain("tanpa mengunggah ulang");
+		// Excluded files are neutral summary info, never an error claim.
+		expect(text).not.toContain("tidak ikut dikirim");
+		expect(text).toContain("68 file tersinkron");
+		expect(text).toContain("42.178 file dikecualikan");
+
+		await retry.click();
+		await expect
+			.poll(async () =>
+				page.evaluate(
+					() =>
+						(window as unknown as Record<string, unknown>)
+							.__analysisRetried,
+				),
+			)
+			.toBe(true);
 		expect(errors).toEqual([]);
 	});
 
