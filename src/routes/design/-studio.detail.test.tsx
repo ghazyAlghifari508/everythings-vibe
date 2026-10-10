@@ -35,7 +35,7 @@ vi.mock("@/lib/session", () => ({
 
 import { Route } from "./studio.$id";
 
-describe("StudioDetailPage Viewport & Revisions", () => {
+describe("StudioDetailPage Multi-Screen Canvas", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -44,16 +44,52 @@ describe("StudioDetailPage Viewport & Revisions", () => {
 		cleanup();
 	});
 
-	it("renders mobile project with Mobile badge and mobile canvas initial viewport", () => {
+	it("renders multi-screen canvas with mobile project and frames", () => {
 		mockUseLoaderData.mockReturnValue({
-			id: "proj-mob-1",
-			title: "Aplikasi POS Kasir",
-			designMode: "mobile",
-			hasDesignMd: true,
-			hasLogo: true,
-			latestHtml: "<html><body>Mobile App Content</body></html>",
-			latestVersion: 1,
-			revisionCount: 1,
+			project: {
+				id: "proj-mob-1",
+				title: "Aplikasi POS Kasir",
+				designMode: "mobile",
+				designMd: "## Tokens",
+				logoAssetId: "logo-1",
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
+			frames: [
+				{
+					id: "f-1",
+					projectId: "proj-mob-1",
+					name: "Dashboard",
+					description: "Ringkasan",
+					viewport: "mobile",
+					htmlCode: "<html><body>Dashboard</body></html>",
+					status: "ready",
+					order: 0,
+					error: null,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+				{
+					id: "f-2",
+					projectId: "proj-mob-1",
+					name: "Transactions",
+					description: "Histori",
+					viewport: "mobile",
+					htmlCode: null,
+					status: "generating",
+					order: 1,
+					error: null,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+			],
+			activeJob: {
+				id: "j-1",
+				status: "generating",
+			},
+			logoUrl: "/api/studio/asset?id=logo-1",
+			revisions: [],
+			latest: null,
 		});
 
 		const Component = (Route as unknown as { component: React.ComponentType })
@@ -67,57 +103,101 @@ describe("StudioDetailPage Viewport & Revisions", () => {
 		expect(screen.getByText("DESIGN.md")).toBeDefined();
 		expect(screen.getByText("Logo")).toBeDefined();
 
-		// Check viewport button state in Canvas
-		const mobileViewportBtn = screen.getByRole("button", {
-			name: /Mobile 375px/i,
-		});
-		expect(mobileViewportBtn.getAttribute("aria-pressed")).toBe("true");
+		// Frames are rendered
+		expect(screen.getByText("Dashboard")).toBeDefined();
+		expect(screen.getAllByText("Transactions").length).toBeGreaterThanOrEqual(1);
+
+		// Floating Composer is present
+		expect(
+			screen.getByPlaceholderText(/Minta AI menambah halaman atau merevisi UI/i),
+		).toBeDefined();
 	});
 
-	it("renders web project with desktop initial viewport", () => {
+	it("selects a frame and targets it in the floating composer", async () => {
 		mockUseLoaderData.mockReturnValue({
-			id: "proj-web-1",
-			title: "Dashboard SIMRS",
-			designMode: "web",
-			hasDesignMd: false,
-			hasLogo: false,
-			latestHtml: "<html><body>Web Dashboard Content</body></html>",
-			latestVersion: 2,
-			revisionCount: 2,
+			project: {
+				id: "proj-1",
+				title: "Multi-Screen Web",
+				designMode: "web",
+				designMd: null,
+				logoAssetId: null,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
+			frames: [
+				{
+					id: "f-1",
+					projectId: "proj-1",
+					name: "Overview",
+					description: "Main overview",
+					viewport: "web",
+					htmlCode: "<html><body>Overview</body></html>",
+					status: "ready",
+					order: 0,
+					error: null,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+			],
+			activeJob: null,
+			logoUrl: null,
+			revisions: [],
+			latest: null,
 		});
 
 		const Component = (Route as unknown as { component: React.ComponentType })
 			.component;
 		render(<Component />);
 
-		expect(
-			screen.getByRole("heading", { level: 1, name: "Dashboard SIMRS" }),
-		).toBeDefined();
-		expect(screen.getByText("Web")).toBeDefined();
+		const frameBtn = screen.getByRole("button", { name: /^Overview$/i });
+		fireEvent.click(frameBtn);
 
-		const desktopViewportBtn = screen.getByRole("button", {
-			name: /Desktop 1440px/i,
+		await waitFor(() => {
+			expect(screen.getByText(/Editing: Overview/i)).toBeDefined();
 		});
-		expect(desktopViewportBtn.getAttribute("aria-pressed")).toBe("true");
 	});
 
-	it("submits iterative revision and updates displayed version", async () => {
+	it("submits prompt via floating composer to revise selected frame", async () => {
 		mockUseLoaderData.mockReturnValue({
-			id: "proj-1",
-			title: "Project Revisi",
-			designMode: "web",
-			hasDesignMd: false,
-			hasLogo: false,
-			latestHtml: "<html><body>v1</body></html>",
-			latestVersion: 1,
-			revisionCount: 1,
+			project: {
+				id: "proj-1",
+				title: "Project Canvas",
+				designMode: "mobile",
+				designMd: null,
+				logoAssetId: null,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
+			frames: [
+				{
+					id: "f-1",
+					projectId: "proj-1",
+					name: "Dashboard",
+					description: "Overview",
+					viewport: "mobile",
+					htmlCode: "<html><body>Dashboard</body></html>",
+					status: "ready",
+					order: 0,
+					error: null,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+			],
+			activeJob: null,
+			logoUrl: null,
+			revisions: [],
+			latest: null,
 		});
 
 		const fetchMock = vi.fn().mockResolvedValue({
 			ok: true,
 			json: async () => ({
-				htmlCode: "<html><body>v2 with green button</body></html>",
-				version: 2,
+				frame: {
+					id: "f-1",
+					name: "Dashboard",
+					status: "ready",
+					htmlCode: "<html><body>Revised Dashboard</body></html>",
+				},
 			}),
 		});
 		global.fetch = fetchMock;
@@ -126,30 +206,32 @@ describe("StudioDetailPage Viewport & Revisions", () => {
 			.component;
 		render(<Component />);
 
-		const input = screen.getByPlaceholderText(/ubah warna tombol/i);
+		// Select frame f-1
+		const frameBtn = screen.getByRole("button", { name: /^Dashboard$/i });
+		fireEvent.click(frameBtn);
+
+		const input = screen.getByRole("textbox");
 		fireEvent.change(input, {
-			target: { value: "Ubah warna tombol jadi hijau" },
+			target: { value: "Ubah tombol jadi warna hitam" },
 		});
 
-		const submitBtn = screen.getByRole("button", { name: "Kirim revisi" });
+		const submitBtn = screen.getByRole("button", { name: /Kirim prompt/i });
 		fireEvent.click(submitBtn);
 
 		await waitFor(() => {
 			expect(fetchMock).toHaveBeenCalledWith(
-				"/api/studio/generate",
+				"/api/studio/frame",
 				expect.objectContaining({
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
+						action: "revise",
 						projectId: "proj-1",
-						prompt: "Ubah warna tombol jadi hijau",
+						frameId: "f-1",
+						prompt: "Ubah tombol jadi warna hitam",
 					}),
 				}),
 			);
-		});
-
-		await waitFor(() => {
-			expect(screen.getByText(/v2 · 1 revisi/i)).toBeDefined();
 		});
 	});
 });
