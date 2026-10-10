@@ -12,9 +12,12 @@ import { ScrapeError } from "@/lib/design-errors";
 import { fetchAsset } from "@/lib/fetch-html";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { isPrivateIp } from "@/lib/url-validator";
+import { SCRAPE_LIMITS } from "./scrape-contract";
 
 export interface RenderPageOptions extends ScrapeInstrumentation {
 	mode?: ScrapeMode;
+	waitMs?: number;
+	measureResolution?: boolean;
 }
 
 export const DESKTOP_VIEWPORT = {
@@ -224,6 +227,15 @@ export interface RenderedPage {
 	html: string;
 	status: number;
 	finalUrl: string;
+	images?: RenderedImage[];
+}
+
+export interface RenderedImage {
+	url: string;
+	alt: string | null;
+	width: number | null;
+	height: number | null;
+	source: string;
 }
 
 export async function closeRenderBrowser(): Promise<void> {
@@ -287,6 +299,81 @@ export async function renderPage(
 			if (err instanceof ScrapeError) throw err;
 		}
 		const contentStart = Date.now();
+		if (options.waitMs)
+			await page.waitForTimeout(Math.min(options.waitMs, SCRAPE_LIMITS.waitMs));
+		const images =
+			mode === "images"
+				? await page.evaluate((measure) => {
+						const result: {
+							url: string;
+							alt: string | null;
+							width: number | null;
+							height: number | null;
+							source: string;
+						}[] = [];
+						const add = (
+							raw: string,
+							source: string,
+							alt: string | null = null,
+							width: number | null = null,
+							height: number | null = null,
+						) => {
+							try {
+								const url = new URL(raw, document.baseURI);
+								if (
+									!["http:", "https:"].includes(url.protocol) ||
+									url.username ||
+									url.password ||
+									result.length >= 200
+								)
+									return;
+								result.push({ url: url.href, source, alt, width, height });
+							} catch {
+								return;
+							}
+						};
+						for (const element of [...document.querySelectorAll("*")].slice(
+							0,
+							5000,
+						)) {
+							if (element instanceof HTMLImageElement) {
+								add(
+									element.currentSrc || element.src,
+									"img",
+									element.alt || null,
+									measure && element.naturalWidth ? element.naturalWidth : null,
+									measure && element.naturalHeight
+										? element.naturalHeight
+										: null,
+								);
+								for (const attr of [
+									"data-src",
+									"data-original",
+									"data-lazy-src",
+								]) {
+									const value = element.getAttribute(attr);
+									if (value) add(value, attr, element.alt || null);
+								}
+							}
+							for (const match of (element.getAttribute("srcset") ?? "").split(
+								",",
+							)) {
+								const value = match.trim().split(/\s+/)[0];
+								if (value) add(value, "srcset");
+							}
+							for (const match of getComputedStyle(
+								element,
+							).backgroundImage.matchAll(/url\(["']?([^"')]+)["']?\)/g))
+								add(match[1], "background");
+							if (
+								element instanceof HTMLLinkElement &&
+								/icon/i.test(element.rel)
+							)
+								add(element.href, "icon");
+						}
+						return result;
+					}, options.measureResolution ?? true)
+				: undefined;
 		const html = (await page.content().catch(() => "")).slice(
 			0,
 			SCRAPE_MAX_HTML_BYTES,
@@ -298,7 +385,7 @@ export async function renderPage(
 				"NO_ANALYZABLE_CONTENT",
 				"Sistem tidak menemukan konten yang cukup untuk dianalisis.",
 			);
-		return { html, status: status || 200, finalUrl: page.url() };
+		return { html, status: status || 200, finalUrl: page.url(), images };
 	} finally {
 		await context.close();
 	}
