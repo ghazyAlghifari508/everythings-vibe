@@ -1,4 +1,4 @@
-import { Loader2, Palette, Plus, Send, Sparkles, X } from "lucide-react";
+import { Loader2, Palette, Plus, Sparkles, X } from "lucide-react";
 import { type FormEvent, useRef, useState } from "react";
 
 export interface StudioComposerProps {

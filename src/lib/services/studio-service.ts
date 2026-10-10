@@ -369,7 +369,10 @@ export async function runStudioJobPipeline(
 			.select()
 			.from(studioProjects)
 			.where(
-				and(eq(studioProjects.id, projectId), eq(studioProjects.userId, userId)),
+				and(
+					eq(studioProjects.id, projectId),
+					eq(studioProjects.userId, userId),
+				),
 			)
 			.limit(1);
 		if (!project) {
@@ -552,14 +555,12 @@ export async function runStudioJobPipeline(
 		}
 
 		if (readyCount > 0 && firstReadyHtml) {
-			await db
-				.insert(studioRevisions)
-				.values({
-					projectId,
-					prompt: job.prompt,
-					htmlCode: firstReadyHtml,
-					version: 1,
-				} satisfies InsertStudioRevisionRow);
+			await db.insert(studioRevisions).values({
+				projectId,
+				prompt: job.prompt,
+				htmlCode: firstReadyHtml,
+				version: 1,
+			} satisfies InsertStudioRevisionRow);
 
 			await db
 				.update(studioJobs)
@@ -751,7 +752,10 @@ export async function addStudioFrame(
 		.where(eq(studioFrames.projectId, projectId))
 		.orderBy(asc(studioFrames.order));
 
-	const maxOrder = existingFrames.reduce((max, f) => Math.max(max, f.order), -1);
+	const maxOrder = existingFrames.reduce(
+		(max, f) => Math.max(max, f.order),
+		-1,
+	);
 	const viewport = input.viewport
 		? validateStudioDesignMode(input.viewport)
 		: validateStudioDesignMode(detail.designMode);
@@ -832,14 +836,12 @@ export async function reviseStudioFrame(
 		.select()
 		.from(studioFrames)
 		.where(
-			and(
-				eq(studioFrames.id, frameId),
-				eq(studioFrames.projectId, projectId),
-			),
+			and(eq(studioFrames.id, frameId), eq(studioFrames.projectId, projectId)),
 		)
 		.limit(1);
 
-	if (!frame) throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
+	if (!frame)
+		throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
 
 	await db
 		.update(studioFrames)
@@ -907,14 +909,12 @@ export async function retryStudioFrame(
 		.select()
 		.from(studioFrames)
 		.where(
-			and(
-				eq(studioFrames.id, frameId),
-				eq(studioFrames.projectId, projectId),
-			),
+			and(eq(studioFrames.id, frameId), eq(studioFrames.projectId, projectId)),
 		)
 		.limit(1);
 
-	if (!frame) throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
+	if (!frame)
+		throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
 
 	await db
 		.update(studioFrames)

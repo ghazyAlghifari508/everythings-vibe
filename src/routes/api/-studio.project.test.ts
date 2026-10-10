@@ -10,11 +10,23 @@ vi.mock("@tanstack/react-start/server", () => ({
 }));
 
 vi.mock("@/lib/services/studio-service", () => ({
-	getStudioProjectDetail: async (id: string, userId: string) => ({
+	getStudioProjectDetail: async (id: string, _userId: string) => ({
 		project: { id, title: "Test Canvas", designMode: "mobile" },
 		frames: [
-			{ id: "f-1", name: "Dashboard", status: "ready", order: 0, htmlCode: "<html></html>" },
-			{ id: "f-2", name: "Transactions", status: "generating", order: 1, htmlCode: null },
+			{
+				id: "f-1",
+				name: "Dashboard",
+				status: "ready",
+				order: 0,
+				htmlCode: "<html></html>",
+			},
+			{
+				id: "f-2",
+				name: "Transactions",
+				status: "generating",
+				order: 1,
+				htmlCode: null,
+			},
 		],
 		activeJob: { id: "job-1", status: "generating" },
 		logoUrl: null,

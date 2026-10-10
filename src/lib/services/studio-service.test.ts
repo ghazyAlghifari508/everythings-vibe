@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	addStudioFrame,
 	createStudioProject,
 	createStudioProjectWithJob,
 	getStudioProjectDetail,
-	retryStudioFrame,
-	reviseStudioFrame,
 	reviseStudioProject,
 	sanitizeSvg,
 	validateAndProcessLogo,

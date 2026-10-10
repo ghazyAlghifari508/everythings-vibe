@@ -108,9 +108,7 @@ export function StudioFrameSkeleton({
 					<div className="flex items-center justify-between">
 						<div>
 							<span className="text-sm font-semibold text-snow">{name}</span>
-							{description && (
-								<p className="text-xs text-fog">{description}</p>
-							)}
+							{description && <p className="text-xs text-fog">{description}</p>}
 						</div>
 						<div className="h-6 w-24 rounded bg-graphite/40" />
 					</div>

@@ -105,11 +105,15 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 
 		// Frames are rendered
 		expect(screen.getByText("Dashboard")).toBeDefined();
-		expect(screen.getAllByText("Transactions").length).toBeGreaterThanOrEqual(1);
+		expect(screen.getAllByText("Transactions").length).toBeGreaterThanOrEqual(
+			1,
+		);
 
 		// Floating Composer is present
 		expect(
-			screen.getByPlaceholderText(/Minta AI menambah halaman atau merevisi UI/i),
+			screen.getByPlaceholderText(
+				/Minta AI menambah halaman atau merevisi UI/i,
+			),
 		).toBeDefined();
 	});
 

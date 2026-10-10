@@ -142,21 +142,6 @@ describe("Studio Prompt Builder", () => {
 		});
 
 		it("parses JSON wrapped inside markdown code fences", () => {
-			const wrapped = `Berikut rencananya:
-\`\`\`json
-{
-  "projectTitle": "E-Commerce Web",
-  "screens": [
-    {
-      "name": "Catalog",
-      "description": "Daftar produk",
-      "viewport": "web",
-      "order: 0
-    }
-  ]
-}
-\`\`\``;
-			// Clean json inside fence
 			const cleanWrapped = `\`\`\`json
 {
   "projectTitle": "E-Commerce Web",

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import {
 	AlertCircle,
@@ -7,7 +7,6 @@ import {
 	Loader2,
 	Monitor,
 	Smartphone,
-	Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StudioCanvas } from "@/components/design/studio-canvas";
@@ -18,10 +17,10 @@ import type {
 	StudioProjectRow,
 	StudioRevisionRow,
 } from "@/db/schema";
-import { exportProjectAsZip } from "@/lib/studio-export";
 import { requireUserServer } from "@/lib/session";
+import { exportProjectAsZip } from "@/lib/studio-export";
 
-interface StudioDetailLoaderData {
+export interface StudioDetailLoaderData {
 	project: StudioProjectRow;
 	frames: StudioFrameRow[];
 	activeJob: StudioJobRow | null;
@@ -32,7 +31,7 @@ interface StudioDetailLoaderData {
 
 const loadStudioDetail = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
-	.handler(async ({ data: id }): Promise<StudioDetailLoaderData> => {
+	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
 		const { getStudioProjectDetail } = await import(
 			"@/lib/services/studio-service"
@@ -49,19 +48,14 @@ const loadStudioDetail = createServerFn({ method: "GET" })
 	});
 
 export const Route = createFileRoute("/design/studio/$id")({
-	head: ({ loaderData }) => ({
-		meta: [
-			{
-				title: `${loaderData?.project?.title ?? "Studio Canvas"} | VibeDesign`,
-			},
-		],
+	head: () => ({
+		meta: [{ title: "Studio Canvas | VibeDesign" }],
 	}),
 	loader: async ({ params }) => {
 		try {
 			return await loadStudioDetail({ data: params.id });
 		} catch (e) {
 			if (e instanceof Error && e.message === "Unauthorized") {
-				const { redirect } = await import("@tanstack/react-router");
 				throw redirect({ to: "/login" });
 			}
 			throw e;
@@ -197,7 +191,9 @@ function StudioDetailPage() {
 	async function handleRetryFrame(frameId: string) {
 		try {
 			setFrames((prev) =>
-				prev.map((f) => (f.id === frameId ? { ...f, status: "generating" } : f)),
+				prev.map((f) =>
+					f.id === frameId ? { ...f, status: "generating" } : f,
+				),
 			);
 			await fetch("/api/studio/frame", {
 				method: "POST",
@@ -249,7 +245,9 @@ function StudioDetailPage() {
 								) : (
 									<Monitor size={10} />
 								)}
-								<span>{project.designMode === "mobile" ? "Mobile" : "Web"}</span>
+								<span>
+									{project.designMode === "mobile" ? "Mobile" : "Web"}
+								</span>
 							</span>
 							{project.designMd && (
 								<span className="font-mono text-[10px] rounded border border-graphite bg-onyx px-1.5 py-0.5 text-mist">

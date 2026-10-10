@@ -18,7 +18,9 @@ describe("StudioComposer", () => {
 
 		expect(screen.getByText("Seluruh Project")).toBeDefined();
 		expect(
-			screen.getByPlaceholderText(/Minta AI menambah halaman atau merevisi UI/i),
+			screen.getByPlaceholderText(
+				/Minta AI menambah halaman atau merevisi UI/i,
+			),
 		).toBeDefined();
 	});
 
@@ -34,7 +36,9 @@ describe("StudioComposer", () => {
 		);
 
 		expect(screen.getByText(/Editing: Dashboard/i)).toBeDefined();
-		const clearBtn = screen.getByRole("button", { name: /Beralih ke seluruh project/i });
+		const clearBtn = screen.getByRole("button", {
+			name: /Beralih ke seluruh project/i,
+		});
 		fireEvent.click(clearBtn);
 		expect(onClear).toHaveBeenCalled();
 	});
@@ -71,10 +75,14 @@ describe("StudioComposer", () => {
 			/>,
 		);
 
-		const addPagePreset = screen.getByRole("button", { name: /\+ Tambah Halaman/i });
+		const addPagePreset = screen.getByRole("button", {
+			name: /\+ Tambah Halaman/i,
+		});
 		fireEvent.click(addPagePreset);
 
-		const input = screen.getByPlaceholderText(/Minta AI menambah halaman atau merevisi UI/i) as HTMLInputElement;
+		const input = screen.getByPlaceholderText(
+			/Minta AI menambah halaman atau merevisi UI/i,
+		) as HTMLInputElement;
 		expect(input.value).toContain("Tambahkan halaman ");
 	});
 });

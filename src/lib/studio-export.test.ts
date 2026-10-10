@@ -9,9 +9,7 @@ describe("studio-export", () => {
 			expect(sanitizeFilename("Dashboard & Analytics!")).toBe(
 				"dashboard-analytics",
 			);
-			expect(sanitizeFilename("Screen #1 (Mobile)")).toBe(
-				"screen-1-mobile",
-			);
+			expect(sanitizeFilename("Screen #1 (Mobile)")).toBe("screen-1-mobile");
 			expect(sanitizeFilename("   ")).toBe("screen");
 		});
 
@@ -71,8 +69,8 @@ describe("studio-export", () => {
 
 		it("exports ready frames into ZIP archive and triggers download", async () => {
 			const clickSpy = vi.fn();
-			const appendSpy = vi.spyOn(document.body, "appendChild");
-			const removeSpy = vi.spyOn(document.body, "removeChild");
+			vi.spyOn(document.body, "appendChild");
+			vi.spyOn(document.body, "removeChild");
 
 			// Mock HTMLAnchorElement click
 			const originalCreateElement = document.createElement.bind(document);

@@ -10,7 +10,11 @@ vi.mock("@tanstack/react-start/server", () => ({
 }));
 
 vi.mock("@/lib/services/studio-service", () => ({
-	addStudioFrame: async (projectId: string, userId: string, input: unknown) => ({
+	addStudioFrame: async (
+		projectId: string,
+		_userId: string,
+		input: unknown,
+	) => ({
 		id: "f-new",
 		projectId,
 		name: (input as { name: string }).name,
@@ -18,7 +22,12 @@ vi.mock("@/lib/services/studio-service", () => ({
 		order: 2,
 		htmlCode: "<html>new</html>",
 	}),
-	reviseStudioFrame: async (projectId: string, userId: string, frameId: string, prompt: string) => ({
+	reviseStudioFrame: async (
+		projectId: string,
+		_userId: string,
+		frameId: string,
+		_prompt: string,
+	) => ({
 		id: frameId,
 		projectId,
 		name: "Dashboard",
@@ -26,7 +35,11 @@ vi.mock("@/lib/services/studio-service", () => ({
 		order: 0,
 		htmlCode: "<html>revised</html>",
 	}),
-	retryStudioFrame: async (projectId: string, userId: string, frameId: string) => ({
+	retryStudioFrame: async (
+		projectId: string,
+		_userId: string,
+		frameId: string,
+	) => ({
 		id: frameId,
 		projectId,
 		name: "Transactions",

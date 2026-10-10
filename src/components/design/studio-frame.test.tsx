@@ -12,7 +12,9 @@ describe("StudioFrameSkeleton", () => {
 			<StudioFrameSkeleton viewport="mobile" name="Dashboard" />,
 		);
 		expect(screen.getByText("Dashboard")).toBeDefined();
-		expect(container.querySelector('[data-testid="mobile-skeleton"]')).toBeDefined();
+		expect(
+			container.querySelector('[data-testid="mobile-skeleton"]'),
+		).toBeDefined();
 	});
 
 	it("renders web skeleton with desktop layout elements", () => {
@@ -20,7 +22,9 @@ describe("StudioFrameSkeleton", () => {
 			<StudioFrameSkeleton viewport="web" name="Analytics" />,
 		);
 		expect(screen.getByText("Analytics")).toBeDefined();
-		expect(container.querySelector('[data-testid="web-skeleton"]')).toBeDefined();
+		expect(
+			container.querySelector('[data-testid="web-skeleton"]'),
+		).toBeDefined();
 	});
 });
 
@@ -77,7 +81,9 @@ describe("StudioFrame", () => {
 			/>,
 		);
 
-		expect(screen.getAllByText("Transactions").length).toBeGreaterThanOrEqual(1);
+		expect(screen.getAllByText("Transactions").length).toBeGreaterThanOrEqual(
+			1,
+		);
 		expect(screen.getByText(/Menggenerate/i)).toBeDefined();
 	});
 

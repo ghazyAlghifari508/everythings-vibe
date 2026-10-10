@@ -57,7 +57,9 @@ describe("StudioCanvas", () => {
 		);
 
 		expect(screen.getByText("Dashboard")).toBeDefined();
-		expect(screen.getAllByText("Transactions").length).toBeGreaterThanOrEqual(1);
+		expect(screen.getAllByText("Transactions").length).toBeGreaterThanOrEqual(
+			1,
+		);
 	});
 
 	it("renders zoom controls with current zoom percentage", () => {

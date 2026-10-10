@@ -1,6 +1,6 @@
 import { memo, useRef } from "react";
-import { ZoomControls } from "@/components/task/zoom-controls";
 import { getCanvasDotStyle } from "@/components/task/whiteboard-canvas";
+import { ZoomControls } from "@/components/task/zoom-controls";
 import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import { StudioFrame } from "./studio-frame";
@@ -22,7 +22,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 	onRetryFrame,
 	className = "",
 }: StudioCanvasProps) {
-	const canvasRef = useRef<HTMLDivElement>(null);
+	const canvasRef = useRef<HTMLElement>(null);
 
 	const {
 		zoom,
@@ -44,11 +44,9 @@ export const StudioCanvas = memo(function StudioCanvas({
 	const isPanning = false; // Transient pointer tracking in hook
 
 	return (
-		<div
+		<section
 			ref={canvasRef}
 			data-testid="studio-canvas"
-			tabIndex={0}
-			role="region"
 			aria-label={`Canvas Desain ${project.title}`}
 			onPointerDown={startPan}
 			onPointerMove={updatePan}
@@ -104,6 +102,6 @@ export const StudioCanvas = memo(function StudioCanvas({
 					onReset={resetZoom}
 				/>
 			</div>
-		</div>
+		</section>
 	);
 });

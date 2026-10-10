@@ -3,9 +3,9 @@ import {
 	Check,
 	Copy,
 	Loader2,
+	Monitor,
 	RotateCcw,
 	Smartphone,
-	Monitor,
 } from "lucide-react";
 import { useState } from "react";
 import type { StudioFrameRow } from "@/db/schema";
@@ -49,9 +49,9 @@ export function StudioFrame({
 	}
 
 	return (
-		<div
+		<article
+			aria-label={`Frame ${frame.name}`}
 			className={`flex flex-col gap-2 transition-all select-none ${className}`}
-			onClick={() => onSelect?.(frame.id)}
 		>
 			{/* Frame Title Bar */}
 			<div className="flex items-center justify-between px-1">
@@ -184,6 +184,6 @@ export function StudioFrame({
 					/>
 				)}
 			</div>
-		</div>
+		</article>
 	);
 }
