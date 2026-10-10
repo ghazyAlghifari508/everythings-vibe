@@ -1,0 +1,162 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ScrapeDetail } from "./scrape-detail";
+
+function report(state: string, failed = 0) {
+	const frame = screen.queryByTitle<HTMLIFrameElement>(/^Preview /);
+	const source = frame?.contentWindow ?? null;
+	window.dispatchEvent(
+		new MessageEvent("message", {
+			data: { type: "vibedesign-preview", state, failed },
+			source,
+		}),
+	);
+}
+
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
+});
+
+describe("ScrapeDetail preview readiness", () => {
+	it("shows a preparing state until the preview document arrives", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc=""
+				previewState="loading"
+			/>,
+		);
+		expect(screen.getByRole("status").textContent).toMatch(
+			/preview belum tersedia/i,
+		);
+		expect(screen.queryByTitle("Preview example.com")).toBeNull();
+	});
+
+	it("shows a preparing state while the signed document is still loading", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc=""
+				previewState="loading"
+				onRetryPreview={vi.fn()}
+			/>,
+		);
+		expect(screen.getByRole("status").textContent).toMatch(/belum tersedia/i);
+		expect(screen.queryByTitle("Preview example.com")).toBeNull();
+	});
+
+	it("does not treat onLoad alone as success and stays preparing without a report", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc="<html><body>signed</body></html>"
+				previewState="ready"
+			/>,
+		);
+		const iframe = screen.getByTitle("Preview example.com");
+		expect(iframe.getAttribute("srcdoc")).toBe(
+			"<html><body>signed</body></html>",
+		);
+		expect(screen.getByRole("status").textContent).toMatch(/menyiapkan/i);
+	});
+
+	it("marks the preview ready when the framed document reports success", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc="<html><body>signed</body></html>"
+				previewState="ready"
+			/>,
+		);
+		act(() => report("ready", 0));
+		expect(screen.getByRole("status").textContent).toMatch(/siap dimuat/i);
+	});
+
+	it("distinguishes an empty framed document from a ready one", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc="<html><body></body></html>"
+				previewState="ready"
+			/>,
+		);
+		act(() => report("empty", 0));
+		expect(screen.getByRole("status").textContent).toMatch(/tidak berisi/i);
+	});
+
+	it("warns when the framed document lost external resources", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc="<html><body>signed</body></html>"
+				previewState="ready"
+			/>,
+		);
+		act(() => report("degraded", 3));
+		expect(screen.getByRole("status").textContent).toMatch(/sebagian|gagal/i);
+	});
+
+	it("offers a retry when the preview document cannot be prepared", () => {
+		const onRetryPreview = vi.fn();
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc=""
+				previewState="failed"
+				previewError="Gagal menyiapkan preview scrape."
+				onRetryPreview={onRetryPreview}
+			/>,
+		);
+		expect(screen.getByRole("status").textContent).toMatch(
+			/gagal menyiapkan preview/i,
+		);
+		fireEvent.click(screen.getByRole("button", { name: /coba lagi/i }));
+		expect(onRetryPreview).toHaveBeenCalledOnce();
+	});
+
+	it("keeps the original source available for copy and download when preview fails", () => {
+		const source = "<html><body>Original source</body></html>";
+		const writeText = vi.fn(async () => {});
+		vi.stubGlobal("navigator", { clipboard: { writeText } });
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml={source}
+				previewSrcDoc=""
+				previewState="failed"
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: /Salin HTML/i }));
+		expect(writeText).toHaveBeenCalledWith(source);
+	});
+
+	it("does not remount the iframe when switching Preview to Source HTML and back", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc="<html><body>signed</body></html>"
+				previewState="ready"
+			/>,
+		);
+		const before = screen.getByTitle("Preview example.com");
+		fireEvent.click(screen.getByRole("tab", { name: /Source HTML/i }));
+		expect(
+			screen.getByRole("tabpanel", { name: /Source code index\.html/i }),
+		).toBeDefined();
+		fireEvent.click(screen.getByRole("tab", { name: /^Preview$/i }));
+		const after = screen.getByTitle("Preview example.com");
+		expect(after).toBe(before);
+	});
+});

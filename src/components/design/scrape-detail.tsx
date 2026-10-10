@@ -1,19 +1,58 @@
-import { Check, Copy, Download } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+	AlertTriangle,
+	Check,
+	Copy,
+	Download,
+	Loader2,
+	RotateCw,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ScrapePreviewState } from "@/hooks/use-scrape-preview";
 import { SCRAPE_DESKTOP_HEIGHT } from "@/lib/constants";
 
 export interface ScrapeDetailProps {
 	domain: string;
 	previewHtml?: string;
 	previewSrcDoc?: string;
+	previewState?: ScrapePreviewState;
+	previewError?: string | null;
+	onRetryPreview?: () => void;
 }
 
 type HtmlViewTab = "preview" | "code";
+type FrameReport = "preparing" | "ready" | "empty" | "degraded";
 
 const PREVIEW_WIDTH = 1440;
 const MIN_PREVIEW_SCALE = 0.75;
 const PREVIEW_HEIGHT_RATIO = 0.75;
 const PREVIEW_MAX_HEIGHT = 760;
+
+const READINESS_MESSAGE: Record<
+	FrameReport,
+	{ label: string; tone: "pending" | "ok" | "warn"; detail: string }
+> = {
+	preparing: {
+		label: "Menyiapkan preview",
+		tone: "pending",
+		detail: "Memuat dokumen dan resource website.",
+	},
+	ready: {
+		label: "Preview siap dimuat",
+		tone: "ok",
+		detail: "Dokumen dan resource website berhasil dimuat.",
+	},
+	empty: {
+		label: "Preview tidak berisi konten",
+		tone: "warn",
+		detail: "Halaman hasil scrape tidak memiliki elemen yang bisa ditampilkan.",
+	},
+	degraded: {
+		label: "Preview dimuat sebagian",
+		tone: "warn",
+		detail:
+			"Sebagian resource website gagal dimuat, tampilan bisa tidak lengkap.",
+	},
+};
 
 function safeFilename(domain: string, ext: string): string {
 	const safe = domain.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
@@ -47,12 +86,16 @@ const ICON_BUTTON_CLASS =
 export function ScrapeDetail({
 	domain,
 	previewHtml = "",
-	previewSrcDoc = previewHtml,
+	previewSrcDoc = "",
+	previewState = "ready",
+	previewError = null,
+	onRetryPreview,
 }: ScrapeDetailProps) {
 	const [htmlViewTab, setHtmlViewTab] = useState<HtmlViewTab>("preview");
 	const [notice, setNotice] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [copied, setCopied] = useState(false);
+	const [frameReport, setFrameReport] = useState<FrameReport>("preparing");
 	const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -60,6 +103,16 @@ export function ScrapeDetail({
 			if (copiedTimer.current) clearTimeout(copiedTimer.current);
 		};
 	}, []);
+
+	const handleFrameReport = useCallback((next: FrameReport) => {
+		setFrameReport(next);
+	}, []);
+
+	const [frameSrcDoc, setFrameSrcDoc] = useState(previewSrcDoc);
+	if (frameSrcDoc !== previewSrcDoc) {
+		setFrameSrcDoc(previewSrcDoc);
+		setFrameReport("preparing");
+	}
 
 	async function handleCopy(text: string, successMessage: string) {
 		setBusy(true);
@@ -163,17 +216,39 @@ export function ScrapeDetail({
 				</div>
 			</div>
 
-			{htmlViewTab === "preview" ? (
-				<div role="tabpanel" aria-label="Preview index.html">
-					<DesktopPreview title={`Preview ${domain}`} srcDoc={previewSrcDoc} />
-				</div>
-			) : (
-				<div role="tabpanel" aria-label="Source code index.html">
-					<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
-						{previewHtml}
-					</pre>
-				</div>
-			)}
+			<div
+				role="tabpanel"
+				aria-label="Preview index.html"
+				hidden={htmlViewTab !== "preview"}
+			>
+				{previewState === "failed" || !previewSrcDoc ? (
+					<PreviewUnavailable
+						message={
+							previewState === "failed"
+								? (previewError ?? "Gagal menyiapkan preview scrape.")
+								: "Preview belum tersedia."
+						}
+						isRetryable={previewState === "failed"}
+						onRetry={onRetryPreview}
+					/>
+				) : (
+					<DesktopPreview
+						title={`Preview ${domain}`}
+						srcDoc={previewSrcDoc}
+						report={frameReport}
+						onReport={handleFrameReport}
+					/>
+				)}
+			</div>
+			<div
+				role="tabpanel"
+				aria-label="Source code index.html"
+				hidden={htmlViewTab === "preview"}
+			>
+				<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
+					{previewHtml}
+				</pre>
+			</div>
 
 			{notice ? (
 				<output className="block border-t border-graphite px-3 py-2 text-xs text-fog">
@@ -184,7 +259,72 @@ export function ScrapeDetail({
 	);
 }
 
-function DesktopPreview({ title, srcDoc }: { title: string; srcDoc: string }) {
+function PreviewUnavailable({
+	message,
+	isRetryable,
+	onRetry,
+}: {
+	message: string;
+	isRetryable: boolean;
+	onRetry?: () => void;
+}) {
+	return (
+		<div className="flex min-h-[280px] flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
+			<AlertTriangle size={20} aria-hidden className="text-amber-400" />
+			<output className="text-sm font-semibold text-snow">{message}</output>
+			<p className="max-w-md text-xs leading-5 text-fog">
+				Source HTML asli tetap tersedia di tab Source HTML.
+			</p>
+			{isRetryable && onRetry ? (
+				<button
+					type="button"
+					onClick={onRetry}
+					className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+				>
+					<RotateCw size={14} aria-hidden />
+					Coba lagi
+				</button>
+			) : null}
+		</div>
+	);
+}
+
+function PreviewReadinessBanner({ report }: { report: FrameReport }) {
+	const { label, tone, detail } = READINESS_MESSAGE[report];
+	return (
+		<output
+			className={`flex items-center gap-2 border-t border-graphite px-3 py-2 text-xs ${
+				tone === "ok"
+					? "text-emerald-400"
+					: tone === "warn"
+						? "text-amber-400"
+						: "text-fog"
+			}`}
+		>
+			{tone === "pending" ? (
+				<Loader2 size={14} aria-hidden className="animate-spin" />
+			) : tone === "ok" ? (
+				<Check size={14} aria-hidden />
+			) : (
+				<AlertTriangle size={14} aria-hidden />
+			)}
+			<span className="font-semibold">{label}</span>
+			<span className="text-fog">{detail}</span>
+		</output>
+	);
+}
+
+function DesktopPreview({
+	title,
+	srcDoc,
+	report,
+	onReport,
+}: {
+	title: string;
+	srcDoc: string;
+	report: FrameReport;
+	onReport?: (report: FrameReport) => void;
+}) {
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const [scale, setScale] = useState(1);
 	const [frameHeight, setFrameHeight] = useState(() =>
@@ -227,35 +367,62 @@ function DesktopPreview({ title, srcDoc }: { title: string; srcDoc: string }) {
 		};
 	}, []);
 
+	const frameRef = useRef<HTMLIFrameElement>(null);
+
+	useEffect(() => {
+		if (!onReport) return;
+		const handleMessage = (event: MessageEvent) => {
+			if (event.source !== frameRef.current?.contentWindow) return;
+			const data: unknown = event.data;
+			if (typeof data !== "object" || data === null) return;
+			const payload = data as { type?: unknown; state?: unknown };
+			if (payload.type !== "vibedesign-preview") return;
+			const state = payload.state;
+			if (
+				state === "ready" ||
+				state === "empty" ||
+				state === "degraded" ||
+				state === "failed"
+			)
+				onReport(state === "failed" ? "degraded" : state);
+		};
+		window.addEventListener("message", handleMessage);
+		return () => window.removeEventListener("message", handleMessage);
+	}, [onReport]);
+
 	const canvasWidth = Math.max(1, Math.round(PREVIEW_WIDTH * scale));
 	const canvasHeight = Math.max(1, Math.round(frameHeight * scale));
 
 	return (
-		<div ref={wrapRef} className="w-full overflow-x-auto bg-white">
-			<div
-				style={{
-					position: "relative",
-					width: canvasWidth,
-					height: canvasHeight,
-				}}
-			>
-				<iframe
-					title={title}
-					srcDoc={srcDoc}
-					sandbox="allow-scripts"
-					referrerPolicy="no-referrer"
-					className="border-0"
+		<div className="flex flex-col">
+			<div ref={wrapRef} className="w-full overflow-x-auto bg-white">
+				<div
 					style={{
-						position: "absolute",
-						top: 0,
-						left: 0,
-						width: PREVIEW_WIDTH,
-						height: frameHeight,
-						transform: `scale(${scale})`,
-						transformOrigin: "top left",
+						position: "relative",
+						width: canvasWidth,
+						height: canvasHeight,
 					}}
-				/>
+				>
+					<iframe
+						ref={frameRef}
+						title={title}
+						srcDoc={srcDoc}
+						sandbox="allow-scripts"
+						referrerPolicy="no-referrer"
+						className="border-0"
+						style={{
+							position: "absolute",
+							top: 0,
+							left: 0,
+							width: PREVIEW_WIDTH,
+							height: frameHeight,
+							transform: `scale(${scale})`,
+							transformOrigin: "top left",
+						}}
+					/>
+				</div>
 			</div>
+			{onReport ? <PreviewReadinessBanner report={report} /> : null}
 		</div>
 	);
 }
