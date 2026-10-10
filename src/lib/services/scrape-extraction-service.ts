@@ -18,6 +18,7 @@ import {
 
 const CRAWL_REQUEST_GAP_MS = 1000;
 const CRAWL_ROBOTS_MAX_BYTES = 512000;
+const CRAWL_MAX_HTML_BYTES = 5_000_000;
 
 export async function runExtractionJob(
 	scrape: ScrapeRow,
@@ -43,16 +44,44 @@ export async function runExtractionJob(
 				and(
 					eq(scrapePages.scrapeId, claim.id),
 					eq(scrapePages.userId, claim.userId),
-					eq(scrapePages.status, "completed"),
 				),
 			);
 		await crawlWebsite(request.url, request.settings, {
-			completed: completed.map((page) => ({ ...page, status: "completed" })),
+			frontier: completed.map(({ url, parentUrl, depth }) => ({
+				url,
+				parentUrl,
+				depth,
+			})),
+			completed: completed
+				.filter((page) => page.status === "completed")
+				.map((page) => ({ ...page, status: "completed" })),
+			onDiscovered: async (url, parentUrl, depth) => {
+				await db.transaction(async (tx) => {
+					const [owner] = await tx
+						.select({ id: scrapes.id })
+						.from(scrapes)
+						.where(scrapeClaimPredicate(claim))
+						.for("update")
+						.limit(1);
+					if (!owner) throw new Error("Job lease sudah tidak berlaku.");
+					await tx
+						.insert(scrapePages)
+						.values({
+							url,
+							parentUrl,
+							depth,
+							userId: claim.userId,
+							scrapeId: claim.id,
+						})
+						.onConflictDoNothing();
+				});
+			},
 			load: async (url) => {
 				await new Promise((resolve) =>
 					setTimeout(resolve, CRAWL_REQUEST_GAP_MS),
 				);
 				const result = await fetchAsset(url, 0, {
+					maxBytes: CRAWL_MAX_HTML_BYTES,
 					allowUrl: (target) =>
 						isCrawlScope(
 							target,
@@ -76,7 +105,12 @@ export async function runExtractionJob(
 				if (result.status === 404) return "";
 				if (result.status !== 200)
 					throw new Error("robots.txt tidak dapat diverifikasi.");
-				return result.body.toString("utf8");
+				const content = result.body.toString("utf8");
+				if (/crawl-delay\s*:\s*(?:[2-9]|\d{2,})/i.test(content))
+					throw new Error(
+						"robots.txt meminta crawl delay lebih lama dari kapasitas job ini.",
+					);
+				return content;
 			},
 			onPage: async (page, discovered) => {
 				await db.transaction(async (tx) => {

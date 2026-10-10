@@ -16,6 +16,12 @@ export interface CrawledPage {
 
 export interface CrawlDependencies {
 	completed?: CrawledPage[];
+	frontier?: { url: string; parentUrl: string | null; depth: number }[];
+	onDiscovered?: (
+		url: string,
+		parentUrl: string,
+		depth: number,
+	) => Promise<void>;
 	load: (
 		url: string,
 	) => Promise<{ html: string; status: number; finalUrl: string }>;
@@ -109,8 +115,13 @@ export async function crawlWebsite(
 	settings: CrawlSettings,
 	deps: CrawlDependencies,
 ): Promise<CrawledPage[]> {
-	const queue = [{ url: seed, parentUrl: null as string | null, depth: 0 }];
-	const seen = new Set([seed]);
+	const queue = [
+		{ url: seed, parentUrl: null as string | null, depth: 0 },
+		...(deps.frontier ?? [])
+			.filter((page) => page.url !== seed)
+			.sort((a, b) => a.depth - b.depth),
+	];
+	const seen = new Set(queue.map((page) => page.url));
 	const pages: CrawledPage[] = [];
 	const robots = new Map<string, string>();
 	while (queue.length && pages.length < settings.maxPages) {
@@ -159,6 +170,7 @@ export async function crawlWebsite(
 								continue;
 							seen.add(url);
 							queue.push({ url, parentUrl: next.url, depth: next.depth + 1 });
+							await deps.onDiscovered?.(url, next.url, next.depth + 1);
 						}
 					pages.push(page);
 					await deps.onPage?.(page, seen.size);
@@ -216,6 +228,7 @@ export async function crawlWebsite(
 						if (!(await matchesCrawlUrl(settings.urlRegex, url))) continue;
 						seen.add(url);
 						queue.push({ url, parentUrl: next.url, depth: next.depth + 1 });
+						await deps.onDiscovered?.(url, next.url, next.depth + 1);
 					}
 			}
 		} catch (error) {
