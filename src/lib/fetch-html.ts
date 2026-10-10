@@ -68,6 +68,7 @@ function responseContentType(res: http.IncomingMessage): string {
 }
 
 export interface FetchAssetOptions {
+	allowUrl?: (url: string) => boolean | Promise<boolean>;
 	signal?: AbortSignal;
 	maxBytes?: number;
 	range?: { start: number; end?: number; suffixLength?: number };
@@ -87,6 +88,11 @@ export async function fetchAsset(
 	redirects = 0,
 	options: FetchAssetOptions = {},
 ): Promise<FetchedAsset> {
+	if (options.allowUrl && !(await options.allowUrl(rawUrl)))
+		throw new ScrapeError(
+			"PRIVATE_URL_BLOCKED",
+			"URL di luar scope yang diizinkan.",
+		);
 	const maxBytes = Math.min(
 		options.maxBytes ?? SCRAPE_MAX_ASSET_BYTES,
 		SCRAPE_MAX_ASSET_BYTES,
