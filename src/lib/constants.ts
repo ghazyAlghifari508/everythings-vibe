@@ -337,3 +337,12 @@ export const SCRAPE_ASSET_RATE_LIMIT = 1000;
 export const SCRAPE_ASSET_RATE_WINDOW_S = 60;
 export const SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS = 60 * 60 * 1000;
 export const SCRAPE_PREVIEW_ASSET_MAX_URL_CHARS = 4096;
+
+export const STUDIO_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;
+export const STUDIO_LOGO_ALLOWED_MIMES = [
+	"image/png",
+	"image/jpeg",
+	"image/webp",
+	"image/svg+xml",
+] as const;

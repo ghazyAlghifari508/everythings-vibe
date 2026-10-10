@@ -1011,6 +1011,9 @@ export const studioProjects = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		title: text("title").notNull(),
+		designMode: text("design_mode").notNull().default("web"),
+		designMd: text("design_md"),
+		logoAssetId: text("logo_asset_id"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -1019,6 +1022,30 @@ export const studioProjects = pgTable(
 			.notNull(),
 	},
 	(t) => [index("studio_projects_user_id_idx").on(t.userId)],
+);
+
+export const studioAssets = pgTable(
+	"studio_assets",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		projectId: text("project_id"),
+		filename: text("filename").notNull(),
+		mimeType: text("mime_type").notNull(),
+		byteLength: integer("byte_length").notNull(),
+		data: text("data").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index("studio_assets_user_id_idx").on(t.userId),
+		index("studio_assets_project_id_idx").on(t.projectId),
+	],
 );
 
 export const studioRevisions = pgTable(
@@ -1046,5 +1073,7 @@ export type ScrapeDocumentRow = typeof scrapeDocuments.$inferSelect;
 export type InsertScrapeDocumentRow = typeof scrapeDocuments.$inferInsert;
 export type StudioProjectRow = typeof studioProjects.$inferSelect;
 export type InsertStudioProjectRow = typeof studioProjects.$inferInsert;
+export type StudioAssetRow = typeof studioAssets.$inferSelect;
+export type InsertStudioAssetRow = typeof studioAssets.$inferInsert;
 export type StudioRevisionRow = typeof studioRevisions.$inferSelect;
 export type InsertStudioRevisionRow = typeof studioRevisions.$inferInsert;
