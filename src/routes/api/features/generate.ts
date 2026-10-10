@@ -5,8 +5,8 @@ import {
 	buildAskHandoffPrompt,
 	buildCodebasePromptBlock,
 	getAskHandoff,
-	getProjectGenerationContext,
 	parseStoredHandoffAnswers,
+	requireProjectGenerationContext,
 } from "@/lib/codebase-generation-context";
 import { MAX_FEATURE_RESPONSE_CHARS, MAX_PROMPT_LENGTH } from "@/lib/constants";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
@@ -191,9 +191,14 @@ export const Route = createFileRoute("/api/features/generate")({
 					let codebaseBlock = "";
 					if (project.projectMode === "existing_codebase") {
 						try {
-							codebaseBlock = buildCodebasePromptBlock(
-								await getProjectGenerationContext(projectId),
-							);
+							// Fail closed: a repository-aware Feature Specification
+							// must never be generated from generic greenfield context.
+							const required = await requireProjectGenerationContext(projectId);
+							if ("code" in required) {
+								await releaseClaim();
+								return Response.json(required, { status: required.status });
+							}
+							codebaseBlock = buildCodebasePromptBlock(required.context);
 						} catch (e) {
 							console.warn("fitur codebase context skipped:", e);
 						}

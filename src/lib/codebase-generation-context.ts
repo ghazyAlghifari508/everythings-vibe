@@ -180,6 +180,71 @@ export function formatBoundedGenerationContext(
 const CODEBASE_BLOCK_START = "--- KONTEKS CODEBASE EXISTING ---";
 const CODEBASE_BLOCK_END = "--- AKHIR KONTEKS CODEBASE ---";
 
+/** Actionable failure returned by requireProjectGenerationContext when a
+ *  repository-aware project cannot be grounded in a ready snapshot analysis. */
+export interface GenerationContextUnavailable {
+	status: number;
+	code: "CODEBASE_CONTEXT_UNAVAILABLE";
+	error: string;
+}
+
+const GENERATION_CONTEXT_UNAVAILABLE: GenerationContextUnavailable = {
+	status: 409,
+	code: "CODEBASE_CONTEXT_UNAVAILABLE",
+	error:
+		"Konteks repositori belum siap (analisis snapshot belum tersedia). Selesaikan sinkronisasi dan analisis, lalu coba lagi.",
+};
+
+/** Pure decision for a resolved project mode + context. Greenfield (or other
+ *  modes) keep working without codebase context; existing_codebase without a
+ *  ready analysis fails closed. */
+export function decideContextRequirement(
+	projectMode: string | null | undefined,
+	context: SnapshotGenerationContext | null,
+):
+	| { context: SnapshotGenerationContext | null }
+	| GenerationContextUnavailable {
+	if (projectMode !== "existing_codebase") return { context: null };
+	if (!context) return GENERATION_CONTEXT_UNAVAILABLE;
+	return { context };
+}
+
+/**
+ * Fail-closed context loader for existing-codebase generation.
+ *
+ * Returns `{ context: null }` for greenfield projects (the caller generates
+ * WITHOUT codebase context — legitimate, unchanged behavior). For an
+ * existing-codebase project with no ready snapshot analysis it returns an
+ * actionable error instead of a null context, so a repository-aware stage can
+ * never silently fall back to generic greenfield generation.
+ */
+export async function requireProjectGenerationContext(
+	projectId: string,
+): Promise<
+	{ context: SnapshotGenerationContext | null } | GenerationContextUnavailable
+> {
+	try {
+		const { db } = await import("@/db");
+		const { projects } = await import("@/db/schema");
+		const { and, eq, isNull } = await import("drizzle-orm");
+		const [project] = await db
+			.select({ projectMode: projects.projectMode })
+			.from(projects)
+			.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
+			.limit(1);
+		if (project?.projectMode !== "existing_codebase") {
+			return { context: null };
+		}
+		const context = await getProjectGenerationContext(projectId);
+		return decideContextRequirement(project.projectMode, context);
+	} catch (error) {
+		// A repository-aware project must never silently continue on a context
+		// error (including a DB/provider failure): fail closed.
+		console.warn("requireProjectGenerationContext failed closed:", error);
+		return GENERATION_CONTEXT_UNAVAILABLE;
+	}
+}
+
 /** Single injection helper for Ask/PRD/AC/Task. Null (greenfield) returns ""
  *  so greenfield prompts stay byte-identical. Ready context returns a framed,
  *  bounded block that labels uncertainty as assumptions and instructs the
@@ -474,23 +539,47 @@ export async function getProjectGenerationContext(
 			projectMode: projects.projectMode,
 			name: projects.name,
 			description: projects.description,
+			codebaseId: projects.codebaseId,
 		})
 		.from(projects)
 		.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
 		.limit(1);
 	if (!project || project.projectMode !== "existing_codebase") return null;
 
-	const analysisRows = await db
-		.select({
-			id: codebaseAnalyses.id,
-			status: codebaseAnalyses.status,
-			output: codebaseAnalyses.output,
-			snapshotId: codebaseAnalyses.snapshotId,
-			createdAt: codebaseAnalyses.createdAt,
-		})
-		.from(codebaseAnalyses)
-		.where(eq(codebaseAnalyses.projectId, projectId))
-		.orderBy(desc(codebaseAnalyses.createdAt));
+	// Repository-aware mode resolves context at the CODEBASE level. The
+	// onboarding analysis runs against the codebase's onboarding project, not
+	// the user's feature project, so looking up analyses by the feature
+	// project id alone would find nothing and silently drop to greenfield.
+	// Joining analyses through snapshots keeps every feature project of the
+	// same repository grounded on the same trusted context. A project without a
+	// codebase id falls back to its own analyses (legacy project-scoped rows).
+	const analysisRows = project.codebaseId
+		? await db
+				.select({
+					id: codebaseAnalyses.id,
+					status: codebaseAnalyses.status,
+					output: codebaseAnalyses.output,
+					snapshotId: codebaseAnalyses.snapshotId,
+					createdAt: codebaseAnalyses.createdAt,
+				})
+				.from(codebaseAnalyses)
+				.innerJoin(
+					codebaseSnapshots,
+					eq(codebaseAnalyses.snapshotId, codebaseSnapshots.id),
+				)
+				.where(eq(codebaseSnapshots.codebaseId, project.codebaseId))
+				.orderBy(desc(codebaseAnalyses.createdAt))
+		: await db
+				.select({
+					id: codebaseAnalyses.id,
+					status: codebaseAnalyses.status,
+					output: codebaseAnalyses.output,
+					snapshotId: codebaseAnalyses.snapshotId,
+					createdAt: codebaseAnalyses.createdAt,
+				})
+				.from(codebaseAnalyses)
+				.where(eq(codebaseAnalyses.projectId, projectId))
+				.orderBy(desc(codebaseAnalyses.createdAt));
 	const readyAnalysis = selectNewestReadyAnalysis(
 		analysisRows.map((row) => ({
 			id: row.id,

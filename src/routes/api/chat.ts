@@ -10,6 +10,7 @@ import {
 	buildCodebasePromptBlock,
 	getProjectGenerationContext,
 	linkGenerationContext,
+	requireProjectGenerationContext,
 } from "@/lib/codebase-generation-context";
 import {
 	MAX_PREFERENCES_CHARS,
@@ -289,8 +290,19 @@ export const Route = createFileRoute("/api/chat")({
 
 					if (projCheck?.projectMode === "existing_codebase") {
 						try {
+							// Fail closed for a fresh PRD generation: a repository-aware
+							// PRD must never silently fall back to generic greenfield
+							// context. Revisions keep working on the existing document.
+							const required =
+								mode === "generate"
+									? await requireProjectGenerationContext(projectIdToUse)
+									: { context: null };
+							if ("code" in required) {
+								return Response.json(required, { status: required.status });
+							}
 							const generationContext =
-								await getProjectGenerationContext(projectIdToUse);
+								required.context ??
+								(await getProjectGenerationContext(projectIdToUse));
 							if (generationContext) {
 								codebaseBlock = buildCodebasePromptBlock(generationContext);
 								codebaseSnapshotId = generationContext.snapshotId;

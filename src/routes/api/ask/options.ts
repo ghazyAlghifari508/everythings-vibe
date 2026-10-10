@@ -6,7 +6,7 @@ import {
 	askHandoffSchema,
 	buildCodebasePromptBlock,
 	getAskHandoff,
-	getProjectGenerationContext,
+	requireProjectGenerationContext,
 	resolveActiveSnapshotId,
 	saveAskHandoff,
 } from "@/lib/codebase-generation-context";
@@ -217,12 +217,16 @@ export const Route = createFileRoute("/api/ask/options")({
 				// Task 8 contextual questions: snapshot-bound context is appended
 				// only for existing-codebase projects with ready analysis. Null
 				// (greenfield) appends "" so the prompt stays byte-identical.
+				// Existing-codebase questions are repository-grounded, so a missing
+				// analysis fails closed instead of asking generic questions.
 				let codebaseBlock = "";
 				if (project.projectMode === "existing_codebase") {
 					try {
-						codebaseBlock = buildCodebasePromptBlock(
-							await getProjectGenerationContext(projectId),
-						);
+						const required = await requireProjectGenerationContext(projectId);
+						if ("code" in required) {
+							return Response.json(required, { status: required.status });
+						}
+						codebaseBlock = buildCodebasePromptBlock(required.context);
 					} catch (e) {
 						console.warn("ask codebase context skipped:", e);
 					}
