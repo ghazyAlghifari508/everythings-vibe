@@ -41,6 +41,7 @@ import {
 	type AdaptiveQuestion,
 	buildFeatureMessage,
 	mapAskQuestionsToAdaptive,
+	runConfirmGenerate,
 } from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
@@ -1028,12 +1029,12 @@ function CodebaseDetailPage() {
 
 	const analysisOutput = analysis?.output ?? null;
 
-	const loadPrd = useCallback(async () => {
+	const loadPrd = useCallback(async (): Promise<string | null> => {
 		if (!snapshotReady || !effectiveFeatureId) {
 			setPrdContent(null);
 			setPrdError(null);
 			setPrdLoading(false);
-			return;
+			return null;
 		}
 		setPrdLoading(true);
 		setPrdError(null);
@@ -1045,18 +1046,21 @@ function CodebaseDetailPage() {
 			if (!response.ok) {
 				setPrdError("Dokumen PRD tidak dapat dimuat.");
 				setPrdContent(null);
-				return;
+				return null;
 			}
 			const rows = parseVersionRows(body);
 			if (!rows) {
 				setPrdError("Dokumen PRD tidak valid.");
 				setPrdContent(null);
-				return;
+				return null;
 			}
-			setPrdContent(selectLatestVersionContent(rows));
+			const content = selectLatestVersionContent(rows);
+			setPrdContent(content);
+			return content;
 		} catch {
 			setPrdError("Server tidak dapat dihubungi.");
 			setPrdContent(null);
+			return null;
 		} finally {
 			setPrdLoading(false);
 		}
@@ -1066,12 +1070,12 @@ function CodebaseDetailPage() {
 		void loadPrd();
 	}, [loadPrd]);
 
-	const loadAc = useCallback(async () => {
+	const loadAc = useCallback(async (): Promise<string | null> => {
 		if (!snapshotReady || !effectiveFeatureId) {
 			setAcContent(null);
 			setAcError(null);
 			setAcLoading(false);
-			return;
+			return null;
 		}
 		setAcLoading(true);
 		setAcError(null);
@@ -1083,18 +1087,21 @@ function CodebaseDetailPage() {
 			if (!response.ok) {
 				setAcError("Dokumen AC tidak dapat dimuat.");
 				setAcContent(null);
-				return;
+				return null;
 			}
 			const rows = parseVersionRows(body);
 			if (!rows) {
 				setAcError("Dokumen AC tidak valid.");
 				setAcContent(null);
-				return;
+				return null;
 			}
-			setAcContent(selectLatestVersionContent(rows));
+			const content = selectLatestVersionContent(rows);
+			setAcContent(content);
+			return content;
 		} catch {
 			setAcError("Server tidak dapat dihubungi.");
 			setAcContent(null);
+			return null;
 		} finally {
 			setAcLoading(false);
 		}
@@ -1107,26 +1114,30 @@ function CodebaseDetailPage() {
 	const refreshFeatureTree = useCallback(async (projectId: string | null) => {
 		if (!projectId) {
 			setFeatureTree(null);
-			return;
+			return null;
 		}
 		try {
 			const data = await loadFeatureTree({ data: projectId });
 			setFeatureTree(data.featureTree);
+			return data.featureTree;
 		} catch {
 			setFeatureTree(null);
+			return null;
 		}
 	}, []);
 
 	const refreshTaskTree = useCallback(async (projectId: string | null) => {
 		if (!projectId) {
 			setTaskTree(null);
-			return;
+			return null;
 		}
 		try {
 			const data = await loadTaskTree({ data: projectId });
 			setTaskTree(data.taskTree);
+			return data.taskTree;
 		} catch {
 			setTaskTree(null);
+			return null;
 		}
 	}, []);
 
@@ -1512,53 +1523,77 @@ function CodebaseDetailPage() {
 		setStageError(null);
 		try {
 			const answersList = buildAskHandoffAnswers(chatAnswers, aiQuestions);
-			try {
-				await fetch("/api/ask/options", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						projectId: effectiveFeatureId,
-						action: "save-handoff",
-						handoff: {
-							projectId: effectiveFeatureId,
-							answers: answersList,
-							state: {
-								prompt:
-									lastFeaturePrompt.trim() ||
-									resolvedFeature?.name ||
-									"Fitur baru",
-								platform: "web",
-								session: 1,
-								questions: [],
-							},
-						},
-					}),
-				});
-			} catch {
+			const outcome = await runConfirmGenerate({
+				// Persistence is a hard precondition for generation: an unsaved
+				// handoff would leave the Feature/PRD/AC/Task generators without
+				// the user's answers, so a failed save blocks generation.
+				saveHandoff: async () => {
+					try {
+						const response = await fetch("/api/ask/options", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({
+								projectId: effectiveFeatureId,
+								action: "save-handoff",
+								handoff: {
+									projectId: effectiveFeatureId,
+									answers: answersList,
+									state: {
+										prompt:
+											lastFeaturePrompt.trim() ||
+											resolvedFeature?.name ||
+											"Fitur baru",
+										platform: "web",
+										session: 1,
+										questions: [],
+									},
+								},
+							}),
+						});
+						return response.ok;
+					} catch {
+						return false;
+					}
+				},
+				generateFeature: async () => {
+					try {
+						const response = await fetch("/api/features/generate", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ projectId: effectiveFeatureId }),
+						});
+						return { status: response.status };
+					} catch {
+						return { status: 0 };
+					}
+				},
+				// A 200 alone does not prove the artifact persisted: reload the
+				// authoritative tree and only advance when it is actually there.
+				reloadFeatureTree: () => refreshFeatureTree(effectiveFeatureId),
+			});
+
+			if (outcome.kind === "handoff_failed") {
+				setSpecError(
+					"Jawaban gagal disimpan, jadi spesifikasi tidak dibuat. Coba lagi.",
+				);
 				return;
 			}
-			let specResponse: Response;
-			try {
-				specResponse = await fetch("/api/features/generate", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ projectId: effectiveFeatureId }),
-				});
-			} catch {
-				setSpecError("Server tidak dapat dihubungi. Coba lagi.");
-				return;
-			}
-			if (!specResponse.ok && specResponse.status !== 409) {
+			if (outcome.kind === "spec_failed") {
 				setSpecError("Spesifikasi fitur gagal dibuat. Coba lagi.");
 				return;
 			}
-			if (specResponse.status === 409) {
+			if (outcome.kind === "generating") {
 				pushAssistantMessage(
 					`Pohon fitur ${resolvedFeature?.name ?? "fitur"} sedang disusun. Tunggu sebentar lalu klik Lanjut Bikin Fitur lagi untuk memuat hasilnya.`,
 				);
 				return;
 			}
-			await refreshFeatureTree(effectiveFeatureId);
+			if (outcome.kind === "not_persisted") {
+				setSpecError(
+					"Spesifikasi fitur belum tersimpan di server. Coba lagi sebentar lagi.",
+				);
+				return;
+			}
 			setPipelineStage("feature");
 			const specMessage = buildFeatureMessage(
 				resolvedFeature?.name ?? codebase.name,
@@ -1628,7 +1663,11 @@ function CodebaseDetailPage() {
 				}),
 			},
 			async () => {
-				await loadPrd();
+				const content = await loadPrd();
+				if (!content) {
+					setStageError("PRD belum tersimpan di server. Coba generate ulang.");
+					return;
+				}
 				setPipelineStage("prd");
 				pushAssistantMessage(
 					`PRD 8 seksi untuk ${resolvedFeature?.name ?? "fitur"} siap. Klik file PRD-*.md di bawah untuk membaca dokumen lengkap.`,
@@ -1656,7 +1695,13 @@ function CodebaseDetailPage() {
 				body: JSON.stringify({ projectId: effectiveFeatureId }),
 			},
 			async () => {
-				await loadAc();
+				const content = await loadAc();
+				if (!content) {
+					setStageError(
+						"Acceptance Criteria belum tersimpan di server. Coba generate ulang.",
+					);
+					return;
+				}
 				setPipelineStage("ac");
 				pushAssistantMessage(
 					`Acceptance Criteria untuk ${resolvedFeature?.name ?? "fitur"} siap. Klik file AC-*.md di bawah untuk membaca dokumen lengkap.`,
@@ -1683,7 +1728,13 @@ function CodebaseDetailPage() {
 			},
 			async () => {
 				await kanban.refetch();
-				await refreshTaskTree(effectiveFeatureId);
+				const persistedTaskTree = await refreshTaskTree(effectiveFeatureId);
+				if (!persistedTaskTree) {
+					setStageError(
+						"Task belum tersimpan di server. Coba breakdown task ulang.",
+					);
+					return;
+				}
 				setPipelineStage("handoff");
 				pushAssistantMessage(
 					`Task untuk ${resolvedFeature?.name ?? "fitur"} sudah tersimpan dan papan Kanban aktif. Klik file tasks-*.json di bawah untuk melihat diagram task, atau salin perintah handoff untuk mulai mengerjakan dengan AI Coding Agent.`,

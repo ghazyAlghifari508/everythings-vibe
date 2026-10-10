@@ -1,9 +1,10 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
 	areAllQuestionsAnswered,
 	buildFeatureMessage,
 	mapAskQuestionsToAdaptive,
 	nextQuestionIndex,
+	runConfirmGenerate,
 } from "./codebase-chat-flow";
 
 const questions = [{ id: "q1" }, { id: "q2" }, { id: "q3" }];
@@ -119,5 +120,58 @@ describe("mapAskQuestionsToAdaptive", () => {
 		]);
 		expect(mapped.options.some((o) => o.recommended)).toBe(false);
 		expect(mapped.recommendedOptionId).toBeUndefined();
+	});
+});
+
+describe("runConfirmGenerate", () => {
+	test("never generates the feature when the handoff did not save", async () => {
+		const generateFeature = vi.fn(async () => ({ status: 200 }));
+		const reloadFeatureTree = vi.fn(async () => ({ ok: true }));
+		const outcome = await runConfirmGenerate({
+			saveHandoff: async () => false,
+			generateFeature,
+			reloadFeatureTree,
+		});
+		expect(outcome).toEqual({ kind: "handoff_failed" });
+		expect(generateFeature).not.toHaveBeenCalled();
+		expect(reloadFeatureTree).not.toHaveBeenCalled();
+	});
+
+	test("does not advance on a 200 unless the tree is actually persisted", async () => {
+		const outcome = await runConfirmGenerate({
+			saveHandoff: async () => true,
+			generateFeature: async () => ({ status: 200 }),
+			reloadFeatureTree: async () => null,
+		});
+		expect(outcome).toEqual({ kind: "not_persisted" });
+	});
+
+	test("reports the concurrent-generation 409 without advancing", async () => {
+		const reloadFeatureTree = vi.fn(async () => ({ ok: true }));
+		const outcome = await runConfirmGenerate({
+			saveHandoff: async () => true,
+			generateFeature: async () => ({ status: 409 }),
+			reloadFeatureTree,
+		});
+		expect(outcome).toEqual({ kind: "generating" });
+		expect(reloadFeatureTree).not.toHaveBeenCalled();
+	});
+
+	test("reports a transport failure (status 0) as a spec failure", async () => {
+		const outcome = await runConfirmGenerate({
+			saveHandoff: async () => true,
+			generateFeature: async () => ({ status: 0 }),
+			reloadFeatureTree: async () => ({ ok: true }),
+		});
+		expect(outcome).toEqual({ kind: "spec_failed" });
+	});
+
+	test("succeeds only when generation persisted and the tree reloads", async () => {
+		const outcome = await runConfirmGenerate({
+			saveHandoff: async () => true,
+			generateFeature: async () => ({ status: 200 }),
+			reloadFeatureTree: async () => ({ features: [] }),
+		});
+		expect(outcome).toEqual({ kind: "success" });
 	});
 });
