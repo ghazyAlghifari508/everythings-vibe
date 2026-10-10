@@ -327,4 +327,32 @@ describe("buildSourceViewRows", () => {
 		expect(view.truncatedLines).toBe(true);
 		expect(view.totalLines).toBe(CODEBASE_FILE_PREVIEW_MAX_LINES + 20);
 	});
+
+	it("emits distinct semantic token classes, not one monochrome class", () => {
+		const content = [
+			"// note",
+			'const greeting: string = "hello";',
+			"export function greet(name: string): number {",
+			"  return name.length + 42;",
+			"}",
+		].join("\n");
+		const view = buildSourceViewRows({
+			content,
+			path: "src/greet.ts",
+			mode: "original",
+			maxLines: MAX,
+		});
+		const classes = new Set(
+			view.rows.flatMap((row) =>
+				row.tokens
+					.map((token) => token.className)
+					.filter((name): name is string => Boolean(name)),
+			),
+		);
+		expect(classes.has("hljs-comment")).toBe(true);
+		expect(classes.has("hljs-keyword")).toBe(true);
+		expect(classes.has("hljs-string")).toBe(true);
+		expect(classes.has("hljs-number")).toBe(true);
+		expect(classes.size).toBeGreaterThanOrEqual(4);
+	});
 });
