@@ -249,6 +249,8 @@ function ScrapeDetailPage() {
 				/>
 			) : view === "result-html" ? (
 				<ScrapeDetail
+					sourceUrl={sourceUrl}
+					title={initial.title}
 					domain={domain}
 					previewHtml={previewHtml}
 					previewSrcDoc={previewSrcDoc}

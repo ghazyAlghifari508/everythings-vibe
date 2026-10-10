@@ -1,8 +1,10 @@
 import {
 	AlertTriangle,
 	Check,
+	Code,
 	Copy,
 	Download,
+	Eye,
 	Loader2,
 	RotateCw,
 } from "lucide-react";
@@ -16,6 +18,8 @@ import {
 
 export interface ScrapeDetailProps {
 	domain: string;
+	sourceUrl?: string;
+	title?: string | null;
 	previewHtml?: string;
 	previewSrcDoc?: string;
 	previewState?: ScrapePreviewState;
@@ -95,6 +99,8 @@ const ICON_BUTTON_CLASS =
 
 export function ScrapeDetail({
 	domain,
+	sourceUrl,
+	title,
 	previewHtml = "",
 	previewSrcDoc = "",
 	previewState = "ready",
@@ -164,125 +170,164 @@ export function ScrapeDetail({
 	const copyLabel = "Salin HTML";
 	const downloadLabel = "Download index.html";
 	return (
-		<section
-			aria-label="Hasil HTML"
-			className="overflow-hidden rounded-xl border border-graphite bg-charcoal"
-		>
-			<div className="flex items-center justify-between gap-2 border-b border-graphite px-3 py-2">
+		<div className="space-y-5">
+			{sourceUrl && (
+				<header>
+					<h1 className="text-2xl font-semibold text-snow">
+						{title || domain}
+					</h1>
+					<a
+						href={sourceUrl}
+						target="_blank"
+						rel="noreferrer"
+						className="mt-2 block break-all text-sm text-fog"
+					>
+						{sourceUrl}
+					</a>
+				</header>
+			)}
+			<section
+				aria-label="Hasil HTML"
+				className="overflow-hidden rounded-xl border border-graphite bg-charcoal"
+			>
+				<div className="flex items-center justify-between gap-2 border-b border-graphite px-3 py-2">
+					<div
+						role="tablist"
+						aria-label="Tampilan HTML"
+						className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
+					>
+						<button
+							aria-label="Preview"
+							title="Preview"
+							tabIndex={htmlViewTab === "preview" ? 0 : -1}
+							onKeyDown={(event) => {
+								if (["ArrowRight", "ArrowLeft", "End"].includes(event.key)) {
+									event.preventDefault();
+									setHtmlViewTab("code");
+									document.getElementById("html-code-tab")?.focus();
+								}
+							}}
+							id="html-preview-tab"
+							type="button"
+							role="tab"
+							aria-selected={htmlViewTab === "preview"}
+							onClick={() => setHtmlViewTab("preview")}
+							className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
+								htmlViewTab === "preview"
+									? "bg-charcoal text-snow"
+									: "text-fog hover:text-mist"
+							}`}
+						>
+							<Eye size={16} aria-hidden />
+						</button>
+						<button
+							aria-label="Source HTML"
+							title="Source HTML"
+							tabIndex={htmlViewTab === "code" ? 0 : -1}
+							onKeyDown={(event) => {
+								if (["ArrowRight", "ArrowLeft", "Home"].includes(event.key)) {
+									event.preventDefault();
+									setHtmlViewTab("preview");
+									document.getElementById("html-preview-tab")?.focus();
+								}
+							}}
+							id="html-code-tab"
+							type="button"
+							role="tab"
+							aria-selected={htmlViewTab === "code"}
+							onClick={() => setHtmlViewTab("code")}
+							className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
+								htmlViewTab === "code"
+									? "bg-charcoal text-snow"
+									: "text-fog hover:text-mist"
+							}`}
+						>
+							<Code size={16} aria-hidden />
+						</button>
+					</div>
+					<div className="flex shrink-0 items-center gap-1">
+						<button
+							type="button"
+							onClick={() =>
+								void handleCopy(previewHtml, "HTML tersalin ke clipboard.")
+							}
+							disabled={busy}
+							aria-label={copyLabel}
+							title={copyLabel}
+							className={ICON_BUTTON_CLASS}
+						>
+							{copied ? (
+								<Check size={15} aria-hidden className="text-emerald-400" />
+							) : (
+								<Copy size={15} aria-hidden />
+							)}
+						</button>
+						<button
+							type="button"
+							onClick={handleDownload}
+							disabled={busy}
+							aria-label={downloadLabel}
+							title={downloadLabel}
+							className={ICON_BUTTON_CLASS}
+						>
+							<Download size={15} aria-hidden />
+						</button>
+					</div>
+				</div>
+
 				<div
-					role="tablist"
-					aria-label="Tampilan HTML"
-					className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
+					role="tabpanel"
+					aria-label="Preview index.html"
+					hidden={htmlViewTab !== "preview"}
 				>
-					<button
-						type="button"
-						role="tab"
-						aria-selected={htmlViewTab === "preview"}
-						onClick={() => setHtmlViewTab("preview")}
-						className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
-							htmlViewTab === "preview"
-								? "bg-charcoal text-snow"
-								: "text-fog hover:text-mist"
-						}`}
-					>
-						Preview
-					</button>
-					<button
-						type="button"
-						role="tab"
-						aria-selected={htmlViewTab === "code"}
-						onClick={() => setHtmlViewTab("code")}
-						className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
-							htmlViewTab === "code"
-								? "bg-charcoal text-snow"
-								: "text-fog hover:text-mist"
-						}`}
-					>
-						Source HTML
-					</button>
+					<p className="border-b border-graphite px-3 py-2 text-xs text-fog">
+						Snapshot visual hasil scrape. Interaksi aplikasi website tidak
+						dijalankan ulang.
+					</p>
+					{previewState === "failed" || !previewSrcDoc ? (
+						<PreviewUnavailable
+							message={
+								previewState === "failed"
+									? (previewError ?? "Gagal menyiapkan preview scrape.")
+									: "Preview belum tersedia."
+							}
+							isRetryable={previewState === "failed"}
+							isLoading={previewState === "loading"}
+							onRetry={onRetryPreview}
+						/>
+					) : (
+						<DesktopPreview
+							key={previewAttempt}
+							title={`Preview ${domain}`}
+							srcDoc={frameSrcDoc}
+							report={frameReport}
+							active={htmlViewTab === "preview"}
+							onReport={handleFrameReport}
+							onRetry={() => {
+								setFrameReport("preparing");
+								setPreviewAttempt((attempt) => attempt + 1);
+								onRetryPreview?.();
+							}}
+						/>
+					)}
 				</div>
-				<div className="flex shrink-0 items-center gap-1">
-					<button
-						type="button"
-						onClick={() =>
-							void handleCopy(previewHtml, "HTML tersalin ke clipboard.")
-						}
-						disabled={busy}
-						aria-label={copyLabel}
-						title={copyLabel}
-						className={ICON_BUTTON_CLASS}
-					>
-						{copied ? (
-							<Check size={15} aria-hidden className="text-emerald-400" />
-						) : (
-							<Copy size={15} aria-hidden />
-						)}
-					</button>
-					<button
-						type="button"
-						onClick={handleDownload}
-						disabled={busy}
-						aria-label={downloadLabel}
-						title={downloadLabel}
-						className={ICON_BUTTON_CLASS}
-					>
-						<Download size={15} aria-hidden />
-					</button>
+				<div
+					role="tabpanel"
+					aria-label="Source code index.html"
+					hidden={htmlViewTab === "preview"}
+				>
+					<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
+						{previewHtml}
+					</pre>
 				</div>
-			</div>
 
-			<div
-				role="tabpanel"
-				aria-label="Preview index.html"
-				hidden={htmlViewTab !== "preview"}
-			>
-				<p className="border-b border-graphite px-3 py-2 text-xs text-fog">
-					Snapshot visual hasil scrape. Interaksi aplikasi website tidak
-					dijalankan ulang.
-				</p>
-				{previewState === "failed" || !previewSrcDoc ? (
-					<PreviewUnavailable
-						message={
-							previewState === "failed"
-								? (previewError ?? "Gagal menyiapkan preview scrape.")
-								: "Preview belum tersedia."
-						}
-						isRetryable={previewState === "failed"}
-						isLoading={previewState === "loading"}
-						onRetry={onRetryPreview}
-					/>
-				) : (
-					<DesktopPreview
-						key={previewAttempt}
-						title={`Preview ${domain}`}
-						srcDoc={frameSrcDoc}
-						report={frameReport}
-						active={htmlViewTab === "preview"}
-						onReport={handleFrameReport}
-						onRetry={() => {
-							setFrameReport("preparing");
-							setPreviewAttempt((attempt) => attempt + 1);
-							onRetryPreview?.();
-						}}
-					/>
-				)}
-			</div>
-			<div
-				role="tabpanel"
-				aria-label="Source code index.html"
-				hidden={htmlViewTab === "preview"}
-			>
-				<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
-					{previewHtml}
-				</pre>
-			</div>
-
-			{notice ? (
-				<output className="block border-t border-graphite px-3 py-2 text-xs text-fog">
-					{notice}
-				</output>
-			) : null}
-		</section>
+				{notice ? (
+					<output className="block border-t border-graphite px-3 py-2 text-xs text-fog">
+						{notice}
+					</output>
+				) : null}
+			</section>
+		</div>
 	);
 }
 
