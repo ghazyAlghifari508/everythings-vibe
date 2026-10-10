@@ -199,16 +199,14 @@ export function buildPreviewSrcDoc(
 	const nonce = randomBytes(18).toString("base64");
 	const origin = new URL(options.appOrigin).origin;
 	const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline' ${origin}; img-src data: blob: ${origin}; font-src data: ${origin}; media-src data: ${origin}; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
-	return output
-		.replace(
-			"<script>(()=>{if(window.parent",
-			`<script nonce="${nonce}">(()=>{if(window.parent`,
-		)
-		.replace(
-			/<head[^>]*>/i,
-			(head) =>
-				`${head}<meta http-equiv="Content-Security-Policy" content="${policy}">`,
-		);
+	const secured = output.replace(
+		"<script>(()=>{if(window.parent",
+		`<script nonce="${nonce}">(()=>{if(window.parent`,
+	);
+	const meta = `<meta http-equiv="Content-Security-Policy" content="${policy}">`;
+	return /<head[^>]*>/i.test(secured)
+		? secured.replace(/<head[^>]*>/i, (head) => `${head}${meta}`)
+		: `${meta}${secured}`;
 }
 
 export function rewritePreviewCss(

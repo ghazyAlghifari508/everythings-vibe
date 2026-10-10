@@ -21,6 +21,19 @@ function completedScrape(
 }
 
 describe("buildScrapePreviewDocument", () => {
+	it("applies snapshot CSP even when captured HTML has no head", () => {
+		const result = buildScrapePreviewDocument(
+			completedScrape({
+				html: '<h1>Content</h1><script src="/app.js"></script>',
+			}),
+			"owner-1",
+			APP_ORIGIN,
+			1000,
+		);
+		expect(result?.srcDoc).toContain('http-equiv="Content-Security-Policy"');
+		expect(result?.srcDoc).toContain("connect-src 'none'");
+		expect(result?.srcDoc).toMatch(/<script nonce="[^"]+">/);
+	});
 	it("prepares a visual snapshot without executing captured modules or tracking", () => {
 		const html =
 			'<html><head><script type="module">import("./" + name + ".mjs")</script><link rel="modulepreload" href="/runtime.mjs"><style>.hero{background:url(/hero.png)}</style></head><body onload="start()"><h1>Captured content</h1><img src="/image.png"><script src="/tracking.js"></script></body></html>';
