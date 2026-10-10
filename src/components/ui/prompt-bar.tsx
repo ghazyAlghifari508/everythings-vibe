@@ -8,11 +8,14 @@ import {
 } from "framer-motion";
 import {
 	type KeyboardEvent,
+	type MouseEvent,
 	useCallback,
 	useEffect,
 	useRef,
 	useState,
 } from "react";
+
+export type PromptBarSubmitAppearance = "label" | "icon";
 
 export interface PromptBarProps {
 	id?: string;
@@ -29,6 +32,12 @@ export interface PromptBarProps {
 	className?: string;
 	ariaLabel?: string;
 	sendButtonLabel?: string;
+	/**
+	 * Opt-in submit presentation. "label" keeps the historical text button so
+	 * unrelated flows are untouched; "icon" renders the same functional
+	 * submit as a compact icon-only control.
+	 */
+	submitAppearance?: PromptBarSubmitAppearance;
 }
 
 interface SendGlyphProps {
@@ -44,6 +53,13 @@ const ARROW_UP = [
 const SQUARE = [12, 6, 18, 6, 18, 12, 18, 18, 6, 18, 6, 12, 6, 6];
 const EASE_IN_OUT: [number, number, number, number] = [0.77, 0, 0.175, 1];
 const LINE_HEIGHT_PX = 22;
+const ICON_SUBMIT_LABEL = "Kirim pesan";
+
+// Anything a user expects to activate directly. A click that lands on one of
+// these must keep its native behavior instead of being forwarded to the
+// textarea.
+const INTERACTIVE_SELECTOR =
+	'a[href], button, input, select, textarea, [role="button"], [role="tab"], [role="checkbox"], [role="switch"], [role="slider"], [contenteditable="true"]';
 
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
@@ -127,6 +143,7 @@ export function PromptBar({
 	className = "",
 	ariaLabel = "Jelaskan fitur yang ingin dibangun di repositori ini",
 	sendButtonLabel,
+	submitAppearance = "label",
 }: PromptBarProps) {
 	const isControlled = value !== undefined;
 	const [internalDraft, setInternalDraft] = useState(defaultValue);
@@ -137,6 +154,30 @@ export function PromptBar({
 	const focusInput = useCallback(() => {
 		inputRef.current?.focus({ preventScroll: true });
 	}, []);
+
+	/**
+	 * The composer surface (padding, the footer row, the gap above the submit
+	 * button) is one visual field, so pressing anywhere that is not a control
+	 * must start typing. Pointer-down is intercepted instead of click so the
+	 * browser never moves focus to the surface first, and the caret lands at
+	 * the end of the draft like every other "clicked below the text" input.
+	 */
+	const handleSurfacePointerDown = useCallback(
+		(event: MouseEvent<HTMLFormElement>) => {
+			if (disabled || event.defaultPrevented) return;
+			const target = event.target;
+			if (!(target instanceof HTMLElement)) return;
+			const el = inputRef.current;
+			// Clicks inside the textarea keep native caret/selection behavior.
+			if (el?.contains(target)) return;
+			if (target.closest(INTERACTIVE_SELECTOR)) return;
+			event.preventDefault();
+			focusInput();
+			const caret = draft.length;
+			el?.setSelectionRange(caret, caret);
+		},
+		[draft.length, disabled, focusInput],
+	);
 
 	const updateDraft = (next: string) => {
 		if (!isControlled) {
@@ -184,13 +225,23 @@ export function PromptBar({
 		}
 	};
 
+	const isIconSubmit = submitAppearance === "icon";
 	const displayButtonLabel =
 		sendButtonLabel ?? (isSending ? "Mengirim..." : "Kirim");
+	const iconSubmitLabel = sendButtonLabel ?? ICON_SUBMIT_LABEL;
 
 	return (
-		<div
+		<form
 			data-testid="prompt-bar"
-			className={`group relative flex w-full flex-col rounded-xl border border-graphite bg-charcoal/80 p-3 transition-colors focus-within:border-indigo/50 ${className}`}
+			data-submit-appearance={submitAppearance}
+			onMouseDown={handleSurfacePointerDown}
+			onSubmit={(event) => {
+				// The composer owns submission: never let a native submit
+				// navigate the planning workspace away.
+				event.preventDefault();
+				handleSend();
+			}}
+			className={`group relative flex w-full cursor-text flex-col rounded-xl border border-graphite bg-charcoal/80 p-3 transition-colors focus-within:border-indigo/50 ${className}`}
 		>
 			<label htmlFor={id} className="sr-only">
 				{ariaLabel}
@@ -212,15 +263,22 @@ export function PromptBar({
 					type="button"
 					onClick={handleSend}
 					disabled={!canSend}
-					aria-label={displayButtonLabel}
+					aria-label={isIconSubmit ? iconSubmitLabel : displayButtonLabel}
+					aria-busy={isIconSubmit ? isSending : undefined}
+					title={isIconSubmit ? iconSubmitLabel : undefined}
+					data-testid="prompt-bar-submit"
 					data-armed={canSend ? "" : undefined}
-					className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-graphite/40 disabled:text-slate data-[armed]:bg-snow data-[armed]:text-onyx hover:data-[armed]:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					className={
+						isIconSubmit
+							? "inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md text-snow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:bg-graphite/40 disabled:text-slate data-[armed]:bg-snow data-[armed]:text-onyx hover:data-[armed]:brightness-105"
+							: "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-graphite/40 disabled:text-slate data-[armed]:bg-snow data-[armed]:text-onyx hover:data-[armed]:brightness-105"
+					}
 				>
-					<SendGlyph />
-					<span>{displayButtonLabel}</span>
+					<SendGlyph busy={isSending} />
+					{isIconSubmit ? null : <span>{displayButtonLabel}</span>}
 				</button>
 			</div>
-		</div>
+		</form>
 	);
 }
 

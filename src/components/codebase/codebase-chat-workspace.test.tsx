@@ -482,8 +482,8 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const composer = container.querySelector<HTMLTextAreaElement>(
 			"#codebase-chat-composer",
 		);
-		const sendButton = [...container.querySelectorAll("button")].find((b) =>
-			/Kirim/.test(b.textContent ?? ""),
+		const sendButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
 		);
 		expect(sendButton?.disabled).toBe(true);
 
@@ -500,6 +500,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		act(() => {
 			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
+		expect(onSendMessage).toHaveBeenCalledTimes(1);
 		expect(onSendMessage).toHaveBeenCalledWith("Tambah mode gelap");
 		expect(composer?.value).toBe("");
 	});
@@ -555,8 +556,8 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const composer = container.querySelector<HTMLTextAreaElement>(
 			"#codebase-chat-composer",
 		);
-		const sendButton = [...container.querySelectorAll("button")].find((b) =>
-			/Kirim|Mengirim/.test(b.textContent ?? ""),
+		const sendButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
 		);
 
 		expect(composer?.disabled).toBe(true);
@@ -571,12 +572,131 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const isSendingComposer = container.querySelector<HTMLTextAreaElement>(
 			"#codebase-chat-composer",
 		);
-		const isSendingButton = [...container.querySelectorAll("button")].find(
-			(b) => /Kirim|Mengirim/.test(b.textContent ?? ""),
+		const isSendingButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
 		);
 		expect(isSendingComposer?.disabled).toBe(true);
 		expect(isSendingButton?.disabled).toBe(true);
-		expect(isSendingButton?.textContent).toContain("Mengirim...");
+		// Icon-only submit carries its state through ARIA, never visible text.
+		expect(isSendingButton?.getAttribute("aria-busy")).toBe("true");
+		expect(isSendingButton?.textContent).toBe("");
+	});
+
+	it("focuses the textarea when any empty composer region is pressed", () => {
+		renderWorkspace();
+
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		const surface = container.querySelector("[data-testid='prompt-bar']");
+		const footer = surface?.querySelector(":scope > div");
+		expect(surface).not.toBeNull();
+		expect(footer).not.toBeNull();
+
+		// Lower empty area (footer row), container padding, and the surface
+		// itself must all start typing.
+		for (const region of [footer, surface]) {
+			act(() => {
+				composer?.blur();
+				const press = new MouseEvent("mousedown", {
+					bubbles: true,
+					cancelable: true,
+				});
+				region?.dispatchEvent(press);
+				expect(press.defaultPrevented).toBe(true);
+			});
+			expect(document.activeElement).toBe(composer);
+		}
+	});
+
+	it("leaves textarea and submit interactions to their native handlers", () => {
+		const onSendMessage = vi.fn();
+		renderWorkspace({ onSendMessage });
+
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		const submit = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+
+		act(() => {
+			if (composer) setTextareaValue(composer, "Tambah pencarian proyek");
+		});
+
+		// Pressing inside the textarea must not be intercepted, or caret
+		// placement and drag-selection would break.
+		act(() => {
+			const press = new MouseEvent("mousedown", {
+				bubbles: true,
+				cancelable: true,
+			});
+			composer?.dispatchEvent(press);
+			expect(press.defaultPrevented).toBe(false);
+		});
+
+		// Pressing the submit must not be intercepted, or the click that
+		// follows would be swallowed by the surface handler.
+		act(() => {
+			const press = new MouseEvent("mousedown", {
+				bubbles: true,
+				cancelable: true,
+			});
+			submit?.dispatchEvent(press);
+			expect(press.defaultPrevented).toBe(false);
+		});
+		act(() => {
+			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onSendMessage).toHaveBeenCalledTimes(1);
+		expect(onSendMessage).toHaveBeenCalledWith("Tambah pencarian proyek");
+	});
+
+	it("places the caret at the end of the prefilled prompt when the empty area is pressed", () => {
+		renderWorkspace({
+			starterSuggestions,
+		});
+
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		const startCard = container.querySelector<HTMLButtonElement>(
+			"[data-testid='intent-starter-feature']",
+		);
+		act(() => {
+			startCard?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(composer?.value).toContain("ekspor");
+
+		const footer = container
+			.querySelector("[data-testid='prompt-bar']")
+			?.querySelector(":scope > div");
+		act(() => {
+			composer?.blur();
+			footer?.dispatchEvent(
+				new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+			);
+		});
+		expect(document.activeElement).toBe(composer);
+		expect(composer?.selectionStart).toBe(composer?.value.length);
+	});
+
+	it("renders a compact icon-only submit with an accessible name", () => {
+		renderWorkspace();
+
+		const surface = container.querySelector("[data-testid='prompt-bar']");
+		expect(surface?.getAttribute("data-submit-appearance")).toBe("icon");
+
+		const submit = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		expect(submit?.getAttribute("aria-label")).toBe("Kirim pesan");
+		expect(submit?.getAttribute("title")).toBe("Kirim pesan");
+		expect(submit?.textContent).toBe("");
+		expect(submit?.querySelector("svg")).not.toBeNull();
+		// Touch target stays comfortable on mobile viewports.
+		expect(submit?.className).toContain("h-10");
+		expect(submit?.className).toContain("w-10");
 	});
 
 	it("does not render fake demo controls in codebase chat workspace", () => {

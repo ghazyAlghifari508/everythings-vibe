@@ -257,6 +257,7 @@ export function CodebaseChatWorkspace({
 			className={className}
 			placeholder="Jelaskan fitur atau perubahan yang kamu inginkan..."
 			ariaLabel="Jelaskan fitur atau perubahan yang kamu inginkan"
+			submitAppearance="icon"
 		/>
 	);
 
