@@ -77,6 +77,44 @@ describe("scanRepository", () => {
 		expect(paths).toContain("coverage/lcov.info");
 	});
 
+	it("excludes Vercel local state directories while keeping vercel.json", async () => {
+		const root = await makeTempRoot();
+		await writeRepoFile(root, ".vercel/project.json", "{}\n");
+		await writeRepoFile(root, ".vercel/output/static/index.html", "<p>hi</p>\n");
+		await writeRepoFile(root, "apps/web/.vercel/project.json", "{}\n");
+		await writeRepoFile(root, "vercel.json", '{"framework":"nextjs"}\n');
+		await writeRepoFile(root, "apps/web/vercel.json", "{}\n");
+		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
+		const rules = await readCodebaseIgnore(root);
+		const scan = await scanRepository(root, rules);
+		expect(scan.files.map((f) => f.path)).toEqual([
+			"apps/web/vercel.json",
+			"src/app.ts",
+			"vercel.json",
+		]);
+		const paths = excludedPaths(scan);
+		expect(paths).toContain(".vercel/project.json");
+		expect(paths).toContain(".vercel/output/static/index.html");
+		expect(paths).toContain("apps/web/.vercel/project.json");
+		expect(paths).not.toContain("vercel.json");
+	});
+
+	it("keeps .vercel excluded even when a user ignore rule negates it", async () => {
+		const root = await makeTempRoot();
+		await writeRepoFile(root, ".vercel/project.json", "{}\n");
+		await writeRepoFile(root, "src/app.ts", "export const x = 1;\n");
+		await writeFile(
+			join(root, ".everythingsvibeignore"),
+			"!.vercel/\n",
+			"utf-8",
+		);
+		const rules = await readCodebaseIgnore(root);
+		const scan = await scanRepository(root, rules);
+		expect(rules.droppedNegations).toEqual(["!.vercel/"]);
+		expect(scan.files.map((f) => f.path)).toEqual(["src/app.ts"]);
+		expect(excludedPaths(scan)).toContain(".vercel/project.json");
+	});
+
 	it("applies canonical ignore custom exclusions", async () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, "internal/notes.md", "notes\n");
