@@ -178,6 +178,7 @@ describe("ScrapModeSwitcher UI and Accessible Tabs", () => {
 		expect(mockNavigate).toHaveBeenCalledWith({
 			to: "/design/scrap/$id",
 			params: { id: "scrape-design-123" },
+			search: { from: "/design/scrap" },
 		});
 	});
 
@@ -215,6 +216,7 @@ describe("ScrapModeSwitcher UI and Accessible Tabs", () => {
 		expect(mockNavigate).toHaveBeenCalledWith({
 			to: "/design/scrap/$id",
 			params: { id: "scrape-html-456" },
+			search: { from: "/design/scrap" },
 		});
 	});
 

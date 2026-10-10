@@ -21,8 +21,8 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/services/scrape-service", () => ({
 	getScrapeById: mocks.getScrapeById,
 }));
-vi.mock("@/lib/preview-capabilities", () => ({
-	buildPreviewSrcDoc: mocks.buildPreviewSrcDoc,
+vi.mock("@/lib/scrape-preview-document", () => ({
+	buildScrapePreviewDocument: mocks.buildPreviewSrcDoc,
 }));
 
 import { Route } from "./scrap.$id";
@@ -33,9 +33,10 @@ beforeEach(() => {
 		id: "owner-1",
 		email: "owner@example.invalid",
 	});
-	mocks.buildPreviewSrcDoc.mockReturnValue(
-		'<img src="https://app.example/api/scrape/asset?cap=preview">',
-	);
+	mocks.buildPreviewSrcDoc.mockReturnValue({
+		srcDoc: '<img src="https://app.example/api/scrape/asset?cap=preview">',
+		expiresAt: Date.now() + 60 * 60_000,
+	});
 	mocks.getScrapeById.mockResolvedValue({
 		id: "scrape-1",
 		userId: "owner-1",
@@ -66,12 +67,14 @@ describe("scrape detail route preview loading", () => {
 		expect(mocks.requireUserServer).toHaveBeenCalledOnce();
 		expect(mocks.getScrapeById).toHaveBeenCalledWith("scrape-1", "owner-1");
 		expect(mocks.buildPreviewSrcDoc).toHaveBeenCalledWith(
-			'<img srcset="data:image/png;base64,AAAA 1x, /asset.png 2x">',
 			expect.objectContaining({
-				baseUrl: "https://example.invalid/final",
-				scrapeId: "scrape-1",
-				ownerId: "owner-1",
+				id: "scrape-1",
+				status: "completed",
+				mode: "html",
+				sourceUrl: "https://example.invalid/final",
 			}),
+			"owner-1",
+			expect.any(String),
 		);
 		expect(mocks.getScrapeById.mock.invocationCallOrder[0]).toBeLessThan(
 			mocks.buildPreviewSrcDoc.mock.invocationCallOrder[0],
@@ -81,8 +84,37 @@ describe("scrape detail route preview loading", () => {
 		expect("previewHtml" in result ? result.previewHtml : undefined).toBe(
 			'<img src="/api/scrape/asset?url=https%3A%2F%2Fassets.example%2Fcorrupted.png">',
 		);
-		expect("previewSrcDoc" in result ? result.previewSrcDoc : undefined).toBe(
-			'<img src="https://app.example/api/scrape/asset?cap=preview">',
-		);
+		expect("preview" in result ? result.preview : undefined).toEqual({
+			srcDoc: '<img src="https://app.example/api/scrape/asset?cap=preview">',
+			expiresAt: expect.any(Number),
+		});
+	});
+
+	it("returns a null preview while the scrape is still processing", async () => {
+		mocks.buildPreviewSrcDoc.mockReturnValue(null);
+		mocks.getScrapeById.mockResolvedValue({
+			id: "scrape-1",
+			userId: "owner-1",
+			sourceUrl: "https://example.invalid/final",
+			domain: "example.invalid",
+			title: null,
+			mode: "html",
+			status: "saving",
+			html: null,
+			previewHtml: "",
+			metadata: null,
+			createdAt: new Date("2026-01-01T00:00:00.000Z"),
+			updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+			document: null,
+		});
+		const loader: unknown = Reflect.get(Route.options, "loader");
+		if (typeof loader !== "function")
+			throw new Error("Route loader unavailable");
+		const result: unknown = await Reflect.apply(loader, undefined, [
+			{ params: { id: "scrape-1" } },
+		]);
+		if (typeof result !== "object" || result === null)
+			throw new Error("Loader returned no data");
+		expect("preview" in result ? result.preview : undefined).toBeNull();
 	});
 });
