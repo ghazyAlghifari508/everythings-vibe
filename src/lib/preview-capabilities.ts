@@ -32,6 +32,7 @@ export interface PreviewRewriteOptions {
 	ownerId: string;
 	secret?: string;
 	expiresAt: number;
+	now?: number;
 }
 
 function canonicalTarget(value: string): string {
@@ -159,6 +160,7 @@ export function capabilityUrl(
 			expiresAt: options.expiresAt,
 		},
 		options.secret,
+		options.now,
 	);
 	const origin = new URL(options.appOrigin);
 	if (origin.protocol !== "https:" && origin.protocol !== "http:")

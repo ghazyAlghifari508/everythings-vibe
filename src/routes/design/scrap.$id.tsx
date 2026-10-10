@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { ArrowLeft } from "lucide-react";
 import { DesignResult } from "@/components/design/design-result";
+import { ScrapeBackLink } from "@/components/design/scrape-back-link";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
 import {
@@ -9,10 +9,12 @@ import {
 	resolveScrapeView,
 } from "@/components/design/scrape-view-state";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
+import { useScrapePreview } from "@/hooks/use-scrape-preview";
 import {
 	toScrapeStatusSnapshot,
 	useScrapeStatus,
 } from "@/hooks/use-scrape-status";
+import { scrapeReturnSearchSchema } from "@/lib/scrape-return-path";
 import { requireUserServer } from "@/lib/session";
 
 export const loadScrapeDetail = createServerFn({ method: "GET" })
@@ -21,10 +23,6 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 		const user = await requireUserServer();
 		const { getScrapeById } = await import("@/lib/services/scrape-service");
 		const scrape = await getScrapeById(id, user.id);
-		const { buildPreviewSrcDoc } = await import("@/lib/preview-capabilities");
-		const { SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS } = await import(
-			"@/lib/constants"
-		);
 		let appOrigin = "http://localhost:3000";
 		try {
 			const { getRequestHeaders, getRequestUrl } = await import(
@@ -41,17 +39,11 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 		} catch {
 			// Fallback when called outside of start server request context
 		}
+		const { buildScrapePreviewDocument } = await import(
+			"@/lib/scrape-preview-document"
+		);
 		const previewHtml = scrape.previewHtml ?? "";
-		const previewSrcDoc =
-			scrape.status === "completed" && scrape.mode === "html"
-				? buildPreviewSrcDoc(scrape.html ?? "", {
-						baseUrl: scrape.sourceUrl,
-						appOrigin,
-						scrapeId: scrape.id,
-						ownerId: user.id,
-						expiresAt: Date.now() + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS,
-					})
-				: previewHtml;
+		const preview = buildScrapePreviewDocument(scrape, user.id, appOrigin);
 		return {
 			id: scrape.id,
 			sourceUrl: scrape.sourceUrl,
@@ -60,7 +52,7 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 			status: scrape.status,
 			mode: scrape.mode,
 			previewHtml,
-			previewSrcDoc,
+			preview,
 			designMd: scrape.document?.designMd ?? "",
 			metadata: scrape.metadata,
 			capturedAt:
@@ -77,6 +69,7 @@ export const Route = createFileRoute("/design/scrap/$id")({
 	head: () => ({
 		meta: [{ title: "Hasil Scrape | VibeDesign" }],
 	}),
+	validateSearch: (search) => scrapeReturnSearchSchema.parse(search),
 	loader: async ({ params }) => {
 		try {
 			return await loadScrapeDetail({ data: params.id });
@@ -101,6 +94,7 @@ export const Route = createFileRoute("/design/scrap/$id")({
 function ScrapeDetailPage() {
 	const initial = Route.useLoaderData();
 	const { id } = Route.useParams();
+	const { from } = Route.useSearch();
 
 	const {
 		data,
@@ -131,9 +125,21 @@ function ScrapeDetailPage() {
 		"design") as ScrapeMode;
 	const sourceUrl = data?.sourceUrl ?? initial.sourceUrl;
 	const domain = data?.domain ?? initial.domain;
-	const previewSrcDoc = initial.previewSrcDoc;
 	const previewHtml = data?.previewHtml ?? initial.previewHtml;
 	const designMd = data?.document?.designMd ?? initial.designMd;
+
+	const isHtmlResult = mode === "html";
+	const {
+		preview,
+		state: previewState,
+		error: previewError,
+		retry: retryPreview,
+	} = useScrapePreview(id, {
+		status: currentStatus,
+		enabled: isHtmlResult,
+		initialPreview: initial.preview ?? null,
+	});
+	const previewSrcDoc = preview?.srcDoc ?? "";
 
 	const metadata = (data?.metadata ?? initial.metadata) as Record<
 		string,
@@ -182,13 +188,7 @@ function ScrapeDetailPage() {
 					: "mx-auto max-w-5xl px-4 sm:px-6"
 			}`}
 		>
-			<Link
-				to="/design/scrap"
-				className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-fog transition-colors hover:text-snow"
-			>
-				<ArrowLeft size={16} aria-hidden />
-				Kembali ke scraper
-			</Link>
+			<ScrapeBackLink from={from} />
 			{view === "result-design" ? (
 				<DesignResult
 					sourceUrl={sourceUrl}
@@ -200,6 +200,9 @@ function ScrapeDetailPage() {
 					domain={domain}
 					previewHtml={previewHtml}
 					previewSrcDoc={previewSrcDoc}
+					previewState={previewState}
+					previewError={previewError}
+					onRetryPreview={() => void retryPreview()}
 				/>
 			) : (
 				<ScrapeProgress

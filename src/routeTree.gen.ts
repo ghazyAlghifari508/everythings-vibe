@@ -72,6 +72,7 @@ import { Route as ApiPaymentsWebhookRouteImport } from './routes/api/payments/we
 import { Route as ApiProjectsIndexRouteImport } from './routes/api/projects/index'
 import { Route as ApiProjectsIdRouteImport } from './routes/api/projects/$id'
 import { Route as ApiScrapeAssetRouteImport } from './routes/api/scrape.asset'
+import { Route as ApiScrapePreviewRouteImport } from './routes/api/scrape.preview'
 import { Route as ApiStudioGenerateRouteImport } from './routes/api/studio.generate'
 import { Route as ApiTaskProjectIdRouteImport } from './routes/api/task/$projectId'
 import { Route as ApiTaskGenerateRouteImport } from './routes/api/task/generate'
@@ -426,6 +427,11 @@ const ApiScrapeAssetRoute = ApiScrapeAssetRouteImport.update({
   path: '/asset',
   getParentRoute: () => ApiScrapeRoute,
 } as any)
+const ApiScrapePreviewRoute = ApiScrapePreviewRouteImport.update({
+  id: '/preview',
+  path: '/preview',
+  getParentRoute: () => ApiScrapeRoute,
+} as any)
 const ApiStudioGenerateRoute = ApiStudioGenerateRouteImport.update({
   id: '/api/studio/generate',
   path: '/api/studio/generate',
@@ -693,6 +699,7 @@ export interface FileRoutesByFullPath {
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
   '/api/scrape/asset': typeof ApiScrapeAssetRoute
+  '/api/scrape/preview': typeof ApiScrapePreviewRoute
   '/api/studio/generate': typeof ApiStudioGenerateRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
@@ -791,6 +798,7 @@ export interface FileRoutesByTo {
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
   '/api/scrape/asset': typeof ApiScrapeAssetRoute
+  '/api/scrape/preview': typeof ApiScrapePreviewRoute
   '/api/studio/generate': typeof ApiStudioGenerateRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
@@ -895,6 +903,7 @@ export interface FileRoutesById {
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
   '/api/scrape/asset': typeof ApiScrapeAssetRoute
+  '/api/scrape/preview': typeof ApiScrapePreviewRoute
   '/api/studio/generate': typeof ApiStudioGenerateRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
@@ -1000,6 +1009,7 @@ export interface FileRouteTypes {
     | '/api/payments/webhook'
     | '/api/projects/$id'
     | '/api/scrape/asset'
+    | '/api/scrape/preview'
     | '/api/studio/generate'
     | '/api/task/$projectId'
     | '/api/task/generate'
@@ -1098,6 +1108,7 @@ export interface FileRouteTypes {
     | '/api/payments/webhook'
     | '/api/projects/$id'
     | '/api/scrape/asset'
+    | '/api/scrape/preview'
     | '/api/studio/generate'
     | '/api/task/$projectId'
     | '/api/task/generate'
@@ -1201,6 +1212,7 @@ export interface FileRouteTypes {
     | '/api/payments/webhook'
     | '/api/projects/$id'
     | '/api/scrape/asset'
+    | '/api/scrape/preview'
     | '/api/studio/generate'
     | '/api/task/$projectId'
     | '/api/task/generate'
@@ -1753,6 +1765,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiScrapeAssetRouteImport
       parentRoute: typeof ApiScrapeRoute
     }
+    '/api/scrape/preview': {
+      id: '/api/scrape/preview'
+      path: '/preview'
+      fullPath: '/api/scrape/preview'
+      preLoaderRoute: typeof ApiScrapePreviewRouteImport
+      parentRoute: typeof ApiScrapeRoute
+    }
     '/api/studio/generate': {
       id: '/api/studio/generate'
       path: '/api/studio/generate'
@@ -2080,10 +2099,12 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 
 interface ApiScrapeRouteChildren {
   ApiScrapeAssetRoute: typeof ApiScrapeAssetRoute
+  ApiScrapePreviewRoute: typeof ApiScrapePreviewRoute
 }
 
 const ApiScrapeRouteChildren: ApiScrapeRouteChildren = {
   ApiScrapeAssetRoute: ApiScrapeAssetRoute,
+  ApiScrapePreviewRoute: ApiScrapePreviewRoute,
 }
 
 const ApiScrapeRouteWithChildren = ApiScrapeRoute._addFileChildren(
