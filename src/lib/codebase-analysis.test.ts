@@ -923,7 +923,7 @@ describe("requestCodebaseAnalysis atomic claim contract", () => {
 			"tx.insert(codebaseAnalyses)",
 			legacyClaimIndex,
 		);
-		const generateIndex = requestSource.indexOf("await generate(messages)");
+		const generateIndex = requestSource.indexOf("generateValidatedAnalysis({");
 
 		expect(requestStartIndex).toBeGreaterThan(-1);
 		expect(claimIndex).toBeGreaterThan(-1);

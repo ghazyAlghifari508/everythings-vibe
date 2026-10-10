@@ -158,6 +158,10 @@ export const CODEBASE_ANALYSIS_MAX_TOKENS = 12_000;
 // Maximum manifest entries listed in the analysis prompt. Overflow is marked
 // explicitly so the model never mistakes a truncated list for the full tree.
 export const CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES = 500;
+// Maximum characters of a rejected model output echoed back in the single
+// bounded repair request. Repair re-states the contract with the failure
+// locations; the full output is never replayed unbounded.
+export const CODEBASE_ANALYSIS_REPAIR_MAX_RAW_CHARS = 12_000;
 // Maximum characters for the model-generated application summary stored in
 // the analysis output. Two to three Indonesian sentences fit comfortably;
 // longer prose belongs in findings, not in the review header card.

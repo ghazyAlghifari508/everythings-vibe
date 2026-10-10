@@ -183,17 +183,38 @@ describe("validation failure reasons", () => {
 		}
 	});
 
-	it("documents the prompt/schema null mismatch as evidence", () => {
-		const raw = validPayload({ framework: null, language: null });
-		try {
-			parseAnalysisOutput(raw, ids, trustedManifestPaths);
-			expect.unreachable(
-				"expected AnalysisValidationError under strict schema",
-			);
-		} catch (error) {
-			if (!(error instanceof AnalysisValidationError)) throw error;
-			expect(error.reason).toBe("schema");
-		}
+	it("tolerates prompt-declared nulls in advisory fields", () => {
+		const raw = validPayload({
+			summary: null,
+			framework: null,
+			language: null,
+			packageManager: null,
+			dependencies: null,
+		});
+		const result = parseAnalysisOutput(raw, ids, trustedManifestPaths);
+		expect(result.framework).toBeUndefined();
+		expect(result.language).toBeUndefined();
+		expect(result.packageManager).toBeUndefined();
+		expect(result.dependencies).toBeUndefined();
+		expect(result.starterSuggestions).toHaveLength(4);
+	});
+
+	it("keeps required contracts strict despite null tolerance", () => {
+		const nullSuggestions = validPayload({ starterSuggestions: null });
+		expect(() =>
+			parseAnalysisOutput(nullSuggestions, ids, trustedManifestPaths),
+		).toThrow(AnalysisValidationError);
+		const nullTitle = validPayload({
+			starterSuggestions: [
+				suggestion("feature", { title: null }),
+				suggestion("bugfix"),
+				suggestion("refactor"),
+				suggestion("ui"),
+			],
+		});
+		expect(() =>
+			parseAnalysisOutput(nullTitle, ids, trustedManifestPaths),
+		).toThrow(AnalysisValidationError);
 	});
 
 	it("classifies validation errors by their reason", () => {

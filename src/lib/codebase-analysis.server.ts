@@ -42,7 +42,7 @@ import {
 	type CodebaseAnalysis,
 	classifyAnalysisFailure,
 	formatAnalysisDiagnosticLog,
-	parseAnalysisOutput,
+	generateValidatedAnalysis,
 	resolveAnalysisFeaturePrompt,
 	toSafeAnalysisErrorMessage,
 } from "./codebase-analysis";
@@ -415,12 +415,18 @@ export async function requestCodebaseAnalysis(
 				}),
 			},
 		];
-		const raw = await generate(messages);
-		const analysis = parseAnalysisOutput(
-			raw,
-			{ projectId, snapshotId },
-			new Set(storedManifest.data.map((entry) => entry.path)),
-		);
+		// Exactly one bounded repair for fixable output-contract misses runs
+		// inside this same attempt: same analysis row, same credit
+		// reservation, no extra model billing. Provider errors propagate
+		// immediately and the retry path mints a fresh attempt instead.
+		const analysis = await generateValidatedAnalysis({
+			generate,
+			messages,
+			ids: { projectId, snapshotId },
+			trustedManifestPaths: new Set(
+				storedManifest.data.map((entry) => entry.path),
+			),
+		});
 		stage = "persist";
 
 		await db.transaction(async (tx) => {
