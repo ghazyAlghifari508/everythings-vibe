@@ -1,6 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
+import { useEffect } from "react";
+import { CrawlResult } from "@/components/design/crawl-result";
 import { DesignResult } from "@/components/design/design-result";
+import { ImagesResult } from "@/components/design/images-result";
 import { ScrapeBackLink } from "@/components/design/scrape-back-link";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
@@ -23,6 +26,43 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 		const user = await requireUserServer();
 		const { getScrapeById } = await import("@/lib/services/scrape-service");
 		const scrape = await getScrapeById(id, user.id);
+		const { db } = await import("@/db");
+		const { scrapePages, scrapeImages } = await import("@/db/schema");
+		const { and, eq } = await import("drizzle-orm");
+		const pages =
+			scrape.mode === "crawl"
+				? await db
+						.select()
+						.from(scrapePages)
+						.where(
+							and(
+								eq(scrapePages.scrapeId, id),
+								eq(scrapePages.userId, user.id),
+							),
+						)
+				: [];
+		const imageRows =
+			scrape.mode === "images"
+				? await db
+						.select()
+						.from(scrapeImages)
+						.where(
+							and(
+								eq(scrapeImages.scrapeId, id),
+								eq(scrapeImages.userId, user.id),
+							),
+						)
+				: [];
+		const { issuePreviewAssetCapability } = await import(
+			"@/lib/preview-capabilities"
+		);
+		const { SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS } = await import(
+			"@/lib/constants"
+		);
+		const images = imageRows.map((image) => ({
+			...image,
+			assetUrl: `/api/scrape/asset?cap=${encodeURIComponent(issuePreviewAssetCapability({ target: image.url, scrapeId: id, ownerId: user.id, expiresAt: Date.now() + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS }))}`,
+		}));
 		let appOrigin = "http://localhost:3000";
 		try {
 			const { getRequestHeaders, getRequestUrl } = await import(
@@ -45,6 +85,8 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 		const previewHtml = scrape.html ?? scrape.previewHtml ?? "";
 		const preview = buildScrapePreviewDocument(scrape, user.id, appOrigin);
 		return {
+			pages,
+			images,
 			id: scrape.id,
 			sourceUrl: scrape.sourceUrl,
 			domain: scrape.domain,
@@ -92,6 +134,7 @@ export const Route = createFileRoute("/design/scrap/$id")({
 });
 
 function ScrapeDetailPage() {
+	const router = useRouter();
 	const initial = Route.useLoaderData();
 	const { id } = Route.useParams();
 	const { from } = Route.useSearch();
@@ -114,6 +157,10 @@ function ScrapeDetailPage() {
 				})
 			: null,
 	});
+	useEffect(() => {
+		if (polledStatus === "completed" && initial.status !== "completed")
+			void router.invalidate();
+	}, [polledStatus, initial.status, router]);
 
 	if (!initial) throw new Error("NOT_FOUND");
 
@@ -190,7 +237,11 @@ function ScrapeDetailPage() {
 			}`}
 		>
 			<ScrapeBackLink from={from} />
-			{view === "result-design" ? (
+			{mode === "crawl" && currentStatus === "completed" ? (
+				<CrawlResult pages={initial.pages} sourceUrl={sourceUrl} />
+			) : mode === "images" && currentStatus === "completed" ? (
+				<ImagesResult images={initial.images} sourceUrl={sourceUrl} />
+			) : view === "result-design" ? (
 				<DesignResult
 					sourceUrl={sourceUrl}
 					domain={domain}

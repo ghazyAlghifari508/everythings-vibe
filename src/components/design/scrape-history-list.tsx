@@ -47,6 +47,8 @@ export function formatTimeAgo(dateString: string): string {
 }
 
 function modeLabel(mode?: ScrapeMode): string {
+	if (mode === "crawl") return "Crawl";
+	if (mode === "images") return "Images";
 	return mode === "html" ? "HTML" : "DESIGN.md";
 }
 

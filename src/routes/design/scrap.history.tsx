@@ -68,8 +68,7 @@ function ScrapHistoryPage() {
 						Riwayat Scrape
 					</h1>
 					<p className="mt-2 text-sm leading-6 text-fog">
-						Daftar website yang pernah kamu generate DESIGN.md atau scrape
-						HTML-nya.
+						Riwayat crawl, DESIGN.md, HTML, dan gambar dari website publik.
 					</p>
 				</header>
 
