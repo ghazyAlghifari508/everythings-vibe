@@ -261,11 +261,13 @@ describe("ScrapeDetail preview readiness", () => {
 		);
 		const before = screen.getByTitle("Preview example.com");
 		fireEvent.click(screen.getByRole("tab", { name: /Source HTML/i }));
+		expect(before.getAttribute("srcdoc")).toBe("");
 		expect(
 			screen.getByRole("tabpanel", { name: /Source code index\.html/i }),
 		).toBeDefined();
 		fireEvent.click(screen.getByRole("tab", { name: /^Preview$/i }));
 		const after = screen.getByTitle("Preview example.com");
 		expect(after).toBe(before);
+		expect(after.getAttribute("srcdoc")).toBe("<html><body>signed</body></html>");
 	});
 });

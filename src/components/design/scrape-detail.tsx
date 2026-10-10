@@ -492,6 +492,7 @@ function DesktopPreview({
 			if (pingTimer.current) clearTimeout(pingTimer.current);
 			return;
 		}
+		onReport("preparing");
 		settledRef.current = false;
 		let attempts = 0;
 		const ask = () => {
@@ -542,7 +543,7 @@ function DesktopPreview({
 					<iframe
 						ref={frameRef}
 						title={title}
-						srcDoc={srcDoc}
+						srcDoc={active ? srcDoc : ""}
 						onLoad={handleFrameLoad}
 						sandbox="allow-scripts"
 						referrerPolicy="no-referrer"
