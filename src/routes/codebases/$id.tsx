@@ -1960,6 +1960,7 @@ function CodebaseDetailPage() {
 								{isSourcePreviewOpen ? (
 									sourcePreview.kind === "ready" ? (
 										<CodebaseSourcePreview
+											key={sourcePreview.path}
 											path={sourcePreview.path}
 											content={sourcePreview.content}
 											truncated={sourcePreview.truncated}

@@ -682,21 +682,21 @@ describe("CodebaseExplorerSidebar expansion persistence", () => {
 		expect(isExpanded("pages")).toBe("true");
 	});
 
-	it("toggles a folder from the keyboard", () => {
+	it("exposes folders as native buttons that are focusable and report state", () => {
 		render("repo-a");
 		const button = folderButton("src");
-		expect(button).toBeDefined();
+		expect(button?.tagName).toBe("BUTTON");
+		expect(button?.type).toBe("button");
 		button?.focus();
 		expect(document.activeElement).toBe(button);
+		expect(isExpanded("src")).toBe("false");
+	});
 
-		act(() => {
-			button?.dispatchEvent(
-				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-			);
-		});
-		// A native button converts Enter into a click; jsdom does not, so the
-		// activation is asserted through the same path the browser uses.
-		click(button);
+	it("toggles a folder when its native button is activated, and persists it", () => {
+		render("repo-a");
+		// jsdom does not turn Enter or Space into a click, so activation is
+		// asserted through the click a browser dispatches for a focused button.
+		click(folderButton("src"));
 		expect(isExpanded("src")).toBe("true");
 
 		act(() => {

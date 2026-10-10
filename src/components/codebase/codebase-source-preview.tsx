@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { sourceFileName } from "@/lib/codebase-source-preview";
 import {
 	buildSourceViewRows,
+	type SourceToken,
 	type SourceViewMode,
 } from "@/lib/codebase-source-view";
 import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "@/lib/constants";
@@ -92,6 +93,23 @@ function CopyAction({
  *
  * Copying always uses the original file content, never the formatted view.
  */
+/**
+ * Each run gets a key from its character offset within the row. Offsets are
+ * unique and derive from the content itself, so no array index is used as a key.
+ */
+function renderRowTokens(tokens: readonly SourceToken[]) {
+	let offset = 0;
+	return tokens.map((token) => {
+		const key = offset;
+		offset += token.text.length;
+		return (
+			<span key={key} className={token.className ?? undefined}>
+				{token.text}
+			</span>
+		);
+	});
+}
+
 export function CodebaseSourcePreview({
 	path,
 	content,
@@ -100,9 +118,6 @@ export function CodebaseSourcePreview({
 	onRetry,
 }: CodebaseSourcePreviewProps) {
 	const [mode, setMode] = useState<SourceViewMode>("original");
-	useEffect(() => {
-		setMode("original");
-	}, [path]);
 
 	const view = useMemo(
 		() =>
@@ -198,17 +213,7 @@ export function CodebaseSourcePreview({
 										: "whitespace-pre pl-3"
 								}
 							>
-								{row.tokens.length === 0
-									? null
-									: row.tokens.map((token, index) =>
-											token.className ? (
-												<span key={index} className={token.className}>
-													{token.text}
-												</span>
-											) : (
-												<span key={index}>{token.text}</span>
-											),
-										)}
+								{renderRowTokens(row.tokens)}
 							</div>
 						))}
 					</div>

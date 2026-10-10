@@ -302,21 +302,18 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 						),
 					)
 					.orderBy(desc(codebaseAnalyses.createdAt));
+				// Only a readable ready analysis is returned. A newer failed or
+				// pending attempt is reported on the status route instead, because
+				// the workspace reader accepts nothing but a ready body.
 				const row = selectWorkspaceAnalysis(attempts, {
 					projectId,
 					snapshotId: snapshotRows[0].id,
 				}).selected;
-				if (!row) {
-					const newest = attempts[0];
-					if (newest) {
-						const attempt = toResponse(newest);
-						if (attempt) return Response.json(attempt);
-					}
+				if (!row)
 					return Response.json(
 						{ error: "Belum ada analisis codebase" },
 						{ status: 404 },
 					);
-				}
 				return Response.json(row);
 			},
 
