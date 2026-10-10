@@ -1,0 +1,47 @@
+# VibeDesign captured DOM preview
+
+## Approved strategy
+
+Use the persisted rendered HTML as a visual snapshot, not an interactive replay or screenshot. Keep original HTML separate for source, copy, and download. Remove original executable scripts and event handlers only in the ephemeral preview document. Preserve styles, images, fonts, responsive CSS, and signed resource capabilities.
+
+## Evidence
+
+Chromium loaded the live Framer homepage and its module responses. The main runtime module contains `import(n)`. The lexical rewriter deliberately leaves computed imports unchanged. When served at `/api/scrape/asset?cap=...`, relative module specifiers therefore resolve to `/api/scrape/<chunk>.mjs`, not the original CDN directory. A replay of the captured DOM reproduced two such requests and a sandbox localStorage failure.
+
+The runtime shim also failed to recognize relative proxy URLs because its regex required two leading slashes in that branch. A DOM-executed regression test reproduced the nested URL before the fix. Server and runtime rewriting now share the same proxy guard.
+
+Unknown runtime assets previously used unsigned `?url=` URLs. That route requires a session; opaque-origin iframe requests do not satisfy that ambient-auth contract. The visual snapshot neither runs website scripts nor installs that runtime fallback. Every rewritten visual resource uses an exact signed capability; nested CSS resources continue to be signed server-side.
+
+## Browser comparison
+
+One Chromium comparison used the same live Framer captured DOM and recorded asset bodies for replay and snapshot, at a 1440 × 900 viewport. Assets absent from the capture were retrieved in the test browser. This diagnostic is not an authenticated application E2E test and does not benchmark server proxy latency.
+
+| Metric | Replay | Visual snapshot |
+| --- | ---: | ---: |
+| Requests | 164 | 21 |
+| ScriptDuration | 1.197164 s | 0.002545 s |
+| TaskDuration | 2.649657 s | 0.747045 s |
+| JSHeapUsedSize | 38,246,004 bytes | 10,879,960 bytes |
+| Invalid application module paths | 2 | 0 |
+| Page errors | 1 | 0 |
+
+These are one-run diagnostic measurements, not repeated performance benchmarks or total laptop RAM measurements. Both previews had 6,684 characters of rendered body text. The main heading rectangle was identical: x=120, y=164, width=721, height=108, opacity=1. Screenshot review confirmed visible navigation, heading, buttons, hero imagery, and typography; full-page pixel fidelity has not been established.
+
+A static external website was also replayed: the snapshot issued zero requests and no page errors. Its visible text differed from replay; full visual fidelity for that site needs further investigation before treating that case as passed.
+
+## State and security
+
+Readiness checks visible text nodes, loaded images, SVG/canvas/video geometry, or background images in the initial viewport, excluding hidden ancestors. It bounds element scanning at 5,000 elements. Parent pings are bounded by the existing readiness constants. Empty roots and opacity-hidden content fail the browser contract; an original script that removes the body does not execute in the snapshot. Resource errors are limited to images/stylesheets; optional scripts do not mark visible content degraded. Fatal blank reports have a centered retry. Retry renews the preview and explicitly remounts the current snapshot, without a new scrape.
+
+The iframe retains `sandbox="allow-scripts"` without same-origin. Snapshot CSP allows only the nonce-bearing application reporter to execute, denies connect/frame/object/form activity, and restricts visual resource destinations to the application proxy plus local data/blob media as appropriate. Capability validation, owner lookup, expiry, rate limits, MIME validation, size bounds, DNS/private-network validation, and redirect validation remain in the existing asset boundary.
+
+## Remaining verification
+
+- Authenticated application E2E, including full-resolution fonts/images through the actual proxy.
+- Another real JavaScript-heavy external website and nested module fixture integration.
+- Broader visual checks below the fold, canvas/video preservation, and responsive capture limitations.
+- Readiness false-positive cases: decorative SVG, background-only content, transparent media, occlusion, and application-rendered fatal text.
+- Source tab retained iframe: website JavaScript is absent, but media activity still needs lifecycle verification.
+- Repeat CPU/heap measurements and quantify long tasks.
+
+Do not describe this verification as pixel-perfect or a completed end-to-end delivery.
