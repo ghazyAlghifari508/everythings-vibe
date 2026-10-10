@@ -440,15 +440,9 @@ input.bg-steel:autofill:active {
    The codebase workspace palette is deliberately monochrome (its accent tokens
    resolve to neutral greys there), so tokens are separated by luminance and
    weight instead of hue: comments recede, keywords and types advance. */
-.codebase-source-code code {
-	display: block;
-	font-size: 12px;
-	line-height: 20px;
+.codebase-source-code {
 	color: var(--color-mist);
-	background: transparent;
-	border: 0;
-	padding: 12px 12px 12px 8px;
-	white-space: pre;
+	font-variant-ligatures: none;
 	tab-size: 2;
 }
 

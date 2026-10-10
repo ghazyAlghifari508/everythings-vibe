@@ -7,14 +7,9 @@
  * - the browser renders it as inert text.
  *
  * Nothing here touches the database or the network, so every boundary
- * (chunk completeness, truncation, binary detection, language mapping, fence
- * safety) is unit-testable without either.
+ * (chunk completeness, truncation, binary detection, language mapping) is
+ * unit-testable without either.
  */
-
-import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "./constants";
-
-/** Longest fence we ever emit; markdown requires three backticks minimum. */
-const MIN_FENCE_LENGTH = 3;
 
 export interface SnapshotFileChunk {
 	chunkIndex: number;
@@ -65,15 +60,6 @@ export function truncatePreviewContent(
 	const lastNewline = slice.lastIndexOf("\n");
 	const kept = lastNewline > 0 ? slice.slice(0, lastNewline + 1) : slice;
 	return { content: kept, truncated: true };
-}
-
-/** Clip rendered lines to a bounded count, reporting whether lines were cut. */
-export function limitPreviewLines(
-	lines: readonly string[],
-	maxLines: number = CODEBASE_FILE_PREVIEW_MAX_LINES,
-): { lines: string[]; truncated: boolean } {
-	if (lines.length <= maxLines) return { lines: [...lines], truncated: false };
-	return { lines: lines.slice(0, maxLines), truncated: true };
 }
 
 /**
@@ -150,28 +136,6 @@ export function detectSourceLanguage(path: string): string | null {
 		return name.toLowerCase() === "dockerfile" ? "dockerfile" : null;
 	const extension = name.slice(dot + 1).toLowerCase();
 	return LANGUAGE_BY_EXTENSION[extension] ?? null;
-}
-
-/**
- * Wrap raw file content in a fenced code block for the markdown + highlight
- * pipeline.
- *
- * The fence is longer than any backtick run in the content, so a file that
- * itself contains fenced blocks cannot terminate the block early. `null`
- * language renders as plain preformatted text rather than guessing.
- */
-export function buildFencedSource(
-	content: string,
-	language: string | null,
-): string {
-	let longestRun = 0;
-	let currentRun = 0;
-	for (const char of content) {
-		currentRun = char === "`" ? currentRun + 1 : 0;
-		if (currentRun > longestRun) longestRun = currentRun;
-	}
-	const fence = "`".repeat(Math.max(MIN_FENCE_LENGTH, longestRun + 1));
-	return `${fence}${language ?? ""}\n${content}\n${fence}`;
 }
 
 /** Last path segment of a repository-relative path. */

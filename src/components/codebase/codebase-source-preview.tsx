@@ -2,14 +2,12 @@
 
 import { Check, Copy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Markdown from "react-markdown";
-import rehypeHighlight from "rehype-highlight";
+import { sourceFileName } from "@/lib/codebase-source-preview";
 import {
-	buildFencedSource,
-	detectSourceLanguage,
-	limitPreviewLines,
-	sourceFileName,
-} from "@/lib/codebase-source-preview";
+	buildSourceViewRows,
+	type SourceViewMode,
+} from "@/lib/codebase-source-view";
+import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "@/lib/constants";
 
 export interface CodebaseSourcePreviewProps {
 	/** Repository-relative path of the snapshot file being inspected. */
@@ -19,8 +17,6 @@ export interface CodebaseSourcePreviewProps {
 	sizeBytes: number | null;
 	onRetry?: () => void;
 }
-
-const LINE_HEIGHT_CLASS = "text-[12px] leading-[20px]";
 
 function formatSize(sizeBytes: number | null): string | null {
 	if (sizeBytes === null || !Number.isFinite(sizeBytes) || sizeBytes < 0) {
@@ -87,6 +83,15 @@ function CopyAction({
 	);
 }
 
+/**
+ * Read-only source viewer.
+ *
+ * Every visible line is one row rendered from the same record that supplies its
+ * number, so a wrapped line, an empty line, and a truncated file all stay
+ * aligned without depending on matching heights in two separate blocks.
+ *
+ * Copying always uses the original file content, never the formatted view.
+ */
 export function CodebaseSourcePreview({
 	path,
 	content,
@@ -94,54 +99,71 @@ export function CodebaseSourcePreview({
 	sizeBytes,
 	onRetry,
 }: CodebaseSourcePreviewProps) {
-	const language = useMemo(() => detectSourceLanguage(path), [path]);
-	const fenced = useMemo(
-		() => buildFencedSource(content, language),
-		[content, language],
-	);
-	const { lines, truncated: linesTruncated } = useMemo(
-		() => limitPreviewLines(content.split("\n")),
-		[content],
+	const [mode, setMode] = useState<SourceViewMode>("original");
+	useEffect(() => {
+		setMode("original");
+	}, [path]);
+
+	const view = useMemo(
+		() =>
+			buildSourceViewRows({
+				content,
+				path,
+				mode,
+				maxLines: CODEBASE_FILE_PREVIEW_MAX_LINES,
+			}),
+		[content, path, mode],
 	);
 	const sizeLabel = formatSize(sizeBytes);
-	const lineCount = lines.length;
-	const gutter = Array.from({ length: lineCount }, (_, index) => index + 1);
+	const name = sourceFileName(path);
+	const isClipped = truncated || view.truncatedLines;
 
 	return (
 		<div
 			data-testid="codebase-source-preview"
-			className="flex h-full min-h-0 flex-col gap-3"
+			className="flex h-full min-h-0 flex-col gap-2"
 		>
-			<div className="flex flex-wrap items-start justify-between gap-2">
-				<div className="min-w-0">
-					<p
-						data-testid="codebase-source-filename"
-						className="truncate text-sm font-semibold text-snow"
-						title={sourceFileName(path)}
-					>
-						{sourceFileName(path)}
-					</p>
-					<p
-						data-testid="codebase-source-path"
-						className="mt-0.5 break-all font-mono text-[11px] text-fog"
-					>
-						{path}
-					</p>
-					<p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-slate">
-						{[language ?? "teks", sizeLabel].filter(Boolean).join(" • ")}
-						{` • ${lineCount} baris`}
-					</p>
+			<div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+				<p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-fog">
+					<span className="text-mist">{view.language ?? "teks"}</span>
+					{sizeLabel ? <span>{sizeLabel}</span> : null}
+					<span data-testid="codebase-source-linecount">
+						{view.totalLines.toLocaleString("id-ID")} baris
+					</span>
+				</p>
+				<div className="flex items-center gap-1.5">
+					{view.formattedAvailable ? (
+						<fieldset className="flex rounded-md border border-graphite bg-obsidian p-0.5">
+							<legend className="sr-only">Tampilan isi file</legend>
+							{(["original", "formatted"] as const).map((option) => (
+								<button
+									key={option}
+									type="button"
+									onClick={() => setMode(option)}
+									aria-pressed={view.mode === option}
+									data-testid={`codebase-source-mode-${option}`}
+									className={`min-h-7 rounded px-2 text-[11px] font-medium capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+										view.mode === option
+											? "bg-steel/40 text-snow"
+											: "text-fog hover:text-snow"
+									}`}
+								>
+									{option === "original" ? "Asli" : "Terformat"}
+								</button>
+							))}
+						</fieldset>
+					) : null}
+					<CopyAction
+						label={`Salin isi asli ${name}`}
+						value={content}
+						testId="codebase-source-copy"
+					/>
 				</div>
-				<CopyAction
-					label={`Salin isi ${sourceFileName(path)}`}
-					value={content}
-					testId="codebase-source-copy"
-				/>
 			</div>
-			{truncated || linesTruncated ? (
+			{isClipped ? (
 				<output
 					data-testid="codebase-source-truncated"
-					className="block rounded-lg border border-graphite bg-charcoal px-3 py-2 text-[11px] leading-5 text-fog"
+					className="block shrink-0 rounded-md border border-graphite bg-charcoal px-2.5 py-1.5 text-[11px] leading-4 text-fog"
 				>
 					Pratinjau dipotong agar tetap ringan. File lengkap tersedia di
 					repository lokal.
@@ -149,30 +171,46 @@ export function CodebaseSourcePreview({
 			) : null}
 			<div
 				data-testid="codebase-source-body"
-				className="min-h-0 flex-1 overflow-auto rounded-lg border border-graphite bg-charcoal"
+				className="min-h-0 flex-1 overflow-auto rounded-md border border-graphite bg-charcoal"
 			>
-				<div className="flex min-w-full items-start">
-					<pre
+				<div
+					data-testid="codebase-source-rows"
+					className="flex w-max min-w-full font-mono text-[12px] leading-5"
+				>
+					<div
 						aria-hidden="true"
 						data-testid="codebase-source-linenumbers"
-						className={`sticky left-0 shrink-0 select-none border-r border-graphite bg-obsidian px-2 py-3 text-right font-mono ${LINE_HEIGHT_CLASS} text-slate tabular-nums`}
+						className="sticky left-0 z-10 shrink-0 select-none border-r border-graphite bg-obsidian py-2 pl-2 pr-2 text-right text-slate tabular-nums"
 					>
-						{gutter.join("\n")}
-					</pre>
-					<div className="codebase-source-code min-w-0 flex-1">
-						<Markdown
-							rehypePlugins={[rehypeHighlight]}
-							components={{
-								pre: ({ children }) => <>{children}</>,
-								code: ({ className, children }) => (
-									<code className={`font-mono ${className ?? ""}`}>
-										{children}
-									</code>
-								),
-							}}
-						>
-							{fenced}
-						</Markdown>
+						{view.rows.map((row) => (
+							<div key={row.lineNumber}>{row.lineNumber}</div>
+						))}
+					</div>
+					<div className="codebase-source-code min-w-0 py-2 pr-3">
+						{view.rows.map((row) => (
+							<div
+								key={row.lineNumber}
+								data-testid="codebase-source-row"
+								data-line={row.lineNumber}
+								className={
+									view.softWrap
+										? "whitespace-pre-wrap break-words pl-3"
+										: "whitespace-pre pl-3"
+								}
+							>
+								{row.tokens.length === 0
+									? null
+									: row.tokens.map((token, index) =>
+											token.className ? (
+												<span key={index} className={token.className}>
+													{token.text}
+												</span>
+											) : (
+												<span key={index}>{token.text}</span>
+											),
+										)}
+							</div>
+						))}
 					</div>
 				</div>
 			</div>
@@ -180,7 +218,7 @@ export function CodebaseSourcePreview({
 				<button
 					type="button"
 					onClick={onRetry}
-					className="w-fit rounded-md border border-graphite px-3 py-1.5 text-[11px] text-snow hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					className="w-fit shrink-0 rounded-md border border-graphite px-3 py-1.5 text-[11px] text-snow hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					Muat ulang
 				</button>

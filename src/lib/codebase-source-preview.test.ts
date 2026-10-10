@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
 	assembleSnapshotFileChunks,
-	buildFencedSource,
 	detectSourceLanguage,
 	isDisplayableTextContent,
-	limitPreviewLines,
 	sourceFileName,
 	truncatePreviewContent,
 } from "./codebase-source-preview";
-import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "./constants";
 
 describe("assembleSnapshotFileChunks", () => {
 	it("rejoins chunks in index order regardless of row order", () => {
@@ -79,26 +76,6 @@ describe("truncatePreviewContent", () => {
 	});
 });
 
-describe("limitPreviewLines", () => {
-	it("passes short files through with their real line count", () => {
-		const result = limitPreviewLines(["a", "b", "c"]);
-		expect(result).toEqual({ lines: ["a", "b", "c"], truncated: false });
-	});
-
-	it("bounds very large files at the shared limit", () => {
-		const lines = Array.from(
-			{ length: CODEBASE_FILE_PREVIEW_MAX_LINES + 25 },
-			(_, index) => `line-${index}`,
-		);
-		const result = limitPreviewLines(lines);
-		expect(result.lines).toHaveLength(CODEBASE_FILE_PREVIEW_MAX_LINES);
-		expect(result.truncated).toBe(true);
-		expect(result.lines[CODEBASE_FILE_PREVIEW_MAX_LINES - 1]).toBe(
-			`line-${CODEBASE_FILE_PREVIEW_MAX_LINES - 1}`,
-		);
-	});
-});
-
 describe("isDisplayableTextContent", () => {
 	it("accepts normal source with tabs and newlines", () => {
 		expect(isDisplayableTextContent("const a = 1;\n\tif (a) {\r\n}\n")).toBe(
@@ -135,24 +112,6 @@ describe("detectSourceLanguage", () => {
 		expect(detectSourceLanguage("LICENSE")).toBeNull();
 		expect(detectSourceLanguage("docs/notes.txt")).toBeNull();
 		expect(detectSourceLanguage(".gitignore")).toBeNull();
-	});
-});
-
-describe("buildFencedSource", () => {
-	it("wraps content with the detected language and a minimal fence", () => {
-		expect(buildFencedSource("const a = 1;", "typescript")).toBe(
-			"```typescript\nconst a = 1;\n```",
-		);
-	});
-
-	it("uses a bare fence when no language is supported", () => {
-		expect(buildFencedSource("plain text", null)).toBe("```\nplain text\n```");
-	});
-
-	it("widens the fence past any backtick run in the content", () => {
-		const fenced = buildFencedSource("```js\nconst a = 1;\n```", "typescript");
-		expect(fenced.startsWith("````typescript")).toBe(true);
-		expect(fenced.endsWith("\n````")).toBe(true);
 	});
 });
 
