@@ -36,7 +36,18 @@ export async function runExtractionJob(
 	};
 	await update({ status: "capturing" });
 	if (request.mode === "crawl") {
+		const completed = await db
+			.select()
+			.from(scrapePages)
+			.where(
+				and(
+					eq(scrapePages.scrapeId, claim.id),
+					eq(scrapePages.userId, claim.userId),
+					eq(scrapePages.status, "completed"),
+				),
+			);
 		await crawlWebsite(request.url, request.settings, {
+			completed: completed.map((page) => ({ ...page, status: "completed" })),
 			load: async (url) => {
 				await new Promise((resolve) =>
 					setTimeout(resolve, CRAWL_REQUEST_GAP_MS),

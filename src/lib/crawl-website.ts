@@ -15,6 +15,7 @@ export interface CrawledPage {
 }
 
 export interface CrawlDependencies {
+	completed?: CrawledPage[];
 	load: (
 		url: string,
 	) => Promise<{ html: string; status: number; finalUrl: string }>;
@@ -133,6 +134,36 @@ export async function crawlWebsite(
 			if (!robotsAllows(rules, `${parsed.pathname}${parsed.search}`)) {
 				page = { ...page, status: "skipped", error: "Dibatasi robots.txt." };
 			} else {
+				const previous = deps.completed?.find(
+					(row) =>
+						row.url === next.url && row.status === "completed" && row.content,
+				);
+				if (previous?.content) {
+					page = previous;
+					const observedLinks = [
+						...new Set([
+							...previous.content.links,
+							...(deps.completed ?? [])
+								.filter((row) => row.parentUrl === next.url)
+								.map((row) => row.url),
+						]),
+					];
+					if (next.depth < settings.maxDepth)
+						for (const url of observedLinks) {
+							if (
+								seen.size >= settings.maxPages ||
+								seen.has(url) ||
+								!isCrawlScope(url, seed, settings.followSubdomains) ||
+								!(await matchesCrawlUrl(settings.urlRegex, url))
+							)
+								continue;
+							seen.add(url);
+							queue.push({ url, parentUrl: next.url, depth: next.depth + 1 });
+						}
+					pages.push(page);
+					await deps.onPage?.(page, seen.size);
+					continue;
+				}
 				const captured = await deps.load(next.url);
 				if (!isCrawlScope(captured.finalUrl, seed, settings.followSubdomains))
 					throw new Error("Redirect di luar scope crawl.");

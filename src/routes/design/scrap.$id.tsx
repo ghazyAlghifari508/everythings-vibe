@@ -260,6 +260,15 @@ function ScrapeDetailPage() {
 				/>
 			) : (
 				<ScrapeProgress
+					visitedPages={
+						data?.metadata?.visitedPages ?? initial.metadata?.visitedPages
+					}
+					discoveredPages={
+						data?.metadata?.discoveredPages ?? initial.metadata?.discoveredPages
+					}
+					processedImages={
+						data?.metadata?.processedImages ?? initial.metadata?.processedImages
+					}
 					mode={mode}
 					status={currentStatus}
 					sourceUrl={sourceUrl}

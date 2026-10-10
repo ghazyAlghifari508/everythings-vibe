@@ -19,6 +19,9 @@ export interface ScrapeProgressProps {
 	stageStartedAt?: string | null;
 	activity?: string | null;
 	activityStartedAt?: string | null;
+	visitedPages?: number;
+	discoveredPages?: number;
+	processedImages?: number;
 }
 
 const ORDERED_DESIGN_STAGES: ScrapeStatus[] = [
@@ -71,7 +74,41 @@ export function ScrapeProgress({
 	stageStartedAt,
 	activity,
 	activityStartedAt,
+	visitedPages,
+	discoveredPages,
+	processedImages,
 }: ScrapeProgressProps) {
+	if (mode === "crawl" || mode === "images")
+		return (
+			<section className="rounded-lg border border-graphite p-6">
+				<h2 className="text-xl font-semibold text-snow">
+					{mode === "crawl" ? "Crawl Website" : "Scrape Images"}
+				</h2>
+				<p className="mt-2 break-all text-sm text-fog">{sourceUrl}</p>
+				<output className="mt-5 block text-sm text-snow">
+					{status === "failed"
+						? errorMessage || "Ekstraksi terhenti. Coba lagi."
+						: status === "queued"
+							? "Menunggu worker ekstraksi."
+							: mode === "crawl"
+								? `${visitedPages ?? 0} halaman diproses, ${discoveredPages ?? 0} ditemukan.`
+								: `${processedImages ?? 0} gambar diproses.`}
+				</output>
+				{activity && (
+					<p className="mt-2 break-all text-xs text-fog">{activity}</p>
+				)}
+				{status === "failed" && onRetry && (
+					<button
+						type="button"
+						disabled={isRetrying}
+						onClick={onRetry}
+						className="mt-5 min-h-11 rounded-lg border border-graphite px-4 text-sm text-snow"
+					>
+						Coba lagi
+					</button>
+				)}
+			</section>
+		);
 	const isFailed = status === "failed";
 	const isDone = status === "completed";
 
