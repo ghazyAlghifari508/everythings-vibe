@@ -51,6 +51,19 @@ describe("preview load reporting shim", () => {
 		expect(rewritten).toContain('addEventListener("error"');
 	});
 
+	it("answers a parent ping so a late listener still learns the load result", () => {
+		const rewritten = rewritePreviewAssets(
+			"<html><head></head><body><p>hi</p></body></html>",
+			"https://example.com/",
+		);
+		const reporter = inlineScripts(rewritten).find((s) =>
+			s.includes("vibedesign-preview"),
+		);
+		expect(reporter).toBeDefined();
+		expect(reporter).toContain('addEventListener("message"');
+		expect(reporter).toContain("vibedesign-preview-ping");
+	});
+
 	it("never relaxes the sandbox by granting same-origin access", () => {
 		const rewritten = rewritePreviewAssets(
 			"<html><head></head><body></body></html>",
@@ -70,6 +83,12 @@ describe("preview load reporting shim", () => {
 			(target: string) => target,
 		);
 
-		expect(second.match(/vibedesign-preview/g) ?? []).toHaveLength(1);
+		const reporters = (html: string) =>
+			[...html.matchAll(/<script>([\s\S]*?)<\/script>/gi)]
+				.map((m) => m[1] ?? "")
+				.filter((body) => body.includes("vibedesign-preview-ping")).length;
+
+		expect(reporters(first)).toBe(1);
+		expect(reporters(second)).toBe(1);
 	});
 });

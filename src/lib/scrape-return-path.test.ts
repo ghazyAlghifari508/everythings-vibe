@@ -1,8 +1,46 @@
 import { describe, expect, it } from "vitest";
 import {
+	parseScrapeReturnSearch,
 	resolveScrapeReturnPath,
 	SCRAPE_RETURN_FALLBACK,
 } from "./scrape-return-path";
+
+describe("scrape return search parsing", () => {
+	it("accepts the known internal routes", () => {
+		expect(parseScrapeReturnSearch({ from: "/design/scrap" })).toEqual({
+			from: "/design/scrap",
+		});
+		expect(parseScrapeReturnSearch({ from: "/design/scrap/history" })).toEqual({
+			from: "/design/scrap/history",
+		});
+	});
+
+	it("falls back instead of throwing on a hostile or malformed query", () => {
+		for (const search of [
+			{ from: "https://evil.example" },
+			{ from: "//evil.example" },
+			{ from: "javascript:alert(1)" },
+			{ from: 42 },
+			{ from: null },
+			{ from: ["/design/scrap"] },
+			{ unexpected: "x" },
+		])
+			expect(parseScrapeReturnSearch(search)).toEqual({
+				from: SCRAPE_RETURN_FALLBACK,
+			});
+	});
+
+	it("never returns a destination outside the allowlist", () => {
+		for (const search of [
+			{ from: "/admin/users" },
+			{ from: "/design/scrap/abc" },
+			{ from: "/design/scrap?x=<script>" },
+		]) {
+			const parsed = parseScrapeReturnSearch(search);
+			expect(["/design/scrap", "/design/scrap/history"]).toContain(parsed.from);
+		}
+	});
+});
 
 describe("resolveScrapeReturnPath", () => {
 	it("returns the originating scrap route", () => {

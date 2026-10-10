@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { act } from "react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+} from "@testing-library/react";
+import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScrapeDetail } from "./scrape-detail";
 
@@ -139,6 +145,71 @@ describe("ScrapeDetail preview readiness", () => {
 		);
 		fireEvent.click(screen.getByRole("button", { name: /Salin HTML/i }));
 		expect(writeText).toHaveBeenCalledWith(source);
+	});
+
+	it("registers the listener before the iframe exists so an early load is not lost", async () => {
+		const seen: string[] = [];
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc="<html><body>signed</body></html>"
+				previewState="ready"
+			/>,
+		);
+
+		const frame = screen.getByTitle<HTMLIFrameElement>("Preview example.com");
+		// Simulate the frame reporting the instant it loads, which is what happens
+		// for a small srcdoc before React attaches its effect.
+		await act(async () => {
+			report("ready", 0);
+		});
+		seen.push(document.querySelector("output")?.textContent ?? "");
+
+		expect(seen[0]).toMatch(/siap dimuat/i);
+		expect(frame).toBeDefined();
+	});
+
+	it("keeps asking the frame until it reports, even without a load event", async () => {
+		vi.useFakeTimers();
+		try {
+			render(
+				<ScrapeDetail
+					domain="example.com"
+					previewHtml="<html><body>source</body></html>"
+					previewSrcDoc="<html><body>signed</body></html>"
+					previewState="ready"
+				/>,
+			);
+			const frame = screen.getByTitle<HTMLIFrameElement>("Preview example.com");
+			const posted: unknown[] = [];
+			vi.spyOn(frame.contentWindow as Window, "postMessage").mockImplementation(
+				(...args: unknown[]) => {
+					posted.push(args[0]);
+				},
+			);
+
+			await act(async () => {
+				vi.advanceTimersByTime(250);
+			});
+			expect(posted.length).toBeGreaterThanOrEqual(1);
+			expect(posted[0]).toEqual({ type: "vibedesign-preview-ping" });
+
+			await act(async () => {
+				report("ready", 0);
+			});
+			await act(async () => {
+				vi.advanceTimersByTime(2000);
+			});
+			const afterSettle = posted.length;
+			await act(async () => {
+				vi.advanceTimersByTime(2000);
+			});
+			expect(posted.length).toBe(afterSettle);
+			expect(screen.getByRole("status").textContent).toMatch(/siap dimuat/i);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("does not remount the iframe when switching Preview to Source HTML and back", () => {

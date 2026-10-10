@@ -8,7 +8,11 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScrapePreviewState } from "@/hooks/use-scrape-preview";
-import { SCRAPE_DESKTOP_HEIGHT } from "@/lib/constants";
+import {
+	SCRAPE_DESKTOP_HEIGHT,
+	SCRAPE_PREVIEW_READY_MAX_PINGS,
+	SCRAPE_PREVIEW_READY_PING_INTERVAL_MS,
+} from "@/lib/constants";
 
 export interface ScrapeDetailProps {
 	domain: string;
@@ -368,6 +372,16 @@ function DesktopPreview({
 	}, []);
 
 	const frameRef = useRef<HTMLIFrameElement>(null);
+	const pingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const settledRef = useRef(false);
+
+	const stopPinging = useCallback(() => {
+		settledRef.current = true;
+		if (pingTimer.current) {
+			clearTimeout(pingTimer.current);
+			pingTimer.current = null;
+		}
+	}, []);
 
 	useEffect(() => {
 		if (!onReport) return;
@@ -383,12 +397,64 @@ function DesktopPreview({
 				state === "empty" ||
 				state === "degraded" ||
 				state === "failed"
-			)
+			) {
+				stopPinging();
 				onReport(state === "failed" ? "degraded" : state);
+			}
 		};
 		window.addEventListener("message", handleMessage);
 		return () => window.removeEventListener("message", handleMessage);
-	}, [onReport]);
+	}, [onReport, stopPinging]);
+
+	useEffect(() => {
+		return () => {
+			if (pingTimer.current) clearTimeout(pingTimer.current);
+		};
+	}, []);
+
+	const handleFrameLoad = useCallback(() => {
+		const frame = frameRef.current?.contentWindow;
+		if (!frame) return;
+		try {
+			frame.postMessage({ type: "vibedesign-preview-ping" }, "*");
+		} catch {
+			// Frame navigated away or is not reachable; readiness stays preparing.
+		}
+	}, []);
+
+	// The framed document reports on its own load, but that can land before the
+	// listener above is attached, so keep asking until a report arrives.
+	useEffect(() => {
+		if (!onReport || !srcDoc) return;
+		settledRef.current = false;
+		let attempts = 0;
+		const ask = () => {
+			if (settledRef.current || attempts >= SCRAPE_PREVIEW_READY_MAX_PINGS)
+				return;
+			attempts += 1;
+			const frame = frameRef.current?.contentWindow;
+			if (!frame) {
+				pingTimer.current = setTimeout(
+					ask,
+					SCRAPE_PREVIEW_READY_PING_INTERVAL_MS,
+				);
+				return;
+			}
+			try {
+				frame.postMessage({ type: "vibedesign-preview-ping" }, "*");
+			} catch {
+				return;
+			}
+			pingTimer.current = setTimeout(
+				ask,
+				SCRAPE_PREVIEW_READY_PING_INTERVAL_MS,
+			);
+		};
+		ask();
+		return () => {
+			if (pingTimer.current) clearTimeout(pingTimer.current);
+		};
+	}, [onReport, srcDoc]);
 
 	const canvasWidth = Math.max(1, Math.round(PREVIEW_WIDTH * scale));
 	const canvasHeight = Math.max(1, Math.round(frameHeight * scale));
@@ -407,6 +473,7 @@ function DesktopPreview({
 						ref={frameRef}
 						title={title}
 						srcDoc={srcDoc}
+						onLoad={handleFrameLoad}
 						sandbox="allow-scripts"
 						referrerPolicy="no-referrer"
 						className="border-0"

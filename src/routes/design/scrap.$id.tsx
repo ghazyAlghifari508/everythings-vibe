@@ -14,7 +14,7 @@ import {
 	toScrapeStatusSnapshot,
 	useScrapeStatus,
 } from "@/hooks/use-scrape-status";
-import { scrapeReturnSearchSchema } from "@/lib/scrape-return-path";
+import { parseScrapeReturnSearch } from "@/lib/scrape-return-path";
 import { requireUserServer } from "@/lib/session";
 
 export const loadScrapeDetail = createServerFn({ method: "GET" })
@@ -69,7 +69,7 @@ export const Route = createFileRoute("/design/scrap/$id")({
 	head: () => ({
 		meta: [{ title: "Hasil Scrape | VibeDesign" }],
 	}),
-	validateSearch: (search) => scrapeReturnSearchSchema.parse(search),
+	validateSearch: (search) => parseScrapeReturnSearch(search),
 	loader: async ({ params }) => {
 		try {
 			return await loadScrapeDetail({ data: params.id });

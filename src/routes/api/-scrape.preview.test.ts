@@ -4,9 +4,7 @@ import { GET, type ScrapePreviewRouteDeps } from "./scrape.preview";
 
 const user = { id: "owner-1", email: "owner@example.invalid" };
 
-function completedScrape(
-	overrides: Partial<ScrapeDetail> = {},
-): ScrapeDetail {
+function completedScrape(overrides: Partial<ScrapeDetail> = {}): ScrapeDetail {
 	return {
 		id: "scrape-1",
 		userId: "owner-1",

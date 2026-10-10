@@ -200,7 +200,7 @@ function runtimeShim(base: string, capabilities: Map<string, string>): string {
 }
 
 function previewLoadReporter(): string {
-	return `<script>(()=>{if(window.parent===window)return;let failed=0;const send=(state)=>{try{parent.postMessage({type:"vibedesign-preview",state,failed},"*")}catch{}};window.addEventListener("error",()=>{failed++},true);window.addEventListener("unhandledrejection",()=>{failed++});const report=()=>{const empty=!document.body||document.body.childElementCount===0;send(empty?"empty":failed>0?"degraded":"ready")};if(document.readyState==="complete")report();else window.addEventListener("load",report,{once:true});window.addEventListener("error",()=>{send("failed")},true)})();</script>`;
+	return `<script>(()=>{if(window.parent===window)return;let failed=0;const send=(state)=>{try{parent.postMessage({type:"vibedesign-preview",state,failed},"*")}catch{}};window.addEventListener("error",()=>{failed++},true);window.addEventListener("unhandledrejection",()=>{failed++});const state=()=>{const empty=!document.body||document.body.childElementCount===0;return empty?"empty":failed>0?"degraded":"ready"};const report=()=>send(state());window.addEventListener("message",(e)=>{if(e.data&&e.data.type==="vibedesign-preview-ping")report()});if(document.readyState==="complete")report();else window.addEventListener("load",report,{once:true})})();</script>`;
 }
 
 const LOAD_REPORTER_PATTERN =
