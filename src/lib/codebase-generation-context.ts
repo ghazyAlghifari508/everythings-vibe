@@ -253,6 +253,8 @@ export const askHandoffQuestionSchema = z.object({
 	question: z.string().min(1).max(500),
 	type: z.enum(["select", "text", "multiselect"]),
 	options: z.array(z.string().min(1).max(100)).max(12).optional(),
+	recommended: z.number().int().min(0).max(11).optional(),
+	recommendationReason: z.string().min(1).max(400).optional(),
 });
 
 export const askHandoffNonTechAnswerSchema = z.object({
@@ -320,6 +322,17 @@ export function sanitizeAskHandoffState(
 							.slice(0, CODEBASE_ASK_HANDOFF_MAX_OPTIONS)
 							.map((o) => truncateText(o, 100)),
 					}
+				: {}),
+			// A recommendation is only meaningful when it indexes a surviving
+			// option; otherwise it is dropped on restore.
+			...(q.recommended !== undefined &&
+			q.options &&
+			q.recommended >= 0 &&
+			q.recommended < q.options.length
+				? { recommended: q.recommended }
+				: {}),
+			...(q.recommendationReason
+				? { recommendationReason: truncateText(q.recommendationReason, 400) }
 				: {}),
 		}));
 	const clean: AskHandoffState = {

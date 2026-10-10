@@ -41,7 +41,11 @@ import {
 	type AdaptiveQuestion,
 	buildFeatureMessage,
 	mapAskQuestionsToAdaptive,
+	parseRestoredAnswers,
+	parseRestoredQuestions,
+	restoreAskState,
 	runConfirmGenerate,
+	serializeAskQuestions,
 } from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
@@ -1505,6 +1509,58 @@ function CodebaseDetailPage() {
 
 	const [specError, setSpecError] = useState<string | null>(null);
 
+	// Refresh and History recovery: reopen a project's persisted questions and
+	// answers from the authoritative server handoff instead of transient state.
+	// Completed artifacts (feature tree / PRD / AC / task) are reloaded by the
+	// existing loaders; this restores the Ask stage.
+	const handoffRestoredFor = useRef<string | null>(null);
+	const hasLocalAskStateRef = useRef(false);
+	hasLocalAskStateRef.current =
+		aiQuestions.length > 0 || Object.keys(chatAnswers).length > 0;
+	useEffect(() => {
+		const projectId = effectiveFeatureId;
+		if (!projectId || handoffRestoredFor.current === projectId) return;
+		handoffRestoredFor.current = projectId;
+		void (async () => {
+			try {
+				const response = await fetch("/api/ask/options", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ projectId, action: "get-handoff" }),
+				});
+				if (!response.ok) return;
+				const body: unknown = await response.json().catch(() => null);
+				if (typeof body !== "object" || body === null) return;
+				const handoff = (body as { handoff?: unknown }).handoff;
+				if (typeof handoff !== "object" || handoff === null) return;
+				const record = handoff as {
+					answers?: unknown;
+					state?: { questions?: unknown; prompt?: unknown } | null;
+				};
+				// Never clobber state the user is actively building in this session.
+				if (hasLocalAskStateRef.current) return;
+				const persistedQuestions = parseRestoredQuestions(
+					record.state?.questions,
+				);
+				const persistedAnswers = parseRestoredAnswers(record.answers);
+				if (persistedQuestions.length === 0) return;
+				const restored = restoreAskState(persistedQuestions, persistedAnswers);
+				if (restored.questions.length === 0) return;
+				setAiQuestions(restored.questions);
+				setChatAnswers(restored.answers);
+				if (
+					typeof record.state?.prompt === "string" &&
+					record.state.prompt.trim()
+				) {
+					setLastFeaturePrompt(record.state.prompt.trim());
+				}
+			} catch {
+				// Recovery is best-effort: a failed read leaves the workspace
+				// usable and the user can re-ask without losing completed stages.
+			}
+		})();
+	}, [effectiveFeatureId]);
+
 	const pushAssistantMessage = useCallback((content: string) => {
 		setChatMessages((current) => [
 			...current,
@@ -1545,7 +1601,7 @@ function CodebaseDetailPage() {
 											"Fitur baru",
 										platform: "web",
 										session: 1,
-										questions: [],
+										questions: serializeAskQuestions(aiQuestions),
 									},
 								},
 							}),
