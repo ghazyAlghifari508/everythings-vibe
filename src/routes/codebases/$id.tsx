@@ -16,6 +16,7 @@ import {
 	parseVersionRows,
 	selectLatestVersionContent,
 } from "@/components/codebase/codebase-markdown";
+import { CodebaseSourcePreview } from "@/components/codebase/codebase-source-preview";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { CodebaseWorkspaceSkeleton } from "@/components/codebase/codebase-workspace-skeleton";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
@@ -225,6 +226,9 @@ const loadSnapshotManifest = createServerFn({ method: "GET" })
 		const { manifestEntrySchema } = await import("@/lib/codebase-sync");
 		const { SNAPSHOT_CONTEXT_STATUSES } = await import("@/lib/codebase-sync");
 		const { and, asc, desc, eq, inArray } = await import("drizzle-orm");
+		const { CODEBASE_PACKAGE_JSON_PREVIEW_MAX_CHARS } = await import(
+			"@/lib/constants"
+		);
 		const [codebase] = await db
 			.select({ id: codebases.id })
 			.from(codebases)
@@ -246,7 +250,13 @@ const loadSnapshotManifest = createServerFn({ method: "GET" })
 			)
 			.orderBy(desc(codebaseSnapshots.createdAt))
 			.limit(1);
-		if (!snapshot) return { files: [], fileCount: 0, packageJsonText: null };
+		if (!snapshot)
+			return {
+				snapshotId: null,
+				files: [],
+				fileCount: 0,
+				packageJsonText: null,
+			};
 		const parsed = manifestEntrySchema.array().safeParse(snapshot.manifest);
 		const manifest = parsed.success ? parsed.data : [];
 		const rows = await db
@@ -277,15 +287,220 @@ const loadSnapshotManifest = createServerFn({ method: "GET" })
 				if (!group) continue;
 				try {
 					const text = Buffer.from(group.join(""), "base64").toString("utf8");
-					packageJsonText = text.slice(0, 20000);
+					packageJsonText = text.slice(
+						0,
+						CODEBASE_PACKAGE_JSON_PREVIEW_MAX_CHARS,
+					);
 					break;
 				} catch {}
 			}
 		}
 		return {
+			snapshotId: snapshot.id,
 			files: manifest.map((entry) => ({ path: entry.path })),
 			fileCount: snapshot.fileCount ?? manifest.length,
 			packageJsonText,
+		};
+	});
+
+export type SnapshotFilePreviewResult =
+	| {
+			status: "ok";
+			snapshotId: string;
+			path: string;
+			content: string;
+			truncated: boolean;
+			sizeBytes: number;
+	  }
+	| {
+			status: "unsupported";
+			snapshotId: string;
+			path: string;
+			sizeBytes: number;
+	  }
+	| { status: "unavailable"; snapshotId: string | null; path: string };
+
+export type SourcePreviewState =
+	| { kind: "idle" }
+	| { kind: "loading"; path: string }
+	| {
+			kind: "ready";
+			path: string;
+			content: string;
+			truncated: boolean;
+			sizeBytes: number;
+	  }
+	| { kind: "unsupported"; path: string }
+	| { kind: "unavailable"; path: string }
+	| { kind: "failed"; path: string; message: string };
+
+/**
+ * Map a server preview answer to what the right panel shows. Every non-`ok`
+ * outcome gets its own explicit state: a file the snapshot never stored is
+ * never rendered as an empty file, and binary content is never rendered as
+ * broken source.
+ */
+export function toSourcePreviewState(
+	result: SnapshotFilePreviewResult,
+	requestedPath: string,
+): SourcePreviewState {
+	if (result.status === "ok") {
+		if (result.content.length === 0) {
+			return { kind: "unavailable", path: result.path };
+		}
+		return {
+			kind: "ready",
+			path: result.path,
+			content: result.content,
+			truncated: result.truncated,
+			sizeBytes: result.sizeBytes,
+		};
+	}
+	if (result.status === "unsupported") {
+		return { kind: "unsupported", path: result.path };
+	}
+	return { kind: "unavailable", path: result.path || requestedPath };
+}
+
+/**
+ * Read one synchronized file for the read-only preview.
+ *
+ * The snapshot is derived from the authenticated codebase, never from a
+ * caller-supplied snapshot id, so one user's request can never reach another
+ * user's stored content. The requested path must survive the same relative-path
+ * guard the upload boundary uses AND appear in this snapshot's persisted
+ * manifest, so traversal, absolute paths, and files that were never uploaded
+ * are all rejected before any chunk is read.
+ */
+const loadSnapshotFileContent = createServerFn({ method: "GET" })
+	.validator((input: { codebaseId: string; path: string }) => input)
+	.handler(async ({ data: input }): Promise<SnapshotFilePreviewResult> => {
+		const user = await requireUserServer();
+		const { db } = await import("@/db");
+		const { codebases, codebaseSnapshotFiles, codebaseSnapshots } =
+			await import("@/db/schema");
+		const {
+			isSafeRelativePath,
+			isStrictBase64,
+			manifestEntrySchema,
+			SNAPSHOT_CONTEXT_STATUSES,
+		} = await import("@/lib/codebase-sync");
+		const {
+			assembleSnapshotFileChunks,
+			isDisplayableTextContent,
+			truncatePreviewContent,
+		} = await import("@/lib/codebase-source-preview");
+		const { and, asc, desc, eq, inArray } = await import("drizzle-orm");
+		const { CODEBASE_FILE_PREVIEW_MAX_CHARS } = await import("@/lib/constants");
+
+		const requestedPath = input.path.trim();
+		if (!isSafeRelativePath(requestedPath)) {
+			return { status: "unavailable", snapshotId: null, path: requestedPath };
+		}
+
+		const [codebase] = await db
+			.select({ id: codebases.id })
+			.from(codebases)
+			.where(
+				and(eq(codebases.id, input.codebaseId), eq(codebases.userId, user.id)),
+			)
+			.limit(1);
+		if (!codebase) throw new Error("NOT_FOUND");
+
+		const [snapshot] = await db
+			.select({
+				id: codebaseSnapshots.id,
+				manifest: codebaseSnapshots.manifest,
+			})
+			.from(codebaseSnapshots)
+			.where(
+				and(
+					eq(codebaseSnapshots.codebaseId, input.codebaseId),
+					inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES]),
+				),
+			)
+			.orderBy(desc(codebaseSnapshots.createdAt))
+			.limit(1);
+		if (!snapshot) {
+			return { status: "unavailable", snapshotId: null, path: requestedPath };
+		}
+
+		const parsedManifest = manifestEntrySchema
+			.array()
+			.safeParse(snapshot.manifest ?? []);
+		if (!parsedManifest.success) {
+			return {
+				status: "unavailable",
+				snapshotId: snapshot.id,
+				path: requestedPath,
+			};
+		}
+		// Only files this snapshot actually uploaded are readable.
+		const entry = parsedManifest.data.find(
+			(item) => item.path === requestedPath,
+		);
+		if (!entry) {
+			return {
+				status: "unavailable",
+				snapshotId: snapshot.id,
+				path: requestedPath,
+			};
+		}
+
+		const rows = await db
+			.select({
+				chunkIndex: codebaseSnapshotFiles.chunkIndex,
+				chunkTotal: codebaseSnapshotFiles.chunkTotal,
+				data: codebaseSnapshotFiles.data,
+			})
+			.from(codebaseSnapshotFiles)
+			.where(
+				and(
+					eq(codebaseSnapshotFiles.snapshotId, snapshot.id),
+					eq(codebaseSnapshotFiles.path, requestedPath),
+				),
+			)
+			.orderBy(asc(codebaseSnapshotFiles.chunkIndex));
+
+		const assembled = assembleSnapshotFileChunks(rows);
+		if (!assembled || !isStrictBase64(assembled)) {
+			return {
+				status: "unavailable",
+				snapshotId: snapshot.id,
+				path: requestedPath,
+			};
+		}
+
+		let decoded: string;
+		try {
+			decoded = Buffer.from(assembled, "base64").toString("utf8");
+		} catch {
+			return {
+				status: "unavailable",
+				snapshotId: snapshot.id,
+				path: requestedPath,
+			};
+		}
+		if (!isDisplayableTextContent(decoded)) {
+			return {
+				status: "unsupported",
+				snapshotId: snapshot.id,
+				path: requestedPath,
+				sizeBytes: entry.size,
+			};
+		}
+
+		const bounded = truncatePreviewContent(
+			decoded,
+			CODEBASE_FILE_PREVIEW_MAX_CHARS,
+		);
+		return {
+			status: "ok",
+			snapshotId: snapshot.id,
+			path: requestedPath,
+			content: bounded.content,
+			truncated: bounded.truncated,
+			sizeBytes: entry.size,
 		};
 	});
 
@@ -400,6 +615,12 @@ function CodebaseDetailPage() {
 		null,
 	);
 	const [packageJsonText, setPackageJsonText] = useState<string | null>(null);
+	const [manifestSnapshotId, setManifestSnapshotId] = useState<string | null>(
+		null,
+	);
+	const [sourcePreview, setSourcePreview] = useState<SourcePreviewState>({
+		kind: "idle",
+	});
 	const [chatMessages, setChatMessages] = useState<ChatStreamMessage[]>([]);
 	const [aiQuestions, setAiQuestions] = useState<AdaptiveQuestion[]>([]);
 	const [chatAnswers, setChatAnswers] = useState<Record<string, string>>({});
@@ -903,6 +1124,7 @@ function CodebaseDetailPage() {
 				const data = await loadSnapshotManifest({ data: codebase.id });
 				if (cancelled) return;
 				setManifestFiles(data.files ?? []);
+				setManifestSnapshotId(data.snapshotId ?? null);
 				setManifestFileCount(
 					typeof data.fileCount === "number" ? data.fileCount : null,
 				);
@@ -910,6 +1132,7 @@ function CodebaseDetailPage() {
 			} catch {
 				if (!cancelled) {
 					setManifestFiles([]);
+					setManifestSnapshotId(null);
 					setManifestFileCount(null);
 					setPackageJsonText(null);
 				}
@@ -919,6 +1142,59 @@ function CodebaseDetailPage() {
 			cancelled = true;
 		};
 	}, [snapshotReady, codebase.id]);
+
+	// A new snapshot replaces every file the previous one contributed, so any
+	// inspected source content is stale by definition and must be dropped.
+	const sourcePreviewRequestRef = useRef(0);
+	const activeSnapshotId = status?.snapshotId ?? manifestSnapshotId;
+	const appliedSnapshotRef = useRef<string | null | undefined>(undefined);
+	useEffect(() => {
+		if (appliedSnapshotRef.current === activeSnapshotId) return;
+		appliedSnapshotRef.current = activeSnapshotId;
+		sourcePreviewRequestRef.current += 1;
+		setSourcePreview({ kind: "idle" });
+		setActiveArtifactId(null);
+	}, [activeSnapshotId]);
+
+	const selectSourceFile = useCallback(
+		(path: string) => {
+			const requestId = sourcePreviewRequestRef.current + 1;
+			sourcePreviewRequestRef.current = requestId;
+			setActiveArtifactId(null);
+			setSourcePreview({ kind: "loading", path });
+			setCanvasOpen(true);
+			void (async () => {
+				try {
+					const result = await loadSnapshotFileContent({
+						data: { codebaseId: codebase.id, path },
+					});
+					if (sourcePreviewRequestRef.current !== requestId) return;
+					if (
+						result.status === "ok" &&
+						result.snapshotId !== activeSnapshotId
+					) {
+						setSourcePreview({ kind: "idle" });
+						setCanvasOpen(false);
+						return;
+					}
+					setSourcePreview(toSourcePreviewState(result, path));
+				} catch {
+					if (sourcePreviewRequestRef.current !== requestId) return;
+					setSourcePreview({
+						kind: "failed",
+						path,
+						message: "Pratinjau file tidak dapat dimuat.",
+					});
+				}
+			})();
+		},
+		[codebase.id, activeSnapshotId],
+	);
+
+	const clearSourcePreview = useCallback(() => {
+		sourcePreviewRequestRef.current += 1;
+		setSourcePreview({ kind: "idle" });
+	}, []);
 
 	const explorerFiles = useMemo(() => {
 		if (manifestFiles.length > 0) return manifestFiles;
@@ -1005,19 +1281,26 @@ function CodebaseDetailPage() {
 	]);
 	const activeArtifact =
 		artifacts.find((item) => item.id === activeArtifactId) ?? null;
+	const isSourcePreviewOpen = sourcePreview.kind !== "idle";
+	const sourcePreviewPath =
+		sourcePreview.kind === "idle" ? "" : sourcePreview.path;
 	const isPrdArtifactActive =
+		!isSourcePreviewOpen &&
 		Boolean(activeArtifact) &&
 		resolvedFeature != null &&
 		activeArtifact?.id === `prd-${resolvedFeature.id}`;
 	const isAcArtifactActive =
+		!isSourcePreviewOpen &&
 		Boolean(activeArtifact) &&
 		resolvedFeature != null &&
 		activeArtifact?.id === `ac-${resolvedFeature.id}`;
 	const isFeatureArtifactActive =
+		!isSourcePreviewOpen &&
 		Boolean(activeArtifact) &&
 		resolvedFeature != null &&
 		activeArtifact?.id === `feature-${resolvedFeature.id}`;
 	const isTasksArtifactActive =
+		!isSourcePreviewOpen &&
 		Boolean(activeArtifact) &&
 		resolvedFeature != null &&
 		activeArtifact?.id === `tasks-${resolvedFeature.id}`;
@@ -1505,6 +1788,7 @@ function CodebaseDetailPage() {
 								fileCount={status?.fileCount ?? manifestFileCount ?? undefined}
 								files={explorerFiles}
 								stack={explorerStack}
+								onSelectFile={selectSourceFile}
 							/>
 						}
 						chatPane={
@@ -1548,6 +1832,7 @@ function CodebaseDetailPage() {
 								isConfirming={isConfirming}
 								specError={specError}
 								onOpenArtifact={(artifact) => {
+									clearSourcePreview();
 									setActiveArtifactId(artifact.id);
 									if (
 										resolvedFeature &&
@@ -1577,31 +1862,44 @@ function CodebaseDetailPage() {
 						}
 						canvasPane={
 							<CodebaseArtifactCanvas
-								fileName={activeArtifact?.fileName ?? "Preview artefak"}
-								badge={activeArtifact?.badge ?? "PRATINJAU"}
+								fileName={
+									isSourcePreviewOpen
+										? sourcePreviewPath
+										: (activeArtifact?.fileName ?? "Preview artefak")
+								}
+								badge={
+									isSourcePreviewOpen
+										? "SUMBER"
+										: (activeArtifact?.badge ?? "PRATINJAU")
+								}
 								onClose={() => setCanvasOpen(false)}
 								onDownload={
-									activeArtifact
+									!isSourcePreviewOpen && activeArtifact
 										? () => handleDownloadArtifact(activeArtifact)
 										: undefined
 								}
 								isLoading={
+									(sourcePreview.kind === "loading" && isSourcePreviewOpen) ||
 									(isPrdArtifactActive && prdLoading) ||
 									(isAcArtifactActive && acLoading)
 								}
 								error={
-									isPrdArtifactActive
-										? prdError
-										: isAcArtifactActive
-											? acError
-											: null
+									isSourcePreviewOpen && sourcePreview.kind === "failed"
+										? sourcePreview.message
+										: isPrdArtifactActive
+											? prdError
+											: isAcArtifactActive
+												? acError
+												: null
 								}
 								onRetry={
-									isPrdArtifactActive
-										? () => void loadPrd()
-										: isAcArtifactActive
-											? () => void loadAc()
-											: undefined
+									isSourcePreviewOpen && sourcePreview.kind === "failed"
+										? () => selectSourceFile(sourcePreview.path)
+										: isPrdArtifactActive
+											? () => void loadPrd()
+											: isAcArtifactActive
+												? () => void loadAc()
+												: undefined
 								}
 								subnav={
 									isTasksArtifactActive ? (
@@ -1645,14 +1943,52 @@ function CodebaseDetailPage() {
 									) : undefined
 								}
 							>
-								{!activeArtifact || !resolvedFeature ? (
+								{isSourcePreviewOpen ? (
+									sourcePreview.kind === "ready" ? (
+										<CodebaseSourcePreview
+											path={sourcePreview.path}
+											content={sourcePreview.content}
+											truncated={sourcePreview.truncated}
+											sizeBytes={sourcePreview.sizeBytes}
+										/>
+									) : sourcePreview.kind === "unsupported" ? (
+										<div
+											data-testid="codebase-source-unsupported"
+											className="flex h-full flex-col items-start justify-center gap-2 p-2"
+										>
+											<p className="text-sm font-semibold text-snow">
+												Pratinjau tidak tersedia
+											</p>
+											<p className="max-w-sm text-xs leading-5 text-fog">
+												{sourcePreview.path} bukan berkas teks atau melebihi
+												batas tampilan. Buka di repository lokal untuk
+												membacanya.
+											</p>
+										</div>
+									) : sourcePreview.kind === "unavailable" ? (
+										<div
+											data-testid="codebase-source-unavailable"
+											className="flex h-full flex-col items-start justify-center gap-2 p-2"
+										>
+											<p className="text-sm font-semibold text-snow">
+												File tidak ada di snapshot ini
+											</p>
+											<p className="max-w-sm text-xs leading-5 text-fog">
+												{sourcePreview.path} tidak pernah ter-sync, atau
+												snapshot sudah diganti. Sinkronkan ulang repository
+												untuk melihat isinya.
+											</p>
+										</div>
+									) : null
+								) : !activeArtifact || !resolvedFeature ? (
 									<div className="flex h-full flex-col items-start justify-center gap-3 p-2">
 										<p className="text-sm font-semibold text-snow">
 											Belum ada artefak terpilih
 										</p>
 										<p className="max-w-sm text-xs leading-5 text-fog">
-											Pilih FileCard di kolom chat untuk preview dokumen atau
-											papan Kanban langsung di sini.
+											Pilih file di panel kiri untuk membaca sourcecode, atau
+											FileCard di kolom chat untuk preview dokumen atau papan
+											Kanban langsung di sini.
 										</p>
 									</div>
 								) : isPrdArtifactActive ? (

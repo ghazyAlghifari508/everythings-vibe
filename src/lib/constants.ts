@@ -132,6 +132,18 @@ export const CODEBASE_SYNC_SESSION_EXPIRY_MS = 30 * 60 * 1000;
 export const CODEBASE_MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
 export const CODEBASE_MAX_FILE_BYTES = 1024 * 1024;
 export const CODEBASE_MAX_CHUNK_BYTES = 256 * 1024;
+// Maximum characters of a stored package.json handed to the workspace loader
+// for stack detection. A manifest is a small document; anything longer is not
+// a package manifest and must not be parsed as one.
+export const CODEBASE_PACKAGE_JSON_PREVIEW_MAX_CHARS = 20_000;
+// Maximum characters of one synchronized source file served to the read-only
+// preview. Keeps the response bounded for the largest allowed snapshot file
+// (1 MiB) and the DOM bounded for rendering; the preview states truncation
+// explicitly instead of silently showing a partial file.
+export const CODEBASE_FILE_PREVIEW_MAX_CHARS = 64_000;
+// Maximum rendered lines per preview. A long file is clipped on a line
+// boundary and reported, so line numbers never drift from real content.
+export const CODEBASE_FILE_PREVIEW_MAX_LINES = 3_000;
 // Minimum supported CLI version for `vibeeverything codebase sync`. The floor
 // stays 2.0.0 on purpose: capabilities added later (repositoryName handshake
 // identity, canonical ignore file, preparation-failure reporting) are

@@ -435,6 +435,68 @@ input.bg-steel:autofill:active {
 	color: var(--text-secondary);
 }
 
+/* Read-only source preview in the existing-codebase workspace.
+   Scoped to the preview so PRD/document code blocks keep their own styling.
+   Token colors reuse the workspace palette instead of an imported theme. */
+.codebase-source-code code {
+	display: block;
+	font-family: var(--font-berkeley-mono);
+	font-size: 12px;
+	line-height: 20px;
+	color: var(--color-mist);
+	background: transparent;
+	border: 0;
+	padding: 12px 12px 12px 8px;
+	white-space: pre;
+	tab-size: 2;
+}
+
+.codebase-source-code .hljs-comment,
+.codebase-source-code .hljs-quote {
+	color: var(--color-fog);
+	font-style: normal;
+}
+
+.codebase-source-code .hljs-keyword,
+.codebase-source-code .hljs-selector-tag,
+.codebase-source-code .hljs-literal,
+.codebase-source-code .hljs-doctag,
+.codebase-source-code .hljs-formula {
+	color: var(--color-indigo);
+}
+
+.codebase-source-code .hljs-string,
+.codebase-source-code .hljs-regexp,
+.codebase-source-code .hljs-addition,
+.codebase-source-code .hljs-attribute {
+	color: var(--color-emerald);
+}
+
+.codebase-source-code .hljs-number,
+.codebase-source-code .hljs-symbol,
+.codebase-source-code .hljs-bullet,
+.codebase-source-code .hljs-link {
+	color: var(--color-cyan);
+}
+
+.codebase-source-code .hljs-title,
+.codebase-source-code .hljs-name,
+.codebase-source-code .hljs-section,
+.codebase-source-code .hljs-built_in,
+.codebase-source-code .hljs-type,
+.codebase-source-code .hljs-params {
+	color: var(--color-snow);
+}
+
+.codebase-source-code .hljs-meta,
+.codebase-source-code .hljs-tag {
+	color: var(--color-slate);
+}
+
+.codebase-source-code .hljs-deletion {
+	color: var(--color-crimson);
+}
+
 @keyframes scrapeProgressIndeterminate {
 	from {
 		transform: translateX(-110%);

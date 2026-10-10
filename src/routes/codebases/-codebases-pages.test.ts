@@ -15,6 +15,7 @@ import {
 	formatCodebaseSyncBadge,
 	getCodebaseSessionRequestBody,
 	resolveWorkspaceSnapshotReady,
+	toSourcePreviewState,
 } from "./$id";
 
 describe("decideCodebaseDetailEntry", () => {
@@ -451,6 +452,143 @@ describe("codebase starter suggestions route wiring", () => {
 		expect(detailSource).toContain(
 			"starterSuggestions={analysisOutput?.starterSuggestions}",
 		);
+	});
+});
+
+describe("read-only source preview contract", () => {
+	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const previewSource = detailSource.slice(
+		detailSource.indexOf("const loadSnapshotFileContent"),
+		detailSource.indexOf("const loadFeatureTree"),
+	);
+
+	it("binds every read to the authenticated owner of the codebase", () => {
+		expect(previewSource).toContain("await requireUserServer()");
+		expect(previewSource).toContain("eq(codebases.userId, user.id)");
+		expect(previewSource).toContain(
+			'if (!codebase) throw new Error("NOT_FOUND")',
+		);
+	});
+
+	it("derives the snapshot from the codebase and never from the request", () => {
+		expect(previewSource).toContain(
+			"eq(codebaseSnapshots.codebaseId, input.codebaseId)",
+		);
+		expect(previewSource).toContain(
+			"inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES])",
+		);
+		// A caller-supplied snapshot id must never reach the query.
+		expect(previewSource).not.toContain("eq(codebaseSnapshots.id,");
+		expect(previewSource).not.toContain("input.snapshotId");
+	});
+
+	it("validates the requested path and requires it in the stored manifest", () => {
+		expect(previewSource).toContain("if (!isSafeRelativePath(requestedPath))");
+		expect(previewSource).toContain("manifestEntrySchema");
+		expect(previewSource).toContain("parsedManifest.data.find(");
+		expect(previewSource).toContain(
+			"eq(codebaseSnapshotFiles.snapshotId, snapshot.id)",
+		);
+		expect(previewSource).toContain(
+			"eq(codebaseSnapshotFiles.path, requestedPath)",
+		);
+	});
+
+	it("rejects incomplete chunk sets instead of rendering partial content", () => {
+		expect(previewSource).toContain("assembleSnapshotFileChunks(rows)");
+		expect(previewSource).toContain(
+			"if (!assembled || !isStrictBase64(assembled))",
+		);
+	});
+
+	it("bounds the response and separates unsupported content from missing files", () => {
+		expect(previewSource).toContain("truncatePreviewContent(");
+		expect(previewSource).toContain("CODEBASE_FILE_PREVIEW_MAX_CHARS");
+		expect(previewSource).toContain("isDisplayableTextContent(decoded)");
+		expect(previewSource).toContain('status: "unsupported"');
+		expect(previewSource).toContain('status: "unavailable"');
+	});
+
+	it("drops in-flight and previously selected content when the snapshot changes", () => {
+		expect(detailSource).toContain("const appliedSnapshotRef = useRef");
+		expect(detailSource).toContain(
+			"sourcePreviewRequestRef.current !== requestId",
+		);
+		expect(detailSource).toContain("result.snapshotId !== activeSnapshotId");
+	});
+
+	it("shares the existing right panel with artifacts and never mixes them", () => {
+		expect(detailSource).toContain(
+			'const isSourcePreviewOpen = sourcePreview.kind !== "idle"',
+		);
+		expect(detailSource).toContain("onSelectFile={selectSourceFile}");
+		expect(detailSource).toContain("clearSourcePreview();");
+		// Every artifact branch is gated off while a source file is open, so a
+		// stale document render can never sit next to stale source text.
+		expect(detailSource).toContain("!isSourcePreviewOpen && activeArtifact");
+		expect(detailSource.split("!isSourcePreviewOpen &&").length - 1).toBe(5);
+		expect(detailSource).toContain("<CodebaseSourcePreview");
+		expect(detailSource).toContain('? "SUMBER"');
+	});
+});
+
+describe("toSourcePreviewState", () => {
+	it("keeps real content for a readable snapshot file", () => {
+		expect(
+			toSourcePreviewState(
+				{
+					status: "ok",
+					snapshotId: "snap_1",
+					path: "src/app.ts",
+					content: "const a = 1;",
+					truncated: true,
+					sizeBytes: 12,
+				},
+				"src/app.ts",
+			),
+		).toEqual({
+			kind: "ready",
+			path: "src/app.ts",
+			content: "const a = 1;",
+			truncated: true,
+			sizeBytes: 12,
+		});
+	});
+
+	it("never renders an empty file as readable source", () => {
+		expect(
+			toSourcePreviewState(
+				{
+					status: "ok",
+					snapshotId: "snap_1",
+					path: "src/empty.ts",
+					content: "",
+					truncated: false,
+					sizeBytes: 0,
+				},
+				"src/empty.ts",
+			),
+		).toEqual({ kind: "unavailable", path: "src/empty.ts" });
+	});
+
+	it("distinguishes non-text content from a path the snapshot never stored", () => {
+		expect(
+			toSourcePreviewState(
+				{
+					status: "unsupported",
+					snapshotId: "snap_1",
+					path: "logo.png",
+					sizeBytes: 10,
+				},
+				"logo.png",
+			),
+		).toEqual({ kind: "unsupported", path: "logo.png" });
+		expect(
+			toSourcePreviewState(
+				{ status: "unavailable", snapshotId: null, path: "../../etc/passwd" },
+				"../../etc/passwd",
+			),
+		).toEqual({ kind: "unavailable", path: "../../etc/passwd" });
 	});
 });
 
