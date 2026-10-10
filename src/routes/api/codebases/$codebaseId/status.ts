@@ -12,6 +12,7 @@ import {
 	projects,
 	subscriptions,
 } from "@/db/schema";
+import { selectNewestReadyAnalysis } from "@/lib/codebase-generation-context";
 import {
 	CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION,
 	type CodebaseSyncStatus,
@@ -232,13 +233,16 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 
 					let analysisId: string | null = null;
 					let analysisStatus: "pending" | "ready" | "failed" | undefined;
+					let analysisAttemptId: string | null = null;
+					let analysisAttemptStatus: "pending" | "ready" | "failed" | undefined;
 					let errorCode: string | null = syncFailure?.code ?? null;
 					let errorMessage: string | null = syncFailure?.message ?? null;
 					if (snapshot && analysisProjectId) {
-						const [analysis] = await db
+						const attempts = await db
 							.select({
 								id: codebaseAnalyses.id,
 								status: codebaseAnalyses.status,
+								createdAt: codebaseAnalyses.createdAt,
 								errorCode: codebaseAnalyses.errorCode,
 								errorMessage: codebaseAnalyses.errorMessage,
 							})
@@ -249,29 +253,43 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 									eq(codebaseAnalyses.projectId, analysisProjectId),
 								),
 							)
-							.orderBy(desc(codebaseAnalyses.createdAt))
-							.limit(1);
-						if (analysis) {
-							analysisId = analysis.id;
-							// Task 6: drive the review/retry UI. Stored statuses are
-							// writer-controlled (pending/ready/failed); anything
-							// else is dropped so polling never shows a bogus state.
-							if (
-								analysis.status === "pending" ||
-								analysis.status === "ready" ||
-								analysis.status === "failed"
-							) {
-								analysisStatus = analysis.status;
-							}
+							.orderBy(desc(codebaseAnalyses.createdAt));
+						// The newest attempt is reported on its own so a failed or
+						// still-running retry stays visible, while the workspace
+						// keeps serving the newest ready analysis for this exact
+						// snapshot instead of losing it to that newer attempt.
+						const latest = attempts[0];
+						if (latest) {
+							analysisAttemptId = latest.id;
+							// Stored statuses are writer-controlled
+							// (pending/ready/failed); anything else is dropped
+							// so polling never shows a bogus state.
+							analysisAttemptStatus =
+								latest.status === "pending" ||
+								latest.status === "ready" ||
+								latest.status === "failed"
+									? latest.status
+									: undefined;
 							// Server-written codes only; unknown values collapse so
 							// analysis internals never leak through status polling.
-							if (analysis.errorCode) {
-								errorCode = sanitizeSyncErrorCode(analysis.errorCode);
+							if (latest.errorCode) {
+								errorCode = sanitizeSyncErrorCode(latest.errorCode);
 							}
 							// Analysis writers must store only safe user-facing
 							// strings; this sanitizer is defense-in-depth so
 							// tokens or source content can never pass through.
-							errorMessage = sanitizeSyncErrorMessage(analysis.errorMessage);
+							errorMessage = sanitizeSyncErrorMessage(latest.errorMessage);
+						}
+						const usable = selectNewestReadyAnalysis(
+							attempts.map((attempt) => ({
+								id: attempt.id,
+								status: attempt.status,
+								createdAt: attempt.createdAt?.toISOString() ?? "",
+							})),
+						);
+						if (usable) {
+							analysisId = usable.id;
+							analysisStatus = "ready";
 						}
 					}
 
@@ -301,6 +319,8 @@ export const Route = createFileRoute("/api/codebases/$codebaseId/status")({
 						errorMessage,
 						analysisId,
 						analysisStatus,
+						analysisAttemptId,
+						analysisAttemptStatus,
 						createdAt: toIso(session.createdAt),
 						updatedAt: toIso(sessionUpdatedAt),
 						expiresAt: toIso(session.expiresAt),

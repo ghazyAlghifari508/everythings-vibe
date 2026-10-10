@@ -28,6 +28,7 @@ import {
 	analysisRefreshRequestSchema,
 	decideStarterSuggestionRefresh,
 } from "@/lib/codebase-analysis-refresh";
+import { selectWorkspaceAnalysis } from "@/lib/codebase-analysis-selection";
 import {
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	isSyncCapableProject,
@@ -284,7 +285,11 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 						{ status: 404 },
 					);
 
-				const [row] = await db
+				// Every attempt for this snapshot is a candidate. A newer pending or failed
+				// run must not hide the older ready analysis that still carries the
+				// repository-aware starter suggestions; suggestions from a
+				// different snapshot are never eligible.
+				const attempts = await db
 					.select()
 					.from(codebaseAnalyses)
 					.where(
@@ -296,20 +301,23 @@ export const Route = createFileRoute("/api/v1/projects/$id/codebase/analysis")({
 							),
 						),
 					)
-					.orderBy(desc(codebaseAnalyses.createdAt))
-					.limit(1);
-				if (!row)
+					.orderBy(desc(codebaseAnalyses.createdAt));
+				const row = selectWorkspaceAnalysis(attempts, {
+					projectId,
+					snapshotId: snapshotRows[0].id,
+				}).selected;
+				if (!row) {
+					const newest = attempts[0];
+					if (newest) {
+						const attempt = toResponse(newest);
+						if (attempt) return Response.json(attempt);
+					}
 					return Response.json(
 						{ error: "Belum ada analisis codebase" },
 						{ status: 404 },
 					);
-				const response = toResponse(row);
-				if (!response)
-					return Response.json(
-						{ error: "Hasil analisis rusak", code: "SYNC_FAILED" },
-						{ status: 500 },
-					);
-				return Response.json(response);
+				}
+				return Response.json(row);
 			},
 
 			// Trigger: run analysis on an uploaded snapshot. Idempotent — a

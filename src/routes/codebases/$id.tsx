@@ -31,6 +31,12 @@ import {
 	codebaseStarterSuggestionsSchema,
 	safeParseCodebaseAnalysis,
 } from "@/lib/codebase-analysis";
+import {
+	type LatestAttempt,
+	resolveWorkspaceSnapshotIdentity,
+	selectWorkspaceAnalysis,
+	shouldDiscardWorkspaceAnalysis,
+} from "@/lib/codebase-analysis-selection";
 import { resolveOnboardingAnchorProject } from "@/lib/codebase-anchor";
 import { buildFeatureMessage } from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
@@ -170,8 +176,12 @@ const loadCodebase = createServerFn({ method: "GET" })
 			.orderBy(desc(codebaseSnapshots.createdAt))
 			.limit(1);
 		let analysis: AnalysisResponse | null = null;
+		let latestAnalysisAttempt: LatestAttempt | null = null;
 		if (onboardingFeature && currentSnapshot) {
-			const [row] = await db
+			// Every attempt for this exact project + snapshot is a candidate: a
+			// newer pending or failed run must not hide an older ready result
+			// that already carries the repository-aware starter suggestions.
+			const rows = await db
 				.select()
 				.from(codebaseAnalyses)
 				.where(
@@ -180,27 +190,13 @@ const loadCodebase = createServerFn({ method: "GET" })
 						eq(codebaseAnalyses.snapshotId, currentSnapshot.id),
 					),
 				)
-				.orderBy(desc(codebaseAnalyses.createdAt))
-				.limit(1);
-			if (row) {
-				const parsed = safeParseCodebaseAnalysis(row.output);
-				analysis = {
-					id: row.id,
-					projectId: row.projectId,
-					snapshotId: row.snapshotId,
-					status:
-						row.status === "ready" ||
-						row.status === "failed" ||
-						row.status === "pending"
-							? row.status
-							: "failed",
-					output: parsed.success ? parsed.data : null,
-					errorCode: row.errorCode,
-					errorMessage: row.errorMessage,
-					createdAt: row.createdAt?.toISOString(),
-					updatedAt: row.updatedAt?.toISOString(),
-				};
-			}
+				.orderBy(desc(codebaseAnalyses.createdAt));
+			const selection = selectWorkspaceAnalysis(rows, {
+				projectId: onboardingFeature.id,
+				snapshotId: currentSnapshot.id,
+			});
+			analysis = selection.selected;
+			latestAnalysisAttempt = selection.latestAttempt;
 		}
 		// Stored snapshot derived from usable current snapshot independent of sync session expiry
 		// (including empty repositories).
@@ -212,6 +208,7 @@ const loadCodebase = createServerFn({ method: "GET" })
 			onboardingFeature,
 			currentSnapshotId: currentSnapshot?.id ?? null,
 			analysis,
+			latestAnalysisAttempt,
 			hasStoredSnapshot,
 		};
 	});
@@ -605,6 +602,7 @@ function CodebaseDetailPage() {
 		onboardingFeature,
 		currentSnapshotId,
 		analysis: initialAnalysis,
+		latestAnalysisAttempt,
 		hasStoredSnapshot,
 	} = Route.useLoaderData();
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
@@ -645,7 +643,11 @@ function CodebaseDetailPage() {
 	const analysisAttemptedFor = useRef<string | null>(null);
 	const analysisReadInFlight = useRef(new Set<string>());
 	const analysisRefreshInFlight = useRef(false);
-	const analysisIdentity = `${onboardingFeature?.id ?? ""}:${status?.snapshotId ?? currentSnapshotId ?? ""}`;
+	const activeWorkspaceSnapshotId = resolveWorkspaceSnapshotIdentity({
+		persistedSnapshotId: currentSnapshotId ?? null,
+		polledSnapshotId: status?.snapshotId ?? null,
+	});
+	const analysisIdentity = `${onboardingFeature?.id ?? ""}:${activeWorkspaceSnapshotId ?? ""}`;
 	const analysisIdentityRef = useRef(analysisIdentity);
 	analysisIdentityRef.current = analysisIdentity;
 
@@ -752,36 +754,46 @@ function CodebaseDetailPage() {
 				);
 				return;
 			}
-			analysisIdentityRef.current = `${onboardingFeature?.id ?? ""}:${parsed.data.snapshotId ?? ""}`;
+			// The workspace stays bound to whichever snapshot is persisted, and
+			// polling only moves it forward when the CLI reports a freshly
+			// uploaded one. Session lifecycle is deliberately absent here: an
+			// expired, consumed, or failed session says nothing about the
+			// validity of the analysis already on screen.
+			const activeSnapshotId = resolveWorkspaceSnapshotIdentity({
+				persistedSnapshotId: currentSnapshotId ?? null,
+				polledSnapshotId: parsed.data.snapshotId ?? null,
+			});
+			analysisIdentityRef.current = `${onboardingFeature?.id ?? ""}:${activeSnapshotId ?? ""}`;
 			setStatus(parsed.data);
-			const snapshotId = parsed.data.snapshotId;
-			const hasUsableSnapshot = Boolean(
-				snapshotId && SNAPSHOT_CONTEXT_STATUSES.includes(parsed.data.status),
-			);
-			if (!hasUsableSnapshot || !snapshotId) {
-				setAnalysis(null);
-				return;
-			}
+			const snapshotId = activeSnapshotId;
+			if (!snapshotId) return;
 			const projectId = onboardingFeature?.id;
-			const analysisMatchesCurrent = Boolean(
-				projectId &&
-					(matchesWorkspaceAnalysis(analysis, projectId, snapshotId) ||
-						matchesWorkspaceAnalysis(initialAnalysis, projectId, snapshotId)),
-			);
-			if (!analysisMatchesCurrent) setAnalysis(null);
+			const retained = analysis ?? initialAnalysis;
+			if (
+				shouldDiscardWorkspaceAnalysis({
+					analysis: retained,
+					projectId: projectId ?? "",
+					activeSnapshotId: snapshotId,
+				})
+			) {
+				setAnalysis(null);
+			}
 			if (
 				projectId &&
 				shouldFetchWorkspaceAnalysis({
 					projectId,
 					snapshotId,
 					analysisStatus: parsed.data.analysisStatus,
-					analysis,
+					analysis: retained,
 				})
 			) {
 				void readWorkspaceAnalysis(projectId, snapshotId);
 			}
+			// A fresh analysis is only ever requested for a snapshot that has
+			// none at all: reopening a workspace must never spend credits.
 			if (
 				projectId &&
+				!latestAnalysisAttempt &&
 				!parsed.data.analysisId &&
 				!parsed.data.analysisStatus &&
 				analysisAttemptedFor.current !== `${projectId}:${snapshotId}`
@@ -796,7 +808,9 @@ function CodebaseDetailPage() {
 	}, [
 		analysis,
 		codebase.id,
+		currentSnapshotId,
 		initialAnalysis,
+		latestAnalysisAttempt,
 		onboardingFeature?.id,
 		readWorkspaceAnalysis,
 		status?.sessionId,
@@ -870,23 +884,24 @@ function CodebaseDetailPage() {
 		[analysis, onboardingFeature?.id],
 	);
 	useEffect(() => {
+		const projectId = onboardingFeature?.id ?? "";
 		setAnalysis((current) => {
 			if (
-				matchesWorkspaceAnalysis(
-					current,
-					onboardingFeature?.id ?? "",
-					currentSnapshotId ?? "",
-				)
+				!shouldDiscardWorkspaceAnalysis({
+					analysis: current,
+					projectId,
+					activeSnapshotId: currentSnapshotId ?? null,
+				})
 			) {
 				return current;
 			}
-			return matchesWorkspaceAnalysis(
-				initialAnalysis,
-				onboardingFeature?.id ?? "",
-				currentSnapshotId ?? "",
-			)
-				? initialAnalysis
-				: null;
+			return shouldDiscardWorkspaceAnalysis({
+				analysis: initialAnalysis,
+				projectId,
+				activeSnapshotId: currentSnapshotId ?? null,
+			})
+				? null
+				: initialAnalysis;
 		});
 	}, [currentSnapshotId, initialAnalysis, onboardingFeature?.id]);
 	useEffect(() => {
@@ -1815,7 +1830,7 @@ function CodebaseDetailPage() {
 										analysis.output.starterSuggestions,
 									).success &&
 									analysis.projectId === onboardingFeature?.id &&
-									analysis.snapshotId === status?.snapshotId
+									analysis.snapshotId === activeWorkspaceSnapshotId
 										? {
 												analysisId: analysis.id,
 												snapshotId: analysis.snapshotId,

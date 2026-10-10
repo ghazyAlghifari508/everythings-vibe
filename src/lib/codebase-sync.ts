@@ -656,10 +656,15 @@ export const syncStatusResponseSchema = z.object({
 	// Snapshot creation timestamp ("Waktu sync" in the review page).
 	snapshotCreatedAt: z.string().datetime().optional(),
 	analysisId: z.string().min(1).nullable().optional(),
-	// Latest analysis status for the snapshot (pending while the model runs,
-	// ready on success, failed when retryable). Drives the review/retry UI;
-	// absent when no analysis has been requested yet.
+	// The analysis whose content the workspace renders: the newest ready record
+	// for the snapshot. It survives a newer failed or still-running attempt, and
+	// stays present once the CLI session that produced the snapshot is gone.
 	analysisStatus: codebaseAnalysisStatusSchema.optional(),
+	// The newest stored attempt for that snapshot, which may be a failed or
+	// pending retry. Reported separately so the failure stays visible without
+	// discarding the ready analysis above.
+	analysisAttemptId: z.string().min(1).nullable().optional(),
+	analysisAttemptStatus: codebaseAnalysisStatusSchema.optional(),
 	createdAt: z.string().datetime().optional(),
 	updatedAt: z.string().datetime().optional(),
 	expiresAt: z.string().datetime().optional(),
