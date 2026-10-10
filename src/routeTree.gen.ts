@@ -73,7 +73,9 @@ import { Route as ApiProjectsIndexRouteImport } from './routes/api/projects/inde
 import { Route as ApiProjectsIdRouteImport } from './routes/api/projects/$id'
 import { Route as ApiScrapeAssetRouteImport } from './routes/api/scrape.asset'
 import { Route as ApiStudioAssetRouteImport } from './routes/api/studio.asset'
+import { Route as ApiStudioFrameRouteImport } from './routes/api/studio.frame'
 import { Route as ApiStudioGenerateRouteImport } from './routes/api/studio.generate'
+import { Route as ApiStudioProjectRouteImport } from './routes/api/studio.project'
 import { Route as ApiTaskProjectIdRouteImport } from './routes/api/task/$projectId'
 import { Route as ApiTaskGenerateRouteImport } from './routes/api/task/generate'
 import { Route as ApiUserPlanRouteImport } from './routes/api/user/plan'
@@ -432,9 +434,19 @@ const ApiStudioAssetRoute = ApiStudioAssetRouteImport.update({
   path: '/api/studio/asset',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStudioFrameRoute = ApiStudioFrameRouteImport.update({
+  id: '/api/studio/frame',
+  path: '/api/studio/frame',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStudioGenerateRoute = ApiStudioGenerateRouteImport.update({
   id: '/api/studio/generate',
   path: '/api/studio/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStudioProjectRoute = ApiStudioProjectRouteImport.update({
+  id: '/api/studio/project',
+  path: '/api/studio/project',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTaskProjectIdRoute = ApiTaskProjectIdRouteImport.update({
@@ -700,7 +712,9 @@ export interface FileRoutesByFullPath {
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
   '/api/scrape/asset': typeof ApiScrapeAssetRoute
   '/api/studio/asset': typeof ApiStudioAssetRoute
+  '/api/studio/frame': typeof ApiStudioFrameRoute
   '/api/studio/generate': typeof ApiStudioGenerateRoute
+  '/api/studio/project': typeof ApiStudioProjectRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
@@ -799,7 +813,9 @@ export interface FileRoutesByTo {
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
   '/api/scrape/asset': typeof ApiScrapeAssetRoute
   '/api/studio/asset': typeof ApiStudioAssetRoute
+  '/api/studio/frame': typeof ApiStudioFrameRoute
   '/api/studio/generate': typeof ApiStudioGenerateRoute
+  '/api/studio/project': typeof ApiStudioProjectRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
@@ -904,7 +920,9 @@ export interface FileRoutesById {
   '/api/projects/$id': typeof ApiProjectsIdRouteWithChildren
   '/api/scrape/asset': typeof ApiScrapeAssetRoute
   '/api/studio/asset': typeof ApiStudioAssetRoute
+  '/api/studio/frame': typeof ApiStudioFrameRoute
   '/api/studio/generate': typeof ApiStudioGenerateRoute
+  '/api/studio/project': typeof ApiStudioProjectRoute
   '/api/task/$projectId': typeof ApiTaskProjectIdRoute
   '/api/task/generate': typeof ApiTaskGenerateRoute
   '/api/user/plan': typeof ApiUserPlanRoute
@@ -1010,7 +1028,9 @@ export interface FileRouteTypes {
     | '/api/projects/$id'
     | '/api/scrape/asset'
     | '/api/studio/asset'
+    | '/api/studio/frame'
     | '/api/studio/generate'
+    | '/api/studio/project'
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
@@ -1109,7 +1129,9 @@ export interface FileRouteTypes {
     | '/api/projects/$id'
     | '/api/scrape/asset'
     | '/api/studio/asset'
+    | '/api/studio/frame'
     | '/api/studio/generate'
+    | '/api/studio/project'
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
@@ -1213,7 +1235,9 @@ export interface FileRouteTypes {
     | '/api/projects/$id'
     | '/api/scrape/asset'
     | '/api/studio/asset'
+    | '/api/studio/frame'
     | '/api/studio/generate'
+    | '/api/studio/project'
     | '/api/task/$projectId'
     | '/api/task/generate'
     | '/api/user/plan'
@@ -1303,7 +1327,9 @@ export interface RootRouteChildren {
   ApiPaymentsWebhookRoute: typeof ApiPaymentsWebhookRoute
   ApiProjectsIdRoute: typeof ApiProjectsIdRouteWithChildren
   ApiStudioAssetRoute: typeof ApiStudioAssetRoute
+  ApiStudioFrameRoute: typeof ApiStudioFrameRoute
   ApiStudioGenerateRoute: typeof ApiStudioGenerateRoute
+  ApiStudioProjectRoute: typeof ApiStudioProjectRoute
   ApiTaskProjectIdRoute: typeof ApiTaskProjectIdRoute
   ApiTaskGenerateRoute: typeof ApiTaskGenerateRoute
   ApiUserPlanRoute: typeof ApiUserPlanRoute
@@ -1773,11 +1799,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStudioAssetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/studio/frame': {
+      id: '/api/studio/frame'
+      path: '/api/studio/frame'
+      fullPath: '/api/studio/frame'
+      preLoaderRoute: typeof ApiStudioFrameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/studio/generate': {
       id: '/api/studio/generate'
       path: '/api/studio/generate'
       fullPath: '/api/studio/generate'
       preLoaderRoute: typeof ApiStudioGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/studio/project': {
+      id: '/api/studio/project'
+      path: '/api/studio/project'
+      fullPath: '/api/studio/project'
+      preLoaderRoute: typeof ApiStudioProjectRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/task/$projectId': {
@@ -2254,7 +2294,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPaymentsWebhookRoute: ApiPaymentsWebhookRoute,
   ApiProjectsIdRoute: ApiProjectsIdRouteWithChildren,
   ApiStudioAssetRoute: ApiStudioAssetRoute,
+  ApiStudioFrameRoute: ApiStudioFrameRoute,
   ApiStudioGenerateRoute: ApiStudioGenerateRoute,
+  ApiStudioProjectRoute: ApiStudioProjectRoute,
   ApiTaskProjectIdRoute: ApiTaskProjectIdRoute,
   ApiTaskGenerateRoute: ApiTaskGenerateRoute,
   ApiUserPlanRoute: ApiUserPlanRoute,
@@ -2276,12 +2318,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

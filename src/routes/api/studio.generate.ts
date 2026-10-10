@@ -5,7 +5,7 @@ import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
 import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
 import { validateStudioPrompt } from "@/lib/prompts-ui-studio";
 import {
-	createStudioProject,
+	createStudioProjectWithJob,
 	getStudioProject,
 	listStudioProjects,
 	reviseStudioProject,
@@ -105,7 +105,7 @@ export async function POST({
 			);
 		}
 
-		const { project, revision } = await createStudioProject(user.id, {
+		const { project, job } = await createStudioProjectWithJob(user.id, {
 			title: body.title,
 			prompt: checked.prompt,
 			designMode: body.designMode,
@@ -116,8 +116,8 @@ export async function POST({
 		return Response.json(
 			{
 				projectId: project.id,
-				version: revision.version,
-				htmlCode: revision.htmlCode,
+				jobId: job.id,
+				status: job.status,
 			},
 			{ status: 201 },
 		);

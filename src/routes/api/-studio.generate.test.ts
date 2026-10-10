@@ -10,6 +10,10 @@ vi.mock("@tanstack/react-start/server", () => ({
 }));
 
 vi.mock("@/lib/services/studio-service", () => ({
+	createStudioProjectWithJob: async () => ({
+		project: { id: "proj-100", title: "Test Project" },
+		job: { id: "job-100", status: "queued" },
+	}),
 	createStudioProject: async () => ({
 		project: { id: "proj-100", title: "Test Project" },
 		revision: { version: 1, htmlCode: "<html>mock</html>" },
@@ -66,8 +70,8 @@ describe("POST /api/studio/generate", () => {
 		const data = await res.json();
 		expect(data).toEqual({
 			projectId: "proj-100",
-			version: 1,
-			htmlCode: "<html>mock</html>",
+			jobId: "job-100",
+			status: "queued",
 		});
 	});
 
