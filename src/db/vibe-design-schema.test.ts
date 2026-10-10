@@ -33,7 +33,12 @@ describe("VibeDesign Schema Definitions", () => {
 	});
 
 	it("defines canonical scrape modes with design as default", () => {
-		expect(scrapes.mode.enumValues).toEqual(["design", "html"]);
+		expect(scrapes.mode.enumValues).toEqual([
+			"design",
+			"html",
+			"crawl",
+			"images",
+		]);
 		expect(scrapes.mode.default).toBe("design");
 	});
 });
