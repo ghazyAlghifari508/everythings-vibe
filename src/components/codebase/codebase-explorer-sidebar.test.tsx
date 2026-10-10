@@ -266,7 +266,6 @@ describe("CodebaseExplorerSidebar component integration", () => {
 		act(() => {
 			root?.render(
 				<CodebaseExplorerSidebar
-					codebaseName="test-project"
 					files={sampleFiles}
 					stack={["react", "typescript"]}
 					onSelectFile={onSelectFile}
@@ -275,7 +274,6 @@ describe("CodebaseExplorerSidebar component integration", () => {
 		});
 
 		const text = container.textContent ?? "";
-		expect(text).toContain("test-project");
 		expect(text).toContain("src");
 		expect(text).toContain("Dockerfile");
 		expect(text).toContain("README.md");
@@ -295,13 +293,7 @@ describe("CodebaseExplorerSidebar component integration", () => {
 
 	it("supports expand and collapse of folders", () => {
 		act(() => {
-			root?.render(
-				<CodebaseExplorerSidebar
-					codebaseName="test-project"
-					files={sampleFiles}
-					stack={[]}
-				/>,
-			);
+			root?.render(<CodebaseExplorerSidebar files={sampleFiles} stack={[]} />);
 		});
 
 		// At depth 0, folder 'src' is expanded by default (depth < 2)
@@ -334,13 +326,7 @@ describe("CodebaseExplorerSidebar component integration", () => {
 
 	it("filters files dynamically with the search input", () => {
 		act(() => {
-			root?.render(
-				<CodebaseExplorerSidebar
-					codebaseName="test-project"
-					files={sampleFiles}
-					stack={[]}
-				/>,
-			);
+			root?.render(<CodebaseExplorerSidebar files={sampleFiles} stack={[]} />);
 		});
 
 		const searchInput = container.querySelector<HTMLInputElement>(
@@ -362,5 +348,74 @@ describe("CodebaseExplorerSidebar component integration", () => {
 
 		expect(container.textContent).toContain("Dockerfile");
 		expect(container.textContent).not.toContain("README.md");
+	});
+
+	it("keeps search first and drops the duplicated repository card", () => {
+		act(() => {
+			root?.render(
+				<CodebaseExplorerSidebar files={sampleFiles} stack={["react"]} />,
+			);
+		});
+
+		// Search, tree, and detected stack stay.
+		const searchInput = container.querySelector<HTMLInputElement>(
+			"#codebase-file-search",
+		);
+		expect(searchInput).not.toBeNull();
+		const header = container.querySelector(
+			"[data-testid='codebase-explorer-sidebar'] > div",
+		);
+		expect(header?.firstElementChild?.contains(searchInput)).toBe(true);
+		expect(container.textContent).toContain("Struktur direktori codebase");
+		expect(container.textContent).toContain("Stack codebase terdeteksi");
+		expect(container.textContent).toContain("react");
+
+		// The repository identity card is gone: the workspace header owns it.
+		expect(
+			container.querySelector("[data-testid='codebase-explorer-name']"),
+		).toBeNull();
+		expect(container.textContent).not.toContain("Synced");
+		expect(container.textContent).not.toContain("Branch:");
+	});
+
+	it("keeps the honest empty state for search and for an unsynced snapshot", () => {
+		act(() => {
+			root?.render(<CodebaseExplorerSidebar files={sampleFiles} stack={[]} />);
+		});
+
+		act(() => {
+			const searchInput = container.querySelector<HTMLInputElement>(
+				"#codebase-file-search",
+			);
+			const setter = Object.getOwnPropertyDescriptor(
+				HTMLInputElement.prototype,
+				"value",
+			)?.set;
+			setter?.call(searchInput, "tidak-ada");
+			searchInput?.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+		expect(
+			container.querySelector("[data-testid='codebase-explorer-empty']")
+				?.textContent,
+		).toBe("Tidak ada file yang cocok dengan pencarian.");
+
+		act(() => {
+			root?.render(<CodebaseExplorerSidebar files={[]} stack={[]} />);
+		});
+		const searchInput = container.querySelector<HTMLInputElement>(
+			"#codebase-file-search",
+		);
+		act(() => {
+			const setter = Object.getOwnPropertyDescriptor(
+				HTMLInputElement.prototype,
+				"value",
+			)?.set;
+			setter?.call(searchInput, "");
+			searchInput?.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+		expect(
+			container.querySelector("[data-testid='codebase-explorer-empty']")
+				?.textContent,
+		).toBe("Belum ada file terindeks dari snapshot.");
 	});
 });

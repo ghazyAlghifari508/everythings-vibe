@@ -15,10 +15,6 @@ export interface ExplorerFileEntry {
 }
 
 interface CodebaseExplorerSidebarProps {
-	codebaseName: string;
-	branch?: string;
-	fileCount?: number;
-	syncLabel?: string;
 	files: ExplorerFileEntry[];
 	stack: string[];
 	onSelectFile?: (path: string) => void;
@@ -197,10 +193,6 @@ function TreeRow({
 }
 
 export function CodebaseExplorerSidebar({
-	codebaseName,
-	branch = "main",
-	fileCount,
-	syncLabel = "Synced",
 	files,
 	stack,
 	onSelectFile,
@@ -217,26 +209,8 @@ export function CodebaseExplorerSidebar({
 			data-testid="codebase-explorer-sidebar"
 			className="flex h-full min-h-0 flex-col bg-charcoal"
 		>
-			<div className="shrink-0 border-b border-graphite p-3">
-				<div className="rounded-lg border border-graphite bg-obsidian p-3">
-					<div className="flex items-center justify-between gap-2">
-						<p
-							data-testid="codebase-explorer-name"
-							className="truncate font-mono text-[13px] font-semibold text-snow"
-							title={codebaseName}
-						>
-							{codebaseName}
-						</p>
-						<span className="shrink-0 rounded border border-emerald/30 bg-emerald/10 px-1.5 py-px text-[10px] font-semibold text-emerald">
-							{syncLabel}
-						</span>
-					</div>
-					<p className="mt-1 font-mono text-[11px] text-fog">
-						Branch: {branch}
-						{typeof fileCount === "number" ? ` • ${fileCount} file` : ""}
-					</p>
-				</div>
-				<div className="relative mt-2">
+			<div className="shrink-0 border-b border-graphite px-3 py-2.5">
+				<div className="relative">
 					<Search
 						size={14}
 						aria-hidden="true"
@@ -250,13 +224,13 @@ export function CodebaseExplorerSidebar({
 						type="search"
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}
-						placeholder="Cari file dalam repository..."
+						placeholder="Cari file..."
 						className="w-full rounded-lg border border-graphite bg-obsidian py-2 pl-8 pr-2 text-xs text-snow outline-none placeholder:text-slate focus-visible:ring-2 focus-visible:ring-indigo"
 					/>
 				</div>
 			</div>
 			<div className="min-h-0 flex-1 overflow-y-auto p-2">
-				<p className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate">
+				<p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate">
 					Struktur direktori codebase
 				</p>
 				{tree.length === 0 ? (
@@ -284,14 +258,12 @@ export function CodebaseExplorerSidebar({
 					</div>
 				)}
 			</div>
-			<div className="shrink-0 border-t border-graphite p-3">
+			<div className="shrink-0 border-t border-graphite px-3 py-2.5">
 				<p className="text-[10px] font-semibold uppercase tracking-wider text-slate">
 					Stack codebase terdeteksi
 				</p>
 				{stack.length === 0 ? (
-					<p className="mt-1.5 text-[11px] italic text-slate">
-						Tidak terdeteksi
-					</p>
+					<p className="mt-1 text-[11px] italic text-slate">Tidak terdeteksi</p>
 				) : (
 					<div className="mt-1.5 flex flex-wrap gap-1.5">
 						{stack.map((item) => (

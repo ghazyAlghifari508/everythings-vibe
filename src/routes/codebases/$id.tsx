@@ -1784,8 +1784,6 @@ function CodebaseDetailPage() {
 						canvasOpen={canvasOpen}
 						leftPane={
 							<CodebaseExplorerSidebar
-								codebaseName={codebase.name}
-								fileCount={status?.fileCount ?? manifestFileCount ?? undefined}
 								files={explorerFiles}
 								stack={explorerStack}
 								onSelectFile={selectSourceFile}
