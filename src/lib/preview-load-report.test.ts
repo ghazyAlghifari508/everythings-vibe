@@ -1,7 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { rewritePreviewAssets } from "./preview-html";
 
+function inlineScripts(html: string): string[] {
+	return [
+		...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi),
+	]
+		.map((m) => m[1] ?? "")
+		.filter((body) => body.trim().length > 0);
+}
+
 describe("preview load reporting shim", () => {
+	it("emits syntactically valid inline scripts", () => {
+		const rewritten = rewritePreviewAssets(
+			'<html><head></head><body><img src="/a.png"><script src="/b.js"></script></body></html>',
+			"https://example.com/",
+		);
+
+		for (const source of inlineScripts(rewritten)) {
+			expect(() => new Function(source)).not.toThrow();
+		}
+	});
+
+	it("leaves already-proxied asset urls untouched in the emitted shim", () => {
+		const rewritten = rewritePreviewAssets(
+			"<html><head></head><body></body></html>",
+			"https://example.com/",
+		);
+		const source = inlineScripts(rewritten).join("\n");
+
+		expect(source).toContain(
+			"asset=/^(?:\\/|https?:\\/\\/[^/]+)\\/api\\/scrape\\/asset?/i",
+		);
+		expect(source).toContain('KNOWN[u]||"/api/scrape/asset?url="');
+	});
+
 	it("reports document readiness to the parent frame", () => {
 		const rewritten = rewritePreviewAssets(
 			"<html><head></head><body><p>hi</p></body></html>",
