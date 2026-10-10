@@ -27,7 +27,9 @@ function activeSlotText(): string {
 }
 
 function authoritativeStage(container: HTMLElement): string {
-	return container.querySelector('[aria-current="step"]')?.textContent ?? "";
+	const current = container.querySelector('[aria-current="step"]');
+	const label = current?.querySelector("span > span:first-child");
+	return (label ?? current)?.textContent ?? "";
 }
 
 describe("ScrapeProgress", () => {
@@ -501,5 +503,58 @@ describe("ScrapeProgress", () => {
 			/>,
 		);
 		expect(screen.getByRole("heading", { name: "Notion" })).toBeDefined();
+	});
+
+	it("renders DESIGN.md processing as a two-column workspace matching the result geometry", () => {
+		const { container } = render(
+			<ScrapeProgress
+				mode="design"
+				status="generating"
+				sourceUrl="https://www.notion.com/"
+				domain="www.notion.com"
+				activity="Menghasilkan draft DESIGN.md"
+			/>,
+		);
+		const grid = container.firstElementChild;
+		expect(grid?.className).toMatch(/lg:grid-cols-\[minmax/);
+		expect(
+			screen.getByText("Style Inspector", { selector: "p" }),
+		).toBeDefined();
+		expect(
+			container.querySelector('section[aria-label="Progres DESIGN.md"]'),
+		).not.toBeNull();
+	});
+
+	it("renders the DESIGN.md stages as a vertical timeline in backend order", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="generating" />,
+		);
+		const timeline = container.querySelector(
+			'ol[aria-label="Tahapan DESIGN.md"]',
+		);
+		expect(timeline).not.toBeNull();
+		const labels = [...(timeline?.querySelectorAll("li") ?? [])].map(
+			(li) =>
+				li.querySelector(":scope > span:last-child > span:first-child")
+					?.textContent ?? "",
+		);
+		expect(labels).toEqual([
+			"Menunggu",
+			"Mengambil halaman",
+			"Menganalisis visual",
+			"Menyusun DESIGN.md",
+			"Menyimpan hasil",
+			"Selesai",
+		]);
+	});
+
+	it("keeps HTML processing on the single centered card", () => {
+		const { container } = render(
+			<ScrapeProgress mode="html" status="capturing" />,
+		);
+		expect(
+			container.querySelector('ol[aria-label="Tahapan DESIGN.md"]'),
+		).toBeNull();
+		expect(screen.getByRole("progressbar")).toBeDefined();
 	});
 });

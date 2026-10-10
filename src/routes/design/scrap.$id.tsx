@@ -178,7 +178,7 @@ function ScrapeDetailPage() {
 		designMd,
 	});
 
-	const contentWidth = resolveScrapeContentWidth(view);
+	const contentWidth = resolveScrapeContentWidth(view, mode);
 
 	return (
 		<main
