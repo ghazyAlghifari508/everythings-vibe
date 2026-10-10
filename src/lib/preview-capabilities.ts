@@ -171,6 +171,7 @@ export function capabilityUrl(
 export function buildPreviewSrcDoc(
 	html: string,
 	options: PreviewRewriteOptions,
+	visualSnapshot = false,
 ): string {
 	const capabilities = new Map<string, string>();
 	const resolve = (target: string) => {
@@ -187,7 +188,13 @@ export function buildPreviewSrcDoc(
 		}
 		return capability;
 	};
-	return rewritePreviewAssets(html, options.baseUrl, resolve, capabilities);
+	return rewritePreviewAssets(
+		html,
+		options.baseUrl,
+		resolve,
+		capabilities,
+		visualSnapshot,
+	);
 }
 
 export function rewritePreviewCss(

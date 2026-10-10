@@ -27,15 +27,19 @@ export function buildScrapePreviewDocument(
 		return null;
 	const expiresAt = now + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS;
 	return {
-		srcDoc: buildPreviewSrcDoc(html, {
-			baseUrl: scrape.sourceUrl,
-			appOrigin,
-			scrapeId: scrape.id,
-			ownerId,
-			expiresAt,
-			now,
-			secret,
-		}),
+		srcDoc: buildPreviewSrcDoc(
+			html,
+			{
+				baseUrl: scrape.sourceUrl,
+				appOrigin,
+				scrapeId: scrape.id,
+				ownerId,
+				expiresAt,
+				now,
+				secret,
+			},
+			true,
+		),
 		expiresAt,
 	};
 }

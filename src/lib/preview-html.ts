@@ -212,13 +212,32 @@ export function rewritePreviewAssets(
 	base: string,
 	resolve: (target: string) => string = (target) => proxied(target, base),
 	capabilities = new Map<string, string>(),
+	visualSnapshot = false,
 ): string {
 	const shimPattern = /<script>\(\(\)=>\{const BASE=[\s\S]*?<\/script>/i;
 	const hasExistingShim = shimPattern.test(html);
 	const existingShim = hasExistingShim ? html.match(shimPattern)?.[0] : null;
-	const stripped = html
+	let stripped = html
 		.replace(shimPattern, hasExistingShim ? "" : "$&")
 		.replace(LOAD_REPORTER_PATTERN, "");
+	if (visualSnapshot) {
+		stripped = stripped.replace(
+			/<script\b[^>]*>[\s\S]*?<\/script\s*>|<style\b[^>]*>[\s\S]*?<\/style\s*>|<[^>]+>/gi,
+			(tag) => {
+				if (/^<script\b/i.test(tag)) return "";
+				if (/^<style\b/i.test(tag)) return tag;
+				if (
+					/^<link\b/i.test(tag) &&
+					/\b(?:modulepreload|preconnect|dns-prefetch|manifest)\b/i.test(tag)
+				)
+					return "";
+				return tag.replace(
+					/\s(?:on[a-z]+|srcdoc)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,
+					"",
+				);
+			},
+		);
+	}
 	const rewritten = rewriteHtmlResources(
 		stripped.replace(CSP_META, "").replace(/<base\b[^>]*>/gi, ""),
 		base,
@@ -228,7 +247,7 @@ export function rewritePreviewAssets(
 		hasExistingShim && capabilities.size === 0 && existingShim
 			? existingShim
 			: runtimeShim(base, capabilities);
-	const injected = `${shim}${previewLoadReporter()}`;
+	const injected = `${visualSnapshot ? "" : shim}${previewLoadReporter()}`;
 	return /<head[^>]*>/i.test(rewritten)
 		? rewritten.replace(/<head[^>]*>/i, (head) => `${head}${injected}`)
 		: `${injected}${rewritten}`;

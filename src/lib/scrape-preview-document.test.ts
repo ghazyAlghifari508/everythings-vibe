@@ -21,6 +21,24 @@ function completedScrape(
 }
 
 describe("buildScrapePreviewDocument", () => {
+	it("prepares a visual snapshot without executing captured modules or tracking", () => {
+		const html =
+			'<html><head><script type="module">import("./" + name + ".mjs")</script><link rel="modulepreload" href="/runtime.mjs"><style>.hero{background:url(/hero.png)}</style></head><body onload="start()"><h1>Captured content</h1><img src="/image.png"><script src="/tracking.js"></script></body></html>';
+		const scrape = completedScrape({ html });
+		const result = buildScrapePreviewDocument(
+			scrape,
+			"owner-1",
+			APP_ORIGIN,
+			1000,
+		);
+		expect(result?.srcDoc).not.toContain('import("./"');
+		expect(result?.srcDoc).not.toContain("modulepreload");
+		expect(result?.srcDoc).not.toContain("onload=");
+		expect(result?.srcDoc).not.toContain("MutationObserver");
+		expect(result?.srcDoc).not.toContain("/api/scrape/asset?url=");
+		expect(result?.srcDoc).toContain("Captured content");
+		expect(scrape.html).toBe(html);
+	});
 	it("mints a signed capability document for a completed html scrape", () => {
 		const document = buildScrapePreviewDocument(
 			completedScrape(),
