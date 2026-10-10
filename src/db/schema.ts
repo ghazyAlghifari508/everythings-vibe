@@ -1067,6 +1067,65 @@ export const studioRevisions = pgTable(
 	(t) => [index("studio_revisions_project_id_idx").on(t.projectId)],
 );
 
+export const studioJobs = pgTable(
+	"studio_jobs",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => studioProjects.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		prompt: text("prompt").notNull(),
+		jobType: text("job_type").notNull().default("initial"),
+		targetFrameId: text("target_frame_id"),
+		status: text("status").notNull().default("queued"),
+		error: text("error"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index("studio_jobs_project_id_idx").on(t.projectId),
+		index("studio_jobs_user_id_idx").on(t.userId),
+	],
+);
+
+export const studioFrames = pgTable(
+	"studio_frames",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => studioProjects.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		description: text("description"),
+		viewport: text("viewport").notNull().default("web"),
+		htmlCode: text("html_code"),
+		status: text("status").notNull().default("queued"),
+		order: integer("order").notNull().default(0),
+		error: text("error"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index("studio_frames_project_id_idx").on(t.projectId),
+		index("studio_frames_order_idx").on(t.order),
+	],
+);
+
 export type ScrapeRow = typeof scrapes.$inferSelect;
 export type InsertScrapeRow = typeof scrapes.$inferInsert;
 export type ScrapeDocumentRow = typeof scrapeDocuments.$inferSelect;
@@ -1077,3 +1136,7 @@ export type StudioAssetRow = typeof studioAssets.$inferSelect;
 export type InsertStudioAssetRow = typeof studioAssets.$inferInsert;
 export type StudioRevisionRow = typeof studioRevisions.$inferSelect;
 export type InsertStudioRevisionRow = typeof studioRevisions.$inferInsert;
+export type StudioJobRow = typeof studioJobs.$inferSelect;
+export type InsertStudioJobRow = typeof studioJobs.$inferInsert;
+export type StudioFrameRow = typeof studioFrames.$inferSelect;
+export type InsertStudioFrameRow = typeof studioFrames.$inferInsert;
