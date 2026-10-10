@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
 	areAllQuestionsAnswered,
 	buildFeatureMessage,
+	mapAskQuestionsToAdaptive,
 	nextQuestionIndex,
 } from "./codebase-chat-flow";
 
@@ -48,5 +49,75 @@ describe("buildFeatureMessage", () => {
 
 	test("falls back to prefix only when answers are blank", () => {
 		expect(buildFeatureMessage("Toko", {})).toBe("Rencanakan fitur Toko");
+	});
+});
+
+describe("mapAskQuestionsToAdaptive", () => {
+	test("preserves question type and never turns every question into a select", () => {
+		const mapped = mapAskQuestionsToAdaptive([
+			{
+				id: "store",
+				question: "Simpan di mana?",
+				type: "select",
+				options: ["Lokal", "Server"],
+			},
+			{ id: "name", question: "Nama fitur?", type: "text" },
+			{
+				id: "surfaces",
+				question: "Permukaan mana?",
+				type: "multiselect",
+				options: ["Kartu", "Detail"],
+			},
+		]);
+		expect(mapped.map((q) => q.type)).toEqual([
+			"select",
+			"text",
+			"multiselect",
+		]);
+	});
+
+	test("only marks the explicitly recommended option, never the first", () => {
+		const [mapped] = mapAskQuestionsToAdaptive([
+			{
+				id: "store",
+				question: "Simpan di mana?",
+				type: "select",
+				options: ["Lokal", "Server"],
+				recommended: 1,
+				recommendationReason: "Repo memakai penyimpanan lokal.",
+			},
+		]);
+		expect(mapped.options.map((o) => o.recommended)).toEqual([false, true]);
+		expect(mapped.recommendedOptionId).toBe("store-opt2");
+		expect(mapped.recommendationReason).toBe("Repo memakai penyimpanan lokal.");
+	});
+
+	test("carries no recommendation when the server sent none", () => {
+		const [mapped] = mapAskQuestionsToAdaptive([
+			{
+				id: "store",
+				question: "Simpan di mana?",
+				type: "select",
+				options: ["Lokal", "Server"],
+			},
+		]);
+		expect(mapped.options.some((o) => o.recommended)).toBe(false);
+		expect(mapped.recommendedOptionId).toBeUndefined();
+		expect(mapped.recommendationReason).toBeUndefined();
+	});
+
+	test("never recommends an option on a multiselect question", () => {
+		const [mapped] = mapAskQuestionsToAdaptive([
+			{
+				id: "surfaces",
+				question: "Permukaan mana?",
+				type: "multiselect",
+				options: ["Kartu", "Detail"],
+				recommended: 0,
+				recommendationReason: "Ada.",
+			},
+		]);
+		expect(mapped.options.some((o) => o.recommended)).toBe(false);
+		expect(mapped.recommendedOptionId).toBeUndefined();
 	});
 });

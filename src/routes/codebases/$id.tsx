@@ -3,7 +3,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodebaseArtifactCanvas } from "@/components/codebase/codebase-artifact-canvas";
 import {
-	type AdaptiveQuestion,
 	type ChatStreamMessage,
 	CodebaseChatWorkspace,
 	type PipelineStage,
@@ -38,7 +37,11 @@ import {
 	shouldDiscardWorkspaceAnalysis,
 } from "@/lib/codebase-analysis-selection";
 import { resolveOnboardingAnchorProject } from "@/lib/codebase-anchor";
-import { buildFeatureMessage } from "@/lib/codebase-chat-flow";
+import {
+	type AdaptiveQuestion,
+	buildFeatureMessage,
+	mapAskQuestionsToAdaptive,
+} from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
 	detectStackFromPackageJsonText,
@@ -59,6 +62,7 @@ import {
 } from "@/lib/codebase-workspace-analysis";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
+import { parseAskOptionsJson } from "@/lib/services/ask-service";
 import type { TaskTree } from "@/lib/services/task-service";
 import { requireUserServer } from "@/lib/session";
 import { consumeSseStream } from "@/lib/sse-consume";
@@ -1383,64 +1387,19 @@ function CodebaseDetailPage() {
 					);
 					return;
 				}
-				const rawQuestions =
+				const parsed =
 					typeof body === "object" && body !== null && "questions" in body
-						? (body as { questions: unknown }).questions
-						: null;
-				if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
-					setQuestionsError(
-						"AI menghasilkan respons kosong. Coba kirim ulang fitur.",
-					);
-					return;
-				}
-				const mapped: AdaptiveQuestion[] = rawQuestions.flatMap(
-					(item, index): AdaptiveQuestion[] => {
-						if (typeof item !== "object" || item === null) return [];
-						const record = item as Record<string, unknown>;
-						const id =
-							typeof record.id === "string" && record.id.trim()
-								? record.id.trim()
-								: `q${index + 1}`;
-						const title =
-							typeof record.question === "string" && record.question.trim()
-								? record.question.trim()
-								: null;
-						if (!title) return [];
-						const rawOptions = Array.isArray(record.options)
-							? record.options
-							: [];
-						const options = rawOptions
-							.filter(
-								(option): option is string =>
-									typeof option === "string" && option.trim().length > 0,
+						? parseAskOptionsJson(
+								JSON.stringify((body as { questions: unknown }).questions),
 							)
-							.slice(0, 6)
-							.map((option, optionIndex) => ({
-								id: `${id}-opt${optionIndex + 1}`,
-								label: option.trim(),
-								recommended: optionIndex === 0,
-							}));
-						if (record.type !== "text" && options.length === 0) return [];
-						return [
-							{
-								id,
-								title,
-								options,
-								customPlaceholder:
-									typeof record.customPlaceholder === "string" &&
-									record.customPlaceholder.trim()
-										? record.customPlaceholder.trim()
-										: undefined,
-							},
-						];
-					},
-				);
-				if (mapped.length === 0) {
+						: null;
+				if (!parsed || parsed.length === 0) {
 					setQuestionsError(
 						"AI menghasilkan format tidak valid. Coba kirim ulang fitur.",
 					);
 					return;
 				}
+				const mapped = mapAskQuestionsToAdaptive(parsed);
 				setAiQuestions(mapped);
 				setChatAnswers({});
 			} catch {

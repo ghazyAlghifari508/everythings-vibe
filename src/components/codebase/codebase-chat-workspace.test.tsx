@@ -43,18 +43,40 @@ const sampleQuestions: AdaptiveQuestion[] = [
 	{
 		id: "q1",
 		title: "Bagaimana alur penyimpanan data untuk fitur ini?",
+		type: "select",
 		options: [
 			{ id: "q1-opt1", label: "Database relasional", recommended: true },
 			{ id: "q1-opt2", label: "Penyimpanan lokal" },
 		],
+		recommendedOptionId: "q1-opt1",
+		recommendationReason: "Repo memakai penyimpanan lokal untuk preferensi.",
 	},
 	{
 		id: "q2",
 		title: "Bagaimana feedback UI saat aksi berhasil?",
+		type: "select",
 		options: [
 			{ id: "q2-opt1", label: "Toast notifikasi", recommended: true },
 			{ id: "q2-opt2", label: "Indikator inline" },
 		],
+	},
+];
+
+const typedQuestions: AdaptiveQuestion[] = [
+	{
+		id: "t1",
+		title: "Permukaan UI mana yang terpengaruh?",
+		type: "multiselect",
+		options: [
+			{ id: "t1-opt1", label: "Kartu film" },
+			{ id: "t1-opt2", label: "Halaman detail" },
+		],
+	},
+	{
+		id: "t2",
+		title: "Ada catatan tambahan?",
+		type: "text",
+		options: [],
 	},
 ];
 
@@ -850,6 +872,67 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onSubmitAnswer).toHaveBeenCalledWith("q2", "Banner kilat");
+	});
+
+	it("shows the recommendation reason tied to a select option", () => {
+		renderWorkspace({ questions: sampleQuestions, answers: {} });
+		const reason = container.querySelector(
+			"[data-testid='adaptive-question-reason-q1']",
+		);
+		expect(reason?.textContent).toContain(
+			"Repo memakai penyimpanan lokal untuk preferensi.",
+		);
+	});
+
+	it("lets a multiselect question select more than one option", () => {
+		const onSubmitAnswer = vi.fn();
+		renderWorkspace({
+			questions: typedQuestions,
+			answers: {},
+			onSubmitAnswer,
+		});
+
+		const card = container.querySelector(
+			"[data-testid='adaptive-question-t1']",
+		);
+		const options = [...(card?.querySelectorAll("button") ?? [])].filter((b) =>
+			/Kartu film|Halaman detail/.test(b.textContent ?? ""),
+		);
+		act(() => {
+			options[0]?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		act(() => {
+			options[1]?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(options[0]?.getAttribute("aria-pressed")).toBe("true");
+		expect(options[1]?.getAttribute("aria-pressed")).toBe("true");
+
+		const submit = [...(card?.querySelectorAll("button") ?? [])].find((b) =>
+			/Kirim Jawaban/.test(b.textContent ?? ""),
+		);
+		act(() => {
+			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onSubmitAnswer).toHaveBeenCalledWith(
+			"t1",
+			"Kartu film, Halaman detail",
+		);
+	});
+
+	it("renders a text question as a free-text input without options", () => {
+		renderWorkspace({
+			questions: [typedQuestions[1]],
+			answers: {},
+		});
+		const card = container.querySelector(
+			"[data-testid='adaptive-question-t2']",
+		);
+		expect(card?.querySelector("input#custom-t2")).not.toBeNull();
+		expect(
+			[...(card?.querySelectorAll("button") ?? [])].some((b) =>
+				/Lainnya/.test(b.textContent ?? ""),
+			),
+		).toBe(false);
 	});
 });
 

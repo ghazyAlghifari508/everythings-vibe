@@ -9,7 +9,18 @@ export interface AskQuestion {
 	question: string;
 	type: AskQuestionType;
 	options?: string[];
+	/** 0-based index of the option the model recommends, only when the model
+	 *  declared it explicitly. Never inferred from array order. */
+	recommended?: number;
+	/** Short, evidence-tied justification for the recommendation. */
+	recommendationReason?: string;
 }
+
+const MAX_OPTIONS_PER_QUESTION = 12;
+const MAX_OPTION_CHARS = 500;
+const MAX_QUESTION_CHARS = 2000;
+const MAX_ID_CHARS = 128;
+const MAX_REASON_CHARS = 400;
 
 export function parseAskOptionsJson(jsonString: string): AskQuestion[] | null {
 	try {
@@ -29,10 +40,6 @@ export function parseAskOptionsJson(jsonString: string): AskQuestion[] | null {
 		// Per-question bounds: one valid question must not smuggle an
 		// unbounded options array, and every string must carry visible
 		// content (whitespace-only renders blank and breaks answer lookup).
-		const MAX_OPTIONS_PER_QUESTION = 12;
-		const MAX_OPTION_CHARS = 500;
-		const MAX_QUESTION_CHARS = 2000;
-		const MAX_ID_CHARS = 128;
 		const validated: AskQuestion[] = [];
 
 		for (const q of parsed.questions) {
@@ -67,11 +74,37 @@ export function parseAskOptionsJson(jsonString: string): AskQuestion[] | null {
 					return null;
 				options = q.options.map((o: string) => o.trim());
 			}
+			// A recommendation is only honored on a single-select question, and
+			// only when the model supplied an in-range index AND a non-empty
+			// reason. An out-of-range or reason-less recommendation is dropped
+			// rather than silently pinned to the first option.
+			let recommended: number | undefined;
+			let recommendationReason: string | undefined;
+			if (qType === "select" && options) {
+				const candidate = q.recommended;
+				const reason =
+					typeof q.recommendationReason === "string"
+						? q.recommendationReason.trim()
+						: "";
+				if (
+					typeof candidate === "number" &&
+					Number.isInteger(candidate) &&
+					candidate >= 0 &&
+					candidate < options.length &&
+					reason.length > 0 &&
+					reason.length <= MAX_REASON_CHARS
+				) {
+					recommended = candidate;
+					recommendationReason = reason;
+				}
+			}
 			validated.push({
 				id: q.id.trim(),
 				question: q.question.trim(),
 				type: qType as AskQuestionType,
 				...(options ? { options } : {}),
+				...(recommended !== undefined ? { recommended } : {}),
+				...(recommendationReason ? { recommendationReason } : {}),
 			});
 		}
 

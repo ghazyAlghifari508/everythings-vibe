@@ -36,7 +36,9 @@ FORMAT JSON (output HANYA JSON, tanpa teks lain):
       "id": "snake_case_id",
       "question": "Pertanyaan dalam Bahasa Indonesia?",
       "type": "select",
-      "options": ["Opsi 1", "Opsi 2", "Opsi 3"]
+      "options": ["Opsi 1", "Opsi 2", "Opsi 3"],
+      "recommended": 0,
+      "recommendationReason": "Alasan singkat berbasis bukti analisis codebase"
     }
   ]
 }
@@ -44,7 +46,7 @@ FORMAT JSON (output HANYA JSON, tanpa teks lain):
 ATURAN:
 1. Jumlah pertanyaan ADAPTIF terhadap kompleksitas fitur: fitur sederhana → 3-4 pertanyaan, fitur yang menyentuh banyak lapisan (UI + API + database + auth) → 5-7 pertanyaan. JANGAN tanya hal yang SUDAH dijelaskan user atau yang sudah bisa disimpulkan dari analisis codebase.
 2. Pertanyaan TEKNIS dan KONTEKSTUAL terhadap arsitektur repo. Contoh area wajib: komponen/modul mana yang harus diubah atau ditambah, pola state management yang dipakai, interaksi API atau data (endpoint, tabel, cache), penanganan error dan edge case, serta pertimbangan migrasi/kompatibilitas terhadap kode yang sudah ada.
-3. Opsi pertama pada setiap pertanyaan select adalah REKOMENDASI yang paling sesuai dengan hasil analisis stack codebase. Urutkan opsi dari yang paling direkomendasikan ke paling tidak.
+3. Untuk pertanyaan "select", sertakan "recommended" (indeks opsi 0-based) dan "recommendationReason" (maks 1 kalimat) HANYA jika analisis codebase memberi bukti kuat untuk merekomendasikan satu opsi. Jika tidak ada bukti yang cukup untuk merekomendasikan, OMIT kedua field tersebut dan komunikasikan ketidakpastian di dalam pertanyaan atau opsi — JANGAN memaksakan rekomendasi. JANGAN mengarang alasan yang tidak didukung konteks codebase.
 4. Tipe pertanyaan: "select" (pilih satu, wajib options), "multiselect" (pilih banyak, wajib options), "text" (input bebas, tanpa options). Wajib minimal 1 tipe "select"; variasikan tipe lain bila relevan.
 5. Options: 3-5 opsi singkat (maks 4-5 kata) yang spesifik terhadap teknologi/pola yang terdeteksi di analisis codebase. JANGAN opsi generik seperti "Tergantung" atau "Lain-lain".
 6. id: unique, snake_case, tanpa spasi. JANGAN duplikat pertanyaan atau opsi.`;

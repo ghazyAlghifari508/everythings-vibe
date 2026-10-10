@@ -3,11 +3,11 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { PromptBar } from "@/components/ui/prompt-bar";
+import type { CodebaseStarterSuggestion } from "@/lib/codebase-analysis";
+import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
 import {
-	type CodebaseStarterSuggestion,
-	codebaseStarterSuggestionsSchema,
-} from "@/lib/codebase-analysis";
-import {
+	type AdaptiveQuestion,
+	type AdaptiveQuestionOption,
 	areAllQuestionsAnswered,
 	nextQuestionIndex,
 } from "@/lib/codebase-chat-flow";
@@ -17,18 +17,7 @@ import {
 	CodebaseFileCard,
 } from "./codebase-file-card";
 
-export interface AdaptiveQuestionOption {
-	id: string;
-	label: string;
-	recommended?: boolean;
-}
-
-export interface AdaptiveQuestion {
-	id: string;
-	title: string;
-	options: AdaptiveQuestionOption[];
-	customPlaceholder?: string;
-}
+export type { AdaptiveQuestion, AdaptiveQuestionOption };
 
 export interface ChatStreamMessage {
 	id: string;
@@ -145,6 +134,9 @@ export function CodebaseChatWorkspace({
 	onRefreshStarterSuggestions,
 }: CodebaseChatWorkspaceProps) {
 	const [selected, setSelected] = useState<Record<string, string>>({});
+	const [multiSelected, setMultiSelected] = useState<Record<string, string[]>>(
+		{},
+	);
 	const [customAnswers, setCustomAnswers] = useState<Record<string, string>>(
 		{},
 	);
@@ -216,9 +208,20 @@ export function CodebaseChatWorkspace({
 
 	const handleSubmitOne = (question: AdaptiveQuestion) => {
 		const custom = (customAnswers[question.id] ?? "").trim();
-		const pickedId = selected[question.id];
-		const picked = question.options.find((option) => option.id === pickedId);
-		const answer = custom || picked?.label || "";
+		let answer = "";
+		if (question.type === "multiselect") {
+			const pickedLabels = (multiSelected[question.id] ?? [])
+				.map((id) => question.options.find((option) => option.id === id)?.label)
+				.filter((label): label is string => Boolean(label));
+			const combined = [pickedLabels.join(", "), custom]
+				.filter((part) => part.length > 0)
+				.join(", ");
+			answer = combined;
+		} else {
+			const pickedId = selected[question.id];
+			const picked = question.options.find((option) => option.id === pickedId);
+			answer = custom || picked?.label || "";
+		}
 		if (!answer.trim()) return;
 		onSubmitAnswer?.(question.id, answer.trim());
 	};
@@ -453,8 +456,15 @@ export function CodebaseChatWorkspace({
 								const isCurrent = qIndex === currentIndex;
 								const custom = (customAnswers[question.id] ?? "").trim();
 								const pickedId = selected[question.id];
+								const multiIds = multiSelected[question.id] ?? [];
+								const isMulti = question.type === "multiselect";
+								const isText = question.type === "text";
+								const customVisible =
+									isText || customOpen[question.id] === true;
 								const canSubmit =
-									!submitted && (custom.length > 0 || Boolean(pickedId));
+									!submitted &&
+									(custom.length > 0 ||
+										(isMulti ? multiIds.length > 0 : Boolean(pickedId)));
 								return (
 									<div
 										key={question.id}
@@ -473,72 +483,105 @@ export function CodebaseChatWorkspace({
 											</p>
 										) : (
 											<>
-												<div className="mt-2 flex flex-col gap-2">
-													{question.options.map((option) => {
-														const isSelected = pickedId === option.id;
-														const isCustomMode =
-															customOpen[question.id] === true;
-														return (
-															<button
-																key={option.id}
-																type="button"
-																disabled={!isCurrent}
-																onClick={() => {
-																	setSelected((current) => ({
-																		...current,
-																		[question.id]: option.id,
-																	}));
-																	setCustomOpen((current) => ({
-																		...current,
-																		[question.id]: false,
-																	}));
-																}}
-																aria-pressed={isSelected}
-																className={`flex min-h-11 items-start gap-2 rounded-lg border p-2.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-																	isSelected
-																		? "border-indigo bg-indigo/10 text-snow"
-																		: "border-graphite bg-obsidian text-mist hover:border-steel"
-																} ${isCurrent ? "" : "opacity-60"} ${isCustomMode ? "opacity-60" : ""}`}
-															>
-																<span
-																	aria-hidden="true"
-																	className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] ${
+												{!isText ? (
+													<div className="mt-2 flex flex-col gap-2">
+														{question.options.map((option) => {
+															const isSelected = isMulti
+																? multiIds.includes(option.id)
+																: pickedId === option.id;
+															const isCustomMode =
+																customOpen[question.id] === true;
+															return (
+																<button
+																	key={option.id}
+																	type="button"
+																	disabled={!isCurrent}
+																	onClick={() => {
+																		if (isMulti) {
+																			setMultiSelected((current) => {
+																				const values =
+																					current[question.id] ?? [];
+																				return {
+																					...current,
+																					[question.id]: values.includes(
+																						option.id,
+																					)
+																						? values.filter(
+																								(id) => id !== option.id,
+																							)
+																						: [...values, option.id],
+																				};
+																			});
+																		} else {
+																			setSelected((current) => ({
+																				...current,
+																				[question.id]: option.id,
+																			}));
+																			setCustomOpen((current) => ({
+																				...current,
+																				[question.id]: false,
+																			}));
+																		}
+																	}}
+																	aria-pressed={isSelected}
+																	className={`flex min-h-11 items-start gap-2 rounded-lg border p-2.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
 																		isSelected
-																			? "border-indigo bg-indigo"
-																			: "border-slate"
-																	}`}
-																/>
-																<span>
-																	{option.label}
-																	{option.recommended ? (
-																		<span className="ml-1.5 rounded-full border border-emerald/30 bg-emerald/10 px-1.5 py-px text-[10px] font-semibold text-emerald">
-																			Rekomendasi
-																		</span>
-																	) : null}
-																</span>
-															</button>
-														);
-													})}
-													<button
-														type="button"
-														disabled={!isCurrent}
-														onClick={() =>
-															setCustomOpen((current) => ({
-																...current,
-																[question.id]: !current[question.id],
-															}))
-														}
-														aria-expanded={customOpen[question.id] === true}
-														className={`inline-flex min-h-9 w-fit items-center rounded-md border px-2.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-															customOpen[question.id] === true
-																? "border-indigo text-snow"
-																: "border-graphite text-fog hover:text-snow"
-														}`}
-													>
-														Lainnya
-													</button>
-												</div>
-												{customOpen[question.id] === true ? (
+																			? "border-indigo bg-indigo/10 text-snow"
+																			: "border-graphite bg-obsidian text-mist hover:border-steel"
+																	} ${isCurrent ? "" : "opacity-60"} ${isCustomMode ? "opacity-60" : ""}`}
+																>
+																	<span
+																		aria-hidden="true"
+																		className={`mt-0.5 h-3.5 w-3.5 shrink-0 border-[1.5px] ${
+																			isMulti ? "rounded-[3px]" : "rounded-full"
+																		} ${
+																			isSelected
+																				? "border-indigo bg-indigo"
+																				: "border-slate"
+																		}`}
+																	/>
+																	<span>
+																		{option.label}
+																		{option.recommended ? (
+																			<span className="ml-1.5 rounded-full border border-emerald/30 bg-emerald/10 px-1.5 py-px text-[10px] font-semibold text-emerald">
+																				Rekomendasi
+																			</span>
+																		) : null}
+																	</span>
+																</button>
+															);
+														})}
+														{question.recommendedOptionId &&
+														question.recommendationReason ? (
+															<p
+																data-testid={`adaptive-question-reason-${question.id}`}
+																className="text-[11px] leading-4 text-fog"
+															>
+																Alasan rekomendasi:{" "}
+																{question.recommendationReason}
+															</p>
+														) : null}
+														<button
+															type="button"
+															disabled={!isCurrent}
+															onClick={() =>
+																setCustomOpen((current) => ({
+																	...current,
+																	[question.id]: !current[question.id],
+																}))
+															}
+															aria-expanded={customOpen[question.id] === true}
+															className={`inline-flex min-h-9 w-fit items-center rounded-md border px-2.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+																customOpen[question.id] === true
+																	? "border-indigo text-snow"
+																	: "border-graphite text-fog hover:text-snow"
+															}`}
+														>
+															{isMulti ? "Lainnya (tambahan)" : "Lainnya"}
+														</button>
+													</div>
+												) : null}
+												{customVisible ? (
 													<>
 														<label
 															htmlFor={`custom-${question.id}`}
