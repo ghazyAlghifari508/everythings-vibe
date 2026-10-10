@@ -34,10 +34,14 @@ import {
 	projects,
 } from "@/db/schema";
 import {
+	type AnalysisAttemptStage,
 	type AnalysisSourceFile,
+	AnalysisValidationError,
 	buildAnalysisUserPrompt,
 	CODEBASE_ANALYSIS_SYSTEM_PROMPT,
 	type CodebaseAnalysis,
+	classifyAnalysisFailure,
+	formatAnalysisDiagnosticLog,
 	parseAnalysisOutput,
 	resolveAnalysisFeaturePrompt,
 	toSafeAnalysisErrorMessage,
@@ -351,6 +355,8 @@ export async function requestCodebaseAnalysis(
 		);
 	}
 
+	const startedAt = Date.now();
+	let stage: AnalysisAttemptStage = "generate";
 	try {
 		const storedManifest = manifestEntrySchema
 			.array()
@@ -415,6 +421,7 @@ export async function requestCodebaseAnalysis(
 			{ projectId, snapshotId },
 			new Set(storedManifest.data.map((entry) => entry.path)),
 		);
+		stage = "persist";
 
 		await db.transaction(async (tx) => {
 			await tx
@@ -434,6 +441,28 @@ export async function requestCodebaseAnalysis(
 		});
 		return { ...analysis, id: analysisId };
 	} catch (error) {
+		// Structured server-side diagnostics: the user-facing message below
+		// stays fixed and safe, while operators get the attempt id, failure
+		// category, actual duration, and validation issue paths. Never logs
+		// keys, tokens, repository content, or model output.
+		const category = classifyAnalysisFailure(error, stage);
+		console.error(
+			"[codebase/analysis] attempt failed",
+			formatAnalysisDiagnosticLog({
+				attemptId: analysisId,
+				projectId,
+				snapshotId,
+				category,
+				durationMs: Date.now() - startedAt,
+				...(error instanceof AnalysisValidationError &&
+				error.issuePaths.length > 0
+					? { issuePaths: error.issuePaths }
+					: {}),
+				...(error instanceof AnalysisValidationError
+					? { rawLength: error.rawLength }
+					: {}),
+			}),
+		);
 		// Defense-in-depth: writers store only the fixed safe string; the
 		// sanitizer additionally guarantees no token/source content passes.
 		const safe =
