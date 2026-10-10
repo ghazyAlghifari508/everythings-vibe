@@ -15,6 +15,9 @@ const loadStudioDetail = createServerFn({ method: "GET" })
 		return {
 			id: project.id,
 			title: project.title,
+			designMode: project.designMode,
+			hasDesignMd: Boolean(project.designMd),
+			hasLogo: Boolean(project.logoAssetId),
 			latestHtml: project.latest?.htmlCode ?? "",
 			latestVersion: project.latest?.version ?? 0,
 			revisionCount: project.revisions.length,
@@ -103,9 +106,24 @@ function StudioDetailPage() {
 					<h1 className="text-3xl font-semibold tracking-tight text-snow">
 						{detail.title}
 					</h1>
-					<p className="mt-2 font-mono text-xs text-fog">
-						v{version} · {detail.revisionCount} revisi
-					</p>
+					<div className="mt-2 flex flex-wrap items-center gap-2">
+						<span className="font-mono text-xs text-fog">
+							v{version} · {detail.revisionCount} revisi
+						</span>
+						<span className="font-mono text-[10px] uppercase tracking-wider rounded border border-graphite bg-onyx px-1.5 py-0.5 text-fog">
+							{detail.designMode === "mobile" ? "Mobile" : "Web"}
+						</span>
+						{detail.hasDesignMd && (
+							<span className="font-mono text-[10px] rounded border border-graphite bg-onyx px-1.5 py-0.5 text-mist">
+								DESIGN.md
+							</span>
+						)}
+						{detail.hasLogo && (
+							<span className="font-mono text-[10px] rounded border border-graphite bg-onyx px-1.5 py-0.5 text-mist">
+								Logo
+							</span>
+						)}
+					</div>
 				</div>
 			</header>
 
@@ -114,6 +132,9 @@ function StudioDetailPage() {
 					title={detail.title}
 					htmlCode={htmlCode}
 					version={version}
+					initialViewport={
+						detail.designMode === "mobile" ? "mobile" : "desktop"
+					}
 				/>
 			) : (
 				<div className="rounded-xl border border-graphite bg-charcoal p-8 text-center">

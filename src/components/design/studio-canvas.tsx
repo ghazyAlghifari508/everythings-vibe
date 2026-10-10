@@ -32,12 +32,14 @@ export function StudioCanvas({
 	title,
 	htmlCode,
 	version,
+	initialViewport = "desktop",
 }: {
 	title: string;
 	htmlCode: string;
 	version: number;
+	initialViewport?: StudioViewport;
 }) {
-	const [viewport, setViewport] = useState<StudioViewport>("desktop");
+	const [viewport, setViewport] = useState<StudioViewport>(initialViewport);
 	const [tab, setTab] = useState<CanvasTab>("preview");
 	const [scale, setScale] = useState(1);
 	const [notice, setNotice] = useState("");
