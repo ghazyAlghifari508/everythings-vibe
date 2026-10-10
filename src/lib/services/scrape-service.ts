@@ -277,6 +277,7 @@ export async function retryScrape(
 		.limit(1);
 	if (!scrape)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
+	if (scrape.status !== "failed") return { ok: true };
 
 	const mode: ScrapeMode = (scrape.mode ??
 		scrape.metadata?.mode ??
@@ -285,6 +286,9 @@ export async function retryScrape(
 		.update(scrapes)
 		.set({
 			status: "queued",
+			jobAttempts: 0,
+			jobToken: null,
+			leaseExpiresAt: null,
 			metadata: {
 				...(typeof scrape.metadata === "object" && scrape.metadata !== null
 					? scrape.metadata
@@ -295,6 +299,8 @@ export async function retryScrape(
 				stageStartedAt: new Date().toISOString(),
 				activity: undefined,
 				activityStartedAt: undefined,
+				errorMessage: undefined,
+				errorDetail: undefined,
 			},
 			updatedAt: new Date(),
 		})
@@ -365,40 +371,50 @@ export async function saveScrapeDocument(
 ): Promise<ScrapeDocumentRow> {
 	if (!designMd || designMd.trim().length === 0)
 		throw new ScrapeError("AI_GENERATION_FAILED", "DESIGN.md kosong.");
-	if (claim) {
-		const [owner] = await db
+	if (!userId)
+		throw new ScrapeError(
+			"STORAGE_FAILED",
+			"Pemilik scrape wajib diverifikasi.",
+		);
+	return db.transaction(async (tx) => {
+		const [owner] = await tx
 			.select({ id: scrapes.id })
 			.from(scrapes)
-			.where(scrapeClaimPredicate(claim))
+			.where(
+				claim
+					? scrapeClaimPredicate(claim)
+					: and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)),
+			)
+			.for("update")
 			.limit(1);
-		if (!owner || owner.id !== scrapeId || claim.userId !== userId)
+		if (!owner || owner.id !== scrapeId || (claim && claim.userId !== userId))
 			throw new ScrapeError("STORAGE_FAILED", "Job lease sudah tidak berlaku.");
-	}
 
-	const [existing] = await db
-		.select()
-		.from(scrapeDocuments)
-		.where(eq(scrapeDocuments.scrapeId, scrapeId))
-		.limit(1);
+		const [existing] = await tx
+			.select()
+			.from(scrapeDocuments)
+			.where(eq(scrapeDocuments.scrapeId, scrapeId))
+			.limit(1);
 
-	if (existing) {
-		const [updated] = await db
-			.update(scrapeDocuments)
-			.set({ designMd })
-			.where(eq(scrapeDocuments.id, existing.id))
+		if (existing) {
+			const [updated] = await tx
+				.update(scrapeDocuments)
+				.set({ designMd })
+				.where(eq(scrapeDocuments.id, existing.id))
+				.returning();
+			return updated;
+		}
+
+		const [document] = await tx
+			.insert(scrapeDocuments)
+			.values({
+				scrapeId,
+				designMd,
+			} satisfies InsertScrapeDocumentRow)
 			.returning();
-		return updated;
-	}
-
-	const [document] = await db
-		.insert(scrapeDocuments)
-		.values({
-			scrapeId,
-			designMd,
-		} satisfies InsertScrapeDocumentRow)
-		.returning();
-	if (!document) throw new ScrapeError("STORAGE_FAILED");
-	return document;
+		if (!document) throw new ScrapeError("STORAGE_FAILED");
+		return document;
+	});
 }
 
 export async function generateAndSaveDesignMd(
@@ -413,7 +429,7 @@ export async function generateAndSaveDesignMd(
 		);
 	if (scrape.document) return scrape.document;
 	const designMd = await generateDesignMd(scrape.sourceUrl, scrape.html);
-	return saveScrapeDocument(scrapeId, designMd);
+	return saveScrapeDocument(scrapeId, designMd, userId);
 }
 
 export async function deleteScrape(
