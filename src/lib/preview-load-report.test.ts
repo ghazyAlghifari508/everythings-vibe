@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { rewritePreviewAssets } from "./preview-html";
 
@@ -10,6 +11,18 @@ function inlineScripts(html: string): string[] {
 }
 
 describe("preview load reporting shim", () => {
+	it("does not wrap a relative proxy URL when the runtime scans resources", () => {
+		const html = rewritePreviewAssets(
+			'<html><head></head><body><img src="/api/scrape/asset?url=sample"></body></html>',
+			"https://example.com/",
+		);
+		document.documentElement.innerHTML = html;
+		new Function(inlineScripts(html)[0])();
+		document.dispatchEvent(new Event("DOMContentLoaded"));
+		expect(document.querySelector("img")?.getAttribute("src")).toBe(
+			"/api/scrape/asset?url=sample",
+		);
+	});
 	it("emits syntactically valid inline scripts", () => {
 		const rewritten = rewritePreviewAssets(
 			'<html><head></head><body><img src="/a.png"><script src="/b.js"></script></body></html>',
@@ -28,9 +41,6 @@ describe("preview load reporting shim", () => {
 		);
 		const source = inlineScripts(rewritten).join("\n");
 
-		expect(source).toContain(
-			"asset=/^(?:\\/|https?:\\/\\/[^/]+)\\/api\\/scrape\\/asset?/i",
-		);
 		expect(source).toContain('KNOWN[u]||"/api/scrape/asset?url="');
 	});
 
