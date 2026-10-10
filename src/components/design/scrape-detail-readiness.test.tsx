@@ -268,6 +268,8 @@ describe("ScrapeDetail preview readiness", () => {
 		fireEvent.click(screen.getByRole("tab", { name: /^Preview$/i }));
 		const after = screen.getByTitle("Preview example.com");
 		expect(after).toBe(before);
-		expect(after.getAttribute("srcdoc")).toBe("<html><body>signed</body></html>");
+		expect(after.getAttribute("srcdoc")).toBe(
+			"<html><body>signed</body></html>",
+		);
 	});
 });
