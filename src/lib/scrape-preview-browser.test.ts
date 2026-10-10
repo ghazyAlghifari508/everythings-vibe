@@ -125,6 +125,7 @@ describe("visual snapshot browser contract", () => {
 		try {
 			const page = await browser.newPage();
 			for (const [html, expected] of [
+				["Visible text without a wrapper", "ready"],
 				['<div id="root"></div>', "empty"],
 				['<main style="opacity:0"><h1>Hidden content</h1></main>', "empty"],
 				[

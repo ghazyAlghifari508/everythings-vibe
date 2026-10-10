@@ -247,7 +247,11 @@ export function rewritePreviewAssets(
 		hasExistingShim && capabilities.size === 0 && existingShim
 			? existingShim
 			: runtimeShim(base, capabilities);
-	const injected = `${visualSnapshot ? "" : shim}${previewLoadReporter()}`;
+	const reporter = previewLoadReporter().replace(
+		"const nodes=",
+		'const bodyStyle=getComputedStyle(document.body);if(bodyStyle.display!=="none"&&bodyStyle.visibility!=="hidden"&&Number(bodyStyle.opacity)>0&&Array.from(document.body.childNodes).some(n=>n.nodeType===3&&n.textContent.trim()))return true;const nodes=',
+	);
+	const injected = `${visualSnapshot ? "" : shim}${reporter}`;
 	return /<head[^>]*>/i.test(rewritten)
 		? rewritten.replace(/<head[^>]*>/i, (head) => `${head}${injected}`)
 		: `${injected}${rewritten}`;
