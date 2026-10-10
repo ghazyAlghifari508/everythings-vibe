@@ -8,6 +8,49 @@ import {
 import { buildScrapePreviewDocument } from "./scrape-preview-document";
 
 describe("visual snapshot browser contract", () => {
+	it("ignores removed telemetry and reports a failed visual resource as degraded", async () => {
+		const browser = await chromium.launch({ headless: true });
+		try {
+			const page = await browser.newPage();
+			const requests: string[] = [];
+			page.on("request", (request) => requests.push(request.url()));
+			await page.route("**/*", (route) => route.abort());
+			const preview = buildScrapePreviewDocument(
+				{
+					id: "fixture",
+					status: "completed",
+					mode: "html",
+					sourceUrl: "https://page.example/",
+					html: '<html><head><script src="https://telemetry.example/track.js"></script></head><body><h1>Visible content</h1><img src="/missing.png"></body></html>',
+				},
+				"owner",
+				"https://app.example",
+				Date.now(),
+				"browser fixture secret with enough entropy",
+			);
+			await page.setContent(
+				'<script>window.reports=[];addEventListener("message",e=>window.reports.push(e.data))</script><iframe sandbox="allow-scripts"></iframe>',
+			);
+			await page
+				.locator("iframe")
+				.evaluate(
+					(frame, doc) => frame.setAttribute("srcdoc", doc),
+					preview?.srcDoc ?? "",
+				);
+			await page.waitForFunction(() =>
+				Reflect.get(window, "reports").some(
+					(report: { state: string }) => report.state === "degraded",
+				),
+			);
+			expect(requests).toHaveLength(1);
+			expect(new URL(requests[0]).pathname).toBe("/api/scrape/asset");
+			expect(requests.some((url) => url.includes("telemetry.example"))).toBe(
+				false,
+			);
+		} finally {
+			await browser.close();
+		}
+	}, 30_000);
 	it("loads signed static, literal dynamic, and nested modules from an opaque iframe", async () => {
 		const secret = "module fixture secret with enough entropy";
 		const options = {
