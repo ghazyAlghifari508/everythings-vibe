@@ -96,4 +96,12 @@ describe("rewritePreviewAssets", () => {
 		expect(rewritten).toContain("MutationObserver");
 		expect(rewritten).toContain("/api/scrape/asset?url=");
 	});
+
+	it("observes childList only so animations do not retrigger asset rewriting", () => {
+		const raw = `<html><head></head><body></body></html>`;
+		const rewritten = rewritePreviewAssets(raw, "https://example.com");
+		expect(rewritten).toContain("childList:true");
+		expect(rewritten).not.toContain("attributes:true");
+		expect(rewritten).not.toContain("attributeFilter");
+	});
 });
