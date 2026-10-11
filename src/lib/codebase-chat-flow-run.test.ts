@@ -5,6 +5,7 @@ import {
 	CODEBASE_STAGE_DONE_LABEL,
 	isRunWorking,
 	resetRunThinking,
+	resolveResumeStage,
 	runDurationSeconds,
 	settleRun,
 	shouldAutoRevealArtifact,
@@ -99,5 +100,67 @@ describe("automatic artifact reveal", () => {
 		expect(
 			shouldAutoRevealArtifact({ persisted: false, userTookOverCanvas: true }),
 		).toBe(false);
+	});
+});
+
+describe("resume stage after refresh", () => {
+	it("resumes at the furthest persisted artifact", () => {
+		expect(
+			resolveResumeStage({
+				hasFeatureTree: true,
+				hasPrd: true,
+				hasAc: true,
+				hasTasks: true,
+			}),
+		).toBe("handoff");
+		expect(
+			resolveResumeStage({
+				hasFeatureTree: true,
+				hasPrd: true,
+				hasAc: true,
+				hasTasks: false,
+			}),
+		).toBe("ac");
+		expect(
+			resolveResumeStage({
+				hasFeatureTree: true,
+				hasPrd: true,
+				hasAc: false,
+				hasTasks: false,
+			}),
+		).toBe("prd");
+		expect(
+			resolveResumeStage({
+				hasFeatureTree: true,
+				hasPrd: false,
+				hasAc: false,
+				hasTasks: false,
+			}),
+		).toBe("feature");
+	});
+
+	it("starts at the question stage before any artifact exists", () => {
+		expect(
+			resolveResumeStage({
+				hasFeatureTree: false,
+				hasPrd: false,
+				hasAc: false,
+				hasTasks: false,
+			}),
+		).toBe("questions");
+	});
+
+	it("never rewinds to an earlier artifact that also still exists", () => {
+		// A finished plan keeps its earlier documents readable; reopening must
+		// resume at Task, not at the feature tree that is still on disk.
+		const stage = resolveResumeStage({
+			hasFeatureTree: true,
+			hasPrd: true,
+			hasAc: true,
+			hasTasks: true,
+		});
+		expect(stage).not.toBe("feature");
+		expect(stage).not.toBe("prd");
+		expect(stage).not.toBe("ac");
 	});
 });

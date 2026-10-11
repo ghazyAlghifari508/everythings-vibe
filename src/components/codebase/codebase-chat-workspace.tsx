@@ -11,6 +11,7 @@ import {
 	type AdaptiveQuestionOption,
 	areAllQuestionsAnswered,
 	CODEBASE_STAGE_DONE_LABEL,
+	type CodebasePipelineStage,
 	type CodebaseRunState,
 	nextQuestionIndex,
 } from "@/lib/codebase-chat-flow";
@@ -45,13 +46,8 @@ export interface ChatStreamMessage {
 	content: string;
 }
 
-export type PipelineStage =
-	| "questions"
-	| "feature"
-	| "prd"
-	| "ac"
-	| "task"
-	| "handoff";
+/** Workspace pipeline position; the canonical union lives in the flow module. */
+export type PipelineStage = CodebasePipelineStage;
 
 interface CodebaseChatWorkspaceProps {
 	featureName: string;

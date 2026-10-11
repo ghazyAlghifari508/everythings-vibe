@@ -436,6 +436,26 @@ describe("ask options repository grounding", () => {
 	});
 });
 
+describe("workspace resume after refresh", () => {
+	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+
+	it("derives the resume stage from persisted artifacts, not from a guess", () => {
+		expect(workspaceSource).toContain("resolveResumeStage({");
+		expect(workspaceSource).toMatch(/hasFeatureTree: featureTree !== null/);
+		expect(workspaceSource).toMatch(/hasPrd: prdContent !== null/);
+		expect(workspaceSource).toMatch(/hasAc: acContent !== null/);
+		expect(workspaceSource).toMatch(/hasTasks: hasTasksInDb/);
+	});
+
+	it("advances the visible stage forward only, never rewinding it", () => {
+		// A late artifact load must not pull a project that already advanced
+		// back to an earlier stage while the user is working.
+		expect(workspaceSource).toMatch(
+			/current === "questions" && derivedStage !== "questions"[\s\S]*?derivedStage[\s\S]*?: current/,
+		);
+	});
+});
+
 describe("automatic artifact preview", () => {
 	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
 

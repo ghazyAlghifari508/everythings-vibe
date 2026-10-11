@@ -41,12 +41,14 @@ import {
 	type AdaptiveQuestion,
 	appendRunThinking,
 	buildFeatureMessage,
+	type CodebasePipelineStage,
 	type CodebaseRunStage,
 	type CodebaseRunState,
 	mapAskQuestionsToAdaptive,
 	parseRestoredAnswers,
 	parseRestoredQuestions,
 	resetRunThinking,
+	resolveResumeStage,
 	restoreAskState,
 	runConfirmGenerate,
 	serializeAskQuestions,
@@ -1041,15 +1043,15 @@ function CodebaseDetailPage() {
 		(kanbanProgress && kanbanProgress.total > 0) || taskTree !== null,
 	);
 
-	const derivedStage: PipelineStage = hasTasksInDb
-		? "handoff"
-		: acContent
-			? "ac"
-			: prdContent
-				? "prd"
-				: featureTree
-					? "feature"
-					: "questions";
+	// The stage a reopened workspace resumes at is derived from the artifacts
+	// that are actually persisted, so a refresh or History re-entry continues
+	// where the project really is instead of restarting the pipeline.
+	const derivedStage: CodebasePipelineStage = resolveResumeStage({
+		hasFeatureTree: featureTree !== null,
+		hasPrd: prdContent !== null,
+		hasAc: acContent !== null,
+		hasTasks: hasTasksInDb,
+	});
 	const stage = pipelineStage;
 	useEffect(() => {
 		setPipelineStage((current) =>

@@ -6,6 +6,14 @@ export interface FlowQuestion {
 export type CodebaseRunStage = "questions" | "feature" | "prd" | "ac" | "task";
 
 /**
+ * Where the workspace is in the pipeline. Differs from `CodebaseRunStage` at
+ * the end: `handoff` means the task plan is stored and the project is ready for
+ * an AI coding agent, while the `task` run stage means task generation itself
+ * is in flight.
+ */
+export type CodebasePipelineStage = CodebaseRunStage | "handoff";
+
+/**
  * What the workspace knows about one in-flight or finished AI request.
  *
  * Every field is a client-observable fact: when the request actually started,
@@ -143,6 +151,38 @@ export interface AutoRevealInput {
  */
 export function shouldAutoRevealArtifact(input: AutoRevealInput): boolean {
 	return input.persisted && !input.userTookOverCanvas;
+}
+
+export interface ResumeStageInput {
+	/** A feature tree is persisted for this project. */
+	hasFeatureTree: boolean;
+	/** A PRD version is persisted for this project. */
+	hasPrd: boolean;
+	/** An Acceptance Criteria version is persisted for this project. */
+	hasAc: boolean;
+	/**
+	 * Task rows exist in the database, or a task tree is readable. Either one
+	 * means the project reached the handoff stage.
+	 */
+	hasTasks: boolean;
+}
+
+/**
+ * The stage a reopened workspace must resume at, derived from the artifacts
+ * that are actually persisted.
+ *
+ * Ordered by pipeline progress, so a project that already reached Task reopens
+ * at handoff rather than rewinding to an earlier artifact that still exists.
+ * This is what makes refresh and History re-entry resume instead of restarting.
+ */
+export function resolveResumeStage(
+	input: ResumeStageInput,
+): CodebasePipelineStage {
+	if (input.hasTasks) return "handoff";
+	if (input.hasAc) return "ac";
+	if (input.hasPrd) return "prd";
+	if (input.hasFeatureTree) return "feature";
+	return "questions";
 }
 
 export type AskQuestionType = "select" | "text" | "multiselect";
