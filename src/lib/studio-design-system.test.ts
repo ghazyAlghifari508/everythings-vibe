@@ -50,6 +50,29 @@ const sampleDesignMd = `# MindMarket — Style Reference
 `;
 
 describe("Studio Design System", () => {
+	it("reads the import modal's three-column color format and explicit font without inventing missing tokens", () => {
+		const tokens = extractDesignSystemTokens(
+			"# Sample\n| Name | Hex | Role |\n| Canvas | #ececec | Background |\n| Primary | #224488 | Brand |\nFont: Arial\n### Components\n",
+		);
+		expect(tokens?.colors.canvas).toBe("#ececec");
+		expect(tokens?.colors.primary).toBe("#224488");
+		expect(tokens?.colors.muted).toBeNull();
+		expect(tokens?.typography.fontFamily).toContain("Arial");
+	});
+	it("replaces old enforced tokens when a reference changes", () => {
+		const first = enforceDesignSystemOnHtml(
+			"<html><head></head><body></body></html>",
+			extractDesignSystemTokens(sampleDesignMd),
+		);
+		const next = enforceDesignSystemOnHtml(
+			first,
+			extractDesignSystemTokens(
+				"# Sample\n| Canvas | #eeeeee | --canvas | Background |\nFont: Arial",
+			),
+		);
+		expect(next).toContain("--canvas-bg: #eeeeee");
+		expect(next).not.toContain("--canvas-bg: #f5f1e4");
+	});
 	it("extracts canonical colors, fonts, and border radius from DESIGN.md", () => {
 		const tokens = extractDesignSystemTokens(sampleDesignMd);
 		expect(tokens).not.toBeNull();

@@ -68,14 +68,14 @@ export function extractDesignSystemTokens(
 	// 1. Extract Color Tokens
 	// Match table rows: | Name | `#hex` or #hex | `token` or token | Role |
 	const tableRowRegex =
-		/\|\s*([^|\r\n]+?)\s*\|\s*`?(#[0-9a-fA-F]{3,8})`?\s*\|\s*`?([^\r\n|]*?)`?\s*\|\s*([^|\r\n]*?)\s*\|/g;
+		/^\|[ \t]*([^|\r\n]+?)[ \t]*\|[ \t]*`?(#[0-9a-fA-F]{3,8})`?[ \t]*\|[ \t]*([^|\r\n]*?)[ \t]*\|(?:[ \t]*([^|\r\n]*?)[ \t]*\|)?/gm;
 	let rowMatch: RegExpExecArray | null = null;
 	while (true) {
 		rowMatch = tableRowRegex.exec(text);
 		if (!rowMatch) break;
 		const name = rowMatch[1].trim();
 		const hex = rowMatch[2].trim().toLowerCase();
-		const role = (rowMatch[4] || "").toLowerCase();
+		const role = (rowMatch[4] || rowMatch[3] || "").toLowerCase();
 
 		if (
 			!colors.primary &&
@@ -133,11 +133,11 @@ export function extractDesignSystemTokens(
 	// 2. Extract Typography
 	// Look for font mentions e.g. "### Inter", "Font: Poppins", "font-family: '...'"
 	const fontMatch =
-		text.match(/###\s*([A-Za-z0-9\s_-]+?)(?:\s*—|\s*\(|\s*\n)/i) ||
 		text.match(
-			/font(?:-family)?[:\s]+['"]?([A-Za-z0-9\s_-]+?)['"]?(?:[,;\n]|$)/i,
+			/font(?:-family)?\s*:\s*['"]?([A-Za-z0-9 _-]+?)['"]?(?:[,;\n]|$)/i,
 		) ||
-		text.match(/\*\*Font:\*\*\s*([A-Za-z0-9\s_-]+)/i);
+		text.match(/\*\*Font:\*\*\s*([A-Za-z0-9 _-]+)/i) ||
+		text.match(/###\s*([A-Za-z0-9 _-]+?)(?:\s*—|\s*\()/i);
 
 	if (fontMatch?.[1]) {
 		const rawFont = fontMatch[1].trim();
@@ -271,7 +271,7 @@ ${tokens.shapes.borderRadius.cards ? `.card, [data-card] { border-radius: ${toke
 		twColors[slug] = val;
 	}
 
-	const twConfigScript = `<script>
+	const twConfigScript = `<script id="studio-tailwind-tokens">
 tailwind.config = {
   theme: {
     extend: {
@@ -293,6 +293,17 @@ export function enforceDesignSystemOnHtml(
 	logoUrl?: string | null,
 ): string {
 	let output = html;
+	if (tokens) {
+		output = output
+			.replace(
+				/<style\b[^>]*id=["']studio-design-tokens["'][^>]*>[\s\S]*?<\/style>/gi,
+				"",
+			)
+			.replace(
+				/<script\b[^>]*id=["']studio-tailwind-tokens["'][^>]*>[\s\S]*?<\/script>/gi,
+				"",
+			);
+	}
 
 	// 1. Inject design system tokens into <head> if tokens exist
 	if (tokens && !output.includes("studio-design-tokens")) {
