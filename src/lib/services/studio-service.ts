@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertStudioAssetRow,
@@ -402,6 +402,15 @@ export async function runStudioJobPipeline(
 	activeStudioJobs.add(jobId);
 
 	try {
+		const [operation] = await db
+			.select()
+			.from(studioJobs)
+			.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)))
+			.limit(1);
+		if (operation && operation.jobType !== "initial") {
+			await runStudioFrameOperation(operation);
+			return;
+		}
 		const [job] = await db
 			.select()
 			.from(studioJobs)
@@ -787,6 +796,21 @@ export async function getStudioProjectDetail(
 		.limit(1);
 
 	const activeJob = jobs[0] ?? null;
+	const pendingOperations = await db
+		.select()
+		.from(studioJobs)
+		.where(
+			and(
+				eq(studioJobs.projectId, projectId),
+				eq(studioJobs.userId, userId),
+				inArray(studioJobs.status, ["queued", "generating"]),
+			),
+		)
+		.orderBy(asc(studioJobs.createdAt))
+		.limit(100);
+	for (const operation of pendingOperations)
+		if (operation.jobType !== "initial")
+			void runStudioJobPipeline(operation.id, projectId, userId);
 
 	// Background job recovery check: auto-resume if queued or stalled
 	if (
@@ -1379,6 +1403,329 @@ export async function getStudioFrameVisual(
 		height: visual.height,
 		hash,
 	};
+}
+
+export async function enqueueStudioOperation(
+	projectId: string,
+	userId: string,
+	input: {
+		action: "add" | "revise" | "project";
+		prompt: string;
+		frameIds?: string[];
+		requestId: string;
+	},
+) {
+	const checked = validateStudioPrompt(input.prompt);
+	if (!checked.ok) throw new ScrapeError("INVALID_URL", checked.error);
+	const accepted = await db.transaction(async (tx) => {
+		const [project] = await tx
+			.select()
+			.from(studioProjects)
+			.where(
+				and(
+					eq(studioProjects.id, projectId),
+					eq(studioProjects.userId, userId),
+				),
+			)
+			.for("update");
+		if (!project)
+			throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+		const frames = await tx
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, projectId))
+			.orderBy(asc(studioFrames.order));
+		const ids =
+			input.action === "project"
+				? frames.map((frame) => frame.id)
+				: [...new Set(input.frameIds ?? [])];
+		if (
+			input.action !== "add" &&
+			(!ids.length ||
+				ids.some((id) => !frames.some((frame) => frame.id === id)))
+		)
+			throw new ScrapeError(
+				"INVALID_URL",
+				"Pilihan frame tidak valid untuk project ini.",
+			);
+		const targets: StudioFrameRow[] = [];
+		if (input.action === "add") {
+			const repeated = await tx
+				.select()
+				.from(studioJobs)
+				.where(
+					and(
+						eq(studioJobs.id, `${input.requestId}:add`),
+						eq(studioJobs.userId, userId),
+					),
+				)
+				.limit(1);
+			if (repeated.length) return { jobs: repeated };
+			const [frame] = await tx
+				.insert(studioFrames)
+				.values({
+					projectId,
+					name: "Menamai layar baru…",
+					description: checked.prompt,
+					viewport: project.designMode,
+					order: (frames.at(-1)?.order ?? -1) + 1,
+					status: "queued",
+				} satisfies InsertStudioFrameRow)
+				.returning();
+			if (!frame) throw new ScrapeError("STORAGE_FAILED");
+			targets.push(frame);
+		} else {
+			targets.push(...frames.filter((frame) => ids.includes(frame.id)));
+		}
+		const jobs: StudioJobRow[] = [];
+		for (const frame of targets) {
+			const jobId = `${input.requestId}:${input.action === "add" ? "add" : frame.id}`;
+			const [existing] = await tx
+				.select()
+				.from(studioJobs)
+				.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)))
+				.limit(1);
+			if (existing) {
+				jobs.push(existing);
+				continue;
+			}
+			if (frame.status === "queued" || frame.status === "generating") {
+				if (input.action !== "add")
+					throw new ScrapeError(
+						"INVALID_URL",
+						"Frame masih diproses. Tunggu hasilnya sebelum mengirim perubahan baru.",
+					);
+			}
+			const [job] = await tx
+				.insert(studioJobs)
+				.values({
+					id: jobId,
+					projectId,
+					userId,
+					prompt: checked.prompt,
+					jobType: input.action === "add" ? "add" : "revise",
+					targetFrameId: frame.id,
+					status: "queued",
+				} satisfies InsertStudioJobRow)
+				.returning();
+			if (!job) throw new ScrapeError("STORAGE_FAILED");
+			await tx
+				.update(studioFrames)
+				.set({ status: "queued", error: null, updatedAt: new Date() })
+				.where(
+					and(
+						eq(studioFrames.id, frame.id),
+						eq(studioFrames.projectId, projectId),
+					),
+				);
+			jobs.push(job);
+		}
+		return { jobs };
+	});
+	for (const job of accepted.jobs)
+		void runStudioJobPipeline(job.id, projectId, userId);
+	return accepted;
+}
+
+async function runStudioFrameOperation(job: StudioJobRow) {
+	await db.transaction(async (tx) => {
+		const slot = await tx.execute<{ acquired: boolean }>(
+			sql`select pg_try_advisory_xact_lock(hashtext('studio-frame-worker')) as acquired`,
+		);
+		if (!slot.rows[0]?.acquired) return;
+		await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${job.id}))`);
+		const [current] = await tx
+			.select()
+			.from(studioJobs)
+			.where(and(eq(studioJobs.id, job.id), eq(studioJobs.userId, job.userId)))
+			.limit(1);
+		if (
+			!current ||
+			current.status === "completed" ||
+			current.status === "failed"
+		)
+			return;
+		const [project] = await tx
+			.select()
+			.from(studioProjects)
+			.where(
+				and(
+					eq(studioProjects.id, job.projectId),
+					eq(studioProjects.userId, job.userId),
+				),
+			)
+			.limit(1);
+		if (!project || !job.targetFrameId)
+			throw new ScrapeError(
+				"WEBSITE_BLOCKED",
+				"Target operasi tidak ditemukan.",
+			);
+		const frames = await tx
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, project.id))
+			.orderBy(asc(studioFrames.order));
+		const frame = frames.find((entry) => entry.id === job.targetFrameId);
+		if (!frame)
+			throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
+		await db
+			.update(studioJobs)
+			.set({ status: "generating", updatedAt: new Date() })
+			.where(and(eq(studioJobs.id, job.id), eq(studioJobs.userId, job.userId)));
+		await db
+			.update(studioFrames)
+			.set({ status: "generating", updatedAt: new Date() })
+			.where(
+				and(
+					eq(studioFrames.id, frame.id),
+					eq(studioFrames.projectId, project.id),
+				),
+			);
+		try {
+			const [original] = await tx
+				.select()
+				.from(studioJobs)
+				.where(
+					and(
+						eq(studioJobs.projectId, project.id),
+						eq(studioJobs.userId, job.userId),
+						eq(studioJobs.jobType, "initial"),
+					),
+				)
+				.orderBy(asc(studioJobs.createdAt))
+				.limit(1);
+			let name = frame.name;
+			if (job.jobType === "add") {
+				const { generator, firstChunk } = await tryStreamWithFallback(
+					selectModels(),
+					[
+						{
+							role: "system",
+							content:
+								'Name the requested new application screen. Return only JSON {"name": string} with a concise meaningful screen name.',
+						},
+						{
+							role: "user",
+							content: `Project: ${original?.prompt ?? project.title}\nExisting screens: ${frames.map((entry) => entry.name).join(", ")}\nRequest: ${job.prompt}`,
+						},
+					],
+					undefined,
+					1000,
+				);
+				let raw = firstChunk;
+				for await (const chunk of generator) raw += chunk;
+				const parsed: unknown = JSON.parse(
+					raw.replace(/^```(?:json)?\s*|\s*```$/g, "").trim(),
+				);
+				if (
+					typeof parsed !== "object" ||
+					parsed === null ||
+					!("name" in parsed) ||
+					typeof parsed.name !== "string" ||
+					!parsed.name.trim()
+				)
+					throw new ScrapeError(
+						"AI_GENERATION_FAILED",
+						"AI tidak menghasilkan nama layar yang valid.",
+					);
+				name = parsed.name.trim().slice(0, 100);
+				await db
+					.update(studioFrames)
+					.set({ name })
+					.where(
+						and(
+							eq(studioFrames.id, frame.id),
+							eq(studioFrames.projectId, project.id),
+						),
+					);
+			}
+			const logoUrl = project.logoAssetId
+				? buildStudioAssetUrl(project.logoAssetId, job.userId)
+				: null;
+			const prompt = buildStudioFramePrompt({
+				screenName: name,
+				screenDescription: frame.description ?? undefined,
+				allScreens: frames.map((entry) =>
+					entry.id === frame.id ? name : entry.name,
+				),
+				projectPrompt: original?.prompt ?? project.title,
+				designMode: validateStudioDesignMode(frame.viewport),
+				designMd: project.designMd,
+				logoUrl,
+				previousHtml:
+					job.jobType === "revise" ? (frame.htmlCode ?? undefined) : undefined,
+			});
+			const raw = await generateStudioHtml(
+				`${prompt}\n\nUSER CHANGE INSTRUCTION: ${job.prompt}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
+			);
+			const htmlCode = enforceDesignSystemOnHtml(
+				raw,
+				extractDesignSystemTokens(project.designMd),
+				logoUrl,
+			);
+			await tx
+				.update(studioFrames)
+				.set({
+					name,
+					htmlCode,
+					status: "ready",
+					error: null,
+					updatedAt: new Date(),
+				})
+				.where(
+					and(
+						eq(studioFrames.id, frame.id),
+						eq(studioFrames.projectId, project.id),
+					),
+				);
+			await tx
+				.select()
+				.from(studioProjects)
+				.where(
+					and(
+						eq(studioProjects.id, project.id),
+						eq(studioProjects.userId, job.userId),
+					),
+				)
+				.for("update");
+			const [latest] = await tx
+				.select()
+				.from(studioRevisions)
+				.where(eq(studioRevisions.projectId, project.id))
+				.orderBy(desc(studioRevisions.version))
+				.limit(1);
+			await tx.insert(studioRevisions).values({
+				projectId: project.id,
+				prompt: job.prompt,
+				htmlCode,
+				version: (latest?.version ?? 0) + 1,
+			} satisfies InsertStudioRevisionRow);
+			await tx
+				.update(studioJobs)
+				.set({ status: "completed", error: null, updatedAt: new Date() })
+				.where(
+					and(eq(studioJobs.id, job.id), eq(studioJobs.userId, job.userId)),
+				);
+		} catch (failure) {
+			const error =
+				failure instanceof Error ? failure.message : "AI gagal membuat layar.";
+			await tx
+				.update(studioFrames)
+				.set({ status: "failed", error, updatedAt: new Date() })
+				.where(
+					and(
+						eq(studioFrames.id, frame.id),
+						eq(studioFrames.projectId, project.id),
+					),
+				);
+			await tx
+				.update(studioJobs)
+				.set({ status: "failed", error, updatedAt: new Date() })
+				.where(
+					and(eq(studioJobs.id, job.id), eq(studioJobs.userId, job.userId)),
+				);
+		}
+	});
 }
 
 export async function generateStudioHtml(

@@ -235,14 +235,20 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 				expect.objectContaining({
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "revise",
-						projectId: "proj-1",
-						frameId: "f-1",
-						prompt: "Ubah tombol jadi warna hitam",
-					}),
+					body: expect.any(String),
 				}),
 			);
+		});
+		const operationCall = fetchMock.mock.calls.find(
+			(call) => call[1]?.method === "POST",
+		);
+		const requestBody: unknown = JSON.parse(operationCall?.[1].body);
+		expect(requestBody).toMatchObject({
+			action: "operation",
+			projectId: "proj-1",
+			scope: "revise",
+			frameIds: ["f-1"],
+			prompt: "Ubah tombol jadi warna hitam",
 		});
 	});
 });

@@ -35,15 +35,20 @@ export function StudioComposer({
 }: StudioComposerProps) {
 	const [prompt, setPrompt] = useState("");
 	const [adding, setAdding] = useState(false);
+	const [projectScope, setProjectScope] = useState(false);
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState("");
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const pending = useRef(false);
-	const scope =
-		(selectedFrameName || selectedFrames.length) && !adding ? "revise" : "add";
+	const scope = projectScope
+		? "project"
+		: (selectedFrameName || selectedFrames.length) && !adding
+			? "revise"
+			: "add";
 
 	useEffect(() => {
 		if (selectedFrameName) setAdding(false);
+		if (selectedFrameName) setProjectScope(false);
 	}, [selectedFrameName]);
 	useEffect(() => {
 		const input = inputRef.current;
@@ -112,6 +117,7 @@ export function StudioComposer({
 							aria-pressed={adding}
 							onClick={() => {
 								setAdding(true);
+								setProjectScope(false);
 								inputRef.current?.focus();
 							}}
 							className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 disabled:opacity-50"
@@ -120,6 +126,19 @@ export function StudioComposer({
 							Tambah Halaman
 						</button>
 						{designSystemControl}
+						<button
+							type="button"
+							aria-pressed={projectScope}
+							disabled={loading || sending}
+							onClick={() => {
+								setProjectScope(true);
+								setAdding(false);
+								inputRef.current?.focus();
+							}}
+							className="min-h-9 rounded-lg px-2 text-xs text-fog hover:bg-steel focus-visible:outline-2"
+						>
+							Seluruh project
+						</button>
 					</div>
 					{!adding && selectedFrames.length > 0 ? (
 						<div className="flex max-h-20 flex-wrap gap-2 overflow-y-auto">

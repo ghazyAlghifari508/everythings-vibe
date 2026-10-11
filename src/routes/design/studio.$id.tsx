@@ -192,44 +192,29 @@ function StudioDetailPage() {
 		setComposerLoading(true);
 		setError("");
 		try {
-			if (selectedFrameId && scope === "revise") {
-				const res = await fetch("/api/studio/frame", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "revise",
-						projectId: project.id,
-						frameId: selectedFrameId,
-						prompt: promptText,
-					}),
-				});
-				if (!res.ok) {
-					const data = (await res.json().catch(() => null)) as {
-						error?: string;
-					} | null;
-					setError(data?.error ?? "Gagal merevisi layar.");
-					return false;
-				}
-			} else {
-				// Add frame or project-wide revision
-				const res = await fetch("/api/studio/frame", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "add",
-						projectId: project.id,
-						name: `Layar ${frames.length + 1}`,
-						prompt: promptText,
-						viewport: project.designMode,
-					}),
-				});
-				if (!res.ok) {
-					const data = (await res.json().catch(() => null)) as {
-						error?: string;
-					} | null;
-					setError(data?.error ?? "Gagal menambahkan layar.");
-					return false;
-				}
+			const res = await fetch("/api/studio/frame", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "operation",
+					projectId: project.id,
+					scope,
+					frameIds: scope === "revise" ? selectedFrameIds : undefined,
+					prompt: promptText,
+					requestId: crypto.randomUUID(),
+				}),
+			});
+			if (!res.ok) {
+				const data: unknown = await res.json().catch(() => null);
+				setError(
+					typeof data === "object" &&
+						data !== null &&
+						"error" in data &&
+						typeof data.error === "string"
+						? data.error
+						: "Permintaan desain ditolak.",
+				);
+				return false;
 			}
 			await syncProjectStatus();
 			return true;

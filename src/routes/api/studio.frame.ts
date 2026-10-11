@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ScrapeError } from "@/lib/design-errors";
 import {
 	addStudioFrame,
+	enqueueStudioOperation,
 	getStudioFrameVisual,
 	retryStudioFrame,
 	retryStudioPlanning,
@@ -65,6 +66,14 @@ export async function GET({
 
 export const studioFrameBodySchema = z.discriminatedUnion("action", [
 	z.object({
+		action: z.literal("operation"),
+		projectId: z.string().min(1),
+		scope: z.enum(["add", "revise", "project"]),
+		prompt: z.string().min(10).max(4000),
+		frameIds: z.array(z.string().min(1)).max(100).optional(),
+		requestId: z.string().uuid(),
+	}),
+	z.object({
 		action: z.literal("add"),
 		projectId: z.string().min(1),
 		name: z.string().min(1).max(100),
@@ -104,6 +113,15 @@ export async function POST({
 			);
 		}
 		const body = parseRes.data;
+		if (body.action === "operation") {
+			const accepted = await enqueueStudioOperation(body.projectId, user.id, {
+				action: body.scope,
+				prompt: body.prompt,
+				frameIds: body.frameIds,
+				requestId: body.requestId,
+			});
+			return Response.json(accepted, { status: 202 });
+		}
 
 		if (body.action === "add") {
 			const frame = await addStudioFrame(body.projectId, user.id, {
