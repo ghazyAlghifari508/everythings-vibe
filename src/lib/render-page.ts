@@ -10,6 +10,10 @@ import {
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
 import {
+	DESIGN_EVIDENCE_LIMITS,
+	visualEvidenceSchema,
+} from "@/lib/design-evidence-contract";
+import {
 	collectVisualEvidence,
 	type VisualEvidence,
 } from "@/lib/design-visual-evidence";
@@ -499,7 +503,9 @@ export async function renderPage(
 			);
 		const visualEvidence =
 			mode === "design"
-				? await page.evaluate(collectVisualEvidence)
+				? visualEvidenceSchema.parse(
+						await page.evaluate(collectVisualEvidence, DESIGN_EVIDENCE_LIMITS),
+					)
 				: undefined;
 		return {
 			html,

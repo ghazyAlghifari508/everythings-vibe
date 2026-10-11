@@ -1,3 +1,7 @@
+import {
+	DESIGN_EVIDENCE_LIMITS,
+	visualEvidenceSchema,
+} from "./design-evidence-contract";
 import type { DesignExtraction } from "./design-extraction";
 
 export interface VisualElementEvidence {
@@ -7,11 +11,13 @@ export interface VisualElementEvidence {
 	width: number;
 	height: number;
 	properties: Record<string, string>;
+	variables?: Record<string, string>;
 }
 
 export function extractionFromVisualEvidence(
 	evidence: VisualEvidence,
 ): DesignExtraction {
+	visualEvidenceSchema.parse(evidence);
 	const colors = new Map<string, { role: string; value: string }>();
 	const typographyRoles: NonNullable<DesignExtraction["typographyRoles"]> = [];
 	const ctaButtons: NonNullable<DesignExtraction["ctaButtons"]> = [];
@@ -41,7 +47,7 @@ export function extractionFromVisualEvidence(
 						? "border"
 						: element.role === "cta"
 							? "cta-background"
-							: element.role === "body"
+							: element.role === "canvas"
 								? "canvas"
 								: "surface";
 			const key = `${role}:${value}`;
@@ -106,7 +112,10 @@ export function extractionFromVisualEvidence(
 			maxWidths: [],
 			lineHeights: [],
 			letterSpacing: [],
-			cssVariables: {},
+			cssVariables: Object.assign(
+				{},
+				...evidence.elements.map((element) => element.variables ?? {}),
+			),
 		},
 		metadata: {
 			pagesAnalyzed: [evidence.sourceUrl],
@@ -213,7 +222,9 @@ export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 	return lines.join("\n");
 }
 
-export function collectVisualEvidence(): VisualEvidence {
+export function collectVisualEvidence(
+	limits = DESIGN_EVIDENCE_LIMITS,
+): VisualEvidence {
 	const elements: VisualElementEvidence[] = [];
 	const walker = document.createTreeWalker(
 		document.documentElement,
@@ -242,10 +253,27 @@ export function collectVisualEvidence(): VisualEvidence {
 		"max-width",
 		"display",
 	];
-	while (walker.nextNode() && scanned < 5000 && elements.length < 250) {
+	const candidates: HTMLElement[] = [];
+	while (walker.nextNode() && scanned < limits.scanElements) {
 		scanned += 1;
-		const element = walker.currentNode;
-		if (!(element instanceof HTMLElement)) continue;
+		if (walker.currentNode instanceof HTMLElement)
+			candidates.push(walker.currentNode);
+	}
+	candidates.sort(
+		(a, b) =>
+			Number(
+				b.matches(
+					"body, header, nav, main, h1, h2, h3, p, button, a, section, footer",
+				),
+			) -
+			Number(
+				a.matches(
+					"body, header, nav, main, h1, h2, h3, p, button, a, section, footer",
+				),
+			),
+	);
+	for (const element of candidates) {
+		if (elements.length >= limits.elements) break;
 		const style = getComputedStyle(element);
 		const rect = element.getBoundingClientRect();
 		if (
@@ -280,17 +308,31 @@ export function collectVisualEvidence(): VisualEvidence {
 				? "nav"
 				: /^h[1-6]$/.test(tag)
 					? tag
-					: tag === "p" || tag === "body"
-						? "body"
-						: element.matches("header, main, section, article, footer")
-							? tag
-							: "element";
+					: tag === "body"
+						? "canvas"
+						: tag === "p"
+							? "body"
+							: element.matches("header, main, section, article, footer")
+								? tag
+								: "element";
 		const values: Record<string, string> = {};
 		for (const property of properties)
-			values[property] = style.getPropertyValue(property).trim();
+			values[property] = style
+				.getPropertyValue(property)
+				.trim()
+				.slice(0, limits.valueChars);
+		const variables: Record<string, string> = {};
+		for (const property of Array.from(style)) {
+			if (Object.keys(variables).length >= limits.variables) break;
+			if (/^--[\w-]+$/.test(property))
+				variables[property] = style
+					.getPropertyValue(property)
+					.trim()
+					.slice(0, limits.valueChars);
+		}
 		const path: string[] = [];
 		let current: Element | null = element;
-		while (current && path.length < 12) {
+		while (current && path.join(" > ").length < limits.selectorChars - 100) {
 			const siblings = current.parentElement
 				? Array.from(current.parentElement.children)
 				: [current];
@@ -306,6 +348,7 @@ export function collectVisualEvidence(): VisualEvidence {
 			width: rect.width,
 			height: rect.height,
 			properties: values,
+			variables,
 		});
 	}
 	return {
@@ -315,7 +358,7 @@ export function collectVisualEvidence(): VisualEvidence {
 		viewport: { width: innerWidth, height: innerHeight },
 		elements,
 		fonts: Array.from(document.fonts)
-			.slice(0, 50)
+			.slice(0, limits.fonts)
 			.map((font) => ({
 				family: font.family,
 				weight: font.weight,
@@ -324,7 +367,8 @@ export function collectVisualEvidence(): VisualEvidence {
 		limitations: [
 			"Single viewport; responsive and interaction states were not measured.",
 			"Computed font-family is a stack; selected glyph font is not verified.",
-			...(scanned >= 5000 || elements.length >= 250
+			"Pseudo-elements, third-party overlays and glyph-level font selection are not verified.",
+			...(scanned >= limits.scanElements || elements.length >= limits.elements
 				? ["DOM sampling limit reached."]
 				: []),
 		],
