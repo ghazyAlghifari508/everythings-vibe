@@ -353,8 +353,13 @@ export async function runScrapePipeline(
 					: mode === "crawl" || mode === "images"
 						? "Ekstraksi website terhenti. Hasil yang sudah disimpan tetap tersedia."
 						: "Gagal memproses visual website.";
+		// Unknown failures are reported as unexpected rather than as a website
+		// block, so a crash in our own pipeline is never disguised as a site
+		// refusal the user cannot act on.
 		const errorDetail =
-			error instanceof ScrapeError ? error.code : "WEBSITE_BLOCKED";
+			error instanceof ScrapeError ? error.code : "UNEXPECTED_ERROR";
+		const retryAfterSeconds =
+			error instanceof ScrapeError ? error.retryAfterSeconds : undefined;
 
 		await db
 			.update(scrapes)
@@ -368,6 +373,7 @@ export async function runScrapePipeline(
 						stageStartedAt: new Date().toISOString(),
 						errorMessage,
 						errorDetail,
+						...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
 					},
 				)}::jsonb`,
 				updatedAt: new Date(),

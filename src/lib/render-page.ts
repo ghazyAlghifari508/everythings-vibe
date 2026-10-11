@@ -8,7 +8,11 @@ import {
 	SCRAPE_DESKTOP_WIDTH,
 	SCRAPE_MAX_HTML_BYTES,
 } from "@/lib/constants";
-import { ScrapeError } from "@/lib/design-errors";
+import {
+	designErrorCodeForHttpStatus,
+	parseRetryAfterSeconds,
+	ScrapeError,
+} from "@/lib/design-errors";
 import {
 	DESIGN_EVIDENCE_LIMITS,
 	visualEvidenceSchema,
@@ -56,6 +60,25 @@ let browserPromise: Promise<Browser> | null = null;
 // "ReferenceError: __name is not defined" and the whole capture aborts.
 export const BROWSER_NAME_SHIM =
 	"if (typeof globalThis.__name !== 'function') globalThis.__name = (value) => value;";
+
+// Distinguishes upstream HTTP outcomes so the UI can name the real cause
+// instead of reporting every failure as an unverifiable website block.
+export function httpStatusMessage(
+	status: number,
+	retryAfterSeconds?: number,
+): string {
+	if (status === 429)
+		return retryAfterSeconds === undefined
+			? "Website membatasi jumlah permintaan (HTTP 429). Capture tidak dijalankan ulang agar tidak menambah beban situs."
+			: `Website membatasi jumlah permintaan (HTTP 429) dan meminta menunggu sekitar ${retryAfterSeconds} detik sebelum permintaan berikutnya.`;
+	if (status === 401 || status === 403)
+		return `Website menolak akses otomatis (HTTP ${status}). Halaman ini memerlukan akses resmi sehingga tidak dapat dipakai sebagai evidence.`;
+	if (status === 404 || status === 410)
+		return `Website membalas HTTP ${status}. Halaman tidak ditemukan.`;
+	if (status >= 500)
+		return `Website membalas HTTP ${status} dari sisi server situs. Coba lagi setelah situs pulih.`;
+	return `Website membalas HTTP ${status}. Capture tidak dapat dipakai sebagai evidence.`;
+}
 
 async function getBrowser(): Promise<Browser> {
 	if (!browserPromise) {
@@ -301,6 +324,7 @@ export async function renderPage(
 		const page = await context.newPage();
 		onTiming?.("browserContext", Date.now() - setupStart);
 		let status = 0;
+		let retryAfterHeader: string | undefined;
 		try {
 			await onActivity?.("Membuka website");
 			const navStart = Date.now();
@@ -310,6 +334,7 @@ export async function renderPage(
 			});
 			onTiming?.("navigation", Date.now() - navStart);
 			status = res?.status() ?? 0;
+			retryAfterHeader = res?.headers()["retry-after"];
 			await onActivity?.("Halaman berhasil dimuat");
 			await onActivity?.("Menunggu resource halaman");
 			let t = Date.now();
@@ -336,11 +361,14 @@ export async function renderPage(
 			if (err instanceof ScrapeError) throw err;
 		}
 		const contentStart = Date.now();
-		if (status >= 400)
+		if (status >= 400) {
+			const retryAfterSeconds = parseRetryAfterSeconds(retryAfterHeader);
 			throw new ScrapeError(
-				"WEBSITE_BLOCKED",
-				`Website membalas HTTP ${status}. Capture tidak dapat dipakai sebagai evidence desain.`,
+				designErrorCodeForHttpStatus(status),
+				httpStatusMessage(status, retryAfterSeconds),
+				{ retryAfterSeconds },
 			);
+		}
 		if (status === 0 && /^https?:/i.test(url))
 			throw new ScrapeError(
 				"FETCH_TIMEOUT",

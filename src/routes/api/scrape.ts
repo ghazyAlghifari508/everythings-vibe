@@ -20,7 +20,12 @@ function scrapeErrorResponse(error: unknown): Response {
 					? 429
 					: error.code === "INVALID_URL" || error.code === "PRIVATE_URL_BLOCKED"
 						? 400
-						: error.code === "WEBSITE_BLOCKED" || error.code === "FETCH_TIMEOUT"
+						: error.code === "WEBSITE_BLOCKED" ||
+								error.code === "FETCH_TIMEOUT" ||
+								error.code === "WEBSITE_RATE_LIMITED" ||
+								error.code === "WEBSITE_ACCESS_DENIED" ||
+								error.code === "WEBSITE_NOT_FOUND" ||
+								error.code === "WEBSITE_SERVER_ERROR"
 							? 502
 							: 500;
 		return Response.json(

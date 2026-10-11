@@ -871,6 +871,8 @@ export interface ScrapeMetadata {
 	timings?: Record<string, number>;
 	errorMessage?: string;
 	errorDetail?: string;
+	// Only set when the upstream website supplied a usable Retry-After signal.
+	retryAfterSeconds?: number;
 	mode?: ScrapeMode;
 	visitedPages?: number;
 	discoveredPages?: number;
