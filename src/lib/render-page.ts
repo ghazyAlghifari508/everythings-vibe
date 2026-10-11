@@ -375,6 +375,40 @@ export async function renderPage(
 						return result;
 					}, options.measureResolution ?? true)
 				: undefined;
+		if (images && options.measureResolution !== false) {
+			for (const image of images
+				.filter((candidate) => !candidate.width)
+				.slice(0, 50)) {
+				const dimensions = await page.evaluate(async (url) => {
+					const image = new Image();
+					return new Promise<{ width: number; height: number } | null>(
+						(resolve) => {
+							const timer = setTimeout(() => {
+								image.src = "";
+								resolve(null);
+							}, 3000);
+							image.onload = () => {
+								clearTimeout(timer);
+								resolve(
+									image.naturalWidth && image.naturalHeight
+										? { width: image.naturalWidth, height: image.naturalHeight }
+										: null,
+								);
+							};
+							image.onerror = () => {
+								clearTimeout(timer);
+								resolve(null);
+							};
+							image.src = url;
+						},
+					);
+				}, image.url);
+				if (dimensions) {
+					image.width = dimensions.width;
+					image.height = dimensions.height;
+				}
+			}
+		}
 		if (options.includeIframes) {
 			const origin = new URL(page.url()).origin;
 			let capturedFrames = 0;

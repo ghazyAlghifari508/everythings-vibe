@@ -67,6 +67,12 @@ export async function createScrape(
 		if (!owner) throw new ScrapeError("STORAGE_FAILED");
 		const validated =
 			request ?? scrapeRequestSchema.parse({ url: normalized, mode });
+		const { checkRateLimit } = await import("@/lib/rate-limit");
+		if (!(await checkRateLimit(userId, "free", "api_call")).allowed)
+			throw new ScrapeError(
+				"WEBSITE_BLOCKED",
+				"Batas request tercapai. Coba lagi setelah satu menit.",
+			);
 		const active = await tx
 			.select()
 			.from(scrapes)
@@ -308,7 +314,9 @@ export async function runScrapePipeline(
 				? error.message
 				: mode === "html"
 					? "Gagal memproses HTML website."
-					: "Gagal memproses visual website.";
+					: mode === "crawl" || mode === "images"
+						? "Ekstraksi website terhenti. Hasil yang sudah disimpan tetap tersedia."
+						: "Gagal memproses visual website.";
 		const errorDetail =
 			error instanceof ScrapeError ? error.code : "WEBSITE_BLOCKED";
 

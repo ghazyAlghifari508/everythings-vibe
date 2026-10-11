@@ -68,6 +68,11 @@ export async function POST({
 }): Promise<Response> {
 	try {
 		const user = await requireUser(getRequestHeaders());
+		if (Number(request.headers.get("content-length") ?? 0) > 16000)
+			return Response.json(
+				{ error: "Request terlalu besar." },
+				{ status: 413 },
+			);
 		const body: unknown = await request.json().catch(() => null);
 
 		if (body !== null && typeof body === "object") {

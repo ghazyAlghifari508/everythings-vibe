@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type ScrapeRow,
@@ -46,7 +46,7 @@ export async function runExtractionJob(
 					eq(scrapePages.userId, claim.userId),
 				),
 			);
-		await crawlWebsite(request.url, request.settings, {
+		const results = await crawlWebsite(request.url, request.settings, {
 			frontier: completed.map(({ url, parentUrl, depth }) => ({
 				url,
 				parentUrl,
@@ -77,17 +77,22 @@ export async function runExtractionJob(
 				});
 			},
 			load: async (url) => {
-				await new Promise((resolve) =>
-					setTimeout(resolve, CRAWL_REQUEST_GAP_MS),
-				);
-				const result = await fetchAsset(url, 0, {
-					maxBytes: CRAWL_MAX_HTML_BYTES,
-					allowUrl: (target) =>
-						isCrawlScope(
-							target,
-							request.url,
-							request.settings.followSubdomains,
-						),
+				const result = await db.transaction(async (tx) => {
+					await tx.execute(
+						sql`select pg_advisory_xact_lock(hashtext(${new URL(url).origin}))`,
+					);
+					await new Promise((resolve) =>
+						setTimeout(resolve, CRAWL_REQUEST_GAP_MS),
+					);
+					return fetchAsset(url, 0, {
+						maxBytes: CRAWL_MAX_HTML_BYTES,
+						allowUrl: (target) =>
+							isCrawlScope(
+								target,
+								request.url,
+								request.settings.followSubdomains,
+							),
+					});
 				});
 				if (!/^text\/html|application\/xhtml\+xml/i.test(result.contentType))
 					throw new Error("Konten bukan HTML.");
@@ -106,6 +111,8 @@ export async function runExtractionJob(
 				if (result.status !== 200)
 					throw new Error("robots.txt tidak dapat diverifikasi.");
 				const content = result.body.toString("utf8");
+				if (/<html\b/i.test(content))
+					throw new Error("robots.txt bukan dokumen aturan yang valid.");
 				if (/crawl-delay\s*:\s*(?:[2-9]|\d{2,})/i.test(content))
 					throw new Error(
 						"robots.txt meminta crawl delay lebih lama dari kapasitas job ini.",
@@ -155,6 +162,8 @@ export async function runExtractionJob(
 				});
 			},
 		});
+		if (!results.some((page) => page.status === "completed"))
+			throw new Error("Tidak ada halaman yang berhasil diambil.");
 	} else if (request.mode === "images") {
 		const captured = await renderPage(request.url, {
 			mode: "images",
@@ -164,6 +173,14 @@ export async function runExtractionJob(
 			captured.images ?? [],
 			request.settings.classifyType,
 		);
+		await update({
+			status: "extracting",
+			metadata: {
+				...scrape.metadata,
+				mode: "images",
+				processedImages: images.length,
+			},
+		});
 		await db.transaction(async (tx) => {
 			const [owner] = await tx
 				.select({ id: scrapes.id })

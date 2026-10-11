@@ -237,9 +237,13 @@ function ScrapeDetailPage() {
 			}`}
 		>
 			<ScrapeBackLink from={from} />
-			{mode === "crawl" && currentStatus === "completed" ? (
+			{mode === "crawl" &&
+			(currentStatus === "completed" ||
+				(currentStatus === "failed" && initial.pages.length > 0)) ? (
 				<CrawlResult pages={initial.pages} sourceUrl={sourceUrl} />
-			) : mode === "images" && currentStatus === "completed" ? (
+			) : mode === "images" &&
+				(currentStatus === "completed" ||
+					(currentStatus === "failed" && initial.images.length > 0)) ? (
 				<ImagesResult images={initial.images} sourceUrl={sourceUrl} />
 			) : view === "result-design" ? (
 				<DesignResult

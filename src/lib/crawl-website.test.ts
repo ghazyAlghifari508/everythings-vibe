@@ -3,6 +3,55 @@ import { crawlWebsite, isCrawlScope, robotsAllows } from "./crawl-website";
 import { crawlSettingsSchema } from "./scrape-contract";
 
 describe("website traversal", () => {
+	it("resumes a persisted frontier without refetching completed pages", async () => {
+		const calls: string[] = [];
+		const pages = await crawlWebsite(
+			"https://sample.example/",
+			crawlSettingsSchema.parse({ includeLinks: false }),
+			{
+				completed: [
+					{
+						url: "https://sample.example/",
+						parentUrl: null,
+						depth: 0,
+						status: "completed",
+						title: "Sample",
+						httpStatus: 200,
+						content: {
+							description: null,
+							headings: [],
+							text: "Sample",
+							links: [],
+							images: [],
+							patterns: [],
+						},
+						error: null,
+					},
+				],
+				frontier: [
+					{
+						url: "https://sample.example/next",
+						parentUrl: "https://sample.example/",
+						depth: 1,
+					},
+				],
+				load: async (url) => {
+					calls.push(url);
+					return {
+						html: "<html><body>Next page</body></html>",
+						status: 200,
+						finalUrl: url,
+					};
+				},
+				robots: async () => "",
+			},
+		);
+		expect(calls).toEqual(["https://sample.example/next"]);
+		expect(pages.map((page) => page.status)).toEqual([
+			"completed",
+			"completed",
+		]);
+	});
 	it("restricts scope to the seed host and explicitly permitted descendants", () => {
 		expect(
 			isCrawlScope(
