@@ -6,7 +6,7 @@ import {
 	motion,
 	useReducedMotion,
 } from "framer-motion";
-import { Check, ChevronDown, Sparkles } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Sparkles } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,13 @@ interface ThoughtLineProps {
 	label?: string;
 	doneLabel?: string;
 	working: boolean;
+	/**
+	 * The request this line reports on ended in failure. Renders the failed
+	 * state instead of the settled checkmark, so a failure is never dressed up
+	 * as a completed run.
+	 */
+	failed?: boolean;
+	failedLabel?: string;
 	thinkingText?: string;
 	steps?: string[];
 	activeStep?: number;
@@ -36,6 +43,13 @@ interface ThoughtLineProps {
 	rotationKey?: string | number;
 	rotationIntervalMs?: number;
 	startedAt?: number | string | Date;
+	/**
+	 * Real settle time of the request this line reports on. When present, the
+	 * settled duration is measured from `startedAt` to `finishedAt` instead of
+	 * to "now", so a line mounted after the work already finished still reports
+	 * the actual duration rather than the time since the page was opened.
+	 */
+	finishedAt?: number | string | Date | null;
 	// Backend-backed single activity line. When provided (even null), it
 	// overrides rotatingMessages and never rotates.
 	activity?: string | null;
@@ -83,7 +97,7 @@ function PulsingStepIcon() {
 
 	return (
 		<span ref={ref} className="flex shrink-0">
-			<Sparkles className="size-4 text-[#0f0f0f]" aria-hidden="true" />
+			<Sparkles className="size-4 text-snow" aria-hidden="true" />
 		</span>
 	);
 }
@@ -114,9 +128,12 @@ function RotatingActivity({
 	const reduceMotion = useReducedMotion();
 	const hint =
 		messages.length > 0 ? (messages[index % messages.length] ?? "") : "";
-	const messageTone = bare ? "text-snow" : "text-[#0f0f0f]";
-	const glyphTone = bare ? "text-mist" : "text-[#0f0f0f]";
-	const timerTone = bare ? "text-fog" : "text-[#606060]";
+	// Non-bare (card) presentation draws on the app surface, so the whole card
+	// uses the theme tokens that already flip with light/dark mode. Literal
+	// ink hex values would stay black-on-black in the dark workspace.
+	const messageTone = "text-snow";
+	const glyphTone = "text-mist";
+	const timerTone = "text-fog";
 	return (
 		<div className={cn("flex min-w-0 items-center gap-2.5", className)}>
 			{glyph ?? (
@@ -171,6 +188,8 @@ export function ThoughtLine({
 	label = "Thinking",
 	doneLabel = "Thought",
 	working,
+	failed = false,
+	failedLabel = "Gagal",
 	thinkingText,
 	steps,
 	activeStep = 0,
@@ -186,6 +205,7 @@ export function ThoughtLine({
 	rotationKey,
 	rotationIntervalMs = THOUGHT_LINE_ROTATION_INTERVAL_MS,
 	startedAt,
+	finishedAt,
 	bare = false,
 	activity,
 }: ThoughtLineProps) {
@@ -213,6 +233,20 @@ export function ThoughtLine({
 		startedAtRef.current = resolveStartEpoch(startedAt, startedAtRef.current);
 		setElapsed(Math.max(0, (Date.now() - startedAtRef.current) / 1000));
 	}, [startedAt]);
+
+	// A settled request reports the duration it actually took. The finish epoch
+	// is the recorded settle time, never "now", so remounting the line after the
+	// work finished cannot inflate the reported duration.
+	const settledElapsed =
+		finishedAt === undefined || finishedAt === null
+			? null
+			: Math.max(
+					0,
+					(resolveStartEpoch(finishedAt, Date.now()) - startedAtRef.current) /
+						1000,
+				);
+	const reportedElapsed =
+		!working && settledElapsed !== null ? settledElapsed : elapsed;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: cycle restarts when the parent signals a real stage change via rotationKey by design
 	useEffect(() => {
@@ -258,11 +292,15 @@ export function ThoughtLine({
 		thinkingText && thinkingText.length > MAX_THINKING_CHARS
 			? `…${thinkingText.slice(-MAX_THINKING_CHARS)}`
 			: thinkingText;
-	const timePart = showTimer ? ` (${elapsed.toFixed(1)}s)` : "";
-	const settledTimePart = showTimer ? ` selama ${elapsed.toFixed(1)}s` : "";
+	const timePart = showTimer ? ` (${reportedElapsed.toFixed(1)}s)` : "";
+	const settledTimePart = showTimer
+		? ` selama ${reportedElapsed.toFixed(1)}s`
+		: "";
 	const title = working
 		? `${label}…${timePart}`
-		: `${doneLabel}${settledTimePart}`;
+		: failed
+			? `${failedLabel}${settledTimePart}`
+			: `${doneLabel}${settledTimePart}`;
 	const clampedActive =
 		steps && steps.length > 0
 			? Math.min(Math.max(activeStep, 0), steps.length - 1)
@@ -291,7 +329,7 @@ export function ThoughtLine({
 	return (
 		<div
 			className={cn(
-				"w-full rounded-xl border border-border bg-white p-4 sm:p-5",
+				"w-full rounded-xl border border-graphite bg-charcoal p-4 sm:p-5",
 				className,
 			)}
 		>
@@ -300,20 +338,25 @@ export function ThoughtLine({
 					{working ? (
 						(glyph ?? (
 							<Sparkles
-								className="size-4 shrink-0 text-[#0f0f0f]"
+								className="size-4 shrink-0 text-mist"
 								aria-hidden="true"
 							/>
 						))
+					) : failed ? (
+						<AlertCircle
+							className="size-4 shrink-0 text-crimson"
+							aria-hidden="true"
+						/>
 					) : (
 						<Check
-							className="size-4 shrink-0 text-[#0f0f0f]"
+							className="size-4 shrink-0 text-emerald"
 							aria-hidden="true"
 						/>
 					)}
 					<output
 						aria-live="polite"
 						className={cn(
-							"min-w-0 flex-1 truncate font-semibold text-[#0f0f0f]",
+							"min-w-0 flex-1 truncate font-semibold text-snow",
 							fontSize === "xs" ? "text-xs" : "text-sm",
 						)}
 					>
@@ -324,9 +367,9 @@ export function ThoughtLine({
 					<span
 						role="timer"
 						aria-label="Waktu proses"
-						className="shrink-0 font-mono text-xs text-[#606060] tabular-nums"
+						className="shrink-0 font-mono text-xs text-fog tabular-nums"
 					>
-						{elapsed.toFixed(1)}s
+						{reportedElapsed.toFixed(1)}s
 					</span>
 				) : null}
 			</div>
@@ -355,21 +398,21 @@ export function ThoughtLine({
 							<li key={step} className="flex items-center gap-2.5">
 								{done && !active ? (
 									<Check
-										className="size-4 shrink-0 text-[#0f0f0f]"
+										className="size-4 shrink-0 text-emerald"
 										aria-hidden="true"
 									/>
 								) : active ? (
 									<PulsingStepIcon />
 								) : (
 									<span
-										className="size-4 shrink-0 rounded-full border border-[#d3d3d3]"
+										className="size-4 shrink-0 rounded-full border border-slate"
 										aria-hidden="true"
 									/>
 								)}
 								<span
 									className={cn(
 										"min-w-0 flex-1 truncate text-sm leading-snug",
-										active || done ? "text-[#0f0f0f]" : "text-[#606060]",
+										active || done ? "text-snow" : "text-fog",
 										!active && !done && "opacity-60",
 									)}
 									aria-current={active ? "step" : undefined}
@@ -383,35 +426,35 @@ export function ThoughtLine({
 			) : null}
 
 			{hasThinking ? (
-				<div className="mt-3 rounded-lg border border-[#d3d3d3] p-3">
+				<div className="mt-3 rounded-lg border border-graphite p-3">
 					{collapsible ? (
 						<button
 							type="button"
 							onClick={() => setOpen((value) => !value)}
 							aria-expanded={open}
 							aria-controls={traceId}
-							className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#065fd4]"
+							className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 						>
-							<span className="font-mono text-[10px] uppercase tracking-wider text-[#606060]">
+							<span className="font-mono text-[10px] uppercase tracking-wider text-fog">
 								{THINKING_LABEL}
 							</span>
 							<ChevronDown
 								className={cn(
-									"size-3.5 shrink-0 text-[#606060] transition-transform duration-300 motion-reduce:transition-none",
+									"size-3.5 shrink-0 text-fog transition-transform duration-300 motion-reduce:transition-none",
 									open && "rotate-180",
 								)}
 								aria-hidden="true"
 							/>
 						</button>
 					) : (
-						<span className="font-mono text-[10px] uppercase tracking-wider text-[#606060]">
+						<span className="font-mono text-[10px] uppercase tracking-wider text-fog">
 							{THINKING_LABEL}
 						</span>
 					)}
 					{open || !collapsible ? (
 						<pre
 							id={traceId}
-							className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-[#606060]"
+							className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-fog"
 						>
 							{displayThinking}
 						</pre>

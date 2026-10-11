@@ -39,13 +39,19 @@ import {
 import { resolveOnboardingAnchorProject } from "@/lib/codebase-anchor";
 import {
 	type AdaptiveQuestion,
+	appendRunThinking,
 	buildFeatureMessage,
+	type CodebaseRunStage,
+	type CodebaseRunState,
 	mapAskQuestionsToAdaptive,
 	parseRestoredAnswers,
 	parseRestoredQuestions,
+	resetRunThinking,
 	restoreAskState,
 	runConfirmGenerate,
 	serializeAskQuestions,
+	settleRun,
+	startRun,
 } from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
@@ -631,13 +637,13 @@ function CodebaseDetailPage() {
 	const [chatMessages, setChatMessages] = useState<ChatStreamMessage[]>([]);
 	const [aiQuestions, setAiQuestions] = useState<AdaptiveQuestion[]>([]);
 	const [chatAnswers, setChatAnswers] = useState<Record<string, string>>({});
-	const [questionsLoading, setQuestionsLoading] = useState(false);
-	const [questionsError, setQuestionsError] = useState<string | null>(null);
-	/** Real client-side start of the current question-generation request.
-	 *  Drives the Thinking elapsed timer only — never a fabricated stage. */
-	const [questionsStartedAt, setQuestionsStartedAt] = useState<number | null>(
-		null,
-	);
+	/**
+	 * The one in-flight or settled AI request for this workspace. Every stage
+	 * (questions, Feature, PRD, AC, Task) records its real start, settle time,
+	 * outcome, and the model's own streamed reasoning here, so the workspace
+	 * shows exactly one honest Thinking surface per operation.
+	 */
+	const [run, setRun] = useState<CodebaseRunState | null>(null);
 	const [lastFeaturePrompt, setLastFeaturePrompt] = useState("");
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
@@ -1392,9 +1398,8 @@ function CodebaseDetailPage() {
 
 	const fetchAiQuestions = useCallback(
 		async (projectId: string, prompt: string) => {
-			setQuestionsLoading(true);
-			setQuestionsStartedAt(Date.now());
-			setQuestionsError(null);
+			const startedAt = Date.now();
+			setRun(startRun("questions", startedAt));
 			try {
 				const response = await fetch("/api/ask/options", {
 					method: "POST",
@@ -1413,11 +1418,16 @@ function CodebaseDetailPage() {
 					// The server already distinguishes "repository context is not
 					// ready" from a failed generation; surface that copy instead of
 					// collapsing every failure into one generic sentence.
-					setQuestionsError(
-						serverError ??
-							(response.status === 409
-								? "Konteks repositori belum siap. Selesaikan analisis codebase lalu coba lagi."
-								: "Pertanyaan klarifikasi tidak dapat dibuat."),
+					setRun((current) =>
+						settleRun(
+							current,
+							"failed",
+							Date.now(),
+							serverError ??
+								(response.status === 409
+									? "Konteks repositori belum siap. Selesaikan analisis codebase lalu coba lagi."
+									: "Pertanyaan klarifikasi tidak dapat dibuat."),
+						),
 					);
 					return;
 				}
@@ -1431,18 +1441,29 @@ function CodebaseDetailPage() {
 						? validateAskQuestions((body as { questions: unknown }).questions)
 						: null;
 				if (!parsed || parsed.length === 0) {
-					setQuestionsError(
-						"AI tidak mengembalikan pertanyaan yang valid. Coba kirim ulang fitur.",
+					setRun((current) =>
+						settleRun(
+							current,
+							"failed",
+							Date.now(),
+							"AI tidak mengembalikan pertanyaan yang valid. Coba kirim ulang fitur.",
+						),
 					);
 					return;
 				}
 				const mapped = mapAskQuestionsToAdaptive(parsed);
 				setAiQuestions(mapped);
 				setChatAnswers({});
+				setRun((current) => settleRun(current, "done", Date.now()));
 			} catch {
-				setQuestionsError("Server tidak dapat dihubungi. Coba lagi.");
-			} finally {
-				setQuestionsLoading(false);
+				setRun((current) =>
+					settleRun(
+						current,
+						"failed",
+						Date.now(),
+						"Server tidak dapat dihubungi. Coba lagi.",
+					),
+				);
 			}
 		},
 		[],
@@ -1594,11 +1615,35 @@ function CodebaseDetailPage() {
 		]);
 	}, []);
 
+	/**
+	 * Whether the user has taken over the right panel since the last automatic
+	 * reveal. A manual close or a different selection sets this, and an
+	 * automatic reveal then stays out of the way instead of stealing focus
+	 * mid-generation.
+	 */
+	const userTookOverCanvas = useRef(false);
+
+	/**
+	 * Reveal the artifact a finished stage produced. Only called after the
+	 * artifact is confirmed persisted server-side, and only while the user has
+	 * not taken over the panel.
+	 */
+	const openArtifactPreview = useCallback(
+		(kind: "feature" | "prd" | "ac" | "tasks") => {
+			if (!effectiveFeatureId || userTookOverCanvas.current) return;
+			setActiveArtifactId(`${kind}-${effectiveFeatureId}`);
+			if (kind === "tasks") setCanvasView("kanban");
+			setCanvasOpen(true);
+		},
+		[effectiveFeatureId],
+	);
+
 	const handleConfirmGenerate = useCallback(async () => {
 		if (!effectiveFeatureId || isConfirming) return;
 		setIsConfirming(true);
 		setSpecError(null);
 		setStageError(null);
+		setRun(startRun("feature", Date.now()));
 		try {
 			const answersList = buildAskHandoffAnswers(chatAnswers, aiQuestions);
 			const outcome = await runConfirmGenerate({
@@ -1651,35 +1696,55 @@ function CodebaseDetailPage() {
 			});
 
 			if (outcome.kind === "handoff_failed") {
-				setSpecError(
-					"Jawaban gagal disimpan, jadi spesifikasi tidak dibuat. Coba lagi.",
-				);
+				const message =
+					"Jawaban gagal disimpan, jadi spesifikasi tidak dibuat. Coba lagi.";
+				setSpecError(message);
+				setRun((current) => settleRun(current, "failed", Date.now(), message));
 				return;
 			}
 			if (outcome.kind === "spec_failed") {
-				setSpecError("Spesifikasi fitur gagal dibuat. Coba lagi.");
+				const message = "Spesifikasi fitur gagal dibuat. Coba lagi.";
+				setSpecError(message);
+				setRun((current) => settleRun(current, "failed", Date.now(), message));
 				return;
 			}
 			if (outcome.kind === "generating") {
+				// The server still owns the in-flight generation: this is not a
+				// finished run, so the Thinking surface stays running until the
+				// persisted tree can actually be reloaded.
 				pushAssistantMessage(
-					`Pohon fitur ${resolvedFeature?.name ?? "fitur"} sedang disusun. Tunggu sebentar lalu klik Lanjut Bikin Fitur lagi untuk memuat hasilnya.`,
+					`Pohon fitur ${resolvedFeature?.name ?? "fitur"} sedang disusun. Tunggu sebentar lalu klik Buat Spesifikasi Fitur lagi untuk memuat hasilnya.`,
+				);
+				setRun((current) =>
+					settleRun(
+						current,
+						"failed",
+						Date.now(),
+						"Generasi masih berjalan di server. Coba muat ulang sebentar lagi.",
+					),
 				);
 				return;
 			}
 			if (outcome.kind === "not_persisted") {
-				setSpecError(
-					"Spesifikasi fitur belum tersimpan di server. Coba lagi sebentar lagi.",
-				);
+				const message =
+					"Spesifikasi fitur belum tersimpan di server. Coba lagi sebentar lagi.";
+				setSpecError(message);
+				setRun((current) => settleRun(current, "failed", Date.now(), message));
 				return;
 			}
 			setPipelineStage("feature");
+			setRun((current) => settleRun(current, "done", Date.now()));
 			const specMessage = buildFeatureMessage(
 				resolvedFeature?.name ?? codebase.name,
 				chatAnswers,
 			);
 			pushAssistantMessage(
-				`Pohon fitur ${resolvedFeature?.name ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}. Klik file feature-*.json di bawah untuk melihat diagram pohon fitur.`,
+				`Pohon fitur ${resolvedFeature?.name ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}`,
 			);
+			// The artifact is confirmed persisted (the tree reloaded above), so
+			// the canvas opens on it. A manual panel interaction is respected by
+			// openArtifactPreview, which never fights the user for focus.
+			openArtifactPreview("feature");
 		} finally {
 			setIsConfirming(false);
 		}
@@ -1693,28 +1758,58 @@ function CodebaseDetailPage() {
 		codebase.name,
 		refreshFeatureTree,
 		pushAssistantMessage,
+		openArtifactPreview,
 	]);
 
 	const runPipelineStage = useCallback(
 		async (
-			target: PipelineStage,
+			target: CodebaseRunStage,
 			url: string,
 			init: RequestInit,
-			onSuccess: () => Promise<void>,
+			onSuccess: () => Promise<boolean>,
 		) => {
 			if (!effectiveFeatureId || stageBusy) return;
 			setStageBusy(target);
 			setStageError(null);
+			// One honest Thinking surface for this request. `startedAt` is the
+			// real client start; the model's streamed reasoning and the settle
+			// outcome are filled from the stream's own events.
+			setRun(startRun(target, Date.now()));
 			try {
 				const response = await fetch(url, init);
-				const result = await consumeSseStream(response);
+				const result = await consumeSseStream(response, {
+					onThinking: (text) =>
+						setRun((current) => appendRunThinking(current, text)),
+					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
+				});
 				if (result.error) {
-					setStageError(result.error);
+					const failure = result.error;
+					setStageError(failure);
+					setRun((current) =>
+						settleRun(current, "failed", Date.now(), failure),
+					);
 					return;
 				}
-				await onSuccess();
+				// A completed stream is not yet a usable artifact: the caller
+				// reloads the authoritative server state and reports whether the
+				// artifact really persisted.
+				const persisted = await onSuccess();
+				if (!persisted) {
+					setRun((current) =>
+						settleRun(
+							current,
+							"failed",
+							Date.now(),
+							"Hasil generasi belum tersimpan di server. Coba generate ulang.",
+						),
+					);
+					return;
+				}
+				setRun((current) => settleRun(current, "done", Date.now()));
 			} catch {
-				setStageError("Server tidak dapat dihubungi. Coba lagi.");
+				const message = "Server tidak dapat dihubungi. Coba lagi.";
+				setStageError(message);
+				setRun((current) => settleRun(current, "failed", Date.now(), message));
 			} finally {
 				setStageBusy(null);
 			}
@@ -1744,12 +1839,14 @@ function CodebaseDetailPage() {
 				const content = await loadPrd();
 				if (!content) {
 					setStageError("PRD belum tersimpan di server. Coba generate ulang.");
-					return;
+					return false;
 				}
 				setPipelineStage("prd");
 				pushAssistantMessage(
-					`PRD 8 seksi untuk ${resolvedFeature?.name ?? "fitur"} siap. Klik file PRD-*.md di bawah untuk membaca dokumen lengkap.`,
+					`PRD 8 seksi untuk ${resolvedFeature?.name ?? "fitur"} siap.`,
 				);
+				openArtifactPreview("prd");
+				return true;
 			},
 		);
 	}, [
@@ -1760,6 +1857,7 @@ function CodebaseDetailPage() {
 		runPipelineStage,
 		loadPrd,
 		pushAssistantMessage,
+		openArtifactPreview,
 	]);
 
 	const handleGenerateAc = useCallback(() => {
@@ -1778,12 +1876,14 @@ function CodebaseDetailPage() {
 					setStageError(
 						"Acceptance Criteria belum tersimpan di server. Coba generate ulang.",
 					);
-					return;
+					return false;
 				}
 				setPipelineStage("ac");
 				pushAssistantMessage(
-					`Acceptance Criteria untuk ${resolvedFeature?.name ?? "fitur"} siap. Klik file AC-*.md di bawah untuk membaca dokumen lengkap.`,
+					`Acceptance Criteria untuk ${resolvedFeature?.name ?? "fitur"} siap.`,
 				);
+				openArtifactPreview("ac");
+				return true;
 			},
 		);
 	}, [
@@ -1792,6 +1892,7 @@ function CodebaseDetailPage() {
 		runPipelineStage,
 		loadAc,
 		pushAssistantMessage,
+		openArtifactPreview,
 	]);
 
 	const handleGenerateTask = useCallback(() => {
@@ -1811,12 +1912,14 @@ function CodebaseDetailPage() {
 					setStageError(
 						"Task belum tersimpan di server. Coba breakdown task ulang.",
 					);
-					return;
+					return false;
 				}
 				setPipelineStage("handoff");
 				pushAssistantMessage(
-					`Task untuk ${resolvedFeature?.name ?? "fitur"} sudah tersimpan dan papan Kanban aktif. Klik file tasks-*.json di bawah untuk melihat diagram task, atau salin perintah handoff untuk mulai mengerjakan dengan AI Coding Agent.`,
+					`Task untuk ${resolvedFeature?.name ?? "fitur"} sudah tersimpan dan papan Kanban aktif.`,
 				);
+				openArtifactPreview("tasks");
+				return true;
 			},
 		);
 	}, [
@@ -1826,6 +1929,7 @@ function CodebaseDetailPage() {
 		kanban,
 		refreshTaskTree,
 		pushAssistantMessage,
+		openArtifactPreview,
 	]);
 
 	const handleRetryStage = useCallback(() => {
@@ -1948,9 +2052,7 @@ function CodebaseDetailPage() {
 								messages={chatMessages}
 								questions={aiQuestions}
 								answers={chatAnswers}
-								questionsLoading={questionsLoading}
-								questionsError={questionsError}
-								questionsStartedAt={questionsStartedAt}
+								run={run}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
 								projectIdForHandoff={hasTasksInDb ? effectiveFeatureId : null}
@@ -1989,6 +2091,8 @@ function CodebaseDetailPage() {
 								isConfirming={isConfirming}
 								specError={specError}
 								onOpenArtifact={(artifact) => {
+									// An explicit user choice owns the panel from now on.
+									userTookOverCanvas.current = true;
 									clearSourcePreview();
 									setActiveArtifactId(artifact.id);
 									if (
@@ -2032,7 +2136,12 @@ function CodebaseDetailPage() {
 								copyValue={canvasCopy.value}
 								copyLabel={canvasCopy.label}
 								copyUnavailableReason={canvasCopy.unavailableReason}
-								onClose={() => setCanvasOpen(false)}
+								onClose={() => {
+									// Closing the panel is a deliberate user action: the
+									// workspace stops auto-revealing artifacts after it.
+									userTookOverCanvas.current = true;
+									setCanvasOpen(false);
+								}}
 								onDownload={
 									!isSourcePreviewOpen && activeArtifact
 										? () => handleDownloadArtifact(activeArtifact)

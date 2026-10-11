@@ -3,22 +3,36 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { PromptBar } from "@/components/ui/prompt-bar";
+import { ThoughtLine } from "@/components/ui/thought-line";
 import type { CodebaseStarterSuggestion } from "@/lib/codebase-analysis";
 import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
 import {
 	type AdaptiveQuestion,
 	type AdaptiveQuestionOption,
 	areAllQuestionsAnswered,
+	CODEBASE_STAGE_ACTIVITY,
+	CODEBASE_STAGE_DONE_LABEL,
+	type CodebaseRunState,
 	nextQuestionIndex,
 } from "@/lib/codebase-chat-flow";
 import { resolveCodebaseDisplayName } from "@/lib/codebase-naming";
+import { CodebaseAdaptiveQuestion } from "./codebase-adaptive-question";
 import {
 	type CodebaseArtifactRef,
 	CodebaseFileCard,
 } from "./codebase-file-card";
-import { QuestionThinking } from "./question-thinking";
+import { CodebaseStageHandoff } from "./codebase-stage-handoff";
 
 export type { AdaptiveQuestion, AdaptiveQuestionOption };
+
+/** Human label per run stage, used in the Thinking headline. */
+const STAGE_LABEL: Record<CodebaseRunState["stage"], string> = {
+	questions: "pertanyaan klarifikasi",
+	feature: "spesifikasi fitur",
+	prd: "PRD",
+	ac: "Acceptance Criteria",
+	task: "task",
+};
 
 export interface ChatStreamMessage {
 	id: string;
@@ -42,14 +56,13 @@ interface CodebaseChatWorkspaceProps {
 	messages: ChatStreamMessage[];
 	questions: AdaptiveQuestion[];
 	answers: Record<string, string>;
-	questionsLoading?: boolean;
-	questionsError?: string | null;
 	/**
-	 * Wall-clock start of the in-flight question-generation request, owned by
-	 * the route. Drives the Thinking elapsed timer from a real timestamp
-	 * instead of from this component's mount time.
+	 * The single in-flight or settled AI request for this workspace, with the
+	 * wall-clock start, the real settle time, and the model's own streamed
+	 * reasoning. One run renders one ThoughtLine — the question stage and the
+	 * Feature/PRD/AC/Task stages share it instead of stacking indicators.
 	 */
-	questionsStartedAt?: number | null;
+	run?: CodebaseRunState | null;
 	artifacts: CodebaseArtifactRef[];
 	activeArtifactId?: string | null;
 	projectIdForHandoff?: string | null;
@@ -112,9 +125,7 @@ export function CodebaseChatWorkspace({
 	messages,
 	questions,
 	answers,
-	questionsLoading = false,
-	questionsError = null,
-	questionsStartedAt = null,
+	run = null,
 	artifacts,
 	activeArtifactId = null,
 	projectIdForHandoff = null,
@@ -141,14 +152,6 @@ export function CodebaseChatWorkspace({
 	newerAttemptFailure,
 	onRefreshStarterSuggestions,
 }: CodebaseChatWorkspaceProps) {
-	const [selected, setSelected] = useState<Record<string, string>>({});
-	const [multiSelected, setMultiSelected] = useState<Record<string, string[]>>(
-		{},
-	);
-	const [customAnswers, setCustomAnswers] = useState<Record<string, string>>(
-		{},
-	);
-	const [customOpen, setCustomOpen] = useState<Record<string, boolean>>({});
 	const [draft, setDraft] = useState("");
 	const [copiedCmd, setCopiedCmd] = useState(false);
 	const [copiedExport, setCopiedExport] = useState(false);
@@ -197,7 +200,7 @@ export function CodebaseChatWorkspace({
 
 	const handleSend = (text?: string) => {
 		const message = (text ?? draft).trim();
-		if (message.length < 3 || isSending || questionsLoading) return;
+		if (message.length < 3 || isSending || isRunWorking) return;
 		onSendMessage?.(message);
 		setDraft("");
 	};
@@ -214,26 +217,6 @@ export function CodebaseChatWorkspace({
 		}
 	};
 
-	const handleSubmitOne = (question: AdaptiveQuestion) => {
-		const custom = (customAnswers[question.id] ?? "").trim();
-		let answer = "";
-		if (question.type === "multiselect") {
-			const pickedLabels = (multiSelected[question.id] ?? [])
-				.map((id) => question.options.find((option) => option.id === id)?.label)
-				.filter((label): label is string => Boolean(label));
-			const combined = [pickedLabels.join(", "), custom]
-				.filter((part) => part.length > 0)
-				.join(", ");
-			answer = combined;
-		} else {
-			const pickedId = selected[question.id];
-			const picked = question.options.find((option) => option.id === pickedId);
-			answer = custom || picked?.label || "";
-		}
-		if (!answer.trim()) return;
-		onSubmitAnswer?.(question.id, answer.trim());
-	};
-
 	const currentIndex = nextQuestionIndex(answers, questions);
 	const visibleQuestions =
 		questions.length === 0
@@ -243,6 +226,23 @@ export function CodebaseChatWorkspace({
 				: questions.slice(0, currentIndex + 1);
 	const flowComplete = areAllQuestionsAnswered(answers, questions);
 	const hasLiveData = kanbanProgress !== null && kanbanProgress.total > 0;
+
+	/**
+	 * Artifact the active stage handoff already renders. Every other artifact
+	 * still lists in the stream, so a finished file stays reachable without the
+	 * same card appearing twice.
+	 */
+	const handoffArtifactPrefix =
+		stage === "feature"
+			? "feature-"
+			: stage === "prd"
+				? "prd-"
+				: stage === "ac"
+					? "ac-"
+					: null;
+	const streamArtifacts = handoffArtifactPrefix
+		? artifacts.filter((item) => !item.id.startsWith(handoffArtifactPrefix))
+		: artifacts;
 
 	const resolvedRepoName = resolveCodebaseDisplayName(codebaseName);
 	const resolvedFeatureName = resolveCodebaseDisplayName(featureName);
@@ -256,10 +256,17 @@ export function CodebaseChatWorkspace({
 		questions.length === 0 &&
 		artifacts.length === 0 &&
 		projectIdForHandoff === null &&
-		!questionsLoading &&
-		!questionsError &&
+		run === null &&
 		!isSending &&
 		stage === "questions";
+
+	const isRunWorking = run?.status === "running";
+	const runFailed = run?.status === "failed";
+	const runSettled = run?.status === "done";
+	// A failed request owns its own error row, so the generic stage/spec error
+	// rows must not render a second, duplicate message for the same failure.
+	const stageErrorVisible = Boolean(stageError) && !runFailed;
+	const specErrorVisible = Boolean(specError) && !runFailed;
 
 	const renderComposer = (minRows = 1, className = "") => (
 		<PromptBar
@@ -271,7 +278,7 @@ export function CodebaseChatWorkspace({
 			// user can prepare the next message; only the submit action closes.
 			// Duplicate submissions are blocked by the shared busy guard in
 			// `handleSend` and by PromptBar's `canSend`, which Enter also uses.
-			isSending={isSending || questionsLoading}
+			isSending={isSending || isRunWorking}
 			minCharsToSend={3}
 			minRows={minRows}
 			maxRows={6}
@@ -430,15 +437,29 @@ export function CodebaseChatWorkspace({
 									</div>
 								),
 							)}
-							{questionsLoading ? (
-								<QuestionThinking startedAt={questionsStartedAt} />
+							{run ? (
+								<div data-testid="codebase-run-thinking">
+									<ThoughtLine
+										working={isRunWorking}
+										failed={runFailed}
+										label={`Menyusun ${STAGE_LABEL[run.stage]}`}
+										doneLabel={CODEBASE_STAGE_DONE_LABEL[run.stage]}
+										failedLabel={`Gagal menyusun ${STAGE_LABEL[run.stage]}`}
+										activity={run.activity}
+										presentation="rotating"
+										rotationKey={run.startedAt}
+										thinkingText={run.thinkingText}
+										startedAt={run.startedAt}
+										finishedAt={run.finishedAt}
+									/>
+								</div>
 							) : null}
-							{questionsError ? (
+							{runFailed && run.error ? (
 								<div
 									data-testid="codebase-questions-error"
 									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
 								>
-									<span role="alert">{questionsError}</span>
+									<span role="alert">{run.error}</span>
 									{onRetryQuestions ? (
 										<button
 											type="button"
@@ -450,181 +471,32 @@ export function CodebaseChatWorkspace({
 									) : null}
 								</div>
 							) : null}
-							{visibleQuestions.map((question, qIndex) => {
-								const submitted = (answers[question.id] ?? "").trim();
-								const isCurrent = qIndex === currentIndex;
-								const custom = (customAnswers[question.id] ?? "").trim();
-								const pickedId = selected[question.id];
-								const multiIds = multiSelected[question.id] ?? [];
-								const isMulti = question.type === "multiselect";
-								const isText = question.type === "text";
-								const customVisible =
-									isText || customOpen[question.id] === true;
-								const canSubmit =
-									!submitted &&
-									(custom.length > 0 ||
-										(isMulti ? multiIds.length > 0 : Boolean(pickedId)));
-								return (
-									<div
-										key={question.id}
-										data-testid={`adaptive-question-${question.id}`}
-										className="rounded-xl border border-graphite bg-charcoal p-3"
-									>
-										<p className="text-[13px] font-semibold text-snow">
-											<span className="mr-2 rounded bg-indigo/15 px-1.5 py-0.5 font-mono text-[11px] text-indigo">
-												Q{qIndex + 1}
-											</span>
-											{question.title}
-										</p>
-										{submitted ? (
-											<p className="mt-2 rounded-lg border border-emerald/30 bg-emerald/10 px-3 py-2 text-xs leading-5 text-emerald">
-												Jawaban: {submitted}
-											</p>
-										) : (
-											<>
-												{!isText ? (
-													<div className="mt-2 flex flex-col gap-2">
-														{question.options.map((option) => {
-															const isSelected = isMulti
-																? multiIds.includes(option.id)
-																: pickedId === option.id;
-															const isCustomMode =
-																customOpen[question.id] === true;
-															return (
-																<button
-																	key={option.id}
-																	type="button"
-																	disabled={!isCurrent}
-																	onClick={() => {
-																		if (isMulti) {
-																			setMultiSelected((current) => {
-																				const values =
-																					current[question.id] ?? [];
-																				return {
-																					...current,
-																					[question.id]: values.includes(
-																						option.id,
-																					)
-																						? values.filter(
-																								(id) => id !== option.id,
-																							)
-																						: [...values, option.id],
-																				};
-																			});
-																		} else {
-																			setSelected((current) => ({
-																				...current,
-																				[question.id]: option.id,
-																			}));
-																			setCustomOpen((current) => ({
-																				...current,
-																				[question.id]: false,
-																			}));
-																		}
-																	}}
-																	aria-pressed={isSelected}
-																	className={`flex min-h-11 items-start gap-2 rounded-lg border p-2.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-																		isSelected
-																			? "border-indigo bg-indigo/10 text-snow"
-																			: "border-graphite bg-obsidian text-mist hover:border-steel"
-																	} ${isCurrent ? "" : "opacity-60"} ${isCustomMode ? "opacity-60" : ""}`}
-																>
-																	<span
-																		aria-hidden="true"
-																		className={`mt-0.5 h-3.5 w-3.5 shrink-0 border-[1.5px] ${
-																			isMulti ? "rounded-[3px]" : "rounded-full"
-																		} ${
-																			isSelected
-																				? "border-indigo bg-indigo"
-																				: "border-slate"
-																		}`}
-																	/>
-																	<span>
-																		{option.label}
-																		{option.recommended ? (
-																			<span className="ml-1.5 rounded-full border border-emerald/30 bg-emerald/10 px-1.5 py-px text-[10px] font-semibold text-emerald">
-																				Rekomendasi
-																			</span>
-																		) : null}
-																	</span>
-																</button>
-															);
-														})}
-														{question.recommendedOptionId &&
-														question.recommendationReason ? (
-															<p
-																data-testid={`adaptive-question-reason-${question.id}`}
-																className="text-[11px] leading-4 text-fog"
-															>
-																Alasan rekomendasi:{" "}
-																{question.recommendationReason}
-															</p>
-														) : null}
-														<button
-															type="button"
-															disabled={!isCurrent}
-															onClick={() =>
-																setCustomOpen((current) => ({
-																	...current,
-																	[question.id]: !current[question.id],
-																}))
-															}
-															aria-expanded={customOpen[question.id] === true}
-															className={`inline-flex min-h-9 w-fit items-center rounded-md border px-2.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-																customOpen[question.id] === true
-																	? "border-indigo text-snow"
-																	: "border-graphite text-fog hover:text-snow"
-															}`}
-														>
-															{isMulti ? "Lainnya (tambahan)" : "Lainnya"}
-														</button>
-													</div>
-												) : null}
-												{customVisible ? (
-													<>
-														<label
-															htmlFor={`custom-${question.id}`}
-															className="sr-only"
-														>
-															Jawaban khusus {question.title}
-														</label>
-														<input
-															id={`custom-${question.id}`}
-															type="text"
-															disabled={!isCurrent}
-															value={customAnswers[question.id] ?? ""}
-															onChange={(event) =>
-																setCustomAnswers((current) => ({
-																	...current,
-																	[question.id]: event.target.value,
-																}))
-															}
-															placeholder={
-																question.customPlaceholder ??
-																"Atau ketik preferensi sendiri..."
-															}
-															className="mt-2 w-full rounded-lg border border-graphite bg-onyx px-3 py-2 text-xs text-snow outline-none placeholder:text-slate focus-visible:ring-2 focus-visible:ring-indigo"
-														/>
-													</>
-												) : null}
-												{isCurrent ? (
-													<div className="mt-3 flex justify-end">
-														<button
-															type="button"
-															disabled={!canSubmit}
-															onClick={() => handleSubmitOne(question)}
-															className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-														>
-															Kirim Jawaban
-														</button>
-													</div>
-												) : null}
-											</>
-										)}
-									</div>
-								);
-							})}
-							{specError ? (
+							{visibleQuestions.map((question, qIndex) => (
+								<CodebaseAdaptiveQuestion
+									key={question.id}
+									question={question}
+									index={qIndex + 1}
+									submitted={(answers[question.id] ?? "").trim()}
+									active={qIndex === currentIndex}
+									onSubmit={(questionId, answer) =>
+										onSubmitAnswer?.(questionId, answer)
+									}
+								/>
+							))}
+							{streamArtifacts.length > 0 ? (
+								<div className="flex flex-col">
+									{streamArtifacts.map((artifact) => (
+										<CodebaseFileCard
+											key={artifact.id}
+											artifact={artifact}
+											active={artifact.id === activeArtifactId}
+											onOpen={onOpenArtifact}
+											onDownload={onDownloadArtifact}
+										/>
+									))}
+								</div>
+							) : null}
+							{specErrorVisible ? (
 								<div
 									role="alert"
 									data-testid="codebase-spec-error"
@@ -645,40 +517,30 @@ export function CodebaseChatWorkspace({
 							{flowComplete && stage === "questions" ? (
 								<div
 									data-testid="codebase-questions-complete"
-									className="rounded-xl border border-emerald/30 bg-obsidian p-4"
+									className="rounded-xl border border-graphite bg-obsidian p-3"
 								>
-									<p className="text-[13px] font-semibold leading-6 text-snow">
-										Pertanyaan sudah dijawab semua dan informasi kebutuhan sudah
-										lengkap. Siap membuat spesifikasi fitur?
+									<p className="text-[11px] font-semibold uppercase tracking-wider text-fog">
+										Berikutnya: Spesifikasi fitur
+									</p>
+									<p className="mt-1 text-xs leading-5 text-fog">
+										Semua pertanyaan sudah dijawab. Spesifikasi fitur disusun
+										dari jawaban tersebut dan konteks repository.
 									</p>
 									<div className="mt-3 flex justify-end">
 										<button
 											type="button"
 											disabled={isConfirming}
 											onClick={() => onConfirmGenerate?.()}
-											className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 										>
 											{isConfirming
-												? "Membuat spesifikasi..."
-												: "Lanjut Bikin Fitur"}
+												? "Menyusun spesifikasi..."
+												: "Buat Spesifikasi Fitur"}
 										</button>
 									</div>
 								</div>
 							) : null}
-							{artifacts.length > 0 ? (
-								<div className="flex flex-col">
-									{artifacts.map((artifact) => (
-										<CodebaseFileCard
-											key={artifact.id}
-											artifact={artifact}
-											active={artifact.id === activeArtifactId}
-											onOpen={onOpenArtifact}
-											onDownload={onDownloadArtifact}
-										/>
-									))}
-								</div>
-							) : null}
-							{stageError ? (
+							{stageErrorVisible ? (
 								<div
 									role="alert"
 									data-testid="codebase-stage-error"
@@ -697,33 +559,61 @@ export function CodebaseChatWorkspace({
 								</div>
 							) : null}
 							{stage === "feature" && onGeneratePrd ? (
-								<StageCta
+								<CodebaseStageHandoff
 									testId="codebase-stage-prd"
-									message="Fitur berhasil disusun. Lanjut susun PRD 8 seksi?"
-									buttonLabel="Lanjut Buat PRD"
+									outcome={{
+										title: "Spesifikasi fitur siap",
+										artifact:
+											artifacts.find((item) =>
+												item.id.startsWith("feature-"),
+											) ?? null,
+									}}
+									nextLabel="PRD"
+									nextDescription="Menyusun PRD 8 seksi dari spesifikasi fitur dan konteks repository."
+									actionLabel="Buat PRD"
 									busyLabel="Menyusun PRD..."
 									busy={stageBusy === "prd"}
 									onAction={onGeneratePrd}
+									onOpenArtifact={onOpenArtifact}
+									onDownloadArtifact={onDownloadArtifact}
 								/>
 							) : null}
 							{stage === "prd" && onGenerateAc ? (
-								<StageCta
+								<CodebaseStageHandoff
 									testId="codebase-stage-ac"
-									message="PRD siap. Lanjut generate Acceptance Criteria (AC)?"
-									buttonLabel="Lanjut Buat AC"
-									busyLabel="Membuat AC..."
+									outcome={{
+										title: "PRD selesai",
+										artifact:
+											artifacts.find((item) => item.id.startsWith("prd-")) ??
+											null,
+									}}
+									nextLabel="Acceptance Criteria"
+									nextDescription="Menyusun Acceptance Criteria dari PRD dan konteks repository."
+									actionLabel="Buat AC"
+									busyLabel="Menyusun AC..."
 									busy={stageBusy === "ac"}
 									onAction={onGenerateAc}
+									onOpenArtifact={onOpenArtifact}
+									onDownloadArtifact={onDownloadArtifact}
 								/>
 							) : null}
 							{stage === "ac" && onGenerateTask ? (
-								<StageCta
+								<CodebaseStageHandoff
 									testId="codebase-stage-task"
-									message="Acceptance Criteria siap. Lanjut breakdown Task & Papan Kanban?"
-									buttonLabel="Lanjut Breakdown Task"
-									busyLabel="Membagi task..."
+									outcome={{
+										title: "Acceptance Criteria selesai",
+										artifact:
+											artifacts.find((item) => item.id.startsWith("ac-")) ??
+											null,
+									}}
+									nextLabel="Task dan Kanban"
+									nextDescription="Menyusun breakdown task dari PRD dan Acceptance Criteria, lalu mengaktifkan papan Kanban."
+									actionLabel="Buat Task"
+									busyLabel="Menyusun task..."
 									busy={stageBusy === "task"}
 									onAction={onGenerateTask}
+									onOpenArtifact={onOpenArtifact}
+									onDownloadArtifact={onDownloadArtifact}
 								/>
 							) : null}
 							{handoffCmd && exportCmd && taskCmd ? (
@@ -861,43 +751,6 @@ export function CodebaseChatWorkspace({
 					</div>
 				</>
 			)}
-		</div>
-	);
-}
-
-interface StageCtaProps {
-	testId: string;
-	message: string;
-	buttonLabel: string;
-	busyLabel: string;
-	busy?: boolean;
-	onAction: () => void;
-}
-
-function StageCta({
-	testId,
-	message,
-	buttonLabel,
-	busyLabel,
-	busy = false,
-	onAction,
-}: StageCtaProps) {
-	return (
-		<div
-			data-testid={testId}
-			className="rounded-xl border border-indigo/30 bg-obsidian p-4"
-		>
-			<p className="text-[13px] font-semibold leading-6 text-snow">{message}</p>
-			<div className="mt-3 flex justify-end">
-				<button
-					type="button"
-					disabled={busy}
-					onClick={onAction}
-					className="inline-flex min-h-11 items-center rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					{busy ? busyLabel : buttonLabel}
-				</button>
-			</div>
 		</div>
 	);
 }
