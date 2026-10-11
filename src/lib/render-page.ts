@@ -326,6 +326,16 @@ export async function renderPage(
 			if (err instanceof ScrapeError) throw err;
 		}
 		const contentStart = Date.now();
+		if (status >= 400)
+			throw new ScrapeError(
+				"WEBSITE_BLOCKED",
+				`Website membalas HTTP ${status}. Capture tidak dapat dipakai sebagai evidence desain.`,
+			);
+		if (status === 0)
+			throw new ScrapeError(
+				"FETCH_TIMEOUT",
+				"Tidak ada respons HTTP halaman yang dapat diverifikasi.",
+			);
 		if (options.waitMs)
 			await page.waitForTimeout(Math.min(options.waitMs, SCRAPE_LIMITS.waitMs));
 		const images =
