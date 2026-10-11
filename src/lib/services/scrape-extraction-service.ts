@@ -32,6 +32,31 @@ const RETRYABLE_FETCH_CODES = new Set(["FETCH_TIMEOUT", "WEBSITE_BLOCKED"]);
 
 import { SCRAPE_MAX_HTML_BYTES } from "@/lib/constants";
 
+export interface ImageFetchPlan {
+	attempts: number;
+	retryDelayMs: number;
+	retryableCodes: ReadonlySet<string>;
+}
+
+export const IMAGE_FETCH_PLAN: ImageFetchPlan = {
+	attempts: IMAGE_FETCH_ATTEMPTS,
+	retryDelayMs: IMAGE_FETCH_RETRY_DELAY_MS,
+	retryableCodes: RETRYABLE_FETCH_CODES,
+};
+
+// A site that answered with a final status is never retried; only transport
+// faults and 5xx responses, which may be transient, get another attempt.
+export function shouldRetryImageFetch(
+	attempt: number,
+	status: number | null,
+	errorCode: string | null,
+	plan: ImageFetchPlan = IMAGE_FETCH_PLAN,
+): boolean {
+	if (attempt >= plan.attempts - 1) return false;
+	if (status !== null) return status >= 500;
+	return errorCode !== null && plan.retryableCodes.has(errorCode);
+}
+
 async function fetchImageAsset(
 	url: string,
 	signal: AbortSignal | undefined,
@@ -42,13 +67,13 @@ async function fetchImageAsset(
 			await wait(IMAGE_FETCH_RETRY_DELAY_MS, undefined, { signal });
 		try {
 			const asset = await fetchAsset(url, 0, { signal });
-			if (asset.status >= 500 && attempt < IMAGE_FETCH_ATTEMPTS - 1) continue;
+			if (shouldRetryImageFetch(attempt, asset.status, null)) continue;
 			return asset;
 		} catch (error) {
 			lastError = error;
 			const code =
 				error instanceof ScrapeError ? error.code : "UNEXPECTED_ERROR";
-			if (!RETRYABLE_FETCH_CODES.has(code)) throw error;
+			if (!shouldRetryImageFetch(attempt, null, code)) throw error;
 		}
 	}
 	throw lastError;

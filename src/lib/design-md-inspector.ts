@@ -342,11 +342,15 @@ function parseSpacingShapes(lines: string[]): {
 		const isSpacing =
 			/spac|gap|padding|margin|unit|size|scale|token|value/.test(headerText);
 		if (!isRadii && !isSpacing) continue;
-		const target = isRadii ? radii : spacing;
 		for (const row of table.rows) {
 			const label = row[0] ?? "";
 			const value = row[1] ?? "";
-			if (label || value) target.push({ label, value });
+			if (!label && !value) continue;
+			// The canonical table carries the property name in the first column,
+			// so a radius row must be routed by its value, not the table header.
+			const target =
+				isRadii || /radius|radii|round/.test(label) ? radii : spacing;
+			target.push({ label, value });
 		}
 	}
 	const seen = new Set(spacing.map((token) => token.label));
@@ -371,8 +375,16 @@ function parseGuidelines(lines: string[]): { dos: string[]; donts: string[] } {
 		const raw = bullet[1].trim();
 		if (!raw) continue;
 		const text = raw.replace(/\*\*/g, "").trim();
-		if (/^(don't|dont|do\s+not)\b/i.test(text)) donts.push(text);
-		else dos.push(text);
+		const negative = /^(don't|dont|do\s+not)\b/i.test(text);
+		// The canonical document labels each rule with "Do:" or "Don't:" so the
+		// raw markdown stays readable. The label is redundant once the rule is
+		// already grouped under Do or Don't, so it is not shown twice.
+		const display = text
+			.replace(/^(?:don't|dont|do\s+not|do)\s*:\s*/i, "")
+			.trim();
+		if (!display) continue;
+		if (negative) donts.push(display);
+		else dos.push(display);
 	}
 	return { dos, donts };
 }
