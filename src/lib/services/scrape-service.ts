@@ -322,6 +322,7 @@ export async function runScrapePipeline(
 		const designMd = await generateDesignMd(
 			captured.metadata.visualEvidence,
 			instrumentation,
+			claim?.signal,
 		);
 
 		const saveStart = Date.now();

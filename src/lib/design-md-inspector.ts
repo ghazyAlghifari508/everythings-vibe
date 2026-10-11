@@ -1,9 +1,6 @@
 import { parseVisualEvidence } from "./design-evidence-contract";
-import {
-	extractionFromVisualEvidence,
-	renderEvidenceDesignMd,
-} from "./design-visual-evidence";
-import { normalizeDesign } from "./prompts-design-md";
+import { extractionFromVisualEvidence } from "./design-visual-evidence";
+import { designIssues, normalizeDesign } from "./prompts-design-md";
 
 export type DesignTheme = "light" | "dark" | "unknown";
 
@@ -55,7 +52,7 @@ export function inspectorFromEvidence(
 ): DesignInspectorModel | null {
 	const evidence = parseVisualEvidence(value);
 	if (!evidence) return null;
-	if (document !== undefined && document !== renderEvidenceDesignMd(evidence))
+	if (document !== undefined && designIssues(document, evidence).length)
 		return null;
 	const extraction = extractionFromVisualEvidence(evidence);
 	const typography = (extraction.typographyRoles ?? []).map((entry) => ({
