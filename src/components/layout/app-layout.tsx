@@ -22,11 +22,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 		"/admin",
 	];
 	const isCodebaseWorkspace = pathname.startsWith("/codebases/");
+	const isStudioWorkspace = /^\/design\/studio\/[^/]+\/?$/.test(pathname);
 	const hideNavbar =
 		hideNavbarRoutes.includes(pathname) ||
 		pathname.startsWith("/settings/") ||
 		pathname.startsWith("/admin/") ||
-		isCodebaseWorkspace;
+		isCodebaseWorkspace ||
+		isStudioWorkspace;
 
 	// Lock body scroll on workspace pages (Ask, PRD, AC, Task, Kanban, Codebases)
 	// and while the history drawer overlays the page. Both writers must stay in
@@ -38,7 +40,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 		pathname.startsWith("/ac/") ||
 		pathname.startsWith("/task/") ||
 		pathname.startsWith("/kanban/") ||
-		isCodebaseWorkspace;
+		isCodebaseWorkspace ||
+		isStudioWorkspace;
 
 	const shouldLockScroll = isWorkspace || isDrawerOpen;
 
@@ -73,7 +76,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 			<div
 				data-workspace-shell={isWorkspace ? "" : undefined}
 				className={
-					isCodebaseWorkspace
+					isCodebaseWorkspace || isStudioWorkspace
 						? "flex flex-col h-dvh overflow-hidden"
 						: hideNavbar
 							? "flex flex-col min-h-screen"
