@@ -114,12 +114,15 @@ export async function POST({
 			const parsed = scrapeRequestSchema.safeParse(body);
 			if (parsed.success) {
 				const value = parsed.data;
-				const scrape = await createScrape(
-					user.id,
-					value.url,
-					value.mode,
-					value,
-				);
+				const key = request.headers.get("Idempotency-Key");
+				if (key && !/^[a-zA-Z0-9-]{16,100}$/.test(key))
+					return Response.json(
+						{ error: "Request key tidak valid." },
+						{ status: 400 },
+					);
+				const scrape = key
+					? await createScrape(user.id, value.url, value.mode, value, key)
+					: await createScrape(user.id, value.url, value.mode, value);
 				return Response.json(
 					{
 						scrapeId: scrape.id,

@@ -30,6 +30,9 @@ export function CrawlResult({
 							`Description: ${row.content.description ?? "Not available"}`,
 							`Headings: ${row.content.headings.join("; ")}`,
 							`Observed UI elements: ${row.content.patterns.join(", ")}`,
+							...(row.content.outgoingPages ?? []).map(
+								(url) => `Observed page link: ${url}`,
+							),
 							"",
 							row.content.text,
 							"",
@@ -124,6 +127,19 @@ export function CrawlResult({
 									>
 										{row.title ?? new URL(row.url).pathname}
 									</button>
+									{row.content?.outgoingPages && (
+										<ul className="mt-1 space-y-1">
+											{row.content.outgoingPages
+												.filter((url) =>
+													pages.some((target) => target.url === url),
+												)
+												.map((url) => (
+													<li key={url} className="break-all text-xs">
+														Link ke {url}
+													</li>
+												))}
+										</ul>
+									)}
 									{row.parentUrl && (
 										<span className="block break-all text-xs">
 											Link dari {row.parentUrl}

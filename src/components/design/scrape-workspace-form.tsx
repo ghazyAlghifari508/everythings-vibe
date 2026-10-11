@@ -26,6 +26,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 	const [error, setError] = useState("");
 	const [pending, setPending] = useState(false);
 	const submitting = useRef(false);
+	const requestKey = useRef<{ body: string; key: string } | null>(null);
 	function reset() {
 		if (mode === "crawl") setCrawl(crawlSettingsSchema.parse({}));
 		if (mode === "html") setHtml(htmlSettingsSchema.parse({}));
@@ -66,6 +67,9 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 			return;
 		}
 		submitting.current = true;
+		const body = JSON.stringify(parsed.data);
+		if (requestKey.current?.body !== body)
+			requestKey.current = { body, key: crypto.randomUUID() };
 		setPending(true);
 		setError("");
 		try {
@@ -73,14 +77,15 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
+					"Idempotency-Key": requestKey.current.key,
 				},
-				body: JSON.stringify(parsed.data),
+				body,
 			});
-			const body: unknown = await response.json();
-			const result = responseSchema.safeParse(body);
+			const responseBody: unknown = await response.json();
+			const result = responseSchema.safeParse(responseBody);
 			if (!response.ok || !result.success) {
 				setError(
-					errorSchema.safeParse(body).data?.error ??
+					errorSchema.safeParse(responseBody).data?.error ??
 						"Proses belum bisa dimulai. Coba lagi.",
 				);
 				return;

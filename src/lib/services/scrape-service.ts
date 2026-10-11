@@ -53,6 +53,7 @@ export async function createScrape(
 	rawUrl: string,
 	mode: ScrapeMode = "design",
 	request?: ScrapeRequest,
+	idempotencyKey?: string,
 ): Promise<ScrapeRow> {
 	let normalized: string;
 	try {
@@ -70,6 +71,26 @@ export async function createScrape(
 			.for("update")
 			.limit(1);
 		if (!owner) throw new ScrapeError("STORAGE_FAILED");
+		if (idempotencyKey) {
+			const [replay] = await tx
+				.select()
+				.from(scrapes)
+				.where(
+					and(
+						eq(scrapes.userId, userId),
+						sql`${scrapes.metadata}->>'idempotencyKey' = ${idempotencyKey}`,
+					),
+				)
+				.limit(1);
+			if (replay) {
+				if (!isDeepStrictEqual(replay.request, request))
+					throw new ScrapeError(
+						"INVALID_URL",
+						"Request key sudah dipakai untuk parameter berbeda.",
+					);
+				return replay;
+			}
+		}
 		const validated =
 			request ?? scrapeRequestSchema.parse({ url: normalized, mode });
 		const { checkRateLimit } = await import("@/lib/rate-limit");
@@ -116,6 +137,7 @@ export async function createScrape(
 				status: "queued",
 				metadata: {
 					mode,
+					idempotencyKey,
 					stage: "queued",
 					progress: 0,
 					stageStartedAt: new Date().toISOString(),

@@ -165,7 +165,7 @@ export async function crawlWebsite(
 					page = previous;
 					const observedLinks = [
 						...new Set([
-							...previous.content.links,
+							...(previous.content.outgoingPages ?? previous.content.links),
 							...(deps.completed ?? [])
 								.filter((row) => row.parentUrl === next.url)
 								.map((row) => row.url),
@@ -213,6 +213,9 @@ export async function crawlWebsite(
 					title: extractPageTitle(captured.html),
 					httpStatus: captured.status,
 					content: {
+						outgoingPages: links.filter((url) =>
+							isCrawlScope(url, seed, settings.followSubdomains),
+						),
 						description:
 							captured.html.match(
 								/<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i,

@@ -876,6 +876,7 @@ export interface ScrapeMetadata {
 	discoveredPages?: number;
 	processedImages?: number;
 	failedResources?: number;
+	idempotencyKey?: string;
 }
 
 export type ScrapeStatus =
@@ -997,6 +998,7 @@ export const scrapes = pgTable(
 );
 
 export interface CrawlPageContent {
+	outgoingPages?: string[];
 	description: string | null;
 	headings: string[];
 	text: string;
