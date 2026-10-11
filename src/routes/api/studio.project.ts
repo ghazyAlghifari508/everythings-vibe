@@ -5,6 +5,7 @@ import { ScrapeError } from "@/lib/design-errors";
 import {
 	duplicateStudioProject,
 	getStudioProjectDetail,
+	updateStudioDesignSystem,
 } from "@/lib/services/studio-service";
 import { requireUser } from "@/lib/session";
 
@@ -36,10 +37,25 @@ export const Route = createFileRoute("/api/studio/project")({
 	},
 });
 
-const projectActionSchema = z.object({
-	action: z.literal("duplicate"),
-	projectId: z.string().trim().min(1).max(200),
-});
+const projectActionSchema = z.discriminatedUnion("action", [
+	z.object({
+		action: z.literal("duplicate"),
+		projectId: z.string().trim().min(1).max(200),
+	}),
+	z.object({
+		action: z.literal("design-system"),
+		projectId: z.string().trim().min(1).max(200),
+		designMd: z.string().min(20),
+		logo: z
+			.object({
+				filename: z.string().min(1).max(200),
+				mimeType: z.string().min(1),
+				data: z.string().min(1),
+			})
+			.nullable()
+			.optional(),
+	}),
+]);
 
 export async function POST({
 	request,
@@ -56,6 +72,14 @@ export async function POST({
 				{ error: "Aksi project tidak valid." },
 				{ status: 400 },
 			);
+		if (parsed.data.action === "design-system") {
+			const project = await updateStudioDesignSystem(
+				parsed.data.projectId,
+				user.id,
+				parsed.data,
+			);
+			return Response.json({ project });
+		}
 		const project = await duplicateStudioProject(
 			parsed.data.projectId,
 			user.id,

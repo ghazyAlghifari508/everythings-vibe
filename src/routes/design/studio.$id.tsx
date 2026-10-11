@@ -7,6 +7,7 @@ import {
 	StudioComposer,
 	type StudioComposerScope,
 } from "@/components/design/studio-composer";
+import { StudioDesignPicker } from "@/components/design/studio-design-picker";
 import { StudioHeader } from "@/components/design/studio-header";
 import type {
 	StudioFrameRow,
@@ -310,6 +311,38 @@ function StudioDetailPage() {
 
 				{/* Floating AI Prompt Composer */}
 				<StudioComposer
+					designSystemControl={
+						<StudioDesignPicker
+							designMd={project.designMd}
+							disabled={isProcessing || composerLoading}
+							onApply={async (reference) => {
+								const response = await fetch("/api/studio/project", {
+									method: "POST",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({
+										action: "design-system",
+										projectId: project.id,
+										...reference,
+									}),
+								});
+								if (!response.ok) {
+									const result: unknown = await response
+										.json()
+										.catch(() => null);
+									throw new Error(
+										typeof result === "object" &&
+											result !== null &&
+											"error" in result &&
+											typeof result.error === "string"
+											? result.error
+											: "Gagal menyimpan design system.",
+									);
+								}
+								await syncProjectStatus();
+								return true;
+							}}
+						/>
+					}
 					selectedFrameName={selectedFrame?.name ?? null}
 					onClearSelectedFrame={() => setSelectedFrameId(null)}
 					onSubmit={handleComposerSubmit}

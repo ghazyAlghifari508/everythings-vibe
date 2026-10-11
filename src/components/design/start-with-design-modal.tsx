@@ -34,7 +34,7 @@ export interface StartWithDesignModalProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	initialReference?: AttachedDesignReference | null;
-	onApply: (reference: AttachedDesignReference) => void;
+	onApply: (reference: AttachedDesignReference) => Promise<void> | void;
 }
 
 function formatBytes(bytes: number): string {
@@ -56,6 +56,7 @@ export function StartWithDesignModal({
 	);
 	const [error, setError] = useState<string | null>(null);
 	const [logoError, setLogoError] = useState<string | null>(null);
+	const [applying, setApplying] = useState(false);
 
 	const mdFileInputRef = useRef<HTMLInputElement>(null);
 	const logoFileInputRef = useRef<HTMLInputElement>(null);
@@ -177,7 +178,8 @@ export function StartWithDesignModal({
 		e.target.value = "";
 	};
 
-	const handleConfirm = () => {
+	const handleConfirm = async () => {
+		if (applying) return;
 		setError(null);
 		setLogoError(null);
 
@@ -191,11 +193,19 @@ export function StartWithDesignModal({
 			return;
 		}
 
-		onApply({
-			designMd: checked.designMd,
-			logo,
-		});
-		onOpenChange(false);
+		setApplying(true);
+		try {
+			await onApply({ designMd: checked.designMd, logo });
+			onOpenChange(false);
+		} catch (failure) {
+			setError(
+				failure instanceof Error
+					? failure.message
+					: "Gagal menyimpan referensi.",
+			);
+		} finally {
+			setApplying(false);
+		}
 	};
 
 	return (
@@ -465,7 +475,8 @@ export function StartWithDesignModal({
 							</button>
 							<button
 								type="button"
-								onClick={handleConfirm}
+								onClick={() => void handleConfirm()}
+								disabled={applying}
 								className="btn-primary rounded-full px-5 py-2 text-xs font-semibold transition-all hover:brightness-105 active:scale-[0.98]"
 							>
 								Gunakan desain ini

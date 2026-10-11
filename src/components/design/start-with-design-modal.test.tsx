@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StartWithDesignModal } from "./start-with-design-modal";
 
@@ -55,7 +61,7 @@ describe("StartWithDesignModal", () => {
 		).toBeDefined();
 	});
 
-	it("accepts pasted DESIGN.md and applies successfully", () => {
+	it("accepts pasted DESIGN.md and closes after persistence succeeds", async () => {
 		const onApply = vi.fn();
 		const onOpenChange = vi.fn();
 		render(
@@ -80,7 +86,7 @@ describe("StartWithDesignModal", () => {
 			designMd: sampleMd,
 			logo: null,
 		});
-		expect(onOpenChange).toHaveBeenCalledWith(false);
+		await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
 	});
 
 	it("rejects .fig files with a clear actionable message", () => {

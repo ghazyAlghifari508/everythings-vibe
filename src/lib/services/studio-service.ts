@@ -1209,6 +1209,116 @@ export async function duplicateStudioProject(
 	});
 }
 
+export async function updateStudioDesignSystem(
+	projectId: string,
+	userId: string,
+	input: { designMd: string | null; logo?: StudioLogoInput | null },
+): Promise<StudioProjectRow> {
+	const checked = validateStudioDesignMd(input.designMd);
+	if (!checked.ok || !checked.designMd)
+		throw new ScrapeError(
+			"INVALID_URL",
+			checked.ok ? "DESIGN.md diperlukan." : checked.error,
+		);
+	const designMd = checked.designMd;
+	const validatedLogo = input.logo ? validateAndProcessLogo(input.logo) : null;
+	return db.transaction(async (tx) => {
+		const [project] = await tx
+			.select()
+			.from(studioProjects)
+			.where(
+				and(
+					eq(studioProjects.id, projectId),
+					eq(studioProjects.userId, userId),
+				),
+			)
+			.for("update");
+		if (!project)
+			throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+		const [busy] = await tx
+			.select()
+			.from(studioJobs)
+			.where(
+				and(
+					eq(studioJobs.projectId, projectId),
+					eq(studioJobs.userId, userId),
+					inArray(studioJobs.status, ["queued", "planning", "generating"]),
+				),
+			)
+			.limit(1);
+		if (busy)
+			throw new ScrapeError(
+				"INVALID_URL",
+				"Tunggu proses desain selesai sebelum mengganti design system.",
+			);
+		let logoAssetId = project.logoAssetId;
+		if (validatedLogo) {
+			const [asset] = await tx
+				.insert(studioAssets)
+				.values({
+					userId,
+					projectId,
+					...validatedLogo,
+				} satisfies InsertStudioAssetRow)
+				.returning();
+			if (!asset) throw new ScrapeError("STORAGE_FAILED");
+			logoAssetId = asset.id;
+		} else if (input.logo === null) {
+			logoAssetId = null;
+		}
+		const logoUrl = logoAssetId
+			? buildStudioAssetUrl(logoAssetId, userId)
+			: null;
+		const tokens = extractDesignSystemTokens(designMd);
+		const frames = await tx
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, projectId));
+		for (const frame of frames) {
+			if (!frame.htmlCode) continue;
+			let htmlCode = frame.htmlCode;
+			if (input.logo !== undefined && project.logoAssetId) {
+				htmlCode = htmlCode.replace(
+					/<img\b[^>]*src=["'](\/api\/studio\/asset\?[^"']+)["'][^>]*>/gi,
+					(tag, url: string) => {
+						const id = new URL(
+							url.replaceAll("&amp;", "&"),
+							"https://studio.invalid",
+						).searchParams.get("id");
+						return id === project.logoAssetId
+							? logoUrl
+								? tag.replace(url, logoUrl)
+								: ""
+							: tag;
+					},
+				);
+			}
+			htmlCode = enforceDesignSystemOnHtml(htmlCode, tokens, logoUrl);
+			await tx
+				.update(studioFrames)
+				.set({ htmlCode, updatedAt: new Date() })
+				.where(
+					and(
+						eq(studioFrames.id, frame.id),
+						eq(studioFrames.projectId, projectId),
+					),
+				);
+		}
+		const [updated] = await tx
+			.update(studioProjects)
+			.set({ designMd, logoAssetId, updatedAt: new Date() })
+			.where(
+				and(
+					eq(studioProjects.id, projectId),
+					eq(studioProjects.userId, userId),
+				),
+			)
+			.returning();
+		if (!updated) throw new ScrapeError("STORAGE_FAILED");
+		return updated;
+	});
+}
+
 export async function generateStudioHtml(
 	prompt: string,
 	maxTokens = 12_000,
