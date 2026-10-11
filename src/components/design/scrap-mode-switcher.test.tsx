@@ -72,7 +72,7 @@ describe("extraction workspace", () => {
 		"crawl",
 		"images",
 	] as const)("submits normalized typed %s request once", async (mode) => {
-		const fetchMock = vi.fn(async () => ({
+		const fetchMock = vi.fn(async (_url: string, _options: RequestInit) => ({
 			ok: true,
 			json: async () => ({ scrapeId: "result-1" }),
 		}));
@@ -102,6 +102,9 @@ describe("extraction workspace", () => {
 		);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		const call = fetchMock.mock.calls[0];
-		expect(call).toBeDefined();
+		expect(JSON.parse(String(call[1].body))).toMatchObject({
+			mode,
+			url: "https://sample.example/path?q=1",
+		});
 	});
 });

@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertScrapeDocumentRow,
@@ -335,15 +335,16 @@ export async function runScrapePipeline(
 			.update(scrapes)
 			.set({
 				status: "failed",
-				metadata: {
-					...meta,
-					mode,
-					stage: "failed",
-					progress: 0,
-					stageStartedAt: new Date().toISOString(),
-					errorMessage,
-					errorDetail,
-				},
+				metadata: sql`coalesce(${scrapes.metadata}, '{}'::jsonb) || ${JSON.stringify(
+					{
+						mode,
+						stage: "failed",
+						progress: 0,
+						stageStartedAt: new Date().toISOString(),
+						errorMessage,
+						errorDetail,
+					},
+				)}::jsonb`,
 				updatedAt: new Date(),
 			})
 			.where(writePredicate());
