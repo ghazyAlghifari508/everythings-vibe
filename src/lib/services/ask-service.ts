@@ -2,6 +2,8 @@
  * Ask-flow question parsing - mirrors task-service.ts's parseTaskJson
  * strict-validation pattern (reject malformed shape, no partial trust).
  */
+import { extractJson } from "./json-extract";
+
 export type AskQuestionType = "select" | "text" | "multiselect";
 
 export interface AskQuestion {
@@ -119,4 +121,168 @@ export function parseAskOptionsJson(jsonString: string): AskQuestion[] | null {
 	} catch {
 		return null;
 	}
+}
+
+// === Bounded repair + diagnostics ===
+// The parser above is the contract. When a completion misses it, the caller may
+// run exactly ONE correction request (mirroring the codebase-analysis repair):
+// the rejected output is handed back with the failing locations and the shape
+// rules, and the SAME strict parser runs again. The repair never supplies
+// questions, options, or recommendations of its own — it only restates the
+// contract, so a model that cannot comply fails visibly instead of the UI
+// receiving invented content.
+
+export type AskOptionsFailureReason = "invalid_json" | "schema";
+
+/** Why a completion failed, derived from the completion itself. */
+export function classifyAskOptionsOutput(raw: string): AskOptionsFailureReason {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw);
+	} catch {
+		return "invalid_json";
+	}
+	if (typeof parsed !== "object" || parsed === null) return "invalid_json";
+	return "schema";
+}
+
+const REPAIR_MAX_RAW_CHARS = 6000;
+
+/**
+ * Correction request for a completion that missed the output contract. The
+ * excerpt is bounded and carries no server-side secrets (it is the model's own
+ * prior text), and the rules restate the schema without adding content.
+ */
+export function buildAskOptionsRepairPrompt(input: {
+	raw: string;
+	reason: AskOptionsFailureReason;
+	maxRawChars?: number;
+}): string {
+	const maxRawChars = input.maxRawChars ?? REPAIR_MAX_RAW_CHARS;
+	const excerpt =
+		input.raw.length > maxRawChars
+			? `${input.raw.slice(0, maxRawChars)}\n...(dipotong)`
+			: input.raw;
+	return [
+		"Output sebelumnya tidak memenuhi kontrak JSON. Perbaiki dan kirim ulang HANYA JSON valid, tanpa teks lain.",
+		`Kegagalan: ${input.reason}`,
+		"Bentuk yang diwajibkan:",
+		'{ "questions": [ { "id": "snake_case_id", "question": "Pertanyaan?", "type": "select|text|multiselect", "options": ["Opsi 1", "Opsi 2", "Opsi 3"] } ] }',
+		"Output sebelumnya (dipotong):",
+		excerpt,
+		"Peraturan perbaikan:",
+		"1. Output HANYA JSON valid sesuai bentuk di atas.",
+		"2. Pertahankan jumlah, isi, dan bahasa pertanyaan yang sudah ada — jangan menambah atau menghapus pertanyaan untuk mengisi kekurangan.",
+		"3. type wajib salah satu dari select, text, multiselect. select dan multiselect wajib punya options berisi minimal 3 opsi singkat.",
+		"4. Jangan menambahkan komentar, penjelasan, atau markdown di luar JSON.",
+	].join("\n");
+}
+
+// === Bounded repair orchestration (pure, injectable) ===
+// Mirrors `generateValidatedAnalysis` in codebase-analysis.ts so both AI
+// boundaries share one shape: collect once, parse strictly, and on a fixable
+// contract miss run exactly ONE repair pass that restates the contract. A
+// provider/transport failure is never repaired here — it propagates as-is so
+// the caller can report the real cause.
+
+export interface AskOptionsMessage {
+	role: "system" | "user" | "assistant";
+	content: string;
+}
+
+export type AskOptionsCollectionFailure = {
+	kind: "aborted" | "too_long" | "truncated";
+	message: string;
+};
+
+export type AskOptionsCollection =
+	| { ok: true; text: string; finishReason: string | undefined }
+	| { ok: false; failure: AskOptionsCollectionFailure };
+
+export type AskOptionsOutcome =
+	| { ok: true; questions: AskQuestion[] }
+	| {
+			ok: false;
+			code: "QUESTION_GENERATION_FAILED" | "QUESTION_FORMAT_INVALID";
+			status: 499 | 500;
+			message: string;
+	  };
+
+export interface AskOptionsDiagnostic {
+	stage: "initial" | "repair";
+	category: AskOptionsFailureReason;
+	finishReason?: string;
+	rawLength: number;
+}
+
+export interface GenerateValidatedAskQuestionsInput {
+	/** One full model pass over the supplied conversation. */
+	collect: (messages: AskOptionsMessage[]) => Promise<AskOptionsCollection>;
+	messages: AskOptionsMessage[];
+	/** Optional structured diagnostic sink; never receives model text. */
+	onDiagnostic?: (record: AskOptionsDiagnostic) => void;
+}
+
+export async function generateValidatedAskQuestions(
+	input: GenerateValidatedAskQuestionsInput,
+): Promise<AskOptionsOutcome> {
+	const first = await input.collect(input.messages);
+	if (!first.ok) {
+		return {
+			ok: false,
+			code: "QUESTION_GENERATION_FAILED",
+			status: first.failure.kind === "aborted" ? 499 : 500,
+			message: first.failure.message,
+		};
+	}
+
+	const firstExtracted = extractJson(first.text);
+	const firstQuestions = parseAskOptionsJson(firstExtracted);
+	if (firstQuestions) return { ok: true, questions: firstQuestions };
+
+	const reason = classifyAskOptionsOutput(firstExtracted);
+	input.onDiagnostic?.({
+		stage: "initial",
+		category: reason,
+		...(first.finishReason !== undefined
+			? { finishReason: first.finishReason }
+			: {}),
+		rawLength: first.text.length,
+	});
+
+	const repaired = await input.collect([
+		...input.messages,
+		{
+			role: "user",
+			content: buildAskOptionsRepairPrompt({ raw: first.text, reason }),
+		},
+	]);
+	if (!repaired.ok) {
+		return {
+			ok: false,
+			code: "QUESTION_GENERATION_FAILED",
+			status: repaired.failure.kind === "aborted" ? 499 : 500,
+			message: repaired.failure.message,
+		};
+	}
+
+	const repairedExtracted = extractJson(repaired.text);
+	const repairedQuestions = parseAskOptionsJson(repairedExtracted);
+	if (repairedQuestions) return { ok: true, questions: repairedQuestions };
+
+	input.onDiagnostic?.({
+		stage: "repair",
+		category: classifyAskOptionsOutput(repairedExtracted),
+		...(repaired.finishReason !== undefined
+			? { finishReason: repaired.finishReason }
+			: {}),
+		rawLength: repaired.text.length,
+	});
+	return {
+		ok: false,
+		code: "QUESTION_FORMAT_INVALID",
+		status: 500,
+		message:
+			"AI belum menghasilkan pertanyaan yang valid setelah perbaikan. Coba lagi.",
+	};
 }

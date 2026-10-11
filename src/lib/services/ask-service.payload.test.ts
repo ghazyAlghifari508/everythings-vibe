@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	type AskQuestion,
+	buildAskOptionsRepairPrompt,
+	classifyAskOptionsOutput,
 	parseAskOptionsJson,
 	validateAskQuestions,
 } from "./ask-service";
@@ -124,5 +126,52 @@ describe("validateAskQuestions (server payload boundary)", () => {
 		expect(validateAskQuestions(null)).toBeNull();
 		expect(validateAskQuestions({ questions: validQuestions })).toBeNull();
 		expect(validateAskQuestions("[]")).toBeNull();
+	});
+});
+
+describe("ask options failure classification (diagnostics only)", () => {
+	it("separates unparseable text from schema misses", () => {
+		expect(classifyAskOptionsOutput("not json at all")).toBe("invalid_json");
+		expect(classifyAskOptionsOutput("")).toBe("invalid_json");
+		// Valid JSON in the wrong shape is a schema miss, not a parse failure.
+		expect(classifyAskOptionsOutput("[]")).toBe("schema");
+		expect(classifyAskOptionsOutput(JSON.stringify({ questions: [] }))).toBe(
+			"schema",
+		);
+		expect(
+			classifyAskOptionsOutput(
+				JSON.stringify({ questions: [{ id: "a", question: "Q?", type: "text" }] }),
+			),
+		).toBe("schema");
+	});
+
+	it("never echoes a successful payload as a failure", () => {
+		expect(
+			classifyAskOptionsOutput(JSON.stringify({ questions: validQuestions })),
+		).toBe("schema");
+	});
+});
+
+describe("bounded repair prompt", () => {
+	it("restates the contract without supplying questions or options", () => {
+		const prompt = buildAskOptionsRepairPrompt({
+			raw: '{"questions": "nope"}',
+			reason: "schema",
+		});
+		expect(prompt).toContain("questions");
+		expect(prompt).toContain("select|text|multiselect");
+		expect(prompt).toContain("Perbaiki dan kirim ulang HANYA JSON valid");
+		// The repair must instruct preservation, never invention.
+		expect(prompt).toContain("jangan menambah atau menghapus pertanyaan");
+	});
+
+	it("bounds the rejected output it hands back", () => {
+		const prompt = buildAskOptionsRepairPrompt({
+			raw: "x".repeat(50_000),
+			reason: "invalid_json",
+			maxRawChars: 100,
+		});
+		expect(prompt).toContain("...(dipotong)");
+		expect(prompt.length).toBeLessThan(1_000);
 	});
 });

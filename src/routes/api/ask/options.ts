@@ -25,9 +25,11 @@ import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
-import { parseAskOptionsJson } from "@/lib/services/ask-service";
+import {
+	type AskOptionsCollection,
+	generateValidatedAskQuestions,
+} from "@/lib/services/ask-service";
 import { sanitizeErrorForClient } from "@/lib/services/error-sanitizer";
-import { extractJson } from "@/lib/services/json-extract";
 import { sanitizeModelOutput } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 import type { Plan } from "@/types/database";
@@ -252,23 +254,34 @@ export const Route = createFileRoute("/api/ask/options")({
 
 				const modelsToTry = selectModels();
 
-				try {
-					// ponytail: non-stream: payload is 5-7 short questions, progressive
-					// reveal buys no UX here. Collect fully, then parse once.
-					// 12000 (not 4000): every model here is reasoning:true (model-config.ts)
-					// and reasoning tokens spend from the same maxOutputTokens budget before
-					// any JSON content is emitted — 4000 left too little headroom and the
-					// JSON got cut off mid-object on verbose reasoning runs.
+				// Bounded accumulation: abort the upstream generation if it
+				// exceeds what the parser could ever need.
+				const MAX_ASK_RESPONSE_CHARS = 200_000;
+				// 12000 (not 4000): every model here is reasoning:true
+				// (model-config.ts) and reasoning tokens spend from the same
+				// maxOutputTokens budget before any JSON content is emitted —
+				// 4000 left too little headroom and the JSON got cut off
+				// mid-object on verbose reasoning runs.
+				const ASK_OPTIONS_MAX_TOKENS = 12000;
+
+				/**
+				 * One full model pass. Non-streaming by design: the payload is a
+				 * handful of short questions, so progressive reveal buys no UX
+				 * here — the completion is collected, then parsed once.
+				 */
+				const collectOnce = async (
+					conversation: Array<{
+						role: "system" | "user" | "assistant";
+						content: string;
+					}>,
+				): Promise<AskOptionsCollection> => {
 					const { generator, firstChunk, abortController, outcome } =
 						await tryStreamWithFallback(
 							modelsToTry,
-							messages,
+							conversation,
 							request.signal,
-							12000,
+							ASK_OPTIONS_MAX_TOKENS,
 						);
-					// Bounded accumulation: abort the upstream generation if it
-					// exceeds what the parser could ever need.
-					const MAX_ASK_RESPONSE_CHARS = 200_000;
 					let fullResponse = firstChunk;
 					try {
 						for await (const chunk of generator) {
@@ -280,39 +293,63 @@ export const Route = createFileRoute("/api/ask/options")({
 						}
 					} catch (e) {
 						if (isClientAbort(e, request.signal)) {
-							return Response.json(
-								{ error: "Generasi pertanyaan dibatalkan." },
-								{ status: 499 },
-							);
+							return {
+								ok: false,
+								failure: {
+									kind: "aborted",
+									message: "Generasi pertanyaan dibatalkan.",
+								},
+							};
 						}
 						throw e;
 					}
 					if (fullResponse.length > MAX_ASK_RESPONSE_CHARS) {
-						return Response.json(
-							{ error: "Respons AI melebihi batas. Coba lagi." },
-							{ status: 500 },
-						);
+						return {
+							ok: false,
+							failure: {
+								kind: "too_long",
+								message: "Respons AI melebihi batas. Coba lagi.",
+							},
+						};
 					}
-
 					if (isTruncatedGeneration(fullResponse, outcome.finishReason)) {
-						return Response.json(
-							{
-								error:
+						return {
+							ok: false,
+							failure: {
+								kind: "truncated",
+								message:
 									"Generasi pertanyaan terputus di tengah jalan. Coba lagi.",
 							},
-							{ status: 500 },
-						);
+						};
 					}
+					return {
+						ok: true,
+						// The model's own HTML-page mis-render is normalized once
+						// here, before the shared parser sees it.
+						text: sanitizeModelOutput(fullResponse),
+						finishReason: outcome.finishReason,
+					};
+				};
 
-					const questions = parseAskOptionsJson(
-						extractJson(sanitizeModelOutput(fullResponse)),
-					);
-					if (!questions) {
+				try {
+					// Collect, parse strictly, and on a fixable contract miss run
+					// exactly one bounded repair (see ask-service). Provider and
+					// truncation failures surface unchanged; the repair never
+					// invents questions to fill a gap.
+					const outcome = await generateValidatedAskQuestions({
+						collect: collectOnce,
+						messages,
+						onDiagnostic: (record) => {
+							console.error("[ask/options] output rejected", record);
+						},
+					});
+					if (!outcome.ok) {
 						return Response.json(
-							{ error: "AI menghasilkan JSON tidak valid. Coba lagi." },
-							{ status: 500 },
+							{ error: outcome.message, code: outcome.code },
+							{ status: outcome.status },
 						);
 					}
+					const questions = outcome.questions;
 
 					// Mark pre-artifact projects at question-stage server-side so
 					// History routes them to /ask instead of the empty PRD page.
@@ -373,7 +410,10 @@ export const Route = createFileRoute("/api/ask/options")({
 					}
 					console.error("Ask options generate error:", err);
 					return Response.json(
-						{ error: sanitizeErrorForClient(err) },
+						{
+							error: sanitizeErrorForClient(err),
+							code: "QUESTION_GENERATION_FAILED",
+						},
 						{ status: 500 },
 					);
 				}
