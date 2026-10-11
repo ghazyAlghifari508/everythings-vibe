@@ -331,7 +331,7 @@ export async function renderPage(
 				"WEBSITE_BLOCKED",
 				`Website membalas HTTP ${status}. Capture tidak dapat dipakai sebagai evidence desain.`,
 			);
-		if (status === 0)
+		if (status === 0 && /^https?:/i.test(url))
 			throw new ScrapeError(
 				"FETCH_TIMEOUT",
 				"Tidak ada respons HTTP halaman yang dapat diverifikasi.",

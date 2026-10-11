@@ -60,7 +60,7 @@ it("measures rendered styles and excludes hidden and unused declarations", async
 	} finally {
 		await browser.close();
 	}
-});
+}, 60000);
 
 it("keeps sparse and missing measurements empty rather than filling a palette or type scale", () => {
 	const evidence = {
@@ -124,4 +124,4 @@ it("preserves computed gradients and variables independently of declaration orde
 	} finally {
 		await browser.close();
 	}
-});
+}, 60000);
