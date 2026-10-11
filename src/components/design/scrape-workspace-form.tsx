@@ -43,9 +43,10 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 		event.preventDefault();
 		if (submitting.current) return;
 		const suffix = input.trim();
-		const url = /^[a-z][a-z\d+.-]*:/i.test(suffix)
-			? suffix
-			: `${protocol}${suffix}`;
+		const url =
+			/^[a-z][a-z\d+.-]*:/i.test(suffix) && !/^[^/]+:\d+(?:\/|$)/.test(suffix)
+				? suffix
+				: `${protocol}${suffix}`;
 		const parsed = scrapeRequestSchema.safeParse({
 			url,
 			mode,

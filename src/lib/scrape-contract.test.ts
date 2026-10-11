@@ -3,6 +3,9 @@ import { normalizeScrapeInput, scrapeRequestSchema } from "./scrape-contract";
 
 describe("scrape request contract", () => {
 	it("normalizes domains while preserving explicit protocol, path and query", () => {
+		expect(normalizeScrapeInput("sample.example:8080/path")).toBe(
+			"https://sample.example:8080/path",
+		);
 		expect(normalizeScrapeInput(" sample.example/path?q=1 ")).toBe(
 			"https://sample.example/path?q=1",
 		);

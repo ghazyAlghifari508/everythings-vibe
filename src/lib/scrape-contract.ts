@@ -20,9 +20,10 @@ export function normalizeScrapeInput(raw: string): string {
 	const trimmed = raw.trim();
 	if (!trimmed || trimmed.length > SCRAPE_LIMITS.urlChars)
 		throw new Error("URL tidak valid.");
-	const value = /^[a-z][a-z\d+.-]*:/i.test(trimmed)
-		? trimmed
-		: `https://${trimmed}`;
+	const value =
+		/^[a-z][a-z\d+.-]*:/i.test(trimmed) && !/^[^/]+:\d+(?:\/|$)/.test(trimmed)
+			? trimmed
+			: `https://${trimmed}`;
 	const url = new URL(value);
 	const host = url.hostname.toLowerCase();
 	if (
