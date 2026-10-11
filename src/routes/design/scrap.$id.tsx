@@ -242,20 +242,22 @@ function ScrapeDetailPage() {
 			<ScrapeBackLink from={from} />
 			{currentStatus === "failed" &&
 				(mode === "crawl" || mode === "images") && (
-					<div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-graphite p-4">
-						<p role="alert" className="text-sm text-fog">
-							{errorMessage ??
-								"Ekstraksi terhenti; hasil yang tersimpan tetap tersedia."}
-						</p>
-						<button
-							type="button"
-							onClick={() => void retry()}
-							disabled={isRetrying}
-							className="min-h-11 rounded-md border border-graphite px-4 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							Coba lagi
-						</button>
-					</div>
+					<ScrapeProgress
+						mode={mode}
+						status={currentStatus}
+						sourceUrl={sourceUrl}
+						domain={domain}
+						errorMessage={errorMessage}
+						isRetrying={isRetrying}
+						onRetry={retry}
+						partialResults={
+							mode === "crawl"
+								? initial.pages.filter((page) => page.status === "completed")
+										.length
+								: initial.images.filter((image) => image.status === "completed")
+										.length
+						}
+					/>
 				)}
 			{mode === "crawl" &&
 			(currentStatus === "completed" ||
@@ -283,8 +285,14 @@ function ScrapeDetailPage() {
 					previewError={previewError}
 					onRetryPreview={() => void retryPreview()}
 				/>
-			) : (
+			) : currentStatus === "failed" &&
+				(mode === "crawl" || mode === "images") ? null : (
 				<ScrapeProgress
+					completedPages={data?.metadata?.completedPages}
+					skippedPages={data?.metadata?.skippedPages}
+					discoveredImages={data?.metadata?.discoveredImages}
+					savedImages={data?.metadata?.savedImages}
+					failedResources={data?.metadata?.failedResources}
 					visitedPages={
 						data?.metadata?.visitedPages ?? initial.metadata?.visitedPages
 					}
