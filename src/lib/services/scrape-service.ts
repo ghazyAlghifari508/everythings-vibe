@@ -380,65 +380,74 @@ export async function retryScrape(
 	scrapeId: string,
 	userId: string,
 ): Promise<{ ok: true }> {
-	const [scrape] = await db
-		.select()
-		.from(scrapes)
-		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
-		.limit(1);
-	if (!scrape)
-		throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
-	if (scrape.status !== "failed") return { ok: true };
-	const active = await db
-		.select({ id: scrapes.id })
-		.from(scrapes)
-		.where(
-			and(
-				eq(scrapes.userId, userId),
-				inArray(scrapes.status, [
-					"queued",
-					"capturing",
-					"extracting",
-					"generating",
-					"saving",
-				]),
-			),
-		);
-	if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
-		throw new ScrapeError("QUEUE_CAPACITY");
+	return db.transaction(async (tx) => {
+		const [owner] = await tx
+			.select({ id: users.id })
+			.from(users)
+			.where(eq(users.id, userId))
+			.for("update")
+			.limit(1);
+		if (!owner) throw new ScrapeError("STORAGE_FAILED");
+		const [scrape] = await tx
+			.select()
+			.from(scrapes)
+			.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
+			.limit(1);
+		if (!scrape)
+			throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
+		if (scrape.status !== "failed") return { ok: true };
+		const active = await tx
+			.select({ id: scrapes.id })
+			.from(scrapes)
+			.where(
+				and(
+					eq(scrapes.userId, userId),
+					inArray(scrapes.status, [
+						"queued",
+						"capturing",
+						"extracting",
+						"generating",
+						"saving",
+					]),
+				),
+			);
+		if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
+			throw new ScrapeError("QUEUE_CAPACITY");
 
-	const mode: ScrapeMode = (scrape.mode ??
-		scrape.metadata?.mode ??
-		"design") as ScrapeMode;
-	await db
-		.update(scrapes)
-		.set({
-			status: "queued",
-			jobAttempts: 0,
-			jobToken: null,
-			leaseExpiresAt: null,
-			metadata: {
-				...(typeof scrape.metadata === "object" && scrape.metadata !== null
-					? scrape.metadata
-					: {}),
-				mode,
-				stage: "queued",
-				progress: 0,
-				stageStartedAt: new Date().toISOString(),
-				activity: undefined,
-				activityStartedAt: undefined,
-				errorMessage: undefined,
-				errorDetail: undefined,
-			},
-			updatedAt: new Date(),
-		})
-		.where(
-			and(
-				eq(scrapes.id, scrapeId),
-				eq(scrapes.userId, userId),
-				eq(scrapes.status, "failed"),
-			),
-		);
-	return { ok: true };
+		const mode: ScrapeMode = (scrape.mode ??
+			scrape.metadata?.mode ??
+			"design") as ScrapeMode;
+		await tx
+			.update(scrapes)
+			.set({
+				status: "queued",
+				jobAttempts: 0,
+				jobToken: null,
+				leaseExpiresAt: null,
+				metadata: {
+					...(typeof scrape.metadata === "object" && scrape.metadata !== null
+						? scrape.metadata
+						: {}),
+					mode,
+					stage: "queued",
+					progress: 0,
+					stageStartedAt: new Date().toISOString(),
+					activity: undefined,
+					activityStartedAt: undefined,
+					errorMessage: undefined,
+					errorDetail: undefined,
+				},
+				updatedAt: new Date(),
+			})
+			.where(
+				and(
+					eq(scrapes.id, scrapeId),
+					eq(scrapes.userId, userId),
+					eq(scrapes.status, "failed"),
+				),
+			);
+		return { ok: true };
+	});
 }
 
 export async function getScrapeById(
