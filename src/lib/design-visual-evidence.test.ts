@@ -92,6 +92,44 @@ it("keeps sparse and missing measurements empty rather than filling a palette or
 	).toBe(false);
 });
 
+it("only derives brand-primary from repeated CTAs and a matching semantic variable", () => {
+	const base = {
+		version: 1 as const,
+		sourceUrl: "https://example.test/",
+		capturedAt: new Date().toISOString(),
+		viewport: { width: 1440, height: 900 },
+		fonts: [],
+		limitations: [],
+	};
+	const button = {
+		selector: "body > button:nth-child(1)",
+		role: "cta",
+		text: "Action",
+		width: 120,
+		height: 44,
+		properties: { "background-color": "rgb(70, 180, 40)" },
+		variables: { "--brand-primary": "rgb(70, 180, 40)" },
+	};
+	expect(
+		extractionFromVisualEvidence({ ...base, elements: [button] }).colors[0]
+			.role,
+	).toBe("cta-background");
+	const repeated = extractionFromVisualEvidence({
+		...base,
+		elements: [button, { ...button, selector: "body > button:nth-child(2)" }],
+	});
+	expect(repeated.colors[0].role).toContain("derived");
+	expect(
+		extractionFromVisualEvidence({
+			...base,
+			elements: [
+				{ ...button, variables: {} },
+				{ ...button, selector: "body > button:nth-child(2)", variables: {} },
+			],
+		}).colors[0].role,
+	).toBe("cta-background");
+});
+
 it("preserves computed gradients and variables independently of declaration order", async () => {
 	const browser = await chromium.launch();
 	try {
