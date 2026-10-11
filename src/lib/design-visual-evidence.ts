@@ -308,6 +308,8 @@ export function collectVisualEvidence(
 		"display",
 	];
 	const candidates: HTMLElement[] = [];
+	if (document.documentElement instanceof HTMLElement)
+		candidates.push(document.documentElement);
 	while (walker.nextNode() && scanned < limits.scanElements) {
 		scanned += 1;
 		if (walker.currentNode instanceof HTMLElement)
@@ -362,7 +364,7 @@ export function collectVisualEvidence(
 				? "nav"
 				: /^h[1-6]$/.test(tag)
 					? tag
-					: tag === "body"
+					: tag === "body" || tag === "html"
 						? "canvas"
 						: tag === "p"
 							? "body"

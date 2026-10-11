@@ -349,6 +349,7 @@ export async function renderPage(
 								height: number | null;
 								source: string;
 							}[] = [];
+							const seen = new Set<string>();
 							const add = (
 								raw: string,
 								source: string,
@@ -362,9 +363,11 @@ export async function renderPage(
 										!["http:", "https:"].includes(url.protocol) ||
 										url.username ||
 										url.password ||
-										result.length >= limits.imageCandidates
+										result.length >= limits.imageCandidates ||
+										seen.has(`${url.href}:${source}`)
 									)
 										return;
+									seen.add(`${url.href}:${source}`);
 									result.push({ url: url.href, source, alt, width, height });
 								} catch {
 									return;
