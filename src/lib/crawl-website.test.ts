@@ -3,6 +3,19 @@ import { crawlWebsite, isCrawlScope, robotsAllows } from "./crawl-website";
 import { crawlSettingsSchema } from "./scrape-contract";
 
 describe("website traversal", () => {
+	it("aborts before loading a canceled job", async () => {
+		const controller = new AbortController();
+		controller.abort();
+		await expect(
+			crawlWebsite("https://sample.example/", crawlSettingsSchema.parse({}), {
+				signal: controller.signal,
+				load: async () => {
+					throw new Error("Must not load");
+				},
+				robots: async () => "",
+			}),
+		).rejects.toThrow();
+	});
 	it("does not traverse stylesheet or alternate metadata URLs", async () => {
 		const calls: string[] = [];
 		await crawlWebsite(
