@@ -633,6 +633,11 @@ function CodebaseDetailPage() {
 	const [chatAnswers, setChatAnswers] = useState<Record<string, string>>({});
 	const [questionsLoading, setQuestionsLoading] = useState(false);
 	const [questionsError, setQuestionsError] = useState<string | null>(null);
+	/** Real client-side start of the current question-generation request.
+	 *  Drives the Thinking elapsed timer only — never a fabricated stage. */
+	const [questionsStartedAt, setQuestionsStartedAt] = useState<number | null>(
+		null,
+	);
 	const [lastFeaturePrompt, setLastFeaturePrompt] = useState("");
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
@@ -1388,6 +1393,7 @@ function CodebaseDetailPage() {
 	const fetchAiQuestions = useCallback(
 		async (projectId: string, prompt: string) => {
 			setQuestionsLoading(true);
+			setQuestionsStartedAt(Date.now());
 			setQuestionsError(null);
 			try {
 				const response = await fetch("/api/ask/options", {
@@ -1944,6 +1950,7 @@ function CodebaseDetailPage() {
 								answers={chatAnswers}
 								questionsLoading={questionsLoading}
 								questionsError={questionsError}
+								questionsStartedAt={questionsStartedAt}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
 								projectIdForHandoff={hasTasksInDb ? effectiveFeatureId : null}
