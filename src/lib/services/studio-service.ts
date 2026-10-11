@@ -635,7 +635,8 @@ export async function runStudioJobPipeline(
 			await db
 				.update(studioJobs)
 				.set({
-					status: "completed",
+					status:
+						readyCount === framesToProcess.length ? "completed" : "partial",
 					updatedAt: new Date(),
 				})
 				.where(eq(studioJobs.id, jobId));
@@ -1079,64 +1080,44 @@ export async function retryStudioFrame(
 			throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
 		return frame;
 	}
-	const detail = await getStudioProject(projectId, userId);
-	const [frame] = await db
-		.select()
-		.from(studioFrames)
-		.where(
-			and(eq(studioFrames.id, frameId), eq(studioFrames.projectId, projectId)),
-		)
-		.limit(1);
-
-	if (!frame)
+	const owned = await getStudioProjectDetail(projectId, userId);
+	const target = owned.frames.find((frame) => frame.id === frameId);
+	if (!target)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
-
+	if (target.status !== "failed")
+		throw new ScrapeError("INVALID_URL", "Frame ini tidak memerlukan retry.");
+	const [initial] = await db
+		.select()
+		.from(studioJobs)
+		.where(
+			and(
+				eq(studioJobs.projectId, projectId),
+				eq(studioJobs.userId, userId),
+				eq(studioJobs.jobType, "initial"),
+			),
+		)
+		.orderBy(asc(studioJobs.createdAt))
+		.limit(1);
+	const [retryJob] = await db
+		.insert(studioJobs)
+		.values({
+			projectId,
+			userId,
+			jobType: "retry",
+			targetFrameId: frameId,
+			prompt: initial?.prompt ?? target.description ?? target.name,
+			status: "queued",
+		} satisfies InsertStudioJobRow)
+		.returning();
+	if (!retryJob) throw new ScrapeError("STORAGE_FAILED");
 	await db
 		.update(studioFrames)
-		.set({ status: "generating", error: null, updatedAt: new Date() })
-		.where(eq(studioFrames.id, frameId));
-
-	try {
-		const existingFrames = await db
-			.select({ name: studioFrames.name })
-			.from(studioFrames)
-			.where(eq(studioFrames.projectId, projectId));
-
-		const framePrompt = buildStudioFramePrompt({
-			screenName: frame.name,
-			screenDescription: frame.description ?? undefined,
-			allScreens: existingFrames.map((f) => f.name),
-			projectPrompt: frame.description || frame.name,
-			designMode: validateStudioDesignMode(frame.viewport),
-			designMd: detail.designMd,
-			logoUrl: detail.logoUrl,
-		});
-
-		const rawHtml = await generateStudioHtml(framePrompt);
-		const dsTokens = extractDesignSystemTokens(detail.designMd);
-		const htmlCode = enforceDesignSystemOnHtml(
-			rawHtml,
-			dsTokens,
-			detail.logoUrl,
+		.set({ status: "queued", error: null, updatedAt: new Date() })
+		.where(
+			and(eq(studioFrames.id, frameId), eq(studioFrames.projectId, projectId)),
 		);
-
-		const [updated] = await db
-			.update(studioFrames)
-			.set({ htmlCode, status: "ready", updatedAt: new Date() })
-			.where(eq(studioFrames.id, frameId))
-			.returning();
-
-		return updated ?? frame;
-	} catch (err) {
-		const errorMsg =
-			err instanceof Error ? err.message : "Gagal generate frame";
-		const [failed] = await db
-			.update(studioFrames)
-			.set({ status: "failed", error: errorMsg, updatedAt: new Date() })
-			.where(eq(studioFrames.id, frameId))
-			.returning();
-		return failed ?? frame;
-	}
+	void runStudioJobPipeline(retryJob.id, projectId, userId);
+	return { ...target, status: "queued", error: null };
 }
 
 export async function retryStudioPlanning(

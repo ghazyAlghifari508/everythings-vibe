@@ -239,8 +239,15 @@ describe("End-to-End Multi-Screen Generation Scenarios", () => {
 
 		// Retry only the failed frame
 		const retried = await retryStudioFrame(project.id, userId, failedFrame.id);
-		expect(retried.status).toBe("ready");
-		expect(retried.htmlCode).toContain("<html");
+		expect(retried.status).toBe("queued");
+		await vi.waitFor(async () => {
+			const [persisted] = await db
+				.select()
+				.from(studioFrames)
+				.where(eq(studioFrames.id, failedFrame.id));
+			expect(persisted.status).toBe("ready");
+			expect(persisted.htmlCode).toContain("<html");
+		});
 
 		// Test history listing
 		const history = await listStudioProjects(userId);
