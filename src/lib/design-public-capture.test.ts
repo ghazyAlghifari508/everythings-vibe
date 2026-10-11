@@ -10,7 +10,7 @@ it("verifies public capture measurements agree with the document and inspector",
 			const captured = await renderPage(url, { mode: "design" });
 			expect(captured.visualEvidence).toBeDefined();
 			if (!captured.visualEvidence) throw new Error("No evidence");
-			const document = await generateDesignMd(captured.visualEvidence);
+			const { document } = await generateDesignMd(captured.visualEvidence);
 			expect(designIssues(document, captured.visualEvidence)).toEqual([]);
 			const inspector = inspectorFromEvidence(captured.visualEvidence);
 			expect(

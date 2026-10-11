@@ -319,17 +319,28 @@ export async function runScrapePipeline(
 
 		await persist("generating");
 		await instrumentation.onActivity?.("Menyusun tabel dari evidence visual");
-		const designMd = await generateDesignMd(
+		const generated = await generateDesignMd(
 			captured.metadata.visualEvidence,
 			instrumentation,
 			claim?.signal,
 		);
+		const designMd = generated.document;
+		if (generated.enrichment.status === "unavailable")
+			await instrumentation.onActivity?.(
+				"DESIGN.md dari evidence tersimpan; AI enrichment tidak tersedia",
+			);
 
 		const saveStart = Date.now();
-		await persist("saving", {
-			activity: "Menyimpan hasil",
-			activityStartedAt: new Date().toISOString(),
-		});
+		await persist(
+			"saving",
+			{
+				activity: "Menyimpan hasil",
+				activityStartedAt: new Date().toISOString(),
+				aiEnrichment: generated.enrichment.status,
+				aiEnrichmentDetail: generated.enrichment.detail,
+			},
+			{},
+		);
 		await saveScrapeDocument(scrapeId, designMd, userId, claim);
 		instrumentation.onTiming?.("save", Date.now() - saveStart);
 
@@ -589,11 +600,17 @@ export async function generateAndSaveDesignMd(
 			"NO_ANALYZABLE_CONTENT",
 			"Evidence visual hasil render tidak tersedia.",
 		);
-	const designMd = await generateDesignMd(captured.metadata.visualEvidence);
+	const generated = await generateDesignMd(captured.metadata.visualEvidence);
+	const designMd = generated.document;
 	await db
 		.update(scrapes)
 		.set({
-			metadata: { ...scrape.metadata, ...captured.metadata },
+			metadata: {
+				...scrape.metadata,
+				...captured.metadata,
+				aiEnrichment: generated.enrichment.status,
+				aiEnrichmentDetail: generated.enrichment.detail,
+			},
 			updatedAt: new Date(),
 		})
 		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)));

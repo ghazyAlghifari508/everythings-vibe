@@ -873,6 +873,10 @@ export interface ScrapeMetadata {
 	errorDetail?: string;
 	// Only set when the upstream website supplied a usable Retry-After signal.
 	retryAfterSeconds?: number;
+	// Tracks whether the optional AI reference summary was applied to a
+	// canonical, evidence-backed DESIGN.md.
+	aiEnrichment?: "applied" | "unavailable";
+	aiEnrichmentDetail?: string;
 	mode?: ScrapeMode;
 	visitedPages?: number;
 	discoveredPages?: number;
