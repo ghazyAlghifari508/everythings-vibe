@@ -19,6 +19,8 @@ export interface StudioComposerProps {
 	loading?: boolean;
 	className?: string;
 	designSystemControl?: ReactNode;
+	selectedFrames?: { id: string; name: string }[];
+	onRemoveFrame?: (id: string) => void;
 }
 
 export function StudioComposer({
@@ -28,6 +30,8 @@ export function StudioComposer({
 	loading = false,
 	className = "",
 	designSystemControl,
+	selectedFrames = [],
+	onRemoveFrame,
 }: StudioComposerProps) {
 	const [prompt, setPrompt] = useState("");
 	const [adding, setAdding] = useState(false);
@@ -35,7 +39,8 @@ export function StudioComposer({
 	const [error, setError] = useState("");
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const pending = useRef(false);
-	const scope = selectedFrameName && !adding ? "revise" : "add";
+	const scope =
+		(selectedFrameName || selectedFrames.length) && !adding ? "revise" : "add";
 
 	useEffect(() => {
 		if (selectedFrameName) setAdding(false);
@@ -116,6 +121,26 @@ export function StudioComposer({
 						</button>
 						{designSystemControl}
 					</div>
+					{!adding && selectedFrames.length > 0 ? (
+						<div className="flex max-h-20 flex-wrap gap-2 overflow-y-auto">
+							{selectedFrames.map((frame) => (
+								<span
+									key={frame.id}
+									className="inline-flex max-w-full items-center gap-2 rounded-md border border-iron px-2 text-xs text-snow"
+								>
+									<span className="truncate">{frame.name}</span>
+									<button
+										type="button"
+										aria-label={`Lepas ${frame.name}`}
+										onClick={() => onRemoveFrame?.(frame.id)}
+										className="p-2 focus-visible:outline-2"
+									>
+										<X size={14} />
+									</button>
+								</span>
+							))}
+						</div>
+					) : null}
 				</div>
 				<div className="flex items-end gap-2">
 					<textarea

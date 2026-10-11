@@ -15,7 +15,7 @@ import { StudioFrameSkeleton } from "./studio-frame-skeleton";
 export interface StudioFrameProps {
 	frame: StudioFrameRow;
 	isSelected?: boolean;
-	onSelect?: (frameId: string) => void;
+	onSelect?: (frameId: string, additive?: boolean) => void;
 	onRetry?: (frameId: string) => void;
 	isCanvasPanning?: boolean;
 	className?: string;
@@ -119,7 +119,9 @@ export function StudioFrame({
 				<div className="flex items-center gap-2">
 					<button
 						type="button"
-						onClick={() => onSelect?.(frame.id)}
+						onClick={(event) => {
+							if (!isCanvasPanning) onSelect?.(frame.id, event.shiftKey);
+						}}
 						className="flex items-center gap-1.5 text-xs font-semibold text-snow hover:text-mist focus:outline-none"
 					>
 						{isMobile ? (
@@ -206,8 +208,8 @@ export function StudioFrame({
 							type="button"
 							aria-label={`Pilih frame ${frame.name}`}
 							aria-pressed={isSelected}
-							onClick={() => {
-								if (!isCanvasPanning) onSelect?.(frame.id);
+							onClick={(event) => {
+								if (!isCanvasPanning) onSelect?.(frame.id, event.shiftKey);
 							}}
 							className="block size-full focus-visible:outline-2 focus-visible:outline-snow"
 						>

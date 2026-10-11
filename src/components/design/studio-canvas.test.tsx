@@ -89,7 +89,12 @@ describe("StudioCanvas", () => {
 
 		const dashboardBtn = screen.getByRole("button", { name: /^Dashboard$/i });
 		fireEvent.click(dashboardBtn);
-		expect(onSelectFrame).toHaveBeenCalledWith("f-1");
+		expect(onSelectFrame).toHaveBeenCalledWith("f-1", false);
+		fireEvent.click(dashboardBtn, { shiftKey: true });
+		expect(onSelectFrame).toHaveBeenLastCalledWith("f-1", true);
+		fireEvent.click(screen.getByRole("button", { name: "Hand" }));
+		fireEvent.click(dashboardBtn);
+		expect(onSelectFrame).toHaveBeenCalledTimes(2);
 	});
 
 	it("renders planning failure state with retry button when activeJob failed", () => {

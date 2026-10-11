@@ -79,6 +79,7 @@ function StudioDetailPage() {
 		initialData.activeJob,
 	);
 	const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
+	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
 	const [composerLoading, setComposerLoading] = useState(false);
 	const [exportingZip, setExportingZip] = useState(false);
 	const [error, setError] = useState("");
@@ -124,6 +125,18 @@ function StudioDetailPage() {
 		() => frames.find((f) => f.id === selectedFrameId) ?? null,
 		[frames, selectedFrameId],
 	);
+	const selectFrame = useCallback((id: string | null, additive = false) => {
+		setSelectedFrameIds((previous) =>
+			id === null
+				? []
+				: additive
+					? previous.includes(id)
+						? previous.filter((entry) => entry !== id)
+						: [...previous, id]
+					: [id],
+		);
+		setSelectedFrameId(id);
+	}, []);
 
 	const isProcessing = useMemo(() => {
 		if (
@@ -303,7 +316,8 @@ function StudioDetailPage() {
 					frames={frames}
 					activeJob={activeJob}
 					selectedFrameId={selectedFrameId}
-					onSelectFrame={setSelectedFrameId}
+					selectedFrameIds={selectedFrameIds}
+					onSelectFrame={selectFrame}
 					onRetryFrame={handleRetryFrame}
 					onRetryPlanning={handleRetryPlanning}
 					className="size-full"
@@ -311,6 +325,15 @@ function StudioDetailPage() {
 
 				{/* Floating AI Prompt Composer */}
 				<StudioComposer
+					selectedFrames={frames.filter((frame) =>
+						selectedFrameIds.includes(frame.id),
+					)}
+					onRemoveFrame={(id) => {
+						setSelectedFrameIds((previous) =>
+							previous.filter((entry) => entry !== id),
+						);
+						if (selectedFrameId === id) setSelectedFrameId(null);
+					}}
 					designSystemControl={
 						<StudioDesignPicker
 							designMd={project.designMd}
@@ -344,7 +367,7 @@ function StudioDetailPage() {
 						/>
 					}
 					selectedFrameName={selectedFrame?.name ?? null}
-					onClearSelectedFrame={() => setSelectedFrameId(null)}
+					onClearSelectedFrame={() => selectFrame(null)}
 					onSubmit={handleComposerSubmit}
 					loading={composerLoading}
 				/>

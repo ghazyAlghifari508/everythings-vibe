@@ -1,5 +1,11 @@
-import { AlertCircle, Loader2, RotateCcw } from "lucide-react";
-import { memo, useRef } from "react";
+import {
+	AlertCircle,
+	Hand,
+	Loader2,
+	MousePointer2,
+	RotateCcw,
+} from "lucide-react";
+import { memo, useEffect, useRef, useState } from "react";
 import { getCanvasDotStyle } from "@/components/task/whiteboard-canvas";
 import { ZoomControls } from "@/components/task/zoom-controls";
 import type {
@@ -15,7 +21,8 @@ export interface StudioCanvasProps {
 	frames: StudioFrameRow[];
 	activeJob?: StudioJobRow | null;
 	selectedFrameId?: string | null;
-	onSelectFrame?: (frameId: string | null) => void;
+	selectedFrameIds?: string[];
+	onSelectFrame?: (frameId: string | null, additive?: boolean) => void;
 	onRetryFrame?: (frameId: string) => void;
 	onRetryPlanning?: () => void;
 	className?: string;
@@ -26,6 +33,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 	frames,
 	activeJob = null,
 	selectedFrameId = null,
+	selectedFrameIds = [],
 	onSelectFrame,
 	onRetryFrame,
 	onRetryPlanning,
@@ -50,26 +58,82 @@ export const StudioCanvas = memo(function StudioCanvas({
 		initialZoom: project.designMode === "mobile" ? 0.9 : 0.65,
 	});
 
-	const isPanning = false; // Transient pointer tracking in hook
+	const [tool, setTool] = useState<"select" | "hand">("select");
+	const [spacePan, setSpacePan] = useState(false);
+	const [isPanning, setIsPanning] = useState(false);
+	const panMode = tool === "hand" || spacePan;
+	useEffect(() => {
+		function keydown(event: KeyboardEvent) {
+			if (
+				event.target instanceof Element &&
+				event.target.closest(
+					"input,textarea,select,[contenteditable=true],[role=menu],[role=dialog]",
+				)
+			)
+				return;
+			if (event.ctrlKey || event.metaKey || event.altKey) return;
+			if (event.key.toLowerCase() === "v") setTool("select");
+			if (event.key.toLowerCase() === "h") setTool("hand");
+			if (event.code === "Space") {
+				event.preventDefault();
+				setSpacePan(true);
+			}
+			if (event.key === "Escape") onSelectFrame?.(null);
+		}
+		function release(event: KeyboardEvent) {
+			if (event.code === "Space") setSpacePan(false);
+		}
+		function blur() {
+			setSpacePan(false);
+			setIsPanning(false);
+			endPan();
+		}
+		window.addEventListener("keydown", keydown);
+		window.addEventListener("keyup", release);
+		window.addEventListener("blur", blur);
+		return () => {
+			window.removeEventListener("keydown", keydown);
+			window.removeEventListener("keyup", release);
+			window.removeEventListener("blur", blur);
+		};
+	}, [onSelectFrame, endPan]);
 
 	return (
 		<section
 			ref={canvasRef}
 			data-testid="studio-canvas"
 			aria-label={`Canvas Desain ${project.title}`}
-			onPointerDown={startPan}
+			onPointerDown={(event) => {
+				if (panMode) {
+					startPan(event);
+					setIsPanning(true);
+				}
+			}}
 			onPointerMove={updatePan}
-			onPointerUp={endPan}
-			onPointerCancel={endPan}
+			onPointerUp={() => {
+				endPan();
+				setIsPanning(false);
+			}}
+			onPointerCancel={() => {
+				endPan();
+				setIsPanning(false);
+			}}
 			onWheel={onWheel}
 			onKeyDown={(e) => nudgePan(e.key)}
 			onClick={(e) => {
-				if (e.target === e.currentTarget) {
+				if (
+					!panMode &&
+					e.target instanceof Element &&
+					!e.target.closest("article,button")
+				) {
 					onSelectFrame?.(null);
 				}
 			}}
 			className={`relative size-full overflow-hidden select-none touch-none bg-charcoal text-snow focus-visible:outline-2 focus-visible:outline-snow ${className}`}
-			style={getCanvasDotStyle(zoom, pan)}
+			style={{
+				...getCanvasDotStyle(zoom, pan),
+				cursor: panMode ? (isPanning ? "grabbing" : "grab") : "default",
+			}}
 		>
 			{/* Transformed Canvas Surface holding frames */}
 			<div
@@ -84,10 +148,15 @@ export const StudioCanvas = memo(function StudioCanvas({
 						<StudioFrame
 							key={frame.id}
 							frame={frame}
-							isSelected={selectedFrameId === frame.id}
-							onSelect={(id) => onSelectFrame?.(id)}
+							isSelected={
+								selectedFrameIds.includes(frame.id) ||
+								selectedFrameId === frame.id
+							}
+							onSelect={(id, additive) => {
+								if (!panMode) onSelectFrame?.(id, additive);
+							}}
 							onRetry={(id) => onRetryFrame?.(id)}
-							isCanvasPanning={isPanning}
+							isCanvasPanning={panMode}
 						/>
 					))
 				) : activeJob?.status === "failed" ? (
@@ -129,7 +198,32 @@ export const StudioCanvas = memo(function StudioCanvas({
 			</div>
 
 			{/* Floating Canvas Zoom Controls (Bottom Right) */}
-			<div className="fixed bottom-6 right-6 z-20">
+			<div
+				className="absolute top-4 left-3 z-20 flex gap-1 rounded-lg border border-iron bg-obsidian p-1"
+				onPointerDown={(event) => event.stopPropagation()}
+			>
+				<button
+					type="button"
+					title="Cursor (V)"
+					aria-label="Cursor"
+					aria-pressed={tool === "select"}
+					onClick={() => setTool("select")}
+					className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 ${tool === "select" ? "bg-steel" : "hover:bg-steel"}`}
+				>
+					<MousePointer2 size={18} />
+				</button>
+				<button
+					type="button"
+					title="Hand (H)"
+					aria-label="Hand"
+					aria-pressed={tool === "hand"}
+					onClick={() => setTool("hand")}
+					className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 ${tool === "hand" ? "bg-steel" : "hover:bg-steel"}`}
+				>
+					<Hand size={18} />
+				</button>
+			</div>
+			<div className="absolute top-4 right-3 z-20">
 				<ZoomControls
 					zoom={zoom}
 					onZoomIn={zoomIn}

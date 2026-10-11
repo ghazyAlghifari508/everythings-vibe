@@ -112,7 +112,7 @@ describe("StudioFrame", () => {
 
 		const frameHeader = screen.getByText("Settings");
 		fireEvent.click(frameHeader);
-		expect(onSelect).toHaveBeenCalledWith("f-3");
+		expect(onSelect).toHaveBeenCalledWith("f-3", false);
 	});
 
 	it("renders failed state with retry button", () => {
