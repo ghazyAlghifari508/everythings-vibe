@@ -2,7 +2,6 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "@/lib/constants";
 import { CodebaseSourcePreview } from "./codebase-source-preview";
 
 let container: HTMLDivElement;

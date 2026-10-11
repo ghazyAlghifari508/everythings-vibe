@@ -133,13 +133,12 @@ export function CodebaseArtifactCanvas({
 							)}
 						</button>
 						{copyState === "failed" ? (
-							<span
-								role="status"
+							<output
 								data-testid="codebase-canvas-copy-error"
 								className="font-mono text-[10px] text-crimson"
 							>
 								Gagal menyalin
-							</span>
+							</output>
 						) : null}
 						{onDownload ? (
 							<button
