@@ -13,6 +13,7 @@ import {
 	SCRAPE_MAX_STYLESHEETS,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
+import type { VisualEvidence } from "@/lib/design-visual-evidence";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { rewritePreviewAssets } from "./preview-html";
 import { validateUrl } from "./url-validator";
@@ -28,6 +29,7 @@ export interface ScrapeViewport {
 }
 
 export interface ScrapeCaptureMetadata {
+	visualEvidence?: VisualEvidence;
 	attempt: number;
 	capturedAt: string;
 	finalUrl: string;
@@ -289,6 +291,7 @@ export async function scrapeHtml(
 		domain,
 		title: extractPageTitle(rendered.html),
 		metadata: {
+			visualEvidence: rendered.visualEvidence,
 			attempt: attemptNumber,
 			capturedAt,
 			finalUrl: rendered.finalUrl,

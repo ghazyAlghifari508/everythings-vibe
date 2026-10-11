@@ -9,6 +9,10 @@ import {
 	SCRAPE_MAX_HTML_BYTES,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
+import {
+	collectVisualEvidence,
+	type VisualEvidence,
+} from "@/lib/design-visual-evidence";
 import { fetchAsset } from "@/lib/fetch-html";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { isPrivateIp } from "@/lib/url-validator";
@@ -241,6 +245,7 @@ export interface RenderedPage {
 	status: number;
 	finalUrl: string;
 	images?: RenderedImage[];
+	visualEvidence?: VisualEvidence;
 }
 
 export interface RenderedImage {
@@ -492,7 +497,17 @@ export async function renderPage(
 				"NO_ANALYZABLE_CONTENT",
 				"Sistem tidak menemukan konten yang cukup untuk dianalisis.",
 			);
-		return { html, status: status || 200, finalUrl: page.url(), images };
+		const visualEvidence =
+			mode === "design"
+				? await page.evaluate(collectVisualEvidence)
+				: undefined;
+		return {
+			html,
+			status: status || 200,
+			finalUrl: page.url(),
+			images,
+			visualEvidence,
+		};
 	} finally {
 		options.signal?.removeEventListener("abort", abortCapture);
 		await context.close();
