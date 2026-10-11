@@ -156,7 +156,12 @@ export interface VisualEvidence {
 export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 	const extraction = extractionFromVisualEvidence(evidence);
 	const cell = (value: string) =>
-		value.replace(/\|/g, "\\|").replace(/[\r\n]/g, " ");
+		value
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/\|/g, "\\|")
+			.replace(/[\r\n]/g, " ");
 	const lines = [
 		"# Website - Style Reference",
 		"",
