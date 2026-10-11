@@ -12,7 +12,7 @@ it("runs all extraction modes through persisted queue claims", async () => {
 		deleteScrape,
 		retryScrape,
 	} = await import("./scrape-service");
-	const { claimScrapeJob, releaseScrapeClaim } = await import(
+	const { claimScrapeJob, releaseScrapeClaim, renewScrapeClaim } = await import(
 		"./scrape-job-service"
 	);
 	const { closeRenderBrowser } = await import("../render-page");
@@ -30,8 +30,14 @@ it("runs all extraction modes through persisted queue claims", async () => {
 				throw new Error(
 					"Runtime queue contains earlier work; refusing to process unrelated jobs.",
 				);
-			await runScrapePipeline(row.id, user.id, claim);
+			expect(await renewScrapeClaim(claim)).toBe(true);
 			await releaseScrapeClaim(claim);
+			expect(await renewScrapeClaim(claim)).toBe(false);
+			const recovered = await claimScrapeJob();
+			if (!recovered || recovered.id !== row.id)
+				throw new Error("Restart recovery failed");
+			await runScrapePipeline(row.id, user.id, recovered);
+			await releaseScrapeClaim(recovered);
 			const result = await getScrapeById(row.id, user.id);
 			expect(result.status).toBe("completed");
 			if (mode === "design")
