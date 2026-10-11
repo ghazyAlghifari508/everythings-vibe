@@ -158,7 +158,10 @@ function ScrapeDetailPage() {
 			: null,
 	});
 	useEffect(() => {
-		if (polledStatus === "completed" && initial.status !== "completed")
+		if (
+			(polledStatus === "completed" || polledStatus === "failed") &&
+			initial.status !== polledStatus
+		)
 			void router.invalidate();
 	}, [polledStatus, initial.status, router]);
 

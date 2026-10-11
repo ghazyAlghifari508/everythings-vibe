@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -96,7 +97,7 @@ export async function createScrape(
 			(row) =>
 				row.sourceUrl === normalized &&
 				row.mode === mode &&
-				JSON.stringify(row.request) === JSON.stringify(validated),
+				isDeepStrictEqual(row.request, validated),
 		);
 		if (existing) return existing;
 		if (active.length >= SCRAPE_LIMITS.maxActiveJobs)

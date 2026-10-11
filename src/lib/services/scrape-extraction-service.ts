@@ -37,6 +37,29 @@ export async function runExtractionJob(
 			.returning({ id: scrapes.id });
 		if (!rows.length) throw new Error("Job lease sudah tidak berlaku.");
 	};
+	if (request.mode === "images") {
+		const existing = await db
+			.select({ id: scrapeImages.id })
+			.from(scrapeImages)
+			.where(
+				and(
+					eq(scrapeImages.scrapeId, claim.id),
+					eq(scrapeImages.userId, claim.userId),
+					eq(scrapeImages.status, "completed"),
+				),
+			);
+		if (existing.length) {
+			await update({
+				status: "completed",
+				metadata: {
+					...scrape.metadata,
+					mode: "images",
+					processedImages: existing.length,
+				},
+			});
+			return;
+		}
+	}
 	await update({ status: "capturing" });
 	if (request.mode === "crawl") {
 		const crawlDelays = new Map<string, number>();

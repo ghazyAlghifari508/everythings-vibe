@@ -134,6 +134,11 @@ export async function crawlWebsite(
 	while (queue.length && pages.length < settings.maxPages) {
 		const next = queue.shift();
 		if (!next) break;
+		if (
+			next.depth > settings.maxDepth ||
+			!isCrawlScope(next.url, seed, settings.followSubdomains)
+		)
+			continue;
 		let page: CrawledPage = {
 			...next,
 			status: "failed",
