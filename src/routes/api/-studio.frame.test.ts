@@ -47,6 +47,11 @@ vi.mock("@/lib/services/studio-service", () => ({
 		order: 1,
 		htmlCode: "<html>retried</html>",
 	}),
+	retryStudioPlanning: async (projectId: string, _userId: string) => ({
+		id: "job-101",
+		projectId,
+		status: "queued",
+	}),
 }));
 
 describe("POST /api/studio/frame", () => {
@@ -101,5 +106,21 @@ describe("POST /api/studio/frame", () => {
 		expect(res.status).toBe(200);
 		const data = await res.json();
 		expect(data.frame.status).toBe("ready");
+	});
+
+	it("retries failed planning job", async () => {
+		const req = new Request("https://app.test/api/studio/frame", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				action: "retry-planning",
+				projectId: "proj-1",
+			}),
+		});
+
+		const res = await POST({ request: req });
+		expect(res.status).toBe(200);
+		const data = await res.json();
+		expect(data.job.status).toBe("queued");
 	});
 });

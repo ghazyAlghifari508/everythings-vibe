@@ -13,9 +13,13 @@ const mockDb = {
 	insert: vi.fn(),
 	select: vi.fn(),
 	update: vi.fn(),
+	transaction: vi.fn(),
 };
 
 function setupDefaultDb() {
+	mockDb.transaction.mockImplementation(
+		async (cb: (tx: typeof mockDb) => Promise<unknown>) => cb(mockDb),
+	);
 	mockDb.insert.mockReturnValue({
 		values: vi.fn().mockReturnValue({
 			returning: vi.fn().mockResolvedValue([]),
@@ -30,6 +34,11 @@ function setupDefaultDb() {
 	});
 	mockDb.select.mockReturnValue({
 		from: vi.fn().mockReturnValue({
+			innerJoin: vi.fn().mockReturnValue({
+				where: vi.fn().mockReturnValue({
+					limit: vi.fn().mockResolvedValue([]),
+				}),
+			}),
 			where: vi.fn().mockReturnValue({
 				orderBy: vi.fn().mockReturnValue({
 					limit: vi.fn().mockResolvedValue([]),
@@ -49,6 +58,7 @@ vi.mock("@/db", () => ({
 		insert: (...args: unknown[]) => mockDb.insert(...args),
 		select: (...args: unknown[]) => mockDb.select(...args),
 		update: (...args: unknown[]) => mockDb.update(...args),
+		transaction: (...args: unknown[]) => mockDb.transaction(...args),
 	},
 }));
 

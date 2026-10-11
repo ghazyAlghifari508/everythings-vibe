@@ -1,19 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
+import { ScrapeError } from "@/lib/design-errors";
 import { getStudioProjectDetail } from "@/lib/services/studio-service";
 import { requireUser } from "@/lib/session";
 
 function studioErrorResponse(error: unknown): Response {
-	if (error instanceof ScrapeError)
+	console.error("[studio.project error]", error);
+	if (error instanceof ScrapeError) {
+		const isClientError =
+			error.code === "INVALID_URL" || error.code === "WEBSITE_BLOCKED";
 		return Response.json(
 			{ error: error.message, code: error.code },
-			{ status: error.code === "WEBSITE_BLOCKED" ? 404 : 500 },
+			{ status: isClientError ? 404 : 500 },
 		);
-	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message))
+	}
+	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message)) {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	}
 	return Response.json(
-		{ error: DESIGN_ERROR_CODES.STORAGE_FAILED },
+		{
+			error:
+				"Terjadi kendala saat memuat project Studio. Silakan coba beberapa saat lagi.",
+		},
 		{ status: 500 },
 	);
 }

@@ -1,24 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
+import { ScrapeError } from "@/lib/design-errors";
 import {
 	addStudioFrame,
 	retryStudioFrame,
+	retryStudioPlanning,
 	reviseStudioFrame,
 } from "@/lib/services/studio-service";
 import { requireUser } from "@/lib/session";
 
 function studioErrorResponse(error: unknown): Response {
-	if (error instanceof ScrapeError)
+	console.error("[studio.frame error]", error);
+	if (error instanceof ScrapeError) {
+		const isClientError =
+			error.code === "INVALID_URL" || error.code === "WEBSITE_BLOCKED";
 		return Response.json(
 			{ error: error.message, code: error.code },
-			{ status: error.code === "INVALID_URL" ? 400 : 500 },
+			{ status: isClientError ? 400 : 500 },
 		);
-	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message))
+	}
+	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message)) {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	}
 	return Response.json(
-		{ error: DESIGN_ERROR_CODES.STORAGE_FAILED },
+		{
+			error:
+				"Terjadi kendala saat memproses frame Studio. Silakan coba beberapa saat lagi.",
+		},
 		{ status: 500 },
 	);
 }
@@ -47,6 +56,10 @@ export const studioFrameBodySchema = z.discriminatedUnion("action", [
 		action: z.literal("retry"),
 		projectId: z.string().min(1),
 		frameId: z.string().min(1),
+	}),
+	z.object({
+		action: z.literal("retry-planning"),
+		projectId: z.string().min(1),
 	}),
 ]);
 
@@ -93,6 +106,11 @@ export async function POST({
 				body.frameId,
 			);
 			return Response.json({ frame }, { status: 200 });
+		}
+
+		if (body.action === "retry-planning") {
+			const job = await retryStudioPlanning(body.projectId, user.id);
+			return Response.json({ job }, { status: 200 });
 		}
 
 		return Response.json({ error: "Aksi tidak dikenal" }, { status: 400 });

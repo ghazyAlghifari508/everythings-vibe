@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertStudioAssetRow,
@@ -40,6 +40,12 @@ import {
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
 import { issueStudioAssetCapability } from "@/lib/studio-asset-capability";
+import {
+	enforceDesignSystemOnHtml,
+	extractDesignSystemTokens,
+} from "@/lib/studio-design-system";
+
+const activeStudioJobs = new Set<string>();
 
 export interface StudioProjectDetail extends StudioProjectRow {
 	revisions: StudioRevisionRow[];
@@ -289,62 +295,97 @@ export async function createStudioProjectWithJob(
 		cleanDesignMd = mdChecked.designMd;
 	}
 
-	let logoAssetId: string | null = null;
-	if (input.logo) {
-		const validatedLogo = validateAndProcessLogo(input.logo);
-		const [asset] = await db
-			.insert(studioAssets)
-			.values({
-				userId,
-				filename: validatedLogo.filename,
-				mimeType: validatedLogo.mimeType,
-				byteLength: validatedLogo.byteLength,
-				data: validatedLogo.data,
-			} satisfies InsertStudioAssetRow)
-			.returning();
-
-		if (asset) {
-			logoAssetId = asset.id;
-		}
-	}
-
 	const cleanTitle =
 		(input.title ?? "").trim().slice(0, 200) ||
 		checked.prompt.slice(0, 80) ||
 		"Studio tanpa judul";
 
-	const [project] = await db
-		.insert(studioProjects)
-		.values({
-			userId,
-			title: cleanTitle,
-			designMode,
-			designMd: cleanDesignMd,
-			logoAssetId,
-		} satisfies InsertStudioProjectRow)
-		.returning();
+	// Deduplication: if the user rapidly retried with identical prompt and mode within 10s
+	const tenSecondsAgo = new Date(Date.now() - 10_000);
+	const [recentJob] = await db
+		.select({
+			job: studioJobs,
+			project: studioProjects,
+		})
+		.from(studioJobs)
+		.innerJoin(studioProjects, eq(studioJobs.projectId, studioProjects.id))
+		.where(
+			and(
+				eq(studioJobs.userId, userId),
+				eq(studioJobs.prompt, checked.prompt),
+				gte(studioJobs.createdAt, tenSecondsAgo),
+				inArray(studioJobs.status, ["queued", "planning", "generating"]),
+			),
+		)
+		.limit(1);
 
-	if (!project) throw new ScrapeError("STORAGE_FAILED");
-
-	if (logoAssetId) {
-		await db
-			.update(studioAssets)
-			.set({ projectId: project.id })
-			.where(eq(studioAssets.id, logoAssetId));
+	if (recentJob) {
+		return { project: recentJob.project, job: recentJob.job };
 	}
 
-	const [job] = await db
-		.insert(studioJobs)
-		.values({
-			projectId: project.id,
-			userId,
-			prompt: checked.prompt,
-			jobType: "initial",
-			status: "queued",
-		} satisfies InsertStudioJobRow)
-		.returning();
+	const validatedLogo = input.logo ? validateAndProcessLogo(input.logo) : null;
 
-	if (!job) throw new ScrapeError("STORAGE_FAILED");
+	const { project, job } = await db.transaction(async (tx) => {
+		let logoAssetId: string | null = null;
+		if (validatedLogo) {
+			const [asset] = await tx
+				.insert(studioAssets)
+				.values({
+					userId,
+					filename: validatedLogo.filename,
+					mimeType: validatedLogo.mimeType,
+					byteLength: validatedLogo.byteLength,
+					data: validatedLogo.data,
+				} satisfies InsertStudioAssetRow)
+				.returning();
+			if (asset) logoAssetId = asset.id;
+		}
+
+		const [newProject] = await tx
+			.insert(studioProjects)
+			.values({
+				userId,
+				title: cleanTitle,
+				designMode,
+				designMd: cleanDesignMd,
+				logoAssetId,
+			} satisfies InsertStudioProjectRow)
+			.returning();
+
+		if (!newProject) {
+			throw new ScrapeError(
+				"STORAGE_FAILED",
+				"Gagal menyimpan project studio.",
+			);
+		}
+
+		if (logoAssetId) {
+			await tx
+				.update(studioAssets)
+				.set({ projectId: newProject.id })
+				.where(eq(studioAssets.id, logoAssetId));
+		}
+
+		const [newJob] = await tx
+			.insert(studioJobs)
+			.values({
+				projectId: newProject.id,
+				userId,
+				prompt: checked.prompt,
+				jobType: "initial",
+				status: "queued",
+			} satisfies InsertStudioJobRow)
+			.returning();
+
+		if (!newJob) {
+			throw new ScrapeError(
+				"STORAGE_FAILED",
+				"Gagal membuat antrean studio job.",
+			);
+		}
+
+		return { project: newProject, job: newJob };
+	});
 
 	// Kick off pipeline in background
 	void runStudioJobPipeline(job.id, project.id, userId);
@@ -357,6 +398,9 @@ export async function runStudioJobPipeline(
 	projectId: string,
 	userId: string,
 ): Promise<void> {
+	if (activeStudioJobs.has(jobId)) return;
+	activeStudioJobs.add(jobId);
+
 	try {
 		const [job] = await db
 			.select()
@@ -391,121 +435,123 @@ export async function runStudioJobPipeline(
 			? buildStudioAssetUrl(project.logoAssetId, userId)
 			: null;
 		const designMode = validateStudioDesignMode(project.designMode);
+		const dsTokens = extractDesignSystemTokens(project.designMd);
 
-		// Planning phase
-		await db
-			.update(studioJobs)
-			.set({ status: "planning", updatedAt: new Date() })
-			.where(eq(studioJobs.id, jobId));
+		// Check if frames are already planned from previous execution
+		const existingFrames = await db
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, projectId))
+			.orderBy(asc(studioFrames.order));
 
-		const planPrompt = buildStudioPlanningPrompt(
-			job.prompt,
-			designMode,
-			project.designMd,
-		);
+		const framesToProcess: StudioFrameRow[] = [...existingFrames];
 
-		let screenPlan: StudioScreenPlan;
-		try {
-			const { generator, firstChunk } = await tryStreamWithFallback(
-				selectModels(),
-				[
-					{ role: "system", content: STUDIO_PLAN_SYSTEM_PROMPT },
-					{ role: "user", content: planPrompt },
-				],
-				undefined,
-				4000,
-			);
-			let planRaw = firstChunk;
-			for await (const chunk of generator) planRaw += chunk;
-			const parsed = parseStudioScreenPlan(planRaw);
-			if (parsed.ok) {
-				screenPlan = parsed.plan;
-			} else {
-				screenPlan = {
-					projectTitle: project.title,
-					screens:
-						designMode === "mobile"
-							? [
-									{
-										name: "Dashboard",
-										description: "Ringkasan data utama",
-										viewport: "mobile",
-										order: 0,
-									},
-									{
-										name: "Details",
-										description: "Daftar detail dan histori",
-										viewport: "mobile",
-										order: 1,
-									},
-									{
-										name: "Settings",
-										description: "Pengaturan akun",
-										viewport: "mobile",
-										order: 2,
-									},
-								]
-							: [
-									{
-										name: "Dashboard",
-										description: "Overview metrik dan ringkasan",
-										viewport: "web",
-										order: 0,
-									},
-									{
-										name: "Analytics",
-										description: "Laporan analitik dan tren",
-										viewport: "web",
-										order: 1,
-									},
-									{
-										name: "Settings",
-										description: "Pengaturan dan preferensi",
-										viewport: "web",
-										order: 2,
-									},
-								],
-				};
-			}
-		} catch {
-			screenPlan = {
-				projectTitle: project.title,
-				screens: [
-					{
-						name: "Main",
-						description: "Halaman utama",
-						viewport: designMode,
-						order: 0,
-					},
-				],
-			};
-		}
-
-		if (screenPlan.projectTitle && screenPlan.projectTitle !== project.title) {
+		if (framesToProcess.length === 0) {
+			// Planning phase
 			await db
-				.update(studioProjects)
-				.set({
-					title: screenPlan.projectTitle.slice(0, 200),
-					updatedAt: new Date(),
-				})
-				.where(eq(studioProjects.id, projectId));
-		}
+				.update(studioJobs)
+				.set({ status: "planning", updatedAt: new Date() })
+				.where(eq(studioJobs.id, jobId));
 
-		// Persist planned frames
-		const insertedFrames: StudioFrameRow[] = [];
-		for (const screen of screenPlan.screens) {
-			const [inserted] = await db
-				.insert(studioFrames)
-				.values({
-					projectId,
-					name: screen.name.slice(0, 100),
-					description: screen.description.slice(0, 500),
-					viewport: screen.viewport,
-					order: screen.order,
-					status: "queued",
-				} satisfies InsertStudioFrameRow)
-				.returning();
-			if (inserted) insertedFrames.push(inserted);
+			const planPrompt = buildStudioPlanningPrompt(
+				job.prompt,
+				designMode,
+				project.designMd,
+			);
+
+			let screenPlan: StudioScreenPlan | null = null;
+			let planError: string | null = null;
+
+			// Attempt 1: Standard structured planning
+			try {
+				const { generator, firstChunk } = await tryStreamWithFallback(
+					selectModels(),
+					[
+						{ role: "system", content: STUDIO_PLAN_SYSTEM_PROMPT },
+						{ role: "user", content: planPrompt },
+					],
+					undefined,
+					4000,
+				);
+				let planRaw = firstChunk;
+				for await (const chunk of generator) planRaw += chunk;
+				const parsed = parseStudioScreenPlan(planRaw, designMode);
+				if (parsed.ok) {
+					screenPlan = parsed.plan;
+				} else {
+					planError = parsed.error;
+				}
+			} catch (err) {
+				planError =
+					err instanceof Error ? err.message : "Planning stream error";
+			}
+
+			// Attempt 2: Bounded corrective retry if attempt 1 was malformed
+			if (!screenPlan) {
+				try {
+					const correctivePrompt = `Previous plan output was invalid JSON (${planError ?? "format error"}). Output ONLY standard JSON object without markdown or commentary: { "projectTitle": string, "screens": [{ "name": string, "description": string, "viewport": "${designMode}", "order": number }] } for the following user request: "${job.prompt.trim()}"`;
+					const { generator, firstChunk } = await tryStreamWithFallback(
+						selectModels(),
+						[
+							{ role: "system", content: STUDIO_PLAN_SYSTEM_PROMPT },
+							{ role: "user", content: correctivePrompt },
+						],
+						undefined,
+						4000,
+					);
+					let planRaw = firstChunk;
+					for await (const chunk of generator) planRaw += chunk;
+					const parsed = parseStudioScreenPlan(planRaw, designMode);
+					if (parsed.ok) {
+						screenPlan = parsed.plan;
+					}
+				} catch {
+					// Bounded retry failed
+				}
+			}
+
+			// If planning genuinely failed after retry: fail honestly, NEVER substitute dummy screens!
+			if (!screenPlan || screenPlan.screens.length === 0) {
+				const finalError = `Gagal merencanakan layar aplikasi untuk "${job.prompt.slice(0, 60)}". Silakan coba lagi.`;
+				await db
+					.update(studioJobs)
+					.set({
+						status: "failed",
+						error: finalError,
+						updatedAt: new Date(),
+					})
+					.where(eq(studioJobs.id, jobId));
+				return;
+			}
+
+			if (
+				screenPlan.projectTitle &&
+				screenPlan.projectTitle !== project.title
+			) {
+				await db
+					.update(studioProjects)
+					.set({
+						title: screenPlan.projectTitle.slice(0, 200),
+						updatedAt: new Date(),
+					})
+					.where(eq(studioProjects.id, projectId));
+			}
+
+			// Persist planned frames
+			for (const screen of screenPlan.screens) {
+				const [inserted] = await db
+					.insert(studioFrames)
+					.values({
+						projectId,
+						name: screen.name.slice(0, 100),
+						description: screen.description.slice(0, 500),
+						viewport: screen.viewport,
+						order: screen.order,
+						status: "queued",
+					} satisfies InsertStudioFrameRow)
+					.returning();
+				if (inserted) framesToProcess.push(inserted);
+			}
 		}
 
 		// Generating phase
@@ -514,11 +560,17 @@ export async function runStudioJobPipeline(
 			.set({ status: "generating", updatedAt: new Date() })
 			.where(eq(studioJobs.id, jobId));
 
-		const allScreenNames = insertedFrames.map((f) => f.name);
+		const allScreenNames = framesToProcess.map((f) => f.name);
 		let readyCount = 0;
 		let firstReadyHtml: string | null = null;
 
-		for (const frame of insertedFrames) {
+		for (const frame of framesToProcess) {
+			if (frame.status === "ready" && frame.htmlCode) {
+				readyCount++;
+				if (!firstReadyHtml) firstReadyHtml = frame.htmlCode;
+				continue;
+			}
+
 			try {
 				await db
 					.update(studioFrames)
@@ -535,7 +587,8 @@ export async function runStudioJobPipeline(
 					logoUrl,
 				});
 
-				const htmlCode = await generateStudioHtml(framePrompt);
+				const rawHtml = await generateStudioHtml(framePrompt);
+				const htmlCode = enforceDesignSystemOnHtml(rawHtml, dsTokens, logoUrl);
 
 				await db
 					.update(studioFrames)
@@ -555,12 +608,20 @@ export async function runStudioJobPipeline(
 		}
 
 		if (readyCount > 0 && firstReadyHtml) {
-			await db.insert(studioRevisions).values({
-				projectId,
-				prompt: job.prompt,
-				htmlCode: firstReadyHtml,
-				version: 1,
-			} satisfies InsertStudioRevisionRow);
+			const existingRev = await db
+				.select()
+				.from(studioRevisions)
+				.where(eq(studioRevisions.projectId, projectId))
+				.limit(1);
+
+			if (existingRev.length === 0) {
+				await db.insert(studioRevisions).values({
+					projectId,
+					prompt: job.prompt,
+					htmlCode: firstReadyHtml,
+					version: 1,
+				} satisfies InsertStudioRevisionRow);
+			}
 
 			await db
 				.update(studioJobs)
@@ -591,6 +652,8 @@ export async function runStudioJobPipeline(
 			.update(studioJobs)
 			.set({ status: "failed", error: errorMsg, updatedAt: new Date() })
 			.where(eq(studioJobs.id, jobId));
+	} finally {
+		activeStudioJobs.delete(jobId);
 	}
 }
 
@@ -723,6 +786,18 @@ export async function getStudioProjectDetail(
 		.orderBy(desc(studioJobs.createdAt))
 		.limit(1);
 
+	const activeJob = jobs[0] ?? null;
+
+	// Background job recovery check: auto-resume if queued or stalled
+	if (
+		activeJob &&
+		(activeJob.status === "queued" ||
+			((activeJob.status === "planning" || activeJob.status === "generating") &&
+				Date.now() - new Date(activeJob.updatedAt).getTime() > 150_000))
+	) {
+		void runStudioJobPipeline(activeJob.id, projectId, userId);
+	}
+
 	const logoUrl = project.logoAssetId
 		? buildStudioAssetUrl(project.logoAssetId, userId)
 		: null;
@@ -730,7 +805,7 @@ export async function getStudioProjectDetail(
 	return {
 		project,
 		frames,
-		activeJob: jobs[0] ?? null,
+		activeJob,
 		logoUrl,
 		revisions,
 		latest,
@@ -788,7 +863,13 @@ export async function addStudioFrame(
 			logoUrl: detail.logoUrl,
 		});
 
-		const htmlCode = await generateStudioHtml(framePrompt);
+		const rawHtml = await generateStudioHtml(framePrompt);
+		const dsTokens = extractDesignSystemTokens(detail.designMd);
+		const htmlCode = enforceDesignSystemOnHtml(
+			rawHtml,
+			dsTokens,
+			detail.logoUrl,
+		);
 
 		const [updated] = await db
 			.update(studioFrames)
@@ -865,7 +946,13 @@ export async function reviseStudioFrame(
 			previousHtml: frame.htmlCode ?? undefined,
 		});
 
-		const htmlCode = await generateStudioHtml(framePrompt);
+		const rawHtml = await generateStudioHtml(framePrompt);
+		const dsTokens = extractDesignSystemTokens(detail.designMd);
+		const htmlCode = enforceDesignSystemOnHtml(
+			rawHtml,
+			dsTokens,
+			detail.logoUrl,
+		);
 
 		const [updated] = await db
 			.update(studioFrames)
@@ -937,7 +1024,13 @@ export async function retryStudioFrame(
 			logoUrl: detail.logoUrl,
 		});
 
-		const htmlCode = await generateStudioHtml(framePrompt);
+		const rawHtml = await generateStudioHtml(framePrompt);
+		const dsTokens = extractDesignSystemTokens(detail.designMd);
+		const htmlCode = enforceDesignSystemOnHtml(
+			rawHtml,
+			dsTokens,
+			detail.logoUrl,
+		);
 
 		const [updated] = await db
 			.update(studioFrames)
@@ -956,6 +1049,40 @@ export async function retryStudioFrame(
 			.returning();
 		return failed ?? frame;
 	}
+}
+
+export async function retryStudioPlanning(
+	projectId: string,
+	userId: string,
+): Promise<StudioJobRow> {
+	const [job] = await db
+		.select()
+		.from(studioJobs)
+		.where(
+			and(eq(studioJobs.projectId, projectId), eq(studioJobs.userId, userId)),
+		)
+		.orderBy(desc(studioJobs.createdAt))
+		.limit(1);
+
+	if (!job) {
+		throw new ScrapeError("WEBSITE_BLOCKED", "Job antrean tidak ditemukan.");
+	}
+
+	const [updated] = await db
+		.update(studioJobs)
+		.set({
+			status: "queued",
+			error: null,
+			updatedAt: new Date(),
+		})
+		.where(eq(studioJobs.id, job.id))
+		.returning();
+
+	if (!updated) throw new ScrapeError("STORAGE_FAILED");
+
+	void runStudioJobPipeline(updated.id, projectId, userId);
+
+	return updated;
 }
 
 export async function listStudioProjects(

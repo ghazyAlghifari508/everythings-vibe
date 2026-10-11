@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
-import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
+import { ScrapeError } from "@/lib/design-errors";
 import { validateStudioPrompt } from "@/lib/prompts-ui-studio";
 import {
 	createStudioProjectWithJob,
@@ -13,15 +13,23 @@ import {
 import { requireUser } from "@/lib/session";
 
 function studioErrorResponse(error: unknown): Response {
-	if (error instanceof ScrapeError)
+	console.error("[studio.generate error]", error);
+	if (error instanceof ScrapeError) {
+		const isClientError =
+			error.code === "INVALID_URL" || error.code === "WEBSITE_BLOCKED";
 		return Response.json(
 			{ error: error.message, code: error.code },
-			{ status: error.code === "INVALID_URL" ? 400 : 500 },
+			{ status: isClientError ? 400 : 500 },
 		);
-	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message))
+	}
+	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message)) {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	}
 	return Response.json(
-		{ error: DESIGN_ERROR_CODES.STORAGE_FAILED },
+		{
+			error:
+				"Terjadi kendala saat memproses permintaan Studio. Silakan coba beberapa saat lagi.",
+		},
 		{ status: 500 },
 	);
 }
