@@ -644,3 +644,30 @@ input.bg-steel:autofill:active {
 		transition: none;
 	}
 }
+
+.studio-generating-artboard::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border: 2px solid var(--border-medium);
+	border-top-color: var(--text-secondary);
+	border-radius: inherit;
+	pointer-events: none;
+	animation: studioEdgeHighlight 2.5s ease-in-out infinite;
+}
+
+@keyframes studioEdgeHighlight {
+	0%,
+	100% {
+		opacity: 0.35;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.studio-generating-artboard::after {
+		animation: none;
+	}
+}

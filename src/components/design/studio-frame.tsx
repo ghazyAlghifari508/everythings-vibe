@@ -273,6 +273,7 @@ export function StudioFrame({
 						name={frame.name}
 						description={frame.description}
 						viewport={frame.viewport}
+						status={frame.status}
 					/>
 				)}
 			</div>
