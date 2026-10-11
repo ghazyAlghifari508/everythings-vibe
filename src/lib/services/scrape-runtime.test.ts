@@ -3,9 +3,7 @@ import { expect, it } from "vitest";
 it("runs all extraction modes through persisted queue claims", async () => {
 	if (process.env.SCRAPE_RUNTIME_VERIFY !== "1") return;
 	const { db } = await import("@/db");
-	const { users, scrapes, scrapeImages, scrapePages } = await import(
-		"@/db/schema"
-	);
+	const { users, scrapeImages, scrapePages } = await import("@/db/schema");
 	const { eq, and } = await import("drizzle-orm");
 	const {
 		createScrape,
@@ -21,7 +19,11 @@ it("runs all extraction modes through persisted queue claims", async () => {
 	const [user] = await db.select({ id: users.id }).from(users).limit(1);
 	if (!user) throw new Error("Runtime verification requires an existing user.");
 	for (const mode of ["design", "html", "images", "crawl"] as const) {
-		const row = await createScrape(user.id, "https://example.com/", mode);
+		const target =
+			mode === "images" && process.env.SCRAPE_RUNTIME_IMAGE_URL
+				? process.env.SCRAPE_RUNTIME_IMAGE_URL
+				: "https://example.com/";
+		const row = await createScrape(user.id, target, mode);
 		try {
 			const claim = await claimScrapeJob();
 			if (!claim || claim.id !== row.id)
@@ -45,8 +47,14 @@ it("runs all extraction modes through persisted queue claims", async () => {
 							eq(scrapeImages.userId, user.id),
 						),
 					);
-				expect(images).toEqual([]);
-				expect(result.metadata?.discoveredImages).toBe(0);
+				if (process.env.SCRAPE_RUNTIME_IMAGE_URL)
+					expect(
+						images.filter((image) => image.status === "completed").length,
+					).toBeGreaterThan(0);
+				else {
+					expect(images).toEqual([]);
+					expect(result.metadata?.discoveredImages).toBe(0);
+				}
 			}
 			if (mode === "crawl") {
 				const pages = await db

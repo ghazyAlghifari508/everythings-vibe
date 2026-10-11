@@ -31,6 +31,15 @@ export async function runExtractionJob(
 		scrape.request ?? { url: scrape.sourceUrl, mode: scrape.mode },
 	);
 	const update = async (values: Partial<typeof scrapes.$inferInsert>) => {
+		if (values.status)
+			values.metadata = {
+				...scrape.metadata,
+				...values.metadata,
+				stage: values.status,
+				stageStartedAt: new Date().toISOString(),
+			};
+		if (values.metadata)
+			scrape.metadata = { ...scrape.metadata, ...values.metadata };
 		const rows = await db
 			.update(scrapes)
 			.set({ ...values, updatedAt: new Date() })
