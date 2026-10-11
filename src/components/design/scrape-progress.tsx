@@ -1,5 +1,5 @@
-import { Check, RotateCcw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Check, Loader2, RotateCcw } from "lucide-react";
+import { ThoughtLine } from "@/components/ui/thought-line";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
 import { displaySiteName } from "@/lib/site-name";
 
@@ -36,6 +36,48 @@ const LABELS: Record<ScrapeStatus, string> = {
 	failed: "Proses terhenti",
 };
 
+const OPERATIONS: Record<ScrapeMode, string> = {
+	design: "DESIGN.md",
+	crawl: "Crawl Website",
+	images: "Scrape Images",
+	html: "Scrape HTML",
+};
+
+function stagesFor(mode: ScrapeMode): ScrapeStatus[] {
+	if (mode === "design")
+		return [
+			"queued",
+			"capturing",
+			"extracting",
+			"generating",
+			"saving",
+			"completed",
+		];
+	if (mode === "html")
+		return ["queued", "capturing", "extracting", "saving", "completed"];
+	return ["queued", "capturing", "extracting", "completed"];
+}
+
+// A live stage is shown by a real spinning indicator; completed stages keep a
+// check mark and upcoming stages stay neutral. The number of finished stages
+// comes from the persisted status, never from an estimate.
+function StageMarker({ done, current }: { done: boolean; current: boolean }) {
+	if (done && !current)
+		return <Check size={14} aria-hidden className="text-mist" />;
+	if (current)
+		return (
+			<Loader2
+				size={14}
+				aria-hidden
+				data-active-stage-marker
+				className="text-mist motion-safe:animate-spin motion-reduce:animate-none"
+			/>
+		);
+	return (
+		<span aria-hidden className="size-1.5 rounded-full border border-slate" />
+	);
+}
+
 export function ScrapeProgress(props: ScrapeProgressProps) {
 	const {
 		status,
@@ -44,44 +86,18 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 		domain,
 		activity,
 		stageStartedAt,
+		activityStartedAt,
 		isRetrying,
 		onRetry,
 		errorMessage,
 	} = props;
-	const stages: ScrapeStatus[] =
-		mode === "design"
-			? [
-					"queued",
-					"capturing",
-					"extracting",
-					"generating",
-					"saving",
-					"completed",
-				]
-			: mode === "html"
-				? ["queued", "capturing", "extracting", "saving", "completed"]
-				: ["queued", "capturing", "extracting", "completed"];
+	const stages = stagesFor(mode);
 	const index = stages.indexOf(status);
-	const active = status !== "completed" && status !== "failed";
-	const [now, setNow] = useState(Date.now());
-	useEffect(() => {
-		if (!active) return;
-		const timer = setInterval(() => setNow(Date.now()), 1000);
-		return () => clearInterval(timer);
-	}, [active]);
-	const timestamp = props.activityStartedAt ?? stageStartedAt;
-	const start = timestamp ? Date.parse(timestamp) : NaN;
-	const elapsed = Number.isFinite(start)
-		? Math.max(0, Math.floor((now - start) / 1000))
-		: null;
-	const operation =
-		mode === "design"
-			? "DESIGN.md"
-			: mode === "crawl"
-				? "Crawl Website"
-				: mode === "images"
-					? "Scrape Images"
-					: "Scrape HTML";
+	const isFailed = status === "failed";
+	const isDone = status === "completed";
+	const active = !isDone && !isFailed;
+	const operation = OPERATIONS[mode];
+
 	const counters =
 		mode === "crawl"
 			? [
@@ -99,6 +115,14 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 						["Gagal", props.failedResources],
 					]
 				: [];
+	const visibleCounters = counters.filter(
+		([, value]) => typeof value === "number",
+	);
+	const startTimestamp = activityStartedAt ?? stageStartedAt;
+	// While queued no worker has touched the job, so the activity slot states
+	// that honestly instead of animating as if analysis had started.
+	const activityText = activity ?? null;
+
 	return (
 		<div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
 			<div className="min-w-0">
@@ -107,54 +131,80 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 					{domain ? displaySiteName(domain) : "Website"}
 				</h2>
 				<p className="mt-2 break-all font-mono text-xs text-fog">{sourceUrl}</p>
+
 				<div className="mt-6 border-t border-graphite pt-5">
 					<p className="text-sm font-semibold text-snow">
 						Aktivitas pemrosesan
 					</p>
-					<p className="mt-2 break-words text-sm text-fog">
-						{status === "failed"
-							? "Pemrosesan berhenti. Lihat alasan dan opsi pemulihan di workspace."
-							: activity || LABELS[status]}
-					</p>
-					{active && errorMessage && (
-						<p role="alert" className="mt-3 text-sm text-fog">
-							{errorMessage}
+					{isFailed ? (
+						<p className="mt-2 break-words text-sm text-fog">
+							Pemrosesan berhenti. Lihat alasan dan opsi pemulihan di panel
+							progres.
 						</p>
-					)}
-					{elapsed !== null && active && (
-						<p role="timer" className="mt-3 font-mono text-xs text-fog">
-							{elapsed}s pada tahap ini
-						</p>
-					)}
-					{status === "queued" && (
-						<p className="mt-3 text-sm text-fog">
-							{props.workerHealth ??
-								"Job menunggu worker. Belum ada sinyal pemrosesan."}
+					) : activityText ? (
+						<ThoughtLine
+							working={active}
+							bare
+							label={LABELS[status]}
+							doneLabel={LABELS[status]}
+							presentation="rotating"
+							activity={activityText}
+							rotationKey={activityText}
+							startedAt={startTimestamp ?? undefined}
+							showTimer={active}
+							fontSize="xs"
+							className="mt-2"
+							glyph={
+								<Loader2
+									size={14}
+									aria-hidden
+									className="shrink-0 text-mist motion-safe:animate-spin motion-reduce:animate-none"
+								/>
+							}
+						/>
+					) : (
+						<p className="mt-2 break-words text-sm text-fog">
+							{status === "queued"
+								? (props.workerHealth ??
+									"Job menunggu worker. Belum ada sinyal pemrosesan.")
+								: LABELS[status]}
 						</p>
 					)}
 				</div>
-				{counters.some(([, value]) => typeof value === "number") && (
+
+				{visibleCounters.length > 0 && (
 					<dl className="mt-6 grid grid-cols-2 gap-4">
-						{counters
-							.filter(([, value]) => typeof value === "number")
-							.map(([label, value]) => (
-								<div key={String(label)}>
-									<dt className="text-xs text-fog">{label}</dt>
-									<dd className="mt-1 font-mono text-xl text-snow">{value}</dd>
-								</div>
-							))}
+						{visibleCounters.map(([label, value]) => (
+							<div key={String(label)}>
+								<dt className="text-xs text-fog">{label}</dt>
+								<dd className="mt-1 font-mono text-xl text-snow tabular-nums">
+									{value}
+								</dd>
+							</div>
+						))}
 					</dl>
 				)}
 			</div>
+
 			<section
 				aria-label={`Progres ${operation}`}
 				className="min-w-0 rounded-xl border border-graphite bg-charcoal p-6"
 			>
 				<div className="flex items-center justify-between gap-3">
 					<h3 className="text-lg font-semibold text-snow">{operation}</h3>
-					<output className="text-sm text-fog">{LABELS[status]}</output>
+					<p className="flex shrink-0 items-center gap-2 text-sm text-fog">
+						{active ? (
+							<Loader2
+								size={14}
+								aria-hidden
+								className="text-mist motion-safe:animate-spin motion-reduce:animate-none"
+							/>
+						) : null}
+						<span aria-live="polite">{LABELS[status]}</span>
+					</p>
 				</div>
-				{status === "failed" ? (
+
+				{isFailed ? (
 					<div className="mt-5">
 						<p role="alert" className="text-sm text-snow">
 							{errorMessage || "Ekstraksi tidak dapat diselesaikan."}
@@ -179,46 +229,64 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 				) : (
 					<>
 						<div aria-hidden="true" className="mt-5 flex gap-1">
-							{stages.map((stage, i) => (
-								<span
-									key={stage}
-									className={`h-1.5 min-w-0 flex-1 rounded-sm ${i <= index ? "bg-mist" : "bg-slate"}`}
-								/>
-							))}
-						</div>
-						<ol className="mt-6 space-y-5" aria-label="Tahapan pemrosesan">
-							{stages.map((stage, i) => (
-								<li
-									key={stage}
-									aria-current={stage === status ? "step" : undefined}
-									className="flex items-start gap-3"
-								>
-									<span className="mt-1 flex size-4 shrink-0 items-center justify-center">
-										{i < index || status === "completed" ? (
-											<Check size={14} aria-hidden />
-										) : (
+							{stages.map((stage, i) => {
+								const stageDone = isDone || i < index;
+								const stageCurrent = !isDone && i === index;
+								return (
+									<span
+										key={stage}
+										className={`relative min-w-0 flex-1 overflow-hidden rounded-sm ${
+											stageDone ? "bg-mist" : "bg-slate"
+										}`}
+									>
+										{stageCurrent ? (
 											<span
-												className={`size-2 rounded-full ${stage === status ? "bg-mist motion-safe:animate-pulse" : "bg-graphite"}`}
+												data-active-stage-segment
+												className="absolute inset-y-0 left-0 w-1/3 bg-mist motion-safe:animate-scrape-progress motion-reduce:animate-none"
 											/>
-										)}
+										) : null}
 									</span>
-									<div className="min-w-0">
-										<p
-											className={`text-sm ${stage === status ? "font-semibold text-snow" : "text-fog"}`}
-										>
-											{LABELS[stage]}
-										</p>
-										{stage === status && (
-											<p className="mt-1 break-all text-xs leading-5 text-fog">
-												{activity ||
-													(status === "queued"
-														? "Menunggu worker mengambil job."
-														: "Tahap ini sedang berlangsung.")}
+								);
+							})}
+						</div>
+
+						<ol className="mt-6 space-y-5" aria-label="Tahapan pemrosesan">
+							{stages.map((stage, i) => {
+								const stageDone = isDone || i < index;
+								const stageCurrent = !isDone && i === index;
+								return (
+									<li
+										key={stage}
+										aria-current={stageCurrent ? "step" : undefined}
+										className="flex items-start gap-3"
+									>
+										<span className="mt-1 flex size-4 shrink-0 items-center justify-center">
+											<StageMarker done={stageDone} current={stageCurrent} />
+										</span>
+										<div className="min-w-0">
+											<p
+												className={`text-sm ${
+													stageCurrent
+														? "font-semibold text-snow"
+														: stageDone
+															? "text-fog"
+															: "text-fog/70"
+												}`}
+											>
+												{LABELS[stage]}
 											</p>
-										)}
-									</div>
-								</li>
-							))}
+											{stageCurrent && (
+												<p className="mt-1 break-all text-xs leading-5 text-fog">
+													{activityText ??
+														(status === "queued"
+															? "Menunggu worker mengambil job."
+															: "Tahap ini sedang berlangsung.")}
+												</p>
+											)}
+										</div>
+									</li>
+								);
+							})}
 						</ol>
 					</>
 				)}
