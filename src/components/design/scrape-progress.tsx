@@ -145,9 +145,7 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 			>
 				<div className="flex items-center justify-between gap-3">
 					<h3 className="text-lg font-semibold text-snow">{operation}</h3>
-					<output className="text-sm text-fog">
-						{LABELS[status]}
-					</output>
+					<output className="text-sm text-fog">{LABELS[status]}</output>
 				</div>
 				{status === "failed" ? (
 					<div className="mt-5">
@@ -173,11 +171,7 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 					</div>
 				) : (
 					<>
-						<div
-							role="group"
-							aria-label="Tahap pemrosesan, bukan persentase"
-							className="mt-5 flex gap-1"
-						>
+						<div aria-hidden="true" className="mt-5 flex gap-1">
 							{stages.map((stage, i) => (
 								<span
 									key={stage}
