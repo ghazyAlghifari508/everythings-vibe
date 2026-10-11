@@ -663,6 +663,20 @@ export async function runStudioJobPipeline(
 			.where(eq(studioJobs.id, jobId));
 	} finally {
 		activeStudioJobs.delete(jobId);
+		const queued = await db
+			.select()
+			.from(studioJobs)
+			.where(
+				and(
+					eq(studioJobs.userId, userId),
+					eq(studioJobs.projectId, projectId),
+					eq(studioJobs.status, "queued"),
+				),
+			)
+			.orderBy(asc(studioJobs.createdAt))
+			.limit(1);
+		if (queued[0] && queued[0].id !== jobId)
+			void runStudioJobPipeline(queued[0].id, projectId, userId);
 	}
 }
 
