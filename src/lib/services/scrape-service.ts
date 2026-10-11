@@ -17,7 +17,6 @@ import {
 import { ScrapeError } from "@/lib/design-errors";
 import { renderEvidenceDesignMd } from "@/lib/design-visual-evidence";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
-import { generateDesignMd } from "@/lib/prompts-design-md";
 import {
 	SCRAPE_LIMITS,
 	type ScrapeRequest,
@@ -536,7 +535,13 @@ export async function generateAndSaveDesignMd(
 			"HTML scrape belum tersedia.",
 		);
 	if (scrape.document) return scrape.document;
-	const designMd = await generateDesignMd(scrape.sourceUrl, scrape.html);
+	const captured = await scrapeHtml(scrape.sourceUrl, scrape.jobAttempts);
+	if (!captured.metadata.visualEvidence)
+		throw new ScrapeError(
+			"NO_ANALYZABLE_CONTENT",
+			"Evidence visual hasil render tidak tersedia.",
+		);
+	const designMd = renderEvidenceDesignMd(captured.metadata.visualEvidence);
 	return saveScrapeDocument(scrapeId, designMd, userId);
 }
 
