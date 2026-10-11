@@ -51,20 +51,41 @@ describe("extraction workspace", () => {
 			target: { value: "http://sample.example/path?q=1" },
 		});
 		fireEvent.click(screen.getByRole("tab", { name: "Crawl Website" }));
-		fireEvent.change(screen.getByLabelText(/Max Pages/), {
+		fireEvent.click(
+			screen.getByRole("button", { name: /parameter lanjutan/i }),
+		);
+		fireEvent.change(screen.getByLabelText(/Maksimum halaman/), {
 			target: { value: "3" },
 		});
 		fireEvent.click(screen.getByRole("tab", { name: "Scrape HTML" }));
-		fireEvent.change(screen.getByLabelText(/Wait for/), {
+		fireEvent.click(
+			screen.getByRole("button", { name: /parameter lanjutan/i }),
+		);
+		fireEvent.change(screen.getByLabelText(/Waktu tunggu tambahan/), {
 			target: { value: "200" },
 		});
-		fireEvent.click(screen.getByText("Reset parameters"));
-		expect(screen.getByLabelText(/Wait for/).getAttribute("value")).toBe("0");
-		fireEvent.click(screen.getByRole("tab", { name: "Crawl Website" }));
-		expect(screen.getByLabelText(/Max Pages/).getAttribute("value")).toBe("3");
-		expect(screen.getByLabelText("URL website").getAttribute("value")).toBe(
-			"sample.example/path?q=1",
+		fireEvent.click(
+			screen.getByRole("button", { name: /kembalikan ke pengaturan awal/i }),
 		);
+		expect(
+			screen
+				.getByLabelText<HTMLInputElement>(/Waktu tunggu tambahan/)
+				.getAttribute("value"),
+		).toBe("0");
+		fireEvent.click(screen.getByRole("tab", { name: "Crawl Website" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: /parameter lanjutan/i }),
+		);
+		expect(
+			screen
+				.getByLabelText<HTMLInputElement>(/Maksimum halaman/)
+				.getAttribute("value"),
+		).toBe("3");
+		expect(
+			screen
+				.getByLabelText<HTMLInputElement>("URL website")
+				.getAttribute("value"),
+		).toBe("sample.example/path?q=1");
 	});
 	it.each([
 		"design",
