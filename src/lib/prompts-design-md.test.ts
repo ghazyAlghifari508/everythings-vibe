@@ -4,6 +4,7 @@ import {
 	designIssues,
 	generateDesignMd,
 	normalizeDesign,
+	renderValidatedExplanation,
 } from "./prompts-design-md";
 
 const evidence: VisualEvidence = {
@@ -48,4 +49,37 @@ it("fails closed when evidence is empty", async () => {
 
 it("retains normalization for legacy inspector documents", () => {
 	expect(normalizeDesign("## Tokens - colors")).toBe("## Tokens - Colors");
+});
+
+it("only allows AI to select real property references, never supply CSS values", async () => {
+	const summary = renderValidatedExplanation(
+		{ observations: [{ element: 0, properties: ["font-size"] }] },
+		evidence,
+	);
+	const document = await generateDesignMd(evidence);
+	expect(
+		designIssues(`${document}\n\n## Evidence Summary\n${summary}`, evidence),
+	).toEqual([]);
+	expect(() =>
+		renderValidatedExplanation(
+			{ observations: [{ element: 0, properties: ["not-observed"] }] },
+			evidence,
+		),
+	).toThrow();
+	expect(() =>
+		renderValidatedExplanation(
+			{ observations: [{ element: 20, properties: ["font-size"] }] },
+			evidence,
+		),
+	).toThrow();
+	expect(() =>
+		renderValidatedExplanation(
+			{
+				observations: [
+					{ element: 0, properties: ["font-size"], value: "48px" },
+				],
+			},
+			evidence,
+		),
+	).toThrow();
 });

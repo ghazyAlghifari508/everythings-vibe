@@ -18,6 +18,30 @@ it("runs all extraction modes through persisted queue claims", async () => {
 	const { closeRenderBrowser } = await import("../render-page");
 	const [user] = await db.select({ id: users.id }).from(users).limit(1);
 	if (!user) throw new Error("Runtime verification requires an existing user.");
+	const capacityOne = await createScrape(
+		user.id,
+		"https://example.com/",
+		"html",
+	);
+	const capacityTwo = await createScrape(
+		user.id,
+		"https://example.com/",
+		"images",
+	);
+	try {
+		expect(
+			(await createScrape(user.id, "https://example.com/", "html")).id,
+		).toBe(capacityOne.id);
+		await expect(
+			createScrape(user.id, "https://example.com/", "design"),
+		).rejects.toMatchObject({ code: "QUEUE_CAPACITY" });
+		await expect(
+			getScrapeById(capacityOne.id, "unrelated-owner"),
+		).rejects.toThrow();
+	} finally {
+		await deleteScrape(capacityOne.id, user.id);
+		await deleteScrape(capacityTwo.id, user.id);
+	}
 	for (const mode of ["design", "html", "images", "crawl"] as const) {
 		const target =
 			mode === "images" && process.env.SCRAPE_RUNTIME_IMAGE_URL
