@@ -15,6 +15,7 @@ export interface CrawledPage {
 }
 
 export interface CrawlDependencies {
+	signal?: AbortSignal;
 	completed?: CrawledPage[];
 	frontier?: { url: string; parentUrl: string | null; depth: number }[];
 	onDiscovered?: (
@@ -132,6 +133,7 @@ export async function crawlWebsite(
 	const pages: CrawledPage[] = [];
 	const robots = new Map<string, string>();
 	while (queue.length && pages.length < settings.maxPages) {
+		deps.signal?.throwIfAborted();
 		const next = queue.shift();
 		if (!next) break;
 		if (
@@ -254,6 +256,7 @@ export async function crawlWebsite(
 					}
 			}
 		} catch (error) {
+			deps.signal?.throwIfAborted();
 			if (error instanceof Error && /URL Regex|Job lease/.test(error.message))
 				throw error;
 			page.error =

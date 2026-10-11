@@ -263,6 +263,7 @@ export async function runScrapePipeline(
 						...instrumentation,
 						mode,
 						...settings,
+						signal: claim?.signal,
 					});
 		meta = { ...meta, ...captured.metadata };
 

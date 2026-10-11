@@ -34,12 +34,15 @@ async function run() {
 			continue;
 		}
 		let heartbeatRunning = false;
+		const controller = new AbortController();
+		claim.signal = controller.signal;
 		const startedAt = Date.now();
 		let leaseLost = false;
 		const heartbeat = setInterval(() => {
 			if (heartbeatRunning || leaseLost) return;
 			if (Date.now() - startedAt >= SCRAPE_LIMITS.jobTimeoutMs) {
 				leaseLost = true;
+				controller.abort();
 				void releaseScrapeClaim(claim)
 					.finally(async () => {
 						const { closeRenderBrowser } = await import("@/lib/render-page");
@@ -55,6 +58,7 @@ async function run() {
 				.then((current) => {
 					if (!current) {
 						leaseLost = true;
+						controller.abort();
 						console.error("Scrape worker lost job lease", claim.id);
 						void import("@/lib/render-page")
 							.then(({ closeRenderBrowser }) => closeRenderBrowser())

@@ -19,6 +19,7 @@ export interface RenderPageOptions extends ScrapeInstrumentation {
 	waitMs?: number;
 	measureResolution?: boolean;
 	includeIframes?: boolean;
+	signal?: AbortSignal;
 }
 
 export const DESKTOP_VIEWPORT = {
@@ -271,7 +272,12 @@ export async function renderPage(
 		ignoreHTTPSErrors: true,
 		serviceWorkers: "block",
 	});
+	const abortCapture = () => {
+		void context.close().catch(() => {});
+	};
+	options.signal?.addEventListener("abort", abortCapture, { once: true });
 	try {
+		if (options.signal?.aborted) throw new ScrapeError("FETCH_TIMEOUT");
 		await guardContext(context);
 		const page = await context.newPage();
 		onTiming?.("browserContext", Date.now() - setupStart);
@@ -488,6 +494,7 @@ export async function renderPage(
 			);
 		return { html, status: status || 200, finalUrl: page.url(), images };
 	} finally {
+		options.signal?.removeEventListener("abort", abortCapture);
 		await context.close();
 	}
 }

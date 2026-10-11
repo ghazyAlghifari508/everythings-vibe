@@ -262,6 +262,7 @@ export async function scrapeHtml(
 		mode?: ScrapeMode;
 		waitMs?: number;
 		includeIframes?: boolean;
+		signal?: AbortSignal;
 	},
 ): Promise<ScrapeCapture> {
 	const { url } = await validateUrl(rawUrl);

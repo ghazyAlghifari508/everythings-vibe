@@ -41,6 +41,7 @@ export interface ScrapeJobClaim {
 	id: string;
 	userId: string;
 	token: string;
+	signal?: AbortSignal;
 }
 
 export function scrapeClaimPredicate(claim: ScrapeJobClaim) {

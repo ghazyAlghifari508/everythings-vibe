@@ -1,3 +1,4 @@
+import { setTimeout as wait } from "node:timers/promises";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -73,6 +74,7 @@ export async function runExtractionJob(
 				),
 			);
 		const results = await crawlWebsite(request.url, request.settings, {
+			signal: claim.signal,
 			frontier: completed.map(({ url, parentUrl, depth }) => ({
 				url,
 				parentUrl,
@@ -107,14 +109,14 @@ export async function runExtractionJob(
 					await tx.execute(
 						sql`select pg_advisory_xact_lock(hashtext(${new URL(url).origin}))`,
 					);
-					await new Promise((resolve) =>
-						setTimeout(
-							resolve,
-							crawlDelays.get(new URL(url).origin) ?? CRAWL_REQUEST_GAP_MS,
-						),
+					await wait(
+						crawlDelays.get(new URL(url).origin) ?? CRAWL_REQUEST_GAP_MS,
+						undefined,
+						{ signal: claim.signal },
 					);
 					return fetchAsset(url, 0, {
 						maxBytes: SCRAPE_MAX_HTML_BYTES,
+						signal: claim.signal,
 						allowUrl: (target) =>
 							isCrawlScope(
 								target,
@@ -134,6 +136,7 @@ export async function runExtractionJob(
 			robots: async (origin) => {
 				const result = await fetchAsset(`${origin}/robots.txt`, 0, {
 					maxBytes: CRAWL_ROBOTS_MAX_BYTES,
+					signal: claim.signal,
 					allowUrl: (target) => new URL(target).origin === origin,
 				});
 				if (result.status === 404) return "";
@@ -198,6 +201,7 @@ export async function runExtractionJob(
 			throw new Error("Tidak ada halaman yang berhasil diambil.");
 	} else if (request.mode === "images") {
 		const captured = await renderPage(request.url, {
+			signal: claim.signal,
 			mode: "images",
 			...request.settings,
 		});
