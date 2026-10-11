@@ -24,6 +24,15 @@ export interface ScrapeProgressProps {
 	failedResources?: number;
 	workerHealth?: string | null;
 	partialResults?: number;
+	// Images mode outcome, persisted by the worker. "empty" is a truthful
+	// result for a page without images; the failure states are not.
+	imageDiscovery?:
+		| "found"
+		| "none"
+		| "capture-failed"
+		| "discovery-failed"
+		| null;
+	imageOutcome?: "complete" | "partial" | "empty" | "all-failed" | null;
 }
 
 const LABELS: Record<ScrapeStatus, string> = {
@@ -184,6 +193,27 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 						))}
 					</dl>
 				)}
+
+				{mode === "images" && props.imageOutcome === "empty" && (
+					<p className="mt-6 text-sm text-fog">
+						Halaman berhasil di-capture dan tidak ditemukan resource gambar di
+						dalamnya. Tidak ada gambar yang bisa disimpan dari halaman ini.
+					</p>
+				)}
+				{mode === "images" && props.imageOutcome === "partial" && (
+					<p className="mt-6 text-sm text-fog">
+						Sebagian gambar berhasil diverifikasi dan tetap tersimpan; sisanya
+						gagal diambil beserta alasannya.
+					</p>
+				)}
+				{mode === "images" &&
+					(props.imageDiscovery === "discovery-failed" ||
+						props.imageDiscovery === "capture-failed") && (
+						<p className="mt-6 text-sm text-fog">
+							Discovery gambar tidak selesai, jadi halaman ini belum terbukti
+							tidak memiliki gambar.
+						</p>
+					)}
 			</div>
 
 			<section

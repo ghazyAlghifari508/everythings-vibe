@@ -243,7 +243,11 @@ function ScrapeDetailPage() {
 			) : mode === "images" &&
 				(currentStatus === "completed" ||
 					(currentStatus === "failed" && images.length > 0)) ? (
-				<ImagesResult images={images} sourceUrl={sourceUrl} />
+				<ImagesResult
+					images={images}
+					sourceUrl={sourceUrl}
+					imageOutcome={data?.metadata?.imageOutcome ?? null}
+				/>
 			) : view === "result-design" ? (
 				<DesignResult
 					sourceUrl={sourceUrl}
@@ -266,6 +270,8 @@ function ScrapeDetailPage() {
 				(mode === "crawl" || mode === "images") ? null : (
 				<ScrapeProgress
 					workerHealth={data?.metadata?.workerHealth}
+					imageDiscovery={data?.metadata?.imageDiscovery ?? null}
+					imageOutcome={data?.metadata?.imageOutcome ?? null}
 					completedPages={data?.metadata?.completedPages}
 					skippedPages={data?.metadata?.skippedPages}
 					discoveredImages={data?.metadata?.discoveredImages}

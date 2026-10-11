@@ -1,6 +1,32 @@
 import type { ImageEvidence } from "@/db/schema";
 import type { RenderedImage } from "./render-page";
 
+// How a page-level image capture ended. Kept explicit so the UI never presents
+// a failed extraction as a successful empty result.
+export type ScrapeImageDiscovery =
+	| "found"
+	| "none"
+	| "capture-failed"
+	| "discovery-failed";
+export type ScrapeImageOutcome =
+	| "complete"
+	| "partial"
+	| "empty"
+	| "all-failed";
+
+// A page that genuinely has no images is a truthful result, while discovering
+// candidates that all failed verification is not. Collapsing both into
+// "completed" made the two indistinguishable to the user.
+export function classifyImageOutcome(
+	discovered: number,
+	verified: number,
+): ScrapeImageOutcome {
+	if (discovered === 0) return "empty";
+	if (verified === 0) return "all-failed";
+	if (verified < discovered) return "partial";
+	return "complete";
+}
+
 export interface DiscoveredImage {
 	url: string;
 	format: string | null;

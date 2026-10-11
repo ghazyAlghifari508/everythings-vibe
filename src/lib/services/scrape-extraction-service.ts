@@ -1,4 +1,4 @@
-import { setTimeout as wait } from "node:timers/promises";
+﻿import { setTimeout as wait } from "node:timers/promises";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -12,7 +12,10 @@ import { ScrapeError } from "@/lib/design-errors";
 import { fetchAsset } from "@/lib/fetch-html";
 import { renderPage } from "@/lib/render-page";
 import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/lib/scrape-contract";
-import { normalizeImageCandidates } from "@/lib/scrape-images";
+import {
+	classifyImageOutcome,
+	normalizeImageCandidates,
+} from "@/lib/scrape-images";
 import {
 	type ScrapeJobClaim,
 	scrapeClaimPredicate,
@@ -20,8 +23,36 @@ import {
 
 const CRAWL_REQUEST_GAP_MS = 1000;
 const CRAWL_ROBOTS_MAX_BYTES = 512000;
+// Transient transport failures are retried a bounded number of times. Status
+// responses such as 404 or 403 are final answers from the site and are never
+// retried, so we do not add load to a server that already refused the request.
+const IMAGE_FETCH_ATTEMPTS = 2;
+const IMAGE_FETCH_RETRY_DELAY_MS = 400;
+const RETRYABLE_FETCH_CODES = new Set(["FETCH_TIMEOUT", "WEBSITE_BLOCKED"]);
 
 import { SCRAPE_MAX_HTML_BYTES } from "@/lib/constants";
+
+async function fetchImageAsset(
+	url: string,
+	signal: AbortSignal | undefined,
+): Promise<Awaited<ReturnType<typeof fetchAsset>>> {
+	let lastError: unknown;
+	for (let attempt = 0; attempt < IMAGE_FETCH_ATTEMPTS; attempt += 1) {
+		if (attempt > 0)
+			await wait(IMAGE_FETCH_RETRY_DELAY_MS, undefined, { signal });
+		try {
+			const asset = await fetchAsset(url, 0, { signal });
+			if (asset.status >= 500 && attempt < IMAGE_FETCH_ATTEMPTS - 1) continue;
+			return asset;
+		} catch (error) {
+			lastError = error;
+			const code =
+				error instanceof ScrapeError ? error.code : "UNEXPECTED_ERROR";
+			if (!RETRYABLE_FETCH_CODES.has(code)) throw error;
+		}
+	}
+	throw lastError;
+}
 
 export async function runExtractionJob(
 	scrape: ScrapeRow,
@@ -190,22 +221,52 @@ export async function runExtractionJob(
 		if (!results.some((page) => page.status === "completed"))
 			throw new Error("Tidak ada halaman yang berhasil diambil.");
 	} else if (request.mode === "images") {
-		const captured = await renderPage(request.url, {
-			signal: claim.signal,
-			mode: "images",
-			...request.settings,
-			onActivity: async (activity) =>
-				update({
-					metadata: {
-						...scrape.metadata,
-						mode: "images",
-						activity,
-						activityStartedAt: new Date().toISOString(),
-					},
-				}),
-		});
+		// Distinguishes a page that genuinely has no images from a discovery
+		// failure. The browser capture already succeeded by this point, so an
+		// empty candidate list is a real observation, while a missing list means
+		// discovery never ran.
+		let captured: Awaited<ReturnType<typeof renderPage>>;
+		try {
+			captured = await renderPage(request.url, {
+				signal: claim.signal,
+				mode: "images",
+				...request.settings,
+				onActivity: async (activity) =>
+					update({
+						metadata: {
+							...scrape.metadata,
+							mode: "images",
+							activity,
+							activityStartedAt: new Date().toISOString(),
+						},
+					}),
+			});
+		} catch (error) {
+			if (claim.signal?.aborted) throw error;
+			await update({
+				metadata: {
+					...scrape.metadata,
+					mode: "images",
+					imageDiscovery: "capture-failed",
+				},
+			});
+			throw error;
+		}
+		if (!Array.isArray(captured.images)) {
+			await update({
+				metadata: {
+					...scrape.metadata,
+					mode: "images",
+					imageDiscovery: "discovery-failed",
+				},
+			});
+			throw new ScrapeError(
+				"NO_ANALYZABLE_CONTENT",
+				"Discovery gambar tidak menghasilkan daftar kandidat. Capture tidak dapat dipakai.",
+			);
+		}
 		const images = normalizeImageCandidates(
-			captured.images ?? [],
+			captured.images,
 			request.settings.classifyType,
 		);
 		const validImages: typeof images = [];
@@ -215,6 +276,7 @@ export async function runExtractionJob(
 			metadata: {
 				...scrape.metadata,
 				mode: "images",
+				imageDiscovery: images.length ? "found" : "none",
 				discoveredImages: images.length,
 				processedImages: 0,
 			},
@@ -222,7 +284,7 @@ export async function runExtractionJob(
 		for (const image of images) {
 			let error: string | null = null;
 			try {
-				const asset = await fetchAsset(image.url, 0, { signal: claim.signal });
+				const asset = await fetchImageAsset(image.url, claim.signal);
 				if (asset.status < 200 || asset.status >= 300)
 					throw new Error(`HTTP ${asset.status}`);
 				if (!/^image\//i.test(asset.contentType) || !asset.body.length)
@@ -281,7 +343,14 @@ export async function runExtractionJob(
 				},
 			});
 		}
-		if (images.length && !validImages.length)
+		// Every distinct outcome is reported honestly instead of collapsing into
+		// one generic completion: an empty page, a partial result and a total
+		// verification failure are different facts about the run.
+		const imageOutcome = classifyImageOutcome(
+			images.length,
+			validImages.length,
+		);
+		if (imageOutcome === "all-failed")
 			throw new ScrapeError(
 				"NO_ANALYZABLE_CONTENT",
 				`Seluruh ${failedImages} resource gambar gagal diverifikasi. Detail kegagalan tersimpan.`,
@@ -291,6 +360,7 @@ export async function runExtractionJob(
 			metadata: {
 				...scrape.metadata,
 				mode: "images",
+				imageOutcome,
 				discoveredImages: images.length,
 				processedImages: validImages.length + failedImages,
 				savedImages: validImages.length,

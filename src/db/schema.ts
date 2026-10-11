@@ -23,6 +23,10 @@ import type {
 } from "@/lib/adaptive-credit";
 import type { CodebaseNameSource } from "@/lib/codebase-library";
 import type { ScrapeRequest } from "@/lib/scrape-contract";
+import type {
+	ScrapeImageDiscovery,
+	ScrapeImageOutcome,
+} from "@/lib/scrape-images";
 
 // === TABLES ===
 // ponytail: RLS policies dropped - app-level ownership filters (eq(userId, user.id))
@@ -877,6 +881,10 @@ export interface ScrapeMetadata {
 	// canonical, evidence-backed DESIGN.md.
 	aiEnrichment?: "applied" | "unavailable";
 	aiEnrichmentDetail?: string;
+	// Images mode: separates a page that truly has no images from a discovery
+	// or capture failure, and records how the verified resources ended up.
+	imageDiscovery?: ScrapeImageDiscovery;
+	imageOutcome?: ScrapeImageOutcome;
 	mode?: ScrapeMode;
 	visitedPages?: number;
 	discoveredPages?: number;

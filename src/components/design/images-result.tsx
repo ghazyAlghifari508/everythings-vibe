@@ -7,9 +7,11 @@ export type ImageResult = ScrapeImageResult;
 export function ImagesResult({
 	images,
 	sourceUrl,
+	imageOutcome,
 }: {
 	images: ImageResult[];
 	sourceUrl: string;
+	imageOutcome?: "complete" | "partial" | "empty" | "all-failed" | null;
 }) {
 	const [filter, setFilter] = useState("");
 	const [downloading, setDownloading] = useState<string | null>(null);
@@ -164,7 +166,9 @@ export function ImagesResult({
 				<p className="rounded-lg border border-graphite p-6 text-sm text-fog">
 					{images.length
 						? "Tidak ada gambar yang sesuai filter."
-						: "Tidak ditemukan resource gambar yang dapat diambil dari halaman ini."}
+						: imageOutcome === "empty"
+							? "Halaman berhasil di-capture dan tidak memiliki resource gambar. Ini hasil yang sah, bukan kegagalan ekstraksi."
+							: "Tidak ditemukan resource gambar yang dapat diambil dari halaman ini."}
 				</p>
 			)}
 		</section>
