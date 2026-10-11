@@ -58,7 +58,9 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 					"saving",
 					"completed",
 				]
-			: ["queued", "capturing", "extracting", "completed"];
+			: mode === "html"
+				? ["queued", "capturing", "extracting", "saving", "completed"]
+				: ["queued", "capturing", "extracting", "completed"];
 	const index = stages.indexOf(status);
 	const active = status !== "completed" && status !== "failed";
 	const [now, setNow] = useState(Date.now());

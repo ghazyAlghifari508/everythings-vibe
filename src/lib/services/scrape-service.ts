@@ -388,6 +388,23 @@ export async function retryScrape(
 	if (!scrape)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
 	if (scrape.status !== "failed") return { ok: true };
+	const active = await db
+		.select({ id: scrapes.id })
+		.from(scrapes)
+		.where(
+			and(
+				eq(scrapes.userId, userId),
+				inArray(scrapes.status, [
+					"queued",
+					"capturing",
+					"extracting",
+					"generating",
+					"saving",
+				]),
+			),
+		);
+	if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
+		throw new ScrapeError("QUEUE_CAPACITY");
 
 	const mode: ScrapeMode = (scrape.mode ??
 		scrape.metadata?.mode ??
