@@ -187,14 +187,21 @@ export async function crawlWebsite(
 				if (!isCrawlScope(captured.finalUrl, seed, settings.followSubdomains))
 					throw new Error("Redirect di luar scope crawl.");
 				if (captured.status >= 400) throw new Error(`HTTP ${captured.status}`);
-				const links = resources(captured.html, "href", captured.finalUrl);
+				const links = resources(
+					[...captured.html.matchAll(/<a\b[^>]*>/gi)]
+						.map((match) => match[0])
+						.join(" "),
+					"href",
+					captured.finalUrl,
+				);
 				const body = settings.mainContentOnly
 					? (
 							captured.html.match(
 								/<(?:main|article)\b[^>]*>([\s\S]*?)<\/(?:main|article)\s*>/i,
 							)?.[1] ?? captured.html
 						).replace(/<(nav|footer|aside)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "")
-					: captured.html;
+					: (captured.html.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i)?.[1] ??
+						captured.html);
 				page = {
 					...page,
 					status: "completed",
@@ -239,7 +246,7 @@ export async function crawlWebsite(
 					}
 			}
 		} catch (error) {
-			if (error instanceof Error && /URL Regex/.test(error.message))
+			if (error instanceof Error && /URL Regex|Job lease/.test(error.message))
 				throw error;
 			page.error =
 				error instanceof Error ? error.message : "Halaman gagal diambil.";

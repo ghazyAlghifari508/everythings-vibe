@@ -26,7 +26,6 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 	const [error, setError] = useState("");
 	const [pending, setPending] = useState(false);
 	const submitting = useRef(false);
-	const requestKey = useRef<string | null>(null);
 	function reset() {
 		if (mode === "crawl") setCrawl(crawlSettingsSchema.parse({}));
 		if (mode === "html") setHtml(htmlSettingsSchema.parse({}));
@@ -39,7 +38,6 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 			setProtocol(match[1].toLowerCase());
 			setInput(match[2]);
 		} else setInput(value);
-		requestKey.current = null;
 	}
 	async function submit(event: FormEvent) {
 		event.preventDefault();
@@ -69,13 +67,11 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 		submitting.current = true;
 		setPending(true);
 		setError("");
-		requestKey.current ??= crypto.randomUUID();
 		try {
 			const response = await fetch("/api/scrape", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					"Idempotency-Key": requestKey.current,
 				},
 				body: JSON.stringify(parsed.data),
 			});
@@ -93,7 +89,6 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 				params: { id: result.data.scrapeId },
 				search: { from: "/design/scrap" },
 			});
-			requestKey.current = null;
 		} catch {
 			setError("Jaringan bermasalah. Coba lagi dari URL yang sama.");
 		} finally {
@@ -110,10 +105,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 			<fieldset disabled={pending} className="min-w-0">
 				<div className="flex items-stretch gap-3">
 					<div className="flex h-14 min-w-0 flex-1 items-center overflow-hidden rounded-lg border border-graphite bg-charcoal focus-within:ring-2 focus-within:ring-indigo">
-						<span
-							className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-sm text-fog"
-							aria-hidden
-						>
+						<span className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-sm text-fog">
 							{protocol}
 						</span>
 						<label htmlFor="scrape-url" className="sr-only">

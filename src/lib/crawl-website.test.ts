@@ -3,6 +3,25 @@ import { crawlWebsite, isCrawlScope, robotsAllows } from "./crawl-website";
 import { crawlSettingsSchema } from "./scrape-contract";
 
 describe("website traversal", () => {
+	it("does not traverse stylesheet or alternate metadata URLs", async () => {
+		const calls: string[] = [];
+		await crawlWebsite(
+			"https://sample.example/",
+			crawlSettingsSchema.parse({}),
+			{
+				load: async (url) => {
+					calls.push(url);
+					return {
+						html: '<html><head><link href="/style.css" rel="stylesheet"></head><body>Content</body></html>',
+						status: 200,
+						finalUrl: url,
+					};
+				},
+				robots: async () => "",
+			},
+		);
+		expect(calls).toEqual(["https://sample.example/"]);
+	});
 	it("resumes a persisted frontier without refetching completed pages", async () => {
 		const calls: string[] = [];
 		const pages = await crawlWebsite(
