@@ -1296,7 +1296,7 @@ export async function updateStudioDesignSystem(
 		);
 	const designMd = checked.designMd;
 	const validatedLogo = input.logo ? validateAndProcessLogo(input.logo) : null;
-	return db.transaction(async (tx) => {
+	const updatedProject = await db.transaction(async (tx) => {
 		const [project] = await tx
 			.select()
 			.from(studioProjects)
@@ -1391,6 +1391,22 @@ export async function updateStudioDesignSystem(
 		if (!updated) throw new ScrapeError("STORAGE_FAILED");
 		return updated;
 	});
+	const targets = await db
+		.select()
+		.from(studioFrames)
+		.where(eq(studioFrames.projectId, projectId));
+	if (targets.some((frame) => frame.status === "ready")) {
+		await enqueueStudioOperation(projectId, userId, {
+			action: "revise",
+			frameIds: targets
+				.filter((frame) => frame.status === "ready")
+				.map((frame) => frame.id),
+			requestId: crypto.randomUUID(),
+			prompt:
+				"Apply the active DESIGN.md design system to this screen: typography, colors, spacing, radius, surfaces, component styling and elevation. Preserve its content and screen identity.",
+		});
+	}
+	return updatedProject;
 }
 
 export async function getStudioFrameVisual(

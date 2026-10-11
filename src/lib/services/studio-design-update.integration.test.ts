@@ -1,9 +1,14 @@
 import { eq } from "drizzle-orm";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { db } from "@/db";
 import { studioAssets, studioFrames, studioProjects, users } from "@/db/schema";
 import { getStudioPresetDesignMd } from "@/lib/studio-presets";
 import { updateStudioDesignSystem } from "./studio-service";
+
+vi.mock("./ai-orchestrator", () => ({
+	selectModels: () => [],
+	tryStreamWithFallback: () => new Promise(() => {}),
+}));
 
 it("persists the selected specification and applies it to actual existing HTML with owner isolation", async () => {
 	const userId = crypto.randomUUID();
