@@ -8,11 +8,11 @@ import {
 	scrapes,
 } from "@/db/schema";
 import { crawlWebsite, isCrawlScope } from "@/lib/crawl-website";
+import { ScrapeError } from "@/lib/design-errors";
 import { fetchAsset } from "@/lib/fetch-html";
 import { renderPage } from "@/lib/render-page";
 import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/lib/scrape-contract";
 import { normalizeImageCandidates } from "@/lib/scrape-images";
-import { validateUrl } from "@/lib/url-validator";
 import {
 	type ScrapeJobClaim,
 	scrapeClaimPredicate,
@@ -38,29 +38,6 @@ export async function runExtractionJob(
 			.returning({ id: scrapes.id });
 		if (!rows.length) throw new Error("Job lease sudah tidak berlaku.");
 	};
-	if (request.mode === "images") {
-		const existing = await db
-			.select({ id: scrapeImages.id })
-			.from(scrapeImages)
-			.where(
-				and(
-					eq(scrapeImages.scrapeId, claim.id),
-					eq(scrapeImages.userId, claim.userId),
-					eq(scrapeImages.status, "completed"),
-				),
-			);
-		if (existing.length) {
-			await update({
-				status: "completed",
-				metadata: {
-					...scrape.metadata,
-					mode: "images",
-					processedImages: existing.length,
-				},
-			});
-			return;
-		}
-	}
 	await update({ status: "capturing" });
 	if (request.mode === "crawl") {
 		const crawlDelays = new Map<string, number>();
@@ -204,35 +181,61 @@ export async function runExtractionJob(
 			signal: claim.signal,
 			mode: "images",
 			...request.settings,
+			onActivity: async (activity) =>
+				update({
+					metadata: {
+						...scrape.metadata,
+						mode: "images",
+						activity,
+						activityStartedAt: new Date().toISOString(),
+					},
+				}),
 		});
 		const images = normalizeImageCandidates(
 			captured.images ?? [],
 			request.settings.classifyType,
 		);
 		const validImages: typeof images = [];
-		for (const image of images) {
-			try {
-				await validateUrl(image.url);
-				validImages.push(image);
-			} catch {}
-		}
+		let failedImages = 0;
 		await update({
 			status: "extracting",
 			metadata: {
 				...scrape.metadata,
 				mode: "images",
-				processedImages: images.length,
+				discoveredImages: images.length,
+				processedImages: 0,
 			},
 		});
-		await db.transaction(async (tx) => {
-			const [owner] = await tx
-				.select({ id: scrapes.id })
-				.from(scrapes)
-				.where(scrapeClaimPredicate(claim))
-				.for("update")
-				.limit(1);
-			if (!owner) throw new Error("Job lease sudah tidak berlaku.");
-			for (const image of validImages)
+		for (const image of images) {
+			let error: string | null = null;
+			try {
+				const asset = await fetchAsset(image.url, 0, { signal: claim.signal });
+				if (asset.status < 200 || asset.status >= 300)
+					throw new Error(`HTTP ${asset.status}`);
+				if (!/^image\//i.test(asset.contentType) || !asset.body.length)
+					throw new Error("Resource bukan gambar yang valid.");
+				image.format = asset.contentType
+					.split(";")[0]
+					.replace(/^image\//i, "")
+					.replace("svg+xml", "svg")
+					.replace("jpeg", "jpg");
+				validImages.push(image);
+			} catch (failure) {
+				if (claim.signal?.aborted) throw failure;
+				failedImages += 1;
+				error =
+					failure instanceof Error
+						? failure.message
+						: "Resource gagal diambil.";
+			}
+			await db.transaction(async (tx) => {
+				const [owner] = await tx
+					.select({ id: scrapes.id })
+					.from(scrapes)
+					.where(scrapeClaimPredicate(claim))
+					.for("update")
+					.limit(1);
+				if (!owner) throw new Error("Job lease sudah tidak berlaku.");
 				await tx
 					.insert(scrapeImages)
 					.values({
@@ -240,16 +243,45 @@ export async function runExtractionJob(
 						pageUrl: captured.finalUrl,
 						userId: claim.userId,
 						scrapeId: claim.id,
-						status: "completed",
+						status: error ? "failed" : "completed",
+						error,
 					})
-					.onConflictDoNothing();
-		});
+					.onConflictDoUpdate({
+						target: [
+							scrapeImages.userId,
+							scrapeImages.scrapeId,
+							scrapeImages.url,
+						],
+						set: { ...image, status: error ? "failed" : "completed", error },
+					});
+			});
+			await update({
+				metadata: {
+					...scrape.metadata,
+					mode: "images",
+					discoveredImages: images.length,
+					processedImages: validImages.length + failedImages,
+					savedImages: validImages.length,
+					failedResources: failedImages,
+					activity: image.url,
+					activityStartedAt: new Date().toISOString(),
+				},
+			});
+		}
+		if (images.length && !validImages.length)
+			throw new ScrapeError(
+				"NO_ANALYZABLE_CONTENT",
+				`Seluruh ${failedImages} resource gambar gagal diverifikasi. Detail kegagalan tersimpan.`,
+			);
 		await update({
 			sourceUrl: captured.finalUrl,
 			metadata: {
 				...scrape.metadata,
 				mode: "images",
-				processedImages: validImages.length,
+				discoveredImages: images.length,
+				processedImages: validImages.length + failedImages,
+				savedImages: validImages.length,
+				failedResources: failedImages,
 			},
 		});
 	} else throw new Error("Mode extraction tidak sesuai.");

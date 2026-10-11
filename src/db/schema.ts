@@ -875,6 +875,10 @@ export interface ScrapeMetadata {
 	visitedPages?: number;
 	discoveredPages?: number;
 	processedImages?: number;
+	discoveredImages?: number;
+	savedImages?: number;
+	completedPages?: number;
+	skippedPages?: number;
 	failedResources?: number;
 	idempotencyKey?: string;
 }

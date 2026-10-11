@@ -20,7 +20,8 @@ export function ImagesResult({
 	];
 	const visible = images.filter(
 		(image) =>
-			!filter || image.format === filter || image.classification === filter,
+			image.status === "completed" &&
+			(!filter || image.format === filter || image.classification === filter),
 	);
 	async function download(image: ImageResult) {
 		if (downloading) return;
@@ -85,6 +86,20 @@ export function ImagesResult({
 				<p role="alert" className="text-sm text-fog">
 					{notice}
 				</p>
+			)}
+			{images.some((image) => image.status === "failed") && (
+				<details className="text-sm text-fog">
+					<summary>Resource yang gagal diverifikasi</summary>
+					<ul className="mt-3 space-y-2">
+						{images
+							.filter((image) => image.status === "failed")
+							.map((image) => (
+								<li key={image.id} className="break-all">
+									{image.url}: {image.error}
+								</li>
+							))}
+					</ul>
+				</details>
 			)}
 			{visible.length ? (
 				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
