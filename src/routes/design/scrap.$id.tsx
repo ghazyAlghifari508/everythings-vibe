@@ -144,6 +144,7 @@ function ScrapeDetailPage() {
 		status: polledStatus,
 		isRetrying,
 		retry,
+		error: requestError,
 	} = useScrapeStatus(id, {
 		initialData: initial
 			? toScrapeStatusSnapshot({
@@ -197,9 +198,10 @@ function ScrapeDetailPage() {
 		unknown
 	> | null;
 	const errorMessage =
-		metadata && typeof metadata === "object" && "errorMessage" in metadata
+		requestError ??
+		(metadata && typeof metadata === "object" && "errorMessage" in metadata
 			? String(metadata.errorMessage)
-			: null;
+			: null);
 	const stageStartedAt =
 		metadata &&
 		typeof metadata === "object" &&

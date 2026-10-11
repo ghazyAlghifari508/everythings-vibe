@@ -72,6 +72,7 @@ export function useScrapeStatus(
 			setError(null);
 			return json.scrape;
 		} catch {
+			setError("Jaringan bermasalah. Status terakhir tetap ditampilkan.");
 			return null;
 		}
 	}, [scrapeId]);
