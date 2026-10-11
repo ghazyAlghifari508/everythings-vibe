@@ -127,7 +127,7 @@ export async function captureStudioVisual(
 		});
 		const page = await context.newPage();
 		page.setDefaultTimeout(CAPTURE_TIMEOUT_MS);
-		await page.setContent(parsed.html, {
+		await page.setContent(`<!doctype html>${parsed.html}`, {
 			waitUntil: "load",
 			timeout: CAPTURE_TIMEOUT_MS,
 		});
@@ -191,7 +191,10 @@ export async function captureStudioVisual(
 			Math.ceil(
 				Math.max(
 					document.body.scrollHeight,
-					document.documentElement.scrollHeight,
+					...Array.from(
+						document.body.querySelectorAll("*"),
+						(element) => element.getBoundingClientRect().bottom,
+					),
 					document.body.getBoundingClientRect().bottom,
 				),
 			),
@@ -207,7 +210,7 @@ export async function captureStudioVisual(
 		const data = await page.screenshot({
 			type: "jpeg",
 			quality: 90,
-			fullPage: true,
+			clip: { x: 0, y: 0, width, height },
 			animations: "disabled",
 		});
 		return { width, height, data };
