@@ -92,6 +92,23 @@ export function extractionFromVisualEvidence(
 		if (p["box-shadow"] && p["box-shadow"] !== "none")
 			shadows.add(p["box-shadow"]);
 	}
+	for (const color of colors.values()) {
+		if (color.role !== "cta-background") continue;
+		const uses = evidence.elements.filter(
+			(element) =>
+				element.role === "cta" &&
+				element.properties["background-color"] === color.value,
+		);
+		const semantic = uses.some((element) =>
+			Object.entries(element.variables ?? {}).some(
+				([name, value]) =>
+					/(?:brand|primary|accent)/i.test(name) && value === color.value,
+			),
+		);
+		if (uses.length > 1 && semantic)
+			color.role =
+				"brand-primary (derived from repeated CTA and resolved semantic variable)";
+	}
 	return {
 		colors: [...colors.values()],
 		typography: [...fonts].map((family) => ({ family })),
@@ -207,7 +224,7 @@ export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 		"",
 		"## Limitations & Confidence Notes",
 		"",
-		"Semantic roles describe DOM usage, not verified brand-primary identity. Missing evidence is unknown. CSS custom properties were not measured. Loaded font-face status does not identify the font used for each glyph.",
+		"Measurements are observed; semantic classifications are derived from DOM usage. Brand-primary is only classified when repeated CTA backgrounds agree with a resolved semantic variable. Otherwise brand identity is unknown. Missing evidence is unknown. Loaded font-face status does not identify the font used for each glyph.",
 		...evidence.limitations.map((limitation) => `- ${limitation}`),
 		"",
 		"## Font loading evidence",
@@ -219,6 +236,43 @@ export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 		lines.push(
 			`| ${cell(font.family)} | ${cell(font.weight)} | ${font.status} |`,
 		);
+	lines.push(
+		"",
+		"## Observed CSS Custom Properties",
+		"",
+		"| Variable | Resolved value | Source element | Status |",
+		"| --- | --- | --- | --- |",
+	);
+	const seenVariables = new Set<string>();
+	for (const element of evidence.elements)
+		for (const [name, value] of Object.entries(element.variables ?? {})) {
+			const key = `${name}:${value}`;
+			if (!value || seenVariables.has(key)) continue;
+			seenVariables.add(key);
+			lines.push(
+				`| ${cell(name)} | ${cell(value)} | ${cell(element.selector)} | observed |`,
+			);
+		}
+	lines.push(
+		"",
+		"## Color Measurement Provenance",
+		"",
+		"| Property | Value | Source element | Status |",
+		"| --- | --- | --- | --- |",
+	);
+	for (const element of evidence.elements)
+		for (const property of [
+			"background-color",
+			"color",
+			"border-top-color",
+			"background-image",
+		]) {
+			const value = element.properties[property];
+			if (value && value !== "none")
+				lines.push(
+					`| ${property} | ${cell(value)} | ${cell(element.selector)} | observed |`,
+				);
+		}
 	return lines.join("\n");
 }
 

@@ -27,7 +27,7 @@ export function DesignResult({
 	const siteName = displaySiteName(domain);
 	const model = useMemo(
 		() =>
-			inspectorFromEvidence(visualEvidence) ?? {
+			inspectorFromEvidence(visualEvidence, designMd) ?? {
 				...parseDesignMd(designMd),
 				verification: "unverified" as const,
 			},
