@@ -44,7 +44,9 @@ export function StudioComposer({
 		? "project"
 		: (selectedFrameName || selectedFrames.length) && !adding
 			? "revise"
-			: "add";
+			: adding
+				? "add"
+				: "project";
 
 	useEffect(() => {
 		if (selectedFrameName) setAdding(false);
@@ -93,7 +95,7 @@ export function StudioComposer({
 				className="flex flex-col gap-3 rounded-xl border border-iron bg-obsidian p-3 text-snow focus-within:border-snow"
 			>
 				<div className="flex flex-wrap items-center justify-between gap-2">
-					{selectedFrameName && !adding ? (
+					{selectedFrameName && !adding && !projectScope ? (
 						<span className="inline-flex max-w-full items-center gap-2 rounded-md border border-iron px-2 py-1 text-xs text-snow">
 							<span className="truncate">Editing: {selectedFrameName}</span>
 							<button
@@ -140,7 +142,7 @@ export function StudioComposer({
 							Seluruh project
 						</button>
 					</div>
-					{!adding && selectedFrames.length > 0 ? (
+					{!adding && !projectScope && selectedFrames.length > 0 ? (
 						<div className="flex max-h-20 flex-wrap gap-2 overflow-y-auto">
 							{selectedFrames.map((frame) => (
 								<span

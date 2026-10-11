@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { AlertCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StudioCanvas } from "@/components/design/studio-canvas";
 import {
 	StudioComposer,
@@ -72,7 +72,16 @@ export const Route = createFileRoute("/design/studio/$id")({
 function StudioDetailPage() {
 	const initialData = Route.useLoaderData();
 	if (!initialData?.project) throw new Error("NOT_FOUND");
+	return (
+		<StudioWorkspace key={initialData.project.id} initialData={initialData} />
+	);
+}
 
+function StudioWorkspace({
+	initialData,
+}: {
+	initialData: StudioDetailLoaderData;
+}) {
 	const [project, setProject] = useState(initialData.project);
 	const [frames, setFrames] = useState<StudioFrameRow[]>(initialData.frames);
 	const [activeJob, setActiveJob] = useState<StudioJobRow | null>(
@@ -85,6 +94,7 @@ function StudioDetailPage() {
 	const [error, setError] = useState("");
 	const [duplicating, setDuplicating] = useState(false);
 	const navigate = useNavigate();
+	const pendingRequest = useRef<{ signature: string; id: string } | null>(null);
 
 	async function handleDuplicate() {
 		if (duplicating) return;
@@ -135,7 +145,7 @@ function StudioDetailPage() {
 						: [...previous, id]
 					: [id],
 		);
-		setSelectedFrameId(id);
+		setSelectedFrameId(additive ? null : id);
 	}, []);
 
 	const isProcessing = useMemo(() => {
@@ -191,6 +201,9 @@ function StudioDetailPage() {
 	): Promise<boolean> {
 		setComposerLoading(true);
 		setError("");
+		const signature = JSON.stringify({ promptText, scope, selectedFrameIds });
+		if (pendingRequest.current?.signature !== signature)
+			pendingRequest.current = { signature, id: crypto.randomUUID() };
 		try {
 			const res = await fetch("/api/studio/frame", {
 				method: "POST",
@@ -201,7 +214,7 @@ function StudioDetailPage() {
 					scope,
 					frameIds: scope === "revise" ? selectedFrameIds : undefined,
 					prompt: promptText,
-					requestId: crypto.randomUUID(),
+					requestId: pendingRequest.current.id,
 				}),
 			});
 			if (!res.ok) {
@@ -217,6 +230,7 @@ function StudioDetailPage() {
 				return false;
 			}
 			await syncProjectStatus();
+			pendingRequest.current = null;
 			return true;
 		} catch {
 			setError("Jaringan bermasalah. Coba lagi.");
