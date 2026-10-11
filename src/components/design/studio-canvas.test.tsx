@@ -91,4 +91,38 @@ describe("StudioCanvas", () => {
 		fireEvent.click(dashboardBtn);
 		expect(onSelectFrame).toHaveBeenCalledWith("f-1");
 	});
+
+	it("renders planning failure state with retry button when activeJob failed", () => {
+		const onRetryPlanning = vi.fn();
+		const failedJob = {
+			id: "j-1",
+			projectId: "p-1",
+			userId: "u-1",
+			prompt: "Test",
+			jobType: "initial",
+			targetFrameId: null,
+			status: "failed",
+			error: "AI rate limit reached",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		};
+
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={[]}
+				activeJob={failedJob}
+				onRetryPlanning={onRetryPlanning}
+			/>,
+		);
+
+		expect(screen.getByText("Perencanaan Layar Gagal")).toBeDefined();
+		expect(screen.getByText("AI rate limit reached")).toBeDefined();
+
+		const retryBtn = screen.getByRole("button", {
+			name: /Coba Lagi Perencanaan/i,
+		});
+		fireEvent.click(retryBtn);
+		expect(onRetryPlanning).toHaveBeenCalled();
+	});
 });

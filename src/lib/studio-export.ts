@@ -21,8 +21,45 @@ export async function exportProjectAsZip(
 
 	if (readyFrames.length === 0) return;
 
+	// Detect if any frame references a studio asset (such as uploaded logo)
+	const assetMap = new Map<string, string>();
+	const assetUrlRegex = /\/api\/studio\/asset\?[^"'\s<>]+/g;
+	const foundUrls = new Set<string>();
+
+	for (const frame of readyFrames) {
+		const matches = (frame.htmlCode ?? "").match(assetUrlRegex);
+		if (matches) {
+			for (const url of matches) foundUrls.add(url);
+		}
+	}
+
+	for (const url of foundUrls) {
+		try {
+			const res = await fetch(url);
+			if (res.ok) {
+				const blob = await res.blob();
+				const mime = blob.type || "image/png";
+				const ext = mime.includes("svg")
+					? "svg"
+					: mime.includes("webp")
+						? "webp"
+						: mime.includes("jpeg") || mime.includes("jpg")
+							? "jpg"
+							: "png";
+				const localPath = `assets/logo.${ext}`;
+				zip.file(localPath, blob);
+				assetMap.set(url, `./${localPath}`);
+			}
+		} catch {
+			// If fetch fails in test or offline environment, keep URL
+		}
+	}
+
 	readyFrames.forEach((frame, index) => {
-		const clean = extractCleanHtml(frame.htmlCode ?? "");
+		let clean = extractCleanHtml(frame.htmlCode ?? "");
+		for (const [remoteUrl, localPath] of assetMap.entries()) {
+			clean = clean.replaceAll(remoteUrl, localPath);
+		}
 		const filename = `${index + 1}-${sanitizeFilename(frame.name)}.html`;
 		zip.file(filename, clean);
 		if (index === 0) {

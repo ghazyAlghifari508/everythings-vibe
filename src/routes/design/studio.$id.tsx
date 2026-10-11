@@ -210,6 +210,29 @@ function StudioDetailPage() {
 		}
 	}
 
+	async function handleRetryPlanning() {
+		try {
+			const res = await fetch("/api/studio/frame", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "retry-planning",
+					projectId: project.id,
+				}),
+			});
+			if (!res.ok) {
+				const data = (await res.json().catch(() => null)) as {
+					error?: string;
+				} | null;
+				setError(data?.error ?? "Gagal mencoba lagi perencanaan.");
+				return;
+			}
+			await syncProjectStatus();
+		} catch {
+			setError("Jaringan bermasalah. Coba lagi.");
+		}
+	}
+
 	async function handleDownloadAllZip() {
 		if (frames.length === 0 || exportingZip) return;
 		setExportingZip(true);
@@ -305,9 +328,11 @@ function StudioDetailPage() {
 				<StudioCanvas
 					project={project}
 					frames={frames}
+					activeJob={activeJob}
 					selectedFrameId={selectedFrameId}
 					onSelectFrame={setSelectedFrameId}
 					onRetryFrame={handleRetryFrame}
+					onRetryPlanning={handleRetryPlanning}
 					className="size-full"
 				/>
 

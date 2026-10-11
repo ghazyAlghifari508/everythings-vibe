@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import {
 	AlertCircle,
@@ -56,7 +56,16 @@ export const Route = createFileRoute("/design/studio/")({
 		meta: [{ title: "Prompt UI Studio | VibeDesign" }],
 	}),
 	validateSearch: (search) => studioSearchSchema.parse(search),
-	loader: async () => loadStudioHistory(),
+	loader: async () => {
+		try {
+			return await loadStudioHistory();
+		} catch (e) {
+			if (e instanceof Error && e.message === "Unauthorized") {
+				throw redirect({ to: "/login" });
+			}
+			throw e;
+		}
+	},
 	component: StudioPage,
 });
 

@@ -1,25 +1,34 @@
+import { AlertCircle, Loader2, RotateCcw } from "lucide-react";
 import { memo, useRef } from "react";
 import { getCanvasDotStyle } from "@/components/task/whiteboard-canvas";
 import { ZoomControls } from "@/components/task/zoom-controls";
-import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
+import type {
+	StudioFrameRow,
+	StudioJobRow,
+	StudioProjectRow,
+} from "@/db/schema";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import { StudioFrame } from "./studio-frame";
 
 export interface StudioCanvasProps {
 	project: StudioProjectRow;
 	frames: StudioFrameRow[];
+	activeJob?: StudioJobRow | null;
 	selectedFrameId?: string | null;
 	onSelectFrame?: (frameId: string | null) => void;
 	onRetryFrame?: (frameId: string) => void;
+	onRetryPlanning?: () => void;
 	className?: string;
 }
 
 export const StudioCanvas = memo(function StudioCanvas({
 	project,
 	frames,
+	activeJob = null,
 	selectedFrameId = null,
 	onSelectFrame,
 	onRetryFrame,
+	onRetryPlanning,
 	className = "",
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
@@ -81,8 +90,34 @@ export const StudioCanvas = memo(function StudioCanvas({
 							isCanvasPanning={isPanning}
 						/>
 					))
+				) : activeJob?.status === "failed" ? (
+					<div className="flex h-96 w-96 flex-col items-center justify-center rounded-2xl border border-dashed border-red-500/40 bg-charcoal/60 p-8 text-center gap-3">
+						<div className="flex size-10 items-center justify-center rounded-full bg-red-500/10 text-red-400">
+							<AlertCircle size={20} />
+						</div>
+						<div className="space-y-1">
+							<p className="text-sm font-semibold text-snow">
+								Perencanaan Layar Gagal
+							</p>
+							<p className="text-xs text-fog max-w-xs">
+								{activeJob?.error ||
+									"AI tidak dapat menyusun rencana layar untuk topik ini."}
+							</p>
+						</div>
+						{onRetryPlanning && (
+							<button
+								type="button"
+								onClick={onRetryPlanning}
+								className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-graphite bg-onyx px-4 py-1.5 text-xs font-semibold text-snow hover:bg-charcoal transition-colors cursor-pointer"
+							>
+								<RotateCcw size={13} />
+								<span>Coba Lagi Perencanaan</span>
+							</button>
+						)}
+					</div>
 				) : (
-					<div className="flex h-96 w-96 flex-col items-center justify-center rounded-2xl border border-dashed border-graphite bg-charcoal/50 p-8 text-center">
+					<div className="flex h-96 w-96 flex-col items-center justify-center rounded-2xl border border-dashed border-graphite bg-charcoal/50 p-8 text-center gap-2">
+						<Loader2 size={24} className="animate-spin text-indigo-400" />
 						<p className="text-sm font-semibold text-snow">
 							Menyiapkan Kanvas...
 						</p>
