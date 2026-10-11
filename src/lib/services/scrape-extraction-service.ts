@@ -11,6 +11,7 @@ import { fetchAsset } from "@/lib/fetch-html";
 import { renderPage } from "@/lib/render-page";
 import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/lib/scrape-contract";
 import { normalizeImageCandidates } from "@/lib/scrape-images";
+import { validateUrl } from "@/lib/url-validator";
 import {
 	type ScrapeJobClaim,
 	scrapeClaimPredicate,
@@ -161,7 +162,7 @@ export async function runExtractionJob(
 					metadata: {
 						...scrape.metadata,
 						mode: "crawl",
-						visitedPages: pages.length,
+						visitedPages: pages.filter((row) => row.status !== "queued").length,
 						discoveredPages: discovered,
 						failedResources: pages.filter((row) => row.status === "failed")
 							.length,
@@ -181,6 +182,13 @@ export async function runExtractionJob(
 			captured.images ?? [],
 			request.settings.classifyType,
 		);
+		const validImages: typeof images = [];
+		for (const image of images) {
+			try {
+				await validateUrl(image.url);
+				validImages.push(image);
+			} catch {}
+		}
 		await update({
 			status: "extracting",
 			metadata: {
@@ -197,7 +205,7 @@ export async function runExtractionJob(
 				.for("update")
 				.limit(1);
 			if (!owner) throw new Error("Job lease sudah tidak berlaku.");
-			for (const image of images)
+			for (const image of validImages)
 				await tx
 					.insert(scrapeImages)
 					.values({
@@ -214,7 +222,7 @@ export async function runExtractionJob(
 			metadata: {
 				...scrape.metadata,
 				mode: "images",
-				processedImages: images.length,
+				processedImages: validImages.length,
 			},
 		});
 	} else throw new Error("Mode extraction tidak sesuai.");

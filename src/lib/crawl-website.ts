@@ -52,6 +52,7 @@ export function isCrawlScope(
 
 export function robotsAllows(content: string, path: string): boolean {
 	let applies = false;
+	let inRules = false;
 	const rules: { allow: boolean; value: string }[] = [];
 	for (const raw of content.split(/\r?\n/)) {
 		const line = raw.replace(/#.*$/, "").trim();
@@ -59,10 +60,16 @@ export function robotsAllows(content: string, path: string): boolean {
 		if (separator < 0) continue;
 		const key = line.slice(0, separator).toLowerCase();
 		const value = line.slice(separator + 1).trim();
-		if (key === "user-agent")
-			applies = value === "*" || /vibeeverything/i.test(value);
-		else if (applies && value && (key === "allow" || key === "disallow"))
-			rules.push({ allow: key === "allow", value });
+		if (key === "user-agent") {
+			if (inRules) {
+				applies = false;
+				inRules = false;
+			}
+			applies ||= value === "*" || /vibeeverything/i.test(value);
+		} else if (key === "allow" || key === "disallow") {
+			inRules = true;
+			if (applies && value) rules.push({ allow: key === "allow", value });
+		}
 	}
 	const matched = rules
 		.filter(({ value }) => {

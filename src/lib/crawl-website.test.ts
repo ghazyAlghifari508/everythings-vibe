@@ -80,6 +80,14 @@ describe("website traversal", () => {
 		expect(robotsAllows(rules, "/private/account")).toBe(false);
 		expect(robotsAllows(rules, "/private/public/article")).toBe(true);
 	});
+	it("applies rules shared by multiple robots user agents", () => {
+		expect(
+			robotsAllows(
+				"User-agent: *\nUser-agent: OtherBot\nDisallow: /restricted",
+				"/restricted",
+			),
+		).toBe(false);
+	});
 	it("depth zero captures only the seed and include flags change output", async () => {
 		const calls: string[] = [];
 		const pages = await crawlWebsite(
