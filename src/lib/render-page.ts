@@ -48,6 +48,15 @@ const BLOCK_HOSTS = new Set(["localhost", "ip6-localhost", "ip6-loopback"]);
 
 let browserPromise: Promise<Browser> | null = null;
 
+// Functions passed to page.evaluate/addInitScript are serialized with
+// Function.prototype.toString and re-parsed inside the browser. The tsx dev
+// worker loads this module through esbuild with keepNames enabled, which wraps
+// every inner function binding in a `__name(...)` helper call that only exists
+// in the Node module scope. Without this shim the browser throws
+// "ReferenceError: __name is not defined" and the whole capture aborts.
+export const BROWSER_NAME_SHIM =
+	"if (typeof globalThis.__name !== 'function') globalThis.__name = (value) => value;";
+
 async function getBrowser(): Promise<Browser> {
 	if (!browserPromise) {
 		browserPromise = chromium
@@ -109,6 +118,7 @@ export async function isBlockedRequestUrl(raw: string): Promise<boolean> {
 export async function guardContext(context: BrowserContext): Promise<void> {
 	let requests = 0;
 	let transferredBytes = 0;
+	await context.addInitScript({ content: BROWSER_NAME_SHIM });
 	await context.addInitScript(() => {
 		class BlockedWebSocket extends EventTarget {
 			static CONNECTING = 0;
