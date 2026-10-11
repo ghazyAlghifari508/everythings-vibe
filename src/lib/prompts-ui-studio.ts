@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
+import { extractDesignSystemTokens } from "@/lib/studio-design-system";
 
 export const STUDIO_MIN_PROMPT_CHARS = 10;
 export const STUDIO_MAX_PROMPT_CHARS = 4000;
@@ -54,12 +55,13 @@ export type StudioScreenPlan = z.infer<typeof studioScreenPlanSchema>;
 
 export function parseStudioScreenPlan(
 	raw: string,
+	fallbackViewport: StudioDesignMode = "web",
 ): { ok: true; plan: StudioScreenPlan } | { ok: false; error: string } {
 	try {
 		const clean = raw
-			.replace(/^```json\s*/i, "")
-			.replace(/^```\s*/i, "")
-			.replace(/\s*```$/i, "")
+			.replace(/^```json\s*/im, "")
+			.replace(/^```\s*/im, "")
+			.replace(/\s*```$/im, "")
 			.trim();
 		const firstBrace = clean.indexOf("{");
 		const lastBrace = clean.lastIndexOf("}");
@@ -69,9 +71,66 @@ export function parseStudioScreenPlan(
 				error: "Format JSON tidak ditemukan pada output perencana layar.",
 			};
 		}
-		const jsonString = clean.slice(firstBrace, lastBrace + 1);
-		const parsedJson: unknown = JSON.parse(jsonString);
-		const result = studioScreenPlanSchema.safeParse(parsedJson);
+		let jsonString = clean.slice(firstBrace, lastBrace + 1);
+		// Strip trailing commas before closing braces/brackets
+		jsonString = jsonString.replace(/,\s*([\]}])/g, "$1");
+
+		const parsedJson = JSON.parse(jsonString) as Record<string, unknown>;
+
+		const rawTitle =
+			typeof parsedJson.projectTitle === "string" &&
+			parsedJson.projectTitle.trim()
+				? parsedJson.projectTitle.trim()
+				: typeof parsedJson.title === "string" && parsedJson.title.trim()
+					? parsedJson.title.trim()
+					: "Aplikasi Prototipe";
+
+		const rawScreens = Array.isArray(parsedJson.screens)
+			? parsedJson.screens
+			: [];
+
+		const normalizedScreens = rawScreens.map((item, idx) => {
+			if (typeof item !== "object" || item === null) {
+				return {
+					name: `Layar ${idx + 1}`,
+					description: "",
+					viewport: fallbackViewport,
+					order: idx,
+				};
+			}
+			const screenObj = item as Record<string, unknown>;
+			const name =
+				typeof screenObj.name === "string" && screenObj.name.trim()
+					? screenObj.name.trim()
+					: typeof screenObj.title === "string" && screenObj.title.trim()
+						? screenObj.title.trim()
+						: `Layar ${idx + 1}`;
+			const description =
+				typeof screenObj.description === "string"
+					? screenObj.description.trim()
+					: "";
+			const viewport =
+				screenObj.viewport === "mobile" || screenObj.viewport === "web"
+					? screenObj.viewport
+					: fallbackViewport;
+			const order =
+				typeof screenObj.order === "number" && !Number.isNaN(screenObj.order)
+					? screenObj.order
+					: idx;
+
+			return {
+				name,
+				description,
+				viewport,
+				order,
+			};
+		});
+
+		const result = studioScreenPlanSchema.safeParse({
+			projectTitle: rawTitle,
+			screens: normalizedScreens,
+		});
+
 		if (!result.success) {
 			return {
 				ok: false,
@@ -95,13 +154,42 @@ export function buildStudioPlanningPrompt(
 	];
 
 	if (designMd && designMd.trim().length > 0) {
+		const tokens = extractDesignSystemTokens(designMd);
+		if (tokens) {
+			const tokenSummary: string[] = [];
+			if (tokens.colors.primary)
+				tokenSummary.push(`- Primary Brand Color: ${tokens.colors.primary}`);
+			if (tokens.colors.canvas)
+				tokenSummary.push(`- Canvas Background: ${tokens.colors.canvas}`);
+			if (tokens.colors.ink)
+				tokenSummary.push(`- Dominant Text/Ink Color: ${tokens.colors.ink}`);
+			if (tokens.typography.fontFamily)
+				tokenSummary.push(`- Typography: ${tokens.typography.fontFamily}`);
+			if (tokens.shapes.borderRadius.cards)
+				tokenSummary.push(
+					`- Card Border Radius: ${tokens.shapes.borderRadius.cards}`,
+				);
+			if (tokens.shapes.borderRadius.buttons)
+				tokenSummary.push(
+					`- Button Border Radius: ${tokens.shapes.borderRadius.buttons}`,
+				);
+			if (tokens.rules.dos.length > 0)
+				tokenSummary.push(
+					`- Key Guidelines: ${tokens.rules.dos.slice(0, 3).join("; ")}`,
+				);
+
+			sections.push(
+				`Validated Design System Summary:\n${tokenSummary.join("\n")}`,
+			);
+		}
+
 		sections.push(
-			`Design System Reference:\n${sanitizeStudioDesignMd(designMd.trim()).slice(0, 10_000)}`,
+			`Design System Reference:\n${sanitizeStudioDesignMd(designMd.trim())}`,
 		);
 	}
 
 	sections.push(
-		`Plan the necessary screens for this application. Output strict JSON with "projectTitle" and "screens" array with order starting at 0.`,
+		`Plan the necessary screens for this application. Output strict JSON with "projectTitle" and "screens" array (each with "name", "description", "viewport": "${designMode}", "order": 0..N). Plan only relevant screens for the user's specific application domain.`,
 	);
 
 	return sections.join("\n\n");
