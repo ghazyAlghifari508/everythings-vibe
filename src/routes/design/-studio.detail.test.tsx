@@ -10,6 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockUseLoaderData = vi.fn();
 
+vi.mock("@/lib/auth-client", () => ({
+	authClient: { useSession: () => ({ data: null }) },
+}));
+
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: Record<string, unknown>) => ({
 		...options,
@@ -18,6 +22,7 @@ vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
 		<a href={to}>{children}</a>
 	),
+	useNavigate: () => vi.fn(),
 }));
 
 vi.mock("@tanstack/react-start", () => ({
@@ -99,9 +104,11 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 		expect(
 			screen.getByRole("heading", { level: 1, name: "Aplikasi POS Kasir" }),
 		).toBeDefined();
-		expect(screen.getByText("Mobile")).toBeDefined();
-		expect(screen.getByText("DESIGN.md")).toBeDefined();
-		expect(screen.getByText("Logo")).toBeDefined();
+		expect(screen.getByRole("button", { name: "Menu project" })).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: "Export project" }),
+		).toBeDefined();
+		expect(screen.queryByText(/Layar Siap/)).toBeNull();
 
 		// Frames are rendered
 		expect(screen.getByText("Dashboard")).toBeDefined();

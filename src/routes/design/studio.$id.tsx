@@ -1,16 +1,10 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import {
-	AlertCircle,
-	ArrowLeft,
-	Download,
-	Loader2,
-	Monitor,
-	Smartphone,
-} from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StudioCanvas } from "@/components/design/studio-canvas";
 import { StudioComposer } from "@/components/design/studio-composer";
+import { StudioHeader } from "@/components/design/studio-header";
 import type {
 	StudioFrameRow,
 	StudioJobRow,
@@ -84,6 +78,43 @@ function StudioDetailPage() {
 	const [composerLoading, setComposerLoading] = useState(false);
 	const [exportingZip, setExportingZip] = useState(false);
 	const [error, setError] = useState("");
+	const [duplicating, setDuplicating] = useState(false);
+	const navigate = useNavigate();
+
+	async function handleDuplicate() {
+		if (duplicating) return;
+		setDuplicating(true);
+		setError("");
+		try {
+			const response = await fetch("/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action: "duplicate", projectId: project.id }),
+			});
+			const result: unknown = await response.json();
+			if (
+				!response.ok ||
+				typeof result !== "object" ||
+				result === null ||
+				!("projectId" in result) ||
+				typeof result.projectId !== "string"
+			) {
+				throw new Error("Gagal menduplikasi project. Coba lagi.");
+			}
+			await navigate({
+				to: "/design/studio/$id",
+				params: { id: result.projectId },
+			});
+		} catch (failure) {
+			setError(
+				failure instanceof Error
+					? failure.message
+					: "Gagal menduplikasi project.",
+			);
+		} finally {
+			setDuplicating(false);
+		}
+	}
 
 	const selectedFrame = useMemo(
 		() => frames.find((f) => f.id === selectedFrameId) ?? null,
@@ -246,82 +277,15 @@ function StudioDetailPage() {
 	}
 
 	return (
-		<main className="flex h-[calc(100vh-3.5rem)] w-full flex-col overflow-hidden bg-[#0a0a0c] text-snow relative">
-			{/* Top Workspace Header */}
-			<header className="z-20 flex h-14 w-full shrink-0 items-center justify-between border-b border-graphite bg-[#121215] px-4">
-				<div className="flex items-center gap-3">
-					<Link
-						to="/design/studio"
-						className="inline-flex items-center gap-1.5 rounded-lg border border-graphite/60 bg-onyx px-2.5 py-1 text-xs font-semibold text-fog hover:bg-charcoal hover:text-snow transition-colors"
-					>
-						<ArrowLeft size={14} aria-hidden />
-						<span className="hidden sm:inline">Studio</span>
-					</Link>
-					<div className="flex items-center gap-2">
-						<h1 className="text-sm font-semibold tracking-tight text-snow sm:text-base">
-							{project.title}
-						</h1>
-						<div className="flex items-center gap-1.5">
-							<span className="font-mono text-[10px] uppercase tracking-wider rounded border border-graphite bg-onyx px-1.5 py-0.5 text-fog inline-flex items-center gap-1">
-								{project.designMode === "mobile" ? (
-									<Smartphone size={10} />
-								) : (
-									<Monitor size={10} />
-								)}
-								<span>
-									{project.designMode === "mobile" ? "Mobile" : "Web"}
-								</span>
-							</span>
-							{project.designMd && (
-								<span className="font-mono text-[10px] rounded border border-graphite bg-onyx px-1.5 py-0.5 text-mist">
-									DESIGN.md
-								</span>
-							)}
-							{project.logoAssetId && (
-								<span className="font-mono text-[10px] rounded border border-graphite bg-onyx px-1.5 py-0.5 text-mist">
-									Logo
-								</span>
-							)}
-						</div>
-					</div>
-				</div>
-
-				{/* Center: Generation Status Badge */}
-				<div className="hidden md:flex items-center gap-2">
-					{isProcessing ? (
-						<div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs text-indigo-300 animate-pulse">
-							<Loader2 size={12} className="animate-spin" />
-							<span>
-								{activeJob?.status === "planning"
-									? "Merencanakan layar..."
-									: `Menggenerate ${readyFramesCount}/${frames.length} layar...`}
-							</span>
-						</div>
-					) : (
-						<div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-400">
-							<span className="size-1.5 rounded-full bg-emerald-400" />
-							<span>{frames.length} Layar Siap</span>
-						</div>
-					)}
-				</div>
-
-				{/* Right: Actions */}
-				<div className="flex items-center gap-2">
-					<button
-						type="button"
-						onClick={() => void handleDownloadAllZip()}
-						disabled={exportingZip || frames.length === 0}
-						className="inline-flex items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow hover:bg-onyx transition-colors disabled:opacity-40"
-					>
-						{exportingZip ? (
-							<Loader2 size={13} className="animate-spin" />
-						) : (
-							<Download size={13} />
-						)}
-						<span className="hidden sm:inline">Download ZIP</span>
-					</button>
-				</div>
-			</header>
+		<main className="relative flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-charcoal text-snow">
+			<StudioHeader
+				title={project.title}
+				duplicating={duplicating}
+				exporting={exportingZip}
+				canExport={readyFramesCount > 0}
+				onDuplicate={() => void handleDuplicate()}
+				onExport={() => void handleDownloadAllZip()}
+			/>
 
 			{/* Main Fullscreen Canvas Workspace */}
 			<div className="relative flex-1 w-full overflow-hidden">

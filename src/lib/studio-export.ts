@@ -19,7 +19,8 @@ export async function exportProjectAsZip(
 	const zip = new JSZip();
 	const readyFrames = frames.filter((f) => f.status === "ready" && f.htmlCode);
 
-	if (readyFrames.length === 0) return;
+	if (readyFrames.length === 0)
+		throw new Error("Belum ada layar selesai untuk diekspor.");
 
 	// Detect if any frame references a studio asset (such as uploaded logo)
 	const assetMap = new Map<string, string>();
@@ -35,7 +36,8 @@ export async function exportProjectAsZip(
 
 	for (const url of foundUrls) {
 		try {
-			const res = await fetch(url);
+			const res = await fetch(url.replaceAll("&amp;", "&"));
+			if (!res.ok) throw new Error("Aset project tidak dapat diunduh.");
 			if (res.ok) {
 				const blob = await res.blob();
 				const mime = blob.type || "image/png";
@@ -46,12 +48,12 @@ export async function exportProjectAsZip(
 						: mime.includes("jpeg") || mime.includes("jpg")
 							? "jpg"
 							: "png";
-				const localPath = `assets/logo.${ext}`;
+				const localPath = `assets/asset-${assetMap.size + 1}.${ext}`;
 				zip.file(localPath, blob);
 				assetMap.set(url, `./${localPath}`);
 			}
 		} catch {
-			// If fetch fails in test or offline environment, keep URL
+			throw new Error("Gagal menyertakan aset project. Coba unduh kembali.");
 		}
 	}
 

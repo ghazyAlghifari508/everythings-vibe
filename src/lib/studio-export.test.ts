@@ -88,10 +88,26 @@ describe("studio-export", () => {
 			expect(clickSpy).toHaveBeenCalled();
 		});
 
-		it("does nothing when there are no ready frames", async () => {
-			const clickSpy = vi.fn();
-			await exportProjectAsZip("Empty App", []);
-			expect(clickSpy).not.toHaveBeenCalled();
+		it("rejects empty output rather than acknowledging a nonexistent download", async () => {
+			await expect(exportProjectAsZip("Empty App", [])).rejects.toThrow();
+			expect(global.URL.createObjectURL).not.toHaveBeenCalled();
+		});
+		it("rejects unavailable required assets rather than exporting broken private references", async () => {
+			vi.stubGlobal(
+				"fetch",
+				vi.fn(async () => new Response(null, { status: 404 })),
+			);
+			await expect(
+				exportProjectAsZip("Sample", [
+					{
+						...mockFrames[0],
+						htmlCode:
+							'<html><body><img src="/api/studio/asset?id=asset-1&amp;cap=token"></body></html>',
+					},
+				]),
+			).rejects.toThrow();
+			expect(global.URL.createObjectURL).not.toHaveBeenCalled();
+			vi.unstubAllGlobals();
 		});
 	});
 });
