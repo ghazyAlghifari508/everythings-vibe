@@ -53,7 +53,8 @@ export function extractionFromVisualEvidence(
 			const key = `${role}:${value}`;
 			colors.set(key, { role, value });
 		}
-		if (p["font-family"]) fonts.add(p["font-family"]);
+		if (p["font-family"] && element.text && element.role !== "canvas")
+			fonts.add(p["font-family"]);
 		if (
 			["h1", "h2", "h3", "body", "nav", "cta"].includes(element.role) &&
 			p["font-family"]
@@ -164,6 +165,8 @@ export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 		`Source: ${cell(evidence.sourceUrl)}`,
 		`Captured: ${evidence.capturedAt}`,
 		"",
+		"Panduan ini merangkum pengukuran rendered page, bukan rekonstruksi visual lengkap. Nilai pada tabel dapat dipakai langsung; peran semantik merupakan klasifikasi penggunaan elemen. Jangan menambahkan font, warna, skala atau responsive state yang tidak memiliki evidence.",
+		"",
 		"## Tokens - Colors",
 		"",
 		"| Name | Value | Token | Role |",
@@ -211,6 +214,11 @@ export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 		"| Element | Property | Value | Source | Status |",
 		"| --- | --- | --- | --- | --- |",
 	);
+	lines.push(
+		"",
+		"Komponen di bawah berasal dari elemen yang benar-benar terlihat saat capture. State hover, focus, mobile dan disabled belum diuji; jangan menganggapnya terukur.",
+		"",
+	);
 	for (const element of evidence.elements.filter(
 		(entry) => entry.role !== "element",
 	))
@@ -231,6 +239,13 @@ export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 		"",
 		"| Declared family | Weight | Resource status |",
 		"| --- | --- | --- |",
+	);
+	lines.push(
+		"",
+		"## Agent Prompt Guide",
+		"",
+		"Gunakan nilai observed persis seperti pada tabel dan pertahankan source selector untuk audit. Role derived tidak boleh dipromosikan menjadi measurement. Jika kebutuhan UI baru tidak tercakup, tentukan styling sebagai keputusan produk baru, bukan sebagai hasil ekstraksi situs sumber.",
+		"",
 	);
 	for (const font of evidence.fonts)
 		lines.push(

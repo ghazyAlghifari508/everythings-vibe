@@ -10,7 +10,6 @@ import {
 	type ScrapeRow,
 	type ScrapeStatus,
 	scrapeDocuments,
-	scrapeProgressForStatus,
 	scrapes,
 	users,
 } from "@/db/schema";
@@ -187,7 +186,7 @@ export async function runScrapePipeline(
 			...patch,
 			mode,
 			stage: status,
-			progress: scrapeProgressForStatus(status, mode),
+			progress: undefined,
 			stageStartedAt: new Date().toISOString(),
 		};
 		const saved = await db
