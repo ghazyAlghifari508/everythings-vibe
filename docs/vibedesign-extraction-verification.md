@@ -27,15 +27,20 @@ generation and captured-DOM snapshot boundaries are retained. No runtime depende
   measured patterns.
 - The crawl explorer resyncs its selected page whenever results change, and the status
   poll returns persisted pages and images so no reload is needed.
+- The inspector routes a row by its own property name as well as the table header, so
+  `border-radius` values reach the radius bucket instead of the spacing list, and the
+  canonical `Do:` / `Don't:` labels are not repeated inside an already-labelled section.
 
 ## Checks
 
-- Full Vitest suite passed: 240 files, 2,235 tests.
+- Full Vitest suite passed: 242 files, 2,248 tests.
 - Runtime suite passed with `SCRAPE_RUNTIME_VERIFY=1`, driving all four modes through the
   persisted queue, lease recovery, and the standalone worker process.
 - TypeScript no-emit passed; repository Biome check passed with ten existing autofill
   `!important` warnings; production build passed.
 - Type-bypass scan over every changed file found no `any`, `@ts-ignore`, or `as unknown as`.
+- The polling race, radius routing, and rule-label tests are mutation-verified: each one
+  fails when its fix is reverted and passes when it is present.
 
 ## Live capture evidence
 
@@ -43,7 +48,9 @@ generation and captured-DOM snapshot boundaries are retained. No runtime depende
   saved, 0 failed, 86 with measured dimensions.
 - Images on `framer.com`: outcome `partial`, 149 saved, 2 failed with stored reasons.
 - Design on `notion.com`: three consecutive runs completed with `aiEnrichment: applied`;
-  the document shrank from roughly 1.1 MB to 84 KB with zero duplicate rows.
+  the document shrank from roughly 1.1 MB to 84 KB with zero duplicate rows. The same
+  capture round-trips through the inspector with 24 colours, 43 spacing rows, 8 radii,
+  4 Do rules and 4 Don't rules, and no `border-radius` row left in the spacing list.
 - A rate-limited public site: code `WEBSITE_RATE_LIMITED` with actionable copy and no
   fabricated retry delay, where it previously reported a generic block.
 
