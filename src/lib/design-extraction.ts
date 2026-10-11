@@ -80,7 +80,7 @@ export interface DesignExtraction {
 		pagesAnalyzed: string[];
 		pagesFailed: number;
 	};
-	confidence_score: number;
+	confidence_score?: number;
 }
 
 function cleanText(val: string): string {

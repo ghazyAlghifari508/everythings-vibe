@@ -15,7 +15,7 @@ import {
 	users,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
-import { extractDesignFromHtml } from "@/lib/design-extraction";
+import { extractionFromVisualEvidence } from "@/lib/design-visual-evidence";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
 import {
@@ -237,7 +237,7 @@ export async function runScrapePipeline(
 		const settings =
 			scrape.request?.mode === "html" ? scrape.request.settings : undefined;
 		const captured: ScrapeCapture =
-			scrape.html && scrape.previewHtml
+			mode === "html" && scrape.html && scrape.previewHtml
 				? {
 						sourceUrl: scrape.sourceUrl,
 						domain: scrape.domain,
@@ -311,7 +311,14 @@ export async function runScrapePipeline(
 		);
 		await instrumentation.onActivity?.("Menganalisis design system");
 		const extractionStart = Date.now();
-		const extraction = extractDesignFromHtml(captured.html, captured.sourceUrl);
+		if (!captured.metadata.visualEvidence)
+			throw new ScrapeError(
+				"NO_ANALYZABLE_CONTENT",
+				"Evidence visual hasil render tidak tersedia.",
+			);
+		const extraction = extractionFromVisualEvidence(
+			captured.metadata.visualEvidence,
+		);
 		instrumentation.onTiming?.("extraction", Date.now() - extractionStart);
 		await instrumentation.onActivity?.("Analisis visual selesai");
 

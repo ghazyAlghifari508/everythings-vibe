@@ -1,6 +1,9 @@
 import { chromium } from "playwright";
 import { expect, it } from "vitest";
-import { collectVisualEvidence } from "./design-visual-evidence";
+import {
+	collectVisualEvidence,
+	extractionFromVisualEvidence,
+} from "./design-visual-evidence";
 
 it("measures rendered styles and excludes hidden and unused declarations", async () => {
 	const browser = await chromium.launch({ headless: true });
@@ -25,6 +28,14 @@ it("measures rendered styles and excludes hidden and unused declarations", async
 			),
 		).toBe(false);
 		expect(evidence.fonts).toEqual([]);
+		const extraction = extractionFromVisualEvidence(evidence);
+		expect(extraction.colors).toContainEqual({
+			role: "cta-background",
+			value: "rgba(90, 200, 40, 0.8)",
+		});
+		expect(
+			extraction.typographyRoles?.find((role) => role.role === "cta")?.size,
+		).toBe("19px");
 		expect(
 			evidence.elements.every(
 				(element) =>

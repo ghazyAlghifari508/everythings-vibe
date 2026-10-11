@@ -1,3 +1,5 @@
+import type { DesignExtraction } from "./design-extraction";
+
 export interface VisualElementEvidence {
 	selector: string;
 	role: string;
@@ -5,6 +7,113 @@ export interface VisualElementEvidence {
 	width: number;
 	height: number;
 	properties: Record<string, string>;
+}
+
+export function extractionFromVisualEvidence(
+	evidence: VisualEvidence,
+): DesignExtraction {
+	const colors = new Map<string, { role: string; value: string }>();
+	const typographyRoles: NonNullable<DesignExtraction["typographyRoles"]> = [];
+	const ctaButtons: NonNullable<DesignExtraction["ctaButtons"]> = [];
+	const fonts = new Set<string>();
+	const spacing = new Set<string>();
+	const radii = new Set<string>();
+	const shadows = new Set<string>();
+	for (const element of evidence.elements) {
+		const p = element.properties;
+		for (const property of ["background-color", "color", "border-top-color"]) {
+			const value = p[property];
+			if (
+				!value ||
+				value === "transparent" ||
+				/rgba\([^)]*,\s*0\)$/.test(value)
+			)
+				continue;
+			if (
+				property === "border-top-color" &&
+				(p["border-top-style"] === "none" || p["border-top-width"] === "0px")
+			)
+				continue;
+			const role =
+				property === "color"
+					? "text"
+					: property === "border-top-color"
+						? "border"
+						: element.role === "cta"
+							? "cta-background"
+							: element.role === "body"
+								? "canvas"
+								: "surface";
+			const key = `${role}:${value}`;
+			colors.set(key, { role, value });
+		}
+		if (p["font-family"]) fonts.add(p["font-family"]);
+		if (
+			["h1", "h2", "h3", "body", "nav", "cta"].includes(element.role) &&
+			p["font-family"]
+		) {
+			const role = {
+				role: element.role,
+				family: p["font-family"],
+				size: p["font-size"] ?? "",
+				weight: p["font-weight"] ?? "",
+				lineHeight: p["line-height"] ?? "",
+				letterSpacing: p["letter-spacing"] ?? "",
+			};
+			if (
+				!typographyRoles.some(
+					(existing) => JSON.stringify(existing) === JSON.stringify(role),
+				)
+			)
+				typographyRoles.push(role);
+		}
+		if (element.role === "cta")
+			ctaButtons.push({
+				text: element.text,
+				family: p["font-family"] ?? "",
+				weight: p["font-weight"] ?? "",
+				size: p["font-size"] ?? "",
+				bg: p["background-color"] ?? "",
+				color: p.color ?? "",
+				radius: p["border-radius"] ?? "",
+				padding: p.padding ?? "",
+				border:
+					`${p["border-top-width"] ?? ""} ${p["border-top-style"] ?? ""} ${p["border-top-color"] ?? ""}`.trim(),
+			});
+		for (const property of ["padding", "margin", "gap"])
+			if (p[property]) spacing.add(p[property]);
+		if (p["border-radius"]) radii.add(p["border-radius"]);
+		if (p["box-shadow"] && p["box-shadow"] !== "none")
+			shadows.add(p["box-shadow"]);
+	}
+	return {
+		colors: [...colors.values()],
+		typography: [...fonts].map((family) => ({ family })),
+		typographyRoles,
+		ctaButtons,
+		components: [
+			...new Set(
+				evidence.elements
+					.map((element) => element.role)
+					.filter((role) => role !== "element"),
+			),
+		],
+		layout_patterns: [],
+		tokens: {
+			spacing: [...spacing],
+			radii: [...radii],
+			shadows: [...shadows],
+			maxWidths: [],
+			lineHeights: [],
+			letterSpacing: [],
+			cssVariables: {},
+		},
+		metadata: {
+			pagesAnalyzed: [evidence.sourceUrl],
+			pagesFailed: 0,
+			theme: "unknown",
+		},
+	};
 }
 
 export interface VisualEvidence {
