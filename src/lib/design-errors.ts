@@ -1,4 +1,6 @@
 export const DESIGN_ERROR_CODES = {
+	QUEUE_CAPACITY: "Tunggu proses aktif selesai sebelum memulai ekstraksi baru.",
+	RATE_LIMITED: "Batas request tercapai. Coba lagi setelah satu menit.",
 	INVALID_URL: "URL tidak valid. Masukkan URL website yang benar.",
 	PRIVATE_URL_BLOCKED: "URL tidak dapat diproses karena alasan keamanan.",
 	FETCH_TIMEOUT: "Website terlalu lama merespons. Coba lagi nanti.",

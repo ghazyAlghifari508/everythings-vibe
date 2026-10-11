@@ -96,7 +96,7 @@ export async function createScrape(
 		const { checkRateLimit } = await import("@/lib/rate-limit");
 		if (!(await checkRateLimit(userId, "free", "api_call")).allowed)
 			throw new ScrapeError(
-				"WEBSITE_BLOCKED",
+				"RATE_LIMITED",
 				"Batas request tercapai. Coba lagi setelah satu menit.",
 			);
 		const active = await tx
@@ -123,7 +123,7 @@ export async function createScrape(
 		if (existing) return existing;
 		if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
 			throw new ScrapeError(
-				"WEBSITE_BLOCKED",
+				"QUEUE_CAPACITY",
 				"Tunggu proses aktif selesai sebelum memulai ekstraksi baru.",
 			);
 		const [pending] = await tx

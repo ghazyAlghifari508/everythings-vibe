@@ -14,11 +14,15 @@ import { requireUser } from "@/lib/session";
 function scrapeErrorResponse(error: unknown): Response {
 	if (error instanceof ScrapeError) {
 		const status =
-			error.code === "INVALID_URL" || error.code === "PRIVATE_URL_BLOCKED"
-				? 400
-				: error.code === "WEBSITE_BLOCKED" || error.code === "FETCH_TIMEOUT"
-					? 502
-					: 500;
+			error.code === "QUEUE_CAPACITY"
+				? 409
+				: error.code === "RATE_LIMITED"
+					? 429
+					: error.code === "INVALID_URL" || error.code === "PRIVATE_URL_BLOCKED"
+						? 400
+						: error.code === "WEBSITE_BLOCKED" || error.code === "FETCH_TIMEOUT"
+							? 502
+							: 500;
 		return Response.json(
 			{ error: error.message, code: error.code },
 			{ status },

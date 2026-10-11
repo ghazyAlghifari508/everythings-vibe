@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ScrapeError } from "@/lib/design-errors";
 import { GET, POST } from "./scrape";
 
 vi.mock("@tanstack/react-start/server", () => ({
@@ -26,6 +27,20 @@ vi.mock("@/lib/services/scrape-service", () => ({
 }));
 
 describe("Scrape API Route Modes", () => {
+	it.each([
+		["QUEUE_CAPACITY", 409],
+		["RATE_LIMITED", 429],
+	] as const)("classifies %s without an upstream failure", async (code, status) => {
+		mockCreateScrape.mockRejectedValueOnce(new ScrapeError(code));
+		const res = await POST({
+			request: new Request("http://localhost/api/scrape", {
+				method: "POST",
+				body: JSON.stringify({ url: "https://example.com" }),
+			}),
+		});
+		expect(res.status).toBe(status);
+		expect(await res.json()).toMatchObject({ code });
+	});
 	it("creates a scrape in design mode by default", async () => {
 		mockCreateScrape.mockResolvedValueOnce({
 			id: "sc-design-1",
