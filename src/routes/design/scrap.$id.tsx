@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+﻿import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useEffect } from "react";
 import { CrawlResult } from "@/components/design/crawl-result";
@@ -24,45 +24,18 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
 	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
-		const { getScrapeById } = await import("@/lib/services/scrape-service");
+		const { getScrapeById, getScrapeResults } = await import(
+			"@/lib/services/scrape-service"
+		);
 		const scrape = await getScrapeById(id, user.id);
-		const { db } = await import("@/db");
-		const { scrapePages, scrapeImages } = await import("@/db/schema");
-		const { and, eq } = await import("drizzle-orm");
-		const pages =
-			scrape.mode === "crawl"
-				? await db
-						.select()
-						.from(scrapePages)
-						.where(
-							and(
-								eq(scrapePages.scrapeId, id),
-								eq(scrapePages.userId, user.id),
-							),
-						)
-				: [];
-		const imageRows =
-			scrape.mode === "images"
-				? await db
-						.select()
-						.from(scrapeImages)
-						.where(
-							and(
-								eq(scrapeImages.scrapeId, id),
-								eq(scrapeImages.userId, user.id),
-							),
-						)
-				: [];
-		const { issuePreviewAssetCapability } = await import(
-			"@/lib/preview-capabilities"
+		const mode = (scrape.mode ?? "design") as ScrapeMode;
+		const { pages, images: imageRows } = await getScrapeResults(
+			id,
+			user.id,
+			mode,
 		);
-		const { SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS } = await import(
-			"@/lib/constants"
-		);
-		const images = imageRows.map((image) => ({
-			...image,
-			assetUrl: `/api/scrape/asset?cap=${encodeURIComponent(issuePreviewAssetCapability({ target: image.url, scrapeId: id, ownerId: user.id, expiresAt: Date.now() + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS }))}`,
-		}));
+		const { attachImageAssetUrls } = await import("@/lib/preview-capabilities");
+		const images = attachImageAssetUrls(imageRows, id, user.id);
 		let appOrigin = "http://localhost:3000";
 		try {
 			const { getRequestHeaders, getRequestUrl } = await import(
@@ -197,6 +170,10 @@ function ScrapeDetailPage() {
 		string,
 		unknown
 	> | null;
+	// Polled results win so rows persisted after the initial load appear without
+	// a reload; the loader snapshot only seeds the first render.
+	const pages = data?.pages ?? initial.pages;
+	const images = data?.images ?? initial.images;
 	const errorMessage =
 		requestError ??
 		(metadata && typeof metadata === "object" && "errorMessage" in metadata
@@ -254,21 +231,19 @@ function ScrapeDetailPage() {
 						onRetry={retry}
 						partialResults={
 							mode === "crawl"
-								? initial.pages.filter((page) => page.status === "completed")
-										.length
-								: initial.images.filter((image) => image.status === "completed")
-										.length
+								? pages.filter((page) => page.status === "completed").length
+								: images.filter((image) => image.status === "completed").length
 						}
 					/>
 				)}
 			{mode === "crawl" &&
 			(currentStatus === "completed" ||
-				(currentStatus === "failed" && initial.pages.length > 0)) ? (
-				<CrawlResult pages={initial.pages} sourceUrl={sourceUrl} />
+				(currentStatus === "failed" && pages.length > 0)) ? (
+				<CrawlResult pages={pages} sourceUrl={sourceUrl} />
 			) : mode === "images" &&
 				(currentStatus === "completed" ||
-					(currentStatus === "failed" && initial.images.length > 0)) ? (
-				<ImagesResult images={initial.images} sourceUrl={sourceUrl} />
+					(currentStatus === "failed" && images.length > 0)) ? (
+				<ImagesResult images={images} sourceUrl={sourceUrl} />
 			) : view === "result-design" ? (
 				<DesignResult
 					sourceUrl={sourceUrl}

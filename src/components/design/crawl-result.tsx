@@ -1,8 +1,16 @@
 import { Download } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { scrapePages } from "@/db/schema";
 
 type Page = typeof scrapePages.$inferSelect;
+
+// Keeps the explorer selection valid as pages arrive from polling: an explicit
+// user choice is preserved while it still exists, and any other case resolves
+// to a real page instead of leaving the panel on its empty state.
+export function resolveSelectedPageId(pages: Page[], current: string): string {
+	if (current && pages.some((page) => page.id === current)) return current;
+	return pages[0]?.id ?? "";
+}
 
 export function CrawlResult({
 	pages,
@@ -12,6 +20,9 @@ export function CrawlResult({
 	sourceUrl: string;
 }) {
 	const [selected, setSelected] = useState(pages[0]?.id ?? "");
+	useEffect(() => {
+		setSelected((current) => resolveSelectedPageId(pages, current));
+	}, [pages]);
 	const page = pages.find((row) => row.id === selected);
 	function download() {
 		const markdown = [

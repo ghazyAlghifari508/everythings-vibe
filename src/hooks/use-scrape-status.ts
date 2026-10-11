@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScrapeMetadata, ScrapeMode, ScrapeStatus } from "@/db/schema";
-import type { ScrapeDetail } from "@/lib/services/scrape-service";
+import type { ScrapeDetailPayload } from "@/lib/services/scrape-service";
 
 export interface ScrapeStatusSnapshot {
 	status: string;
@@ -10,6 +10,8 @@ export interface ScrapeStatusSnapshot {
 	previewHtml?: string | null;
 	document?: { designMd: string } | null;
 	metadata?: ScrapeMetadata | null;
+	pages?: ScrapeDetailPayload["pages"];
+	images?: ScrapeDetailPayload["images"];
 }
 
 export interface ScrapeStatusSeedInput {
@@ -50,16 +52,21 @@ export function useScrapeStatus(
 	options: UseScrapeStatusOptions = {},
 ) {
 	const { initialData = null, pollIntervalMs = 1500 } = options;
-	const [data, setData] = useState<ScrapeDetail | ScrapeStatusSnapshot | null>(
-		initialData,
-	);
+	const [data, setData] = useState<
+		ScrapeDetailPayload | ScrapeStatusSnapshot | null
+	>(initialData);
 	const [error, setError] = useState<string | null>(null);
 	const [isRetrying, setIsRetrying] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	// Monotonic request id: a slow response from an earlier poll must never
+	// overwrite a newer one, which would resurrect stale status or stale rows.
+	const requestSeqRef = useRef(0);
 
 	const fetchStatus = useCallback(async () => {
+		const requestId = ++requestSeqRef.current;
 		try {
 			const res = await fetch(`/api/scrape?id=${encodeURIComponent(scrapeId)}`);
+			if (requestId !== requestSeqRef.current) return null;
 			if (!res.ok) {
 				const errData = (await res.json().catch(() => null)) as {
 					error?: string;
@@ -67,11 +74,13 @@ export function useScrapeStatus(
 				setError(errData?.error ?? "Gagal memuat status scrape.");
 				return null;
 			}
-			const json = (await res.json()) as { scrape: ScrapeDetail };
+			const json = (await res.json()) as { scrape: ScrapeDetailPayload };
+			if (requestId !== requestSeqRef.current) return null;
 			setData(json.scrape);
 			setError(null);
 			return json.scrape;
 		} catch {
+			if (requestId !== requestSeqRef.current) return null;
 			setError("Jaringan bermasalah. Status terakhir tetap ditampilkan.");
 			return null;
 		}

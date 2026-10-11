@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
 	getScrapeById: vi.fn(),
+	getScrapeResults: vi.fn(),
 	buildPreviewSrcDoc: vi.fn(),
 	requireUserServer: vi.fn(),
 }));
@@ -20,6 +21,7 @@ vi.mock("@/lib/session", () => ({
 }));
 vi.mock("@/lib/services/scrape-service", () => ({
 	getScrapeById: mocks.getScrapeById,
+	getScrapeResults: mocks.getScrapeResults,
 }));
 vi.mock("@/lib/scrape-preview-document", () => ({
 	buildScrapePreviewDocument: mocks.buildPreviewSrcDoc,
@@ -33,6 +35,7 @@ beforeEach(() => {
 		id: "owner-1",
 		email: "owner@example.invalid",
 	});
+	mocks.getScrapeResults.mockResolvedValue({ pages: [], images: [] });
 	mocks.buildPreviewSrcDoc.mockReturnValue({
 		srcDoc: '<img src="https://app.example/api/scrape/asset?cap=preview">',
 		expiresAt: Date.now() + 60 * 60_000,

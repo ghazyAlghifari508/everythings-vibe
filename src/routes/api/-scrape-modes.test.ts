@@ -113,6 +113,8 @@ describe("Scrape API Route Modes", () => {
 			html: "<html><body>Hello</body></html>",
 			previewHtml: "<html><body>Hello</body></html>",
 			document: null,
+			pages: [],
+			images: [],
 		});
 
 		const req = new Request("http://localhost/api/scrape?id=sc-html-1");
@@ -121,5 +123,7 @@ describe("Scrape API Route Modes", () => {
 		const json = await res.json();
 		expect(json.scrape.mode).toBe("html");
 		expect(json.scrape.document).toBeNull();
+		expect(json.scrape.pages).toEqual([]);
+		expect(json.scrape.images).toEqual([]);
 	});
 });

@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertScrapeDocumentRow,
@@ -10,6 +10,8 @@ import {
 	type ScrapeRow,
 	type ScrapeStatus,
 	scrapeDocuments,
+	scrapeImages,
+	scrapePages,
 	scrapes,
 	users,
 } from "@/db/schema";
@@ -38,8 +40,24 @@ export interface ScrapeSummary {
 	createdAt: Date;
 }
 
+export type ScrapePageRow = typeof scrapePages.$inferSelect;
+export type ScrapeImageRow = typeof scrapeImages.$inferSelect;
+
+// A verified image row plus the same-origin signed URL used for preview and
+// download. Only rows whose resource passed verification reach the client.
+export type ScrapeImageResult = ScrapeImageRow & { assetUrl: string };
+
+// Persisted detail without signed asset URLs: signing needs request context, so
+// the API route and the detail loader attach them.
 export interface ScrapeDetail extends ScrapeRow {
 	document: ScrapeDocumentRow | null;
+	pages: ScrapePageRow[];
+	images: ScrapeImageRow[];
+}
+
+// Wire shape returned by the status poll and the detail loader.
+export interface ScrapeDetailPayload extends Omit<ScrapeDetail, "images"> {
+	images: ScrapeImageResult[];
 }
 
 function domainOf(sourceUrl: string): string {
@@ -467,6 +485,44 @@ export async function retryScrape(
 	});
 }
 
+export interface ScrapeResults {
+	pages: (typeof scrapePages.$inferSelect)[];
+	images: (typeof scrapeImages.$inferSelect)[];
+}
+
+// Reads the persisted crawl/image rows for a scrape. The detail route and the
+// status poll share this so newly persisted rows appear without a page reload.
+export async function getScrapeResults(
+	id: string,
+	userId: string,
+	mode: ScrapeMode,
+): Promise<ScrapeResults> {
+	const empty: ScrapeResults = { pages: [], images: [] };
+	if (mode === "crawl")
+		return {
+			...empty,
+			pages: await db
+				.select()
+				.from(scrapePages)
+				.where(
+					and(eq(scrapePages.scrapeId, id), eq(scrapePages.userId, userId)),
+				)
+				.orderBy(asc(scrapePages.depth), asc(scrapePages.url)),
+		};
+	if (mode === "images")
+		return {
+			...empty,
+			images: await db
+				.select()
+				.from(scrapeImages)
+				.where(
+					and(eq(scrapeImages.scrapeId, id), eq(scrapeImages.userId, userId)),
+				)
+				.orderBy(asc(scrapeImages.url)),
+		};
+	return empty;
+}
+
 export async function getScrapeById(
 	id: string,
 	userId: string,
@@ -491,10 +547,17 @@ export async function getScrapeById(
 					!["completed", "failed"].includes(row.status)
 				? "Heartbeat worker tidak aktif. Job menunggu pemulihan lease oleh worker."
 				: undefined;
+	const results = await getScrapeResults(
+		id,
+		userId,
+		(row.mode ?? "design") as ScrapeMode,
+	);
 	return {
 		...row,
 		metadata: { ...row.metadata, workerHealth: health },
 		document: document ?? null,
+		pages: results.pages,
+		images: results.images,
 	};
 }
 

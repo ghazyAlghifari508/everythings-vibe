@@ -1,10 +1,8 @@
 import { Download, ExternalLink } from "lucide-react";
 import { useState } from "react";
-import type { scrapeImages } from "@/db/schema";
+import type { ScrapeImageResult } from "@/lib/services/scrape-service";
 
-export type ImageResult = typeof scrapeImages.$inferSelect & {
-	assetUrl: string;
-};
+export type ImageResult = ScrapeImageResult;
 
 export function ImagesResult({
 	images,

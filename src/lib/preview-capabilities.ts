@@ -168,6 +168,28 @@ export function capabilityUrl(
 	return `${origin.origin}/api/scrape/asset?cap=${encodeURIComponent(token)}`;
 }
 
+// Attaches a freshly signed same-origin asset URL to every verified image row.
+// Both the detail loader and the status poll use this so polled results render
+// with the same credentials as the initial page load.
+export function attachImageAssetUrls<T extends { url: string }>(
+	images: T[],
+	scrapeId: string,
+	ownerId: string,
+	now = Date.now(),
+): (T & { assetUrl: string })[] {
+	const expiresAt = now + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS;
+	return images.map((image) => ({
+		...image,
+		assetUrl: `/api/scrape/asset?cap=${encodeURIComponent(
+			issuePreviewAssetCapability(
+				{ target: image.url, scrapeId, ownerId, expiresAt },
+				undefined,
+				now,
+			),
+		)}`,
+	}));
+}
+
 export function buildPreviewSrcDoc(
 	html: string,
 	options: PreviewRewriteOptions,
