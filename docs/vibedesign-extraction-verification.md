@@ -10,43 +10,64 @@ shared history, HTML context/icon toolbar, and allowlisted contextual Back navig
 Crawl and Images do not deduct credits, per the user's decision. Existing AI DESIGN.md
 generation and captured-DOM snapshot boundaries are retained. No runtime dependency was added.
 
+## Reliability fixes
+
+- Browser capture installs a guarded `__name` shim so tsx/esbuild `keepNames` output does
+  not break serialized page functions; images mode and the resource guard depend on it.
+- Upstream HTTP failures are classified (rate limited, access denied, not found, server
+  error) and `Retry-After` is read in both forms without inventing a wait. Internal faults
+  report `UNEXPECTED_ERROR` instead of a website block.
+- Image runs resolve to `complete`, `partial`, `empty`, or `all-failed`, and discovery
+  records whether it found candidates, found none, or never ran. Only transient transport
+  failures and 5xx responses retry; a site's own status answer is final.
+- The canonical DESIGN.md is built from browser evidence and survives an optional AI
+  summary failure; enrichment status is persisted and reported honestly.
+- Identical measurements collapse into one curated row that keeps its frequency and
+  representative selector, and Do and Don't guidance is derived only from repeated
+  measured patterns.
+- The crawl explorer resyncs its selected page whenever results change, and the status
+  poll returns persisted pages and images so no reload is needed.
+
 ## Checks
 
-- Final full Vitest suite passed: 230 files, 2,200 tests (2026-10-11).
-- TypeScript no-emit passed after each code checkpoint.
-- Repository Biome check passed with ten existing autofill `!important` warnings.
-- Production client/SSR build passed, with existing browser externalization and chunk-size warnings.
-- Type-bypass scan found existing generated route assertions and unrelated legacy application/test
-  assertions. No forbidden bypass was introduced in changed extraction files.
-- Back regression first failed against unconditional history Back, then passed after the fix.
-- Controlled tests cover URL/settings bounds, mode payloads, keyboard selection/reset, depth zero,
-  page caps/deduplication, partial failure, resume frontier, robots grouping/allow precedence,
-  regex termination, image deduplication and evidence-based classification.
+- Full Vitest suite passed: 240 files, 2,235 tests.
+- Runtime suite passed with `SCRAPE_RUNTIME_VERIFY=1`, driving all four modes through the
+  persisted queue, lease recovery, and the standalone worker process.
+- TypeScript no-emit passed; repository Biome check passed with ten existing autofill
+  `!important` warnings; production build passed.
+- Type-bypass scan over every changed file found no `any`, `@ts-ignore`, or `as unknown as`.
+
+## Live capture evidence
+
+- Images on `notion.com`: discovery `found`, outcome `complete`, 174 discovered, 174
+  saved, 0 failed, 86 with measured dimensions.
+- Images on `framer.com`: outcome `partial`, 149 saved, 2 failed with stored reasons.
+- Design on `notion.com`: three consecutive runs completed with `aiEnrichment: applied`;
+  the document shrank from roughly 1.1 MB to 84 KB with zero duplicate rows.
+- A rate-limited public site: code `WEBSITE_RATE_LIMITED` with actionable copy and no
+  fabricated retry delay, where it previously reported a generic block.
 
 ## Unverified runtime and known limitations
 
-The user explicitly declined running dev server and worker. No authenticated application
-browser QA, responsive screenshot review, database-backed concurrent claim/recovery test,
-live Crawl/Images run, migration application, or production worker provisioning was performed.
-Do not call this complete or production-ready on the basis of unit tests/build alone.
+No authenticated browser QA was performed in this session; the user runs workspace UI QA
+separately. Not verified here: responsive layout quality, screenshot fidelity, focus order,
+and download authorization in a real browser.
 
 - Crawl extracts server-delivered HTML, not JavaScript-only rendered navigation/content.
 - Sitemap records first discovered parent relationships and extracted outgoing page links;
   links beyond crawl limits remain observations rather than visited pages.
 - Blueprint is deterministic observed data; it contains no AI architecture inferences.
 - Image classification currently supports metadata-evidenced icons/logos; ambiguous images
-  remain unclassified. Dimensions are measured for loaded images and at most fifty additional
-  candidates. Resources with unavailable dimensions do not receive invented sizes.
+  remain unclassified. Resources with unavailable dimensions do not receive invented sizes.
 - Image discovery bounds scanning at 5,000 elements and 200 candidate entries. Capture limits
-  browser requests to 500 and accepted resource bodies to 50 MB; concurrent fetch overshoot and
-  decoded image memory are not yet governed by a strict aggregate memory budget.
+  browser requests to 500 and accepted resource bodies to 50 MB.
 - Worker lease fencing prevents stale writes, aborts Crawl fetch/delay, and closes capture
   contexts after lease loss or the fifteen-minute job budget. AI provider generation does not
   yet receive the worker abort signal. Shutdown finishes the current operation.
 - API deduplicates identical active jobs under a locked user row and persists replay keys in
-  job metadata. Key reuse with different parameters is rejected. Database race verification
-  remains unperformed.
+  job metadata. Key reuse with different parameters is rejected.
 - Same-origin iframe content is captured into exported HTML without re-navigation; secured
   visual snapshot CSP still prevents executing embedded website frames.
 
-These are explicit remaining contract/verification gaps, not successful QA claims.
+These are explicit remaining verification gaps, not successful QA claims.
+
