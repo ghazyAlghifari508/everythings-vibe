@@ -1,4 +1,5 @@
 import { Check, Circle, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
 	resolveSyncStageView,
 	SYNC_STAGE_ORDER,
@@ -75,7 +76,47 @@ function StageIcon({ state }: { state: SyncStageState }) {
 	);
 }
 
+/**
+ * Live elapsed seconds since a real server-recorded start. Ticks only while a
+ * stage is active, and renders nothing when the backend never recorded a
+ * start — the timer measures, it never guesses.
+ */
+function useElapsedSeconds(startedAt: string | undefined): number | null {
+	const [elapsed, setElapsed] = useState<number | null>(null);
+	useEffect(() => {
+		if (!startedAt) {
+			setElapsed(null);
+			return;
+		}
+		const startMs = Date.parse(startedAt);
+		if (!Number.isFinite(startMs)) {
+			setElapsed(null);
+			return;
+		}
+		const tick = () => setElapsed(Math.max(0, (Date.now() - startMs) / 1000));
+		tick();
+		const timer = setInterval(tick, 1000);
+		return () => clearInterval(timer);
+	}, [startedAt]);
+	return elapsed;
+}
+
+/** Real completion time, rendered as a short local clock reading. */
+function formatCompletedAt(value: string): string | null {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return null;
+	return date.toLocaleTimeString("id-ID", {
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+	});
+}
+
 function StageRow({ testId, row }: { testId: string; row: SyncStageRow }) {
+	const elapsed = useElapsedSeconds(row.startedAt);
+	const completedAt = row.completedAt
+		? formatCompletedAt(row.completedAt)
+		: null;
 	return (
 		<div
 			data-testid={testId}
@@ -94,11 +135,28 @@ function StageRow({ testId, row }: { testId: string; row: SyncStageRow }) {
 					<span className="leading-relaxed text-fog">{row.detail}</span>
 				)}
 			</span>
-			{row.meta && (
-				<span className="ml-auto shrink-0 font-mono text-[11px] text-fog">
-					{row.meta}
+			{row.meta ||
+			completedAt ||
+			(row.state === "active" && elapsed !== null) ? (
+				<span className="ml-auto flex shrink-0 items-center gap-2">
+					{row.meta ? (
+						<span className="font-mono text-[11px] text-fog">{row.meta}</span>
+					) : null}
+					{row.state === "active" && elapsed !== null ? (
+						<span
+							role="timer"
+							aria-label="Waktu proses"
+							className="font-mono text-[11px] tabular-nums text-fog"
+						>
+							{elapsed.toFixed(1)}s
+						</span>
+					) : completedAt ? (
+						<span className="font-mono text-[11px] tabular-nums text-fog">
+							{completedAt}
+						</span>
+					) : null}
 				</span>
-			)}
+			) : null}
 		</div>
 	);
 }
@@ -131,35 +189,54 @@ export function SyncStageList({
 
 	if (view.stages.length === 0) return null;
 
-	const hasAnalysisStage = Boolean(
-		status?.snapshotId && status?.analysisStatus,
-	);
+	// The live attempt is the newest persisted analysis row for this snapshot
+	// (`analysisAttemptStatus`), which is what actually reports pending and
+	// failed. `analysisStatus` only ever carries the ready content, so using it
+	// alone made a running analysis invisible until it was already finished —
+	// the exact "conclusion appeared instantly" symptom. Ready content still
+	// wins whenever it exists, so a failed retry can never hide a usable result.
+	const liveAnalysisStatus =
+		status?.analysisStatus === "ready"
+			? "ready"
+			: (status?.analysisAttemptStatus ?? status?.analysisStatus);
+	const hasAnalysisStage = Boolean(status?.snapshotId && liveAnalysisStatus);
 	let analysisRow: SyncStageRow | null = null;
-	if (hasAnalysisStage && status?.analysisStatus) {
-		if (status.analysisStatus === "pending") {
+	if (hasAnalysisStage && liveAnalysisStatus) {
+		if (liveAnalysisStatus === "pending") {
 			analysisRow = {
 				state: "active",
 				title: "Menganalisis codebase",
 				detail: "AI sedang membaca arsitektur dan menyiapkan rekomendasi",
+				// Real start time of this attempt: drives a measured elapsed
+				// timer instead of an indeterminate spinner.
+				...(status?.analysisAttemptCreatedAt
+					? { startedAt: status.analysisAttemptCreatedAt }
+					: {}),
 			};
-		} else if (status.analysisStatus === "failed") {
+		} else if (liveAnalysisStatus === "failed") {
 			analysisRow = {
 				state: "failed",
 				title: "Menganalisis codebase",
 				detail: "Analisis belum berhasil diselesaikan",
 			};
-		} else if (status.analysisStatus === "ready") {
+		} else if (liveAnalysisStatus === "ready") {
 			if (isAnalysisReady) {
 				analysisRow = {
 					state: "done",
 					title: "Kesimpulan siap",
 					detail: "Ringkasan arsitektur dan rekomendasi task awal tersedia",
+					...(status?.analysisAttemptUpdatedAt
+						? { completedAt: status.analysisAttemptUpdatedAt }
+						: {}),
 				};
 			} else {
 				analysisRow = {
 					state: "done",
 					title: "Analisis selesai",
 					detail: "Perlu pembaruan rekomendasi task awal untuk melanjutkan",
+					...(status?.analysisAttemptUpdatedAt
+						? { completedAt: status.analysisAttemptUpdatedAt }
+						: {}),
 				};
 			}
 		}

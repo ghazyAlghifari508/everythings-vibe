@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import { normalizeRepositoryName } from "@/lib/codebase-library";
 import {
+	appendSyncLifecycleEvent,
 	assertSyncTransition,
 	buildHandshakeMetadata,
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
@@ -210,11 +211,21 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 					// inside the handshake transaction, and survives a later failure
 					// or expiry so the prompt screen can still tell a handshaked
 					// session from one the CLI never reached.
-					const metadata = buildHandshakeMetadata({
+					//
+					// The lifecycle log records the same fact as an ordered event so
+					// a browser that first polls after this transition can still show
+					// WHEN the agent connected instead of only that it did.
+					const handshakeAt = new Date();
+					const withHandshake = buildHandshakeMetadata({
 						previous: currentSession?.metadata ?? session.metadata ?? null,
 						cliVersion: parsedBody.data.cliVersion,
 						...(repositoryName ? { repositoryName } : {}),
-						handshakeAt: new Date(),
+						handshakeAt,
+					});
+					const metadata = appendSyncLifecycleEvent({
+						previous: withHandshake,
+						kind: "agent_connected",
+						at: handshakeAt,
 					});
 					await tx
 						.update(codebaseSyncSessions)

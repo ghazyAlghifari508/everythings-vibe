@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertCircle, ArrowRight, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { AnalysisResponse } from "@/lib/codebase-analysis";
 import type { SyncStatusResponse } from "@/lib/codebase-sync";
 import { CodebaseReview } from "./codebase-review";
@@ -66,6 +67,33 @@ export function resolveConclusionState(input: {
 	return "analyzing";
 }
 
+/**
+ * Live elapsed seconds for the running analysis, measured from the persisted
+ * attempt's own start time. Renders nothing when the server never recorded
+ * one, so the duration is reported rather than invented.
+ */
+function useAnalysisElapsedSeconds(
+	startedAt: string | null | undefined,
+): number | null {
+	const [elapsed, setElapsed] = useState<number | null>(null);
+	useEffect(() => {
+		if (!startedAt) {
+			setElapsed(null);
+			return;
+		}
+		const startMs = Date.parse(startedAt);
+		if (!Number.isFinite(startMs)) {
+			setElapsed(null);
+			return;
+		}
+		const tick = () => setElapsed(Math.max(0, (Date.now() - startMs) / 1000));
+		tick();
+		const timer = setInterval(tick, 1000);
+		return () => clearInterval(timer);
+	}, [startedAt]);
+	return elapsed;
+}
+
 export function CodebaseConclusion({
 	snapshot,
 	analysis,
@@ -82,6 +110,10 @@ export function CodebaseConclusion({
 		analysis,
 		isAnalyzing,
 	});
+	// The persisted attempt's start is the real measurement point. The local
+	// trigger's own start is only a fallback for the window before the first
+	// poll lands, and only while this client knows it sent the request.
+	const elapsed = useAnalysisElapsedSeconds(snapshot.analysisAttemptCreatedAt);
 
 	if (state === "ready" && analysis?.output && snapshot.snapshotId) {
 		return (
@@ -148,6 +180,15 @@ export function CodebaseConclusion({
 							Sinkronisasi repository sudah selesai. VibeEverything sedang
 							memahami teknologi, struktur project, dependensi, dan modul utama.
 						</p>
+						{elapsed !== null ? (
+							<p
+								role="timer"
+								aria-label="Waktu proses analisis"
+								className="mt-2 font-mono text-[11px] tabular-nums text-fog"
+							>
+								{elapsed.toFixed(1)}s
+							</p>
+						) : null}
 						{errorMessage && (
 							<p role="alert" className="mt-3 text-xs text-crimson">
 								{errorMessage}
