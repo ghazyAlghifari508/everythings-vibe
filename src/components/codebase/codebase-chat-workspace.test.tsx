@@ -492,9 +492,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
 		// The real activity line for this stage, plus a real elapsed timer.
 		expect(thinking?.textContent).toContain("Menyusun pertanyaan klarifikasi");
-		expect(thinking?.textContent).toContain(
-			CODEBASE_STAGE_ACTIVITY.questions,
-		);
+		expect(thinking?.textContent).toContain(CODEBASE_STAGE_ACTIVITY.questions);
 		const timer = thinking?.querySelector("[role='timer']");
 		expect(timer).not.toBeNull();
 		expect(timer?.textContent).toMatch(/^\d+\.\d+s$/);
@@ -548,9 +546,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 
 	it("places the thinking line directly below the user message", () => {
 		renderWorkspace({
-			messages: [
-				{ id: "user-1", role: "user", content: "Tambah mode gelap" },
-			],
+			messages: [{ id: "user-1", role: "user", content: "Tambah mode gelap" }],
 			run: startRun("questions", Date.now()),
 		});
 		const stream = container.querySelector(
@@ -562,8 +558,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		);
 		const thinkingIndex = children.findIndex(
 			(child) =>
-				child.querySelector("[data-testid='codebase-run-thinking']") !==
-					null ||
+				child.querySelector("[data-testid='codebase-run-thinking']") !== null ||
 				child.getAttribute("data-testid") === "codebase-run-thinking",
 		);
 		expect(userIndex).toBeGreaterThanOrEqual(0);
@@ -644,7 +639,10 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onSendMessage).toHaveBeenCalledTimes(1);
-		expect(onSendMessage).toHaveBeenCalledWith("Tambah mode gelap", "new_feature");
+		expect(onSendMessage).toHaveBeenCalledWith(
+			"Tambah mode gelap",
+			"new_feature",
+		);
 		expect(composer?.value).toBe("");
 	});
 
@@ -807,7 +805,10 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onSendMessage).toHaveBeenCalledTimes(1);
-		expect(onSendMessage).toHaveBeenCalledWith("Tambah pencarian proyek", "new_feature");
+		expect(onSendMessage).toHaveBeenCalledWith(
+			"Tambah pencarian proyek",
+			"new_feature",
+		);
 	});
 
 	it("places the caret at the end of the prefilled prompt when the empty area is pressed", () => {
@@ -976,7 +977,9 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		const input = card?.querySelector<HTMLInputElement>("input#custom-q1");
 		expect(input).not.toBeNull();
 		// The field stays inside the same question card: no extra card appears.
-		expect(input?.closest("[data-testid='adaptive-question-q1']")).not.toBeNull();
+		expect(
+			input?.closest("[data-testid='adaptive-question-q1']"),
+		).not.toBeNull();
 		expect(
 			container.querySelectorAll("[data-testid='adaptive-question-q1']"),
 		).toHaveLength(1);
@@ -1027,7 +1030,10 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		});
 		// The custom text alone is the answer — never combined with the cleared
 		// option label.
-		expect(onSubmitAnswer).toHaveBeenCalledWith("q1", "Penyimpanan terenkripsi");
+		expect(onSubmitAnswer).toHaveBeenCalledWith(
+			"q1",
+			"Penyimpanan terenkripsi",
+		);
 	});
 
 	it("keeps an empty custom answer unsendable until it has content", () => {
@@ -1116,9 +1122,8 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			"[data-testid='adaptive-question-t1']",
 		);
 		const options = [
-			...(card?.querySelectorAll<HTMLInputElement>(
-				"input[type='checkbox']",
-			) ?? []),
+			...(card?.querySelectorAll<HTMLInputElement>("input[type='checkbox']") ??
+				[]),
 		].filter((input) => !input.value.endsWith("-custom"));
 		act(() => {
 			options[0]?.click();
@@ -1406,7 +1411,10 @@ describe("CodebaseChatWorkspace chat intent after a plan exists", () => {
 		act(() => {
 			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
-		expect(onSendMessage).toHaveBeenCalledWith("Tambah mode gelap", "new_feature");
+		expect(onSendMessage).toHaveBeenCalledWith(
+			"Tambah mode gelap",
+			"new_feature",
+		);
 	});
 
 	it("shows the task impact only for a revision, and only when the caller reports one", () => {
@@ -1598,7 +1606,11 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 	});
 
 	it("shows no artifact card before the artifact is confirmed persisted", () => {
-		renderWorkspace({ stage: "feature", artifacts: [], onGeneratePrd: vi.fn() });
+		renderWorkspace({
+			stage: "feature",
+			artifacts: [],
+			onGeneratePrd: vi.fn(),
+		});
 		const cta = container.querySelector("[data-testid='codebase-stage-prd']");
 		expect(cta).not.toBeNull();
 		expect(cta?.querySelector("[data-testid='codebase-file-card']")).toBeNull();
