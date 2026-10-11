@@ -1639,16 +1639,19 @@ function CodebaseDetailPage() {
 	const userTookOverCanvas = useRef(false);
 
 	/**
-	 * Reveal the artifact a finished stage produced. The caller passes the real
-	 * persistence result, so the reveal can never be based on an assumed
-	 * success, and a user who took over the panel keeps it.
+	 * Reveal the artifact a finished stage produced.
+	 *
+	 * Only ever called after the artifact was reloaded from the authoritative
+	 * server state, so the reveal can never be based on an assumed success. The
+	 * user's own panel interaction always wins: once they open another artifact
+	 * or close the panel, this stops moving the canvas.
 	 */
 	const openArtifactPreview = useCallback(
-		(kind: "feature" | "prd" | "ac" | "tasks", persisted: boolean) => {
+		(kind: "feature" | "prd" | "ac" | "tasks") => {
 			if (
 				!effectiveFeatureId ||
 				!shouldAutoRevealArtifact({
-					persisted,
+					persisted: true,
 					userTookOverCanvas: userTookOverCanvas.current,
 				})
 			) {
@@ -1727,7 +1730,7 @@ function CodebaseDetailPage() {
 				pushAssistantMessage(
 					`Revisi untuk ${resolvedFeature?.name ?? "fitur"} sudah diterapkan sebagai versi PRD baru. Dokumen versi sebelumnya tetap tersimpan.`,
 				);
-				openArtifactPreview("prd", true);
+				openArtifactPreview("prd");
 			} catch {
 				const failure = "Server tidak dapat dihubungi. Coba lagi.";
 				setStageError(failure);
@@ -1877,7 +1880,7 @@ function CodebaseDetailPage() {
 			// The artifact is confirmed persisted (the tree reloaded above), so
 			// the canvas opens on it. A manual panel interaction is respected by
 			// openArtifactPreview, which never fights the user for focus.
-			openArtifactPreview("feature", true);
+			openArtifactPreview("feature");
 		} finally {
 			setIsConfirming(false);
 		}
@@ -1978,7 +1981,7 @@ function CodebaseDetailPage() {
 				pushAssistantMessage(
 					`PRD 8 seksi untuk ${resolvedFeature?.name ?? "fitur"} siap.`,
 				);
-				openArtifactPreview("prd", true);
+				openArtifactPreview("prd");
 				return true;
 			},
 		);
@@ -2015,7 +2018,7 @@ function CodebaseDetailPage() {
 				pushAssistantMessage(
 					`Acceptance Criteria untuk ${resolvedFeature?.name ?? "fitur"} siap.`,
 				);
-				openArtifactPreview("ac", true);
+				openArtifactPreview("ac");
 				return true;
 			},
 		);
@@ -2051,7 +2054,7 @@ function CodebaseDetailPage() {
 				pushAssistantMessage(
 					`Task untuk ${resolvedFeature?.name ?? "fitur"} sudah tersimpan dan papan Kanban aktif.`,
 				);
-				openArtifactPreview("tasks", true);
+				openArtifactPreview("tasks");
 				return true;
 			},
 		);

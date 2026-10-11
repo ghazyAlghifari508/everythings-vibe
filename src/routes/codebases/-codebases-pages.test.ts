@@ -400,7 +400,10 @@ describe("codebase detail incomplete sync handling", () => {
 });
 
 describe("ask options repository grounding", () => {
-	const askOptionsSource = readFileSync("src/routes/api/ask/options.ts", "utf8");
+	const askOptionsSource = readFileSync(
+		"src/routes/api/ask/options.ts",
+		"utf8",
+	);
 
 	it("fails closed when repository context cannot be read", () => {
 		// A repository-aware question set must never be generated without the
@@ -423,10 +426,73 @@ describe("ask options repository grounding", () => {
 	});
 
 	it("uses the repository-aware product prompt only for existing codebases", () => {
-		expect(askOptionsSource).toContain("ASK_CODEBASE_OPTIONS_GENERATION_PROMPT");
+		expect(askOptionsSource).toContain(
+			"ASK_CODEBASE_OPTIONS_GENERATION_PROMPT",
+		);
 		expect(askOptionsSource).toContain("ASK_OPTIONS_GENERATION_PROMPT");
 		expect(askOptionsSource).toMatch(
 			/project\.projectMode === "existing_codebase"[\s\S]*ASK_CODEBASE_OPTIONS_GENERATION_PROMPT/,
+		);
+	});
+});
+
+describe("automatic artifact preview", () => {
+	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+
+	it("reveals an artifact only after the server state was reloaded", () => {
+		// Each reveal sits in the success branch of a loader that had to return
+		// real content first, so no reveal can be reached from a failure path.
+		const feature = workspaceSource.slice(
+			workspaceSource.indexOf("const handleConfirmGenerate"),
+			workspaceSource.indexOf("const runPipelineStage"),
+		);
+		expect(feature).toMatch(
+			/reloadFeatureTree: \(\) => refreshFeatureTree[\s\S]*?openArtifactPreview\("feature"\)/,
+		);
+
+		const prd = workspaceSource.slice(
+			workspaceSource.indexOf("const handleGeneratePrd"),
+			workspaceSource.indexOf("const handleGenerateAc"),
+		);
+		expect(prd).toMatch(
+			/const content = await loadPrd\(\)[\s\S]*?if \(!content\)[\s\S]*?return false;[\s\S]*?openArtifactPreview\("prd"\)/,
+		);
+
+		const ac = workspaceSource.slice(
+			workspaceSource.indexOf("const handleGenerateAc"),
+			workspaceSource.indexOf("const handleGenerateTask"),
+		);
+		expect(ac).toMatch(
+			/const content = await loadAc\(\)[\s\S]*?if \(!content\)[\s\S]*?return false;[\s\S]*?openArtifactPreview\("ac"\)/,
+		);
+
+		const task = workspaceSource.slice(
+			workspaceSource.indexOf("const handleGenerateTask"),
+			workspaceSource.indexOf("const handleRetryStage"),
+		);
+		expect(task).toMatch(
+			/const persistedTaskTree = await refreshTaskTree[\s\S]*?if \(!persistedTaskTree\)[\s\S]*?return false;[\s\S]*?openArtifactPreview\("tasks"\)/,
+		);
+
+		// A revision reveals the PRD only after the document reloaded.
+		const revision = workspaceSource.slice(
+			workspaceSource.indexOf("const runRevision"),
+			workspaceSource.indexOf("const handleConfirmGenerate"),
+		);
+		expect(revision).toMatch(
+			/const content = await loadPrd\(\)[\s\S]*?if \(!content\)[\s\S]*?openArtifactPreview\("prd"\)/,
+		);
+	});
+
+	it("never moves the canvas after the user takes it over", () => {
+		expect(workspaceSource).toContain("userTookOverCanvas");
+		// Both a manual artifact open and a manual close hand the panel to the
+		// user, so a later automatic reveal stands down.
+		expect(workspaceSource).toMatch(
+			/onOpenArtifact=\{\(artifact\)[\s\S]*?userTookOverCanvas\.current = true/,
+		);
+		expect(workspaceSource).toMatch(
+			/onClose=\{\(\)[\s\S]*?userTookOverCanvas\.current = true/,
 		);
 	});
 });
@@ -458,7 +524,10 @@ describe("chat intent after task generation", () => {
 		const revisionBlock = workspaceSource.slice(
 			workspaceSource.indexOf("const runRevision = useCallback("),
 		);
-		const body = revisionBlock.slice(0, revisionBlock.indexOf("const handleSendMessage"));
+		const body = revisionBlock.slice(
+			0,
+			revisionBlock.indexOf("const handleSendMessage"),
+		);
 		expect(body).not.toContain("refreshTaskTree");
 		expect(body).not.toContain("/api/task/generate");
 		expect(body).not.toContain("reset-progress");
