@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { config } from "dotenv";
 import { SCRAPE_LIMITS } from "@/lib/scrape-contract";
 import {

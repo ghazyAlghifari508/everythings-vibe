@@ -262,6 +262,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ```bash
 pnpm dev          # start the dev server on port 3000
+pnpm dev:all      # web + extraction worker, shared .env.local/.env, supervised cleanup
+pnpm scrape:worker # standalone extraction worker
 pnpm build        # production build
 pnpm preview      # preview the production build
 pnpm db:generate  # generate a Drizzle migration
@@ -402,6 +404,14 @@ pnpm preview
 Point the deployment at a managed Postgres instance, set the environment variables above, and expose the server over HTTPS. Because the AI calls go to your own router, there is no external model provider to configure in production.
 
 ## Troubleshooting
+
+**Scrap jobs remain queued.**
+Use `pnpm dev:all` for VibeDesign Scrap. `pnpm dev` runs only the web process.
+Wait for the Vite URL and `Scrape worker ready` before submitting jobs. The worker
+checks the configured database at startup. A startup failure exits the combined
+command and stops its sibling process. Stop the combined command with Ctrl+C.
+Both processes read `.env.local` before `.env`; shell environment variables take
+precedence. Restarted workers reclaim expired leases without request-launched workers.
 
 **The app shows an error on generation.**
 Check that `NINE_ROUTER_URL` is reachable and that `pnpm dev` started without errors. The AI calls go through the local router, so a stopped router means empty generations.
