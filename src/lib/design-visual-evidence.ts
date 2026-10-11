@@ -155,6 +155,224 @@ export interface VisualEvidence {
 	limitations: string[];
 }
 
+export interface GroupedMeasurement {
+	property: string;
+	value: string;
+	// How many distinct visible elements produced this exact property/value pair.
+	frequency: number;
+	// Selectors kept for audit; the first entry is the representative sample.
+	selectors: string[];
+	roles: string[];
+}
+
+const AUDIT_SELECTOR_LIMIT = 3;
+const AUDIT_ROLE_LIMIT = 3;
+
+// Curated component properties: the values a design-system consumer can reuse.
+// Full per-element CSS remains available through the raw capture, not here.
+const COMPONENT_PROPERTIES = [
+	"background-color",
+	"color",
+	"font-family",
+	"font-size",
+	"font-weight",
+	"line-height",
+	"border-radius",
+	"padding",
+	"gap",
+	"box-shadow",
+];
+
+// Collapses identical property/value measurements into one curated entry so the
+// document describes a design system instead of dumping per-element CSS. Raw
+// provenance stays available through frequency, selectors and roles.
+export function groupMeasurements(
+	elements: VisualElementEvidence[],
+	properties: string[],
+): GroupedMeasurement[] {
+	const groups = new Map<string, GroupedMeasurement>();
+	for (const element of elements) {
+		for (const property of properties) {
+			const value = element.properties[property];
+			if (!value || value === "none" || value === "normal") continue;
+			const key = `${property}\u0000${value}`;
+			const existing = groups.get(key);
+			if (existing) {
+				existing.frequency += 1;
+				if (
+					existing.selectors.length < AUDIT_SELECTOR_LIMIT &&
+					!existing.selectors.includes(element.selector)
+				)
+					existing.selectors.push(element.selector);
+				if (
+					existing.roles.length < AUDIT_ROLE_LIMIT &&
+					!existing.roles.includes(element.role)
+				)
+					existing.roles.push(element.role);
+				continue;
+			}
+			groups.set(key, {
+				property,
+				value,
+				frequency: 1,
+				selectors: [element.selector],
+				roles: [element.role],
+			});
+		}
+	}
+	return [...groups.values()].sort(
+		(a, b) =>
+			b.frequency - a.frequency ||
+			a.property.localeCompare(b.property) ||
+			a.value.localeCompare(b.value),
+	);
+}
+
+export interface EvidenceGuidelines {
+	dos: string[];
+	donts: string[];
+	// Stated when the capture cannot support a recommendation, so the document
+	// explains the gap instead of shipping generic advice.
+	limitations: string[];
+}
+
+const RULE_FREQUENCY_MINIMUM = 2;
+// Font-family stacks are long; guidance quotes the first declared family so a
+// rule stays readable while still pointing at the measured value.
+const RULE_FAMILY_CHARS = 60;
+
+function primaryFamily(stack: string): string {
+	const first =
+		stack
+			.split(",")[0]
+			?.trim()
+			.replace(/^["']|["']$/g, "") ?? "";
+	return first.length > 0 && first.length <= RULE_FAMILY_CHARS ? first : "";
+}
+
+// Derives guidance only from repeated, measured patterns. Nothing is emitted
+// for a single observation, and no interaction, responsive or hover claim is
+// made because those states were never captured.
+export function deriveEvidenceGuidelines(
+	evidence: VisualEvidence,
+): EvidenceGuidelines {
+	const dos: string[] = [];
+	const donts: string[] = [];
+	const limitations: string[] = [];
+
+	const ctaElements = evidence.elements.filter(
+		(element) => element.role === "cta",
+	);
+	const ctaRadii = new Map<string, number>();
+	const ctaTypography = new Map<string, number>();
+	const ctaBackgrounds = new Map<string, number>();
+	for (const element of ctaElements) {
+		const radius = element.properties["border-radius"];
+		if (radius && radius !== "0px")
+			ctaRadii.set(radius, (ctaRadii.get(radius) ?? 0) + 1);
+		const background = element.properties["background-color"];
+		if (background && background !== "transparent")
+			ctaBackgrounds.set(background, (ctaBackgrounds.get(background) ?? 0) + 1);
+		const font = element.properties["font-family"];
+		const size = element.properties["font-size"];
+		const weight = element.properties["font-weight"];
+		if (font && size && weight)
+			ctaTypography.set(
+				`${font} · ${size} · ${weight}`,
+				(ctaTypography.get(`${font} · ${size} · ${weight}`) ?? 0) + 1,
+			);
+	}
+	const repeatedRadius = [...ctaRadii.entries()]
+		.filter(([, count]) => count >= RULE_FREQUENCY_MINIMUM)
+		.sort((a, b) => b[1] - a[1])[0];
+	const repeatedType = [...ctaTypography.entries()]
+		.filter(([, count]) => count >= RULE_FREQUENCY_MINIMUM)
+		.sort((a, b) => b[1] - a[1])[0];
+	const repeatedBackground = [...ctaBackgrounds.entries()]
+		.filter(([, count]) => count >= RULE_FREQUENCY_MINIMUM)
+		.sort((a, b) => b[1] - a[1])[0];
+
+	if (ctaElements.length >= RULE_FREQUENCY_MINIMUM && repeatedRadius)
+		dos.push(
+			`Gunakan border-radius ${repeatedRadius[0]} untuk tombol aksi; pola ini terukur pada ${repeatedRadius[1]} dari ${ctaElements.length} tombol.`,
+		);
+	if (ctaElements.length >= RULE_FREQUENCY_MINIMUM && repeatedType) {
+		const [stack, size, weight] = repeatedType[0].split(" · ");
+		const family = primaryFamily(stack ?? "");
+		dos.push(
+			`Pertahankan tipografi tombol${family ? ` ${family}` : ""} · ${size} · ${weight}; kombinasi ini berulang pada ${repeatedType[1]} tombol terukur.`,
+		);
+	}
+	if (ctaElements.length >= RULE_FREQUENCY_MINIMUM && repeatedBackground)
+		dos.push(
+			`Pakai warna aksi ${repeatedBackground[0]} untuk tombol utama; nilai ini dipakai ${repeatedBackground[1]} tombol.`,
+		);
+
+	if (ctaElements.length >= RULE_FREQUENCY_MINIMUM) {
+		const radiiSeen = [...ctaRadii.keys()];
+		if (radiiSeen.length > 1)
+			donts.push(
+				`Jangan mencampur radius tombol (${radiiSeen.join(", ")}); situs sumber memakai lebih dari satu nilai sehingga konsistensi harus ditetapkan secara sadar.`,
+			);
+		if (repeatedBackground)
+			for (const [background, count] of ctaBackgrounds)
+				if (background !== repeatedBackground[0] && count === 1)
+					donts.push(
+						`Jangan memakai warna tombol ${background} sebagai pola; nilai ini hanya muncul sekali dan tidak terverifikasi sebagai bagian dari sistem.`,
+					);
+	}
+
+	const groupedSpacing = groupMeasurements(evidence.elements, [
+		"padding",
+		"gap",
+	]);
+	const zeroSpacing = groupedSpacing.filter((group) => group.value === "0px");
+	const meaningfulSpacing = groupedSpacing.filter(
+		(group) => group.value !== "0px",
+	);
+	if (zeroSpacing.length && !meaningfulSpacing.length)
+		limitations.push(
+			"Seluruh nilai padding dan gap terukur 0px pada elemen yang terlihat, sehingga skala spacing situs ini tidak dapat disimpulkan.",
+		);
+	if (meaningfulSpacing.length >= RULE_FREQUENCY_MINIMUM)
+		dos.push(
+			`Ikuti nilai spacing terukur yang berulang, misalnya ${meaningfulSpacing
+				.slice(0, 3)
+				.map((group) => `${group.property} ${group.value}`)
+				.join(", ")}.`,
+		);
+
+	const fontFamilies = new Set(
+		evidence.elements
+			.filter((element) => element.role !== "canvas")
+			.map((element) => element.properties["font-family"])
+			.filter((family): family is string => Boolean(family)),
+	);
+	if (fontFamilies.size > 1) {
+		const named = [
+			...new Set([...fontFamilies].map(primaryFamily).filter(Boolean)),
+		];
+		donts.push(
+			`Jangan menggabungkan family font di luar yang terukur${named.length ? ` (${named.join(", ")})` : ""}.`,
+		);
+	}
+
+	if (!dos.length && !donts.length)
+		limitations.push(
+			"Evidence belum cukup untuk menurunkan panduan Do & Don'ts; hanya pengukuran tunggal yang tersedia.",
+		);
+
+	const declaredFonts = evidence.fonts.filter(
+		(font) => font.status !== "loaded",
+	);
+	if (declaredFonts.length)
+		limitations.push(
+			`Status pemuatan ${declaredFonts.length} font-face belum terverifikasi, jadi font yang benar-benar dipakai glyph tidak dapat dipastikan.`,
+		);
+
+	return { dos, donts, limitations };
+}
+
 export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 	const extraction = extractionFromVisualEvidence(evidence);
 	const cell = (value: string) =>
@@ -196,51 +414,72 @@ export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 		"",
 		"## Tokens - Spacing & Shapes",
 		"",
-		"| Property | Value | Source element | Status |",
-		"| --- | --- | --- | --- |",
+		"Setiap baris adalah satu nilai unik beserta berapa elemen terlihat yang memakainya, sehingga tidak ada pengulangan identik.",
+		"",
+		"| Property | Value | Terukur pada | Representative source | Status |",
+		"| --- | --- | --- | --- | --- |",
 	);
-	for (const element of evidence.elements)
-		for (const property of [
-			"padding",
-			"margin",
-			"gap",
-			"border-radius",
-			"box-shadow",
-			"max-width",
-		]) {
-			const value = element.properties[property];
-			if (value && value !== "none" && value !== "normal")
-				lines.push(
-					`| ${property} | ${cell(value)} | ${cell(element.selector)} | observed |`,
-				);
-		}
+	for (const group of groupMeasurements(evidence.elements, [
+		"padding",
+		"margin",
+		"gap",
+		"border-radius",
+		"box-shadow",
+		"max-width",
+	]))
+		lines.push(
+			`| ${group.property} | ${cell(group.value)} | ${group.frequency} elemen | ${cell(group.selectors[0] ?? "")} | observed |`,
+		);
 	lines.push(
 		"",
 		"## Components",
 		"",
-		"| Element | Property | Value | Source | Status |",
-		"| --- | --- | --- | --- | --- |",
+		"| Element | Property | Value | Terukur pada | Representative source | Status |",
+		"| --- | --- | --- | --- | --- | --- |",
 	);
 	lines.push(
 		"",
 		"Komponen di bawah berasal dari elemen yang benar-benar terlihat saat capture. State hover, focus, mobile dan disabled belum diuji; jangan menganggapnya terukur.",
 		"",
 	);
-	for (const element of evidence.elements.filter(
-		(entry) => entry.role !== "element",
-	))
-		for (const [property, value] of Object.entries(element.properties)) {
-			if (value)
-				lines.push(
-					`| ${element.role} | ${property} | ${cell(value)} | ${cell(element.selector)} | observed |`,
-				);
-		}
+	const componentRoles = [
+		...new Set(
+			evidence.elements
+				.map((element) => element.role)
+				.filter((role) => role !== "element"),
+		),
+	].sort();
+	for (const role of componentRoles)
+		for (const group of groupMeasurements(
+			evidence.elements.filter((element) => element.role === role),
+			COMPONENT_PROPERTIES,
+		))
+			lines.push(
+				`| ${role} | ${group.property} | ${cell(group.value)} | ${group.frequency} elemen | ${cell(group.selectors[0] ?? "")} | observed |`,
+			);
+	const guidelines = deriveEvidenceGuidelines(evidence);
+	lines.push(
+		"",
+		"## Do's and Don'ts",
+		"",
+		"Panduan ini hanya diturunkan dari pola terukur yang berulang. Tidak ada klaim tentang hover, focus, responsive, atau state yang tidak di-capture.",
+		"",
+	);
+	if (guidelines.dos.length)
+		for (const rule of guidelines.dos) lines.push(`- Do: ${cell(rule)}`);
+	if (guidelines.donts.length)
+		for (const rule of guidelines.donts) lines.push(`- Don't: ${cell(rule)}`);
+	if (!guidelines.dos.length && !guidelines.donts.length)
+		lines.push(
+			"- Tidak ada panduan yang dapat diturunkan: evidence belum menunjukkan pola berulang.",
+		);
 	lines.push(
 		"",
 		"## Limitations & Confidence Notes",
 		"",
 		"Measurements are observed; semantic classifications are derived from DOM usage. Brand-primary is only classified when repeated CTA backgrounds agree with a resolved semantic variable. Otherwise brand identity is unknown. Missing evidence is unknown. Loaded font-face status does not identify the font used for each glyph.",
-		...evidence.limitations.map((limitation) => `- ${limitation}`),
+		...evidence.limitations.map((limitation) => `- ${cell(limitation)}`),
+		...guidelines.limitations.map((limitation) => `- ${cell(limitation)}`),
 		"",
 		"## Font loading evidence",
 		"",
@@ -262,44 +501,45 @@ export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 		"",
 		"## Observed CSS Custom Properties",
 		"",
-		"| Variable | Resolved value | Source element | Status |",
-		"| --- | --- | --- | --- |",
+		"| Variable | Resolved value | Representative source | Terukur pada | Status |",
+		"| --- | --- | --- | --- | --- |",
 	);
-	const seenVariables = new Set<string>();
-	for (const element of evidence.elements)
-		for (const [name, value] of Object.entries(element.variables ?? {})) {
-			const key = `${name}:${value}`;
-			if (
-				!value ||
-				!Object.values(element.properties).includes(value) ||
-				seenVariables.has(key)
-			)
-				continue;
-			seenVariables.add(key);
-			lines.push(
-				`| ${cell(name)} | ${cell(value)} | ${cell(element.selector)} | observed |`,
-			);
-		}
+	for (const group of groupMeasurements(
+		evidence.elements.map((element) => ({
+			...element,
+			properties: Object.fromEntries(
+				Object.entries(element.variables ?? {}).filter(([, value]) =>
+					Object.values(element.properties).includes(value),
+				),
+			),
+		})),
+		[
+			...new Set(
+				evidence.elements.flatMap((element) =>
+					Object.keys(element.variables ?? {}),
+				),
+			),
+		],
+	))
+		lines.push(
+			`| ${cell(group.property)} | ${cell(group.value)} | ${cell(group.selectors[0] ?? "")} | ${group.frequency} elemen | observed |`,
+		);
 	lines.push(
 		"",
 		"## Color Measurement Provenance",
 		"",
-		"| Property | Value | Source element | Status |",
-		"| --- | --- | --- | --- |",
+		"| Property | Value | Representative source | Terukur pada | Status |",
+		"| --- | --- | --- | --- | --- |",
 	);
-	for (const element of evidence.elements)
-		for (const property of [
-			"background-color",
-			"color",
-			"border-top-color",
-			"background-image",
-		]) {
-			const value = element.properties[property];
-			if (value && value !== "none")
-				lines.push(
-					`| ${property} | ${cell(value)} | ${cell(element.selector)} | observed |`,
-				);
-		}
+	for (const group of groupMeasurements(evidence.elements, [
+		"background-color",
+		"color",
+		"border-top-color",
+		"background-image",
+	]))
+		lines.push(
+			`| ${group.property} | ${cell(group.value)} | ${cell(group.selectors[0] ?? "")} | ${group.frequency} elemen | observed |`,
+		);
 	return lines.join("\n");
 }
 

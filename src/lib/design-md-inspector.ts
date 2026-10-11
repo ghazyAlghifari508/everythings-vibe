@@ -1,5 +1,9 @@
 import { parseVisualEvidence } from "./design-evidence-contract";
-import { extractionFromVisualEvidence } from "./design-visual-evidence";
+import {
+	deriveEvidenceGuidelines,
+	extractionFromVisualEvidence,
+	groupMeasurements,
+} from "./design-visual-evidence";
 import { designIssues, normalizeDesign } from "./prompts-design-md";
 
 export type DesignTheme = "light" | "dark" | "unknown";
@@ -62,6 +66,15 @@ export function inspectorFromEvidence(
 		weight: entry.weight,
 		lineHeight: entry.lineHeight,
 	}));
+	// Grouped, not raw: identical property/value pairs collapse into one row and
+	// the occurrence count stays visible as provenance.
+	const spacingGroups = groupMeasurements(evidence.elements, [
+		"padding",
+		"margin",
+		"gap",
+	]);
+	const radiusGroups = groupMeasurements(evidence.elements, ["border-radius"]);
+	const guidelines = deriveEvidenceGuidelines(evidence);
 	return {
 		...EMPTY_MODEL,
 		verification: "observed",
@@ -73,14 +86,16 @@ export function inspectorFromEvidence(
 		})),
 		typography,
 		fonts: deriveFonts(typography),
-		spacing: (extraction.tokens?.spacing ?? []).map((value) => ({
-			label: "Computed spacing",
-			value,
+		spacing: spacingGroups.map((group) => ({
+			label: `${group.property} · ${group.frequency} elemen`,
+			value: group.value,
 		})),
-		radii: (extraction.tokens?.radii ?? []).map((value) => ({
-			label: "Computed radius",
-			value,
+		radii: radiusGroups.map((group) => ({
+			label: `border-radius · ${group.frequency} elemen`,
+			value: group.value,
 		})),
+		dos: guidelines.dos,
+		donts: guidelines.donts,
 		overview:
 			"Pengukuran pada satu viewport. Preview font memakai font yang tersedia di browser Anda; font glyph situs asal belum terverifikasi.",
 	};
