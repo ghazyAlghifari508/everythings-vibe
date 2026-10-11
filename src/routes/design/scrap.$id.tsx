@@ -240,6 +240,23 @@ function ScrapeDetailPage() {
 			}`}
 		>
 			<ScrapeBackLink from={from} />
+			{currentStatus === "failed" &&
+				(mode === "crawl" || mode === "images") && (
+					<div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-graphite p-4">
+						<p role="alert" className="text-sm text-fog">
+							{errorMessage ??
+								"Ekstraksi terhenti; hasil yang tersimpan tetap tersedia."}
+						</p>
+						<button
+							type="button"
+							onClick={() => void retry()}
+							disabled={isRetrying}
+							className="min-h-11 rounded-md border border-graphite px-4 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							Coba lagi
+						</button>
+					</div>
+				)}
 			{mode === "crawl" &&
 			(currentStatus === "completed" ||
 				(currentStatus === "failed" && initial.pages.length > 0)) ? (

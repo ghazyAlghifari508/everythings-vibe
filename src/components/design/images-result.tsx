@@ -14,6 +14,7 @@ export function ImagesResult({
 	sourceUrl: string;
 }) {
 	const [filter, setFilter] = useState("");
+	const [downloading, setDownloading] = useState<string | null>(null);
 	const formats = [
 		...new Set(images.flatMap((image) => (image.format ? [image.format] : []))),
 	];
@@ -22,6 +23,9 @@ export function ImagesResult({
 			!filter || image.format === filter || image.classification === filter,
 	);
 	async function download(image: ImageResult) {
+		if (downloading) return;
+		setDownloading(image.id);
+		setNotice("");
 		try {
 			const response = await fetch(image.assetUrl);
 			if (!response.ok) throw new Error("Download gagal.");
@@ -33,6 +37,8 @@ export function ImagesResult({
 			setTimeout(() => URL.revokeObjectURL(url), 1000);
 		} catch {
 			setNotice("Gambar gagal diunduh. Buka sumber asli atau coba lagi.");
+		} finally {
+			setDownloading(null);
 		}
 	}
 	const [notice, setNotice] = useState("");
@@ -117,6 +123,7 @@ export function ImagesResult({
 								</a>
 								<div className="flex gap-2">
 									<button
+										disabled={downloading !== null}
 										type="button"
 										onClick={() => void download(image)}
 										aria-label="Download gambar"
