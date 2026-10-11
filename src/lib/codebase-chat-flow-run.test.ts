@@ -7,6 +7,7 @@ import {
 	resetRunThinking,
 	runDurationSeconds,
 	settleRun,
+	shouldAutoRevealArtifact,
 	startRun,
 } from "./codebase-chat-flow";
 
@@ -28,7 +29,9 @@ describe("codebase run state (real request facts only)", () => {
 			expect(typeof activity).toBe("string");
 			expect(activity.length).toBeGreaterThan(0);
 			// Every line names the real request; none claims an internal phase.
-			expect(activity).not.toMatch(/membaca file|reading database|analyzing repository/i);
+			expect(activity).not.toMatch(
+				/membaca file|reading database|analyzing repository/i,
+			);
 		}
 		expect(new Set(stages.map((s) => CODEBASE_STAGE_ACTIVITY[s])).size).toBe(
 			stages.length,
@@ -74,5 +77,27 @@ describe("codebase run state (real request facts only)", () => {
 		const settled = settleRun(startRun("prd", 0), "done", 10);
 		expect(appendRunThinking(settled, "late")).toBe(settled);
 		expect(resetRunThinking(settled)).toBe(settled);
+	});
+});
+
+describe("automatic artifact reveal", () => {
+	it("reveals only when the artifact is confirmed persisted", () => {
+		expect(
+			shouldAutoRevealArtifact({ persisted: true, userTookOverCanvas: false }),
+		).toBe(true);
+		// A request that returned 200 without a persisted artifact must not open
+		// the panel: the reveal would be based on an assumption, not a fact.
+		expect(
+			shouldAutoRevealArtifact({ persisted: false, userTookOverCanvas: false }),
+		).toBe(false);
+	});
+
+	it("never steals the panel from a user who took it over", () => {
+		expect(
+			shouldAutoRevealArtifact({ persisted: true, userTookOverCanvas: true }),
+		).toBe(false);
+		expect(
+			shouldAutoRevealArtifact({ persisted: false, userTookOverCanvas: true }),
+		).toBe(false);
 	});
 });

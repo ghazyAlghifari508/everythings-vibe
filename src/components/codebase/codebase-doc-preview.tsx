@@ -2,7 +2,6 @@
 
 import { memo } from "react";
 import Markdown from "react-markdown";
-import { TableOfContents } from "@/components/prd/table-of-contents";
 import { cn } from "@/lib/utils";
 import {
 	codebaseMarkdownComponents,
@@ -15,6 +14,12 @@ export interface CodebaseDocPreviewProps {
 	className?: string;
 }
 
+/**
+ * Document preview for the existing-codebase workspace (PRD and Acceptance
+ * Criteria). The document itself owns the panel width — the greenfield PRD
+ * viewer keeps its own table of contents, and duplicating a narrow sidebar
+ * here only squeezed the content it was meant to help navigate.
+ */
 export const CodebaseDocPreview = memo(function CodebaseDocPreview({
 	content,
 	className,
@@ -22,12 +27,9 @@ export const CodebaseDocPreview = memo(function CodebaseDocPreview({
 	return (
 		<div
 			data-testid="codebase-doc-preview"
-			className={cn("flex h-full min-h-0 gap-6", className)}
+			className={cn("h-full min-h-0", className)}
 		>
-			<aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-graphite pr-4 md:block">
-				<TableOfContents content={content} className="sticky top-0" />
-			</aside>
-			<article className="prd-content min-w-0 flex-1 self-start text-sm leading-7 text-mist">
+			<article className="prd-content min-w-0 text-sm leading-7 text-mist">
 				<Markdown
 					remarkPlugins={codebaseRemarkPlugins}
 					rehypePlugins={codebaseRehypePlugins}

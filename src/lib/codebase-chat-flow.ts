@@ -120,6 +120,31 @@ export function runDurationSeconds(
 	return Math.max(0, (run.finishedAt - run.startedAt) / 1000);
 }
 
+export interface AutoRevealInput {
+	/**
+	 * The artifact was reloaded from the authoritative server state, so it is
+	 * known to be persisted. A request that merely returned 200 is not enough.
+	 */
+	persisted: boolean;
+	/**
+	 * The user has already chosen what the right panel shows (opened another
+	 * artifact, or closed it). An automatic reveal must not fight that choice.
+	 */
+	userTookOverCanvas: boolean;
+}
+
+/**
+ * Whether a finished stage may reveal its artifact in the right panel.
+ *
+ * Both conditions are required: the artifact must be confirmed persisted
+ * server-side, and the user must not have taken over the panel. This keeps the
+ * reveal honest (never based on an assumed success) and unobtrusive (never
+ * stealing focus from a deliberate interaction).
+ */
+export function shouldAutoRevealArtifact(input: AutoRevealInput): boolean {
+	return input.persisted && !input.userTookOverCanvas;
+}
+
 export type AskQuestionType = "select" | "text" | "multiselect";
 
 /** Validated question shape from `/api/ask/options` (ask-service contract). */

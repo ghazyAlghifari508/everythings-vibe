@@ -51,6 +51,7 @@ import {
 	runConfirmGenerate,
 	serializeAskQuestions,
 	settleRun,
+	shouldAutoRevealArtifact,
 	startRun,
 } from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
@@ -148,6 +149,13 @@ const loadCodebase = createServerFn({ method: "GET" })
 		const { codebases, codebaseAnalyses, codebaseSnapshots, projects } =
 			await import("@/db/schema");
 		const { and, desc, eq, inArray, isNull } = await import("drizzle-orm");
+		// Resolved on the server with the rest of the loader data: the workspace
+		// needs it to decide whether the full Kanban route will open for this
+		// account, and the route already gates that same decision server-side.
+		const { hasFullWorkflow } = await import("@/lib/credits");
+		const { getUserPlanAndQuota } = await import("@/lib/session");
+		const { plan } = await getUserPlanAndQuota();
+		const canOpenFullBoard = hasFullWorkflow(plan);
 		const [codebase] = await db
 			.select({
 				id: codebases.id,
@@ -225,6 +233,7 @@ const loadCodebase = createServerFn({ method: "GET" })
 			analysis,
 			latestAnalysisAttempt,
 			hasStoredSnapshot,
+			canOpenFullBoard,
 		};
 	});
 
@@ -619,6 +628,7 @@ function CodebaseDetailPage() {
 		analysis: initialAnalysis,
 		latestAnalysisAttempt,
 		hasStoredSnapshot,
+		canOpenFullBoard,
 	} = Route.useLoaderData();
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
 	const [manifestFiles, setManifestFiles] = useState<Array<{ path: string }>>(
@@ -1624,13 +1634,21 @@ function CodebaseDetailPage() {
 	const userTookOverCanvas = useRef(false);
 
 	/**
-	 * Reveal the artifact a finished stage produced. Only called after the
-	 * artifact is confirmed persisted server-side, and only while the user has
-	 * not taken over the panel.
+	 * Reveal the artifact a finished stage produced. The caller passes the real
+	 * persistence result, so the reveal can never be based on an assumed
+	 * success, and a user who took over the panel keeps it.
 	 */
 	const openArtifactPreview = useCallback(
-		(kind: "feature" | "prd" | "ac" | "tasks") => {
-			if (!effectiveFeatureId || userTookOverCanvas.current) return;
+		(kind: "feature" | "prd" | "ac" | "tasks", persisted: boolean) => {
+			if (
+				!effectiveFeatureId ||
+				!shouldAutoRevealArtifact({
+					persisted,
+					userTookOverCanvas: userTookOverCanvas.current,
+				})
+			) {
+				return;
+			}
 			setActiveArtifactId(`${kind}-${effectiveFeatureId}`);
 			if (kind === "tasks") setCanvasView("kanban");
 			setCanvasOpen(true);
@@ -1744,7 +1762,7 @@ function CodebaseDetailPage() {
 			// The artifact is confirmed persisted (the tree reloaded above), so
 			// the canvas opens on it. A manual panel interaction is respected by
 			// openArtifactPreview, which never fights the user for focus.
-			openArtifactPreview("feature");
+			openArtifactPreview("feature", true);
 		} finally {
 			setIsConfirming(false);
 		}
@@ -1845,7 +1863,7 @@ function CodebaseDetailPage() {
 				pushAssistantMessage(
 					`PRD 8 seksi untuk ${resolvedFeature?.name ?? "fitur"} siap.`,
 				);
-				openArtifactPreview("prd");
+				openArtifactPreview("prd", true);
 				return true;
 			},
 		);
@@ -1882,7 +1900,7 @@ function CodebaseDetailPage() {
 				pushAssistantMessage(
 					`Acceptance Criteria untuk ${resolvedFeature?.name ?? "fitur"} siap.`,
 				);
-				openArtifactPreview("ac");
+				openArtifactPreview("ac", true);
 				return true;
 			},
 		);
@@ -1918,7 +1936,7 @@ function CodebaseDetailPage() {
 				pushAssistantMessage(
 					`Task untuk ${resolvedFeature?.name ?? "fitur"} sudah tersimpan dan papan Kanban aktif.`,
 				);
-				openArtifactPreview("tasks");
+				openArtifactPreview("tasks", true);
 				return true;
 			},
 		);
@@ -2278,6 +2296,7 @@ function CodebaseDetailPage() {
 											isLoadingExternal={kanban.isLoading}
 											isErrorExternal={kanban.isError}
 											onRetryExternal={() => void kanban.refetch()}
+											canOpenFullBoard={canOpenFullBoard}
 										/>
 									) : (
 										<div
