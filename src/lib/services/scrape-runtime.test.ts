@@ -82,4 +82,31 @@ it("runs all extraction modes through persisted queue claims", async () => {
 			await closeRenderBrowser();
 		}
 	}
+	const failure = await createScrape(
+		user.id,
+		"https://www.brainfishai.com/",
+		"images",
+	);
+	try {
+		const claim = await claimScrapeJob();
+		if (!claim || claim.id !== failure.id)
+			throw new Error("Unexpected queued job");
+		await runScrapePipeline(failure.id, user.id, claim);
+		await releaseScrapeClaim(claim);
+		const failed = await getScrapeById(failure.id, user.id);
+		if (failed.status === "failed") {
+			expect(failed.metadata?.errorMessage).toBeTruthy();
+			await retryScrape(failure.id, user.id);
+			expect((await getScrapeById(failure.id, user.id)).status).toBe("queued");
+			console.info(
+				JSON.stringify({
+					failure: failed.metadata?.errorMessage,
+					retry: "queued",
+				}),
+			);
+		}
+	} finally {
+		await deleteScrape(failure.id, user.id);
+		await closeRenderBrowser();
+	}
 }, 300000);

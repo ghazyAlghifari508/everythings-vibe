@@ -558,6 +558,13 @@ export async function generateAndSaveDesignMd(
 			"Evidence visual hasil render tidak tersedia.",
 		);
 	const designMd = await generateDesignMd(captured.metadata.visualEvidence);
+	await db
+		.update(scrapes)
+		.set({
+			metadata: { ...scrape.metadata, ...captured.metadata },
+			updatedAt: new Date(),
+		})
+		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)));
 	return saveScrapeDocument(scrapeId, designMd, userId);
 }
 

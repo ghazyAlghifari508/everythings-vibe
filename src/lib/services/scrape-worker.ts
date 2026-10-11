@@ -66,9 +66,11 @@ async function run() {
 							);
 					}
 				})
-				.catch((error: unknown) =>
-					console.error("Scrape heartbeat failed", error),
-				)
+				.catch((error: unknown) => {
+					console.error("Scrape heartbeat failed", error);
+					leaseLost = true;
+					controller.abort();
+				})
 				.finally(() => {
 					heartbeatRunning = false;
 				});
