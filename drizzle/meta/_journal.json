@@ -239,6 +239,13 @@
       "when": 1791657455964,
       "tag": "0033_thin_dagger",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791673282594,
+      "tag": "0034_studio_multi_screen_canvas",
+      "breakpoints": true
     }
   ]
 }
