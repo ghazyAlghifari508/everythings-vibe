@@ -68,7 +68,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 					onSelectFrame?.(null);
 				}
 			}}
-			className={`relative size-full overflow-hidden select-none touch-none bg-[#0a0a0c] text-snow focus:outline-none ${className}`}
+			className={`relative size-full overflow-hidden select-none touch-none bg-charcoal text-snow focus-visible:outline-2 focus-visible:outline-snow ${className}`}
 			style={getCanvasDotStyle(zoom, pan)}
 		>
 			{/* Transformed Canvas Surface holding frames */}

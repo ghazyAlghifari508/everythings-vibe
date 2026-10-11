@@ -3,7 +3,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { AlertCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StudioCanvas } from "@/components/design/studio-canvas";
-import { StudioComposer } from "@/components/design/studio-composer";
+import {
+	StudioComposer,
+	type StudioComposerScope,
+} from "@/components/design/studio-composer";
 import { StudioHeader } from "@/components/design/studio-header";
 import type {
 	StudioFrameRow,
@@ -168,11 +171,14 @@ function StudioDetailPage() {
 		return () => clearInterval(timer);
 	}, [isProcessing, syncProjectStatus]);
 
-	async function handleComposerSubmit(promptText: string) {
+	async function handleComposerSubmit(
+		promptText: string,
+		scope: StudioComposerScope,
+	): Promise<boolean> {
 		setComposerLoading(true);
 		setError("");
 		try {
-			if (selectedFrameId) {
+			if (selectedFrameId && scope === "revise") {
 				const res = await fetch("/api/studio/frame", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
@@ -188,7 +194,7 @@ function StudioDetailPage() {
 						error?: string;
 					} | null;
 					setError(data?.error ?? "Gagal merevisi layar.");
-					return;
+					return false;
 				}
 			} else {
 				// Add frame or project-wide revision
@@ -208,12 +214,14 @@ function StudioDetailPage() {
 						error?: string;
 					} | null;
 					setError(data?.error ?? "Gagal menambahkan layar.");
-					return;
+					return false;
 				}
 			}
 			await syncProjectStatus();
+			return true;
 		} catch {
 			setError("Jaringan bermasalah. Coba lagi.");
+			return false;
 		} finally {
 			setComposerLoading(false);
 		}
@@ -313,7 +321,7 @@ function StudioDetailPage() {
 			{error && (
 				<div
 					role="alert"
-					className="fixed bottom-24 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/20 px-4 py-2.5 text-xs text-red-300 shadow-xl backdrop-blur-md"
+					className="absolute top-16 left-1/2 z-40 flex w-[calc(100%-24px)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-xl border border-crimson bg-obsidian px-4 py-2.5 text-sm text-crimson"
 				>
 					<AlertCircle size={15} />
 					<span>{error}</span>

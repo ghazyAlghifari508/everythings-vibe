@@ -136,7 +136,7 @@ export function StudioFrame({
 					isSelected
 						? "border-indigo-500 ring-2 ring-indigo-500/50 shadow-lg shadow-indigo-500/10"
 						: "border-graphite hover:border-steel"
-				} bg-[#121214]`}
+				} bg-obsidian`}
 				style={{ width: frameWidth, height: frameHeight }}
 			>
 				{frame.status === "ready" && cleanHtml ? (
