@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+	type DesignInspectorModel,
 	inspectorFromEvidence,
 	parseDesignMd,
 } from "@/lib/design-md-inspector";
@@ -17,6 +18,29 @@ export interface DesignResultProps {
 	visualEvidence?: unknown;
 }
 
+export interface ResolvedInspector {
+	model: DesignInspectorModel;
+	// "observed" means the values came from a verified browser capture whose
+	// document still matches that capture. "unverified" means only the archived
+	// markdown could be parsed, so values are shown as parsed text, never as
+	// capture-verified measurements.
+	source: "observed" | "unverified";
+}
+
+// Single decision point for what the inspector shows. The archive fallback is
+// explicit here and never presented as equivalent to verified evidence.
+export function resolveInspector(
+	visualEvidence: unknown,
+	designMd: string,
+): ResolvedInspector {
+	const observed = inspectorFromEvidence(visualEvidence, designMd);
+	if (observed) return { model: observed, source: "observed" };
+	return {
+		model: { ...parseDesignMd(designMd), verification: "unverified" },
+		source: "unverified",
+	};
+}
+
 export function DesignResult({
 	sourceUrl,
 	domain,
@@ -25,12 +49,8 @@ export function DesignResult({
 }: DesignResultProps) {
 	const [agentOpen, setAgentOpen] = useState(false);
 	const siteName = displaySiteName(domain);
-	const model = useMemo(
-		() =>
-			inspectorFromEvidence(visualEvidence, designMd) ?? {
-				...parseDesignMd(designMd),
-				verification: "unverified" as const,
-			},
+	const { model, source } = useMemo(
+		() => resolveInspector(visualEvidence, designMd),
 		[designMd, visualEvidence],
 	);
 
@@ -45,6 +65,7 @@ export function DesignResult({
 				<DesignMdSourcePanel
 					designMd={designMd}
 					domain={domain}
+					inspectorSource={source}
 					onImplementAgent={() => setAgentOpen(true)}
 					className="lg:max-h-[calc(100vh-6rem)]"
 				/>
