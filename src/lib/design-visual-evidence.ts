@@ -126,6 +126,93 @@ export interface VisualEvidence {
 	limitations: string[];
 }
 
+export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
+	const extraction = extractionFromVisualEvidence(evidence);
+	const cell = (value: string) =>
+		value.replace(/\|/g, "\\|").replace(/[\r\n]/g, " ");
+	const lines = [
+		"# Website - Style Reference",
+		"",
+		"**Theme:** unknown",
+		"",
+		`Source: ${cell(evidence.sourceUrl)}`,
+		`Captured: ${evidence.capturedAt}`,
+		"",
+		"## Tokens - Colors",
+		"",
+		"| Name | Value | Token | Role |",
+		"| --- | --- | --- | --- |",
+	];
+	for (const color of extraction.colors)
+		lines.push(`| ${color.role} | ${cell(color.value)} | | ${color.role} |`);
+	lines.push(
+		"",
+		"## Tokens - Typography",
+		"",
+		"| Role | Family | Size | Weight | Line height | Letter spacing |",
+		"| --- | --- | --- | --- | --- | --- |",
+	);
+	for (const type of extraction.typographyRoles ?? [])
+		lines.push(
+			`| ${type.role} | ${cell(type.family)} | ${cell(type.size)} | ${cell(type.weight)} | ${cell(type.lineHeight)} | ${cell(type.letterSpacing)} |`,
+		);
+	lines.push(
+		"",
+		"## Tokens - Spacing & Shapes",
+		"",
+		"| Property | Value | Source element | Status |",
+		"| --- | --- | --- | --- |",
+	);
+	for (const element of evidence.elements)
+		for (const property of [
+			"padding",
+			"margin",
+			"gap",
+			"border-radius",
+			"box-shadow",
+			"max-width",
+		]) {
+			const value = element.properties[property];
+			if (value && value !== "none" && value !== "normal")
+				lines.push(
+					`| ${property} | ${cell(value)} | ${cell(element.selector)} | observed |`,
+				);
+		}
+	lines.push(
+		"",
+		"## Components",
+		"",
+		"| Element | Property | Value | Source | Status |",
+		"| --- | --- | --- | --- | --- |",
+	);
+	for (const element of evidence.elements.filter(
+		(entry) => entry.role !== "element",
+	))
+		for (const [property, value] of Object.entries(element.properties)) {
+			if (value)
+				lines.push(
+					`| ${element.role} | ${property} | ${cell(value)} | ${cell(element.selector)} | observed |`,
+				);
+		}
+	lines.push(
+		"",
+		"## Limitations & Confidence Notes",
+		"",
+		"Semantic roles describe DOM usage, not verified brand-primary identity. Missing evidence is unknown. CSS custom properties were not measured. Loaded font-face status does not identify the font used for each glyph.",
+		...evidence.limitations.map((limitation) => `- ${limitation}`),
+		"",
+		"## Font loading evidence",
+		"",
+		"| Declared family | Weight | Resource status |",
+		"| --- | --- | --- |",
+	);
+	for (const font of evidence.fonts)
+		lines.push(
+			`| ${cell(font.family)} | ${cell(font.weight)} | ${font.status} |`,
+		);
+	return lines.join("\n");
+}
+
 export function collectVisualEvidence(): VisualEvidence {
 	const elements: VisualElementEvidence[] = [];
 	const walker = document.createTreeWalker(

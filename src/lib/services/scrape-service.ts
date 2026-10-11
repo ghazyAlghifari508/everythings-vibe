@@ -15,7 +15,7 @@ import {
 	users,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
-import { extractionFromVisualEvidence } from "@/lib/design-visual-evidence";
+import { renderEvidenceDesignMd } from "@/lib/design-visual-evidence";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
 import {
@@ -316,19 +316,12 @@ export async function runScrapePipeline(
 				"NO_ANALYZABLE_CONTENT",
 				"Evidence visual hasil render tidak tersedia.",
 			);
-		const extraction = extractionFromVisualEvidence(
-			captured.metadata.visualEvidence,
-		);
 		instrumentation.onTiming?.("extraction", Date.now() - extractionStart);
 		await instrumentation.onActivity?.("Analisis visual selesai");
 
 		await persist("generating");
-		const designMd = await generateDesignMd(
-			captured.sourceUrl,
-			extraction,
-			undefined,
-			instrumentation,
-		);
+		await instrumentation.onActivity?.("Menyusun tabel dari evidence visual");
+		const designMd = renderEvidenceDesignMd(captured.metadata.visualEvidence);
 
 		const saveStart = Date.now();
 		await persist("saving", {

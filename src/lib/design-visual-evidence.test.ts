@@ -3,6 +3,7 @@ import { expect, it } from "vitest";
 import {
 	collectVisualEvidence,
 	extractionFromVisualEvidence,
+	renderEvidenceDesignMd,
 } from "./design-visual-evidence";
 
 it("measures rendered styles and excludes hidden and unused declarations", async () => {
@@ -36,6 +37,10 @@ it("measures rendered styles and excludes hidden and unused declarations", async
 		expect(
 			extraction.typographyRoles?.find((role) => role.role === "cta")?.size,
 		).toBe("19px");
+		const document = renderEvidenceDesignMd(evidence);
+		expect(document).toContain("rgba(90, 200, 40, 0.8)");
+		expect(document).toContain("19px");
+		expect(document).not.toContain("--color-primary");
 		expect(
 			evidence.elements.every(
 				(element) =>
