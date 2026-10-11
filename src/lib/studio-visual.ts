@@ -6,6 +6,7 @@ import { isBlockedRequestUrl } from "@/lib/render-page";
 import { extractDesignSystemTokens } from "@/lib/studio-design-system";
 
 export const STUDIO_VISUAL_WIDTH = { mobile: 390, web: 1440 } as const;
+const STUDIO_VISUAL_VIEWPORT_HEIGHT = { mobile: 844, web: 900 } as const;
 const CAPTURE_TIMEOUT_MS = 30000;
 const CAPTURE_MAX_HEIGHT = 30000;
 const TAILWIND_RUNTIME = "https://cdn.tailwindcss.com";
@@ -96,7 +97,10 @@ export async function captureStudioVisual(
 				viewport === "mobile"
 					? STUDIO_VISUAL_WIDTH.mobile
 					: STUDIO_VISUAL_WIDTH.web,
-			height: 1,
+			height:
+				viewport === "mobile"
+					? STUDIO_VISUAL_VIEWPORT_HEIGHT.mobile
+					: STUDIO_VISUAL_VIEWPORT_HEIGHT.web,
 		},
 		deviceScaleFactor: 2,
 		serviceWorkers: "block",
