@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+import { setTimeout as wait } from "node:timers/promises";
 import { expect, it } from "vitest";
 
 it("runs all extraction modes through persisted queue claims", async () => {
@@ -138,5 +140,37 @@ it("runs all extraction modes through persisted queue claims", async () => {
 	} finally {
 		await deleteScrape(failure.id, user.id);
 		await closeRenderBrowser();
+	}
+	const queued = await createScrape(user.id, "https://example.com/", "html");
+	expect((await getScrapeById(queued.id, user.id)).status).toBe("queued");
+	const worker = spawn(
+		process.execPath,
+		["--import", "tsx", "src/lib/services/scrape-worker.ts"],
+		{ cwd: process.cwd(), env: process.env, stdio: ["ignore", "pipe", "pipe"] },
+	);
+	let workerOutput = "";
+	worker.stdout.on("data", (chunk: Buffer) => {
+		workerOutput += chunk.toString();
+	});
+	worker.stderr.on("data", (chunk: Buffer) => {
+		workerOutput += chunk.toString();
+	});
+	try {
+		const deadline = Date.now() + 60000;
+		let status = "queued";
+		while (Date.now() < deadline && !["completed", "failed"].includes(status)) {
+			await wait(250);
+			status = (await getScrapeById(queued.id, user.id)).status;
+		}
+		expect(workerOutput).toContain("Scrape worker ready");
+		expect(status).toBe("completed");
+		console.info("Standalone worker processed persisted queued job.");
+	} finally {
+		worker.kill("SIGTERM");
+		await new Promise<void>((resolve) => {
+			if (worker.exitCode !== null) resolve();
+			else worker.once("exit", () => resolve());
+		});
+		await deleteScrape(queued.id, user.id);
 	}
 }, 300000);
