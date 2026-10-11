@@ -223,19 +223,33 @@ export const Route = createFileRoute("/api/ask/options")({
 				// analysis fails closed instead of asking generic questions.
 				let codebaseBlock = "";
 				if (project.projectMode === "existing_codebase") {
+					let required: Awaited<
+						ReturnType<typeof requireProjectGenerationContext>
+					>;
 					try {
-						const required = await requireProjectGenerationContext(projectId);
-						if ("code" in required) {
-							return Response.json(required, { status: required.status });
-						}
-						codebaseBlock = buildCodebasePromptBlock(required.context);
+						required = await requireProjectGenerationContext(projectId);
 					} catch (e) {
-						console.warn("ask codebase context skipped:", e);
+						// The loader already fails closed internally; this guard keeps
+						// an unexpected failure from silently producing questions that
+						// carry no repository evidence at all.
+						console.error("ask codebase context failed:", e);
+						return Response.json(
+							{
+								error:
+									"Konteks repositori tidak dapat dibaca. Muat ulang workspace lalu coba lagi.",
+								code: "CODEBASE_CONTEXT_UNAVAILABLE",
+							},
+							{ status: 409 },
+						);
 					}
+					if ("code" in required) {
+						return Response.json(required, { status: required.status });
+					}
+					codebaseBlock = buildCodebasePromptBlock(required.context);
 				}
-				// Existing-codebase projects need TECHNICAL questions grounded in the
-				// snapshot analysis; the greenfield prompt forbids stack questions
-				// and would starve the codebase flow of architectural context.
+				// Existing-codebase projects need repository-aware PRODUCT questions;
+				// the greenfield prompt lacks the repository context block and the
+				// "do not ask what the analysis already answers" rule.
 				const basePrompt =
 					project.projectMode === "existing_codebase"
 						? ASK_CODEBASE_OPTIONS_GENERATION_PROMPT

@@ -399,6 +399,38 @@ describe("codebase detail incomplete sync handling", () => {
 	});
 });
 
+describe("ask options repository grounding", () => {
+	const askOptionsSource = readFileSync("src/routes/api/ask/options.ts", "utf8");
+
+	it("fails closed when repository context cannot be read", () => {
+		// A repository-aware question set must never be generated without the
+		// snapshot context: an unexpected context failure returns an error
+		// instead of quietly continuing with generic questions.
+		expect(askOptionsSource).toContain("CODEBASE_CONTEXT_UNAVAILABLE");
+		expect(askOptionsSource).not.toContain(
+			'console.warn("ask codebase context skipped:"',
+		);
+		expect(askOptionsSource).toMatch(
+			/required = await requireProjectGenerationContext\(projectId\)/,
+		);
+	});
+
+	it("appends the bounded repository block to the prompt", () => {
+		expect(askOptionsSource).toContain(
+			"codebaseBlock = buildCodebasePromptBlock(required.context)",
+		);
+		expect(askOptionsSource).toMatch(/systemPrompt[\s\S]*\$\{codebaseBlock\}/);
+	});
+
+	it("uses the repository-aware product prompt only for existing codebases", () => {
+		expect(askOptionsSource).toContain("ASK_CODEBASE_OPTIONS_GENERATION_PROMPT");
+		expect(askOptionsSource).toContain("ASK_OPTIONS_GENERATION_PROMPT");
+		expect(askOptionsSource).toMatch(
+			/project\.projectMode === "existing_codebase"[\s\S]*ASK_CODEBASE_OPTIONS_GENERATION_PROMPT/,
+		);
+	});
+});
+
 describe("buildAskHandoffAnswers", () => {
 	it("maps answer map to question title and answer list conforming to askHandoffAnswerSchema", () => {
 		const questions = [
