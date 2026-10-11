@@ -67,7 +67,7 @@ import {
 } from "@/lib/codebase-workspace-analysis";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
-import { parseAskOptionsJson } from "@/lib/services/ask-service";
+import { validateAskQuestions } from "@/lib/services/ask-service";
 import type { TaskTree } from "@/lib/services/task-service";
 import { requireUserServer } from "@/lib/session";
 import { consumeSseStream } from "@/lib/sse-consume";
@@ -1396,21 +1396,37 @@ function CodebaseDetailPage() {
 					body: JSON.stringify({ projectId, prompt, platform: "web" }),
 				});
 				const body: unknown = await response.json().catch(() => null);
+				const serverError =
+					typeof body === "object" &&
+					body !== null &&
+					"error" in body &&
+					typeof body.error === "string"
+						? body.error
+						: null;
 				if (!response.ok) {
+					// The server already distinguishes "repository context is not
+					// ready" from a failed generation; surface that copy instead of
+					// collapsing every failure into one generic sentence.
 					setQuestionsError(
-						"Pertanyaan klarifikasi tidak dapat dibuat. Coba lagi.",
+						serverError ??
+							(response.status === 409
+								? "Konteks repositori belum siap. Selesaikan analisis codebase lalu coba lagi."
+								: "Pertanyaan klarifikasi tidak dapat dibuat."),
 					);
 					return;
 				}
+				// The endpoint already validated the array against the shared
+				// ask-service contract; validate again here so a malformed or
+				// empty payload can never reach the question UI. Never re-wrap
+				// the array in the JSON envelope parser — that shape mismatch was
+				// the bug that rejected every valid response.
 				const parsed =
 					typeof body === "object" && body !== null && "questions" in body
-						? parseAskOptionsJson(
-								JSON.stringify((body as { questions: unknown }).questions),
-							)
+						? validateAskQuestions((body as { questions: unknown }).questions)
 						: null;
 				if (!parsed || parsed.length === 0) {
 					setQuestionsError(
-						"AI menghasilkan format tidak valid. Coba kirim ulang fitur.",
+						"AI tidak mengembalikan pertanyaan yang valid. Coba kirim ulang fitur.",
 					);
 					return;
 				}
