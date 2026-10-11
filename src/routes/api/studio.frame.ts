@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ScrapeError } from "@/lib/design-errors";
 import {
 	addStudioFrame,
+	getStudioFrameVisual,
 	retryStudioFrame,
 	retryStudioPlanning,
 	reviseStudioFrame,
@@ -34,9 +35,33 @@ function studioErrorResponse(error: unknown): Response {
 
 export const Route = createFileRoute("/api/studio/frame")({
 	server: {
-		handlers: { POST },
+		handlers: { GET, POST },
 	},
 });
+
+export async function GET({
+	request,
+}: {
+	request: Request;
+}): Promise<Response> {
+	try {
+		const user = await requireUser(getRequestHeaders());
+		const url = new URL(request.url);
+		const projectId = url.searchParams.get("projectId");
+		const frameId = url.searchParams.get("frameId");
+		if (!projectId || !frameId)
+			return Response.json(
+				{ error: "Identitas project dan frame diperlukan." },
+				{ status: 400 },
+			);
+		return Response.json(
+			await getStudioFrameVisual(projectId, frameId, user.id),
+			{ headers: { "Cache-Control": "private, no-store" } },
+		);
+	} catch (error) {
+		return studioErrorResponse(error);
+	}
+}
 
 export const studioFrameBodySchema = z.discriminatedUnion("action", [
 	z.object({

@@ -1319,6 +1319,68 @@ export async function updateStudioDesignSystem(
 	});
 }
 
+export async function getStudioFrameVisual(
+	projectId: string,
+	frameId: string,
+	userId: string,
+) {
+	const detail = await getStudioProjectDetail(projectId, userId);
+	const frame = detail.frames.find((entry) => entry.id === frameId);
+	if (!frame?.htmlCode)
+		throw new ScrapeError("WEBSITE_BLOCKED", "Output frame belum tersedia.");
+	const { captureStudioVisual, studioVisualHash } = await import(
+		"@/lib/studio-visual"
+	);
+	const hash = studioVisualHash(frame.htmlCode, frame.viewport);
+	const assets = await db
+		.select()
+		.from(studioAssets)
+		.where(
+			and(
+				eq(studioAssets.projectId, projectId),
+				eq(studioAssets.userId, userId),
+			),
+		);
+	const cached = assets.find((asset) =>
+		asset.filename.startsWith(`visual-${hash}-`),
+	);
+	if (cached) {
+		const bounds = /-(\d+)x(\d+)\.jpg$/.exec(cached.filename);
+		if (bounds)
+			return {
+				url: buildStudioAssetUrl(cached.id, userId),
+				width: Number(bounds[1]),
+				height: Number(bounds[2]),
+				hash,
+			};
+	}
+	const visual = await captureStudioVisual(
+		frame.htmlCode,
+		frame.viewport,
+		detail.project.designMd,
+		assets,
+	);
+	const [asset] = await db
+		.insert(studioAssets)
+		.values({
+			userId,
+			projectId,
+			filename: `visual-${hash}-${visual.width}x${visual.height}.jpg`,
+			mimeType: "image/jpeg",
+			byteLength: visual.data.byteLength,
+			data: visual.data.toString("base64"),
+		} satisfies InsertStudioAssetRow)
+		.returning();
+	if (!asset)
+		throw new ScrapeError("STORAGE_FAILED", "Gagal menyimpan visual frame.");
+	return {
+		url: buildStudioAssetUrl(asset.id, userId),
+		width: visual.width,
+		height: visual.height,
+		hash,
+	};
+}
+
 export async function generateStudioHtml(
 	prompt: string,
 	maxTokens = 12_000,

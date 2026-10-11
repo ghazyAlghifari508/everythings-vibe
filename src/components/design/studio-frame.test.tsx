@@ -31,9 +31,9 @@ describe("StudioFrameSkeleton", () => {
 describe("StudioFrame", () => {
 	afterEach(() => cleanup());
 
-	it("renders ready frame with sandboxed iframe", () => {
+	it("never mounts executable generated content in the application canvas", () => {
 		const onSelect = vi.fn();
-		render(
+		const { container } = render(
 			<StudioFrame
 				frame={{
 					id: "f-1",
@@ -55,8 +55,8 @@ describe("StudioFrame", () => {
 		);
 
 		expect(screen.getByText("Dashboard")).toBeDefined();
-		const iframe = screen.getByTitle(/Dashboard/i);
-		expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
+		expect(container.querySelector("iframe")).toBeNull();
+		expect(container.querySelector("script")).toBeNull();
 	});
 
 	it("renders skeleton while frame is generating", () => {
