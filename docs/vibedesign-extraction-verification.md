@@ -12,7 +12,7 @@ generation and captured-DOM snapshot boundaries are retained. No runtime depende
 
 ## Checks
 
-- Final full Vitest suite passed: 230 files, 2,199 tests (2026-10-11).
+- Final full Vitest suite passed: 230 files, 2,200 tests (2026-10-11).
 - TypeScript no-emit passed after each code checkpoint.
 - Repository Biome check passed with ten existing autofill `!important` warnings.
 - Production client/SSR build passed, with existing browser externalization and chunk-size warnings.
@@ -31,7 +31,8 @@ live Crawl/Images run, migration application, or production worker provisioning 
 Do not call this complete or production-ready on the basis of unit tests/build alone.
 
 - Crawl extracts server-delivered HTML, not JavaScript-only rendered navigation/content.
-- Sitemap records first discovered parent relationships, not every link edge in the site.
+- Sitemap records first discovered parent relationships and extracted outgoing page links;
+  links beyond crawl limits remain observations rather than visited pages.
 - Blueprint is deterministic observed data; it contains no AI architecture inferences.
 - Image classification currently supports metadata-evidenced icons/logos; ambiguous images
   remain unclassified. Dimensions are measured for loaded images and at most fifty additional
@@ -39,11 +40,12 @@ Do not call this complete or production-ready on the basis of unit tests/build a
 - Image discovery bounds scanning at 5,000 elements and 200 candidate entries. Capture limits
   browser requests to 500 and accepted resource bodies to 50 MB; concurrent fetch overshoot and
   decoded image memory are not yet governed by a strict aggregate memory budget.
-- Worker lease fencing prevents stale writes and closes Chromium after lease loss or the
-  fifteen-minute job budget. It does not yet actively cancel every in-flight HTTP fetch or
-  robots delay when the lease is lost. Shutdown finishes the current operation.
-- API deduplicates identical active jobs under a locked user row; completed-request replay does
-  not have a persisted idempotency-key contract.
+- Worker lease fencing prevents stale writes, aborts Crawl fetch/delay, and closes capture
+  contexts after lease loss or the fifteen-minute job budget. AI provider generation does not
+  yet receive the worker abort signal. Shutdown finishes the current operation.
+- API deduplicates identical active jobs under a locked user row and persists replay keys in
+  job metadata. Key reuse with different parameters is rejected. Database race verification
+  remains unperformed.
 - Same-origin iframe content is captured into exported HTML without re-navigation; secured
   visual snapshot CSP still prevents executing embedded website frames.
 
