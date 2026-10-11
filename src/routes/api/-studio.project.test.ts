@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { GET } from "./studio.project";
+import { GET, POST } from "./studio.project";
+
+const duplicate = vi.hoisted(() =>
+	vi.fn(async () => ({ id: "independent-project" })),
+);
 
 vi.mock("@/lib/session", () => ({
 	requireUser: async () => ({ id: "user-123", email: "test@example.com" }),
@@ -10,6 +14,7 @@ vi.mock("@tanstack/react-start/server", () => ({
 }));
 
 vi.mock("@/lib/services/studio-service", () => ({
+	duplicateStudioProject: duplicate,
 	getStudioProjectDetail: async (id: string, _userId: string) => ({
 		project: { id, title: "Test Canvas", designMode: "mobile" },
 		frames: [
@@ -36,6 +41,21 @@ vi.mock("@/lib/services/studio-service", () => ({
 }));
 
 describe("GET /api/studio/project", () => {
+	it("duplicates through the authenticated owner and returns the independent identifier", async () => {
+		const response = await POST({
+			request: new Request("https://app.test/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "duplicate",
+					projectId: "source-project",
+				}),
+			}),
+		});
+		expect(response.status).toBe(201);
+		expect(await response.json()).toEqual({ projectId: "independent-project" });
+		expect(duplicate).toHaveBeenCalledWith("source-project", "user-123");
+	});
 	it("returns project detail with frames and active job", async () => {
 		const req = new Request("https://app.test/api/studio/project?id=proj-1");
 		const res = await GET({ request: req });

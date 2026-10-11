@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
+import { z } from "zod";
 import { ScrapeError } from "@/lib/design-errors";
-import { getStudioProjectDetail } from "@/lib/services/studio-service";
+import {
+	duplicateStudioProject,
+	getStudioProjectDetail,
+} from "@/lib/services/studio-service";
 import { requireUser } from "@/lib/session";
 
 function studioErrorResponse(error: unknown): Response {
@@ -28,9 +32,39 @@ function studioErrorResponse(error: unknown): Response {
 
 export const Route = createFileRoute("/api/studio/project")({
 	server: {
-		handlers: { GET },
+		handlers: { GET, POST },
 	},
 });
+
+const projectActionSchema = z.object({
+	action: z.literal("duplicate"),
+	projectId: z.string().trim().min(1).max(200),
+});
+
+export async function POST({
+	request,
+}: {
+	request: Request;
+}): Promise<Response> {
+	try {
+		const user = await requireUser(getRequestHeaders());
+		const parsed = projectActionSchema.safeParse(
+			await request.json().catch(() => null),
+		);
+		if (!parsed.success)
+			return Response.json(
+				{ error: "Aksi project tidak valid." },
+				{ status: 400 },
+			);
+		const project = await duplicateStudioProject(
+			parsed.data.projectId,
+			user.id,
+		);
+		return Response.json({ projectId: project.id }, { status: 201 });
+	} catch (error) {
+		return studioErrorResponse(error);
+	}
+}
 
 export async function GET({
 	request,
