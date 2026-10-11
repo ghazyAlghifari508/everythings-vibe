@@ -31,10 +31,13 @@ function renderProgress(
 }
 
 describe("GenerationProgress", () => {
-	it("renders label, elapsed timer, and natural waiting message without reasoning", () => {
+	it("renders label, a live elapsed timer, and natural waiting message without reasoning", () => {
 		const c = renderProgress({ label: "PRD" });
 		expect(c.textContent).toContain("Menyusun PRD");
-		expect(c.textContent).toContain("0.0s");
+		// The timer is a real elapsed clock, so assert the format rather than a
+		// frozen reading that depends on how long the render took.
+		const timer = c.querySelector('[role="timer"]')?.textContent ?? "";
+		expect(timer).toMatch(/^\d+\.\ds$/);
 		expect(c.textContent).toContain(
 			"Sedang menganalisis kebutuhan dan menyusun dokumen",
 		);

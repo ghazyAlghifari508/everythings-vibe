@@ -31,7 +31,14 @@ it("keeps authoritative activity unchanged as measured time advances", () => {
 	expect(Number.parseFloat(screen.getByRole("timer").textContent ?? "")).toBe(
 		17,
 	);
-	expect(screen.getAllByText("Checking evidence")).toHaveLength(2);
+	// The activity lives only in the left panel: the right panel states the stage
+	// progression and never repeats the same sentence.
+	const leftPanel = screen.getByText("Aktivitas pemrosesan").parentElement;
+	const rightPanel = screen.getByRole("region", {
+		name: /progres DESIGN\.md/i,
+	});
+	expect(leftPanel?.textContent).toContain("Checking evidence");
+	expect(rightPanel.textContent).not.toContain("Checking evidence");
 });
 
 it("has exactly one failure reason and one functional retry", () => {
@@ -72,12 +79,14 @@ it("does not keep a timer running after terminal status", () => {
 	const { rerender, container } = render(
 		<ScrapeProgress
 			status="capturing"
+			activity="Mengambil halaman"
 			activityStartedAt={new Date().toISOString()}
 		/>,
 	);
 	rerender(
 		<ScrapeProgress
 			status="completed"
+			activity="Mengambil halaman"
 			activityStartedAt={new Date().toISOString()}
 		/>,
 	);
@@ -88,12 +97,14 @@ it("does not keep a timer running after terminal status", () => {
 });
 
 describe("restored processing workspace", () => {
-	it("shows a spinner for the live stage instead of only a pulsing bullet", () => {
+	it("gives every progress-bar segment a non-zero height so the bar is visible", () => {
 		const { container } = render(
 			<ScrapeProgress mode="design" status="generating" />,
 		);
-		const spinners = container.querySelectorAll('[class*="animate-spin"]');
-		expect(spinners.length).toBeGreaterThanOrEqual(2);
+		const bar = container.querySelector(".mt-5.flex.h-1\\.5");
+		expect(bar).not.toBeNull();
+		const segments = bar?.querySelectorAll(":scope > span") ?? [];
+		expect(segments.length).toBeGreaterThanOrEqual(2);
 	});
 
 	it("animates only the active stage segment of the progress bar", () => {
@@ -103,6 +114,29 @@ describe("restored processing workspace", () => {
 		const segments = container.querySelectorAll("[data-active-stage-segment]");
 		expect(segments).toHaveLength(1);
 		expect(segments[0]?.className).toContain("animate-scrape-progress");
+		expect(segments[0]?.className).toContain("motion-reduce:animate-none");
+	});
+
+	it("keeps later segments neutral until their stage actually starts", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="extracting" />,
+		);
+		const bar = container.querySelector(".mt-5.flex.h-1\\.5");
+		const segments = Array.from(bar?.querySelectorAll(":scope > span") ?? []);
+		// "extracting" is the third stage: queued and capturing are done, the third
+		// segment is live, and everything after it stays neutral.
+		expect(segments[0]?.className).toContain("bg-mist");
+		expect(segments[1]?.className).toContain("bg-mist");
+		expect(
+			segments[2]?.querySelector("[data-active-stage-segment]"),
+		).not.toBeNull();
+		expect(segments[3]?.className).toContain("bg-slate");
+		expect(
+			segments[3]?.querySelector("[data-active-stage-segment]"),
+		).toBeNull();
+		expect(
+			segments[5]?.querySelector("[data-active-stage-segment]"),
+		).toBeNull();
 	});
 
 	it("stops animating once the run reaches a terminal status", () => {
@@ -112,9 +146,24 @@ describe("restored processing workspace", () => {
 		expect(
 			container.querySelectorAll("[data-active-stage-segment]"),
 		).toHaveLength(0);
+	});
+
+	it("removes every redundant spinner from the panel, header and stage list", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="generating" />,
+		);
 		expect(container.querySelectorAll('[class*="animate-spin"]')).toHaveLength(
 			0,
 		);
+	});
+
+	it("marks the live stage without spinning a replacement indicator", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="extracting" />,
+		);
+		const marker = container.querySelector("[data-active-stage-marker]");
+		expect(marker).not.toBeNull();
+		expect(marker?.className).not.toContain("animate-spin");
 	});
 
 	it("keeps the two-column layout with the activity panel beside the stages", () => {
@@ -144,10 +193,11 @@ describe("restored processing workspace", () => {
 		).toBeGreaterThan(0);
 	});
 
-	it("tells the truth while the job is still queued", () => {
+	it("shows no activity line at all while the job is still queued", () => {
 		render(<ScrapeProgress mode="design" status="queued" />);
 		expect(screen.getAllByText(/menunggu worker/i).length).toBeGreaterThan(0);
 		expect(screen.queryByText(/menganalisis/i)).toBeNull();
+		expect(screen.queryByRole("timer")).toBeNull();
 	});
 
 	it("surfaces the worker health message while queued", () => {
@@ -167,7 +217,6 @@ describe("restored processing workspace", () => {
 		const { container } = render(
 			<ScrapeProgress mode="design" status="extracting" />,
 		);
-		// Two earlier stages are done, the active one spins, the rest stay plain.
 		const list = screen.getByRole("list", { name: "Tahapan pemrosesan" });
 		const items = list.querySelectorAll("li");
 		expect(items).toHaveLength(6);
@@ -184,5 +233,12 @@ describe("restored processing workspace", () => {
 		render(<ScrapeProgress mode="crawl" status="extracting" />);
 		const list = screen.getByRole("list", { name: "Tahapan pemrosesan" });
 		expect(list.querySelectorAll("li")).toHaveLength(4);
+	});
+
+	it("never shows a percentage because no stage completion is measured", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="extracting" />,
+		);
+		expect(container.textContent).not.toMatch(/\d+\s*%/);
 	});
 });

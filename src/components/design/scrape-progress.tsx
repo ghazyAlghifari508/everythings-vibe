@@ -1,4 +1,4 @@
-import { Check, Loader2, RotateCcw } from "lucide-react";
+import { Check, RotateCcw } from "lucide-react";
 import { ThoughtLine } from "@/components/ui/thought-line";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
 import { displaySiteName } from "@/lib/site-name";
@@ -67,19 +67,18 @@ function stagesFor(mode: ScrapeMode): ScrapeStatus[] {
 	return ["queued", "capturing", "extracting", "completed"];
 }
 
-// A live stage is shown by a real spinning indicator; completed stages keep a
-// check mark and upcoming stages stay neutral. The number of finished stages
-// comes from the persisted status, never from an estimate.
+// A finished stage keeps a check mark and the live stage is marked by a filled
+// dot: the progress bar below is the single running indicator, so no stage
+// marker spins and no replacement spinner is introduced.
 function StageMarker({ done, current }: { done: boolean; current: boolean }) {
 	if (done && !current)
 		return <Check size={14} aria-hidden className="text-mist" />;
 	if (current)
 		return (
-			<Loader2
-				size={14}
+			<span
 				aria-hidden
 				data-active-stage-marker
-				className="text-mist motion-safe:animate-spin motion-reduce:animate-none"
+				className="block size-2 rounded-full bg-mist"
 			/>
 		);
 	return (
@@ -150,26 +149,18 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 							Pemrosesan berhenti. Lihat alasan dan opsi pemulihan di panel
 							progres.
 						</p>
-					) : activityText ? (
+					) : active && activityText ? (
 						<ThoughtLine
-							working={active}
+							working
 							bare
-							label={LABELS[status]}
+							collapsible={false}
+							label={activityText}
 							doneLabel={LABELS[status]}
-							presentation="rotating"
-							activity={activityText}
-							rotationKey={activityText}
 							startedAt={startTimestamp ?? undefined}
-							showTimer={active}
-							fontSize="xs"
+							showTimer
+							fontSize={14}
 							className="mt-2"
-							glyph={
-								<Loader2
-									size={14}
-									aria-hidden
-									className="shrink-0 text-mist motion-safe:animate-spin motion-reduce:animate-none"
-								/>
-							}
+							glyph="sparkle"
 						/>
 					) : (
 						<p className="mt-2 break-words text-sm text-fog">
@@ -222,14 +213,7 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 			>
 				<div className="flex items-center justify-between gap-3">
 					<h3 className="text-lg font-semibold text-snow">{operation}</h3>
-					<p className="flex shrink-0 items-center gap-2 text-sm text-fog">
-						{active ? (
-							<Loader2
-								size={14}
-								aria-hidden
-								className="text-mist motion-safe:animate-spin motion-reduce:animate-none"
-							/>
-						) : null}
+					<p className="shrink-0 text-sm text-fog">
 						<span aria-live="polite">{LABELS[status]}</span>
 					</p>
 				</div>
@@ -258,7 +242,10 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 					</div>
 				) : (
 					<>
-						<div aria-hidden="true" className="mt-5 flex gap-1">
+						{/* Segments carry an explicit height: inline spans inside a flex
+						    row have no intrinsic height, which previously collapsed the
+						    whole bar to zero and hid the live stage entirely. */}
+						<div aria-hidden="true" className="mt-5 flex h-1.5 gap-1">
 							{stages.map((stage, i) => {
 								const stageDone = isDone || i < index;
 								const stageCurrent = !isDone && i === index;
@@ -305,14 +292,6 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 											>
 												{LABELS[stage]}
 											</p>
-											{stageCurrent && (
-												<p className="mt-1 break-all text-xs leading-5 text-fog">
-													{activityText ??
-														(status === "queued"
-															? "Menunggu worker mengambil job."
-															: "Tahap ini sedang berlangsung.")}
-												</p>
-											)}
 										</div>
 									</li>
 								);
