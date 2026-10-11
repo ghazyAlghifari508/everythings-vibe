@@ -9,7 +9,7 @@ import {
 import { crawlWebsite, isCrawlScope } from "@/lib/crawl-website";
 import { fetchAsset } from "@/lib/fetch-html";
 import { renderPage } from "@/lib/render-page";
-import { scrapeRequestSchema } from "@/lib/scrape-contract";
+import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/lib/scrape-contract";
 import { normalizeImageCandidates } from "@/lib/scrape-images";
 import {
 	type ScrapeJobClaim,
@@ -38,6 +38,7 @@ export async function runExtractionJob(
 	};
 	await update({ status: "capturing" });
 	if (request.mode === "crawl") {
+		const crawlDelays = new Map<string, number>();
 		const completed = await db
 			.select()
 			.from(scrapePages)
@@ -83,7 +84,10 @@ export async function runExtractionJob(
 						sql`select pg_advisory_xact_lock(hashtext(${new URL(url).origin}))`,
 					);
 					await new Promise((resolve) =>
-						setTimeout(resolve, CRAWL_REQUEST_GAP_MS),
+						setTimeout(
+							resolve,
+							crawlDelays.get(new URL(url).origin) ?? CRAWL_REQUEST_GAP_MS,
+						),
 					);
 					return fetchAsset(url, 0, {
 						maxBytes: SCRAPE_MAX_HTML_BYTES,
@@ -114,10 +118,13 @@ export async function runExtractionJob(
 				const content = result.body.toString("utf8");
 				if (/<html\b/i.test(content))
 					throw new Error("robots.txt bukan dokumen aturan yang valid.");
-				if (/crawl-delay\s*:\s*(?:[2-9]|\d{2,})/i.test(content))
-					throw new Error(
-						"robots.txt meminta crawl delay lebih lama dari kapasitas job ini.",
-					);
+				const delay =
+					Number(
+						content.match(/crawl-delay\s*:\s*(\d+(?:\.\d+)?)/i)?.[1] ?? "0",
+					) * 1000;
+				if (delay > SCRAPE_LIMITS.maxCrawlDelayMs)
+					throw new Error("Crawl delay robots.txt melampaui batas job.");
+				crawlDelays.set(origin, Math.max(CRAWL_REQUEST_GAP_MS, delay));
 				return content;
 			},
 			onPage: async (page, discovered) => {

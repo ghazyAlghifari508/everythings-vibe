@@ -13,6 +13,7 @@ export const SCRAPE_LIMITS = {
 	imageMeasurementTimeoutMs: 3000,
 	domScanElements: 5000,
 	maxFrames: 10,
+	maxCrawlDelayMs: 60000,
 } as const;
 
 export function normalizeScrapeInput(raw: string): string {

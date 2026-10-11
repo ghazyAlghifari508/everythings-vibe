@@ -426,6 +426,7 @@ export async function renderPage(
 				}
 			}
 		}
+		let html = await page.content().catch(() => "");
 		if (options.includeIframes) {
 			const origin = new URL(page.url()).origin;
 			let capturedFrames = 0;
@@ -442,24 +443,31 @@ export async function renderPage(
 						continue;
 					}
 					const element = await frame.frameElement();
-					await element.evaluate((node, source) => {
-						if (!(node instanceof Element)) return;
-						node.setAttribute("srcdoc", source);
-						node.removeAttribute("src");
-					}, content);
+					const original = await element.evaluate((node) =>
+						node instanceof Element ? node.outerHTML : "",
+					);
+					if (original) {
+						const escaped = content
+							.replace(/&/g, "&amp;")
+							.replace(/"/g, "&quot;")
+							.replace(/</g, "&lt;");
+						const captured = original
+							.replace(
+								/\s(?:src|srcdoc)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
+								"",
+							)
+							.replace(/<iframe\b/i, `<iframe srcdoc="${escaped}"`);
+						html = html.replace(original, captured);
+					}
 					capturedFrames += 1;
 				} catch {
 					await onActivity?.("Iframe tidak dapat diakses, dilewati");
 				}
 			}
 		} else if (mode === "html")
-			await page.evaluate(() => {
-				for (const frame of document.querySelectorAll("iframe")) frame.remove();
-			});
-		const html = (await page.content().catch(() => "")).slice(
-			0,
-			SCRAPE_MAX_HTML_BYTES,
-		);
+			html = html.replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe\s*>/gi, "");
+		if (Buffer.byteLength(html) > SCRAPE_MAX_HTML_BYTES)
+			throw new ScrapeError("NO_ANALYZABLE_CONTENT", "HTML terlalu besar.");
 		onTiming?.("pageContent", Date.now() - contentStart);
 		if (mode === "design") await onActivity?.("Capture halaman selesai");
 		if (!html || html.length < MIN_ANALYZABLE_HTML_BYTES)

@@ -181,10 +181,16 @@ export async function runScrapePipeline(
 	const instrumentation: ScrapeInstrumentation = {
 		onActivity: async (activity) => {
 			meta = { ...meta, activity, activityStartedAt: new Date().toISOString() };
-			await db
+			const updated = await db
 				.update(scrapes)
 				.set({ metadata: meta, updatedAt: new Date() })
-				.where(writePredicate());
+				.where(writePredicate())
+				.returning({ id: scrapes.id });
+			if (!updated.length)
+				throw new ScrapeError(
+					"STORAGE_FAILED",
+					"Job lease sudah tidak berlaku.",
+				);
 		},
 		onTiming: (label, durationMs) => {
 			timings[label] = (timings[label] ?? 0) + durationMs;
