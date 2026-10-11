@@ -5,7 +5,7 @@ import {
 	MousePointer2,
 	RotateCcw,
 } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { getCanvasDotStyle } from "@/components/task/whiteboard-canvas";
 import { ZoomControls } from "@/components/task/zoom-controls";
 import type {
@@ -44,6 +44,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 	const {
 		zoom,
 		pan,
+		setPan,
+		setZoom,
 		zoomIn,
 		zoomOut,
 		resetZoom,
@@ -53,7 +55,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 		nudgePan,
 		onWheel,
 	} = useCanvasZoom({
-		minZoom: 0.25,
+		minZoom: 0.05,
 		maxZoom: 2.0,
 		initialZoom: project.designMode === "mobile" ? 0.9 : 0.65,
 	});
@@ -62,6 +64,46 @@ export const StudioCanvas = memo(function StudioCanvas({
 	const [spacePan, setSpacePan] = useState(false);
 	const [isPanning, setIsPanning] = useState(false);
 	const panMode = tool === "hand" || spacePan;
+	const dimensions = useRef(
+		new Map<string, { width: number; height: number }>(),
+	);
+	const measureFrame = useCallback(
+		(id: string, width: number, height: number) => {
+			dimensions.current.set(id, { width, height });
+		},
+		[],
+	);
+	function fitCanvas() {
+		if (!canvasRef.current || !frames.length) {
+			resetZoom();
+			return;
+		}
+		const bounds = frames.map(
+			(frame) =>
+				dimensions.current.get(frame.id) ?? {
+					width: frame.viewport === "mobile" ? 390 : 1440,
+					height: 750,
+				},
+		);
+		const width =
+			bounds.reduce((total, frame) => total + frame.width, 0) +
+			(bounds.length - 1) * 56 +
+			192;
+		const height = Math.max(...bounds.map((frame) => frame.height)) + 192;
+		const available = canvasRef.current.getBoundingClientRect();
+		const nextZoom = Math.max(
+			0.05,
+			Math.min(
+				2,
+				Math.min(
+					available.width / width,
+					Math.max(100, available.height - 220) / height,
+				),
+			),
+		);
+		setZoom(nextZoom);
+		setPan({ x: (available.width - width * nextZoom) / 2, y: 60 });
+	}
 	useEffect(() => {
 		function keydown(event: KeyboardEvent) {
 			if (
@@ -118,7 +160,14 @@ export const StudioCanvas = memo(function StudioCanvas({
 				endPan();
 				setIsPanning(false);
 			}}
-			onWheel={onWheel}
+			onWheel={(event) => {
+				if (event.ctrlKey || event.metaKey) onWheel(event);
+				else
+					setPan((previous) => ({
+						x: previous.x - event.deltaX,
+						y: previous.y - event.deltaY,
+					}));
+			}}
 			onKeyDown={(e) => nudgePan(e.key)}
 			onClick={(e) => {
 				if (
@@ -148,9 +197,11 @@ export const StudioCanvas = memo(function StudioCanvas({
 						<StudioFrame
 							key={frame.id}
 							frame={frame}
+							onMeasure={measureFrame}
 							isSelected={
-								selectedFrameIds.includes(frame.id) ||
-								selectedFrameId === frame.id
+								selectedFrameIds.length
+									? selectedFrameIds.includes(frame.id)
+									: selectedFrameId === frame.id
 							}
 							onSelect={(id, additive) => {
 								if (!panMode) onSelectFrame?.(id, additive);
@@ -228,7 +279,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 					zoom={zoom}
 					onZoomIn={zoomIn}
 					onZoomOut={zoomOut}
-					onReset={resetZoom}
+					onReset={fitCanvas}
 				/>
 			</div>
 		</section>

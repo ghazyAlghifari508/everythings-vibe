@@ -19,6 +19,7 @@ export interface StudioFrameProps {
 	onRetry?: (frameId: string) => void;
 	isCanvasPanning?: boolean;
 	className?: string;
+	onMeasure?: (id: string, width: number, height: number) => void;
 }
 
 export function StudioFrame({
@@ -28,6 +29,7 @@ export function StudioFrame({
 	onRetry,
 	isCanvasPanning = false,
 	className = "",
+	onMeasure,
 }: StudioFrameProps) {
 	const [copied, setCopied] = useState(false);
 	const isMobile = frame.viewport === "mobile";
@@ -68,6 +70,7 @@ export function StudioFrame({
 				)
 					throw new Error("Gagal menyiapkan visual frame.");
 				setVisual({ url: data.url, width: data.width, height: data.height });
+				onMeasure?.(frame.id, data.width, data.height);
 			} catch (failure) {
 				if (!controller.signal.aborted)
 					setVisualError(
@@ -92,7 +95,7 @@ export function StudioFrame({
 			controller.abort();
 			observer?.disconnect();
 		};
-	}, [frame.id, frame.projectId, frame.htmlCode, visualAttempt]);
+	}, [frame.id, frame.projectId, frame.htmlCode, visualAttempt, onMeasure]);
 
 	const cleanHtml = frame.htmlCode ? extractCleanHtml(frame.htmlCode) : "";
 
@@ -197,7 +200,7 @@ export function StudioFrame({
 					isMobile ? "rounded-[24px]" : "rounded-xl"
 				} border ${
 					isSelected
-						? "border-indigo-500 ring-2 ring-indigo-500/50 shadow-lg shadow-indigo-500/10"
+						? "border-blue-600 outline-2 outline-offset-2 outline-blue-600"
 						: "border-graphite hover:border-steel"
 				} bg-obsidian`}
 				style={{ width: visual?.width ?? frameWidth, height: frameHeight }}
