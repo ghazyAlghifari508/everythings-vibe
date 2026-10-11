@@ -25,8 +25,13 @@ export function extractionFromVisualEvidence(
 	const spacing = new Set<string>();
 	const radii = new Set<string>();
 	const shadows = new Set<string>();
+	const visibleVariables: Record<string, string> = {};
 	for (const element of evidence.elements) {
 		const p = element.properties;
+		for (const [name, value] of Object.entries(element.variables ?? {})) {
+			if (value && Object.values(p).includes(value))
+				visibleVariables[name] = value;
+		}
 		for (const property of ["background-color", "color", "border-top-color"]) {
 			const value = p[property];
 			if (
@@ -130,10 +135,7 @@ export function extractionFromVisualEvidence(
 			maxWidths: [],
 			lineHeights: [],
 			letterSpacing: [],
-			cssVariables: Object.assign(
-				{},
-				...evidence.elements.map((element) => element.variables ?? {}),
-			),
+			cssVariables: visibleVariables,
 		},
 		metadata: {
 			pagesAnalyzed: [evidence.sourceUrl],
@@ -267,7 +269,12 @@ export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 	for (const element of evidence.elements)
 		for (const [name, value] of Object.entries(element.variables ?? {})) {
 			const key = `${name}:${value}`;
-			if (!value || seenVariables.has(key)) continue;
+			if (
+				!value ||
+				!Object.values(element.properties).includes(value) ||
+				seenVariables.has(key)
+			)
+				continue;
 			seenVariables.add(key);
 			lines.push(
 				`| ${cell(name)} | ${cell(value)} | ${cell(element.selector)} | observed |`,

@@ -116,6 +116,11 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 							? "Pemrosesan berhenti. Lihat alasan dan opsi pemulihan di workspace."
 							: activity || LABELS[status]}
 					</p>
+					{active && errorMessage && (
+						<p role="alert" className="mt-3 text-sm text-fog">
+							{errorMessage}
+						</p>
+					)}
 					{elapsed !== null && active && (
 						<p role="timer" className="mt-3 font-mono text-xs text-fog">
 							{elapsed}s pada tahap ini
