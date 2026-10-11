@@ -18,7 +18,8 @@ import {
 
 const CRAWL_REQUEST_GAP_MS = 1000;
 const CRAWL_ROBOTS_MAX_BYTES = 512000;
-const CRAWL_MAX_HTML_BYTES = 5_000_000;
+
+import { SCRAPE_MAX_HTML_BYTES } from "@/lib/constants";
 
 export async function runExtractionJob(
 	scrape: ScrapeRow,
@@ -85,7 +86,7 @@ export async function runExtractionJob(
 						setTimeout(resolve, CRAWL_REQUEST_GAP_MS),
 					);
 					return fetchAsset(url, 0, {
-						maxBytes: CRAWL_MAX_HTML_BYTES,
+						maxBytes: SCRAPE_MAX_HTML_BYTES,
 						allowUrl: (target) =>
 							isCrawlScope(
 								target,

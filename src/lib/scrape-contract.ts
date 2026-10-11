@@ -6,6 +6,13 @@ export const SCRAPE_LIMITS = {
 	maxDepth: 5,
 	waitMs: 10000,
 	regexChars: 256,
+	maxActiveJobs: 2,
+	requestBytes: 16000,
+	imageCandidates: 200,
+	imageMeasurementCount: 50,
+	imageMeasurementTimeoutMs: 3000,
+	domScanElements: 5000,
+	maxFrames: 10,
 } as const;
 
 export function normalizeScrapeInput(raw: string): string {

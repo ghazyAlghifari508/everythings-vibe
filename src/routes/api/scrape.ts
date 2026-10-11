@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
-import { scrapeRequestSchema } from "@/lib/scrape-contract";
+import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/lib/scrape-contract";
 import {
 	createScrape,
 	deleteScrape,
@@ -68,12 +68,38 @@ export async function POST({
 }): Promise<Response> {
 	try {
 		const user = await requireUser(getRequestHeaders());
-		if (Number(request.headers.get("content-length") ?? 0) > 16000)
+		if (
+			Number(request.headers.get("content-length") ?? 0) >
+			SCRAPE_LIMITS.requestBytes
+		)
 			return Response.json(
 				{ error: "Request terlalu besar." },
 				{ status: 413 },
 			);
-		const body: unknown = await request.json().catch(() => null);
+		const reader = request.body?.getReader();
+		let bytes = 0;
+		const chunks: Uint8Array[] = [];
+		if (reader) {
+			while (true) {
+				const chunk = await reader.read();
+				if (chunk.done) break;
+				bytes += chunk.value.byteLength;
+				if (bytes > SCRAPE_LIMITS.requestBytes) {
+					await reader.cancel();
+					return Response.json(
+						{ error: "Request terlalu besar." },
+						{ status: 413 },
+					);
+				}
+				chunks.push(chunk.value);
+			}
+		}
+		let body: unknown = null;
+		try {
+			body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+		} catch {
+			body = null;
+		}
 
 		if (body !== null && typeof body === "object") {
 			const candidate = body as Record<string, unknown>;

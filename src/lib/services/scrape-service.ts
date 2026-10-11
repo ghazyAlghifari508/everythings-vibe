@@ -17,7 +17,11 @@ import { ScrapeError } from "@/lib/design-errors";
 import { extractDesignFromHtml } from "@/lib/design-extraction";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
-import { type ScrapeRequest, scrapeRequestSchema } from "@/lib/scrape-contract";
+import {
+	SCRAPE_LIMITS,
+	type ScrapeRequest,
+	scrapeRequestSchema,
+} from "@/lib/scrape-contract";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { parseAndValidateFormat } from "@/lib/url-validator";
 import {
@@ -95,7 +99,7 @@ export async function createScrape(
 				JSON.stringify(row.request) === JSON.stringify(validated),
 		);
 		if (existing) return existing;
-		if (active.length >= 2)
+		if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
 			throw new ScrapeError(
 				"WEBSITE_BLOCKED",
 				"Tunggu proses aktif selesai sebelum memulai ekstraksi baru.",

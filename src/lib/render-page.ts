@@ -304,105 +304,122 @@ export async function renderPage(
 			await page.waitForTimeout(Math.min(options.waitMs, SCRAPE_LIMITS.waitMs));
 		const images =
 			mode === "images"
-				? await page.evaluate((measure) => {
-						const result: {
-							url: string;
-							alt: string | null;
-							width: number | null;
-							height: number | null;
-							source: string;
-						}[] = [];
-						const add = (
-							raw: string,
-							source: string,
-							alt: string | null = null,
-							width: number | null = null,
-							height: number | null = null,
-						) => {
-							try {
-								const url = new URL(raw, document.baseURI);
-								if (
-									!["http:", "https:"].includes(url.protocol) ||
-									url.username ||
-									url.password ||
-									result.length >= 200
-								)
+				? await page.evaluate(
+						({ measure, limits }) => {
+							const result: {
+								url: string;
+								alt: string | null;
+								width: number | null;
+								height: number | null;
+								source: string;
+							}[] = [];
+							const add = (
+								raw: string,
+								source: string,
+								alt: string | null = null,
+								width: number | null = null,
+								height: number | null = null,
+							) => {
+								try {
+									const url = new URL(raw, document.baseURI);
+									if (
+										!["http:", "https:"].includes(url.protocol) ||
+										url.username ||
+										url.password ||
+										result.length >= limits.imageCandidates
+									)
+										return;
+									result.push({ url: url.href, source, alt, width, height });
+								} catch {
 									return;
-								result.push({ url: url.href, source, alt, width, height });
-							} catch {
-								return;
-							}
-						};
-						for (const element of [...document.querySelectorAll("*")].slice(
-							0,
-							5000,
-						)) {
-							if (element instanceof HTMLImageElement) {
-								add(
-									element.currentSrc || element.src,
-									"img",
-									element.alt || null,
-									measure && element.naturalWidth ? element.naturalWidth : null,
-									measure && element.naturalHeight
-										? element.naturalHeight
-										: null,
-								);
-								for (const attr of [
-									"data-src",
-									"data-original",
-									"data-lazy-src",
-								]) {
-									const value = element.getAttribute(attr);
-									if (value) add(value, attr, element.alt || null);
 								}
-							}
-							for (const match of (element.getAttribute("srcset") ?? "").split(
-								",",
+							};
+							for (const element of [...document.querySelectorAll("*")].slice(
+								0,
+								limits.domScanElements,
 							)) {
-								const value = match.trim().split(/\s+/)[0];
-								if (value) add(value, "srcset");
+								if (element instanceof HTMLImageElement) {
+									add(
+										element.currentSrc || element.src,
+										"img",
+										element.alt || null,
+										measure && element.naturalWidth
+											? element.naturalWidth
+											: null,
+										measure && element.naturalHeight
+											? element.naturalHeight
+											: null,
+									);
+									for (const attr of [
+										"data-src",
+										"data-original",
+										"data-lazy-src",
+									]) {
+										const value = element.getAttribute(attr);
+										if (value) add(value, attr, element.alt || null);
+									}
+								}
+								for (const match of (
+									element.getAttribute("srcset") ?? ""
+								).split(",")) {
+									const value = match.trim().split(/\s+/)[0];
+									if (value) add(value, "srcset");
+								}
+								for (const match of getComputedStyle(
+									element,
+								).backgroundImage.matchAll(/url\(["']?([^"')]+)["']?\)/g))
+									add(match[1], "background");
+								if (
+									element instanceof HTMLLinkElement &&
+									/icon/i.test(element.rel)
+								)
+									add(element.href, "icon");
 							}
-							for (const match of getComputedStyle(
-								element,
-							).backgroundImage.matchAll(/url\(["']?([^"')]+)["']?\)/g))
-								add(match[1], "background");
-							if (
-								element instanceof HTMLLinkElement &&
-								/icon/i.test(element.rel)
-							)
-								add(element.href, "icon");
-						}
-						return result;
-					}, options.measureResolution ?? true)
+							return result;
+						},
+						{
+							measure: options.measureResolution ?? true,
+							limits: SCRAPE_LIMITS,
+						},
+					)
 				: undefined;
 		if (images && options.measureResolution !== false) {
 			for (const image of images
 				.filter((candidate) => !candidate.width)
-				.slice(0, 50)) {
-				const dimensions = await page.evaluate(async (url) => {
-					const image = new Image();
-					return new Promise<{ width: number; height: number } | null>(
-						(resolve) => {
-							const timer = setTimeout(() => {
-								image.src = "";
-								resolve(null);
-							}, 3000);
-							image.onload = () => {
-								clearTimeout(timer);
-								resolve(
-									image.naturalWidth && image.naturalHeight
-										? { width: image.naturalWidth, height: image.naturalHeight }
-										: null,
-								);
-							};
-							image.onerror = () => {
-								clearTimeout(timer);
-								resolve(null);
-							};
-							image.src = url;
-						},
-					);
-				}, image.url);
+				.slice(0, SCRAPE_LIMITS.imageMeasurementCount)) {
+				const dimensions = await page.evaluate(
+					async ({ url, timeoutMs }) => {
+						const image = new Image();
+						return new Promise<{ width: number; height: number } | null>(
+							(resolve) => {
+								const timer = setTimeout(() => {
+									image.src = "";
+									resolve(null);
+								}, timeoutMs);
+								image.onload = () => {
+									clearTimeout(timer);
+									resolve(
+										image.naturalWidth && image.naturalHeight
+											? {
+													width: image.naturalWidth,
+													height: image.naturalHeight,
+												}
+											: null,
+									);
+								};
+								image.onerror = () => {
+									clearTimeout(timer);
+									resolve(null);
+								};
+								image.src = url;
+							},
+						);
+					},
+					{
+						url: image.url,
+						timeoutMs: SCRAPE_LIMITS.imageMeasurementTimeoutMs,
+					},
+				);
 				if (dimensions) {
 					image.width = dimensions.width;
 					image.height = dimensions.height;
@@ -412,8 +429,8 @@ export async function renderPage(
 		if (options.includeIframes) {
 			const origin = new URL(page.url()).origin;
 			let capturedFrames = 0;
-			for (const frame of page.frames().slice(1, 11)) {
-				if (capturedFrames >= 10) break;
+			for (const frame of page.frames().slice(1, SCRAPE_LIMITS.maxFrames + 1)) {
+				if (capturedFrames >= SCRAPE_LIMITS.maxFrames) break;
 				try {
 					if (new URL(frame.url()).origin !== origin) {
 						await onActivity?.("Iframe cross-origin dilewati");
@@ -435,7 +452,7 @@ export async function renderPage(
 					await onActivity?.("Iframe tidak dapat diakses, dilewati");
 				}
 			}
-		} else
+		} else if (mode === "html")
 			await page.evaluate(() => {
 				for (const frame of document.querySelectorAll("iframe")) frame.remove();
 			});
