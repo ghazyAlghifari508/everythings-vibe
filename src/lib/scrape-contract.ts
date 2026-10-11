@@ -14,6 +14,9 @@ export const SCRAPE_LIMITS = {
 	domScanElements: 5000,
 	maxFrames: 10,
 	maxCrawlDelayMs: 60000,
+	captureMaxRequests: 500,
+	captureMaxBytes: 50_000_000,
+	jobTimeoutMs: 15 * 60 * 1000,
 } as const;
 
 export function normalizeScrapeInput(raw: string): string {

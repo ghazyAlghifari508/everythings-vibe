@@ -98,6 +98,8 @@ export async function isBlockedRequestUrl(raw: string): Promise<boolean> {
 }
 
 export async function guardContext(context: BrowserContext): Promise<void> {
+	let requests = 0;
+	let transferredBytes = 0;
 	await context.addInitScript(() => {
 		class BlockedWebSocket extends EventTarget {
 			static CONNECTING = 0;
@@ -157,6 +159,12 @@ export async function guardContext(context: BrowserContext): Promise<void> {
 		});
 	});
 	await context.route("**/*", async (route) => {
+		requests += 1;
+		if (
+			requests > SCRAPE_LIMITS.captureMaxRequests ||
+			transferredBytes >= SCRAPE_LIMITS.captureMaxBytes
+		)
+			return route.abort();
 		const req = route.request();
 		const method = req.method();
 		if (method !== "GET" && method !== "HEAD") return route.abort();
@@ -164,6 +172,9 @@ export async function guardContext(context: BrowserContext): Promise<void> {
 		if (await isBlockedRequestUrl(req.url())) return route.abort();
 		try {
 			const { body, status, contentType } = await fetchAsset(req.url());
+			transferredBytes += body.byteLength;
+			if (transferredBytes > SCRAPE_LIMITS.captureMaxBytes)
+				return route.abort();
 			return route.fulfill({
 				status,
 				body: method === "HEAD" ? undefined : body,

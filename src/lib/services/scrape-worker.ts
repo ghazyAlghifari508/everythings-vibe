@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { config } from "dotenv";
+import { SCRAPE_LIMITS } from "@/lib/scrape-contract";
 import {
 	claimScrapeJob,
 	releaseScrapeClaim,
@@ -33,12 +34,34 @@ async function run() {
 			continue;
 		}
 		let heartbeatRunning = false;
+		const startedAt = Date.now();
+		let leaseLost = false;
 		const heartbeat = setInterval(() => {
-			if (heartbeatRunning) return;
+			if (heartbeatRunning || leaseLost) return;
+			if (Date.now() - startedAt >= SCRAPE_LIMITS.jobTimeoutMs) {
+				leaseLost = true;
+				void releaseScrapeClaim(claim)
+					.finally(async () => {
+						const { closeRenderBrowser } = await import("@/lib/render-page");
+						await closeRenderBrowser();
+					})
+					.catch((error: unknown) =>
+						console.error("Scrape timeout cleanup failed", error),
+					);
+				return;
+			}
 			heartbeatRunning = true;
 			void renewScrapeClaim(claim)
 				.then((current) => {
-					if (!current) console.error("Scrape worker lost job lease", claim.id);
+					if (!current) {
+						leaseLost = true;
+						console.error("Scrape worker lost job lease", claim.id);
+						void import("@/lib/render-page")
+							.then(({ closeRenderBrowser }) => closeRenderBrowser())
+							.catch((error: unknown) =>
+								console.error("Scrape lease cleanup failed", error),
+							);
+					}
 				})
 				.catch((error: unknown) =>
 					console.error("Scrape heartbeat failed", error),
