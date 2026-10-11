@@ -47,7 +47,11 @@ describe("buildScrapePreviewDocument", () => {
 		expect(result?.srcDoc).not.toContain('import("./"');
 		expect(result?.srcDoc).not.toContain("modulepreload");
 		expect(result?.srcDoc).not.toContain("onload=");
-		expect(result?.srcDoc).not.toContain("MutationObserver");
+		// The asset-rewriting shim is what must not run here; the readiness
+		// reporter is server-injected and nonce-allowed so the parent can still
+		// learn whether the snapshot rendered anything.
+		expect(result?.srcDoc).not.toContain("const BASE=");
+		expect(result?.srcDoc).toContain("vibedesign-preview");
 		expect(result?.srcDoc).not.toContain("/api/scrape/asset?url=");
 		expect(result?.srcDoc).toContain("Captured content");
 		expect(scrape.html).toBe(html);

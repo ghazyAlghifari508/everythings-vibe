@@ -48,7 +48,61 @@ const AUTO_SCROLL_DELAY_MS = 100;
 const AUTO_SCROLL_MAX_STEPS = 60;
 const AUTO_SCROLL_STABLE_STEPS = 2;
 const MIN_ANALYZABLE_HTML_BYTES = 200;
+// Text shorter than this cannot carry a rendered page, so it is treated as
+// absent rather than as content.
+const MIN_VISIBLE_TEXT_CHARS = 12;
 const BLOCK_HOSTS = new Set(["localhost", "ip6-localhost", "ip6-loopback"]);
+
+const SCRIPTISH_BLOCK =
+	/<(script|style|noscript|template|svg)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+const COMMENT_BLOCK = /<!--[\s\S]*?-->/g;
+const TAG = /<[^>]*>/g;
+const EMBEDDED_MEDIA =
+	/<(img|picture|video|audio|canvas|iframe|embed|object|source)\b/i;
+// A CSS background image is rendered content even when the element has no text.
+const CSS_BACKGROUND_URL = /background(?:-image)?\s*:[^;"']*url\(/i;
+
+export type HtmlCaptureReason = "ok" | "too-small" | "no-meaningful-content";
+
+export interface HtmlCaptureAssessment {
+	bytes: number;
+	hasMeaningfulContent: boolean;
+	reason: HtmlCaptureReason;
+}
+
+// Distinguishes a syntactically valid HTML document from one that actually
+// rendered something a reader could see. Byte length alone cannot tell the two
+// apart: an empty application shell is comfortably over any size threshold yet
+// contains no visible content, while a short page can be perfectly valid.
+// Content presence is therefore the primary signal, and byte length only
+// classifies why a document was rejected.
+export function assessHtmlCapture(html: string): HtmlCaptureAssessment {
+	const bytes = Buffer.byteLength(html, "utf8");
+	const markup = html.replace(COMMENT_BLOCK, "").replace(SCRIPTISH_BLOCK, "");
+	const text = markup
+		.replace(TAG, " ")
+		.replace(/&[a-z#0-9]+;/gi, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (text.length >= MIN_VISIBLE_TEXT_CHARS)
+		return { bytes, hasMeaningfulContent: true, reason: "ok" };
+	if (EMBEDDED_MEDIA.test(markup) || CSS_BACKGROUND_URL.test(markup))
+		return { bytes, hasMeaningfulContent: true, reason: "ok" };
+	return {
+		bytes,
+		hasMeaningfulContent: false,
+		reason:
+			bytes < MIN_ANALYZABLE_HTML_BYTES ? "too-small" : "no-meaningful-content",
+	};
+}
+
+export function htmlCaptureFailureMessage(
+	assessment: HtmlCaptureAssessment,
+): string {
+	if (assessment.reason === "too-small")
+		return "Halaman mengembalikan dokumen yang jauh lebih kecil dari satu halaman HTML utuh.";
+	return "Halaman merender dokumen HTML tanpa konten yang dapat dilihat. Capture tidak dianggap berhasil.";
+}
 
 let browserPromise: Promise<Browser> | null = null;
 
@@ -547,10 +601,11 @@ export async function renderPage(
 			throw new ScrapeError("NO_ANALYZABLE_CONTENT", "HTML terlalu besar.");
 		onTiming?.("pageContent", Date.now() - contentStart);
 		if (mode === "design") await onActivity?.("Capture halaman selesai");
-		if (!html || html.length < MIN_ANALYZABLE_HTML_BYTES)
+		const assessment = assessHtmlCapture(html);
+		if (!assessment.hasMeaningfulContent)
 			throw new ScrapeError(
 				"NO_ANALYZABLE_CONTENT",
-				"Sistem tidak menemukan konten yang cukup untuk dianalisis.",
+				htmlCaptureFailureMessage(assessment),
 			);
 		const visualEvidence =
 			mode === "design"

@@ -7,6 +7,7 @@ import {
 	screen,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS } from "@/lib/constants";
 import { ScrapeDetail } from "./scrape-detail";
 
 function report(state: string, failed = 0) {
@@ -122,7 +123,7 @@ describe("ScrapeDetail preview readiness", () => {
 		).not.toMatch(/border-t/);
 	});
 
-	it("distinguishes an empty framed document from a ready one", () => {
+	it("keeps a single empty report provisional instead of declaring the page empty", () => {
 		render(
 			<ScrapeDetail
 				domain="example.com"
@@ -132,7 +133,40 @@ describe("ScrapeDetail preview readiness", () => {
 			/>,
 		);
 		act(() => report("empty", 0));
+		// The document may still be assembling its layout, so the verdict stays open.
+		expect(screen.getByRole("status").textContent).toMatch(/menyiapkan/i);
+		expect(screen.queryByText(/tidak berisi/i)).toBeNull();
+	});
+
+	it("settles as empty only after the frame keeps reporting empty", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc="<html><body></body></html>"
+				previewState="ready"
+			/>,
+		);
+		act(() => {
+			for (let i = 0; i < SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS; i += 1)
+				report("empty", 0);
+		});
 		expect(screen.getByRole("status").textContent).toMatch(/tidak berisi/i);
+	});
+
+	it("upgrades a provisional empty report once the frame renders content", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc="<html><body></body></html>"
+				previewState="ready"
+			/>,
+		);
+		act(() => report("empty", 0));
+		act(() => report("ready", 0));
+		expect(screen.queryByText(/tidak berisi/i)).toBeNull();
+		expect(screen.queryByRole("status")).toBeNull();
 	});
 
 	it("warns when the framed document lost external resources", () => {

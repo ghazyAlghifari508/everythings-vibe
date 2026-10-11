@@ -12,9 +12,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScrapePreviewState } from "@/hooks/use-scrape-preview";
 import {
 	SCRAPE_DESKTOP_HEIGHT,
-	SCRAPE_PREVIEW_READY_MAX_PINGS,
 	SCRAPE_PREVIEW_READY_PING_INTERVAL_MS,
 } from "@/lib/constants";
+import {
+	INITIAL_PREVIEW_READINESS,
+	type PreviewFrameReport,
+	type PreviewReadinessState,
+	previewDisplayReport,
+	previewFrameResponded,
+	previewShouldKeepPolling,
+	reducePreviewReport,
+} from "@/lib/preview-readiness";
 
 export interface ScrapeDetailProps {
 	domain: string;
@@ -28,7 +36,7 @@ export interface ScrapeDetailProps {
 }
 
 type HtmlViewTab = "preview" | "code";
-type FrameReport = "preparing" | "ready" | "empty" | "degraded" | "failed";
+type FrameReport = PreviewFrameReport;
 
 const PREVIEW_WIDTH = 1440;
 const MIN_PREVIEW_SCALE = 0.75;
@@ -58,7 +66,8 @@ const READINESS_MESSAGE: Record<
 	empty: {
 		label: "Preview tidak berisi konten",
 		tone: "warn",
-		detail: "Halaman hasil scrape tidak memiliki elemen yang bisa ditampilkan.",
+		detail:
+			"Dokumen hasil capture tidak memuat teks, media, atau latar yang bisa ditampilkan.",
 	},
 	degraded: {
 		label: "Preview dimuat sebagian",
@@ -480,15 +489,26 @@ function DesktopPreview({
 
 	const frameRef = useRef<HTMLIFrameElement>(null);
 	const pingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const settledRef = useRef(false);
+	// Every frame report is folded through one reducer, so a provisional empty
+	// verdict can be upgraded by a later ready report instead of sticking.
+	const readinessRef = useRef<PreviewReadinessState>(INITIAL_PREVIEW_READINESS);
 
 	const stopPinging = useCallback(() => {
-		settledRef.current = true;
 		if (pingTimer.current) {
 			clearTimeout(pingTimer.current);
 			pingTimer.current = null;
 		}
 	}, []);
+
+	const applyReport = useCallback(
+		(incoming: FrameReport) => {
+			const next = reducePreviewReport(readinessRef.current, incoming);
+			readinessRef.current = next;
+			onReport?.(previewDisplayReport(next));
+			if (!previewShouldKeepPolling(next)) stopPinging();
+		},
+		[onReport, stopPinging],
+	);
 
 	useEffect(() => {
 		if (!onReport) return;
@@ -503,15 +523,15 @@ function DesktopPreview({
 				state === "ready" ||
 				state === "empty" ||
 				state === "degraded" ||
-				state === "failed"
+				state === "failed" ||
+				state === "preparing"
 			) {
-				stopPinging();
-				onReport(state);
+				applyReport(state);
 			}
 		};
 		window.addEventListener("message", handleMessage);
 		return () => window.removeEventListener("message", handleMessage);
-	}, [onReport, stopPinging]);
+	}, [onReport, applyReport]);
 
 	useEffect(() => {
 		return () => {
@@ -531,34 +551,34 @@ function DesktopPreview({
 	}, [active]);
 
 	// The framed document reports on its own load, but that can land before the
-	// listener above is attached, so keep asking until a report arrives.
+	// listener above is attached, so keep asking until a verdict settles.
 	useEffect(() => {
 		if (!onReport || !srcDoc || !active) {
 			if (pingTimer.current) clearTimeout(pingTimer.current);
 			return;
 		}
+		readinessRef.current = INITIAL_PREVIEW_READINESS;
 		onReport("preparing");
-		settledRef.current = false;
-		let attempts = 0;
 		const ask = () => {
-			if (settledRef.current) return;
-			if (attempts >= SCRAPE_PREVIEW_READY_MAX_PINGS) {
-				onReport("failed");
+			if (!previewShouldKeepPolling(readinessRef.current)) {
+				pingTimer.current = null;
+				// The budget ran out with no verdict. A frame that answered at least
+				// once is alive and slow, so its last report stands; a frame that
+				// never answered at all is a real failure to report.
+				if (
+					readinessRef.current.report === "preparing" &&
+					!previewFrameResponded(readinessRef.current)
+				)
+					onReport("failed");
 				return;
 			}
-			attempts += 1;
 			const frame = frameRef.current?.contentWindow;
-			if (!frame) {
-				pingTimer.current = setTimeout(
-					ask,
-					SCRAPE_PREVIEW_READY_PING_INTERVAL_MS,
-				);
-				return;
-			}
-			try {
-				frame.postMessage({ type: "vibedesign-preview-ping" }, "*");
-			} catch {
-				return;
+			if (frame) {
+				try {
+					frame.postMessage({ type: "vibedesign-preview-ping" }, "*");
+				} catch {
+					// Unreachable frame keeps the open verdict; the budget bounds it.
+				}
 			}
 			pingTimer.current = setTimeout(
 				ask,
