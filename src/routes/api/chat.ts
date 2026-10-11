@@ -102,6 +102,7 @@ export const Route = createFileRoute("/api/chat")({
 					selectedVersionNum,
 					idempotencyKey: callerIdempotencyKey,
 					attempt: callerAttempt,
+					confirmedImpact,
 				} = body as {
 					message: string;
 					displayMessage?: string;
@@ -113,6 +114,12 @@ export const Route = createFileRoute("/api/chat")({
 					selectedVersionNum?: number;
 					idempotencyKey?: string;
 					attempt?: number;
+					/**
+					 * The user was shown the revision's impact on existing tasks and
+					 * confirmed it. Without this the ac/task lock below still applies,
+					 * so a revision can never change a locked document silently.
+					 */
+					confirmedImpact?: boolean;
 				};
 
 				if (!message?.trim())
@@ -269,7 +276,7 @@ export const Route = createFileRoute("/api/chat")({
 
 					if (mode === "revise") {
 						const { isPrdLocked } = await import("@/lib/flow-progress");
-						if (isPrdLocked(projCheck?.step)) {
+						if (isPrdLocked(projCheck?.step) && !confirmedImpact) {
 							const stageLabel =
 								projCheck?.step === "task"
 									? "Task / Kanban"

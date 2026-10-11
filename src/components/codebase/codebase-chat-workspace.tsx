@@ -10,17 +10,22 @@ import {
 	type AdaptiveQuestion,
 	type AdaptiveQuestionOption,
 	areAllQuestionsAnswered,
-	CODEBASE_STAGE_ACTIVITY,
 	CODEBASE_STAGE_DONE_LABEL,
 	type CodebaseRunState,
 	nextQuestionIndex,
 } from "@/lib/codebase-chat-flow";
 import { resolveCodebaseDisplayName } from "@/lib/codebase-naming";
+import {
+	type CodebaseChatIntent,
+	type IntentOption,
+	resolveIntentOptions,
+} from "@/lib/codebase-revision-intent";
 import { CodebaseAdaptiveQuestion } from "./codebase-adaptive-question";
 import {
 	type CodebaseArtifactRef,
 	CodebaseFileCard,
 } from "./codebase-file-card";
+import { CodebaseIntentChoice } from "./codebase-intent-choice";
 import { CodebaseStageHandoff } from "./codebase-stage-handoff";
 
 export type { AdaptiveQuestion, AdaptiveQuestionOption };
@@ -90,7 +95,14 @@ interface CodebaseChatWorkspaceProps {
 	onOpenArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onDownloadArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onSubmitAnswer?: (questionId: string, answer: string) => void;
-	onSendMessage?: (message: string) => void;
+	onSendMessage?: (message: string, intent: CodebaseChatIntent) => void;
+	/**
+	 * Intents the next message may carry. One entry (new feature) before any
+	 * artifact exists; both entries once there is a plan to revise.
+	 */
+	intentOptions?: IntentOption[];
+	/** Copy describing a revision's impact on existing tasks. */
+	revisionImpactNotice?: string | null;
 	onConfirmGenerate?: () => void;
 	onRetryQuestions?: () => void;
 	onRetryGenerate?: () => void;
@@ -134,6 +146,8 @@ export function CodebaseChatWorkspace({
 	stageError = null,
 	codebaseName,
 	starterSuggestions,
+	intentOptions,
+	revisionImpactNotice = null,
 	isSending = false,
 	isConfirming = false,
 	specError = null,
@@ -153,6 +167,8 @@ export function CodebaseChatWorkspace({
 	onRefreshStarterSuggestions,
 }: CodebaseChatWorkspaceProps) {
 	const [draft, setDraft] = useState("");
+	const [selectedIntent, setSelectedIntent] =
+		useState<CodebaseChatIntent | null>(null);
 	const [copiedCmd, setCopiedCmd] = useState(false);
 	const [copiedExport, setCopiedExport] = useState(false);
 	const [copiedTask, setCopiedTask] = useState(false);
@@ -201,8 +217,16 @@ export function CodebaseChatWorkspace({
 	const handleSend = (text?: string) => {
 		const message = (text ?? draft).trim();
 		if (message.length < 3 || isSending || isRunWorking) return;
-		onSendMessage?.(message);
+		// Both intents are real choices once a plan exists, so the message is
+		// only sent after the user states which one it carries.
+		const intent =
+			resolvedIntentOptions.length === 1
+				? resolvedIntentOptions[0].intent
+				: selectedIntent;
+		if (!intent) return;
+		onSendMessage?.(message, intent);
 		setDraft("");
+		setSelectedIntent(null);
 	};
 
 	const handlePrefillDraft = (text: string) => {
@@ -226,6 +250,18 @@ export function CodebaseChatWorkspace({
 				: questions.slice(0, currentIndex + 1);
 	const flowComplete = areAllQuestionsAnswered(answers, questions);
 	const hasLiveData = kanbanProgress !== null && kanbanProgress.total > 0;
+
+	/**
+	 * Intents offered for the next message. The caller supplies them from the
+	 * real workspace state; the default keeps the pre-plan behavior (a new
+	 * feature is the only thing a message can mean before anything exists).
+	 */
+	const resolvedIntentOptions =
+		intentOptions ??
+		resolveIntentOptions({ hasExistingFeature: artifacts.length > 0 });
+	// A choice is required only when there is more than one real option.
+	const needsIntentChoice = resolvedIntentOptions.length > 1;
+	const intentChosen = !needsIntentChoice || selectedIntent !== null;
 
 	/**
 	 * Artifact the active stage handoff already renders. Every other artifact
@@ -262,31 +298,52 @@ export function CodebaseChatWorkspace({
 
 	const isRunWorking = run?.status === "running";
 	const runFailed = run?.status === "failed";
-	const runSettled = run?.status === "done";
 	// A failed request owns its own error row, so the generic stage/spec error
 	// rows must not render a second, duplicate message for the same failure.
 	const stageErrorVisible = Boolean(stageError) && !runFailed;
 	const specErrorVisible = Boolean(specError) && !runFailed;
 
 	const renderComposer = (minRows = 1, className = "") => (
-		<PromptBar
-			id="codebase-chat-composer"
-			value={draft}
-			onValueChange={setDraft}
-			onSend={handleSend}
-			// The composer stays editable while a request is in flight so the
-			// user can prepare the next message; only the submit action closes.
-			// Duplicate submissions are blocked by the shared busy guard in
-			// `handleSend` and by PromptBar's `canSend`, which Enter also uses.
-			isSending={isSending || isRunWorking}
-			minCharsToSend={3}
-			minRows={minRows}
-			maxRows={6}
-			className={className}
-			placeholder="Jelaskan fitur atau perubahan yang kamu inginkan..."
-			ariaLabel="Jelaskan fitur atau perubahan yang kamu inginkan"
-			submitAppearance="icon"
-		/>
+		<div className="flex w-full flex-col gap-2.5">
+			{needsIntentChoice ? (
+				<CodebaseIntentChoice
+					options={resolvedIntentOptions}
+					selected={selectedIntent}
+					onSelect={setSelectedIntent}
+				>
+					{selectedIntent === "revise_current" && revisionImpactNotice ? (
+						<p
+							data-testid="codebase-revision-impact"
+							className="mt-2 rounded-lg border border-graphite bg-obsidian p-2.5 text-[11px] leading-4 text-fog"
+						>
+							{revisionImpactNotice}
+						</p>
+					) : null}
+				</CodebaseIntentChoice>
+			) : null}
+			<PromptBar
+				id="codebase-chat-composer"
+				value={draft}
+				onValueChange={setDraft}
+				onSend={handleSend}
+				// The composer stays editable while a request is in flight so the
+				// user can prepare the next message; only the submit action closes.
+				// Duplicate submissions are blocked by the shared busy guard in
+				// `handleSend` and by PromptBar's `canSend`, which Enter also uses.
+				isSending={isSending || isRunWorking || !intentChosen}
+				minCharsToSend={3}
+				minRows={minRows}
+				maxRows={6}
+				className={className}
+				placeholder={
+					needsIntentChoice && !intentChosen
+						? "Pilih dulu: fitur baru atau revisi fitur ini"
+						: "Jelaskan fitur atau perubahan yang kamu inginkan..."
+				}
+				ariaLabel="Jelaskan fitur atau perubahan yang kamu inginkan"
+				submitAppearance="icon"
+			/>
+		</div>
 	);
 
 	return (

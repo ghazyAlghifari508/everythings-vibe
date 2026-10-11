@@ -644,7 +644,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onSendMessage).toHaveBeenCalledTimes(1);
-		expect(onSendMessage).toHaveBeenCalledWith("Tambah mode gelap");
+		expect(onSendMessage).toHaveBeenCalledWith("Tambah mode gelap", "new_feature");
 		expect(composer?.value).toBe("");
 	});
 
@@ -685,7 +685,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 				}),
 			);
 		});
-		expect(onSendMessage).toHaveBeenCalledWith("Baris satu");
+		expect(onSendMessage).toHaveBeenCalledWith("Baris satu", "new_feature");
 		expect(composer?.value).toBe("");
 	});
 
@@ -807,7 +807,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onSendMessage).toHaveBeenCalledTimes(1);
-		expect(onSendMessage).toHaveBeenCalledWith("Tambah pencarian proyek");
+		expect(onSendMessage).toHaveBeenCalledWith("Tambah pencarian proyek", "new_feature");
 	});
 
 	it("places the caret at the end of the prefilled prompt when the empty area is pressed", () => {
@@ -1301,6 +1301,150 @@ describe("CodebaseChatWorkspace confirmation and spec errors", () => {
 			retry?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onRetryGenerate).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("CodebaseChatWorkspace chat intent after a plan exists", () => {
+	const planArtifact = {
+		id: "tasks-abc",
+		fileName: "tasks-demo.json",
+		fileSizeBytes: null,
+		badge: "KANBAN LIVE",
+		description: "Task tree dan papan Kanban live",
+	};
+
+	it("offers both intents once a plan exists", () => {
+		renderWorkspace({ artifacts: [planArtifact] });
+		const choice = container.querySelector(
+			"[data-testid='codebase-intent-choice']",
+		);
+		expect(choice).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-intent-revise_current']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-intent-new_feature']"),
+		).not.toBeNull();
+	});
+
+	it("requires an explicit intent before the message can be sent", () => {
+		const onSendMessage = vi.fn();
+		renderWorkspace({ artifacts: [planArtifact], onSendMessage });
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		const sendButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		act(() => {
+			if (composer) setTextareaValue(composer, "Tambah opsi ekspor Markdown");
+		});
+		// No intent chosen yet: sending is closed and the placeholder says why.
+		expect(sendButton?.disabled).toBe(true);
+		expect(composer?.placeholder).toContain("Pilih dulu");
+
+		const reviseRadio = container.querySelector<HTMLInputElement>(
+			"[data-testid='codebase-intent-revise_current'] input",
+		);
+		act(() => {
+			reviseRadio?.click();
+		});
+		expect(sendButton?.disabled).toBe(false);
+
+		act(() => {
+			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onSendMessage).toHaveBeenCalledWith(
+			"Tambah opsi ekspor Markdown",
+			"revise_current",
+		);
+	});
+
+	it("sends a new-feature intent when that option is chosen", () => {
+		const onSendMessage = vi.fn();
+		renderWorkspace({ artifacts: [planArtifact], onSendMessage });
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		act(() => {
+			if (composer) setTextareaValue(composer, "Tambah fitur lain di repo ini");
+		});
+		const newFeatureRadio = container.querySelector<HTMLInputElement>(
+			"[data-testid='codebase-intent-new_feature'] input",
+		);
+		act(() => {
+			newFeatureRadio?.click();
+		});
+		const sendButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		act(() => {
+			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onSendMessage).toHaveBeenCalledWith(
+			"Tambah fitur lain di repo ini",
+			"new_feature",
+		);
+	});
+
+	it("does not ask for an intent before anything exists to revise", () => {
+		const onSendMessage = vi.fn();
+		renderWorkspace({ artifacts: [], onSendMessage });
+		expect(
+			container.querySelector("[data-testid='codebase-intent-choice']"),
+		).toBeNull();
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		act(() => {
+			if (composer) setTextareaValue(composer, "Tambah mode gelap");
+		});
+		const sendButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		expect(sendButton?.disabled).toBe(false);
+		act(() => {
+			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onSendMessage).toHaveBeenCalledWith("Tambah mode gelap", "new_feature");
+	});
+
+	it("shows the task impact only for a revision, and only when the caller reports one", () => {
+		renderWorkspace({
+			artifacts: [planArtifact],
+			revisionImpactNotice:
+				"Revisi ini berdampak pada 2 task selesai. Menyusun ulang task akan mereset progres tersebut.",
+		});
+		expect(
+			container.querySelector("[data-testid='codebase-revision-impact']"),
+		).toBeNull();
+
+		const reviseRadio = container.querySelector<HTMLInputElement>(
+			"[data-testid='codebase-intent-revise_current'] input",
+		);
+		act(() => {
+			reviseRadio?.click();
+		});
+		const notice = container.querySelector(
+			"[data-testid='codebase-revision-impact']",
+		);
+		expect(notice?.textContent).toContain("2 task selesai");
+	});
+
+	it("never shows a task impact notice for the new-feature intent", () => {
+		renderWorkspace({
+			artifacts: [planArtifact],
+			revisionImpactNotice: "Revisi ini berdampak pada 1 task selesai.",
+		});
+		const newFeatureRadio = container.querySelector<HTMLInputElement>(
+			"[data-testid='codebase-intent-new_feature'] input",
+		);
+		act(() => {
+			newFeatureRadio?.click();
+		});
+		expect(
+			container.querySelector("[data-testid='codebase-revision-impact']"),
+		).toBeNull();
 	});
 });
 

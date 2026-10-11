@@ -431,6 +431,61 @@ describe("ask options repository grounding", () => {
 	});
 });
 
+describe("chat intent after task generation", () => {
+	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const chatSource = readFileSync("src/routes/api/chat.ts", "utf8");
+
+	it("routes a new message through the chosen intent instead of guessing", () => {
+		expect(workspaceSource).toContain("CodebaseChatIntent");
+		expect(workspaceSource).toMatch(
+			/intent === "revise_current"[\s\S]*runRevision\(trimmed\)/,
+		);
+		// A new feature still goes through the existing creation path.
+		expect(workspaceSource).toContain("ensureFeatureInWorkspace(trimmed)");
+	});
+
+	it("keeps a revision on the existing append-only versioning path", () => {
+		expect(workspaceSource).toMatch(/mode: "revise"/);
+		// The revision reuses /api/chat, so no parallel versioning system exists.
+		expect(workspaceSource).not.toMatch(/\/api\/[a-z-]*revision/);
+		// Success is only reported after the document is readable again.
+		expect(workspaceSource).toMatch(
+			/runRevision[\s\S]*const content = await loadPrd\(\)[\s\S]*if \(!content\)/,
+		);
+	});
+
+	it("never resets task progress as part of a revision", () => {
+		const revisionBlock = workspaceSource.slice(
+			workspaceSource.indexOf("const runRevision = useCallback("),
+		);
+		const body = revisionBlock.slice(0, revisionBlock.indexOf("const handleSendMessage"));
+		expect(body).not.toContain("refreshTaskTree");
+		expect(body).not.toContain("/api/task/generate");
+		expect(body).not.toContain("reset-progress");
+	});
+
+	it("gates a locked-document revision behind an explicit confirmation", () => {
+		// The lock still blocks a silent revision, and only an explicit
+		// confirmation lifts it for that request.
+		expect(chatSource).toMatch(
+			/isPrdLocked\(projCheck\?\.step\) && !confirmedImpact/,
+		);
+		expect(chatSource).toContain("confirmedImpact");
+		expect(workspaceSource).toContain("confirmedImpact: true");
+	});
+
+	it("computes the task impact from the real Kanban rows", () => {
+		expect(workspaceSource).toContain("assessRevisionImpact");
+		expect(workspaceSource).toContain("describeRevisionImpact(revisionImpact)");
+		expect(workspaceSource).toMatch(/kanban\.data\?\.columns/);
+	});
+
+	it("reports a locked document instead of silently rewriting it", () => {
+		expect(chatSource).toContain("PRD_LOCKED");
+		expect(chatSource).toMatch(/Dokumen PRD telah dikunci \(Read-Only\)/);
+	});
+});
+
 describe("buildAskHandoffAnswers", () => {
 	it("maps answer map to question title and answer list conforming to askHandoffAnswerSchema", () => {
 		const questions = [

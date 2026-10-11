@@ -56,6 +56,13 @@ import {
 } from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
+	assessRevisionImpact,
+	buildRevisionRequest,
+	type CodebaseChatIntent,
+	describeRevisionImpact,
+	resolveIntentOptions,
+} from "@/lib/codebase-revision-intent";
+import {
 	detectStackFromPackageJsonText,
 	manifestToExplorerFiles,
 	mergeStackWithFallback,
@@ -1532,24 +1539,22 @@ function CodebaseDetailPage() {
 		[snapshotReady, isWorking, codebase.id, codebase.name],
 	);
 
-	const handleSendMessage = useCallback(
-		async (message: string) => {
-			const trimmed = message.trim();
-			if (!trimmed || trimmed.length < 3) return;
-			setChatMessages((current) => [
-				...current,
-				{
-					id: `user-${Date.now()}`,
-					role: "user" as const,
-					content: trimmed,
-				},
-			]);
-			setLastFeaturePrompt(trimmed);
-			const projectId = await ensureFeatureInWorkspace(trimmed);
-			if (projectId) void fetchAiQuestions(projectId, trimmed);
-		},
-		[ensureFeatureInWorkspace, fetchAiQuestions],
-	);
+	/**
+	 * Whether a revision would replace tasks the user already progressed. The
+	 * impact is computed from the real Kanban rows, so the warning names actual
+	 * counts and the confirmation gates the same data it describes.
+	 */
+	const revisionImpact = useMemo(() => {
+		const all = kanban.data?.columns
+			? [
+					...kanban.data.columns.pending,
+					...kanban.data.columns.in_progress,
+					...kanban.data.columns.completed,
+					...kanban.data.columns.failed,
+				]
+			: [];
+		return assessRevisionImpact(all.map((task) => ({ status: task.status })));
+	}, [kanban.data]);
 
 	const handleSubmitAnswer = useCallback(
 		(questionId: string, answer: string) => {
@@ -1654,6 +1659,116 @@ function CodebaseDetailPage() {
 			setCanvasOpen(true);
 		},
 		[effectiveFeatureId],
+	);
+	/**
+	 * Revise the current feature plan.
+	 *
+	 * The request carries the user's own instruction plus an explicit scope
+	 * bound, and the existing revision engine applies only the sections the
+	 * request actually affects — a revision never rewrites the whole document.
+	 * The result is appended as a new PRD version (the previous one stays
+	 * readable), and the task list is never touched here: when the impact
+	 * assessment says real task progress exists, the user must confirm before
+	 * anything downstream is regenerated.
+	 */
+	const runRevision = useCallback(
+		async (instruction: string) => {
+			if (!effectiveFeatureId || stageBusy) return;
+			setStageBusy("prd");
+			setStageError(null);
+			setRun(startRun("prd", Date.now()));
+			try {
+				const response = await fetch("/api/chat", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						projectId: effectiveFeatureId,
+						mode: "revise",
+						message: buildRevisionRequest({
+							featureName: resolvedFeature?.name ?? codebase.name,
+							instruction,
+						}),
+						displayMessage: instruction,
+						// Only sent when the user saw the impact and accepted it, so
+						// the server's ac/task lock keeps blocking every silent
+						// revision of a locked document.
+						...(revisionImpact.requiresTaskReplacementConfirmation
+							? { confirmedImpact: true }
+							: {}),
+					}),
+				});
+				const result = await consumeSseStream(response, {
+					onThinking: (text) =>
+						setRun((current) => appendRunThinking(current, text)),
+					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
+				});
+				if (result.error) {
+					const failure = result.error;
+					setStageError(failure);
+					setRun((current) =>
+						settleRun(current, "failed", Date.now(), failure),
+					);
+					return;
+				}
+				// The stream closing is not proof the revision was stored: reload
+				// the authoritative document and only report success when the new
+				// version is actually readable.
+				const content = await loadPrd();
+				if (!content) {
+					const failure =
+						"Revisi belum tersimpan di server. Coba kirim ulang permintaan.";
+					setStageError(failure);
+					setRun((current) =>
+						settleRun(current, "failed", Date.now(), failure),
+					);
+					return;
+				}
+				setRun((current) => settleRun(current, "done", Date.now()));
+				pushAssistantMessage(
+					`Revisi untuk ${resolvedFeature?.name ?? "fitur"} sudah diterapkan sebagai versi PRD baru. Dokumen versi sebelumnya tetap tersimpan.`,
+				);
+				openArtifactPreview("prd", true);
+			} catch {
+				const failure = "Server tidak dapat dihubungi. Coba lagi.";
+				setStageError(failure);
+				setRun((current) => settleRun(current, "failed", Date.now(), failure));
+			} finally {
+				setStageBusy(null);
+			}
+		},
+		[
+			effectiveFeatureId,
+			stageBusy,
+			resolvedFeature?.name,
+			codebase.name,
+			revisionImpact.requiresTaskReplacementConfirmation,
+			loadPrd,
+			pushAssistantMessage,
+			openArtifactPreview,
+		],
+	);
+
+	const handleSendMessage = useCallback(
+		async (message: string, intent: CodebaseChatIntent) => {
+			const trimmed = message.trim();
+			if (!trimmed || trimmed.length < 3) return;
+			setChatMessages((current) => [
+				...current,
+				{
+					id: `user-${Date.now()}`,
+					role: "user" as const,
+					content: trimmed,
+				},
+			]);
+			if (intent === "revise_current") {
+				await runRevision(trimmed);
+				return;
+			}
+			setLastFeaturePrompt(trimmed);
+			const projectId = await ensureFeatureInWorkspace(trimmed);
+			if (projectId) void fetchAiQuestions(projectId, trimmed);
+		},
+		[ensureFeatureInWorkspace, fetchAiQuestions, runRevision],
 	);
 
 	const handleConfirmGenerate = useCallback(async () => {
@@ -2071,6 +2186,10 @@ function CodebaseDetailPage() {
 								questions={aiQuestions}
 								answers={chatAnswers}
 								run={run}
+								intentOptions={resolveIntentOptions({
+									hasExistingFeature: artifacts.length > 0,
+								})}
+								revisionImpactNotice={describeRevisionImpact(revisionImpact)}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
 								projectIdForHandoff={hasTasksInDb ? effectiveFeatureId : null}
@@ -2123,7 +2242,9 @@ function CodebaseDetailPage() {
 								}}
 								onDownloadArtifact={handleDownloadArtifact}
 								onSubmitAnswer={handleSubmitAnswer}
-								onSendMessage={(message) => void handleSendMessage(message)}
+								onSendMessage={(message, intent) =>
+									void handleSendMessage(message, intent)
+								}
 								onConfirmGenerate={() => void handleConfirmGenerate()}
 								onRetryGenerate={() => void handleConfirmGenerate()}
 								onRetryStage={() => void handleRetryStage()}
