@@ -161,6 +161,10 @@ export function PromptBar({
 	 * must start typing. Pointer-down is intercepted instead of click so the
 	 * browser never moves focus to the surface first, and the caret lands at
 	 * the end of the draft like every other "clicked below the text" input.
+	 *
+	 * Only `disabled` stops this: a busy composer stays editable by design, so
+	 * a user can keep preparing their next message while a request is in
+	 * flight. The submit action is what the busy state blocks, not typing.
 	 */
 	const handleSurfacePointerDown = useCallback(
 		(event: MouseEvent<HTMLFormElement>) => {
@@ -202,7 +206,11 @@ export function PromptBar({
 		el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
 	}, [draft, minRows, maxRows]);
 
-	const canSend = !disabled && draft.trim().length >= minCharsToSend;
+	// A busy composer keeps the textarea editable so a draft survives the
+	// in-flight request, but the submit action is closed: Enter and the button
+	// both consult this one predicate, so the keyboard cannot bypass the guard.
+	const canSend =
+		!disabled && !isSending && draft.trim().length >= minCharsToSend;
 
 	const handleSend = () => {
 		if (!canSend) return;
@@ -241,7 +249,7 @@ export function PromptBar({
 				event.preventDefault();
 				handleSend();
 			}}
-			className={`group relative flex w-full cursor-text flex-col rounded-xl border border-graphite bg-charcoal/80 p-3 transition-colors focus-within:border-indigo/50 ${className}`}
+			className={`group relative flex w-full ${disabled ? "cursor-not-allowed" : "cursor-text"} flex-col rounded-xl border border-graphite bg-charcoal/80 p-3 transition-colors focus-within:border-indigo/50 ${className}`}
 		>
 			<label htmlFor={id} className="sr-only">
 				{ariaLabel}

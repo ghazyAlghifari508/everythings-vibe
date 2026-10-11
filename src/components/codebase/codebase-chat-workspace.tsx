@@ -16,6 +16,7 @@ import {
 	type CodebaseArtifactRef,
 	CodebaseFileCard,
 } from "./codebase-file-card";
+import { QuestionThinking } from "./question-thinking";
 
 export type { AdaptiveQuestion, AdaptiveQuestionOption };
 
@@ -43,6 +44,12 @@ interface CodebaseChatWorkspaceProps {
 	answers: Record<string, string>;
 	questionsLoading?: boolean;
 	questionsError?: string | null;
+	/**
+	 * Wall-clock start of the in-flight question-generation request, owned by
+	 * the route. Drives the Thinking elapsed timer from a real timestamp
+	 * instead of from this component's mount time.
+	 */
+	questionsStartedAt?: number | null;
 	artifacts: CodebaseArtifactRef[];
 	activeArtifactId?: string | null;
 	projectIdForHandoff?: string | null;
@@ -107,6 +114,7 @@ export function CodebaseChatWorkspace({
 	answers,
 	questionsLoading = false,
 	questionsError = null,
+	questionsStartedAt = null,
 	artifacts,
 	activeArtifactId = null,
 	projectIdForHandoff = null,
@@ -259,8 +267,11 @@ export function CodebaseChatWorkspace({
 			value={draft}
 			onValueChange={setDraft}
 			onSend={handleSend}
-			disabled={isSending || questionsLoading}
-			isSending={isSending}
+			// The composer stays editable while a request is in flight so the
+			// user can prepare the next message; only the submit action closes.
+			// Duplicate submissions are blocked by the shared busy guard in
+			// `handleSend` and by PromptBar's `canSend`, which Enter also uses.
+			isSending={isSending || questionsLoading}
 			minCharsToSend={3}
 			minRows={minRows}
 			maxRows={6}
@@ -420,26 +431,14 @@ export function CodebaseChatWorkspace({
 								),
 							)}
 							{questionsLoading ? (
-								<div
-									data-testid="codebase-questions-loading"
-									className="flex flex-col gap-2 rounded-xl border border-graphite bg-charcoal p-3"
-									aria-busy="true"
-								>
-									<div className="h-4 w-2/3 animate-pulse rounded bg-graphite" />
-									<div className="h-3 w-full animate-pulse rounded bg-graphite" />
-									<div className="h-3 w-5/6 animate-pulse rounded bg-graphite" />
-									<p className="text-xs text-fog">
-										Menyusun pertanyaan klarifikasi dari konteks repositori...
-									</p>
-								</div>
+								<QuestionThinking startedAt={questionsStartedAt} />
 							) : null}
 							{questionsError ? (
 								<div
-									role="alert"
 									data-testid="codebase-questions-error"
 									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
 								>
-									<span>{questionsError}</span>
+									<span role="alert">{questionsError}</span>
 									{onRetryQuestions ? (
 										<button
 											type="button"

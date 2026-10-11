@@ -214,6 +214,56 @@ describe("PromptBar Component", () => {
 		expect(sendButton?.textContent).toContain("Mengirim...");
 	});
 
+	it("keeps the textarea editable while isSending and preserves the draft", () => {
+		const onSend = vi.fn();
+		const onValueChange = vi.fn();
+		act(() => {
+			root?.render(
+				<PromptBar
+					isSending
+					value="Draft yang sedang saya susun"
+					onValueChange={onValueChange}
+					onSend={onSend}
+				/>,
+			);
+		});
+
+		const textarea = container.querySelector<HTMLTextAreaElement>("textarea");
+		const sendButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		// Editable, but the submit action is closed for the whole busy window.
+		expect(textarea?.disabled).toBe(false);
+		expect(sendButton?.disabled).toBe(true);
+		expect(textarea?.value).toBe("Draft yang sedang saya susun");
+
+		// Enter cannot bypass the pending-request guard.
+		act(() => {
+			textarea?.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
+		});
+		expect(onSend).not.toHaveBeenCalled();
+	});
+
+	it("uses one cursor treatment across the whole surface when disabled", () => {
+		act(() => {
+			root?.render(<PromptBar disabled value="Teks" />);
+		});
+		const surface = container.querySelector("[data-testid='prompt-bar']");
+		expect(surface?.className).toContain("cursor-not-allowed");
+		expect(surface?.className).not.toContain("cursor-text");
+	});
+
+	it("keeps the text cursor across the whole surface while only busy", () => {
+		act(() => {
+			root?.render(<PromptBar isSending value="Teks" />);
+		});
+		const surface = container.querySelector("[data-testid='prompt-bar']");
+		expect(surface?.className).toContain("cursor-text");
+		expect(surface?.className).not.toContain("cursor-not-allowed");
+	});
+
 	it("does not render demo controls such as model picker, mic, attachments, or effort slider", () => {
 		act(() => {
 			root?.render(<PromptBar />);

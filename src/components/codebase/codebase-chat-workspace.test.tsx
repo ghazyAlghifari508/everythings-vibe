@@ -467,11 +467,58 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			container.querySelector("[data-testid='codebase-chat-messages']"),
 		).not.toBeNull();
 		expect(
-			container.querySelector("[data-testid='codebase-questions-loading']"),
+			container.querySelector("[data-testid='codebase-question-thinking']"),
 		).not.toBeNull();
 		expect(
 			container.querySelectorAll("[data-testid='prompt-bar']"),
 		).toHaveLength(1);
+	});
+
+	it("shows genuine thinking activity with elapsed time, never skeleton bars", () => {
+		renderWorkspace({
+			questionsLoading: true,
+			questionsStartedAt: Date.now() - 1500,
+		});
+		const thinking = container.querySelector(
+			"[data-testid='codebase-question-thinking']",
+		);
+		expect(thinking).not.toBeNull();
+		// The old placeholder is gone: no skeleton bars may remain.
+		expect(
+			container.querySelector("[data-testid='codebase-questions-loading']"),
+		).toBeNull();
+		expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+		// A real label plus a real elapsed timer, not a fabricated reasoning log.
+		expect(thinking?.textContent).toContain("Thinking");
+		expect(thinking?.textContent).toContain("Menunggu output model");
+		const timer = thinking?.querySelector("[role='timer']");
+		expect(timer).not.toBeNull();
+		expect(timer?.textContent).toMatch(/^\d+\.\d+s$/);
+	});
+
+	it("places the thinking line directly below the user message", () => {
+		renderWorkspace({
+			messages: [
+				{ id: "user-1", role: "user", content: "Tambah mode gelap" },
+			],
+			questionsLoading: true,
+			questionsStartedAt: Date.now(),
+		});
+		const stream = container.querySelector(
+			"[data-testid='codebase-chat-messages']",
+		);
+		const children = Array.from(stream?.firstElementChild?.children ?? []);
+		const userIndex = children.findIndex((child) =>
+			child.textContent?.includes("Tambah mode gelap"),
+		);
+		const thinkingIndex = children.findIndex(
+			(child) =>
+				child.querySelector("[data-testid='codebase-question-thinking']") !==
+					null ||
+				child.getAttribute("data-testid") === "codebase-question-thinking",
+		);
+		expect(userIndex).toBeGreaterThanOrEqual(0);
+		expect(thinkingIndex).toBeGreaterThan(userIndex);
 	});
 
 	it("exits pristine state when questions are present", () => {
@@ -593,7 +640,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(composer?.value).toBe("");
 	});
 
-	it("blocks sending and disables composer during questionsLoading or isSending", () => {
+	it("blocks sending while busy but keeps the composer editable and the draft intact", () => {
 		const onSendMessage = vi.fn();
 		renderWorkspace({
 			questionsLoading: true,
@@ -607,8 +654,23 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			"[data-testid='prompt-bar-submit']",
 		);
 
-		expect(composer?.disabled).toBe(true);
+		// Editable: the user can prepare the next message while AI works.
+		expect(composer?.disabled).toBe(false);
+		// Submit closed, and Enter must not bypass the pending-request guard.
 		expect(sendButton?.disabled).toBe(true);
+		act(() => {
+			if (composer) setTextareaValue(composer, "Draft baru");
+		});
+		expect(composer?.value).toBe("Draft baru");
+		act(() => {
+			composer?.dispatchEvent(
+				new KeyboardEvent("keydown", {
+					key: "Enter",
+					bubbles: true,
+				}),
+			);
+		});
+		expect(onSendMessage).not.toHaveBeenCalled();
 
 		// Now render with isSending
 		renderWorkspace({
@@ -622,7 +684,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		const isSendingButton = container.querySelector<HTMLButtonElement>(
 			"[data-testid='prompt-bar-submit']",
 		);
-		expect(isSendingComposer?.disabled).toBe(true);
+		expect(isSendingComposer?.disabled).toBe(false);
 		expect(isSendingButton?.disabled).toBe(true);
 		// Icon-only submit carries its state through ARIA, never visible text.
 		expect(isSendingButton?.getAttribute("aria-busy")).toBe("true");
