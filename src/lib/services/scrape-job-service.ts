@@ -108,7 +108,10 @@ export async function renewScrapeClaim(
 	const { db } = await import("@/db");
 	const rows = await db
 		.update(scrapes)
-		.set({ leaseExpiresAt: new Date(Date.now() + SCRAPE_JOB_LEASE_MS) })
+		.set({
+			leaseExpiresAt: new Date(Date.now() + SCRAPE_JOB_LEASE_MS),
+			metadata: sql`coalesce(${scrapes.metadata}, '{}'::jsonb) || ${JSON.stringify({ workerHeartbeatAt: new Date().toISOString() })}::jsonb`,
+		})
 		.where(scrapeClaimPredicate(claim))
 		.returning({ id: scrapes.id });
 	return rows.length === 1;

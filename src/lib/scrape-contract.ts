@@ -17,6 +17,7 @@ export const SCRAPE_LIMITS = {
 	captureMaxRequests: 500,
 	captureMaxBytes: 50_000_000,
 	jobTimeoutMs: 15 * 60 * 1000,
+	queueHealthAfterMs: 30_000,
 } as const;
 
 export function normalizeScrapeInput(raw: string): string {

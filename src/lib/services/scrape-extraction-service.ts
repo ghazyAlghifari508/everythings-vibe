@@ -166,6 +166,10 @@ export async function runExtractionJob(
 						...scrape.metadata,
 						mode: "crawl",
 						visitedPages: pages.filter((row) => row.status !== "queued").length,
+						completedPages: pages.filter((row) => row.status === "completed")
+							.length,
+						skippedPages: pages.filter((row) => row.status === "skipped")
+							.length,
 						discoveredPages: discovered,
 						failedResources: pages.filter((row) => row.status === "failed")
 							.length,

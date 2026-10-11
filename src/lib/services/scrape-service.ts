@@ -439,7 +439,20 @@ export async function getScrapeById(
 		.from(scrapeDocuments)
 		.where(eq(scrapeDocuments.scrapeId, id))
 		.limit(1);
-	return { ...row, document: document ?? null };
+	const ageMs = Date.now() - row.createdAt.getTime();
+	const health =
+		row.status === "queued" && ageMs > SCRAPE_LIMITS.queueHealthAfterMs
+			? "Belum ada worker yang mengambil job ini. Pastikan worker berjalan; antrean akan dilanjutkan saat worker tersedia."
+			: row.leaseExpiresAt &&
+					row.leaseExpiresAt <= new Date() &&
+					!["completed", "failed"].includes(row.status)
+				? "Heartbeat worker tidak aktif. Job menunggu pemulihan lease oleh worker."
+				: undefined;
+	return {
+		...row,
+		metadata: { ...row.metadata, workerHealth: health },
+		document: document ?? null,
+	};
 }
 
 export async function listScrapes(

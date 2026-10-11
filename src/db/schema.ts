@@ -881,6 +881,8 @@ export interface ScrapeMetadata {
 	skippedPages?: number;
 	failedResources?: number;
 	idempotencyKey?: string;
+	workerHeartbeatAt?: string;
+	workerHealth?: string;
 }
 
 export type ScrapeStatus =

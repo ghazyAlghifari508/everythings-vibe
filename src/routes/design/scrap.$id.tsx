@@ -288,6 +288,7 @@ function ScrapeDetailPage() {
 			) : currentStatus === "failed" &&
 				(mode === "crawl" || mode === "images") ? null : (
 				<ScrapeProgress
+					workerHealth={data?.metadata?.workerHealth}
 					completedPages={data?.metadata?.completedPages}
 					skippedPages={data?.metadata?.skippedPages}
 					discoveredImages={data?.metadata?.discoveredImages}
