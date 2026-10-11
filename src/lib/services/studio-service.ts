@@ -1015,6 +1015,56 @@ export async function retryStudioFrame(
 	userId: string,
 	frameId: string,
 ): Promise<StudioFrameRow> {
+	const [failedOperation] = await db
+		.select()
+		.from(studioJobs)
+		.where(
+			and(
+				eq(studioJobs.projectId, projectId),
+				eq(studioJobs.userId, userId),
+				eq(studioJobs.targetFrameId, frameId),
+				eq(studioJobs.status, "failed"),
+			),
+		)
+		.orderBy(desc(studioJobs.createdAt))
+		.limit(1);
+	if (failedOperation) {
+		await getStudioProject(projectId, userId);
+		await db.transaction(async (tx) => {
+			await tx
+				.update(studioJobs)
+				.set({ status: "queued", error: null, updatedAt: new Date() })
+				.where(
+					and(
+						eq(studioJobs.id, failedOperation.id),
+						eq(studioJobs.userId, userId),
+						eq(studioJobs.status, "failed"),
+					),
+				);
+			await tx
+				.update(studioFrames)
+				.set({ status: "queued", error: null, updatedAt: new Date() })
+				.where(
+					and(
+						eq(studioFrames.id, frameId),
+						eq(studioFrames.projectId, projectId),
+					),
+				);
+		});
+		void runStudioJobPipeline(failedOperation.id, projectId, userId);
+		const [frame] = await db
+			.select()
+			.from(studioFrames)
+			.where(
+				and(
+					eq(studioFrames.id, frameId),
+					eq(studioFrames.projectId, projectId),
+				),
+			);
+		if (!frame)
+			throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
+		return frame;
+	}
 	const detail = await getStudioProject(projectId, userId);
 	const [frame] = await db
 		.select()

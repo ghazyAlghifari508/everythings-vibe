@@ -228,12 +228,7 @@ function StudioDetailPage() {
 
 	async function handleRetryFrame(frameId: string) {
 		try {
-			setFrames((prev) =>
-				prev.map((f) =>
-					f.id === frameId ? { ...f, status: "generating" } : f,
-				),
-			);
-			await fetch("/api/studio/frame", {
+			const response = await fetch("/api/studio/frame", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
@@ -242,9 +237,12 @@ function StudioDetailPage() {
 					frameId,
 				}),
 			});
+			if (!response.ok) throw new Error("Permintaan retry gagal. Coba lagi.");
 			await syncProjectStatus();
-		} catch {
-			// Retry trigger error handled by sync
+		} catch (failure) {
+			setError(
+				failure instanceof Error ? failure.message : "Permintaan retry gagal.",
+			);
 		}
 	}
 
