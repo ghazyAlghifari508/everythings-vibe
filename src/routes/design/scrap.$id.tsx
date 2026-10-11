@@ -270,6 +270,7 @@ function ScrapeDetailPage() {
 					sourceUrl={sourceUrl}
 					domain={domain}
 					designMd={designMd}
+					visualEvidence={metadata?.visualEvidence}
 				/>
 			) : view === "result-html" ? (
 				<ScrapeDetail

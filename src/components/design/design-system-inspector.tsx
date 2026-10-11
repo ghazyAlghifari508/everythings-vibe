@@ -23,7 +23,7 @@ function isCssLength(value: string): boolean {
 }
 
 function isSafeFontFamily(value: string): boolean {
-	return /^[\w\s-]+$/.test(value.trim());
+	return /^[\w\s,'"-]+$/.test(value.trim());
 }
 
 function isSafeLineHeight(value: string): boolean {
@@ -231,7 +231,7 @@ function TypePreview({ entry }: { entry: InspectorTypeEntry }) {
 	if (weight) style.fontWeight = weight;
 	if (isSafeLineHeight(entry.lineHeight)) style.lineHeight = entry.lineHeight;
 	if (entry.family && isSafeFontFamily(entry.family)) {
-		style.fontFamily = `${entry.family}, sans-serif`;
+		style.fontFamily = entry.family;
 	}
 	const meta = [entry.size, entry.weight, entry.lineHeight]
 		.filter((part) => part.length > 0)
@@ -286,7 +286,7 @@ function FontCard({ font, sizes }: { font: InspectorFont; sizes: string[] }) {
 				className="mt-2 truncate text-sm text-mist"
 				style={
 					isSafeFontFamily(font.family)
-						? { fontFamily: `${font.family}, sans-serif` }
+						? { fontFamily: font.family }
 						: undefined
 				}
 			>
@@ -388,6 +388,11 @@ export function DesignSystemInspector({
 			</div>
 
 			<div className="mt-6 flex flex-col gap-6">
+				<p className="text-sm text-fog">
+					{model.verification === "observed"
+						? "Sumber: pengukuran browser. Peran warna mengikuti penggunaan elemen, bukan klaim brand yang belum terbukti."
+						: "Hasil lama belum terverifikasi terhadap evidence browser. Dokumen asli tetap tersedia."}
+				</p>
 				{model.colors.length > 0 ? (
 					<InspectorSection label="Palet Warna">
 						<div className="flex min-w-0 flex-col gap-6">

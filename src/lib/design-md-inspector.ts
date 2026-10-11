@@ -1,3 +1,5 @@
+import { parseVisualEvidence } from "./design-evidence-contract";
+import { extractionFromVisualEvidence } from "./design-visual-evidence";
 import { normalizeDesign } from "./prompts-design-md";
 
 export type DesignTheme = "light" | "dark" | "unknown";
@@ -29,6 +31,7 @@ export interface InspectorToken {
 }
 
 export interface DesignInspectorModel {
+	verification?: "observed" | "unverified";
 	title: string;
 	essence: string;
 	theme: DesignTheme;
@@ -41,6 +44,43 @@ export interface DesignInspectorModel {
 	baseUnit: string;
 	dos: string[];
 	donts: string[];
+}
+
+export function inspectorFromEvidence(
+	value: unknown,
+): DesignInspectorModel | null {
+	const evidence = parseVisualEvidence(value);
+	if (!evidence) return null;
+	const extraction = extractionFromVisualEvidence(evidence);
+	const typography = (extraction.typographyRoles ?? []).map((entry) => ({
+		label: entry.role,
+		family: entry.family,
+		size: entry.size,
+		weight: entry.weight,
+		lineHeight: entry.lineHeight,
+	}));
+	return {
+		...EMPTY_MODEL,
+		verification: "observed",
+		colors: extraction.colors.map((color) => ({
+			name: color.role,
+			value: color.value,
+			token: "",
+			role: color.role,
+		})),
+		typography,
+		fonts: deriveFonts(typography),
+		spacing: (extraction.tokens?.spacing ?? []).map((value) => ({
+			label: "Computed spacing",
+			value,
+		})),
+		radii: (extraction.tokens?.radii ?? []).map((value) => ({
+			label: "Computed radius",
+			value,
+		})),
+		overview:
+			"Pengukuran pada satu viewport. Preview font memakai font yang tersedia di browser Anda; font glyph situs asal belum terverifikasi.",
+	};
 }
 
 interface ParsedTable {

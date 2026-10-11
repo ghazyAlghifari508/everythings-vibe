@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { parseDesignMd } from "@/lib/design-md-inspector";
+import {
+	inspectorFromEvidence,
+	parseDesignMd,
+} from "@/lib/design-md-inspector";
 import { displaySiteName } from "@/lib/site-name";
 import { DesignAgentPromptDialog } from "./design-agent-prompt-dialog";
 import { DesignMdSourcePanel } from "./design-md-source-panel";
@@ -11,16 +14,25 @@ export interface DesignResultProps {
 	sourceUrl: string;
 	domain: string;
 	designMd: string;
+	visualEvidence?: unknown;
 }
 
 export function DesignResult({
 	sourceUrl,
 	domain,
 	designMd,
+	visualEvidence,
 }: DesignResultProps) {
 	const [agentOpen, setAgentOpen] = useState(false);
 	const siteName = displaySiteName(domain);
-	const model = useMemo(() => parseDesignMd(designMd), [designMd]);
+	const model = useMemo(
+		() =>
+			inspectorFromEvidence(visualEvidence) ?? {
+				...parseDesignMd(designMd),
+				verification: "unverified" as const,
+			},
+		[designMd, visualEvidence],
+	);
 
 	return (
 		<div className="grid min-w-0 w-full grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] lg:gap-8">
