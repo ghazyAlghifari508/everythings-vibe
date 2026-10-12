@@ -289,10 +289,6 @@ export function ScrapeDetail({
 					aria-label="Preview index.html"
 					hidden={htmlViewTab !== "preview"}
 				>
-					<p className="border-b border-graphite px-3 py-2 text-xs text-fog">
-						Snapshot visual hasil scrape. Interaksi aplikasi website tidak
-						dijalankan ulang.
-					</p>
 					{previewState === "failed" || !previewSrcDoc ? (
 						<PreviewUnavailable
 							message={
