@@ -148,6 +148,7 @@ const MODEL: DesignInspectorModel = {
 			roles: ["canvas", "nav"],
 		},
 	],
+	components: [],
 	baseUnitPx: 4,
 	dos: [
 		{
@@ -178,6 +179,7 @@ const EMPTY_MODEL: DesignInspectorModel = {
 	radii: [],
 	elevation: [],
 	surfaces: [],
+	components: [],
 	baseUnitPx: Number.NaN,
 	dos: [],
 	donts: [],
