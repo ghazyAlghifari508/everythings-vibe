@@ -1,7 +1,10 @@
-import { Check, RotateCcw } from "lucide-react";
-import { ThoughtLine } from "@/components/ui/thought-line";
+import { AlertTriangle, Check, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ScrapeErrorCard } from "@/components/design/scrape-error-card";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
+import { resolveScrapeErrorPresentation } from "@/lib/scrape-error-presentation";
 import { displaySiteName } from "@/lib/site-name";
+import { cn } from "@/lib/utils";
 
 export interface ScrapeProgressProps {
 	status: ScrapeStatus;
@@ -9,6 +12,9 @@ export interface ScrapeProgressProps {
 	sourceUrl?: string;
 	domain?: string;
 	errorMessage?: string | null;
+	errorDetail?: string | null;
+	failedAtStage?: ScrapeStatus | null;
+	retryAfterSeconds?: number | null;
 	isRetrying?: boolean;
 	onRetry?: () => void;
 	stageStartedAt?: string | null;
@@ -33,6 +39,8 @@ export interface ScrapeProgressProps {
 		| "discovery-failed"
 		| null;
 	imageOutcome?: "complete" | "partial" | "empty" | "all-failed" | null;
+	// Shared composition without duplicating the stepper per mode.
+	layout?: "two-panel" | "single";
 }
 
 const LABELS: Record<ScrapeStatus, string> = {
@@ -45,6 +53,16 @@ const LABELS: Record<ScrapeStatus, string> = {
 	failed: "Proses terhenti",
 };
 
+const DESCRIPTIONS: Record<ScrapeStatus, string> = {
+	queued: "Permintaan berhasil diterima",
+	capturing: "Memproses halaman yang ditemukan",
+	extracting: "Memeriksa konten yang tertangkap",
+	generating: "Menyusun DESIGN.md dari evidence",
+	saving: "Menyimpan hasil",
+	completed: "Semua tahapan selesai",
+	failed: "Tahap ini tidak dapat diselesaikan",
+};
+
 const OPERATIONS: Record<ScrapeMode, string> = {
 	design: "DESIGN.md",
 	crawl: "Crawl Website",
@@ -52,7 +70,10 @@ const OPERATIONS: Record<ScrapeMode, string> = {
 	html: "Scrape HTML",
 };
 
-function stagesFor(mode: ScrapeMode): ScrapeStatus[] {
+// Only the stages a mode really persists. Crawl never persists "extracting":
+// its worker moves from capturing straight to completed, so rendering an
+// extracting row would be a fabricated stage.
+export function getScrapeStagesForMode(mode: ScrapeMode): ScrapeStatus[] {
 	if (mode === "design")
 		return [
 			"queued",
@@ -64,25 +85,150 @@ function stagesFor(mode: ScrapeMode): ScrapeStatus[] {
 		];
 	if (mode === "html")
 		return ["queued", "capturing", "extracting", "saving", "completed"];
-	return ["queued", "capturing", "extracting", "completed"];
+	if (mode === "images")
+		return ["queued", "capturing", "extracting", "completed"];
+	return ["queued", "capturing", "completed"];
 }
 
-// A finished stage keeps a check mark and the live stage is marked by a filled
-// dot: the progress bar below is the single running indicator, so no stage
-// marker spins and no replacement spinner is introduced.
-function StageMarker({ done, current }: { done: boolean; current: boolean }) {
-	if (done && !current)
+type StepState = "done" | "active" | "pending" | "failed";
+
+function StepMarker({ state }: { state: StepState }) {
+	if (state === "done")
 		return <Check size={14} aria-hidden className="text-mist" />;
-	if (current)
+	if (state === "active")
 		return (
-			<span
+			<Loader2
+				size={14}
 				aria-hidden
-				data-active-stage-marker
-				className="block size-2 rounded-full bg-mist"
+				data-active-stage-spinner
+				className="shrink-0 text-mist motion-safe:animate-spin motion-reduce:animate-none"
+			/>
+		);
+	if (state === "failed")
+		return (
+			<AlertTriangle
+				size={14}
+				aria-hidden
+				data-failed-stage-marker
+				className="shrink-0 text-crimson"
 			/>
 		);
 	return (
 		<span aria-hidden className="size-1.5 rounded-full border border-slate" />
+	);
+}
+
+export interface ScrapeStepperProps {
+	stages: ScrapeStatus[];
+	status: ScrapeStatus;
+	failedAt?: ScrapeStatus | null;
+	className?: string;
+}
+
+// Shared vertical stepper: one continuous connector per gap, a real spinner
+// on the live stage, and a failed marker only on the persisted failure stage.
+export function ScrapeStepper({
+	stages,
+	status,
+	failedAt,
+	className,
+}: ScrapeStepperProps) {
+	const isFailed = status === "failed";
+	const isDone = status === "completed";
+	const index = stages.indexOf(status);
+	const failedIndex = failedAt ? stages.indexOf(failedAt) : -1;
+
+	function stepState(i: number): StepState {
+		if (isFailed) {
+			if (failedIndex >= 0) {
+				if (i < failedIndex) return "done";
+				if (i === failedIndex) return "failed";
+				return "pending";
+			}
+			return i === 0 ? "done" : "pending";
+		}
+		if (isDone) return "done";
+		if (i < index) return "done";
+		if (i === index) return "active";
+		return "pending";
+	}
+
+	return (
+		<ol
+			data-stepper
+			aria-label="Tahapan pemrosesan"
+			className={cn("mt-6", className)}
+		>
+			{stages.map((stage, i) => {
+				const state = stepState(i);
+				const connectorState =
+					state === "pending"
+						? "pending"
+						: state === "done"
+							? "done"
+							: "active";
+				return (
+					<li
+						key={stage}
+						data-step-state={state}
+						aria-current={state === "active" ? "step" : undefined}
+						className="relative flex items-start gap-3 pb-5 last:pb-0"
+					>
+						{i < stages.length - 1 ? (
+							<span
+								aria-hidden
+								data-step-connector
+								data-connector-state={connectorState}
+								className={cn(
+									"absolute top-5 bottom-1 left-2 w-px",
+									connectorState === "pending" ? "bg-slate" : "bg-mist",
+								)}
+							/>
+						) : null}
+						<span className="relative z-10 flex size-4 shrink-0 items-center justify-center bg-charcoal">
+							<StepMarker state={state} />
+						</span>
+						<div className="min-w-0">
+							<p
+								className={cn(
+									"text-sm",
+									state === "active" || state === "failed"
+										? "font-semibold text-snow"
+										: state === "done"
+											? "text-fog"
+											: "text-fog/70",
+								)}
+							>
+								{LABELS[stage]}
+								{state === "failed" ? " — Gagal" : null}
+							</p>
+							<p className="mt-0.5 text-xs text-fog">{DESCRIPTIONS[stage]}</p>
+						</div>
+					</li>
+				);
+			})}
+		</ol>
+	);
+}
+
+// Measured elapsed time from a real persisted start. Renders nothing when the
+// backend never recorded a start, so the timer measures instead of guessing.
+function ElapsedTimer({ start }: { start: string }) {
+	const [now, setNow] = useState(() => Date.now());
+	useEffect(() => {
+		const id = setInterval(() => setNow(Date.now()), 250);
+		return () => clearInterval(id);
+	}, []);
+	const startMs = Date.parse(start);
+	if (!Number.isFinite(startMs)) return null;
+	return (
+		<span
+			role="timer"
+			aria-label="Waktu proses"
+			className="font-mono text-xs text-fog tabular-nums"
+		>
+			{((now - startMs) / 1000).toFixed(1)}s
+		</span>
 	);
 }
 
@@ -98,13 +244,17 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 		isRetrying,
 		onRetry,
 		errorMessage,
+		errorDetail,
+		failedAtStage,
+		retryAfterSeconds,
+		layout = "two-panel",
 	} = props;
-	const stages = stagesFor(mode);
-	const index = stages.indexOf(status);
+	const stages = getScrapeStagesForMode(mode);
 	const isFailed = status === "failed";
 	const isDone = status === "completed";
 	const active = !isDone && !isFailed;
 	const operation = OPERATIONS[mode];
+	const headerState = isFailed ? "Gagal" : isDone ? "Selesai" : "Berjalan";
 
 	const counters =
 		mode === "crawl"
@@ -127,12 +277,19 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 		([, value]) => typeof value === "number",
 	);
 	const startTimestamp = activityStartedAt ?? stageStartedAt;
-	// While queued no worker has touched the job, so the activity slot states
-	// that honestly instead of animating as if analysis had started.
+	// A single persisted activity line. When the backend recorded nothing, the
+	// slot keeps one honest idle label instead of inventing a feed.
 	const activityText = activity ?? null;
 
 	return (
-		<div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
+		<div
+			data-layout={layout}
+			className={
+				layout === "single"
+					? "grid min-w-0 gap-6"
+					: "grid min-w-0 gap-6 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]"
+			}
+		>
 			<div className="min-w-0">
 				<p className="text-sm text-fog">{operation}</p>
 				<h2 className="mt-1 text-2xl font-bold text-snow">
@@ -141,32 +298,26 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 				<p className="mt-2 break-all font-mono text-xs text-fog">{sourceUrl}</p>
 
 				<div className="mt-6 border-t border-graphite pt-5">
-					<p className="text-sm font-semibold text-snow">
-						Aktivitas pemrosesan
-					</p>
+					<p className="text-sm font-semibold text-snow">Aktivitas terbaru</p>
 					{isFailed ? (
 						<p className="mt-2 break-words text-sm text-fog">
 							Pemrosesan berhenti. Lihat alasan dan opsi pemulihan di panel
 							progres.
 						</p>
 					) : active && activityText ? (
-						<ThoughtLine
-							working
-							bare
-							collapsible={false}
-							label={activityText}
-							doneLabel={LABELS[status]}
-							startedAt={startTimestamp ?? undefined}
-							showTimer
-							fontSize={14}
-							className="mt-2"
-							glyph="sparkle"
-						/>
+						<div className="mt-2 flex min-w-0 items-baseline gap-2">
+							<output
+								aria-live="polite"
+								className="min-w-0 flex-1 break-words text-sm text-snow"
+							>
+								{activityText}
+							</output>
+							{startTimestamp ? <ElapsedTimer start={startTimestamp} /> : null}
+						</div>
 					) : (
 						<p className="mt-2 break-words text-sm text-fog">
 							{status === "queued"
-								? (props.workerHealth ??
-									"Job menunggu worker. Belum ada sinyal pemrosesan.")
+								? (props.workerHealth ?? "Menunggu giliran pemrosesan.")
 								: LABELS[status]}
 						</p>
 					)}
@@ -214,90 +365,29 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 				<div className="flex items-center justify-between gap-3">
 					<h3 className="text-lg font-semibold text-snow">{operation}</h3>
 					<p className="shrink-0 text-sm text-fog">
-						<span aria-live="polite">{LABELS[status]}</span>
+						<span aria-live="polite">{headerState}</span>
 					</p>
 				</div>
 
 				{isFailed ? (
 					<div className="mt-5">
-						<p role="alert" className="text-sm text-snow">
-							{errorMessage || "Ekstraksi tidak dapat diselesaikan."}
-						</p>
-						<p className="mt-2 text-sm text-fog">
-							{props.partialResults
-								? `${props.partialResults} hasil tersimpan tetap tersedia di bawah.`
-								: "Belum ada hasil yang berhasil disimpan."}
-						</p>
-						{onRetry && (
-							<button
-								type="button"
-								disabled={isRetrying}
-								onClick={onRetry}
-								className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg border border-graphite px-4 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50"
-							>
-								<RotateCcw size={16} aria-hidden />
-								{isRetrying ? "Mengantrekan ulang" : "Coba lagi"}
-							</button>
-						)}
+						<ScrapeErrorCard
+							{...resolveScrapeErrorPresentation({
+								code: errorDetail ?? "UNEXPECTED_ERROR",
+								message: errorMessage,
+								retryAfterSeconds,
+							})}
+							partialResults={props.partialResults}
+							isRetrying={isRetrying}
+							onRetry={onRetry}
+						/>
 					</div>
 				) : (
-					<>
-						{/* Segments carry an explicit height: inline spans inside a flex
-						    row have no intrinsic height, which previously collapsed the
-						    whole bar to zero and hid the live stage entirely. */}
-						<div aria-hidden="true" className="mt-5 flex h-1.5 gap-1">
-							{stages.map((stage, i) => {
-								const stageDone = isDone || i < index;
-								const stageCurrent = !isDone && i === index;
-								return (
-									<span
-										key={stage}
-										className={`relative min-w-0 flex-1 overflow-hidden rounded-sm ${
-											stageDone ? "bg-mist" : "bg-slate"
-										}`}
-									>
-										{stageCurrent ? (
-											<span
-												data-active-stage-segment
-												className="absolute inset-y-0 left-0 w-1/3 bg-mist motion-safe:animate-scrape-progress motion-reduce:animate-none"
-											/>
-										) : null}
-									</span>
-								);
-							})}
-						</div>
-
-						<ol className="mt-6 space-y-5" aria-label="Tahapan pemrosesan">
-							{stages.map((stage, i) => {
-								const stageDone = isDone || i < index;
-								const stageCurrent = !isDone && i === index;
-								return (
-									<li
-										key={stage}
-										aria-current={stageCurrent ? "step" : undefined}
-										className="flex items-start gap-3"
-									>
-										<span className="mt-1 flex size-4 shrink-0 items-center justify-center">
-											<StageMarker done={stageDone} current={stageCurrent} />
-										</span>
-										<div className="min-w-0">
-											<p
-												className={`text-sm ${
-													stageCurrent
-														? "font-semibold text-snow"
-														: stageDone
-															? "text-fog"
-															: "text-fog/70"
-												}`}
-											>
-												{LABELS[stage]}
-											</p>
-										</div>
-									</li>
-								);
-							})}
-						</ol>
-					</>
+					<ScrapeStepper
+						stages={stages}
+						status={status}
+						failedAt={failedAtStage}
+					/>
 				)}
 			</section>
 		</div>
