@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
 	scrapeDocuments,
 	scrapes,
+	studioFrames,
+	studioJobs,
 	studioProjects,
 	studioRevisions,
 } from "./schema";
@@ -17,6 +19,20 @@ describe("VibeDesign Schema Definitions", () => {
 		expect(studioProjects.id.dataType).toBe("string");
 		expect(studioProjects.userId.dataType).toBe("string");
 		expect(studioRevisions.projectId.dataType).toBe("string");
+	});
+
+	it("defines studio_jobs and studio_frames tables with required columns", () => {
+		expect(studioJobs.id.dataType).toBe("string");
+		expect(studioJobs.projectId.dataType).toBe("string");
+		expect(studioJobs.userId.dataType).toBe("string");
+		expect(studioJobs.status.dataType).toBe("string");
+		expect(studioJobs.jobType.dataType).toBe("string");
+		expect(studioFrames.id.dataType).toBe("string");
+		expect(studioFrames.projectId.dataType).toBe("string");
+		expect(studioFrames.name.dataType).toBe("string");
+		expect(studioFrames.viewport.dataType).toBe("string");
+		expect(studioFrames.status.dataType).toBe("string");
+		expect(studioFrames.order.dataType).toBe("number");
 	});
 
 	it("supports canonical scrape statuses across pipeline lifecycle", () => {

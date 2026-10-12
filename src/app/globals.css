@@ -84,6 +84,10 @@
 	--border-medium: #d4d4d8;
 	/* Canvas dot grid */
 	--canvas-dot-color: rgba(15, 23, 42, 0.16);
+	/* Studio frame shimmer: neutral base + a low-contrast light band so the
+	   sweep reads as a sheen in both themes without glowing. */
+	--studio-shimmer-base: #ececee;
+	--studio-shimmer-sweep: rgba(255, 255, 255, 0.72);
 
 	/* Scrollbar */
 	--scrollbar-thumb: rgba(9, 9, 11, 0.18);
@@ -138,6 +142,8 @@
 	--border-medium: #383b3f;
 	/* Canvas dot grid */
 	--canvas-dot-color: rgba(255, 255, 255, 0.15);
+	--studio-shimmer-base: #1b1d20;
+	--studio-shimmer-sweep: rgba(255, 255, 255, 0.07);
 	/* Scrollbar */
 	--scrollbar-thumb: rgba(138, 143, 152, 0.28);
 	--scrollbar-thumb-hover: rgba(208, 214, 224, 0.4);
@@ -742,5 +748,47 @@ input.bg-steel:autofill:active {
 	.drawer-content[data-state="closed"] {
 		animation: none;
 		transition: none;
+	}
+}
+
+/* Full-surface shimmer for a frame whose real visual is not displayable yet.
+   Technique adapted from the Magic UI shine-border registry item (a large
+   animated gradient sweep) but applied to the entire artboard surface instead
+   of a border ring, so the whole card reads as one continuous loading surface.
+   Only `transform` animates, so the sweep stays on the compositor. */
+.studio-frame-shimmer {
+	position: relative;
+	overflow: hidden;
+	background-color: var(--studio-shimmer-base);
+}
+
+.studio-frame-shimmer::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-image: linear-gradient(
+		90deg,
+		transparent 0%,
+		var(--studio-shimmer-sweep) 50%,
+		transparent 100%
+	);
+	transform: translateX(-100%);
+	animation: studioFrameShimmer 2.4s linear infinite;
+	will-change: transform;
+}
+
+@keyframes studioFrameShimmer {
+	to {
+		transform: translateX(100%);
+	}
+}
+
+/* Reduced motion keeps the neutral surface and drops the sweep entirely
+   rather than freezing a bright band mid-artboard. */
+@media (prefers-reduced-motion: reduce) {
+	.studio-frame-shimmer::after {
+		animation: none;
+		transform: none;
+		opacity: 0;
 	}
 }

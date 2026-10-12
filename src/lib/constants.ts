@@ -353,3 +353,55 @@ export const SCRAPE_ASSET_RATE_LIMIT = 1000;
 export const SCRAPE_ASSET_RATE_WINDOW_S = 60;
 export const SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS = 60 * 60 * 1000;
 export const SCRAPE_PREVIEW_ASSET_MAX_URL_CHARS = 4096;
+
+export const STUDIO_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;
+
+/**
+ * Canonical capture widths for Studio frame visuals.
+ *
+ * The client sizes each artboard from these same values before its visual
+ * exists, so a frame never changes width when the screenshot arrives and the
+ * captured pixels always match the displayed box.
+ */
+export const STUDIO_VISUAL_WIDTH = {
+	mobile: 390,
+	web: 1440,
+} as const;
+export const STUDIO_VISUAL_VIEWPORT_HEIGHT = {
+	mobile: 844,
+	web: 900,
+} as const;
+/** Fallback artboard height used before a frame's real height is measured. */
+export const STUDIO_VISUAL_FALLBACK_HEIGHT = {
+	mobile: 844,
+	web: 900,
+} as const;
+
+/**
+ * Canonical canvas zoom bounds. Every zoom entry point (toolbar, wheel,
+ * pinch, reset, fit-to-content) clamps against these, so no path can leave the
+ * canvas at an unusable scale.
+ */
+export const CANVAS_MIN_ZOOM = 0.54;
+export const CANVAS_MAX_ZOOM = 1.54;
+/** Studio artboards span several screens, so its usable range is wider. */
+export const STUDIO_CANVAS_MIN_ZOOM = 0.2;
+export const STUDIO_CANVAS_MAX_ZOOM = 2;
+
+/** Wheel normalization: DOM deltaMode 1 is lines, 2 is pages. */
+export const WHEEL_LINE_HEIGHT_PX = 16;
+export const WHEEL_PAGE_HEIGHT_PX = 800;
+/**
+ * Pixels of wheel travel that produce one e-fold of zoom. Higher is slower,
+ * which keeps trackpad bursts from jumping across the whole zoom range.
+ */
+export const WHEEL_ZOOM_SENSITIVITY_PX = 600;
+/** Largest zoom change a single animation frame may apply. */
+export const WHEEL_ZOOM_MAX_FRAME_FACTOR = 1.6;
+export const STUDIO_LOGO_ALLOWED_MIMES = [
+	"image/png",
+	"image/jpeg",
+	"image/webp",
+	"image/svg+xml",
+] as const;
