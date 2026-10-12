@@ -13,6 +13,7 @@ import {
 	scrapeRequestSchema,
 } from "@/lib/scrape-contract";
 import { cn } from "@/lib/utils";
+import { ScrapeFormNotice } from "./scrape-form-notice";
 import {
 	ADVANCED_PARAMETER_GROUPS,
 	type AdvancedParameterGroup,
@@ -317,6 +318,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 						)}
 					</button>
 				</div>
+				<ScrapeFormNotice className="mt-3" />
 
 				{hasAdvanced ? (
 					<div className="mt-5 min-w-0 rounded-lg border border-graphite">

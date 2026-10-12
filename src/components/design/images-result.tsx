@@ -1,8 +1,13 @@
-import { Download, ExternalLink } from "lucide-react";
+import { Check, Copy, Download, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import type { ScrapeImageResult } from "@/lib/services/scrape-service";
 
 export type ImageResult = ScrapeImageResult;
+
+function shortUrl(value: string, max = 48): string {
+	if (value.length <= max) return value;
+	return `${value.slice(0, max - 1)}…`;
+}
 
 export function ImagesResult({
 	images,
@@ -13,16 +18,29 @@ export function ImagesResult({
 	sourceUrl: string;
 	imageOutcome?: "complete" | "partial" | "empty" | "all-failed" | null;
 }) {
-	const [filter, setFilter] = useState("");
+	const [formatFilter, setFormatFilter] = useState("");
+	const [kindFilter, setKindFilter] = useState("");
 	const [downloading, setDownloading] = useState<string | null>(null);
+	const [copied, setCopied] = useState<string | null>(null);
 	const formats = [
 		...new Set(images.flatMap((image) => (image.format ? [image.format] : []))),
 	];
+	const kinds = [
+		...new Set(
+			images.flatMap((image) =>
+				image.classification ? [image.classification] : [],
+			),
+		),
+	];
+	const saved = images.filter((image) => image.status === "completed").length;
+	const failed = images.filter((image) => image.status === "failed").length;
 	const visible = images.filter(
 		(image) =>
 			image.status === "completed" &&
-			(!filter || image.format === filter || image.classification === filter),
+			(!formatFilter || image.format === formatFilter) &&
+			(!kindFilter || image.classification === kindFilter),
 	);
+	const hasFilter = formatFilter !== "" || kindFilter !== "";
 	async function download(image: ImageResult) {
 		if (downloading) return;
 		setDownloading(image.id);
@@ -42,71 +60,119 @@ export function ImagesResult({
 			setDownloading(null);
 		}
 	}
+	async function copySource(image: ImageResult) {
+		try {
+			await navigator.clipboard.writeText(image.url);
+			setCopied(image.id);
+			setTimeout(() => {
+				setCopied((current) => (current === image.id ? null : current));
+			}, 1500);
+		} catch {
+			setNotice("URL sumber gagal disalin.");
+		}
+	}
 	const [notice, setNotice] = useState("");
 	return (
-		<section className="space-y-5">
+		<section className="space-y-5" aria-label="Images Explorer">
 			<header>
-				<h1 className="text-2xl font-semibold text-snow">Images Explorer</h1>
+				<h2 className="text-2xl font-bold text-snow">Images Explorer</h2>
 				<a
 					href={sourceUrl}
 					target="_blank"
 					rel="noreferrer"
-					className="mt-2 block break-all text-sm text-fog"
+					className="mt-2 block max-w-full truncate font-mono text-xs text-fog"
+					title={sourceUrl}
 				>
 					{sourceUrl}
 				</a>
+				<p className="mt-3 font-mono text-xs text-fog tabular-nums">
+					{images.length} ditemukan · {saved} tersimpan · {failed} gagal
+				</p>
+				{imageOutcome === "partial" && (
+					<p className="mt-2 text-sm text-fog">
+						Sebagian gambar berhasil diambil. {saved} gambar tersedia. {failed}{" "}
+						resource gagal diverifikasi.
+					</p>
+				)}
 			</header>
-			<label className="inline-flex items-center gap-3 text-sm text-snow">
-				Filter
-				<select
-					value={filter}
-					onChange={(event) => setFilter(event.target.value)}
-					className="min-h-11 rounded-lg border border-graphite bg-charcoal px-3"
-				>
-					<option value="">Semua gambar</option>
-					{formats.map((format) => (
-						<option key={format} value={format}>
-							{format}
-						</option>
-					))}
-					{[
-						...new Set(
-							images.flatMap((image) =>
-								image.classification ? [image.classification] : [],
-							),
-						),
-					].map((type) => (
-						<option key={type} value={type}>
-							{type}
-						</option>
-					))}
-				</select>
-			</label>
+			<div className="flex flex-wrap items-end gap-3">
+				<label className="inline-flex flex-col gap-1.5 text-xs text-fog">
+					Format
+					<select
+						value={formatFilter}
+						onChange={(event) => setFormatFilter(event.target.value)}
+						aria-label="Filter format"
+						className="min-h-11 rounded-lg border border-graphite bg-charcoal px-3 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						<option value="">Semua</option>
+						{formats.map((format) => (
+							<option key={format} value={format}>
+								{format}
+							</option>
+						))}
+					</select>
+				</label>
+				<label className="inline-flex flex-col gap-1.5 text-xs text-fog">
+					Jenis
+					<select
+						value={kindFilter}
+						onChange={(event) => setKindFilter(event.target.value)}
+						aria-label="Filter jenis"
+						className="min-h-11 rounded-lg border border-graphite bg-charcoal px-3 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						<option value="">Semua</option>
+						{kinds.map((type) => (
+							<option key={type} value={type}>
+								{type}
+							</option>
+						))}
+					</select>
+				</label>
+				{hasFilter && (
+					<button
+						type="button"
+						onClick={() => {
+							setFormatFilter("");
+							setKindFilter("");
+						}}
+						className="inline-flex min-h-11 items-center rounded-full px-4 text-sm text-fog underline underline-offset-4 hover:text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						Reset filter
+					</button>
+				)}
+			</div>
 			{notice && (
 				<p role="alert" className="text-sm text-fog">
 					{notice}
 				</p>
 			)}
-			{images.some((image) => image.status === "failed") && (
+			{failed > 0 && (
 				<details className="text-sm text-fog">
-					<summary>Resource yang gagal diverifikasi</summary>
+					<summary className="cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo">
+						{failed} gambar tidak dapat diambil
+					</summary>
 					<ul className="mt-3 space-y-2">
 						{images
 							.filter((image) => image.status === "failed")
 							.map((image) => (
-								<li key={image.id} className="break-all">
-									{image.url}: {image.error}
+								<li key={image.id} className="min-w-0">
+									<p className="truncate font-mono text-xs" title={image.url}>
+										{shortUrl(image.url)}
+									</p>
+									{image.error ? (
+										<p className="mt-1 font-mono text-xs">{image.error}</p>
+									) : null}
 								</li>
 							))}
 					</ul>
 				</details>
 			)}
 			{visible.length ? (
-				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 					{visible.map((image) => (
 						<article
 							key={image.id}
-							className="min-w-0 overflow-hidden rounded-lg border border-graphite"
+							className="min-w-0 overflow-hidden rounded-xl border border-graphite bg-charcoal"
 						>
 							<div className="flex h-52 items-center justify-center bg-onyx p-4">
 								<img
@@ -128,14 +194,17 @@ export function ImagesResult({
 										: ""}
 									{image.classification ? ` · ${image.classification}` : ""}
 								</p>
-								<a
-									href={image.url}
-									target="_blank"
-									rel="noreferrer"
-									className="block break-all text-xs text-fog underline"
-								>
-									{image.url}
-								</a>
+								<details className="min-w-0 text-xs text-fog">
+									<summary
+										className="cursor-pointer truncate focus-visible:ring-2 focus-visible:ring-indigo"
+										title={image.url}
+									>
+										{shortUrl(image.url)}
+									</summary>
+									<p className="mt-1 break-all font-mono text-xs">
+										{image.url}
+									</p>
+								</details>
 								<div className="flex gap-2">
 									<button
 										disabled={downloading !== null}
@@ -143,7 +212,7 @@ export function ImagesResult({
 										onClick={() => void download(image)}
 										aria-label="Download gambar"
 										title="Download gambar"
-										className="inline-flex size-11 items-center justify-center rounded-md border border-graphite text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+										className="inline-flex size-11 items-center justify-center rounded-md border border-graphite text-snow focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50"
 									>
 										<Download size={16} aria-hidden />
 									</button>
@@ -157,19 +226,54 @@ export function ImagesResult({
 									>
 										<ExternalLink size={16} aria-hidden />
 									</a>
+									<button
+										type="button"
+										onClick={() => void copySource(image)}
+										aria-label="Salin URL sumber"
+										title="Salin URL sumber"
+										className="inline-flex size-11 items-center justify-center rounded-md border border-graphite text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+									>
+										{copied === image.id ? (
+											<Check size={16} aria-hidden />
+										) : (
+											<Copy size={16} aria-hidden />
+										)}
+									</button>
 								</div>
 							</div>
 						</article>
 					))}
 				</div>
 			) : (
-				<p className="rounded-lg border border-graphite p-6 text-sm text-fog">
-					{images.length
-						? "Tidak ada gambar yang sesuai filter."
-						: imageOutcome === "empty"
-							? "Halaman berhasil di-capture dan tidak memiliki resource gambar. Ini hasil yang sah, bukan kegagalan ekstraksi."
-							: "Tidak ditemukan resource gambar yang dapat diambil dari halaman ini."}
-				</p>
+				<div className="rounded-xl border border-graphite bg-charcoal p-6">
+					{images.length === 0 && imageOutcome === "empty" ? (
+						<>
+							<p className="text-sm font-semibold text-snow">
+								Tidak ada gambar yang ditemukan
+							</p>
+							<p className="mt-1 text-sm text-fog">
+								Halaman berhasil diperiksa, tetapi tidak ada gambar yang dapat
+								diambil.
+							</p>
+						</>
+					) : images.length > 0 && saved === 0 ? (
+						<>
+							<p className="text-sm font-semibold text-snow">
+								Gambar belum dapat diperiksa
+							</p>
+							<p className="mt-1 text-sm text-fog">
+								Akses ke website gagal sebelum proses pemeriksaan gambar
+								selesai.
+							</p>
+						</>
+					) : (
+						<p className="text-sm text-fog">
+							{images.length
+								? "Tidak ada gambar yang sesuai filter."
+								: "Tidak ditemukan resource gambar yang dapat diambil dari halaman ini."}
+						</p>
+					)}
+				</div>
 			)}
 		</section>
 	);

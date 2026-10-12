@@ -172,6 +172,11 @@ function ScrapeDetailPage() {
 	// a reload; the loader snapshot only seeds the first render.
 	const pages = data?.pages ?? initial.pages;
 	const images = data?.images ?? initial.images;
+	const hasVerifiedImages = images.some(
+		(image) => image.status === "completed",
+	);
+	const isTerminalStatus =
+		currentStatus === "completed" || currentStatus === "failed";
 	const errorMessage =
 		requestError ??
 		(metadata && typeof metadata === "object" && "errorMessage" in metadata
@@ -180,6 +185,7 @@ function ScrapeDetailPage() {
 	const errorDetail = metadata?.errorDetail ?? null;
 	const failedAtStage = metadata?.failedAtStage ?? null;
 	const retryAfterSeconds = metadata?.retryAfterSeconds ?? null;
+	const retryAfterExpiresAt = metadata?.retryAfterExpiresAt ?? null;
 	const stageStartedAt =
 		metadata &&
 		typeof metadata === "object" &&
@@ -231,8 +237,16 @@ function ScrapeDetailPage() {
 						errorDetail={errorDetail}
 						failedAtStage={failedAtStage}
 						retryAfterSeconds={retryAfterSeconds}
+						retryAfterExpiresAt={retryAfterExpiresAt}
+						layout={mode === "images" ? "single" : "two-panel"}
 						isRetrying={isRetrying}
 						onRetry={retry}
+						imageDiscovery={data?.metadata?.imageDiscovery ?? null}
+						imageOutcome={data?.metadata?.imageOutcome ?? null}
+						discoveredImages={data?.metadata?.discoveredImages}
+						savedImages={data?.metadata?.savedImages}
+						processedImages={data?.metadata?.processedImages}
+						failedResources={data?.metadata?.failedResources}
 						partialResults={
 							mode === "crawl"
 								? pages.filter((page) => page.status === "completed").length
@@ -246,7 +260,8 @@ function ScrapeDetailPage() {
 				<CrawlResult pages={pages} sourceUrl={sourceUrl} />
 			) : mode === "images" &&
 				(currentStatus === "completed" ||
-					(currentStatus === "failed" && images.length > 0)) ? (
+					(currentStatus === "failed" && images.length > 0) ||
+					(!isTerminalStatus && hasVerifiedImages)) ? (
 				<ImagesResult
 					images={images}
 					sourceUrl={sourceUrl}
@@ -290,7 +305,7 @@ function ScrapeDetailPage() {
 					processedImages={
 						data?.metadata?.processedImages ?? initial.metadata?.processedImages
 					}
-					layout={mode === "html" ? "single" : "two-panel"}
+					layout={mode === "html" || mode === "images" ? "single" : "two-panel"}
 					mode={mode}
 					status={currentStatus}
 					sourceUrl={sourceUrl}
@@ -299,6 +314,7 @@ function ScrapeDetailPage() {
 					errorDetail={errorDetail}
 					failedAtStage={failedAtStage}
 					retryAfterSeconds={retryAfterSeconds}
+					retryAfterExpiresAt={retryAfterExpiresAt}
 					isRetrying={isRetrying}
 					onRetry={retry}
 					stageStartedAt={stageStartedAt}

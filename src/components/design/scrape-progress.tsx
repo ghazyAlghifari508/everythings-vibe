@@ -15,6 +15,7 @@ export interface ScrapeProgressProps {
 	errorDetail?: string | null;
 	failedAtStage?: ScrapeStatus | null;
 	retryAfterSeconds?: number | null;
+	retryAfterExpiresAt?: string | null;
 	isRetrying?: boolean;
 	onRetry?: () => void;
 	stageStartedAt?: string | null;
@@ -30,8 +31,6 @@ export interface ScrapeProgressProps {
 	failedResources?: number;
 	workerHealth?: string | null;
 	partialResults?: number;
-	// Images mode outcome, persisted by the worker. "empty" is a truthful
-	// result for a page without images; the failure states are not.
 	imageDiscovery?:
 		| "found"
 		| "none"
@@ -39,7 +38,6 @@ export interface ScrapeProgressProps {
 		| "discovery-failed"
 		| null;
 	imageOutcome?: "complete" | "partial" | "empty" | "all-failed" | null;
-	// Shared composition without duplicating the stepper per mode.
 	layout?: "two-panel" | "single";
 }
 
@@ -70,9 +68,6 @@ const OPERATIONS: Record<ScrapeMode, string> = {
 	html: "Scrape HTML",
 };
 
-// Only the stages a mode really persists. Crawl never persists "extracting":
-// its worker moves from capturing straight to completed, so rendering an
-// extracting row would be a fabricated stage.
 export function getScrapeStagesForMode(mode: ScrapeMode): ScrapeStatus[] {
 	if (mode === "design")
 		return [
@@ -125,8 +120,6 @@ export interface ScrapeStepperProps {
 	className?: string;
 }
 
-// Shared vertical stepper: one continuous connector per gap, a real spinner
-// on the live stage, and a failed marker only on the persisted failure stage.
 export function ScrapeStepper({
 	stages,
 	status,
@@ -211,8 +204,6 @@ export function ScrapeStepper({
 	);
 }
 
-// Measured elapsed time from a real persisted start. Renders nothing when the
-// backend never recorded a start, so the timer measures instead of guessing.
 function ElapsedTimer({ start }: { start: string }) {
 	const [now, setNow] = useState(() => Date.now());
 	useEffect(() => {
@@ -247,6 +238,7 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 		errorDetail,
 		failedAtStage,
 		retryAfterSeconds,
+		retryAfterExpiresAt,
 		layout = "two-panel",
 	} = props;
 	const stages = getScrapeStagesForMode(mode);
@@ -255,6 +247,7 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 	const active = !isDone && !isFailed;
 	const operation = OPERATIONS[mode];
 	const headerState = isFailed ? "Gagal" : isDone ? "Selesai" : "Berjalan";
+	const effectiveLayout = mode === "images" ? "single" : layout;
 
 	const counters =
 		mode === "crawl"
@@ -277,9 +270,108 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 		([, value]) => typeof value === "number",
 	);
 	const startTimestamp = activityStartedAt ?? stageStartedAt;
-	// A single persisted activity line. When the backend recorded nothing, the
-	// slot keeps one honest idle label instead of inventing a feed.
 	const activityText = activity ?? null;
+	const presentation = resolveScrapeErrorPresentation({
+		code: errorDetail ?? "UNEXPECTED_ERROR",
+		message: errorMessage,
+		retryAfterSeconds,
+		retryAfterExpiresAt,
+	});
+
+	if (mode === "images") {
+		return (
+			<div data-layout={effectiveLayout} className="grid min-w-0 gap-6">
+				<div className="min-w-0">
+					<p className="text-sm text-fog">{operation}</p>
+					<h2 className="mt-1 text-2xl font-bold text-snow">
+						{domain ? displaySiteName(domain) : "Website"}
+					</h2>
+					{sourceUrl ? (
+						<p className="mt-2 break-all font-mono text-xs text-fog">
+							{sourceUrl}
+						</p>
+					) : null}
+				</div>
+				<section
+					aria-label={`Progres ${operation}`}
+					className="min-w-0 rounded-xl border border-graphite bg-charcoal p-6"
+				>
+					<div className="flex items-center justify-between gap-3">
+						<h3 className="text-lg font-semibold text-snow">
+							Status:{" "}
+							{isFailed ? "Gagal" : active ? "Sedang diproses" : "Selesai"}
+						</h3>
+						<p className="shrink-0 text-sm text-fog">
+							<span aria-live="polite">{headerState}</span>
+						</p>
+					</div>
+					{isFailed ? (
+						<div className="mt-5">
+							<ScrapeErrorCard
+								{...presentation}
+								partialResults={props.partialResults}
+								isRetrying={isRetrying}
+								onRetry={onRetry}
+							/>
+						</div>
+					) : (
+						<ScrapeStepper
+							stages={stages}
+							status={status}
+							failedAt={failedAtStage}
+						/>
+					)}
+					{!isFailed && active && activityText ? (
+						<div className="mt-5 flex min-w-0 items-baseline gap-2 border-t border-graphite pt-4">
+							<output
+								aria-live="polite"
+								className="min-w-0 flex-1 break-words text-sm text-snow"
+							>
+								{activityText}
+							</output>
+							{startTimestamp ? <ElapsedTimer start={startTimestamp} /> : null}
+						</div>
+					) : null}
+					{!isFailed && !activityText && status === "queued" ? (
+						<p className="mt-5 break-words border-t border-graphite pt-4 text-sm text-fog">
+							{props.workerHealth ?? "Menunggu giliran pemrosesan."}
+						</p>
+					) : null}
+					{visibleCounters.length > 0 && (
+						<dl className="mt-6 grid grid-cols-2 gap-4 border-t border-graphite pt-5 sm:grid-cols-4">
+							{visibleCounters.map(([label, value]) => (
+								<div key={String(label)}>
+									<dt className="text-xs text-fog">{label}</dt>
+									<dd className="mt-1 font-mono text-xl text-snow tabular-nums">
+										{value}
+									</dd>
+								</div>
+							))}
+						</dl>
+					)}
+					{props.imageOutcome === "empty" && (
+						<p className="mt-6 text-sm text-fog">
+							Tidak ada gambar yang ditemukan. Halaman berhasil diperiksa,
+							tetapi tidak ada gambar yang dapat diambil.
+						</p>
+					)}
+					{props.imageOutcome === "partial" && (
+						<p className="mt-6 text-sm text-fog">
+							Sebagian gambar berhasil diambil. Gambar yang tersedia tetap
+							tersimpan; resource yang gagal diverifikasi beserta alasannya.
+						</p>
+					)}
+					{(props.imageDiscovery === "discovery-failed" ||
+						props.imageDiscovery === "capture-failed") && (
+						<p className="mt-6 text-sm text-fog">
+							Gambar belum dapat diperiksa. Akses ke website gagal sebelum
+							proses pemeriksaan gambar selesai.
+						</p>
+					)}
+				</section>
+			</div>
+		);
+	}
 
 	return (
 		<div
@@ -335,27 +427,6 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 						))}
 					</dl>
 				)}
-
-				{mode === "images" && props.imageOutcome === "empty" && (
-					<p className="mt-6 text-sm text-fog">
-						Halaman berhasil di-capture dan tidak ditemukan resource gambar di
-						dalamnya. Tidak ada gambar yang bisa disimpan dari halaman ini.
-					</p>
-				)}
-				{mode === "images" && props.imageOutcome === "partial" && (
-					<p className="mt-6 text-sm text-fog">
-						Sebagian gambar berhasil diverifikasi dan tetap tersimpan; sisanya
-						gagal diambil beserta alasannya.
-					</p>
-				)}
-				{mode === "images" &&
-					(props.imageDiscovery === "discovery-failed" ||
-						props.imageDiscovery === "capture-failed") && (
-						<p className="mt-6 text-sm text-fog">
-							Discovery gambar tidak selesai, jadi halaman ini belum terbukti
-							tidak memiliki gambar.
-						</p>
-					)}
 			</div>
 
 			<section
@@ -372,11 +443,7 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 				{isFailed ? (
 					<div className="mt-5">
 						<ScrapeErrorCard
-							{...resolveScrapeErrorPresentation({
-								code: errorDetail ?? "UNEXPECTED_ERROR",
-								message: errorMessage,
-								retryAfterSeconds,
-							})}
+							{...presentation}
 							partialResults={props.partialResults}
 							isRetrying={isRetrying}
 							onRetry={onRetry}
