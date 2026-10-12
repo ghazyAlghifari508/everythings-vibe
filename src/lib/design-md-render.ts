@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { DesignTokenModel } from "./design-model";
 import { MODEL_VERSION } from "./design-model";
+import { isPillRadius } from "./design-normalize-shape";
 import { primaryFontFamily } from "./design-normalize-typography";
 
 // Renders the canonical DESIGN.md from the validated structured model. Both the
@@ -45,17 +46,43 @@ export function escapeCell(value: string): string {
 
 // Only values that are valid CSS are emitted into a stylesheet block. Anything
 // else is dropped rather than shipped as a broken declaration.
-const HEX = /^#[0-9a-f]{6}$/i;
-const RGBA = /^rgba\(\s*\d{1,3},\s*\d{1,3},\s*\d{1,3},\s*[\d.]+\s*\)$/i;
-const CSS_LENGTH = /^-?[\d.]+(px|rem|em|%|vw|vh)$/;
-const CSS_NUMBER = /^-?[\d.]+$/;
+const HEX = /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const RGBA =
+	/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*([\d.]+))?\s*\)$/i;
+const CSS_LENGTH =
+	/^-?(?:\d+(?:\.\d+)?|\.\d+)(px|rem|em|%|vw|vh|vmin|vmax|dvh|dvw|ch|ex|cap|lh|cqw|cqh)$/;
+const CSS_NUMBER = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/;
 
 export function isValidCssColor(value: string): boolean {
-	return HEX.test(value.trim()) || RGBA.test(value.trim());
+	const trimmed = value.trim();
+	if (HEX.test(trimmed)) return true;
+	const match = trimmed.match(RGBA);
+	if (!match) return false;
+	const r = Number(match[1]);
+	const g = Number(match[2]);
+	const b = Number(match[3]);
+	const a = match[4] === undefined ? 1 : Number(match[4]);
+	return (
+		Number.isFinite(r) &&
+		Number.isFinite(g) &&
+		Number.isFinite(b) &&
+		Number.isFinite(a) &&
+		r >= 0 &&
+		r <= 255 &&
+		g >= 0 &&
+		g <= 255 &&
+		b >= 0 &&
+		b <= 255 &&
+		a >= 0 &&
+		a <= 1 &&
+		match[4] !== "."
+	);
 }
 
 export function isValidCssLength(value: string): boolean {
-	return CSS_LENGTH.test(value.trim());
+	const trimmed = value.trim();
+	if (trimmed === "0") return true;
+	return CSS_LENGTH.test(trimmed);
 }
 
 // A CSS custom property name must be a valid identifier. Names derived from a
@@ -247,7 +274,9 @@ export function renderDesignMd(
 					["Context", "Value", "Measured on"],
 					model.radii.map((token) => [
 						escapeCell(token.purpose),
-						`\`${escapeCell(token.value)}\``,
+						isPillRadius(token.valuePx)
+							? `\`${escapeCell(token.value)}\` (fully rounded / pill)`
+							: `\`${escapeCell(token.value)}\``,
 						String(token.frequency),
 					]),
 				),
@@ -256,13 +285,35 @@ export function renderDesignMd(
 	}
 
 	// --- 7. Components -------------------------------------------------------
-	const components = options.componentPatterns ?? [];
-	if (components.length) {
+	// Observed patterns are always rendered when justified by evidence; AI
+	// patterns enrich them when synthesis succeeded.
+	const observedComponents = (model.observedComponents ?? []).map(
+		(component) => ({
+			name: component.name,
+			description: component.description,
+			evidence: component.evidence,
+		}),
+	);
+	const aiComponents = options.componentPatterns ?? [];
+	const seenNames = new Set(
+		aiComponents.map((component) => component.name.toLowerCase()),
+	);
+	const mergedComponents = [
+		...aiComponents,
+		...observedComponents.filter(
+			(component) => !seenNames.has(component.name.toLowerCase()),
+		),
+	];
+	if (mergedComponents.length) {
 		lines.push("", heading(2, "Components"), "");
-		for (const component of components) {
+		for (const component of mergedComponents) {
 			lines.push(heading(3, escapeCell(component.name)));
 			lines.push("", escapeCell(component.description), "");
 			lines.push(`**Evidence:** ${escapeCell(component.evidence)}`);
+			lines.push(
+				"",
+				"Reuse this treatment for the same class of elements to retain visual consistency.",
+			);
 		}
 	}
 
@@ -369,10 +420,16 @@ export function renderDesignMd(
 	// Only tokens that pass validation reach the stylesheet, and generated
 	// implementation aliases are labelled as generated rather than presented as
 	// the website's own variables.
+	// Semantic names reflect validated meaning: unknown or unproven roles use
+	// measured-N aliases instead of brand/accent claims.
 	const colorEntries = uniqueTokenNames(
-		model.colors.flatMap((color) => {
+		model.colors.flatMap((color, index) => {
 			if (!isValidCssColor(color.value)) return [];
-			const name = tokenName("--color", color.role);
+			const label =
+				color.roleClass === "unknown" || color.confidence === "unknown"
+					? `measured ${index + 1}`
+					: color.role;
+			const name = tokenName("--color", label);
 			return name ? [{ name, value: color.value }] : [];
 		}),
 	);
@@ -403,6 +460,13 @@ export function renderDesignMd(
 					isValidCssLength(entry.lineHeight))
 			)
 				entries.push({ name: leadingName, value: entry.lineHeight });
+			const trackingName = tokenName("--tracking", entry.role);
+			if (
+				trackingName &&
+				(entry.letterSpacing.trim() === "normal" ||
+					isValidCssLength(entry.letterSpacing))
+			)
+				entries.push({ name: trackingName, value: entry.letterSpacing });
 			return entries;
 		}),
 	);
@@ -410,8 +474,8 @@ export function renderDesignMd(
 		model.typefaces.flatMap((typeface) => {
 			const name = tokenName("--font", typeface.family);
 			// A family name can only enter a declaration when it cannot break the
-			// CSS syntax.
-			return name && /^[\w\s,'"-]+$/.test(typeface.stack)
+			// CSS syntax. Unicode letters are allowed for CJK families.
+			return name && /^[\w\s,'"\-\p{L}\p{M}]+$/u.test(typeface.stack)
 				? [{ name, value: typeface.stack }]
 				: [];
 		}),
@@ -538,7 +602,8 @@ export interface DesignMdIssue {
 
 // Validates the rendered document as a document. It catches the failure modes
 // that a structured renderer can still produce: section order drift, unbalanced
-// code fences, malformed tables and invalid CSS values.
+// code fences, malformed tables, invalid CSS values, missing model version and
+// duplicate aliases.
 export function validateDesignMd(markdown: string): DesignMdIssue[] {
 	const issues: DesignMdIssue[] = [];
 	if (!markdown.trim())
@@ -586,7 +651,7 @@ export function validateDesignMd(markdown: string): DesignMdIssue[] {
 		const body = block[1] ?? "";
 		for (const match of body.matchAll(HEX_IN_CODE)) {
 			const value = match[0];
-			if (![4, 7, 9].includes(value.length))
+			if (![4, 5, 7, 9].includes(value.length))
 				issues.push({
 					code: "invalid-hex",
 					detail: `Invalid hex colour ${value}.`,
@@ -594,17 +659,38 @@ export function validateDesignMd(markdown: string): DesignMdIssue[] {
 		}
 		for (const declaration of body.matchAll(/:\s*([^;]+);/g)) {
 			const value = (declaration[1] ?? "").trim();
-			if (
-				value.startsWith("#") &&
-				!isValidCssColor(value) &&
-				value.length !== 4
-			)
+			if (value.startsWith("#") && !isValidCssColor(value))
 				issues.push({
 					code: "invalid-css-color",
 					detail: `Invalid CSS colour value ${value}.`,
 				});
 		}
+		const names = [...body.matchAll(/^\s*(--[\w-]+)\s*:/gm)].map(
+			(match) => match[1] ?? "",
+		);
+		const seen = new Set<string>();
+		for (const name of names) {
+			if (seen.has(name))
+				issues.push({
+					code: "duplicate-token",
+					detail: `Duplicate custom property ${name}.`,
+				});
+			else seen.add(name);
+		}
 	}
+
+	const versionMatch = markdown.match(/^Document model version (\d+)\./m);
+	if (!versionMatch)
+		issues.push({
+			code: "missing-version",
+			detail: "Document model version footer is missing.",
+		});
+	else if (Number(versionMatch[1]) < MODEL_VERSION)
+		issues.push({
+			code: "stale-version",
+			detail: `Document model version ${versionMatch[1]} predates current model version ${MODEL_VERSION}.`,
+		});
+
 	return issues;
 }
 

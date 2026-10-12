@@ -2,6 +2,7 @@ import {
 	type ColorClassification,
 	type ColorRoleClass,
 	classifyColors,
+	normalizeColor,
 } from "./design-normalize-color";
 import {
 	normalizeElevation,
@@ -128,6 +129,14 @@ export interface ModelGuideline {
 	evidence: string;
 }
 
+export interface ModelComponent {
+	name: string;
+	description: string;
+	evidence: string;
+	frequency: number;
+	roles: string[];
+}
+
 export interface ModelGuidelines {
 	dos: ModelGuideline[];
 	donts: ModelGuideline[];
@@ -151,6 +160,8 @@ export interface DesignTokenModel {
 	radii: ModelRadiusToken[];
 	elevation: ModelElevationToken[];
 	surfaces: ModelSurface[];
+	/** Deterministic component patterns observed in the capture. */
+	observedComponents: ModelComponent[];
 	guidelines: ModelGuidelines;
 	/** Honest statement of what the capture could not establish. */
 	limitations: string[];
@@ -265,6 +276,72 @@ export function deriveModelGuidelines(
 	return { dos, donts, limitations };
 }
 
+// Infers light/dark from the measured canvas background luminance. Returns
+// unknown when the capture cannot support an answer, so callers never present
+// a guessed theme as measured.
+export function inferTheme(
+	evidence: VisualEvidence,
+): "light" | "dark" | "unknown" {
+	const canvas = evidence.elements.find(
+		(element) =>
+			element.role === "canvas" && element.properties["background-color"],
+	);
+	const raw =
+		canvas?.properties["background-color"] ??
+		evidence.elements.find((element) => element.properties["background-color"])
+			?.properties["background-color"] ??
+		"";
+	const normalized = normalizeColor(raw);
+	if (!normalized || normalized.isNoOp) return "unknown";
+	const luminance =
+		(0.2126 * normalized.r + 0.7152 * normalized.g + 0.0722 * normalized.b) /
+		255;
+	if (luminance >= 0.6) return "light";
+	if (luminance <= 0.4) return "dark";
+	return "unknown";
+}
+
+// Deterministic component patterns observed in the capture. Only roles seen at
+// least twice become patterns, and every pattern cites measured frequency and
+// roles so it is evidence-grounded without AI.
+export function deriveObservedComponents(
+	evidence: VisualEvidence,
+): ModelComponent[] {
+	const components: ModelComponent[] = [];
+	const byRole = new Map<string, number>();
+	for (const element of evidence.elements) {
+		if (element.role === "element" || element.role === "canvas") continue;
+		byRole.set(element.role, (byRole.get(element.role) ?? 0) + 1);
+	}
+	const roleLabel: Record<string, string> = {
+		nav: "Navigation",
+		h1: "Hero heading",
+		h2: "Section heading",
+		h3: "Subheading",
+		body: "Body copy",
+		cta: "Buttons and CTAs",
+		section: "Layout containers",
+		main: "Layout containers",
+		header: "Header",
+		footer: "Footer",
+	};
+	for (const [role, frequency] of [...byRole.entries()].sort(
+		(a, b) => b[1] - a[1],
+	)) {
+		if (frequency < RULE_FREQUENCY_MINIMUM) continue;
+		const name = roleLabel[role] ?? `Observed ${role}`;
+		components.push({
+			name,
+			description: `Observed ${frequency} ${role} elements in the captured viewport with consistent measured styling.`,
+			evidence: `Measured on ${frequency} ${role} elements.`,
+			frequency,
+			roles: [role],
+		});
+		if (components.length >= 8) break;
+	}
+	return components;
+}
+
 // ---------------------------------------------------------------------------
 // Model assembly
 // ---------------------------------------------------------------------------
@@ -368,13 +445,19 @@ export function buildDesignModel(
 		radii,
 	);
 
+	const observedComponents = deriveObservedComponents(evidence);
+	const inferredTheme = inferTheme(evidence);
 	const limitations = [...evidence.limitations, ...guidelines.limitations];
+	if ((options.theme ?? inferredTheme) === "unknown")
+		limitations.push(
+			"Theme could not be established from the measured canvas background, so it is reported as unknown rather than estimated.",
+		);
 
 	return {
 		version: MODEL_VERSION,
 		title: options.title ?? "Website Style Reference",
 		essence: options.essence ?? "",
-		theme: options.theme ?? "unknown",
+		theme: options.theme ?? inferredTheme,
 		overview: options.overview ?? "",
 		sourceUrl: evidence.sourceUrl,
 		capturedAt: evidence.capturedAt,
@@ -402,6 +485,7 @@ export function buildDesignModel(
 		radii: radiusTokens,
 		elevation: elevationTokens,
 		surfaces: surfaceTokens,
+		observedComponents,
 		guidelines,
 		limitations,
 		measurementProvenance: {
