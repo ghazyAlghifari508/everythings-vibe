@@ -32,9 +32,7 @@ describe("codebases schema", () => {
 		// adopts one on its next sync. A NOT NULL column would have required a
 		// fabricated default, which could bind a codebase to the wrong repository.
 		const config = getTableConfig(codebases);
-		const column = config.columns.find(
-			(c) => c.name === "repository_identity",
-		);
+		const column = config.columns.find((c) => c.name === "repository_identity");
 		expect(column).toBeDefined();
 		expect(column?.notNull).toBe(false);
 		expect(column?.hasDefault).toBe(false);
@@ -46,10 +44,12 @@ describe("codebases schema", () => {
 			(i) => i.config.name === "codebases_user_id_repository_identity_idx",
 		);
 		expect(index).toBeDefined();
-		expect(index?.config.columns.map((c) => c.name)).toEqual([
-			"user_id",
-			"repository_identity",
-		]);
+		// The index leads with the tenant column, because a re-sync resolves an
+		// identity inside one owner's rows only.
+		const columns = (index?.config.columns ?? []).map((column) =>
+			"name" in column ? column.name : null,
+		);
+		expect(columns).toEqual(["user_id", "repository_identity"]);
 	});
 
 	it("defaults name provenance to user so a forgotten writer is never clobbered", () => {
