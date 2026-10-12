@@ -1,0 +1,2 @@
+ALTER TABLE "codebases" ADD COLUMN "repository_identity" text;--> statement-breakpoint
+CREATE INDEX "codebases_user_id_repository_identity_idx" ON "codebases" USING btree ("user_id","repository_identity");

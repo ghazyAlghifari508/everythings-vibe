@@ -59,6 +59,12 @@ export interface HandshakeResponse extends SyncSession {
 	snapshotId?: string;
 	cliMinVersion?: string;
 	expiresAt?: string;
+	/**
+	 * The server already holds a different repository identity for this
+	 * codebase. Advisory only: the sync continues, and the user is told so a
+	 * wrong-codebase upload can be noticed instead of silently accepted.
+	 */
+	repositoryIdentityMismatch?: boolean;
 }
 
 /** Manifest entry as sent to the server (subset of the Task 1 DTO). */
@@ -256,10 +262,12 @@ export interface SyncClient {
 	handshake(
 		projectId: string,
 		repositoryName?: string,
+		repositoryIdentity?: string,
 	): Promise<HandshakeResponse>;
 	handshakeWithRetry(
 		projectId: string,
 		repositoryName?: string,
+		repositoryIdentity?: string,
 	): Promise<HandshakeResponse>;
 	uploadManifestWithRetry(
 		projectId: string,
@@ -304,6 +312,7 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 	async function handshake(
 		projectId: string,
 		repositoryName?: string,
+		repositoryIdentity?: string,
 	): Promise<HandshakeResponse> {
 		const res = await post<HandshakeResponse>(projectId, "sync", {
 			cliVersion: CODEBASE_CLI_VERSION,
@@ -317,6 +326,11 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 			...(repositoryName && isSafeRepositoryName(repositoryName)
 				? { repositoryName }
 				: {}),
+			// The normalized Git remote identity, when the repository has one. It
+			// is already free of credentials, ports, and local paths, and it is
+			// advisory: a repository with no remote simply omits it and the server
+			// keeps its existing identity (possibly none).
+			...(repositoryIdentity ? { repositoryIdentity } : {}),
 		});
 		const minVersion = res.cliMinVersion ?? CODEBASE_CLI_MIN_VERSION;
 		if (compareCliVersions(CODEBASE_CLI_VERSION, minVersion) < 0) {
@@ -416,8 +430,10 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 
 	return {
 		handshake,
-		handshakeWithRetry: (projectId, repositoryName) =>
-			withSyncRetry(() => handshake(projectId, repositoryName)),
+		handshakeWithRetry: (projectId, repositoryName, repositoryIdentity) =>
+			withSyncRetry(() =>
+				handshake(projectId, repositoryName, repositoryIdentity),
+			),
 		uploadManifestWithRetry: (projectId, session, entries) =>
 			withSyncRetry(() => uploadManifest(projectId, session, entries)),
 		uploadFileChunksWithRetry: (projectId, session, chunks, startIndex = 0) =>
