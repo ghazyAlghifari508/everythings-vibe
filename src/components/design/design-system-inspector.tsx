@@ -107,13 +107,19 @@ function InspectorSection({
 	label,
 	description,
 	children,
+	id,
 }: {
 	label: string;
 	description?: string;
 	children: React.ReactNode;
+	id?: string;
 }) {
 	return (
-		<section aria-label={label} className="border-t border-graphite pt-6">
+		<section
+			aria-label={label}
+			id={id}
+			className="scroll-mt-24 border-t border-graphite pt-6"
+		>
 			<SectionHeading>{label}</SectionHeading>
 			{description ? (
 				<p className="mt-1 text-xs leading-5 text-fog">{description}</p>
@@ -195,15 +201,24 @@ function PaletteColorCard({
 						<span className="ml-2 text-slate">{color.token}</span>
 					) : null}
 				</p>
-				{/* The rationale is the audit trail: it names the measured usage
-				    behind the role instead of asserting a brand identity. */}
-				{color.rationale ? (
-					<p className="mt-1.5 text-xs leading-5 text-fog">{color.rationale}</p>
-				) : null}
-				<p className="mt-1 font-mono text-[11px] text-slate">
-					{color.confidence}
-					{color.frequency > 0 ? ` · ${color.frequency} elemen` : ""}
-				</p>
+				{color.rationale || color.frequency > 0 ? (
+					<details className="group mt-1.5">
+						<summary className="cursor-pointer font-mono text-[11px] text-slate hover:text-fog focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo">
+							{color.confidence}
+							{color.frequency > 0 ? ` · ${color.frequency} elemen` : ""}
+							{" · bukti"}
+						</summary>
+						{color.rationale ? (
+							<p className="mt-1 text-xs leading-5 text-fog">
+								{color.rationale}
+							</p>
+						) : null}
+					</details>
+				) : (
+					<p className="mt-1 font-mono text-[11px] text-slate">
+						{color.confidence}
+					</p>
+				)}
 			</div>
 		</div>
 	);
@@ -316,12 +331,6 @@ function TypefaceCard({ typeface }: { typeface: InspectorTypeface }) {
 						<dd className="min-w-0 break-words font-mono text-mist">{value}</dd>
 					</div>
 				))}
-				<div className="flex gap-2">
-					<dt className="w-32 shrink-0 font-mono text-fog">CSS stack</dt>
-					<dd className="min-w-0 break-words font-mono text-mist">
-						{typeface.stack}
-					</dd>
-				</div>
 			</dl>
 			<p
 				className="mt-3 break-words text-lg text-mist"
@@ -341,12 +350,20 @@ function TypefaceCard({ typeface }: { typeface: InspectorTypeface }) {
 					? "; status resource font sudah terverifikasi dimuat."
 					: "; font yang benar-benar dipakai glyph belum terverifikasi."}
 			</p>
-			{typeface.uncertainty ? (
-				<p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-4 text-fog">
-					<AlertTriangle size={12} aria-hidden className="mt-0.5 shrink-0" />
-					{typeface.uncertainty}
+			<details className="mt-2">
+				<summary className="cursor-pointer font-mono text-[11px] text-slate hover:text-fog focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo">
+					Stack & bukti font
+				</summary>
+				<p className="mt-1 min-w-0 break-words font-mono text-[11px] leading-4 text-mist">
+					{typeface.stack}
 				</p>
-			) : null}
+				{typeface.uncertainty ? (
+					<p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-4 text-fog">
+						<AlertTriangle size={12} aria-hidden className="mt-0.5 shrink-0" />
+						{typeface.uncertainty}
+					</p>
+				) : null}
+			</details>
 		</div>
 	);
 }
@@ -357,23 +374,45 @@ function TypefaceCard({ typeface }: { typeface: InspectorTypeface }) {
 
 function SpacingRow({ token }: { token: InspectorToken }) {
 	const px = token.value.trim().match(/^([\d.]+)px$/);
+	const pxValue = px?.[1] !== undefined ? Number(px[1]) : null;
+	const isZero = pxValue === 0;
 	const width =
-		px?.[1] !== undefined ? Math.min(180, Math.max(4, Number(px[1]))) : null;
+		pxValue !== null && Number.isFinite(pxValue) && !isZero
+			? Math.min(180, Math.max(12, pxValue))
+			: null;
 	return (
 		<div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
 			<div className="min-w-0">
-				<p className="text-sm text-snow">{token.label}</p>
+				<p className="truncate text-sm text-snow" title={token.label}>
+					{token.label}
+				</p>
 				<p className="font-mono text-xs text-fog tabular-nums">
 					{token.value}
 					{token.frequency > 1 ? (
 						<span className="ml-2 text-slate">{token.frequency} elemen</span>
 					) : null}
 				</p>
+				{token.context ? (
+					<p className="mt-0.5 truncate text-[11px] leading-4 text-slate">
+						{token.context}
+					</p>
+				) : null}
 			</div>
-			{width !== null && Number.isFinite(width) ? (
+			{isZero ? (
+				<span
+					role="img"
+					aria-label={`${token.label} nol, tidak ada jarak`}
+					title="0px — tidak ada jarak"
+					className="inline-flex h-5 w-8 shrink-0 items-center justify-center rounded-sm border border-dashed border-slate font-mono text-[10px] text-slate"
+				>
+					0
+				</span>
+			) : width !== null && Number.isFinite(width) ? (
 				<div
-					aria-hidden="true"
-					className="h-2 shrink-0 rounded-sm bg-steel"
+					role="img"
+					aria-label={`${token.label} ${token.value}`}
+					title={token.value}
+					className="h-2.5 shrink-0 rounded-sm border border-slate/40 bg-snow"
 					style={{ width }}
 				/>
 			) : null}
@@ -382,26 +421,42 @@ function SpacingRow({ token }: { token: InspectorToken }) {
 }
 
 function RadiusRow({ token }: { token: InspectorRadiusToken }) {
+	const normalized = token.value.trim().toLowerCase();
+	const isPill =
+		normalized.includes("full") ||
+		normalized.includes("pill") ||
+		normalized === "50%" ||
+		(Number.isFinite(token.valuePx) && token.valuePx >= 999);
+	const previewRadius = isPill
+		? "999px"
+		: Number.isFinite(token.valuePx)
+			? `${Math.min(24, token.valuePx)}px`
+			: undefined;
 	return (
 		<div className="flex items-center gap-3">
 			<div className="min-w-0 flex-1">
-				<p className="text-sm text-snow">{token.label}</p>
+				<p className="truncate text-sm text-snow" title={token.label}>
+					{token.label}
+				</p>
 				<p className="font-mono text-xs text-fog tabular-nums">
 					{token.value}
 					{token.frequency > 1 ? (
 						<span className="ml-2 text-slate">{token.frequency} elemen</span>
 					) : null}
 				</p>
+				{token.context ? (
+					<p className="mt-0.5 truncate text-[11px] leading-4 text-slate">
+						{token.context}
+					</p>
+				) : null}
 			</div>
 			{/* A real rounded-corner preview at the measured radius. */}
 			<div
-				aria-hidden="true"
+				role="img"
+				aria-label={`${token.label} ${token.value}`}
+				title={token.value}
 				className="size-12 shrink-0 border border-graphite bg-onyx"
-				style={
-					Number.isFinite(token.valuePx)
-						? { borderRadius: `${Math.min(24, token.valuePx)}px` }
-						: undefined
-				}
+				style={previewRadius ? { borderRadius: previewRadius } : undefined}
 			/>
 		</div>
 	);
@@ -472,7 +527,7 @@ export function DesignSystemInspector({
 
 	return (
 		<div className="min-w-0">
-			<div>
+			<div id="overview" className="scroll-mt-24">
 				<p className="font-mono text-xs tracking-wider text-fog uppercase">
 					Style Inspector
 				</p>
@@ -515,30 +570,33 @@ export function DesignSystemInspector({
 			</div>
 
 			<div className="mt-6 flex flex-col gap-6">
-				<p
-					className={cn(
-						"flex items-start gap-2 rounded-lg border p-3 text-xs leading-5",
-						model.verification === "observed"
-							? "border-graphite text-fog"
-							: "border-graphite text-mist",
-					)}
-				>
-					{model.verification === "observed" ? (
-						<Info size={14} aria-hidden className="mt-0.5 shrink-0" />
-					) : (
-						<AlertTriangle size={14} aria-hidden className="mt-0.5 shrink-0" />
-					)}
-					<span>
-						{model.verification === "observed"
-							? "Sumber: pengukuran browser. Peran warna mengikuti penggunaan elemen yang terukur, bukan klaim brand yang belum terbukti."
-							: "Hasil lama belum terverifikasi terhadap evidence browser. Nilai di bawah adalah hasil parsing dokumen arsip, bukan pengukuran."}
-					</span>
-				</p>
+				<details className="rounded-lg border border-graphite px-3 py-2">
+					<summary className="cursor-pointer text-xs font-medium text-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo">
+						Tentang analisis
+					</summary>
+					<p className="mt-1.5 flex items-start gap-2 text-xs leading-5 text-fog">
+						{model.verification === "observed" ? (
+							<Info size={14} aria-hidden className="mt-0.5 shrink-0" />
+						) : (
+							<AlertTriangle
+								size={14}
+								aria-hidden
+								className="mt-0.5 shrink-0"
+							/>
+						)}
+						<span>
+							{model.verification === "observed"
+								? "Pengukuran browser yang terverifikasi. Peran mengikuti pemakaian elemen yang terukur."
+								: "Hasil lama belum terverifikasi terhadap evidence browser. Nilai di bawah adalah hasil parsing dokumen arsip, bukan pengukuran."}
+						</span>
+					</p>
+				</details>
 
 				{model.colors.length > 0 ? (
 					<InspectorSection
+						id="colors"
 						label="Palet Warna"
-						description="Warna dikelompokkan dari peran yang terukur, dengan alasan di balik setiap peran."
+						description="Warna dikelompokkan dari peran yang terukur."
 					>
 						<div className="flex min-w-0 flex-col gap-6">
 							{groupPaletteColors(model.colors).map((group) => (
@@ -550,6 +608,7 @@ export function DesignSystemInspector({
 
 				{model.typography.length > 0 ? (
 					<InspectorSection
+						id="typography"
 						label="Type Scale"
 						description="Satu specimen representatif per peran skala, ditampilkan pada ukuran terukurnya."
 					>
@@ -566,6 +625,7 @@ export function DesignSystemInspector({
 
 				{model.typefaces.length > 0 ? (
 					<InspectorSection
+						id="typeface"
 						label="Typeface Inspector"
 						description="Family, weight, dan rentang ukuran yang benar-benar terukur pada teks halaman."
 					>
@@ -579,6 +639,7 @@ export function DesignSystemInspector({
 
 				{hasShapes ? (
 					<InspectorSection
+						id="spacing"
 						label="Spacing & Bentuk"
 						description="Nilai dikelompokkan menurut konteks pemakaiannya, bukan sebagai daftar properti."
 					>
@@ -591,6 +652,13 @@ export function DesignSystemInspector({
 							{model.spacing.length > 0 ? (
 								<div className="flex flex-col gap-3">
 									<h4 className="text-sm font-semibold text-mist">Spacing</h4>
+									<div
+										aria-hidden="true"
+										className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 font-mono text-[11px] tracking-wider text-slate uppercase"
+									>
+										<span>Tujuan</span>
+										<span className="w-8 text-right sm:w-[180px]">Visual</span>
+									</div>
 									{model.spacing.map((token) => (
 										<SpacingRow
 											key={`${token.label}-${token.value}`}
@@ -618,9 +686,51 @@ export function DesignSystemInspector({
 
 				{model.surfaces.length > 0 ? (
 					<InspectorSection
+						id="surfaces"
 						label="Surface"
 						description="Lapisan latar yang terukur, dari kanvas halaman ke permukaan yang lebih tinggi."
 					>
+						{model.surfaces.length >= 2 ? (
+							<div
+								role="img"
+								aria-label={`Hierarki ${model.surfaces.length} lapisan surface terukur`}
+								className="mb-3 rounded-lg border border-graphite bg-onyx p-3"
+							>
+								<div
+									className="rounded-md border border-graphite p-3"
+									style={{
+										backgroundColor: model.surfaces[0]?.value,
+									}}
+								>
+									<p className="font-mono text-[10px] text-slate">
+										Kanvas · {model.surfaces[0]?.value}
+									</p>
+									<div
+										className="mt-2 rounded-md border border-graphite p-3"
+										style={{
+											backgroundColor:
+												model.surfaces[1]?.value ?? model.surfaces[0]?.value,
+										}}
+									>
+										<p className="font-mono text-[10px] text-slate">
+											Sekunder · {model.surfaces[1]?.value}
+										</p>
+										{model.surfaces[2] ? (
+											<div
+												className="mt-2 rounded-md border border-graphite p-3"
+												style={{
+													backgroundColor: model.surfaces[2]?.value,
+												}}
+											>
+												<p className="font-mono text-[10px] text-slate">
+													Komponen · {model.surfaces[2]?.value}
+												</p>
+											</div>
+										) : null}
+									</div>
+								</div>
+							</div>
+						) : null}
 						<div className="flex flex-col gap-2">
 							{model.surfaces.map((surface) => (
 								<div
@@ -649,6 +759,7 @@ export function DesignSystemInspector({
 
 				{model.elevation.length > 0 ? (
 					<InspectorSection
+						id="elevation"
 						label="Elevation"
 						description="Shadow yang benar-benar terukur, beserta jumlah elemen yang memakainya."
 					>
@@ -659,15 +770,20 @@ export function DesignSystemInspector({
 									className="min-w-0 rounded-lg border border-graphite p-3"
 								>
 									<div
-										aria-hidden="true"
-										className="mb-2 h-12 rounded-md bg-obsidian"
+										role="img"
+										aria-label={`Contoh elevation ${token.value}`}
+										className="mb-2 h-12 rounded-md border border-graphite bg-onyx"
 										style={{ boxShadow: token.value }}
 									/>
 									<p className="break-all font-mono text-[11px] text-mist">
 										{token.value}
 									</p>
 									<p className="mt-1 text-[11px] leading-4 text-fog">
-										{token.usageNote}
+										{token.frequency > 0 ? `${token.frequency} elemen` : null}
+										{token.roles.length > 0
+											? ` · ${token.roles.join(", ")}`
+											: null}
+										{token.usageNote ? ` · ${token.usageNote}` : null}
 									</p>
 								</div>
 							))}
@@ -675,8 +791,41 @@ export function DesignSystemInspector({
 					</InspectorSection>
 				) : null}
 
+				{model.components.length > 0 ? (
+					<InspectorSection
+						id="components"
+						label="Pola Komponen"
+						description="Pola antarmuka yang benar-benar terukur, bukan rekonstruksi kode."
+					>
+						<ul className="flex flex-col gap-3">
+							{model.components.map((component) => (
+								<li
+									key={component.name}
+									className="min-w-0 rounded-lg border border-graphite p-3"
+								>
+									<p className="text-sm font-semibold text-snow">
+										{component.name}
+									</p>
+									<p className="mt-1 text-xs leading-5 text-mist">
+										{component.description}
+									</p>
+									{component.evidence ? (
+										<p className="mt-1 text-[11px] leading-4 text-fog">
+											Bukti: {component.evidence}
+											{component.frequency > 1
+												? ` · ${component.frequency} elemen`
+												: null}
+										</p>
+									) : null}
+								</li>
+							))}
+						</ul>
+					</InspectorSection>
+				) : null}
+
 				{hasGuidance ? (
 					<InspectorSection
+						id="guidelines"
 						label="Panduan Desain"
 						description="Setiap aturan diturunkan dari pola terukur yang berulang."
 					>
@@ -702,7 +851,7 @@ export function DesignSystemInspector({
 				) : null}
 
 				{model.limitations.length > 0 ? (
-					<InspectorSection label="Keterbatasan Pengukuran">
+					<InspectorSection id="limitations" label="Keterbatasan Pengukuran">
 						<ul className="flex flex-col gap-2">
 							{model.limitations.map((limitation) => (
 								<li
