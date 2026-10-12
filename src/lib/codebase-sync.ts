@@ -268,6 +268,57 @@ export function hasCliHandshake(status: {
 	);
 }
 
+/** Metadata key holding the repository identity reported at handshake. */
+export const REPOSITORY_IDENTITY_METADATA_KEY = "repositoryIdentity";
+/** Metadata key marking that the reported identity did not match the stored one. */
+export const REPOSITORY_IDENTITY_MISMATCH_METADATA_KEY =
+	"repositoryIdentityMismatch";
+
+/**
+ * Record the repository identity the CLI reported, plus whether it agreed with
+ * what the codebase already held.
+ *
+ * The identity is a normalized, credential-free value, so persisting it in
+ * session metadata is safe. The mismatch flag is the durable proof that an
+ * upload targeted a codebase bound to another repository; a later handshake
+ * that does match clears it, so the warning never outlives the condition.
+ */
+export function buildRepositoryIdentityMetadata(input: {
+	previous: unknown;
+	repositoryIdentity: string;
+	matchesStored: boolean;
+	at: Date;
+}): Record<string, unknown> {
+	const previous =
+		typeof input.previous === "object" && input.previous !== null
+			? (input.previous as Record<string, unknown>)
+			: {};
+	const next: Record<string, unknown> = {
+		...previous,
+		[REPOSITORY_IDENTITY_METADATA_KEY]: input.repositoryIdentity,
+		[REPOSITORY_IDENTITY_REPORTED_AT_METADATA_KEY]: input.at.toISOString(),
+	};
+	if (input.matchesStored) {
+		delete next[REPOSITORY_IDENTITY_MISMATCH_METADATA_KEY];
+		return next;
+	}
+	next[REPOSITORY_IDENTITY_MISMATCH_METADATA_KEY] = true;
+	return next;
+}
+
+/** When the CLI last reported a repository identity for this session. */
+export const REPOSITORY_IDENTITY_REPORTED_AT_METADATA_KEY =
+	"repositoryIdentityReportedAt";
+
+/** Read the persisted mismatch flag, or false when it was never set. */
+export function readRepositoryIdentityMismatch(metadata: unknown): boolean {
+	if (typeof metadata !== "object" || metadata === null) return false;
+	const value = (metadata as Record<string, unknown>)[
+		REPOSITORY_IDENTITY_MISMATCH_METADATA_KEY
+	];
+	return value === true;
+}
+
 /**
  * Whether the conclusion step may be opened.
  *
@@ -985,6 +1036,13 @@ export const PLAN_CODEBASE_PROJECT_STORAGE_KEY =
 // refresh return the user to the screen they were reading instead of guessing
 // a screen from the server snapshot alone.
 export const PLAN_CODEBASE_STEP_STORAGE_KEY = "prdfy:plan-codebase-step";
+// Active feature-plan pointer for the repository workspace: which of a
+// codebase's several feature plans the user last had open. Suffixed with the
+// codebase id so two repositories never share a pointer. Navigation state only
+// — planning artifacts always come from the server, and the workspace resolves
+// a correct plan on its own when this pointer is missing or stale.
+export const ACTIVE_PLAN_POINTER_STORAGE_KEY_PREFIX =
+	"prdfy:active-plan-project-id:";
 
 // One usable credential per project: this predicate is advisory only; session
 // creation must re-check under a per-project transaction/advisory lock
@@ -1260,6 +1318,10 @@ export function readSyncLifecycleAt(
 export const cliHandshakeRequestSchema = z.object({
 	cliVersion: z.string().min(1).max(64),
 	repositoryName: z.unknown().optional(),
+	// Normalized Git remote identity. Untrusted cosmetic metadata like
+	// `repositoryName`: validated by `normalizeRepositoryIdentity`, and an
+	// unusable value is ignored rather than failing an otherwise valid upload.
+	repositoryIdentity: z.unknown().optional(),
 });
 
 export type CliHandshakeRequest = z.infer<typeof cliHandshakeRequestSchema>;
@@ -1271,6 +1333,9 @@ export const cliHandshakeResponseSchema = z.object({
 	status: codebaseSyncStatusSchema,
 	cliMinVersion: z.string().min(1),
 	expiresAt: z.string().datetime(),
+	// Present only when the codebase already holds a different identity, so an
+	// upload into the wrong repository is visible to the user instead of silent.
+	repositoryIdentityMismatch: z.boolean().optional(),
 });
 
 export type CliHandshakeResponse = z.infer<typeof cliHandshakeResponseSchema>;
