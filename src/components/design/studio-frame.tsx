@@ -9,6 +9,10 @@ import {
 import { useEffect, useRef, useState } from "react";
 import type { StudioFrameRow } from "@/db/schema";
 import { extractCleanHtml } from "@/lib/clean-html";
+import {
+	STUDIO_VISUAL_FALLBACK_HEIGHT,
+	STUDIO_VISUAL_WIDTH,
+} from "@/lib/constants";
 import { StudioFrameShimmer } from "./studio-frame-shimmer";
 
 export interface StudioFrameProps {
@@ -48,7 +52,9 @@ export function StudioFrame({
 }: StudioFrameProps) {
 	const [copied, setCopied] = useState(false);
 	const isMobile = frame.viewport === "mobile";
-	const frameWidth = isMobile ? 375 : 1200;
+	const frameWidth = isMobile
+		? STUDIO_VISUAL_WIDTH.mobile
+		: STUDIO_VISUAL_WIDTH.web;
 	const [visual, setVisual] = useState<{
 		url: string;
 		width: number;
@@ -57,7 +63,11 @@ export function StudioFrame({
 	const [visualError, setVisualError] = useState("");
 	const [visualAttempt, setVisualAttempt] = useState(0);
 	const artboardRef = useRef<HTMLElement>(null);
-	const frameHeight = visual?.height ?? (isMobile ? 740 : 750);
+	const frameHeight =
+		visual?.height ??
+		(isMobile
+			? STUDIO_VISUAL_FALLBACK_HEIGHT.mobile
+			: STUDIO_VISUAL_FALLBACK_HEIGHT.web);
 	useEffect(() => {
 		if (!frame.htmlCode || !artboardRef.current) return;
 		const controller = new AbortController();

@@ -7,6 +7,26 @@ export const STUDIO_MAX_PROMPT_CHARS = 4000;
 
 export type StudioDesignMode = "web" | "mobile";
 
+/**
+ * Shared platform contracts. Both the initial user prompt and the per-screen
+ * frame prompt must describe the same rendering rules, otherwise screens from
+ * the same project come back with different proportions.
+ */
+const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Experience (mobile-first UI/UX).
+- Design for a single mobile viewport width (390px) and let the document grow vertically as tall as the content needs. A long, scrollable page is correct; never compress or rescale sections to force everything into one screen height.
+- Provide a clean mobile top app bar with the screen title and relevant action buttons.
+- Provide a sticky bottom navigation tab bar (with icons and labels), highlighting the active screen.
+- Ensure all clickable touch targets have a minimum height/width of 44px.
+- Use mobile-first interaction patterns: card stacks, segmented switchers, and compact stat rows.
+- Keep body text at 14px-16px with comfortable line height so it stays readable at the captured 390px width.
+- Size sections with padding, gaps, and min-height instead of fixed pixel heights, so the page never looks stretched or squashed when captured.`;
+
+const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Web Application Experience.
+- Design for desktop browsers (1280px-1440px) while maintaining smooth responsive adaptation to tablet and mobile.
+- Include a full desktop navigation header, balanced multi-column grid, and clean card hierarchy.
+- Indicate the active section in the navigation header.
+- Let the document grow vertically as tall as the content needs instead of forcing a fixed height.`;
+
 export const STUDIO_SYSTEM_PROMPT = `You are an expert front-end builder generating a complete, production-grade single-file HTML page.
 
 Output contract (non-negotiable):
@@ -227,21 +247,9 @@ Maintain exact visual continuity (colors, header/footer layout, typography, comp
 
 	// Platform instructions
 	if (opts.designMode === "mobile") {
-		sections.push(
-			`Target platform: Mobile Application Experience (mobile-first UI/UX).
-- Design primarily for mobile screen dimensions (optimal preview width 375px–430px).
-- Provide a clean mobile top app bar with screen title "${opts.screenName}" and relevant action buttons.
-- Provide a sticky bottom navigation tab bar (with icons and labels), highlighting "${opts.screenName}" as active if present in navigation.
-- Ensure all clickable touch targets have a minimum height/width of 44px.
-- Use mobile-first interaction patterns: card stacks, segmented switchers, and compact stat rows.`,
-		);
+		sections.push(MOBILE_PLATFORM_CONTRACT);
 	} else {
-		sections.push(
-			`Target platform: Responsive Web Application Experience.
-- Design for desktop browsers (1280px–1440px) while maintaining smooth responsive adaptation.
-- Include a full desktop navigation header with screen title or logo, balanced multi-column grid, and clean card hierarchy.
-- In the navigation header, indicate "${opts.screenName}" as the active section.`,
-		);
+		sections.push(WEB_PLATFORM_CONTRACT);
 	}
 
 	// Design tokens
@@ -369,20 +377,9 @@ export function buildStudioUserPrompt(
 
 	// Target design mode guidance
 	if (opts.designMode === "mobile") {
-		sections.push(
-			`Target platform: Mobile Application Experience (mobile-first UI/UX).
-- Design primarily for mobile screen dimensions (optimal preview width 375px–430px).
-- Provide a clean mobile top app bar with screen title, back or action button.
-- Provide a sticky bottom navigation tab bar (with icons and labels) or fixed primary action button.
-- Ensure all clickable touch targets have a minimum height/width of 44px.
-- Use mobile-first interaction patterns: card stacks, segmented switchers, and compact stat rows.`,
-		);
+		sections.push(MOBILE_PLATFORM_CONTRACT);
 	} else {
-		sections.push(
-			`Target platform: Responsive Web Application Experience.
-- Design for desktop browsers (1280px–1440px) while maintaining smooth responsive adaptation to tablet and mobile.
-- Include a full desktop navigation header, balanced multi-column grid, and clean card hierarchy.`,
-		);
+		sections.push(WEB_PLATFORM_CONTRACT);
 	}
 
 	// DESIGN.md reference

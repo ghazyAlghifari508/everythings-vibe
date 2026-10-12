@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
 import { StudioFrame, isFrameVisualPending } from "./studio-frame";
 import { StudioFrameShimmer } from "./studio-frame-shimmer";
 
@@ -141,6 +142,41 @@ describe("StudioFrame", () => {
 		expect(
 			container.querySelector('[data-testid="mobile-shimmer"]'),
 		).not.toBeNull();
+	});
+
+	it("sizes a mobile artboard at the canonical capture width so it never shifts", () => {
+		const { container } = render(
+			<StudioFrame
+				frame={frame({ status: "generating" })}
+				isSelected={false}
+				onSelect={vi.fn()}
+				isCanvasPanning={false}
+			/>,
+		);
+
+		const artboard = container.querySelector<HTMLElement>(
+			".studio-frame-shimmer",
+		)?.parentElement;
+		// The artboard box must already match the width the visual is captured
+		// at, so the frame does not resize when the preview arrives.
+		expect(artboard?.style.width).toBe(`${STUDIO_VISUAL_WIDTH.mobile}px`);
+	});
+
+	it("uses restrained corner rounding instead of a decorative device bezel", () => {
+		const { container } = render(
+			<StudioFrame
+				frame={frame({ status: "generating" })}
+				isSelected={false}
+				onSelect={vi.fn()}
+				isCanvasPanning={false}
+			/>,
+		);
+
+		const artboard = container.querySelector<HTMLElement>(
+			".studio-frame-shimmer",
+		)?.parentElement;
+		expect(artboard?.className).toContain("rounded-lg");
+		expect(artboard?.className).not.toContain("rounded-[24px]");
 	});
 
 	it("triggers onSelect when frame is clicked", () => {

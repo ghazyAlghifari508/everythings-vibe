@@ -54,7 +54,9 @@ describe("Studio Prompt Builder", () => {
 			designMode: "mobile",
 		});
 		expect(prompt).toContain("Target platform: Mobile Application Experience");
-		expect(prompt).toContain("375px");
+		// The directive must name the canonical capture width, otherwise the
+		// generated layout is designed for a different width than it is rendered at.
+		expect(prompt).toContain("390px");
 		expect(prompt).toContain("bottom navigation");
 	});
 
@@ -63,7 +65,7 @@ describe("Studio Prompt Builder", () => {
 			designMode: "web",
 		});
 		expect(prompt).toContain("Target platform: Responsive Web Application");
-		expect(prompt).toContain("1280px–1440px");
+		expect(prompt).toContain("1280px-1440px");
 	});
 
 	it("validates and sanitizes DESIGN.md input", () => {

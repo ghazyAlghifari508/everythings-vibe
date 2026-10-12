@@ -7,6 +7,10 @@ import type {
 	StudioJobRow,
 	StudioProjectRow,
 } from "@/db/schema";
+import {
+	STUDIO_VISUAL_FALLBACK_HEIGHT,
+	STUDIO_VISUAL_WIDTH,
+} from "@/lib/constants";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import { StudioFrame } from "./studio-frame";
 
@@ -75,8 +79,14 @@ export const StudioCanvas = memo(function StudioCanvas({
 		const bounds = frames.map(
 			(frame) =>
 				dimensions.current.get(frame.id) ?? {
-					width: frame.viewport === "mobile" ? 390 : 1440,
-					height: 750,
+					width:
+						frame.viewport === "mobile"
+							? STUDIO_VISUAL_WIDTH.mobile
+							: STUDIO_VISUAL_WIDTH.web,
+					height:
+						frame.viewport === "mobile"
+							? STUDIO_VISUAL_FALLBACK_HEIGHT.mobile
+							: STUDIO_VISUAL_FALLBACK_HEIGHT.web,
 				},
 		);
 		const width =
