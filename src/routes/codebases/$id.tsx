@@ -272,28 +272,39 @@ const loadCodebase = createServerFn({ method: "GET" })
 			)
 			.orderBy(desc(codebaseSnapshots.createdAt))
 			.limit(1);
-		// The snapshot the existing planning was generated against, read from the
-		// generation-context link rather than assumed. When it differs from the
-		// newest usable snapshot the repository moved on after the plan was
-		// written, which the workspace reports as "review this plan" — it never
-		// regenerates anything.
-		const planningSnapshotRows = onboardingFeature
-			? await db
-					.select({ snapshotId: codebaseGenerationContexts.snapshotId })
-					.from(codebaseGenerationContexts)
-					.innerJoin(
-						projects,
-						eq(projects.id, codebaseGenerationContexts.projectId),
-					)
-					.where(
-						and(
-							eq(codebaseGenerationContexts.projectId, onboardingFeature.id),
-							eq(projects.userId, user.id),
-						),
-					)
-					.orderBy(desc(codebaseGenerationContexts.updatedAt))
-					.limit(1)
-			: [];
+		// The snapshot each plan's planning was generated against, read from the
+		// generation-context links rather than assumed. Bound per plan, because a
+		// repository holds several independent plans and each one may have been
+		// written against a different snapshot: the workspace reports "review this
+		// plan" only for the plan actually on screen. Nothing is ever regenerated.
+		const planningSnapshotRows =
+			projectIds.length === 0
+				? []
+				: await db
+						.select({
+							projectId: codebaseGenerationContexts.projectId,
+							snapshotId: codebaseGenerationContexts.snapshotId,
+							updatedAt: codebaseGenerationContexts.updatedAt,
+						})
+						.from(codebaseGenerationContexts)
+						.innerJoin(
+							projects,
+							eq(projects.id, codebaseGenerationContexts.projectId),
+						)
+						.where(
+							and(
+								inArray(codebaseGenerationContexts.projectId, projectIds),
+								eq(projects.userId, user.id),
+							),
+						)
+						.orderBy(desc(codebaseGenerationContexts.updatedAt));
+		const planningSnapshotByProject = new Map<string, string>();
+		for (const row of planningSnapshotRows) {
+			// Newest link wins; the rows are already ordered by it.
+			if (!planningSnapshotByProject.has(row.projectId)) {
+				planningSnapshotByProject.set(row.projectId, row.snapshotId);
+			}
+		}
 		let analysis: AnalysisResponse | null = null;
 		if (onboardingFeature && currentSnapshot) {
 			// Every attempt for this exact project + snapshot is a candidate: a
@@ -323,7 +334,9 @@ const loadCodebase = createServerFn({ method: "GET" })
 			plans,
 			onboardingFeatureId: onboardingFeature?.id ?? null,
 			currentSnapshotId: currentSnapshot?.id ?? null,
-			planningSnapshotId: planningSnapshotRows[0]?.snapshotId ?? null,
+			// Serialized as a plain record so the client can look up the snapshot
+			// for whichever plan it resolves as active.
+			planningSnapshotByProject: Object.fromEntries(planningSnapshotByProject),
 			analysis,
 			hasStoredSnapshot,
 			canOpenFullBoard,
@@ -718,7 +731,7 @@ function CodebaseDetailPage() {
 		plans,
 		onboardingFeatureId,
 		currentSnapshotId,
-		planningSnapshotId,
+		planningSnapshotByProject,
 		analysis: initialAnalysis,
 		hasStoredSnapshot,
 		canOpenFullBoard,
@@ -2525,7 +2538,11 @@ function CodebaseDetailPage() {
 								stageBusy={stageBusy}
 								stageError={stageError}
 								codebaseName={codebase.name}
-								planningSnapshotId={planningSnapshotId}
+								planningSnapshotId={
+									effectiveFeatureId
+										? (planningSnapshotByProject[effectiveFeatureId] ?? null)
+										: null
+								}
 								currentSnapshotId={activeWorkspaceSnapshotId}
 								onReviewPlan={() => {
 									// Reviewing is a read: it reveals the stored plan and

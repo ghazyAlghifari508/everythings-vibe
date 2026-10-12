@@ -20,7 +20,7 @@ interface WorkspaceLoaderData {
 	featuresStatusById: Map<string, string | null>;
 	onboardingFeatureId: string | null;
 	currentSnapshotId: string | null;
-	planningSnapshotId: string | null;
+	planningSnapshotByProject: Record<string, string>;
 	analysis: null;
 	latestAnalysisAttempt: null;
 	hasStoredSnapshot: boolean;
@@ -176,7 +176,7 @@ function setLoaderData(snapshotId: string) {
 		featuresStatusById: new Map([[PROJECT_ID, null]]),
 		onboardingFeatureId: PROJECT_ID,
 		currentSnapshotId: snapshotId,
-		planningSnapshotId: snapshotId,
+		planningSnapshotByProject: { [PROJECT_ID]: snapshotId },
 		analysis: null,
 		latestAnalysisAttempt: null,
 		hasStoredSnapshot: false,
@@ -360,7 +360,7 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 			featuresStatusById: new Map([[PROJECT_ID, null]]),
 			onboardingFeatureId: PROJECT_ID,
 			currentSnapshotId: "snapshot-empty",
-			planningSnapshotId: "snapshot-empty",
+			planningSnapshotByProject: { [PROJECT_ID]: "snapshot-empty" },
 			analysis: null,
 			latestAnalysisAttempt: null,
 			hasStoredSnapshot: true,
