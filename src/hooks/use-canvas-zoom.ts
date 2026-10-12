@@ -2,6 +2,10 @@
  * Canvas zoom and pan hook.
  * Provides zoom level, pan position, and control functions.
  *
+ * Zoom is clamped at this single state-update boundary, so every entry point
+ * (toolbar buttons, wheel, pinch, reset, fit-to-content) is bounded by the same
+ * limits and no code path can produce an unusable or non-finite scale.
+ *
  * ponytail: pointermove/wheel can fire more often than the display refreshes.
  * Gesture values are transient, so they live in refs and are committed via
  * requestAnimationFrame - at most one React render per frame instead of one
@@ -9,6 +13,14 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	CANVAS_MAX_ZOOM,
+	CANVAS_MIN_ZOOM,
+	WHEEL_LINE_HEIGHT_PX,
+	WHEEL_PAGE_HEIGHT_PX,
+	WHEEL_ZOOM_MAX_FRAME_FACTOR,
+	WHEEL_ZOOM_SENSITIVITY_PX,
+} from "@/lib/constants";
 
 interface UseCanvasZoomOptions {
 	minZoom?: number;
@@ -16,24 +28,84 @@ interface UseCanvasZoomOptions {
 	initialZoom?: number;
 }
 
+/** The subset of a wheel event that zoom/pan math actually reads. */
+export interface WheelDeltaLike {
+	deltaY: number;
+	deltaMode: number;
+}
+
+export interface WheelLike extends WheelDeltaLike {
+	clientX: number;
+	clientY: number;
+}
+
+/**
+ * Normalizes a wheel event to pixels.
+ *
+ * deltaMode is honoured because a line- or page-based device reports tiny
+ * deltaY values that would otherwise be read as a near-zero gesture, and the
+ * raw magnitude is used instead of only its sign so the zoom tracks how far
+ * the user actually scrolled.
+ */
+export function normalizeWheelDelta(event: WheelDeltaLike): number {
+	if (!Number.isFinite(event.deltaY)) return 0;
+	const scale =
+		event.deltaMode === 1
+			? WHEEL_LINE_HEIGHT_PX
+			: event.deltaMode === 2
+				? WHEEL_PAGE_HEIGHT_PX
+				: 1;
+	return event.deltaY * scale;
+}
+
+/**
+ * Converts normalized wheel pixels into a zoom factor.
+ *
+ * The factor is exponential in the delta so repeated small gestures feel
+ * smooth, and it is bounded per frame so one burst can never jump the whole
+ * range.
+ */
+export function wheelDeltaToZoomFactor(deltaPixels: number): number {
+	if (!Number.isFinite(deltaPixels) || deltaPixels === 0) return 1;
+	const raw = Math.exp(-deltaPixels / WHEEL_ZOOM_SENSITIVITY_PX);
+	if (!Number.isFinite(raw)) return 1;
+	return Math.min(
+		WHEEL_ZOOM_MAX_FRAME_FACTOR,
+		Math.max(1 / WHEEL_ZOOM_MAX_FRAME_FACTOR, raw),
+	);
+}
+
 export function useCanvasZoom({
-	minZoom = 0.54,
-	maxZoom = 1.54,
+	minZoom = CANVAS_MIN_ZOOM,
+	maxZoom = CANVAS_MAX_ZOOM,
 	initialZoom = 1,
 }: UseCanvasZoomOptions = {}) {
 	const clampZoom = useCallback(
-		(value: number) => Math.min(maxZoom, Math.max(minZoom, value)),
+		(value: number) =>
+			// A non-finite candidate must never reach the transform: NaN would
+			// poison every later calculation, so it falls back to the previous
+			// scale instead of propagating.
+			Number.isFinite(value)
+				? Math.min(maxZoom, Math.max(minZoom, value))
+				: minZoom,
 		[minZoom, maxZoom],
 	);
 	const [zoom, setZoomState] = useState(() => clampZoom(initialZoom));
 	const [pan, setPan] = useState({ x: 0, y: 0 });
 	const isPanningRef = useRef(false);
+	// Mirror of the committed zoom so gesture handlers can compute the next
+	// value without reading state inside an updater (updaters must stay pure).
+	const zoomRef = useRef(zoom);
 
 	const setZoom = useCallback(
 		(value: number | ((prev: number) => number)) => {
-			setZoomState((prev) =>
-				clampZoom(typeof value === "function" ? value(prev) : value),
-			);
+			setZoomState((prev) => {
+				const next = clampZoom(
+					typeof value === "function" ? value(prev) : value,
+				);
+				zoomRef.current = next;
+				return next;
+			});
 		},
 		[clampZoom],
 	);
@@ -43,6 +115,8 @@ export function useCanvasZoom({
 	const lastAppliedRef = useRef({ x: 0, y: 0 });
 	// Multiplicative wheel factors accumulated since last commit.
 	const pendingZoomFactorRef = useRef(1);
+	// Zoom anchor: the point that must stay under the pointer while zooming.
+	const zoomAnchorRef = useRef<{ x: number; y: number } | null>(null);
 	const panRafRef = useRef<number | null>(null);
 	const zoomRafRef = useRef<number | null>(null);
 
@@ -69,10 +143,24 @@ export function useCanvasZoom({
 	const flushZoom = useCallback(() => {
 		zoomRafRef.current = null;
 		const factor = pendingZoomFactorRef.current;
-		if (factor === 1) return;
 		pendingZoomFactorRef.current = 1;
-		setZoom((prev) => prev * factor);
-	}, [setZoom]);
+		if (!Number.isFinite(factor) || factor === 1) return;
+		const anchor = zoomAnchorRef.current;
+		zoomAnchorRef.current = null;
+		const previous = zoomRef.current;
+		const next = clampZoom(previous * factor);
+		zoomRef.current = next;
+		// Keep the anchored content point under the cursor so the board does not
+		// fly away while zooming.
+		if (anchor && next !== previous) {
+			const ratio = next / previous;
+			setPan((panPrev) => ({
+				x: anchor.x - (anchor.x - panPrev.x) * ratio,
+				y: anchor.y - (anchor.y - panPrev.y) * ratio,
+			}));
+		}
+		setZoomState(next);
+	}, [clampZoom]);
 
 	const zoomIn = useCallback(() => {
 		setZoom((prev) => prev * 1.2);
@@ -93,10 +181,12 @@ export function useCanvasZoom({
 		}
 		pendingPointerRef.current = null;
 		pendingZoomFactorRef.current = 1;
+		zoomAnchorRef.current = null;
 		isPanningRef.current = false;
+		zoomRef.current = clampZoom(initialZoom);
 		setZoom(initialZoom);
 		setPan({ x: 0, y: 0 });
-	}, [initialZoom, setZoom]);
+	}, [initialZoom, setZoom, clampZoom]);
 
 	const startPan = useCallback((e: React.PointerEvent) => {
 		// Only react to primary button / touch / pen contact.
@@ -139,7 +229,18 @@ export function useCanvasZoom({
 	// Canvas div uses touch-action: none + overflow-hidden to block native scroll.
 	const onWheel = useCallback(
 		(e: React.WheelEvent) => {
-			pendingZoomFactorRef.current *= e.deltaY < 0 ? 1.1 : 1 / 1.1;
+			const deltaPixels = normalizeWheelDelta(e);
+			const factor = wheelDeltaToZoomFactor(deltaPixels);
+			if (factor === 1) return;
+			pendingZoomFactorRef.current *= factor;
+			if (!Number.isFinite(pendingZoomFactorRef.current)) {
+				pendingZoomFactorRef.current = 1;
+				return;
+			}
+			// Anchor at the pointer position when the event carries one.
+			if (Number.isFinite(e.clientX) && Number.isFinite(e.clientY)) {
+				zoomAnchorRef.current = { x: e.clientX, y: e.clientY };
+			}
 			if (zoomRafRef.current === null) {
 				zoomRafRef.current = requestAnimationFrame(flushZoom);
 			}
