@@ -290,6 +290,7 @@ function ScrapeDetailPage() {
 					processedImages={
 						data?.metadata?.processedImages ?? initial.metadata?.processedImages
 					}
+					layout={mode === "html" ? "single" : "two-panel"}
 					mode={mode}
 					status={currentStatus}
 					sourceUrl={sourceUrl}
