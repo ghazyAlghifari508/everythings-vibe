@@ -2,16 +2,175 @@ import { z } from "zod";
 import { ScrapeError } from "./design-errors";
 import { visualEvidenceSchema } from "./design-evidence-contract";
 import {
-	renderEvidenceDesignMd,
-	type VisualEvidence,
-} from "./design-visual-evidence";
+	type RenderDesignMdOptions,
+	renderDesignMd,
+	validateDesignMd,
+} from "./design-md-render";
+import {
+	buildDesignModel,
+	type DesignTokenModel,
+	MODEL_VERSION,
+} from "./design-model";
+import {
+	buildSynthesisInstruction,
+	buildSynthesisPayload,
+	parseSynthesisResponse,
+	type SynthesisOutcome,
+	synthesisToRenderOptions,
+} from "./design-synthesis";
+import type { VisualEvidence } from "./design-visual-evidence";
 import type { ScrapeInstrumentation } from "./scrape-instrumentation";
 import { extractJson } from "./services/json-extract";
 
-// The summary is a short reference list, so the number of rendered lines is
-// bounded for readability. This is a presentation bound only: the model may
-// legitimately return more valid references, and dropping the extras is
-// honest, while rejecting the whole response would discard valid output.
+export const DESIGN_SYSTEM_PROMPT =
+	"Summarize only supplied rendered observations. Never invent measurements, semantic brand identity, fonts, tokens, responsive states or component behavior. Missing evidence is unknown. No document-length or token-count quotas.";
+
+export interface DesignMdEnrichment {
+	status: "applied" | "unavailable";
+	detail?: string;
+}
+
+export interface GeneratedDesignMd {
+	document: string;
+	enrichment: DesignMdEnrichment;
+	/** The validated model both renderers read. */
+	model: DesignTokenModel;
+}
+
+// The rendered document is a pure function of the validated model, so the
+// document and the Style Inspector cannot disagree about a measured value.
+export function renderModelDesignMd(
+	model: DesignTokenModel,
+	options: RenderDesignMdOptions = {},
+): string {
+	return renderDesignMd(model, options);
+}
+
+export async function generateDesignMd(
+	evidence: VisualEvidence,
+	instrumentation?: ScrapeInstrumentation,
+	signal?: AbortSignal,
+): Promise<GeneratedDesignMd> {
+	const parsed = visualEvidenceSchema.safeParse(evidence);
+	if (!parsed.success || !parsed.data.elements.length)
+		throw new ScrapeError(
+			"NO_ANALYZABLE_CONTENT",
+			"Evidence visual tidak tersedia.",
+		);
+	await instrumentation?.onActivity?.("Menormalkan evidence visual");
+	const model = buildDesignModel(parsed.data);
+
+	// Without instrumentation there is no AI step at all, so the measured model
+	// produces the document on its own.
+	if (!instrumentation) {
+		const document = renderModelDesignMd(model);
+		assertDocumentValid(document);
+		return { document, enrichment: { status: "unavailable" }, model };
+	}
+
+	await instrumentation.onActivity?.(
+		"Menyusun DESIGN.md dari pengukuran browser",
+	);
+	const synthesis = await synthesizeWithEvidence(
+		model,
+		instrumentation,
+		signal,
+	);
+	const options = synthesis.synthesis
+		? synthesisToRenderOptions(synthesis.synthesis, model)
+		: {};
+	const document = renderModelDesignMd(model, {
+		...options,
+		enrichmentUnavailable: synthesis.status === "unavailable",
+	});
+	await instrumentation.onActivity?.(
+		"Memvalidasi kesesuaian DESIGN.md dan evidence",
+	);
+	assertDocumentValid(document);
+
+	return {
+		document,
+		enrichment:
+			synthesis.status === "applied"
+				? { status: "applied" }
+				: { status: "unavailable", detail: synthesis.detail },
+		model,
+	};
+}
+
+// A rendered document must pass its own contract before it can be stored.
+function assertDocumentValid(document: string): void {
+	const issues = validateDesignMd(document);
+	if (issues.length)
+		throw new ScrapeError(
+			"AI_GENERATION_FAILED",
+			`DESIGN.md tidak memenuhi kontrak format: ${issues[0]?.detail ?? "unknown"}`,
+		);
+}
+
+// Runs the AI synthesis step. Any failure degrades enrichment instead of
+// discarding the measured model, and a cancelled job still stops the pipeline.
+async function synthesizeWithEvidence(
+	model: DesignTokenModel,
+	instrumentation: ScrapeInstrumentation,
+	signal?: AbortSignal,
+): Promise<SynthesisOutcome> {
+	try {
+		await instrumentation.onActivity?.("AI menyusun analisis design system");
+		const { selectModels, tryStreamWithFallback } = await import(
+			"./services/ai-orchestrator"
+		);
+		const stream = await tryStreamWithFallback(
+			selectModels(),
+			[
+				{ role: "system", content: buildSynthesisInstruction() },
+				{ role: "user", content: buildSynthesisPayload(model) },
+			],
+			signal,
+			2000,
+		);
+		let response = stream.firstChunk;
+		for await (const chunk of stream.generator) {
+			response += chunk;
+		}
+		// A job cancelled at any point during synthesis must stop the pipeline
+		// rather than be reported as a degraded enrichment.
+		if (signal?.aborted) {
+			stream.abortController.abort();
+			throw new ScrapeError("AI_GENERATION_FAILED", "Generation dibatalkan.");
+		}
+		return parseSynthesisResponse(response, model, extractJson);
+	} catch (error) {
+		if (signal?.aborted) throw error;
+		return {
+			synthesis: null,
+			status: "unavailable",
+			detail:
+				error instanceof Error && error.message
+					? error.message
+					: "AI synthesis tidak tersedia.",
+		};
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Legacy compatibility layer
+// ---------------------------------------------------------------------------
+
+// Documents produced before the structured model existed are still readable.
+// They are validated against the evidence that produced them, and never
+// presented as verified against a current capture.
+export const LEGACY_DESIGN_MD_VERSION = 1;
+
+export function designMdVersionOf(document: string): number {
+	const match = document.match(/^Document model version (\d+)\./m);
+	return match?.[1] ? Number(match[1]) : LEGACY_DESIGN_MD_VERSION;
+}
+
+export function isCurrentModelDocument(document: string): boolean {
+	return designMdVersionOf(document) >= MODEL_VERSION;
+}
+
 const MAX_EXPLANATION_OBSERVATIONS = 12;
 const MAX_EXPLANATION_PROPERTIES = 6;
 
@@ -24,6 +183,9 @@ const explanationSchema = z.strictObject({
 	),
 });
 
+// Legacy: validates an observation-reference summary against the evidence that
+// produced it. Every reference must resolve to a measured observation, so a
+// hallucinated claim can never reach an archived document.
 export function renderValidatedExplanation(
 	value: unknown,
 	evidence: VisualEvidence,
@@ -34,10 +196,6 @@ export function renderValidatedExplanation(
 			"AI_GENERATION_FAILED",
 			"Penjelasan AI tidak memenuhi kontrak evidence.",
 		);
-	// Every reference in the response must resolve to a measured observation; a
-	// single unsupported reference rejects the response rather than being
-	// dropped, so hallucinated claims can never reach the document. Only the
-	// rendered line count is capped, after validation.
 	const lines = parsed.data.observations.flatMap((observation) => {
 		const element = evidence.elements[observation.element];
 		if (
@@ -56,8 +214,6 @@ export function renderValidatedExplanation(
 	return lines.slice(0, MAX_EXPLANATION_OBSERVATIONS).join("\n");
 }
 
-// Accepts the model's own output only. A fenced or prose-wrapped JSON object is
-// still the same response; nothing is synthesized or inferred.
 export function parseExplanationResponse(response: string): unknown {
 	const direct = response.trim();
 	try {
@@ -73,34 +229,12 @@ export function parseExplanationResponse(response: string): unknown {
 	}
 }
 
-export const DESIGN_SYSTEM_PROMPT =
-	"Summarize only supplied rendered observations. Never invent measurements, semantic brand identity, fonts, tokens, responsive states or component behavior. Missing evidence is unknown. No document-length or token-count quotas.";
-
-export function normalizeDesign(text: string): string {
-	return text
-		.replace(/[\u2010-\u2015]/g, "-")
-		.replace(/[‘’]/g, "'")
-		.replace(/[“”]/g, '"')
-		.replace(/^## Tokens\s*-\s*Colors$/gim, "## Tokens - Colors")
-		.replace(/^## Tokens\s*-\s*Typography$/gim, "## Tokens - Typography")
-		.replace(
-			/^## Tokens\s*-\s*Spacing & Shapes$/gim,
-			"## Tokens - Spacing & Shapes",
-		)
-		.replace(
-			/^## Limitations & Confidence(?: Notes)?$/gim,
-			"## Limitations & Confidence Notes",
-		)
-		.replace(
-			/^### .*Component Prompts?.*$/gim,
-			"### Example Component Prompts",
-		);
-}
-
+// Legacy: confirms an archived document still matches the capture it came from.
+// A document that does not match is reported as unverified rather than trusted.
 export function designIssues(text: string, evidence: VisualEvidence): string[] {
 	const parsed = visualEvidenceSchema.safeParse(evidence);
 	if (!parsed.success) return ["invalid visual evidence"];
-	const canonical = renderEvidenceDesignMd(parsed.data);
+	const canonical = legacyRenderEvidenceDesignMd(parsed.data);
 	const suffix = text.slice(canonical.length);
 	const explanationLines = suffix.startsWith("\n\n## Evidence Summary\n")
 		? suffix
@@ -124,117 +258,34 @@ export function designIssues(text: string, evidence: VisualEvidence): string[] {
 		: ["document does not match canonical evidence"];
 }
 
-export interface DesignMdEnrichment {
-	status: "applied" | "unavailable";
-	detail?: string;
+// Imported here so the legacy validator renders exactly the archived shape it
+// was written against.
+import { renderEvidenceDesignMd as legacyRenderEvidenceDesignMd } from "./design-visual-evidence";
+
+export function normalizeDesign(text: string): string {
+	return text
+		.replace(/[\u2010-\u2015]/g, "-")
+		.replace(/[‘’]/g, "'")
+		.replace(/[“”]/g, '"')
+		.replace(/^## Tokens\s*-\s*Colors$/gim, "## Tokens - Colors")
+		.replace(/^## Tokens\s*-\s*Typography$/gim, "## Tokens - Typography")
+		.replace(
+			/^## Tokens\s*-\s*Spacing & Shapes$/gim,
+			"## Tokens - Spacing & Shapes",
+		)
+		.replace(
+			/^## Limitations & Confidence(?: Notes)?$/gim,
+			"## Limitations & Confidence Notes",
+		)
+		.replace(
+			/^### .*Component Prompts?.*$/gim,
+			"### Example Component Prompts",
+		);
 }
 
-export interface GeneratedDesignMd {
-	document: string;
-	enrichment: DesignMdEnrichment;
-}
+export const designMdIssueSchema = z.object({
+	code: z.string(),
+	detail: z.string(),
+});
 
-export async function generateDesignMd(
-	evidence: VisualEvidence,
-	instrumentation?: ScrapeInstrumentation,
-	signal?: AbortSignal,
-): Promise<GeneratedDesignMd> {
-	const parsed = visualEvidenceSchema.safeParse(evidence);
-	if (!parsed.success || !parsed.data.elements.length)
-		throw new ScrapeError(
-			"NO_ANALYZABLE_CONTENT",
-			"Evidence visual tidak tersedia.",
-		);
-	await instrumentation?.onActivity?.(
-		"Menyusun DESIGN.md dari pengukuran browser",
-	);
-	const canonical = renderEvidenceDesignMd(parsed.data);
-	if (!instrumentation)
-		return { document: canonical, enrichment: { status: "unavailable" } };
-
-	// The canonical document is already complete and evidence-backed. The AI
-	// step only appends references to observations that were measured, so any
-	// failure here degrades enrichment instead of discarding valid evidence.
-	const enrichment = await enrichWithEvidenceReferences(
-		parsed.data,
-		instrumentation,
-		signal,
-	);
-	const document = enrichment.summary
-		? `${canonical}\n\n## Evidence Summary\n${enrichment.summary}`
-		: canonical;
-	await instrumentation.onActivity?.(
-		"Memvalidasi kesesuaian DESIGN.md dan evidence",
-	);
-	if (designIssues(document, parsed.data).length)
-		throw new ScrapeError(
-			"AI_GENERATION_FAILED",
-			"DESIGN.md tidak sesuai evidence.",
-		);
-	return {
-		document,
-		enrichment: enrichment.summary
-			? { status: "applied" }
-			: { status: "unavailable", detail: enrichment.reason },
-	};
-}
-
-async function enrichWithEvidenceReferences(
-	evidence: VisualEvidence,
-	instrumentation: ScrapeInstrumentation,
-	signal?: AbortSignal,
-): Promise<{ summary?: string; reason?: string }> {
-	try {
-		await instrumentation.onActivity?.("AI mengorganisasi referensi evidence");
-		const { selectModels, tryStreamWithFallback } = await import(
-			"./services/ai-orchestrator"
-		);
-		const stream = await tryStreamWithFallback(
-			selectModels(),
-			[
-				{
-					role: "system",
-					content: `${DESIGN_SYSTEM_PROMPT} Return JSON only: {"observations":[{"element":0,"properties":["color"]}]}. Choose meaningful existing element indices and property names. No prose or CSS values.`,
-				},
-				{
-					role: "user",
-					content: JSON.stringify(
-						evidence.elements.map((element, index) => ({
-							index,
-							role: element.role,
-							properties: element.properties,
-						})),
-					),
-				},
-			],
-			signal,
-			1000,
-		);
-		let response = stream.firstChunk;
-		for await (const chunk of stream.generator) {
-			if (signal?.aborted) {
-				stream.abortController.abort();
-				throw new ScrapeError("AI_GENERATION_FAILED", "Generation dibatalkan.");
-			}
-			response += chunk;
-		}
-		const payload = parseExplanationResponse(response);
-		if (payload === null)
-			throw new ScrapeError(
-				"AI_GENERATION_FAILED",
-				"AI mengembalikan referensi evidence tidak valid.",
-			);
-		const summary = renderValidatedExplanation(payload, evidence);
-		return summary ? { summary } : {};
-	} catch (error) {
-		// A cancelled job must still stop the pipeline; every other enrichment
-		// fault keeps the canonical document and reports the limitation.
-		if (signal?.aborted) throw error;
-		return {
-			reason:
-				error instanceof Error && error.message
-					? error.message
-					: "AI enrichment tidak tersedia.",
-		};
-	}
-}
+export { MODEL_VERSION };
