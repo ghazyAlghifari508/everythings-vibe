@@ -140,7 +140,9 @@ describe("ThoughtLine settled outcome", () => {
 		);
 		// 18.4s is the measured duration, not the time since mount.
 		expect(container.textContent).toContain("PRD selesai");
-		expect(container.querySelector('[role="timer"]')?.textContent).toBe("18.4s");
+		expect(container.querySelector('[role="timer"]')?.textContent).toBe(
+			"18.4s",
+		);
 	});
 
 	it("renders the failed state instead of a completed checkmark", () => {
@@ -155,7 +157,9 @@ describe("ThoughtLine settled outcome", () => {
 				finishedAt={2_500}
 			/>,
 		);
-		expect(container.textContent).toContain("Gagal menyusun Acceptance Criteria");
+		expect(container.textContent).toContain(
+			"Gagal menyusun Acceptance Criteria",
+		);
 		expect(container.textContent).not.toContain("Acceptance Criteria selesai");
 		expect(container.querySelector('[role="timer"]')?.textContent).toBe("2.5s");
 	});
@@ -170,9 +174,9 @@ describe("ThoughtLine settled outcome", () => {
 				failedLabel="Gagal menyusun PRD"
 			/>,
 		);
-		expect(hasAttr(container.querySelector(".thought-line"), "data-failed")).toBe(
-			true,
-		);
+		expect(
+			hasAttr(container.querySelector(".thought-line"), "data-failed"),
+		).toBe(true);
 		expect(
 			hasAttr(container.querySelector(".thought-line__glyph"), "data-failed"),
 		).toBe(true);
@@ -180,11 +184,16 @@ describe("ThoughtLine settled outcome", () => {
 
 	it("keeps a working line out of the failed state even when the flag is set", () => {
 		const { container } = render(
-			<ThoughtLine working failed label="Menyusun PRD" doneLabel="PRD selesai" />,
+			<ThoughtLine
+				working
+				failed
+				label="Menyusun PRD"
+				doneLabel="PRD selesai"
+			/>,
 		);
-		expect(hasAttr(container.querySelector(".thought-line"), "data-failed")).toBe(
-			false,
-		);
+		expect(
+			hasAttr(container.querySelector(".thought-line"), "data-failed"),
+		).toBe(false);
 	});
 
 	it("shows the model's real streamed reasoning verbatim", () => {

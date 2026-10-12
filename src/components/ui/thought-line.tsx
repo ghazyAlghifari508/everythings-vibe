@@ -177,8 +177,7 @@ export function ThoughtLine({
 			? null
 			: Math.max(
 					0,
-					(resolveStartEpoch(finishedAt, Date.now()) -
-						startedAtRef.current) /
+					(resolveStartEpoch(finishedAt, Date.now()) - startedAtRef.current) /
 						100,
 				);
 
