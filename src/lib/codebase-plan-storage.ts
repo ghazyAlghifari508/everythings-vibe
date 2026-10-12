@@ -10,6 +10,7 @@
  */
 
 import {
+	ACTIVE_PLAN_POINTER_STORAGE_KEY_PREFIX,
 	PLAN_CODEBASE_ID_STORAGE_KEY,
 	PLAN_CODEBASE_NAME_STORAGE_KEY,
 	PLAN_CODEBASE_PROJECT_STORAGE_KEY,
@@ -89,6 +90,37 @@ export function storePlanCodebaseProjectPointer(id: string): void {
 
 export function clearPlanCodebaseProjectPointer(): void {
 	removeItem(PLAN_CODEBASE_PROJECT_STORAGE_KEY);
+}
+
+/**
+ * Which feature plan the user last had open in a repository workspace.
+ *
+ * Keyed per codebase so two repositories never share a pointer, and stored in
+ * `sessionStorage` because it is navigation state, not planning data: losing it
+ * costs the user one click, and the workspace still resolves a correct plan from
+ * the server. The planning itself is never stored here.
+ */
+function activePlanStorageKey(codebaseId: string): string {
+	return `${ACTIVE_PLAN_POINTER_STORAGE_KEY_PREFIX}${codebaseId}`;
+}
+
+export function readActivePlanPointer(codebaseId: string): string | null {
+	if (!codebaseId) return null;
+	const id = readItem(activePlanStorageKey(codebaseId));
+	return id && id.trim().length > 0 ? id : null;
+}
+
+export function storeActivePlanPointer(
+	codebaseId: string,
+	projectId: string,
+): void {
+	if (!codebaseId || !projectId) return;
+	writeItem(activePlanStorageKey(codebaseId), projectId);
+}
+
+export function clearActivePlanPointer(codebaseId: string): void {
+	if (!codebaseId) return;
+	removeItem(activePlanStorageKey(codebaseId));
 }
 
 /**

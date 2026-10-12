@@ -37,7 +37,10 @@ export type ActivePlanSource =
 
 export type ActivePlanResolution =
 	| { kind: "resolved"; plan: ActivePlanCandidate; source: ActivePlanSource }
+	/** The repository genuinely has no feature plan yet. */
 	| { kind: "empty" }
+	/** The plan list is not available yet, so nothing may be claimed about it. */
+	| { kind: "unknown" }
 	| { kind: "needs_selection"; plans: readonly ActivePlanCandidate[] };
 
 export interface ResolveActivePlanInput {
@@ -45,7 +48,13 @@ export interface ResolveActivePlanInput {
 	requestedProjectId?: string | null;
 	/** Durable onboarding anchor recorded on the codebase. */
 	anchorProjectId?: string | null;
-	plans: readonly ActivePlanCandidate[];
+	/**
+	 * The repository's feature plans, or `undefined` while the list has not been
+	 * read yet. An absent list is deliberately NOT treated as an empty one: a
+	 * loader still in flight must not be reported as a repository with no
+	 * planning.
+	 */
+	plans: readonly ActivePlanCandidate[] | null | undefined;
 }
 
 function cleanId(value: string | null | undefined): string | null {
@@ -72,6 +81,10 @@ function findById(
 export function resolveActivePlan(
 	input: ResolveActivePlanInput,
 ): ActivePlanResolution {
+	// An unread list is unknown, not empty: reporting "no planning" for a list
+	// that was never fetched is exactly the false empty state this module exists
+	// to prevent.
+	if (input.plans == null) return { kind: "unknown" };
 	const plans = input.plans;
 	if (plans.length === 0) return { kind: "empty" };
 

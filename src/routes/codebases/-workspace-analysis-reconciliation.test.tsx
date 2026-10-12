@@ -11,11 +11,20 @@ interface TestResponse {
 }
 interface WorkspaceLoaderData {
 	codebase: { id: string; name: string };
-	feature: { id: string; name: string; featuresStatus?: string | null } | null;
-	onboardingFeature: { id: string; name: string } | null;
+	plans: Array<{
+		id: string;
+		name: string;
+		updatedAt: string | null;
+		hasArtifacts: boolean;
+	}>;
+	featuresStatusById: Map<string, string | null>;
+	onboardingFeatureId: string | null;
 	currentSnapshotId: string | null;
+	planningSnapshotId: string | null;
 	analysis: null;
+	latestAnalysisAttempt: null;
 	hasStoredSnapshot: boolean;
+	canOpenFullBoard: boolean;
 }
 
 interface WorkspaceRouteOptions {
@@ -156,11 +165,22 @@ function syncStatus(snapshotId: string, analysisStatus: "pending" | "ready") {
 function setLoaderData(snapshotId: string) {
 	routeHarness.loaderData = {
 		codebase: { id: "codebase-1", name: "Workspace repo" },
-		feature: { id: PROJECT_ID, name: "Workspace feature" },
-		onboardingFeature: { id: PROJECT_ID, name: "Workspace feature" },
+		plans: [
+			{
+				id: PROJECT_ID,
+				name: "Workspace feature",
+				updatedAt: "2026-10-01T00:00:00.000Z",
+				hasArtifacts: true,
+			},
+		],
+		featuresStatusById: new Map([[PROJECT_ID, null]]),
+		onboardingFeatureId: PROJECT_ID,
 		currentSnapshotId: snapshotId,
+		planningSnapshotId: snapshotId,
 		analysis: null,
+		latestAnalysisAttempt: null,
 		hasStoredSnapshot: false,
+		canOpenFullBoard: true,
 	};
 }
 
@@ -329,11 +349,22 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 	it("opens workspace with 0 file tersinkron badge when session is expired but usable empty snapshot exists", async () => {
 		routeHarness.loaderData = {
 			codebase: { id: "codebase-1", name: "Workspace repo" },
-			feature: { id: PROJECT_ID, name: "Workspace feature" },
-			onboardingFeature: { id: PROJECT_ID, name: "Workspace feature" },
+			plans: [
+				{
+					id: PROJECT_ID,
+					name: "Workspace feature",
+					updatedAt: "2026-10-01T00:00:00.000Z",
+					hasArtifacts: true,
+				},
+			],
+			featuresStatusById: new Map([[PROJECT_ID, null]]),
+			onboardingFeatureId: PROJECT_ID,
 			currentSnapshotId: "snapshot-empty",
+			planningSnapshotId: "snapshot-empty",
 			analysis: null,
+			latestAnalysisAttempt: null,
 			hasStoredSnapshot: true,
+			canOpenFullBoard: true,
 		};
 		const fetchMock = vi.fn(
 			async (input: RequestInfo | URL, _init?: RequestInit) => {

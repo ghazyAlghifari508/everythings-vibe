@@ -83,6 +83,7 @@ import { Route as DesignStudioIndexRouteImport } from './routes/design/studio.in
 import { Route as DesignStudioIdRouteImport } from './routes/design/studio.$id'
 import { Route as PrdShareTokenRouteImport } from './routes/prd/share/$token'
 import { Route as ApiCodebasesCodebaseIdFeaturesRouteImport } from './routes/api/codebases/$codebaseId/features'
+import { Route as ApiCodebasesCodebaseIdPlansRouteImport } from './routes/api/codebases/$codebaseId/plans'
 import { Route as ApiCodebasesCodebaseIdSessionRouteImport } from './routes/api/codebases/$codebaseId/session'
 import { Route as ApiCodebasesCodebaseIdStatusRouteImport } from './routes/api/codebases/$codebaseId/status'
 import { Route as ApiProjectsIdAcVersionsRouteImport } from './routes/api/projects/$id/ac-versions'
@@ -482,6 +483,12 @@ const ApiCodebasesCodebaseIdFeaturesRoute =
     path: '/features',
     getParentRoute: () => ApiCodebasesCodebaseIdRoute,
   } as any)
+const ApiCodebasesCodebaseIdPlansRoute =
+  ApiCodebasesCodebaseIdPlansRouteImport.update({
+    id: '/plans',
+    path: '/plans',
+    getParentRoute: () => ApiCodebasesCodebaseIdRoute,
+  } as any)
 const ApiCodebasesCodebaseIdSessionRoute =
   ApiCodebasesCodebaseIdSessionRouteImport.update({
     id: '/session',
@@ -706,6 +713,7 @@ export interface FileRoutesByFullPath {
   '/design/scrap/': typeof DesignScrapIndexRoute
   '/design/studio/': typeof DesignStudioIndexRoute
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
+  '/api/codebases/$codebaseId/plans': typeof ApiCodebasesCodebaseIdPlansRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
   '/api/projects/$id/ac-versions': typeof ApiProjectsIdAcVersionsRoute
@@ -804,6 +812,7 @@ export interface FileRoutesByTo {
   '/design/scrap': typeof DesignScrapIndexRoute
   '/design/studio': typeof DesignStudioIndexRoute
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
+  '/api/codebases/$codebaseId/plans': typeof ApiCodebasesCodebaseIdPlansRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
   '/api/projects/$id/ac-versions': typeof ApiProjectsIdAcVersionsRoute
@@ -908,6 +917,7 @@ export interface FileRoutesById {
   '/design/scrap/': typeof DesignScrapIndexRoute
   '/design/studio/': typeof DesignStudioIndexRoute
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
+  '/api/codebases/$codebaseId/plans': typeof ApiCodebasesCodebaseIdPlansRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
   '/api/projects/$id/ac-versions': typeof ApiProjectsIdAcVersionsRoute
@@ -1013,6 +1023,7 @@ export interface FileRouteTypes {
     | '/design/scrap/'
     | '/design/studio/'
     | '/api/codebases/$codebaseId/features'
+    | '/api/codebases/$codebaseId/plans'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
     | '/api/projects/$id/ac-versions'
@@ -1111,6 +1122,7 @@ export interface FileRouteTypes {
     | '/design/scrap'
     | '/design/studio'
     | '/api/codebases/$codebaseId/features'
+    | '/api/codebases/$codebaseId/plans'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
     | '/api/projects/$id/ac-versions'
@@ -1214,6 +1226,7 @@ export interface FileRouteTypes {
     | '/design/scrap/'
     | '/design/studio/'
     | '/api/codebases/$codebaseId/features'
+    | '/api/codebases/$codebaseId/plans'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
     | '/api/projects/$id/ac-versions'
@@ -1830,6 +1843,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCodebasesCodebaseIdFeaturesRouteImport
       parentRoute: typeof ApiCodebasesCodebaseIdRoute
     }
+    '/api/codebases/$codebaseId/plans': {
+      id: '/api/codebases/$codebaseId/plans'
+      path: '/plans'
+      fullPath: '/api/codebases/$codebaseId/plans'
+      preLoaderRoute: typeof ApiCodebasesCodebaseIdPlansRouteImport
+      parentRoute: typeof ApiCodebasesCodebaseIdRoute
+    }
     '/api/codebases/$codebaseId/session': {
       id: '/api/codebases/$codebaseId/session'
       path: '/session'
@@ -2122,6 +2142,7 @@ const DesignStudioRouteWithChildren = DesignStudioRoute._addFileChildren(
 
 interface ApiCodebasesCodebaseIdRouteChildren {
   ApiCodebasesCodebaseIdFeaturesRoute: typeof ApiCodebasesCodebaseIdFeaturesRoute
+  ApiCodebasesCodebaseIdPlansRoute: typeof ApiCodebasesCodebaseIdPlansRoute
   ApiCodebasesCodebaseIdSessionRoute: typeof ApiCodebasesCodebaseIdSessionRoute
   ApiCodebasesCodebaseIdStatusRoute: typeof ApiCodebasesCodebaseIdStatusRoute
 }
@@ -2129,6 +2150,7 @@ interface ApiCodebasesCodebaseIdRouteChildren {
 const ApiCodebasesCodebaseIdRouteChildren: ApiCodebasesCodebaseIdRouteChildren =
   {
     ApiCodebasesCodebaseIdFeaturesRoute: ApiCodebasesCodebaseIdFeaturesRoute,
+    ApiCodebasesCodebaseIdPlansRoute: ApiCodebasesCodebaseIdPlansRoute,
     ApiCodebasesCodebaseIdSessionRoute: ApiCodebasesCodebaseIdSessionRoute,
     ApiCodebasesCodebaseIdStatusRoute: ApiCodebasesCodebaseIdStatusRoute,
   }
@@ -2255,12 +2277,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

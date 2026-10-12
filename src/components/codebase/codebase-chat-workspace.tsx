@@ -1,7 +1,7 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, Check, Copy, Layers, RotateCcw } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { PromptBar } from "@/components/ui/prompt-bar";
 import { ThoughtLine } from "@/components/ui/thought-line";
 import type { CodebaseStarterSuggestion } from "@/lib/codebase-analysis";
@@ -21,6 +21,10 @@ import {
 	type IntentOption,
 	resolveIntentOptions,
 } from "@/lib/codebase-revision-intent";
+import type {
+	ArtifactKind,
+	WorkspaceView,
+} from "@/lib/codebase-workspace-hydration";
 import { CodebaseAdaptiveQuestion } from "./codebase-adaptive-question";
 import {
 	type CodebaseArtifactRef,
@@ -40,6 +44,18 @@ const STAGE_LABEL: Record<CodebaseRunState["stage"], string> = {
 	task: "task",
 };
 
+/** Human label per artifact, used when reporting which artifact failed to load. */
+const ARTIFACT_LABEL: Record<ArtifactKind, string> = {
+	feature: "spesifikasi fitur",
+	prd: "PRD",
+	ac: "Acceptance Criteria",
+	tasks: "task",
+};
+
+function artifactLabel(kind: ArtifactKind): string {
+	return ARTIFACT_LABEL[kind];
+}
+
 export interface ChatStreamMessage {
 	id: string;
 	role: "user" | "assistant";
@@ -51,6 +67,16 @@ export type PipelineStage = CodebasePipelineStage;
 
 interface CodebaseChatWorkspaceProps {
 	featureName: string;
+	/**
+	 * What the workspace is allowed to show. Supplied by the route from the
+	 * resolved plan plus the real per-artifact hydration statuses, so a pending
+	 * or failed read can never render as an empty repository. Omitted by callers
+	 * that only render the workspace body, which then derives it from the props
+	 * below.
+	 */
+	view?: WorkspaceView;
+	/** Plan switcher, rendered in the header when the repository has several plans. */
+	planSwitcher?: ReactNode;
 	contextFiles?: string[];
 	fileCount?: number;
 	kanbanProgress?: { done: number; total: number; pct: number } | null;
@@ -99,6 +125,15 @@ interface CodebaseChatWorkspaceProps {
 	intentOptions?: IntentOption[];
 	/** Copy describing a revision's impact on existing tasks. */
 	revisionImpactNotice?: string | null;
+	/**
+	 * The snapshot the existing planning was generated against, and the newest
+	 * usable snapshot. A difference means the repository moved on after the plan
+	 * was written, which is reported as "review this plan" — nothing is ever
+	 * regenerated automatically.
+	 */
+	planningSnapshotId?: string | null;
+	currentSnapshotId?: string | null;
+	onReviewPlan?: () => void;
 	onConfirmGenerate?: () => void;
 	onRetryQuestions?: () => void;
 	onRetryGenerate?: () => void;
@@ -127,6 +162,8 @@ export function buildTaskNextCommand(projectId: string): string {
 
 export function CodebaseChatWorkspace({
 	featureName,
+	view,
+	planSwitcher,
 	contextFiles: _contextFiles = [],
 	fileCount: _fileCount,
 	kanbanProgress = null,
@@ -161,6 +198,9 @@ export function CodebaseChatWorkspace({
 	starterRefresh,
 	newerAttemptFailure,
 	onRefreshStarterSuggestions,
+	planningSnapshotId = null,
+	currentSnapshotId = null,
+	onReviewPlan,
 }: CodebaseChatWorkspaceProps) {
 	const [draft, setDraft] = useState("");
 	const [selectedIntent, setSelectedIntent] =
@@ -292,6 +332,34 @@ export function CodebaseChatWorkspace({
 		!isSending &&
 		stage === "questions";
 
+	/**
+	 * The view the caller derived from the resolved plan and the real artifact
+	 * hydration statuses. When a caller does not supply one — tests and the
+	 * standalone body render — it is derived from the props above, which keeps
+	 * the previous behaviour without letting a pending read look like an empty
+	 * repository.
+	 */
+	const effectiveView: WorkspaceView =
+		view ??
+		(isPristine
+			? { kind: "pristine" }
+			: { kind: "active", failedArtifacts: [] });
+	const showPristine = effectiveView.kind === "pristine";
+	const showLoading = effectiveView.kind === "loading";
+	const showPlanUnavailable = effectiveView.kind === "plan_unavailable";
+	const showPlanSelection = effectiveView.kind === "needs_plan_selection";
+	const failedArtifacts =
+		effectiveView.kind === "active" ? effectiveView.failedArtifacts : [];
+
+	// Only a repository that moved on after this plan was written is reported as
+	// needing review. Both ids must be real, and the notice is informational: the
+	// user opens the stored plan, nothing is regenerated and no credit is spent.
+	const planningMovedOn = Boolean(
+		planningSnapshotId &&
+			currentSnapshotId &&
+			planningSnapshotId !== currentSnapshotId,
+	);
+
 	const isRunWorking = run?.status === "running";
 	const runFailed = run?.status === "failed";
 	// A failed request owns its own error row, so the generic stage/spec error
@@ -362,17 +430,91 @@ export function CodebaseChatWorkspace({
 							</p>
 						) : null}
 					</div>
-					{hasLiveData && kanbanProgress ? (
-						<span
-							data-testid="codebase-kanban-badge"
-							className="shrink-0 rounded-md border border-graphite bg-obsidian px-2 py-1 font-mono text-[11px] text-fog"
-						>
-							{`Kanban Live: ${kanbanProgress.done}/${kanbanProgress.total} Selesai (${kanbanProgress.pct}%)`}
-						</span>
-					) : null}
+					<div className="flex shrink-0 items-center gap-2">
+						{planSwitcher}
+						{hasLiveData && kanbanProgress ? (
+							<span
+								data-testid="codebase-kanban-badge"
+								className="shrink-0 rounded-md border border-graphite bg-obsidian px-2 py-1 font-mono text-[11px] text-fog"
+							>
+								{`Kanban Live: ${kanbanProgress.done}/${kanbanProgress.total} Selesai (${kanbanProgress.pct}%)`}
+							</span>
+						) : null}
+					</div>
 				</div>
 			</div>
-			{isPristine ? (
+			{planningMovedOn ? (
+				<div
+					data-testid="codebase-planning-review-notice"
+					className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-amber/30 bg-amber/10 px-4 py-2 text-[11px] text-amber"
+				>
+					<span>
+						Repository sudah disinkronkan ulang setelah planning ini dibuat.
+						Planning lama tetap tersimpan — tinjau apakah masih sesuai.
+					</span>
+					{onReviewPlan ? (
+						<button
+							type="button"
+							onClick={onReviewPlan}
+							className="min-h-7 shrink-0 rounded-md border border-amber/40 px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							Tinjau planning
+						</button>
+					) : null}
+				</div>
+			) : null}
+			{showLoading ? (
+				<div
+					data-testid="codebase-chat-loading"
+					aria-busy="true"
+					className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-6"
+				>
+					<p className="text-xs text-fog">Memuat planning yang tersimpan...</p>
+					<div className="flex flex-col gap-2.5">
+						{["a", "b", "c"].map((row) => (
+							<div
+								key={row}
+								className="h-16 animate-pulse rounded-lg border border-graphite bg-charcoal/60"
+							/>
+						))}
+					</div>
+				</div>
+			) : showPlanUnavailable ? (
+				<div
+					data-testid="codebase-chat-plan-unavailable"
+					className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center"
+				>
+					<p className="text-sm font-semibold text-snow">
+						Planning tidak dapat dimuat
+					</p>
+					<p className="max-w-sm text-xs leading-5 text-fog">
+						Data planning tersimpan di server, tetapi tidak dapat dibaca saat
+						ini. Coba muat ulang halaman.
+					</p>
+					<button
+						type="button"
+						onClick={() => window.location.reload()}
+						className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-md border border-graphite px-3 text-xs text-snow hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						<RotateCcw size={13} aria-hidden />
+						Muat ulang
+					</button>
+				</div>
+			) : showPlanSelection ? (
+				<div
+					data-testid="codebase-chat-plan-selection"
+					className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center"
+				>
+					<Layers size={20} aria-hidden className="text-fog" />
+					<p className="text-sm font-semibold text-snow">
+						Pilih fitur yang ingin dikerjakan
+					</p>
+					<p className="max-w-sm text-xs leading-5 text-fog">
+						Repository ini punya beberapa fitur plan. Pilih satu dari daftar di
+						atas untuk melanjutkan — setiap fitur punya planning sendiri.
+					</p>
+				</div>
+			) : showPristine ? (
 				<div
 					data-testid="codebase-chat-pristine"
 					className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-10 pb-8 sm:pt-14 md:pt-16 lg:pt-20"
@@ -467,6 +609,19 @@ export function CodebaseChatWorkspace({
 				</div>
 			) : (
 				<>
+					{failedArtifacts.length > 0 ? (
+						<div
+							data-testid="codebase-artifacts-failed"
+							className="shrink-0 border-b border-crimson/30 bg-crimson/10 px-4 py-2 text-[11px] text-crimson"
+						>
+							<span className="inline-flex items-center gap-1.5">
+								<AlertTriangle size={12} aria-hidden />
+								Sebagian planning tidak dapat dimuat:{" "}
+								{failedArtifacts.map(artifactLabel).join(", ")}. Bagian lain
+								tetap tersimpan di server.
+							</span>
+						</div>
+					) : null}
 					<div
 						data-testid="codebase-chat-messages"
 						className="min-h-0 flex-1 overflow-y-auto px-4 py-5"

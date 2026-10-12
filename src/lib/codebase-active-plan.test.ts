@@ -22,6 +22,15 @@ describe("resolveActivePlan", () => {
 		expect(resolveActivePlan({ plans: [] })).toEqual({ kind: "empty" });
 	});
 
+	it("reports unknown when the plan list was never read", () => {
+		// A list still in flight must not be reported as a repository with no
+		// planning: that is the false empty state this module exists to prevent.
+		expect(resolveActivePlan({ plans: undefined })).toEqual({
+			kind: "unknown",
+		});
+		expect(resolveActivePlan({ plans: null })).toEqual({ kind: "unknown" });
+	});
+
 	it("honours the explicitly requested plan", () => {
 		const result = resolveActivePlan({
 			requestedProjectId: "plan-b",

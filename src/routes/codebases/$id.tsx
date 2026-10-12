@@ -15,6 +15,7 @@ import {
 	parseVersionRows,
 	selectLatestVersionContent,
 } from "@/components/codebase/codebase-markdown";
+import { CodebasePlanSwitcher } from "@/components/codebase/codebase-plan-switcher";
 import { CodebaseSourcePreview } from "@/components/codebase/codebase-source-preview";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { CodebaseWorkspaceSkeleton } from "@/components/codebase/codebase-workspace-skeleton";
@@ -26,12 +27,15 @@ import { Logo } from "@/components/ui/logo";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
+	type ActivePlanCandidate,
+	resolveActivePlan,
+} from "@/lib/codebase-active-plan";
+import {
 	type AnalysisResponse,
 	codebaseStarterSuggestionsSchema,
 	safeParseCodebaseAnalysis,
 } from "@/lib/codebase-analysis";
 import {
-	type LatestAttempt,
 	resolveWorkspaceSnapshotIdentity,
 	selectWorkspaceAnalysis,
 	shouldDiscardWorkspaceAnalysis,
@@ -58,6 +62,10 @@ import {
 } from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
+	readActivePlanPointer,
+	storeActivePlanPointer,
+} from "@/lib/codebase-plan-storage";
+import {
 	assessRevisionImpact,
 	buildRevisionRequest,
 	type CodebaseChatIntent,
@@ -81,6 +89,14 @@ import {
 	matchesWorkspaceAnalysis,
 	shouldFetchWorkspaceAnalysis,
 } from "@/lib/codebase-workspace-analysis";
+import {
+	type ArtifactHydrationStatus,
+	type ArtifactKind,
+	emptyArtifactHydration,
+	resolveWorkspaceView,
+	type WorkspaceArtifactHydration,
+	type WorkspacePlanState,
+} from "@/lib/codebase-workspace-hydration";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import { validateAskQuestions } from "@/lib/services/ask-service";
@@ -155,8 +171,16 @@ const loadCodebase = createServerFn({ method: "GET" })
 	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
 		const { db } = await import("@/db");
-		const { codebases, codebaseAnalyses, codebaseSnapshots, projects } =
-			await import("@/db/schema");
+		const {
+			acVersions,
+			codebaseAnalyses,
+			codebaseGenerationContexts,
+			codebaseSnapshots,
+			codebases,
+			prdVersions,
+			projects,
+			tasks,
+		} = await import("@/db/schema");
 		const { and, desc, eq, inArray, isNull } = await import("drizzle-orm");
 		// Resolved on the server with the rest of the loader data: the workspace
 		// needs it to decide whether the full Kanban route will open for this
@@ -170,16 +194,19 @@ const loadCodebase = createServerFn({ method: "GET" })
 				id: codebases.id,
 				name: codebases.name,
 				onboardingProjectId: codebases.onboardingProjectId,
+				repositoryIdentity: codebases.repositoryIdentity,
 			})
 			.from(codebases)
 			.where(and(eq(codebases.id, id), eq(codebases.userId, user.id)))
 			.limit(1);
 		if (!codebase) throw new Error("NOT_FOUND");
-		const featureProjects = await db
+		const projectRows = await db
 			.select({
 				id: projects.id,
 				name: projects.name,
 				featuresStatus: projects.featuresStatus,
+				featureTree: projects.featureTree,
+				updatedAt: projects.updatedAt,
 			})
 			.from(projects)
 			.where(
@@ -190,10 +217,46 @@ const loadCodebase = createServerFn({ method: "GET" })
 				),
 			)
 			.orderBy(desc(projects.updatedAt));
-		const feature = featureProjects[0] ?? null;
+
+		// "Does this plan hold real work?" is answered from the artifact tables
+		// rather than from the project row, so a plan whose row was touched by an
+		// unrelated write is never mistaken for one that carries planning.
+		const projectIds = projectRows.map((row) => row.id);
+		const [prdRows, acRows, taskRows] =
+			projectIds.length === 0
+				? [[], [], []]
+				: await Promise.all([
+						db
+							.select({ projectId: prdVersions.projectId })
+							.from(prdVersions)
+							.where(inArray(prdVersions.projectId, projectIds)),
+						db
+							.select({ projectId: acVersions.projectId })
+							.from(acVersions)
+							.where(inArray(acVersions.projectId, projectIds)),
+						db
+							.select({ projectId: tasks.projectId })
+							.from(tasks)
+							.where(inArray(tasks.projectId, projectIds)),
+					]);
+		const withPrd = new Set(prdRows.map((row) => row.projectId));
+		const withAc = new Set(acRows.map((row) => row.projectId));
+		const withTasks = new Set(taskRows.map((row) => row.projectId));
+
+		const plans: ActivePlanCandidate[] = projectRows.map((row) => ({
+			id: row.id,
+			name: row.name,
+			updatedAt: row.updatedAt?.toISOString() ?? null,
+			hasArtifacts:
+				row.featureTree != null ||
+				withPrd.has(row.id) ||
+				withAc.has(row.id) ||
+				withTasks.has(row.id),
+		}));
+
 		const onboardingFeature = resolveOnboardingAnchorProject({
 			onboardingProjectId: codebase.onboardingProjectId,
-			projects: featureProjects,
+			projects: projectRows,
 			expectedCodebaseId: id,
 		});
 		const [currentSnapshot] = await db
@@ -207,8 +270,29 @@ const loadCodebase = createServerFn({ method: "GET" })
 			)
 			.orderBy(desc(codebaseSnapshots.createdAt))
 			.limit(1);
+		// The snapshot the existing planning was generated against, read from the
+		// generation-context link rather than assumed. When it differs from the
+		// newest usable snapshot the repository moved on after the plan was
+		// written, which the workspace reports as "review this plan" — it never
+		// regenerates anything.
+		const planningSnapshotRows = onboardingFeature
+			? await db
+					.select({ snapshotId: codebaseGenerationContexts.snapshotId })
+					.from(codebaseGenerationContexts)
+					.innerJoin(
+						projects,
+						eq(projects.id, codebaseGenerationContexts.projectId),
+					)
+					.where(
+						and(
+							eq(codebaseGenerationContexts.projectId, onboardingFeature.id),
+							eq(projects.userId, user.id),
+						),
+					)
+					.orderBy(desc(codebaseGenerationContexts.updatedAt))
+					.limit(1)
+			: [];
 		let analysis: AnalysisResponse | null = null;
-		let latestAnalysisAttempt: LatestAttempt | null = null;
 		if (onboardingFeature && currentSnapshot) {
 			// Every attempt for this exact project + snapshot is a candidate: a
 			// newer pending or failed run must not hide an older ready result
@@ -223,12 +307,10 @@ const loadCodebase = createServerFn({ method: "GET" })
 					),
 				)
 				.orderBy(desc(codebaseAnalyses.createdAt));
-			const selection = selectWorkspaceAnalysis(rows, {
+			analysis = selectWorkspaceAnalysis(rows, {
 				projectId: onboardingFeature.id,
 				snapshotId: currentSnapshot.id,
-			});
-			analysis = selection.selected;
-			latestAnalysisAttempt = selection.latestAttempt;
+			}).selected;
 		}
 		// Stored snapshot derived from usable current snapshot independent of sync session expiry
 		// (including empty repositories).
@@ -236,11 +318,11 @@ const loadCodebase = createServerFn({ method: "GET" })
 		const hasStoredSnapshot = Boolean(storedSnapshot);
 		return {
 			codebase,
-			feature,
-			onboardingFeature,
+			plans,
+			onboardingFeatureId: onboardingFeature?.id ?? null,
 			currentSnapshotId: currentSnapshot?.id ?? null,
+			planningSnapshotId: planningSnapshotRows[0]?.snapshotId ?? null,
 			analysis,
-			latestAnalysisAttempt,
 			hasStoredSnapshot,
 			canOpenFullBoard,
 		};
@@ -631,14 +713,49 @@ export function CodebaseDetailPending() {
 function CodebaseDetailPage() {
 	const {
 		codebase,
-		feature,
-		onboardingFeature,
+		plans,
+		onboardingFeatureId,
 		currentSnapshotId,
+		planningSnapshotId,
 		analysis: initialAnalysis,
-		latestAnalysisAttempt,
 		hasStoredSnapshot,
 		canOpenFullBoard,
 	} = Route.useLoaderData();
+	/**
+	 * The active feature plan, resolved from the server's plan list instead of
+	 * from array position. The pointer is a navigation preference the user set
+	 * by opening a plan; it is validated against the real list, so a stale or
+	 * foreign id resolves to a real plan rather than opening the wrong one.
+	 */
+	const [requestedProjectId, setRequestedProjectId] = useState<string | null>(
+		null,
+	);
+	const planResolution = useMemo(
+		() =>
+			resolveActivePlan({
+				requestedProjectId:
+					requestedProjectId ?? readActivePlanPointer(codebase.id),
+				anchorProjectId: onboardingFeatureId,
+				plans,
+			}),
+		[codebase.id, onboardingFeatureId, plans, requestedProjectId],
+	);
+	// Persist the resolved plan so a reopen returns to the plan the user last
+	// read, without ever making the pointer the source of truth.
+	useEffect(() => {
+		if (planResolution.kind === "resolved") {
+			storeActivePlanPointer(codebase.id, planResolution.plan.id);
+		}
+	}, [codebase.id, planResolution]);
+	const resolvedPlan =
+		planResolution.kind === "resolved" ? planResolution.plan : null;
+	const onboardingFeature = useMemo(
+		() =>
+			onboardingFeatureId
+				? (plans.find((plan) => plan.id === onboardingFeatureId) ?? null)
+				: null,
+		[onboardingFeatureId, plans],
+	);
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
 	const [manifestFiles, setManifestFiles] = useState<Array<{ path: string }>>(
 		[],
@@ -828,17 +945,10 @@ function CodebaseDetailPage() {
 			) {
 				void readWorkspaceAnalysis(projectId, snapshotId);
 			}
-			// A fresh analysis is only ever requested for a snapshot that has
-			// none at all: reopening a workspace must never spend credits.
-			if (
-				projectId &&
-				!latestAnalysisAttempt &&
-				!parsed.data.analysisId &&
-				!parsed.data.analysisStatus &&
-				analysisAttemptedFor.current !== `${projectId}:${snapshotId}`
-			) {
-				void triggerAnalysis(snapshotId);
-			}
+			// Opening a workspace never starts an analysis. A fresh analysis is a
+			// billable action, so it is only ever requested from an explicit user
+			// action (`triggerAnalysis` via the retry control) or from the
+			// onboarding flow, never as a side effect of reading a plan.
 		} catch {
 			setError("Server tidak dapat dihubungi. Coba lagi.");
 		} finally {
@@ -849,11 +959,9 @@ function CodebaseDetailPage() {
 		codebase.id,
 		currentSnapshotId,
 		initialAnalysis,
-		latestAnalysisAttempt,
 		onboardingFeature?.id,
 		readWorkspaceAnalysis,
 		status?.sessionId,
-		triggerAnalysis,
 	]);
 
 	const [isRefreshingStarterSuggestions, setIsRefreshingStarterSuggestions] =
@@ -1003,13 +1111,31 @@ function CodebaseDetailPage() {
 		status,
 		hasStoredSnapshot,
 	});
+	/**
+	 * A plan created in this session, before the loader's plan list catches up.
+	 * It only ever names the plan the user just created; the server list stays
+	 * the authority for every other case.
+	 */
 	const [activeFeature, setActiveFeature] = useState<{
 		id: string;
 		name: string;
 		featuresStatus?: string | null;
 	} | null>(null);
-	const resolvedFeature = activeFeature ?? feature;
+	const resolvedFeature = activeFeature ?? resolvedPlan;
 	const effectiveFeatureId = resolvedFeature?.id ?? null;
+	/**
+	 * Which plan the UI is showing, and whether it could be read at all. An
+	 * unresolved, unknown, or ambiguous list is a real state with its own
+	 * surface, never an empty workspace.
+	 */
+	const planState: WorkspacePlanState =
+		planResolution.kind === "resolved"
+			? "resolved"
+			: planResolution.kind === "empty"
+				? "empty"
+				: planResolution.kind === "unknown"
+					? "failed"
+					: "needs_selection";
 	const [canvasOpen, setCanvasOpen] = useState(false);
 	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
@@ -1025,6 +1151,21 @@ function CodebaseDetailPage() {
 		null,
 	);
 	const [taskTree, setTaskTree] = useState<TaskTree | null>(null);
+	/**
+	 * Real hydration status per artifact. Every loader writes its own outcome, so
+	 * "still loading", "the server says there is none", and "the read failed"
+	 * stay distinguishable and a failure can never render as an empty plan.
+	 */
+	const [artifactHydration, setArtifactHydration] =
+		useState<WorkspaceArtifactHydration>(emptyArtifactHydration);
+	const markArtifact = useCallback(
+		(kind: ArtifactKind, status: ArtifactHydrationStatus) => {
+			setArtifactHydration((current) =>
+				current[kind] === status ? current : { ...current, [kind]: status },
+			);
+		},
+		[],
+	);
 	const [pipelineStage, setPipelineStage] =
 		useState<PipelineStage>("questions");
 	const [stageBusy, setStageBusy] = useState<PipelineStage | null>(null);
@@ -1041,6 +1182,44 @@ function CodebaseDetailPage() {
 
 	const hasTasksInDb = Boolean(
 		(kanbanProgress && kanbanProgress.total > 0) || taskTree !== null,
+	);
+
+	// Tasks arrive from the Kanban query as well as the task tree, so the task
+	// artifact's status is settled from both real sources. A tree that loaded
+	// empty while live Kanban rows exist is still `ready`.
+	const hydration: WorkspaceArtifactHydration = useMemo(() => {
+		if (!hasTasksInDb || artifactHydration.tasks === "ready") {
+			return artifactHydration;
+		}
+		if (artifactHydration.tasks === "empty") {
+			return { ...artifactHydration, tasks: "ready" };
+		}
+		return artifactHydration;
+	}, [artifactHydration, hasTasksInDb]);
+
+	/**
+	 * What the chat pane may show. Derived from the resolved plan plus the real
+	 * per-artifact statuses, so a pending read is loading and a failed read is a
+	 * reported failure — never the initial empty composer.
+	 */
+	const workspaceView = useMemo(
+		() =>
+			resolveWorkspaceView({
+				plan: planState,
+				artifacts: hydration,
+				hasMessages: chatMessages.length > 0,
+				hasQuestions: aiQuestions.length > 0,
+				isSending: isWorking,
+				runStatus: run?.status ?? "idle",
+			}),
+		[
+			planState,
+			hydration,
+			chatMessages.length,
+			aiQuestions.length,
+			isWorking,
+			run?.status,
+		],
 	);
 
 	// The stage a reopened workspace resumes at is derived from the artifacts
@@ -1068,10 +1247,12 @@ function CodebaseDetailPage() {
 			setPrdContent(null);
 			setPrdError(null);
 			setPrdLoading(false);
+			markArtifact("prd", "empty");
 			return null;
 		}
 		setPrdLoading(true);
 		setPrdError(null);
+		markArtifact("prd", "pending");
 		try {
 			const response = await fetch(
 				`/api/projects/${encodeURIComponent(effectiveFeatureId)}/versions`,
@@ -1080,25 +1261,29 @@ function CodebaseDetailPage() {
 			if (!response.ok) {
 				setPrdError("Dokumen PRD tidak dapat dimuat.");
 				setPrdContent(null);
+				markArtifact("prd", "failed");
 				return null;
 			}
 			const rows = parseVersionRows(body);
 			if (!rows) {
 				setPrdError("Dokumen PRD tidak valid.");
 				setPrdContent(null);
+				markArtifact("prd", "failed");
 				return null;
 			}
 			const content = selectLatestVersionContent(rows);
 			setPrdContent(content);
+			markArtifact("prd", content ? "ready" : "empty");
 			return content;
 		} catch {
 			setPrdError("Server tidak dapat dihubungi.");
 			setPrdContent(null);
+			markArtifact("prd", "failed");
 			return null;
 		} finally {
 			setPrdLoading(false);
 		}
-	}, [snapshotReady, effectiveFeatureId]);
+	}, [snapshotReady, effectiveFeatureId, markArtifact]);
 
 	useEffect(() => {
 		void loadPrd();
@@ -1109,10 +1294,12 @@ function CodebaseDetailPage() {
 			setAcContent(null);
 			setAcError(null);
 			setAcLoading(false);
+			markArtifact("ac", "empty");
 			return null;
 		}
 		setAcLoading(true);
 		setAcError(null);
+		markArtifact("ac", "pending");
 		try {
 			const response = await fetch(
 				`/api/projects/${encodeURIComponent(effectiveFeatureId)}/ac-versions`,
@@ -1121,59 +1308,77 @@ function CodebaseDetailPage() {
 			if (!response.ok) {
 				setAcError("Dokumen AC tidak dapat dimuat.");
 				setAcContent(null);
+				markArtifact("ac", "failed");
 				return null;
 			}
 			const rows = parseVersionRows(body);
 			if (!rows) {
 				setAcError("Dokumen AC tidak valid.");
 				setAcContent(null);
+				markArtifact("ac", "failed");
 				return null;
 			}
 			const content = selectLatestVersionContent(rows);
 			setAcContent(content);
+			markArtifact("ac", content ? "ready" : "empty");
 			return content;
 		} catch {
 			setAcError("Server tidak dapat dihubungi.");
 			setAcContent(null);
+			markArtifact("ac", "failed");
 			return null;
 		} finally {
 			setAcLoading(false);
 		}
-	}, [snapshotReady, effectiveFeatureId]);
+	}, [snapshotReady, effectiveFeatureId, markArtifact]);
 
 	useEffect(() => {
 		void loadAc();
 	}, [loadAc]);
 
-	const refreshFeatureTree = useCallback(async (projectId: string | null) => {
-		if (!projectId) {
-			setFeatureTree(null);
-			return null;
-		}
-		try {
-			const data = await loadFeatureTree({ data: projectId });
-			setFeatureTree(data.featureTree);
-			return data.featureTree;
-		} catch {
-			setFeatureTree(null);
-			return null;
-		}
-	}, []);
+	const refreshFeatureTree = useCallback(
+		async (projectId: string | null) => {
+			if (!projectId) {
+				setFeatureTree(null);
+				markArtifact("feature", "empty");
+				return null;
+			}
+			markArtifact("feature", "pending");
+			try {
+				const data = await loadFeatureTree({ data: projectId });
+				setFeatureTree(data.featureTree);
+				markArtifact("feature", data.featureTree ? "ready" : "empty");
+				return data.featureTree;
+			} catch {
+				setFeatureTree(null);
+				markArtifact("feature", "failed");
+				return null;
+			}
+		},
+		[markArtifact],
+	);
 
-	const refreshTaskTree = useCallback(async (projectId: string | null) => {
-		if (!projectId) {
-			setTaskTree(null);
-			return null;
-		}
-		try {
-			const data = await loadTaskTree({ data: projectId });
-			setTaskTree(data.taskTree);
-			return data.taskTree;
-		} catch {
-			setTaskTree(null);
-			return null;
-		}
-	}, []);
+	const refreshTaskTree = useCallback(
+		async (projectId: string | null) => {
+			if (!projectId) {
+				setTaskTree(null);
+				markArtifact("tasks", "empty");
+				return null;
+			}
+			markArtifact("tasks", "pending");
+			try {
+				const data = await loadTaskTree({ data: projectId });
+				setTaskTree(data.taskTree);
+				markArtifact("tasks", data.taskTree ? "ready" : "empty");
+				return data.taskTree;
+			} catch {
+				setTaskTree(null);
+				markArtifact("tasks", "failed");
+				return null;
+			}
+		},
+		[markArtifact],
+	);
 
 	useEffect(() => {
 		void refreshFeatureTree(effectiveFeatureId);
@@ -2184,6 +2389,39 @@ function CodebaseDetailPage() {
 						chatPane={
 							<CodebaseChatWorkspace
 								featureName={resolvedFeature?.name ?? codebase.name}
+								view={workspaceView}
+								planSwitcher={
+									plans.length > 1 ? (
+										<CodebasePlanSwitcher
+											plans={plans}
+											activePlanId={effectiveFeatureId}
+											onSelectPlan={(projectId) => {
+												setRequestedProjectId(projectId);
+												// A different plan is a different set of artifacts:
+												// drop the previous plan's content and mark every
+												// artifact unread so nothing from the old plan can
+												// be shown as if it belonged to the new one.
+												setActiveFeature(null);
+												setFeatureTree(null);
+												setTaskTree(null);
+												setPrdContent(null);
+												setAcContent(null);
+												setPrdError(null);
+												setAcError(null);
+												setAiQuestions([]);
+												setChatAnswers({});
+												setChatMessages([]);
+												setRun(null);
+												setStageError(null);
+												setSpecError(null);
+												setActiveArtifactId(null);
+												setCanvasOpen(false);
+												setArtifactHydration(emptyArtifactHydration());
+												setPipelineStage("questions");
+											}}
+										/>
+									) : null
+								}
 								contextFiles={contextFiles}
 								fileCount={status?.fileCount ?? manifestFileCount ?? undefined}
 								kanbanProgress={kanbanProgress}
@@ -2202,6 +2440,17 @@ function CodebaseDetailPage() {
 								stageBusy={stageBusy}
 								stageError={stageError}
 								codebaseName={codebase.name}
+								planningSnapshotId={planningSnapshotId}
+								currentSnapshotId={activeWorkspaceSnapshotId}
+								onReviewPlan={() => {
+									// Reviewing is a read: it reveals the stored plan and
+									// never regenerates anything.
+									userTookOverCanvas.current = true;
+									if (resolvedFeature && featureTree) {
+										setActiveArtifactId(`feature-${resolvedFeature.id}`);
+										setCanvasOpen(true);
+									}
+								}}
 								starterSuggestions={analysisOutput?.starterSuggestions}
 								starterRefresh={
 									analysis?.status === "ready" &&
