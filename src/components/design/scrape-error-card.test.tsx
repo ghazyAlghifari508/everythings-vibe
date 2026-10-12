@@ -28,7 +28,9 @@ describe("ScrapeErrorCard", () => {
 		);
 		expect(screen.getAllByRole("alert")).toHaveLength(1);
 		expect(screen.getAllByRole("button")).toHaveLength(1);
-		fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Coba lagi jika tersedia" }),
+		);
 		expect(retry).toHaveBeenCalledTimes(1);
 	});
 
@@ -43,7 +45,9 @@ describe("ScrapeErrorCard", () => {
 			/>,
 		);
 		expect(screen.queryByRole("button")).toBeNull();
-		expect(screen.getByRole("link", { name: "URL lain" })).toBeDefined();
+		expect(
+			screen.getByRole("link", { name: "Gunakan URL lain" }),
+		).toBeDefined();
 	});
 
 	it("points the secondary action at the scrape workspace", () => {
@@ -56,7 +60,9 @@ describe("ScrapeErrorCard", () => {
 			/>,
 		);
 		expect(
-			screen.getByRole("link", { name: "URL lain" }).getAttribute("href"),
+			screen
+				.getByRole("link", { name: "Gunakan URL lain" })
+				.getAttribute("href"),
 		).toBe("/design/scrap");
 	});
 
@@ -81,5 +87,27 @@ describe("ScrapeErrorCard", () => {
 			/>,
 		);
 		expect(screen.queryByText(/\d+\s*detik/)).toBeNull();
+	});
+
+	it("disables retry until a persisted deadline passes", () => {
+		const retry = vi.fn();
+		const expiresAt = new Date(Date.now() + 60 * 1000).toISOString();
+		render(
+			<ScrapeErrorCard
+				title="Website membatasi akses"
+				guidance="Tunggu sebelum mencoba lagi."
+				retryable
+				retryHint="Permintaan berikutnya dapat dicoba setelah waktu tunggu dari website berakhir. Sisa waktu: 60 detik."
+				retryAfterExpiresAt={expiresAt}
+				retryAfterRemaining={60}
+				onRetry={retry}
+			/>,
+		);
+		const button = screen.getByRole("button", {
+			name: "Coba lagi — belum tersedia",
+		});
+		expect(button.hasAttribute("disabled")).toBe(true);
+		fireEvent.click(button);
+		expect(retry).not.toHaveBeenCalled();
 	});
 });

@@ -191,7 +191,9 @@ describe("failed state delegates to the shared error card", () => {
 		);
 		expect(screen.getAllByRole("alert")).toHaveLength(1);
 		expect(screen.getAllByRole("button")).toHaveLength(1);
-		fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Coba lagi jika tersedia" }),
+		);
 		expect(retry).toHaveBeenCalledTimes(1);
 		expect(screen.queryByRole("timer")).toBeNull();
 	});
@@ -235,6 +237,18 @@ describe("layout flexibility", () => {
 		expect(screen.getByText("Aktivitas terbaru")).toBeDefined();
 		expect(
 			screen.getByRole("region", { name: /progres DESIGN\.md/i }),
+		).toBeDefined();
+	});
+
+	it("uses a gallery-aligned single panel for images", () => {
+		const { container } = render(
+			<ScrapeProgress mode="images" status="capturing" />,
+		);
+		expect(container.firstElementChild?.getAttribute("data-layout")).toBe(
+			"single",
+		);
+		expect(
+			screen.getByRole("region", { name: /progres Scrape Images/i }),
 		).toBeDefined();
 	});
 });

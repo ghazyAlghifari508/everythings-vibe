@@ -34,8 +34,43 @@ describe("resolveScrapeErrorPresentation", () => {
 		expect(withSignal.retryHint).toMatch(/60/);
 
 		const withoutSignal = present({ code: "WEBSITE_RATE_LIMITED" });
-		expect(withoutSignal.retryable).toBe(true);
+		expect(withoutSignal.retryable).toBe(false);
 		expect(withoutSignal.retryHint ?? "").not.toMatch(/\d+\s*(detik|s)/);
+	});
+
+	it("derives the remaining wait from a persisted deadline across refresh", () => {
+		const now = Date.parse("2026-01-01T00:00:00Z");
+		const expiresAt = new Date(now + 90 * 1000).toISOString();
+		const first = present({
+			code: "WEBSITE_RATE_LIMITED",
+			retryAfterExpiresAt: expiresAt,
+			now,
+		});
+		expect(first.retryable).toBe(true);
+		expect(first.retryAfterRemaining).toBe(90);
+		expect(first.retryHint).toMatch(/90/);
+		const later = present({
+			code: "WEBSITE_RATE_LIMITED",
+			retryAfterExpiresAt: expiresAt,
+			now: now + 30 * 1000,
+		});
+		expect(later.retryAfterRemaining).toBe(60);
+		const expired = present({
+			code: "WEBSITE_RATE_LIMITED",
+			retryAfterExpiresAt: expiresAt,
+			now: now + 120 * 1000,
+		});
+		expect(expired.retryAfterRemaining).toBe(0);
+	});
+
+	it("never invents a countdown from an unusable deadline", () => {
+		const broken = present({
+			code: "WEBSITE_RATE_LIMITED",
+			retryAfterExpiresAt: "not-a-date",
+			now: Date.parse("2026-01-01T00:00:00Z"),
+		});
+		expect(broken.retryable).toBe(false);
+		expect(broken.retryHint).toBeNull();
 	});
 
 	it("denies retry for failures a retry cannot fix", () => {
