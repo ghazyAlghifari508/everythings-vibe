@@ -1,4 +1,9 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	redirect,
+	useNavigate,
+	useRouter,
+} from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { AlertCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +22,7 @@ import type {
 } from "@/db/schema";
 import { requireUserServer } from "@/lib/session";
 import { exportProjectAsZip } from "@/lib/studio-export";
+import { useUIStore } from "@/store";
 
 export interface StudioDetailLoaderData {
 	project: StudioProjectRow;
@@ -91,9 +97,12 @@ function StudioWorkspace({
 	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
 	const [composerLoading, setComposerLoading] = useState(false);
 	const [exportingZip, setExportingZip] = useState(false);
+	const [deleting, setDeleting] = useState(false);
 	const [error, setError] = useState("");
 	const [duplicating, setDuplicating] = useState(false);
 	const navigate = useNavigate();
+	const router = useRouter();
+	const showToast = useUIStore((state) => state.showToast);
 	const pendingRequest = useRef<{ signature: string; id: string } | null>(null);
 
 	async function handleDuplicate() {
@@ -173,6 +182,12 @@ function StudioWorkspace({
 			const res = await fetch(
 				`/api/studio/project?id=${encodeURIComponent(project.id)}`,
 			);
+			// 404 means the project no longer exists (deleted here or in another
+			// tab). Leave the workspace instead of polling a dead id forever.
+			if (res.status === 404) {
+				void router.invalidate();
+				return;
+			}
 			if (!res.ok) return;
 			const data = (await res.json()) as {
 				project: StudioProjectRow;
@@ -185,7 +200,7 @@ function StudioWorkspace({
 		} catch {
 			// Network hiccup during polling
 		}
-	}, [project.id]);
+	}, [project.id, router]);
 
 	useEffect(() => {
 		if (!isProcessing) return;
@@ -194,6 +209,40 @@ function StudioWorkspace({
 		}, 1500);
 		return () => clearInterval(timer);
 	}, [isProcessing, syncProjectStatus]);
+
+	async function handleDelete() {
+		if (deleting) return;
+		setDeleting(true);
+		setError("");
+		try {
+			const response = await fetch("/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action: "delete", projectId: project.id }),
+			});
+			if (!response.ok) {
+				const body: unknown = await response.json().catch(() => null);
+				throw new Error(
+					typeof body === "object" &&
+						body !== null &&
+						"error" in body &&
+						typeof body.error === "string"
+						? body.error
+						: "Gagal menghapus project. Coba lagi.",
+				);
+			}
+			showToast("Project dihapus.", "success");
+			await router.invalidate();
+			await navigate({ to: "/design/studio" });
+		} catch (failure) {
+			setError(
+				failure instanceof Error ? failure.message : "Gagal menghapus project.",
+			);
+			throw failure;
+		} finally {
+			setDeleting(false);
+		}
+	}
 
 	async function handleComposerSubmit(
 		promptText: string,
@@ -301,9 +350,11 @@ function StudioWorkspace({
 				title={project.title}
 				duplicating={duplicating}
 				exporting={exportingZip}
+				deleting={deleting}
 				canExport={readyFramesCount > 0}
 				onDuplicate={() => void handleDuplicate()}
 				onExport={() => void handleDownloadAllZip()}
+				onDelete={handleDelete}
 			/>
 
 			{/* Main Fullscreen Canvas Workspace */}

@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockNavigate = vi.fn();
 const mockUseLoaderData = vi.fn();
 const mockUseSearch = vi.fn();
+const mockInvalidate = vi.fn(async () => {});
 
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: Record<string, unknown>) => ({
@@ -19,6 +20,7 @@ vi.mock("@tanstack/react-router", () => ({
 		useSearch: () => mockUseSearch(),
 	}),
 	useNavigate: () => mockNavigate,
+	useRouter: () => ({ invalidate: mockInvalidate }),
 	Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
 		<a href={to}>{children}</a>
 	),
@@ -186,5 +188,74 @@ describe("StudioPage UI & Workflow", () => {
 				"Gunakan design system dan identitas visual yang sudah kamu punya sebagai referensi.",
 			),
 		).toBeDefined();
+	});
+
+	it("deletes a history project through the server action and revalidates the loader", async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({ deletedProjectId: "proj-1" }),
+		});
+		global.fetch = fetchMock;
+
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		fireEvent.pointerDown(
+			screen.getByRole("button", { name: "Aksi project SIMRS Dashboard" }),
+			{ button: 0, ctrlKey: false, pointerType: "mouse" },
+		);
+		fireEvent.click(
+			await screen.findByRole("menuitem", { name: /Hapus project/i }),
+		);
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Hapus project" }),
+		);
+
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalledWith(
+				"/api/studio/project",
+				expect.objectContaining({
+					method: "POST",
+					body: JSON.stringify({ action: "delete", projectId: "proj-1" }),
+				}),
+			);
+		});
+		// The list reconciles from authoritative loader data, not a page reload.
+		await waitFor(() => expect(mockInvalidate).toHaveBeenCalled());
+		expect(mockNavigate).not.toHaveBeenCalled();
+	});
+
+	it("surfaces a retryable error and keeps the project when deletion fails", async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: false,
+			json: async () => ({ error: "Gagal menghapus project. Coba lagi." }),
+		});
+		global.fetch = fetchMock;
+
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		fireEvent.pointerDown(
+			screen.getByRole("button", { name: "Aksi project SIMRS Dashboard" }),
+			{ button: 0, ctrlKey: false, pointerType: "mouse" },
+		);
+		fireEvent.click(
+			await screen.findByRole("menuitem", { name: /Hapus project/i }),
+		);
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Hapus project" }),
+		);
+
+		await waitFor(() =>
+			expect(screen.getByRole("alert").textContent).toContain(
+				"Gagal menghapus project. Coba lagi.",
+			),
+		);
+		expect(mockInvalidate).not.toHaveBeenCalled();
+		expect(screen.getByText("SIMRS Dashboard")).toBeDefined();
 	});
 });

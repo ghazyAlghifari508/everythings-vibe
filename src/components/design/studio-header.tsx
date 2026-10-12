@@ -6,8 +6,19 @@ import {
 	Download,
 	Loader2,
 	Menu,
+	Trash2,
 	User,
 } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -23,21 +34,41 @@ export function StudioHeader({
 	title,
 	duplicating,
 	exporting,
+	deleting,
 	canExport,
 	onDuplicate,
 	onExport,
+	onDelete,
 }: {
 	title: string;
 	duplicating: boolean;
 	exporting: boolean;
+	deleting?: boolean;
 	canExport: boolean;
 	onDuplicate: () => void;
 	onExport: () => void;
+	onDelete?: () => Promise<void>;
 }) {
 	const { data: session } = authClient.useSession();
+	const [isDeleteOpen, setDeleteOpen] = useState(false);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
 	const control =
 		"inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:opacity-50";
 	const item = "gap-2 focus:bg-steel";
+	async function confirmDelete() {
+		if (!onDelete || deleting) return;
+		setDeleteError(null);
+		try {
+			await onDelete();
+			setDeleteOpen(false);
+		} catch (failure) {
+			setDeleteError(
+				failure instanceof Error
+					? failure.message
+					: "Gagal menghapus project. Coba lagi.",
+			);
+		}
+	}
 	return (
 		<header className="z-20 flex h-14 shrink-0 items-center justify-between gap-3 bg-charcoal px-2 sm:px-4">
 			<div className="flex min-w-0 items-center gap-2">
@@ -74,6 +105,22 @@ export function StudioHeader({
 							)}
 							{duplicating ? "Menduplikasi project…" : "Duplicate Project"}
 						</DropdownMenuItem>
+						{onDelete ? (
+							<>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem
+									className="gap-2 text-crimson focus:text-crimson"
+									disabled={deleting}
+									onSelect={() => {
+										setDeleteError(null);
+										setDeleteOpen(true);
+									}}
+								>
+									<Trash2 size={16} />
+									Hapus project
+								</DropdownMenuItem>
+							</>
+						) : null}
 					</DropdownMenuContent>
 				</DropdownMenu>
 				<h1
@@ -148,6 +195,40 @@ export function StudioHeader({
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
+
+			<Dialog open={isDeleteOpen} onOpenChange={setDeleteOpen}>
+				<DialogContent className="max-w-sm">
+					<DialogHeader>
+						<DialogTitle>Hapus project?</DialogTitle>
+						<DialogDescription>
+							{`Project "${title}" akan dihapus permanen beserta seluruh layar, riwayat revisi, dan asetnya. Tindakan ini tidak dapat dibatalkan.`}
+						</DialogDescription>
+					</DialogHeader>
+					{deleteError ? (
+						<p role="alert" className="text-sm text-crimson">
+							{deleteError}
+						</p>
+					) : null}
+					<DialogFooter>
+						<Button
+							type="button"
+							variant="secondary"
+							onClick={() => setDeleteOpen(false)}
+							disabled={deleting}
+						>
+							Batal
+						</Button>
+						<Button
+							type="button"
+							variant="destructive"
+							onClick={() => void confirmDelete()}
+							disabled={deleting}
+						>
+							{deleting ? "Menghapus..." : "Hapus project"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</header>
 	);
 }

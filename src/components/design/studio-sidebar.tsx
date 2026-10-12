@@ -3,12 +3,30 @@
 import {
 	FileText,
 	ImageIcon,
+	Loader2,
 	Monitor,
+	MoreHorizontal,
 	Search,
 	Smartphone,
+	Trash2,
 	X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export interface StudioHistoryItem {
 	id: string;
@@ -22,21 +40,48 @@ export interface StudioHistoryItem {
 export interface StudioSidebarProps {
 	history: StudioHistoryItem[];
 	onSelectProject: (id: string) => void;
+	onDeleteProject: (id: string) => Promise<void>;
 	className?: string;
 }
 
 export function StudioSidebar({
 	history,
 	onSelectProject,
+	onDeleteProject,
 	className = "",
 }: StudioSidebarProps) {
 	const [query, setQuery] = useState("");
+	const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+	const [confirmTarget, setConfirmTarget] = useState<StudioHistoryItem | null>(
+		null,
+	);
+	const [deletingId, setDeletingId] = useState<string | null>(null);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
 
 	const filtered = useMemo(() => {
 		const trimmed = query.trim().toLowerCase();
 		if (!trimmed) return history;
 		return history.filter((item) => item.title.toLowerCase().includes(trimmed));
 	}, [history, query]);
+
+	async function confirmDelete() {
+		if (!confirmTarget || deletingId) return;
+		const id = confirmTarget.id;
+		setDeletingId(id);
+		setDeleteError(null);
+		try {
+			await onDeleteProject(id);
+			setConfirmTarget(null);
+		} catch (failure) {
+			setDeleteError(
+				failure instanceof Error
+					? failure.message
+					: "Gagal menghapus project. Coba lagi.",
+			);
+		} finally {
+			setDeletingId(null);
+		}
+	}
 
 	return (
 		<aside
@@ -106,66 +151,174 @@ export function StudioSidebar({
 					<ul className="space-y-1">
 						{filtered.map((item) => {
 							const isMobile = item.designMode === "mobile";
+							const isDeleting = deletingId === item.id;
+							const isMenuOpen = openMenuId === item.id;
 							return (
 								<li key={item.id}>
-									<button
-										type="button"
-										onClick={() => onSelectProject(item.id)}
-										className="group flex w-full flex-col gap-1.5 rounded-lg border border-transparent p-2.5 text-left transition-colors hover:border-graphite hover:bg-onyx focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
+									<div
+										data-state={
+											isDeleting
+												? "deleting"
+												: isMenuOpen
+													? "menu-open"
+													: "idle"
+										}
+										className={`group flex items-stretch gap-1 rounded-lg border transition-colors ${
+											isDeleting
+												? "border-transparent opacity-60"
+												: isMenuOpen
+													? "border-iron bg-steel"
+													: "border-transparent hover:border-graphite hover:bg-steel"
+										}`}
 									>
-										<div className="flex items-start justify-between gap-2">
-											<span className="line-clamp-2 text-xs font-semibold text-snow group-hover:text-white">
-												{item.title}
-											</span>
-											<span
-												className="shrink-0 text-fog group-hover:text-mist mt-0.5"
-												title={isMobile ? "Mobile Design" : "Web Design"}
-											>
-												{isMobile ? (
-													<Smartphone size={13} aria-hidden />
-												) : (
-													<Monitor size={13} aria-hidden />
-												)}
-											</span>
-										</div>
+										<button
+											type="button"
+											onClick={() => onSelectProject(item.id)}
+											disabled={isDeleting}
+											className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-lg p-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed"
+										>
+											<div className="flex items-start justify-between gap-2">
+												<span className="line-clamp-2 text-xs font-semibold text-snow">
+													{item.title}
+												</span>
+												<span
+													className="mt-0.5 shrink-0 text-fog"
+													title={isMobile ? "Mobile Design" : "Web Design"}
+												>
+													{isMobile ? (
+														<Smartphone size={13} aria-hidden />
+													) : (
+														<Monitor size={13} aria-hidden />
+													)}
+												</span>
+											</div>
 
-										<div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-fog">
-											<span>
-												{new Date(item.createdAt).toLocaleDateString("id-ID", {
-													day: "numeric",
-													month: "short",
-												})}
-											</span>
-											<span>·</span>
-											<span className="uppercase tracking-wider">
-												{isMobile ? "Mobile" : "Web"}
-											</span>
-											{item.hasDesignMd && (
-												<span
-													className="inline-flex items-center gap-0.5 rounded bg-charcoal px-1 py-0.5 text-mist border border-graphite/80"
-													title="Menggunakan DESIGN.md"
-												>
-													<FileText size={10} aria-hidden />
-													<span>Ref</span>
+											<div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-fog">
+												<span>
+													{new Date(item.createdAt).toLocaleDateString(
+														"id-ID",
+														{
+															day: "numeric",
+															month: "short",
+														},
+													)}
 												</span>
-											)}
-											{item.hasLogo && (
-												<span
-													className="inline-flex items-center gap-0.5 rounded bg-charcoal px-1 py-0.5 text-mist border border-graphite/80"
-													title="Menggunakan Logo"
-												>
-													<ImageIcon size={10} aria-hidden />
-													<span>Logo</span>
+												<span>·</span>
+												<span className="uppercase tracking-wider">
+													{isMobile ? "Mobile" : "Web"}
 												</span>
-											)}
-										</div>
-									</button>
+												{item.hasDesignMd && (
+													<span
+														className="inline-flex items-center gap-0.5 rounded bg-charcoal px-1 py-0.5 text-mist border border-graphite/80"
+														title="Menggunakan DESIGN.md"
+													>
+														<FileText size={10} aria-hidden />
+														<span>Ref</span>
+													</span>
+												)}
+												{item.hasLogo && (
+													<span
+														className="inline-flex items-center gap-0.5 rounded bg-charcoal px-1 py-0.5 text-mist border border-graphite/80"
+														title="Menggunakan Logo"
+													>
+														<ImageIcon size={10} aria-hidden />
+														<span>Logo</span>
+													</span>
+												)}
+											</div>
+										</button>
+
+										<DropdownMenu
+											open={isMenuOpen}
+											onOpenChange={(open) =>
+												setOpenMenuId(open ? item.id : null)
+											}
+										>
+											<DropdownMenuTrigger asChild>
+												<button
+													type="button"
+													disabled={isDeleting}
+													aria-label={`Aksi project ${item.title}`}
+													className="my-1 mr-1 flex size-8 shrink-0 items-center justify-center self-center rounded-md text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
+												>
+													{isDeleting ? (
+														<Loader2
+															size={14}
+															className="motion-safe:animate-spin"
+															aria-hidden
+														/>
+													) : (
+														<MoreHorizontal size={15} aria-hidden />
+													)}
+												</button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent align="end">
+												<DropdownMenuItem
+													className="text-crimson focus:text-crimson"
+													onSelect={() => {
+														setDeleteError(null);
+														setConfirmTarget(item);
+													}}
+												>
+													<Trash2 size={14} aria-hidden className="mr-2" />
+													Hapus project
+												</DropdownMenuItem>
+											</DropdownMenuContent>
+										</DropdownMenu>
+									</div>
 								</li>
 							);
 						})}
 					</ul>
 				)}
 			</div>
+
+			<Dialog
+				open={confirmTarget !== null}
+				onOpenChange={(open) => {
+					if (!open && !deletingId) {
+						setConfirmTarget(null);
+						setDeleteError(null);
+					}
+				}}
+			>
+				<DialogContent className="max-w-sm">
+					<DialogHeader>
+						<DialogTitle>Hapus project?</DialogTitle>
+						<DialogDescription>
+							{confirmTarget
+								? `Project "${confirmTarget.title}" akan dihapus permanen beserta seluruh layar, riwayat revisi, dan asetnya. Tindakan ini tidak dapat dibatalkan.`
+								: ""}
+						</DialogDescription>
+					</DialogHeader>
+					{deleteError ? (
+						<p role="alert" className="text-sm text-crimson">
+							{deleteError}
+						</p>
+					) : null}
+					<DialogFooter>
+						<Button
+							type="button"
+							variant="secondary"
+							onClick={() => {
+								setConfirmTarget(null);
+								setDeleteError(null);
+							}}
+							disabled={deletingId !== null}
+						>
+							Batal
+						</Button>
+						<Button
+							type="button"
+							variant="destructive"
+							onClick={() => void confirmDelete()}
+							disabled={deletingId !== null}
+						>
+							{deletingId ? "Menghapus..." : "Hapus project"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</aside>
 	);
 }

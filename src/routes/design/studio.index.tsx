@@ -1,5 +1,10 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	redirect,
+	useNavigate,
+	useRouter,
+} from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import {
 	AlertCircle,
@@ -26,6 +31,7 @@ import {
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import type { StudioDesignMode } from "@/lib/prompts-ui-studio";
 import { requireUserServer } from "@/lib/session";
+import { useUIStore } from "@/store";
 
 const loadStudioHistory = createServerFn({ method: "GET" }).handler(
 	async (): Promise<{ history: StudioHistoryItem[] }> => {
@@ -73,6 +79,8 @@ function StudioPage() {
 	const { history } = Route.useLoaderData();
 	const search = Route.useSearch();
 	const navigate = useNavigate();
+	const router = useRouter();
+	const showToast = useUIStore((state) => state.showToast);
 
 	const [prompt, setPrompt] = useState(search.prompt ?? "");
 	const [designMode, setDesignMode] = useState<StudioDesignMode>("web");
@@ -96,6 +104,30 @@ function StudioPage() {
 			params: { id },
 		});
 	};
+
+	// Deletion goes through the authoritative server action, then the loader is
+	// revalidated so the list, the count badge, and the filter all reconcile
+	// from persisted state instead of an optimistic guess.
+	async function handleDeleteProject(id: string) {
+		const response = await fetch("/api/studio/project", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ action: "delete", projectId: id }),
+		});
+		if (!response.ok) {
+			const body: unknown = await response.json().catch(() => null);
+			throw new Error(
+				typeof body === "object" &&
+					body !== null &&
+					"error" in body &&
+					typeof body.error === "string"
+					? body.error
+					: "Gagal menghapus project. Coba lagi.",
+			);
+		}
+		await router.invalidate();
+		showToast("Project dihapus.", "success");
+	}
 
 	async function submit(e: FormEvent) {
 		e.preventDefault();
@@ -148,6 +180,7 @@ function StudioPage() {
 			<StudioSidebar
 				history={history}
 				onSelectProject={handleOpenProject}
+				onDeleteProject={handleDeleteProject}
 				className="hidden md:flex w-72 lg:w-80 shrink-0 h-full"
 			/>
 
@@ -186,6 +219,7 @@ function StudioPage() {
 							<StudioSidebar
 								history={history}
 								onSelectProject={handleOpenProject}
+								onDeleteProject={handleDeleteProject}
 								className="border-0 h-full w-full"
 							/>
 						</div>

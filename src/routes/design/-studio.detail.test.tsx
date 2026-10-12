@@ -23,6 +23,7 @@ vi.mock("@tanstack/react-router", () => ({
 		<a href={to}>{children}</a>
 	),
 	useNavigate: () => vi.fn(),
+	useRouter: () => ({ invalidate: vi.fn(async () => {}) }),
 }));
 
 vi.mock("@tanstack/react-start", () => ({
