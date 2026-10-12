@@ -22,6 +22,7 @@ import type {
 	CreditPricingVersion,
 } from "@/lib/adaptive-credit";
 import type { CodebaseNameSource } from "@/lib/codebase-library";
+import type { VisualEvidence } from "@/lib/design-visual-evidence";
 import type { ScrapeRequest } from "@/lib/scrape-contract";
 import type {
 	ScrapeImageDiscovery,
@@ -879,6 +880,7 @@ export interface ScrapeMetadata {
 	finalUrl?: string;
 	viewport?: { width: number; height: number };
 	captureMode?: string;
+	visualEvidence?: VisualEvidence;
 	htmlBytes?: number;
 	previewHtmlBytes?: number;
 	stage?: ScrapeStatus;
@@ -889,6 +891,9 @@ export interface ScrapeMetadata {
 	timings?: Record<string, number>;
 	errorMessage?: string;
 	errorDetail?: string;
+	// Last real pipeline stage before the run failed. Lets the progress UI
+	// mark the persisted failure stage instead of guessing where it stopped.
+	failedAtStage?: ScrapeStatus;
 	// Only set when the upstream website supplied a usable Retry-After signal.
 	retryAfterSeconds?: number;
 	// Tracks whether the optional AI reference summary was applied to a

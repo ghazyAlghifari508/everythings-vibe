@@ -402,6 +402,7 @@ export async function runScrapePipeline(
 						stageStartedAt: new Date().toISOString(),
 						errorMessage,
 						errorDetail,
+						failedAtStage: meta.stage,
 						...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
 					},
 				)}::jsonb`,
@@ -471,6 +472,7 @@ export async function retryScrape(
 					activityStartedAt: undefined,
 					errorMessage: undefined,
 					errorDetail: undefined,
+					failedAtStage: undefined,
 				},
 				updatedAt: new Date(),
 			})

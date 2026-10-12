@@ -11,7 +11,7 @@ import {
 	resolveScrapeContentWidth,
 	resolveScrapeView,
 } from "@/components/design/scrape-view-state";
-import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
+import type { ScrapeMetadata, ScrapeMode, ScrapeStatus } from "@/db/schema";
 import { useScrapePreview } from "@/hooks/use-scrape-preview";
 import {
 	toScrapeStatusSnapshot,
@@ -166,10 +166,8 @@ function ScrapeDetailPage() {
 	});
 	const previewSrcDoc = preview?.srcDoc ?? "";
 
-	const metadata = (data?.metadata ?? initial.metadata) as Record<
-		string,
-		unknown
-	> | null;
+	const metadata = (data?.metadata ??
+		initial.metadata) as ScrapeMetadata | null;
 	// Polled results win so rows persisted after the initial load appear without
 	// a reload; the loader snapshot only seeds the first render.
 	const pages = data?.pages ?? initial.pages;
@@ -179,6 +177,9 @@ function ScrapeDetailPage() {
 		(metadata && typeof metadata === "object" && "errorMessage" in metadata
 			? String(metadata.errorMessage)
 			: null);
+	const errorDetail = metadata?.errorDetail ?? null;
+	const failedAtStage = metadata?.failedAtStage ?? null;
+	const retryAfterSeconds = metadata?.retryAfterSeconds ?? null;
 	const stageStartedAt =
 		metadata &&
 		typeof metadata === "object" &&
@@ -227,6 +228,9 @@ function ScrapeDetailPage() {
 						sourceUrl={sourceUrl}
 						domain={domain}
 						errorMessage={errorMessage}
+						errorDetail={errorDetail}
+						failedAtStage={failedAtStage}
+						retryAfterSeconds={retryAfterSeconds}
 						isRetrying={isRetrying}
 						onRetry={retry}
 						partialResults={
@@ -291,6 +295,9 @@ function ScrapeDetailPage() {
 					sourceUrl={sourceUrl}
 					domain={domain}
 					errorMessage={errorMessage}
+					errorDetail={errorDetail}
+					failedAtStage={failedAtStage}
+					retryAfterSeconds={retryAfterSeconds}
 					isRetrying={isRetrying}
 					onRetry={retry}
 					stageStartedAt={stageStartedAt}
