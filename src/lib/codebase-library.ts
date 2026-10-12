@@ -3,7 +3,11 @@ import {
 	type CodebaseAnalysis,
 	safeParseCodebaseAnalysis,
 } from "./codebase-analysis";
-import { hasControlCharacters, isSafeRelativePath } from "./codebase-sync";
+import {
+	hasControlCharacters,
+	isSafeRelativePath,
+	SNAPSHOT_CONTEXT_STATUSES,
+} from "./codebase-sync";
 import { CODEBASE_NAME_MAX_CHARS, CODEBASE_NAME_MIN_CHARS } from "./constants";
 
 export const NEW_REPOSITORY_HREF = "/plan/codebase";
@@ -134,7 +138,33 @@ export interface CodebaseLibraryReadiness {
 	} | null;
 }
 
-export function isCodebaseLibraryReady(
+/**
+ * Whether the repository has a snapshot the workspace can actually plan against.
+ *
+ * Readiness is a persistence question, not an analysis question. A repository
+ * with a usable snapshot must stay in History even while its analysis is still
+ * running or has failed: the user's planning is attached to that snapshot, and
+ * hiding the repository would make their work unreachable. Analysis progress is
+ * reported separately as its own status.
+ */
+export function hasUsableLibrarySnapshot(
+	snapshotStatus: string | null | undefined,
+): boolean {
+	if (!snapshotStatus) return false;
+	return (SNAPSHOT_CONTEXT_STATUSES as readonly string[]).includes(
+		snapshotStatus,
+	);
+}
+
+/**
+ * Whether a validated analysis exists for the repository's newest snapshot.
+ *
+ * This is the analysis signal on its own, kept separate from readiness so the
+ * library can say "synced, analysis running" instead of collapsing both into one
+ * label. A ready analysis bound to an older snapshot never counts: a re-synced
+ * repository is not analysed until its new snapshot is.
+ */
+export function hasReadyLibraryAnalysis(
 	input: CodebaseLibraryReadiness,
 ): boolean {
 	if (!input.latestSnapshotId) return false;
@@ -155,6 +185,14 @@ export function buildCodebaseLibraryItems(input: {
 	const latest = selectLatestCodebaseSnapshots(snapshots);
 	const latestProjectByCodebase =
 		selectNewestFeatureProjectIdPerCodebase(projects);
+	const planCountByCodebase = new Map<string, number>();
+	for (const project of projects) {
+		if (!project.codebaseId) continue;
+		planCountByCodebase.set(
+			project.codebaseId,
+			(planCountByCodebase.get(project.codebaseId) ?? 0) + 1,
+		);
+	}
 	const analysesByProject = new Map<string, LibraryAssemblyAnalysis[]>();
 	for (const analysis of analyses) {
 		const list = analysesByProject.get(analysis.projectId) ?? [];
@@ -176,7 +214,7 @@ export function buildCodebaseLibraryItems(input: {
 			? safeParseCodebaseAnalysis(matched.output)
 			: null;
 		const parsedData = parsedResult?.success ? parsedResult.data : null;
-		const hasReadyAnalysis = isCodebaseLibraryReady({
+		const hasReadyAnalysis = hasReadyLibraryAnalysis({
 			latestSnapshotId,
 			matchedAnalysis: matched
 				? {
@@ -199,9 +237,13 @@ export function buildCodebaseLibraryItems(input: {
 			language: slice?.language ?? null,
 			packageManager: slice?.packageManager ?? null,
 			hasReadyAnalysis,
+			hasUsableSnapshot: hasUsableLibrarySnapshot(snapshot?.status ?? null),
+			planCount: planCountByCodebase.get(row.id) ?? 0,
 		});
 	}
-	return items.filter((item) => item.hasReadyAnalysis);
+	// A repository stays listed as soon as it has a snapshot the workspace can
+	// plan against. Analysis is a separate, non-blocking signal.
+	return items.filter((item) => item.hasUsableSnapshot);
 }
 
 /**
@@ -243,10 +285,16 @@ export interface CodebaseLibraryItem {
 	framework: string | null;
 	language: string | null;
 	packageManager: string | null;
-	// True only when validated analysis exists for the codebases newest
+	// True only when validated analysis exists for the codebase's newest
 	// snapshot. A ready analysis bound to an older snapshot must never make a
-	// re-synced codebase look finished.
+	// re-synced codebase look analysed.
 	hasReadyAnalysis: boolean;
+	// True when the newest snapshot is one the workspace can plan against. This
+	// is the readiness signal for History: a repository with usable planning
+	// context stays listed while its analysis is pending or failed.
+	hasUsableSnapshot: boolean;
+	// Number of independent feature plans in this repository.
+	planCount: number;
 }
 
 export interface LibraryAnalysisSlice {
@@ -286,20 +334,28 @@ export function libraryAnalysisLabels(
 	);
 }
 
+/**
+ * Status label for a library row.
+ *
+ * Sync and analysis are reported as separate facts. A repository whose snapshot
+ * is usable is "Tersinkron" even while its analysis is still running or has
+ * failed, because the sync really did succeed and the planning context is
+ * usable. A ready analysis upgrades the label to "Siap". The legacy `ready`
+ * snapshot status keeps meaning "Siap" on its own: rows written before analyses
+ * were tracked separately recorded their completion there.
+ */
 export function mapLibraryStatus(
 	snapshotStatus: string | null | undefined,
 	hasReadyAnalysis: boolean,
 ): string {
 	if (hasReadyAnalysis) return "Siap";
+	if (snapshotStatus === "ready") return "Siap";
+	if (hasUsableLibrarySnapshot(snapshotStatus)) return "Tersinkron";
 	switch (snapshotStatus) {
-		case "ready":
-			return "Siap";
 		case "analyzing":
 			return "Sedang dianalisis";
 		case "uploading":
 			return "Sedang disinkronkan";
-		case "uploaded":
-			return "Tersinkron";
 		case "failed":
 			return "Perlu perhatian";
 		case "expired":

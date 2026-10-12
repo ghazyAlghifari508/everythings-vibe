@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
-import { buildCodebaseLibraryItems } from "@/lib/codebase-library";
+import {
+	buildCodebaseLibraryItems,
+	mapLibraryStatus,
+} from "@/lib/codebase-library";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
 import {
 	selectLatestCodebaseSnapshots,
@@ -299,14 +302,12 @@ describe("codebase list filtering gate", () => {
 });
 
 describe("codebase library readiness vs workspace availability", () => {
-	// Known product inconsistency (not a bug in this task's scope): the library
-	// lists a codebase only once validated analysis exists for its newest
-	// snapshot, while the workspace opens as soon as the snapshot is synced. A
-	// codebase can therefore be usable at /codebases/:id yet absent from
-	// Project Tersimpan while analysis is still pending or failed. This test
-	// pins the current behavior so a future decision to relax it is a
-	// deliberate, visible change rather than an accident.
-	it("still hides a synced-but-unanalyzed codebase from the library", () => {
+	// Readiness is a persistence question: a codebase with a usable snapshot is
+	// listed, and analysis progress is reported as its own signal. Previously the
+	// library required a ready analysis, so a repository whose analysis was still
+	// running (or had failed) disappeared from Project Tersimpan even though its
+	// workspace and planning were perfectly usable.
+	it("lists a synced codebase whose analysis is still pending", () => {
 		const items = buildCodebaseLibraryItems({
 			codebases: [
 				{
@@ -334,6 +335,37 @@ describe("codebase library readiness vs workspace availability", () => {
 					output: null,
 				},
 			],
+		});
+
+		expect(items).toHaveLength(1);
+		expect(items[0].id).toBe("cb-pending");
+		// The analysis signal stays honest: listed, but not analysed yet.
+		expect(items[0].hasReadyAnalysis).toBe(false);
+		expect(items[0].hasUsableSnapshot).toBe(true);
+		expect(mapLibraryStatus(items[0].snapshotStatus, false)).toBe("Tersinkron");
+	});
+
+	it("still hides a codebase that never produced a usable snapshot", () => {
+		const items = buildCodebaseLibraryItems({
+			codebases: [
+				{
+					id: "cb-uploading",
+					name: "Uploading Repo",
+					createdAt: new Date("2026-09-23T10:00:00.000Z"),
+					updatedAt: new Date("2026-09-23T10:00:00.000Z"),
+				},
+			],
+			snapshots: [
+				{
+					id: "snap-uploading",
+					codebaseId: "cb-uploading",
+					createdAt: new Date("2026-09-23T10:00:00.000Z"),
+					fileCount: 0,
+					status: "uploading",
+				},
+			],
+			projects: [{ id: "proj-uploading", codebaseId: "cb-uploading" }],
+			analyses: [],
 		});
 
 		expect(items).toHaveLength(0);

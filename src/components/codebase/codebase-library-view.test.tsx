@@ -84,6 +84,8 @@ function makeItem(
 		language: null,
 		packageManager: null,
 		hasReadyAnalysis: false,
+		hasUsableSnapshot: true,
+		planCount: 0,
 		...overrides,
 	};
 }
