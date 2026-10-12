@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
+import { Copy, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodebaseArtifactCanvas } from "@/components/codebase/codebase-artifact-canvas";
 import {
@@ -78,6 +79,7 @@ import {
 	mergeStackWithFallback,
 } from "@/lib/codebase-stack";
 import {
+	buildAgentPrompt,
 	getPendingSyncPayloadKey,
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
@@ -1073,6 +1075,18 @@ function CodebaseDetailPage() {
 		return () => clearInterval(interval);
 	}, [readStatus]);
 
+	// A re-sync prompt is dismissed by its own success: once polling reports a
+	// usable snapshot for the new session, the CLI instructions have served
+	// their purpose and the workspace continues on the adopted snapshot. A
+	// failed or expired session keeps the panel, because the retry still has to
+	// be run.
+	useEffect(() => {
+		if (!payload) return;
+		if (!status?.snapshotId) return;
+		if (!SNAPSHOT_CONTEXT_STATUSES.includes(status.status)) return;
+		setPayload(null);
+	}, [payload, status?.snapshotId, status?.status]);
+
 	const startSession = async (
 		action: CodebaseSessionStartAction = "initial",
 	) => {
@@ -1244,10 +1258,13 @@ function CodebaseDetailPage() {
 
 	const loadPrd = useCallback(async (): Promise<string | null> => {
 		if (!snapshotReady || !effectiveFeatureId) {
+			// The read has not happened yet, so the artifact's real state is
+			// still unknown. Reporting "empty" here is what let an unread plan
+			// render as an empty one.
 			setPrdContent(null);
 			setPrdError(null);
 			setPrdLoading(false);
-			markArtifact("prd", "empty");
+			markArtifact("prd", "pending");
 			return null;
 		}
 		setPrdLoading(true);
@@ -1294,7 +1311,7 @@ function CodebaseDetailPage() {
 			setAcContent(null);
 			setAcError(null);
 			setAcLoading(false);
-			markArtifact("ac", "empty");
+			markArtifact("ac", "pending");
 			return null;
 		}
 		setAcLoading(true);
@@ -1340,7 +1357,7 @@ function CodebaseDetailPage() {
 		async (projectId: string | null) => {
 			if (!projectId) {
 				setFeatureTree(null);
-				markArtifact("feature", "empty");
+				markArtifact("feature", "pending");
 				return null;
 			}
 			markArtifact("feature", "pending");
@@ -1362,7 +1379,7 @@ function CodebaseDetailPage() {
 		async (projectId: string | null) => {
 			if (!projectId) {
 				setTaskTree(null);
-				markArtifact("tasks", "empty");
+				markArtifact("tasks", "pending");
 				return null;
 			}
 			markArtifact("tasks", "pending");
@@ -2353,12 +2370,24 @@ function CodebaseDetailPage() {
 							<span className="truncate">{codebase.name}</span>
 						</span>
 					</div>
-					<span
-						data-testid="codebase-sync-badge"
-						className="shrink-0 rounded-md border border-graphite bg-obsidian px-2.5 py-1 font-mono text-[11px] text-fog"
-					>
-						{formatCodebaseSyncBadge(status?.fileCount ?? manifestFileCount)}
-					</span>
+					<div className="flex shrink-0 items-center gap-2">
+						<button
+							type="button"
+							data-testid="codebase-resync-action"
+							onClick={() => void startSession("retry")}
+							disabled={isStarting}
+							className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2.5 font-mono text-[11px] text-fog transition hover:text-snow disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							<RefreshCw size={12} aria-hidden />
+							{isStarting ? "Menyiapkan..." : "Sync ulang"}
+						</button>
+						<span
+							data-testid="codebase-sync-badge"
+							className="shrink-0 rounded-md border border-graphite bg-obsidian px-2.5 py-1 font-mono text-[11px] text-fog"
+						>
+							{formatCodebaseSyncBadge(status?.fileCount ?? manifestFileCount)}
+						</span>
+					</div>
 				</header>
 				{error && (
 					<div
@@ -2375,6 +2404,62 @@ function CodebaseDetailPage() {
 						</button>
 					</div>
 				)}
+				{payload ? (
+					// Re-sync of the SAME codebase: the server minted a new session for
+					// this existing repository, so the CLI uploads a new snapshot while
+					// every feature plan and its artifacts stay attached. The panel is
+					// dismissed once the CLI reports a new usable snapshot.
+					<div
+						data-testid="codebase-resync-panel"
+						className="shrink-0 border-b border-graphite bg-obsidian px-4 py-3"
+					>
+						<div className="flex flex-wrap items-start justify-between gap-3">
+							<div className="min-w-0">
+								<p className="text-xs font-semibold text-snow">
+									Sync ulang repository
+								</p>
+								<p className="mt-1 text-[11px] leading-5 text-fog">
+									Jalankan perintah berikut dari root repository lokal. Planning
+									yang sudah ada tetap tersimpan dan tetap terhubung ke project
+									yang sama.
+								</p>
+							</div>
+							<button
+								type="button"
+								onClick={() => setPayload(null)}
+								className="min-h-8 shrink-0 rounded-md border border-graphite px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								Tutup
+							</button>
+						</div>
+						<div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
+							<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
+								{buildAgentPrompt(payload, { projectName: codebase.name })}
+							</code>
+							<button
+								type="button"
+								aria-label="Salin perintah sync ulang"
+								onClick={() => {
+									void navigator.clipboard
+										?.writeText(
+											buildAgentPrompt(payload, { projectName: codebase.name }),
+										)
+										.catch(() => {});
+								}}
+								className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								<Copy size={11} aria-hidden />
+								Salin
+							</button>
+						</div>
+						{status ? (
+							<p className="mt-2 font-mono text-[10.5px] text-slate">
+								Status sync: {status.status}
+								{status.snapshotId ? ` · snapshot ${status.snapshotId}` : ""}
+							</p>
+						) : null}
+					</div>
+				) : null}
 				<div className="min-h-0 flex-1">
 					<CodebaseWorkspaceShell
 						canvasOpen={canvasOpen}
