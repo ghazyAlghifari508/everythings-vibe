@@ -2,7 +2,6 @@ import {
 	AlertCircle,
 	Check,
 	Copy,
-	Loader2,
 	Monitor,
 	RotateCcw,
 	Smartphone,
@@ -10,7 +9,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import type { StudioFrameRow } from "@/db/schema";
 import { extractCleanHtml } from "@/lib/clean-html";
-import { StudioFrameSkeleton } from "./studio-frame-skeleton";
+import { StudioFrameShimmer } from "./studio-frame-shimmer";
 
 export interface StudioFrameProps {
 	frame: StudioFrameRow;
@@ -20,6 +19,22 @@ export interface StudioFrameProps {
 	isCanvasPanning?: boolean;
 	className?: string;
 	onMeasure?: (id: string, width: number, height: number) => void;
+}
+
+/**
+ * Whether the frame's artboard is still waiting for its real visual. This is
+ * the single source of truth for the shimmer lifecycle: queued and generating
+ * frames shimmer, a frame with HTML but no displayable preview keeps
+ * shimmering, and a frame whose preview failed must not shimmer at all.
+ */
+export function isFrameVisualPending(
+	status: string,
+	hasVisual: boolean,
+	hasVisualError: boolean,
+): boolean {
+	if (status === "failed") return false;
+	if (status === "ready") return !hasVisual && !hasVisualError;
+	return true;
 }
 
 export function StudioFrame({
@@ -137,16 +152,25 @@ export function StudioFrame({
 
 					{/* Generation Status Indicator */}
 					{frame.status === "generating" && (
-						<span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-medium text-indigo-400">
-							<Loader2 size={10} className="animate-spin" aria-hidden />
-							<span>Menggenerate...</span>
+						<span className="inline-flex items-center rounded-full bg-graphite/40 px-2 py-0.5 text-[10px] font-medium text-fog">
+							<span>Menggenerate</span>
 						</span>
 					)}
 					{frame.status === "queued" && (
 						<span className="inline-flex items-center rounded-full bg-graphite/40 px-2 py-0.5 text-[10px] font-medium text-fog">
-							Menunggu
+							<span>Menunggu</span>
 						</span>
 					)}
+					{frame.status === "ready" &&
+						isFrameVisualPending(
+							"ready",
+							visual !== null,
+							Boolean(visualError),
+						) && (
+							<span className="inline-flex items-center rounded-full bg-graphite/40 px-2 py-0.5 text-[10px] font-medium text-fog">
+								<span>Menyiapkan pratinjau</span>
+							</span>
+						)}
 					{frame.status === "failed" && (
 						<span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-400">
 							<AlertCircle size={10} aria-hidden />
@@ -197,7 +221,7 @@ export function StudioFrame({
 			{/* Frame Content Box */}
 			<div
 				className={`relative overflow-hidden transition-all ${
-					isMobile ? "rounded-[24px]" : "rounded-xl"
+					isMobile ? "rounded-lg" : "rounded-xl"
 				} border ${
 					isSelected
 						? "border-blue-600 outline-2 outline-offset-2 outline-blue-600"
@@ -222,27 +246,26 @@ export function StudioFrame({
 								height={visual.height}
 								alt={`Desain ${frame.name}`}
 								draggable={false}
-								className="size-full pointer-events-none"
+								className="size-full object-contain pointer-events-none"
 								onError={() => setVisualError("Gambar frame gagal dimuat.")}
 							/>
 						</button>
-					) : (
+					) : visualError ? (
 						<div className="flex size-full flex-col items-center justify-center gap-3 p-6 text-sm text-fog">
-							{visualError ? (
-								<>
-									<p role="alert">{visualError}</p>
-									<button
-										type="button"
-										onClick={() => setVisualAttempt((attempt) => attempt + 1)}
-										className="rounded border border-iron px-3 py-2 text-snow"
-									>
-										Coba lagi visual
-									</button>
-								</>
-							) : (
-								<span>Menyiapkan visual {frame.name}…</span>
-							)}
+							<p role="alert">{visualError}</p>
+							<button
+								type="button"
+								onClick={() => setVisualAttempt((attempt) => attempt + 1)}
+								className="rounded border border-iron px-3 py-2 text-snow"
+							>
+								Coba lagi visual
+							</button>
 						</div>
+					) : (
+						<StudioFrameShimmer
+							viewport={frame.viewport}
+							status={frame.status}
+						/>
 					)
 				) : frame.status === "failed" ? (
 					<div className="flex size-full flex-col items-center justify-center gap-3 p-6 text-center">
@@ -272,12 +295,7 @@ export function StudioFrame({
 						)}
 					</div>
 				) : (
-					<StudioFrameSkeleton
-						name={frame.name}
-						description={frame.description}
-						viewport={frame.viewport}
-						status={frame.status}
-					/>
+					<StudioFrameShimmer viewport={frame.viewport} status={frame.status} />
 				)}
 			</div>
 		</article>

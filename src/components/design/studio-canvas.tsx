@@ -1,10 +1,4 @@
-import {
-	AlertCircle,
-	Hand,
-	Loader2,
-	MousePointer2,
-	RotateCcw,
-} from "lucide-react";
+import { AlertCircle, Hand, MousePointer2, RotateCcw } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { getCanvasDotStyle } from "@/components/task/whiteboard-canvas";
 import { ZoomControls } from "@/components/task/zoom-controls";
@@ -211,42 +205,40 @@ export const StudioCanvas = memo(function StudioCanvas({
 						/>
 					))
 				) : activeJob?.status === "failed" ? (
-					<div className="flex h-96 w-96 flex-col items-center justify-center rounded-2xl border border-dashed border-red-500/40 bg-charcoal/60 p-8 text-center gap-3">
-						<div className="flex size-10 items-center justify-center rounded-full bg-red-500/10 text-red-400">
-							<AlertCircle size={20} />
-						</div>
-						<div className="space-y-1">
+					// Planning failed: the canvas stays clean and the recovery
+					// action sits inside the canvas surface itself.
+					<div className="flex w-80 flex-col items-start gap-3 rounded-xl border border-graphite bg-obsidian p-5 text-left">
+						<div className="flex items-center gap-2">
+							<AlertCircle size={16} className="text-crimson" aria-hidden />
 							<p className="text-sm font-semibold text-snow">
-								Perencanaan Layar Gagal
-							</p>
-							<p className="text-xs text-fog max-w-xs">
-								{activeJob?.error ||
-									"AI tidak dapat menyusun rencana layar untuk topik ini."}
+								Perencanaan layar gagal
 							</p>
 						</div>
+						<p className="text-xs leading-5 text-fog">
+							{activeJob?.error ||
+								"AI tidak dapat menyusun rencana layar untuk topik ini."}
+						</p>
 						{onRetryPlanning && (
 							<button
 								type="button"
 								onClick={onRetryPlanning}
-								className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-graphite bg-onyx px-4 py-1.5 text-xs font-semibold text-snow hover:bg-charcoal transition-colors cursor-pointer"
+								className="inline-flex items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-steel"
 							>
-								<RotateCcw size={13} />
-								<span>Coba Lagi Perencanaan</span>
+								<RotateCcw size={13} aria-hidden />
+								<span>Coba lagi</span>
 							</button>
 						)}
 					</div>
-				) : (
-					<div className="flex h-96 w-96 flex-col items-center justify-center rounded-2xl border border-dashed border-graphite bg-charcoal/50 p-8 text-center gap-2">
-						<Loader2 size={24} className="animate-spin text-indigo-400" />
-						<p className="text-sm font-semibold text-snow">
-							Menyiapkan Kanvas...
-						</p>
-						<p className="mt-1 text-xs text-fog">
-							Layar sedang direncanakan oleh AI.
-						</p>
-					</div>
-				)}
+				) : null}
 			</div>
+
+			{/* Understated, factual state readout: derived only from persisted job
+			    status, never from a timer or an invented stage sequence. */}
+			{frames.length === 0 && activeJob?.status === "planning" && (
+				<p className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full border border-graphite bg-obsidian px-3 py-1 text-[11px] text-fog">
+					Menyusun rencana layar
+				</p>
+			)}
 
 			{/* Floating Canvas Zoom Controls (Bottom Right) */}
 			<div

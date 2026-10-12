@@ -97,7 +97,44 @@ describe("StudioCanvas", () => {
 		expect(onSelectFrame).toHaveBeenCalledTimes(2);
 	});
 
-	it("renders planning failure state with retry button when activeJob failed", () => {
+	it("renders a clean, navigable canvas with no oversized loading card while planning", () => {
+		const planningJob = {
+			id: "j-2",
+			projectId: "p-1",
+			userId: "u-1",
+			prompt: "Test",
+			jobType: "initial",
+			targetFrameId: null,
+			status: "planning",
+			error: null,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		};
+
+		const { container } = render(
+			<StudioCanvas
+				project={mockProject}
+				frames={[]}
+				activeJob={planningJob}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+
+		// The removed loading block and its copy must not come back.
+		expect(screen.queryByText(/Menyiapkan Kanvas/i)).toBeNull();
+		expect(screen.queryByText(/Layar sedang direncanakan oleh AI/i)).toBeNull();
+		// No placeholder frame may be fabricated before real frames exist.
+		expect(container.querySelector('[data-testid$="-shimmer"]')).toBeNull();
+		// The canvas surface and its controls stay available immediately.
+		expect(screen.getByTestId("studio-canvas")).toBeDefined();
+		expect(screen.getByRole("button", { name: "Cursor" })).toBeDefined();
+		expect(screen.getByRole("button", { name: "Hand" })).toBeDefined();
+		expect(screen.getByRole("button", { name: /Perbesar/i })).toBeDefined();
+		// One honest, factual status line derived from the persisted job.
+		expect(screen.getByText("Menyusun rencana layar")).toBeDefined();
+	});
+
+	it("renders planning failure state with a retry action when activeJob failed", () => {
 		const onRetryPlanning = vi.fn();
 		const failedJob = {
 			id: "j-1",
@@ -121,11 +158,11 @@ describe("StudioCanvas", () => {
 			/>,
 		);
 
-		expect(screen.getByText("Perencanaan Layar Gagal")).toBeDefined();
+		expect(screen.getByText("Perencanaan layar gagal")).toBeDefined();
 		expect(screen.getByText("AI rate limit reached")).toBeDefined();
 
 		const retryBtn = screen.getByRole("button", {
-			name: /Coba Lagi Perencanaan/i,
+			name: /Coba lagi/i,
 		});
 		fireEvent.click(retryBtn);
 		expect(onRetryPlanning).toHaveBeenCalled();
