@@ -8,10 +8,12 @@ import type {
 	StudioProjectRow,
 } from "@/db/schema";
 import {
+	STUDIO_CANVAS_MAX_ZOOM,
+	STUDIO_CANVAS_MIN_ZOOM,
 	STUDIO_VISUAL_FALLBACK_HEIGHT,
 	STUDIO_VISUAL_WIDTH,
 } from "@/lib/constants";
-import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
+import { normalizeWheelDelta, useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import { StudioFrame } from "./studio-frame";
 
 export interface StudioCanvasProps {
@@ -53,8 +55,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 		nudgePan,
 		onWheel,
 	} = useCanvasZoom({
-		minZoom: 0.05,
-		maxZoom: 2.0,
+		minZoom: STUDIO_CANVAS_MIN_ZOOM,
+		maxZoom: STUDIO_CANVAS_MAX_ZOOM,
 		initialZoom: project.designMode === "mobile" ? 0.9 : 0.65,
 	});
 
@@ -95,10 +97,12 @@ export const StudioCanvas = memo(function StudioCanvas({
 			192;
 		const height = Math.max(...bounds.map((frame) => frame.height)) + 192;
 		const available = canvasRef.current.getBoundingClientRect();
-		const nextZoom = Math.max(
-			0.05,
-			Math.min(
-				2,
+		// Clamp through the shared setter so fit-to-content obeys the same
+		// canonical bounds as every other zoom entry point.
+		const nextZoom = Math.min(
+			STUDIO_CANVAS_MAX_ZOOM,
+			Math.max(
+				STUDIO_CANVAS_MIN_ZOOM,
 				Math.min(
 					available.width / width,
 					Math.max(100, available.height - 220) / height,
@@ -167,10 +171,16 @@ export const StudioCanvas = memo(function StudioCanvas({
 			onWheel={(event) => {
 				if (event.ctrlKey || event.metaKey) onWheel(event);
 				else
-					setPan((previous) => ({
-						x: previous.x - event.deltaX,
-						y: previous.y - event.deltaY,
-					}));
+					setPan((previous) => {
+						const deltaX = normalizeWheelDelta({
+							deltaY: event.deltaX,
+							deltaMode: event.deltaMode,
+						});
+						const deltaY = normalizeWheelDelta(event);
+						// Two-axis trackpad scrolling pans the board; it must not
+						// change the scale, which is reserved for ctrl/pinch.
+						return { x: previous.x - deltaX, y: previous.y - deltaY };
+					});
 			}}
 			onKeyDown={(e) => nudgePan(e.key)}
 			onClick={(e) => {
@@ -243,16 +253,19 @@ export const StudioCanvas = memo(function StudioCanvas({
 			</div>
 
 			{/* Understated, factual state readout: derived only from persisted job
-			    status, never from a timer or an invented stage sequence. */}
+			    status, never from a timer or an invented stage sequence. Kept in
+			    the bottom-left corner, clear of the composer and zoom controls. */}
 			{frames.length === 0 && activeJob?.status === "planning" && (
-				<p className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full border border-graphite bg-obsidian px-3 py-1 text-[11px] text-fog">
+				<p className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-full border border-graphite bg-obsidian px-3 py-1 text-[11px] text-fog">
 					Menyusun rencana layar
 				</p>
 			)}
 
-			{/* Floating Canvas Zoom Controls (Bottom Right) */}
+			{/* Floating tool palette: compact vertical toolbar on the right edge,
+			    vertically centred so it never overlaps the composer or the zoom
+			    controls at the bottom corner. */}
 			<div
-				className="absolute top-4 left-3 z-20 flex gap-1 rounded-lg border border-iron bg-obsidian p-1"
+				className="absolute top-1/2 right-3 z-20 flex -translate-y-1/2 flex-col gap-1 rounded-lg border border-iron bg-obsidian p-1"
 				onPointerDown={(event) => event.stopPropagation()}
 			>
 				<button
@@ -261,9 +274,9 @@ export const StudioCanvas = memo(function StudioCanvas({
 					aria-label="Cursor"
 					aria-pressed={tool === "select"}
 					onClick={() => setTool("select")}
-					className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 ${tool === "select" ? "bg-steel" : "hover:bg-steel"}`}
+					className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow ${tool === "select" ? "bg-steel" : "hover:bg-steel"}`}
 				>
-					<MousePointer2 size={18} />
+					<MousePointer2 size={18} aria-hidden />
 				</button>
 				<button
 					type="button"
@@ -271,12 +284,15 @@ export const StudioCanvas = memo(function StudioCanvas({
 					aria-label="Hand"
 					aria-pressed={tool === "hand"}
 					onClick={() => setTool("hand")}
-					className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 ${tool === "hand" ? "bg-steel" : "hover:bg-steel"}`}
+					className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow ${tool === "hand" ? "bg-steel" : "hover:bg-steel"}`}
 				>
-					<Hand size={18} />
+					<Hand size={18} aria-hidden />
 				</button>
 			</div>
-			<div className="absolute top-4 right-3 z-20">
+
+			{/* Zoom controls live in the bottom-right corner, clear of the
+			    right-centre toolbar and the bottom-centre composer. */}
+			<div className="absolute right-3 bottom-3 z-20">
 				<ZoomControls
 					zoom={zoom}
 					onZoomIn={zoomIn}

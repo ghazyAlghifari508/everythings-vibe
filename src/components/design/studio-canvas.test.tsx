@@ -76,6 +76,97 @@ describe("StudioCanvas", () => {
 		expect(screen.getByRole("button", { name: /Perkecil/i })).toBeDefined();
 	});
 
+	it("places the cursor/hand tools at the right edge, vertically centred", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+
+		const cursor = screen.getByRole("button", { name: "Cursor" });
+		const hand = screen.getByRole("button", { name: "Hand" });
+		// Both tools live in one compact vertical group on the right edge.
+		const toolbar = cursor.parentElement;
+		expect(toolbar).toBe(hand.parentElement);
+		expect(toolbar?.className).toContain("right-3");
+		expect(toolbar?.className).toContain("top-1/2");
+		expect(toolbar?.className).toContain("-translate-y-1/2");
+		expect(toolbar?.className).toContain("flex-col");
+		// Cursor stays on top of the group.
+		expect(
+			cursor.compareDocumentPosition(hand) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+	});
+
+	it("places the zoom controls in the bottom-right corner", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+
+		const zoomOut = screen.getByRole("button", { name: /Perkecil/i });
+		// The positioning wrapper is the element that anchors the group.
+		const group = zoomOut.parentElement?.parentElement;
+		expect(group?.className).toContain("bottom-3");
+		expect(group?.className).toContain("right-3");
+		// The tools must not share the zoom group's anchor.
+		const cursorToolbar = screen.getByRole("button", {
+			name: "Cursor",
+		}).parentElement;
+		expect(cursorToolbar?.className).not.toContain("bottom-3");
+	});
+
+	it("provides active/inactive tool state and shortcuts in tooltips", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+
+		const cursor = screen.getByRole("button", { name: "Cursor" });
+		const hand = screen.getByRole("button", { name: "Hand" });
+		expect(cursor.getAttribute("aria-pressed")).toBe("true");
+		expect(hand.getAttribute("aria-pressed")).toBe("false");
+		expect(cursor.getAttribute("title")).toContain("V");
+		expect(hand.getAttribute("title")).toContain("H");
+
+		fireEvent.click(hand);
+		expect(hand.getAttribute("aria-pressed")).toBe("true");
+		expect(cursor.getAttribute("aria-pressed")).toBe("false");
+	});
+
+	it("does not let the V/H shortcuts fire while typing in an input", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+
+		const input = document.createElement("textarea");
+		document.body.appendChild(input);
+		input.focus();
+		fireEvent.keyDown(input, { key: "h" });
+		expect(
+			screen
+				.getByRole("button", { name: "Cursor" })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+		input.remove();
+	});
+
 	it("calls onSelectFrame when clicking a frame", () => {
 		const onSelectFrame = vi.fn();
 		render(
