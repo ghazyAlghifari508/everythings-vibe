@@ -4,6 +4,9 @@ import { GET, POST } from "./studio.project";
 const duplicate = vi.hoisted(() =>
 	vi.fn(async () => ({ id: "independent-project" })),
 );
+const remove = vi.hoisted(() =>
+	vi.fn(async (projectId: string) => ({ id: projectId })),
+);
 
 vi.mock("@/lib/session", () => ({
 	requireUser: async () => ({ id: "user-123", email: "test@example.com" }),
@@ -15,6 +18,7 @@ vi.mock("@tanstack/react-start/server", () => ({
 
 vi.mock("@/lib/services/studio-service", () => ({
 	duplicateStudioProject: duplicate,
+	deleteStudioProject: remove,
 	getStudioProjectDetail: async (id: string, _userId: string) => ({
 		project: { id, title: "Test Canvas", designMode: "mobile" },
 		frames: [
@@ -56,6 +60,38 @@ describe("GET /api/studio/project", () => {
 		expect(await response.json()).toEqual({ projectId: "independent-project" });
 		expect(duplicate).toHaveBeenCalledWith("source-project", "user-123");
 	});
+
+	it("deletes through the authenticated owner and reports the removed identifier", async () => {
+		const response = await POST({
+			request: new Request("https://app.test/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "delete",
+					projectId: "owned-project",
+				}),
+			}),
+		});
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({
+			deletedProjectId: "owned-project",
+		});
+		expect(remove).toHaveBeenCalledWith("owned-project", "user-123");
+	});
+
+	it("rejects a delete payload without a project id", async () => {
+		remove.mockClear();
+		const response = await POST({
+			request: new Request("https://app.test/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action: "delete" }),
+			}),
+		});
+		expect(response.status).toBe(400);
+		expect(remove).not.toHaveBeenCalled();
+	});
+
 	it("returns project detail with frames and active job", async () => {
 		const req = new Request("https://app.test/api/studio/project?id=proj-1");
 		const res = await GET({ request: req });

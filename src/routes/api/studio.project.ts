@@ -3,6 +3,7 @@ import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { ScrapeError } from "@/lib/design-errors";
 import {
+	deleteStudioProject,
 	duplicateStudioProject,
 	getStudioProjectDetail,
 	updateStudioDesignSystem,
@@ -12,11 +13,15 @@ import { requireUser } from "@/lib/session";
 function studioErrorResponse(error: unknown): Response {
 	console.error("[studio.project error]", error);
 	if (error instanceof ScrapeError) {
-		const isClientError =
-			error.code === "INVALID_URL" || error.code === "WEBSITE_BLOCKED";
+		// A missing project is a stale-reference signal, not a server fault: the
+		// client uses 404 to drop deleted projects from its polling loop.
+		const status =
+			error.code === "WEBSITE_BLOCKED" || error.code === "INVALID_URL"
+				? 404
+				: 500;
 		return Response.json(
 			{ error: error.message, code: error.code },
-			{ status: isClientError ? 404 : 500 },
+			{ status },
 		);
 	}
 	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message)) {
@@ -40,6 +45,10 @@ export const Route = createFileRoute("/api/studio/project")({
 const projectActionSchema = z.discriminatedUnion("action", [
 	z.object({
 		action: z.literal("duplicate"),
+		projectId: z.string().trim().min(1).max(200),
+	}),
+	z.object({
+		action: z.literal("delete"),
 		projectId: z.string().trim().min(1).max(200),
 	}),
 	z.object({
@@ -79,6 +88,10 @@ export async function POST({
 				parsed.data,
 			);
 			return Response.json({ project });
+		}
+		if (parsed.data.action === "delete") {
+			const deleted = await deleteStudioProject(parsed.data.projectId, user.id);
+			return Response.json({ deletedProjectId: deleted.id });
 		}
 		const project = await duplicateStudioProject(
 			parsed.data.projectId,

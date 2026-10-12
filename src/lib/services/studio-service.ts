@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertStudioAssetRow,
@@ -1166,6 +1166,67 @@ export async function listStudioProjects(
 		.limit(limit);
 }
 
+export async function deleteStudioProject(
+	projectId: string,
+	userId: string,
+): Promise<{ id: string }> {
+	return db.transaction(async (tx) => {
+		// Row lock serialises deletion against the background workers, which take
+		// the same project lock before persisting frame/revision output. Without
+		// it a worker could commit generated rows right after the delete and
+		// leave the project partially resurrected.
+		const [project] = await tx
+			.select({
+				id: studioProjects.id,
+				logoAssetId: studioProjects.logoAssetId,
+			})
+			.from(studioProjects)
+			.where(
+				and(
+					eq(studioProjects.id, projectId),
+					eq(studioProjects.userId, userId),
+				),
+			)
+			.for("update");
+		if (!project)
+			throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+
+		// Explicit child-first deletion: studio_assets.project_id carries no
+		// foreign key, so a cascade on studio_projects would orphan generated
+		// visual assets and the uploaded logo.
+		await tx
+			.delete(studioAssets)
+			.where(
+				and(
+					eq(studioAssets.userId, userId),
+					project.logoAssetId
+						? or(
+								eq(studioAssets.projectId, projectId),
+								eq(studioAssets.id, project.logoAssetId),
+							)
+						: eq(studioAssets.projectId, projectId),
+				),
+			);
+		await tx
+			.delete(studioRevisions)
+			.where(eq(studioRevisions.projectId, projectId));
+		await tx.delete(studioFrames).where(eq(studioFrames.projectId, projectId));
+		await tx.delete(studioJobs).where(eq(studioJobs.projectId, projectId));
+		const deleted = await tx
+			.delete(studioProjects)
+			.where(
+				and(
+					eq(studioProjects.id, projectId),
+					eq(studioProjects.userId, userId),
+				),
+			)
+			.returning({ id: studioProjects.id });
+		if (deleted.length === 0)
+			throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+		return { id: deleted[0].id };
+	});
+}
+
 export async function duplicateStudioProject(
 	projectId: string,
 	userId: string,
@@ -1615,6 +1676,7 @@ async function runStudioFrameOperation(job: StudioJobRow) {
 					eq(studioProjects.userId, job.userId),
 				),
 			)
+			.for("update")
 			.limit(1);
 		if (!project || !job.targetFrameId)
 			throw new ScrapeError(
