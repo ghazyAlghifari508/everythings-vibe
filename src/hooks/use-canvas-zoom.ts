@@ -227,8 +227,10 @@ export function useCanvasZoom({
 
 	// ponytail: no e.preventDefault(), causes passive listener warning.
 	// Canvas div uses touch-action: none + overflow-hidden to block native scroll.
+	// Typed against the fields it reads so a real WheelEvent and a test double
+	// are both accepted without a cast.
 	const onWheel = useCallback(
-		(e: React.WheelEvent) => {
+		(e: WheelLike) => {
 			const deltaPixels = normalizeWheelDelta(e);
 			const factor = wheelDeltaToZoomFactor(deltaPixels);
 			if (factor === 1) return;

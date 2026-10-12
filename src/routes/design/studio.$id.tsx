@@ -7,6 +7,7 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { AlertCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AttachedDesignReference } from "@/components/design/start-with-design-modal";
 import { StudioCanvas } from "@/components/design/studio-canvas";
 import {
 	StudioComposer,
@@ -14,7 +15,6 @@ import {
 } from "@/components/design/studio-composer";
 import { StudioDesignPicker } from "@/components/design/studio-design-picker";
 import { StudioHeader } from "@/components/design/studio-header";
-import { type AttachedDesignReference } from "@/components/design/start-with-design-modal";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -151,10 +151,6 @@ function StudioWorkspace({
 		}
 	}
 
-	const selectedFrame = useMemo(
-		() => frames.find((f) => f.id === selectedFrameId) ?? null,
-		[frames, selectedFrameId],
-	);
 	const selectFrame = useCallback((id: string | null, additive = false) => {
 		setSelectedFrameIds((previous) =>
 			id === null

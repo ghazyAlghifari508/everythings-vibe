@@ -10,6 +10,7 @@ import {
 import {
 	normalizeWheelDelta,
 	useCanvasZoom,
+	type WheelLike,
 	wheelDeltaToZoomFactor,
 } from "./use-canvas-zoom";
 
@@ -196,13 +197,8 @@ function fakeWheel(
 	deltaMode = 0,
 	clientX = 100,
 	clientY = 100,
-) {
-	return {
-		deltaY,
-		deltaMode,
-		clientX,
-		clientY,
-	} as unknown as React.WheelEvent;
+): WheelLike {
+	return { deltaY, deltaMode, clientX, clientY };
 }
 
 describe("useCanvasZoom wheel normalization", () => {
