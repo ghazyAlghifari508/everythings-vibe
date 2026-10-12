@@ -64,7 +64,9 @@ describe("CrawlResult async page arrival", () => {
 		const { rerender } = render(
 			<CrawlResult pages={[]} sourceUrl="https://example.test/" />,
 		);
-		expect(screen.getByText(/belum ada halaman/i)).toBeDefined();
+		expect(
+			screen.getAllByText(/belum ada halaman/i).length,
+		).toBeGreaterThanOrEqual(1);
 
 		const pages = [
 			page("a", "https://example.test/a", "First"),
@@ -123,8 +125,9 @@ describe("CrawlResult async page arrival", () => {
 		];
 		render(<CrawlResult pages={pages} sourceUrl="https://example.test/" />);
 
-		// A page without a title is labelled by pathname in the Visual Sitemap.
-		fireEvent.click(screen.getAllByRole("button", { name: "/b" })[0]);
+		// A page without a title is labelled by pathname in the Visual Sitemap
+		// (graph buttons append status for screen readers, so match substring).
+		fireEvent.click(screen.getAllByRole("button", { name: /\/b/ })[0]);
 		expect(screen.getByText("https://example.test/b body text")).toBeDefined();
 	});
 

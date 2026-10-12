@@ -70,6 +70,7 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 			preview,
 			designMd: scrape.document?.designMd ?? "",
 			metadata: scrape.metadata,
+			request: scrape.request ?? null,
 			capturedAt:
 				scrape.metadata &&
 				typeof scrape.metadata === "object" &&
@@ -217,6 +218,36 @@ function ScrapeDetailPage() {
 
 	const contentWidth = resolveScrapeContentWidth(view, mode);
 
+	const polledRequest =
+		data && typeof data === "object" && "request" in data
+			? (data.request ?? null)
+			: null;
+	const initialRequest =
+		"request" in initial ? (initial.request ?? null) : null;
+	const crawlRequest = polledRequest ?? initialRequest;
+	const crawlScope =
+		crawlRequest &&
+		typeof crawlRequest === "object" &&
+		"mode" in crawlRequest &&
+		crawlRequest.mode === "crawl" &&
+		"settings" in crawlRequest &&
+		crawlRequest.settings &&
+		typeof crawlRequest.settings === "object"
+			? {
+					maxPages: crawlRequest.settings.maxPages,
+					maxDepth: crawlRequest.settings.maxDepth,
+					followSubdomains: crawlRequest.settings.followSubdomains,
+					urlRegex: crawlRequest.settings.urlRegex,
+				}
+			: undefined;
+	const capturedAt =
+		(data?.metadata &&
+		typeof data.metadata === "object" &&
+		"capturedAt" in data.metadata &&
+		typeof data.metadata.capturedAt === "string"
+			? data.metadata.capturedAt
+			: null) ?? initial.capturedAt;
+
 	return (
 		<main
 			className={`flex w-full flex-col gap-6 py-10 sm:py-14 ${
@@ -257,7 +288,13 @@ function ScrapeDetailPage() {
 			{mode === "crawl" &&
 			(currentStatus === "completed" ||
 				(currentStatus === "failed" && pages.length > 0)) ? (
-				<CrawlResult pages={pages} sourceUrl={sourceUrl} />
+				<CrawlResult
+					pages={pages}
+					sourceUrl={sourceUrl}
+					scope={crawlScope}
+					capturedAt={capturedAt ?? undefined}
+					domain={domain}
+				/>
 			) : mode === "images" &&
 				(currentStatus === "completed" ||
 					(currentStatus === "failed" && images.length > 0) ||
