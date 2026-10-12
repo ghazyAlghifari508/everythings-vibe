@@ -58,6 +58,9 @@ describe("scrape asset capability route", () => {
 		}));
 		const deps = {
 			secret,
+			requireUser: vi.fn(async () => {
+				throw new Error("Unauthorized");
+			}),
 			getCapabilityOwner: vi.fn(async (scrapeId: string) => ({
 				ownerId: scrapeId === "scrape-1" ? claims.ownerId : "other-owner",
 				active: scrapeId === "scrape-1",

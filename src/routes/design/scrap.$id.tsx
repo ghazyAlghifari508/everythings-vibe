@@ -1,7 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+﻿import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { ArrowLeft } from "lucide-react";
+import { useEffect } from "react";
+import { CrawlResult } from "@/components/design/crawl-result";
 import { DesignResult } from "@/components/design/design-result";
+import { ImagesResult } from "@/components/design/images-result";
+import { ScrapeBackLink } from "@/components/design/scrape-back-link";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
 import {
@@ -9,22 +12,30 @@ import {
 	resolveScrapeView,
 } from "@/components/design/scrape-view-state";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
+import { useScrapePreview } from "@/hooks/use-scrape-preview";
 import {
 	toScrapeStatusSnapshot,
 	useScrapeStatus,
 } from "@/hooks/use-scrape-status";
+import { parseScrapeReturnSearch } from "@/lib/scrape-return-path";
 import { requireUserServer } from "@/lib/session";
 
 export const loadScrapeDetail = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
 	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
-		const { getScrapeById } = await import("@/lib/services/scrape-service");
-		const scrape = await getScrapeById(id, user.id);
-		const { buildPreviewSrcDoc } = await import("@/lib/preview-capabilities");
-		const { SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS } = await import(
-			"@/lib/constants"
+		const { getScrapeById, getScrapeResults } = await import(
+			"@/lib/services/scrape-service"
 		);
+		const scrape = await getScrapeById(id, user.id);
+		const mode = (scrape.mode ?? "design") as ScrapeMode;
+		const { pages, images: imageRows } = await getScrapeResults(
+			id,
+			user.id,
+			mode,
+		);
+		const { attachImageAssetUrls } = await import("@/lib/preview-capabilities");
+		const images = attachImageAssetUrls(imageRows, id, user.id);
 		let appOrigin = "http://localhost:3000";
 		try {
 			const { getRequestHeaders, getRequestUrl } = await import(
@@ -41,18 +52,14 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 		} catch {
 			// Fallback when called outside of start server request context
 		}
-		const previewHtml = scrape.previewHtml ?? "";
-		const previewSrcDoc =
-			scrape.status === "completed" && scrape.mode === "html"
-				? buildPreviewSrcDoc(scrape.html ?? "", {
-						baseUrl: scrape.sourceUrl,
-						appOrigin,
-						scrapeId: scrape.id,
-						ownerId: user.id,
-						expiresAt: Date.now() + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS,
-					})
-				: previewHtml;
+		const { buildScrapePreviewDocument } = await import(
+			"@/lib/scrape-preview-document"
+		);
+		const previewHtml = scrape.html ?? scrape.previewHtml ?? "";
+		const preview = buildScrapePreviewDocument(scrape, user.id, appOrigin);
 		return {
+			pages,
+			images,
 			id: scrape.id,
 			sourceUrl: scrape.sourceUrl,
 			domain: scrape.domain,
@@ -60,7 +67,7 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 			status: scrape.status,
 			mode: scrape.mode,
 			previewHtml,
-			previewSrcDoc,
+			preview,
 			designMd: scrape.document?.designMd ?? "",
 			metadata: scrape.metadata,
 			capturedAt:
@@ -77,6 +84,7 @@ export const Route = createFileRoute("/design/scrap/$id")({
 	head: () => ({
 		meta: [{ title: "Hasil Scrape | VibeDesign" }],
 	}),
+	validateSearch: (search) => parseScrapeReturnSearch(search),
 	loader: async ({ params }) => {
 		try {
 			return await loadScrapeDetail({ data: params.id });
@@ -99,14 +107,17 @@ export const Route = createFileRoute("/design/scrap/$id")({
 });
 
 function ScrapeDetailPage() {
+	const router = useRouter();
 	const initial = Route.useLoaderData();
 	const { id } = Route.useParams();
+	const { from } = Route.useSearch();
 
 	const {
 		data,
 		status: polledStatus,
 		isRetrying,
 		retry,
+		error: requestError,
 	} = useScrapeStatus(id, {
 		initialData: initial
 			? toScrapeStatusSnapshot({
@@ -120,6 +131,13 @@ function ScrapeDetailPage() {
 				})
 			: null,
 	});
+	useEffect(() => {
+		if (
+			(polledStatus === "completed" || polledStatus === "failed") &&
+			initial.status !== polledStatus
+		)
+			void router.invalidate();
+	}, [polledStatus, initial.status, router]);
 
 	if (!initial) throw new Error("NOT_FOUND");
 
@@ -131,18 +149,36 @@ function ScrapeDetailPage() {
 		"design") as ScrapeMode;
 	const sourceUrl = data?.sourceUrl ?? initial.sourceUrl;
 	const domain = data?.domain ?? initial.domain;
-	const previewSrcDoc = initial.previewSrcDoc;
-	const previewHtml = data?.previewHtml ?? initial.previewHtml;
+	const previewHtml =
+		(data && "html" in data ? data.html : null) ?? initial.previewHtml;
 	const designMd = data?.document?.designMd ?? initial.designMd;
+
+	const isHtmlResult = mode === "html";
+	const {
+		preview,
+		state: previewState,
+		error: previewError,
+		retry: retryPreview,
+	} = useScrapePreview(id, {
+		status: currentStatus,
+		enabled: isHtmlResult,
+		initialPreview: initial.preview ?? null,
+	});
+	const previewSrcDoc = preview?.srcDoc ?? "";
 
 	const metadata = (data?.metadata ?? initial.metadata) as Record<
 		string,
 		unknown
 	> | null;
+	// Polled results win so rows persisted after the initial load appear without
+	// a reload; the loader snapshot only seeds the first render.
+	const pages = data?.pages ?? initial.pages;
+	const images = data?.images ?? initial.images;
 	const errorMessage =
-		metadata && typeof metadata === "object" && "errorMessage" in metadata
+		requestError ??
+		(metadata && typeof metadata === "object" && "errorMessage" in metadata
 			? String(metadata.errorMessage)
-			: null;
+			: null);
 	const stageStartedAt =
 		metadata &&
 		typeof metadata === "object" &&
@@ -172,7 +208,7 @@ function ScrapeDetailPage() {
 		designMd,
 	});
 
-	const contentWidth = resolveScrapeContentWidth(view);
+	const contentWidth = resolveScrapeContentWidth(view, mode);
 
 	return (
 		<main
@@ -182,27 +218,74 @@ function ScrapeDetailPage() {
 					: "mx-auto max-w-5xl px-4 sm:px-6"
 			}`}
 		>
-			<Link
-				to="/design/scrap"
-				className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-fog transition-colors hover:text-snow"
-			>
-				<ArrowLeft size={16} aria-hidden />
-				Kembali ke scraper
-			</Link>
-			{view === "result-design" ? (
+			<ScrapeBackLink from={from} />
+			{currentStatus === "failed" &&
+				(mode === "crawl" || mode === "images") && (
+					<ScrapeProgress
+						mode={mode}
+						status={currentStatus}
+						sourceUrl={sourceUrl}
+						domain={domain}
+						errorMessage={errorMessage}
+						isRetrying={isRetrying}
+						onRetry={retry}
+						partialResults={
+							mode === "crawl"
+								? pages.filter((page) => page.status === "completed").length
+								: images.filter((image) => image.status === "completed").length
+						}
+					/>
+				)}
+			{mode === "crawl" &&
+			(currentStatus === "completed" ||
+				(currentStatus === "failed" && pages.length > 0)) ? (
+				<CrawlResult pages={pages} sourceUrl={sourceUrl} />
+			) : mode === "images" &&
+				(currentStatus === "completed" ||
+					(currentStatus === "failed" && images.length > 0)) ? (
+				<ImagesResult
+					images={images}
+					sourceUrl={sourceUrl}
+					imageOutcome={data?.metadata?.imageOutcome ?? null}
+				/>
+			) : view === "result-design" ? (
 				<DesignResult
 					sourceUrl={sourceUrl}
 					domain={domain}
 					designMd={designMd}
+					visualEvidence={metadata?.visualEvidence}
 				/>
 			) : view === "result-html" ? (
 				<ScrapeDetail
+					sourceUrl={sourceUrl}
+					title={initial.title}
 					domain={domain}
 					previewHtml={previewHtml}
 					previewSrcDoc={previewSrcDoc}
+					previewState={previewState}
+					previewError={previewError}
+					onRetryPreview={() => void retryPreview()}
 				/>
-			) : (
+			) : currentStatus === "failed" &&
+				(mode === "crawl" || mode === "images") ? null : (
 				<ScrapeProgress
+					workerHealth={data?.metadata?.workerHealth}
+					imageDiscovery={data?.metadata?.imageDiscovery ?? null}
+					imageOutcome={data?.metadata?.imageOutcome ?? null}
+					completedPages={data?.metadata?.completedPages}
+					skippedPages={data?.metadata?.skippedPages}
+					discoveredImages={data?.metadata?.discoveredImages}
+					savedImages={data?.metadata?.savedImages}
+					failedResources={data?.metadata?.failedResources}
+					visitedPages={
+						data?.metadata?.visitedPages ?? initial.metadata?.visitedPages
+					}
+					discoveredPages={
+						data?.metadata?.discoveredPages ?? initial.metadata?.discoveredPages
+					}
+					processedImages={
+						data?.metadata?.processedImages ?? initial.metadata?.processedImages
+					}
 					mode={mode}
 					status={currentStatus}
 					sourceUrl={sourceUrl}

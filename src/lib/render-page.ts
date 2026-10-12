@@ -1,19 +1,37 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { type Browser, type BrowserContext, chromium } from "playwright";
+import type { ScrapeMode } from "@/db/schema";
 import {
 	SCRAPE_BROWSER_UA,
 	SCRAPE_DESKTOP_HEIGHT,
 	SCRAPE_DESKTOP_WIDTH,
 	SCRAPE_MAX_HTML_BYTES,
 } from "@/lib/constants";
-import { ScrapeError } from "@/lib/design-errors";
+import {
+	designErrorCodeForHttpStatus,
+	parseRetryAfterSeconds,
+	ScrapeError,
+} from "@/lib/design-errors";
+import {
+	DESIGN_EVIDENCE_LIMITS,
+	visualEvidenceSchema,
+} from "@/lib/design-evidence-contract";
+import {
+	collectVisualEvidence,
+	type VisualEvidence,
+} from "@/lib/design-visual-evidence";
 import { fetchAsset } from "@/lib/fetch-html";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { isPrivateIp } from "@/lib/url-validator";
+import { SCRAPE_LIMITS } from "./scrape-contract";
 
 export interface RenderPageOptions extends ScrapeInstrumentation {
-	mode?: "design" | "html";
+	mode?: ScrapeMode;
+	waitMs?: number;
+	measureResolution?: boolean;
+	includeIframes?: boolean;
+	signal?: AbortSignal;
 }
 
 export const DESKTOP_VIEWPORT = {
@@ -30,9 +48,91 @@ const AUTO_SCROLL_DELAY_MS = 100;
 const AUTO_SCROLL_MAX_STEPS = 60;
 const AUTO_SCROLL_STABLE_STEPS = 2;
 const MIN_ANALYZABLE_HTML_BYTES = 200;
+// Text shorter than this cannot carry a rendered page, so it is treated as
+// absent rather than as content.
+const MIN_VISIBLE_TEXT_CHARS = 12;
 const BLOCK_HOSTS = new Set(["localhost", "ip6-localhost", "ip6-loopback"]);
 
+const SCRIPTISH_BLOCK =
+	/<(script|style|noscript|template|svg)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+const COMMENT_BLOCK = /<!--[\s\S]*?-->/g;
+const TAG = /<[^>]*>/g;
+const EMBEDDED_MEDIA =
+	/<(img|picture|video|audio|canvas|iframe|embed|object|source)\b/i;
+// A CSS background image is rendered content even when the element has no text.
+const CSS_BACKGROUND_URL = /background(?:-image)?\s*:[^;"']*url\(/i;
+
+export type HtmlCaptureReason = "ok" | "too-small" | "no-meaningful-content";
+
+export interface HtmlCaptureAssessment {
+	bytes: number;
+	hasMeaningfulContent: boolean;
+	reason: HtmlCaptureReason;
+}
+
+// Distinguishes a syntactically valid HTML document from one that actually
+// rendered something a reader could see. Byte length alone cannot tell the two
+// apart: an empty application shell is comfortably over any size threshold yet
+// contains no visible content, while a short page can be perfectly valid.
+// Content presence is therefore the primary signal, and byte length only
+// classifies why a document was rejected.
+export function assessHtmlCapture(html: string): HtmlCaptureAssessment {
+	const bytes = Buffer.byteLength(html, "utf8");
+	const markup = html.replace(COMMENT_BLOCK, "").replace(SCRIPTISH_BLOCK, "");
+	const text = markup
+		.replace(TAG, " ")
+		.replace(/&[a-z#0-9]+;/gi, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (text.length >= MIN_VISIBLE_TEXT_CHARS)
+		return { bytes, hasMeaningfulContent: true, reason: "ok" };
+	if (EMBEDDED_MEDIA.test(markup) || CSS_BACKGROUND_URL.test(markup))
+		return { bytes, hasMeaningfulContent: true, reason: "ok" };
+	return {
+		bytes,
+		hasMeaningfulContent: false,
+		reason:
+			bytes < MIN_ANALYZABLE_HTML_BYTES ? "too-small" : "no-meaningful-content",
+	};
+}
+
+export function htmlCaptureFailureMessage(
+	assessment: HtmlCaptureAssessment,
+): string {
+	if (assessment.reason === "too-small")
+		return "Halaman mengembalikan dokumen yang jauh lebih kecil dari satu halaman HTML utuh.";
+	return "Halaman merender dokumen HTML tanpa konten yang dapat dilihat. Capture tidak dianggap berhasil.";
+}
+
 let browserPromise: Promise<Browser> | null = null;
+
+// Functions passed to page.evaluate/addInitScript are serialized with
+// Function.prototype.toString and re-parsed inside the browser. The tsx dev
+// worker loads this module through esbuild with keepNames enabled, which wraps
+// every inner function binding in a `__name(...)` helper call that only exists
+// in the Node module scope. Without this shim the browser throws
+// "ReferenceError: __name is not defined" and the whole capture aborts.
+export const BROWSER_NAME_SHIM =
+	"if (typeof globalThis.__name !== 'function') globalThis.__name = (value) => value;";
+
+// Distinguishes upstream HTTP outcomes so the UI can name the real cause
+// instead of reporting every failure as an unverifiable website block.
+export function httpStatusMessage(
+	status: number,
+	retryAfterSeconds?: number,
+): string {
+	if (status === 429)
+		return retryAfterSeconds === undefined
+			? "Website membatasi jumlah permintaan (HTTP 429). Capture tidak dijalankan ulang agar tidak menambah beban situs."
+			: `Website membatasi jumlah permintaan (HTTP 429) dan meminta menunggu sekitar ${retryAfterSeconds} detik sebelum permintaan berikutnya.`;
+	if (status === 401 || status === 403)
+		return `Website menolak akses otomatis (HTTP ${status}). Halaman ini memerlukan akses resmi sehingga tidak dapat dipakai sebagai evidence.`;
+	if (status === 404 || status === 410)
+		return `Website membalas HTTP ${status}. Halaman tidak ditemukan.`;
+	if (status >= 500)
+		return `Website membalas HTTP ${status} dari sisi server situs. Coba lagi setelah situs pulih.`;
+	return `Website membalas HTTP ${status}. Capture tidak dapat dipakai sebagai evidence.`;
+}
 
 async function getBrowser(): Promise<Browser> {
 	if (!browserPromise) {
@@ -93,6 +193,9 @@ export async function isBlockedRequestUrl(raw: string): Promise<boolean> {
 }
 
 export async function guardContext(context: BrowserContext): Promise<void> {
+	let requests = 0;
+	let transferredBytes = 0;
+	await context.addInitScript({ content: BROWSER_NAME_SHIM });
 	await context.addInitScript(() => {
 		class BlockedWebSocket extends EventTarget {
 			static CONNECTING = 0;
@@ -152,6 +255,12 @@ export async function guardContext(context: BrowserContext): Promise<void> {
 		});
 	});
 	await context.route("**/*", async (route) => {
+		requests += 1;
+		if (
+			requests > SCRAPE_LIMITS.captureMaxRequests ||
+			transferredBytes >= SCRAPE_LIMITS.captureMaxBytes
+		)
+			return route.abort();
 		const req = route.request();
 		const method = req.method();
 		if (method !== "GET" && method !== "HEAD") return route.abort();
@@ -159,6 +268,9 @@ export async function guardContext(context: BrowserContext): Promise<void> {
 		if (await isBlockedRequestUrl(req.url())) return route.abort();
 		try {
 			const { body, status, contentType } = await fetchAsset(req.url());
+			transferredBytes += body.byteLength;
+			if (transferredBytes > SCRAPE_LIMITS.captureMaxBytes)
+				return route.abort();
 			return route.fulfill({
 				status,
 				body: method === "HEAD" ? undefined : body,
@@ -223,6 +335,16 @@ export interface RenderedPage {
 	html: string;
 	status: number;
 	finalUrl: string;
+	images?: RenderedImage[];
+	visualEvidence?: VisualEvidence;
+}
+
+export interface RenderedImage {
+	url: string;
+	alt: string | null;
+	width: number | null;
+	height: number | null;
+	source: string;
 }
 
 export async function closeRenderBrowser(): Promise<void> {
@@ -246,11 +368,17 @@ export async function renderPage(
 		ignoreHTTPSErrors: true,
 		serviceWorkers: "block",
 	});
+	const abortCapture = () => {
+		void context.close().catch(() => {});
+	};
+	options.signal?.addEventListener("abort", abortCapture, { once: true });
 	try {
+		if (options.signal?.aborted) throw new ScrapeError("FETCH_TIMEOUT");
 		await guardContext(context);
 		const page = await context.newPage();
 		onTiming?.("browserContext", Date.now() - setupStart);
 		let status = 0;
+		let retryAfterHeader: string | undefined;
 		try {
 			await onActivity?.("Membuka website");
 			const navStart = Date.now();
@@ -260,6 +388,7 @@ export async function renderPage(
 			});
 			onTiming?.("navigation", Date.now() - navStart);
 			status = res?.status() ?? 0;
+			retryAfterHeader = res?.headers()["retry-after"];
 			await onActivity?.("Halaman berhasil dimuat");
 			await onActivity?.("Menunggu resource halaman");
 			let t = Date.now();
@@ -286,19 +415,213 @@ export async function renderPage(
 			if (err instanceof ScrapeError) throw err;
 		}
 		const contentStart = Date.now();
-		const html = (await page.content().catch(() => "")).slice(
-			0,
-			SCRAPE_MAX_HTML_BYTES,
-		);
+		if (status >= 400) {
+			const retryAfterSeconds = parseRetryAfterSeconds(retryAfterHeader);
+			throw new ScrapeError(
+				designErrorCodeForHttpStatus(status),
+				httpStatusMessage(status, retryAfterSeconds),
+				{ retryAfterSeconds },
+			);
+		}
+		if (status === 0 && /^https?:/i.test(url))
+			throw new ScrapeError(
+				"FETCH_TIMEOUT",
+				"Tidak ada respons HTTP halaman yang dapat diverifikasi.",
+			);
+		if (options.waitMs)
+			await page.waitForTimeout(Math.min(options.waitMs, SCRAPE_LIMITS.waitMs));
+		const images =
+			mode === "images"
+				? await page.evaluate(
+						({ measure, limits }) => {
+							const result: {
+								url: string;
+								alt: string | null;
+								width: number | null;
+								height: number | null;
+								source: string;
+							}[] = [];
+							const seen = new Set<string>();
+							const add = (
+								raw: string,
+								source: string,
+								alt: string | null = null,
+								width: number | null = null,
+								height: number | null = null,
+							) => {
+								try {
+									const url = new URL(raw, document.baseURI);
+									if (
+										!["http:", "https:"].includes(url.protocol) ||
+										url.username ||
+										url.password ||
+										result.length >= limits.imageCandidates ||
+										seen.has(`${url.href}:${source}`)
+									)
+										return;
+									seen.add(`${url.href}:${source}`);
+									result.push({ url: url.href, source, alt, width, height });
+								} catch {
+									return;
+								}
+							};
+							for (const element of [...document.querySelectorAll("*")].slice(
+								0,
+								limits.domScanElements,
+							)) {
+								if (element instanceof HTMLImageElement) {
+									add(
+										element.currentSrc || element.src,
+										"img",
+										element.alt || null,
+										measure && element.naturalWidth
+											? element.naturalWidth
+											: null,
+										measure && element.naturalHeight
+											? element.naturalHeight
+											: null,
+									);
+									for (const attr of [
+										"data-src",
+										"data-original",
+										"data-lazy-src",
+									]) {
+										const value = element.getAttribute(attr);
+										if (value) add(value, attr, element.alt || null);
+									}
+								}
+								for (const match of (
+									element.getAttribute("srcset") ?? ""
+								).split(",")) {
+									const value = match.trim().split(/\s+/)[0];
+									if (value) add(value, "srcset");
+								}
+								for (const match of getComputedStyle(
+									element,
+								).backgroundImage.matchAll(/url\(["']?([^"')]+)["']?\)/g))
+									add(match[1], "background");
+								if (
+									element instanceof HTMLLinkElement &&
+									/icon/i.test(element.rel)
+								)
+									add(element.href, "icon");
+							}
+							return result;
+						},
+						{
+							measure: options.measureResolution ?? true,
+							limits: SCRAPE_LIMITS,
+						},
+					)
+				: undefined;
+		if (images && options.measureResolution !== false) {
+			for (const image of images
+				.filter((candidate) => !candidate.width)
+				.slice(0, SCRAPE_LIMITS.imageMeasurementCount)) {
+				const dimensions = await page.evaluate(
+					async ({ url, timeoutMs }) => {
+						const image = new Image();
+						return new Promise<{ width: number; height: number } | null>(
+							(resolve) => {
+								const timer = setTimeout(() => {
+									image.src = "";
+									resolve(null);
+								}, timeoutMs);
+								image.onload = () => {
+									clearTimeout(timer);
+									resolve(
+										image.naturalWidth && image.naturalHeight
+											? {
+													width: image.naturalWidth,
+													height: image.naturalHeight,
+												}
+											: null,
+									);
+								};
+								image.onerror = () => {
+									clearTimeout(timer);
+									resolve(null);
+								};
+								image.src = url;
+							},
+						);
+					},
+					{
+						url: image.url,
+						timeoutMs: SCRAPE_LIMITS.imageMeasurementTimeoutMs,
+					},
+				);
+				if (dimensions) {
+					image.width = dimensions.width;
+					image.height = dimensions.height;
+				}
+			}
+		}
+		let html = await page.content().catch(() => "");
+		if (options.includeIframes) {
+			const origin = new URL(page.url()).origin;
+			let capturedFrames = 0;
+			for (const frame of page.frames().slice(1, SCRAPE_LIMITS.maxFrames + 1)) {
+				if (capturedFrames >= SCRAPE_LIMITS.maxFrames) break;
+				try {
+					if (new URL(frame.url()).origin !== origin) {
+						await onActivity?.("Iframe cross-origin dilewati");
+						continue;
+					}
+					const content = await frame.content();
+					if (Buffer.byteLength(content) > SCRAPE_MAX_HTML_BYTES / 10) {
+						await onActivity?.("Iframe terlalu besar dilewati");
+						continue;
+					}
+					const element = await frame.frameElement();
+					const original = await element.evaluate((node) =>
+						node instanceof Element ? node.outerHTML : "",
+					);
+					if (original) {
+						const escaped = content
+							.replace(/&/g, "&amp;")
+							.replace(/"/g, "&quot;")
+							.replace(/</g, "&lt;");
+						const captured = original
+							.replace(
+								/\s(?:src|srcdoc)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
+								"",
+							)
+							.replace(/<iframe\b/i, `<iframe srcdoc="${escaped}"`);
+						html = html.replace(original, captured);
+					}
+					capturedFrames += 1;
+				} catch {
+					await onActivity?.("Iframe tidak dapat diakses, dilewati");
+				}
+			}
+		} else if (mode === "html")
+			html = html.replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe\s*>/gi, "");
+		if (Buffer.byteLength(html) > SCRAPE_MAX_HTML_BYTES)
+			throw new ScrapeError("NO_ANALYZABLE_CONTENT", "HTML terlalu besar.");
 		onTiming?.("pageContent", Date.now() - contentStart);
 		if (mode === "design") await onActivity?.("Capture halaman selesai");
-		if (!html || html.length < MIN_ANALYZABLE_HTML_BYTES)
+		const assessment = assessHtmlCapture(html);
+		if (!assessment.hasMeaningfulContent)
 			throw new ScrapeError(
 				"NO_ANALYZABLE_CONTENT",
-				"Sistem tidak menemukan konten yang cukup untuk dianalisis.",
+				htmlCaptureFailureMessage(assessment),
 			);
-		return { html, status: status || 200, finalUrl: page.url() };
+		const visualEvidence =
+			mode === "design"
+				? visualEvidenceSchema.parse(
+						await page.evaluate(collectVisualEvidence, DESIGN_EVIDENCE_LIMITS),
+					)
+				: undefined;
+		return {
+			html,
+			status: status || 200,
+			finalUrl: page.url(),
+			images,
+			visualEvidence,
+		};
 	} finally {
+		options.signal?.removeEventListener("abort", abortCapture);
 		await context.close();
 	}
 }

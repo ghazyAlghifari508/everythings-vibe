@@ -13,6 +13,7 @@ import {
 	SCRAPE_MAX_STYLESHEETS,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
+import type { VisualEvidence } from "@/lib/design-visual-evidence";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { rewritePreviewAssets } from "./preview-html";
 import { validateUrl } from "./url-validator";
@@ -28,6 +29,7 @@ export interface ScrapeViewport {
 }
 
 export interface ScrapeCaptureMetadata {
+	visualEvidence?: VisualEvidence;
 	attempt: number;
 	capturedAt: string;
 	finalUrl: string;
@@ -68,6 +70,7 @@ function responseContentType(res: http.IncomingMessage): string {
 }
 
 export interface FetchAssetOptions {
+	allowUrl?: (url: string) => boolean | Promise<boolean>;
 	signal?: AbortSignal;
 	maxBytes?: number;
 	range?: { start: number; end?: number; suffixLength?: number };
@@ -87,6 +90,11 @@ export async function fetchAsset(
 	redirects = 0,
 	options: FetchAssetOptions = {},
 ): Promise<FetchedAsset> {
+	if (options.allowUrl && !(await options.allowUrl(rawUrl)))
+		throw new ScrapeError(
+			"PRIVATE_URL_BLOCKED",
+			"URL di luar scope yang diizinkan.",
+		);
 	const maxBytes = Math.min(
 		options.maxBytes ?? SCRAPE_MAX_ASSET_BYTES,
 		SCRAPE_MAX_ASSET_BYTES,
@@ -252,7 +260,12 @@ export async function fetchHtml(
 export async function scrapeHtml(
 	rawUrl: string,
 	attemptNumber = 1,
-	instrumentation?: ScrapeInstrumentation & { mode?: ScrapeMode },
+	instrumentation?: ScrapeInstrumentation & {
+		mode?: ScrapeMode;
+		waitMs?: number;
+		includeIframes?: boolean;
+		signal?: AbortSignal;
+	},
 ): Promise<ScrapeCapture> {
 	const { url } = await validateUrl(rawUrl);
 	const { renderPage } = await import("./render-page");
@@ -278,6 +291,7 @@ export async function scrapeHtml(
 		domain,
 		title: extractPageTitle(rendered.html),
 		metadata: {
+			visualEvidence: rendered.visualEvidence,
 			attempt: attemptNumber,
 			capturedAt,
 			finalUrl: rendered.finalUrl,

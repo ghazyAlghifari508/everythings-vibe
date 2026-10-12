@@ -8,6 +8,9 @@ export interface DesignMdSourcePanelProps {
 	designMd: string;
 	domain: string;
 	onImplementAgent: () => void;
+	// Mirrors the inspector: an archived document is still available, but it is
+	// labelled as an archive instead of capture-verified output.
+	inspectorSource?: "observed" | "unverified";
 	className?: string;
 }
 
@@ -44,6 +47,7 @@ export function DesignMdSourcePanel({
 	designMd,
 	domain,
 	onImplementAgent,
+	inspectorSource = "observed",
 	className,
 }: DesignMdSourcePanelProps) {
 	const [notice, setNotice] = useState("");
@@ -97,8 +101,15 @@ export function DesignMdSourcePanel({
 			className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-graphite bg-charcoal ${className ?? ""}`}
 		>
 			<div className="flex flex-wrap items-center justify-between gap-2 border-b border-graphite bg-charcoal px-3 py-2">
-				<span className="truncate font-mono text-xs font-semibold text-mist">
-					DESIGN.md
+				<span className="flex min-w-0 items-baseline gap-2">
+					<span className="truncate font-mono text-xs font-semibold text-mist">
+						DESIGN.md
+					</span>
+					<span className="truncate text-xs text-fog">
+						{inspectorSource === "observed"
+							? "Sesuai evidence browser"
+							: "Arsip: belum terverifikasi terhadap evidence"}
+					</span>
 				</span>
 				<div className="flex shrink-0 flex-wrap items-center gap-1">
 					<button

@@ -47,6 +47,8 @@ export function formatTimeAgo(dateString: string): string {
 }
 
 function modeLabel(mode?: ScrapeMode): string {
+	if (mode === "crawl") return "Crawl";
+	if (mode === "images") return "Images";
 	return mode === "html" ? "HTML" : "DESIGN.md";
 }
 
@@ -133,6 +135,7 @@ export function ScrapeHistoryList({
 							<Link
 								to="/design/scrap/$id"
 								params={{ id: item.id }}
+								search={{ from: "/design/scrap/history" }}
 								className="flex min-w-0 flex-1 flex-col gap-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 							>
 								<span className="truncate text-sm font-semibold text-snow">

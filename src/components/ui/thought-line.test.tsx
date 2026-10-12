@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen } from "@testing-library/react";
+import { MotionConfig } from "framer-motion";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThoughtLine } from "./thought-line";
 
@@ -14,94 +16,114 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-const HINTS = ["hint-first", "hint-second", "hint-third"];
+const STEPS = ["step-one", "step-two", "step-three"];
 
-function renderRotating(
+function renderLine(
 	props: Partial<React.ComponentProps<typeof ThoughtLine>> = {},
+	wrapper?: (children: ReactNode) => ReactNode,
 ) {
-	return render(
+	const line = (
 		<ThoughtLine
 			working
 			label="ScrapeLabel"
 			doneLabel="ScrapeLabel selesai"
-			presentation="rotating"
-			rotatingMessages={HINTS}
 			{...props}
-		/>,
+		/>
 	);
+	return render(wrapper ? wrapper(line) : line);
 }
 
-describe("ThoughtLine default presentation", () => {
-	it("keeps stacked behavior: renders the vertical steps list", () => {
-		const { container } = render(
-			<ThoughtLine
-				working
-				label="Menyusun PRD"
-				steps={["step-one", "step-two", "step-three"]}
-				activeStep={1}
-			/>,
+function hasAttr(element: Element | null, attribute: string): boolean {
+	return element?.hasAttribute(attribute) ?? false;
+}
+
+describe("ThoughtLine work reporting", () => {
+	it("reports the supplied real activity verbatim and never invents text", () => {
+		renderLine({ activity: "Membuka website" });
+		const working = document.querySelector(
+			'[data-active=""].thought-line__text',
 		);
-		expect(container.querySelectorAll("li").length).toBe(3);
+		expect(working?.textContent).toBe("Membuka website");
+		expect(document.body.textContent).not.toMatch(/menganalisis|reasoning/i);
+	});
+
+	it("keeps the last honest label when no activity detail exists", () => {
+		renderLine({ activity: null });
+		const working = document.querySelector(
+			'[data-active=""].thought-line__text',
+		);
+		expect(working?.textContent).toBe("ScrapeLabel");
+	});
+
+	it("never rotates between invented messages on a timer", () => {
+		renderLine({ activity: "Mengambil halaman" });
+		const before = document.querySelector(
+			'[data-active=""].thought-line__text',
+		)?.textContent;
+		act(() => {
+			vi.advanceTimersByTime(30_000);
+		});
 		expect(
-			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
-		).toBeNull();
+			document.querySelector('[data-active=""].thought-line__text')
+				?.textContent,
+		).toBe(before);
 	});
 });
 
-describe("ThoughtLine bare presentation", () => {
-	it("renders the activity line without the header row", () => {
-		const { container } = render(
-			<ThoughtLine
-				working
-				label="ScrapeLabel"
-				doneLabel="ScrapeLabel selesai"
-				presentation="rotating"
-				rotatingMessages={HINTS}
-				bare
-			/>,
-		);
-		expect(screen.getAllByRole("status").length).toBe(1);
-		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
-		).toContain(HINTS[0]);
-		expect(container.querySelector('[role="timer"]')?.textContent).toBe("0.0s");
-		expect(container.querySelectorAll("ol, ul, li").length).toBe(0);
-	});
-
-	it("advances the bare line over time and empties it on settle", () => {
-		const { container, rerender } = render(
-			<ThoughtLine
-				working
-				label="ScrapeLabel"
-				doneLabel="ScrapeLabel selesai"
-				presentation="rotating"
-				rotatingMessages={HINTS}
-				bare
-			/>,
-		);
-		act(() => {
-			vi.advanceTimersByTime(3200);
+describe("ThoughtLine settle contract", () => {
+	it("cross-fades to the done label and freezes the measured timer", () => {
+		const { rerender, container } = renderLine({
+			activity: "Membuka website",
 		});
-		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
-		).toContain(HINTS[1]);
+		act(() => {
+			vi.advanceTimersByTime(1500);
+		});
 		rerender(
 			<ThoughtLine
 				working={false}
 				label="ScrapeLabel"
 				doneLabel="ScrapeLabel selesai"
-				presentation="rotating"
-				rotatingMessages={HINTS}
-				bare
+				activity="Membuka website"
 			/>,
 		);
-		expect(
-			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
-		).toBeNull();
+		expect(container.textContent).toContain("ScrapeLabel selesai");
+		const frozen = container.querySelector('[role="timer"]')?.textContent ?? "";
 		act(() => {
-			vi.advanceTimersByTime(10000);
+			vi.advanceTimersByTime(10_000);
 		});
-		expect(container.textContent).toBe("");
+		expect(container.querySelector('[role="timer"]')?.textContent).toBe(frozen);
+	});
+
+	it("fires onSettle once with the measured elapsed seconds", () => {
+		const onSettle = vi.fn();
+		const { rerender } = renderLine({ onSettle });
+		act(() => {
+			vi.advanceTimersByTime(2400);
+		});
+		rerender(
+			<ThoughtLine
+				working={false}
+				label="ScrapeLabel"
+				doneLabel="ScrapeLabel selesai"
+				onSettle={onSettle}
+			/>,
+		);
+		expect(onSettle).toHaveBeenCalledTimes(1);
+		expect(onSettle.mock.calls[0]?.[0]).toBeGreaterThanOrEqual(2);
+	});
+
+	it("measures elapsed time from the real stage start, not from mount", () => {
+		const startedAt = new Date(Date.now() - 14_000);
+		const { container } = renderLine({ startedAt });
+		act(() => {
+			vi.advanceTimersByTime(600);
+		});
+		const seconds = Number.parseFloat(
+			container.querySelector('[role="timer"]')?.textContent ?? "",
+		);
+		expect(Number.isFinite(seconds)).toBe(true);
+		expect(seconds).toBeGreaterThanOrEqual(14);
+		expect(seconds).toBeLessThan(20);
 	});
 });
 
@@ -118,7 +140,9 @@ describe("ThoughtLine settled outcome", () => {
 		);
 		// 18.4s is the measured duration, not the time since mount.
 		expect(container.textContent).toContain("PRD selesai");
-		expect(container.querySelector('[role="timer"]')?.textContent).toBe("18.4s");
+		expect(container.querySelector('[role="timer"]')?.textContent).toBe(
+			"18.4s",
+		);
 	});
 
 	it("renders the failed state instead of a completed checkmark", () => {
@@ -133,9 +157,43 @@ describe("ThoughtLine settled outcome", () => {
 				finishedAt={2_500}
 			/>,
 		);
-		expect(container.textContent).toContain("Gagal menyusun Acceptance Criteria");
+		expect(container.textContent).toContain(
+			"Gagal menyusun Acceptance Criteria",
+		);
 		expect(container.textContent).not.toContain("Acceptance Criteria selesai");
 		expect(container.querySelector('[role="timer"]')?.textContent).toBe("2.5s");
+	});
+
+	it("marks the failed line so the failure is visible, not just worded", () => {
+		const { container } = render(
+			<ThoughtLine
+				working={false}
+				failed
+				label="Menyusun PRD"
+				doneLabel="PRD selesai"
+				failedLabel="Gagal menyusun PRD"
+			/>,
+		);
+		expect(
+			hasAttr(container.querySelector(".thought-line"), "data-failed"),
+		).toBe(true);
+		expect(
+			hasAttr(container.querySelector(".thought-line__glyph"), "data-failed"),
+		).toBe(true);
+	});
+
+	it("keeps a working line out of the failed state even when the flag is set", () => {
+		const { container } = render(
+			<ThoughtLine
+				working
+				failed
+				label="Menyusun PRD"
+				doneLabel="PRD selesai"
+			/>,
+		);
+		expect(
+			hasAttr(container.querySelector(".thought-line"), "data-failed"),
+		).toBe(false);
 	});
 
 	it("shows the model's real streamed reasoning verbatim", () => {
@@ -157,179 +215,74 @@ describe("ThoughtLine settled outcome", () => {
 	});
 });
 
-describe("ThoughtLine rotation stability", () => {
-	it("keeps rotating across equivalent rerenders without restarting the cycle", () => {
-		const renderRotatingClone = () =>
-			render(
-				<ThoughtLine
-					working
-					label="ScrapeLabel"
-					doneLabel="ScrapeLabel selesai"
-					presentation="rotating"
-					rotatingMessages={[...HINTS]}
-					rotationKey="generating"
-				/>,
-			);
-		const { rerender } = renderRotatingClone();
-		const rerenderClone = () =>
-			rerender(
-				<ThoughtLine
-					working
-					label="ScrapeLabel"
-					doneLabel="ScrapeLabel selesai"
-					presentation="rotating"
-					rotatingMessages={[...HINTS]}
-					rotationKey="generating"
-				/>,
-			);
-		act(() => {
-			vi.advanceTimersByTime(1000);
-		});
-		rerenderClone();
-		act(() => {
-			vi.advanceTimersByTime(1000);
-		});
-		rerenderClone();
-		act(() => {
-			vi.advanceTimersByTime(1200);
-		});
+describe("ThoughtLine trace folding", () => {
+	it("renders the vertical step list and collapses it after settling", () => {
+		const { container, rerender } = renderLine({ steps: STEPS });
+		expect(container.querySelectorAll("li").length).toBe(3);
 		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
-		).toContain(HINTS[1]);
-		rerenderClone();
-		act(() => {
-			vi.advanceTimersByTime(3200);
-		});
-		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
-		).toContain(HINTS[2]);
-	});
-
-	it("renders no activity slot when work never starts", () => {
-		render(
+			hasAttr(container.querySelector(".thought-line__trace"), "data-open"),
+		).toBe(true);
+		rerender(
 			<ThoughtLine
 				working={false}
 				label="ScrapeLabel"
 				doneLabel="ScrapeLabel selesai"
-				presentation="rotating"
-				rotatingMessages={HINTS}
+				steps={STEPS}
 			/>,
 		);
 		expect(
-			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
-		).toBeNull();
+			hasAttr(container.querySelector(".thought-line__trace"), "data-open"),
+		).toBe(false);
+	});
+
+	it("tracks the real active step instead of assuming the last one", () => {
+		const { container } = renderLine({ steps: STEPS, activeStep: 1 });
+		const steps = container.querySelectorAll(".thought-line__step");
+		expect(hasAttr(steps[0] ?? null, "data-done")).toBe(true);
+		expect(hasAttr(steps[1] ?? null, "data-done")).toBe(false);
+		expect(steps[1]?.querySelector(".thought-line__pulse")).not.toBeNull();
+	});
+
+	it("renders no trace at all when there is no real step or reasoning data", () => {
+		const { container } = renderLine({});
+		expect(container.querySelector(".thought-line__trace")).toBeNull();
+		expect(screen.getByRole("status").textContent).toBe("ScrapeLabel");
+	});
+
+	it("shows model reasoning only when real thinking text is supplied", () => {
+		const { container } = renderLine({ thinkingText: "menimbang bukti" });
+		expect(container.textContent).toContain("Proses Berpikir Model");
+		expect(container.querySelector("pre")?.textContent).toBe("menimbang bukti");
 	});
 });
 
-describe("ThoughtLine rotating presentation", () => {
-	it("renders exactly one activity slot and never a vertical list", () => {
-		const { container } = renderRotating();
+describe("ThoughtLine presentation modes", () => {
+	it("renders a bare inline line without card chrome or a step list", () => {
+		const { container } = renderLine({
+			bare: true,
+			collapsible: false,
+			steps: STEPS,
+		});
+		expect(container.querySelector(".thought-line--card")).toBeNull();
 		expect(container.querySelectorAll("ol, ul, li").length).toBe(0);
-		const slot = screen.getByRole("status", { name: "Aktivitas berlangsung" });
-		expect(slot.textContent).toContain(HINTS[0]);
+		expect(container.querySelector('[role="timer"]')?.textContent).toBe("0.0s");
 	});
 
-	it("advances the single slot to the next message over time while working", () => {
-		renderRotating();
-		const slot = screen.getByRole("status", { name: "Aktivitas berlangsung" });
-		expect(slot.textContent).toContain(HINTS[0]);
-		act(() => {
-			vi.advanceTimersByTime(3200);
-		});
-		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
-		).toContain(HINTS[1]);
-		act(() => {
-			vi.advanceTimersByTime(3200);
-		});
-		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
-		).toContain(HINTS[2]);
+	it("keeps one accessible live region for screen readers", () => {
+		renderLine({ activity: "Memuat konten lazy-load" });
+		const statuses = screen.getAllByRole("status");
+		expect(statuses).toHaveLength(1);
+		expect(statuses[0]?.textContent).toBe("Memuat konten lazy-load");
 	});
 
-	it("restarts the message cycle when the rotation key changes", () => {
-		const { rerender } = renderRotating({ rotationKey: "capturing" });
-		act(() => {
-			vi.advanceTimersByTime(6400);
-		});
-		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
-		).toContain(HINTS[2]);
-		rerender(
-			<ThoughtLine
-				working
-				label="ScrapeLabel"
-				doneLabel="ScrapeLabel selesai"
-				presentation="rotating"
-				rotatingMessages={HINTS}
-				rotationKey="extracting"
-			/>,
+	it("renders without motion when the user prefers reduced motion", () => {
+		const { container } = renderLine(
+			{ activity: "Mengambil halaman" },
+			(line) => <MotionConfig reducedMotion="always">{line}</MotionConfig>,
 		);
 		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
-		).toContain(HINTS[0]);
-	});
-
-	it("stops rotation and freezes the timer once work settles", () => {
-		const { rerender, container } = renderRotating();
-		act(() => {
-			vi.advanceTimersByTime(1000);
-		});
-		const timer = container.querySelector('[role="timer"]');
-		const frozen = timer?.textContent;
-		rerender(
-			<ThoughtLine
-				working={false}
-				label="ScrapeLabel"
-				doneLabel="ScrapeLabel selesai"
-				presentation="rotating"
-				rotatingMessages={HINTS}
-			/>,
-		);
-		expect(
-			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
-		).toBeNull();
-		expect(screen.getByText(/ScrapeLabel selesai/i)).toBeDefined();
-		act(() => {
-			vi.advanceTimersByTime(10000);
-		});
-		expect(container.querySelector('[role="timer"]')?.textContent).toBe(frozen);
-		expect(container.querySelectorAll("ol, ul, li").length).toBe(0);
-	});
-
-	it("derives the elapsed timer from the supplied stage start instead of mount", () => {
-		const stageStart = Date.now() - 14_000;
-		const { container } = renderRotating({ startedAt: stageStart });
-		act(() => {
-			vi.advanceTimersByTime(600);
-		});
-		const text = container.querySelector('[role="timer"]')?.textContent ?? "";
-		const seconds = Number.parseFloat(text);
-		expect(Number.isFinite(seconds)).toBe(true);
-		expect(seconds).toBeGreaterThanOrEqual(14);
-		expect(seconds).toBeLessThan(20);
-	});
-
-	it("renders a valid single slot on the reduced-motion path", () => {
-		vi.stubGlobal("matchMedia", (query: string) => ({
-			matches: query.includes("reduce"),
-			media: query,
-			addEventListener: () => {},
-			removeEventListener: () => {},
-			addListener: () => {},
-			removeListener: () => {},
-			dispatchEvent: () => false,
-		}));
-		const { container } = renderRotating();
-		expect(container.querySelectorAll("ol, ul, li").length).toBe(0);
-		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
-		).toContain(HINTS[0]);
-		act(() => {
-			vi.advanceTimersByTime(3200);
-		});
-		expect(
-			screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent,
-		).toContain(HINTS[1]);
+			hasAttr(container.querySelector(".thought-line__breath"), "data-shimmer"),
+		).toBe(false);
+		expect(container.textContent).toContain("Mengambil halaman");
 	});
 });

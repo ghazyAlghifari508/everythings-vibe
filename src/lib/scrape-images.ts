@@ -1,0 +1,73 @@
+import type { ImageEvidence } from "@/db/schema";
+import type { RenderedImage } from "./render-page";
+
+// How a page-level image capture ended. Kept explicit so the UI never presents
+// a failed extraction as a successful empty result.
+export type ScrapeImageDiscovery =
+	| "found"
+	| "none"
+	| "capture-failed"
+	| "discovery-failed";
+export type ScrapeImageOutcome =
+	| "complete"
+	| "partial"
+	| "empty"
+	| "all-failed";
+
+// A page that genuinely has no images is a truthful result, while discovering
+// candidates that all failed verification is not. Collapsing both into
+// "completed" made the two indistinguishable to the user.
+export function classifyImageOutcome(
+	discovered: number,
+	verified: number,
+): ScrapeImageOutcome {
+	if (discovered === 0) return "empty";
+	if (verified === 0) return "all-failed";
+	if (verified < discovered) return "partial";
+	return "complete";
+}
+
+export interface DiscoveredImage {
+	url: string;
+	format: string | null;
+	width: number | null;
+	height: number | null;
+	classification: "icon" | "logo" | null;
+	evidence: ImageEvidence;
+}
+
+export function normalizeImageCandidates(
+	candidates: RenderedImage[],
+	classify: boolean,
+): DiscoveredImage[] {
+	const images = new Map<string, DiscoveredImage>();
+	for (const candidate of candidates) {
+		const existing = images.get(candidate.url);
+		const sources = [
+			...new Set([...(existing?.evidence.sources ?? []), candidate.source]),
+		];
+		const isIcon = classify && sources.includes("icon");
+		const alt = existing?.evidence.alt ?? candidate.alt;
+		const isLogo = classify && !!alt && /\blogo\b/i.test(alt);
+		images.set(candidate.url, {
+			url: candidate.url,
+			format:
+				new URL(candidate.url).pathname
+					.match(/\.(avif|webp|png|jpe?g|gif|svg|ico)$/i)?.[1]
+					?.toLowerCase() ?? null,
+			width: existing?.width ?? candidate.width,
+			height: existing?.height ?? candidate.height,
+			classification: isIcon ? "icon" : isLogo ? "logo" : null,
+			evidence: {
+				sources,
+				alt,
+				...(isIcon
+					? { classificationReason: "HTML link rel icon" }
+					: isLogo
+						? { classificationReason: "Image alt identifies logo" }
+						: {}),
+			},
+		});
+	}
+	return [...images.values()];
+}

@@ -246,6 +246,13 @@
       "when": 1791769929564,
       "tag": "0034_motionless_shooting_star",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791773044357,
+      "tag": "0035_dry_thunderbird",
+      "breakpoints": true
     }
   ]
 }

@@ -104,10 +104,12 @@ describe("DesignResult", () => {
 	it("pairs the visual inspector with the raw DESIGN.md source", () => {
 		const { container } = renderResult();
 		expect(screen.getByRole("heading", { name: /palet warna/i })).toBeDefined();
-		expect(screen.getByRole("heading", { name: /tipografi/i })).toBeDefined();
-		expect(screen.getByRole("heading", { name: /^font$/i })).toBeDefined();
+		expect(screen.getByRole("heading", { name: /type scale/i })).toBeDefined();
 		expect(
-			screen.getByRole("heading", { name: /spasi.*bentuk/i }),
+			screen.getByRole("heading", { name: /typeface inspector/i }),
+		).toBeDefined();
+		expect(
+			screen.getByRole("heading", { name: /spacing & bentuk/i }),
 		).toBeDefined();
 		expect(screen.getByRole("heading", { name: /panduan/i })).toBeDefined();
 		expect(screen.getByText("DESIGN.md")).toBeDefined();

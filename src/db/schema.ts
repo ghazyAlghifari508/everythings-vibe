@@ -22,6 +22,11 @@ import type {
 	CreditPricingVersion,
 } from "@/lib/adaptive-credit";
 import type { CodebaseNameSource } from "@/lib/codebase-library";
+import type { ScrapeRequest } from "@/lib/scrape-contract";
+import type {
+	ScrapeImageDiscovery,
+	ScrapeImageOutcome,
+} from "@/lib/scrape-images";
 
 // === TABLES ===
 // ponytail: RLS policies dropped - app-level ownership filters (eq(userId, user.id))
@@ -866,7 +871,7 @@ export const payments = pgTable(
 // === VIBEDESIGN TABLES ===
 // Scrapes (Opsi 1): user-owned URL captures. IDs and user_id are text to
 // match Better Auth users.id (uuid would cause PG type mismatch).
-export type ScrapeMode = "design" | "html";
+export type ScrapeMode = ScrapeRequest["mode"];
 
 export interface ScrapeMetadata {
 	attempt?: number;
@@ -884,7 +889,28 @@ export interface ScrapeMetadata {
 	timings?: Record<string, number>;
 	errorMessage?: string;
 	errorDetail?: string;
+	// Only set when the upstream website supplied a usable Retry-After signal.
+	retryAfterSeconds?: number;
+	// Tracks whether the optional AI reference summary was applied to a
+	// canonical, evidence-backed DESIGN.md.
+	aiEnrichment?: "applied" | "unavailable";
+	aiEnrichmentDetail?: string;
+	// Images mode: separates a page that truly has no images from a discovery
+	// or capture failure, and records how the verified resources ended up.
+	imageDiscovery?: ScrapeImageDiscovery;
+	imageOutcome?: ScrapeImageOutcome;
 	mode?: ScrapeMode;
+	visitedPages?: number;
+	discoveredPages?: number;
+	processedImages?: number;
+	discoveredImages?: number;
+	savedImages?: number;
+	completedPages?: number;
+	skippedPages?: number;
+	failedResources?: number;
+	idempotencyKey?: string;
+	workerHeartbeatAt?: string;
+	workerHealth?: string;
 }
 
 export type ScrapeStatus =
@@ -969,7 +995,7 @@ export const scrapes = pgTable(
 		sourceUrl: text("source_url").notNull(),
 		domain: text("domain").notNull(),
 		title: text("title"),
-		mode: text("mode", { enum: ["design", "html"] })
+		mode: text("mode", { enum: ["design", "html", "crawl", "images"] })
 			.notNull()
 			.default("design"),
 		status: text("status", {
@@ -988,6 +1014,10 @@ export const scrapes = pgTable(
 		html: text("html"),
 		previewHtml: text("preview_html"),
 		metadata: jsonb("metadata").$type<ScrapeMetadata>(),
+		request: jsonb("request").$type<ScrapeRequest>(),
+		jobToken: text("job_token"),
+		leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+		jobAttempts: integer("job_attempts").notNull().default(0),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -995,7 +1025,88 @@ export const scrapes = pgTable(
 			.defaultNow()
 			.notNull(),
 	},
-	(t) => [index("scrapes_user_id_idx").on(t.userId)],
+	(t) => [
+		index("scrapes_user_id_idx").on(t.userId),
+		index("scrapes_job_queue_idx").on(t.status, t.leaseExpiresAt, t.createdAt),
+	],
+);
+
+export interface CrawlPageContent {
+	outgoingPages?: string[];
+	description: string | null;
+	headings: string[];
+	text: string;
+	links: string[];
+	images: string[];
+	patterns: string[];
+}
+
+export const scrapePages = pgTable(
+	"scrape_pages",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		scrapeId: text("scrape_id")
+			.notNull()
+			.references(() => scrapes.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		url: text("url").notNull(),
+		parentUrl: text("parent_url"),
+		depth: integer("depth").notNull(),
+		status: text("status", {
+			enum: ["queued", "completed", "failed", "skipped"],
+		})
+			.notNull()
+			.default("queued"),
+		title: text("title"),
+		httpStatus: integer("http_status"),
+		content: jsonb("content").$type<CrawlPageContent>(),
+		error: text("error"),
+	},
+	(t) => [
+		uniqueIndex("scrape_pages_owner_url_idx").on(t.userId, t.scrapeId, t.url),
+	],
+);
+
+export interface ImageEvidence {
+	sources: string[];
+	alt: string | null;
+	classificationReason?: string;
+	dimensionError?: string;
+}
+
+export const scrapeImages = pgTable(
+	"scrape_images",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		scrapeId: text("scrape_id")
+			.notNull()
+			.references(() => scrapes.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		url: text("url").notNull(),
+		pageUrl: text("page_url").notNull(),
+		format: text("format"),
+		width: integer("width"),
+		height: integer("height"),
+		classification: text("classification", {
+			enum: ["logo", "icon", "illustration", "photograph", "screenshot"],
+		}),
+		evidence: jsonb("evidence").$type<ImageEvidence>().notNull(),
+		status: text("status", { enum: ["queued", "completed", "failed"] })
+			.notNull()
+			.default("queued"),
+		error: text("error"),
+	},
+	(t) => [
+		uniqueIndex("scrape_images_owner_url_idx").on(t.userId, t.scrapeId, t.url),
+	],
 );
 
 export const scrapeDocuments = pgTable(

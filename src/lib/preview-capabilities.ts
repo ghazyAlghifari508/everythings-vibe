@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { init as initModuleLexer, parse as parseModule } from "es-module-lexer";
 import {
 	SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS,
@@ -32,6 +32,7 @@ export interface PreviewRewriteOptions {
 	ownerId: string;
 	secret?: string;
 	expiresAt: number;
+	now?: number;
 }
 
 function canonicalTarget(value: string): string {
@@ -159,6 +160,7 @@ export function capabilityUrl(
 			expiresAt: options.expiresAt,
 		},
 		options.secret,
+		options.now,
 	);
 	const origin = new URL(options.appOrigin);
 	if (origin.protocol !== "https:" && origin.protocol !== "http:")
@@ -166,9 +168,32 @@ export function capabilityUrl(
 	return `${origin.origin}/api/scrape/asset?cap=${encodeURIComponent(token)}`;
 }
 
+// Attaches a freshly signed same-origin asset URL to every verified image row.
+// Both the detail loader and the status poll use this so polled results render
+// with the same credentials as the initial page load.
+export function attachImageAssetUrls<T extends { url: string }>(
+	images: T[],
+	scrapeId: string,
+	ownerId: string,
+	now = Date.now(),
+): (T & { assetUrl: string })[] {
+	const expiresAt = now + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS;
+	return images.map((image) => ({
+		...image,
+		assetUrl: `/api/scrape/asset?cap=${encodeURIComponent(
+			issuePreviewAssetCapability(
+				{ target: image.url, scrapeId, ownerId, expiresAt },
+				undefined,
+				now,
+			),
+		)}`,
+	}));
+}
+
 export function buildPreviewSrcDoc(
 	html: string,
 	options: PreviewRewriteOptions,
+	visualSnapshot = false,
 ): string {
 	const capabilities = new Map<string, string>();
 	const resolve = (target: string) => {
@@ -185,7 +210,25 @@ export function buildPreviewSrcDoc(
 		}
 		return capability;
 	};
-	return rewritePreviewAssets(html, options.baseUrl, resolve, capabilities);
+	const output = rewritePreviewAssets(
+		html,
+		options.baseUrl,
+		resolve,
+		capabilities,
+		visualSnapshot,
+	);
+	if (!visualSnapshot) return output;
+	const nonce = randomBytes(18).toString("base64");
+	const origin = new URL(options.appOrigin).origin;
+	const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline' ${origin}; img-src data: blob: ${origin}; font-src data: ${origin}; media-src data: ${origin}; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
+	const secured = output.replace(
+		"<script>(()=>{if(window.parent",
+		`<script nonce="${nonce}">(()=>{if(window.parent`,
+	);
+	const meta = `<meta http-equiv="Content-Security-Policy" content="${policy}">`;
+	return /<head[^>]*>/i.test(secured)
+		? secured.replace(/<head[^>]*>/i, (head) => `${head}${meta}`)
+		: `${meta}${secured}`;
 }
 
 export function rewritePreviewCss(

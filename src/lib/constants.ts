@@ -353,7 +353,14 @@ export const SCRAPE_ASSET_RATE_LIMIT = 1000;
 export const SCRAPE_ASSET_RATE_WINDOW_S = 60;
 export const SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS = 60 * 60 * 1000;
 export const SCRAPE_PREVIEW_ASSET_MAX_URL_CHARS = 4096;
+export const SCRAPE_PREVIEW_READY_PING_INTERVAL_MS = 250;
+export const SCRAPE_PREVIEW_READY_MAX_PINGS = 20;
+// A single "empty" report is provisional: layout can still settle after it.
+// The verdict is only treated as final after this many consecutive empty
+// observations, which keeps a slow first render from being mislabelled empty.
+export const SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS = 3;
 
+// === VibeDesign Studio bounds ===
 export const STUDIO_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;
 

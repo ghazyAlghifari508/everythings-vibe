@@ -1,4 +1,5 @@
-import { and, desc, eq } from "drizzle-orm";
+import { isDeepStrictEqual } from "node:util";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertScrapeDocumentRow,
@@ -9,15 +10,25 @@ import {
 	type ScrapeRow,
 	type ScrapeStatus,
 	scrapeDocuments,
-	scrapeProgressForStatus,
+	scrapeImages,
+	scrapePages,
 	scrapes,
+	users,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
-import { extractDesignFromHtml } from "@/lib/design-extraction";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
+import {
+	SCRAPE_LIMITS,
+	type ScrapeRequest,
+	scrapeRequestSchema,
+} from "@/lib/scrape-contract";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { parseAndValidateFormat } from "@/lib/url-validator";
+import {
+	type ScrapeJobClaim,
+	scrapeClaimPredicate,
+} from "./scrape-job-service";
 
 export interface ScrapeSummary {
 	id: string;
@@ -29,8 +40,24 @@ export interface ScrapeSummary {
 	createdAt: Date;
 }
 
+export type ScrapePageRow = typeof scrapePages.$inferSelect;
+export type ScrapeImageRow = typeof scrapeImages.$inferSelect;
+
+// A verified image row plus the same-origin signed URL used for preview and
+// download. Only rows whose resource passed verification reach the client.
+export type ScrapeImageResult = ScrapeImageRow & { assetUrl: string };
+
+// Persisted detail without signed asset URLs: signing needs request context, so
+// the API route and the detail loader attach them.
 export interface ScrapeDetail extends ScrapeRow {
 	document: ScrapeDocumentRow | null;
+	pages: ScrapePageRow[];
+	images: ScrapeImageRow[];
+}
+
+// Wire shape returned by the status poll and the detail loader.
+export interface ScrapeDetailPayload extends Omit<ScrapeDetail, "images"> {
+	images: ScrapeImageResult[];
 }
 
 function domainOf(sourceUrl: string): string {
@@ -41,6 +68,8 @@ export async function createScrape(
 	userId: string,
 	rawUrl: string,
 	mode: ScrapeMode = "design",
+	request?: ScrapeRequest,
+	idempotencyKey?: string,
 ): Promise<ScrapeRow> {
 	let normalized: string;
 	try {
@@ -50,30 +79,97 @@ export async function createScrape(
 		throw new ScrapeError("INVALID_URL");
 	}
 
-	const [pending] = await db
-		.insert(scrapes)
-		.values({
-			userId,
-			sourceUrl: normalized,
-			domain: domainOf(normalized),
-			mode,
-			status: "queued",
-			metadata: {
+	return db.transaction(async (tx) => {
+		const [owner] = await tx
+			.select({ id: users.id })
+			.from(users)
+			.where(eq(users.id, userId))
+			.for("update")
+			.limit(1);
+		if (!owner) throw new ScrapeError("STORAGE_FAILED");
+		if (idempotencyKey) {
+			const [replay] = await tx
+				.select()
+				.from(scrapes)
+				.where(
+					and(
+						eq(scrapes.userId, userId),
+						sql`${scrapes.metadata}->>'idempotencyKey' = ${idempotencyKey}`,
+					),
+				)
+				.limit(1);
+			if (replay) {
+				if (!isDeepStrictEqual(replay.request, request))
+					throw new ScrapeError(
+						"INVALID_URL",
+						"Request key sudah dipakai untuk parameter berbeda.",
+					);
+				return replay;
+			}
+		}
+		const validated =
+			request ?? scrapeRequestSchema.parse({ url: normalized, mode });
+		const { checkRateLimit } = await import("@/lib/rate-limit");
+		if (!(await checkRateLimit(userId, "free", "api_call")).allowed)
+			throw new ScrapeError(
+				"RATE_LIMITED",
+				"Batas request tercapai. Coba lagi setelah satu menit.",
+			);
+		const active = await tx
+			.select()
+			.from(scrapes)
+			.where(
+				and(
+					eq(scrapes.userId, userId),
+					inArray(scrapes.status, [
+						"queued",
+						"capturing",
+						"extracting",
+						"generating",
+						"saving",
+					]),
+				),
+			);
+		const existing = active.find(
+			(row) =>
+				row.sourceUrl === normalized &&
+				row.mode === mode &&
+				isDeepStrictEqual(row.request, validated),
+		);
+		if (existing) return existing;
+		if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
+			throw new ScrapeError(
+				"QUEUE_CAPACITY",
+				"Tunggu proses aktif selesai sebelum memulai ekstraksi baru.",
+			);
+		const [pending] = await tx
+			.insert(scrapes)
+			.values({
+				userId,
+				sourceUrl: normalized,
+				domain: domainOf(normalized),
 				mode,
-				stage: "queued",
-				progress: 0,
-				stageStartedAt: new Date().toISOString(),
-			},
-		} satisfies InsertScrapeRow)
-		.returning();
+				request: validated,
+				status: "queued",
+				metadata: {
+					mode,
+					idempotencyKey,
+					stage: "queued",
+					progress: 0,
+					stageStartedAt: new Date().toISOString(),
+				},
+			} satisfies InsertScrapeRow)
+			.returning();
 
-	if (!pending) throw new ScrapeError("STORAGE_FAILED");
-	return pending;
+		if (!pending) throw new ScrapeError("STORAGE_FAILED");
+		return pending;
+	});
 }
 
 export async function runScrapePipeline(
 	scrapeId: string,
 	userId: string,
+	claim?: ScrapeJobClaim,
 ): Promise<void> {
 	const [scrape] = await db
 		.select()
@@ -81,6 +177,10 @@ export async function runScrapePipeline(
 		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
 		.limit(1);
 	if (!scrape) return;
+	const writePredicate = () =>
+		claim
+			? scrapeClaimPredicate(claim)
+			: and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId));
 	const mode: ScrapeMode = (scrape.mode ??
 		scrape.metadata?.mode ??
 		"design") as ScrapeMode;
@@ -104,23 +204,32 @@ export async function runScrapePipeline(
 			...patch,
 			mode,
 			stage: status,
-			progress: scrapeProgressForStatus(status, mode),
+			progress: undefined,
 			stageStartedAt: new Date().toISOString(),
 		};
-		await db
+		const saved = await db
 			.update(scrapes)
 			.set({ status, metadata: meta, updatedAt: new Date(), ...columns })
-			.where(eq(scrapes.id, scrapeId));
+			.where(writePredicate())
+			.returning({ id: scrapes.id });
+		if (!saved.length)
+			throw new ScrapeError("STORAGE_FAILED", "Job lease sudah tidak berlaku.");
 	};
 
 	const timings: Record<string, number> = {};
 	const instrumentation: ScrapeInstrumentation = {
 		onActivity: async (activity) => {
 			meta = { ...meta, activity, activityStartedAt: new Date().toISOString() };
-			await db
+			const updated = await db
 				.update(scrapes)
 				.set({ metadata: meta, updatedAt: new Date() })
-				.where(eq(scrapes.id, scrapeId));
+				.where(writePredicate())
+				.returning({ id: scrapes.id });
+			if (!updated.length)
+				throw new ScrapeError(
+					"STORAGE_FAILED",
+					"Job lease sudah tidak berlaku.",
+				);
 		},
 		onTiming: (label, durationMs) => {
 			timings[label] = (timings[label] ?? 0) + durationMs;
@@ -129,12 +238,49 @@ export async function runScrapePipeline(
 	};
 
 	try {
+		if (mode === "crawl" || mode === "images") {
+			if (!claim)
+				throw new ScrapeError(
+					"STORAGE_FAILED",
+					"Job harus diproses oleh worker.",
+				);
+			const { runExtractionJob } = await import("./scrape-extraction-service");
+			await runExtractionJob(scrape, claim);
+			return;
+		}
 		await persist("capturing");
 
-		const captured: ScrapeCapture = await scrapeHtml(scrape.sourceUrl, 1, {
-			...instrumentation,
-			mode,
-		});
+		const settings =
+			scrape.request?.mode === "html" ? scrape.request.settings : undefined;
+		const captured: ScrapeCapture =
+			mode === "html" && scrape.html && scrape.previewHtml
+				? {
+						sourceUrl: scrape.sourceUrl,
+						domain: scrape.domain,
+						title: scrape.title,
+						html: scrape.html,
+						previewHtml: scrape.previewHtml,
+						status: 200,
+						metadata: {
+							attempt: scrape.jobAttempts,
+							capturedAt:
+								scrape.metadata?.capturedAt ?? scrape.createdAt.toISOString(),
+							finalUrl: scrape.sourceUrl,
+							viewport: scrape.metadata?.viewport ?? {
+								width: 1440,
+								height: 900,
+							},
+							captureMode: "persisted",
+							htmlBytes: Buffer.byteLength(scrape.html),
+							previewHtmlBytes: Buffer.byteLength(scrape.previewHtml),
+						},
+					}
+				: await scrapeHtml(scrape.sourceUrl, scrape.jobAttempts, {
+						...instrumentation,
+						mode,
+						...settings,
+						signal: claim?.signal,
+					});
 		meta = { ...meta, ...captured.metadata };
 
 		if (mode === "html") {
@@ -181,24 +327,39 @@ export async function runScrapePipeline(
 		);
 		await instrumentation.onActivity?.("Menganalisis design system");
 		const extractionStart = Date.now();
-		const extraction = extractDesignFromHtml(captured.html, captured.sourceUrl);
+		if (!captured.metadata.visualEvidence)
+			throw new ScrapeError(
+				"NO_ANALYZABLE_CONTENT",
+				"Evidence visual hasil render tidak tersedia.",
+			);
 		instrumentation.onTiming?.("extraction", Date.now() - extractionStart);
 		await instrumentation.onActivity?.("Analisis visual selesai");
 
 		await persist("generating");
-		const designMd = await generateDesignMd(
-			captured.sourceUrl,
-			extraction,
-			undefined,
+		await instrumentation.onActivity?.("Menyusun tabel dari evidence visual");
+		const generated = await generateDesignMd(
+			captured.metadata.visualEvidence,
 			instrumentation,
+			claim?.signal,
 		);
+		const designMd = generated.document;
+		if (generated.enrichment.status === "unavailable")
+			await instrumentation.onActivity?.(
+				"DESIGN.md dari evidence tersimpan; AI enrichment tidak tersedia",
+			);
 
 		const saveStart = Date.now();
-		await persist("saving", {
-			activity: "Menyimpan hasil",
-			activityStartedAt: new Date().toISOString(),
-		});
-		await saveScrapeDocument(scrapeId, designMd);
+		await persist(
+			"saving",
+			{
+				activity: "Menyimpan hasil",
+				activityStartedAt: new Date().toISOString(),
+				aiEnrichment: generated.enrichment.status,
+				aiEnrichmentDetail: generated.enrichment.detail,
+			},
+			{},
+		);
+		await saveScrapeDocument(scrapeId, designMd, userId, claim);
 		instrumentation.onTiming?.("save", Date.now() - saveStart);
 
 		await persist("completed");
@@ -218,26 +379,35 @@ export async function runScrapePipeline(
 				? error.message
 				: mode === "html"
 					? "Gagal memproses HTML website."
-					: "Gagal memproses visual website.";
+					: mode === "crawl" || mode === "images"
+						? "Ekstraksi website terhenti. Hasil yang sudah disimpan tetap tersedia."
+						: "Gagal memproses visual website.";
+		// Unknown failures are reported as unexpected rather than as a website
+		// block, so a crash in our own pipeline is never disguised as a site
+		// refusal the user cannot act on.
 		const errorDetail =
-			error instanceof ScrapeError ? error.code : "WEBSITE_BLOCKED";
+			error instanceof ScrapeError ? error.code : "UNEXPECTED_ERROR";
+		const retryAfterSeconds =
+			error instanceof ScrapeError ? error.retryAfterSeconds : undefined;
 
 		await db
 			.update(scrapes)
 			.set({
 				status: "failed",
-				metadata: {
-					...meta,
-					mode,
-					stage: "failed",
-					progress: 0,
-					stageStartedAt: new Date().toISOString(),
-					errorMessage,
-					errorDetail,
-				},
+				metadata: sql`coalesce(${scrapes.metadata}, '{}'::jsonb) || ${JSON.stringify(
+					{
+						mode,
+						stage: "failed",
+						progress: 0,
+						stageStartedAt: new Date().toISOString(),
+						errorMessage,
+						errorDetail,
+						...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+					},
+				)}::jsonb`,
 				updatedAt: new Date(),
 			})
-			.where(eq(scrapes.id, scrapeId));
+			.where(writePredicate());
 	}
 }
 
@@ -245,38 +415,112 @@ export async function retryScrape(
 	scrapeId: string,
 	userId: string,
 ): Promise<{ ok: true }> {
-	const [scrape] = await db
-		.select()
-		.from(scrapes)
-		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
-		.limit(1);
-	if (!scrape)
-		throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
+	return db.transaction(async (tx) => {
+		const [owner] = await tx
+			.select({ id: users.id })
+			.from(users)
+			.where(eq(users.id, userId))
+			.for("update")
+			.limit(1);
+		if (!owner) throw new ScrapeError("STORAGE_FAILED");
+		const [scrape] = await tx
+			.select()
+			.from(scrapes)
+			.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)))
+			.limit(1);
+		if (!scrape)
+			throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
+		if (scrape.status !== "failed") return { ok: true };
+		const active = await tx
+			.select({ id: scrapes.id })
+			.from(scrapes)
+			.where(
+				and(
+					eq(scrapes.userId, userId),
+					inArray(scrapes.status, [
+						"queued",
+						"capturing",
+						"extracting",
+						"generating",
+						"saving",
+					]),
+				),
+			);
+		if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
+			throw new ScrapeError("QUEUE_CAPACITY");
 
-	const mode: ScrapeMode = (scrape.mode ??
-		scrape.metadata?.mode ??
-		"design") as ScrapeMode;
-	await db
-		.update(scrapes)
-		.set({
-			status: "queued",
-			metadata: {
-				...(typeof scrape.metadata === "object" && scrape.metadata !== null
-					? scrape.metadata
-					: {}),
-				mode,
-				stage: "queued",
-				progress: 0,
-				stageStartedAt: new Date().toISOString(),
-				activity: undefined,
-				activityStartedAt: undefined,
-			},
-			updatedAt: new Date(),
-		})
-		.where(eq(scrapes.id, scrapeId));
+		const mode: ScrapeMode = (scrape.mode ??
+			scrape.metadata?.mode ??
+			"design") as ScrapeMode;
+		await tx
+			.update(scrapes)
+			.set({
+				status: "queued",
+				jobAttempts: 0,
+				jobToken: null,
+				leaseExpiresAt: null,
+				metadata: {
+					...(typeof scrape.metadata === "object" && scrape.metadata !== null
+						? scrape.metadata
+						: {}),
+					mode,
+					stage: "queued",
+					progress: 0,
+					stageStartedAt: new Date().toISOString(),
+					activity: undefined,
+					activityStartedAt: undefined,
+					errorMessage: undefined,
+					errorDetail: undefined,
+				},
+				updatedAt: new Date(),
+			})
+			.where(
+				and(
+					eq(scrapes.id, scrapeId),
+					eq(scrapes.userId, userId),
+					eq(scrapes.status, "failed"),
+				),
+			);
+		return { ok: true };
+	});
+}
 
-	void runScrapePipeline(scrapeId, userId);
-	return { ok: true };
+export interface ScrapeResults {
+	pages: (typeof scrapePages.$inferSelect)[];
+	images: (typeof scrapeImages.$inferSelect)[];
+}
+
+// Reads the persisted crawl/image rows for a scrape. The detail route and the
+// status poll share this so newly persisted rows appear without a page reload.
+export async function getScrapeResults(
+	id: string,
+	userId: string,
+	mode: ScrapeMode,
+): Promise<ScrapeResults> {
+	const empty: ScrapeResults = { pages: [], images: [] };
+	if (mode === "crawl")
+		return {
+			...empty,
+			pages: await db
+				.select()
+				.from(scrapePages)
+				.where(
+					and(eq(scrapePages.scrapeId, id), eq(scrapePages.userId, userId)),
+				)
+				.orderBy(asc(scrapePages.depth), asc(scrapePages.url)),
+		};
+	if (mode === "images")
+		return {
+			...empty,
+			images: await db
+				.select()
+				.from(scrapeImages)
+				.where(
+					and(eq(scrapeImages.scrapeId, id), eq(scrapeImages.userId, userId)),
+				)
+				.orderBy(asc(scrapeImages.url)),
+		};
+	return empty;
 }
 
 export async function getScrapeById(
@@ -294,7 +538,27 @@ export async function getScrapeById(
 		.from(scrapeDocuments)
 		.where(eq(scrapeDocuments.scrapeId, id))
 		.limit(1);
-	return { ...row, document: document ?? null };
+	const ageMs = Date.now() - row.createdAt.getTime();
+	const health =
+		row.status === "queued" && ageMs > SCRAPE_LIMITS.queueHealthAfterMs
+			? "Belum ada worker yang mengambil job ini. Pastikan worker berjalan; antrean akan dilanjutkan saat worker tersedia."
+			: row.leaseExpiresAt &&
+					row.leaseExpiresAt <= new Date() &&
+					!["completed", "failed"].includes(row.status)
+				? "Heartbeat worker tidak aktif. Job menunggu pemulihan lease oleh worker."
+				: undefined;
+	const results = await getScrapeResults(
+		id,
+		userId,
+		(row.mode ?? "design") as ScrapeMode,
+	);
+	return {
+		...row,
+		metadata: { ...row.metadata, workerHealth: health },
+		document: document ?? null,
+		pages: results.pages,
+		images: results.images,
+	};
 }
 
 export async function listScrapes(
@@ -331,34 +595,55 @@ export async function listScrapes(
 export async function saveScrapeDocument(
 	scrapeId: string,
 	designMd: string,
+	userId?: string,
+	claim?: ScrapeJobClaim,
 ): Promise<ScrapeDocumentRow> {
 	if (!designMd || designMd.trim().length === 0)
 		throw new ScrapeError("AI_GENERATION_FAILED", "DESIGN.md kosong.");
+	if (!userId)
+		throw new ScrapeError(
+			"STORAGE_FAILED",
+			"Pemilik scrape wajib diverifikasi.",
+		);
+	return db.transaction(async (tx) => {
+		const [owner] = await tx
+			.select({ id: scrapes.id })
+			.from(scrapes)
+			.where(
+				claim
+					? scrapeClaimPredicate(claim)
+					: and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)),
+			)
+			.for("update")
+			.limit(1);
+		if (!owner || owner.id !== scrapeId || (claim && claim.userId !== userId))
+			throw new ScrapeError("STORAGE_FAILED", "Job lease sudah tidak berlaku.");
 
-	const [existing] = await db
-		.select()
-		.from(scrapeDocuments)
-		.where(eq(scrapeDocuments.scrapeId, scrapeId))
-		.limit(1);
+		const [existing] = await tx
+			.select()
+			.from(scrapeDocuments)
+			.where(eq(scrapeDocuments.scrapeId, scrapeId))
+			.limit(1);
 
-	if (existing) {
-		const [updated] = await db
-			.update(scrapeDocuments)
-			.set({ designMd })
-			.where(eq(scrapeDocuments.id, existing.id))
+		if (existing) {
+			const [updated] = await tx
+				.update(scrapeDocuments)
+				.set({ designMd })
+				.where(eq(scrapeDocuments.id, existing.id))
+				.returning();
+			return updated;
+		}
+
+		const [document] = await tx
+			.insert(scrapeDocuments)
+			.values({
+				scrapeId,
+				designMd,
+			} satisfies InsertScrapeDocumentRow)
 			.returning();
-		return updated;
-	}
-
-	const [document] = await db
-		.insert(scrapeDocuments)
-		.values({
-			scrapeId,
-			designMd,
-		} satisfies InsertScrapeDocumentRow)
-		.returning();
-	if (!document) throw new ScrapeError("STORAGE_FAILED");
-	return document;
+		if (!document) throw new ScrapeError("STORAGE_FAILED");
+		return document;
+	});
 }
 
 export async function generateAndSaveDesignMd(
@@ -372,8 +657,27 @@ export async function generateAndSaveDesignMd(
 			"HTML scrape belum tersedia.",
 		);
 	if (scrape.document) return scrape.document;
-	const designMd = await generateDesignMd(scrape.sourceUrl, scrape.html);
-	return saveScrapeDocument(scrapeId, designMd);
+	const captured = await scrapeHtml(scrape.sourceUrl, scrape.jobAttempts);
+	if (!captured.metadata.visualEvidence)
+		throw new ScrapeError(
+			"NO_ANALYZABLE_CONTENT",
+			"Evidence visual hasil render tidak tersedia.",
+		);
+	const generated = await generateDesignMd(captured.metadata.visualEvidence);
+	const designMd = generated.document;
+	await db
+		.update(scrapes)
+		.set({
+			metadata: {
+				...scrape.metadata,
+				...captured.metadata,
+				aiEnrichment: generated.enrichment.status,
+				aiEnrichmentDetail: generated.enrichment.detail,
+			},
+			updatedAt: new Date(),
+		})
+		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)));
+	return saveScrapeDocument(scrapeId, designMd, userId);
 }
 
 export async function deleteScrape(

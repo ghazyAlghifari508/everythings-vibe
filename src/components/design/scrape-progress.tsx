@@ -1,11 +1,6 @@
-import { AlertCircle, Check, Loader2, RotateCcw } from "lucide-react";
+import { Check, RotateCcw } from "lucide-react";
 import { ThoughtLine } from "@/components/ui/thought-line";
-import {
-	HTML_SCRAPE_STATUS_LABELS,
-	SCRAPE_STATUS_LABELS,
-	type ScrapeMode,
-	type ScrapeStatus,
-} from "@/db/schema";
+import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
 import { displaySiteName } from "@/lib/site-name";
 
 export interface ScrapeProgressProps {
@@ -19,263 +14,292 @@ export interface ScrapeProgressProps {
 	stageStartedAt?: string | null;
 	activity?: string | null;
 	activityStartedAt?: string | null;
+	visitedPages?: number;
+	discoveredPages?: number;
+	completedPages?: number;
+	skippedPages?: number;
+	processedImages?: number;
+	discoveredImages?: number;
+	savedImages?: number;
+	failedResources?: number;
+	workerHealth?: string | null;
+	partialResults?: number;
+	// Images mode outcome, persisted by the worker. "empty" is a truthful
+	// result for a page without images; the failure states are not.
+	imageDiscovery?:
+		| "found"
+		| "none"
+		| "capture-failed"
+		| "discovery-failed"
+		| null;
+	imageOutcome?: "complete" | "partial" | "empty" | "all-failed" | null;
 }
 
-const ORDERED_DESIGN_STAGES: ScrapeStatus[] = [
-	"queued",
-	"capturing",
-	"extracting",
-	"generating",
-	"saving",
-	"completed",
-];
-
-const ORDERED_HTML_STAGES: ScrapeStatus[] = [
-	"queued",
-	"capturing",
-	"extracting",
-	"saving",
-	"completed",
-];
-
-const DESIGN_STAGE_DESCRIPTIONS: Record<ScrapeStatus, string> = {
-	queued: "Menunggu giliran pemrosesan.",
-	capturing:
-		"Membuka website di browser dan menunggu tampilan serta aset selesai dimuat.",
-	extracting: "Membaca warna, tipografi, spacing, komponen, dan pola layout.",
-	generating:
-		"AI sedang menyusun DESIGN.md lengkap dari hasil analisis visual.",
-	saving: "Menyimpan DESIGN.md yang sudah selesai.",
-	completed: "Panduan desain DESIGN.md siap digunakan.",
-	failed: "Proses pembuatan DESIGN.md terhenti sebelum selesai.",
+const LABELS: Record<ScrapeStatus, string> = {
+	queued: "Dalam antrean",
+	capturing: "Mengambil halaman",
+	extracting: "Memeriksa hasil ekstraksi",
+	generating: "Menyusun DESIGN.md",
+	saving: "Menyimpan hasil",
+	completed: "Selesai",
+	failed: "Proses terhenti",
 };
 
-const HTML_STAGE_DESCRIPTIONS: Record<ScrapeStatus, string> = {
-	queued: "Menunggu giliran pemrosesan.",
-	capturing: "Membuka website di browser dan menjalankan JavaScript halaman.",
-	extracting: "Menyiapkan HTML standalone dan resource untuk preview.",
-	generating: "Menyiapkan HTML standalone dan resource untuk preview.",
-	saving: "Menyimpan index.html yang sudah selesai.",
-	completed: "Hasil scraping index.html siap digunakan.",
-	failed: "Proses scraping HTML terhenti sebelum selesai.",
+const OPERATIONS: Record<ScrapeMode, string> = {
+	design: "DESIGN.md",
+	crawl: "Crawl Website",
+	images: "Scrape Images",
+	html: "Scrape HTML",
 };
 
-export function ScrapeProgress({
-	status,
-	mode = "design",
-	sourceUrl,
-	domain,
-	errorMessage,
-	isRetrying = false,
-	onRetry,
-	stageStartedAt,
-	activity,
-	activityStartedAt,
-}: ScrapeProgressProps) {
+function stagesFor(mode: ScrapeMode): ScrapeStatus[] {
+	if (mode === "design")
+		return [
+			"queued",
+			"capturing",
+			"extracting",
+			"generating",
+			"saving",
+			"completed",
+		];
+	if (mode === "html")
+		return ["queued", "capturing", "extracting", "saving", "completed"];
+	return ["queued", "capturing", "extracting", "completed"];
+}
+
+// A finished stage keeps a check mark and the live stage is marked by a filled
+// dot: the progress bar below is the single running indicator, so no stage
+// marker spins and no replacement spinner is introduced.
+function StageMarker({ done, current }: { done: boolean; current: boolean }) {
+	if (done && !current)
+		return <Check size={14} aria-hidden className="text-mist" />;
+	if (current)
+		return (
+			<span
+				aria-hidden
+				data-active-stage-marker
+				className="block size-2 rounded-full bg-mist"
+			/>
+		);
+	return (
+		<span aria-hidden className="size-1.5 rounded-full border border-slate" />
+	);
+}
+
+export function ScrapeProgress(props: ScrapeProgressProps) {
+	const {
+		status,
+		mode = "design",
+		sourceUrl,
+		domain,
+		activity,
+		stageStartedAt,
+		activityStartedAt,
+		isRetrying,
+		onRetry,
+		errorMessage,
+	} = props;
+	const stages = stagesFor(mode);
+	const index = stages.indexOf(status);
 	const isFailed = status === "failed";
 	const isDone = status === "completed";
+	const active = !isDone && !isFailed;
+	const operation = OPERATIONS[mode];
 
-	const orderedStages =
-		mode === "html" ? ORDERED_HTML_STAGES : ORDERED_DESIGN_STAGES;
-	const stageLabels =
-		mode === "html" ? HTML_SCRAPE_STATUS_LABELS : SCRAPE_STATUS_LABELS;
-	const stageDescriptions =
-		mode === "html" ? HTML_STAGE_DESCRIPTIONS : DESIGN_STAGE_DESCRIPTIONS;
-	const currentIndex = orderedStages.indexOf(status);
-	const currentLabel = stageLabels[status] ?? status;
-
-	const defaultError =
-		mode === "html"
-			? "Scrape HTML belum bisa diselesaikan. Coba ulangi dari link yang sama."
-			: "DESIGN.md belum bisa dibuat. Coba ulangi dari link yang sama.";
-	const siteName = domain
-		? displaySiteName(domain)
-		: sourceUrl
-			? displaySiteName(new URL(sourceUrl).hostname)
-			: "Website";
+	const counters =
+		mode === "crawl"
+			? [
+					["Ditemukan", props.discoveredPages],
+					["Dikunjungi", props.visitedPages],
+					["Selesai", props.completedPages],
+					["Dilewati", props.skippedPages],
+					["Gagal", props.failedResources],
+				]
+			: mode === "images"
+				? [
+						["Ditemukan", props.discoveredImages],
+						["Diproses", props.processedImages],
+						["Tersimpan", props.savedImages],
+						["Gagal", props.failedResources],
+					]
+				: [];
+	const visibleCounters = counters.filter(
+		([, value]) => typeof value === "number",
+	);
+	const startTimestamp = activityStartedAt ?? stageStartedAt;
+	// While queued no worker has touched the job, so the activity slot states
+	// that honestly instead of animating as if analysis had started.
+	const activityText = activity ?? null;
 
 	return (
-		<div className="w-full rounded-2xl border border-graphite bg-charcoal p-6 sm:p-8">
-			<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<span className="font-mono text-xs uppercase tracking-wider text-fog">
-						Status Pemrosesan {mode === "html" ? "(HTML)" : "(DESIGN.md)"}
-					</span>
-					<h2 className="text-xl font-semibold text-snow">{siteName}</h2>
-					{sourceUrl ? (
-						<p className="mt-0.5 truncate font-mono text-xs text-fog max-w-xl">
-							{sourceUrl}
-						</p>
-					) : null}
-				</div>
+		<div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
+			<div className="min-w-0">
+				<p className="text-sm text-fog">{operation}</p>
+				<h2 className="mt-1 text-2xl font-bold text-snow">
+					{domain ? displaySiteName(domain) : "Website"}
+				</h2>
+				<p className="mt-2 break-all font-mono text-xs text-fog">{sourceUrl}</p>
 
-				<p className="flex items-center gap-2 font-mono text-xs font-semibold text-snow">
-					{!isDone && !isFailed ? (
-						<Loader2
-							size={14}
-							className="motion-safe:animate-spin motion-reduce:animate-none text-mist"
-						/>
-					) : null}
-					<span aria-live="polite">{currentLabel}</span>
-				</p>
-			</div>
-
-			{!isFailed ? (
-				<div
-					role="progressbar"
-					aria-label="Tahap pemrosesan scraping"
-					aria-valuemin={1}
-					aria-valuemax={orderedStages.length}
-					aria-valuenow={isDone ? orderedStages.length : currentIndex + 1}
-					aria-valuetext={`Tahap ${isDone ? orderedStages.length : currentIndex + 1} dari ${orderedStages.length}: ${currentLabel}`}
-					className="mt-6 grid h-2 gap-1"
-					style={{
-						gridTemplateColumns: `repeat(${orderedStages.length}, minmax(0, 1fr))`,
-					}}
-				>
-					{orderedStages.map((stage, index) => {
-						const isStageDone = isDone || index < currentIndex;
-						const isStageCurrent = index === currentIndex && !isDone;
-
-						return (
-							<span
-								key={stage}
-								aria-hidden="true"
-								className={`relative min-w-0 overflow-hidden rounded-sm ${isStageDone ? "bg-mist" : "bg-slate"}`}
-							>
-								{isStageCurrent ? (
-									<span
-										data-active-stage-segment
-										className="absolute inset-y-0 left-0 w-1/3 bg-mist motion-safe:animate-scrape-progress motion-reduce:animate-none"
-									/>
-								) : null}
-							</span>
-						);
-					})}
-				</div>
-			) : null}
-			<div className="mt-6">
-				{isFailed || isDone ? (
-					<p aria-live="polite" className="mt-2.5 text-xs text-fog">
-						{isFailed
-							? errorMessage || defaultError
-							: (stageDescriptions[status] ?? "Sedang memproses website…")}
+				<div className="mt-6 border-t border-graphite pt-5">
+					<p className="text-sm font-semibold text-snow">
+						Aktivitas pemrosesan
 					</p>
-				) : (
-					<ThoughtLine
-						working
-						bare
-						label={currentLabel}
-						doneLabel={currentLabel}
-						presentation="rotating"
-						activity={activity ?? null}
-						rotationKey={activity ?? status}
-						startedAt={activityStartedAt ?? stageStartedAt ?? undefined}
-						fontSize="xs"
-						className="mt-2.5"
-						glyph={
-							activity ? (
-								<span
-									aria-hidden="true"
-									data-testid="scrape-active-indicator"
-									className="inline-flex shrink-0 items-center gap-1.5"
-								>
-									<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none" />
-									<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none animate-delay-200" />
-									<span className="size-1 rounded-full bg-fog motion-safe:animate-pulse motion-reduce:animate-none animate-delay-400" />
-								</span>
-							) : undefined
-						}
-					/>
+					{isFailed ? (
+						<p className="mt-2 break-words text-sm text-fog">
+							Pemrosesan berhenti. Lihat alasan dan opsi pemulihan di panel
+							progres.
+						</p>
+					) : active && activityText ? (
+						<ThoughtLine
+							working
+							bare
+							collapsible={false}
+							label={activityText}
+							doneLabel={LABELS[status]}
+							startedAt={startTimestamp ?? undefined}
+							showTimer
+							fontSize={14}
+							className="mt-2"
+							glyph="sparkle"
+						/>
+					) : (
+						<p className="mt-2 break-words text-sm text-fog">
+							{status === "queued"
+								? (props.workerHealth ??
+									"Job menunggu worker. Belum ada sinyal pemrosesan.")
+								: LABELS[status]}
+						</p>
+					)}
+				</div>
+
+				{visibleCounters.length > 0 && (
+					<dl className="mt-6 grid grid-cols-2 gap-4">
+						{visibleCounters.map(([label, value]) => (
+							<div key={String(label)}>
+								<dt className="text-xs text-fog">{label}</dt>
+								<dd className="mt-1 font-mono text-xl text-snow tabular-nums">
+									{value}
+								</dd>
+							</div>
+						))}
+					</dl>
 				)}
+
+				{mode === "images" && props.imageOutcome === "empty" && (
+					<p className="mt-6 text-sm text-fog">
+						Halaman berhasil di-capture dan tidak ditemukan resource gambar di
+						dalamnya. Tidak ada gambar yang bisa disimpan dari halaman ini.
+					</p>
+				)}
+				{mode === "images" && props.imageOutcome === "partial" && (
+					<p className="mt-6 text-sm text-fog">
+						Sebagian gambar berhasil diverifikasi dan tetap tersimpan; sisanya
+						gagal diambil beserta alasannya.
+					</p>
+				)}
+				{mode === "images" &&
+					(props.imageDiscovery === "discovery-failed" ||
+						props.imageDiscovery === "capture-failed") && (
+						<p className="mt-6 text-sm text-fog">
+							Discovery gambar tidak selesai, jadi halaman ini belum terbukti
+							tidak memiliki gambar.
+						</p>
+					)}
 			</div>
 
-			{isFailed ? (
-				<div className="mt-6 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4">
-					<div className="flex items-start gap-3">
-						<AlertCircle
-							size={18}
-							className="mt-0.5 shrink-0 text-rose-400"
-							aria-hidden="true"
-						/>
-						<div className="flex-1">
-							<p className="text-sm font-semibold text-rose-200">
-								{errorMessage || defaultError}
-							</p>
-							<p className="mt-1 text-xs text-rose-300/80">
-								Pastikan website publik dapat diakses tanpa login atau bot
-								protection.
-							</p>
-							{onRetry ? (
-								<button
-									type="button"
-									onClick={onRetry}
-									disabled={isRetrying}
-									className="btn-primary mt-4 inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition-all hover:brightness-105 disabled:opacity-50"
-								>
-									{isRetrying ? (
-										<Loader2
-											size={14}
-											className="motion-safe:animate-spin motion-reduce:animate-none"
-										/>
-									) : (
-										<RotateCcw size={14} />
-									)}
-									<span>Coba lagi</span>
-								</button>
-							) : null}
-						</div>
-					</div>
+			<section
+				aria-label={`Progres ${operation}`}
+				className="min-w-0 rounded-xl border border-graphite bg-charcoal p-6"
+			>
+				<div className="flex items-center justify-between gap-3">
+					<h3 className="text-lg font-semibold text-snow">{operation}</h3>
+					<p className="shrink-0 text-sm text-fog">
+						<span aria-live="polite">{LABELS[status]}</span>
+					</p>
 				</div>
-			) : (
-				<div className="mt-8 border-t border-graphite/60 pt-6">
-					<ol
-						className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${
-							mode === "html" ? "lg:grid-cols-5" : "lg:grid-cols-6"
-						}`}
-					>
-						{orderedStages.map((s, idx) => {
-							const isStageDone =
-								isDone || (currentIndex >= 0 && idx < currentIndex);
-							const isStageCurrent = currentIndex === idx && !isDone;
 
-							return (
-								<li
-									key={s}
-									aria-current={isStageCurrent ? "step" : undefined}
-									className={`flex items-center gap-2 font-mono text-xs ${
-										isStageDone
-											? "text-fog"
-											: isStageCurrent
-												? "font-semibold text-snow"
-												: "text-fog/60"
-									}`}
-								>
-									{isStageDone ? (
-										<Check
-											size={12}
-											strokeWidth={3}
-											aria-hidden="true"
-											className="text-emerald-500/80"
-										/>
-									) : isStageCurrent ? (
-										<Loader2
-											size={12}
-											className="motion-safe:animate-spin motion-reduce:animate-none"
-										/>
-									) : (
-										<span
-											aria-hidden="true"
-											className="size-1.5 rounded-full bg-graphite"
-										/>
-									)}
-									<span className="truncate">{stageLabels[s] ?? s}</span>
-								</li>
-							);
-						})}
-					</ol>
-				</div>
-			)}
+				{isFailed ? (
+					<div className="mt-5">
+						<p role="alert" className="text-sm text-snow">
+							{errorMessage || "Ekstraksi tidak dapat diselesaikan."}
+						</p>
+						<p className="mt-2 text-sm text-fog">
+							{props.partialResults
+								? `${props.partialResults} hasil tersimpan tetap tersedia di bawah.`
+								: "Belum ada hasil yang berhasil disimpan."}
+						</p>
+						{onRetry && (
+							<button
+								type="button"
+								disabled={isRetrying}
+								onClick={onRetry}
+								className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg border border-graphite px-4 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50"
+							>
+								<RotateCcw size={16} aria-hidden />
+								{isRetrying ? "Mengantrekan ulang" : "Coba lagi"}
+							</button>
+						)}
+					</div>
+				) : (
+					<>
+						{/* Segments carry an explicit height: inline spans inside a flex
+						    row have no intrinsic height, which previously collapsed the
+						    whole bar to zero and hid the live stage entirely. */}
+						<div aria-hidden="true" className="mt-5 flex h-1.5 gap-1">
+							{stages.map((stage, i) => {
+								const stageDone = isDone || i < index;
+								const stageCurrent = !isDone && i === index;
+								return (
+									<span
+										key={stage}
+										className={`relative min-w-0 flex-1 overflow-hidden rounded-sm ${
+											stageDone ? "bg-mist" : "bg-slate"
+										}`}
+									>
+										{stageCurrent ? (
+											<span
+												data-active-stage-segment
+												className="absolute inset-y-0 left-0 w-1/3 bg-mist motion-safe:animate-scrape-progress motion-reduce:animate-none"
+											/>
+										) : null}
+									</span>
+								);
+							})}
+						</div>
+
+						<ol className="mt-6 space-y-5" aria-label="Tahapan pemrosesan">
+							{stages.map((stage, i) => {
+								const stageDone = isDone || i < index;
+								const stageCurrent = !isDone && i === index;
+								return (
+									<li
+										key={stage}
+										aria-current={stageCurrent ? "step" : undefined}
+										className="flex items-start gap-3"
+									>
+										<span className="mt-1 flex size-4 shrink-0 items-center justify-center">
+											<StageMarker done={stageDone} current={stageCurrent} />
+										</span>
+										<div className="min-w-0">
+											<p
+												className={`text-sm ${
+													stageCurrent
+														? "font-semibold text-snow"
+														: stageDone
+															? "text-fog"
+															: "text-fog/70"
+												}`}
+											>
+												{LABELS[stage]}
+											</p>
+										</div>
+									</li>
+								);
+							})}
+						</ol>
+					</>
+				)}
+			</section>
 		</div>
 	);
 }
