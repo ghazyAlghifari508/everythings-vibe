@@ -6,10 +6,11 @@ import {
 	Download,
 	Loader2,
 	Menu,
+	Plus,
 	Trash2,
 	User,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -39,6 +40,8 @@ export function StudioHeader({
 	onDuplicate,
 	onExport,
 	onDelete,
+	onAddFrame,
+	designSystemControl,
 }: {
 	title: string;
 	duplicating: boolean;
@@ -48,6 +51,8 @@ export function StudioHeader({
 	onDuplicate: () => void;
 	onExport: () => void;
 	onDelete?: () => Promise<void>;
+	onAddFrame?: () => void;
+	designSystemControl?: ReactNode;
 }) {
 	const { data: session } = authClient.useSession();
 	const [isDeleteOpen, setDeleteOpen] = useState(false);
@@ -93,6 +98,14 @@ export function StudioHeader({
 								Kembali ke Semua Project
 							</Link>
 						</DropdownMenuItem>
+						{onAddFrame ? (
+							<DropdownMenuItem className={item} onSelect={onAddFrame}>
+								<Plus size={16} />
+								Tambah Halaman
+							</DropdownMenuItem>
+						) : null}
+						{designSystemControl}
+						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							className={item}
 							disabled={duplicating}

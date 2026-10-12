@@ -14,6 +14,16 @@ import {
 } from "@/components/design/studio-composer";
 import { StudioDesignPicker } from "@/components/design/studio-design-picker";
 import { StudioHeader } from "@/components/design/studio-header";
+import { type AttachedDesignReference } from "@/components/design/start-with-design-modal";
+import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import type {
 	StudioFrameRow,
 	StudioJobRow,
@@ -98,6 +108,7 @@ function StudioWorkspace({
 	const [composerLoading, setComposerLoading] = useState(false);
 	const [exportingZip, setExportingZip] = useState(false);
 	const [deleting, setDeleting] = useState(false);
+	const [isAddFrameOpen, setIsAddFrameOpen] = useState(false);
 	const [error, setError] = useState("");
 	const [duplicating, setDuplicating] = useState(false);
 	const navigate = useNavigate();
@@ -289,6 +300,75 @@ function StudioWorkspace({
 		}
 	}
 
+	// Adding a screen is an explicit project-level action, never inferred from
+	// prompt wording, so an add request can never be silently turned into a
+	// project-wide revision.
+	async function handleAddFrame(input: { name: string; prompt: string }) {
+		setComposerLoading(true);
+		setError("");
+		try {
+			const response = await fetch("/api/studio/frame", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "add",
+					projectId: project.id,
+					name: input.name,
+					prompt: input.prompt,
+				}),
+			});
+			if (!response.ok) {
+				const data: unknown = await response.json().catch(() => null);
+				throw new Error(
+					typeof data === "object" &&
+						data !== null &&
+						"error" in data &&
+						typeof data.error === "string"
+						? data.error
+						: "Gagal menambah halaman baru.",
+				);
+			}
+			setIsAddFrameOpen(false);
+			await syncProjectStatus();
+			showToast("Halaman baru ditambahkan.", "success");
+		} catch (failure) {
+			setError(
+				failure instanceof Error
+					? failure.message
+					: "Gagal menambah halaman baru.",
+			);
+		} finally {
+			setComposerLoading(false);
+		}
+	}
+
+	async function handleApplyDesignSystem(
+		reference: AttachedDesignReference,
+	): Promise<boolean> {
+		const response = await fetch("/api/studio/project", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				action: "design-system",
+				projectId: project.id,
+				...reference,
+			}),
+		});
+		if (!response.ok) {
+			const result: unknown = await response.json().catch(() => null);
+			throw new Error(
+				typeof result === "object" &&
+					result !== null &&
+					"error" in result &&
+					typeof result.error === "string"
+					? result.error
+					: "Gagal menyimpan design system.",
+			);
+		}
+		await syncProjectStatus();
+		return true;
+	}
+
 	async function handleRetryFrame(frameId: string) {
 		try {
 			const response = await fetch("/api/studio/frame", {
@@ -355,6 +435,14 @@ function StudioWorkspace({
 				onDuplicate={() => void handleDuplicate()}
 				onExport={() => void handleDownloadAllZip()}
 				onDelete={handleDelete}
+				onAddFrame={() => setIsAddFrameOpen(true)}
+				designSystemControl={
+					<StudioDesignPicker
+						designMd={project.designMd}
+						disabled={isProcessing || composerLoading}
+						onApply={handleApplyDesignSystem}
+					/>
+				}
 			/>
 
 			{/* Main Fullscreen Canvas Workspace */}
@@ -382,44 +470,18 @@ function StudioWorkspace({
 						);
 						if (selectedFrameId === id) setSelectedFrameId(null);
 					}}
-					designSystemControl={
-						<StudioDesignPicker
-							designMd={project.designMd}
-							disabled={isProcessing || composerLoading}
-							onApply={async (reference) => {
-								const response = await fetch("/api/studio/project", {
-									method: "POST",
-									headers: { "Content-Type": "application/json" },
-									body: JSON.stringify({
-										action: "design-system",
-										projectId: project.id,
-										...reference,
-									}),
-								});
-								if (!response.ok) {
-									const result: unknown = await response
-										.json()
-										.catch(() => null);
-									throw new Error(
-										typeof result === "object" &&
-											result !== null &&
-											"error" in result &&
-											typeof result.error === "string"
-											? result.error
-											: "Gagal menyimpan design system.",
-									);
-								}
-								await syncProjectStatus();
-								return true;
-							}}
-						/>
-					}
-					selectedFrameName={selectedFrame?.name ?? null}
-					onClearSelectedFrame={() => selectFrame(null)}
 					onSubmit={handleComposerSubmit}
 					loading={composerLoading}
 				/>
 			</div>
+
+			{/* Explicit add-screen flow, kept out of the composer */}
+			<AddFrameDialog
+				open={isAddFrameOpen}
+				onOpenChange={setIsAddFrameOpen}
+				busy={composerLoading}
+				onSubmit={handleAddFrame}
+			/>
 
 			{/* Error Toast if any */}
 			{error && (
@@ -439,5 +501,100 @@ function StudioWorkspace({
 				</div>
 			)}
 		</main>
+	);
+}
+
+function AddFrameDialog({
+	open,
+	onOpenChange,
+	busy,
+	onSubmit,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	busy: boolean;
+	onSubmit: (input: { name: string; prompt: string }) => Promise<void>;
+}) {
+	const [name, setName] = useState("");
+	const [prompt, setPrompt] = useState("");
+	const [localError, setLocalError] = useState("");
+	const canSubmit =
+		name.trim().length > 0 && prompt.trim().length >= 10 && !busy;
+
+	useEffect(() => {
+		if (open) {
+			setName("");
+			setPrompt("");
+			setLocalError("");
+		}
+	}, [open]);
+
+	async function submit() {
+		if (!canSubmit) {
+			setLocalError(
+				"Isi nama halaman dan instruksi minimal 10 karakter sebelum melanjutkan.",
+			);
+			return;
+		}
+		setLocalError("");
+		await onSubmit({ name: name.trim(), prompt: prompt.trim() });
+	}
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-w-md">
+				<DialogHeader>
+					<DialogTitle>Tambah halaman baru</DialogTitle>
+					<DialogDescription>
+						AI membuat satu layar baru dan menyambungkannya ke project ini tanpa
+						mengubah layar lain.
+					</DialogDescription>
+				</DialogHeader>
+				<div className="flex flex-col gap-3">
+					<label className="flex flex-col gap-1.5">
+						<span className="text-xs text-fog">Nama halaman</span>
+						<input
+							type="text"
+							value={name}
+							onChange={(event) => setName(event.target.value)}
+							placeholder="Contoh: Pengaturan Akun"
+							className="min-h-11 rounded-lg border border-graphite bg-charcoal px-3 text-sm text-snow placeholder:text-fog focus:border-fog/40 focus:outline-none"
+						/>
+					</label>
+					<label className="flex flex-col gap-1.5">
+						<span className="text-xs text-fog">Instruksi halaman</span>
+						<textarea
+							value={prompt}
+							onChange={(event) => setPrompt(event.target.value)}
+							rows={4}
+							placeholder="Jelaskan isi dan tujuan halaman ini..."
+							className="resize-y rounded-lg border border-graphite bg-charcoal px-3 py-2 text-sm text-snow placeholder:text-fog focus:border-fog/40 focus:outline-none"
+						/>
+					</label>
+					{localError ? (
+						<p role="alert" className="text-sm text-crimson">
+							{localError}
+						</p>
+					) : null}
+				</div>
+				<DialogFooter>
+					<Button
+						type="button"
+						variant="secondary"
+						onClick={() => onOpenChange(false)}
+						disabled={busy}
+					>
+						Batal
+					</Button>
+					<Button
+						type="button"
+						onClick={() => void submit()}
+						disabled={!canSubmit}
+					>
+						{busy ? "Menambahkan..." : "Tambah halaman"}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }

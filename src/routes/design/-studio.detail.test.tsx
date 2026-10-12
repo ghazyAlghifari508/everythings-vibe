@@ -50,7 +50,7 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 		cleanup();
 	});
 
-	it("renders multi-screen canvas with mobile project and frames", () => {
+	it("renders multi-screen canvas with mobile project and frames", async () => {
 		mockUseLoaderData.mockReturnValue({
 			project: {
 				id: "proj-mob-1",
@@ -119,9 +119,23 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 
 		// Floating Composer is present
 		expect(
-			screen.getByPlaceholderText(
-				/Minta AI menambah halaman atau merevisi UI/i,
-			),
+			screen.getByPlaceholderText(/Minta revisi untuk seluruh project/i),
+		).toBeDefined();
+		// The simplified composer must not bring back the removed controls.
+		expect(screen.queryByText(/Tambah Halaman/i)).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /Pilih design system/i }),
+		).toBeNull();
+		// The relocated capabilities stay reachable from the project menu.
+		fireEvent.pointerDown(
+			screen.getByRole("button", { name: "Menu project" }),
+			{ button: 0, ctrlKey: false, pointerType: "mouse" },
+		);
+		expect(
+			await screen.findByRole("menuitem", { name: /Tambah Halaman/i }),
+		).toBeDefined();
+		expect(
+			await screen.findByRole("menuitem", { name: /Design system/i }),
 		).toBeDefined();
 	});
 

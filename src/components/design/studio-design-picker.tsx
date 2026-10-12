@@ -1,12 +1,12 @@
-import { Check, FileCode2, Loader2, Palette } from "lucide-react";
+import { Check, FileCode2, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
-	DropdownMenu,
-	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
-	DropdownMenuTrigger,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
 	getStudioPresetDesignMd,
@@ -17,6 +17,11 @@ import {
 	StartWithDesignModal,
 } from "./start-with-design-modal";
 
+/**
+ * Design-system selection lives in the project menu rather than the composer.
+ * It renders DropdownMenu items, so it must be mounted inside a
+ * DropdownMenuContent.
+ */
 export function StudioDesignPicker({
 	designMd,
 	disabled,
@@ -24,10 +29,7 @@ export function StudioDesignPicker({
 }: {
 	designMd: string | null;
 	disabled: boolean;
-	onApply: (reference: {
-		designMd: string;
-		logo?: AttachedDesignReference["logo"];
-	}) => Promise<boolean>;
+	onApply: (reference: AttachedDesignReference) => Promise<boolean>;
 }) {
 	const [open, setOpen] = useState(false);
 	const [pending, setPending] = useState(false);
@@ -44,7 +46,10 @@ export function StudioDesignPicker({
 		setPending(true);
 		setError("");
 		try {
-			return await onApply(next);
+			return await onApply({
+				designMd: next.designMd,
+				logo: next.logo ?? null,
+			});
 		} catch (failure) {
 			setError(
 				failure instanceof Error ? failure.message : "Gagal menerapkan desain.",
@@ -56,27 +61,19 @@ export function StudioDesignPicker({
 	}
 	return (
 		<>
-			<DropdownMenu>
-				<DropdownMenuTrigger asChild>
-					<button
-						type="button"
-						disabled={disabled || pending}
-						aria-label="Pilih design system"
-						title="Pilih design system"
-						className="flex size-9 items-center justify-center rounded-lg text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 disabled:opacity-50"
-					>
-						{pending ? (
-							<Loader2 size={16} className="motion-safe:animate-spin" />
-						) : (
-							<Palette size={16} />
-						)}
-					</button>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent
-					side="top"
-					align="end"
-					className="w-72 max-w-[calc(100vw-24px)]"
+			<DropdownMenuSub>
+				<DropdownMenuSubTrigger
+					className="gap-2 focus:bg-steel"
+					disabled={disabled || pending}
 				>
+					{pending ? (
+						<Loader2 size={16} className="motion-safe:animate-spin" />
+					) : (
+						<FileCode2 size={16} />
+					)}
+					Design system
+				</DropdownMenuSubTrigger>
+				<DropdownMenuSubContent className="w-72 max-w-[calc(100vw-24px)]">
 					<DropdownMenuItem
 						className="gap-2 focus:bg-steel"
 						onSelect={() => setOpen(true)}
@@ -118,8 +115,8 @@ export function StudioDesignPicker({
 							) : null}
 						</DropdownMenuItem>
 					))}
-				</DropdownMenuContent>
-			</DropdownMenu>
+				</DropdownMenuSubContent>
+			</DropdownMenuSub>
 			<StartWithDesignModal
 				open={open}
 				onOpenChange={setOpen}
@@ -134,7 +131,7 @@ export function StudioDesignPicker({
 				}}
 			/>
 			{error ? (
-				<span role="alert" className="text-xs text-crimson">
+				<span role="alert" className="sr-only">
 					{error}
 				</span>
 			) : null}
