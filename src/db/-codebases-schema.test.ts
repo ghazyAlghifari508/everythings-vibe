@@ -20,10 +20,36 @@ describe("codebases schema", () => {
 				"name",
 				"name_source",
 				"onboarding_project_id",
+				"repository_identity",
 				"updated_at",
 				"user_id",
 			].sort(),
 		);
+	});
+
+	it("keeps repository identity nullable so pre-existing rows stay valid", () => {
+		// A repository synced before this column existed has no identity yet and
+		// adopts one on its next sync. A NOT NULL column would have required a
+		// fabricated default, which could bind a codebase to the wrong repository.
+		const config = getTableConfig(codebases);
+		const column = config.columns.find(
+			(c) => c.name === "repository_identity",
+		);
+		expect(column).toBeDefined();
+		expect(column?.notNull).toBe(false);
+		expect(column?.hasDefault).toBe(false);
+	});
+
+	it("indexes repository identity per owner for re-sync lookups", () => {
+		const config = getTableConfig(codebases);
+		const index = config.indexes.find(
+			(i) => i.config.name === "codebases_user_id_repository_identity_idx",
+		);
+		expect(index).toBeDefined();
+		expect(index?.config.columns.map((c) => c.name)).toEqual([
+			"user_id",
+			"repository_identity",
+		]);
 	});
 
 	it("defaults name provenance to user so a forgotten writer is never clobbered", () => {
@@ -136,5 +162,64 @@ WHERE "name" = 'Repository Lokal';`,
 			notNull: true,
 			default: "'user'",
 		});
+	});
+});
+
+describe("repository identity migration", () => {
+	const migration = readFileSync(
+		"drizzle/0033_repository_identity.sql",
+		"utf8",
+	).replace(/\r\n/g, "\n");
+
+	it("adds a nullable column and never fabricates an identity", () => {
+		// A backfill would have to guess an identity for every existing row,
+		// which is exactly the automatic merging the contract forbids.
+		expect(migration).toContain(
+			'ALTER TABLE "codebases" ADD COLUMN "repository_identity" text;',
+		);
+		expect(migration).not.toContain("NOT NULL");
+		expect(migration).not.toContain("DEFAULT");
+		expect(migration).not.toContain("UPDATE");
+	});
+
+	it("creates the per-owner index", () => {
+		expect(migration).toContain(
+			'CREATE INDEX "codebases_user_id_repository_identity_idx" ON "codebases" USING btree ("user_id","repository_identity");',
+		);
+	});
+
+	it("is registered in the Drizzle journal so the migrator actually applies it", () => {
+		const journal = JSON.parse(
+			readFileSync("drizzle/meta/_journal.json", "utf8"),
+		) as { entries: Array<{ idx: number; when: number; tag: string }> };
+		const entry = journal.entries.find(
+			(candidate) => candidate.tag === "0033_repository_identity",
+		);
+		expect(entry).toBeDefined();
+		const previous = journal.entries.find(
+			(candidate) => candidate.tag === "0032_codebase_onboarding_project_id",
+		);
+		expect(entry?.idx).toBe(previous ? previous.idx + 1 : 33);
+		expect(entry?.when).toBeGreaterThan(previous?.when ?? 0);
+	});
+
+	it("ships a snapshot carrying the new column so the next generate is drift-free", () => {
+		const snapshot = JSON.parse(
+			readFileSync("drizzle/meta/0033_snapshot.json", "utf8"),
+		) as {
+			prevId: string;
+			tables: {
+				"public.codebases": {
+					columns: Record<string, { name: string; type: string }>;
+				};
+			};
+		};
+		const previousSnapshot = JSON.parse(
+			readFileSync("drizzle/meta/0032_snapshot.json", "utf8"),
+		) as { id: string };
+		expect(snapshot.prevId).toBe(previousSnapshot.id);
+		expect(
+			snapshot.tables["public.codebases"].columns.repository_identity,
+		).toMatchObject({ name: "repository_identity", type: "text" });
 	});
 });
