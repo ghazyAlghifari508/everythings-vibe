@@ -6,13 +6,10 @@ import {
 	type PointerEvent as ReactPointerEvent,
 	useCallback,
 	useEffect,
-	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
-
-const useIsomorphicLayoutEffect =
-	typeof window !== "undefined" ? useLayoutEffect : useEffect;
+import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
 
 export interface CodebaseWorkspaceShellProps {
 	canvasOpen: boolean;

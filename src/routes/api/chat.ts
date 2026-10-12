@@ -10,6 +10,7 @@ import {
 	buildCodebasePromptBlock,
 	getProjectGenerationContext,
 	linkGenerationContext,
+	requireProjectGenerationContext,
 } from "@/lib/codebase-generation-context";
 import {
 	MAX_PREFERENCES_CHARS,
@@ -101,6 +102,7 @@ export const Route = createFileRoute("/api/chat")({
 					selectedVersionNum,
 					idempotencyKey: callerIdempotencyKey,
 					attempt: callerAttempt,
+					confirmedImpact,
 				} = body as {
 					message: string;
 					displayMessage?: string;
@@ -112,6 +114,12 @@ export const Route = createFileRoute("/api/chat")({
 					selectedVersionNum?: number;
 					idempotencyKey?: string;
 					attempt?: number;
+					/**
+					 * The user was shown the revision's impact on existing tasks and
+					 * confirmed it. Without this the ac/task lock below still applies,
+					 * so a revision can never change a locked document silently.
+					 */
+					confirmedImpact?: boolean;
 				};
 
 				if (!message?.trim())
@@ -268,7 +276,7 @@ export const Route = createFileRoute("/api/chat")({
 
 					if (mode === "revise") {
 						const { isPrdLocked } = await import("@/lib/flow-progress");
-						if (isPrdLocked(projCheck?.step)) {
+						if (isPrdLocked(projCheck?.step) && !confirmedImpact) {
 							const stageLabel =
 								projCheck?.step === "task"
 									? "Task / Kanban"
@@ -289,8 +297,19 @@ export const Route = createFileRoute("/api/chat")({
 
 					if (projCheck?.projectMode === "existing_codebase") {
 						try {
+							// Fail closed for a fresh PRD generation: a repository-aware
+							// PRD must never silently fall back to generic greenfield
+							// context. Revisions keep working on the existing document.
+							const required =
+								mode === "generate"
+									? await requireProjectGenerationContext(projectIdToUse)
+									: { context: null };
+							if ("code" in required) {
+								return Response.json(required, { status: required.status });
+							}
 							const generationContext =
-								await getProjectGenerationContext(projectIdToUse);
+								required.context ??
+								(await getProjectGenerationContext(projectIdToUse));
 							if (generationContext) {
 								codebaseBlock = buildCodebasePromptBlock(generationContext);
 								codebaseSnapshotId = generationContext.snapshotId;

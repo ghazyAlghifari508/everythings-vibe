@@ -23,6 +23,7 @@ import {
 } from "../lib/manifest.js";
 import {
 	getRepositoryName,
+	readRepositoryIdentity,
 	resolveRepositoryRoot,
 	scanRepository,
 } from "../lib/repository.js";
@@ -66,6 +67,13 @@ export interface SyncResult {
 	 * it is the only piece of repository identity that leaves this machine.
 	 */
 	repositoryName?: string;
+	/**
+	 * Normalized Git remote identity (`host/owner/repo`), or absent when the
+	 * repository has no remote. Credential-free by construction.
+	 */
+	repositoryIdentity?: string;
+	/** True when the server reported that this identity differs from the stored one. */
+	repositoryIdentityMismatch?: boolean;
 	/** True when this run created `.everythingsvibeignore` from the default template. */
 	ignoreCreated?: boolean;
 	/**
@@ -267,6 +275,11 @@ export async function syncCodebase(
 	// repository identity that leaves this machine. It is derived before the
 	// handshake so the server can label the project from the first contact.
 	const repositoryName = getRepositoryName(root) ?? undefined;
+	// The normalized Git remote identity, when the repository has one. Reading
+	// the Git config is best-effort: a repository without a remote (or without
+	// a readable config) simply reports no identity and keeps working.
+	const repositoryIdentity =
+		(await readRepositoryIdentity(root).catch(() => null)) ?? undefined;
 
 	const createClient =
 		deps.createClient ??
@@ -287,7 +300,11 @@ export async function syncCodebase(
 	// repository identity is already verified.
 	let handshake: Awaited<ReturnType<SyncClient["handshakeWithRetry"]>>;
 	try {
-		handshake = await client.handshakeWithRetry(projectId, repositoryName);
+		handshake = await client.handshakeWithRetry(
+			projectId,
+			repositoryName,
+			repositoryIdentity,
+		);
 	} catch (err) {
 		const res = handshakeFailure(projectId, repositoryName, err);
 		printResult(res, output);
@@ -338,6 +355,10 @@ export async function syncCodebase(
 	const preparation = {
 		root,
 		...(repositoryName ? { repositoryName } : {}),
+		...(repositoryIdentity ? { repositoryIdentity } : {}),
+		...(handshake.repositoryIdentityMismatch
+			? { repositoryIdentityMismatch: true }
+			: {}),
 	};
 
 	let ignoreCreated: boolean;

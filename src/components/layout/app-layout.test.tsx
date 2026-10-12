@@ -6,13 +6,14 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppLayout } from "./app-layout";
 
+const location = vi.hoisted(() => ({ pathname: "/ask/proj-1" }));
+
 vi.mock("@tanstack/react-router", () => ({
 	useLocation: ({
 		select,
 	}: {
 		select?: (l: { pathname: string }) => unknown;
-	}) =>
-		select ? select({ pathname: "/ask/proj-1" }) : { pathname: "/ask/proj-1" },
+	}) => (select ? select(location) : location),
 	Link: ({ children }: { children: React.ReactNode }) => children,
 	useNavigate: () => () => {},
 	useMatches: () => [],
@@ -32,6 +33,7 @@ let root: Root | null = null;
 let queryClient: QueryClient;
 
 beforeEach(() => {
+	location.pathname = "/ask/proj-1";
 	(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 	queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
@@ -55,6 +57,39 @@ afterEach(() => {
 });
 
 describe("AppLayout workspace scroll ownership", () => {
+	it("keeps the global navbar off both Studio routes and leaves unrelated routes intact", () => {
+		const renderLayout = () =>
+			act(() =>
+				root?.render(
+					<QueryClientProvider client={queryClient}>
+						<AppLayout>
+							<main>Studio</main>
+						</AppLayout>
+					</QueryClientProvider>,
+				),
+			);
+
+		location.pathname = "/design/studio/project-1";
+		renderLayout();
+		expect(container.querySelector("nav")).toBeNull();
+		expect(document.body.style.overflow).toBe("hidden");
+
+		// The Studio landing page owns its own navigation too: the global
+		// Pricing/Top Up navbar must not appear there either.
+		location.pathname = "/design/studio";
+		renderLayout();
+		expect(container.querySelector("nav")).toBeNull();
+		expect(document.body.style.overflow).toBe("hidden");
+
+		location.pathname = "/pricing";
+		renderLayout();
+		expect(container.querySelector("nav")).not.toBeNull();
+		expect(document.body.style.overflow).toBe("");
+
+		location.pathname = "/settings";
+		renderLayout();
+		expect(container.querySelector("nav")).toBeNull();
+	});
 	it("sizes the workspace shell to the visible viewport, not 100vh", () => {
 		act(() => {
 			root?.render(

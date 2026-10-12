@@ -6,7 +6,9 @@ import {
 	CODEBASE_IGNORE_FILENAME,
 	CODEBASE_IGNORE_TEMPLATE,
 	ensureCodebaseIgnore,
+	isBuiltInExcluded,
 	LEGACY_IGNORE_FILENAME,
+	matchesCustomIgnore,
 	readCodebaseIgnore,
 } from "./ignore.js";
 
@@ -181,5 +183,88 @@ describe("ensureCodebaseIgnore", () => {
 		expect(content).toContain("node_modules/");
 		expect(content).toContain(".env");
 		expect(content).toContain("!...");
+	});
+});
+
+describe("isBuiltInExcluded", () => {
+	it("excludes the .vercel directory at any depth", () => {
+		for (const path of [
+			".vercel/project.json",
+			".vercel/output/static/index.html",
+			"apps/web/.vercel/project.json",
+			"a/b/c/.vercel/README.txt",
+		]) {
+			expect(isBuiltInExcluded(path, false)).toEqual({
+				excluded: true,
+				reason: "built-in:build",
+			});
+		}
+		expect(isBuiltInExcluded(".vercel", true)).toEqual({
+			excluded: true,
+			reason: "built-in:build",
+		});
+	});
+
+	it("keeps deployment configuration files eligible for sync", () => {
+		for (const path of [
+			"vercel.json",
+			"apps/web/vercel.json",
+			"netlify.toml",
+			"fly.toml",
+			"railway.json",
+			"wrangler.toml",
+			".github/workflows/deploy.yml",
+		]) {
+			expect(isBuiltInExcluded(path, false)).toEqual({ excluded: false });
+		}
+	});
+
+	it("keeps the existing built-in exclusions unchanged", () => {
+		expect(isBuiltInExcluded(".git/config", false)).toEqual({
+			excluded: true,
+			reason: "built-in:vcs",
+		});
+		expect(isBuiltInExcluded("node_modules/pkg/index.js", false)).toEqual({
+			excluded: true,
+			reason: "built-in:dependency",
+		});
+		expect(isBuiltInExcluded("dist/bundle.js", false)).toEqual({
+			excluded: true,
+			reason: "built-in:build",
+		});
+		expect(isBuiltInExcluded(".next/server/page.js", false)).toEqual({
+			excluded: true,
+			reason: "built-in:build",
+		});
+		expect(isBuiltInExcluded(".env.local", false)).toEqual({
+			excluded: true,
+			reason: "built-in:dotenv",
+		});
+		expect(isBuiltInExcluded("certs/server.pem", false)).toEqual({
+			excluded: true,
+			reason: "built-in:key-material",
+		});
+		expect(isBuiltInExcluded("dump.sql", false)).toEqual({
+			excluded: true,
+			reason: "built-in:database-dump",
+		});
+		expect(isBuiltInExcluded("secrets/token", false)).toEqual({
+			excluded: true,
+			reason: "built-in:secret-directory",
+		});
+		expect(isBuiltInExcluded("src/app.ts", false)).toEqual({ excluded: false });
+	});
+
+	it("cannot be lifted by a custom negation, only narrowed further", () => {
+		// Negations are dropped at parse time, so a user rule can never re-include
+		// a built-in exclusion.
+		expect(matchesCustomIgnore(".vercel/project.json", false, [])).toBe(false);
+		expect(
+			matchesCustomIgnore(".vercel/project.json", false, ["!.vercel/"]),
+		).toBe(false);
+		// Additional user rules still apply on top of the built-ins.
+		expect(
+			matchesCustomIgnore("internal/notes.md", false, ["internal/"]),
+		).toBe(true);
 	});
 });

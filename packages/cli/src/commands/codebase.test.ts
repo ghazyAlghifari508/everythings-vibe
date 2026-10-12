@@ -87,10 +87,19 @@ function mockClient(overrides: Record<string, unknown> = {}) {
 			...SESSION,
 			status: "connected",
 		})),
-		handshakeWithRetry: vi.fn(async () => ({
-			...SESSION,
-			status: "connected",
-		})),
+		// Parameters are declared so the mock stays a faithful double of
+		// `SyncClient["handshakeWithRetry"]`: a zero-argument `vi.fn` would type
+		// its recorded calls as an empty tuple and hide what was really sent.
+		handshakeWithRetry: vi.fn(
+			async (
+				_projectId: string,
+				_repositoryName?: string,
+				_repositoryIdentity?: string,
+			) => ({
+				...SESSION,
+				status: "connected",
+			}),
+		),
 		uploadManifestWithRetry: vi.fn(
 			async (
 				_projectId: string,
@@ -595,6 +604,7 @@ describe("syncCodebase repository naming", () => {
 		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
 			"p1",
 			basename(root),
+			undefined,
 		);
 	});
 
@@ -633,6 +643,156 @@ describe("syncCodebase repository naming", () => {
 		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
 			"p1",
 			basename(root),
+			undefined,
 		);
+	});
+});
+
+describe("syncCodebase repository identity", () => {
+	it("reports the normalized Git remote identity at handshake", async () => {
+		const client = mockClient();
+		const root = trackRepo(
+			makeRepo({
+				"src/app.ts": "export const x = 1;\n",
+				".git/config":
+					'[core]\n\trepositoryformatversion = 0\n[remote "origin"]\n\turl = https://github.com/Owner/App.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n',
+			}),
+		);
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(true);
+		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
+			"p1",
+			basename(root),
+			"github.com/owner/app",
+		);
+		expect(res.repositoryIdentity).toBe("github.com/owner/app");
+	});
+
+	it("never sends a credentialed remote as identity", async () => {
+		const client = mockClient();
+		const root = trackRepo(
+			makeRepo({
+				"src/app.ts": "export const x = 1;\n",
+				".git/config":
+					'[remote "origin"]\n\turl = https://user:ghp_secrettoken@github.com/owner/app.git\n',
+			}),
+		);
+
+		await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		const identity = client.handshakeWithRetry.mock.calls[0]?.[2];
+		expect(identity).toBe("github.com/owner/app");
+		expect(String(identity)).not.toContain("ghp_secrettoken");
+		expect(String(identity)).not.toContain("user:");
+	});
+
+	it("sends no identity for a repository without a remote", async () => {
+		// A repository that was never pushed must still sync normally.
+		const client = mockClient();
+		const root = trackRepo(makeRepo({ "src/app.ts": "export const x = 1;\n" }));
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.ok).toBe(true);
+		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
+			"p1",
+			basename(root),
+			undefined,
+		);
+		expect(res.repositoryIdentity).toBeUndefined();
+	});
+
+	it("ignores a non-origin remote so an unrelated url is never reported", async () => {
+		const client = mockClient();
+		const root = trackRepo(
+			makeRepo({
+				"src/app.ts": "export const x = 1;\n",
+				".git/config":
+					'[remote "upstream"]\n\turl = https://github.com/someone-else/fork.git\n',
+			}),
+		);
+
+		await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
+			"p1",
+			basename(root),
+			undefined,
+		);
+	});
+
+	it("never exposes the absolute root in machine-readable output", async () => {
+		mockClient();
+		const root = trackRepo(
+			makeRepo({
+				"src/app.ts": "export const x = 1;\n",
+				".git/config":
+					'[remote "origin"]\n\turl = git@github.com:owner/app.git\n',
+			}),
+		);
+		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		expect(res.repositoryIdentity).toBe("github.com/owner/app");
+		const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+		expect(printed).not.toContain(root);
+		logSpy.mockRestore();
+	});
+
+	it("surfaces a server-reported identity mismatch without failing the sync", async () => {
+		const client = mockClient({
+			handshakeWithRetry: vi.fn(async () => ({
+				...SESSION,
+				status: "connected",
+				repositoryIdentityMismatch: true,
+			})),
+		});
+		const root = trackRepo(
+			makeRepo({
+				"src/app.ts": "export const x = 1;\n",
+				".git/config":
+					'[remote "origin"]\n\turl = https://github.com/owner/app.git\n',
+			}),
+		);
+
+		const res = await syncCodebase({
+			projectId: "p1",
+			syncToken: "tok",
+			root,
+			output: "json",
+		});
+
+		// Advisory only: the upload still completes.
+		expect(res.ok).toBe(true);
+		expect(res.repositoryIdentityMismatch).toBe(true);
+		expect(client.handshakeWithRetry).toHaveBeenCalledOnce();
 	});
 });

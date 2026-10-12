@@ -11,11 +11,20 @@ interface TestResponse {
 }
 interface WorkspaceLoaderData {
 	codebase: { id: string; name: string };
-	feature: { id: string; name: string; featuresStatus?: string | null } | null;
-	onboardingFeature: { id: string; name: string } | null;
+	plans: Array<{
+		id: string;
+		name: string;
+		updatedAt: string | null;
+		hasArtifacts: boolean;
+	}>;
+	featuresStatusById: Map<string, string | null>;
+	onboardingFeatureId: string | null;
 	currentSnapshotId: string | null;
+	planningSnapshotByProject: Record<string, string>;
 	analysis: null;
+	latestAnalysisAttempt: null;
 	hasStoredSnapshot: boolean;
+	canOpenFullBoard: boolean;
 }
 
 interface WorkspaceRouteOptions {
@@ -156,11 +165,22 @@ function syncStatus(snapshotId: string, analysisStatus: "pending" | "ready") {
 function setLoaderData(snapshotId: string) {
 	routeHarness.loaderData = {
 		codebase: { id: "codebase-1", name: "Workspace repo" },
-		feature: { id: PROJECT_ID, name: "Workspace feature" },
-		onboardingFeature: { id: PROJECT_ID, name: "Workspace feature" },
+		plans: [
+			{
+				id: PROJECT_ID,
+				name: "Workspace feature",
+				updatedAt: "2026-10-01T00:00:00.000Z",
+				hasArtifacts: true,
+			},
+		],
+		featuresStatusById: new Map([[PROJECT_ID, null]]),
+		onboardingFeatureId: PROJECT_ID,
 		currentSnapshotId: snapshotId,
+		planningSnapshotByProject: { [PROJECT_ID]: snapshotId },
 		analysis: null,
+		latestAnalysisAttempt: null,
 		hasStoredSnapshot: false,
+		canOpenFullBoard: true,
 	};
 }
 
@@ -329,11 +349,22 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 	it("opens workspace with 0 file tersinkron badge when session is expired but usable empty snapshot exists", async () => {
 		routeHarness.loaderData = {
 			codebase: { id: "codebase-1", name: "Workspace repo" },
-			feature: { id: PROJECT_ID, name: "Workspace feature" },
-			onboardingFeature: { id: PROJECT_ID, name: "Workspace feature" },
+			plans: [
+				{
+					id: PROJECT_ID,
+					name: "Workspace feature",
+					updatedAt: "2026-10-01T00:00:00.000Z",
+					hasArtifacts: true,
+				},
+			],
+			featuresStatusById: new Map([[PROJECT_ID, null]]),
+			onboardingFeatureId: PROJECT_ID,
 			currentSnapshotId: "snapshot-empty",
+			planningSnapshotByProject: { [PROJECT_ID]: "snapshot-empty" },
 			analysis: null,
+			latestAnalysisAttempt: null,
 			hasStoredSnapshot: true,
+			canOpenFullBoard: true,
 		};
 		const fetchMock = vi.fn(
 			async (input: RequestInfo | URL, _init?: RequestInit) => {
@@ -361,5 +392,125 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 		});
 		const badge = screen.getByTestId("codebase-sync-badge");
 		expect(badge.textContent).toBe("0 file tersinkron");
+	});
+});
+
+describe("workspace reopen never reports an empty plan", () => {
+	beforeEach(() => {
+		routeHarness.serverFn.mockClear();
+	});
+
+	afterEach(() => {
+		cleanup();
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+	});
+
+	it("shows a loading surface, not the initial composer, while artifacts are read", async () => {
+		setLoaderData(CURRENT_SNAPSHOT_ID);
+		// The artifact reads never settle, which is exactly the window in which
+		// the old build painted "Apa yang ingin kamu bangun?".
+		const pending = defer<TestResponse>();
+		const fetchMock = vi.fn(
+			async (input: RequestInfo | URL, _init?: RequestInit) => {
+				const url = String(input);
+				if (url.startsWith("/api/codebases/codebase-1/status")) {
+					return response(syncStatus(CURRENT_SNAPSHOT_ID, "ready"));
+				}
+				if (url.endsWith("/versions") || url.endsWith("/ac-versions")) {
+					return pending.promise;
+				}
+				throw new Error(`unexpected fetch GET ${url}`);
+			},
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		renderWorkspaceRoute();
+		await waitFor(() => {
+			expect(screen.getByTestId("codebase-workspace-page")).toBeDefined();
+		});
+
+		expect(screen.queryByTestId("codebase-chat-loading")).not.toBeNull();
+		expect(document.body.textContent).not.toContain(
+			"Apa yang ingin kamu bangun?",
+		);
+	});
+
+	it("reports which artifact failed instead of showing an empty plan", async () => {
+		setLoaderData(CURRENT_SNAPSHOT_ID);
+		const fetchMock = vi.fn(
+			async (input: RequestInfo | URL, _init?: RequestInit) => {
+				const url = String(input);
+				if (url.startsWith("/api/codebases/codebase-1/status")) {
+					return response(syncStatus(CURRENT_SNAPSHOT_ID, "ready"));
+				}
+				// A real failure: the artifact exists server-side but this read
+				// cannot reach it.
+				if (url.endsWith("/versions") || url.endsWith("/ac-versions")) {
+					return { ok: false, status: 500, json: async () => ({}) };
+				}
+				throw new Error(`unexpected fetch GET ${url}`);
+			},
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		renderWorkspaceRoute();
+		await waitFor(() => {
+			expect(screen.getByTestId("codebase-artifacts-failed")).toBeDefined();
+		});
+
+		expect(
+			screen.getByTestId("codebase-artifacts-failed").textContent,
+		).toContain("PRD");
+		expect(document.body.textContent).not.toContain(
+			"Apa yang ingin kamu bangun?",
+		);
+	});
+
+	it("never starts a billable analysis just because a plan was opened", async () => {
+		setLoaderData(CURRENT_SNAPSHOT_ID);
+		const fetchMock = vi.fn(
+			async (input: RequestInfo | URL, _init?: RequestInit) => {
+				const url = String(input);
+				if (url.startsWith("/api/codebases/codebase-1/status")) {
+					// The snapshot has no analysis at all: the old build treated
+					// that as a reason to start one.
+					return response({
+						projectId: PROJECT_ID,
+						sessionId: "sync-session",
+						status: "uploaded",
+						snapshotId: CURRENT_SNAPSHOT_ID,
+						analysisStatus: undefined,
+					});
+				}
+				if (url.endsWith("/versions") || url.endsWith("/ac-versions")) {
+					return response([]);
+				}
+				throw new Error(`unexpected fetch GET ${url}`);
+			},
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		renderWorkspaceRoute();
+		await waitFor(() => {
+			expect(screen.getByTestId("codebase-workspace-page")).toBeDefined();
+		});
+
+		// Give the status polling a couple of cycles to prove the absence is
+		// steady state and not just an early render.
+		await waitFor(() => {
+			expect(
+				fetchMock.mock.calls.filter(([url]) =>
+					String(url).startsWith("/api/codebases/codebase-1/status"),
+				).length,
+			).toBeGreaterThanOrEqual(1);
+		});
+		expect(
+			fetchMock.mock.calls.some(
+				([url, init]) =>
+					String(url).includes("/codebase/analysis") &&
+					(init as RequestInit | undefined)?.method === "POST",
+			),
+		).toBe(false);
 	});
 });

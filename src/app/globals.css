@@ -84,6 +84,10 @@
 	--border-medium: #d4d4d8;
 	/* Canvas dot grid */
 	--canvas-dot-color: rgba(15, 23, 42, 0.16);
+	/* Studio frame shimmer: neutral base + a low-contrast light band so the
+	   sweep reads as a sheen in both themes without glowing. */
+	--studio-shimmer-base: #ececee;
+	--studio-shimmer-sweep: rgba(255, 255, 255, 0.72);
 
 	/* Scrollbar */
 	--scrollbar-thumb: rgba(9, 9, 11, 0.18);
@@ -138,6 +142,8 @@
 	--border-medium: #383b3f;
 	/* Canvas dot grid */
 	--canvas-dot-color: rgba(255, 255, 255, 0.15);
+	--studio-shimmer-base: #1b1d20;
+	--studio-shimmer-sweep: rgba(255, 255, 255, 0.07);
 	/* Scrollbar */
 	--scrollbar-thumb: rgba(138, 143, 152, 0.28);
 	--scrollbar-thumb-hover: rgba(208, 214, 224, 0.4);
@@ -435,6 +441,106 @@ input.bg-steel:autofill:active {
 	color: var(--text-secondary);
 }
 
+/* Read-only source preview in the existing-codebase workspace.
+   Scoped to the preview so PRD/document code blocks keep their own styling.
+   Semantic token colors are defined as scoped variables so the viewer reads as
+   a real code editor in both themes: light and dark each get their own coherent
+   palette, while text, punctuation, and indentation stay on the inherited
+   foreground. */
+.codebase-source-code {
+	color: var(--color-mist);
+	font-variant-ligatures: none;
+	tab-size: 2;
+
+	--code-comment: #6e7781;
+	--code-keyword: #8250df;
+	--code-string: #0a7b34;
+	--code-number: #b35900;
+	--code-function: #0550ae;
+	--code-type: #953800;
+	--code-variable: #cf222e;
+	--code-tag: #116329;
+	--code-meta: #6e7781;
+}
+
+.dark .codebase-source-code {
+	--code-comment: #7f848e;
+	--code-keyword: #c678dd;
+	--code-string: #98c379;
+	--code-number: #d19a66;
+	--code-function: #61afef;
+	--code-type: #e5c07b;
+	--code-variable: #e06c75;
+	--code-tag: #e06c75;
+	--code-meta: #7f848e;
+}
+
+.codebase-source-code .hljs-comment,
+.codebase-source-code .hljs-quote {
+	color: var(--code-comment);
+	font-style: italic;
+}
+
+.codebase-source-code .hljs-keyword,
+.codebase-source-code .hljs-selector-tag,
+.codebase-source-code .hljs-literal,
+.codebase-source-code .hljs-doctag,
+.codebase-source-code .hljs-formula,
+.codebase-source-code .hljs-meta-keyword {
+	color: var(--code-keyword);
+}
+
+.codebase-source-code .hljs-string,
+.codebase-source-code .hljs-regexp,
+.codebase-source-code .hljs-attr,
+.codebase-source-code .hljs-attribute,
+.codebase-source-code .hljs-meta-string,
+.codebase-source-code .hljs-addition {
+	color: var(--code-string);
+}
+
+.codebase-source-code .hljs-number,
+.codebase-source-code .hljs-symbol,
+.codebase-source-code .hljs-bullet,
+.codebase-source-code .hljs-link,
+.codebase-source-code .hljs-section {
+	color: var(--code-number);
+}
+
+.codebase-source-code .hljs-title,
+.codebase-source-code .hljs-title.function_,
+.codebase-source-code .hljs-built_in {
+	color: var(--code-function);
+}
+
+.codebase-source-code .hljs-type,
+.codebase-source-code .hljs-title.class_,
+.codebase-source-code .hljs-class .hljs-title,
+.codebase-source-code .hljs-params {
+	color: var(--code-type);
+}
+
+.codebase-source-code .hljs-variable,
+.codebase-source-code .hljs-template-variable,
+.codebase-source-code .hljs-property,
+.codebase-source-code .hljs-selector-id,
+.codebase-source-code .hljs-selector-class {
+	color: var(--code-variable);
+}
+
+.codebase-source-code .hljs-tag,
+.codebase-source-code .hljs-name {
+	color: var(--code-tag);
+}
+
+.codebase-source-code .hljs-meta {
+	color: var(--code-meta);
+}
+
+.codebase-source-code .hljs-deletion {
+	color: var(--code-variable);
+}
+
 @keyframes scrapeProgressIndeterminate {
 	from {
 		transform: translateX(-110%);
@@ -532,6 +638,17 @@ input.bg-steel:autofill:active {
 	display: block;
 	width: 100%;
 	height: 100%;
+}
+
+/* A failed request shows its own glyph and label, so a failure is never dressed
+   up as a completed run. */
+.thought-line__glyph[data-failed] {
+	color: var(--color-crimson);
+}
+
+.thought-line__text--done[data-failed][data-active] {
+	color: var(--color-crimson);
+	opacity: 1;
 }
 
 .thought-line__dot {
@@ -988,5 +1105,47 @@ input.bg-steel:autofill:active {
 	.drawer-content[data-state="closed"] {
 		animation: none;
 		transition: none;
+	}
+}
+
+/* Full-surface shimmer for a frame whose real visual is not displayable yet.
+   Technique adapted from the Magic UI shine-border registry item (a large
+   animated gradient sweep) but applied to the entire artboard surface instead
+   of a border ring, so the whole card reads as one continuous loading surface.
+   Only `transform` animates, so the sweep stays on the compositor. */
+.studio-frame-shimmer {
+	position: relative;
+	overflow: hidden;
+	background-color: var(--studio-shimmer-base);
+}
+
+.studio-frame-shimmer::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-image: linear-gradient(
+		90deg,
+		transparent 0%,
+		var(--studio-shimmer-sweep) 50%,
+		transparent 100%
+	);
+	transform: translateX(-100%);
+	animation: studioFrameShimmer 2.4s linear infinite;
+	will-change: transform;
+}
+
+@keyframes studioFrameShimmer {
+	to {
+		transform: translateX(100%);
+	}
+}
+
+/* Reduced motion keeps the neutral surface and drops the sweep entirely
+   rather than freezing a bright band mid-artboard. */
+@media (prefers-reduced-motion: reduce) {
+	.studio-frame-shimmer::after {
+		animation: none;
+		transform: none;
+		opacity: 0;
 	}
 }

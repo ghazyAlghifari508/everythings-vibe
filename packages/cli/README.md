@@ -63,13 +63,29 @@ sync. Running the command from a subdirectory is safe.
 The CLI automatically excludes:
 - Environment variables and secrets (`.env*`, `*.pem`, `*.key`, `*.p12`)
 - Dependency and build folders (`node_modules/`, `dist/`, `build/`, `coverage/`, `.git/`)
+- Local deployment state folders (`.vercel/`) at any depth — the folder only; deployment
+  configuration that is meant to be versioned (`vercel.json`, `netlify.toml`, `fly.toml`,
+  `railway.json`, `wrangler.toml`, workflows) is still synchronized
 - Binary files and SQLite/local database files
 - Its own ignore control files (`.everythingsvibeignore` and legacy `.prdfyignore`)
 
 Custom exclusions can be added to `.everythingsvibeignore` in your repository root. The
 file is created for you on the first sync with the built-in coverage documented
 in its header, so you only add repository-specific patterns. A pre-existing
-`.prdfyignore` keeps working until you create the canonical file.
+`.prdfyignore` keeps working until you create the canonical file. Negation patterns are
+inert, so a custom rule can never re-include a built-in exclusion.
+
+#### Filtering applies to new syncs only
+
+Built-in exclusions are evaluated by the CLI while it builds a snapshot. A snapshot that
+was already uploaded keeps the file set it was uploaded with — updating the CLI does not
+rewrite stored snapshots. After upgrading to **3.2.0** (`.vercel/` exclusion), run
+`vibeeverything codebase sync` again to produce a snapshot without the local Vercel
+state directory. The repository working tree is never modified by this: the CLI only
+reads files and never edits your `.gitignore`, `.everythingsvibeignore`, or `.vercel/`.
+
+The server-side minimum CLI version stays at **2.0.0**; this filtering change does not
+require it to be raised.
 
 ### Authentication for Task Management
 

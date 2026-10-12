@@ -5,7 +5,7 @@ import {
 	animate,
 	useReducedMotionConfig,
 } from "framer-motion";
-import { Check, ChevronDown, Sparkles } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Sparkles } from "lucide-react";
 import {
 	type CSSProperties,
 	type ReactNode,
@@ -32,6 +32,13 @@ export interface ThoughtLineProps {
 	label?: string;
 	doneLabel?: string;
 	working: boolean;
+	/**
+	 * The request this line reports on ended in failure. Renders the failed
+	 * state instead of the settled checkmark, so a failure is never dressed up
+	 * as a completed run.
+	 */
+	failed?: boolean;
+	failedLabel?: string;
 	glyph?: "sparkle" | "dot" | "none" | ReactNode;
 	steps?: readonly string[];
 	/** Real index into steps, when the parent tracks a live pipeline stage. */
@@ -61,6 +68,13 @@ export interface ThoughtLineProps {
 	 * instant, never from component mount.
 	 */
 	startedAt?: number | string | Date;
+	/**
+	 * Real settle time of the request this line reports on. When present, the
+	 * settled duration is measured from `startedAt` to `finishedAt` instead of
+	 * to "now", so a line mounted after the work already finished still reports
+	 * the actual duration rather than the time since the page was opened.
+	 */
+	finishedAt?: number | string | Date | null;
 	/** Embeds the line inline instead of rendering it as a standalone card. */
 	bare?: boolean;
 }
@@ -96,6 +110,8 @@ export function ThoughtLine({
 	label = "Thinking",
 	doneLabel = "Selesai",
 	working,
+	failed = false,
+	failedLabel = "Gagal",
 	glyph = "sparkle",
 	steps = EMPTY_STEPS,
 	activeStep,
@@ -114,6 +130,7 @@ export function ThoughtLine({
 	activity,
 	thinkingText,
 	startedAt,
+	finishedAt,
 	bare = false,
 }: ThoughtLineProps) {
 	const reduce = useReducedMotionConfig();
@@ -133,6 +150,7 @@ export function ThoughtLine({
 	const traceId = useId();
 
 	const isWorking = working;
+	const isFailed = failed && !isWorking;
 	const depth = reduce === true ? Math.min(breathDepth, 0.2) : breathDepth;
 	const period = reduce === true ? breathPeriod * 1.5 : breathPeriod;
 	const trough = 1 - depth;
@@ -142,12 +160,27 @@ export function ThoughtLine({
 	// the last honest label rather than inventing a message.
 	const reportedActivity = activity?.trim();
 	const workingText = reportedActivity ? reportedActivity : label;
-	const doneText = doneLabel;
+	// A failed request reports its own outcome instead of the success label, so
+	// the settled line never reads as a completed run.
+	const settledText = isFailed ? failedLabel : doneLabel;
 	const hasThinking = (thinkingText?.trim().length ?? 0) > 0;
 	// Bare embeds a single inline activity line inside a parent card, so the
 	// fold-out trace belongs to the parent layout instead of this component.
 	const hasTrace = !bare && (steps.length > 0 || hasThinking);
 	const toggle = hasTrace && collapsible;
+
+	// A settled request reports the duration it actually took. The finish epoch
+	// is the recorded settle time, never "now", so remounting the line after the
+	// work finished cannot inflate the reported duration.
+	const settledDeciseconds =
+		finishedAt === undefined || finishedAt === null
+			? null
+			: Math.max(
+					0,
+					(resolveStartEpoch(finishedAt, Date.now()) -
+						startedAtRef.current) /
+						100,
+				);
 
 	useEffect(() => {
 		startedAtRef.current = resolveStartEpoch(startedAt, startedAtRef.current);
@@ -235,7 +268,9 @@ export function ThoughtLine({
 				timerRef.current.textContent = formatElapsed(deciseconds);
 		};
 		if (!isWorking) {
-			paint(decisecondsRef.current);
+			// The recorded settle time wins over the last ticked value, so a line
+			// mounted after the work finished still shows the real duration.
+			paint(settledDeciseconds ?? decisecondsRef.current);
 			return undefined;
 		}
 		// Reads startedAtRef on every tick, so a stage change re-anchors the clock
@@ -245,7 +280,7 @@ export function ThoughtLine({
 			paint(Math.max(0, (Date.now() - startedAtRef.current) / 100));
 		}, 100);
 		return () => clearInterval(id);
-	}, [isWorking]);
+	}, [isWorking, settledDeciseconds]);
 
 	// Keeps the clock visually anchored to the active label while the two labels
 	// cross-fade. The ResizeObserver re-anchors it whenever either label's width
@@ -284,11 +319,11 @@ export function ThoughtLine({
 		settledRef.current = true;
 		setAnnounce(
 			showTimer
-				? `${doneText} selama ${spokenElapsed(decisecondsRef.current)}`
-				: doneText,
+				? `${settledText} selama ${spokenElapsed(decisecondsRef.current)}`
+				: settledText,
 		);
 		latest.current.onSettle?.(decisecondsRef.current / 10);
-	}, [isWorking, workingText, doneText, showTimer]);
+	}, [isWorking, workingText, settledText, showTimer]);
 
 	useEffect(() => {
 		if (working) settledRef.current = false;
@@ -311,8 +346,15 @@ export function ThoughtLine({
 	const head = (
 		<>
 			{glyph !== "none" ? (
-				<span ref={glyphRef} className="thought-line__glyph" aria-hidden="true">
-					{glyph === "sparkle" ? (
+				<span
+					ref={glyphRef}
+					className="thought-line__glyph"
+					data-failed={isFailed ? "" : undefined}
+					aria-hidden="true"
+				>
+					{isFailed ? (
+						<AlertCircle className="size-full" />
+					) : glyph === "sparkle" ? (
 						<Sparkles className="size-full" />
 					) : glyph === "dot" ? (
 						<span className="thought-line__dot" />
@@ -339,8 +381,9 @@ export function ThoughtLine({
 					ref={doneRef}
 					className="thought-line__text thought-line__text--done"
 					data-active={isWorking ? undefined : ""}
+					data-failed={isFailed ? "" : undefined}
 				>
-					{doneText}
+					{settledText}
 				</span>
 			</span>
 			{showTimer ? (
@@ -373,6 +416,7 @@ export function ThoughtLine({
 		<div
 			className={cn("thought-line", !bare && "thought-line--card", className)}
 			data-working={isWorking ? "" : undefined}
+			data-failed={isFailed ? "" : undefined}
 			data-open={open && hasTrace ? "" : undefined}
 			style={styleVars}
 		>

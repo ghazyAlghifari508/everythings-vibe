@@ -127,6 +127,85 @@ describe("ThoughtLine settle contract", () => {
 	});
 });
 
+describe("ThoughtLine settled outcome", () => {
+	it("reports the measured duration between the real start and settle times", () => {
+		const { container } = render(
+			<ThoughtLine
+				working={false}
+				label="Menyusun PRD"
+				doneLabel="PRD selesai"
+				startedAt={1_000}
+				finishedAt={19_400}
+			/>,
+		);
+		// 18.4s is the measured duration, not the time since mount.
+		expect(container.textContent).toContain("PRD selesai");
+		expect(container.querySelector('[role="timer"]')?.textContent).toBe("18.4s");
+	});
+
+	it("renders the failed state instead of a completed checkmark", () => {
+		const { container } = render(
+			<ThoughtLine
+				working={false}
+				failed
+				label="Menyusun Acceptance Criteria"
+				doneLabel="Acceptance Criteria selesai"
+				failedLabel="Gagal menyusun Acceptance Criteria"
+				startedAt={0}
+				finishedAt={2_500}
+			/>,
+		);
+		expect(container.textContent).toContain("Gagal menyusun Acceptance Criteria");
+		expect(container.textContent).not.toContain("Acceptance Criteria selesai");
+		expect(container.querySelector('[role="timer"]')?.textContent).toBe("2.5s");
+	});
+
+	it("marks the failed line so the failure is visible, not just worded", () => {
+		const { container } = render(
+			<ThoughtLine
+				working={false}
+				failed
+				label="Menyusun PRD"
+				doneLabel="PRD selesai"
+				failedLabel="Gagal menyusun PRD"
+			/>,
+		);
+		expect(hasAttr(container.querySelector(".thought-line"), "data-failed")).toBe(
+			true,
+		);
+		expect(
+			hasAttr(container.querySelector(".thought-line__glyph"), "data-failed"),
+		).toBe(true);
+	});
+
+	it("keeps a working line out of the failed state even when the flag is set", () => {
+		const { container } = render(
+			<ThoughtLine working failed label="Menyusun PRD" doneLabel="PRD selesai" />,
+		);
+		expect(hasAttr(container.querySelector(".thought-line"), "data-failed")).toBe(
+			false,
+		);
+	});
+
+	it("shows the model's real streamed reasoning verbatim", () => {
+		const { container } = render(
+			<ThoughtLine
+				working
+				label="Menyusun PRD"
+				thinkingText="menimbang struktur dokumen"
+			/>,
+		);
+		expect(container.textContent).toContain("menimbang struktur dokumen");
+	});
+
+	it("renders no reasoning panel when the endpoint streamed none", () => {
+		const { container } = render(
+			<ThoughtLine working label="Menyusun PRD" thinkingText="" />,
+		);
+		expect(container.textContent).not.toContain("Proses Berpikir Model");
+	});
+});
+
 describe("ThoughtLine trace folding", () => {
 	it("renders the vertical step list and collapses it after settling", () => {
 		const { container, rerender } = renderLine({ steps: STEPS });

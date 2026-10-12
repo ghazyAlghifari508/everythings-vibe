@@ -87,3 +87,18 @@ The model remains responsible for semantic relevance. Deterministic enforcement 
 - Live authenticated full browser flow E2E is currently unavailable in automated runs due to port 3001 being unauthenticated while Playwright configuration is tied to port 3000.
 - Test semantic state styles and computed contrast in light/dark themes for default, hover, focus-visible, and active.
 - Keep changes on `feature/vibeplan-existing-codebase`; commit each verified logical milestone atomically, push to its resolved upstream, and verify clean tree and zero outgoing commits.
+
+## Amendment: product-oriented starter copy
+
+The first implementation produced technically correct but unusable starter text: suggestions read like instructions to a coding agent ("open this file, use this hook") rather than product improvements a repository owner could evaluate.
+
+The contract now splits the two channels:
+
+| Channel | Content | Enforced by |
+| --- | --- | --- |
+| `title`, `description`, `prompt` (user-facing) | Goal, expected behavior, user value. No file names, paths, hooks, type names, or algorithms. | System prompt rules 8–9 plus `findStarterTechnicalLeaks`, a token-shape guard |
+| `relevantPaths`, `findings`, `moduleMap` (internal) | Proven repository locations, validated against the snapshot manifest | `parseAnalysisOutput` trusted-path allowlist |
+
+`findStarterTechnicalLeaks` matches token shapes (a source-file extension, a `useXxx` hook identifier), never a fixed word list, so it holds for any repository domain. A leak raises the new `technical_leak` validation reason, which the existing bounded single-repair attempt converts into one rewritten analysis — no extra model call on render, and no client-side generation.
+
+Backward compatibility: the guard runs only on freshly generated output. Persisted analyses are still parsed with the plain schema, so history the user already sees is never invalidated. Suggestions produced before this amendment keep their stored wording until the user explicitly triggers the persisted refresh action; no analysis record is rewritten and no background model call is issued.

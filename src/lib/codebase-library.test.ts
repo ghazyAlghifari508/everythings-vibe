@@ -4,7 +4,7 @@ import {
 	type CodebaseLibraryItem,
 	filterLibraryItems,
 	getLibraryItemHref,
-	isCodebaseLibraryReady,
+	hasReadyLibraryAnalysis,
 	libraryAnalysisLabels,
 	mapLibraryStatus,
 	NEW_REPOSITORY_HREF,
@@ -26,6 +26,8 @@ function makeItem(
 		language: null,
 		packageManager: null,
 		hasReadyAnalysis: false,
+		hasUsableSnapshot: true,
+		planCount: 0,
 		...overrides,
 	};
 }
@@ -169,16 +171,19 @@ describe("pickLibraryAnalysis", () => {
 	});
 });
 
-describe("isCodebaseLibraryReady", () => {
+describe("hasReadyLibraryAnalysis", () => {
 	it("is strict when no snapshot exists", () => {
 		expect(
-			isCodebaseLibraryReady({ latestSnapshotId: null, matchedAnalysis: null }),
+			hasReadyLibraryAnalysis({
+				latestSnapshotId: null,
+				matchedAnalysis: null,
+			}),
 		).toBe(false);
 	});
 
 	it("is strict when analysis is absent", () => {
 		expect(
-			isCodebaseLibraryReady({
+			hasReadyLibraryAnalysis({
 				latestSnapshotId: "snap-1",
 				matchedAnalysis: null,
 			}),
@@ -187,7 +192,7 @@ describe("isCodebaseLibraryReady", () => {
 
 	it("is false when the matched analysis points at a stale snapshot", () => {
 		expect(
-			isCodebaseLibraryReady({
+			hasReadyLibraryAnalysis({
 				latestSnapshotId: "snap-2",
 				matchedAnalysis: {
 					snapshotId: "snap-1",
@@ -200,7 +205,7 @@ describe("isCodebaseLibraryReady", () => {
 
 	it("is false while analysis is pending", () => {
 		expect(
-			isCodebaseLibraryReady({
+			hasReadyLibraryAnalysis({
 				latestSnapshotId: "snap-1",
 				matchedAnalysis: {
 					snapshotId: "snap-1",
@@ -213,7 +218,7 @@ describe("isCodebaseLibraryReady", () => {
 
 	it("is false when analysis failed", () => {
 		expect(
-			isCodebaseLibraryReady({
+			hasReadyLibraryAnalysis({
 				latestSnapshotId: "snap-1",
 				matchedAnalysis: {
 					snapshotId: "snap-1",
@@ -226,7 +231,7 @@ describe("isCodebaseLibraryReady", () => {
 
 	it("is false when ready analysis output failed validation", () => {
 		expect(
-			isCodebaseLibraryReady({
+			hasReadyLibraryAnalysis({
 				latestSnapshotId: "snap-1",
 				matchedAnalysis: {
 					snapshotId: "snap-1",
@@ -239,7 +244,7 @@ describe("isCodebaseLibraryReady", () => {
 
 	it("is true only for a ready, parsed analysis bound to the latest snapshot", () => {
 		expect(
-			isCodebaseLibraryReady({
+			hasReadyLibraryAnalysis({
 				latestSnapshotId: "snap-1",
 				matchedAnalysis: {
 					snapshotId: "snap-1",
@@ -398,44 +403,73 @@ describe("buildCodebaseLibraryItems", () => {
 		expect(items.map((item) => item.id)).not.toContain("cb-draft");
 	});
 
-	it("keeps only snapshots whose project has a ready, valid analysis for the latest snapshot", () => {
+	it("lists every codebase whose newest snapshot is usable for planning", () => {
+		// Readiness is a persistence question, not an analysis question: a
+		// repository with a usable snapshot stays reachable while its analysis is
+		// pending or failed, because the user's planning is attached to it.
 		const items = buildCodebaseLibraryItems(baseInput());
-		expect(items.map((item) => item.id)).toEqual(["cb-ready"]);
-		expect(items.every((item) => item.hasReadyAnalysis)).toBe(true);
-		expect(
-			items[0].summary === null || typeof items[0].summary === "string",
-		).toBe(true);
+		expect(items.map((item) => item.id).sort()).toEqual(
+			[
+				"cb-bad-output",
+				"cb-failed",
+				"cb-pending",
+				"cb-ready",
+				"cb-stale",
+				"cb-uploaded-no-analysis",
+			].sort(),
+		);
 	});
 
-	it("hides an uploaded snapshot without a ready analysis", () => {
-		expect(
-			buildCodebaseLibraryItems(baseInput()).map((i) => i.id),
-		).not.toContain("cb-uploaded-no-analysis");
+	it("marks only a ready, valid analysis for the newest snapshot as analysed", () => {
+		const items = buildCodebaseLibraryItems(baseInput());
+		const byId = new Map(items.map((item) => [item.id, item]));
+		expect(byId.get("cb-ready")?.hasReadyAnalysis).toBe(true);
+		expect(byId.get("cb-uploaded-no-analysis")?.hasReadyAnalysis).toBe(false);
+		expect(byId.get("cb-pending")?.hasReadyAnalysis).toBe(false);
+		expect(byId.get("cb-failed")?.hasReadyAnalysis).toBe(false);
+		expect(byId.get("cb-bad-output")?.hasReadyAnalysis).toBe(false);
 	});
 
-	it("hides pending and failed analyses", () => {
-		const ids = buildCodebaseLibraryItems(baseInput()).map((i) => i.id);
-		expect(ids).not.toContain("cb-pending");
-		expect(ids).not.toContain("cb-failed");
+	it("does not count an analysis bound to an older snapshot as analysed", () => {
+		// A re-synced repository is not analysed until its new snapshot is.
+		const byId = new Map(
+			buildCodebaseLibraryItems(baseInput()).map((item) => [item.id, item]),
+		);
+		expect(byId.get("cb-stale")?.hasReadyAnalysis).toBe(false);
+		expect(byId.get("cb-stale")?.hasUsableSnapshot).toBe(true);
 	});
 
-	it("hides a codebase whose ready analysis is bound to an older snapshot than the latest", () => {
-		expect(
-			buildCodebaseLibraryItems(baseInput()).map((i) => i.id),
-		).not.toContain("cb-stale");
+	it("reports a usable snapshot without a ready analysis as synced, not analysed", () => {
+		const byId = new Map(
+			buildCodebaseLibraryItems(baseInput()).map((item) => [item.id, item]),
+		);
+		const uploaded = byId.get("cb-uploaded-no-analysis");
+		expect(mapLibraryStatus(uploaded?.snapshotStatus, false)).toBe(
+			"Tersinkron",
+		);
+		expect(mapLibraryStatus(uploaded?.snapshotStatus, true)).toBe("Siap");
 	});
 
-	it("hides a codebase whose ready analysis output is not parseable", () => {
-		expect(
-			buildCodebaseLibraryItems(baseInput()).map((i) => i.id),
-		).not.toContain("cb-bad-output");
+	it("keeps the summary of the newest ready analysis", () => {
+		const items = buildCodebaseLibraryItems(baseInput());
+		const ready = items.find((item) => item.id === "cb-ready");
+		expect(ready?.summary === null || typeof ready?.summary === "string").toBe(
+			true,
+		);
 	});
 
-	it("scopes search and pagination only to visible ready projects", () => {
+	it("scopes search and pagination only to visible repositories", () => {
 		const items = buildCodebaseLibraryItems(baseInput());
 		const matches = filterLibraryItems(items, "draft");
 		expect(matches).toEqual([]);
-		expect(items.length).toBe(1);
+		expect(items.length).toBe(6);
+	});
+
+	it("counts the feature plans of each repository", () => {
+		const byId = new Map(
+			buildCodebaseLibraryItems(baseInput()).map((item) => [item.id, item]),
+		);
+		expect(byId.get("cb-ready")?.planCount).toBe(1);
 	});
 
 	it("treats a codebase with no ready items as an empty library state", () => {

@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
-import { buildCodebaseLibraryItems } from "@/lib/codebase-library";
+import {
+	buildCodebaseLibraryItems,
+	mapLibraryStatus,
+} from "@/lib/codebase-library";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
 import {
 	selectLatestCodebaseSnapshots,
@@ -15,6 +18,7 @@ import {
 	formatCodebaseSyncBadge,
 	getCodebaseSessionRequestBody,
 	resolveWorkspaceSnapshotReady,
+	toSourcePreviewState,
 } from "./$id";
 
 describe("decideCodebaseDetailEntry", () => {
@@ -298,14 +302,12 @@ describe("codebase list filtering gate", () => {
 });
 
 describe("codebase library readiness vs workspace availability", () => {
-	// Known product inconsistency (not a bug in this task's scope): the library
-	// lists a codebase only once validated analysis exists for its newest
-	// snapshot, while the workspace opens as soon as the snapshot is synced. A
-	// codebase can therefore be usable at /codebases/:id yet absent from
-	// Project Tersimpan while analysis is still pending or failed. This test
-	// pins the current behavior so a future decision to relax it is a
-	// deliberate, visible change rather than an accident.
-	it("still hides a synced-but-unanalyzed codebase from the library", () => {
+	// Readiness is a persistence question: a codebase with a usable snapshot is
+	// listed, and analysis progress is reported as its own signal. Previously the
+	// library required a ready analysis, so a repository whose analysis was still
+	// running (or had failed) disappeared from Project Tersimpan even though its
+	// workspace and planning were perfectly usable.
+	it("lists a synced codebase whose analysis is still pending", () => {
 		const items = buildCodebaseLibraryItems({
 			codebases: [
 				{
@@ -333,6 +335,37 @@ describe("codebase library readiness vs workspace availability", () => {
 					output: null,
 				},
 			],
+		});
+
+		expect(items).toHaveLength(1);
+		expect(items[0].id).toBe("cb-pending");
+		// The analysis signal stays honest: listed, but not analysed yet.
+		expect(items[0].hasReadyAnalysis).toBe(false);
+		expect(items[0].hasUsableSnapshot).toBe(true);
+		expect(mapLibraryStatus(items[0].snapshotStatus, false)).toBe("Tersinkron");
+	});
+
+	it("still hides a codebase that never produced a usable snapshot", () => {
+		const items = buildCodebaseLibraryItems({
+			codebases: [
+				{
+					id: "cb-uploading",
+					name: "Uploading Repo",
+					createdAt: new Date("2026-09-23T10:00:00.000Z"),
+					updatedAt: new Date("2026-09-23T10:00:00.000Z"),
+				},
+			],
+			snapshots: [
+				{
+					id: "snap-uploading",
+					codebaseId: "cb-uploading",
+					createdAt: new Date("2026-09-23T10:00:00.000Z"),
+					fileCount: 0,
+					status: "uploading",
+				},
+			],
+			projects: [{ id: "proj-uploading", codebaseId: "cb-uploading" }],
+			analyses: [],
 		});
 
 		expect(items).toHaveLength(0);
@@ -398,6 +431,182 @@ describe("codebase detail incomplete sync handling", () => {
 	});
 });
 
+describe("ask options repository grounding", () => {
+	const askOptionsSource = readFileSync(
+		"src/routes/api/ask/options.ts",
+		"utf8",
+	);
+
+	it("fails closed when repository context cannot be read", () => {
+		// A repository-aware question set must never be generated without the
+		// snapshot context: an unexpected context failure returns an error
+		// instead of quietly continuing with generic questions.
+		expect(askOptionsSource).toContain("CODEBASE_CONTEXT_UNAVAILABLE");
+		expect(askOptionsSource).not.toContain(
+			'console.warn("ask codebase context skipped:"',
+		);
+		expect(askOptionsSource).toMatch(
+			/required = await requireProjectGenerationContext\(projectId\)/,
+		);
+	});
+
+	it("appends the bounded repository block to the prompt", () => {
+		expect(askOptionsSource).toContain(
+			"codebaseBlock = buildCodebasePromptBlock(required.context)",
+		);
+		expect(askOptionsSource).toMatch(/systemPrompt[\s\S]*\$\{codebaseBlock\}/);
+	});
+
+	it("uses the repository-aware product prompt only for existing codebases", () => {
+		expect(askOptionsSource).toContain(
+			"ASK_CODEBASE_OPTIONS_GENERATION_PROMPT",
+		);
+		expect(askOptionsSource).toContain("ASK_OPTIONS_GENERATION_PROMPT");
+		expect(askOptionsSource).toMatch(
+			/project\.projectMode === "existing_codebase"[\s\S]*ASK_CODEBASE_OPTIONS_GENERATION_PROMPT/,
+		);
+	});
+});
+
+describe("workspace resume after refresh", () => {
+	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+
+	it("derives the resume stage from persisted artifacts, not from a guess", () => {
+		expect(workspaceSource).toContain("resolveResumeStage({");
+		expect(workspaceSource).toMatch(/hasFeatureTree: featureTree !== null/);
+		expect(workspaceSource).toMatch(/hasPrd: prdContent !== null/);
+		expect(workspaceSource).toMatch(/hasAc: acContent !== null/);
+		expect(workspaceSource).toMatch(/hasTasks: hasTasksInDb/);
+	});
+
+	it("advances the visible stage forward only, never rewinding it", () => {
+		// A late artifact load must not pull a project that already advanced
+		// back to an earlier stage while the user is working.
+		expect(workspaceSource).toMatch(
+			/current === "questions" && derivedStage !== "questions"[\s\S]*?derivedStage[\s\S]*?: current/,
+		);
+	});
+});
+
+describe("automatic artifact preview", () => {
+	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+
+	it("reveals an artifact only after the server state was reloaded", () => {
+		// Each reveal sits in the success branch of a loader that had to return
+		// real content first, so no reveal can be reached from a failure path.
+		const feature = workspaceSource.slice(
+			workspaceSource.indexOf("const handleConfirmGenerate"),
+			workspaceSource.indexOf("const runPipelineStage"),
+		);
+		expect(feature).toMatch(
+			/reloadFeatureTree: \(\) => refreshFeatureTree[\s\S]*?openArtifactPreview\("feature"\)/,
+		);
+
+		const prd = workspaceSource.slice(
+			workspaceSource.indexOf("const handleGeneratePrd"),
+			workspaceSource.indexOf("const handleGenerateAc"),
+		);
+		expect(prd).toMatch(
+			/const content = await loadPrd\(\)[\s\S]*?if \(!content\)[\s\S]*?return false;[\s\S]*?openArtifactPreview\("prd"\)/,
+		);
+
+		const ac = workspaceSource.slice(
+			workspaceSource.indexOf("const handleGenerateAc"),
+			workspaceSource.indexOf("const handleGenerateTask"),
+		);
+		expect(ac).toMatch(
+			/const content = await loadAc\(\)[\s\S]*?if \(!content\)[\s\S]*?return false;[\s\S]*?openArtifactPreview\("ac"\)/,
+		);
+
+		const task = workspaceSource.slice(
+			workspaceSource.indexOf("const handleGenerateTask"),
+			workspaceSource.indexOf("const handleRetryStage"),
+		);
+		expect(task).toMatch(
+			/const persistedTaskTree = await refreshTaskTree[\s\S]*?if \(!persistedTaskTree\)[\s\S]*?return false;[\s\S]*?openArtifactPreview\("tasks"\)/,
+		);
+
+		// A revision reveals the PRD only after the document reloaded.
+		const revision = workspaceSource.slice(
+			workspaceSource.indexOf("const runRevision"),
+			workspaceSource.indexOf("const handleConfirmGenerate"),
+		);
+		expect(revision).toMatch(
+			/const content = await loadPrd\(\)[\s\S]*?if \(!content\)[\s\S]*?openArtifactPreview\("prd"\)/,
+		);
+	});
+
+	it("never moves the canvas after the user takes it over", () => {
+		expect(workspaceSource).toContain("userTookOverCanvas");
+		// Both a manual artifact open and a manual close hand the panel to the
+		// user, so a later automatic reveal stands down.
+		expect(workspaceSource).toMatch(
+			/onOpenArtifact=\{\(artifact\)[\s\S]*?userTookOverCanvas\.current = true/,
+		);
+		expect(workspaceSource).toMatch(
+			/onClose=\{\(\)[\s\S]*?userTookOverCanvas\.current = true/,
+		);
+	});
+});
+
+describe("chat intent after task generation", () => {
+	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const chatSource = readFileSync("src/routes/api/chat.ts", "utf8");
+
+	it("routes a new message through the chosen intent instead of guessing", () => {
+		expect(workspaceSource).toContain("CodebaseChatIntent");
+		expect(workspaceSource).toMatch(
+			/intent === "revise_current"[\s\S]*runRevision\(trimmed\)/,
+		);
+		// A new feature still goes through the existing creation path.
+		expect(workspaceSource).toContain("ensureFeatureInWorkspace(trimmed)");
+	});
+
+	it("keeps a revision on the existing append-only versioning path", () => {
+		expect(workspaceSource).toMatch(/mode: "revise"/);
+		// The revision reuses /api/chat, so no parallel versioning system exists.
+		expect(workspaceSource).not.toMatch(/\/api\/[a-z-]*revision/);
+		// Success is only reported after the document is readable again.
+		expect(workspaceSource).toMatch(
+			/runRevision[\s\S]*const content = await loadPrd\(\)[\s\S]*if \(!content\)/,
+		);
+	});
+
+	it("never resets task progress as part of a revision", () => {
+		const revisionBlock = workspaceSource.slice(
+			workspaceSource.indexOf("const runRevision = useCallback("),
+		);
+		const body = revisionBlock.slice(
+			0,
+			revisionBlock.indexOf("const handleSendMessage"),
+		);
+		expect(body).not.toContain("refreshTaskTree");
+		expect(body).not.toContain("/api/task/generate");
+		expect(body).not.toContain("reset-progress");
+	});
+
+	it("gates a locked-document revision behind an explicit confirmation", () => {
+		// The lock still blocks a silent revision, and only an explicit
+		// confirmation lifts it for that request.
+		expect(chatSource).toMatch(
+			/isPrdLocked\(projCheck\?\.step\) && !confirmedImpact/,
+		);
+		expect(chatSource).toContain("confirmedImpact");
+		expect(workspaceSource).toContain("confirmedImpact: true");
+	});
+
+	it("computes the task impact from the real Kanban rows", () => {
+		expect(workspaceSource).toContain("assessRevisionImpact");
+		expect(workspaceSource).toContain("describeRevisionImpact(revisionImpact)");
+		expect(workspaceSource).toMatch(/kanban\.data\?\.columns/);
+	});
+
+	it("reports a locked document instead of silently rewriting it", () => {
+		expect(chatSource).toContain("PRD_LOCKED");
+		expect(chatSource).toMatch(/Dokumen PRD telah dikunci \(Read-Only\)/);
+	});
+});
+
 describe("buildAskHandoffAnswers", () => {
 	it("maps answer map to question title and answer list conforming to askHandoffAnswerSchema", () => {
 		const questions = [
@@ -451,6 +660,143 @@ describe("codebase starter suggestions route wiring", () => {
 		expect(detailSource).toContain(
 			"starterSuggestions={analysisOutput?.starterSuggestions}",
 		);
+	});
+});
+
+describe("read-only source preview contract", () => {
+	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const previewSource = detailSource.slice(
+		detailSource.indexOf("const loadSnapshotFileContent"),
+		detailSource.indexOf("const loadFeatureTree"),
+	);
+
+	it("binds every read to the authenticated owner of the codebase", () => {
+		expect(previewSource).toContain("await requireUserServer()");
+		expect(previewSource).toContain("eq(codebases.userId, user.id)");
+		expect(previewSource).toContain(
+			'if (!codebase) throw new Error("NOT_FOUND")',
+		);
+	});
+
+	it("derives the snapshot from the codebase and never from the request", () => {
+		expect(previewSource).toContain(
+			"eq(codebaseSnapshots.codebaseId, input.codebaseId)",
+		);
+		expect(previewSource).toContain(
+			"inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES])",
+		);
+		// A caller-supplied snapshot id must never reach the query.
+		expect(previewSource).not.toContain("eq(codebaseSnapshots.id,");
+		expect(previewSource).not.toContain("input.snapshotId");
+	});
+
+	it("validates the requested path and requires it in the stored manifest", () => {
+		expect(previewSource).toContain("if (!isSafeRelativePath(requestedPath))");
+		expect(previewSource).toContain("manifestEntrySchema");
+		expect(previewSource).toContain("parsedManifest.data.find(");
+		expect(previewSource).toContain(
+			"eq(codebaseSnapshotFiles.snapshotId, snapshot.id)",
+		);
+		expect(previewSource).toContain(
+			"eq(codebaseSnapshotFiles.path, requestedPath)",
+		);
+	});
+
+	it("rejects incomplete chunk sets instead of rendering partial content", () => {
+		expect(previewSource).toContain("assembleSnapshotFileChunks(rows)");
+		expect(previewSource).toContain(
+			"if (!assembled || !isStrictBase64(assembled))",
+		);
+	});
+
+	it("bounds the response and separates unsupported content from missing files", () => {
+		expect(previewSource).toContain("truncatePreviewContent(");
+		expect(previewSource).toContain("CODEBASE_FILE_PREVIEW_MAX_CHARS");
+		expect(previewSource).toContain("isDisplayableTextContent(decoded)");
+		expect(previewSource).toContain('status: "unsupported"');
+		expect(previewSource).toContain('status: "unavailable"');
+	});
+
+	it("drops in-flight and previously selected content when the snapshot changes", () => {
+		expect(detailSource).toContain("const appliedSnapshotRef = useRef");
+		expect(detailSource).toContain(
+			"sourcePreviewRequestRef.current !== requestId",
+		);
+		expect(detailSource).toContain("result.snapshotId !== activeSnapshotId");
+	});
+
+	it("shares the existing right panel with artifacts and never mixes them", () => {
+		expect(detailSource).toContain(
+			'const isSourcePreviewOpen = sourcePreview.kind !== "idle"',
+		);
+		expect(detailSource).toContain("onSelectFile={selectSourceFile}");
+		expect(detailSource).toContain("clearSourcePreview();");
+		// Every artifact branch is gated off while a source file is open, so a
+		// stale document render can never sit next to stale source text.
+		expect(detailSource).toContain("!isSourcePreviewOpen && activeArtifact");
+		expect(detailSource.split("!isSourcePreviewOpen &&").length - 1).toBe(5);
+		expect(detailSource).toContain("<CodebaseSourcePreview");
+		expect(detailSource).toContain('? "SUMBER"');
+	});
+});
+
+describe("toSourcePreviewState", () => {
+	it("keeps real content for a readable snapshot file", () => {
+		expect(
+			toSourcePreviewState(
+				{
+					status: "ok",
+					snapshotId: "snap_1",
+					path: "src/app.ts",
+					content: "const a = 1;",
+					truncated: true,
+					sizeBytes: 12,
+				},
+				"src/app.ts",
+			),
+		).toEqual({
+			kind: "ready",
+			path: "src/app.ts",
+			content: "const a = 1;",
+			truncated: true,
+			sizeBytes: 12,
+		});
+	});
+
+	it("never renders an empty file as readable source", () => {
+		expect(
+			toSourcePreviewState(
+				{
+					status: "ok",
+					snapshotId: "snap_1",
+					path: "src/empty.ts",
+					content: "",
+					truncated: false,
+					sizeBytes: 0,
+				},
+				"src/empty.ts",
+			),
+		).toEqual({ kind: "unavailable", path: "src/empty.ts" });
+	});
+
+	it("distinguishes non-text content from a path the snapshot never stored", () => {
+		expect(
+			toSourcePreviewState(
+				{
+					status: "unsupported",
+					snapshotId: "snap_1",
+					path: "logo.png",
+					sizeBytes: 10,
+				},
+				"logo.png",
+			),
+		).toEqual({ kind: "unsupported", path: "logo.png" });
+		expect(
+			toSourcePreviewState(
+				{ status: "unavailable", snapshotId: null, path: "../../etc/passwd" },
+				"../../etc/passwd",
+			),
+		).toEqual({ kind: "unavailable", path: "../../etc/passwd" });
 	});
 });
 

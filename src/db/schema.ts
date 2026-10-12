@@ -617,15 +617,29 @@ export const codebases = pgTable(
 			.default("user"),
 		// Anchor onboarding project created during initial repository setup.
 		// Immutable once assigned; subsequent feature projects never overwrite it.
-		// Nullable until the first feature is planned or if no safe candidate exists.
+		// Nullable until the first feature planned or if no safe candidate exists.
 		onboardingProjectId: text("onboarding_project_id").references(
 			(): AnyPgColumn => projects.id,
 			{ onDelete: "set null" },
 		),
+		// Normalized Git remote identity (`host/owner/repo`, lowercase, no
+		// credentials, port, or `.git`). Nullable: repositories synced before
+		// this column existed have no identity yet and adopt one on their next
+		// sync. Never derived from the folder name, and never used to merge two
+		// codebases automatically — a mismatch is reported, not acted on.
+		repositoryIdentity: text("repository_identity"),
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at").defaultNow(),
 	},
-	(t) => [index("codebases_user_id_idx").on(t.userId)],
+	(t) => [
+		index("codebases_user_id_idx").on(t.userId),
+		// Re-sync resolves an existing codebase by identity within one owner's
+		// rows, so the index leads with the tenant column.
+		index("codebases_user_id_repository_identity_idx").on(
+			t.userId,
+			t.repositoryIdentity,
+		),
+	],
 );
 
 // Sync session: one short-lived codebase-scoped credential per attempt.
@@ -1122,6 +1136,9 @@ export const studioProjects = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		title: text("title").notNull(),
+		designMode: text("design_mode").notNull().default("web"),
+		designMd: text("design_md"),
+		logoAssetId: text("logo_asset_id"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -1130,6 +1147,30 @@ export const studioProjects = pgTable(
 			.notNull(),
 	},
 	(t) => [index("studio_projects_user_id_idx").on(t.userId)],
+);
+
+export const studioAssets = pgTable(
+	"studio_assets",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		projectId: text("project_id"),
+		filename: text("filename").notNull(),
+		mimeType: text("mime_type").notNull(),
+		byteLength: integer("byte_length").notNull(),
+		data: text("data").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index("studio_assets_user_id_idx").on(t.userId),
+		index("studio_assets_project_id_idx").on(t.projectId),
+	],
 );
 
 export const studioRevisions = pgTable(
@@ -1151,11 +1192,76 @@ export const studioRevisions = pgTable(
 	(t) => [index("studio_revisions_project_id_idx").on(t.projectId)],
 );
 
+export const studioJobs = pgTable(
+	"studio_jobs",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => studioProjects.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		prompt: text("prompt").notNull(),
+		jobType: text("job_type").notNull().default("initial"),
+		targetFrameId: text("target_frame_id"),
+		status: text("status").notNull().default("queued"),
+		error: text("error"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index("studio_jobs_project_id_idx").on(t.projectId),
+		index("studio_jobs_user_id_idx").on(t.userId),
+	],
+);
+
+export const studioFrames = pgTable(
+	"studio_frames",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => studioProjects.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		description: text("description"),
+		viewport: text("viewport").notNull().default("web"),
+		htmlCode: text("html_code"),
+		status: text("status").notNull().default("queued"),
+		order: integer("order").notNull().default(0),
+		error: text("error"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index("studio_frames_project_id_idx").on(t.projectId),
+		index("studio_frames_order_idx").on(t.order),
+	],
+);
+
 export type ScrapeRow = typeof scrapes.$inferSelect;
 export type InsertScrapeRow = typeof scrapes.$inferInsert;
 export type ScrapeDocumentRow = typeof scrapeDocuments.$inferSelect;
 export type InsertScrapeDocumentRow = typeof scrapeDocuments.$inferInsert;
 export type StudioProjectRow = typeof studioProjects.$inferSelect;
 export type InsertStudioProjectRow = typeof studioProjects.$inferInsert;
+export type StudioAssetRow = typeof studioAssets.$inferSelect;
+export type InsertStudioAssetRow = typeof studioAssets.$inferInsert;
 export type StudioRevisionRow = typeof studioRevisions.$inferSelect;
 export type InsertStudioRevisionRow = typeof studioRevisions.$inferInsert;
+export type StudioJobRow = typeof studioJobs.$inferSelect;
+export type InsertStudioJobRow = typeof studioJobs.$inferInsert;
+export type StudioFrameRow = typeof studioFrames.$inferSelect;
+export type InsertStudioFrameRow = typeof studioFrames.$inferInsert;

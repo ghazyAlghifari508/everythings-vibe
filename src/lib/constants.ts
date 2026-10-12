@@ -132,6 +132,18 @@ export const CODEBASE_SYNC_SESSION_EXPIRY_MS = 30 * 60 * 1000;
 export const CODEBASE_MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
 export const CODEBASE_MAX_FILE_BYTES = 1024 * 1024;
 export const CODEBASE_MAX_CHUNK_BYTES = 256 * 1024;
+// Maximum characters of a stored package.json handed to the workspace loader
+// for stack detection. A manifest is a small document; anything longer is not
+// a package manifest and must not be parsed as one.
+export const CODEBASE_PACKAGE_JSON_PREVIEW_MAX_CHARS = 20_000;
+// Maximum characters of one synchronized source file served to the read-only
+// preview. Keeps the response bounded for the largest allowed snapshot file
+// (1 MiB) and the DOM bounded for rendering; the preview states truncation
+// explicitly instead of silently showing a partial file.
+export const CODEBASE_FILE_PREVIEW_MAX_CHARS = 64_000;
+// Maximum rendered lines per preview. A long file is clipped on a line
+// boundary and reported, so line numbers never drift from real content.
+export const CODEBASE_FILE_PREVIEW_MAX_LINES = 3_000;
 // Minimum supported CLI version for `vibeeverything codebase sync`. The floor
 // stays 2.0.0 on purpose: capabilities added later (repositoryName handshake
 // identity, canonical ignore file, preparation-failure reporting) are
@@ -158,6 +170,10 @@ export const CODEBASE_ANALYSIS_MAX_TOKENS = 12_000;
 // Maximum manifest entries listed in the analysis prompt. Overflow is marked
 // explicitly so the model never mistakes a truncated list for the full tree.
 export const CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES = 500;
+// Maximum characters of a rejected model output echoed back in the single
+// bounded repair request. Repair re-states the contract with the failure
+// locations; the full output is never replayed unbounded.
+export const CODEBASE_ANALYSIS_REPAIR_MAX_RAW_CHARS = 12_000;
 // Maximum characters for the model-generated application summary stored in
 // the analysis output. Two to three Indonesian sentences fit comfortably;
 // longer prose belongs in findings, not in the review header card.
@@ -343,3 +359,56 @@ export const SCRAPE_PREVIEW_READY_MAX_PINGS = 20;
 // The verdict is only treated as final after this many consecutive empty
 // observations, which keeps a slow first render from being mislabelled empty.
 export const SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS = 3;
+
+// === VibeDesign Studio bounds ===
+export const STUDIO_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;
+
+/**
+ * Canonical capture widths for Studio frame visuals.
+ *
+ * The client sizes each artboard from these same values before its visual
+ * exists, so a frame never changes width when the screenshot arrives and the
+ * captured pixels always match the displayed box.
+ */
+export const STUDIO_VISUAL_WIDTH = {
+	mobile: 390,
+	web: 1440,
+} as const;
+export const STUDIO_VISUAL_VIEWPORT_HEIGHT = {
+	mobile: 844,
+	web: 900,
+} as const;
+/** Fallback artboard height used before a frame's real height is measured. */
+export const STUDIO_VISUAL_FALLBACK_HEIGHT = {
+	mobile: 844,
+	web: 900,
+} as const;
+
+/**
+ * Canonical canvas zoom bounds. Every zoom entry point (toolbar, wheel,
+ * pinch, reset, fit-to-content) clamps against these, so no path can leave the
+ * canvas at an unusable scale.
+ */
+export const CANVAS_MIN_ZOOM = 0.54;
+export const CANVAS_MAX_ZOOM = 1.54;
+/** Studio artboards span several screens, so its usable range is wider. */
+export const STUDIO_CANVAS_MIN_ZOOM = 0.2;
+export const STUDIO_CANVAS_MAX_ZOOM = 2;
+
+/** Wheel normalization: DOM deltaMode 1 is lines, 2 is pages. */
+export const WHEEL_LINE_HEIGHT_PX = 16;
+export const WHEEL_PAGE_HEIGHT_PX = 800;
+/**
+ * Pixels of wheel travel that produce one e-fold of zoom. Higher is slower,
+ * which keeps trackpad bursts from jumping across the whole zoom range.
+ */
+export const WHEEL_ZOOM_SENSITIVITY_PX = 600;
+/** Largest zoom change a single animation frame may apply. */
+export const WHEEL_ZOOM_MAX_FRAME_FACTOR = 1.6;
+export const STUDIO_LOGO_ALLOWED_MIMES = [
+	"image/png",
+	"image/jpeg",
+	"image/webp",
+	"image/svg+xml",
+] as const;
