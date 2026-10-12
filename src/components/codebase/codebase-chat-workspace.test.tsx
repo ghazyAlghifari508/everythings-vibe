@@ -1509,7 +1509,7 @@ describe("CodebaseChatWorkspace artifacts", () => {
 			container.querySelector("[data-testid='codebase-handoff-card']"),
 		).not.toBeNull();
 		expect(container.textContent).toContain(
-			"npx vibeeverything export rules proj-123",
+			"npx vibeeverything export plan proj-123 --root .",
 		);
 	});
 
@@ -1660,19 +1660,31 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 		).toHaveLength(1);
 	});
 
-	it("renders the comprehensive handoff with both CLI commands", () => {
-		renderWorkspace({ projectIdForHandoff: "proj-123" });
+	it("renders the handoff prompt with the CLI plan export for this project", () => {
+		renderWorkspace({
+			projectIdForHandoff: "proj-123",
+			codebaseName: "react-movie-app",
+		});
 
 		const card = container.querySelector(
 			"[data-testid='codebase-handoff-card']",
 		);
 		expect(card).not.toBeNull();
+		// The handoff uses the real project id with the CLI plan export, not the
+		// old rules export and not a placeholder.
 		expect(card?.textContent).toContain(
-			"npx vibeeverything export rules proj-123",
+			"npx vibeeverything export plan proj-123 --root .",
 		);
-		expect(card?.textContent).toContain(
-			"npx vibeeverything task next proj-123",
-		);
+		expect(card?.textContent).not.toContain("export rules");
+		expect(card?.textContent).toContain("docs/vibeplan/");
+		expect(card?.textContent).toContain("Project ID: proj-123");
 		expect(card?.textContent).toContain("polling");
+	});
+
+	it("offers no handoff before tasks exist", () => {
+		renderWorkspace({ projectIdForHandoff: null });
+		expect(
+			container.querySelector("[data-testid='codebase-handoff-card']"),
+		).toBeNull();
 	});
 });

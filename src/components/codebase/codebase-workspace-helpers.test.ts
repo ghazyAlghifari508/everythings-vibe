@@ -1,7 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import { buildHandoffCommand } from "./codebase-chat-workspace";
+import {
+	buildExportPlanCommand,
+	buildPlanHandoffPrompt,
+} from "./codebase-chat-workspace";
 import {
 	type ExplorerFileEntry,
 	filterExplorerFiles,
@@ -80,17 +83,48 @@ describe("filterExplorerFiles", () => {
 	});
 });
 
-describe("buildHandoffCommand", () => {
-	test("builds the export plus task-next command for a project", () => {
-		expect(buildHandoffCommand("prj_123")).toBe(
-			"npx vibeeverything export rules prj_123 && npx vibeeverything task next prj_123",
+describe("buildExportPlanCommand", () => {
+	test("builds the plan export command for a project", () => {
+		expect(buildExportPlanCommand("prj_123")).toBe(
+			"npx vibeeverything export plan prj_123 --root .",
 		);
 	});
 
 	test("trims surrounding whitespace from the project id", () => {
-		expect(buildHandoffCommand("  prj_123  ")).toBe(
-			"npx vibeeverything export rules prj_123 && npx vibeeverything task next prj_123",
+		expect(buildExportPlanCommand("  prj_123  ")).toBe(
+			"npx vibeeverything export plan prj_123 --root .",
 		);
+	});
+});
+
+describe("buildPlanHandoffPrompt", () => {
+	test("uses the real project id and the CLI export command", () => {
+		const prompt = buildPlanHandoffPrompt("prj_123", "react-movie-app");
+		expect(prompt).toContain("npx vibeeverything export plan prj_123 --root .");
+		expect(prompt).toContain("Project ID: prj_123");
+		// The agent is pointed at the written documents, not handed the PRD.
+		expect(prompt).toContain("docs/vibeplan/");
+		expect(prompt).toContain("manifest.json");
+		expect(prompt).toContain("tasks.json");
+		// It must read repository rules and preserve the existing architecture.
+		expect(prompt).toContain("AGENTS.md");
+		expect(prompt).toContain("react-movie-app");
+		// Task status is updated through the CLI, never by editing the snapshot.
+		expect(prompt).toContain("task update");
+		expect(prompt).toContain("subtask update");
+	});
+
+	test("never embeds a credential or a placeholder", () => {
+		const prompt = buildPlanHandoffPrompt("prj_123", null);
+		expect(prompt).not.toMatch(/token|api[-_ ]?key|secret|bearer/i);
+		expect(prompt).not.toContain("<projectId>");
+		expect(prompt).not.toContain("YOUR_");
+	});
+
+	test("omits the repository name when none is known", () => {
+		const prompt = buildPlanHandoffPrompt("prj_123", null);
+		expect(prompt).not.toContain("repository null");
+		expect(prompt).toContain("Pastikan kamu berada di repository yang benar");
 	});
 });
 

@@ -147,17 +147,42 @@ interface CodebaseChatWorkspaceProps {
 	) => void;
 }
 
-export function buildHandoffCommand(projectId: string): string {
-	const trimmed = projectId.trim();
-	return `npx vibeeverything export rules ${trimmed} && npx vibeeverything task next ${trimmed}`;
+export function buildExportPlanCommand(projectId: string): string {
+	return `npx vibeeverything export plan ${projectId.trim()} --root .`;
 }
 
-export function buildExportRulesCommand(projectId: string): string {
-	return `npx vibeeverything export rules ${projectId.trim()}`;
-}
-
-export function buildTaskNextCommand(projectId: string): string {
-	return `npx vibeeverything task next ${projectId.trim()}`;
+/**
+ * The one copy-pasteable handoff for an AI coding agent.
+ *
+ * The agent is told to read the repository's own rules, confirm it is in the
+ * right repository, export the plan through the CLI, and then read the written
+ * documents instead of being handed the PRD inline. The real project id is
+ * embedded so the export resolves this exact feature plan; no credential or
+ * placeholder appears anywhere in the text.
+ */
+export function buildPlanHandoffPrompt(
+	projectId: string,
+	codebaseName: string | null,
+): string {
+	const id = projectId.trim();
+	const repository = codebaseName?.trim();
+	return [
+		"Kamu mengerjakan satu feature plan VibeEverything di repository ini.",
+		"",
+		"1. Baca AGENTS.md dan file aturan agent lain di repository ini, lalu pahami arsitektur, konvensi, dan perintah verifikasi yang berlaku sebelum mengubah apa pun.",
+		repository
+			? `2. Pastikan kamu berada di repository ${repository}. Kalau bukan, berhenti dan konfirmasi dulu.`
+			: "2. Pastikan kamu berada di repository yang benar. Kalau ragu, berhenti dan konfirmasi dulu.",
+		`3. Jalankan perintah ini dari root repository untuk menulis planning ke docs/vibeplan/: ${buildExportPlanCommand(id)}`,
+		"4. Baca docs/vibeplan/manifest.json, lalu baca seluruh file planning untuk fitur tersebut: feature.md, PRD.md, AC.md, dan tasks.json.",
+		"5. Analisis implementasi yang sudah ada di repository sebelum menulis kode. Jangan membuat ulang PRD, jangan menambah scope di luar dokumen, dan jangan mengganti arsitektur yang sudah berjalan.",
+		"6. Kerjakan task sesuai urutan dan dependency di tasks.json, dan penuhi Acceptance Criteria yang relevan untuk setiap task.",
+		"7. Verifikasi hasilnya terhadap PRD dan AC sebelum menandai task selesai.",
+		`8. Perbarui status task lewat CLI, bukan dengan mengedit tasks.json manual: \`npx vibeeverything task next ${id}\` untuk melihat task berikutnya, lalu \`npx vibeeverything task update <taskId> --status in_progress\` / \`--status completed\`, dan \`npx vibeeverything subtask update <taskId> --index <i> --status <status>\` untuk subtask. Kanban di workspace ikut terbarui.`,
+		"9. Ikuti aturan repository untuk testing, commit, dan push. Jangan commit atau push kalau repository ini melarangnya.",
+		"",
+		`Project ID: ${id}`,
+	].join("\n");
 }
 
 export function CodebaseChatWorkspace({
@@ -207,7 +232,6 @@ export function CodebaseChatWorkspace({
 		useState<CodebaseChatIntent | null>(null);
 	const [copiedCmd, setCopiedCmd] = useState(false);
 	const [copiedExport, setCopiedExport] = useState(false);
-	const [copiedTask, setCopiedTask] = useState(false);
 	const parsedStarterSuggestions =
 		codebaseStarterSuggestionsSchema.safeParse(starterSuggestions);
 	const validStarterSuggestions = parsedStarterSuggestions.success
@@ -215,20 +239,17 @@ export function CodebaseChatWorkspace({
 		: null;
 
 	const exportCmd = projectIdForHandoff
-		? buildExportRulesCommand(projectIdForHandoff)
+		? buildExportPlanCommand(projectIdForHandoff)
 		: null;
-	const taskCmd = projectIdForHandoff
-		? buildTaskNextCommand(projectIdForHandoff)
-		: null;
-	const handoffCmd = projectIdForHandoff
-		? buildHandoffCommand(projectIdForHandoff)
+	const handoffPrompt = projectIdForHandoff
+		? buildPlanHandoffPrompt(projectIdForHandoff, codebaseName ?? null)
 		: null;
 
 	const handleCopyCmd = async () => {
-		if (!handoffCmd) return;
+		if (!handoffPrompt) return;
 		try {
 			if (!navigator.clipboard?.writeText) return;
-			await navigator.clipboard.writeText(handoffCmd);
+			await navigator.clipboard.writeText(handoffPrompt);
 			setCopiedCmd(true);
 			setTimeout(() => setCopiedCmd(false), 2000);
 		} catch {
@@ -824,7 +845,7 @@ export function CodebaseChatWorkspace({
 									onDownloadArtifact={onDownloadArtifact}
 								/>
 							) : null}
-							{handoffCmd && exportCmd && taskCmd ? (
+							{handoffPrompt && exportCmd ? (
 								<div
 									data-testid="codebase-handoff-card"
 									className="rounded-xl border border-emerald/30 bg-obsidian p-4"
@@ -850,103 +871,71 @@ export function CodebaseChatWorkspace({
 											) : (
 												<>
 													<Copy size={12} aria-hidden="true" />
-													<span>Salin perintah lengkap</span>
+													<span>Salin prompt handoff</span>
 												</>
 											)}
 										</button>
 									</div>
 									<p className="mt-1.5 text-xs leading-5 text-fog">
-										Seluruh tahap selesai: pohon fitur, PRD 8 seksi, Acceptance
-										Criteria, dan task sudah tersimpan. Salin blok perintah
-										berikut ke AI Coding Agent eksternal (Cursor, Claude Code,
-										Windsurf, dll.) dan jalankan di root repository
+										Seluruh tahap selesai: pohon fitur, PRD, Acceptance
+										Criteria, dan task sudah tersimpan. Prompt berikut menyuruh
+										AI Coding Agent mengekspor planning ke{" "}
+										<code className="font-mono text-[11px] text-mist">
+											docs/vibeplan/
+										</code>{" "}
+										lalu mengerjakannya di repository
 										{codebaseName ? ` ${codebaseName}` : ""}.
 									</p>
-									<div className="mt-3 flex flex-col gap-2.5">
-										<div>
-											<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
-												Langkah 1 — Ekspor aturan proyek
-											</p>
-											<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
-												<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
-													{exportCmd}
-												</code>
-												<button
-													type="button"
-													onClick={() =>
-														handleCopy(exportCmd, (value) =>
-															setCopiedExport(value),
-														)
-													}
-													aria-label="Salin perintah export rules"
-													className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-												>
-													{copiedExport ? (
-														<>
-															<Check
-																size={11}
-																aria-hidden="true"
-																className="text-emerald"
-															/>
-															<span className="text-emerald">Tersalin</span>
-														</>
-													) : (
-														<>
-															<Copy size={11} aria-hidden="true" />
-															<span>Salin</span>
-														</>
-													)}
-												</button>
-											</div>
-											<p className="mt-1 text-[10.5px] leading-4 text-slate">
-												Menulis file aturan proyek (AGENTS.md dan setara) berisi
-												konteks codebase, skema, dan konvensi yang dipakai
-												agent.
-											</p>
-										</div>
-										<div>
-											<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
-												Langkah 2 — Kerjakan task bertahap
-											</p>
-											<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
-												<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
-													{taskCmd}
-												</code>
-												<button
-													type="button"
-													onClick={() =>
-														handleCopy(taskCmd, (value) => setCopiedTask(value))
-													}
-													aria-label="Salin perintah task next"
-													className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-												>
-													{copiedTask ? (
-														<>
-															<Check
-																size={11}
-																aria-hidden="true"
-																className="text-emerald"
-															/>
-															<span className="text-emerald">Tersalin</span>
-														</>
-													) : (
-														<>
-															<Copy size={11} aria-hidden="true" />
-															<span>Salin</span>
-														</>
-													)}
-												</button>
-											</div>
-											<p className="mt-1 text-[10.5px] leading-4 text-slate">
-												Mengambil task prioritas berikutnya dari papan Kanban
-												beserta konteks PRD dan AC yang relevan.
-											</p>
+									<div className="mt-3">
+										<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
+											Perintah ekspor
+										</p>
+										<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
+											<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
+												{exportCmd}
+											</code>
+											<button
+												type="button"
+												onClick={() =>
+													handleCopy(exportCmd, (value) =>
+														setCopiedExport(value),
+													)
+												}
+												aria-label="Salin perintah export plan"
+												className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											>
+												{copiedExport ? (
+													<>
+														<Check
+															size={11}
+															aria-hidden="true"
+															className="text-emerald"
+														/>
+														<span className="text-emerald">Tersalin</span>
+													</>
+												) : (
+													<>
+														<Copy size={11} aria-hidden="true" />
+														<span>Salin</span>
+													</>
+												)}
+											</button>
 										</div>
 									</div>
+									<div className="mt-3 rounded-lg border border-graphite bg-onyx p-3">
+										<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
+											Prompt untuk agent
+										</p>
+										<pre className="mt-1.5 max-h-56 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-5 text-mist">
+											{handoffPrompt}
+										</pre>
+									</div>
 									<p className="mt-3 text-[11px] leading-5 text-slate">
-										Mekanisme progres: saat agent menyelesaikan task via CLI,
-										kartu di Papan Kanban kanan berpindah kolom secara real-time
-										melalui polling. Tidak perlu me-refresh manual.
+										Agent memakai CLI untuk memperbarui status task, jadi kartu
+										di Papan Kanban kanan ikut berpindah kolom lewat polling.
+										tasks.json adalah snapshot saat ekspor; sumber kebenaran
+										status tetap backend, dan planning yang berubah bisa
+										di-export ulang dengan perintah yang sama.
 									</p>
 								</div>
 							) : null}
