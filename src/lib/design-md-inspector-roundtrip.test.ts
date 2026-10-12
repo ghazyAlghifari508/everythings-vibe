@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseDesignMd } from "./design-md-inspector";
 import { renderEvidenceDesignMd } from "./design-visual-evidence";
 
@@ -61,13 +61,15 @@ describe("canonical DESIGN.md round-trip", () => {
 	it("classifies Don't bullets as donts before stripping the label", () => {
 		const model = parseDesignMd(canonicalDocument());
 		expect(model.donts.length).toBeGreaterThan(0);
-		expect(model.dos.every((rule) => !/^Don't:/.test(rule))).toBe(true);
+		expect(model.dos.every((rule) => !/^Don't:/.test(rule.rule))).toBe(true);
 	});
 
 	it("drops the redundant Do and Don't label from displayed rules", () => {
 		const model = parseDesignMd(canonicalDocument());
-		expect(model.dos.every((rule) => !rule.startsWith("Do:"))).toBe(true);
-		expect(model.donts.every((rule) => !rule.startsWith("Don't:"))).toBe(true);
+		expect(model.dos.every((rule) => !rule.rule.startsWith("Do:"))).toBe(true);
+		expect(model.donts.every((rule) => !rule.rule.startsWith("Don't:"))).toBe(
+			true,
+		);
 	});
 
 	it("keeps legacy verbatim bullets unchanged", () => {
@@ -80,7 +82,11 @@ describe("canonical DESIGN.md round-trip", () => {
 			"",
 		].join("\n");
 		const model = parseDesignMd(legacy);
-		expect(model.dos).toEqual(["Do use observed colors for surfaces."]);
-		expect(model.donts).toEqual(["Don't copy the source brand name or logo."]);
+		expect(model.dos.map((rule) => rule.rule)).toEqual([
+			"Do use observed colors for surfaces.",
+		]);
+		expect(model.donts.map((rule) => rule.rule)).toEqual([
+			"Don't copy the source brand name or logo.",
+		]);
 	});
 });

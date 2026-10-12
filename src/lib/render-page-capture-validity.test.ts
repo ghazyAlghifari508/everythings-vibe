@@ -81,7 +81,7 @@ describe("assessHtmlCapture", () => {
 		for (const markup of [
 			'<video controls><source src="/api/scrape/asset?url=clip.mp4"></video>',
 			'<iframe srcdoc="&lt;p&gt;inner&lt;/p&gt;"></iframe>',
-			'<object data="/api/scrape/asset?url=doc.pdf"></object>',
+			'<object data="/api/scrape/asset?url=brochure.bin"></object>',
 		])
 			expect(assessHtmlCapture(wrap(markup)).hasMeaningfulContent).toBe(true);
 	});

@@ -23,67 +23,165 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
+function color(
+	overrides: Partial<InspectorColorToken> & {
+		name: string;
+		value: string;
+		role: string;
+	},
+): InspectorColorToken {
+	return {
+		token: "",
+		roleClass: "unknown",
+		frequency: 1,
+		rationale: "",
+		confidence: "inferred",
+		...overrides,
+	};
+}
+
 const MODEL: DesignInspectorModel = {
+	verification: "observed",
+	modelVersion: 2,
 	title: "Acme - Style Reference",
 	essence: "A crisp ledger console under morning light.",
 	theme: "light",
 	overview: "Acme pairs a paper canvas with ink typography.",
 	colors: [
-		{
-			name: "Canvas",
+		color({
+			name: "Canvas 1",
 			value: "#ffffff",
 			token: "--color-canvas",
-			role: "Page background",
-		},
-		{
-			name: "Cobalt",
+			role: "Surface",
+			roleClass: "neutral",
+			rationale: "Repeated on 4 measured surfaces.",
+		}),
+		color({
+			name: "Primary action 2",
 			value: "#155eef",
-			token: "--color-cobalt",
-			role: "Primary CTA",
-		},
+			token: "--color-primary",
+			role: "Primary action",
+			roleClass: "brand",
+			frequency: 2,
+			rationale: "Painted the background of 2 measured action elements.",
+		}),
 	],
 	typography: [
 		{
-			label: "Display",
+			role: "Display",
 			family: "Inter",
 			size: "48px",
+			sizePx: 48,
 			weight: "700",
 			lineHeight: "1.1",
+			letterSpacing: "-2px",
+			frequency: 1,
+			sample: "Pricing that scales with your team",
 		},
 		{
-			label: "Body",
+			role: "Body",
 			family: "Inter",
 			size: "16px",
+			sizePx: 16,
 			weight: "400",
 			lineHeight: "1.5",
+			letterSpacing: "normal",
+			frequency: 3,
+			sample: "Start free and upgrade when the team is ready.",
 		},
 	],
-	fonts: [
-		{ family: "Inter", weights: ["700", "400"], roles: ["Display", "Body"] },
+	typefaces: [
+		{
+			family: "Inter",
+			stack: "Inter, sans-serif",
+			weights: ["400", "700"],
+			sizes: ["48px", "16px"],
+			roles: ["Display", "Body"],
+			lineHeights: ["1.1", "1.5"],
+			letterSpacings: ["-2px"],
+			loadedEvidence: true,
+			declaredFaces: [
+				{ family: "Inter", weight: "400", status: "loaded" },
+				{ family: "Inter", weight: "700", status: "loaded" },
+			],
+			uncertainty: null,
+			sample: "Pricing that scales with your team",
+		},
 	],
 	spacing: [
-		{ label: "space-1", value: "4px" },
-		{ label: "section-gap", value: "64px" },
+		{
+			label: "Card padding",
+			value: "48px",
+			context: "padding on 2 element",
+			frequency: 2,
+		},
+		{
+			label: "Element gap",
+			value: "16px",
+			context: "gap on 3 element",
+			frequency: 3,
+		},
 	],
-	radii: [{ label: "radius-md", value: "8px" }],
-	baseUnit: "4px",
-	dos: ["Do use observed colors for surfaces."],
-	donts: ["Don't copy the source brand name or logo."],
+	radii: [
+		{
+			label: "Buttons",
+			value: "8px",
+			valuePx: 8,
+			context: "2 element",
+			frequency: 2,
+		},
+	],
+	elevation: [
+		{
+			value: "rgba(16, 24, 40, 0.06) 0px 1px 3px 0px",
+			frequency: 2,
+			roles: ["section"],
+			usageNote: "Repeated across 2 measured elements.",
+			confidence: "observed",
+		},
+	],
+	surfaces: [
+		{
+			value: "#ffffff",
+			level: 0,
+			frequency: 3,
+			roles: ["canvas", "nav"],
+		},
+	],
+	baseUnitPx: 4,
+	dos: [
+		{
+			rule: "Use 8px for action buttons.",
+			evidence: "Measured on 2 elements.",
+		},
+	],
+	donts: [
+		{
+			rule: "Do not introduce a second action colour.",
+			evidence: "Only one repeated action fill was measured.",
+		},
+	],
+	limitations: ["Single viewport; responsive states were not measured."],
 };
 
 const EMPTY_MODEL: DesignInspectorModel = {
+	verification: "observed",
+	modelVersion: 2,
 	title: "",
 	essence: "",
 	theme: "unknown",
 	overview: "",
 	colors: [],
 	typography: [],
-	fonts: [],
+	typefaces: [],
 	spacing: [],
 	radii: [],
-	baseUnit: "",
+	elevation: [],
+	surfaces: [],
+	baseUnitPx: Number.NaN,
 	dos: [],
 	donts: [],
+	limitations: [],
 };
 
 function renderInspector(
@@ -110,7 +208,6 @@ describe("DesignSystemInspector", () => {
 		expect(sourceLink.getAttribute("href")).toBe("https://acme.example/");
 		expect(sourceLink.getAttribute("target")).toBe("_blank");
 		expect(sourceLink.getAttribute("rel")).toBe("noreferrer noopener");
-		expect(sourceLink.textContent).toBe("https://acme.example/");
 		expect(
 			screen.getAllByText("https://acme.example/", { exact: true }),
 		).toHaveLength(1);
@@ -125,58 +222,149 @@ describe("DesignSystemInspector", () => {
 		expect(screen.getByText("javascript:alert(1)")).toBeDefined();
 	});
 
-	it("renders the parsed color palette with values", () => {
+	it("states the verification source instead of implying unverified data is measured", () => {
+		const { rerender } = renderInspector();
+		expect(screen.getByText(/pengukuran browser/i)).toBeDefined();
+		rerender(
+			<DesignSystemInspector
+				siteName="Acme"
+				sourceUrl="https://acme.example/"
+				model={{ ...MODEL, verification: "unverified" }}
+			/>,
+		);
+		expect(screen.getByText(/belum terverifikasi/i)).toBeDefined();
+	});
+
+	it("renders the palette with values, roles and the evidence behind each role", () => {
 		renderInspector();
 		expect(screen.getByRole("heading", { name: /palet warna/i })).toBeDefined();
 		expect(screen.getByText("#155eef")).toBeDefined();
-		expect(screen.getByText("Cobalt")).toBeDefined();
-		expect(screen.getByText("Primary CTA")).toBeDefined();
+		expect(screen.getByText("Primary action")).toBeDefined();
+		expect(
+			screen.getByText(/painted the background of 2 measured action elements/i),
+		).toBeDefined();
 	});
 
-	it("renders the parsed type scale with size metadata", () => {
+	it("renders the type scale with size, weight and line-height metadata", () => {
 		renderInspector();
-		expect(screen.getByRole("heading", { name: /tipografi/i })).toBeDefined();
+		expect(screen.getByRole("heading", { name: /type scale/i })).toBeDefined();
 		expect(screen.getByText("Display")).toBeDefined();
-		expect(screen.getByText("48px · 700 · 1.1")).toBeDefined();
+		expect(screen.getByText("48px · w700 · lh 1.1 · ls -2px")).toBeDefined();
 	});
 
-	it("renders parsed font families with weights", () => {
+	it("renders a display specimen at its measured size instead of flattening it", () => {
 		renderInspector();
-		expect(screen.getByRole("heading", { name: /^font$/i })).toBeDefined();
-		expect(screen.getByText("Inter")).toBeDefined();
-		expect(screen.getByText("700, 400")).toBeDefined();
+		const specimens = screen.getAllByText("Pricing that scales with your team");
+		// The type scale row carries the measured size and weight; the typeface
+		// card carries the family. Both show the real page sample.
+		const scaleSpecimen = specimens.find(
+			(node) => (node as HTMLElement).style.fontWeight === "700",
+		);
+		expect(scaleSpecimen).toBeDefined();
+		expect((scaleSpecimen as HTMLElement).style.fontSize).toBe("48px");
+		const bodySpecimen = screen.getByText(
+			"Start free and upgrade when the team is ready.",
+		);
+		expect(bodySpecimen.style.fontSize).toBe("16px");
 	});
 
-	it("renders spacing and shape tokens", () => {
+	it("states the scale reduction instead of silently shrinking a display size", () => {
+		const displayEntry = MODEL.typography[0];
+		if (!displayEntry) throw new Error("type scale fixture missing");
+		renderInspector({
+			...MODEL,
+			typefaces: [],
+			typography: [
+				{ ...displayEntry, role: "Display", size: "96px", sizePx: 96 },
+			],
+		});
+		const specimen = screen.getByText("Pricing that scales with your team");
+		expect(specimen.style.fontSize).toBe("48px");
+		expect(screen.getByText(/ukuran terukur 96px/i)).toBeDefined();
+	});
+
+	it("uses the real page sample rather than a fabricated sentence", () => {
 		renderInspector();
 		expect(
-			screen.getByRole("heading", { name: /spasi.*bentuk/i }),
-		).toBeDefined();
-		expect(screen.getByText("section-gap")).toBeDefined();
-		expect(screen.getByText("64px")).toBeDefined();
-		expect(screen.getByText("radius-md")).toBeDefined();
+			screen.getAllByText("Pricing that scales with your team").length,
+		).toBeGreaterThan(0);
+		expect(
+			screen.queryByText("The quick brown fox jumps over the lazy dog"),
+		).toBeNull();
 	});
 
-	it("renders guideline rules verbatim", () => {
+	it("renders a typeface inspector with real measured metrics", () => {
+		renderInspector();
+		expect(
+			screen.getByRole("heading", { name: /typeface inspector/i }),
+		).toBeDefined();
+		expect(screen.getByText("Inter")).toBeDefined();
+		expect(screen.getByText("400, 700")).toBeDefined();
+		expect(screen.getByText("48px, 16px")).toBeDefined();
+		expect(screen.getByText("Inter, sans-serif")).toBeDefined();
+		expect(screen.getByText(/font resource loaded/i)).toBeDefined();
+	});
+
+	it("warns that the preview font may not be the rendered font", () => {
+		renderInspector();
+		expect(screen.getByText(/tersedia di browser Anda/i)).toBeDefined();
+	});
+
+	it("renders semantic spacing and radius context", () => {
+		renderInspector();
+		expect(
+			screen.getByRole("heading", { name: /spacing.*bentuk/i }),
+		).toBeDefined();
+		expect(screen.getByText("Card padding")).toBeDefined();
+		expect(screen.getByText("Element gap")).toBeDefined();
+		expect(screen.getByText("Buttons")).toBeDefined();
+		expect(screen.getByText("Unit dasar 4px")).toBeDefined();
+	});
+
+	it("renders surfaces and measured elevation", () => {
+		renderInspector();
+		expect(screen.getByRole("heading", { name: /^surface$/i })).toBeDefined();
+		expect(screen.getByRole("heading", { name: /elevation/i })).toBeDefined();
+		expect(
+			screen.getByText("rgba(16, 24, 40, 0.06) 0px 1px 3px 0px"),
+		).toBeDefined();
+		expect(
+			screen.getByText(/repeated across 2 measured elements/i),
+		).toBeDefined();
+	});
+
+	it("renders guideline rules with their evidence", () => {
 		renderInspector();
 		expect(screen.getByRole("heading", { name: /panduan/i })).toBeDefined();
+		expect(screen.getByText("Use 8px for action buttons.")).toBeDefined();
+		expect(screen.getByText("Measured on 2 elements.")).toBeDefined();
 		expect(
-			screen.getByText("Do use observed colors for surfaces."),
+			screen.getByText("Do not introduce a second action colour."),
+		).toBeDefined();
+	});
+
+	it("states the measurement limitations instead of hiding them", () => {
+		renderInspector();
+		expect(
+			screen.getByRole("heading", { name: /keterbatasan pengukuran/i }),
 		).toBeDefined();
 		expect(
-			screen.getByText("Don't copy the source brand name or logo."),
+			screen.getByText(/responsive states were not measured/i),
 		).toBeDefined();
 	});
 
 	it("omits sections without data instead of inventing values", () => {
 		const { container } = renderInspector(EMPTY_MODEL);
 		expect(screen.queryByRole("heading", { name: /palet warna/i })).toBeNull();
-		expect(screen.queryByRole("heading", { name: /tipografi/i })).toBeNull();
-		expect(screen.queryByRole("heading", { name: /^font$/i })).toBeNull();
+		expect(screen.queryByRole("heading", { name: /type scale/i })).toBeNull();
 		expect(
-			screen.queryByRole("heading", { name: /spasi.*bentuk/i }),
+			screen.queryByRole("heading", { name: /typeface inspector/i }),
+		).toBeNull();
+		expect(
+			screen.queryByRole("heading", { name: /spacing.*bentuk/i }),
 		).toBeNull();
 		expect(screen.queryByRole("heading", { name: /panduan/i })).toBeNull();
+		expect(screen.queryByRole("heading", { name: /elevation/i })).toBeNull();
 		expect(container.querySelectorAll('[role="img"]').length).toBe(0);
 	});
 
@@ -184,52 +372,55 @@ describe("DesignSystemInspector", () => {
 		const { container } = renderInspector();
 		expect(container.textContent).not.toMatch(/tailwind v4/i);
 		expect(container.textContent).not.toMatch(/css variables/i);
-		expect(container.textContent).not.toMatch(/design tokens/i);
 		expect(container.textContent).not.toMatch(/compact|extended/i);
 	});
 });
 
-const BRAND_COLOR: InspectorColorToken = {
-	name: "Primary",
+const BRAND_COLOR = color({
+	name: "Primary 1",
 	value: "#155eef",
 	token: "--color-primary",
 	role: "Primary action",
-};
+	roleClass: "brand",
+});
 
-const ACCENT_COLOR: InspectorColorToken = {
-	name: "Highlight",
+const ACCENT_COLOR = color({
+	name: "Accent 2",
 	value: "#f5b301",
-	token: "--color-highlight",
-	role: "Decorative highlight",
-};
+	token: "--color-accent",
+	role: "Accent",
+	roleClass: "accent",
+});
 
-const NEUTRAL_COLOR: InspectorColorToken = {
-	name: "Canvas",
+const NEUTRAL_COLOR = color({
+	name: "Surface 3",
 	value: "#ffffff",
-	token: "--color-canvas",
-	role: "Page background",
-};
+	token: "--color-surface",
+	role: "Surface",
+	roleClass: "neutral",
+});
 
-const SEMANTIC_COLOR: InspectorColorToken = {
-	name: "Success",
+const SEMANTIC_COLOR = color({
+	name: "Semantic 4",
 	value: "#16a34a",
-	token: "--color-success",
-	role: "Success state",
-};
+	token: "--color-semantic",
+	role: "Semantic state",
+	roleClass: "semantic",
+});
 
-const AMBIGUOUS_COLOR: InspectorColorToken = {
-	name: "Nebula",
+const AMBIGUOUS_COLOR = color({
+	name: "Unclassified 5",
 	value: "#123456",
-	token: "--color-nebula",
-	role: "Khusus",
-};
+	role: "Neutral",
+	roleClass: "unknown",
+});
 
 function paletteModel(colors: InspectorColorToken[]): DesignInspectorModel {
 	return { ...EMPTY_MODEL, colors };
 }
 
 describe("classifyPaletteGroup", () => {
-	it("maps brand, accent, neutral, and semantic signals deterministically", () => {
+	it("uses the role class the model already derived from measured usage", () => {
 		expect(classifyPaletteGroup(BRAND_COLOR)).toBe("brand");
 		expect(classifyPaletteGroup(ACCENT_COLOR)).toBe("accent");
 		expect(classifyPaletteGroup(NEUTRAL_COLOR)).toBe("neutral");
@@ -247,7 +438,7 @@ describe("classifyPaletteGroup", () => {
 		expect(groupPaletteColors(colors)).toEqual(groupPaletteColors(colors));
 	});
 
-	it("falls back to other for ambiguous colors", () => {
+	it("falls back to other for unclassified colors", () => {
 		expect(classifyPaletteGroup(AMBIGUOUS_COLOR)).toBe("other");
 		const groups = groupPaletteColors([AMBIGUOUS_COLOR]);
 		expect(groups).toHaveLength(1);
@@ -255,14 +446,17 @@ describe("classifyPaletteGroup", () => {
 		expect(groups[0]?.colors).toEqual([AMBIGUOUS_COLOR]);
 	});
 
-	it("keeps surface-bound primary colors neutral instead of brand", () => {
+	it("keeps a text colour neutral even when its label says primary", () => {
 		expect(
-			classifyPaletteGroup({
-				name: "Ink",
-				value: "#0f0f0f",
-				token: "--color-ink",
-				role: "Primary text",
-			}),
+			classifyPaletteGroup(
+				color({
+					name: "Ink",
+					value: "#0f0f0f",
+					token: "--color-ink",
+					role: "Base text",
+					roleClass: "neutral",
+				}),
+			),
 		).toBe("neutral");
 	});
 });
@@ -278,31 +472,33 @@ describe("palette gallery", () => {
 			]),
 		);
 		const brand = screen.getByRole("region", { name: "Brand" });
-		expect(within(brand).getByText("Primary")).toBeDefined();
+		expect(within(brand).getByText("Primary action")).toBeDefined();
 		const neutral = screen.getByRole("region", { name: "Netral" });
-		expect(within(neutral).getByText("Canvas")).toBeDefined();
+		expect(within(neutral).getByText("Surface")).toBeDefined();
 		const semantic = screen.getByRole("region", { name: "Semantik" });
-		expect(within(semantic).getByText("Success")).toBeDefined();
-		const other = screen.getByRole("region", { name: "Lainnya" });
-		expect(within(other).getByText("Nebula")).toBeDefined();
+		expect(within(semantic).getByText("Semantic state")).toBeDefined();
+		const other = screen.getByRole("region", {
+			name: "Belum terklasifikasi",
+		});
+		expect(within(other).getByText("Neutral")).toBeDefined();
 	});
 
-	it("keeps actual parsed color values unchanged on swatches", () => {
+	it("keeps the measured color value unchanged on the swatch", () => {
 		renderInspector(paletteModel([BRAND_COLOR, NEUTRAL_COLOR]));
 		const reference = document.createElement("div");
-		for (const color of [BRAND_COLOR, NEUTRAL_COLOR]) {
+		for (const entry of [BRAND_COLOR, NEUTRAL_COLOR]) {
 			const swatch = screen.getByRole("img", {
-				name: `Swatch warna ${color.name} ${color.value}`,
+				name: `Swatch warna ${entry.role} ${entry.value}`,
 			});
-			reference.style.backgroundColor = color.value;
+			reference.style.backgroundColor = entry.value;
 			expect(swatch.style.backgroundColor).toBe(
 				reference.style.backgroundColor,
 			);
-			expect(screen.getByText(color.value)).toBeDefined();
+			expect(screen.getByText(entry.value)).toBeDefined();
 		}
 	});
 
-	it("shows a brand group only when parsed data supports it", () => {
+	it("shows a brand group only when the model supports it", () => {
 		const { rerender } = renderInspector(paletteModel([NEUTRAL_COLOR]));
 		expect(screen.queryByRole("region", { name: "Brand" })).toBeNull();
 		rerender(
@@ -332,22 +528,22 @@ describe("palette gallery", () => {
 	it("renders many colors without dropping any or fixing widths", () => {
 		const colors: InspectorColorToken[] = Array.from(
 			{ length: 12 },
-			(_, index) => ({
-				name: `Warna ${index + 1}`,
-				value: `#${(index + 1).toString(16).padStart(6, "0")}`,
-				token: `--color-contoh-${index + 1}`,
-				role: `Contoh peran ${index + 1}`,
-			}),
+			(_, index) =>
+				color({
+					name: `Warna ${index + 1}`,
+					value: `#${(index + 1).toString(16).padStart(6, "0")}`,
+					token: `--color-contoh-${index + 1}`,
+					role: `Contoh peran ${index + 1}`,
+					roleClass: "unknown",
+				}),
 		);
 		const { container } = renderInspector(paletteModel(colors));
 		const swatches = within(container).getAllByRole("img");
 		expect(swatches).toHaveLength(colors.length);
-		for (const swatch of swatches) {
-			expect(swatch.style.width).toBe("");
-		}
+		for (const swatch of swatches) expect(swatch.style.width).toBe("");
 	});
 
-	it("copies the exact source value with an accessible action", async () => {
+	it("copies the exact measured value with an accessible action", async () => {
 		const writeText = vi.fn(async () => {});
 		vi.stubGlobal("navigator", { clipboard: { writeText } });
 		renderInspector(paletteModel([BRAND_COLOR]));
@@ -362,58 +558,26 @@ describe("palette gallery", () => {
 		).toBeDefined();
 	});
 
-	it("renders a realistic parsed DESIGN.md as a grouped gallery", () => {
+	it("renders an archived DESIGN.md as a grouped gallery labelled unverified", () => {
 		const designMd = [
 			"# Acme - Style Reference",
 			"> A crisp ledger console under morning light.",
 			"",
 			"**Theme:** light",
 			"",
-			"Acme pairs a paper canvas with ink typography.",
-			"",
 			"## Tokens - Colors",
 			"| Name | Value | Token | Role |",
 			"| --- | --- | --- | --- |",
 			"| Canvas | #ffffff | --color-canvas | Page background |",
-			"| Surface | #f7f8f8 | --color-surface | Card surface |",
-			"| Ink | #0f0f0f | --color-ink | Primary text |",
-			"| Muted | #606060 | --color-muted | Muted text |",
-			"| Hairline | #d3d3d3 | --color-hairline | Hairline border |",
 			"| Cobalt | #155eef | --color-cobalt | Primary CTA |",
-			"| Accent | #6ee7b7 | --color-accent | Decorative highlight |",
-			"| Success | #16a34a | --color-success | Success state |",
-			"| Warning | #d97706 | --color-warning | Warning state |",
-			"| Error | #dc2626 | --color-error | Error state |",
 			"| Nebula | #123456 | --color-nebula | Khusus |",
 		].join("\n");
 		const model = parseDesignMd(designMd);
-		expect(model.colors).toHaveLength(11);
+		expect(model.colors).toHaveLength(3);
+		expect(model.verification).toBe("unverified");
 		renderInspector(model);
-		for (const label of ["Brand", "Aksen", "Netral", "Semantik", "Lainnya"]) {
-			expect(screen.getByRole("region", { name: label })).toBeDefined();
-		}
-		expect(
-			within(screen.getByRole("region", { name: "Brand" })).getByText("Cobalt"),
-		).toBeDefined();
-		expect(
-			within(screen.getByRole("region", { name: "Lainnya" })).getByText(
-				"Nebula",
-			),
-		).toBeDefined();
-		for (const value of [
-			"#ffffff",
-			"#f7f8f8",
-			"#0f0f0f",
-			"#606060",
-			"#d3d3d3",
-			"#155eef",
-			"#6ee7b7",
-			"#16a34a",
-			"#d97706",
-			"#dc2626",
-			"#123456",
-		]) {
-			expect(screen.getByText(value)).toBeDefined();
-		}
+		expect(screen.getByText(/belum terverifikasi/i)).toBeDefined();
+		expect(screen.getByText("#155eef")).toBeDefined();
+		expect(screen.getByText("#123456")).toBeDefined();
 	});
 });

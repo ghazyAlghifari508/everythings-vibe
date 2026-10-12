@@ -75,7 +75,7 @@ describe("resolveInspector", () => {
 });
 
 describe("DesignResult verification labelling", () => {
-	it("labels a capture-backed document as matching browser evidence", () => {
+	it("labels a capture-backed document as measured browser evidence", () => {
 		const evidence = capturedEvidence();
 		render(
 			<DesignResult
@@ -85,11 +85,11 @@ describe("DesignResult verification labelling", () => {
 				visualEvidence={evidence}
 			/>,
 		);
-		expect(screen.getByText(/sesuai evidence browser/i)).toBeDefined();
+		expect(screen.getByText(/pengukuran browser/i)).toBeDefined();
 		expect(screen.queryByText(/arsip/i)).toBeNull();
 	});
 
-	it("labels an archived document as unverified archive", () => {
+	it("labels an archived document as unverified rather than measured", () => {
 		render(
 			<DesignResult
 				sourceUrl="https://example.test/"
@@ -97,11 +97,12 @@ describe("DesignResult verification labelling", () => {
 				designMd="# Legacy - Style Reference\n"
 			/>,
 		);
-		expect(screen.getByText(/arsip/i)).toBeDefined();
+		// The label appears on the inspector and on the source panel, so the
+		// archived state is visible wherever the reader looks.
 		expect(screen.getAllByText(/belum terverifikasi/i).length).toBeGreaterThan(
 			0,
 		);
-		expect(screen.queryByText(/sesuai evidence browser/i)).toBeNull();
+		expect(screen.queryByText(/pengukuran browser/i)).toBeNull();
 	});
 
 	it("still exposes the archived raw document for copy and download", () => {

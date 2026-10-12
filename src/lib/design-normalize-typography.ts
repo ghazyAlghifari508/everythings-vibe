@@ -223,6 +223,8 @@ export interface NormalizedTypeface {
 	loadedEvidence: boolean;
 	/** True when this family is only a fallback in the measured stack. */
 	fallbackOnly: boolean;
+	/** A real sample rendered in this family, when the capture recorded one. */
+	sample: string;
 }
 
 // Placeholder families are what a page writes before a webfont resolves. They
@@ -256,6 +258,7 @@ export function normalizeTypefaces(
 			declaredFaces: [],
 			loadedEvidence: false,
 			fallbackOnly: false,
+			sample: "",
 		};
 		if (
 			specimen.fontWeight &&
@@ -279,6 +282,9 @@ export function normalizeTypefaces(
 			!existing.letterSpacings.includes(specimen.letterSpacing)
 		)
 			existing.letterSpacings.push(specimen.letterSpacing);
+		// Keep the longest real sample, so the specimen shows actual page copy.
+		if (specimen.sample.length > existing.sample.length)
+			existing.sample = specimen.sample;
 		typefaces.set(family, existing);
 	}
 	for (const typeface of typefaces.values()) {

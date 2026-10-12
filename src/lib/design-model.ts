@@ -82,6 +82,8 @@ export interface ModelTypeface {
 	declaredFaces: { family: string; weight: string; status: string }[];
 	confidence: Confidence;
 	uncertainty: string | null;
+	/** A real sample rendered in this family, when the capture recorded one. */
+	sample: string;
 }
 
 export interface ModelSpacingToken {
@@ -394,6 +396,7 @@ export function buildDesignModel(
 			uncertainty: typeface.loadedEvidence
 				? null
 				: "No declared font resource for this family reported a loaded state, so the glyph font is not confirmed.",
+			sample: typeface.sample,
 		})),
 		spacing: spacingTokens,
 		radii: radiusTokens,

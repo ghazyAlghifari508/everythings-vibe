@@ -1,105 +1,235 @@
 import { parseVisualEvidence } from "./design-evidence-contract";
+import { buildDesignModel, type DesignTokenModel } from "./design-model";
 import {
-	deriveEvidenceGuidelines,
-	extractionFromVisualEvidence,
-	groupMeasurements,
-} from "./design-visual-evidence";
-import { designIssues, normalizeDesign } from "./prompts-design-md";
+	designIssues,
+	designMdVersionOf,
+	isCurrentModelDocument,
+	LEGACY_DESIGN_MD_VERSION,
+	normalizeDesign,
+} from "./prompts-design-md";
 
-export type DesignTheme = "light" | "dark" | "unknown";
+// The Style Inspector reads the same validated structured model the document is
+// rendered from, so the two cannot disagree about a measured value.
+//
+// A document that predates the structured model is still parsed as archived
+// text, but it is explicitly labelled unverified: parsing a markdown archive
+// cannot establish that its values were measured.
+
+export type InspectorVerification = "observed" | "unverified";
 
 export interface InspectorColorToken {
 	name: string;
 	value: string;
 	token: string;
 	role: string;
+	roleClass: string;
+	frequency: number;
+	/** Why the role was assigned, and what evidence supports it. */
+	rationale: string;
+	confidence: string;
 }
 
 export interface InspectorTypeEntry {
-	label: string;
+	role: string;
 	family: string;
 	size: string;
+	sizePx: number;
 	weight: string;
 	lineHeight: string;
+	letterSpacing: string;
+	frequency: number;
+	/** A real sample taken from the measured page. */
+	sample: string;
 }
 
-export interface InspectorFont {
+export interface InspectorTypeface {
 	family: string;
+	stack: string;
 	weights: string[];
+	sizes: string[];
 	roles: string[];
+	lineHeights: string[];
+	letterSpacings: string[];
+	loadedEvidence: boolean;
+	declaredFaces: { family: string; weight: string; status: string }[];
+	uncertainty: string | null;
+	/** A real sample rendered in this family, when the capture recorded one. */
+	sample: string;
 }
 
 export interface InspectorToken {
 	label: string;
 	value: string;
+	/** The measured context this value came from. */
+	context: string;
+	frequency: number;
+}
+
+export interface InspectorRadiusToken extends InspectorToken {
+	valuePx: number;
+}
+
+export interface InspectorElevationToken {
+	value: string;
+	frequency: number;
+	roles: string[];
+	usageNote: string;
+	confidence: string;
+}
+
+export interface InspectorSurface {
+	value: string;
+	level: number;
+	frequency: number;
+	roles: string[];
+}
+
+export interface InspectorGuideline {
+	rule: string;
+	evidence: string;
 }
 
 export interface DesignInspectorModel {
-	verification?: "observed" | "unverified";
+	verification: InspectorVerification;
+	modelVersion: number;
 	title: string;
 	essence: string;
-	theme: DesignTheme;
+	theme: "light" | "dark" | "unknown";
 	overview: string;
 	colors: InspectorColorToken[];
 	typography: InspectorTypeEntry[];
-	fonts: InspectorFont[];
+	typefaces: InspectorTypeface[];
 	spacing: InspectorToken[];
-	radii: InspectorToken[];
-	baseUnit: string;
-	dos: string[];
-	donts: string[];
+	radii: InspectorRadiusToken[];
+	elevation: InspectorElevationToken[];
+	surfaces: InspectorSurface[];
+	baseUnitPx: number;
+	dos: InspectorGuideline[];
+	donts: InspectorGuideline[];
+	limitations: string[];
 }
 
+// Builds the inspector view from a verified capture. The document, when given,
+// must still match that capture, otherwise the model is refused so a stale
+// archive is never shown as observed.
 export function inspectorFromEvidence(
 	value: unknown,
 	document?: string,
 ): DesignInspectorModel | null {
 	const evidence = parseVisualEvidence(value);
 	if (!evidence) return null;
-	if (document !== undefined && designIssues(document, evidence).length)
-		return null;
-	const extraction = extractionFromVisualEvidence(evidence);
-	const typography = (extraction.typographyRoles ?? []).map((entry) => ({
-		label: entry.role,
-		family: entry.family,
-		size: entry.size,
-		weight: entry.weight,
-		lineHeight: entry.lineHeight,
-	}));
-	// Grouped, not raw: identical property/value pairs collapse into one row and
-	// the occurrence count stays visible as provenance.
-	const spacingGroups = groupMeasurements(evidence.elements, [
-		"padding",
-		"margin",
-		"gap",
-	]);
-	const radiusGroups = groupMeasurements(evidence.elements, ["border-radius"]);
-	const guidelines = deriveEvidenceGuidelines(evidence);
+	// A current-model document is checked structurally; a legacy archive is
+	// checked against the capture it came from.
+	if (document !== undefined) {
+		if (isCurrentModelDocument(document)) {
+			if (!documentMatchesEvidence(document, evidence)) return null;
+		} else if (designIssues(document, evidence).length) {
+			return null;
+		}
+	}
+	const model = buildDesignModel(evidence);
+	return inspectorFromModel(model, "observed");
+}
+
+// A rendered document is consistent with its evidence when the measured values
+// it must contain are all present.
+function documentMatchesEvidence(
+	document: string,
+	evidence: {
+		elements: { properties: Record<string, string> }[];
+	},
+): boolean {
+	const measured = new Set<string>();
+	for (const element of evidence.elements)
+		for (const value of Object.values(element.properties))
+			if (value.trim().length > 0) measured.add(value);
+	// The document must reference at least one measured value; an unrelated
+	// document would contain none.
+	for (const value of measured) if (document.includes(value)) return true;
+	return false;
+}
+
+export function inspectorFromModel(
+	model: DesignTokenModel,
+	verification: InspectorVerification,
+): DesignInspectorModel {
 	return {
-		...EMPTY_MODEL,
-		verification: "observed",
-		colors: extraction.colors.map((color) => ({
-			name: color.role,
+		verification,
+		modelVersion: model.version,
+		title: model.title,
+		essence: model.essence,
+		theme: model.theme,
+		overview: model.overview,
+		colors: model.colors.map((color) => ({
+			name: color.name,
 			value: color.value,
-			token: "",
+			token: color.token,
 			role: color.role,
+			roleClass: color.roleClass,
+			frequency: color.frequency,
+			rationale: color.rationale,
+			confidence: color.confidence,
 		})),
-		typography,
-		fonts: deriveFonts(typography),
-		spacing: spacingGroups.map((group) => ({
-			label: `${group.property} · ${group.frequency} elemen`,
-			value: group.value,
+		typography: model.typography.map((entry) => ({
+			role: entry.role,
+			family: entry.fontFamily,
+			size: entry.fontSize,
+			sizePx: entry.fontSizePx,
+			weight: entry.fontWeight,
+			lineHeight: entry.lineHeight,
+			letterSpacing: entry.letterSpacing,
+			frequency: entry.frequency,
+			sample: entry.sample,
 		})),
-		radii: radiusGroups.map((group) => ({
-			label: `border-radius · ${group.frequency} elemen`,
-			value: group.value,
+		typefaces: model.typefaces.map((typeface) => ({
+			family: typeface.family,
+			stack: typeface.stack,
+			weights: typeface.measuredWeights,
+			sizes: typeface.measuredSizes,
+			roles: typeface.roles,
+			lineHeights: typeface.lineHeights,
+			letterSpacings: typeface.letterSpacings,
+			loadedEvidence: typeface.loadedEvidence,
+			declaredFaces: typeface.declaredFaces,
+			uncertainty: typeface.uncertainty,
+			sample: typeface.sample,
 		})),
-		dos: guidelines.dos,
-		donts: guidelines.donts,
-		overview:
-			"Pengukuran pada satu viewport. Preview font memakai font yang tersedia di browser Anda; font glyph situs asal belum terverifikasi.",
+		spacing: model.spacing.map((token) => ({
+			label: token.purpose,
+			value: token.value,
+			context: `${token.property} on ${token.frequency} element`,
+			frequency: token.frequency,
+		})),
+		radii: model.radii.map((token) => ({
+			label: token.purpose,
+			value: token.value,
+			valuePx: token.valuePx,
+			context: `${token.frequency} element`,
+			frequency: token.frequency,
+		})),
+		elevation: model.elevation.map((token) => ({
+			value: token.value,
+			frequency: token.frequency,
+			roles: token.roles,
+			usageNote: token.usageNote,
+			confidence: token.confidence,
+		})),
+		surfaces: model.surfaces.map((surface) => ({
+			value: surface.value,
+			level: surface.level,
+			frequency: surface.frequency,
+			roles: surface.roles,
+		})),
+		baseUnitPx: model.baseUnitPx,
+		dos: model.guidelines.dos,
+		donts: model.guidelines.donts,
+		limitations: model.limitations,
 	};
 }
+
+// ---------------------------------------------------------------------------
+// Archived document fallback
+// ---------------------------------------------------------------------------
 
 interface ParsedTable {
 	headers: string[];
@@ -107,18 +237,23 @@ interface ParsedTable {
 }
 
 const EMPTY_MODEL: DesignInspectorModel = {
+	verification: "unverified",
+	modelVersion: LEGACY_DESIGN_MD_VERSION,
 	title: "",
 	essence: "",
 	theme: "unknown",
 	overview: "",
 	colors: [],
 	typography: [],
-	fonts: [],
+	typefaces: [],
 	spacing: [],
 	radii: [],
-	baseUnit: "",
+	elevation: [],
+	surfaces: [],
+	baseUnitPx: Number.NaN,
 	dos: [],
 	donts: [],
+	limitations: [],
 };
 
 function cleanCell(value: string): string {
@@ -157,15 +292,18 @@ function parseTables(lines: string[]): ParsedTable[] {
 	const tables: ParsedTable[] = [];
 	let index = 0;
 	while (index < lines.length) {
-		const line = lines[index].trim();
+		const line = lines[index]?.trim() ?? "";
 		const next = (lines[index + 1] ?? "").trim();
 		if (line.startsWith("|") && next.startsWith("|") && isAlignmentRow(next)) {
 			const headers = splitRow(line);
 			const rows: string[][] = [];
 			index += 2;
-			while (index < lines.length && lines[index].trim().startsWith("|")) {
-				if (!isAlignmentRow(lines[index].trim())) {
-					rows.push(splitRow(lines[index]));
+			while (
+				index < lines.length &&
+				(lines[index] ?? "").trim().startsWith("|")
+			) {
+				if (!isAlignmentRow((lines[index] ?? "").trim())) {
+					rows.push(splitRow(lines[index] ?? ""));
 				}
 				index += 1;
 			}
@@ -193,7 +331,7 @@ function splitSections(text: string): {
 		const line = rawLine.replace(/\r$/, "");
 		const match = line.match(/^##\s+(.*)$/);
 		if (match) {
-			current = { heading: match[1].trim(), lines: [] };
+			current = { heading: (match[1] ?? "").trim(), lines: [] };
 			sections.push(current);
 			continue;
 		}
@@ -214,12 +352,12 @@ function headerIndex(headers: string[], pattern: RegExp): number {
 function parseHeaderBlock(prelude: string[]): {
 	title: string;
 	essence: string;
-	theme: DesignTheme;
+	theme: "light" | "dark" | "unknown";
 	overview: string;
 } {
 	let title = "";
 	let essence = "";
-	let theme: DesignTheme = "unknown";
+	let theme: "light" | "dark" | "unknown" = "unknown";
 	const overviewLines: string[] = [];
 	let themeSeen = false;
 	for (const rawLine of prelude) {
@@ -227,18 +365,18 @@ function parseHeaderBlock(prelude: string[]): {
 		if (!title) {
 			const titleMatch = line.match(/^#\s+(?!#)(.*)$/);
 			if (titleMatch) {
-				title = titleMatch[1].trim();
+				title = (titleMatch[1] ?? "").trim();
 				continue;
 			}
 		}
 		const quoteMatch = line.match(/^>\s?(.*)$/);
 		if (quoteMatch && !essence) {
-			essence = quoteMatch[1].replace(/\*\*/g, "").trim();
+			essence = (quoteMatch[1] ?? "").replace(/\*\*/g, "").trim();
 			continue;
 		}
 		const themeMatch = line.replace(/\*\*/g, "").match(/^theme\s*:\s*(\w+)/i);
 		if (themeMatch) {
-			const value = themeMatch[1].toLowerCase();
+			const value = (themeMatch[1] ?? "").toLowerCase();
 			theme = value === "light" || value === "dark" ? value : "unknown";
 			themeSeen = true;
 			continue;
@@ -253,6 +391,7 @@ function parseColors(lines: string[]): InspectorColorToken[] {
 	const tables = parseTables(lines);
 	if (tables.length === 0) return [];
 	const table = tables[0];
+	if (!table) return [];
 	const nameIdx = headerIndex(table.headers, /name/);
 	const valueIdx = headerIndex(table.headers, /value/);
 	const tokenIdx = headerIndex(table.headers, /token/);
@@ -266,10 +405,13 @@ function parseColors(lines: string[]): InspectorColorToken[] {
 			value: valueIdx >= 0 ? (cells[valueIdx] ?? "") : (cells[1] ?? ""),
 			token: tokenIdx >= 0 ? (cells[tokenIdx] ?? "") : (cells[2] ?? ""),
 			role: roleIdx >= 0 ? (cells[roleIdx] ?? "") : (cells[3] ?? ""),
+			roleClass: "unknown",
+			frequency: 0,
+			rationale: "",
+			confidence: "unknown",
 		};
-		if (entry.name || entry.value || entry.token || entry.role) {
+		if (entry.name || entry.value || entry.token || entry.role)
 			colors.push(entry);
-		}
 	}
 	return colors;
 }
@@ -278,6 +420,7 @@ function parseTypography(lines: string[]): InspectorTypeEntry[] {
 	const tables = parseTables(lines);
 	if (tables.length === 0) return [];
 	const table = tables[0];
+	if (!table) return [];
 	const labelIdx = headerIndex(
 		table.headers,
 		/name|role|scale|style|element|level/,
@@ -291,32 +434,45 @@ function parseTypography(lines: string[]): InspectorTypeEntry[] {
 		const label = labelIdx >= 0 ? (row[labelIdx] ?? "") : (row[0] ?? "");
 		if (!label && row.every((cell) => cell.length === 0)) continue;
 		entries.push({
-			label,
+			role: label,
 			family: familyIdx >= 0 ? (row[familyIdx] ?? "") : "",
 			size: sizeIdx >= 0 ? (row[sizeIdx] ?? "") : "",
+			sizePx: Number.parseFloat(sizeIdx >= 0 ? (row[sizeIdx] ?? "") : ""),
 			weight: weightIdx >= 0 ? (row[weightIdx] ?? "") : "",
 			lineHeight: lineHeightIdx >= 0 ? (row[lineHeightIdx] ?? "") : "",
+			letterSpacing: "",
+			frequency: 0,
+			sample: "",
 		});
 	}
 	return entries;
 }
 
-function deriveFonts(entries: InspectorTypeEntry[]): InspectorFont[] {
-	const byFamily = new Map<string, InspectorFont>();
+function deriveTypefaces(entries: InspectorTypeEntry[]): InspectorTypeface[] {
+	const byFamily = new Map<string, InspectorTypeface>();
 	for (const entry of entries) {
 		if (!entry.family) continue;
 		const existing = byFamily.get(entry.family) ?? {
 			family: entry.family,
+			stack: entry.family,
 			weights: [],
+			sizes: [],
 			roles: [],
+			lineHeights: [],
+			letterSpacings: [],
+			loadedEvidence: false,
+			declaredFaces: [],
+			uncertainty:
+				"Parsed from an archived document, so the declared and rendered fonts are not verified.",
+			sample: "",
 		};
 		const weight = normalizeFontWeight(entry.weight);
-		if (weight && !existing.weights.includes(weight)) {
+		if (weight && !existing.weights.includes(weight))
 			existing.weights.push(weight);
-		}
-		if (entry.label && !existing.roles.includes(entry.label)) {
-			existing.roles.push(entry.label);
-		}
+		if (entry.size && !existing.sizes.includes(entry.size))
+			existing.sizes.push(entry.size);
+		if (entry.role && !existing.roles.includes(entry.role))
+			existing.roles.push(entry.role);
 		byFamily.set(entry.family, existing);
 	}
 	return [...byFamily.values()];
@@ -324,35 +480,46 @@ function deriveFonts(entries: InspectorTypeEntry[]): InspectorFont[] {
 
 function parseSpacingShapes(lines: string[]): {
 	spacing: InspectorToken[];
-	radii: InspectorToken[];
-	baseUnit: string;
+	radii: InspectorRadiusToken[];
+	elevation: InspectorElevationToken[];
+	baseUnitPx: number;
 } {
 	const spacing: InspectorToken[] = [];
-	const radii: InspectorToken[] = [];
-	let baseUnit = "";
+	const radii: InspectorRadiusToken[] = [];
+	const elevation: InspectorElevationToken[] = [];
+	let baseUnitPx = Number.NaN;
 	const baseMatch = lines
 		.map((line) =>
 			line.replace(/[*`]/g, "").match(/base\s*(?:unit)?\s*[:=]\s*([\d.]+px)/i),
 		)
 		.find((match) => match !== null);
-	if (baseMatch?.[1]) baseUnit = baseMatch[1];
+	if (baseMatch?.[1]) baseUnitPx = Number.parseFloat(baseMatch[1]);
 	for (const table of parseTables(lines)) {
 		const headerText = table.headers.join(" ").toLowerCase();
 		const isRadii = /radius|radii|round|shape/.test(headerText);
 		const isSpacing =
-			/spac|gap|padding|margin|unit|size|scale|token|value/.test(headerText);
+			/spac|gap|padding|margin|unit|size|scale|token|value|purpose/.test(
+				headerText,
+			);
 		if (!isRadii && !isSpacing) continue;
 		for (const row of table.rows) {
 			const label = row[0] ?? "";
 			const value = row[1] ?? "";
 			if (!label && !value) continue;
-			// The canonical table carries the property name in the first column,
-			// so a radius row must be routed by its value, not the table header.
-			const target =
-				isRadii || /radius|radii|round/.test(label) ? radii : spacing;
-			target.push({ label, value });
+			// The canonical table carries the purpose in the first column, so a
+			// radius row is routed by its label as well as the table header.
+			if (isRadii || /radius|radii|round/.test(label))
+				radii.push({
+					label,
+					value,
+					valuePx: Number.parseFloat(value),
+					context: "",
+					frequency: 0,
+				});
+			else spacing.push({ label, value, context: "", frequency: 0 });
 		}
 	}
+	// Archived documents may list a spacing scale as bullets rather than a table.
 	const seen = new Set(spacing.map((token) => token.label));
 	for (const rawLine of lines) {
 		if (spacing.length >= 24) break;
@@ -361,34 +528,43 @@ function parseSpacingShapes(lines: string[]): {
 		const token = bullet.match(/`?(--[\w-]+)`?\s*:\s*`?([\d.]+px)`?/);
 		if (!token?.[1] || !token[2] || seen.has(token[1])) continue;
 		seen.add(token[1]);
-		spacing.push({ label: token[1], value: token[2] });
+		spacing.push({
+			label: token[1],
+			value: token[2],
+			context: "",
+			frequency: 0,
+		});
 	}
-	return { spacing, radii, baseUnit };
+	return { spacing, radii, elevation, baseUnitPx };
 }
 
-function parseGuidelines(lines: string[]): { dos: string[]; donts: string[] } {
-	const dos: string[] = [];
-	const donts: string[] = [];
+function parseGuidelines(lines: string[]): {
+	dos: InspectorGuideline[];
+	donts: InspectorGuideline[];
+} {
+	const dos: InspectorGuideline[] = [];
+	const donts: InspectorGuideline[] = [];
 	for (const rawLine of lines) {
 		const bullet = rawLine.match(/^\s*(?:[-*]|\d+[.)])\s+(.*)$/);
 		if (!bullet?.[1]) continue;
 		const raw = bullet[1].trim();
-		if (!raw) continue;
-		const text = raw.replace(/\*\*/g, "").trim();
+		if (!raw || /^_?evidence/i.test(raw)) continue;
+		const text = raw.replace(/\*\*/g, "").replace(/^_|_$/g, "").trim();
 		const negative = /^(don't|dont|do\s+not)\b/i.test(text);
-		// The canonical document labels each rule with "Do:" or "Don't:" so the
-		// raw markdown stays readable. The label is redundant once the rule is
-		// already grouped under Do or Don't, so it is not shown twice.
+		// The canonical document labels each rule so the raw markdown stays
+		// readable; the label is redundant once grouped, so it is not shown twice.
 		const display = text
 			.replace(/^(?:don't|dont|do\s+not|do)\s*:\s*/i, "")
 			.trim();
 		if (!display) continue;
-		if (negative) donts.push(display);
-		else dos.push(display);
+		if (negative) donts.push({ rule: display, evidence: "" });
+		else dos.push({ rule: display, evidence: "" });
 	}
 	return { dos, donts };
 }
 
+// Parses an archived DESIGN.md. The result is always labelled unverified,
+// because parsing text cannot establish that its values were measured.
 export function parseDesignMd(designMd: string): DesignInspectorModel {
 	if (!designMd || designMd.trim().length === 0) return { ...EMPTY_MODEL };
 	const normalized = normalizeDesign(designMd.replace(/\r\n/g, "\n"));
@@ -397,21 +573,28 @@ export function parseDesignMd(designMd: string): DesignInspectorModel {
 	const typography = parseTypography(
 		sectionBody(sections, "Tokens - Typography"),
 	);
-	const { spacing, radii, baseUnit } = parseSpacingShapes(
+	const { spacing, radii, elevation, baseUnitPx } = parseSpacingShapes(
 		sectionBody(sections, "Tokens - Spacing & Shapes"),
 	);
 	const { dos, donts } = parseGuidelines(
 		sectionBody(sections, "Do's and Don'ts"),
 	);
+	const limitations = sectionBody(sections, "Limitations & Confidence Notes")
+		.map((line) => line.replace(/^\s*[-*]\s*/, "").trim())
+		.filter((line) => line.length > 0 && !line.startsWith("#"));
 	return {
+		...EMPTY_MODEL,
 		...header,
+		modelVersion: designMdVersionOf(designMd),
 		colors: parseColors(sectionBody(sections, "Tokens - Colors")),
 		typography,
-		fonts: deriveFonts(typography),
+		typefaces: deriveTypefaces(typography),
 		spacing,
 		radii,
-		baseUnit,
+		elevation,
+		baseUnitPx,
 		dos,
 		donts,
+		limitations,
 	};
 }
