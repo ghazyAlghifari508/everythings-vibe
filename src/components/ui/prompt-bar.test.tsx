@@ -214,6 +214,56 @@ describe("PromptBar Component", () => {
 		expect(sendButton?.textContent).toContain("Mengirim...");
 	});
 
+	it("keeps the textarea editable while isSending and preserves the draft", () => {
+		const onSend = vi.fn();
+		const onValueChange = vi.fn();
+		act(() => {
+			root?.render(
+				<PromptBar
+					isSending
+					value="Draft yang sedang saya susun"
+					onValueChange={onValueChange}
+					onSend={onSend}
+				/>,
+			);
+		});
+
+		const textarea = container.querySelector<HTMLTextAreaElement>("textarea");
+		const sendButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		// Editable, but the submit action is closed for the whole busy window.
+		expect(textarea?.disabled).toBe(false);
+		expect(sendButton?.disabled).toBe(true);
+		expect(textarea?.value).toBe("Draft yang sedang saya susun");
+
+		// Enter cannot bypass the pending-request guard.
+		act(() => {
+			textarea?.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
+		});
+		expect(onSend).not.toHaveBeenCalled();
+	});
+
+	it("uses one cursor treatment across the whole surface when disabled", () => {
+		act(() => {
+			root?.render(<PromptBar disabled value="Teks" />);
+		});
+		const surface = container.querySelector("[data-testid='prompt-bar']");
+		expect(surface?.className).toContain("cursor-not-allowed");
+		expect(surface?.className).not.toContain("cursor-text");
+	});
+
+	it("keeps the text cursor across the whole surface while only busy", () => {
+		act(() => {
+			root?.render(<PromptBar isSending value="Teks" />);
+		});
+		const surface = container.querySelector("[data-testid='prompt-bar']");
+		expect(surface?.className).toContain("cursor-text");
+		expect(surface?.className).not.toContain("cursor-not-allowed");
+	});
+
 	it("does not render demo controls such as model picker, mic, attachments, or effort slider", () => {
 		act(() => {
 			root?.render(<PromptBar />);
@@ -247,5 +297,140 @@ describe("PromptBar Component", () => {
 			"[data-testid='prompt-bar']",
 		);
 		expect(promptBarContainer?.classList.contains("border")).toBe(true);
+	});
+});
+
+describe("PromptBar composer surface", () => {
+	function press(target: Element) {
+		const press = new MouseEvent("mousedown", {
+			bubbles: true,
+			cancelable: true,
+		});
+		target.dispatchEvent(press);
+		return press;
+	}
+
+	it("focuses the textarea from the surface, the footer row, and the padding gap", () => {
+		act(() => {
+			root?.render(<PromptBar id="surface-composer" minRows={2} />);
+		});
+
+		const textarea =
+			container.querySelector<HTMLTextAreaElement>("#surface-composer");
+		const surface = container.querySelector("[data-testid='prompt-bar']");
+		const footer = surface?.querySelector(":scope > div");
+		const padding = surface?.querySelector(":scope > label");
+		expect(footer).not.toBeNull();
+		expect(padding).not.toBeNull();
+
+		for (const region of [surface, footer, padding]) {
+			act(() => {
+				textarea?.blur();
+				expect(press(region as Element).defaultPrevented).toBe(true);
+			});
+			expect(document.activeElement).toBe(textarea);
+		}
+	});
+
+	it("never intercepts presses that land on the textarea or a control", () => {
+		const onSend = vi.fn();
+		act(() => {
+			root?.render(<PromptBar id="surface-composer" onSend={onSend} />);
+		});
+
+		const textarea =
+			container.querySelector<HTMLTextAreaElement>("#surface-composer");
+		const submit = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		act(() => {
+			if (textarea) setTextareaValue(textarea, "Tambah pencarian");
+		});
+
+		act(() => {
+			expect(press(textarea as Element).defaultPrevented).toBe(false);
+		});
+		act(() => {
+			expect(press(submit as Element).defaultPrevented).toBe(false);
+		});
+		act(() => {
+			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onSend).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not steal focus while disabled", () => {
+		act(() => {
+			root?.render(<PromptBar id="surface-composer" disabled value="Teks" />);
+		});
+
+		const textarea =
+			container.querySelector<HTMLTextAreaElement>("#surface-composer");
+		const surface = container.querySelector("[data-testid='prompt-bar']");
+		act(() => {
+			expect(press(surface as Element).defaultPrevented).toBe(false);
+		});
+		expect(document.activeElement).not.toBe(textarea);
+	});
+});
+
+describe("PromptBar icon submit appearance", () => {
+	it("keeps the historical labelled button by default", () => {
+		act(() => {
+			root?.render(<PromptBar />);
+		});
+
+		const surface = container.querySelector("[data-testid='prompt-bar']");
+		expect(surface?.getAttribute("data-submit-appearance")).toBe("label");
+		const submit = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		expect(submit?.textContent).toContain("Kirim");
+		expect(submit?.getAttribute("aria-label")).toBe("Kirim");
+	});
+
+	it("renders an accessible, non-textual submit when opted in", () => {
+		act(() => {
+			root?.render(<PromptBar submitAppearance="icon" />);
+		});
+
+		const submit = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		expect(submit?.textContent).toBe("");
+		expect(submit?.getAttribute("aria-label")).toBe("Kirim pesan");
+		expect(submit?.getAttribute("title")).toBe("Kirim pesan");
+		expect(submit?.querySelector("svg")).not.toBeNull();
+		expect(submit?.getAttribute("aria-busy")).toBe("false");
+	});
+
+	it("exposes the sending state through aria-busy without changing the name", () => {
+		act(() => {
+			root?.render(<PromptBar submitAppearance="icon" isSending disabled />);
+		});
+
+		const submit = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		expect(submit?.getAttribute("aria-busy")).toBe("true");
+		expect(submit?.getAttribute("aria-label")).toBe("Kirim pesan");
+		expect(submit?.disabled).toBe(true);
+	});
+
+	it("honours an explicit sendButtonLabel as the icon-only accessible name", () => {
+		act(() => {
+			root?.render(
+				<PromptBar
+					submitAppearance="icon"
+					sendButtonLabel="Kirim permintaan"
+				/>,
+			);
+		});
+
+		const submit = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		expect(submit?.getAttribute("aria-label")).toBe("Kirim permintaan");
+		expect(submit?.textContent).toBe("");
 	});
 });

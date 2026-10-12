@@ -268,6 +268,57 @@ export function hasCliHandshake(status: {
 	);
 }
 
+/** Metadata key holding the repository identity reported at handshake. */
+export const REPOSITORY_IDENTITY_METADATA_KEY = "repositoryIdentity";
+/** Metadata key marking that the reported identity did not match the stored one. */
+export const REPOSITORY_IDENTITY_MISMATCH_METADATA_KEY =
+	"repositoryIdentityMismatch";
+
+/**
+ * Record the repository identity the CLI reported, plus whether it agreed with
+ * what the codebase already held.
+ *
+ * The identity is a normalized, credential-free value, so persisting it in
+ * session metadata is safe. The mismatch flag is the durable proof that an
+ * upload targeted a codebase bound to another repository; a later handshake
+ * that does match clears it, so the warning never outlives the condition.
+ */
+export function buildRepositoryIdentityMetadata(input: {
+	previous: unknown;
+	repositoryIdentity: string;
+	matchesStored: boolean;
+	at: Date;
+}): Record<string, unknown> {
+	const previous =
+		typeof input.previous === "object" && input.previous !== null
+			? (input.previous as Record<string, unknown>)
+			: {};
+	const next: Record<string, unknown> = {
+		...previous,
+		[REPOSITORY_IDENTITY_METADATA_KEY]: input.repositoryIdentity,
+		[REPOSITORY_IDENTITY_REPORTED_AT_METADATA_KEY]: input.at.toISOString(),
+	};
+	if (input.matchesStored) {
+		delete next[REPOSITORY_IDENTITY_MISMATCH_METADATA_KEY];
+		return next;
+	}
+	next[REPOSITORY_IDENTITY_MISMATCH_METADATA_KEY] = true;
+	return next;
+}
+
+/** When the CLI last reported a repository identity for this session. */
+export const REPOSITORY_IDENTITY_REPORTED_AT_METADATA_KEY =
+	"repositoryIdentityReportedAt";
+
+/** Read the persisted mismatch flag, or false when it was never set. */
+export function readRepositoryIdentityMismatch(metadata: unknown): boolean {
+	if (typeof metadata !== "object" || metadata === null) return false;
+	const value = (metadata as Record<string, unknown>)[
+		REPOSITORY_IDENTITY_MISMATCH_METADATA_KEY
+	];
+	return value === true;
+}
+
 /**
  * Whether the conclusion step may be opened.
  *
@@ -365,6 +416,18 @@ export interface SyncStageRow {
 	detail?: string;
 	/** Optional short qualifier rendered beside the row (e.g. a live count). */
 	meta?: string;
+	/**
+	 * Server-recorded time this stage actually finished. Present only when the
+	 * backend persisted a real timestamp for it, so a fast sync can report
+	 * WHEN each stage completed instead of replaying it as if still running.
+	 */
+	completedAt?: string;
+	/**
+	 * Server-recorded time this stage actually began. Set only for the active
+	 * stage, and only from a real prior transition, so an elapsed duration is
+	 * measured rather than guessed.
+	 */
+	startedAt?: string;
 }
 
 export interface SyncStageView {
@@ -418,7 +481,10 @@ const AGENT_HINT = "Jalankan prompt dari root repository.";
 const PREPARE_TITLE = "Menyiapkan source code";
 const SYNC_TITLE = "Menyinkronkan codebase";
 
-function buildAgentRow(progress: SyncStageProgress): SyncStageRow {
+function buildAgentRow(
+	progress: SyncStageProgress,
+	agentConnectedAt: string | null,
+): SyncStageRow {
 	if (progress === "waiting") {
 		return { state: "waiting", title: AGENT_TITLE, detail: AGENT_HINT };
 	}
@@ -426,15 +492,23 @@ function buildAgentRow(progress: SyncStageProgress): SyncStageRow {
 		state: "done",
 		title: "Agent terhubung",
 		detail: "Agent berhasil tersambung ke VibeEverything.",
+		...(agentConnectedAt ? { completedAt: agentConnectedAt } : {}),
 	};
 }
 
-function buildPreparingRow(progress: SyncStageProgress): SyncStageRow {
+function buildPreparingRow(
+	progress: SyncStageProgress,
+	preparationStartedAt: string | null,
+): SyncStageRow {
 	if (progress === "preparing") {
 		return {
 			state: "active",
 			title: `${PREPARE_TITLE}...`,
 			detail: "Memeriksa file project yang akan disinkronkan.",
+			// The handshake is when preparation really began: the CLI handshakes
+			// BEFORE it walks the repository, so this elapsed window is measured
+			// from a persisted fact.
+			...(preparationStartedAt ? { startedAt: preparationStartedAt } : {}),
 		};
 	}
 	if (progress === "syncing" || progress === "done") {
@@ -450,15 +524,23 @@ function buildPreparingRow(progress: SyncStageProgress): SyncStageRow {
 function buildSyncingRow(
 	progress: SyncStageProgress,
 	fileCount: number | undefined,
+	uploadStartedAt: string | null,
+	snapshotPersistedAt: string | null,
+	snapshotPersistedCount: number | undefined,
 ): SyncStageRow {
 	if (progress === "done") {
+		const verifiedCount =
+			typeof snapshotPersistedCount === "number"
+				? snapshotPersistedCount
+				: fileCount;
 		return {
 			state: "done",
 			title: "Sinkronisasi selesai",
 			detail:
-				typeof fileCount === "number"
-					? `${fileCount} file berhasil diterima.`
+				typeof verifiedCount === "number"
+					? `${verifiedCount} file berhasil diterima.`
 					: "Source code berhasil diterima.",
+			...(snapshotPersistedAt ? { completedAt: snapshotPersistedAt } : {}),
 		};
 	}
 	if (progress === "syncing") {
@@ -466,6 +548,9 @@ function buildSyncingRow(
 			state: "active",
 			title: `${SYNC_TITLE}...`,
 			detail: "Mengirim source code ke VibeEverything.",
+			// Upload start is the persisted moment transport actually began, so
+			// the elapsed timer measures real transfer time.
+			...(uploadStartedAt ? { startedAt: uploadStartedAt } : {}),
 		};
 		// The count is real server data, so it is shown as soon as there is one
 		// rather than inventing a percentage the server never reports.
@@ -492,6 +577,8 @@ export function resolveSyncStageView(
 				| "excludedCount"
 				| "errorMessage"
 				| "cliConnectedAt"
+				| "snapshotCreatedAt"
+				| "lifecycle"
 		  >
 		| null
 		| undefined,
@@ -556,14 +643,37 @@ export function resolveSyncStageView(
 			? "syncing"
 			: SYNC_STAGE_PROGRESS[status.status];
 
+	// Real transition timestamps, in order of preference:
+	// 1. the persisted lifecycle log, written by the route that performed the
+	//    transition — this is what lets a fast sync report WHEN it finished;
+	// 2. the handshake evidence column, for sessions created before the log.
+	// A missing timestamp stays missing: the row simply renders without one.
+	const lifecycle = status.lifecycle ?? [];
+	const eventAt = (kind: SyncLifecycleEventKind): string | null =>
+		lifecycle.find((event) => event.kind === kind)?.at ?? null;
+	const agentConnectedAt =
+		eventAt("agent_connected") ?? status.cliConnectedAt ?? null;
+	const uploadStartedAt = eventAt("upload_started");
+	const snapshotPersistedAt =
+		eventAt("snapshot_persisted") ?? status.snapshotCreatedAt ?? null;
+	const snapshotPersistedCount = lifecycle.find(
+		(event) => event.kind === "snapshot_persisted",
+	)?.count;
+
 	return {
 		hasStatus: true,
 		hasStarted: true,
 		failed: false,
 		stages: [
-			buildAgentRow(progress),
-			buildPreparingRow(progress),
-			buildSyncingRow(progress, status.fileCount),
+			buildAgentRow(progress, agentConnectedAt),
+			buildPreparingRow(progress, agentConnectedAt),
+			buildSyncingRow(
+				progress,
+				status.fileCount,
+				uploadStartedAt,
+				snapshotPersistedAt,
+				snapshotPersistedCount,
+			),
 		],
 		...(status.excludedCount !== undefined
 			? { excludedCount: status.excludedCount }
@@ -604,6 +714,36 @@ export function isSafeRelativePath(path: string): boolean {
 }
 
 // === DTOs (Zod boundary validation) ===
+
+// === Persisted lifecycle event log (vocabulary) ===
+// Why this exists: the CLI can finish several real transitions between two
+// browser polls. Polling alone then observes only the terminal state, so the
+// UI can honestly say "all stages done" but cannot say WHEN each one happened
+// or how long it took. Recording each real transition with its own timestamp
+// on the session row turns "we missed it" into "here is what actually
+// happened", without replaying a stage or inventing a delay.
+//
+// The log is append-only and bounded, stored beside the handshake/failure
+// evidence in `codebase_sync_sessions.metadata` (jsonb) so no new table is
+// needed. Every entry is written by the same route that performs the real
+// transition; nothing else may append to it.
+//
+// Declared here (before the status DTO below) because the status response
+// validates the log against this same vocabulary.
+
+export const SYNC_LIFECYCLE_EVENT_KINDS = [
+	"agent_connected",
+	"upload_started",
+	"snapshot_persisted",
+	"failed",
+] as const;
+
+export type SyncLifecycleEventKind =
+	(typeof SYNC_LIFECYCLE_EVENT_KINDS)[number];
+
+/** Bound on retained events: a linear lifecycle produces a handful, and the
+ *  jsonb column must never grow without limit. */
+export const SYNC_LIFECYCLE_MAX_EVENTS = 24;
 
 export const manifestEntrySchema = z.object({
 	path: z.string().refine(isSafeRelativePath, {
@@ -656,10 +796,33 @@ export const syncStatusResponseSchema = z.object({
 	// Snapshot creation timestamp ("Waktu sync" in the review page).
 	snapshotCreatedAt: z.string().datetime().optional(),
 	analysisId: z.string().min(1).nullable().optional(),
-	// Latest analysis status for the snapshot (pending while the model runs,
-	// ready on success, failed when retryable). Drives the review/retry UI;
-	// absent when no analysis has been requested yet.
+	// The analysis whose content the workspace renders: the newest ready record
+	// for the snapshot. It survives a newer failed or still-running attempt, and
+	// stays present once the CLI session that produced the snapshot is gone.
 	analysisStatus: codebaseAnalysisStatusSchema.optional(),
+	// The newest stored attempt for that snapshot, which may be a failed or
+	// pending retry. Reported separately so the failure stays visible without
+	// discarding the ready analysis above.
+	analysisAttemptId: z.string().min(1).nullable().optional(),
+	analysisAttemptStatus: codebaseAnalysisStatusSchema.optional(),
+	// When the newest attempt was created and last written. Real timestamps
+	// only: the conclusion step derives elapsed time from them instead of from
+	// a client-side guess, and omits the timer when they are absent.
+	analysisAttemptCreatedAt: z.string().datetime().optional(),
+	analysisAttemptUpdatedAt: z.string().datetime().optional(),
+	// Ordered log of the real sync transitions this attempt performed, each
+	// with the timestamp the server persisted at that moment. Lets a browser
+	// that polls after a fast CLI finished report WHAT happened and WHEN,
+	// instead of replaying a stage that already completed.
+	lifecycle: z
+		.array(
+			z.object({
+				kind: z.enum(SYNC_LIFECYCLE_EVENT_KINDS),
+				at: z.string().datetime(),
+				count: z.number().int().nonnegative().optional(),
+			}),
+		)
+		.optional(),
 	createdAt: z.string().datetime().optional(),
 	updatedAt: z.string().datetime().optional(),
 	expiresAt: z.string().datetime().optional(),
@@ -873,6 +1036,13 @@ export const PLAN_CODEBASE_PROJECT_STORAGE_KEY =
 // refresh return the user to the screen they were reading instead of guessing
 // a screen from the server snapshot alone.
 export const PLAN_CODEBASE_STEP_STORAGE_KEY = "prdfy:plan-codebase-step";
+// Active feature-plan pointer for the repository workspace: which of a
+// codebase's several feature plans the user last had open. Suffixed with the
+// codebase id so two repositories never share a pointer. Navigation state only
+// — planning artifacts always come from the server, and the workspace resolves
+// a correct plan on its own when this pointer is missing or stale.
+export const ACTIVE_PLAN_POINTER_STORAGE_KEY_PREFIX =
+	"prdfy:active-plan-project-id:";
 
 // One usable credential per project: this predicate is advisory only; session
 // creation must re-check under a per-project transaction/advisory lock
@@ -1045,6 +1215,93 @@ export function buildFailureMetadata(input: {
 	};
 }
 
+// === Persisted lifecycle event log ===
+// Why this exists: the CLI can finish several real transitions between two
+// browser polls. Polling alone then observes only the terminal state, so the
+// UI can honestly say "all stages done" but cannot say WHEN each one happened
+// or how long it took. Recording each real transition with its own timestamp
+// on the session row turns "we missed it" into "here is what actually
+// happened", without replaying a stage or inventing a delay.
+//
+// The log is append-only and bounded, stored beside the handshake/failure
+// evidence in `codebase_sync_sessions.metadata` (jsonb) so no new table is
+// needed. Every entry is written by the same route that performs the real
+// transition; nothing else may append to it.
+
+export const SYNC_LIFECYCLE_METADATA_KEY = "lifecycle" as const;
+
+export interface SyncLifecycleEvent {
+	kind: SyncLifecycleEventKind;
+	at: string;
+	/**
+	 * Optional verified count attached to the event (files received for
+	 * `snapshot_persisted`). Never a percentage or an estimate.
+	 */
+	count?: number;
+}
+
+const syncLifecycleEventSchema = z.object({
+	kind: z.enum(SYNC_LIFECYCLE_EVENT_KINDS),
+	at: z.string().datetime(),
+	count: z.number().int().nonnegative().optional(),
+});
+
+const syncLifecycleEventListSchema = z.array(syncLifecycleEventSchema);
+
+/**
+ * Read the persisted lifecycle log. The metadata column is untrusted jsonb:
+ * malformed entries are dropped rather than throwing, so a corrupt row
+ * degrades to "no history" instead of breaking status polling.
+ */
+export function readSyncLifecycle(metadata: unknown): SyncLifecycleEvent[] {
+	if (typeof metadata !== "object" || metadata === null) return [];
+	const raw = (metadata as Record<string, unknown>)[
+		SYNC_LIFECYCLE_METADATA_KEY
+	];
+	const parsed = syncLifecycleEventListSchema.safeParse(raw);
+	return parsed.success ? parsed.data.slice(0, SYNC_LIFECYCLE_MAX_EVENTS) : [];
+}
+
+/**
+ * Append one real transition to the log. Idempotent by kind: the first event
+ * of a kind wins, so a repeated handshake or a replayed completion cannot
+ * move an already-recorded timestamp forward (same rule the handshake
+ * evidence uses). Returns the metadata patch to persist.
+ */
+export function appendSyncLifecycleEvent(input: {
+	previous: unknown;
+	kind: SyncLifecycleEventKind;
+	at: Date;
+	count?: number;
+}): Record<string, unknown> {
+	const previous =
+		typeof input.previous === "object" && input.previous !== null
+			? (input.previous as Record<string, unknown>)
+			: {};
+	const existing = readSyncLifecycle(previous);
+	if (existing.some((event) => event.kind === input.kind)) {
+		return { ...previous, [SYNC_LIFECYCLE_METADATA_KEY]: existing };
+	}
+	const event: SyncLifecycleEvent = {
+		kind: input.kind,
+		at: input.at.toISOString(),
+		...(typeof input.count === "number" ? { count: input.count } : {}),
+	};
+	const next = [...existing, event].slice(-SYNC_LIFECYCLE_MAX_EVENTS);
+	return { ...previous, [SYNC_LIFECYCLE_METADATA_KEY]: next };
+}
+
+/** Timestamp of one recorded event, or null when it never happened. */
+export function readSyncLifecycleAt(
+	metadata: unknown,
+	kind: SyncLifecycleEventKind,
+): string | null {
+	const found = readSyncLifecycle(metadata).find(
+		(event) => event.kind === kind,
+	);
+	return found?.at ?? null;
+}
+
 // === CLI handshake DTOs (Task 4) ===
 // Mirrors `packages/cli/src/lib/sync-client.ts`: the CLI POSTs `{cliVersion}`
 // with the sync token as Bearer auth and expects the bound session/attempt/
@@ -1061,6 +1318,10 @@ export function buildFailureMetadata(input: {
 export const cliHandshakeRequestSchema = z.object({
 	cliVersion: z.string().min(1).max(64),
 	repositoryName: z.unknown().optional(),
+	// Normalized Git remote identity. Untrusted cosmetic metadata like
+	// `repositoryName`: validated by `normalizeRepositoryIdentity`, and an
+	// unusable value is ignored rather than failing an otherwise valid upload.
+	repositoryIdentity: z.unknown().optional(),
 });
 
 export type CliHandshakeRequest = z.infer<typeof cliHandshakeRequestSchema>;
@@ -1072,6 +1333,9 @@ export const cliHandshakeResponseSchema = z.object({
 	status: codebaseSyncStatusSchema,
 	cliMinVersion: z.string().min(1),
 	expiresAt: z.string().datetime(),
+	// Present only when the codebase already holds a different identity, so an
+	// upload into the wrong repository is visible to the user instead of silent.
+	repositoryIdentityMismatch: z.boolean().optional(),
 });
 
 export type CliHandshakeResponse = z.infer<typeof cliHandshakeResponseSchema>;
@@ -1224,7 +1488,7 @@ export function buildAgentPrompt(
 		"<output CLI asli secara lengkap>",
 		"",
 		"Tindakan Untuk User:",
-		"<Jika berhasil: 'Sinkronisasi berhasil! Kembali ke tab browser VibeEverything untuk melihat ringkasan analisis codebase.'>",
+		"<Jika berhasil: 'Sinkronisasi repository berhasil. Sebutkan jumlah file dari output CLI asli. Hasil upload sudah tersimpan di VibeEverything. Analisis codebase berjalan terpisah di website dan mungkin belum selesai — arahkan user kembali ke VibeEverything untuk memantau status analisis sampai kesimpulan siap. Jangan menyatakan analisis selesai.'>",
 		"<Jika gagal: sampaikan arahan solusi sesuai diagnosa di atas.>",
 	].join("\n");
 }

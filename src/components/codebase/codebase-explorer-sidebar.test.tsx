@@ -2,15 +2,24 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { explorerExpansionStorageKey } from "@/lib/codebase-explorer-expansion";
 import {
 	buildTree,
 	CodebaseExplorerSidebar,
+	collectTreeFolderPaths,
 	compareExplorerTreeNodes,
 	type ExplorerFileEntry,
 	filterExplorerFiles,
 	sortTreeNodes,
 	type TreeNode,
 } from "./codebase-explorer-sidebar";
+
+const nestedTreeFiles: ExplorerFileEntry[] = [
+	{ path: "src/pages/PortfolioPage.tsx" },
+	{ path: "src/components/Card.tsx" },
+	{ path: "docs/readme.md" },
+	{ path: "index.html" },
+];
 
 let container: HTMLDivElement;
 let root: Root | null = null;
@@ -266,7 +275,6 @@ describe("CodebaseExplorerSidebar component integration", () => {
 		act(() => {
 			root?.render(
 				<CodebaseExplorerSidebar
-					codebaseName="test-project"
 					files={sampleFiles}
 					stack={["react", "typescript"]}
 					onSelectFile={onSelectFile}
@@ -275,7 +283,6 @@ describe("CodebaseExplorerSidebar component integration", () => {
 		});
 
 		const text = container.textContent ?? "";
-		expect(text).toContain("test-project");
 		expect(text).toContain("src");
 		expect(text).toContain("Dockerfile");
 		expect(text).toContain("README.md");
@@ -293,25 +300,56 @@ describe("CodebaseExplorerSidebar component integration", () => {
 		expect(onSelectFile).toHaveBeenCalledWith("Dockerfile");
 	});
 
-	it("supports expand and collapse of folders", () => {
+	it("opens every folder collapsed on the first visit", () => {
 		act(() => {
 			root?.render(
 				<CodebaseExplorerSidebar
-					codebaseName="test-project"
 					files={sampleFiles}
 					stack={[]}
+					codebaseId="repo"
 				/>,
 			);
 		});
 
-		// At depth 0, folder 'src' is expanded by default (depth < 2)
-		expect(container.textContent).toContain("App.tsx");
+		// No depth-based auto expansion: 'src' stays closed, so its children
+		// are not rendered at all.
+		expect(container.textContent).not.toContain("App.tsx");
+		const folderButtons = [...container.querySelectorAll("button")].filter(
+			(b) => b.getAttribute("aria-expanded") !== null,
+		);
+		expect(folderButtons.length).toBeGreaterThan(0);
+		for (const button of folderButtons) {
+			expect(button.getAttribute("aria-expanded")).toBe("false");
+		}
+	});
+
+	it("supports expand and collapse of folders", () => {
+		act(() => {
+			root?.render(
+				<CodebaseExplorerSidebar
+					files={sampleFiles}
+					stack={[]}
+					codebaseId="repo"
+				/>,
+			);
+		});
+
+		expect(container.textContent).not.toContain("App.tsx");
 
 		const srcFolderButton = [...container.querySelectorAll("button")].find(
 			(b) => b.textContent?.trim() === "src",
 		);
 		expect(srcFolderButton).toBeDefined();
+		expect(srcFolderButton?.getAttribute("aria-expanded")).toBe("false");
+
+		// Click to expand
+		act(() => {
+			srcFolderButton?.dispatchEvent(
+				new MouseEvent("click", { bubbles: true }),
+			);
+		});
 		expect(srcFolderButton?.getAttribute("aria-expanded")).toBe("true");
+		expect(container.textContent).toContain("App.tsx");
 
 		// Click to collapse
 		act(() => {
@@ -321,26 +359,11 @@ describe("CodebaseExplorerSidebar component integration", () => {
 		});
 		expect(srcFolderButton?.getAttribute("aria-expanded")).toBe("false");
 		expect(container.textContent).not.toContain("App.tsx");
-
-		// Click again to expand
-		act(() => {
-			srcFolderButton?.dispatchEvent(
-				new MouseEvent("click", { bubbles: true }),
-			);
-		});
-		expect(srcFolderButton?.getAttribute("aria-expanded")).toBe("true");
-		expect(container.textContent).toContain("App.tsx");
 	});
 
 	it("filters files dynamically with the search input", () => {
 		act(() => {
-			root?.render(
-				<CodebaseExplorerSidebar
-					codebaseName="test-project"
-					files={sampleFiles}
-					stack={[]}
-				/>,
-			);
+			root?.render(<CodebaseExplorerSidebar files={sampleFiles} stack={[]} />);
 		});
 
 		const searchInput = container.querySelector<HTMLInputElement>(
@@ -362,5 +385,333 @@ describe("CodebaseExplorerSidebar component integration", () => {
 
 		expect(container.textContent).toContain("Dockerfile");
 		expect(container.textContent).not.toContain("README.md");
+	});
+
+	it("keeps search first and drops the duplicated repository card", () => {
+		act(() => {
+			root?.render(
+				<CodebaseExplorerSidebar files={sampleFiles} stack={["react"]} />,
+			);
+		});
+
+		// Search, tree, and detected stack stay.
+		const searchInput = container.querySelector<HTMLInputElement>(
+			"#codebase-file-search",
+		);
+		expect(searchInput).not.toBeNull();
+		const header = container.querySelector(
+			"[data-testid='codebase-explorer-sidebar'] > div",
+		);
+		expect(header?.firstElementChild?.contains(searchInput)).toBe(true);
+		expect(container.textContent).toContain("Struktur direktori codebase");
+		expect(container.textContent).toContain("Stack codebase terdeteksi");
+		expect(container.textContent).toContain("react");
+
+		// The repository identity card is gone: the workspace header owns it.
+		expect(
+			container.querySelector("[data-testid='codebase-explorer-name']"),
+		).toBeNull();
+		expect(container.textContent).not.toContain("Synced");
+		expect(container.textContent).not.toContain("Branch:");
+	});
+
+	it("keeps the honest empty state for search and for an unsynced snapshot", () => {
+		act(() => {
+			root?.render(<CodebaseExplorerSidebar files={sampleFiles} stack={[]} />);
+		});
+
+		act(() => {
+			const searchInput = container.querySelector<HTMLInputElement>(
+				"#codebase-file-search",
+			);
+			const setter = Object.getOwnPropertyDescriptor(
+				HTMLInputElement.prototype,
+				"value",
+			)?.set;
+			setter?.call(searchInput, "tidak-ada");
+			searchInput?.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+		expect(
+			container.querySelector("[data-testid='codebase-explorer-empty']")
+				?.textContent,
+		).toBe("Tidak ada file yang cocok dengan pencarian.");
+
+		act(() => {
+			root?.render(<CodebaseExplorerSidebar files={[]} stack={[]} />);
+		});
+		const searchInput = container.querySelector<HTMLInputElement>(
+			"#codebase-file-search",
+		);
+		act(() => {
+			const setter = Object.getOwnPropertyDescriptor(
+				HTMLInputElement.prototype,
+				"value",
+			)?.set;
+			setter?.call(searchInput, "");
+			searchInput?.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+		expect(
+			container.querySelector("[data-testid='codebase-explorer-empty']")
+				?.textContent,
+		).toBe("Belum ada file terindeks dari snapshot.");
+	});
+});
+
+describe("CodebaseExplorerSidebar expansion persistence", () => {
+	const nestedFiles: ExplorerFileEntry[] = [
+		{ path: "src/pages/PortfolioPage.tsx" },
+		{ path: "src/components/Card.tsx" },
+		{ path: "docs/readme.md" },
+		{ path: "index.html" },
+	];
+
+	function render(codebaseId: string, files = nestedFiles) {
+		act(() => {
+			root?.render(
+				<CodebaseExplorerSidebar
+					files={files}
+					stack={[]}
+					codebaseId={codebaseId}
+				/>,
+			);
+		});
+	}
+
+	function folderButton(label: string): HTMLButtonElement | undefined {
+		return [...container.querySelectorAll("button")].find(
+			(b) => b.textContent?.trim() === label,
+		);
+	}
+
+	function click(element: Element | undefined) {
+		act(() => {
+			element?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+	}
+
+	function setSearch(value: string) {
+		act(() => {
+			const input = container.querySelector<HTMLInputElement>(
+				"#codebase-file-search",
+			);
+			const setter = Object.getOwnPropertyDescriptor(
+				HTMLInputElement.prototype,
+				"value",
+			)?.set;
+			setter?.call(input, value);
+			input?.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+	}
+
+	function isExpanded(label: string): string | null {
+		return folderButton(label)?.getAttribute("aria-expanded") ?? null;
+	}
+
+	beforeEach(() => {
+		localStorage.clear();
+	});
+
+	it("restores an expanded folder after a refresh", () => {
+		render("repo-a");
+		click(folderButton("src"));
+		expect(isExpanded("src")).toBe("true");
+
+		// A refresh remounts the tree with no in-memory state.
+		act(() => {
+			root?.unmount();
+			root = createRoot(container);
+		});
+		render("repo-a");
+		expect(isExpanded("src")).toBe("true");
+		expect(container.textContent).toContain("components");
+	});
+
+	it("restores a collapsed folder after a refresh", () => {
+		render("repo-a");
+		click(folderButton("src"));
+		expect(isExpanded("src")).toBe("true");
+		click(folderButton("src"));
+		expect(isExpanded("src")).toBe("false");
+
+		act(() => {
+			root?.unmount();
+			root = createRoot(container);
+		});
+		render("repo-a");
+		expect(isExpanded("src")).toBe("false");
+		expect(container.textContent).not.toContain("components");
+	});
+
+	it("restores nested expansion state", () => {
+		render("repo-a");
+		click(folderButton("src"));
+		click(folderButton("pages"));
+		expect(container.textContent).toContain("PortfolioPage.tsx");
+
+		act(() => {
+			root?.unmount();
+			root = createRoot(container);
+		});
+		render("repo-a");
+		expect(isExpanded("src")).toBe("true");
+		expect(isExpanded("pages")).toBe("true");
+		expect(container.textContent).toContain("PortfolioPage.tsx");
+	});
+
+	it("keeps separate preferences per repository", () => {
+		render("repo-a");
+		click(folderButton("src"));
+
+		act(() => {
+			root?.unmount();
+			root = createRoot(container);
+		});
+		render("repo-b");
+		expect(isExpanded("src")).toBe("false");
+
+		click(folderButton("docs"));
+		expect(isExpanded("docs")).toBe("true");
+
+		act(() => {
+			root?.unmount();
+			root = createRoot(container);
+		});
+		render("repo-a");
+		expect(isExpanded("src")).toBe("true");
+		expect(isExpanded("docs")).toBe("false");
+	});
+
+	it("does not leak state when the repository changes without remounting", () => {
+		render("repo-a");
+		click(folderButton("src"));
+		expect(isExpanded("src")).toBe("true");
+
+		render("repo-b");
+		expect(isExpanded("src")).toBe("false");
+	});
+
+	it("keeps stored expansion through a search that hides the folder", () => {
+		render("repo-a");
+		click(folderButton("src"));
+		click(folderButton("pages"));
+
+		setSearch("readme");
+		expect(container.textContent).not.toContain("PortfolioPage.tsx");
+
+		setSearch("");
+		expect(isExpanded("src")).toBe("true");
+		expect(isExpanded("pages")).toBe("true");
+
+		act(() => {
+			root?.unmount();
+			root = createRoot(container);
+		});
+		render("repo-a");
+		expect(isExpanded("src")).toBe("true");
+		expect(isExpanded("pages")).toBe("true");
+	});
+
+	it("ignores stored folder paths the tree no longer has", () => {
+		localStorage.setItem(
+			explorerExpansionStorageKey("repo-a") ?? "",
+			JSON.stringify(["src", "removed/folder", "/etc"]),
+		);
+
+		render("repo-a");
+		// 'src' still exists, so it is restored; the removed and unsafe paths
+		// are dropped instead of resurrecting a folder the tree does not have.
+		expect(isExpanded("src")).toBe("true");
+		expect(isExpanded("removed")).toBeNull();
+		expect(isExpanded("etc")).toBeNull();
+
+		// The stale entries are not carried forward.
+		expect(
+			JSON.parse(
+				localStorage.getItem(explorerExpansionStorageKey("repo-a") ?? "") ??
+					"null",
+			),
+		).not.toContain("removed/folder");
+	});
+
+	it("opens every folder collapsed when the stored value is corrupt", () => {
+		localStorage.setItem(
+			explorerExpansionStorageKey("repo-a") ?? "",
+			"{ this is not json",
+		);
+		render("repo-a");
+		expect(isExpanded("src")).toBe("false");
+		expect(isExpanded("docs")).toBe("false");
+	});
+
+	it("does not expand folders when no codebase scopes the preference", () => {
+		act(() => {
+			root?.render(<CodebaseExplorerSidebar files={nestedFiles} stack={[]} />);
+		});
+		expect(isExpanded("src")).toBe("false");
+		click(folderButton("src"));
+		expect(isExpanded("src")).toBe("true");
+		// Nothing was persisted, so a remount starts over.
+		act(() => {
+			root?.unmount();
+			root = createRoot(container);
+		});
+		act(() => {
+			root?.render(<CodebaseExplorerSidebar files={nestedFiles} stack={[]} />);
+		});
+		expect(isExpanded("src")).toBe("false");
+	});
+
+	it("keeps the folder expansion when a file is selected", () => {
+		const onSelectFile = vi.fn();
+		act(() => {
+			root?.render(
+				<CodebaseExplorerSidebar
+					files={nestedFiles}
+					stack={[]}
+					codebaseId="repo-a"
+					onSelectFile={onSelectFile}
+				/>,
+			);
+		});
+		click(folderButton("src"));
+		click(folderButton("pages"));
+		click(folderButton("PortfolioPage.tsx"));
+
+		expect(onSelectFile).toHaveBeenCalledWith("src/pages/PortfolioPage.tsx");
+		expect(isExpanded("src")).toBe("true");
+		expect(isExpanded("pages")).toBe("true");
+	});
+
+	it("exposes folders as native buttons that are focusable and report state", () => {
+		render("repo-a");
+		const button = folderButton("src");
+		expect(button?.tagName).toBe("BUTTON");
+		expect(button?.type).toBe("button");
+		button?.focus();
+		expect(document.activeElement).toBe(button);
+		expect(isExpanded("src")).toBe("false");
+	});
+
+	it("toggles a folder when its native button is activated, and persists it", () => {
+		render("repo-a");
+		// jsdom does not turn Enter or Space into a click, so activation is
+		// asserted through the click a browser dispatches for a focused button.
+		click(folderButton("src"));
+		expect(isExpanded("src")).toBe("true");
+
+		act(() => {
+			root?.unmount();
+			root = createRoot(container);
+		});
+		render("repo-a");
+		expect(isExpanded("src")).toBe("true");
+	});
+});
+
+describe("collectTreeFolderPaths", () => {
+	it("lists every folder path in the built tree", () => {
+		expect(
+			[...collectTreeFolderPaths(buildTree(nestedTreeFiles))].sort(),
+		).toEqual(["docs", "src", "src/components", "src/pages"]);
 	});
 });

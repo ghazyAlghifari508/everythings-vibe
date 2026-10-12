@@ -239,3 +239,108 @@ describe("parseAskOptionsJson", () => {
 		expect(parseAskOptionsJson(JSON.stringify({ questions }))).toBeNull();
 	});
 });
+
+describe("parseAskOptionsJson recommendations", () => {
+	const base = [
+		{ id: "b", question: "Q2?", type: "text" },
+		{ id: "c", question: "Q3?", type: "text" },
+	];
+
+	it("keeps an explicit in-range recommendation with its reason", () => {
+		const result = parseAskOptionsJson(
+			JSON.stringify({
+				questions: [
+					{
+						id: "a",
+						question: "Q?",
+						type: "select",
+						options: ["Lokal", "Server"],
+						recommended: 1,
+						recommendationReason: "Repo memakai penyimpanan lokal.",
+					},
+					...base,
+				],
+			}),
+		);
+		expect(result?.[0]).toMatchObject({
+			recommended: 1,
+			recommendationReason: "Repo memakai penyimpanan lokal.",
+		});
+	});
+
+	it("drops an out-of-range recommendation instead of pinning option 0", () => {
+		const result = parseAskOptionsJson(
+			JSON.stringify({
+				questions: [
+					{
+						id: "a",
+						question: "Q?",
+						type: "select",
+						options: ["Lokal", "Server"],
+						recommended: 5,
+						recommendationReason: "Invalid.",
+					},
+					...base,
+				],
+			}),
+		);
+		expect(result?.[0].recommended).toBeUndefined();
+		expect(result?.[0].recommendationReason).toBeUndefined();
+	});
+
+	it("drops a recommendation without a reason", () => {
+		const result = parseAskOptionsJson(
+			JSON.stringify({
+				questions: [
+					{
+						id: "a",
+						question: "Q?",
+						type: "select",
+						options: ["Lokal", "Server"],
+						recommended: 0,
+					},
+					...base,
+				],
+			}),
+		);
+		expect(result?.[0].recommended).toBeUndefined();
+	});
+
+	it("ignores a recommendation on a multiselect question", () => {
+		const result = parseAskOptionsJson(
+			JSON.stringify({
+				questions: [
+					{
+						id: "a",
+						question: "Q?",
+						type: "multiselect",
+						options: ["Lokal", "Server"],
+						recommended: 0,
+						recommendationReason: "Ada.",
+					},
+					...base,
+				],
+			}),
+		);
+		expect(result?.[0].recommended).toBeUndefined();
+		expect(result?.[0].recommendationReason).toBeUndefined();
+	});
+
+	it("carries no recommendation fields when the model omits them", () => {
+		const result = parseAskOptionsJson(
+			JSON.stringify({
+				questions: [
+					{
+						id: "a",
+						question: "Q?",
+						type: "select",
+						options: ["Lokal", "Server"],
+					},
+					...base,
+				],
+			}),
+		);
+		expect(result?.[0]).not.toHaveProperty("recommended");
+		expect(result?.[0]).not.toHaveProperty("recommendationReason");
+	});
+});

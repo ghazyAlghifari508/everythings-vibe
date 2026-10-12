@@ -10,6 +10,7 @@ import {
 	codebaseSyncSessions,
 } from "@/db/schema";
 import {
+	appendSyncLifecycleEvent,
 	assertSyncTransition,
 	checkSnapshotCompletion,
 	isCompleteReplayCompatible,
@@ -286,7 +287,19 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/complete")(
 								.where(eq(codebaseSnapshots.id, snapshot.id));
 							await tx
 								.update(codebaseSyncSessions)
-								.set({ status: "uploaded", updatedAt: new Date() })
+								.set({
+									status: "uploaded",
+									updatedAt: new Date(),
+									// The verified file count travels with the event, so a
+									// browser that first polls after completion can still
+									// report what was received and when.
+									metadata: appendSyncLifecycleEvent({
+										previous: session.metadata,
+										kind: "snapshot_persisted",
+										at: new Date(),
+										count: body.fileCount,
+									}),
+								})
 								.where(eq(codebaseSyncSessions.id, session.id));
 						});
 

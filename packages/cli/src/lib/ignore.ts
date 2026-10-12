@@ -48,8 +48,12 @@ export const CODEBASE_IGNORE_TEMPLATE = `# .everythingsvibeignore — exclusions
 # ditulis ulang di sini:
 #   - file rahasia      : .env*, *.pem, *.key, *.p12, *.pfx, sertifikat
 #   - dependensi & build: node_modules/, dist/, build/, coverage/, .git/
+#   - state deploy lokal: .vercel/
 #   - dump database     : *.sql, *.sqlite, *.db, *.dump
 #   - file binary       : gambar, audio, video, arsip, executable
+#
+# File konfigurasi deploy yang sengaja disimpan (vercel.json, netlify.toml, dan
+# sejenisnya) tetap ikut ter-sync; hanya folder state lokal yang dikecualikan.
 #
 # Tambahkan pola di bawah untuk mengecualikan path khusus repositori kamu.
 # Satu pola per baris. Mendukung *, **, ?, dan awalan direktori diakhiri "/".
@@ -70,6 +74,7 @@ const BUILT_IN_DIRECTORIES = new Set([
 	"build",
 	"coverage",
 	".next",
+	".vercel",
 	"out",
 	"credentials",
 	"secrets",
@@ -292,6 +297,9 @@ export function isBuiltInExcluded(
 			segment === "build" ||
 			segment === "coverage" ||
 			segment === ".next" ||
+			// Vercel writes local build/link/deploy state here. Only the folder
+			// is excluded; `vercel.json` at any depth stays eligible.
+			segment === ".vercel" ||
 			segment === "out"
 		) {
 			return { excluded: true, reason: "built-in:build" };

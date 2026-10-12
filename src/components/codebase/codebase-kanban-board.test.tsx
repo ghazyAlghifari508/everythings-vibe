@@ -1,0 +1,258 @@
+// @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { computeKanbanProgress } from "@/lib/kanban-utils";
+import { CodebaseKanbanBoard } from "./codebase-kanban-board";
+
+declare global {
+	var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
+}
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import("@tanstack/react-router")>();
+	return {
+		...actual,
+		// A real Link needs a router context; the board only needs the resolved
+		// target to be reachable and observable, so `$id` is substituted here
+		// exactly like the router would.
+		Link: ({
+			to,
+			params,
+			children,
+			...rest
+		}: {
+			to: string;
+			params?: { id: string };
+			children: React.ReactNode;
+		}) => (
+			<a href={to.replace("$id", params?.id ?? "")} {...rest}>
+				{children}
+			</a>
+		),
+	};
+});
+
+let container: HTMLDivElement;
+let root: Root | null = null;
+
+beforeEach(() => {
+	container = document.createElement("div");
+	document.body.appendChild(container);
+	root = createRoot(container);
+});
+
+afterEach(() => {
+	if (root) {
+		const current = root;
+		act(() => {
+			current.unmount();
+		});
+		root = null;
+	}
+	container?.remove();
+	document.body.innerHTML = "";
+});
+
+function card(overrides: Record<string, unknown> = {}) {
+	return {
+		id: "task-1",
+		type: "task" as const,
+		featureName: "Ekspor Ringkasan",
+		name: "Tambah tombol ekspor di halaman rekomendasi",
+		description: "",
+		status: "pending" as const,
+		dependencies: [],
+		startedAt: null,
+		completedAt: null,
+		...overrides,
+	};
+}
+
+const columns = {
+	pending: [card()],
+	in_progress: [
+		card({
+			id: "task-2",
+			name: "Kirim ringkasan ke clipboard",
+			status: "in_progress" as const,
+			subtaskCount: 4,
+			subtaskCompleted: 1,
+		}),
+	],
+	completed: [card({ id: "task-3", status: "completed" as const })],
+	failed: [],
+};
+
+function render(
+	props: Partial<Parameters<typeof CodebaseKanbanBoard>[0]> = {},
+) {
+	const queryClient = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	act(() => {
+		root?.render(
+			<QueryClientProvider client={queryClient}>
+				<CodebaseKanbanBoard
+					projectId="proj-1"
+					columns={columns}
+					staleness="live"
+					{...props}
+				/>
+			</QueryClientProvider>,
+		);
+	});
+}
+
+describe("CodebaseKanbanBoard panel layout", () => {
+	it("scrolls columns horizontally instead of squeezing them", () => {
+		render();
+		const board = container.querySelector(
+			"[data-testid='codebase-kanban-columns']",
+		);
+		expect(board?.className).toContain("overflow-x-auto");
+		expect(board?.className).not.toContain("grid-cols-3");
+	});
+
+	it("keeps a readable fixed card width per column", () => {
+		render();
+		const columnsEl = container.querySelectorAll(
+			"[data-testid^='codebase-kanban-col-']",
+		);
+		expect(columnsEl.length).toBe(3);
+		for (const column of columnsEl) {
+			expect(column.className).toContain("w-56");
+		}
+	});
+
+	it("keeps the full task title visible instead of clamping it", () => {
+		render();
+		const titles = [...container.querySelectorAll("article p")].map(
+			(node) => node.textContent,
+		);
+		expect(titles).toContain("Tambah tombol ekspor di halaman rekomendasi");
+		const titleNode = [...container.querySelectorAll("article p")].find(
+			(node) =>
+				node.textContent === "Tambah tombol ekspor di halaman rekomendasi",
+		);
+		expect(titleNode?.className).not.toContain("line-clamp");
+	});
+
+	it("keeps status, feature grouping, and subtask progress", () => {
+		render();
+		expect(container.textContent).toContain("Ekspor Ringkasan");
+		expect(container.textContent).toContain("1/4 subtask");
+		expect(container.textContent).toContain("Agent coding...");
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-progress']")
+				?.textContent,
+		).toBe("1/3 selesai (33%)");
+	});
+
+	it("matches the canonical progress calculation", () => {
+		render();
+		const expected = computeKanbanProgress(columns);
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-progress']")
+				?.textContent,
+		).toBe(`${expected.done}/${expected.total} selesai (${expected.pct}%)`);
+	});
+});
+
+describe("CodebaseKanbanBoard full board action", () => {
+	it("offers the full board when the plan allows it", () => {
+		render({ canOpenFullBoard: true });
+		const link = container.querySelector<HTMLAnchorElement>(
+			"[data-testid='codebase-kanban-full-board']",
+		);
+		expect(link).not.toBeNull();
+		expect(link?.textContent).toContain("Buka Kanban Penuh");
+		expect(link?.getAttribute("href")).toBe("/kanban/proj-1");
+	});
+
+	it("hides the full board link when the route would redirect for the plan", () => {
+		render({ canOpenFullBoard: false });
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-full-board']"),
+		).toBeNull();
+	});
+});
+
+describe("CodebaseKanbanBoard states", () => {
+	it("renders one clear empty state when the board has no task", () => {
+		render({
+			columns: {
+				pending: [],
+				in_progress: [],
+				completed: [],
+				failed: [],
+			},
+		});
+		const empty = container.querySelector(
+			"[data-testid='codebase-kanban-empty']",
+		);
+		expect(empty).not.toBeNull();
+		expect(empty?.textContent).toContain("Belum ada task di papan ini");
+		// No per-column repeated "Kosong" placeholders in the empty state.
+		expect(
+			container.querySelectorAll("[data-testid^='codebase-kanban-col-']"),
+		).toHaveLength(0);
+	});
+
+	it("shows the failed column and a note only when tasks failed", () => {
+		render();
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-failed-note']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-col-Gagal']"),
+		).toBeNull();
+
+		render({
+			columns: {
+				...columns,
+				failed: [card({ id: "task-4", status: "failed" as const })],
+			},
+		});
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-col-Gagal']"),
+		).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-failed-note']")
+				?.textContent,
+		).toContain("1 task gagal");
+	});
+
+	it("asks for a project before rendering a board", () => {
+		render({ projectId: null, columns: undefined });
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-empty-project']"),
+		).not.toBeNull();
+	});
+
+	it("surfaces a load failure with retry", () => {
+		const onRetryExternal = vi.fn();
+		render({ columns: undefined, isErrorExternal: true, onRetryExternal });
+		const error = container.querySelector(
+			"[data-testid='codebase-kanban-error']",
+		);
+		expect(error).not.toBeNull();
+		const retry = [...(error?.querySelectorAll("button") ?? [])].find((b) =>
+			/Coba lagi/.test(b.textContent ?? ""),
+		);
+		act(() => {
+			retry?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onRetryExternal).toHaveBeenCalledTimes(1);
+	});
+
+	it("reports a non-live connection instead of pretending to be live", () => {
+		render({ staleness: "disconnected" });
+		expect(container.textContent).toContain(
+			"Koneksi terputus. Menampilkan data terakhir.",
+		);
+	});
+});

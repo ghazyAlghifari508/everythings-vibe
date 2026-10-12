@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { codebaseSnapshotFiles, codebaseSyncSessions } from "@/db/schema";
 import {
+	appendSyncLifecycleEvent,
 	assertSyncTransition,
 	fileChunkRequestSchema,
 	isFileReplayCompatible,
@@ -237,7 +238,18 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/files")({
 					if (steps.length > 0) {
 						await db
 							.update(codebaseSyncSessions)
-							.set({ status: "uploading", updatedAt: new Date() })
+							.set({
+								status: "uploading",
+								updatedAt: new Date(),
+								// Fallback writer: if a chunk is the first transport
+								// request (manifest batches may be empty), the upload
+								// start is still recorded exactly once.
+								metadata: appendSyncLifecycleEvent({
+									previous: session.metadata,
+									kind: "upload_started",
+									at: new Date(),
+								}),
+							})
 							.where(eq(codebaseSyncSessions.id, session.id));
 					}
 

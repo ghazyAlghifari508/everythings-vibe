@@ -43,6 +43,7 @@
     "drizzle-orm": "^0.45.1",
     "es-module-lexer": "2.3.1",
     "framer-motion": "^12.42.2",
+    "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
     "lucide-react": "^1.27.0",
     "mermaid": "^11.16.0",

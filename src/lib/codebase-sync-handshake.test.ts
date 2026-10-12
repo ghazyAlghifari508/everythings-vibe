@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildHandshakeMetadata,
+	buildRepositoryIdentityMetadata,
 	CLI_HANDSHAKE_METADATA_KEY,
 	canOpenSummary,
 	hasCliHandshake,
+	REPOSITORY_IDENTITY_METADATA_KEY,
 	readCliHandshakeAt,
+	readRepositoryIdentityMismatch,
 	syncStatusResponseSchema,
 } from "./codebase-sync";
 
@@ -226,5 +229,63 @@ describe("status response carries the handshake evidence", () => {
 			snapshotId: null,
 		});
 		expect(parsed.cliConnectedAt).toBeUndefined();
+	});
+});
+
+describe("repository identity at handshake", () => {
+	it("records the reported identity and no mismatch when it agrees", () => {
+		const metadata = buildRepositoryIdentityMetadata({
+			previous: null,
+			repositoryIdentity: "github.com/owner/app",
+			matchesStored: true,
+			at: new Date("2026-10-10T00:00:00.000Z"),
+		});
+		expect(metadata[REPOSITORY_IDENTITY_METADATA_KEY]).toBe(
+			"github.com/owner/app",
+		);
+		expect(readRepositoryIdentityMismatch(metadata)).toBe(false);
+	});
+
+	it("flags a mismatch when the codebase holds a different identity", () => {
+		const metadata = buildRepositoryIdentityMetadata({
+			previous: null,
+			repositoryIdentity: "gitlab.com/other/app",
+			matchesStored: false,
+			at: new Date("2026-10-10T00:00:00.000Z"),
+		});
+		expect(readRepositoryIdentityMismatch(metadata)).toBe(true);
+	});
+
+	it("clears an earlier mismatch once a later handshake matches", () => {
+		// The warning must not outlive the condition it describes.
+		const mismatched = buildRepositoryIdentityMetadata({
+			previous: null,
+			repositoryIdentity: "gitlab.com/other/app",
+			matchesStored: false,
+			at: new Date("2026-10-10T00:00:00.000Z"),
+		});
+		const matched = buildRepositoryIdentityMetadata({
+			previous: mismatched,
+			repositoryIdentity: "github.com/owner/app",
+			matchesStored: true,
+			at: new Date("2026-10-10T01:00:00.000Z"),
+		});
+		expect(readRepositoryIdentityMismatch(matched)).toBe(false);
+	});
+
+	it("preserves unrelated metadata already on the session", () => {
+		const metadata = buildRepositoryIdentityMetadata({
+			previous: { cliVersion: "3.2.0" },
+			repositoryIdentity: "github.com/owner/app",
+			matchesStored: true,
+			at: new Date("2026-10-10T00:00:00.000Z"),
+		});
+		expect(metadata.cliVersion).toBe("3.2.0");
+	});
+
+	it("fails closed on unusable metadata shapes", () => {
+		for (const value of [null, undefined, "true", 42, []]) {
+			expect(readRepositoryIdentityMismatch(value)).toBe(false);
+		}
 	});
 });

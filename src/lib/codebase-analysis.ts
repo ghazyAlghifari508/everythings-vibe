@@ -8,6 +8,7 @@ import {
 import {
 	CODEBASE_ANALYSIS_MAX_CONTEXT_CHARS,
 	CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES,
+	CODEBASE_ANALYSIS_REPAIR_MAX_RAW_CHARS,
 	CODEBASE_ANALYSIS_SUMMARY_MAX_CHARS,
 	CODEBASE_STARTER_DESCRIPTION_MAX_CHARS,
 	CODEBASE_STARTER_PROMPT_MAX_CHARS,
@@ -174,10 +175,10 @@ export const CODEBASE_ANALYSIS_SYSTEM_PROMPT = `Kamu adalah PrdFy AI. Analisis s
 
 FORMAT JSON (output HANYA JSON, tanpa teks lain):
 {
-  "summary": "Ringkasan 2-3 kalimat tentang aplikasi ini: apa fungsinya, alur utama, dan bagaimana data dikelola. Kosongkan bila bukti snapshot tidak cukup — jangan mengarang",
-  "framework": "Framework yang terdeteksi, atau null bila tidak terdeteksi",
-  "language": "Bahasa utama, atau null bila tidak terdeteksi",
-  "packageManager": "Package manager, atau null bila tidak terdeteksi",
+  "summary": "Ringkasan 2-3 kalimat tentang aplikasi ini: apa fungsinya, alur utama, dan bagaimana data dikelola. Hilangkan field ini bila bukti snapshot tidak cukup — jangan mengarang",
+  "framework": "Framework yang terdeteksi (hilangkan field bila tidak terdeteksi)",
+  "language": "Bahasa utama (hilangkan field bila tidak terdeteksi)",
+  "packageManager": "Package manager (hilangkan field bila tidak terdeteksi)",
   "dependencies": ["dependensi utama"],
   "database": "Database yang terdeteksi, atau null",
   "auth": "Mekanisme auth yang terdeteksi, atau null",
@@ -198,15 +199,17 @@ ATURAN:
 1. Output HANYA JSON valid. Jangan tambah penjelasan di luar JSON.
 2. JANGAN mengarang jalur file, perilaku framework, atau detail arsitektur yang tidak ada di snapshot. Gunakan HANYA jalur dari manifest.
 3. Setiap temuan yang tidak pasti WAJIB mencantumkan field "uncertainty" berisi hal yang perlu diverifikasi.
-4. Field yang tidak terdeteksi diisi null atau array kosong — jangan ditebak.
+4. Field database/auth yang tidak terdeteksi diisi null; field opsional lain yang tidak terdeteksi dihilangkan atau diisi array kosong — jangan tulis null dan jangan ditebak.
 5. Tulis ringkasan dan temuan dalam Bahasa Indonesia.
 6. Summary menjawab "aplikasi ini tentang apa" (fungsi, alur utama, pengelolaan data) — bukan sekadar menyebut ulang tech stack.
 7. starterSuggestions wajib berisi tepat satu saran untuk setiap id: feature, bugfix, refactor, dan ui. Setiap saran harus spesifik, kecil, berguna, dan diturunkan dari summary, moduleMap, relevantFiles, impactAreas, findings, atau isi source snapshot.
-8. Jangan menyimpulkan domain aplikasi dari framework, bahasa, dependency, atau nama repository. Identifikasi fitur yang sudah terbukti ada agar saran tidak menggandakan kemampuan yang sudah tersedia.
-9. Untuk kategori feature, usulkan kemampuan yang masuk akal dari bukti tentang fungsi aplikasi. Untuk bugfix, sebutkan kondisi yang benar-benar tampak bermasalah; bila belum ada bukti bug, pilih perbaikan alur konservatif dan jangan menyatakan bug pasti ada. Untuk refactor, pilih modul atau pola yang terlihat dan pertahankan stack/perilaku. Jangan usulkan migrasi stack kecuali findings secara eksplisit membuktikan kebutuhan. Untuk ui, rujuk antarmuka yang benar-benar terlihat dalam source snapshot.
-10. Title, description, dan prompt harus ditulis dalam Bahasa Indonesia. Pertahankan istilah teknis baku dalam Bahasa Inggris. Prompt harus berupa instruksi lengkap dan siap diedit/dikirim, bukan fragmen atau template kosong. Title dan description singkat dan spesifik. Jangan membuat klaim behavior yang tidak dibuktikan snapshot.
-11. relevantPaths hanya boleh berisi jalur yang benar-benar ada dalam manifest. Sertakan jalur saat saran menyebut modul tertentu; bila tidak dapat membuktikan jalurnya, jangan mengarangnya.
-12. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.`;
+8. Saran ditulis sebagai permintaan perbaikan produk, bukan instruksi kerja untuk coding agent. Title, description, dan prompt harus menyatakan tujuan, perilaku yang diharapkan, dan manfaat bagi pengguna. Saran harus tetap bisa dibaca dan bernilai bagi pemilik produk yang tidak mengenal isi repository.
+9. DILARANG menulis di title, description, dan prompt: nama file, jalur file, nama folder source, nama fungsi/komponen/property, hook, tipe data, nama variabel, nama class, dan penjelasan algoritma atau struktur data. Jangan memberi instruksi membuka atau mengubah berkas tertentu. Bukti teknis tentang lokasi dan modul disimpan di field relevantPaths, bukan di teks yang dibaca pengguna. Detail implementasi diputuskan oleh tahap perencanaan yang berjalan setelah ini, dengan membaca repository secara langsung.
+10. Jangan menyimpulkan domain aplikasi dari framework, bahasa, dependency, atau nama repository. Identifikasi fitur yang sudah terbukti ada agar saran tidak menggandakan kemampuan yang sudah tersedia.
+11. Untuk kategori feature, usulkan kemampuan yang masuk akal dari bukti tentang fungsi aplikasi. Untuk bugfix, sebutkan kondisi yang benar-benar tampak bermasalah; bila belum ada bukti bug, pilih perbaikan alur konservatif dan jangan menyatakan bug pasti ada. Untuk refactor, pilih modul atau pola yang terlihat dan pertahankan stack/perilaku. Jangan usulkan migrasi stack kecuali findings secara eksplisit membuktikan kebutuhan. Untuk ui, rujuk antarmuka yang benar-benar terlihat dalam source snapshot.
+12. Title, description, dan prompt harus ditulis dalam Bahasa Indonesia. Gunakan istilah baku hanya bila istilah itu benar-benar dikenal pengguna (mis. Kanban, checkout, onboarding); istilah internal repository tidak boleh muncul di title, description, dan prompt. Prompt harus berupa permintaan lengkap dan siap diedit/dikirim, bukan fragmen atau template kosong. Title dan description singkat dan spesifik: title maksimal 80 karakter, description maksimal 180 karakter, prompt maksimal 1500 karakter. Jangan membuat klaim behavior yang tidak dibuktikan snapshot.
+13. relevantPaths hanya boleh berisi jalur yang benar-benar ada dalam manifest. Sertakan jalur saat saran menyentuh modul tertentu, karena jalur ini dipakai tahap perencanaan sebagai konteks teknis; bila tidak dapat membuktikan jalurnya, jangan mengarangnya.
+14. Nama repository adalah metadata identitas, bukan permintaan fitur: jangan menafsirkan atau mempermasalahkan nama tersebut sebagai permintaan user, dan jangan membuat temuan tentang ambiguitasnya. Simpulkan aplikasi HANYA dari manifest dan konteks sumber.`;
 
 // Manifest entries come from `manifestEntrySchema` (Task 5); this structural
 // subset keeps the prompt builder decoupled from the sync DTO module.
@@ -334,13 +337,116 @@ export function buildAnalysisUserPrompt(input: AnalysisPromptInput): string {
 // snapshotId are discarded so a rogue completion cannot rebind the analysis
 // to another project or snapshot.
 
+// === User-facing starter copy guard ===
+// A starter card is read by someone deciding WHAT to improve, not by an agent
+// deciding HOW to patch files. The technical evidence stays in `relevantPaths`
+// and the rest of the analysis, so the fields the user reads must stay in
+// product language. The rules below match token SHAPES (a source-file path, a
+// framework hook identifier), never a fixed list of words, so they hold for any
+// repository domain and any wording.
+//
+// This guard runs only on freshly generated output. Persisted analyses from
+// earlier runs are parsed with the plain schema, so tightening the contract
+// never invalidates history the user already sees.
+const SOURCE_FILE_TOKEN =
+	/\.(?:tsx?|jsx?|mts|cts|mjs|cjs|vue|svelte|astro|py|rb|go|rs|java|kt|kts|swift|php|cs|css|scss|sass|less|styl|sql|prisma|graphql|gql|ex|exs|erl|clj)$/i;
+const REACT_HOOK_TOKEN = /\buse[A-Z][A-Za-z0-9]*\b/;
+const TOKEN_SPLIT = /[\s"'`(),;:[\]{}<>|]+/;
+
+/**
+ * Report the user-facing starter fields that leak repository implementation
+ * detail. Locations only (`starterSuggestions.<id>.<field>`) — never the
+ * offending token — so callers can log and repair without echoing model text.
+ */
+export function findStarterTechnicalLeaks(
+	suggestions: readonly CodebaseStarterSuggestion[],
+): string[] {
+	const leaks: string[] = [];
+	for (const suggestion of suggestions) {
+		const fields: Array<[string, string]> = [
+			["title", suggestion.title],
+			["description", suggestion.description],
+			["prompt", suggestion.prompt],
+		];
+		for (const [field, value] of fields) {
+			const tokens = value.split(TOKEN_SPLIT).filter(Boolean);
+			const leaked = tokens.some(
+				(token) =>
+					SOURCE_FILE_TOKEN.test(token) || REACT_HOOK_TOKEN.test(token),
+			);
+			if (leaked) leaks.push(`starterSuggestions.${suggestion.id}.${field}`);
+		}
+	}
+	return leaks;
+}
+
+export type AnalysisValidationReason =
+	| "invalid_json"
+	| "schema"
+	| "untrusted_paths"
+	| "technical_leak";
+
+export const ANALYSIS_VALIDATION_MESSAGE =
+	"AI menghasilkan output yang tidak valid. Coba analisis ulang.";
+
+const MAX_DIAGNOSTIC_ISSUE_PATHS = 8;
+const MAX_DIAGNOSTIC_PATH_CHARS = 120;
+
+function toDiagnosticPath(value: unknown): string {
+	const text = Array.isArray(value)
+		? value.map((segment) => String(segment)).join(".")
+		: String(value);
+	return text.length > MAX_DIAGNOSTIC_PATH_CHARS
+		? text.slice(0, MAX_DIAGNOSTIC_PATH_CHARS)
+		: text;
+}
+
 export class AnalysisValidationError extends Error {
 	readonly code = "ANALYSIS_FAILED" as const;
+	readonly reason: AnalysisValidationReason;
+	readonly issuePaths: readonly string[];
+	readonly rawLength: number;
 
-	constructor(message: string) {
-		super(message);
+	constructor(input: {
+		reason: AnalysisValidationReason;
+		rawLength: number;
+		issuePaths?: readonly string[];
+	}) {
+		super(ANALYSIS_VALIDATION_MESSAGE);
 		this.name = "AnalysisValidationError";
+		this.reason = input.reason;
+		this.rawLength = input.rawLength;
+		this.issuePaths = input.issuePaths ?? [];
 	}
+}
+
+// Advisory top-level fields the system prompt declares nullable-or-omittable
+// when the snapshot proves nothing. A model that writes null for one of
+// these is following the prompt, so the reader normalizes null to absent
+// before the strict schema runs. Required contracts (starterSuggestions and
+// every field inside them) stay strict: null there still fails.
+const NULLABLE_ADVISORY_KEYS = [
+	"summary",
+	"framework",
+	"language",
+	"packageManager",
+	"dependencies",
+	"moduleMap",
+	"relevantFiles",
+	"impactAreas",
+	"limitations",
+	"findings",
+] as const;
+
+function normalizeNullAdvisoryFields(
+	record: Record<string, unknown>,
+): Record<string, unknown> {
+	const normalized = { ...record };
+	for (const key of NULLABLE_ADVISORY_KEYS) {
+		if (normalized[key] === null) normalized[key] = undefined;
+	}
+	if (normalized.summary === "") normalized.summary = undefined;
+	return normalized;
 }
 
 export function parseAnalysisOutput(
@@ -354,14 +460,16 @@ export function parseAnalysisOutput(
 		// mis-rendered HTML page) fails closed into AnalysisValidationError.
 		parsed = JSON.parse(extractJson(raw)) as unknown;
 	} catch {
-		throw new AnalysisValidationError(
-			"AI menghasilkan output yang tidak valid. Coba analisis ulang.",
-		);
+		throw new AnalysisValidationError({
+			reason: "invalid_json",
+			rawLength: raw.length,
+		});
 	}
 	if (typeof parsed !== "object" || parsed === null) {
-		throw new AnalysisValidationError(
-			"AI menghasilkan output yang tidak valid. Coba analisis ulang.",
-		);
+		throw new AnalysisValidationError({
+			reason: "invalid_json",
+			rawLength: raw.length,
+		});
 	}
 	const {
 		projectId: _droppedProject,
@@ -369,25 +477,124 @@ export function parseAnalysisOutput(
 		...rest
 	} = parsed as Record<string, unknown>;
 	const result = codebaseAnalysisGenerationSchema.safeParse({
-		...rest,
+		...normalizeNullAdvisoryFields(rest),
 		projectId: ids.projectId,
 		snapshotId: ids.snapshotId,
 	});
 	if (!result.success) {
-		throw new AnalysisValidationError(
-			"AI menghasilkan output yang tidak valid. Coba analisis ulang.",
-		);
+		throw new AnalysisValidationError({
+			reason: "schema",
+			rawLength: raw.length,
+			issuePaths: result.error.issues
+				.slice(0, MAX_DIAGNOSTIC_ISSUE_PATHS)
+				.map((issue) =>
+					toDiagnosticPath(issue.path.length > 0 ? issue.path : "(root)"),
+				),
+		});
 	}
-	if (
-		result.data.starterSuggestions.some((suggestion) =>
-			suggestion.relevantPaths?.some((path) => !trustedManifestPaths.has(path)),
-		)
-	) {
-		throw new AnalysisValidationError(
-			"AI menghasilkan output yang tidak valid. Coba analisis ulang.",
-		);
+	const untrusted = result.data.starterSuggestions.flatMap((suggestion) =>
+		(suggestion.relevantPaths ?? []).filter(
+			(path) => !trustedManifestPaths.has(path),
+		),
+	);
+	if (untrusted.length > 0) {
+		throw new AnalysisValidationError({
+			reason: "untrusted_paths",
+			rawLength: raw.length,
+			issuePaths: untrusted
+				.slice(0, MAX_DIAGNOSTIC_ISSUE_PATHS)
+				.map((path) => toDiagnosticPath(path)),
+		});
+	}
+	const leaks = findStarterTechnicalLeaks(result.data.starterSuggestions);
+	if (leaks.length > 0) {
+		throw new AnalysisValidationError({
+			reason: "technical_leak",
+			rawLength: raw.length,
+			issuePaths: leaks.slice(0, MAX_DIAGNOSTIC_ISSUE_PATHS),
+		});
 	}
 	return result.data;
+}
+
+// === Bounded single repair ===
+// A validation failure is a fixable output-contract miss, not proof the
+// repository is unanalyzable. The caller gets exactly one correction
+// request carrying the failure reason, the failing locations, and a bounded
+// excerpt of the rejected output — then the strict parser runs again with
+// no further retries. Provider errors are never repaired here: they
+// propagate immediately so the retry path mints a fresh attempt.
+export interface AnalysisRepairPromptInput {
+	raw: string;
+	reason: AnalysisValidationReason;
+	issuePaths: readonly string[];
+	maxRawChars?: number;
+}
+
+export function buildAnalysisRepairPrompt(
+	input: AnalysisRepairPromptInput,
+): string {
+	const maxRawChars =
+		input.maxRawChars ?? CODEBASE_ANALYSIS_REPAIR_MAX_RAW_CHARS;
+	const excerpt =
+		input.raw.length > maxRawChars
+			? `${input.raw.slice(0, maxRawChars)}\n...(dipotong)`
+			: input.raw;
+	const locations =
+		input.issuePaths.length > 0 ? input.issuePaths.join(", ") : "-";
+	return [
+		"Output JSON sebelumnya tidak valid. Perbaiki dan kirim ulang HANYA JSON yang valid, tanpa teks lain.",
+		`Kegagalan: ${input.reason}`,
+		`Lokasi masalah: ${locations}`,
+		"Output sebelumnya (dipotong):",
+		excerpt,
+		"Peraturan perbaikan:",
+		"1. Output HANYA JSON valid sesuai format awal.",
+		"2. Gunakan HANYA jalur dari manifest — jangan mengarang jalur baru.",
+		"3. starterSuggestions wajib tepat satu untuk setiap id: feature, bugfix, refactor, dan ui.",
+		`4. Batas panjang: title maksimal ${CODEBASE_STARTER_TITLE_MAX_CHARS} karakter, description maksimal ${CODEBASE_STARTER_DESCRIPTION_MAX_CHARS} karakter, prompt maksimal ${CODEBASE_STARTER_PROMPT_MAX_CHARS} karakter.`,
+		"5. Field opsional yang tidak terbukti: hilangkan field atau isi array kosong — jangan tulis null kecuali database/auth.",
+		"6. Title, description, dan prompt ditulis sebagai permintaan perbaikan produk: tujuan, perilaku yang diharapkan, dan manfaat bagi pengguna. Jangan menyebut nama file, jalur file, hook, tipe data, atau algoritme di tiga field ini; pindahkan bukti teknis ke relevantPaths.",
+		"7. Jangan mengubah fakta arsitektur dari output sebelumnya; hanya perbaiki bentuknya.",
+	].join("\n");
+}
+
+export interface ValidatedGenerationInput {
+	generate: (
+		messages: Array<{
+			role: "system" | "user" | "assistant";
+			content: string;
+		}>,
+	) => Promise<string>;
+	messages: Array<{
+		role: "system" | "user" | "assistant";
+		content: string;
+	}>;
+	ids: { projectId: string; snapshotId: string };
+	trustedManifestPaths: ReadonlySet<string>;
+}
+
+export async function generateValidatedAnalysis(
+	input: ValidatedGenerationInput,
+): Promise<CodebaseAnalysis> {
+	const raw = await input.generate(input.messages);
+	try {
+		return parseAnalysisOutput(raw, input.ids, input.trustedManifestPaths);
+	} catch (error) {
+		if (!(error instanceof AnalysisValidationError)) throw error;
+		const repaired = await input.generate([
+			...input.messages,
+			{
+				role: "user",
+				content: buildAnalysisRepairPrompt({
+					raw,
+					reason: error.reason,
+					issuePaths: error.issuePaths,
+				}),
+			},
+		]);
+		return parseAnalysisOutput(repaired, input.ids, input.trustedManifestPaths);
+	}
 }
 
 // Fixed user-facing message. Never echoes model text, stack traces, tokens,
@@ -395,6 +602,96 @@ export function parseAnalysisOutput(
 export function toSafeAnalysisErrorMessage(error: unknown): string {
 	void error;
 	return "Analisis codebase gagal. Coba analisis ulang dalam beberapa menit.";
+}
+
+// === Server-side failure diagnostics ===
+// Operators need to know WHY an attempt failed (provider, timeout, malformed
+// JSON, schema mismatch, invented paths, persistence), while users must only
+// ever see the fixed safe message above. These helpers classify the failure
+// and shape a log record that carries an attempt identifier, the category,
+// the actual duration, and validation issue paths — never API keys, sync
+// tokens, repository content, or unrestricted model output.
+export const ANALYSIS_FAILURE_CATEGORIES = [
+	"provider",
+	"timeout",
+	"aborted",
+	"snapshot",
+	"invalid_json",
+	"schema",
+	"untrusted_paths",
+	"technical_leak",
+	"persistence",
+	"unknown",
+] as const;
+
+export type AnalysisFailureCategory =
+	(typeof ANALYSIS_FAILURE_CATEGORIES)[number];
+
+export type AnalysisAttemptStage = "generate" | "persist";
+
+function readServiceErrorCode(error: unknown): string | null {
+	if (!(error instanceof Error)) return null;
+	if (error.name !== "AnalysisServiceError") return null;
+	if (!("code" in error)) return null;
+	const code: unknown = error.code;
+	return typeof code === "string" ? code : null;
+}
+
+export function classifyAnalysisFailure(
+	error: unknown,
+	stage?: AnalysisAttemptStage,
+): AnalysisFailureCategory {
+	if (error instanceof AnalysisValidationError) return error.reason;
+	if (readServiceErrorCode(error) === "SNAPSHOT_NOT_UPLOADED") {
+		return "snapshot";
+	}
+	const message = error instanceof Error ? error.message : String(error);
+	if (/aborted|aborterror/i.test(message)) return "aborted";
+	if (
+		/tidak merespons dalam 2 menit|melebihi batas waktu|timeout|timed out|etimedout|stall/i.test(
+			message,
+		)
+	) {
+		return "timeout";
+	}
+	if (
+		/tidak tersedia|rate.?limit|too many requests|429|401|403|unauthorized|unauthenticated|api key|model|provider|respons kosong|fetch failed|econn|network|socket/i.test(
+			message,
+		)
+	) {
+		return "provider";
+	}
+	if (stage === "persist") return "persistence";
+	return "unknown";
+}
+
+export interface AnalysisDiagnosticRecord {
+	attemptId: string;
+	projectId: string;
+	snapshotId: string;
+	category: AnalysisFailureCategory;
+	durationMs: number;
+	issuePaths?: readonly string[];
+	rawLength?: number;
+}
+
+export function formatAnalysisDiagnosticLog(
+	record: AnalysisDiagnosticRecord,
+): Record<string, string | number | readonly string[]> {
+	const shaped: Record<string, string | number | readonly string[]> = {
+		attemptId: record.attemptId,
+		projectId: record.projectId,
+		snapshotId: record.snapshotId,
+		category: record.category,
+		durationMs: record.durationMs,
+	};
+	if (record.issuePaths && record.issuePaths.length > 0) {
+		shaped.issuePaths = record.issuePaths;
+	}
+	if (typeof record.rawLength === "number") {
+		shaped.rawLength = record.rawLength;
+	}
+	return shaped;
 }
 
 // === Idempotent trigger decision (pure, DB-agnostic) ===

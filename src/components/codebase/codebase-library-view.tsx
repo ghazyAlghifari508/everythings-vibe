@@ -259,6 +259,9 @@ export function CodebaseLibraryView({
 										{item.fileCount !== null
 											? `${item.fileCount} file`
 											: "Belum ada sync"}
+										{item.planCount > 0
+											? ` · ${item.planCount} fitur plan`
+											: ""}
 										{displayDate ? ` · Terakhir diperbarui ${displayDate}` : ""}
 									</span>
 									<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
