@@ -896,6 +896,10 @@ export interface ScrapeMetadata {
 	failedAtStage?: ScrapeStatus;
 	// Only set when the upstream website supplied a usable Retry-After signal.
 	retryAfterSeconds?: number;
+	// Persisted absolute deadline derived from Retry-After. Lets the UI show a
+	// real remaining wait that stays accurate after refresh, and lets the
+	// backend enforce the cooldown instead of relying on a disabled button.
+	retryAfterExpiresAt?: string;
 	// Tracks whether the optional AI reference summary was applied to a
 	// canonical, evidence-backed DESIGN.md.
 	aiEnrichment?: "applied" | "unavailable";

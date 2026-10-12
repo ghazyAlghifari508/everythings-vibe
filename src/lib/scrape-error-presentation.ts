@@ -1,9 +1,9 @@
 export interface ScrapeErrorPresentationInput {
 	code: string;
-	// Persisted message, used only when the code is unknown to future-proof
-	// rows. Known codes resolve purely from the code, never from this text.
 	message?: string | null;
 	retryAfterSeconds?: number | null;
+	retryAfterExpiresAt?: string | null;
+	now?: number;
 }
 
 export interface ScrapeErrorPresentation {
@@ -12,6 +12,8 @@ export interface ScrapeErrorPresentation {
 	retryable: boolean;
 	retryHint: string | null;
 	technicalDetail: string;
+	retryAfterExpiresAt: string | null;
+	retryAfterRemaining: number | null;
 }
 
 function retryAfterSecondsOf(value: number | null | undefined): number | null {
@@ -20,30 +22,76 @@ function retryAfterSecondsOf(value: number | null | undefined): number | null {
 	return Math.ceil(value);
 }
 
+function remainingFromDeadline(
+	expiresAt: string | null | undefined,
+	fallbackSeconds: number | null | undefined,
+	now: number,
+): number | null {
+	if (typeof expiresAt === "string" && expiresAt.trim().length > 0) {
+		const target = Date.parse(expiresAt);
+		if (Number.isFinite(target))
+			return Math.max(0, Math.ceil((target - now) / 1000));
+	}
+	return retryAfterSecondsOf(fallbackSeconds);
+}
+
 function retryAfterText(value: number | null | undefined): string | null {
 	const seconds = retryAfterSecondsOf(value);
 	if (seconds === null) return null;
 	return `Tunggu sekitar ${seconds} detik sebelum mencoba lagi.`;
 }
 
+function deadlineHint(remaining: number | null): string | null {
+	if (remaining === null) return null;
+	if (remaining <= 0) return "Waktu tunggu berakhir. Coba lagi.";
+	return `Permintaan berikutnya dapat dicoba setelah waktu tunggu dari website berakhir. Sisa waktu: ${remaining} detik.`;
+}
+
 export function resolveScrapeErrorPresentation(
 	input: ScrapeErrorPresentationInput,
 ): ScrapeErrorPresentation {
-	const retryHint = retryAfterText(input.retryAfterSeconds);
-	const retryAfterSeconds = retryAfterSecondsOf(input.retryAfterSeconds);
+	const now = typeof input.now === "number" ? input.now : Date.now();
+	const expiresAt =
+		typeof input.retryAfterExpiresAt === "string" &&
+		input.retryAfterExpiresAt.trim().length > 0
+			? input.retryAfterExpiresAt
+			: null;
+	const remaining = remainingFromDeadline(
+		expiresAt,
+		input.retryAfterSeconds,
+		now,
+	);
+	const retryHint =
+		remaining !== null && expiresAt !== null
+			? deadlineHint(remaining)
+			: retryAfterText(input.retryAfterSeconds);
+	const base = {
+		retryAfterExpiresAt: expiresAt,
+		retryAfterRemaining: remaining,
+	};
 	switch (input.code) {
-		case "WEBSITE_RATE_LIMITED":
+		case "WEBSITE_RATE_LIMITED": {
+			if (remaining === null)
+				return {
+					title: "Website membatasi akses",
+					guidance:
+						"Website tujuan sedang membatasi permintaan otomatis. Karena itu, gambar belum berhasil diambil. Website tidak memberi informasi kapan pembatasan berakhir. Gunakan URL lain yang mengizinkan pengambilan konten.",
+					retryable: false,
+					retryHint: null,
+					technicalDetail: "Detail teknis: HTTP 429",
+					...base,
+					retryAfterRemaining: null,
+				};
 			return {
 				title: "Website membatasi akses",
 				guidance:
-					"Website tujuan membatasi permintaan otomatis. Hasil belum dapat diambil. Tunggu sebelum mencoba lagi, atau gunakan website lain yang mengizinkan scraping.",
+					"Website tujuan sedang membatasi permintaan otomatis. Karena itu, gambar belum berhasil diambil. Permintaan berikutnya dapat dicoba setelah waktu tunggu dari website berakhir.",
 				retryable: true,
 				retryHint,
-				technicalDetail:
-					retryAfterSeconds === null
-						? "Detail teknis: HTTP 429"
-						: `Detail teknis: HTTP 429 · Retry-After: ${retryAfterSeconds} dtk`,
+				technicalDetail: `Detail teknis: HTTP 429 · Retry-After: ${remaining} dtk`,
+				...base,
 			};
+		}
 		case "RATE_LIMITED":
 			return {
 				title: "Batas request tercapai",
@@ -52,6 +100,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: true,
 				retryHint,
 				technicalDetail: "Detail teknis: HTTP 429 (batas aplikasi)",
+				...base,
 			};
 		case "QUEUE_CAPACITY":
 			return {
@@ -60,6 +109,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: true,
 				retryHint,
 				technicalDetail: "Detail teknis: kapasitas antrean",
+				...base,
 			};
 		case "INVALID_URL":
 			return {
@@ -69,6 +119,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: false,
 				retryHint: null,
 				technicalDetail: "Detail teknis: URL tidak valid",
+				...base,
 			};
 		case "PRIVATE_URL_BLOCKED":
 			return {
@@ -78,6 +129,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: false,
 				retryHint: null,
 				technicalDetail: "Detail teknis: URL privat diblokir",
+				...base,
 			};
 		case "WEBSITE_ACCESS_DENIED":
 			return {
@@ -87,6 +139,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: false,
 				retryHint: null,
 				technicalDetail: "Detail teknis: HTTP 401/403",
+				...base,
 			};
 		case "WEBSITE_NOT_FOUND":
 			return {
@@ -96,6 +149,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: false,
 				retryHint: null,
 				technicalDetail: "Detail teknis: HTTP 404/410",
+				...base,
 			};
 		case "WEBSITE_SERVER_ERROR":
 			return {
@@ -105,6 +159,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: true,
 				retryHint,
 				technicalDetail: "Detail teknis: HTTP 5xx",
+				...base,
 			};
 		case "WEBSITE_BLOCKED":
 			return {
@@ -114,6 +169,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: true,
 				retryHint,
 				technicalDetail: "Detail teknis: akses diblokir",
+				...base,
 			};
 		case "FETCH_TIMEOUT":
 			return {
@@ -122,6 +178,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: true,
 				retryHint,
 				technicalDetail: "Detail teknis: timeout",
+				...base,
 			};
 		case "NO_ANALYZABLE_CONTENT":
 			return {
@@ -131,6 +188,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: true,
 				retryHint,
 				technicalDetail: "Detail teknis: konten kosong",
+				...base,
 			};
 		case "AI_GENERATION_FAILED":
 			return {
@@ -139,6 +197,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: true,
 				retryHint,
 				technicalDetail: "Detail teknis: generasi AI gagal",
+				...base,
 			};
 		case "STORAGE_FAILED":
 			return {
@@ -147,6 +206,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: true,
 				retryHint,
 				technicalDetail: "Detail teknis: penyimpanan gagal",
+				...base,
 			};
 		default: {
 			const fallbackMessage =
@@ -161,6 +221,7 @@ export function resolveScrapeErrorPresentation(
 				retryable: true,
 				retryHint,
 				technicalDetail: `Detail teknis: ${input.code}`,
+				...base,
 			};
 		}
 	}

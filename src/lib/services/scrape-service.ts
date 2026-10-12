@@ -389,6 +389,10 @@ export async function runScrapePipeline(
 			error instanceof ScrapeError ? error.code : "UNEXPECTED_ERROR";
 		const retryAfterSeconds =
 			error instanceof ScrapeError ? error.retryAfterSeconds : undefined;
+		const retryAfterExpiresAt =
+			retryAfterSeconds === undefined
+				? undefined
+				: new Date(Date.now() + retryAfterSeconds * 1000).toISOString();
 
 		await db
 			.update(scrapes)
@@ -404,6 +408,9 @@ export async function runScrapePipeline(
 						errorDetail,
 						failedAtStage: meta.stage,
 						...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+						...(retryAfterExpiresAt === undefined
+							? {}
+							: { retryAfterExpiresAt }),
 					},
 				)}::jsonb`,
 				updatedAt: new Date(),
@@ -432,6 +439,40 @@ export async function retryScrape(
 		if (!scrape)
 			throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
 		if (scrape.status !== "failed") return { ok: true };
+		const metadata =
+			typeof scrape.metadata === "object" && scrape.metadata !== null
+				? (scrape.metadata as ScrapeMetadata)
+				: null;
+		const failedCode = metadata?.errorDetail ?? null;
+		if (
+			failedCode === "INVALID_URL" ||
+			failedCode === "PRIVATE_URL_BLOCKED" ||
+			failedCode === "WEBSITE_ACCESS_DENIED" ||
+			failedCode === "WEBSITE_NOT_FOUND"
+		)
+			throw new ScrapeError(
+				failedCode as
+					| "INVALID_URL"
+					| "PRIVATE_URL_BLOCKED"
+					| "WEBSITE_ACCESS_DENIED"
+					| "WEBSITE_NOT_FOUND",
+				"Retry tidak tersedia untuk kegagalan ini. Gunakan URL lain.",
+			);
+		const retryExpiresAt =
+			typeof metadata?.retryAfterExpiresAt === "string"
+				? Date.parse(metadata.retryAfterExpiresAt)
+				: Number.NaN;
+		if (Number.isFinite(retryExpiresAt) && retryExpiresAt > Date.now()) {
+			const remaining = Math.max(
+				1,
+				Math.ceil((retryExpiresAt - Date.now()) / 1000),
+			);
+			throw new ScrapeError(
+				"WEBSITE_RATE_LIMITED",
+				"Website masih membatasi permintaan otomatis. Tunggu hingga waktu tunggu berakhir.",
+				{ retryAfterSeconds: remaining },
+			);
+		}
 		const active = await tx
 			.select({ id: scrapes.id })
 			.from(scrapes)
@@ -473,6 +514,8 @@ export async function retryScrape(
 					errorMessage: undefined,
 					errorDetail: undefined,
 					failedAtStage: undefined,
+					retryAfterSeconds: undefined,
+					retryAfterExpiresAt: undefined,
 				},
 				updatedAt: new Date(),
 			})
