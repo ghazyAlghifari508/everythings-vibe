@@ -57,8 +57,7 @@ afterEach(() => {
 });
 
 describe("AppLayout workspace scroll ownership", () => {
-	it("lets Studio detail own navigation while the project list keeps its navbar", () => {
-		location.pathname = "/design/studio/project-1";
+	it("keeps the global navbar off both Studio routes and leaves unrelated routes intact", () => {
 		const renderLayout = () =>
 			act(() =>
 				root?.render(
@@ -69,13 +68,27 @@ describe("AppLayout workspace scroll ownership", () => {
 					</QueryClientProvider>,
 				),
 			);
+
+		location.pathname = "/design/studio/project-1";
 		renderLayout();
 		expect(container.querySelector("nav")).toBeNull();
 		expect(document.body.style.overflow).toBe("hidden");
+
+		// The Studio landing page owns its own navigation too: the global
+		// Pricing/Top Up navbar must not appear there either.
 		location.pathname = "/design/studio";
+		renderLayout();
+		expect(container.querySelector("nav")).toBeNull();
+		expect(document.body.style.overflow).toBe("hidden");
+
+		location.pathname = "/pricing";
 		renderLayout();
 		expect(container.querySelector("nav")).not.toBeNull();
 		expect(document.body.style.overflow).toBe("");
+
+		location.pathname = "/settings";
+		renderLayout();
+		expect(container.querySelector("nav")).toBeNull();
 	});
 	it("sizes the workspace shell to the visible viewport, not 100vh", () => {
 		act(() => {

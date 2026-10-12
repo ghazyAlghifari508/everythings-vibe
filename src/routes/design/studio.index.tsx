@@ -29,6 +29,7 @@ import {
 	StudioSidebar,
 } from "@/components/design/studio-sidebar";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import type { StudioDesignMode } from "@/lib/prompts-ui-studio";
 import { requireUserServer } from "@/lib/session";
 import { useUIStore } from "@/store";
@@ -175,7 +176,7 @@ function StudioPage() {
 	}
 
 	return (
-		<div className="flex h-[calc(100vh-3.5rem)] w-full overflow-hidden bg-onyx text-snow">
+		<div className="flex h-dvh w-full overflow-hidden bg-onyx text-snow">
 			{/* Desktop Left Sidebar: Real Project History */}
 			<StudioSidebar
 				history={history}
@@ -233,14 +234,17 @@ function StudioPage() {
 					{/* Mobile project drawer trigger & breadcrumb */}
 					<div className="flex items-center justify-between gap-3 w-full">
 						<HubBreadcrumb current="Prompt UI Studio" />
-						<button
-							type="button"
-							onClick={() => setIsMobileDrawerOpen(true)}
-							className="inline-flex md:hidden items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow hover:bg-onyx transition-colors"
-						>
-							<FolderOpen size={14} className="text-fog" aria-hidden />
-							<span>Project ({history.length})</span>
-						</button>
+						<div className="flex items-center gap-1.5">
+							<ThemeToggle />
+							<button
+								type="button"
+								onClick={() => setIsMobileDrawerOpen(true)}
+								className="inline-flex md:hidden items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow hover:bg-onyx transition-colors"
+							>
+								<FolderOpen size={14} className="text-fog" aria-hidden />
+								<span>Project ({history.length})</span>
+							</button>
+						</div>
 					</div>
 
 					{/* Center Workspace Heading */}

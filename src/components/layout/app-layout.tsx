@@ -22,7 +22,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 		"/admin",
 	];
 	const isCodebaseWorkspace = pathname.startsWith("/codebases/");
-	const isStudioWorkspace = /^\/design\/studio\/[^/]+\/?$/.test(pathname);
+	// Studio owns its whole viewport: both the project list and the detail
+	// workspace render their own navigation, so the global product navbar
+	// (Pricing / Top Up) must not appear on either route.
+	const isStudioWorkspace =
+		pathname === "/design/studio" || pathname.startsWith("/design/studio/");
 	const hideNavbar =
 		hideNavbarRoutes.includes(pathname) ||
 		pathname.startsWith("/settings/") ||
