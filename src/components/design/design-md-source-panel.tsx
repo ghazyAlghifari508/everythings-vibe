@@ -11,6 +11,9 @@ export interface DesignMdSourcePanelProps {
 	// Mirrors the inspector: an archived document is still available, but it is
 	// labelled as an archive instead of capture-verified output.
 	inspectorSource?: "observed" | "unverified";
+	// Explicit AI enrichment status: full narrative vs measurement-only fallback.
+	enrichment?: "applied" | "unavailable";
+	enrichmentDetail?: string;
 	className?: string;
 }
 
@@ -48,6 +51,8 @@ export function DesignMdSourcePanel({
 	domain,
 	onImplementAgent,
 	inspectorSource = "observed",
+	enrichment,
+	enrichmentDetail,
 	className,
 }: DesignMdSourcePanelProps) {
 	const [notice, setNotice] = useState("");
@@ -107,7 +112,9 @@ export function DesignMdSourcePanel({
 					</span>
 					<span className="truncate text-xs text-fog">
 						{inspectorSource === "observed"
-							? "Sesuai evidence browser"
+							? enrichment === "unavailable"
+								? "Pengukuran lengkap tanpa narasi AI"
+								: "Sesuai evidence browser"
 							: "Arsip: belum terverifikasi terhadap evidence"}
 					</span>
 				</span>
@@ -148,6 +155,14 @@ export function DesignMdSourcePanel({
 					</Button>
 				</div>
 			</div>
+			{inspectorSource === "observed" && enrichment === "unavailable" ? (
+				<p className="block border-b border-graphite px-3 py-2 text-xs text-fog">
+					Dokumen ini berisi pengukuran lengkap dari evidence browser. Narasi AI
+					tidak tersedia
+					{enrichmentDetail ? `: ${enrichmentDetail}` : "."} Token terukur di
+					bawah tidak terpengaruh.
+				</p>
+			) : null}
 
 			<pre
 				className="min-h-0 min-w-0 flex-1 overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist"

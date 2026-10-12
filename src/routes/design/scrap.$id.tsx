@@ -310,6 +310,8 @@ function ScrapeDetailPage() {
 					domain={domain}
 					designMd={designMd}
 					visualEvidence={metadata?.visualEvidence}
+					enrichment={metadata?.aiEnrichment}
+					enrichmentDetail={metadata?.aiEnrichmentDetail}
 				/>
 			) : view === "result-html" ? (
 				<ScrapeDetail

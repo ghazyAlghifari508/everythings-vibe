@@ -16,6 +16,8 @@ export interface DesignResultProps {
 	domain: string;
 	designMd: string;
 	visualEvidence?: unknown;
+	enrichment?: "applied" | "unavailable";
+	enrichmentDetail?: string;
 }
 
 export interface ResolvedInspector {
@@ -46,6 +48,8 @@ export function DesignResult({
 	domain,
 	designMd,
 	visualEvidence,
+	enrichment,
+	enrichmentDetail,
 }: DesignResultProps) {
 	const [agentOpen, setAgentOpen] = useState(false);
 	const siteName = displaySiteName(domain);
@@ -66,6 +70,8 @@ export function DesignResult({
 					designMd={designMd}
 					domain={domain}
 					inspectorSource={source}
+					enrichment={enrichment}
+					enrichmentDetail={enrichmentDetail}
 					onImplementAgent={() => setAgentOpen(true)}
 					className="lg:max-h-[calc(100vh-6rem)]"
 				/>

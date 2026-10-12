@@ -356,6 +356,7 @@ export async function runScrapePipeline(
 				activityStartedAt: new Date().toISOString(),
 				aiEnrichment: generated.enrichment.status,
 				aiEnrichmentDetail: generated.enrichment.detail,
+				designModelVersion: generated.model.version,
 			},
 			{},
 		);
@@ -582,6 +583,7 @@ export async function getScrapeById(
 		.select()
 		.from(scrapeDocuments)
 		.where(eq(scrapeDocuments.scrapeId, id))
+		.orderBy(desc(scrapeDocuments.createdAt))
 		.limit(1);
 	const ageMs = Date.now() - row.createdAt.getTime();
 	const health =
@@ -664,21 +666,9 @@ export async function saveScrapeDocument(
 		if (!owner || owner.id !== scrapeId || (claim && claim.userId !== userId))
 			throw new ScrapeError("STORAGE_FAILED", "Job lease sudah tidak berlaku.");
 
-		const [existing] = await tx
-			.select()
-			.from(scrapeDocuments)
-			.where(eq(scrapeDocuments.scrapeId, scrapeId))
-			.limit(1);
-
-		if (existing) {
-			const [updated] = await tx
-				.update(scrapeDocuments)
-				.set({ designMd })
-				.where(eq(scrapeDocuments.id, existing.id))
-				.returning();
-			return updated;
-		}
-
+		// Append-only history: every generation inserts a new version so
+		// previously generated documents remain safely accessible. Readers
+		// take the latest row by createdAt.
 		const [document] = await tx
 			.insert(scrapeDocuments)
 			.values({
@@ -718,11 +708,46 @@ export async function generateAndSaveDesignMd(
 				...captured.metadata,
 				aiEnrichment: generated.enrichment.status,
 				aiEnrichmentDetail: generated.enrichment.detail,
+				designModelVersion: generated.model.version,
 			},
 			updatedAt: new Date(),
 		})
 		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)));
 	return saveScrapeDocument(scrapeId, designMd, userId);
+}
+
+// Retries only the AI synthesis step from persisted evidence, without
+// recapturing the website. Valid measurements are never discarded: a failed
+// retry still leaves the measurement-only document intact.
+export async function retryDesignSynthesis(
+	scrapeId: string,
+	userId: string,
+): Promise<ScrapeDocumentRow> {
+	const scrape = await getScrapeById(scrapeId, userId);
+	const evidence = scrape.metadata?.visualEvidence;
+	if (!evidence)
+		throw new ScrapeError(
+			"NO_ANALYZABLE_CONTENT",
+			"Evidence visual tersimpan tidak tersedia untuk retry.",
+		);
+	const { generateDesignMd } = await import("@/lib/prompts-design-md");
+	const generated = await generateDesignMd(evidence, {
+		onActivity: async () => {},
+		onTiming: () => {},
+	});
+	await db
+		.update(scrapes)
+		.set({
+			metadata: {
+				...scrape.metadata,
+				aiEnrichment: generated.enrichment.status,
+				aiEnrichmentDetail: generated.enrichment.detail,
+				designModelVersion: generated.model.version,
+			},
+			updatedAt: new Date(),
+		})
+		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)));
+	return saveScrapeDocument(scrapeId, generated.document, userId);
 }
 
 export async function deleteScrape(

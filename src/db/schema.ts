@@ -904,6 +904,10 @@ export interface ScrapeMetadata {
 	// canonical, evidence-backed DESIGN.md.
 	aiEnrichment?: "applied" | "unavailable";
 	aiEnrichmentDetail?: string;
+	// Structured model version the current DESIGN.md was rendered from.
+	// Lets the inspector distinguish verified current-model documents from
+	// unverified legacy archives without parsing markdown footers.
+	designModelVersion?: number;
 	// Images mode: separates a page that truly has no images from a discovery
 	// or capture failure, and records how the verified resources ended up.
 	imageDiscovery?: ScrapeImageDiscovery;
