@@ -310,6 +310,7 @@ export function ScrapeDetail({
 							isRetryable={previewState === "failed"}
 							isLoading={previewState === "loading"}
 							onRetry={onRetryPreview}
+							onOpenSource={() => setHtmlViewTab("code")}
 						/>
 					) : (
 						<DesktopPreview
@@ -324,6 +325,7 @@ export function ScrapeDetail({
 								setPreviewAttempt((attempt) => attempt + 1);
 								onRetryPreview?.();
 							}}
+							onOpenSource={() => setHtmlViewTab("code")}
 						/>
 					)}
 				</div>
@@ -357,11 +359,13 @@ function PreviewUnavailable({
 	isRetryable,
 	isLoading = false,
 	onRetry,
+	onOpenSource,
 }: {
 	message: string;
 	isRetryable: boolean;
 	isLoading?: boolean;
 	onRetry?: () => void;
+	onOpenSource?: () => void;
 }) {
 	return (
 		<div className="flex min-h-[280px] flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
@@ -379,14 +383,26 @@ function PreviewUnavailable({
 				Source HTML asli tetap tersedia di tab Source HTML.
 			</p>
 			{isRetryable && onRetry ? (
-				<button
-					type="button"
-					onClick={onRetry}
-					className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					<RotateCw size={14} aria-hidden />
-					Coba lagi
-				</button>
+				<div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+					<button
+						type="button"
+						onClick={onRetry}
+						className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						<RotateCw size={14} aria-hidden />
+						Coba lagi
+					</button>
+					{onOpenSource ? (
+						<button
+							type="button"
+							onClick={onOpenSource}
+							className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							<Code size={14} aria-hidden />
+							Buka Source HTML
+						</button>
+					) : null}
+				</div>
 			) : null}
 		</div>
 	);
@@ -395,9 +411,11 @@ function PreviewUnavailable({
 function PreviewCanvasOverlay({
 	report,
 	onRetry,
+	onOpenSource,
 }: {
 	report: FrameReport;
 	onRetry?: () => void;
+	onOpenSource?: () => void;
 }) {
 	const { label, detail } = READINESS_MESSAGE[report];
 	if (report === "ready") return null;
@@ -430,13 +448,24 @@ function PreviewCanvasOverlay({
 			<output className="text-sm font-semibold text-snow">{label}</output>
 			<p className="max-w-md text-xs leading-5 text-fog">{detail}</p>
 			{(report === "failed" || report === "empty") && onRetry ? (
-				<button
-					type="button"
-					onClick={onRetry}
-					className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					Coba lagi
-				</button>
+				<div className="flex flex-wrap items-center justify-center gap-2">
+					<button
+						type="button"
+						onClick={onRetry}
+						className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						Coba lagi
+					</button>
+					{onOpenSource ? (
+						<button
+							type="button"
+							onClick={onOpenSource}
+							className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							Buka Source HTML
+						</button>
+					) : null}
+				</div>
 			) : null}
 		</div>
 	);
@@ -449,6 +478,7 @@ function DesktopPreview({
 	active = true,
 	onReport,
 	onRetry,
+	onOpenSource,
 }: {
 	title: string;
 	srcDoc: string;
@@ -456,6 +486,7 @@ function DesktopPreview({
 	active?: boolean;
 	onReport?: (report: FrameReport) => void;
 	onRetry?: () => void;
+	onOpenSource?: () => void;
 }) {
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const [scale, setScale] = useState(1);
@@ -635,7 +666,11 @@ function DesktopPreview({
 							transformOrigin: "top left",
 						}}
 					/>
-					<PreviewCanvasOverlay report={report} onRetry={onRetry} />
+					<PreviewCanvasOverlay
+						report={report}
+						onRetry={onRetry}
+						onOpenSource={onOpenSource}
+					/>
 				</div>
 			</div>
 		</div>
