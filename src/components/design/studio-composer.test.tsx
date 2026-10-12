@@ -7,66 +7,81 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StudioComposer } from "./studio-composer";
+import { StudioComposer, resolveComposerScope } from "./studio-composer";
+
+describe("resolveComposerScope", () => {
+	it("targets the whole project when no frame is selected", () => {
+		expect(resolveComposerScope(0)).toBe("project");
+	});
+
+	it("targets exactly the selected frames when one is selected", () => {
+		expect(resolveComposerScope(1)).toBe("revise");
+	});
+
+	it("targets exactly the selected frames when several are selected", () => {
+		expect(resolveComposerScope(4)).toBe("revise");
+	});
+});
 
 describe("StudioComposer", () => {
 	afterEach(() => cleanup());
 
-	it("renders project-wide target when no frame is selected", () => {
-		render(
-			<StudioComposer
-				selectedFrameName={null}
-				onClearSelectedFrame={vi.fn()}
-				onSubmit={vi.fn()}
-				loading={false}
-			/>,
-		);
+	it("shows the project scope when no frame is selected", () => {
+		render(<StudioComposer onSubmit={vi.fn()} loading={false} />);
 
-		expect(screen.getByText("Seluruh Project")).toBeDefined();
+		expect(screen.getByText("Seluruh project")).toBeDefined();
 		expect(
-			screen.getByPlaceholderText(
-				/Minta AI menambah halaman atau merevisi UI/i,
-			),
+			screen.getByPlaceholderText(/Minta revisi untuk seluruh project/i),
 		).toBeDefined();
 	});
 
-	it("renders selected frame target pill when a frame is selected", () => {
-		const onClear = vi.fn();
+	it("does not render the removed composer controls", () => {
 		render(
 			<StudioComposer
-				selectedFrameName="Dashboard"
-				onClearSelectedFrame={onClear}
 				onSubmit={vi.fn()}
 				loading={false}
+				selectedFrames={[{ id: "f-1", name: "Dashboard" }]}
+			/>,
+		);
+
+		expect(screen.queryByText(/Tambah Halaman/i)).toBeNull();
+		expect(screen.queryByText(/Seluruh project/i)).toBeNull();
+		// The palette icon is gone with its trigger.
+		expect(
+			screen.queryByRole("button", { name: /Pilih design system/i }),
+		).toBeNull();
+	});
+
+	it("targets a single selected frame and allows deselecting it", () => {
+		const onRemoveFrame = vi.fn();
+		render(
+			<StudioComposer
+				onSubmit={vi.fn()}
+				loading={false}
+				selectedFrames={[{ id: "f-1", name: "Dashboard" }]}
+				onRemoveFrame={onRemoveFrame}
 			/>,
 		);
 
 		expect(screen.getByText(/Editing: Dashboard/i)).toBeDefined();
-		const clearBtn = screen.getByRole("button", {
-			name: /Beralih ke seluruh project/i,
-		});
-		fireEvent.click(clearBtn);
-		expect(onClear).toHaveBeenCalled();
+		fireEvent.click(screen.getByRole("button", { name: /Lepas Dashboard/i }));
+		expect(onRemoveFrame).toHaveBeenCalledWith("f-1");
 	});
 
-	it("submits prompt when submit button is clicked", () => {
+	it("submits a revise request scoped to the selected frame", () => {
 		const onSubmit = vi.fn();
 		render(
 			<StudioComposer
-				selectedFrameName="Dashboard"
-				onClearSelectedFrame={vi.fn()}
 				onSubmit={onSubmit}
 				loading={false}
+				selectedFrames={[{ id: "f-1", name: "Dashboard" }]}
 			/>,
 		);
 
-		const input = screen.getByRole("textbox");
-		fireEvent.change(input, {
+		fireEvent.change(screen.getByRole("textbox"), {
 			target: { value: "Ubah warna header jadi biru" },
 		});
-
-		const submitBtn = screen.getByRole("button", { name: /Kirim prompt/i });
-		fireEvent.click(submitBtn);
+		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
 
 		expect(onSubmit).toHaveBeenCalledWith(
 			"Ubah warna header jadi biru",
@@ -74,40 +89,76 @@ describe("StudioComposer", () => {
 		);
 	});
 
-	it("activates add scope without replacing the draft", async () => {
-		const onSubmit = vi.fn(async () => true);
+	it("submits a project-scoped request when nothing is selected", () => {
+		const onSubmit = vi.fn();
+		render(<StudioComposer onSubmit={onSubmit} loading={false} />);
+
+		fireEvent.change(screen.getByRole("textbox"), {
+			target: { value: "Samakan radius kartu di semua layar" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
+
+		expect(onSubmit).toHaveBeenCalledWith(
+			"Samakan radius kartu di semua layar",
+			"project",
+		);
+	});
+
+	it("reports the multi-frame count and targets all selected frames", () => {
+		const onSubmit = vi.fn();
 		render(
 			<StudioComposer
-				selectedFrameName={null}
-				onClearSelectedFrame={vi.fn()}
 				onSubmit={onSubmit}
 				loading={false}
+				selectedFrames={[
+					{ id: "f-1", name: "Dashboard" },
+					{ id: "f-2", name: "Transactions" },
+				]}
 			/>,
 		);
 
-		const input = screen.getByRole("textbox");
-		fireEvent.change(input, {
-			target: { value: "A meaningful additional screen" },
+		expect(screen.getByText(/Merevisi 2 layar terpilih/i)).toBeDefined();
+		fireEvent.change(screen.getByRole("textbox"), {
+			target: { value: "Rapatkan spacing kartu metrik" },
 		});
-		const addPagePreset = screen.getByRole("button", {
-			name: /Tambah Halaman/i,
-		});
-		fireEvent.click(addPagePreset);
-		expect(document.activeElement).toBe(input);
 		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
-		await waitFor(() =>
-			expect(onSubmit).toHaveBeenCalledWith(
-				"A meaningful additional screen",
-				"add",
-			),
+
+		expect(onSubmit).toHaveBeenCalledWith(
+			"Rapatkan spacing kartu metrik",
+			"revise",
 		);
 	});
+
+	it("submits on Enter and keeps Shift+Enter for new lines", () => {
+		const onSubmit = vi.fn(() => true);
+		render(<StudioComposer onSubmit={onSubmit} loading={false} />);
+
+		const input = screen.getByRole("textbox");
+		fireEvent.change(input, { target: { value: "Revisi seluruh project" } });
+		fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+		expect(onSubmit).not.toHaveBeenCalled();
+
+		fireEvent.keyDown(input, { key: "Enter" });
+		expect(onSubmit).toHaveBeenCalledWith("Revisi seluruh project", "project");
+	});
+
+	it("does not submit while an IME composition is active", () => {
+		const onSubmit = vi.fn();
+		render(<StudioComposer onSubmit={onSubmit} loading={false} />);
+
+		const input = screen.getByRole("textbox");
+		fireEvent.change(input, { target: { value: "Mengubah tata letak" } });
+		fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+
+		expect(onSubmit).not.toHaveBeenCalled();
+	});
+
 	it("preserves rejected drafts and prevents repeated pending submissions", async () => {
-		let reject: (accepted: boolean) => void = () => {};
+		let settle: (accepted: boolean) => void = () => {};
 		const onSubmit = vi.fn(
 			() =>
 				new Promise<boolean>((resolve) => {
-					reject = resolve;
+					settle = resolve;
 				}),
 		);
 		render(<StudioComposer onSubmit={onSubmit} />);
@@ -118,11 +169,40 @@ describe("StudioComposer", () => {
 		fireEvent.keyDown(input, { key: "Enter" });
 		fireEvent.keyDown(input, { key: "Enter" });
 		expect(onSubmit).toHaveBeenCalledTimes(1);
-		reject(false);
+		settle(false);
 		await waitFor(() =>
 			expect(screen.getByRole("textbox")).toHaveProperty(
 				"value",
 				"Change the project spacing",
+			),
+		);
+	});
+
+	it("clears the draft only after the request is accepted", async () => {
+		const onSubmit = vi.fn(async () => true);
+		render(<StudioComposer onSubmit={onSubmit} />);
+		const input = screen.getByRole("textbox");
+		fireEvent.change(input, { target: { value: "Ganti tipografi judul" } });
+		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
+
+		await waitFor(() =>
+			expect(screen.getByRole("textbox")).toHaveProperty("value", ""),
+		);
+	});
+
+	it("surfaces a thrown failure so the user can retry", async () => {
+		const onSubmit = vi.fn(async () => {
+			throw new Error("Permintaan desain ditolak.");
+		});
+		render(<StudioComposer onSubmit={onSubmit} />);
+		fireEvent.change(screen.getByRole("textbox"), {
+			target: { value: "Ganti warna aksen" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
+
+		await waitFor(() =>
+			expect(screen.getByRole("alert").textContent).toContain(
+				"Permintaan desain ditolak.",
 			),
 		);
 	});

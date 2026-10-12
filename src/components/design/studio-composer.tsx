@@ -1,57 +1,46 @@
-import { ArrowUp, Loader2, Plus, X } from "lucide-react";
-import {
-	type FormEvent,
-	type ReactNode,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { ArrowUp, Loader2, X } from "lucide-react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
 export type StudioComposerScope = "add" | "revise" | "project";
 
 export interface StudioComposerProps {
-	selectedFrameName?: string | null;
-	onClearSelectedFrame?: () => void;
 	onSubmit: (
 		prompt: string,
 		scope: StudioComposerScope,
 	) => Promise<boolean> | boolean;
 	loading?: boolean;
 	className?: string;
-	designSystemControl?: ReactNode;
 	selectedFrames?: { id: string; name: string }[];
 	onRemoveFrame?: (id: string) => void;
 }
 
+/**
+ * Operation scope is derived from real selection state only: with frames
+ * selected the request revises exactly those frames, and with nothing selected
+ * it applies to the whole project. Adding a screen is an explicit project-level
+ * action in the workspace menu, so it is never inferred from prompt wording.
+ */
+export function resolveComposerScope(
+	selectedFrameCount: number,
+): StudioComposerScope {
+	return selectedFrameCount > 0 ? "revise" : "project";
+}
+
 export function StudioComposer({
-	selectedFrameName,
-	onClearSelectedFrame,
 	onSubmit,
 	loading = false,
 	className = "",
-	designSystemControl,
 	selectedFrames = [],
 	onRemoveFrame,
 }: StudioComposerProps) {
 	const [prompt, setPrompt] = useState("");
-	const [adding, setAdding] = useState(false);
-	const [projectScope, setProjectScope] = useState(false);
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState("");
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const pending = useRef(false);
-	const scope = projectScope
-		? "project"
-		: (selectedFrameName || selectedFrames.length) && !adding
-			? "revise"
-			: adding
-				? "add"
-				: "project";
+	const scope = resolveComposerScope(selectedFrames.length);
+	const singleFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
 
-	useEffect(() => {
-		if (selectedFrameName) setAdding(false);
-		if (selectedFrameName) setProjectScope(false);
-	}, [selectedFrameName]);
 	useEffect(() => {
 		const input = inputRef.current;
 		if (!input) return;
@@ -94,75 +83,33 @@ export function StudioComposer({
 				onSubmit={handleSubmit}
 				className="flex flex-col gap-3 rounded-xl border border-iron bg-obsidian p-3 text-snow focus-within:border-snow"
 			>
-				<div className="flex flex-wrap items-center justify-between gap-2">
-					{selectedFrameName && !adding && !projectScope ? (
-						<span className="inline-flex max-w-full items-center gap-2 rounded-md border border-iron px-2 py-1 text-xs text-snow">
-							<span className="truncate">Editing: {selectedFrameName}</span>
-							<button
-								type="button"
-								onClick={onClearSelectedFrame}
-								aria-label="Beralih ke seluruh project"
-								className="rounded p-1 hover:bg-steel focus-visible:outline-2"
-							>
-								<X size={14} />
-							</button>
-						</span>
-					) : (
+				{selectedFrames.length > 0 ? (
+					<div className="flex max-h-20 flex-wrap items-center gap-2 overflow-y-auto">
 						<span className="text-xs text-fog">
-							{adding ? "Tambah layar baru" : "Seluruh Project"}
+							{singleFrame
+								? `Editing: ${singleFrame.name}`
+								: `Merevisi ${selectedFrames.length} layar terpilih`}
 						</span>
-					)}
-					<div className="flex items-center gap-1">
-						<button
-							type="button"
-							disabled={loading || sending}
-							aria-pressed={adding}
-							onClick={() => {
-								setAdding(true);
-								setProjectScope(false);
-								inputRef.current?.focus();
-							}}
-							className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs text-fog hover:bg-steel hover:text-snow focus-visible:outline-2 disabled:opacity-50"
-						>
-							<Plus size={16} />
-							Tambah Halaman
-						</button>
-						{designSystemControl}
-						<button
-							type="button"
-							aria-pressed={projectScope}
-							disabled={loading || sending}
-							onClick={() => {
-								setProjectScope(true);
-								setAdding(false);
-								inputRef.current?.focus();
-							}}
-							className="min-h-9 rounded-lg px-2 text-xs text-fog hover:bg-steel focus-visible:outline-2"
-						>
-							Seluruh project
-						</button>
-					</div>
-					{!adding && !projectScope && selectedFrames.length > 0 ? (
-						<div className="flex max-h-20 flex-wrap gap-2 overflow-y-auto">
-							{selectedFrames.map((frame) => (
-								<span
-									key={frame.id}
-									className="inline-flex max-w-full items-center gap-2 rounded-md border border-iron px-2 text-xs text-snow"
+						{selectedFrames.map((frame) => (
+							<span
+								key={frame.id}
+								className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-0.5 text-xs text-snow"
+							>
+								<span className="truncate">{frame.name}</span>
+								<button
+									type="button"
+									aria-label={`Lepas ${frame.name}`}
+									onClick={() => onRemoveFrame?.(frame.id)}
+									className="rounded p-0.5 hover:bg-steel focus-visible:outline-2 focus-visible:outline-snow"
 								>
-									<span className="truncate">{frame.name}</span>
-									<button
-										type="button"
-										aria-label={`Lepas ${frame.name}`}
-										onClick={() => onRemoveFrame?.(frame.id)}
-										className="p-2 focus-visible:outline-2"
-									>
-										<X size={14} />
-									</button>
-								</span>
-							))}
-						</div>
-					) : null}
-				</div>
+									<X size={12} aria-hidden />
+								</button>
+							</span>
+						))}
+					</div>
+				) : (
+					<span className="text-xs text-fog">Seluruh project</span>
+				)}
 				<div className="flex items-end gap-2">
 					<textarea
 						ref={inputRef}
@@ -181,9 +128,11 @@ export function StudioComposer({
 							}
 						}}
 						placeholder={
-							selectedFrameName && !adding
-								? `Minta perubahan khusus untuk layar ${selectedFrameName}...`
-								: "Minta AI menambah halaman atau merevisi UI..."
+							singleFrame
+								? `Minta perubahan khusus untuk layar ${singleFrame.name}...`
+								: selectedFrames.length > 1
+									? `Minta perubahan untuk ${selectedFrames.length} layar terpilih...`
+									: "Minta revisi untuk seluruh project..."
 						}
 						disabled={loading || sending}
 						className="max-h-40 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-1 text-sm leading-6 text-snow placeholder:text-fog focus:outline-none disabled:opacity-60"
