@@ -776,7 +776,7 @@ input.bg-steel:autofill:active {
 
 @media (prefers-reduced-motion: reduce) {
 	.thought-line__text {
-		filter: none !important;
+		filter: none;
 		transition: opacity var(--tl-settle) ease;
 	}
 
@@ -785,7 +785,7 @@ input.bg-steel:autofill:active {
 	}
 
 	.thought-line__step {
-		transform: none !important;
+		transform: none;
 		transition: opacity 200ms ease;
 	}
 

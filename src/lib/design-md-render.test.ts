@@ -2,6 +2,7 @@
 import { buildFixtureModel } from "./design-fixture";
 import {
 	DESIGN_MD_SECTIONS,
+	type DesignMdSection,
 	escapeCell,
 	isValidCssColor,
 	isValidCssLength,
@@ -17,19 +18,15 @@ describe("renderDesignMd", () => {
 	it("renders the required sections in the documented order", () => {
 		const issues = validateDesignMd(markdown);
 		expect(issues).toEqual([]);
-		const headings = [...markdown.matchAll(/^##\s+(.*)$/gm)].map(
-			(match) => match[1],
+		const headings = [...markdown.matchAll(/^##\s+(.*)$/gm)]
+			.map((match) => (match[1] ?? "").trim())
+			.filter((heading): heading is DesignMdSection =>
+				(DESIGN_MD_SECTIONS as readonly string[]).includes(heading),
+			);
+		const ranks = headings.map((heading) =>
+			DESIGN_MD_SECTIONS.indexOf(heading),
 		);
-		const expected = headings.filter((entry) =>
-			(DESIGN_MD_SECTIONS as readonly string[]).includes(entry ?? ""),
-		);
-		expect(expected).toEqual(
-			[...expected].sort((a, b) => {
-				const aIndex = DESIGN_MD_SECTIONS.indexOf(a as never);
-				const bIndex = DESIGN_MD_SECTIONS.indexOf(b as never);
-				return aIndex - bIndex;
-			}),
-		);
+		expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
 		expect(headings).toContain("Tokens - Colors");
 		expect(headings).toContain("Fonts & Type Scale");
 		expect(headings).toContain("Do's and Don'ts");
