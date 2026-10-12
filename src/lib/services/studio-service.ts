@@ -1676,7 +1676,6 @@ async function runStudioFrameOperation(job: StudioJobRow) {
 					eq(studioProjects.userId, job.userId),
 				),
 			)
-			.for("update")
 			.limit(1);
 		if (!project || !job.targetFrameId)
 			throw new ScrapeError(

@@ -239,3 +239,50 @@ it("serialises concurrent deletes of the same project into one success", async (
 		await db.delete(users).where(eq(users.id, ownerId));
 	}
 });
+
+it("rejects background writes that target a deleted project", async () => {
+	const ownerId = await createOwner();
+	try {
+		const owned = await seedProject(ownerId, "Late worker project");
+		await deleteStudioProject(owned.project.id, ownerId);
+
+		// A worker that resolved the project before the delete committed must
+		// not be able to persist frames, revisions, or jobs afterwards. The
+		// foreign keys enforce that, so the delete cannot be partially undone.
+		await expect(
+			db.insert(studioFrames).values({
+				projectId: owned.project.id,
+				name: "Late screen",
+				viewport: "mobile",
+				status: "ready",
+			}),
+		).rejects.toThrow();
+		await expect(
+			db.insert(studioRevisions).values({
+				projectId: owned.project.id,
+				prompt: "Late revision",
+				htmlCode: "<html></html>",
+				version: 2,
+			}),
+		).rejects.toThrow();
+		await expect(
+			db.insert(studioJobs).values({
+				projectId: owned.project.id,
+				userId: ownerId,
+				prompt: "Late job",
+				jobType: "retry",
+				status: "queued",
+			}),
+		).rejects.toThrow();
+
+		expect(
+			await db
+				.select()
+				.from(studioFrames)
+				.where(eq(studioFrames.projectId, owned.project.id)),
+		).toHaveLength(0);
+	} finally {
+		await db.delete(studioAssets).where(eq(studioAssets.userId, ownerId));
+		await db.delete(users).where(eq(users.id, ownerId));
+	}
+});
