@@ -8,7 +8,8 @@ import {
 	Loader2,
 	RotateCw,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CodebaseSourcePreview } from "@/components/codebase/codebase-source-preview";
 import type { ScrapePreviewState } from "@/hooks/use-scrape-preview";
 import {
 	SCRAPE_DESKTOP_HEIGHT,
@@ -122,6 +123,13 @@ export function ScrapeDetail({
 	const [copied, setCopied] = useState(false);
 	const [frameReport, setFrameReport] = useState<FrameReport>("preparing");
 	const [previewAttempt, setPreviewAttempt] = useState(0);
+	const sourceSizeBytes = useMemo(
+		() =>
+			previewHtml.length > 0
+				? new TextEncoder().encode(previewHtml).length
+				: null,
+		[previewHtml],
+	);
 	const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -199,7 +207,7 @@ export function ScrapeDetail({
 				aria-label="Hasil HTML"
 				className="overflow-hidden rounded-xl border border-graphite bg-charcoal"
 			>
-				<div className="flex items-center justify-between gap-2 border-b border-graphite px-3 py-2">
+				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-graphite px-3 py-2">
 					<div
 						role="tablist"
 						aria-label="Tampilan HTML"
@@ -221,13 +229,14 @@ export function ScrapeDetail({
 							role="tab"
 							aria-selected={htmlViewTab === "preview"}
 							onClick={() => setHtmlViewTab("preview")}
-							className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
+							className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
 								htmlViewTab === "preview"
 									? "bg-charcoal text-snow"
 									: "text-fog hover:text-mist"
 							}`}
 						>
 							<Eye size={16} aria-hidden />
+							<span>Preview</span>
 						</button>
 						<button
 							aria-label="Source HTML"
@@ -245,13 +254,15 @@ export function ScrapeDetail({
 							role="tab"
 							aria-selected={htmlViewTab === "code"}
 							onClick={() => setHtmlViewTab("code")}
-							className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
+							className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
 								htmlViewTab === "code"
 									? "bg-charcoal text-snow"
 									: "text-fog hover:text-mist"
 							}`}
 						>
 							<Code size={16} aria-hidden />
+							<span className="hidden sm:inline">Source HTML</span>
+							<span className="sm:hidden">HTML</span>
 						</button>
 					</div>
 					<div className="flex shrink-0 items-center gap-1">
@@ -321,9 +332,14 @@ export function ScrapeDetail({
 					aria-label="Source code index.html"
 					hidden={htmlViewTab === "preview"}
 				>
-					<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
-						{previewHtml}
-					</pre>
+					<div className="max-h-[720px] bg-onyx p-3">
+						<CodebaseSourcePreview
+							path="index.html"
+							content={previewHtml}
+							truncated={false}
+							sizeBytes={sourceSizeBytes}
+						/>
+					</div>
 				</div>
 
 				{notice ? (
