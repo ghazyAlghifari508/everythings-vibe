@@ -368,11 +368,59 @@ export function withBaseHref(html: string, pageUrl: string): string {
 		: `${tag}${html}`;
 }
 
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+	amp: "&",
+	lt: "<",
+	gt: ">",
+	quot: '"',
+	apos: "'",
+	nbsp: "\u00a0",
+	copy: "©",
+	reg: "®",
+	trade: "™",
+	hellip: "…",
+	ndash: "–",
+	mdash: "—",
+	laquo: "«",
+	raquo: "»",
+	ldquo: "“",
+	rdquo: "”",
+	lsquo: "‘",
+	rsquo: "’",
+};
+
+export function decodeHtmlEntities(value: string): string {
+	return value.replace(
+		/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]+);/g,
+		(match, body: string) => {
+			if (body[0] === "#") {
+				const code =
+					body[1] === "x" || body[1] === "X"
+						? Number.parseInt(body.slice(2), 16)
+						: Number.parseInt(body.slice(1), 10);
+				if (
+					Number.isFinite(code) &&
+					code > 0 &&
+					code <= 0x10ffff &&
+					!(code >= 0xd800 && code <= 0xdfff)
+				) {
+					try {
+						return String.fromCodePoint(code);
+					} catch {
+						return match;
+					}
+				}
+				return match;
+			}
+			return NAMED_HTML_ENTITIES[body] ?? match;
+		},
+	);
+}
+
 export function extractPageTitle(html: string): string | null {
 	const match = html.match(/<title[^>]*>([\s\S]*?)<\/title\s*>/i);
 	if (!match) return null;
-	const title = match[1]
-		.replace(/<[^>]+>/g, "")
+	const title = decodeHtmlEntities(match[1].replace(/<[^>]+>/g, ""))
 		.replace(/\s+/g, " ")
 		.trim();
 	return title.length > 0 ? title.slice(0, 300) : null;
