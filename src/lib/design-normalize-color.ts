@@ -299,6 +299,25 @@ function matchingVariableNames(measurement: ColorMeasurement): string[] {
 // this value, so it must not be presented as a brand decision.
 const USER_AGENT_TEXT = "#000000";
 
+// A brand claim needs repeated or action-grounded evidence. A single sighting
+// of a brand-named variable is not enough to promote a colour.
+const BRAND_MIN_FREQUENCY = 2;
+
+const SURFACE_PAGE_ROLES = [
+	"canvas",
+	"main",
+	"section",
+	"header",
+	"footer",
+	"nav",
+] as const;
+
+function hasPageSurfaceRole(roles: string[]): boolean {
+	return roles.some((role) =>
+		(SURFACE_PAGE_ROLES as readonly string[]).includes(role),
+	);
+}
+
 export interface ColorClassification {
 	token: NormalizedColorToken;
 	roleClass: ColorRoleClass;
@@ -356,7 +375,9 @@ export function classifyColorToken(
 	const isUserAgentDefault =
 		token.color.hex === USER_AGENT_TEXT &&
 		!token.usage.hasVariableEvidence &&
-		token.usage.roles.every((role) => role === "element" || role === "body");
+		token.usage.roles.every(
+			(role) => role === "element" || role === "body" || role === "canvas",
+		);
 	if (isUserAgentDefault)
 		return {
 			token,
@@ -375,15 +396,6 @@ export function classifyColorToken(
 				"Resolved from a custom property the page named after a state, so it reads as a semantic colour rather than decoration.",
 			userAgentDefault: false,
 		};
-	if (BRAND_NAME.test(haystack))
-		return {
-			token,
-			roleClass: "brand",
-			roleLabel: roleLabelFor(token, "brand"),
-			rationale:
-				"Resolved from a custom property the page named for its brand or primary action.",
-			userAgentDefault: false,
-		};
 	// Only a filled action surface can establish a primary action colour. Text
 	// painted on an action element is not the action colour itself, so the check
 	// reads the paired role/property context rather than the two lists.
@@ -391,6 +403,27 @@ export function classifyColorToken(
 		token.usage,
 		colorContext("cta", "background-color"),
 	);
+	if (BRAND_NAME.test(haystack)) {
+		const repeated =
+			token.usage.frequency >= BRAND_MIN_FREQUENCY || actionFill >= 1;
+		if (repeated)
+			return {
+				token,
+				roleClass: "brand",
+				roleLabel: roleLabelFor(token, "brand"),
+				rationale:
+					"Resolved from a custom property the page named for its brand or primary action, with repeated or action-grounded usage.",
+				userAgentDefault: false,
+			};
+		return {
+			token,
+			roleClass: "accent",
+			roleLabel: roleLabelFor(token, "accent"),
+			rationale:
+				"Resolved from a brand-named custom property but measured only once without action fill, so it is recorded as an accent rather than a confirmed brand colour.",
+			userAgentDefault: false,
+		};
+	}
 	if (actionFill >= 2)
 		return {
 			token,
@@ -420,7 +453,8 @@ export function classifyColorToken(
 		};
 	const surfaceOnly =
 		token.usage.properties.includes("background-color") &&
-		token.usage.frequency >= 2;
+		token.usage.frequency >= 2 &&
+		hasPageSurfaceRole(token.usage.roles);
 	return {
 		token,
 		roleClass: surfaceOnly ? "neutral" : "unknown",

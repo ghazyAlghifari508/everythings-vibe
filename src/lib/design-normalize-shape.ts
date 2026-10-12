@@ -1,3 +1,4 @@
+import { normalizeColor } from "./design-normalize-color";
 import { parsePx } from "./design-normalize-typography";
 import {
 	type GroupedMeasurement,
@@ -68,8 +69,10 @@ function pxOf(value: string): number {
 	const direct = parsePx(value);
 	if (Number.isFinite(direct)) return direct;
 	// Multi-value shorthands report several lengths; the largest drives the scale.
-	const matches = [...value.matchAll(/(-?[\d.]+)px/g)].map((match) =>
-		Number.parseFloat(match[1] ?? ""),
+	// Supports scientific notation so an extreme computed value is measured
+	// correctly instead of being misparsed from a substring.
+	const matches = [...value.matchAll(/(-?[\d.]+(?:[eE][+-]?\d+)?)px/g)].map(
+		(match) => Number.parseFloat(match[1] ?? ""),
 	);
 	const finite = matches.filter((entry) => Number.isFinite(entry));
 	return finite.length ? Math.max(...finite) : Number.NaN;
@@ -149,8 +152,9 @@ export function classifySpacingToken(
 		purpose = "Action padding";
 	else if (
 		group.property === "padding" &&
+		Number.isFinite(valuePx) &&
+		valuePx > 0 &&
 		(roles.includes("section") ||
-			roles.includes("main") ||
 			roles.includes("header") ||
 			roles.includes("article") ||
 			roles.includes("footer"))
@@ -191,12 +195,17 @@ export function normalizeSpacing(elements: VisualElementEvidence[]): {
 		.map((group) => classifySpacingToken(group, elements, baseUnit))
 		// A value measured on a single generic element is not yet a system token;
 		// it is kept only when its context proves a purpose.
-		.filter(
-			(token) =>
+		// Zero measurements are CSS reset defaults, not design rhythm: they are
+		// kept only when a real component context gives them meaning.
+		.filter((token) => {
+			if (token.valuePx === 0 && token.purpose === "Measured spacing")
+				return false;
+			return (
 				token.frequency > 1 ||
 				token.purpose !== "Measured spacing" ||
-				token.roles.some((role) => role !== "element"),
-		)
+				token.roles.some((role) => role !== "element")
+			);
+		})
 		.sort(
 			(a, b) =>
 				b.frequency - a.frequency ||
@@ -269,12 +278,58 @@ export function normalizeElevation(
 			frequency: group.frequency,
 			roles: rolesFor(elements, "box-shadow", group.value).slice(0, 6),
 			selectors: group.selectors.slice(0, AUDIT_LIMIT),
-			usageNote:
-				group.frequency === 1
-					? "Measured once, so it is not presented as a system elevation."
-					: `Repeated across ${group.frequency} measured elements.`,
+			usageNote: describeShadow(group.value, group.frequency),
 		}))
 		.sort((a, b) => b.frequency - a.frequency);
+}
+
+// Summarizes a raw shadow into readable measured structure. The original value
+// stays as provenance; this note explains layers and extents without inventing
+// a preset name.
+function describeShadow(value: string, frequency: number): string {
+	const layers = splitShadowLayers(value);
+	const extent = largestShadowExtent(value);
+	const base =
+		frequency === 1
+			? "Measured once, so it is not presented as a system elevation."
+			: `Repeated across ${frequency} measured elements.`;
+	if (layers <= 1 && !Number.isFinite(extent)) return base;
+	const shape =
+		layers > 1
+			? `${layers} layers`
+			: Number.isFinite(extent)
+				? `blur ${extent}px`
+				: "single layer";
+	return `${base} Structure: ${shape}.`;
+}
+
+function splitShadowLayers(value: string): number {
+	let depth = 0;
+	let layers = 1;
+	for (const char of value) {
+		if (char === "(") depth += 1;
+		else if (char === ")") depth = Math.max(0, depth - 1);
+		else if (char === "," && depth === 0) layers += 1;
+	}
+	return value.trim().length ? layers : 0;
+}
+
+function largestShadowExtent(value: string): number {
+	const matches = [...value.matchAll(/(-?[\d.]+(?:[eE][+-]?\d+)?)px/g)].map(
+		(match) => Number.parseFloat(match[1] ?? ""),
+	);
+	const finite = matches.filter((entry) => Number.isFinite(entry));
+	return finite.length
+		? Math.max(...finite.map((entry) => Math.abs(entry)))
+		: Number.NaN;
+}
+
+// Pill and fully-rounded shapes come from very large radii. The original value
+// is preserved as provenance; the magnitude only informs the description.
+export const PILL_RADIUS_PX = 120;
+
+export function isPillRadius(valuePx: number): boolean {
+	return Number.isFinite(valuePx) && valuePx >= PILL_RADIUS_PX;
 }
 
 // Surfaces are the background colours that cover large areas, ordered from the
@@ -289,29 +344,38 @@ export interface SurfaceToken {
 export function normalizeSurfaces(
 	elements: VisualElementEvidence[],
 ): SurfaceToken[] {
-	return groupMeasurements(elements, ["background-color"])
-		.filter((group) => {
-			const roles = rolesFor(elements, "background-color", group.value);
-			return (
-				group.frequency >= 2 &&
-				roles.some((role) =>
-					[
-						"canvas",
-						"body",
-						"main",
-						"section",
-						"header",
-						"footer",
-						"div",
-					].includes(role),
+	const seen = new Map<string, SurfaceToken>();
+	for (const group of groupMeasurements(elements, ["background-color"])) {
+		const normalized = normalizeColor(group.value);
+		// Fully transparent paint contributes nothing visible and must never
+		// become the only surface.
+		if (!normalized || normalized.isNoOp) continue;
+		const roles = rolesFor(elements, "background-color", group.value);
+		const isPageSurface = roles.some((role) =>
+			["canvas", "main", "section", "header", "footer", "nav"].includes(role),
+		);
+		if (group.frequency < 2 || !isPageSurface) continue;
+		const key = `${normalized.hex}@${normalized.a.toFixed(3)}`;
+		const existing = seen.get(key);
+		if (existing) {
+			existing.frequency += group.frequency;
+			for (const role of roles)
+				if (!existing.roles.includes(role) && existing.roles.length < 6)
+					existing.roles.push(role);
+			for (const selector of group.selectors)
+				if (
+					!existing.selectors.includes(selector) &&
+					existing.selectors.length < AUDIT_LIMIT
 				)
-			);
-		})
-		.map((group) => ({
-			value: group.value,
+					existing.selectors.push(selector);
+			continue;
+		}
+		seen.set(key, {
+			value: normalized.css,
 			frequency: group.frequency,
-			roles: rolesFor(elements, "background-color", group.value).slice(0, 6),
+			roles: roles.slice(0, 6),
 			selectors: group.selectors.slice(0, AUDIT_LIMIT),
-		}))
-		.sort((a, b) => b.frequency - a.frequency);
+		});
+	}
+	return [...seen.values()].sort((a, b) => b.frequency - a.frequency);
 }

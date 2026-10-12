@@ -49,7 +49,7 @@ const TYPE_PROPERTIES = [
 ] as const;
 
 export function parsePx(value: string): number {
-	const match = value.trim().match(/^(-?[\d.]+)px$/);
+	const match = value.trim().match(/^(-?[\d.]+(?:[eE][+-]?\d+)?)px$/);
 	if (!match?.[1]) return Number.NaN;
 	const parsed = Number.parseFloat(match[1]);
 	return Number.isFinite(parsed) ? parsed : Number.NaN;
@@ -70,7 +70,7 @@ export function normalizeFontWeight(value: string): string {
 	const lowered = keyword.toLowerCase();
 	if (lowered === "bold") return "700";
 	if (lowered === "normal") return "400";
-	return "";
+	return lowered;
 }
 
 const MONOSPACE_HINT = /mono|code|consolas|menlo|courier/i;
@@ -94,6 +94,10 @@ export function classifyTypeRole(
 		if (fontSizePx >= 22) return "Heading";
 		return "Subheading";
 	}
+	const interactive = elementRoles.some((role) =>
+		["cta", "nav", "a", "button"].includes(role),
+	);
+	if (interactive && fontSizePx >= 10 && fontSizePx < 14) return "UI label";
 	if (fontSizePx >= 20) return "Body large";
 	if (fontSizePx >= 15) return "Body";
 	if (fontSizePx >= 13) return "Body small";
