@@ -355,6 +355,11 @@ export const SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS = 60 * 60 * 1000;
 export const SCRAPE_PREVIEW_ASSET_MAX_URL_CHARS = 4096;
 export const SCRAPE_PREVIEW_READY_PING_INTERVAL_MS = 250;
 export const SCRAPE_PREVIEW_READY_MAX_PINGS = 20;
+// Structured crawl extraction bounds keep persisted page content bounded
+// without scattering magic numbers across the extractor.
+export const CRAWL_DESCRIPTION_MAX_CHARS = 2000;
+export const CRAWL_HEADING_MAX_CHARS = 500;
+export const CRAWL_SECTION_TEXT_MAX_CHARS = 8000;
 // A single "empty" report is provisional: layout can still settle after it.
 // The verdict is only treated as final after this many consecutive empty
 // observations, which keeps a slow first render from being mislabelled empty.

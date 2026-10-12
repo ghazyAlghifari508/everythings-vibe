@@ -1040,6 +1040,17 @@ export const scrapes = pgTable(
 	],
 );
 
+export interface CrawlHeading {
+	level: number;
+	text: string;
+}
+
+export interface CrawlSection {
+	title: string | null;
+	level: number | null;
+	text: string;
+}
+
 export interface CrawlPageContent {
 	outgoingPages?: string[];
 	description: string | null;
@@ -1048,6 +1059,10 @@ export interface CrawlPageContent {
 	links: string[];
 	images: string[];
 	patterns: string[];
+	headingLevels?: CrawlHeading[];
+	sections?: CrawlSection[];
+	internalLinks?: string[];
+	externalLinks?: string[];
 }
 
 export const scrapePages = pgTable(
