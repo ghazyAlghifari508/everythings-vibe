@@ -7,7 +7,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StudioComposer, resolveComposerScope } from "./studio-composer";
+import { resolveComposerScope, StudioComposer } from "./studio-composer";
 
 describe("resolveComposerScope", () => {
 	it("targets the whole project when no frame is selected", () => {
@@ -29,10 +29,11 @@ describe("StudioComposer", () => {
 	it("shows the project scope when no frame is selected", () => {
 		render(<StudioComposer onSubmit={vi.fn()} loading={false} />);
 
-		expect(screen.getByText("Seluruh project")).toBeDefined();
+		// Scope is communicated by the placeholder, not a static control label.
 		expect(
 			screen.getByPlaceholderText(/Minta revisi untuk seluruh project/i),
 		).toBeDefined();
+		expect(screen.queryByText("Seluruh project")).toBeNull();
 	});
 
 	it("does not render the removed composer controls", () => {

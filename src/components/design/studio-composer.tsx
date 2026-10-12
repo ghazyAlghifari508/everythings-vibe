@@ -107,9 +107,7 @@ export function StudioComposer({
 							</span>
 						))}
 					</div>
-				) : (
-					<span className="text-xs text-fog">Seluruh project</span>
-				)}
+				) : null}
 				<div className="flex items-end gap-2">
 					<textarea
 						ref={inputRef}
