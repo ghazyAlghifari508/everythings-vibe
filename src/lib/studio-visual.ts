@@ -1,12 +1,15 @@
 import { createHash } from "node:crypto";
 import { type Browser, chromium } from "playwright";
 import type { StudioAssetRow } from "@/db/schema";
+import {
+	STUDIO_VISUAL_VIEWPORT_HEIGHT,
+	STUDIO_VISUAL_WIDTH,
+} from "@/lib/constants";
 import { fetchAsset } from "@/lib/fetch-html";
 import { isBlockedRequestUrl } from "@/lib/render-page";
 import { extractDesignSystemTokens } from "@/lib/studio-design-system";
 
-export const STUDIO_VISUAL_WIDTH = { mobile: 390, web: 1440 } as const;
-const STUDIO_VISUAL_VIEWPORT_HEIGHT = { mobile: 844, web: 900 } as const;
+export { STUDIO_VISUAL_WIDTH };
 const CAPTURE_TIMEOUT_MS = 30000;
 const CAPTURE_MAX_HEIGHT = 30000;
 const TAILWIND_RUNTIME = "https://cdn.tailwindcss.com";
@@ -210,6 +213,12 @@ export async function captureStudioVisual(
 		const data = await page.screenshot({
 			type: "jpeg",
 			quality: 90,
+			// fullPage is required alongside clip: a clip rect taller than the
+			// viewport is silently cropped to the viewport, so the stored image
+			// was shorter than the reported height and the frame <img> stretched
+			// it vertically. With fullPage the captured pixels match the reported
+			// document bounds exactly.
+			fullPage: true,
 			clip: { x: 0, y: 0, width, height },
 			animations: "disabled",
 		});
