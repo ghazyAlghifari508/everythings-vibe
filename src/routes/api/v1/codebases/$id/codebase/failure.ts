@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { codebaseSyncSessions } from "@/db/schema";
 import {
+	appendSyncLifecycleEvent,
 	assertSyncTransition,
 	buildFailureMetadata,
 	isExpectedIdempotencyKey,
@@ -138,10 +139,15 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/failure")({
 						"failed",
 					);
 					const code = sanitizeSyncErrorCode(body.errorCode);
-					const metadata = buildFailureMetadata({
-						previous: session.metadata,
-						rawCode: code,
-						failedAt: new Date(),
+					const failedAt = new Date();
+					const metadata = appendSyncLifecycleEvent({
+						previous: buildFailureMetadata({
+							previous: session.metadata,
+							rawCode: code,
+							failedAt,
+						}),
+						kind: "failed",
+						at: failedAt,
 					});
 					await db
 						.update(codebaseSyncSessions)

@@ -1,8 +1,14 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
 	areAllQuestionsAnswered,
 	buildFeatureMessage,
+	mapAskQuestionsToAdaptive,
 	nextQuestionIndex,
+	parseRestoredAnswers,
+	parseRestoredQuestions,
+	restoreAskState,
+	runConfirmGenerate,
+	serializeAskQuestions,
 } from "./codebase-chat-flow";
 
 const questions = [{ id: "q1" }, { id: "q2" }, { id: "q3" }];
@@ -48,5 +54,196 @@ describe("buildFeatureMessage", () => {
 
 	test("falls back to prefix only when answers are blank", () => {
 		expect(buildFeatureMessage("Toko", {})).toBe("Rencanakan fitur Toko");
+	});
+});
+
+describe("mapAskQuestionsToAdaptive", () => {
+	test("preserves question type and never turns every question into a select", () => {
+		const mapped = mapAskQuestionsToAdaptive([
+			{
+				id: "store",
+				question: "Simpan di mana?",
+				type: "select",
+				options: ["Lokal", "Server"],
+			},
+			{ id: "name", question: "Nama fitur?", type: "text" },
+			{
+				id: "surfaces",
+				question: "Permukaan mana?",
+				type: "multiselect",
+				options: ["Kartu", "Detail"],
+			},
+		]);
+		expect(mapped.map((q) => q.type)).toEqual([
+			"select",
+			"text",
+			"multiselect",
+		]);
+	});
+
+	test("only marks the explicitly recommended option, never the first", () => {
+		const [mapped] = mapAskQuestionsToAdaptive([
+			{
+				id: "store",
+				question: "Simpan di mana?",
+				type: "select",
+				options: ["Lokal", "Server"],
+				recommended: 1,
+				recommendationReason: "Repo memakai penyimpanan lokal.",
+			},
+		]);
+		expect(mapped.options.map((o) => o.recommended)).toEqual([false, true]);
+		expect(mapped.recommendedOptionId).toBe("store-opt2");
+		expect(mapped.recommendationReason).toBe("Repo memakai penyimpanan lokal.");
+	});
+
+	test("carries no recommendation when the server sent none", () => {
+		const [mapped] = mapAskQuestionsToAdaptive([
+			{
+				id: "store",
+				question: "Simpan di mana?",
+				type: "select",
+				options: ["Lokal", "Server"],
+			},
+		]);
+		expect(mapped.options.some((o) => o.recommended)).toBe(false);
+		expect(mapped.recommendedOptionId).toBeUndefined();
+		expect(mapped.recommendationReason).toBeUndefined();
+	});
+
+	test("never recommends an option on a multiselect question", () => {
+		const [mapped] = mapAskQuestionsToAdaptive([
+			{
+				id: "surfaces",
+				question: "Permukaan mana?",
+				type: "multiselect",
+				options: ["Kartu", "Detail"],
+				recommended: 0,
+				recommendationReason: "Ada.",
+			},
+		]);
+		expect(mapped.options.some((o) => o.recommended)).toBe(false);
+		expect(mapped.recommendedOptionId).toBeUndefined();
+	});
+});
+
+describe("runConfirmGenerate", () => {
+	test("never generates the feature when the handoff did not save", async () => {
+		const generateFeature = vi.fn(async () => ({ status: 200 }));
+		const reloadFeatureTree = vi.fn(async () => ({ ok: true }));
+		const outcome = await runConfirmGenerate({
+			saveHandoff: async () => false,
+			generateFeature,
+			reloadFeatureTree,
+		});
+		expect(outcome).toEqual({ kind: "handoff_failed" });
+		expect(generateFeature).not.toHaveBeenCalled();
+		expect(reloadFeatureTree).not.toHaveBeenCalled();
+	});
+
+	test("does not advance on a 200 unless the tree is actually persisted", async () => {
+		const outcome = await runConfirmGenerate({
+			saveHandoff: async () => true,
+			generateFeature: async () => ({ status: 200 }),
+			reloadFeatureTree: async () => null,
+		});
+		expect(outcome).toEqual({ kind: "not_persisted" });
+	});
+
+	test("reports the concurrent-generation 409 without advancing", async () => {
+		const reloadFeatureTree = vi.fn(async () => ({ ok: true }));
+		const outcome = await runConfirmGenerate({
+			saveHandoff: async () => true,
+			generateFeature: async () => ({ status: 409 }),
+			reloadFeatureTree,
+		});
+		expect(outcome).toEqual({ kind: "generating" });
+		expect(reloadFeatureTree).not.toHaveBeenCalled();
+	});
+
+	test("reports a transport failure (status 0) as a spec failure", async () => {
+		const outcome = await runConfirmGenerate({
+			saveHandoff: async () => true,
+			generateFeature: async () => ({ status: 0 }),
+			reloadFeatureTree: async () => ({ ok: true }),
+		});
+		expect(outcome).toEqual({ kind: "spec_failed" });
+	});
+
+	test("succeeds only when generation persisted and the tree reloads", async () => {
+		const outcome = await runConfirmGenerate({
+			saveHandoff: async () => true,
+			generateFeature: async () => ({ status: 200 }),
+			reloadFeatureTree: async () => ({ features: [] }),
+		});
+		expect(outcome).toEqual({ kind: "success" });
+	});
+});
+
+describe("ask handoff round-trip", () => {
+	const questions = mapAskQuestionsToAdaptive([
+		{
+			id: "store",
+			question: "Simpan di mana?",
+			type: "select",
+			options: ["Lokal", "Server"],
+			recommended: 0,
+			recommendationReason: "Repo memakai penyimpanan lokal.",
+		},
+		{
+			id: "surfaces",
+			question: "Permukaan mana?",
+			type: "multiselect",
+			options: ["Kartu", "Detail"],
+		},
+		{ id: "notes", question: "Catatan?", type: "text" },
+	]);
+
+	test("serializes question type, options, and recommendation", () => {
+		const serialized = serializeAskQuestions(questions);
+		expect(serialized[0]).toMatchObject({
+			type: "select",
+			options: ["Lokal", "Server"],
+			recommended: 0,
+			recommendationReason: "Repo memakai penyimpanan lokal.",
+		});
+		expect(serialized[1]).toMatchObject({
+			type: "multiselect",
+			options: ["Kartu", "Detail"],
+		});
+		expect(serialized[2]).toMatchObject({ type: "text" });
+		expect(serialized[2]).not.toHaveProperty("options");
+	});
+
+	test("restores question semantics and answers across a refresh", () => {
+		const serialized = serializeAskQuestions(questions);
+		const restored = restoreAskState(serialized, [
+			{ question: "Simpan di mana?", answer: "Lokal" },
+			{ question: "Permukaan mana?", answer: "Kartu, Detail" },
+		]);
+		expect(restored.questions.map((q) => q.type)).toEqual([
+			"select",
+			"multiselect",
+			"text",
+		]);
+		expect(restored.answers).toEqual({
+			store: "Lokal",
+			surfaces: "Kartu, Detail",
+		});
+	});
+
+	test("a defensive parse keeps valid entries and drops malformed ones", () => {
+		const parsed = parseRestoredQuestions([
+			{ id: "ok", question: "Q?", type: "text" },
+			{ id: "bad", question: "Q?", type: "slider" },
+			{ nope: true },
+		]);
+		expect(parsed).toEqual([{ id: "ok", question: "Q?", type: "text" }]);
+		expect(
+			parseRestoredAnswers([
+				{ question: "Q?", answer: "A" },
+				{ question: "", answer: "A" },
+			]),
+		).toEqual([{ question: "Q?", answer: "A" }]);
 	});
 });

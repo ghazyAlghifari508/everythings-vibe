@@ -7,7 +7,7 @@
  * file contents. Source content loading happens later in `manifest.ts`.
  */
 
-import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
+import { lstat, open, readdir, readFile, realpath, stat } from "node:fs/promises";
 import {
 	dirname,
 	isAbsolute,
@@ -134,6 +134,145 @@ export function getRepositoryName(root: string): string | null {
 	const candidate = flavor.basename(root).trim();
 	if (!isSafeRepositoryName(candidate)) return null;
 	return candidate;
+}
+
+/** Credentials embedded in a remote URL: `scheme://user:token@host/...`. */
+const URL_USERINFO_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/[^/@]+@/i;
+/** Scp-style remote with a username: `git@host:owner/repo.git`. */
+const SCP_LIKE_PATTERN = /^[^/@\s]+@([^/:\s]+):(.+)$/;
+/** `scheme://host/path` — the shape that survives normalization. */
+const URL_LIKE_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/(.+)$/i;
+const SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):\/\//i;
+/** A Windows drive or UNC prefix, which is a local path, never a remote. */
+const WINDOWS_PATH_PATTERN = /^[a-zA-Z]:[\\/]|^\\\\/;
+const TRAILING_SLASHES_PATTERN = /\/+$/;
+const GIT_SUFFIX_PATTERN = /\.git$/i;
+/**
+ * Transport markers that are never a repository's own name: `_git` is Azure
+ * DevOps' separator, `scm` is Bitbucket Server's. Generic words like `git` are
+ * deliberately kept, since they are legitimate group names on self-hosted hosts
+ * and stripping them could merge two different repositories.
+ */
+const NON_IDENTITY_SEGMENTS = new Set(["_git", "scm"]);
+
+/**
+ * Normalize a Git remote URL into a stable repository identity, or `null` when
+ * it cannot be verified.
+ *
+ * Mirrors `normalizeRepositoryIdentity` in the web app (`src/lib/codebase-repository-identity.ts`)
+ * so the standalone CLI package never imports from `src/`. The result is
+ * `host/owner/repo` in lowercase with `.git`, trailing slashes, ports,
+ * credentials, and query strings removed. Credentials can never survive: any
+ * userinfo is dropped before the value is built. Callers must treat `null` as
+ * "identity unknown" and never fall back to comparing folder names.
+ */
+export function normalizeRepositoryIdentity(
+	remoteUrl: string | null | undefined,
+): string | null {
+	if (typeof remoteUrl !== "string") return null;
+	const trimmed = remoteUrl.trim();
+	if (!trimmed) return null;
+	if (WINDOWS_PATH_PATTERN.test(trimmed)) return null;
+	if (trimmed.startsWith("/") || trimmed.startsWith("./")) return null;
+	if (URL_USERINFO_PATTERN.test(trimmed) && !SCP_LIKE_PATTERN.test(trimmed)) {
+		const scheme = SCHEME_PATTERN.exec(trimmed)?.[1] ?? "https";
+		return normalizeRepositoryIdentity(`${scheme}://${trimmed.slice(trimmed.indexOf("@") + 1)}`);
+	}
+
+	const scpLike = SCP_LIKE_PATTERN.exec(trimmed);
+	const split = scpLike
+		? { host: scpLike[1], path: scpLike[2] }
+		: (() => {
+				const withoutScheme = URL_LIKE_PATTERN.exec(trimmed);
+				if (!withoutScheme) return null;
+				const rest = withoutScheme[1];
+				const slashIndex = rest.indexOf("/");
+				if (slashIndex === -1) return null;
+				const authority = rest.slice(0, slashIndex);
+				const hostWithPort = authority.includes("@")
+					? authority.slice(authority.lastIndexOf("@") + 1)
+					: authority;
+				const host = hostWithPort.includes(":")
+					? hostWithPort.slice(0, hostWithPort.lastIndexOf(":"))
+					: hostWithPort;
+				if (!host) return null;
+				return { host, path: rest.slice(slashIndex + 1) };
+			})();
+	if (!split) return null;
+
+	const path = split.path
+		.split(/[?#]/)[0]
+		.replace(TRAILING_SLASHES_PATTERN, "")
+		.replace(GIT_SUFFIX_PATTERN, "")
+		.replace(TRAILING_SLASHES_PATTERN, "");
+	const segments = path
+		.split("/")
+		.map((segment) => segment.trim())
+		.filter((segment) => segment.length > 0)
+		.filter((segment) => !NON_IDENTITY_SEGMENTS.has(segment.toLowerCase()));
+	if (segments.length === 0) return null;
+	return [split.host.toLowerCase(), ...segments.map((s) => s.toLowerCase())].join(
+		"/",
+	);
+}
+
+/**
+ * Read `remote.origin.url` from a repository's Git config, or `null` when the
+ * repository has no origin remote or no readable config.
+ *
+ * The config is parsed directly instead of shelling out to git: no PATH
+ * dependency, no encoding surprises, and no subprocess to fail halfway. A `.git`
+ * *file* (worktree or submodule) is followed through its `gitdir:` pointer so a
+ * linked checkout still reports the same identity as its main repository.
+ *
+ * Only the remote URL is read. Nothing else from the config — credentials
+ * helpers, user identity, or local paths — is parsed or transmitted.
+ */
+export async function readRepositoryIdentity(
+	root: string,
+): Promise<string | null> {
+	if (typeof root !== "string" || root.trim().length === 0) return null;
+	const gitEntry = join(root, ".git");
+	let configPath: string;
+	try {
+		const entryStat = await lstat(gitEntry);
+		if (entryStat.isDirectory()) {
+			configPath = join(gitEntry, "config");
+		} else {
+			const pointer = await readFile(gitEntry, "utf-8");
+			const match = /^gitdir:\s*(.+)$/m.exec(pointer);
+			const target = match?.[1]?.trim();
+			if (!target) return null;
+			const gitDir = isAbsolute(target) ? target : resolve(root, target);
+			configPath = join(gitDir, "config");
+		}
+	} catch {
+		return null;
+	}
+
+	let config: string;
+	try {
+		config = await readFile(configPath, "utf-8");
+	} catch {
+		return null;
+	}
+
+	// `[remote "origin"]` followed by its `url = ...` line. Parsing the section
+	// rather than grepping for `url` keeps an unrelated remote's URL out.
+	const lines = config.split(/\r?\n/);
+	let inOrigin = false;
+	for (const line of lines) {
+		const trimmed = line.trim();
+		const section = /^\[remote\s+"(.+)"\]$/i.exec(trimmed);
+		if (section) {
+			inOrigin = section[1] === "origin";
+			continue;
+		}
+		if (!inOrigin) continue;
+		const assignment = /^url\s*=\s*(.+)$/i.exec(trimmed);
+		if (assignment) return normalizeRepositoryIdentity(assignment[1]);
+	}
+	return null;
 }
 
 /**

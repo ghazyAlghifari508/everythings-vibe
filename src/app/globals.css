@@ -441,6 +441,106 @@ input.bg-steel:autofill:active {
 	color: var(--text-secondary);
 }
 
+/* Read-only source preview in the existing-codebase workspace.
+   Scoped to the preview so PRD/document code blocks keep their own styling.
+   Semantic token colors are defined as scoped variables so the viewer reads as
+   a real code editor in both themes: light and dark each get their own coherent
+   palette, while text, punctuation, and indentation stay on the inherited
+   foreground. */
+.codebase-source-code {
+	color: var(--color-mist);
+	font-variant-ligatures: none;
+	tab-size: 2;
+
+	--code-comment: #6e7781;
+	--code-keyword: #8250df;
+	--code-string: #0a7b34;
+	--code-number: #b35900;
+	--code-function: #0550ae;
+	--code-type: #953800;
+	--code-variable: #cf222e;
+	--code-tag: #116329;
+	--code-meta: #6e7781;
+}
+
+.dark .codebase-source-code {
+	--code-comment: #7f848e;
+	--code-keyword: #c678dd;
+	--code-string: #98c379;
+	--code-number: #d19a66;
+	--code-function: #61afef;
+	--code-type: #e5c07b;
+	--code-variable: #e06c75;
+	--code-tag: #e06c75;
+	--code-meta: #7f848e;
+}
+
+.codebase-source-code .hljs-comment,
+.codebase-source-code .hljs-quote {
+	color: var(--code-comment);
+	font-style: italic;
+}
+
+.codebase-source-code .hljs-keyword,
+.codebase-source-code .hljs-selector-tag,
+.codebase-source-code .hljs-literal,
+.codebase-source-code .hljs-doctag,
+.codebase-source-code .hljs-formula,
+.codebase-source-code .hljs-meta-keyword {
+	color: var(--code-keyword);
+}
+
+.codebase-source-code .hljs-string,
+.codebase-source-code .hljs-regexp,
+.codebase-source-code .hljs-attr,
+.codebase-source-code .hljs-attribute,
+.codebase-source-code .hljs-meta-string,
+.codebase-source-code .hljs-addition {
+	color: var(--code-string);
+}
+
+.codebase-source-code .hljs-number,
+.codebase-source-code .hljs-symbol,
+.codebase-source-code .hljs-bullet,
+.codebase-source-code .hljs-link,
+.codebase-source-code .hljs-section {
+	color: var(--code-number);
+}
+
+.codebase-source-code .hljs-title,
+.codebase-source-code .hljs-title.function_,
+.codebase-source-code .hljs-built_in {
+	color: var(--code-function);
+}
+
+.codebase-source-code .hljs-type,
+.codebase-source-code .hljs-title.class_,
+.codebase-source-code .hljs-class .hljs-title,
+.codebase-source-code .hljs-params {
+	color: var(--code-type);
+}
+
+.codebase-source-code .hljs-variable,
+.codebase-source-code .hljs-template-variable,
+.codebase-source-code .hljs-property,
+.codebase-source-code .hljs-selector-id,
+.codebase-source-code .hljs-selector-class {
+	color: var(--code-variable);
+}
+
+.codebase-source-code .hljs-tag,
+.codebase-source-code .hljs-name {
+	color: var(--code-tag);
+}
+
+.codebase-source-code .hljs-meta {
+	color: var(--code-meta);
+}
+
+.codebase-source-code .hljs-deletion {
+	color: var(--code-variable);
+}
+
 @keyframes scrapeProgressIndeterminate {
 	from {
 		transform: translateX(-110%);

@@ -612,15 +612,29 @@ export const codebases = pgTable(
 			.default("user"),
 		// Anchor onboarding project created during initial repository setup.
 		// Immutable once assigned; subsequent feature projects never overwrite it.
-		// Nullable until the first feature is planned or if no safe candidate exists.
+		// Nullable until the first feature planned or if no safe candidate exists.
 		onboardingProjectId: text("onboarding_project_id").references(
 			(): AnyPgColumn => projects.id,
 			{ onDelete: "set null" },
 		),
+		// Normalized Git remote identity (`host/owner/repo`, lowercase, no
+		// credentials, port, or `.git`). Nullable: repositories synced before
+		// this column existed have no identity yet and adopt one on their next
+		// sync. Never derived from the folder name, and never used to merge two
+		// codebases automatically — a mismatch is reported, not acted on.
+		repositoryIdentity: text("repository_identity"),
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at").defaultNow(),
 	},
-	(t) => [index("codebases_user_id_idx").on(t.userId)],
+	(t) => [
+		index("codebases_user_id_idx").on(t.userId),
+		// Re-sync resolves an existing codebase by identity within one owner's
+		// rows, so the index leads with the tenant column.
+		index("codebases_user_id_repository_identity_idx").on(
+			t.userId,
+			t.repositoryIdentity,
+		),
+	],
 );
 
 // Sync session: one short-lived codebase-scoped credential per attempt.

@@ -380,6 +380,29 @@ describe("Step 1 continue gating", () => {
 		});
 		expect(onRetryAnalysis).toHaveBeenCalledTimes(1);
 	});
+	it("renders one integrated analysis error while sync stages stay successful", () => {
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_1",
+				fileCount: 68,
+				excludedCount: 42178,
+				analysisStatus: "failed",
+			}),
+			analysisError: "Analisis codebase gagal. Coba analisis ulang.",
+			onRetryAnalysis: () => {},
+		});
+		expect(allStageStates()).toEqual(["done", "done", "done"]);
+		expect(
+			container.querySelectorAll('[data-stage-state="failed"]'),
+		).toHaveLength(1);
+		expect(
+			container.querySelectorAll('[data-testid="analysis-failure-alert"]'),
+		).toHaveLength(1);
+		expect(container.textContent).not.toContain("tidak ikut dikirim");
+		expect(container.textContent).toContain("68 file tersinkron");
+		expect(container.textContent).toContain("42.178 file dikecualikan");
+	});
 	it("shows legacy analysis warning and refresh button when legacy analysis is missing suggestions", () => {
 		const onRefreshLegacySuggestions = vi.fn();
 		renderConnect({

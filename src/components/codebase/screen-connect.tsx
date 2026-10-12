@@ -256,11 +256,23 @@ export function ScreenConnect({
 							)}
 
 							{/* The one live sync presentation for this flow: agent, source
-							preparation, and upload, all mapped from the same polled
-							server status. */}
+							preparation, upload, the analysis state, and the neutral
+							sync summary — all mapped from the same polled server
+							status. A failed analysis expands inside its own row;
+							no second alert is rendered below it. */}
 							<SyncStageList
 								status={status}
 								isAnalysisReady={canContinueToSummary}
+								showAnalysisFailure={
+									!isLegacyAnalysisMissingSuggestions &&
+									(Boolean(analysisError) ||
+										status?.analysisStatus === "failed" ||
+										analysis?.status === "failed") &&
+									Boolean(onRetryAnalysis)
+								}
+								analysisError={analysisError}
+								onRetryAnalysis={onRetryAnalysis}
+								isAnalyzing={isAnalyzing}
 							/>
 
 							{statusError && (
@@ -344,49 +356,6 @@ export function ScreenConnect({
 													className="mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 												>
 													Perbarui rekomendasi
-												</button>
-											</span>
-										</div>
-									</div>
-								)}
-
-							{!isLegacyAnalysisMissingSuggestions &&
-								(Boolean(analysisError) ||
-									status?.analysisStatus === "failed" ||
-									analysis?.status === "failed") &&
-								Boolean(onRetryAnalysis) && (
-									<div
-										role="alert"
-										data-testid="analysis-failure-alert"
-										className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px]"
-									>
-										<div className="flex items-start gap-2.5">
-											<AlertCircle
-												size={14}
-												className="mt-0.5 shrink-0 text-crimson"
-												aria-hidden="true"
-											/>
-											<span className="flex flex-1 flex-col gap-1">
-												<span className="font-semibold text-snow">
-													Analisis codebase belum berhasil
-												</span>
-												{analysisError && (
-													<span className="leading-relaxed text-fog">
-														{analysisError}
-													</span>
-												)}
-												<span className="leading-relaxed text-fog">
-													Analisis dapat dicoba ulang tanpa perlu mengunggah
-													ulang snapshot.
-												</span>
-												<button
-													type="button"
-													data-testid="retry-analysis-button"
-													onClick={onRetryAnalysis}
-													disabled={isStarting || isAnalyzing}
-													className="mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-												>
-													Coba lagi analisis
 												</button>
 											</span>
 										</div>

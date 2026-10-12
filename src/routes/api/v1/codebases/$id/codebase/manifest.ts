@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { codebaseSnapshots, codebaseSyncSessions } from "@/db/schema";
 import {
+	appendSyncLifecycleEvent,
 	assertSyncTransition,
 	isExpectedIdempotencyKey,
 	isManifestReplayCompatible,
@@ -216,7 +217,18 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/manifest")(
 						if (steps.length > 0) {
 							await db
 								.update(codebaseSyncSessions)
-								.set({ status: "uploading", updatedAt: new Date() })
+								.set({
+									status: "uploading",
+									updatedAt: new Date(),
+									// First transition into transport: recorded once, so a
+									// fast upload that finishes before the next poll can still
+									// report when source transfer actually began.
+									metadata: appendSyncLifecycleEvent({
+										previous: session.metadata,
+										kind: "upload_started",
+										at: new Date(),
+									}),
+								})
 								.where(eq(codebaseSyncSessions.id, session.id));
 						}
 

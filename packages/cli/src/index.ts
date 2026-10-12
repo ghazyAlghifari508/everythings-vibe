@@ -18,6 +18,7 @@ import { Command } from "commander";
 import { acCommand } from "./commands/ac.js";
 import { codebaseSyncAction } from "./commands/codebase.js";
 import { exportRulesCommand } from "./commands/export.js";
+import { exportPlanCommand } from "./commands/export-plan.js";
 import { kanbanCommand } from "./commands/kanban.js";
 import { loginCommand } from "./commands/login.js";
 import { prdCommand } from "./commands/prd.js";
@@ -145,6 +146,14 @@ exportCmd
 	)
 	.option("--format <format>", "Output format (agents|claude|cursor)")
 	.action(exportRulesCommand);
+exportCmd
+	.command("plan")
+	.argument("<projectId>", "Project UUID")
+	.description("Export planning artifacts to docs/vibeplan/ for a coding agent")
+	.option("--root <path>", "Repository root (default: current directory)")
+	.option("--output <mode>", "Output mode (human|json)", "human")
+	.option("--api-url <url>", "API base URL")
+	.action(exportPlanCommand);
 
 // Parse only when executed as the CLI entrypoint; importing this module
 // (e.g. wiring tests) must not consume the importer's argv.

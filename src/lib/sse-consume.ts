@@ -1,14 +1,22 @@
+import { parseStreamEvent } from "./sse-events";
+
 export interface SseConsumeResult {
 	error: string | null;
 }
 
-function readJsonError(body: unknown): string | null {
-	return typeof body === "object" &&
-		body !== null &&
-		"error" in body &&
-		typeof (body as { error: unknown }).error === "string"
-		? (body as { error: string }).error
-		: null;
+/**
+ * Real stream facts a caller may observe while a generator runs. Every handler
+ * is fed by an actual SSE frame the server emitted, never by a timer or a
+ * synthesized stage: `started` means the generator accepted the work,
+ * `thinking` carries the model's own streamed reasoning, `delta` means document
+ * bytes arrived, `done` means the artifact was durably saved server-side.
+ */
+export interface SseStreamHandlers {
+	onStarted?: (event: { model?: string }) => void;
+	onThinking?: (text: string) => void;
+	onThinkingReset?: () => void;
+	onDelta?: (chunk: string) => void;
+	onDone?: (event: { content?: string }) => void;
 }
 
 /**
@@ -20,10 +28,19 @@ function readJsonError(body: unknown): string | null {
  */
 export async function consumeSseStream(
 	response: Response,
+	handlers: SseStreamHandlers = {},
 ): Promise<SseConsumeResult> {
 	if (!response.ok) {
 		const body: unknown = await response.json().catch(() => null);
-		return { error: readJsonError(body) ?? "Generator gagal. Coba lagi." };
+		return {
+			error:
+				typeof body === "object" &&
+				body !== null &&
+				"error" in body &&
+				typeof body.error === "string"
+					? body.error
+					: "Generator gagal. Coba lagi.",
+		};
 	}
 	const reader = response.body?.getReader();
 	if (!reader) return { error: "Generator gagal. Coba lagi." };
@@ -39,23 +56,34 @@ export async function consumeSseStream(
 		for (const event of events) {
 			const payload = event.trim();
 			if (!payload.startsWith("data:")) continue;
-			let parsed: unknown;
-			try {
-				parsed = JSON.parse(payload.slice(5).trim());
-			} catch {
+			const parsed = parseStreamEvent(payload.slice(5).trim());
+			if (!parsed) continue;
+			if (parsed.type === "error") {
+				if (typeof parsed.error === "string") return { error: parsed.error };
 				continue;
 			}
-			if (typeof parsed !== "object" || parsed === null || !("type" in parsed))
+			if (parsed.type === "started") {
+				handlers.onStarted?.(
+					typeof parsed.model === "string" ? { model: parsed.model } : {},
+				);
 				continue;
-			const type = (parsed as { type: unknown }).type;
-			if (
-				type === "error" &&
-				"error" in parsed &&
-				typeof (parsed as { error: unknown }).error === "string"
-			) {
-				return { error: (parsed as { error: string }).error };
 			}
-			if (type === "done") sawDone = true;
+			if (parsed.type === "thinking") {
+				handlers.onThinking?.(parsed.content);
+				continue;
+			}
+			if (parsed.type === "thinking_reset") {
+				handlers.onThinkingReset?.();
+				continue;
+			}
+			if (parsed.type === "delta") {
+				handlers.onDelta?.(parsed.content);
+				continue;
+			}
+			sawDone = true;
+			handlers.onDone?.(
+				typeof parsed.content === "string" ? { content: parsed.content } : {},
+			);
 		}
 	}
 	if (!sawDone)

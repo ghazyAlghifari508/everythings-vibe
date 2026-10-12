@@ -7,7 +7,15 @@ import {
 	Folder,
 	Search,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
+import {
+	collectFolderPaths,
+	explorerExpansionStorageKey,
+	parseExplorerExpansion,
+	pruneExplorerExpansion,
+	serializeExplorerExpansion,
+} from "@/lib/codebase-explorer-expansion";
 
 export interface ExplorerFileEntry {
 	path: string;
@@ -15,12 +23,10 @@ export interface ExplorerFileEntry {
 }
 
 interface CodebaseExplorerSidebarProps {
-	codebaseName: string;
-	branch?: string;
-	fileCount?: number;
-	syncLabel?: string;
 	files: ExplorerFileEntry[];
 	stack: string[];
+	/** Scopes the stored expansion preference; repositories never share one. */
+	codebaseId?: string;
 	onSelectFile?: (path: string) => void;
 }
 
@@ -116,22 +122,36 @@ export function buildTree(files: ExplorerFileEntry[]): TreeNode[] {
 	return sortTreeNodes(roots);
 }
 
+/**
+ * Collects every folder path a tree can contain, including folders that only
+ * appear once their parent is expanded.
+ */
+export function collectTreeFolderPaths(
+	nodes: readonly TreeNode[],
+): Set<string> {
+	return collectFolderPaths(nodes);
+}
+
 function TreeRow({
 	node,
 	depth,
+	expandedPaths,
+	onToggleFolder,
 	onSelectFile,
 }: {
 	node: TreeNode;
 	depth: number;
+	expandedPaths: ReadonlySet<string>;
+	onToggleFolder: (path: string) => void;
 	onSelectFile?: (path: string) => void;
 }) {
-	const [expanded, setExpanded] = useState(depth < 2);
+	const expanded = expandedPaths.has(node.fullPath);
 	if (!node.isFile && node.children.length > 0) {
 		return (
 			<div>
 				<button
 					type="button"
-					onClick={() => setExpanded((current) => !current)}
+					onClick={() => onToggleFolder(node.fullPath)}
 					aria-expanded={expanded}
 					className="flex min-h-9 w-full items-center gap-1.5 rounded-md px-2 text-left font-mono text-[12px] text-mist hover:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					style={{ paddingLeft: `${8 + depth * 12}px` }}
@@ -163,6 +183,8 @@ function TreeRow({
 								key={child.fullPath}
 								node={child}
 								depth={depth + 1}
+								expandedPaths={expandedPaths}
+								onToggleFolder={onToggleFolder}
 								onSelectFile={onSelectFile}
 							/>
 						))}
@@ -197,46 +219,82 @@ function TreeRow({
 }
 
 export function CodebaseExplorerSidebar({
-	codebaseName,
-	branch = "main",
-	fileCount,
-	syncLabel = "Synced",
 	files,
 	stack,
+	codebaseId,
 	onSelectFile,
 }: CodebaseExplorerSidebarProps) {
 	const [query, setQuery] = useState("");
+	const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(
+		() => new Set<string>(),
+	);
 	const filtered = useMemo(
 		() => filterExplorerFiles(files, query),
 		[files, query],
 	);
 	const tree = useMemo(() => buildTree(filtered), [filtered]);
+	// Pruning uses the unfiltered tree: a search that hides a folder must never
+	// look like the folder was removed.
+	const allFolders = useMemo(() => buildTree(files), [files]);
+	const storageKey = explorerExpansionStorageKey(codebaseId ?? "");
+	const restoredKeyRef = useRef<string | null>(null);
+
+	const persist = useCallback(
+		(paths: Iterable<string>) => {
+			if (!storageKey) return;
+			try {
+				localStorage.setItem(storageKey, serializeExplorerExpansion(paths));
+			} catch {
+				return;
+			}
+		},
+		[storageKey],
+	);
+
+	// Restored before the browser paints so a returning folder does not flash
+	// collapsed first; on the server the passive effect runs instead, which
+	// keeps the first client render identical to the server markup.
+	useIsomorphicLayoutEffect(() => {
+		if (!storageKey) return;
+		if (restoredKeyRef.current === storageKey) return;
+		restoredKeyRef.current = storageKey;
+		let stored: string[] = [];
+		try {
+			stored = parseExplorerExpansion(localStorage.getItem(storageKey));
+		} catch {
+			stored = [];
+		}
+		// Restoring is also the moment stale paths are dropped: writing the
+		// pruned list back keeps storage bounded and self-healing instead of
+		// carrying dead entries from an older snapshot forever.
+		const kept = pruneExplorerExpansion(
+			stored,
+			collectTreeFolderPaths(allFolders),
+		);
+		if (kept.length !== stored.length) persist(kept);
+		setExpandedPaths(new Set(kept));
+	}, [allFolders, persist, storageKey]);
+
+	const toggleFolder = useCallback(
+		(path: string) => {
+			setExpandedPaths((current) => {
+				const next = new Set(current);
+				if (next.has(path)) next.delete(path);
+				else next.add(path);
+				persist(next);
+				return next;
+			});
+		},
+		[persist],
+	);
 
 	return (
 		<div
 			data-testid="codebase-explorer-sidebar"
 			className="flex h-full min-h-0 flex-col bg-charcoal"
 		>
-			<div className="shrink-0 border-b border-graphite p-3">
-				<div className="rounded-lg border border-graphite bg-obsidian p-3">
-					<div className="flex items-center justify-between gap-2">
-						<p
-							data-testid="codebase-explorer-name"
-							className="truncate font-mono text-[13px] font-semibold text-snow"
-							title={codebaseName}
-						>
-							{codebaseName}
-						</p>
-						<span className="shrink-0 rounded border border-emerald/30 bg-emerald/10 px-1.5 py-px text-[10px] font-semibold text-emerald">
-							{syncLabel}
-						</span>
-					</div>
-					<p className="mt-1 font-mono text-[11px] text-fog">
-						Branch: {branch}
-						{typeof fileCount === "number" ? ` • ${fileCount} file` : ""}
-					</p>
-				</div>
-				<div className="relative mt-2">
+			<div className="shrink-0 border-b border-graphite px-3 py-2.5">
+				<div className="relative">
 					<Search
 						size={14}
 						aria-hidden="true"
@@ -250,13 +308,13 @@ export function CodebaseExplorerSidebar({
 						type="search"
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}
-						placeholder="Cari file dalam repository..."
+						placeholder="Cari file..."
 						className="w-full rounded-lg border border-graphite bg-obsidian py-2 pl-8 pr-2 text-xs text-snow outline-none placeholder:text-slate focus-visible:ring-2 focus-visible:ring-indigo"
 					/>
 				</div>
 			</div>
 			<div className="min-h-0 flex-1 overflow-y-auto p-2">
-				<p className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate">
+				<p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate">
 					Struktur direktori codebase
 				</p>
 				{tree.length === 0 ? (
@@ -278,20 +336,20 @@ export function CodebaseExplorerSidebar({
 								key={node.fullPath}
 								node={node}
 								depth={0}
+								expandedPaths={expandedPaths}
+								onToggleFolder={toggleFolder}
 								onSelectFile={onSelectFile}
 							/>
 						))}
 					</div>
 				)}
 			</div>
-			<div className="shrink-0 border-t border-graphite p-3">
+			<div className="shrink-0 border-t border-graphite px-3 py-2.5">
 				<p className="text-[10px] font-semibold uppercase tracking-wider text-slate">
 					Stack codebase terdeteksi
 				</p>
 				{stack.length === 0 ? (
-					<p className="mt-1.5 text-[11px] italic text-slate">
-						Tidak terdeteksi
-					</p>
+					<p className="mt-1 text-[11px] italic text-slate">Tidak terdeteksi</p>
 				) : (
 					<div className="mt-1.5 flex flex-wrap gap-1.5">
 						{stack.map((item) => (

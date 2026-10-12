@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { and, desc, eq, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	codebaseSnapshots,
@@ -9,8 +9,14 @@ import {
 } from "@/db/schema";
 import { normalizeRepositoryName } from "@/lib/codebase-library";
 import {
+	compareRepositoryIdentity,
+	normalizeRepositoryIdentity,
+} from "@/lib/codebase-repository-identity";
+import {
+	appendSyncLifecycleEvent,
 	assertSyncTransition,
 	buildHandshakeMetadata,
+	buildRepositoryIdentityMetadata,
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	type CodebaseSyncStatus,
 	cliHandshakeRequestSchema,
@@ -111,7 +117,11 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 				// Ownership flows through the credential owner; the codebase
 				// must still exist and belong to that owner.
 				const [codebase] = await db
-					.select({ id: codebases.id, userId: codebases.userId })
+					.select({
+						id: codebases.id,
+						userId: codebases.userId,
+						repositoryIdentity: codebases.repositoryIdentity,
+					})
 					.from(codebases)
 					.where(eq(codebases.id, codebaseId))
 					.limit(1);
@@ -160,6 +170,15 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 				const repositoryName = normalizeRepositoryName(
 					parsedBody.data.repositoryName,
 				);
+				// Same boundary for the Git remote identity: untrusted cosmetic
+				// metadata, validated here and ignored when unusable. It is never
+				// used to pick a codebase automatically — a mismatch is reported
+				// back to the CLI so the user can notice a wrong-repository upload.
+				const repositoryIdentity = normalizeRepositoryIdentity(
+					typeof parsedBody.data.repositoryIdentity === "string"
+						? parsedBody.data.repositoryIdentity
+						: null,
+				);
 
 				const [sub] = await db
 					.select({ plan: subscriptions.plan })
@@ -185,6 +204,10 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 				// Serialize handshake per session using advisory xact lock:
 				// concurrent handshake retries cannot race to create duplicate
 				// snapshots or double-advance session state.
+				const identityComparison = compareRepositoryIdentity(
+					codebase.repositoryIdentity,
+					repositoryIdentity,
+				);
 				const handshakeResult = await db.transaction(async (tx) => {
 					await tx.execute(
 						sql`select pg_advisory_xact_lock(hashtext(${session.id}))`,
@@ -210,11 +233,29 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 					// inside the handshake transaction, and survives a later failure
 					// or expiry so the prompt screen can still tell a handshaked
 					// session from one the CLI never reached.
-					const metadata = buildHandshakeMetadata({
+					//
+					// The lifecycle log records the same fact as an ordered event so
+					// a browser that first polls after this transition can still show
+					// WHEN the agent connected instead of only that it did.
+					const handshakeAt = new Date();
+					const withHandshake = buildHandshakeMetadata({
 						previous: currentSession?.metadata ?? session.metadata ?? null,
 						cliVersion: parsedBody.data.cliVersion,
 						...(repositoryName ? { repositoryName } : {}),
-						handshakeAt: new Date(),
+						handshakeAt,
+					});
+					const withIdentity = repositoryIdentity
+						? buildRepositoryIdentityMetadata({
+								previous: withHandshake,
+								repositoryIdentity,
+								matchesStored: identityComparison.matches,
+								at: handshakeAt,
+							})
+						: withHandshake;
+					const metadata = appendSyncLifecycleEvent({
+						previous: withIdentity,
+						kind: "agent_connected",
+						at: handshakeAt,
 					});
 					await tx
 						.update(codebaseSyncSessions)
@@ -241,6 +282,27 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 									eq(codebases.userId, session.userId),
 									eq(codebases.nameSource, "auto"),
 									ne(codebases.name, repositoryName),
+								),
+							);
+					}
+
+					// A repository registered before this contract existed has no
+					// identity yet, so the first sync that reports one adopts it.
+					// A different identity is never written over: the mismatch is
+					// reported to the CLI instead, because silently re-pointing a
+					// codebase would strand the planning already attached to it.
+					if (identityComparison.adoptable && repositoryIdentity) {
+						await tx
+							.update(codebases)
+							.set({
+								repositoryIdentity,
+								updatedAt: new Date(),
+							})
+							.where(
+								and(
+									eq(codebases.id, codebaseId),
+									eq(codebases.userId, session.userId),
+									isNull(codebases.repositoryIdentity),
 								),
 							);
 					}
@@ -295,6 +357,15 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 					status,
 					cliMinVersion: session.cliMinVersion,
 					expiresAt: session.expiresAt.toISOString(),
+					// Reported so the CLI can warn that this upload targets a
+					// codebase already bound to a different repository. The sync
+					// itself is not blocked: the user owns both rows and the
+					// session's own snapshot stays attached to this codebase.
+					...(repositoryIdentity &&
+					codebase.repositoryIdentity &&
+					!identityComparison.matches
+						? { repositoryIdentityMismatch: true }
+						: {}),
 				});
 				if (!parsed.success)
 					return Response.json(

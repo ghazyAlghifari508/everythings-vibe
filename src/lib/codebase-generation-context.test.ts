@@ -7,6 +7,7 @@ import {
 	buildCodebasePromptBlock,
 	buildGenerationContext,
 	buildGenerationLinkRow,
+	decideContextRequirement,
 	formatBoundedGenerationContext,
 	formatGenerationContext,
 	limitGenerationContext,
@@ -460,6 +461,39 @@ describe("formatGenerationContext", () => {
 		expect(formatted).toContain("Relevant modules/files: -");
 		expect(formatted).toContain("Known constraints: -");
 		expect(formatted).toContain("Codebase analysis: -");
+	});
+});
+
+describe("decideContextRequirement", () => {
+	const readyContext = buildGenerationContext({
+		featurePrompt: "prompt",
+		analysis,
+		snapshot,
+	});
+
+	it("lets greenfield generate without codebase context", () => {
+		expect(decideContextRequirement("greenfield", null)).toEqual({
+			context: null,
+		});
+		expect(decideContextRequirement(null, null)).toEqual({ context: null });
+	});
+
+	it("fails closed when an existing-codebase project has no ready context", () => {
+		const decision = decideContextRequirement("existing_codebase", null);
+		expect("code" in decision && decision.code).toBe(
+			"CODEBASE_CONTEXT_UNAVAILABLE",
+		);
+		expect("context" in decision).toBe(false);
+	});
+
+	it("returns the resolved context when the analysis is ready", () => {
+		const decision = decideContextRequirement(
+			"existing_codebase",
+			readyContext,
+		);
+		expect("context" in decision && decision.context?.snapshotId).toBe(
+			"snap_123",
+		);
 	});
 });
 

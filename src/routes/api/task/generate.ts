@@ -7,8 +7,8 @@ import {
 } from "@/lib/adaptive-credit";
 import {
 	buildCodebasePromptBlock,
-	getProjectGenerationContext,
 	linkGenerationContext,
+	requireProjectGenerationContext,
 } from "@/lib/codebase-generation-context";
 import { CLAIM_POLL_MS, CLAIM_RETRY_MS } from "@/lib/constants";
 import { hasFullWorkflow } from "@/lib/credits";
@@ -185,12 +185,19 @@ export const Route = createFileRoute("/api/task/generate")({
 				let codebaseSnapshotInfo:
 					| { fileCount?: number; sourceBytes?: number }
 					| undefined;
+				let codebaseBlock = "";
 
 				if (project.projectMode === "existing_codebase") {
 					try {
-						const generationContext =
-							await getProjectGenerationContext(projectId);
+						// Fail closed: a repository-aware task breakdown must never be
+						// generated from generic greenfield context.
+						const required = await requireProjectGenerationContext(projectId);
+						if ("code" in required) {
+							return Response.json(required, { status: required.status });
+						}
+						const generationContext = required.context;
 						if (generationContext) {
+							codebaseBlock = buildCodebasePromptBlock(generationContext);
 							codebaseSnapshotId = generationContext.snapshotId;
 							codebaseAnalysisId = generationContext.analysisId ?? undefined;
 							const [snapRow] = await db
@@ -710,18 +717,6 @@ export const Route = createFileRoute("/api/task/generate")({
 								if (e instanceof Error && e.name === "AbortError") throw e;
 							}
 
-							let codebaseBlock = "";
-							if (project.projectMode === "existing_codebase") {
-								try {
-									const generationContext =
-										await getProjectGenerationContext(projectId);
-									if (generationContext) {
-										codebaseBlock = buildCodebasePromptBlock(generationContext);
-									}
-								} catch (e) {
-									if (e instanceof Error && e.name === "AbortError") throw e;
-								}
-							}
 							const projectLanguage = normalizeLanguage(project.language);
 							systemPrompt = buildTaskSystemPrompt({
 								acMarkdown,
