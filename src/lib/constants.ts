@@ -365,6 +365,18 @@ export const CRAWL_SECTION_TEXT_MAX_CHARS = 8000;
 // observations, which keeps a slow first render from being mislabelled empty.
 export const SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS = 3;
 
+// === DESIGN.md synthesis bounds ===
+// Bounded budgets for the evidence-grounded AI synthesis step. Single source
+// of truth so the prompt builder, parser and persistence never scatter magic
+// numbers.
+export const DESIGN_SYNTHESIS_MAX_TOKENS = 2000;
+export const DESIGN_SYNTHESIS_DETAIL_MAX_CHARS = 500;
+export const DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS = 60_000;
+export const DESIGN_SYNTHESIS_MAX_COLORS = 40;
+export const DESIGN_SYNTHESIS_MAX_TYPOGRAPHY = 20;
+export const DESIGN_SYNTHESIS_MAX_SPACING = 30;
+export const DESIGN_SYNTHESIS_MAX_RADII = 20;
+
 // === VibeDesign Studio bounds ===
 export const STUDIO_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;
