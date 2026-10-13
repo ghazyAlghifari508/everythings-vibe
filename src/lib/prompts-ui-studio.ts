@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
+import {
+	STUDIO_DESIGN_MD_MAX_CHARS,
+	STUDIO_PREVIOUS_HTML_MAX_CHARS,
+} from "@/lib/constants";
 import {
 	type StudioDesignBlueprint,
 	validateBlueprint,
@@ -18,12 +21,17 @@ export type StudioDesignMode = "web" | "mobile";
  */
 const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Experience (mobile-first UI/UX).
 - Design for a single mobile viewport width (390px) and let the document grow vertically as tall as the content needs. A long, scrollable page is correct; never compress or rescale sections to force everything into one screen height.
+- Include <meta name="viewport" content="width=device-width, initial-scale=1"> in <head>.
 - Provide a clean mobile top app bar with the screen title and relevant action buttons.
 - Provide a sticky bottom navigation tab bar (with icons and labels), highlighting the active screen.
+- Reserve space for the bottom navigation: main content needs padding-bottom so nothing hides behind the tab bar; account for env(safe-area-inset-bottom) where relevant.
 - Ensure all clickable touch targets have a minimum height/width of 44px.
 - Use mobile-first interaction patterns: card stacks, segmented switchers, and compact stat rows.
+- Use fluid sizing: max-width: 100% on all sections, images, and tables; never use fixed pixel widths larger than the viewport; avoid unintended horizontal overflow (no overflow-x scroll on the page).
+- Avoid overlapping fixed/sticky elements; only the top app bar and bottom tab bar may be fixed/sticky.
 - Keep body text at 14px-16px with comfortable line height so it stays readable at the captured 390px width.
-- Size sections with padding, gaps, and min-height instead of fixed pixel heights, so the page never looks stretched or squashed when captured.`;
+- Size sections with padding, gaps, and min-height instead of fixed pixel heights, so the page never looks stretched or squashed when captured.
+- Preserve true document height: images keep aspect ratio with max-width: 100% and height auto.`;
 
 const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Web Application Experience.
 - Design for desktop browsers (1280px-1440px) while maintaining smooth responsive adaptation to tablet and mobile.
@@ -353,6 +361,8 @@ export interface StudioFramePromptOptions {
 	designMd?: string | null;
 	logoUrl?: string | null;
 	previousHtml?: string;
+	blueprint?: StudioDesignBlueprint | null;
+	activeScreen?: string;
 }
 
 export function buildStudioFramePrompt(opts: StudioFramePromptOptions): string {
@@ -371,6 +381,19 @@ OVERALL APPLICATION PURPOSE: "${opts.projectPrompt.trim()}"`,
 			`Application screens in this project: ${opts.allScreens.join(", ")}.
 Maintain exact visual continuity (colors, header/footer layout, typography, components) with other screens in this application.
 - If this screen has a navigation bar or tab bar, ensure "${opts.screenName}" is marked as the active/selected item.`,
+		);
+	}
+
+	// Shared design blueprint: the single authoritative specification every
+	// frame in this project must follow. Screen content must not redefine
+	// these shared decisions; only the active navigation item may differ.
+	if (opts.blueprint) {
+		sections.push(
+			`<SHARED_DESIGN_BLUEPRINT>
+Every screen in this project uses this exact specification. Apply it verbatim:
+${JSON.stringify(opts.blueprint)}
+Active screen for this frame: "${opts.activeScreen ?? opts.screenName}". Render the shared navigation with identical icons, labels, ordering, sizing, and geometry; highlight only the active item.
+</SHARED_DESIGN_BLUEPRINT>`,
 		);
 	}
 
@@ -415,7 +438,7 @@ Do NOT replace this logo with text initials or placeholder shapes.
 		sections.push(
 			`Revise the existing screen below according to the request:
 <EXISTING_HTML>
-${opts.previousHtml.trim().slice(0, 60_000)}
+${opts.previousHtml.trim().slice(0, STUDIO_PREVIOUS_HTML_MAX_CHARS)}
 </EXISTING_HTML>
 
 Return the FULL revised single-file HTML document for "${opts.screenName}".`,
@@ -425,6 +448,10 @@ Return the FULL revised single-file HTML document for "${opts.screenName}".`,
 			`Generate the complete standalone single-file HTML document for screen "${opts.screenName}".`,
 		);
 	}
+
+	sections.push(
+		`Design precedence, highest to lowest: explicit user requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override explicit user colors or brand requirements. Resolve conflicts deterministically in that order.`,
+	);
 
 	return sections.join("\n\n");
 }
@@ -547,7 +574,7 @@ Do NOT replace this logo with text initials, generic SVG shapes, or external pla
 			`Revise the existing page below according to this request: ${prompt}
 
 <EXISTING_HTML>
-${opts.previousHtml.trim().slice(0, 60_000)}
+${opts.previousHtml.trim().slice(0, STUDIO_PREVIOUS_HTML_MAX_CHARS)}
 </EXISTING_HTML>
 
 Return the FULL revised single-file HTML document.`,

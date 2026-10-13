@@ -1,3 +1,5 @@
+import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
+
 export interface CanonicalDesignSystem {
 	colors: {
 		primary: string | null;
@@ -291,6 +293,7 @@ export function enforceDesignSystemOnHtml(
 	html: string,
 	tokens: CanonicalDesignSystem | null,
 	logoUrl?: string | null,
+	blueprint?: StudioDesignBlueprint | null,
 ): string {
 	let output = html;
 	output = output
@@ -306,6 +309,22 @@ export function enforceDesignSystemOnHtml(
 	// 1. Inject design system tokens into <head> if tokens exist
 	if (tokens && !output.includes("studio-design-tokens")) {
 		const headerHtml = generateDesignSystemHtmlHeader(tokens);
+		if (output.includes("</head>")) {
+			output = output.replace("</head>", `${headerHtml}\n</head>`);
+		} else if (output.includes("<head>")) {
+			output = output.replace("<head>", `<head>\n${headerHtml}`);
+		} else if (output.includes("<!DOCTYPE html>") || output.includes("<html")) {
+			output = output.replace(
+				/<html\b[^>]*>/i,
+				`$&\n<head>\n${headerHtml}\n</head>`,
+			);
+		}
+	}
+
+	// 1b. Inject shared blueprint tokens into <head> when a blueprint exists
+	if (blueprint && !output.includes("studio-blueprint-tokens")) {
+		const bp = blueprint.designTokens;
+		const headerHtml = `<style id="studio-blueprint-tokens">:root{--bp-primary:${bp.primary};--bp-secondary:${bp.secondary};--bp-background:${bp.background};--bp-surface:${bp.surface};--bp-font:${bp.fontFamily};--bp-radius:${bp.radius}px;--bp-border:${bp.border};--bp-elevation:${bp.elevation};}</style>`;
 		if (output.includes("</head>")) {
 			output = output.replace("</head>", `${headerHtml}\n</head>`);
 		} else if (output.includes("<head>")) {
@@ -356,4 +375,44 @@ export function enforceDesignSystemOnHtml(
 	}
 
 	return output;
+}
+
+export interface ValidateGeneratedHtmlOptions {
+	blueprint: StudioDesignBlueprint | null;
+	viewport: "web" | "mobile";
+	expectTokens: boolean;
+}
+
+// Deterministic structural validation for generated HTML. String checks
+// cannot prove visual correctness; they only catch concrete contract
+// violations that warrant one bounded corrective regeneration.
+export function validateGeneratedHtml(
+	html: string,
+	opts: ValidateGeneratedHtmlOptions,
+): string[] {
+	const issues: string[] = [];
+	if (!/<html[\s>]/i.test(html) || !/<\/html>/i.test(html)) {
+		issues.push("HTML tidak lengkap.");
+		return issues;
+	}
+	if (opts.viewport === "mobile" && !/name=["']viewport["']/i.test(html)) {
+		issues.push("Viewport meta hilang.");
+	}
+	if (opts.blueprint && !html.includes("studio-blueprint-tokens")) {
+		issues.push("Token blueprint bersama hilang.");
+	}
+	if (opts.expectTokens && !html.includes("studio-design-tokens")) {
+		issues.push("Token design system hilang.");
+	}
+	if (opts.blueprint) {
+		for (const label of opts.blueprint.navigationContract.labels) {
+			if (!html.includes(label)) {
+				issues.push(`Label navigasi hilang: ${label}.`);
+			}
+		}
+	}
+	if (/width:\s*\d{4,}px|width=["']\d{4,}/i.test(html)) {
+		issues.push("Lebar tetap melebihi viewport.");
+	}
+	return issues;
 }

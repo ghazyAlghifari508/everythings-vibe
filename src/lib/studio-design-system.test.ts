@@ -1,9 +1,50 @@
 import { describe, expect, it } from "vitest";
+import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import {
 	enforceDesignSystemOnHtml,
 	extractDesignSystemTokens,
 	generateDesignSystemHtmlHeader,
+	validateGeneratedHtml,
 } from "./studio-design-system";
+
+const sampleBlueprint: StudioDesignBlueprint = {
+	productIdentity: {
+		productName: "Kopi",
+		targetAudience: "Umum",
+		platform: "mobile",
+		visualDirection: "Hangat",
+	},
+	designTokens: {
+		primary: "#0f0f0f",
+		secondary: "#606060",
+		background: "#ffffff",
+		surface: "#f8f8f8",
+		fontFamily: "system-ui",
+		radius: 12,
+		border: "1px solid #d3d3d3",
+		elevation: "none",
+	},
+	sharedComponents: {
+		header: "Bar",
+		navigation: "Tabs",
+		buttons: "Ink",
+		inputs: "8px",
+		cards: "12px",
+		tabs: "Seg",
+		icons: "Lucide",
+	},
+	navigationContract: {
+		destinations: ["jelajah", "kustom"],
+		labels: ["Jelajah", "Kustom"],
+		iconMapping: { jelajah: "compass", kustom: "sliders" },
+		ordering: ["jelajah", "kustom"],
+		activeItemRule: "Highlight aktif",
+	},
+	screenPlan: [
+		{ name: "Jelajah", role: "Katalog", order: 0 },
+		{ name: "Kustom", role: "Opsi", order: 1 },
+	],
+};
 
 const sampleDesignMd = `# MindMarket — Style Reference
 > Warm storybook on cream paper — a friendly editorial canvas where oversized Inter headlines and paper-cut characters share a sunlit, sticker-soft surface.
@@ -144,5 +185,39 @@ describe("Studio Design System", () => {
 		expect(enforced).toContain("studio-design-tokens");
 		expect(enforced).toContain("--canvas-bg: #f5f1e4");
 		expect(enforced).toContain("/api/studio/asset?id=123&cap=abc");
+	});
+
+	it("injects shared blueprint tokens deterministically", () => {
+		const enforced = enforceDesignSystemOnHtml(
+			"<html><head></head><body></body></html>",
+			null,
+			null,
+			sampleBlueprint,
+		);
+		expect(enforced).toContain("studio-blueprint-tokens");
+		expect(enforced).toContain("--bp-primary:#0f0f0f");
+	});
+
+	it("validates generated HTML against blueprint and viewport contract", () => {
+		expect(
+			validateGeneratedHtml("<html><body><p>Halo</p></body></html>", {
+				blueprint: null,
+				viewport: "mobile",
+				expectTokens: false,
+			}).length,
+		).toBeGreaterThan(0);
+		const valid = enforceDesignSystemOnHtml(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><nav>Jelajah Kustom</nav></body></html>',
+			null,
+			null,
+			sampleBlueprint,
+		);
+		expect(
+			validateGeneratedHtml(valid, {
+				blueprint: sampleBlueprint,
+				viewport: "mobile",
+				expectTokens: false,
+			}),
+		).toEqual([]);
 	});
 });

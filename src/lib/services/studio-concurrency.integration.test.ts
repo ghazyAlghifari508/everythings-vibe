@@ -91,7 +91,8 @@ vi.mock("./ai-orchestrator", () => ({
 		await new Promise((r) => setTimeout(r, 150));
 		tracker.inFlight--;
 		return {
-			firstChunk: "<html><head></head><body>Frame</body></html>",
+			firstChunk:
+				'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>Screen 0 Screen 1 Screen 2</body></html>',
 			generator: (async function* () {})(),
 		};
 	},

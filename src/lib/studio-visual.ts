@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import { type Browser, chromium } from "playwright";
 import type { StudioAssetRow } from "@/db/schema";
 import {
+	STUDIO_CAPTURE_DSF,
+	STUDIO_CAPTURE_MAX_HEIGHT,
+	STUDIO_CAPTURE_QUALITY,
+	STUDIO_CAPTURE_TIMEOUT_MS,
 	STUDIO_VISUAL_VIEWPORT_HEIGHT,
 	STUDIO_VISUAL_WIDTH,
 } from "@/lib/constants";
@@ -10,8 +14,6 @@ import { isBlockedRequestUrl } from "@/lib/render-page";
 import { extractDesignSystemTokens } from "@/lib/studio-design-system";
 
 export { STUDIO_VISUAL_WIDTH };
-const CAPTURE_TIMEOUT_MS = 30000;
-const CAPTURE_MAX_HEIGHT = 30000;
 const TAILWIND_RUNTIME = "https://cdn.tailwindcss.com";
 const LUCIDE_RUNTIME = "https://unpkg.com/lucide@latest";
 let browser: Promise<Browser> | null = null;
@@ -57,7 +59,7 @@ export async function captureStudioVisual(
 		const page = await parser.newPage();
 		await page.setContent(html, {
 			waitUntil: "domcontentloaded",
-			timeout: CAPTURE_TIMEOUT_MS,
+			timeout: STUDIO_CAPTURE_TIMEOUT_MS,
 		});
 		parsed = await page.evaluate(
 			({ assets, tailwind }) => {
@@ -105,7 +107,7 @@ export async function captureStudioVisual(
 					? STUDIO_VISUAL_VIEWPORT_HEIGHT.mobile
 					: STUDIO_VISUAL_VIEWPORT_HEIGHT.web,
 		},
-		deviceScaleFactor: 2,
+		deviceScaleFactor: STUDIO_CAPTURE_DSF,
 		serviceWorkers: "block",
 	});
 	try {
@@ -129,10 +131,10 @@ export async function captureStudioVisual(
 			}
 		});
 		const page = await context.newPage();
-		page.setDefaultTimeout(CAPTURE_TIMEOUT_MS);
+		page.setDefaultTimeout(STUDIO_CAPTURE_TIMEOUT_MS);
 		await page.setContent(`<!doctype html>${parsed.html}`, {
 			waitUntil: "load",
-			timeout: CAPTURE_TIMEOUT_MS,
+			timeout: STUDIO_CAPTURE_TIMEOUT_MS,
 		});
 		if (parsed.usesTailwind) {
 			const runtime = await fetchAsset(TAILWIND_RUNTIME);
@@ -202,7 +204,7 @@ export async function captureStudioVisual(
 				),
 			),
 		);
-		if (height < 1 || height > CAPTURE_MAX_HEIGHT)
+		if (height < 1 || height > STUDIO_CAPTURE_MAX_HEIGHT)
 			throw new Error(
 				"Dimensi frame melebihi batas rendering. Konten tidak dipotong.",
 			);
@@ -212,7 +214,7 @@ export async function captureStudioVisual(
 				: STUDIO_VISUAL_WIDTH.web;
 		const data = await page.screenshot({
 			type: "jpeg",
-			quality: 90,
+			quality: STUDIO_CAPTURE_QUALITY,
 			// fullPage is required alongside clip: a clip rect taller than the
 			// viewport is silently cropped to the viewport, so the stored image
 			// was shorter than the reported height and the frame <img> stretched

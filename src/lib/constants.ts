@@ -418,6 +418,10 @@ export const STUDIO_PREVIOUS_HTML_MAX_CHARS = 60000;
 export const STUDIO_CAPTURE_TIMEOUT_MS = 30000;
 /** Max document height accepted by visual capture. */
 export const STUDIO_CAPTURE_MAX_HEIGHT = 30000;
+/** JPEG quality for captured frame visuals. */
+export const STUDIO_CAPTURE_QUALITY = 90;
+/** Device pixel ratio for captured frame visuals. */
+export const STUDIO_CAPTURE_DSF = 2;
 /** TTL for worker job claim lease before stale recovery. */
 export const STUDIO_JOB_CLAIM_TTL_MS = 150000;
 /** Max corrective retries for a single failed frame. */

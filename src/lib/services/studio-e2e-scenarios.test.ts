@@ -9,6 +9,8 @@ import {
 	retryStudioFrame,
 } from "./studio-service";
 
+const e2eState = vi.hoisted(() => ({ labels: [] as string[] }));
+
 vi.mock("@/lib/services/ai-orchestrator", () => ({
 	selectModels: () => ["prdfy-combo"],
 	tryStreamWithFallback: async (
@@ -41,6 +43,7 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 				order,
 			}));
 			const destinations = screens.map((_, order) => `screen-${order}`);
+			e2eState.labels = screens.map((s) => s.name);
 			const planJson = JSON.stringify({
 				projectTitle: isMobile ? "Aplikasi Keuangan" : "Website Portofolio",
 				screens,
@@ -94,10 +97,11 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 <html>
 <head>
   <title>Screen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-white">
-  <nav><div class="logo">Brand</div></nav>
+  <nav><div class="logo">Brand</div><span>${e2eState.labels.join(" ")}</span></nav>
   <main><h1>Hello World</h1></main>
 </body>
 </html>`;

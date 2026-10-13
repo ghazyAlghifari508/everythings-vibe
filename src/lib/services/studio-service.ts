@@ -54,6 +54,7 @@ import {
 import {
 	enforceDesignSystemOnHtml,
 	extractDesignSystemTokens,
+	validateGeneratedHtml,
 } from "@/lib/studio-design-system";
 import {
 	type StudioDesignReference,
@@ -151,6 +152,54 @@ export interface InitialFrameContext {
 	designMd: string | null;
 	logoUrl: string | null;
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
+	blueprint: StudioDesignBlueprint | null;
+}
+
+export interface ValidatedFrameInput {
+	framePrompt: string;
+	blueprint: StudioDesignBlueprint | null;
+	viewport: StudioDesignMode;
+	expectTokens: boolean;
+	designSkillId: StudioDesignSkillId;
+	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
+	logoUrl: string | null;
+}
+
+// Generate + enforce + validasi deterministik dengan satu koreksi terbatas.
+// Melempar ScrapeError bila output tetap melanggar kontrak setelah koreksi;
+// pemanggil mempertahankan HTML lama dan menandai failed secara jujur.
+export async function generateValidatedFrameHtml(
+	input: ValidatedFrameInput,
+): Promise<string> {
+	let framePrompt = input.framePrompt;
+	for (let round = 0; round < 2; round++) {
+		const rawHtml = await generateStudioHtml(
+			framePrompt,
+			STUDIO_FRAME_MAX_TOKENS,
+			input.designSkillId,
+		);
+		const htmlCode = enforceDesignSystemOnHtml(
+			rawHtml,
+			input.dsTokens,
+			input.logoUrl,
+			input.blueprint,
+		);
+		const issues = validateGeneratedHtml(htmlCode, {
+			blueprint: input.blueprint,
+			viewport: input.viewport,
+			expectTokens: input.expectTokens,
+		});
+		if (issues.length === 0) return htmlCode;
+		if (round === 0) {
+			framePrompt = `${input.framePrompt}\n\nPrevious output violated the contract (${issues.join(" ")}). Correct these issues and return the FULL single-file HTML document.`;
+			continue;
+		}
+		throw new ScrapeError(
+			"AI_GENERATION_FAILED",
+			`Output tidak memenuhi kontrak: ${issues.join(" ")}`,
+		);
+	}
+	throw new ScrapeError("AI_GENERATION_FAILED", "Gagal generate frame.");
 }
 
 // Generate satu frame awal: klaim status independen, bounded retry hanya
@@ -172,28 +221,30 @@ export async function generateInitialFrame(
 			updatedAt: new Date(),
 		})
 		.where(eq(studioFrames.id, frame.id));
-	const framePrompt = buildStudioFramePrompt({
+	const designMode = validateStudioDesignMode(frame.viewport);
+	const basePrompt = buildStudioFramePrompt({
 		screenName: frame.name,
 		screenDescription: frame.description ?? undefined,
 		allScreens: ctx.allScreenNames,
 		projectPrompt: ctx.jobPrompt,
-		designMode: validateStudioDesignMode(frame.viewport),
+		designMode,
 		designMd: ctx.designMd,
 		logoUrl: ctx.logoUrl,
+		blueprint: ctx.blueprint,
+		activeScreen: frame.name,
 	});
 	let attempt = 0;
 	for (;;) {
 		try {
-			const rawHtml = await generateStudioHtml(
-				framePrompt,
-				STUDIO_FRAME_MAX_TOKENS,
-				ctx.designSkillId,
-			);
-			const htmlCode = enforceDesignSystemOnHtml(
-				rawHtml,
-				ctx.dsTokens,
-				ctx.logoUrl,
-			);
+			const htmlCode = await generateValidatedFrameHtml({
+				framePrompt: basePrompt,
+				blueprint: ctx.blueprint,
+				viewport: designMode,
+				expectTokens: ctx.dsTokens !== null,
+				designSkillId: ctx.designSkillId,
+				dsTokens: ctx.dsTokens,
+				logoUrl: ctx.logoUrl,
+			});
 			await db
 				.update(studioFrames)
 				.set({ htmlCode, status: "ready", error: null, updatedAt: new Date() })
@@ -702,6 +753,9 @@ export async function runStudioJobPipeline(
 			framesToProcess.length === 0 ||
 			framesToProcess.some((frame) => isTemporarySlot(frame));
 
+		let screenPlan: StudioScreenPlan | null = null;
+		let designBlueprint: StudioDesignBlueprint | null = null;
+
 		if (needsPlanning) {
 			// Planning phase
 			await db
@@ -716,8 +770,6 @@ export async function runStudioJobPipeline(
 				project.initialPageCount,
 			);
 
-			let screenPlan: StudioScreenPlan | null = null;
-			let designBlueprint: StudioDesignBlueprint | null = null;
 			let planError: string | null = null;
 
 			// Attempt 1: Standard structured planning
@@ -904,6 +956,7 @@ export async function runStudioJobPipeline(
 						designMd: project.designMd,
 						logoUrl,
 						dsTokens,
+						blueprint: designBlueprint ?? project.designBlueprint,
 					}),
 			),
 			STUDIO_FRAME_CONCURRENCY,
@@ -1209,19 +1262,20 @@ export async function addStudioFrame(
 			designMode: viewport,
 			designMd: detail.designMd,
 			logoUrl: detail.logoUrl,
+			blueprint: detail.designBlueprint,
+			activeScreen: cleanName,
 		});
 
-		const rawHtml = await generateStudioHtml(
-			framePrompt,
-			undefined,
-			detail.designSkillId,
-		);
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
-		const htmlCode = enforceDesignSystemOnHtml(
-			rawHtml,
+		const htmlCode = await generateValidatedFrameHtml({
+			framePrompt,
+			blueprint: detail.designBlueprint,
+			viewport,
+			expectTokens: dsTokens !== null,
+			designSkillId: detail.designSkillId,
 			dsTokens,
-			detail.logoUrl,
-		);
+			logoUrl: detail.logoUrl,
+		});
 
 		const [updated] = await db
 			.update(studioFrames)
@@ -1296,19 +1350,20 @@ export async function reviseStudioFrame(
 			designMd: detail.designMd,
 			logoUrl: detail.logoUrl,
 			previousHtml: frame.htmlCode ?? undefined,
+			blueprint: detail.designBlueprint,
+			activeScreen: frame.name,
 		});
 
-		const rawHtml = await generateStudioHtml(
-			framePrompt,
-			undefined,
-			detail.designSkillId,
-		);
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
-		const htmlCode = enforceDesignSystemOnHtml(
-			rawHtml,
+		const htmlCode = await generateValidatedFrameHtml({
+			framePrompt,
+			blueprint: detail.designBlueprint,
+			viewport: validateStudioDesignMode(frame.viewport),
+			expectTokens: dsTokens !== null,
+			designSkillId: detail.designSkillId,
 			dsTokens,
-			detail.logoUrl,
-		);
+			logoUrl: detail.logoUrl,
+		});
 
 		const [updated] = await db
 			.update(studioFrames)
@@ -1764,7 +1819,12 @@ export async function updateStudioPreferences(
 					},
 				);
 			}
-			htmlCode = enforceDesignSystemOnHtml(htmlCode, tokens, logoUrl);
+			htmlCode = enforceDesignSystemOnHtml(
+				htmlCode,
+				tokens,
+				logoUrl,
+				project.designBlueprint,
+			);
 			await tx
 				.update(studioFrames)
 				.set({ htmlCode, updatedAt: new Date() })
@@ -1839,6 +1899,17 @@ export async function getStudioFrameVisual(
 		"@/lib/studio-visual"
 	);
 	const hash = studioVisualHash(frame.htmlCode, frame.viewport);
+	if (frame.visualHash !== hash) {
+		await db
+			.update(studioFrames)
+			.set({ visualHash: hash, updatedAt: new Date() })
+			.where(
+				and(
+					eq(studioFrames.id, frame.id),
+					eq(studioFrames.projectId, projectId),
+				),
+			);
+	}
 	const assets = await db
 		.select()
 		.from(studioAssets)
@@ -2137,17 +2208,19 @@ async function runStudioFrameOperation(job: StudioJobRow) {
 			logoUrl,
 			previousHtml:
 				job.jobType === "revise" ? (frame.htmlCode ?? undefined) : undefined,
+			blueprint: project.designBlueprint,
+			activeScreen: name,
 		});
-		const raw = await generateStudioHtml(
-			`${prompt}\n\nUSER CHANGE INSTRUCTION: ${job.prompt}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
-			undefined,
-			project.designSkillId,
-		);
-		const htmlCode = enforceDesignSystemOnHtml(
-			raw,
-			extractDesignSystemTokens(project.designMd),
+		const dsTokens = extractDesignSystemTokens(project.designMd);
+		const htmlCode = await generateValidatedFrameHtml({
+			framePrompt: `${prompt}\n\nUSER CHANGE INSTRUCTION: ${job.prompt}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
+			blueprint: project.designBlueprint,
+			viewport: validateStudioDesignMode(frame.viewport),
+			expectTokens: dsTokens !== null,
+			designSkillId: project.designSkillId,
+			dsTokens,
 			logoUrl,
-		);
+		});
 		// Persist dalam transaksi pendek dengan deletion guard dan ownership
 		// guard. Jika project dihapus atau lease berpindah tangan selama AI
 		// bekerja, persist dilewati (no-op aman) agar tidak menimpa hasil baru.

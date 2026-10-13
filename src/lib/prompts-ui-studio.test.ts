@@ -223,5 +223,54 @@ describe("Studio Prompt Builder", () => {
 			expect(prompt).toContain("/api/studio/asset?id=logo-1");
 			expect(prompt).toContain("Primary: #000000");
 		});
+
+		it("injects the shared blueprint verbatim with precedence rules", () => {
+			const blueprint = {
+				productIdentity: {
+					productName: "Kopi",
+					targetAudience: "Umum",
+					platform: "mobile" as const,
+					visualDirection: "Hangat",
+				},
+				designTokens: {
+					primary: "#0f0f0f",
+					secondary: "#606060",
+					background: "#ffffff",
+					surface: "#f8f8f8",
+					fontFamily: "system-ui",
+					radius: 12,
+					border: "1px solid #d3d3d3",
+					elevation: "none",
+				},
+				sharedComponents: {
+					header: "Bar",
+					navigation: "Tabs",
+					buttons: "Ink",
+					inputs: "8px",
+					cards: "12px",
+					tabs: "Seg",
+					icons: "Lucide",
+				},
+				navigationContract: {
+					destinations: ["jelajah"],
+					labels: ["Jelajah"],
+					iconMapping: {},
+					ordering: ["jelajah"],
+					activeItemRule: "Highlight aktif",
+				},
+				screenPlan: [{ name: "Jelajah", role: "Katalog", order: 0 }],
+			};
+			const prompt = buildStudioFramePrompt({
+				screenName: "Jelajah",
+				projectPrompt: "Aplikasi kopi",
+				designMode: "mobile",
+				blueprint,
+				activeScreen: "Jelajah",
+			});
+			expect(prompt).toContain("SHARED_DESIGN_BLUEPRINT");
+			expect(prompt).toContain('"primary":"#0f0f0f"');
+			expect(prompt).toContain("Design precedence");
+			expect(prompt).toContain("width=device-width");
+		});
 	});
 });

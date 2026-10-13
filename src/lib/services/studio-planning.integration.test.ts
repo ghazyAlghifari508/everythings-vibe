@@ -11,6 +11,7 @@ const provider = vi.hoisted(() => ({
 	counts: [2, 3],
 	messages: [] as Array<Array<{ role: string; content: string }>>,
 	enabled: true,
+	lastLabels: [] as string[],
 }));
 vi.mock("./ai-orchestrator", () => ({
 	selectModels: () => [],
@@ -31,6 +32,7 @@ vi.mock("./ai-orchestrator", () => ({
 			viewport,
 			order,
 		}));
+		provider.lastLabels = screens.map((s) => s.name);
 		const destinations = screens.map((_, order) => `screen-${order}`);
 		return {
 			firstChunk: planning
@@ -77,7 +79,7 @@ vi.mock("./ai-orchestrator", () => ({
 							})),
 						},
 					})
-				: "<html><head></head><body>Sample</body></html>",
+				: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${provider.lastLabels.join(" ")}</body></html>`,
 			generator: (async function* () {})(),
 		};
 	},
@@ -85,6 +87,7 @@ vi.mock("./ai-orchestrator", () => ({
 beforeEach(() => {
 	provider.counts = [2, 3];
 	provider.messages = [];
+	provider.lastLabels = [];
 	provider.enabled = true;
 });
 
