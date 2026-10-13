@@ -108,6 +108,10 @@ function StudioWorkspace({
 	const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
 	const [composerLoading, setComposerLoading] = useState(false);
+	// Design-system and skill changes are independent writes; sharing the
+	// composer's busy flag made the composer look like it was sending a prompt
+	// whenever an unrelated preference was saved.
+	const [preferenceSaving, setPreferenceSaving] = useState(false);
 	const [exportingZip, setExportingZip] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [isAddFrameOpen, setIsAddFrameOpen] = useState(false);
@@ -354,6 +358,17 @@ function StudioWorkspace({
 	async function handleApplyDesignSystem(
 		reference: AttachedDesignReference,
 	): Promise<boolean> {
+		setPreferenceSaving(true);
+		try {
+			return await applyDesignSystem(reference);
+		} finally {
+			setPreferenceSaving(false);
+		}
+	}
+
+	async function applyDesignSystem(
+		reference: AttachedDesignReference,
+	): Promise<boolean> {
 		const response = await fetch("/api/studio/project", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -381,9 +396,9 @@ function StudioWorkspace({
 	// Skill changes persist immediately so every later revision reads the
 	// stored selection. The row is never updated optimistically.
 	async function handleSkillChange(skillId: StudioDesignSkillId) {
-		if (isProcessing || composerLoading || project.designSkillId === skillId)
+		if (isProcessing || preferenceSaving || project.designSkillId === skillId)
 			return;
-		setComposerLoading(true);
+		setPreferenceSaving(true);
 		setError("");
 		try {
 			const response = await fetch("/api/studio/project", {
@@ -414,7 +429,7 @@ function StudioWorkspace({
 					: "Gagal menyimpan design skill.",
 			);
 		} finally {
-			setComposerLoading(false);
+			setPreferenceSaving(false);
 		}
 	}
 
@@ -505,7 +520,7 @@ function StudioWorkspace({
 				designSystemControl={
 					<StudioDesignPicker
 						designMd={project.designMd}
-						disabled={isProcessing || composerLoading}
+						disabled={isProcessing || preferenceSaving}
 						onApply={handleApplyDesignSystem}
 					/>
 				}

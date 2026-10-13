@@ -154,6 +154,34 @@ describe("StudioComposer", () => {
 		expect(onSubmit).not.toHaveBeenCalled();
 	});
 
+	it("applies the shared minimum prompt length before sending", () => {
+		const onSubmit = vi.fn();
+		render(<StudioComposer onSubmit={onSubmit} loading={false} />);
+		const input = screen.getByRole("textbox");
+		fireEvent.change(input, { target: { value: "ubah" } });
+
+		// The server rejects a prompt below the shared minimum, so the composer
+		// must not send it and must explain the requirement instead.
+		expect(
+			screen
+				.getByRole("button", { name: /Kirim prompt/i })
+				.hasAttribute("disabled"),
+		).toBe(true);
+		expect(screen.getByText(/minimal 10 karakter/i)).toBeDefined();
+		fireEvent.keyDown(input, { key: "Enter" });
+		expect(onSubmit).not.toHaveBeenCalled();
+
+		fireEvent.change(input, {
+			target: { value: "Ubah warna tombol utama" },
+		});
+		expect(
+			screen
+				.getByRole("button", { name: /Kirim prompt/i })
+				.hasAttribute("disabled"),
+		).toBe(false);
+		expect(screen.queryByText(/minimal 10 karakter/i)).toBeNull();
+	});
+
 	it("preserves rejected drafts and prevents repeated pending submissions", async () => {
 		let settle: (accepted: boolean) => void = () => {};
 		const onSubmit = vi.fn(

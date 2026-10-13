@@ -1,5 +1,6 @@
 import { ArrowUp, FileCode2, Loader2, X } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { STUDIO_MIN_PROMPT_CHARS } from "@/lib/prompts-ui-studio";
 import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
 import { shouldSubmitComposerEvent } from "./composer-keyboard";
 import { StudioSkillSelect } from "./studio-skill-select";
@@ -49,6 +50,14 @@ export function StudioComposer({
 	const pending = useRef(false);
 	const scope = resolveComposerScope(selectedFrames.length);
 	const singleFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
+	// The server rejects prompts shorter than the shared minimum, so the
+	// composer applies the same rule client-side and explains it instead of
+	// letting the request fail with a generic payload error.
+	const trimmedPrompt = prompt.trim();
+	const isTooShort =
+		trimmedPrompt.length > 0 && trimmedPrompt.length < STUDIO_MIN_PROMPT_CHARS;
+	const canSubmit =
+		trimmedPrompt.length >= STUDIO_MIN_PROMPT_CHARS && !loading && !sending;
 
 	useEffect(() => {
 		const input = inputRef.current;
@@ -59,7 +68,8 @@ export function StudioComposer({
 
 	async function submit() {
 		const trimmed = prompt.trim();
-		if (!trimmed || loading || pending.current) return;
+		if (trimmed.length < STUDIO_MIN_PROMPT_CHARS || loading || pending.current)
+			return;
 		pending.current = true;
 		setSending(true);
 		setError("");
@@ -140,6 +150,7 @@ export function StudioComposer({
 						value={prompt}
 						rows={2}
 						aria-label="Instruksi desain"
+						aria-describedby={isTooShort ? "studio-composer-hint" : undefined}
 						onChange={(event) => setPrompt(event.target.value)}
 						onKeyDown={(event) => {
 							if (shouldSubmitComposerEvent(event)) {
@@ -159,7 +170,7 @@ export function StudioComposer({
 					/>
 					<button
 						type="submit"
-						disabled={loading || sending || !prompt.trim()}
+						disabled={!canSubmit}
 						aria-label="Kirim prompt"
 						title="Kirim prompt (Enter)"
 						style={{ background: "var(--btn-bg)", color: "var(--btn-text)" }}
@@ -175,6 +186,11 @@ export function StudioComposer({
 				{error ? (
 					<p role="alert" className="text-xs text-crimson">
 						{error}
+					</p>
+				) : null}
+				{isTooShort ? (
+					<p id="studio-composer-hint" className="text-xs text-fog">
+						{`Tulis minimal ${STUDIO_MIN_PROMPT_CHARS} karakter agar instruksinya jelas.`}
 					</p>
 				) : null}
 			</form>
