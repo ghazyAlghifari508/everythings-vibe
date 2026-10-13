@@ -7,7 +7,7 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { AlertCircle, FolderOpen, User, X } from "lucide-react";
+import { FolderOpen, User, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import type { AttachedDesignReference } from "@/components/design/start-with-design-modal";
@@ -238,6 +238,7 @@ function StudioPage() {
 		: null;
 
 	async function submit() {
+		if (loading) return;
 		if (!prompt.trim()) {
 			setError("Ceritakan UI yang mau dibuat dulu.");
 			textareaRef.current?.focus();
@@ -396,16 +397,6 @@ function StudioPage() {
 						onSubmit={() => void submit()}
 						textareaRef={textareaRef}
 					/>
-
-					{error ? (
-						<div
-							role="alert"
-							className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-400"
-						>
-							<AlertCircle size={16} className="shrink-0" aria-hidden />
-							<span>{error}</span>
-						</div>
-					) : null}
 
 					<section
 						aria-label="Brief siap pakai"

@@ -58,7 +58,7 @@ export function StudioLaunchComposer({
 
 	function handleSubmit(event: FormEvent) {
 		event.preventDefault();
-		if (canSubmit) onSubmit();
+		onSubmit();
 	}
 
 	return (

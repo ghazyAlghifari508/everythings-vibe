@@ -123,7 +123,7 @@ Layar yang direncanakan (3 halaman, saling terhubung):
 2. Proyek: galeri 6 studi kasus dengan cover, peran, stack, dan hasil terukur (misal "checkout 34% lebih cepat", "LCP 1,8 detik"); filter berdasarkan stack dan tipe (SaaS, E-commerce, Dashboard); setiap kartu membuka detail berisi masalah, pendekatan, tangkapan layar bagian penting, dan pelajaran.
 3. Tentang + kontak: cerita karier ringkas, pengalaman kerja timeline, layanan yang ditawarkan (freelance, konsultasi performa, code review), formulir kontak (nama, email, budget, kebutuhan) dengan validasi, dan tautan GitHub/LinkedIn/email.
 
-Fitur utama: filter proyek tanpa reload, mode terang/gelap, navigasi keyboard penuh, dan CV PDF yang selalu versi terbaru.
+Fitur utama: filter proyek tanpa reload, mode terang/gelap, navigasi keyboard penuh, dan berkas CV yang selalu versi terbaru.
 Contoh data: proyek "Dashboard Logistik KirimCepat" (React + Go, 40 ribu pengguna), "Toko Kopi Langganan" (checkout 1 langkah), testimoni dari CTO dan product manager dengan nama dan perusahaan asli yang bisa diverifikasi.
 Kondisi UI: state kosong filter dengan tombol reset, error kirim formulir dengan pesan spesifik per field, sukses kirim dengan estimasi respons 2 hari kerja, dan fallback saat gambar gagal dimuat.
 Audiens: hiring manager dan klien yang menilai dalam 30 detik pertama; hero langsung menjawab stack, pengalaman, dan bukti hasil tanpa scroll panjang.`,
