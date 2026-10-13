@@ -15,6 +15,26 @@ import {
 } from "./prompts-ui-studio";
 
 describe("Studio Prompt Builder", () => {
+	it("enforces the requested initial cardinality and platform without truncating output", () => {
+		const plan = (count: number) =>
+			JSON.stringify({
+				projectTitle: "Sample",
+				screens: Array.from({ length: count }, (_, order) => ({
+					name: `Screen ${order}`,
+					description: "Sample",
+					viewport: "web",
+					order,
+				})),
+			});
+		expect(parseStudioScreenPlan(plan(2), "web", 3).ok).toBe(false);
+		expect(parseStudioScreenPlan(plan(3), "web", 3).ok).toBe(true);
+		expect(parseStudioScreenPlan(plan(6), "web", 5).ok).toBe(false);
+		expect(parseStudioScreenPlan(plan(3), "mobile", 3).ok).toBe(false);
+		expect(parseStudioScreenPlan(plan(8)).ok).toBe(true);
+		expect(
+			buildStudioPlanningPrompt("Sample application", "web", null, 1),
+		).toContain("exactly 1");
+	});
 	it("instructs single-file Tailwind CDN output with Indonesian copy", () => {
 		expect(STUDIO_SYSTEM_PROMPT).toContain("cdn.tailwindcss.com");
 		expect(STUDIO_SYSTEM_PROMPT).toContain("single-file");

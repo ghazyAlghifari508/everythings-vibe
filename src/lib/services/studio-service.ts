@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertStudioAssetRow,
@@ -40,6 +40,7 @@ import {
 } from "@/lib/services/ai-orchestrator";
 import { issueStudioAssetCapability } from "@/lib/studio-asset-capability";
 import { resolveStudioDesignReference } from "@/lib/studio-design-reference.server";
+import { studioSkillSystemGuidance } from "@/lib/studio-design-skill-registry.server";
 import {
 	enforceDesignSystemOnHtml,
 	extractDesignSystemTokens,
@@ -240,7 +241,11 @@ export async function createStudioProject(
 		logoUrl,
 	});
 
-	const htmlCode = await generateStudioHtml(userPrompt);
+	const htmlCode = await generateStudioHtml(
+		userPrompt,
+		undefined,
+		options.designSkillId,
+	);
 
 	const [project] = await db
 		.insert(studioProjects)
@@ -309,7 +314,7 @@ export async function createStudioProjectWithJob(
 		checked.prompt.slice(0, 80) ||
 		"Studio tanpa judul";
 
-	// Deduplication: if the user rapidly retried with identical prompt and mode within 10s
+	const validatedLogo = input.logo ? validateAndProcessLogo(input.logo) : null;
 	const tenSecondsAgo = new Date(Date.now() - 10_000);
 	const [recentJob] = await db
 		.select({
@@ -322,6 +327,19 @@ export async function createStudioProjectWithJob(
 			and(
 				eq(studioJobs.userId, userId),
 				eq(studioJobs.prompt, checked.prompt),
+				eq(studioProjects.userId, userId),
+				eq(studioProjects.designMode, designMode),
+				eq(studioProjects.designSkillId, options.designSkillId),
+				eq(studioProjects.initialPageCount, options.initialPageCount),
+				cleanDesignMd === null
+					? isNull(studioProjects.designMd)
+					: eq(studioProjects.designMd, cleanDesignMd),
+				resolved.designReference === null
+					? isNull(studioProjects.designReference)
+					: eq(studioProjects.designReference, resolved.designReference),
+				validatedLogo
+					? sql`exists (select 1 from ${studioAssets} where ${studioAssets.id} = ${studioProjects.logoAssetId} and ${studioAssets.userId} = ${userId} and ${studioAssets.data} = ${validatedLogo.data} and ${studioAssets.mimeType} = ${validatedLogo.mimeType})`
+					: isNull(studioProjects.logoAssetId),
 				gte(studioJobs.createdAt, tenSecondsAgo),
 				inArray(studioJobs.status, ["queued", "planning", "generating"]),
 			),
@@ -331,8 +349,6 @@ export async function createStudioProjectWithJob(
 	if (recentJob) {
 		return { project: recentJob.project, job: recentJob.job };
 	}
-
-	const validatedLogo = input.logo ? validateAndProcessLogo(input.logo) : null;
 
 	const { project, job } = await db.transaction(async (tx) => {
 		let logoAssetId: string | null = null;
@@ -478,6 +494,7 @@ export async function runStudioJobPipeline(
 				job.prompt,
 				designMode,
 				project.designMd,
+				project.initialPageCount,
 			);
 
 			let screenPlan: StudioScreenPlan | null = null;
@@ -488,7 +505,12 @@ export async function runStudioJobPipeline(
 				const { generator, firstChunk } = await tryStreamWithFallback(
 					selectModels(),
 					[
-						{ role: "system", content: STUDIO_PLAN_SYSTEM_PROMPT },
+						{
+							role: "system",
+							content:
+								STUDIO_PLAN_SYSTEM_PROMPT +
+								studioSkillSystemGuidance(project.designSkillId ?? "none"),
+						},
 						{ role: "user", content: planPrompt },
 					],
 					undefined,
@@ -496,7 +518,11 @@ export async function runStudioJobPipeline(
 				);
 				let planRaw = firstChunk;
 				for await (const chunk of generator) planRaw += chunk;
-				const parsed = parseStudioScreenPlan(planRaw, designMode);
+				const parsed = parseStudioScreenPlan(
+					planRaw,
+					designMode,
+					project.initialPageCount,
+				);
 				if (parsed.ok) {
 					screenPlan = parsed.plan;
 				} else {
@@ -510,11 +536,16 @@ export async function runStudioJobPipeline(
 			// Attempt 2: Bounded corrective retry if attempt 1 was malformed
 			if (!screenPlan) {
 				try {
-					const correctivePrompt = `Previous plan output was invalid JSON (${planError ?? "format error"}). Output ONLY standard JSON object without markdown or commentary: { "projectTitle": string, "screens": [{ "name": string, "description": string, "viewport": "${designMode}", "order": number }] } for the following user request: "${job.prompt.trim()}"`;
+					const correctivePrompt = `${planPrompt}\n\nPrevious plan violated the contract (${planError ?? "format error"}). Correct the plan and return ONLY valid JSON matching the required count, platform and order.`;
 					const { generator, firstChunk } = await tryStreamWithFallback(
 						selectModels(),
 						[
-							{ role: "system", content: STUDIO_PLAN_SYSTEM_PROMPT },
+							{
+								role: "system",
+								content:
+									STUDIO_PLAN_SYSTEM_PROMPT +
+									studioSkillSystemGuidance(project.designSkillId ?? "none"),
+							},
 							{ role: "user", content: correctivePrompt },
 						],
 						undefined,
@@ -522,7 +553,11 @@ export async function runStudioJobPipeline(
 					);
 					let planRaw = firstChunk;
 					for await (const chunk of generator) planRaw += chunk;
-					const parsed = parseStudioScreenPlan(planRaw, designMode);
+					const parsed = parseStudioScreenPlan(
+						planRaw,
+						designMode,
+						project.initialPageCount,
+					);
 					if (parsed.ok) {
 						screenPlan = parsed.plan;
 					}
@@ -558,21 +593,44 @@ export async function runStudioJobPipeline(
 					.where(eq(studioProjects.id, projectId));
 			}
 
-			// Persist planned frames
-			for (const screen of screenPlan.screens) {
-				const [inserted] = await db
+			const planned = screenPlan.screens;
+			const persisted = await db.transaction(async (tx) => {
+				const [owned] = await tx
+					.select()
+					.from(studioProjects)
+					.where(
+						and(
+							eq(studioProjects.id, projectId),
+							eq(studioProjects.userId, userId),
+						),
+					)
+					.for("update");
+				if (!owned)
+					throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+				const existing = await tx
+					.select()
+					.from(studioFrames)
+					.where(eq(studioFrames.projectId, projectId))
+					.orderBy(asc(studioFrames.order));
+				if (existing.length) return existing;
+				return tx
 					.insert(studioFrames)
-					.values({
-						projectId,
-						name: screen.name.slice(0, 100),
-						description: screen.description.slice(0, 500),
-						viewport: screen.viewport,
-						order: screen.order,
-						status: "queued",
-					} satisfies InsertStudioFrameRow)
+					.values(
+						planned.map(
+							(screen) =>
+								({
+									projectId,
+									name: screen.name.slice(0, 100),
+									description: screen.description.slice(0, 500),
+									viewport: screen.viewport,
+									order: screen.order,
+									status: "queued",
+								}) satisfies InsertStudioFrameRow,
+						),
+					)
 					.returning();
-				if (inserted) framesToProcess.push(inserted);
-			}
+			});
+			framesToProcess.push(...persisted);
 		}
 
 		// Generating phase
@@ -608,7 +666,11 @@ export async function runStudioJobPipeline(
 					logoUrl,
 				});
 
-				const rawHtml = await generateStudioHtml(framePrompt);
+				const rawHtml = await generateStudioHtml(
+					framePrompt,
+					undefined,
+					project.designSkillId,
+				);
 				const htmlCode = enforceDesignSystemOnHtml(rawHtml, dsTokens, logoUrl);
 
 				await db
@@ -711,7 +773,11 @@ export async function reviseStudioProject(
 		logoUrl: detail.logoUrl,
 	});
 
-	const htmlCode = await generateStudioHtml(userPrompt);
+	const htmlCode = await generateStudioHtml(
+		userPrompt,
+		undefined,
+		detail.designSkillId,
+	);
 	const nextVersion = (detail.latest?.version ?? 0) + 1;
 
 	const [revision] = await db
@@ -914,7 +980,11 @@ export async function addStudioFrame(
 			logoUrl: detail.logoUrl,
 		});
 
-		const rawHtml = await generateStudioHtml(framePrompt);
+		const rawHtml = await generateStudioHtml(
+			framePrompt,
+			undefined,
+			detail.designSkillId,
+		);
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
 		const htmlCode = enforceDesignSystemOnHtml(
 			rawHtml,
@@ -997,7 +1067,11 @@ export async function reviseStudioFrame(
 			previousHtml: frame.htmlCode ?? undefined,
 		});
 
-		const rawHtml = await generateStudioHtml(framePrompt);
+		const rawHtml = await generateStudioHtml(
+			framePrompt,
+			undefined,
+			detail.designSkillId,
+		);
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
 		const htmlCode = enforceDesignSystemOnHtml(
 			rawHtml,
@@ -1824,6 +1898,8 @@ async function runStudioFrameOperation(job: StudioJobRow) {
 			});
 			const raw = await generateStudioHtml(
 				`${prompt}\n\nUSER CHANGE INSTRUCTION: ${job.prompt}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
+				undefined,
+				project.designSkillId,
 			);
 			const htmlCode = enforceDesignSystemOnHtml(
 				raw,
@@ -1898,11 +1974,16 @@ async function runStudioFrameOperation(job: StudioJobRow) {
 export async function generateStudioHtml(
 	prompt: string,
 	maxTokens = 12_000,
+	designSkillId: StudioDesignSkillId = "none",
 ): Promise<string> {
 	const { generator, firstChunk } = await tryStreamWithFallback(
 		selectModels(),
 		[
-			{ role: "system", content: STUDIO_SYSTEM_PROMPT },
+			{
+				role: "system",
+				content:
+					STUDIO_SYSTEM_PROMPT + studioSkillSystemGuidance(designSkillId),
+			},
 			{ role: "user", content: prompt },
 		],
 		undefined,
