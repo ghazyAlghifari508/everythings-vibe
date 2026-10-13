@@ -32,6 +32,8 @@ import type {
 } from "@/db/schema";
 import { requireUserServer } from "@/lib/session";
 import { exportProjectAsZip } from "@/lib/studio-export";
+import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
+import { STUDIO_DESIGN_PRESETS } from "@/lib/studio-presets";
 import { useUIStore } from "@/store";
 
 export interface StudioDetailLoaderData {
@@ -365,6 +367,59 @@ function StudioWorkspace({
 		return true;
 	}
 
+	// Skill changes persist immediately so every later revision reads the
+	// stored selection. The row is never updated optimistically.
+	async function handleSkillChange(skillId: StudioDesignSkillId) {
+		if (isProcessing || composerLoading || project.designSkillId === skillId)
+			return;
+		setComposerLoading(true);
+		setError("");
+		try {
+			const response = await fetch("/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "preferences",
+					projectId: project.id,
+					designSkillId: skillId,
+				}),
+			});
+			if (!response.ok) {
+				const data: unknown = await response.json().catch(() => null);
+				throw new Error(
+					typeof data === "object" &&
+						data !== null &&
+						"error" in data &&
+						typeof data.error === "string"
+						? data.error
+						: "Gagal menyimpan design skill.",
+				);
+			}
+			await syncProjectStatus();
+		} catch (failure) {
+			setError(
+				failure instanceof Error
+					? failure.message
+					: "Gagal menyimpan design skill.",
+			);
+		} finally {
+			setComposerLoading(false);
+		}
+	}
+
+	const storedReferenceLabel = (() => {
+		const reference = project.designReference;
+		if (reference?.kind === "theme") {
+			const preset = STUDIO_DESIGN_PRESETS.find(
+				(entry) => entry.id === reference.id,
+			);
+			return preset ? `${preset.name}` : null;
+		}
+		if (reference?.kind === "custom") return reference.filename;
+		if (project.designMd) return "Referensi desain";
+		return null;
+	})();
+
 	async function handleRetryFrame(frameId: string) {
 		try {
 			const response = await fetch("/api/studio/frame", {
@@ -468,6 +523,9 @@ function StudioWorkspace({
 					}}
 					onSubmit={handleComposerSubmit}
 					loading={composerLoading}
+					designSkillId={project.designSkillId}
+					onDesignSkillChange={handleSkillChange}
+					referenceLabel={storedReferenceLabel}
 				/>
 			</div>
 

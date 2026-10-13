@@ -1,6 +1,8 @@
-import { ArrowUp, Loader2, X } from "lucide-react";
+import { ArrowUp, FileCode2, Loader2, X } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
 import { shouldSubmitComposerEvent } from "./composer-keyboard";
+import { StudioSkillSelect } from "./studio-skill-select";
 
 export type StudioComposerScope = "add" | "revise" | "project";
 
@@ -13,6 +15,9 @@ export interface StudioComposerProps {
 	className?: string;
 	selectedFrames?: { id: string; name: string }[];
 	onRemoveFrame?: (id: string) => void;
+	designSkillId?: StudioDesignSkillId;
+	onDesignSkillChange?: (skillId: StudioDesignSkillId) => void;
+	referenceLabel?: string | null;
 }
 
 /**
@@ -33,6 +38,9 @@ export function StudioComposer({
 	className = "",
 	selectedFrames = [],
 	onRemoveFrame,
+	designSkillId,
+	onDesignSkillChange,
+	referenceLabel,
 }: StudioComposerProps) {
 	const [prompt, setPrompt] = useState("");
 	const [sending, setSending] = useState(false);
@@ -107,6 +115,23 @@ export function StudioComposer({
 								</button>
 							</span>
 						))}
+					</div>
+				) : null}
+				{onDesignSkillChange || referenceLabel ? (
+					<div className="flex flex-wrap items-center gap-2">
+						{onDesignSkillChange && designSkillId ? (
+							<StudioSkillSelect
+								value={designSkillId}
+								onChange={onDesignSkillChange}
+								disabled={loading || sending}
+							/>
+						) : null}
+						{referenceLabel ? (
+							<span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-1 text-xs text-mist">
+								<FileCode2 size={12} aria-hidden className="shrink-0" />
+								<span className="truncate">{referenceLabel}</span>
+							</span>
+						) : null}
 					</div>
 				) : null}
 				<div className="flex items-end gap-2">
