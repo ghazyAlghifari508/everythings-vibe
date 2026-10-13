@@ -425,7 +425,10 @@ export const StudioCanvas = memo(function StudioCanvas({
 			    status, never from a timer or an invented stage sequence. Kept in
 			    the bottom-left corner, clear of the composer and zoom controls. */}
 			{frames.length === 0 && activeJob?.status === "planning" && (
-				<p className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-full border border-graphite bg-obsidian px-3 py-1 text-[11px] text-fog">
+				<p
+					className="pointer-events-none absolute left-3 z-20 rounded-full border border-graphite bg-obsidian px-3 py-1 text-xs text-fog"
+					style={{ bottom: canvasZoomRowBottomCss() }}
+				>
 					Menyusun rencana layar
 				</p>
 			)}

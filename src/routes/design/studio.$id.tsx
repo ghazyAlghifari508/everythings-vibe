@@ -560,18 +560,21 @@ function StudioWorkspace({
 				onSubmit={handleAddFrame}
 			/>
 
-			{/* Error Toast if any */}
+			{/* Error banner sits below the floating header band so it never
+			    collides with the header controls. */}
 			{error && (
 				<div
 					role="alert"
-					className="absolute top-16 left-1/2 z-40 flex w-[calc(100%-24px)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-xl border border-crimson bg-obsidian px-4 py-2.5 text-sm text-crimson"
+					className="absolute left-1/2 z-40 flex w-[calc(100%-24px)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-xl border border-crimson bg-obsidian px-4 py-2.5 text-sm text-crimson"
+					style={{ top: "calc(4rem + env(safe-area-inset-top))" }}
 				>
-					<AlertCircle size={15} />
+					<AlertCircle size={15} aria-hidden />
 					<span>{error}</span>
 					<button
 						type="button"
 						onClick={() => setError("")}
-						className="ml-2 text-red-400 hover:text-snow"
+						aria-label="Tutup pesan error"
+						className="ml-2 rounded px-1.5 py-0.5 text-xs font-medium text-crimson hover:bg-crimson/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow"
 					>
 						Tutup
 					</button>

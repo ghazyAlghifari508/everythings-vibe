@@ -233,7 +233,7 @@ export const StudioFrame = memo(function StudioFrame({
 						}}
 						aria-label={`Coba lagi generate ${frame.name}`}
 						title={`Coba lagi generate ${frame.name}`}
-						className="inline-flex shrink-0 items-center gap-1 rounded-md border border-crimson/40 px-1.5 py-0.5 text-[11px] font-medium text-crimson transition-colors hover:bg-crimson/10"
+						className="inline-flex shrink-0 items-center gap-1 rounded-md border border-crimson/40 px-1.5 py-0.5 text-xs font-medium text-crimson transition-colors hover:bg-crimson/10"
 					>
 						<RotateCcw size={11} aria-hidden />
 						<span>Coba lagi</span>
