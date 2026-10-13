@@ -2,6 +2,10 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { studioFrames, studioJobs, studioProjects, users } from "@/db/schema";
+import {
+	recoverStalledStudioJobs,
+	refreshStudioJobLease,
+} from "./studio-service";
 
 async function createOwner(): Promise<string> {
 	const userId = crypto.randomUUID();
@@ -92,5 +96,71 @@ describe("p2 persistence schema", () => {
 		await db.delete(studioJobs).where(eq(studioJobs.projectId, project.id));
 		await db.delete(studioProjects).where(eq(studioProjects.id, project.id));
 		await db.delete(users).where(eq(users.id, userId));
+	});
+});
+
+describe("p2 worker recovery", () => {
+	async function seedJob(status: string, leaseExpiresAt: Date | null) {
+		const userId = await createOwner();
+		const [project] = await db
+			.insert(studioProjects)
+			.values({ userId, title: "Pulih" })
+			.returning();
+		const [job] = await db
+			.insert(studioJobs)
+			.values({
+				userId,
+				projectId: project.id,
+				prompt: "Brief aplikasi yang cukup panjang untuk validasi",
+				status,
+				leaseExpiresAt,
+				claimedBy: leaseExpiresAt ? "worker-mati" : null,
+			})
+			.returning();
+		return { userId, job };
+	}
+
+	it("mengembalikan lease kedaluwarsa ke queued tanpa menyentuh lease segar", async () => {
+		const stalled = await seedJob("generating", new Date(Date.now() - 1000));
+		const fresh = await seedJob("generating", new Date(Date.now() + 60000));
+		const done = await seedJob("completed", new Date(Date.now() - 1000));
+		try {
+			const recovered = await recoverStalledStudioJobs();
+			expect(recovered).toBeGreaterThanOrEqual(1);
+			const [s] = await db
+				.select()
+				.from(studioJobs)
+				.where(eq(studioJobs.id, stalled.job.id));
+			expect(s.status).toBe("queued");
+			expect(s.claimedBy).toBeNull();
+			const [f] = await db
+				.select()
+				.from(studioJobs)
+				.where(eq(studioJobs.id, fresh.job.id));
+			expect(f.status).toBe("generating");
+			expect(f.claimedBy).toBe("worker-mati");
+			const [d] = await db
+				.select()
+				.from(studioJobs)
+				.where(eq(studioJobs.id, done.job.id));
+			expect(d.status).toBe("completed");
+		} finally {
+			await db.delete(users).where(eq(users.id, stalled.userId));
+			await db.delete(users).where(eq(users.id, fresh.userId));
+			await db.delete(users).where(eq(users.id, done.userId));
+		}
+	});
+
+	it("refresh lease hanya berhasil untuk pemiliknya", async () => {
+		const { userId, job } = await seedJob(
+			"generating",
+			new Date(Date.now() + 60000),
+		);
+		try {
+			expect(await refreshStudioJobLease(job.id, "worker-mati")).toBe(true);
+			expect(await refreshStudioJobLease(job.id, "worker-lain")).toBe(false);
+		} finally {
+			await db.delete(users).where(eq(users.id, userId));
+		}
 	});
 });

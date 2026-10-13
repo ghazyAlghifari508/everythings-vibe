@@ -144,6 +144,50 @@ export async function claimStudioJob(
 	return claimed ?? null;
 }
 
+// Perpanjang lease klaim milik worker ini. Hanya berhasil bila job masih
+// dipegang worker yang sama; mengembalikan true bila lease diperpanjang.
+export async function refreshStudioJobLease(
+	jobId: string,
+	workerId: string,
+	ttlMs: number = STUDIO_JOB_CLAIM_TTL_MS,
+): Promise<boolean> {
+	const now = new Date();
+	const [refreshed] = await db
+		.update(studioJobs)
+		.set({
+			leaseExpiresAt: new Date(now.getTime() + ttlMs),
+			updatedAt: now,
+		})
+		.where(and(eq(studioJobs.id, jobId), eq(studioJobs.claimedBy, workerId)))
+		.returning({ id: studioJobs.id });
+	return refreshed !== undefined;
+}
+
+// Pulihkan jobs yang diklaim worker yang mati: lease kedaluwarsa
+// dikembalikan ke queued dan klaim dibersihkan tanpa duplikasi kerja.
+// Mengembalikan jumlah jobs yang dipulihkan.
+export async function recoverStalledStudioJobs(
+	now: Date = new Date(),
+): Promise<number> {
+	const recovered = await db
+		.update(studioJobs)
+		.set({
+			status: "queued",
+			claimedBy: null,
+			claimedAt: null,
+			leaseExpiresAt: null,
+			updatedAt: now,
+		})
+		.where(
+			and(
+				inArray(studioJobs.status, ["queued", "planning", "generating"]),
+				sql`${studioJobs.leaseExpiresAt} < ${now.toISOString()}::timestamptz`,
+			),
+		)
+		.returning({ id: studioJobs.id });
+	return recovered.length;
+}
+
 export interface InitialFrameContext {
 	frame: StudioFrameRow;
 	jobPrompt: string;
@@ -153,6 +197,7 @@ export interface InitialFrameContext {
 	logoUrl: string | null;
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
 	blueprint: StudioDesignBlueprint | null;
+	lease?: { jobId: string; workerId: string };
 }
 
 export interface ValidatedFrameInput {
@@ -249,6 +294,16 @@ export async function generateInitialFrame(
 				.update(studioFrames)
 				.set({ htmlCode, status: "ready", error: null, updatedAt: new Date() })
 				.where(eq(studioFrames.id, frame.id));
+			if (ctx.lease) {
+				refreshStudioJobLease(ctx.lease.jobId, ctx.lease.workerId).catch(
+					(err) => {
+						console.warn(
+							"[studio] lease heartbeat failed",
+							err instanceof Error ? err.message : err,
+						);
+					},
+				);
+			}
 			return { ok: true, htmlCode };
 		} catch (frameErr) {
 			const retryable = isRetryableProviderError(frameErr);
@@ -711,6 +766,7 @@ export async function runStudioJobPipeline(
 		const workerId = crypto.randomUUID();
 		const claimed = await claimStudioJob(job.id, userId, workerId);
 		if (!claimed) return;
+		const pipelineStart = Date.now();
 
 		const [project] = await db
 			.select()
@@ -758,6 +814,7 @@ export async function runStudioJobPipeline(
 
 		if (needsPlanning) {
 			// Planning phase
+			const planningStart = Date.now();
 			await db
 				.update(studioJobs)
 				.set({ status: "planning", updatedAt: new Date() })
@@ -850,6 +907,7 @@ export async function runStudioJobPipeline(
 					.set({
 						status: "failed",
 						error: finalError,
+						finishedAt: new Date(),
 						updatedAt: new Date(),
 					})
 					.where(eq(studioJobs.id, jobId));
@@ -935,15 +993,32 @@ export async function runStudioJobPipeline(
 			});
 			framesToProcess.length = 0;
 			framesToProcess.push(...persisted);
+			// Lease sempat berjalan selama planning: perpanjang dan pastikan
+			// worker ini masih pemiliknya sebelum lanjut ke fase generate.
+			const stillOwnerAfterPlanning = await refreshStudioJobLease(
+				jobId,
+				workerId,
+			);
+			if (!stillOwnerAfterPlanning) return;
+			console.info(
+				JSON.stringify({
+					scope: "studio",
+					stage: "planning",
+					durationMs: Date.now() - planningStart,
+					projectId,
+					jobId,
+				}),
+			);
 		}
 
 		// Generating phase
 		await db
 			.update(studioJobs)
 			.set({ status: "generating", updatedAt: new Date() })
-			.where(eq(studioJobs.id, jobId));
+			.where(and(eq(studioJobs.id, jobId), eq(studioJobs.claimedBy, workerId)));
 
 		const allScreenNames = framesToProcess.map((f) => f.name);
+		const framesStart = Date.now();
 
 		const frameResults = await runWithConcurrency(
 			framesToProcess.map(
@@ -957,6 +1032,7 @@ export async function runStudioJobPipeline(
 						logoUrl,
 						dsTokens,
 						blueprint: designBlueprint ?? project.designBlueprint,
+						lease: { jobId, workerId },
 					}),
 			),
 			STUDIO_FRAME_CONCURRENCY,
@@ -970,6 +1046,36 @@ export async function runStudioJobPipeline(
 				if (!firstReadyHtml) firstReadyHtml = result.htmlCode;
 			}
 		}
+
+		const failedCount = frameResults.length - readyCount;
+		console.info(
+			JSON.stringify({
+				scope: "studio",
+				stage: "frames",
+				durationMs: Date.now() - framesStart,
+				projectId,
+				jobId,
+				ready: readyCount,
+				failed: failedCount,
+				concurrency: STUDIO_FRAME_CONCURRENCY,
+			}),
+		);
+
+		// Ownership + deletion guard sebelum finalisasi: jangan finalisasi bila
+		// lease berpindah tangan atau project dihapus selama generate.
+		const stillOwner = await refreshStudioJobLease(jobId, workerId);
+		if (!stillOwner) return;
+		const [projectStillThere] = await db
+			.select({ id: studioProjects.id })
+			.from(studioProjects)
+			.where(
+				and(
+					eq(studioProjects.id, projectId),
+					eq(studioProjects.userId, userId),
+				),
+			)
+			.limit(1);
+		if (!projectStillThere) return;
 
 		if (readyCount > 0 && firstReadyHtml) {
 			const existingRev = await db
@@ -992,18 +1098,35 @@ export async function runStudioJobPipeline(
 				.set({
 					status:
 						readyCount === framesToProcess.length ? "completed" : "partial",
+					finishedAt: new Date(),
 					updatedAt: new Date(),
 				})
-				.where(eq(studioJobs.id, jobId));
+				.where(
+					and(eq(studioJobs.id, jobId), eq(studioJobs.claimedBy, workerId)),
+				);
+			console.info(
+				JSON.stringify({
+					scope: "studio",
+					stage: "complete",
+					durationMs: Date.now() - pipelineStart,
+					projectId,
+					jobId,
+					ready: readyCount,
+					failed: failedCount,
+				}),
+			);
 		} else {
 			await db
 				.update(studioJobs)
 				.set({
 					status: "failed",
 					error: "Semua frame gagal digenerate.",
+					finishedAt: new Date(),
 					updatedAt: new Date(),
 				})
-				.where(eq(studioJobs.id, jobId));
+				.where(
+					and(eq(studioJobs.id, jobId), eq(studioJobs.claimedBy, workerId)),
+				);
 		}
 
 		await db
@@ -1015,7 +1138,12 @@ export async function runStudioJobPipeline(
 			pipelineErr instanceof Error ? pipelineErr.message : "Pipeline error";
 		await db
 			.update(studioJobs)
-			.set({ status: "failed", error: errorMsg, updatedAt: new Date() })
+			.set({
+				status: "failed",
+				error: errorMsg,
+				finishedAt: new Date(),
+				updatedAt: new Date(),
+			})
 			.where(eq(studioJobs.id, jobId));
 	} finally {
 		activeStudioJobs.delete(jobId);
@@ -1173,6 +1301,21 @@ export async function getStudioProjectDetail(
 		.limit(1);
 
 	const activeJob = jobs[0] ?? null;
+	if (
+		activeJob &&
+		(activeJob.status === "queued" ||
+			activeJob.status === "planning" ||
+			activeJob.status === "generating")
+	) {
+		try {
+			await recoverStalledStudioJobs();
+		} catch (err) {
+			console.warn(
+				"[studio] stall recovery failed",
+				err instanceof Error ? err.message : err,
+			);
+		}
+	}
 	const pendingOperations = await db
 		.select()
 		.from(studioJobs)
