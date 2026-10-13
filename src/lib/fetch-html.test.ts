@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	DESKTOP_WIDTH,
+	decodeHtmlEntities,
 	extractPageTitle,
 	forceDesktopViewport,
 	stylesheetHrefs,
@@ -45,5 +46,35 @@ describe("fetch-html helpers", () => {
 			),
 		).toBe("Linear — App");
 		expect(extractPageTitle(`<html><head></head></html>`)).toBeNull();
+	});
+
+	it("decodes entities in the page title without HTML injection", () => {
+		expect(
+			extractPageTitle(
+				`<html><head><title>Riset &amp; Pengembangan</title></head></html>`,
+			),
+		).toBe("Riset & Pengembangan");
+		expect(
+			extractPageTitle(
+				`<html><head><title>A &lt; B &gt; C &quot;D&quot;</title></head></html>`,
+			),
+		).toBe('A < B > C "D"');
+		expect(
+			extractPageTitle(
+				`<html><head><title>Hak &#169; 2026</title></head></html>`,
+			),
+		).toBe("Hak © 2026");
+		expect(
+			extractPageTitle(
+				`<html><head><title>Em &#x2014; Dash</title></head></html>`,
+			),
+		).toBe("Em — Dash");
+	});
+
+	it("decodes entities generically and leaves unknowns intact", () => {
+		expect(decodeHtmlEntities("A &amp; B")).toBe("A & B");
+		expect(decodeHtmlEntities("&#65;&#x42;")).toBe("AB");
+		expect(decodeHtmlEntities("Fish &chips; here")).toBe("Fish &chips; here");
+		expect(decodeHtmlEntities("plain text")).toBe("plain text");
 	});
 });

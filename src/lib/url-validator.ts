@@ -87,6 +87,8 @@ export function parseAndValidateFormat(raw: string): URL {
 	if (url.protocol !== "http:" && url.protocol !== "https:") {
 		throw new ScrapeError("PRIVATE_URL_BLOCKED");
 	}
+	if (url.username || url.password)
+		throw new ScrapeError("PRIVATE_URL_BLOCKED");
 	const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
 	if (BLOCKED_HOSTNAMES[host] || host.endsWith(".localhost")) {
 		throw new ScrapeError("PRIVATE_URL_BLOCKED");

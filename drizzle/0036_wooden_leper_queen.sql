@@ -7,6 +7,9 @@ ALTER TABLE "studio_jobs" ADD COLUMN "claimed_at" timestamp with time zone;--> s
 ALTER TABLE "studio_jobs" ADD COLUMN "lease_expires_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "studio_jobs" ADD COLUMN "started_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "studio_jobs" ADD COLUMN "finished_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "studio_projects" ADD COLUMN "design_skill_id" text DEFAULT 'none' NOT NULL;--> statement-breakpoint
+ALTER TABLE "studio_projects" ADD COLUMN "initial_page_count" integer;--> statement-breakpoint
+ALTER TABLE "studio_projects" ADD COLUMN "design_reference" jsonb;--> statement-breakpoint
 ALTER TABLE "studio_projects" ADD COLUMN "design_blueprint" jsonb;--> statement-breakpoint
 ALTER TABLE "studio_projects" ADD COLUMN "design_blueprint_version" integer DEFAULT 1 NOT NULL;--> statement-breakpoint
 ALTER TABLE "studio_projects" ADD COLUMN "design_skill_version" integer;--> statement-breakpoint

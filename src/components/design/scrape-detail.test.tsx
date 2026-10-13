@@ -70,6 +70,7 @@ describe("ScrapeDetail", () => {
 				<ScrapeDetail
 					domain="example.com"
 					previewHtml="<main>preview</main>"
+					previewSrcDoc="<main>preview</main>"
 				/>,
 			);
 		} finally {
@@ -117,6 +118,7 @@ describe("ScrapeDetail", () => {
 					<ScrapeDetail
 						domain="example.com"
 						previewHtml="<main>preview</main>"
+						previewSrcDoc="<main>preview</main>"
 					/>,
 				);
 			});
@@ -143,6 +145,7 @@ describe("ScrapeDetail", () => {
 			<ScrapeDetail
 				domain="www.notion.com"
 				previewHtml="<main>desktop</main>"
+				previewSrcDoc="<main>desktop</main>"
 			/>,
 		);
 
@@ -219,7 +222,11 @@ describe("ScrapeDetail", () => {
 	});
 	it("keeps the preview sandbox and referrer policy restricted", () => {
 		render(
-			<ScrapeDetail domain="example.com" previewHtml="<main>safe</main>" />,
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<main>safe</main>"
+				previewSrcDoc="<main>safe</main>"
+			/>,
 		);
 		const iframe = screen.getByTitle("Preview example.com");
 		expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
@@ -252,7 +259,8 @@ describe("ScrapeDetail", () => {
 		expect(
 			screen.getByRole("tabpanel", { name: /Source code index\.html/i })
 				.textContent,
-		).toBe(source);
+		).toContain(source);
+		expect(screen.getByTestId("codebase-source-preview")).toBeDefined();
 		fireEvent.click(screen.getByRole("button", { name: /Salin HTML/i }));
 		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
 		expect(writeText).toHaveBeenCalledWith(source);
@@ -271,7 +279,8 @@ describe("ScrapeDetail", () => {
 		expect(
 			screen.getByRole("tabpanel", { name: /Source code index\.html/i })
 				.textContent,
-		).toBe(source);
+		).toContain(source);
+		expect(screen.getByTestId("codebase-source-preview")).toBeDefined();
 		fireEvent.click(screen.getByRole("tab", { name: /^Preview$/i }));
 		expect(
 			screen.getByRole("tabpanel", { name: /Preview index\.html/i }),

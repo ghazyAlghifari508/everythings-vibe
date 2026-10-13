@@ -675,8 +675,6 @@ export function CodebaseChatWorkspace({
 										doneLabel={CODEBASE_STAGE_DONE_LABEL[run.stage]}
 										failedLabel={`Gagal menyusun ${STAGE_LABEL[run.stage]}`}
 										activity={run.activity}
-										presentation="rotating"
-										rotationKey={run.startedAt}
 										thinkingText={run.thinkingText}
 										startedAt={run.startedAt}
 										finishedAt={run.finishedAt}

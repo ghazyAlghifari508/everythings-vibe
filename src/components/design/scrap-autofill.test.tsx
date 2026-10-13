@@ -30,10 +30,8 @@ describe("VibeDesign Scrap Autofill Styling & Contract", () => {
 	it("ensures URL inputs declare autocomplete and token-bound autofill background", () => {
 		render(<ScrapModeSwitcher />);
 
-		const designInput = screen.getByLabelText(
-			/Website yang ingin di-generate DESIGN\.md/i,
-		);
-		expect(designInput.getAttribute("type")).toBe("url");
+		const designInput = screen.getByLabelText("URL website");
+		expect(designInput.getAttribute("inputMode")).toBe("url");
 		expect(designInput.getAttribute("autoComplete")).toBe("url");
 		expect(designInput.getAttribute("name")).toBe("url");
 		expect(designInput.className).toContain(

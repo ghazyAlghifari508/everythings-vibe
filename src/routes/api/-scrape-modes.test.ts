@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ScrapeError } from "@/lib/design-errors";
 import { GET, POST } from "./scrape";
 
 vi.mock("@tanstack/react-start/server", () => ({
@@ -26,6 +27,20 @@ vi.mock("@/lib/services/scrape-service", () => ({
 }));
 
 describe("Scrape API Route Modes", () => {
+	it.each([
+		["QUEUE_CAPACITY", 409],
+		["RATE_LIMITED", 429],
+	] as const)("classifies %s without an upstream failure", async (code, status) => {
+		mockCreateScrape.mockRejectedValueOnce(new ScrapeError(code));
+		const res = await POST({
+			request: new Request("http://localhost/api/scrape", {
+				method: "POST",
+				body: JSON.stringify({ url: "https://example.com" }),
+			}),
+		});
+		expect(res.status).toBe(status);
+		expect(await res.json()).toMatchObject({ code });
+	});
 	it("creates a scrape in design mode by default", async () => {
 		mockCreateScrape.mockResolvedValueOnce({
 			id: "sc-design-1",
@@ -48,13 +63,11 @@ describe("Scrape API Route Modes", () => {
 		expect(json.mode).toBe("design");
 		expect(mockCreateScrape).toHaveBeenCalledWith(
 			"user-123",
-			"https://example.com",
+			"https://example.com/",
 			"design",
+			{ url: "https://example.com/", mode: "design" },
 		);
-		expect(mockRunScrapePipeline).toHaveBeenCalledWith(
-			"sc-design-1",
-			"user-123",
-		);
+		expect(mockRunScrapePipeline).not.toHaveBeenCalled();
 	});
 
 	it("creates a scrape in html mode when explicitly requested", async () => {
@@ -79,10 +92,15 @@ describe("Scrape API Route Modes", () => {
 		expect(json.mode).toBe("html");
 		expect(mockCreateScrape).toHaveBeenCalledWith(
 			"user-123",
-			"https://example.com",
+			"https://example.com/",
 			"html",
+			{
+				url: "https://example.com/",
+				mode: "html",
+				settings: { waitMs: 0, includeIframes: false },
+			},
 		);
-		expect(mockRunScrapePipeline).toHaveBeenCalledWith("sc-html-1", "user-123");
+		expect(mockRunScrapePipeline).not.toHaveBeenCalled();
 	});
 
 	it("returns mode in GET /api/scrape?id=...", async () => {
@@ -95,6 +113,8 @@ describe("Scrape API Route Modes", () => {
 			html: "<html><body>Hello</body></html>",
 			previewHtml: "<html><body>Hello</body></html>",
 			document: null,
+			pages: [],
+			images: [],
 		});
 
 		const req = new Request("http://localhost/api/scrape?id=sc-html-1");
@@ -103,5 +123,7 @@ describe("Scrape API Route Modes", () => {
 		const json = await res.json();
 		expect(json.scrape.mode).toBe("html");
 		expect(json.scrape.document).toBeNull();
+		expect(json.scrape.pages).toEqual([]);
+		expect(json.scrape.images).toEqual([]);
 	});
 });

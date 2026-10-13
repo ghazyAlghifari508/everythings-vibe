@@ -1,505 +1,254 @@
-// @vitest-environment jsdom
-import {
-	act,
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-} from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScrapeProgress } from "./scrape-progress";
+﻿// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-beforeEach(() => {
-	vi.useFakeTimers();
-});
+vi.mock("@tanstack/react-router", () => ({
+	Link: ({ to, children, ...rest }: { to: string; children?: ReactNode }) =>
+		createElement("a", { href: to, ...rest }, children),
+}));
+
+import { ScrapeProgress } from "./scrape-progress";
 
 afterEach(() => {
 	cleanup();
 	vi.useRealTimers();
-	vi.restoreAllMocks();
 });
 
-function activeSlotText(): string {
-	return (
-		screen.getByRole("status", { name: "Aktivitas berlangsung" }).textContent ??
-		""
-	);
-}
+describe("connected vertical stepper", () => {
+	it("marks the live stage with a real spinner, not the legacy dot", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="extracting" />,
+		);
+		expect(
+			container.querySelector("[data-active-stage-spinner]"),
+		).not.toBeNull();
+		expect(container.querySelector("[data-active-stage-marker]")).toBeNull();
+	});
 
-function authoritativeStage(container: HTMLElement): string {
-	return container.querySelector('[aria-current="step"]')?.textContent ?? "";
-}
+	it("renders exactly one spinner while processing", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="generating" />,
+		);
+		expect(
+			container.querySelectorAll("[data-active-stage-spinner]"),
+		).toHaveLength(1);
+	});
 
-describe("ScrapeProgress", () => {
-	it("shows the real backend activity, not synthetic rotating hints", () => {
+	it("removes the horizontal segmented progress bar entirely", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="extracting" />,
+		);
+		expect(
+			container.querySelectorAll("[data-active-stage-segment]"),
+		).toHaveLength(0);
+		expect(container.textContent).not.toMatch(/\d+\s*%/);
+	});
+
+	it("connects every stage with one continuous connector per gap", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="extracting" />,
+		);
+		const list = screen.getByRole("list", { name: "Tahapan pemrosesan" });
+		const items = list.querySelectorAll("li");
+		const connectors = container.querySelectorAll("[data-step-connector]");
+		expect(connectors).toHaveLength(items.length - 1);
+		for (const connector of connectors) {
+			expect(connector.getAttribute("data-connector-state")).toMatch(
+				/^(done|active|pending)$/,
+			);
+		}
+	});
+
+	it("announces the live stage once through aria-current", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="extracting" />,
+		);
+		expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
+	});
+
+	it("marks completed stages and keeps upcoming stages neutral", () => {
+		render(<ScrapeProgress mode="design" status="extracting" />);
+		const list = screen.getByRole("list", { name: "Tahapan pemrosesan" });
+		const items = list.querySelectorAll("li");
+		expect(items).toHaveLength(6);
+		expect(items[0]?.querySelector("svg")).not.toBeNull();
+		expect(items[1]?.querySelector("svg")).not.toBeNull();
+		expect(
+			items[2]?.querySelector("[data-active-stage-spinner]"),
+		).not.toBeNull();
+		expect(items[3]?.querySelector("svg")).toBeNull();
+		expect(items[3]?.querySelector("[data-active-stage-spinner]")).toBeNull();
+	});
+
+	it("stops the spinner once the run reaches a terminal status", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="completed" />,
+		);
+		expect(
+			container.querySelectorAll("[data-active-stage-spinner]"),
+		).toHaveLength(0);
+	});
+});
+
+describe("honest stages per mode", () => {
+	it("renders the full six stages for design mode", () => {
+		render(<ScrapeProgress mode="design" status="extracting" />);
+		expect(
+			screen
+				.getByRole("list", { name: "Tahapan pemrosesan" })
+				.querySelectorAll("li"),
+		).toHaveLength(6);
+	});
+
+	it("renders five stages for html mode", () => {
+		render(<ScrapeProgress mode="html" status="extracting" />);
+		expect(
+			screen
+				.getByRole("list", { name: "Tahapan pemrosesan" })
+				.querySelectorAll("li"),
+		).toHaveLength(5);
+	});
+
+	it("renders four stages for images mode", () => {
+		render(<ScrapeProgress mode="images" status="extracting" />);
+		expect(
+			screen
+				.getByRole("list", { name: "Tahapan pemrosesan" })
+				.querySelectorAll("li"),
+		).toHaveLength(4);
+	});
+
+	it("renders only the stages crawl actually persists", () => {
+		render(<ScrapeProgress mode="crawl" status="capturing" />);
+		expect(
+			screen
+				.getByRole("list", { name: "Tahapan pemrosesan" })
+				.querySelectorAll("li"),
+		).toHaveLength(3);
+	});
+});
+
+describe("truthful activity", () => {
+	it("shows a single waiting line while the job is still queued", () => {
+		render(<ScrapeProgress mode="design" status="queued" />);
+		expect(screen.getByText("Aktivitas terbaru")).toBeDefined();
+		expect(screen.getAllByText(/menunggu giliran/i).length).toBeGreaterThan(0);
+		expect(screen.queryByRole("timer")).toBeNull();
+	});
+
+	it("surfaces the worker health message while queued", () => {
 		render(
 			<ScrapeProgress
 				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Memvalidasi DESIGN.md"
+				status="queued"
+				workerHealth="Belum ada worker yang mengambil job ini."
 			/>,
 		);
-		expect(activeSlotText()).toContain("Memvalidasi DESIGN.md");
-		expect(screen.queryByText(/\(\d+%/)).toBeNull();
-	});
-	const stageCases = [
-		{
-			mode: "design",
-			status: "queued",
-			position: "1",
-			total: "6",
-			label: "Menunggu",
-		},
-		{
-			mode: "design",
-			status: "capturing",
-			position: "2",
-			total: "6",
-			label: "Mengambil halaman",
-		},
-		{
-			mode: "design",
-			status: "extracting",
-			position: "3",
-			total: "6",
-			label: "Menganalisis visual",
-		},
-		{
-			mode: "design",
-			status: "generating",
-			position: "4",
-			total: "6",
-			label: "Menyusun DESIGN.md",
-		},
-		{
-			mode: "design",
-			status: "saving",
-			position: "5",
-			total: "6",
-			label: "Menyimpan hasil",
-		},
-		{
-			mode: "html",
-			status: "queued",
-			position: "1",
-			total: "5",
-			label: "Menunggu",
-		},
-		{
-			mode: "html",
-			status: "capturing",
-			position: "2",
-			total: "5",
-			label: "Mengambil halaman",
-		},
-		{
-			mode: "html",
-			status: "extracting",
-			position: "3",
-			total: "5",
-			label: "Menyiapkan preview",
-		},
-		{
-			mode: "html",
-			status: "saving",
-			position: "4",
-			total: "5",
-			label: "Menyimpan index.html",
-		},
-	] as const;
-
-	it.each(
-		stageCases,
-	)("reports the persisted $mode stage $status as position $position of $total", ({
-		mode,
-		status,
-		position,
-		total,
-		label,
-	}) => {
-		render(<ScrapeProgress mode={mode} status={status} />);
-		const progressbar = screen.getByRole("progressbar");
-		expect(progressbar.getAttribute("aria-valuenow")).toBe(position);
-		expect(progressbar.getAttribute("aria-valuemax")).toBe(total);
-		expect(progressbar.getAttribute("aria-valuemin")).toBe("1");
 		expect(
-			screen.getByText(label, { selector: 'li[aria-current="step"] span' }),
+			screen.getByText("Belum ada worker yang mengambil job ini."),
 		).toBeDefined();
 	});
 
-	it("keeps the active dots and persisted timer through long unchanged activity", () => {
-		const activityStartedAt = new Date(Date.now() - 12_000).toISOString();
-		const { container, rerender } = render(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				activity="Memvalidasi DESIGN.md"
-				activityStartedAt={activityStartedAt}
-			/>,
-		);
-		const activity = screen.getByRole("status", {
-			name: "Aktivitas berlangsung",
-		});
-		const indicator = container.querySelector(
-			'[data-testid="scrape-active-indicator"]',
-		);
-		expect(activity.textContent).toBe("Memvalidasi DESIGN.md");
-		expect(indicator?.children).toHaveLength(3);
-		expect(indicator?.getAttribute("aria-hidden")).toBe("true");
-		act(() => vi.advanceTimersByTime(60_000));
-		rerender(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				activity="Memvalidasi DESIGN.md"
-				activityStartedAt={activityStartedAt}
-			/>,
-		);
-		expect(
-			container.querySelector('[data-testid="scrape-active-indicator"]')
-				?.children,
-		).toHaveLength(3);
-		const timer = screen.getByRole("timer");
-		expect(Number.parseFloat(timer.textContent ?? "")).toBeGreaterThanOrEqual(
-			72,
-		);
-		expect(timer.getAttribute("aria-live")).toBeNull();
-		expect(activity.getAttribute("aria-live")).toBe("polite");
-	});
-
-	it("does not keep an active progress indicator after a terminal state", () => {
-		const { container, rerender } = render(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				activity="Menyusun dokumen"
-				activityStartedAt={new Date().toISOString()}
-			/>,
-		);
-		rerender(<ScrapeProgress mode="design" status="completed" />);
-		const progressbar = screen.getByRole("progressbar");
-		expect(progressbar.getAttribute("aria-valuenow")).toBe(
-			progressbar.getAttribute("aria-valuemax"),
-		);
-		expect(progressbar.querySelector("[data-active-stage-segment]")).toBeNull();
-		expect(
-			container.querySelector('[data-testid="scrape-active-indicator"]'),
-		).toBeNull();
-		expect(screen.queryByRole("timer")).toBeNull();
-		rerender(<ScrapeProgress mode="design" status="failed" />);
-		expect(screen.queryByRole("progressbar")).toBeNull();
-		expect(
-			container.querySelector('[data-testid="scrape-active-indicator"]'),
-		).toBeNull();
-		expect(screen.queryByRole("timer")).toBeNull();
-	});
-
-	it("does not rotate synthetic activity text while polling", () => {
+	it("reports the persisted activity verbatim without repeating the stage", () => {
 		render(
 			<ScrapeProgress
 				mode="design"
 				status="generating"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Memvalidasi DESIGN.md"
-				activityStartedAt={new Date(Date.now() - 3000).toISOString()}
+				activity="Menyusun tabel dari evidence visual"
 			/>,
 		);
-		const before = activeSlotText();
-		act(() => {
-			vi.advanceTimersByTime(12000);
+		const leftPanel = screen.getByText("Aktivitas terbaru").parentElement;
+		const rightPanel = screen.getByRole("region", {
+			name: /progres DESIGN\.md/i,
 		});
-		expect(activeSlotText()).toBe(before);
-	});
-
-	it("changes activity only when backend metadata changes", () => {
-		const { rerender } = render(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Memvalidasi DESIGN.md"
-			/>,
+		expect(leftPanel?.textContent).toContain(
+			"Menyusun tabel dari evidence visual",
 		);
-		expect(activeSlotText()).toContain("Memvalidasi DESIGN.md");
-		rerender(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Memperbaiki bagian DESIGN.md yang belum lengkap"
-			/>,
-		);
-		expect(activeSlotText()).toContain(
-			"Memperbaiki bagian DESIGN.md yang belum lengkap",
+		expect(rightPanel.textContent).not.toContain(
+			"Menyusun tabel dari evidence visual",
 		);
 	});
 
-	it("keeps the same activity stable while polling with unchanged metadata", () => {
-		const { rerender } = render(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Menyimpan hasil"
-				activityStartedAt={new Date(Date.now() - 2000).toISOString()}
-			/>,
-		);
-		const first = activeSlotText();
-		rerender(
-			<ScrapeProgress
-				mode="design"
-				status="saving"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Menyimpan hasil"
-				activityStartedAt={new Date(Date.now() - 2000).toISOString()}
-			/>,
-		);
-		expect(activeSlotText()).toBe(first);
+	it("does not fabricate counters when no counters have been persisted", () => {
+		render(<ScrapeProgress mode="images" status="capturing" />);
+		expect(screen.queryByText("0")).toBeNull();
+		expect(screen.queryByText(/%/)).toBeNull();
 	});
+});
 
-	it("derives the activity timer from the persisted activity start", () => {
-		const activityStartedAt = new Date(Date.now() - 14000).toISOString();
-		const { container } = render(
-			<ScrapeProgress
-				mode="design"
-				status="capturing"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Membuka website"
-				activityStartedAt={activityStartedAt}
-			/>,
-		);
-		act(() => {
-			vi.advanceTimersByTime(600);
-		});
-		const text = container.querySelector('[role="timer"]')?.textContent ?? "";
-		const seconds = Number.parseFloat(text);
-		expect(Number.isFinite(seconds)).toBe(true);
-		expect(seconds).toBeGreaterThanOrEqual(14);
-		expect(seconds).toBeLessThan(20);
-	});
-
-	it("falls back to stageStartedAt when no activity timestamp exists", () => {
-		const stageStartedAt = new Date(Date.now() - 8000).toISOString();
-		const { container } = render(
-			<ScrapeProgress
-				mode="design"
-				status="capturing"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Membuka website"
-				stageStartedAt={stageStartedAt}
-			/>,
-		);
-		act(() => {
-			vi.advanceTimersByTime(400);
-		});
-		const text = container.querySelector('[role="timer"]')?.textContent ?? "";
-		expect(Number.parseFloat(text)).toBeGreaterThanOrEqual(8);
-	});
-
-	it("keeps the authoritative stage fixed when only activity changes", () => {
-		const { container, rerender } = render(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Memvalidasi DESIGN.md"
-			/>,
-		);
-		const stageBefore = authoritativeStage(container);
-		rerender(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="2 bagian belum lengkap"
-			/>,
-		);
-		expect(authoritativeStage(container)).toBe(stageBefore);
-	});
-
-	it("advances the stage tracker only from real status changes", () => {
-		const { container, rerender } = render(
-			<ScrapeProgress
-				mode="design"
-				status="extracting"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Menganalisis design system"
-			/>,
-		);
-		expect(authoritativeStage(container)).toBe("Menganalisis visual");
-		rerender(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Menghasilkan draft DESIGN.md"
-			/>,
-		);
-		expect(authoritativeStage(container)).toBe("Menyusun DESIGN.md");
-	});
-
-	it("preserves activity and timer across a remount with the same persisted metadata", () => {
-		const activityStartedAt = new Date(Date.now() - 5000).toISOString();
-		const first = render(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Memvalidasi DESIGN.md"
-				activityStartedAt={activityStartedAt}
-			/>,
-		);
-		const slotText = activeSlotText();
-		first.unmount();
+describe("failed state delegates to the shared error card", () => {
+	it("has exactly one failure reason and one functional retry", () => {
+		const retry = vi.fn();
 		render(
 			<ScrapeProgress
-				mode="design"
-				status="generating"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Memvalidasi DESIGN.md"
-				activityStartedAt={activityStartedAt}
-			/>,
-		);
-		expect(activeSlotText()).toBe(slotText);
-	});
-
-	it("stops the active timer on failure while preserving retry", () => {
-		const onRetry = vi.fn();
-		render(
-			<ScrapeProgress
-				mode="html"
+				mode="images"
 				status="failed"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				errorMessage="Gagal memproses HTML website."
-				onRetry={onRetry}
+				errorMessage="Asset verification failed"
+				onRetry={retry}
+				partialResults={2}
 			/>,
 		);
-		expect(
-			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
-		).toBeNull();
-		expect(screen.queryByRole("timer")).toBeNull();
-		const retryButton = screen.getByRole("button", { name: /Coba lagi/i });
-		fireEvent.click(retryButton);
-		expect(onRetry).toHaveBeenCalledTimes(1);
-	});
-
-	it("stops the active timer on completion without further rotation", () => {
-		const { container } = render(
-			<ScrapeProgress
-				mode="design"
-				status="completed"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-			/>,
+		expect(screen.getAllByRole("alert")).toHaveLength(1);
+		expect(screen.getAllByRole("button")).toHaveLength(1);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Coba lagi jika tersedia" }),
 		);
-		expect(
-			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
-		).toBeNull();
+		expect(retry).toHaveBeenCalledTimes(1);
 		expect(screen.queryByRole("timer")).toBeNull();
-		expect(screen.getByText(/siap digunakan/i)).toBeDefined();
-		expect(screen.getAllByText("Selesai")).toHaveLength(2);
-		const settled = container.textContent;
-		act(() => {
-			vi.advanceTimersByTime(10000);
-		});
-		expect(container.textContent).toBe(settled);
 	});
 
-	it("renders no activity slot when the backend has not emitted one yet", () => {
+	it("disables retry while request is pending", () => {
+		const retry = vi.fn();
 		render(
 			<ScrapeProgress
-				mode="design"
-				status="queued"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
+				mode="crawl"
+				status="failed"
+				onRetry={retry}
+				isRetrying
 			/>,
 		);
-		expect(
-			screen.queryByRole("status", { name: "Aktivitas berlangsung" }),
-		).toBeNull();
-		expect(screen.queryByRole("timer")).toBeNull();
+		fireEvent.click(screen.getByRole("button"));
+		expect(retry).not.toHaveBeenCalled();
 	});
+});
 
-	it("still shows browser captures through the same real activity path", () => {
-		render(
-			<ScrapeProgress
-				mode="html"
-				status="capturing"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-				activity="Menangkap DOM hasil render"
-			/>,
-		);
-		expect(activeSlotText()).toContain("Menangkap DOM hasil render");
-		expect(screen.queryByText(/Menyusun DESIGN\.md/i)).toBeNull();
-		expect(screen.queryByText(/\(\d+%/)).toBeNull();
-		expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
-			"2",
-		);
-	});
-
-	it("places the active indicator glyph inside the activity line before the timer and adjacent to activity text", () => {
-		const { container } = render(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				activity="Memvalidasi DESIGN.md"
-				activityStartedAt={new Date().toISOString()}
-			/>,
-		);
-		const indicator = container.querySelector(
-			'[data-testid="scrape-active-indicator"]',
-		);
-		expect(indicator).not.toBeNull();
-		const activity = screen.getByRole("status", {
-			name: "Aktivitas berlangsung",
-		});
-		const timer = screen.getByRole("timer");
-		expect(indicator?.parentElement).toBe(activity.parentElement);
-		expect(
-			(indicator?.compareDocumentPosition(activity) ?? 0) &
-				Node.DOCUMENT_POSITION_FOLLOWING,
-		).toBeTruthy();
-		expect(
-			activity.compareDocumentPosition(timer) &
-				Node.DOCUMENT_POSITION_FOLLOWING,
-		).toBeTruthy();
-	});
-
-	it("renders no active indicator when backend activity is absent", () => {
+describe("layout flexibility", () => {
+	it("keeps the two-panel composition by default", () => {
 		const { container } = render(
 			<ScrapeProgress mode="design" status="capturing" />,
 		);
+		expect(container.firstElementChild?.getAttribute("data-layout")).toBe(
+			"two-panel",
+		);
+		expect(screen.getByText("Aktivitas terbaru")).toBeDefined();
 		expect(
-			container.querySelector('[data-testid="scrape-active-indicator"]'),
-		).toBeNull();
+			screen.getByRole("region", { name: /progres DESIGN\.md/i }),
+		).toBeDefined();
 	});
 
-	it("uses the website name as the progress heading, not the raw domain", () => {
-		render(
-			<ScrapeProgress
-				mode="design"
-				status="queued"
-				sourceUrl="https://www.notion.com/"
-				domain="www.notion.com"
-			/>,
+	it("stacks activity above progress in single-panel composition", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="capturing" layout="single" />,
 		);
-		expect(screen.getByRole("heading", { name: "Notion" })).toBeDefined();
+		expect(container.firstElementChild?.getAttribute("data-layout")).toBe(
+			"single",
+		);
+		expect(screen.getByText("Aktivitas terbaru")).toBeDefined();
+		expect(
+			screen.getByRole("region", { name: /progres DESIGN\.md/i }),
+		).toBeDefined();
+	});
+
+	it("uses a gallery-aligned single panel for images", () => {
+		const { container } = render(
+			<ScrapeProgress mode="images" status="capturing" />,
+		);
+		expect(container.firstElementChild?.getAttribute("data-layout")).toBe(
+			"single",
+		);
+		expect(
+			screen.getByRole("region", { name: /progres Scrape Images/i }),
+		).toBeDefined();
 	});
 });

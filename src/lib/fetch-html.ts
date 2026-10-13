@@ -13,6 +13,7 @@ import {
 	SCRAPE_MAX_STYLESHEETS,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
+import type { VisualEvidence } from "@/lib/design-visual-evidence";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { rewritePreviewAssets } from "./preview-html";
 import { validateUrl } from "./url-validator";
@@ -28,6 +29,7 @@ export interface ScrapeViewport {
 }
 
 export interface ScrapeCaptureMetadata {
+	visualEvidence?: VisualEvidence;
 	attempt: number;
 	capturedAt: string;
 	finalUrl: string;
@@ -68,6 +70,7 @@ function responseContentType(res: http.IncomingMessage): string {
 }
 
 export interface FetchAssetOptions {
+	allowUrl?: (url: string) => boolean | Promise<boolean>;
 	signal?: AbortSignal;
 	maxBytes?: number;
 	range?: { start: number; end?: number; suffixLength?: number };
@@ -87,6 +90,11 @@ export async function fetchAsset(
 	redirects = 0,
 	options: FetchAssetOptions = {},
 ): Promise<FetchedAsset> {
+	if (options.allowUrl && !(await options.allowUrl(rawUrl)))
+		throw new ScrapeError(
+			"PRIVATE_URL_BLOCKED",
+			"URL di luar scope yang diizinkan.",
+		);
 	const maxBytes = Math.min(
 		options.maxBytes ?? SCRAPE_MAX_ASSET_BYTES,
 		SCRAPE_MAX_ASSET_BYTES,
@@ -252,7 +260,12 @@ export async function fetchHtml(
 export async function scrapeHtml(
 	rawUrl: string,
 	attemptNumber = 1,
-	instrumentation?: ScrapeInstrumentation & { mode?: ScrapeMode },
+	instrumentation?: ScrapeInstrumentation & {
+		mode?: ScrapeMode;
+		waitMs?: number;
+		includeIframes?: boolean;
+		signal?: AbortSignal;
+	},
 ): Promise<ScrapeCapture> {
 	const { url } = await validateUrl(rawUrl);
 	const { renderPage } = await import("./render-page");
@@ -278,6 +291,7 @@ export async function scrapeHtml(
 		domain,
 		title: extractPageTitle(rendered.html),
 		metadata: {
+			visualEvidence: rendered.visualEvidence,
 			attempt: attemptNumber,
 			capturedAt,
 			finalUrl: rendered.finalUrl,
@@ -354,11 +368,59 @@ export function withBaseHref(html: string, pageUrl: string): string {
 		: `${tag}${html}`;
 }
 
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+	amp: "&",
+	lt: "<",
+	gt: ">",
+	quot: '"',
+	apos: "'",
+	nbsp: "\u00a0",
+	copy: "©",
+	reg: "®",
+	trade: "™",
+	hellip: "…",
+	ndash: "–",
+	mdash: "—",
+	laquo: "«",
+	raquo: "»",
+	ldquo: "“",
+	rdquo: "”",
+	lsquo: "‘",
+	rsquo: "’",
+};
+
+export function decodeHtmlEntities(value: string): string {
+	return value.replace(
+		/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]+);/g,
+		(match, body: string) => {
+			if (body[0] === "#") {
+				const code =
+					body[1] === "x" || body[1] === "X"
+						? Number.parseInt(body.slice(2), 16)
+						: Number.parseInt(body.slice(1), 10);
+				if (
+					Number.isFinite(code) &&
+					code > 0 &&
+					code <= 0x10ffff &&
+					!(code >= 0xd800 && code <= 0xdfff)
+				) {
+					try {
+						return String.fromCodePoint(code);
+					} catch {
+						return match;
+					}
+				}
+				return match;
+			}
+			return NAMED_HTML_ENTITIES[body] ?? match;
+		},
+	);
+}
+
 export function extractPageTitle(html: string): string | null {
 	const match = html.match(/<title[^>]*>([\s\S]*?)<\/title\s*>/i);
 	if (!match) return null;
-	const title = match[1]
-		.replace(/<[^>]+>/g, "")
+	const title = decodeHtmlEntities(match[1].replace(/<[^>]+>/g, ""))
 		.replace(/\s+/g, " ")
 		.trim();
 	return title.length > 0 ? title.slice(0, 300) : null;

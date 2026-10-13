@@ -195,20 +195,64 @@ function rewriteHtmlResources(
 }
 
 function runtimeShim(base: string, capabilities: Map<string, string>): string {
+	// Observer watches childList only; attribute writes are already intercepted via setAttribute/property patches.
 	const known = scriptValue(Object.fromEntries(capabilities));
-	return `<script>(()=>{const BASE=${scriptValue(base)},KNOWN=${known},skip=/^(data:|blob:|about:|javascript:|mailto:|tel:|#)/i,asset=/^(?:/|https?://[^/]+)/api/scrape/asset?/i,attrs=new Set(["src","href","poster","data-src","data"]),sets=new Set(["srcset","imagesrcset"]),tags=new Set(["SCRIPT","LINK","IMG","SOURCE","VIDEO","AUDIO","IFRAME","EMBED","OBJECT","TRACK"]),noop={getItem(){return null},setItem(){},removeItem(){},clear(){},key(){return null},length:0};function clean(v){return String(v||"").trim().replace(/&(amp|#38|#x26);/gi,"&")}function proxy(v){v=clean(v);if(!v||skip.test(v)||asset.test(v))return v;try{const u=new URL(v,BASE).href;return KNOWN[u]||"/api/scrape/asset?url="+encodeURIComponent(u)}catch{return v}}function srcset(v){v=clean(v);let out="",i=0;while(i<v.length){while(i<v.length&&/[\\s,]/.test(v[i]))out+=v[i++];if(i>=v.length)break;const start=i,data=v.slice(i,i+5).toLowerCase()==="data:";while(i<v.length&&!/[\\s]/.test(v[i])&&(data||v[i]!==","))i++;out+=proxy(v.slice(start,i));while(i<v.length&&v[i]!==",")out+=v[i++];if(v[i]==",")out+=v[i++]}return out}function fix(el){if(!el||!tags.has(el.tagName))return;for(const a of attrs)if(el.hasAttribute(a)){const v=proxy(el.getAttribute(a));if(v!==el.getAttribute(a))rawSet.call(el,a,v)}for(const a of sets)if(el.hasAttribute(a)){const v=srcset(el.getAttribute(a));if(v!==el.getAttribute(a))rawSet.call(el,a,v)}}function prop(type,name,fn){const C=window[type],d=C&&Object.getOwnPropertyDescriptor(C.prototype,name);if(!d||!d.get||!d.set)return;Object.defineProperty(C.prototype,name,{get(){return d.get.call(this)},set(v){return d.set.call(this,fn(v))}})}const rawSet=Element.prototype.setAttribute;Element.prototype.setAttribute=function(k,v){const key=String(k).toLowerCase();if(tags.has(this.tagName)){if(attrs.has(key))v=proxy(v);else if(sets.has(key))v=srcset(v)}return rawSet.call(this,k,v)};[["HTMLImageElement","src",proxy],["HTMLImageElement","srcset",srcset],["HTMLScriptElement","src",proxy],["HTMLLinkElement","href",proxy],["HTMLLinkElement","imageSrcset",srcset],["HTMLSourceElement","src",proxy],["HTMLSourceElement","srcset",srcset],["HTMLVideoElement","src",proxy],["HTMLVideoElement","poster",proxy],["HTMLAudioElement","src",proxy],["HTMLIFrameElement","src",proxy],["HTMLEmbedElement","src",proxy],["HTMLObjectElement","data",proxy],["HTMLTrackElement","src",proxy]].forEach(([t,n,f])=>prop(t,n,f));for(const k of["localStorage","sessionStorage"])try{window[k]}catch{Object.defineProperty(window,k,{value:noop})}try{document.cookie}catch{Object.defineProperty(document,"cookie",{get(){return""},set(){}})}const scan=()=>document.querySelectorAll("script[src],link[href],img,source,video,audio,iframe,embed,object,track").forEach(fix);new MutationObserver(ms=>ms.forEach(m=>{fix(m.target);m.addedNodes.forEach(n=>{fix(n);n.querySelectorAll&&n.querySelectorAll("script[src],link[href],img,source,video,audio,iframe,embed,object,track").forEach(fix)})})).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:["src","href","poster","data-src","data","srcset","imagesrcset"]});document.readyState==="loading"?document.addEventListener("DOMContentLoaded",scan,{once:true}):scan()})();</script>`;
+	return `<script>(()=>{const BASE=${scriptValue(base)},KNOWN=${known},skip=${SKIP_URL},asset=${PROXIED_URL},attrs=new Set(["src","href","poster","data-src","data"]),sets=new Set(["srcset","imagesrcset"]),tags=new Set(["SCRIPT","LINK","IMG","SOURCE","VIDEO","AUDIO","IFRAME","EMBED","OBJECT","TRACK"]),noop={getItem(){return null},setItem(){},removeItem(){},clear(){},key(){return null},length:0};function clean(v){return String(v||"").trim().replace(/&(amp|#38|#x26);/gi,"&")}function proxy(v){v=clean(v);if(!v||skip.test(v)||asset.test(v))return v;try{const u=new URL(v,BASE).href;return KNOWN[u]||"/api/scrape/asset?url="+encodeURIComponent(u)}catch{return v}}function srcset(v){v=clean(v);let out="",i=0;while(i<v.length){while(i<v.length&&/[\\s,]/.test(v[i]))out+=v[i++];if(i>=v.length)break;const start=i,data=v.slice(i,i+5).toLowerCase()==="data:";while(i<v.length&&!/[\\s]/.test(v[i])&&(data||v[i]!==","))i++;out+=proxy(v.slice(start,i));while(i<v.length&&v[i]!==",")out+=v[i++];if(v[i]==",")out+=v[i++]}return out}function fix(el){if(!el||!tags.has(el.tagName))return;for(const a of attrs)if(el.hasAttribute(a)){const v=proxy(el.getAttribute(a));if(v!==el.getAttribute(a))rawSet.call(el,a,v)}for(const a of sets)if(el.hasAttribute(a)){const v=srcset(el.getAttribute(a));if(v!==el.getAttribute(a))rawSet.call(el,a,v)}}function prop(type,name,fn){const C=window[type],d=C&&Object.getOwnPropertyDescriptor(C.prototype,name);if(!d||!d.get||!d.set)return;Object.defineProperty(C.prototype,name,{get(){return d.get.call(this)},set(v){return d.set.call(this,fn(v))}})}const rawSet=Element.prototype.setAttribute;Element.prototype.setAttribute=function(k,v){const key=String(k).toLowerCase();if(tags.has(this.tagName)){if(attrs.has(key))v=proxy(v);else if(sets.has(key))v=srcset(v)}return rawSet.call(this,k,v)};[["HTMLImageElement","src",proxy],["HTMLImageElement","srcset",srcset],["HTMLScriptElement","src",proxy],["HTMLLinkElement","href",proxy],["HTMLLinkElement","imageSrcset",srcset],["HTMLSourceElement","src",proxy],["HTMLSourceElement","srcset",srcset],["HTMLVideoElement","src",proxy],["HTMLVideoElement","poster",proxy],["HTMLAudioElement","src",proxy],["HTMLIFrameElement","src",proxy],["HTMLEmbedElement","src",proxy],["HTMLObjectElement","data",proxy],["HTMLTrackElement","src",proxy]].forEach(([t,n,f])=>prop(t,n,f));for(const k of["localStorage","sessionStorage"])try{window[k]}catch{Object.defineProperty(window,k,{value:noop})}try{document.cookie}catch{Object.defineProperty(document,"cookie",{get(){return""},set(){}})}const scan=()=>document.querySelectorAll("script[src],link[href],img,source,video,audio,iframe,embed,object,track").forEach(fix);new MutationObserver(ms=>ms.forEach(m=>{fix(m.target);m.addedNodes.forEach(n=>{fix(n);n.querySelectorAll&&n.querySelectorAll("script[src],link[href],img,source,video,audio,iframe,embed,object,track").forEach(fix)})})).observe(document.documentElement,{subtree:true,childList:true});document.readyState==="loading"?document.addEventListener("DOMContentLoaded",scan,{once:true}):scan()})();</script>`;
 }
+
+// Reports what the framed snapshot actually shows so the parent can tell
+// "still preparing" apart from "rendered nothing".
+//
+// Two defects made this report a false-empty:
+//   1. visibility was tested against the frame's own viewport, so any document
+//      whose first screen is a tall hero, a spacer, or an offset header looked
+//      empty even though the captured page was full of content further down;
+//   2. an image only counted once its bytes had arrived, so a page built around
+//      imagery reported empty whenever a resource was slow.
+// Content is now judged across the whole document, and a present <img>/media
+// element counts as content while its load result is reported on the separate
+// degraded axis. The reporter also re-reports on DOM change so a late layout
+// upgrade is never lost.
+function previewLoadReporter(): string {
+	return `<script>(()=>{if(window.parent===window)return;let failed=0;let fatal=false;let lastState="";const isResourceError=el=>el instanceof Element&&(el.tagName==="IMG"||(el.tagName==="LINK"&&el.getAttribute("rel")==="stylesheet"));const visible=()=>{const body=document.body;if(!body)return false;const bodyStyle=getComputedStyle(body);if(bodyStyle.display==="none"||bodyStyle.visibility==="hidden"||Number(bodyStyle.opacity)===0)return false;for(const node of body.childNodes)if(node.nodeType===3&&node.textContent.trim())return true;const nodes=body.querySelectorAll("*");for(let i=0;i<Math.min(nodes.length,5000);i++){const el=nodes[i];if(/^(SCRIPT|STYLE|LINK|META|NOSCRIPT|TEMPLATE)$/.test(el.tagName))continue;const rect=el.getBoundingClientRect();if(rect.width<2||rect.height<2)continue;let hidden=false;for(let p=el;p&&p!==document.documentElement;p=p.parentElement){const s=getComputedStyle(p);if(s.display==="none"||s.visibility==="hidden"||Number(s.opacity)===0){hidden=true;break}}if(hidden)continue;const text=Array.from(el.childNodes).some(n=>n.nodeType===3&&n.textContent.trim());const media=el.tagName==="IMG"||/^(SVG|CANVAS|VIDEO|PICTURE|IFRAME|EMBED|OBJECT)$/.test(el.tagName);if(text||media||getComputedStyle(el).backgroundImage!=="none")return true}return false};const compute=()=>{if(visible())return failed>0?"degraded":"ready";if(fatal)return"failed";return document.readyState==="complete"?"empty":"preparing"};const report=force=>{const state=compute();if(!force&&state===lastState)return;lastState=state;parent.postMessage({type:"vibedesign-preview",state,failed},"*")};window.addEventListener("error",e=>{if(isResourceError(e.target))failed+=1;else fatal=true;requestAnimationFrame(()=>report(true))},true);window.addEventListener("unhandledrejection",()=>{fatal=true;requestAnimationFrame(()=>report(true))});window.addEventListener("message",e=>{if(e.source===parent&&e.data&&e.data.type==="vibedesign-preview-ping")report(true)});window.addEventListener("load",()=>requestAnimationFrame(()=>report(true)),{once:true});if(document.readyState==="complete")requestAnimationFrame(()=>report(true));if(typeof MutationObserver==="function"){const observer=new MutationObserver(()=>requestAnimationFrame(()=>report(false)));observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:["src","srcset","style","class"]})}})();</script>`;
+}
+
+// Matches the reporter by its stable opening, so re-rewriting an already
+// processed document replaces the reporter instead of stacking a second one.
+const LOAD_REPORTER_PATTERN =
+	/<script>\(\(\)=>\{if\(window\.parent===window\)return;let failed=0;[\s\S]*?<\/script>/i;
 
 export function rewritePreviewAssets(
 	html: string,
 	base: string,
 	resolve: (target: string) => string = (target) => proxied(target, base),
 	capabilities = new Map<string, string>(),
+	visualSnapshot = false,
 ): string {
 	const shimPattern = /<script>\(\(\)=>\{const BASE=[\s\S]*?<\/script>/i;
 	const hasExistingShim = shimPattern.test(html);
 	const existingShim = hasExistingShim ? html.match(shimPattern)?.[0] : null;
-	const stripped = hasExistingShim ? html.replace(shimPattern, "") : html;
+	let stripped = html
+		.replace(shimPattern, hasExistingShim ? "" : "$&")
+		.replace(LOAD_REPORTER_PATTERN, "");
+	if (visualSnapshot) {
+		stripped = stripped.replace(
+			/<script\b[^>]*>[\s\S]*?<\/script\s*>|<style\b[^>]*>[\s\S]*?<\/style\s*>|<[^>]+>/gi,
+			(tag) => {
+				if (/^<script\b/i.test(tag)) return "";
+				if (/^<style\b/i.test(tag)) return tag;
+				if (
+					/^<link\b/i.test(tag) &&
+					/\b(?:modulepreload|preconnect|dns-prefetch|manifest)\b/i.test(tag)
+				)
+					return "";
+				return tag.replace(
+					/\s(?:on[a-z]+|srcdoc)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,
+					"",
+				);
+			},
+		);
+	}
 	const rewritten = rewriteHtmlResources(
 		stripped.replace(CSP_META, "").replace(/<base\b[^>]*>/gi, ""),
 		base,
@@ -218,9 +262,10 @@ export function rewritePreviewAssets(
 		hasExistingShim && capabilities.size === 0 && existingShim
 			? existingShim
 			: runtimeShim(base, capabilities);
+	const injected = `${visualSnapshot ? "" : shim}${previewLoadReporter()}`;
 	return /<head[^>]*>/i.test(rewritten)
-		? rewritten.replace(/<head[^>]*>/i, (head) => `${head}${shim}`)
-		: `${shim}${rewritten}`;
+		? rewritten.replace(/<head[^>]*>/i, (head) => `${head}${injected}`)
+		: `${injected}${rewritten}`;
 }
 
 export function rewritePreviewAssetUrls(
