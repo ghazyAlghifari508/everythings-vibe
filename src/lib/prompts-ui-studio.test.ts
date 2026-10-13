@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { STUDIO_VISUAL_WIDTH } from "./constants";
 import {
 	buildStudioFramePrompt,
 	buildStudioPlanningPrompt,
@@ -76,8 +77,12 @@ describe("Studio Prompt Builder", () => {
 		expect(prompt).toContain("Target platform: Mobile Application Experience");
 		// The directive must name the canonical capture width, otherwise the
 		// generated layout is designed for a different width than it is rendered at.
-		expect(prompt).toContain("390px");
+		expect(prompt).toContain(`${STUDIO_VISUAL_WIDTH.mobile}px`);
 		expect(prompt).toContain("bottom navigation");
+		// The artboard is a static full-page preview, so a viewport-anchored
+		// bottom bar would paint in the middle of a long page.
+		expect(prompt).toContain("normal document flow");
+		expect(prompt).not.toContain("sticky bottom navigation");
 	});
 
 	it("injects desktop responsive directives when web mode is selected", () => {
@@ -85,7 +90,7 @@ describe("Studio Prompt Builder", () => {
 			designMode: "web",
 		});
 		expect(prompt).toContain("Target platform: Responsive Web Application");
-		expect(prompt).toContain("1280px-1440px");
+		expect(prompt).toContain(`${STUDIO_VISUAL_WIDTH.web}px`);
 	});
 
 	it("validates and sanitizes DESIGN.md input", () => {

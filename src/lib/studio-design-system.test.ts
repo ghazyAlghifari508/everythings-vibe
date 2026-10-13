@@ -220,4 +220,67 @@ describe("Studio Design System", () => {
 			}),
 		).toEqual([]);
 	});
+
+	it("rejects a mobile artboard with a viewport-anchored bar", () => {
+		const anchored = enforceDesignSystemOnHtml(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>.tab{position: fixed; bottom:0;}</style></head><body><nav>Jelajah Kustom</nav></body></html>',
+			null,
+			null,
+			sampleBlueprint,
+		);
+		const issues = validateGeneratedHtml(anchored, {
+			blueprint: sampleBlueprint,
+			viewport: "mobile",
+			expectTokens: false,
+		});
+		expect(issues.some((issue) => issue.includes("fixed"))).toBe(true);
+	});
+
+	it("rejects a sticky mobile element regardless of declaration spacing", () => {
+		const sticky = enforceDesignSystemOnHtml(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>.bar{position:sticky;top:0}</style></head><body><nav>Jelajah Kustom</nav></body></html>',
+			null,
+			null,
+			sampleBlueprint,
+		);
+		expect(
+			validateGeneratedHtml(sticky, {
+				blueprint: sampleBlueprint,
+				viewport: "mobile",
+				expectTokens: false,
+			}).some((issue) => issue.includes("sticky")),
+		).toBe(true);
+	});
+
+	it("accepts an in-flow bottom navigation for a mobile artboard", () => {
+		const inFlow = enforceDesignSystemOnHtml(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>.tab{display:flex;padding-bottom:env(safe-area-inset-bottom)}</style></head><body><main style="padding-bottom:64px">Konten</main><nav class="tab">Jelajah Kustom</nav></body></html>',
+			null,
+			null,
+			sampleBlueprint,
+		);
+		expect(
+			validateGeneratedHtml(inFlow, {
+				blueprint: sampleBlueprint,
+				viewport: "mobile",
+				expectTokens: false,
+			}),
+		).toEqual([]);
+	});
+
+	it("does not apply the mobile positioning contract to web artboards", () => {
+		const web = enforceDesignSystemOnHtml(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>.hdr{position:sticky;top:0}</style></head><body><nav>Jelajah Kustom</nav></body></html>',
+			null,
+			null,
+			sampleBlueprint,
+		);
+		expect(
+			validateGeneratedHtml(web, {
+				blueprint: sampleBlueprint,
+				viewport: "web",
+				expectTokens: false,
+			}),
+		).toEqual([]);
+	});
 });

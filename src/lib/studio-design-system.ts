@@ -383,6 +383,20 @@ export interface ValidateGeneratedHtmlOptions {
 	expectTokens: boolean;
 }
 
+/**
+ * Detects a CSS declaration for a positioning mode, ignoring comments.
+ *
+ * The artboard is a static full-page preview, so an element anchored to the
+ * bottom of the viewport paints in the middle of a long page instead of at the
+ * end of the document. The check is declaration-based rather than a stylesheet
+ * rewrite: it reports the contract violation so the generator can correct it,
+ * and never mutates the generated markup.
+ */
+function hasPositioningDeclaration(html: string, mode: string): boolean {
+	const withoutComments = html.replace(/\/\*[\s\S]*?\*\//g, "");
+	return new RegExp(`position\\s*:\\s*${mode}\\b`, "i").test(withoutComments);
+}
+
 // Deterministic structural validation for generated HTML. String checks
 // cannot prove visual correctness; they only catch concrete contract
 // violations that warrant one bounded corrective regeneration.
@@ -413,6 +427,15 @@ export function validateGeneratedHtml(
 	}
 	if (/width:\s*\d{4,}px|width=["']\d{4,}/i.test(html)) {
 		issues.push("Lebar tetap melebihi viewport.");
+	}
+	if (opts.viewport === "mobile") {
+		for (const mode of ["fixed", "sticky"]) {
+			if (hasPositioningDeclaration(html, mode)) {
+				issues.push(
+					`Posisi ${mode} tidak diizinkan pada artboard mobile statis.`,
+				);
+			}
+		}
 	}
 	return issues;
 }

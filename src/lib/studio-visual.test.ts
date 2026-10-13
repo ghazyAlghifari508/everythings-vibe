@@ -1,8 +1,12 @@
-import { afterAll, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
+import { STUDIO_CAPTURE_DSF, STUDIO_VISUAL_VIEWPORT_HEIGHT } from "./constants";
 import {
 	captureStudioVisual,
 	closeStudioVisualBrowser,
 	STUDIO_VISUAL_WIDTH,
+	studioVisualCacheKey,
+	studioVisualCaptureConfig,
+	studioVisualHash,
 } from "./studio-visual";
 
 afterAll(closeStudioVisualBrowser);
@@ -115,3 +119,72 @@ it("uses one consistent mobile viewport width across captures", async () => {
 	expect(tall.width).toBe(short.width);
 	expect(tall.width).toBe(STUDIO_VISUAL_WIDTH.mobile);
 }, 60000);
+
+it("clamps a height that only an inner scroll container can reach", async () => {
+	// A descendant inside an overflow container can measure taller than the
+	// document, but the screenshot clips to the document bounds. Reporting the
+	// larger number produced an artboard taller than its own image.
+	const result = await captureStudioVisual(
+		`<!doctype html><html><head><style>
+			* { margin:0; padding:0; box-sizing:border-box; }
+			main { height:${STUDIO_VISUAL_VIEWPORT_HEIGHT.mobile}px; background:#ddd; }
+			.scroller { height:400px; overflow:auto; }
+			.inner { height:2300px; }
+		</style></head><body><main><div class="scroller"><div class="inner"></div></div></main></body></html>`,
+		"mobile",
+		null,
+		[],
+	);
+	const pixels = readJpegSize(result.data);
+	expect(result.height).toBe(STUDIO_VISUAL_VIEWPORT_HEIGHT.mobile);
+	expect(result.height * STUDIO_CAPTURE_DSF).toBe(pixels.height);
+}, 60000);
+
+it("rounds fractional content height without inventing pixels", async () => {
+	const result = await captureStudioVisual(page(1765.4), "mobile", null, []);
+	const pixels = readJpegSize(result.data);
+	expect(result.height).toBe(1765);
+	expect(result.height * STUDIO_CAPTURE_DSF).toBe(pixels.height);
+}, 60000);
+
+describe("studioVisualHash", () => {
+	it("is stable for identical input", () => {
+		expect(studioVisualHash("<html></html>", "mobile")).toBe(
+			studioVisualHash("<html></html>", "mobile"),
+		);
+	});
+
+	it("separates viewports and markup", () => {
+		expect(studioVisualHash("<html></html>", "mobile")).not.toBe(
+			studioVisualHash("<html></html>", "web"),
+		);
+		expect(studioVisualHash("<html>a</html>", "mobile")).not.toBe(
+			studioVisualHash("<html>b</html>", "mobile"),
+		);
+	});
+
+	it("is keyed to the capture configuration so a config change invalidates it", () => {
+		const config = studioVisualCaptureConfig("mobile");
+		const base = studioVisualCacheKey("<html></html>", "mobile", config);
+		expect(
+			studioVisualCacheKey("<html></html>", "mobile", {
+				...config,
+				width: config.width + 1,
+			}),
+		).not.toBe(base);
+		expect(
+			studioVisualCacheKey("<html></html>", "mobile", {
+				...config,
+				height: config.height + 1,
+			}),
+		).not.toBe(base);
+		expect(
+			studioVisualCacheKey("<html></html>", "mobile", {
+				...config,
+				deviceScaleFactor: config.deviceScaleFactor + 1,
+			}),
+		).not.toBe(base);
+		// The production helper must derive its key from that same config.
+		expect(studioVisualHash("<html></html>", "mobile")).toBe(base);
+	});
+});

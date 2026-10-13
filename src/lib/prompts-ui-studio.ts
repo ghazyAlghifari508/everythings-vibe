@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
 	STUDIO_DESIGN_MD_MAX_CHARS,
 	STUDIO_PREVIOUS_HTML_MAX_CHARS,
+	STUDIO_VISUAL_WIDTH,
 } from "@/lib/constants";
 import {
 	type StudioDesignBlueprint,
@@ -18,23 +19,27 @@ export type StudioDesignMode = "web" | "mobile";
  * Shared platform contracts. Both the initial user prompt and the per-screen
  * frame prompt must describe the same rendering rules, otherwise screens from
  * the same project come back with different proportions.
+ *
+ * The width is interpolated from the canonical capture constants so the
+ * requested layout width and the renderer's viewport can never drift apart.
  */
 const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Experience (mobile-first UI/UX).
-- Design for a single mobile viewport width (390px) and let the document grow vertically as tall as the content needs. A long, scrollable page is correct; never compress or rescale sections to force everything into one screen height.
+- Design for a single mobile viewport width (${STUDIO_VISUAL_WIDTH.mobile}px) and let the document grow vertically as tall as the content needs. A long, scrollable page is correct; never compress or rescale sections to force everything into one screen height.
 - Include <meta name="viewport" content="width=device-width, initial-scale=1"> in <head>.
 - Provide a clean mobile top app bar with the screen title and relevant action buttons.
-- Provide a sticky bottom navigation tab bar (with icons and labels), highlighting the active screen.
+- Provide a bottom navigation tab bar (with icons and labels) highlighting the active screen, placed in normal document flow at the end of the document so it renders at the bottom of the full page. This artboard is a static full-page preview: a bottom-anchored fixed or sticky bar would be painted at the viewport edge in the middle of the page, so do not use position: fixed or position: sticky for the tab bar.
 - Reserve space for the bottom navigation: main content needs padding-bottom so nothing hides behind the tab bar; account for env(safe-area-inset-bottom) where relevant.
 - Ensure all clickable touch targets have a minimum height/width of 44px.
 - Use mobile-first interaction patterns: card stacks, segmented switchers, and compact stat rows.
 - Use fluid sizing: max-width: 100% on all sections, images, and tables; never use fixed pixel widths larger than the viewport; avoid unintended horizontal overflow (no overflow-x scroll on the page).
-- Avoid overlapping fixed/sticky elements; only the top app bar and bottom tab bar may be fixed/sticky.
-- Keep body text at 14px-16px with comfortable line height so it stays readable at the captured 390px width.
+- Keep the layout free of overlapping layers: reserve vertical space instead of stacking elements on top of each other.
+- Keep body text at 14px-16px with comfortable line height so it stays readable at the captured ${STUDIO_VISUAL_WIDTH.mobile}px width.
 - Size sections with padding, gaps, and min-height instead of fixed pixel heights, so the page never looks stretched or squashed when captured.
-- Preserve true document height: images keep aspect ratio with max-width: 100% and height auto.`;
+- Preserve true document height: images keep aspect ratio with max-width: 100% and height auto.
+- Use the same navigation structure, icon family, and design tokens on every screen of this application.`;
 
 const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Web Application Experience.
-- Design for desktop browsers (1280px-1440px) while maintaining smooth responsive adaptation to tablet and mobile.
+- Design for desktop browsers at a ${STUDIO_VISUAL_WIDTH.web}px wide viewport while maintaining smooth responsive adaptation to tablet and mobile.
 - Include a full desktop navigation header, balanced multi-column grid, and clean card hierarchy.
 - Indicate the active section in the navigation header.
 - Let the document grow vertically as tall as the content needs instead of forcing a fixed height.`;
@@ -299,7 +304,11 @@ export function buildStudioPlanningPrompt(
 ): string {
 	const sections: string[] = [
 		`User Request: "${prompt.trim()}"`,
-		`Target Viewport Platform: ${designMode === "mobile" ? "Mobile (mobile-first screens, 390px)" : "Web (desktop responsive screens, 1280px–1440px)"}`,
+		`Target Viewport Platform: ${
+			designMode === "mobile"
+				? `Mobile (mobile-first screens, ${STUDIO_VISUAL_WIDTH.mobile}px)`
+				: `Web (desktop responsive screens, ${STUDIO_VISUAL_WIDTH.web}px and below)`
+		}`,
 	];
 	if (initialPageCount != null)
 		sections.push(
