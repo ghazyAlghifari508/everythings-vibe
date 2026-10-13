@@ -388,6 +388,29 @@ export const CANVAS_MAX_ZOOM = 1.54;
 /** Studio artboards span several screens, so its usable range is wider. */
 export const STUDIO_CANVAS_MIN_ZOOM = 0.2;
 export const STUDIO_CANVAS_MAX_ZOOM = 2;
+/**
+ * Initial canvas scale per platform. Mobile artboards are close to the real
+ * device width, so they can start near 1:1; web artboards must start smaller
+ * to stay readable inside a laptop viewport.
+ */
+export const STUDIO_CANVAS_INITIAL_ZOOM = {
+	mobile: 0.9,
+	web: 0.65,
+} as const;
+
+/**
+ * Canvas layout metrics used by fit-to-content. They mirror the real overlay
+ * geometry (floating header, floating composer, right-centre toolbar) and the
+ * frame track styling, so fitting never parks content under an overlay.
+ */
+export const STUDIO_CANVAS_FRAME_GAP_PX = 56;
+export const STUDIO_CANVAS_FIT_PADDING_PX = 192;
+export const STUDIO_CANVAS_FRAME_HEADER_PX = 28;
+export const STUDIO_CANVAS_HEADER_INSET_PX = 64;
+export const STUDIO_CANVAS_COMPOSER_INSET_PX = 168;
+export const STUDIO_CANVAS_TOOLBAR_INSET_PX = 64;
+/** Smallest visible artboard band a fit is allowed to compress to. */
+export const STUDIO_CANVAS_MIN_VISIBLE_PX = 120;
 
 /** Wheel normalization: DOM deltaMode 1 is lines, 2 is pages. */
 export const WHEEL_LINE_HEIGHT_PX = 16;

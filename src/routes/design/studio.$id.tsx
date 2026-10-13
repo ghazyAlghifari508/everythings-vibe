@@ -477,6 +477,10 @@ function StudioWorkspace({
 
 	return (
 		<main className="relative flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-charcoal text-snow">
+			{/* The header floats above the dotted canvas instead of occupying a
+			    full-width navbar band, so the canvas extends behind it. It is a
+			    sibling of the canvas section, never a descendant: header clicks
+			    therefore cannot start a canvas pan or change the selection. */}
 			<StudioHeader
 				title={project.title}
 				duplicating={duplicating}

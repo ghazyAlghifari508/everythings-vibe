@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StudioCanvas } from "./studio-canvas";
+import {
+	STUDIO_CANVAS_HEADER_INSET_PX,
+	STUDIO_CANVAS_MAX_ZOOM,
+	STUDIO_CANVAS_MIN_ZOOM,
+} from "@/lib/constants";
+import { computeCanvasFit, StudioCanvas } from "./studio-canvas";
 
 describe("StudioCanvas", () => {
 	afterEach(() => cleanup());
@@ -281,5 +286,152 @@ describe("StudioCanvas", () => {
 		});
 		fireEvent.click(retryBtn);
 		expect(onRetryPlanning).toHaveBeenCalled();
+	});
+
+	describe("computeCanvasFit", () => {
+		const limits = {
+			minZoom: STUDIO_CANVAS_MIN_ZOOM,
+			maxZoom: STUDIO_CANVAS_MAX_ZOOM,
+		};
+
+		it("keeps every artboard inside the usable band left by the overlays", () => {
+			const bounds = [
+				{ width: 390, height: 1765 },
+				{ width: 390, height: 844 },
+			];
+			const available = { width: 1440, height: 900 };
+			const { zoom, pan } = computeCanvasFit({
+				bounds,
+				available,
+				...limits,
+			});
+			// The tallest artboard plus the frame header row must fit below the
+			// header band and above the composer band.
+			const tallest = Math.max(...bounds.map((frame) => frame.height));
+			const top = pan.y;
+			const bottom = pan.y + (tallest + 28) * zoom;
+			expect(top).toBeGreaterThanOrEqual(STUDIO_CANVAS_HEADER_INSET_PX);
+			expect(bottom).toBeLessThanOrEqual(available.height);
+		});
+
+		it("never exceeds the canonical zoom bounds", () => {
+			const huge = computeCanvasFit({
+				bounds: [{ width: 1440, height: 30000 }],
+				available: { width: 320, height: 320 },
+				...limits,
+			});
+			const tiny = computeCanvasFit({
+				bounds: [{ width: 390, height: 200 }],
+				available: { width: 4000, height: 3000 },
+				...limits,
+			});
+			expect(huge.zoom).toBe(STUDIO_CANVAS_MIN_ZOOM);
+			expect(tiny.zoom).toBe(STUDIO_CANVAS_MAX_ZOOM);
+		});
+
+		it("falls back to the minimum scale when there is nothing to fit", () => {
+			expect(
+				computeCanvasFit({
+					bounds: [],
+					available: { width: 1000, height: 800 },
+					...limits,
+				}),
+			).toEqual({ zoom: STUDIO_CANVAS_MIN_ZOOM, pan: { x: 0, y: 0 } });
+		});
+
+		it("centres a single artboard horizontally", () => {
+			const { zoom, pan } = computeCanvasFit({
+				bounds: [{ width: 390, height: 844 }],
+				available: { width: 1200, height: 900 },
+				...limits,
+			});
+			const trackWidth = 390 + 192;
+			expect(pan.x).toBeCloseTo((1200 - trackWidth * zoom) / 2, 6);
+		});
+	});
+
+	it("stops panning when pointer capture is lost mid-drag", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Hand" }));
+		const canvas = screen.getByTestId("studio-canvas");
+		fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 10, clientY: 10 });
+		fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 40, clientY: 40 });
+		// Losing capture (OS gesture, element removal) must end the gesture.
+		fireEvent.lostPointerCapture(canvas, { pointerId: 1 });
+		fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 400, clientY: 400 });
+		expect(canvas.style.cursor).toBe("grab");
+	});
+
+	it("does not start a pan when a floating overlay receives the pointer", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Hand" }));
+		const canvas = screen.getByTestId("studio-canvas");
+		expect(canvas.style.cursor).toBe("grab");
+		// Overlay pointerdown must be isolated from the canvas gesture.
+		fireEvent.pointerDown(screen.getByRole("button", { name: "Perbesar" }), {
+			pointerId: 2,
+		});
+		fireEvent.pointerMove(canvas, { pointerId: 2, clientX: 500, clientY: 500 });
+		expect(canvas.style.cursor).toBe("grab");
+	});
+
+	it("pans with arrow keys while focus is not inside a control", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		const surface = screen.getByTestId("studio-canvas-surface");
+		const before = surface.style.transform;
+		fireEvent.keyDown(document.body, { key: "ArrowRight" });
+		expect(surface.style.transform).not.toBe(before);
+	});
+
+	it("ignores arrow keys while focus is inside a control", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		const surface = screen.getByTestId("studio-canvas-surface");
+		const before = surface.style.transform;
+		const hand = screen.getByRole("button", { name: "Hand" });
+		fireEvent.keyDown(hand, { key: "ArrowRight" });
+		expect(surface.style.transform).toBe(before);
+	});
+
+	it("ignores the V/H/Space shortcuts while focus is on a button", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		const hand = screen.getByRole("button", { name: "Hand" });
+		hand.focus();
+		fireEvent.keyDown(hand, { key: "v" });
+		expect(hand.getAttribute("aria-pressed")).toBe("false");
 	});
 });
