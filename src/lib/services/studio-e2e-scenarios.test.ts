@@ -21,22 +21,28 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 			userMsg.includes("User Request")
 		) {
 			const isMobile = userMsg.includes("Mobile");
+			// The mock honors the requested initial screen count so the
+			// exact-cardinality contract is exercised instead of tripped.
+			const countMatch = userMsg.match(/Initial screen count: exactly (\d+)/);
+			const parsedCount = countMatch
+				? Number.parseInt(countMatch[1], 10)
+				: Number.NaN;
+			const screenCount =
+				Number.isInteger(parsedCount) && parsedCount >= 1 && parsedCount <= 8
+					? parsedCount
+					: 2;
+			const baseNames = isMobile
+				? ["Ringkasan Saldo", "Riwayat Transaksi"]
+				: ["Beranda Utama", "Daftar Karya"];
+			const screens = Array.from({ length: screenCount }, (_, order) => ({
+				name: baseNames[order] ?? `Layar Tambahan ${order + 1}`,
+				description: "Halaman ringkasan",
+				viewport: isMobile ? "mobile" : "web",
+				order,
+			}));
 			const planJson = JSON.stringify({
 				projectTitle: isMobile ? "Aplikasi Keuangan" : "Website Portofolio",
-				screens: [
-					{
-						name: isMobile ? "Ringkasan Saldo" : "Beranda Utama",
-						description: "Halaman ringkasan",
-						viewport: isMobile ? "mobile" : "web",
-						order: 0,
-					},
-					{
-						name: isMobile ? "Riwayat Transaksi" : "Daftar Karya",
-						description: "Halaman riwayat",
-						viewport: isMobile ? "mobile" : "web",
-						order: 1,
-					},
-				],
+				screens,
 			});
 			return {
 				firstChunk: planJson,
