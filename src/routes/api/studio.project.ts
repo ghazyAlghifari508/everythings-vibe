@@ -1,14 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
 import {
 	deleteStudioProject,
 	duplicateStudioProject,
 	getStudioProjectDetail,
 	updateStudioDesignSystem,
+	updateStudioPreferences,
 } from "@/lib/services/studio-service";
 import { requireUser } from "@/lib/session";
+import {
+	studioDesignReferenceSchema,
+	studioDesignSkillIdSchema,
+} from "@/lib/studio-generation-options";
 
 function studioErrorResponse(error: unknown): Response {
 	console.error("[studio.project error]", error);
@@ -54,7 +60,24 @@ const projectActionSchema = z.discriminatedUnion("action", [
 	z.object({
 		action: z.literal("design-system"),
 		projectId: z.string().trim().min(1).max(200),
-		designMd: z.string().min(20),
+		designMd: z.string().max(STUDIO_DESIGN_MD_MAX_CHARS).nullable().optional(),
+		designReference: studioDesignReferenceSchema.nullable().optional(),
+		designSkillId: studioDesignSkillIdSchema.optional(),
+		logo: z
+			.object({
+				filename: z.string().min(1).max(200),
+				mimeType: z.string().min(1),
+				data: z.string().min(1),
+			})
+			.nullable()
+			.optional(),
+	}),
+	z.object({
+		action: z.literal("preferences"),
+		projectId: z.string().trim().min(1).max(200),
+		designSkillId: studioDesignSkillIdSchema.optional(),
+		designReference: studioDesignReferenceSchema.nullable().optional(),
+		designMd: z.string().max(STUDIO_DESIGN_MD_MAX_CHARS).nullable().optional(),
 		logo: z
 			.object({
 				filename: z.string().min(1).max(200),
@@ -83,6 +106,14 @@ export async function POST({
 			);
 		if (parsed.data.action === "design-system") {
 			const project = await updateStudioDesignSystem(
+				parsed.data.projectId,
+				user.id,
+				parsed.data,
+			);
+			return Response.json({ project });
+		}
+		if (parsed.data.action === "preferences") {
+			const project = await updateStudioPreferences(
 				parsed.data.projectId,
 				user.id,
 				parsed.data,

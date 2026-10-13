@@ -31,7 +31,6 @@ import {
 	STUDIO_SYSTEM_PROMPT,
 	type StudioDesignMode,
 	type StudioScreenPlan,
-	validateStudioDesignMd,
 	validateStudioDesignMode,
 	validateStudioPrompt,
 } from "@/lib/prompts-ui-studio";
@@ -40,10 +39,16 @@ import {
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
 import { issueStudioAssetCapability } from "@/lib/studio-asset-capability";
+import { resolveStudioDesignReference } from "@/lib/studio-design-reference.server";
 import {
 	enforceDesignSystemOnHtml,
 	extractDesignSystemTokens,
 } from "@/lib/studio-design-system";
+import {
+	type StudioDesignReference,
+	type StudioDesignSkillId,
+	studioGenerationOptionsSchema,
+} from "@/lib/studio-generation-options";
 
 const activeStudioJobs = new Set<string>();
 
@@ -74,6 +79,9 @@ export interface CreateStudioProjectInput {
 	designMode?: StudioDesignMode;
 	designMd?: string | null;
 	logo?: StudioLogoInput | null;
+	designSkillId?: StudioDesignSkillId;
+	initialPageCount?: number;
+	designReference?: StudioDesignReference | null;
 }
 
 export function sanitizeSvg(svgContent: string): string {
@@ -191,14 +199,13 @@ export async function createStudioProject(
 	const checked = validateStudioPrompt(input.prompt);
 	if (!checked.ok) throw new ScrapeError("INVALID_URL", checked.error);
 
-	const designMode = validateStudioDesignMode(input.designMode);
-
-	let cleanDesignMd: string | null = null;
-	if (input.designMd) {
-		const mdChecked = validateStudioDesignMd(input.designMd);
-		if (!mdChecked.ok) throw new ScrapeError("INVALID_URL", mdChecked.error);
-		cleanDesignMd = mdChecked.designMd;
-	}
+	const options = studioGenerationOptionsSchema.parse(input);
+	const designMode = options.designMode;
+	const resolved = resolveStudioDesignReference(
+		options.designReference,
+		options.designMd,
+	);
+	const cleanDesignMd = resolved.designMd;
 
 	let logoAssetId: string | null = null;
 	let logoUrl: string | null = null;
@@ -243,6 +250,9 @@ export async function createStudioProject(
 			designMode,
 			designMd: cleanDesignMd,
 			logoAssetId,
+			designSkillId: options.designSkillId,
+			initialPageCount: options.initialPageCount,
+			designReference: resolved.designReference,
 		} satisfies InsertStudioProjectRow)
 		.returning();
 
@@ -286,14 +296,13 @@ export async function createStudioProjectWithJob(
 	const checked = validateStudioPrompt(input.prompt);
 	if (!checked.ok) throw new ScrapeError("INVALID_URL", checked.error);
 
-	const designMode = validateStudioDesignMode(input.designMode);
-
-	let cleanDesignMd: string | null = null;
-	if (input.designMd) {
-		const mdChecked = validateStudioDesignMd(input.designMd);
-		if (!mdChecked.ok) throw new ScrapeError("INVALID_URL", mdChecked.error);
-		cleanDesignMd = mdChecked.designMd;
-	}
+	const options = studioGenerationOptionsSchema.parse(input);
+	const designMode = options.designMode;
+	const resolved = resolveStudioDesignReference(
+		options.designReference,
+		options.designMd,
+	);
+	const cleanDesignMd = resolved.designMd;
 
 	const cleanTitle =
 		(input.title ?? "").trim().slice(0, 200) ||
@@ -349,6 +358,9 @@ export async function createStudioProjectWithJob(
 				designMode,
 				designMd: cleanDesignMd,
 				logoAssetId,
+				designSkillId: options.designSkillId,
+				initialPageCount: options.initialPageCount,
+				designReference: resolved.designReference,
 			} satisfies InsertStudioProjectRow)
 			.returning();
 
@@ -1260,6 +1272,9 @@ export async function duplicateStudioProject(
 				title: `${source.title.slice(0, 190)} (Salinan)`,
 				designMode: source.designMode,
 				designMd: source.designMd,
+				designSkillId: source.designSkillId,
+				initialPageCount: source.initialPageCount,
+				designReference: source.designReference,
 			} satisfies InsertStudioProjectRow)
 			.returning();
 		if (!copy) throw new ScrapeError("STORAGE_FAILED");
@@ -1342,15 +1357,34 @@ export async function duplicateStudioProject(
 export async function updateStudioDesignSystem(
 	projectId: string,
 	userId: string,
-	input: { designMd: string | null; logo?: StudioLogoInput | null },
+	input: StudioPreferencesInput,
 ): Promise<StudioProjectRow> {
-	const checked = validateStudioDesignMd(input.designMd);
-	if (!checked.ok || !checked.designMd)
-		throw new ScrapeError(
-			"INVALID_URL",
-			checked.ok ? "DESIGN.md diperlukan." : checked.error,
-		);
-	const designMd = checked.designMd;
+	return updateStudioPreferences(projectId, userId, input);
+}
+
+export interface StudioPreferencesInput {
+	designMd?: string | null;
+	designReference?: StudioDesignReference | null;
+	designSkillId?: StudioDesignSkillId;
+	logo?: StudioLogoInput | null;
+}
+
+export async function updateStudioPreferences(
+	projectId: string,
+	userId: string,
+	input: StudioPreferencesInput,
+): Promise<StudioProjectRow> {
+	const hasReference =
+		input.designReference !== undefined || input.designMd !== undefined;
+	const resolved = hasReference
+		? resolveStudioDesignReference(input.designReference, input.designMd)
+		: undefined;
+	const skillId =
+		input.designSkillId === undefined
+			? undefined
+			: studioGenerationOptionsSchema.parse({
+					designSkillId: input.designSkillId,
+				}).designSkillId;
 	const validatedLogo = input.logo ? validateAndProcessLogo(input.logo) : null;
 	const updatedProject = await db.transaction(async (tx) => {
 		const [project] = await tx
@@ -1399,12 +1433,14 @@ export async function updateStudioDesignSystem(
 		const logoUrl = logoAssetId
 			? buildStudioAssetUrl(logoAssetId, userId)
 			: null;
+		const designMd = resolved ? resolved.designMd : project.designMd;
 		const tokens = extractDesignSystemTokens(designMd);
 		const frames = await tx
 			.select()
 			.from(studioFrames)
 			.where(eq(studioFrames.projectId, projectId));
 		for (const frame of frames) {
+			if (!hasReference && input.logo === undefined) continue;
 			if (!frame.htmlCode) continue;
 			let htmlCode = frame.htmlCode;
 			if (input.logo !== undefined && project.logoAssetId) {
@@ -1436,7 +1472,13 @@ export async function updateStudioDesignSystem(
 		}
 		const [updated] = await tx
 			.update(studioProjects)
-			.set({ designMd, logoAssetId, updatedAt: new Date() })
+			.set({
+				designMd,
+				logoAssetId,
+				...(resolved ? { designReference: resolved.designReference } : {}),
+				...(skillId !== undefined ? { designSkillId: skillId } : {}),
+				updatedAt: new Date(),
+			})
 			.where(
 				and(
 					eq(studioProjects.id, projectId),
@@ -1451,7 +1493,10 @@ export async function updateStudioDesignSystem(
 		.select()
 		.from(studioFrames)
 		.where(eq(studioFrames.projectId, projectId));
-	if (targets.some((frame) => frame.status === "ready")) {
+	if (
+		(hasReference || input.logo !== undefined) &&
+		targets.some((frame) => frame.status === "ready")
+	) {
 		await enqueueStudioOperation(projectId, userId, {
 			action: "revise",
 			frameIds: targets

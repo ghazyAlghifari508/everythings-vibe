@@ -22,6 +22,10 @@ import type {
 	CreditPricingVersion,
 } from "@/lib/adaptive-credit";
 import type { CodebaseNameSource } from "@/lib/codebase-library";
+import type {
+	StudioDesignReferenceMetadata,
+	StudioDesignSkillId,
+} from "@/lib/studio-generation-options";
 
 // === TABLES ===
 // ponytail: RLS policies dropped - app-level ownership filters (eq(userId, user.id))
@@ -1027,6 +1031,13 @@ export const studioProjects = pgTable(
 		title: text("title").notNull(),
 		designMode: text("design_mode").notNull().default("web"),
 		designMd: text("design_md"),
+		designSkillId: text("design_skill_id")
+			.$type<StudioDesignSkillId>()
+			.notNull()
+			.default("none"),
+		initialPageCount: integer("initial_page_count"),
+		designReference:
+			jsonb("design_reference").$type<StudioDesignReferenceMetadata>(),
 		logoAssetId: text("logo_asset_id"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
