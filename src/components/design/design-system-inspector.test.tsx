@@ -148,6 +148,7 @@ const MODEL: DesignInspectorModel = {
 			roles: ["canvas", "nav"],
 		},
 	],
+	components: [],
 	baseUnitPx: 4,
 	dos: [
 		{
@@ -178,6 +179,7 @@ const EMPTY_MODEL: DesignInspectorModel = {
 	radii: [],
 	elevation: [],
 	surfaces: [],
+	components: [],
 	baseUnitPx: Number.NaN,
 	dos: [],
 	donts: [],
@@ -579,5 +581,57 @@ describe("palette gallery", () => {
 		expect(screen.getByText(/belum terverifikasi/i)).toBeDefined();
 		expect(screen.getByText("#155eef")).toBeDefined();
 		expect(screen.getByText("#123456")).toBeDefined();
+	});
+});
+
+describe("phase 6 inspector overhaul", () => {
+	it("collapses provenance into a compact disclosure instead of a long banner", () => {
+		renderInspector();
+		expect(
+			screen.queryByText(/bukan klaim brand yang belum terbukti/i),
+		).toBeNull();
+		expect(screen.getByText(/tentang analisis/i)).toBeDefined();
+		expect(screen.getByText(/pengukuran browser/i)).toBeDefined();
+	});
+
+	it("renders spacing bars with a high-contrast fill and a zero indicator", () => {
+		const { container } = renderInspector({
+			...MODEL,
+			spacing: [
+				{ label: "Nol", value: "0px", context: "margin", frequency: 2 },
+				{ label: "Celah", value: "16px", context: "gap", frequency: 3 },
+			],
+			radii: [],
+		});
+		expect(screen.getByText("0", { exact: true })).toBeDefined();
+		const bar = container.querySelector(
+			'[role="img"][aria-label="Celah 16px"]',
+		);
+		expect(bar).toBeDefined();
+		expect((bar as HTMLElement).className).toMatch(/bg-snow/);
+		expect(container.textContent).toMatch(/gap/);
+	});
+
+	it("renders component observations only when the model provides them", () => {
+		const withComponents = renderInspector({
+			...MODEL,
+			components: [
+				{
+					name: "Navigasi",
+					description: "Bar atas dengan tautan primer.",
+					evidence: "Terukur pada 3 elemen.",
+					frequency: 3,
+				},
+			],
+		});
+		expect(
+			screen.getByRole("heading", { name: /pola komponen/i }),
+		).toBeDefined();
+		expect(screen.getByText("Navigasi")).toBeDefined();
+		withComponents.unmount();
+		renderInspector({ ...MODEL, components: [] });
+		expect(
+			screen.queryByRole("heading", { name: /pola komponen/i }),
+		).toBeNull();
 	});
 });

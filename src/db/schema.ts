@@ -22,6 +22,7 @@ import type {
 	CreditPricingVersion,
 } from "@/lib/adaptive-credit";
 import type { CodebaseNameSource } from "@/lib/codebase-library";
+import type { VisualEvidence } from "@/lib/design-visual-evidence";
 import type { ScrapeRequest } from "@/lib/scrape-contract";
 import type {
 	ScrapeImageDiscovery,
@@ -879,6 +880,7 @@ export interface ScrapeMetadata {
 	finalUrl?: string;
 	viewport?: { width: number; height: number };
 	captureMode?: string;
+	visualEvidence?: VisualEvidence;
 	htmlBytes?: number;
 	previewHtmlBytes?: number;
 	stage?: ScrapeStatus;
@@ -889,12 +891,23 @@ export interface ScrapeMetadata {
 	timings?: Record<string, number>;
 	errorMessage?: string;
 	errorDetail?: string;
+	// Last real pipeline stage before the run failed. Lets the progress UI
+	// mark the persisted failure stage instead of guessing where it stopped.
+	failedAtStage?: ScrapeStatus;
 	// Only set when the upstream website supplied a usable Retry-After signal.
 	retryAfterSeconds?: number;
+	// Persisted absolute deadline derived from Retry-After. Lets the UI show a
+	// real remaining wait that stays accurate after refresh, and lets the
+	// backend enforce the cooldown instead of relying on a disabled button.
+	retryAfterExpiresAt?: string;
 	// Tracks whether the optional AI reference summary was applied to a
 	// canonical, evidence-backed DESIGN.md.
 	aiEnrichment?: "applied" | "unavailable";
 	aiEnrichmentDetail?: string;
+	// Structured model version the current DESIGN.md was rendered from.
+	// Lets the inspector distinguish verified current-model documents from
+	// unverified legacy archives without parsing markdown footers.
+	designModelVersion?: number;
 	// Images mode: separates a page that truly has no images from a discovery
 	// or capture failure, and records how the verified resources ended up.
 	imageDiscovery?: ScrapeImageDiscovery;
@@ -1031,6 +1044,17 @@ export const scrapes = pgTable(
 	],
 );
 
+export interface CrawlHeading {
+	level: number;
+	text: string;
+}
+
+export interface CrawlSection {
+	title: string | null;
+	level: number | null;
+	text: string;
+}
+
 export interface CrawlPageContent {
 	outgoingPages?: string[];
 	description: string | null;
@@ -1039,6 +1063,10 @@ export interface CrawlPageContent {
 	links: string[];
 	images: string[];
 	patterns: string[];
+	headingLevels?: CrawlHeading[];
+	sections?: CrawlSection[];
+	internalLinks?: string[];
+	externalLinks?: string[];
 }
 
 export const scrapePages = pgTable(

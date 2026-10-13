@@ -84,7 +84,13 @@ describe("renderDesignMd", () => {
 	it("omits a section rather than filling it with fabricated content", () => {
 		// The fixture has no imagery evidence and the renderer was given none.
 		expect(markdown).not.toContain("## Imagery & Iconography");
-		expect(markdown).not.toContain("## Components");
+		// Observed component patterns are evidence-grounded, so they render
+		// even without AI enrichment.
+		expect(markdown).toContain("## Components");
+		const section = markdown
+			.split("## Components")[1]
+			?.split("## Do's and Don'ts")[0];
+		expect(section).toMatch(/Measured on \d+ .* elements/);
 	});
 
 	it("states limitations honestly", () => {

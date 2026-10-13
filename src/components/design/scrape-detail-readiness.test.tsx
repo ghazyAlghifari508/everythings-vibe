@@ -201,6 +201,49 @@ describe("ScrapeDetail preview readiness", () => {
 		expect(onRetryPreview).toHaveBeenCalledOnce();
 	});
 
+	it("opens the Source HTML tab from the failed preview fallback", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc=""
+				previewState="failed"
+				previewError="Gagal menyiapkan preview scrape."
+				onRetryPreview={vi.fn()}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: /buka source html/i }));
+		expect(
+			screen
+				.getByRole("tab", { name: /Source HTML/i })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+		expect(
+			screen.getByRole("tabpanel", { name: /Source code index\.html/i }),
+		).toBeDefined();
+	});
+
+	it("opens the Source HTML tab from the failed iframe overlay", () => {
+		render(
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<html><body>source</body></html>"
+				previewSrcDoc="<html><body>signed</body></html>"
+				previewState="ready"
+			/>,
+		);
+		act(() => report("failed"));
+		fireEvent.click(screen.getByRole("button", { name: /buka source html/i }));
+		expect(
+			screen
+				.getByRole("tab", { name: /Source HTML/i })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+		expect(
+			screen.getByRole("tabpanel", { name: /Source code index\.html/i }),
+		).toBeDefined();
+	});
+
 	it("keeps the original source available for copy and download when preview fails", () => {
 		const source = "<html><body>Original source</body></html>";
 		const writeText = vi.fn(async () => {});

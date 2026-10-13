@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+	DESIGN_SYNTHESIS_MAX_COLORS,
+	DESIGN_SYNTHESIS_MAX_RADII,
+	DESIGN_SYNTHESIS_MAX_SPACING,
+	DESIGN_SYNTHESIS_MAX_TYPOGRAPHY,
+} from "./constants";
 import type { RenderDesignMdOptions } from "./design-md-render";
 import type { DesignTokenModel } from "./design-model";
 
@@ -83,21 +89,40 @@ export function buildSynthesisInstruction(): string {
 }
 
 // A compact, deterministic view of the model. Sending the whole model would
-// waste context on fields the synthesis cannot cite anyway.
+// waste context on fields the synthesis cannot cite anyway. Arrays are bounded
+// so a large capture cannot overflow the prompt without an explicit marker.
 export function buildSynthesisPayload(model: DesignTokenModel): string {
+	const truncate = <T>(
+		values: T[],
+		max: number,
+	): { slice: T[]; cut: boolean } =>
+		values.length > max
+			? { slice: values.slice(0, max), cut: true }
+			: { slice: values, cut: false };
+	const colors = truncate(model.colors, DESIGN_SYNTHESIS_MAX_COLORS);
+	const typography = truncate(
+		model.typography,
+		DESIGN_SYNTHESIS_MAX_TYPOGRAPHY,
+	);
+	const typefaces = truncate(model.typefaces, DESIGN_SYNTHESIS_MAX_TYPOGRAPHY);
+	const spacing = truncate(model.spacing, DESIGN_SYNTHESIS_MAX_SPACING);
+	const radii = truncate(model.radii, DESIGN_SYNTHESIS_MAX_RADII);
+	const payloadTruncated =
+		colors.cut || typography.cut || typefaces.cut || spacing.cut || radii.cut;
 	return JSON.stringify({
 		sourceUrl: model.sourceUrl,
 		viewport: model.viewport,
 		theme: model.theme,
 		baseUnitPx: Number.isFinite(model.baseUnitPx) ? model.baseUnitPx : null,
-		colors: model.colors.map((color, index) => ({
+		payloadTruncated,
+		colors: colors.slice.map((color, index) => ({
 			index,
 			role: color.role,
 			value: color.value,
 			roleClass: color.roleClass,
 			frequency: color.frequency,
 		})),
-		typography: model.typography.map((entry, index) => ({
+		typography: typography.slice.map((entry, index) => ({
 			index,
 			role: entry.role,
 			family: entry.fontFamily,
@@ -106,7 +131,7 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 			lineHeight: entry.lineHeight,
 			frequency: entry.frequency,
 		})),
-		typefaces: model.typefaces.map((typeface, index) => ({
+		typefaces: typefaces.slice.map((typeface, index) => ({
 			index,
 			family: typeface.family,
 			roles: typeface.roles,
@@ -114,14 +139,14 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 			sizes: typeface.measuredSizes,
 			loadedEvidence: typeface.loadedEvidence,
 		})),
-		spacing: model.spacing.map((token, index) => ({
+		spacing: spacing.slice.map((token, index) => ({
 			index,
 			purpose: token.purpose,
 			property: token.property,
 			value: token.value,
 			frequency: token.frequency,
 		})),
-		radii: model.radii.map((token, index) => ({
+		radii: radii.slice.map((token, index) => ({
 			index,
 			purpose: token.purpose,
 			value: token.value,
@@ -258,10 +283,19 @@ export function synthesisToRenderOptions(
 	};
 }
 
+export type SynthesisCause =
+	| "truncated"
+	| "invalid_json"
+	| "schema"
+	| "unknown_reference"
+	| "provider"
+	| "cancelled";
+
 export interface SynthesisOutcome {
 	synthesis: DesignSynthesis | null;
 	status: "applied" | "unavailable";
 	detail?: string;
+	cause?: SynthesisCause;
 }
 
 // Parses the model's response. A fenced or prose-wrapped object is still the
@@ -271,7 +305,15 @@ export function parseSynthesisResponse(
 	response: string,
 	model: DesignTokenModel,
 	extractJson: (text: string) => string,
+	outcome?: { finishReason?: string },
 ): SynthesisOutcome {
+	if (outcome?.finishReason === "length")
+		return {
+			synthesis: null,
+			status: "unavailable",
+			detail: "AI memotong respons karena batas token.",
+			cause: "truncated",
+		};
 	const direct = response.trim();
 	let parsed: unknown = null;
 	try {
@@ -291,6 +333,7 @@ export function parseSynthesisResponse(
 			synthesis: null,
 			status: "unavailable",
 			detail: "AI tidak mengembalikan JSON yang valid.",
+			cause: "invalid_json",
 		};
 	const result = designSynthesisSchema.safeParse(parsed);
 	if (!result.success)
@@ -298,6 +341,7 @@ export function parseSynthesisResponse(
 			synthesis: null,
 			status: "unavailable",
 			detail: "AI tidak memenuhi kontrak sintesis design system.",
+			cause: "schema",
 		};
 	const issues = validateSynthesis(result.data, model);
 	if (issues.length)
@@ -305,6 +349,7 @@ export function parseSynthesisResponse(
 			synthesis: null,
 			status: "unavailable",
 			detail: issues[0]?.detail ?? "AI merujuk evidence yang tidak tersedia.",
+			cause: "unknown_reference",
 		};
 	return { synthesis: result.data, status: "applied" };
 }

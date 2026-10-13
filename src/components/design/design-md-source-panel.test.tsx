@@ -47,8 +47,10 @@ describe("DesignMdSourcePanel", () => {
 		).toBeDefined();
 	});
 
-	it("exposes no framework tabs or density modes", () => {
+	it("exposes rendered/source tabs without framework tabs", () => {
 		const { container } = renderPanel();
+		expect(screen.getByRole("tab", { name: /rendered/i })).toBeDefined();
+		expect(screen.getByRole("tab", { name: /source/i })).toBeDefined();
 		expect(screen.queryByRole("tab", { name: /tailwind/i })).toBeNull();
 		expect(container.textContent).not.toMatch(/css variables/i);
 		expect(container.textContent).not.toMatch(/design tokens/i);
@@ -59,7 +61,7 @@ describe("DesignMdSourcePanel", () => {
 		renderPanel();
 		const source = screen
 			.getByRole("region", { name: "Sumber DESIGN.md" })
-			.querySelector("pre");
+			.querySelector("#designmd-source-panel");
 		expect(source?.textContent).toBe(DESIGN_MD);
 	});
 
@@ -93,5 +95,24 @@ describe("DesignMdSourcePanel", () => {
 			screen.getByRole("button", { name: /implement ke ai agent/i }),
 		);
 		expect(onImplementAgent).toHaveBeenCalledTimes(1);
+	});
+
+	it("switches between rendered markdown and raw source", () => {
+		const { container } = renderPanel();
+		expect(screen.getByRole("tab", { name: /rendered/i })).toBeDefined();
+		const renderedPanel = container.querySelector("#designmd-rendered-panel");
+		const sourcePanel = container.querySelector("#designmd-source-panel");
+		expect(renderedPanel).toBeDefined();
+		expect(sourcePanel).toBeDefined();
+		expect((renderedPanel as HTMLElement).hidden).toBe(false);
+		expect((sourcePanel as HTMLElement).hidden).toBe(true);
+		fireEvent.click(screen.getByRole("tab", { name: /source/i }));
+		expect((sourcePanel as HTMLElement).hidden).toBe(false);
+		expect((renderedPanel as HTMLElement).hidden).toBe(true);
+		expect(
+			screen
+				.getByRole("tab", { name: /source/i })
+				.getAttribute("aria-selected"),
+		).toBe("true");
 	});
 });

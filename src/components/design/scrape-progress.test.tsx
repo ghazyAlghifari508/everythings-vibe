@@ -1,12 +1,13 @@
 ﻿// @vitest-environment jsdom
-import {
-	act,
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@tanstack/react-router", () => ({
+	Link: ({ to, children, ...rest }: { to: string; children?: ReactNode }) =>
+		createElement("a", { href: to, ...rest }, children),
+}));
+
 import { ScrapeProgress } from "./scrape-progress";
 
 afterEach(() => {
@@ -14,189 +15,125 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-it("keeps authoritative activity unchanged as measured time advances", () => {
-	vi.useFakeTimers();
-	render(
-		<ScrapeProgress
-			mode="design"
-			status="generating"
-			activity="Checking evidence"
-			activityStartedAt={new Date(Date.now() - 12000).toISOString()}
-		/>,
-	);
-	expect(Number.parseFloat(screen.getByRole("timer").textContent ?? "")).toBe(
-		12,
-	);
-	act(() => vi.advanceTimersByTime(5000));
-	expect(Number.parseFloat(screen.getByRole("timer").textContent ?? "")).toBe(
-		17,
-	);
-	// The activity lives only in the left panel: the right panel states the stage
-	// progression and never repeats the same sentence.
-	const leftPanel = screen.getByText("Aktivitas pemrosesan").parentElement;
-	const rightPanel = screen.getByRole("region", {
-		name: /progres DESIGN\.md/i,
+describe("connected vertical stepper", () => {
+	it("marks the live stage with a real spinner, not the legacy dot", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="extracting" />,
+		);
+		expect(
+			container.querySelector("[data-active-stage-spinner]"),
+		).not.toBeNull();
+		expect(container.querySelector("[data-active-stage-marker]")).toBeNull();
 	});
-	expect(leftPanel?.textContent).toContain("Checking evidence");
-	expect(rightPanel.textContent).not.toContain("Checking evidence");
-});
 
-it("has exactly one failure reason and one functional retry", () => {
-	const retry = vi.fn();
-	render(
-		<ScrapeProgress
-			mode="images"
-			status="failed"
-			errorMessage="Asset verification failed"
-			onRetry={retry}
-			partialResults={2}
-		/>,
-	);
-	expect(screen.getAllByRole("alert")).toHaveLength(1);
-	expect(screen.getAllByRole("button")).toHaveLength(1);
-	fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
-	expect(retry).toHaveBeenCalledTimes(1);
-	expect(screen.queryByRole("timer")).toBeNull();
-});
-
-it("does not fabricate counters when no counters have been persisted", () => {
-	render(<ScrapeProgress mode="images" status="capturing" />);
-	expect(screen.queryByText("0")).toBeNull();
-	expect(screen.queryByText(/%/)).toBeNull();
-});
-
-it("disables retry while request is pending", () => {
-	const retry = vi.fn();
-	render(
-		<ScrapeProgress mode="crawl" status="failed" onRetry={retry} isRetrying />,
-	);
-	fireEvent.click(screen.getByRole("button"));
-	expect(retry).not.toHaveBeenCalled();
-});
-
-it("does not keep a timer running after terminal status", () => {
-	vi.useFakeTimers();
-	const { rerender, container } = render(
-		<ScrapeProgress
-			status="capturing"
-			activity="Mengambil halaman"
-			activityStartedAt={new Date().toISOString()}
-		/>,
-	);
-	rerender(
-		<ScrapeProgress
-			status="completed"
-			activity="Mengambil halaman"
-			activityStartedAt={new Date().toISOString()}
-		/>,
-	);
-	expect(screen.queryByRole("timer")).toBeNull();
-	const text = container.textContent;
-	act(() => vi.advanceTimersByTime(10000));
-	expect(container.textContent).toBe(text);
-});
-
-describe("restored processing workspace", () => {
-	it("gives every progress-bar segment a non-zero height so the bar is visible", () => {
+	it("renders exactly one spinner while processing", () => {
 		const { container } = render(
 			<ScrapeProgress mode="design" status="generating" />,
 		);
-		const bar = container.querySelector(".mt-5.flex.h-1\\.5");
-		expect(bar).not.toBeNull();
-		const segments = bar?.querySelectorAll(":scope > span") ?? [];
-		expect(segments.length).toBeGreaterThanOrEqual(2);
+		expect(
+			container.querySelectorAll("[data-active-stage-spinner]"),
+		).toHaveLength(1);
 	});
 
-	it("animates only the active stage segment of the progress bar", () => {
+	it("removes the horizontal segmented progress bar entirely", () => {
 		const { container } = render(
 			<ScrapeProgress mode="design" status="extracting" />,
-		);
-		const segments = container.querySelectorAll("[data-active-stage-segment]");
-		expect(segments).toHaveLength(1);
-		expect(segments[0]?.className).toContain("animate-scrape-progress");
-		expect(segments[0]?.className).toContain("motion-reduce:animate-none");
-	});
-
-	it("keeps later segments neutral until their stage actually starts", () => {
-		const { container } = render(
-			<ScrapeProgress mode="design" status="extracting" />,
-		);
-		const bar = container.querySelector(".mt-5.flex.h-1\\.5");
-		const segments = Array.from(bar?.querySelectorAll(":scope > span") ?? []);
-		// "extracting" is the third stage: queued and capturing are done, the third
-		// segment is live, and everything after it stays neutral.
-		expect(segments[0]?.className).toContain("bg-mist");
-		expect(segments[1]?.className).toContain("bg-mist");
-		expect(
-			segments[2]?.querySelector("[data-active-stage-segment]"),
-		).not.toBeNull();
-		expect(segments[3]?.className).toContain("bg-slate");
-		expect(
-			segments[3]?.querySelector("[data-active-stage-segment]"),
-		).toBeNull();
-		expect(
-			segments[5]?.querySelector("[data-active-stage-segment]"),
-		).toBeNull();
-	});
-
-	it("stops animating once the run reaches a terminal status", () => {
-		const { container } = render(
-			<ScrapeProgress mode="design" status="completed" />,
 		);
 		expect(
 			container.querySelectorAll("[data-active-stage-segment]"),
 		).toHaveLength(0);
+		expect(container.textContent).not.toMatch(/\d+\s*%/);
 	});
 
-	it("removes every redundant spinner from the panel, header and stage list", () => {
-		const { container } = render(
-			<ScrapeProgress mode="design" status="generating" />,
-		);
-		expect(container.querySelectorAll('[class*="animate-spin"]')).toHaveLength(
-			0,
-		);
-	});
-
-	it("marks the live stage without spinning a replacement indicator", () => {
+	it("connects every stage with one continuous connector per gap", () => {
 		const { container } = render(
 			<ScrapeProgress mode="design" status="extracting" />,
 		);
-		const marker = container.querySelector("[data-active-stage-marker]");
-		expect(marker).not.toBeNull();
-		expect(marker?.className).not.toContain("animate-spin");
+		const list = screen.getByRole("list", { name: "Tahapan pemrosesan" });
+		const items = list.querySelectorAll("li");
+		const connectors = container.querySelectorAll("[data-step-connector]");
+		expect(connectors).toHaveLength(items.length - 1);
+		for (const connector of connectors) {
+			expect(connector.getAttribute("data-connector-state")).toMatch(
+				/^(done|active|pending)$/,
+			);
+		}
 	});
 
-	it("keeps the two-column layout with the activity panel beside the stages", () => {
+	it("announces the live stage once through aria-current", () => {
 		const { container } = render(
-			<ScrapeProgress mode="design" status="capturing" />,
+			<ScrapeProgress mode="design" status="extracting" />,
 		);
-		const grid = container.firstElementChild;
-		expect(grid?.className).toContain(
-			"lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]",
-		);
-		expect(screen.getByText("Aktivitas pemrosesan")).toBeDefined();
-		expect(
-			screen.getByRole("region", { name: /progres DESIGN\.md/i }),
-		).toBeDefined();
+		expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
 	});
 
-	it("reports a real activity message through the shared ThoughtLine", () => {
-		render(
-			<ScrapeProgress
-				mode="design"
-				status="generating"
-				activity="Menyusun tabel dari evidence visual"
-			/>,
-		);
+	it("marks completed stages and keeps upcoming stages neutral", () => {
+		render(<ScrapeProgress mode="design" status="extracting" />);
+		const list = screen.getByRole("list", { name: "Tahapan pemrosesan" });
+		const items = list.querySelectorAll("li");
+		expect(items).toHaveLength(6);
+		expect(items[0]?.querySelector("svg")).not.toBeNull();
+		expect(items[1]?.querySelector("svg")).not.toBeNull();
 		expect(
-			screen.getAllByText("Menyusun tabel dari evidence visual").length,
-		).toBeGreaterThan(0);
+			items[2]?.querySelector("[data-active-stage-spinner]"),
+		).not.toBeNull();
+		expect(items[3]?.querySelector("svg")).toBeNull();
+		expect(items[3]?.querySelector("[data-active-stage-spinner]")).toBeNull();
 	});
 
-	it("shows no activity line at all while the job is still queued", () => {
+	it("stops the spinner once the run reaches a terminal status", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="completed" />,
+		);
+		expect(
+			container.querySelectorAll("[data-active-stage-spinner]"),
+		).toHaveLength(0);
+	});
+});
+
+describe("honest stages per mode", () => {
+	it("renders the full six stages for design mode", () => {
+		render(<ScrapeProgress mode="design" status="extracting" />);
+		expect(
+			screen
+				.getByRole("list", { name: "Tahapan pemrosesan" })
+				.querySelectorAll("li"),
+		).toHaveLength(6);
+	});
+
+	it("renders five stages for html mode", () => {
+		render(<ScrapeProgress mode="html" status="extracting" />);
+		expect(
+			screen
+				.getByRole("list", { name: "Tahapan pemrosesan" })
+				.querySelectorAll("li"),
+		).toHaveLength(5);
+	});
+
+	it("renders four stages for images mode", () => {
+		render(<ScrapeProgress mode="images" status="extracting" />);
+		expect(
+			screen
+				.getByRole("list", { name: "Tahapan pemrosesan" })
+				.querySelectorAll("li"),
+		).toHaveLength(4);
+	});
+
+	it("renders only the stages crawl actually persists", () => {
+		render(<ScrapeProgress mode="crawl" status="capturing" />);
+		expect(
+			screen
+				.getByRole("list", { name: "Tahapan pemrosesan" })
+				.querySelectorAll("li"),
+		).toHaveLength(3);
+	});
+});
+
+describe("truthful activity", () => {
+	it("shows a single waiting line while the job is still queued", () => {
 		render(<ScrapeProgress mode="design" status="queued" />);
-		expect(screen.getAllByText(/menunggu worker/i).length).toBeGreaterThan(0);
-		expect(screen.queryByText(/menganalisis/i)).toBeNull();
+		expect(screen.getByText("Aktivitas terbaru")).toBeDefined();
+		expect(screen.getAllByText(/menunggu giliran/i).length).toBeGreaterThan(0);
 		expect(screen.queryByRole("timer")).toBeNull();
 	});
 
@@ -213,32 +150,105 @@ describe("restored processing workspace", () => {
 		).toBeDefined();
 	});
 
-	it("marks completed stages and keeps upcoming stages neutral", () => {
-		const { container } = render(
-			<ScrapeProgress mode="design" status="extracting" />,
+	it("reports the persisted activity verbatim without repeating the stage", () => {
+		render(
+			<ScrapeProgress
+				mode="design"
+				status="generating"
+				activity="Menyusun tabel dari evidence visual"
+			/>,
 		);
-		const list = screen.getByRole("list", { name: "Tahapan pemrosesan" });
-		const items = list.querySelectorAll("li");
-		expect(items).toHaveLength(6);
-		expect(items[0]?.querySelector("svg")).not.toBeNull();
-		expect(items[1]?.querySelector("svg")).not.toBeNull();
+		const leftPanel = screen.getByText("Aktivitas terbaru").parentElement;
+		const rightPanel = screen.getByRole("region", {
+			name: /progres DESIGN\.md/i,
+		});
+		expect(leftPanel?.textContent).toContain(
+			"Menyusun tabel dari evidence visual",
+		);
+		expect(rightPanel.textContent).not.toContain(
+			"Menyusun tabel dari evidence visual",
+		);
+	});
+
+	it("does not fabricate counters when no counters have been persisted", () => {
+		render(<ScrapeProgress mode="images" status="capturing" />);
+		expect(screen.queryByText("0")).toBeNull();
+		expect(screen.queryByText(/%/)).toBeNull();
+	});
+});
+
+describe("failed state delegates to the shared error card", () => {
+	it("has exactly one failure reason and one functional retry", () => {
+		const retry = vi.fn();
+		render(
+			<ScrapeProgress
+				mode="images"
+				status="failed"
+				errorMessage="Asset verification failed"
+				onRetry={retry}
+				partialResults={2}
+			/>,
+		);
+		expect(screen.getAllByRole("alert")).toHaveLength(1);
+		expect(screen.getAllByRole("button")).toHaveLength(1);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Coba lagi jika tersedia" }),
+		);
+		expect(retry).toHaveBeenCalledTimes(1);
+		expect(screen.queryByRole("timer")).toBeNull();
+	});
+
+	it("disables retry while request is pending", () => {
+		const retry = vi.fn();
+		render(
+			<ScrapeProgress
+				mode="crawl"
+				status="failed"
+				onRetry={retry}
+				isRetrying
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button"));
+		expect(retry).not.toHaveBeenCalled();
+	});
+});
+
+describe("layout flexibility", () => {
+	it("keeps the two-panel composition by default", () => {
+		const { container } = render(
+			<ScrapeProgress mode="design" status="capturing" />,
+		);
+		expect(container.firstElementChild?.getAttribute("data-layout")).toBe(
+			"two-panel",
+		);
+		expect(screen.getByText("Aktivitas terbaru")).toBeDefined();
 		expect(
-			items[2]?.querySelector("[data-active-stage-marker]"),
-		).not.toBeNull();
-		expect(items[3]?.querySelector("svg")).toBeNull();
-		expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
+			screen.getByRole("region", { name: /progres DESIGN\.md/i }),
+		).toBeDefined();
 	});
 
-	it("keeps a crawl stage list honest about its own stages", () => {
-		render(<ScrapeProgress mode="crawl" status="extracting" />);
-		const list = screen.getByRole("list", { name: "Tahapan pemrosesan" });
-		expect(list.querySelectorAll("li")).toHaveLength(4);
-	});
-
-	it("never shows a percentage because no stage completion is measured", () => {
+	it("stacks activity above progress in single-panel composition", () => {
 		const { container } = render(
-			<ScrapeProgress mode="design" status="extracting" />,
+			<ScrapeProgress mode="design" status="capturing" layout="single" />,
 		);
-		expect(container.textContent).not.toMatch(/\d+\s*%/);
+		expect(container.firstElementChild?.getAttribute("data-layout")).toBe(
+			"single",
+		);
+		expect(screen.getByText("Aktivitas terbaru")).toBeDefined();
+		expect(
+			screen.getByRole("region", { name: /progres DESIGN\.md/i }),
+		).toBeDefined();
+	});
+
+	it("uses a gallery-aligned single panel for images", () => {
+		const { container } = render(
+			<ScrapeProgress mode="images" status="capturing" />,
+		);
+		expect(container.firstElementChild?.getAttribute("data-layout")).toBe(
+			"single",
+		);
+		expect(
+			screen.getByRole("region", { name: /progres Scrape Images/i }),
+		).toBeDefined();
 	});
 });

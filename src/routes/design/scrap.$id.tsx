@@ -11,7 +11,7 @@ import {
 	resolveScrapeContentWidth,
 	resolveScrapeView,
 } from "@/components/design/scrape-view-state";
-import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
+import type { ScrapeMetadata, ScrapeMode, ScrapeStatus } from "@/db/schema";
 import { useScrapePreview } from "@/hooks/use-scrape-preview";
 import {
 	toScrapeStatusSnapshot,
@@ -70,6 +70,7 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 			preview,
 			designMd: scrape.document?.designMd ?? "",
 			metadata: scrape.metadata,
+			request: scrape.request ?? null,
 			capturedAt:
 				scrape.metadata &&
 				typeof scrape.metadata === "object" &&
@@ -166,19 +167,26 @@ function ScrapeDetailPage() {
 	});
 	const previewSrcDoc = preview?.srcDoc ?? "";
 
-	const metadata = (data?.metadata ?? initial.metadata) as Record<
-		string,
-		unknown
-	> | null;
+	const metadata = (data?.metadata ??
+		initial.metadata) as ScrapeMetadata | null;
 	// Polled results win so rows persisted after the initial load appear without
 	// a reload; the loader snapshot only seeds the first render.
 	const pages = data?.pages ?? initial.pages;
 	const images = data?.images ?? initial.images;
+	const hasVerifiedImages = images.some(
+		(image) => image.status === "completed",
+	);
+	const isTerminalStatus =
+		currentStatus === "completed" || currentStatus === "failed";
 	const errorMessage =
 		requestError ??
 		(metadata && typeof metadata === "object" && "errorMessage" in metadata
 			? String(metadata.errorMessage)
 			: null);
+	const errorDetail = metadata?.errorDetail ?? null;
+	const failedAtStage = metadata?.failedAtStage ?? null;
+	const retryAfterSeconds = metadata?.retryAfterSeconds ?? null;
+	const retryAfterExpiresAt = metadata?.retryAfterExpiresAt ?? null;
 	const stageStartedAt =
 		metadata &&
 		typeof metadata === "object" &&
@@ -210,6 +218,36 @@ function ScrapeDetailPage() {
 
 	const contentWidth = resolveScrapeContentWidth(view, mode);
 
+	const polledRequest =
+		data && typeof data === "object" && "request" in data
+			? (data.request ?? null)
+			: null;
+	const initialRequest =
+		"request" in initial ? (initial.request ?? null) : null;
+	const crawlRequest = polledRequest ?? initialRequest;
+	const crawlScope =
+		crawlRequest &&
+		typeof crawlRequest === "object" &&
+		"mode" in crawlRequest &&
+		crawlRequest.mode === "crawl" &&
+		"settings" in crawlRequest &&
+		crawlRequest.settings &&
+		typeof crawlRequest.settings === "object"
+			? {
+					maxPages: crawlRequest.settings.maxPages,
+					maxDepth: crawlRequest.settings.maxDepth,
+					followSubdomains: crawlRequest.settings.followSubdomains,
+					urlRegex: crawlRequest.settings.urlRegex,
+				}
+			: undefined;
+	const capturedAt =
+		(data?.metadata &&
+		typeof data.metadata === "object" &&
+		"capturedAt" in data.metadata &&
+		typeof data.metadata.capturedAt === "string"
+			? data.metadata.capturedAt
+			: null) ?? initial.capturedAt;
+
 	return (
 		<main
 			className={`flex w-full flex-col gap-6 py-10 sm:py-14 ${
@@ -227,8 +265,19 @@ function ScrapeDetailPage() {
 						sourceUrl={sourceUrl}
 						domain={domain}
 						errorMessage={errorMessage}
+						errorDetail={errorDetail}
+						failedAtStage={failedAtStage}
+						retryAfterSeconds={retryAfterSeconds}
+						retryAfterExpiresAt={retryAfterExpiresAt}
+						layout={mode === "images" ? "single" : "two-panel"}
 						isRetrying={isRetrying}
 						onRetry={retry}
+						imageDiscovery={data?.metadata?.imageDiscovery ?? null}
+						imageOutcome={data?.metadata?.imageOutcome ?? null}
+						discoveredImages={data?.metadata?.discoveredImages}
+						savedImages={data?.metadata?.savedImages}
+						processedImages={data?.metadata?.processedImages}
+						failedResources={data?.metadata?.failedResources}
 						partialResults={
 							mode === "crawl"
 								? pages.filter((page) => page.status === "completed").length
@@ -239,10 +288,17 @@ function ScrapeDetailPage() {
 			{mode === "crawl" &&
 			(currentStatus === "completed" ||
 				(currentStatus === "failed" && pages.length > 0)) ? (
-				<CrawlResult pages={pages} sourceUrl={sourceUrl} />
+				<CrawlResult
+					pages={pages}
+					sourceUrl={sourceUrl}
+					scope={crawlScope}
+					capturedAt={capturedAt ?? undefined}
+					domain={domain}
+				/>
 			) : mode === "images" &&
 				(currentStatus === "completed" ||
-					(currentStatus === "failed" && images.length > 0)) ? (
+					(currentStatus === "failed" && images.length > 0) ||
+					(!isTerminalStatus && hasVerifiedImages)) ? (
 				<ImagesResult
 					images={images}
 					sourceUrl={sourceUrl}
@@ -254,6 +310,8 @@ function ScrapeDetailPage() {
 					domain={domain}
 					designMd={designMd}
 					visualEvidence={metadata?.visualEvidence}
+					enrichment={metadata?.aiEnrichment}
+					enrichmentDetail={metadata?.aiEnrichmentDetail}
 				/>
 			) : view === "result-html" ? (
 				<ScrapeDetail
@@ -286,11 +344,16 @@ function ScrapeDetailPage() {
 					processedImages={
 						data?.metadata?.processedImages ?? initial.metadata?.processedImages
 					}
+					layout={mode === "html" || mode === "images" ? "single" : "two-panel"}
 					mode={mode}
 					status={currentStatus}
 					sourceUrl={sourceUrl}
 					domain={domain}
 					errorMessage={errorMessage}
+					errorDetail={errorDetail}
+					failedAtStage={failedAtStage}
+					retryAfterSeconds={retryAfterSeconds}
+					retryAfterExpiresAt={retryAfterExpiresAt}
 					isRetrying={isRetrying}
 					onRetry={retry}
 					stageStartedAt={stageStartedAt}

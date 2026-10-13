@@ -8,7 +8,8 @@ import {
 	Loader2,
 	RotateCw,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CodebaseSourcePreview } from "@/components/codebase/codebase-source-preview";
 import type { ScrapePreviewState } from "@/hooks/use-scrape-preview";
 import {
 	SCRAPE_DESKTOP_HEIGHT,
@@ -122,6 +123,13 @@ export function ScrapeDetail({
 	const [copied, setCopied] = useState(false);
 	const [frameReport, setFrameReport] = useState<FrameReport>("preparing");
 	const [previewAttempt, setPreviewAttempt] = useState(0);
+	const sourceSizeBytes = useMemo(
+		() =>
+			previewHtml.length > 0
+				? new TextEncoder().encode(previewHtml).length
+				: null,
+		[previewHtml],
+	);
 	const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -199,7 +207,7 @@ export function ScrapeDetail({
 				aria-label="Hasil HTML"
 				className="overflow-hidden rounded-xl border border-graphite bg-charcoal"
 			>
-				<div className="flex items-center justify-between gap-2 border-b border-graphite px-3 py-2">
+				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-graphite px-3 py-2">
 					<div
 						role="tablist"
 						aria-label="Tampilan HTML"
@@ -221,13 +229,14 @@ export function ScrapeDetail({
 							role="tab"
 							aria-selected={htmlViewTab === "preview"}
 							onClick={() => setHtmlViewTab("preview")}
-							className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
+							className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
 								htmlViewTab === "preview"
 									? "bg-charcoal text-snow"
 									: "text-fog hover:text-mist"
 							}`}
 						>
 							<Eye size={16} aria-hidden />
+							<span>Preview</span>
 						</button>
 						<button
 							aria-label="Source HTML"
@@ -245,13 +254,15 @@ export function ScrapeDetail({
 							role="tab"
 							aria-selected={htmlViewTab === "code"}
 							onClick={() => setHtmlViewTab("code")}
-							className={`rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
+							className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
 								htmlViewTab === "code"
 									? "bg-charcoal text-snow"
 									: "text-fog hover:text-mist"
 							}`}
 						>
 							<Code size={16} aria-hidden />
+							<span className="hidden sm:inline">Source HTML</span>
+							<span className="sm:hidden">HTML</span>
 						</button>
 					</div>
 					<div className="flex shrink-0 items-center gap-1">
@@ -289,10 +300,6 @@ export function ScrapeDetail({
 					aria-label="Preview index.html"
 					hidden={htmlViewTab !== "preview"}
 				>
-					<p className="border-b border-graphite px-3 py-2 text-xs text-fog">
-						Snapshot visual hasil scrape. Interaksi aplikasi website tidak
-						dijalankan ulang.
-					</p>
 					{previewState === "failed" || !previewSrcDoc ? (
 						<PreviewUnavailable
 							message={
@@ -303,6 +310,7 @@ export function ScrapeDetail({
 							isRetryable={previewState === "failed"}
 							isLoading={previewState === "loading"}
 							onRetry={onRetryPreview}
+							onOpenSource={() => setHtmlViewTab("code")}
 						/>
 					) : (
 						<DesktopPreview
@@ -317,6 +325,7 @@ export function ScrapeDetail({
 								setPreviewAttempt((attempt) => attempt + 1);
 								onRetryPreview?.();
 							}}
+							onOpenSource={() => setHtmlViewTab("code")}
 						/>
 					)}
 				</div>
@@ -325,9 +334,14 @@ export function ScrapeDetail({
 					aria-label="Source code index.html"
 					hidden={htmlViewTab === "preview"}
 				>
-					<pre className="max-h-[720px] overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist">
-						{previewHtml}
-					</pre>
+					<div className="max-h-[720px] bg-onyx p-3">
+						<CodebaseSourcePreview
+							path="index.html"
+							content={previewHtml}
+							truncated={false}
+							sizeBytes={sourceSizeBytes}
+						/>
+					</div>
 				</div>
 
 				{notice ? (
@@ -345,11 +359,13 @@ function PreviewUnavailable({
 	isRetryable,
 	isLoading = false,
 	onRetry,
+	onOpenSource,
 }: {
 	message: string;
 	isRetryable: boolean;
 	isLoading?: boolean;
 	onRetry?: () => void;
+	onOpenSource?: () => void;
 }) {
 	return (
 		<div className="flex min-h-[280px] flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
@@ -367,14 +383,26 @@ function PreviewUnavailable({
 				Source HTML asli tetap tersedia di tab Source HTML.
 			</p>
 			{isRetryable && onRetry ? (
-				<button
-					type="button"
-					onClick={onRetry}
-					className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					<RotateCw size={14} aria-hidden />
-					Coba lagi
-				</button>
+				<div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+					<button
+						type="button"
+						onClick={onRetry}
+						className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						<RotateCw size={14} aria-hidden />
+						Coba lagi
+					</button>
+					{onOpenSource ? (
+						<button
+							type="button"
+							onClick={onOpenSource}
+							className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							<Code size={14} aria-hidden />
+							Buka Source HTML
+						</button>
+					) : null}
+				</div>
 			) : null}
 		</div>
 	);
@@ -383,9 +411,11 @@ function PreviewUnavailable({
 function PreviewCanvasOverlay({
 	report,
 	onRetry,
+	onOpenSource,
 }: {
 	report: FrameReport;
 	onRetry?: () => void;
+	onOpenSource?: () => void;
 }) {
 	const { label, detail } = READINESS_MESSAGE[report];
 	if (report === "ready") return null;
@@ -418,13 +448,24 @@ function PreviewCanvasOverlay({
 			<output className="text-sm font-semibold text-snow">{label}</output>
 			<p className="max-w-md text-xs leading-5 text-fog">{detail}</p>
 			{(report === "failed" || report === "empty") && onRetry ? (
-				<button
-					type="button"
-					onClick={onRetry}
-					className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					Coba lagi
-				</button>
+				<div className="flex flex-wrap items-center justify-center gap-2">
+					<button
+						type="button"
+						onClick={onRetry}
+						className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						Coba lagi
+					</button>
+					{onOpenSource ? (
+						<button
+							type="button"
+							onClick={onOpenSource}
+							className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							Buka Source HTML
+						</button>
+					) : null}
+				</div>
 			) : null}
 		</div>
 	);
@@ -437,6 +478,7 @@ function DesktopPreview({
 	active = true,
 	onReport,
 	onRetry,
+	onOpenSource,
 }: {
 	title: string;
 	srcDoc: string;
@@ -444,6 +486,7 @@ function DesktopPreview({
 	active?: boolean;
 	onReport?: (report: FrameReport) => void;
 	onRetry?: () => void;
+	onOpenSource?: () => void;
 }) {
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const [scale, setScale] = useState(1);
@@ -623,7 +666,11 @@ function DesktopPreview({
 							transformOrigin: "top left",
 						}}
 					/>
-					<PreviewCanvasOverlay report={report} onRetry={onRetry} />
+					<PreviewCanvasOverlay
+						report={report}
+						onRetry={onRetry}
+						onOpenSource={onOpenSource}
+					/>
 				</div>
 			</div>
 		</div>

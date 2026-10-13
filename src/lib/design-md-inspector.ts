@@ -1,5 +1,9 @@
 import { parseVisualEvidence } from "./design-evidence-contract";
-import { buildDesignModel, type DesignTokenModel } from "./design-model";
+import {
+	buildDesignModel,
+	type DesignTokenModel,
+	MODEL_VERSION,
+} from "./design-model";
 import {
 	designIssues,
 	designMdVersionOf,
@@ -89,6 +93,13 @@ export interface InspectorGuideline {
 	evidence: string;
 }
 
+export interface InspectorComponent {
+	name: string;
+	description: string;
+	evidence: string;
+	frequency: number;
+}
+
 export interface DesignInspectorModel {
 	verification: InspectorVerification;
 	modelVersion: number;
@@ -103,6 +114,7 @@ export interface DesignInspectorModel {
 	radii: InspectorRadiusToken[];
 	elevation: InspectorElevationToken[];
 	surfaces: InspectorSurface[];
+	components: InspectorComponent[];
 	baseUnitPx: number;
 	dos: InspectorGuideline[];
 	donts: InspectorGuideline[];
@@ -132,8 +144,64 @@ export function inspectorFromEvidence(
 }
 
 // A rendered document is consistent with its evidence when the measured values
-// it must contain are all present.
-function documentMatchesEvidence(
+// it must contain are all present. A single shared string is never sufficient:
+// version, origin and a meaningful share of canonical measurements must match.
+export function documentMatchesEvidence(
+	document: string,
+	evidence: {
+		elements: { properties: Record<string, string> }[];
+		sourceUrl?: string;
+		viewport?: { width: number; height: number };
+	},
+): boolean {
+	if (designMdVersionOf(document) < MODEL_VERSION) return false;
+	if (evidence.sourceUrl && !document.includes(evidence.sourceUrl))
+		return false;
+	if (evidence.viewport) {
+		const dims = `${evidence.viewport.width}x${evidence.viewport.height}`;
+		if (!document.includes(dims)) return false;
+	}
+	let model: DesignTokenModel;
+	try {
+		const parsed = parseVisualEvidence(
+			evidence.sourceUrl
+				? evidence
+				: { ...evidence, sourceUrl: "", viewport: { width: 1, height: 1 } },
+		);
+		if (!parsed) {
+			return fallbackStringMatch(document, evidence);
+		}
+		model = buildDesignModel(parsed);
+	} catch {
+		return fallbackStringMatch(document, evidence);
+	}
+	const canonical: string[] = [
+		...model.colors.map((color) => color.value),
+		...model.typography.map((entry) => entry.fontSize),
+		...model.spacing.map((token) => token.value),
+		...model.radii.map((token) => token.value),
+		...model.surfaces.map((surface) => surface.value),
+	].filter((value) => value.trim().length > 0);
+	if (!canonical.length) return fallbackStringMatch(document, evidence);
+	let matched = 0;
+	for (const value of new Set(canonical)) {
+		if (document.includes(`\`${value}\``) || document.includes(value)) {
+			// Avoid substring false positives for bare lengths: 8px must not
+			// match inside 48px unless the fenced form matched.
+			if (
+				/^\d/.test(value) &&
+				!document.includes(`\`${value}\``) &&
+				!document.includes(` ${value} `)
+			)
+				continue;
+			matched += 1;
+		}
+	}
+	const coverage = matched / new Set(canonical).size;
+	return matched >= 3 && coverage >= 0.4;
+}
+
+function fallbackStringMatch(
 	document: string,
 	evidence: {
 		elements: { properties: Record<string, string> }[];
@@ -143,10 +211,10 @@ function documentMatchesEvidence(
 	for (const element of evidence.elements)
 		for (const value of Object.values(element.properties))
 			if (value.trim().length > 0) measured.add(value);
-	// The document must reference at least one measured value; an unrelated
-	// document would contain none.
-	for (const value of measured) if (document.includes(value)) return true;
-	return false;
+	let matched = 0;
+	for (const value of measured)
+		if (document.includes(`\`${value}\``)) matched += 1;
+	return matched >= 3;
 }
 
 export function inspectorFromModel(
@@ -220,6 +288,12 @@ export function inspectorFromModel(
 			frequency: surface.frequency,
 			roles: surface.roles,
 		})),
+		components: (model.observedComponents ?? []).map((component) => ({
+			name: component.name,
+			description: component.description,
+			evidence: component.evidence,
+			frequency: component.frequency,
+		})),
 		baseUnitPx: model.baseUnitPx,
 		dos: model.guidelines.dos,
 		donts: model.guidelines.donts,
@@ -250,6 +324,7 @@ const EMPTY_MODEL: DesignInspectorModel = {
 	radii: [],
 	elevation: [],
 	surfaces: [],
+	components: [],
 	baseUnitPx: Number.NaN,
 	dos: [],
 	donts: [],

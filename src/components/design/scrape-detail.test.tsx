@@ -259,7 +259,8 @@ describe("ScrapeDetail", () => {
 		expect(
 			screen.getByRole("tabpanel", { name: /Source code index\.html/i })
 				.textContent,
-		).toBe(source);
+		).toContain(source);
+		expect(screen.getByTestId("codebase-source-preview")).toBeDefined();
 		fireEvent.click(screen.getByRole("button", { name: /Salin HTML/i }));
 		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
 		expect(writeText).toHaveBeenCalledWith(source);
@@ -278,7 +279,8 @@ describe("ScrapeDetail", () => {
 		expect(
 			screen.getByRole("tabpanel", { name: /Source code index\.html/i })
 				.textContent,
-		).toBe(source);
+		).toContain(source);
+		expect(screen.getByTestId("codebase-source-preview")).toBeDefined();
 		fireEvent.click(screen.getByRole("tab", { name: /^Preview$/i }));
 		expect(
 			screen.getByRole("tabpanel", { name: /Preview index\.html/i }),

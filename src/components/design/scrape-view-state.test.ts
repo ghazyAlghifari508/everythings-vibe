@@ -65,10 +65,10 @@ describe("resolveScrapeView", () => {
 			).toBe("progress");
 		}
 	});
-	it("uses a wide canvas only for successful result views", () => {
+	it("uses a wide canvas for progress and result views", () => {
 		expect(resolveScrapeContentWidth("result-design")).toBe("wide");
 		expect(resolveScrapeContentWidth("result-html")).toBe("wide");
-		expect(resolveScrapeContentWidth("progress", "html")).toBe("bounded");
+		expect(resolveScrapeContentWidth("progress", "html")).toBe("wide");
 	});
 
 	it("uses the wide Style Inspector geometry for DESIGN.md processing", () => {

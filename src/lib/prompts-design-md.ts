@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+	DESIGN_SYNTHESIS_DETAIL_MAX_CHARS,
+	DESIGN_SYNTHESIS_MAX_TOKENS,
+} from "./constants";
 import { ScrapeError } from "./design-errors";
 import { visualEvidenceSchema } from "./design-evidence-contract";
 import {
@@ -127,7 +131,7 @@ async function synthesizeWithEvidence(
 				{ role: "user", content: buildSynthesisPayload(model) },
 			],
 			signal,
-			2000,
+			DESIGN_SYNTHESIS_MAX_TOKENS,
 		);
 		let response = stream.firstChunk;
 		for await (const chunk of stream.generator) {
@@ -139,16 +143,19 @@ async function synthesizeWithEvidence(
 			stream.abortController.abort();
 			throw new ScrapeError("AI_GENERATION_FAILED", "Generation dibatalkan.");
 		}
-		return parseSynthesisResponse(response, model, extractJson);
+		return parseSynthesisResponse(response, model, extractJson, stream.outcome);
 	} catch (error) {
 		if (signal?.aborted) throw error;
+		const raw =
+			error instanceof Error && error.message
+				? error.message
+				: "AI synthesis tidak tersedia.";
+		const cause = /abort|batal/i.test(raw) ? "cancelled" : "provider";
 		return {
 			synthesis: null,
 			status: "unavailable",
-			detail:
-				error instanceof Error && error.message
-					? error.message
-					: "AI synthesis tidak tersedia.",
+			detail: raw.slice(0, DESIGN_SYNTHESIS_DETAIL_MAX_CHARS),
+			cause: cause as SynthesisOutcome["cause"],
 		};
 	}
 }

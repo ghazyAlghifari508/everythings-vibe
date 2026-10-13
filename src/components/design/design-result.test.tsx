@@ -112,7 +112,7 @@ describe("DesignResult", () => {
 			screen.getByRole("heading", { name: /spacing & bentuk/i }),
 		).toBeDefined();
 		expect(screen.getByRole("heading", { name: /panduan/i })).toBeDefined();
-		expect(screen.getByText("DESIGN.md")).toBeDefined();
+		expect(screen.getAllByText("DESIGN.md").length).toBeGreaterThan(0);
 		expect(
 			screen.getByRole("button", { name: "Salin DESIGN.md" }),
 		).toBeDefined();
@@ -125,9 +125,11 @@ describe("DesignResult", () => {
 		expect(container.textContent).toContain("# Acme - Style Reference");
 	});
 
-	it("exposes no framework tabs or density modes", () => {
+	it("exposes rendered/source tabs without framework tabs", () => {
 		const { container } = renderResult();
-		expect(screen.queryByRole("tab")).toBeNull();
+		expect(screen.getByRole("tab", { name: /rendered/i })).toBeDefined();
+		expect(screen.getByRole("tab", { name: /source/i })).toBeDefined();
+		expect(screen.queryByRole("tab", { name: /tailwind/i })).toBeNull();
 		expect(container.textContent).not.toMatch(/css variables/i);
 		expect(container.textContent).not.toMatch(/design tokens/i);
 		expect(container.textContent).not.toMatch(/compact|extended/i);
@@ -148,5 +150,15 @@ describe("DesignResult", () => {
 			throw new Error("Expected the prompt control to be a textarea");
 		}
 		expect(prompt.value.endsWith(`## DESIGN.md\n\n${rawSource}`)).toBe(true);
+	});
+
+	it("exposes section navigation and a mobile inspector/design switch", () => {
+		renderResult();
+		expect(
+			screen.getByRole("navigation", { name: /bagian style reference/i }),
+		).toBeDefined();
+		expect(screen.getByRole("link", { name: "Colors" })).toBeDefined();
+		expect(screen.getByRole("button", { name: "Inspector" })).toBeDefined();
+		expect(screen.getByRole("button", { name: "DESIGN.md" })).toBeDefined();
 	});
 });

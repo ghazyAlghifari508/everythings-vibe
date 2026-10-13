@@ -1,6 +1,11 @@
-import type { CrawlPageContent } from "@/db/schema";
+import type { CrawlHeading, CrawlPageContent, CrawlSection } from "@/db/schema";
+import {
+	CRAWL_DESCRIPTION_MAX_CHARS,
+	CRAWL_HEADING_MAX_CHARS,
+	CRAWL_SECTION_TEXT_MAX_CHARS,
+} from "./constants";
 import { matchesCrawlUrl } from "./crawl-url-filter";
-import { extractPageTitle } from "./fetch-html";
+import { decodeHtmlEntities, extractPageTitle } from "./fetch-html";
 import type { CrawlSettings } from "./scrape-contract";
 
 export interface CrawledPage {
@@ -88,13 +93,86 @@ export function robotsAllows(content: string, path: string): boolean {
 }
 
 function textOf(html: string): string {
-	return html
+	const stripped = html
 		.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "")
-		.replace(/<[^>]+>/g, " ")
-		.replace(/&nbsp;/g, " ")
-		.replace(/&amp;/g, "&")
-		.replace(/\s+/g, " ")
-		.trim();
+		.replace(/<[^>]+>/g, " ");
+	return decodeHtmlEntities(stripped).replace(/\s+/g, " ").trim();
+}
+
+function extractHeadings(body: string): CrawlHeading[] {
+	const matches = [...body.matchAll(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h[1-6]>/gi)];
+	return matches
+		.map((match) => {
+			const level = Number.parseInt(match[1], 10);
+			const text = textOf(match[2]).slice(0, CRAWL_HEADING_MAX_CHARS);
+			return { level, text };
+		})
+		.filter((row) => row.text.length > 0);
+}
+
+function extractSections(body: string): CrawlSection[] {
+	const boundaries: { index: number; level: number; title: string }[] = [];
+	for (const match of body.matchAll(
+		/<h([1-6])\b[^>]*>([\s\S]*?)<\/h[1-6]>/gi,
+	)) {
+		const title = textOf(match[2]).slice(0, CRAWL_HEADING_MAX_CHARS).trim();
+		if (!title) continue;
+		const level = Number.parseInt(match[1], 10);
+		const index = match.index ?? 0;
+		boundaries.push({ index, level, title });
+	}
+	if (boundaries.length === 0) {
+		const text = textOf(body).slice(0, CRAWL_SECTION_TEXT_MAX_CHARS);
+		return text ? [{ title: null, level: null, text }] : [];
+	}
+	const sections: CrawlSection[] = [];
+	for (let i = 0; i < boundaries.length; i++) {
+		const current = boundaries[i];
+		const next = boundaries[i + 1];
+		const slice = body.slice(current.index, next ? next.index : body.length);
+		const withoutHeading = slice.replace(
+			/<h[1-6]\b[^>]*>[\s\S]*?<\/h[1-6]>/i,
+			" ",
+		);
+		const text = textOf(withoutHeading).slice(0, CRAWL_SECTION_TEXT_MAX_CHARS);
+		if (!text) continue;
+		sections.push({ title: current.title, level: current.level, text });
+	}
+	return sections;
+}
+
+function extractDescription(html: string): string | null {
+	const metaTags = [...html.matchAll(/<meta\b[^>]*>/gi)].map(
+		(match) => match[0],
+	);
+	for (const tag of metaTags) {
+		const attrs = [...tag.matchAll(/(\w+)\s*=\s*["']([^"']*)["']/gi)];
+		const lower: Record<string, string> = {};
+		for (const attr of attrs) lower[attr[1].toLowerCase()] = attr[2];
+		const name = lower.name ?? lower.property ?? "";
+		if (
+			name.toLowerCase() === "description" ||
+			name.toLowerCase() === "og:description"
+		) {
+			const raw = lower.content ?? "";
+			const decoded = decodeHtmlEntities(raw).replace(/\s+/g, " ").trim();
+			if (decoded) return decoded.slice(0, CRAWL_DESCRIPTION_MAX_CHARS);
+		}
+	}
+	return null;
+}
+
+function extractMainBody(html: string, mainContentOnly: boolean): string {
+	if (!mainContentOnly)
+		return html.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i)?.[1] ?? html;
+	const main =
+		html.match(/<main\b[^>]*>([\s\S]*?)<\/main\s*>/i)?.[1] ??
+		html.match(/<article\b[^>]*>([\s\S]*?)<\/article\s*>/i)?.[1] ??
+		html.match(
+			/<div\b[^>]*role=["']main["'][^>]*>([\s\S]*?)<\/div\s*>/i,
+		)?.[1] ??
+		html;
+	return main.replace(/<(nav|footer|aside)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
 }
 
 function resources(html: string, attribute: string, base: string): string[] {
@@ -107,7 +185,8 @@ function resources(html: string, attribute: string, base: string): string[] {
 		...new Set(
 			values.flatMap((match) => {
 				try {
-					const url = new URL(match[1].replace(/&amp;/g, "&"), base);
+					const decoded = decodeHtmlEntities(match[1]);
+					const url = new URL(decoded, base);
 					url.hash = "";
 					return ["http:", "https:"].includes(url.protocol) ? [url.href] : [];
 				} catch {
@@ -201,30 +280,24 @@ export async function crawlWebsite(
 					"href",
 					captured.finalUrl,
 				);
-				const body = settings.mainContentOnly
-					? (
-							captured.html.match(
-								/<(?:main|article)\b[^>]*>([\s\S]*?)<\/(?:main|article)\s*>/i,
-							)?.[1] ?? captured.html
-						).replace(/<(nav|footer|aside)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "")
-					: (captured.html.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i)?.[1] ??
-						captured.html);
+				const body = extractMainBody(captured.html, settings.mainContentOnly);
+				const headingLevels = extractHeadings(body);
+				const outgoingPages = links.filter((url) =>
+					isCrawlScope(url, seed, settings.followSubdomains),
+				);
+				const internalLinks = outgoingPages;
+				const externalLinks = links.filter(
+					(url) => !isCrawlScope(url, seed, settings.followSubdomains),
+				);
 				page = {
 					...page,
 					status: "completed",
 					title: extractPageTitle(captured.html),
 					httpStatus: captured.status,
 					content: {
-						outgoingPages: links.filter((url) =>
-							isCrawlScope(url, seed, settings.followSubdomains),
-						),
-						description:
-							captured.html.match(
-								/<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i,
-							)?.[1] ?? null,
-						headings: [
-							...body.matchAll(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/gi),
-						].map((match) => textOf(match[1])),
+						outgoingPages,
+						description: extractDescription(captured.html),
+						headings: headingLevels.map((row) => row.text),
 						text: textOf(body),
 						links: settings.includeLinks ? links : [],
 						images: settings.includeImages
@@ -239,6 +312,10 @@ export async function crawlWebsite(
 						patterns: ["nav", "header", "footer", "form", "table"].filter(
 							(tag) => new RegExp(`<${tag}\\b`, "i").test(captured.html),
 						),
+						headingLevels,
+						sections: extractSections(body),
+						internalLinks: settings.includeLinks ? internalLinks : [],
+						externalLinks: settings.includeLinks ? externalLinks : [],
 					},
 				};
 				if (next.depth < settings.maxDepth)

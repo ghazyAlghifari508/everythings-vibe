@@ -17,21 +17,32 @@ function scrapeErrorResponse(error: unknown): Response {
 		const status =
 			error.code === "QUEUE_CAPACITY"
 				? 409
-				: error.code === "RATE_LIMITED"
+				: error.code === "RATE_LIMITED" || error.code === "WEBSITE_RATE_LIMITED"
 					? 429
 					: error.code === "INVALID_URL" || error.code === "PRIVATE_URL_BLOCKED"
 						? 400
 						: error.code === "WEBSITE_BLOCKED" ||
 								error.code === "FETCH_TIMEOUT" ||
-								error.code === "WEBSITE_RATE_LIMITED" ||
 								error.code === "WEBSITE_ACCESS_DENIED" ||
 								error.code === "WEBSITE_NOT_FOUND" ||
 								error.code === "WEBSITE_SERVER_ERROR"
 							? 502
 							: 500;
+		const headers: Record<string, string> = {};
+		if (
+			typeof error.retryAfterSeconds === "number" &&
+			Number.isFinite(error.retryAfterSeconds)
+		)
+			headers["Retry-After"] = String(Math.ceil(error.retryAfterSeconds));
 		return Response.json(
-			{ error: error.message, code: error.code },
-			{ status },
+			{
+				error: error.message,
+				code: error.code,
+				...(typeof error.retryAfterSeconds === "number"
+					? { retryAfterSeconds: error.retryAfterSeconds }
+					: {}),
+			},
+			{ status, headers },
 		);
 	}
 	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message))
