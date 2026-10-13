@@ -22,6 +22,12 @@ it("resolves canonical themes and rejects unknown identity or meaningless upload
 			"This text contains no design tokens.",
 		),
 	).toThrow();
+	expect(() =>
+		resolveStudioDesignReference(
+			{ kind: "custom", filename: "style.md" },
+			"# Sample\n| Canvas | #12345 | Background |",
+		),
+	).toThrow();
 	const custom = resolveStudioDesignReference(
 		{ kind: "custom", filename: "style.md" },
 		"# Sample\nFont: Arial\n| Canvas | #ffffff | Background |",

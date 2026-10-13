@@ -293,17 +293,15 @@ export function enforceDesignSystemOnHtml(
 	logoUrl?: string | null,
 ): string {
 	let output = html;
-	if (tokens) {
-		output = output
-			.replace(
-				/<style\b[^>]*id=["']studio-design-tokens["'][^>]*>[\s\S]*?<\/style>/gi,
-				"",
-			)
-			.replace(
-				/<script\b[^>]*id=["']studio-tailwind-tokens["'][^>]*>[\s\S]*?<\/script>/gi,
-				"",
-			);
-	}
+	output = output
+		.replace(
+			/<style\b[^>]*id=["']studio-design-tokens["'][^>]*>[\s\S]*?<\/style>/gi,
+			"",
+		)
+		.replace(
+			/<script\b[^>]*id=["']studio-tailwind-tokens["'][^>]*>[\s\S]*?<\/script>/gi,
+			"",
+		);
 
 	// 1. Inject design system tokens into <head> if tokens exist
 	if (tokens && !output.includes("studio-design-tokens")) {

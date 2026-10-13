@@ -50,6 +50,18 @@ const sampleDesignMd = `# MindMarket — Style Reference
 `;
 
 describe("Studio Design System", () => {
+	it("removes enforced token blocks when a reference is explicitly removed", () => {
+		const old = enforceDesignSystemOnHtml(
+			"<html><head></head><body>Sample</body></html>",
+			extractDesignSystemTokens(sampleDesignMd),
+		);
+		expect(enforceDesignSystemOnHtml(old, null)).not.toContain(
+			"studio-design-tokens",
+		);
+		expect(enforceDesignSystemOnHtml(old, null)).not.toContain(
+			"studio-tailwind-tokens",
+		);
+	});
 	it("reads the import modal's three-column color format and explicit font without inventing missing tokens", () => {
 		const tokens = extractDesignSystemTokens(
 			"# Sample\n| Name | Hex | Role |\n| Canvas | #ececec | Background |\n| Primary | #224488 | Brand |\nFont: Arial\n### Components\n",

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import { ScrapeError } from "./design-errors";
 import { validateStudioDesignMd } from "./prompts-ui-studio";
 import { extractDesignSystemTokens } from "./studio-design-system";
@@ -47,6 +48,19 @@ export function resolveStudioDesignReference(
 	if (Buffer.byteLength(raw ?? "", "utf8") > STUDIO_DESIGN_FILE_MAX_BYTES)
 		throw new ScrapeError("INVALID_URL", "Ukuran file desain melebihi batas.");
 	const tokens = extractDesignSystemTokens(checked.designMd);
+	const colors = tokens
+		? [
+				...Object.values(tokens.colors).filter(
+					(value): value is string => typeof value === "string",
+				),
+				...Object.values(tokens.colors.accents),
+			]
+		: [];
+	const validColor = z
+		.string()
+		.regex(/^#(?:[a-f0-9]{3}|[a-f0-9]{4}|[a-f0-9]{6}|[a-f0-9]{8})$/i);
+	if (colors.some((color) => !validColor.safeParse(color).success))
+		throw new ScrapeError("INVALID_URL", "Token warna DESIGN.md tidak valid.");
 	if (
 		!tokens ||
 		(!tokens.typography.fontFamily &&
