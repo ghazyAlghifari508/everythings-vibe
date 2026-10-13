@@ -18,7 +18,10 @@ import {
 } from "@/db/schema";
 import { extractCleanHtml } from "@/lib/clean-html";
 import {
+	STUDIO_FRAME_CONCURRENCY,
 	STUDIO_FRAME_MAX_TOKENS,
+	STUDIO_FRAME_RETRY_MAX,
+	STUDIO_JOB_CLAIM_TTL_MS,
 	STUDIO_LOGO_ALLOWED_MIMES,
 	STUDIO_LOGO_MAX_BYTES,
 	STUDIO_PLANNING_MAX_TOKENS,
@@ -69,6 +72,149 @@ export function isTemporarySlot(
 		(frame.description ?? "") === "" &&
 		frame.htmlCode == null
 	);
+}
+
+// Bounded worker pool: menjalankan tugas dengan maksimal `limit` in-flight.
+// Tugas yang sudah mulai tidak pernah dibatalkan oleh kegagalan tugas lain.
+export async function runWithConcurrency<T>(
+	tasks: Array<() => Promise<T>>,
+	limit: number,
+): Promise<T[]> {
+	const results: T[] = new Array(tasks.length);
+	let cursor = 0;
+	const workers = Array.from(
+		{ length: Math.max(1, Math.min(limit, tasks.length)) },
+		async () => {
+			while (cursor < tasks.length) {
+				const index = cursor++;
+				const task = tasks[index];
+				if (!task) continue;
+				results[index] = await task();
+			}
+		},
+	);
+	await Promise.all(workers);
+	return results;
+}
+
+// Klasifikasi error provider: retryable (rate limit/transien) vs permanen.
+// Hanya mencocokkan pola error infrastruktur generik, bukan isi domain user.
+export function isRetryableProviderError(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : String(error);
+	return /429|rate.?limit|too many requests|timeout|timed out|econn|socket|temporar|unavailable|overloaded|try again/i.test(
+		message,
+	);
+}
+
+// Klaim atomic atas sebuah job: satu UPDATE pendek, transaksi langsung dilepas.
+// Mengembalikan baris job bila klaim berhasil, null bila job sudah dipegang
+// worker lain (lease masih segar) atau sudah terminal. TIDAK PERNAH menahan
+// transaksi selama panggilan AI eksternal.
+export async function claimStudioJob(
+	jobId: string,
+	userId: string,
+	workerId: string,
+	ttlMs: number = STUDIO_JOB_CLAIM_TTL_MS,
+	claimableStatuses: string[] = ["queued", "planning", "generating"],
+): Promise<StudioJobRow | null> {
+	const now = new Date();
+	const [claimed] = await db
+		.update(studioJobs)
+		.set({
+			claimedBy: workerId,
+			claimedAt: now,
+			leaseExpiresAt: new Date(now.getTime() + ttlMs),
+			attempts: sql`${studioJobs.attempts} + 1`,
+			startedAt: sql`coalesce(${studioJobs.startedAt}, now())`,
+			updatedAt: now,
+		})
+		.where(
+			and(
+				eq(studioJobs.id, jobId),
+				eq(studioJobs.userId, userId),
+				inArray(studioJobs.status, claimableStatuses),
+				or(
+					isNull(studioJobs.leaseExpiresAt),
+					sql`${studioJobs.leaseExpiresAt} < now()`,
+				),
+			),
+		)
+		.returning();
+	return claimed ?? null;
+}
+
+export interface InitialFrameContext {
+	frame: StudioFrameRow;
+	jobPrompt: string;
+	allScreenNames: string[];
+	designSkillId: StudioDesignSkillId;
+	designMd: string | null;
+	logoUrl: string | null;
+	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
+}
+
+// Generate satu frame awal: klaim status independen, bounded retry hanya
+// untuk error provider retryable, persist independen. Kegagalan satu frame
+// tidak membatalkan frame lain; hasilnya digabung oleh pemanggil sesuai
+// urutan frame asli.
+export async function generateInitialFrame(
+	ctx: InitialFrameContext,
+): Promise<{ ok: true; htmlCode: string } | { ok: false; error: string }> {
+	const { frame } = ctx;
+	if (frame.status === "ready" && frame.htmlCode) {
+		return { ok: true, htmlCode: frame.htmlCode };
+	}
+	await db
+		.update(studioFrames)
+		.set({
+			status: "generating",
+			attempts: sql`${studioFrames.attempts} + 1`,
+			updatedAt: new Date(),
+		})
+		.where(eq(studioFrames.id, frame.id));
+	const framePrompt = buildStudioFramePrompt({
+		screenName: frame.name,
+		screenDescription: frame.description ?? undefined,
+		allScreens: ctx.allScreenNames,
+		projectPrompt: ctx.jobPrompt,
+		designMode: validateStudioDesignMode(frame.viewport),
+		designMd: ctx.designMd,
+		logoUrl: ctx.logoUrl,
+	});
+	let attempt = 0;
+	for (;;) {
+		try {
+			const rawHtml = await generateStudioHtml(
+				framePrompt,
+				STUDIO_FRAME_MAX_TOKENS,
+				ctx.designSkillId,
+			);
+			const htmlCode = enforceDesignSystemOnHtml(
+				rawHtml,
+				ctx.dsTokens,
+				ctx.logoUrl,
+			);
+			await db
+				.update(studioFrames)
+				.set({ htmlCode, status: "ready", error: null, updatedAt: new Date() })
+				.where(eq(studioFrames.id, frame.id));
+			return { ok: true, htmlCode };
+		} catch (frameErr) {
+			const retryable = isRetryableProviderError(frameErr);
+			if (retryable && attempt < STUDIO_FRAME_RETRY_MAX) {
+				attempt++;
+				await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+				continue;
+			}
+			const errorMsg =
+				frameErr instanceof Error ? frameErr.message : "Gagal generate frame";
+			await db
+				.update(studioFrames)
+				.set({ status: "failed", error: errorMsg, updatedAt: new Date() })
+				.where(eq(studioFrames.id, frame.id));
+			return { ok: false, error: errorMsg };
+		}
+	}
 }
 
 export interface StudioProjectDetail extends StudioProjectRow {
@@ -501,7 +647,19 @@ export async function runStudioJobPipeline(
 			.from(studioJobs)
 			.where(and(eq(studioJobs.id, jobId), eq(studioJobs.userId, userId)))
 			.limit(1);
-		if (!job || job.status === "completed") return;
+		if (
+			!job ||
+			job.status === "completed" ||
+			job.status === "partial" ||
+			job.status === "failed"
+		)
+			return;
+
+		// Klaim atomic lintas proses: hanya satu worker yang memegang job ini.
+		// Klaim dilepas (transaksi pendek) sebelum panggilan AI eksternal.
+		const workerId = crypto.randomUUID();
+		const claimed = await claimStudioJob(job.id, userId, workerId);
+		if (!claimed) return;
 
 		const [project] = await db
 			.select()
@@ -734,53 +892,29 @@ export async function runStudioJobPipeline(
 			.where(eq(studioJobs.id, jobId));
 
 		const allScreenNames = framesToProcess.map((f) => f.name);
+
+		const frameResults = await runWithConcurrency(
+			framesToProcess.map(
+				(frame) => () =>
+					generateInitialFrame({
+						frame,
+						jobPrompt: job.prompt,
+						allScreenNames,
+						designSkillId: project.designSkillId,
+						designMd: project.designMd,
+						logoUrl,
+						dsTokens,
+					}),
+			),
+			STUDIO_FRAME_CONCURRENCY,
+		);
+
 		let readyCount = 0;
 		let firstReadyHtml: string | null = null;
-
-		for (const frame of framesToProcess) {
-			if (frame.status === "ready" && frame.htmlCode) {
+		for (const result of frameResults) {
+			if (result.ok) {
 				readyCount++;
-				if (!firstReadyHtml) firstReadyHtml = frame.htmlCode;
-				continue;
-			}
-
-			try {
-				await db
-					.update(studioFrames)
-					.set({ status: "generating", updatedAt: new Date() })
-					.where(eq(studioFrames.id, frame.id));
-
-				const framePrompt = buildStudioFramePrompt({
-					screenName: frame.name,
-					screenDescription: frame.description ?? undefined,
-					allScreens: allScreenNames,
-					projectPrompt: job.prompt,
-					designMode: validateStudioDesignMode(frame.viewport),
-					designMd: project.designMd,
-					logoUrl,
-				});
-
-				const rawHtml = await generateStudioHtml(
-					framePrompt,
-					undefined,
-					project.designSkillId,
-				);
-				const htmlCode = enforceDesignSystemOnHtml(rawHtml, dsTokens, logoUrl);
-
-				await db
-					.update(studioFrames)
-					.set({ htmlCode, status: "ready", updatedAt: new Date() })
-					.where(eq(studioFrames.id, frame.id));
-
-				readyCount++;
-				if (!firstReadyHtml) firstReadyHtml = htmlCode;
-			} catch (frameErr) {
-				const errorMsg =
-					frameErr instanceof Error ? frameErr.message : "Gagal generate frame";
-				await db
-					.update(studioFrames)
-					.set({ status: "failed", error: errorMsg, updatedAt: new Date() })
-					.where(eq(studioFrames.id, frame.id));
+				if (!firstReadyHtml) firstReadyHtml = result.htmlCode;
 			}
 		}
 
@@ -1877,143 +2011,166 @@ export async function enqueueStudioOperation(
 }
 
 async function runStudioFrameOperation(job: StudioJobRow) {
-	await db.transaction(async (tx) => {
-		const slot = await tx.execute<{ acquired: boolean }>(
-			sql`select pg_try_advisory_xact_lock(hashtext('studio-frame-worker')) as acquired`,
-		);
-		if (!slot.rows[0]?.acquired) return;
-		await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${job.id}))`);
-		const [current] = await tx
-			.select()
-			.from(studioJobs)
-			.where(and(eq(studioJobs.id, job.id), eq(studioJobs.userId, job.userId)))
-			.limit(1);
-		if (
-			!current ||
-			current.status === "completed" ||
-			current.status === "failed"
+	// Klaim lease atomic menggantikan advisory lock: transaksi pendek untuk
+	// klaim, AI di luar transaksi, persist dalam transaksi pendek terpisah.
+	// Tidak ada transaksi yang ditahan selama panggilan model eksternal.
+	const workerId = crypto.randomUUID();
+	const claimed = await claimStudioJob(job.id, job.userId, workerId);
+	if (!claimed) return;
+	const [project] = await db
+		.select()
+		.from(studioProjects)
+		.where(
+			and(
+				eq(studioProjects.id, job.projectId),
+				eq(studioProjects.userId, job.userId),
+			),
 		)
-			return;
-		const [project] = await tx
-			.select()
-			.from(studioProjects)
-			.where(
-				and(
-					eq(studioProjects.id, job.projectId),
-					eq(studioProjects.userId, job.userId),
-				),
-			)
-			.limit(1);
-		if (!project || !job.targetFrameId)
-			throw new ScrapeError(
-				"WEBSITE_BLOCKED",
-				"Target operasi tidak ditemukan.",
-			);
-		const frames = await tx
-			.select()
-			.from(studioFrames)
-			.where(eq(studioFrames.projectId, project.id))
-			.orderBy(asc(studioFrames.order));
-		const frame = frames.find((entry) => entry.id === job.targetFrameId);
-		if (!frame)
-			throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
+		.limit(1);
+	if (!project || !job.targetFrameId) return;
+	const frames = await db
+		.select()
+		.from(studioFrames)
+		.where(eq(studioFrames.projectId, project.id))
+		.orderBy(asc(studioFrames.order));
+	const frame = frames.find((entry) => entry.id === job.targetFrameId);
+	if (!frame) {
 		await db
 			.update(studioJobs)
-			.set({ status: "generating", updatedAt: new Date() })
-			.where(and(eq(studioJobs.id, job.id), eq(studioJobs.userId, job.userId)));
-		await db
-			.update(studioFrames)
-			.set({ status: "generating", updatedAt: new Date() })
+			.set({
+				status: "failed",
+				error: "Frame tidak ditemukan.",
+				updatedAt: new Date(),
+			})
+			.where(
+				and(eq(studioJobs.id, job.id), eq(studioJobs.claimedBy, workerId)),
+			);
+		return;
+	}
+	await db
+		.update(studioJobs)
+		.set({ status: "generating", updatedAt: new Date() })
+		.where(and(eq(studioJobs.id, job.id), eq(studioJobs.claimedBy, workerId)));
+	await db
+		.update(studioFrames)
+		.set({
+			status: "generating",
+			attempts: sql`${studioFrames.attempts} + 1`,
+			updatedAt: new Date(),
+		})
+		.where(
+			and(
+				eq(studioFrames.id, frame.id),
+				eq(studioFrames.projectId, project.id),
+			),
+		);
+	try {
+		const [original] = await db
+			.select()
+			.from(studioJobs)
 			.where(
 				and(
-					eq(studioFrames.id, frame.id),
-					eq(studioFrames.projectId, project.id),
+					eq(studioJobs.projectId, project.id),
+					eq(studioJobs.userId, job.userId),
+					eq(studioJobs.jobType, "initial"),
 				),
+			)
+			.orderBy(asc(studioJobs.createdAt))
+			.limit(1);
+		let name = frame.name;
+		if (job.jobType === "add") {
+			const { generator, firstChunk } = await tryStreamWithFallback(
+				selectModels(),
+				[
+					{
+						role: "system",
+						content:
+							'Name the requested new application screen. Return only JSON {"name": string} with a concise meaningful screen name.',
+					},
+					{
+						role: "user",
+						content: `Project: ${original?.prompt ?? project.title}\nExisting screens: ${frames.map((entry) => entry.name).join(", ")}\nRequest: ${job.prompt}`,
+					},
+				],
+				undefined,
+				1000,
 			);
-		try {
-			const [original] = await tx
-				.select()
-				.from(studioJobs)
+			let raw = firstChunk;
+			for await (const chunk of generator) raw += chunk;
+			const parsed: unknown = JSON.parse(
+				raw.replace(/^```(?:json)?\s*|\s*```$/g, "").trim(),
+			);
+			if (
+				typeof parsed !== "object" ||
+				parsed === null ||
+				!("name" in parsed) ||
+				typeof parsed.name !== "string" ||
+				!parsed.name.trim()
+			)
+				throw new ScrapeError(
+					"AI_GENERATION_FAILED",
+					"AI tidak menghasilkan nama layar yang valid.",
+				);
+			name = parsed.name.trim().slice(0, 100);
+			await db
+				.update(studioFrames)
+				.set({ name })
 				.where(
 					and(
-						eq(studioJobs.projectId, project.id),
-						eq(studioJobs.userId, job.userId),
-						eq(studioJobs.jobType, "initial"),
+						eq(studioFrames.id, frame.id),
+						eq(studioFrames.projectId, project.id),
+					),
+				);
+		}
+		const logoUrl = project.logoAssetId
+			? buildStudioAssetUrl(project.logoAssetId, job.userId)
+			: null;
+		const prompt = buildStudioFramePrompt({
+			screenName: name,
+			screenDescription: frame.description ?? undefined,
+			allScreens: frames.map((entry) =>
+				entry.id === frame.id ? name : entry.name,
+			),
+			projectPrompt: original?.prompt ?? project.title,
+			designMode: validateStudioDesignMode(frame.viewport),
+			designMd: project.designMd,
+			logoUrl,
+			previousHtml:
+				job.jobType === "revise" ? (frame.htmlCode ?? undefined) : undefined,
+		});
+		const raw = await generateStudioHtml(
+			`${prompt}\n\nUSER CHANGE INSTRUCTION: ${job.prompt}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
+			undefined,
+			project.designSkillId,
+		);
+		const htmlCode = enforceDesignSystemOnHtml(
+			raw,
+			extractDesignSystemTokens(project.designMd),
+			logoUrl,
+		);
+		// Persist dalam transaksi pendek dengan deletion guard dan ownership
+		// guard. Jika project dihapus atau lease berpindah tangan selama AI
+		// bekerja, persist dilewati (no-op aman) agar tidak menimpa hasil baru.
+		await db.transaction(async (tx) => {
+			const [stillThere] = await tx
+				.select({ id: studioProjects.id })
+				.from(studioProjects)
+				.where(
+					and(
+						eq(studioProjects.id, project.id),
+						eq(studioProjects.userId, job.userId),
 					),
 				)
-				.orderBy(asc(studioJobs.createdAt))
-				.limit(1);
-			let name = frame.name;
-			if (job.jobType === "add") {
-				const { generator, firstChunk } = await tryStreamWithFallback(
-					selectModels(),
-					[
-						{
-							role: "system",
-							content:
-								'Name the requested new application screen. Return only JSON {"name": string} with a concise meaningful screen name.',
-						},
-						{
-							role: "user",
-							content: `Project: ${original?.prompt ?? project.title}\nExisting screens: ${frames.map((entry) => entry.name).join(", ")}\nRequest: ${job.prompt}`,
-						},
-					],
-					undefined,
-					1000,
-				);
-				let raw = firstChunk;
-				for await (const chunk of generator) raw += chunk;
-				const parsed: unknown = JSON.parse(
-					raw.replace(/^```(?:json)?\s*|\s*```$/g, "").trim(),
-				);
-				if (
-					typeof parsed !== "object" ||
-					parsed === null ||
-					!("name" in parsed) ||
-					typeof parsed.name !== "string" ||
-					!parsed.name.trim()
+				.for("update");
+			if (!stillThere) return;
+			const [owned] = await tx
+				.select({ id: studioJobs.id })
+				.from(studioJobs)
+				.where(
+					and(eq(studioJobs.id, job.id), eq(studioJobs.claimedBy, workerId)),
 				)
-					throw new ScrapeError(
-						"AI_GENERATION_FAILED",
-						"AI tidak menghasilkan nama layar yang valid.",
-					);
-				name = parsed.name.trim().slice(0, 100);
-				await db
-					.update(studioFrames)
-					.set({ name })
-					.where(
-						and(
-							eq(studioFrames.id, frame.id),
-							eq(studioFrames.projectId, project.id),
-						),
-					);
-			}
-			const logoUrl = project.logoAssetId
-				? buildStudioAssetUrl(project.logoAssetId, job.userId)
-				: null;
-			const prompt = buildStudioFramePrompt({
-				screenName: name,
-				screenDescription: frame.description ?? undefined,
-				allScreens: frames.map((entry) =>
-					entry.id === frame.id ? name : entry.name,
-				),
-				projectPrompt: original?.prompt ?? project.title,
-				designMode: validateStudioDesignMode(frame.viewport),
-				designMd: project.designMd,
-				logoUrl,
-				previousHtml:
-					job.jobType === "revise" ? (frame.htmlCode ?? undefined) : undefined,
-			});
-			const raw = await generateStudioHtml(
-				`${prompt}\n\nUSER CHANGE INSTRUCTION: ${job.prompt}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
-				undefined,
-				project.designSkillId,
-			);
-			const htmlCode = enforceDesignSystemOnHtml(
-				raw,
-				extractDesignSystemTokens(project.designMd),
-				logoUrl,
-			);
+				.limit(1);
+			if (!owned) return;
 			await tx
 				.update(studioFrames)
 				.set({
@@ -2029,16 +2186,6 @@ async function runStudioFrameOperation(job: StudioJobRow) {
 						eq(studioFrames.projectId, project.id),
 					),
 				);
-			await tx
-				.select()
-				.from(studioProjects)
-				.where(
-					and(
-						eq(studioProjects.id, project.id),
-						eq(studioProjects.userId, job.userId),
-					),
-				)
-				.for("update");
 			const [latest] = await tx
 				.select()
 				.from(studioRevisions)
@@ -2055,33 +2202,33 @@ async function runStudioFrameOperation(job: StudioJobRow) {
 				.update(studioJobs)
 				.set({ status: "completed", error: null, updatedAt: new Date() })
 				.where(
-					and(eq(studioJobs.id, job.id), eq(studioJobs.userId, job.userId)),
+					and(eq(studioJobs.id, job.id), eq(studioJobs.claimedBy, workerId)),
 				);
-		} catch (failure) {
-			const error =
-				failure instanceof Error ? failure.message : "AI gagal membuat layar.";
-			await tx
-				.update(studioFrames)
-				.set({ status: "failed", error, updatedAt: new Date() })
-				.where(
-					and(
-						eq(studioFrames.id, frame.id),
-						eq(studioFrames.projectId, project.id),
-					),
-				);
-			await tx
-				.update(studioJobs)
-				.set({ status: "failed", error, updatedAt: new Date() })
-				.where(
-					and(eq(studioJobs.id, job.id), eq(studioJobs.userId, job.userId)),
-				);
-		}
-	});
+		});
+	} catch (failure) {
+		const error =
+			failure instanceof Error ? failure.message : "AI gagal membuat layar.";
+		await db
+			.update(studioFrames)
+			.set({ status: "failed", error, updatedAt: new Date() })
+			.where(
+				and(
+					eq(studioFrames.id, frame.id),
+					eq(studioFrames.projectId, project.id),
+				),
+			);
+		await db
+			.update(studioJobs)
+			.set({ status: "failed", error, updatedAt: new Date() })
+			.where(
+				and(eq(studioJobs.id, job.id), eq(studioJobs.claimedBy, workerId)),
+			);
+	}
 }
 
 export async function generateStudioHtml(
 	prompt: string,
-	maxTokens = 12_000,
+	maxTokens = STUDIO_FRAME_MAX_TOKENS,
 	designSkillId: StudioDesignSkillId = "none",
 ): Promise<string> {
 	const { generator, firstChunk } = await tryStreamWithFallback(
