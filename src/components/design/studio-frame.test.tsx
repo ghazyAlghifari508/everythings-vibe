@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
-import { StudioFrame, isFrameVisualPending } from "./studio-frame";
+import { isFrameVisualPending, StudioFrame } from "./studio-frame";
 import { StudioFrameShimmer } from "./studio-frame-shimmer";
 
 describe("StudioFrameShimmer", () => {
@@ -81,6 +81,9 @@ describe("StudioFrame", () => {
 			status: "queued",
 			order: 0,
 			error: null,
+			attempts: 0,
+			visualHash: null,
+			promptHash: null,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			...overrides,
