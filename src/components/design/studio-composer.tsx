@@ -1,5 +1,6 @@
 import { ArrowUp, Loader2, X } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { shouldSubmitComposerEvent } from "./composer-keyboard";
 
 export type StudioComposerScope = "add" | "revise" | "project";
 
@@ -116,11 +117,7 @@ export function StudioComposer({
 						aria-label="Instruksi desain"
 						onChange={(event) => setPrompt(event.target.value)}
 						onKeyDown={(event) => {
-							if (
-								event.key === "Enter" &&
-								!event.shiftKey &&
-								!event.nativeEvent.isComposing
-							) {
+							if (shouldSubmitComposerEvent(event)) {
 								event.preventDefault();
 								void submit();
 							}
