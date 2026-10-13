@@ -404,6 +404,62 @@ describe("StudioCanvas", () => {
 		expect(surface.style.transform).not.toBe(before);
 	});
 
+	it("registers the wheel listener non-passively so ctrl+wheel stays on the canvas", () => {
+		const addEventListener = vi.spyOn(
+			HTMLElement.prototype,
+			"addEventListener",
+		);
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		const registrations = addEventListener.mock.calls.filter(
+			([type]) => type === "wheel",
+		);
+		// React attaches wheel passively, which is why the canvas registers its
+		// own listener: without passive:false the browser also zooms the page.
+		expect(
+			registrations.some(
+				([, , options]) =>
+					typeof options === "object" &&
+					options !== null &&
+					"passive" in options &&
+					options.passive === false,
+			),
+		).toBe(true);
+		addEventListener.mockRestore();
+	});
+
+	it("does not move the view again once the user has positioned it", () => {
+		const { rerender } = render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		const surface = screen.getByTestId("studio-canvas-surface");
+		fireEvent.click(screen.getByRole("button", { name: "Perbesar" }));
+		const afterUserZoom = surface.style.transform;
+		// A later measurement must not yank the view the user is working in.
+		rerender(
+			<StudioCanvas
+				project={mockProject}
+				frames={[...mockFrames]}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		expect(screen.getByTestId("studio-canvas-surface").style.transform).toBe(
+			afterUserZoom,
+		);
+	});
+
 	it("ignores arrow keys while focus is inside a control", () => {
 		render(
 			<StudioCanvas

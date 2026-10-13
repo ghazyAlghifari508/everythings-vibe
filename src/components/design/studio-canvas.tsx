@@ -145,23 +145,37 @@ export const StudioCanvas = memo(function StudioCanvas({
 	const [spacePan, setSpacePan] = useState(false);
 	const [isPanning, setIsPanning] = useState(false);
 	const panMode = tool === "hand" || spacePan;
-	const dimensions = useRef(
-		new Map<string, { width: number; height: number }>(),
-	);
+	// Real artboard measurements are reactive state, not a ref: a fit must run
+	// when a preview arrives and its true height is known.
+	const [dimensions, setDimensions] = useState<
+		ReadonlyMap<string, { width: number; height: number }>
+	>(() => new Map());
+	// Once the user pans or zooms, the view belongs to them and automatic
+	// re-fitting stops.
+	const userPositioned = useRef(false);
 	const measureFrame = useCallback(
 		(id: string, width: number, height: number) => {
-			dimensions.current.set(id, { width, height });
+			setDimensions((previous) => {
+				const existing = previous.get(id);
+				if (existing?.width === width && existing?.height === height) {
+					return previous;
+				}
+				const next = new Map(previous);
+				next.set(id, { width, height });
+				return next;
+			});
 		},
 		[],
 	);
-	function fitCanvas() {
-		if (!canvasRef.current || !frames.length) {
+	const fitCanvas = useCallback(() => {
+		const canvas = canvasRef.current;
+		if (!canvas || !frames.length) {
 			resetZoom();
 			return;
 		}
 		const bounds = frames.map(
 			(frame) =>
-				dimensions.current.get(frame.id) ?? {
+				dimensions.get(frame.id) ?? {
 					width:
 						frame.viewport === "mobile"
 							? STUDIO_VISUAL_WIDTH.mobile
@@ -174,13 +188,97 @@ export const StudioCanvas = memo(function StudioCanvas({
 		);
 		const { zoom: nextZoom, pan: nextPan } = computeCanvasFit({
 			bounds,
-			available: canvasRef.current.getBoundingClientRect(),
+			available: canvas.getBoundingClientRect(),
 			minZoom,
 			maxZoom,
 		});
+		userPositioned.current = false;
 		setZoom(nextZoom);
 		setPan(nextPan);
-	}
+	}, [dimensions, frames, maxZoom, minZoom, resetZoom, setPan, setZoom]);
+	// An untouched workspace keeps the whole project in view. The signature
+	// changes only when a frame slot appears or a real artboard size is
+	// measured, so status polls do not repeatedly recentre the view, and a user
+	// who already panned or zoomed is never yanked back at all.
+	const layoutSignature = frames
+		.map((frame) => {
+			const measured = dimensions.get(frame.id);
+			return measured
+				? `${frame.id}:${measured.width}x${measured.height}`
+				: frame.id;
+		})
+		.join("|");
+	const fitSignatureRef = useRef("");
+	useEffect(() => {
+		if (!frames.length) return;
+		if (fitSignatureRef.current === layoutSignature) return;
+		fitSignatureRef.current = layoutSignature;
+		if (userPositioned.current) return;
+		fitCanvas();
+	}, [layoutSignature, frames.length, fitCanvas]);
+
+	// Every user-driven view change opts out of automatic re-fitting, so a
+	// frame that finishes later cannot move the view the user is working in.
+	const zoomInByUser = useCallback(() => {
+		userPositioned.current = true;
+		zoomIn();
+	}, [zoomIn]);
+	const zoomOutByUser = useCallback(() => {
+		userPositioned.current = true;
+		zoomOut();
+	}, [zoomOut]);
+
+	// Stable frame callbacks keep the memoized artboards from re-rendering on
+	// every pan frame; the handlers read the latest values through refs.
+	const panModeRef = useRef(panMode);
+	panModeRef.current = panMode;
+	const selectFrameRef = useRef(onSelectFrame);
+	selectFrameRef.current = onSelectFrame;
+	const retryFrameRef = useRef(onRetryFrame);
+	retryFrameRef.current = onRetryFrame;
+	const handleFrameSelect = useCallback((id: string, additive?: boolean) => {
+		if (panModeRef.current) return;
+		selectFrameRef.current?.(id, additive);
+	}, []);
+	const handleFrameRetry = useCallback((id: string) => {
+		retryFrameRef.current?.(id);
+	}, []);
+
+	/**
+	 * Wheel handling must be a non-passive native listener.
+	 *
+	 * React attaches `wheel` passively, so a Ctrl/Cmd + wheel gesture cannot be
+	 * prevented and the browser applies its own page zoom on top of the canvas
+	 * zoom. Registering the listener with `{ passive: false }` keeps the
+	 * gesture inside the canvas and lets the pointer-anchored zoom work as
+	 * intended, while plain two-axis scrolling still pans.
+	 */
+	useEffect(() => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+		function handleWheel(event: WheelEvent) {
+			userPositioned.current = true;
+			if (event.ctrlKey || event.metaKey) {
+				event.preventDefault();
+				onWheel(event);
+				return;
+			}
+			event.preventDefault();
+			const deltaX = normalizeWheelDelta({
+				deltaY: event.deltaX,
+				deltaMode: event.deltaMode,
+			});
+			const deltaY = normalizeWheelDelta(event);
+			// Two-axis trackpad scrolling pans the board; it must not change
+			// the scale, which is reserved for ctrl/pinch.
+			setPan((previous) => ({
+				x: previous.x - deltaX,
+				y: previous.y - deltaY,
+			}));
+		}
+		canvas.addEventListener("wheel", handleWheel, { passive: false });
+		return () => canvas.removeEventListener("wheel", handleWheel);
+	}, [onWheel, setPan]);
 	useEffect(() => {
 		// Arrow-key panning is a window-level affordance because the canvas
 		// surface is a non-interactive landmark and must not enter the tab
@@ -243,7 +341,11 @@ export const StudioCanvas = memo(function StudioCanvas({
 					onSelectFrame?.(null);
 				}
 			}}
-			onPointerMove={updatePan}
+			onPointerMove={(event) => {
+				// Any drag also opts out of automatic re-fitting.
+				if (panMode) userPositioned.current = true;
+				updatePan(event);
+			}}
 			onPointerUp={() => {
 				endPan();
 				setIsPanning(false);
@@ -258,20 +360,6 @@ export const StudioCanvas = memo(function StudioCanvas({
 			onLostPointerCapture={() => {
 				endPan();
 				setIsPanning(false);
-			}}
-			onWheel={(event) => {
-				if (event.ctrlKey || event.metaKey) onWheel(event);
-				else
-					setPan((previous) => {
-						const deltaX = normalizeWheelDelta({
-							deltaY: event.deltaX,
-							deltaMode: event.deltaMode,
-						});
-						const deltaY = normalizeWheelDelta(event);
-						// Two-axis trackpad scrolling pans the board; it must not
-						// change the scale, which is reserved for ctrl/pinch.
-						return { x: previous.x - deltaX, y: previous.y - deltaY };
-					});
 			}}
 			className={`relative size-full overflow-hidden select-none touch-none bg-charcoal text-snow focus-visible:outline-2 focus-visible:outline-snow ${className}`}
 			style={{
@@ -299,10 +387,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 									? selectedFrameIds.includes(frame.id)
 									: selectedFrameId === frame.id
 							}
-							onSelect={(id, additive) => {
-								if (!panMode) onSelectFrame?.(id, additive);
-							}}
-							onRetry={(id) => onRetryFrame?.(id)}
+							onSelect={handleFrameSelect}
+							onRetry={handleFrameRetry}
 							isCanvasPanning={panMode}
 						/>
 					))
@@ -379,8 +465,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 			<div className="absolute right-3 bottom-3 z-20">
 				<ZoomControls
 					zoom={zoom}
-					onZoomIn={zoomIn}
-					onZoomOut={zoomOut}
+					onZoomIn={zoomInByUser}
+					onZoomOut={zoomOutByUser}
 					onReset={fitCanvas}
 					resetLabel="Sesuaikan tampilan"
 				/>

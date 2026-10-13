@@ -5,7 +5,7 @@ import {
 	RotateCcw,
 	Smartphone,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { StudioFrameRow } from "@/db/schema";
 import { extractCleanHtml } from "@/lib/clean-html";
 import {
@@ -74,8 +74,12 @@ export function resolveFrameArtboardMode(input: {
  * generating, a quiet static dot while it waits in the queue, and a small
  * error affordance when generation failed. Queued and generating stay
  * distinguishable for assistive technology through their text alternatives.
+ *
+ * Memoized: status polling replaces the frame array every tick, so without a
+ * stable render boundary every artboard would re-render (and re-run its HTML
+ * extraction) on each poll and on every pan frame.
  */
-export function StudioFrame({
+export const StudioFrame = memo(function StudioFrame({
 	frame,
 	isSelected = false,
 	onSelect,
@@ -339,7 +343,7 @@ export function StudioFrame({
 			</div>
 		</article>
 	);
-}
+});
 
 /**
  * Reads the server's capture-failure explanation from the frame visual

@@ -185,6 +185,17 @@ function StudioWorkspace({
 		[frames],
 	);
 
+	// Derived selection state must keep a stable identity: a fresh array on
+	// every poll tick would re-render the composer even when nothing changed.
+	const selectedFrames = useMemo(
+		() => frames.filter((frame) => selectedFrameIds.includes(frame.id)),
+		[frames, selectedFrameIds],
+	);
+	const handleRemoveSelectedFrame = useCallback((id: string) => {
+		setSelectedFrameIds((previous) => previous.filter((entry) => entry !== id));
+		setSelectedFrameId((previous) => (previous === id ? null : previous));
+	}, []);
+
 	// Poll authoritative status while jobs or frames are actively processing
 	const syncProjectStatus = useCallback(async () => {
 		try {
@@ -516,15 +527,8 @@ function StudioWorkspace({
 
 				{/* Floating AI Prompt Composer */}
 				<StudioComposer
-					selectedFrames={frames.filter((frame) =>
-						selectedFrameIds.includes(frame.id),
-					)}
-					onRemoveFrame={(id) => {
-						setSelectedFrameIds((previous) =>
-							previous.filter((entry) => entry !== id),
-						);
-						if (selectedFrameId === id) setSelectedFrameId(null);
-					}}
+					selectedFrames={selectedFrames}
+					onRemoveFrame={handleRemoveSelectedFrame}
 					onSubmit={handleComposerSubmit}
 					loading={composerLoading}
 					designSkillId={project.designSkillId}
