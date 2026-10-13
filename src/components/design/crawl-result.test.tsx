@@ -147,4 +147,17 @@ describe("CrawlResult async page arrival", () => {
 		fireEvent.click(screen.getAllByRole("button", { name: /Second/ })[0]);
 		expect(screen.getByRole("heading", { name: "Second" })).toBeDefined();
 	});
+
+	it("presents explorer status in Indonesian consistent with inventory", () => {
+		render(
+			<CrawlResult
+				pages={[page("a", "https://example.test/a", "First")]}
+				sourceUrl="https://example.test/"
+			/>,
+		);
+		expect(screen.getAllByText("Berhasil").length).toBeGreaterThanOrEqual(1);
+		expect(screen.queryByText("Completed")).toBeNull();
+		expect(screen.queryByText("Failed")).toBeNull();
+		expect(screen.queryByText("Skipped")).toBeNull();
+	});
 });

@@ -328,13 +328,7 @@ function PageDetail({ page }: { page: Page }) {
 					)}
 				>
 					<span aria-hidden>{statusMark(page.status)}</span>
-					{page.status === "completed"
-						? "Completed"
-						: page.status === "failed"
-							? "Failed"
-							: page.status === "skipped"
-								? "Skipped"
-								: "Queued"}
+					{statusText(page.status)}
 				</span>
 				{page.httpStatus ? (
 					<span className="text-xs text-fog tabular-nums">
