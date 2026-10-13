@@ -2033,6 +2033,7 @@ export async function getStudioFrameVisual(
 	projectId: string,
 	frameId: string,
 	userId: string,
+	options: { forceRecapture?: boolean } = {},
 ) {
 	const detail = await getStudioProjectDetail(projectId, userId);
 	const frame = detail.frames.find((entry) => entry.id === frameId);
@@ -2062,9 +2063,18 @@ export async function getStudioFrameVisual(
 				eq(studioAssets.userId, userId),
 			),
 		);
-	const cached = assets.find((asset) =>
-		asset.filename.startsWith(`visual-${hash}-`),
-	);
+	// A targeted visual retry must be able to replace a cached render that the
+	// browser could not decode; otherwise the retry would replay the same
+	// broken asset and the recovery action would be meaningless. Lookups always
+	// prefer the newest render for a given hash so a successful re-capture wins
+	// over the older one it replaced.
+	const cached = options.forceRecapture
+		? undefined
+		: assets
+				.filter((asset) => asset.filename.startsWith(`visual-${hash}-`))
+				.sort(
+					(left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+				)[0];
 	if (cached) {
 		const bounds = /-(\d+)x(\d+)\.jpg$/.exec(cached.filename);
 		if (bounds)
@@ -2080,7 +2090,18 @@ export async function getStudioFrameVisual(
 		frame.viewport,
 		detail.project.designMd,
 		assets,
-	);
+	).catch((failure: unknown) => {
+		// The HTML itself is intact; only the visual render failed. Surfacing
+		// that distinction lets the workspace offer a targeted visual retry
+		// instead of regenerating a frame whose markup is already stored.
+		throw new ScrapeError(
+			"VISUAL_CAPTURE_FAILED",
+			failure instanceof Error
+				? `Pratinjau visual frame gagal dirender: ${failure.message}`
+				: undefined,
+			{ cause: failure },
+		);
+	});
 	const [asset] = await db
 		.insert(studioAssets)
 		.values({

@@ -2,7 +2,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
-import { isFrameVisualPending, StudioFrame } from "./studio-frame";
+import {
+	isFrameVisualPending,
+	resolveFrameArtboardMode,
+	StudioFrame,
+} from "./studio-frame";
 import { StudioFrameShimmer } from "./studio-frame-shimmer";
 
 describe("StudioFrameShimmer", () => {
@@ -65,6 +69,71 @@ describe("isFrameVisualPending", () => {
 	});
 });
 
+describe("resolveFrameArtboardMode", () => {
+	it("shimmers only while the preview is genuinely pending", () => {
+		expect(
+			resolveFrameArtboardMode({
+				status: "queued",
+				hasRenderableHtml: false,
+				hasVisual: false,
+				hasVisualError: false,
+			}),
+		).toBe("shimmer");
+		expect(
+			resolveFrameArtboardMode({
+				status: "ready",
+				hasRenderableHtml: true,
+				hasVisual: false,
+				hasVisualError: false,
+			}),
+		).toBe("shimmer");
+	});
+
+	it("reveals the preview once the visual exists", () => {
+		expect(
+			resolveFrameArtboardMode({
+				status: "ready",
+				hasRenderableHtml: true,
+				hasVisual: true,
+				hasVisualError: false,
+			}),
+		).toBe("preview");
+	});
+
+	it("shows a targeted visual retry when the capture failed", () => {
+		expect(
+			resolveFrameArtboardMode({
+				status: "ready",
+				hasRenderableHtml: true,
+				hasVisual: false,
+				hasVisualError: true,
+			}),
+		).toBe("visual-error");
+	});
+
+	it("never shimmers forever for a ready frame without HTML", () => {
+		expect(
+			resolveFrameArtboardMode({
+				status: "ready",
+				hasRenderableHtml: false,
+				hasVisual: false,
+				hasVisualError: false,
+			}),
+		).toBe("preview-unavailable");
+	});
+
+	it("shows the generation failure state for failed frames", () => {
+		expect(
+			resolveFrameArtboardMode({
+				status: "failed",
+				hasRenderableHtml: false,
+				hasVisual: false,
+				hasVisualError: false,
+			}),
+		).toBe("generation-failed");
+	});
+});
+
 describe("StudioFrame", () => {
 	afterEach(() => cleanup());
 
@@ -120,13 +189,92 @@ describe("StudioFrame", () => {
 		);
 
 		expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1);
-		expect(screen.getByText(/Menggenerate/i)).toBeDefined();
+		// Active generation is a small spinner next to the title, not a badge.
+		expect(screen.getByLabelText("Sedang digenerate")).toBeDefined();
+		expect(screen.queryByText(/Menggenerate/i)).toBeNull();
 		// The artboard itself is one shimmer surface, not skeleton content.
 		expect(
 			container.querySelector('[data-testid="mobile-shimmer"]'),
 		).not.toBeNull();
 		expect(screen.queryByText(/Membuat desain layar/i)).toBeNull();
 		expect(screen.queryByText(/Menunggu giliran/i)).toBeNull();
+	});
+
+	it("distinguishes queued from generating for assistive technology", () => {
+		const { unmount } = render(
+			<StudioFrame
+				frame={frame({ status: "queued" })}
+				isSelected={false}
+				onSelect={vi.fn()}
+				isCanvasPanning={false}
+			/>,
+		);
+		expect(screen.getByLabelText("Menunggu antrean")).toBeDefined();
+		expect(screen.queryByLabelText("Sedang digenerate")).toBeNull();
+		unmount();
+
+		render(
+			<StudioFrame
+				frame={frame({ status: "generating" })}
+				isSelected={false}
+				onSelect={vi.fn()}
+				isCanvasPanning={false}
+			/>,
+		);
+		expect(screen.getByLabelText("Sedang digenerate")).toBeDefined();
+		expect(screen.queryByLabelText("Menunggu antrean")).toBeNull();
+	});
+
+	it("needs no ready badge once the frame is complete", () => {
+		render(
+			<StudioFrame
+				frame={frame({
+					status: "ready",
+					htmlCode: "<html><body>Ready</body></html>",
+				})}
+				isSelected={false}
+				onSelect={vi.fn()}
+				isCanvasPanning={false}
+			/>,
+		);
+		expect(screen.queryByText(/Siap/i)).toBeNull();
+		expect(screen.queryByText(/Menyiapkan pratinjau/i)).toBeNull();
+	});
+
+	it("offers no frame-level copy action", () => {
+		render(
+			<StudioFrame
+				frame={frame({
+					status: "ready",
+					htmlCode: "<html><body>Ready</body></html>",
+				})}
+				isSelected={false}
+				onSelect={vi.fn()}
+				isCanvasPanning={false}
+			/>,
+		);
+		expect(screen.queryByText(/Salin/i)).toBeNull();
+		expect(screen.queryByRole("button", { name: /Salin/i })).toBeNull();
+		expect(screen.queryByText(/Tersalin/i)).toBeNull();
+	});
+
+	it("stops shimmering and explains a ready frame without stored HTML", () => {
+		const onRetry = vi.fn();
+		const { container } = render(
+			<StudioFrame
+				frame={frame({ status: "ready", htmlCode: "   " })}
+				isSelected={false}
+				onSelect={vi.fn()}
+				onRetry={onRetry}
+				isCanvasPanning={false}
+			/>,
+		);
+		expect(screen.getByText("Pratinjau tidak tersedia")).toBeDefined();
+		expect(
+			container.querySelector('[data-testid="mobile-shimmer"]'),
+		).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: /Generate ulang/i }));
+		expect(onRetry).toHaveBeenCalledWith("f-1");
 	});
 
 	it("keeps shimmering when HTML exists but the preview is not ready", () => {

@@ -1,5 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
-import { POST } from "./studio.frame";
+import { GET, POST } from "./studio.frame";
+
+const getStudioFrameVisual = vi.fn(
+	async (
+		_projectId: string,
+		_frameId: string,
+		_userId: string,
+		options: { forceRecapture?: boolean } = {},
+	) => ({
+		url: "/api/studio/asset?id=a-1",
+		width: 390,
+		height: 1765,
+		hash: "hash-1",
+		forceRecapture: options.forceRecapture === true,
+	}),
+);
 
 vi.mock("@/lib/session", () => ({
 	requireUser: async () => ({ id: "user-123", email: "test@example.com" }),
@@ -10,6 +25,12 @@ vi.mock("@tanstack/react-start/server", () => ({
 }));
 
 vi.mock("@/lib/services/studio-service", () => ({
+	getStudioFrameVisual: (
+		projectId: string,
+		frameId: string,
+		userId: string,
+		options?: { forceRecapture?: boolean },
+	) => getStudioFrameVisual(projectId, frameId, userId, options),
 	addStudioFrame: async (
 		projectId: string,
 		_userId: string,
@@ -122,5 +143,50 @@ describe("POST /api/studio/frame", () => {
 		expect(res.status).toBe(200);
 		const data = await res.json();
 		expect(data.job.status).toBe("queued");
+	});
+});
+
+describe("GET /api/studio/frame", () => {
+	it("serves the cached capture without forcing a re-render", async () => {
+		getStudioFrameVisual.mockClear();
+		const res = await GET({
+			request: new Request(
+				"https://app.test/api/studio/frame?projectId=proj-1&frameId=f-1",
+			),
+		});
+		expect(res.status).toBe(200);
+		const data = await res.json();
+		expect(data).toMatchObject({ width: 390, height: 1765 });
+		expect(getStudioFrameVisual).toHaveBeenCalledWith(
+			"proj-1",
+			"f-1",
+			"user-123",
+			{ forceRecapture: false },
+		);
+	});
+
+	it("forces a re-render when the client asks for a retry", async () => {
+		getStudioFrameVisual.mockClear();
+		const res = await GET({
+			request: new Request(
+				"https://app.test/api/studio/frame?projectId=proj-1&frameId=f-1&attempt=2",
+			),
+		});
+		expect(res.status).toBe(200);
+		expect(getStudioFrameVisual).toHaveBeenCalledWith(
+			"proj-1",
+			"f-1",
+			"user-123",
+			{ forceRecapture: true },
+		);
+	});
+
+	it("rejects a request without frame identity", async () => {
+		const res = await GET({
+			request: new Request(
+				"https://app.test/api/studio/frame?projectId=proj-1",
+			),
+		});
+		expect(res.status).toBe(400);
 	});
 });
