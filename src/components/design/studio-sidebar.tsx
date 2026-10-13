@@ -86,7 +86,7 @@ export function StudioSidebar({
 	return (
 		<aside
 			aria-label="Riwayat Project Studio"
-			className={`flex flex-col border-r border-graphite bg-charcoal ${className}`}
+			className={`flex flex-col overflow-hidden rounded-2xl border border-graphite bg-charcoal ${className}`}
 		>
 			{/* Sidebar Header */}
 			<div className="flex shrink-0 items-center justify-between border-b border-graphite px-4 py-3.5">
