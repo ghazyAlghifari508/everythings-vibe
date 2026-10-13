@@ -1,3 +1,5 @@
+import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
+
 export interface CanonicalDesignSystem {
 	colors: {
 		primary: string | null;
@@ -291,23 +293,38 @@ export function enforceDesignSystemOnHtml(
 	html: string,
 	tokens: CanonicalDesignSystem | null,
 	logoUrl?: string | null,
+	blueprint?: StudioDesignBlueprint | null,
 ): string {
 	let output = html;
-	if (tokens) {
-		output = output
-			.replace(
-				/<style\b[^>]*id=["']studio-design-tokens["'][^>]*>[\s\S]*?<\/style>/gi,
-				"",
-			)
-			.replace(
-				/<script\b[^>]*id=["']studio-tailwind-tokens["'][^>]*>[\s\S]*?<\/script>/gi,
-				"",
-			);
-	}
+	output = output
+		.replace(
+			/<style\b[^>]*id=["']studio-design-tokens["'][^>]*>[\s\S]*?<\/style>/gi,
+			"",
+		)
+		.replace(
+			/<script\b[^>]*id=["']studio-tailwind-tokens["'][^>]*>[\s\S]*?<\/script>/gi,
+			"",
+		);
 
 	// 1. Inject design system tokens into <head> if tokens exist
 	if (tokens && !output.includes("studio-design-tokens")) {
 		const headerHtml = generateDesignSystemHtmlHeader(tokens);
+		if (output.includes("</head>")) {
+			output = output.replace("</head>", `${headerHtml}\n</head>`);
+		} else if (output.includes("<head>")) {
+			output = output.replace("<head>", `<head>\n${headerHtml}`);
+		} else if (output.includes("<!DOCTYPE html>") || output.includes("<html")) {
+			output = output.replace(
+				/<html\b[^>]*>/i,
+				`$&\n<head>\n${headerHtml}\n</head>`,
+			);
+		}
+	}
+
+	// 1b. Inject shared blueprint tokens into <head> when a blueprint exists
+	if (blueprint && !output.includes("studio-blueprint-tokens")) {
+		const bp = blueprint.designTokens;
+		const headerHtml = `<style id="studio-blueprint-tokens">:root{--bp-primary:${bp.primary};--bp-secondary:${bp.secondary};--bp-background:${bp.background};--bp-surface:${bp.surface};--bp-font:${bp.fontFamily};--bp-radius:${bp.radius}px;--bp-border:${bp.border};--bp-elevation:${bp.elevation};}</style>`;
 		if (output.includes("</head>")) {
 			output = output.replace("</head>", `${headerHtml}\n</head>`);
 		} else if (output.includes("<head>")) {
@@ -358,4 +375,67 @@ export function enforceDesignSystemOnHtml(
 	}
 
 	return output;
+}
+
+export interface ValidateGeneratedHtmlOptions {
+	blueprint: StudioDesignBlueprint | null;
+	viewport: "web" | "mobile";
+	expectTokens: boolean;
+}
+
+/**
+ * Detects a CSS declaration for a positioning mode, ignoring comments.
+ *
+ * The artboard is a static full-page preview, so an element anchored to the
+ * bottom of the viewport paints in the middle of a long page instead of at the
+ * end of the document. The check is declaration-based rather than a stylesheet
+ * rewrite: it reports the contract violation so the generator can correct it,
+ * and never mutates the generated markup.
+ */
+function hasPositioningDeclaration(html: string, mode: string): boolean {
+	const withoutComments = html.replace(/\/\*[\s\S]*?\*\//g, "");
+	return new RegExp(`position\\s*:\\s*${mode}\\b`, "i").test(withoutComments);
+}
+
+// Deterministic structural validation for generated HTML. String checks
+// cannot prove visual correctness; they only catch concrete contract
+// violations that warrant one bounded corrective regeneration.
+export function validateGeneratedHtml(
+	html: string,
+	opts: ValidateGeneratedHtmlOptions,
+): string[] {
+	const issues: string[] = [];
+	if (!/<html[\s>]/i.test(html) || !/<\/html>/i.test(html)) {
+		issues.push("HTML tidak lengkap.");
+		return issues;
+	}
+	if (opts.viewport === "mobile" && !/name=["']viewport["']/i.test(html)) {
+		issues.push("Viewport meta hilang.");
+	}
+	if (opts.blueprint && !html.includes("studio-blueprint-tokens")) {
+		issues.push("Token blueprint bersama hilang.");
+	}
+	if (opts.expectTokens && !html.includes("studio-design-tokens")) {
+		issues.push("Token design system hilang.");
+	}
+	if (opts.blueprint) {
+		for (const label of opts.blueprint.navigationContract.labels) {
+			if (!html.includes(label)) {
+				issues.push(`Label navigasi hilang: ${label}.`);
+			}
+		}
+	}
+	if (/width:\s*\d{4,}px|width=["']\d{4,}/i.test(html)) {
+		issues.push("Lebar tetap melebihi viewport.");
+	}
+	if (opts.viewport === "mobile") {
+		for (const mode of ["fixed", "sticky"]) {
+			if (hasPositioningDeclaration(html, mode)) {
+				issues.push(
+					`Posisi ${mode} tidak diizinkan pada artboard mobile statis.`,
+				);
+			}
+		}
+	}
+	return issues;
 }

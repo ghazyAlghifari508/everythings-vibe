@@ -1,37 +1,49 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
 	createFileRoute,
+	Link,
 	redirect,
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import {
-	AlertCircle,
-	Check,
-	FolderOpen,
-	Loader2,
-	Monitor,
-	Palette,
-	Smartphone,
-	Sparkles,
-	Trash2,
-	X,
-} from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { FolderOpen, User, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import type { AttachedDesignReference } from "@/components/design/start-with-design-modal";
+import { StudioDesignPickerDialog } from "@/components/design/studio-design-picker-dialog";
 import {
-	type AttachedDesignReference,
-	StartWithDesignModal,
-} from "@/components/design/start-with-design-modal";
+	type LaunchComposerConfig,
+	StudioLaunchComposer,
+} from "@/components/design/studio-launch-composer";
 import {
 	type StudioHistoryItem,
 	StudioSidebar,
 } from "@/components/design/studio-sidebar";
-import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import type { StudioDesignMode } from "@/lib/prompts-ui-studio";
+import { authClient } from "@/lib/auth-client";
 import { requireUserServer } from "@/lib/session";
+import {
+	STUDIO_DEFAULT_PAGE_COUNT,
+	type StudioDesignSkillId,
+} from "@/lib/studio-generation-options";
+import {
+	getStudioPresetDesignMd,
+	STUDIO_DESIGN_PRESETS,
+} from "@/lib/studio-presets";
+import {
+	STUDIO_PROMPT_SHORTCUTS,
+	type StudioPromptShortcut,
+} from "@/lib/studio-prompt-shortcuts";
 import { useUIStore } from "@/store";
 
 const loadStudioHistory = createServerFn({ method: "GET" }).handler(
@@ -76,6 +88,52 @@ export const Route = createFileRoute("/design/studio/")({
 	component: StudioPage,
 });
 
+type StagedReference =
+	| { kind: "theme"; id: string; designMd: string }
+	| {
+			kind: "custom";
+			filename: string;
+			designMd: string;
+			logo: AttachedDesignReference["logo"];
+	  };
+
+function StudioLandingProfile() {
+	const { data: session } = authClient.useSession();
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<button
+					type="button"
+					aria-label="Profil dan tampilan"
+					title="Profil dan tampilan"
+					className="flex size-9 items-center justify-center rounded-full border border-graphite bg-charcoal text-mist transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+				>
+					{session?.user.image ? (
+						<img
+							src={session.user.image}
+							alt=""
+							className="size-8 rounded-full"
+						/>
+					) : (
+						<User size={16} aria-hidden />
+					)}
+				</button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end">
+				<DropdownMenuLabel>{session?.user.name ?? "Akun"}</DropdownMenuLabel>
+				<DropdownMenuItem asChild>
+					<Link to="/settings">Pengaturan akun</Link>
+				</DropdownMenuItem>
+				<DropdownMenuSeparator />
+				<div className="flex items-center justify-between gap-4 px-2 py-1 text-sm text-fog">
+					<span>Tampilan workspace</span>
+					<ThemeToggle />
+				</div>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
 function StudioPage() {
 	const { history } = Route.useLoaderData();
 	const search = Route.useSearch();
@@ -84,10 +142,14 @@ function StudioPage() {
 	const showToast = useUIStore((state) => state.showToast);
 
 	const [prompt, setPrompt] = useState(search.prompt ?? "");
-	const [designMode, setDesignMode] = useState<StudioDesignMode>("web");
-	const [attachedReference, setAttachedReference] =
-		useState<AttachedDesignReference | null>(null);
-	const [isModalOpen, setIsModalOpen] = useState(false);
+	const [config, setConfig] = useState<LaunchComposerConfig>({
+		designMode: "web",
+		designSkillId: "none" satisfies StudioDesignSkillId,
+		initialPageCount: STUDIO_DEFAULT_PAGE_COUNT,
+	});
+	const [stagedReference, setStagedReference] =
+		useState<StagedReference | null>(null);
+	const [isPickerOpen, setIsPickerOpen] = useState(false);
 	const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
@@ -130,8 +192,53 @@ function StudioPage() {
 		showToast("Project dihapus.", "success");
 	}
 
-	async function submit(e: FormEvent) {
-		e.preventDefault();
+	function applyShortcut(shortcut: StudioPromptShortcut) {
+		setPrompt(shortcut.prompt);
+		setConfig((previous) => ({
+			...previous,
+			designMode: shortcut.designMode,
+			initialPageCount: shortcut.initialPageCount,
+		}));
+		setError("");
+		textareaRef.current?.focus();
+	}
+
+	function handleSelectTheme(presetId: string) {
+		const designMd = getStudioPresetDesignMd(presetId);
+		if (!designMd) {
+			setError("Tema tidak tersedia. Pilih tema lain.");
+			return;
+		}
+		setStagedReference({ kind: "theme", id: presetId, designMd });
+		setError("");
+		textareaRef.current?.focus();
+	}
+
+	function handleSelectCustom(input: {
+		filename: string;
+		designMd: string;
+		logo: AttachedDesignReference["logo"];
+	}) {
+		setStagedReference({
+			kind: "custom",
+			filename: input.filename,
+			designMd: input.designMd,
+			logo: input.logo,
+		});
+		setError("");
+		textareaRef.current?.focus();
+	}
+
+	const referenceLabel = stagedReference
+		? stagedReference.kind === "theme"
+			? (STUDIO_DESIGN_PRESETS.find(
+					(preset) => preset.id === stagedReference.id,
+				)?.name ?? "Tema")
+			: stagedReference.filename
+		: null;
+
+	async function submit() {
+		if (loading) return;
 		if (!prompt.trim()) {
 			setError("Ceritakan UI yang mau dibuat dulu.");
 			textareaRef.current?.focus();
@@ -145,15 +252,23 @@ function StudioPage() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					prompt: prompt.trim(),
-					designMode,
-					designMd: attachedReference?.designMd ?? null,
-					logo: attachedReference?.logo
-						? {
-								filename: attachedReference.logo.filename,
-								mimeType: attachedReference.logo.mimeType,
-								data: attachedReference.logo.data,
-							}
+					designMode: config.designMode,
+					designSkillId: config.designSkillId,
+					initialPageCount: config.initialPageCount,
+					designReference: stagedReference
+						? stagedReference.kind === "theme"
+							? { kind: "theme", id: stagedReference.id }
+							: { kind: "custom", filename: stagedReference.filename }
 						: null,
+					designMd: stagedReference?.designMd ?? null,
+					logo:
+						stagedReference?.kind === "custom" && stagedReference.logo
+							? {
+									filename: stagedReference.logo.filename,
+									mimeType: stagedReference.logo.mimeType,
+									data: stagedReference.logo.data,
+								}
+							: null,
 				}),
 			});
 			const data = (await res.json().catch(() => null)) as {
@@ -169,23 +284,21 @@ function StudioPage() {
 				params: { id: data.projectId },
 			});
 		} catch {
-			setError("Jaringan bermasalah. Coba lagi sebentar lagi.");
+			setError("Jaringan bermasalah. Draf tetap tersimpan, coba lagi.");
 		} finally {
 			setLoading(false);
 		}
 	}
 
 	return (
-		<div className="flex h-dvh w-full overflow-hidden bg-onyx text-snow">
-			{/* Desktop Left Sidebar: Real Project History */}
+		<div className="flex h-dvh w-full gap-3 overflow-hidden bg-onyx p-3 text-snow md:gap-4 md:p-4">
 			<StudioSidebar
 				history={history}
 				onSelectProject={handleOpenProject}
 				onDeleteProject={handleDeleteProject}
-				className="hidden md:flex w-72 lg:w-80 shrink-0 h-full"
+				className="hidden h-full w-72 shrink-0 md:flex lg:w-80"
 			/>
 
-			{/* Mobile / Tablet Collapsible Slide-over Drawer */}
 			<DialogPrimitive.Root
 				open={isMobileDrawerOpen}
 				onOpenChange={setIsMobileDrawerOpen}
@@ -205,7 +318,7 @@ function StudioPage() {
 						>
 							Daftar project studio kamu yang tersimpan
 						</DialogPrimitive.Description>
-						<div className="flex items-center justify-between border-b border-graphite px-4 py-3 bg-charcoal">
+						<div className="flex items-center justify-between border-b border-graphite bg-charcoal px-4 py-3">
 							<span className="text-xs font-semibold uppercase tracking-wider text-snow">
 								My Projects
 							</span>
@@ -221,25 +334,23 @@ function StudioPage() {
 								history={history}
 								onSelectProject={handleOpenProject}
 								onDeleteProject={handleDeleteProject}
-								className="border-0 h-full w-full"
+								className="h-full w-full rounded-none border-0"
 							/>
 						</div>
 					</DialogPrimitive.Content>
 				</DialogPrimitive.Portal>
 			</DialogPrimitive.Root>
 
-			{/* Main AI Creative Workspace Center */}
-			<main className="flex-1 overflow-y-auto px-4 py-8 sm:px-8 sm:py-12 md:px-12 flex flex-col items-center justify-center">
-				<div className="w-full max-w-3xl flex flex-col gap-6">
-					{/* Mobile project drawer trigger & breadcrumb */}
-					<div className="flex items-center justify-between gap-3 w-full">
-						<HubBreadcrumb current="Prompt UI Studio" />
+			<main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+				<div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-1 py-2 sm:px-2 md:justify-center md:py-6">
+					<div className="flex items-center justify-between gap-3">
+						<Logo height={26} />
 						<div className="flex items-center gap-1.5">
-							<ThemeToggle />
+							<StudioLandingProfile />
 							<button
 								type="button"
 								onClick={() => setIsMobileDrawerOpen(true)}
-								className="inline-flex md:hidden items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow hover:bg-onyx transition-colors"
+								className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-steel md:hidden"
 							>
 								<FolderOpen size={14} className="text-fog" aria-hidden />
 								<span>Project ({history.length})</span>
@@ -247,180 +358,96 @@ function StudioPage() {
 						</div>
 					</div>
 
-					{/* Center Workspace Heading */}
-					<header className="text-center sm:text-left space-y-2">
+					<header className="space-y-2 text-center sm:text-left">
 						<h1 className="text-3xl font-bold tracking-tight text-snow sm:text-4xl lg:text-5xl">
 							What will you design?
 						</h1>
-						<p className="text-sm leading-6 text-fog max-w-2xl">
+						<p className="mx-auto max-w-2xl text-sm leading-6 text-fog sm:mx-0">
 							Jelaskan antarmuka yang ingin kamu buat dalam Bahasa Indonesia.
 							Studio menghasilkan halaman HTML interaktif lengkap dengan
 							Tailwind dan data realistis.
 						</p>
 					</header>
 
-					{/* Main AI Prompt Composer Surface */}
-					<form
-						onSubmit={(e) => void submit(e)}
-						className="group flex flex-col gap-3 rounded-2xl border border-graphite bg-charcoal p-4 sm:p-5 shadow-lg transition-all focus-within:border-steel focus-within:ring-2 focus-within:ring-indigo/40"
+					<StudioLaunchComposer
+						prompt={prompt}
+						onPromptChange={(value) => {
+							setPrompt(value);
+							if (error) setError("");
+						}}
+						config={config}
+						onConfigChange={(patch) =>
+							setConfig((previous) => ({ ...previous, ...patch }))
+						}
+						reference={
+							referenceLabel
+								? {
+										label: referenceLabel,
+										logoFilename:
+											stagedReference?.kind === "custom"
+												? (stagedReference.logo?.filename ?? null)
+												: null,
+									}
+								: null
+						}
+						onOpenDesignPicker={() => setIsPickerOpen(true)}
+						onRemoveReference={() => setStagedReference(null)}
+						loading={loading}
+						error={error}
+						onSubmit={() => void submit()}
+						textareaRef={textareaRef}
+					/>
+
+					<section
+						aria-label="Brief siap pakai"
+						className="flex flex-col gap-3"
 					>
-						<label
-							htmlFor="studio-prompt"
-							className="block cursor-text space-y-1.5"
-						>
-							<span className="sr-only">Prompt Desain UI</span>
-							<textarea
-								ref={textareaRef}
-								id="studio-prompt"
-								value={prompt}
-								onChange={(e) => {
-									setPrompt(e.target.value);
-									if (error) setError("");
-								}}
-								placeholder="Jelaskan kebutuhan antarmukamu... Contoh: Dashboard analitik penjualan dengan kartu metrik ringkasan, grafik tren bulanan, dan tabel transaksi terkini dengan filter status..."
-								rows={5}
-								disabled={loading}
-								className="w-full resize-none bg-transparent font-sans text-sm sm:text-base leading-relaxed text-snow placeholder:text-fog focus:outline-none disabled:opacity-50"
-							/>
-						</label>
-
-						{/* Composer Bottom Toolbar: Mode Toggle & Action Button */}
-						<div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-graphite/60">
-							{/* Segmented Web / Mobile Toggle */}
-							<fieldset
-								aria-label="Pilih mode desain antarmuka"
-								className="m-0 flex items-center gap-1 rounded-xl border border-graphite bg-onyx p-1"
-							>
-								<button
-									type="button"
-									aria-pressed={designMode === "web"}
-									onClick={() => setDesignMode("web")}
-									disabled={loading}
-									className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-										designMode === "web"
-											? "bg-charcoal text-snow shadow-xs border border-graphite/80"
-											: "text-fog hover:text-mist"
-									}`}
-								>
-									<Monitor size={14} aria-hidden />
-									<span>Web</span>
-								</button>
-								<button
-									type="button"
-									aria-pressed={designMode === "mobile"}
-									onClick={() => setDesignMode("mobile")}
-									disabled={loading}
-									className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-										designMode === "mobile"
-											? "bg-charcoal text-snow shadow-xs border border-graphite/80"
-											: "text-fog hover:text-mist"
-									}`}
-								>
-									<Smartphone size={14} aria-hidden />
-									<span>Mobile</span>
-								</button>
-							</fieldset>
-
-							{/* Generate Submit Button */}
-							<button
-								type="submit"
-								disabled={loading || !prompt.trim()}
-								className="btn-primary inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-2 text-xs sm:text-sm font-semibold transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-							>
-								{loading ? (
-									<Loader2 size={16} aria-hidden className="animate-spin" />
-								) : (
-									<Sparkles size={16} aria-hidden />
-								)}
-								<span>{loading ? "Menggenerate UI..." : "Generate UI"}</span>
-							</button>
-						</div>
-					</form>
-
-					{/* Attached Design Reference Notice (if attached via modal) */}
-					{attachedReference && (
-						<div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-graphite bg-charcoal px-4 py-2.5 text-xs text-mist shadow-xs animate-in fade-in-0">
-							<div className="flex items-center gap-2">
-								<span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
-									<Check size={14} aria-hidden />
-								</span>
-								<span>
-									<strong className="text-snow">Design reference aktif:</strong>{" "}
-									DESIGN.md
-									{attachedReference.logo ? (
-										<span className="text-fog">
-											{" "}
-											· Logo ({attachedReference.logo.filename})
+						<h2 className="text-sm font-semibold text-snow">
+							Mulai dari brief siap pakai
+						</h2>
+						<ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+							{STUDIO_PROMPT_SHORTCUTS.map((shortcut) => (
+								<li key={shortcut.id}>
+									<button
+										type="button"
+										onClick={() => applyShortcut(shortcut)}
+										className="flex h-full w-full flex-col gap-1.5 rounded-xl border border-graphite bg-charcoal p-3.5 text-left transition-colors hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									>
+										<span className="text-sm font-semibold text-snow">
+											{shortcut.title}
 										</span>
-									) : null}
-								</span>
-							</div>
-							<div className="flex items-center gap-2">
-								<button
-									type="button"
-									onClick={() => setIsModalOpen(true)}
-									className="text-xs font-semibold text-mist hover:text-snow underline underline-offset-2"
-								>
-									Edit Referensi
-								</button>
-								<button
-									type="button"
-									onClick={() => setAttachedReference(null)}
-									aria-label="Lepas referensi desain"
-									className="text-fog hover:text-red-400 p-1"
-								>
-									<Trash2 size={13} aria-hidden />
-								</button>
-							</div>
-						</div>
-					)}
-
-					{/* Error Alert if any */}
-					{error && (
-						<div
-							role="alert"
-							className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-400"
-						>
-							<AlertCircle size={16} className="shrink-0" aria-hidden />
-							<span>{error}</span>
-						</div>
-					)}
-
-					{/* Prominent Secondary Action: Start with your design */}
-					<div className="flex justify-center sm:justify-start">
-						<button
-							type="button"
-							onClick={() => setIsModalOpen(true)}
-							className="inline-flex items-center gap-2 rounded-full border border-graphite bg-charcoal px-5 py-2.5 text-xs sm:text-sm font-semibold text-mist hover:border-steel hover:bg-onyx hover:text-snow transition-all shadow-xs"
-						>
-							{attachedReference?.logo?.previewUrl ? (
-								<img
-									src={attachedReference.logo.previewUrl}
-									alt=""
-									className="size-4 object-contain rounded-xs"
-								/>
-							) : (
-								<Palette size={15} className="text-fog" aria-hidden />
-							)}
-							<span>
-								{attachedReference
-									? "Ubah referensi design system & logo"
-									: "Start with your design"}
-							</span>
-						</button>
-					</div>
+										<span className="text-xs leading-5 text-fog">
+											{shortcut.preview}
+										</span>
+										<span className="mt-auto flex flex-wrap items-center gap-1.5 pt-1 font-mono text-[10px] uppercase tracking-wider text-fog">
+											<span>{shortcut.category}</span>
+											<span aria-hidden>·</span>
+											<span>
+												{shortcut.designMode === "mobile" ? "Mobile" : "Web"}
+											</span>
+											<span aria-hidden>·</span>
+											<span>{shortcut.initialPageCount} halaman</span>
+										</span>
+									</button>
+								</li>
+							))}
+						</ul>
+					</section>
 				</div>
 			</main>
 
-			{/* Fullscreen Design System Reference Modal */}
-			<StartWithDesignModal
-				open={isModalOpen}
-				onOpenChange={setIsModalOpen}
-				initialReference={attachedReference}
-				onApply={(reference) => {
-					setAttachedReference(reference);
-					textareaRef.current?.focus();
-				}}
+			<StudioDesignPickerDialog
+				open={isPickerOpen}
+				onOpenChange={setIsPickerOpen}
+				selectedThemeId={
+					stagedReference?.kind === "theme" ? stagedReference.id : null
+				}
+				customFilename={
+					stagedReference?.kind === "custom" ? stagedReference.filename : null
+				}
+				onSelectTheme={handleSelectTheme}
+				onSelectCustom={handleSelectCustom}
+				onClear={() => setStagedReference(null)}
 			/>
 		</div>
 	);

@@ -190,7 +190,7 @@ export function useCanvasZoom({
 
 	const startPan = useCallback((e: React.PointerEvent) => {
 		// Only react to primary button / touch / pen contact.
-		if (e.pointerType === "mouse" && e.buttons !== 1) return;
+		if (e.pointerType === "mouse" && e.buttons !== 1) return false;
 		isPanningRef.current = true;
 		pendingPointerRef.current = null;
 		if (panRafRef.current !== null) {
@@ -201,6 +201,7 @@ export function useCanvasZoom({
 		lastAppliedRef.current = { x: e.clientX, y: e.clientY };
 		// ponytail: capture so we keep receiving move events outside the element.
 		(e.currentTarget as Element | null)?.setPointerCapture?.(e.pointerId);
+		return true;
 	}, []);
 
 	const updatePan = useCallback(

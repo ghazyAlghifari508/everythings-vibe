@@ -9,6 +9,8 @@ import {
 	retryStudioFrame,
 } from "./studio-service";
 
+const e2eState = vi.hoisted(() => ({ labels: [] as string[] }));
+
 vi.mock("@/lib/services/ai-orchestrator", () => ({
 	selectModels: () => ["prdfy-combo"],
 	tryStreamWithFallback: async (
@@ -21,22 +23,69 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 			userMsg.includes("User Request")
 		) {
 			const isMobile = userMsg.includes("Mobile");
+			// The mock honors the requested initial screen count so the
+			// exact-cardinality contract is exercised instead of tripped.
+			const countMatch = userMsg.match(/Initial screen count: exactly (\d+)/);
+			const parsedCount = countMatch
+				? Number.parseInt(countMatch[1], 10)
+				: Number.NaN;
+			const screenCount =
+				Number.isInteger(parsedCount) && parsedCount >= 1 && parsedCount <= 8
+					? parsedCount
+					: 2;
+			const baseNames = isMobile
+				? ["Ringkasan Saldo", "Riwayat Transaksi"]
+				: ["Beranda Utama", "Daftar Karya"];
+			const screens = Array.from({ length: screenCount }, (_, order) => ({
+				name: baseNames[order] ?? `Layar Tambahan ${order + 1}`,
+				description: "Halaman ringkasan",
+				viewport: isMobile ? "mobile" : "web",
+				order,
+			}));
+			const destinations = screens.map((_, order) => `screen-${order}`);
+			e2eState.labels = screens.map((s) => s.name);
 			const planJson = JSON.stringify({
 				projectTitle: isMobile ? "Aplikasi Keuangan" : "Website Portofolio",
-				screens: [
-					{
-						name: isMobile ? "Ringkasan Saldo" : "Beranda Utama",
-						description: "Halaman ringkasan",
-						viewport: isMobile ? "mobile" : "web",
-						order: 0,
+				screens,
+				blueprint: {
+					productIdentity: {
+						productName: isMobile ? "Aplikasi Keuangan" : "Website Portofolio",
+						targetAudience: "Umum",
+						platform: isMobile ? "mobile" : "web",
+						visualDirection: "Bersih",
 					},
-					{
-						name: isMobile ? "Riwayat Transaksi" : "Daftar Karya",
-						description: "Halaman riwayat",
-						viewport: isMobile ? "mobile" : "web",
-						order: 1,
+					designTokens: {
+						primary: "#8ed462",
+						secondary: "#606060",
+						background: "#f5f1e4",
+						surface: "#ffffff",
+						fontFamily: "Inter",
+						radius: 12,
+						border: "1px solid #d3d3d3",
+						elevation: "none",
 					},
-				],
+					sharedComponents: {
+						header: "Bar",
+						navigation: "Tabs",
+						buttons: "Ink",
+						inputs: "8px",
+						cards: "12px",
+						tabs: "Seg",
+						icons: "Lucide",
+					},
+					navigationContract: {
+						destinations,
+						labels: screens.map((s) => s.name),
+						iconMapping: {},
+						ordering: destinations,
+						activeItemRule: "Highlight active",
+					},
+					screenPlan: screens.map((s) => ({
+						name: s.name,
+						role: s.description,
+						order: s.order,
+					})),
+				},
 			});
 			return {
 				firstChunk: planJson,
@@ -48,10 +97,11 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 <html>
 <head>
   <title>Screen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-white">
-  <nav><div class="logo">Brand</div></nav>
+  <nav><div class="logo">Brand</div><span>${e2eState.labels.join(" ")}</span></nav>
   <main><h1>Hello World</h1></main>
 </body>
 </html>`;
@@ -224,18 +274,27 @@ describe("End-to-End Multi-Screen Generation Scenarios", () => {
 			designMode: "web",
 		});
 
-		// Insert 1 failed frame manually to test individual frame retry
-		const [failedFrame] = await db
-			.insert(studioFrames)
-			.values({
-				projectId: project.id,
+		// Tandai 1 slot bawaan sebagai failed untuk menguji retry frame individual
+		const slots = await db
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, project.id))
+			.orderBy(studioFrames.order);
+		expect(slots.length).toBeGreaterThanOrEqual(1);
+		const slot = slots[0];
+		await db
+			.update(studioFrames)
+			.set({
 				name: "Detail Catatan",
-				viewport: "web",
 				status: "failed",
 				error: "Simulated timeout",
-				order: 0,
+				updatedAt: new Date(),
 			})
-			.returning();
+			.where(eq(studioFrames.id, slot.id));
+		const [failedFrame] = await db
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.id, slot.id));
 
 		// Retry only the failed frame
 		const retried = await retryStudioFrame(project.id, userId, failedFrame.id);

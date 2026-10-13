@@ -11,6 +11,11 @@ import {
 	reviseStudioProject,
 } from "@/lib/services/studio-service";
 import { requireUser } from "@/lib/session";
+import {
+	studioDesignReferenceSchema,
+	studioDesignSkillIdSchema,
+	studioInitialPageCountSchema,
+} from "@/lib/studio-generation-options";
 
 function studioErrorResponse(error: unknown): Response {
 	console.error("[studio.generate error]", error);
@@ -45,6 +50,9 @@ export const studioGenerateBodySchema = z.object({
 	title: z.string().optional(),
 	projectId: z.string().optional(),
 	designMode: z.enum(["web", "mobile"]).optional(),
+	designSkillId: studioDesignSkillIdSchema.optional(),
+	initialPageCount: studioInitialPageCountSchema.optional(),
+	designReference: studioDesignReferenceSchema.nullable().optional(),
 	designMd: z.string().max(STUDIO_DESIGN_MD_MAX_CHARS).nullable().optional(),
 	logo: z
 		.object({
@@ -113,12 +121,15 @@ export async function POST({
 			);
 		}
 
-		const { project, job } = await createStudioProjectWithJob(user.id, {
+		const { project, job, frames } = await createStudioProjectWithJob(user.id, {
 			title: body.title,
 			prompt: checked.prompt,
 			designMode: body.designMode,
 			designMd: body.designMd,
 			logo: body.logo,
+			designSkillId: body.designSkillId,
+			initialPageCount: body.initialPageCount,
+			designReference: body.designReference,
 		});
 
 		return Response.json(
@@ -126,6 +137,8 @@ export async function POST({
 				projectId: project.id,
 				jobId: job.id,
 				status: job.status,
+				frameIds: frames.map((frame) => frame.id),
+				pageCount: frames.length,
 			},
 			{ status: 201 },
 		);

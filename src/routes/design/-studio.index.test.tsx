@@ -37,6 +37,10 @@ vi.mock("@/lib/session", () => ({
 	requireUserServer: vi.fn(),
 }));
 
+vi.mock("@/lib/auth-client", () => ({
+	authClient: { useSession: () => ({ data: null }) },
+}));
+
 import { Route } from "./studio.index";
 
 describe("StudioPage UI & Workflow", () => {
@@ -81,9 +85,16 @@ describe("StudioPage UI & Workflow", () => {
 			screen.getByPlaceholderText(/Jelaskan kebutuhan antarmukamu/i),
 		).toBeDefined();
 		expect(
-			screen.getByRole("button", { name: /Start with your design/i }),
+			screen.getByRole("button", { name: "Tambah referensi desain" }),
 		).toBeDefined();
-		expect(screen.getByRole("button", { name: "Generate UI" })).toBeDefined();
+		expect(screen.getByRole("button", { name: "Kirim prompt" })).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: /Design skill: No Skill/i }),
+		).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: /Jumlah halaman awal: 3/i }),
+		).toBeDefined();
+		expect(screen.getByText("Mulai dari brief siap pakai")).toBeDefined();
 	});
 
 	it("allows switching between Web and Mobile design modes", () => {
@@ -147,7 +158,7 @@ describe("StudioPage UI & Workflow", () => {
 		const mobileBtn = screen.getByRole("button", { name: "Mobile" });
 		fireEvent.click(mobileBtn);
 
-		const submitBtn = screen.getByRole("button", { name: "Generate UI" });
+		const submitBtn = screen.getByRole("button", { name: "Kirim prompt" });
 		fireEvent.click(submitBtn);
 
 		await waitFor(() => {
@@ -159,6 +170,9 @@ describe("StudioPage UI & Workflow", () => {
 					body: JSON.stringify({
 						prompt: "Aplikasi mobile fitness tracking dengan kalender",
 						designMode: "mobile",
+						designSkillId: "none",
+						initialPageCount: 3,
+						designReference: null,
 						designMd: null,
 						logo: null,
 					}),
@@ -172,21 +186,43 @@ describe("StudioPage UI & Workflow", () => {
 		});
 	});
 
-	it("opens Start with your design modal when clicking secondary action", () => {
+	it("opens the visual design picker from the composer icon", () => {
 		const StudioComponent = (
 			Route as unknown as { component: React.ComponentType }
 		).component;
 		render(<StudioComponent />);
 
-		const modalBtn = screen.getByRole("button", {
-			name: /Start with your design/i,
-		});
-		fireEvent.click(modalBtn);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Tambah referensi desain" }),
+		);
 
+		expect(screen.getByText("Pilih tampilan")).toBeDefined();
+		expect(screen.getByRole("tab", { name: "Tema" })).toBeDefined();
+		expect(screen.getByRole("tab", { name: "Template" })).toBeDefined();
+		expect(screen.getByRole("tab", { name: "Punya Saya" })).toBeDefined();
+	});
+
+	it("populates an editable brief with platform and page count from a shortcut", () => {
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: /Kopi Specialty Ordering/i }),
+		);
+
+		const textarea = screen.getByPlaceholderText(
+			/Jelaskan kebutuhan antarmukamu/i,
+		) as HTMLTextAreaElement;
+		expect(textarea.value).toContain("Ruang Seduh");
 		expect(
-			screen.getByText(
-				"Gunakan design system dan identitas visual yang sudah kamu punya sebagai referensi.",
-			),
+			screen
+				.getByRole("button", { name: "Mobile" })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+		expect(
+			screen.getByRole("button", { name: /Jumlah halaman awal: 4/i }),
 		).toBeDefined();
 	});
 

@@ -412,6 +412,48 @@ export const CANVAS_MAX_ZOOM = 1.54;
 /** Studio artboards span several screens, so its usable range is wider. */
 export const STUDIO_CANVAS_MIN_ZOOM = 0.2;
 export const STUDIO_CANVAS_MAX_ZOOM = 2;
+/**
+ * Initial canvas scale per platform. Mobile artboards are close to the real
+ * device width, so they can start near 1:1; web artboards must start smaller
+ * to stay readable inside a laptop viewport.
+ */
+export const STUDIO_CANVAS_INITIAL_ZOOM = {
+	mobile: 0.9,
+	web: 0.65,
+} as const;
+
+/**
+ * Canvas layout metrics used by fit-to-content. They mirror the real overlay
+ * geometry (floating header, floating composer, right-centre toolbar) and the
+ * frame track styling, so fitting never parks content under an overlay.
+ */
+export const STUDIO_CANVAS_FRAME_GAP_PX = 56;
+export const STUDIO_CANVAS_FIT_PADDING_PX = 192;
+export const STUDIO_CANVAS_FRAME_HEADER_PX = 28;
+export const STUDIO_CANVAS_HEADER_INSET_PX = 64;
+export const STUDIO_CANVAS_COMPOSER_INSET_PX = 168;
+export const STUDIO_CANVAS_TOOLBAR_INSET_PX = 64;
+/** Smallest visible artboard band a fit is allowed to compress to. */
+export const STUDIO_CANVAS_MIN_VISIBLE_PX = 120;
+
+/**
+ * Floating overlay geometry for the canvas bottom edge.
+ *
+ * The composer is bottom-centred and the zoom controls occupy the bottom-right
+ * corner. The composer's width is capped so its right edge always clears that
+ * row: on a narrow viewport the composer narrows instead of piling on top of
+ * the zoom controls.
+ */
+export const STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX = 672;
+export const STUDIO_CANVAS_ZOOM_ROW_WIDTH_PX = 180;
+export const STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX = 52;
+export const STUDIO_CANVAS_ZOOM_BOTTOM_PX = 12;
+export const STUDIO_CANVAS_COMPOSER_BOTTOM_PX = 24;
+/** Breathing room between the composer band and the zoom row beside it. */
+export const STUDIO_CANVAS_OVERLAY_GAP_PX = 12;
+/** Horizontal room the composer must leave for the bottom-right zoom row. */
+export const STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX =
+	STUDIO_CANVAS_ZOOM_ROW_WIDTH_PX + STUDIO_CANVAS_OVERLAY_GAP_PX * 2;
 
 /** Wheel normalization: DOM deltaMode 1 is lines, 2 is pages. */
 export const WHEEL_LINE_HEIGHT_PX = 16;
@@ -429,3 +471,24 @@ export const STUDIO_LOGO_ALLOWED_MIMES = [
 	"image/webp",
 	"image/svg+xml",
 ] as const;
+
+/** Max parallel frame generations; conservative default respects provider limits. */
+export const STUDIO_FRAME_CONCURRENCY = 3;
+/** Token budget for single structured planning generation. */
+export const STUDIO_PLANNING_MAX_TOKENS = 4000;
+/** Token budget for per-frame HTML generation. */
+export const STUDIO_FRAME_MAX_TOKENS = 12000;
+/** Max chars of previous HTML kept for revision context. */
+export const STUDIO_PREVIOUS_HTML_MAX_CHARS = 60000;
+/** Timeout for Playwright visual capture per frame. */
+export const STUDIO_CAPTURE_TIMEOUT_MS = 30000;
+/** Max document height accepted by visual capture. */
+export const STUDIO_CAPTURE_MAX_HEIGHT = 30000;
+/** JPEG quality for captured frame visuals. */
+export const STUDIO_CAPTURE_QUALITY = 90;
+/** Device pixel ratio for captured frame visuals. */
+export const STUDIO_CAPTURE_DSF = 2;
+/** TTL for worker job claim lease before stale recovery. */
+export const STUDIO_JOB_CLAIM_TTL_MS = 150000;
+/** Max corrective retries for a single failed frame. */
+export const STUDIO_FRAME_RETRY_MAX = 1;

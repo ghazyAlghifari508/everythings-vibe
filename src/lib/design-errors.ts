@@ -17,6 +17,8 @@ export const DESIGN_ERROR_CODES = {
 		"Sistem tidak menemukan konten yang cukup untuk dianalisis.",
 	AI_GENERATION_FAILED:
 		"DESIGN.md belum bisa dibuat. Coba ulangi dari link yang sama.",
+	VISUAL_CAPTURE_FAILED:
+		"Pratinjau visual frame gagal dirender. HTML frame tetap tersimpan.",
 	STORAGE_FAILED: "Terjadi kendala saat menyimpan hasil.",
 	UNEXPECTED_ERROR:
 		"Pemrosesan berhenti karena kendala teknis yang tidak terduga.",

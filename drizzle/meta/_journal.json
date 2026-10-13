@@ -253,6 +253,13 @@
       "when": 1791773044357,
       "tag": "0035_dry_thunderbird",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791909689305,
+      "tag": "0036_wooden_leper_queen",
+      "breakpoints": true
     }
   ]
 }

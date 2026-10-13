@@ -16,7 +16,9 @@ function studioErrorResponse(error: unknown): Response {
 	console.error("[studio.frame error]", error);
 	if (error instanceof ScrapeError) {
 		const isClientError =
-			error.code === "INVALID_URL" || error.code === "WEBSITE_BLOCKED";
+			error.code === "INVALID_URL" ||
+			error.code === "WEBSITE_BLOCKED" ||
+			error.code === "VISUAL_CAPTURE_FAILED";
 		return Response.json(
 			{ error: error.message, code: error.code },
 			{ status: isClientError ? 400 : 500 },
@@ -55,8 +57,13 @@ export async function GET({
 				{ error: "Identitas project dan frame diperlukan." },
 				{ status: 400 },
 			);
+		// A user-initiated visual retry must bypass the cached render so a
+		// capture that could not be decoded is genuinely re-rendered.
+		const attempt = Number(url.searchParams.get("attempt") ?? "0");
 		return Response.json(
-			await getStudioFrameVisual(projectId, frameId, user.id),
+			await getStudioFrameVisual(projectId, frameId, user.id, {
+				forceRecapture: Number.isFinite(attempt) && attempt > 0,
+			}),
 			{ headers: { "Cache-Control": "private, no-store" } },
 		);
 	} catch (error) {

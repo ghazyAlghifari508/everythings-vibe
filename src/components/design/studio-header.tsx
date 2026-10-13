@@ -57,8 +57,11 @@ export function StudioHeader({
 	const { data: session } = authClient.useSession();
 	const [isDeleteOpen, setDeleteOpen] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
-	const control =
-		"inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:opacity-50";
+	// Each floating control carries its own restrained surface so it stays
+	// legible over the dotted canvas without a full-width navbar background.
+	const surface =
+		"border border-iron/70 bg-charcoal/85 backdrop-blur-sm supports-[backdrop-filter]:bg-charcoal/70";
+	const control = `inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:opacity-50 ${surface}`;
 	const item = "gap-2 focus:bg-steel";
 	async function confirmDelete() {
 		if (!onDelete || deleting) return;
@@ -75,8 +78,15 @@ export function StudioHeader({
 		}
 	}
 	return (
-		<header className="z-20 flex h-14 shrink-0 items-center justify-between gap-3 bg-charcoal px-2 sm:px-4">
-			<div className="flex min-w-0 items-center gap-2">
+		// Floating canvas header: the dotted canvas shows through behind it, so
+		// there is no full-width navbar surface and no divider line. Only the
+		// individual controls carry a surface, and the empty middle band is
+		// pointer-transparent so it never swallows canvas pan/selection.
+		<header
+			className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between gap-3 px-2 pt-[env(safe-area-inset-top)] sm:px-4"
+			data-testid="studio-header"
+		>
+			<div className="pointer-events-auto flex min-w-0 items-center gap-2">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<button
@@ -137,13 +147,13 @@ export function StudioHeader({
 					</DropdownMenuContent>
 				</DropdownMenu>
 				<h1
-					className="truncate text-sm font-semibold text-snow sm:text-base"
+					className="truncate text-sm font-semibold text-snow [text-shadow:0_1px_2px_var(--color-charcoal)] sm:text-base"
 					title={title}
 				>
 					{title}
 				</h1>
 			</div>
-			<div className="flex shrink-0 items-center gap-1">
+			<div className="pointer-events-auto flex shrink-0 items-center gap-1">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<button
@@ -154,7 +164,7 @@ export function StudioHeader({
 							{exporting ? (
 								<Loader2 size={16} className="motion-safe:animate-spin" />
 							) : null}
-							Export
+							<span className="hidden sm:inline">Export</span>
 							<ChevronDown size={14} />
 						</button>
 					</DropdownMenuTrigger>

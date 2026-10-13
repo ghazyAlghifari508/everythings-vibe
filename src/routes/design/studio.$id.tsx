@@ -32,6 +32,8 @@ import type {
 } from "@/db/schema";
 import { requireUserServer } from "@/lib/session";
 import { exportProjectAsZip } from "@/lib/studio-export";
+import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
+import { STUDIO_DESIGN_PRESETS } from "@/lib/studio-presets";
 import { useUIStore } from "@/store";
 
 export interface StudioDetailLoaderData {
@@ -106,6 +108,10 @@ function StudioWorkspace({
 	const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
 	const [composerLoading, setComposerLoading] = useState(false);
+	// Design-system and skill changes are independent writes; sharing the
+	// composer's busy flag made the composer look like it was sending a prompt
+	// whenever an unrelated preference was saved.
+	const [preferenceSaving, setPreferenceSaving] = useState(false);
 	const [exportingZip, setExportingZip] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [isAddFrameOpen, setIsAddFrameOpen] = useState(false);
@@ -182,6 +188,17 @@ function StudioWorkspace({
 		() => frames.filter((f) => f.status === "ready").length,
 		[frames],
 	);
+
+	// Derived selection state must keep a stable identity: a fresh array on
+	// every poll tick would re-render the composer even when nothing changed.
+	const selectedFrames = useMemo(
+		() => frames.filter((frame) => selectedFrameIds.includes(frame.id)),
+		[frames, selectedFrameIds],
+	);
+	const handleRemoveSelectedFrame = useCallback((id: string) => {
+		setSelectedFrameIds((previous) => previous.filter((entry) => entry !== id));
+		setSelectedFrameId((previous) => (previous === id ? null : previous));
+	}, []);
 
 	// Poll authoritative status while jobs or frames are actively processing
 	const syncProjectStatus = useCallback(async () => {
@@ -341,6 +358,17 @@ function StudioWorkspace({
 	async function handleApplyDesignSystem(
 		reference: AttachedDesignReference,
 	): Promise<boolean> {
+		setPreferenceSaving(true);
+		try {
+			return await applyDesignSystem(reference);
+		} finally {
+			setPreferenceSaving(false);
+		}
+	}
+
+	async function applyDesignSystem(
+		reference: AttachedDesignReference,
+	): Promise<boolean> {
 		const response = await fetch("/api/studio/project", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -364,6 +392,59 @@ function StudioWorkspace({
 		await syncProjectStatus();
 		return true;
 	}
+
+	// Skill changes persist immediately so every later revision reads the
+	// stored selection. The row is never updated optimistically.
+	async function handleSkillChange(skillId: StudioDesignSkillId) {
+		if (isProcessing || preferenceSaving || project.designSkillId === skillId)
+			return;
+		setPreferenceSaving(true);
+		setError("");
+		try {
+			const response = await fetch("/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "preferences",
+					projectId: project.id,
+					designSkillId: skillId,
+				}),
+			});
+			if (!response.ok) {
+				const data: unknown = await response.json().catch(() => null);
+				throw new Error(
+					typeof data === "object" &&
+						data !== null &&
+						"error" in data &&
+						typeof data.error === "string"
+						? data.error
+						: "Gagal menyimpan design skill.",
+				);
+			}
+			await syncProjectStatus();
+		} catch (failure) {
+			setError(
+				failure instanceof Error
+					? failure.message
+					: "Gagal menyimpan design skill.",
+			);
+		} finally {
+			setPreferenceSaving(false);
+		}
+	}
+
+	const storedReferenceLabel = (() => {
+		const reference = project.designReference;
+		if (reference?.kind === "theme") {
+			const preset = STUDIO_DESIGN_PRESETS.find(
+				(entry) => entry.id === reference.id,
+			);
+			return preset ? `${preset.name}` : null;
+		}
+		if (reference?.kind === "custom") return reference.filename;
+		if (project.designMd) return "Referensi desain";
+		return null;
+	})();
 
 	async function handleRetryFrame(frameId: string) {
 		try {
@@ -422,6 +503,10 @@ function StudioWorkspace({
 
 	return (
 		<main className="relative flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-charcoal text-snow">
+			{/* The header floats above the dotted canvas instead of occupying a
+			    full-width navbar band, so the canvas extends behind it. It is a
+			    sibling of the canvas section, never a descendant: header clicks
+			    therefore cannot start a canvas pan or change the selection. */}
 			<StudioHeader
 				title={project.title}
 				duplicating={duplicating}
@@ -435,7 +520,7 @@ function StudioWorkspace({
 				designSystemControl={
 					<StudioDesignPicker
 						designMd={project.designMd}
-						disabled={isProcessing || composerLoading}
+						disabled={isProcessing || preferenceSaving}
 						onApply={handleApplyDesignSystem}
 					/>
 				}
@@ -457,17 +542,13 @@ function StudioWorkspace({
 
 				{/* Floating AI Prompt Composer */}
 				<StudioComposer
-					selectedFrames={frames.filter((frame) =>
-						selectedFrameIds.includes(frame.id),
-					)}
-					onRemoveFrame={(id) => {
-						setSelectedFrameIds((previous) =>
-							previous.filter((entry) => entry !== id),
-						);
-						if (selectedFrameId === id) setSelectedFrameId(null);
-					}}
+					selectedFrames={selectedFrames}
+					onRemoveFrame={handleRemoveSelectedFrame}
 					onSubmit={handleComposerSubmit}
 					loading={composerLoading}
+					designSkillId={project.designSkillId}
+					onDesignSkillChange={handleSkillChange}
+					referenceLabel={storedReferenceLabel}
 				/>
 			</div>
 
@@ -479,18 +560,21 @@ function StudioWorkspace({
 				onSubmit={handleAddFrame}
 			/>
 
-			{/* Error Toast if any */}
+			{/* Error banner sits below the floating header band so it never
+			    collides with the header controls. */}
 			{error && (
 				<div
 					role="alert"
-					className="absolute top-16 left-1/2 z-40 flex w-[calc(100%-24px)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-xl border border-crimson bg-obsidian px-4 py-2.5 text-sm text-crimson"
+					className="absolute left-1/2 z-40 flex w-[calc(100%-24px)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-xl border border-crimson bg-obsidian px-4 py-2.5 text-sm text-crimson"
+					style={{ top: "calc(4rem + env(safe-area-inset-top))" }}
 				>
-					<AlertCircle size={15} />
+					<AlertCircle size={15} aria-hidden />
 					<span>{error}</span>
 					<button
 						type="button"
 						onClick={() => setError("")}
-						className="ml-2 text-red-400 hover:text-snow"
+						aria-label="Tutup pesan error"
+						className="ml-2 rounded px-1.5 py-0.5 text-xs font-medium text-crimson hover:bg-crimson/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow"
 					>
 						Tutup
 					</button>

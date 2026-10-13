@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { STUDIO_VISUAL_WIDTH } from "./constants";
 import {
 	buildStudioFramePrompt,
 	buildStudioPlanningPrompt,
@@ -15,6 +16,26 @@ import {
 } from "./prompts-ui-studio";
 
 describe("Studio Prompt Builder", () => {
+	it("enforces the requested initial cardinality and platform without truncating output", () => {
+		const plan = (count: number) =>
+			JSON.stringify({
+				projectTitle: "Sample",
+				screens: Array.from({ length: count }, (_, order) => ({
+					name: `Screen ${order}`,
+					description: "Sample",
+					viewport: "web",
+					order,
+				})),
+			});
+		expect(parseStudioScreenPlan(plan(2), "web", 3).ok).toBe(false);
+		expect(parseStudioScreenPlan(plan(3), "web", 3).ok).toBe(true);
+		expect(parseStudioScreenPlan(plan(6), "web", 5).ok).toBe(false);
+		expect(parseStudioScreenPlan(plan(3), "mobile", 3).ok).toBe(false);
+		expect(parseStudioScreenPlan(plan(8)).ok).toBe(true);
+		expect(
+			buildStudioPlanningPrompt("Sample application", "web", null, 1),
+		).toContain("exactly 1");
+	});
 	it("instructs single-file Tailwind CDN output with Indonesian copy", () => {
 		expect(STUDIO_SYSTEM_PROMPT).toContain("cdn.tailwindcss.com");
 		expect(STUDIO_SYSTEM_PROMPT).toContain("single-file");
@@ -56,8 +77,12 @@ describe("Studio Prompt Builder", () => {
 		expect(prompt).toContain("Target platform: Mobile Application Experience");
 		// The directive must name the canonical capture width, otherwise the
 		// generated layout is designed for a different width than it is rendered at.
-		expect(prompt).toContain("390px");
+		expect(prompt).toContain(`${STUDIO_VISUAL_WIDTH.mobile}px`);
 		expect(prompt).toContain("bottom navigation");
+		// The artboard is a static full-page preview, so a viewport-anchored
+		// bottom bar would paint in the middle of a long page.
+		expect(prompt).toContain("normal document flow");
+		expect(prompt).not.toContain("sticky bottom navigation");
 	});
 
 	it("injects desktop responsive directives when web mode is selected", () => {
@@ -65,7 +90,7 @@ describe("Studio Prompt Builder", () => {
 			designMode: "web",
 		});
 		expect(prompt).toContain("Target platform: Responsive Web Application");
-		expect(prompt).toContain("1280px-1440px");
+		expect(prompt).toContain(`${STUDIO_VISUAL_WIDTH.web}px`);
 	});
 
 	it("validates and sanitizes DESIGN.md input", () => {
@@ -202,6 +227,55 @@ describe("Studio Prompt Builder", () => {
 			expect(prompt).toContain("Sistem kasir toko ritel");
 			expect(prompt).toContain("/api/studio/asset?id=logo-1");
 			expect(prompt).toContain("Primary: #000000");
+		});
+
+		it("injects the shared blueprint verbatim with precedence rules", () => {
+			const blueprint = {
+				productIdentity: {
+					productName: "Kopi",
+					targetAudience: "Umum",
+					platform: "mobile" as const,
+					visualDirection: "Hangat",
+				},
+				designTokens: {
+					primary: "#0f0f0f",
+					secondary: "#606060",
+					background: "#ffffff",
+					surface: "#f8f8f8",
+					fontFamily: "system-ui",
+					radius: 12,
+					border: "1px solid #d3d3d3",
+					elevation: "none",
+				},
+				sharedComponents: {
+					header: "Bar",
+					navigation: "Tabs",
+					buttons: "Ink",
+					inputs: "8px",
+					cards: "12px",
+					tabs: "Seg",
+					icons: "Lucide",
+				},
+				navigationContract: {
+					destinations: ["jelajah"],
+					labels: ["Jelajah"],
+					iconMapping: {},
+					ordering: ["jelajah"],
+					activeItemRule: "Highlight aktif",
+				},
+				screenPlan: [{ name: "Jelajah", role: "Katalog", order: 0 }],
+			};
+			const prompt = buildStudioFramePrompt({
+				screenName: "Jelajah",
+				projectPrompt: "Aplikasi kopi",
+				designMode: "mobile",
+				blueprint,
+				activeScreen: "Jelajah",
+			});
+			expect(prompt).toContain("SHARED_DESIGN_BLUEPRINT");
+			expect(prompt).toContain('"primary":"#0f0f0f"');
+			expect(prompt).toContain("Design precedence");
+			expect(prompt).toContain("width=device-width");
 		});
 	});
 });
