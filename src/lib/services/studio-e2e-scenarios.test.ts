@@ -40,9 +40,49 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 				viewport: isMobile ? "mobile" : "web",
 				order,
 			}));
+			const destinations = screens.map((_, order) => `screen-${order}`);
 			const planJson = JSON.stringify({
 				projectTitle: isMobile ? "Aplikasi Keuangan" : "Website Portofolio",
 				screens,
+				blueprint: {
+					productIdentity: {
+						productName: isMobile ? "Aplikasi Keuangan" : "Website Portofolio",
+						targetAudience: "Umum",
+						platform: isMobile ? "mobile" : "web",
+						visualDirection: "Bersih",
+					},
+					designTokens: {
+						primary: "#8ed462",
+						secondary: "#606060",
+						background: "#f5f1e4",
+						surface: "#ffffff",
+						fontFamily: "Inter",
+						radius: 12,
+						border: "1px solid #d3d3d3",
+						elevation: "none",
+					},
+					sharedComponents: {
+						header: "Bar",
+						navigation: "Tabs",
+						buttons: "Ink",
+						inputs: "8px",
+						cards: "12px",
+						tabs: "Seg",
+						icons: "Lucide",
+					},
+					navigationContract: {
+						destinations,
+						labels: screens.map((s) => s.name),
+						iconMapping: {},
+						ordering: destinations,
+						activeItemRule: "Highlight active",
+					},
+					screenPlan: screens.map((s) => ({
+						name: s.name,
+						role: s.description,
+						order: s.order,
+					})),
+				},
 			});
 			return {
 				firstChunk: planJson,

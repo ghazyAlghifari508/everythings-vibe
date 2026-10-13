@@ -23,19 +23,59 @@ vi.mock("./ai-orchestrator", () => ({
 		const planning = messages[0].content.includes(
 			"planning application screens",
 		);
+		const screenCount = provider.counts.shift() ?? 3;
+		const viewport = "web";
+		const screens = Array.from({ length: screenCount }, (_, order) => ({
+			name: `Screen ${order}`,
+			description: "Sample",
+			viewport,
+			order,
+		}));
+		const destinations = screens.map((_, order) => `screen-${order}`);
 		return {
 			firstChunk: planning
 				? JSON.stringify({
 						projectTitle: "Sample",
-						screens: Array.from(
-							{ length: provider.counts.shift() ?? 3 },
-							(_, order) => ({
-								name: `Screen ${order}`,
-								description: "Sample",
-								viewport: "web",
-								order,
-							}),
-						),
+						screens,
+						blueprint: {
+							productIdentity: {
+								productName: "Sample",
+								targetAudience: "General",
+								platform: viewport,
+								visualDirection: "Clean",
+							},
+							designTokens: {
+								primary: "#0f0f0f",
+								secondary: "#606060",
+								background: "#ffffff",
+								surface: "#f8f8f8",
+								fontFamily: "Arial",
+								radius: 12,
+								border: "1px solid #d3d3d3",
+								elevation: "none",
+							},
+							sharedComponents: {
+								header: "Bar",
+								navigation: "Tabs",
+								buttons: "Ink",
+								inputs: "8px",
+								cards: "12px",
+								tabs: "Seg",
+								icons: "Lucide",
+							},
+							navigationContract: {
+								destinations,
+								labels: screens.map((s) => s.name),
+								iconMapping: {},
+								ordering: destinations,
+								activeItemRule: "Highlight active",
+							},
+							screenPlan: screens.map((s) => ({
+								name: s.name,
+								role: s.description,
+								order: s.order,
+							})),
+						},
 					})
 				: "<html><head></head><body>Sample</body></html>",
 			generator: (async function* () {})(),
@@ -84,6 +124,14 @@ it("repairs count mismatch with retained options and persists the exact accepted
 			.from(studioJobs)
 			.where(eq(studioJobs.id, job.id));
 		expect(stored.status).toBe("completed");
+		const [storedProject] = await db
+			.select()
+			.from(studioProjects)
+			.where(eq(studioProjects.id, project.id));
+		expect(storedProject.designBlueprint).toBeDefined();
+		expect(
+			storedProject.designBlueprint?.navigationContract.labels,
+		).toHaveLength(3);
 		for (const attempt of provider.messages.slice(0, 2)) {
 			expect(attempt[0].content).toContain("Selected design skill: taste");
 			expect(attempt[1].content).toContain("exactly 3");

@@ -18,15 +18,18 @@ import {
 } from "@/db/schema";
 import { extractCleanHtml } from "@/lib/clean-html";
 import {
+	STUDIO_FRAME_MAX_TOKENS,
 	STUDIO_LOGO_ALLOWED_MIMES,
 	STUDIO_LOGO_MAX_BYTES,
+	STUDIO_PLANNING_MAX_TOKENS,
+	STUDIO_PREVIOUS_HTML_MAX_CHARS,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
 import {
 	buildStudioFramePrompt,
 	buildStudioPlanningPrompt,
 	buildStudioUserPrompt,
-	parseStudioScreenPlan,
+	parseStudioPlanningWithBlueprint,
 	STUDIO_PLAN_SYSTEM_PROMPT,
 	STUDIO_SYSTEM_PROMPT,
 	type StudioDesignMode,
@@ -39,8 +42,12 @@ import {
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
 import { issueStudioAssetCapability } from "@/lib/studio-asset-capability";
+import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import { resolveStudioDesignReference } from "@/lib/studio-design-reference.server";
-import { studioSkillSystemGuidance } from "@/lib/studio-design-skill-registry.server";
+import {
+	resolveStudioDesignSkill,
+	studioSkillSystemGuidance,
+} from "@/lib/studio-design-skill-registry.server";
 import {
 	enforceDesignSystemOnHtml,
 	extractDesignSystemTokens,
@@ -552,6 +559,7 @@ export async function runStudioJobPipeline(
 			);
 
 			let screenPlan: StudioScreenPlan | null = null;
+			let designBlueprint: StudioDesignBlueprint | null = null;
 			let planError: string | null = null;
 
 			// Attempt 1: Standard structured planning
@@ -568,17 +576,18 @@ export async function runStudioJobPipeline(
 						{ role: "user", content: planPrompt },
 					],
 					undefined,
-					4000,
+					STUDIO_PLANNING_MAX_TOKENS,
 				);
 				let planRaw = firstChunk;
 				for await (const chunk of generator) planRaw += chunk;
-				const parsed = parseStudioScreenPlan(
+				const parsed = parseStudioPlanningWithBlueprint(
 					planRaw,
 					designMode,
 					project.initialPageCount,
 				);
 				if (parsed.ok) {
 					screenPlan = parsed.plan;
+					designBlueprint = parsed.blueprint;
 				} else {
 					planError = parsed.error;
 				}
@@ -588,9 +597,9 @@ export async function runStudioJobPipeline(
 			}
 
 			// Attempt 2: Bounded corrective retry if attempt 1 was malformed
-			if (!screenPlan) {
+			if (!screenPlan || !designBlueprint) {
 				try {
-					const correctivePrompt = `${planPrompt}\n\nPrevious plan violated the contract (${planError ?? "format error"}). Correct the plan and return ONLY valid JSON matching the required count, platform and order.`;
+					const correctivePrompt = `${planPrompt}\n\nPrevious plan violated the contract (${planError ?? "format error"}). Correct the plan and return ONLY valid JSON matching the required count, platform and order, including the complete shared design blueprint object.`;
 					const { generator, firstChunk } = await tryStreamWithFallback(
 						selectModels(),
 						[
@@ -603,17 +612,20 @@ export async function runStudioJobPipeline(
 							{ role: "user", content: correctivePrompt },
 						],
 						undefined,
-						4000,
+						STUDIO_PLANNING_MAX_TOKENS,
 					);
 					let planRaw = firstChunk;
 					for await (const chunk of generator) planRaw += chunk;
-					const parsed = parseStudioScreenPlan(
+					const parsed = parseStudioPlanningWithBlueprint(
 						planRaw,
 						designMode,
 						project.initialPageCount,
 					);
 					if (parsed.ok) {
 						screenPlan = parsed.plan;
+						designBlueprint = parsed.blueprint;
+					} else {
+						planError = parsed.error;
 					}
 				} catch {
 					// Bounded retry failed
@@ -621,7 +633,7 @@ export async function runStudioJobPipeline(
 			}
 
 			// If planning genuinely failed after retry: fail honestly, NEVER substitute dummy screens!
-			if (!screenPlan || screenPlan.screens.length === 0) {
+			if (!screenPlan || !designBlueprint || screenPlan.screens.length === 0) {
 				const finalError = `Gagal merencanakan layar aplikasi untuk "${job.prompt.slice(0, 60)}". Silakan coba lagi.`;
 				await db
 					.update(studioJobs)
@@ -634,18 +646,17 @@ export async function runStudioJobPipeline(
 				return;
 			}
 
-			if (
-				screenPlan.projectTitle &&
-				screenPlan.projectTitle !== project.title
-			) {
-				await db
-					.update(studioProjects)
-					.set({
-						title: screenPlan.projectTitle.slice(0, 200),
-						updatedAt: new Date(),
-					})
-					.where(eq(studioProjects.id, projectId));
-			}
+			await db
+				.update(studioProjects)
+				.set({
+					...(screenPlan.projectTitle &&
+					screenPlan.projectTitle !== project.title
+						? { title: screenPlan.projectTitle.slice(0, 200) }
+						: {}),
+					designBlueprint,
+					updatedAt: new Date(),
+				})
+				.where(eq(studioProjects.id, projectId));
 
 			const planned = screenPlan.screens;
 			const persisted = await db.transaction(async (tx) => {
@@ -1637,6 +1648,17 @@ export async function updateStudioPreferences(
 				logoAssetId,
 				...(resolved ? { designReference: resolved.designReference } : {}),
 				...(skillId !== undefined ? { designSkillId: skillId } : {}),
+				...(resolved &&
+				(resolved.designMd !== project.designMd ||
+					JSON.stringify(resolved.designReference ?? null) !==
+						JSON.stringify(project.designReference ?? null))
+					? {
+							designBlueprintVersion: sql`${studioProjects.designBlueprintVersion} + 1`,
+						}
+					: {}),
+				...(skillId !== undefined && skillId !== project.designSkillId
+					? { designSkillVersion: resolveStudioDesignSkill(skillId).version }
+					: {}),
 				updatedAt: new Date(),
 			})
 			.where(

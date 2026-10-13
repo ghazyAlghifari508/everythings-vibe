@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
+import {
+	type StudioDesignBlueprint,
+	validateBlueprint,
+} from "@/lib/studio-design-blueprint";
 import { extractDesignSystemTokens } from "@/lib/studio-design-system";
 
 export const STUDIO_MIN_PROMPT_CHARS = 10;
@@ -53,9 +57,47 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "viewport": "web" | "mobile",
       "order": 0
     }
-  ]
+  ],
+  "blueprint": {
+    "productIdentity": {
+      "productName": "Application name",
+      "targetAudience": "Primary audience",
+      "platform": "web" | "mobile",
+      "visualDirection": "Concise visual direction"
+    },
+    "designTokens": {
+      "primary": "Primary color hex",
+      "secondary": "Secondary color hex",
+      "background": "Page background hex",
+      "surface": "Card surface hex",
+      "fontFamily": "Font stack",
+      "radius": 12,
+      "border": "Border treatment",
+      "elevation": "Shadow model"
+    },
+    "sharedComponents": {
+      "header": "App header specification",
+      "navigation": "Navigation system specification",
+      "buttons": "Button styling",
+      "inputs": "Input styling",
+      "cards": "Card geometry",
+      "tabs": "Tab styling",
+      "icons": "Icon family and stroke"
+    },
+    "navigationContract": {
+      "destinations": ["home", "search"],
+      "labels": ["Home", "Search"],
+      "iconMapping": { "home": "home", "search": "search" },
+      "ordering": ["home", "search"],
+      "activeItemRule": "Highlight the item matching the active screen"
+    },
+    "screenPlan": [
+      { "name": "Screen Name", "role": "Screen role", "order": 0 }
+    ]
+  }
 }
-- Do not invent artificial screen counts; plan exactly the essential screens needed for the user's request.
+- The screens array and blueprint.screenPlan must each contain exactly the requested count, ordered 0..N, using the requested viewport platform.
+- The navigation contract (destinations, labels, ordering, icons) is shared by every screen; only the active item changes per screen.
 - Names must be standard, clean UI titles matching the user domain.`;
 
 export const studioScreenPlanItemSchema = z.object({
@@ -180,6 +222,67 @@ export function parseStudioScreenPlan(
 	}
 }
 
+export function parseStudioPlanningWithBlueprint(
+	raw: string,
+	fallbackViewport: StudioDesignMode = "web",
+	expectedCount?: number | null,
+):
+	| { ok: true; plan: StudioScreenPlan; blueprint: StudioDesignBlueprint }
+	| { ok: false; error: string } {
+	const planParsed = parseStudioScreenPlan(
+		raw,
+		fallbackViewport,
+		expectedCount,
+	);
+	if (!planParsed.ok) return planParsed;
+	let parsedJson: unknown;
+	try {
+		const clean = raw
+			.replace(/^```json\s*/im, "")
+			.replace(/^```\s*/im, "")
+			.replace(/\s*```$/im, "")
+			.trim();
+		const firstBrace = clean.indexOf("{");
+		const lastBrace = clean.lastIndexOf("}");
+		if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+			return {
+				ok: false,
+				error: "Format JSON tidak ditemukan pada output perencana layar.",
+			};
+		}
+		parsedJson = JSON.parse(
+			clean.slice(firstBrace, lastBrace + 1).replace(/,\s*([\]}])/g, "$1"),
+		);
+	} catch {
+		return { ok: false, error: "Gagal mem-parse respon JSON rencana layar." };
+	}
+	if (typeof parsedJson !== "object" || parsedJson === null)
+		return { ok: false, error: "Rencana layar harus berupa object." };
+	const record = z.record(z.string(), z.unknown()).safeParse(parsedJson);
+	if (!record.success || record.data.blueprint === undefined)
+		return {
+			ok: false,
+			error: "Blueprint desain bersama tidak ditemukan pada output perencana.",
+		};
+	const validated = validateBlueprint(record.data.blueprint);
+	if (!validated.ok) return validated;
+	if (validated.blueprint.productIdentity.platform !== fallbackViewport)
+		return {
+			ok: false,
+			error: `Blueprint harus menargetkan platform ${fallbackViewport}.`,
+		};
+	if (validated.blueprint.screenPlan.length !== planParsed.plan.screens.length)
+		return {
+			ok: false,
+			error: "Jumlah screen pada blueprint harus sama dengan rencana layar.",
+		};
+	return {
+		ok: true,
+		plan: planParsed.plan,
+		blueprint: validated.blueprint,
+	};
+}
+
 export function buildStudioPlanningPrompt(
 	prompt: string,
 	designMode: StudioDesignMode,
@@ -188,7 +291,7 @@ export function buildStudioPlanningPrompt(
 ): string {
 	const sections: string[] = [
 		`User Request: "${prompt.trim()}"`,
-		`Target Viewport Platform: ${designMode === "mobile" ? "Mobile (mobile-first screens, 375px–430px)" : "Web (desktop responsive screens, 1280px–1440px)"}`,
+		`Target Viewport Platform: ${designMode === "mobile" ? "Mobile (mobile-first screens, 390px)" : "Web (desktop responsive screens, 1280px–1440px)"}`,
 	];
 	if (initialPageCount != null)
 		sections.push(
@@ -231,7 +334,11 @@ export function buildStudioPlanningPrompt(
 	}
 
 	sections.push(
-		`Plan the necessary screens for this application. Output strict JSON with "projectTitle" and "screens" array (each with "name", "description", "viewport": "${designMode}", "order": 0..N). Plan only relevant screens for the user's specific application domain.`,
+		`Plan the necessary screens for this application. Output strict JSON with "projectTitle", "screens" array (each with "name", "description", "viewport": "${designMode}", "order": 0..N), and a "blueprint" object (productIdentity, designTokens, sharedComponents, navigationContract, screenPlan) shared by all screens. The blueprint navigation contract and tokens apply identically to every screen. Plan only relevant screens for the user's specific application domain.`,
+	);
+
+	sections.push(
+		`Design precedence, highest to lowest: explicit user requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override explicit user colors or brand requirements. Resolve conflicts deterministically in that order.`,
 	);
 
 	return sections.join("\n\n");
