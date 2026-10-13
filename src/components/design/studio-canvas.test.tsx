@@ -2,11 +2,21 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX,
+	STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX,
 	STUDIO_CANVAS_HEADER_INSET_PX,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
+	STUDIO_CANVAS_OVERLAY_GAP_PX,
+	STUDIO_CANVAS_ZOOM_BOTTOM_PX,
+	STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX,
 } from "@/lib/constants";
 import { computeCanvasFit, StudioCanvas } from "./studio-canvas";
+import {
+	canvasComposerBottomCss,
+	canvasComposerWidthCss,
+	canvasZoomRowBottomCss,
+} from "./studio-canvas-layout";
 
 describe("StudioCanvas", () => {
 	afterEach(() => cleanup());
@@ -131,13 +141,15 @@ describe("StudioCanvas", () => {
 		const zoomOut = screen.getByRole("button", { name: /Perkecil/i });
 		// The positioning wrapper is the element that anchors the group.
 		const group = zoomOut.parentElement?.parentElement;
-		expect(group?.className).toContain("bottom-3");
 		expect(group?.className).toContain("right-3");
+		// The bottom anchor comes from the shared overlay geometry so the
+		// composer can reserve exactly the same band.
+		expect(group?.style.bottom).toBe(canvasZoomRowBottomCss());
 		// The tools must not share the zoom group's anchor.
 		const cursorToolbar = screen.getByRole("button", {
 			name: "Cursor",
 		}).parentElement;
-		expect(cursorToolbar?.className).not.toContain("bottom-3");
+		expect(cursorToolbar?.style.bottom).toBe("");
 	});
 
 	it("provides active/inactive tool state and shortcuts in tooltips", () => {
@@ -347,6 +359,33 @@ describe("StudioCanvas", () => {
 			});
 			const trackWidth = 390 + 192;
 			expect(pan.x).toBeCloseTo((1200 - trackWidth * zoom) / 2, 6);
+		});
+	});
+
+	describe("floating overlay geometry", () => {
+		it("caps the composer so it never reaches the zoom row", () => {
+			expect(canvasComposerWidthCss()).toContain(
+				`${STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX}px`,
+			);
+			expect(canvasComposerWidthCss()).toContain(
+				`${STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX * 2}px`,
+			);
+		});
+
+		it("keeps the composer clear of the zoom row and the safe area", () => {
+			const bottom = canvasComposerBottomCss();
+			expect(bottom).toContain("env(safe-area-inset-bottom)");
+			// The composer must sit at or above the zoom row's top edge plus the
+			// breathing gap, so the two overlays can never share pixels.
+			const zoomRowTop =
+				STUDIO_CANVAS_ZOOM_BOTTOM_PX +
+				STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX +
+				STUDIO_CANVAS_OVERLAY_GAP_PX;
+			expect(bottom).toContain(`${zoomRowTop}px`);
+		});
+
+		it("honours the safe area for the zoom row too", () => {
+			expect(canvasZoomRowBottomCss()).toContain("env(safe-area-inset-bottom)");
 		});
 	});
 

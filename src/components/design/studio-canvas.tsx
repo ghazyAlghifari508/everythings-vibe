@@ -22,6 +22,7 @@ import {
 	STUDIO_VISUAL_FALLBACK_HEIGHT,
 	STUDIO_VISUAL_WIDTH,
 } from "@/lib/constants";
+import { canvasZoomRowBottomCss } from "./studio-canvas-layout";
 import { StudioFrame } from "./studio-frame";
 
 export interface StudioCanvasProps {
@@ -462,7 +463,10 @@ export const StudioCanvas = memo(function StudioCanvas({
 			    right-centre toolbar and the bottom-centre composer. The reset
 			    action fits every real artboard into the visible band, so its
 			    accessible name describes that behaviour. */}
-			<div className="absolute right-3 bottom-3 z-20">
+			<div
+				className="absolute right-3 z-20"
+				style={{ bottom: canvasZoomRowBottomCss() }}
+			>
 				<ZoomControls
 					zoom={zoom}
 					onZoomIn={zoomInByUser}

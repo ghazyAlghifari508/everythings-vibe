@@ -412,6 +412,25 @@ export const STUDIO_CANVAS_TOOLBAR_INSET_PX = 64;
 /** Smallest visible artboard band a fit is allowed to compress to. */
 export const STUDIO_CANVAS_MIN_VISIBLE_PX = 120;
 
+/**
+ * Floating overlay geometry for the canvas bottom edge.
+ *
+ * The composer is bottom-centred and the zoom controls occupy the bottom-right
+ * corner. The composer's width is capped so its right edge always clears that
+ * row: on a narrow viewport the composer narrows instead of piling on top of
+ * the zoom controls.
+ */
+export const STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX = 672;
+export const STUDIO_CANVAS_ZOOM_ROW_WIDTH_PX = 180;
+export const STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX = 52;
+export const STUDIO_CANVAS_ZOOM_BOTTOM_PX = 12;
+export const STUDIO_CANVAS_COMPOSER_BOTTOM_PX = 24;
+/** Breathing room between the composer band and the zoom row beside it. */
+export const STUDIO_CANVAS_OVERLAY_GAP_PX = 12;
+/** Horizontal room the composer must leave for the bottom-right zoom row. */
+export const STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX =
+	STUDIO_CANVAS_ZOOM_ROW_WIDTH_PX + STUDIO_CANVAS_OVERLAY_GAP_PX * 2;
+
 /** Wheel normalization: DOM deltaMode 1 is lines, 2 is pages. */
 export const WHEEL_LINE_HEIGHT_PX = 16;
 export const WHEEL_PAGE_HEIGHT_PX = 800;

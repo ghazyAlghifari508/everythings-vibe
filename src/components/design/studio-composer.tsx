@@ -1,5 +1,9 @@
 import { ArrowUp, FileCode2, Loader2, X } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+	canvasComposerBottomCss,
+	canvasComposerWidthCss,
+} from "@/components/design/studio-canvas-layout";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/lib/prompts-ui-studio";
 import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
 import { shouldSubmitComposerEvent } from "./composer-keyboard";
@@ -94,7 +98,16 @@ export function StudioComposer({
 
 	return (
 		<div
-			className={`absolute bottom-4 left-1/2 z-30 w-full max-w-2xl -translate-x-1/2 px-3 sm:bottom-6 ${className}`}
+			data-testid="studio-composer"
+			className={`absolute left-1/2 z-30 -translate-x-1/2 ${className}`}
+			// The zoom controls own the bottom-right corner, so the composer is
+			// inset from both sides and its width is capped by the same
+			// clearance fit-to-content reserves. It therefore narrows on small
+			// viewports instead of overlapping the zoom row.
+			style={{
+				bottom: canvasComposerBottomCss(),
+				width: canvasComposerWidthCss(),
+			}}
 			onPointerDown={(event) => event.stopPropagation()}
 			onWheel={(event) => event.stopPropagation()}
 		>
