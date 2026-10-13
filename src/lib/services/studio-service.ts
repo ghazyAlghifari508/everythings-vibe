@@ -25,7 +25,6 @@ import {
 	STUDIO_LOGO_ALLOWED_MIMES,
 	STUDIO_LOGO_MAX_BYTES,
 	STUDIO_PLANNING_MAX_TOKENS,
-	STUDIO_PREVIOUS_HTML_MAX_CHARS,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
 import {
