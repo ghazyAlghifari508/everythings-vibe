@@ -405,3 +405,20 @@ export const STUDIO_LOGO_ALLOWED_MIMES = [
 	"image/webp",
 	"image/svg+xml",
 ] as const;
+
+/** Max parallel frame generations; conservative default respects provider limits. */
+export const STUDIO_FRAME_CONCURRENCY = 3;
+/** Token budget for single structured planning generation. */
+export const STUDIO_PLANNING_MAX_TOKENS = 4000;
+/** Token budget for per-frame HTML generation. */
+export const STUDIO_FRAME_MAX_TOKENS = 12000;
+/** Max chars of previous HTML kept for revision context. */
+export const STUDIO_PREVIOUS_HTML_MAX_CHARS = 60000;
+/** Timeout for Playwright visual capture per frame. */
+export const STUDIO_CAPTURE_TIMEOUT_MS = 30000;
+/** Max document height accepted by visual capture. */
+export const STUDIO_CAPTURE_MAX_HEIGHT = 30000;
+/** TTL for worker job claim lease before stale recovery. */
+export const STUDIO_JOB_CLAIM_TTL_MS = 150000;
+/** Max corrective retries for a single failed frame. */
+export const STUDIO_FRAME_RETRY_MAX = 1;
