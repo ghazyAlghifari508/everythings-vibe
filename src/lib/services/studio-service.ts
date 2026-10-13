@@ -53,6 +53,17 @@ import {
 
 const activeStudioJobs = new Set<string>();
 
+// Slot sementara yang dibuat saat submit, sebelum planning AI menetapkan nama layar sebenarnya.
+export function isTemporarySlot(
+	frame: Pick<StudioFrameRow, "name" | "description" | "htmlCode">,
+): boolean {
+	return (
+		/^Layar \d+$/.test(frame.name) &&
+		(frame.description ?? "") === "" &&
+		frame.htmlCode == null
+	);
+}
+
 export interface StudioProjectDetail extends StudioProjectRow {
 	revisions: StudioRevisionRow[];
 	latest: StudioRevisionRow | null;
@@ -288,7 +299,11 @@ export async function createStudioProjectWithJob(
 	userId: string,
 	titleOrInput: string | CreateStudioProjectInput,
 	legacyPrompt?: string,
-): Promise<{ project: StudioProjectRow; job: StudioJobRow }> {
+): Promise<{
+	project: StudioProjectRow;
+	job: StudioJobRow;
+	frames: StudioFrameRow[];
+}> {
 	const input: CreateStudioProjectInput =
 		typeof titleOrInput === "string"
 			? {
@@ -347,10 +362,19 @@ export async function createStudioProjectWithJob(
 		.limit(1);
 
 	if (recentJob) {
-		return { project: recentJob.project, job: recentJob.job };
+		const recentFrames = await db
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, recentJob.project.id))
+			.orderBy(asc(studioFrames.order));
+		return {
+			project: recentJob.project,
+			job: recentJob.job,
+			frames: recentFrames,
+		};
 	}
 
-	const { project, job } = await db.transaction(async (tx) => {
+	const { project, job, frames } = await db.transaction(async (tx) => {
 		let logoAssetId: string | null = null;
 		if (validatedLogo) {
 			const [asset] = await tx
@@ -412,13 +436,39 @@ export async function createStudioProjectWithJob(
 			);
 		}
 
-		return { project: newProject, job: newJob };
+		const slotCount = options.initialPageCount;
+		const slots = await tx
+			.insert(studioFrames)
+			.values(
+				Array.from(
+					{ length: slotCount },
+					(_, index) =>
+						({
+							projectId: newProject.id,
+							name: `Layar ${index + 1}`,
+							description: "",
+							viewport: designMode,
+							order: index,
+							status: "queued",
+						}) satisfies InsertStudioFrameRow,
+				),
+			)
+			.returning();
+
+		if (slots.length !== slotCount) {
+			throw new ScrapeError(
+				"STORAGE_FAILED",
+				"Gagal menyiapkan slot layar studio.",
+			);
+		}
+
+		return { project: newProject, job: newJob, frames: slots };
 	});
 
 	// Kick off pipeline in background
 	void runStudioJobPipeline(job.id, project.id, userId);
 
-	return { project, job };
+	return { project, job, frames };
 }
 
 export async function runStudioJobPipeline(
@@ -483,7 +533,11 @@ export async function runStudioJobPipeline(
 
 		const framesToProcess: StudioFrameRow[] = [...existingFrames];
 
-		if (framesToProcess.length === 0) {
+		const needsPlanning =
+			framesToProcess.length === 0 ||
+			framesToProcess.some((frame) => isTemporarySlot(frame));
+
+		if (needsPlanning) {
 			// Planning phase
 			await db
 				.update(studioJobs)
@@ -612,7 +666,35 @@ export async function runStudioJobPipeline(
 					.from(studioFrames)
 					.where(eq(studioFrames.projectId, projectId))
 					.orderBy(asc(studioFrames.order));
-				if (existing.length) return existing;
+				const plannedSet = existing.some((frame) => !isTemporarySlot(frame));
+				if (plannedSet) return existing;
+				if (
+					existing.length === planned.length &&
+					existing.every((frame) => isTemporarySlot(frame))
+				) {
+					const updated: StudioFrameRow[] = [];
+					for (const screen of planned) {
+						const slot = existing[screen.order];
+						if (!slot) continue;
+						const [row] = await tx
+							.update(studioFrames)
+							.set({
+								name: screen.name.slice(0, 100),
+								description: screen.description.slice(0, 500),
+								viewport: screen.viewport,
+								order: screen.order,
+								status: "queued",
+								updatedAt: new Date(),
+							})
+							.where(eq(studioFrames.id, slot.id))
+							.returning();
+						if (row) updated.push(row);
+					}
+					return updated;
+				}
+				await tx
+					.delete(studioFrames)
+					.where(eq(studioFrames.projectId, projectId));
 				return tx
 					.insert(studioFrames)
 					.values(
@@ -630,6 +712,7 @@ export async function runStudioJobPipeline(
 					)
 					.returning();
 			});
+			framesToProcess.length = 0;
 			framesToProcess.push(...persisted);
 		}
 

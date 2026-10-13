@@ -230,18 +230,27 @@ describe("End-to-End Multi-Screen Generation Scenarios", () => {
 			designMode: "web",
 		});
 
-		// Insert 1 failed frame manually to test individual frame retry
-		const [failedFrame] = await db
-			.insert(studioFrames)
-			.values({
-				projectId: project.id,
+		// Tandai 1 slot bawaan sebagai failed untuk menguji retry frame individual
+		const slots = await db
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.projectId, project.id))
+			.orderBy(studioFrames.order);
+		expect(slots.length).toBeGreaterThanOrEqual(1);
+		const slot = slots[0];
+		await db
+			.update(studioFrames)
+			.set({
 				name: "Detail Catatan",
-				viewport: "web",
 				status: "failed",
 				error: "Simulated timeout",
-				order: 0,
+				updatedAt: new Date(),
 			})
-			.returning();
+			.where(eq(studioFrames.id, slot.id));
+		const [failedFrame] = await db
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.id, slot.id));
 
 		// Retry only the failed frame
 		const retried = await retryStudioFrame(project.id, userId, failedFrame.id);

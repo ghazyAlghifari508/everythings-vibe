@@ -121,7 +121,7 @@ export async function POST({
 			);
 		}
 
-		const { project, job } = await createStudioProjectWithJob(user.id, {
+		const { project, job, frames } = await createStudioProjectWithJob(user.id, {
 			title: body.title,
 			prompt: checked.prompt,
 			designMode: body.designMode,
@@ -137,6 +137,8 @@ export async function POST({
 				projectId: project.id,
 				jobId: job.id,
 				status: job.status,
+				frameIds: frames.map((frame) => frame.id),
+				pageCount: frames.length,
 			},
 			{ status: 201 },
 		);
