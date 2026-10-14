@@ -337,11 +337,14 @@ export function CodebaseChatWorkspace({
 		? artifacts.filter((item) => !item.id.startsWith(handoffArtifactPrefix))
 		: artifacts;
 
+	// Repository identity only. A feature plan title is a different identity,
+	// so it is never borrowed as the repository name; when the repository is not
+	// identified the header stays neutral instead of mislabeling the plan. The
+	// feature name still labels the subtitle, where it is context, not identity.
 	const resolvedRepoName = resolveCodebaseDisplayName(codebaseName);
 	const resolvedFeatureName = resolveCodebaseDisplayName(featureName);
-	const resolvedDisplayName = resolvedRepoName ?? resolvedFeatureName;
-	const headerTitle = resolvedDisplayName
-		? `Workspace · ${resolvedDisplayName}`
+	const headerTitle = resolvedRepoName
+		? `Workspace · ${resolvedRepoName}`
 		: "Workspace · Perencanaan codebase";
 
 	const isPristine =
@@ -445,9 +448,13 @@ export function CodebaseChatWorkspace({
 						>
 							{headerTitle}
 						</p>
-						{resolvedDisplayName ? (
+						{resolvedRepoName ? (
 							<p className="truncate text-[11px] text-fog">
 								Planning workspace
+							</p>
+						) : resolvedFeatureName ? (
+							<p className="truncate text-[11px] text-fog">
+								{`Perencanaan · ${resolvedFeatureName}`}
 							</p>
 						) : null}
 					</div>

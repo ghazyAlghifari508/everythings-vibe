@@ -206,6 +206,22 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(container.textContent).not.toContain("Repository Lokal");
 	});
 
+	it("never presents a feature plan name as the repository identity", () => {
+		// A feature title is not repository identity. When the repository name
+		// is unavailable the header must stay neutral instead of borrowing the
+		// plan's name, which would present a feature as the repository.
+		renderWorkspace({
+			codebaseName: "Repository Lokal",
+			featureName: "Sistem Checkout Billing",
+		});
+
+		const titleEl = container.querySelector(
+			"[data-testid='codebase-chat-title']",
+		);
+		expect(titleEl?.textContent).toBe("Workspace · Perencanaan codebase");
+		expect(titleEl?.textContent).not.toContain("Sistem Checkout Billing");
+	});
+
 	it("keeps the starter cards and reports a newer failed attempt beside them", () => {
 		renderWorkspace({
 			starterSuggestions,
