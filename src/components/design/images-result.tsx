@@ -1,6 +1,7 @@
 import { Check, Copy, Download, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import type { ScrapeImageResult } from "@/lib/services/scrape-service";
+import { ScrapeFilterSelect } from "./scrape-filter-select";
 
 export type ImageResult = ScrapeImageResult;
 
@@ -96,38 +97,24 @@ export function ImagesResult({
 				)}
 			</header>
 			<div className="flex flex-wrap items-end gap-3">
-				<label className="inline-flex flex-col gap-1.5 text-xs text-fog">
-					Format
-					<select
-						value={formatFilter}
-						onChange={(event) => setFormatFilter(event.target.value)}
-						aria-label="Filter format"
-						className="min-h-11 rounded-lg border border-graphite bg-charcoal px-3 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						<option value="">Semua</option>
-						{formats.map((format) => (
-							<option key={format} value={format}>
-								{format}
-							</option>
-						))}
-					</select>
-				</label>
-				<label className="inline-flex flex-col gap-1.5 text-xs text-fog">
-					Jenis
-					<select
-						value={kindFilter}
-						onChange={(event) => setKindFilter(event.target.value)}
-						aria-label="Filter jenis"
-						className="min-h-11 rounded-lg border border-graphite bg-charcoal px-3 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						<option value="">Semua</option>
-						{kinds.map((type) => (
-							<option key={type} value={type}>
-								{type}
-							</option>
-						))}
-					</select>
-				</label>
+				<ScrapeFilterSelect
+					label="Format"
+					value={formatFilter}
+					onChange={setFormatFilter}
+					options={[
+						{ value: "", label: "Semua" },
+						...formats.map((format) => ({ value: format, label: format })),
+					]}
+				/>
+				<ScrapeFilterSelect
+					label="Jenis"
+					value={kindFilter}
+					onChange={setKindFilter}
+					options={[
+						{ value: "", label: "Semua" },
+						...kinds.map((type) => ({ value: type, label: type })),
+					]}
+				/>
 				{hasFilter && (
 					<button
 						type="button"

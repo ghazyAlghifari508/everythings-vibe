@@ -4,6 +4,7 @@ import type { scrapePages } from "@/db/schema";
 import { buildWebsiteBlueprint } from "@/lib/crawl-blueprint";
 import { cn } from "@/lib/utils";
 import { CrawlSitemapGraph } from "./crawl-sitemap-graph";
+import { ScrapeFilterSelect } from "./scrape-filter-select";
 
 type Page = typeof scrapePages.$inferSelect;
 
@@ -191,22 +192,22 @@ export function CrawlResult({
 								className="w-full rounded-lg border border-graphite bg-charcoal py-2 pl-9 pr-3 text-sm text-snow placeholder:text-fog focus-visible:ring-2 focus-visible:ring-indigo"
 							/>
 						</label>
-						<label className="sm:w-40">
-							<span className="sr-only">Filter status</span>
-							<select
-								value={statusFilter}
-								onChange={(e) =>
-									setStatusFilter(e.target.value as Page["status"] | "all")
-								}
-								className="w-full rounded-lg border border-graphite bg-charcoal px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								<option value="all">Semua status</option>
-								<option value="completed">Berhasil</option>
-								<option value="failed">Gagal</option>
-								<option value="skipped">Dilewati</option>
-								<option value="queued">Antre</option>
-							</select>
-						</label>
+						<ScrapeFilterSelect
+							label="Filter status"
+							hideLabel
+							value={statusFilter}
+							onChange={(value) =>
+								setStatusFilter(value as Page["status"] | "all")
+							}
+							options={[
+								{ value: "all", label: "Semua status" },
+								{ value: "completed", label: "Berhasil" },
+								{ value: "failed", label: "Gagal" },
+								{ value: "skipped", label: "Dilewati" },
+								{ value: "queued", label: "Antre" },
+							]}
+							className="sm:w-40"
+						/>
 					</div>
 					{filtered.length === 0 ? (
 						<p className="rounded-lg border border-graphite p-4 text-sm text-fog">
