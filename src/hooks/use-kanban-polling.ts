@@ -52,6 +52,13 @@ export function useKanbanTasks({
 	const refreshInFlight = useRef<Promise<void> | null>(null);
 	const reconnectAttemptsRef = useRef(0);
 	const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	/**
+	 * The project the hook currently represents. A response that resolves after
+	 * the caller has switched plans carries a stale id and must be dropped
+	 * instead of overwriting the new project's board.
+	 */
+	const activeProjectIdRef = useRef(projectId);
+	activeProjectIdRef.current = projectId;
 
 	useEffect(() => {
 		if (!enabled || !projectId) {
@@ -199,13 +206,23 @@ export function useKanbanTasks({
 					await refreshInFlight.current;
 					return;
 				}
+				// The request is bound to the project it was issued for. A plan
+				// switch while it is in flight must not paint the previous
+				// project's rows onto the new board.
+				const requestedProjectId = projectId;
 				const refresh = (async () => {
 					try {
-						const res = await fetch(`/api/kanban/${projectId}`);
+						const res = await fetch(
+							`/api/kanban/${encodeURIComponent(requestedProjectId)}`,
+						);
 						if (res.ok) {
 							const json = (await res.json()) as KanbanData;
+							if (activeProjectIdRef.current !== requestedProjectId) return;
 							setSseData(json);
-							queryClient.setQueryData(["kanban-tasks", projectId], json);
+							queryClient.setQueryData(
+								["kanban-tasks", requestedProjectId],
+								json,
+							);
 						}
 					} catch {}
 				})();

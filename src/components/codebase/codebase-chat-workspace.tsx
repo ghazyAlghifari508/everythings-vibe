@@ -96,6 +96,13 @@ interface CodebaseChatWorkspaceProps {
 	stage?: PipelineStage;
 	stageBusy?: PipelineStage | null;
 	stageError?: string | null;
+	/**
+	 * True while the task read has not settled, so the workspace cannot yet
+	 * prove whether tasks already exist. The Task CTA stays hidden until the
+	 * read says tasks are genuinely absent, because offering "Buat Task" before
+	 * that would invite regenerating work that is already in the database.
+	 */
+	tasksUnresolved?: boolean;
 	codebaseName?: string;
 	starterSuggestions?: CodebaseStarterSuggestion[];
 	starterRefresh?: {
@@ -202,6 +209,7 @@ export function CodebaseChatWorkspace({
 	stage = "questions",
 	stageBusy = null,
 	stageError = null,
+	tasksUnresolved = false,
 	codebaseName,
 	starterSuggestions,
 	intentOptions,
@@ -833,7 +841,7 @@ export function CodebaseChatWorkspace({
 									onDownloadArtifact={onDownloadArtifact}
 								/>
 							) : null}
-							{stage === "ac" && onGenerateTask ? (
+							{stage === "ac" && onGenerateTask && !tasksUnresolved ? (
 								<CodebaseStageHandoff
 									testId="codebase-stage-task"
 									outcome={{
