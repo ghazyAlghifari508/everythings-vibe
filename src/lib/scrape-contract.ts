@@ -18,6 +18,7 @@ export const SCRAPE_LIMITS = {
 	captureMaxBytes: 50_000_000,
 	jobTimeoutMs: 15 * 60 * 1000,
 	queueHealthAfterMs: 30_000,
+	designViews: 4,
 } as const;
 
 export function normalizeScrapeInput(raw: string): string {
@@ -93,6 +94,18 @@ export const imagesSettingsSchema = z.strictObject({
 	classifyType: z.boolean().default(true),
 });
 
+export const designSettingsSchema = z.strictObject({
+	viewport: z.enum(["desktop", "mobile", "both"]).default("desktop"),
+	theme: z.enum(["auto", "light", "dark", "both"]).default("auto"),
+	depth: z.enum(["standard", "detailed"]).default("standard"),
+	focus: z
+		.enum(["complete", "visual-tokens", "components"])
+		.default("complete"),
+	codeReference: z.enum(["css", "tailwind-v4", "both"]).default("both"),
+});
+
+export type DesignSettings = z.infer<typeof designSettingsSchema>;
+
 export const scrapeRequestSchema = z.preprocess(
 	(value) => {
 		if (typeof value === "object" && value !== null && !("mode" in value))
@@ -100,7 +113,11 @@ export const scrapeRequestSchema = z.preprocess(
 		return value;
 	},
 	z.discriminatedUnion("mode", [
-		z.strictObject({ url: sourceUrl, mode: z.literal("design") }),
+		z.strictObject({
+			url: sourceUrl,
+			mode: z.literal("design"),
+			settings: designSettingsSchema.prefault({}),
+		}),
 		z.strictObject({
 			url: sourceUrl,
 			mode: z.literal("html"),

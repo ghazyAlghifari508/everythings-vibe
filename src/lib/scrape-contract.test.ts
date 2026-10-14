@@ -2,6 +2,49 @@ import { describe, expect, it } from "vitest";
 import { normalizeScrapeInput, scrapeRequestSchema } from "./scrape-contract";
 
 describe("scrape request contract", () => {
+	it("defaults saved design requests and preserves all five selected settings", () => {
+		const defaults = scrapeRequestSchema.parse({ url: "sample.example" });
+		expect(defaults).toMatchObject({
+			settings: {
+				viewport: "desktop",
+				theme: "auto",
+				depth: "standard",
+				focus: "complete",
+				codeReference: "both",
+			},
+		});
+		const settings = {
+			viewport: "both",
+			theme: "both",
+			depth: "detailed",
+			focus: "components",
+			codeReference: "css",
+		};
+		expect(
+			scrapeRequestSchema.parse({
+				url: "sample.example",
+				mode: "design",
+				settings,
+			}),
+		).toMatchObject({ settings });
+	});
+
+	it.each([
+		{ viewport: "tablet" },
+		{ theme: "sepia" },
+		{ depth: "unlimited" },
+		{ focus: "other" },
+		{ codeReference: "v3" },
+		{ waitMs: 1 },
+	])("rejects unsupported design settings %j", (settings) => {
+		expect(
+			scrapeRequestSchema.safeParse({
+				url: "sample.example",
+				mode: "design",
+				settings,
+			}).success,
+		).toBe(false);
+	});
 	it("normalizes domains while preserving explicit protocol, path and query", () => {
 		expect(normalizeScrapeInput("sample.example:8080/path")).toBe(
 			"https://sample.example:8080/path",

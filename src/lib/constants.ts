@@ -349,6 +349,7 @@ export const SCRAPE_MAX_STYLESHEETS = 8;
 export const SCRAPE_MAX_INLINE_CSS_BYTES = 512_000;
 export const SCRAPE_DESKTOP_WIDTH = 1440;
 export const SCRAPE_DESKTOP_HEIGHT = 900;
+export const SCRAPE_MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
 export const SCRAPE_ASSET_RATE_LIMIT = 1000;
 export const SCRAPE_ASSET_RATE_WINDOW_S = 60;
 export const SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS = 60 * 60 * 1000;

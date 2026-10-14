@@ -65,7 +65,17 @@ describe("Scrape API Route Modes", () => {
 			"user-123",
 			"https://example.com/",
 			"design",
-			{ url: "https://example.com/", mode: "design" },
+			{
+				url: "https://example.com/",
+				mode: "design",
+				settings: {
+					viewport: "desktop",
+					theme: "auto",
+					depth: "standard",
+					focus: "complete",
+					codeReference: "both",
+				},
+			},
 		);
 		expect(mockRunScrapePipeline).not.toHaveBeenCalled();
 	});

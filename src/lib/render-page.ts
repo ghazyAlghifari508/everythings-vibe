@@ -16,6 +16,7 @@ import {
 	type ScrapeFailureReason,
 } from "@/lib/design-errors";
 import {
+	DESIGN_DETAILED_EVIDENCE_LIMITS,
 	DESIGN_EVIDENCE_LIMITS,
 	visualEvidenceSchema,
 } from "@/lib/design-evidence-contract";
@@ -29,6 +30,9 @@ import { isPrivateIp } from "@/lib/url-validator";
 import { SCRAPE_LIMITS } from "./scrape-contract";
 
 export interface RenderPageOptions extends ScrapeInstrumentation {
+	viewport?: { width: number; height: number };
+	colorScheme?: "light" | "dark" | null;
+	evidenceDepth?: "standard" | "detailed";
 	mode?: ScrapeMode;
 	waitMs?: number;
 	measureResolution?: boolean;
@@ -455,7 +459,8 @@ export async function renderPage(
 	let context: BrowserContext;
 	try {
 		context = await browser.newContext({
-			viewport: DESKTOP_VIEWPORT,
+			viewport: options.viewport ?? DESKTOP_VIEWPORT,
+			colorScheme: options.colorScheme,
 			userAgent: SCRAPE_BROWSER_UA,
 			locale: "en-US",
 			deviceScaleFactor: 1,
@@ -774,7 +779,12 @@ export async function renderPage(
 		const visualEvidence =
 			mode === "design"
 				? visualEvidenceSchema.parse(
-						await page.evaluate(collectVisualEvidence, DESIGN_EVIDENCE_LIMITS),
+						await page.evaluate(
+							collectVisualEvidence,
+							options.evidenceDepth === "detailed"
+								? DESIGN_DETAILED_EVIDENCE_LIMITS
+								: DESIGN_EVIDENCE_LIMITS,
+						),
 					)
 				: undefined;
 		return {

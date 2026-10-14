@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScrapeWorkspaceForm } from "./scrape-workspace-form";
 
@@ -36,11 +42,63 @@ describe("advanced parameters disclosure", () => {
 		expect(screen.queryByLabelText(/maksimum halaman/i)).toBeNull();
 	});
 
-	it("shows no advanced panel at all in design mode", () => {
+	it("submits selected design settings and resets defaults without losing the URL", async () => {
+		let submitted: unknown;
+		vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+			submitted = JSON.parse(String(init.body));
+			return Response.json({ scrapeId: "sample" });
+		});
 		render(<ScrapeWorkspaceForm mode="design" />);
+		fireEvent.click(advancedTrigger());
+		fireEvent.change(screen.getByLabelText(/URL website/i), {
+			target: { value: "sample.example" },
+		});
+		fireEvent.change(screen.getByLabelText("Tampilan yang dianalisis"), {
+			target: { value: "both" },
+		});
+		fireEvent.change(screen.getByLabelText("Tema"), {
+			target: { value: "both" },
+		});
+		fireEvent.change(screen.getByLabelText("Kedalaman analisis"), {
+			target: { value: "detailed" },
+		});
+		fireEvent.change(screen.getByLabelText("Fokus analisis"), {
+			target: { value: "components" },
+		});
+		fireEvent.change(screen.getByLabelText("Format panduan kode"), {
+			target: { value: "css" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: /jalankan generate/i }));
+		await waitFor(() =>
+			expect(submitted).toMatchObject({
+				mode: "design",
+				settings: {
+					viewport: "both",
+					theme: "both",
+					depth: "detailed",
+					focus: "components",
+					codeReference: "css",
+				},
+			}),
+		);
+		await waitFor(() =>
+			expect(
+				screen.getByRole<HTMLButtonElement>("button", {
+					name: /kembalikan ke pengaturan awal/i,
+				}).disabled,
+			).toBe(false),
+		);
+		fireEvent.click(
+			screen.getByRole("button", { name: /kembalikan ke pengaturan awal/i }),
+		);
 		expect(
-			screen.queryByRole("button", { name: /parameter lanjutan/i }),
-		).toBeNull();
+			screen.getByLabelText<HTMLSelectElement>("Tampilan yang dianalisis")
+				.value,
+		).toBe("desktop");
+		expect(screen.getByLabelText<HTMLInputElement>(/URL website/i).value).toBe(
+			"sample.example",
+		);
+		vi.unstubAllGlobals();
 	});
 
 	it("shows only the active mode's settings", () => {

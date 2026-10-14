@@ -27,7 +27,7 @@ import type {
 	ScrapeFailureReason,
 } from "@/lib/design-errors";
 import type { VisualEvidence } from "@/lib/design-visual-evidence";
-import type { ScrapeRequest } from "@/lib/scrape-contract";
+import type { DesignSettings, ScrapeRequest } from "@/lib/scrape-contract";
 import type {
 	ScrapeImageDiscovery,
 	ScrapeImageOutcome,
@@ -879,6 +879,7 @@ export const payments = pgTable(
 export type ScrapeMode = ScrapeRequest["mode"];
 
 export interface ScrapeMetadata {
+	designSettings?: DesignSettings;
 	attempt?: number;
 	capturedAt?: string;
 	finalUrl?: string;

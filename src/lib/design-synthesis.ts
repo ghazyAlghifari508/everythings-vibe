@@ -110,6 +110,14 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 	const payloadTruncated =
 		colors.cut || typography.cut || typefaces.cut || spacing.cut || radii.cut;
 	return JSON.stringify({
+		settings: model.settings,
+		capturedViews: model.capturedViews,
+		analysisScope:
+			model.settings?.focus === "visual-tokens"
+				? "Analyze visual tokens only; return no componentPatterns."
+				: model.settings?.focus === "components"
+					? "Analyze observed component treatments and their measured tokens only."
+					: "Analyze visual tokens and observed components.",
 		sourceUrl: model.sourceUrl,
 		viewport: model.viewport,
 		theme: model.theme,

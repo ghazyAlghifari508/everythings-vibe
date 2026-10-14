@@ -21,6 +21,7 @@ import {
 	type TypeSpecimen,
 } from "./design-normalize-typography";
 import type { VisualEvidence } from "./design-visual-evidence";
+import { type DesignSettings, designSettingsSchema } from "./scrape-contract";
 
 // The structured design model is the single source of truth for both the
 // DESIGN.md document and the Style Inspector. Both renderers read this model, so
@@ -144,6 +145,13 @@ export interface ModelGuidelines {
 }
 
 export interface DesignTokenModel {
+	settings?: DesignSettings;
+	capturedViews?: {
+		width: number;
+		height: number;
+		colorScheme: string;
+		sourceUrl: string;
+	}[];
 	version: typeof MODEL_VERSION;
 	title: string;
 	essence: string;
@@ -362,6 +370,36 @@ export function buildDesignModel(
 	evidence: VisualEvidence,
 	options: BuildModelOptions = {},
 ): DesignTokenModel {
+	const settings = designSettingsSchema.parse(evidence.settings ?? {});
+	const views = [evidence, ...(evidence.additionalViews ?? [])];
+	const capturedViews = views.map((view) => ({
+		...view.viewport,
+		colorScheme: view.colorScheme ?? "auto",
+		sourceUrl: view.sourceUrl,
+	}));
+	const themes = new Set(views.map((view) => inferTheme(view)));
+	if (evidence.additionalViews?.length)
+		evidence = {
+			...evidence,
+			elements: views.flatMap((view, index) =>
+				view.elements.map((element) => ({
+					...element,
+					selector: `[capture ${index + 1}: ${view.viewport.width}x${view.viewport.height}, ${view.colorScheme ?? "auto"}] ${element.selector}`,
+				})),
+			),
+			fonts: views.flatMap((view) => view.fonts),
+			limitations: [
+				...new Set(views.flatMap((view) => view.limitations)),
+				"Measurements combine separate captures; frequencies count sampled observations, not unique DOM elements across views. No interaction states or intermediate breakpoints were measured.",
+			],
+		};
+	if (settings.focus === "components")
+		evidence = {
+			...evidence,
+			elements: evidence.elements.filter(
+				(element) => element.role !== "element" && element.role !== "canvas",
+			),
+		};
 	const colors = classifyColors(evidence.elements);
 	const spacingResult = normalizeSpacing(evidence.elements);
 	const radii = normalizeRadii(evidence.elements);
@@ -445,15 +483,32 @@ export function buildDesignModel(
 		radii,
 	);
 
-	const observedComponents = deriveObservedComponents(evidence);
-	const inferredTheme = inferTheme(evidence);
+	const observedComponents =
+		settings.focus === "visual-tokens"
+			? []
+			: deriveObservedComponents(evidence);
+	const inferredTheme =
+		themes.size === 1 ? inferTheme(views[0] ?? evidence) : "unknown";
 	const limitations = [...evidence.limitations, ...guidelines.limitations];
+	for (const view of views) {
+		const appearance = inferTheme(view);
+		if (
+			view.colorScheme &&
+			view.colorScheme !== "auto" &&
+			appearance !== view.colorScheme
+		)
+			limitations.push(
+				`Requested browser preference ${view.colorScheme} at ${view.viewport.width}px; measured canvas appearance ${appearance}. The requested site theme was not verified.`,
+			);
+	}
 	if ((options.theme ?? inferredTheme) === "unknown")
 		limitations.push(
 			"Theme could not be established from the measured canvas background, so it is reported as unknown rather than estimated.",
 		);
 
 	return {
+		settings,
+		capturedViews,
 		version: MODEL_VERSION,
 		title: options.title ?? "Website Style Reference",
 		essence: options.essence ?? "",

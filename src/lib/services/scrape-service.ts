@@ -87,6 +87,9 @@ export async function createScrape(
 		throw new ScrapeError("INVALID_URL");
 	}
 
+	const validated = scrapeRequestSchema.parse(
+		request ?? { url: normalized, mode },
+	);
 	return db.transaction(async (tx) => {
 		const [owner] = await tx
 			.select({ id: users.id })
@@ -107,7 +110,14 @@ export async function createScrape(
 				)
 				.limit(1);
 			if (replay) {
-				if (!isDeepStrictEqual(replay.request, request))
+				if (
+					!isDeepStrictEqual(
+						scrapeRequestSchema.parse(
+							replay.request ?? { url: replay.sourceUrl, mode: replay.mode },
+						),
+						validated,
+					)
+				)
 					throw new ScrapeError(
 						"INVALID_URL",
 						"Request key sudah dipakai untuk parameter berbeda.",
@@ -115,8 +125,6 @@ export async function createScrape(
 				return replay;
 			}
 		}
-		const validated =
-			request ?? scrapeRequestSchema.parse({ url: normalized, mode });
 		const { checkRateLimit } = await import("@/lib/rate-limit");
 		if (!(await checkRateLimit(userId, "free", "api_call")).allowed)
 			throw new ScrapeError(
@@ -142,7 +150,12 @@ export async function createScrape(
 			(row) =>
 				row.sourceUrl === normalized &&
 				row.mode === mode &&
-				isDeepStrictEqual(row.request, validated),
+				isDeepStrictEqual(
+					scrapeRequestSchema.parse(
+						row.request ?? { url: row.sourceUrl, mode: row.mode },
+					),
+					validated,
+				),
 		);
 		if (existing) return existing;
 		if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
@@ -160,6 +173,8 @@ export async function createScrape(
 				request: validated,
 				status: "queued",
 				metadata: {
+					designSettings:
+						validated.mode === "design" ? validated.settings : undefined,
 					mode,
 					idempotencyKey,
 					stage: "queued",
@@ -246,6 +261,9 @@ export async function runScrapePipeline(
 	};
 
 	try {
+		const request = scrapeRequestSchema.parse(
+			scrape.request ?? { url: scrape.sourceUrl, mode },
+		);
 		if (mode === "crawl" || mode === "images") {
 			if (!claim)
 				throw new ScrapeError(
@@ -256,10 +274,16 @@ export async function runScrapePipeline(
 			await runExtractionJob(scrape, claim);
 			return;
 		}
-		await persist("capturing");
+		await persist("capturing", {
+			designSettings: request.mode === "design" ? request.settings : undefined,
+		});
 
 		const settings =
-			scrape.request?.mode === "html" ? scrape.request.settings : undefined;
+			request.mode === "html"
+				? request.settings
+				: request.mode === "design"
+					? { designSettings: request.settings }
+					: undefined;
 		const captured: ScrapeCapture =
 			mode === "html" && scrape.html && scrape.previewHtml
 				? {
@@ -714,7 +738,16 @@ export async function generateAndSaveDesignMd(
 			"HTML scrape belum tersedia.",
 		);
 	if (scrape.document) return scrape.document;
-	const captured = await scrapeHtml(scrape.sourceUrl, scrape.jobAttempts);
+	const request = scrapeRequestSchema.parse(
+		scrape.request ?? { url: scrape.sourceUrl, mode: "design" },
+	);
+	const captured = await scrapeHtml(
+		scrape.sourceUrl,
+		scrape.jobAttempts,
+		request.mode === "design"
+			? { designSettings: request.settings }
+			: undefined,
+	);
 	if (!captured.metadata.visualEvidence)
 		throw new ScrapeError(
 			"NO_ANALYZABLE_CONTENT",
