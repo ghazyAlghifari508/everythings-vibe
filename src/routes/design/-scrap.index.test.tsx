@@ -3,7 +3,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tanstack/react-router", () => ({
-	createFileRoute: () => (options: unknown) => ({ options }),
+	createFileRoute: () => (options: unknown) => ({
+		options,
+		useSearch: () => ({}),
+	}),
 	useNavigate: () => vi.fn(async () => {}),
 }));
 

@@ -123,3 +123,26 @@ export type ScrapeRequest = z.infer<typeof scrapeRequestSchema>;
 export type CrawlSettings = z.infer<typeof crawlSettingsSchema>;
 export type HtmlSettings = z.infer<typeof htmlSettingsSchema>;
 export type ImagesSettings = z.infer<typeof imagesSettingsSchema>;
+
+const SCRAPE_MODES = ["design", "html", "crawl", "images"] as const;
+
+// Optional so existing links keep working without a mode, while a recovery link
+// can still ask for the form that matches the mode that failed.
+export const scrapeWorkspaceSearchSchema = z.object({
+	mode: z.enum(SCRAPE_MODES).optional(),
+});
+
+export type ScrapeWorkspaceSearch = z.infer<typeof scrapeWorkspaceSearchSchema>;
+
+export function parseScrapeWorkspaceSearch(
+	search: unknown,
+): ScrapeWorkspaceSearch {
+	const parsed = scrapeWorkspaceSearchSchema.safeParse(search);
+	return parsed.success ? parsed.data : {};
+}
+
+export function resolveScrapeWorkspaceMode(
+	search: ScrapeWorkspaceSearch,
+): ScrapeRequest["mode"] {
+	return search.mode ?? "design";
+}

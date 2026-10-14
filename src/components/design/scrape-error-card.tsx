@@ -3,8 +3,14 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { ScrapeMode } from "@/db/schema";
+import type { ScrapePartialResult } from "@/lib/scrape-error-presentation";
 import { SCRAPE_RETURN_FALLBACK } from "@/lib/scrape-return-path";
 import { cn } from "@/lib/utils";
+
+// Anchor id owned by the detail route. Kept here so the failure card and the
+// results section cannot drift apart.
+export const SCRAPE_RESULTS_ANCHOR_ID = "scrape-results";
 
 export interface ScrapeErrorCardProps {
 	title: string;
@@ -12,7 +18,8 @@ export interface ScrapeErrorCardProps {
 	retryable: boolean;
 	retryHint?: string | null;
 	technicalDetail?: string | null;
-	partialResults?: number;
+	partial?: ScrapePartialResult | null;
+	mode?: ScrapeMode | null;
 	isRetrying?: boolean;
 	onRetry?: () => void;
 	retryAfterExpiresAt?: string | null;
@@ -33,7 +40,8 @@ export function ScrapeErrorCard({
 	retryable,
 	retryHint,
 	technicalDetail,
-	partialResults,
+	partial,
+	mode,
 	isRetrying,
 	onRetry,
 	retryAfterExpiresAt,
@@ -58,13 +66,36 @@ export function ScrapeErrorCard({
 		typeof retryAfterExpiresAt === "string" &&
 		retryAfterExpiresAt.length > 0;
 	const retryDisabled = Boolean(isRetrying) || cooldownActive;
+	// The secondary action must open the form that matches the failing mode,
+	// otherwise an images failure sends the user to the DESIGN.md form.
+	const workspaceSearch = mode ? { mode } : undefined;
 	return (
 		<div className={cn("min-w-0", className)}>
 			<p role="alert" className="flex items-start gap-2 text-sm text-snow">
 				<AlertTriangle size={16} aria-hidden className="mt-0.5 shrink-0" />
-				<span className="font-semibold">{title}</span>
+				<span className="font-semibold">{partial ? partial.title : title}</span>
 			</p>
 			<p className="mt-2 text-sm leading-6 text-fog">{guidance}</p>
+			{partial ? (
+				<div className="mt-3 border-t border-graphite pt-3">
+					<dl className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">
+						<div>
+							<dt className="sr-only">Hasil tersedia</dt>
+							<dd className="font-mono text-snow tabular-nums">
+								{partial.availableLabel}
+							</dd>
+						</div>
+						{partial.failedLabel ? (
+							<div>
+								<dt className="sr-only">Kegagalan</dt>
+								<dd className="font-mono text-fog tabular-nums">
+									{partial.failedLabel}
+								</dd>
+							</div>
+						) : null}
+					</dl>
+				</div>
+			) : null}
 			<p className="mt-3 text-sm font-semibold text-snow">
 				Apa yang bisa dilakukan?
 			</p>
@@ -79,11 +110,6 @@ export function ScrapeErrorCard({
 					Sisa waktu tunggu: {remaining} detik.
 				</p>
 			) : null}
-			<p className="mt-2 text-sm text-fog">
-				{partialResults
-					? `${partialResults} hasil tersimpan tetap tersedia di bawah.`
-					: "Belum ada hasil yang berhasil disimpan."}
-			</p>
 			<div className="mt-5 flex flex-wrap items-center gap-3">
 				{showRetry ? (
 					<button
@@ -101,8 +127,22 @@ export function ScrapeErrorCard({
 								: "Coba lagi jika tersedia"}
 					</button>
 				) : null}
+				{partial ? (
+					<button
+						type="button"
+						onClick={() =>
+							document
+								.getElementById(SCRAPE_RESULTS_ANCHOR_ID)
+								?.scrollIntoView({ behavior: "smooth", block: "start" })
+						}
+						className="inline-flex min-h-11 items-center rounded-full border border-graphite px-4 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						{partial.actionLabel}
+					</button>
+				) : null}
 				<Link
 					to={SCRAPE_RETURN_FALLBACK}
+					search={workspaceSearch}
 					className="inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold text-fog transition-colors hover:text-snow focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					Gunakan URL lain

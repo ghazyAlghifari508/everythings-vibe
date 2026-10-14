@@ -30,7 +30,10 @@ export interface ScrapeProgressProps {
 	savedImages?: number;
 	failedResources?: number;
 	workerHealth?: string | null;
+	// How many results are actually saved on disk, and how many resources failed.
+	// Both come from persisted rows, so the failure card never invents a count.
 	partialResults?: number;
+	partialFailed?: number;
 	imageDiscovery?:
 		| "found"
 		| "none"
@@ -276,6 +279,10 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 		message: errorMessage,
 		retryAfterSeconds,
 		retryAfterExpiresAt,
+		partialResults: props.partialResults,
+		partialFailed: props.partialFailed,
+		partialKind:
+			mode === "crawl" ? "pages" : mode === "html" ? "documents" : "images",
 	});
 
 	if (mode === "images") {
@@ -305,22 +312,23 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 							<span aria-live="polite">{headerState}</span>
 						</p>
 					</div>
+					{/* The stepper stays mounted on failure so the failed stage is
+					    visible in the same progress hierarchy the user already saw. */}
+					<ScrapeStepper
+						stages={stages}
+						status={status}
+						failedAt={failedAtStage}
+					/>
 					{isFailed ? (
-						<div className="mt-5">
+						<div className="mt-5 border-t border-graphite pt-5">
 							<ScrapeErrorCard
 								{...presentation}
-								partialResults={props.partialResults}
+								mode={mode}
 								isRetrying={isRetrying}
 								onRetry={onRetry}
 							/>
 						</div>
-					) : (
-						<ScrapeStepper
-							stages={stages}
-							status={status}
-							failedAt={failedAtStage}
-						/>
-					)}
+					) : null}
 					{!isFailed && active && activityText ? (
 						<div className="mt-5 flex min-w-0 items-baseline gap-2 border-t border-graphite pt-4">
 							<output
@@ -440,22 +448,24 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 					</p>
 				</div>
 
+				{/* The stepper stays mounted on failure so the failed stage is
+				    visible in the same progress hierarchy the user already saw. */}
+				<ScrapeStepper
+					stages={stages}
+					status={status}
+					failedAt={failedAtStage}
+				/>
+
 				{isFailed ? (
-					<div className="mt-5">
+					<div className="mt-5 border-t border-graphite pt-5">
 						<ScrapeErrorCard
 							{...presentation}
-							partialResults={props.partialResults}
+							mode={mode}
 							isRetrying={isRetrying}
 							onRetry={onRetry}
 						/>
 					</div>
-				) : (
-					<ScrapeStepper
-						stages={stages}
-						status={status}
-						failedAt={failedAtStage}
-					/>
-				)}
+				) : null}
 			</section>
 		</div>
 	);

@@ -4,8 +4,26 @@ import { createElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tanstack/react-router", () => ({
-	Link: ({ to, children, ...rest }: { to: string; children?: ReactNode }) =>
-		createElement("a", { href: to, ...rest }, children),
+	Link: ({
+		to,
+		search,
+		children,
+		...rest
+	}: {
+		to: string;
+		search?: Record<string, unknown>;
+		children?: ReactNode;
+	}) =>
+		createElement(
+			"a",
+			{
+				href: search
+					? `${to}?${new URLSearchParams(search as Record<string, string>).toString()}`
+					: to,
+				...rest,
+			},
+			children,
+		),
 }));
 
 import { ScrapeErrorCard } from "./scrape-error-card";

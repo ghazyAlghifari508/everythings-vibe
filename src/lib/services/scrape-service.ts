@@ -469,6 +469,14 @@ export async function retryScrape(
 		if (!scrape)
 			throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
 		if (scrape.status !== "failed") return { ok: true };
+		// A retry consumes a real worker slot, so it respects the same request
+		// rate limit as creating a new scrape instead of bypassing it.
+		const { checkRateLimit } = await import("@/lib/rate-limit");
+		if (!(await checkRateLimit(userId, "free", "api_call")).allowed)
+			throw new ScrapeError(
+				"RATE_LIMITED",
+				"Batas request tercapai. Coba lagi setelah satu menit.",
+			);
 		const active = await tx
 			.select({ id: scrapes.id })
 			.from(scrapes)

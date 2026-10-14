@@ -190,12 +190,45 @@ describe("failed state delegates to the shared error card", () => {
 			/>,
 		);
 		expect(screen.getAllByRole("alert")).toHaveLength(1);
-		expect(screen.getAllByRole("button")).toHaveLength(1);
+		expect(
+			screen.getAllByRole("button", { name: "Coba lagi jika tersedia" }),
+		).toHaveLength(1);
 		fireEvent.click(
 			screen.getByRole("button", { name: "Coba lagi jika tersedia" }),
 		);
 		expect(retry).toHaveBeenCalledTimes(1);
 		expect(screen.queryByRole("timer")).toBeNull();
+	});
+
+	it("keeps saved results reachable through a dedicated action", () => {
+		render(
+			<ScrapeProgress
+				mode="images"
+				status="failed"
+				onRetry={vi.fn()}
+				partialResults={2}
+				partialFailed={1}
+			/>,
+		);
+		expect(
+			screen.getByRole("button", { name: "Lihat hasil tersedia" }),
+		).toBeDefined();
+	});
+
+	it("keeps the stepper mounted so the failed stage stays visible", () => {
+		const { container } = render(
+			<ScrapeProgress
+				mode="images"
+				status="failed"
+				failedAtStage="extracting"
+				onRetry={vi.fn()}
+			/>,
+		);
+		const items = container.querySelectorAll("[data-step-state]");
+		expect(items.length).toBeGreaterThan(0);
+		expect(
+			container.querySelector("[data-failed-stage-marker]"),
+		).not.toBeNull();
 	});
 
 	it("disables retry while request is pending", () => {

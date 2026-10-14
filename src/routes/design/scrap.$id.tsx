@@ -6,6 +6,7 @@ import { DesignResult } from "@/components/design/design-result";
 import { ImagesResult } from "@/components/design/images-result";
 import { ScrapeBackLink } from "@/components/design/scrape-back-link";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
+import { SCRAPE_RESULTS_ANCHOR_ID } from "@/components/design/scrape-error-card";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
 import {
 	resolveScrapeContentWidth,
@@ -258,7 +259,11 @@ function ScrapeDetailPage() {
 		>
 			<ScrapeBackLink from={from} />
 			{currentStatus === "failed" &&
-				(mode === "crawl" || mode === "images") && (
+				(mode === "crawl" ||
+					mode === "images" ||
+					// An HTML run that persisted its capture keeps that partial
+					// result, so the failure card is shown with the saved document.
+					(mode === "html" && previewHtml.length > 0)) && (
 					<ScrapeProgress
 						mode={mode}
 						status={currentStatus}
@@ -269,7 +274,9 @@ function ScrapeDetailPage() {
 						failedAtStage={failedAtStage}
 						retryAfterSeconds={retryAfterSeconds}
 						retryAfterExpiresAt={retryAfterExpiresAt}
-						layout={mode === "images" ? "single" : "two-panel"}
+						layout={
+							mode === "images" || mode === "html" ? "single" : "two-panel"
+						}
 						isRetrying={isRetrying}
 						onRetry={retry}
 						imageDiscovery={data?.metadata?.imageDiscovery ?? null}
@@ -281,29 +288,43 @@ function ScrapeDetailPage() {
 						partialResults={
 							mode === "crawl"
 								? pages.filter((page) => page.status === "completed").length
-								: images.filter((image) => image.status === "completed").length
+								: mode === "images"
+									? images.filter((image) => image.status === "completed")
+											.length
+									: 1
+						}
+						partialFailed={
+							mode === "crawl"
+								? pages.filter((page) => page.status === "failed").length
+								: mode === "images"
+									? images.filter((image) => image.status === "failed").length
+									: 0
 						}
 					/>
 				)}
 			{mode === "crawl" &&
 			(currentStatus === "completed" ||
 				(currentStatus === "failed" && pages.length > 0)) ? (
-				<CrawlResult
-					pages={pages}
-					sourceUrl={sourceUrl}
-					scope={crawlScope}
-					capturedAt={capturedAt ?? undefined}
-					domain={domain}
-				/>
+				<div id={SCRAPE_RESULTS_ANCHOR_ID} className="scroll-mt-6">
+					<CrawlResult
+						pages={pages}
+						sourceUrl={sourceUrl}
+						scope={crawlScope}
+						capturedAt={capturedAt ?? undefined}
+						domain={domain}
+					/>
+				</div>
 			) : mode === "images" &&
 				(currentStatus === "completed" ||
 					(currentStatus === "failed" && images.length > 0) ||
 					(!isTerminalStatus && hasVerifiedImages)) ? (
-				<ImagesResult
-					images={images}
-					sourceUrl={sourceUrl}
-					imageOutcome={data?.metadata?.imageOutcome ?? null}
-				/>
+				<div id={SCRAPE_RESULTS_ANCHOR_ID} className="scroll-mt-6">
+					<ImagesResult
+						images={images}
+						sourceUrl={sourceUrl}
+						imageOutcome={data?.metadata?.imageOutcome ?? null}
+					/>
+				</div>
 			) : view === "result-design" ? (
 				<DesignResult
 					sourceUrl={sourceUrl}
@@ -313,17 +334,24 @@ function ScrapeDetailPage() {
 					enrichment={metadata?.aiEnrichment}
 					enrichmentDetail={metadata?.aiEnrichmentDetail}
 				/>
-			) : view === "result-html" ? (
-				<ScrapeDetail
-					sourceUrl={sourceUrl}
-					title={initial.title}
-					domain={domain}
-					previewHtml={previewHtml}
-					previewSrcDoc={previewSrcDoc}
-					previewState={previewState}
-					previewError={previewError}
-					onRetryPreview={() => void retryPreview()}
-				/>
+			) : view === "result-html" ||
+				// A failed HTML run that already persisted its capture keeps that
+				// partial result visible instead of discarding it.
+				(currentStatus === "failed" &&
+					mode === "html" &&
+					previewHtml.length > 0) ? (
+				<div id={SCRAPE_RESULTS_ANCHOR_ID} className="scroll-mt-6">
+					<ScrapeDetail
+						sourceUrl={sourceUrl}
+						title={initial.title}
+						domain={domain}
+						previewHtml={previewHtml}
+						previewSrcDoc={previewSrcDoc}
+						previewState={previewState}
+						previewError={previewError}
+						onRetryPreview={() => void retryPreview()}
+					/>
+				</div>
 			) : currentStatus === "failed" &&
 				(mode === "crawl" || mode === "images") ? null : (
 				<ScrapeProgress
