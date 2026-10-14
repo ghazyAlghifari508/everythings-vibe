@@ -9,9 +9,11 @@ import {
 	SCRAPE_MAX_HTML_BYTES,
 } from "@/lib/constants";
 import {
+	type DesignErrorCode,
 	designErrorCodeForHttpStatus,
 	parseRetryAfterSeconds,
 	ScrapeError,
+	type ScrapeFailureReason,
 } from "@/lib/design-errors";
 import {
 	DESIGN_EVIDENCE_LIMITS,
@@ -102,6 +104,57 @@ export function htmlCaptureFailureMessage(
 	if (assessment.reason === "too-small")
 		return "Halaman mengembalikan dokumen yang jauh lebih kecil dari satu halaman HTML utuh.";
 	return "Halaman merender dokumen HTML tanpa konten yang dapat dilihat. Capture tidak dianggap berhasil.";
+}
+
+export interface NavigationFailureInput {
+	timedOut: boolean;
+	status: number;
+}
+
+// A navigation timeout and a connection failure are different facts: only the
+// first one proves the website was reachable but too slow, so they must never
+// collapse into one generic timeout code. A received status always wins because
+// it is direct evidence of what the site answered.
+export function classifyNavigationFailure({
+	timedOut,
+	status,
+}: NavigationFailureInput): DesignErrorCode | null {
+	if (status >= 400) return designErrorCodeForHttpStatus(status);
+	if (status > 0) return null;
+	return timedOut ? "WEBSITE_NAVIGATION_TIMEOUT" : "WEBSITE_BLOCKED";
+}
+
+export interface EmptyCaptureInput {
+	reason: HtmlCaptureReason;
+	resourceLoadTimedOut: boolean;
+	captureAssetFailures: number;
+}
+
+export interface EmptyCaptureClassification {
+	code: DesignErrorCode;
+	failureReason: ScrapeFailureReason;
+}
+
+// An empty capture has several distinguishable causes. Naming the one the
+// capture actually observed prevents every empty result from being reported as
+// a vague "not enough content" even when resources never finished loading.
+export function classifyEmptyCapture({
+	reason,
+	resourceLoadTimedOut,
+	captureAssetFailures,
+}: EmptyCaptureInput): EmptyCaptureClassification {
+	if (resourceLoadTimedOut)
+		return {
+			code: "NO_ANALYZABLE_CONTENT",
+			failureReason: "resource-load-timeout",
+		};
+	if (captureAssetFailures > 0)
+		return { code: "ASSET_FETCH_FAILED", failureReason: "asset-unavailable" };
+	return {
+		code: "NO_ANALYZABLE_CONTENT",
+		failureReason:
+			reason === "too-small" ? "too-small" : "no-meaningful-content",
+	};
 }
 
 let browserPromise: Promise<Browser> | null = null;
