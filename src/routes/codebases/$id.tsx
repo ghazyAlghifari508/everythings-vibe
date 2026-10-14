@@ -52,8 +52,9 @@ import {
 	mapAskQuestionsToAdaptive,
 	parseRestoredAnswers,
 	parseRestoredQuestions,
+	reconcilePipelineStage,
 	resetRunThinking,
-	resolveResumeStage,
+	resolvePersistedStage,
 	restoreAskState,
 	runConfirmGenerate,
 	serializeAskQuestions,
@@ -166,6 +167,24 @@ export function resolveWorkspaceSnapshotReady(input: {
 				SNAPSHOT_CONTEXT_STATUSES.includes(input.status.status),
 		) || input.hasStoredSnapshot
 	);
+}
+
+/**
+ * Human, distinguishable copy for a failed artifact read. An unauthenticated
+ * session and a missing project are different from a transient failure, so they
+ * must not be reported as the same thing.
+ */
+export function describeArtifactReadFailure(
+	label: string,
+	status: number,
+): string {
+	if (status === 401 || status === 403) {
+		return `Sesi tidak berlaku saat memuat ${label}. Masuk kembali lalu buka ulang workspace.`;
+	}
+	if (status === 404) {
+		return `${label} tidak ditemukan untuk perencanaan ini.`;
+	}
+	return `${label} gagal dibaca dari server. Coba lagi.`;
 }
 
 const loadCodebase = createServerFn({ method: "GET" })
@@ -1197,6 +1216,22 @@ function CodebaseDetailPage() {
 		useState<PipelineStage>("questions");
 	const [stageBusy, setStageBusy] = useState<PipelineStage | null>(null);
 	const [stageError, setStageError] = useState<string | null>(null);
+	/**
+	 * The project the artifact loaders currently speak for. Every asynchronous
+	 * read captures it when it starts and drops its result if the active project
+	 * changed meanwhile, so a slow response for the previous plan can never be
+	 * written into the plan the user is now looking at.
+	 */
+	const activeProjectIdRef = useRef<string | null>(effectiveFeatureId);
+	useEffect(() => {
+		activeProjectIdRef.current = effectiveFeatureId;
+	}, [effectiveFeatureId]);
+	/**
+	 * Guards a pipeline generation against a duplicate submit from the same
+	 * render, where `stageBusy` state has not re-rendered yet. A second request
+	 * would burn another credit for an artifact that is already being produced.
+	 */
+	const stageRunInFlight = useRef(false);
 
 	const kanban = useKanbanTasks({
 		projectId: effectiveFeatureId ?? "",
@@ -1251,21 +1286,24 @@ function CodebaseDetailPage() {
 
 	// The stage a reopened workspace resumes at is derived from the artifacts
 	// that are actually persisted, so a refresh or History re-entry continues
-	// where the project really is instead of restarting the pipeline.
-	const derivedStage: CodebasePipelineStage = resolveResumeStage({
-		hasFeatureTree: featureTree !== null,
-		hasPrd: prdContent !== null,
-		hasAc: acContent !== null,
-		hasTasks: hasTasksInDb,
+	// where the project really is instead of restarting the pipeline. Presence
+	// is read from each artifact's real hydration status, so a failed or still
+	// pending read can never be mistaken for a missing artifact.
+	const persistedStage: CodebasePipelineStage = resolvePersistedStage({
+		feature: hydration.feature,
+		prd: hydration.prd,
+		ac: hydration.ac,
+		tasks: hydration.tasks,
 	});
-	const stage = pipelineStage;
+	// Reconcile forward only: a slow task read still lifts the stage to handoff
+	// after a fast feature read latched an earlier one, and no late or failed
+	// read can ever rewind a stage the user has already left.
+	const stage = reconcilePipelineStage(pipelineStage, persistedStage);
 	useEffect(() => {
 		setPipelineStage((current) =>
-			current === "questions" && derivedStage !== "questions"
-				? derivedStage
-				: current,
+			reconcilePipelineStage(current, persistedStage),
 		);
-	}, [derivedStage]);
+	}, [persistedStage]);
 
 	const analysisOutput = analysis?.output ?? null;
 
@@ -1283,13 +1321,17 @@ function CodebaseDetailPage() {
 		setPrdLoading(true);
 		setPrdError(null);
 		markArtifact("prd", "pending");
+		const requestedProjectId = effectiveFeatureId;
 		try {
 			const response = await fetch(
-				`/api/projects/${encodeURIComponent(effectiveFeatureId)}/versions`,
+				`/api/projects/${encodeURIComponent(requestedProjectId)}/versions`,
 			);
 			const body: unknown = await response.json().catch(() => null);
+			if (activeProjectIdRef.current !== requestedProjectId) return null;
 			if (!response.ok) {
-				setPrdError("Dokumen PRD tidak dapat dimuat.");
+				setPrdError(
+					describeArtifactReadFailure("Dokumen PRD", response.status),
+				);
 				setPrdContent(null);
 				markArtifact("prd", "failed");
 				return null;
@@ -1306,12 +1348,15 @@ function CodebaseDetailPage() {
 			markArtifact("prd", content ? "ready" : "empty");
 			return content;
 		} catch {
+			if (activeProjectIdRef.current !== requestedProjectId) return null;
 			setPrdError("Server tidak dapat dihubungi.");
 			setPrdContent(null);
 			markArtifact("prd", "failed");
 			return null;
 		} finally {
-			setPrdLoading(false);
+			if (activeProjectIdRef.current === requestedProjectId) {
+				setPrdLoading(false);
+			}
 		}
 	}, [snapshotReady, effectiveFeatureId, markArtifact]);
 
@@ -1330,13 +1375,15 @@ function CodebaseDetailPage() {
 		setAcLoading(true);
 		setAcError(null);
 		markArtifact("ac", "pending");
+		const requestedProjectId = effectiveFeatureId;
 		try {
 			const response = await fetch(
-				`/api/projects/${encodeURIComponent(effectiveFeatureId)}/ac-versions`,
+				`/api/projects/${encodeURIComponent(requestedProjectId)}/ac-versions`,
 			);
 			const body: unknown = await response.json().catch(() => null);
+			if (activeProjectIdRef.current !== requestedProjectId) return null;
 			if (!response.ok) {
-				setAcError("Dokumen AC tidak dapat dimuat.");
+				setAcError(describeArtifactReadFailure("Dokumen AC", response.status));
 				setAcContent(null);
 				markArtifact("ac", "failed");
 				return null;
@@ -1353,12 +1400,15 @@ function CodebaseDetailPage() {
 			markArtifact("ac", content ? "ready" : "empty");
 			return content;
 		} catch {
+			if (activeProjectIdRef.current !== requestedProjectId) return null;
 			setAcError("Server tidak dapat dihubungi.");
 			setAcContent(null);
 			markArtifact("ac", "failed");
 			return null;
 		} finally {
-			setAcLoading(false);
+			if (activeProjectIdRef.current === requestedProjectId) {
+				setAcLoading(false);
+			}
 		}
 	}, [snapshotReady, effectiveFeatureId, markArtifact]);
 
@@ -1376,10 +1426,12 @@ function CodebaseDetailPage() {
 			markArtifact("feature", "pending");
 			try {
 				const data = await loadFeatureTree({ data: projectId });
+				if (activeProjectIdRef.current !== projectId) return null;
 				setFeatureTree(data.featureTree);
 				markArtifact("feature", data.featureTree ? "ready" : "empty");
 				return data.featureTree;
 			} catch {
+				if (activeProjectIdRef.current !== projectId) return null;
 				setFeatureTree(null);
 				markArtifact("feature", "failed");
 				return null;
@@ -1398,10 +1450,12 @@ function CodebaseDetailPage() {
 			markArtifact("tasks", "pending");
 			try {
 				const data = await loadTaskTree({ data: projectId });
+				if (activeProjectIdRef.current !== projectId) return null;
 				setTaskTree(data.taskTree);
 				markArtifact("tasks", data.taskTree ? "ready" : "empty");
 				return data.taskTree;
 			} catch {
+				if (activeProjectIdRef.current !== projectId) return null;
 				setTaskTree(null);
 				markArtifact("tasks", "failed");
 				return null;
@@ -2141,7 +2195,9 @@ function CodebaseDetailPage() {
 			init: RequestInit,
 			onSuccess: () => Promise<boolean>,
 		) => {
-			if (!effectiveFeatureId || stageBusy) return;
+			if (!effectiveFeatureId || stageBusy || stageRunInFlight.current) return;
+			const requestedProjectId = effectiveFeatureId;
+			stageRunInFlight.current = true;
 			setStageBusy(target);
 			setStageError(null);
 			// One honest Thinking surface for this request. `startedAt` is the
@@ -2155,6 +2211,7 @@ function CodebaseDetailPage() {
 						setRun((current) => appendRunThinking(current, text)),
 					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
 				});
+				if (activeProjectIdRef.current !== requestedProjectId) return;
 				if (result.error) {
 					const failure = result.error;
 					setStageError(failure);
@@ -2167,6 +2224,7 @@ function CodebaseDetailPage() {
 				// reloads the authoritative server state and reports whether the
 				// artifact really persisted.
 				const persisted = await onSuccess();
+				if (activeProjectIdRef.current !== requestedProjectId) return;
 				if (!persisted) {
 					setRun((current) =>
 						settleRun(
@@ -2180,11 +2238,15 @@ function CodebaseDetailPage() {
 				}
 				setRun((current) => settleRun(current, "done", Date.now()));
 			} catch {
+				if (activeProjectIdRef.current !== requestedProjectId) return;
 				const message = "Server tidak dapat dihubungi. Coba lagi.";
 				setStageError(message);
 				setRun((current) => settleRun(current, "failed", Date.now(), message));
 			} finally {
-				setStageBusy(null);
+				stageRunInFlight.current = false;
+				if (activeProjectIdRef.current === requestedProjectId) {
+					setStageBusy(null);
+				}
 			}
 		},
 		[effectiveFeatureId, stageBusy],
@@ -2537,6 +2599,7 @@ function CodebaseDetailPage() {
 								stage={stage}
 								stageBusy={stageBusy}
 								stageError={stageError}
+								tasksUnresolved={hydration.tasks !== "empty"}
 								codebaseName={codebase.name}
 								planningSnapshotId={
 									effectiveFeatureId
