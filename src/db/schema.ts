@@ -885,6 +885,7 @@ export interface ScrapeMetadata {
 	finalUrl?: string;
 	viewport?: { width: number; height: number };
 	captureMode?: string;
+	screenshot?: string;
 	visualEvidence?: VisualEvidence;
 	htmlBytes?: number;
 	previewHtmlBytes?: number;

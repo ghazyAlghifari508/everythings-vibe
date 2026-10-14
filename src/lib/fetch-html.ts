@@ -396,6 +396,7 @@ export async function scrapeHtml(
 		domain,
 		title: extractPageTitle(rendered.html),
 		metadata: {
+			screenshot: rendered.screenshot,
 			visualEvidence: rendered.visualEvidence,
 			attempt: attemptNumber,
 			capturedAt,

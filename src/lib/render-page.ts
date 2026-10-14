@@ -37,6 +37,7 @@ export interface RenderPageOptions extends ScrapeInstrumentation {
 	waitMs?: number;
 	measureResolution?: boolean;
 	includeIframes?: boolean;
+	captureScreenshot?: boolean;
 	signal?: AbortSignal;
 }
 
@@ -410,6 +411,7 @@ export interface RenderedPage {
 	html: string;
 	status: number;
 	finalUrl: string;
+	screenshot?: string;
 	images?: RenderedImage[];
 	visualEvidence?: VisualEvidence;
 	// True only when an actual HTTP response was received for the document, so
@@ -787,10 +789,26 @@ export async function renderPage(
 						),
 					)
 				: undefined;
+		let screenshot: string | undefined;
+		if (
+			options.captureScreenshot !== false &&
+			(mode === "html" || mode === "design")
+		) {
+			try {
+				const buffer = await page.screenshot({
+					type: "jpeg",
+					quality: 85,
+				});
+				screenshot = `data:image/jpeg;base64,${buffer.toString("base64")}`;
+			} catch {
+				// Best-effort screenshot: browser failure to snapshot must not fail the run
+			}
+		}
 		return {
 			html,
 			status: status || 200,
 			finalUrl: page.url(),
+			screenshot,
 			images,
 			visualEvidence,
 			responseReceived: status > 0,

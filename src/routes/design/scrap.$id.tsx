@@ -349,6 +349,7 @@ function ScrapeDetailPage() {
 						previewSrcDoc={previewSrcDoc}
 						previewState={previewState}
 						previewError={previewError}
+						screenshot={metadata?.screenshot ?? null}
 						onRetryPreview={() => void retryPreview()}
 					/>
 				</div>
