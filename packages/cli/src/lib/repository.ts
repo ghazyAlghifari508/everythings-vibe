@@ -143,7 +143,7 @@ export function getRepositoryName(root: string): string | null {
 	return candidate;
 }
 
-function humanizeRepositorySegment(value: string): string | null {
+export function humanizeRepositoryName(value: string): string | null {
 	const words = value
 		.replace(/[._-]+/g, " ")
 		.trim()
@@ -158,20 +158,6 @@ function humanizeRepositorySegment(value: string): string | null {
 				: "";
 		})
 		.join(" ");
-}
-
-/** Resolve a safe display name from a verified Git identity, then root folder. */
-export function resolveRepositoryDisplayName(
-	root: string,
-	identity: string | null | undefined,
-): string | null {
-	const repositorySegment = identity?.split("/").at(-1);
-	const fromIdentity = repositorySegment
-		? humanizeRepositorySegment(repositorySegment.replace(/\.git$/i, ""))
-		: null;
-	if (fromIdentity) return fromIdentity;
-	const folder = getRepositoryName(root);
-	return folder ? humanizeRepositorySegment(folder) : null;
 }
 
 /** Credentials embedded in a remote URL: `scheme://user:token@host/...`. */

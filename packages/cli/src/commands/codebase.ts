@@ -22,8 +22,9 @@ import {
 	type RepositoryManifest,
 } from "../lib/manifest.js";
 import {
+	getRepositoryName,
+	humanizeRepositoryName,
 	readRepositoryIdentity,
-	resolveRepositoryDisplayName,
 	resolveRepositoryRoot,
 	scanRepository,
 } from "../lib/repository.js";
@@ -276,11 +277,12 @@ export async function syncCodebase(
 	// a readable config) simply reports no identity and keeps working.
 	const repositoryIdentity =
 		(await readRepositoryIdentity(root).catch(() => null)) ?? undefined;
-	// Prefer the verified remote's repository segment for the display name;
-	// otherwise use the resolved root folder. Only a single safe segment leaves
-	// this machine, never the absolute local path or raw Git remote URL.
-	const repositoryName =
-		resolveRepositoryDisplayName(root, repositoryIdentity) ?? undefined;
+	// The repository display name comes only from the safe local root folder.
+	// Git remote data remains separate for identity comparison and warnings.
+	const repositoryFolderName = getRepositoryName(root);
+	const repositoryName = repositoryFolderName
+		? (humanizeRepositoryName(repositoryFolderName) ?? undefined)
+		: undefined;
 
 	const createClient =
 		deps.createClient ??

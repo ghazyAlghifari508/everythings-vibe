@@ -676,9 +676,11 @@ describe("syncCodebase repository identity", () => {
 		expect(res.ok).toBe(true);
 		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
 			"p1",
-			"Ocean Guard",
+			displayNameForFixtureRoot(root),
 			"github.com/owner/ocean-guard",
 		);
+		expect(res.repositoryName).toBe(displayNameForFixtureRoot(root));
+		expect(res.repositoryName).not.toBe("Ocean Guard");
 		expect(res.repositoryIdentity).toBe("github.com/owner/ocean-guard");
 	});
 
