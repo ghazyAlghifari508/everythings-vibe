@@ -5,7 +5,6 @@ import {
 	Loader2,
 	Monitor,
 	Palette,
-	Plus,
 	Smartphone,
 	X,
 } from "lucide-react";
@@ -163,17 +162,15 @@ export function StudioLaunchComposer({
 						type="button"
 						onClick={onOpenDesignPicker}
 						disabled={loading}
-						aria-label={
-							reference ? "Ganti referensi desain" : "Tambah referensi desain"
-						}
-						title="Pilih referensi desain"
+						aria-label={reference ? "Ganti referensi desain" : "Pilih tampilan"}
+						title={reference ? "Ganti referensi desain" : "Pilih tampilan"}
 						className="flex size-9 items-center justify-center rounded-lg border border-graphite bg-onyx text-mist transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
 					>
-						{reference ? (
-							<Palette size={15} aria-hidden />
-						) : (
-							<Plus size={15} aria-hidden />
-						)}
+						<Palette
+							size={15}
+							aria-hidden
+							className={reference ? "text-indigo" : undefined}
+						/>
 					</button>
 					<StudioSkillSelect
 						value={config.designSkillId}

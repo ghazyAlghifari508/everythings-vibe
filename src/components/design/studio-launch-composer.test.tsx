@@ -91,4 +91,28 @@ describe("StudioLaunchComposer", () => {
 		expect(onConfigChange).toHaveBeenCalledWith({ designMode: "mobile" });
 		expect(onSubmit).not.toHaveBeenCalled();
 	});
+
+	it("always renders a design affordance, never a generic plus, when no reference is active", () => {
+		const onOpenDesignPicker = vi.fn();
+		renderComposer({ reference: null, onOpenDesignPicker });
+		const trigger = screen.getByRole("button", { name: "Pilih tampilan" });
+		expect(trigger.getAttribute("title")).toBe("Pilih tampilan");
+		const icon = trigger.querySelector("svg");
+		expect(icon).not.toBeNull();
+		expect(icon?.classList.contains("lucide-plus")).toBe(false);
+		expect(icon?.classList.contains("lucide-palette")).toBe(true);
+		fireEvent.click(trigger);
+		expect(onOpenDesignPicker).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps the same design affordance while a reference is active", () => {
+		renderComposer({
+			reference: { label: "Workspace", logoFilename: null },
+		});
+		const trigger = screen.getByRole("button", {
+			name: "Ganti referensi desain",
+		});
+		const icon = trigger.querySelector("svg");
+		expect(icon?.classList.contains("lucide-palette")).toBe(true);
+	});
 });
