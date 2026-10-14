@@ -209,19 +209,19 @@ export function StudioDesignPickerDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[90dvh] w-[calc(100vw-2rem)] max-w-2xl overflow-hidden">
-				<DialogHeader>
+			<DialogContent className="flex w-screen max-w-none flex-col gap-0 overflow-hidden border-0 p-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:rounded-none sm:h-[calc(100dvh-4rem)] sm:max-h-[calc(100dvh-4rem)] sm:w-[calc(100vw-4rem)] sm:max-w-6xl sm:rounded-2xl">
+				<DialogHeader className="shrink-0 gap-1 border-b border-graphite px-5 py-4 pr-14 text-left sm:px-6">
 					<DialogTitle>Pilih tampilan</DialogTitle>
 					<DialogDescription>
-						Referensi tersimpan sebagai draf dan baru dipakai saat kamu menekan
-						kirim.
+						Pilih referensi visual untuk proyek desainmu. Referensi tersimpan
+						sebagai draf dan baru dipakai saat kamu menekan kirim.
 					</DialogDescription>
 				</DialogHeader>
 
 				<div
 					role="tablist"
 					aria-label="Sumber referensi desain"
-					className="flex shrink-0 gap-1 rounded-xl border border-graphite bg-onyx p-1"
+					className="mx-5 mt-4 flex shrink-0 gap-1 rounded-xl border border-graphite bg-onyx p-1 sm:mx-6"
 				>
 					{tabs.map((entry) => (
 						<button
@@ -241,14 +241,14 @@ export function StudioDesignPickerDialog({
 					))}
 				</div>
 
-				<div className="min-h-0 overflow-y-auto">
+				<div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
 					{tab === "tema" ? (
 						<div
 							role="tabpanel"
 							aria-label="Tema"
 							className="flex flex-col gap-3"
 						>
-							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 								{STUDIO_DESIGN_PRESETS.map((preset) => {
 									const selected = activeThemeId === preset.id;
 									return (
@@ -349,7 +349,7 @@ export function StudioDesignPickerDialog({
 							aria-label="Template"
 							className="flex flex-col gap-3"
 						>
-							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 								{TEMPLATE_PLACEHOLDERS.map((template) => (
 									<div
 										key={template.id}
@@ -523,7 +523,7 @@ export function StudioDesignPickerDialog({
 					) : null}
 				</div>
 
-				<DialogFooter className="flex-row items-center justify-between gap-2">
+				<DialogFooter className="shrink-0 flex-row items-center justify-between gap-2 border-t border-graphite px-5 py-4 sm:px-6">
 					{selectedThemeId || customFilename ? (
 						<button
 							type="button"
@@ -532,7 +532,7 @@ export function StudioDesignPickerDialog({
 								onClear();
 								onOpenChange(false);
 							}}
-							className="rounded-lg px-3 py-2 text-xs font-semibold text-fog hover:text-snow"
+							className="rounded-lg px-3 py-2 text-xs font-semibold text-fog hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 						>
 							Lepas referensi
 						</button>
@@ -540,6 +540,14 @@ export function StudioDesignPickerDialog({
 						<span />
 					)}
 					<span className="flex items-center gap-2">
+						<span className="mr-2 hidden text-xs text-fog sm:inline">
+							Referensi terpilih:{" "}
+							<span className="font-semibold text-mist">
+								{activeTheme
+									? activeTheme.name
+									: (customFilename ?? "belum ada")}
+							</span>
+						</span>
 						<Button
 							type="button"
 							variant="secondary"
