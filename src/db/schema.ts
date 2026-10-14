@@ -22,6 +22,10 @@ import type {
 	CreditPricingVersion,
 } from "@/lib/adaptive-credit";
 import type { CodebaseNameSource } from "@/lib/codebase-library";
+import type {
+	ScrapeErrorSource,
+	ScrapeFailureReason,
+} from "@/lib/design-errors";
 import type { VisualEvidence } from "@/lib/design-visual-evidence";
 import type { ScrapeRequest } from "@/lib/scrape-contract";
 import type {
@@ -883,6 +887,13 @@ export interface ScrapeMetadata {
 	visualEvidence?: VisualEvidence;
 	htmlBytes?: number;
 	previewHtmlBytes?: number;
+	// Capture evidence observed during the run. `responseReceived` is true only
+	// when an HTTP response was actually received, so the UI never displays an
+	// HTTP status for a failure that never got one.
+	responseReceived?: boolean;
+	httpStatus?: number;
+	resourceLoadTimedOut?: boolean;
+	assetFetchFailures?: number;
 	stage?: ScrapeStatus;
 	progress?: number;
 	stageStartedAt?: string;
@@ -891,6 +902,10 @@ export interface ScrapeMetadata {
 	timings?: Record<string, number>;
 	errorMessage?: string;
 	errorDetail?: string;
+	// Which pipeline part failed and the evidence-backed reason behind it, so
+	// the failure UI can separate website failures from internal ones.
+	errorSource?: ScrapeErrorSource;
+	failureReason?: ScrapeFailureReason;
 	// Last real pipeline stage before the run failed. Lets the progress UI
 	// mark the persisted failure stage instead of guessing where it stopped.
 	failedAtStage?: ScrapeStatus;

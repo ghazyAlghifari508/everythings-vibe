@@ -260,12 +260,12 @@ export async function runScrapePipeline(
 						title: scrape.title,
 						html: scrape.html,
 						previewHtml: scrape.previewHtml,
-						status: 200,
+						status: scrape.metadata?.httpStatus ?? 200,
 						metadata: {
 							attempt: scrape.jobAttempts,
 							capturedAt:
 								scrape.metadata?.capturedAt ?? scrape.createdAt.toISOString(),
-							finalUrl: scrape.sourceUrl,
+							finalUrl: scrape.metadata?.finalUrl ?? scrape.sourceUrl,
 							viewport: scrape.metadata?.viewport ?? {
 								width: 1440,
 								height: 900,
@@ -273,6 +273,13 @@ export async function runScrapePipeline(
 							captureMode: "persisted",
 							htmlBytes: Buffer.byteLength(scrape.html),
 							previewHtmlBytes: Buffer.byteLength(scrape.previewHtml),
+							// Reuses the persisted capture evidence instead of
+							// re-measuring, so the stored facts stay the source of truth.
+							responseReceived: scrape.metadata?.responseReceived ?? true,
+							httpStatus: scrape.metadata?.httpStatus,
+							resourceLoadTimedOut:
+								scrape.metadata?.resourceLoadTimedOut ?? false,
+							assetFetchFailures: scrape.metadata?.assetFetchFailures ?? 0,
 						},
 					}
 				: await scrapeHtml(scrape.sourceUrl, scrape.jobAttempts, {

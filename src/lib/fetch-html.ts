@@ -37,6 +37,12 @@ export interface ScrapeCaptureMetadata {
 	captureMode: string;
 	htmlBytes: number;
 	previewHtmlBytes: number;
+	// Evidence actually observed during capture, persisted so the failure UI can
+	// answer "was an HTTP response received?" without guessing.
+	responseReceived: boolean;
+	httpStatus?: number;
+	resourceLoadTimedOut: boolean;
+	assetFetchFailures: number;
 }
 
 export interface ScrapeCapture {
@@ -99,11 +105,11 @@ export async function fetchAsset(
 		options.maxBytes ?? SCRAPE_MAX_ASSET_BYTES,
 		SCRAPE_MAX_ASSET_BYTES,
 	);
-	if (options.signal?.aborted) throw new ScrapeError("FETCH_TIMEOUT");
+	if (options.signal?.aborted) throw new ScrapeError("JOB_TIMEOUT");
 	if (redirects > SCRAPE_MAX_REDIRECTS)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Redirect terlalu banyak.");
 	const { url, ip } = await validateUrl(rawUrl);
-	if (options.signal?.aborted) throw new ScrapeError("FETCH_TIMEOUT");
+	if (options.signal?.aborted) throw new ScrapeError("JOB_TIMEOUT");
 	const isHttps = url.protocol === "https:";
 	const requestOptions = {
 		protocol: url.protocol,
@@ -174,7 +180,7 @@ export async function fetchAsset(
 				)
 			: http.request(requestOptions, onResponse);
 		req.on("timeout", () => req.destroy(new ScrapeError("FETCH_TIMEOUT")));
-		const abort = () => req.destroy(new ScrapeError("FETCH_TIMEOUT"));
+		const abort = () => req.destroy(new ScrapeError("JOB_TIMEOUT"));
 		options.signal?.addEventListener("abort", abort, { once: true });
 		req.on("close", () => options.signal?.removeEventListener("abort", abort));
 		req.on("error", reject);
@@ -299,6 +305,10 @@ export async function scrapeHtml(
 			captureMode: "desktop-browser",
 			htmlBytes: Buffer.byteLength(html, "utf8"),
 			previewHtmlBytes: Buffer.byteLength(previewHtml, "utf8"),
+			responseReceived: rendered.responseReceived,
+			httpStatus: rendered.httpStatus,
+			resourceLoadTimedOut: rendered.resourceLoadTimedOut,
+			assetFetchFailures: rendered.assetFetchFailures,
 		},
 	};
 }

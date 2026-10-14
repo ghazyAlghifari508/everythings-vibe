@@ -111,6 +111,13 @@ export interface NavigationFailureInput {
 	status: number;
 }
 
+// Playwright signals an exceeded navigation budget with a TimeoutError. The
+// name is checked instead of the message because the message text is
+// browser-specific, while the error name is part of the API contract.
+export function isTimeoutError(error: unknown): boolean {
+	return error instanceof Error && error.name === "TimeoutError";
+}
+
 // A navigation timeout and a connection failure are different facts: only the
 // first one proves the website was reachable but too slow, so they must never
 // collapse into one generic timeout code. A received status always wins because
@@ -245,7 +252,17 @@ export async function isBlockedRequestUrl(raw: string): Promise<boolean> {
 	return blocked;
 }
 
-export async function guardContext(context: BrowserContext): Promise<void> {
+export interface CaptureStats {
+	// Subresource requests the capture attempted but could not retrieve. Only
+	// requests the website itself failed are counted; requests refused by the
+	// capture policy are excluded because they were blocked by design.
+	assetFetchFailures: number;
+}
+
+export async function guardContext(
+	context: BrowserContext,
+	stats?: CaptureStats,
+): Promise<void> {
 	let requests = 0;
 	let transferredBytes = 0;
 	await context.addInitScript({ content: BROWSER_NAME_SHIM });
@@ -330,6 +347,7 @@ export async function guardContext(context: BrowserContext): Promise<void> {
 				headers: { "Content-Type": contentType },
 			});
 		} catch {
+			if (stats) stats.assetFetchFailures += 1;
 			return route.abort();
 		}
 	});
@@ -390,6 +408,18 @@ export interface RenderedPage {
 	finalUrl: string;
 	images?: RenderedImage[];
 	visualEvidence?: VisualEvidence;
+	// True only when an actual HTTP response was received for the document, so
+	// callers never show a status for a navigation that never got one.
+	responseReceived: boolean;
+	httpStatus?: number;
+	// True when the page never reached a settled network state inside the
+	// bounded wait. Recorded instead of silently discarded so an empty capture
+	// can name the real cause.
+	resourceLoadTimedOut: boolean;
+	// Subresources the capture attempted but could not retrieve. Policy-blocked
+	// requests (private hosts, non-http schemes) are not counted because they
+	// were refused by design, not failed by the website.
+	assetFetchFailures: number;
 }
 
 export interface RenderedImage {
@@ -412,26 +442,58 @@ export async function renderPage(
 ): Promise<RenderedPage> {
 	const { onActivity, onTiming, mode = "design" } = options;
 	const setupStart = Date.now();
-	const browser = await getBrowser();
-	const context = await browser.newContext({
-		viewport: DESKTOP_VIEWPORT,
-		userAgent: SCRAPE_BROWSER_UA,
-		locale: "en-US",
-		deviceScaleFactor: 1,
-		ignoreHTTPSErrors: true,
-		serviceWorkers: "block",
-	});
+	let browser: Browser;
+	try {
+		browser = await getBrowser();
+	} catch (error) {
+		throw new ScrapeError(
+			"CAPTURE_FAILED",
+			"Browser capture tidak dapat disiapkan. Ini kendala sistem, bukan respons website.",
+			{ cause: error, failureReason: "browser-init" },
+		);
+	}
+	let context: BrowserContext;
+	try {
+		context = await browser.newContext({
+			viewport: DESKTOP_VIEWPORT,
+			userAgent: SCRAPE_BROWSER_UA,
+			locale: "en-US",
+			deviceScaleFactor: 1,
+			ignoreHTTPSErrors: true,
+			serviceWorkers: "block",
+		});
+	} catch (error) {
+		throw new ScrapeError(
+			"CAPTURE_FAILED",
+			"Browser context capture tidak dapat dibuat. Ini kendala sistem, bukan respons website.",
+			{ cause: error, failureReason: "browser-init" },
+		);
+	}
+	const stats: CaptureStats = { assetFetchFailures: 0 };
 	const abortCapture = () => {
 		void context.close().catch(() => {});
 	};
 	options.signal?.addEventListener("abort", abortCapture, { once: true });
 	try {
-		if (options.signal?.aborted) throw new ScrapeError("FETCH_TIMEOUT");
-		await guardContext(context);
-		const page = await context.newPage();
+		// An aborted capture is a system-side stop (worker timeout or lost
+		// lease), not a website timeout, so it must not be reported as one.
+		if (options.signal?.aborted) throw new ScrapeError("JOB_TIMEOUT");
+		await guardContext(context, stats);
+		let page: import("playwright").Page;
+		try {
+			page = await context.newPage();
+		} catch (error) {
+			throw new ScrapeError(
+				"CAPTURE_FAILED",
+				"Halaman capture tidak dapat dibuka. Ini kendala sistem, bukan respons website.",
+				{ cause: error, failureReason: "browser-init" },
+			);
+		}
 		onTiming?.("browserContext", Date.now() - setupStart);
 		let status = 0;
 		let retryAfterHeader: string | undefined;
+		let navigationTimedOut = false;
+		let resourceLoadTimedOut = false;
 		try {
 			await onActivity?.("Membuka website");
 			const navStart = Date.now();
@@ -445,20 +507,27 @@ export async function renderPage(
 			await onActivity?.("Halaman berhasil dimuat");
 			await onActivity?.("Menunggu resource halaman");
 			let t = Date.now();
-			await page
+			resourceLoadTimedOut = await page
 				.waitForLoadState("networkidle", { timeout: IDLE_TIMEOUT_MS })
-				.catch(() => {});
+				.then(
+					() => false,
+					() => true,
+				);
 			onTiming?.("firstNetworkIdle", Date.now() - t);
 			await onActivity?.("Memuat konten lazy-load");
 			t = Date.now();
 			await autoScroll(page).catch(() => {});
 			onTiming?.("autoScroll", Date.now() - t);
 			t = Date.now();
-			await page
-				.waitForLoadState("networkidle", {
-					timeout: POST_SCROLL_IDLE_TIMEOUT_MS,
-				})
-				.catch(() => {});
+			resourceLoadTimedOut =
+				(await page
+					.waitForLoadState("networkidle", {
+						timeout: POST_SCROLL_IDLE_TIMEOUT_MS,
+					})
+					.then(
+						() => false,
+						() => true,
+					)) || resourceLoadTimedOut;
 			onTiming?.("secondNetworkIdle", Date.now() - t);
 			t = Date.now();
 			await page.waitForTimeout(SETTLE_MS);
@@ -466,6 +535,11 @@ export async function renderPage(
 			if (mode === "html") await onActivity?.("Menangkap DOM hasil render");
 		} catch (err) {
 			if (err instanceof ScrapeError) throw err;
+			if (options.signal?.aborted) throw new ScrapeError("JOB_TIMEOUT");
+			// Playwright reports an exceeded navigation budget as a timeout.
+			// Any other navigation error is a connection-level failure, and the
+			// two must stay distinguishable.
+			navigationTimedOut = isTimeoutError(err);
 		}
 		const contentStart = Date.now();
 		if (status >= 400) {
@@ -473,14 +547,24 @@ export async function renderPage(
 			throw new ScrapeError(
 				designErrorCodeForHttpStatus(status),
 				httpStatusMessage(status, retryAfterSeconds),
-				{ retryAfterSeconds },
+				{ retryAfterSeconds, httpStatus: status },
 			);
 		}
-		if (status === 0 && /^https?:/i.test(url))
+		if (status === 0 && /^https?:/i.test(url)) {
+			const code = classifyNavigationFailure({
+				timedOut: navigationTimedOut,
+				status,
+			});
 			throw new ScrapeError(
-				"FETCH_TIMEOUT",
-				"Tidak ada respons HTTP halaman yang dapat diverifikasi.",
+				code ?? "WEBSITE_BLOCKED",
+				navigationTimedOut
+					? "Website tidak menyelesaikan pemuatan halaman dalam batas waktu sistem. Tidak ada respons HTTP yang dapat diverifikasi."
+					: "Website tidak dapat dihubungi. Tidak ada respons HTTP yang dapat diverifikasi.",
+				{
+					failureReason: navigationTimedOut ? "navigation-timeout" : undefined,
+				},
 			);
+		}
 		if (options.waitMs)
 			await page.waitForTimeout(Math.min(options.waitMs, SCRAPE_LIMITS.waitMs));
 		const images =
@@ -610,7 +694,16 @@ export async function renderPage(
 				}
 			}
 		}
-		let html = await page.content().catch(() => "");
+		let html: string;
+		try {
+			html = await page.content();
+		} catch (error) {
+			throw new ScrapeError(
+				"CAPTURE_FAILED",
+				"DOM hasil render tidak dapat dibaca. Ini kendala sistem, bukan respons website.",
+				{ cause: error, failureReason: "page-content" },
+			);
+		}
 		if (options.includeIframes) {
 			const origin = new URL(page.url()).origin;
 			let capturedFrames = 0;
@@ -655,11 +748,25 @@ export async function renderPage(
 		onTiming?.("pageContent", Date.now() - contentStart);
 		if (mode === "design") await onActivity?.("Capture halaman selesai");
 		const assessment = assessHtmlCapture(html);
-		if (!assessment.hasMeaningfulContent)
+		if (!assessment.hasMeaningfulContent) {
+			// An empty capture is classified from what the capture actually
+			// observed: an unsettled network, aborted subresources, or a document
+			// that truly carried no readable content.
+			const classification = classifyEmptyCapture({
+				reason: assessment.reason,
+				resourceLoadTimedOut,
+				captureAssetFailures: stats.assetFetchFailures,
+			});
 			throw new ScrapeError(
-				"NO_ANALYZABLE_CONTENT",
-				htmlCaptureFailureMessage(assessment),
+				classification.code,
+				classification.failureReason === "resource-load-timeout"
+					? "Resource halaman tidak selesai dimuat dalam batas waktu sistem sehingga konten yang dapat dianalisis tidak terbentuk."
+					: classification.code === "ASSET_FETCH_FAILED"
+						? `Sebanyak ${stats.assetFetchFailures} resource halaman gagal diambil sehingga dokumen tidak memuat konten yang dapat dianalisis.`
+						: htmlCaptureFailureMessage(assessment),
+				{ failureReason: classification.failureReason },
 			);
+		}
 		const visualEvidence =
 			mode === "design"
 				? visualEvidenceSchema.parse(
@@ -672,6 +779,10 @@ export async function renderPage(
 			finalUrl: page.url(),
 			images,
 			visualEvidence,
+			responseReceived: status > 0,
+			httpStatus: status > 0 ? status : undefined,
+			resourceLoadTimedOut,
+			assetFetchFailures: stats.assetFetchFailures,
 		};
 	} finally {
 		options.signal?.removeEventListener("abort", abortCapture);
