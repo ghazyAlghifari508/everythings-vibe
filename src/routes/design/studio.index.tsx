@@ -11,11 +11,13 @@ import { FolderOpen, User, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import type { AttachedDesignReference } from "@/components/design/start-with-design-modal";
+import { StudioBackLink } from "@/components/design/studio-back-link";
 import { StudioDesignPickerDialog } from "@/components/design/studio-design-picker-dialog";
 import {
 	type LaunchComposerConfig,
 	StudioLaunchComposer,
 } from "@/components/design/studio-launch-composer";
+import { StudioShortcutCarousel } from "@/components/design/studio-shortcut-carousel";
 import {
 	type StudioHistoryItem,
 	StudioSidebar,
@@ -68,6 +70,7 @@ const loadStudioHistory = createServerFn({ method: "GET" }).handler(
 
 export const studioSearchSchema = z.object({
 	prompt: z.string().optional(),
+	from: z.string().optional(),
 });
 
 export const Route = createFileRoute("/design/studio/")({
@@ -151,6 +154,9 @@ function StudioPage() {
 		useState<StagedReference | null>(null);
 	const [isPickerOpen, setIsPickerOpen] = useState(false);
 	const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+	const [selectedShortcutId, setSelectedShortcutId] = useState<string | null>(
+		null,
+	);
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
@@ -194,6 +200,7 @@ function StudioPage() {
 
 	function applyShortcut(shortcut: StudioPromptShortcut) {
 		setPrompt(shortcut.prompt);
+		setSelectedShortcutId(shortcut.id);
 		setConfig((previous) => ({
 			...previous,
 			designMode: shortcut.designMode,
@@ -291,150 +298,126 @@ function StudioPage() {
 	}
 
 	return (
-		<div className="flex h-dvh w-full gap-3 overflow-hidden bg-onyx p-3 text-snow md:gap-4 md:p-4">
-			<StudioSidebar
-				history={history}
-				onSelectProject={handleOpenProject}
-				onDeleteProject={handleDeleteProject}
-				className="hidden h-full w-72 shrink-0 md:flex lg:w-80"
-			/>
-
-			<DialogPrimitive.Root
-				open={isMobileDrawerOpen}
-				onOpenChange={setIsMobileDrawerOpen}
-			>
-				<DialogPrimitive.Portal>
-					<DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs transition-opacity data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:hidden" />
-					<DialogPrimitive.Content
-						className="fixed inset-y-0 left-0 z-50 flex h-full w-80 max-w-[85vw] flex-col border-r border-graphite bg-charcoal text-snow shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left md:hidden"
-						aria-describedby="mobile-drawer-desc"
-					>
-						<DialogPrimitive.Title className="sr-only">
-							Riwayat Project Studio
-						</DialogPrimitive.Title>
-						<DialogPrimitive.Description
-							id="mobile-drawer-desc"
-							className="sr-only"
-						>
-							Daftar project studio kamu yang tersimpan
-						</DialogPrimitive.Description>
-						<div className="flex items-center justify-between border-b border-graphite bg-charcoal px-4 py-3">
-							<span className="text-xs font-semibold uppercase tracking-wider text-snow">
-								My Projects
-							</span>
-							<DialogPrimitive.Close
-								aria-label="Tutup riwayat"
-								className="rounded-md p-1 text-fog hover:text-snow"
-							>
-								<X size={16} aria-hidden />
-							</DialogPrimitive.Close>
-						</div>
-						<div className="flex-1 overflow-hidden">
-							<StudioSidebar
-								history={history}
-								onSelectProject={handleOpenProject}
-								onDeleteProject={handleDeleteProject}
-								className="h-full w-full rounded-none border-0"
-							/>
-						</div>
-					</DialogPrimitive.Content>
-				</DialogPrimitive.Portal>
-			</DialogPrimitive.Root>
-
-			<main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-				<div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-1 py-2 sm:px-2 md:justify-center md:py-6">
-					<div className="flex items-center justify-between gap-3">
-						<Logo height={26} />
-						<div className="flex items-center gap-1.5">
-							<StudioLandingProfile />
-							<button
-								type="button"
-								onClick={() => setIsMobileDrawerOpen(true)}
-								className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-steel md:hidden"
-							>
-								<FolderOpen size={14} className="text-fog" aria-hidden />
-								<span>Project ({history.length})</span>
-							</button>
-						</div>
-					</div>
-
-					<header className="space-y-2 text-center sm:text-left">
-						<h1 className="text-3xl font-bold tracking-tight text-snow sm:text-4xl lg:text-5xl">
-							What will you design?
-						</h1>
-						<p className="mx-auto max-w-2xl text-sm leading-6 text-fog sm:mx-0">
-							Jelaskan antarmuka yang ingin kamu buat dalam Bahasa Indonesia.
-							Studio menghasilkan halaman HTML interaktif lengkap dengan
-							Tailwind dan data realistis.
-						</p>
-					</header>
-
-					<StudioLaunchComposer
-						prompt={prompt}
-						onPromptChange={(value) => {
-							setPrompt(value);
-							if (error) setError("");
-						}}
-						config={config}
-						onConfigChange={(patch) =>
-							setConfig((previous) => ({ ...previous, ...patch }))
-						}
-						reference={
-							referenceLabel
-								? {
-										label: referenceLabel,
-										logoFilename:
-											stagedReference?.kind === "custom"
-												? (stagedReference.logo?.filename ?? null)
-												: null,
-									}
-								: null
-						}
-						onOpenDesignPicker={() => setIsPickerOpen(true)}
-						onRemoveReference={() => setStagedReference(null)}
-						loading={loading}
-						error={error}
-						onSubmit={() => void submit()}
-						textareaRef={textareaRef}
-					/>
-
-					<section
-						aria-label="Brief siap pakai"
-						className="flex flex-col gap-3"
-					>
-						<h2 className="text-sm font-semibold text-snow">
-							Mulai dari brief siap pakai
-						</h2>
-						<ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-							{STUDIO_PROMPT_SHORTCUTS.map((shortcut) => (
-								<li key={shortcut.id}>
-									<button
-										type="button"
-										onClick={() => applyShortcut(shortcut)}
-										className="flex h-full w-full flex-col gap-1.5 rounded-xl border border-graphite bg-charcoal p-3.5 text-left transition-colors hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										<span className="text-sm font-semibold text-snow">
-											{shortcut.title}
-										</span>
-										<span className="text-xs leading-5 text-fog">
-											{shortcut.preview}
-										</span>
-										<span className="mt-auto flex flex-wrap items-center gap-1.5 pt-1 font-mono text-[10px] uppercase tracking-wider text-fog">
-											<span>{shortcut.category}</span>
-											<span aria-hidden>·</span>
-											<span>
-												{shortcut.designMode === "mobile" ? "Mobile" : "Web"}
-											</span>
-											<span aria-hidden>·</span>
-											<span>{shortcut.initialPageCount} halaman</span>
-										</span>
-									</button>
-								</li>
-							))}
-						</ul>
-					</section>
+		<div className="min-h-dvh w-full overflow-x-clip bg-onyx text-snow">
+			<header className="flex items-center justify-between gap-3 px-4 py-3 md:px-6">
+				<div className="flex min-w-0 items-center gap-2">
+					<StudioBackLink from={search.from} />
+					<Logo height={26} />
 				</div>
-			</main>
+				<div className="flex items-center gap-1.5">
+					<StudioLandingProfile />
+					<button
+						type="button"
+						onClick={() => setIsMobileDrawerOpen(true)}
+						className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-steel md:hidden"
+					>
+						<FolderOpen size={14} className="text-fog" aria-hidden />
+						<span>Project ({history.length})</span>
+					</button>
+				</div>
+			</header>
+
+			<div className="flex w-full items-start gap-3 px-3 pb-6 md:gap-4 md:px-4">
+				<StudioSidebar
+					history={history}
+					onSelectProject={handleOpenProject}
+					onDeleteProject={handleDeleteProject}
+					className="sticky top-4 hidden max-h-[calc(100dvh-2rem)] w-72 shrink-0 overflow-hidden md:flex lg:w-80"
+				/>
+
+				<DialogPrimitive.Root
+					open={isMobileDrawerOpen}
+					onOpenChange={setIsMobileDrawerOpen}
+				>
+					<DialogPrimitive.Portal>
+						<DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs transition-opacity data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:hidden" />
+						<DialogPrimitive.Content
+							className="fixed inset-y-0 left-0 z-50 flex h-full w-80 max-w-[85vw] flex-col border-r border-graphite bg-charcoal text-snow shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left md:hidden"
+							aria-describedby="mobile-drawer-desc"
+						>
+							<DialogPrimitive.Title className="sr-only">
+								Riwayat Project Studio
+							</DialogPrimitive.Title>
+							<DialogPrimitive.Description
+								id="mobile-drawer-desc"
+								className="sr-only"
+							>
+								Daftar project studio kamu yang tersimpan
+							</DialogPrimitive.Description>
+							<div className="flex items-center justify-between border-b border-graphite bg-charcoal px-4 py-3">
+								<span className="text-xs font-semibold uppercase tracking-wider text-snow">
+									My Projects
+								</span>
+								<DialogPrimitive.Close
+									aria-label="Tutup riwayat"
+									className="rounded-md p-1 text-fog hover:text-snow"
+								>
+									<X size={16} aria-hidden />
+								</DialogPrimitive.Close>
+							</div>
+							<div className="flex-1 overflow-hidden">
+								<StudioSidebar
+									history={history}
+									onSelectProject={handleOpenProject}
+									onDeleteProject={handleDeleteProject}
+									className="h-full w-full rounded-none border-0"
+								/>
+							</div>
+						</DialogPrimitive.Content>
+					</DialogPrimitive.Portal>
+				</DialogPrimitive.Root>
+
+				<main className="min-w-0 flex-1">
+					<div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-1 py-2 sm:px-2 md:py-6">
+						<div className="space-y-2 text-center sm:text-left">
+							<h1 className="text-3xl font-bold tracking-tight text-snow sm:text-4xl lg:text-5xl">
+								What will you design?
+							</h1>
+							<p className="mx-auto max-w-2xl text-sm leading-6 text-fog sm:mx-0">
+								Jelaskan antarmuka yang ingin kamu buat dalam Bahasa Indonesia.
+								Studio menghasilkan halaman HTML interaktif lengkap dengan
+								Tailwind dan data realistis.
+							</p>
+						</div>
+
+						<StudioLaunchComposer
+							prompt={prompt}
+							onPromptChange={(value) => {
+								setPrompt(value);
+								setSelectedShortcutId(null);
+								if (error) setError("");
+							}}
+							config={config}
+							onConfigChange={(patch) =>
+								setConfig((previous) => ({ ...previous, ...patch }))
+							}
+							reference={
+								referenceLabel
+									? {
+											label: referenceLabel,
+											logoFilename:
+												stagedReference?.kind === "custom"
+													? (stagedReference.logo?.filename ?? null)
+													: null,
+										}
+									: null
+							}
+							onOpenDesignPicker={() => setIsPickerOpen(true)}
+							onRemoveReference={() => setStagedReference(null)}
+							loading={loading}
+							error={error}
+							onSubmit={() => void submit()}
+							textareaRef={textareaRef}
+						/>
+
+						<StudioShortcutCarousel
+							shortcuts={STUDIO_PROMPT_SHORTCUTS}
+							onSelect={applyShortcut}
+							selectedId={selectedShortcutId}
+						/>
+					</div>
+				</main>
+			</div>
 
 			<StudioDesignPickerDialog
 				open={isPickerOpen}

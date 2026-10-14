@@ -5,6 +5,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -293,5 +294,76 @@ describe("StudioPage UI & Workflow", () => {
 		);
 		expect(mockInvalidate).not.toHaveBeenCalled();
 		expect(screen.getByText("SIMRS Dashboard")).toBeDefined();
+	});
+
+	it("renders the page-shell header with back control, logo and profile outside the composer column", () => {
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		const banner = screen.getByRole("banner");
+		expect(
+			within(banner).getByRole("link", { name: /kembali/i }),
+		).toBeDefined();
+		expect(within(banner).getByText("VibeEverything")).toBeDefined();
+		expect(
+			within(banner).getByRole("button", { name: "Profil dan tampilan" }),
+		).toBeDefined();
+
+		const main = screen.getByRole("main");
+		expect(within(main).getByText("What will you design?")).toBeDefined();
+		expect(
+			within(main).getByRole("region", { name: "Daftar brief siap pakai" }),
+		).toBeDefined();
+	});
+
+	it("falls back to the design hub for the back control on direct visits", () => {
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		const back = screen.getByRole("link", { name: /kembali/i });
+		expect(back.getAttribute("href")).toBe("/design");
+	});
+
+	it("renders all shortcuts in one horizontal carousel with arrow controls", () => {
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		const carousel = screen.getByRole("region", {
+			name: "Daftar brief siap pakai",
+		});
+		expect(
+			screen.getByRole("button", { name: "Brief sebelumnya" }),
+		).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: "Brief berikutnya" }),
+		).toBeDefined();
+		expect(within(carousel).getAllByRole("listitem")).toHaveLength(5);
+	});
+
+	it("marks the applied brief as selected without submitting a generation", () => {
+		const fetchMock = vi.fn();
+		global.fetch = fetchMock;
+
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: /Kopi Specialty Ordering/i }),
+		);
+
+		expect(
+			screen
+				.getByRole("button", { name: /Kopi Specialty Ordering/i })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });
