@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	classifyColors,
 	collectColorMeasurements,
+	collectUnsupportedColors,
 	normalizeColor,
 	normalizeColors,
 } from "./design-normalize-color";
@@ -176,6 +177,41 @@ describe("color role classification", () => {
 		]);
 		expect(entry?.roleClass).toBe("unknown");
 		expect(entry?.rationale).toMatch(/too thin/i);
+	});
+
+	it("treats a single brand-named sighting with one action fill as an association, not proof", () => {
+		const [entry] = classifyColors([
+			element({
+				role: "cta",
+				properties: { "background-color": "#155eef" },
+				variables: { "--color-brand": "#155eef" },
+			}),
+		]);
+		expect(entry?.roleClass).toBe("accent");
+		expect(entry?.rationale).toMatch(/once|single|association|confirmed/i);
+	});
+
+	it("never treats action text paint as an action fill", () => {
+		const [entry] = classifyColors([
+			element({ role: "cta", properties: { color: "#ffffff" } }),
+			element({ role: "cta", properties: { color: "#ffffff" } }),
+		]);
+		expect(entry?.roleClass).not.toBe("brand");
+		expect(entry?.roleClass).not.toBe("accent");
+		expect(entry?.roleLabel).toMatch(/text/i);
+	});
+
+	it("reports modern colour spaces the parser cannot reduce instead of dropping them silently", () => {
+		const unsupported = collectUnsupportedColors([
+			element({ properties: { "background-color": "oklch(0.7 0.1 250)" } }),
+			element({
+				properties: { color: "color(display-p3 1 0.5 0)" },
+			}),
+			element({ properties: { "background-color": "rgb(21, 94, 239)" } }),
+		]);
+		expect(unsupported).toContain("oklch(0.7 0.1 250)");
+		expect(unsupported).toContain("color(display-p3 1 0.5 0)");
+		expect(unsupported).not.toContain("rgb(21, 94, 239)");
 	});
 
 	it("keeps the audit trail of variables and selectors behind a role", () => {

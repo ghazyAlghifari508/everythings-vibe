@@ -2,6 +2,7 @@ import {
 	type ColorClassification,
 	type ColorRoleClass,
 	classifyColors,
+	collectUnsupportedColors,
 	normalizeColor,
 } from "./design-normalize-color";
 import {
@@ -191,6 +192,10 @@ export interface DesignTokenModel {
 
 const RULE_FREQUENCY_MINIMUM = 2;
 
+// The document carries useful rules, not an exhaustive dump: ten Do and ten
+// Don't at most, so the guidance stays within twenty evidence-backed rules.
+const MAX_GUIDELINE_RULES_PER_SIDE = 10;
+
 // Guidance is derived only from repeated measured patterns. A single observation
 // cannot support a rule, and no interaction, hover, focus or responsive claim is
 // ever made because those states were not captured.
@@ -281,31 +286,41 @@ export function deriveModelGuidelines(
 			`Load status of ${unloaded.length} declared font resources was not verified, so the font actually used for glyphs is not confirmed.`,
 		);
 
-	return { dos, donts, limitations };
+	return {
+		dos: dos.slice(0, MAX_GUIDELINE_RULES_PER_SIDE),
+		donts: donts.slice(0, MAX_GUIDELINE_RULES_PER_SIDE),
+		limitations,
+	};
 }
 
-// Infers light/dark from the measured canvas background luminance. Returns
-// unknown when the capture cannot support an answer, so callers never present
-// a guessed theme as measured.
+// Infers light/dark from the measured background luminance. A transparent
+// canvas contributes nothing visible, so transparent and unparsable paints are
+// skipped until the first opaque background: canvas first, then the remaining
+// elements in capture order. Returns unknown when no opaque background was
+// measured, so callers never present a guessed theme as measured.
 export function inferTheme(
 	evidence: VisualEvidence,
 ): "light" | "dark" | "unknown" {
-	const canvas = evidence.elements.find(
+	const canvas = evidence.elements.filter(
 		(element) =>
 			element.role === "canvas" && element.properties["background-color"],
 	);
-	const raw =
-		canvas?.properties["background-color"] ??
-		evidence.elements.find((element) => element.properties["background-color"])
-			?.properties["background-color"] ??
-		"";
-	const normalized = normalizeColor(raw);
-	if (!normalized || normalized.isNoOp) return "unknown";
-	const luminance =
-		(0.2126 * normalized.r + 0.7152 * normalized.g + 0.0722 * normalized.b) /
-		255;
-	if (luminance >= 0.6) return "light";
-	if (luminance <= 0.4) return "dark";
+	const rest = evidence.elements.filter(
+		(element) =>
+			element.role !== "canvas" && element.properties["background-color"],
+	);
+	for (const element of [...canvas, ...rest]) {
+		const normalized = normalizeColor(
+			element.properties["background-color"] ?? "",
+		);
+		if (!normalized || normalized.isNoOp) continue;
+		const luminance =
+			(0.2126 * normalized.r + 0.7152 * normalized.g + 0.0722 * normalized.b) /
+			255;
+		if (luminance >= 0.6) return "light";
+		if (luminance <= 0.4) return "dark";
+		return "unknown";
+	}
 	return "unknown";
 }
 
@@ -490,6 +505,19 @@ export function buildDesignModel(
 	const inferredTheme =
 		themes.size === 1 ? inferTheme(views[0] ?? evidence) : "unknown";
 	const limitations = [...evidence.limitations, ...guidelines.limitations];
+	if (surfaces.length === 1)
+		limitations.push(
+			"Only a single surface colour was measured, so a surface stack cannot be established from this capture.",
+		);
+	if (surfaces.some((surface) => surface.value.startsWith("rgba(")))
+		limitations.push(
+			"One or more measured surfaces are translucent, so the effective colour depends on what is painted beneath and is reported as measured rather than as a solid surface.",
+		);
+	const unsupportedColors = collectUnsupportedColors(evidence.elements);
+	if (unsupportedColors.length)
+		limitations.push(
+			`${unsupportedColors.length} measured colour value${unsupportedColors.length === 1 ? "" : "s"} use${unsupportedColors.length === 1 ? "s" : ""} a modern colour space the parser cannot reduce to sRGB (${unsupportedColors.slice(0, 3).join(", ")}); ${unsupportedColors.length === 1 ? "it is" : "they are"} omitted from tokens rather than guessed.`,
+		);
 	for (const view of views) {
 		const appearance = inferTheme(view);
 		if (
