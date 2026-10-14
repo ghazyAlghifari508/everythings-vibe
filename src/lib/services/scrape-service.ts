@@ -15,7 +15,11 @@ import {
 	scrapes,
 	users,
 } from "@/db/schema";
-import { ScrapeError } from "@/lib/design-errors";
+import {
+	errorSourceForCode,
+	ScrapeError,
+	scrapeFailureReasonForCode,
+} from "@/lib/design-errors";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
 import {
@@ -24,6 +28,10 @@ import {
 	scrapeRequestSchema,
 } from "@/lib/scrape-contract";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
+import {
+	assertScrapeRetryAllowed,
+	resolveScrapeRetryDecision,
+} from "@/lib/scrape-retry";
 import { parseAndValidateFormat } from "@/lib/url-validator";
 import {
 	type ScrapeJobClaim,
@@ -401,26 +409,40 @@ export async function runScrapePipeline(
 			retryAfterSeconds === undefined
 				? undefined
 				: new Date(Date.now() + retryAfterSeconds * 1000).toISOString();
+		const errorSource = errorSourceForCode(errorDetail);
+		const failureReason =
+			error instanceof ScrapeError
+				? error.failureReason
+				: scrapeFailureReasonForCode("UNEXPECTED_ERROR");
+		const evidence: Record<string, unknown> = {};
+		if (retryAfterSeconds !== undefined)
+			evidence.retryAfterSeconds = retryAfterSeconds;
+		if (retryAfterExpiresAt !== undefined)
+			evidence.retryAfterExpiresAt = retryAfterExpiresAt;
+		// A status is persisted only when the response actually carried one, so
+		// the UI can answer "was an HTTP response received?" from stored facts.
+		if (error instanceof ScrapeError && error.httpStatus !== undefined) {
+			evidence.httpStatus = error.httpStatus;
+			evidence.responseReceived = true;
+		}
 
 		await db
 			.update(scrapes)
 			.set({
 				status: "failed",
-				metadata: sql`coalesce(${scrapes.metadata}, '{}'::jsonb) || ${JSON.stringify(
-					{
-						mode,
-						stage: "failed",
-						progress: 0,
-						stageStartedAt: new Date().toISOString(),
-						errorMessage,
-						errorDetail,
-						failedAtStage: meta.stage,
-						...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
-						...(retryAfterExpiresAt === undefined
-							? {}
-							: { retryAfterExpiresAt }),
-					},
-				)}::jsonb`,
+				// The stage that actually failed is read from the persisted row at
+				// update time. Worker modes write their stage directly to the row, so
+				// a locally cached stage would report the stage from before the job ran.
+				metadata: sql`coalesce(${scrapes.metadata}, '{}'::jsonb) || jsonb_build_object(
+						'mode', ${mode}::text,
+						'stage', 'failed',
+						'stageStartedAt', ${new Date().toISOString()}::text,
+						'errorMessage', ${errorMessage}::text,
+						'errorDetail', ${errorDetail}::text,
+						'errorSource', ${errorSource}::text,
+						'failureReason', ${failureReason}::text,
+						'failedAtStage', coalesce(${scrapes.metadata}->>'stage', 'queued')
+					) || ${JSON.stringify({ progress: 0, ...evidence })}::jsonb`,
 				updatedAt: new Date(),
 			})
 			.where(writePredicate());
@@ -447,40 +469,6 @@ export async function retryScrape(
 		if (!scrape)
 			throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
 		if (scrape.status !== "failed") return { ok: true };
-		const metadata =
-			typeof scrape.metadata === "object" && scrape.metadata !== null
-				? (scrape.metadata as ScrapeMetadata)
-				: null;
-		const failedCode = metadata?.errorDetail ?? null;
-		if (
-			failedCode === "INVALID_URL" ||
-			failedCode === "PRIVATE_URL_BLOCKED" ||
-			failedCode === "WEBSITE_ACCESS_DENIED" ||
-			failedCode === "WEBSITE_NOT_FOUND"
-		)
-			throw new ScrapeError(
-				failedCode as
-					| "INVALID_URL"
-					| "PRIVATE_URL_BLOCKED"
-					| "WEBSITE_ACCESS_DENIED"
-					| "WEBSITE_NOT_FOUND",
-				"Retry tidak tersedia untuk kegagalan ini. Gunakan URL lain.",
-			);
-		const retryExpiresAt =
-			typeof metadata?.retryAfterExpiresAt === "string"
-				? Date.parse(metadata.retryAfterExpiresAt)
-				: Number.NaN;
-		if (Number.isFinite(retryExpiresAt) && retryExpiresAt > Date.now()) {
-			const remaining = Math.max(
-				1,
-				Math.ceil((retryExpiresAt - Date.now()) / 1000),
-			);
-			throw new ScrapeError(
-				"WEBSITE_RATE_LIMITED",
-				"Website masih membatasi permintaan otomatis. Tunggu hingga waktu tunggu berakhir.",
-				{ retryAfterSeconds: remaining },
-			);
-		}
 		const active = await tx
 			.select({ id: scrapes.id })
 			.from(scrapes)
@@ -496,9 +484,22 @@ export async function retryScrape(
 					]),
 				),
 			);
-		if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
-			throw new ScrapeError("QUEUE_CAPACITY");
-
+		const metadata =
+			typeof scrape.metadata === "object" && scrape.metadata !== null
+				? scrape.metadata
+				: null;
+		assertScrapeRetryAllowed(
+			resolveScrapeRetryDecision({
+				status: scrape.status,
+				errorCode: metadata?.errorDetail ?? null,
+				retryAfterExpiresAt: metadata?.retryAfterExpiresAt ?? null,
+				activeJobs: active.length,
+				maxActiveJobs: SCRAPE_LIMITS.maxActiveJobs,
+			}),
+		);
+		// A retry is a fresh attempt at the same request: it keeps the persisted
+		// partial rows, clears the previous failure evidence, and resets the
+		// worker bookkeeping so a new lease can be claimed.
 		const mode: ScrapeMode = (scrape.mode ??
 			scrape.metadata?.mode ??
 			"design") as ScrapeMode;
@@ -521,6 +522,8 @@ export async function retryScrape(
 					activityStartedAt: undefined,
 					errorMessage: undefined,
 					errorDetail: undefined,
+					errorSource: undefined,
+					failureReason: undefined,
 					failedAtStage: undefined,
 					retryAfterSeconds: undefined,
 					retryAfterExpiresAt: undefined,

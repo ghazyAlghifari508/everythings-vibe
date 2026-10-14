@@ -1,5 +1,9 @@
 import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { scrapes } from "@/db/schema";
+import {
+	errorSourceForCode,
+	scrapeFailureReasonForCode,
+} from "@/lib/design-errors";
 
 export const SCRAPE_JOB_LEASE_MS = 60_000;
 export const SCRAPE_JOB_HEARTBEAT_MS = 15_000;
@@ -73,6 +77,9 @@ export async function claimScrapeJob(): Promise<ScrapeJobClaim | null> {
 			.for("update", { skipLocked: true });
 		if (!row) return null;
 		if (row.jobAttempts >= SCRAPE_JOB_MAX_ATTEMPTS) {
+			// The job never reached a terminal stage, so the stage it was last
+			// seen in is the honest failure stage, and the reason is a worker
+			// interruption rather than anything the website did.
 			await tx
 				.update(scrapes)
 				.set({
@@ -81,8 +88,14 @@ export async function claimScrapeJob(): Promise<ScrapeJobClaim | null> {
 					leaseExpiresAt: null,
 					metadata: {
 						...row.metadata,
-						errorMessage: "Pemrosesan terhenti berulang kali. Coba lagi.",
+						stage: "failed",
+						stageStartedAt: new Date().toISOString(),
+						errorMessage:
+							"Pemrosesan tidak selesai karena worker berhenti berulang kali. Coba lagi.",
 						errorDetail: "WORKER_INTERRUPTED",
+						errorSource: errorSourceForCode("WORKER_INTERRUPTED"),
+						failureReason: scrapeFailureReasonForCode("WORKER_INTERRUPTED"),
+						failedAtStage: row.metadata?.stage ?? "queued",
 					},
 				})
 				.where(and(eq(scrapes.id, row.id), eq(scrapes.userId, row.userId)));

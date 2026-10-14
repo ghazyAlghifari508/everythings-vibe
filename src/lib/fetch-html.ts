@@ -89,6 +89,9 @@ export interface FetchedAsset {
 	finalUrl: string;
 	contentRange?: string;
 	acceptRanges?: string;
+	// Raw Retry-After header, present only when the response actually sent one.
+	// Callers parse it themselves so no wait is ever invented.
+	retryAfter?: string;
 }
 
 export async function fetchAsset(
@@ -169,6 +172,10 @@ export async function fetchAsset(
 					acceptRanges:
 						typeof res.headers["accept-ranges"] === "string"
 							? res.headers["accept-ranges"]
+							: undefined,
+					retryAfter:
+						typeof res.headers["retry-after"] === "string"
+							? res.headers["retry-after"]
 							: undefined,
 				});
 			});

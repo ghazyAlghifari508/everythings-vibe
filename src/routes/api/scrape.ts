@@ -1,6 +1,10 @@
 ﻿import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
+import {
+	DESIGN_ERROR_CODES,
+	httpStatusForErrorCode,
+	ScrapeError,
+} from "@/lib/design-errors";
 import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/lib/scrape-contract";
 import {
 	createScrape,
@@ -14,20 +18,9 @@ import { requireUser } from "@/lib/session";
 
 function scrapeErrorResponse(error: unknown): Response {
 	if (error instanceof ScrapeError) {
-		const status =
-			error.code === "QUEUE_CAPACITY"
-				? 409
-				: error.code === "RATE_LIMITED" || error.code === "WEBSITE_RATE_LIMITED"
-					? 429
-					: error.code === "INVALID_URL" || error.code === "PRIVATE_URL_BLOCKED"
-						? 400
-						: error.code === "WEBSITE_BLOCKED" ||
-								error.code === "FETCH_TIMEOUT" ||
-								error.code === "WEBSITE_ACCESS_DENIED" ||
-								error.code === "WEBSITE_NOT_FOUND" ||
-								error.code === "WEBSITE_SERVER_ERROR"
-							? 502
-							: 500;
+		// One shared mapping keeps the HTTP response aligned with the retry and
+		// presentation contracts instead of duplicating the status table.
+		const status = httpStatusForErrorCode(error.code);
 		const headers: Record<string, string> = {};
 		if (
 			typeof error.retryAfterSeconds === "number" &&
