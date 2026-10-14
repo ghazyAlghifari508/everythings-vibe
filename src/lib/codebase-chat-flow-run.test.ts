@@ -4,7 +4,9 @@ import {
 	CODEBASE_STAGE_ACTIVITY,
 	CODEBASE_STAGE_DONE_LABEL,
 	isRunWorking,
+	reconcilePipelineStage,
 	resetRunThinking,
+	resolvePersistedStage,
 	resolveResumeStage,
 	runDurationSeconds,
 	settleRun,
@@ -162,5 +164,123 @@ describe("resume stage after refresh", () => {
 		expect(stage).not.toBe("feature");
 		expect(stage).not.toBe("prd");
 		expect(stage).not.toBe("ac");
+	});
+});
+
+describe("authoritative stage from persisted hydration", () => {
+	it("resolves PRD-only to the prd stage", () => {
+		expect(
+			resolvePersistedStage({
+				feature: "ready",
+				prd: "ready",
+				ac: "empty",
+				tasks: "empty",
+			}),
+		).toBe("prd");
+	});
+
+	it("resolves PRD + AC to the ac stage", () => {
+		expect(
+			resolvePersistedStage({
+				feature: "ready",
+				prd: "ready",
+				ac: "ready",
+				tasks: "empty",
+			}),
+		).toBe("ac");
+	});
+
+	it("resolves a full task plan to handoff", () => {
+		expect(
+			resolvePersistedStage({
+				feature: "ready",
+				prd: "ready",
+				ac: "ready",
+				tasks: "ready",
+			}),
+		).toBe("handoff");
+	});
+
+	it("treats a ready task list as handoff even when PRD failed to read", () => {
+		// The reported bug's worst case: tasks exist, but another artifact read
+		// failed. The stage must still be the furthest one proven.
+		expect(
+			resolvePersistedStage({
+				feature: "ready",
+				prd: "failed",
+				ac: "failed",
+				tasks: "ready",
+			}),
+		).toBe("handoff");
+	});
+
+	it("never advances on a pending or failed read", () => {
+		expect(
+			resolvePersistedStage({
+				feature: "pending",
+				prd: "pending",
+				ac: "failed",
+				tasks: "pending",
+			}),
+		).toBe("questions");
+	});
+
+	it("never mistakes a missing artifact for a failed one", () => {
+		// `empty` is a proven absence; `failed` and `pending` are unknown. All
+		// three keep the stage at questions rather than assuming content.
+		expect(
+			resolvePersistedStage({
+				feature: "empty",
+				prd: "empty",
+				ac: "empty",
+				tasks: "empty",
+			}),
+		).toBe("questions");
+		expect(
+			resolvePersistedStage({
+				feature: null,
+				prd: undefined,
+				ac: "failed",
+				tasks: "empty",
+			}),
+		).toBe("questions");
+	});
+});
+
+describe("monotonic pipeline stage reconciliation", () => {
+	it("catches up to the furthest persisted stage regardless of arrival order", () => {
+		// The exact race from the report: a fast feature read latches `feature`,
+		// then a slow task read proves `handoff`.
+		const afterFeatureRead = reconcilePipelineStage("questions", "feature");
+		expect(afterFeatureRead).toBe("feature");
+		expect(reconcilePipelineStage(afterFeatureRead, "handoff")).toBe("handoff");
+	});
+
+	it("never rewinds when an earlier stage arrives late", () => {
+		expect(reconcilePipelineStage("handoff", "ac")).toBe("handoff");
+		expect(reconcilePipelineStage("handoff", "questions")).toBe("handoff");
+		expect(reconcilePipelineStage("ac", "prd")).toBe("ac");
+	});
+
+	it("keeps the visible stage when the persisted stage is not proven", () => {
+		expect(reconcilePipelineStage("prd", "questions")).toBe("prd");
+		expect(reconcilePipelineStage("questions", "questions")).toBe("questions");
+	});
+
+	it("treats task and handoff as the same terminal rank", () => {
+		expect(reconcilePipelineStage("task", "handoff")).toBe("task");
+		expect(reconcilePipelineStage("handoff", "task")).toBe("handoff");
+	});
+
+	it("is idempotent for a repeated identical stage", () => {
+		for (const stage of [
+			"questions",
+			"feature",
+			"prd",
+			"ac",
+			"handoff",
+		] as const) {
+			expect(reconcilePipelineStage(stage, stage)).toBe(stage);
+		}
 	});
 });

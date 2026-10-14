@@ -29,6 +29,7 @@ type Hook = ReturnType<typeof useKanbanTasks>;
 let container: HTMLDivElement;
 let root: Root | null = null;
 let latest: Hook | null = null;
+let client: QueryClient;
 
 function Harness({ projectId }: { projectId: string }) {
 	latest = useKanbanTasks({ projectId, intervalMs: 50 });
@@ -36,12 +37,22 @@ function Harness({ projectId }: { projectId: string }) {
 }
 
 async function mount(projectId: string) {
-	const client = new QueryClient({
+	client = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
 	});
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
+	await act(async () => {
+		root?.render(
+			<QueryClientProvider client={client}>
+				<Harness projectId={projectId} />
+			</QueryClientProvider>,
+		);
+	});
+}
+
+async function switchProject(projectId: string) {
 	await act(async () => {
 		root?.render(
 			<QueryClientProvider client={client}>
@@ -148,5 +159,58 @@ describe("useKanbanTasks", () => {
 		expect(FakeEventSource.instances.length).toBe(2);
 
 		vi.useRealTimers();
+	});
+
+	it("drops a manual refresh response for a project the user already left", async () => {
+		vi.stubGlobal("EventSource", FakeEventSource);
+		let resolveFetch!: (value: unknown) => void;
+		const fetchMock = vi.fn(
+			() =>
+				new Promise((resolve) => {
+					resolveFetch = resolve;
+				}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		await mount("project-1");
+
+		let pending: Promise<void> | undefined;
+		await act(async () => {
+			pending = latest?.refetch();
+		});
+
+		// Switch plans before the old request settles.
+		await switchProject("project-2");
+
+		// The stale project-1 payload arrives after the switch.
+		const stalePayload: KanbanData = {
+			columns: {
+				pending: [
+					{
+						id: "task-stale",
+						type: "task",
+						featureName: "Fitur Lama",
+						name: "Task lama",
+						description: "",
+						status: "pending",
+						dependencies: [],
+						startedAt: null,
+						completedAt: null,
+					},
+				],
+				in_progress: [],
+				completed: [],
+				failed: [],
+			},
+			staleness: "live",
+			lastUpdateAt: new Date().toISOString(),
+		};
+		await act(async () => {
+			resolveFetch({ ok: true, json: async () => stalePayload });
+			await pending;
+		});
+
+		// The new project's board must not have been overwritten by the stale row.
+		expect(latest?.data?.columns.pending ?? []).toHaveLength(0);
 	});
 });

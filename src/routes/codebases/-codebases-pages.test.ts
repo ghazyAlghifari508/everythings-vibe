@@ -15,6 +15,7 @@ import {
 	buildAskHandoffAnswers,
 	canRenderCodebaseReview,
 	decideCodebaseDetailEntry,
+	describeArtifactReadFailure,
 	formatCodebaseSyncBadge,
 	getCodebaseSessionRequestBody,
 	resolveWorkspaceSnapshotReady,
@@ -29,6 +30,29 @@ describe("decideCodebaseDetailEntry", () => {
 	it("denies a missing id", () => {
 		expect(decideCodebaseDetailEntry(undefined)).toBe("deny");
 		expect(decideCodebaseDetailEntry("")).toBe("deny");
+	});
+});
+
+describe("artifact read failure classification", () => {
+	it("names an expired session distinctly from a missing document", () => {
+		const unauthorized = describeArtifactReadFailure("Dokumen PRD", 401);
+		const missing = describeArtifactReadFailure("Dokumen PRD", 404);
+		expect(unauthorized).not.toBe(missing);
+		expect(unauthorized).toContain("Sesi");
+		expect(missing).toContain("tidak ditemukan");
+	});
+
+	it("treats forbidden reads the same as an expired session", () => {
+		expect(describeArtifactReadFailure("Dokumen AC", 403)).toBe(
+			describeArtifactReadFailure("Dokumen AC", 401),
+		);
+	});
+
+	it("reports a transient server failure without claiming the artifact is empty", () => {
+		const message = describeArtifactReadFailure("Dokumen PRD", 500);
+		expect(message).toContain("Dokumen PRD");
+		expect(message).toContain("Coba lagi");
+		expect(message).not.toContain("kosong");
 	});
 });
 
@@ -472,18 +496,44 @@ describe("workspace resume after refresh", () => {
 	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
 
 	it("derives the resume stage from persisted artifacts, not from a guess", () => {
-		expect(workspaceSource).toContain("resolveResumeStage({");
-		expect(workspaceSource).toMatch(/hasFeatureTree: featureTree !== null/);
-		expect(workspaceSource).toMatch(/hasPrd: prdContent !== null/);
-		expect(workspaceSource).toMatch(/hasAc: acContent !== null/);
-		expect(workspaceSource).toMatch(/hasTasks: hasTasksInDb/);
+		expect(workspaceSource).toContain("resolvePersistedStage({");
+		expect(workspaceSource).toMatch(/feature: hydration\.feature/);
+		expect(workspaceSource).toMatch(/prd: hydration\.prd/);
+		expect(workspaceSource).toMatch(/ac: hydration\.ac/);
+		expect(workspaceSource).toMatch(/tasks: hydration\.tasks/);
 	});
 
-	it("advances the visible stage forward only, never rewinding it", () => {
+	it("reconciles the visible stage forward only, never rewinding it", () => {
 		// A late artifact load must not pull a project that already advanced
 		// back to an earlier stage while the user is working.
+		expect(workspaceSource).toContain("reconcilePipelineStage(");
 		expect(workspaceSource).toMatch(
-			/current === "questions" && derivedStage !== "questions"[\s\S]*?derivedStage[\s\S]*?: current/,
+			/setPipelineStage\(\(current\) =>\s*reconcilePipelineStage\(current, persistedStage\)/,
+		);
+	});
+
+	it("binds every artifact read to the project that started it", () => {
+		// A response for a plan the user already left must be dropped instead of
+		// overwriting the plan now on screen.
+		expect(workspaceSource).toContain("activeProjectIdRef");
+		expect(workspaceSource).toMatch(
+			/if \(activeProjectIdRef\.current !== requestedProjectId\) return null/,
+		);
+		expect(workspaceSource).toMatch(
+			/if \(activeProjectIdRef\.current !== projectId\) return null/,
+		);
+	});
+
+	it("never offers the Task step before tasks are proven absent", () => {
+		expect(workspaceSource).toContain(
+			"tasksUnresolved={hydration.tasks !== \"empty\"}",
+		);
+	});
+
+	it("never runs two pipeline generations at once", () => {
+		expect(workspaceSource).toContain("stageRunInFlight");
+		expect(workspaceSource).toMatch(
+			/if \(!effectiveFeatureId \|\| stageBusy \|\| stageRunInFlight\.current\) return/,
 		);
 	});
 });

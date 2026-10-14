@@ -342,6 +342,34 @@ describe("kanban-utils", () => {
 			expect(progress.done).toBe(0);
 			expect(progress.pct).toBe(0);
 		});
+
+		it("reflects persisted agent progress across 30 tasks", () => {
+			// A repository whose AI agent already updated part of a 30-task plan
+			// must report that persisted progress, not a fresh board.
+			const pending = Array.from({ length: 20 }, () =>
+				mockCard({ status: "pending" }),
+			);
+			const inProgress = Array.from({ length: 4 }, () =>
+				mockCard({ status: "in_progress" }),
+			);
+			const completed = Array.from({ length: 5 }, () =>
+				mockCard({ status: "completed" }),
+			);
+			const failed = Array.from({ length: 1 }, () =>
+				mockCard({ status: "failed" }),
+			);
+
+			const progress = computeKanbanProgress({
+				pending,
+				in_progress: inProgress,
+				completed,
+				failed,
+			});
+
+			expect(progress.total).toBe(30);
+			expect(progress.done).toBe(6); // completed + failed are terminal
+			expect(progress.pct).toBe(20);
+		});
 	});
 
 	describe("getTaskPriorityConfig", () => {

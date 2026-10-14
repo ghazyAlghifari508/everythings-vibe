@@ -1621,6 +1621,44 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 		expect(onGenerateTask).toHaveBeenCalledTimes(1);
 	});
 
+	it("never offers the Task step while tasks are unresolved", () => {
+		// The task read has not settled, so the workspace cannot prove tasks are
+		// absent. Offering "Buat Task" here would invite regenerating tasks that
+		// may already be in the database.
+		const onGenerateTask = vi.fn();
+		renderWorkspace({ stage: "ac", onGenerateTask, tasksUnresolved: true });
+
+		expect(
+			container.querySelector("[data-testid='codebase-stage-task']"),
+		).toBeNull();
+		expect(onGenerateTask).not.toHaveBeenCalled();
+	});
+
+	it("shows no stage CTA at the terminal handoff stage", () => {
+		// With 30 tasks persisted, the stage is handoff and no regeneration
+		// button may appear at all.
+		renderWorkspace({
+			stage: "handoff",
+			projectIdForHandoff: "project-1",
+			onGenerateTask: vi.fn(),
+			onGenerateAc: vi.fn(),
+			onGeneratePrd: vi.fn(),
+		});
+
+		expect(
+			container.querySelector("[data-testid='codebase-stage-task']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-stage-ac']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-stage-prd']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-handoff-card']"),
+		).not.toBeNull();
+	});
+
 	it("shows no artifact card before the artifact is confirmed persisted", () => {
 		renderWorkspace({
 			stage: "feature",
