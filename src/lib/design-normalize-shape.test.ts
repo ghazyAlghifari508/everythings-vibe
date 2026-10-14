@@ -110,6 +110,41 @@ describe("spacing classification", () => {
 		expect(tokens).toEqual([]);
 	});
 
+	it("collapses a uniform shorthand into its single canonical value", () => {
+		const { tokens } = normalizeSpacing([
+			element({ padding: "16px" }, { role: "section" }),
+			element({ padding: "16px 16px 16px 16px" }, { role: "section" }),
+		]);
+		const canonical = tokens.filter((token) => token.value === "16px");
+		expect(canonical).toHaveLength(1);
+		expect(canonical[0]?.frequency).toBe(2);
+	});
+
+	it("keeps the raw value of a mixed shorthand instead of inventing one", () => {
+		const { tokens } = normalizeSpacing([
+			element({ padding: "14px 20px" }, { role: "section" }),
+			element({ padding: "14px 20px" }, { role: "section" }),
+		]);
+		expect(tokens.some((token) => token.value === "14px 20px")).toBe(true);
+	});
+
+	it("drops a zero reset without component meaning", () => {
+		const { tokens } = normalizeSpacing([
+			element({ padding: "0px" }, { role: "nav" }),
+			element({ padding: "0px" }, { role: "nav" }),
+		]);
+		expect(tokens).toEqual([]);
+	});
+
+	it("keeps a zero only when an action component was measured square", () => {
+		const { tokens } = normalizeSpacing([
+			element({ padding: "0px" }, { role: "cta" }),
+			element({ padding: "0px" }, { role: "cta" }),
+		]);
+		expect(tokens).toHaveLength(1);
+		expect(tokens[0]?.purpose).toBe("Action padding");
+	});
+
 	it("keeps every token tied to a real measured frequency", () => {
 		const { tokens } = normalizeSpacing([
 			element({ padding: "16px" }, { role: "section" }),
@@ -167,6 +202,37 @@ describe("radius classification", () => {
 			element({ "border-radius": "9999px" }, { role: "cta" }),
 		]);
 		expect(tokens[0]?.frequency).toBe(3);
+	});
+
+	it("marks a radius that rounds the full height as a pill from element geometry", () => {
+		const tokens = normalizeRadii([
+			element(
+				{ "border-radius": "9999px" },
+				{ role: "cta", width: 160, height: 48 },
+			),
+			element(
+				{ "border-radius": "9999px" },
+				{ role: "cta", width: 160, height: 48 },
+			),
+		]);
+		expect(tokens[0]?.purpose).toBe("Buttons");
+		expect(tokens[0]?.pill).toBe(true);
+		expect(tokens[0]?.value).toBe("9999px");
+	});
+
+	it("keeps a large non-pill section radius distinct from a pill", () => {
+		const tokens = normalizeRadii([
+			element(
+				{ "border-radius": "24px" },
+				{ role: "section", width: 1200, height: 400 },
+			),
+			element(
+				{ "border-radius": "24px" },
+				{ role: "section", width: 1200, height: 400 },
+			),
+		]);
+		expect(tokens[0]?.purpose).toBe("Large cards");
+		expect(tokens[0]?.pill).toBe(false);
 	});
 
 	it("classifies by measured context, not by value magnitude alone", () => {

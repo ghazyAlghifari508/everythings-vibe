@@ -286,7 +286,7 @@ export function renderDesignMd(
 					["Context", "Value", "Measured on"],
 					model.radii.map((token) => [
 						escapeCell(token.purpose),
-						isPillRadius(token.valuePx)
+						token.pill || isPillRadius(token.valuePx)
 							? `\`${escapeCell(token.value)}\` (fully rounded / pill)`
 							: `\`${escapeCell(token.value)}\``,
 						String(token.frequency),

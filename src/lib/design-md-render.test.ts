@@ -64,6 +64,27 @@ describe("renderDesignMd", () => {
 			expect([4, 7, 9]).toContain(match[0].length);
 	});
 
+	it("marks a geometry-proven pill without rewriting its raw value", () => {
+		const model = buildFixtureModel();
+		const pillModel = {
+			...model,
+			radii: [
+				{
+					purpose: "Buttons",
+					value: "9999px",
+					valuePx: 9999,
+					frequency: 2,
+					roles: ["cta"],
+					confidence: "observed",
+					pill: true,
+				},
+			],
+		} as typeof model;
+		const markdown = renderDesignMd(pillModel);
+		expect(markdown).toContain("9999px");
+		expect(markdown).toMatch(/fully rounded \/ pill/);
+	});
+
 	it("labels generated CSS tokens as aliases rather than source variables", () => {
 		expect(markdown).toContain(
 			"not declarations copied from the website's own stylesheet",

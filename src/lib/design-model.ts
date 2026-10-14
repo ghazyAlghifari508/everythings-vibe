@@ -107,6 +107,8 @@ export interface ModelRadiusToken {
 	frequency: number;
 	roles: string[];
 	confidence: Confidence;
+	/** True when element geometry proves the shape is fully rounded. */
+	pill?: boolean;
 }
 
 export interface ModelElevationToken {
@@ -471,6 +473,7 @@ export function buildDesignModel(
 		frequency: token.frequency,
 		roles: token.roles,
 		confidence: "observed",
+		pill: token.pill,
 	}));
 
 	const elevationTokens: ModelElevationToken[] = elevation.map((token) => ({
