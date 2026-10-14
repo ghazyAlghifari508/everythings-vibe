@@ -1,8 +1,12 @@
 import { afterEach, expect, it, vi } from "vitest";
+import { buildFixtureModel } from "./design-fixture";
+import { renderDesignMd } from "./design-md-render";
 import type { VisualEvidence } from "./design-visual-evidence";
 import {
 	designIssues,
+	designMdVersionOf,
 	generateDesignMd,
+	isCurrentModelDocument,
 	normalizeDesign,
 	parseExplanationResponse,
 	renderValidatedExplanation,
@@ -267,6 +271,14 @@ it("propagates cancellation instead of degrading it into enrichment failure", as
 	await expect(
 		generateDesignMd(evidence, instrumentation, controller.signal),
 	).rejects.toMatchObject({ code: "AI_GENERATION_FAILED" });
+});
+
+it("keeps archived documents readable while marking the current model", () => {
+	const current = renderDesignMd(buildFixtureModel());
+	expect(designMdVersionOf(current)).toBeGreaterThanOrEqual(2);
+	expect(isCurrentModelDocument(current)).toBe(true);
+	expect(designMdVersionOf("# Old archive\n\nSome text")).toBe(1);
+	expect(isCurrentModelDocument("# Old archive\n\nSome text")).toBe(false);
 });
 
 it("retains normalization for legacy inspector documents", () => {

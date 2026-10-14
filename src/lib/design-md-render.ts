@@ -453,8 +453,21 @@ export function renderDesignMd(
 	);
 	const spacingEntries = uniqueTokenNames(
 		model.spacing.flatMap((token) => {
+			// Container widths are not spacing steps: they live under the
+			// Tailwind v4 container scale instead of the spacing namespace.
+			if (token.purpose === "Container max-width") return [];
 			if (!isValidCssLength(token.value)) return [];
 			const name = tokenName("--spacing", token.purpose);
+			return name ? [{ name, value: token.value }] : [];
+		}),
+	);
+	// Measured max-widths map to the Tailwind v4 container scale, so they
+	// generate max-width utilities instead of corrupting the spacing scale.
+	const containerEntries = uniqueTokenNames(
+		model.spacing.flatMap((token) => {
+			if (token.purpose !== "Container max-width") return [];
+			if (!isValidCssLength(token.value)) return [];
+			const name = tokenName("--container", "max-width");
 			return name ? [{ name, value: token.value }] : [];
 		}),
 	);
@@ -514,6 +527,9 @@ export function renderDesignMd(
 		cssBlocks.push(["  /* Type scale */", ...typeDeclarations].join("\n"));
 	if (spacingDeclarations.length)
 		cssBlocks.push(["  /* Spacing */", ...spacingDeclarations].join("\n"));
+	const containerDeclarations = containerEntries.map(declaration);
+	if (containerDeclarations.length)
+		cssBlocks.push(["  /* Container */", ...containerDeclarations].join("\n"));
 	if (radiusDeclarations.length)
 		cssBlocks.push(["  /* Radius */", ...radiusDeclarations].join("\n"));
 
@@ -544,6 +560,10 @@ export function renderDesignMd(
 			themeBlocks.push(["  /* Type scale */", ...typeDeclarations].join("\n"));
 		if (spacingDeclarations.length)
 			themeBlocks.push(["  /* Spacing */", ...spacingDeclarations].join("\n"));
+		if (containerDeclarations.length)
+			themeBlocks.push(
+				["  /* Container */", ...containerDeclarations].join("\n"),
+			);
 		if (radiusDeclarations.length)
 			themeBlocks.push(["  /* Radius */", ...radiusDeclarations].join("\n"));
 		lines.push(

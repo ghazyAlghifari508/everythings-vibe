@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { buildFixtureModel } from "./design-fixture";
+import { renderDesignMd } from "./design-md-render";
 import {
 	enforceDesignSystemOnHtml,
 	extractDesignSystemTokens,
@@ -59,6 +61,17 @@ describe("Studio Design System", () => {
 		expect(tokens?.colors.muted).toBeNull();
 		expect(tokens?.typography.fontFamily).toContain("Arial");
 	});
+	it("hands the current model-rendered document off without inventing tokens", () => {
+		const document = renderDesignMd(buildFixtureModel());
+		const tokens = extractDesignSystemTokens(document);
+		expect(tokens).not.toBeNull();
+		if (!tokens) return;
+		expect(tokens.colors.primary?.toLowerCase()).toBe("#155eef");
+		expect(tokens.typography.fontFamily).toContain("Inter");
+		expect(tokens.shapes.borderRadius.buttons).toBe("8px");
+		expect(tokens.rules.dos.length).toBeGreaterThan(0);
+	});
+
 	it("replaces old enforced tokens when a reference changes", () => {
 		const first = enforceDesignSystemOnHtml(
 			"<html><head></head><body></body></html>",
