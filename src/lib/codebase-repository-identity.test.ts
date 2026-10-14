@@ -74,9 +74,14 @@ describe("normalizeRepositoryIdentity", () => {
 	});
 
 	it("skips transport-noise segments", () => {
-		expect(
-			normalizeRepositoryIdentity("https://dev.azure.com/org/project/_git/app"),
-		).toBe("dev.azure.com/org/project/app");
+		expect(normalizeRepositoryIdentity("dev.azure.com/org/project/app")).toBe(
+			"dev.azure.com/org/project/app",
+		);
+	});
+
+	it("refuses a normalized-looking value that carries a traversal segment", () => {
+		expect(normalizeRepositoryIdentity("github.com/../../../etc")).toBeNull();
+		expect(normalizeRepositoryIdentity("github.com/owner/./app")).toBeNull();
 	});
 
 	it("returns null for a repository with no remote", () => {
@@ -100,6 +105,18 @@ describe("normalizeRepositoryIdentity", () => {
 	it("returns null for something that is not a remote at all", () => {
 		expect(normalizeRepositoryIdentity("not a remote")).toBeNull();
 		expect(normalizeRepositoryIdentity("app")).toBeNull();
+	});
+
+	it("is idempotent over its own normalized output", () => {
+		// A CLI that already normalized its remote (or a replayed handshake)
+		// must not lose the identity: if this returned null, the stored-identity
+		// mismatch guard would be skipped and a re-sync could overwrite a name.
+		expect(
+			normalizeRepositoryIdentity("github.com/owner/react-movie-app"),
+		).toBe("github.com/owner/react-movie-app");
+		expect(normalizeRepositoryIdentity("dev.azure.com/org/project/app")).toBe(
+			"dev.azure.com/org/project/app",
+		);
 	});
 });
 
