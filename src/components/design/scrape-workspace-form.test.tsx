@@ -175,6 +175,37 @@ describe("reset parameters", () => {
 	});
 });
 
+describe("warning and url composition", () => {
+	it("renders the notice before the url input in a single integrated area", () => {
+		const { container } = render(<ScrapeWorkspaceForm mode="crawl" />);
+		const notice = screen.getByText("Tidak semua website dapat di-scrape");
+		const url = screen.getByLabelText(/URL website/i);
+		const form = container.querySelector("form");
+		expect(form?.contains(notice)).toBe(true);
+		expect(form?.contains(url)).toBe(true);
+		expect(
+			notice.compareDocumentPosition(url) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+	});
+
+	it("does not render a separate warning card or redundant hint", () => {
+		render(<ScrapeWorkspaceForm mode="crawl" />);
+		expect(
+			screen.queryByText(
+				/Gunakan website publik yang dapat diakses tanpa login/,
+			),
+		).toBeNull();
+		expect(screen.queryByRole("alert")).toBeNull();
+	});
+
+	it("keeps validation and error feedback without the redundant hint", () => {
+		render(<ScrapeWorkspaceForm mode="crawl" />);
+		const url = screen.getByLabelText(/URL website/i);
+		fireEvent.change(url, { target: { value: "notaurl" } });
+		fireEvent.click(screen.getByRole("button", { name: /crawl website/i }));
+		expect(screen.getByRole("alert").textContent).toMatch(/tidak valid/i);
+	});
+});
 describe("parameter groups keep their own scope", () => {
 	it("does not carry a crawl value into another mode's form", () => {
 		const crawl = render(<ScrapeWorkspaceForm mode="crawl" />);

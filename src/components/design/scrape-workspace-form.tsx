@@ -277,48 +277,51 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 			className="mx-auto w-full max-w-3xl text-left"
 		>
 			<fieldset disabled={pending} className="min-w-0">
-				<div className="flex items-stretch gap-3">
-					<div className="flex h-14 min-w-0 flex-1 items-center overflow-hidden rounded-lg border border-graphite bg-charcoal focus-within:ring-2 focus-within:ring-indigo">
-						<span className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-sm text-fog">
-							{protocol}
-						</span>
-						<label htmlFor="scrape-url" className="sr-only">
-							URL website
-						</label>
-						<input
-							id="scrape-url"
-							name="url"
-							inputMode="url"
-							autoComplete="url"
-							value={input}
-							onChange={(event) => changeUrl(event.target.value)}
-							placeholder="example.com"
-							required
-							maxLength={SCRAPE_LIMITS.urlChars}
-							aria-invalid={!!error}
-							aria-describedby="scrape-form-error"
-							className="h-full min-w-0 flex-1 bg-transparent px-3 text-base text-snow outline-none placeholder:text-fog [--autofill-bg:var(--color-charcoal)]"
-						/>
-					</div>
-					<button
-						type="submit"
-						disabled={pending || !input.trim()}
-						aria-label={`Jalankan ${mode === "design" ? "Generate DESIGN.md" : mode === "crawl" ? "Crawl Website" : mode === "images" ? "Scrape Images" : "Scrape HTML"}`}
-						title="Mulai ekstraksi"
-						className="btn-primary inline-flex size-14 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
-					>
-						{pending ? (
-							<Loader2
-								size={20}
-								aria-hidden
-								className="motion-safe:animate-spin"
+				<div className="rounded-xl border border-graphite bg-charcoal focus-within:ring-2 focus-within:ring-indigo">
+					<ScrapeFormNotice tone="plain" />
+					<div aria-hidden className="mx-4 mt-4 border-t border-graphite" />
+					<div className="flex items-stretch gap-3 p-3 sm:p-4">
+						<div className="flex h-14 min-w-0 flex-1 items-center overflow-hidden rounded-lg bg-transparent">
+							<span className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-sm text-fog">
+								{protocol}
+							</span>
+							<label htmlFor="scrape-url" className="sr-only">
+								URL website
+							</label>
+							<input
+								id="scrape-url"
+								name="url"
+								inputMode="url"
+								autoComplete="url"
+								value={input}
+								onChange={(event) => changeUrl(event.target.value)}
+								placeholder="example.com"
+								required
+								maxLength={SCRAPE_LIMITS.urlChars}
+								aria-invalid={!!error}
+								aria-describedby={error ? "scrape-form-error" : undefined}
+								className="h-full min-w-0 flex-1 bg-transparent px-3 text-base text-snow outline-none placeholder:text-fog [--autofill-bg:var(--color-charcoal)]"
 							/>
-						) : (
-							<ArrowUp size={20} aria-hidden />
-						)}
-					</button>
+						</div>
+						<button
+							type="submit"
+							disabled={pending || !input.trim()}
+							aria-label={`Jalankan ${mode === "design" ? "Generate DESIGN.md" : mode === "crawl" ? "Crawl Website" : mode === "images" ? "Scrape Images" : "Scrape HTML"}`}
+							title="Mulai ekstraksi"
+							className="btn-primary inline-flex size-14 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
+						>
+							{pending ? (
+								<Loader2
+									size={20}
+									aria-hidden
+									className="motion-safe:animate-spin"
+								/>
+							) : (
+								<ArrowUp size={20} aria-hidden />
+							)}
+						</button>
+					</div>
 				</div>
-				<ScrapeFormNotice className="mt-3" />
 
 				{hasAdvanced ? (
 					<div className="mt-5 min-w-0 rounded-lg border border-graphite">
@@ -403,13 +406,15 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 					</div>
 				) : null}
 			</fieldset>
-			<p
-				id="scrape-form-error"
-				role={error ? "alert" : undefined}
-				className={cn("mt-3 text-sm", error ? "text-crimson" : "text-fog")}
-			>
-				{error || "Gunakan website publik yang dapat diakses tanpa login."}
-			</p>
+			{error ? (
+				<p
+					id="scrape-form-error"
+					role="alert"
+					className="mt-3 text-sm text-crimson"
+				>
+					{error}
+				</p>
+			) : null}
 		</form>
 	);
 }
