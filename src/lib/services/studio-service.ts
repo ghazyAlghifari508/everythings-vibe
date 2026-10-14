@@ -32,8 +32,6 @@ import {
 	buildStudioPlanningPrompt,
 	buildStudioUserPrompt,
 	parseStudioPlanningWithBlueprint,
-	STUDIO_PLAN_SYSTEM_PROMPT,
-	STUDIO_SYSTEM_PROMPT,
 	type StudioDesignMode,
 	type StudioScreenPlan,
 	validateStudioDesignMode,
@@ -48,7 +46,8 @@ import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import { resolveStudioDesignReference } from "@/lib/studio-design-reference.server";
 import {
 	resolveStudioDesignSkill,
-	studioSkillSystemGuidance,
+	resolveStudioFrameSystemPrompt,
+	resolveStudioPlanningSystemPrompt,
 } from "@/lib/studio-design-skill-registry.server";
 import {
 	enforceDesignSystemOnHtml,
@@ -835,9 +834,9 @@ export async function runStudioJobPipeline(
 					[
 						{
 							role: "system",
-							content:
-								STUDIO_PLAN_SYSTEM_PROMPT +
-								studioSkillSystemGuidance(project.designSkillId ?? "none"),
+							content: resolveStudioPlanningSystemPrompt(
+								project.designSkillId ?? "none",
+							),
 						},
 						{ role: "user", content: planPrompt },
 					],
@@ -871,9 +870,9 @@ export async function runStudioJobPipeline(
 						[
 							{
 								role: "system",
-								content:
-									STUDIO_PLAN_SYSTEM_PROMPT +
-									studioSkillSystemGuidance(project.designSkillId ?? "none"),
+								content: resolveStudioPlanningSystemPrompt(
+									project.designSkillId ?? "none",
+								),
 							},
 							{ role: "user", content: correctivePrompt },
 						],
@@ -2472,8 +2471,7 @@ export async function generateStudioHtml(
 		[
 			{
 				role: "system",
-				content:
-					STUDIO_SYSTEM_PROMPT + studioSkillSystemGuidance(designSkillId),
+				content: resolveStudioFrameSystemPrompt(designSkillId),
 			},
 			{ role: "user", content: prompt },
 		],

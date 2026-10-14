@@ -1,4 +1,4 @@
-# Studio design skill adapters (version 1)
+# Studio design skill adapters (version 2)
 
 The guidance in `src/lib/studio-design-skill-registry.server.ts` is modified, abridged and adapted from the pinned definitions below. It is a curated visual-design subset, not the complete upstream agent, CLI, dataset or workflow. Every adapter remains subordinate to Studio's static HTML output, platform, safety and user-selected reference contracts. No upstream scripts run and no remote content is fetched during generation.
 
