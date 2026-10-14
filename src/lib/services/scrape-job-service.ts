@@ -1,4 +1,5 @@
 import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import type { ScrapeStatus } from "@/db/schema";
 import { scrapes } from "@/db/schema";
 import {
 	errorSourceForCode,
@@ -27,6 +28,19 @@ export function isScrapeJobEligible(
 		activeStatuses.some((active) => active === status) &&
 		(!leaseExpiresAt || leaseExpiresAt <= now)
 	);
+}
+
+const TERMINAL_OR_FAILED_STAGES = new Set(["completed", "failed"]);
+
+// The stage a run was last seen in is only usable when it is a real processing
+// stage. Anything else (missing, terminal, or an unknown value) resolves to the
+// first stage every job must have reached, so the failure UI never marks a
+// fabricated stage.
+export function resolveFailedAtStage(
+	stage: ScrapeStatus | undefined,
+): ScrapeStatus {
+	if (stage && !TERMINAL_OR_FAILED_STAGES.has(stage)) return stage;
+	return "queued";
 }
 
 export function isScrapeClaimCurrent(
@@ -95,7 +109,7 @@ export async function claimScrapeJob(): Promise<ScrapeJobClaim | null> {
 						errorDetail: "WORKER_INTERRUPTED",
 						errorSource: errorSourceForCode("WORKER_INTERRUPTED"),
 						failureReason: scrapeFailureReasonForCode("WORKER_INTERRUPTED"),
-						failedAtStage: row.metadata?.stage ?? "queued",
+						failedAtStage: resolveFailedAtStage(row.metadata?.stage),
 					},
 				})
 				.where(and(eq(scrapes.id, row.id), eq(scrapes.userId, row.userId)));
