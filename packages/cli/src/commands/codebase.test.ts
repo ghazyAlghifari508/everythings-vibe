@@ -50,6 +50,13 @@ function makeRepo(files: Record<string, string>): string {
 	return root;
 }
 
+function displayNameForFixtureRoot(root: string): string {
+	return basename(root)
+		.split(/[._-]+/)
+		.map((word) => word.charAt(0).toLocaleUpperCase() + word.slice(1))
+		.join(" ");
+}
+
 let repos: string[] = [];
 
 function trackRepo(root: string): string {
@@ -603,7 +610,7 @@ describe("syncCodebase repository naming", () => {
 		expect(res.ok).toBe(true);
 		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
 			"p1",
-			basename(root),
+			displayNameForFixtureRoot(root),
 			undefined,
 		);
 	});
@@ -620,9 +627,9 @@ describe("syncCodebase repository naming", () => {
 			output: "json",
 		});
 
-		expect(res.repositoryName).toBe(basename(root));
+		expect(res.repositoryName).toBe(displayNameForFixtureRoot(root));
 		const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
-		expect(printed).toContain(basename(root));
+		expect(printed).toContain(displayNameForFixtureRoot(root));
 		expect(printed).not.toContain(root);
 		expect(printed).not.toContain("root");
 		logSpy.mockRestore();
@@ -642,7 +649,7 @@ describe("syncCodebase repository naming", () => {
 		expect(res.ok).toBe(true);
 		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
 			"p1",
-			basename(root),
+			displayNameForFixtureRoot(root),
 			undefined,
 		);
 	});
@@ -655,7 +662,7 @@ describe("syncCodebase repository identity", () => {
 			makeRepo({
 				"src/app.ts": "export const x = 1;\n",
 				".git/config":
-					'[core]\n\trepositoryformatversion = 0\n[remote "origin"]\n\turl = https://github.com/Owner/App.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n',
+					'[core]\n\trepositoryformatversion = 0\n[remote "origin"]\n\turl = https://github.com/Owner/ocean-guard.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n',
 			}),
 		);
 
@@ -669,10 +676,10 @@ describe("syncCodebase repository identity", () => {
 		expect(res.ok).toBe(true);
 		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
 			"p1",
-			basename(root),
-			"github.com/owner/app",
+			"Ocean Guard",
+			"github.com/owner/ocean-guard",
 		);
-		expect(res.repositoryIdentity).toBe("github.com/owner/app");
+		expect(res.repositoryIdentity).toBe("github.com/owner/ocean-guard");
 	});
 
 	it("never sends a credentialed remote as identity", async () => {
@@ -713,7 +720,7 @@ describe("syncCodebase repository identity", () => {
 		expect(res.ok).toBe(true);
 		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
 			"p1",
-			basename(root),
+			displayNameForFixtureRoot(root),
 			undefined,
 		);
 		expect(res.repositoryIdentity).toBeUndefined();
@@ -738,7 +745,7 @@ describe("syncCodebase repository identity", () => {
 
 		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
 			"p1",
-			basename(root),
+			displayNameForFixtureRoot(root),
 			undefined,
 		);
 	});

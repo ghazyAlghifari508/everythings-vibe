@@ -22,8 +22,8 @@ import {
 	type RepositoryManifest,
 } from "../lib/manifest.js";
 import {
-	getRepositoryName,
 	readRepositoryIdentity,
+	resolveRepositoryDisplayName,
 	resolveRepositoryRoot,
 	scanRepository,
 } from "../lib/repository.js";
@@ -271,15 +271,16 @@ export async function syncCodebase(
 		return res;
 	}
 
-	// `repositoryName` is the basename of the resolved root and is the only
-	// repository identity that leaves this machine. It is derived before the
-	// handshake so the server can label the project from the first contact.
-	const repositoryName = getRepositoryName(root) ?? undefined;
 	// The normalized Git remote identity, when the repository has one. Reading
 	// the Git config is best-effort: a repository without a remote (or without
 	// a readable config) simply reports no identity and keeps working.
 	const repositoryIdentity =
 		(await readRepositoryIdentity(root).catch(() => null)) ?? undefined;
+	// Prefer the verified remote's repository segment for the display name;
+	// otherwise use the resolved root folder. Only a single safe segment leaves
+	// this machine, never the absolute local path or raw Git remote URL.
+	const repositoryName =
+		resolveRepositoryDisplayName(root, repositoryIdentity) ?? undefined;
 
 	const createClient =
 		deps.createClient ??

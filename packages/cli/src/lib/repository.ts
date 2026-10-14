@@ -7,7 +7,14 @@
  * file contents. Source content loading happens later in `manifest.ts`.
  */
 
-import { lstat, open, readdir, readFile, realpath, stat } from "node:fs/promises";
+import {
+	lstat,
+	open,
+	readdir,
+	readFile,
+	realpath,
+	stat,
+} from "node:fs/promises";
 import {
 	dirname,
 	isAbsolute,
@@ -136,6 +143,37 @@ export function getRepositoryName(root: string): string | null {
 	return candidate;
 }
 
+function humanizeRepositorySegment(value: string): string | null {
+	const words = value
+		.replace(/[._-]+/g, " ")
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean);
+	if (words.length === 0) return null;
+	return words
+		.map((word) => {
+			const first = [...word][0];
+			return first
+				? `${first.toLocaleUpperCase()}${word.slice(first.length)}`
+				: "";
+		})
+		.join(" ");
+}
+
+/** Resolve a safe display name from a verified Git identity, then root folder. */
+export function resolveRepositoryDisplayName(
+	root: string,
+	identity: string | null | undefined,
+): string | null {
+	const repositorySegment = identity?.split("/").at(-1);
+	const fromIdentity = repositorySegment
+		? humanizeRepositorySegment(repositorySegment.replace(/\.git$/i, ""))
+		: null;
+	if (fromIdentity) return fromIdentity;
+	const folder = getRepositoryName(root);
+	return folder ? humanizeRepositorySegment(folder) : null;
+}
+
 /** Credentials embedded in a remote URL: `scheme://user:token@host/...`. */
 const URL_USERINFO_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/[^/@]+@/i;
 /** Scp-style remote with a username: `git@host:owner/repo.git`. */
@@ -176,7 +214,9 @@ export function normalizeRepositoryIdentity(
 	if (trimmed.startsWith("/") || trimmed.startsWith("./")) return null;
 	if (URL_USERINFO_PATTERN.test(trimmed) && !SCP_LIKE_PATTERN.test(trimmed)) {
 		const scheme = SCHEME_PATTERN.exec(trimmed)?.[1] ?? "https";
-		return normalizeRepositoryIdentity(`${scheme}://${trimmed.slice(trimmed.indexOf("@") + 1)}`);
+		return normalizeRepositoryIdentity(
+			`${scheme}://${trimmed.slice(trimmed.indexOf("@") + 1)}`,
+		);
 	}
 
 	const scpLike = SCP_LIKE_PATTERN.exec(trimmed);
@@ -211,9 +251,10 @@ export function normalizeRepositoryIdentity(
 		.filter((segment) => segment.length > 0)
 		.filter((segment) => !NON_IDENTITY_SEGMENTS.has(segment.toLowerCase()));
 	if (segments.length === 0) return null;
-	return [split.host.toLowerCase(), ...segments.map((s) => s.toLowerCase())].join(
-		"/",
-	);
+	return [
+		split.host.toLowerCase(),
+		...segments.map((s) => s.toLowerCase()),
+	].join("/");
 }
 
 /**
