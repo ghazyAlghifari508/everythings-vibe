@@ -425,6 +425,10 @@ export async function runScrapePipeline(
 			evidence.httpStatus = error.httpStatus;
 			evidence.responseReceived = true;
 		}
+		// A final URL is persisted only when the page actually resolved to one,
+		// so the metadata can answer whether a redirect target existed.
+		if (error instanceof ScrapeError && error.finalUrl !== undefined)
+			evidence.finalUrl = error.finalUrl;
 
 		await db
 			.update(scrapes)

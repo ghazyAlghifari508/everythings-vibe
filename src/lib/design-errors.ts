@@ -182,6 +182,7 @@ export class ScrapeError extends Error {
 		options?: ErrorOptions & {
 			retryAfterSeconds?: number;
 			httpStatus?: number;
+			finalUrl?: string;
 			failureReason?: ScrapeFailureReason;
 		},
 	) {
@@ -189,6 +190,7 @@ export class ScrapeError extends Error {
 		this.name = "ScrapeError";
 		this.retryAfterSeconds = options?.retryAfterSeconds;
 		this.httpStatus = options?.httpStatus;
+		this.finalUrl = options?.finalUrl;
 		this.failureReason =
 			options?.failureReason ?? scrapeFailureReasonForCode(code);
 	}
@@ -200,6 +202,10 @@ export class ScrapeError extends Error {
 	// Present only when an actual HTTP response was received, so a status is
 	// never displayed for a failure that never got one.
 	readonly httpStatus?: number;
+
+	// Present only when the page actually resolved to a URL, so the diagnostic
+	// metadata can answer whether a final URL existed after redirects.
+	readonly finalUrl?: string;
 
 	readonly failureReason: ScrapeFailureReason;
 }

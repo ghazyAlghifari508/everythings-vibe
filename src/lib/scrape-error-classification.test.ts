@@ -122,6 +122,14 @@ describe("ScrapeError evidence", () => {
 			"asset-unavailable",
 		);
 	});
+
+	it("carries a final URL only when the page actually resolved to one", () => {
+		const resolved = new ScrapeError("WEBSITE_NOT_FOUND", "not found", {
+			finalUrl: "https://example.test/redirected",
+		});
+		expect(resolved.finalUrl).toBe("https://example.test/redirected");
+		expect(new ScrapeError("JOB_TIMEOUT").finalUrl).toBeUndefined();
+	});
 });
 
 describe("classifyNavigationFailure", () => {

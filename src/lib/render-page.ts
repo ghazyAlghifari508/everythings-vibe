@@ -547,7 +547,11 @@ export async function renderPage(
 			throw new ScrapeError(
 				designErrorCodeForHttpStatus(status),
 				httpStatusMessage(status, retryAfterSeconds),
-				{ retryAfterSeconds, httpStatus: status },
+				{
+					retryAfterSeconds,
+					httpStatus: status,
+					finalUrl: page.url(),
+				},
 			);
 		}
 		if (status === 0 && /^https?:/i.test(url)) {
