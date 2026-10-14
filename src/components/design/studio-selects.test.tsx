@@ -135,4 +135,34 @@ describe("StudioPageCountSelect", () => {
 		fireEvent.click(screen.getByRole("menuitemradio", { name: /5 halaman/i }));
 		expect(onChange).toHaveBeenCalledWith(5);
 	});
+
+	it("presents a titled menu with a subtitle and a single checked radio", async () => {
+		render(<StudioPageCountSelect value={3} onChange={vi.fn()} />);
+		openMenu(/Jumlah halaman awal: 3/i);
+		await waitFor(() => {
+			expect(screen.getByText("Jumlah halaman")).toBeDefined();
+		});
+		expect(screen.getByText("Tentukan layar awal proyek")).toBeDefined();
+		const radios = screen.getAllByRole("menuitemradio");
+		const checked = radios.filter(
+			(item) => item.getAttribute("aria-checked") === "true",
+		);
+		expect(checked).toHaveLength(1);
+		expect(checked[0].textContent).toContain("3 halaman");
+		expect(screen.getByText("Default")).toBeDefined();
+	});
+
+	it("keeps an accessible trigger name for every value in the range", () => {
+		for (const value of [1, 2, 3, 4, 5]) {
+			const { unmount } = render(
+				<StudioPageCountSelect value={value} onChange={vi.fn()} />,
+			);
+			expect(
+				screen.getByRole("button", {
+					name: new RegExp(`Jumlah halaman awal: ${value}`),
+				}),
+			).toBeDefined();
+			unmount();
+		}
+	});
 });

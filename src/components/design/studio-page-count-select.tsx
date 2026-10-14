@@ -5,7 +5,6 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
-	DropdownMenuLabel,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -45,8 +44,15 @@ export function StudioPageCountSelect({
 					<span>{value} halaman</span>
 				</button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="w-44">
-				<DropdownMenuLabel>Halaman awal</DropdownMenuLabel>
+			<DropdownMenuContent align="start" sideOffset={6} className="w-64 p-1.5">
+				<div className="px-2.5 pb-2 pt-1.5">
+					<span className="block text-sm font-semibold text-snow">
+						Jumlah halaman
+					</span>
+					<span className="mt-0.5 block text-xs text-fog">
+						Tentukan layar awal proyek
+					</span>
+				</div>
 				<DropdownMenuSeparator />
 				{PAGE_COUNT_OPTIONS.map((count) => {
 					const selected = count === value;
@@ -56,14 +62,24 @@ export function StudioPageCountSelect({
 							role="menuitemradio"
 							aria-checked={selected}
 							onSelect={() => onChange(count)}
-							className="gap-2"
+							className={`gap-2.5 px-2.5 py-2 ${
+								selected ? "bg-white/5 text-snow" : "text-mist focus:text-snow"
+							}`}
 						>
 							<span className="flex size-4 shrink-0 items-center justify-center">
-								{selected ? <Check size={14} aria-label="Terpilih" /> : null}
+								{selected ? (
+									<Check
+										size={14}
+										aria-label="Terpilih"
+										className="text-snow"
+									/>
+								) : null}
 							</span>
-							<span className="flex-1 text-sm text-snow">{count} halaman</span>
+							<span className="flex-1 text-sm font-medium">
+								{count} halaman
+							</span>
 							{count === STUDIO_DEFAULT_PAGE_COUNT ? (
-								<span className="text-[10px] uppercase tracking-wider text-fog">
+								<span className="rounded border border-graphite px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-fog">
 									Default
 								</span>
 							) : null}
