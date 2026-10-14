@@ -79,7 +79,7 @@ vi.mock("./ai-orchestrator", () => ({
 							})),
 						},
 					})
-				: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${provider.lastLabels.join(" ")}</body></html>`,
+				: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><nav>${provider.lastLabels.join(" ")}</nav></body></html>`,
 			generator: (async function* () {})(),
 		};
 	},
