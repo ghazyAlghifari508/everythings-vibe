@@ -235,7 +235,7 @@ export function DesignMdSourcePanel({
 					<span className="truncate text-xs text-fog">
 						{inspectorSource === "observed"
 							? enrichment === "unavailable"
-								? "Pengukuran lengkap tanpa narasi AI"
+								? "Analisis AI belum lengkap"
 								: "Sesuai evidence browser"
 							: "Arsip: belum terverifikasi terhadap evidence"}
 					</span>
@@ -335,10 +335,9 @@ export function DesignMdSourcePanel({
 			</div>
 			{inspectorSource === "observed" && enrichment === "unavailable" ? (
 				<p className="block border-b border-graphite px-3 py-2 text-xs text-fog">
-					Dokumen ini berisi pengukuran lengkap dari evidence browser. Narasi AI
-					tidak tersedia
+					Analisis AI belum lengkap
 					{enrichmentDetail ? `: ${enrichmentDetail}` : "."} Token terukur di
-					bawah tidak terpengaruh.
+					bawah lengkap dan tidak terpengaruh.
 				</p>
 			) : null}
 

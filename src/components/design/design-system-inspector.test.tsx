@@ -226,7 +226,11 @@ describe("DesignSystemInspector", () => {
 
 	it("states the verification source instead of implying unverified data is measured", () => {
 		const { rerender } = renderInspector();
-		expect(screen.getByText(/pengukuran browser/i)).toBeDefined();
+		expect(
+			screen.getByText(
+				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
+			),
+		).toBeDefined();
 		rerender(
 			<DesignSystemInspector
 				siteName="Acme"
@@ -480,7 +484,7 @@ describe("palette gallery", () => {
 		const semantic = screen.getByRole("region", { name: "Semantik" });
 		expect(within(semantic).getByText("Semantic state")).toBeDefined();
 		const other = screen.getByRole("region", {
-			name: "Belum terklasifikasi",
+			name: "Warna lainnya",
 		});
 		expect(within(other).getByText("Neutral")).toBeDefined();
 	});
@@ -584,6 +588,28 @@ describe("palette gallery", () => {
 	});
 });
 
+describe("task D ambiguous copy", () => {
+	it("labels unclassified colors as other colors", () => {
+		renderInspector(paletteModel([AMBIGUOUS_COLOR]));
+		expect(screen.getByRole("region", { name: "Warna lainnya" })).toBeDefined();
+		expect(
+			screen.queryByRole("region", { name: "Belum terklasifikasi" }),
+		).toBeNull();
+	});
+
+	it("explains observed analysis in user language", () => {
+		renderInspector();
+		expect(
+			screen.getByText(
+				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
+			),
+		).toBeDefined();
+		expect(
+			screen.queryByText(/pengukuran browser yang terverifikasi/i),
+		).toBeNull();
+	});
+});
+
 describe("phase 6 inspector overhaul", () => {
 	it("collapses provenance into a compact disclosure instead of a long banner", () => {
 		renderInspector();
@@ -591,7 +617,11 @@ describe("phase 6 inspector overhaul", () => {
 			screen.queryByText(/bukan klaim brand yang belum terbukti/i),
 		).toBeNull();
 		expect(screen.getByText(/tentang analisis/i)).toBeDefined();
-		expect(screen.getByText(/pengukuran browser/i)).toBeDefined();
+		expect(
+			screen.getByText(
+				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
+			),
+		).toBeDefined();
 	});
 
 	it("renders spacing bars with a high-contrast fill and a zero indicator", () => {

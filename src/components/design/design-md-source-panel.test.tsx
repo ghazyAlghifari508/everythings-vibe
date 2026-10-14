@@ -97,6 +97,38 @@ describe("DesignMdSourcePanel", () => {
 		expect(onImplementAgent).toHaveBeenCalledTimes(1);
 	});
 
+	it("states incomplete AI analysis only when enrichment is unavailable", () => {
+		const { rerender } = render(
+			<DesignMdSourcePanel
+				designMd={DESIGN_MD}
+				domain="acme.example"
+				onImplementAgent={vi.fn()}
+				inspectorSource="observed"
+				enrichment="unavailable"
+				enrichmentDetail="Model timeout."
+			/>,
+		);
+		expect(
+			screen.getAllByText(/analisis ai belum lengkap/i).length,
+		).toBeGreaterThan(0);
+		expect(
+			screen.queryByText(/pengukuran lengkap tanpa narasi ai/i),
+		).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /coba lagi|retry/i }),
+		).toBeNull();
+		rerender(
+			<DesignMdSourcePanel
+				designMd={DESIGN_MD}
+				domain="acme.example"
+				onImplementAgent={vi.fn()}
+				inspectorSource="observed"
+				enrichment="applied"
+			/>,
+		);
+		expect(screen.queryByText(/analisis ai belum lengkap/i)).toBeNull();
+	});
+
 	it("switches between rendered markdown and raw source", () => {
 		const { container } = renderPanel();
 		expect(screen.getByRole("tab", { name: /rendered/i })).toBeDefined();

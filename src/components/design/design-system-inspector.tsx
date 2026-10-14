@@ -55,7 +55,7 @@ const PALETTE_GROUP_LABELS: Record<PaletteGroupKey, string> = {
 	accent: "Aksen",
 	neutral: "Netral",
 	semantic: "Semantik",
-	other: "Belum terklasifikasi",
+	other: "Warna lainnya",
 };
 
 const PALETTE_GROUP_ORDER: PaletteGroupKey[] = [
@@ -586,7 +586,7 @@ export function DesignSystemInspector({
 						)}
 						<span>
 							{model.verification === "observed"
-								? "Pengukuran browser yang terverifikasi. Peran mengikuti pemakaian elemen yang terukur."
+								? "Analisis berdasarkan tampilan website yang berhasil diperiksa."
 								: "Hasil lama belum terverifikasi terhadap evidence browser. Nilai di bawah adalah hasil parsing dokumen arsip, bukan pengukuran."}
 						</span>
 					</p>
