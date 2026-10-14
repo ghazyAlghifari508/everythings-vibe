@@ -119,8 +119,7 @@ export function CrawlResult({
 			<header className="space-y-4">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div className="min-w-0">
-						<p className="text-xs text-fog">← Kembali ke hasil scrape</p>
-						<h1 className="mt-1 text-2xl font-semibold text-snow">
+						<h1 className="text-2xl font-semibold text-snow">
 							Website Blueprint
 						</h1>
 						<a

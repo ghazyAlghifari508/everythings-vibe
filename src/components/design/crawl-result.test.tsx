@@ -161,3 +161,16 @@ describe("CrawlResult async page arrival", () => {
 		expect(screen.queryByText("Skipped")).toBeNull();
 	});
 });
+
+describe("CrawlResult back navigation", () => {
+	it("renders no duplicate back link inside the result component", () => {
+		render(
+			<CrawlResult
+				pages={[page("a", "https://example.test/a", "First")]}
+				sourceUrl="https://example.test/"
+			/>,
+		);
+		expect(screen.queryByText(/kembali ke hasil scrape/i)).toBeNull();
+		expect(screen.queryByRole("link", { name: /^kembali$/i })).toBeNull();
+	});
+});
