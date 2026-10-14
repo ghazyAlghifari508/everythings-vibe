@@ -68,6 +68,25 @@ export function validateBlueprint(
 			ok: false,
 			error: "Jumlah label navigasi harus sama dengan destinasi.",
 		};
+	const { destinations, ordering } = parsed.data.navigationContract;
+	if (ordering.length !== destinations.length)
+		return {
+			ok: false,
+			error: "Urutan navigasi harus memuat semua destinasi.",
+		};
+	if (new Set(ordering).size !== ordering.length)
+		return {
+			ok: false,
+			error: "Urutan navigasi tidak boleh duplikat.",
+		};
+	if (
+		!ordering.every((entry) => destinations.includes(entry)) ||
+		!destinations.every((entry) => ordering.includes(entry))
+	)
+		return {
+			ok: false,
+			error: "Urutan navigasi harus menjadi permutasi destinasi.",
+		};
 	const orders = parsed.data.screenPlan.map((s) => s.order);
 	if (new Set(orders).size !== orders.length)
 		return { ok: false, error: "Order screen harus unik dan berurutan." };

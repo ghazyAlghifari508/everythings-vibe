@@ -36,7 +36,8 @@ const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Experience
 - Keep body text at 14px-16px with comfortable line height so it stays readable at the captured ${STUDIO_VISUAL_WIDTH.mobile}px width.
 - Size sections with padding, gaps, and min-height instead of fixed pixel heights, so the page never looks stretched or squashed when captured.
 - Preserve true document height: images keep aspect ratio with max-width: 100% and height auto.
-- Use the same navigation structure, icon family, and design tokens on every screen of this application.`;
+- Use the same navigation structure, icon family, and design tokens on every screen of this application.
+- Keep exactly one bottom tab <nav> containing every destination label in blueprint order; do not duplicate the full tab set in a second <nav>.`;
 
 const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Web Application Experience.
 - Design for desktop browsers at a ${STUDIO_VISUAL_WIDTH.web}px wide viewport while maintaining smooth responsive adaptation to tablet and mobile.
@@ -48,6 +49,7 @@ export const STUDIO_SYSTEM_PROMPT = `You are an expert front-end builder generat
 
 Output contract (non-negotiable):
 - Return ONE complete standalone HTML document. No explanations, no markdown fences, no commentary outside the HTML.
+- Open with <!DOCTYPE html>/<html> and close with </body></html>; never leave fence markers, markdown artifacts, or explanatory prose inside or outside the document. When demonstrating code, use <pre><code> blocks.
 - Use complete inline CSS in a <style> block, with semantic design tokens as CSS variables. No build step is needed. Legacy Tailwind CSS via cdn.tailwindcss.com can be exported, but new visual screens must not require a script to become visible.
 - Use modern typography (system font stack or Google Fonts link), semantic sections, cards, grids, and realistic Indonesian copy (Bahasa Indonesia) with believable dummy data.
 - Icons must be inline SVG. No emojis in the UI.
