@@ -106,6 +106,52 @@ describe("StudioSkillSelect", () => {
 		];
 		expect(ids).toContain(onChange.mock.calls[0][0]);
 	});
+
+	it("renders bundled authentic logos for skills that ship one", async () => {
+		render(<StudioSkillSelect value="none" onChange={vi.fn()} />);
+		openMenu(/Design skill: No Skill/i);
+		await waitFor(() => {
+			expect(
+				screen.getByRole("menuitemradio", { name: /Impeccable/i }),
+			).toBeDefined();
+		});
+		const impeccableLogo = document.querySelector(
+			'img[src="/icons/skills/impeccable.svg"]',
+		);
+		const tasteLogo = document.querySelector(
+			'img[src="/icons/skills/taste.png"]',
+		);
+		expect(impeccableLogo).not.toBeNull();
+		expect(tasteLogo).not.toBeNull();
+		expect(impeccableLogo?.getAttribute("alt")).toBe("Logo Impeccable");
+		expect(tasteLogo?.getAttribute("alt")).toBe("Logo Taste");
+		expect(impeccableLogo?.getAttribute("class")).toContain("object-contain");
+	});
+
+	it("falls back to distinct restrained icons when no official logo exists", async () => {
+		render(<StudioSkillSelect value="none" onChange={vi.fn()} />);
+		openMenu(/Design skill: No Skill/i);
+		await waitFor(() => {
+			expect(
+				screen.getByRole("menuitemradio", { name: /Impeccable/i }),
+			).toBeDefined();
+		});
+		expect(document.querySelectorAll("img")).toHaveLength(2);
+		const fallbackLabels = [
+			"No Skill",
+			"Frontend Design",
+			"UI UX Pro Max",
+			"Anti-Slop",
+		];
+		for (const label of fallbackLabels) {
+			const item = screen
+				.getAllByRole("menuitemradio")
+				.find((radio) => radio.textContent?.includes(label));
+			expect(item, `menu item for ${label}`).toBeDefined();
+			expect(item?.querySelector("img")).toBeNull();
+			expect(item?.querySelector("svg")).not.toBeNull();
+		}
+	});
 });
 
 describe("StudioPageCountSelect", () => {
