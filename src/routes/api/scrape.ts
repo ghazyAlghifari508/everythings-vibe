@@ -11,6 +11,7 @@ import {
 	deleteScrape,
 	getScrapeById,
 	listScrapes,
+	retryDesignSynthesis,
 	retryScrape,
 	type ScrapeDetailPayload,
 } from "@/lib/services/scrape-service";
@@ -131,6 +132,23 @@ export async function POST({
 			) {
 				await retryScrape(candidate.scrapeId, user.id);
 				return Response.json({ ok: true, scrapeId: candidate.scrapeId });
+			}
+			// AI-only enrichment retry from persisted evidence: no recapture,
+			// no new credit charge. Owner scope, rate limit and replay
+			// protection live in the service.
+			if (
+				candidate.action === "retry-enrichment" &&
+				typeof candidate.scrapeId === "string"
+			) {
+				const document = await retryDesignSynthesis(
+					candidate.scrapeId,
+					user.id,
+				);
+				return Response.json({
+					ok: true,
+					scrapeId: candidate.scrapeId,
+					documentId: document.id,
+				});
 			}
 
 			const parsed = scrapeRequestSchema.safeParse(body);

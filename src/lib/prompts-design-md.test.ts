@@ -91,6 +91,51 @@ const evidence: VisualEvidence = {
 	limitations: [],
 };
 
+it("forwards the captured title instead of a generic heading", async () => {
+	const { document, model } = await generateDesignMd(
+		evidence,
+		undefined,
+		undefined,
+		{
+			title: "Acme Corp",
+		},
+	);
+	expect(model.title).toBe("Acme Corp");
+	expect(document).toContain("# Acme Corp - Style Reference");
+});
+
+it("codes a provider failure and redacts the raw message", async () => {
+	mocks.tryStreamWithFallback.mockRejectedValue(
+		new Error("upstream 500: secret-key project-123 exploded"),
+	);
+	const result = await generateDesignMd(evidence, instrumentation);
+	expect(result.enrichment.status).toBe("unavailable");
+	expect(result.enrichment.cause).toBe("provider");
+	expect(result.enrichment.detail).not.toContain("upstream 500");
+	expect(result.enrichment.detail).not.toContain("secret-key");
+	expect(result.document).not.toContain("upstream 500");
+});
+
+it("codes a watchdog timeout distinctly", async () => {
+	mocks.tryStreamWithFallback.mockRejectedValue(
+		new Error("AI tidak merespons dalam 2 menit. Coba generate ulang."),
+	);
+	const result = await generateDesignMd(evidence, instrumentation);
+	expect(result.enrichment.status).toBe("unavailable");
+	expect(result.enrichment.cause).toBe("timeout");
+});
+
+it("propagates a midstream abort instead of degrading it", async () => {
+	const controller = new AbortController();
+	mocks.tryStreamWithFallback.mockImplementation(async () => {
+		controller.abort();
+		throw new Error("AI stream aborted");
+	});
+	await expect(
+		generateDesignMd(evidence, instrumentation, controller.signal),
+	).rejects.toMatchObject({ code: "AI_GENERATION_FAILED" });
+});
+
 it("renders a measured document from the structured model without any AI step", async () => {
 	const { document, model } = await generateDesignMd(evidence);
 	expect(document).toContain("## Tokens - Colors");

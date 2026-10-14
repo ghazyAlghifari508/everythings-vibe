@@ -18,7 +18,10 @@ import {
 import {
 	buildSynthesisInstruction,
 	buildSynthesisPayload,
+	classifySynthesisCause,
+	enrichmentDetailForCause,
 	parseSynthesisResponse,
+	type SynthesisCause,
 	type SynthesisOutcome,
 	synthesisToRenderOptions,
 } from "./design-synthesis";
@@ -32,6 +35,13 @@ export const DESIGN_SYSTEM_PROMPT =
 export interface DesignMdEnrichment {
 	status: "applied" | "unavailable";
 	detail?: string;
+	/** Typed failure cause, safe to persist and return to the client. */
+	cause?: SynthesisCause;
+}
+
+export interface GenerateDesignMdOptions {
+	/** Captured page title forwarded into the model instead of a generic heading. */
+	title?: string;
 }
 
 export interface GeneratedDesignMd {
@@ -54,6 +64,7 @@ export async function generateDesignMd(
 	evidence: VisualEvidence,
 	instrumentation?: ScrapeInstrumentation,
 	signal?: AbortSignal,
+	options?: GenerateDesignMdOptions,
 ): Promise<GeneratedDesignMd> {
 	const parsed = visualEvidenceSchema.safeParse(evidence);
 	if (!parsed.success || !parsed.data.elements.length)
@@ -62,7 +73,10 @@ export async function generateDesignMd(
 			"Evidence visual tidak tersedia.",
 		);
 	await instrumentation?.onActivity?.("Menormalkan evidence visual");
-	const model = buildDesignModel(parsed.data);
+	const model = buildDesignModel(
+		parsed.data,
+		options?.title ? { title: options.title } : {},
+	);
 
 	// Without instrumentation there is no AI step at all, so the measured model
 	// produces the document on its own.
@@ -80,12 +94,22 @@ export async function generateDesignMd(
 		instrumentation,
 		signal,
 	);
-	const options = synthesis.synthesis
+	const renderOptions = synthesis.synthesis
 		? synthesisToRenderOptions(synthesis.synthesis, model)
 		: {};
+	// A rejected citation names the fabrication it caught, so it is never
+	// rendered verbatim: the document carries a fixed safe line while the
+	// diagnostic detail stays in the enrichment result only.
+	const renderDetail =
+		synthesis.status === "unavailable"
+			? synthesis.cause === "unknown_reference"
+				? enrichmentDetailForCause("unknown_reference")
+				: synthesis.detail
+			: undefined;
 	const document = renderModelDesignMd(model, {
-		...options,
+		...renderOptions,
 		enrichmentUnavailable: synthesis.status === "unavailable",
+		enrichmentDetail: renderDetail,
 	});
 	await instrumentation.onActivity?.(
 		"Memvalidasi kesesuaian DESIGN.md dan evidence",
@@ -97,7 +121,11 @@ export async function generateDesignMd(
 		enrichment:
 			synthesis.status === "applied"
 				? { status: "applied" }
-				: { status: "unavailable", detail: synthesis.detail },
+				: {
+						status: "unavailable",
+						detail: synthesis.detail,
+						cause: synthesis.cause,
+					},
 		model,
 	};
 }
@@ -145,17 +173,22 @@ async function synthesizeWithEvidence(
 		}
 		return parseSynthesisResponse(response, model, extractJson, stream.outcome);
 	} catch (error) {
-		if (signal?.aborted) throw error;
-		const raw =
-			error instanceof Error && error.message
-				? error.message
-				: "AI synthesis tidak tersedia.";
-		const cause = /abort|batal/i.test(raw) ? "cancelled" : "provider";
+		// A cancelled job stops the pipeline instead of degrading into a
+		// measurement-only document, and the throw is normalized so callers
+		// always see a typed contract error for cancellations.
+		if (signal?.aborted)
+			throw error instanceof ScrapeError
+				? error
+				: new ScrapeError("AI_GENERATION_FAILED", "Generation dibatalkan.");
+		const cause = classifySynthesisCause(error, signal);
 		return {
 			synthesis: null,
 			status: "unavailable",
-			detail: raw.slice(0, DESIGN_SYNTHESIS_DETAIL_MAX_CHARS),
-			cause: cause as SynthesisOutcome["cause"],
+			detail: enrichmentDetailForCause(cause).slice(
+				0,
+				DESIGN_SYNTHESIS_DETAIL_MAX_CHARS,
+			),
+			cause,
 		};
 	}
 }

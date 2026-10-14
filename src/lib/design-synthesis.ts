@@ -297,7 +297,53 @@ export type SynthesisCause =
 	| "schema"
 	| "unknown_reference"
 	| "provider"
+	| "timeout"
 	| "cancelled";
+
+// Maps a synthesis failure to its typed cause from code evidence, never from
+// guessing. Timeouts come from the watchdog messages the AI client actually
+// throws; cancellations from an aborted signal or an abort report.
+export function classifySynthesisCause(
+	error: unknown,
+	signal?: AbortSignal,
+): SynthesisCause {
+	if (signal?.aborted) return "cancelled";
+	const raw = error instanceof Error ? error.message : String(error ?? "");
+	if (/abort|batal/i.test(raw)) return "cancelled";
+	if (
+		/tidak merespons|melebihi batas waktu|timeout|timed out|ETIMEDOUT|deadline/i.test(
+			raw,
+		)
+	)
+		return "timeout";
+	return "provider";
+}
+
+// The stored detail for a failure cause. Fixed strings only: the raw provider
+// message is never persisted or returned, so upstream internals cannot leak to
+// the client. Validation details are safe to keep because they only name model
+// indices the document already contains.
+export function enrichmentDetailForCause(
+	cause: SynthesisCause,
+	safeDetail?: string,
+): string {
+	switch (cause) {
+		case "truncated":
+			return "AI memotong respons karena batas token.";
+		case "invalid_json":
+			return "AI tidak mengembalikan JSON yang valid.";
+		case "schema":
+			return "AI tidak memenuhi kontrak sintesis design system.";
+		case "unknown_reference":
+			return safeDetail ?? "AI merujuk evidence yang tidak tersedia.";
+		case "timeout":
+			return "AI synthesis melampaui batas waktu.";
+		case "cancelled":
+			return "Generation dibatalkan.";
+		default:
+			return "AI synthesis tidak tersedia.";
+	}
+}
 
 export interface SynthesisOutcome {
 	synthesis: DesignSynthesis | null;

@@ -147,6 +147,12 @@ export interface RenderDesignMdOptions {
 	implementationGuidance?: string[];
 	/** True when the AI synthesis step did not run or did not succeed. */
 	enrichmentUnavailable?: boolean;
+	/**
+	 * Safe failure detail rendered as a limitation, so the cause survives
+	 * persistence and reload inside the document. Must only carry fixed safe
+	 * strings, never a raw provider message.
+	 */
+	enrichmentDetail?: string;
 }
 
 export function renderDesignMd(
@@ -554,11 +560,14 @@ export function renderDesignMd(
 		"",
 		"Measurements are observed; semantic classifications are inferred from measured usage. Missing evidence is reported as unknown rather than estimated.",
 	);
-	if (options.enrichmentUnavailable)
+	if (options.enrichmentUnavailable) {
 		lines.push(
 			"",
 			"The AI synthesis step did not produce a narrative for this capture. The measured tokens below are complete and unaffected.",
 		);
+		if (options.enrichmentDetail?.trim())
+			lines.push(`- ${escapeCell(options.enrichmentDetail.trim())}`);
+	}
 	for (const limitation of model.limitations)
 		lines.push(`- ${escapeCell(limitation)}`);
 
