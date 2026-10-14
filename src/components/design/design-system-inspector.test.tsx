@@ -674,6 +674,45 @@ describe("task E inspector composition", () => {
 	});
 });
 
+describe("task F static readability", () => {
+	it("exposes spacing and radius previews to assistive tech in any theme", () => {
+		renderInspector({
+			...MODEL,
+			spacing: [
+				{ label: "Celah", value: "16px", context: "gap", frequency: 3 },
+			],
+			radii: [
+				{
+					label: "Buttons",
+					value: "8px",
+					valuePx: 8,
+					context: "",
+					frequency: 2,
+				},
+			],
+		});
+		expect(screen.getByRole("img", { name: "Celah 16px" })).toBeDefined();
+		expect(screen.getByRole("img", { name: "Buttons 8px" })).toBeDefined();
+	});
+
+	it("wraps long color tokens instead of clipping them", () => {
+		const { container } = renderInspector(
+			paletteModel([
+				color({
+					name: "Panjang",
+					value: "#123456",
+					token: "--color-contoh-token-yang-sangat-panjang-sekali",
+					role: "Contoh peran",
+					roleClass: "unknown",
+				}),
+			]),
+		);
+		expect(container.querySelector(".break-all")?.textContent).toContain(
+			"--color-contoh-token-yang-sangat-panjang-sekali",
+		);
+	});
+});
+
 describe("task D ambiguous copy", () => {
 	it("labels unclassified colors as other colors", () => {
 		renderInspector(paletteModel([AMBIGUOUS_COLOR]));

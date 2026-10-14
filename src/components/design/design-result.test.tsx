@@ -213,6 +213,17 @@ describe("DesignResult", () => {
 		).toBe(true);
 	});
 
+	it("keeps responsive containers from overflowing narrow viewports", () => {
+		const { container } = renderResult();
+		expect(container.querySelector(".min-w-0.w-full")).toBeTruthy();
+		expect(container.querySelector(".overflow-x-auto")).toBeTruthy();
+		const mobileTabs = screen.getAllByRole("tab", {
+			name: /inspector|design\.md/i,
+		});
+		for (const tab of mobileTabs.slice(0, 2))
+			expect((tab as HTMLElement).className).toMatch(/min-h-\[44px\]/);
+	});
+
 	it("keeps the two-column composition with a sticky source panel", () => {
 		const { container } = renderResult();
 		expect(
