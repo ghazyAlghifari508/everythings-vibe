@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	codebaseSnapshots,
@@ -7,7 +7,10 @@ import {
 	codebases,
 	subscriptions,
 } from "@/db/schema";
-import { normalizeRepositoryName } from "@/lib/codebase-library";
+import {
+	normalizeRepositoryName,
+	PROVISIONAL_CODEBASE_NAME,
+} from "@/lib/codebase-library";
 import {
 	compareRepositoryIdentity,
 	normalizeRepositoryIdentity,
@@ -120,6 +123,8 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 					.select({
 						id: codebases.id,
 						userId: codebases.userId,
+						name: codebases.name,
+						nameSource: codebases.nameSource,
 						repositoryIdentity: codebases.repositoryIdentity,
 					})
 					.from(codebases)
@@ -272,7 +277,11 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 					// and is never overwritten. Ownership is repeated in the
 					// predicate, and the name inequality makes a repeat sync a
 					// no-op for naming instead of a second write.
-					if (repositoryName) {
+					const identityAllowsNameUpdate =
+						!repositoryIdentity ||
+						identityComparison.matches ||
+						identityComparison.adoptable;
+					if (repositoryName && identityAllowsNameUpdate) {
 						await tx
 							.update(codebases)
 							.set({ name: repositoryName, updatedAt: new Date() })
@@ -280,7 +289,10 @@ export const Route = createFileRoute("/api/v1/codebases/$id/codebase/sync")({
 								and(
 									eq(codebases.id, codebaseId),
 									eq(codebases.userId, session.userId),
-									eq(codebases.nameSource, "auto"),
+									or(
+										eq(codebases.nameSource, "auto"),
+										eq(codebases.name, PROVISIONAL_CODEBASE_NAME),
+									),
 									ne(codebases.name, repositoryName),
 								),
 							);

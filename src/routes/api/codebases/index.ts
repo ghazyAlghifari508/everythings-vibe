@@ -10,14 +10,16 @@ import {
 	codebases,
 } from "@/db/schema";
 import type { CodebaseNameSource } from "@/lib/codebase-library";
-import { PROVISIONAL_CODEBASE_NAME } from "@/lib/codebase-library";
+import {
+	normalizeRepositoryName,
+	PROVISIONAL_CODEBASE_NAME,
+} from "@/lib/codebase-library";
 import { buildSyncCommand, type SyncPromptPayload } from "@/lib/codebase-sync";
 import { generateSyncToken, hashSyncToken } from "@/lib/codebase-sync.server";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
 } from "@/lib/constants";
-import { deriveProjectNameSync } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 
 export const DEFAULT_CODEBASE_NAME = PROVISIONAL_CODEBASE_NAME;
@@ -25,11 +27,9 @@ export const DEFAULT_CODEBASE_NAME = PROVISIONAL_CODEBASE_NAME;
 /**
  * Decide a codebase's display name and where that name came from.
  *
- * Provenance matters because the CLI later reports the repository folder name at
- * sync handshake and may replace a name only while the system chose it. A name
- * the user supplied — typed directly, derived from their composer message, or
- * later set through the rename endpoint — is marked `user` and never
- * auto-detected over. Only the untouched placeholder is marked `auto`.
+ * Provenance matters because the CLI later reports the repository folder name
+ * at sync handshake. An explicit name or rename is user-owned; a `message`
+ * describes feature intent and must never become repository identity.
  */
 export function validateCodebaseNameInput(
 	body:
@@ -43,27 +43,17 @@ export function validateCodebaseNameInput(
 	| { ok: true; name: string; nameSource: CodebaseNameSource }
 	| { ok: false; error: string } {
 	const rawName = typeof body?.name === "string" ? body.name.trim() : "";
-	const rawMessage = typeof body?.message === "string" ? body.message : "";
-
 	if (!rawName) {
-		if (rawMessage) {
-			const derived = deriveProjectNameSync(rawMessage);
-			if (derived && derived.length >= 3)
-				return { ok: true, name: derived, nameSource: "user" };
-			return {
-				ok: false,
-				error: "Nama codebase harus diisi minimal 3 karakter",
-			};
-		}
 		return { ok: true, name: DEFAULT_CODEBASE_NAME, nameSource: "auto" };
 	}
-	if (rawName.length < 3) {
+	const normalizedName = normalizeRepositoryName(rawName);
+	if (!normalizedName) {
 		return {
 			ok: false,
-			error: "Nama codebase harus diisi minimal 3 karakter",
+			error: "Nama codebase tidak valid",
 		};
 	}
-	return { ok: true, name: rawName, nameSource: "user" };
+	return { ok: true, name: normalizedName, nameSource: "user" };
 }
 
 export const Route = createFileRoute("/api/codebases/")({
