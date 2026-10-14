@@ -656,7 +656,7 @@ describe("syncCodebase repository naming", () => {
 });
 
 describe("syncCodebase repository identity", () => {
-	it("reports the normalized Git remote identity at handshake", async () => {
+	it("uses the verified repository name and normalized Git identity at handshake", async () => {
 		const client = mockClient();
 		const root = trackRepo(
 			makeRepo({
@@ -676,11 +676,10 @@ describe("syncCodebase repository identity", () => {
 		expect(res.ok).toBe(true);
 		expect(client.handshakeWithRetry).toHaveBeenCalledWith(
 			"p1",
-			displayNameForFixtureRoot(root),
+			"Ocean Guard",
 			"github.com/owner/ocean-guard",
 		);
-		expect(res.repositoryName).toBe(displayNameForFixtureRoot(root));
-		expect(res.repositoryName).not.toBe("Ocean Guard");
+		expect(res.repositoryName).toBe("Ocean Guard");
 		expect(res.repositoryIdentity).toBe("github.com/owner/ocean-guard");
 	});
 

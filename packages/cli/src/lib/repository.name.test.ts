@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getRepositoryName } from "./repository.js";
+import {
+	getRepositoryName,
+	resolveRepositoryDisplayName,
+} from "./repository.js";
 
 describe("getRepositoryName", () => {
 	it("derives the folder name from a Windows repository root", () => {
@@ -48,5 +51,26 @@ describe("getRepositoryName", () => {
 		expect(name).not.toContain("/");
 		expect(name).not.toContain("\\");
 		expect(getRepositoryName("C:project")).toBeNull();
+	});
+});
+
+describe("resolveRepositoryDisplayName", () => {
+	it("uses the verified Git repository segment before a local clone folder", () => {
+		expect(
+			resolveRepositoryDisplayName(
+				"C:\\Coding\\local-copy",
+				"github.com/team/ocean-guard",
+			),
+		).toBe("Ocean Guard");
+	});
+
+	it("uses a valid folder name when Git identity is unavailable", () => {
+		expect(
+			resolveRepositoryDisplayName("C:\\Coding\\react-movie-app", null),
+		).toBe("React Movie App");
+	});
+
+	it("returns null when neither identity nor a valid root name exists", () => {
+		expect(resolveRepositoryDisplayName("C:\\", null)).toBeNull();
 	});
 });
