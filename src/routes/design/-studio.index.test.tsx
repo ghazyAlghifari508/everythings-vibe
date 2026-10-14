@@ -86,7 +86,7 @@ describe("StudioPage UI & Workflow", () => {
 			screen.getByPlaceholderText(/Jelaskan kebutuhan antarmukamu/i),
 		).toBeDefined();
 		expect(
-			screen.getByRole("button", { name: "Tambah referensi desain" }),
+			screen.getByRole("button", { name: "Pilih tampilan" }),
 		).toBeDefined();
 		expect(screen.getByRole("button", { name: "Kirim prompt" })).toBeDefined();
 		expect(
@@ -193,9 +193,7 @@ describe("StudioPage UI & Workflow", () => {
 		).component;
 		render(<StudioComponent />);
 
-		fireEvent.click(
-			screen.getByRole("button", { name: "Tambah referensi desain" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Pilih tampilan" }));
 
 		expect(screen.getByText("Pilih tampilan")).toBeDefined();
 		expect(screen.getByRole("tab", { name: "Tema" })).toBeDefined();
