@@ -59,10 +59,32 @@ describe("DesignMdSourcePanel", () => {
 
 	it("renders the authoritative source without changing whitespace", () => {
 		renderPanel();
-		const source = screen
-			.getByRole("region", { name: "Sumber DESIGN.md" })
-			.querySelector("#designmd-source-panel");
+		const sourceTab = screen.getByRole("tab", { name: /source/i });
+		const panelId = sourceTab.getAttribute("aria-controls") ?? "";
+		expect(panelId).toBeTruthy();
+		const source = document.getElementById(panelId);
 		expect(source?.textContent).toBe(DESIGN_MD);
+	});
+
+	it("uses unique tab and panel ids per instance", () => {
+		const first = renderPanel();
+		const second = render(
+			<DesignMdSourcePanel
+				designMd={DESIGN_MD}
+				domain="acme.example"
+				onImplementAgent={vi.fn()}
+			/>,
+		);
+		const tabs = screen.getAllByRole("tab", { name: /rendered|source/i });
+		expect(tabs.length).toBeGreaterThanOrEqual(4);
+		const ids = tabs.map((tab) => tab.getAttribute("id"));
+		expect(new Set(ids).size).toBe(ids.length);
+		for (const tab of tabs) {
+			const controls = tab.getAttribute("aria-controls") ?? "";
+			expect(document.getElementById(controls)).toBeTruthy();
+		}
+		first.unmount();
+		second.unmount();
 	});
 
 	it("copies DESIGN.md to the clipboard with feedback", async () => {
@@ -130,10 +152,16 @@ describe("DesignMdSourcePanel", () => {
 	});
 
 	it("switches between rendered markdown and raw source", () => {
-		const { container } = renderPanel();
+		renderPanel();
 		expect(screen.getByRole("tab", { name: /rendered/i })).toBeDefined();
-		const renderedPanel = container.querySelector("#designmd-rendered-panel");
-		const sourcePanel = container.querySelector("#designmd-source-panel");
+		const renderedTab = screen.getByRole("tab", { name: /rendered/i });
+		const sourceTab = screen.getByRole("tab", { name: /source/i });
+		const renderedPanel = document.getElementById(
+			renderedTab.getAttribute("aria-controls") ?? "",
+		);
+		const sourcePanel = document.getElementById(
+			sourceTab.getAttribute("aria-controls") ?? "",
+		);
 		expect(renderedPanel).toBeDefined();
 		expect(sourcePanel).toBeDefined();
 		expect((renderedPanel as HTMLElement).hidden).toBe(false);
@@ -146,5 +174,20 @@ describe("DesignMdSourcePanel", () => {
 				.getByRole("tab", { name: /source/i })
 				.getAttribute("aria-selected"),
 		).toBe("true");
+	});
+
+	it("moves focus with arrow keys between rendered and source tabs", () => {
+		renderPanel();
+		const renderedTab = screen.getByRole("tab", {
+			name: /rendered/i,
+		}) as HTMLElement;
+		const sourceTab = screen.getByRole("tab", {
+			name: /source/i,
+		}) as HTMLElement;
+		renderedTab.focus();
+		fireEvent.keyDown(renderedTab, { key: "ArrowRight" });
+		expect(document.activeElement).toBe(sourceTab);
+		fireEvent.keyDown(sourceTab, { key: "ArrowLeft" });
+		expect(document.activeElement).toBe(renderedTab);
 	});
 });

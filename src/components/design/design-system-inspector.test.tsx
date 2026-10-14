@@ -588,6 +588,92 @@ describe("palette gallery", () => {
 	});
 });
 
+describe("task E inspector composition", () => {
+	it("does not claim capped specimens keep cross-role ratios", () => {
+		const displayEntry = MODEL.typography[0];
+		if (!displayEntry) throw new Error("type scale fixture missing");
+		renderInspector({
+			...MODEL,
+			typefaces: [],
+			typography: [
+				{ ...displayEntry, role: "Display", size: "96px", sizePx: 96 },
+			],
+		});
+		expect(screen.getByText(/ukuran terukur 96px/i)).toBeDefined();
+		expect(screen.queryByText(/rasio antar peran tetap/i)).toBeNull();
+	});
+
+	it("treats mid-size radii as pills through the shared threshold", () => {
+		renderInspector({
+			...EMPTY_MODEL,
+			radii: [
+				{
+					label: "Buttons",
+					value: "150px",
+					valuePx: 150,
+					context: "",
+					frequency: 2,
+				},
+			],
+		});
+		const preview = screen.getByRole("img", { name: "Buttons 150px" });
+		expect((preview as HTMLElement).style.borderRadius).toBe("999px");
+	});
+
+	it("does not label surfaces from array position", () => {
+		renderInspector({
+			...MODEL,
+			surfaces: [
+				{ value: "#ffffff", level: 0, frequency: 3, roles: ["canvas"] },
+				{ value: "#f8f8f8", level: 1, frequency: 2, roles: ["section"] },
+				{ value: "#eeeeee", level: 2, frequency: 1, roles: ["card"] },
+			],
+		});
+		expect(screen.queryByText(/kanvas ·/i)).toBeNull();
+		expect(screen.queryByText(/sekunder ·/i)).toBeNull();
+		expect(screen.queryByText(/komponen ·/i)).toBeNull();
+		expect(screen.getByText(/level 0/i)).toBeDefined();
+	});
+
+	it("keeps surface labels outside arbitrary swatch backgrounds", () => {
+		const { container } = renderInspector({
+			...MODEL,
+			surfaces: [
+				{ value: "#ffffff", level: 0, frequency: 3, roles: ["canvas"] },
+				{ value: "#f8f8f8", level: 1, frequency: 2, roles: ["section"] },
+			],
+		});
+		const swatches = container.querySelectorAll('[style*="background-color"]');
+		for (const swatch of swatches) {
+			expect(swatch.textContent ?? "").not.toMatch(/#(?:[0-9a-f]{3,8})\b/i);
+		}
+	});
+
+	it("shows failure feedback instead of silently dropping a copy error", async () => {
+		vi.stubGlobal("navigator", {
+			clipboard: {
+				writeText: vi.fn(async () => {
+					throw new Error("denied");
+				}),
+			},
+		});
+		renderInspector(paletteModel([BRAND_COLOR]));
+		fireEvent.click(
+			screen.getByRole("button", { name: `Salin warna ${BRAND_COLOR.value}` }),
+		);
+		expect(await screen.findByText(/gagal menyalin/i)).toBeDefined();
+	});
+
+	it("displays letter-spacing without claiming it is applied", () => {
+		renderInspector();
+		const specimen = screen.getByText(
+			"Start free and upgrade when the team is ready.",
+		);
+		expect((specimen as HTMLElement).style.letterSpacing).toBe("");
+		expect(screen.getByText("48px · w700 · lh 1.1 · ls -2px")).toBeDefined();
+	});
+});
+
 describe("task D ambiguous copy", () => {
 	it("labels unclassified colors as other colors", () => {
 		renderInspector(paletteModel([AMBIGUOUS_COLOR]));
