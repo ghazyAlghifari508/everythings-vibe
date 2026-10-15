@@ -271,4 +271,30 @@ describe("StudioLaunchComposer", () => {
 		});
 		expect(onPrdChange).not.toHaveBeenCalled();
 	});
+
+	it("preserves prompt draft when an error is displayed", () => {
+		renderComposer({
+			prompt: "Draft prompt that user spent effort typing",
+			error: "Format PRD tidak didukung. Hanya file berekstensi .md yang didukung.",
+		});
+
+		const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+		expect(textarea.value).toBe("Draft prompt that user spent effort typing");
+		expect(screen.getByRole("alert")).toBeDefined();
+		expect(screen.getByText(/Format PRD tidak didukung/i)).toBeDefined();
+	});
+
+	it("disables submit and prevents duplicate submit while loading", () => {
+		const { onSubmit } = renderComposer({
+			prompt: "Desain sistem keuangan",
+			loading: true,
+		});
+
+		const submitBtn = screen.getByRole("button", { name: "Kirim prompt" });
+		expect(submitBtn).toHaveProperty("disabled", true);
+
+		const textarea = screen.getByRole("textbox");
+		fireEvent.keyDown(textarea, { key: "Enter" });
+		expect(onSubmit).not.toHaveBeenCalled();
+	});
 });
