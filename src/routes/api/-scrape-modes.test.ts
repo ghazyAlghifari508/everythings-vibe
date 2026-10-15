@@ -17,7 +17,8 @@ const mockCreateScrape = vi.fn();
 const mockRunScrapePipeline = vi.fn();
 const mockGetScrapeById = vi.fn();
 
-vi.mock("@/lib/services/scrape-service", () => ({
+vi.mock("@/lib/services/scrape-service", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/services/scrape-service")>()),
 	createScrape: (...args: unknown[]) => mockCreateScrape(...args),
 	runScrapePipeline: (...args: unknown[]) => mockRunScrapePipeline(...args),
 	getScrapeById: (...args: unknown[]) => mockGetScrapeById(...args),
