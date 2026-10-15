@@ -1184,6 +1184,9 @@ export const studioProjects = pgTable(
 			.default(1),
 		designSkillVersion: integer("design_skill_version"),
 		logoAssetId: text("logo_asset_id"),
+		prdContent: text("prd_content"),
+		prdFilename: text("prd_filename"),
+		prdContentHash: text("prd_content_hash"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),

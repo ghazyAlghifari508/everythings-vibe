@@ -34,6 +34,9 @@ describe("StudioCanvas", () => {
 		designBlueprintVersion: 1,
 		designSkillVersion: null,
 		logoAssetId: null,
+		prdContent: null,
+		prdFilename: null,
+		prdContentHash: null,
 		createdAt: new Date(),
 		updatedAt: new Date(),
 	};
