@@ -35,6 +35,7 @@ export interface ScrapeViewport {
 }
 
 export interface ScrapeCaptureMetadata {
+	screenshot?: string;
 	visualEvidence?: VisualEvidence;
 	attempt: number;
 	capturedAt: string;

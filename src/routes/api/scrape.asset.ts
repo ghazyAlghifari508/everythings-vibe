@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { db } from "@/db";
 import { rateLimits, scrapes, users } from "@/db/schema";
 import {
 	SCRAPE_ASSET_RATE_LIMIT,
@@ -14,6 +13,11 @@ import {
 	rewritePreviewModule,
 	verifyPreviewAssetCapability,
 } from "@/lib/preview-capabilities";
+import {
+	ImageStorageError,
+	readStoredScrapeImage,
+	validateStoredImage,
+} from "@/lib/services/scrape-image-storage";
 import { requireUser } from "@/lib/session";
 import { parseAndValidateFormat } from "@/lib/url-validator";
 
@@ -27,10 +31,11 @@ const ASSET_HEADERS: Record<string, string> = {
 	"Content-Security-Policy": "sandbox; default-src 'none'",
 	"Access-Control-Allow-Origin": "*",
 	"Access-Control-Expose-Headers":
-		"Accept-Ranges, Content-Range, Content-Length",
+		"Accept-Ranges, Content-Range, Content-Length, Retry-After",
 };
 
 interface AssetResult {
+	retryAfter?: string;
 	body: Buffer;
 	status: number;
 	contentType: string;
@@ -46,6 +51,12 @@ interface ByteRange {
 }
 
 export type AssetRouteDeps = {
+	now?: () => number;
+	readStoredScrapeImage?: (
+		userId: string,
+		scrapeId: string,
+		imageId: string,
+	) => Promise<{ body: Buffer; mimeType: string; byteLength: number } | null>;
 	secret?: string;
 	requireUser?: typeof requireUser;
 	getCapabilityOwner?: (
@@ -64,6 +75,7 @@ function assetWindowStart(now: Date): Date {
 }
 
 export async function allowAssetRequest(key: string): Promise<boolean> {
+	const { db } = await import("@/db");
 	try {
 		const [row] = await db
 			.insert(rateLimits)
@@ -81,8 +93,8 @@ export async function allowAssetRequest(key: string): Promise<boolean> {
 			})
 			.returning({ count: rateLimits.count });
 		return Boolean(row);
-	} catch {
-		return false;
+	} catch (cause) {
+		throw new Error("Asset rate limiter unavailable", { cause });
 	}
 }
 
@@ -90,6 +102,7 @@ async function getCapabilityOwner(
 	scrapeId: string,
 	ownerId: string,
 ): Promise<{ ownerId: string; active: boolean } | null> {
+	const { db } = await import("@/db");
 	const [row] = await db
 		.select({ scrapeId: scrapes.id, ownerId: scrapes.userId })
 		.from(scrapes)
@@ -172,6 +185,54 @@ function responseHeaders(contentType?: string): Headers {
 	return headers;
 }
 
+function assetError(
+	status: number,
+	code: string,
+	retryAfterSeconds?: number,
+): Response {
+	const headers = responseHeaders("application/json; charset=utf-8");
+	if (retryAfterSeconds !== undefined)
+		headers.set("Retry-After", String(retryAfterSeconds));
+	return new Response(
+		JSON.stringify({
+			error: {
+				code,
+				retryable:
+					retryAfterSeconds !== undefined ||
+					code === "REMOTE_TIMEOUT" ||
+					code === "REMOTE_FETCH_FAILED",
+				...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+			},
+		}),
+		{ status, headers },
+	);
+}
+
+function retrySeconds(
+	value: string | undefined,
+	now: number,
+): number | undefined {
+	if (!value) return undefined;
+	const seconds = /^\d+$/.test(value.trim())
+		? Number(value)
+		: Math.ceil((Date.parse(value) - now) / 1000);
+	return Number.isSafeInteger(seconds) && seconds >= 0 ? seconds : undefined;
+}
+
+function rateLimited(deps: AssetRouteDeps): Response {
+	const now = (deps.now ?? Date.now)();
+	return assetError(
+		429,
+		"PROXY_RATE_LIMITED",
+		Math.ceil(
+			(assetWindowStart(new Date(now)).getTime() +
+				SCRAPE_ASSET_RATE_WINDOW_S * 1000 -
+				now) /
+				1000,
+		),
+	);
+}
+
 export async function shapeAssetResponse(
 	target: string,
 	deps: AssetRouteDeps = {},
@@ -188,7 +249,13 @@ export async function shapeAssetResponse(
 	const loaded = await loader(target, {
 		maxBytes: SCRAPE_MAX_ASSET_BYTES,
 		range: options.range,
+	}).catch((error: unknown) => {
+		if (error instanceof ScrapeError) throw error;
+		return null;
 	});
+	if (!loaded) return assetError(502, "REMOTE_FETCH_FAILED");
+	if (loaded.body.length > SCRAPE_MAX_ASSET_BYTES)
+		return assetError(413, "ASSET_TOO_LARGE");
 	const headers = responseHeaders();
 	if (loaded.status === 416) {
 		headers.set("Accept-Ranges", loaded.acceptRanges ?? "bytes");
@@ -197,9 +264,19 @@ export async function shapeAssetResponse(
 		return new Response(null, { status: 416, headers });
 	}
 	if (loaded.status >= 400)
-		return new Response(null, { status: loaded.status, headers });
+		return assetError(
+			loaded.status,
+			loaded.status === 429
+				? "REMOTE_RATE_LIMITED"
+				: loaded.status === 401 || loaded.status === 403
+					? "REMOTE_ACCESS_DENIED"
+					: loaded.status === 404 || loaded.status === 410
+						? "REMOTE_NOT_FOUND"
+						: "REMOTE_HTTP_ERROR",
+			retrySeconds(loaded.retryAfter, (deps.now ?? Date.now)()),
+		);
 	const mime = safeMime(loaded.contentType, loaded.body, loaded.finalUrl);
-	if (!mime) return new Response(null, { status: 415, headers });
+	if (!mime) return assetError(415, "UNSUPPORTED_MIME");
 	const cap = options.capability;
 	const appOrigin = options.appOrigin ?? new URL(target).origin;
 	let body = loaded.body;
@@ -230,7 +307,7 @@ export async function shapeAssetResponse(
 			);
 			contentType = "text/javascript; charset=utf-8";
 		} catch {
-			return new Response(null, { status: 415, headers });
+			return assetError(415, "INVALID_MODULE");
 		}
 	}
 	headers.set("Content-Type", contentType);
@@ -260,37 +337,53 @@ export async function GET(
 		urls.length > 1 ||
 		(caps.length > 0 && urls.length > 0)
 	)
-		return new Response(null, { status: 400, headers: responseHeaders() });
+		return assetError(400, "INVALID_REQUEST");
 	const token = caps[0];
 	const targetValue = urls[0];
 	const headers = ctx.request.headers;
 	try {
 		if (token !== undefined) {
-			const capability = verifyPreviewAssetCapability(token, deps.secret);
-			if (!capability)
-				return new Response(null, { status: 401, headers: responseHeaders() });
+			const now = (deps.now ?? Date.now)();
+			const capability = verifyPreviewAssetCapability(token, deps.secret, {
+				now,
+				allowExpired: true,
+			});
+			if (!capability) return assetError(401, "CAPABILITY_INVALID");
+			if (capability.expiresAt <= now)
+				return assetError(401, "CAPABILITY_EXPIRED");
 			const owner = await (
 				deps.getCapabilityOwner ??
 				((id) => getCapabilityOwner(id, capability.ownerId))
 			)(capability.scrapeId);
 			if (!owner?.active || owner.ownerId !== capability.ownerId)
-				return new Response(null, { status: 401, headers: responseHeaders() });
+				return assetError(401, "OWNERSHIP_DENIED");
 			const allowed = await (deps.checkRateLimit ?? allowAssetRequest)(
 				`${capability.ownerId}:${capability.scrapeId}`,
 			);
-			if (!allowed)
-				return new Response(null, { status: 429, headers: responseHeaders() });
+			if (!allowed) return rateLimited(deps);
+			if (capability.imageId) {
+				const stored = await (
+					deps.readStoredScrapeImage ?? readStoredScrapeImage
+				)(capability.ownerId, capability.scrapeId, capability.imageId);
+				if (!stored) return assetError(404, "STORED_BYTES_MISSING");
+				if (stored.byteLength !== stored.body.length || !stored.body.length)
+					return assetError(502, "STORED_BYTES_INVALID");
+				const verified = validateStoredImage(stored.body, stored.mimeType);
+				const storedHeaders = responseHeaders(verified.mimeType);
+				storedHeaders.set("Content-Length", String(verified.byteLength));
+				return new Response(new Uint8Array(stored.body), {
+					headers: storedHeaders,
+				});
+			}
 			const range = parseByteRange(headers.get("range"));
-			if (range === false)
-				return new Response(null, { status: 416, headers: responseHeaders() });
+			if (range === false) return assetError(416, "INVALID_RANGE");
 			return await shapeAssetResponse(capability.target, deps, {
 				range: range ?? undefined,
 				capability,
 				appOrigin: url.origin,
 			});
 		}
-		if (!targetValue)
-			return new Response(null, { status: 400, headers: responseHeaders() });
+		if (!targetValue) return assetError(400, "INVALID_REQUEST");
 		const target = parseAndValidateFormat(targetValue).href;
 		const user = await (
 			deps.requireUser ?? ((requestHeaders) => requireUser(requestHeaders))
@@ -299,18 +392,30 @@ export async function GET(
 			ctx.request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			"local";
 		if (!(await (deps.checkRateLimit ?? allowAssetRequest)(ip)))
-			return new Response(null, { status: 429, headers: responseHeaders() });
+			return rateLimited(deps);
 		void user;
 		return await shapeAssetResponse(target, deps);
 	} catch (error) {
+		if (error instanceof ImageStorageError)
+			return assetError(
+				error.assetCode === "IMAGE_TOO_LARGE" ? 413 : 415,
+				error.assetCode === "IMAGE_TOO_LARGE"
+					? "ASSET_TOO_LARGE"
+					: "UNSUPPORTED_MIME",
+			);
 		if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message))
-			return new Response(null, { status: 401, headers: responseHeaders() });
-		const status =
-			error instanceof ScrapeError &&
-			(error.code === "INVALID_URL" || error.code === "PRIVATE_URL_BLOCKED")
-				? 400
-				: 502;
-		return new Response(null, { status, headers: responseHeaders() });
+			return assetError(401, "AUTHENTICATION_REQUIRED");
+		if (error instanceof ScrapeError) {
+			if (error.code === "INVALID_URL" || error.code === "PRIVATE_URL_BLOCKED")
+				return assetError(400, "URL_BLOCKED");
+			if (error.code === "FETCH_TIMEOUT" || error.code === "JOB_TIMEOUT")
+				return assetError(504, "REMOTE_TIMEOUT");
+			if (error.code === "WEBSITE_BLOCKED")
+				return assetError(502, "REMOTE_REDIRECT_BLOCKED");
+			if (error.code === "NO_ANALYZABLE_CONTENT")
+				return assetError(413, "ASSET_TOO_LARGE");
+		}
+		return assetError(502, token ? "ASSET_READ_FAILED" : "REMOTE_FETCH_FAILED");
 	}
 }
 
