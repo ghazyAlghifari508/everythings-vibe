@@ -4,7 +4,7 @@
 
 - Backend `43083ea` stores validated image bytes in PostgreSQL; proxy `bca1522` serves signed private image identities.
 - Required migration: `drizzle/0036_clammy_darkstar.sql`. It creates `scrape_image_assets` with byte-length integrity, owner/scrape/hash deduplication and cascading deletion; adds nullable asset and failure evidence columns to `scrape_images`.
-- Deployment must reconcile the known existing migration-history collision before applying 0036. This integration did not execute migrations or alter migration history.
+- Backend-agent migration evidence: the local ledger ends at 0033 (hash prefix `79d69...`, timestamp `1791763331875`), but `studio_assets` already exists while 0034 remains pending. Normal migration therefore fails with PostgreSQL `42P07` (duplicate relation) at 0034, before 0036. A clean transaction replay of 0000–0036 passed. No existing database or migration-history modifications were made; deployment requires reconciling this pre-existing ledger/schema mismatch.
 - Legacy completed rows without `assetId` remain remote links. Verification is historical evidence, not a guarantee of current remote availability. No automatic backfill is performed.
 - Stored identities use the image row ID, scrape ID and owner ID. Preview and download use the signed same-origin asset URL; opening the original URL is a separate explicit action.
 
