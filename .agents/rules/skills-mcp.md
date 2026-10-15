@@ -1,6 +1,6 @@
 # everythings-vibe — Skills, MCP & Plugins Rules (MANDATORY)
 
-> **Source of truth:** `AGENTS.md` + `.opencode/rules/*` + `docs/` (locked stack and scope).
+> **Source of truth:** `AGENTS.md` + `.agents/rules/*` + `docs/` (locked stack and scope).
 > This rule defines which skills, MCPs, and plugins are relevant to
 > everythings-vibe, when to invoke them, and how to keep the boundary. Do not
 > hardcode providers, models, credit policy, or credentials; do not bypass a

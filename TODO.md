@@ -497,13 +497,13 @@ Seringkali AI coding assistant (agent) bertindak malas atau memilih jalan pintas
 - Menulis kode monster hingga ribuan baris dalam 1 file karena tidak mau repot memecah komponen.
 - Meninggalkan file coba-coba, sisa prototipe, export yang tidak dipakai, atau helper yatim (*deathcode*).
 - Menaruh file test di dalam folder routing dengan prefiks `-` sembarangan.
-**Tujuan:** Merumuskan aturan tertulis yang mengikat (*mandatory execution contract*) di `.opencode/rules/` dan `AGENTS.md` agar setiap agent yang bekerja pada repositori ini wajib mematuhi arsitektur yang bersih.
+**Tujuan:** Merumuskan aturan tertulis yang mengikat (*mandatory execution contract*) di `.agents/rules/` dan `AGENTS.md` agar setiap agent yang bekerja pada repositori ini wajib mematuhi arsitektur yang bersih.
 
 ---
 
-### 7.2. Rencana Pembuatan File Aturan: `.opencode/rules/architecture-folder-structure.md`
+### 7.2. Rencana Pembuatan File Aturan: `.agents/rules/architecture-folder-structure.md`
 
-Aturan ini akan memuat 5 Kontrak Wajib Agen:
+Aturan ini memuat 5 Kontrak Wajib Agen:
 
 #### 1. Kontrak Penempatan Kode (Strict Feature Colocation)
 * Setiap pembuatan komponen, hook, helper, atau service baru **WAJIB** dimasukkan ke dalam folder fiturnya di `src/features/<feature-name>/`.
@@ -532,12 +532,12 @@ Aturan ini akan memuat 5 Kontrak Wajib Agen:
 ---
 
 ### 7.3. Checklist Implementasi Aturan Agent
-- [ ] Buat file aturan baru: `.opencode/rules/architecture-folder-structure.md` yang memuat kontrak di atas secara komprehensif.
-- [ ] Perbarui `AGENTS.md`:
-  - [ ] Tambahkan tautan `.opencode/rules/architecture-folder-structure.md` ke dalam daftar *Always Read / Router Rules*.
-  - [ ] Tambahkan pasal larangan file monster (> 400 baris) dan larangan menumpuk file test di `src/routes/`.
-- [ ] Perbarui `.opencode/rules/basic-rules.md`:
-  - [ ] Perbarui peta direktori target dari layer-based ke `src/features/`.
+- [x] Buat file aturan baru: `.agents/rules/architecture-folder-structure.md` yang memuat kontrak di atas secara komprehensif.
+- [x] Perbarui `AGENTS.md`:
+  - [x] Tambahkan tautan `.agents/rules/architecture-folder-structure.md` ke dalam daftar *Always Read / Router Rules*.
+  - [x] Tambahkan pasal larangan file monster (> 400 baris) dan larangan menumpuk file test di `src/routes/`.
+- [x] Perbarui `.agents/rules/basic-rules.md`:
+  - [x] Perbarui peta direktori target dari layer-based ke `src/features/`.
 - [ ] Integrasikan script audit dead code ke dalam command verifikasi lokal:
   - [ ] Tambahkan script `"audit:deadcode": "knip"` pada `package.json` agar mudah dijalankan oleh developer maupun agent sebelum handoff.
 

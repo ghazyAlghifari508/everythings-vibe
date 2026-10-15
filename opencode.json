@@ -1,15 +1,15 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": [
-    ".opencode/rules/basic-rules.md",
-    ".opencode/rules/no-assumptions.md",
-    ".opencode/rules/no-hardcode.md",
-    ".opencode/rules/no-type-bypass.md",
-    ".opencode/rules/anti-satisficing.md",
-    ".opencode/rules/anti-ai-slop.md",
-    ".opencode/rules/skills-mcp.md",
-    ".opencode/rules/architecture-folder-structure.md",
-    ".opencode/rules/vibe-everythings-context.md"
+    ".agents/rules/basic-rules.md",
+    ".agents/rules/no-assumptions.md",
+    ".agents/rules/no-hardcode.md",
+    ".agents/rules/no-type-bypass.md",
+    ".agents/rules/anti-satisficing.md",
+    ".agents/rules/anti-ai-slop.md",
+    ".agents/rules/skills-mcp.md",
+    ".agents/rules/architecture-folder-structure.md",
+    ".agents/rules/vibe-everythings-context.md"
   ],
   "mcp": {
     "supabase": {

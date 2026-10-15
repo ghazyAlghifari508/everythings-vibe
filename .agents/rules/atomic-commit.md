@@ -1,8 +1,8 @@
-# PRDFY - Atomic Commit & Git Discipline Rules (MANDATORY)
+# everythings-vibe — Atomic Commit & Git Discipline Rules (MANDATORY)
 
-> **Source of truth:** `AGENTS.md` + `.opencode/rules/basic-rules.md`.
+> **Source of truth:** `AGENTS.md` + `.agents/rules/basic-rules.md`.
 > This rule defines how AI agents, subagents, and human developers must manage
-> git commits and pushes in PRDFY. Never hoard code changes into lazy megacommits;
+> git commits and pushes in everythings-vibe. Never hoard code changes into lazy megacommits;
 > commit incrementally per logical concern, and always push before handoff.
 
 ---

@@ -23,6 +23,5 @@ todos.json
 playwright-report/
 test-results/
 
-# legacy Claude Code agent config (migrated to .opencode/)
+# legacy Claude Code agent config
 .claude/
-.agents/

@@ -4,7 +4,7 @@
 >
 > Repository-wide execution contract for AI/coding agents working on **everythings-vibe / VibeEverything**.
 >
-> Keep this file small. Detailed rules live in `.opencode/rules/` and remain authoritative.
+> Keep this file small. Detailed rules live in `.agents/rules/` and remain authoritative.
 
 ---
 
@@ -14,37 +14,37 @@
 
 Read fully to actual EOF before project work:
 
-- `.opencode/rules/basic-rules.md`
-- `.opencode/rules/architecture-folder-structure.md`
-- `.opencode/rules/no-assumptions.md`
-- `.opencode/rules/skills-mcp.md`
+- `.agents/rules/basic-rules.md`
+- `.agents/rules/architecture-folder-structure.md`
+- `.agents/rules/no-assumptions.md`
+- `.agents/rules/skills-mcp.md`
 
 ### Read for implementation tasks
 
 When modifying code, tests, config, schema, routes, state, or behavior:
 
-- `.opencode/rules/atomic-commit.md`
-- `.opencode/rules/no-hardcode.md`
-- `.opencode/rules/architecture-folder-structure.md`
+- `.agents/rules/atomic-commit.md`
+- `.agents/rules/no-hardcode.md`
+- `.agents/rules/architecture-folder-structure.md`
 
 ### Read for typed code
 
 When TypeScript/types/validation/DB contracts are involved:
 
-- `.opencode/rules/no-type-bypass.md`
+- `.agents/rules/no-type-bypass.md`
 
 ### Read for bugs, architecture, refactors, trade-offs, or scope decisions
 
-- `.opencode/rules/anti-satisficing.md`
-- `.opencode/rules/architecture-folder-structure.md`
+- `.agents/rules/anti-satisficing.md`
+- `.agents/rules/architecture-folder-structure.md`
 
 ### Read for UI/UX/copy/responsive/accessibility work
 
-- `.opencode/rules/anti-ai-slop.md`
+- `.agents/rules/anti-ai-slop.md`
 
 ### Read for product/domain/workflow semantics
 
-- `.opencode/rules/vibe-everythings-context.md`
+- `.agents/rules/vibe-everythings-context.md`
 
 These conditions are inclusive. A task may require several or all rules.
 
@@ -113,7 +113,7 @@ Before changing or describing behavior:
 - inspect tests;
 - inspect recent git changes for regressions.
 
-Follow `.opencode/rules/[no-assumptions.md](http://no-assumptions.md)` for absence claims.
+Follow `.agents/rules/[no-assumptions.md](http://no-assumptions.md)` for absence claims.
 
 If evidence is incomplete, state uncertainty instead of guessing.
 
@@ -194,8 +194,8 @@ If no real signal exists, show one honest neutral state.
 
 When applicable, obey:
 
-- `.opencode/rules/[no-type-bypass.md](http://no-type-bypass.md)`
-- `.opencode/rules/[no-hardcode.md](http://no-hardcode.md)`
+- `.agents/rules/[no-type-bypass.md](http://no-type-bypass.md)`
+- `.agents/rules/[no-hardcode.md](http://no-hardcode.md)`
 
 Do not hide type mismatches with broad assertions/suppressions.
 
@@ -216,7 +216,7 @@ Never weaken:
 
 ## 10. UI and Copy
 
-For UI work, `.opencode/rules/[anti-ai-slop.md](http://anti-ai-slop.md)` is mandatory.
+For UI work, `.agents/rules/[anti-ai-slop.md](http://anti-ai-slop.md)` is mandatory.
 
 Evaluate:
 

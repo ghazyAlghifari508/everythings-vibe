@@ -5,14 +5,14 @@ Boot instructions for AI agents working on **everythings-vibe**.
 ## Read first
 
 - `AGENTS.md` -> repository-wide product, architecture, phase, and safety rules
-- `.opencode/rules/vibe-everythings-context.md` -> comprehensive product definition, multi-surface architecture, flows, and schema
-- `.opencode/rules/architecture-folder-structure.md` -> feature-driven colocation, thin routes, anti-monster file limits, and zero dead code
-- `.opencode/rules/no-assumptions.md` -> strict fact verification and zero assumptions
-- `.opencode/rules/atomic-commit.md` -> atomic commits per logical change and mandatory git push before handoff
-- `.opencode/rules/no-hardcode.md` -> configuration, provider, and constants discipline
-- `.opencode/rules/no-type-bypass.md` -> strict type safety (`as never`, `as any`, and `@ts-ignore` are forbidden)
-- `.opencode/rules/anti-ai-slop.md` -> design constraints and UI standards
-- `.opencode/rules/anti-satisficing.md` -> completeness, quality, and verification discipline; never stop at the first acceptable implementation
+- `.agents/rules/vibe-everythings-context.md` -> comprehensive product definition, multi-surface architecture, flows, and schema
+- `.agents/rules/architecture-folder-structure.md` -> feature-driven colocation, thin routes, anti-monster file limits, and zero dead code
+- `.agents/rules/no-assumptions.md` -> strict fact verification and zero assumptions
+- `.agents/rules/atomic-commit.md` -> atomic commits per logical change and mandatory git push before handoff
+- `.agents/rules/no-hardcode.md` -> configuration, provider, and constants discipline
+- `.agents/rules/no-type-bypass.md` -> strict type safety (`as never`, `as any`, and `@ts-ignore` are forbidden)
+- `.agents/rules/anti-ai-slop.md` -> design constraints and UI standards
+- `.agents/rules/anti-satisficing.md` -> completeness, quality, and verification discipline; never stop at the first acceptable implementation
 - `docs/` and `TODO.md` -> behavior, scope, acceptance, test plan, and architecture specs
 
 If documents disagree, use the most specific approved requirement and document the decision before changing code. Once implementation exists, actual source, package manifests, migrations, and runtime configuration are evidence of current behavior.
@@ -59,7 +59,7 @@ If documents disagree, use the most specific approved requirement and document t
 - **Feature-driven colocation (Domain before file type):** Organize by feature domain
   (`src/features/greenfield`, `src/features/codebase`, `src/features/studio`,
   `src/features/billing`, `src/features/templates`). Follow
-  `.opencode/rules/architecture-folder-structure.md`. Never create generic catch-all
+  `.agents/rules/architecture-folder-structure.md`. Never create generic catch-all
   directories such as `hooks/`, `utils/`, `helpers/`, or `misc/` without a documented
   cross-cutting boundary.
 - **Anti-monster file ceiling (Max 300–400 lines):** Maintain strict modularity.
@@ -89,7 +89,7 @@ If documents disagree, use the most specific approved requirement and document t
 - **FAIL LOUD AND NEVER HIDE STATE:** Validate untrusted input at server
   boundaries and fail closed on auth, ownership, credit deduction, rate limiting,
   provider output, and state transition failures.
-- **Always unslop:** Follow `.opencode/rules/anti-ai-slop.md` across code, prompt
+- **Always unslop:** Follow `.agents/rules/anti-ai-slop.md` across code, prompt
   strings, docs, and UI copy. Cut AI filler words, puffery, and passive voice.
 - **Native tool calling only:** When executing actions or tools, always invoke the
   native tool calling schema provided by the platform. Never emit simulated XML,
