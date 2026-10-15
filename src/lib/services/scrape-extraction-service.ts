@@ -1,12 +1,7 @@
 ﻿import { setTimeout as wait } from "node:timers/promises";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import {
-	type ScrapeRow,
-	scrapeImages,
-	scrapePages,
-	scrapes,
-} from "@/db/schema";
+import { type ScrapeRow, scrapePages, scrapes } from "@/db/schema";
 import { crawlWebsite, isCrawlScope } from "@/lib/crawl-website";
 import {
 	designErrorCodeForHttpStatus,
@@ -25,6 +20,11 @@ import {
 	classifyImageFailures,
 	type FailedResourceEvidence,
 } from "./scrape-failure-summary";
+import {
+	ImageStorageError,
+	persistScrapeImage,
+	validateStoredImage,
+} from "./scrape-image-storage";
 import {
 	type ScrapeJobClaim,
 	scrapeClaimPredicate,
@@ -347,12 +347,17 @@ export async function runExtractionJob(
 				...scrape.metadata,
 				mode: "images",
 				imageDiscovery: images.length ? "found" : "none",
+				imageStorage: "postgres-private",
 				discoveredImages: images.length,
 				processedImages: 0,
+				savedImages: 0,
+				failedResources: 0,
 			},
 		});
 		for (const image of images) {
 			let error: string | null = null;
+			let imageAsset: Awaited<ReturnType<typeof fetchAsset>> | undefined;
+			let failureCode: string | null = null;
 			let failureEvidence: FailedResourceEvidence = {
 				code: null,
 				httpStatus: null,
@@ -368,20 +373,35 @@ export async function runExtractionJob(
 							retryAfterSeconds: parseRetryAfterSeconds(asset.retryAfter),
 						},
 					);
-				if (!/^image\//i.test(asset.contentType) || !asset.body.length)
-					throw new ScrapeError(
-						"NO_ANALYZABLE_CONTENT",
-						"Resource bukan gambar yang valid.",
-					);
-				image.format = asset.contentType
+				const verified = validateStoredImage(asset.body, asset.contentType);
+				image.format = verified.mimeType
 					.split(";")[0]
 					.replace(/^image\//i, "")
 					.replace("svg+xml", "svg")
 					.replace("jpeg", "jpg");
+				await persistScrapeImage(
+					claim,
+					{
+						...image,
+						pageUrl: captured.finalUrl,
+						status: "completed",
+						error: null,
+						failureCode: null,
+						httpStatus: asset.status,
+					},
+					asset,
+				);
+				imageAsset = asset;
 				validImages.push(image);
 			} catch (failure) {
 				if (claim.signal?.aborted) throw failure;
 				failedImages += 1;
+				failureCode =
+					failure instanceof ImageStorageError
+						? failure.assetCode
+						: failure instanceof ScrapeError
+							? failure.code
+							: "STORAGE_FAILED";
 				error =
 					failure instanceof Error
 						? failure.message
@@ -397,37 +417,21 @@ export async function runExtractionJob(
 				};
 				failedResources.push(failureEvidence);
 			}
-			await db.transaction(async (tx) => {
-				const [owner] = await tx
-					.select({ id: scrapes.id })
-					.from(scrapes)
-					.where(scrapeClaimPredicate(claim))
-					.for("update")
-					.limit(1);
-				if (!owner)
-					throw new ScrapeError(
-						"STORAGE_FAILED",
-						"Job lease sudah tidak berlaku.",
-					);
-				await tx
-					.insert(scrapeImages)
-					.values({
-						...image,
-						pageUrl: captured.finalUrl,
-						userId: claim.userId,
-						scrapeId: claim.id,
-						status: error ? "failed" : "completed",
-						error,
-					})
-					.onConflictDoUpdate({
-						target: [
-							scrapeImages.userId,
-							scrapeImages.scrapeId,
-							scrapeImages.url,
-						],
-						set: { ...image, status: error ? "failed" : "completed", error },
-					});
-			});
+			if (!imageAsset) {
+				const saved = await persistScrapeImage(claim, {
+					...image,
+					pageUrl: captured.finalUrl,
+					status: "failed",
+					error,
+					failureCode,
+					httpStatus: failureEvidence.httpStatus,
+				});
+				if (saved.assetId) {
+					failedImages -= 1;
+					failedResources.pop();
+					validImages.push(image);
+				}
+			}
 			await update({
 				metadata: {
 					...scrape.metadata,

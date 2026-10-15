@@ -3,6 +3,7 @@ import {
 	type AnyPgColumn,
 	boolean,
 	check,
+	customType,
 	foreignKey,
 	index,
 	integer,
@@ -935,6 +936,7 @@ export interface ScrapeMetadata {
 	processedImages?: number;
 	discoveredImages?: number;
 	savedImages?: number;
+	imageStorage?: "postgres-private";
 	completedPages?: number;
 	skippedPages?: number;
 	failedResources?: number;
@@ -1123,6 +1125,43 @@ export interface ImageEvidence {
 	dimensionError?: string;
 }
 
+const privateImageBytes = customType<{ data: Buffer; driverData: Buffer }>({
+	dataType: () => "bytea",
+});
+
+export const scrapeImageAssets = pgTable(
+	"scrape_image_assets",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		scrapeId: text("scrape_id")
+			.notNull()
+			.references(() => scrapes.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		sha256: text("sha256").notNull(),
+		mimeType: text("mime_type").notNull(),
+		byteLength: integer("byte_length").notNull(),
+		body: privateImageBytes("body").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		uniqueIndex("scrape_image_assets_owner_hash_idx").on(
+			t.userId,
+			t.scrapeId,
+			t.sha256,
+		),
+		check(
+			"scrape_image_assets_size_check",
+			sql`${t.byteLength} > 0 AND ${t.byteLength} = octet_length(${t.body})`,
+		),
+	],
+);
+
 export const scrapeImages = pgTable(
 	"scrape_images",
 	{
@@ -1137,6 +1176,11 @@ export const scrapeImages = pgTable(
 			.references(() => users.id, { onDelete: "cascade" }),
 		url: text("url").notNull(),
 		pageUrl: text("page_url").notNull(),
+		assetId: text("asset_id").references(() => scrapeImageAssets.id, {
+			onDelete: "set null",
+		}),
+		failureCode: text("failure_code"),
+		httpStatus: integer("http_status"),
 		format: text("format"),
 		width: integer("width"),
 		height: integer("height"),
