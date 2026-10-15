@@ -18,6 +18,8 @@ import {
 	toScrapeStatusSnapshot,
 	useScrapeStatus,
 } from "@/hooks/use-scrape-status";
+import { parseScrapeHistorySearch } from "@/lib/scrape-contract";
+import { toScrapeHistorySearchParams } from "@/lib/scrape-history";
 import { imageResultCounts } from "@/lib/scrape-images";
 import { parseScrapeReturnSearch } from "@/lib/scrape-return-path";
 import { requireUserServer } from "@/lib/session";
@@ -87,7 +89,10 @@ export const Route = createFileRoute("/design/scrap/$id")({
 	head: () => ({
 		meta: [{ title: "Hasil Scrape | VibeDesign" }],
 	}),
-	validateSearch: (search) => parseScrapeReturnSearch(search),
+	validateSearch: (search) => ({
+		...parseScrapeReturnSearch(search),
+		...toScrapeHistorySearchParams(parseScrapeHistorySearch(search)),
+	}),
 	loader: async ({ params }) => {
 		try {
 			return await loadScrapeDetail({ data: params.id });
@@ -113,7 +118,9 @@ function ScrapeDetailPage() {
 	const router = useRouter();
 	const initial = Route.useLoaderData();
 	const { id } = Route.useParams();
-	const { from } = Route.useSearch();
+	const rawSearch = Route.useSearch();
+	const { from } = rawSearch;
+	const history = parseScrapeHistorySearch(rawSearch);
 
 	const {
 		data,
@@ -258,7 +265,7 @@ function ScrapeDetailPage() {
 					: "mx-auto max-w-5xl px-4 sm:px-6"
 			}`}
 		>
-			<ScrapeBackLink from={from} />
+			<ScrapeBackLink from={from} historySearch={history} />
 			{currentStatus === "failed" &&
 				(mode === "crawl" ||
 					mode === "images" ||
