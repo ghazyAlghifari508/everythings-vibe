@@ -526,7 +526,7 @@ describe("workspace resume after refresh", () => {
 
 	it("never offers the Task step before tasks are proven absent", () => {
 		expect(workspaceSource).toContain(
-			"tasksUnresolved={hydration.tasks !== \"empty\"}",
+			'tasksUnresolved={hydration.tasks !== "empty"}',
 		);
 	});
 
@@ -599,17 +599,30 @@ describe("automatic artifact preview", () => {
 	});
 });
 
-describe("chat intent after task generation", () => {
+describe("composer message routing without intent choice", () => {
 	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
 	const chatSource = readFileSync("src/routes/api/chat.ts", "utf8");
 
-	it("routes a new message through the chosen intent instead of guessing", () => {
-		expect(workspaceSource).toContain("CodebaseChatIntent");
+	it("routes a message by workspace state instead of a per-message choice", () => {
+		// No persistent intent card, no radio gate, no inferred choice.
+		expect(workspaceSource).not.toContain("CodebaseChatIntent");
+		expect(workspaceSource).not.toContain("resolveIntentOptions");
+		expect(workspaceSource).not.toContain("CodebaseIntentChoice");
+		expect(workspaceSource).not.toContain("selectedIntent");
+		expect(workspaceSource).not.toContain("needsIntentChoice");
+		// A message in a plan with planning revises that same plan.
 		expect(workspaceSource).toMatch(
-			/intent === "revise_current"[\s\S]*runRevision\(trimmed\)/,
+			/activeHasPlanning[\s\S]*await runRevision\(trimmed\)/,
 		);
 		// A new feature still goes through the existing creation path.
 		expect(workspaceSource).toContain("ensureFeatureInWorkspace(trimmed)");
+	});
+
+	it("creates a new plan only from the explicit create action", () => {
+		expect(workspaceSource).toContain("isCreatingNew");
+		expect(workspaceSource).toContain("handleCreateFeature");
+		expect(workspaceSource).toContain("onCreateFeature");
+		expect(workspaceSource).toContain("setIsCreatingNew(false)");
 	});
 
 	it("keeps a revision on the existing append-only versioning path", () => {

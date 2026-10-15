@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Layers } from "lucide-react";
+import { Check, ChevronDown, Layers, Plus } from "lucide-react";
 import { useState } from "react";
 import {
 	DropdownMenu,
@@ -10,7 +10,10 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ActivePlanCandidate } from "@/lib/codebase-active-plan";
+import {
+	type ActivePlanCandidate,
+	describePlanReadiness,
+} from "@/lib/codebase-active-plan";
 
 function formatPlanDate(value: string | null): string | null {
 	if (!value) return null;
@@ -24,26 +27,32 @@ function formatPlanDate(value: string | null): string | null {
 }
 
 /**
- * Switch between the feature plans of one repository.
+ * Switch between the user-facing feature plans of one repository.
  *
- * A codebase holds many independent plans, so the workspace needs a way to see
- * them and move between them. Each entry states whether the plan already holds
- * planning, because that is what tells a real plan apart from one that was
- * created and never used. Selecting a plan is a navigation choice: the parent
- * drops the previous plan's loaded artifacts and rehydrates from the server, so
- * nothing from one plan can be shown as another's.
+ * The trigger names the active plan, so the workspace always says which
+ * feature is on screen. Each entry states its real artifact readiness,
+ * because that is what tells a finished plan apart from a resumable draft.
+ * The onboarding anchor never reaches this list: the caller filters it with
+ * `selectUserFacingPlans`, so repository analysis context cannot pose as a
+ * feature plan. Selecting a plan is a navigation choice: the parent drops the
+ * previous plan's loaded artifacts and rehydrates from the server, so nothing
+ * from one plan can be shown as another's. Creating a plan is an explicit
+ * action of its own, never a side effect of sending a message.
  */
 export function CodebasePlanSwitcher({
 	plans,
 	activePlanId,
+	activePlanName,
 	onSelectPlan,
+	onCreateFeature,
 }: {
 	plans: readonly ActivePlanCandidate[];
 	activePlanId: string | null;
+	activePlanName: string | null;
 	onSelectPlan: (projectId: string) => void;
+	onCreateFeature: () => void;
 }) {
 	const [open, setOpen] = useState(false);
-	const withPlanning = plans.filter((plan) => plan.hasArtifacts).length;
 
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen}>
@@ -52,25 +61,34 @@ export function CodebasePlanSwitcher({
 					type="button"
 					data-testid="codebase-plan-switcher"
 					aria-label="Pilih fitur plan"
-					className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					aria-haspopup="menu"
+					className="inline-flex min-h-8 max-w-44 shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
-					<Layers size={12} aria-hidden />
-					<span className="font-mono">
-						{plans.length} fitur
-						{withPlanning > 0 ? ` · ${withPlanning} berisi` : ""}
+					<Layers size={12} aria-hidden className="shrink-0" />
+					<span className="truncate font-medium text-snow">
+						{activePlanName ?? "Pilih fitur"}
 					</span>
+					<ChevronDown size={12} aria-hidden className="shrink-0" />
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="w-72">
-				<DropdownMenuLabel>Fitur di repository ini</DropdownMenuLabel>
+				<DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider">
+					Fitur repository
+				</DropdownMenuLabel>
 				<DropdownMenuSeparator />
 				{plans.map((plan) => {
 					const isActive = plan.id === activePlanId;
 					const updated = formatPlanDate(plan.updatedAt);
+					const readiness = describePlanReadiness(plan);
+					const status =
+						plan.hasArtifacts && updated
+							? `${readiness} · ${updated}`
+							: readiness;
 					return (
 						<DropdownMenuItem
 							key={plan.id}
 							data-testid={`codebase-plan-option-${plan.id}`}
+							aria-current={isActive ? "true" : undefined}
 							onSelect={() => {
 								if (!isActive) onSelectPlan(plan.id);
 							}}
@@ -80,11 +98,7 @@ export function CodebasePlanSwitcher({
 								<span className="truncate text-[13px] text-snow">
 									{plan.name}
 								</span>
-								<span className="text-[10.5px] text-slate">
-									{plan.hasArtifacts
-										? `Sudah ada planning${updated ? ` · ${updated}` : ""}`
-										: "Belum ada planning"}
-								</span>
+								<span className="text-[10.5px] text-slate">{status}</span>
 							</span>
 							{isActive ? (
 								<Check
@@ -96,6 +110,17 @@ export function CodebasePlanSwitcher({
 						</DropdownMenuItem>
 					);
 				})}
+				<DropdownMenuSeparator />
+				<DropdownMenuItem
+					data-testid="codebase-plan-create-new"
+					onSelect={() => onCreateFeature()}
+					className="flex items-center gap-2"
+				>
+					<Plus size={13} aria-hidden className="shrink-0 text-fog" />
+					<span className="text-[13px] font-medium text-snow">
+						Buat fitur baru
+					</span>
+				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

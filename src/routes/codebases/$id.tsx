@@ -30,6 +30,7 @@ import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
 	type ActivePlanCandidate,
 	resolveActivePlan,
+	selectUserFacingPlans,
 } from "@/lib/codebase-active-plan";
 import {
 	type AnalysisResponse,
@@ -70,9 +71,8 @@ import {
 import {
 	assessRevisionImpact,
 	buildRevisionRequest,
-	type CodebaseChatIntent,
+	type CodebaseComposerMode,
 	describeRevisionImpact,
-	resolveIntentOptions,
 } from "@/lib/codebase-revision-intent";
 import {
 	detectStackFromPackageJsonText,
@@ -264,16 +264,22 @@ const loadCodebase = createServerFn({ method: "GET" })
 		const withAc = new Set(acRows.map((row) => row.projectId));
 		const withTasks = new Set(taskRows.map((row) => row.projectId));
 
-		const plans: ActivePlanCandidate[] = projectRows.map((row) => ({
-			id: row.id,
-			name: row.name,
-			updatedAt: row.updatedAt?.toISOString() ?? null,
-			hasArtifacts:
-				row.featureTree != null ||
-				withPrd.has(row.id) ||
-				withAc.has(row.id) ||
-				withTasks.has(row.id),
-		}));
+		const plans: ActivePlanCandidate[] = projectRows.map((row) => {
+			const hasFeature = row.featureTree != null;
+			const hasPrd = withPrd.has(row.id);
+			const hasAc = withAc.has(row.id);
+			const hasTasks = withTasks.has(row.id);
+			return {
+				id: row.id,
+				name: row.name,
+				updatedAt: row.updatedAt?.toISOString() ?? null,
+				hasArtifacts: hasFeature || hasPrd || hasAc || hasTasks,
+				hasFeature,
+				hasPrd,
+				hasAc,
+				hasTasks,
+			};
+		});
 
 		const onboardingFeature = resolveOnboardingAnchorProject({
 			onboardingProjectId: codebase.onboardingProjectId,
@@ -764,6 +770,12 @@ function CodebaseDetailPage() {
 	const [requestedProjectId, setRequestedProjectId] = useState<string | null>(
 		null,
 	);
+	/**
+	 * True after the explicit "Buat fitur baru" action until the next message
+	 * creates that plan. Only this flag — never an ambiguous message — may
+	 * start a new feature project from the workspace composer.
+	 */
+	const [isCreatingNew, setIsCreatingNew] = useState(false);
 	const planResolution = useMemo(
 		() =>
 			resolveActivePlan({
@@ -789,6 +801,15 @@ function CodebaseDetailPage() {
 				? (plans.find((plan) => plan.id === onboardingFeatureId) ?? null)
 				: null,
 		[onboardingFeatureId, plans],
+	);
+	/**
+	 * Plans the switcher may show. The onboarding anchor is repository analysis
+	 * context, so it stays out of the list while it carries no planning; the
+	 * resolver above still sees the full list and keeps its anchor fallback.
+	 */
+	const userFacingPlans = useMemo(
+		() => selectUserFacingPlans(plans, onboardingFeatureId),
+		[plans, onboardingFeatureId],
 	);
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
 	const [manifestFiles, setManifestFiles] = useState<Array<{ path: string }>>(
@@ -1632,6 +1653,23 @@ function CodebaseDetailPage() {
 		prdContent,
 		acContent,
 	]);
+	/**
+	 * What the next composer message means, mirroring `handleSendMessage` so
+	 * the label above the composer always names the real target.
+	 */
+	const activeIsAnchorPlan =
+		effectiveFeatureId != null && effectiveFeatureId === onboardingFeatureId;
+	const activeHasPlanning = artifacts.length > 0;
+	const composerMode: CodebaseComposerMode =
+		isCreatingNew ||
+		!effectiveFeatureId ||
+		(activeIsAnchorPlan && !activeHasPlanning)
+			? "create"
+			: activeHasPlanning
+				? "revise"
+				: "clarify";
+	const composerTargetName =
+		composerMode === "create" ? null : (resolvedFeature?.name ?? null);
 	const activeArtifact =
 		artifacts.find((item) => item.id === activeArtifactId) ?? null;
 	const isSourcePreviewOpen = sourcePreview.kind !== "idle";
@@ -2042,8 +2080,21 @@ function CodebaseDetailPage() {
 		],
 	);
 
+	const handleCreateFeature = useCallback(() => {
+		setIsCreatingNew(true);
+	}, []);
+
+	/**
+	 * Direct a new composer message without ever asking what it is for.
+	 *
+	 * A message in a user-facing plan stays with that plan: it revises real
+	 * planning, or clarifies a draft that has none yet. A new project is only
+	 * created from the explicit "Buat fitur baru" action, from an empty
+	 * repository, or from the onboarding anchor that still carries no planning
+	 * — never silently from an ambiguous message in an existing plan.
+	 */
 	const handleSendMessage = useCallback(
-		async (message: string, intent: CodebaseChatIntent) => {
+		async (message: string) => {
 			const trimmed = message.trim();
 			if (!trimmed || trimmed.length < 3) return;
 			setChatMessages((current) => [
@@ -2054,15 +2105,39 @@ function CodebaseDetailPage() {
 					content: trimmed,
 				},
 			]);
-			if (intent === "revise_current") {
+			const activeIsAnchor =
+				effectiveFeatureId != null &&
+				effectiveFeatureId === onboardingFeatureId;
+			const activeHasPlanning = artifacts.length > 0;
+			if (
+				isCreatingNew ||
+				!effectiveFeatureId ||
+				(activeIsAnchor && !activeHasPlanning)
+			) {
+				setLastFeaturePrompt(trimmed);
+				const projectId = await ensureFeatureInWorkspace(trimmed);
+				if (projectId) {
+					setIsCreatingNew(false);
+					void fetchAiQuestions(projectId, trimmed);
+				}
+				return;
+			}
+			if (activeHasPlanning) {
 				await runRevision(trimmed);
 				return;
 			}
 			setLastFeaturePrompt(trimmed);
-			const projectId = await ensureFeatureInWorkspace(trimmed);
-			if (projectId) void fetchAiQuestions(projectId, trimmed);
+			void fetchAiQuestions(effectiveFeatureId, trimmed);
 		},
-		[ensureFeatureInWorkspace, fetchAiQuestions, runRevision],
+		[
+			artifacts.length,
+			effectiveFeatureId,
+			ensureFeatureInWorkspace,
+			fetchAiQuestions,
+			isCreatingNew,
+			onboardingFeatureId,
+			runRevision,
+		],
 	);
 
 	const handleConfirmGenerate = useCallback(async () => {
@@ -2551,11 +2626,13 @@ function CodebaseDetailPage() {
 								featureName={resolvedFeature?.name ?? codebase.name}
 								view={workspaceView}
 								planSwitcher={
-									plans.length > 1 ? (
+									userFacingPlans.length > 0 ? (
 										<CodebasePlanSwitcher
-											plans={plans}
+											plans={userFacingPlans}
 											activePlanId={effectiveFeatureId}
+											activePlanName={resolvedFeature?.name ?? null}
 											onSelectPlan={(projectId) => {
+												setIsCreatingNew(false);
 												setRequestedProjectId(projectId);
 												// A different plan is a different set of artifacts:
 												// drop the previous plan's content and mark every
@@ -2579,6 +2656,7 @@ function CodebaseDetailPage() {
 												setArtifactHydration(emptyArtifactHydration());
 												setPipelineStage("questions");
 											}}
+											onCreateFeature={handleCreateFeature}
 										/>
 									) : null
 								}
@@ -2589,9 +2667,8 @@ function CodebaseDetailPage() {
 								questions={aiQuestions}
 								answers={chatAnswers}
 								run={run}
-								intentOptions={resolveIntentOptions({
-									hasExistingFeature: artifacts.length > 0,
-								})}
+								composerMode={composerMode}
+								composerTargetName={composerTargetName}
 								revisionImpactNotice={describeRevisionImpact(revisionImpact)}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
@@ -2661,9 +2738,7 @@ function CodebaseDetailPage() {
 								}}
 								onDownloadArtifact={handleDownloadArtifact}
 								onSubmitAnswer={handleSubmitAnswer}
-								onSendMessage={(message, intent) =>
-									void handleSendMessage(message, intent)
-								}
+								onSendMessage={(message) => void handleSendMessage(message)}
 								onConfirmGenerate={() => void handleConfirmGenerate()}
 								onRetryGenerate={() => void handleConfirmGenerate()}
 								onRetryStage={() => void handleRetryStage()}

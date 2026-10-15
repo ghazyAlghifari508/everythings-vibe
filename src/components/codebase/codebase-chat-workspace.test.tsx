@@ -184,12 +184,12 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			container.querySelector("[data-testid='codebase-chat-messages']"),
 		).toBeNull();
 
-		// 8. Composer placeholder
+		// 8. Composer placeholder names a new feature while nothing exists
 		const composer = container.querySelector<HTMLTextAreaElement>(
 			"#codebase-chat-composer",
 		);
 		expect(composer?.placeholder).toBe(
-			"Jelaskan fitur atau perubahan yang kamu inginkan...",
+			"Jelaskan fitur baru yang kamu inginkan...",
 		);
 	});
 
@@ -655,10 +655,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onSendMessage).toHaveBeenCalledTimes(1);
-		expect(onSendMessage).toHaveBeenCalledWith(
-			"Tambah mode gelap",
-			"new_feature",
-		);
+		expect(onSendMessage).toHaveBeenCalledWith("Tambah mode gelap");
 		expect(composer?.value).toBe("");
 	});
 
@@ -699,7 +696,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 				}),
 			);
 		});
-		expect(onSendMessage).toHaveBeenCalledWith("Baris satu", "new_feature");
+		expect(onSendMessage).toHaveBeenCalledWith("Baris satu");
 		expect(composer?.value).toBe("");
 	});
 
@@ -821,10 +818,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		expect(onSendMessage).toHaveBeenCalledTimes(1);
-		expect(onSendMessage).toHaveBeenCalledWith(
-			"Tambah pencarian proyek",
-			"new_feature",
-		);
+		expect(onSendMessage).toHaveBeenCalledWith("Tambah pencarian proyek");
 	});
 
 	it("places the caret at the end of the prefilled prompt when the empty area is pressed", () => {
@@ -1325,7 +1319,7 @@ describe("CodebaseChatWorkspace confirmation and spec errors", () => {
 	});
 });
 
-describe("CodebaseChatWorkspace chat intent after a plan exists", () => {
+describe("CodebaseChatWorkspace composer without intent choice", () => {
 	const planArtifact = {
 		id: "tasks-abc",
 		fileName: "tasks-demo.json",
@@ -1334,81 +1328,45 @@ describe("CodebaseChatWorkspace chat intent after a plan exists", () => {
 		description: "Task tree dan papan Kanban live",
 	};
 
-	it("offers both intents once a plan exists", () => {
+	it("never shows the persistent intent card", () => {
 		renderWorkspace({ artifacts: [planArtifact] });
-		const choice = container.querySelector(
-			"[data-testid='codebase-intent-choice']",
-		);
-		expect(choice).not.toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-intent-choice']"),
+		).toBeNull();
 		expect(
 			container.querySelector("[data-testid='codebase-intent-revise_current']"),
-		).not.toBeNull();
+		).toBeNull();
 		expect(
 			container.querySelector("[data-testid='codebase-intent-new_feature']"),
-		).not.toBeNull();
+		).toBeNull();
 	});
 
-	it("requires an explicit intent before the message can be sent", () => {
+	it("sends a message in an existing plan without asking first", () => {
 		const onSendMessage = vi.fn();
-		renderWorkspace({ artifacts: [planArtifact], onSendMessage });
+		renderWorkspace({
+			artifacts: [planArtifact],
+			composerMode: "revise",
+			composerTargetName: "Filter Artikel",
+			onSendMessage,
+		});
 		const composer = container.querySelector<HTMLTextAreaElement>(
 			"#codebase-chat-composer",
-		);
-		const sendButton = container.querySelector<HTMLButtonElement>(
-			"[data-testid='prompt-bar-submit']",
 		);
 		act(() => {
 			if (composer) setTextareaValue(composer, "Tambah opsi ekspor Markdown");
 		});
-		// No intent chosen yet: sending is closed and the placeholder says why.
-		expect(sendButton?.disabled).toBe(true);
-		expect(composer?.placeholder).toContain("Pilih dulu");
-
-		const reviseRadio = container.querySelector<HTMLInputElement>(
-			"[data-testid='codebase-intent-revise_current'] input",
-		);
-		act(() => {
-			reviseRadio?.click();
-		});
-		expect(sendButton?.disabled).toBe(false);
-
-		act(() => {
-			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-		expect(onSendMessage).toHaveBeenCalledWith(
-			"Tambah opsi ekspor Markdown",
-			"revise_current",
-		);
-	});
-
-	it("sends a new-feature intent when that option is chosen", () => {
-		const onSendMessage = vi.fn();
-		renderWorkspace({ artifacts: [planArtifact], onSendMessage });
-		const composer = container.querySelector<HTMLTextAreaElement>(
-			"#codebase-chat-composer",
-		);
-		act(() => {
-			if (composer) setTextareaValue(composer, "Tambah fitur lain di repo ini");
-		});
-		const newFeatureRadio = container.querySelector<HTMLInputElement>(
-			"[data-testid='codebase-intent-new_feature'] input",
-		);
-		act(() => {
-			newFeatureRadio?.click();
-		});
 		const sendButton = container.querySelector<HTMLButtonElement>(
 			"[data-testid='prompt-bar-submit']",
 		);
+		expect(sendButton?.disabled).toBe(false);
+		expect(composer?.placeholder).not.toContain("Pilih dulu");
 		act(() => {
 			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
-		expect(onSendMessage).toHaveBeenCalledWith(
-			"Tambah fitur lain di repo ini",
-			"new_feature",
-		);
+		expect(onSendMessage).toHaveBeenCalledWith("Tambah opsi ekspor Markdown");
 	});
 
-	it("does not ask for an intent before anything exists to revise", () => {
+	it("keeps the composer usable before anything exists", () => {
 		const onSendMessage = vi.fn();
 		renderWorkspace({ artifacts: [], onSendMessage });
 		expect(
@@ -1427,27 +1385,36 @@ describe("CodebaseChatWorkspace chat intent after a plan exists", () => {
 		act(() => {
 			sendButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
-		expect(onSendMessage).toHaveBeenCalledWith(
-			"Tambah mode gelap",
-			"new_feature",
-		);
+		expect(onSendMessage).toHaveBeenCalledWith("Tambah mode gelap");
 	});
 
-	it("shows the task impact only for a revision, and only when the caller reports one", () => {
+	it("names the active feature above the composer", () => {
 		renderWorkspace({
 			artifacts: [planArtifact],
+			composerMode: "revise",
+			composerTargetName: "Filter Artikel",
+		});
+		const target = container.querySelector(
+			"[data-testid='codebase-composer-target']",
+		);
+		expect(target?.textContent).toContain("Filter Artikel");
+	});
+
+	it("labels a new-feature composer instead of borrowing a plan name", () => {
+		renderWorkspace({ artifacts: [], composerMode: "create" });
+		const target = container.querySelector(
+			"[data-testid='codebase-composer-target']",
+		);
+		expect(target?.textContent).toContain("Fitur baru");
+	});
+
+	it("shows the task impact inline while revising", () => {
+		renderWorkspace({
+			artifacts: [planArtifact],
+			composerMode: "revise",
+			composerTargetName: "Filter Artikel",
 			revisionImpactNotice:
 				"Revisi ini berdampak pada 2 task selesai. Menyusun ulang task akan mereset progres tersebut.",
-		});
-		expect(
-			container.querySelector("[data-testid='codebase-revision-impact']"),
-		).toBeNull();
-
-		const reviseRadio = container.querySelector<HTMLInputElement>(
-			"[data-testid='codebase-intent-revise_current'] input",
-		);
-		act(() => {
-			reviseRadio?.click();
 		});
 		const notice = container.querySelector(
 			"[data-testid='codebase-revision-impact']",
@@ -1455,16 +1422,11 @@ describe("CodebaseChatWorkspace chat intent after a plan exists", () => {
 		expect(notice?.textContent).toContain("2 task selesai");
 	});
 
-	it("never shows a task impact notice for the new-feature intent", () => {
+	it("hides the task impact while creating a new feature", () => {
 		renderWorkspace({
-			artifacts: [planArtifact],
+			artifacts: [],
+			composerMode: "create",
 			revisionImpactNotice: "Revisi ini berdampak pada 1 task selesai.",
-		});
-		const newFeatureRadio = container.querySelector<HTMLInputElement>(
-			"[data-testid='codebase-intent-new_feature'] input",
-		);
-		act(() => {
-			newFeatureRadio?.click();
 		});
 		expect(
 			container.querySelector("[data-testid='codebase-revision-impact']"),
