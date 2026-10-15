@@ -10,8 +10,9 @@ Dokumen ini memuat daftar rencana kerja, backlog arsitektur, standarisasi kualit
 3. [Bagian 3: Refactoring & Clean Code — Dekonstruksi File Monster (~2.000 Baris) & Reusable Architecture](#3-refactoring--clean-code--dekonstruksi-file-monster-2000-baris--reusable-architecture)
 4. [Bagian 4: Dead Code Elimination — Pembersihan Total Deathcode, File/Folder Sampah & Unused Dependencies](#4-dead-code-elimination--pembersihan-total-deathcode-filefolder-sampah--unused-dependencies)
 5. [Bagian 5: Rebranding Ecosystem — Migrasi Menyeluruh dari VibeEverything ke everythings-vibe](#5-rebranding-ecosystem--migrasi-menyeluruh-dari-vibeeverything-ke-everythings-vibe)
-6. [Bagian 6: Arsitektur Berbasis Fitur — Modular Feature-Driven Directory Structure](#6-arsitektur-berbasis-fitur--modular-feature-driven-directory-structure)
-7. [Bagian 7: Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure & Zero Dead Code](#7-aturan-tegas-ai-agent--enforcement-policy-anti-slop-strict-structure--zero-dead-code)
+6. [Bagian 6: Runtime & Performance Optimization — Migrasi Node.js ke Bun](#6-runtime--performance-optimization--migrasi-nodejs-ke-bun)
+7. [Bagian 7: Arsitektur Berbasis Fitur — Modular Feature-Driven Directory Structure](#7-arsitektur-berbasis-fitur--modular-feature-driven-directory-structure)
+8. [Bagian 8: Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure & Zero Dead Code](#8-aturan-tegas-ai-agent--enforcement-policy-anti-slop-strict-structure--zero-dead-code)
 
 ---
 
@@ -414,13 +415,131 @@ Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenG
 
 ---
 
-## 6. Arsitektur Berbasis Fitur — Modular Feature-Driven Directory Structure
+## 6. Runtime & Performance Optimization — Migrasi Node.js ke Bun
 
-### 6.1. Latar Belakang & Masalah Struktur Eksisting
+### Metadata
+* **Status:** `Proposed / Backlog`
+* **Prioritas:** `P2`
+* **Kompleksitas:** `Tinggi`
+* **Tujuan:** Mengevaluasi dan menerapkan Bun sebagai runtime serta package manager apabila terbukti meningkatkan performa, stabilitas, dan efisiensi aplikasi secara terukur tanpa mengorbankan kompatibilitas ekosistem TanStack Start.
+
+---
+
+### 6.1. Latar Belakang & Tujuan
+Saat ini repositori **everythings-vibe** berjalan di atas runtime Node.js (Node 20/22+) dengan package manager `pnpm`. Seiring berkembangnya platform menjadi ekosistem multi-surface (VibePlan, VibeDesign, Existing Codebase sync, VibeTemplate), kebutuhan akan efisiensi proses server semakin tinggi.
+
+Evaluasi migrasi ke Bun didasari oleh potensi manfaat:
+1. **Startup & Execution Performance:** Kecepatan cold startup server function dan event loop berbasis JavaScriptCore.
+2. **Resource Utilization:** Efisiensi memori (RAM) dan CPU overhead pada server production.
+3. **Dependency Installation & Tooling:** Kecepatan instalasi dependensi, caching modul, dan eksekusi task runner terintegrasi.
+4. **Development Experience (DX):** Waktu booting development server dan reload lingkungan lokal yang lebih gegas.
+
+> **PENTING — BATASAN ARSITEKTUR:**  
+> **TanStack Start TETAP menjadi full-stack web framework utama.**  
+> Bun hanya dievaluasi sebagai pengganti *runtime engine* (menggantikan Node.js process) dan package manager, **BUKAN** untuk merombak atau menulis ulang backend menggunakan Elysia, Hono, Express, atau framework lainnya. Seluruh route handlers, server functions (`createServerFn`), middleware, SSR streaming, dan loader TanStack Start dipertahankan sepenuhnya.
+
+---
+
+### 6.2. Target Arsitektur
+Arsitektur target apabila Bun dinyatakan lolos evaluasi:
+
+* **Frontend:** React 19 + TanStack Router (file-based routing, type-safe search params).
+* **Full-stack Framework:** TanStack Start (SSR, client hydration, server functions).
+* **Runtime:** Bun (v1.2+) sebagai host eksekusi server production dan development, jika hasil benchmark mendukung.
+* **Build Tooling:** Vite 8 + `@tanstack/react-start/plugin/vite` + Tailwind CSS 4 Vite plugin.
+* **Database & ORM:** PostgreSQL 17 + Drizzle ORM (mempertahankan connection pooling, schema, dan migrasi).
+* **AI Integration:** Vercel AI SDK v7 (`ai`, `@ai-sdk/openai`) via local gateway 9router dengan SSE streaming.
+* **Background Worker:** Scraping & Crawling worker (Playwright Chromium) dipertahankan sebagai proses terisolasi dan dievaluasi secara independen dari web server utama.
+* **CLI Companion:** `packages/cli` tetap kompatibel ganda (bisa dijalankan via Node.js atau Bun di terminal pengguna).
+
+---
+
+### 6.3. Audit Dependencies & Runtime Compatibility
+Sebelum migrasi dilakukan, setiap risiko kompatibilitas wajib diaudit dan diverifikasi secara empiris:
+
+- [ ] **Audit Scripts & Referensi Eksplisit Node.js:**
+  - [ ] Periksa script `package.json`: `"dev": "node --dns-result-order=ipv4first node_modules/vite/bin/vite.js dev --port 3000"`. Evaluasi penggantian dengan `bun --bun vite dev` atau `bun run vite dev`.
+  - [ ] Periksa referensi `process.execPath`, `node:child_process` (misal `spawn` di `src/lib/services/scrape-dev-all.ts` dan test runner), serta `node:worker_threads` (di `src/lib/crawl-url-filter.ts`).
+  - [ ] Periksa modul utilitas Node.js: `node:crypto` (`createHash`, `createHmac`, `randomBytes`, `timingSafeEqual`), `node:timers/promises`, `node:util` (`isDeepStrictEqual`), serta modul jaringan `node:net` dan `node:dns/promises` (SSRF protection di `render-page.ts` dan `url-validator.ts`).
+- [ ] **TanStack Start & Vite Compatibility:**
+  - [ ] Verifikasi kompatibilitas SSR handler TanStack Start di bawah runtime Bun (apakah Nitro/Vinxi server adapter berjalan mulus).
+  - [ ] Uji build pipeline `vite build` dan `vite preview` di bawah Bun.
+- [ ] **Database & Connection Pooling:**
+  - [ ] Uji kompatibilitas driver `pg` (`node-postgres` `Pool`) di bawah Bun Node-compatibility layer vs native `bun:sql` / postgres.
+  - [ ] Pastikan transaksi atomic credit (`WHERE credits_used + :charge <= credits`) dan tenant queries (`WHERE user_id = ?`) tidak mengalami race condition atau connection leak.
+- [ ] **Better Auth & Session Lifecycle:**
+  - [ ] Verifikasi cookie parsing, session verification, OAuth callback handling (Google/GitHub), dan CSRF middleware pada environment Bun.
+- [ ] **Vercel AI SDK & SSE Streaming:**
+  - [ ] Uji kestabilan chunk streaming (`ReadableStream` / Server-Sent Events) dari `ai-sdk` ke klien.
+  - [ ] Pastikan abort handling (`AbortController`), timeout handling, dan typewriter reveal tidak mengalami buffer stall di Bun.
+- [ ] **Scraping Worker & Playwright:**
+  - [ ] Uji eksekusi browser automation Playwright Chromium di bawah Bun (apakah socket IPC child process browser stabil).
+  - [ ] Verifikasi graceful shutdown worker process agar tidak meninggalkan zombie Chromium processes.
+- [ ] **CLI Runtime Requirements (`packages/cli`):**
+  - [ ] Pastikan package CLI tetap kompatibel ketika di-install secara global oleh user yang hanya memiliki Node.js (`npm i -g @ghazynabiel/everythings-vibe`).
+- [ ] **Deployment Environment & CI/CD:**
+  - [ ] Evaluasi kesiapan container Docker (Bun official image vs Node Alpine/Debian) dan environment variables.
+
+---
+
+### 6.4. Tahapan Migrasi (Milestone Terukur)
+
+1. **Milestone 1 — Baseline Benchmark (Node.js Baseline):**
+   - [ ] Catat metrik performa saat ini menggunakan Node.js pada workload standar (cold start, SSR latency, build time, memory footprint) sebagai angka pembanding acuan.
+2. **Milestone 2 — Compatibility Assessment:**
+   - [ ] Uji seluruh library inti dan native Node modules di sandbox Bun lokal.
+   - [ ] Identifikasi dependency atau API yang memicu warning atau incompatibilities.
+3. **Milestone 3 — Bun Package Manager Evaluation:**
+   - [ ] Uji instalasi dependency via `bun install` vs `pnpm install` (periksa lockfile reproducibility, hoisting behavior, dan workspace support untuk `packages/cli`).
+   - [ ] Pastikan seluruh dev tooling (Biome, Vitest, TypeScript compiler) dapat berjalan normal.
+4. **Milestone 4 — Bun Runtime Integration (Local Dev & Test):**
+   - [ ] Sesuaikan scripts di `package.json` untuk pengujian lokal berbasis Bun tanpa mengubah kontrak aplikasi.
+   - [ ] Jalankan seluruh test suite (`vitest run`) di bawah runtime Bun dan pastikan 100% test passing.
+5. **Milestone 5 — Production Simulation Benchmark:**
+   - [ ] Jalankan simulasi beban produksi setara (stress test API endpoints, server function SSR, dan AI stream pipeline) membandingkan Node.js vs Bun.
+6. **Milestone 6 — Stability & Regression Validation:**
+   - [ ] Lakukan verifikasi manual end-to-end: Auth login, Greenfield PRD generation, Existing Codebase sync, VibeDesign Studio live preview, dan Midtrans webhook.
+7. **Milestone 7 — Deployment Strategy & Rollback Plan:**
+   - [ ] Susun strategi deployment bertahap (canary / blue-green).
+   - [ ] Dokumentasikan SOP rollback instan kembali ke Node.js jika ditemukan anomali stabilitas di production.
+
+---
+
+### 6.5. Performance Benchmark & Acceptance Criteria
+
+#### Metrik Evaluasi:
+* **Cold Startup & Dev Server Boot:** Waktu dari perintah dijalankan hingga server siap menerima request HTTP pertama.
+* **Dependency Installation Duration:** Waktu clean install dependensi (`fresh clone`).
+* **Production Build Duration:** Total waktu eksekusi `vite build` dan kompilasi route tree.
+* **Server Response Latency (p50 / p95):** Latensi respon server functions dan API endpoints di bawah beban konkurensi (10, 50, 100 concurrent requests).
+* **SSR TTFB (Time to First Byte):** Waktu respon awal dokumen HTML ter-render di rute utama.
+* **CPU & Memory Footprint:** Konsumsi resource idle dan konsumsi puncak (*peak memory*) saat pemrosesan berat.
+* **AI Streaming Overhead:** Latensi waktu-ke-chunk-pertama (*time-to-first-chunk*) pada pipeline SSE.
+* **Scraping Throughput & Worker Resource:** Penggunaan memori saat Playwright me-render dan meng-capture snapshot web.
+* **Error Rate & Runtime Uptime:** Ketiadaan unhandled exceptions, segfaults, atau memory leaks selama uji ketahanan 24 jam.
+
+> **Catatan Metrik Isolasi:**  
+> Metrik benchmark runtime wajib dipisahkan dari latensi eksternal pihak ketiga (seperti latensi jaringan internet, durasi kalkulasi reasoning model AI dari 9router, atau waktu respons eksternal server Midtrans). Keputusan migrasi harus bersandar pada bukti benchmark yang dapat direproduksi, bukan klaim asumtif.
+
+#### Migration Acceptance Criteria (Syarat Kelolosan Migrasi):
+- [ ] **Zero Functional & Security Regressions:** Tidak ada satupun fitur atau batas keamanan (auth, session, tenant isolation, credit atomicity) yang rusak atau melemah.
+- [ ] **Critical Workflows Berfungsi Sempurna:** Seluruh alur kritis (VibePlan, VibeDesign Studio, Codebase CLI Sync, Billing Midtrans) lolos verifikasi.
+- [ ] **Test & Build 100% Green:** Seluruh unit test, integration test, typecheck (`tsc --noEmit`), dan `vite build` selesai sukses tanpa error.
+- [ ] **Peningkatan Terukur & Nyata:** Bun terbukti memberikan peningkatan efisiensi yang signifikan (misal penurunan TTFB, build time lebih cepat, atau penghematan RAM) tanpa meningkatkan error rate.
+- [ ] **Rollback Plan Teruji:** Prosedur beralih kembali ke Node.js runtime siap dan dapat dieksekusi dalam hitungan menit bila terjadi kendala tak terduga.
+
+> **Prinsip Keputusan:**  
+> Apabila hasil benchmark menunjukkan Bun tidak memberikan manfaat performa yang signifikan, atau memicu instabilitas pada worker scraping/connection pool database, maka **Node.js tetap dipertahankan sebagai runtime standar produksi**.
+
+---
+
+## 7. Arsitektur Berbasis Fitur — Modular Feature-Driven Directory Structure
+
+### 7.1. Latar Belakang & Masalah Struktur Eksisting
 Saat ini struktur repositori masih menganut pola *layer-based* umum di mana komponen tersebar di `src/components/`, hooks di `src/hooks/`, logic backend di `src/lib/services/`, dan test tersebar acak di `src/routes/` atau `src/lib/`. 
 Ketika sebuah fitur (misalnya **Greenfield Planning** atau **Codebase Sync**) ingin dipelajari, dimodifikasi, atau di-refactor, developer/agent harus melompat-lompat di 5+ direktori terpisah.
 
-### 6.2. Konsep Target: Feature-Driven Architecture (`src/features/`)
+### 7.2. Konsep Target: Feature-Driven Architecture (`src/features/`)
 Setiap domain bisnis memiliki rumah mandiri di bawah `src/features/<feature-name>/`. Seluruh kode yang berkaitan erat (*high cohesion*) diletakkan di dalam folder fitur tersebut.
 
 ```
@@ -452,7 +571,7 @@ src/
 
 ---
 
-### 6.3. Solusi & Penataan File Test TanStack Router Berawalan Dash (`-*`)
+### 7.3. Solusi & Penataan File Test TanStack Router Berawalan Dash (`-*`)
 * **Mengapa ada file berawalan `-` di `src/routes/`?**
   Di TanStack Router (file-based routing), seluruh file di dalam `src/routes/` otomatis diubah menjadi URL rute. Prefix tanda hubung (`-`) adalah konvensi resmi TanStack Router untuk **mengabaikan file (Route Ignore Prefix)** agar generator rute tidak membuat endpoint untuk file tersebut.
   Di repositori ini, prefix `-` digunakan untuk menaruh file test langsung di sebelah file rute (misal `src/routes/plan/-codebase.test.tsx`).
@@ -466,7 +585,7 @@ src/
 
 ---
 
-### 6.4. Checklist Migrasi Struktur Modular
+### 7.4. Checklist Migrasi Struktur Modular
 - [ ] **Fase 1: Scaffolding Direktori Fitur (`src/features/`):**
   - [ ] Buat struktur dasar `src/features/greenfield/`, `src/features/codebase/`, `src/features/studio/`, `src/features/billing/`, `src/features/templates/`.
 - [ ] **Fase 2: Migrasi Domain Codebase:**
@@ -489,9 +608,9 @@ src/
 
 ---
 
-## 7. Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure & Zero Dead Code
+## 8. Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure & Zero Dead Code
 
-### 7.1. Latar Belakang & Urgensi
+### 8.1. Latar Belakang & Urgensi
 Seringkali AI coding assistant (agent) bertindak malas atau memilih jalan pintas:
 - Menaruh file sembarangan di root `src/lib/` atau `src/hooks/` alih-alih meletakkannya di domain fiturnya.
 - Menulis kode monster hingga ribuan baris dalam 1 file karena tidak mau repot memecah komponen.
@@ -501,7 +620,7 @@ Seringkali AI coding assistant (agent) bertindak malas atau memilih jalan pintas
 
 ---
 
-### 7.2. Rencana Pembuatan File Aturan: `.agents/rules/architecture-folder-structure.md`
+### 8.2. Rencana Pembuatan File Aturan: `.agents/rules/architecture-folder-structure.md`
 
 Aturan ini memuat 5 Kontrak Wajib Agen:
 
@@ -531,7 +650,7 @@ Aturan ini memuat 5 Kontrak Wajib Agen:
 
 ---
 
-### 7.3. Checklist Implementasi Aturan Agent
+### 8.3. Checklist Implementasi Aturan Agent
 - [x] Buat file aturan baru: `.agents/rules/architecture-folder-structure.md` yang memuat kontrak di atas secara komprehensif.
 - [x] Perbarui `AGENTS.md`:
   - [x] Tambahkan tautan `.agents/rules/architecture-folder-structure.md` ke dalam daftar *Always Read / Router Rules*.
@@ -550,6 +669,7 @@ Aturan ini memuat 5 Kontrak Wajib Agen:
 | **P1** | **Pembuatan Rules Agent (`architecture-folder-structure.md`)** | Kritis (Mencegah Sampah Baru Sejak Hari Ini) | Rendah (Dokumentasi & Regulasi) |
 | **P1** | **Standarisasi Responsivitas Mobile & Tablet** | Sangat Tinggi (UX Pengguna Mobile) | Sedang - Luas |
 | **P1** | **Dead Code Elimination & Pembersihan File `-` di Routes** | Tinggi (Mengurangi Bundle & Menghapus Kerumitan) | Sedang |
+| **P2** | **Migrasi Node.js ke Bun — Runtime & Performance Optimization** | Potensial Tinggi (Performance & Runtime Efficiency) | Tinggi |
 | **P2** | **Rebranding VibeEverything $\rightarrow$ everythings-vibe** | Tinggi (Konsistensi Merek & CLI) | Sedang (Banyak File & Test Update) |
 | **P2** | **Refactoring File Monster (~2.000 Baris)** | Sangat Tinggi (Maintainability & Clean Code) | Tinggi (Arsitektural & Butuh Kehati-hatian) |
 | **P2** | **Migrasi ke Feature-Driven Architecture (`src/features/`)** | Sangat Tinggi (Kerapihan Struktur Jangka Panjang) | Tinggi (Pindai & Pindahkan File Bertahap) |
