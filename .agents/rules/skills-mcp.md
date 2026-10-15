@@ -215,7 +215,7 @@ harness.
   `webapp-testing` / `chrome-devtools-qa` -> flat task table with JSON subtask tree, drag-and-drop, 10s polling reconciliation.
 - **Flow 07 Existing Codebase Planning (CLI & Analysis):** `tanstack-start-best-practices` + `tanstack-query-best-practices` + TDD ->
   CLI sync session authentication, chunked snapshot ingestion, AST/manifest analysis, context generation, and codebase-aware planning.
-- **Flow 08 VibeDesign Web Scraping (`/design/scrap`):** `context7-mcp` + `web-design-guidelines` + TDD ->
+- **Flow 08 VibeScrape Web Scraping (`/scrape`):** `context7-mcp` + `web-design-guidelines` + TDD ->
   URL crawl, HTML cleaning, stylesheet extraction, structured color/typography normalization, and token generation into `DESIGN.md`.
 - **Flow 09 VibeDesign Studio Prototyping (`/design/studio`):** `antislop-ui` + `antislop-layoutmobile` + `chrome-devtools-qa` ->
   interactive HTML/Tailwind prototype generation, live browser iframe preview, versioned design revisions (`studio_revisions`), and style inspection.

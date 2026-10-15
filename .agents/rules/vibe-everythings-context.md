@@ -13,7 +13,8 @@
 Platform ini menjembatani ide mentah menjadi rencana implementasi siap-eksekusi bagi pengembang dan tim perangkat lunak:
 - **Greenfield Planning:** Mengubah ide produk menjadi *Feature Tree*, PRD (*Product Requirements Document*) 8-seksi, kriteria penerimaan terstruktur (*Acceptance Criteria* / AC), diagram tugas ber-checklist (*Task Diagram Canvas*), hingga papan Kanban interaktif.
 - **Existing Codebase Planning:** Menghubungkan repositori kode yang sudah ada (melalui sinkronisasi CLI) untuk menganalisis arsitektur eksisting dan merencanakan fitur baru secara kontekstual di atas fondasi kode tersebut.
-- **Vibe Design Studio & Web Scraping:** Mengekstrak struktur UI dan aset dari situs web publik menjadi dokumen panduan token `DESIGN.md`, serta menyediakan studio prototipe HTML interaktif dengan live-preview dan revisi AI berbasis versi.
+- **VibeScrape:** Ekstraksi struktur UI, stylesheet, dan aset dari situs web publik menjadi dokumen panduan token `DESIGN.md` via crawler headless Playwright.
+- **VibeDesign Studio:** Studio prototipe antarmuka interaktif HTML/Tailwind dengan live multi-screen preview dan revisi AI berbasis versi.
 - **CLI Companion (`packages/cli`):** Utility command-line untuk sinkronisasi snapshot codebase lokal, inspeksi tugas/Kanban, dan ekspor spesifikasi proyek ke aturan agen AI (`AGENTS.md`, `.cursorrules`, `.claude/rules/project-spec.md`).
 
 **Bahasa:** Seluruh antarmuka (UI copy), label, pesan error, dan prompt bawaan menggunakan **Bahasa Indonesia**. Istilah teknis pemrograman (misal: *server function*, *polling*, *routing*, *hook*, *mutation*, *caching*, *drag-and-drop*) tetap dipertahankan dalam Bahasa Inggris aslinya.
@@ -100,20 +101,32 @@ Memungkinkan tim merencanakan fitur baru pada basis kode yang sedang berjalan:
 
 ---
 
-### C. Vibe Design Studio & Web Scraping (`/design/*`)
+### C. VibeScrape Pipeline (`/scrape/*`)
 
-Sub-ekosistem desain visual dan ekstraksi antarmuka:
-1. **Web Scraper Antarmuka (`/design/scrap`):**
-   - Mengambil markup dari URL referensi pengguna (`scrapes`).
-   - Membersihkan HTML, mengekstrak stylesheet/aset, dan menyusun dokumen pedoman token desain `DESIGN.md` (`scrape_documents`).
-2. **Vibe Design Studio (`/design/studio`):**
-   - Lingkungan pembuatan prototipe antarmuka interaktif berbasis web.
-   - Pengguna memasukkan instruksi styling/komponen -> AI menghasilkan markup HTML/Tailwind siap pakai dengan live preview di browser.
+Fitur mandiri untuk ekstraksi dan dekonstruksi antarmuka web publik:
+1. **Inisiasi & Crawling Web (`/scrape`, `/scrape/new`):**
+   - Menjalankan Playwright Chromium headless crawler (`scrape-worker.ts`) dengan perlindungan SSRF (`url-validator.ts`).
+   - Mengambil markup HTML utuh, stylesheet internal/eksternal, font definitions, dan aset gambar/SVG ke penyimpanan lokal (`scrapes`).
+2. **Normalisasi Token & Artefak (`/scrape/$id`):**
+   - Membersihkan tag skrip pelacak, menormalisasi palet warna dan tipografi.
+   - Mengompilasi ringkasan pedoman token desain ke dalam format standar `DESIGN.md` (`scrape_documents`).
+   - Riwayat pencarian dan audit ekstraksi tersimpan di `/scrape/history`. Artefak siap diekspor atau dikonsumsi oleh VibeDesign dan VibePlan.
+
+---
+
+### D. VibeDesign Studio (`/design/*` atau `/design/studio/*`)
+
+Sub-ekosistem pembuatan prototipe antarmuka interaktif:
+1. **Interactive Prototyping Canvas (`/design/studio`):**
+   - Pengguna memasukkan instruksi styling/komponen -> AI menghasilkan markup HTML/Tailwind siap pakai dengan live preview di multi-screen canvas (desktop/tablet/mobile).
+   - Opsi konsumsi token desain: Pengguna dapat menyuntikkan token dari hasil VibeScrape sebagai referensi styling.
+2. **Revisi Visual & Design Skills (`/design/studio/$id`):**
+   - Integrasi presets keahlian desain (*design skills* seperti Taste, Anti-Slop, Modern-Minimalist).
    - Mendukung riwayat revisi berbasis versi (`studio_projects`, `studio_revisions`).
 
 ---
 
-### D. Portal Manajemen Admin (`/admin/*`)
+### E. Portal Manajemen Admin (`/admin/*`)
 
 Dasbor khusus untuk pemantauan sistem dan operasional:
 - **Ikhtisar Metrik:** Statistik proyek aktif, konsumsi kredit, dan pertumbuhan pengguna.
@@ -157,7 +170,8 @@ Dasbor khusus untuk pemantauan sistem dan operasional:
 | **Interaksi AI** | `conversations`, `messages`, `codebase_ask_handoffs` | Utas percakapan, pesan streaming, dan persistensi jawaban sesi Ask di server. |
 | **Tugas & Kanban** | `tasks` | Tabel tugas terdenormalisasi (grup fitur, subtask jsonb, koordinat kanban, tracking status & referensi seksi). |
 | **Existing Codebase** | `codebases`, `codebase_sync_sessions`, `codebase_snapshots`, `codebase_snapshot_files`, `codebase_analyses`, `codebase_generation_contexts` | Manajemen repositori, chunk file kode lokal, snapshot commit, ekstraksi manifest, dan analisis arsitektur AI. |
-| **Vibe Design Studio** | `scrapes`, `scrape_documents`, `studio_projects`, `studio_revisions` | Scraping web, ekstraksi file `DESIGN.md`, dan proyek revisi prototipe visual interaktif. |
+| **VibeScrape** | `scrapes`, `scrape_documents` | Scraping web publik, crawler snapshot, ekstraksi stylesheet/aset, dan pedoman token `DESIGN.md`. |
+| **VibeDesign Studio** | `studio_projects`, `studio_revisions` | Proyek prototipe visual interaktif, riwayat revisi AI, canvas frame state, dan preset styling. |
 | **Utilitas & Sistem** | `api_keys`, `feedback`, `error_reports`, `rate_limits`, `notification_preferences` | Kunci REST API eksternal (SHA-256 hash), laporan bug, pembatasan laju (*rate limiting*), dan preferensi email. |
 
 ---

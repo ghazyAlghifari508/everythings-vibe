@@ -26,7 +26,8 @@ If documents disagree, use the most specific approved requirement and document t
 1. **Multi-surface Vibe Ecosystem:**
    - **VibePlan (Greenfield):** Interactive question flow, feature tree map, 8-section PRD, structured acceptance criteria (AC), task whiteboard canvas, and interactive Kanban boards.
    - **VibePlan (Existing Codebase):** Local repository synchronization via CLI (`packages/cli`), AST/dependency analysis, and context-aware planning directly on top of existing code.
-   - **VibeDesign (Studio & Scrap):** Web scraping of public UI into `DESIGN.md` token guides, interactive HTML/Tailwind studio prototypes with live browser preview, and versioned AI visual synthesis.
+   - **VibeScrape:** Web scraping of public website UI, Playwright headless crawling, stylesheet/asset extraction, and design token compilation into `DESIGN.md`.
+   - **VibeDesign (Studio):** Interactive HTML/Tailwind prototyping studio with live canvas preview, multi-screen frame inspection, design skill selection, and versioned AI visual synthesis.
    - **VibeTemplate:** Catalog of prompt blueprints and starter boilerplates for planning and design.
 2. **Real generation pipeline:** Question flow, PRD streaming, AC generation, task breakdowns, and studio synthesis must come from real system signals, proper SSE streams, and persisted records. Never fake progress, typewriter deltas, or provider output.
 3. **Safe, atomic credit and data flow:** 1 credit = 1 generate action (revisions and patch updates are free and unlimited). Credit burning must be atomic (`WHERE credits_used + :charge <= credits`). Database queries strictly enforce tenant isolation (`WHERE user_id = ?`).
@@ -103,7 +104,8 @@ If documents disagree, use the most specific approved requirement and document t
 - `src/features/` — Feature-driven domain modules (high cohesion):
   - `greenfield/` — Ask flow, Feature tree map, PRD viewer/editor, AC, Task whiteboard, Kanban board
   - `codebase/` — CLI sync handling, codebase explorer, chat workspace, analysis engine
-  - `studio/` — Web scraper, design token extraction (`DESIGN.md`), interactive HTML/Tailwind studio
+  - `studio/` — Interactive HTML/Tailwind studio, multi-screen canvas preview, design skill presets
+  - `scrape/` — Web scraper engine, Playwright headless crawler, token extraction (`DESIGN.md`), asset ingestion
   - `templates/` — Blueprint prompt catalog and starter templates
   - `billing/` — Midtrans payment integration, credit balance, atomic ledger, invoices
   - `auth-settings/` — Better Auth flows, user profile, account settings, API keys, notifications

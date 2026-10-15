@@ -13,6 +13,7 @@ Dokumen ini memuat daftar rencana kerja, backlog arsitektur, standarisasi kualit
 6. [Bagian 6: Runtime & Performance Optimization — Migrasi Node.js ke Bun](#6-runtime--performance-optimization--migrasi-nodejs-ke-bun)
 7. [Bagian 7: Arsitektur Berbasis Fitur — Modular Feature-Driven Directory Structure](#7-arsitektur-berbasis-fitur--modular-feature-driven-directory-structure)
 8. [Bagian 8: Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure & Zero Dead Code](#8-aturan-tegas-ai-agent--enforcement-policy-anti-slop-strict-structure--zero-dead-code)
+9. [Bagian 9: Decoupling & Standalone Domain — Pemisahan VibeScrape dari VibeDesign](#9-decoupling--standalone-domain--pemisahan-vibescrape-dari-vibedesign)
 
 ---
 
@@ -177,10 +178,13 @@ Saat ini sebagian antarmuka terfokus pada viewport desktop (layar lebar). Ketika
   - [ ] Dual/Triple pane (Explorer sidebar + Canvas/Doc Preview + Chat) beralih menjadi navigation tab atau drawer switch di mobile/tablet.
   - [ ] Terminal sync command prompt box tidak membuat horizontal overflow di HP.
 
-#### C. Design Studio Pages
-- [ ] **Design Scrap & Studio (`src/routes/design/index.tsx`, `scrap.*`, `studio.*`):**
-  - [ ] Layout editor desain responsif: panel tools, canvas preview, dan inspect panel beradaptasi pada viewport tablet.
-  - [ ] Di layar mobile, berikan tampilan preview yang optimal atau notifikasi visual bahwa mode editing lebih disarankan di tablet/desktop.
+#### C. VibeScrape & VibeDesign Studio Pages
+- [ ] **VibeScrape Workspace (`src/routes/scrape/*` / legacy `/design/scrap.*`):**
+  - [ ] Form input URL scrape, status progress bar, parameter tuning, dan extraction error card tampil rapi di mobile tanpa horizontal overflow.
+  - [ ] Tampilan hasil ekstraksi `DESIGN.md`, inspeksi color token swatch, dan asset gallery adaptif di mobile/tablet.
+- [ ] **VibeDesign Studio (`src/routes/design/studio.*`):**
+  - [ ] Layout editor desain responsif: panel tools, multi-screen canvas preview, dan inspect panel beradaptasi pada viewport tablet.
+  - [ ] Di layar mobile, berikan tampilan preview yang optimal atau notifikasi visual bahwa mode canvas editing lebih disarankan di tablet/desktop.
 
 #### D. Settings & Admin Dashboard
 - [ ] **Settings Pages (`src/routes/settings/*`):**
@@ -297,8 +301,8 @@ Seiring iterasi pengembangan fitur, banyak sisa artefak sementara, rute coba-cob
 - [ ] **Audit `src/routes/demo/`:**
   - [ ] Periksa file `src/routes/demo/tanstack-query.tsx`. Jika ini hanya rute testing internal yang tidak digunakan lagi di production, jadwalkan untuk dihapus beserta foldernya.
   - [ ] Jalankan `pnpm generate-routes` untuk memastikan rute terhapus rapi dari `src/routeTree.gen.ts`.
-- [ ] **Audit Scrap & Eksperimen Desain:**
-  - [ ] Periksa `src/routes/design/scrap.*.tsx` dan pastikan file yang sudah digantikan oleh `studio.*` dibersihkan atau ditata secara teratur.
+- [ ] **Pemisahan Scrap dari Design Studio & Pembersihan Rute Usang:**
+  - [ ] Rute `src/routes/design/scrap.*.tsx` bukan bagian dari studio dan tidak boleh dibiarkan bercampur di bawah `/design/`. Rute ini akan dipindahkan ke domain mandiri `/scrape/*` (VibeScrape) dengan redirect 301 backward compatibility (lihat Bagian 9).
 - [ ] **Audit File Testing Berawalan Dash (`-*`):**
   - [ ] Pindahkan file test di `src/routes/` yang berawalan `-` (seperti `-codebase.test.tsx`, `-bantuan.test.tsx`, `-templates.test.tsx`) keluar dari folder `src/routes/` menuju folder test fitur masing-masing agar `src/routes/` murni hanya berisi file route.
 
@@ -559,10 +563,18 @@ src/
 │   │   ├── services/          # codebase-analysis, codebase-sync, codebase-anchor
 │   │   ├── types/             # Sync schemas, Analysis schemas
 │   │   └── tests/             # Seluruh test sinkronisasi & analisis codebase
-│   ├── studio/                # Fitur VibeDesign Studio & Scrap
-│   │   ├── components/        # StudioCanvas, FramePicker, StyleInspector
-│   │   ├── services/          # crawl-website, design-synthesis, scrape-worker
-│   │   └── tests/             # Test crawling & studio synthesis
+│   ├── studio/                # Fitur VibeDesign Studio (Interactive Canvas & Prototyping)
+│   │   ├── components/        # StudioCanvas, StudioFrame, StudioSidebar, FramePicker
+│   │   ├── hooks/             # useStudioWorkspace, useStudioCanvasMarquee
+│   │   ├── services/          # studio-service, studio-design-blueprint, studio-export
+│   │   ├── types/             # studio-schemas, studio-types
+│   │   └── tests/             # Unit & integration tests studio synthesis
+│   ├── scrape/                # Fitur VibeScrape (Web Scraping, Crawling & Token Extraction)
+│   │   ├── components/        # ScrapeWorkspaceForm, HtmlScraperPanel, ScrapeHistoryList
+│   │   ├── hooks/             # useScrapeStatus, useScrapePreview
+│   │   ├── services/          # scrape-service, scrape-worker (Playwright), crawl-website
+│   │   ├── types/             # scrape-contract, scrape Zod schemas
+│   │   └── tests/             # Unit & integration tests scraping & Playwright crawling
 │   ├── templates/             # Fitur Katalog Template & Blueprints
 │   ├── billing/               # Fitur Midtrans Snap, Credits, Balance & Invoices
 │   └── auth-settings/         # Fitur Autentikasi Better Auth, Profile & Pengaturan
@@ -589,7 +601,7 @@ src/
 
 ### 7.4. Checklist Migrasi Struktur Modular
 - [ ] **Fase 1: Scaffolding Direktori Fitur (`src/features/`):**
-  - [ ] Buat struktur dasar `src/features/greenfield/`, `src/features/codebase/`, `src/features/studio/`, `src/features/billing/`, `src/features/templates/`.
+  - [ ] Buat struktur dasar `src/features/greenfield/`, `src/features/codebase/`, `src/features/studio/`, `src/features/scrape/`, `src/features/billing/`, `src/features/templates/`.
 - [ ] **Fase 2: Migrasi Domain Codebase:**
   - [ ] Pindahkan komponen `src/components/codebase/*` ke `src/features/codebase/components/`.
   - [ ] Pindahkan helpers `src/lib/codebase-*` ke `src/features/codebase/services/`.
@@ -597,14 +609,20 @@ src/
 - [ ] **Fase 3: Migrasi Domain Greenfield:**
   - [ ] Pindahkan komponen `prd/`, `ac/`, `task/`, `kanban/`, `ask/`, `fitur/` ke `src/features/greenfield/components/`.
   - [ ] Pindahkan services `prd-service.ts`, `ac-service.ts`, `task-service.ts` ke `src/features/greenfield/services/`.
-- [ ] **Fase 4: Migrasi Domain Design Studio:**
-  - [ ] Pindahkan komponen `src/components/design/*` ke `src/features/studio/components/`.
-  - [ ] Pindahkan logic scraping & crawling ke `src/features/studio/services/`.
+- [ ] **Fase 4: Migrasi Domain VibeDesign Studio:**
+  - [ ] Pindahkan komponen `src/components/design/studio-*` ke `src/features/studio/components/`.
+  - [ ] Pindahkan services `studio-service.ts`, `studio-design-blueprint.ts`, `studio-export.ts` ke `src/features/studio/services/`.
   - [ ] Pindahkan file test `-studio.*.test.tsx` dari `src/routes/` ke `src/features/studio/tests/`.
-- [ ] **Fase 5: Pembersihan `src/routes/` (Thin Routes Only):**
+- [ ] **Fase 5: Migrasi Domain VibeScrape (Web Scraping & Extraction):**
+  - [ ] Pindahkan komponen `src/components/design/scrape-*` dan `html-scraper*.tsx` ke `src/features/scrape/components/`.
+  - [ ] Pindahkan hooks `use-scrape-status.ts` dan `use-scrape-preview.ts` ke `src/features/scrape/hooks/`.
+  - [ ] Pindahkan logic scraping, crawling, dan worker (`scrape-service.ts`, `scrape-job-service.ts`, `scrape-worker.ts`, `crawl-website.ts`) ke `src/features/scrape/services/`.
+  - [ ] Pindahkan file test `-scrap.*.test.tsx` dari `src/routes/design/` dan `-scrape.*.test.ts` dari `src/routes/api/` ke `src/features/scrape/tests/`.
+- [ ] **Fase 6: Pembersihan `src/routes/` (Thin Routes Only) & Route Separation:**
   - [ ] Pastikan setiap file di `src/routes/` hanya bertindak sebagai wire up (mengambil params/search params, memanggil loader/query, lalu me-render View dari `src/features/`).
+  - [ ] Pisahkan namespace routing VibeScrape (`/scrape/*`) dari VibeDesign Studio (`/design/studio/*`) dengan redirect backward-compatibility.
   - [ ] Hapus seluruh prefiks `-` dari `src/routes/`.
-- [ ] **Fase 6: Validasi Integritas Import & Test:**
+- [ ] **Fase 7: Validasi Integritas Import & Test:**
   - [ ] Jalankan `pnpm generate-routes` untuk memastikan route tree tetap valid.
   - [ ] Jalankan `pnpm check` dan `pnpm test` hingga seluruh suite lulus tanpa import error.
 
@@ -664,6 +682,177 @@ Aturan ini memuat 5 Kontrak Wajib Agen:
 
 ---
 
+## 9. Decoupling & Standalone Domain — Pemisahan VibeScrape dari VibeDesign
+
+### 9.1. Latar Belakang & Rasional Pemisahan
+* **Status:** `Proposed / Backlog`
+* **Prioritas:** `P2`
+* **Kompleksitas:** `Sedang - Luas`
+* **Tujuan:** Memisahkan fitur Web Scraping menjadi pilar domain fitur mandiri tingkat pertama (**VibeScrape**) yang sepenuhnya terisolasi dari **VibeDesign Studio**.
+
+#### Masalah Coupling Historis:
+Sebelumnya, modul Web Scraping diletakkan di bawah payung VibeDesign (rute `src/routes/design/scrap.*.tsx`, komponen di `src/components/design/`, dan grouping "VibeDesign Studio & Scrap"). Coupling ini terjadi akibat asumsi lama bahwa scraping hanyalah langkah pendukung (*auxiliary input*) untuk menyedot CSS/warna website sebelum merancang prototipe Studio.
+
+#### Mengapa Scraping Harus Menjadi Fitur Mandiri (VibeScrape)?
+1. **Perbedaan Domain Masalah & Tanggung Jawab (Separation of Concerns):**
+   - **VibeScrape:** Bertanggung jawab atas ekstraksi data web eksternal, crawling headless browser (Playwright Chromium), sanitasi HTML & filtering skrip pelacak, ekstraksi stylesheet/aset gambar/SVG/font, kalkulasi kontras warna, serta kompilasi panduan token desain terstruktur ke dalam format `DESIGN.md`.
+   - **VibeDesign Studio:** Bertanggung jawab atas lingkungan kanvas pembuatan prototipe visual interaktif, pembangkitan komponen HTML/Tailwind via AI reasoning, multi-screen live preview (desktop, tablet, mobile), inspeksi frame, dan riwayat revisi berbasis versi.
+2. **Nilai Penggunaan Mandiri di Luar Studio Prototyping:**
+   Artefak `DESIGN.md` dan aset visual hasil VibeScrape bernilai tinggi untuk berbagai use-case yang sama sekali tidak membutuhkan Studio:
+   - Sumber konteks visual dan token desain bagi alur **VibePlan** (Greenfield & Codebase).
+   - Panduan styling acuan bagi coding agent (`AGENTS.md`, `.cursorrules`, `.claude/rules/`).
+   - Audit desain sistem, riset antarmuka kompetitor, dan benchmarking UI.
+   - Ekspor mandiri aset dan dokumen token desain tanpa harus membuka kanvas prototipe.
+3. **Penyederhanaan Mental Model & Pengalaman Pengguna (UX Clarity):**
+   Menyatukan scraping di dalam studio membuat alur membingungkan. Pengguna yang hanya ingin mengekstrak token dari sebuah website terpaksa harus melewati menu desain. Dengan pemisahan ini, pengguna mendapatkan alur yang cepat, transparan, dan terfokus di rute `/scrape`.
+4. **Isolasi Beban Worker & Keamanan (SSRF & Resource Safety):**
+   Scraping melibatkan Chromium headless, request jaringan ke internet publik, dan validasi SSRF (`url-validator.ts`). Mengisolasi worker ini ke domain `src/features/scrape/` memastikan kegagalan crawling atau lonjakan memori browser tidak mempengaruhi stabilitas server utama maupun VibeDesign.
+
+---
+
+### 9.2. Arsitektur Target Pemisahan Domain
+
+Struktur direktori target mengisolasi kedua domain secara tegas di bawah `src/features/`:
+
+```
+src/features/
+├── scrape/                            # FITUR MANDIRI: VibeScrape
+│   ├── components/                    # Komponen UI spesifik ekstraksi & scraping
+│   │   ├── scrape-workspace-form.tsx  # Form input URL & parameter tuning
+│   │   ├── html-scraper-panel.tsx     # Panel kontrol scraper
+│   │   ├── scrape-detail.tsx          # Detail hasil ekstraksi & viewer token DESIGN.md
+│   │   ├── scrape-history-list.tsx    # Daftar audit riwayat scraping pengguna
+│   │   ├── scrape-progress.tsx        # Indikator progress crawling & status Playwright
+│   │   ├── scrape-error-card.tsx      # Tampilan penanganan error ekstraksi
+│   │   └── scrap-mode-switcher.tsx    # Pemilih mode ekstraksi
+│   ├── hooks/                         # Custom hooks VibeScrape
+│   │   ├── use-scrape-status.ts       # Polling/SSE status job scraping
+│   │   └── use-scrape-preview.ts      # Preview DOM & asset snapshot
+│   ├── services/                      # Backend & worker logic VibeScrape
+│   │   ├── scrape-service.ts          # Layanan orkestrasi scraping & query DB
+│   │   ├── scrape-job-service.ts      # Antrean job & tracking eksekusi
+│   │   ├── scrape-worker.ts           # Background worker Playwright Chromium
+│   │   ├── crawl-website.ts           # Headless crawling engine & link traversal
+│   │   ├── scrape-extraction-service.ts # Parser CSS, font, color palette & DESIGN.md
+│   │   └── scrape-image-storage.ts    # Penyimpanan lokal screenshot & aset visual
+│   ├── types/                         # Kontrak & Zod schemas domain VibeScrape
+│   │   ├── scrape-contract.ts         # Schema kontrak scraping & parameter spec
+│   │   └── scrape-error-presentation.ts # Klasifikasi error & pemulihan
+│   └── tests/                         # Seluruh unit, integration & worker test VibeScrape
+│
+└── studio/                            # FITUR MANDIRI: VibeDesign Studio
+    ├── components/                    # Komponen UI studio prototyping
+    │   ├── studio-canvas.tsx          # Multi-screen canvas container
+    │   ├── studio-frame.tsx           # Frame render prototipe (iframe sandbox)
+    │   ├── studio-sidebar.tsx         # Sidebar pengaturan & layer tree
+    │   ├── studio-header.tsx          # Toolbar canvas & zoom/pan controls
+    │   └── studio-design-picker.tsx   # Dialog pemilihan preset & token impor
+    ├── hooks/                         # Custom hooks VibeDesign Studio
+    │   ├── use-studio-workspace.ts    # State aktif kanvas & framing
+    │   └── use-studio-canvas-marquee.ts # Interaksi seleksi marquee pada kanvas
+    ├── services/                      # Logika bisnis & AI synthesis VibeDesign
+    │   ├── studio-service.ts          # CRUD proyek studio & riwayat versi revisi
+    │   ├── studio-design-blueprint.ts # Sintesis AI untuk markup HTML/Tailwind
+    │   ├── studio-design-skills.ts    # Registry design skills (Taste, Anti-Slop, dll.)
+    │   └── studio-export.ts           # Ekspor prototipe ke file mandiri / ZIP
+    ├── types/                         # Schema & tipe domain VibeDesign
+    │   └── studio-schemas.ts          # Zod schema blueprint, frames, dan presets
+    └── tests/                         # Unit & integration test studio canvas & generator
+```
+
+---
+
+### 9.3. Pemisahan Routing & URL Namespace
+
+#### 1. Rute Resmi Baru VibeScrape (`/scrape/*`):
+- `/scrape`: Halaman beranda VibeScrape (form input URL, pengaturan parameter, inisiasi ekstraksi).
+- `/scrape/$id`: Halaman detail hasil scrape (viewer `DESIGN.md`, daftar aset terunduh, preview HTML/CSS, tombol ekspor).
+- `/scrape/history`: Riwayat lengkap proses scraping yang pernah dijalankan oleh pengguna.
+- API Endpoints: `/api/scrape`, `/api/scrape/preview`, `/api/scrape/asset` (tetap bersih di bawah namespace `/api/scrape/*`).
+
+#### 2. Rute Resmi VibeDesign Studio (`/design/studio/*` atau `/design/*`):
+- `/design/studio`: Dashboard & inisiasi kanvas prototipe visual interaktif.
+- `/design/studio/$id`: Workspace studio aktif dengan editor kanvas multi-screen.
+- API Endpoints: `/api/studio/project`, `/api/studio/generate`, `/api/studio/frame`, `/api/studio/asset`.
+
+#### 3. Backward Compatibility & Seamless Redirects:
+Agar tidak merusak bookmark atau tautan eksternal yang sudah ada:
+- `src/routes/design/scrap.tsx` $\rightarrow$ Redirect otomatis (HTTP 301 / loader redirect) ke `/scrape`.
+- `src/routes/design/scrap.index.tsx` $\rightarrow$ Redirect ke `/scrape`.
+- `src/routes/design/scrap.$id.tsx` $\rightarrow$ Redirect ke `/scrape/$id`.
+- `src/routes/design/scrap.history.tsx` $\rightarrow$ Redirect ke `/scrape/history`.
+
+---
+
+### 9.4. Kontrak Integrasi Antar-Fitur (Cross-Feature Consumption)
+
+Pemisahan fitur tidak menghilangkan sinergi. VibeDesign Studio tetap dapat memanfaatkan hasil scraping VibeScrape melalui kontrak integrasi yang bersih:
+
+1. **Konsumsi Satu Arah (*One-Way Dependency*):**
+   VibeDesign Studio bertindak sebagai *consumer* (pengguna artefak). VibeScrape **sama sekali tidak memiliki dependensi** ke VibeDesign Studio.
+2. **Pola Pemanggilan DTO / Service Publik:**
+   Di dalam VibeDesign Studio, terdapat opsi *"Gunakan Desain dari URL / Scrape"*:
+   - Studio memanggil fungsi publik `getScrapeDocument(scrapeId)` dari `src/features/scrape/services/scrape-service.ts`.
+   - Dokumen `DESIGN.md` yang diperoleh langsung disuntikkan ke context prompt blueprint studio.
+3. **Decoupled Engine:**
+   Modul studio bebas 100% dari dependensi Playwright, Chromium headless, maupun kode crawling jaringan.
+
+---
+
+### 9.5. Database Schema & Worker Isolation
+
+1. **Tabel Database Milik VibeScrape:**
+   - `scrapes`: Menyimpan URL sasaran, status eksekusi job (`pending`, `scraping`, `completed`, `failed`), waktu eksekusi, opsi ekstraksi, dan metadata sesi.
+   - `scrape_documents`: Menyimpan dokumen markdown terstruktur (`DESIGN.md`), stylesheet mentah, dan manifest aset.
+2. **Tabel Database Milik VibeDesign Studio:**
+   - `studio_projects`: Proyek desain kanvas, preferensi framework/preset, prompt desain pengguna.
+   - `studio_revisions`: Riwayat versi kode HTML/Tailwind interaktif per iterasi AI.
+3. **Isolasi Background Worker:**
+   - Skrip worker Playwright `scrape-worker.ts` dijalankan sebagai proses latar belakang terisolasi.
+   - Dilengkapi proteksi SSRF (`url-validator.ts`), pembatasan resource memori browser, dan graceful shutdown handler agar tidak membebani proses Node/Bun web server utama.
+
+---
+
+### 9.6. Checklist Eksekusi Pemisahan VibeScrape
+
+- [ ] **Fase 1 — Scaffolding Direktori Domain VibeScrape:**
+  - [ ] Buat struktur folder: `src/features/scrape/{components,hooks,services,types,tests}`.
+- [ ] **Fase 2 — Migrasi Komponen UI Scraper:**
+  - [ ] Pindahkan komponen scraper dari `src/components/design/` ke `src/features/scrape/components/`:
+    - `scrape-workspace-form.tsx`
+    - `html-scraper-panel.tsx` & `html-scraper.tsx`
+    - `scrape-detail.tsx`
+    - `scrape-history-list.tsx`
+    - `scrape-progress.tsx`
+    - `scrape-error-card.tsx`
+    - `scrap-mode-switcher.tsx`
+    - `scrape-filter-select.tsx`, `scrape-form-notice.tsx`, `scrape-back-link.tsx`
+- [ ] **Fase 3 — Migrasi Custom Hooks:**
+  - [ ] Pindahkan `use-scrape-status.ts` dan `use-scrape-preview.ts` dari `src/hooks/` ke `src/features/scrape/hooks/`.
+- [ ] **Fase 4 — Migrasi Services, Crawler & Worker:**
+  - [ ] Pindahkan services dari `src/lib/services/` dan `src/lib/` ke `src/features/scrape/services/`:
+    - `scrape-service.ts` & `scrape-job-service.ts`
+    - `scrape-worker.ts` & `crawl-website.ts`
+    - `scrape-extraction-service.ts`
+    - `scrape-image-storage.ts` & `scrape-images.ts`
+    - `scrape-retry.ts`, `scrape-preview-document.ts`, `scrape-history.ts`
+  - [ ] Pindahkan tipe & kontrak ke `src/features/scrape/types/`:
+    - `scrape-contract.ts`
+    - `scrape-error-presentation.ts`
+    - `scrape-parameter-spec.ts` & `scrape-view-state.ts`
+- [ ] **Fase 5 — Migrasi Rute TanStack Router:**
+  - [ ] Buat rute baru: `src/routes/scrape/index.tsx`, `src/routes/scrape/$id.tsx`, dan `src/routes/scrape/history.tsx`.
+  - [ ] Ubah file rute lama `src/routes/design/scrap.*.tsx` menjadi thin redirect ke rute `/scrape/*`.
+  - [ ] Jalankan `pnpm generate-routes` untuk meregenerasi route tree TanStack Router.
+- [ ] **Fase 6 — Pemindahan Test Suites:**
+  - [ ] Pindahkan seluruh file test scraping (`-scrap.*.test.tsx`, `scrape-*.test.ts`) keluar dari `src/routes/` dan `src/lib/` ke dalam `src/features/scrape/tests/`.
+- [ ] **Fase 7 — Integrasi Bersih VibeDesign Studio:**
+  - [ ] Pastikan komponen studio di `src/features/studio/` hanya memanggil DTO/service publik dari `src/features/scrape/` tanpa circular dependency.
+- [ ] **Fase 8 — Verifikasi & Test Passing:**
+  - [ ] Jalankan `pnpm check`, `pnpm test`, dan verifikasi build hingga 100% green.
+
+---
+
 ## 📋 Ringkasan Prioritas Eksekusi Mendatang
 
 | Prioritas | Backlog Item | Tingkat Dampak | Kompleksitas |
@@ -671,6 +860,7 @@ Aturan ini memuat 5 Kontrak Wajib Agen:
 | **P1** | **Pembuatan Rules Agent (`architecture-folder-structure.md`)** | Kritis (Mencegah Sampah Baru Sejak Hari Ini) | Rendah (Dokumentasi & Regulasi) |
 | **P1** | **Standarisasi Responsivitas Mobile & Tablet** | Sangat Tinggi (UX Pengguna Mobile) | Sedang - Luas |
 | **P1** | **Dead Code Elimination & Pembersihan File `-` di Routes** | Tinggi (Mengurangi Bundle & Menghapus Kerumitan) | Sedang |
+| **P2** | **Pemisahan Domain VibeScrape dari VibeDesign** | Tinggi (Pemisahan Domain Bersih & Worker Isolation) | Sedang - Luas |
 | **P2** | **Migrasi Node.js ke Bun — Runtime & Performance Optimization** | Potensial Tinggi (Performance & Runtime Efficiency) | Tinggi |
 | **P2** | **Rebranding VibeEverything $\rightarrow$ everythings-vibe** | Tinggi (Konsistensi Merek & CLI) | Sedang (Banyak File & Test Update) |
 | **P2** | **Refactoring File Monster (~2.000 Baris)** | Sangat Tinggi (Maintainability & Clean Code) | Tinggi (Arsitektural & Butuh Kehati-hatian) |

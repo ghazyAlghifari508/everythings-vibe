@@ -25,11 +25,12 @@ src/features/<feature-name>/
 ### Domain Fitur Resmi di everythings-vibe:
 1. `src/features/greenfield/` (atau `vibeplan/`): Ask flow, Feature tree map, 8-section PRD, Acceptance criteria, Task whiteboard canvas, Interactive Kanban board.
 2. `src/features/codebase/`: Codebase analysis, CLI sync session handling, Codebase explorer sidebar, Codebase chat workspace.
-3. `src/features/studio/`: VibeDesign scraping, Studio editor, Blueprint synthesis, Canvas preview, Frame inspection.
-4. `src/features/templates/`: VibeTemplate catalog, prompt shortcuts, boilerplate blueprints.
-5. `src/features/billing/`: Midtrans Snap integration, credit ledger, atomic balance deduction, top-up packages, invoices.
-6. `src/features/auth-settings/`: Better Auth integration, user sessions, user profile, API keys, notifications, feedback.
-7. `src/features/admin/`: Admin metrics dashboard, user management, project oversight, transaction audit.
+3. `src/features/studio/`: VibeDesign Studio editor, interactive HTML/Tailwind prototyping canvas, Blueprint synthesis, Multi-screen preview, Frame inspection.
+4. `src/features/scrape/`: VibeScrape web scraper engine, Playwright Chromium headless crawler, DOM asset/stylesheet extraction, dan token normalization (`DESIGN.md`).
+5. `src/features/templates/`: VibeTemplate catalog, prompt shortcuts, boilerplate blueprints.
+6. `src/features/billing/`: Midtrans Snap integration, credit ledger, atomic balance deduction, top-up packages, invoices.
+7. `src/features/auth-settings/`: Better Auth integration, user sessions, user profile, API keys, notifications, feedback.
+8. `src/features/admin/`: Admin metrics dashboard, user management, project oversight, transaction audit.
 
 ### Aturan Penempatan Kode:
 * **DILARANG KERAS** melempar komponen baru ke root `src/components/` atau helper baru ke `src/lib/` jika file tersebut hanya dikonsumsi oleh satu domain fitur.
