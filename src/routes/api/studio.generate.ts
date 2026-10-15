@@ -119,9 +119,7 @@ export async function POST({
 			if (!validFilename.ok) {
 				return Response.json({ error: validFilename.error }, { status: 400 });
 			}
-			const validContent = validateStudioPrdContent(
-				body.prdAttachment.content,
-			);
+			const validContent = validateStudioPrdContent(body.prdAttachment.content);
 			if (!validContent.ok) {
 				return Response.json({ error: validContent.error }, { status: 400 });
 			}

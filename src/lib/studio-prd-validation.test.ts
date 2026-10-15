@@ -54,7 +54,7 @@ describe("validateStudioPrdFilename", () => {
 		expect(validateStudioPrdFilename("../secret.md").ok).toBe(false);
 		expect(validateStudioPrdFilename("folder/prd.md").ok).toBe(false);
 		expect(validateStudioPrdFilename("C:\\path\\prd.md").ok).toBe(false);
-		expect(validateStudioPrdFilename("".padStart(300, "a") + ".md").ok).toBe(
+		expect(validateStudioPrdFilename(`${"".padStart(300, "a")}.md`).ok).toBe(
 			false,
 		);
 	});
@@ -99,7 +99,10 @@ describe("validateStudioPrdContent", () => {
 		}
 
 		// Byte limit check
-		const hugeBytes = Buffer.alloc(STUDIO_PRD_FILE_MAX_BYTES + 10, "a").toString("utf8");
+		const hugeBytes = Buffer.alloc(
+			STUDIO_PRD_FILE_MAX_BYTES + 10,
+			"a",
+		).toString("utf8");
 		const resBytes = validateStudioPrdContent(hugeBytes);
 		expect(resBytes.ok).toBe(false);
 	});
@@ -110,7 +113,8 @@ describe("validateStudioPrdContent", () => {
 		expect(validateStudioPrdContent(withNull).ok).toBe(false);
 
 		// PDF header disguised as .md
-		const fakePdf = "%PDF-1.4\nSome text content that looks long enough to pass min chars";
+		const fakePdf =
+			"%PDF-1.4\nSome text content that looks long enough to pass min chars";
 		const resPdf = validateStudioPrdContent(fakePdf);
 		expect(resPdf.ok).toBe(false);
 		if (!resPdf.ok) {
@@ -118,7 +122,8 @@ describe("validateStudioPrdContent", () => {
 		}
 
 		// ZIP / DOCX magic header PK\x03\x04
-		const fakeZip = "PK\x03\x04\x14\x00\x06\x00Some binary archive disguised as markdown";
+		const fakeZip =
+			"PK\x03\x04\x14\x00\x06\x00Some binary archive disguised as markdown";
 		expect(validateStudioPrdContent(fakeZip).ok).toBe(false);
 	});
 });

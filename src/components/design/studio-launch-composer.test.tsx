@@ -172,7 +172,8 @@ describe("StudioLaunchComposer", () => {
 		) as HTMLInputElement;
 		expect(fileInput).not.toBeNull();
 
-		const validContent = "# PRD Title\nValid product requirement specifications.";
+		const validContent =
+			"# PRD Title\nValid product requirement specifications.";
 		const file = new File([validContent], "spec.md", { type: "text/markdown" });
 
 		fireEvent.change(fileInput, { target: { files: [file] } });
@@ -275,7 +276,8 @@ describe("StudioLaunchComposer", () => {
 	it("preserves prompt draft when an error is displayed", () => {
 		renderComposer({
 			prompt: "Draft prompt that user spent effort typing",
-			error: "Format PRD tidak didukung. Hanya file berekstensi .md yang didukung.",
+			error:
+				"Format PRD tidak didukung. Hanya file berekstensi .md yang didukung.",
 		});
 
 		const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;

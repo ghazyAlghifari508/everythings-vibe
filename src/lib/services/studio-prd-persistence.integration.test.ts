@@ -58,7 +58,12 @@ describe("Studio PRD Persistence & Ownership", () => {
 		const [deletedProject] = await db
 			.select()
 			.from(studioProjects)
-			.where(and(eq(studioProjects.id, project.id), eq(studioProjects.userId, userId)));
+			.where(
+				and(
+					eq(studioProjects.id, project.id),
+					eq(studioProjects.userId, userId),
+				),
+			);
 		expect(deletedProject).toBeUndefined();
 
 		// Clean up duplicate
@@ -106,7 +111,8 @@ describe("Studio PRD Persistence & Ownership", () => {
 			prompt,
 			prdAttachment: {
 				filename: "market-v1.md",
-				content: "# Marketplace V1\nFokus pada produk fashion dan kerajinan tangan.",
+				content:
+					"# Marketplace V1\nFokus pada produk fashion dan kerajinan tangan.",
 			},
 		});
 
@@ -114,7 +120,8 @@ describe("Studio PRD Persistence & Ownership", () => {
 			prompt,
 			prdAttachment: {
 				filename: "market-v2.md",
-				content: "# Marketplace V2\nFokus pada kuliner dan rempah-rempah nusantara.",
+				content:
+					"# Marketplace V2\nFokus pada kuliner dan rempah-rempah nusantara.",
 			},
 		});
 
@@ -128,7 +135,8 @@ describe("Studio PRD Persistence & Ownership", () => {
 			prompt,
 			prdAttachment: {
 				filename: "market-v2.md",
-				content: "# Marketplace V2\nFokus pada kuliner dan rempah-rempah nusantara.",
+				content:
+					"# Marketplace V2\nFokus pada kuliner dan rempah-rempah nusantara.",
 			},
 		});
 		expect(thirdWithSamePrd.project.id).toBe(secondWithDifferentPrd.project.id);

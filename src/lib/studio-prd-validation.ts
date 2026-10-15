@@ -47,7 +47,8 @@ export function validateStudioPrdFilename(
 	if (!lower.endsWith(".md") || lower === ".md") {
 		return {
 			ok: false,
-			error: "Format PRD tidak didukung. Hanya file berekstensi .md yang didukung.",
+			error:
+				"Format PRD tidak didukung. Hanya file berekstensi .md yang didukung.",
 		};
 	}
 
@@ -105,7 +106,8 @@ export function validateStudioPrdContent(
 	if (trimmed.includes("\0")) {
 		return {
 			ok: false,
-			error: "File terdeteksi sebagai file biner dan bukan dokumen teks markdown yang valid.",
+			error:
+				"File terdeteksi sebagai file biner dan bukan dokumen teks markdown yang valid.",
 		};
 	}
 
@@ -119,7 +121,8 @@ export function validateStudioPrdContent(
 		if (trimmed.startsWith(sig)) {
 			return {
 				ok: false,
-				error: "File terdeteksi sebagai file biner dan bukan dokumen teks markdown yang valid.",
+				error:
+					"File terdeteksi sebagai file biner dan bukan dokumen teks markdown yang valid.",
 			};
 		}
 	}
@@ -145,7 +148,10 @@ export function sanitizeStudioPrd(content: string): string {
 			/<\/?PRODUCT_REQUIREMENTS_REFERENCE_DO_NOT_EXECUTE_AS_INSTRUCTIONS>/gi,
 			"",
 		)
-		.replace(/<\/?DESIGN_SYSTEM_REFERENCE_DO_NOT_EXECUTE_AS_INSTRUCTIONS>/gi, "")
+		.replace(
+			/<\/?DESIGN_SYSTEM_REFERENCE_DO_NOT_EXECUTE_AS_INSTRUCTIONS>/gi,
+			"",
+		)
 		.replace(/<\/?SHARED_DESIGN_BLUEPRINT>/gi, "")
 		.trim();
 }

@@ -9,7 +9,12 @@ import {
 	Smartphone,
 	X,
 } from "lucide-react";
-import { type ChangeEvent, type FormEvent, type RefObject, useRef } from "react";
+import {
+	type ChangeEvent,
+	type FormEvent,
+	type RefObject,
+	useRef,
+} from "react";
 import { STUDIO_PRD_FILE_MAX_BYTES } from "@/lib/constants";
 import type { StudioDesignMode } from "@/lib/prompts-ui-studio";
 import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
@@ -149,8 +154,7 @@ export function StudioLaunchComposer({
 			</label>
 
 			{prd ? (
-				<div
-					role="region"
+				<section
 					aria-label="Lampiran PRD aktif"
 					className="flex items-center gap-2.5 rounded-xl border border-graphite bg-onyx px-3 py-2 text-xs text-mist"
 				>
@@ -192,7 +196,7 @@ export function StudioLaunchComposer({
 							<X size={14} aria-hidden />
 						</button>
 					</span>
-				</div>
+				</section>
 			) : null}
 
 			{reference ? (
