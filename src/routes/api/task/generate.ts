@@ -73,7 +73,7 @@ import { requireUser } from "@/lib/session";
  * Returns the tree unchanged when scope evidence is unavailable (greenfield),
  * so greenfield behavior is untouched.
  */
-function applyScopeRefinement(input: {
+export function applyScopeRefinement(input: {
 	tree: TaskTree;
 	scopeEvidence: ScopeEvidence | null;
 	emit: (payload: Record<string, unknown>) => void;
