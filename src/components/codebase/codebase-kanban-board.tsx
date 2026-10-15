@@ -1,8 +1,8 @@
 "use client";
 
 import { Link } from "@tanstack/react-router";
-import { ExternalLink } from "lucide-react";
-import { useMemo } from "react";
+import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type TaskCard, useKanbanTasks } from "@/hooks/use-kanban-polling";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 
@@ -134,6 +134,108 @@ export function CodebaseKanbanBoard({
 		return computeKanbanProgress(columns);
 	}, [columns]);
 
+	const failed = columns?.failed ?? [];
+	const columnSpecs: ColumnSpec[] = useMemo(() => {
+		const todo = columns?.pending ?? [];
+		const doing = columns?.in_progress ?? [];
+		const done = columns?.completed ?? [];
+		const specs: ColumnSpec[] = [
+			{ key: "todo", title: "To Do", cards: todo },
+			{
+				key: "doing",
+				title: "In Progress",
+				cards: doing,
+				highlightInProgress: true,
+			},
+			{ key: "done", title: "Done", cards: done },
+		];
+		if (failed.length > 0) {
+			specs.push({ key: "failed", title: "Gagal", cards: failed });
+		}
+		return specs;
+	}, [columns, failed]);
+
+	const scrollRef = useRef<HTMLDivElement>(null);
+	const [canScrollLeft, setCanScrollLeft] = useState(false);
+	const [canScrollRight, setCanScrollRight] = useState(false);
+
+	const updateScrollButtons = useCallback(() => {
+		const el = scrollRef.current;
+		if (!el) {
+			setCanScrollLeft(false);
+			setCanScrollRight(false);
+			return;
+		}
+		const maxScroll = el.scrollWidth - el.clientWidth;
+		if (maxScroll <= 0) {
+			setCanScrollLeft(el.scrollLeft > 2);
+			setCanScrollRight(columnSpecs.length > 1);
+			return;
+		}
+		setCanScrollLeft(el.scrollLeft > 2);
+		setCanScrollRight(el.scrollLeft < maxScroll - 2);
+	}, [columnSpecs.length]);
+
+	useEffect(() => {
+		const el = scrollRef.current;
+		if (!el) return;
+
+		updateScrollButtons();
+
+		el.addEventListener("scroll", updateScrollButtons, { passive: true });
+
+		let observer: ResizeObserver | null = null;
+		if (typeof ResizeObserver !== "undefined") {
+			observer = new ResizeObserver(() => {
+				updateScrollButtons();
+			});
+			observer.observe(el);
+		} else if (typeof window !== "undefined") {
+			window.addEventListener("resize", updateScrollButtons);
+		}
+
+		return () => {
+			el.removeEventListener("scroll", updateScrollButtons);
+			if (observer) {
+				observer.disconnect();
+			} else if (typeof window !== "undefined") {
+				window.removeEventListener("resize", updateScrollButtons);
+			}
+		};
+	}, [updateScrollButtons]);
+
+	const handleScrollLeft = () => {
+		const el = scrollRef.current;
+		if (!el) return;
+		if (typeof el.scrollBy === "function") {
+			el.scrollBy({ left: -236, behavior: "smooth" });
+		} else {
+			el.scrollLeft -= 236;
+		}
+		updateScrollButtons();
+	};
+
+	const handleScrollRight = () => {
+		const el = scrollRef.current;
+		if (!el) return;
+		if (typeof el.scrollBy === "function") {
+			el.scrollBy({ left: 236, behavior: "smooth" });
+		} else {
+			el.scrollLeft += 236;
+		}
+		updateScrollButtons();
+	};
+
+	const handleToolbarKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+		if (e.key === "ArrowLeft") {
+			e.preventDefault();
+			handleScrollLeft();
+		} else if (e.key === "ArrowRight") {
+			e.preventDefault();
+			handleScrollRight();
+		}
+	};
+
 	if (!projectId) {
 		return (
 			<div
@@ -195,60 +297,79 @@ export function CodebaseKanbanBoard({
 		);
 	}
 
-	const todo = columns?.pending ?? [];
-	const doing = columns?.in_progress ?? [];
-	const done = columns?.completed ?? [];
-	const failed = columns?.failed ?? [];
-	const columnSpecs: ColumnSpec[] = [
-		{ key: "todo", title: "To Do", cards: todo },
-		{
-			key: "doing",
-			title: "In Progress",
-			cards: doing,
-			highlightInProgress: true,
-		},
-		{ key: "done", title: "Done", cards: done },
-	];
-	// The failed column appears only when it has work: an always-present empty
-	// column would be one more thing to read for no information.
-	if (failed.length > 0) {
-		columnSpecs.push({ key: "failed", title: "Gagal", cards: failed });
-	}
 	const hasAnyTask = progress.total > 0;
 
 	return (
 		<div data-testid="codebase-kanban-board" className="flex flex-col gap-3">
-			<div className="flex flex-wrap items-center gap-2">
+			<div className="sticky top-0 z-10 -mt-1 flex flex-col gap-2 bg-obsidian/95 pb-2 pt-1 backdrop-blur-sm">
+				<div className="flex items-center justify-between gap-2">
+					<div className="flex items-center gap-2">
+						<h3 className="text-xs font-semibold text-snow">Papan Kanban</h3>
+						<span
+							data-testid="codebase-kanban-progress"
+							className="font-mono text-[11px] tabular-nums text-fog"
+						>
+							{progress.done}/{progress.total} selesai ({progress.pct}%)
+						</span>
+					</div>
+					<div className="flex items-center gap-1.5">
+						{hasAnyTask ? (
+							<div
+								role="toolbar"
+								aria-label="Navigasi horizontal Kanban"
+								onKeyDown={handleToolbarKeyDown}
+								className="flex items-center gap-1 rounded-md border border-graphite bg-charcoal p-0.5"
+							>
+								<button
+									type="button"
+									onClick={handleScrollLeft}
+									disabled={!canScrollLeft}
+									aria-label="Gulir kolom ke kiri"
+									title="Gulir ke kiri (Panah Kiri)"
+									data-testid="codebase-kanban-scroll-left"
+									className="inline-flex h-6 w-6 items-center justify-center rounded text-mist transition hover:bg-obsidian hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-mist"
+								>
+									<ChevronLeft size={13} aria-hidden="true" />
+								</button>
+								<button
+									type="button"
+									onClick={handleScrollRight}
+									disabled={!canScrollRight}
+									aria-label="Gulir kolom ke kanan"
+									title="Gulir ke kanan (Panah Kanan)"
+									data-testid="codebase-kanban-scroll-right"
+									className="inline-flex h-6 w-6 items-center justify-center rounded text-mist transition hover:bg-obsidian hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-mist"
+								>
+									<ChevronRight size={13} aria-hidden="true" />
+								</button>
+							</div>
+						) : null}
+						{canOpenFullBoard ? (
+							<Link
+								to="/kanban/$id"
+								params={{ id: projectId }}
+								data-testid="codebase-kanban-full-board"
+								className="inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-charcoal px-2 text-[11px] font-medium text-mist transition hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								<ExternalLink size={12} aria-hidden="true" />
+								Buka Kanban Penuh
+							</Link>
+						) : null}
+					</div>
+				</div>
 				<div
 					role="progressbar"
 					aria-valuenow={progress.pct}
 					aria-valuemin={0}
 					aria-valuemax={100}
 					aria-label="Progress penyelesaian task"
-					className="h-1.5 min-w-24 flex-1 overflow-hidden rounded-full bg-steel/40"
+					className="h-1.5 w-full overflow-hidden rounded-full bg-steel/40"
 				>
 					<div
 						className="h-full rounded-full bg-indigo transition-all duration-500"
 						style={{ width: `${progress.pct}%` }}
 					/>
 				</div>
-				<span
-					data-testid="codebase-kanban-progress"
-					className="shrink-0 font-mono text-[11px] tabular-nums text-fog"
-				>
-					{progress.done}/{progress.total} selesai ({progress.pct}%)
-				</span>
-				{canOpenFullBoard ? (
-					<Link
-						to="/kanban/$id"
-						params={{ id: projectId }}
-						data-testid="codebase-kanban-full-board"
-						className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-charcoal px-2.5 text-[11px] font-medium text-mist transition hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						<ExternalLink size={12} aria-hidden="true" />
-						Buka Kanban Penuh
-					</Link>
-				) : null}
 			</div>
 			{staleness !== "live" ? (
 				<p className="rounded-md border border-graphite bg-charcoal p-2 text-[11px] text-fog">
@@ -265,18 +386,35 @@ export function CodebaseKanbanBoard({
 				</p>
 			) : null}
 			{hasAnyTask ? (
-				<div
-					data-testid="codebase-kanban-columns"
-					className="flex gap-3 overflow-x-auto pb-1"
-				>
-					{columnSpecs.map((spec) => (
-						<Column
-							key={spec.key}
-							title={spec.title}
-							cards={spec.cards}
-							highlightInProgress={spec.highlightInProgress}
+				<div className="relative min-w-0">
+					{canScrollLeft ? (
+						<div
+							aria-hidden="true"
+							data-testid="codebase-kanban-fade-left"
+							className="pointer-events-none absolute left-0 top-0 bottom-1 z-10 w-6 bg-gradient-to-r from-obsidian to-transparent"
 						/>
-					))}
+					) : null}
+					{canScrollRight ? (
+						<div
+							aria-hidden="true"
+							data-testid="codebase-kanban-fade-right"
+							className="pointer-events-none absolute right-0 top-0 bottom-1 z-10 w-6 bg-gradient-to-l from-obsidian to-transparent"
+						/>
+					) : null}
+					<div
+						ref={scrollRef}
+						data-testid="codebase-kanban-columns"
+						className="flex gap-3 overflow-x-auto pb-1 scroll-smooth focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo/40 rounded-lg"
+					>
+						{columnSpecs.map((spec) => (
+							<Column
+								key={spec.key}
+								title={spec.title}
+								cards={spec.cards}
+								highlightInProgress={spec.highlightInProgress}
+							/>
+						))}
+					</div>
 				</div>
 			) : (
 				<div
