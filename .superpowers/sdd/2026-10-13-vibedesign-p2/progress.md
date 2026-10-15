@@ -1,0 +1,24 @@
+# SDD ledger — plan: docs/superpowers/plans/2026-10-13-vibedesign-p2.md
+- BASE=1ec34d65a0127788d2ce4ef16fdc58c72295db81 (feature/vibedesign-design-studio HEAD at plan start)
+- Worktree: existing feature branch verified isolated (not main), no new worktree needed.
+- Preflight scan rows:
+  - Task1(constants+blueprint) vs Task2(schema): Task1 produces StudioDesignBlueprint type; Task2 consumes it for jsonb.$type — compatible, no conflict.
+  - Task3(slots) vs Task4(planning persist): Task3 produces slots Layar 1..N; Task4 updates same slots by order — produces/consume aligned, rule: update not re-insert when count matches.
+  - Task5(concurrency) vs Task4: Task5 consumes framesToProcess + blueprint; Task4 produces both — aligned.
+  - Task6(prompts) vs Task1: consumes blueprint schema — aligned.
+  - Task7(reliability) vs Task5: consumes claim/lease — aligned.
+  - Self-check per task: tests vs code specified concretely, files created vs later touched consistent.
+- Ruling: none preflight (scan clean).
+- Ruling: subagent dispatch gagal (API connect) — eksekusi inline per task dengan TDD + review sendiri via gates. Cost: tanpa independent reviewer; mitigasi: full suite + tsc + bypass scan tiap milestone.
+- Ruling: advisory locks diganti lease claims DB (claimStudioJob) — p2 mandatkan klaim atomik + lepas tx sebelum AI; advisory xact-lock hanya ada di runStudioFrameOperation dan menahan tx selama AI. Cost jika salah: duplikasi pada deployment multi-instance; mitigasi: claim UPDATE atomik + claimedBy guard + test claim collisions.
+- Ruling: migrasi 0036 memakai nama generator (0036_romantic_johnny_blaze) bukan nama deskriptif plan — rename merusak _journal.json. `pnpm db:migrate` gagal pre-existing (0034/0035 sudah terapply via push tanpa record) — kolom 0036 diapply idempoten ke dev DB via SQL langsung; file migrasi tetap untuk env bersih.
+- Ruling: batas truncasi inline (judul/nama/deskripsi) tetap — detail implementasi statis, bukan business rule yang configurable.
+- Task 1: complete (commits 1ec34d6..22e728e, review clean: 3 tests, tsc, biome)
+- Task 2: complete (commits 22e728e..7f8cb75, review clean: persistence 2 tests + fixtures ripple, tsc)
+- Task 3: complete (commits 7f8cb75..d4ee662, review clean: slots 3 tests + e2e scenario5 adaptasi + mock route, 147 studio tests)
+- Task 4: complete (commits d4ee662..4597416, review clean: blueprint 5 tests + persist assertion, mock planning/e2e blueprint)
+- Task 5: complete (commits 4597416..17cb48b, review clean: concurrency 6 tests, advisory→lease, 158 studio tests)
+- Task 6: complete (commits 17cb48b..1f1fba9, review clean: validator + helper + mock HTML kontrak, 160 studio tests)
+- Task 7: complete (commits 1f1fba9..7103b86, review clean: recovery 4 tests, 162 studio tests)
+- Task 8: verification: pnpm test 277 files/2809 tests PASS; tsc PASS; bypass scan empty; pnpm build PASS; pnpm check 9 errors pre-existing di luar scope (globals.css, ask-service, cli, thought-line, prompts-ask, studio-canvas organizeImports) — tak tersentuh.
+- Push: 8 commits (22e728e, 7f8cb75, d4ee662, 4597416, 17cb48b, 1f1fba9, 7103b86, cebfdc1) pushed to origin/feature/vibedesign-design-studio; outgoing 0; tree hanya menyisakan TODO.md (pre-existing user) + untracked ledger/prompt-dir.
