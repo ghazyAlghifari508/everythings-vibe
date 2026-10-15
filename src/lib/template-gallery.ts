@@ -1,6 +1,8 @@
 // Readonly catalogs: shared definitions must not be mutable at runtime —
 // any module could otherwise push/splice entries and corrupt every
 // subsequent render in the process. Deep-frozen below.
+import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
+
 interface CatalogEntry {
 	readonly id: string;
 	readonly title: string;
@@ -254,8 +256,7 @@ export const VIBE_TEMPLATES: readonly VibeTemplateEntry[] = freezeCatalog([
 		platform: "mobile",
 		description:
 			"Tampilan antarmuka mobile e-commerce modern dengan banner promosi carousel, grid produk 2 kolom, dan bottom navigation bar.",
-		prompt:
-			"Buatkan layout antarmuka mobile aplikasi belanja online e-commerce modern di viewport mobile (375px). Di bagian atas buat search bar produk dengan tombol keranjang belanja dan badge jumlah item. Di bawahnya pasang banner promo slider dengan warna gradien menarik dan countdown flash sale. Tampilkan kategori cepat dalam icon bulat (Elektronik, Fashion, Kuliner, Gadget). Di bawahnya buat grid produk 2 kolom yang menampilkan gambar produk, judul produk 2 baris, rating bintang dan jumlah terjual, harga diskon coret, harga akhir tebal, dan tombol tambah ke keranjang instan (+). Di bagian paling bawah buat fixed bottom navigation bar (Home, Kategori, Favorit, Pesanan, Akun).",
+		prompt: `Buatkan layout antarmuka mobile aplikasi belanja online e-commerce modern di viewport mobile (${STUDIO_VISUAL_WIDTH.mobile}px). Di bagian atas buat search bar produk dengan tombol keranjang belanja dan badge jumlah item. Di bawahnya pasang banner promo slider dengan warna gradien menarik dan countdown flash sale. Tampilkan kategori cepat dalam icon bulat (Elektronik, Fashion, Kuliner, Gadget). Di bawahnya buat grid produk 2 kolom yang menampilkan gambar produk, judul produk 2 baris, rating bintang dan jumlah terjual, harga diskon coret, harga akhir tebal, dan tombol tambah ke keranjang instan (+). Di bagian paling bawah buat bottom navigation bar (Home, Kategori, Favorit, Pesanan, Akun) yang berada di alur dokumen.`,
 		tags: [
 			"Mobile UI",
 			"E-Commerce",
@@ -273,8 +274,7 @@ export const VIBE_TEMPLATES: readonly VibeTemplateEntry[] = freezeCatalog([
 		platform: "mobile",
 		description:
 			"Tampilan dompet digital modern dengan kartu saldo virtual gradien, menu transfer cepat, dan riwayat mutasi bank.",
-		prompt:
-			"Rancang antarmuka mobile dompet digital fintech modern premium (375px). Header atas menampilkan sapaan pengguna, avatar foto, dan tombol scan QRIS. Bagian utama adalah kartu saldo virtual bergradien ungu-biru elegan yang menampilkan total saldo rupiah, nomor kartu tersembunyi (**** 4892), dan tombol Top Up, Transfer, Tarik Tunai, serta Minta Uang. Di bawahnya tampilkan deretan icon lingkaran aksi cepat kontak favorit untuk transfer 1-klik. Di bagian bawah sediakan daftar riwayat transaksi terbaru yang dikelompokkan berdasarkan tanggal (Hari Ini, Kemarin), lengkap dengan logo merchant, kategori, dan nominal uang berwarna merah (keluar) atau hijau (masuk).",
+		prompt: `Rancang antarmuka mobile dompet digital fintech modern premium (${STUDIO_VISUAL_WIDTH.mobile}px). Header atas menampilkan sapaan pengguna, avatar foto, dan tombol scan QRIS. Bagian utama adalah kartu saldo virtual bergradien ungu-biru elegan yang menampilkan total saldo rupiah, nomor kartu tersembunyi (**** 4892), dan tombol Top Up, Transfer, Tarik Tunai, serta Minta Uang. Di bawahnya tampilkan deretan icon lingkaran aksi cepat kontak favorit untuk transfer 1-klik. Di bagian bawah sediakan daftar riwayat transaksi terbaru yang dikelompokkan berdasarkan tanggal (Hari Ini, Kemarin), lengkap dengan logo merchant, kategori, dan nominal uang berwarna merah (keluar) atau hijau (masuk).`,
 		tags: ["Fintech", "Wallet", "Virtual Card", "Transfer Flow", "QRIS"],
 		recommendedTarget: "/design/studio",
 	},

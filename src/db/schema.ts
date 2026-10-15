@@ -3,6 +3,7 @@ import {
 	type AnyPgColumn,
 	boolean,
 	check,
+	customType,
 	foreignKey,
 	index,
 	integer,
@@ -22,6 +23,21 @@ import type {
 	CreditPricingVersion,
 } from "@/lib/adaptive-credit";
 import type { CodebaseNameSource } from "@/lib/codebase-library";
+import type {
+	ScrapeErrorSource,
+	ScrapeFailureReason,
+} from "@/lib/design-errors";
+import type { VisualEvidence } from "@/lib/design-visual-evidence";
+import type { DesignSettings, ScrapeRequest } from "@/lib/scrape-contract";
+import type {
+	ScrapeImageDiscovery,
+	ScrapeImageOutcome,
+} from "@/lib/scrape-images";
+import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
+import type {
+	StudioDesignReferenceMetadata,
+	StudioDesignSkillId,
+} from "@/lib/studio-generation-options";
 
 // === TABLES ===
 // ponytail: RLS policies dropped - app-level ownership filters (eq(userId, user.id))
@@ -866,16 +882,26 @@ export const payments = pgTable(
 // === VIBEDESIGN TABLES ===
 // Scrapes (Opsi 1): user-owned URL captures. IDs and user_id are text to
 // match Better Auth users.id (uuid would cause PG type mismatch).
-export type ScrapeMode = "design" | "html";
+export type ScrapeMode = ScrapeRequest["mode"];
 
 export interface ScrapeMetadata {
+	designSettings?: DesignSettings;
 	attempt?: number;
 	capturedAt?: string;
 	finalUrl?: string;
 	viewport?: { width: number; height: number };
 	captureMode?: string;
+	screenshot?: string;
+	visualEvidence?: VisualEvidence;
 	htmlBytes?: number;
 	previewHtmlBytes?: number;
+	// Capture evidence observed during the run. `responseReceived` is true only
+	// when an HTTP response was actually received, so the UI never displays an
+	// HTTP status for a failure that never got one.
+	responseReceived?: boolean;
+	httpStatus?: number;
+	resourceLoadTimedOut?: boolean;
+	assetFetchFailures?: number;
 	stage?: ScrapeStatus;
 	progress?: number;
 	stageStartedAt?: string;
@@ -884,7 +910,44 @@ export interface ScrapeMetadata {
 	timings?: Record<string, number>;
 	errorMessage?: string;
 	errorDetail?: string;
+	// Which pipeline part failed and the evidence-backed reason behind it, so
+	// the failure UI can separate website failures from internal ones.
+	errorSource?: ScrapeErrorSource;
+	failureReason?: ScrapeFailureReason;
+	// Last real pipeline stage before the run failed. Lets the progress UI
+	// mark the persisted failure stage instead of guessing where it stopped.
+	failedAtStage?: ScrapeStatus;
+	// Only set when the upstream website supplied a usable Retry-After signal.
+	retryAfterSeconds?: number;
+	// Persisted absolute deadline derived from Retry-After. Lets the UI show a
+	// real remaining wait that stays accurate after refresh, and lets the
+	// backend enforce the cooldown instead of relying on a disabled button.
+	retryAfterExpiresAt?: string;
+	// Tracks whether the optional AI reference summary was applied to a
+	// canonical, evidence-backed DESIGN.md.
+	aiEnrichment?: "applied" | "unavailable";
+	aiEnrichmentDetail?: string;
+	// Structured model version the current DESIGN.md was rendered from.
+	// Lets the inspector distinguish verified current-model documents from
+	// unverified legacy archives without parsing markdown footers.
+	designModelVersion?: number;
+	// Images mode: separates a page that truly has no images from a discovery
+	// or capture failure, and records how the verified resources ended up.
+	imageDiscovery?: ScrapeImageDiscovery;
+	imageOutcome?: ScrapeImageOutcome;
 	mode?: ScrapeMode;
+	visitedPages?: number;
+	discoveredPages?: number;
+	processedImages?: number;
+	discoveredImages?: number;
+	savedImages?: number;
+	imageStorage?: "postgres-private";
+	completedPages?: number;
+	skippedPages?: number;
+	failedResources?: number;
+	idempotencyKey?: string;
+	workerHeartbeatAt?: string;
+	workerHealth?: string;
 }
 
 export type ScrapeStatus =
@@ -969,7 +1032,7 @@ export const scrapes = pgTable(
 		sourceUrl: text("source_url").notNull(),
 		domain: text("domain").notNull(),
 		title: text("title"),
-		mode: text("mode", { enum: ["design", "html"] })
+		mode: text("mode", { enum: ["design", "html", "crawl", "images"] })
 			.notNull()
 			.default("design"),
 		status: text("status", {
@@ -988,6 +1051,10 @@ export const scrapes = pgTable(
 		html: text("html"),
 		previewHtml: text("preview_html"),
 		metadata: jsonb("metadata").$type<ScrapeMetadata>(),
+		request: jsonb("request").$type<ScrapeRequest>(),
+		jobToken: text("job_token"),
+		leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+		jobAttempts: integer("job_attempts").notNull().default(0),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -995,7 +1062,145 @@ export const scrapes = pgTable(
 			.defaultNow()
 			.notNull(),
 	},
-	(t) => [index("scrapes_user_id_idx").on(t.userId)],
+	(t) => [
+		index("scrapes_user_id_idx").on(t.userId),
+		index("scrapes_job_queue_idx").on(t.status, t.leaseExpiresAt, t.createdAt),
+	],
+);
+
+export interface CrawlHeading {
+	level: number;
+	text: string;
+}
+
+export interface CrawlSection {
+	title: string | null;
+	level: number | null;
+	text: string;
+}
+
+export interface CrawlPageContent {
+	outgoingPages?: string[];
+	description: string | null;
+	headings: string[];
+	text: string;
+	links: string[];
+	images: string[];
+	patterns: string[];
+	headingLevels?: CrawlHeading[];
+	sections?: CrawlSection[];
+	internalLinks?: string[];
+	externalLinks?: string[];
+}
+
+export const scrapePages = pgTable(
+	"scrape_pages",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		scrapeId: text("scrape_id")
+			.notNull()
+			.references(() => scrapes.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		url: text("url").notNull(),
+		parentUrl: text("parent_url"),
+		depth: integer("depth").notNull(),
+		status: text("status", {
+			enum: ["queued", "completed", "failed", "skipped"],
+		})
+			.notNull()
+			.default("queued"),
+		title: text("title"),
+		httpStatus: integer("http_status"),
+		content: jsonb("content").$type<CrawlPageContent>(),
+		error: text("error"),
+	},
+	(t) => [
+		uniqueIndex("scrape_pages_owner_url_idx").on(t.userId, t.scrapeId, t.url),
+	],
+);
+
+export interface ImageEvidence {
+	sources: string[];
+	alt: string | null;
+	classificationReason?: string;
+	dimensionError?: string;
+}
+
+const privateImageBytes = customType<{ data: Buffer; driverData: Buffer }>({
+	dataType: () => "bytea",
+});
+
+export const scrapeImageAssets = pgTable(
+	"scrape_image_assets",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		scrapeId: text("scrape_id")
+			.notNull()
+			.references(() => scrapes.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		sha256: text("sha256").notNull(),
+		mimeType: text("mime_type").notNull(),
+		byteLength: integer("byte_length").notNull(),
+		body: privateImageBytes("body").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		uniqueIndex("scrape_image_assets_owner_hash_idx").on(
+			t.userId,
+			t.scrapeId,
+			t.sha256,
+		),
+		check(
+			"scrape_image_assets_size_check",
+			sql`${t.byteLength} > 0 AND ${t.byteLength} = octet_length(${t.body})`,
+		),
+	],
+);
+
+export const scrapeImages = pgTable(
+	"scrape_images",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		scrapeId: text("scrape_id")
+			.notNull()
+			.references(() => scrapes.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		url: text("url").notNull(),
+		pageUrl: text("page_url").notNull(),
+		assetId: text("asset_id").references(() => scrapeImageAssets.id, {
+			onDelete: "set null",
+		}),
+		failureCode: text("failure_code"),
+		httpStatus: integer("http_status"),
+		format: text("format"),
+		width: integer("width"),
+		height: integer("height"),
+		classification: text("classification", {
+			enum: ["logo", "icon", "illustration", "photograph", "screenshot"],
+		}),
+		evidence: jsonb("evidence").$type<ImageEvidence>().notNull(),
+		status: text("status", { enum: ["queued", "completed", "failed"] })
+			.notNull()
+			.default("queued"),
+		error: text("error"),
+	},
+	(t) => [
+		uniqueIndex("scrape_images_owner_url_idx").on(t.userId, t.scrapeId, t.url),
+	],
 );
 
 export const scrapeDocuments = pgTable(
@@ -1025,6 +1230,24 @@ export const studioProjects = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		title: text("title").notNull(),
+		designMode: text("design_mode").notNull().default("web"),
+		designMd: text("design_md"),
+		designSkillId: text("design_skill_id")
+			.$type<StudioDesignSkillId>()
+			.notNull()
+			.default("none"),
+		initialPageCount: integer("initial_page_count"),
+		designReference:
+			jsonb("design_reference").$type<StudioDesignReferenceMetadata>(),
+		designBlueprint: jsonb("design_blueprint").$type<StudioDesignBlueprint>(),
+		designBlueprintVersion: integer("design_blueprint_version")
+			.notNull()
+			.default(1),
+		designSkillVersion: integer("design_skill_version"),
+		logoAssetId: text("logo_asset_id"),
+		prdContent: text("prd_content"),
+		prdFilename: text("prd_filename"),
+		prdContentHash: text("prd_content_hash"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -1033,6 +1256,30 @@ export const studioProjects = pgTable(
 			.notNull(),
 	},
 	(t) => [index("studio_projects_user_id_idx").on(t.userId)],
+);
+
+export const studioAssets = pgTable(
+	"studio_assets",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		projectId: text("project_id"),
+		filename: text("filename").notNull(),
+		mimeType: text("mime_type").notNull(),
+		byteLength: integer("byte_length").notNull(),
+		data: text("data").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index("studio_assets_user_id_idx").on(t.userId),
+		index("studio_assets_project_id_idx").on(t.projectId),
+	],
 );
 
 export const studioRevisions = pgTable(
@@ -1054,11 +1301,88 @@ export const studioRevisions = pgTable(
 	(t) => [index("studio_revisions_project_id_idx").on(t.projectId)],
 );
 
+export const studioJobs = pgTable(
+	"studio_jobs",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => studioProjects.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		prompt: text("prompt").notNull(),
+		jobType: text("job_type").notNull().default("initial"),
+		targetFrameId: text("target_frame_id"),
+		status: text("status").notNull().default("queued"),
+		error: text("error"),
+		claimedBy: text("claimed_by"),
+		attempts: integer("attempts").notNull().default(0),
+		claimedAt: timestamp("claimed_at", { withTimezone: true }),
+		leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+		startedAt: timestamp("started_at", { withTimezone: true }),
+		finishedAt: timestamp("finished_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index("studio_jobs_project_id_idx").on(t.projectId),
+		index("studio_jobs_user_id_idx").on(t.userId),
+		index("studio_jobs_status_idx").on(t.status),
+	],
+);
+
+export const studioFrames = pgTable(
+	"studio_frames",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => studioProjects.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		description: text("description"),
+		viewport: text("viewport").notNull().default("web"),
+		htmlCode: text("html_code"),
+		status: text("status").notNull().default("queued"),
+		order: integer("order").notNull().default(0),
+		error: text("error"),
+		attempts: integer("attempts").notNull().default(0),
+		visualHash: text("visual_hash"),
+		promptHash: text("prompt_hash"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index("studio_frames_project_id_idx").on(t.projectId),
+		index("studio_frames_order_idx").on(t.order),
+		index("studio_frames_project_status_idx").on(t.projectId, t.status),
+		unique("studio_frames_project_order_unique").on(t.projectId, t.order),
+	],
+);
+
 export type ScrapeRow = typeof scrapes.$inferSelect;
 export type InsertScrapeRow = typeof scrapes.$inferInsert;
 export type ScrapeDocumentRow = typeof scrapeDocuments.$inferSelect;
 export type InsertScrapeDocumentRow = typeof scrapeDocuments.$inferInsert;
 export type StudioProjectRow = typeof studioProjects.$inferSelect;
 export type InsertStudioProjectRow = typeof studioProjects.$inferInsert;
+export type StudioAssetRow = typeof studioAssets.$inferSelect;
+export type InsertStudioAssetRow = typeof studioAssets.$inferInsert;
 export type StudioRevisionRow = typeof studioRevisions.$inferSelect;
 export type InsertStudioRevisionRow = typeof studioRevisions.$inferInsert;
+export type StudioJobRow = typeof studioJobs.$inferSelect;
+export type InsertStudioJobRow = typeof studioJobs.$inferInsert;
+export type StudioFrameRow = typeof studioFrames.$inferSelect;
+export type InsertStudioFrameRow = typeof studioFrames.$inferInsert;

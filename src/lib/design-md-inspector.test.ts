@@ -111,7 +111,7 @@ describe("parseDesignMd", () => {
 	it("parses the color table into named tokens with roles", () => {
 		const model = parseDesignMd(FIXTURE);
 		expect(model.colors.length).toBe(8);
-		expect(model.colors[0]).toEqual({
+		expect(model.colors[0]).toMatchObject({
 			name: "Canvas",
 			value: "#ffffff",
 			token: "--color-canvas",
@@ -124,7 +124,7 @@ describe("parseDesignMd", () => {
 		const model = parseDesignMd(FIXTURE);
 		expect(model.typography.length).toBe(3);
 		expect(model.typography[0]).toMatchObject({
-			label: "Display",
+			role: "Display",
 			family: "Inter",
 			size: "48px",
 			weight: "700",
@@ -134,12 +134,12 @@ describe("parseDesignMd", () => {
 
 	it("groups font families with their observed weights and roles", () => {
 		const model = parseDesignMd(FIXTURE);
-		expect(model.fonts.length).toBe(1);
-		expect(model.fonts[0]?.family).toBe("Inter");
-		expect(model.fonts[0]?.weights).toEqual(
+		expect(model.typefaces.length).toBe(1);
+		expect(model.typefaces[0]?.family).toBe("Inter");
+		expect(model.typefaces[0]?.weights).toEqual(
 			expect.arrayContaining(["700", "600", "400"]),
 		);
-		expect(model.fonts[0]?.roles).toEqual(
+		expect(model.typefaces[0]?.roles).toEqual(
 			expect.arrayContaining(["Display", "Heading", "Body"]),
 		);
 	});
@@ -147,22 +147,26 @@ describe("parseDesignMd", () => {
 	it("parses spacing and radius tables separately", () => {
 		const model = parseDesignMd(FIXTURE);
 		expect(model.spacing.length).toBe(3);
-		expect(model.spacing[2]).toEqual({
+		expect(model.spacing[2]).toMatchObject({
 			label: "section-gap",
 			value: "64px",
 		});
 		expect(model.radii.length).toBe(3);
-		expect(model.radii[2]).toEqual({ label: "radius-lg", value: "12px" });
-		expect(model.baseUnit).toBe("4px");
+		expect(model.radii[2]).toMatchObject({ label: "radius-lg", value: "12px" });
+		expect(model.baseUnitPx).toBe(4);
 	});
 
 	it("splits Do and Don't bullets without paraphrasing", () => {
 		const model = parseDesignMd(FIXTURE);
 		expect(model.dos.length).toBe(3);
 		expect(model.donts.length).toBe(3);
-		expect(model.dos[0]).toBe("Do use observed colors for surfaces.");
-		expect(model.donts).toContain("Don't copy the source brand name or logo.");
-		expect(model.donts).toContain("Do not flatten typography into one size.");
+		expect(model.dos[0]?.rule).toBe("Do use observed colors for surfaces.");
+		expect(model.donts.map((rule) => rule.rule)).toContain(
+			"Don't copy the source brand name or logo.",
+		);
+		expect(model.donts.map((rule) => rule.rule)).toContain(
+			"Do not flatten typography into one size.",
+		);
 	});
 
 	it("omits missing optional sections instead of inventing values", () => {
@@ -173,10 +177,10 @@ describe("parseDesignMd", () => {
 		expect(model.overview).toBe("");
 		expect(model.colors).toEqual([]);
 		expect(model.typography).toEqual([]);
-		expect(model.fonts).toEqual([]);
+		expect(model.typefaces).toEqual([]);
 		expect(model.spacing).toEqual([]);
 		expect(model.radii).toEqual([]);
-		expect(model.baseUnit).toBe("");
+		expect(model.baseUnitPx).toBeNaN();
 		expect(model.dos).toEqual([]);
 		expect(model.donts).toEqual([]);
 	});
@@ -200,7 +204,7 @@ describe("parseDesignMd", () => {
 		const model = parseDesignMd(raw);
 		expect(model.theme).toBe("dark");
 		expect(model.colors.length).toBe(1);
-		expect(model.colors[0]).toEqual({
+		expect(model.colors[0]).toMatchObject({
 			name: "Canvas",
 			value: "#ffffff",
 			token: "--color-canvas",
@@ -225,18 +229,18 @@ describe("parseDesignMd", () => {
 				"",
 			].join("\n"),
 		);
-		expect(model.colors[0]).toEqual({
+		expect(model.colors[0]).toMatchObject({
 			name: "Canvas",
 			value: "#f9f9f8",
 			token: "--color-canvas",
 			role: "Base",
 		});
 		expect(model.typography[0]).toMatchObject({
-			label: "Display",
+			role: "Display",
 			family: "Inter",
 			weight: "700 (Bold)",
 		});
-		expect(model.fonts[0]).toMatchObject({
+		expect(model.typefaces[0]).toMatchObject({
 			family: "Inter",
 			weights: ["700"],
 		});
@@ -258,12 +262,19 @@ describe("parseDesignMd", () => {
 				"",
 			].join("\n"),
 		);
-		expect(model.baseUnit).toBe("4px");
-		expect(model.spacing).toEqual([
+		expect(model.baseUnitPx).toBe(4);
+		expect(
+			model.spacing.map((token) => ({
+				label: token.label,
+				value: token.value,
+			})),
+		).toEqual([
 			{ label: "--box-space-1", value: "4px" },
 			{ label: "--box-space-4", value: "16px" },
 		]);
-		expect(model.radii).toEqual([{ label: "--radius-md", value: "8px" }]);
+		expect(
+			model.radii.map((token) => ({ label: token.label, value: token.value })),
+		).toEqual([{ label: "--radius-md", value: "8px" }]);
 	});
 
 	it("classifies bold-prefixed detailed rules without leaking markers", () => {
@@ -286,11 +297,11 @@ describe("parseDesignMd", () => {
 		);
 		expect(model.essence).toBe("A crisp console.");
 		expect(model.overview).toBe("Overview with bold emphasis.");
-		expect(model.dos).toEqual([
+		expect(model.dos.map((rule) => rule.rule)).toEqual([
 			"Do keep it simple.",
 			"Do use warm bases for layouts.",
 		]);
-		expect(model.donts).toEqual([
+		expect(model.donts.map((rule) => rule.rule)).toEqual([
 			"Don't use neon glow effects.",
 			"Don't copy the logo.",
 		]);

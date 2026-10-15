@@ -239,6 +239,41 @@
       "when": 1791763331875,
       "tag": "0033_repository_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791769929564,
+      "tag": "0034_motionless_shooting_star",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791773044357,
+      "tag": "0035_dry_thunderbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791909689305,
+      "tag": "0036_wooden_leper_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792023500000,
+      "tag": "0037_studio_projects_prd_context",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792079094648,
+      "tag": "0038_clammy_darkstar",
+      "breakpoints": true
     }
   ]
 }

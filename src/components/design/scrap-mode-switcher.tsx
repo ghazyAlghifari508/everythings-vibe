@@ -1,99 +1,99 @@
 "use client";
 
-import { Code, FileText } from "lucide-react";
+import { Code, FileText, Images, Network } from "lucide-react";
 import { type KeyboardEvent, useState } from "react";
 import type { ScrapeMode } from "@/db/schema";
-import { DesignGeneratorPanel } from "./design-generator-panel";
-import { HtmlScraperPanel } from "./html-scraper-panel";
+import { ScrapeWorkspaceForm } from "./scrape-workspace-form";
 
-export function ScrapModeSwitcher() {
-	const [mode, setMode] = useState<ScrapeMode>("design");
+const modes: ScrapeMode[] = ["crawl", "design", "html", "images"];
+const modeInfo = {
+	crawl: {
+		label: "Crawl Website",
+		description:
+			"Petakan halaman dan struktur website dari link yang ditemukan.",
+		icon: Network,
+	},
+	design: {
+		label: "Generate DESIGN.md",
+		description: "Ambil design system sebagai panduan untuk AI coding.",
+		icon: FileText,
+	},
+	html: {
+		label: "Scrape HTML",
+		description: "Simpan HTML hasil render dan lihat snapshot visual website.",
+		icon: Code,
+	},
+	images: {
+		label: "Scrape Images",
+		description:
+			"Temukan gambar, sumber aset, dan metadata dari halaman website.",
+		icon: Images,
+	},
+};
 
-	function onTabKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
-		const modes: ScrapeMode[] = ["design", "html"];
+export function ScrapModeSwitcher({
+	initialMode = "design",
+}: {
+	initialMode?: ScrapeMode;
+}) {
+	const [mode, setMode] = useState<ScrapeMode>(initialMode);
+	function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
 		const current = modes.indexOf(mode);
 		const next =
-			e.key === "ArrowRight"
+			event.key === "ArrowRight"
 				? modes[(current + 1) % modes.length]
-				: e.key === "ArrowLeft"
+				: event.key === "ArrowLeft"
 					? modes[(current - 1 + modes.length) % modes.length]
-					: e.key === "Home"
+					: event.key === "Home"
 						? modes[0]
-						: e.key === "End"
+						: event.key === "End"
 							? modes[modes.length - 1]
 							: null;
-
 		if (!next) return;
-		e.preventDefault();
+		event.preventDefault();
 		setMode(next);
-		requestAnimationFrame(() => {
-			document.getElementById(`${next}-tab`)?.focus();
-		});
+		requestAnimationFrame(() =>
+			document.getElementById(`${next}-tab`)?.focus(),
+		);
 	}
-
 	return (
 		<div className="flex w-full flex-col items-center">
 			<div
 				role="tablist"
 				aria-label="Pilih mode"
-				className="mb-8 inline-flex max-w-full overflow-x-auto rounded-xl border border-graphite bg-onyx p-1"
+				className="mb-7 flex w-full max-w-3xl gap-2 overflow-x-auto py-1"
 			>
-				<button
-					id="design-tab"
-					type="button"
-					role="tab"
-					aria-selected={mode === "design"}
-					aria-controls="design-panel"
-					tabIndex={mode === "design" ? 0 : -1}
-					onClick={() => setMode("design")}
-					onKeyDown={onTabKeyDown}
-					className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors sm:px-4 sm:text-sm ${
-						mode === "design"
-							? "bg-charcoal text-snow shadow-xs"
-							: "text-fog hover:text-mist"
-					}`}
-				>
-					<FileText size={16} aria-hidden="true" className="shrink-0" />
-					<span className="whitespace-nowrap">Generate DESIGN.md</span>
-				</button>
-				<button
-					id="html-tab"
-					type="button"
-					role="tab"
-					aria-selected={mode === "html"}
-					aria-controls="html-panel"
-					tabIndex={mode === "html" ? 0 : -1}
-					onClick={() => setMode("html")}
-					onKeyDown={onTabKeyDown}
-					className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors sm:px-4 sm:text-sm ${
-						mode === "html"
-							? "bg-charcoal text-snow shadow-xs"
-							: "text-fog hover:text-mist"
-					}`}
-				>
-					<Code size={16} aria-hidden="true" className="shrink-0" />
-					<span className="whitespace-nowrap">Scrape HTML</span>
-				</button>
+				{modes.map((value) => {
+					const Icon = modeInfo[value].icon;
+					return (
+						<button
+							key={value}
+							id={`${value}-tab`}
+							type="button"
+							role="tab"
+							aria-selected={mode === value}
+							aria-controls="extraction-panel"
+							tabIndex={mode === value ? 0 : -1}
+							onClick={() => setMode(value)}
+							onKeyDown={onTabKeyDown}
+							className={`inline-flex min-h-11 flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-indigo ${mode === value ? "border-snow bg-snow text-obsidian" : "border-graphite text-fog hover:border-steel hover:text-snow"}`}
+						>
+							<Icon size={16} aria-hidden />
+							{modeInfo[value].label}
+						</button>
+					);
+				})}
 			</div>
-
-			<div className="w-full">
-				<div
-					id="design-panel"
-					role="tabpanel"
-					aria-labelledby="design-tab"
-					hidden={mode !== "design"}
-				>
-					<DesignGeneratorPanel />
-				</div>
-
-				<div
-					id="html-panel"
-					role="tabpanel"
-					aria-labelledby="html-tab"
-					hidden={mode !== "html"}
-				>
-					<HtmlScraperPanel />
-				</div>
+			<div
+				id="extraction-panel"
+				role="tabpanel"
+				aria-labelledby={`${mode}-tab`}
+				className="w-full"
+			>
+				<p className="mx-auto mb-6 max-w-2xl text-center text-sm leading-6 text-fog">
+					{modeInfo[mode].description}
+				</p>
+				<ScrapeWorkspaceForm mode={mode} />
 			</div>
 		</div>
 	);

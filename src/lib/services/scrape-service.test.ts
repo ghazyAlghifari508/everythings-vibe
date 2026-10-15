@@ -1,63 +1,112 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { verifyPreviewAssetCapability } from "@/lib/preview-capabilities";
+import { generateDesignMd } from "../prompts-design-md";
 import {
-	buildDesignMdPrompt,
-	DESIGN_MIN_CHARS,
-	DESIGN_REQUIRED_HEADINGS,
-	DESIGN_SYSTEM_PROMPT,
-	designIssues,
-} from "@/lib/prompts-design-md";
+	resolveEnrichmentRetry,
+	type ScrapeImageRow,
+	signScrapeImages,
+} from "./scrape-service";
 
-describe("Scrape Prompt Builder", () => {
-	it("builds 12,000+ character depth system prompt with token tables", () => {
-		const prompt = buildDesignMdPrompt(
-			"https://linear.app",
-			"<html><body><header>Linear</header></html>",
+it("signs stored image identities and retains remote targets only for legacy rows", async () => {
+	vi.stubEnv("BETTER_AUTH_SECRET", "test-signing-secret-with-enough-entropy");
+	try {
+		const base: ScrapeImageRow = {
+			id: "image-a",
+			scrapeId: "scrape-a",
+			userId: "owner-a",
+			url: "https://example.test/a.png",
+			pageUrl: "https://example.test",
+			assetId: "bytes-a",
+			status: "completed",
+			error: null,
+			failureCode: null,
+			httpStatus: 200,
+			width: null,
+			height: null,
+			format: "png",
+			classification: null,
+			evidence: { sources: ["img"], alt: null },
+		};
+		const result = await signScrapeImages(
+			[base, { ...base, id: "legacy", assetId: null }],
+			base.scrapeId,
+			base.userId,
 		);
-		expect(prompt).toContain("Tokens - Colors");
-		expect(prompt).toContain("Tokens - Typography");
-		expect(prompt).toContain("Tokens - Spacing & Shapes");
-		expect(prompt).toContain("Tailwind v4");
+		const claims = result.map((image) =>
+			verifyPreviewAssetCapability(
+				new URL(image.assetUrl, "https://app.test").searchParams.get("cap") ??
+					"",
+			),
+		);
+		expect(claims[0]).toMatchObject({
+			imageId: "image-a",
+			target: "stored-image:image-a",
+			scrapeId: base.scrapeId,
+			ownerId: base.userId,
+		});
+		expect(claims[1]).toMatchObject({
+			target: base.url,
+			scrapeId: base.scrapeId,
+			ownerId: base.userId,
+		});
+		expect(claims[1]).not.toHaveProperty("imageId");
+	} finally {
+		vi.unstubAllEnvs();
+	}
+});
+
+describe("resolveEnrichmentRetry", () => {
+	it("replays the stored document instead of regenerating applied enrichment", () => {
+		expect(
+			resolveEnrichmentRetry({
+				enrichment: "applied",
+				hasDocument: true,
+				hasEvidence: true,
+			}),
+		).toEqual({ proceed: false, mode: "replay" });
 	});
 
-	it("covers every required DESIGN.md heading in the system prompt", () => {
-		for (const heading of DESIGN_REQUIRED_HEADINGS) {
-			expect(DESIGN_SYSTEM_PROMPT).toContain(heading);
-		}
-		expect(DESIGN_MIN_CHARS).toBe(12_000);
+	it("retries AI-only synthesis from persisted evidence", () => {
+		expect(
+			resolveEnrichmentRetry({
+				enrichment: "unavailable",
+				hasDocument: true,
+				hasEvidence: true,
+			}),
+		).toEqual({ proceed: true });
 	});
 
-	it("rejects thin DESIGN.md output", () => {
-		expect(designIssues("# Tipis")).toContain("missing ## Tokens - Colors");
+	it("refuses a retry with no persisted evidence", () => {
+		expect(
+			resolveEnrichmentRetry({
+				enrichment: "unavailable",
+				hasDocument: false,
+				hasEvidence: false,
+			}),
+		).toEqual({ proceed: false, mode: "missing-evidence" });
+	});
+
+	it("repairs an applied status that lost its document", () => {
+		expect(
+			resolveEnrichmentRetry({
+				enrichment: "applied",
+				hasDocument: false,
+				hasEvidence: true,
+			}),
+		).toEqual({ proceed: true });
 	});
 });
 
-describe("Mode-Specific Scrape Status & Progress Contracts", () => {
-	it("calculates distinct progress stages for html mode and design mode", async () => {
-		const { scrapeProgressForStatus } = await import("@/db/schema");
-
-		// design mode progress stages
-		expect(scrapeProgressForStatus("queued", "design")).toBe(10);
-		expect(scrapeProgressForStatus("capturing", "design")).toBe(30);
-		expect(scrapeProgressForStatus("extracting", "design")).toBe(55);
-		expect(scrapeProgressForStatus("generating", "design")).toBe(80);
-		expect(scrapeProgressForStatus("saving", "design")).toBe(95);
-		expect(scrapeProgressForStatus("completed", "design")).toBe(100);
-
-		// html mode skips generating stage and reaches higher progress earlier
-		expect(scrapeProgressForStatus("queued", "html")).toBe(15);
-		expect(scrapeProgressForStatus("capturing", "html")).toBe(40);
-		expect(scrapeProgressForStatus("extracting", "html")).toBe(75);
-		expect(scrapeProgressForStatus("saving", "html")).toBe(95);
-		expect(scrapeProgressForStatus("completed", "html")).toBe(100);
-	});
-
-	it("provides mode-specific Indonesian status labels", async () => {
-		const { HTML_SCRAPE_STATUS_LABELS, SCRAPE_STATUS_LABELS } = await import(
-			"@/db/schema"
-		);
-
-		expect(SCRAPE_STATUS_LABELS.generating).toBe("Menyusun DESIGN.md");
-		expect(HTML_SCRAPE_STATUS_LABELS.extracting).toBe("Menyiapkan preview");
-		expect(HTML_SCRAPE_STATUS_LABELS.saving).toBe("Menyimpan index.html");
-	});
+it("does not generate website measurements without observed elements", async () => {
+	await expect(
+		generateDesignMd({
+			version: 1,
+			sourceUrl: "https://example.test/",
+			capturedAt: new Date().toISOString(),
+			viewport: { width: 1440, height: 900 },
+			elements: [],
+			fonts: [],
+			limitations: [],
+		}),
+	).rejects.toMatchObject({ code: "NO_ANALYZABLE_CONTENT" });
 });

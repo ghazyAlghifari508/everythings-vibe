@@ -1,28 +1,42 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import type { ScrapeMode } from "@/db/schema";
-import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
+import {
+	DESIGN_ERROR_CODES,
+	httpStatusForErrorCode,
+	ScrapeError,
+} from "@/lib/design-errors";
+import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/lib/scrape-contract";
 import {
 	createScrape,
 	deleteScrape,
 	getScrapeById,
 	listScrapes,
+	retryDesignSynthesis,
 	retryScrape,
-	runScrapePipeline,
+	type ScrapeDetailPayload,
 } from "@/lib/services/scrape-service";
 import { requireUser } from "@/lib/session";
 
 function scrapeErrorResponse(error: unknown): Response {
 	if (error instanceof ScrapeError) {
-		const status =
-			error.code === "INVALID_URL" || error.code === "PRIVATE_URL_BLOCKED"
-				? 400
-				: error.code === "WEBSITE_BLOCKED" || error.code === "FETCH_TIMEOUT"
-					? 502
-					: 500;
+		// One shared mapping keeps the HTTP response aligned with the retry and
+		// presentation contracts instead of duplicating the status table.
+		const status = httpStatusForErrorCode(error.code);
+		const headers: Record<string, string> = {};
+		if (
+			typeof error.retryAfterSeconds === "number" &&
+			Number.isFinite(error.retryAfterSeconds)
+		)
+			headers["Retry-After"] = String(Math.ceil(error.retryAfterSeconds));
 		return Response.json(
-			{ error: error.message, code: error.code },
-			{ status },
+			{
+				error: error.message,
+				code: error.code,
+				...(typeof error.retryAfterSeconds === "number"
+					? { retryAfterSeconds: error.retryAfterSeconds }
+					: {}),
+			},
+			{ status, headers },
 		);
 	}
 	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message))
@@ -56,7 +70,15 @@ export async function GET({
 		if (!id)
 			return Response.json({ error: "Scrape ID required" }, { status: 400 });
 		const scrape = await getScrapeById(id, user.id);
-		return Response.json({ scrape });
+		// Crawl and image rows are returned with the status so polling renders
+		// progressively persisted results without a page reload. Image rows get
+		// freshly signed asset URLs, matching the detail loader contract.
+		const { signScrapeImages } = await import("@/lib/services/scrape-service");
+		const payload: ScrapeDetailPayload = {
+			...scrape,
+			images: await signScrapeImages(scrape.images, id, user.id),
+		};
+		return Response.json({ scrape: payload });
 	} catch (error) {
 		return scrapeErrorResponse(error);
 	}
@@ -69,7 +91,38 @@ export async function POST({
 }): Promise<Response> {
 	try {
 		const user = await requireUser(getRequestHeaders());
-		const body: unknown = await request.json().catch(() => null);
+		if (
+			Number(request.headers.get("content-length") ?? 0) >
+			SCRAPE_LIMITS.requestBytes
+		)
+			return Response.json(
+				{ error: "Request terlalu besar." },
+				{ status: 413 },
+			);
+		const reader = request.body?.getReader();
+		let bytes = 0;
+		const chunks: Uint8Array[] = [];
+		if (reader) {
+			while (true) {
+				const chunk = await reader.read();
+				if (chunk.done) break;
+				bytes += chunk.value.byteLength;
+				if (bytes > SCRAPE_LIMITS.requestBytes) {
+					await reader.cancel();
+					return Response.json(
+						{ error: "Request terlalu besar." },
+						{ status: 413 },
+					);
+				}
+				chunks.push(chunk.value);
+			}
+		}
+		let body: unknown = null;
+		try {
+			body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+		} catch {
+			body = null;
+		}
 
 		if (body !== null && typeof body === "object") {
 			const candidate = body as Record<string, unknown>;
@@ -80,13 +133,36 @@ export async function POST({
 				await retryScrape(candidate.scrapeId, user.id);
 				return Response.json({ ok: true, scrapeId: candidate.scrapeId });
 			}
+			// AI-only enrichment retry from persisted evidence: no recapture,
+			// no new credit charge. Owner scope, rate limit and replay
+			// protection live in the service.
+			if (
+				candidate.action === "retry-enrichment" &&
+				typeof candidate.scrapeId === "string"
+			) {
+				const document = await retryDesignSynthesis(
+					candidate.scrapeId,
+					user.id,
+				);
+				return Response.json({
+					ok: true,
+					scrapeId: candidate.scrapeId,
+					documentId: document.id,
+				});
+			}
 
-			const rawUrl = candidate.url;
-			const rawMode = candidate.mode;
-			const mode: ScrapeMode = rawMode === "html" ? "html" : "design";
-			if (typeof rawUrl === "string" && rawUrl.trim().length > 0) {
-				const scrape = await createScrape(user.id, rawUrl.trim(), mode);
-				void runScrapePipeline(scrape.id, user.id);
+			const parsed = scrapeRequestSchema.safeParse(body);
+			if (parsed.success) {
+				const value = parsed.data;
+				const key = request.headers.get("Idempotency-Key");
+				if (key && !/^[a-zA-Z0-9-]{16,100}$/.test(key))
+					return Response.json(
+						{ error: "Request key tidak valid." },
+						{ status: 400 },
+					);
+				const scrape = key
+					? await createScrape(user.id, value.url, value.mode, value, key)
+					: await createScrape(user.id, value.url, value.mode, value);
 				return Response.json(
 					{
 						scrapeId: scrape.id,

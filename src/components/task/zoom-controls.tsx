@@ -9,6 +9,8 @@ interface ZoomControlsProps {
 	onZoomOut: () => void;
 	onReset: () => void;
 	className?: string;
+	/** Accessible name of the reset action; callers that fit instead of reset must say so. */
+	resetLabel?: string;
 }
 
 /**
@@ -20,6 +22,7 @@ export function ZoomControls({
 	onZoomOut,
 	onReset,
 	className,
+	resetLabel = "Reset tampilan",
 }: ZoomControlsProps) {
 	return (
 		<div
@@ -52,7 +55,8 @@ export function ZoomControls({
 			<button
 				type="button"
 				onClick={onReset}
-				aria-label="Reset tampilan"
+				aria-label={resetLabel}
+				title={resetLabel}
 				className="flex h-8 w-8 items-center justify-center rounded text-fog transition-colors hover:bg-white/5 hover:text-snow"
 			>
 				<RotateCcw size={15} />

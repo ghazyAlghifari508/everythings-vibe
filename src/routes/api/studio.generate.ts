@@ -1,25 +1,45 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
+import { z } from "zod";
+import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
+import { ScrapeError } from "@/lib/design-errors";
 import { validateStudioPrompt } from "@/lib/prompts-ui-studio";
 import {
-	createStudioProject,
+	createStudioProjectWithJob,
 	getStudioProject,
 	listStudioProjects,
 	reviseStudioProject,
 } from "@/lib/services/studio-service";
 import { requireUser } from "@/lib/session";
+import {
+	studioDesignReferenceSchema,
+	studioDesignSkillIdSchema,
+	studioInitialPageCountSchema,
+	studioPrdAttachmentSchema,
+} from "@/lib/studio-generation-options";
+import {
+	validateStudioPrdContent,
+	validateStudioPrdFilename,
+} from "@/lib/studio-prd-validation";
 
 function studioErrorResponse(error: unknown): Response {
-	if (error instanceof ScrapeError)
+	console.error("[studio.generate error]", error);
+	if (error instanceof ScrapeError) {
+		const isClientError =
+			error.code === "INVALID_URL" || error.code === "WEBSITE_BLOCKED";
 		return Response.json(
 			{ error: error.message, code: error.code },
-			{ status: error.code === "INVALID_URL" ? 400 : 500 },
+			{ status: isClientError ? 400 : 500 },
 		);
-	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message))
+	}
+	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message)) {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	}
 	return Response.json(
-		{ error: DESIGN_ERROR_CODES.STORAGE_FAILED },
+		{
+			error:
+				"Terjadi kendala saat memproses permintaan Studio. Silakan coba beberapa saat lagi.",
+		},
 		{ status: 500 },
 	);
 }
@@ -28,6 +48,26 @@ export const Route = createFileRoute("/api/studio/generate")({
 	server: {
 		handlers: { GET, POST },
 	},
+});
+
+export const studioGenerateBodySchema = z.object({
+	prompt: z.string(),
+	title: z.string().optional(),
+	projectId: z.string().optional(),
+	designMode: z.enum(["web", "mobile"]).optional(),
+	designSkillId: studioDesignSkillIdSchema.optional(),
+	initialPageCount: studioInitialPageCountSchema.optional(),
+	designReference: studioDesignReferenceSchema.nullable().optional(),
+	designMd: z.string().max(STUDIO_DESIGN_MD_MAX_CHARS).nullable().optional(),
+	prdAttachment: studioPrdAttachmentSchema.nullable().optional(),
+	logo: z
+		.object({
+			filename: z.string().max(255),
+			mimeType: z.string(),
+			data: z.string(),
+		})
+		.nullable()
+		.optional(),
 });
 
 export async function GET({
@@ -57,43 +97,73 @@ export async function POST({
 }): Promise<Response> {
 	try {
 		const user = await requireUser(getRequestHeaders());
-		const body: unknown = await request.json().catch(() => null);
-		const prompt =
-			body !== null && typeof body === "object" && "prompt" in body
-				? body.prompt
-				: undefined;
-		const projectId =
-			body !== null && typeof body === "object" && "projectId" in body
-				? body.projectId
-				: undefined;
-		const title =
-			body !== null && typeof body === "object" && "title" in body
-				? body.title
-				: undefined;
-		const checked = validateStudioPrompt(prompt);
+		const rawBody: unknown = await request.json().catch(() => null);
+		const parseRes = studioGenerateBodySchema.safeParse(rawBody);
+		if (!parseRes.success) {
+			return Response.json(
+				{ error: "Payload generate tidak valid." },
+				{ status: 400 },
+			);
+		}
+		const body = parseRes.data;
+
+		const checked = validateStudioPrompt(body.prompt);
 		if (!checked.ok)
 			return Response.json({ error: checked.error }, { status: 400 });
-		if (typeof projectId === "string" && projectId.length > 0) {
+
+		let validatedPrd: { filename: string; content: string } | null = null;
+		if (body.prdAttachment) {
+			const validFilename = validateStudioPrdFilename(
+				body.prdAttachment.filename,
+			);
+			if (!validFilename.ok) {
+				return Response.json({ error: validFilename.error }, { status: 400 });
+			}
+			const validContent = validateStudioPrdContent(body.prdAttachment.content);
+			if (!validContent.ok) {
+				return Response.json({ error: validContent.error }, { status: 400 });
+			}
+			validatedPrd = {
+				filename: validFilename.filename,
+				content: validContent.content,
+			};
+		}
+
+		if (typeof body.projectId === "string" && body.projectId.length > 0) {
 			const revision = await reviseStudioProject(
-				projectId,
+				body.projectId,
 				user.id,
 				checked.prompt,
 			);
 			return Response.json(
-				{ projectId, version: revision.version, htmlCode: revision.htmlCode },
+				{
+					projectId: body.projectId,
+					version: revision.version,
+					htmlCode: revision.htmlCode,
+				},
 				{ status: 201 },
 			);
 		}
-		const { project, revision } = await createStudioProject(
-			user.id,
-			typeof title === "string" ? title : checked.prompt.slice(0, 80),
-			checked.prompt,
-		);
+
+		const { project, job, frames } = await createStudioProjectWithJob(user.id, {
+			title: body.title,
+			prompt: checked.prompt,
+			designMode: body.designMode,
+			designMd: body.designMd,
+			logo: body.logo,
+			designSkillId: body.designSkillId,
+			initialPageCount: body.initialPageCount,
+			designReference: body.designReference,
+			prdAttachment: validatedPrd,
+		});
+
 		return Response.json(
 			{
 				projectId: project.id,
-				version: revision.version,
-				htmlCode: revision.htmlCode,
+				jobId: job.id,
+				status: job.status,
+				frameIds: frames.map((frame) => frame.id),
+				pageCount: frames.length,
 			},
 			{ status: 201 },
 		);

@@ -47,8 +47,10 @@ describe("DesignMdSourcePanel", () => {
 		).toBeDefined();
 	});
 
-	it("exposes no framework tabs or density modes", () => {
+	it("exposes rendered/source tabs without framework tabs", () => {
 		const { container } = renderPanel();
+		expect(screen.getByRole("tab", { name: /rendered/i })).toBeDefined();
+		expect(screen.getByRole("tab", { name: /source/i })).toBeDefined();
 		expect(screen.queryByRole("tab", { name: /tailwind/i })).toBeNull();
 		expect(container.textContent).not.toMatch(/css variables/i);
 		expect(container.textContent).not.toMatch(/design tokens/i);
@@ -57,10 +59,32 @@ describe("DesignMdSourcePanel", () => {
 
 	it("renders the authoritative source without changing whitespace", () => {
 		renderPanel();
-		const source = screen
-			.getByRole("region", { name: "Sumber DESIGN.md" })
-			.querySelector("pre");
+		const sourceTab = screen.getByRole("tab", { name: /source/i });
+		const panelId = sourceTab.getAttribute("aria-controls") ?? "";
+		expect(panelId).toBeTruthy();
+		const source = document.getElementById(panelId);
 		expect(source?.textContent).toBe(DESIGN_MD);
+	});
+
+	it("uses unique tab and panel ids per instance", () => {
+		const first = renderPanel();
+		const second = render(
+			<DesignMdSourcePanel
+				designMd={DESIGN_MD}
+				domain="acme.example"
+				onImplementAgent={vi.fn()}
+			/>,
+		);
+		const tabs = screen.getAllByRole("tab", { name: /rendered|source/i });
+		expect(tabs.length).toBeGreaterThanOrEqual(4);
+		const ids = tabs.map((tab) => tab.getAttribute("id"));
+		expect(new Set(ids).size).toBe(ids.length);
+		for (const tab of tabs) {
+			const controls = tab.getAttribute("aria-controls") ?? "";
+			expect(document.getElementById(controls)).toBeTruthy();
+		}
+		first.unmount();
+		second.unmount();
 	});
 
 	it("copies DESIGN.md to the clipboard with feedback", async () => {
@@ -93,5 +117,77 @@ describe("DesignMdSourcePanel", () => {
 			screen.getByRole("button", { name: /implement ke ai agent/i }),
 		);
 		expect(onImplementAgent).toHaveBeenCalledTimes(1);
+	});
+
+	it("states incomplete AI analysis only when enrichment is unavailable", () => {
+		const { rerender } = render(
+			<DesignMdSourcePanel
+				designMd={DESIGN_MD}
+				domain="acme.example"
+				onImplementAgent={vi.fn()}
+				inspectorSource="observed"
+				enrichment="unavailable"
+				enrichmentDetail="Model timeout."
+			/>,
+		);
+		expect(
+			screen.getAllByText(/analisis ai belum lengkap/i).length,
+		).toBeGreaterThan(0);
+		expect(
+			screen.queryByText(/pengukuran lengkap tanpa narasi ai/i),
+		).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /coba lagi|retry/i }),
+		).toBeNull();
+		rerender(
+			<DesignMdSourcePanel
+				designMd={DESIGN_MD}
+				domain="acme.example"
+				onImplementAgent={vi.fn()}
+				inspectorSource="observed"
+				enrichment="applied"
+			/>,
+		);
+		expect(screen.queryByText(/analisis ai belum lengkap/i)).toBeNull();
+	});
+
+	it("switches between rendered markdown and raw source", () => {
+		renderPanel();
+		expect(screen.getByRole("tab", { name: /rendered/i })).toBeDefined();
+		const renderedTab = screen.getByRole("tab", { name: /rendered/i });
+		const sourceTab = screen.getByRole("tab", { name: /source/i });
+		const renderedPanel = document.getElementById(
+			renderedTab.getAttribute("aria-controls") ?? "",
+		);
+		const sourcePanel = document.getElementById(
+			sourceTab.getAttribute("aria-controls") ?? "",
+		);
+		expect(renderedPanel).toBeDefined();
+		expect(sourcePanel).toBeDefined();
+		expect((renderedPanel as HTMLElement).hidden).toBe(false);
+		expect((sourcePanel as HTMLElement).hidden).toBe(true);
+		fireEvent.click(screen.getByRole("tab", { name: /source/i }));
+		expect((sourcePanel as HTMLElement).hidden).toBe(false);
+		expect((renderedPanel as HTMLElement).hidden).toBe(true);
+		expect(
+			screen
+				.getByRole("tab", { name: /source/i })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+	});
+
+	it("moves focus with arrow keys between rendered and source tabs", () => {
+		renderPanel();
+		const renderedTab = screen.getByRole("tab", {
+			name: /rendered/i,
+		}) as HTMLElement;
+		const sourceTab = screen.getByRole("tab", {
+			name: /source/i,
+		}) as HTMLElement;
+		renderedTab.focus();
+		fireEvent.keyDown(renderedTab, { key: "ArrowRight" });
+		expect(document.activeElement).toBe(sourceTab);
+		fireEvent.keyDown(sourceTab, { key: "ArrowLeft" });
+		expect(document.activeElement).toBe(renderedTab);
 	});
 });

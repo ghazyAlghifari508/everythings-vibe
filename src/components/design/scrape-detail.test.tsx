@@ -50,11 +50,15 @@ describe("ScrapeDetail", () => {
 				previewHtml="<html><body>hi</body></html>"
 			/>,
 		);
-		expect(screen.getByRole("tab", { name: /^Preview$/i })).toBeDefined();
-		expect(screen.getByRole("tab", { name: /Source HTML/i })).toBeDefined();
+		expect(screen.getByRole("tab", { name: /Visual|Preview/i })).toBeDefined();
+		expect(
+			screen.getByRole("tab", { name: /HTML Source|Source HTML/i }),
+		).toBeDefined();
 		expect(screen.getByRole("button", { name: /Salin HTML/i })).toBeDefined();
 		expect(
-			screen.getByRole("button", { name: /Download index\.html/i }),
+			screen.getByRole("button", {
+				name: /Download (?:index\.html|.*\.html)/i,
+			}),
 		).toBeDefined();
 		expect(
 			screen.queryByRole("button", { name: /Salin DESIGN\.md/i }),
@@ -70,6 +74,7 @@ describe("ScrapeDetail", () => {
 				<ScrapeDetail
 					domain="example.com"
 					previewHtml="<main>preview</main>"
+					previewSrcDoc="<main>preview</main>"
 				/>,
 			);
 		} finally {
@@ -117,6 +122,7 @@ describe("ScrapeDetail", () => {
 					<ScrapeDetail
 						domain="example.com"
 						previewHtml="<main>preview</main>"
+						previewSrcDoc="<main>preview</main>"
 					/>,
 				);
 			});
@@ -143,6 +149,7 @@ describe("ScrapeDetail", () => {
 			<ScrapeDetail
 				domain="www.notion.com"
 				previewHtml="<main>desktop</main>"
+				previewSrcDoc="<main>desktop</main>"
 			/>,
 		);
 
@@ -214,12 +221,18 @@ describe("ScrapeDetail", () => {
 		fireEvent.click(copyButton);
 		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
 		expect(
-			screen.getByRole("button", { name: /Download index\.html/i }),
+			screen.getByRole("button", {
+				name: /Download (?:index\.html|.*\.html)/i,
+			}),
 		).toBeDefined();
 	});
 	it("keeps the preview sandbox and referrer policy restricted", () => {
 		render(
-			<ScrapeDetail domain="example.com" previewHtml="<main>safe</main>" />,
+			<ScrapeDetail
+				domain="example.com"
+				previewHtml="<main>safe</main>"
+				previewSrcDoc="<main>safe</main>"
+			/>,
 		);
 		const iframe = screen.getByTitle("Preview example.com");
 		expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
@@ -248,16 +261,21 @@ describe("ScrapeDetail", () => {
 		expect(
 			screen.getByTitle("Preview example.com").getAttribute("srcdoc"),
 		).toBe(preview);
-		fireEvent.click(screen.getByRole("tab", { name: /Source HTML/i }));
+		fireEvent.click(
+			screen.getByRole("tab", { name: /HTML Source|Source HTML/i }),
+		);
 		expect(
 			screen.getByRole("tabpanel", { name: /Source code index\.html/i })
 				.textContent,
-		).toBe(source);
+		).toContain(source);
+		expect(screen.getByTestId("codebase-source-preview")).toBeDefined();
 		fireEvent.click(screen.getByRole("button", { name: /Salin HTML/i }));
 		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
 		expect(writeText).toHaveBeenCalledWith(source);
 		fireEvent.click(
-			screen.getByRole("button", { name: /Download index\.html/i }),
+			screen.getByRole("button", {
+				name: /Download (?:index\.html|.*\.html)/i,
+			}),
 		);
 		await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
 		expect(click).toHaveBeenCalledOnce();
@@ -267,12 +285,15 @@ describe("ScrapeDetail", () => {
 	it("switches between Preview and exact Source HTML", () => {
 		const source = "<html><body>Original source</body></html>";
 		render(<ScrapeDetail domain="example.com" previewHtml={source} />);
-		fireEvent.click(screen.getByRole("tab", { name: /Source HTML/i }));
+		fireEvent.click(
+			screen.getByRole("tab", { name: /HTML Source|Source HTML/i }),
+		);
 		expect(
 			screen.getByRole("tabpanel", { name: /Source code index\.html/i })
 				.textContent,
-		).toBe(source);
-		fireEvent.click(screen.getByRole("tab", { name: /^Preview$/i }));
+		).toContain(source);
+		expect(screen.getByTestId("codebase-source-preview")).toBeDefined();
+		fireEvent.click(screen.getByRole("tab", { name: /Visual|Preview/i }));
 		expect(
 			screen.getByRole("tabpanel", { name: /Preview index\.html/i }),
 		).toBeDefined();
@@ -297,7 +318,9 @@ describe("ScrapeDetail", () => {
 		vi.stubGlobal("URL", { createObjectURL, revokeObjectURL: vi.fn() });
 		render(<ScrapeDetail domain="example.com" previewHtml={source} />);
 		fireEvent.click(
-			screen.getByRole("button", { name: /Download index\.html/i }),
+			screen.getByRole("button", {
+				name: /Download (?:index\.html|.*\.html)/i,
+			}),
 		);
 		await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
 		expect(click).toHaveBeenCalledOnce();

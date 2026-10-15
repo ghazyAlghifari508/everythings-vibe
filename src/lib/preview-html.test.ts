@@ -96,4 +96,18 @@ describe("rewritePreviewAssets", () => {
 		expect(rewritten).toContain("MutationObserver");
 		expect(rewritten).toContain("/api/scrape/asset?url=");
 	});
+
+	it("keeps the asset shim on childList only so animations do not retrigger rewriting", () => {
+		const raw = `<html><head></head><body></body></html>`;
+		const rewritten = rewritePreviewAssets(raw, "https://example.com");
+		// The asset shim owns the first script; the readiness reporter is separate
+		// and may watch attributes because it only reports, never rewrites.
+		const shim = rewritten.match(
+			/<script>\(\(\)=>\{const BASE=[\s\S]*?<\/script>/,
+		)?.[0];
+		expect(shim).toBeDefined();
+		expect(shim).toContain("childList:true");
+		expect(shim).not.toContain("attributes:true");
+		expect(shim).not.toContain("attributeFilter");
+	});
 });

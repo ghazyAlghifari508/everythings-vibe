@@ -11,8 +11,11 @@ export interface ScrapeViewInput {
 
 export function resolveScrapeContentWidth(
 	view: ScrapeViewKind,
+	mode: ScrapeMode | string = "design",
 ): "wide" | "bounded" {
-	return view === "progress" ? "bounded" : "wide";
+	if (view !== "progress") return "wide";
+	void mode;
+	return "wide";
 }
 
 export function resolveScrapeView(input: ScrapeViewInput): ScrapeViewKind {

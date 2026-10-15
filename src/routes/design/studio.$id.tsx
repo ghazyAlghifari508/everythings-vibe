@@ -1,23 +1,65 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	redirect,
+	useNavigate,
+	useRouter,
+} from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Loader2, Send } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { AlertCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AttachedDesignReference } from "@/components/design/start-with-design-modal";
 import { StudioCanvas } from "@/components/design/studio-canvas";
-import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import {
+	StudioComposer,
+	type StudioComposerScope,
+} from "@/components/design/studio-composer";
+import { StudioDesignPicker } from "@/components/design/studio-design-picker";
+import { StudioHeader } from "@/components/design/studio-header";
+import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import type {
+	StudioFrameRow,
+	StudioJobRow,
+	StudioProjectRow,
+	StudioRevisionRow,
+} from "@/db/schema";
 import { requireUserServer } from "@/lib/session";
+import { exportProjectAsZip } from "@/lib/studio-export";
+import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
+import { STUDIO_DESIGN_PRESETS } from "@/lib/studio-presets";
+import { useUIStore } from "@/store";
+
+export interface StudioDetailLoaderData {
+	project: StudioProjectRow;
+	frames: StudioFrameRow[];
+	activeJob: StudioJobRow | null;
+	logoUrl: string | null;
+	revisions: StudioRevisionRow[];
+	latest: StudioRevisionRow | null;
+}
 
 const loadStudioDetail = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
 	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
-		const { getStudioProject } = await import("@/lib/services/studio-service");
-		const project = await getStudioProject(id, user.id);
+		const { getStudioProjectDetail } = await import(
+			"@/lib/services/studio-service"
+		);
+		const detail = await getStudioProjectDetail(id, user.id);
 		return {
-			id: project.id,
-			title: project.title,
-			latestHtml: project.latest?.htmlCode ?? "",
-			latestVersion: project.latest?.version ?? 0,
-			revisionCount: project.revisions.length,
+			project: detail.project,
+			frames: detail.frames,
+			activeJob: detail.activeJob,
+			logoUrl: detail.logoUrl,
+			revisions: detail.revisions,
+			latest: detail.latest,
 		};
 	});
 
@@ -30,7 +72,6 @@ export const Route = createFileRoute("/design/studio/$id")({
 			return await loadStudioDetail({ data: params.id });
 		} catch (e) {
 			if (e instanceof Error && e.message === "Unauthorized") {
-				const { redirect } = await import("@tanstack/react-router");
 				throw redirect({ to: "/login" });
 			}
 			throw e;
@@ -47,120 +88,603 @@ export const Route = createFileRoute("/design/studio/$id")({
 });
 
 function StudioDetailPage() {
-	const detail = Route.useLoaderData();
-	if (!detail) throw new Error("NOT_FOUND");
-	const [revision, setRevision] = useState("");
-	const [error, setError] = useState("");
-	const [loading, setLoading] = useState(false);
-	const [htmlCode, setHtmlCode] = useState(detail.latestHtml);
-	const [version, setVersion] = useState(detail.latestVersion);
+	const initialData = Route.useLoaderData();
+	if (!initialData?.project) throw new Error("NOT_FOUND");
+	return (
+		<StudioWorkspace key={initialData.project.id} initialData={initialData} />
+	);
+}
 
-	async function submitRevision(e: FormEvent) {
-		e.preventDefault();
-		if (!revision.trim()) return;
-		setLoading(true);
+function StudioWorkspace({
+	initialData,
+}: {
+	initialData: StudioDetailLoaderData;
+}) {
+	const [project, setProject] = useState(initialData.project);
+	const [frames, setFrames] = useState<StudioFrameRow[]>(initialData.frames);
+	const [activeJob, setActiveJob] = useState<StudioJobRow | null>(
+		initialData.activeJob,
+	);
+	const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
+	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
+	const [composerLoading, setComposerLoading] = useState(false);
+	// Design-system and skill changes are independent writes; sharing the
+	// composer's busy flag made the composer look like it was sending a prompt
+	// whenever an unrelated preference was saved.
+	const [preferenceSaving, setPreferenceSaving] = useState(false);
+	const [exportingZip, setExportingZip] = useState(false);
+	const [deleting, setDeleting] = useState(false);
+	const [isAddFrameOpen, setIsAddFrameOpen] = useState(false);
+	const [error, setError] = useState("");
+	const [duplicating, setDuplicating] = useState(false);
+	const navigate = useNavigate();
+	const router = useRouter();
+	const showToast = useUIStore((state) => state.showToast);
+	const pendingRequest = useRef<{ signature: string; id: string } | null>(null);
+
+	async function handleDuplicate() {
+		if (duplicating) return;
+		setDuplicating(true);
 		setError("");
 		try {
-			const res = await fetch("/api/studio/generate", {
+			const response = await fetch("/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action: "duplicate", projectId: project.id }),
+			});
+			const result: unknown = await response.json();
+			if (
+				!response.ok ||
+				typeof result !== "object" ||
+				result === null ||
+				!("projectId" in result) ||
+				typeof result.projectId !== "string"
+			) {
+				throw new Error("Gagal menduplikasi project. Coba lagi.");
+			}
+			await navigate({
+				to: "/design/studio/$id",
+				params: { id: result.projectId },
+			});
+		} catch (failure) {
+			setError(
+				failure instanceof Error
+					? failure.message
+					: "Gagal menduplikasi project.",
+			);
+		} finally {
+			setDuplicating(false);
+		}
+	}
+
+	const selectFrame = useCallback((id: string | null, additive = false) => {
+		setSelectedFrameIds((previous) =>
+			id === null
+				? []
+				: additive
+					? previous.includes(id)
+						? previous.filter((entry) => entry !== id)
+						: [...previous, id]
+					: [id],
+		);
+		setSelectedFrameId(additive ? null : id);
+	}, []);
+
+	// Marquee selection reports the whole id set at once. Deduping and keeping
+	// the incoming order means the composer chips mirror the canvas order and
+	// every selected frame survives to the revision request.
+	const selectFrames = useCallback((ids: string[]) => {
+		const unique = [...new Set(ids)];
+		setSelectedFrameIds(unique);
+		setSelectedFrameId(unique.length === 1 ? unique[0] : null);
+	}, []);
+
+	const isProcessing = useMemo(() => {
+		if (
+			activeJob &&
+			(activeJob.status === "queued" ||
+				activeJob.status === "planning" ||
+				activeJob.status === "generating")
+		) {
+			return true;
+		}
+		return frames.some(
+			(f) => f.status === "queued" || f.status === "generating",
+		);
+	}, [activeJob, frames]);
+
+	const readyFramesCount = useMemo(
+		() => frames.filter((f) => f.status === "ready").length,
+		[frames],
+	);
+
+	// Derived selection state must keep a stable identity: a fresh array on
+	// every poll tick would re-render the composer even when nothing changed.
+	const selectedFrames = useMemo(
+		() => frames.filter((frame) => selectedFrameIds.includes(frame.id)),
+		[frames, selectedFrameIds],
+	);
+	const handleRemoveSelectedFrame = useCallback((id: string) => {
+		setSelectedFrameIds((previous) => previous.filter((entry) => entry !== id));
+		setSelectedFrameId((previous) => (previous === id ? null : previous));
+	}, []);
+
+	// Poll authoritative status while jobs or frames are actively processing
+	const syncProjectStatus = useCallback(async () => {
+		try {
+			const res = await fetch(
+				`/api/studio/project?id=${encodeURIComponent(project.id)}`,
+			);
+			// 404 means the project no longer exists (deleted here or in another
+			// tab). Leave the workspace instead of polling a dead id forever.
+			if (res.status === 404) {
+				void router.invalidate();
+				return;
+			}
+			if (!res.ok) return;
+			const data = (await res.json()) as {
+				project: StudioProjectRow;
+				frames: StudioFrameRow[];
+				activeJob: StudioJobRow | null;
+			};
+			if (data.project) setProject(data.project);
+			if (data.frames) setFrames(data.frames);
+			if (data.activeJob !== undefined) setActiveJob(data.activeJob);
+		} catch {
+			// Network hiccup during polling
+		}
+	}, [project.id, router]);
+
+	useEffect(() => {
+		if (!isProcessing) return;
+		const timer = setInterval(() => {
+			void syncProjectStatus();
+		}, 1500);
+		return () => clearInterval(timer);
+	}, [isProcessing, syncProjectStatus]);
+
+	async function handleDelete() {
+		if (deleting) return;
+		setDeleting(true);
+		setError("");
+		try {
+			const response = await fetch("/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action: "delete", projectId: project.id }),
+			});
+			if (!response.ok) {
+				const body: unknown = await response.json().catch(() => null);
+				throw new Error(
+					typeof body === "object" &&
+						body !== null &&
+						"error" in body &&
+						typeof body.error === "string"
+						? body.error
+						: "Gagal menghapus project. Coba lagi.",
+				);
+			}
+			showToast("Project dihapus.", "success");
+			await router.invalidate();
+			await navigate({ to: "/design/studio" });
+		} catch (failure) {
+			setError(
+				failure instanceof Error ? failure.message : "Gagal menghapus project.",
+			);
+			throw failure;
+		} finally {
+			setDeleting(false);
+		}
+	}
+
+	async function handleComposerSubmit(
+		promptText: string,
+		scope: StudioComposerScope,
+	): Promise<boolean> {
+		setComposerLoading(true);
+		setError("");
+		const signature = JSON.stringify({ promptText, scope, selectedFrameIds });
+		if (pendingRequest.current?.signature !== signature)
+			pendingRequest.current = { signature, id: crypto.randomUUID() };
+		try {
+			const res = await fetch("/api/studio/frame", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
-					projectId: detail.id,
-					prompt: revision.trim(),
+					action: "operation",
+					projectId: project.id,
+					scope,
+					frameIds: scope === "revise" ? selectedFrameIds : undefined,
+					prompt: promptText,
+					requestId: pendingRequest.current.id,
 				}),
 			});
-			const data = (await res.json().catch(() => null)) as {
-				htmlCode?: string;
-				version?: number;
-				error?: string;
-			} | null;
-			if (!res.ok || !data?.htmlCode) {
-				setError(data?.error ?? "Revisi gagal. Coba lagi.");
+			if (!res.ok) {
+				const data: unknown = await res.json().catch(() => null);
+				setError(
+					typeof data === "object" &&
+						data !== null &&
+						"error" in data &&
+						typeof data.error === "string"
+						? data.error
+						: "Permintaan desain ditolak.",
+				);
+				return false;
+			}
+			await syncProjectStatus();
+			pendingRequest.current = null;
+			return true;
+		} catch {
+			setError("Jaringan bermasalah. Coba lagi.");
+			return false;
+		} finally {
+			setComposerLoading(false);
+		}
+	}
+
+	// Adding a screen is an explicit project-level action, never inferred from
+	// prompt wording, so an add request can never be silently turned into a
+	// project-wide revision.
+	async function handleAddFrame(input: { name: string; prompt: string }) {
+		setComposerLoading(true);
+		setError("");
+		try {
+			const response = await fetch("/api/studio/frame", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "add",
+					projectId: project.id,
+					name: input.name,
+					prompt: input.prompt,
+				}),
+			});
+			if (!response.ok) {
+				const data: unknown = await response.json().catch(() => null);
+				throw new Error(
+					typeof data === "object" &&
+						data !== null &&
+						"error" in data &&
+						typeof data.error === "string"
+						? data.error
+						: "Gagal menambah halaman baru.",
+				);
+			}
+			setIsAddFrameOpen(false);
+			await syncProjectStatus();
+			showToast("Halaman baru ditambahkan.", "success");
+		} catch (failure) {
+			setError(
+				failure instanceof Error
+					? failure.message
+					: "Gagal menambah halaman baru.",
+			);
+		} finally {
+			setComposerLoading(false);
+		}
+	}
+
+	async function handleApplyDesignSystem(
+		reference: AttachedDesignReference,
+	): Promise<boolean> {
+		setPreferenceSaving(true);
+		try {
+			return await applyDesignSystem(reference);
+		} finally {
+			setPreferenceSaving(false);
+		}
+	}
+
+	async function applyDesignSystem(
+		reference: AttachedDesignReference,
+	): Promise<boolean> {
+		const response = await fetch("/api/studio/project", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				action: "design-system",
+				projectId: project.id,
+				...reference,
+			}),
+		});
+		if (!response.ok) {
+			const result: unknown = await response.json().catch(() => null);
+			throw new Error(
+				typeof result === "object" &&
+					result !== null &&
+					"error" in result &&
+					typeof result.error === "string"
+					? result.error
+					: "Gagal menyimpan design system.",
+			);
+		}
+		await syncProjectStatus();
+		return true;
+	}
+
+	// Skill changes persist immediately so every later revision reads the
+	// stored selection. The row is never updated optimistically.
+	async function handleSkillChange(skillId: StudioDesignSkillId) {
+		if (isProcessing || preferenceSaving || project.designSkillId === skillId)
+			return;
+		setPreferenceSaving(true);
+		setError("");
+		try {
+			const response = await fetch("/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "preferences",
+					projectId: project.id,
+					designSkillId: skillId,
+				}),
+			});
+			if (!response.ok) {
+				const data: unknown = await response.json().catch(() => null);
+				throw new Error(
+					typeof data === "object" &&
+						data !== null &&
+						"error" in data &&
+						typeof data.error === "string"
+						? data.error
+						: "Gagal menyimpan design skill.",
+				);
+			}
+			await syncProjectStatus();
+		} catch (failure) {
+			setError(
+				failure instanceof Error
+					? failure.message
+					: "Gagal menyimpan design skill.",
+			);
+		} finally {
+			setPreferenceSaving(false);
+		}
+	}
+
+	const storedReferenceLabel = (() => {
+		const reference = project.designReference;
+		if (reference?.kind === "theme") {
+			const preset = STUDIO_DESIGN_PRESETS.find(
+				(entry) => entry.id === reference.id,
+			);
+			return preset ? `${preset.name}` : null;
+		}
+		if (reference?.kind === "custom") return reference.filename;
+		if (project.designMd) return "Referensi desain";
+		return null;
+	})();
+
+	async function handleRetryFrame(frameId: string) {
+		try {
+			const response = await fetch("/api/studio/frame", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "retry",
+					projectId: project.id,
+					frameId,
+				}),
+			});
+			if (!response.ok) throw new Error("Permintaan retry gagal. Coba lagi.");
+			await syncProjectStatus();
+		} catch (failure) {
+			setError(
+				failure instanceof Error ? failure.message : "Permintaan retry gagal.",
+			);
+		}
+	}
+
+	async function handleRetryPlanning() {
+		try {
+			const res = await fetch("/api/studio/frame", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "retry-planning",
+					projectId: project.id,
+				}),
+			});
+			if (!res.ok) {
+				const data = (await res.json().catch(() => null)) as {
+					error?: string;
+				} | null;
+				setError(data?.error ?? "Gagal mencoba lagi perencanaan.");
 				return;
 			}
-			setHtmlCode(data.htmlCode);
-			if (typeof data.version === "number") setVersion(data.version);
-			setRevision("");
+			await syncProjectStatus();
 		} catch {
-			setError("Jaringan bermasalah. Coba lagi sebentar lagi.");
+			setError("Jaringan bermasalah. Coba lagi.");
+		}
+	}
+
+	async function handleDownloadAllZip() {
+		if (frames.length === 0 || exportingZip) return;
+		setExportingZip(true);
+		try {
+			await exportProjectAsZip(project.title, frames);
+		} catch {
+			setError("Gagal menyiapkan bundel ZIP unduhan.");
 		} finally {
-			setLoading(false);
+			setExportingZip(false);
 		}
 	}
 
 	return (
-		<main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14">
-			<HubBreadcrumb current={detail.title} />
-			<Link
-				to="/design/studio"
-				className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-fog transition-colors hover:text-snow"
-			>
-				<ArrowLeft size={16} aria-hidden />
-				Kembali ke studio
-			</Link>
-			<header className="flex flex-wrap items-end justify-between gap-3">
-				<div>
-					<h1 className="text-3xl font-semibold tracking-tight text-snow">
-						{detail.title}
-					</h1>
-					<p className="mt-2 font-mono text-xs text-fog">
-						v{version} · {detail.revisionCount} revisi
-					</p>
-				</div>
-			</header>
-
-			{htmlCode ? (
-				<StudioCanvas
-					title={detail.title}
-					htmlCode={htmlCode}
-					version={version}
-				/>
-			) : (
-				<div className="rounded-xl border border-graphite bg-charcoal p-8 text-center">
-					<p className="text-sm font-semibold text-mist">
-						Project ini belum punya revisi.
-					</p>
-				</div>
-			)}
-
-			<form
-				onSubmit={(e) => void submitRevision(e)}
-				className="sticky bottom-4 flex flex-col gap-2 rounded-xl border border-graphite bg-charcoal p-4"
-			>
-				<label
-					htmlFor="studio-revision"
-					className="font-mono text-[11px] uppercase tracking-widest text-fog"
-				>
-					Revisi iteratif
-				</label>
-				<div className="flex flex-col gap-2 sm:flex-row">
-					<input
-						id="studio-revision"
-						value={revision}
-						onChange={(e) => setRevision(e.target.value)}
-						placeholder="Contoh: ubah warna tombol jadi hijau, tambahkan tabel riwayat…"
-						disabled={loading}
-						className="flex-1 rounded-lg border border-graphite bg-onyx px-3 py-2 text-sm text-snow placeholder:text-fog focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50"
+		<main className="relative flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-charcoal text-snow">
+			{/* The header floats above the dotted canvas instead of occupying a
+			    full-width navbar band, so the canvas extends behind it. It is a
+			    sibling of the canvas section, never a descendant: header clicks
+			    therefore cannot start a canvas pan or change the selection. */}
+			<StudioHeader
+				title={project.title}
+				duplicating={duplicating}
+				exporting={exportingZip}
+				deleting={deleting}
+				canExport={readyFramesCount > 0}
+				onDuplicate={() => void handleDuplicate()}
+				onExport={() => void handleDownloadAllZip()}
+				onDelete={handleDelete}
+				onAddFrame={() => setIsAddFrameOpen(true)}
+				designSystemControl={
+					<StudioDesignPicker
+						designMd={project.designMd}
+						disabled={isProcessing || preferenceSaving}
+						onApply={handleApplyDesignSystem}
 					/>
+				}
+			/>
+
+			{/* Main Fullscreen Canvas Workspace */}
+			<div className="relative flex-1 w-full overflow-hidden">
+				<StudioCanvas
+					project={project}
+					frames={frames}
+					activeJob={activeJob}
+					selectedFrameId={selectedFrameId}
+					selectedFrameIds={selectedFrameIds}
+					onSelectFrame={selectFrame}
+					onSelectFrames={selectFrames}
+					onRetryFrame={handleRetryFrame}
+					onRetryPlanning={handleRetryPlanning}
+					className="size-full"
+				/>
+
+				{/* Floating AI Prompt Composer */}
+				<StudioComposer
+					selectedFrames={selectedFrames}
+					onRemoveFrame={handleRemoveSelectedFrame}
+					onSubmit={handleComposerSubmit}
+					loading={composerLoading}
+					designSkillId={project.designSkillId}
+					onDesignSkillChange={handleSkillChange}
+					referenceLabel={storedReferenceLabel}
+				/>
+			</div>
+
+			{/* Explicit add-screen flow, kept out of the composer */}
+			<AddFrameDialog
+				open={isAddFrameOpen}
+				onOpenChange={setIsAddFrameOpen}
+				busy={composerLoading}
+				onSubmit={handleAddFrame}
+			/>
+
+			{/* Error banner sits below the floating header band so it never
+			    collides with the header controls. */}
+			{error && (
+				<div
+					role="alert"
+					className="absolute left-1/2 z-40 flex w-[calc(100%-24px)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-xl border border-crimson bg-obsidian px-4 py-2.5 text-sm text-crimson"
+					style={{ top: "calc(4rem + env(safe-area-inset-top))" }}
+				>
+					<AlertCircle size={15} aria-hidden />
+					<span>{error}</span>
 					<button
-						type="submit"
-						disabled={loading || !revision.trim()}
-						className="inline-flex items-center justify-center gap-1.5 rounded-full bg-snow px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-mist disabled:opacity-50"
+						type="button"
+						onClick={() => setError("")}
+						aria-label="Tutup pesan error"
+						className="ml-2 rounded px-1.5 py-0.5 text-xs font-medium text-crimson hover:bg-crimson/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow"
 					>
-						{loading ? (
-							<Loader2 size={16} aria-hidden className="animate-spin" />
-						) : (
-							<Send size={16} aria-hidden />
-						)}
-						{loading ? "Merevisi…" : "Kirim revisi"}
+						Tutup
 					</button>
 				</div>
-				{error ? (
-					<p role="alert" className="text-xs text-red-400">
-						{error}
-					</p>
-				) : null}
-			</form>
+			)}
 		</main>
+	);
+}
+
+function AddFrameDialog({
+	open,
+	onOpenChange,
+	busy,
+	onSubmit,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	busy: boolean;
+	onSubmit: (input: { name: string; prompt: string }) => Promise<void>;
+}) {
+	const [name, setName] = useState("");
+	const [prompt, setPrompt] = useState("");
+	const [localError, setLocalError] = useState("");
+	const canSubmit =
+		name.trim().length > 0 && prompt.trim().length >= 10 && !busy;
+
+	useEffect(() => {
+		if (open) {
+			setName("");
+			setPrompt("");
+			setLocalError("");
+		}
+	}, [open]);
+
+	async function submit() {
+		if (!canSubmit) {
+			setLocalError(
+				"Isi nama halaman dan instruksi minimal 10 karakter sebelum melanjutkan.",
+			);
+			return;
+		}
+		setLocalError("");
+		await onSubmit({ name: name.trim(), prompt: prompt.trim() });
+	}
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-w-md">
+				<DialogHeader>
+					<DialogTitle>Tambah halaman baru</DialogTitle>
+					<DialogDescription>
+						AI membuat satu layar baru dan menyambungkannya ke project ini tanpa
+						mengubah layar lain.
+					</DialogDescription>
+				</DialogHeader>
+				<div className="flex flex-col gap-3">
+					<label className="flex flex-col gap-1.5">
+						<span className="text-xs text-fog">Nama halaman</span>
+						<input
+							type="text"
+							value={name}
+							onChange={(event) => setName(event.target.value)}
+							placeholder="Contoh: Pengaturan Akun"
+							className="min-h-11 rounded-lg border border-graphite bg-charcoal px-3 text-sm text-snow placeholder:text-fog focus:border-fog/40 focus:outline-none"
+						/>
+					</label>
+					<label className="flex flex-col gap-1.5">
+						<span className="text-xs text-fog">Instruksi halaman</span>
+						<textarea
+							value={prompt}
+							onChange={(event) => setPrompt(event.target.value)}
+							rows={4}
+							placeholder="Jelaskan isi dan tujuan halaman ini..."
+							className="resize-y rounded-lg border border-graphite bg-charcoal px-3 py-2 text-sm text-snow placeholder:text-fog focus:border-fog/40 focus:outline-none"
+						/>
+					</label>
+					{localError ? (
+						<p role="alert" className="text-sm text-crimson">
+							{localError}
+						</p>
+					) : null}
+				</div>
+				<DialogFooter>
+					<Button
+						type="button"
+						variant="secondary"
+						onClick={() => onOpenChange(false)}
+						disabled={busy}
+					>
+						Batal
+					</Button>
+					<Button
+						type="button"
+						onClick={() => void submit()}
+						disabled={!canSubmit}
+					>
+						{busy ? "Menambahkan..." : "Tambah halaman"}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }

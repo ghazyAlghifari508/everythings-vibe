@@ -11,10 +11,17 @@ import {
 	SCRAPE_MAX_INLINE_CSS_BYTES,
 	SCRAPE_MAX_REDIRECTS,
 	SCRAPE_MAX_STYLESHEETS,
+	SCRAPE_MOBILE_VIEWPORT,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
+import type { VisualEvidence } from "@/lib/design-visual-evidence";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import { rewritePreviewAssets } from "./preview-html";
+import {
+	type DesignSettings,
+	designSettingsSchema,
+	SCRAPE_LIMITS,
+} from "./scrape-contract";
 import { validateUrl } from "./url-validator";
 
 export const DESKTOP_WIDTH = SCRAPE_DESKTOP_WIDTH;
@@ -28,6 +35,8 @@ export interface ScrapeViewport {
 }
 
 export interface ScrapeCaptureMetadata {
+	screenshot?: string;
+	visualEvidence?: VisualEvidence;
 	attempt: number;
 	capturedAt: string;
 	finalUrl: string;
@@ -35,6 +44,12 @@ export interface ScrapeCaptureMetadata {
 	captureMode: string;
 	htmlBytes: number;
 	previewHtmlBytes: number;
+	// Evidence actually observed during capture, persisted so the failure UI can
+	// answer "was an HTTP response received?" without guessing.
+	responseReceived: boolean;
+	httpStatus?: number;
+	resourceLoadTimedOut: boolean;
+	assetFetchFailures: number;
 }
 
 export interface ScrapeCapture {
@@ -68,6 +83,7 @@ function responseContentType(res: http.IncomingMessage): string {
 }
 
 export interface FetchAssetOptions {
+	allowUrl?: (url: string) => boolean | Promise<boolean>;
 	signal?: AbortSignal;
 	maxBytes?: number;
 	range?: { start: number; end?: number; suffixLength?: number };
@@ -80,6 +96,9 @@ export interface FetchedAsset {
 	finalUrl: string;
 	contentRange?: string;
 	acceptRanges?: string;
+	// Raw Retry-After header, present only when the response actually sent one.
+	// Callers parse it themselves so no wait is ever invented.
+	retryAfter?: string;
 }
 
 export async function fetchAsset(
@@ -87,15 +106,20 @@ export async function fetchAsset(
 	redirects = 0,
 	options: FetchAssetOptions = {},
 ): Promise<FetchedAsset> {
+	if (options.allowUrl && !(await options.allowUrl(rawUrl)))
+		throw new ScrapeError(
+			"PRIVATE_URL_BLOCKED",
+			"URL di luar scope yang diizinkan.",
+		);
 	const maxBytes = Math.min(
 		options.maxBytes ?? SCRAPE_MAX_ASSET_BYTES,
 		SCRAPE_MAX_ASSET_BYTES,
 	);
-	if (options.signal?.aborted) throw new ScrapeError("FETCH_TIMEOUT");
+	if (options.signal?.aborted) throw new ScrapeError("JOB_TIMEOUT");
 	if (redirects > SCRAPE_MAX_REDIRECTS)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Redirect terlalu banyak.");
 	const { url, ip } = await validateUrl(rawUrl);
-	if (options.signal?.aborted) throw new ScrapeError("FETCH_TIMEOUT");
+	if (options.signal?.aborted) throw new ScrapeError("JOB_TIMEOUT");
 	const isHttps = url.protocol === "https:";
 	const requestOptions = {
 		protocol: url.protocol,
@@ -156,6 +180,10 @@ export async function fetchAsset(
 						typeof res.headers["accept-ranges"] === "string"
 							? res.headers["accept-ranges"]
 							: undefined,
+					retryAfter:
+						typeof res.headers["retry-after"] === "string"
+							? res.headers["retry-after"]
+							: undefined,
 				});
 			});
 		};
@@ -166,7 +194,7 @@ export async function fetchAsset(
 				)
 			: http.request(requestOptions, onResponse);
 		req.on("timeout", () => req.destroy(new ScrapeError("FETCH_TIMEOUT")));
-		const abort = () => req.destroy(new ScrapeError("FETCH_TIMEOUT"));
+		const abort = () => req.destroy(new ScrapeError("JOB_TIMEOUT"));
 		options.signal?.addEventListener("abort", abort, { once: true });
 		req.on("close", () => options.signal?.removeEventListener("abort", abort));
 		req.on("error", reject);
@@ -252,16 +280,107 @@ export async function fetchHtml(
 export async function scrapeHtml(
 	rawUrl: string,
 	attemptNumber = 1,
-	instrumentation?: ScrapeInstrumentation & { mode?: ScrapeMode },
+	instrumentation?: ScrapeInstrumentation & {
+		mode?: ScrapeMode;
+		designSettings?: DesignSettings;
+		waitMs?: number;
+		includeIframes?: boolean;
+		signal?: AbortSignal;
+	},
 ): Promise<ScrapeCapture> {
 	const { url } = await validateUrl(rawUrl);
 	const { renderPage } = await import("./render-page");
-	const rendered = await renderPage(url.href, instrumentation);
+	const design = (instrumentation?.mode ?? "design") === "design";
+	const settings = designSettingsSchema.parse(
+		instrumentation?.designSettings ?? {},
+	);
+	const desktop = {
+		width: SCRAPE_DESKTOP_WIDTH,
+		height: SCRAPE_DESKTOP_HEIGHT,
+	};
+	const viewports =
+		!design || settings.viewport === "desktop"
+			? [desktop]
+			: settings.viewport === "mobile"
+				? [SCRAPE_MOBILE_VIEWPORT]
+				: [desktop, SCRAPE_MOBILE_VIEWPORT];
+	const schemes =
+		!design || settings.theme === "auto"
+			? [null]
+			: settings.theme === "both"
+				? (["light", "dark"] as const)
+				: [settings.theme];
+	const views = viewports.flatMap((viewport) =>
+		schemes.map((colorScheme) => ({ viewport, colorScheme })),
+	);
+	if (views.length > SCRAPE_LIMITS.designViews)
+		throw new ScrapeError("CAPTURE_FAILED");
+	const captures: import("./render-page").RenderedPage[] = [];
+	for (const [index, view] of views.entries()) {
+		if (instrumentation?.signal?.aborted) throw new ScrapeError("JOB_TIMEOUT");
+		const label = `${view.viewport.width}x${view.viewport.height}, ${view.colorScheme ?? "auto"} (${index + 1}/${views.length})`;
+		if (design)
+			await instrumentation?.onActivity?.(`Mengambil tampilan ${label}`);
+		const captured = await renderPage(url.href, {
+			...instrumentation,
+			...(design ? view : {}),
+			evidenceDepth: settings.depth,
+			onActivity:
+				design && instrumentation?.onActivity
+					? (activity) => instrumentation.onActivity?.(`${activity}: ${label}`)
+					: instrumentation?.onActivity,
+		});
+		if (instrumentation?.signal?.aborted) throw new ScrapeError("JOB_TIMEOUT");
+		if (design && !captured.visualEvidence?.elements.length)
+			throw new ScrapeError(
+				"NO_ANALYZABLE_CONTENT",
+				"Evidence visual tampilan tidak tersedia.",
+			);
+		if (captured.visualEvidence)
+			captured.visualEvidence.colorScheme = view.colorScheme ?? "auto";
+		captures.push(captured);
+	}
+	const rendered = captures[0];
+	if (!rendered) throw new ScrapeError("CAPTURE_FAILED");
+	if (design && rendered.visualEvidence) {
+		const evidence = rendered.visualEvidence;
+		evidence.settings = settings;
+		evidence.additionalViews = captures
+			.slice(1)
+			.flatMap((capture) =>
+				capture.visualEvidence ? [capture.visualEvidence] : [],
+			);
+		evidence.limitations.push(
+			"Theme capture sets only the browser prefers-color-scheme preference. Site theme controls, cookies and stored preferences are not changed; a requested scheme does not prove site support.",
+		);
+		for (const viewport of viewports) {
+			const pair = captures.flatMap((capture) =>
+				capture.visualEvidence?.viewport.width === viewport.width
+					? [capture.visualEvidence]
+					: [],
+			);
+			const light = pair.find((view) => view.colorScheme === "light");
+			const dark = pair.find((view) => view.colorScheme === "dark");
+			if (
+				light &&
+				dark &&
+				JSON.stringify(light.elements.map((element) => element.properties)) ===
+					JSON.stringify(dark.elements.map((element) => element.properties))
+			)
+				evidence.limitations.push(
+					`Sampled styles were unchanged between light and dark browser preferences at ${viewport.width}px; separate site themes could not be verified.`,
+				);
+		}
+	}
 	const capturedAt = new Date().toISOString();
 	await instrumentation?.onActivity?.("Menyiapkan HTML standalone");
 	const inlineStart = Date.now();
 	const html = withBaseHref(
-		forceDesktopViewport(await inlineStyles(rendered.html, rendered.finalUrl)),
+		design
+			? await inlineStyles(rendered.html, rendered.finalUrl)
+			: forceDesktopViewport(
+					await inlineStyles(rendered.html, rendered.finalUrl),
+				),
 		rendered.finalUrl,
 	);
 	instrumentation?.onTiming?.("inlineStyles", Date.now() - inlineStart);
@@ -278,13 +397,24 @@ export async function scrapeHtml(
 		domain,
 		title: extractPageTitle(rendered.html),
 		metadata: {
+			screenshot: rendered.screenshot,
+			visualEvidence: rendered.visualEvidence,
 			attempt: attemptNumber,
 			capturedAt,
 			finalUrl: rendered.finalUrl,
-			viewport: { width: SCRAPE_DESKTOP_WIDTH, height: SCRAPE_DESKTOP_HEIGHT },
-			captureMode: "desktop-browser",
+			viewport: viewports[0] ?? desktop,
+			captureMode: design ? "design-browser" : "desktop-browser",
 			htmlBytes: Buffer.byteLength(html, "utf8"),
 			previewHtmlBytes: Buffer.byteLength(previewHtml, "utf8"),
+			responseReceived: rendered.responseReceived,
+			httpStatus: rendered.httpStatus,
+			resourceLoadTimedOut: captures.some(
+				(capture) => capture.resourceLoadTimedOut,
+			),
+			assetFetchFailures: captures.reduce(
+				(total, capture) => total + capture.assetFetchFailures,
+				0,
+			),
 		},
 	};
 }
@@ -354,11 +484,59 @@ export function withBaseHref(html: string, pageUrl: string): string {
 		: `${tag}${html}`;
 }
 
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+	amp: "&",
+	lt: "<",
+	gt: ">",
+	quot: '"',
+	apos: "'",
+	nbsp: "\u00a0",
+	copy: "©",
+	reg: "®",
+	trade: "™",
+	hellip: "…",
+	ndash: "–",
+	mdash: "—",
+	laquo: "«",
+	raquo: "»",
+	ldquo: "“",
+	rdquo: "”",
+	lsquo: "‘",
+	rsquo: "’",
+};
+
+export function decodeHtmlEntities(value: string): string {
+	return value.replace(
+		/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]+);/g,
+		(match, body: string) => {
+			if (body[0] === "#") {
+				const code =
+					body[1] === "x" || body[1] === "X"
+						? Number.parseInt(body.slice(2), 16)
+						: Number.parseInt(body.slice(1), 10);
+				if (
+					Number.isFinite(code) &&
+					code > 0 &&
+					code <= 0x10ffff &&
+					!(code >= 0xd800 && code <= 0xdfff)
+				) {
+					try {
+						return String.fromCodePoint(code);
+					} catch {
+						return match;
+					}
+				}
+				return match;
+			}
+			return NAMED_HTML_ENTITIES[body] ?? match;
+		},
+	);
+}
+
 export function extractPageTitle(html: string): string | null {
 	const match = html.match(/<title[^>]*>([\s\S]*?)<\/title\s*>/i);
 	if (!match) return null;
-	const title = match[1]
-		.replace(/<[^>]+>/g, "")
+	const title = decodeHtmlEntities(match[1].replace(/<[^>]+>/g, ""))
 		.replace(/\s+/g, " ")
 		.trim();
 	return title.length > 0 ? title.slice(0, 300) : null;

@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { init as initModuleLexer, parse as parseModule } from "es-module-lexer";
 import {
 	SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS,
@@ -12,6 +12,7 @@ const TOKEN_MAX_CHARS = 8192;
 const TOKEN_DOMAIN = "everythings-vibe/scrape-preview-asset/v1\0";
 
 export interface PreviewAssetClaims {
+	imageId?: string;
 	scrapeId: string;
 	ownerId: string;
 	target: string;
@@ -19,6 +20,7 @@ export interface PreviewAssetClaims {
 }
 
 export interface PreviewAssetExpected {
+	allowExpired?: boolean;
 	now?: number;
 	scrapeId?: string;
 	ownerId?: string;
@@ -32,6 +34,7 @@ export interface PreviewRewriteOptions {
 	ownerId: string;
 	secret?: string;
 	expiresAt: number;
+	now?: number;
 }
 
 function canonicalTarget(value: string): string {
@@ -61,7 +64,10 @@ export function issuePreviewAssetCapability(
 	secret = process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET ?? "",
 	now = Date.now(),
 ): string {
-	const target = canonicalTarget(claims.target);
+	const target = claims.imageId
+		? storedTarget(claims.imageId)
+		: canonicalTarget(claims.target);
+	if (claims.target !== target) throw new Error("Invalid capability target");
 	if (
 		!claims.scrapeId ||
 		claims.scrapeId.length > 200 ||
@@ -74,7 +80,11 @@ export function issuePreviewAssetCapability(
 	)
 		throw new Error("Invalid preview capability claims");
 	const payload = Buffer.from(
-		JSON.stringify({ v: TOKEN_VERSION, ...claims, target }),
+		JSON.stringify({
+			...claims,
+			v: claims.imageId ? 2 : TOKEN_VERSION,
+			target,
+		}),
 		"utf8",
 	).toString("base64url");
 	const token = `${payload}.${signature(payload, secret).toString("base64url")}`;
@@ -113,7 +123,7 @@ export function verifyPreviewAssetCapability(
 		const data = value as Record<string, unknown>;
 		const now = expected.now ?? Date.now();
 		if (
-			data.v !== TOKEN_VERSION ||
+			(data.v !== TOKEN_VERSION && data.v !== 2) ||
 			typeof data.scrapeId !== "string" ||
 			!data.scrapeId ||
 			data.scrapeId.length > 200 ||
@@ -123,11 +133,18 @@ export function verifyPreviewAssetCapability(
 			typeof data.target !== "string" ||
 			typeof data.expiresAt !== "number" ||
 			!Number.isSafeInteger(data.expiresAt) ||
-			data.expiresAt <= now ||
+			(!expected.allowExpired && data.expiresAt <= now) ||
 			data.expiresAt - now > SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS
 		)
 			return null;
-		const target = canonicalTarget(data.target);
+		const imageId =
+			data.v === 2 && typeof data.imageId === "string"
+				? data.imageId
+				: undefined;
+		if (data.v === 2 && !imageId) return null;
+		const target = imageId
+			? storedTarget(imageId)
+			: canonicalTarget(data.target);
 		if (
 			target !== data.target ||
 			(expected.scrapeId !== undefined &&
@@ -137,6 +154,7 @@ export function verifyPreviewAssetCapability(
 		)
 			return null;
 		return {
+			...(imageId ? { imageId } : {}),
 			scrapeId: data.scrapeId,
 			ownerId: data.ownerId,
 			target,
@@ -145,6 +163,33 @@ export function verifyPreviewAssetCapability(
 	} catch {
 		return null;
 	}
+}
+
+function storedTarget(imageId: string): string {
+	if (!/^[A-Za-z0-9_-]{1,200}$/.test(imageId))
+		throw new Error("Invalid image identity");
+	return `stored-image:${imageId}`;
+}
+
+export function storedImageAssetUrl(
+	imageId: string,
+	scrapeId: string,
+	ownerId: string,
+	now = Date.now(),
+	secret?: string,
+): string {
+	const cap = issuePreviewAssetCapability(
+		{
+			imageId,
+			target: storedTarget(imageId),
+			scrapeId,
+			ownerId,
+			expiresAt: now + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS,
+		},
+		secret,
+		now,
+	);
+	return `/api/scrape/asset?cap=${encodeURIComponent(cap)}`;
 }
 
 export function capabilityUrl(
@@ -159,6 +204,7 @@ export function capabilityUrl(
 			expiresAt: options.expiresAt,
 		},
 		options.secret,
+		options.now,
 	);
 	const origin = new URL(options.appOrigin);
 	if (origin.protocol !== "https:" && origin.protocol !== "http:")
@@ -166,9 +212,32 @@ export function capabilityUrl(
 	return `${origin.origin}/api/scrape/asset?cap=${encodeURIComponent(token)}`;
 }
 
+// Attaches a freshly signed same-origin asset URL to every verified image row.
+// Both the detail loader and the status poll use this so polled results render
+// with the same credentials as the initial page load.
+export function attachImageAssetUrls<T extends { url: string }>(
+	images: T[],
+	scrapeId: string,
+	ownerId: string,
+	now = Date.now(),
+): (T & { assetUrl: string })[] {
+	const expiresAt = now + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS;
+	return images.map((image) => ({
+		...image,
+		assetUrl: `/api/scrape/asset?cap=${encodeURIComponent(
+			issuePreviewAssetCapability(
+				{ target: image.url, scrapeId, ownerId, expiresAt },
+				undefined,
+				now,
+			),
+		)}`,
+	}));
+}
+
 export function buildPreviewSrcDoc(
 	html: string,
 	options: PreviewRewriteOptions,
+	visualSnapshot = false,
 ): string {
 	const capabilities = new Map<string, string>();
 	const resolve = (target: string) => {
@@ -185,7 +254,25 @@ export function buildPreviewSrcDoc(
 		}
 		return capability;
 	};
-	return rewritePreviewAssets(html, options.baseUrl, resolve, capabilities);
+	const output = rewritePreviewAssets(
+		html,
+		options.baseUrl,
+		resolve,
+		capabilities,
+		visualSnapshot,
+	);
+	if (!visualSnapshot) return output;
+	const nonce = randomBytes(18).toString("base64");
+	const origin = new URL(options.appOrigin).origin;
+	const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline' ${origin}; img-src data: blob: ${origin}; font-src data: ${origin}; media-src data: ${origin}; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
+	const secured = output.replace(
+		"<script>(()=>{if(window.parent",
+		`<script nonce="${nonce}">(()=>{if(window.parent`,
+	);
+	const meta = `<meta http-equiv="Content-Security-Policy" content="${policy}">`;
+	return /<head[^>]*>/i.test(secured)
+		? secured.replace(/<head[^>]*>/i, (head) => `${head}${meta}`)
+		: `${meta}${secured}`;
 }
 
 export function rewritePreviewCss(

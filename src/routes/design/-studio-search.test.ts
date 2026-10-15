@@ -31,4 +31,14 @@ describe("studioSearchSchema", () => {
 	it("rejects a non-string prompt instead of prefilling silently", () => {
 		expect(() => studioSearchSchema.parse({ prompt: 42 })).toThrow();
 	});
+
+	it("accepts an optional recorded origin for the back control", () => {
+		expect(studioSearchSchema.parse({ from: "/design" })).toEqual({
+			from: "/design",
+		});
+	});
+
+	it("rejects a non-string origin instead of trusting it", () => {
+		expect(() => studioSearchSchema.parse({ from: 42 })).toThrow();
+	});
 });
