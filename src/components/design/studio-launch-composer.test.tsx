@@ -115,4 +115,160 @@ describe("StudioLaunchComposer", () => {
 		const icon = trigger.querySelector("svg");
 		expect(icon?.classList.contains("lucide-palette")).toBe(true);
 	});
+
+	it("renders PRD attachment trigger in toolbar", () => {
+		renderComposer();
+		const trigger = screen.getByRole("button", {
+			name: "Lampirkan PRD (.md)",
+		});
+		expect(trigger).toBeDefined();
+		expect(trigger.getAttribute("title")).toBe("Lampirkan PRD (.md)");
+	});
+
+	it("displays compact PRD chip with filename, status, and remove action", () => {
+		const onPrdChange = vi.fn();
+		renderComposer({
+			prd: {
+				filename: "PRD-CatatDompet.md",
+				content: "# CatatDompet\nFeature list here.",
+			},
+			onPrdChange,
+		});
+
+		expect(screen.getByText("PRD-CatatDompet.md")).toBeDefined();
+		expect(screen.getByText(/Product requirements · Ready/i)).toBeDefined();
+		expect(screen.getByText("MD")).toBeDefined();
+
+		const removeBtn = screen.getByRole("button", {
+			name: "Hapus lampiran PRD",
+		});
+		fireEvent.click(removeBtn);
+		expect(onPrdChange).toHaveBeenCalledWith(null);
+	});
+
+	it("handles file selection and attaches valid .md file", async () => {
+		const onPrdChange = vi.fn();
+		const onError = vi.fn();
+		const { container } = render(
+			<StudioLaunchComposer
+				prompt="Test prompt"
+				onPromptChange={vi.fn()}
+				config={baseConfig}
+				onConfigChange={vi.fn()}
+				reference={null}
+				onOpenDesignPicker={vi.fn()}
+				onRemoveReference={vi.fn()}
+				onPrdChange={onPrdChange}
+				onError={onError}
+				loading={false}
+				error=""
+				onSubmit={vi.fn()}
+				textareaRef={{ current: null }}
+			/>,
+		);
+
+		const fileInput = container.querySelector(
+			'input[type="file"][accept=".md"]',
+		) as HTMLInputElement;
+		expect(fileInput).not.toBeNull();
+
+		const validContent = "# PRD Title\nValid product requirement specifications.";
+		const file = new File([validContent], "spec.md", { type: "text/markdown" });
+
+		fireEvent.change(fileInput, { target: { files: [file] } });
+
+		// Wait for async file reading
+		await vi.waitFor(() => {
+			expect(onPrdChange).toHaveBeenCalledWith({
+				filename: "spec.md",
+				content: validContent,
+			});
+		});
+		expect(onError).toHaveBeenCalledWith("");
+	});
+
+	it("rejects non-.md files and calls onError with descriptive feedback", async () => {
+		const onPrdChange = vi.fn();
+		const onError = vi.fn();
+		const { container } = render(
+			<StudioLaunchComposer
+				prompt="Test prompt"
+				onPromptChange={vi.fn()}
+				config={baseConfig}
+				onConfigChange={vi.fn()}
+				reference={null}
+				onOpenDesignPicker={vi.fn()}
+				onRemoveReference={vi.fn()}
+				onPrdChange={onPrdChange}
+				onError={onError}
+				loading={false}
+				error=""
+				onSubmit={vi.fn()}
+				textareaRef={{ current: null }}
+			/>,
+		);
+
+		const fileInput = container.querySelector(
+			'input[type="file"][accept=".md"]',
+		) as HTMLInputElement;
+
+		// Try uploading a PDF
+		const pdfFile = new File(["%PDF-1.4 dummy"], "spec.pdf", {
+			type: "application/pdf",
+		});
+		fireEvent.change(fileInput, { target: { files: [pdfFile] } });
+
+		expect(onError).toHaveBeenCalledWith(
+			expect.stringMatching(/Hanya file berekstensi \.md yang didukung/i),
+		);
+		expect(onPrdChange).not.toHaveBeenCalled();
+
+		// Try uploading a .markdown file (strictly rejected per spec)
+		onError.mockReset();
+		const markdownFile = new File(["# Content"], "spec.markdown", {
+			type: "text/markdown",
+		});
+		fireEvent.change(fileInput, { target: { files: [markdownFile] } });
+
+		expect(onError).toHaveBeenCalledWith(
+			expect.stringMatching(/Hanya file berekstensi \.md yang didukung/i),
+		);
+		expect(onPrdChange).not.toHaveBeenCalled();
+	});
+
+	it("rejects empty .md files and calls onError", async () => {
+		const onPrdChange = vi.fn();
+		const onError = vi.fn();
+		const { container } = render(
+			<StudioLaunchComposer
+				prompt="Test prompt"
+				onPromptChange={vi.fn()}
+				config={baseConfig}
+				onConfigChange={vi.fn()}
+				reference={null}
+				onOpenDesignPicker={vi.fn()}
+				onRemoveReference={vi.fn()}
+				onPrdChange={onPrdChange}
+				onError={onError}
+				loading={false}
+				error=""
+				onSubmit={vi.fn()}
+				textareaRef={{ current: null }}
+			/>,
+		);
+
+		const fileInput = container.querySelector(
+			'input[type="file"][accept=".md"]',
+		) as HTMLInputElement;
+
+		const emptyFile = new File(["   "], "empty.md", { type: "text/markdown" });
+		fireEvent.change(fileInput, { target: { files: [emptyFile] } });
+
+		await vi.waitFor(() => {
+			expect(onError).toHaveBeenCalledWith(
+				expect.stringMatching(/tidak boleh kosong/i),
+			);
+		});
+		expect(onPrdChange).not.toHaveBeenCalled();
+	});
 });

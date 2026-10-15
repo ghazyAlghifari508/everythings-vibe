@@ -5,12 +5,18 @@ import {
 	Loader2,
 	Monitor,
 	Palette,
+	Paperclip,
 	Smartphone,
 	X,
 } from "lucide-react";
-import type { FormEvent, RefObject } from "react";
+import { type ChangeEvent, type FormEvent, type RefObject, useRef } from "react";
+import { STUDIO_PRD_FILE_MAX_BYTES } from "@/lib/constants";
 import type { StudioDesignMode } from "@/lib/prompts-ui-studio";
 import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
+import {
+	validateStudioPrdContent,
+	validateStudioPrdFilename,
+} from "@/lib/studio-prd-validation";
 import { shouldSubmitComposerEvent } from "./composer-keyboard";
 import { StudioPageCountSelect } from "./studio-page-count-select";
 import { StudioSkillSelect } from "./studio-skill-select";
@@ -26,6 +32,11 @@ export interface LaunchComposerReference {
 	logoFilename: string | null;
 }
 
+export interface StudioPrdAttachmentState {
+	filename: string;
+	content: string;
+}
+
 // Initial-project composer for the Studio landing workspace. Page count only
 // appears here: revision composers must not offer it.
 export function StudioLaunchComposer({
@@ -36,8 +47,11 @@ export function StudioLaunchComposer({
 	reference,
 	onOpenDesignPicker,
 	onRemoveReference,
+	prd,
+	onPrdChange,
 	loading,
 	error,
+	onError,
 	onSubmit,
 	textareaRef,
 }: {
@@ -48,11 +62,15 @@ export function StudioLaunchComposer({
 	reference: LaunchComposerReference | null;
 	onOpenDesignPicker: () => void;
 	onRemoveReference: () => void;
+	prd?: StudioPrdAttachmentState | null;
+	onPrdChange?: (prd: StudioPrdAttachmentState | null) => void;
 	loading: boolean;
 	error: string;
+	onError?: (error: string) => void;
 	onSubmit: () => void;
 	textareaRef: RefObject<HTMLTextAreaElement | null>;
 }) {
+	const fileInputRef = useRef<HTMLInputElement>(null);
 	const canSubmit = prompt.trim().length > 0 && !loading;
 
 	function handleSubmit(event: FormEvent) {
@@ -60,11 +78,56 @@ export function StudioLaunchComposer({
 		onSubmit();
 	}
 
+	async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+		const file = event.target.files?.[0];
+		event.target.value = "";
+		if (!file) return;
+
+		const validName = validateStudioPrdFilename(file.name);
+		if (!validName.ok) {
+			onError?.(validName.error);
+			return;
+		}
+
+		if (file.size > STUDIO_PRD_FILE_MAX_BYTES) {
+			onError?.(
+				`Ukuran file PRD melebihi batas ${(STUDIO_PRD_FILE_MAX_BYTES / 1024).toFixed(0)} KB.`,
+			);
+			return;
+		}
+
+		try {
+			const text = await file.text();
+			const validContent = validateStudioPrdContent(text);
+			if (!validContent.ok) {
+				onError?.(validContent.error);
+				return;
+			}
+			onError?.("");
+			onPrdChange?.({
+				filename: validName.filename,
+				content: validContent.content,
+			});
+		} catch {
+			onError?.("Gagal membaca file .md. Coba pilih kembali.");
+		}
+	}
+
 	return (
 		<form
 			onSubmit={handleSubmit}
 			className="flex flex-col gap-3 rounded-2xl border border-graphite bg-charcoal p-4 shadow-lg transition-colors focus-within:border-steel sm:p-5"
 		>
+			<input
+				ref={fileInputRef}
+				type="file"
+				accept=".md"
+				onChange={handleFileChange}
+				className="sr-only hidden"
+				tabIndex={-1}
+				aria-hidden
+			/>
+
 			<label htmlFor="studio-prompt" className="block cursor-text">
 				<span className="sr-only">Prompt Desain UI</span>
 				<textarea
@@ -84,6 +147,53 @@ export function StudioLaunchComposer({
 					className="w-full resize-none bg-transparent font-sans text-sm leading-relaxed text-snow placeholder:text-fog focus:outline-none disabled:opacity-50 sm:text-base"
 				/>
 			</label>
+
+			{prd ? (
+				<div
+					role="region"
+					aria-label="Lampiran PRD aktif"
+					className="flex items-center gap-2.5 rounded-xl border border-graphite bg-onyx px-3 py-2 text-xs text-mist"
+				>
+					<span className="flex size-6 shrink-0 items-center justify-center rounded bg-charcoal font-mono text-[10px] font-bold text-indigo">
+						MD
+					</span>
+					<div className="flex min-w-0 flex-col">
+						<span
+							className="max-w-48 truncate font-semibold text-snow sm:max-w-64 md:max-w-80"
+							title={prd.filename}
+						>
+							{prd.filename}
+						</span>
+						<span className="text-[11px] text-fog">
+							Product requirements · Ready
+						</span>
+					</div>
+					<span className="ml-auto flex items-center gap-1.5">
+						<button
+							type="button"
+							onClick={() => fileInputRef.current?.click()}
+							disabled={loading}
+							aria-label="Ganti lampiran PRD"
+							className="rounded px-1.5 py-0.5 font-semibold text-mist underline underline-offset-2 hover:text-snow disabled:opacity-50"
+						>
+							Ganti
+						</button>
+						<button
+							type="button"
+							onClick={() => {
+								onError?.("");
+								onPrdChange?.(null);
+							}}
+							disabled={loading}
+							aria-label="Hapus lampiran PRD"
+							title="Hapus lampiran PRD"
+							className="rounded p-1 text-fog hover:text-snow disabled:opacity-50"
+						>
+							<X size={14} aria-hidden />
+						</button>
+					</span>
+				</div>
+			) : null}
 
 			{reference ? (
 				<div className="flex flex-wrap items-center gap-2 rounded-xl border border-graphite bg-onyx px-3 py-2 text-xs text-mist">
@@ -158,6 +268,20 @@ export function StudioLaunchComposer({
 				/>
 
 				<span className="ml-auto flex items-center gap-2">
+					<button
+						type="button"
+						onClick={() => fileInputRef.current?.click()}
+						disabled={loading}
+						aria-label={prd ? "Ganti lampiran PRD" : "Lampirkan PRD (.md)"}
+						title={prd ? "Ganti lampiran PRD" : "Lampirkan PRD (.md)"}
+						className="flex size-9 items-center justify-center rounded-lg border border-graphite bg-onyx text-mist transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						<Paperclip
+							size={15}
+							aria-hidden
+							className={prd ? "text-indigo" : undefined}
+						/>
+					</button>
 					<button
 						type="button"
 						onClick={onOpenDesignPicker}

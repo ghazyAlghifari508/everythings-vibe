@@ -152,6 +152,10 @@ function StudioPage() {
 	});
 	const [stagedReference, setStagedReference] =
 		useState<StagedReference | null>(null);
+	const [stagedPrd, setStagedPrd] = useState<{
+		filename: string;
+		content: string;
+	} | null>(null);
 	const [isPickerOpen, setIsPickerOpen] = useState(false);
 	const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 	const [selectedShortcutId, setSelectedShortcutId] = useState<string | null>(
@@ -268,6 +272,12 @@ function StudioPage() {
 							: { kind: "custom", filename: stagedReference.filename }
 						: null,
 					designMd: stagedReference?.designMd ?? null,
+					prdAttachment: stagedPrd
+						? {
+								filename: stagedPrd.filename,
+								content: stagedPrd.content,
+							}
+						: null,
 					logo:
 						stagedReference?.kind === "custom" && stagedReference.logo
 							? {
@@ -404,8 +414,11 @@ function StudioPage() {
 							}
 							onOpenDesignPicker={() => setIsPickerOpen(true)}
 							onRemoveReference={() => setStagedReference(null)}
+							prd={stagedPrd}
+							onPrdChange={setStagedPrd}
 							loading={loading}
 							error={error}
+							onError={setError}
 							onSubmit={() => void submit()}
 							textareaRef={textareaRef}
 						/>
