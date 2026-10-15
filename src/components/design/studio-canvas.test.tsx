@@ -529,4 +529,360 @@ describe("StudioCanvas", () => {
 		fireEvent.keyDown(hand, { key: "v" });
 		expect(hand.getAttribute("aria-pressed")).toBe("false");
 	});
+
+	describe("marquee selection", () => {
+		// jsdom reports zeroed layout boxes, so each test supplies the real
+		// rectangles the canvas would read from the browser: the canvas origin
+		// and the two frame artboards, all in the shared canvas-local space.
+		const canvasRect = {
+			left: 0,
+			top: 0,
+			width: 1000,
+			height: 800,
+			right: 1000,
+			bottom: 800,
+			x: 0,
+			y: 0,
+			toJSON: () => ({}),
+		};
+		const frameRects: Record<string, DOMRect> = {
+			"f-1": {
+				left: 100,
+				top: 100,
+				width: 200,
+				height: 300,
+				right: 300,
+				bottom: 400,
+				x: 100,
+				y: 100,
+				toJSON: () => ({}),
+			},
+			"f-2": {
+				left: 400,
+				top: 100,
+				width: 200,
+				height: 300,
+				right: 600,
+				bottom: 400,
+				x: 400,
+				y: 100,
+				toJSON: () => ({}),
+			},
+		};
+
+		function installLayout() {
+			const canvas = screen.getByTestId("studio-canvas");
+			canvas.getBoundingClientRect = () => canvasRect;
+			for (const [id, rect] of Object.entries(frameRects)) {
+				const node = canvas.querySelector(`[data-frame-id="${id}"]`);
+				if (node instanceof HTMLElement)
+					node.getBoundingClientRect = () => rect;
+			}
+			return canvas;
+		}
+
+		function drag(
+			canvas: HTMLElement,
+			from: { x: number; y: number },
+			to: { x: number; y: number },
+			init: { shiftKey?: boolean } = {},
+		) {
+			fireEvent.pointerDown(canvas, {
+				pointerId: 7,
+				button: 0,
+				clientX: from.x,
+				clientY: from.y,
+				shiftKey: init.shiftKey,
+			});
+			fireEvent.pointerMove(canvas, {
+				pointerId: 7,
+				clientX: to.x,
+				clientY: to.y,
+			});
+			fireEvent.pointerUp(canvas, { pointerId: 7 });
+		}
+
+		it("selects every frame the rectangle touches", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={[]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			const canvas = installLayout();
+			// A rectangle spanning both artboards.
+			drag(canvas, { x: 50, y: 50 }, { x: 650, y: 450 });
+			expect(onSelectFrames).toHaveBeenLastCalledWith(["f-1", "f-2"]);
+		});
+
+		it("selects only the frame the rectangle reaches", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={[]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			const canvas = installLayout();
+			drag(canvas, { x: 50, y: 50 }, { x: 250, y: 250 });
+			expect(onSelectFrames).toHaveBeenLastCalledWith(["f-1"]);
+		});
+
+		it("keeps the existing selection on a shift+drag and appends new frames", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={["f-1"]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			const canvas = installLayout();
+			// Drag across only the second artboard while holding shift.
+			drag(canvas, { x: 380, y: 50 }, { x: 650, y: 450 }, { shiftKey: true });
+			expect(onSelectFrames).toHaveBeenLastCalledWith(["f-1", "f-2"]);
+		});
+
+		it("paints a visible rectangle during the drag and hides it on release", () => {
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={[]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={vi.fn()}
+				/>,
+			);
+			const canvas = installLayout();
+			const marquee = screen.getByTestId("studio-marquee");
+			expect(marquee.style.display).toBe("none");
+
+			fireEvent.pointerDown(canvas, {
+				pointerId: 7,
+				button: 0,
+				clientX: 50,
+				clientY: 50,
+			});
+			fireEvent.pointerMove(canvas, {
+				pointerId: 7,
+				clientX: 260,
+				clientY: 210,
+			});
+			expect(marquee.style.display).toBe("block");
+			expect(marquee.style.left).toBe("50px");
+			expect(marquee.style.width).toBe("210px");
+
+			fireEvent.pointerUp(canvas, { pointerId: 7 });
+			expect(marquee.style.display).toBe("none");
+		});
+
+		it("does not start a marquee below the drag threshold", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={["f-1"]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			const canvas = installLayout();
+			// A sub-threshold move is a click, not a marquee.
+			fireEvent.pointerDown(canvas, {
+				pointerId: 7,
+				button: 0,
+				clientX: 50,
+				clientY: 50,
+			});
+			fireEvent.pointerMove(canvas, { pointerId: 7, clientX: 51, clientY: 51 });
+			fireEvent.pointerUp(canvas, { pointerId: 7 });
+			expect(onSelectFrames).toHaveBeenLastCalledWith([]);
+		});
+
+		it("clears the selection on an empty-canvas click with no drag", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={["f-1"]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			const canvas = installLayout();
+			fireEvent.pointerDown(canvas, {
+				pointerId: 7,
+				button: 0,
+				clientX: 900,
+				clientY: 700,
+			});
+			fireEvent.pointerUp(canvas, { pointerId: 7 });
+			expect(onSelectFrames).toHaveBeenLastCalledWith([]);
+		});
+
+		it("does not start a marquee from a frame or a control", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={[]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			installLayout();
+			const frame = screen
+				.getByTestId("studio-canvas")
+				.querySelector('[data-frame-id="f-1"]');
+			expect(frame).not.toBeNull();
+			if (frame)
+				fireEvent.pointerDown(frame, {
+					pointerId: 7,
+					button: 0,
+					clientX: 150,
+					clientY: 150,
+				});
+			fireEvent.pointerMove(screen.getByTestId("studio-canvas"), {
+				pointerId: 7,
+				clientX: 650,
+				clientY: 450,
+			});
+			expect(onSelectFrames).not.toHaveBeenCalled();
+			expect(screen.getByTestId("studio-marquee").style.display).toBe("none");
+		});
+
+		it("cancels and restores the selection on Escape", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={["f-1"]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			const canvas = installLayout();
+			fireEvent.pointerDown(canvas, {
+				pointerId: 7,
+				button: 0,
+				clientX: 50,
+				clientY: 50,
+			});
+			fireEvent.pointerMove(canvas, {
+				pointerId: 7,
+				clientX: 650,
+				clientY: 450,
+			});
+			expect(onSelectFrames).toHaveBeenLastCalledWith(["f-1", "f-2"]);
+			fireEvent.keyDown(document.body, { key: "Escape" });
+			// The pre-drag selection is restored and the rectangle disappears.
+			expect(onSelectFrames).toHaveBeenLastCalledWith(["f-1"]);
+			expect(screen.getByTestId("studio-marquee").style.display).toBe("none");
+		});
+
+		it("cancels and restores the selection when pointer capture is lost", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={["f-1"]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			const canvas = installLayout();
+			fireEvent.pointerDown(canvas, {
+				pointerId: 7,
+				button: 0,
+				clientX: 50,
+				clientY: 50,
+			});
+			fireEvent.pointerMove(canvas, {
+				pointerId: 7,
+				clientX: 650,
+				clientY: 450,
+			});
+			fireEvent.lostPointerCapture(canvas, { pointerId: 7 });
+			expect(onSelectFrames).toHaveBeenLastCalledWith(["f-1"]);
+			expect(screen.getByTestId("studio-marquee").style.display).toBe("none");
+		});
+
+		it("cancels the marquee on pointercancel without leaving a stuck rectangle", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={["f-1"]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			const canvas = installLayout();
+			fireEvent.pointerDown(canvas, {
+				pointerId: 7,
+				button: 0,
+				clientX: 50,
+				clientY: 50,
+			});
+			fireEvent.pointerMove(canvas, {
+				pointerId: 7,
+				clientX: 650,
+				clientY: 450,
+			});
+			fireEvent.pointerCancel(canvas, { pointerId: 7 });
+			expect(onSelectFrames).toHaveBeenLastCalledWith(["f-1"]);
+			expect(screen.getByTestId("studio-marquee").style.display).toBe("none");
+		});
+
+		it("never starts a marquee in hand mode", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={[]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			const canvas = installLayout();
+			fireEvent.click(screen.getByRole("button", { name: "Hand" }));
+			drag(canvas, { x: 50, y: 50 }, { x: 650, y: 450 });
+			expect(onSelectFrames).not.toHaveBeenCalled();
+			expect(screen.getByTestId("studio-marquee").style.display).toBe("none");
+		});
+
+		it("lets space-pan temporarily override marquee selection", () => {
+			const onSelectFrames = vi.fn();
+			render(
+				<StudioCanvas
+					project={mockProject}
+					frames={mockFrames}
+					selectedFrameIds={[]}
+					onSelectFrame={vi.fn()}
+					onSelectFrames={onSelectFrames}
+				/>,
+			);
+			const canvas = installLayout();
+			fireEvent.keyDown(document.body, { code: "Space" });
+			drag(canvas, { x: 50, y: 50 }, { x: 650, y: 450 });
+			expect(onSelectFrames).not.toHaveBeenCalled();
+			expect(screen.getByTestId("studio-marquee").style.display).toBe("none");
+		});
+	});
 });
