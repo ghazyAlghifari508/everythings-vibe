@@ -8,7 +8,42 @@ vi.mock("@tanstack/react-router", () => ({
 		createElement("a", { href: to, ...rest }, children),
 }));
 
+import { imageResultCounts } from "@/lib/scrape-images";
 import { ScrapeProgress } from "./scrape-progress";
+
+it("uses row counts rather than legacy saved metadata for partial image results", () => {
+	const counts = imageResultCounts(
+		[
+			{ status: "completed", assetId: "bytes" },
+			{ status: "completed", assetId: null },
+			{ status: "failed" },
+		],
+		4,
+	);
+	const { container } = render(
+		<ScrapeProgress
+			mode="images"
+			status="completed"
+			imageOutcome="partial"
+			savedImages={99}
+			imageCounts={counts}
+		/>,
+	);
+	const counters = Object.fromEntries(
+		[...container.querySelectorAll("dl > div")].map((item) => [
+			item.querySelector("dt")?.textContent,
+			item.querySelector("dd")?.textContent,
+		]),
+	);
+	expect(counters).toEqual({
+		Ditemukan: "4",
+		Tersimpan: "1",
+		"Tautan terverifikasi": "1",
+		Gagal: "1",
+		Tertunda: "1",
+	});
+	expect(container.textContent).not.toContain("tersedia tetap tersimpan");
+});
 
 afterEach(() => {
 	cleanup();

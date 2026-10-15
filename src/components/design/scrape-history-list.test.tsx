@@ -1,7 +1,36 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { imageCountsLabel, imageResultCounts } from "@/lib/scrape-images";
 import { ScrapeHistoryList } from "./scrape-history-list";
+
+it("keeps historical stored and legacy counts distinct", () => {
+	const counts = imageResultCounts(
+		[
+			{ status: "completed", assetId: "bytes" },
+			{ status: "completed", assetId: null },
+			{ status: "failed" },
+		],
+		4,
+	);
+	render(
+		<ScrapeHistoryList
+			initialItems={[
+				{
+					id: "sample",
+					domain: "example.test",
+					sourceUrl: "https://example.test",
+					title: null,
+					status: "failed",
+					mode: "images",
+					createdAt: new Date().toISOString(),
+					imageCounts: counts,
+				},
+			]}
+		/>,
+	);
+	expect(screen.getByText(imageCountsLabel(counts))).toBeDefined();
+});
 
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({

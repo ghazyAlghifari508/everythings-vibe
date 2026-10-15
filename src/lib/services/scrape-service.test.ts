@@ -1,6 +1,59 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { verifyPreviewAssetCapability } from "@/lib/preview-capabilities";
 import { generateDesignMd } from "../prompts-design-md";
-import { resolveEnrichmentRetry } from "./scrape-service";
+import {
+	resolveEnrichmentRetry,
+	type ScrapeImageRow,
+	signScrapeImages,
+} from "./scrape-service";
+
+it("signs stored image identities and retains remote targets only for legacy rows", async () => {
+	vi.stubEnv("BETTER_AUTH_SECRET", "test-signing-secret-with-enough-entropy");
+	try {
+		const base: ScrapeImageRow = {
+			id: "image-a",
+			scrapeId: "scrape-a",
+			userId: "owner-a",
+			url: "https://example.test/a.png",
+			pageUrl: "https://example.test",
+			assetId: "bytes-a",
+			status: "completed",
+			error: null,
+			failureCode: null,
+			httpStatus: 200,
+			width: null,
+			height: null,
+			format: "png",
+			classification: null,
+			evidence: { sources: ["img"], alt: null },
+		};
+		const result = await signScrapeImages(
+			[base, { ...base, id: "legacy", assetId: null }],
+			base.scrapeId,
+			base.userId,
+		);
+		const claims = result.map((image) =>
+			verifyPreviewAssetCapability(
+				new URL(image.assetUrl, "https://app.test").searchParams.get("cap") ??
+					"",
+			),
+		);
+		expect(claims[0]).toMatchObject({
+			imageId: "image-a",
+			target: "stored-image:image-a",
+			scrapeId: base.scrapeId,
+			ownerId: base.userId,
+		});
+		expect(claims[1]).toMatchObject({
+			target: base.url,
+			scrapeId: base.scrapeId,
+			ownerId: base.userId,
+		});
+		expect(claims[1]).not.toHaveProperty("imageId");
+	} finally {
+		vi.unstubAllEnvs();
+	}
+});
 
 describe("resolveEnrichmentRetry", () => {
 	it("replays the stored document instead of regenerating applied enrichment", () => {

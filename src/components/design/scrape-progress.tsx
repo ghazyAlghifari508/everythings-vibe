@@ -371,8 +371,9 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 					)}
 					{props.imageOutcome === "partial" && (
 						<p className="mt-6 text-sm text-fog">
-							Sebagian gambar berhasil diambil. Gambar yang tersedia tetap
-							tersimpan; resource yang gagal diverifikasi beserta alasannya.
+							Sebagian gambar berhasil diproses. Jumlah byte tersimpan dan
+							tautan terverifikasi ditampilkan terpisah. Alasan kegagalan
+							tersedia di hasil gambar.
 						</p>
 					)}
 					{(props.imageDiscovery === "discovery-failed" ||
