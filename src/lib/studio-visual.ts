@@ -226,14 +226,24 @@ export async function captureStudioVisual(
 					window.lucide.createIcons();
 			});
 		}
-		await page.evaluate(async () => {
-			await document.fonts.ready;
-			await Promise.all(
-				Array.from(document.images, (image) =>
-					image.decode().catch(() => undefined),
-				),
-			);
-		});
+		await page
+			.evaluate(async () => {
+				await document.fonts.ready;
+				const decoded = await Promise.all(
+					Array.from(document.images, async (image) => {
+						try {
+							await image.decode();
+							return true;
+						} catch {
+							return image.getAttribute("src") ?? "gambar";
+						}
+					}),
+				);
+				return decoded.filter((entry) => entry !== true);
+			})
+			.then((broken) => {
+				for (const source of broken) failedResources.push(`decode:${source}`);
+			});
 		// The reported height must equal the pixels Playwright actually paints
 		// for this clip. Playwright's fullPage document rect is derived from the
 		// document/body scroll and client metrics, while a naive element scan
@@ -262,7 +272,11 @@ export async function captureStudioVisual(
 		const contentHeight = Math.ceil(measured.contentBottom);
 		const documentHeight = Math.ceil(measured.documentBottom);
 		const height = Math.min(contentHeight, documentHeight);
-		if (height < 1 || height > STUDIO_CAPTURE_MAX_HEIGHT)
+		if (height < 1)
+			throw new Error(
+				"Frame tidak memiliki konten yang dapat dirender. Periksa HTML layar sebelum menangkap ulang.",
+			);
+		if (height > STUDIO_CAPTURE_MAX_HEIGHT)
 			throw new Error(
 				"Dimensi frame melebihi batas rendering. Konten tidak dipotong.",
 			);

@@ -179,6 +179,7 @@ export const StudioFrame = memo(function StudioFrame({
 	return (
 		<article
 			ref={artboardRef}
+			data-frame-id={frame.id}
 			aria-label={`Frame ${frame.name}`}
 			className={`flex flex-col gap-2 select-none ${className}`}
 		>

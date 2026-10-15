@@ -32,8 +32,6 @@ import {
 	buildStudioPlanningPrompt,
 	buildStudioUserPrompt,
 	parseStudioPlanningWithBlueprint,
-	STUDIO_PLAN_SYSTEM_PROMPT,
-	STUDIO_SYSTEM_PROMPT,
 	type StudioDesignMode,
 	type StudioScreenPlan,
 	validateStudioDesignMode,
@@ -48,7 +46,8 @@ import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import { resolveStudioDesignReference } from "@/lib/studio-design-reference.server";
 import {
 	resolveStudioDesignSkill,
-	studioSkillSystemGuidance,
+	resolveStudioFrameSystemPrompt,
+	resolveStudioPlanningSystemPrompt,
 } from "@/lib/studio-design-skill-registry.server";
 import {
 	enforceDesignSystemOnHtml,
@@ -60,6 +59,10 @@ import {
 	type StudioDesignSkillId,
 	studioGenerationOptionsSchema,
 } from "@/lib/studio-generation-options";
+import {
+	validateStudioPrdContent,
+	validateStudioPrdFilename,
+} from "@/lib/studio-prd-validation";
 
 const activeStudioJobs = new Set<string>();
 
@@ -196,6 +199,7 @@ export interface InitialFrameContext {
 	logoUrl: string | null;
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
 	blueprint: StudioDesignBlueprint | null;
+	prdContent?: string | null;
 	lease?: { jobId: string; workerId: string };
 }
 
@@ -276,6 +280,7 @@ export async function generateInitialFrame(
 		logoUrl: ctx.logoUrl,
 		blueprint: ctx.blueprint,
 		activeScreen: frame.name,
+		prdContent: ctx.prdContent,
 	});
 	let attempt = 0;
 	for (;;) {
@@ -352,6 +357,7 @@ export interface CreateStudioProjectInput {
 	designSkillId?: StudioDesignSkillId;
 	initialPageCount?: number;
 	designReference?: StudioDesignReference | null;
+	prdAttachment?: { filename: string; content: string } | null;
 }
 
 export function sanitizeSvg(svgContent: string): string {
@@ -499,6 +505,20 @@ export async function createStudioProject(
 		}
 	}
 
+	let cleanPrdContent: string | null = null;
+	let cleanPrdFilename: string | null = null;
+	let prdContentHash: string | null = null;
+	if (input.prdAttachment) {
+		const validName = validateStudioPrdFilename(input.prdAttachment.filename);
+		if (!validName.ok) throw new ScrapeError("INVALID_URL", validName.error);
+		const validContent = validateStudioPrdContent(input.prdAttachment.content);
+		if (!validContent.ok)
+			throw new ScrapeError("INVALID_URL", validContent.error);
+		cleanPrdFilename = validName.filename;
+		cleanPrdContent = validContent.content;
+		prdContentHash = validContent.contentHash;
+	}
+
 	const cleanTitle =
 		(input.title ?? "").trim().slice(0, 200) ||
 		checked.prompt.slice(0, 80) ||
@@ -527,6 +547,9 @@ export async function createStudioProject(
 			designSkillId: options.designSkillId,
 			initialPageCount: options.initialPageCount,
 			designReference: resolved.designReference,
+			prdContent: cleanPrdContent,
+			prdFilename: cleanPrdFilename,
+			prdContentHash,
 		} satisfies InsertStudioProjectRow)
 		.returning();
 
@@ -588,6 +611,21 @@ export async function createStudioProjectWithJob(
 		"Studio tanpa judul";
 
 	const validatedLogo = input.logo ? validateAndProcessLogo(input.logo) : null;
+
+	let cleanPrdContent: string | null = null;
+	let cleanPrdFilename: string | null = null;
+	let prdContentHash: string | null = null;
+	if (input.prdAttachment) {
+		const validName = validateStudioPrdFilename(input.prdAttachment.filename);
+		if (!validName.ok) throw new ScrapeError("INVALID_URL", validName.error);
+		const validContent = validateStudioPrdContent(input.prdAttachment.content);
+		if (!validContent.ok)
+			throw new ScrapeError("INVALID_URL", validContent.error);
+		cleanPrdFilename = validName.filename;
+		cleanPrdContent = validContent.content;
+		prdContentHash = validContent.contentHash;
+	}
+
 	const tenSecondsAgo = new Date(Date.now() - 10_000);
 	const [recentJob] = await db
 		.select({
@@ -610,6 +648,9 @@ export async function createStudioProjectWithJob(
 				resolved.designReference === null
 					? isNull(studioProjects.designReference)
 					: eq(studioProjects.designReference, resolved.designReference),
+				prdContentHash === null
+					? isNull(studioProjects.prdContentHash)
+					: eq(studioProjects.prdContentHash, prdContentHash),
 				validatedLogo
 					? sql`exists (select 1 from ${studioAssets} where ${studioAssets.id} = ${studioProjects.logoAssetId} and ${studioAssets.userId} = ${userId} and ${studioAssets.data} = ${validatedLogo.data} and ${studioAssets.mimeType} = ${validatedLogo.mimeType})`
 					: isNull(studioProjects.logoAssetId),
@@ -659,6 +700,9 @@ export async function createStudioProjectWithJob(
 				designSkillId: options.designSkillId,
 				initialPageCount: options.initialPageCount,
 				designReference: resolved.designReference,
+				prdContent: cleanPrdContent,
+				prdFilename: cleanPrdFilename,
+				prdContentHash,
 			} satisfies InsertStudioProjectRow)
 			.returning();
 
@@ -824,6 +868,7 @@ export async function runStudioJobPipeline(
 				designMode,
 				project.designMd,
 				project.initialPageCount,
+				project.prdContent,
 			);
 
 			let planError: string | null = null;
@@ -835,9 +880,9 @@ export async function runStudioJobPipeline(
 					[
 						{
 							role: "system",
-							content:
-								STUDIO_PLAN_SYSTEM_PROMPT +
-								studioSkillSystemGuidance(project.designSkillId ?? "none"),
+							content: resolveStudioPlanningSystemPrompt(
+								project.designSkillId ?? "none",
+							),
 						},
 						{ role: "user", content: planPrompt },
 					],
@@ -871,9 +916,9 @@ export async function runStudioJobPipeline(
 						[
 							{
 								role: "system",
-								content:
-									STUDIO_PLAN_SYSTEM_PROMPT +
-									studioSkillSystemGuidance(project.designSkillId ?? "none"),
+								content: resolveStudioPlanningSystemPrompt(
+									project.designSkillId ?? "none",
+								),
 							},
 							{ role: "user", content: correctivePrompt },
 						],
@@ -1031,6 +1076,7 @@ export async function runStudioJobPipeline(
 						logoUrl,
 						dsTokens,
 						blueprint: designBlueprint ?? project.designBlueprint,
+						prdContent: project.prdContent,
 						lease: { jobId, workerId },
 					}),
 			),
@@ -1179,6 +1225,7 @@ export async function reviseStudioProject(
 		designMode,
 		designMd: detail.designMd,
 		logoUrl: detail.logoUrl,
+		prdContent: detail.prdContent,
 	});
 
 	const htmlCode = await generateStudioHtml(
@@ -1406,6 +1453,7 @@ export async function addStudioFrame(
 			logoUrl: detail.logoUrl,
 			blueprint: detail.designBlueprint,
 			activeScreen: cleanName,
+			prdContent: detail.prdContent,
 		});
 
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
@@ -1494,6 +1542,7 @@ export async function reviseStudioFrame(
 			previousHtml: frame.htmlCode ?? undefined,
 			blueprint: detail.designBlueprint,
 			activeScreen: frame.name,
+			prdContent: detail.prdContent,
 		});
 
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
@@ -1777,6 +1826,9 @@ export async function duplicateStudioProject(
 				designSkillId: source.designSkillId,
 				initialPageCount: source.initialPageCount,
 				designReference: source.designReference,
+				prdContent: source.prdContent,
+				prdFilename: source.prdFilename,
+				prdContentHash: source.prdContentHash,
 			} satisfies InsertStudioProjectRow)
 			.returning();
 		if (!copy) throw new ScrapeError("STORAGE_FAILED");
@@ -2373,6 +2425,7 @@ async function runStudioFrameOperation(job: StudioJobRow) {
 				job.jobType === "revise" ? (frame.htmlCode ?? undefined) : undefined,
 			blueprint: project.designBlueprint,
 			activeScreen: name,
+			prdContent: project.prdContent,
 		});
 		const dsTokens = extractDesignSystemTokens(project.designMd);
 		const htmlCode = await generateValidatedFrameHtml({
@@ -2472,8 +2525,7 @@ export async function generateStudioHtml(
 		[
 			{
 				role: "system",
-				content:
-					STUDIO_SYSTEM_PROMPT + studioSkillSystemGuidance(designSkillId),
+				content: resolveStudioFrameSystemPrompt(designSkillId),
 			},
 			{ role: "user", content: prompt },
 		],

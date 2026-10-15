@@ -106,6 +106,52 @@ describe("StudioSkillSelect", () => {
 		];
 		expect(ids).toContain(onChange.mock.calls[0][0]);
 	});
+
+	it("renders bundled authentic logos for skills that ship one", async () => {
+		render(<StudioSkillSelect value="none" onChange={vi.fn()} />);
+		openMenu(/Design skill: No Skill/i);
+		await waitFor(() => {
+			expect(
+				screen.getByRole("menuitemradio", { name: /Impeccable/i }),
+			).toBeDefined();
+		});
+		const impeccableLogo = document.querySelector(
+			'img[src="/icons/skills/impeccable.svg"]',
+		);
+		const tasteLogo = document.querySelector(
+			'img[src="/icons/skills/taste.png"]',
+		);
+		expect(impeccableLogo).not.toBeNull();
+		expect(tasteLogo).not.toBeNull();
+		expect(impeccableLogo?.getAttribute("alt")).toBe("Logo Impeccable");
+		expect(tasteLogo?.getAttribute("alt")).toBe("Logo Taste");
+		expect(impeccableLogo?.getAttribute("class")).toContain("object-contain");
+	});
+
+	it("falls back to distinct restrained icons when no official logo exists", async () => {
+		render(<StudioSkillSelect value="none" onChange={vi.fn()} />);
+		openMenu(/Design skill: No Skill/i);
+		await waitFor(() => {
+			expect(
+				screen.getByRole("menuitemradio", { name: /Impeccable/i }),
+			).toBeDefined();
+		});
+		expect(document.querySelectorAll("img")).toHaveLength(2);
+		const fallbackLabels = [
+			"No Skill",
+			"Frontend Design",
+			"UI UX Pro Max",
+			"Anti-Slop",
+		];
+		for (const label of fallbackLabels) {
+			const item = screen
+				.getAllByRole("menuitemradio")
+				.find((radio) => radio.textContent?.includes(label));
+			expect(item, `menu item for ${label}`).toBeDefined();
+			expect(item?.querySelector("img")).toBeNull();
+			expect(item?.querySelector("svg")).not.toBeNull();
+		}
+	});
 });
 
 describe("StudioPageCountSelect", () => {
@@ -134,5 +180,35 @@ describe("StudioPageCountSelect", () => {
 		expect(screen.getAllByRole("menuitemradio")).toHaveLength(5);
 		fireEvent.click(screen.getByRole("menuitemradio", { name: /5 halaman/i }));
 		expect(onChange).toHaveBeenCalledWith(5);
+	});
+
+	it("presents a titled menu with a subtitle and a single checked radio", async () => {
+		render(<StudioPageCountSelect value={3} onChange={vi.fn()} />);
+		openMenu(/Jumlah halaman awal: 3/i);
+		await waitFor(() => {
+			expect(screen.getByText("Jumlah halaman")).toBeDefined();
+		});
+		expect(screen.getByText("Tentukan layar awal proyek")).toBeDefined();
+		const radios = screen.getAllByRole("menuitemradio");
+		const checked = radios.filter(
+			(item) => item.getAttribute("aria-checked") === "true",
+		);
+		expect(checked).toHaveLength(1);
+		expect(checked[0].textContent).toContain("3 halaman");
+		expect(screen.getByText("Default")).toBeDefined();
+	});
+
+	it("keeps an accessible trigger name for every value in the range", () => {
+		for (const value of [1, 2, 3, 4, 5]) {
+			const { unmount } = render(
+				<StudioPageCountSelect value={value} onChange={vi.fn()} />,
+			);
+			expect(
+				screen.getByRole("button", {
+					name: new RegExp(`Jumlah halaman awal: ${value}`),
+				}),
+			).toBeDefined();
+			unmount();
+		}
 	});
 });

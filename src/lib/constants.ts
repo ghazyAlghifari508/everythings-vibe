@@ -380,6 +380,9 @@ export const DESIGN_SYNTHESIS_MAX_RADII = 20;
 // === VibeDesign Studio bounds ===
 export const STUDIO_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;
+export const STUDIO_PRD_FILE_MAX_BYTES = 500 * 1024;
+export const STUDIO_PRD_MAX_CHARS = 100_000;
+export const STUDIO_PRD_MIN_CHARS = 10;
 
 /**
  * Canonical capture widths for Studio frame visuals.
@@ -435,6 +438,13 @@ export const STUDIO_CANVAS_COMPOSER_INSET_PX = 168;
 export const STUDIO_CANVAS_TOOLBAR_INSET_PX = 64;
 /** Smallest visible artboard band a fit is allowed to compress to. */
 export const STUDIO_CANVAS_MIN_VISIBLE_PX = 120;
+
+/**
+ * Pointer travel, in canvas-local pixels, before an empty-canvas press becomes
+ * a marquee selection instead of a click. Keeps a plain click on the canvas
+ * clearing the selection while a deliberate drag starts a rectangle.
+ */
+export const STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX = 4;
 
 /**
  * Floating overlay geometry for the canvas bottom edge.

@@ -104,4 +104,38 @@ describe("StudioDesignPickerDialog", () => {
 		).toHaveProperty("disabled", true);
 		expect(onSelectCustom).not.toHaveBeenCalled();
 	});
+
+	it("exposes a real labelled close control at the dialog edge", () => {
+		renderDialog();
+		const dialog = screen.getByRole("dialog");
+		const closeButtons = screen.getAllByRole("button", { name: "Close" });
+		expect(closeButtons).toHaveLength(1);
+		expect(dialog.contains(closeButtons[0])).toBe(true);
+		expect(closeButtons[0].className).toContain("top-4");
+		expect(closeButtons[0].className).toContain("right-4");
+	});
+
+	it("sizes the dialog beyond a medium popup and keeps header/footer outside the scroll body", () => {
+		renderDialog();
+		const dialog = screen.getByRole("dialog");
+		const classes = dialog.className;
+		expect(classes).not.toContain("max-w-2xl");
+		expect(classes).not.toContain("max-h-[90dvh]");
+		expect(classes).toContain("max-w-none");
+		expect(classes).toContain("w-screen");
+		expect(classes).toContain("flex-col");
+
+		const scroller = dialog.querySelector(".overflow-y-auto");
+		expect(scroller).not.toBeNull();
+		const header = screen.getByText("Pilih tampilan").closest("div");
+		const footer = screen.getByRole("button", { name: "Batal" }).closest("div");
+		expect(header?.contains(scroller)).toBe(false);
+		expect(footer?.contains(scroller)).toBe(false);
+	});
+
+	it("closes through the dialog open-change contract on Escape", () => {
+		const { onOpenChange } = renderDialog();
+		fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+		expect(onOpenChange).toHaveBeenCalledWith(false);
+	});
 });

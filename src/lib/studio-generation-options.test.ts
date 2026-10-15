@@ -51,7 +51,7 @@ describe("Studio generation configuration", () => {
 		expect(resolveStudioDesignSkill("none").guidance).toBe("");
 		for (const skill of STUDIO_DESIGN_SKILLS.slice(1)) {
 			const resolved = resolveStudioDesignSkill(skill.id);
-			expect(resolved.version).toBe(1);
+			expect(resolved.version).toBe(2);
 			expect(resolved.guidance.length).toBeGreaterThan(100);
 			expect(resolved.sourceRevision).toMatch(/^[a-f0-9]{40}$/);
 			expect(skill).not.toHaveProperty("guidance");

@@ -266,4 +266,140 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 			prompt: "Ubah tombol jadi warna hitam",
 		});
 	});
+
+	function frame(id: string, name: string, order: number) {
+		return {
+			id,
+			projectId: "proj-1",
+			name,
+			description: name,
+			viewport: "mobile" as const,
+			htmlCode: `<html><body>${name}</body></html>`,
+			status: "ready" as const,
+			order,
+			error: null,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		};
+	}
+
+	const multiSelectLoader = {
+		project: {
+			id: "proj-1",
+			title: "Multi Select",
+			designMode: "mobile",
+			designMd: null,
+			logoAssetId: null,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		},
+		frames: [
+			frame("f-1", "Ringkasan", 0),
+			frame("f-2", "Anggaran", 1),
+			frame("f-3", "Laporan", 2),
+		],
+		activeJob: null,
+		logoUrl: null,
+		revisions: [],
+		latest: null,
+	};
+
+	it("sends every shift-selected frame id to the revision API", async () => {
+		mockUseLoaderData.mockReturnValue(structuredClone(multiSelectLoader));
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({ frames: [] }),
+		});
+		global.fetch = fetchMock;
+
+		const Component = (Route as unknown as { component: React.ComponentType })
+			.component;
+		render(<Component />);
+
+		fireEvent.click(screen.getByRole("button", { name: /^Ringkasan$/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^Anggaran$/i }), {
+			shiftKey: true,
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText(/Merevisi 2 layar terpilih/i)).toBeDefined();
+		});
+
+		fireEvent.change(screen.getByRole("textbox"), {
+			target: { value: "Samakan hierarki tipografi antar layar" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
+
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalled();
+		});
+		const operationCall = fetchMock.mock.calls.find(
+			(call) => call[1]?.method === "POST",
+		);
+		const requestBody: unknown = JSON.parse(operationCall?.[1].body);
+		expect(requestBody).toMatchObject({
+			action: "operation",
+			scope: "revise",
+			frameIds: ["f-1", "f-2"],
+		});
+	});
+
+	it("keeps multiple selected frames while a status poll replaces frame rows", async () => {
+		mockUseLoaderData.mockReturnValue(structuredClone(multiSelectLoader));
+		global.fetch = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({ frames: [] }),
+		});
+
+		const Component = (Route as unknown as { component: React.ComponentType })
+			.component;
+		const { rerender } = render(<Component />);
+
+		fireEvent.click(screen.getByRole("button", { name: /^Ringkasan$/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^Laporan$/i }), {
+			shiftKey: true,
+		});
+		await waitFor(() => {
+			expect(screen.getByText(/Merevisi 2 layar terpilih/i)).toBeDefined();
+		});
+
+		// A poll returns the same frames with fresh row identity and a changed
+		// height (a re-measured preview); the id-based selection must survive.
+		const polled = structuredClone(multiSelectLoader);
+		polled.frames = polled.frames.map((entry) => ({
+			...entry,
+			updatedAt: new Date(),
+		}));
+		mockUseLoaderData.mockReturnValue(polled);
+		rerender(<Component />);
+
+		expect(screen.getByText(/Merevisi 2 layar terpilih/i)).toBeDefined();
+		expect(screen.getAllByText("Ringkasan").length).toBeGreaterThanOrEqual(1);
+		expect(screen.getAllByText("Laporan").length).toBeGreaterThanOrEqual(1);
+	});
+
+	it("removes a single frame through the composer without dropping the rest", async () => {
+		mockUseLoaderData.mockReturnValue(structuredClone(multiSelectLoader));
+		global.fetch = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({ frames: [] }),
+		});
+
+		const Component = (Route as unknown as { component: React.ComponentType })
+			.component;
+		render(<Component />);
+
+		fireEvent.click(screen.getByRole("button", { name: /^Ringkasan$/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^Anggaran$/i }), {
+			shiftKey: true,
+		});
+		await waitFor(() => {
+			expect(screen.getByText(/Merevisi 2 layar terpilih/i)).toBeDefined();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Lepas Ringkasan/i }));
+		await waitFor(() => {
+			expect(screen.getByText(/Editing: Anggaran/i)).toBeDefined();
+		});
+	});
 });
