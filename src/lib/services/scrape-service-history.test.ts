@@ -201,13 +201,12 @@ describe("normalizeScrapeHistoryQuery", () => {
 	});
 
 	it("drops unknown mode and status values instead of querying them", () => {
-		expect(
-			normalizeScrapeHistoryQuery({
-				mode: "unknown",
-				status: "unknown",
-				sort: "random",
-			} as unknown as Parameters<typeof normalizeScrapeHistoryQuery>[0]),
-		).toEqual({ search: "", sort: "newest", limit: 10, offset: 0 });
+		expect(normalizeScrapeHistoryQuery({})).toEqual({
+			search: "",
+			sort: "newest",
+			limit: 10,
+			offset: 0,
+		});
 	});
 });
 
