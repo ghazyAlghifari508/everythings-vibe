@@ -437,6 +437,13 @@ export const STUDIO_CANVAS_TOOLBAR_INSET_PX = 64;
 export const STUDIO_CANVAS_MIN_VISIBLE_PX = 120;
 
 /**
+ * Pointer travel, in canvas-local pixels, before an empty-canvas press becomes
+ * a marquee selection instead of a click. Keeps a plain click on the canvas
+ * clearing the selection while a deliberate drag starts a rectangle.
+ */
+export const STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX = 4;
+
+/**
  * Floating overlay geometry for the canvas bottom edge.
  *
  * The composer is bottom-centred and the zoom controls occupy the bottom-right
