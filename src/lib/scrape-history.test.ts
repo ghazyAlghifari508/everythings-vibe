@@ -6,6 +6,8 @@ import {
 	historyTotalPages,
 	isHistoryFiltered,
 	resolveHistoryStatusGroup,
+	resolvePageAfterDelete,
+	toScrapeHistorySearchParams,
 } from "@/lib/scrape-history";
 
 describe("resolveHistoryStatusGroup", () => {
@@ -85,18 +87,18 @@ describe("buildHistoryDetailSearch", () => {
 				mode: "html",
 				status: "failed",
 				q: "stitch",
-				sort: "newest",
+				sort: "oldest",
 				page: 2,
-				pageSize: 10,
+				pageSize: 20,
 			}),
 		).toEqual({
 			from: "/design/scrap/history",
 			mode: "html",
 			status: "failed",
 			q: "stitch",
-			sort: "newest",
+			sort: "oldest",
 			page: 2,
-			pageSize: 10,
+			pageSize: 20,
 		});
 	});
 
@@ -107,8 +109,45 @@ describe("buildHistoryDetailSearch", () => {
 			page: 1,
 			pageSize: 10,
 		});
-		expect(built).not.toHaveProperty("mode");
-		expect(built).not.toHaveProperty("status");
-		expect(built).not.toHaveProperty("q");
+		expect(built).toEqual({ from: "/design/scrap/history" });
+	});
+});
+
+describe("toScrapeHistorySearchParams", () => {
+	it("shares the filter state without the return marker", () => {
+		expect(
+			toScrapeHistorySearchParams({
+				mode: "crawl",
+				q: "",
+				sort: "oldest",
+				page: 2,
+				pageSize: 20,
+			}),
+		).toEqual({ mode: "crawl", sort: "oldest", page: 2, pageSize: 20 });
+	});
+
+	it("drops default values so the default view has a clean URL", () => {
+		expect(
+			toScrapeHistorySearchParams({
+				q: "",
+				sort: "newest",
+				page: 1,
+				pageSize: 10,
+			}),
+		).toEqual({});
+	});
+});
+
+describe("resolvePageAfterDelete", () => {
+	it("stays on the page when rows remain", () => {
+		expect(resolvePageAfterDelete(33, 2, 10)).toBe(2);
+	});
+
+	it("steps back when the last row of the last page was deleted", () => {
+		expect(resolvePageAfterDelete(31, 4, 10)).toBe(3);
+	});
+
+	it("returns to the first page when nothing remains", () => {
+		expect(resolvePageAfterDelete(1, 1, 10)).toBe(1);
 	});
 });

@@ -1,3 +1,4 @@
+import { SCRAPE_HISTORY_DEFAULT_PAGE_SIZE } from "@/lib/constants";
 import type {
 	ScrapeHistorySearch,
 	ScrapeHistoryStatusGroup,
@@ -59,17 +60,44 @@ export function buildHistoryDetailSearch(search: ScrapeHistorySearch): {
 	mode?: ScrapeHistorySearch["mode"];
 	status?: ScrapeHistorySearch["status"];
 	q?: string;
-	sort: ScrapeHistorySearch["sort"];
-	page: number;
-	pageSize: number;
+	sort?: ScrapeHistorySearch["sort"];
+	page?: number;
+	pageSize?: number;
 } {
 	return {
 		from: SCRAPE_HISTORY_RETURN_FROM,
+		...toScrapeHistorySearchParams(search),
+	};
+}
+
+export function toScrapeHistorySearchParams(search: ScrapeHistorySearch): {
+	mode?: ScrapeHistorySearch["mode"];
+	status?: ScrapeHistorySearch["status"];
+	q?: string;
+	sort?: ScrapeHistorySearch["sort"];
+	page?: number;
+	pageSize?: number;
+} {
+	return {
 		...(search.mode ? { mode: search.mode } : {}),
 		...(search.status ? { status: search.status } : {}),
 		...(search.q ? { q: search.q } : {}),
-		sort: search.sort,
-		page: search.page,
-		pageSize: search.pageSize,
+		...(search.sort !== "newest" ? { sort: search.sort } : {}),
+		...(search.page !== 1 ? { page: search.page } : {}),
+		...(search.pageSize !== SCRAPE_HISTORY_DEFAULT_PAGE_SIZE
+			? { pageSize: search.pageSize }
+			: {}),
 	};
+}
+
+export function resolvePageAfterDelete(
+	total: number,
+	page: number,
+	pageSize: number,
+): number {
+	const remaining = Number.isSafeInteger(total) ? Math.max(0, total - 1) : 0;
+	const totalPages = historyTotalPages(remaining, pageSize);
+	if (totalPages <= 0) return 1;
+	const safePage = Number.isSafeInteger(page) && page >= 1 ? page : 1;
+	return Math.min(safePage, totalPages);
 }

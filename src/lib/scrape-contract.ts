@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+	SCRAPE_HISTORY_DEFAULT_PAGE_SIZE,
+	SCRAPE_HISTORY_SEARCH_MAX_CHARS,
+} from "@/lib/constants";
 
 export const SCRAPE_LIMITS = {
 	urlChars: 4096,
@@ -177,7 +181,7 @@ export interface ScrapeHistorySearch {
 function toSafePageSize(value: unknown): number {
 	const num = typeof value === "string" ? Number(value) : value;
 	if (num === 10 || num === 20 || num === 50) return num;
-	return 10;
+	return SCRAPE_HISTORY_DEFAULT_PAGE_SIZE;
 }
 
 function toSafePage(value: unknown): number {
@@ -197,7 +201,7 @@ export function parseScrapeHistorySearch(search: unknown): ScrapeHistorySearch {
 			: "newest";
 	const q =
 		parsed.success && typeof raw.q === "string"
-			? raw.q.trim().slice(0, 128)
+			? raw.q.trim().slice(0, SCRAPE_HISTORY_SEARCH_MAX_CHARS)
 			: "";
 	return {
 		...(mode ? { mode } : {}),
