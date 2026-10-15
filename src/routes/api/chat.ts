@@ -19,6 +19,7 @@ import {
 } from "@/lib/constants";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
 import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
+import { buildStageScopeDirective } from "@/lib/planning-mode";
 import { depthDirective } from "@/lib/prompt-depth";
 import { PRD_REVISION_PROMPT, PRD_SYSTEM_PROMPT } from "@/lib/prompts";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -220,6 +221,7 @@ export const Route = createFileRoute("/api/chat")({
 				let systemPrompt = PRD_SYSTEM_PROMPT();
 				let groundingSource = message;
 				let projectLanguage: "id" | "en" = "id";
+				let projectMode: string | null = null;
 				let codebaseBlock = "";
 				let codebaseSnapshotId: string | undefined;
 				let codebaseAnalysisId: string | undefined;
@@ -294,6 +296,7 @@ export const Route = createFileRoute("/api/chat")({
 					if (projCheck?.language) {
 						projectLanguage = normalizeLanguage(projCheck.language);
 					}
+					projectMode = projCheck.projectMode ?? null;
 
 					if (projCheck?.projectMode === "existing_codebase") {
 						try {
@@ -460,6 +463,8 @@ export const Route = createFileRoute("/api/chat")({
 					systemPrompt = PRD_SYSTEM_PROMPT(projectLanguage);
 				systemPrompt += `\n${depthDirective("prd")}`;
 				systemPrompt += `\n${getLanguageDirective(projectLanguage, "prd")}`;
+				// Planning mode scope directive: "" for greenfield.
+				systemPrompt += buildStageScopeDirective("prd", projectMode);
 
 				// ponytail: server-only grounding, dynamically imported so it never
 				// enters the client bundle. groundStack() returns "" on any failure;

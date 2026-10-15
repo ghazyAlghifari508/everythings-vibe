@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildTaskRepairPrompt } from "@/lib/prompts-task";
 import {
+	buildTaskRepairUserMessage,
 	buildTaskSystemPrompt,
 	MAX_TASK_COVERAGE_REPAIR_ATTEMPTS,
 	repairTaskCoverage,
@@ -455,5 +456,87 @@ describe("repairTaskCoverage", () => {
 			maxAttempts: MAX_TASK_COVERAGE_REPAIR_ATTEMPTS,
 		});
 		expect(result.ok).toBe(true);
+	});
+});
+
+describe("buildTaskSystemPrompt — planning mode composition", () => {
+	function baseInput(mode?: string | null) {
+		return {
+			acMarkdown: AC,
+			prdContent: "## 5. User Flow\n### 5.3 Pages & Screens\n#### Artikel",
+			grounded: "",
+			codebaseBlock: "",
+			language: "id" as const,
+			...(mode === undefined ? {} : { mode }),
+		};
+	}
+
+	it("keeps the greenfield prompt byte-identical to the pre-mode contract", () => {
+		const withoutMode = buildTaskSystemPrompt(baseInput());
+		const explicitGreenfield = buildTaskSystemPrompt(baseInput("greenfield"));
+		const nullMode = buildTaskSystemPrompt(baseInput(null));
+		expect(explicitGreenfield).toBe(withoutMode);
+		expect(nullMode).toBe(withoutMode);
+	});
+
+	it("treats every technical layer as conditional on an existing codebase", () => {
+		const prompt = buildTaskSystemPrompt(baseInput("existing_codebase"));
+		expect(prompt).toContain("DEKOMPOSISI TEKNIS KONDISIONAL");
+		expect(prompt).not.toContain(
+			"Setiap fitur pada AC wajib dipecah ke dalam 5-layer teknis",
+		);
+		expect(prompt).toMatch(/BUKAN daftar layer yang wajib ada/);
+	});
+
+	it("injects the change-scope directive only for an existing codebase", () => {
+		expect(buildTaskSystemPrompt(baseInput())).not.toContain(
+			"ATURAN KHUSUS EXISTING CODEBASE (TASK)",
+		);
+		const prompt = buildTaskSystemPrompt(baseInput("existing_codebase"));
+		expect(prompt).toContain("ATURAN KHUSUS EXISTING CODEBASE (TASK)");
+	});
+
+	it("keeps the AC authority and traceability contract in both modes", () => {
+		for (const mode of [undefined, "greenfield", "existing_codebase"]) {
+			const prompt = buildTaskSystemPrompt(baseInput(mode));
+			expect(prompt).toContain(
+				"--- ACCEPTANCE CRITERIA (AUTHORITATIVE SCOPE + IDs) ---",
+			);
+			expect(prompt).toContain("AC-1.1");
+			expect(prompt).toContain("covers");
+			expect(prompt).toContain("priority");
+		}
+	});
+
+	it("keeps the Fitur SSOT anchoring in both modes", () => {
+		const block =
+			"--- DAFTAR FITUR & SUBFITUR WAJIB (SSOT) ---\n- feat-1 Katalog";
+		for (const mode of [undefined, "existing_codebase"]) {
+			const prompt = buildTaskSystemPrompt({
+				...baseInput(mode),
+				featureTreeBlock: block,
+			});
+			expect(prompt).toContain(block);
+			expect(prompt).toContain("subfeatureId");
+		}
+	});
+});
+
+describe("buildTaskRepairUserMessage — planning mode composition", () => {
+	it("appends the minimum-change rule only for an existing codebase", () => {
+		const greenfield = buildTaskRepairUserMessage(["AC-1.1"], "greenfield");
+		const plain = buildTaskRepairUserMessage(["AC-1.1"]);
+		expect(greenfield).toBe(plain);
+		expect(greenfield).not.toContain("MODE EXISTING CODEBASE");
+
+		const existing = buildTaskRepairUserMessage(
+			["AC-1.1"],
+			"existing_codebase",
+		);
+		expect(existing).toContain("MODE EXISTING CODEBASE");
+		expect(existing).toMatch(/bukan pembangunan dari nol/);
+		// The base repair contract must still be present in both.
+		expect(existing).toContain("AC-1.1");
+		expect(existing).toContain("Output HANYA JSON.");
 	});
 });

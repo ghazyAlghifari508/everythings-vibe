@@ -472,7 +472,10 @@ export const Route = createFileRoute("/api/task/generate")({
 								{ role: "assistant", content: fullResponse },
 								{
 									role: "user",
-									content: buildTaskRepairUserMessage(missing),
+									content: buildTaskRepairUserMessage(
+										missing,
+										project.projectMode,
+									),
 								},
 							];
 							const { generator, firstChunk } = await tryStreamWithFallback(
@@ -725,6 +728,7 @@ export const Route = createFileRoute("/api/task/generate")({
 								codebaseBlock,
 								language: projectLanguage,
 								featureTreeBlock,
+								mode: project.projectMode,
 							});
 							const messages: Array<{
 								role: "system" | "user" | "assistant";
