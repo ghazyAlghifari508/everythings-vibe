@@ -29,10 +29,59 @@ const diagnosticLabels: Record<string, string> = {
 	REMOTE_FETCH_FAILED: "Proxy gagal mengambil gambar dari sumber.",
 	UNSUPPORTED_MIME: "Format respons tidak aman untuk preview.",
 	ASSET_TOO_LARGE: "Ukuran gambar melewati batas proxy.",
+	REMOTE_ACCESS_DENIED: "Sumber menolak akses ke gambar.",
+	REMOTE_NOT_FOUND: "Gambar tidak lagi tersedia di sumber.",
+	REMOTE_RATE_LIMITED: "Batas request sumber tercapai.",
+	REMOTE_HTTP_ERROR: "Sumber mengembalikan respons gagal.",
+	REMOTE_REDIRECT_BLOCKED: "Redirect sumber ditolak oleh pemeriksaan keamanan.",
+	URL_BLOCKED: "Alamat gambar ditolak oleh pemeriksaan keamanan.",
+	ASSET_READ_FAILED: "Sistem gagal membaca gambar. Coba lagi nanti.",
+	DECODE_FAILED: "Browser tidak dapat membaca isi gambar.",
+	NETWORK: "Koneksi ke layanan gambar gagal.",
+	REFRESH_FAILED: "Akses gambar gagal diperbarui. Coba lagi.",
 };
 
-function ImagePreview({ image }: { image: ImageResult }) {
-	const [src, setSrc] = useState(image.assetUrl);
+async function readAssetFailure(response: Response) {
+	const parsed = diagnosticSchema.safeParse(
+		await response.json().catch(() => null),
+	);
+	const error = parsed.success
+		? parsed.data.error
+		: { code: `HTTP_${response.status}`, retryable: response.status >= 500 };
+	return {
+		...error,
+		retryAt: error.retryAfterSeconds
+			? Date.now() + error.retryAfterSeconds * 1000
+			: 0,
+	};
+}
+
+async function refreshImageUrl(image: ImageResult) {
+	const response = await fetch(
+		`/api/scrape?id=${encodeURIComponent(image.scrapeId)}`,
+	);
+	if (!response.ok) throw new Error("Refresh failed");
+	const result = z
+		.object({
+			scrape: z.object({
+				images: z.array(z.object({ id: z.string(), assetUrl: z.string() })),
+			}),
+		})
+		.parse(await response.json());
+	const refreshed = result.scrape.images.find((row) => row.id === image.id);
+	if (!refreshed) throw new Error("Missing image");
+	return refreshed.assetUrl;
+}
+
+function ImagePreview({
+	image,
+	src,
+	onRefresh,
+}: {
+	image: ImageResult;
+	src: string;
+	onRefresh: (url: string) => void;
+}) {
 	const [attempt, setAttempt] = useState(0);
 	const [state, setState] = useState<"loading" | "loaded" | "failed">(
 		"loading",
@@ -56,16 +105,7 @@ function ImagePreview({ image }: { image: ImageResult }) {
 				setFailure({ code: "DECODE_FAILED", retryable: true, retryAt: 0 });
 				return;
 			}
-			const parsed = diagnosticSchema.safeParse(await response.json());
-			const error = parsed.success
-				? parsed.data.error
-				: { code: "UNKNOWN", retryable: false };
-			setFailure({
-				...error,
-				retryAt: error.retryAfterSeconds
-					? Date.now() + error.retryAfterSeconds * 1000
-					: 0,
-			});
+			setFailure(await readAssetFailure(response));
 		} catch {
 			setFailure({ code: "NETWORK", retryable: true, retryAt: 0 });
 		}
@@ -75,24 +115,7 @@ function ImagePreview({ image }: { image: ImageResult }) {
 		setState("loading");
 		try {
 			if (["CAPABILITY_EXPIRED", "CAPABILITY_INVALID"].includes(failure.code)) {
-				const response = await fetch(
-					`/api/scrape?id=${encodeURIComponent(image.scrapeId)}`,
-				);
-				if (!response.ok) throw new Error("Refresh failed");
-				const result = z
-					.object({
-						scrape: z.object({
-							images: z.array(
-								z.object({ id: z.string(), assetUrl: z.string() }),
-							),
-						}),
-					})
-					.parse(await response.json());
-				const refreshed = result.scrape.images.find(
-					(row) => row.id === image.id,
-				);
-				if (!refreshed) throw new Error("Missing image");
-				setSrc(refreshed.assetUrl);
+				onRefresh(await refreshImageUrl(image));
 			}
 			setFailure(null);
 			setAttempt((value) => value + 1);
@@ -169,6 +192,21 @@ export function ImagesResult({
 	const [kindFilter, setKindFilter] = useState("");
 	const [search, setSearch] = useState("");
 	const [downloading, setDownloading] = useState<string | null>(null);
+	const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+	const [downloadFailures, setDownloadFailures] = useState<
+		Record<string, Awaited<ReturnType<typeof readAssetFailure>>>
+	>({});
+	const [now, setNow] = useState(Date.now());
+	useEffect(() => {
+		if (
+			!Object.values(downloadFailures).some(
+				(failure) => failure.retryAt > Date.now(),
+			)
+		)
+			return;
+		const timer = setInterval(() => setNow(Date.now()), 1000);
+		return () => clearInterval(timer);
+	}, [downloadFailures]);
 	const [copied, setCopied] = useState<string | null>(null);
 	const formats = [
 		...new Set(images.flatMap((image) => (image.format ? [image.format] : []))),
@@ -194,18 +232,35 @@ export function ImagesResult({
 	);
 	const hasFilter = formatFilter !== "" || kindFilter !== "" || search !== "";
 	async function download(image: ImageResult) {
-		if (downloading) return;
+		if (downloading || (downloadFailures[image.id]?.retryAt ?? 0) > Date.now())
+			return;
 		setDownloading(image.id);
 		setNotice("");
 		try {
-			const response = await fetch(image.assetUrl);
-			if (!response.ok) throw new Error("Download gagal.");
-			const url = URL.createObjectURL(await response.blob());
+			let url = assetUrls[image.id] ?? image.assetUrl;
+			if (
+				["CAPABILITY_EXPIRED", "CAPABILITY_INVALID"].includes(
+					downloadFailures[image.id]?.code ?? "",
+				)
+			) {
+				url = await refreshImageUrl(image);
+				setAssetUrls((current) => ({ ...current, [image.id]: url }));
+			}
+			const response = await fetch(url);
+			if (!response.ok) {
+				const failure = await readAssetFailure(response);
+				setDownloadFailures((current) => ({ ...current, [image.id]: failure }));
+				setNotice(
+					`${diagnosticLabels[failure.code] ?? `Download gagal (${failure.code}).`}${failure.retryAt > Date.now() ? ` Coba lagi setelah ${Math.ceil((failure.retryAt - Date.now()) / 1000)} dtk.` : ""}`,
+				);
+				return;
+			}
+			const blobUrl = URL.createObjectURL(await response.blob());
 			const anchor = document.createElement("a");
-			anchor.href = url;
+			anchor.href = blobUrl;
 			anchor.download = `image-${image.id}.${image.format ?? "bin"}`;
 			anchor.click();
-			setTimeout(() => URL.revokeObjectURL(url), 1000);
+			setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 		} catch {
 			setNotice("Gambar gagal diunduh. Buka sumber asli atau coba lagi.");
 		} finally {
@@ -322,7 +377,13 @@ export function ImagesResult({
 							key={image.id}
 							className="min-w-0 overflow-hidden rounded-xl border border-graphite bg-charcoal"
 						>
-							<ImagePreview image={image} />
+							<ImagePreview
+								image={image}
+								src={assetUrls[image.id] ?? image.assetUrl}
+								onRefresh={(url) =>
+									setAssetUrls((current) => ({ ...current, [image.id]: url }))
+								}
+							/>
 							<div className="space-y-3 p-3">
 								<p className="text-xs text-fog">
 									{image.format ?? "Format belum diketahui"}
@@ -344,7 +405,10 @@ export function ImagesResult({
 								</details>
 								<div className="flex gap-2">
 									<button
-										disabled={downloading !== null}
+										disabled={
+											downloading !== null ||
+											(downloadFailures[image.id]?.retryAt ?? 0) > now
+										}
 										type="button"
 										onClick={() => void download(image)}
 										aria-label="Download gambar"

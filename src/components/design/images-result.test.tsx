@@ -199,5 +199,52 @@ describe("ImagesResult gallery", () => {
 		fireEvent.load(container.querySelector("img") ?? image);
 		expect(screen.queryByRole("status")).toBeNull();
 		expect(fetcher).toHaveBeenCalledTimes(2);
+		fetcher.mockResolvedValueOnce(
+			Response.json(
+				{ error: { code: "REMOTE_ACCESS_DENIED", retryable: false } },
+				{ status: 403 },
+			),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Download gambar" }));
+		await waitFor(() =>
+			expect(fetcher).toHaveBeenLastCalledWith("/api/scrape/asset?cap=fresh"),
+		);
+		await waitFor(() =>
+			expect(screen.getByRole("alert").textContent).toContain(
+				"Sumber menolak akses",
+			),
+		);
+	});
+	it("honors download cooldown without refetching the thumbnail", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockResolvedValue(
+				Response.json(
+					{
+						error: {
+							code: "PROXY_RATE_LIMITED",
+							retryable: true,
+							retryAfterSeconds: 60,
+						},
+					},
+					{ status: 429 },
+				),
+			),
+		);
+		render(
+			<ImagesResult
+				images={[row({ id: "a" })]}
+				sourceUrl="https://sample.example/"
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Download gambar" }));
+		await waitFor(() =>
+			expect(screen.getByRole("alert").textContent).toContain("Batas proxy"),
+		);
+		expect(
+			screen
+				.getByRole("button", { name: "Download gambar" })
+				.hasAttribute("disabled"),
+		).toBe(true);
 	});
 });
