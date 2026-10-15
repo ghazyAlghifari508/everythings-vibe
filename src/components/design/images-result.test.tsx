@@ -161,4 +161,43 @@ describe("ImagesResult gallery", () => {
 		});
 		expect(screen.getAllByRole("article")).toHaveLength(1);
 	});
+	it("refreshes an expired capability and retries only the failed image", async () => {
+		const fetcher = vi
+			.fn()
+			.mockResolvedValueOnce(
+				Response.json(
+					{ error: { code: "CAPABILITY_EXPIRED", retryable: false } },
+					{ status: 401 },
+				),
+			)
+			.mockResolvedValueOnce(
+				Response.json({
+					scrape: {
+						images: [{ id: "a", assetUrl: "/api/scrape/asset?cap=fresh" }],
+					},
+				}),
+			);
+		vi.stubGlobal("fetch", fetcher);
+		const { container } = render(
+			<ImagesResult
+				images={[row({ id: "a" })]}
+				sourceUrl="https://sample.example/"
+			/>,
+		);
+		const image = container.querySelector("img");
+		if (!image) throw new Error("Missing image");
+		fireEvent.error(image);
+		await waitFor(() =>
+			expect(screen.getByRole("button", { name: "Coba lagi" })).toBeDefined(),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+		await waitFor(() =>
+			expect(container.querySelector("img")?.getAttribute("src")).toBe(
+				"/api/scrape/asset?cap=fresh",
+			),
+		);
+		fireEvent.load(container.querySelector("img") ?? image);
+		expect(screen.queryByRole("status")).toBeNull();
+		expect(fetcher).toHaveBeenCalledTimes(2);
+	});
 });

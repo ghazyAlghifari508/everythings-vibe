@@ -18,9 +18,13 @@ const diagnosticLabels: Record<string, string> = {
 	PROXY_RATE_LIMITED: "Batas proxy tercapai. Tunggu sebelum mencoba lagi.",
 	CAPABILITY_EXPIRED:
 		"Akses preview kedaluwarsa. Perbarui akses untuk mencoba lagi.",
-	INVALID_CAPABILITY:
+	CAPABILITY_INVALID:
 		"Akses preview tidak valid. Perbarui akses untuk mencoba lagi.",
-	ASSET_NOT_FOUND: "Byte gambar tersimpan tidak tersedia.",
+	STORED_BYTES_MISSING: "Byte gambar tersimpan tidak tersedia.",
+	STORED_BYTES_INVALID: "Isi gambar tersimpan tidak dapat diverifikasi.",
+	OWNERSHIP_DENIED: "Akses ke hasil ini tidak diizinkan.",
+	AUTHENTICATION_REQUIRED:
+		"Sesi berakhir. Masuk kembali untuk mengakses gambar.",
 	REMOTE_TIMEOUT: "Sumber gambar melewati batas waktu.",
 	REMOTE_FETCH_FAILED: "Proxy gagal mengambil gambar dari sumber.",
 	UNSUPPORTED_MIME: "Format respons tidak aman untuk preview.",
@@ -58,7 +62,9 @@ function ImagePreview({ image }: { image: ImageResult }) {
 				: { code: "UNKNOWN", retryable: false };
 			setFailure({
 				...error,
-				retryAt: Date.now() + (error.retryAfterSeconds ?? 0) * 1000,
+				retryAt: error.retryAfterSeconds
+					? Date.now() + error.retryAfterSeconds * 1000
+					: 0,
 			});
 		} catch {
 			setFailure({ code: "NETWORK", retryable: true, retryAt: 0 });
@@ -68,7 +74,7 @@ function ImagePreview({ image }: { image: ImageResult }) {
 		if (!failure || failure.retryAt > Date.now()) return;
 		setState("loading");
 		try {
-			if (["CAPABILITY_EXPIRED", "INVALID_CAPABILITY"].includes(failure.code)) {
+			if (["CAPABILITY_EXPIRED", "CAPABILITY_INVALID"].includes(failure.code)) {
 				const response = await fetch(
 					`/api/scrape?id=${encodeURIComponent(image.scrapeId)}`,
 				);
@@ -98,7 +104,7 @@ function ImagePreview({ image }: { image: ImageResult }) {
 	const recoverable =
 		failure &&
 		(failure.retryable ||
-			["CAPABILITY_EXPIRED", "INVALID_CAPABILITY"].includes(failure.code));
+			["CAPABILITY_EXPIRED", "CAPABILITY_INVALID"].includes(failure.code));
 	return (
 		<div className="relative flex h-52 items-center justify-center bg-onyx p-4">
 			{state === "loading" && (
