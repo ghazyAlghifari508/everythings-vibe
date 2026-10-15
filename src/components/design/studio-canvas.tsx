@@ -15,6 +15,7 @@ import {
 	STUDIO_CANVAS_FRAME_HEADER_PX,
 	STUDIO_CANVAS_HEADER_INSET_PX,
 	STUDIO_CANVAS_INITIAL_ZOOM,
+	STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_VISIBLE_PX,
 	STUDIO_CANVAS_MIN_ZOOM,
@@ -23,6 +24,15 @@ import {
 	STUDIO_VISUAL_WIDTH,
 } from "@/lib/constants";
 import { canvasZoomRowBottomCss } from "./studio-canvas-layout";
+import {
+	exceedsDragThreshold,
+	isMarqueeIgnoredTarget,
+	type MarqueeFrameBounds,
+	normalizeRect,
+	type Point,
+	type Rect,
+	resolveMarqueeSelection,
+} from "./studio-canvas-marquee";
 import { StudioFrame } from "./studio-frame";
 
 export interface StudioCanvasProps {
@@ -32,6 +42,12 @@ export interface StudioCanvasProps {
 	selectedFrameId?: string | null;
 	selectedFrameIds?: string[];
 	onSelectFrame?: (frameId: string | null, additive?: boolean) => void;
+	/**
+	 * Commits a whole selection list at once. Marquee selection owns the full
+	 * id set (not a single delta), so the canvas reports the resolved list here
+	 * and the route stays the single source of truth for `selectedFrameIds`.
+	 */
+	onSelectFrames?: (frameIds: string[]) => void;
 	onRetryFrame?: (frameId: string) => void;
 	onRetryPlanning?: () => void;
 	className?: string;
@@ -112,11 +128,13 @@ export const StudioCanvas = memo(function StudioCanvas({
 	selectedFrameId = null,
 	selectedFrameIds = [],
 	onSelectFrame,
+	onSelectFrames,
 	onRetryFrame,
 	onRetryPlanning,
 	className = "",
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
+	const marqueeRef = useRef<HTMLDivElement>(null);
 
 	const {
 		zoom,
@@ -245,6 +263,183 @@ export const StudioCanvas = memo(function StudioCanvas({
 		retryFrameRef.current?.(id);
 	}, []);
 
+	// Latest selection and commit handler for the marquee gesture, read through
+	// refs so the pointer handlers stay stable and never re-render the frames.
+	const selectedFrameIdsRef = useRef(selectedFrameIds);
+	selectedFrameIdsRef.current = selectedFrameIds;
+	const selectFramesRef = useRef(onSelectFrames);
+	selectFramesRef.current = onSelectFrames;
+
+	/**
+	 * Transient marquee gesture state.
+	 *
+	 * The rectangle is painted by mutating one absolutely positioned node's
+	 * style directly, so a drag produces at most one React render (when the
+	 * intersected frame set actually changes) instead of one per pointermove.
+	 * `active` flips true once the drag passes the threshold; `base` is the
+	 * selection captured at press time so additive and cancel both have a stable
+	 * origin.
+	 */
+	const marqueeGestureRef = useRef<{
+		pointerId: number;
+		start: Point;
+		base: string[];
+		additive: boolean;
+		active: boolean;
+		previewKey: string;
+	} | null>(null);
+
+	const paintMarquee = useCallback((rect: Rect | null) => {
+		const node = marqueeRef.current;
+		if (!node) return;
+		if (!rect) {
+			node.style.display = "none";
+			return;
+		}
+		node.style.display = "block";
+		node.style.left = `${rect.x}px`;
+		node.style.top = `${rect.y}px`;
+		node.style.width = `${rect.width}px`;
+		node.style.height = `${rect.height}px`;
+	}, []);
+
+	/** Reads every frame artboard's rectangle in shared canvas-local space. */
+	const measureFrameBounds = useCallback((): MarqueeFrameBounds[] => {
+		const canvas = canvasRef.current;
+		if (!canvas) return [];
+		const canvasRect = canvas.getBoundingClientRect();
+		const measured: MarqueeFrameBounds[] = [];
+		for (const node of canvas.querySelectorAll("[data-frame-id]")) {
+			const id = node.getAttribute("data-frame-id");
+			if (!id) continue;
+			const rect = node.getBoundingClientRect();
+			measured.push({
+				id,
+				rect: {
+					x: rect.left - canvasRect.left,
+					y: rect.top - canvasRect.top,
+					width: rect.width,
+					height: rect.height,
+				},
+			});
+		}
+		return measured;
+	}, []);
+
+	/**
+	 * Cancels an in-progress marquee and restores the selection captured at
+	 * press time. Used by Escape, window blur, pointer cancel, lost capture,
+	 * tool switching and unmount so the rectangle never sticks and a preview is
+	 * never left half-committed.
+	 */
+	const cancelMarquee = useCallback(() => {
+		const gesture = marqueeGestureRef.current;
+		marqueeGestureRef.current = null;
+		paintMarquee(null);
+		if (gesture?.active) {
+			const base = gesture.base;
+			selectFramesRef.current?.(base);
+		}
+	}, [paintMarquee]);
+
+	/** Drops the gesture and rectangle without touching the route selection. */
+	const abortMarquee = useCallback(() => {
+		marqueeGestureRef.current = null;
+		paintMarquee(null);
+	}, [paintMarquee]);
+
+	/** Commits the current preview selection and hides the rectangle. */
+	const commitMarquee = useCallback(() => {
+		marqueeGestureRef.current = null;
+		paintMarquee(null);
+	}, [paintMarquee]);
+
+	const handleCanvasPointerDown = useCallback((event: React.PointerEvent) => {
+		const canvas = canvasRef.current;
+		if (!canvas || event.button !== 0) return;
+		// A frame, control, field, menu or dialog owns its own gesture.
+		if (isMarqueeIgnoredTarget(event.target)) return;
+		const rect = canvas.getBoundingClientRect();
+		const start: Point = {
+			x: event.clientX - rect.left,
+			y: event.clientY - rect.top,
+		};
+		marqueeGestureRef.current = {
+			pointerId: event.pointerId,
+			start,
+			base: selectedFrameIdsRef.current,
+			additive: event.shiftKey,
+			active: false,
+			previewKey: "",
+		};
+		event.currentTarget.setPointerCapture?.(event.pointerId);
+	}, []);
+
+	const handleCanvasPointerMove = useCallback(
+		(event: React.PointerEvent) => {
+			const gesture = marqueeGestureRef.current;
+			const canvas = canvasRef.current;
+			if (!gesture || !canvas || gesture.pointerId !== event.pointerId) return;
+			const canvasRect = canvas.getBoundingClientRect();
+			const current: Point = {
+				x: event.clientX - canvasRect.left,
+				y: event.clientY - canvasRect.top,
+			};
+			if (
+				!gesture.active &&
+				!exceedsDragThreshold(
+					gesture.start,
+					current,
+					STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX,
+				)
+			) {
+				return;
+			}
+			gesture.active = true;
+			const marquee = normalizeRect(gesture.start, current);
+			paintMarquee(marquee);
+			const resolved = resolveMarqueeSelection(marquee, measureFrameBounds(), {
+				additive: gesture.additive,
+				base: gesture.base,
+			});
+			// Only commit a selection change when the intersected set actually
+			// changed, so a smooth drag does not re-render the composer per move.
+			const key = resolved.join("|");
+			if (key === gesture.previewKey) return;
+			gesture.previewKey = key;
+			selectFramesRef.current?.(resolved);
+		},
+		[measureFrameBounds, paintMarquee],
+	);
+
+	const handleCanvasPointerUp = useCallback(
+		(event: React.PointerEvent) => {
+			const gesture = marqueeGestureRef.current;
+			if (!gesture || gesture.pointerId !== event.pointerId) return;
+			if (gesture.active) {
+				// The preview already equals the committed set; keep it.
+				commitMarquee();
+				return;
+			}
+			// A press with no drag is a click: on empty canvas it clears the
+			// selection, while shift keeps the current selection intact.
+			marqueeGestureRef.current = null;
+			if (!gesture.additive) selectFramesRef.current?.([]);
+		},
+		[commitMarquee],
+	);
+
+	// Leaving select mode (hand tool or space-pan) abandons any in-progress
+	// marquee so a pan can never inherit a half-drawn selection rectangle.
+	useEffect(() => {
+		if (!panMode) return;
+		cancelMarquee();
+	}, [panMode, cancelMarquee]);
+
+	// Unmount must drop the gesture and its rectangle: a removed canvas can
+	// neither paint nor commit a selection afterwards.
+	useEffect(() => abortMarquee, [abortMarquee]);
+
 	/**
 	 * Wheel handling must be a non-passive native listener.
 	 *
@@ -296,14 +491,25 @@ export const StudioCanvas = memo(function StudioCanvas({
 		function keydown(event: KeyboardEvent) {
 			if (isEditableTarget(event.target)) return;
 			if (event.ctrlKey || event.metaKey || event.altKey) return;
-			if (event.key.toLowerCase() === "v") setTool("select");
-			if (event.key.toLowerCase() === "h") setTool("hand");
+			if (event.key.toLowerCase() === "v") {
+				cancelMarquee();
+				setTool("select");
+			}
+			if (event.key.toLowerCase() === "h") {
+				cancelMarquee();
+				setTool("hand");
+			}
 			if (event.key.startsWith("Arrow")) nudgePan(event.key);
 			if (event.code === "Space") {
 				event.preventDefault();
 				setSpacePan(true);
 			}
-			if (event.key === "Escape") onSelectFrame?.(null);
+			if (event.key === "Escape") {
+				// Escape first cancels an in-progress marquee (restoring the
+				// selection it started from); otherwise it clears the selection.
+				if (marqueeGestureRef.current) cancelMarquee();
+				else onSelectFrame?.(null);
+			}
 		}
 		function release(event: KeyboardEvent) {
 			if (event.code === "Space") setSpacePan(false);
@@ -312,6 +518,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 			setSpacePan(false);
 			setIsPanning(false);
 			endPan();
+			// A lost window focus must not leave a drag preview half-committed.
+			cancelMarquee();
 		}
 		window.addEventListener("keydown", keydown);
 		window.addEventListener("keyup", release);
@@ -321,7 +529,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 			window.removeEventListener("keyup", release);
 			window.removeEventListener("blur", blur);
 		};
-	}, [onSelectFrame, endPan, nudgePan]);
+	}, [onSelectFrame, endPan, nudgePan, cancelMarquee]);
 
 	return (
 		<section
@@ -333,34 +541,34 @@ export const StudioCanvas = memo(function StudioCanvas({
 					if (startPan(event)) setIsPanning(true);
 					return;
 				}
-				// Pressing empty canvas clears the selection. Frames and
+				// Select mode: an empty-canvas press arms a marquee. Frames and
 				// floating controls are excluded so their own handlers win.
-				if (
-					event.target instanceof Element &&
-					!event.target.closest("article,button")
-				) {
-					onSelectFrame?.(null);
-				}
+				handleCanvasPointerDown(event);
 			}}
 			onPointerMove={(event) => {
 				// Any drag also opts out of automatic re-fitting.
 				if (panMode) userPositioned.current = true;
 				updatePan(event);
+				handleCanvasPointerMove(event);
 			}}
-			onPointerUp={() => {
+			onPointerUp={(event) => {
 				endPan();
 				setIsPanning(false);
+				handleCanvasPointerUp(event);
 			}}
 			onPointerCancel={() => {
 				endPan();
 				setIsPanning(false);
+				cancelMarquee();
 			}}
 			// Pointer capture can be revoked mid-drag (element removal, OS
 			// gesture, focus loss). Without this the canvas would keep panning
-			// on the next move and stay stuck in the grabbing cursor.
+			// on the next move and stay stuck in the grabbing cursor, and a
+			// marquee would stay painted with a half-committed selection.
 			onLostPointerCapture={() => {
 				endPan();
 				setIsPanning(false);
+				cancelMarquee();
 			}}
 			className={`relative size-full overflow-hidden select-none touch-none bg-charcoal text-snow focus-visible:outline-2 focus-visible:outline-snow ${className}`}
 			style={{
@@ -433,6 +641,19 @@ export const StudioCanvas = memo(function StudioCanvas({
 				</p>
 			)}
 
+			{/* Selection rectangle. Painted imperatively during a drag so a
+			    pointermove never re-renders the canvas; it only appears once the
+			    drag passes the threshold and is hidden again on release/cancel.
+			    Styling stays restrained: a clear accent outline over a light
+			    accent wash, matching the selected-frame border colour. */}
+			<div
+				ref={marqueeRef}
+				data-testid="studio-marquee"
+				aria-hidden
+				style={{ display: "none" }}
+				className="pointer-events-none absolute z-10 rounded-sm border border-blue-600/70 bg-blue-600/10"
+			/>
+
 			{/* Floating tool palette: compact vertical toolbar on the right edge,
 			    vertically centred so it never overlaps the composer or the zoom
 			    controls at the bottom corner. */}
@@ -445,7 +666,10 @@ export const StudioCanvas = memo(function StudioCanvas({
 					title="Cursor (V)"
 					aria-label="Cursor"
 					aria-pressed={tool === "select"}
-					onClick={() => setTool("select")}
+					onClick={() => {
+						cancelMarquee();
+						setTool("select");
+					}}
 					className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow ${tool === "select" ? "bg-steel" : "hover:bg-steel"}`}
 				>
 					<MousePointer2 size={18} aria-hidden />
@@ -455,7 +679,10 @@ export const StudioCanvas = memo(function StudioCanvas({
 					title="Hand (H)"
 					aria-label="Hand"
 					aria-pressed={tool === "hand"}
-					onClick={() => setTool("hand")}
+					onClick={() => {
+						cancelMarquee();
+						setTool("hand");
+					}}
 					className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow ${tool === "hand" ? "bg-steel" : "hover:bg-steel"}`}
 				>
 					<Hand size={18} aria-hidden />

@@ -170,6 +170,15 @@ function StudioWorkspace({
 		setSelectedFrameId(additive ? null : id);
 	}, []);
 
+	// Marquee selection reports the whole id set at once. Deduping and keeping
+	// the incoming order means the composer chips mirror the canvas order and
+	// every selected frame survives to the revision request.
+	const selectFrames = useCallback((ids: string[]) => {
+		const unique = [...new Set(ids)];
+		setSelectedFrameIds(unique);
+		setSelectedFrameId(unique.length === 1 ? unique[0] : null);
+	}, []);
+
 	const isProcessing = useMemo(() => {
 		if (
 			activeJob &&
@@ -535,6 +544,7 @@ function StudioWorkspace({
 					selectedFrameId={selectedFrameId}
 					selectedFrameIds={selectedFrameIds}
 					onSelectFrame={selectFrame}
+					onSelectFrames={selectFrames}
 					onRetryFrame={handleRetryFrame}
 					onRetryPlanning={handleRetryPlanning}
 					className="size-full"
