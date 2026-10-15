@@ -23,6 +23,8 @@ async function mockRawSequence(raws: string[]) {
 		mocked.mockImplementationOnce(async () => ({
 			firstChunk: raw,
 			generator: (async function* () {})(),
+			abortController: new AbortController(),
+			outcome: {},
 		}));
 	}
 	return mocked;

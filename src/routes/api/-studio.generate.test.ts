@@ -115,4 +115,57 @@ describe("POST /api/studio/generate", () => {
 		const data = await res.json();
 		expect(data.error).toContain("minimal");
 	});
+
+	it("accepts valid .md PRD attachment and forwards to studio service", async () => {
+		const req = new Request("https://app.test/api/studio/generate", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				prompt: "Buat personal finance app berbasis PRD",
+				prdAttachment: {
+					filename: "PRD-CatatDompet.md",
+					content: "# PRD CatatDompet\nFitur: pencatatan transaksi harian dan budget.",
+				},
+			}),
+		});
+
+		const res = await POST({ request: req });
+		expect(res.status).toBe(201);
+		const data = await res.json();
+		expect(data.projectId).toBe("proj-100");
+	});
+
+	it("rejects invalid PRD attachment with non-.md extension or empty content", async () => {
+		// Non-.md extension (e.g. .markdown or .pdf)
+		const reqPdf = new Request("https://app.test/api/studio/generate", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				prompt: "Buat personal finance app berbasis PRD",
+				prdAttachment: {
+					filename: "PRD-CatatDompet.pdf",
+					content: "# PRD CatatDompet\nValid markdown content.",
+				},
+			}),
+		});
+		const resPdf = await POST({ request: reqPdf });
+		expect(resPdf.status).toBe(400);
+		const dataPdf = await resPdf.json();
+		expect(dataPdf.error).toMatch(/Payload generate tidak valid|didukung/i);
+
+		// Empty PRD content
+		const reqEmpty = new Request("https://app.test/api/studio/generate", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				prompt: "Buat personal finance app berbasis PRD",
+				prdAttachment: {
+					filename: "PRD-CatatDompet.md",
+					content: "   ",
+				},
+			}),
+		});
+		const resEmpty = await POST({ request: reqEmpty });
+		expect(resEmpty.status).toBe(400);
+	});
 });

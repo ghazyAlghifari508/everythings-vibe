@@ -380,6 +380,9 @@ export const DESIGN_SYNTHESIS_MAX_RADII = 20;
 // === VibeDesign Studio bounds ===
 export const STUDIO_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;
+export const STUDIO_PRD_FILE_MAX_BYTES = 500 * 1024;
+export const STUDIO_PRD_MAX_CHARS = 100_000;
+export const STUDIO_PRD_MIN_CHARS = 10;
 
 /**
  * Canonical capture widths for Studio frame visuals.

@@ -351,6 +351,7 @@ export interface CreateStudioProjectInput {
 	designSkillId?: StudioDesignSkillId;
 	initialPageCount?: number;
 	designReference?: StudioDesignReference | null;
+	prdAttachment?: { filename: string; content: string } | null;
 }
 
 export function sanitizeSvg(svgContent: string): string {

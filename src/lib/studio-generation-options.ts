@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { STUDIO_DESIGN_MD_MAX_CHARS } from "./constants";
+import {
+	STUDIO_DESIGN_MD_MAX_CHARS,
+	STUDIO_PRD_MAX_CHARS,
+	STUDIO_PRD_MIN_CHARS,
+} from "./constants";
+import { validateStudioPrdFilename } from "./studio-prd-validation";
 
 export const STUDIO_DEFAULT_PAGE_COUNT = 3;
 export const STUDIO_MIN_PAGE_COUNT = 1;
@@ -56,6 +61,20 @@ export const studioDesignReferenceMetadataSchema = z.discriminatedUnion(
 export type StudioDesignReferenceMetadata = z.infer<
 	typeof studioDesignReferenceMetadataSchema
 >;
+export const studioPrdAttachmentSchema = z.object({
+	filename: z
+		.string()
+		.trim()
+		.min(1)
+		.max(255)
+		.refine(
+			(filename) => validateStudioPrdFilename(filename).ok,
+			"Hanya file berekstensi .md yang didukung.",
+		),
+	content: z.string().min(STUDIO_PRD_MIN_CHARS).max(STUDIO_PRD_MAX_CHARS),
+});
+export type StudioPrdAttachment = z.infer<typeof studioPrdAttachmentSchema>;
+
 export const studioGenerationOptionsSchema = z.object({
 	designSkillId: studioDesignSkillIdSchema.default("none"),
 	initialPageCount: studioInitialPageCountSchema.default(
@@ -64,6 +83,7 @@ export const studioGenerationOptionsSchema = z.object({
 	designMode: z.enum(["web", "mobile"]).default("web"),
 	designReference: studioDesignReferenceSchema.nullable().optional(),
 	designMd: z.string().max(STUDIO_DESIGN_MD_MAX_CHARS).nullable().optional(),
+	prdAttachment: studioPrdAttachmentSchema.nullable().optional(),
 });
 export type StudioGenerationOptions = z.infer<
 	typeof studioGenerationOptionsSchema
