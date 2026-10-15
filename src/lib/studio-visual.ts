@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import { type Browser, chromium } from "playwright";
 import type { StudioAssetRow } from "@/db/schema";
 import {
+	STUDIO_CAPTURE_DSF,
+	STUDIO_CAPTURE_MAX_HEIGHT,
+	STUDIO_CAPTURE_QUALITY,
+	STUDIO_CAPTURE_TIMEOUT_MS,
 	STUDIO_VISUAL_VIEWPORT_HEIGHT,
 	STUDIO_VISUAL_WIDTH,
 } from "@/lib/constants";
@@ -10,16 +14,59 @@ import { isBlockedRequestUrl } from "@/lib/render-page";
 import { extractDesignSystemTokens } from "@/lib/studio-design-system";
 
 export { STUDIO_VISUAL_WIDTH };
-const CAPTURE_TIMEOUT_MS = 30000;
-const CAPTURE_MAX_HEIGHT = 30000;
 const TAILWIND_RUNTIME = "https://cdn.tailwindcss.com";
 const LUCIDE_RUNTIME = "https://unpkg.com/lucide@latest";
 let browser: Promise<Browser> | null = null;
 
-export function studioVisualHash(html: string, viewport: string) {
+export interface StudioVisualCaptureConfig {
+	width: number;
+	height: number;
+	deviceScaleFactor: number;
+}
+
+/** The canonical capture geometry for a viewport. */
+export function studioVisualCaptureConfig(
+	viewport: string,
+): StudioVisualCaptureConfig {
+	return viewport === "mobile"
+		? {
+				width: STUDIO_VISUAL_WIDTH.mobile,
+				height: STUDIO_VISUAL_VIEWPORT_HEIGHT.mobile,
+				deviceScaleFactor: STUDIO_CAPTURE_DSF,
+			}
+		: {
+				width: STUDIO_VISUAL_WIDTH.web,
+				height: STUDIO_VISUAL_VIEWPORT_HEIGHT.web,
+				deviceScaleFactor: STUDIO_CAPTURE_DSF,
+			};
+}
+
+/**
+ * Cache key for a captured frame visual.
+ *
+ * The capture configuration is part of the key, so changing the canonical
+ * width, viewport height, or device scale factor invalidates every stored
+ * visual instead of replaying an image whose pixel dimensions no longer match
+ * the configuration that produced it.
+ */
+export function studioVisualCacheKey(
+	html: string,
+	viewport: string,
+	config: StudioVisualCaptureConfig,
+) {
 	return createHash("sha256")
-		.update(`visual-v1:${viewport}:${html}`)
+		.update(
+			`visual-v2:${viewport}:${config.width}x${config.height}@${config.deviceScaleFactor}:${html}`,
+		)
 		.digest("hex");
+}
+
+export function studioVisualHash(html: string, viewport: string) {
+	return studioVisualCacheKey(
+		html,
+		viewport,
+		studioVisualCaptureConfig(viewport),
+	);
 }
 
 export async function closeStudioVisualBrowser() {
@@ -57,7 +104,7 @@ export async function captureStudioVisual(
 		const page = await parser.newPage();
 		await page.setContent(html, {
 			waitUntil: "domcontentloaded",
-			timeout: CAPTURE_TIMEOUT_MS,
+			timeout: STUDIO_CAPTURE_TIMEOUT_MS,
 		});
 		parsed = await page.evaluate(
 			({ assets, tailwind }) => {
@@ -94,21 +141,17 @@ export async function captureStudioVisual(
 		await parser.close();
 	}
 	const tokens = extractDesignSystemTokens(designMd);
+	const config = studioVisualCaptureConfig(viewport);
 	const context = await (await browser).newContext({
-		viewport: {
-			width:
-				viewport === "mobile"
-					? STUDIO_VISUAL_WIDTH.mobile
-					: STUDIO_VISUAL_WIDTH.web,
-			height:
-				viewport === "mobile"
-					? STUDIO_VISUAL_VIEWPORT_HEIGHT.mobile
-					: STUDIO_VISUAL_VIEWPORT_HEIGHT.web,
-		},
-		deviceScaleFactor: 2,
+		viewport: { width: config.width, height: config.height },
+		deviceScaleFactor: config.deviceScaleFactor,
 		serviceWorkers: "block",
 	});
 	try {
+		// Remote styling, font, and image fetches are proxied through the
+		// server. Counting the ones that could not be served is what turns a
+		// silently degraded render into an explicit, actionable signal.
+		const failedResources: string[] = [];
 		await context.route("**/*", async (route) => {
 			const request = route.request();
 			if (
@@ -125,14 +168,15 @@ export async function captureStudioVisual(
 					contentType: asset.contentType,
 				});
 			} catch {
+				failedResources.push(request.url());
 				await route.abort();
 			}
 		});
 		const page = await context.newPage();
-		page.setDefaultTimeout(CAPTURE_TIMEOUT_MS);
+		page.setDefaultTimeout(STUDIO_CAPTURE_TIMEOUT_MS);
 		await page.setContent(`<!doctype html>${parsed.html}`, {
 			waitUntil: "load",
-			timeout: CAPTURE_TIMEOUT_MS,
+			timeout: STUDIO_CAPTURE_TIMEOUT_MS,
 		});
 		if (parsed.usesTailwind) {
 			const runtime = await fetchAsset(TAILWIND_RUNTIME);
@@ -182,37 +226,70 @@ export async function captureStudioVisual(
 					window.lucide.createIcons();
 			});
 		}
-		await page.evaluate(async () => {
-			await document.fonts.ready;
-			await Promise.all(
-				Array.from(document.images, (image) =>
-					image.decode().catch(() => undefined),
+		await page
+			.evaluate(async () => {
+				await document.fonts.ready;
+				const decoded = await Promise.all(
+					Array.from(document.images, async (image) => {
+						try {
+							await image.decode();
+							return true;
+						} catch {
+							return image.getAttribute("src") ?? "gambar";
+						}
+					}),
+				);
+				return decoded.filter((entry) => entry !== true);
+			})
+			.then((broken) => {
+				for (const source of broken) failedResources.push(`decode:${source}`);
+			});
+		// The reported height must equal the pixels Playwright actually paints
+		// for this clip. Playwright's fullPage document rect is derived from the
+		// document/body scroll and client metrics, while a naive element scan
+		// also counts descendants inside scroll containers that the screenshot
+		// legitimately clips. Measuring both and clamping to the document bounds
+		// keeps reported and captured dimensions in agreement.
+		const measured = await page.evaluate(() => {
+			const contentBottom = Math.max(
+				document.body.scrollHeight,
+				...Array.from(
+					document.body.querySelectorAll("*"),
+					(element) => element.getBoundingClientRect().bottom,
 				),
+				document.body.getBoundingClientRect().bottom,
 			);
+			const documentBottom = Math.max(
+				document.documentElement.scrollHeight,
+				document.documentElement.offsetHeight,
+				document.documentElement.clientHeight,
+				document.body.scrollHeight,
+				document.body.offsetHeight,
+				document.body.clientHeight,
+			);
+			return { contentBottom, documentBottom };
 		});
-		const height = await page.evaluate(() =>
-			Math.ceil(
-				Math.max(
-					document.body.scrollHeight,
-					...Array.from(
-						document.body.querySelectorAll("*"),
-						(element) => element.getBoundingClientRect().bottom,
-					),
-					document.body.getBoundingClientRect().bottom,
-				),
-			),
-		);
-		if (height < 1 || height > CAPTURE_MAX_HEIGHT)
+		const contentHeight = Math.ceil(measured.contentBottom);
+		const documentHeight = Math.ceil(measured.documentBottom);
+		const height = Math.min(contentHeight, documentHeight);
+		if (height < 1)
+			throw new Error(
+				"Frame tidak memiliki konten yang dapat dirender. Periksa HTML layar sebelum menangkap ulang.",
+			);
+		if (height > STUDIO_CAPTURE_MAX_HEIGHT)
 			throw new Error(
 				"Dimensi frame melebihi batas rendering. Konten tidak dipotong.",
 			);
-		const width =
-			viewport === "mobile"
-				? STUDIO_VISUAL_WIDTH.mobile
-				: STUDIO_VISUAL_WIDTH.web;
+		// A materially incomplete render (fonts or images that could not be
+		// served) must not be stored as if it were the real design.
+		if (failedResources.length > 0)
+			throw new Error(
+				`Aset frame gagal dimuat (${failedResources.length} resource). Pratinjau tidak disimpan agar tidak menampilkan hasil yang tidak lengkap.`,
+			);
+		const width = config.width;
 		const data = await page.screenshot({
 			type: "jpeg",
-			quality: 90,
+			quality: STUDIO_CAPTURE_QUALITY,
 			// fullPage is required alongside clip: a clip rect taller than the
 			// viewport is silently cropped to the viewport, so the stored image
 			// was shorter than the reported height and the frame <img> stretched

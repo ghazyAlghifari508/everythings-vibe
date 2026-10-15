@@ -1,11 +1,52 @@
 import { describe, expect, it } from "vitest";
+import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import { buildFixtureModel } from "./design-fixture";
 import { renderDesignMd } from "./design-md-render";
 import {
 	enforceDesignSystemOnHtml,
 	extractDesignSystemTokens,
 	generateDesignSystemHtmlHeader,
+	validateGeneratedHtml,
 } from "./studio-design-system";
+
+const sampleBlueprint: StudioDesignBlueprint = {
+	productIdentity: {
+		productName: "Kopi",
+		targetAudience: "Umum",
+		platform: "mobile",
+		visualDirection: "Hangat",
+	},
+	designTokens: {
+		primary: "#0f0f0f",
+		secondary: "#606060",
+		background: "#ffffff",
+		surface: "#f8f8f8",
+		fontFamily: "system-ui",
+		radius: 12,
+		border: "1px solid #d3d3d3",
+		elevation: "none",
+	},
+	sharedComponents: {
+		header: "Bar",
+		navigation: "Tabs",
+		buttons: "Ink",
+		inputs: "8px",
+		cards: "12px",
+		tabs: "Seg",
+		icons: "Lucide",
+	},
+	navigationContract: {
+		destinations: ["jelajah", "kustom"],
+		labels: ["Jelajah", "Kustom"],
+		iconMapping: { jelajah: "compass", kustom: "sliders" },
+		ordering: ["jelajah", "kustom"],
+		activeItemRule: "Highlight aktif",
+	},
+	screenPlan: [
+		{ name: "Jelajah", role: "Katalog", order: 0 },
+		{ name: "Kustom", role: "Opsi", order: 1 },
+	],
+};
 
 const sampleDesignMd = `# MindMarket — Style Reference
 > Warm storybook on cream paper — a friendly editorial canvas where oversized Inter headlines and paper-cut characters share a sunlit, sticker-soft surface.
@@ -52,6 +93,18 @@ const sampleDesignMd = `# MindMarket — Style Reference
 `;
 
 describe("Studio Design System", () => {
+	it("removes enforced token blocks when a reference is explicitly removed", () => {
+		const old = enforceDesignSystemOnHtml(
+			"<html><head></head><body>Sample</body></html>",
+			extractDesignSystemTokens(sampleDesignMd),
+		);
+		expect(enforceDesignSystemOnHtml(old, null)).not.toContain(
+			"studio-design-tokens",
+		);
+		expect(enforceDesignSystemOnHtml(old, null)).not.toContain(
+			"studio-tailwind-tokens",
+		);
+	});
 	it("reads the import modal's three-column color format and explicit font without inventing missing tokens", () => {
 		const tokens = extractDesignSystemTokens(
 			"# Sample\n| Name | Hex | Role |\n| Canvas | #ececec | Background |\n| Primary | #224488 | Brand |\nFont: Arial\n### Components\n",
@@ -145,5 +198,102 @@ describe("Studio Design System", () => {
 		expect(enforced).toContain("studio-design-tokens");
 		expect(enforced).toContain("--canvas-bg: #f5f1e4");
 		expect(enforced).toContain("/api/studio/asset?id=123&cap=abc");
+	});
+
+	it("injects shared blueprint tokens deterministically", () => {
+		const enforced = enforceDesignSystemOnHtml(
+			"<html><head></head><body></body></html>",
+			null,
+			null,
+			sampleBlueprint,
+		);
+		expect(enforced).toContain("studio-blueprint-tokens");
+		expect(enforced).toContain("--bp-primary:#0f0f0f");
+	});
+
+	it("validates generated HTML against blueprint and viewport contract", () => {
+		expect(
+			validateGeneratedHtml("<html><body><p>Halo</p></body></html>", {
+				blueprint: null,
+				viewport: "mobile",
+				expectTokens: false,
+			}).length,
+		).toBeGreaterThan(0);
+		const valid = enforceDesignSystemOnHtml(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><nav>Jelajah Kustom</nav></body></html>',
+			null,
+			null,
+			sampleBlueprint,
+		);
+		expect(
+			validateGeneratedHtml(valid, {
+				blueprint: sampleBlueprint,
+				viewport: "mobile",
+				expectTokens: false,
+			}),
+		).toEqual([]);
+	});
+
+	it("rejects a mobile artboard with a viewport-anchored bar", () => {
+		const anchored = enforceDesignSystemOnHtml(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>.tab{position: fixed; bottom:0;}</style></head><body><nav>Jelajah Kustom</nav></body></html>',
+			null,
+			null,
+			sampleBlueprint,
+		);
+		const issues = validateGeneratedHtml(anchored, {
+			blueprint: sampleBlueprint,
+			viewport: "mobile",
+			expectTokens: false,
+		});
+		expect(issues.some((issue) => issue.includes("fixed"))).toBe(true);
+	});
+
+	it("rejects a sticky mobile element regardless of declaration spacing", () => {
+		const sticky = enforceDesignSystemOnHtml(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>.bar{position:sticky;top:0}</style></head><body><nav>Jelajah Kustom</nav></body></html>',
+			null,
+			null,
+			sampleBlueprint,
+		);
+		expect(
+			validateGeneratedHtml(sticky, {
+				blueprint: sampleBlueprint,
+				viewport: "mobile",
+				expectTokens: false,
+			}).some((issue) => issue.includes("sticky")),
+		).toBe(true);
+	});
+
+	it("accepts an in-flow bottom navigation for a mobile artboard", () => {
+		const inFlow = enforceDesignSystemOnHtml(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>.tab{display:flex;padding-bottom:env(safe-area-inset-bottom)}</style></head><body><main style="padding-bottom:64px">Konten</main><nav class="tab">Jelajah Kustom</nav></body></html>',
+			null,
+			null,
+			sampleBlueprint,
+		);
+		expect(
+			validateGeneratedHtml(inFlow, {
+				blueprint: sampleBlueprint,
+				viewport: "mobile",
+				expectTokens: false,
+			}),
+		).toEqual([]);
+	});
+
+	it("does not apply the mobile positioning contract to web artboards", () => {
+		const web = enforceDesignSystemOnHtml(
+			'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>.hdr{position:sticky;top:0}</style></head><body><nav>Jelajah Kustom</nav></body></html>',
+			null,
+			null,
+			sampleBlueprint,
+		);
+		expect(
+			validateGeneratedHtml(web, {
+				blueprint: sampleBlueprint,
+				viewport: "web",
+				expectTokens: false,
+			}),
+		).toEqual([]);
 	});
 });

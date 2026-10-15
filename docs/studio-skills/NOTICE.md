@@ -1,0 +1,15 @@
+# Studio design skill adapters (version 2)
+
+The guidance in `src/lib/studio-design-skill-registry.server.ts` is modified, abridged and adapted from the pinned definitions below. It is a curated visual-design subset, not the complete upstream agent, CLI, dataset or workflow. Every adapter remains subordinate to Studio's static HTML output, platform, safety and user-selected reference contracts. No upstream scripts run and no remote content is fetched during generation.
+
+| Adapter | Source revision | Definition | License / attribution |
+| --- | --- | --- | --- |
+| Impeccable | `245ad82def45831dc56a21b683c7a1ff530b06cc` | [SKILL.md](https://github.com/pbakaus/impeccable/blob/245ad82def45831dc56a21b683c7a1ff530b06cc/.agents/skills/impeccable/SKILL.md), [craft-floor.md](https://github.com/pbakaus/impeccable/blob/245ad82def45831dc56a21b683c7a1ff530b06cc/.agents/skills/impeccable/reference/craft-floor.md), upstream 4.5.2 | Apache-2.0, Copyright 2025 Paul Bakaus; `Apache-2.0.txt` |
+| Frontend Design | `dbd4588f9e1033efb41dad4bef2f7947c8993d44` | [SKILL.md](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/frontend-design/SKILL.md) | Apache-2.0, Anthropic; `Apache-2.0.txt` |
+| UI UX Pro Max | `7246805992a42b7bba37d4cac83b01416f0c6c44` | [SKILL.md](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill/blob/7246805992a42b7bba37d4cac83b01416f0c6c44/.claude/skills/ui-ux-pro-max/SKILL.md) | MIT, Copyright (c) 2024 Next Level Builder; `ui-ux-pro-max-LICENSE.txt` |
+| Anti-Slop | `9685ca7eac70283d083fc23baa9a88e7d3cd93c4` | [SKILL.md](https://github.com/miqdadbadjuber/anti-slop/blob/9685ca7eac70283d083fc23baa9a88e7d3cd93c4/skills/antislop/SKILL.md) | MIT, Copyright (c) 2026 Miqdad Badjuber (antislop); `anti-slop-LICENSE.txt` |
+| Taste | `d237dd399d57524945c0c81327da5da19f7a468d` | [SKILL.md](https://github.com/Leonxlnx/taste-skill/blob/d237dd399d57524945c0c81327da5da19f7a468d/skills/taste-skill/SKILL.md) | MIT, Copyright (c) 2026 Leonxlnx; `taste-LICENSE.txt` |
+
+Impeccable contributes surface modes, grouping, hierarchy, product language and its craft-floor anti-patterns. Frontend Design contributes content-grounded direction, typography, a single focal point and restrained structural devices. UI UX Pro Max contributes the definition's priority table only: no searchable palettes, font pairings, CLI searches or full datasets are integrated. Anti-Slop contributes its purpose filter, content-driven composition, honesty and accessibility principles; agent installation and mode-selection instructions are excluded. Taste contributes transferable brief inference, consistency, layout and type principles. Its upstream explicitly excludes dashboards, multi-step product UI and native mobile, so this adapter does not claim full upstream support for those surfaces and does not impose landing-page quotas or motion prescriptions on them.
+
+No Skill adds no user-selected guidance. Baseline Studio rules remain active. The browser-safe catalog is separate from the server registry. Source changes require review and an adapter-version increment.

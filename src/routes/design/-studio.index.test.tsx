@@ -5,6 +5,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -35,6 +36,10 @@ vi.mock("@tanstack/react-start", () => ({
 
 vi.mock("@/lib/session", () => ({
 	requireUserServer: vi.fn(),
+}));
+
+vi.mock("@/lib/auth-client", () => ({
+	authClient: { useSession: () => ({ data: null }) },
 }));
 
 import { Route } from "./studio.index";
@@ -81,9 +86,16 @@ describe("StudioPage UI & Workflow", () => {
 			screen.getByPlaceholderText(/Jelaskan kebutuhan antarmukamu/i),
 		).toBeDefined();
 		expect(
-			screen.getByRole("button", { name: /Start with your design/i }),
+			screen.getByRole("button", { name: "Pilih tampilan" }),
 		).toBeDefined();
-		expect(screen.getByRole("button", { name: "Generate UI" })).toBeDefined();
+		expect(screen.getByRole("button", { name: "Kirim prompt" })).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: /Design skill: No Skill/i }),
+		).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: /Jumlah halaman awal: 3/i }),
+		).toBeDefined();
+		expect(screen.getByText("Mulai dari brief siap pakai")).toBeDefined();
 	});
 
 	it("allows switching between Web and Mobile design modes", () => {
@@ -147,7 +159,7 @@ describe("StudioPage UI & Workflow", () => {
 		const mobileBtn = screen.getByRole("button", { name: "Mobile" });
 		fireEvent.click(mobileBtn);
 
-		const submitBtn = screen.getByRole("button", { name: "Generate UI" });
+		const submitBtn = screen.getByRole("button", { name: "Kirim prompt" });
 		fireEvent.click(submitBtn);
 
 		await waitFor(() => {
@@ -159,7 +171,11 @@ describe("StudioPage UI & Workflow", () => {
 					body: JSON.stringify({
 						prompt: "Aplikasi mobile fitness tracking dengan kalender",
 						designMode: "mobile",
+						designSkillId: "none",
+						initialPageCount: 3,
+						designReference: null,
 						designMd: null,
+						prdAttachment: null,
 						logo: null,
 					}),
 				}),
@@ -172,21 +188,41 @@ describe("StudioPage UI & Workflow", () => {
 		});
 	});
 
-	it("opens Start with your design modal when clicking secondary action", () => {
+	it("opens the visual design picker from the composer icon", () => {
 		const StudioComponent = (
 			Route as unknown as { component: React.ComponentType }
 		).component;
 		render(<StudioComponent />);
 
-		const modalBtn = screen.getByRole("button", {
-			name: /Start with your design/i,
-		});
-		fireEvent.click(modalBtn);
+		fireEvent.click(screen.getByRole("button", { name: "Pilih tampilan" }));
 
+		expect(screen.getByText("Pilih tampilan")).toBeDefined();
+		expect(screen.getByRole("tab", { name: "Tema" })).toBeDefined();
+		expect(screen.getByRole("tab", { name: "Template" })).toBeDefined();
+		expect(screen.getByRole("tab", { name: "Punya Saya" })).toBeDefined();
+	});
+
+	it("populates an editable brief with platform and page count from a shortcut", () => {
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: /Kopi Specialty Ordering/i }),
+		);
+
+		const textarea = screen.getByPlaceholderText(
+			/Jelaskan kebutuhan antarmukamu/i,
+		) as HTMLTextAreaElement;
+		expect(textarea.value).toContain("Ruang Seduh");
 		expect(
-			screen.getByText(
-				"Gunakan design system dan identitas visual yang sudah kamu punya sebagai referensi.",
-			),
+			screen
+				.getByRole("button", { name: "Mobile" })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+		expect(
+			screen.getByRole("button", { name: /Jumlah halaman awal: 4/i }),
 		).toBeDefined();
 	});
 
@@ -257,5 +293,76 @@ describe("StudioPage UI & Workflow", () => {
 		);
 		expect(mockInvalidate).not.toHaveBeenCalled();
 		expect(screen.getByText("SIMRS Dashboard")).toBeDefined();
+	});
+
+	it("renders the page-shell header with back control, logo and profile outside the composer column", () => {
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		const banner = screen.getByRole("banner");
+		expect(
+			within(banner).getByRole("link", { name: /kembali/i }),
+		).toBeDefined();
+		expect(within(banner).getByText("VibeEverything")).toBeDefined();
+		expect(
+			within(banner).getByRole("button", { name: "Profil dan tampilan" }),
+		).toBeDefined();
+
+		const main = screen.getByRole("main");
+		expect(within(main).getByText("What will you design?")).toBeDefined();
+		expect(
+			within(main).getByRole("region", { name: "Daftar brief siap pakai" }),
+		).toBeDefined();
+	});
+
+	it("falls back to the design hub for the back control on direct visits", () => {
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		const back = screen.getByRole("link", { name: /kembali/i });
+		expect(back.getAttribute("href")).toBe("/design");
+	});
+
+	it("renders all shortcuts in one horizontal carousel with arrow controls", () => {
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		const carousel = screen.getByRole("region", {
+			name: "Daftar brief siap pakai",
+		});
+		expect(
+			screen.getByRole("button", { name: "Brief sebelumnya" }),
+		).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: "Brief berikutnya" }),
+		).toBeDefined();
+		expect(within(carousel).getAllByRole("listitem")).toHaveLength(5);
+	});
+
+	it("marks the applied brief as selected without submitting a generation", () => {
+		const fetchMock = vi.fn();
+		global.fetch = fetchMock;
+
+		const StudioComponent = (
+			Route as unknown as { component: React.ComponentType }
+		).component;
+		render(<StudioComponent />);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: /Kopi Specialty Ordering/i }),
+		);
+
+		expect(
+			screen
+				.getByRole("button", { name: /Kopi Specialty Ordering/i })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });

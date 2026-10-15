@@ -33,6 +33,11 @@ import type {
 	ScrapeImageDiscovery,
 	ScrapeImageOutcome,
 } from "@/lib/scrape-images";
+import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
+import type {
+	StudioDesignReferenceMetadata,
+	StudioDesignSkillId,
+} from "@/lib/studio-generation-options";
 
 // === TABLES ===
 // ponytail: RLS policies dropped - app-level ownership filters (eq(userId, user.id))
@@ -1227,7 +1232,22 @@ export const studioProjects = pgTable(
 		title: text("title").notNull(),
 		designMode: text("design_mode").notNull().default("web"),
 		designMd: text("design_md"),
+		designSkillId: text("design_skill_id")
+			.$type<StudioDesignSkillId>()
+			.notNull()
+			.default("none"),
+		initialPageCount: integer("initial_page_count"),
+		designReference:
+			jsonb("design_reference").$type<StudioDesignReferenceMetadata>(),
+		designBlueprint: jsonb("design_blueprint").$type<StudioDesignBlueprint>(),
+		designBlueprintVersion: integer("design_blueprint_version")
+			.notNull()
+			.default(1),
+		designSkillVersion: integer("design_skill_version"),
 		logoAssetId: text("logo_asset_id"),
+		prdContent: text("prd_content"),
+		prdFilename: text("prd_filename"),
+		prdContentHash: text("prd_content_hash"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -1298,6 +1318,12 @@ export const studioJobs = pgTable(
 		targetFrameId: text("target_frame_id"),
 		status: text("status").notNull().default("queued"),
 		error: text("error"),
+		claimedBy: text("claimed_by"),
+		attempts: integer("attempts").notNull().default(0),
+		claimedAt: timestamp("claimed_at", { withTimezone: true }),
+		leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+		startedAt: timestamp("started_at", { withTimezone: true }),
+		finishedAt: timestamp("finished_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -1308,6 +1334,7 @@ export const studioJobs = pgTable(
 	(t) => [
 		index("studio_jobs_project_id_idx").on(t.projectId),
 		index("studio_jobs_user_id_idx").on(t.userId),
+		index("studio_jobs_status_idx").on(t.status),
 	],
 );
 
@@ -1327,6 +1354,9 @@ export const studioFrames = pgTable(
 		status: text("status").notNull().default("queued"),
 		order: integer("order").notNull().default(0),
 		error: text("error"),
+		attempts: integer("attempts").notNull().default(0),
+		visualHash: text("visual_hash"),
+		promptHash: text("prompt_hash"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -1337,6 +1367,8 @@ export const studioFrames = pgTable(
 	(t) => [
 		index("studio_frames_project_id_idx").on(t.projectId),
 		index("studio_frames_order_idx").on(t.order),
+		index("studio_frames_project_status_idx").on(t.projectId, t.status),
+		unique("studio_frames_project_order_unique").on(t.projectId, t.order),
 	],
 );
 

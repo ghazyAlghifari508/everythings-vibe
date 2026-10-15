@@ -22,7 +22,7 @@ it("stores private bytes once under concurrent retries, enforces lease/ownership
 	await pool.query(
 		`ALTER TABLE ${schema}.scrapes ADD FOREIGN KEY (user_id) REFERENCES ${schema}.users(id) ON DELETE CASCADE; ALTER TABLE ${schema}.scrape_images ADD FOREIGN KEY (scrape_id) REFERENCES ${schema}.scrapes(id) ON DELETE CASCADE`,
 	);
-	const migration = await readFile("drizzle/0036_clammy_darkstar.sql", "utf8");
+	const migration = await readFile("drizzle/0038_clammy_darkstar.sql", "utf8");
 	const client = await pool.connect();
 	try {
 		await client.query(`SET search_path TO ${schema}`);

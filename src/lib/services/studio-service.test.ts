@@ -381,6 +381,21 @@ describe("Studio Service", () => {
 					values: vi.fn().mockReturnValue({
 						returning: vi.fn().mockResolvedValue([mockJob]),
 					}),
+				})
+				.mockReturnValueOnce({
+					values: vi.fn().mockReturnValue({
+						returning: vi.fn().mockResolvedValue(
+							[1, 2, 3].map((n) => ({
+								id: `frame-${n}`,
+								projectId: "proj-10",
+								name: `Layar ${n}`,
+								description: "",
+								viewport: "mobile",
+								order: n - 1,
+								status: "queued",
+							})),
+						),
+					}),
 				});
 
 			const result = await createStudioProjectWithJob("user-1", {
@@ -392,6 +407,12 @@ describe("Studio Service", () => {
 			expect(result.project.id).toBe("proj-10");
 			expect(result.job.id).toBe("job-10");
 			expect(result.job.status).toBe("queued");
+			expect(result.frames).toHaveLength(3);
+			expect(result.frames.map((f) => f.name)).toEqual([
+				"Layar 1",
+				"Layar 2",
+				"Layar 3",
+			]);
 		});
 
 		it("synthesizes legacy single-HTML project into one ready frame", async () => {

@@ -1,5 +1,13 @@
-import { ArrowUp, Loader2, X } from "lucide-react";
+import { ArrowUp, FileCode2, Loader2, X } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+	canvasComposerBottomCss,
+	canvasComposerWidthCss,
+} from "@/components/design/studio-canvas-layout";
+import { STUDIO_MIN_PROMPT_CHARS } from "@/lib/prompts-ui-studio";
+import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
+import { shouldSubmitComposerEvent } from "./composer-keyboard";
+import { StudioSkillSelect } from "./studio-skill-select";
 
 export type StudioComposerScope = "add" | "revise" | "project";
 
@@ -12,6 +20,9 @@ export interface StudioComposerProps {
 	className?: string;
 	selectedFrames?: { id: string; name: string }[];
 	onRemoveFrame?: (id: string) => void;
+	designSkillId?: StudioDesignSkillId;
+	onDesignSkillChange?: (skillId: StudioDesignSkillId) => void;
+	referenceLabel?: string | null;
 }
 
 /**
@@ -32,6 +43,9 @@ export function StudioComposer({
 	className = "",
 	selectedFrames = [],
 	onRemoveFrame,
+	designSkillId,
+	onDesignSkillChange,
+	referenceLabel,
 }: StudioComposerProps) {
 	const [prompt, setPrompt] = useState("");
 	const [sending, setSending] = useState(false);
@@ -40,6 +54,14 @@ export function StudioComposer({
 	const pending = useRef(false);
 	const scope = resolveComposerScope(selectedFrames.length);
 	const singleFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
+	// The server rejects prompts shorter than the shared minimum, so the
+	// composer applies the same rule client-side and explains it instead of
+	// letting the request fail with a generic payload error.
+	const trimmedPrompt = prompt.trim();
+	const isTooShort =
+		trimmedPrompt.length > 0 && trimmedPrompt.length < STUDIO_MIN_PROMPT_CHARS;
+	const canSubmit =
+		trimmedPrompt.length >= STUDIO_MIN_PROMPT_CHARS && !loading && !sending;
 
 	useEffect(() => {
 		const input = inputRef.current;
@@ -50,7 +72,8 @@ export function StudioComposer({
 
 	async function submit() {
 		const trimmed = prompt.trim();
-		if (!trimmed || loading || pending.current) return;
+		if (trimmed.length < STUDIO_MIN_PROMPT_CHARS || loading || pending.current)
+			return;
 		pending.current = true;
 		setSending(true);
 		setError("");
@@ -75,7 +98,16 @@ export function StudioComposer({
 
 	return (
 		<div
-			className={`absolute bottom-4 left-1/2 z-30 w-full max-w-2xl -translate-x-1/2 px-3 sm:bottom-6 ${className}`}
+			data-testid="studio-composer"
+			className={`absolute left-1/2 z-30 -translate-x-1/2 ${className}`}
+			// The zoom controls own the bottom-right corner, so the composer is
+			// inset from both sides and its width is capped by the same
+			// clearance fit-to-content reserves. It therefore narrows on small
+			// viewports instead of overlapping the zoom row.
+			style={{
+				bottom: canvasComposerBottomCss(),
+				width: canvasComposerWidthCss(),
+			}}
 			onPointerDown={(event) => event.stopPropagation()}
 			onWheel={(event) => event.stopPropagation()}
 		>
@@ -108,19 +140,33 @@ export function StudioComposer({
 						))}
 					</div>
 				) : null}
+				{onDesignSkillChange || referenceLabel ? (
+					<div className="flex flex-wrap items-center gap-2">
+						{onDesignSkillChange && designSkillId ? (
+							<StudioSkillSelect
+								value={designSkillId}
+								onChange={onDesignSkillChange}
+								disabled={loading || sending}
+							/>
+						) : null}
+						{referenceLabel ? (
+							<span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-1 text-xs text-mist">
+								<FileCode2 size={12} aria-hidden className="shrink-0" />
+								<span className="truncate">{referenceLabel}</span>
+							</span>
+						) : null}
+					</div>
+				) : null}
 				<div className="flex items-end gap-2">
 					<textarea
 						ref={inputRef}
 						value={prompt}
 						rows={2}
 						aria-label="Instruksi desain"
+						aria-describedby={isTooShort ? "studio-composer-hint" : undefined}
 						onChange={(event) => setPrompt(event.target.value)}
 						onKeyDown={(event) => {
-							if (
-								event.key === "Enter" &&
-								!event.shiftKey &&
-								!event.nativeEvent.isComposing
-							) {
+							if (shouldSubmitComposerEvent(event)) {
 								event.preventDefault();
 								void submit();
 							}
@@ -137,7 +183,7 @@ export function StudioComposer({
 					/>
 					<button
 						type="submit"
-						disabled={loading || sending || !prompt.trim()}
+						disabled={!canSubmit}
 						aria-label="Kirim prompt"
 						title="Kirim prompt (Enter)"
 						style={{ background: "var(--btn-bg)", color: "var(--btn-text)" }}
@@ -153,6 +199,11 @@ export function StudioComposer({
 				{error ? (
 					<p role="alert" className="text-xs text-crimson">
 						{error}
+					</p>
+				) : null}
+				{isTooShort ? (
+					<p id="studio-composer-hint" className="text-xs text-fog">
+						{`Tulis minimal ${STUDIO_MIN_PROMPT_CHARS} karakter agar instruksinya jelas.`}
 					</p>
 				) : null}
 			</form>

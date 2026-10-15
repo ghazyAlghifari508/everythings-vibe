@@ -23,6 +23,7 @@ describe("errorSourceForCode", () => {
 		] as const)
 			expect(errorSourceForCode(code)).toBe("website");
 		expect(errorSourceForCode("CAPTURE_FAILED")).toBe("capture");
+		expect(errorSourceForCode("VISUAL_CAPTURE_FAILED")).toBe("capture");
 		expect(errorSourceForCode("ASSET_FETCH_FAILED")).toBe("asset");
 		expect(errorSourceForCode("JOB_TIMEOUT")).toBe("worker");
 		expect(errorSourceForCode("WORKER_INTERRUPTED")).toBe("worker");
@@ -61,6 +62,7 @@ describe("isRetryableScrapeErrorCode", () => {
 			"WEBSITE_NAVIGATION_TIMEOUT",
 			"FETCH_TIMEOUT",
 			"CAPTURE_FAILED",
+			"VISUAL_CAPTURE_FAILED",
 			"ASSET_FETCH_FAILED",
 			"JOB_TIMEOUT",
 			"WORKER_INTERRUPTED",
@@ -96,6 +98,7 @@ describe("httpStatusForErrorCode", () => {
 		expect(httpStatusForErrorCode("JOB_TIMEOUT")).toBe(503);
 		expect(httpStatusForErrorCode("WORKER_INTERRUPTED")).toBe(503);
 		expect(httpStatusForErrorCode("CAPTURE_FAILED")).toBe(500);
+		expect(httpStatusForErrorCode("VISUAL_CAPTURE_FAILED")).toBe(500);
 	});
 });
 
@@ -120,6 +123,9 @@ describe("ScrapeError evidence", () => {
 		expect(scrapeFailureReasonForCode("JOB_TIMEOUT")).toBe("job-timeout");
 		expect(scrapeFailureReasonForCode("ASSET_FETCH_FAILED")).toBe(
 			"asset-unavailable",
+		);
+		expect(scrapeFailureReasonForCode("VISUAL_CAPTURE_FAILED")).toBe(
+			"content-capture",
 		);
 	});
 

@@ -11,6 +11,16 @@ import {
 	reviseStudioProject,
 } from "@/lib/services/studio-service";
 import { requireUser } from "@/lib/session";
+import {
+	studioDesignReferenceSchema,
+	studioDesignSkillIdSchema,
+	studioInitialPageCountSchema,
+	studioPrdAttachmentSchema,
+} from "@/lib/studio-generation-options";
+import {
+	validateStudioPrdContent,
+	validateStudioPrdFilename,
+} from "@/lib/studio-prd-validation";
 
 function studioErrorResponse(error: unknown): Response {
 	console.error("[studio.generate error]", error);
@@ -45,7 +55,11 @@ export const studioGenerateBodySchema = z.object({
 	title: z.string().optional(),
 	projectId: z.string().optional(),
 	designMode: z.enum(["web", "mobile"]).optional(),
+	designSkillId: studioDesignSkillIdSchema.optional(),
+	initialPageCount: studioInitialPageCountSchema.optional(),
+	designReference: studioDesignReferenceSchema.nullable().optional(),
 	designMd: z.string().max(STUDIO_DESIGN_MD_MAX_CHARS).nullable().optional(),
+	prdAttachment: studioPrdAttachmentSchema.nullable().optional(),
 	logo: z
 		.object({
 			filename: z.string().max(255),
@@ -97,6 +111,24 @@ export async function POST({
 		if (!checked.ok)
 			return Response.json({ error: checked.error }, { status: 400 });
 
+		let validatedPrd: { filename: string; content: string } | null = null;
+		if (body.prdAttachment) {
+			const validFilename = validateStudioPrdFilename(
+				body.prdAttachment.filename,
+			);
+			if (!validFilename.ok) {
+				return Response.json({ error: validFilename.error }, { status: 400 });
+			}
+			const validContent = validateStudioPrdContent(body.prdAttachment.content);
+			if (!validContent.ok) {
+				return Response.json({ error: validContent.error }, { status: 400 });
+			}
+			validatedPrd = {
+				filename: validFilename.filename,
+				content: validContent.content,
+			};
+		}
+
 		if (typeof body.projectId === "string" && body.projectId.length > 0) {
 			const revision = await reviseStudioProject(
 				body.projectId,
@@ -113,12 +145,16 @@ export async function POST({
 			);
 		}
 
-		const { project, job } = await createStudioProjectWithJob(user.id, {
+		const { project, job, frames } = await createStudioProjectWithJob(user.id, {
 			title: body.title,
 			prompt: checked.prompt,
 			designMode: body.designMode,
 			designMd: body.designMd,
 			logo: body.logo,
+			designSkillId: body.designSkillId,
+			initialPageCount: body.initialPageCount,
+			designReference: body.designReference,
+			prdAttachment: validatedPrd,
 		});
 
 		return Response.json(
@@ -126,6 +162,8 @@ export async function POST({
 				projectId: project.id,
 				jobId: job.id,
 				status: job.status,
+				frameIds: frames.map((frame) => frame.id),
+				pageCount: frames.length,
 			},
 			{ status: 201 },
 		);

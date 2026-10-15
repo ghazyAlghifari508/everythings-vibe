@@ -27,6 +27,8 @@ export const DESIGN_ERROR_CODES = {
 		"Sistem tidak menemukan konten yang cukup untuk dianalisis.",
 	AI_GENERATION_FAILED:
 		"DESIGN.md belum bisa dibuat. Coba ulangi dari link yang sama.",
+	VISUAL_CAPTURE_FAILED:
+		"Pratinjau visual frame gagal dirender. HTML frame tetap tersimpan.",
 	STORAGE_FAILED: "Terjadi kendala saat menyimpan hasil.",
 	UNEXPECTED_ERROR:
 		"Pemrosesan berhenti karena kendala teknis yang tidak terduga.",
@@ -90,6 +92,7 @@ const ERROR_SOURCES: Record<DesignErrorCode, ScrapeErrorSource> = {
 	WORKER_INTERRUPTED: "worker",
 	NO_ANALYZABLE_CONTENT: "capture",
 	AI_GENERATION_FAILED: "internal",
+	VISUAL_CAPTURE_FAILED: "capture",
 	STORAGE_FAILED: "storage",
 	UNEXPECTED_ERROR: "internal",
 };
@@ -112,6 +115,7 @@ const FAILURE_REASONS: Record<DesignErrorCode, ScrapeFailureReason> = {
 	WORKER_INTERRUPTED: "worker-interrupted",
 	NO_ANALYZABLE_CONTENT: "no-meaningful-content",
 	AI_GENERATION_FAILED: "generation-failed",
+	VISUAL_CAPTURE_FAILED: "content-capture",
 	STORAGE_FAILED: "storage-failed",
 	UNEXPECTED_ERROR: "unknown",
 };
@@ -134,6 +138,7 @@ const HTTP_STATUSES: Record<DesignErrorCode, number> = {
 	WORKER_INTERRUPTED: 503,
 	NO_ANALYZABLE_CONTENT: 500,
 	AI_GENERATION_FAILED: 500,
+	VISUAL_CAPTURE_FAILED: 500,
 	STORAGE_FAILED: 500,
 	UNEXPECTED_ERROR: 500,
 };
