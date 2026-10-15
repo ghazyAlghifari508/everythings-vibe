@@ -150,6 +150,7 @@ describe("Export PDF removal", () => {
 			"src/lib/template-gallery.ts",
 			"src/app/ask/-ask-restore.test.ts",
 			"src/components/prd/prd-viewer.test.tsx",
+			"src/lib/prompts-ask.ts",
 		]);
 		const walk = (dir: string) => {
 			for (const entry of readdirSync(dir, { withFileTypes: true })) {

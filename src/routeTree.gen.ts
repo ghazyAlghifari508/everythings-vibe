@@ -98,6 +98,7 @@ import { Route as ApiSettingsApiKeysIndexRouteImport } from './routes/api/settin
 import { Route as ApiSettingsApiKeysIdRouteImport } from './routes/api/settings/api-keys/$id'
 import { Route as ApiSettingsApiKeysAutoRouteImport } from './routes/api/settings/api-keys/auto'
 import { Route as ApiV1ProjectsIdRouteImport } from './routes/api/v1/projects/$id'
+import { Route as CodebasesKanbanCodebaseIdProjectIdRouteImport } from './routes/codebases/kanban/$codebaseId/$projectId'
 import { Route as ApiV1ProjectsIdAcRouteImport } from './routes/api/v1/projects/$id/ac'
 import { Route as ApiV1ProjectsIdKanbanRouteImport } from './routes/api/v1/projects/$id/kanban'
 import { Route as ApiV1ProjectsIdPrdRouteImport } from './routes/api/v1/projects/$id/prd'
@@ -564,6 +565,12 @@ const ApiV1ProjectsIdRoute = ApiV1ProjectsIdRouteImport.update({
   path: '/api/v1/projects/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CodebasesKanbanCodebaseIdProjectIdRoute =
+  CodebasesKanbanCodebaseIdProjectIdRouteImport.update({
+    id: '/kanban/$codebaseId/$projectId',
+    path: '/kanban/$codebaseId/$projectId',
+    getParentRoute: () => CodebasesRoute,
+  } as any)
 const ApiV1ProjectsIdAcRoute = ApiV1ProjectsIdAcRouteImport.update({
   id: '/ac',
   path: '/ac',
@@ -744,6 +751,7 @@ export interface FileRoutesByFullPath {
   '/api/settings/api-keys/$id': typeof ApiSettingsApiKeysIdRoute
   '/api/settings/api-keys/auto': typeof ApiSettingsApiKeysAutoRoute
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
+  '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys/': typeof ApiSettingsApiKeysIndexRoute
   '/api/v1/projects/$id/ac': typeof ApiV1ProjectsIdAcRoute
   '/api/v1/projects/$id/kanban': typeof ApiV1ProjectsIdKanbanRoute
@@ -846,6 +854,7 @@ export interface FileRoutesByTo {
   '/api/settings/api-keys/$id': typeof ApiSettingsApiKeysIdRoute
   '/api/settings/api-keys/auto': typeof ApiSettingsApiKeysAutoRoute
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
+  '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys': typeof ApiSettingsApiKeysIndexRoute
   '/api/v1/projects/$id/ac': typeof ApiV1ProjectsIdAcRoute
   '/api/v1/projects/$id/kanban': typeof ApiV1ProjectsIdKanbanRoute
@@ -954,6 +963,7 @@ export interface FileRoutesById {
   '/api/settings/api-keys/$id': typeof ApiSettingsApiKeysIdRoute
   '/api/settings/api-keys/auto': typeof ApiSettingsApiKeysAutoRoute
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
+  '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys/': typeof ApiSettingsApiKeysIndexRoute
   '/api/v1/projects/$id/ac': typeof ApiV1ProjectsIdAcRoute
   '/api/v1/projects/$id/kanban': typeof ApiV1ProjectsIdKanbanRoute
@@ -1063,6 +1073,7 @@ export interface FileRouteTypes {
     | '/api/settings/api-keys/$id'
     | '/api/settings/api-keys/auto'
     | '/api/v1/projects/$id'
+    | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys/'
     | '/api/v1/projects/$id/ac'
     | '/api/v1/projects/$id/kanban'
@@ -1165,6 +1176,7 @@ export interface FileRouteTypes {
     | '/api/settings/api-keys/$id'
     | '/api/settings/api-keys/auto'
     | '/api/v1/projects/$id'
+    | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys'
     | '/api/v1/projects/$id/ac'
     | '/api/v1/projects/$id/kanban'
@@ -1272,6 +1284,7 @@ export interface FileRouteTypes {
     | '/api/settings/api-keys/$id'
     | '/api/settings/api-keys/auto'
     | '/api/v1/projects/$id'
+    | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys/'
     | '/api/v1/projects/$id/ac'
     | '/api/v1/projects/$id/kanban'
@@ -1986,6 +1999,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1ProjectsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/codebases/kanban/$codebaseId/$projectId': {
+      id: '/codebases/kanban/$codebaseId/$projectId'
+      path: '/kanban/$codebaseId/$projectId'
+      fullPath: '/codebases/kanban/$codebaseId/$projectId'
+      preLoaderRoute: typeof CodebasesKanbanCodebaseIdProjectIdRouteImport
+      parentRoute: typeof CodebasesRoute
+    }
     '/api/v1/projects/$id/ac': {
       id: '/api/v1/projects/$id/ac'
       path: '/ac'
@@ -2122,11 +2142,14 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 interface CodebasesRouteChildren {
   CodebasesIdRoute: typeof CodebasesIdRoute
   CodebasesIndexRoute: typeof CodebasesIndexRoute
+  CodebasesKanbanCodebaseIdProjectIdRoute: typeof CodebasesKanbanCodebaseIdProjectIdRoute
 }
 
 const CodebasesRouteChildren: CodebasesRouteChildren = {
   CodebasesIdRoute: CodebasesIdRoute,
   CodebasesIndexRoute: CodebasesIndexRoute,
+  CodebasesKanbanCodebaseIdProjectIdRoute:
+    CodebasesKanbanCodebaseIdProjectIdRoute,
 }
 
 const CodebasesRouteWithChildren = CodebasesRoute._addFileChildren(

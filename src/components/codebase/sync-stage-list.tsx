@@ -1,4 +1,4 @@
-import { Check, Circle, Loader2 } from "lucide-react";
+import { AlertCircle, Check, Circle, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
 	resolveSyncStageView,
@@ -11,36 +11,18 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * The three sync stages a user can actually observe, and nothing else.
+ * Clean vertical status list for codebase sync progress.
  *
- * Presentation only: every word and every state comes from
- * `resolveSyncStageView`, so mounting this in two different screens cannot
- * produce two different stories about the same server status. The component
- * never polls and never fetches — the owning screen supplies the reconciled
- * snapshot, which is what keeps exactly one reconciliation loop per flow.
- *
- * The list is withheld entirely when the state is unknown or the attempt failed,
- * because neither case supports a truthful per-stage claim.
- *
- * AI analysis is deliberately absent. It is real server work, but it belongs to
- * the conclusion step and would be a fabricated stage here.
+ * Presentation only: every word and state comes from `resolveSyncStageView`
+ * and real server events / persisted timestamps. No card-per-stage, no
+ * green success cards, and no fabricated progress.
  */
-
-// Surfaces only; the title and description weights/colors are set per state
-// below so a completed row stays on the neutral surface with just the check
-// icon carrying success, in both light and dark mode.
-const STAGE_SURFACE: Record<SyncStageState, string> = {
-	done: "border-graphite bg-obsidian dark:border-emerald-500/25 dark:bg-emerald-500/10",
-	active: "border-blue-500/25 bg-blue-500/10",
-	waiting: "border-graphite/70 bg-transparent",
-	failed: "border-crimson/30 bg-crimson/10",
-};
 
 const STAGE_TITLE: Record<SyncStageState, string> = {
 	done: "font-medium text-snow",
 	active: "font-semibold text-snow",
-	waiting: "font-medium text-fog",
-	failed: "font-semibold text-snow",
+	waiting: "font-normal text-fog",
+	failed: "font-semibold text-crimson",
 };
 
 function StageIcon({ state }: { state: SyncStageState }) {
@@ -48,7 +30,7 @@ function StageIcon({ state }: { state: SyncStageState }) {
 		return (
 			<Check
 				size={14}
-				className="shrink-0 font-bold text-emerald-600 dark:text-emerald-400"
+				className="shrink-0 font-bold text-emerald-400"
 				aria-hidden="true"
 			/>
 		);
@@ -64,15 +46,15 @@ function StageIcon({ state }: { state: SyncStageState }) {
 	}
 	if (state === "failed") {
 		return (
-			<Circle
+			<AlertCircle
 				size={14}
-				className="shrink-0 fill-crimson/40 text-crimson"
+				className="shrink-0 text-crimson"
 				aria-hidden="true"
 			/>
 		);
 	}
 	return (
-		<Circle size={14} className="shrink-0 text-slate" aria-hidden="true" />
+		<Circle size={14} className="shrink-0 text-graphite" aria-hidden="true" />
 	);
 }
 
@@ -121,10 +103,7 @@ function StageRow({ testId, row }: { testId: string; row: SyncStageRow }) {
 		<div
 			data-testid={testId}
 			data-stage-state={row.state}
-			className={cn(
-				"flex items-start gap-2.5 rounded-md border p-3 text-[11px] transition-colors",
-				STAGE_SURFACE[row.state],
-			)}
+			className="flex items-start gap-2.5 py-1.5 px-0.5 text-[11px] transition-colors"
 		>
 			<span className="mt-0.5 shrink-0">
 				<StageIcon state={row.state} />
@@ -252,7 +231,7 @@ export function SyncStageList({
 	}
 
 	return (
-		<div className={cn("flex flex-col gap-2.5", className)}>
+		<div className={cn("flex flex-col gap-1 py-1", className)}>
 			{view.stages.map((row, index) => {
 				const key = SYNC_STAGE_ORDER[index];
 				return key ? (
@@ -263,10 +242,7 @@ export function SyncStageList({
 				<div
 					data-testid="sync-stage-analysis"
 					data-stage-state="failed"
-					className={cn(
-						"flex items-start gap-2.5 rounded-md border p-3 text-[11px] transition-colors",
-						STAGE_SURFACE.failed,
-					)}
+					className="flex items-start gap-2.5 py-1.5 px-0.5 text-[11px]"
 				>
 					<span className="mt-0.5 shrink-0">
 						<StageIcon state="failed" />
@@ -307,7 +283,7 @@ export function SyncStageList({
 				)
 			)}
 			{summaryParts.length > 0 && (
-				<p className="font-mono text-[11px] tabular-nums text-fog">
+				<p className="mt-1 font-mono text-[11px] tabular-nums text-fog">
 					{summaryParts.join(" · ")}
 				</p>
 			)}

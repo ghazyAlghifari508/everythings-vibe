@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readCodebaseIgnore } from "./ignore.js";
-import { scanRepository } from "./repository.js";
+import { normalizeRepositoryIdentity, scanRepository } from "./repository.js";
 
 async function makeTempRoot(): Promise<string> {
 	return mkdtemp(join(tmpdir(), "prdfy-repo-test-"));
@@ -80,7 +80,11 @@ describe("scanRepository", () => {
 	it("excludes Vercel local state directories while keeping vercel.json", async () => {
 		const root = await makeTempRoot();
 		await writeRepoFile(root, ".vercel/project.json", "{}\n");
-		await writeRepoFile(root, ".vercel/output/static/index.html", "<p>hi</p>\n");
+		await writeRepoFile(
+			root,
+			".vercel/output/static/index.html",
+			"<p>hi</p>\n",
+		);
 		await writeRepoFile(root, "apps/web/.vercel/project.json", "{}\n");
 		await writeRepoFile(root, "vercel.json", '{"framework":"nextjs"}\n');
 		await writeRepoFile(root, "apps/web/vercel.json", "{}\n");
@@ -219,5 +223,28 @@ describe("scanRepository", () => {
 		const scan = await scanRepository(root, rules);
 		expect(scan.files.map((f) => f.path)).toEqual(["src/app.ts"]);
 		expect(excludedPaths(scan)).toContain("src/locked.ts");
+	});
+});
+
+describe("normalizeRepositoryIdentity", () => {
+	it("is idempotent over its own normalized output", () => {
+		// The web app stores exactly this shape, so the CLI must not drop a
+		// verified identity when the same value is normalized again.
+		expect(
+			normalizeRepositoryIdentity("github.com/owner/react-movie-app"),
+		).toBe("github.com/owner/react-movie-app");
+		expect(normalizeRepositoryIdentity("dev.azure.com/org/project/app")).toBe(
+			"dev.azure.com/org/project/app",
+		);
+	});
+
+	it("still refuses an unverifiable value that is not a remote", () => {
+		expect(normalizeRepositoryIdentity("app")).toBeNull();
+		expect(normalizeRepositoryIdentity("C:\\Coding\\app")).toBeNull();
+	});
+
+	it("refuses a normalized-looking value that carries a traversal segment", () => {
+		expect(normalizeRepositoryIdentity("github.com/../../../etc")).toBeNull();
+		expect(normalizeRepositoryIdentity("github.com/owner/./app")).toBeNull();
 	});
 });

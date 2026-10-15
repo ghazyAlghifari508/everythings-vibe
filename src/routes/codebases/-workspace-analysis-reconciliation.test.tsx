@@ -212,11 +212,19 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 	it("reconciles a pending refresh to ready with one pinned GET and no analysis POST", async () => {
 		setLoaderData(CURRENT_SNAPSHOT_ID);
 		let statusReads = 0;
+		// The first status response stays gated until the pending-state
+		// assertions run, so they observe a deterministic point in time rather
+		// than racing the polling chain.
+		let releaseFirstStatus = () => {};
+		const firstStatusGate = new Promise<void>((resolve) => {
+			releaseFirstStatus = resolve;
+		});
 		const fetchMock = vi.fn(
 			async (input: RequestInfo | URL, _init?: RequestInit) => {
 				const url = String(input);
 				if (url.startsWith("/api/codebases/codebase-1/status")) {
 					statusReads += 1;
+					if (statusReads === 1) await firstStatusGate;
 					return response(
 						syncStatus(
 							CURRENT_SNAPSHOT_ID,
@@ -256,6 +264,7 @@ describe("existing-codebase workspace analysis reconciliation", () => {
 					String(url).includes("/codebase/analysis") && init?.method === "POST",
 			),
 		).toBe(false);
+		releaseFirstStatus();
 
 		for (const suggestion of SUGGESTIONS) {
 			await screen.findByText(suggestion.title, {}, { timeout: 6000 });

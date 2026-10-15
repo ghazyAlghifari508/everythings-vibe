@@ -7,16 +7,18 @@
  */
 import type { AcCoverageReport } from "@/lib/ac-coverage";
 import { getLanguageDirective, type OutputLanguage } from "@/lib/language";
+import { buildStageScopeDirective } from "@/lib/planning-mode";
 import { depthDirective } from "@/lib/prompt-depth";
-import {
-	buildTaskRepairPrompt,
-	TASK_GENERATION_PROMPT,
-} from "@/lib/prompts-task";
+import { buildTaskRepairPromptForMode } from "@/lib/prompts-task";
 import {
 	evaluateTaskCoverage,
 	type TaskTree,
 } from "@/lib/services/task-service";
 import { buildTaskPrdContext } from "@/lib/task-context";
+import {
+	buildTaskGenerationPrompt,
+	taskDepthDirectiveForMode,
+} from "@/lib/task-decomposition";
 
 export interface TaskPromptInput {
 	acMarkdown: string;
@@ -32,6 +34,13 @@ export interface TaskPromptInput {
 	 * must anchor to a subfeature id from the block.
 	 */
 	featureTreeBlock?: string;
+	/**
+	 * Planning mode (`projects.projectMode`). Existing-codebase mode composes
+	 * conditional decomposition rules and the change-scope directive instead of
+	 * the unconditional greenfield 5-layer mandate. Greenfield (the default)
+	 * composes exactly the same prompt as before.
+	 */
+	mode?: string | null;
 }
 
 /** Maximum repair rounds. One is the intended path; the second absorbs a
@@ -60,9 +69,10 @@ Setiap subtask "details" adalah checklist langkah granular yang bisa dieksekusi 
  */
 export function buildTaskSystemPrompt(input: TaskPromptInput): string {
 	const parts = [
-		TASK_GENERATION_PROMPT,
-		depthDirective("task"),
+		buildTaskGenerationPrompt(input.mode),
+		taskDepthDirectiveForMode(input.mode, depthDirective("task")),
 		getLanguageDirective(input.language, "task"),
+		buildStageScopeDirective("task", input.mode),
 		input.grounded,
 		input.codebaseBlock,
 	];
@@ -243,6 +253,9 @@ function mergeRepair(
 	return { tree, addedCount };
 }
 
-export function buildTaskRepairUserMessage(missing: string[]): string {
-	return buildTaskRepairPrompt(missing);
+export function buildTaskRepairUserMessage(
+	missing: string[],
+	mode?: string | null,
+): string {
+	return buildTaskRepairPromptForMode(mode, missing);
 }

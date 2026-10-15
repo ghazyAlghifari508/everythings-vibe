@@ -2,6 +2,7 @@
 
 import { AlertCircle, ArrowRight, Check, Copy, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { copyToClipboard } from "@/lib/clipboard";
 import type { AnalysisResponse } from "@/lib/codebase-analysis";
 import { resolveCodebaseDisplayName } from "@/lib/codebase-naming";
 import {
@@ -96,19 +97,17 @@ export function ScreenConnect({
 
 	const handleCopy = async () => {
 		if (!promptText) return;
-		try {
-			if (!navigator.clipboard?.writeText) {
-				throw new Error("Clipboard API tidak tersedia");
-			}
-			await navigator.clipboard.writeText(promptText);
+		const result = await copyToClipboard(promptText);
+		if (result.success) {
 			setCopied(true);
 			setCopyError(null);
 			if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
 			copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
-		} catch {
+		} else {
 			setCopied(false);
 			setCopyError(
-				"Gagal menyalin otomatis. Silakan salin teks secara manual.",
+				result.error ??
+					"Gagal menyalin otomatis. Silakan salin teks secara manual.",
 			);
 			if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
 			copyTimeoutRef.current = setTimeout(() => setCopyError(null), 4000);
@@ -140,30 +139,35 @@ export function ScreenConnect({
 							1
 						</span>
 						<div className="flex flex-1 flex-col gap-2">
-							<div className="text-xs font-semibold text-mist">
-								Copy prompt untuk AI agent
+							<div className="flex items-center justify-between">
+								<div className="text-xs font-semibold text-mist">
+									Copy prompt untuk AI agent
+								</div>
+								{payload && (
+									<button
+										type="button"
+										onClick={handleCopy}
+										aria-label="Salin prompt untuk AI agent"
+										className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-iron bg-charcoal px-3 py-1 font-sans text-xs font-semibold text-snow transition hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+									>
+										{copied ? (
+											<>
+												<Check size={13} className="text-emerald-400" />
+												<span className="text-emerald-400">Tersalin</span>
+											</>
+										) : (
+											<>
+												<Copy size={13} />
+												<span>Salin</span>
+											</>
+										)}
+									</button>
+								)}
 							</div>
 							<div className="relative min-h-[90px] rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4">
 								{payload ? (
 									<>
-										<button
-											type="button"
-											onClick={handleCopy}
-											className="absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded border border-iron bg-obsidian px-2.5 py-1 font-sans text-[11px] text-fog transition hover:bg-steel hover:text-snow"
-										>
-											{copied ? (
-												<>
-													<Check size={12} className="text-emerald-400" />
-													<span className="text-emerald-400">Tersalin</span>
-												</>
-											) : (
-												<>
-													<Copy size={12} />
-													<span>Salin</span>
-												</>
-											)}
-										</button>
-										<div className="hide-scrollbar max-h-48 select-all overflow-y-auto whitespace-pre-wrap pr-16 text-snow">
+										<div className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow">
 											{promptText}
 										</div>
 										{copyError && (
@@ -367,13 +371,18 @@ export function ScreenConnect({
 
 				{onContinueToSummary && (
 					<div className="flex flex-col items-center justify-between gap-3 border-t border-graphite bg-charcoal/60 px-5 py-4 sm:flex-row sm:px-6">
-						<p className="text-center text-[11px] leading-relaxed text-fog sm:text-left">
-							{canAdvance
-								? "Sinkronisasi selesai. Lanjutkan untuk melihat ringkasan codebase."
-								: isLegacyAnalysisMissingSuggestions
-									? "Perbarui rekomendasi task awal untuk melanjutkan ke kesimpulan."
-									: "Tombol lanjut aktif setelah sinkronisasi dan analisis codebase selesai."}
-						</p>
+						{canAdvance ? (
+							<p className="text-center text-[11px] leading-relaxed text-fog sm:text-left">
+								Sinkronisasi selesai. Lanjutkan untuk melihat ringkasan
+								codebase.
+							</p>
+						) : isLegacyAnalysisMissingSuggestions ? (
+							<p className="text-center text-[11px] leading-relaxed text-fog sm:text-left">
+								Perbarui rekomendasi task awal untuk melanjutkan ke kesimpulan.
+							</p>
+						) : (
+							<span className="hidden sm:inline" />
+						)}
 						<button
 							type="button"
 							data-testid="sync-continue-to-summary"

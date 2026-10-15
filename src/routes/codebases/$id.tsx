@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { Copy, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodebaseArtifactCanvas } from "@/components/codebase/codebase-artifact-canvas";
 import {
@@ -15,8 +15,10 @@ import { CodebaseKanbanBoard } from "@/components/codebase/codebase-kanban-board
 import {
 	parseVersionRows,
 	selectLatestVersionContent,
+	stripInternalSectionMarkers,
 } from "@/components/codebase/codebase-markdown";
 import { CodebasePlanSwitcher } from "@/components/codebase/codebase-plan-switcher";
+import { CodebaseResyncDrawer } from "@/components/codebase/codebase-resync-drawer";
 import { CodebaseSourcePreview } from "@/components/codebase/codebase-source-preview";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { CodebaseWorkspaceSkeleton } from "@/components/codebase/codebase-workspace-skeleton";
@@ -30,6 +32,7 @@ import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
 	type ActivePlanCandidate,
 	resolveActivePlan,
+	selectUserFacingPlans,
 } from "@/lib/codebase-active-plan";
 import {
 	type AnalysisResponse,
@@ -52,11 +55,13 @@ import {
 	mapAskQuestionsToAdaptive,
 	parseRestoredAnswers,
 	parseRestoredQuestions,
+	reconcilePipelineStage,
 	resetRunThinking,
-	resolveResumeStage,
+	resolvePersistedStage,
 	restoreAskState,
 	runConfirmGenerate,
 	serializeAskQuestions,
+	setRunPhase,
 	settleRun,
 	shouldAutoRevealArtifact,
 	startRun,
@@ -69,9 +74,8 @@ import {
 import {
 	assessRevisionImpact,
 	buildRevisionRequest,
-	type CodebaseChatIntent,
+	type CodebaseComposerMode,
 	describeRevisionImpact,
-	resolveIntentOptions,
 } from "@/lib/codebase-revision-intent";
 import {
 	detectStackFromPackageJsonText,
@@ -79,7 +83,6 @@ import {
 	mergeStackWithFallback,
 } from "@/lib/codebase-stack";
 import {
-	buildAgentPrompt,
 	getPendingSyncPayloadKey,
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
@@ -168,6 +171,24 @@ export function resolveWorkspaceSnapshotReady(input: {
 	);
 }
 
+/**
+ * Human, distinguishable copy for a failed artifact read. An unauthenticated
+ * session and a missing project are different from a transient failure, so they
+ * must not be reported as the same thing.
+ */
+export function describeArtifactReadFailure(
+	label: string,
+	status: number,
+): string {
+	if (status === 401 || status === 403) {
+		return `Sesi tidak berlaku saat memuat ${label}. Masuk kembali lalu buka ulang workspace.`;
+	}
+	if (status === 404) {
+		return `${label} tidak ditemukan untuk perencanaan ini.`;
+	}
+	return `${label} gagal dibaca dari server. Coba lagi.`;
+}
+
 const loadCodebase = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
 	.handler(async ({ data: id }) => {
@@ -245,16 +266,22 @@ const loadCodebase = createServerFn({ method: "GET" })
 		const withAc = new Set(acRows.map((row) => row.projectId));
 		const withTasks = new Set(taskRows.map((row) => row.projectId));
 
-		const plans: ActivePlanCandidate[] = projectRows.map((row) => ({
-			id: row.id,
-			name: row.name,
-			updatedAt: row.updatedAt?.toISOString() ?? null,
-			hasArtifacts:
-				row.featureTree != null ||
-				withPrd.has(row.id) ||
-				withAc.has(row.id) ||
-				withTasks.has(row.id),
-		}));
+		const plans: ActivePlanCandidate[] = projectRows.map((row) => {
+			const hasFeature = row.featureTree != null;
+			const hasPrd = withPrd.has(row.id);
+			const hasAc = withAc.has(row.id);
+			const hasTasks = withTasks.has(row.id);
+			return {
+				id: row.id,
+				name: row.name,
+				updatedAt: row.updatedAt?.toISOString() ?? null,
+				hasArtifacts: hasFeature || hasPrd || hasAc || hasTasks,
+				hasFeature,
+				hasPrd,
+				hasAc,
+				hasTasks,
+			};
+		});
 
 		const onboardingFeature = resolveOnboardingAnchorProject({
 			onboardingProjectId: codebase.onboardingProjectId,
@@ -745,6 +772,12 @@ function CodebaseDetailPage() {
 	const [requestedProjectId, setRequestedProjectId] = useState<string | null>(
 		null,
 	);
+	/**
+	 * True after the explicit "Buat fitur baru" action until the next message
+	 * creates that plan. Only this flag — never an ambiguous message — may
+	 * start a new feature project from the workspace composer.
+	 */
+	const [isCreatingNew, setIsCreatingNew] = useState(false);
 	const planResolution = useMemo(
 		() =>
 			resolveActivePlan({
@@ -771,7 +804,17 @@ function CodebaseDetailPage() {
 				: null,
 		[onboardingFeatureId, plans],
 	);
+	/**
+	 * Plans the switcher may show. The onboarding anchor is repository analysis
+	 * context, so it stays out of the list while it carries no planning; the
+	 * resolver above still sees the full list and keeps its anchor fallback.
+	 */
+	const userFacingPlans = useMemo(
+		() => selectUserFacingPlans(plans, onboardingFeatureId),
+		[plans, onboardingFeatureId],
+	);
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
+	const [isResyncDrawerOpen, setIsResyncDrawerOpen] = useState(false);
 	const [manifestFiles, setManifestFiles] = useState<Array<{ path: string }>>(
 		[],
 	);
@@ -1071,8 +1114,10 @@ function CodebaseDetailPage() {
 			const raw = sessionStorage.getItem(getPendingSyncPayloadKey(codebase.id));
 			if (!raw) return;
 			const parsed = syncPromptPayloadSchema.safeParse(JSON.parse(raw));
-			if (parsed.success && parsed.data.projectId === codebase.id)
+			if (parsed.success && parsed.data.projectId === codebase.id) {
 				setPayload(parsed.data);
+				setIsResyncDrawerOpen(true);
+			}
 			sessionStorage.removeItem(getPendingSyncPayloadKey(codebase.id));
 		} catch {
 			setError("Instruksi sync tidak dapat dibaca dari browser.");
@@ -1098,12 +1143,14 @@ function CodebaseDetailPage() {
 		if (!status?.snapshotId) return;
 		if (!SNAPSHOT_CONTEXT_STATUSES.includes(status.status)) return;
 		setPayload(null);
+		setIsResyncDrawerOpen(false);
 	}, [payload, status?.snapshotId, status?.status]);
 
 	const startSession = async (
 		action: CodebaseSessionStartAction = "initial",
 	) => {
 		setIsStarting(true);
+		setIsResyncDrawerOpen(true);
 		setError(null);
 		try {
 			const response = await fetch(
@@ -1197,6 +1244,22 @@ function CodebaseDetailPage() {
 		useState<PipelineStage>("questions");
 	const [stageBusy, setStageBusy] = useState<PipelineStage | null>(null);
 	const [stageError, setStageError] = useState<string | null>(null);
+	/**
+	 * The project the artifact loaders currently speak for. Every asynchronous
+	 * read captures it when it starts and drops its result if the active project
+	 * changed meanwhile, so a slow response for the previous plan can never be
+	 * written into the plan the user is now looking at.
+	 */
+	const activeProjectIdRef = useRef<string | null>(effectiveFeatureId);
+	useEffect(() => {
+		activeProjectIdRef.current = effectiveFeatureId;
+	}, [effectiveFeatureId]);
+	/**
+	 * Guards a pipeline generation against a duplicate submit from the same
+	 * render, where `stageBusy` state has not re-rendered yet. A second request
+	 * would burn another credit for an artifact that is already being produced.
+	 */
+	const stageRunInFlight = useRef(false);
 
 	const kanban = useKanbanTasks({
 		projectId: effectiveFeatureId ?? "",
@@ -1251,21 +1314,24 @@ function CodebaseDetailPage() {
 
 	// The stage a reopened workspace resumes at is derived from the artifacts
 	// that are actually persisted, so a refresh or History re-entry continues
-	// where the project really is instead of restarting the pipeline.
-	const derivedStage: CodebasePipelineStage = resolveResumeStage({
-		hasFeatureTree: featureTree !== null,
-		hasPrd: prdContent !== null,
-		hasAc: acContent !== null,
-		hasTasks: hasTasksInDb,
+	// where the project really is instead of restarting the pipeline. Presence
+	// is read from each artifact's real hydration status, so a failed or still
+	// pending read can never be mistaken for a missing artifact.
+	const persistedStage: CodebasePipelineStage = resolvePersistedStage({
+		feature: hydration.feature,
+		prd: hydration.prd,
+		ac: hydration.ac,
+		tasks: hydration.tasks,
 	});
-	const stage = pipelineStage;
+	// Reconcile forward only: a slow task read still lifts the stage to handoff
+	// after a fast feature read latched an earlier one, and no late or failed
+	// read can ever rewind a stage the user has already left.
+	const stage = reconcilePipelineStage(pipelineStage, persistedStage);
 	useEffect(() => {
 		setPipelineStage((current) =>
-			current === "questions" && derivedStage !== "questions"
-				? derivedStage
-				: current,
+			reconcilePipelineStage(current, persistedStage),
 		);
-	}, [derivedStage]);
+	}, [persistedStage]);
 
 	const analysisOutput = analysis?.output ?? null;
 
@@ -1283,13 +1349,17 @@ function CodebaseDetailPage() {
 		setPrdLoading(true);
 		setPrdError(null);
 		markArtifact("prd", "pending");
+		const requestedProjectId = effectiveFeatureId;
 		try {
 			const response = await fetch(
-				`/api/projects/${encodeURIComponent(effectiveFeatureId)}/versions`,
+				`/api/projects/${encodeURIComponent(requestedProjectId)}/versions`,
 			);
 			const body: unknown = await response.json().catch(() => null);
+			if (activeProjectIdRef.current !== requestedProjectId) return null;
 			if (!response.ok) {
-				setPrdError("Dokumen PRD tidak dapat dimuat.");
+				setPrdError(
+					describeArtifactReadFailure("Dokumen PRD", response.status),
+				);
 				setPrdContent(null);
 				markArtifact("prd", "failed");
 				return null;
@@ -1306,12 +1376,15 @@ function CodebaseDetailPage() {
 			markArtifact("prd", content ? "ready" : "empty");
 			return content;
 		} catch {
+			if (activeProjectIdRef.current !== requestedProjectId) return null;
 			setPrdError("Server tidak dapat dihubungi.");
 			setPrdContent(null);
 			markArtifact("prd", "failed");
 			return null;
 		} finally {
-			setPrdLoading(false);
+			if (activeProjectIdRef.current === requestedProjectId) {
+				setPrdLoading(false);
+			}
 		}
 	}, [snapshotReady, effectiveFeatureId, markArtifact]);
 
@@ -1330,13 +1403,15 @@ function CodebaseDetailPage() {
 		setAcLoading(true);
 		setAcError(null);
 		markArtifact("ac", "pending");
+		const requestedProjectId = effectiveFeatureId;
 		try {
 			const response = await fetch(
-				`/api/projects/${encodeURIComponent(effectiveFeatureId)}/ac-versions`,
+				`/api/projects/${encodeURIComponent(requestedProjectId)}/ac-versions`,
 			);
 			const body: unknown = await response.json().catch(() => null);
+			if (activeProjectIdRef.current !== requestedProjectId) return null;
 			if (!response.ok) {
-				setAcError("Dokumen AC tidak dapat dimuat.");
+				setAcError(describeArtifactReadFailure("Dokumen AC", response.status));
 				setAcContent(null);
 				markArtifact("ac", "failed");
 				return null;
@@ -1353,12 +1428,15 @@ function CodebaseDetailPage() {
 			markArtifact("ac", content ? "ready" : "empty");
 			return content;
 		} catch {
+			if (activeProjectIdRef.current !== requestedProjectId) return null;
 			setAcError("Server tidak dapat dihubungi.");
 			setAcContent(null);
 			markArtifact("ac", "failed");
 			return null;
 		} finally {
-			setAcLoading(false);
+			if (activeProjectIdRef.current === requestedProjectId) {
+				setAcLoading(false);
+			}
 		}
 	}, [snapshotReady, effectiveFeatureId, markArtifact]);
 
@@ -1376,10 +1454,12 @@ function CodebaseDetailPage() {
 			markArtifact("feature", "pending");
 			try {
 				const data = await loadFeatureTree({ data: projectId });
+				if (activeProjectIdRef.current !== projectId) return null;
 				setFeatureTree(data.featureTree);
 				markArtifact("feature", data.featureTree ? "ready" : "empty");
 				return data.featureTree;
 			} catch {
+				if (activeProjectIdRef.current !== projectId) return null;
 				setFeatureTree(null);
 				markArtifact("feature", "failed");
 				return null;
@@ -1398,10 +1478,12 @@ function CodebaseDetailPage() {
 			markArtifact("tasks", "pending");
 			try {
 				const data = await loadTaskTree({ data: projectId });
+				if (activeProjectIdRef.current !== projectId) return null;
 				setTaskTree(data.taskTree);
 				markArtifact("tasks", data.taskTree ? "ready" : "empty");
 				return data.taskTree;
 			} catch {
+				if (activeProjectIdRef.current !== projectId) return null;
 				setTaskTree(null);
 				markArtifact("tasks", "failed");
 				return null;
@@ -1578,6 +1660,23 @@ function CodebaseDetailPage() {
 		prdContent,
 		acContent,
 	]);
+	/**
+	 * What the next composer message means, mirroring `handleSendMessage` so
+	 * the label above the composer always names the real target.
+	 */
+	const activeIsAnchorPlan =
+		effectiveFeatureId != null && effectiveFeatureId === onboardingFeatureId;
+	const activeHasPlanning = artifacts.length > 0;
+	const composerMode: CodebaseComposerMode =
+		isCreatingNew ||
+		!effectiveFeatureId ||
+		(activeIsAnchorPlan && !activeHasPlanning)
+			? "create"
+			: activeHasPlanning
+				? "revise"
+				: "clarify";
+	const composerTargetName =
+		composerMode === "create" ? null : (resolvedFeature?.name ?? null);
 	const activeArtifact =
 		artifacts.find((item) => item.id === activeArtifactId) ?? null;
 	const isSourcePreviewOpen = sourcePreview.kind !== "idle";
@@ -1631,10 +1730,10 @@ function CodebaseDetailPage() {
 			return { value: JSON.stringify(featureTree, null, 2) };
 		}
 		if (activeArtifact.id.startsWith("prd-") && prdContent) {
-			return { value: prdContent };
+			return { value: stripInternalSectionMarkers(prdContent) };
 		}
 		if (activeArtifact.id.startsWith("ac-") && acContent) {
-			return { value: acContent };
+			return { value: stripInternalSectionMarkers(acContent) };
 		}
 		if (activeArtifact.id.startsWith("tasks-") && taskTree) {
 			return { value: JSON.stringify(taskTree, null, 2) };
@@ -1941,6 +2040,8 @@ function CodebaseDetailPage() {
 					onThinking: (text) =>
 						setRun((current) => appendRunThinking(current, text)),
 					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
+					onDelta: () =>
+						setRun((current) => setRunPhase(current, "generating")),
 				});
 				if (result.error) {
 					const failure = result.error;
@@ -1988,8 +2089,21 @@ function CodebaseDetailPage() {
 		],
 	);
 
+	const handleCreateFeature = useCallback(() => {
+		setIsCreatingNew(true);
+	}, []);
+
+	/**
+	 * Direct a new composer message without ever asking what it is for.
+	 *
+	 * A message in a user-facing plan stays with that plan: it revises real
+	 * planning, or clarifies a draft that has none yet. A new project is only
+	 * created from the explicit "Buat fitur baru" action, from an empty
+	 * repository, or from the onboarding anchor that still carries no planning
+	 * — never silently from an ambiguous message in an existing plan.
+	 */
 	const handleSendMessage = useCallback(
-		async (message: string, intent: CodebaseChatIntent) => {
+		async (message: string) => {
 			const trimmed = message.trim();
 			if (!trimmed || trimmed.length < 3) return;
 			setChatMessages((current) => [
@@ -2000,15 +2114,39 @@ function CodebaseDetailPage() {
 					content: trimmed,
 				},
 			]);
-			if (intent === "revise_current") {
+			const activeIsAnchor =
+				effectiveFeatureId != null &&
+				effectiveFeatureId === onboardingFeatureId;
+			const activeHasPlanning = artifacts.length > 0;
+			if (
+				isCreatingNew ||
+				!effectiveFeatureId ||
+				(activeIsAnchor && !activeHasPlanning)
+			) {
+				setLastFeaturePrompt(trimmed);
+				const projectId = await ensureFeatureInWorkspace(trimmed);
+				if (projectId) {
+					setIsCreatingNew(false);
+					void fetchAiQuestions(projectId, trimmed);
+				}
+				return;
+			}
+			if (activeHasPlanning) {
 				await runRevision(trimmed);
 				return;
 			}
 			setLastFeaturePrompt(trimmed);
-			const projectId = await ensureFeatureInWorkspace(trimmed);
-			if (projectId) void fetchAiQuestions(projectId, trimmed);
+			void fetchAiQuestions(effectiveFeatureId, trimmed);
 		},
-		[ensureFeatureInWorkspace, fetchAiQuestions, runRevision],
+		[
+			artifacts.length,
+			effectiveFeatureId,
+			ensureFeatureInWorkspace,
+			fetchAiQuestions,
+			isCreatingNew,
+			onboardingFeatureId,
+			runRevision,
+		],
 	);
 
 	const handleConfirmGenerate = useCallback(async () => {
@@ -2141,7 +2279,9 @@ function CodebaseDetailPage() {
 			init: RequestInit,
 			onSuccess: () => Promise<boolean>,
 		) => {
-			if (!effectiveFeatureId || stageBusy) return;
+			if (!effectiveFeatureId || stageBusy || stageRunInFlight.current) return;
+			const requestedProjectId = effectiveFeatureId;
+			stageRunInFlight.current = true;
 			setStageBusy(target);
 			setStageError(null);
 			// One honest Thinking surface for this request. `startedAt` is the
@@ -2154,7 +2294,10 @@ function CodebaseDetailPage() {
 					onThinking: (text) =>
 						setRun((current) => appendRunThinking(current, text)),
 					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
+					onDelta: () =>
+						setRun((current) => setRunPhase(current, "generating")),
 				});
+				if (activeProjectIdRef.current !== requestedProjectId) return;
 				if (result.error) {
 					const failure = result.error;
 					setStageError(failure);
@@ -2167,6 +2310,7 @@ function CodebaseDetailPage() {
 				// reloads the authoritative server state and reports whether the
 				// artifact really persisted.
 				const persisted = await onSuccess();
+				if (activeProjectIdRef.current !== requestedProjectId) return;
 				if (!persisted) {
 					setRun((current) =>
 						settleRun(
@@ -2180,11 +2324,15 @@ function CodebaseDetailPage() {
 				}
 				setRun((current) => settleRun(current, "done", Date.now()));
 			} catch {
+				if (activeProjectIdRef.current !== requestedProjectId) return;
 				const message = "Server tidak dapat dihubungi. Coba lagi.";
 				setStageError(message);
 				setRun((current) => settleRun(current, "failed", Date.now(), message));
 			} finally {
-				setStageBusy(null);
+				stageRunInFlight.current = false;
+				if (activeProjectIdRef.current === requestedProjectId) {
+					setStageBusy(null);
+				}
 			}
 		},
 		[effectiveFeatureId, stageBusy],
@@ -2351,14 +2499,14 @@ function CodebaseDetailPage() {
 			if (artifact.id.startsWith("prd-") && prdContent) {
 				downloadArtifact({
 					fileName: artifact.fileName,
-					content: prdContent,
+					content: stripInternalSectionMarkers(prdContent),
 					mimeType: artifactMimeTypeFor(artifact.fileName),
 				});
 			}
 			if (artifact.id.startsWith("ac-") && acContent) {
 				downloadArtifact({
 					fileName: artifact.fileName,
-					content: acContent,
+					content: stripInternalSectionMarkers(acContent),
 					mimeType: artifactMimeTypeFor(artifact.fileName),
 				});
 			}
@@ -2387,7 +2535,12 @@ function CodebaseDetailPage() {
 						<button
 							type="button"
 							data-testid="codebase-resync-action"
-							onClick={() => void startSession("retry")}
+							onClick={() => {
+								setIsResyncDrawerOpen(true);
+								if (!payload) {
+									void startSession("retry");
+								}
+							}}
 							disabled={isStarting}
 							className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2.5 font-mono text-[11px] text-fog transition hover:text-snow disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 						>
@@ -2417,62 +2570,24 @@ function CodebaseDetailPage() {
 						</button>
 					</div>
 				)}
-				{payload ? (
-					// Re-sync of the SAME codebase: the server minted a new session for
-					// this existing repository, so the CLI uploads a new snapshot while
-					// every feature plan and its artifacts stay attached. The panel is
-					// dismissed once the CLI reports a new usable snapshot.
-					<div
-						data-testid="codebase-resync-panel"
-						className="shrink-0 border-b border-graphite bg-obsidian px-4 py-3"
-					>
-						<div className="flex flex-wrap items-start justify-between gap-3">
-							<div className="min-w-0">
-								<p className="text-xs font-semibold text-snow">
-									Sync ulang repository
-								</p>
-								<p className="mt-1 text-[11px] leading-5 text-fog">
-									Jalankan perintah berikut dari root repository lokal. Planning
-									yang sudah ada tetap tersimpan dan tetap terhubung ke project
-									yang sama.
-								</p>
-							</div>
-							<button
-								type="button"
-								onClick={() => setPayload(null)}
-								className="min-h-8 shrink-0 rounded-md border border-graphite px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								Tutup
-							</button>
-						</div>
-						<div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
-							<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
-								{buildAgentPrompt(payload, { projectName: codebase.name })}
-							</code>
-							<button
-								type="button"
-								aria-label="Salin perintah sync ulang"
-								onClick={() => {
-									void navigator.clipboard
-										?.writeText(
-											buildAgentPrompt(payload, { projectName: codebase.name }),
-										)
-										.catch(() => {});
-								}}
-								className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								<Copy size={11} aria-hidden />
-								Salin
-							</button>
-						</div>
-						{status ? (
-							<p className="mt-2 font-mono text-[10.5px] text-slate">
-								Status sync: {status.status}
-								{status.snapshotId ? ` · snapshot ${status.snapshotId}` : ""}
-							</p>
-						) : null}
-					</div>
-				) : null}
+				<CodebaseResyncDrawer
+					isOpen={isResyncDrawerOpen}
+					onClose={() => setIsResyncDrawerOpen(false)}
+					projectName={codebase.name}
+					payload={payload}
+					isStarting={isStarting}
+					status={status}
+					statusError={error}
+					onRequestNewToken={() => void startSession("retry")}
+					onRetrySync={() => void startSession("retry")}
+					analysis={analysis}
+					isAnalyzing={isWorking}
+					onRetryAnalysis={
+						activeWorkspaceSnapshotId
+							? () => void triggerAnalysis(activeWorkspaceSnapshotId)
+							: undefined
+					}
+				/>
 				<div className="min-h-0 flex-1">
 					<CodebaseWorkspaceShell
 						canvasOpen={canvasOpen}
@@ -2489,11 +2604,13 @@ function CodebaseDetailPage() {
 								featureName={resolvedFeature?.name ?? codebase.name}
 								view={workspaceView}
 								planSwitcher={
-									plans.length > 1 ? (
+									userFacingPlans.length > 0 ? (
 										<CodebasePlanSwitcher
-											plans={plans}
+											plans={userFacingPlans}
 											activePlanId={effectiveFeatureId}
+											activePlanName={resolvedFeature?.name ?? null}
 											onSelectPlan={(projectId) => {
+												setIsCreatingNew(false);
 												setRequestedProjectId(projectId);
 												// A different plan is a different set of artifacts:
 												// drop the previous plan's content and mark every
@@ -2517,6 +2634,7 @@ function CodebaseDetailPage() {
 												setArtifactHydration(emptyArtifactHydration());
 												setPipelineStage("questions");
 											}}
+											onCreateFeature={handleCreateFeature}
 										/>
 									) : null
 								}
@@ -2527,9 +2645,8 @@ function CodebaseDetailPage() {
 								questions={aiQuestions}
 								answers={chatAnswers}
 								run={run}
-								intentOptions={resolveIntentOptions({
-									hasExistingFeature: artifacts.length > 0,
-								})}
+								composerMode={composerMode}
+								composerTargetName={composerTargetName}
 								revisionImpactNotice={describeRevisionImpact(revisionImpact)}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
@@ -2537,6 +2654,7 @@ function CodebaseDetailPage() {
 								stage={stage}
 								stageBusy={stageBusy}
 								stageError={stageError}
+								tasksUnresolved={hydration.tasks !== "empty"}
 								codebaseName={codebase.name}
 								planningSnapshotId={
 									effectiveFeatureId
@@ -2598,9 +2716,7 @@ function CodebaseDetailPage() {
 								}}
 								onDownloadArtifact={handleDownloadArtifact}
 								onSubmitAnswer={handleSubmitAnswer}
-								onSendMessage={(message, intent) =>
-									void handleSendMessage(message, intent)
-								}
+								onSendMessage={(message) => void handleSendMessage(message)}
 								onConfirmGenerate={() => void handleConfirmGenerate()}
 								onRetryGenerate={() => void handleConfirmGenerate()}
 								onRetryStage={() => void handleRetryStage()}
@@ -2768,6 +2884,7 @@ function CodebaseDetailPage() {
 									canvasView === "kanban" ? (
 										<CodebaseKanbanBoard
 											projectId={resolvedFeature.id}
+											codebaseId={codebase.id}
 											columns={kanbanColumns}
 											staleness={kanban.staleness}
 											isLoadingExternal={kanban.isLoading}

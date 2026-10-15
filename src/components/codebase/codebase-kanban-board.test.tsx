@@ -11,31 +11,6 @@ declare global {
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock("@tanstack/react-router", async (importOriginal) => {
-	const actual =
-		await importOriginal<typeof import("@tanstack/react-router")>();
-	return {
-		...actual,
-		// A real Link needs a router context; the board only needs the resolved
-		// target to be reachable and observable, so `$id` is substituted here
-		// exactly like the router would.
-		Link: ({
-			to,
-			params,
-			children,
-			...rest
-		}: {
-			to: string;
-			params?: { id: string };
-			children: React.ReactNode;
-		}) => (
-			<a href={to.replace("$id", params?.id ?? "")} {...rest}>
-				{children}
-			</a>
-		),
-	};
-});
-
 let container: HTMLDivElement;
 let root: Root | null = null;
 
@@ -171,12 +146,162 @@ describe("CodebaseKanbanBoard full board action", () => {
 		expect(link).not.toBeNull();
 		expect(link?.textContent).toContain("Buka Kanban Penuh");
 		expect(link?.getAttribute("href")).toBe("/kanban/proj-1");
+		expect(link?.getAttribute("target")).toBe("_blank");
+		expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+	});
+
+	it("opens an existing-codebase project at its dedicated route in a new tab", () => {
+		render({ codebaseId: "repo-1" });
+		const link = container.querySelector<HTMLAnchorElement>(
+			"[data-testid='codebase-kanban-full-board']",
+		);
+
+		expect(link?.getAttribute("href")).toBe("/codebases/kanban/repo-1/proj-1");
+		expect(link?.getAttribute("target")).toBe("_blank");
+		expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
 	});
 
 	it("hides the full board link when the route would redirect for the plan", () => {
 		render({ canOpenFullBoard: false });
 		expect(
 			container.querySelector("[data-testid='codebase-kanban-full-board']"),
+		).toBeNull();
+	});
+});
+
+describe("CodebaseKanbanBoard accessible horizontal navigation", () => {
+	it("renders accessible horizontal scroll buttons when tasks exist", () => {
+		render();
+		const leftBtn = container.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-kanban-scroll-left']",
+		);
+		const rightBtn = container.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-kanban-scroll-right']",
+		);
+		expect(leftBtn).not.toBeNull();
+		expect(rightBtn).not.toBeNull();
+		expect(leftBtn?.getAttribute("aria-label")).toBe("Gulir kolom ke kiri");
+		expect(rightBtn?.getAttribute("aria-label")).toBe("Gulir kolom ke kanan");
+		// At initial position (scrollLeft=0), left scroll is disabled
+		expect(leftBtn?.disabled).toBe(true);
+	});
+
+	it("triggers horizontal scroll when scroll buttons are clicked", () => {
+		render();
+		const columnsEl = container.querySelector<HTMLDivElement>(
+			"[data-testid='codebase-kanban-columns']",
+		);
+		expect(columnsEl).not.toBeNull();
+
+		const scrollBySpy = vi.fn();
+		if (columnsEl) {
+			columnsEl.scrollBy = scrollBySpy;
+		}
+
+		const rightBtn = container.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-kanban-scroll-right']",
+		);
+		act(() => {
+			rightBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(scrollBySpy).toHaveBeenCalledWith({ left: 236, behavior: "smooth" });
+	});
+
+	it("navigates horizontally with keyboard arrow keys on toolbar", () => {
+		render();
+		const toolbar = container.querySelector<HTMLDivElement>(
+			'[role="toolbar"][aria-label="Navigasi horizontal Kanban"]',
+		);
+		expect(toolbar).not.toBeNull();
+
+		const columnsEl = container.querySelector<HTMLDivElement>(
+			"[data-testid='codebase-kanban-columns']",
+		);
+		const scrollBySpy = vi.fn();
+		if (columnsEl) {
+			columnsEl.scrollBy = scrollBySpy;
+		}
+
+		act(() => {
+			toolbar?.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+			);
+		});
+		expect(scrollBySpy).toHaveBeenCalledWith({ left: 236, behavior: "smooth" });
+
+		act(() => {
+			toolbar?.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
+			);
+		});
+		expect(scrollBySpy).toHaveBeenCalledWith({
+			left: -236,
+			behavior: "smooth",
+		});
+	});
+
+	it("updates button disabled state when scrolled", () => {
+		render();
+		const columnsEl = container.querySelector<HTMLDivElement>(
+			"[data-testid='codebase-kanban-columns']",
+		);
+		const leftBtn = container.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-kanban-scroll-left']",
+		);
+		const rightBtn = container.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-kanban-scroll-right']",
+		);
+
+		if (columnsEl) {
+			// Mock dimensions for overflow
+			Object.defineProperty(columnsEl, "scrollWidth", {
+				value: 800,
+				configurable: true,
+			});
+			Object.defineProperty(columnsEl, "clientWidth", {
+				value: 300,
+				configurable: true,
+			});
+			Object.defineProperty(columnsEl, "scrollLeft", {
+				value: 100,
+				configurable: true,
+			});
+
+			act(() => {
+				columnsEl.dispatchEvent(new Event("scroll"));
+			});
+
+			expect(leftBtn?.disabled).toBe(false);
+			expect(rightBtn?.disabled).toBe(false);
+
+			// Now scroll to the end
+			Object.defineProperty(columnsEl, "scrollLeft", {
+				value: 500,
+				configurable: true,
+			});
+			act(() => {
+				columnsEl.dispatchEvent(new Event("scroll"));
+			});
+
+			expect(leftBtn?.disabled).toBe(false);
+			expect(rightBtn?.disabled).toBe(true);
+		}
+	});
+
+	it("hides navigation controls when the board has no tasks", () => {
+		render({
+			columns: {
+				pending: [],
+				in_progress: [],
+				completed: [],
+				failed: [],
+			},
+		});
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-scroll-left']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-kanban-scroll-right']"),
 		).toBeNull();
 	});
 });

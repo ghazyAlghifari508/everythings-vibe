@@ -1,12 +1,13 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import Markdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import {
 	codebaseMarkdownComponents,
 	codebaseRehypePlugins,
 	codebaseRemarkPlugins,
+	stripInternalSectionMarkers,
 } from "./codebase-markdown";
 
 export interface CodebaseDocPreviewProps {
@@ -24,6 +25,10 @@ export const CodebaseDocPreview = memo(function CodebaseDocPreview({
 	content,
 	className,
 }: CodebaseDocPreviewProps) {
+	const sanitizedContent = useMemo(
+		() => stripInternalSectionMarkers(content),
+		[content],
+	);
 	return (
 		<div
 			data-testid="codebase-doc-preview"
@@ -35,7 +40,7 @@ export const CodebaseDocPreview = memo(function CodebaseDocPreview({
 					rehypePlugins={codebaseRehypePlugins}
 					components={codebaseMarkdownComponents}
 				>
-					{content}
+					{sanitizedContent}
 				</Markdown>
 			</article>
 		</div>

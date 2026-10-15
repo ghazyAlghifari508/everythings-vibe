@@ -97,7 +97,26 @@ describe("ASK_CODEBASE_OPTIONS_GENERATION_PROMPT", () => {
 		expect(prompt).toMatch(/jelaskan|penjelasan/i);
 	});
 
+	it("prioritises search/filter semantics and state persistence", () => {
+		const prompt = ASK_CODEBASE_OPTIONS_GENERATION_PROMPT;
+		expect(prompt).toMatch(/pencarian|filter/i);
+		expect(prompt).toMatch(/state persistence|shareability|penyimpanan/i);
+	});
+
+	it("forbids suggestive feature scope expansion and quota filling", () => {
+		const prompt = ASK_CODEBASE_OPTIONS_GENERATION_PROMPT;
+		expect(prompt).toMatch(/sugestif/i);
+		expect(prompt).toMatch(/kuota|batas maksimum/i);
+	});
+
+	it("requires meaningfully distinct options without ambiguity", () => {
+		const prompt = ASK_CODEBASE_OPTIONS_GENERATION_PROMPT;
+		expect(prompt).toMatch(/berbeda secara bermakna|distinct/i);
+	});
+
 	it("requires questions in Indonesian", () => {
-		expect(ASK_CODEBASE_OPTIONS_GENERATION_PROMPT).toContain("Bahasa Indonesia");
+		expect(ASK_CODEBASE_OPTIONS_GENERATION_PROMPT).toContain(
+			"Bahasa Indonesia",
+		);
 	});
 });

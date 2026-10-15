@@ -3,11 +3,8 @@ import {
 	type CodebaseAnalysis,
 	safeParseCodebaseAnalysis,
 } from "./codebase-analysis";
-import {
-	hasControlCharacters,
-	isSafeRelativePath,
-	SNAPSHOT_CONTEXT_STATUSES,
-} from "./codebase-sync";
+import { isSingleSafeNameSegment } from "./codebase-naming";
+import { isSafeRelativePath, SNAPSHOT_CONTEXT_STATUSES } from "./codebase-sync";
 import { CODEBASE_NAME_MAX_CHARS, CODEBASE_NAME_MIN_CHARS } from "./constants";
 
 export const NEW_REPOSITORY_HREF = "/plan/codebase";
@@ -25,6 +22,7 @@ export const CODEBASE_ONBOARDING_LABEL = "Hubungkan Repository";
 
 export {
 	isProvisionalCodebaseName,
+	isSingleSafeNameSegment,
 	PROVISIONAL_CODEBASE_NAME,
 	resolveCodebaseDisplayName,
 } from "./codebase-naming";
@@ -262,14 +260,13 @@ export function buildCodebaseLibraryItems(input: {
  * fail a repository upload.
  */
 export function normalizeRepositoryName(value: unknown): string | null {
-	if (typeof value !== "string") return null;
-	const trimmed = value.trim();
+	if (!isSingleSafeNameSegment(value)) return null;
+	const trimmed = (value as string).trim();
 	if (trimmed.length < CODEBASE_NAME_MIN_CHARS) return null;
 	if (trimmed.length > CODEBASE_NAME_MAX_CHARS) return null;
-	if (hasControlCharacters(trimmed)) return null;
-	// A repository name is one segment, never a nested path, so any separator is
-	// rejected outright before the path-safety guard runs.
-	if (trimmed.includes("/") || trimmed.includes("\\")) return null;
+	// The single-segment rule already rejects separators, traversal, blanks, and
+	// control characters; the manifest guard is kept as defense in depth for the
+	// absolute/drive/UNC shapes it names explicitly.
 	if (!isSafeRelativePath(trimmed)) return null;
 	return trimmed;
 }

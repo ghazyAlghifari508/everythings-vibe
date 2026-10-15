@@ -1,9 +1,16 @@
 "use client";
 
-import { AlertTriangle, Check, Copy, Layers, RotateCcw } from "lucide-react";
+import {
+	AlertTriangle,
+	ArrowRight,
+	Check,
+	Copy,
+	Layers,
+	RotateCcw,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { AgentThinking } from "@/components/ui/agent-thinking";
 import { PromptBar } from "@/components/ui/prompt-bar";
-import { ThoughtLine } from "@/components/ui/thought-line";
 import type { CodebaseStarterSuggestion } from "@/lib/codebase-analysis";
 import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
 import {
@@ -16,11 +23,7 @@ import {
 	nextQuestionIndex,
 } from "@/lib/codebase-chat-flow";
 import { resolveCodebaseDisplayName } from "@/lib/codebase-naming";
-import {
-	type CodebaseChatIntent,
-	type IntentOption,
-	resolveIntentOptions,
-} from "@/lib/codebase-revision-intent";
+import type { CodebaseComposerMode } from "@/lib/codebase-revision-intent";
 import type {
 	ArtifactKind,
 	WorkspaceView,
@@ -30,7 +33,6 @@ import {
 	type CodebaseArtifactRef,
 	CodebaseFileCard,
 } from "./codebase-file-card";
-import { CodebaseIntentChoice } from "./codebase-intent-choice";
 import { CodebaseStageHandoff } from "./codebase-stage-handoff";
 
 export type { AdaptiveQuestion, AdaptiveQuestionOption };
@@ -90,12 +92,19 @@ interface CodebaseChatWorkspaceProps {
 	 * Feature/PRD/AC/Task stages share it instead of stacking indicators.
 	 */
 	run?: CodebaseRunState | null;
-	artifacts: CodebaseArtifactRef[];
+	artifacts?: CodebaseArtifactRef[];
 	activeArtifactId?: string | null;
 	projectIdForHandoff?: string | null;
 	stage?: PipelineStage;
 	stageBusy?: PipelineStage | null;
 	stageError?: string | null;
+	/**
+	 * True while the task read has not settled, so the workspace cannot yet
+	 * prove whether tasks already exist. The Task CTA stays hidden until the
+	 * read says tasks are genuinely absent, because offering "Buat Task" before
+	 * that would invite regenerating work that is already in the database.
+	 */
+	tasksUnresolved?: boolean;
 	codebaseName?: string;
 	starterSuggestions?: CodebaseStarterSuggestion[];
 	starterRefresh?: {
@@ -117,12 +126,16 @@ interface CodebaseChatWorkspaceProps {
 	onOpenArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onDownloadArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onSubmitAnswer?: (questionId: string, answer: string) => void;
-	onSendMessage?: (message: string, intent: CodebaseChatIntent) => void;
+	onSendMessage?: (message: string) => void;
 	/**
-	 * Intents the next message may carry. One entry (new feature) before any
-	 * artifact exists; both entries once there is a plan to revise.
+	 * What the next message means. The route derives it from the workspace
+	 * state: a message in a user-facing plan revises or clarifies that plan,
+	 * and only the explicit "Buat fitur baru" action starts a new one. The
+	 * composer never asks the user to choose.
 	 */
-	intentOptions?: IntentOption[];
+	composerMode?: CodebaseComposerMode;
+	/** Name of the plan the next message targets. Null while creating. */
+	composerTargetName?: string | null;
 	/** Copy describing a revision's impact on existing tasks. */
 	revisionImpactNotice?: string | null;
 	/**
@@ -196,15 +209,17 @@ export function CodebaseChatWorkspace({
 	questions,
 	answers,
 	run = null,
-	artifacts,
+	artifacts = [],
 	activeArtifactId = null,
 	projectIdForHandoff = null,
 	stage = "questions",
 	stageBusy = null,
 	stageError = null,
+	tasksUnresolved = false,
 	codebaseName,
 	starterSuggestions,
-	intentOptions,
+	composerMode = "create",
+	composerTargetName = null,
 	revisionImpactNotice = null,
 	isSending = false,
 	isConfirming = false,
@@ -228,10 +243,11 @@ export function CodebaseChatWorkspace({
 	onReviewPlan,
 }: CodebaseChatWorkspaceProps) {
 	const [draft, setDraft] = useState("");
-	const [selectedIntent, setSelectedIntent] =
-		useState<CodebaseChatIntent | null>(null);
 	const [copiedCmd, setCopiedCmd] = useState(false);
 	const [copiedExport, setCopiedExport] = useState(false);
+	const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
+		null,
+	);
 	const parsedStarterSuggestions =
 		codebaseStarterSuggestionsSchema.safeParse(starterSuggestions);
 	const validStarterSuggestions = parsedStarterSuggestions.success
@@ -274,16 +290,8 @@ export function CodebaseChatWorkspace({
 	const handleSend = (text?: string) => {
 		const message = (text ?? draft).trim();
 		if (message.length < 3 || isSending || isRunWorking) return;
-		// Both intents are real choices once a plan exists, so the message is
-		// only sent after the user states which one it carries.
-		const intent =
-			resolvedIntentOptions.length === 1
-				? resolvedIntentOptions[0].intent
-				: selectedIntent;
-		if (!intent) return;
-		onSendMessage?.(message, intent);
+		onSendMessage?.(message);
 		setDraft("");
-		setSelectedIntent(null);
 	};
 
 	const handlePrefillDraft = (text: string) => {
@@ -309,18 +317,6 @@ export function CodebaseChatWorkspace({
 	const hasLiveData = kanbanProgress !== null && kanbanProgress.total > 0;
 
 	/**
-	 * Intents offered for the next message. The caller supplies them from the
-	 * real workspace state; the default keeps the pre-plan behavior (a new
-	 * feature is the only thing a message can mean before anything exists).
-	 */
-	const resolvedIntentOptions =
-		intentOptions ??
-		resolveIntentOptions({ hasExistingFeature: artifacts.length > 0 });
-	// A choice is required only when there is more than one real option.
-	const needsIntentChoice = resolvedIntentOptions.length > 1;
-	const intentChosen = !needsIntentChoice || selectedIntent !== null;
-
-	/**
 	 * Artifact the active stage handoff already renders. Every other artifact
 	 * still lists in the stream, so a finished file stays reachable without the
 	 * same card appearing twice.
@@ -337,11 +333,14 @@ export function CodebaseChatWorkspace({
 		? artifacts.filter((item) => !item.id.startsWith(handoffArtifactPrefix))
 		: artifacts;
 
+	// Repository identity only. A feature plan title is a different identity,
+	// so it is never borrowed as the repository name; when the repository is not
+	// identified the header stays neutral instead of mislabeling the plan. The
+	// feature name still labels the subtitle, where it is context, not identity.
 	const resolvedRepoName = resolveCodebaseDisplayName(codebaseName);
 	const resolvedFeatureName = resolveCodebaseDisplayName(featureName);
-	const resolvedDisplayName = resolvedRepoName ?? resolvedFeatureName;
-	const headerTitle = resolvedDisplayName
-		? `Workspace · ${resolvedDisplayName}`
+	const headerTitle = resolvedRepoName
+		? `Workspace · ${resolvedRepoName}`
 		: "Workspace · Perencanaan codebase";
 
 	const isPristine =
@@ -388,23 +387,35 @@ export function CodebaseChatWorkspace({
 	const stageErrorVisible = Boolean(stageError) && !runFailed;
 	const specErrorVisible = Boolean(specError) && !runFailed;
 
+	const composerPlaceholder =
+		composerMode === "create"
+			? "Jelaskan fitur baru yang kamu inginkan..."
+			: "Jelaskan perubahan yang kamu inginkan...";
+
 	const renderComposer = (minRows = 1, className = "") => (
 		<div className="flex w-full flex-col gap-2.5">
-			{needsIntentChoice ? (
-				<CodebaseIntentChoice
-					options={resolvedIntentOptions}
-					selected={selectedIntent}
-					onSelect={setSelectedIntent}
+			{composerTargetName ? (
+				<p
+					data-testid="codebase-composer-target"
+					className="truncate text-[11px] text-fog"
 				>
-					{selectedIntent === "revise_current" && revisionImpactNotice ? (
-						<p
-							data-testid="codebase-revision-impact"
-							className="mt-2 rounded-lg border border-graphite bg-obsidian p-2.5 text-[11px] leading-4 text-fog"
-						>
-							{revisionImpactNotice}
-						</p>
-					) : null}
-				</CodebaseIntentChoice>
+					{`Fitur aktif: ${composerTargetName}`}
+				</p>
+			) : (
+				<p
+					data-testid="codebase-composer-target"
+					className="truncate text-[11px] text-fog"
+				>
+					Fitur baru
+				</p>
+			)}
+			{composerMode === "revise" && revisionImpactNotice ? (
+				<p
+					data-testid="codebase-revision-impact"
+					className="rounded-lg border border-graphite bg-obsidian p-2.5 text-[11px] leading-4 text-fog"
+				>
+					{revisionImpactNotice}
+				</p>
 			) : null}
 			<PromptBar
 				id="codebase-chat-composer"
@@ -415,17 +426,13 @@ export function CodebaseChatWorkspace({
 				// user can prepare the next message; only the submit action closes.
 				// Duplicate submissions are blocked by the shared busy guard in
 				// `handleSend` and by PromptBar's `canSend`, which Enter also uses.
-				isSending={isSending || isRunWorking || !intentChosen}
+				isSending={isSending || isRunWorking}
 				minCharsToSend={3}
 				minRows={minRows}
 				maxRows={6}
 				className={className}
-				placeholder={
-					needsIntentChoice && !intentChosen
-						? "Pilih dulu: fitur baru atau revisi fitur ini"
-						: "Jelaskan fitur atau perubahan yang kamu inginkan..."
-				}
-				ariaLabel="Jelaskan fitur atau perubahan yang kamu inginkan"
+				placeholder={composerPlaceholder}
+				ariaLabel={composerPlaceholder}
 				submitAppearance="icon"
 			/>
 		</div>
@@ -445,9 +452,13 @@ export function CodebaseChatWorkspace({
 						>
 							{headerTitle}
 						</p>
-						{resolvedDisplayName ? (
+						{resolvedRepoName ? (
 							<p className="truncate text-[11px] text-fog">
 								Planning workspace
+							</p>
+						) : resolvedFeatureName ? (
+							<p className="truncate text-[11px] text-fog">
+								{`Perencanaan · ${resolvedFeatureName}`}
 							</p>
 						) : null}
 					</div>
@@ -668,10 +679,11 @@ export function CodebaseChatWorkspace({
 							)}
 							{run ? (
 								<div data-testid="codebase-run-thinking">
-									<ThoughtLine
-										working={isRunWorking}
-										failed={runFailed}
-										label={`Menyusun ${STAGE_LABEL[run.stage]}`}
+									<AgentThinking
+										status={run.status}
+										phase={run.phase}
+										thinkingLabel={`Menyusun ${STAGE_LABEL[run.stage]}`}
+										generatingLabel={`Menyusun ${STAGE_LABEL[run.stage]}`}
 										doneLabel={CODEBASE_STAGE_DONE_LABEL[run.stage]}
 										failedLabel={`Gagal menyusun ${STAGE_LABEL[run.stage]}`}
 										activity={run.activity}
@@ -684,32 +696,43 @@ export function CodebaseChatWorkspace({
 							{runFailed && run.error ? (
 								<div
 									data-testid="codebase-questions-error"
-									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+									className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
 								>
 									<span role="alert">{run.error}</span>
 									{onRetryQuestions ? (
 										<button
 											type="button"
 											onClick={onRetryQuestions}
-											className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											className="inline-flex min-h-7 items-center rounded border border-crimson/40 px-2 text-[11px] font-medium text-crimson hover:bg-crimson/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
 										>
 											Coba lagi
 										</button>
 									) : null}
 								</div>
 							) : null}
-							{visibleQuestions.map((question, qIndex) => (
-								<CodebaseAdaptiveQuestion
-									key={question.id}
-									question={question}
-									index={qIndex + 1}
-									submitted={(answers[question.id] ?? "").trim()}
-									active={qIndex === currentIndex}
-									onSubmit={(questionId, answer) =>
-										onSubmitAnswer?.(questionId, answer)
-									}
-								/>
-							))}
+							{visibleQuestions.map((question, qIndex) => {
+								const isEditing = editingQuestionId === question.id;
+								const isActive =
+									isEditing ||
+									(editingQuestionId === null && qIndex === currentIndex);
+								return (
+									<CodebaseAdaptiveQuestion
+										key={question.id}
+										question={question}
+										index={qIndex + 1}
+										totalQuestions={questions.length}
+										submitted={(answers[question.id] ?? "").trim()}
+										active={isActive}
+										isEditing={isEditing}
+										onEdit={(qId) => setEditingQuestionId(qId)}
+										onCancelEdit={() => setEditingQuestionId(null)}
+										onSubmit={(questionId, answer) => {
+											setEditingQuestionId(null);
+											onSubmitAnswer?.(questionId, answer);
+										}}
+									/>
+								);
+							})}
 							{streamArtifacts.length > 0 ? (
 								<div className="flex flex-col">
 									{streamArtifacts.map((artifact) => (
@@ -727,14 +750,14 @@ export function CodebaseChatWorkspace({
 								<div
 									role="alert"
 									data-testid="codebase-spec-error"
-									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+									className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
 								>
 									<span>{specError}</span>
 									{onRetryGenerate ? (
 										<button
 											type="button"
 											onClick={onRetryGenerate}
-											className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											className="inline-flex min-h-7 items-center rounded border border-crimson/40 px-2 text-[11px] font-medium text-crimson hover:bg-crimson/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
 										>
 											Coba lagi
 										</button>
@@ -744,34 +767,40 @@ export function CodebaseChatWorkspace({
 							{flowComplete && stage === "questions" ? (
 								<div
 									data-testid="codebase-questions-complete"
-									className="rounded-xl border border-graphite bg-obsidian p-3"
+									className="flex flex-col gap-1 py-1"
 								>
-									<p className="text-[11px] font-semibold uppercase tracking-wider text-fog">
-										Berikutnya: Spesifikasi fitur
-									</p>
-									<p className="mt-1 text-xs leading-5 text-fog">
-										Semua pertanyaan sudah dijawab. Spesifikasi fitur disusun
-										dari jawaban tersebut dan konteks repository.
-									</p>
-									<div className="mt-3 flex justify-end">
+									<div className="flex flex-wrap items-center justify-between gap-3">
+										<span className="text-xs text-fog">
+											<span className="font-medium text-snow/90">
+												Berikutnya:
+											</span>{" "}
+											Spesifikasi fitur
+										</span>
 										<button
 											type="button"
 											disabled={isConfirming}
 											onClick={() => onConfirmGenerate?.()}
-											className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 										>
 											{isConfirming
 												? "Menyusun spesifikasi..."
 												: "Buat Spesifikasi Fitur"}
+											{!isConfirming ? (
+												<ArrowRight size={12} aria-hidden="true" />
+											) : null}
 										</button>
 									</div>
+									<p className="text-[11.5px] leading-relaxed text-fog/80">
+										Semua pertanyaan sudah dijawab. Spesifikasi fitur disusun
+										dari jawaban tersebut dan konteks repository.
+									</p>
 								</div>
 							) : null}
 							{stageErrorVisible ? (
 								<div
 									role="alert"
 									data-testid="codebase-stage-error"
-									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+									className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
 								>
 									<span>{stageError}</span>
 									{onRetryStage ? (
@@ -824,7 +853,7 @@ export function CodebaseChatWorkspace({
 									onDownloadArtifact={onDownloadArtifact}
 								/>
 							) : null}
-							{stage === "ac" && onGenerateTask ? (
+							{stage === "ac" && onGenerateTask && !tasksUnresolved ? (
 								<CodebaseStageHandoff
 									testId="codebase-stage-task"
 									outcome={{

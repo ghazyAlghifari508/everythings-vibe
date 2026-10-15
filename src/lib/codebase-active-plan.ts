@@ -27,6 +27,11 @@ export interface ActivePlanCandidate {
 	updatedAt: string | null;
 	/** The plan has at least one persisted artifact (feature/PRD/AC/task). */
 	hasArtifacts: boolean;
+	/** Per-artifact breakdown backing the user-facing readiness label. */
+	hasFeature?: boolean;
+	hasPrd?: boolean;
+	hasAc?: boolean;
+	hasTasks?: boolean;
 }
 
 export type ActivePlanSource =
@@ -116,4 +121,36 @@ export function resolveActivePlan(
 	}
 
 	return { kind: "needs_selection", plans };
+}
+
+/**
+ * Plans a repository workspace shows as switchable feature plans.
+ *
+ * The onboarding anchor is repository analysis context, not a user-facing
+ * plan, so it is hidden while it carries no planning of its own. Drafts with
+ * a real user prompt stay visible so they can be resumed.
+ */
+export function selectUserFacingPlans(
+	plans: readonly ActivePlanCandidate[],
+	anchorProjectId: string | null | undefined,
+): ActivePlanCandidate[] {
+	const anchorId = cleanId(anchorProjectId);
+	if (!anchorId) return [...plans];
+	return plans.filter((plan) => !(plan.id === anchorId && !plan.hasArtifacts));
+}
+
+/**
+ * User-facing readiness of one plan, derived from the real artifact
+ * breakdown rather than from row metadata. A plan with no artifact at all is
+ * a resumable draft, never an error and never hidden.
+ */
+export function describePlanReadiness(plan: ActivePlanCandidate): string {
+	const parts: string[] = [];
+	if (plan.hasFeature) parts.push("Fitur");
+	if (plan.hasPrd) parts.push("PRD");
+	if (plan.hasAc) parts.push("AC");
+	if (plan.hasTasks) parts.push("Task");
+	if (parts.length > 0) return parts.join(" · ");
+	if (plan.hasArtifacts) return "Sudah ada planning";
+	return "Draft · Belum selesai";
 }

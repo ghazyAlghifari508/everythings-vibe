@@ -3,37 +3,7 @@ import {
 	assessRevisionImpact,
 	buildRevisionRequest,
 	describeRevisionImpact,
-	resolveIntentOptions,
 } from "./codebase-revision-intent";
-
-describe("resolveIntentOptions", () => {
-	it("offers only the new-feature intent before anything exists to revise", () => {
-		const options = resolveIntentOptions({ hasExistingFeature: false });
-		expect(options.map((option) => option.intent)).toEqual(["new_feature"]);
-	});
-
-	it("offers both real intents once a feature exists", () => {
-		const options = resolveIntentOptions({ hasExistingFeature: true });
-		expect(options.map((option) => option.intent)).toEqual([
-			"revise_current",
-			"new_feature",
-		]);
-	});
-
-	it("explains the consequence of each intent", () => {
-		for (const option of resolveIntentOptions({ hasExistingFeature: true })) {
-			expect(option.label.length).toBeGreaterThan(0);
-			expect(option.description.length).toBeGreaterThan(0);
-		}
-		const [revise, newFeature] = resolveIntentOptions({
-			hasExistingFeature: true,
-		});
-		// A new feature must state that the current work is preserved.
-		expect(newFeature?.description).toMatch(/tetap tersimpan|tidak terhapus/i);
-		// A revision must state that the previous document is kept.
-		expect(revise?.description).toMatch(/versi baru|tetap tersimpan/i);
-	});
-});
 
 describe("assessRevisionImpact", () => {
 	it("needs no confirmation when every task is still pending", () => {

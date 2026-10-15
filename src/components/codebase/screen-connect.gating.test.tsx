@@ -346,11 +346,12 @@ describe("Step 1 continue gating", () => {
 		});
 		expect(summaryButton()?.disabled).toBe(false);
 	});
-	it("shows exact readiness criteria in disabled helper copy", () => {
+	it("does not render repetitive helper copy when not ready and keeps CTA disabled", () => {
 		renderConnect({ canContinueToSummary: false });
-		expect(container.textContent).toContain(
+		expect(container.textContent).not.toContain(
 			"Tombol lanjut aktif setelah sinkronisasi dan analisis codebase selesai.",
 		);
+		expect(summaryButton()?.disabled).toBe(true);
 	});
 
 	it("shows analysis failure alert and retry button inside Sync when analysis fails", () => {

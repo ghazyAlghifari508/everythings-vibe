@@ -151,6 +151,15 @@ describe("POST /api/codebases", () => {
 		});
 	});
 
+	it("keeps a feature message out of repository name and provenance", async () => {
+		await post({ message: "Tambahkan fitur checkout" });
+
+		expect(codebaseInsert()?.values).toMatchObject({
+			name: "Repository Lokal",
+			nameSource: "auto",
+		});
+	});
+
 	it("answers a storage failure with a safe message and no database internals", async () => {
 		recorder.failWith = new Error(
 			'column "name_source" of relation "codebases" does not exist',

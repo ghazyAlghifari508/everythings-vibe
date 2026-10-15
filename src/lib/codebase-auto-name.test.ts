@@ -31,7 +31,9 @@ vi.mock("drizzle-orm", () => ({
 	and: (...args: unknown[]) => ({ op: "and", args }),
 	desc: (col: unknown) => ({ op: "desc", col }),
 	eq: (col: unknown, value: unknown) => ({ op: "eq", col, value }),
+	isNull: (col: unknown) => ({ op: "isNull", col }),
 	ne: (col: unknown, value: unknown) => ({ op: "ne", col, value }),
+	or: (...args: unknown[]) => ({ op: "or", args }),
 	sql: Object.assign(() => ({ op: "sql" }), { raw: () => ({ op: "sql" }) }),
 }));
 
@@ -68,6 +70,7 @@ vi.mock("@/db/schema", () => ({
 		userId: "codebases.user_id",
 		name: "codebases.name",
 		nameSource: "codebases.name_source",
+		repositoryIdentity: "codebases.repository_identity",
 	},
 	codebaseSnapshots: {
 		id: "codebase_snapshots.id",
@@ -174,7 +177,13 @@ function handshake(): HandshakeHandler {
 	return captured.post;
 }
 
-const OWNED_CODEBASE = { id: "cb-1", userId: "user-1" };
+const OWNED_CODEBASE = {
+	id: "cb-1",
+	userId: "user-1",
+	name: "Repository Lokal",
+	nameSource: "auto",
+	repositoryIdentity: null,
+};
 
 function sessionRow(overrides: Record<string, unknown> = {}) {
 	return { ...SESSION_ROW, ...overrides };
@@ -183,8 +192,9 @@ function sessionRow(overrides: Record<string, unknown> = {}) {
 /** Queue the reads the handler performs, in order, for a successful handshake. */
 function queueOwnedHandshake(
 	session: Record<string, unknown> = sessionRow(),
+	codebase: Record<string, unknown> = OWNED_CODEBASE,
 ): void {
-	recorder.dbQueue.push([session], [OWNED_CODEBASE], []);
+	recorder.dbQueue.push([session], [codebase], []);
 	recorder.txQueue.push([{ status: "waiting_for_cli", metadata: null }], []);
 }
 
@@ -235,19 +245,139 @@ describe("handshake repository auto-naming", () => {
 		expect(updates[0]?.set).toMatchObject({ name: "react-movie-app" });
 	});
 
+	it("repairs an exact legacy placeholder even when provenance is user", async () => {
+		queueOwnedHandshake(sessionRow(), {
+			...OWNED_CODEBASE,
+			name: "Repository Lokal",
+			nameSource: "user",
+		});
+
+		await invoke({
+			cliVersion: "3.0.0",
+			repositoryName: "Ocean Guard",
+			repositoryIdentity: "github.com/team/ocean-guard",
+		});
+
+		expect(codebaseUpdates()[0]?.where).toMatchObject({
+			op: "and",
+			args: expect.arrayContaining([
+				{
+					op: "or",
+					args: expect.arrayContaining([
+						{
+							op: "eq",
+							col: "codebases.name_source",
+							value: "auto",
+						},
+						{
+							op: "eq",
+							col: "codebases.name",
+							value: "Repository Lokal",
+						},
+					]),
+				},
+			]),
+		});
+	});
+
+	it("never overwrites a custom name during re-sync", async () => {
+		queueOwnedHandshake(sessionRow(), {
+			...OWNED_CODEBASE,
+			name: "My Private Alias",
+			nameSource: "user",
+			repositoryIdentity: "github.com/team/ocean-guard",
+		});
+
+		await invoke({
+			cliVersion: "3.0.0",
+			repositoryName: "New Folder Name",
+			repositoryIdentity: "github.com/team/ocean-guard",
+		});
+
+		expect(codebaseUpdates()[0]?.where).toMatchObject({
+			op: "and",
+			args: expect.arrayContaining([
+				{
+					op: "or",
+					args: expect.arrayContaining([
+						{ op: "eq", col: "codebases.name_source", value: "auto" },
+						{
+							op: "eq",
+							col: "codebases.name",
+							value: "Repository Lokal",
+						},
+					]),
+				},
+				{
+					op: "ne",
+					col: "codebases.name",
+					value: "New Folder Name",
+				},
+			]),
+		});
+		expect(codebaseUpdates()[0]?.set).toMatchObject({
+			name: "New Folder Name",
+		});
+	});
+
+	it("keeps name and stored identity when a re-sync reports another repository", async () => {
+		queueOwnedHandshake(sessionRow(), {
+			...OWNED_CODEBASE,
+			name: "Ocean Guard",
+			repositoryIdentity: "github.com/team/ocean-guard",
+		});
+
+		const response = await invoke({
+			cliVersion: "3.0.0",
+			repositoryName: "Another Repository",
+			repositoryIdentity: "github.com/other/another-repository",
+		});
+
+		// The identity comparison is what makes this a mismatch: only the
+		// session metadata and the snapshot may be written, never `name` or
+		// `repository_identity`. Asserting the predicate on the recorded name
+		// write is what proves the stored identity still guards the row.
+		const nameUpdates = codebaseUpdates().filter(
+			(entry) => entry.set !== null && "name" in entry.set,
+		);
+		expect(nameUpdates).toHaveLength(0);
+		const identityUpdates = codebaseUpdates().filter(
+			(entry) => entry.set !== null && "repositoryIdentity" in entry.set,
+		);
+		expect(identityUpdates).toHaveLength(0);
+		expect(await response.json()).toHaveProperty(
+			"repositoryIdentityMismatch",
+			true,
+		);
+	});
+
 	it("scopes the rename to the session owner and an auto-sourced name", async () => {
-		queueOwnedHandshake();
+		queueOwnedHandshake(sessionRow(), {
+			...OWNED_CODEBASE,
+			name: "Repository Lokal",
+			repositoryIdentity: null,
+		});
 
 		await invoke({ cliVersion: "3.0.0", repositoryName: "react-movie-app" });
 
-		expect(codebaseUpdates()[0]?.where).toEqual({
+		expect(codebaseUpdates()[0]?.where).toMatchObject({
 			op: "and",
-			args: [
+			args: expect.arrayContaining([
 				{ op: "eq", col: "codebases.id", value: "cb-1" },
 				{ op: "eq", col: "codebases.user_id", value: "user-1" },
-				{ op: "eq", col: "codebases.name_source", value: "auto" },
+				{
+					op: "or",
+					args: expect.arrayContaining([
+						{ op: "eq", col: "codebases.name_source", value: "auto" },
+						{
+							op: "eq",
+							col: "codebases.name",
+							value: "Repository Lokal",
+						},
+					]),
+				},
 				{ op: "ne", col: "codebases.name", value: "react-movie-app" },
-			],
+			]),
 		});
 	});
 

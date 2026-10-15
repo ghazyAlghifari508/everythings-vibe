@@ -14,6 +14,7 @@ import { CLAIM_POLL_MS, CLAIM_RETRY_MS } from "@/lib/constants";
 import { hasFullWorkflow } from "@/lib/credits";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
 import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
+import { buildStageScopeDirective } from "@/lib/planning-mode";
 import { depthDirective } from "@/lib/prompt-depth";
 import { AC_GENERATION_PROMPT } from "@/lib/prompts-ac";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -581,7 +582,12 @@ export const Route = createFileRoute("/api/ac/generate")({
 							}
 
 							const projectLanguage = normalizeLanguage(project.language);
-							const systemPrompt = `${AC_GENERATION_PROMPT(projectLanguage)}\n${depthDirective("ac")}\n${getLanguageDirective(projectLanguage, "ac")}\n${grounded}${codebaseBlock}\n${featureTreeBlock}\n\n--- PRD CONTENT ---\n${prdContent}`;
+							// Planning mode scope directive: "" for greenfield.
+							const modeDirective = buildStageScopeDirective(
+								"ac",
+								project.projectMode,
+							);
+							const systemPrompt = `${AC_GENERATION_PROMPT(projectLanguage)}\n${depthDirective("ac")}\n${getLanguageDirective(projectLanguage, "ac")}${modeDirective}\n${grounded}${codebaseBlock}\n${featureTreeBlock}\n\n--- PRD CONTENT ---\n${prdContent}`;
 							const messages: Array<{
 								role: "system" | "user" | "assistant";
 								content: string;

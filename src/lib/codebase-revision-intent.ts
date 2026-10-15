@@ -1,49 +1,14 @@
 import type { TaskCardStatus } from "./kanban-utils";
 
 /**
- * What a new chat message in the workspace means.
+ * How the workspace directs a new chat message.
  *
- * Both intents are real and mutually exclusive, and the workspace must never
- * pick one on the user's behalf: creating a new feature plan and revising the
- * current one change different persisted artifacts, so the choice is always
- * explicit.
+ * There is no per-message choice: a message sent while a user-facing feature
+ * plan is active revises that plan, and a new plan is only ever created from
+ * the explicit "Buat fitur baru" action. The two change different persisted
+ * artifacts, so the explicit action is the only thing that may create one.
  */
-export type CodebaseChatIntent = "new_feature" | "revise_current";
-
-export interface IntentOption {
-	intent: CodebaseChatIntent;
-	label: string;
-	description: string;
-}
-
-const NEW_FEATURE_OPTION: IntentOption = {
-	intent: "new_feature",
-	label: "Buat Fitur Baru",
-	description:
-		"Merencanakan fitur lain di repository yang sama, mulai dari pertanyaan klarifikasi. Fitur yang sekarang tetap tersimpan dan bisa dibuka lagi.",
-};
-
-const REVISE_OPTION: IntentOption = {
-	intent: "revise_current",
-	label: "Revisi Fitur Saat Ini",
-	description:
-		"Meminta perubahan pada fitur yang sedang dibuka. Spesifikasi, PRD, dan Acceptance Criteria yang terdampak disusun ulang sebagai versi baru; dokumen lama tetap tersimpan.",
-};
-
-/**
- * Which intents to offer for a message sent at the given pipeline stage.
- *
- * Before any artifact exists there is nothing to revise, so the only real
- * intent is a new feature and the user is not asked a question with one answer.
- * Once a feature exists, both intents are genuine choices and both are offered.
- */
-export function resolveIntentOptions(input: {
-	/** A feature project with at least one persisted artifact exists. */
-	hasExistingFeature: boolean;
-}): IntentOption[] {
-	if (!input.hasExistingFeature) return [NEW_FEATURE_OPTION];
-	return [REVISE_OPTION, NEW_FEATURE_OPTION];
-}
+export type CodebaseComposerMode = "create" | "clarify" | "revise";
 
 export interface TaskImpactInput {
 	status: TaskCardStatus;

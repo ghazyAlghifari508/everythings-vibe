@@ -58,6 +58,17 @@ describe("resolveCodebaseDisplayName", () => {
 		expect(resolveCodebaseDisplayName(undefined)).toBeNull();
 		expect(resolveCodebaseDisplayName("   ")).toBeNull();
 	});
+
+	it("refuses a value that is a path or traversal segment", () => {
+		// A display name must never be an absolute path, a drive prefix, a
+		// nested path, or a `.`/`..` segment: those are filesystem coordinates,
+		// not a presentable repository identity.
+		expect(resolveCodebaseDisplayName("..")).toBeNull();
+		expect(resolveCodebaseDisplayName(".")).toBeNull();
+		expect(resolveCodebaseDisplayName("/home/user/app")).toBeNull();
+		expect(resolveCodebaseDisplayName("C:\\Coding\\app")).toBeNull();
+		expect(resolveCodebaseDisplayName("team/app")).toBeNull();
+	});
 });
 
 describe("buildAgentPrompt repository identity", () => {

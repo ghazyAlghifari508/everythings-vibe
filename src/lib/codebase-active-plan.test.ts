@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
 	type ActivePlanCandidate,
+	describePlanReadiness,
 	resolveActivePlan,
+	selectUserFacingPlans,
 } from "./codebase-active-plan";
 
 function plan(
@@ -157,5 +159,79 @@ describe("resolveActivePlan", () => {
 		const snapshot = plans.map((item) => ({ ...item }));
 		resolveActivePlan({ plans });
 		expect(plans).toEqual(snapshot);
+	});
+});
+
+describe("selectUserFacingPlans", () => {
+	it("hides the onboarding anchor while it carries no planning", () => {
+		const plans = [
+			plan("anchor-plan"),
+			plan("watchlist", { hasArtifacts: true }),
+			plan("draft-baru"),
+		];
+		const visible = selectUserFacingPlans(plans, "anchor-plan");
+		expect(visible.map((item) => item.id)).toEqual(["watchlist", "draft-baru"]);
+	});
+
+	it("keeps the anchor once it holds real artifacts", () => {
+		const plans = [
+			plan("anchor-plan", { hasArtifacts: true }),
+			plan("watchlist", { hasArtifacts: true }),
+		];
+		const visible = selectUserFacingPlans(plans, "anchor-plan");
+		expect(visible.map((item) => item.id)).toEqual([
+			"anchor-plan",
+			"watchlist",
+		]);
+	});
+
+	it("keeps artifact-less drafts so they can be resumed", () => {
+		const plans = [plan("anchor-plan"), plan("draft-baru")];
+		const visible = selectUserFacingPlans(plans, "anchor-plan");
+		expect(visible.map((item) => item.id)).toEqual(["draft-baru"]);
+	});
+
+	it("keeps every plan when no anchor pointer exists", () => {
+		const plans = [plan("one"), plan("two", { hasArtifacts: true })];
+		expect(selectUserFacingPlans(plans, null)).toEqual(plans);
+	});
+
+	it("does not mutate the caller's plan list", () => {
+		const plans = [plan("anchor-plan"), plan("watchlist")];
+		const snapshot = plans.map((item) => ({ ...item }));
+		selectUserFacingPlans(plans, "anchor-plan");
+		expect(plans).toEqual(snapshot);
+	});
+});
+
+describe("describePlanReadiness", () => {
+	it("reports a resumable draft when no artifact exists", () => {
+		expect(describePlanReadiness(plan("draft-baru"))).toBe(
+			"Draft · Belum selesai",
+		);
+	});
+
+	it("names the real artifacts when planning exists", () => {
+		const text = describePlanReadiness(
+			plan("watchlist", {
+				hasArtifacts: true,
+				hasFeature: true,
+				hasPrd: true,
+				hasAc: true,
+				hasTasks: true,
+			}),
+		);
+		expect(text).toContain("PRD");
+		expect(text).toContain("AC");
+		expect(text).toContain("Task");
+	});
+
+	it("names a lone feature spec without claiming PRD or tasks", () => {
+		const text = describePlanReadiness(
+			plan("spec-only", { hasArtifacts: true, hasFeature: true }),
+		);
+		expect(text).toContain("Fitur");
+		expect(text).not.toContain("PRD");
+		expect(text).not.toContain("Task");
 	});
 });

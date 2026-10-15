@@ -11,6 +11,7 @@ import {
 import { MAX_FEATURE_RESPONSE_CHARS, MAX_PROMPT_LENGTH } from "@/lib/constants";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
 import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
+import { buildStageScopeDirective } from "@/lib/planning-mode";
 import {
 	FEATURE_GENERATION_PROMPT,
 	FEATURE_GENERATION_USER_MESSAGE,
@@ -205,7 +206,13 @@ export const Route = createFileRoute("/api/features/generate")({
 					}
 
 					const projectLanguage = normalizeLanguage(project.language);
-					const systemPrompt = `${FEATURE_GENERATION_PROMPT}\n${getLanguageDirective(projectLanguage)}${codebaseBlock}`;
+					// Planning mode decides scope discipline: greenfield returns ""
+					// so the prompt stays byte-identical.
+					const modeDirective = buildStageScopeDirective(
+						"fitur",
+						project.projectMode,
+					);
+					const systemPrompt = `${FEATURE_GENERATION_PROMPT}\n${getLanguageDirective(projectLanguage)}${modeDirective}${codebaseBlock}`;
 					const messages: Array<{
 						role: "system" | "user" | "assistant";
 						content: string;

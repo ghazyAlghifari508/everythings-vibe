@@ -118,3 +118,24 @@ ATURAN:
 
 Output HANYA JSON.`;
 }
+
+/**
+ * Repair rule appended to the repair prompt for existing-codebase projects.
+ * A coverage gap must be filled with the MINIMUM change that satisfies the
+ * missing requirement, not with a fresh greenfield build of that feature.
+ */
+export const TASK_REPAIR_EXISTING_CODEBASE_RULE = `10. MODE EXISTING CODEBASE: task tambahan adalah PERUBAHAN pada aplikasi yang sudah ada, bukan pembangunan dari nol. Gunakan ulang komponen, service, route, dan kontrak data yang sudah ada. JANGAN menambah layer teknis (migration database, endpoint backend, authentication/authorization, dashboard, state library, infrastructure) kecuali requirement yang belum ter-cover itu memang membutuhkannya. JANGAN membuat task untuk membangun ulang perilaku yang sudah ada. Gunakan path file dari bukti konteks codebase; modul baru wajib dinyatakan sebagai proposed new file.`;
+
+/**
+ * Mode-aware repair prompt. Greenfield returns the base repair prompt
+ * unchanged; existing codebase appends the minimum-change rule so a repair
+ * round cannot reintroduce scope creep.
+ */
+export function buildTaskRepairPromptForMode(
+	mode: string | null | undefined,
+	missingAcIds: string[],
+): string {
+	const base = buildTaskRepairPrompt(missingAcIds);
+	if (mode !== "existing_codebase") return base;
+	return `${base}\n${TASK_REPAIR_EXISTING_CODEBASE_RULE}`;
+}

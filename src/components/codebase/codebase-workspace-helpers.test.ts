@@ -15,6 +15,7 @@ import {
 	CodebaseMarkdown,
 	parseVersionRows,
 	selectLatestVersionContent,
+	stripInternalSectionMarkers,
 } from "./codebase-markdown";
 
 function renderMarkdown(content: string): string {
@@ -189,5 +190,108 @@ describe("selectLatestVersionContent", () => {
 		expect(
 			selectLatestVersionContent([{ version: 1, content: "   " }]),
 		).toBeNull();
+	});
+});
+
+describe("stripInternalSectionMarkers", () => {
+	test("returns original content when there are no markers or empty input", () => {
+		expect(stripInternalSectionMarkers("")).toBe("");
+		expect(stripInternalSectionMarkers("## Judul\n\nIsi")).toBe(
+			"## Judul\n\nIsi",
+		);
+	});
+
+	test("strips opening and closing section comments from markdown", () => {
+		const raw = [
+			"<!-- SECTION: Overview -->",
+			"## 1. Overview",
+			"### 1.1 Latar Belakang",
+			"Paragraf pengantar.",
+			"<!-- /SECTION -->",
+			"",
+			"<!-- SECTION: Goals & Success Metrics -->",
+			"## 2. Goals & Success Metrics",
+			"- Metrik 1",
+			"<!-- /SECTION -->",
+		].join("\n");
+
+		const cleaned = stripInternalSectionMarkers(raw);
+		expect(cleaned).not.toContain("<!-- SECTION: Overview -->");
+		expect(cleaned).not.toContain("<!-- /SECTION -->");
+		expect(cleaned).not.toContain("<!-- SECTION: Goals & Success Metrics -->");
+		expect(cleaned).toContain("## 1. Overview");
+		expect(cleaned).toContain("Paragraf pengantar.");
+		expect(cleaned).toContain("## 2. Goals & Success Metrics");
+		expect(cleaned).toContain("- Metrik 1");
+	});
+
+	test("preserves markers verbatim inside triple-backtick code fences", () => {
+		const raw = [
+			"## Panduan",
+			"",
+			"```html",
+			"<!-- SECTION: Overview -->",
+			"<div>Konten</div>",
+			"<!-- /SECTION -->",
+			"```",
+		].join("\n");
+
+		const cleaned = stripInternalSectionMarkers(raw);
+		expect(cleaned).toBe(raw);
+	});
+
+	test("preserves markers verbatim inside tilde code fences", () => {
+		const raw = [
+			"## Panduan Tilde",
+			"",
+			"~~~markdown",
+			"<!-- SECTION: Architecture & Tech Stack -->",
+			"~~~",
+		].join("\n");
+
+		const cleaned = stripInternalSectionMarkers(raw);
+		expect(cleaned).toBe(raw);
+	});
+
+	test("preserves markers inside inline backtick code spans", () => {
+		const raw = "Gunakan `<!-- SECTION: Overview -->` sebagai marker pembuka.";
+		const cleaned = stripInternalSectionMarkers(raw);
+		expect(cleaned).toBe(raw);
+	});
+
+	test("does not strip legitimate non-section HTML comments or HTML elements", () => {
+		const raw = [
+			"<!-- Copyright 2026 Author -->",
+			'<div class="custom">',
+			"Konten",
+			"</div>",
+		].join("\n");
+
+		const cleaned = stripInternalSectionMarkers(raw);
+		expect(cleaned).toContain("<!-- Copyright 2026 Author -->");
+		expect(cleaned).toContain('<div class="custom">');
+	});
+
+	test("preserves tables, headings, and mermaid diagrams", () => {
+		const raw = [
+			"<!-- SECTION: Architecture & Tech Stack -->",
+			"## 6. Architecture & Tech Stack",
+			"",
+			"| Komponen | Fungsi |",
+			"| --- | --- |",
+			"| Web | Client |",
+			"",
+			"```mermaid",
+			"graph TD;",
+			"  A-->B;",
+			"```",
+			"<!-- /SECTION -->",
+		].join("\n");
+
+		const cleaned = stripInternalSectionMarkers(raw);
+		expect(cleaned).not.toContain("SECTION: Architecture");
+		expect(cleaned).toContain("## 6. Architecture & Tech Stack");
+		expect(cleaned).toContain("| Komponen | Fungsi |");
+		expect(cleaned).toContain("```mermaid\ngraph TD;\n  A-->B;\n```");
 	});
 });

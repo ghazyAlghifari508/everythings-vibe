@@ -7,7 +7,14 @@
  * file contents. Source content loading happens later in `manifest.ts`.
  */
 
-import { lstat, open, readdir, readFile, realpath, stat } from "node:fs/promises";
+import {
+	lstat,
+	open,
+	readdir,
+	readFile,
+	realpath,
+	stat,
+} from "node:fs/promises";
 import {
 	dirname,
 	isAbsolute,
@@ -136,6 +143,37 @@ export function getRepositoryName(root: string): string | null {
 	return candidate;
 }
 
+export function humanizeRepositoryName(value: string): string | null {
+	const words = value
+		.replace(/[._-]+/g, " ")
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean);
+	if (words.length === 0) return null;
+	return words
+		.map((word) => {
+			const first = [...word][0];
+			return first
+				? `${first.toLocaleUpperCase()}${word.slice(first.length)}`
+				: "";
+		})
+		.join(" ");
+}
+
+/** Prefer the repository segment of a verified remote, then a valid root name. */
+export function resolveRepositoryDisplayName(
+	root: string,
+	identity: string | null | undefined,
+): string | null {
+	const repositorySegment = identity?.split("/").at(-1);
+	const fromIdentity = repositorySegment
+		? humanizeRepositoryName(repositorySegment)
+		: null;
+	if (fromIdentity) return fromIdentity;
+	const folder = getRepositoryName(root);
+	return folder ? humanizeRepositoryName(folder) : null;
+}
+
 /** Credentials embedded in a remote URL: `scheme://user:token@host/...`. */
 const URL_USERINFO_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/[^/@]+@/i;
 /** Scp-style remote with a username: `git@host:owner/repo.git`. */
@@ -154,6 +192,24 @@ const GIT_SUFFIX_PATTERN = /\.git$/i;
  * and stripping them could merge two different repositories.
  */
 const NON_IDENTITY_SEGMENTS = new Set(["_git", "scm"]);
+
+/**
+ * A value already in normalized identity form: `host/segment[/segment...]`.
+ *
+ * Mirrors the web app, which stores exactly this shape and must accept it back
+ * from the CLI (and from a replayed handshake). Deliberately narrow: the host
+ * must be dotted, so a bare folder name or an unverifiable value still
+ * normalizes to `null`.
+ */
+const NORMALIZED_IDENTITY_PATTERN =
+	/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?:\/[^/?#@:\s]+)+$/i;
+
+/** A `.` or `..` segment is a filesystem coordinate, never an identity. */
+function hasTraversalSegment(value: string): boolean {
+	return value
+		.split("/")
+		.some((segment) => segment === "." || segment === "..");
+}
 
 /**
  * Normalize a Git remote URL into a stable repository identity, or `null` when
@@ -176,7 +232,9 @@ export function normalizeRepositoryIdentity(
 	if (trimmed.startsWith("/") || trimmed.startsWith("./")) return null;
 	if (URL_USERINFO_PATTERN.test(trimmed) && !SCP_LIKE_PATTERN.test(trimmed)) {
 		const scheme = SCHEME_PATTERN.exec(trimmed)?.[1] ?? "https";
-		return normalizeRepositoryIdentity(`${scheme}://${trimmed.slice(trimmed.indexOf("@") + 1)}`);
+		return normalizeRepositoryIdentity(
+			`${scheme}://${trimmed.slice(trimmed.indexOf("@") + 1)}`,
+		);
 	}
 
 	const scpLike = SCP_LIKE_PATTERN.exec(trimmed);
@@ -198,7 +256,14 @@ export function normalizeRepositoryIdentity(
 				if (!host) return null;
 				return { host, path: rest.slice(slashIndex + 1) };
 			})();
-	if (!split) return null;
+	if (!split) {
+		// Already-normalized identity (`host/owner/repo`): reuse it verbatim so
+		// the function is idempotent over its own output.
+		return NORMALIZED_IDENTITY_PATTERN.test(trimmed) &&
+			!hasTraversalSegment(trimmed)
+			? trimmed.toLowerCase()
+			: null;
+	}
 
 	const path = split.path
 		.split(/[?#]/)[0]
@@ -211,9 +276,10 @@ export function normalizeRepositoryIdentity(
 		.filter((segment) => segment.length > 0)
 		.filter((segment) => !NON_IDENTITY_SEGMENTS.has(segment.toLowerCase()));
 	if (segments.length === 0) return null;
-	return [split.host.toLowerCase(), ...segments.map((s) => s.toLowerCase())].join(
-		"/",
-	);
+	return [
+		split.host.toLowerCase(),
+		...segments.map((s) => s.toLowerCase()),
+	].join("/");
 }
 
 /**

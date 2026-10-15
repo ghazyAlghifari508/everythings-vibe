@@ -16,11 +16,11 @@ describe("validateCodebaseNameInput", () => {
 	it("rejects direct name shorter than 3 characters", () => {
 		expect(validateCodebaseNameInput({ name: "ab" })).toEqual({
 			ok: false,
-			error: "Nama codebase harus diisi minimal 3 karakter",
+			error: "Nama codebase tidak valid",
 		});
 		expect(validateCodebaseNameInput({ name: "  a  " })).toEqual({
 			ok: false,
-			error: "Nama codebase harus diisi minimal 3 karakter",
+			error: "Nama codebase tidak valid",
 		});
 	});
 
@@ -32,12 +32,13 @@ describe("validateCodebaseNameInput", () => {
 		});
 	});
 
-	it("derives name from message if name is omitted", () => {
+	it("keeps feature message separate from repository name", () => {
 		expect(
 			validateCodebaseNameInput({ message: "Buat fitur billing checkout" }),
-		).toMatchObject({
+		).toEqual({
 			ok: true,
-			nameSource: "user",
+			name: "Repository Lokal",
+			nameSource: "auto",
 		});
 	});
 
@@ -66,13 +67,6 @@ describe("validateCodebaseNameInput", () => {
 			ok: true,
 			name: "Repository Lokal",
 			nameSource: "user",
-		});
-	});
-
-	it("rejects when a message is present but too short to derive from", () => {
-		expect(validateCodebaseNameInput({ message: "hi" })).toEqual({
-			ok: false,
-			error: "Nama codebase harus diisi minimal 3 karakter",
 		});
 	});
 });

@@ -19,6 +19,16 @@ import {
 	findUnknownSurfaces,
 } from "@/lib/page-inventory";
 import { checkRateLimit } from "@/lib/rate-limit";
+import {
+	buildScopeEvidence,
+	describeScopeRefinement,
+	refineTaskScope,
+} from "@/lib/scope-refinement";
+import {
+	type ScopeEvidence,
+	type ScopeTaskView,
+	validateScopeConsistency,
+} from "@/lib/scope-validation";
 import { getLatestAcMarkdown } from "@/lib/services/ac-service";
 import {
 	selectModels,
@@ -43,8 +53,60 @@ import {
 	repairTaskCoverage,
 	TASK_FIRST_PASS_USER_MESSAGE,
 } from "@/lib/services/task-generation";
-import { parseTaskJson, saveTaskTree } from "@/lib/services/task-service";
+import {
+	parseTaskJson,
+	saveTaskTree,
+	type TaskTree,
+} from "@/lib/services/task-service";
 import { requireUser } from "@/lib/session";
+
+/**
+ * Apply evidence-based scope refinement to a generated task tree.
+ *
+ * Coverage-safe by construction: a task is dropped only when it requires a
+ * capability the repository analysis positively reports absent, the request or
+ * confirmed answers never asked for it, AND every AC it declared is still
+ * covered by a surviving task. `unverified_path` findings never drop a task
+ * (a new file may simply be proposed). Decisions are reported through the SSE
+ * `thinking` stream so a plan is never silently altered.
+ *
+ * Returns the tree unchanged when scope evidence is unavailable (greenfield),
+ * so greenfield behavior is untouched.
+ */
+export function applyScopeRefinement(input: {
+	tree: TaskTree;
+	scopeEvidence: ScopeEvidence | null;
+	emit: (payload: Record<string, unknown>) => void;
+}): TaskTree {
+	const { tree, scopeEvidence, emit } = input;
+	if (!scopeEvidence) return tree;
+
+	const views: ScopeTaskView[] = tree.features.flatMap((feature) =>
+		feature.tasks.map((task) => ({
+			name: task.name,
+			description: task.description,
+			covers: task.covers,
+			subtasks: task.subtasks,
+		})),
+	);
+	const report = validateScopeConsistency(views, scopeEvidence);
+	if (report.consistent) return tree;
+
+	const refined = refineTaskScope(views, report);
+	const summary = describeScopeRefinement(refined);
+	if (summary) emit({ type: "thinking", content: summary });
+	if (refined.dropped.length === 0) return tree;
+
+	const dropped = new Set(refined.dropped);
+	return {
+		features: tree.features
+			.map((feature) => ({
+				...feature,
+				tasks: feature.tasks.filter((task) => !dropped.has(task.name)),
+			}))
+			.filter((feature) => feature.tasks.length > 0),
+	};
+}
 
 export const Route = createFileRoute("/api/task/generate")({
 	server: {
@@ -186,6 +248,9 @@ export const Route = createFileRoute("/api/task/generate")({
 					| { fileCount?: number; sourceBytes?: number }
 					| undefined;
 				let codebaseBlock = "";
+				// Scope evidence for evidence-based validation: null for
+				// greenfield, so the refinement is a strict no-op there.
+				let scopeEvidence: ScopeEvidence | null = null;
 
 				if (project.projectMode === "existing_codebase") {
 					try {
@@ -198,6 +263,7 @@ export const Route = createFileRoute("/api/task/generate")({
 						const generationContext = required.context;
 						if (generationContext) {
 							codebaseBlock = buildCodebasePromptBlock(generationContext);
+							scopeEvidence = buildScopeEvidence(generationContext);
 							codebaseSnapshotId = generationContext.snapshotId;
 							codebaseAnalysisId = generationContext.analysisId ?? undefined;
 							const [snapRow] = await db
@@ -472,7 +538,10 @@ export const Route = createFileRoute("/api/task/generate")({
 								{ role: "assistant", content: fullResponse },
 								{
 									role: "user",
-									content: buildTaskRepairUserMessage(missing),
+									content: buildTaskRepairUserMessage(
+										missing,
+										project.projectMode,
+									),
 								},
 							];
 							const { generator, firstChunk } = await tryStreamWithFallback(
@@ -571,7 +640,17 @@ export const Route = createFileRoute("/api/task/generate")({
 										return;
 									}
 								}
-								const saveResult = await saveTaskTree(projectId, taskTree);
+								// Scope consistency: on an existing codebase, AC coverage
+								// alone does not prove the work is needed. Tasks that
+								// require a capability the analysis reports absent (and
+								// that the request never asked for) are dropped, never
+								// silently kept. Coverage-safe by construction.
+								const scopedTree = applyScopeRefinement({
+									tree: taskTree,
+									scopeEvidence,
+									emit,
+								});
+								const saveResult = await saveTaskTree(projectId, scopedTree);
 								if (codebaseSnapshotId && saveResult.success) {
 									await linkGenerationContext(
 										projectId,
@@ -725,6 +804,7 @@ export const Route = createFileRoute("/api/task/generate")({
 								codebaseBlock,
 								language: projectLanguage,
 								featureTreeBlock,
+								mode: project.projectMode,
 							});
 							const messages: Array<{
 								role: "system" | "user" | "assistant";

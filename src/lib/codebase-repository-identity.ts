@@ -38,6 +38,33 @@ const GIT_SUFFIX_PATTERN = /\.git$/i;
 const NON_IDENTITY_SEGMENTS = new Set(["_git", "scm"]);
 
 /**
+ * A value already in normalized identity form: `host/segment[/segment...]`.
+ *
+ * The CLI may send its own normalized identity back (and a replayed handshake
+ * can resend it), so `normalizeRepositoryIdentity` must be idempotent over its
+ * own output. Without this branch the value would be rejected as "not a remote",
+ * silently dropping the identity and skipping the stored-identity mismatch
+ * guard. Deliberately narrow: a host segment cannot be a local path, cannot
+ * carry a scheme or userinfo, and cannot be a single dotless word such as
+ * `app`, so a folder name or an unverifiable value still normalizes to `null`.
+ */
+const NORMALIZED_IDENTITY_PATTERN =
+	/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?:\/[^/?#@:\s]+)+$/i;
+
+/**
+ * A `.` or `..` path segment inside an otherwise normalized-looking value.
+ *
+ * Such a segment is a filesystem coordinate, never repository identity. The
+ * value never becomes a display name (the folder rule rejects separators), but
+ * the identity branch must not accept a traversal-shaped string at all.
+ */
+function hasTraversalSegment(value: string): boolean {
+	return value
+		.split("/")
+		.some((segment) => segment === "." || segment === "..");
+}
+
+/**
  * Extract the repository path from a remote URL, dropping everything that is
  * not part of identity: scheme, credentials, host, port, and query/fragment.
  * The host is kept because two hosts can legitimately serve same-named paths.
@@ -98,7 +125,15 @@ export function normalizeRepositoryIdentity(
 	}
 
 	const split = splitRemote(trimmed);
-	if (!split) return null;
+	if (!split) {
+		// Already-normalized identity (`host/owner/repo`): reuse it verbatim so
+		// the function is idempotent over its own output. Only a structured,
+		// multi-segment value with a real dotted host qualifies.
+		return NORMALIZED_IDENTITY_PATTERN.test(trimmed) &&
+			!hasTraversalSegment(trimmed)
+			? trimmed.toLowerCase()
+			: null;
+	}
 
 	const path = split.path
 		.split(/[?#]/)[0]

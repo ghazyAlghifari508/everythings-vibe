@@ -88,6 +88,8 @@ Jika refactor ini dieksekusi di masa mendatang, area berikut wajib diperbarui:
 - [ ] **Fase 3 — Migrasi View Anak:** Pindahkan implementasi Ask, Fitur, PRD, AC, Task, dan Kanban ke dalam outlet/switcher baru.
 - [ ] **Fase 4 — Router Redirects:** Tambahkan backward-compatibility redirect dari `/ask/:id`, `/prd/:id`, dll. ke route baru agar link lama tidak 404.
 - [ ] **Fase 5 — Verifikasi & Test Suite:** Update dan jalankan seluruh suite `pnpm check`, `pnpm test`, dan QA DevTools.
+- [ ] **Fase 6 — Input PRD:** Pastikan alur input PRD ikut migrasi ke layout workspace baru tanpa kehilangan perilaku yang sudah ada.
+- [ ] **Fase 7 — Skill Compliance:** Pastikan skill benar-benar dipakai pada setiap tahap eksekusi (bukan hanya dibaca).
 
 ---
 
