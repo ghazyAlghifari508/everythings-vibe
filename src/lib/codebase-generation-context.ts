@@ -47,6 +47,64 @@ export interface SnapshotGenerationContext {
 	relevantPaths: string[];
 	constraints: string[];
 	uncertainFindings: CodebaseAnalysisFinding[];
+	/**
+	 * Repository capability facts derived from the analysis, for evidence-based
+	 * scope validation. `"absent"` is a positive finding (e.g. `database: null`),
+	 * `"unknown"` is silence. Optional so contexts built from a partial analysis
+	 * keep parsing.
+	 */
+	capabilities?: RepositoryCapabilities;
+}
+
+export interface RepositoryCapabilities {
+	database: "absent" | "present" | "unknown";
+	backend_api: "absent" | "present" | "unknown";
+	authentication: "absent" | "present" | "unknown";
+}
+
+/**
+ * Derive capability facts from the analysis. A `null` database/auth is a
+ * positive finding of absence; a named one is presence; an absent field is
+ * unknown and can never justify flagging work.
+ *
+ * There is no explicit "backend" field in the analysis contract, so it is
+ * inferred from the module map: an analysis that reports no backend-ish module
+ * while also reporting no database is treated as client-only. Anything less
+ * certain stays `unknown`.
+ */
+export function deriveRepositoryCapabilities(
+	analysis: CodebaseAnalysis,
+): RepositoryCapabilities {
+	const database =
+		analysis.database === null
+			? "absent"
+			: analysis.database && analysis.database.trim().length > 0
+				? "present"
+				: "unknown";
+	const authentication =
+		analysis.auth === null
+			? "absent"
+			: analysis.auth && analysis.auth.trim().length > 0
+				? "present"
+				: "unknown";
+
+	const modulePaths = (analysis.moduleMap ?? []).map((entry) =>
+		entry.path.toLowerCase(),
+	);
+	const hasServerModule = modulePaths.some((path) =>
+		/(^|\/)(server|api|backend|routes?\/api|controllers?|services?\/server)/.test(
+			path,
+		),
+	);
+	// Only assert "absent" when the analysis positively reports no database;
+	// otherwise silence must stay unknown so no task is flagged by omission.
+	const backendApi: RepositoryCapabilities["backend_api"] = hasServerModule
+		? "present"
+		: database === "absent"
+			? "absent"
+			: "unknown";
+
+	return { database, backend_api: backendApi, authentication };
 }
 
 export function buildAnalysisSummary(analysis: CodebaseAnalysis): string {
@@ -98,6 +156,7 @@ export function buildGenerationContext(
 		relevantPaths: [...new Set(relevantPaths)],
 		constraints,
 		uncertainFindings,
+		capabilities: deriveRepositoryCapabilities(analysis),
 	};
 }
 
@@ -247,8 +306,9 @@ export async function requireProjectGenerationContext(
 
 /** Single injection helper for Ask/PRD/AC/Task. Null (greenfield) returns ""
  *  so greenfield prompts stay byte-identical. Ready context returns a framed,
- *  bounded block that labels uncertainty as assumptions and instructs the
- *  model never to invent paths or architecture. */
+ *  bounded block that labels uncertainty as assumptions, instructs the
+ *  model never to invent paths or architecture, and carries the change-scope
+ *  and reuse discipline for an existing codebase. */
 export function buildCodebasePromptBlock(
 	context: SnapshotGenerationContext | null,
 ): string {
@@ -260,6 +320,12 @@ export function buildCodebasePromptBlock(
 		`Snapshot sumber: ${context.snapshotId}.`,
 		body,
 		"ATURAN: JANGAN mengarang jalur file, perilaku framework, atau detail arsitektur yang tidak ada di konteks di atas. Gunakan HANYA jalur dari daftar Relevant modules/files. Setiap hal yang tidak pasti adalah asumsi yang wajib diverifikasi — tandai sebagai asumsi, jangan sajikan sebagai fakta. HORMATI framework dan bahasa asli codebase — JANGAN mengalihkan framework (misal Vue ke React) atau memaksakan TypeScript jika codebase menggunakan JavaScript. Jika database terdeteksi None/client-side, DILARANG membuat skema database internal/SQL.",
+		// Change-scope discipline: the repo is the ground truth for what already
+		// exists, so the plan is a proportional change instead of a rebuild.
+		"SCOPE PERUBAHAN: Aplikasi ini SUDAH ADA. Rencanakan PERUBAHAN yang diminta, bukan membangun ulang aplikasi. Gunakan analisis repositori di atas sebagai bukti tentang apa yang sudah tersedia — jangan merencanakan ulang hal yang sudah ada.",
+		'REUSE: Utamakan memakai ulang modul, service, route, dan kontrak data yang sudah ada pada analisis. Perluas modul existing bila memadai. Bila sebuah file/modul disebut, path-nya harus berasal dari bukti di atas, atau dinyatakan eksplisit sebagai "proposed new file". JANGAN mencampuradukkan file existing dengan file baru yang diusulkan.',
+		"LAYER KONDISIONAL: Setiap layer teknis (data/storage, service/domain, API, UI, state) hanya boleh direncanakan bila requirement atau bukti repositori mendukungnya. JANGAN mewajibkan migration database, endpoint backend, authentication/authorization, dashboard, atau infrastructure baru hanya karena template.",
+		"PERTAHANKAN FUNGSI LAIN: Jangan mengubah perilaku, alur, atau modul existing yang tidak berkaitan dengan permintaan ini.",
 		CODEBASE_BLOCK_END,
 	].join("\n");
 }

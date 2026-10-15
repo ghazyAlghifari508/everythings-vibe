@@ -8,6 +8,7 @@ import {
 	buildGenerationContext,
 	buildGenerationLinkRow,
 	decideContextRequirement,
+	deriveRepositoryCapabilities,
 	formatBoundedGenerationContext,
 	formatGenerationContext,
 	limitGenerationContext,
@@ -267,6 +268,28 @@ describe("task 8 generation-context bounds", () => {
 		expect(block.length).toBeLessThanOrEqual(
 			CODEBASE_GENERATION_MAX_CONTEXT_CHARS + 1_000,
 		);
+	});
+
+	it("buildCodebasePromptBlock carries change-scope and reuse discipline", () => {
+		const block = buildCodebasePromptBlock(
+			buildGenerationContext({
+				featurePrompt: "Tambah pencarian artikel",
+				analysis,
+				snapshot,
+			}),
+		);
+		// The repository is ground truth for what already exists.
+		expect(block).toMatch(/Aplikasi ini SUDAH ADA/);
+		expect(block).toMatch(/Rencanakan PERUBAHAN yang diminta/);
+		// Reuse before reinvent, and existing vs proposed paths must not mix.
+		expect(block).toMatch(/REUSE/);
+		expect(block).toContain("proposed new file");
+		expect(block).toMatch(/JANGAN mencampuradukkan file existing/);
+		// Technical layers are conditional, not template-mandated.
+		expect(block).toMatch(/LAYER KONDISIONAL/);
+		expect(block).toMatch(/migration database, endpoint backend/);
+		// Unrelated functionality must be preserved.
+		expect(block).toMatch(/PERTAHANKAN FUNGSI LAIN/);
 	});
 
 	it("selectReadyAnalysis picks the latest ready record only", () => {
@@ -532,5 +555,72 @@ describe("selectNewestReadyAnalysis", () => {
 				{ id: "f", status: "failed", createdAt: "2026-01-01T00:00:00.000Z" },
 			]),
 		).toBeNull();
+	});
+});
+
+describe("deriveRepositoryCapabilities", () => {
+	it("reads an explicit null database/auth as absent", () => {
+		const caps = deriveRepositoryCapabilities({
+			projectId: "p",
+			snapshotId: "s",
+			database: null,
+			auth: null,
+			moduleMap: [{ path: "src/components/App.tsx", summary: "UI" }],
+		});
+		expect(caps.database).toBe("absent");
+		expect(caps.authentication).toBe("absent");
+	});
+
+	it("reads a named database/auth as present", () => {
+		const caps = deriveRepositoryCapabilities(analysis);
+		expect(caps.database).toBe("present");
+		expect(caps.authentication).toBe("present");
+	});
+
+	it("keeps a missing database field unknown, never absent", () => {
+		const caps = deriveRepositoryCapabilities({
+			projectId: "p",
+			snapshotId: "s",
+			moduleMap: [{ path: "src/components/App.tsx", summary: "UI" }],
+		});
+		expect(caps.database).toBe("unknown");
+		expect(caps.authentication).toBe("unknown");
+		expect(caps.backend_api).toBe("unknown");
+	});
+
+	it("detects a server module as a present backend", () => {
+		const caps = deriveRepositoryCapabilities({
+			projectId: "p",
+			snapshotId: "s",
+			database: "PostgreSQL",
+			moduleMap: [{ path: "src/routes/api/search.ts", summary: "Search API" }],
+		});
+		expect(caps.backend_api).toBe("present");
+	});
+
+	it("keeps a client-only app with no database as an absent backend", () => {
+		const caps = deriveRepositoryCapabilities({
+			projectId: "p",
+			snapshotId: "s",
+			database: null,
+			moduleMap: [{ path: "src/App.tsx", summary: "SPA entry" }],
+		});
+		expect(caps.backend_api).toBe("absent");
+	});
+
+	it("is attached to the generation context", () => {
+		const context = buildGenerationContext({
+			featurePrompt: "Tambah pencarian",
+			analysis,
+			snapshot,
+		});
+		// The shared fixture's module map lists "src/routes" (UI file-based
+		// routing), not an API/server module, so the backend stays unknown: the
+		// derivation must not claim presence it cannot prove.
+		expect(context.capabilities).toEqual({
+			database: "present",
+			backend_api: "unknown",
+			authentication: "present",
+		});
 	});
 });
