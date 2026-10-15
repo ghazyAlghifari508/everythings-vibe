@@ -42,10 +42,9 @@ interface CodebaseStageHandoffProps {
 }
 
 /**
- * The transition between two pipeline stages, rendered as one conversational
- * block instead of a large card: the finished artifact, then the next request
- * and its single CTA. The artifact card is the same FileCard used in the chat
- * stream, so a stage result looks identical wherever it appears.
+ * The transition between two pipeline stages, rendered as a compact conversational
+ * block without large bordered cards: settled outcome, persisted artifact, and the
+ * next conversational CTA.
  */
 export function CodebaseStageHandoff({
 	outcome,
@@ -63,7 +62,7 @@ export function CodebaseStageHandoff({
 	secondaryAction,
 }: CodebaseStageHandoffProps) {
 	return (
-		<div data-testid={testId} className="flex flex-col gap-2.5">
+		<div data-testid={testId} className="flex flex-col gap-2 py-1">
 			<p className="flex items-center gap-1.5 text-[13px] font-semibold text-emerald">
 				<span aria-hidden="true">✓</span>
 				{outcome.title}
@@ -75,28 +74,33 @@ export function CodebaseStageHandoff({
 					onDownload={onDownloadArtifact}
 				/>
 			) : null}
-			<div className="rounded-xl border border-graphite bg-obsidian p-3">
-				<p className="text-[11px] font-semibold uppercase tracking-wider text-fog">
-					Berikutnya: {nextLabel}
-				</p>
-				<p className="mt-1 text-xs leading-5 text-fog">{nextDescription}</p>
-				<div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-					{secondaryAction}
-					{actionBlockedReason ? (
-						<p className="mr-auto text-[11px] leading-4 text-crimson">
-							{actionBlockedReason}
-						</p>
-					) : null}
-					<button
-						type="button"
-						disabled={busy || !actionEnabled}
-						onClick={onAction}
-						className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						{busy ? busyLabel : actionLabel}
-						{!busy ? <ArrowRight size={13} aria-hidden="true" /> : null}
-					</button>
+			<div className="flex flex-col gap-1 pt-0.5">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<span className="text-xs text-fog">
+						<span className="font-medium text-snow/90">Berikutnya:</span>{" "}
+						{nextLabel}
+					</span>
+					<div className="flex flex-wrap items-center gap-2">
+						{secondaryAction}
+						{actionBlockedReason ? (
+							<p className="text-[11px] leading-4 text-crimson">
+								{actionBlockedReason}
+							</p>
+						) : null}
+						<button
+							type="button"
+							disabled={busy || !actionEnabled}
+							onClick={onAction}
+							className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							{busy ? busyLabel : actionLabel}
+							{!busy ? <ArrowRight size={12} aria-hidden="true" /> : null}
+						</button>
+					</div>
 				</div>
+				<p className="text-[11.5px] leading-relaxed text-fog/80">
+					{nextDescription}
+				</p>
 			</div>
 		</div>
 	);

@@ -122,7 +122,7 @@ function RotatingActivity({
 	fontSize,
 	showTimer,
 	elapsed,
-	bare,
+	bare: _bare,
 	className,
 }: RotatingActivityProps) {
 	const reduceMotion = useReducedMotion();
@@ -318,7 +318,7 @@ export function ThoughtLine({
 						glyph={glyph}
 						fontSize={fontSize}
 						showTimer={showTimer}
-						elapsed={elapsed}
+						elapsed={reportedElapsed}
 						bare
 					/>
 				) : null}
@@ -383,7 +383,7 @@ export function ThoughtLine({
 						glyph={glyph}
 						fontSize={fontSize}
 						showTimer={false}
-						elapsed={elapsed}
+						elapsed={reportedElapsed}
 						bare={false}
 						className="mt-3"
 					/>

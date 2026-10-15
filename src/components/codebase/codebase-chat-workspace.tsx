@@ -1,9 +1,16 @@
 "use client";
 
-import { AlertTriangle, Check, Copy, Layers, RotateCcw } from "lucide-react";
+import {
+	AlertTriangle,
+	ArrowRight,
+	Check,
+	Copy,
+	Layers,
+	RotateCcw,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { AgentThinking } from "@/components/ui/agent-thinking";
 import { PromptBar } from "@/components/ui/prompt-bar";
-import { ThoughtLine } from "@/components/ui/thought-line";
 import type { CodebaseStarterSuggestion } from "@/lib/codebase-analysis";
 import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
 import {
@@ -85,7 +92,7 @@ interface CodebaseChatWorkspaceProps {
 	 * Feature/PRD/AC/Task stages share it instead of stacking indicators.
 	 */
 	run?: CodebaseRunState | null;
-	artifacts: CodebaseArtifactRef[];
+	artifacts?: CodebaseArtifactRef[];
 	activeArtifactId?: string | null;
 	projectIdForHandoff?: string | null;
 	stage?: PipelineStage;
@@ -202,7 +209,7 @@ export function CodebaseChatWorkspace({
 	questions,
 	answers,
 	run = null,
-	artifacts,
+	artifacts = [],
 	activeArtifactId = null,
 	projectIdForHandoff = null,
 	stage = "questions",
@@ -669,15 +676,14 @@ export function CodebaseChatWorkspace({
 							)}
 							{run ? (
 								<div data-testid="codebase-run-thinking">
-									<ThoughtLine
-										working={isRunWorking}
-										failed={runFailed}
-										label={`Menyusun ${STAGE_LABEL[run.stage]}`}
+									<AgentThinking
+										status={run.status}
+										phase={run.phase}
+										thinkingLabel={`Menyusun ${STAGE_LABEL[run.stage]}`}
+										generatingLabel={`Menyusun ${STAGE_LABEL[run.stage]}`}
 										doneLabel={CODEBASE_STAGE_DONE_LABEL[run.stage]}
 										failedLabel={`Gagal menyusun ${STAGE_LABEL[run.stage]}`}
 										activity={run.activity}
-										presentation="rotating"
-										rotationKey={run.startedAt}
 										thinkingText={run.thinkingText}
 										startedAt={run.startedAt}
 										finishedAt={run.finishedAt}
@@ -687,14 +693,14 @@ export function CodebaseChatWorkspace({
 							{runFailed && run.error ? (
 								<div
 									data-testid="codebase-questions-error"
-									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+									className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
 								>
 									<span role="alert">{run.error}</span>
 									{onRetryQuestions ? (
 										<button
 											type="button"
 											onClick={onRetryQuestions}
-											className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											className="inline-flex min-h-7 items-center rounded border border-crimson/40 px-2 text-[11px] font-medium text-crimson hover:bg-crimson/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
 										>
 											Coba lagi
 										</button>
@@ -730,14 +736,14 @@ export function CodebaseChatWorkspace({
 								<div
 									role="alert"
 									data-testid="codebase-spec-error"
-									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+									className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
 								>
 									<span>{specError}</span>
 									{onRetryGenerate ? (
 										<button
 											type="button"
 											onClick={onRetryGenerate}
-											className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											className="inline-flex min-h-7 items-center rounded border border-crimson/40 px-2 text-[11px] font-medium text-crimson hover:bg-crimson/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
 										>
 											Coba lagi
 										</button>
@@ -747,34 +753,40 @@ export function CodebaseChatWorkspace({
 							{flowComplete && stage === "questions" ? (
 								<div
 									data-testid="codebase-questions-complete"
-									className="rounded-xl border border-graphite bg-obsidian p-3"
+									className="flex flex-col gap-1 py-1"
 								>
-									<p className="text-[11px] font-semibold uppercase tracking-wider text-fog">
-										Berikutnya: Spesifikasi fitur
-									</p>
-									<p className="mt-1 text-xs leading-5 text-fog">
-										Semua pertanyaan sudah dijawab. Spesifikasi fitur disusun
-										dari jawaban tersebut dan konteks repository.
-									</p>
-									<div className="mt-3 flex justify-end">
+									<div className="flex flex-wrap items-center justify-between gap-3">
+										<span className="text-xs text-fog">
+											<span className="font-medium text-snow/90">
+												Berikutnya:
+											</span>{" "}
+											Spesifikasi fitur
+										</span>
 										<button
 											type="button"
 											disabled={isConfirming}
 											onClick={() => onConfirmGenerate?.()}
-											className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-snow px-4 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+											className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 										>
 											{isConfirming
 												? "Menyusun spesifikasi..."
 												: "Buat Spesifikasi Fitur"}
+											{!isConfirming ? (
+												<ArrowRight size={12} aria-hidden="true" />
+											) : null}
 										</button>
 									</div>
+									<p className="text-[11.5px] leading-relaxed text-fog/80">
+										Semua pertanyaan sudah dijawab. Spesifikasi fitur disusun
+										dari jawaban tersebut dan konteks repository.
+									</p>
 								</div>
 							) : null}
 							{stageErrorVisible ? (
 								<div
 									role="alert"
 									data-testid="codebase-stage-error"
-									className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-crimson/40 bg-crimson/10 p-3 text-xs text-crimson"
+									className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
 								>
 									<span>{stageError}</span>
 									{onRetryStage ? (

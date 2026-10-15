@@ -60,6 +60,7 @@ import {
 	restoreAskState,
 	runConfirmGenerate,
 	serializeAskQuestions,
+	setRunPhase,
 	settleRun,
 	shouldAutoRevealArtifact,
 	startRun,
@@ -2038,6 +2039,8 @@ function CodebaseDetailPage() {
 					onThinking: (text) =>
 						setRun((current) => appendRunThinking(current, text)),
 					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
+					onDelta: () =>
+						setRun((current) => setRunPhase(current, "generating")),
 				});
 				if (result.error) {
 					const failure = result.error;
@@ -2290,6 +2293,8 @@ function CodebaseDetailPage() {
 					onThinking: (text) =>
 						setRun((current) => appendRunThinking(current, text)),
 					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
+					onDelta: () =>
+						setRun((current) => setRunPhase(current, "generating")),
 				});
 				if (activeProjectIdRef.current !== requestedProjectId) return;
 				if (result.error) {

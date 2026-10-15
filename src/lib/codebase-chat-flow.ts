@@ -29,6 +29,8 @@ export interface CodebaseRunState {
 	/** Wall-clock settle time, null while the request is still in flight. */
 	finishedAt: number | null;
 	status: "running" | "done" | "failed";
+	/** Active stage phase: "thinking" vs "generating" */
+	phase?: "thinking" | "generating" | null;
 	/** One honest description of what the request does. Never rotates. */
 	activity: string;
 	/** Real reasoning streamed by the model; empty when the endpoint is not streaming. */
@@ -62,16 +64,31 @@ export const CODEBASE_STAGE_DONE_LABEL: Record<CodebaseRunStage, string> = {
 export function startRun(
 	stage: CodebaseRunStage,
 	startedAt: number,
+	initialPhase: "thinking" | "generating" = "thinking",
 ): CodebaseRunState {
 	return {
 		stage,
 		startedAt,
 		finishedAt: null,
 		status: "running",
+		phase: initialPhase,
 		activity: CODEBASE_STAGE_ACTIVITY[stage],
 		thinkingText: "",
 		error: null,
 	};
+}
+
+/**
+ * Update the observable generation phase ("thinking" vs "generating") when a real
+ * backend signal arrives (e.g. onDelta stream chunks).
+ */
+export function setRunPhase(
+	run: CodebaseRunState | null,
+	phase: "thinking" | "generating",
+): CodebaseRunState | null {
+	if (!run || run.status !== "running") return run;
+	if (run.phase === phase) return run;
+	return { ...run, phase };
 }
 
 /**
