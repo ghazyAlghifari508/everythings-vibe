@@ -1,5 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { normalizeImageCandidates } from "./scrape-images";
+import { imageResultCounts, normalizeImageCandidates } from "./scrape-images";
+
+describe("image result counts", () => {
+	it("separates stored bytes from legacy verification and pending discovery", () => {
+		expect(
+			imageResultCounts(
+				[
+					{ status: "completed", assetId: "asset" },
+					{ status: "completed", assetId: null },
+					{ status: "failed", assetId: null },
+				],
+				5,
+			),
+		).toEqual({
+			discovered: 5,
+			persisted: 1,
+			linked: 1,
+			verified: 2,
+			failed: 1,
+			pending: 2,
+		});
+	});
+	it("handles empty and all failed without reporting saved images", () => {
+		expect(imageResultCounts([]).persisted).toBe(0);
+		expect(imageResultCounts([{ status: "failed", assetId: null }])).toEqual({
+			discovered: 1,
+			persisted: 0,
+			linked: 0,
+			verified: 0,
+			failed: 1,
+			pending: 0,
+		});
+	});
+});
 
 describe("image discovery metadata", () => {
 	it("deduplicates actual candidates and records supported icon evidence", () => {

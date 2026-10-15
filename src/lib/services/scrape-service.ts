@@ -55,6 +55,22 @@ export type ScrapeImageRow = typeof scrapeImages.$inferSelect;
 // download. Only rows whose resource passed verification reach the client.
 export type ScrapeImageResult = ScrapeImageRow & { assetUrl: string };
 
+export async function signScrapeImages(
+	images: ScrapeImageRow[],
+	scrapeId: string,
+	ownerId: string,
+): Promise<ScrapeImageResult[]> {
+	const { attachImageAssetUrls, storedImageAssetUrl } = await import(
+		"@/lib/preview-capabilities"
+	);
+	return images.map((image) => ({
+		...image,
+		assetUrl: image.assetId
+			? storedImageAssetUrl(image.id, scrapeId, ownerId)
+			: attachImageAssetUrls([image], scrapeId, ownerId)[0].assetUrl,
+	}));
+}
+
 // Persisted detail without signed asset URLs: signing needs request context, so
 // the API route and the detail loader attach them.
 export interface ScrapeDetail extends ScrapeRow {

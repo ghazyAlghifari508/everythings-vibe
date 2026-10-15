@@ -35,8 +35,8 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 			user.id,
 			mode,
 		);
-		const { attachImageAssetUrls } = await import("@/lib/preview-capabilities");
-		const images = attachImageAssetUrls(imageRows, id, user.id);
+		const { signScrapeImages } = await import("@/lib/services/scrape-service");
+		const images = await signScrapeImages(imageRows, id, user.id);
 		let appOrigin = "http://localhost:3000";
 		try {
 			const { getRequestHeaders, getRequestUrl } = await import(

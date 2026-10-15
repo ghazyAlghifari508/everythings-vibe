@@ -73,10 +73,10 @@ export async function GET({
 		// Crawl and image rows are returned with the status so polling renders
 		// progressively persisted results without a page reload. Image rows get
 		// freshly signed asset URLs, matching the detail loader contract.
-		const { attachImageAssetUrls } = await import("@/lib/preview-capabilities");
+		const { signScrapeImages } = await import("@/lib/services/scrape-service");
 		const payload: ScrapeDetailPayload = {
 			...scrape,
-			images: attachImageAssetUrls(scrape.images, id, user.id),
+			images: await signScrapeImages(scrape.images, id, user.id),
 		};
 		return Response.json({ scrape: payload });
 	} catch (error) {

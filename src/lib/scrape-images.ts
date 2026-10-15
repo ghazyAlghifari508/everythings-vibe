@@ -1,6 +1,28 @@
 import type { ImageEvidence } from "@/db/schema";
 import type { RenderedImage } from "./render-page";
 
+export function imageResultCounts(
+	images: readonly { status: string; assetId?: string | null }[],
+	discovered = images.length,
+) {
+	const verified = images.filter((image) => image.status === "completed");
+	const persisted = verified.filter((image) => image.assetId).length;
+	const failed = images.filter((image) => image.status === "failed").length;
+	const total = Math.max(discovered, images.length);
+	return {
+		discovered: total,
+		persisted,
+		linked: verified.length - persisted,
+		verified: verified.length,
+		failed,
+		pending: total - verified.length - failed,
+	};
+}
+
+export function imageCountsLabel(counts: ReturnType<typeof imageResultCounts>) {
+	return `${counts.discovered} ditemukan · ${counts.persisted} tersimpan · ${counts.linked} tautan terverifikasi · ${counts.failed} gagal · ${counts.pending} tertunda`;
+}
+
 // How a page-level image capture ended. Kept explicit so the UI never presents
 // a failed extraction as a successful empty result.
 export type ScrapeImageDiscovery =
