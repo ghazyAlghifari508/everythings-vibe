@@ -1,7 +1,12 @@
 ﻿import { setTimeout as wait } from "node:timers/promises";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { type ScrapeRow, scrapePages, scrapes } from "@/db/schema";
+import {
+	type ScrapeRow,
+	scrapeImages,
+	scrapePages,
+	scrapes,
+} from "@/db/schema";
 import { crawlWebsite, isCrawlScope } from "@/lib/crawl-website";
 import {
 	designErrorCodeForHttpStatus,
@@ -20,6 +25,10 @@ import {
 	classifyImageFailures,
 	type FailedResourceEvidence,
 } from "./scrape-failure-summary";
+import {
+	createImageSitePolicy,
+	imageResultCounts,
+} from "./scrape-image-policy";
 import {
 	ImageStorageError,
 	persistScrapeImage,
@@ -69,13 +78,14 @@ export function shouldRetryImageFetch(
 async function fetchImageAsset(
 	url: string,
 	signal: AbortSignal | undefined,
+	allowUrl: (url: string) => Promise<boolean>,
 ): Promise<Awaited<ReturnType<typeof fetchAsset>>> {
 	let lastError: unknown;
 	for (let attempt = 0; attempt < IMAGE_FETCH_ATTEMPTS; attempt += 1) {
 		if (attempt > 0)
 			await wait(IMAGE_FETCH_RETRY_DELAY_MS, undefined, { signal });
 		try {
-			const asset = await fetchAsset(url, 0, { signal });
+			const asset = await fetchAsset(url, 0, { signal, allowUrl });
 			if (shouldRetryImageFetch(attempt, asset.status, null)) continue;
 			return asset;
 		} catch (error) {
@@ -290,6 +300,8 @@ export async function runExtractionJob(
 			);
 		}
 	} else if (request.mode === "images") {
+		const allowUrl = createImageSitePolicy(claim.signal);
+		await allowUrl(request.url);
 		// Distinguishes a page that genuinely has no images from a discovery
 		// failure. The browser capture already succeeded by this point, so an
 		// empty candidate list is a real observation, while a missing list means
@@ -341,6 +353,22 @@ export async function runExtractionJob(
 		const validImages: typeof images = [];
 		let failedImages = 0;
 		const failedResources: FailedResourceEvidence[] = [];
+		const loadResults = () =>
+			db
+				.select({
+					url: scrapeImages.url,
+					assetId: scrapeImages.assetId,
+					failureCode: scrapeImages.failureCode,
+					httpStatus: scrapeImages.httpStatus,
+				})
+				.from(scrapeImages)
+				.where(
+					and(
+						eq(scrapeImages.userId, claim.userId),
+						eq(scrapeImages.scrapeId, claim.id),
+					),
+				);
+		const initialCounts = imageResultCounts(await loadResults(), images);
 		await update({
 			status: "extracting",
 			metadata: {
@@ -348,10 +376,7 @@ export async function runExtractionJob(
 				mode: "images",
 				imageDiscovery: images.length ? "found" : "none",
 				imageStorage: "postgres-private",
-				discoveredImages: images.length,
-				processedImages: 0,
-				savedImages: 0,
-				failedResources: 0,
+				...initialCounts,
 			},
 		});
 		for (const image of images) {
@@ -363,7 +388,7 @@ export async function runExtractionJob(
 				httpStatus: null,
 			};
 			try {
-				const asset = await fetchImageAsset(image.url, claim.signal);
+				const asset = await fetchImageAsset(image.url, claim.signal, allowUrl);
 				if (asset.status < 200 || asset.status >= 300)
 					throw new ScrapeError(
 						designErrorCodeForHttpStatus(asset.status),
@@ -436,10 +461,7 @@ export async function runExtractionJob(
 				metadata: {
 					...scrape.metadata,
 					mode: "images",
-					discoveredImages: images.length,
-					processedImages: validImages.length + failedImages,
-					savedImages: validImages.length,
-					failedResources: failedImages,
+					...imageResultCounts(await loadResults(), images),
 					activity: image.url,
 					activityStartedAt: new Date().toISOString(),
 				},
@@ -450,12 +472,23 @@ export async function runExtractionJob(
 		// verification failure are different facts about the run. When every
 		// asset failed, the failure is classified from the evidence each fetch
 		// actually produced instead of one generic message.
+		const finalRows = await loadResults();
+		const finalCounts = imageResultCounts(finalRows, images);
 		const imageOutcome = classifyImageOutcome(
-			images.length,
-			validImages.length,
+			finalCounts.discoveredImages,
+			finalCounts.savedImages,
 		);
 		if (imageOutcome === "all-failed") {
-			const failure = classifyImageFailures(failedResources);
+			const failure = classifyImageFailures(
+				finalRows
+					.filter((row) => !row.assetId)
+					.map((row) => ({
+						code: row.failureCode?.endsWith("STORAGE_QUOTA")
+							? "STORAGE_FAILED"
+							: row.failureCode,
+						httpStatus: row.httpStatus,
+					})),
+			);
 			throw new ScrapeError(
 				failure.code,
 				`Seluruh ${failedImages} resource gambar gagal diverifikasi. Detail kegagalan tersimpan.`,
@@ -472,10 +505,7 @@ export async function runExtractionJob(
 				...scrape.metadata,
 				mode: "images",
 				imageOutcome,
-				discoveredImages: images.length,
-				processedImages: validImages.length + failedImages,
-				savedImages: validImages.length,
-				failedResources: failedImages,
+				...finalCounts,
 			},
 		});
 	} else
