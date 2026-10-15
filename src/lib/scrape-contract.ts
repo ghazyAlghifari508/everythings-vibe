@@ -143,6 +143,82 @@ export type ImagesSettings = z.infer<typeof imagesSettingsSchema>;
 
 const SCRAPE_MODES = ["design", "html", "crawl", "images"] as const;
 
+export type ScrapeHistoryMode = (typeof SCRAPE_MODES)[number];
+export type ScrapeHistoryStatusGroup = "completed" | "failed" | "processing";
+export type ScrapeHistorySort = "newest" | "oldest";
+
+export const SCRAPE_HISTORY_MODES: ReadonlyArray<ScrapeHistoryMode> =
+	SCRAPE_MODES;
+export const SCRAPE_HISTORY_STATUS_GROUPS: ReadonlyArray<ScrapeHistoryStatusGroup> =
+	["completed", "failed", "processing"];
+export const SCRAPE_HISTORY_SORTS: ReadonlyArray<ScrapeHistorySort> = [
+	"newest",
+	"oldest",
+];
+
+const scrapeHistorySearchRawSchema = z.object({
+	mode: z.enum(SCRAPE_MODES).optional(),
+	status: z.enum(["completed", "failed", "processing"]).optional(),
+	q: z.string().optional(),
+	sort: z.enum(["newest", "oldest"]).optional(),
+	page: z.union([z.number(), z.string()]).optional(),
+	pageSize: z.union([z.number(), z.string()]).optional(),
+});
+
+export interface ScrapeHistorySearch {
+	mode?: ScrapeHistoryMode;
+	status?: ScrapeHistoryStatusGroup;
+	q: string;
+	sort: ScrapeHistorySort;
+	page: number;
+	pageSize: number;
+}
+
+function toSafePageSize(value: unknown): number {
+	const num = typeof value === "string" ? Number(value) : value;
+	if (num === 10 || num === 20 || num === 50) return num;
+	return 10;
+}
+
+function toSafePage(value: unknown): number {
+	const num = typeof value === "string" ? Number(value) : value;
+	if (Number.isSafeInteger(num) && (num as number) >= 1) return num as number;
+	return 1;
+}
+
+export function parseScrapeHistorySearch(search: unknown): ScrapeHistorySearch {
+	const parsed = scrapeHistorySearchRawSchema.safeParse(search);
+	const raw = parsed.success ? parsed.data : {};
+	const mode = parsed.success ? raw.mode : undefined;
+	const status = parsed.success ? raw.status : undefined;
+	const sort: ScrapeHistorySort =
+		parsed.success && (raw.sort === "newest" || raw.sort === "oldest")
+			? raw.sort
+			: "newest";
+	const q =
+		parsed.success && typeof raw.q === "string"
+			? raw.q.trim().slice(0, 128)
+			: "";
+	return {
+		...(mode ? { mode } : {}),
+		...(status ? { status } : {}),
+		q,
+		sort,
+		page: toSafePage(parsed.success ? raw.page : undefined),
+		pageSize: toSafePageSize(parsed.success ? raw.pageSize : undefined),
+	};
+}
+
+export function resolveScrapeHistoryOffset(search: ScrapeHistorySearch): {
+	limit: number;
+	offset: number;
+} {
+	return {
+		limit: search.pageSize,
+		offset: (search.page - 1) * search.pageSize,
+	};
+}
+
 // Optional so existing links keep working without a mode, while a recovery link
 // can still ask for the form that matches the mode that failed.
 export const scrapeWorkspaceSearchSchema = z.object({

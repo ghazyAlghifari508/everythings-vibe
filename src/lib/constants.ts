@@ -90,6 +90,19 @@ export const MAX_PROMPT_LENGTH = 3000;
 export const EXPORT_FILENAME_PREFIX = "vibeeverything";
 export const HOME_DRAFT_DEBOUNCE_MS = 300;
 export const HISTORY_PAGE_SIZE = 12;
+// === Scrape history (Phase 7) ===
+// Bounded server-side pagination for the scrape history workspace. The list
+// surface stays dense and predictable: only these page sizes ever reach the
+// query, so counts and offsets cannot be abused into over-fetching.
+export const SCRAPE_HISTORY_PAGE_SIZES = [10, 20, 50] as const;
+export const SCRAPE_HISTORY_DEFAULT_PAGE_SIZE = 10;
+export const SCRAPE_HISTORY_MAX_LIMIT = 50;
+// Literal substring search bound shared by the validator and the query so a
+// pasted paragraph never becomes an unbounded LIKE pattern.
+export const SCRAPE_HISTORY_SEARCH_MAX_CHARS = 128;
+// Debounce for the history search input: visible keystrokes stay instant while
+// URL/loader updates wait for a pause in typing.
+export const SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS = 300;
 // Existing-codebase library page size. Separate from HISTORY_PAGE_SIZE: the
 // two lists show different entity types with different card density, so they
 // must be able to diverge without coupling the Greenfield history list.
