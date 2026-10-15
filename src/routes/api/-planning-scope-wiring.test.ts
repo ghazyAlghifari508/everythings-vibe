@@ -65,4 +65,25 @@ describe("Task generation route", () => {
 		expect(src).toContain("buildTaskRepairUserMessage");
 		expect(src).toContain("project.projectMode");
 	});
+
+	it("applies evidence-based scope refinement before persisting", () => {
+		expect(src).toContain("applyScopeRefinement");
+		expect(src).toContain("buildScopeEvidence(generationContext)");
+		expect(src).toContain("validateScopeConsistency");
+		expect(src).toContain("refineTaskScope");
+		// The refined tree — not the raw model tree — is what gets saved.
+		expect(src).toContain("saveTaskTree(projectId, scopedTree)");
+	});
+
+	it("reports scope decisions on the stream instead of mutating silently", () => {
+		expect(src).toContain("describeScopeRefinement");
+		expect(src).toMatch(/type: "thinking", content: summary/);
+	});
+
+	it("never adds a destructive path for existing task progress", () => {
+		// The refinement must not reset Kanban status or delete persisted tasks
+		// outside the pre-existing saveTaskTree boundary.
+		expect(src).not.toContain("delete(tasks)");
+		expect(src).not.toMatch(/set\(\{\s*status:\s*"pending"/);
+	});
 });
