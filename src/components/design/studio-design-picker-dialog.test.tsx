@@ -138,4 +138,60 @@ describe("StudioDesignPickerDialog", () => {
 		fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
 		expect(onOpenChange).toHaveBeenCalledWith(false);
 	});
+
+	it("renders as true fullscreen shell with horizontally centered content container", () => {
+		renderDialog();
+		const dialog = screen.getByRole("dialog");
+		const classes = dialog.className;
+
+		// Shell fills viewport without floating borders or margins
+		expect(classes).toContain("w-screen");
+		expect(classes).toContain("h-dvh");
+		expect(classes).toContain("rounded-none");
+		expect(classes).not.toContain("sm:rounded-2xl");
+
+		// Centered container inside scroller
+		const scroller = dialog.querySelector(".overflow-y-auto");
+		expect(scroller).not.toBeNull();
+		const centeredContainer = scroller?.firstElementChild as HTMLElement;
+		expect(centeredContainer).not.toBeNull();
+		expect(centeredContainer.className).toContain("mx-auto");
+		expect(centeredContainer.className).toContain("max-w-4xl");
+	});
+
+	it("keeps tabs compact and supports keyboard arrow navigation", () => {
+		renderDialog();
+		const tablist = screen.getByRole("tablist");
+		expect(tablist.className).toContain("inline-flex");
+
+		const tabs = screen.getAllByRole("tab");
+		for (const tab of tabs) {
+			expect(tab.className).not.toContain("flex-1");
+		}
+
+		// Keyboard navigation
+		const activeTab = screen.getByRole("tab", { name: "Tema" });
+		fireEvent.keyDown(activeTab, { key: "ArrowRight" });
+		expect(
+			screen
+				.getByRole("tab", { name: "Template" })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+
+		const templateTab = screen.getByRole("tab", { name: "Template" });
+		fireEvent.keyDown(templateTab, { key: "ArrowRight" });
+		expect(
+			screen
+				.getByRole("tab", { name: "Punya Saya" })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+
+		const customTab = screen.getByRole("tab", { name: "Punya Saya" });
+		fireEvent.keyDown(customTab, { key: "ArrowLeft" });
+		expect(
+			screen
+				.getByRole("tab", { name: "Template" })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+	});
 });
