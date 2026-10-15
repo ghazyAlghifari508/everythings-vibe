@@ -3,6 +3,7 @@
 import { Link } from "@tanstack/react-router";
 import {
 	AlertTriangle,
+	ArrowLeft,
 	ArrowUpDown,
 	Check,
 	ChevronDown,
@@ -58,6 +59,10 @@ interface KanbanBoardProps {
 	projectName: string;
 	latestPrdContent?: string | null;
 	latestAcContent?: string | null;
+	navigationContext?: {
+		codebaseId: string;
+		codebaseName: string;
+	};
 }
 
 export function KanbanBoard({
@@ -65,6 +70,7 @@ export function KanbanBoard({
 	projectName,
 	latestPrdContent,
 	latestAcContent,
+	navigationContext,
 }: KanbanBoardProps) {
 	const isProjectDrawerOpen = useUIStore((s) => s.isProjectDrawerOpen);
 	const setProjectDrawerOpen = useUIStore((s) => s.setProjectDrawerOpen);
@@ -114,6 +120,11 @@ export function KanbanBoard({
 				? computeKanbanProgress(visibleColumns)
 				: { total: 0, done: 0, pct: 0 },
 		[visibleColumns],
+	);
+	const projectProgress = useMemo(
+		() =>
+			columns ? computeKanbanProgress(columns) : { total: 0, done: 0, pct: 0 },
+		[columns],
 	);
 
 	const hasProjectTasks = useMemo(() => {
@@ -306,9 +317,16 @@ export function KanbanBoard({
 						<div className="flex items-center gap-2.5 min-w-0">
 							<KanbanSquare size={18} className="text-indigo shrink-0" />
 							<h1 className="truncate font-inter text-base sm:text-lg font-[600] text-snow">
-								Kanban - {projectName}
+								{navigationContext ? projectName : `Kanban - ${projectName}`}
 							</h1>
 						</div>
+						{navigationContext ? (
+							<p className="mt-1 truncate text-xs text-fog">
+								{navigationContext.codebaseName} / {projectName} ·{" "}
+								{projectProgress.done}/{projectProgress.total} task selesai (
+								{projectProgress.pct}%)
+							</p>
+						) : null}
 
 						{/* CLI / Connection status as supporting metadata */}
 						<div className="mt-1 flex items-center gap-1.5 text-xs min-w-0">
@@ -374,7 +392,7 @@ export function KanbanBoard({
 						</div>
 					</div>
 
-					<div className="flex items-center gap-2 sm:gap-3 shrink-0 self-start sm:self-center">
+					<div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 self-start sm:self-center">
 						{lastUpdateAt && (
 							<span className="text-[10px] text-fog/60 font-mono hidden md:inline">
 								Update: {new Date(lastUpdateAt).toLocaleTimeString()}
@@ -392,19 +410,33 @@ export function KanbanBoard({
 								{isResetting ? "Mereset..." : "Reset Progress"}
 							</Button>
 						)}
-						<Link
-							to="/task/$id"
-							params={{ id: projectId }}
-							className="btn-primary px-3 py-1.5 rounded-md text-xs font-[510]"
-						>
-							Roadmap
-						</Link>
-						<Link
-							to="/plan/new"
-							className="px-3 py-1.5 rounded-md text-xs font-[510] flex items-center gap-1.5 border border-snow/40 text-snow hover:border-snow/70 transition-colors bg-transparent"
-						>
-							Kembali ke Chat
-						</Link>
+						{navigationContext ? (
+							<Link
+								to="/codebases/$id"
+								params={{ id: navigationContext.codebaseId }}
+								aria-label={`Kembali ke workspace ${navigationContext.codebaseName}`}
+								className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-snow/40 px-3 py-1.5 text-xs font-[510] text-snow transition-colors hover:border-snow/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								<ArrowLeft size={14} aria-hidden="true" />
+								Kembali ke Workspace
+							</Link>
+						) : (
+							<>
+								<Link
+									to="/task/$id"
+									params={{ id: projectId }}
+									className="btn-primary px-3 py-1.5 rounded-md text-xs font-[510]"
+								>
+									Roadmap
+								</Link>
+								<Link
+									to="/plan/new"
+									className="px-3 py-1.5 rounded-md text-xs font-[510] flex items-center gap-1.5 border border-snow/40 text-snow hover:border-snow/70 transition-colors bg-transparent"
+								>
+									Kembali ke Chat
+								</Link>
+							</>
+						)}
 					</div>
 				</div>
 			</header>

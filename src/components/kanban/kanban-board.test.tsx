@@ -172,6 +172,24 @@ describe("KanbanBoard", () => {
 		);
 	});
 
+	it("renders repository identity and live project progress with workspace navigation", async () => {
+		const c = renderBoard({
+			navigationContext: {
+				codebaseId: "repo-1",
+				codebaseName: "Ocean Guard",
+			},
+		});
+
+		await vi.waitFor(() => {
+			expect(c.textContent).toContain("Ocean Guard / Test Kanban App");
+			expect(c.textContent).toContain("0/3 task selesai (0%)");
+		});
+
+		expect(c.querySelector('a[to="/codebases/$id"]')).not.toBeNull();
+		expect(c.querySelector('a[to="/plan/new"]')).toBeNull();
+		expect(c.textContent).not.toContain("Kembali ke Chat");
+	});
+
 	it("renders toolbar with compact phase filter and wide progress track", async () => {
 		const c = renderBoard();
 

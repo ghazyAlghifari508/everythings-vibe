@@ -349,7 +349,7 @@ export function CodebaseKanbanBoard({
 							<a
 								href={
 									codebaseId
-										? `/codebases/${encodeURIComponent(codebaseId)}/kanban/${encodeURIComponent(projectId)}`
+										? `/codebases/kanban/${encodeURIComponent(codebaseId)}/${encodeURIComponent(projectId)}`
 										: `/kanban/${encodeURIComponent(projectId)}`
 								}
 								target="_blank"

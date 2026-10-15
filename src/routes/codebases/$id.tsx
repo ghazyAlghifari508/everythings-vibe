@@ -2884,6 +2884,7 @@ function CodebaseDetailPage() {
 									canvasView === "kanban" ? (
 										<CodebaseKanbanBoard
 											projectId={resolvedFeature.id}
+											codebaseId={codebase.id}
 											columns={kanbanColumns}
 											staleness={kanban.staleness}
 											isLoadingExternal={kanban.isLoading}

@@ -156,7 +156,7 @@ describe("CodebaseKanbanBoard full board action", () => {
 			"[data-testid='codebase-kanban-full-board']",
 		);
 
-		expect(link?.getAttribute("href")).toBe("/codebases/repo-1/kanban/proj-1");
+		expect(link?.getAttribute("href")).toBe("/codebases/kanban/repo-1/proj-1");
 		expect(link?.getAttribute("target")).toBe("_blank");
 		expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
 	});
