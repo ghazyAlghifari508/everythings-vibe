@@ -325,6 +325,7 @@ function ScrapeDetailPage() {
 				<div id={SCRAPE_RESULTS_ANCHOR_ID} className="scroll-mt-6">
 					<ImagesResult
 						images={images}
+						discoveredImages={metadata?.discoveredImages}
 						sourceUrl={sourceUrl}
 						imageOutcome={data?.metadata?.imageOutcome ?? null}
 					/>

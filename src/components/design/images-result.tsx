@@ -158,10 +158,12 @@ export function ImagesResult({
 	images,
 	sourceUrl,
 	imageOutcome,
+	discoveredImages,
 }: {
 	images: ImageResult[];
 	sourceUrl: string;
 	imageOutcome?: "complete" | "partial" | "empty" | "all-failed" | null;
+	discoveredImages?: number;
 }) {
 	const [formatFilter, setFormatFilter] = useState("");
 	const [kindFilter, setKindFilter] = useState("");
@@ -178,7 +180,7 @@ export function ImagesResult({
 			),
 		),
 	];
-	const counts = imageResultCounts(images);
+	const counts = imageResultCounts(images, discoveredImages);
 	const saved = counts.verified;
 	const failed = images.filter((image) => image.status === "failed").length;
 	const visible = images.filter(
@@ -391,7 +393,7 @@ export function ImagesResult({
 								diambil.
 							</p>
 						</>
-					) : images.length > 0 && saved === 0 ? (
+					) : images.length > 0 && saved === 0 && counts.pending === 0 ? (
 						<>
 							<p className="text-sm font-semibold text-snow">
 								Semua gambar gagal diambil
