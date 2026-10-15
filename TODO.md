@@ -1,8 +1,21 @@
-# PRDFY / VibeEverything — Backlog & Roadmap (TODO)
+# everythings-vibe — Backlog & Roadmap (TODO)
 
-## 📌 Architectural Backlog: Greenfield Workspace Routing Architecture Refactor
+Dokumen ini memuat daftar rencana kerja, backlog arsitektur, standarisasi kualitas, refaktor teknis, dan pembersihan sistem untuk repositori **everythings-vibe**.
 
-### 1. Ringkasan Ide & Kebutuhan
+---
+
+## 📌 DAFTAR ISI BACKLOG
+1. [Bagian 1: Architectural Backlog — Greenfield Workspace Routing Architecture Refactor](#1-architectural-backlog--greenfield-workspace-routing-architecture-refactor)
+2. [Bagian 2: UI/UX Standarisasi — WAJIB Mobile & Tablet Responsive Seluruh Halaman](#2-uiux-standarisasi--wajib-mobile--tablet-responsive-seluruh-halaman)
+3. [Bagian 3: Refactoring & Clean Code — Dekonstruksi File Monster (~2.000 Baris) & Reusable Architecture](#3-refactoring--clean-code--dekonstruksi-file-monster-2000-baris--reusable-architecture)
+4. [Bagian 4: Dead Code Elimination — Pembersihan Total Deathcode, File/Folder Sampah & Unused Dependencies](#4-dead-code-elimination--pembersihan-total-deathcode-filefolder-sampah--unused-dependencies)
+5. [Bagian 5: Rebranding Ecosystem — Migrasi Menyeluruh dari VibeEverything ke everythings-vibe](#5-rebranding-ecosystem--migrasi-menyeluruh-dari-vibeeverything-ke-everythings-vibe)
+
+---
+
+## 1. Architectural Backlog — Greenfield Workspace Routing Architecture Refactor
+
+### 1.1. Ringkasan Ide & Kebutuhan
 * **Status:** `Proposed / Backlog`
 * **Inisiator:** Product & UX Alignment
 * **Deskripsi:** Saat ini alur Greenfield berpindah-pindah rute menggunakan path mandiri terpisah:
@@ -16,7 +29,7 @@
 
 ---
 
-### 2. Evaluasi Opsi Solusi
+### 1.2. Evaluasi Opsi Solusi
 
 #### Opsi 1: Search-Param-Driven State Routing (Wizard Single-Route)
 * **Format URL:** `/vibeplan/:id?step=question` $\rightarrow$ `?step=fitur` $\rightarrow$ `?step=prd` $\rightarrow$ `?step=ac` $\rightarrow$ `?step=task` $\rightarrow$ `?step=kanban`
@@ -56,19 +69,355 @@
 
 ---
 
-### 3. Lingkup Perubahan & Dampak (Impact Assessment)
+### 1.3. Lingkup Perubahan & Dampak (Impact Assessment)
 Jika refactor ini dieksekusi di masa mendatang, area berikut wajib diperbarui:
 1. **Routing Files:** Penataan ulang file di `src/routes/`.
 2. **Step Mapping Helper:** Penyesuaian `stepToRoute` & `stepToRouteTarget` di `src/lib/flow-step.ts`.
 3. **Card History & Deep Linking:** Link resume di `src/components/history/history-card.tsx`.
 4. **Auth & Redirection:** Callback login / onboarding redirect targets.
-5. **Test Suites:** Penyesuaian assertions rute di 140+ file unit test dan E2E test.
+5. **Test Suites:** Penyesuaian assertions rute di file unit test dan E2E test terkait navigasi rute.
 
 ---
 
-### 4. Milestone Eksekusi (Ketika Siap Diimplementasikan)
+### 1.4. Milestone Eksekusi (Ketika Siap Diimplementasikan)
 - [ ] **Fase 1 — Desain Spesifikasi:** Putuskan antara Opsi 1 (Search-Param) atau Opsi 2 (Nested Layout Routes).
 - [ ] **Fase 2 — Layout Shell Prototype:** Buat layout parent `/vibeplan/$id` dengan shared Navbar & breadcrumb.
 - [ ] **Fase 3 — Migrasi View Anak:** Pindahkan implementasi Ask, Fitur, PRD, AC, Task, dan Kanban ke dalam outlet/switcher baru.
 - [ ] **Fase 4 — Router Redirects:** Tambahkan backward-compatibility redirect dari `/ask/:id`, `/prd/:id`, dll. ke route baru agar link lama tidak 404.
 - [ ] **Fase 5 — Verifikasi & Test Suite:** Update dan jalankan seluruh suite `pnpm check`, `pnpm test`, dan QA DevTools.
+
+---
+
+## 2. UI/UX Standarisasi — WAJIB Mobile & Tablet Responsive Seluruh Halaman
+
+### 2.1. Latar Belakang & Urgensi
+Saat ini sebagian antarmuka terfokus pada viewport desktop (layar lebar). Ketika dibuka pada layar Tablet (768px - 1024px) atau Ponsel/Mobile (360px - 480px), terdapat potensi horizontal overflow, font terpotong, canvas sulit digeser/di-pinch, toolbar menumpuk, tabel/kanban board terdistorsi, atau drawer/modal yang melebihi batas layar.
+**Mandat:** Seluruh halaman dan komponen UI tanpa terkecuali WAJIB responsif, nyaman disentuh (touch-friendly), dan bebas dari bug layout pada resolusi mobile serta tablet.
+
+### 2.2. Prinsip & Standar Responsivitas (Definition of Done)
+1. **Zero Horizontal Overflow:** Tidak ada elemen yang bocor ke kanan (`overflow-x: hidden` alami tanpa merusak scrolling konten utama).
+2. **Breakpoints Standar:**
+   - **Mobile:** 360px – 640px (`sm` breakpoint Tailwind).
+   - **Tablet / Small Laptop:** 641px – 1024px (`md` & `lg` breakpoint).
+   - **Desktop:** > 1024px (`xl` & `2xl`).
+3. **Touch Targets Safe:** Semua button, icon button, dan trigger minimal memiliki ukuran interaktif 44x44px.
+4. **Readable Typography:** Ukuran font dan line-height nyaman dibaca di layar kecil tanpa perlu zoom manual.
+5. **Fluid Drawers & Bottom Sheets:** Sidebar/panel di desktop berubah menjadi collapsible bottom sheet atau off-canvas drawer di mobile.
+
+---
+
+### 2.3. Checklist Audit & Perbaikan per Halaman
+
+#### A. Public & Marketing Pages
+- [ ] **Landing Page (`src/routes/index.tsx`):**
+  - [ ] Hero Section: Susunan headline, CTA button, dan ilustrasi bento grid stack vertikal pada layar `< 768px`.
+  - [ ] 4-Bento Navigation Hub: Grid bento 4-kolom berubah menjadi 1-kolom di mobile dan 2-kolom di tablet.
+  - [ ] Interactive feature previews / showcase tidak meluap ke luar layar.
+- [ ] **Pricing Page (`src/routes/pricing.tsx`):**
+  - [ ] Pricing card grid berubah dari 3-kolom menjadi 1-kolom bersusun dengan kartu "Recommended" tetap kontras.
+  - [ ] Tabel perbandingan fitur memiliki horizontal scroll indikator yang jelas atau accordion di mobile.
+  - [ ] Tombol Checkout/Top-up mudah diakses (sticky bottom bar jika diperlukan).
+- [ ] **About (`src/routes/about.tsx`) & FAQ (`src/routes/faq.tsx`):**
+  - [ ] Padding container responsif (`px-4 sm:px-6 lg:px-8`).
+  - [ ] Accordion item pada FAQ mudah ditekan dengan target sentuh lebar.
+- [ ] **Templates Page (`src/routes/templates.tsx`):**
+  - [ ] Filter tab / category pill dapat digeser horizontal secara halus (`flex overflow-x-auto no-scrollbar`).
+  - [ ] Card template beralih ke layout 1-kolom (mobile) dan 2-kolom (tablet).
+- [ ] **Bantuan & Feedback (`src/routes/bantuan.tsx`):**
+  - [ ] Form input keluhan, file uploader screenshot, dan tombol kirim responsif penuh.
+- [ ] **Auth, Login & Onboarding (`src/routes/login.tsx`, `src/routes/onboarding.tsx`):**
+  - [ ] Card formulir login OAuth (Google & GitHub) berada tepat di tengah tanpa margin terpotong keyboard virtual mobile.
+  - [ ] Step onboarding multi-step muat dengan rapi tanpa tertutup header browser HP.
+- [ ] **Maintenance Page (`src/routes/maintenance.tsx`):**
+  - [ ] Ilustrasi dan pesan error terpusat dan proporsional di seluruh ukuran layar.
+
+#### B. Core Workspace & Flow Pages
+- [ ] **Global Navbar & History Drawer (`src/components/layout/navbar.tsx`, `history-drawer.tsx`):**
+  - [ ] Hamburger icon responsif di pojok kiri atas untuk membuka History Drawer di mobile.
+  - [ ] Logo dan status kredit tetap terbaca rapi; sisa kredit tidak berhimpitan dengan profile avatar.
+  - [ ] Profile dropdown menu dan modal dialogs pas di dalam viewport HP.
+- [ ] **History Page (`src/routes/history.tsx`):**
+  - [ ] Daftar project card tersusun rapi dengan badge status yang tidak wrap semrawut.
+  - [ ] Search input dan filter dropdown mudah diakses di layar sempit.
+- [ ] **Plan Hub (`src/routes/plan/index.tsx`, `plan/new.tsx`, `plan/codebase.tsx`):**
+  - [ ] Pilihan mode workspace ("Greenfield New Project" vs "Existing Codebase") stack vertikal di mobile.
+  - [ ] Form input ide / deskripsi proyek memenuhi lebar layar dengan padding yang proporsional.
+  - [ ] CLI sync instruction box di `/plan/codebase` memiliki copy-to-clipboard button yang nyaman dan text block `overflow-x-auto`.
+- [ ] **Guided Questions (`src/routes/ask/$id.tsx`):**
+  - [ ] Question cards dan multiple-choice options mudah dipilih via sentuhan jari (min 44px tinggi tap).
+  - [ ] Textarea untuk custom answer tidak tertutup oleh tombol navigasi "Next / Generate".
+  - [ ] Progress indicator pertanyaan di atas terlihat jelas dan tidak gepeng di tablet/HP.
+- [ ] **Feature Tree Diagram (`src/routes/fitur/$id.tsx`):**
+  - [ ] Canvas diagram pohon fitur (`FeatureMapCanvas`) mendukung gesture pan (geser layar) dan zoom in/out di mobile/tablet.
+  - [ ] Floating action toolbar (Zoom, Reset, Download, Continue) tidak menutupi diagram utama di mobile.
+- [ ] **PRD Viewer & AI Revision Chat (`src/routes/prd/$id.tsx`):**
+  - [ ] Dual-panel (PRD Document di kiri + Chat Panel di kanan) berubah menjadi tabbed view atau toggle sheet di mobile (`< 1024px`).
+  - [ ] Markdown PRD rendered table memiliki wrapper `overflow-x-auto` agar tabel spesifikasi tidak memotong halaman.
+  - [ ] Mermaid diagram di dalam PRD otomatis scale atau menyediakan zoom modal jika diagram terlalu lebar.
+  - [ ] Chat panel bubble input tidak tertutup virtual keyboard mobile.
+- [ ] **PRD Public Share (`src/routes/prd/share/$token.tsx`):**
+  - [ ] View publik PRD bebas gangguan pada browser mobile; tombol export/copy link tetap accessible.
+- [ ] **Acceptance Criteria (`src/routes/ac/$id.tsx`):**
+  - [ ] Daftar AC dan scenario Gherkin (Given-When-Then) ter-render rapi tanpa text clipping.
+  - [ ] Tombol edit / regenerate / accept criteria responsif dan tidak tumpang tindih.
+- [ ] **Task Breakdown Whiteboard Canvas (`src/routes/task/$id.tsx`):**
+  - [ ] `WhiteboardCanvas` mendukung viewport touch / drag canvas di tablet dan ponsel.
+  - [ ] Task card hierarchy node tidak berantakan saat resolusi layar berubah.
+  - [ ] Mode list alternatif (opsional jika canvas terlalu padat untuk layar 360px HP) agar pengguna tetap bisa membaca task tree.
+- [ ] **Interactive Kanban Board (`src/routes/kanban/$id.tsx`):**
+  - [ ] Kolom Kanban (To Do, In Progress, Done, etc.) dapat di-scroll horizontal secara halus (`flex gap-4 overflow-x-auto snap-x`).
+  - [ ] Drag-and-drop task card kompatibel dengan sentuhan sentuh layar (touch dnd fallback atau action menu pindah status).
+  - [ ] Modal detail card kanban muat penuh di layar HP (full-screen modal atau bottom sheet).
+- [ ] **Codebase Workspace (`src/routes/codebases/index.tsx`, `src/routes/codebases/$id.tsx`):**
+  - [ ] Dual/Triple pane (Explorer sidebar + Canvas/Doc Preview + Chat) beralih menjadi navigation tab atau drawer switch di mobile/tablet.
+  - [ ] Terminal sync command prompt box tidak membuat horizontal overflow di HP.
+
+#### C. Design Studio Pages
+- [ ] **Design Scrap & Studio (`src/routes/design/index.tsx`, `scrap.*`, `studio.*`):**
+  - [ ] Layout editor desain responsif: panel tools, canvas preview, dan inspect panel beradaptasi pada viewport tablet.
+  - [ ] Di layar mobile, berikan tampilan preview yang optimal atau notifikasi visual bahwa mode editing lebih disarankan di tablet/desktop.
+
+#### D. Settings & Admin Dashboard
+- [ ] **Settings Pages (`src/routes/settings/*`):**
+  - [ ] Sidebar navigasi Settings (`Profile`, `Account`, `Billing`, `API Keys`, `Notifications`, `Feedback`) berubah menjadi horizontal tab atau dropdown select di mobile.
+  - [ ] Tabel riwayat transaksi invoice Midtrans di `billing.tsx` responsif dengan card list fallback di mobile.
+- [ ] **Admin Dashboard (`src/routes/admin/*`):**
+  - [ ] Metric cards di `admin/index.tsx` stack menjadi 1 kolom (mobile) dan 2 kolom (tablet).
+  - [ ] Tabel pengguna, proyek, feedback, dan transaksi menggunakan responsive table layout (card view pada viewport kecil).
+
+---
+
+## 3. Refactoring & Clean Code — Dekonstruksi File Monster (~2.000 Baris) & Reusable Architecture
+
+### 3.1. Latar Belakang Masalah
+Ditemukan beberapa file raksasa (monster files) yang memiliki panjang antara 1.000 hingga hampir 2.000 baris kode dalam satu file. Hal ini melanggar prinsip *Single Responsibility Principle* (SRP), membuat readability sangat rendah, mempersulit maintenance, memicu merge conflict, dan memperlambat debugging.
+
+### 3.2. Temuan File Raksasa dalam Codebase (Fakta Kode)
+1. **`src/routes/codebases/$id.tsx` — 1.835 Baris:**
+   - Menampung seluruh logika workspace codebase: screen connection, sync polling, dynamic analysis fetcher, multi-tab switching, SSE streaming chat, Kanban integration, whiteboard integration, download handlers, dan puluhan state lokal.
+2. **`src/lib/codebase-sync.ts` — 1.582 Baris:**
+   - Menampung schema validation Zod, CLI command generator, format prompt builder, mock payload fixtures, token expiry checker, progress stage calculator, dan error mapper dalam satu file raksasa.
+3. **`src/components/task/whiteboard-canvas.tsx` — 1.349 Baris:**
+   - Menggabungkan logic canvas coordinate matrix, drag-and-drop listener, zoom/pan transforms, rendering node pohon task, konektor garis SVG/canvas, minimap, toolbar actions, dan modal edit task.
+4. **`src/lib/services/credit-service.ts` — 1.256 Baris:**
+   - Menampung transaksi balance, deduction atomic locks, audit logs, invoice creation, package listing, dan top-up webhook processing.
+5. **`src/components/chat/chat-panel.tsx` — 1.183 Baris:**
+   - Menggabungkan virtualized message list, markdown rendering, AI stream typewriter effect, file upload, quick prompts, revision patch parser (`:::UPDATE_SECTION:::`) dan audio/speech triggers.
+6. **File Pendukung Lain yang Membengkak:**
+   - `src/routes/api/chat.ts` — 931 baris.
+   - `src/components/codebase/codebase-chat-workspace.tsx` — 814 baris.
+   - `src/routes/plan/codebase.tsx` — 779 baris.
+   - `src/components/layout/navbar.tsx` — 771 baris.
+
+---
+
+### 3.3. Arsitektur Reusable & Clean Code yang Ditargetkan
+* **Batas Maksimal Baris:** Target ideal per file komponen/service adalah $\le$ 300 - 400 baris.
+* **Separation of Concerns (SoC):**
+  - **View Component:** Hanya menangani representasi visual dan styling JSX.
+  - **Custom Hook:** Menangani seluruh stateful logic, SSE subscription, event listeners, dan API calls.
+  - **Utility / Pure Function:** Fungsi transformasi data murni tanpa side-effect diletakkan di file terpisah.
+  - **Types / Schemas:** Definisi tipe domain dan skema Zod diletakkan di module terpisah atau didekatkan ke domain.
+
+---
+
+### 3.4. Checklist Refactoring File Monster
+
+#### A. Refactor `src/routes/codebases/$id.tsx` (1.835 baris $\rightarrow$ modular components)
+- [ ] Ekstraksi Custom Hook State & Polling:
+  - [ ] Buat `src/hooks/codebase/use-codebase-workspace.ts` (mengelola query data proyek, status sync, tab aktif).
+  - [ ] Buat `src/hooks/codebase/use-codebase-chat-stream.ts` (mengelola SSE chat streaming dan message state).
+- [ ] Dekonstruksi Sub-Komponen View:
+  - [ ] Pindahkan Screen Switcher ke `src/components/codebase/workspace/codebase-screen-resolver.tsx`.
+  - [ ] Ekstraksi Tab Content Renderers ke folder `src/components/codebase/tabs/`:
+    - `tab-overview.tsx`
+    - `tab-doc-preview.tsx`
+    - `tab-feature-map.tsx`
+    - `tab-whiteboard.tsx`
+    - `tab-kanban.tsx`
+  - [ ] Ekstraksi Toolbar & Header Workspace ke `src/components/codebase/workspace/codebase-workspace-header.tsx`.
+- [ ] Ringankan `src/routes/codebases/$id.tsx` menjadi file routing tipis (< 150 baris) yang hanya menyatukan layout shell dan hook.
+
+#### B. Refactor `src/lib/codebase-sync.ts` (1.582 baris $\rightarrow$ domain services)
+- [ ] Pecah menjadi modul terisolasi di dalam `src/lib/codebase/`:
+  - [ ] `sync-schemas.ts`: Seluruh Zod schema dan inferensi tipe TypeScript.
+  - [ ] `sync-commands.ts`: Logic pembentukan command CLI (`everythings-vibe codebase sync ...`).
+  - [ ] `sync-stages.ts`: Evaluasi stage progress, status enum, dan message mapping.
+  - [ ] `sync-prompts.ts`: Prompt generator untuk AI analysis instruksi sync.
+- [ ] Pertahankan re-export di `src/lib/codebase-sync.ts` sebagai facade agar backward compatibility impor tidak rusak.
+
+#### C. Refactor `src/components/task/whiteboard-canvas.tsx` (1.349 baris $\rightarrow$ canvas submodules)
+- [ ] Ekstraksi Logic Transformasi Canvas:
+  - [ ] Buat hook `src/hooks/use-canvas-viewport.ts` (mengelola pan, zoom, scale, pointer events, pinch-to-zoom).
+- [ ] Ekstraksi Komponen Grafis:
+  - [ ] `src/components/task/canvas/canvas-toolbar.tsx` (tombol zoom in/out, fit to screen, reset, fullscreen).
+  - [ ] `src/components/task/canvas/canvas-minimap.tsx` (radar view posisi canvas).
+  - [ ] `src/components/task/canvas/canvas-node.tsx` (rendering satu node task/subtask).
+  - [ ] `src/components/task/canvas/canvas-connectors.tsx` (rendering garis hubungan antar node).
+- [ ] Bersihkan `whiteboard-canvas.tsx` hingga fokus sebagai orchestrator visual canvas (< 300 baris).
+
+#### D. Refactor `src/components/chat/chat-panel.tsx` (1.183 baris $\rightarrow$ chat primitives)
+- [ ] Ekstraksi Sub-Komponen Chat:
+  - [ ] `src/components/chat/chat-message-list.tsx` (scrollable container dan virtualization).
+  - [ ] `src/components/chat/chat-message-item.tsx` (bubble pesan user vs assistant, copy button, timestamp).
+  - [ ] `src/components/chat/chat-input-area.tsx` (textarea auto-grow, submit shortcut, voice trigger, token counter).
+  - [ ] `src/components/chat/chat-patch-preview.tsx` (rendering visual diff untuk patch `:::UPDATE_SECTION:::`).
+- [ ] Ekstraksi State Hook:
+  - [ ] `src/hooks/use-chat-panel.ts` (mengisolasi autosave draft, scroll-to-bottom anchor, audio status).
+
+#### E. Refactor `src/lib/services/credit-service.ts` (1.256 baris $\rightarrow$ domain modules)
+- [ ] Pecah menjadi service modular di bawah `src/lib/services/credit/`:
+  - [ ] `credit-balance.ts` (query saldo kredit & tenant verification).
+  - [ ] `credit-deduction.ts` (atomic lock `consumeCredit` dengan strict WHERE clauses).
+  - [ ] `credit-topup.ts` (paket kredit, penambahan saldo, dan integrasi invoice).
+  - [ ] `credit-history.ts` (audit ledger logging & query pagination riwayat).
+- [ ] Facade file `src/lib/services/credit-service.ts` mengekspor kembali seluruh fungsi untuk menjaga kontrak pemanggil.
+
+#### F. Standar Koding & Safety Guard
+- [ ] Terapkan aturan ketat `no-type-bypass.md`: Dilarang menggunakan `as any`, `as never`, atau `@ts-ignore` pada hasil refaktor.
+- [ ] Menjaga seluruh test eksisting (unit test & e2e) tetap hijau: Tidak boleh me-refactor dengan cara menghapus assertion valid.
+- [ ] Dokumentasi interface / types yang jelas pada setiap modul baru.
+
+---
+
+## 4. Dead Code Elimination — Pembersihan Total Deathcode, File/Folder Sampah & Unused Dependencies
+
+### 4.1. Latar Belakang & Tujuan
+Seiring iterasi pengembangan fitur, banyak sisa artefak sementara, rute coba-coba (spike/prototype yang sudah usang), file boilerplate tidak terpakai, fungsi yatim (unreferenced functions), tipe data kadaluarsa, atau package dependencies yang tertinggal.
+**Tujuan:** Membersihkan repositori secara tuntas dari seluruh dead code agar codebase ramping, waktu build lebih cepat, ukuran bundle minimal, dan struktur folder bersih tanpa "sampah".
+
+### 4.2. Checklist Audit & Eliminasi Bertahap
+
+#### Tahap 1: Audit Rute & Folder Sementara (Route Spikes)
+- [ ] **Audit `src/routes/demo/`:**
+  - [ ] Periksa file `src/routes/demo/tanstack-query.tsx`. Jika ini hanya rute testing internal yang tidak digunakan lagi di production, jadwalkan untuk dihapus beserta foldernya.
+  - [ ] Jalankan `pnpm generate-routes` untuk memastikan rute terhapus rapi dari `src/routeTree.gen.ts`.
+- [ ] **Audit Scrap & Eksperimen Desain:**
+  - [ ] Periksa `src/routes/design/scrap.*.tsx` dan pastikan file yang sudah digantikan oleh `studio.*` dibersihkan atau ditata secara teratur.
+- [ ] **Audit File Testing Berawalan Dash (`-*`):**
+  - [ ] Identifikasi file seperti `src/routes/-bantuan.test.tsx`, `src/routes/-templates.test.tsx`, dsb. Pindahkan atau satukan ke struktur folder test standar (`tests/` atau colocation konsisten).
+
+#### Tahap 2: Audit Komponen & Hooks Yatim (Unreferenced Components & Hooks)
+- [ ] **Audit `src/components/ui/`:**
+  - [ ] Periksa seluruh primitive UI (apakah ada komponen shadcn/radix yang di-generate tapi tidak pernah diimpor di rute/komponen mana pun).
+- [ ] **Audit `src/components/` per Feature Domain:**
+  - [ ] Cari komponen yang tidak lagi memiliki caller/consumer di `src/components/prd/`, `ac/`, `task/`, `kanban/`, `codebase/`.
+- [ ] **Audit `src/hooks/`:**
+  - [ ] Periksa seluruh custom hooks di `src/hooks/` yang sudah tidak memiliki import aktif.
+
+#### Tahap 3: Audit Lib, Helpers & Tipe Data Obsolete
+- [ ] **Audit `src/lib/`:**
+  - [ ] Grep fungsi-fungsi helper yang tidak pernah dipanggil di mana pun.
+  - [ ] Hapus mock data lama yang sudah digantikan oleh integrasi API/DB riil.
+- [ ] **Audit `src/db/schema.ts` & `src/types/`:**
+  - [ ] Periksa kolom/tipe yang didefinisikan tetapi tidak pernah dibaca/ditulis di application code.
+  - [ ] Pastikan tidak ada skema Zod yatim yang tidak terikat pada validasi rute atau API.
+
+#### Tahap 4: Audit Package Dependencies (`package.json`)
+- [ ] Jalankan tool pendeteksi dead code / unused packages:
+  - [ ] Jalankan `npx knip` atau script analisa unused imports/dependencies.
+  - [ ] Periksa dependencies di root `package.json` yang tidak lagi diimpor di `src/`.
+  - [ ] Periksa dependencies di `packages/cli/package.json` yang tidak lagi dipakai di CLI.
+- [ ] Hapus package yang tidak terpakai menggunakan `pnpm remove <package-name>`.
+
+#### Tahap 5: Gate Verifikasi Pasca Eliminasi
+- [ ] [ ] Jalankan `pnpm generate-routes` $\rightarrow$ Pastikan route tree ter-update tanpa dangling routes.
+- [ ] [ ] Jalankan `pnpm check` (Biome format & lint) $\rightarrow$ Pastikan tidak ada error import broken.
+- [ ] [ ] Jalankan `pnpm exec tsc --noEmit` $\rightarrow$ Pastikan kompilasi TypeScript 100% bebas error tipe hilang.
+- [ ] [ ] Jalankan `pnpm test` $\rightarrow$ Pastikan semua unit & integration tests tetap PASS.
+- [ ] [ ] Jalankan `pnpm build` $\rightarrow$ Pastikan build production bundling TanStack Start selesai dengan sukses.
+
+---
+
+## 5. Rebranding Ecosystem — Migrasi Menyeluruh dari "VibeEverything" ke "everythings-vibe"
+
+### 5.1. Latar Belakang & Identitas Baru
+Proyek sedang bertransformasi secara merek dan repositori dari identitas lama **"VibeEverything"** (atau "vibe everything") menjadi identitas baru: **"everythings-vibe"** (nama proyek/package resmi: `everythings-vibe`, format tampilan display: `EverythingsVibe` atau `everythings-vibe` sesuai konsensus desain).
+Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenGraph, dan dokumentasi harus diselaraskan secara konsisten.
+
+---
+
+### 5.2. Inventaris Lokasi yang Wajib Dimigrasikan
+
+#### A. Logo & UI Display Branding
+- [ ] **Logo Component (`src/components/ui/logo.tsx`):**
+  - [ ] Perbarui teks merek dari `VibeEverything` menjadi `everythings-vibe` (atau `EverythingsVibe`).
+  - [ ] Perbarui komentar dan metadata fungsi `VibeEverythingMark` menjadi `EverythingsVibeMark`.
+- [ ] **Navigation & Footer (`src/components/layout/navbar.tsx`, `footer.tsx`):**
+  - [ ] Sesuaikan tampilan brand name dan link home.
+  - [ ] Perbarui tooltip, aria-label, dan alt text logo.
+
+#### B. Page Titles & Meta Tags (SEO & Head)
+- [ ] **Root Shell Meta (`src/routes/__root.tsx`):**
+  - [ ] Ganti title utama: `"everythings-vibe - All-in-One AI Vibe-Coding Workspace"`.
+  - [ ] Perbarui description, OpenGraph title, Twitter card, dan manifest name.
+- [ ] **Seluruh Route Head Title di `src/routes/`:**
+  - [ ] `src/routes/index.tsx`: Title & description `everythings-vibe`.
+  - [ ] `src/routes/pricing.tsx`: `"Pricing | everythings-vibe"`.
+  - [ ] `src/routes/faq.tsx`: `"FAQ | everythings-vibe"`.
+  - [ ] `src/routes/bantuan.tsx`: `"Bantuan | everythings-vibe"`.
+  - [ ] `src/routes/history.tsx`: `"History | everythings-vibe"`.
+  - [ ] `src/routes/codebases/index.tsx`: `"Project Tersimpan | everythings-vibe"`.
+  - [ ] `src/routes/templates.tsx`: `"Templates | everythings-vibe"`.
+  - [ ] `src/routes/maintenance.tsx`: `"everythings-vibe Sedang Dalam Perbaikan"`.
+  - [ ] `src/routes/settings/feedback.tsx`: Teks copy *"Bantu kami meningkatkan everythings-vibe..."*.
+
+#### C. In-App Copy, Helper Text & CLI Commands
+- [ ] **CLI Sync Instructions (`src/lib/codebase-sync.ts`, `src/routes/plan/codebase.tsx`, `src/components/task/implementation-options.tsx`):**
+  - [ ] Ubah perintah sinkronisasi terminal:
+    - Dari: `vibeeverything codebase sync --project-id ...`
+    - Menjadi: `everythings-vibe codebase sync --project-id ...`
+  - [ ] Ubah instruksi instalasi global:
+    - Dari: `npm i -g @ghazynabiel/vibeeverything`
+    - Menjadi: `npm i -g @ghazynabiel/everythings-vibe` (atau nama package npm yang ditargetkan).
+  - [ ] Ubah pesan status stage sync: *"Agent berhasil tersambung ke everythings-vibe"*, *"Mengirim source code ke everythings-vibe"*.
+- [ ] **Sistem Pembayaran & Notifikasi:**
+  - [ ] `src/routes/api/payments/create.ts`: Item label Midtrans `"Top Up X Kredit everythings-vibe"`.
+  - [ ] `src/lib/email.ts`: Pengirim email `"everythings-vibe <onboarding@resend.dev>"` dan footer *"Email otomatis dari everythings-vibe"*.
+- [ ] **Constants File (`src/lib/constants.ts`):**
+  - [ ] Ubah `EXPORT_FILENAME_PREFIX`: Dari `"vibeeverything"` menjadi `"everythings-vibe"`.
+
+#### D. CLI Package (`packages/cli/`)
+- [ ] **`packages/cli/package.json`:**
+  - [ ] Update `"name"`: `@ghazynabiel/everythings-vibe`.
+  - [ ] Update `"description"`: *"CLI tool for everythings-vibe — manage projects, codebases, and tasks from terminal"*.
+  - [ ] Update `"bin"`:
+    ```json
+    "bin": {
+      "everythings-vibe": "dist/index.js",
+      "vibe": "dist/index.js",
+      "vibeeverything": "dist/index.js"
+    }
+    ```
+    *(Catatan: Pertahankan alias `vibeeverything` sementara agar backward compatible dengan instalasi user lama).*
+- [ ] **CLI Program Metadata (`packages/cli/src/index.ts`):**
+  - [ ] Perbarui `program.name("everythings-vibe")`.
+  - [ ] Perbarui banner sambutan CLI dan pesan `--help`.
+
+#### E. Dokumentasi & Rules Repository
+- [ ] Perbarui referensi di `AGENTS.md` (bagian header, kontrak, dan identifier yang relevan).
+- [ ] Perbarui file-file spesifikasi di `docs/` yang menyebutkan VibeEverything.
+- [ ] Perbarui `README.md` repositori dengan nama dan instruksi baru.
+
+#### F. Test Suites & Contract Alignment
+- [ ] **Update Test Expectations:**
+  - Periksa dan sesuaikan test file yang memvalidasi teks copy lama:
+    - `src/lib/codebase-naming.test.ts`
+    - `src/lib/codebase-sync.test.ts`
+    - `src/lib/codebase-sync-stage.test.ts`
+    - `src/routes/plan/-codebase-*.test.tsx` (seluruh suite pengujian sinkronisasi codebase)
+    - `src/components/task/implementation-options.test.tsx`
+  - Pastikan semua assertion string yang awalnya mengecek `"vibeeverything"` atau `"VibeEverything"` disesuaikan ke `"everythings-vibe"` / `"EverythingsVibe"`.
+- [ ] Jalankan `pnpm test` untuk membuktikan bahwa tidak ada assertion yang tertinggal atau gagal.
+
+---
+
+## 📋 Ringkasan Prioritas Eksekusi Mendatang
+
+| Prioritas | Backlog Item | Tingkat Dampak | Kompleksitas |
+| :--- | :--- | :--- | :--- |
+| **P1** | **Standarisasi Responsivitas Mobile & Tablet** | Sangat Tinggi (UX Pengguna Mobile) | Sedang - Luas |
+| **P1** | **Dead Code Elimination** | Tinggi (Mengurangi Bundle & Menghapus Kerumitan) | Rendah - Sedang |
+| **P2** | **Rebranding VibeEverything $\rightarrow$ everythings-vibe** | Tinggi (Konsistensi Merek & CLI) | Sedang (Banyak File & Test Update) |
+| **P2** | **Refactoring File Monster (~2.000 Baris)** | Sangat Tinggi (Maintainability & Clean Code) | Tinggi (Arsitektural & Butuh Kehati-hatian) |
+| **P3** | **Greenfield Workspace Routing Refactor** | Strategis (Pengalaman Workspace Single Shell) | Tinggi |
