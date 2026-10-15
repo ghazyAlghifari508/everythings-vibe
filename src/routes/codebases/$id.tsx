@@ -15,6 +15,7 @@ import { CodebaseKanbanBoard } from "@/components/codebase/codebase-kanban-board
 import {
 	parseVersionRows,
 	selectLatestVersionContent,
+	stripInternalSectionMarkers,
 } from "@/components/codebase/codebase-markdown";
 import { CodebasePlanSwitcher } from "@/components/codebase/codebase-plan-switcher";
 import { CodebaseResyncDrawer } from "@/components/codebase/codebase-resync-drawer";
@@ -1729,10 +1730,10 @@ function CodebaseDetailPage() {
 			return { value: JSON.stringify(featureTree, null, 2) };
 		}
 		if (activeArtifact.id.startsWith("prd-") && prdContent) {
-			return { value: prdContent };
+			return { value: stripInternalSectionMarkers(prdContent) };
 		}
 		if (activeArtifact.id.startsWith("ac-") && acContent) {
-			return { value: acContent };
+			return { value: stripInternalSectionMarkers(acContent) };
 		}
 		if (activeArtifact.id.startsWith("tasks-") && taskTree) {
 			return { value: JSON.stringify(taskTree, null, 2) };
@@ -2498,14 +2499,14 @@ function CodebaseDetailPage() {
 			if (artifact.id.startsWith("prd-") && prdContent) {
 				downloadArtifact({
 					fileName: artifact.fileName,
-					content: prdContent,
+					content: stripInternalSectionMarkers(prdContent),
 					mimeType: artifactMimeTypeFor(artifact.fileName),
 				});
 			}
 			if (artifact.id.startsWith("ac-") && acContent) {
 				downloadArtifact({
 					fileName: artifact.fileName,
-					content: acContent,
+					content: stripInternalSectionMarkers(acContent),
 					mimeType: artifactMimeTypeFor(artifact.fileName),
 				});
 			}

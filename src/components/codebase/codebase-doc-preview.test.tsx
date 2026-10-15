@@ -103,4 +103,48 @@ describe("CodebaseDocPreview", () => {
 		expect(container.querySelectorAll("h2").length).toBe(80);
 		expect(container.textContent).toContain("Isi bagian 80.");
 	});
+
+	it("strips internal structural section markers from the presentation preview", () => {
+		const docWithMarkers = [
+			"<!-- SECTION: Overview -->",
+			"## 1. Overview",
+			"",
+			"Deskripsi produk di sini.",
+			"<!-- /SECTION -->",
+			"",
+			"<!-- SECTION: Goals & Success Metrics -->",
+			"## 2. Goals & Success Metrics",
+			"",
+			"- Target 1",
+			"<!-- /SECTION -->",
+		].join("\n");
+
+		render(docWithMarkers);
+		expect(container.textContent).not.toContain("SECTION: Overview");
+		expect(container.textContent).not.toContain("<!--");
+		expect(container.textContent).not.toContain("/SECTION");
+		expect(container.querySelector('h2[id="1-overview"]')?.textContent).toBe(
+			"1. Overview",
+		);
+		expect(container.textContent).toContain("Deskripsi produk di sini.");
+		expect(container.textContent).toContain("Target 1");
+	});
+
+	it("preserves section markers when they are inside code fences", () => {
+		const docWithFencedMarker = [
+			"## 1. Panduan Markdown",
+			"",
+			"```html",
+			"<!-- SECTION: Overview -->",
+			"<div>Contoh kode</div>",
+			"<!-- /SECTION -->",
+			"```",
+		].join("\n");
+
+		render(docWithFencedMarker);
+		const codeBlock = container.querySelector("pre code");
+		expect(codeBlock).not.toBeNull();
+		expect(codeBlock?.textContent).toContain("<!-- SECTION: Overview -->");
+		expect(codeBlock?.textContent).toContain("<!-- /SECTION -->");
+	});
 });
