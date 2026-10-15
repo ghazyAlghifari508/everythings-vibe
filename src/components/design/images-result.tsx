@@ -1,9 +1,147 @@
 import { Check, Copy, Download, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { z } from "zod";
+import { imageCountsLabel, imageResultCounts } from "@/lib/scrape-images";
 import type { ScrapeImageResult } from "@/lib/services/scrape-service";
 import { ScrapeFilterSelect } from "./scrape-filter-select";
 
 export type ImageResult = ScrapeImageResult;
+
+const diagnosticSchema = z.object({
+	error: z.object({
+		code: z.string(),
+		retryable: z.boolean(),
+		retryAfterSeconds: z.number().nonnegative().optional(),
+	}),
+});
+const diagnosticLabels: Record<string, string> = {
+	PROXY_RATE_LIMITED: "Batas proxy tercapai. Tunggu sebelum mencoba lagi.",
+	CAPABILITY_EXPIRED:
+		"Akses preview kedaluwarsa. Perbarui akses untuk mencoba lagi.",
+	INVALID_CAPABILITY:
+		"Akses preview tidak valid. Perbarui akses untuk mencoba lagi.",
+	ASSET_NOT_FOUND: "Byte gambar tersimpan tidak tersedia.",
+	REMOTE_TIMEOUT: "Sumber gambar melewati batas waktu.",
+	REMOTE_FETCH_FAILED: "Proxy gagal mengambil gambar dari sumber.",
+	UNSUPPORTED_MIME: "Format respons tidak aman untuk preview.",
+	ASSET_TOO_LARGE: "Ukuran gambar melewati batas proxy.",
+};
+
+function ImagePreview({ image }: { image: ImageResult }) {
+	const [src, setSrc] = useState(image.assetUrl);
+	const [attempt, setAttempt] = useState(0);
+	const [state, setState] = useState<"loading" | "loaded" | "failed">(
+		"loading",
+	);
+	const [failure, setFailure] = useState<{
+		code: string;
+		retryable: boolean;
+		retryAt: number;
+	} | null>(null);
+	const [now, setNow] = useState(Date.now());
+	useEffect(() => {
+		if (!failure || failure.retryAt <= Date.now()) return;
+		const timer = setInterval(() => setNow(Date.now()), 1000);
+		return () => clearInterval(timer);
+	}, [failure]);
+	async function diagnose() {
+		setState("failed");
+		try {
+			const response = await fetch(src);
+			if (response.ok) {
+				setFailure({ code: "DECODE_FAILED", retryable: true, retryAt: 0 });
+				return;
+			}
+			const parsed = diagnosticSchema.safeParse(await response.json());
+			const error = parsed.success
+				? parsed.data.error
+				: { code: "UNKNOWN", retryable: false };
+			setFailure({
+				...error,
+				retryAt: Date.now() + (error.retryAfterSeconds ?? 0) * 1000,
+			});
+		} catch {
+			setFailure({ code: "NETWORK", retryable: true, retryAt: 0 });
+		}
+	}
+	async function retry() {
+		if (!failure || failure.retryAt > Date.now()) return;
+		setState("loading");
+		try {
+			if (["CAPABILITY_EXPIRED", "INVALID_CAPABILITY"].includes(failure.code)) {
+				const response = await fetch(
+					`/api/scrape?id=${encodeURIComponent(image.scrapeId)}`,
+				);
+				if (!response.ok) throw new Error("Refresh failed");
+				const result = z
+					.object({
+						scrape: z.object({
+							images: z.array(
+								z.object({ id: z.string(), assetUrl: z.string() }),
+							),
+						}),
+					})
+					.parse(await response.json());
+				const refreshed = result.scrape.images.find(
+					(row) => row.id === image.id,
+				);
+				if (!refreshed) throw new Error("Missing image");
+				setSrc(refreshed.assetUrl);
+			}
+			setFailure(null);
+			setAttempt((value) => value + 1);
+		} catch {
+			setFailure({ code: "REFRESH_FAILED", retryable: true, retryAt: 0 });
+			setState("failed");
+		}
+	}
+	const recoverable =
+		failure &&
+		(failure.retryable ||
+			["CAPABILITY_EXPIRED", "INVALID_CAPABILITY"].includes(failure.code));
+	return (
+		<div className="relative flex h-52 items-center justify-center bg-onyx p-4">
+			{state === "loading" && (
+				<output className="absolute text-xs text-fog">Memuat gambar…</output>
+			)}
+			{state !== "failed" ? (
+				<img
+					key={attempt}
+					src={src}
+					alt={image.evidence.alt ?? ""}
+					loading="lazy"
+					decoding="async"
+					referrerPolicy="no-referrer"
+					className="max-h-full max-w-full object-contain"
+					onLoad={() => setState("loaded")}
+					onError={() => void diagnose()}
+				/>
+			) : (
+				<div className="space-y-2 text-center text-xs text-fog">
+					<p>
+						{failure
+							? (diagnosticLabels[failure.code] ??
+								`Preview gagal dimuat (${failure.code}).`)
+							: "Memeriksa kegagalan preview…"}
+					</p>
+					{recoverable && (
+						<button
+							type="button"
+							disabled={failure.retryAt > now}
+							onClick={() => void retry()}
+							className="min-h-11 rounded-md border border-graphite px-3 text-snow focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50"
+						>
+							Coba lagi
+							{failure.retryAt > now
+								? ` (${Math.ceil((failure.retryAt - now) / 1000)} dtk)`
+								: ""}
+						</button>
+					)}
+				</div>
+			)}
+		</div>
+	);
+}
 
 function shortUrl(value: string, max = 48): string {
 	if (value.length <= max) return value;
@@ -21,6 +159,7 @@ export function ImagesResult({
 }) {
 	const [formatFilter, setFormatFilter] = useState("");
 	const [kindFilter, setKindFilter] = useState("");
+	const [search, setSearch] = useState("");
 	const [downloading, setDownloading] = useState<string | null>(null);
 	const [copied, setCopied] = useState<string | null>(null);
 	const formats = [
@@ -33,15 +172,19 @@ export function ImagesResult({
 			),
 		),
 	];
-	const saved = images.filter((image) => image.status === "completed").length;
+	const counts = imageResultCounts(images);
+	const saved = counts.verified;
 	const failed = images.filter((image) => image.status === "failed").length;
 	const visible = images.filter(
 		(image) =>
 			image.status === "completed" &&
+			`${image.url} ${image.evidence.alt ?? ""}`
+				.toLowerCase()
+				.includes(search.toLowerCase()) &&
 			(!formatFilter || image.format === formatFilter) &&
 			(!kindFilter || image.classification === kindFilter),
 	);
-	const hasFilter = formatFilter !== "" || kindFilter !== "";
+	const hasFilter = formatFilter !== "" || kindFilter !== "" || search !== "";
 	async function download(image: ImageResult) {
 		if (downloading) return;
 		setDownloading(image.id);
@@ -87,16 +230,25 @@ export function ImagesResult({
 					{sourceUrl}
 				</a>
 				<p className="mt-3 font-mono text-xs text-fog tabular-nums">
-					{images.length} ditemukan · {saved} tersimpan · {failed} gagal
+					{imageCountsLabel(counts)}
 				</p>
 				{imageOutcome === "partial" && (
 					<p className="mt-2 text-sm text-fog">
-						Sebagian gambar berhasil diambil. {saved} gambar tersedia. {failed}{" "}
-						resource gagal diverifikasi.
+						Sebagian gambar berhasil diambil. {saved} gambar terverifikasi.{" "}
+						{failed} resource gagal diverifikasi.
 					</p>
 				)}
 			</header>
 			<div className="flex flex-wrap items-end gap-3">
+				<label className="flex min-w-0 flex-col gap-1.5 text-xs text-fog">
+					Cari gambar
+					<input
+						type="search"
+						value={search}
+						onChange={(event) => setSearch(event.target.value)}
+						className="min-h-11 rounded-lg border border-graphite bg-charcoal px-3 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+					/>
+				</label>
 				<ScrapeFilterSelect
 					label="Format"
 					value={formatFilter}
@@ -121,6 +273,7 @@ export function ImagesResult({
 						onClick={() => {
 							setFormatFilter("");
 							setKindFilter("");
+							setSearch("");
 						}}
 						className="inline-flex min-h-11 items-center rounded-full px-4 text-sm text-fog underline underline-offset-4 hover:text-snow focus-visible:ring-2 focus-visible:ring-indigo"
 					>
@@ -161,18 +314,7 @@ export function ImagesResult({
 							key={image.id}
 							className="min-w-0 overflow-hidden rounded-xl border border-graphite bg-charcoal"
 						>
-							<div className="flex h-52 items-center justify-center bg-onyx p-4">
-								<img
-									src={image.assetUrl}
-									alt={image.evidence.alt ?? ""}
-									loading="lazy"
-									referrerPolicy="no-referrer"
-									className="max-h-full max-w-full object-contain"
-									onError={(event) => {
-										event.currentTarget.alt = "Gambar tidak dapat dimuat";
-									}}
-								/>
-							</div>
+							<ImagePreview image={image} />
 							<div className="space-y-3 p-3">
 								<p className="text-xs text-fog">
 									{image.format ?? "Format belum diketahui"}
@@ -246,11 +388,11 @@ export function ImagesResult({
 					) : images.length > 0 && saved === 0 ? (
 						<>
 							<p className="text-sm font-semibold text-snow">
-								Gambar belum dapat diperiksa
+								Semua gambar gagal diambil
 							</p>
 							<p className="mt-1 text-sm text-fog">
-								Akses ke website gagal sebelum proses pemeriksaan gambar
-								selesai.
+								Tidak ada byte gambar yang tersedia dari ekstraksi ini. Periksa
+								alasan kegagalan di atas.
 							</p>
 						</>
 					) : (
