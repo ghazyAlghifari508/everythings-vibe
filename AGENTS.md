@@ -14,34 +14,37 @@
 
 Read fully to actual EOF before project work:
 
-- `.opencode/rules/[basic-rules.md](http://basic-rules.md)`
-- `.opencode/rules/[no-assumptions.md](http://no-assumptions.md)`
-- `.opencode/rules/[skills-mcp.md](http://skills-mcp.md)`
+- `.opencode/rules/basic-rules.md`
+- `.opencode/rules/architecture-folder-structure.md`
+- `.opencode/rules/no-assumptions.md`
+- `.opencode/rules/skills-mcp.md`
 
 ### Read for implementation tasks
 
 When modifying code, tests, config, schema, routes, state, or behavior:
 
-- `.opencode/rules/[atomic-commit.md](http://atomic-commit.md)`
-- `.opencode/rules/[no-hardcode.md](http://no-hardcode.md)`
+- `.opencode/rules/atomic-commit.md`
+- `.opencode/rules/no-hardcode.md`
+- `.opencode/rules/architecture-folder-structure.md`
 
 ### Read for typed code
 
 When TypeScript/types/validation/DB contracts are involved:
 
-- `.opencode/rules/[no-type-bypass.md](http://no-type-bypass.md)`
+- `.opencode/rules/no-type-bypass.md`
 
 ### Read for bugs, architecture, refactors, trade-offs, or scope decisions
 
-- `.opencode/rules/[anti-satisficing.md](http://anti-satisficing.md)`
+- `.opencode/rules/anti-satisficing.md`
+- `.opencode/rules/architecture-folder-structure.md`
 
 ### Read for UI/UX/copy/responsive/accessibility work
 
-- `.opencode/rules/[anti-ai-slop.md](http://anti-ai-slop.md)`
+- `.opencode/rules/anti-ai-slop.md`
 
 ### Read for product/domain/workflow semantics
 
-- `.opencode/rules/[prdfy-context.md](http://prdfy-context.md)`
+- `.opencode/rules/vibe-everythings-context.md`
 
 These conditions are inclusive. A task may require several or all rules.
 
@@ -253,15 +256,17 @@ Do not unit-test stochastic AI prose or purely visual implementation details unl
 
 ## 12. Product Invariants
 
-VibeEverything must preserve:
+everythings-vibe must preserve:
 
-1. real persisted workflow state;
-2. safe atomic data/credit behavior;
-3. strict type safety;
-4. developer-grade UI quality;
-5. Existing Codebase behavior grounded in real repository snapshots/context.
+1. real persisted workflow state across all surfaces (Plan, Design, Codebase, Templates);
+2. safe atomic data/credit behavior (1 credit = 1 generate, unlimited revisions/patches);
+3. strict type safety with zero type bypasses (`as any`, `as never`, `@ts-ignore`);
+4. developer-grade UI quality without AI-slop;
+5. Existing Codebase behavior grounded in real repository snapshots and context;
+6. modular feature-driven architecture (`src/features/`) and anti-monster file limits (max 300–400 lines);
+7. zero dead code discipline across the repository.
 
-Legacy `PRDFY` / `PrdFy` identifiers may remain. Do not rename them blindly.
+Legacy `PRDFY` / `PrdFy` or `VibeEverything` identifiers may remain in specific database columns/migrations. Do not rename them blindly without migration plans.
 
 ---
 

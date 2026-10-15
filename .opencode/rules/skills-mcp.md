@@ -1,8 +1,8 @@
-# PRDFY - Skills, MCP & Plugins Rules (MANDATORY)
+# everythings-vibe — Skills, MCP & Plugins Rules (MANDATORY)
 
-> **Source of truth:** `AGENTS.md` + `docs/` + `.opencode/rules/*` (locked stack and scope).
+> **Source of truth:** `AGENTS.md` + `.opencode/rules/*` + `docs/` (locked stack and scope).
 > This rule defines which skills, MCPs, and plugins are relevant to
-> PRDFY, when to invoke them, and how to keep the boundary. Do not
+> everythings-vibe, when to invoke them, and how to keep the boundary. Do not
 > hardcode providers, models, credit policy, or credentials; do not bypass a
 > skill gate.
 
@@ -67,9 +67,9 @@
 
 ---
 
-## 3. Mandatory/Relevant Skills for PRDFY
+## 3. Mandatory/Relevant Skills for everythings-vibe
 
-| Skill                                 | When Mandatory/Relevant                                 | PRDFY Example                                                                          |
+| Skill                                 | When Mandatory/Relevant                                 | everythings-vibe Example                                                                |
 | ------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `brainstorming`                       | Before designing/spec'ing a new feature or subsystem    | Ask flow, PRD streaming, AC generation, task tree, Kanban, Billing                     |
 | `writing-plans`                       | After an architectural design/spec is approved          | Plan migration, chat service, pipeline orchestration, billing top-up                   |
@@ -196,7 +196,7 @@ harness.
 
 ---
 
-## 7. Example PRDFY Combinations per Feature / Flow
+## 7. Example everythings-vibe Combinations per Feature / Flow
 
 - **Flow 00 Exploratory Prototyping (State & UI):** `brainstorming` -> `prototype` (Logic Demo HTML or UI Multi-Variant Switcher on existing route) -> human/team review & verdict -> `writing-plans` -> production implementation.
 - **Flow 01 Landing & Auth:** `better-auth-authentication` + `better-auth-security-best-practices` ->
@@ -213,11 +213,19 @@ harness.
 - **Flow 06 Task Breakdown & Kanban Board:** `shadcn-component-discovery` -> evaluate ready-made
   components from the repository, shadcn/ui, 21st.dev, HeroUI, or Magic UI -> `ui-design-system` +
   `webapp-testing` / `chrome-devtools-qa` -> flat task table with JSON subtask tree, drag-and-drop, 10s polling reconciliation.
-- **Flow 07 Billing & Midtrans:** `integrate-midtrans-payments` + security/TDD ->
+- **Flow 07 Existing Codebase Planning (CLI & Analysis):** `tanstack-start-best-practices` + `tanstack-query-best-practices` + TDD ->
+  CLI sync session authentication, chunked snapshot ingestion, AST/manifest analysis, context generation, and codebase-aware planning.
+- **Flow 08 VibeDesign Web Scraping (`/design/scrap`):** `context7-mcp` + `web-design-guidelines` + TDD ->
+  URL crawl, HTML cleaning, stylesheet extraction, structured color/typography normalization, and token generation into `DESIGN.md`.
+- **Flow 09 VibeDesign Studio Prototyping (`/design/studio`):** `antislop-ui` + `antislop-layoutmobile` + `chrome-devtools-qa` ->
+  interactive HTML/Tailwind prototype generation, live browser iframe preview, versioned design revisions (`studio_revisions`), and style inspection.
+- **Flow 10 VibeTemplate Catalog:** `ui-design-system` + `antislop-copywriting` ->
+  structured blueprint library, category filtering, search, and one-click injection into VibePlan or VibeDesign.
+- **Flow 11 Billing & Midtrans:** `integrate-midtrans-payments` + security/TDD ->
   Snap token creation, SHA512 signature verification, atomic credit top-up, settlement idempotency.
-- **Flow 08 Export & Sharing:** `document-pdf` + `context7` ->
+- **Flow 12 Export & Sharing:** `document-pdf` + `context7` ->
   markdown/PDF export, JSZip bundle, public read-only share token (`/prd/share/$token`).
-- **Flow 09 Hardening & Hard Mode:** `better-auth-security-best-practices` +
+- **Flow 13 Hardening & Hard Mode:** `better-auth-security-best-practices` +
   `vercel-react-best-practices` + `webapp-testing` + `chrome-devtools-qa` +
   `verification-before-completion` -> tenant security, performance, CI verification.
 
@@ -252,7 +260,7 @@ harness.
 
 ## 9. How to Use These Rules
 
-1. Before working on a feature, read `AGENTS.md`, `docs/`, `prdfy-context.md`,
+1. Before working on a feature, read `AGENTS.md`, `docs/`, `vibe-everythings-context.md`,
    and the relevant rules.
 2. Classify a spike/bounded/architectural task via `brainstorming` before
    asking a question or changing code, when that skill is relevant.

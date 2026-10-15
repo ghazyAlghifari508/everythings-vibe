@@ -10,6 +10,8 @@ Dokumen ini memuat daftar rencana kerja, backlog arsitektur, standarisasi kualit
 3. [Bagian 3: Refactoring & Clean Code — Dekonstruksi File Monster (~2.000 Baris) & Reusable Architecture](#3-refactoring--clean-code--dekonstruksi-file-monster-2000-baris--reusable-architecture)
 4. [Bagian 4: Dead Code Elimination — Pembersihan Total Deathcode, File/Folder Sampah & Unused Dependencies](#4-dead-code-elimination--pembersihan-total-deathcode-filefolder-sampah--unused-dependencies)
 5. [Bagian 5: Rebranding Ecosystem — Migrasi Menyeluruh dari VibeEverything ke everythings-vibe](#5-rebranding-ecosystem--migrasi-menyeluruh-dari-vibeeverything-ke-everythings-vibe)
+6. [Bagian 6: Arsitektur Berbasis Fitur — Modular Feature-Driven Directory Structure](#6-arsitektur-berbasis-fitur--modular-feature-driven-directory-structure)
+7. [Bagian 7: Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure & Zero Dead Code](#7-aturan-tegas-ai-agent--enforcement-policy-anti-slop-strict-structure--zero-dead-code)
 
 ---
 
@@ -295,7 +297,7 @@ Seiring iterasi pengembangan fitur, banyak sisa artefak sementara, rute coba-cob
 - [ ] **Audit Scrap & Eksperimen Desain:**
   - [ ] Periksa `src/routes/design/scrap.*.tsx` dan pastikan file yang sudah digantikan oleh `studio.*` dibersihkan atau ditata secara teratur.
 - [ ] **Audit File Testing Berawalan Dash (`-*`):**
-  - [ ] Identifikasi file seperti `src/routes/-bantuan.test.tsx`, `src/routes/-templates.test.tsx`, dsb. Pindahkan atau satukan ke struktur folder test standar (`tests/` atau colocation konsisten).
+  - [ ] Pindahkan file test di `src/routes/` yang berawalan `-` (seperti `-codebase.test.tsx`, `-bantuan.test.tsx`, `-templates.test.tsx`) keluar dari folder `src/routes/` menuju folder test fitur masing-masing agar `src/routes/` murni hanya berisi file route.
 
 #### Tahap 2: Audit Komponen & Hooks Yatim (Unreferenced Components & Hooks)
 - [ ] **Audit `src/components/ui/`:**
@@ -412,12 +414,143 @@ Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenG
 
 ---
 
+## 6. Arsitektur Berbasis Fitur — Modular Feature-Driven Directory Structure
+
+### 6.1. Latar Belakang & Masalah Struktur Eksisting
+Saat ini struktur repositori masih menganut pola *layer-based* umum di mana komponen tersebar di `src/components/`, hooks di `src/hooks/`, logic backend di `src/lib/services/`, dan test tersebar acak di `src/routes/` atau `src/lib/`. 
+Ketika sebuah fitur (misalnya **Greenfield Planning** atau **Codebase Sync**) ingin dipelajari, dimodifikasi, atau di-refactor, developer/agent harus melompat-lompat di 5+ direktori terpisah.
+
+### 6.2. Konsep Target: Feature-Driven Architecture (`src/features/`)
+Setiap domain bisnis memiliki rumah mandiri di bawah `src/features/<feature-name>/`. Seluruh kode yang berkaitan erat (*high cohesion*) diletakkan di dalam folder fitur tersebut.
+
+```
+src/
+├── features/
+│   ├── greenfield/            # Fitur alur Greenfield (Ask, Fitur tree, PRD, AC, Task canvas, Kanban)
+│   │   ├── components/        # UI khusus greenfield (PrdViewer, WhiteboardCanvas, KanbanBoard)
+│   │   ├── hooks/             # Custom hooks khusus greenfield (useKanban, useWhiteboard)
+│   │   ├── services/          # Logika bisnis & API (prd-service, ac-service, task-service)
+│   │   ├── types/             # Domain types & Zod schemas
+│   │   └── tests/             # Unit & integration tests khusus greenfield
+│   ├── codebase/              # Fitur Existing Codebase Workspace & CLI Sync
+│   │   ├── components/        # CodebaseExplorer, CodebaseChatWorkspace, DocPreview
+│   │   ├── hooks/             # useCodebaseWorkspace, useCodebaseChatStream
+│   │   ├── services/          # codebase-analysis, codebase-sync, codebase-anchor
+│   │   ├── types/             # Sync schemas, Analysis schemas
+│   │   └── tests/             # Seluruh test sinkronisasi & analisis codebase
+│   ├── studio/                # Fitur VibeDesign Studio & Scrap
+│   │   ├── components/        # StudioCanvas, FramePicker, StyleInspector
+│   │   ├── services/          # crawl-website, design-synthesis, scrape-worker
+│   │   └── tests/             # Test crawling & studio synthesis
+│   ├── templates/             # Fitur Katalog Template & Blueprints
+│   ├── billing/               # Fitur Midtrans Snap, Credits, Balance & Invoices
+│   └── auth-settings/         # Fitur Autentikasi Better Auth, Profile & Pengaturan
+├── routes/                    # THIN ROUTING LAYER (Hanya definisi rute, loader, dan panggil fitur)
+├── components/ui/             # SHARED PRIMITIVES (shadcn/radix murni yang reusable lintas fitur)
+└── lib/                       # SHARED INFRASTRUCTURE (DB client, session, auth client, core constants)
+```
+
+---
+
+### 6.3. Solusi & Penataan File Test TanStack Router Berawalan Dash (`-*`)
+* **Mengapa ada file berawalan `-` di `src/routes/`?**
+  Di TanStack Router (file-based routing), seluruh file di dalam `src/routes/` otomatis diubah menjadi URL rute. Prefix tanda hubung (`-`) adalah konvensi resmi TanStack Router untuk **mengabaikan file (Route Ignore Prefix)** agar generator rute tidak membuat endpoint untuk file tersebut.
+  Di repositori ini, prefix `-` digunakan untuk menaruh file test langsung di sebelah file rute (misal `src/routes/plan/-codebase.test.tsx`).
+* **Apakah pola ini bagus?**
+  **TIDAK IDEAL jangka panjang.** Menaruh file test di dalam folder `src/routes/`:
+  1. Mengotori folder rute dengan puluhan file non-rute (saat ini ada 30+ file test bertanda `-` di `src/routes/`).
+  2. Membingungkan navigasi developer dan AI agent saat membaca struktur URL aplikasi.
+* **Target Refaktor:**
+  - Pindahkan SELURUH file `-*.test.ts` dan `-*.test.tsx` dari `src/routes/` ke folder `tests/` di masing-masing domain fitur (`src/features/<feature>/tests/` atau `tests/routes/`).
+  - Folder `src/routes/` harus bersih 100%, hanya berisi file rute resmi (`index.tsx`, `$id.tsx`, `__root.tsx`).
+
+---
+
+### 6.4. Checklist Migrasi Struktur Modular
+- [ ] **Fase 1: Scaffolding Direktori Fitur (`src/features/`):**
+  - [ ] Buat struktur dasar `src/features/greenfield/`, `src/features/codebase/`, `src/features/studio/`, `src/features/billing/`, `src/features/templates/`.
+- [ ] **Fase 2: Migrasi Domain Codebase:**
+  - [ ] Pindahkan komponen `src/components/codebase/*` ke `src/features/codebase/components/`.
+  - [ ] Pindahkan helpers `src/lib/codebase-*` ke `src/features/codebase/services/`.
+  - [ ] Pindahkan file test `-codebase-*.test.tsx` dari `src/routes/plan/` ke `src/features/codebase/tests/`.
+- [ ] **Fase 3: Migrasi Domain Greenfield:**
+  - [ ] Pindahkan komponen `prd/`, `ac/`, `task/`, `kanban/`, `ask/`, `fitur/` ke `src/features/greenfield/components/`.
+  - [ ] Pindahkan services `prd-service.ts`, `ac-service.ts`, `task-service.ts` ke `src/features/greenfield/services/`.
+- [ ] **Fase 4: Migrasi Domain Design Studio:**
+  - [ ] Pindahkan komponen `src/components/design/*` ke `src/features/studio/components/`.
+  - [ ] Pindahkan logic scraping & crawling ke `src/features/studio/services/`.
+  - [ ] Pindahkan file test `-studio.*.test.tsx` dari `src/routes/` ke `src/features/studio/tests/`.
+- [ ] **Fase 5: Pembersihan `src/routes/` (Thin Routes Only):**
+  - [ ] Pastikan setiap file di `src/routes/` hanya bertindak sebagai wire up (mengambil params/search params, memanggil loader/query, lalu me-render View dari `src/features/`).
+  - [ ] Hapus seluruh prefiks `-` dari `src/routes/`.
+- [ ] **Fase 6: Validasi Integritas Import & Test:**
+  - [ ] Jalankan `pnpm generate-routes` untuk memastikan route tree tetap valid.
+  - [ ] Jalankan `pnpm check` dan `pnpm test` hingga seluruh suite lulus tanpa import error.
+
+---
+
+## 7. Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure & Zero Dead Code
+
+### 7.1. Latar Belakang & Urgensi
+Seringkali AI coding assistant (agent) bertindak malas atau memilih jalan pintas:
+- Menaruh file sembarangan di root `src/lib/` atau `src/hooks/` alih-alih meletakkannya di domain fiturnya.
+- Menulis kode monster hingga ribuan baris dalam 1 file karena tidak mau repot memecah komponen.
+- Meninggalkan file coba-coba, sisa prototipe, export yang tidak dipakai, atau helper yatim (*deathcode*).
+- Menaruh file test di dalam folder routing dengan prefiks `-` sembarangan.
+**Tujuan:** Merumuskan aturan tertulis yang mengikat (*mandatory execution contract*) di `.opencode/rules/` dan `AGENTS.md` agar setiap agent yang bekerja pada repositori ini wajib mematuhi arsitektur yang bersih.
+
+---
+
+### 7.2. Rencana Pembuatan File Aturan: `.opencode/rules/architecture-folder-structure.md`
+
+Aturan ini akan memuat 5 Kontrak Wajib Agen:
+
+#### 1. Kontrak Penempatan Kode (Strict Feature Colocation)
+* Setiap pembuatan komponen, hook, helper, atau service baru **WAJIB** dimasukkan ke dalam folder fiturnya di `src/features/<feature-name>/`.
+* DILARANG membuat file baru di `src/lib/` atau `src/hooks/` kecuali itu adalah modul infrastruktur global yang digunakan oleh $\ge$ 3 fitur berbeda (dan harus didokumentasikan alasannya).
+* Komponen di `src/components/ui/` hanya boleh diisi oleh primitive UI murni (shadcn/Radix) tanpa logika bisnis.
+
+#### 2. Kontrak Ukuran File & Anti-Monster (Max 300–400 Baris)
+* Batas keras (*hard ceiling*) untuk file kode adalah **400 baris**.
+* Jika suatu file mendekati 350 baris, agent WAJIB memecahnya ke dalam sub-komponen, custom hook, atau helper module terpisah.
+* DILARANG membuat file monster 1.000–2.000 baris. Pekerjaan dianggap cacat/gagal (*violating*) jika menghasilkan file monster.
+
+#### 3. Kontrak Zero Dead Code & Zero Garbage (Anti-Deathcode)
+* Setiap fungsi, variabel, tipe data, dan komponen yang dibuat WAJIB memiliki pemanggil aktif (*active consumer*).
+* Dilarang meninggalkan mock fixtures, file spike, atau rute coba-coba setelah task selesai.
+* Sebelum menyatakan task "Done", agent WAJIB melakukan audit dead code (memastikan tidak ada unreferenced exports atau unused dependencies).
+
+#### 4. Kontrak Thin Routes (Folder `src/routes/` Murni Bersih)
+* Folder `src/routes/` hanya diperuntukkan bagi pendefinisian rute TanStack Router/Start.
+* File rute maksimal 100–150 baris yang hanya bertugas menghubungkan loader, search params, dan merender container dari `src/features/`.
+* DILARANG membuat file non-rute atau file test berawalan `-` di dalam `src/routes/`. Seluruh test harus berada di folder `tests/` fitur.
+
+#### 5. Kontrak Verifikasi Handoff & Stop-on-Violation
+* Jika agent mendapati dirinya melanggar salah satu poin di atas karena alasan "cepat" atau "kemudahan", agent **WAJIB BERHENTI** dan memperbaiki strukturnya terlebih dahulu.
+* Setiap commit harus memenuhi kriteria atomik dan lolos `pnpm check`, `pnpm test`, dan pemeriksaan dead code.
+
+---
+
+### 7.3. Checklist Implementasi Aturan Agent
+- [ ] Buat file aturan baru: `.opencode/rules/architecture-folder-structure.md` yang memuat kontrak di atas secara komprehensif.
+- [ ] Perbarui `AGENTS.md`:
+  - [ ] Tambahkan tautan `.opencode/rules/architecture-folder-structure.md` ke dalam daftar *Always Read / Router Rules*.
+  - [ ] Tambahkan pasal larangan file monster (> 400 baris) dan larangan menumpuk file test di `src/routes/`.
+- [ ] Perbarui `.opencode/rules/basic-rules.md`:
+  - [ ] Perbarui peta direktori target dari layer-based ke `src/features/`.
+- [ ] Integrasikan script audit dead code ke dalam command verifikasi lokal:
+  - [ ] Tambahkan script `"audit:deadcode": "knip"` pada `package.json` agar mudah dijalankan oleh developer maupun agent sebelum handoff.
+
+---
+
 ## 📋 Ringkasan Prioritas Eksekusi Mendatang
 
 | Prioritas | Backlog Item | Tingkat Dampak | Kompleksitas |
 | :--- | :--- | :--- | :--- |
+| **P1** | **Pembuatan Rules Agent (`architecture-folder-structure.md`)** | Kritis (Mencegah Sampah Baru Sejak Hari Ini) | Rendah (Dokumentasi & Regulasi) |
 | **P1** | **Standarisasi Responsivitas Mobile & Tablet** | Sangat Tinggi (UX Pengguna Mobile) | Sedang - Luas |
-| **P1** | **Dead Code Elimination** | Tinggi (Mengurangi Bundle & Menghapus Kerumitan) | Rendah - Sedang |
+| **P1** | **Dead Code Elimination & Pembersihan File `-` di Routes** | Tinggi (Mengurangi Bundle & Menghapus Kerumitan) | Sedang |
 | **P2** | **Rebranding VibeEverything $\rightarrow$ everythings-vibe** | Tinggi (Konsistensi Merek & CLI) | Sedang (Banyak File & Test Update) |
 | **P2** | **Refactoring File Monster (~2.000 Baris)** | Sangat Tinggi (Maintainability & Clean Code) | Tinggi (Arsitektural & Butuh Kehati-hatian) |
+| **P2** | **Migrasi ke Feature-Driven Architecture (`src/features/`)** | Sangat Tinggi (Kerapihan Struktur Jangka Panjang) | Tinggi (Pindai & Pindahkan File Bertahap) |
 | **P3** | **Greenfield Workspace Routing Refactor** | Strategis (Pengalaman Workspace Single Shell) | Tinggi |

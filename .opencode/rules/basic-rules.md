@@ -1,16 +1,17 @@
-# AGENTS.md
+# basic-rules.md
 
-Boot instructions for AI agents working on **PRDFY**.
+Boot instructions for AI agents working on **everythings-vibe**.
 
 ## Read first
 
 - `AGENTS.md` -> repository-wide product, architecture, phase, and safety rules
-- `.opencode/rules/prdfy-context.md` -> product definition, architecture, and locked stack
+- `.opencode/rules/vibe-everythings-context.md` -> comprehensive product definition, multi-surface architecture, flows, and schema
+- `.opencode/rules/architecture-folder-structure.md` -> feature-driven colocation, thin routes, anti-monster file limits, and zero dead code
 - `.opencode/rules/no-assumptions.md` -> strict fact verification and zero assumptions
 - `.opencode/rules/atomic-commit.md` -> atomic commits per logical change and mandatory git push before handoff
 - `.opencode/rules/no-hardcode.md` -> configuration, provider, and constants discipline
 - `.opencode/rules/no-type-bypass.md` -> strict type safety (`as never`, `as any`, and `@ts-ignore` are forbidden)
-- `.opencode/rules/anti-ai-slop.md` -> PRDFY design constraints and UI standards
+- `.opencode/rules/anti-ai-slop.md` -> design constraints and UI standards
 - `.opencode/rules/anti-satisficing.md` -> completeness, quality, and verification discipline; never stop at the first acceptable implementation
 - `docs/` and `TODO.md` -> behavior, scope, acceptance, test plan, and architecture specs
 
@@ -18,25 +19,19 @@ If documents disagree, use the most specific approved requirement and document t
 
 ---
 
-## What makes PRDFY special
+## What makes everythings-vibe special
 
-PRDFY is an AI-powered product development workspace that turns product ideas
-into complete, professional PRDs (8 sections), acceptance criteria (AC), task trees,
-and interactive Kanban boards. Four non-negotiables:
+**everythings-vibe** is an all-in-one AI vibe-coding and creation ecosystem that turns raw concepts, existing codebases, and visual references into production-ready implementation plans, interactive design prototypes, and actionable agent rules. Four non-negotiables:
 
-1. **Real generation pipeline:** Question flow, PRD generation, AC breakdown,
-   task tree generation, and Kanban tracking must come from real system signals,
-   proper SSE streams, and persisted records. Never fake progress, typewriter deltas,
-   or provider output.
-2. **Safe, atomic credit and data flow:** 1 credit = 1 generate action (revisions
-   are free and unlimited). Credit burning must be atomic (`WHERE creditsUsed < credits`).
-   Database queries strictly enforce tenant isolation (`WHERE user_id = ?`).
-3. **100% type-safe and robust:** Zero type-safety bypasses (`as never`, `as any`,
-   `@ts-ignore`) are allowed. Strict Drizzle schema types, typed server routes,
-   and Zod validation protect every trust boundary.
-4. **Restrained developer-grade aesthetic:** PRD document, sections, markdown,
-   Mermaid diagrams, and Kanban boards lead the hierarchy. The UI follows the clean,
-   content-first, high-utility design contract without cheap AI slop.
+1. **Multi-surface Vibe Ecosystem:**
+   - **VibePlan (Greenfield):** Interactive question flow, feature tree map, 8-section PRD, structured acceptance criteria (AC), task whiteboard canvas, and interactive Kanban boards.
+   - **VibePlan (Existing Codebase):** Local repository synchronization via CLI (`packages/cli`), AST/dependency analysis, and context-aware planning directly on top of existing code.
+   - **VibeDesign (Studio & Scrap):** Web scraping of public UI into `DESIGN.md` token guides, interactive HTML/Tailwind studio prototypes with live browser preview, and versioned AI visual synthesis.
+   - **VibeTemplate:** Catalog of prompt blueprints and starter boilerplates for planning and design.
+2. **Real generation pipeline:** Question flow, PRD streaming, AC generation, task breakdowns, and studio synthesis must come from real system signals, proper SSE streams, and persisted records. Never fake progress, typewriter deltas, or provider output.
+3. **Safe, atomic credit and data flow:** 1 credit = 1 generate action (revisions and patch updates are free and unlimited). Credit burning must be atomic (`WHERE credits_used + :charge <= credits`). Database queries strictly enforce tenant isolation (`WHERE user_id = ?`).
+4. **100% type-safe, modular, and robust:** Zero type-safety bypasses (`as never`, `as any`, `@ts-ignore`) are allowed. Strict Drizzle schema types, typed server routes, and Zod validation protect every trust boundary. Hard ceiling of $\le$ 400 lines per file to prevent monster files.
+5. **Restrained developer-grade aesthetic:** Clean, high-utility, content-first interface without cheap AI slop (no unnecessary gradients, glow effects, or decorative filler copy).
 
 ---
 
@@ -61,11 +56,22 @@ and interactive Kanban boards. Four non-negotiables:
      security, compilation, and idempotency.
   Rendered aesthetic quality and copy appeal belong to human evaluation and live
   browser reviews.
-- **Domain before file type:** Organize by feature or domain first (`src/components/prd`,
-  `src/components/ac`, `src/components/task`, `src/components/kanban`, `src/components/chat`,
-  `src/lib/services`). Never create generic catch-all directories such as `hooks/`, `utils/`,
-  `helpers/`, or `misc/` without a documented boundary.
-- **Structured test suites:** Unit tests sit in `tests/` or alongside feature files
+- **Feature-driven colocation (Domain before file type):** Organize by feature domain
+  (`src/features/greenfield`, `src/features/codebase`, `src/features/studio`,
+  `src/features/billing`, `src/features/templates`). Follow
+  `.opencode/rules/architecture-folder-structure.md`. Never create generic catch-all
+  directories such as `hooks/`, `utils/`, `helpers/`, or `misc/` without a documented
+  cross-cutting boundary.
+- **Anti-monster file ceiling (Max 300–400 lines):** Maintain strict modularity.
+  Any file approaching 350 lines must be decomposed into sub-components, custom hooks,
+  or dedicated service modules. Files $\ge$ 400 lines are strictly forbidden.
+- **Thin routes & clean routing tree:** Files in `src/routes/` must remain thin
+  ($\le$ 100–150 lines), serving solely as route declarations and loaders that render
+  feature containers. Non-route helper files and unit tests prefixed with `-` must
+  NOT reside in `src/routes/`—colocate tests in feature `tests/` directories.
+- **Zero dead code & zero garbage:** Never leave orphan files, unreferenced exports,
+  obsolete prototypes, mock fixtures, or unused packages in the repository.
+- **Structured test suites:** Unit tests sit in feature `tests/` directories
   (`*.test.ts`, `*.test.tsx`), API/security tests at their API boundary, and end-to-end
   user journeys in `e2e/`. Follow the repository's actual Vitest and Playwright scripts.
 - **No `any`, `as never`, or `@ts-ignore`:** `any` and `never` casting disables
@@ -94,26 +100,21 @@ and interactive Kanban boards. Four non-negotiables:
 
 ## Where code lives
 
-- `src/routes/` — TanStack Router file-based UI routes and server API route handlers (`/api/*`, `/api/v1/*`)
-- `src/components/` — Feature-grouped UI components:
-  - `prd/` — PRD viewer, version history, table of contents, diff viewer, Mermaid rendering
-  - `ac/` — Acceptance criteria viewer and detail
-  - `task/` — Task tree, implementation options, whiteboard canvas, zoom controls
-  - `kanban/` — Kanban board, columns, cards, feature groups
-  - `chat/` — Streaming chat panel, chat bubbles, typing indicators, modals
-  - `ask/` — Guided question flow
-  - `settings/` — Profile, account, API keys, notifications, feedback
-  - `auth/` — Login form, onboarding form
-  - `layout/` — App layout, navbar, footer, hero, flow step navigation
-  - `ui/` — Base design system primitives (shadcn / Radix)
-  - `admin/` — Admin dashboard and metric cards
-  - `codebase/` — Codebase review and sync modals
+- `src/features/` — Feature-driven domain modules (high cohesion):
+  - `greenfield/` — Ask flow, Feature tree map, PRD viewer/editor, AC, Task whiteboard, Kanban board
+  - `codebase/` — CLI sync handling, codebase explorer, chat workspace, analysis engine
+  - `studio/` — Web scraper, design token extraction (`DESIGN.md`), interactive HTML/Tailwind studio
+  - `templates/` — Blueprint prompt catalog and starter templates
+  - `billing/` — Midtrans payment integration, credit balance, atomic ledger, invoices
+  - `auth-settings/` — Better Auth flows, user profile, account settings, API keys, notifications
+  - `admin/` — Admin metrics dashboard, user management, project triage
+- `src/routes/` — Thin TanStack Router file-based UI routes and server API route handlers (`/api/*`, `/api/v1/*`)
+- `src/components/ui/` — Base design system primitives (shadcn / Radix) without domain logic
 - `src/db/` — Drizzle ORM schema (`schema.ts`), PostgreSQL connection client, and migrations
-- `src/lib/` — Auth (Better Auth), constants, session, rate-limiting, credit gate, model configuration, prompts
-- `src/lib/services/` — Business logic and orchestration (`ai-orchestrator`, `chat-service`, `prd-service`, `ac-service`, `task-service`, `payment-service`)
+- `src/lib/` — Shared infrastructure (Auth session, base constants, rate-limiting, credit policy, model gateway)
 - `src/store/` — Zustand in-memory state stores (`useAuthStore`, `useChatStore`, `useUIStore`)
-- `src/types/` — Shared domain types (`database.ts`)
-- `src/hooks/` — Specialized hooks (`use-kanban-polling`, `use-canvas-zoom`, `use-panel-resize`, `use-user-plan`)
+- `src/types/` — Shared global domain types (`database.ts`)
+- `packages/cli/` — Companion CLI tool (`everythings-vibe`) for terminal-based codebase sync and task management
 - `e2e/` — Playwright end-to-end test suites
 - `docs/` — Specifications, architecture, plans, and technical documentation
 

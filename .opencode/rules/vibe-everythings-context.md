@@ -194,3 +194,9 @@ Dasbor khusus untuk pemantauan sistem dan operasional:
 7. **Patuhi Standar Visual & Bahasa:**
    - Gunakan Bahasa Indonesia untuk salinan teks antarmuka tanpa menerjemahkan istilah baku teknologi.
    - Tolak semua estetika AI slop (gradien murahan, *neon glow*, bayangan berlebihan, teks filler tak bermakna).
+8. **Struktur Berbasis Fitur & Anti-Monster File (`architecture-folder-structure.md`):**
+   - Kode baru wajib ditempatkan di `src/features/<fitur>/` sesuai domainnya.
+   - Batas maksimal panjang file adalah **400 baris**. File $\ge$ 350 baris wajib dipecah ke sub-komponen atau custom hooks.
+9. **Zero Dead Code & Thin Routes:**
+   - Dilarang meninggalkan kode mati (*deathcode*), file coba-coba tanpa pemanggil, atau sisa prototipe.
+   - Folder `src/routes/` harus tipis ($\le$ 150 baris) dan bebas dari file test berawalan `-`. Seluruh test wajib berada di folder `tests/` fitur.
