@@ -175,6 +175,7 @@ describe("StudioPage UI & Workflow", () => {
 						initialPageCount: 3,
 						designReference: null,
 						designMd: null,
+						prdAttachment: null,
 						logo: null,
 					}),
 				}),
