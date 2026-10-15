@@ -199,6 +199,7 @@ export interface InitialFrameContext {
 	logoUrl: string | null;
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
 	blueprint: StudioDesignBlueprint | null;
+	prdContent?: string | null;
 	lease?: { jobId: string; workerId: string };
 }
 
@@ -279,6 +280,7 @@ export async function generateInitialFrame(
 		logoUrl: ctx.logoUrl,
 		blueprint: ctx.blueprint,
 		activeScreen: frame.name,
+		prdContent: ctx.prdContent,
 	});
 	let attempt = 0;
 	for (;;) {
@@ -866,6 +868,7 @@ export async function runStudioJobPipeline(
 				designMode,
 				project.designMd,
 				project.initialPageCount,
+				project.prdContent,
 			);
 
 			let planError: string | null = null;
@@ -1073,6 +1076,7 @@ export async function runStudioJobPipeline(
 						logoUrl,
 						dsTokens,
 						blueprint: designBlueprint ?? project.designBlueprint,
+						prdContent: project.prdContent,
 						lease: { jobId, workerId },
 					}),
 			),
@@ -1221,6 +1225,7 @@ export async function reviseStudioProject(
 		designMode,
 		designMd: detail.designMd,
 		logoUrl: detail.logoUrl,
+		prdContent: detail.prdContent,
 	});
 
 	const htmlCode = await generateStudioHtml(
@@ -1448,6 +1453,7 @@ export async function addStudioFrame(
 			logoUrl: detail.logoUrl,
 			blueprint: detail.designBlueprint,
 			activeScreen: cleanName,
+			prdContent: detail.prdContent,
 		});
 
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
@@ -1536,6 +1542,7 @@ export async function reviseStudioFrame(
 			previousHtml: frame.htmlCode ?? undefined,
 			blueprint: detail.designBlueprint,
 			activeScreen: frame.name,
+			prdContent: detail.prdContent,
 		});
 
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
@@ -2418,6 +2425,7 @@ async function runStudioFrameOperation(job: StudioJobRow) {
 				job.jobType === "revise" ? (frame.htmlCode ?? undefined) : undefined,
 			blueprint: project.designBlueprint,
 			activeScreen: name,
+			prdContent: project.prdContent,
 		});
 		const dsTokens = extractDesignSystemTokens(project.designMd);
 		const htmlCode = await generateValidatedFrameHtml({
