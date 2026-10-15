@@ -31,8 +31,12 @@ const modeInfo = {
 	},
 };
 
-export function ScrapModeSwitcher() {
-	const [mode, setMode] = useState<ScrapeMode>("design");
+export function ScrapModeSwitcher({
+	initialMode = "design",
+}: {
+	initialMode?: ScrapeMode;
+}) {
+	const [mode, setMode] = useState<ScrapeMode>(initialMode);
 	function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
 		const current = modes.indexOf(mode);
 		const next =

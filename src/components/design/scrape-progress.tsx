@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ScrapeErrorCard } from "@/components/design/scrape-error-card";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
 import { resolveScrapeErrorPresentation } from "@/lib/scrape-error-presentation";
+import type { imageResultCounts } from "@/lib/scrape-images";
 import { displaySiteName } from "@/lib/site-name";
 import { cn } from "@/lib/utils";
 
@@ -28,9 +29,13 @@ export interface ScrapeProgressProps {
 	processedImages?: number;
 	discoveredImages?: number;
 	savedImages?: number;
+	imageCounts?: ReturnType<typeof imageResultCounts>;
 	failedResources?: number;
 	workerHealth?: string | null;
+	// How many results are actually saved on disk, and how many resources failed.
+	// Both come from persisted rows, so the failure card never invents a count.
 	partialResults?: number;
+	partialFailed?: number;
 	imageDiscovery?:
 		| "found"
 		| "none"
@@ -260,10 +265,14 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 				]
 			: mode === "images"
 				? [
-						["Ditemukan", props.discoveredImages],
-						["Diproses", props.processedImages],
-						["Tersimpan", props.savedImages],
-						["Gagal", props.failedResources],
+						[
+							"Ditemukan",
+							props.imageCounts?.discovered ?? props.discoveredImages,
+						],
+						["Tersimpan", props.imageCounts?.persisted],
+						["Tautan terverifikasi", props.imageCounts?.linked],
+						["Gagal", props.imageCounts?.failed],
+						["Tertunda", props.imageCounts?.pending],
 					]
 				: [];
 	const visibleCounters = counters.filter(
@@ -276,6 +285,10 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 		message: errorMessage,
 		retryAfterSeconds,
 		retryAfterExpiresAt,
+		partialResults: props.partialResults,
+		partialFailed: props.partialFailed,
+		partialKind:
+			mode === "crawl" ? "pages" : mode === "html" ? "documents" : "images",
 	});
 
 	if (mode === "images") {
@@ -305,22 +318,23 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 							<span aria-live="polite">{headerState}</span>
 						</p>
 					</div>
+					{/* The stepper stays mounted on failure so the failed stage is
+					    visible in the same progress hierarchy the user already saw. */}
+					<ScrapeStepper
+						stages={stages}
+						status={status}
+						failedAt={failedAtStage}
+					/>
 					{isFailed ? (
-						<div className="mt-5">
+						<div className="mt-5 border-t border-graphite pt-5">
 							<ScrapeErrorCard
 								{...presentation}
-								partialResults={props.partialResults}
+								mode={mode}
 								isRetrying={isRetrying}
 								onRetry={onRetry}
 							/>
 						</div>
-					) : (
-						<ScrapeStepper
-							stages={stages}
-							status={status}
-							failedAt={failedAtStage}
-						/>
-					)}
+					) : null}
 					{!isFailed && active && activityText ? (
 						<div className="mt-5 flex min-w-0 items-baseline gap-2 border-t border-graphite pt-4">
 							<output
@@ -357,8 +371,9 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 					)}
 					{props.imageOutcome === "partial" && (
 						<p className="mt-6 text-sm text-fog">
-							Sebagian gambar berhasil diambil. Gambar yang tersedia tetap
-							tersimpan; resource yang gagal diverifikasi beserta alasannya.
+							Sebagian gambar berhasil diproses. Jumlah byte tersimpan dan
+							tautan terverifikasi ditampilkan terpisah. Alasan kegagalan
+							tersedia di hasil gambar.
 						</p>
 					)}
 					{(props.imageDiscovery === "discovery-failed" ||
@@ -440,22 +455,24 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 					</p>
 				</div>
 
+				{/* The stepper stays mounted on failure so the failed stage is
+				    visible in the same progress hierarchy the user already saw. */}
+				<ScrapeStepper
+					stages={stages}
+					status={status}
+					failedAt={failedAtStage}
+				/>
+
 				{isFailed ? (
-					<div className="mt-5">
+					<div className="mt-5 border-t border-graphite pt-5">
 						<ScrapeErrorCard
 							{...presentation}
-							partialResults={props.partialResults}
+							mode={mode}
 							isRetrying={isRetrying}
 							onRetry={onRetry}
 						/>
 					</div>
-				) : (
-					<ScrapeStepper
-						stages={stages}
-						status={status}
-						failedAt={failedAtStage}
-					/>
-				)}
+				) : null}
 			</section>
 		</div>
 	);

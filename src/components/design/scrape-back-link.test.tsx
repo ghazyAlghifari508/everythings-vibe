@@ -13,11 +13,13 @@ vi.mock("@tanstack/react-router", () => ({
 		to,
 		children,
 		replace,
+		search,
 		...rest
 	}: {
 		to: string;
 		children?: ReactNode;
 		replace?: boolean;
+		search?: unknown;
 		onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 	}) => {
 		const anchorProps: Record<string, unknown> = { ...rest };
@@ -27,6 +29,7 @@ vi.mock("@tanstack/react-router", () => ({
 				href: to,
 				"data-to": to,
 				"data-replace": String(replace),
+				"data-search": search ? JSON.stringify(search) : undefined,
 				...anchorProps,
 			},
 			children,
@@ -85,5 +88,47 @@ describe("ScrapeBackLink", () => {
 		render(<ScrapeBackLink from="/design/scrap/history" />);
 		fireEvent.click(screen.getByRole("link"));
 		expect(routerMock.history.back).not.toHaveBeenCalled();
+	});
+
+	it("restores the history filter state when returning from History", () => {
+		render(
+			<ScrapeBackLink
+				from="/design/scrap/history"
+				historySearch={{
+					mode: "html",
+					status: "failed",
+					q: "stitch",
+					sort: "newest",
+					page: 2,
+					pageSize: 10,
+				}}
+			/>,
+		);
+		const link = screen.getByRole("link");
+		expect(link.dataset.to).toBe("/design/scrap/history");
+		expect(JSON.parse(link.dataset.search ?? "{}")).toEqual({
+			mode: "html",
+			status: "failed",
+			q: "stitch",
+			page: 2,
+		});
+	});
+
+	it("ignores stored filters when returning to Scrap", () => {
+		render(
+			<ScrapeBackLink
+				from="/design/scrap"
+				historySearch={{
+					mode: "html",
+					q: "",
+					sort: "newest",
+					page: 3,
+					pageSize: 10,
+				}}
+			/>,
+		);
+		const link = screen.getByRole("link");
+		expect(link.dataset.to).toBe("/design/scrap");
+		expect(link.dataset.search).toBeUndefined();
 	});
 });

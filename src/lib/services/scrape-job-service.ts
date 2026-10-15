@@ -1,5 +1,10 @@
 import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import type { ScrapeStatus } from "@/db/schema";
 import { scrapes } from "@/db/schema";
+import {
+	errorSourceForCode,
+	scrapeFailureReasonForCode,
+} from "@/lib/design-errors";
 
 export const SCRAPE_JOB_LEASE_MS = 60_000;
 export const SCRAPE_JOB_HEARTBEAT_MS = 15_000;
@@ -23,6 +28,19 @@ export function isScrapeJobEligible(
 		activeStatuses.some((active) => active === status) &&
 		(!leaseExpiresAt || leaseExpiresAt <= now)
 	);
+}
+
+const TERMINAL_OR_FAILED_STAGES = new Set(["completed", "failed"]);
+
+// The stage a run was last seen in is only usable when it is a real processing
+// stage. Anything else (missing, terminal, or an unknown value) resolves to the
+// first stage every job must have reached, so the failure UI never marks a
+// fabricated stage.
+export function resolveFailedAtStage(
+	stage: ScrapeStatus | undefined,
+): ScrapeStatus {
+	if (stage && !TERMINAL_OR_FAILED_STAGES.has(stage)) return stage;
+	return "queued";
 }
 
 export function isScrapeClaimCurrent(
@@ -73,6 +91,9 @@ export async function claimScrapeJob(): Promise<ScrapeJobClaim | null> {
 			.for("update", { skipLocked: true });
 		if (!row) return null;
 		if (row.jobAttempts >= SCRAPE_JOB_MAX_ATTEMPTS) {
+			// The job never reached a terminal stage, so the stage it was last
+			// seen in is the honest failure stage, and the reason is a worker
+			// interruption rather than anything the website did.
 			await tx
 				.update(scrapes)
 				.set({
@@ -81,8 +102,14 @@ export async function claimScrapeJob(): Promise<ScrapeJobClaim | null> {
 					leaseExpiresAt: null,
 					metadata: {
 						...row.metadata,
-						errorMessage: "Pemrosesan terhenti berulang kali. Coba lagi.",
+						stage: "failed",
+						stageStartedAt: new Date().toISOString(),
+						errorMessage:
+							"Pemrosesan tidak selesai karena worker berhenti berulang kali. Coba lagi.",
 						errorDetail: "WORKER_INTERRUPTED",
+						errorSource: errorSourceForCode("WORKER_INTERRUPTED"),
+						failureReason: scrapeFailureReasonForCode("WORKER_INTERRUPTED"),
+						failedAtStage: resolveFailedAtStage(row.metadata?.stage),
 					},
 				})
 				.where(and(eq(scrapes.id, row.id), eq(scrapes.userId, row.userId)));

@@ -5,6 +5,7 @@ import {
 	CRAWL_SECTION_TEXT_MAX_CHARS,
 } from "./constants";
 import { matchesCrawlUrl } from "./crawl-url-filter";
+import { designErrorCodeForHttpStatus, ScrapeError } from "./design-errors";
 import { decodeHtmlEntities, extractPageTitle } from "./fetch-html";
 import type { CrawlSettings } from "./scrape-contract";
 
@@ -17,6 +18,10 @@ export interface CrawledPage {
 	httpStatus: number | null;
 	content: CrawlPageContent | null;
 	error: string | null;
+	// Typed failure evidence for a failed page. Kept alongside the message so a
+	// summary can be classified from codes and statuses instead of copy. Optional
+	// because persisted rows are fed back in as the resume frontier.
+	failureCode?: string | null;
 }
 
 export interface CrawlDependencies {
@@ -227,6 +232,7 @@ export async function crawlWebsite(
 			httpStatus: null,
 			content: null,
 			error: null,
+			failureCode: null,
 		};
 		try {
 			const parsed = new URL(next.url);
@@ -236,7 +242,12 @@ export async function crawlWebsite(
 				robots.set(parsed.origin, rules);
 			}
 			if (!robotsAllows(rules, `${parsed.pathname}${parsed.search}`)) {
-				page = { ...page, status: "skipped", error: "Dibatasi robots.txt." };
+				page = {
+					...page,
+					status: "skipped",
+					error: "Dibatasi robots.txt.",
+					failureCode: "WEBSITE_ACCESS_DENIED",
+				};
 			} else {
 				const previous = deps.completed?.find(
 					(row) =>
@@ -271,8 +282,16 @@ export async function crawlWebsite(
 				}
 				const captured = await deps.load(next.url);
 				if (!isCrawlScope(captured.finalUrl, seed, settings.followSubdomains))
-					throw new Error("Redirect di luar scope crawl.");
-				if (captured.status >= 400) throw new Error(`HTTP ${captured.status}`);
+					throw new ScrapeError(
+						"WEBSITE_BLOCKED",
+						"Redirect di luar scope crawl.",
+					);
+				if (captured.status >= 400)
+					throw new ScrapeError(
+						designErrorCodeForHttpStatus(captured.status),
+						`HTTP ${captured.status}`,
+						{ httpStatus: captured.status },
+					);
 				const links = resources(
 					[...captured.html.matchAll(/<a\b[^>]*>/gi)]
 						.map((match) => match[0])
@@ -338,6 +357,11 @@ export async function crawlWebsite(
 				throw error;
 			page.error =
 				error instanceof Error ? error.message : "Halaman gagal diambil.";
+			// A typed ScrapeError carries the parsed status and code, so the
+			// aggregate classification never has to read the message text.
+			page.failureCode = error instanceof ScrapeError ? error.code : null;
+			if (error instanceof ScrapeError && error.httpStatus !== undefined)
+				page.httpStatus = error.httpStatus;
 		}
 		pages.push(page);
 		await deps.onPage?.(page, seen.size);

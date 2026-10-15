@@ -85,7 +85,11 @@ describe("DesignResult verification labelling", () => {
 				visualEvidence={evidence}
 			/>,
 		);
-		expect(screen.getByText(/pengukuran browser/i)).toBeDefined();
+		expect(
+			screen.getByText(
+				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
+			),
+		).toBeDefined();
 		expect(screen.queryByText(/arsip/i)).toBeNull();
 	});
 
@@ -102,7 +106,11 @@ describe("DesignResult verification labelling", () => {
 		expect(screen.getAllByText(/belum terverifikasi/i).length).toBeGreaterThan(
 			0,
 		);
-		expect(screen.queryByText(/pengukuran browser/i)).toBeNull();
+		expect(
+			screen.queryByText(
+				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
+			),
+		).toBeNull();
 	});
 
 	it("still exposes the archived raw document for copy and download", () => {

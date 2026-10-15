@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
 	buildSourceViewRows,
 	type SourceToken,
@@ -59,6 +59,17 @@ export function CodebaseSourcePreview({
 	onRetry,
 }: CodebaseSourcePreviewProps) {
 	const [mode, setMode] = useState<SourceViewMode>("original");
+	const [pendingMode, setPendingMode] = useState<SourceViewMode | null>(null);
+	const [activePath, setActivePath] = useState(path);
+	const [isPending, startTransition] = useTransition();
+
+	if (activePath !== path) {
+		setActivePath(path);
+		setMode("original");
+		setPendingMode(null);
+	}
+
+	const activeMode = pendingMode ?? mode;
 
 	const view = useMemo(
 		() =>
@@ -70,6 +81,16 @@ export function CodebaseSourcePreview({
 			}),
 		[content, path, mode],
 	);
+
+	const handleModeChange = (next: SourceViewMode) => {
+		if (next === mode && !pendingMode) return;
+		setPendingMode(next);
+		startTransition(() => {
+			setMode(next);
+			setPendingMode(null);
+		});
+	};
+
 	const sizeLabel = formatSize(sizeBytes);
 	const isClipped = truncated || view.truncatedLines;
 
@@ -85,6 +106,11 @@ export function CodebaseSourcePreview({
 					<span data-testid="codebase-source-linecount">
 						{view.totalLines.toLocaleString("id-ID")} baris
 					</span>
+					{isPending ? (
+						<span className="text-[10px] text-fog animate-pulse">
+							Menyiapkan tampilan...
+						</span>
+					) : null}
 				</p>
 				{view.formattedAvailable ? (
 					<fieldset className="flex rounded-md border border-graphite bg-obsidian p-0.5">
@@ -93,11 +119,11 @@ export function CodebaseSourcePreview({
 							<button
 								key={option}
 								type="button"
-								onClick={() => setMode(option)}
-								aria-pressed={view.mode === option}
+								onClick={() => handleModeChange(option)}
+								aria-pressed={activeMode === option}
 								data-testid={`codebase-source-mode-${option}`}
 								className={`min-h-7 rounded px-2 text-[11px] font-medium capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-									view.mode === option
+									activeMode === option
 										? "bg-steel/40 text-snow"
 										: "text-fog hover:text-snow"
 								}`}

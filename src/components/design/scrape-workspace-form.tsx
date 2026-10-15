@@ -7,12 +7,14 @@ import { z } from "zod";
 import type { ScrapeMode } from "@/db/schema";
 import {
 	crawlSettingsSchema,
+	designSettingsSchema,
 	htmlSettingsSchema,
 	imagesSettingsSchema,
 	SCRAPE_LIMITS,
 	scrapeRequestSchema,
 } from "@/lib/scrape-contract";
 import { cn } from "@/lib/utils";
+import { ScrapeFilterSelect } from "./scrape-filter-select";
 import { ScrapeFormNotice } from "./scrape-form-notice";
 import {
 	ADVANCED_PARAMETER_GROUPS,
@@ -40,12 +42,14 @@ function ParameterGroup({
 	issues,
 	onNumberChange,
 	onToggleChange,
+	onSelectChange,
 }: {
 	group: AdvancedParameterGroup;
 	settings: AnyScrapeSettings;
 	issues: Record<string, string>;
 	onNumberChange: (key: NumericParameterSpec["key"], value: number) => void;
 	onToggleChange: (key: ToggleParameterSpec["key"], value: boolean) => void;
+	onSelectChange: (key: string, value: string) => void;
 }) {
 	const baseId = useId();
 	return (
@@ -55,6 +59,22 @@ function ParameterGroup({
 			</p>
 			<p className="mt-1 text-xs leading-5 text-fog">{group.description}</p>
 			<div className="mt-4 grid gap-4 sm:grid-cols-2">
+				{"viewport" in settings
+					? group.selects?.map((spec) => (
+							<div key={spec.key} className="min-w-0">
+								<ScrapeFilterSelect
+									label={spec.label}
+									value={settings[spec.key]}
+									options={spec.options}
+									onChange={(value) => onSelectChange(spec.key, value)}
+									className="w-full"
+								/>
+								<p className="mt-1.5 text-xs leading-5 text-fog">
+									{spec.helper}
+								</p>
+							</div>
+						))
+					: null}
 				{group.numbers.map((spec) => (
 					<NumberField
 						key={spec.key}
@@ -152,6 +172,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 	const [input, setInput] = useState("");
 	const [protocol, setProtocol] = useState("https://");
 	const [crawl, setCrawl] = useState(() => crawlSettingsSchema.parse({}));
+	const [design, setDesign] = useState(() => designSettingsSchema.parse({}));
 	const [html, setHtml] = useState(() => htmlSettingsSchema.parse({}));
 	const [images, setImages] = useState(() => imagesSettingsSchema.parse({}));
 	const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -172,6 +193,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 	const hasAdvanced = groups.length > 0;
 
 	function reset() {
+		if (mode === "design") setDesign(designSettingsSchema.parse({}));
 		if (mode === "crawl") setCrawl(crawlSettingsSchema.parse({}));
 		if (mode === "html") setHtml(htmlSettingsSchema.parse({}));
 		if (mode === "images") setImages(imagesSettingsSchema.parse({}));
@@ -188,7 +210,13 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 	// Only the active mode's settings object is ever read or written, so a
 	// parameter can never leak between modes.
 	const activeSettings: AnyScrapeSettings =
-		mode === "crawl" ? crawl : mode === "html" ? html : images;
+		mode === "design"
+			? design
+			: mode === "crawl"
+				? crawl
+				: mode === "html"
+					? html
+					: images;
 
 	const issues = groups
 		.flatMap((group) => validateParameterGroup(group, activeSettings))
@@ -219,12 +247,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 		const parsed = scrapeRequestSchema.safeParse({
 			url,
 			mode,
-			...(mode === "design"
-				? {}
-				: {
-						settings:
-							mode === "crawl" ? crawl : mode === "html" ? html : images,
-					}),
+			settings: activeSettings,
 		});
 		if (!parsed.success) {
 			setError(
@@ -277,48 +300,51 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 			className="mx-auto w-full max-w-3xl text-left"
 		>
 			<fieldset disabled={pending} className="min-w-0">
-				<div className="flex items-stretch gap-3">
-					<div className="flex h-14 min-w-0 flex-1 items-center overflow-hidden rounded-lg border border-graphite bg-charcoal focus-within:ring-2 focus-within:ring-indigo">
-						<span className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-sm text-fog">
-							{protocol}
-						</span>
-						<label htmlFor="scrape-url" className="sr-only">
-							URL website
-						</label>
-						<input
-							id="scrape-url"
-							name="url"
-							inputMode="url"
-							autoComplete="url"
-							value={input}
-							onChange={(event) => changeUrl(event.target.value)}
-							placeholder="example.com"
-							required
-							maxLength={SCRAPE_LIMITS.urlChars}
-							aria-invalid={!!error}
-							aria-describedby="scrape-form-error"
-							className="h-full min-w-0 flex-1 bg-transparent px-3 text-base text-snow outline-none placeholder:text-fog [--autofill-bg:var(--color-charcoal)]"
-						/>
-					</div>
-					<button
-						type="submit"
-						disabled={pending || !input.trim()}
-						aria-label={`Jalankan ${mode === "design" ? "Generate DESIGN.md" : mode === "crawl" ? "Crawl Website" : mode === "images" ? "Scrape Images" : "Scrape HTML"}`}
-						title="Mulai ekstraksi"
-						className="btn-primary inline-flex size-14 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
-					>
-						{pending ? (
-							<Loader2
-								size={20}
-								aria-hidden
-								className="motion-safe:animate-spin"
+				<div className="rounded-xl border border-graphite bg-charcoal focus-within:ring-2 focus-within:ring-indigo">
+					<ScrapeFormNotice tone="plain" />
+					<div aria-hidden className="mx-4 mt-4 border-t border-graphite" />
+					<div className="flex items-stretch gap-3 p-3 sm:p-4">
+						<div className="flex h-14 min-w-0 flex-1 items-center overflow-hidden rounded-lg bg-transparent">
+							<span className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-sm text-fog">
+								{protocol}
+							</span>
+							<label htmlFor="scrape-url" className="sr-only">
+								URL website
+							</label>
+							<input
+								id="scrape-url"
+								name="url"
+								inputMode="url"
+								autoComplete="url"
+								value={input}
+								onChange={(event) => changeUrl(event.target.value)}
+								placeholder="example.com"
+								required
+								maxLength={SCRAPE_LIMITS.urlChars}
+								aria-invalid={!!error}
+								aria-describedby={error ? "scrape-form-error" : undefined}
+								className="h-full min-w-0 flex-1 bg-transparent px-3 text-base text-snow outline-none placeholder:text-fog [--autofill-bg:var(--color-charcoal)]"
 							/>
-						) : (
-							<ArrowUp size={20} aria-hidden />
-						)}
-					</button>
+						</div>
+						<button
+							type="submit"
+							disabled={pending || !input.trim()}
+							aria-label={`Jalankan ${mode === "design" ? "Generate DESIGN.md" : mode === "crawl" ? "Crawl Website" : mode === "images" ? "Scrape Images" : "Scrape HTML"}`}
+							title="Mulai ekstraksi"
+							className="btn-primary inline-flex size-14 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
+						>
+							{pending ? (
+								<Loader2
+									size={20}
+									aria-hidden
+									className="motion-safe:animate-spin"
+								/>
+							) : (
+								<ArrowUp size={20} aria-hidden />
+							)}
+						</button>
+					</div>
 				</div>
-				<ScrapeFormNotice className="mt-3" />
 
 				{hasAdvanced ? (
 					<div className="mt-5 min-w-0 rounded-lg border border-graphite">
@@ -335,11 +361,13 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 										Parameter lanjutan
 									</span>
 									<span className="mt-0.5 block text-xs text-fog">
-										{mode === "crawl"
-											? "Cakupan crawl dan jenis data yang disimpan"
-											: mode === "html"
-												? "Cara halaman diambil sebelum disimpan"
-												: "Seberapa detail setiap gambar diperiksa"}
+										{mode === "design"
+											? "Tampilan, tema, dan isi panduan desain"
+											: mode === "crawl"
+												? "Cakupan crawl dan jenis data yang disimpan"
+												: mode === "html"
+													? "Cara halaman diambil sebelum disimpan"
+													: "Seberapa detail setiap gambar diperiksa"}
 									</span>
 								</span>
 								<ChevronDown
@@ -365,6 +393,13 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 										issues={issues}
 										onNumberChange={updateNumber}
 										onToggleChange={updateToggle}
+										onSelectChange={(key, value) => {
+											const parsed = designSettingsSchema.safeParse({
+												...design,
+												[key]: value,
+											});
+											if (parsed.success) setDesign(parsed.data);
+										}}
 									/>
 								))}
 								{mode === "crawl" ? (
@@ -403,13 +438,15 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 					</div>
 				) : null}
 			</fieldset>
-			<p
-				id="scrape-form-error"
-				role={error ? "alert" : undefined}
-				className={cn("mt-3 text-sm", error ? "text-crimson" : "text-fog")}
-			>
-				{error || "Gunakan website publik yang dapat diakses tanpa login."}
-			</p>
+			{error ? (
+				<p
+					id="scrape-form-error"
+					role="alert"
+					className="mt-3 text-sm text-crimson"
+				>
+					{error}
+				</p>
+			) : null}
 		</form>
 	);
 }

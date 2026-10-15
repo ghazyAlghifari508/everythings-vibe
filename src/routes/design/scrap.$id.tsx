@@ -6,6 +6,7 @@ import { DesignResult } from "@/components/design/design-result";
 import { ImagesResult } from "@/components/design/images-result";
 import { ScrapeBackLink } from "@/components/design/scrape-back-link";
 import { ScrapeDetail } from "@/components/design/scrape-detail";
+import { SCRAPE_RESULTS_ANCHOR_ID } from "@/components/design/scrape-error-card";
 import { ScrapeProgress } from "@/components/design/scrape-progress";
 import {
 	resolveScrapeContentWidth,
@@ -17,6 +18,9 @@ import {
 	toScrapeStatusSnapshot,
 	useScrapeStatus,
 } from "@/hooks/use-scrape-status";
+import { parseScrapeHistorySearch } from "@/lib/scrape-contract";
+import { toScrapeHistorySearchParams } from "@/lib/scrape-history";
+import { imageResultCounts } from "@/lib/scrape-images";
 import { parseScrapeReturnSearch } from "@/lib/scrape-return-path";
 import { requireUserServer } from "@/lib/session";
 
@@ -34,8 +38,8 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 			user.id,
 			mode,
 		);
-		const { attachImageAssetUrls } = await import("@/lib/preview-capabilities");
-		const images = attachImageAssetUrls(imageRows, id, user.id);
+		const { signScrapeImages } = await import("@/lib/services/scrape-service");
+		const images = await signScrapeImages(imageRows, id, user.id);
 		let appOrigin = "http://localhost:3000";
 		try {
 			const { getRequestHeaders, getRequestUrl } = await import(
@@ -85,7 +89,10 @@ export const Route = createFileRoute("/design/scrap/$id")({
 	head: () => ({
 		meta: [{ title: "Hasil Scrape | VibeDesign" }],
 	}),
-	validateSearch: (search) => parseScrapeReturnSearch(search),
+	validateSearch: (search) => ({
+		...parseScrapeReturnSearch(search),
+		...toScrapeHistorySearchParams(parseScrapeHistorySearch(search)),
+	}),
 	loader: async ({ params }) => {
 		try {
 			return await loadScrapeDetail({ data: params.id });
@@ -111,7 +118,9 @@ function ScrapeDetailPage() {
 	const router = useRouter();
 	const initial = Route.useLoaderData();
 	const { id } = Route.useParams();
-	const { from } = Route.useSearch();
+	const rawSearch = Route.useSearch();
+	const { from } = rawSearch;
+	const history = parseScrapeHistorySearch(rawSearch);
 
 	const {
 		data,
@@ -256,9 +265,13 @@ function ScrapeDetailPage() {
 					: "mx-auto max-w-5xl px-4 sm:px-6"
 			}`}
 		>
-			<ScrapeBackLink from={from} />
+			<ScrapeBackLink from={from} historySearch={history} />
 			{currentStatus === "failed" &&
-				(mode === "crawl" || mode === "images") && (
+				(mode === "crawl" ||
+					mode === "images" ||
+					// An HTML run that persisted its capture keeps that partial
+					// result, so the failure card is shown with the saved document.
+					(mode === "html" && previewHtml.length > 0)) && (
 					<ScrapeProgress
 						mode={mode}
 						status={currentStatus}
@@ -269,41 +282,61 @@ function ScrapeDetailPage() {
 						failedAtStage={failedAtStage}
 						retryAfterSeconds={retryAfterSeconds}
 						retryAfterExpiresAt={retryAfterExpiresAt}
-						layout={mode === "images" ? "single" : "two-panel"}
+						layout={
+							mode === "images" || mode === "html" ? "single" : "two-panel"
+						}
 						isRetrying={isRetrying}
 						onRetry={retry}
 						imageDiscovery={data?.metadata?.imageDiscovery ?? null}
 						imageOutcome={data?.metadata?.imageOutcome ?? null}
 						discoveredImages={data?.metadata?.discoveredImages}
-						savedImages={data?.metadata?.savedImages}
+						imageCounts={imageResultCounts(
+							images,
+							data?.metadata?.discoveredImages,
+						)}
 						processedImages={data?.metadata?.processedImages}
 						failedResources={data?.metadata?.failedResources}
 						partialResults={
 							mode === "crawl"
 								? pages.filter((page) => page.status === "completed").length
-								: images.filter((image) => image.status === "completed").length
+								: mode === "images"
+									? images.filter((image) => image.status === "completed")
+											.length
+									: 1
+						}
+						partialFailed={
+							mode === "crawl"
+								? pages.filter((page) => page.status === "failed").length
+								: mode === "images"
+									? images.filter((image) => image.status === "failed").length
+									: 0
 						}
 					/>
 				)}
 			{mode === "crawl" &&
 			(currentStatus === "completed" ||
 				(currentStatus === "failed" && pages.length > 0)) ? (
-				<CrawlResult
-					pages={pages}
-					sourceUrl={sourceUrl}
-					scope={crawlScope}
-					capturedAt={capturedAt ?? undefined}
-					domain={domain}
-				/>
+				<div id={SCRAPE_RESULTS_ANCHOR_ID} className="scroll-mt-6">
+					<CrawlResult
+						pages={pages}
+						sourceUrl={sourceUrl}
+						scope={crawlScope}
+						capturedAt={capturedAt ?? undefined}
+						domain={domain}
+					/>
+				</div>
 			) : mode === "images" &&
 				(currentStatus === "completed" ||
 					(currentStatus === "failed" && images.length > 0) ||
 					(!isTerminalStatus && hasVerifiedImages)) ? (
-				<ImagesResult
-					images={images}
-					sourceUrl={sourceUrl}
-					imageOutcome={data?.metadata?.imageOutcome ?? null}
-				/>
+				<div id={SCRAPE_RESULTS_ANCHOR_ID} className="scroll-mt-6">
+					<ImagesResult
+						images={images}
+						discoveredImages={metadata?.discoveredImages}
+						sourceUrl={sourceUrl}
+						imageOutcome={data?.metadata?.imageOutcome ?? null}
+					/>
+				</div>
 			) : view === "result-design" ? (
 				<DesignResult
 					sourceUrl={sourceUrl}
@@ -313,17 +346,25 @@ function ScrapeDetailPage() {
 					enrichment={metadata?.aiEnrichment}
 					enrichmentDetail={metadata?.aiEnrichmentDetail}
 				/>
-			) : view === "result-html" ? (
-				<ScrapeDetail
-					sourceUrl={sourceUrl}
-					title={initial.title}
-					domain={domain}
-					previewHtml={previewHtml}
-					previewSrcDoc={previewSrcDoc}
-					previewState={previewState}
-					previewError={previewError}
-					onRetryPreview={() => void retryPreview()}
-				/>
+			) : view === "result-html" ||
+				// A failed HTML run that already persisted its capture keeps that
+				// partial result visible instead of discarding it.
+				(currentStatus === "failed" &&
+					mode === "html" &&
+					previewHtml.length > 0) ? (
+				<div id={SCRAPE_RESULTS_ANCHOR_ID} className="scroll-mt-6">
+					<ScrapeDetail
+						sourceUrl={sourceUrl}
+						title={initial.title}
+						domain={domain}
+						previewHtml={previewHtml}
+						previewSrcDoc={previewSrcDoc}
+						previewState={previewState}
+						previewError={previewError}
+						screenshot={metadata?.screenshot ?? null}
+						onRetryPreview={() => void retryPreview()}
+					/>
+				</div>
 			) : currentStatus === "failed" &&
 				(mode === "crawl" || mode === "images") ? null : (
 				<ScrapeProgress
@@ -333,7 +374,10 @@ function ScrapeDetailPage() {
 					completedPages={data?.metadata?.completedPages}
 					skippedPages={data?.metadata?.skippedPages}
 					discoveredImages={data?.metadata?.discoveredImages}
-					savedImages={data?.metadata?.savedImages}
+					imageCounts={imageResultCounts(
+						images,
+						data?.metadata?.discoveredImages,
+					)}
 					failedResources={data?.metadata?.failedResources}
 					visitedPages={
 						data?.metadata?.visitedPages ?? initial.metadata?.visitedPages

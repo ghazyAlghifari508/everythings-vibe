@@ -19,7 +19,8 @@ vi.mock("@tanstack/react-start", () => ({
 vi.mock("@/lib/session", () => ({
 	requireUserServer: mocks.requireUserServer,
 }));
-vi.mock("@/lib/services/scrape-service", () => ({
+vi.mock("@/lib/services/scrape-service", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/services/scrape-service")>()),
 	getScrapeById: mocks.getScrapeById,
 	getScrapeResults: mocks.getScrapeResults,
 }));

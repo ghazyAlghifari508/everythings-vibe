@@ -147,6 +147,12 @@ export interface RenderDesignMdOptions {
 	implementationGuidance?: string[];
 	/** True when the AI synthesis step did not run or did not succeed. */
 	enrichmentUnavailable?: boolean;
+	/**
+	 * Safe failure detail rendered as a limitation, so the cause survives
+	 * persistence and reload inside the document. Must only carry fixed safe
+	 * strings, never a raw provider message.
+	 */
+	enrichmentDetail?: string;
 }
 
 export function renderDesignMd(
@@ -154,6 +160,9 @@ export function renderDesignMd(
 	options: RenderDesignMdOptions = {},
 ): string {
 	const lines: string[] = [];
+	const focus = model.settings?.focus ?? "complete";
+	const tokens = focus !== "components";
+	const codeReference = model.settings?.codeReference ?? "both";
 
 	// --- 1. Website identity & visual essence --------------------------------
 	const essence =
@@ -173,11 +182,20 @@ export function renderDesignMd(
 		lines.push("", options.overview?.trim() || model.overview.trim());
 	lines.push(
 		"",
-		`Measured from a single ${model.viewport.width}x${model.viewport.height} viewport on ${model.sourceUrl}. Observed values are browser measurements; role names are classifications of measured usage.`,
+		`Measured from ${model.viewport.width}x${model.viewport.height} on ${model.sourceUrl}. Observed values are browser measurements; role names are classifications of measured usage.`,
 	);
+	if (model.settings)
+		lines.push(
+			"",
+			`Analysis scope: ${model.settings.focus}; depth: ${model.settings.depth}; code reference: ${model.settings.codeReference}.`,
+		);
+	for (const view of model.capturedViews ?? [])
+		lines.push(
+			`- Captured ${view.width}x${view.height}, browser preference ${view.colorScheme}: ${escapeCell(view.sourceUrl)}`,
+		);
 
 	// --- 3. Tokens - Colors --------------------------------------------------
-	if (model.colors.length) {
+	if (tokens && model.colors.length) {
 		lines.push("", heading(2, "Tokens - Colors"), "");
 		lines.push(
 			table(
@@ -194,7 +212,7 @@ export function renderDesignMd(
 	}
 
 	// --- 4. Tokens - Typography ---------------------------------------------
-	if (model.typography.length) {
+	if (tokens && model.typography.length) {
 		lines.push("", heading(2, "Tokens - Typography"), "");
 		lines.push(
 			table(
@@ -221,7 +239,7 @@ export function renderDesignMd(
 	}
 
 	// --- 5. Fonts & Type Scale ----------------------------------------------
-	if (model.typefaces.length) {
+	if (tokens && model.typefaces.length) {
 		lines.push("", heading(2, "Fonts & Type Scale"), "");
 		for (const typeface of model.typefaces) {
 			lines.push(heading(3, escapeCell(typeface.family)));
@@ -248,7 +266,7 @@ export function renderDesignMd(
 	}
 
 	// --- 6. Tokens - Spacing & Shapes ---------------------------------------
-	if (model.spacing.length || model.radii.length) {
+	if (tokens && (model.spacing.length || model.radii.length)) {
 		lines.push("", heading(2, "Tokens - Spacing & Shapes"));
 		if (Number.isFinite(model.baseUnitPx))
 			lines.push("", `**Base unit:** ${model.baseUnitPx}px`);
@@ -274,7 +292,7 @@ export function renderDesignMd(
 					["Context", "Value", "Measured on"],
 					model.radii.map((token) => [
 						escapeCell(token.purpose),
-						isPillRadius(token.valuePx)
+						token.pill || isPillRadius(token.valuePx)
 							? `\`${escapeCell(token.value)}\` (fully rounded / pill)`
 							: `\`${escapeCell(token.value)}\``,
 						String(token.frequency),
@@ -304,7 +322,7 @@ export function renderDesignMd(
 			(component) => !seenNames.has(component.name.toLowerCase()),
 		),
 	];
-	if (mergedComponents.length) {
+	if (focus !== "visual-tokens" && mergedComponents.length) {
 		lines.push("", heading(2, "Components"), "");
 		for (const component of mergedComponents) {
 			lines.push(heading(3, escapeCell(component.name)));
@@ -435,8 +453,21 @@ export function renderDesignMd(
 	);
 	const spacingEntries = uniqueTokenNames(
 		model.spacing.flatMap((token) => {
+			// Container widths are not spacing steps: they live under the
+			// Tailwind v4 container scale instead of the spacing namespace.
+			if (token.purpose === "Container max-width") return [];
 			if (!isValidCssLength(token.value)) return [];
 			const name = tokenName("--spacing", token.purpose);
+			return name ? [{ name, value: token.value }] : [];
+		}),
+	);
+	// Measured max-widths map to the Tailwind v4 container scale, so they
+	// generate max-width utilities instead of corrupting the spacing scale.
+	const containerEntries = uniqueTokenNames(
+		model.spacing.flatMap((token) => {
+			if (token.purpose !== "Container max-width") return [];
+			if (!isValidCssLength(token.value)) return [];
+			const name = tokenName("--container", "max-width");
 			return name ? [{ name, value: token.value }] : [];
 		}),
 	);
@@ -496,10 +527,13 @@ export function renderDesignMd(
 		cssBlocks.push(["  /* Type scale */", ...typeDeclarations].join("\n"));
 	if (spacingDeclarations.length)
 		cssBlocks.push(["  /* Spacing */", ...spacingDeclarations].join("\n"));
+	const containerDeclarations = containerEntries.map(declaration);
+	if (containerDeclarations.length)
+		cssBlocks.push(["  /* Container */", ...containerDeclarations].join("\n"));
 	if (radiusDeclarations.length)
 		cssBlocks.push(["  /* Radius */", ...radiusDeclarations].join("\n"));
 
-	if (cssBlocks.length) {
+	if (codeReference !== "tailwind-v4" && cssBlocks.length) {
 		lines.push(
 			"",
 			heading(2, "CSS Custom Properties"),
@@ -511,7 +545,10 @@ export function renderDesignMd(
 	}
 
 	// --- 15. Tailwind v4 -----------------------------------------------------
-	if (colorDeclarations.length || typeDeclarations.length) {
+	if (
+		codeReference !== "css" &&
+		(colorDeclarations.length || typeDeclarations.length)
+	) {
 		const themeBlocks: string[] = [];
 		if (colorDeclarations.length)
 			themeBlocks.push(["  /* Colors */", ...colorDeclarations].join("\n"));
@@ -523,6 +560,10 @@ export function renderDesignMd(
 			themeBlocks.push(["  /* Type scale */", ...typeDeclarations].join("\n"));
 		if (spacingDeclarations.length)
 			themeBlocks.push(["  /* Spacing */", ...spacingDeclarations].join("\n"));
+		if (containerDeclarations.length)
+			themeBlocks.push(
+				["  /* Container */", ...containerDeclarations].join("\n"),
+			);
 		if (radiusDeclarations.length)
 			themeBlocks.push(["  /* Radius */", ...radiusDeclarations].join("\n"));
 		lines.push(
@@ -539,11 +580,14 @@ export function renderDesignMd(
 		"",
 		"Measurements are observed; semantic classifications are inferred from measured usage. Missing evidence is reported as unknown rather than estimated.",
 	);
-	if (options.enrichmentUnavailable)
+	if (options.enrichmentUnavailable) {
 		lines.push(
 			"",
 			"The AI synthesis step did not produce a narrative for this capture. The measured tokens below are complete and unaffected.",
 		);
+		if (options.enrichmentDetail?.trim())
+			lines.push(`- ${escapeCell(options.enrichmentDetail.trim())}`);
+	}
 	for (const limitation of model.limitations)
 		lines.push(`- ${escapeCell(limitation)}`);
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { buildFixtureModel } from "./design-fixture";
 import { parseDesignMd } from "./design-md-inspector";
+import { renderDesignMd } from "./design-md-render";
 import { renderEvidenceDesignMd } from "./design-visual-evidence";
 
 describe("canonical DESIGN.md round-trip", () => {
@@ -70,6 +72,48 @@ describe("canonical DESIGN.md round-trip", () => {
 		expect(model.donts.every((rule) => !rule.rule.startsWith("Don't:"))).toBe(
 			true,
 		);
+	});
+
+	it("only parses px units into sizePx instead of float-coercing other units", () => {
+		const model = parseDesignMd(
+			[
+				"# Acme - Style Reference",
+				"",
+				"## Tokens - Typography",
+				"| Role | Family | Size | Weight | Line Height |",
+				"| --- | --- | --- | --- | --- |",
+				"| Display | Inter | 2em | 700 | 1.1 |",
+				"| Body | Inter | 16px | 400 | 1.5 |",
+				"",
+			].join("\n"),
+		);
+		const display = model.typography.find((entry) => entry.role === "Display");
+		expect(display?.size).toBe("2em");
+		expect(display?.sizePx).toBeNaN();
+		const body = model.typography.find((entry) => entry.role === "Body");
+		expect(body?.sizePx).toBe(16);
+	});
+
+	it("round-trips the current renderer without losing theme or tokens", () => {
+		const document = renderDesignMd(buildFixtureModel());
+		const model = parseDesignMd(document);
+		expect(model.theme).not.toBe("unknown");
+		expect(model.spacing.length).toBeGreaterThan(0);
+		expect(model.radii.length).toBeGreaterThan(0);
+		expect(model.surfaces.length).toBeGreaterThan(0);
+		expect(model.elevation.length).toBeGreaterThan(0);
+		expect(model.components.length).toBeGreaterThan(0);
+		expect(model.dos.length + model.donts.length).toBeGreaterThan(0);
+		for (const color of model.colors)
+			expect(color.role.length).toBeGreaterThan(0);
+	});
+
+	it("groups current Do and Don't subsections with their evidence", () => {
+		const document = renderDesignMd(buildFixtureModel());
+		const model = parseDesignMd(document);
+		expect(model.dos.every((rule) => !/^Do:/.test(rule.rule))).toBe(true);
+		expect(model.donts.every((rule) => !/^Don't:/.test(rule.rule))).toBe(true);
+		expect(model.dos.every((rule) => rule.rule.length > 0)).toBe(true);
 	});
 
 	it("keeps legacy verbatim bullets unchanged", () => {

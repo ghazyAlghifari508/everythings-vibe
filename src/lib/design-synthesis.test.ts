@@ -3,7 +3,9 @@ import { buildFixtureModel } from "./design-fixture";
 import {
 	buildSynthesisInstruction,
 	buildSynthesisPayload,
+	classifySynthesisCause,
 	designSynthesisSchema,
+	enrichmentDetailForCause,
 	parseSynthesisResponse,
 	synthesisToRenderOptions,
 	validateSynthesis,
@@ -173,6 +175,51 @@ describe("synthesis parsing", () => {
 			extractJson,
 		);
 		expect(outcome.status).toBe("unavailable");
+	});
+});
+
+describe("synthesis failure causes", () => {
+	it("codes a stall or budget timeout distinctly from a provider error", () => {
+		expect(
+			classifySynthesisCause(
+				new Error("AI tidak merespons dalam 2 menit. Coba generate ulang."),
+			),
+		).toBe("timeout");
+		expect(
+			classifySynthesisCause(
+				new Error("Generasi melebihi batas waktu. Coba lagi."),
+			),
+		).toBe("timeout");
+		expect(classifySynthesisCause(new Error("upstream 500"))).toBe("provider");
+	});
+
+	it("codes an aborted job as cancelled", () => {
+		const controller = new AbortController();
+		controller.abort();
+		expect(
+			classifySynthesisCause(new Error("AI stream aborted"), controller.signal),
+		).toBe("cancelled");
+		expect(classifySynthesisCause(new Error("Generation dibatalkan."))).toBe(
+			"cancelled",
+		);
+	});
+
+	it("never leaks the raw provider message into the stored detail", () => {
+		const detail = enrichmentDetailForCause(
+			"provider",
+			"upstream 500: secret-key project-123 exploded",
+		);
+		expect(detail).not.toContain("upstream 500");
+		expect(detail).not.toContain("secret-key");
+		expect(detail.trim().length).toBeGreaterThan(0);
+	});
+
+	it("explains a timeout without the raw watchdog text", () => {
+		const detail = enrichmentDetailForCause(
+			"timeout",
+			"AI tidak merespons dalam 2 menit.",
+		);
+		expect(detail).toMatch(/batas waktu|timeout/i);
 	});
 });
 

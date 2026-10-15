@@ -71,6 +71,28 @@ describe("document and inspector consistency", () => {
 			expect(color.value).toMatch(/^#[0-9a-f]{6}$|^rgba\(/i);
 		}
 	});
+
+	it("keeps measured tokens identical with or without AI enrichment", () => {
+		const enriched = renderDesignMd(model, {
+			essence: "Enriched overview.",
+			overview: "Enriched narrative.",
+		});
+		const fallback = renderDesignMd(model, { enrichmentUnavailable: true });
+		const parsedEnriched = parseDesignMd(enriched);
+		const parsedFallback = parseDesignMd(fallback);
+		expect(parsedFallback.spacing.map((token) => token.value)).toEqual(
+			parsedEnriched.spacing.map((token) => token.value),
+		);
+		expect(parsedFallback.radii.map((token) => token.value)).toEqual(
+			parsedEnriched.radii.map((token) => token.value),
+		);
+		expect(parsedFallback.surfaces.map((surface) => surface.value)).toEqual(
+			parsedEnriched.surfaces.map((surface) => surface.value),
+		);
+		expect(parsedFallback.components.map((item) => item.name)).toEqual(
+			parsedEnriched.components.map((item) => item.name),
+		);
+	});
 });
 
 describe("archived document fallback", () => {

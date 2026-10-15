@@ -190,6 +190,37 @@ export interface ColorMeasurement {
 const AUDIT_SELECTOR_LIMIT = 3;
 const AUDIT_ROLE_LIMIT = 6;
 
+// Values from a colour space the parser cannot reduce to sRGB. They are
+// reported as evidence with a limitation instead of being guessed or silently
+// dropped.
+const UNSUPPORTED_COLOR_SPACE =
+	/^(oklch|oklab|lch|lab|hwb|hsl|hsla|color|color-mix|light-dark)\(/i;
+
+// Collects the distinct raw colour values the palette cannot represent, so
+// callers can state the gap instead of dropping the measurement silently.
+export function collectUnsupportedColors(
+	elements: VisualElementEvidence[],
+): string[] {
+	const unsupported: string[] = [];
+	for (const element of elements) {
+		const properties = element.properties;
+		for (const property of ["background-color", "color", "border-top-color"]) {
+			const value = properties[property];
+			if (!value) continue;
+			if (
+				property === "border-top-color" &&
+				(properties["border-top-style"] === "none" ||
+					properties["border-top-width"] === "0px")
+			)
+				continue;
+			if (!UNSUPPORTED_COLOR_SPACE.test(value.trim())) continue;
+			if (normalizeColor(value) !== null) continue;
+			if (!unsupported.includes(value)) unsupported.push(value);
+		}
+	}
+	return unsupported;
+}
+
 // Collects every colour-bearing property measurement that actually paints
 // something. Fully transparent paints and borders with no width are excluded
 // because they cannot form part of the visible palette.
@@ -404,8 +435,10 @@ export function classifyColorToken(
 		colorContext("cta", "background-color"),
 	);
 	if (BRAND_NAME.test(haystack)) {
-		const repeated =
-			token.usage.frequency >= BRAND_MIN_FREQUENCY || actionFill >= 1;
+		// An equal-valued custom property is an association, not proof of use:
+		// a single sighting stays an accent even when it fills one action
+		// element. Only repetition promotes it to a confirmed brand colour.
+		const repeated = token.usage.frequency >= BRAND_MIN_FREQUENCY;
 		if (repeated)
 			return {
 				token,
@@ -432,7 +465,12 @@ export function classifyColorToken(
 			rationale: `Painted the background of ${actionFill} measured action elements, which is repeated evidence of a primary action colour.`,
 			userAgentDefault: false,
 		};
-	const onAction = token.usage.roles.includes("cta");
+	// Only a background fill on an action element associates the colour with
+	// the action. Text painted on an action element (for example white label
+	// copy on a filled button) is text, not the action colour itself.
+	const onAction = token.usage.contexts.includes(
+		colorContext("cta", "background-color"),
+	);
 	if (onAction)
 		return {
 			token,

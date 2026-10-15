@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScrapeWorkspaceForm } from "./scrape-workspace-form";
 
@@ -36,11 +42,63 @@ describe("advanced parameters disclosure", () => {
 		expect(screen.queryByLabelText(/maksimum halaman/i)).toBeNull();
 	});
 
-	it("shows no advanced panel at all in design mode", () => {
+	it("submits selected design settings and resets defaults without losing the URL", async () => {
+		let submitted: unknown;
+		vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+			submitted = JSON.parse(String(init.body));
+			return Response.json({ scrapeId: "sample" });
+		});
 		render(<ScrapeWorkspaceForm mode="design" />);
+		fireEvent.click(advancedTrigger());
+		fireEvent.change(screen.getByLabelText(/URL website/i), {
+			target: { value: "sample.example" },
+		});
+		fireEvent.change(screen.getByLabelText("Tampilan yang dianalisis"), {
+			target: { value: "both" },
+		});
+		fireEvent.change(screen.getByLabelText("Tema"), {
+			target: { value: "both" },
+		});
+		fireEvent.change(screen.getByLabelText("Kedalaman analisis"), {
+			target: { value: "detailed" },
+		});
+		fireEvent.change(screen.getByLabelText("Fokus analisis"), {
+			target: { value: "components" },
+		});
+		fireEvent.change(screen.getByLabelText("Format panduan kode"), {
+			target: { value: "css" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: /jalankan generate/i }));
+		await waitFor(() =>
+			expect(submitted).toMatchObject({
+				mode: "design",
+				settings: {
+					viewport: "both",
+					theme: "both",
+					depth: "detailed",
+					focus: "components",
+					codeReference: "css",
+				},
+			}),
+		);
+		await waitFor(() =>
+			expect(
+				screen.getByRole<HTMLButtonElement>("button", {
+					name: /kembalikan ke pengaturan awal/i,
+				}).disabled,
+			).toBe(false),
+		);
+		fireEvent.click(
+			screen.getByRole("button", { name: /kembalikan ke pengaturan awal/i }),
+		);
 		expect(
-			screen.queryByRole("button", { name: /parameter lanjutan/i }),
-		).toBeNull();
+			screen.getByLabelText<HTMLSelectElement>("Tampilan yang dianalisis")
+				.value,
+		).toBe("desktop");
+		expect(screen.getByLabelText<HTMLInputElement>(/URL website/i).value).toBe(
+			"sample.example",
+		);
+		vi.unstubAllGlobals();
 	});
 
 	it("shows only the active mode's settings", () => {
@@ -175,6 +233,37 @@ describe("reset parameters", () => {
 	});
 });
 
+describe("warning and url composition", () => {
+	it("renders the notice before the url input in a single integrated area", () => {
+		const { container } = render(<ScrapeWorkspaceForm mode="crawl" />);
+		const notice = screen.getByText("Tidak semua website dapat di-scrape");
+		const url = screen.getByLabelText(/URL website/i);
+		const form = container.querySelector("form");
+		expect(form?.contains(notice)).toBe(true);
+		expect(form?.contains(url)).toBe(true);
+		expect(
+			notice.compareDocumentPosition(url) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+	});
+
+	it("does not render a separate warning card or redundant hint", () => {
+		render(<ScrapeWorkspaceForm mode="crawl" />);
+		expect(
+			screen.queryByText(
+				/Gunakan website publik yang dapat diakses tanpa login/,
+			),
+		).toBeNull();
+		expect(screen.queryByRole("alert")).toBeNull();
+	});
+
+	it("keeps validation and error feedback without the redundant hint", () => {
+		render(<ScrapeWorkspaceForm mode="crawl" />);
+		const url = screen.getByLabelText(/URL website/i);
+		fireEvent.change(url, { target: { value: "notaurl" } });
+		fireEvent.click(screen.getByRole("button", { name: /crawl website/i }));
+		expect(screen.getByRole("alert").textContent).toMatch(/tidak valid/i);
+	});
+});
 describe("parameter groups keep their own scope", () => {
 	it("does not carry a crawl value into another mode's form", () => {
 		const crawl = render(<ScrapeWorkspaceForm mode="crawl" />);

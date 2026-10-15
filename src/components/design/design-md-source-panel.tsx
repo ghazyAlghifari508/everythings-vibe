@@ -1,7 +1,7 @@
 "use client";
 
 import { Bot, Check, Code, Copy, Download, Eye } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
@@ -181,6 +181,13 @@ export function DesignMdSourcePanel({
 	const [copied, setCopied] = useState(false);
 	const [viewTab, setViewTab] = useState<SourceViewTab>("rendered");
 	const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const panelBaseId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+	const renderedTabId = `${panelBaseId}-rendered-tab`;
+	const sourceTabId = `${panelBaseId}-source-tab`;
+	const renderedPanelId = `${panelBaseId}-rendered-panel`;
+	const sourcePanelId = `${panelBaseId}-source-panel`;
+	const renderedTabRef = useRef<HTMLButtonElement>(null);
+	const sourceTabRef = useRef<HTMLButtonElement>(null);
 
 	useEffect(() => {
 		return () => {
@@ -235,7 +242,7 @@ export function DesignMdSourcePanel({
 					<span className="truncate text-xs text-fog">
 						{inspectorSource === "observed"
 							? enrichment === "unavailable"
-								? "Pengukuran lengkap tanpa narasi AI"
+								? "Analisis AI belum lengkap"
 								: "Sesuai evidence browser"
 							: "Arsip: belum terverifikasi terhadap evidence"}
 					</span>
@@ -284,17 +291,18 @@ export function DesignMdSourcePanel({
 					className="flex gap-1 rounded-lg border border-graphite bg-onyx p-1"
 				>
 					<button
-						id="designmd-rendered-tab"
+						ref={renderedTabRef}
+						id={renderedTabId}
 						type="button"
 						role="tab"
 						aria-selected={viewTab === "rendered"}
-						aria-controls="designmd-rendered-panel"
+						aria-controls={renderedPanelId}
 						tabIndex={viewTab === "rendered" ? 0 : -1}
 						onKeyDown={(event) => {
 							if (["ArrowRight", "ArrowLeft", "End"].includes(event.key)) {
 								event.preventDefault();
 								setViewTab("source");
-								document.getElementById("designmd-source-tab")?.focus();
+								sourceTabRef.current?.focus();
 							}
 						}}
 						onClick={() => setViewTab("rendered")}
@@ -308,17 +316,18 @@ export function DesignMdSourcePanel({
 						<span>Rendered</span>
 					</button>
 					<button
-						id="designmd-source-tab"
+						ref={sourceTabRef}
+						id={sourceTabId}
 						type="button"
 						role="tab"
 						aria-selected={viewTab === "source"}
-						aria-controls="designmd-source-panel"
+						aria-controls={sourcePanelId}
 						tabIndex={viewTab === "source" ? 0 : -1}
 						onKeyDown={(event) => {
 							if (["ArrowRight", "ArrowLeft", "Home"].includes(event.key)) {
 								event.preventDefault();
 								setViewTab("rendered");
-								document.getElementById("designmd-rendered-tab")?.focus();
+								renderedTabRef.current?.focus();
 							}
 						}}
 						onClick={() => setViewTab("source")}
@@ -335,17 +344,16 @@ export function DesignMdSourcePanel({
 			</div>
 			{inspectorSource === "observed" && enrichment === "unavailable" ? (
 				<p className="block border-b border-graphite px-3 py-2 text-xs text-fog">
-					Dokumen ini berisi pengukuran lengkap dari evidence browser. Narasi AI
-					tidak tersedia
+					Analisis AI belum lengkap
 					{enrichmentDetail ? `: ${enrichmentDetail}` : "."} Token terukur di
-					bawah tidak terpengaruh.
+					bawah lengkap dan tidak terpengaruh.
 				</p>
 			) : null}
 
 			<div
-				id="designmd-rendered-panel"
+				id={renderedPanelId}
 				role="tabpanel"
-				aria-labelledby="designmd-rendered-tab"
+				aria-labelledby={renderedTabId}
 				hidden={viewTab !== "rendered"}
 				className="min-h-0 min-w-0 flex-1 overflow-auto p-5"
 			>
@@ -359,9 +367,9 @@ export function DesignMdSourcePanel({
 			</div>
 
 			<pre
-				id="designmd-source-panel"
+				id={sourcePanelId}
 				role="tabpanel"
-				aria-labelledby="designmd-source-tab"
+				aria-labelledby={sourceTabId}
 				hidden={viewTab !== "source"}
 				className="min-h-0 min-w-0 flex-1 overflow-auto bg-onyx p-5 font-mono text-xs leading-5 text-mist"
 				style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}

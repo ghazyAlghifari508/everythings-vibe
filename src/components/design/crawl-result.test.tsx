@@ -131,6 +131,27 @@ describe("CrawlResult async page arrival", () => {
 		expect(screen.getByText("https://example.test/b body text")).toBeDefined();
 	});
 
+	it("synchronizes selection from inventory click to sitemap graph", () => {
+		const pages = [
+			page("a", "https://example.test/a", "First"),
+			page("b", "https://example.test/b", "Second"),
+		];
+		render(<CrawlResult pages={pages} sourceUrl="https://example.test/" />);
+
+		// Click the inventory item for 'Second'
+		const inventoryButtons = screen.getAllByRole("button", { name: /Second/ });
+		fireEvent.click(inventoryButtons[inventoryButtons.length - 1]);
+
+		// Verify Explorer displays Second
+		expect(screen.getByRole("heading", { name: "Second" })).toBeDefined();
+
+		// Verify sitemap graph button for Second is selected
+		const sitemapButtons = screen.getAllByRole("button", {
+			name: /Second — Berhasil/,
+		});
+		expect(sitemapButtons[0].getAttribute("aria-pressed")).toBe("true");
+	});
+
 	it("keeps a progressively growing page list selectable", () => {
 		const first = page("a", "https://example.test/a", "First");
 		const { rerender } = render(
@@ -159,5 +180,18 @@ describe("CrawlResult async page arrival", () => {
 		expect(screen.queryByText("Completed")).toBeNull();
 		expect(screen.queryByText("Failed")).toBeNull();
 		expect(screen.queryByText("Skipped")).toBeNull();
+	});
+});
+
+describe("CrawlResult back navigation", () => {
+	it("renders no duplicate back link inside the result component", () => {
+		render(
+			<CrawlResult
+				pages={[page("a", "https://example.test/a", "First")]}
+				sourceUrl="https://example.test/"
+			/>,
+		);
+		expect(screen.queryByText(/kembali ke hasil scrape/i)).toBeNull();
+		expect(screen.queryByRole("link", { name: /^kembali$/i })).toBeNull();
 	});
 });

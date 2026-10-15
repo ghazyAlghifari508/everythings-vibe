@@ -226,7 +226,11 @@ describe("DesignSystemInspector", () => {
 
 	it("states the verification source instead of implying unverified data is measured", () => {
 		const { rerender } = renderInspector();
-		expect(screen.getByText(/pengukuran browser/i)).toBeDefined();
+		expect(
+			screen.getByText(
+				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
+			),
+		).toBeDefined();
 		rerender(
 			<DesignSystemInspector
 				siteName="Acme"
@@ -480,7 +484,7 @@ describe("palette gallery", () => {
 		const semantic = screen.getByRole("region", { name: "Semantik" });
 		expect(within(semantic).getByText("Semantic state")).toBeDefined();
 		const other = screen.getByRole("region", {
-			name: "Belum terklasifikasi",
+			name: "Warna lainnya",
 		});
 		expect(within(other).getByText("Neutral")).toBeDefined();
 	});
@@ -584,6 +588,153 @@ describe("palette gallery", () => {
 	});
 });
 
+describe("task E inspector composition", () => {
+	it("does not claim capped specimens keep cross-role ratios", () => {
+		const displayEntry = MODEL.typography[0];
+		if (!displayEntry) throw new Error("type scale fixture missing");
+		renderInspector({
+			...MODEL,
+			typefaces: [],
+			typography: [
+				{ ...displayEntry, role: "Display", size: "96px", sizePx: 96 },
+			],
+		});
+		expect(screen.getByText(/ukuran terukur 96px/i)).toBeDefined();
+		expect(screen.queryByText(/rasio antar peran tetap/i)).toBeNull();
+	});
+
+	it("treats mid-size radii as pills through the shared threshold", () => {
+		renderInspector({
+			...EMPTY_MODEL,
+			radii: [
+				{
+					label: "Buttons",
+					value: "150px",
+					valuePx: 150,
+					context: "",
+					frequency: 2,
+				},
+			],
+		});
+		const preview = screen.getByRole("img", { name: "Buttons 150px" });
+		expect((preview as HTMLElement).style.borderRadius).toBe("999px");
+	});
+
+	it("does not label surfaces from array position", () => {
+		renderInspector({
+			...MODEL,
+			surfaces: [
+				{ value: "#ffffff", level: 0, frequency: 3, roles: ["canvas"] },
+				{ value: "#f8f8f8", level: 1, frequency: 2, roles: ["section"] },
+				{ value: "#eeeeee", level: 2, frequency: 1, roles: ["card"] },
+			],
+		});
+		expect(screen.queryByText(/kanvas ·/i)).toBeNull();
+		expect(screen.queryByText(/sekunder ·/i)).toBeNull();
+		expect(screen.queryByText(/komponen ·/i)).toBeNull();
+		expect(screen.getByText(/level 0/i)).toBeDefined();
+	});
+
+	it("keeps surface labels outside arbitrary swatch backgrounds", () => {
+		const { container } = renderInspector({
+			...MODEL,
+			surfaces: [
+				{ value: "#ffffff", level: 0, frequency: 3, roles: ["canvas"] },
+				{ value: "#f8f8f8", level: 1, frequency: 2, roles: ["section"] },
+			],
+		});
+		const swatches = container.querySelectorAll('[style*="background-color"]');
+		for (const swatch of swatches) {
+			expect(swatch.textContent ?? "").not.toMatch(/#(?:[0-9a-f]{3,8})\b/i);
+		}
+	});
+
+	it("shows failure feedback instead of silently dropping a copy error", async () => {
+		vi.stubGlobal("navigator", {
+			clipboard: {
+				writeText: vi.fn(async () => {
+					throw new Error("denied");
+				}),
+			},
+		});
+		renderInspector(paletteModel([BRAND_COLOR]));
+		fireEvent.click(
+			screen.getByRole("button", { name: `Salin warna ${BRAND_COLOR.value}` }),
+		);
+		expect(await screen.findByText(/gagal menyalin/i)).toBeDefined();
+	});
+
+	it("displays letter-spacing without claiming it is applied", () => {
+		renderInspector();
+		const specimen = screen.getByText(
+			"Start free and upgrade when the team is ready.",
+		);
+		expect((specimen as HTMLElement).style.letterSpacing).toBe("");
+		expect(screen.getByText("48px · w700 · lh 1.1 · ls -2px")).toBeDefined();
+	});
+});
+
+describe("task F static readability", () => {
+	it("exposes spacing and radius previews to assistive tech in any theme", () => {
+		renderInspector({
+			...MODEL,
+			spacing: [
+				{ label: "Celah", value: "16px", context: "gap", frequency: 3 },
+			],
+			radii: [
+				{
+					label: "Buttons",
+					value: "8px",
+					valuePx: 8,
+					context: "",
+					frequency: 2,
+				},
+			],
+		});
+		expect(screen.getByRole("img", { name: "Celah 16px" })).toBeDefined();
+		expect(screen.getByRole("img", { name: "Buttons 8px" })).toBeDefined();
+	});
+
+	it("wraps long color tokens instead of clipping them", () => {
+		const { container } = renderInspector(
+			paletteModel([
+				color({
+					name: "Panjang",
+					value: "#123456",
+					token: "--color-contoh-token-yang-sangat-panjang-sekali",
+					role: "Contoh peran",
+					roleClass: "unknown",
+				}),
+			]),
+		);
+		expect(container.querySelector(".break-all")?.textContent).toContain(
+			"--color-contoh-token-yang-sangat-panjang-sekali",
+		);
+	});
+});
+
+describe("task D ambiguous copy", () => {
+	it("labels unclassified colors as other colors", () => {
+		renderInspector(paletteModel([AMBIGUOUS_COLOR]));
+		expect(screen.getByRole("region", { name: "Warna lainnya" })).toBeDefined();
+		expect(
+			screen.queryByRole("region", { name: "Belum terklasifikasi" }),
+		).toBeNull();
+	});
+
+	it("explains observed analysis in user language", () => {
+		renderInspector();
+		expect(
+			screen.getByText(
+				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
+			),
+		).toBeDefined();
+		expect(
+			screen.queryByText(/pengukuran browser yang terverifikasi/i),
+		).toBeNull();
+	});
+});
+
 describe("phase 6 inspector overhaul", () => {
 	it("collapses provenance into a compact disclosure instead of a long banner", () => {
 		renderInspector();
@@ -591,7 +742,11 @@ describe("phase 6 inspector overhaul", () => {
 			screen.queryByText(/bukan klaim brand yang belum terbukti/i),
 		).toBeNull();
 		expect(screen.getByText(/tentang analisis/i)).toBeDefined();
-		expect(screen.getByText(/pengukuran browser/i)).toBeDefined();
+		expect(
+			screen.getByText(
+				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
+			),
+		).toBeDefined();
 	});
 
 	it("renders spacing bars with a high-contrast fill and a zero indicator", () => {

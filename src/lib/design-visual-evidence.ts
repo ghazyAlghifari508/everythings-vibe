@@ -1,8 +1,10 @@
 import {
 	DESIGN_EVIDENCE_LIMITS,
+	type DesignEvidenceLimits,
 	visualEvidenceSchema,
 } from "./design-evidence-contract";
 import type { DesignExtraction } from "./design-extraction";
+import type { DesignSettings } from "./scrape-contract";
 
 export interface VisualElementEvidence {
 	selector: string;
@@ -153,6 +155,9 @@ export interface VisualEvidence {
 	elements: VisualElementEvidence[];
 	fonts: { family: string; weight: string; status: string }[];
 	limitations: string[];
+	colorScheme?: "auto" | "light" | "dark";
+	settings?: DesignSettings;
+	additionalViews?: Omit<VisualEvidence, "settings" | "additionalViews">[];
 }
 
 export interface GroupedMeasurement {
@@ -544,7 +549,7 @@ export function renderEvidenceDesignMd(evidence: VisualEvidence): string {
 }
 
 export function collectVisualEvidence(
-	limits = DESIGN_EVIDENCE_LIMITS,
+	limits: DesignEvidenceLimits = DESIGN_EVIDENCE_LIMITS,
 ): VisualEvidence {
 	const elements: VisualElementEvidence[] = [];
 	const walker = document.createTreeWalker(
@@ -688,7 +693,7 @@ export function collectVisualEvidence(
 				status: font.status,
 			})),
 		limitations: [
-			"Single viewport; responsive and interaction states were not measured.",
+			"Only selected viewport sizes are measured; intermediate widths and interaction states are not verified.",
 			"Computed font-family is a stack; selected glyph font is not verified.",
 			"Pseudo-elements, third-party overlays and glyph-level font selection are not verified.",
 			...(scanned >= limits.scanElements || elements.length >= limits.elements

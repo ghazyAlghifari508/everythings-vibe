@@ -3,6 +3,7 @@ import {
 	type AnyPgColumn,
 	boolean,
 	check,
+	customType,
 	foreignKey,
 	index,
 	integer,
@@ -22,8 +23,12 @@ import type {
 	CreditPricingVersion,
 } from "@/lib/adaptive-credit";
 import type { CodebaseNameSource } from "@/lib/codebase-library";
+import type {
+	ScrapeErrorSource,
+	ScrapeFailureReason,
+} from "@/lib/design-errors";
 import type { VisualEvidence } from "@/lib/design-visual-evidence";
-import type { ScrapeRequest } from "@/lib/scrape-contract";
+import type { DesignSettings, ScrapeRequest } from "@/lib/scrape-contract";
 import type {
 	ScrapeImageDiscovery,
 	ScrapeImageOutcome,
@@ -880,14 +885,23 @@ export const payments = pgTable(
 export type ScrapeMode = ScrapeRequest["mode"];
 
 export interface ScrapeMetadata {
+	designSettings?: DesignSettings;
 	attempt?: number;
 	capturedAt?: string;
 	finalUrl?: string;
 	viewport?: { width: number; height: number };
 	captureMode?: string;
+	screenshot?: string;
 	visualEvidence?: VisualEvidence;
 	htmlBytes?: number;
 	previewHtmlBytes?: number;
+	// Capture evidence observed during the run. `responseReceived` is true only
+	// when an HTTP response was actually received, so the UI never displays an
+	// HTTP status for a failure that never got one.
+	responseReceived?: boolean;
+	httpStatus?: number;
+	resourceLoadTimedOut?: boolean;
+	assetFetchFailures?: number;
 	stage?: ScrapeStatus;
 	progress?: number;
 	stageStartedAt?: string;
@@ -896,6 +910,10 @@ export interface ScrapeMetadata {
 	timings?: Record<string, number>;
 	errorMessage?: string;
 	errorDetail?: string;
+	// Which pipeline part failed and the evidence-backed reason behind it, so
+	// the failure UI can separate website failures from internal ones.
+	errorSource?: ScrapeErrorSource;
+	failureReason?: ScrapeFailureReason;
 	// Last real pipeline stage before the run failed. Lets the progress UI
 	// mark the persisted failure stage instead of guessing where it stopped.
 	failedAtStage?: ScrapeStatus;
@@ -923,6 +941,7 @@ export interface ScrapeMetadata {
 	processedImages?: number;
 	discoveredImages?: number;
 	savedImages?: number;
+	imageStorage?: "postgres-private";
 	completedPages?: number;
 	skippedPages?: number;
 	failedResources?: number;
@@ -1111,6 +1130,43 @@ export interface ImageEvidence {
 	dimensionError?: string;
 }
 
+const privateImageBytes = customType<{ data: Buffer; driverData: Buffer }>({
+	dataType: () => "bytea",
+});
+
+export const scrapeImageAssets = pgTable(
+	"scrape_image_assets",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		scrapeId: text("scrape_id")
+			.notNull()
+			.references(() => scrapes.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		sha256: text("sha256").notNull(),
+		mimeType: text("mime_type").notNull(),
+		byteLength: integer("byte_length").notNull(),
+		body: privateImageBytes("body").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		uniqueIndex("scrape_image_assets_owner_hash_idx").on(
+			t.userId,
+			t.scrapeId,
+			t.sha256,
+		),
+		check(
+			"scrape_image_assets_size_check",
+			sql`${t.byteLength} > 0 AND ${t.byteLength} = octet_length(${t.body})`,
+		),
+	],
+);
+
 export const scrapeImages = pgTable(
 	"scrape_images",
 	{
@@ -1125,6 +1181,11 @@ export const scrapeImages = pgTable(
 			.references(() => users.id, { onDelete: "cascade" }),
 		url: text("url").notNull(),
 		pageUrl: text("page_url").notNull(),
+		assetId: text("asset_id").references(() => scrapeImageAssets.id, {
+			onDelete: "set null",
+		}),
+		failureCode: text("failure_code"),
+		httpStatus: integer("http_status"),
 		format: text("format"),
 		width: integer("width"),
 		height: integer("height"),

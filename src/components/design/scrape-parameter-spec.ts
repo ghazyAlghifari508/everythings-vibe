@@ -1,6 +1,7 @@
 import type { ScrapeMode } from "@/db/schema";
 import type {
 	CrawlSettings,
+	DesignSettings,
 	HtmlSettings,
 	ImagesSettings,
 } from "@/lib/scrape-contract";
@@ -44,15 +45,26 @@ export interface AdvancedParameterGroup {
 	description: string;
 	numbers: NumericParameterSpec[];
 	toggles: ToggleParameterSpec[];
+	selects?: {
+		key: keyof DesignSettings;
+		label: string;
+		helper: string;
+		options: { value: string; label: string }[];
+	}[];
 }
 
 export type SettingsForMode = {
+	design: DesignSettings;
 	crawl: CrawlSettings;
 	html: HtmlSettings;
 	images: ImagesSettings;
 };
 
-export type AnyScrapeSettings = CrawlSettings | HtmlSettings | ImagesSettings;
+export type AnyScrapeSettings =
+	| DesignSettings
+	| CrawlSettings
+	| HtmlSettings
+	| ImagesSettings;
 
 // Reads a spec's value out of the active settings object. Narrowing on the key
 // keeps this type-safe without casting the settings object to a loose record.
@@ -193,7 +205,71 @@ export const ADVANCED_PARAMETER_GROUPS: Record<
 	ScrapeMode,
 	AdvancedParameterGroup[]
 > = {
-	design: [],
+	design: [
+		{
+			key: "design",
+			title: "Cakupan analisis desain",
+			description: `Setiap tampilan diambil bergiliran, maksimum ${SCRAPE_LIMITS.designViews} kombinasi. Lebih banyak tampilan dan analisis mendalam memerlukan pemrosesan lebih lama.`,
+			numbers: [],
+			toggles: [],
+			selects: [
+				{
+					key: "viewport",
+					label: "Tampilan yang dianalisis",
+					helper: "Desktop, mobile, atau keduanya pada URL yang sama.",
+					options: [
+						{ value: "desktop", label: "Desktop" },
+						{ value: "mobile", label: "Mobile" },
+						{ value: "both", label: "Desktop + Mobile" },
+					],
+				},
+				{
+					key: "theme",
+					label: "Tema",
+					helper:
+						"Mengatur preferensi warna browser, bukan tombol tema website. Dukungan tema situs belum tentu tersedia.",
+					options: [
+						{ value: "auto", label: "Otomatis" },
+						{ value: "light", label: "Terang" },
+						{ value: "dark", label: "Gelap" },
+						{ value: "both", label: "Terang + Gelap" },
+					],
+				},
+				{
+					key: "depth",
+					label: "Kedalaman analisis",
+					helper:
+						"Mendalam menggandakan batas sampel elemen, pemindaian DOM, font, dan CSS variables per tampilan.",
+					options: [
+						{ value: "standard", label: "Standar" },
+						{ value: "detailed", label: "Mendalam" },
+					],
+				},
+				{
+					key: "focus",
+					label: "Fokus analisis",
+					helper:
+						"Pilih panduan lengkap, token visual tanpa analisis komponen, atau treatment komponen yang teramati.",
+					options: [
+						{ value: "complete", label: "Lengkap" },
+						{ value: "visual-tokens", label: "Token visual" },
+						{ value: "components", label: "Komponen" },
+					],
+				},
+				{
+					key: "codeReference",
+					label: "Format panduan kode",
+					helper:
+						"Format contoh kode pada DESIGN.md yang diunduh dan diserahkan ke agent.",
+					options: [
+						{ value: "css", label: "CSS" },
+						{ value: "tailwind-v4", label: "Tailwind v4" },
+						{ value: "both", label: "CSS + Tailwind v4" },
+					],
+				},
+			],
+		},
+	],
 	crawl: [CRAWL_GROUP],
 	html: [HTML_GROUP],
 	images: [IMAGES_GROUP],

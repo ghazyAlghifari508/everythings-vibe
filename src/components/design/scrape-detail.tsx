@@ -5,6 +5,7 @@ import {
 	Copy,
 	Download,
 	Eye,
+	Image as ImageIcon,
 	Loader2,
 	RotateCw,
 } from "lucide-react";
@@ -33,6 +34,7 @@ export interface ScrapeDetailProps {
 	previewSrcDoc?: string;
 	previewState?: ScrapePreviewState;
 	previewError?: string | null;
+	screenshot?: string | null;
 	onRetryPreview?: () => void;
 }
 
@@ -78,9 +80,40 @@ const READINESS_MESSAGE: Record<
 	},
 };
 
-function safeFilename(domain: string, ext: string): string {
-	const safe = domain.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
-	return `${safe || "site"}.${ext}`;
+export function safeScrapeFilename(
+	domain: string,
+	ext: string,
+	sourceUrl?: string,
+	suffix?: string,
+): string {
+	let base = domain.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
+	if (sourceUrl) {
+		try {
+			const parsed = new URL(sourceUrl);
+			const segments = parsed.pathname.split("/").filter(Boolean);
+			if (segments.length > 0) {
+				const pathPart = segments
+					.slice(0, 3)
+					.join("-")
+					.replace(/[^a-zA-Z0-9.-]/g, "-")
+					.toLowerCase();
+				if (pathPart) base = `${base}-${pathPart}`;
+			}
+		} catch {
+			// ignore invalid URL
+		}
+	}
+	const combined = suffix ? `${base}-${suffix}` : base;
+	return `${combined || "site"}.${ext}`;
+}
+
+function safeFilename(
+	domain: string,
+	ext: string,
+	sourceUrl?: string,
+	suffix?: string,
+): string {
+	return safeScrapeFilename(domain, ext, sourceUrl, suffix);
 }
 
 async function copyText(value: string): Promise<boolean> {
@@ -115,9 +148,13 @@ export function ScrapeDetail({
 	previewSrcDoc = "",
 	previewState = "ready",
 	previewError = null,
+	screenshot = null,
 	onRetryPreview,
 }: ScrapeDetailProps) {
 	const [htmlViewTab, setHtmlViewTab] = useState<HtmlViewTab>("preview");
+	const [visualSubView, setVisualSubView] = useState<"dom" | "screenshot">(
+		"dom",
+	);
 	const [notice, setNotice] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [copied, setCopied] = useState(false);
@@ -167,16 +204,19 @@ export function ScrapeDetail({
 		}
 	}
 
+	const filename = safeFilename(domain, "html", sourceUrl);
+	const screenshotFilename = safeFilename(
+		domain,
+		"jpg",
+		sourceUrl,
+		"screenshot",
+	);
+
 	function handleDownload() {
 		setBusy(true);
 		setNotice("");
 		try {
-			downloadFile(
-				safeFilename(domain, "html"),
-				previewHtml,
-				"text/html;charset=utf-8",
-			);
-			setNotice("index.html mulai diunduh.");
+			downloadFile(filename, previewHtml, "text/html;charset=utf-8");
 		} catch {
 			setNotice("Gagal mengunduh file. Coba lagi.");
 		} finally {
@@ -184,8 +224,26 @@ export function ScrapeDetail({
 		}
 	}
 
+	function handleDownloadScreenshot() {
+		if (!screenshot) return;
+		setBusy(true);
+		setNotice("");
+		try {
+			const anchor = document.createElement("a");
+			anchor.href = screenshot;
+			anchor.download = screenshotFilename;
+			document.body.appendChild(anchor);
+			anchor.click();
+			anchor.remove();
+		} catch {
+			setNotice("Gagal mengunduh tangkapan layar. Coba lagi.");
+		} finally {
+			setBusy(false);
+		}
+	}
+
 	const copyLabel = "Salin HTML";
-	const downloadLabel = "Download index.html";
+	const downloadLabel = `Download ${filename}`;
 	return (
 		<div className="space-y-5">
 			{sourceUrl && (
@@ -215,7 +273,7 @@ export function ScrapeDetail({
 					>
 						<button
 							aria-label="Preview"
-							title="Preview"
+							title="Visual"
 							tabIndex={htmlViewTab === "preview" ? 0 : -1}
 							onKeyDown={(event) => {
 								if (["ArrowRight", "ArrowLeft", "End"].includes(event.key)) {
@@ -236,11 +294,11 @@ export function ScrapeDetail({
 							}`}
 						>
 							<Eye size={16} aria-hidden />
-							<span>Preview</span>
+							<span>Visual</span>
 						</button>
 						<button
-							aria-label="Source HTML"
-							title="Source HTML"
+							aria-label="Source HTML / HTML Source"
+							title="HTML Source"
 							tabIndex={htmlViewTab === "code" ? 0 : -1}
 							onKeyDown={(event) => {
 								if (["ArrowRight", "ArrowLeft", "Home"].includes(event.key)) {
@@ -261,11 +319,23 @@ export function ScrapeDetail({
 							}`}
 						>
 							<Code size={16} aria-hidden />
-							<span className="hidden sm:inline">Source HTML</span>
+							<span className="hidden sm:inline">HTML Source</span>
 							<span className="sm:hidden">HTML</span>
 						</button>
 					</div>
 					<div className="flex shrink-0 items-center gap-1">
+						{screenshot ? (
+							<button
+								type="button"
+								onClick={handleDownloadScreenshot}
+								disabled={busy}
+								aria-label={`Download screenshot ${screenshotFilename}`}
+								title={`Download screenshot ${screenshotFilename}`}
+								className={ICON_BUTTON_CLASS}
+							>
+								<ImageIcon size={15} aria-hidden />
+							</button>
+						) : null}
 						<button
 							type="button"
 							onClick={() =>
@@ -300,22 +370,74 @@ export function ScrapeDetail({
 					aria-label="Preview index.html"
 					hidden={htmlViewTab !== "preview"}
 				>
-					{previewState === "failed" || !previewSrcDoc ? (
-						<PreviewUnavailable
-							message={
-								previewState === "failed"
-									? (previewError ?? "Gagal menyiapkan preview scrape.")
-									: "Preview belum tersedia."
-							}
-							isRetryable={previewState === "failed"}
-							isLoading={previewState === "loading"}
-							onRetry={onRetryPreview}
+					{screenshot && previewSrcDoc && previewState !== "failed" ? (
+						<div className="flex items-center justify-between border-b border-graphite bg-obsidian px-3 py-1.5 text-xs text-fog">
+							<span className="font-mono text-[11px] text-snow">
+								Mode Tampilan Visual
+							</span>
+							<div className="flex gap-1 rounded border border-graphite bg-charcoal p-0.5">
+								<button
+									type="button"
+									onClick={() => setVisualSubView("dom")}
+									aria-pressed={visualSubView === "dom"}
+									className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${
+										visualSubView === "dom"
+											? "bg-steel/40 text-snow"
+											: "text-fog hover:text-snow"
+									}`}
+								>
+									Tampilan DOM
+								</button>
+								<button
+									type="button"
+									onClick={() => setVisualSubView("screenshot")}
+									aria-pressed={visualSubView === "screenshot"}
+									className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${
+										visualSubView === "screenshot"
+											? "bg-steel/40 text-snow"
+											: "text-fog hover:text-snow"
+									}`}
+								>
+									Tangkapan Layar
+								</button>
+							</div>
+						</div>
+					) : null}
+
+					{visualSubView === "screenshot" && screenshot ? (
+						<ScreenshotView
+							screenshot={screenshot}
+							domain={domain}
 							onOpenSource={() => setHtmlViewTab("code")}
+							onRetry={onRetryPreview}
 						/>
+					) : previewState === "failed" || !previewSrcDoc ? (
+						screenshot ? (
+							<ScreenshotView
+								screenshot={screenshot}
+								domain={domain}
+								onOpenSource={() => setHtmlViewTab("code")}
+								onRetry={onRetryPreview}
+							/>
+						) : (
+							<PreviewUnavailable
+								message={
+									previewState === "failed"
+										? (previewError ?? "Gagal menyiapkan preview scrape.")
+										: "Preview belum tersedia."
+								}
+								isRetryable={previewState === "failed"}
+								isLoading={previewState === "loading"}
+								onRetry={onRetryPreview}
+								onOpenSource={() => setHtmlViewTab("code")}
+							/>
+						)
 					) : (
 						<DesktopPreview
 							key={previewAttempt}
 							title={`Preview ${domain}`}
+							domain={domain}
+							screenshot={screenshot}
 							srcDoc={frameSrcDoc}
 							report={frameReport}
 							active={htmlViewTab === "preview"}
@@ -354,6 +476,63 @@ export function ScrapeDetail({
 	);
 }
 
+export function ScreenshotView({
+	screenshot,
+	domain,
+	onOpenSource,
+	onRetry,
+}: {
+	screenshot: string;
+	domain: string;
+	onOpenSource?: () => void;
+	onRetry?: () => void;
+}) {
+	return (
+		<div className="flex flex-col" data-testid="visual-screenshot-view">
+			<div className="flex flex-wrap items-center justify-between gap-2 border-b border-graphite bg-obsidian px-3 py-2 text-xs text-fog">
+				<div className="flex items-center gap-2">
+					<span className="rounded bg-indigo/20 px-2 py-0.5 text-[11px] font-semibold text-indigo">
+						Tangkapan Layar Browser
+					</span>
+					<span className="text-snow">
+						Referensi visual asli dari browser saat capture
+					</span>
+				</div>
+				<div className="flex items-center gap-2">
+					{onOpenSource ? (
+						<button
+							type="button"
+							onClick={onOpenSource}
+							className="inline-flex items-center gap-1 text-[11px] text-fog hover:text-snow"
+						>
+							<Code size={13} aria-hidden />
+							Lihat HTML Source
+						</button>
+					) : null}
+					{onRetry ? (
+						<button
+							type="button"
+							onClick={onRetry}
+							className="inline-flex items-center gap-1 text-[11px] text-fog hover:text-snow"
+						>
+							<RotateCw size={13} aria-hidden />
+							Coba lagi preview
+						</button>
+					) : null}
+				</div>
+			</div>
+			<div className="flex max-h-[760px] min-h-[300px] w-full items-center justify-center overflow-auto bg-onyx p-4">
+				<img
+					src={screenshot}
+					alt={`Tangkapan layar ${domain}`}
+					data-testid="scrape-visual-screenshot"
+					className="max-h-[700px] w-auto max-w-full rounded border border-graphite object-contain shadow-sm"
+				/>
+			</div>
+		</div>
+	);
+}
+
 function PreviewUnavailable({
 	message,
 	isRetryable,
@@ -368,7 +547,10 @@ function PreviewUnavailable({
 	onOpenSource?: () => void;
 }) {
 	return (
-		<div className="flex min-h-[280px] flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
+		<div
+			data-testid="preview-unavailable"
+			className="flex min-h-[280px] flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center"
+		>
 			{isLoading ? (
 				<Loader2
 					size={20}
@@ -380,10 +562,23 @@ function PreviewUnavailable({
 			)}
 			<output className="text-sm font-semibold text-snow">{message}</output>
 			<p className="max-w-md text-xs leading-5 text-fog">
+				Visual preview unavailable. The website could not be shown accurately.
 				Source HTML asli tetap tersedia di tab Source HTML.
 			</p>
-			{isRetryable && onRetry ? (
-				<div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+			<div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+				{onOpenSource ? (
+					<button
+						type="button"
+						onClick={onOpenSource}
+						aria-label="Buka Source HTML"
+						title="View HTML Source"
+						className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						<Code size={14} aria-hidden />
+						Buka Source HTML
+					</button>
+				) : null}
+				{isRetryable && onRetry ? (
 					<button
 						type="button"
 						onClick={onRetry}
@@ -392,28 +587,22 @@ function PreviewUnavailable({
 						<RotateCw size={14} aria-hidden />
 						Coba lagi
 					</button>
-					{onOpenSource ? (
-						<button
-							type="button"
-							onClick={onOpenSource}
-							className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							<Code size={14} aria-hidden />
-							Buka Source HTML
-						</button>
-					) : null}
-				</div>
-			) : null}
+				) : null}
+			</div>
 		</div>
 	);
 }
 
 function PreviewCanvasOverlay({
 	report,
+	screenshot,
+	domain,
 	onRetry,
 	onOpenSource,
 }: {
 	report: FrameReport;
+	screenshot?: string | null;
+	domain?: string;
 	onRetry?: () => void;
 	onOpenSource?: () => void;
 }) {
@@ -434,20 +623,40 @@ function PreviewCanvasOverlay({
 			</div>
 		);
 	}
-	return (
-		<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
-			{report === "preparing" ? (
+	if (report === "preparing") {
+		return (
+			<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
 				<Loader2
 					size={20}
 					aria-hidden
 					className="text-fog motion-safe:animate-spin motion-reduce:animate-none"
 				/>
-			) : (
-				<AlertTriangle size={20} aria-hidden className="text-amber-400" />
-			)}
+				<output className="text-sm font-semibold text-snow">{label}</output>
+				<p className="max-w-md text-xs leading-5 text-fog">{detail}</p>
+			</div>
+		);
+	}
+	if (screenshot && domain) {
+		return (
+			<div className="absolute inset-0 z-10 flex flex-col bg-onyx">
+				<ScreenshotView
+					screenshot={screenshot}
+					domain={domain}
+					onOpenSource={onOpenSource}
+					onRetry={onRetry}
+				/>
+			</div>
+		);
+	}
+	return (
+		<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
+			<AlertTriangle size={20} aria-hidden className="text-amber-400" />
 			<output className="text-sm font-semibold text-snow">{label}</output>
-			<p className="max-w-md text-xs leading-5 text-fog">{detail}</p>
-			{(report === "failed" || report === "empty") && onRetry ? (
+			<p className="max-w-md text-xs leading-5 text-fog">
+				Visual preview unavailable. The website could not be shown accurately.{" "}
+				{detail}
+			</p>
+			{onRetry ? (
 				<div className="flex flex-wrap items-center justify-center gap-2">
 					<button
 						type="button"
@@ -473,6 +682,8 @@ function PreviewCanvasOverlay({
 
 function DesktopPreview({
 	title,
+	domain,
+	screenshot,
 	srcDoc,
 	report,
 	active = true,
@@ -481,6 +692,8 @@ function DesktopPreview({
 	onOpenSource,
 }: {
 	title: string;
+	domain?: string;
+	screenshot?: string | null;
 	srcDoc: string;
 	report: FrameReport;
 	active?: boolean;
@@ -668,6 +881,8 @@ function DesktopPreview({
 					/>
 					<PreviewCanvasOverlay
 						report={report}
+						screenshot={screenshot}
+						domain={domain}
 						onRetry={onRetry}
 						onOpenSource={onOpenSource}
 					/>

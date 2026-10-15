@@ -1,5 +1,15 @@
 import { isDeepStrictEqual } from "node:util";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import {
+	and,
+	asc,
+	count,
+	desc,
+	eq,
+	ilike,
+	inArray,
+	or,
+	sql,
+} from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type InsertScrapeDocumentRow,
@@ -15,15 +25,33 @@ import {
 	scrapes,
 	users,
 } from "@/db/schema";
-import { ScrapeError } from "@/lib/design-errors";
+import {
+	SCRAPE_HISTORY_MAX_LIMIT,
+	SCRAPE_HISTORY_SEARCH_MAX_CHARS,
+} from "@/lib/constants";
+import {
+	errorSourceForCode,
+	ScrapeError,
+	scrapeFailureReasonForCode,
+} from "@/lib/design-errors";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
+import type {
+	ScrapeHistoryMode,
+	ScrapeHistorySort,
+	ScrapeHistoryStatusGroup,
+} from "@/lib/scrape-contract";
 import {
 	SCRAPE_LIMITS,
 	type ScrapeRequest,
 	scrapeRequestSchema,
 } from "@/lib/scrape-contract";
+import { imageResultCounts } from "@/lib/scrape-images";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
+import {
+	assertScrapeRetryAllowed,
+	resolveScrapeRetryDecision,
+} from "@/lib/scrape-retry";
 import { parseAndValidateFormat } from "@/lib/url-validator";
 import {
 	type ScrapeJobClaim,
@@ -38,6 +66,7 @@ export interface ScrapeSummary {
 	mode: ScrapeMode;
 	status: string;
 	createdAt: Date;
+	imageCounts?: ReturnType<typeof imageResultCounts>;
 }
 
 export type ScrapePageRow = typeof scrapePages.$inferSelect;
@@ -46,6 +75,22 @@ export type ScrapeImageRow = typeof scrapeImages.$inferSelect;
 // A verified image row plus the same-origin signed URL used for preview and
 // download. Only rows whose resource passed verification reach the client.
 export type ScrapeImageResult = ScrapeImageRow & { assetUrl: string };
+
+export async function signScrapeImages(
+	images: ScrapeImageRow[],
+	scrapeId: string,
+	ownerId: string,
+): Promise<ScrapeImageResult[]> {
+	const { attachImageAssetUrls, storedImageAssetUrl } = await import(
+		"@/lib/preview-capabilities"
+	);
+	return images.map((image) => ({
+		...image,
+		assetUrl: image.assetId
+			? storedImageAssetUrl(image.id, scrapeId, ownerId)
+			: attachImageAssetUrls([image], scrapeId, ownerId)[0].assetUrl,
+	}));
+}
 
 // Persisted detail without signed asset URLs: signing needs request context, so
 // the API route and the detail loader attach them.
@@ -79,6 +124,9 @@ export async function createScrape(
 		throw new ScrapeError("INVALID_URL");
 	}
 
+	const validated = scrapeRequestSchema.parse(
+		request ?? { url: normalized, mode },
+	);
 	return db.transaction(async (tx) => {
 		const [owner] = await tx
 			.select({ id: users.id })
@@ -99,7 +147,14 @@ export async function createScrape(
 				)
 				.limit(1);
 			if (replay) {
-				if (!isDeepStrictEqual(replay.request, request))
+				if (
+					!isDeepStrictEqual(
+						scrapeRequestSchema.parse(
+							replay.request ?? { url: replay.sourceUrl, mode: replay.mode },
+						),
+						validated,
+					)
+				)
 					throw new ScrapeError(
 						"INVALID_URL",
 						"Request key sudah dipakai untuk parameter berbeda.",
@@ -107,8 +162,6 @@ export async function createScrape(
 				return replay;
 			}
 		}
-		const validated =
-			request ?? scrapeRequestSchema.parse({ url: normalized, mode });
 		const { checkRateLimit } = await import("@/lib/rate-limit");
 		if (!(await checkRateLimit(userId, "free", "api_call")).allowed)
 			throw new ScrapeError(
@@ -134,7 +187,12 @@ export async function createScrape(
 			(row) =>
 				row.sourceUrl === normalized &&
 				row.mode === mode &&
-				isDeepStrictEqual(row.request, validated),
+				isDeepStrictEqual(
+					scrapeRequestSchema.parse(
+						row.request ?? { url: row.sourceUrl, mode: row.mode },
+					),
+					validated,
+				),
 		);
 		if (existing) return existing;
 		if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
@@ -152,6 +210,8 @@ export async function createScrape(
 				request: validated,
 				status: "queued",
 				metadata: {
+					designSettings:
+						validated.mode === "design" ? validated.settings : undefined,
 					mode,
 					idempotencyKey,
 					stage: "queued",
@@ -238,6 +298,9 @@ export async function runScrapePipeline(
 	};
 
 	try {
+		const request = scrapeRequestSchema.parse(
+			scrape.request ?? { url: scrape.sourceUrl, mode },
+		);
 		if (mode === "crawl" || mode === "images") {
 			if (!claim)
 				throw new ScrapeError(
@@ -248,10 +311,16 @@ export async function runScrapePipeline(
 			await runExtractionJob(scrape, claim);
 			return;
 		}
-		await persist("capturing");
+		await persist("capturing", {
+			designSettings: request.mode === "design" ? request.settings : undefined,
+		});
 
 		const settings =
-			scrape.request?.mode === "html" ? scrape.request.settings : undefined;
+			request.mode === "html"
+				? request.settings
+				: request.mode === "design"
+					? { designSettings: request.settings }
+					: undefined;
 		const captured: ScrapeCapture =
 			mode === "html" && scrape.html && scrape.previewHtml
 				? {
@@ -260,12 +329,12 @@ export async function runScrapePipeline(
 						title: scrape.title,
 						html: scrape.html,
 						previewHtml: scrape.previewHtml,
-						status: 200,
+						status: scrape.metadata?.httpStatus ?? 200,
 						metadata: {
 							attempt: scrape.jobAttempts,
 							capturedAt:
 								scrape.metadata?.capturedAt ?? scrape.createdAt.toISOString(),
-							finalUrl: scrape.sourceUrl,
+							finalUrl: scrape.metadata?.finalUrl ?? scrape.sourceUrl,
 							viewport: scrape.metadata?.viewport ?? {
 								width: 1440,
 								height: 900,
@@ -273,6 +342,13 @@ export async function runScrapePipeline(
 							captureMode: "persisted",
 							htmlBytes: Buffer.byteLength(scrape.html),
 							previewHtmlBytes: Buffer.byteLength(scrape.previewHtml),
+							// Reuses the persisted capture evidence instead of
+							// re-measuring, so the stored facts stay the source of truth.
+							responseReceived: scrape.metadata?.responseReceived ?? true,
+							httpStatus: scrape.metadata?.httpStatus,
+							resourceLoadTimedOut:
+								scrape.metadata?.resourceLoadTimedOut ?? false,
+							assetFetchFailures: scrape.metadata?.assetFetchFailures ?? 0,
 						},
 					}
 				: await scrapeHtml(scrape.sourceUrl, scrape.jobAttempts, {
@@ -341,6 +417,7 @@ export async function runScrapePipeline(
 			captured.metadata.visualEvidence,
 			instrumentation,
 			claim?.signal,
+			{ title: captured.title ?? undefined },
 		);
 		const designMd = generated.document;
 		if (generated.enrichment.status === "unavailable")
@@ -394,26 +471,44 @@ export async function runScrapePipeline(
 			retryAfterSeconds === undefined
 				? undefined
 				: new Date(Date.now() + retryAfterSeconds * 1000).toISOString();
+		const errorSource = errorSourceForCode(errorDetail);
+		const failureReason =
+			error instanceof ScrapeError
+				? error.failureReason
+				: scrapeFailureReasonForCode("UNEXPECTED_ERROR");
+		const evidence: Record<string, unknown> = {};
+		if (retryAfterSeconds !== undefined)
+			evidence.retryAfterSeconds = retryAfterSeconds;
+		if (retryAfterExpiresAt !== undefined)
+			evidence.retryAfterExpiresAt = retryAfterExpiresAt;
+		// A status is persisted only when the response actually carried one, so
+		// the UI can answer "was an HTTP response received?" from stored facts.
+		if (error instanceof ScrapeError && error.httpStatus !== undefined) {
+			evidence.httpStatus = error.httpStatus;
+			evidence.responseReceived = true;
+		}
+		// A final URL is persisted only when the page actually resolved to one,
+		// so the metadata can answer whether a redirect target existed.
+		if (error instanceof ScrapeError && error.finalUrl !== undefined)
+			evidence.finalUrl = error.finalUrl;
 
 		await db
 			.update(scrapes)
 			.set({
 				status: "failed",
-				metadata: sql`coalesce(${scrapes.metadata}, '{}'::jsonb) || ${JSON.stringify(
-					{
-						mode,
-						stage: "failed",
-						progress: 0,
-						stageStartedAt: new Date().toISOString(),
-						errorMessage,
-						errorDetail,
-						failedAtStage: meta.stage,
-						...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
-						...(retryAfterExpiresAt === undefined
-							? {}
-							: { retryAfterExpiresAt }),
-					},
-				)}::jsonb`,
+				// The stage that actually failed is read from the persisted row at
+				// update time. Worker modes write their stage directly to the row, so
+				// a locally cached stage would report the stage from before the job ran.
+				metadata: sql`coalesce(${scrapes.metadata}, '{}'::jsonb) || jsonb_build_object(
+						'mode', ${mode}::text,
+						'stage', 'failed',
+						'stageStartedAt', ${new Date().toISOString()}::text,
+						'errorMessage', ${errorMessage}::text,
+						'errorDetail', ${errorDetail}::text,
+						'errorSource', ${errorSource}::text,
+						'failureReason', ${failureReason}::text,
+						'failedAtStage', coalesce(${scrapes.metadata}->>'stage', 'queued')
+					) || ${JSON.stringify({ progress: 0, ...evidence })}::jsonb`,
 				updatedAt: new Date(),
 			})
 			.where(writePredicate());
@@ -440,40 +535,14 @@ export async function retryScrape(
 		if (!scrape)
 			throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
 		if (scrape.status !== "failed") return { ok: true };
-		const metadata =
-			typeof scrape.metadata === "object" && scrape.metadata !== null
-				? (scrape.metadata as ScrapeMetadata)
-				: null;
-		const failedCode = metadata?.errorDetail ?? null;
-		if (
-			failedCode === "INVALID_URL" ||
-			failedCode === "PRIVATE_URL_BLOCKED" ||
-			failedCode === "WEBSITE_ACCESS_DENIED" ||
-			failedCode === "WEBSITE_NOT_FOUND"
-		)
+		// A retry consumes a real worker slot, so it respects the same request
+		// rate limit as creating a new scrape instead of bypassing it.
+		const { checkRateLimit } = await import("@/lib/rate-limit");
+		if (!(await checkRateLimit(userId, "free", "api_call")).allowed)
 			throw new ScrapeError(
-				failedCode as
-					| "INVALID_URL"
-					| "PRIVATE_URL_BLOCKED"
-					| "WEBSITE_ACCESS_DENIED"
-					| "WEBSITE_NOT_FOUND",
-				"Retry tidak tersedia untuk kegagalan ini. Gunakan URL lain.",
+				"RATE_LIMITED",
+				"Batas request tercapai. Coba lagi setelah satu menit.",
 			);
-		const retryExpiresAt =
-			typeof metadata?.retryAfterExpiresAt === "string"
-				? Date.parse(metadata.retryAfterExpiresAt)
-				: Number.NaN;
-		if (Number.isFinite(retryExpiresAt) && retryExpiresAt > Date.now()) {
-			const remaining = Math.max(
-				1,
-				Math.ceil((retryExpiresAt - Date.now()) / 1000),
-			);
-			throw new ScrapeError(
-				"WEBSITE_RATE_LIMITED",
-				"Website masih membatasi permintaan otomatis. Tunggu hingga waktu tunggu berakhir.",
-				{ retryAfterSeconds: remaining },
-			);
-		}
 		const active = await tx
 			.select({ id: scrapes.id })
 			.from(scrapes)
@@ -489,9 +558,22 @@ export async function retryScrape(
 					]),
 				),
 			);
-		if (active.length >= SCRAPE_LIMITS.maxActiveJobs)
-			throw new ScrapeError("QUEUE_CAPACITY");
-
+		const metadata =
+			typeof scrape.metadata === "object" && scrape.metadata !== null
+				? scrape.metadata
+				: null;
+		assertScrapeRetryAllowed(
+			resolveScrapeRetryDecision({
+				status: scrape.status,
+				errorCode: metadata?.errorDetail ?? null,
+				retryAfterExpiresAt: metadata?.retryAfterExpiresAt ?? null,
+				activeJobs: active.length,
+				maxActiveJobs: SCRAPE_LIMITS.maxActiveJobs,
+			}),
+		);
+		// A retry is a fresh attempt at the same request: it keeps the persisted
+		// partial rows, clears the previous failure evidence, and resets the
+		// worker bookkeeping so a new lease can be claimed.
 		const mode: ScrapeMode = (scrape.mode ??
 			scrape.metadata?.mode ??
 			"design") as ScrapeMode;
@@ -514,6 +596,8 @@ export async function retryScrape(
 					activityStartedAt: undefined,
 					errorMessage: undefined,
 					errorDetail: undefined,
+					errorSource: undefined,
+					failureReason: undefined,
 					failedAtStage: undefined,
 					retryAfterSeconds: undefined,
 					retryAfterExpiresAt: undefined,
@@ -608,26 +692,153 @@ export async function getScrapeById(
 	};
 }
 
-export async function listScrapes(
-	userId: string,
-	limit = 50,
-): Promise<ScrapeSummary[]> {
-	const rows = await db
-		.select({
-			id: scrapes.id,
-			sourceUrl: scrapes.sourceUrl,
-			domain: scrapes.domain,
-			title: scrapes.title,
-			mode: scrapes.mode,
-			metadata: scrapes.metadata,
-			status: scrapes.status,
-			createdAt: scrapes.createdAt,
-		})
-		.from(scrapes)
-		.where(eq(scrapes.userId, userId))
-		.orderBy(desc(scrapes.createdAt))
-		.limit(limit);
+export interface ScrapeHistoryQuery {
+	mode?: ScrapeHistoryMode;
+	status?: ScrapeHistoryStatusGroup;
+	search?: string;
+	sort?: ScrapeHistorySort;
+	limit?: number;
+	offset?: number;
+}
 
+export interface NormalizedScrapeHistoryQuery {
+	mode?: ScrapeHistoryMode;
+	status?: ScrapeHistoryStatusGroup;
+	search: string;
+	sort: ScrapeHistorySort;
+	limit: number;
+	offset: number;
+}
+
+export interface ScrapeHistoryPage {
+	items: ScrapeSummary[];
+	total: number;
+	limit: number;
+	offset: number;
+}
+
+const SCRAPE_HISTORY_PROCESSING_STATUSES = [
+	"queued",
+	"capturing",
+	"extracting",
+	"generating",
+	"saving",
+] as const;
+
+function isScrapeHistoryMode(value: unknown): value is ScrapeHistoryMode {
+	return (
+		value === "design" ||
+		value === "html" ||
+		value === "crawl" ||
+		value === "images"
+	);
+}
+
+function isScrapeHistoryStatus(
+	value: unknown,
+): value is ScrapeHistoryStatusGroup {
+	return value === "completed" || value === "failed" || value === "processing";
+}
+
+export function normalizeScrapeHistoryQuery(
+	raw: ScrapeHistoryQuery = {},
+): NormalizedScrapeHistoryQuery {
+	const mode = isScrapeHistoryMode(raw.mode) ? raw.mode : undefined;
+	const status = isScrapeHistoryStatus(raw.status) ? raw.status : undefined;
+	const search =
+		typeof raw.search === "string"
+			? raw.search.trim().slice(0, SCRAPE_HISTORY_SEARCH_MAX_CHARS)
+			: "";
+	const sort: ScrapeHistorySort = raw.sort === "oldest" ? "oldest" : "newest";
+	const limit = Number.isSafeInteger(raw.limit)
+		? Math.min(Math.max(raw.limit as number, 1), SCRAPE_HISTORY_MAX_LIMIT)
+		: 10;
+	const offset = Number.isSafeInteger(raw.offset)
+		? Math.max(raw.offset as number, 0)
+		: 0;
+	return {
+		...(mode ? { mode } : {}),
+		...(status ? { status } : {}),
+		search,
+		sort,
+		limit,
+		offset,
+	};
+}
+
+function escapeHistoryLike(value: string): string {
+	return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+function scrapeHistoryConditions(
+	userId: string,
+	query: NormalizedScrapeHistoryQuery,
+) {
+	const conditions = [eq(scrapes.userId, userId)];
+	if (query.mode) conditions.push(eq(scrapes.mode, query.mode));
+	if (query.status === "completed")
+		conditions.push(eq(scrapes.status, "completed"));
+	else if (query.status === "failed")
+		conditions.push(eq(scrapes.status, "failed"));
+	else if (query.status === "processing")
+		conditions.push(
+			inArray(scrapes.status, [...SCRAPE_HISTORY_PROCESSING_STATUSES]),
+		);
+	if (query.search) {
+		const pattern = `%${escapeHistoryLike(query.search)}%`;
+		const searchCondition = or(
+			ilike(scrapes.domain, pattern),
+			ilike(scrapes.title, pattern),
+			ilike(scrapes.sourceUrl, pattern),
+		);
+		if (searchCondition) conditions.push(searchCondition);
+	}
+	return conditions;
+}
+
+export async function countScrapes(
+	userId: string,
+	raw: ScrapeHistoryQuery = {},
+): Promise<number> {
+	const query = normalizeScrapeHistoryQuery(raw);
+	const [row] = await db
+		.select({ total: count() })
+		.from(scrapes)
+		.where(and(...scrapeHistoryConditions(userId, query)));
+	return row?.total ?? 0;
+}
+
+async function toScrapeSummaries(
+	rows: Array<{
+		id: string;
+		sourceUrl: string;
+		domain: string;
+		title: string | null;
+		mode: ScrapeMode | string | null;
+		metadata: ScrapeMetadata | null;
+		status: string;
+		createdAt: Date;
+	}>,
+	userId: string,
+): Promise<ScrapeSummary[]> {
+	const imageRows = rows.length
+		? await db
+				.select({
+					scrapeId: scrapeImages.scrapeId,
+					status: scrapeImages.status,
+					assetId: scrapeImages.assetId,
+				})
+				.from(scrapeImages)
+				.where(
+					and(
+						eq(scrapeImages.userId, userId),
+						inArray(
+							scrapeImages.scrapeId,
+							rows.map((row) => row.id),
+						),
+					),
+				)
+		: [];
 	return rows.map((r) => ({
 		id: r.id,
 		sourceUrl: r.sourceUrl,
@@ -636,7 +847,63 @@ export async function listScrapes(
 		mode: (r.mode ?? r.metadata?.mode ?? "design") as ScrapeMode,
 		status: r.status,
 		createdAt: r.createdAt,
+		...(r.mode === "images"
+			? {
+					imageCounts: imageResultCounts(
+						imageRows.filter((image) => image.scrapeId === r.id),
+						r.metadata?.discoveredImages,
+					),
+				}
+			: {}),
 	}));
+}
+
+export async function listScrapeHistory(
+	userId: string,
+	raw: ScrapeHistoryQuery = {},
+): Promise<ScrapeHistoryPage> {
+	const query = normalizeScrapeHistoryQuery(raw);
+	const ordering =
+		query.sort === "oldest"
+			? [asc(scrapes.createdAt), asc(scrapes.id)]
+			: [desc(scrapes.createdAt), desc(scrapes.id)];
+	const [countRow, rows] = await Promise.all([
+		db
+			.select({ total: count() })
+			.from(scrapes)
+			.where(and(...scrapeHistoryConditions(userId, query))),
+		db
+			.select({
+				id: scrapes.id,
+				sourceUrl: scrapes.sourceUrl,
+				domain: scrapes.domain,
+				title: scrapes.title,
+				mode: scrapes.mode,
+				metadata: scrapes.metadata,
+				status: scrapes.status,
+				createdAt: scrapes.createdAt,
+			})
+			.from(scrapes)
+			.where(and(...scrapeHistoryConditions(userId, query)))
+			.orderBy(...ordering)
+			.limit(query.limit)
+			.offset(query.offset),
+	]);
+	const total = countRow[0]?.total ?? 0;
+	return {
+		items: await toScrapeSummaries(rows, userId),
+		total,
+		limit: query.limit,
+		offset: query.offset,
+	};
+}
+
+export async function listScrapes(
+	userId: string,
+	limit = 50,
+): Promise<ScrapeSummary[]> {
+	const page = await listScrapeHistory(userId, { limit, sort: "newest" });
+	return page.items;
 }
 
 export async function saveScrapeDocument(
@@ -692,13 +959,27 @@ export async function generateAndSaveDesignMd(
 			"HTML scrape belum tersedia.",
 		);
 	if (scrape.document) return scrape.document;
-	const captured = await scrapeHtml(scrape.sourceUrl, scrape.jobAttempts);
+	const request = scrapeRequestSchema.parse(
+		scrape.request ?? { url: scrape.sourceUrl, mode: "design" },
+	);
+	const captured = await scrapeHtml(
+		scrape.sourceUrl,
+		scrape.jobAttempts,
+		request.mode === "design"
+			? { designSettings: request.settings }
+			: undefined,
+	);
 	if (!captured.metadata.visualEvidence)
 		throw new ScrapeError(
 			"NO_ANALYZABLE_CONTENT",
 			"Evidence visual hasil render tidak tersedia.",
 		);
-	const generated = await generateDesignMd(captured.metadata.visualEvidence);
+	const generated = await generateDesignMd(
+		captured.metadata.visualEvidence,
+		undefined,
+		undefined,
+		{ title: scrape.title ?? undefined },
+	);
 	const designMd = generated.document;
 	await db
 		.update(scrapes)
@@ -716,38 +997,141 @@ export async function generateAndSaveDesignMd(
 	return saveScrapeDocument(scrapeId, designMd, userId);
 }
 
+export interface EnrichmentRetryInput {
+	enrichment: "applied" | "unavailable" | undefined;
+	hasDocument: boolean;
+	hasEvidence: boolean;
+}
+
+export type EnrichmentRetryDecision =
+	| { proceed: true }
+	| { proceed: false; mode: "replay" | "missing-evidence" };
+
+// Decides an AI-only enrichment retry from persisted state, without touching
+// the network. Applied enrichment replays the stored document; a retry without
+// persisted evidence is refused instead of fabricating one.
+export function resolveEnrichmentRetry(
+	input: EnrichmentRetryInput,
+): EnrichmentRetryDecision {
+	if (!input.hasEvidence) return { proceed: false, mode: "missing-evidence" };
+	if (input.enrichment === "applied" && input.hasDocument)
+		return { proceed: false, mode: "replay" };
+	return { proceed: true };
+}
+
+// Concurrent AI-only retries for one scrape share a single run, so parallel
+// clicks or double-mounted components cannot stack duplicate generations.
+const enrichmentRetryInflight = new Map<string, Promise<ScrapeDocumentRow>>();
+
 // Retries only the AI synthesis step from persisted evidence, without
-// recapturing the website. Valid measurements are never discarded: a failed
-// retry still leaves the measurement-only document intact.
+// recapturing the website and without charging new credits: no billing path is
+// touched here. A failed retry retains the stored document and only updates
+// the enrichment status; a successful retry stores the document, the model
+// version and the status atomically in one transaction.
 export async function retryDesignSynthesis(
+	scrapeId: string,
+	userId: string,
+): Promise<ScrapeDocumentRow> {
+	const running = enrichmentRetryInflight.get(scrapeId);
+	if (running) return running;
+	const task = runEnrichmentRetry(scrapeId, userId).finally(() => {
+		if (enrichmentRetryInflight.get(scrapeId) === task)
+			enrichmentRetryInflight.delete(scrapeId);
+	});
+	enrichmentRetryInflight.set(scrapeId, task);
+	return task;
+}
+
+async function runEnrichmentRetry(
 	scrapeId: string,
 	userId: string,
 ): Promise<ScrapeDocumentRow> {
 	const scrape = await getScrapeById(scrapeId, userId);
 	const evidence = scrape.metadata?.visualEvidence;
+	const decision = resolveEnrichmentRetry({
+		enrichment: scrape.metadata?.aiEnrichment,
+		hasDocument: scrape.document !== null,
+		hasEvidence: evidence !== undefined,
+	});
+	if (!decision.proceed) {
+		if (decision.mode === "replay" && scrape.document) return scrape.document;
+		throw new ScrapeError(
+			"NO_ANALYZABLE_CONTENT",
+			"Evidence visual tersimpan tidak tersedia untuk retry.",
+		);
+	}
 	if (!evidence)
 		throw new ScrapeError(
 			"NO_ANALYZABLE_CONTENT",
 			"Evidence visual tersimpan tidak tersedia untuk retry.",
 		);
+	// An AI-only retry consumes a real generation slot, so it respects the same
+	// request rate limit as creating a new scrape instead of bypassing it.
+	const { checkRateLimit } = await import("@/lib/rate-limit");
+	if (!(await checkRateLimit(userId, "free", "api_call")).allowed)
+		throw new ScrapeError(
+			"RATE_LIMITED",
+			"Batas request tercapai. Coba lagi setelah satu menit.",
+		);
 	const { generateDesignMd } = await import("@/lib/prompts-design-md");
-	const generated = await generateDesignMd(evidence, {
-		onActivity: async () => {},
-		onTiming: () => {},
+	const generated = await generateDesignMd(
+		evidence,
+		{
+			onActivity: async () => {},
+			onTiming: () => {},
+		},
+		undefined,
+		{ title: scrape.title ?? undefined },
+	);
+	return db.transaction(async (tx) => {
+		if (generated.enrichment.status === "applied") {
+			const [inserted] = await tx
+				.insert(scrapeDocuments)
+				.values({ scrapeId, designMd: generated.document })
+				.returning();
+			if (!inserted) throw new ScrapeError("STORAGE_FAILED");
+			await tx
+				.update(scrapes)
+				.set({
+					metadata: {
+						...scrape.metadata,
+						aiEnrichment: "applied",
+						aiEnrichmentDetail: undefined,
+						designModelVersion: generated.model.version,
+					},
+					updatedAt: new Date(),
+				})
+				.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)));
+			return inserted;
+		}
+		await tx
+			.update(scrapes)
+			.set({
+				metadata: {
+					...scrape.metadata,
+					aiEnrichment: "unavailable",
+					aiEnrichmentDetail: generated.enrichment.detail,
+					designModelVersion: generated.model.version,
+				},
+				updatedAt: new Date(),
+			})
+			.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)));
+		const [current] = await tx
+			.select()
+			.from(scrapeDocuments)
+			.where(eq(scrapeDocuments.scrapeId, scrapeId))
+			.orderBy(desc(scrapeDocuments.createdAt))
+			.limit(1);
+		if (current) return current;
+		// No stored document exists yet: keep the measurement-only fallback as
+		// the first version instead of leaving the retry empty-handed.
+		const [inserted] = await tx
+			.insert(scrapeDocuments)
+			.values({ scrapeId, designMd: generated.document })
+			.returning();
+		if (!inserted) throw new ScrapeError("STORAGE_FAILED");
+		return inserted;
 	});
-	await db
-		.update(scrapes)
-		.set({
-			metadata: {
-				...scrape.metadata,
-				aiEnrichment: generated.enrichment.status,
-				aiEnrichmentDetail: generated.enrichment.detail,
-				designModelVersion: generated.model.version,
-			},
-			updatedAt: new Date(),
-		})
-		.where(and(eq(scrapes.id, scrapeId), eq(scrapes.userId, userId)));
-	return saveScrapeDocument(scrapeId, generated.document, userId);
 }
 
 export async function deleteScrape(

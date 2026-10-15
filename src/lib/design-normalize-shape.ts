@@ -52,6 +52,24 @@ export interface RadiusToken {
 	selectors: string[];
 	/** True when the value came from elements that were not generic containers. */
 	contextual: boolean;
+	/**
+	 * True when the radius covers at least half of the smallest measured side
+	 * of the elements that carry it, so the corners meet and the shape reads
+	 * as fully rounded. Judged from element geometry, never from a fixed pixel
+	 * threshold alone. The raw measured value is always preserved.
+	 */
+	pill: boolean;
+}
+
+// Collapses a uniform multi-value shorthand ("16px 16px 16px 16px") into its
+// single canonical value. Mixed shorthands ("14px 20px") are kept raw: reducing
+// them to one number would invent a measurement that was never taken.
+export function canonicalSpacingValue(value: string): string {
+	const parts = value.trim().split(/\s+/).filter(Boolean);
+	if (parts.length < 2) return value;
+	const first = parts[0] ?? "";
+	if (parts.every((part) => part === first)) return first;
+	return value;
 }
 
 export interface ElevationToken {
@@ -186,20 +204,43 @@ export function normalizeSpacing(elements: VisualElementEvidence[]): {
 	baseUnit: number;
 } {
 	const baseUnit = inferSpacingBaseUnit(elements);
-	const tokens = groupMeasurements(elements, [
+	const classified = groupMeasurements(elements, [
 		"padding",
 		"margin",
 		"gap",
 		"max-width",
 	])
 		.map((group) => classifySpacingToken(group, elements, baseUnit))
+		.map((token) => ({ ...token, value: canonicalSpacingValue(token.value) }));
+	// Equivalent shorthands measured in different spellings describe one token,
+	// so their frequencies merge instead of appearing as separate rows.
+	const merged = new Map<string, SpacingToken>();
+	for (const token of classified) {
+		const key = `${token.property}\u0000${token.purpose}\u0000${token.value}`;
+		const existing = merged.get(key);
+		if (!existing) {
+			merged.set(key, token);
+			continue;
+		}
+		existing.frequency += token.frequency;
+		for (const role of token.roles)
+			if (!existing.roles.includes(role) && existing.roles.length < 6)
+				existing.roles.push(role);
+		for (const selector of token.selectors)
+			if (
+				!existing.selectors.includes(selector) &&
+				existing.selectors.length < AUDIT_LIMIT
+			)
+				existing.selectors.push(selector);
+	}
+	const tokens = [...merged.values()]
 		// A value measured on a single generic element is not yet a system token;
 		// it is kept only when its context proves a purpose.
 		// Zero measurements are CSS reset defaults, not design rhythm: they are
-		// kept only when a real component context gives them meaning.
+		// kept only when an action component was measured square on purpose.
+		// Navigation and container zeros carry no spacing decision.
 		.filter((token) => {
-			if (token.valuePx === 0 && token.purpose === "Measured spacing")
-				return false;
+			if (token.valuePx === 0) return token.purpose === "Action padding";
 			return (
 				token.frequency > 1 ||
 				token.purpose !== "Measured spacing" ||
@@ -225,6 +266,19 @@ export function classifyRadiusToken(
 	const valuePx = pxOf(group.value);
 	const contextual =
 		roles.some((role) => role !== "element") || group.frequency >= 2;
+	// A radius at least half of the smallest measured side rounds the corners
+	// into each other, so the element reads as fully rounded regardless of how
+	// large the raw pixel number is.
+	const smallestSide = elements
+		.filter((element) => element.properties["border-radius"] === group.value)
+		.map((element) => Math.min(element.width, element.height))
+		.filter((side) => Number.isFinite(side) && side > 0);
+	const shortest = smallestSide.length ? Math.min(...smallestSide) : NaN;
+	const pill =
+		Number.isFinite(valuePx) &&
+		valuePx > 0 &&
+		Number.isFinite(shortest) &&
+		valuePx >= shortest / 2;
 	let purpose: RadiusPurpose = "Measured radius";
 	if (roles.includes("cta")) purpose = "Buttons";
 	else if (roles.includes("nav")) purpose = "Navigation";
@@ -243,6 +297,7 @@ export function classifyRadiusToken(
 		roles: roles.slice(0, 6),
 		selectors: group.selectors.slice(0, AUDIT_LIMIT),
 		contextual,
+		pill,
 	};
 }
 

@@ -158,7 +158,78 @@ describe("DesignResult", () => {
 			screen.getByRole("navigation", { name: /bagian style reference/i }),
 		).toBeDefined();
 		expect(screen.getByRole("link", { name: "Colors" })).toBeDefined();
-		expect(screen.getByRole("button", { name: "Inspector" })).toBeDefined();
-		expect(screen.getByRole("button", { name: "DESIGN.md" })).toBeDefined();
+		expect(screen.getByRole("tab", { name: "Inspector" })).toBeDefined();
+		expect(screen.getByRole("tab", { name: "DESIGN.md" })).toBeDefined();
+	});
+
+	it("anchors every rendered inspector section in the navigation", () => {
+		renderResult();
+		for (const name of [
+			"Overview",
+			"Colors",
+			"Typography",
+			"Spacing",
+			"Panduan",
+			"Keterbatasan",
+		]) {
+			expect(screen.getByRole("link", { name })).toBeDefined();
+		}
+		expect(
+			screen.getByRole("link", { name: "Panduan" }).getAttribute("href"),
+		).toBe("#guidelines");
+		expect(
+			screen.getByRole("link", { name: "Keterbatasan" }).getAttribute("href"),
+		).toBe("#limitations");
+	});
+
+	it("links mobile tabs to their panels with unique ids per instance", () => {
+		const first = renderResult();
+		const second = renderResult();
+		const tabs = screen.getAllByRole("tab", { name: /inspector|design\.md/i });
+		expect(tabs.length).toBeGreaterThanOrEqual(4);
+		const ids = tabs.map((tab) => tab.getAttribute("id"));
+		expect(new Set(ids).size).toBe(ids.length);
+		for (const tab of tabs) {
+			const controls = tab.getAttribute("aria-controls");
+			expect(controls).toBeTruthy();
+			const panel = document.getElementById(controls ?? "");
+			expect(panel).toBeTruthy();
+			expect(panel?.getAttribute("role")).toBe("tabpanel");
+		}
+		first.unmount();
+		second.unmount();
+	});
+
+	it("moves focus with arrow keys between mobile tabs", () => {
+		renderResult();
+		const inspectorTab = screen.getByRole("tab", {
+			name: "Inspector",
+		}) as HTMLElement;
+		inspectorTab.focus();
+		fireEvent.keyDown(inspectorTab, { key: "ArrowRight" });
+		expect(
+			(screen.getByRole("tab", { name: "DESIGN.md" }) as HTMLElement) ===
+				document.activeElement,
+		).toBe(true);
+	});
+
+	it("keeps responsive containers from overflowing narrow viewports", () => {
+		const { container } = renderResult();
+		expect(container.querySelector(".min-w-0.w-full")).toBeTruthy();
+		expect(container.querySelector(".overflow-x-auto")).toBeTruthy();
+		const mobileTabs = screen.getAllByRole("tab", {
+			name: /inspector|design\.md/i,
+		});
+		for (const tab of mobileTabs.slice(0, 2))
+			expect((tab as HTMLElement).className).toMatch(/min-h-\[44px\]/);
+	});
+
+	it("keeps the two-column composition with a sticky source panel", () => {
+		const { container } = renderResult();
+		expect(
+			container.querySelector(
+				".lg\\:grid-cols-\\[minmax\\(0\\,45fr\\)_minmax\\(0\\,55fr\\)\\]",
+			),
+		).toBeTruthy();
 	});
 });

@@ -12,6 +12,7 @@ import type {
 	InspectorTypeface,
 } from "@/lib/design-md-inspector";
 import { firstCssLength } from "@/lib/design-md-inspector";
+import { isPillRadius } from "@/lib/design-normalize-shape";
 import { cn } from "@/lib/utils";
 
 export interface DesignSystemInspectorProps {
@@ -55,7 +56,7 @@ const PALETTE_GROUP_LABELS: Record<PaletteGroupKey, string> = {
 	accent: "Aksen",
 	neutral: "Netral",
 	semantic: "Semantik",
-	other: "Belum terklasifikasi",
+	other: "Warna lainnya",
 };
 
 const PALETTE_GROUP_ORDER: PaletteGroupKey[] = [
@@ -147,6 +148,7 @@ function PaletteColorCard({
 	featured: boolean;
 }) {
 	const [copied, setCopied] = useState(false);
+	const [copyFailed, setCopyFailed] = useState(false);
 	const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -159,8 +161,12 @@ function PaletteColorCard({
 		try {
 			await navigator.clipboard.writeText(color.value);
 		} catch {
+			setCopyFailed(true);
+			if (copiedTimer.current) clearTimeout(copiedTimer.current);
+			copiedTimer.current = setTimeout(() => setCopyFailed(false), 2000);
 			return;
 		}
+		setCopyFailed(false);
 		setCopied(true);
 		if (copiedTimer.current) clearTimeout(copiedTimer.current);
 		copiedTimer.current = setTimeout(() => setCopied(false), 2000);
@@ -194,13 +200,23 @@ function PaletteColorCard({
 				</button>
 			</div>
 			<div className="mt-2 min-w-0">
-				<p className="text-sm font-semibold text-snow">{color.role}</p>
-				<p className="mt-0.5 font-mono text-xs text-fog tabular-nums">
+				<p className="break-words text-sm font-semibold text-snow">
+					{color.role}
+				</p>
+				<p
+					className="mt-0.5 font-mono text-xs break-all text-fog tabular-nums"
+					style={{ overflowWrap: "anywhere" }}
+				>
 					{color.value}
 					{color.token ? (
 						<span className="ml-2 text-slate">{color.token}</span>
 					) : null}
 				</p>
+				{copyFailed ? (
+					<p className="mt-1 text-[11px] leading-4 text-fog">
+						Gagal menyalin. Salin manual nilainya.
+					</p>
+				) : null}
 				{color.rationale || color.frequency > 0 ? (
 					<details className="group mt-1.5">
 						<summary className="cursor-pointer font-mono text-[11px] text-slate hover:text-fog focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo">
@@ -294,7 +310,7 @@ function TypeSpecimenRow({ entry }: { entry: InspectorTypeEntry }) {
 			{scaled ? (
 				<p className="mt-1 text-[11px] leading-4 text-fog">
 					Ditampilkan pada {SPECIMEN_MAX_PX}px agar muat; ukuran terukur{" "}
-					{entry.size} dan rasio antar peran tetap.
+					{entry.size}.
 				</p>
 			) : null}
 		</div>
@@ -426,7 +442,7 @@ function RadiusRow({ token }: { token: InspectorRadiusToken }) {
 		normalized.includes("full") ||
 		normalized.includes("pill") ||
 		normalized === "50%" ||
-		(Number.isFinite(token.valuePx) && token.valuePx >= 999);
+		isPillRadius(token.valuePx);
 	const previewRadius = isPill
 		? "999px"
 		: Number.isFinite(token.valuePx)
@@ -586,7 +602,7 @@ export function DesignSystemInspector({
 						)}
 						<span>
 							{model.verification === "observed"
-								? "Pengukuran browser yang terverifikasi. Peran mengikuti pemakaian elemen yang terukur."
+								? "Analisis berdasarkan tampilan website yang berhasil diperiksa."
 								: "Hasil lama belum terverifikasi terhadap evidence browser. Nilai di bawah adalah hasil parsing dokumen arsip, bukan pengukuran."}
 						</span>
 					</p>
@@ -690,65 +706,30 @@ export function DesignSystemInspector({
 						label="Surface"
 						description="Lapisan latar yang terukur, dari kanvas halaman ke permukaan yang lebih tinggi."
 					>
-						{model.surfaces.length >= 2 ? (
-							<div
-								role="img"
-								aria-label={`Hierarki ${model.surfaces.length} lapisan surface terukur`}
-								className="mb-3 rounded-lg border border-graphite bg-onyx p-3"
-							>
-								<div
-									className="rounded-md border border-graphite p-3"
-									style={{
-										backgroundColor: model.surfaces[0]?.value,
-									}}
-								>
-									<p className="font-mono text-[10px] text-slate">
-										Kanvas · {model.surfaces[0]?.value}
-									</p>
-									<div
-										className="mt-2 rounded-md border border-graphite p-3"
-										style={{
-											backgroundColor:
-												model.surfaces[1]?.value ?? model.surfaces[0]?.value,
-										}}
-									>
-										<p className="font-mono text-[10px] text-slate">
-											Sekunder · {model.surfaces[1]?.value}
-										</p>
-										{model.surfaces[2] ? (
-											<div
-												className="mt-2 rounded-md border border-graphite p-3"
-												style={{
-													backgroundColor: model.surfaces[2]?.value,
-												}}
-											>
-												<p className="font-mono text-[10px] text-slate">
-													Komponen · {model.surfaces[2]?.value}
-												</p>
-											</div>
-										) : null}
-									</div>
-								</div>
-							</div>
-						) : null}
 						<div className="flex flex-col gap-2">
 							{model.surfaces.map((surface) => (
 								<div
-									key={surface.value}
+									key={`${surface.level}-${surface.value}`}
 									className="flex items-center gap-3 rounded-lg border border-graphite p-3"
 								>
 									<div
-										aria-hidden="true"
+										role="img"
+										aria-label={`Contoh surface level ${surface.level} ${surface.value}`}
 										className="size-8 shrink-0 rounded-md border border-graphite"
 										style={{ backgroundColor: surface.value }}
 									/>
 									<div className="min-w-0">
-										<p className="font-mono text-xs text-snow">
+										<p
+											className="font-mono text-xs break-all text-snow"
+											style={{ overflowWrap: "anywhere" }}
+										>
 											{surface.value}
 										</p>
-										<p className="text-[11px] text-fog">
-											Level {surface.level} · {surface.frequency} elemen ·{" "}
-											{surface.roles.join(", ")}
+										<p className="break-words text-[11px] text-fog">
+											Level {surface.level} · {surface.frequency} elemen
+											{surface.roles.length > 0
+												? ` · ${surface.roles.join(", ")}`
+												: ""}
 										</p>
 									</div>
 								</div>

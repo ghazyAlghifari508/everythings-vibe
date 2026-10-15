@@ -1,12 +1,17 @@
 ﻿import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
+import {
+	DESIGN_ERROR_CODES,
+	httpStatusForErrorCode,
+	ScrapeError,
+} from "@/lib/design-errors";
 import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/lib/scrape-contract";
 import {
 	createScrape,
 	deleteScrape,
 	getScrapeById,
 	listScrapes,
+	retryDesignSynthesis,
 	retryScrape,
 	type ScrapeDetailPayload,
 } from "@/lib/services/scrape-service";
@@ -14,20 +19,9 @@ import { requireUser } from "@/lib/session";
 
 function scrapeErrorResponse(error: unknown): Response {
 	if (error instanceof ScrapeError) {
-		const status =
-			error.code === "QUEUE_CAPACITY"
-				? 409
-				: error.code === "RATE_LIMITED" || error.code === "WEBSITE_RATE_LIMITED"
-					? 429
-					: error.code === "INVALID_URL" || error.code === "PRIVATE_URL_BLOCKED"
-						? 400
-						: error.code === "WEBSITE_BLOCKED" ||
-								error.code === "FETCH_TIMEOUT" ||
-								error.code === "WEBSITE_ACCESS_DENIED" ||
-								error.code === "WEBSITE_NOT_FOUND" ||
-								error.code === "WEBSITE_SERVER_ERROR"
-							? 502
-							: 500;
+		// One shared mapping keeps the HTTP response aligned with the retry and
+		// presentation contracts instead of duplicating the status table.
+		const status = httpStatusForErrorCode(error.code);
 		const headers: Record<string, string> = {};
 		if (
 			typeof error.retryAfterSeconds === "number" &&
@@ -79,10 +73,10 @@ export async function GET({
 		// Crawl and image rows are returned with the status so polling renders
 		// progressively persisted results without a page reload. Image rows get
 		// freshly signed asset URLs, matching the detail loader contract.
-		const { attachImageAssetUrls } = await import("@/lib/preview-capabilities");
+		const { signScrapeImages } = await import("@/lib/services/scrape-service");
 		const payload: ScrapeDetailPayload = {
 			...scrape,
-			images: attachImageAssetUrls(scrape.images, id, user.id),
+			images: await signScrapeImages(scrape.images, id, user.id),
 		};
 		return Response.json({ scrape: payload });
 	} catch (error) {
@@ -138,6 +132,23 @@ export async function POST({
 			) {
 				await retryScrape(candidate.scrapeId, user.id);
 				return Response.json({ ok: true, scrapeId: candidate.scrapeId });
+			}
+			// AI-only enrichment retry from persisted evidence: no recapture,
+			// no new credit charge. Owner scope, rate limit and replay
+			// protection live in the service.
+			if (
+				candidate.action === "retry-enrichment" &&
+				typeof candidate.scrapeId === "string"
+			) {
+				const document = await retryDesignSynthesis(
+					candidate.scrapeId,
+					user.id,
+				);
+				return Response.json({
+					ok: true,
+					scrapeId: candidate.scrapeId,
+					documentId: document.id,
+				});
 			}
 
 			const parsed = scrapeRequestSchema.safeParse(body);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	crawlSettingsSchema,
+	designSettingsSchema,
 	htmlSettingsSchema,
 	imagesSettingsSchema,
 	SCRAPE_LIMITS,
@@ -15,7 +16,18 @@ import {
 
 describe("advanced parameter grouping", () => {
 	it("shows only the settings that belong to the active mode", () => {
-		expect(ADVANCED_PARAMETER_GROUPS.design).toHaveLength(0);
+		const selections = ADVANCED_PARAMETER_GROUPS.design.flatMap(
+			(group) => group.selects ?? [],
+		);
+		expect(selections.map((selection) => selection.key).sort()).toEqual(
+			Object.keys(designSettingsSchema.parse({})).sort(),
+		);
+		for (const selection of selections)
+			for (const option of selection.options)
+				expect(
+					designSettingsSchema.safeParse({ [selection.key]: option.value })
+						.success,
+				).toBe(true);
 		expect(ADVANCED_PARAMETER_GROUPS.crawl).toHaveLength(1);
 		expect(ADVANCED_PARAMETER_GROUPS.html).toHaveLength(1);
 		expect(ADVANCED_PARAMETER_GROUPS.images).toHaveLength(1);

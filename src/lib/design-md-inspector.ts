@@ -339,6 +339,18 @@ export function firstCssLength(value: string): string {
 	return value.match(/[\d.]+(?:px|rem|em|%)/)?.[0] ?? "";
 }
 
+function parsePxOnly(value: string): number {
+	const match = value.match(/([\d.]+)px/i);
+	if (!match?.[1]) return Number.NaN;
+	const parsed = Number.parseFloat(match[1]);
+	return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function parseCount(value: string): number {
+	const parsed = Number.parseInt(value, 10);
+	return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
 export function normalizeFontWeight(value: string): string {
 	const digits = value.match(/^(\d{3})\b/)?.[1];
 	if (digits) return digits;
@@ -471,10 +483,13 @@ function parseColors(lines: string[]): InspectorColorToken[] {
 	const valueIdx = headerIndex(table.headers, /value/);
 	const tokenIdx = headerIndex(table.headers, /token/);
 	const roleIdx = headerIndex(table.headers, /role/);
+	const confidenceIdx = headerIndex(table.headers, /confidence/);
 	const colors: InspectorColorToken[] = [];
 	for (const row of table.rows) {
 		const cells = [...row];
 		while (cells.length < 4) cells.push("");
+		const confidence =
+			confidenceIdx >= 0 ? (cells[confidenceIdx] ?? "").toLowerCase() : "";
 		const entry: InspectorColorToken = {
 			name: nameIdx >= 0 ? (cells[nameIdx] ?? "") : (cells[0] ?? ""),
 			value: valueIdx >= 0 ? (cells[valueIdx] ?? "") : (cells[1] ?? ""),
@@ -483,7 +498,12 @@ function parseColors(lines: string[]): InspectorColorToken[] {
 			roleClass: "unknown",
 			frequency: 0,
 			rationale: "",
-			confidence: "unknown",
+			confidence:
+				confidence === "observed" ||
+				confidence === "inferred" ||
+				confidence === "unknown"
+					? confidence
+					: "unknown",
 		};
 		if (entry.name || entry.value || entry.token || entry.role)
 			colors.push(entry);
@@ -504,18 +524,23 @@ function parseTypography(lines: string[]): InspectorTypeEntry[] {
 	const sizeIdx = headerIndex(table.headers, /size/);
 	const weightIdx = headerIndex(table.headers, /weight/);
 	const lineHeightIdx = headerIndex(table.headers, /line/);
+	const letterSpacingIdx = headerIndex(
+		table.headers,
+		/letter|spacing|tracking/,
+	);
 	const entries: InspectorTypeEntry[] = [];
 	for (const row of table.rows) {
 		const label = labelIdx >= 0 ? (row[labelIdx] ?? "") : (row[0] ?? "");
 		if (!label && row.every((cell) => cell.length === 0)) continue;
+		const size = sizeIdx >= 0 ? (row[sizeIdx] ?? "") : "";
 		entries.push({
 			role: label,
 			family: familyIdx >= 0 ? (row[familyIdx] ?? "") : "",
-			size: sizeIdx >= 0 ? (row[sizeIdx] ?? "") : "",
-			sizePx: Number.parseFloat(sizeIdx >= 0 ? (row[sizeIdx] ?? "") : ""),
+			size,
+			sizePx: parsePxOnly(size),
 			weight: weightIdx >= 0 ? (row[weightIdx] ?? "") : "",
 			lineHeight: lineHeightIdx >= 0 ? (row[lineHeightIdx] ?? "") : "",
-			letterSpacing: "",
+			letterSpacing: letterSpacingIdx >= 0 ? (row[letterSpacingIdx] ?? "") : "",
 			frequency: 0,
 			sample: "",
 		});
@@ -571,27 +596,50 @@ function parseSpacingShapes(lines: string[]): {
 	if (baseMatch?.[1]) baseUnitPx = Number.parseFloat(baseMatch[1]);
 	for (const table of parseTables(lines)) {
 		const headerText = table.headers.join(" ").toLowerCase();
-		const isRadii = /radius|radii|round|shape/.test(headerText);
+		const isRadii = /radius|radii|round|shape|context/.test(headerText);
 		const isSpacing =
-			/spac|gap|padding|margin|unit|size|scale|token|value|purpose/.test(
+			/spac|gap|padding|margin|unit|size|scale|token|value|purpose|property|context|measured/.test(
 				headerText,
 			);
 		if (!isRadii && !isSpacing) continue;
+		const purposeIdx = headerIndex(
+			table.headers,
+			/purpose|context|token|radius|label|name/,
+		);
+		const propertyIdx = headerIndex(table.headers, /property/);
+		const valueIdx = headerIndex(table.headers, /value/);
+		const measuredIdx = headerIndex(table.headers, /measured/);
 		for (const row of table.rows) {
-			const label = row[0] ?? "";
-			const value = row[1] ?? "";
-			if (!label && !value) continue;
+			const label = purposeIdx >= 0 ? (row[purposeIdx] ?? "") : (row[0] ?? "");
+			const rawValue = valueIdx >= 0 ? (row[valueIdx] ?? "") : (row[1] ?? "");
+			if (!label && !rawValue) continue;
 			// The canonical table carries the purpose in the first column, so a
 			// radius row is routed by its label as well as the table header.
-			if (isRadii || /radius|radii|round/.test(label))
+			if (isRadii || /radius|radii|round/.test(label)) {
+				const value = firstCssLength(rawValue) || rawValue;
+				const frequency =
+					measuredIdx >= 0 ? parseCount(row[measuredIdx] ?? "") : 0;
 				radii.push({
 					label,
 					value,
-					valuePx: Number.parseFloat(value),
-					context: "",
-					frequency: 0,
+					valuePx: parsePxOnly(rawValue),
+					context: frequency > 0 ? `${frequency} element` : "",
+					frequency,
 				});
-			else spacing.push({ label, value, context: "", frequency: 0 });
+			} else {
+				const property = propertyIdx >= 0 ? (row[propertyIdx] ?? "") : "";
+				const frequency =
+					measuredIdx >= 0 ? parseCount(row[measuredIdx] ?? "") : 0;
+				spacing.push({
+					label,
+					value: rawValue,
+					context:
+						property || frequency > 0
+							? `${property || "measured"} on ${frequency} element`
+							: "",
+					frequency,
+				});
+			}
 		}
 	}
 	// Archived documents may list a spacing scale as bullets rather than a table.
@@ -638,36 +686,191 @@ function parseGuidelines(lines: string[]): {
 	return { dos, donts };
 }
 
+function parseThemeOverview(
+	lines: string[],
+	fallback: { theme: "light" | "dark" | "unknown"; overview: string },
+): { theme: "light" | "dark" | "unknown"; overview: string } {
+	let theme = fallback.theme;
+	const overviewLines: string[] = fallback.overview ? [fallback.overview] : [];
+	for (const rawLine of lines) {
+		const line = rawLine.trim();
+		if (!line || line.startsWith("#") || line.startsWith("|")) continue;
+		const themeMatch = line.replace(/\*\*/g, "").match(/^theme\s*:\s*(\w+)/i);
+		if (themeMatch) {
+			const value = (themeMatch[1] ?? "").toLowerCase();
+			theme = value === "light" || value === "dark" ? value : "unknown";
+			continue;
+		}
+		if (/^measured from /i.test(line)) continue;
+		if (/^analysis scope:/i.test(line)) continue;
+		if (/^-+\s*captured /i.test(line)) continue;
+		overviewLines.push(line.replace(/\*\*/g, ""));
+	}
+	return { theme, overview: overviewLines.join("\n").trim() };
+}
+
+function parseComponents(lines: string[]): InspectorComponent[] {
+	const components: InspectorComponent[] = [];
+	let current: {
+		name: string;
+		description: string[];
+		evidence: string;
+	} | null = null;
+	for (const rawLine of lines) {
+		const heading = rawLine.match(/^###\s+(.*)$/);
+		if (heading) {
+			if (current?.name)
+				components.push({
+					name: current.name,
+					description: current.description.join(" ").trim(),
+					evidence: current.evidence,
+					frequency: 0,
+				});
+			current = {
+				name: (heading[1] ?? "").trim(),
+				description: [],
+				evidence: "",
+			};
+			continue;
+		}
+		if (!current) continue;
+		const line = rawLine.trim();
+		if (!line) continue;
+		const evidence = line.match(/^\*\*Evidence:\*\*\s*(.*)$/);
+		if (evidence) {
+			current.evidence = (evidence[1] ?? "").trim();
+			continue;
+		}
+		if (/^reuse this treatment/i.test(line)) continue;
+		if (line.startsWith("|")) continue;
+		current.description.push(line.replace(/\*\*/g, ""));
+	}
+	if (current?.name)
+		components.push({
+			name: current.name,
+			description: current.description.join(" ").trim(),
+			evidence: current.evidence,
+			frequency: 0,
+		});
+	return components.filter(
+		(component) => component.name || component.description,
+	);
+}
+
+function parseSurfaces(lines: string[]): InspectorSurface[] {
+	const surfaces: InspectorSurface[] = [];
+	for (const table of parseTables(lines)) {
+		const headerText = table.headers.join(" ").toLowerCase();
+		if (!/level|value|purpose|measured/.test(headerText)) continue;
+		const levelIdx = headerIndex(table.headers, /level/);
+		const valueIdx = headerIndex(table.headers, /value/);
+		const measuredIdx = headerIndex(table.headers, /measured/);
+		const purposeIdx = headerIndex(table.headers, /purpose|role/);
+		table.rows.forEach((row, rowIndex) => {
+			const value = valueIdx >= 0 ? (row[valueIdx] ?? "") : "";
+			if (!value) return;
+			const level = levelIdx >= 0 ? parseCount(row[levelIdx] ?? "") : rowIndex;
+			const frequency =
+				measuredIdx >= 0 ? parseCount(row[measuredIdx] ?? "") : 0;
+			const roles =
+				purposeIdx >= 0
+					? (row[purposeIdx] ?? "")
+							.split(",")
+							.map((role) => role.trim())
+							.filter((role) => role.length > 0)
+					: [];
+			surfaces.push({ value, level, frequency, roles });
+		});
+	}
+	return surfaces;
+}
+
+function parseElevation(lines: string[]): InspectorElevationToken[] {
+	const elevation: InspectorElevationToken[] = [];
+	for (const table of parseTables(lines)) {
+		const headerText = table.headers.join(" ").toLowerCase();
+		if (!/shadow/.test(headerText)) continue;
+		const shadowIdx = headerIndex(table.headers, /shadow/);
+		const measuredIdx = headerIndex(table.headers, /measured/);
+		const notesIdx = headerIndex(table.headers, /note/);
+		for (const row of table.rows) {
+			const value = shadowIdx >= 0 ? (row[shadowIdx] ?? "") : "";
+			if (!value) continue;
+			elevation.push({
+				value,
+				frequency: measuredIdx >= 0 ? parseCount(row[measuredIdx] ?? "") : 0,
+				roles: [],
+				usageNote: notesIdx >= 0 ? (row[notesIdx] ?? "") : "",
+				confidence: "unknown",
+			});
+		}
+	}
+	return elevation;
+}
+
+function parseLimitations(lines: string[], version: number): string[] {
+	const current = version >= 2;
+	const items: string[] = [];
+	for (const rawLine of lines) {
+		if (rawLine.trim().startsWith("#")) continue;
+		const bullet = rawLine.match(/^\s*(?:[-*]|\d+[.)])\s+(.*)$/)?.[1];
+		if (bullet) {
+			const text = bullet.trim();
+			if (text.length > 0) items.push(text);
+			continue;
+		}
+		if (!current) {
+			const text = rawLine.replace(/^\s*[-*]\s*/, "").trim();
+			if (text.length > 0) items.push(text);
+		}
+	}
+	return items;
+}
+
 // Parses an archived DESIGN.md. The result is always labelled unverified,
 // because parsing text cannot establish that its values were measured.
 export function parseDesignMd(designMd: string): DesignInspectorModel {
 	if (!designMd || designMd.trim().length === 0) return { ...EMPTY_MODEL };
 	const normalized = normalizeDesign(designMd.replace(/\r\n/g, "\n"));
 	const { prelude, sections } = splitSections(normalized);
+	const version = designMdVersionOf(designMd);
 	const header = parseHeaderBlock(prelude);
+	const themeOverview = parseThemeOverview(
+		sectionBody(sections, "Theme & Overview"),
+		{ theme: header.theme, overview: header.overview },
+	);
 	const typography = parseTypography(
 		sectionBody(sections, "Tokens - Typography"),
 	);
-	const { spacing, radii, elevation, baseUnitPx } = parseSpacingShapes(
+	const parsedShapes = parseSpacingShapes(
 		sectionBody(sections, "Tokens - Spacing & Shapes"),
 	);
+	const elevation = [
+		...parsedShapes.elevation,
+		...parseElevation(sectionBody(sections, "Elevation")),
+	];
 	const { dos, donts } = parseGuidelines(
 		sectionBody(sections, "Do's and Don'ts"),
 	);
-	const limitations = sectionBody(sections, "Limitations & Confidence Notes")
-		.map((line) => line.replace(/^\s*[-*]\s*/, "").trim())
-		.filter((line) => line.length > 0 && !line.startsWith("#"));
+	const limitations = parseLimitations(
+		sectionBody(sections, "Limitations & Confidence Notes"),
+		version,
+	);
 	return {
 		...EMPTY_MODEL,
 		...header,
-		modelVersion: designMdVersionOf(designMd),
+		theme: themeOverview.theme,
+		overview: themeOverview.overview,
+		modelVersion: version,
 		colors: parseColors(sectionBody(sections, "Tokens - Colors")),
 		typography,
 		typefaces: deriveTypefaces(typography),
-		spacing,
-		radii,
+		spacing: parsedShapes.spacing,
+		radii: parsedShapes.radii,
 		elevation,
-		baseUnitPx,
+		surfaces: parseSurfaces(sectionBody(sections, "Surfaces")),
+		components: parseComponents(sectionBody(sections, "Components")),
+		baseUnitPx: parsedShapes.baseUnitPx,
 		dos,
 		donts,
 		limitations,

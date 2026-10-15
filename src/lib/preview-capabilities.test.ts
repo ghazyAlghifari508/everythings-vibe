@@ -3,6 +3,7 @@ import {
 	buildPreviewSrcDoc,
 	issuePreviewAssetCapability,
 	rewritePreviewModule,
+	storedImageAssetUrl,
 	verifyPreviewAssetCapability,
 } from "./preview-capabilities";
 
@@ -15,6 +16,51 @@ const context = {
 };
 
 describe("preview asset capabilities", () => {
+	it("binds stored image identity and authenticates expiry before diagnosing it", () => {
+		const now = 1_000_000;
+		const url = storedImageAssetUrl(
+			"image-1",
+			context.scrapeId,
+			context.ownerId,
+			now,
+			secret,
+		);
+		const token =
+			new URL(url, "https://app.example").searchParams.get("cap") ?? "";
+		const claims = verifyPreviewAssetCapability(token, secret, { now });
+		expect(claims?.imageId).toBe("image-1");
+		expect(claims?.target).toBe("stored-image:image-1");
+		expect(
+			verifyPreviewAssetCapability(token, secret, { now: claims?.expiresAt }),
+		).toBeNull();
+		expect(
+			verifyPreviewAssetCapability(token, secret, {
+				now: claims?.expiresAt,
+				allowExpired: true,
+			})?.imageId,
+		).toBe("image-1");
+		expect(
+			verifyPreviewAssetCapability(`${token}x`, secret, {
+				now,
+				allowExpired: true,
+			}),
+		).toBeNull();
+		expect(
+			verifyPreviewAssetCapability(token, secret, {
+				now,
+				ownerId: "other-owner",
+			}),
+		).toBeNull();
+		expect(() =>
+			storedImageAssetUrl(
+				"../image",
+				context.scrapeId,
+				context.ownerId,
+				now,
+				secret,
+			),
+		).toThrow();
+	});
 	it("binds the exact target, scrape, owner, and expiry", () => {
 		const token = issuePreviewAssetCapability(context, secret);
 

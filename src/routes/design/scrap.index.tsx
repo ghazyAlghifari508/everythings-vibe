@@ -1,14 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ScrapModeSwitcher } from "@/components/design/scrap-mode-switcher";
+import {
+	parseScrapeWorkspaceSearch,
+	resolveScrapeWorkspaceMode,
+} from "@/lib/scrape-contract";
 
 export const Route = createFileRoute("/design/scrap/")({
 	head: () => ({
 		meta: [{ title: "Scrap website | VibeDesign" }],
 	}),
+	validateSearch: (search) => parseScrapeWorkspaceSearch(search),
 	component: ScrapIndexPage,
 });
 
 function ScrapIndexPage() {
+	const search = Route.useSearch();
 	return (
 		<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
 			<main className="flex w-full flex-col items-center justify-center py-6 sm:py-12">
@@ -22,7 +28,7 @@ function ScrapIndexPage() {
 				</div>
 
 				<div className="mt-8 w-full">
-					<ScrapModeSwitcher />
+					<ScrapModeSwitcher initialMode={resolveScrapeWorkspaceMode(search)} />
 				</div>
 			</main>
 		</div>

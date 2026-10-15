@@ -1,8 +1,12 @@
 import { afterEach, expect, it, vi } from "vitest";
+import { buildFixtureModel } from "./design-fixture";
+import { renderDesignMd } from "./design-md-render";
 import type { VisualEvidence } from "./design-visual-evidence";
 import {
 	designIssues,
+	designMdVersionOf,
 	generateDesignMd,
+	isCurrentModelDocument,
 	normalizeDesign,
 	parseExplanationResponse,
 	renderValidatedExplanation,
@@ -90,6 +94,51 @@ const evidence: VisualEvidence = {
 	fonts: [],
 	limitations: [],
 };
+
+it("forwards the captured title instead of a generic heading", async () => {
+	const { document, model } = await generateDesignMd(
+		evidence,
+		undefined,
+		undefined,
+		{
+			title: "Acme Corp",
+		},
+	);
+	expect(model.title).toBe("Acme Corp");
+	expect(document).toContain("# Acme Corp - Style Reference");
+});
+
+it("codes a provider failure and redacts the raw message", async () => {
+	mocks.tryStreamWithFallback.mockRejectedValue(
+		new Error("upstream 500: secret-key project-123 exploded"),
+	);
+	const result = await generateDesignMd(evidence, instrumentation);
+	expect(result.enrichment.status).toBe("unavailable");
+	expect(result.enrichment.cause).toBe("provider");
+	expect(result.enrichment.detail).not.toContain("upstream 500");
+	expect(result.enrichment.detail).not.toContain("secret-key");
+	expect(result.document).not.toContain("upstream 500");
+});
+
+it("codes a watchdog timeout distinctly", async () => {
+	mocks.tryStreamWithFallback.mockRejectedValue(
+		new Error("AI tidak merespons dalam 2 menit. Coba generate ulang."),
+	);
+	const result = await generateDesignMd(evidence, instrumentation);
+	expect(result.enrichment.status).toBe("unavailable");
+	expect(result.enrichment.cause).toBe("timeout");
+});
+
+it("propagates a midstream abort instead of degrading it", async () => {
+	const controller = new AbortController();
+	mocks.tryStreamWithFallback.mockImplementation(async () => {
+		controller.abort();
+		throw new Error("AI stream aborted");
+	});
+	await expect(
+		generateDesignMd(evidence, instrumentation, controller.signal),
+	).rejects.toMatchObject({ code: "AI_GENERATION_FAILED" });
+});
 
 it("renders a measured document from the structured model without any AI step", async () => {
 	const { document, model } = await generateDesignMd(evidence);
@@ -222,6 +271,14 @@ it("propagates cancellation instead of degrading it into enrichment failure", as
 	await expect(
 		generateDesignMd(evidence, instrumentation, controller.signal),
 	).rejects.toMatchObject({ code: "AI_GENERATION_FAILED" });
+});
+
+it("keeps archived documents readable while marking the current model", () => {
+	const current = renderDesignMd(buildFixtureModel());
+	expect(designMdVersionOf(current)).toBeGreaterThanOrEqual(2);
+	expect(isCurrentModelDocument(current)).toBe(true);
+	expect(designMdVersionOf("# Old archive\n\nSome text")).toBe(1);
+	expect(isCurrentModelDocument("# Old archive\n\nSome text")).toBe(false);
 });
 
 it("retains normalization for legacy inspector documents", () => {

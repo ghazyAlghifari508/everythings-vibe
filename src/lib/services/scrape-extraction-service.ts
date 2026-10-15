@@ -8,7 +8,11 @@ import {
 	scrapes,
 } from "@/db/schema";
 import { crawlWebsite, isCrawlScope } from "@/lib/crawl-website";
-import { ScrapeError } from "@/lib/design-errors";
+import {
+	designErrorCodeForHttpStatus,
+	parseRetryAfterSeconds,
+	ScrapeError,
+} from "@/lib/design-errors";
 import { fetchAsset } from "@/lib/fetch-html";
 import { renderPage } from "@/lib/render-page";
 import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/lib/scrape-contract";
@@ -16,6 +20,20 @@ import {
 	classifyImageOutcome,
 	normalizeImageCandidates,
 } from "@/lib/scrape-images";
+import {
+	classifyCrawlFailures,
+	classifyImageFailures,
+	type FailedResourceEvidence,
+} from "./scrape-failure-summary";
+import {
+	createImageSitePolicy,
+	imageResultCounts,
+} from "./scrape-image-policy";
+import {
+	ImageStorageError,
+	persistScrapeImage,
+	validateStoredImage,
+} from "./scrape-image-storage";
 import {
 	type ScrapeJobClaim,
 	scrapeClaimPredicate,
@@ -60,13 +78,14 @@ export function shouldRetryImageFetch(
 async function fetchImageAsset(
 	url: string,
 	signal: AbortSignal | undefined,
+	allowUrl: (url: string) => Promise<boolean>,
 ): Promise<Awaited<ReturnType<typeof fetchAsset>>> {
 	let lastError: unknown;
 	for (let attempt = 0; attempt < IMAGE_FETCH_ATTEMPTS; attempt += 1) {
 		if (attempt > 0)
 			await wait(IMAGE_FETCH_RETRY_DELAY_MS, undefined, { signal });
 		try {
-			const asset = await fetchAsset(url, 0, { signal });
+			const asset = await fetchAsset(url, 0, { signal, allowUrl });
 			if (shouldRetryImageFetch(attempt, asset.status, null)) continue;
 			return asset;
 		} catch (error) {
@@ -101,7 +120,8 @@ export async function runExtractionJob(
 			.set({ ...values, updatedAt: new Date() })
 			.where(scrapeClaimPredicate(claim))
 			.returning({ id: scrapes.id });
-		if (!rows.length) throw new Error("Job lease sudah tidak berlaku.");
+		if (!rows.length)
+			throw new ScrapeError("STORAGE_FAILED", "Job lease sudah tidak berlaku.");
 	};
 	await update({ status: "capturing" });
 	if (request.mode === "crawl") {
@@ -133,7 +153,11 @@ export async function runExtractionJob(
 						.where(scrapeClaimPredicate(claim))
 						.for("update")
 						.limit(1);
-					if (!owner) throw new Error("Job lease sudah tidak berlaku.");
+					if (!owner)
+						throw new ScrapeError(
+							"STORAGE_FAILED",
+							"Job lease sudah tidak berlaku.",
+						);
 					await tx
 						.insert(scrapePages)
 						.values({
@@ -168,7 +192,7 @@ export async function runExtractionJob(
 					});
 				});
 				if (!/^text\/html|application\/xhtml\+xml/i.test(result.contentType))
-					throw new Error("Konten bukan HTML.");
+					throw new ScrapeError("NO_ANALYZABLE_CONTENT", "Konten bukan HTML.");
 				return {
 					html: result.body.toString("utf8"),
 					status: result.status,
@@ -183,16 +207,25 @@ export async function runExtractionJob(
 				});
 				if (result.status === 404) return "";
 				if (result.status !== 200)
-					throw new Error("robots.txt tidak dapat diverifikasi.");
+					throw new ScrapeError(
+						"WEBSITE_BLOCKED",
+						"robots.txt tidak dapat diverifikasi.",
+					);
 				const content = result.body.toString("utf8");
 				if (/<html\b/i.test(content))
-					throw new Error("robots.txt bukan dokumen aturan yang valid.");
+					throw new ScrapeError(
+						"WEBSITE_BLOCKED",
+						"robots.txt bukan dokumen aturan yang valid.",
+					);
 				const delay =
 					Number(
 						content.match(/crawl-delay\s*:\s*(\d+(?:\.\d+)?)/i)?.[1] ?? "0",
 					) * 1000;
 				if (delay > SCRAPE_LIMITS.maxCrawlDelayMs)
-					throw new Error("Crawl delay robots.txt melampaui batas job.");
+					throw new ScrapeError(
+						"WEBSITE_ACCESS_DENIED",
+						"Crawl delay robots.txt melampaui batas job.",
+					);
 				crawlDelays.set(origin, Math.max(CRAWL_REQUEST_GAP_MS, delay));
 				return content;
 			},
@@ -204,7 +237,11 @@ export async function runExtractionJob(
 						.where(scrapeClaimPredicate(claim))
 						.for("update")
 						.limit(1);
-					if (!owner) throw new Error("Job lease sudah tidak berlaku.");
+					if (!owner)
+						throw new ScrapeError(
+							"STORAGE_FAILED",
+							"Job lease sudah tidak berlaku.",
+						);
 					await tx
 						.insert(scrapePages)
 						.values({ ...page, userId: claim.userId, scrapeId: claim.id })
@@ -243,9 +280,28 @@ export async function runExtractionJob(
 				});
 			},
 		});
-		if (!results.some((page) => page.status === "completed"))
-			throw new Error("Tidak ada halaman yang berhasil diambil.");
+		if (!results.some((page) => page.status === "completed")) {
+			// No page completed, so the run's failure is classified from the
+			// evidence each page actually produced.
+			const failure = classifyCrawlFailures(
+				results.map((page) => ({
+					code: page.failureCode ?? null,
+					httpStatus: page.httpStatus,
+				})),
+			);
+			throw new ScrapeError(
+				failure.code,
+				"Tidak ada halaman yang berhasil diambil.",
+				{
+					...(failure.httpStatus === undefined
+						? {}
+						: { httpStatus: failure.httpStatus }),
+				},
+			);
+		}
 	} else if (request.mode === "images") {
+		const allowUrl = createImageSitePolicy(claim.signal);
+		await allowUrl(request.url);
 		// Distinguishes a page that genuinely has no images from a discovery
 		// failure. The browser capture already succeeded by this point, so an
 		// empty candidate list is a real observation, while a missing list means
@@ -296,73 +352,116 @@ export async function runExtractionJob(
 		);
 		const validImages: typeof images = [];
 		let failedImages = 0;
+		const failedResources: FailedResourceEvidence[] = [];
+		const loadResults = () =>
+			db
+				.select({
+					url: scrapeImages.url,
+					assetId: scrapeImages.assetId,
+					failureCode: scrapeImages.failureCode,
+					httpStatus: scrapeImages.httpStatus,
+				})
+				.from(scrapeImages)
+				.where(
+					and(
+						eq(scrapeImages.userId, claim.userId),
+						eq(scrapeImages.scrapeId, claim.id),
+					),
+				);
+		const initialCounts = imageResultCounts(await loadResults(), images);
 		await update({
 			status: "extracting",
 			metadata: {
 				...scrape.metadata,
 				mode: "images",
 				imageDiscovery: images.length ? "found" : "none",
-				discoveredImages: images.length,
-				processedImages: 0,
+				imageStorage: "postgres-private",
+				...initialCounts,
 			},
 		});
 		for (const image of images) {
 			let error: string | null = null;
+			let imageAsset: Awaited<ReturnType<typeof fetchAsset>> | undefined;
+			let failureCode: string | null = null;
+			let failureEvidence: FailedResourceEvidence = {
+				code: null,
+				httpStatus: null,
+			};
 			try {
-				const asset = await fetchImageAsset(image.url, claim.signal);
+				const asset = await fetchImageAsset(image.url, claim.signal, allowUrl);
 				if (asset.status < 200 || asset.status >= 300)
-					throw new Error(`HTTP ${asset.status}`);
-				if (!/^image\//i.test(asset.contentType) || !asset.body.length)
-					throw new Error("Resource bukan gambar yang valid.");
-				image.format = asset.contentType
+					throw new ScrapeError(
+						designErrorCodeForHttpStatus(asset.status),
+						`HTTP ${asset.status}`,
+						{
+							httpStatus: asset.status,
+							retryAfterSeconds: parseRetryAfterSeconds(asset.retryAfter),
+						},
+					);
+				const verified = validateStoredImage(asset.body, asset.contentType);
+				image.format = verified.mimeType
 					.split(";")[0]
 					.replace(/^image\//i, "")
 					.replace("svg+xml", "svg")
 					.replace("jpeg", "jpg");
+				await persistScrapeImage(
+					claim,
+					{
+						...image,
+						pageUrl: captured.finalUrl,
+						status: "completed",
+						error: null,
+						failureCode: null,
+						httpStatus: asset.status,
+					},
+					asset,
+				);
+				imageAsset = asset;
 				validImages.push(image);
 			} catch (failure) {
 				if (claim.signal?.aborted) throw failure;
 				failedImages += 1;
+				failureCode =
+					failure instanceof ImageStorageError
+						? failure.assetCode
+						: failure instanceof ScrapeError
+							? failure.code
+							: "STORAGE_FAILED";
 				error =
 					failure instanceof Error
 						? failure.message
 						: "Resource gagal diambil.";
+				// Only parsed statuses and typed codes are recorded, so the
+				// aggregate classification never reads message text.
+				failureEvidence = {
+					code: failure instanceof ScrapeError ? failure.code : null,
+					httpStatus:
+						failure instanceof ScrapeError && failure.httpStatus !== undefined
+							? failure.httpStatus
+							: null,
+				};
+				failedResources.push(failureEvidence);
 			}
-			await db.transaction(async (tx) => {
-				const [owner] = await tx
-					.select({ id: scrapes.id })
-					.from(scrapes)
-					.where(scrapeClaimPredicate(claim))
-					.for("update")
-					.limit(1);
-				if (!owner) throw new Error("Job lease sudah tidak berlaku.");
-				await tx
-					.insert(scrapeImages)
-					.values({
-						...image,
-						pageUrl: captured.finalUrl,
-						userId: claim.userId,
-						scrapeId: claim.id,
-						status: error ? "failed" : "completed",
-						error,
-					})
-					.onConflictDoUpdate({
-						target: [
-							scrapeImages.userId,
-							scrapeImages.scrapeId,
-							scrapeImages.url,
-						],
-						set: { ...image, status: error ? "failed" : "completed", error },
-					});
-			});
+			if (!imageAsset) {
+				const saved = await persistScrapeImage(claim, {
+					...image,
+					pageUrl: captured.finalUrl,
+					status: "failed",
+					error,
+					failureCode,
+					httpStatus: failureEvidence.httpStatus,
+				});
+				if (saved.assetId) {
+					failedImages -= 1;
+					failedResources.pop();
+					validImages.push(image);
+				}
+			}
 			await update({
 				metadata: {
 					...scrape.metadata,
 					mode: "images",
-					discoveredImages: images.length,
-					processedImages: validImages.length + failedImages,
-					savedImages: validImages.length,
-					failedResources: failedImages,
+					...imageResultCounts(await loadResults(), images),
 					activity: image.url,
 					activityStartedAt: new Date().toISOString(),
 				},
@@ -370,28 +469,46 @@ export async function runExtractionJob(
 		}
 		// Every distinct outcome is reported honestly instead of collapsing into
 		// one generic completion: an empty page, a partial result and a total
-		// verification failure are different facts about the run.
+		// verification failure are different facts about the run. When every
+		// asset failed, the failure is classified from the evidence each fetch
+		// actually produced instead of one generic message.
+		const finalRows = await loadResults();
+		const finalCounts = imageResultCounts(finalRows, images);
 		const imageOutcome = classifyImageOutcome(
-			images.length,
-			validImages.length,
+			finalCounts.discoveredImages,
+			finalCounts.savedImages,
 		);
-		if (imageOutcome === "all-failed")
-			throw new ScrapeError(
-				"NO_ANALYZABLE_CONTENT",
-				`Seluruh ${failedImages} resource gambar gagal diverifikasi. Detail kegagalan tersimpan.`,
+		if (imageOutcome === "all-failed") {
+			const failure = classifyImageFailures(
+				finalRows
+					.filter((row) => !row.assetId)
+					.map((row) => ({
+						code: row.failureCode?.endsWith("STORAGE_QUOTA")
+							? "STORAGE_FAILED"
+							: row.failureCode,
+						httpStatus: row.httpStatus,
+					})),
 			);
+			throw new ScrapeError(
+				failure.code,
+				`Seluruh ${failedImages} resource gambar gagal diverifikasi. Detail kegagalan tersimpan.`,
+				{
+					...(failure.httpStatus === undefined
+						? {}
+						: { httpStatus: failure.httpStatus }),
+				},
+			);
+		}
 		await update({
 			sourceUrl: captured.finalUrl,
 			metadata: {
 				...scrape.metadata,
 				mode: "images",
 				imageOutcome,
-				discoveredImages: images.length,
-				processedImages: validImages.length + failedImages,
-				savedImages: validImages.length,
-				failedResources: failedImages,
+				...finalCounts,
 			},
 		});
-	} else throw new Error("Mode extraction tidak sesuai.");
+	} else
+		throw new ScrapeError("UNEXPECTED_ERROR", "Mode extraction tidak sesuai.");
 	await update({ status: "completed" });
 }

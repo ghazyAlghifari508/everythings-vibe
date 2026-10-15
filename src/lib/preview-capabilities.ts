@@ -12,6 +12,7 @@ const TOKEN_MAX_CHARS = 8192;
 const TOKEN_DOMAIN = "everythings-vibe/scrape-preview-asset/v1\0";
 
 export interface PreviewAssetClaims {
+	imageId?: string;
 	scrapeId: string;
 	ownerId: string;
 	target: string;
@@ -19,6 +20,7 @@ export interface PreviewAssetClaims {
 }
 
 export interface PreviewAssetExpected {
+	allowExpired?: boolean;
 	now?: number;
 	scrapeId?: string;
 	ownerId?: string;
@@ -62,7 +64,10 @@ export function issuePreviewAssetCapability(
 	secret = process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET ?? "",
 	now = Date.now(),
 ): string {
-	const target = canonicalTarget(claims.target);
+	const target = claims.imageId
+		? storedTarget(claims.imageId)
+		: canonicalTarget(claims.target);
+	if (claims.target !== target) throw new Error("Invalid capability target");
 	if (
 		!claims.scrapeId ||
 		claims.scrapeId.length > 200 ||
@@ -75,7 +80,11 @@ export function issuePreviewAssetCapability(
 	)
 		throw new Error("Invalid preview capability claims");
 	const payload = Buffer.from(
-		JSON.stringify({ v: TOKEN_VERSION, ...claims, target }),
+		JSON.stringify({
+			...claims,
+			v: claims.imageId ? 2 : TOKEN_VERSION,
+			target,
+		}),
 		"utf8",
 	).toString("base64url");
 	const token = `${payload}.${signature(payload, secret).toString("base64url")}`;
@@ -114,7 +123,7 @@ export function verifyPreviewAssetCapability(
 		const data = value as Record<string, unknown>;
 		const now = expected.now ?? Date.now();
 		if (
-			data.v !== TOKEN_VERSION ||
+			(data.v !== TOKEN_VERSION && data.v !== 2) ||
 			typeof data.scrapeId !== "string" ||
 			!data.scrapeId ||
 			data.scrapeId.length > 200 ||
@@ -124,11 +133,18 @@ export function verifyPreviewAssetCapability(
 			typeof data.target !== "string" ||
 			typeof data.expiresAt !== "number" ||
 			!Number.isSafeInteger(data.expiresAt) ||
-			data.expiresAt <= now ||
+			(!expected.allowExpired && data.expiresAt <= now) ||
 			data.expiresAt - now > SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS
 		)
 			return null;
-		const target = canonicalTarget(data.target);
+		const imageId =
+			data.v === 2 && typeof data.imageId === "string"
+				? data.imageId
+				: undefined;
+		if (data.v === 2 && !imageId) return null;
+		const target = imageId
+			? storedTarget(imageId)
+			: canonicalTarget(data.target);
 		if (
 			target !== data.target ||
 			(expected.scrapeId !== undefined &&
@@ -138,6 +154,7 @@ export function verifyPreviewAssetCapability(
 		)
 			return null;
 		return {
+			...(imageId ? { imageId } : {}),
 			scrapeId: data.scrapeId,
 			ownerId: data.ownerId,
 			target,
@@ -146,6 +163,33 @@ export function verifyPreviewAssetCapability(
 	} catch {
 		return null;
 	}
+}
+
+function storedTarget(imageId: string): string {
+	if (!/^[A-Za-z0-9_-]{1,200}$/.test(imageId))
+		throw new Error("Invalid image identity");
+	return `stored-image:${imageId}`;
+}
+
+export function storedImageAssetUrl(
+	imageId: string,
+	scrapeId: string,
+	ownerId: string,
+	now = Date.now(),
+	secret?: string,
+): string {
+	const cap = issuePreviewAssetCapability(
+		{
+			imageId,
+			target: storedTarget(imageId),
+			scrapeId,
+			ownerId,
+			expiresAt: now + SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS,
+		},
+		secret,
+		now,
+	);
+	return `/api/scrape/asset?cap=${encodeURIComponent(cap)}`;
 }
 
 export function capabilityUrl(

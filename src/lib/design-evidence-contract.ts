@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { designSettingsSchema, SCRAPE_LIMITS } from "./scrape-contract";
 
 export const DESIGN_EVIDENCE_LIMITS = {
 	elements: 250,
@@ -9,7 +10,19 @@ export const DESIGN_EVIDENCE_LIMITS = {
 	selectorChars: 4000,
 } as const;
 
-export const visualEvidenceSchema = z.strictObject({
+export const DESIGN_DETAILED_EVIDENCE_LIMITS = {
+	...DESIGN_EVIDENCE_LIMITS,
+	elements: 500,
+	scanElements: 10000,
+	fonts: 100,
+	variables: 200,
+} as const;
+
+export type DesignEvidenceLimits = {
+	[Key in keyof typeof DESIGN_EVIDENCE_LIMITS]: number;
+};
+
+const visualViewSchema = z.strictObject({
 	version: z.literal(1),
 	sourceUrl: z.string().max(4096),
 	capturedAt: z.iso.datetime(),
@@ -37,7 +50,7 @@ export const visualEvidenceSchema = z.strictObject({
 					.optional(),
 			}),
 		)
-		.max(DESIGN_EVIDENCE_LIMITS.elements),
+		.max(DESIGN_DETAILED_EVIDENCE_LIMITS.elements),
 	fonts: z
 		.array(
 			z.strictObject({
@@ -46,8 +59,17 @@ export const visualEvidenceSchema = z.strictObject({
 				status: z.enum(["unloaded", "loading", "loaded", "error"]),
 			}),
 		)
-		.max(DESIGN_EVIDENCE_LIMITS.fonts),
+		.max(DESIGN_DETAILED_EVIDENCE_LIMITS.fonts),
 	limitations: z.array(z.string().max(1000)).max(20),
+	colorScheme: z.enum(["auto", "light", "dark"]).optional(),
+});
+
+export const visualEvidenceSchema = visualViewSchema.extend({
+	settings: designSettingsSchema.optional(),
+	additionalViews: z
+		.array(visualViewSchema)
+		.max(SCRAPE_LIMITS.designViews - 1)
+		.optional(),
 });
 
 export type ValidatedVisualEvidence = z.infer<typeof visualEvidenceSchema>;

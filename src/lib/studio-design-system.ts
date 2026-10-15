@@ -100,6 +100,7 @@ export function extractDesignSystemTokens(
 			!colors.ink &&
 			(role.includes("primary text") ||
 				role.includes("dominant text") ||
+				role.includes("base text") ||
 				role.includes("ink") ||
 				name.toLowerCase().includes("ink") ||
 				name.toLowerCase().includes("black"))
@@ -142,17 +143,31 @@ export function extractDesignSystemTokens(
 		text.match(/\*\*Font:\*\*\s*([A-Za-z0-9 _-]+)/i) ||
 		text.match(/###\s*([A-Za-z0-9 _-]+?)(?:\s*—|\s*\()/i);
 
-	if (fontMatch?.[1]) {
-		const rawFont = fontMatch[1].trim();
+	const setFontFamily = (rawFont: string): void => {
+		const family = rawFont.trim();
 		// Exclude generic headings
 		if (
 			!/^(tokens|typography|colors|spacing|components|do's|dont's)/i.test(
-				rawFont,
+				family,
 			)
 		) {
-			typography.fontFamily = `'${rawFont}', system-ui, -apple-system, sans-serif`;
-			typography.googleFontUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(rawFont).replace(/%20/g, "+")}:wght@400;500;600;700&display=swap`;
+			typography.fontFamily = `'${family}', system-ui, -apple-system, sans-serif`;
+			typography.googleFontUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, "+")}:wght@400;500;600;700&display=swap`;
 		}
+	};
+
+	if (fontMatch?.[1]) {
+		setFontFamily(fontMatch[1]);
+	} else {
+		// The model renderer lists one "### Family" heading per measured
+		// typeface inside the Fonts & Type Scale section.
+		const fontsSection = text.match(
+			/## Fonts & Type Scale([\s\S]*?)(?=\n## |$)/,
+		);
+		const heading = fontsSection?.[1].match(
+			/^###\s+([A-Za-z][A-Za-z0-9 _.-]*)\s*$/m,
+		);
+		if (heading?.[1]) setFontFamily(heading[1]);
 	}
 
 	// 3. Extract Border Radius
@@ -161,8 +176,10 @@ export function extractDesignSystemTokens(
 		/###\s*Border\s*Radius[\s\S]*?(?=###|##|$)/i,
 	);
 	if (radiusSection?.[0]) {
+		// Values may be wrapped in backticks by the model renderer, and contexts
+		// may be multi-word labels such as "Large cards".
 		const radRows = radiusSection[0].matchAll(
-			/\|\s*([a-zA-Z0-9_-]+)\s*\|\s*([0-9.]+(?:px|rem|%))\s*\|/g,
+			/\|\s*([A-Za-z][A-Za-z0-9 _-]*?)\s*\|\s*`?([0-9.]+(?:px|rem|%))`?\s*\|/g,
 		);
 		for (const m of radRows) {
 			const key = m[1].toLowerCase().trim();
