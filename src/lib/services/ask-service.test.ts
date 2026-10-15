@@ -198,6 +198,39 @@ describe("parseAskOptionsJson", () => {
 		).toBeNull();
 	});
 
+	it("rejects duplicate question ids", () => {
+		expect(
+			parseAskOptionsJson(
+				JSON.stringify({
+					questions: [
+						{ id: "filter_scope", question: "Scope?", type: "text" },
+						{ id: "filter_scope", question: "Scope 2?", type: "text" },
+						{ id: "other", question: "Other?", type: "text" },
+					],
+				}),
+			),
+		).toBeNull();
+	});
+
+	it("rejects duplicate options within a question", () => {
+		expect(
+			parseAskOptionsJson(
+				JSON.stringify({
+					questions: [
+						{
+							id: "filter_type",
+							question: "Filter type?",
+							type: "select",
+							options: ["Single", "single", "Multi"],
+						},
+						{ id: "other_1", question: "Other 1?", type: "text" },
+						{ id: "other_2", question: "Other 2?", type: "text" },
+					],
+				}),
+			),
+		).toBeNull();
+	});
+
 	it("rejects a missing id", () => {
 		expect(
 			parseAskOptionsJson(

@@ -245,6 +245,9 @@ export function CodebaseChatWorkspace({
 	const [draft, setDraft] = useState("");
 	const [copiedCmd, setCopiedCmd] = useState(false);
 	const [copiedExport, setCopiedExport] = useState(false);
+	const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
+		null,
+	);
 	const parsedStarterSuggestions =
 		codebaseStarterSuggestionsSchema.safeParse(starterSuggestions);
 	const validStarterSuggestions = parsedStarterSuggestions.success
@@ -707,18 +710,29 @@ export function CodebaseChatWorkspace({
 									) : null}
 								</div>
 							) : null}
-							{visibleQuestions.map((question, qIndex) => (
-								<CodebaseAdaptiveQuestion
-									key={question.id}
-									question={question}
-									index={qIndex + 1}
-									submitted={(answers[question.id] ?? "").trim()}
-									active={qIndex === currentIndex}
-									onSubmit={(questionId, answer) =>
-										onSubmitAnswer?.(questionId, answer)
-									}
-								/>
-							))}
+							{visibleQuestions.map((question, qIndex) => {
+								const isEditing = editingQuestionId === question.id;
+								const isActive =
+									isEditing ||
+									(editingQuestionId === null && qIndex === currentIndex);
+								return (
+									<CodebaseAdaptiveQuestion
+										key={question.id}
+										question={question}
+										index={qIndex + 1}
+										totalQuestions={questions.length}
+										submitted={(answers[question.id] ?? "").trim()}
+										active={isActive}
+										isEditing={isEditing}
+										onEdit={(qId) => setEditingQuestionId(qId)}
+										onCancelEdit={() => setEditingQuestionId(null)}
+										onSubmit={(questionId, answer) => {
+											setEditingQuestionId(null);
+											onSubmitAnswer?.(questionId, answer);
+										}}
+									/>
+								);
+							})}
 							{streamArtifacts.length > 0 ? (
 								<div className="flex flex-col">
 									{streamArtifacts.map((artifact) => (

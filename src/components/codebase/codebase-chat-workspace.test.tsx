@@ -1233,6 +1233,89 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 		expect(q2Radios?.length).toBeGreaterThan(0);
 		expect([...(q2Radios ?? [])].every((input) => !input.disabled)).toBe(true);
 	});
+
+	it("shows the progress counter on the active question card", () => {
+		renderWorkspace({
+			questions: sampleQuestions,
+			answers: { q1: "Database relasional" },
+		});
+		const q2 = container.querySelector("[data-testid='adaptive-question-q2']");
+		expect(q2?.textContent).toContain("2 dari 2");
+	});
+
+	it("allows editing a previously answered question via the Ubah button", () => {
+		const onSubmitAnswer = vi.fn();
+		renderWorkspace({
+			questions: sampleQuestions,
+			answers: { q1: "Database relasional" },
+			onSubmitAnswer,
+		});
+
+		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
+		const ubahBtn = [...(q1?.querySelectorAll("button") ?? [])].find((b) =>
+			/Ubah/.test(b.textContent ?? ""),
+		);
+		expect(ubahBtn).toBeDefined();
+
+		// Click Ubah
+		act(() => {
+			ubahBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		// Now q1 is in editing mode with radio buttons revealed
+		const q1Updated = container.querySelector(
+			"[data-testid='adaptive-question-q1']",
+		);
+		const radio2 = q1Updated?.querySelector<HTMLInputElement>(
+			"input[type='radio'][value='q1-opt2']",
+		);
+		expect(radio2).not.toBeNull();
+
+		act(() => {
+			radio2?.click();
+		});
+
+		const submit = [...(q1Updated?.querySelectorAll("button") ?? [])].find(
+			(b) => /Kirim Jawaban|Konfirmasi/.test(b.textContent ?? ""),
+		);
+		act(() => {
+			submit?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(onSubmitAnswer).toHaveBeenCalledWith("q1", "Penyimpanan lokal");
+	});
+
+	it("allows cancelling an edit without changing the answer", () => {
+		renderWorkspace({
+			questions: sampleQuestions,
+			answers: { q1: "Database relasional" },
+		});
+
+		const q1 = container.querySelector("[data-testid='adaptive-question-q1']");
+		const ubahBtn = [...(q1?.querySelectorAll("button") ?? [])].find((b) =>
+			/Ubah/.test(b.textContent ?? ""),
+		);
+
+		act(() => {
+			ubahBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		const batalBtn = [...(container.querySelectorAll("button") ?? [])].find(
+			(b) => /Batal/.test(b.textContent ?? ""),
+		);
+		expect(batalBtn).toBeDefined();
+
+		act(() => {
+			batalBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		// Restores to compact completed line
+		const q1Restored = container.querySelector(
+			"[data-testid='adaptive-question-q1']",
+		);
+		expect(q1Restored?.querySelector("input[type='radio']")).toBeNull();
+		expect(q1Restored?.textContent).toContain("Jawaban: Database relasional");
+	});
 });
 
 describe("CodebaseChatWorkspace confirmation and spec errors", () => {

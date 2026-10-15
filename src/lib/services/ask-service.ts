@@ -45,10 +45,14 @@ export function validateAskQuestions(value: unknown): AskQuestion[] | null {
 	// unbounded options array, and every string must carry visible
 	// content (whitespace-only renders blank and breaks answer lookup).
 	const validated: AskQuestion[] = [];
+	const seenIds = new Set<string>();
 
 	for (const q of value as Array<Record<string, unknown>>) {
 		if (typeof q?.id !== "string" || !q.id.trim() || q.id.length > MAX_ID_CHARS)
 			return null;
+		const cleanId = q.id.trim();
+		if (seenIds.has(cleanId)) return null;
+		seenIds.add(cleanId);
 		if (
 			typeof q?.question !== "string" ||
 			!q.question.trim() ||
@@ -71,6 +75,12 @@ export function validateAskQuestions(value: unknown): AskQuestion[] | null {
 			)
 				return null;
 			options = q.options.map((o: string) => o.trim());
+			const seenOpts = new Set<string>();
+			for (const opt of options) {
+				const lower = opt.toLowerCase();
+				if (seenOpts.has(lower)) return null;
+				seenOpts.add(lower);
+			}
 		}
 		// A recommendation is only honored on a single-select question, and
 		// only when the model supplied an in-range index AND a non-empty

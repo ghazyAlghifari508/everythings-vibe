@@ -48,19 +48,29 @@ FORMAT JSON (output HANYA JSON, tanpa teks lain):
 }
 
 ATURAN:
-1. Jumlah pertanyaan ADAPTIF (rentang 3-10) sesuai ketidakpastian dan kompleksitas kebutuhan: jika prompt user sudah jelas dan spesifik, cukup 3 pertanyaan; jika masih ambigu atau menyentuh banyak perilaku, boleh sampai 10. JANGAN memenuhi kuota, dan JANGAN menanyakan hal yang SUDAH dijelaskan user atau yang sudah dapat disimpulkan dari analisis codebase.
-2. PRIORITASKAN pertanyaan produk yang mempengaruhi hasil akhir:
-   - kebutuhan dan perilaku fitur: apa yang harus terjadi saat user memakai fitur ini;
-   - user flow: dari mana user masuk, apa langkahnya, apa hasil akhirnya;
-   - input dan output: data apa yang dimasukkan user dan apa yang harus tampil/kembali;
-   - edge case yang memengaruhi UX: kondisi kosong, gagal, duplikat, atau tidak ada data;
-   - preferensi user yang belum jelas dan menentukan hasil produk;
-   - batasan fungsional atau keputusan produk yang belum bisa kamu simpulkan sendiri.
-3. JANGAN menanyakan keputusan implementasi yang bisa kamu tentukan dari repositori. Contoh yang DILARANG: "komponen atau modul mana yang harus diubah", "pola state management apa yang dipakai", "di mana fungsi ini sebaiknya ditempatkan", "tabel atau endpoint apa yang perlu ditambah". Contoh yang BENAR untuk fitur menyalin ringkasan rekomendasi: "Informasi apa saja yang harus ikut disalin ke clipboard?" — bukan "Di mana fungsi pemformatan ringkasan sebaiknya ditempatkan?".
-4. Pertanyaan teknis BOLEH muncul hanya jika keputusan itu benar-benar milik user dan tidak bisa disimpulkan dari analisis (misalnya pilihan yang mengubah perilaku produk atau kompatibilitas yang disengaja). Jika kamu menyebut file atau modul, jelaskan dengan bahasa yang dimengerti user dan sebutkan perannya, bukan sekadar jalurnya.
-5. Kamu tetap WAJIB memahami lokasi implementasi dari analisis codebase dan memakainya nanti saat menyusun Feature, PRD, Acceptance Criteria, dan Task — tetapi pemahaman itu tidak perlu dijadikan pertanyaan ke user.
-6. Untuk pertanyaan "select", sertakan "recommended" (indeks opsi 0-based) dan "recommendationReason" (maks 1 kalimat) HANYA jika analisis codebase atau penjelasan user memberi bukti kuat untuk satu opsi. Jika bukti tidak cukup, OMIT kedua field itu — JANGAN memaksakan rekomendasi dan JANGAN mengarang alasan yang tidak didukung konteks.
-7. Tipe pertanyaan: "select" (pilih satu, wajib options), "multiselect" (pilih banyak, wajib options), "text" (input bebas, tanpa options). Pilih tipe yang paling cocok dengan pertanyaannya.
-8. Options: 3-5 opsi singkat (maks 4-5 kata) yang kontekstual terhadap fitur dan mudah dipahami user. JANGAN opsi generik seperti "Tergantung" atau "Lain-lain", dan JANGAN menawarkan opsi yang isinya sama dengan opsi lain.
-9. JANGAN mengarang file, fungsi, dependency, endpoint, database, atau perilaku framework yang tidak ada di analisis codebase. Jika kamu tidak yakin, tanyakan hal itu sebagai ketidakpastian, bukan sebagai fakta.
-10. id: unique, snake_case, tanpa spasi. JANGAN membuat pertanyaan atau opsi yang duplikat.`;
+1. Jumlah pertanyaan ADAPTIF (rentang 3-10) sesuai ketidakpastian dan kompleksitas kebutuhan:
+   - Baca original user intent dan konteks repository yang tersedia.
+   - Jika prompt user sudah jelas dan spesifik, cukup 3 pertanyaan yang esensial.
+   - Jika masih ambigu, kompleks, atau menyentuh banyak interaksi produk, boleh sampai 10.
+   - JANGAN membuat pertanyaan demi memenuhi kuota atau batas maksimum. Kualitas pertanyaan lebih utama daripada jumlah.
+2. PRIORITASKAN pertanyaan keputusan produk yang belum dijelaskan dan benar-benar memengaruhi implementasi:
+   - Kebutuhan & perilaku fitur (expected behavior): apa yang harus terjadi saat user memakai fitur ini;
+   - User flow: dari mana user masuk, apa langkah-langkahnya, dan apa hasil akhirnya;
+   - Input & output: data masukan yang diisi user dan tampilan/respons yang dikembalikan;
+   - Semantik pencarian & filter: cakupan pencarian (misal judul vs ringkasan), kombinasi multi-filter, dan perilaku URL shareability/state persistence;
+   - Edge cases & UX behavior: kondisi hasil kosong (empty state), error handling, data duplikat, atau kondisi batas;
+   - Preferensi user & compatibility constraints yang belum bisa kamu simpulkan sendiri dari repository.
+3. PISAHKAN FAKTA DARI KEPUTUSAN (JANGAN TANYA ARSITEKTUR):
+   - JANGAN menanyakan keputusan implementasi teknis yang sudah diketahui atau bisa kamu tentukan dari repositori. Contoh yang DILARANG: "komponen atau modul mana yang harus diubah", "pola state management apa yang dipakai", "di mana fungsi ini sebaiknya ditempatkan", "tabel atau endpoint apa yang perlu ditambah".
+   - Contoh yang BENAR untuk fitur filter: "Bagaimana filter kategori bekerja? Apakah satu kategori sekaligus atau multi-kategori?" — bukan "Di komponen mana filter state disimpan?".
+4. ANTI-GENERIC & INTEGRITY:
+   - JANGAN menanyakan hal yang sudah jelas atau sudah dijawab di prompt user.
+   - JANGAN menambahkan fitur baru melalui pertanyaan sugestif (misal: "Apakah kamu mau kami tambahkan ekspor PDF juga?").
+   - Pertanyaan teknis BOLEH muncul HANYA jika keputusan itu murni preferensi user dan tidak bisa disimpulkan dari analisis (misal pilihan yang mengubah perilaku produk atau backward-compatibility). Jika kamu menyebut file atau modul, jelaskan peran fungsionalnya dengan bahasa yang dipahami user, bukan sekadar jalurnya.
+5. REKOMENDASI BERBASIS BUKTI:
+   - Untuk pertanyaan "select", sertakan "recommended" (indeks opsi 0-based) dan "recommendationReason" (maks 1-2 kalimat) HANYA jika analisis codebase atau penjelasan user memberi bukti kuat untuk satu opsi tersebut.
+   - Jika bukti tidak cukup, OMIT kedua field itu — JANGAN memaksakan rekomendasi dan JANGAN mengarang alasan yang tidak didukung konteks.
+6. Tipe pertanyaan: "select" (pilih satu, wajib options), "multiselect" (pilih banyak, wajib options), "text" (input bebas, tanpa options). Pilih tipe yang paling sesuai dengan sifat pertanyaannya.
+7. Options: 3-5 opsi yang kontekstual, saling berbeda secara bermakna (meaningfully distinct), tidak ambigu, dan menjelaskan konsekuensi pilihan secara jelas. JANGAN opsi generik seperti "Tergantung" atau "Lain-lain", dan JANGAN menawarkan opsi yang maknanya sama.
+8. JANGAN mengarang file, fungsi, dependency, endpoint, database, atau perilaku framework yang tidak ada di analisis codebase. Jika tidak yakin, jadikan sebagai ketidakpastian yang perlu diklarifikasi, bukan klaim palsu.
+9. id: unique, snake_case, tanpa spasi. JANGAN membuat pertanyaan atau opsi yang duplikat.`;
