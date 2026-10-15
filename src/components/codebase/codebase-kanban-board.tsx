@@ -1,6 +1,5 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type TaskCard, useKanbanTasks } from "@/hooks/use-kanban-polling";
@@ -8,6 +7,7 @@ import { computeKanbanProgress } from "@/lib/kanban-utils";
 
 interface CodebaseKanbanBoardProps {
 	projectId: string | null;
+	codebaseId?: string;
 	columns?: {
 		pending: TaskCard[];
 		in_progress: TaskCard[];
@@ -100,6 +100,7 @@ function Column({ title, cards, highlightInProgress }: ColumnSpec) {
  */
 export function CodebaseKanbanBoard({
 	projectId,
+	codebaseId,
 	columns: columnsProp,
 	staleness: stalenessProp,
 	isLoadingExternal,
@@ -345,15 +346,20 @@ export function CodebaseKanbanBoard({
 							</div>
 						) : null}
 						{canOpenFullBoard ? (
-							<Link
-								to="/kanban/$id"
-								params={{ id: projectId }}
+							<a
+								href={
+									codebaseId
+										? `/codebases/${encodeURIComponent(codebaseId)}/kanban/${encodeURIComponent(projectId)}`
+										: `/kanban/${encodeURIComponent(projectId)}`
+								}
+								target="_blank"
+								rel="noopener noreferrer"
 								data-testid="codebase-kanban-full-board"
 								className="inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-charcoal px-2 text-[11px] font-medium text-mist transition hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 							>
 								<ExternalLink size={12} aria-hidden="true" />
 								Buka Kanban Penuh
-							</Link>
+							</a>
 						) : null}
 					</div>
 				</div>

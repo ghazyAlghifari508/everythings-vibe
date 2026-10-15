@@ -11,31 +11,6 @@ declare global {
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock("@tanstack/react-router", async (importOriginal) => {
-	const actual =
-		await importOriginal<typeof import("@tanstack/react-router")>();
-	return {
-		...actual,
-		// A real Link needs a router context; the board only needs the resolved
-		// target to be reachable and observable, so `$id` is substituted here
-		// exactly like the router would.
-		Link: ({
-			to,
-			params,
-			children,
-			...rest
-		}: {
-			to: string;
-			params?: { id: string };
-			children: React.ReactNode;
-		}) => (
-			<a href={to.replace("$id", params?.id ?? "")} {...rest}>
-				{children}
-			</a>
-		),
-	};
-});
-
 let container: HTMLDivElement;
 let root: Root | null = null;
 
@@ -171,6 +146,19 @@ describe("CodebaseKanbanBoard full board action", () => {
 		expect(link).not.toBeNull();
 		expect(link?.textContent).toContain("Buka Kanban Penuh");
 		expect(link?.getAttribute("href")).toBe("/kanban/proj-1");
+		expect(link?.getAttribute("target")).toBe("_blank");
+		expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+	});
+
+	it("opens an existing-codebase project at its dedicated route in a new tab", () => {
+		render({ codebaseId: "repo-1" });
+		const link = container.querySelector<HTMLAnchorElement>(
+			"[data-testid='codebase-kanban-full-board']",
+		);
+
+		expect(link?.getAttribute("href")).toBe("/codebases/repo-1/kanban/proj-1");
+		expect(link?.getAttribute("target")).toBe("_blank");
+		expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
 	});
 
 	it("hides the full board link when the route would redirect for the plan", () => {
