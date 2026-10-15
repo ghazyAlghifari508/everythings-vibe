@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { ScrapeMode } from "@/db/schema";
+import { imageCountsLabel, type imageResultCounts } from "@/lib/scrape-images";
 import { displaySiteName } from "@/lib/site-name";
 
 export interface ScrapeHistoryItem {
@@ -20,6 +21,7 @@ export interface ScrapeHistoryItem {
 	status: string;
 	mode?: ScrapeMode;
 	createdAt: string;
+	imageCounts?: ReturnType<typeof imageResultCounts>;
 }
 
 export const SCRAPE_STATUS_INDONESIAN_LABELS: Record<string, string> = {
@@ -147,6 +149,11 @@ export function ScrapeHistoryList({
 								<span className="font-mono text-[11px] text-fog">
 									{modeLabel(item.mode)} · {statusLabel(item.status)}
 								</span>
+								{item.imageCounts && (
+									<span className="text-xs text-fog">
+										{imageCountsLabel(item.imageCounts)}
+									</span>
+								)}
 							</Link>
 
 							<ChevronRight

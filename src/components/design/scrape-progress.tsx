@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ScrapeErrorCard } from "@/components/design/scrape-error-card";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
 import { resolveScrapeErrorPresentation } from "@/lib/scrape-error-presentation";
+import type { imageResultCounts } from "@/lib/scrape-images";
 import { displaySiteName } from "@/lib/site-name";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ export interface ScrapeProgressProps {
 	processedImages?: number;
 	discoveredImages?: number;
 	savedImages?: number;
+	imageCounts?: ReturnType<typeof imageResultCounts>;
 	failedResources?: number;
 	workerHealth?: string | null;
 	// How many results are actually saved on disk, and how many resources failed.
@@ -263,10 +265,14 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 				]
 			: mode === "images"
 				? [
-						["Ditemukan", props.discoveredImages],
-						["Diproses", props.processedImages],
-						["Tersimpan", props.savedImages],
-						["Gagal", props.failedResources],
+						[
+							"Ditemukan",
+							props.imageCounts?.discovered ?? props.discoveredImages,
+						],
+						["Tersimpan", props.imageCounts?.persisted],
+						["Tautan terverifikasi", props.imageCounts?.linked],
+						["Gagal", props.imageCounts?.failed],
+						["Tertunda", props.imageCounts?.pending],
 					]
 				: [];
 	const visibleCounters = counters.filter(

@@ -27,6 +27,7 @@ import {
 	type ScrapeRequest,
 	scrapeRequestSchema,
 } from "@/lib/scrape-contract";
+import { imageResultCounts } from "@/lib/scrape-images";
 import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
 import {
 	assertScrapeRetryAllowed,
@@ -46,6 +47,7 @@ export interface ScrapeSummary {
 	mode: ScrapeMode;
 	status: string;
 	createdAt: Date;
+	imageCounts?: ReturnType<typeof imageResultCounts>;
 }
 
 export type ScrapePageRow = typeof scrapePages.$inferSelect;
@@ -691,6 +693,24 @@ export async function listScrapes(
 		.orderBy(desc(scrapes.createdAt))
 		.limit(limit);
 
+	const imageRows = rows.length
+		? await db
+				.select({
+					scrapeId: scrapeImages.scrapeId,
+					status: scrapeImages.status,
+					assetId: scrapeImages.assetId,
+				})
+				.from(scrapeImages)
+				.where(
+					and(
+						eq(scrapeImages.userId, userId),
+						inArray(
+							scrapeImages.scrapeId,
+							rows.map((row) => row.id),
+						),
+					),
+				)
+		: [];
 	return rows.map((r) => ({
 		id: r.id,
 		sourceUrl: r.sourceUrl,
@@ -699,6 +719,14 @@ export async function listScrapes(
 		mode: (r.mode ?? r.metadata?.mode ?? "design") as ScrapeMode,
 		status: r.status,
 		createdAt: r.createdAt,
+		...(r.mode === "images"
+			? {
+					imageCounts: imageResultCounts(
+						imageRows.filter((image) => image.scrapeId === r.id),
+						r.metadata?.discoveredImages,
+					),
+				}
+			: {}),
 	}));
 }
 

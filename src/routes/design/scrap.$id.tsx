@@ -18,6 +18,7 @@ import {
 	toScrapeStatusSnapshot,
 	useScrapeStatus,
 } from "@/hooks/use-scrape-status";
+import { imageResultCounts } from "@/lib/scrape-images";
 import { parseScrapeReturnSearch } from "@/lib/scrape-return-path";
 import { requireUserServer } from "@/lib/session";
 
@@ -282,7 +283,10 @@ function ScrapeDetailPage() {
 						imageDiscovery={data?.metadata?.imageDiscovery ?? null}
 						imageOutcome={data?.metadata?.imageOutcome ?? null}
 						discoveredImages={data?.metadata?.discoveredImages}
-						savedImages={data?.metadata?.savedImages}
+						imageCounts={imageResultCounts(
+							images,
+							data?.metadata?.discoveredImages,
+						)}
 						processedImages={data?.metadata?.processedImages}
 						failedResources={data?.metadata?.failedResources}
 						partialResults={
@@ -362,7 +366,10 @@ function ScrapeDetailPage() {
 					completedPages={data?.metadata?.completedPages}
 					skippedPages={data?.metadata?.skippedPages}
 					discoveredImages={data?.metadata?.discoveredImages}
-					savedImages={data?.metadata?.savedImages}
+					imageCounts={imageResultCounts(
+						images,
+						data?.metadata?.discoveredImages,
+					)}
 					failedResources={data?.metadata?.failedResources}
 					visitedPages={
 						data?.metadata?.visitedPages ?? initial.metadata?.visitedPages

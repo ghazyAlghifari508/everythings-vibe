@@ -19,6 +19,7 @@ const loadScrapesHistory = createServerFn({ method: "GET" }).handler(
 				title: row.title,
 				status: row.status,
 				mode: row.mode,
+				imageCounts: row.imageCounts,
 				createdAt: row.createdAt.toISOString(),
 			})),
 		};
