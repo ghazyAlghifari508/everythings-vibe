@@ -823,7 +823,11 @@ describe("read-only source preview contract", () => {
 	});
 
 	it("shares the existing right panel with artifacts and never mixes them", () => {
-		expect(detailSource).toContain(
+		const presentationSource = readFileSync(
+			"src/features/codebase/hooks/use-workspace-artifact-presentation.ts",
+			"utf8",
+		);
+		expect(presentationSource).toContain(
 			'const isSourcePreviewOpen = sourcePreview.kind !== "idle"',
 		);
 		expect(detailSource).toContain("onSelectFile={selectSourceFile}");
@@ -831,7 +835,10 @@ describe("read-only source preview contract", () => {
 		// Every artifact branch is gated off while a source file is open, so a
 		// stale document render can never sit next to stale source text.
 		expect(detailSource).toContain("!isSourcePreviewOpen && activeArtifact");
-		expect(detailSource.split("!isSourcePreviewOpen &&").length - 1).toBe(5);
+		expect(presentationSource.split("!isSourcePreviewOpen &&").length - 1).toBe(
+			4,
+		);
+		expect(detailSource.split("!isSourcePreviewOpen &&").length - 1).toBe(1);
 		expect(
 			readFileSync(
 				"src/features/codebase/components/workspace-screen-resolver.tsx",

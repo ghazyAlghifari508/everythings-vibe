@@ -7,8 +7,6 @@ import {
 	type PipelineStage,
 } from "@/components/codebase/codebase-chat-workspace";
 import { CodebaseExplorerSidebar } from "@/components/codebase/codebase-explorer-sidebar";
-import type { CodebaseArtifactRef } from "@/components/codebase/codebase-file-card";
-import { stripInternalSectionMarkers } from "@/components/codebase/codebase-markdown";
 import { CodebasePlanSwitcher } from "@/components/codebase/codebase-plan-switcher";
 import { CodebaseResyncDrawer } from "@/components/codebase/codebase-resync-drawer";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
@@ -17,6 +15,7 @@ import { WorkspaceConnectionScreen } from "@/features/codebase/components/worksp
 import { WorkspaceHeader } from "@/features/codebase/components/workspace-header";
 import { WorkspaceScreenResolver } from "@/features/codebase/components/workspace-screen-resolver";
 import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
+import { useWorkspaceArtifactPresentation } from "@/features/codebase/hooks/use-workspace-artifact-presentation";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
 import { useWorkspaceComposer } from "@/features/codebase/hooks/use-workspace-composer";
 import { useWorkspaceFeatureGeneration } from "@/features/codebase/hooks/use-workspace-feature-generation";
@@ -37,7 +36,6 @@ import {
 	resolvePersistedStage,
 	shouldAutoRevealArtifact,
 } from "@/lib/codebase-chat-flow";
-import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
 	assessRevisionImpact,
 	type CodebaseComposerMode,
@@ -299,62 +297,28 @@ function CodebaseDetailPage() {
 		setActiveArtifactId,
 		setCanvasOpen,
 	});
-	const featureSlug = useMemo(() => {
-		const base = (resolvedFeature?.name ?? codebase.name)
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-+|-+$/g, "")
-			.slice(0, 40);
-		return base || "fitur";
-	}, [resolvedFeature?.name, codebase.name]);
-	const artifacts = useMemo<CodebaseArtifactRef[]>(() => {
-		if (!resolvedFeature) return [];
-		const list: CodebaseArtifactRef[] = [];
-		if (featureTree) {
-			list.push({
-				id: `feature-${resolvedFeature.id}`,
-				fileName: `feature-${featureSlug}.json`,
-				fileSizeBytes: null,
-				badge: "FITUR",
-				description: `Spesifikasi fitur ${resolvedFeature.name}`,
-			});
-		}
-		if (prdContent) {
-			list.push({
-				id: `prd-${resolvedFeature.id}`,
-				fileName: `PRD-${featureSlug}.md`,
-				fileSizeBytes: null,
-				badge: "MARKDOWN",
-				description: "Dokumen PRD 8 seksi",
-			});
-		}
-		if (acContent) {
-			list.push({
-				id: `ac-${resolvedFeature.id}`,
-				fileName: `AC-${featureSlug}.md`,
-				fileSizeBytes: null,
-				badge: "MARKDOWN",
-				description: "Kriteria penerimaan formal",
-			});
-		}
-		if (hasTasksInDb) {
-			list.push({
-				id: `tasks-${resolvedFeature.id}`,
-				fileName: `tasks-${featureSlug}.json`,
-				fileSizeBytes: null,
-				badge: "KANBAN LIVE",
-				description: "Task tree dan papan Kanban live",
-			});
-		}
-		return list;
-	}, [
+	const {
+		artifacts,
+		activeArtifact,
+		isSourcePreviewOpen,
+		sourcePreviewPath,
+		isPrdArtifactActive,
+		isAcArtifactActive,
+		isFeatureArtifactActive,
+		isTasksArtifactActive,
+		canvasCopy,
+		handleDownloadArtifact,
+	} = useWorkspaceArtifactPresentation({
 		resolvedFeature,
+		codebaseName: codebase.name,
 		featureTree,
-		featureSlug,
-		hasTasksInDb,
+		taskTree,
 		prdContent,
 		acContent,
-	]);
+		hasTasksInDb,
+		activeArtifactId,
+		sourcePreview,
+	});
 	/**
 	 * What the next composer message means, mirroring `handleSendMessage` so
 	 * the label above the composer always names the real target.
@@ -372,77 +336,6 @@ function CodebaseDetailPage() {
 				: "clarify";
 	const composerTargetName =
 		composerMode === "create" ? null : (resolvedFeature?.name ?? null);
-	const activeArtifact =
-		artifacts.find((item) => item.id === activeArtifactId) ?? null;
-	const isSourcePreviewOpen = sourcePreview.kind !== "idle";
-	const sourcePreviewPath =
-		sourcePreview.kind === "idle" ? "" : sourcePreview.path;
-	const isPrdArtifactActive =
-		!isSourcePreviewOpen &&
-		Boolean(activeArtifact) &&
-		resolvedFeature != null &&
-		activeArtifact?.id === `prd-${resolvedFeature.id}`;
-	const isAcArtifactActive =
-		!isSourcePreviewOpen &&
-		Boolean(activeArtifact) &&
-		resolvedFeature != null &&
-		activeArtifact?.id === `ac-${resolvedFeature.id}`;
-	const isFeatureArtifactActive =
-		!isSourcePreviewOpen &&
-		Boolean(activeArtifact) &&
-		resolvedFeature != null &&
-		activeArtifact?.id === `feature-${resolvedFeature.id}`;
-	const isTasksArtifactActive =
-		!isSourcePreviewOpen &&
-		Boolean(activeArtifact) &&
-		resolvedFeature != null &&
-		activeArtifact?.id === `tasks-${resolvedFeature.id}`;
-
-	// One canonical copy target for the header toolbar. A truncated source
-	// preview has no complete content to copy, so it resolves to null and the
-	// action is disabled rather than copying a partial file as though it were
-	// whole.
-	const canvasCopy = useMemo((): {
-		value: string | null;
-		label?: string;
-		unavailableReason?: string;
-	} => {
-		if (isSourcePreviewOpen) {
-			if (sourcePreview.kind === "ready") {
-				return sourcePreview.truncated
-					? {
-							value: null,
-							label: "Salin isi sumber",
-							unavailableReason:
-								"Pratinjau dipotong — buka file di repository lokal untuk menyalin isi lengkap.",
-						}
-					: { value: sourcePreview.content, label: "Salin isi sumber" };
-			}
-			return { value: null };
-		}
-		if (!activeArtifact) return { value: null };
-		if (activeArtifact.id.startsWith("feature-") && featureTree) {
-			return { value: JSON.stringify(featureTree, null, 2) };
-		}
-		if (activeArtifact.id.startsWith("prd-") && prdContent) {
-			return { value: stripInternalSectionMarkers(prdContent) };
-		}
-		if (activeArtifact.id.startsWith("ac-") && acContent) {
-			return { value: stripInternalSectionMarkers(acContent) };
-		}
-		if (activeArtifact.id.startsWith("tasks-") && taskTree) {
-			return { value: JSON.stringify(taskTree, null, 2) };
-		}
-		return { value: null };
-	}, [
-		isSourcePreviewOpen,
-		sourcePreview,
-		activeArtifact,
-		featureTree,
-		prdContent,
-		acContent,
-		taskTree,
-	]);
 
 	/**
 	 * Whether a revision would replace tasks the user already progressed. The
@@ -591,45 +484,6 @@ function CodebaseDetailPage() {
 		pipelineStage,
 		handleConfirmGenerate,
 	});
-
-	const handleDownloadArtifact = useCallback(
-		(artifact: CodebaseArtifactRef) => {
-			if (!resolvedFeature) return;
-			const isJson = artifact.fileName.toLowerCase().endsWith(".json");
-			if (isJson) {
-				if (artifact.id.startsWith("feature-") && featureTree) {
-					downloadArtifact({
-						fileName: artifact.fileName,
-						content: JSON.stringify(featureTree, null, 2),
-						mimeType: artifactMimeTypeFor(artifact.fileName),
-					});
-				}
-				if (artifact.id.startsWith("tasks-") && taskTree) {
-					downloadArtifact({
-						fileName: artifact.fileName,
-						content: JSON.stringify(taskTree, null, 2),
-						mimeType: artifactMimeTypeFor(artifact.fileName),
-					});
-				}
-				return;
-			}
-			if (artifact.id.startsWith("prd-") && prdContent) {
-				downloadArtifact({
-					fileName: artifact.fileName,
-					content: stripInternalSectionMarkers(prdContent),
-					mimeType: artifactMimeTypeFor(artifact.fileName),
-				});
-			}
-			if (artifact.id.startsWith("ac-") && acContent) {
-				downloadArtifact({
-					fileName: artifact.fileName,
-					content: stripInternalSectionMarkers(acContent),
-					mimeType: artifactMimeTypeFor(artifact.fileName),
-				});
-			}
-		},
-		[resolvedFeature, featureTree, taskTree, prdContent, acContent],
-	);
 
 	if (snapshotReady) {
 		return (
