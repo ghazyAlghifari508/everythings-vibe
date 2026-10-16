@@ -1,4 +1,4 @@
-import type { HistoryItem } from "@/routes/history";
+import type { HistoryItem } from "@/lib/history";
 export function filterHistory(
 	items: HistoryItem[],
 	query: string,
