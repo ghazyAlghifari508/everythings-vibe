@@ -7,6 +7,7 @@ export interface StreamDoneContext {
 	chatMode: string;
 	projectId?: string;
 	streamingNaturalLanguage: string;
+	currentPrdContent?: string;
 	onProjectCreated?: (projectId: string) => void;
 	onPrdRevised?: (content: string) => void;
 	addMessage: (message: ChatMessage) => void;

@@ -25,7 +25,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 	reset: () => set(initialState),
 }));
 
-interface ChatMessage {
+export interface ChatMessage {
 	id: string;
 	role: "user" | "assistant" | "system";
 	content: string;
