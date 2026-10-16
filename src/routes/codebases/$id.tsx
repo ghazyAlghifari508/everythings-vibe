@@ -6,20 +6,16 @@ import {
 	CodebaseChatWorkspace,
 	type PipelineStage,
 } from "@/components/codebase/codebase-chat-workspace";
-import { CodebaseDocPreview } from "@/components/codebase/codebase-doc-preview";
 import { CodebaseExplorerSidebar } from "@/components/codebase/codebase-explorer-sidebar";
 import type { CodebaseArtifactRef } from "@/components/codebase/codebase-file-card";
-import { CodebaseKanbanBoard } from "@/components/codebase/codebase-kanban-board";
 import { stripInternalSectionMarkers } from "@/components/codebase/codebase-markdown";
 import { CodebasePlanSwitcher } from "@/components/codebase/codebase-plan-switcher";
 import { CodebaseResyncDrawer } from "@/components/codebase/codebase-resync-drawer";
-import { CodebaseSourcePreview } from "@/components/codebase/codebase-source-preview";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
 import { CodebaseWorkspaceSkeleton } from "@/components/codebase/codebase-workspace-skeleton";
-import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
-import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { WorkspaceConnectionScreen } from "@/features/codebase/components/workspace-connection-screen";
 import { WorkspaceHeader } from "@/features/codebase/components/workspace-header";
+import { WorkspaceScreenResolver } from "@/features/codebase/components/workspace-screen-resolver";
 import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
 import { useWorkspacePipeline } from "@/features/codebase/hooks/use-workspace-pipeline";
@@ -1048,7 +1044,6 @@ function CodebaseDetailPage() {
 	);
 
 	if (snapshotReady) {
-		const kanbanColumns = kanban.data?.columns ?? null;
 		return (
 			<main
 				data-testid="codebase-workspace-page"
@@ -1331,131 +1326,25 @@ function CodebaseDetailPage() {
 									) : undefined
 								}
 							>
-								{isSourcePreviewOpen ? (
-									sourcePreview.kind === "ready" ? (
-										<CodebaseSourcePreview
-											key={sourcePreview.path}
-											path={sourcePreview.path}
-											content={sourcePreview.content}
-											truncated={sourcePreview.truncated}
-											sizeBytes={sourcePreview.sizeBytes}
-										/>
-									) : sourcePreview.kind === "unsupported" ? (
-										<div
-											data-testid="codebase-source-unsupported"
-											className="flex h-full flex-col items-start justify-center gap-2 p-2"
-										>
-											<p className="text-sm font-semibold text-snow">
-												Pratinjau tidak tersedia
-											</p>
-											<p className="max-w-sm text-xs leading-5 text-fog">
-												{sourcePreview.path} bukan berkas teks atau melebihi
-												batas tampilan. Buka di repository lokal untuk
-												membacanya.
-											</p>
-										</div>
-									) : sourcePreview.kind === "unavailable" ? (
-										<div
-											data-testid="codebase-source-unavailable"
-											className="flex h-full flex-col items-start justify-center gap-2 p-2"
-										>
-											<p className="text-sm font-semibold text-snow">
-												File tidak ada di snapshot ini
-											</p>
-											<p className="max-w-sm text-xs leading-5 text-fog">
-												{sourcePreview.path} tidak pernah ter-sync, atau
-												snapshot sudah diganti. Sinkronkan ulang repository
-												untuk melihat isinya.
-											</p>
-										</div>
-									) : null
-								) : !activeArtifact || !resolvedFeature ? (
-									<div className="flex h-full flex-col items-start justify-center gap-3 p-2">
-										<p className="text-sm font-semibold text-snow">
-											Belum ada artefak terpilih
-										</p>
-										<p className="max-w-sm text-xs leading-5 text-fog">
-											Pilih file di panel kiri untuk membaca sourcecode, atau
-											FileCard di kolom chat untuk preview dokumen atau papan
-											Kanban langsung di sini.
-										</p>
-									</div>
-								) : isPrdArtifactActive ? (
-									prdContent ? (
-										<CodebaseDocPreview content={prdContent} />
-									) : null
-								) : isAcArtifactActive ? (
-									acContent ? (
-										<CodebaseDocPreview content={acContent} />
-									) : null
-								) : isTasksArtifactActive ? (
-									canvasView === "kanban" ? (
-										<CodebaseKanbanBoard
-											projectId={resolvedFeature.id}
-											codebaseId={codebase.id}
-											columns={kanbanColumns}
-											staleness={kanban.staleness}
-											isLoadingExternal={kanban.isLoading}
-											isErrorExternal={kanban.isError}
-											onRetryExternal={() => void kanban.refetch()}
-											canOpenFullBoard={canOpenFullBoard}
-										/>
-									) : (
-										<div
-											data-testid="codebase-checklist-tree"
-											className="h-full min-h-0"
-										>
-											<WhiteboardCanvas
-												projectName={resolvedFeature.name}
-												taskTree={taskTree}
-												featureTree={featureTree}
-											/>
-										</div>
-									)
-								) : isFeatureArtifactActive ? (
-									<div className="h-full min-h-0">
-										<FeatureMapCanvas
-											productName={resolvedFeature.name}
-											featureTree={featureTree}
-										/>
-									</div>
-								) : (
-									<div className="flex flex-col gap-3">
-										<div className="rounded-lg border border-graphite bg-charcoal p-3">
-											<p className="font-mono text-[11px] uppercase tracking-wider text-slate">
-												Fitur
-											</p>
-											<p className="mt-1 text-sm font-semibold text-snow">
-												{resolvedFeature.name}
-											</p>
-											<p className="mt-1 font-mono text-[11px] text-fog">
-												Project: {resolvedFeature.id}
-											</p>
-											{status?.snapshotId ? (
-												<p className="mt-1 font-mono text-[11px] text-fog">
-													Snapshot: {status.snapshotId}
-												</p>
-											) : null}
-										</div>
-										{analysisOutput?.impactAreas &&
-										analysisOutput.impactAreas.length > 0 ? (
-											<div className="rounded-lg border border-graphite bg-charcoal p-3">
-												<p className="font-mono text-[11px] uppercase tracking-wider text-slate">
-													Area dampak terdeteksi
-												</p>
-												<ul className="mt-1.5 flex list-disc flex-col gap-1 pl-5 text-xs leading-5 text-fog">
-													{analysisOutput.impactAreas.map((area) => (
-														<li key={area}>{area}</li>
-													))}
-												</ul>
-											</div>
-										) : null}
-										<p className="text-xs leading-5 text-fog">
-											Jawab pertanyaan klarifikasi di kolom chat, lalu pilih
-											Lanjut Bikin Fitur untuk menyusun spesifikasi.
-										</p>
-									</div>
-								)}
+								<WorkspaceScreenResolver
+									sourcePreview={sourcePreview}
+									activeArtifact={activeArtifact}
+									resolvedFeature={resolvedFeature}
+									isPrdArtifactActive={isPrdArtifactActive}
+									isAcArtifactActive={isAcArtifactActive}
+									isTasksArtifactActive={isTasksArtifactActive}
+									isFeatureArtifactActive={isFeatureArtifactActive}
+									prdContent={prdContent}
+									acContent={acContent}
+									canvasView={canvasView}
+									codebaseId={codebase.id}
+									kanban={kanban}
+									canOpenFullBoard={canOpenFullBoard}
+									taskTree={taskTree}
+									featureTree={featureTree}
+									snapshotId={status?.snapshotId}
+									impactAreas={analysisOutput?.impactAreas}
+								/>
 							</CodebaseArtifactCanvas>
 						}
 					/>

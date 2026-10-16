@@ -824,7 +824,12 @@ describe("read-only source preview contract", () => {
 		// stale document render can never sit next to stale source text.
 		expect(detailSource).toContain("!isSourcePreviewOpen && activeArtifact");
 		expect(detailSource.split("!isSourcePreviewOpen &&").length - 1).toBe(5);
-		expect(detailSource).toContain("<CodebaseSourcePreview");
+		expect(
+			readFileSync(
+				"src/features/codebase/components/workspace-screen-resolver.tsx",
+				"utf8",
+			),
+		).toContain("<CodebaseSourcePreview");
 		expect(detailSource).toContain('? "SUMBER"');
 	});
 });
