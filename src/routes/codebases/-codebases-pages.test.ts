@@ -628,7 +628,12 @@ describe("composer message routing without intent choice", () => {
 		"utf8",
 	);
 	const workspaceSource =
-		readFileSync("src/routes/codebases/$id.tsx", "utf8") + revisionSource;
+		readFileSync("src/routes/codebases/$id.tsx", "utf8") +
+		revisionSource +
+		readFileSync(
+			"src/features/codebase/hooks/use-workspace-composer.ts",
+			"utf8",
+		);
 	const chatSource = readFileSync("src/routes/api/chat.ts", "utf8");
 
 	it("routes a message by workspace state instead of a per-message choice", () => {

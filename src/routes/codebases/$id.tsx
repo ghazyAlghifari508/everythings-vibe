@@ -18,6 +18,7 @@ import { WorkspaceHeader } from "@/features/codebase/components/workspace-header
 import { WorkspaceScreenResolver } from "@/features/codebase/components/workspace-screen-resolver";
 import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
+import { useWorkspaceComposer } from "@/features/codebase/hooks/use-workspace-composer";
 import { useWorkspaceFeatureGeneration } from "@/features/codebase/hooks/use-workspace-feature-generation";
 import { useWorkspaceGenerationActions } from "@/features/codebase/hooks/use-workspace-generation-actions";
 import { useWorkspacePipeline } from "@/features/codebase/hooks/use-workspace-pipeline";
@@ -443,72 +444,6 @@ function CodebaseDetailPage() {
 		taskTree,
 	]);
 
-	const ensureFeatureInWorkspace = useCallback(
-		async (message: string): Promise<string | null> => {
-			const trimmed = message.trim();
-			if (!snapshotReady || trimmed.length < 3 || isWorking) return null;
-			setIsWorking(true);
-			setError(null);
-			try {
-				const response = await fetch(
-					`/api/codebases/${encodeURIComponent(codebase.id)}/features`,
-					{
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ message: trimmed }),
-					},
-				);
-				const body: unknown = await response.json().catch(() => null);
-				if (
-					!response.ok ||
-					typeof body !== "object" ||
-					body === null ||
-					!("projectId" in body) ||
-					typeof body.projectId !== "string"
-				) {
-					setError("Fitur gagal dibuat. Coba lagi.");
-					return null;
-				}
-				const created = body as { projectId: string; name?: unknown };
-				const newFeature = {
-					id: created.projectId,
-					name:
-						typeof created.name === "string" && created.name.trim()
-							? created.name.trim()
-							: codebase.name,
-					featuresStatus: "pending",
-				};
-				setActiveFeature(newFeature);
-				setPipelineStage("questions");
-				setFeatureTree(null);
-				setTaskTree(null);
-				setPrdContent(null);
-				setAcContent(null);
-				setChatAnswers({});
-				return created.projectId;
-			} catch {
-				setError("Server tidak dapat dihubungi.");
-				return null;
-			} finally {
-				setIsWorking(false);
-			}
-		},
-		[
-			snapshotReady,
-			isWorking,
-			codebase.id,
-			codebase.name,
-			setFeatureTree,
-			setTaskTree,
-			setPrdContent,
-			setAcContent,
-			setError,
-			setIsWorking,
-			setChatAnswers,
-			setActiveFeature,
-		],
-	);
-
 	/**
 	 * Whether a revision would replace tasks the user already progressed. The
 	 * impact is computed from the real Kanban rows, so the warning names actual
@@ -585,67 +520,29 @@ function CodebaseDetailPage() {
 		setRun,
 	});
 
-	const handleCreateFeature = useCallback(() => {
-		setIsCreatingNew(true);
-	}, [setIsCreatingNew]);
-
-	/**
-	 * Direct a new composer message without ever asking what it is for.
-	 *
-	 * A message in a user-facing plan stays with that plan: it revises real
-	 * planning, or clarifies a draft that has none yet. A new project is only
-	 * created from the explicit "Buat fitur baru" action, from an empty
-	 * repository, or from the onboarding anchor that still carries no planning
-	 * — never silently from an ambiguous message in an existing plan.
-	 */
-	const handleSendMessage = useCallback(
-		async (message: string) => {
-			const trimmed = message.trim();
-			if (!trimmed || trimmed.length < 3) return;
-			setChatMessages((current) => [
-				...current,
-				{
-					id: `user-${Date.now()}`,
-					role: "user" as const,
-					content: trimmed,
-				},
-			]);
-			const activeIsAnchor =
-				effectiveFeatureId != null &&
-				effectiveFeatureId === onboardingFeatureId;
-			const activeHasPlanning = artifacts.length > 0;
-			if (
-				isCreatingNew ||
-				!effectiveFeatureId ||
-				(activeIsAnchor && !activeHasPlanning)
-			) {
-				setLastFeaturePrompt(trimmed);
-				const projectId = await ensureFeatureInWorkspace(trimmed);
-				if (projectId) {
-					setIsCreatingNew(false);
-					void fetchAiQuestions(projectId, trimmed);
-				}
-				return;
-			}
-			if (activeHasPlanning) {
-				await runRevision(trimmed);
-				return;
-			}
-			setLastFeaturePrompt(trimmed);
-			void fetchAiQuestions(effectiveFeatureId, trimmed);
-		},
-		[
-			artifacts.length,
-			effectiveFeatureId,
-			ensureFeatureInWorkspace,
-			fetchAiQuestions,
-			isCreatingNew,
-			onboardingFeatureId,
-			runRevision,
-			setLastFeaturePrompt,
-			setIsCreatingNew,
-		],
-	);
+	const { handleCreateFeature, handleSendMessage } = useWorkspaceComposer({
+		codebase,
+		snapshotReady,
+		isWorking,
+		setIsWorking,
+		setError,
+		setActiveFeature,
+		setPipelineStage,
+		setFeatureTree,
+		setTaskTree,
+		setPrdContent,
+		setAcContent,
+		setChatAnswers,
+		setChatMessages,
+		effectiveFeatureId,
+		onboardingFeatureId,
+		artifactCount: artifacts.length,
+		isCreatingNew,
+		setIsCreatingNew,
+		setLastFeaturePrompt,
+		fetchAiQuestions,
+		runRevision,
+	});
 
 	const { isConfirming, specError, setSpecError, handleConfirmGenerate } =
 		useWorkspaceFeatureGeneration({
