@@ -543,8 +543,12 @@ describe("workspace resume after refresh", () => {
 	});
 
 	it("never runs two pipeline generations at once", () => {
-		expect(workspaceSource).toContain("stageRunInFlight");
-		expect(workspaceSource).toMatch(
+		const pipelineSource = readFileSync(
+			"src/features/codebase/hooks/use-workspace-pipeline.ts",
+			"utf8",
+		);
+		expect(pipelineSource).toContain("stageRunInFlight");
+		expect(pipelineSource).toMatch(
 			/if \(!effectiveFeatureId \|\| stageBusy \|\| stageRunInFlight\.current\) return/,
 		);
 	});

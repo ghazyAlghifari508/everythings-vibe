@@ -24,6 +24,7 @@ import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
 import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
+import { useWorkspacePipeline } from "@/features/codebase/hooks/use-workspace-pipeline";
 import { useWorkspaceQuestions } from "@/features/codebase/hooks/use-workspace-questions";
 import { useWorkspaceSource } from "@/features/codebase/hooks/use-workspace-source";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
@@ -42,7 +43,6 @@ import {
 	appendRunThinking,
 	buildFeatureMessage,
 	type CodebasePipelineStage,
-	type CodebaseRunStage,
 	type CodebaseRunState,
 	reconcilePipelineStage,
 	resetRunThinking,
@@ -297,12 +297,6 @@ function CodebaseDetailPage() {
 		useState<PipelineStage>("questions");
 	const [stageBusy, setStageBusy] = useState<PipelineStage | null>(null);
 	const [stageError, setStageError] = useState<string | null>(null);
-	/**
-	 * Guards a pipeline generation against a duplicate submit from the same
-	 * render, where `stageBusy` state has not re-rendered yet. A second request
-	 * would burn another credit for an artifact that is already being produced.
-	 */
-	const stageRunInFlight = useRef(false);
 
 	const kanban = useKanbanTasks({
 		projectId: effectiveFeatureId ?? "",
@@ -941,71 +935,14 @@ function CodebaseDetailPage() {
 		openArtifactPreview,
 	]);
 
-	const runPipelineStage = useCallback(
-		async (
-			target: CodebaseRunStage,
-			url: string,
-			init: RequestInit,
-			onSuccess: () => Promise<boolean>,
-		) => {
-			if (!effectiveFeatureId || stageBusy || stageRunInFlight.current) return;
-			const requestedProjectId = effectiveFeatureId;
-			stageRunInFlight.current = true;
-			setStageBusy(target);
-			setStageError(null);
-			// One honest Thinking surface for this request. `startedAt` is the
-			// real client start; the model's streamed reasoning and the settle
-			// outcome are filled from the stream's own events.
-			setRun(startRun(target, Date.now()));
-			try {
-				const response = await fetch(url, init);
-				const result = await consumeSseStream(response, {
-					onThinking: (text) =>
-						setRun((current) => appendRunThinking(current, text)),
-					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
-					onDelta: () =>
-						setRun((current) => setRunPhase(current, "generating")),
-				});
-				if (activeProjectIdRef.current !== requestedProjectId) return;
-				if (result.error) {
-					const failure = result.error;
-					setStageError(failure);
-					setRun((current) =>
-						settleRun(current, "failed", Date.now(), failure),
-					);
-					return;
-				}
-				// A completed stream is not yet a usable artifact: the caller
-				// reloads the authoritative server state and reports whether the
-				// artifact really persisted.
-				const persisted = await onSuccess();
-				if (activeProjectIdRef.current !== requestedProjectId) return;
-				if (!persisted) {
-					setRun((current) =>
-						settleRun(
-							current,
-							"failed",
-							Date.now(),
-							"Hasil generasi belum tersimpan di server. Coba generate ulang.",
-						),
-					);
-					return;
-				}
-				setRun((current) => settleRun(current, "done", Date.now()));
-			} catch {
-				if (activeProjectIdRef.current !== requestedProjectId) return;
-				const message = "Server tidak dapat dihubungi. Coba lagi.";
-				setStageError(message);
-				setRun((current) => settleRun(current, "failed", Date.now(), message));
-			} finally {
-				stageRunInFlight.current = false;
-				if (activeProjectIdRef.current === requestedProjectId) {
-					setStageBusy(null);
-				}
-			}
-		},
-		[effectiveFeatureId, stageBusy, activeProjectIdRef],
-	);
+	const runPipelineStage = useWorkspacePipeline({
+		effectiveFeatureId,
+		stageBusy,
+		activeProjectIdRef,
+		setStageBusy,
+		setStageError,
+		setRun,
+	});
 
 	const handleGeneratePrd = useCallback(() => {
 		if (!effectiveFeatureId) return;
