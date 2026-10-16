@@ -446,7 +446,10 @@ describe("codebase library readiness vs workspace availability", () => {
 });
 
 describe("codebase detail incomplete sync handling", () => {
-	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const detailSource = readFileSync(
+		"src/features/codebase/components/workspace-connection-screen.tsx",
+		"utf8",
+	);
 
 	it("renders ScreenConnect only when a payload or loading state exists", () => {
 		expect(detailSource).toContain("payload !== null || isStarting");
