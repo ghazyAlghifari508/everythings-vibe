@@ -563,9 +563,9 @@ describe("automatic artifact preview", () => {
 	it("reveals an artifact only after the server state was reloaded", () => {
 		// Each reveal sits in the success branch of a loader that had to return
 		// real content first, so no reveal can be reached from a failure path.
-		const feature = workspaceSource.slice(
-			workspaceSource.indexOf("const handleConfirmGenerate"),
-			workspaceSource.indexOf("const runPipelineStage"),
+		const feature = readFileSync(
+			"src/features/codebase/hooks/use-workspace-feature-generation.ts",
+			"utf8",
 		);
 		expect(feature).toMatch(
 			/reloadFeatureTree: \(\) => refreshFeatureTree[\s\S]*?openArtifactPreview\("feature"\)/,

@@ -18,16 +18,14 @@ import { WorkspaceHeader } from "@/features/codebase/components/workspace-header
 import { WorkspaceScreenResolver } from "@/features/codebase/components/workspace-screen-resolver";
 import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
+import { useWorkspaceFeatureGeneration } from "@/features/codebase/hooks/use-workspace-feature-generation";
 import { useWorkspacePipeline } from "@/features/codebase/hooks/use-workspace-pipeline";
 import { useWorkspacePlan } from "@/features/codebase/hooks/use-workspace-plan";
 import { useWorkspaceQuestions } from "@/features/codebase/hooks/use-workspace-questions";
 import { useWorkspaceRevision } from "@/features/codebase/hooks/use-workspace-revision";
 import { useWorkspaceSource } from "@/features/codebase/hooks/use-workspace-source";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
-import {
-	buildAskHandoffAnswers,
-	decideCodebaseDetailEntry,
-} from "@/features/codebase/utils/workspace-contracts";
+import { decideCodebaseDetailEntry } from "@/features/codebase/utils/workspace-contracts";
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
 import {
@@ -36,11 +34,7 @@ import {
 	type CodebaseRunState,
 	reconcilePipelineStage,
 	resolvePersistedStage,
-	runConfirmGenerate,
-	serializeAskQuestions,
-	settleRun,
 	shouldAutoRevealArtifact,
-	startRun,
 } from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
@@ -145,7 +139,6 @@ function CodebaseDetailPage() {
 	 * shows exactly one honest Thinking surface per operation.
 	 */
 	const [run, setRun] = useState<CodebaseRunState | null>(null);
-	const [isConfirming, setIsConfirming] = useState(false);
 	const {
 		analysis,
 		activeWorkspaceSnapshotId,
@@ -533,8 +526,6 @@ function CodebaseDetailPage() {
 		return assessRevisionImpact(all.map((task) => ({ status: task.status })));
 	}, [kanban.data]);
 
-	const [specError, setSpecError] = useState<string | null>(null);
-
 	const pushAssistantMessage = useCallback((content: string) => {
 		setChatMessages((current) => [
 			...current,
@@ -656,128 +647,21 @@ function CodebaseDetailPage() {
 		],
 	);
 
-	const handleConfirmGenerate = useCallback(async () => {
-		if (!effectiveFeatureId || isConfirming) return;
-		setIsConfirming(true);
-		setSpecError(null);
-		setStageError(null);
-		setRun(startRun("feature", Date.now()));
-		try {
-			const answersList = buildAskHandoffAnswers(chatAnswers, aiQuestions);
-			const outcome = await runConfirmGenerate({
-				// Persistence is a hard precondition for generation: an unsaved
-				// handoff would leave the Feature/PRD/AC/Task generators without
-				// the user's answers, so a failed save blocks generation.
-				saveHandoff: async () => {
-					try {
-						const response = await fetch("/api/ask/options", {
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify({
-								projectId: effectiveFeatureId,
-								action: "save-handoff",
-								handoff: {
-									projectId: effectiveFeatureId,
-									answers: answersList,
-									state: {
-										prompt:
-											lastFeaturePrompt.trim() ||
-											resolvedFeature?.name ||
-											"Fitur baru",
-										platform: "web",
-										session: 1,
-										questions: serializeAskQuestions(aiQuestions),
-									},
-								},
-							}),
-						});
-						return response.ok;
-					} catch {
-						return false;
-					}
-				},
-				generateFeature: async () => {
-					try {
-						const response = await fetch("/api/features/generate", {
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify({ projectId: effectiveFeatureId }),
-						});
-						return { status: response.status };
-					} catch {
-						return { status: 0 };
-					}
-				},
-				// A 200 alone does not prove the artifact persisted: reload the
-				// authoritative tree and only advance when it is actually there.
-				reloadFeatureTree: () => refreshFeatureTree(effectiveFeatureId),
-			});
-
-			if (outcome.kind === "handoff_failed") {
-				const message =
-					"Jawaban gagal disimpan, jadi spesifikasi tidak dibuat. Coba lagi.";
-				setSpecError(message);
-				setRun((current) => settleRun(current, "failed", Date.now(), message));
-				return;
-			}
-			if (outcome.kind === "spec_failed") {
-				const message = "Spesifikasi fitur gagal dibuat. Coba lagi.";
-				setSpecError(message);
-				setRun((current) => settleRun(current, "failed", Date.now(), message));
-				return;
-			}
-			if (outcome.kind === "generating") {
-				// The server still owns the in-flight generation: this is not a
-				// finished run, so the Thinking surface stays running until the
-				// persisted tree can actually be reloaded.
-				pushAssistantMessage(
-					`Pohon fitur ${resolvedFeature?.name ?? "fitur"} sedang disusun. Tunggu sebentar lalu klik Buat Spesifikasi Fitur lagi untuk memuat hasilnya.`,
-				);
-				setRun((current) =>
-					settleRun(
-						current,
-						"failed",
-						Date.now(),
-						"Generasi masih berjalan di server. Coba muat ulang sebentar lagi.",
-					),
-				);
-				return;
-			}
-			if (outcome.kind === "not_persisted") {
-				const message =
-					"Spesifikasi fitur belum tersimpan di server. Coba lagi sebentar lagi.";
-				setSpecError(message);
-				setRun((current) => settleRun(current, "failed", Date.now(), message));
-				return;
-			}
-			setPipelineStage("feature");
-			setRun((current) => settleRun(current, "done", Date.now()));
-			const specMessage = buildFeatureMessage(
-				resolvedFeature?.name ?? codebase.name,
-				chatAnswers,
-			);
-			pushAssistantMessage(
-				`Pohon fitur ${resolvedFeature?.name ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}`,
-			);
-			// The artifact is confirmed persisted (the tree reloaded above), so
-			// the canvas opens on it. A manual panel interaction is respected by
-			// openArtifactPreview, which never fights the user for focus.
-			openArtifactPreview("feature");
-		} finally {
-			setIsConfirming(false);
-		}
-	}, [
-		effectiveFeatureId,
-		isConfirming,
-		chatAnswers,
-		aiQuestions,
-		lastFeaturePrompt,
-		resolvedFeature?.name,
-		codebase.name,
-		refreshFeatureTree,
-		pushAssistantMessage,
-		openArtifactPreview,
-	]);
+	const { isConfirming, specError, setSpecError, handleConfirmGenerate } =
+		useWorkspaceFeatureGeneration({
+			effectiveFeatureId,
+			chatAnswers,
+			aiQuestions,
+			lastFeaturePrompt,
+			featureName: resolvedFeature?.name,
+			codebaseName: codebase.name,
+			refreshFeatureTree,
+			pushAssistantMessage,
+			openArtifactPreview,
+			setPipelineStage,
+			setStageError,
+			setRun,
+		});
 
 	const runPipelineStage = useWorkspacePipeline({
 		effectiveFeatureId,
