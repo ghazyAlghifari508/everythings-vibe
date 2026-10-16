@@ -571,25 +571,29 @@ describe("automatic artifact preview", () => {
 			/reloadFeatureTree: \(\) => refreshFeatureTree[\s\S]*?openArtifactPreview\("feature"\)/,
 		);
 
-		const prd = workspaceSource.slice(
-			workspaceSource.indexOf("const handleGeneratePrd"),
-			workspaceSource.indexOf("const handleGenerateAc"),
+		const generationSource = readFileSync(
+			"src/features/codebase/hooks/use-workspace-generation-actions.ts",
+			"utf8",
+		);
+		const prd = generationSource.slice(
+			generationSource.indexOf("const handleGeneratePrd"),
+			generationSource.indexOf("const handleGenerateAc"),
 		);
 		expect(prd).toMatch(
 			/const content = await loadPrd\(\)[\s\S]*?if \(!content\)[\s\S]*?return false;[\s\S]*?openArtifactPreview\("prd"\)/,
 		);
 
-		const ac = workspaceSource.slice(
-			workspaceSource.indexOf("const handleGenerateAc"),
-			workspaceSource.indexOf("const handleGenerateTask"),
+		const ac = generationSource.slice(
+			generationSource.indexOf("const handleGenerateAc"),
+			generationSource.indexOf("const handleGenerateTask"),
 		);
 		expect(ac).toMatch(
 			/const content = await loadAc\(\)[\s\S]*?if \(!content\)[\s\S]*?return false;[\s\S]*?openArtifactPreview\("ac"\)/,
 		);
 
-		const task = workspaceSource.slice(
-			workspaceSource.indexOf("const handleGenerateTask"),
-			workspaceSource.indexOf("const handleRetryStage"),
+		const task = generationSource.slice(
+			generationSource.indexOf("const handleGenerateTask"),
+			generationSource.indexOf("const handleRetryStage"),
 		);
 		expect(task).toMatch(
 			/const persistedTaskTree = await refreshTaskTree[\s\S]*?if \(!persistedTaskTree\)[\s\S]*?return false;[\s\S]*?openArtifactPreview\("tasks"\)/,

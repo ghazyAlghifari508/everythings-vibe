@@ -19,6 +19,7 @@ import { WorkspaceScreenResolver } from "@/features/codebase/components/workspac
 import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
 import { useWorkspaceFeatureGeneration } from "@/features/codebase/hooks/use-workspace-feature-generation";
+import { useWorkspaceGenerationActions } from "@/features/codebase/hooks/use-workspace-generation-actions";
 import { useWorkspacePipeline } from "@/features/codebase/hooks/use-workspace-pipeline";
 import { useWorkspacePlan } from "@/features/codebase/hooks/use-workspace-plan";
 import { useWorkspaceQuestions } from "@/features/codebase/hooks/use-workspace-questions";
@@ -29,7 +30,6 @@ import { decideCodebaseDetailEntry } from "@/features/codebase/utils/workspace-c
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
 import {
-	buildFeatureMessage,
 	type CodebasePipelineStage,
 	type CodebaseRunState,
 	reconcilePipelineStage,
@@ -672,142 +672,28 @@ function CodebaseDetailPage() {
 		setRun,
 	});
 
-	const handleGeneratePrd = useCallback(() => {
-		if (!effectiveFeatureId) return;
-		const message = buildFeatureMessage(
-			resolvedFeature?.name ?? codebase.name,
-			chatAnswers,
-		);
-		void runPipelineStage(
-			"prd",
-			"/api/chat",
-			{
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					projectId: effectiveFeatureId,
-					mode: "generate",
-					message,
-				}),
-			},
-			async () => {
-				const content = await loadPrd();
-				if (!content) {
-					setStageError("PRD belum tersimpan di server. Coba generate ulang.");
-					return false;
-				}
-				setPipelineStage("prd");
-				pushAssistantMessage(
-					`PRD 8 seksi untuk ${resolvedFeature?.name ?? "fitur"} siap.`,
-				);
-				openArtifactPreview("prd");
-				return true;
-			},
-		);
-	}, [
-		effectiveFeatureId,
-		resolvedFeature?.name,
-		codebase.name,
-		chatAnswers,
-		runPipelineStage,
-		loadPrd,
-		pushAssistantMessage,
-		openArtifactPreview,
-	]);
-
-	const handleGenerateAc = useCallback(() => {
-		if (!effectiveFeatureId) return;
-		void runPipelineStage(
-			"ac",
-			"/api/ac/generate",
-			{
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ projectId: effectiveFeatureId }),
-			},
-			async () => {
-				const content = await loadAc();
-				if (!content) {
-					setStageError(
-						"Acceptance Criteria belum tersimpan di server. Coba generate ulang.",
-					);
-					return false;
-				}
-				setPipelineStage("ac");
-				pushAssistantMessage(
-					`Acceptance Criteria untuk ${resolvedFeature?.name ?? "fitur"} siap.`,
-				);
-				openArtifactPreview("ac");
-				return true;
-			},
-		);
-	}, [
-		effectiveFeatureId,
-		resolvedFeature?.name,
-		runPipelineStage,
-		loadAc,
-		pushAssistantMessage,
-		openArtifactPreview,
-	]);
-
-	const handleGenerateTask = useCallback(() => {
-		if (!effectiveFeatureId) return;
-		void runPipelineStage(
-			"task",
-			"/api/task/generate",
-			{
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ projectId: effectiveFeatureId }),
-			},
-			async () => {
-				await kanban.refetch();
-				const persistedTaskTree = await refreshTaskTree(effectiveFeatureId);
-				if (!persistedTaskTree) {
-					setStageError(
-						"Task belum tersimpan di server. Coba breakdown task ulang.",
-					);
-					return false;
-				}
-				setPipelineStage("handoff");
-				pushAssistantMessage(
-					`Task untuk ${resolvedFeature?.name ?? "fitur"} sudah tersimpan dan papan Kanban aktif.`,
-				);
-				openArtifactPreview("tasks");
-				return true;
-			},
-		);
-	}, [
-		effectiveFeatureId,
-		resolvedFeature?.name,
-		runPipelineStage,
-		kanban,
-		refreshTaskTree,
-		pushAssistantMessage,
-		openArtifactPreview,
-	]);
-
-	const handleRetryStage = useCallback(() => {
-		if (pipelineStage === "prd") {
-			handleGeneratePrd();
-			return;
-		}
-		if (pipelineStage === "ac") {
-			handleGenerateAc();
-			return;
-		}
-		if (pipelineStage === "task" || pipelineStage === "handoff") {
-			handleGenerateTask();
-			return;
-		}
-		void handleConfirmGenerate();
-	}, [
-		pipelineStage,
+	const {
 		handleGeneratePrd,
 		handleGenerateAc,
 		handleGenerateTask,
+		handleRetryStage,
+	} = useWorkspaceGenerationActions({
+		effectiveFeatureId,
+		featureName: resolvedFeature?.name,
+		codebaseName: codebase.name,
+		chatAnswers,
+		runPipelineStage,
+		loadPrd,
+		loadAc,
+		refreshTaskTree,
+		refetchKanban: kanban.refetch,
+		setStageError,
+		setPipelineStage,
+		pushAssistantMessage,
+		openArtifactPreview,
+		pipelineStage,
 		handleConfirmGenerate,
-	]);
+	});
 
 	const handleDownloadArtifact = useCallback(
 		(artifact: CodebaseArtifactRef) => {
