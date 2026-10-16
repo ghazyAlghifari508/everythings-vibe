@@ -22,6 +22,7 @@ import { ScreenIncompleteSync } from "@/components/codebase/screen-incomplete-sy
 import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
 import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
+import { useWorkspaceAnalysis } from "@/features/codebase/hooks/use-workspace-analysis";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
 import {
@@ -45,11 +46,7 @@ import {
 	resolveActivePlan,
 	selectUserFacingPlans,
 } from "@/lib/codebase-active-plan";
-import {
-	type AnalysisResponse,
-	codebaseStarterSuggestionsSchema,
-	safeParseCodebaseAnalysis,
-} from "@/lib/codebase-analysis";
+import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
 import {
 	resolveWorkspaceSnapshotIdentity,
 	shouldDiscardWorkspaceAnalysis,
@@ -99,10 +96,7 @@ import {
 	syncPromptPayloadSchema,
 	syncStatusResponseSchema,
 } from "@/lib/codebase-sync";
-import {
-	matchesWorkspaceAnalysis,
-	shouldFetchWorkspaceAnalysis,
-} from "@/lib/codebase-workspace-analysis";
+import { shouldFetchWorkspaceAnalysis } from "@/lib/codebase-workspace-analysis";
 import {
 	emptyArtifactHydration,
 	resolveWorkspaceView,
@@ -263,109 +257,29 @@ function CodebaseDetailPage() {
 	const [lastFeaturePrompt, setLastFeaturePrompt] = useState("");
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
-	const [analysis, setAnalysis] = useState<AnalysisResponse | null>(() =>
-		matchesWorkspaceAnalysis(
-			initialAnalysis,
-			onboardingFeature?.id ?? "",
-			currentSnapshotId ?? "",
-		)
-			? initialAnalysis
-			: null,
-	);
 	const [error, setError] = useState<string | null>(null);
 	const [isStarting, setIsStarting] = useState(false);
 	const [isWorking, setIsWorking] = useState(false);
 	const inFlight = useRef(false);
-	const analysisAttemptedFor = useRef<string | null>(null);
-	const analysisReadInFlight = useRef(new Set<string>());
-	const analysisRefreshInFlight = useRef(false);
-	const activeWorkspaceSnapshotId = resolveWorkspaceSnapshotIdentity({
-		persistedSnapshotId: currentSnapshotId ?? null,
+	const {
+		analysis,
+		setAnalysis,
+		analysisAttemptedFor,
+		analysisIdentityRef,
+		activeWorkspaceSnapshotId,
+		triggerAnalysis,
+		readWorkspaceAnalysis,
+		isRefreshingStarterSuggestions,
+		starterRefreshError,
+		refreshStarterSuggestions,
+	} = useWorkspaceAnalysis({
+		projectId: onboardingFeature?.id ?? null,
+		currentSnapshotId,
 		polledSnapshotId: status?.snapshotId ?? null,
+		initialAnalysis,
+		setError,
+		setIsWorking,
 	});
-	const analysisIdentity = `${onboardingFeature?.id ?? ""}:${activeWorkspaceSnapshotId ?? ""}`;
-	const analysisIdentityRef = useRef(analysisIdentity);
-	analysisIdentityRef.current = analysisIdentity;
-
-	const triggerAnalysis = useCallback(
-		async (snapshotId: string) => {
-			if (!onboardingFeature?.id) return;
-			const requestIdentity = `${onboardingFeature.id}:${snapshotId}`;
-			if (analysisAttemptedFor.current === requestIdentity) return;
-			analysisAttemptedFor.current = requestIdentity;
-			setIsWorking(true);
-			setError(null);
-			try {
-				const response = await fetch(
-					`/api/v1/projects/${encodeURIComponent(onboardingFeature.id)}/codebase/analysis`,
-					{
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ snapshotId }),
-					},
-				);
-				const body: unknown = await response.json().catch(() => null);
-				const parsed = safeParseAnalysisResponse(body);
-				if (
-					!response.ok ||
-					!parsed ||
-					!matchesWorkspaceAnalysis(parsed, onboardingFeature.id, snapshotId)
-				) {
-					if (analysisIdentityRef.current === requestIdentity) {
-						setError("Analisis codebase gagal. Coba analisis ulang.");
-					}
-					return;
-				}
-				if (analysisIdentityRef.current === requestIdentity)
-					setAnalysis(parsed);
-			} catch {
-				if (analysisIdentityRef.current === requestIdentity) {
-					setError("Server tidak dapat dihubungi.");
-				}
-			} finally {
-				setIsWorking(false);
-			}
-		},
-		[onboardingFeature?.id],
-	);
-
-	const readWorkspaceAnalysis = useCallback(
-		async (projectId: string, snapshotId: string) => {
-			const key = `${projectId}:${snapshotId}`;
-			if (analysisReadInFlight.current.has(key)) return;
-			analysisReadInFlight.current.add(key);
-			try {
-				const response = await fetch(
-					`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis?snapshotId=${encodeURIComponent(snapshotId)}`,
-				);
-				const body: unknown = await response.json().catch(() => null);
-				if (
-					!response.ok ||
-					!matchesWorkspaceAnalysis(body, projectId, snapshotId)
-				) {
-					if (analysisIdentityRef.current === key) {
-						setError("Analisis codebase tidak dapat dibaca. Coba lagi.");
-					}
-					return;
-				}
-				const parsed = safeParseAnalysisResponse(body);
-				if (!parsed) {
-					if (analysisIdentityRef.current === key) {
-						setError("Hasil analisis tidak valid.");
-					}
-					return;
-				}
-				if (analysisIdentityRef.current === key) setAnalysis(parsed);
-			} catch {
-				if (analysisIdentityRef.current === key) {
-					setError("Server tidak dapat dihubungi. Coba lagi.");
-				}
-			} finally {
-				analysisReadInFlight.current.delete(key);
-			}
-		},
-		[],
-	);
 
 	const readStatus = useCallback(async () => {
 		if (inFlight.current) return;
@@ -442,95 +356,10 @@ function CodebaseDetailPage() {
 		onboardingFeature?.id,
 		readWorkspaceAnalysis,
 		status?.sessionId,
+		analysisIdentityRef,
+		setAnalysis,
 	]);
 
-	const [isRefreshingStarterSuggestions, setIsRefreshingStarterSuggestions] =
-		useState(false);
-	const [starterRefreshError, setStarterRefreshError] = useState<string | null>(
-		null,
-	);
-	const refreshStarterSuggestions = useCallback(
-		async (analysisId: string, snapshotId: string) => {
-			if (
-				!onboardingFeature?.id ||
-				!analysis ||
-				analysis.id !== analysisId ||
-				analysis.snapshotId !== snapshotId ||
-				!matchesWorkspaceAnalysis(analysis, onboardingFeature.id, snapshotId) ||
-				analysisRefreshInFlight.current
-			) {
-				return;
-			}
-			analysisRefreshInFlight.current = true;
-			setIsRefreshingStarterSuggestions(true);
-			setStarterRefreshError(null);
-			try {
-				const response = await fetch(
-					`/api/v1/projects/${encodeURIComponent(onboardingFeature.id)}/codebase/analysis`,
-					{
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({
-							snapshotId,
-							refreshStarterSuggestionsForAnalysisId: analysisId,
-						}),
-					},
-				);
-				const body: unknown = await response.json().catch(() => null);
-				const parsed = safeParseAnalysisResponse(body);
-				const parsedSuggestions = codebaseStarterSuggestionsSchema.safeParse(
-					parsed?.output?.starterSuggestions,
-				);
-				if (
-					!response.ok ||
-					!parsed ||
-					!matchesWorkspaceAnalysis(parsed, onboardingFeature.id, snapshotId) ||
-					!parsedSuggestions.success
-				) {
-					setStarterRefreshError("Pembaruan saran gagal. Coba lagi.");
-					return;
-				}
-				if (
-					analysisIdentityRef.current ===
-					`${onboardingFeature.id}:${snapshotId}`
-				) {
-					setAnalysis(parsed);
-				}
-			} catch {
-				if (
-					analysisIdentityRef.current ===
-					`${onboardingFeature?.id ?? ""}:${snapshotId}`
-				) {
-					setStarterRefreshError("Server tidak dapat dihubungi. Coba lagi.");
-				}
-			} finally {
-				analysisRefreshInFlight.current = false;
-				setIsRefreshingStarterSuggestions(false);
-			}
-		},
-		[analysis, onboardingFeature?.id],
-	);
-	useEffect(() => {
-		const projectId = onboardingFeature?.id ?? "";
-		setAnalysis((current) => {
-			if (
-				!shouldDiscardWorkspaceAnalysis({
-					analysis: current,
-					projectId,
-					activeSnapshotId: currentSnapshotId ?? null,
-				})
-			) {
-				return current;
-			}
-			return shouldDiscardWorkspaceAnalysis({
-				analysis: initialAnalysis,
-				projectId,
-				activeSnapshotId: currentSnapshotId ?? null,
-			})
-				? null
-				: initialAnalysis;
-		});
-	}, [currentSnapshotId, initialAnalysis, onboardingFeature?.id]);
 	useEffect(() => {
 		try {
 			const raw = sessionStorage.getItem(getPendingSyncPayloadKey(codebase.id));
@@ -2273,38 +2102,4 @@ function CodebaseDetailPage() {
 			)}
 		</main>
 	);
-}
-
-function safeParseAnalysisResponse(input: unknown): AnalysisResponse | null {
-	if (typeof input !== "object" || input === null) return null;
-	if (
-		!("id" in input) ||
-		!("projectId" in input) ||
-		!("snapshotId" in input) ||
-		!("status" in input)
-	)
-		return null;
-	const output =
-		"output" in input
-			? safeParseCodebaseAnalysis(input.output)
-			: { success: false as const };
-	if (
-		input.id &&
-		typeof input.id === "string" &&
-		input.projectId &&
-		typeof input.projectId === "string" &&
-		input.snapshotId &&
-		typeof input.snapshotId === "string" &&
-		(input.status === "pending" ||
-			input.status === "ready" ||
-			input.status === "failed")
-	)
-		return {
-			id: input.id,
-			projectId: input.projectId,
-			snapshotId: input.snapshotId,
-			status: input.status,
-			output: output.success ? output.data : null,
-		};
-	return null;
 }
