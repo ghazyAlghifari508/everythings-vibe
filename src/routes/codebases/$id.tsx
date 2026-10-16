@@ -25,6 +25,7 @@ import { Logo } from "@/components/ui/logo";
 import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
 import { useWorkspacePipeline } from "@/features/codebase/hooks/use-workspace-pipeline";
+import { useWorkspacePlan } from "@/features/codebase/hooks/use-workspace-plan";
 import { useWorkspaceQuestions } from "@/features/codebase/hooks/use-workspace-questions";
 import { useWorkspaceSource } from "@/features/codebase/hooks/use-workspace-source";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
@@ -34,10 +35,6 @@ import {
 	formatCodebaseSyncBadge,
 } from "@/features/codebase/utils/workspace-contracts";
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
-import {
-	resolveActivePlan,
-	selectUserFacingPlans,
-} from "@/lib/codebase-active-plan";
 import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
 import {
 	appendRunThinking,
@@ -56,10 +53,6 @@ import {
 } from "@/lib/codebase-chat-flow";
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
-	readActivePlanPointer,
-	storeActivePlanPointer,
-} from "@/lib/codebase-plan-storage";
-import {
 	assessRevisionImpact,
 	buildRevisionRequest,
 	type CodebaseComposerMode,
@@ -69,7 +62,6 @@ import {
 	emptyArtifactHydration,
 	resolveWorkspaceView,
 	type WorkspaceArtifactHydration,
-	type WorkspacePlanState,
 } from "@/lib/codebase-workspace-hydration";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import { consumeSseStream } from "@/lib/sse-consume";
@@ -145,56 +137,17 @@ function CodebaseDetailPage() {
 		hasStoredSnapshot,
 		canOpenFullBoard,
 	} = Route.useLoaderData();
-	/**
-	 * The active feature plan, resolved from the server's plan list instead of
-	 * from array position. The pointer is a navigation preference the user set
-	 * by opening a plan; it is validated against the real list, so a stale or
-	 * foreign id resolves to a real plan rather than opening the wrong one.
-	 */
-	const [requestedProjectId, setRequestedProjectId] = useState<string | null>(
-		null,
-	);
-	/**
-	 * True after the explicit "Buat fitur baru" action until the next message
-	 * creates that plan. Only this flag — never an ambiguous message — may
-	 * start a new feature project from the workspace composer.
-	 */
-	const [isCreatingNew, setIsCreatingNew] = useState(false);
-	const planResolution = useMemo(
-		() =>
-			resolveActivePlan({
-				requestedProjectId:
-					requestedProjectId ?? readActivePlanPointer(codebase.id),
-				anchorProjectId: onboardingFeatureId,
-				plans,
-			}),
-		[codebase.id, onboardingFeatureId, plans, requestedProjectId],
-	);
-	// Persist the resolved plan so a reopen returns to the plan the user last
-	// read, without ever making the pointer the source of truth.
-	useEffect(() => {
-		if (planResolution.kind === "resolved") {
-			storeActivePlanPointer(codebase.id, planResolution.plan.id);
-		}
-	}, [codebase.id, planResolution]);
-	const resolvedPlan =
-		planResolution.kind === "resolved" ? planResolution.plan : null;
-	const onboardingFeature = useMemo(
-		() =>
-			onboardingFeatureId
-				? (plans.find((plan) => plan.id === onboardingFeatureId) ?? null)
-				: null,
-		[onboardingFeatureId, plans],
-	);
-	/**
-	 * Plans the switcher may show. The onboarding anchor is repository analysis
-	 * context, so it stays out of the list while it carries no planning; the
-	 * resolver above still sees the full list and keeps its anchor fallback.
-	 */
-	const userFacingPlans = useMemo(
-		() => selectUserFacingPlans(plans, onboardingFeatureId),
-		[plans, onboardingFeatureId],
-	);
+	const {
+		setRequestedProjectId,
+		isCreatingNew,
+		setIsCreatingNew,
+		onboardingFeature,
+		userFacingPlans,
+		setActiveFeature,
+		resolvedFeature,
+		effectiveFeatureId,
+		planState,
+	} = useWorkspacePlan({ codebase, plans, onboardingFeatureId });
 	const [chatMessages, setChatMessages] = useState<ChatStreamMessage[]>([]);
 	/**
 	 * The one in-flight or settled AI request for this workspace. Every stage
@@ -230,18 +183,6 @@ function CodebaseDetailPage() {
 		initialAnalysis,
 		hasStoredSnapshot,
 	});
-	/**
-	 * A plan created in this session, before the loader's plan list catches up.
-	 * It only ever names the plan the user just created; the server list stays
-	 * the authority for every other case.
-	 */
-	const [activeFeature, setActiveFeature] = useState<{
-		id: string;
-		name: string;
-		featuresStatus?: string | null;
-	} | null>(null);
-	const resolvedFeature = activeFeature ?? resolvedPlan;
-	const effectiveFeatureId = resolvedFeature?.id ?? null;
 	const {
 		aiQuestions,
 		setAiQuestions,
@@ -252,19 +193,6 @@ function CodebaseDetailPage() {
 		fetchAiQuestions,
 		handleSubmitAnswer,
 	} = useWorkspaceQuestions(effectiveFeatureId, setRun);
-	/**
-	 * Which plan the UI is showing, and whether it could be read at all. An
-	 * unresolved, unknown, or ambiguous list is a real state with its own
-	 * surface, never an empty workspace.
-	 */
-	const planState: WorkspacePlanState =
-		planResolution.kind === "resolved"
-			? "resolved"
-			: planResolution.kind === "empty"
-				? "empty"
-				: planResolution.kind === "unknown"
-					? "failed"
-					: "needs_selection";
 	const [canvasOpen, setCanvasOpen] = useState(false);
 	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
@@ -595,6 +523,7 @@ function CodebaseDetailPage() {
 			setError,
 			setIsWorking,
 			setChatAnswers,
+			setActiveFeature,
 		],
 	);
 
@@ -753,7 +682,7 @@ function CodebaseDetailPage() {
 
 	const handleCreateFeature = useCallback(() => {
 		setIsCreatingNew(true);
-	}, []);
+	}, [setIsCreatingNew]);
 
 	/**
 	 * Direct a new composer message without ever asking what it is for.
@@ -809,6 +738,7 @@ function CodebaseDetailPage() {
 			onboardingFeatureId,
 			runRevision,
 			setLastFeaturePrompt,
+			setIsCreatingNew,
 		],
 	);
 
