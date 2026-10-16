@@ -596,9 +596,9 @@ describe("automatic artifact preview", () => {
 		);
 
 		// A revision reveals the PRD only after the document reloaded.
-		const revision = workspaceSource.slice(
-			workspaceSource.indexOf("const runRevision"),
-			workspaceSource.indexOf("const handleConfirmGenerate"),
+		const revision = readFileSync(
+			"src/features/codebase/hooks/use-workspace-revision.ts",
+			"utf8",
 		);
 		expect(revision).toMatch(
 			/const content = await loadPrd\(\)[\s\S]*?if \(!content\)[\s\S]*?openArtifactPreview\("prd"\)/,
@@ -619,7 +619,12 @@ describe("automatic artifact preview", () => {
 });
 
 describe("composer message routing without intent choice", () => {
-	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const revisionSource = readFileSync(
+		"src/features/codebase/hooks/use-workspace-revision.ts",
+		"utf8",
+	);
+	const workspaceSource =
+		readFileSync("src/routes/codebases/$id.tsx", "utf8") + revisionSource;
 	const chatSource = readFileSync("src/routes/api/chat.ts", "utf8");
 
 	it("routes a message by workspace state instead of a per-message choice", () => {
@@ -650,18 +655,12 @@ describe("composer message routing without intent choice", () => {
 		expect(workspaceSource).not.toMatch(/\/api\/[a-z-]*revision/);
 		// Success is only reported after the document is readable again.
 		expect(workspaceSource).toMatch(
-			/runRevision[\s\S]*const content = await loadPrd\(\)[\s\S]*if \(!content\)/,
+			/const content = await loadPrd\(\)[\s\S]*if \(!content\)/,
 		);
 	});
 
 	it("never resets task progress as part of a revision", () => {
-		const revisionBlock = workspaceSource.slice(
-			workspaceSource.indexOf("const runRevision = useCallback("),
-		);
-		const body = revisionBlock.slice(
-			0,
-			revisionBlock.indexOf("const handleSendMessage"),
-		);
+		const body = revisionSource;
 		expect(body).not.toContain("refreshTaskTree");
 		expect(body).not.toContain("/api/task/generate");
 		expect(body).not.toContain("reset-progress");

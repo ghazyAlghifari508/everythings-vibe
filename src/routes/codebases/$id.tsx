@@ -21,6 +21,7 @@ import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-a
 import { useWorkspacePipeline } from "@/features/codebase/hooks/use-workspace-pipeline";
 import { useWorkspacePlan } from "@/features/codebase/hooks/use-workspace-plan";
 import { useWorkspaceQuestions } from "@/features/codebase/hooks/use-workspace-questions";
+import { useWorkspaceRevision } from "@/features/codebase/hooks/use-workspace-revision";
 import { useWorkspaceSource } from "@/features/codebase/hooks/use-workspace-source";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
 import {
@@ -30,16 +31,13 @@ import {
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
 import {
-	appendRunThinking,
 	buildFeatureMessage,
 	type CodebasePipelineStage,
 	type CodebaseRunState,
 	reconcilePipelineStage,
-	resetRunThinking,
 	resolvePersistedStage,
 	runConfirmGenerate,
 	serializeAskQuestions,
-	setRunPhase,
 	settleRun,
 	shouldAutoRevealArtifact,
 	startRun,
@@ -47,7 +45,6 @@ import {
 import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
 import {
 	assessRevisionImpact,
-	buildRevisionRequest,
 	type CodebaseComposerMode,
 	describeRevisionImpact,
 } from "@/lib/codebase-revision-intent";
@@ -57,7 +54,6 @@ import {
 	type WorkspaceArtifactHydration,
 } from "@/lib/codebase-workspace-hydration";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
-import { consumeSseStream } from "@/lib/sse-consume";
 
 export type {
 	SnapshotFilePreviewResult,
@@ -583,95 +579,20 @@ function CodebaseDetailPage() {
 		},
 		[effectiveFeatureId],
 	);
-	/**
-	 * Revise the current feature plan.
-	 *
-	 * The request carries the user's own instruction plus an explicit scope
-	 * bound, and the existing revision engine applies only the sections the
-	 * request actually affects — a revision never rewrites the whole document.
-	 * The result is appended as a new PRD version (the previous one stays
-	 * readable), and the task list is never touched here: when the impact
-	 * assessment says real task progress exists, the user must confirm before
-	 * anything downstream is regenerated.
-	 */
-	const runRevision = useCallback(
-		async (instruction: string) => {
-			if (!effectiveFeatureId || stageBusy) return;
-			setStageBusy("prd");
-			setStageError(null);
-			setRun(startRun("prd", Date.now()));
-			try {
-				const response = await fetch("/api/chat", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						projectId: effectiveFeatureId,
-						mode: "revise",
-						message: buildRevisionRequest({
-							featureName: resolvedFeature?.name ?? codebase.name,
-							instruction,
-						}),
-						displayMessage: instruction,
-						// Only sent when the user saw the impact and accepted it, so
-						// the server's ac/task lock keeps blocking every silent
-						// revision of a locked document.
-						...(revisionImpact.requiresTaskReplacementConfirmation
-							? { confirmedImpact: true }
-							: {}),
-					}),
-				});
-				const result = await consumeSseStream(response, {
-					onThinking: (text) =>
-						setRun((current) => appendRunThinking(current, text)),
-					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
-					onDelta: () =>
-						setRun((current) => setRunPhase(current, "generating")),
-				});
-				if (result.error) {
-					const failure = result.error;
-					setStageError(failure);
-					setRun((current) =>
-						settleRun(current, "failed", Date.now(), failure),
-					);
-					return;
-				}
-				// The stream closing is not proof the revision was stored: reload
-				// the authoritative document and only report success when the new
-				// version is actually readable.
-				const content = await loadPrd();
-				if (!content) {
-					const failure =
-						"Revisi belum tersimpan di server. Coba kirim ulang permintaan.";
-					setStageError(failure);
-					setRun((current) =>
-						settleRun(current, "failed", Date.now(), failure),
-					);
-					return;
-				}
-				setRun((current) => settleRun(current, "done", Date.now()));
-				pushAssistantMessage(
-					`Revisi untuk ${resolvedFeature?.name ?? "fitur"} sudah diterapkan sebagai versi PRD baru. Dokumen versi sebelumnya tetap tersimpan.`,
-				);
-				openArtifactPreview("prd");
-			} catch {
-				const failure = "Server tidak dapat dihubungi. Coba lagi.";
-				setStageError(failure);
-				setRun((current) => settleRun(current, "failed", Date.now(), failure));
-			} finally {
-				setStageBusy(null);
-			}
-		},
-		[
-			effectiveFeatureId,
-			stageBusy,
-			resolvedFeature?.name,
-			codebase.name,
+	const runRevision = useWorkspaceRevision({
+		effectiveFeatureId,
+		stageBusy,
+		featureName: resolvedFeature?.name ?? codebase.name,
+		resolvedFeatureName: resolvedFeature?.name,
+		requiresTaskReplacementConfirmation:
 			revisionImpact.requiresTaskReplacementConfirmation,
-			loadPrd,
-			pushAssistantMessage,
-			openArtifactPreview,
-		],
-	);
+		loadPrd,
+		pushAssistantMessage,
+		openArtifactPreview,
+		setStageBusy,
+		setStageError,
+		setRun,
+	});
 
 	const handleCreateFeature = useCallback(() => {
 		setIsCreatingNew(true);
