@@ -2,6 +2,30 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const servicePath = new URL("./credit-service.ts", import.meta.url);
+const billingDir = new URL("../../features/billing/", import.meta.url);
+const billingModulePaths = [
+	"types/credit-contracts.ts",
+	"services/credit-guards.ts",
+	"services/credit-db.ts",
+	"services/credit-store.ts",
+	"services/credit-reservation.ts",
+	"services/credit-settlement.ts",
+	"services/credit-release.ts",
+	"services/credit-reconciliation.ts",
+	"services/credit-ledger.ts",
+];
+const facadeModulePaths = billingModulePaths.filter(
+	(relative) => relative !== "services/credit-db.ts",
+);
+
+async function readBillingSources(): Promise<string> {
+	const parts = await Promise.all(
+		billingModulePaths.map((relative) =>
+			readFile(new URL(relative, billingDir), "utf8"),
+		),
+	);
+	return parts.join("\n");
+}
 const migrationPath = new URL(
 	"../../../drizzle/0016_lame_squirrel_girl.sql",
 	import.meta.url,
@@ -17,7 +41,7 @@ const journalPath = new URL(
 
 describe("adaptive credit database contracts", () => {
 	it("pins every mutating subscription lookup to the operation subscription", async () => {
-		const source = await readFile(servicePath, "utf8");
+		const source = await readBillingSources();
 		const mutationSections = source.match(
 			/eq\(schema\.subscriptions\.id, subscriptionId\)[\s\S]*?\.for\("update"\)/g,
 		);
@@ -61,7 +85,7 @@ describe("adaptive credit database contracts", () => {
 	});
 
 	it("models nullable origins and terminal reconciliation outcomes", async () => {
-		const source = await readFile(servicePath, "utf8");
+		const source = await readBillingSources();
 		expect(source).toContain("subscriptionId: string | null");
 		expect(source).toContain('state: "quarantined"');
 		expect(source).toContain('accounting: "manual_correction_required"');
@@ -70,5 +94,31 @@ describe("adaptive credit database contracts", () => {
 		expect(source).toContain('state: "quarantined"');
 		expect(source).toContain("class CreditSubscriptionOriginError");
 		expect(source).toContain("instanceof CreditSubscriptionOriginError");
+	});
+
+	it("keeps the legacy facade as a pure re-export of the billing domain", async () => {
+		const facade = await readFile(servicePath, "utf8");
+		expect(facade).not.toContain("db.transaction");
+		for (const relative of facadeModulePaths) {
+			const modulePath = relative
+				.replace(/^types\//, "@/features/billing/types/")
+				.replace(/^services\//, "@/features/billing/services/")
+				.replace(/\.ts$/, "");
+			expect(facade).toContain(modulePath);
+		}
+		for (const name of [
+			"reserveCreditOperation",
+			"reserveActiveCreditOperation",
+			"markCreditOperationRunning",
+			"settleCreditOperation",
+			"releaseCreditOperation",
+			"refundCreditOperation",
+			"quarantineCreditOperation",
+			"reconcileExpiredCreditOperations",
+			"getCreditOperation",
+			"createCreditService",
+		]) {
+			expect(facade).toContain(name);
+		}
 	});
 });
