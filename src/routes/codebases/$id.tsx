@@ -1,5 +1,4 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
 import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodebaseArtifactCanvas } from "@/components/codebase/codebase-artifact-canvas";
@@ -28,6 +27,10 @@ import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
 import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
 import type { ProjectFeatureTree } from "@/db/schema";
+import {
+	loadFeatureTree,
+	loadTaskTree,
+} from "@/features/codebase/services/workspace-artifacts.functions";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
 import {
 	loadSnapshotFileContent,
@@ -121,7 +124,6 @@ import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import { validateAskQuestions } from "@/lib/services/ask-service";
 import type { TaskTree } from "@/lib/services/task-service";
-import { requireUserServer } from "@/lib/session";
 import { consumeSseStream } from "@/lib/sse-consume";
 
 export type {
@@ -138,55 +140,6 @@ export {
 	getCodebaseSessionRequestBody,
 	resolveWorkspaceSnapshotReady,
 } from "@/features/codebase/utils/workspace-contracts";
-
-const loadFeatureTree = createServerFn({ method: "GET" })
-	.validator((id: string) => id)
-	.handler(async ({ data: id }) => {
-		const user = await requireUserServer();
-		const { db } = await import("@/db");
-		const { projects } = await import("@/db/schema");
-		const { and, eq, isNull } = await import("drizzle-orm");
-		const { featureTreeSchema } = await import(
-			"@/lib/services/feature-service"
-		);
-		const [row] = await db
-			.select({ featureTree: projects.featureTree })
-			.from(projects)
-			.where(
-				and(
-					eq(projects.id, id),
-					eq(projects.userId, user.id),
-					isNull(projects.deletedAt),
-				),
-			)
-			.limit(1);
-		if (!row) return { featureTree: null };
-		const parsed = featureTreeSchema.safeParse(row.featureTree);
-		return { featureTree: parsed.success ? parsed.data : null };
-	});
-
-const loadTaskTree = createServerFn({ method: "GET" })
-	.validator((id: string) => id)
-	.handler(async ({ data: id }) => {
-		const user = await requireUserServer();
-		const { db } = await import("@/db");
-		const { projects } = await import("@/db/schema");
-		const { and, eq, isNull } = await import("drizzle-orm");
-		const { getTaskTree } = await import("@/lib/services/task-service");
-		const [row] = await db
-			.select({ id: projects.id })
-			.from(projects)
-			.where(
-				and(
-					eq(projects.id, id),
-					eq(projects.userId, user.id),
-					isNull(projects.deletedAt),
-				),
-			)
-			.limit(1);
-		if (!row) return { taskTree: null };
-		return { taskTree: await getTaskTree(id) };
-	});
 
 export const Route = createFileRoute("/codebases/$id")({
 	loader: async ({ params }) => {
