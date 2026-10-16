@@ -24,6 +24,7 @@ import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
 import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
+import { useWorkspaceQuestions } from "@/features/codebase/hooks/use-workspace-questions";
 import { useWorkspaceSource } from "@/features/codebase/hooks/use-workspace-source";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
 import {
@@ -38,19 +39,14 @@ import {
 } from "@/lib/codebase-active-plan";
 import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
 import {
-	type AdaptiveQuestion,
 	appendRunThinking,
 	buildFeatureMessage,
 	type CodebasePipelineStage,
 	type CodebaseRunStage,
 	type CodebaseRunState,
-	mapAskQuestionsToAdaptive,
-	parseRestoredAnswers,
-	parseRestoredQuestions,
 	reconcilePipelineStage,
 	resetRunThinking,
 	resolvePersistedStage,
-	restoreAskState,
 	runConfirmGenerate,
 	serializeAskQuestions,
 	setRunPhase,
@@ -76,7 +72,6 @@ import {
 	type WorkspacePlanState,
 } from "@/lib/codebase-workspace-hydration";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
-import { validateAskQuestions } from "@/lib/services/ask-service";
 import { consumeSseStream } from "@/lib/sse-consume";
 
 export type {
@@ -201,8 +196,6 @@ function CodebaseDetailPage() {
 		[plans, onboardingFeatureId],
 	);
 	const [chatMessages, setChatMessages] = useState<ChatStreamMessage[]>([]);
-	const [aiQuestions, setAiQuestions] = useState<AdaptiveQuestion[]>([]);
-	const [chatAnswers, setChatAnswers] = useState<Record<string, string>>({});
 	/**
 	 * The one in-flight or settled AI request for this workspace. Every stage
 	 * (questions, Feature, PRD, AC, Task) records its real start, settle time,
@@ -210,7 +203,6 @@ function CodebaseDetailPage() {
 	 * shows exactly one honest Thinking surface per operation.
 	 */
 	const [run, setRun] = useState<CodebaseRunState | null>(null);
-	const [lastFeaturePrompt, setLastFeaturePrompt] = useState("");
 	const [isConfirming, setIsConfirming] = useState(false);
 	const {
 		analysis,
@@ -250,6 +242,16 @@ function CodebaseDetailPage() {
 	} | null>(null);
 	const resolvedFeature = activeFeature ?? resolvedPlan;
 	const effectiveFeatureId = resolvedFeature?.id ?? null;
+	const {
+		aiQuestions,
+		setAiQuestions,
+		chatAnswers,
+		setChatAnswers,
+		lastFeaturePrompt,
+		setLastFeaturePrompt,
+		fetchAiQuestions,
+		handleSubmitAnswer,
+	} = useWorkspaceQuestions(effectiveFeatureId, setRun);
 	/**
 	 * Which plan the UI is showing, and whether it could be read at all. An
 	 * unresolved, unknown, or ambiguous list is a real state with its own
@@ -537,79 +539,6 @@ function CodebaseDetailPage() {
 		taskTree,
 	]);
 
-	const fetchAiQuestions = useCallback(
-		async (projectId: string, prompt: string) => {
-			const startedAt = Date.now();
-			setRun(startRun("questions", startedAt));
-			try {
-				const response = await fetch("/api/ask/options", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ projectId, prompt, platform: "web" }),
-				});
-				const body: unknown = await response.json().catch(() => null);
-				const serverError =
-					typeof body === "object" &&
-					body !== null &&
-					"error" in body &&
-					typeof body.error === "string"
-						? body.error
-						: null;
-				if (!response.ok) {
-					// The server already distinguishes "repository context is not
-					// ready" from a failed generation; surface that copy instead of
-					// collapsing every failure into one generic sentence.
-					setRun((current) =>
-						settleRun(
-							current,
-							"failed",
-							Date.now(),
-							serverError ??
-								(response.status === 409
-									? "Konteks repositori belum siap. Selesaikan analisis codebase lalu coba lagi."
-									: "Pertanyaan klarifikasi tidak dapat dibuat."),
-						),
-					);
-					return;
-				}
-				// The endpoint already validated the array against the shared
-				// ask-service contract; validate again here so a malformed or
-				// empty payload can never reach the question UI. Never re-wrap
-				// the array in the JSON envelope parser — that shape mismatch was
-				// the bug that rejected every valid response.
-				const parsed =
-					typeof body === "object" && body !== null && "questions" in body
-						? validateAskQuestions((body as { questions: unknown }).questions)
-						: null;
-				if (!parsed || parsed.length === 0) {
-					setRun((current) =>
-						settleRun(
-							current,
-							"failed",
-							Date.now(),
-							"AI tidak mengembalikan pertanyaan yang valid. Coba kirim ulang fitur.",
-						),
-					);
-					return;
-				}
-				const mapped = mapAskQuestionsToAdaptive(parsed);
-				setAiQuestions(mapped);
-				setChatAnswers({});
-				setRun((current) => settleRun(current, "done", Date.now()));
-			} catch {
-				setRun((current) =>
-					settleRun(
-						current,
-						"failed",
-						Date.now(),
-						"Server tidak dapat dihubungi. Coba lagi.",
-					),
-				);
-			}
-		},
-		[],
-	);
-
 	const ensureFeatureInWorkspace = useCallback(
 		async (message: string): Promise<string | null> => {
 			const trimmed = message.trim();
@@ -671,6 +600,7 @@ function CodebaseDetailPage() {
 			setAcContent,
 			setError,
 			setIsWorking,
+			setChatAnswers,
 		],
 	);
 
@@ -691,68 +621,7 @@ function CodebaseDetailPage() {
 		return assessRevisionImpact(all.map((task) => ({ status: task.status })));
 	}, [kanban.data]);
 
-	const handleSubmitAnswer = useCallback(
-		(questionId: string, answer: string) => {
-			const trimmed = answer.trim();
-			if (!trimmed) return;
-			setChatAnswers((current) => ({ ...current, [questionId]: trimmed }));
-		},
-		[],
-	);
-
 	const [specError, setSpecError] = useState<string | null>(null);
-
-	// Refresh and History recovery: reopen a project's persisted questions and
-	// answers from the authoritative server handoff instead of transient state.
-	// Completed artifacts (feature tree / PRD / AC / task) are reloaded by the
-	// existing loaders; this restores the Ask stage.
-	const handoffRestoredFor = useRef<string | null>(null);
-	const hasLocalAskStateRef = useRef(false);
-	hasLocalAskStateRef.current =
-		aiQuestions.length > 0 || Object.keys(chatAnswers).length > 0;
-	useEffect(() => {
-		const projectId = effectiveFeatureId;
-		if (!projectId || handoffRestoredFor.current === projectId) return;
-		handoffRestoredFor.current = projectId;
-		void (async () => {
-			try {
-				const response = await fetch("/api/ask/options", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ projectId, action: "get-handoff" }),
-				});
-				if (!response.ok) return;
-				const body: unknown = await response.json().catch(() => null);
-				if (typeof body !== "object" || body === null) return;
-				const handoff = (body as { handoff?: unknown }).handoff;
-				if (typeof handoff !== "object" || handoff === null) return;
-				const record = handoff as {
-					answers?: unknown;
-					state?: { questions?: unknown; prompt?: unknown } | null;
-				};
-				// Never clobber state the user is actively building in this session.
-				if (hasLocalAskStateRef.current) return;
-				const persistedQuestions = parseRestoredQuestions(
-					record.state?.questions,
-				);
-				const persistedAnswers = parseRestoredAnswers(record.answers);
-				if (persistedQuestions.length === 0) return;
-				const restored = restoreAskState(persistedQuestions, persistedAnswers);
-				if (restored.questions.length === 0) return;
-				setAiQuestions(restored.questions);
-				setChatAnswers(restored.answers);
-				if (
-					typeof record.state?.prompt === "string" &&
-					record.state.prompt.trim()
-				) {
-					setLastFeaturePrompt(record.state.prompt.trim());
-				}
-			} catch {
-				// Recovery is best-effort: a failed read leaves the workspace
-				// usable and the user can re-ask without losing completed stages.
-			}
-		})();
-	}, [effectiveFeatureId]);
 
 	const pushAssistantMessage = useCallback((content: string) => {
 		setChatMessages((current) => [
@@ -945,6 +814,7 @@ function CodebaseDetailPage() {
 			isCreatingNew,
 			onboardingFeatureId,
 			runRevision,
+			setLastFeaturePrompt,
 		],
 	);
 
