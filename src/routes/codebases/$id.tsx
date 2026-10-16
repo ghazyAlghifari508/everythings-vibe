@@ -24,15 +24,8 @@ import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
 import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
+import { useWorkspaceSource } from "@/features/codebase/hooks/use-workspace-source";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
-import {
-	loadSnapshotFileContent,
-	loadSnapshotManifest,
-} from "@/features/codebase/services/workspace-snapshot.functions";
-import {
-	type SourcePreviewState,
-	toSourcePreviewState,
-} from "@/features/codebase/types/source-preview";
 import {
 	buildAskHandoffAnswers,
 	decideCodebaseDetailEntry,
@@ -76,11 +69,6 @@ import {
 	type CodebaseComposerMode,
 	describeRevisionImpact,
 } from "@/lib/codebase-revision-intent";
-import {
-	detectStackFromPackageJsonText,
-	manifestToExplorerFiles,
-	mergeStackWithFallback,
-} from "@/lib/codebase-stack";
 import {
 	emptyArtifactHydration,
 	resolveWorkspaceView,
@@ -212,19 +200,6 @@ function CodebaseDetailPage() {
 		() => selectUserFacingPlans(plans, onboardingFeatureId),
 		[plans, onboardingFeatureId],
 	);
-	const [manifestFiles, setManifestFiles] = useState<Array<{ path: string }>>(
-		[],
-	);
-	const [manifestFileCount, setManifestFileCount] = useState<number | null>(
-		null,
-	);
-	const [packageJsonText, setPackageJsonText] = useState<string | null>(null);
-	const [manifestSnapshotId, setManifestSnapshotId] = useState<string | null>(
-		null,
-	);
-	const [sourcePreview, setSourcePreview] = useState<SourcePreviewState>({
-		kind: "idle",
-	});
 	const [chatMessages, setChatMessages] = useState<ChatStreamMessage[]>([]);
 	const [aiQuestions, setAiQuestions] = useState<AdaptiveQuestion[]>([]);
 	const [chatAnswers, setChatAnswers] = useState<Record<string, string>>({});
@@ -401,113 +376,22 @@ function CodebaseDetailPage() {
 
 	const analysisOutput = analysis?.output ?? null;
 
-	useEffect(() => {
-		if (!snapshotReady) return;
-		let cancelled = false;
-		void (async () => {
-			try {
-				const data = await loadSnapshotManifest({ data: codebase.id });
-				if (cancelled) return;
-				setManifestFiles(data.files ?? []);
-				setManifestSnapshotId(data.snapshotId ?? null);
-				setManifestFileCount(
-					typeof data.fileCount === "number" ? data.fileCount : null,
-				);
-				setPackageJsonText(data.packageJsonText ?? null);
-			} catch {
-				if (!cancelled) {
-					setManifestFiles([]);
-					setManifestSnapshotId(null);
-					setManifestFileCount(null);
-					setPackageJsonText(null);
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [snapshotReady, codebase.id]);
-
-	// A new snapshot replaces every file the previous one contributed, so any
-	// inspected source content is stale by definition and must be dropped.
-	const sourcePreviewRequestRef = useRef(0);
-	const activeSnapshotId = status?.snapshotId ?? manifestSnapshotId;
-	const appliedSnapshotRef = useRef<string | null | undefined>(undefined);
-	useEffect(() => {
-		if (appliedSnapshotRef.current === activeSnapshotId) return;
-		appliedSnapshotRef.current = activeSnapshotId;
-		sourcePreviewRequestRef.current += 1;
-		setSourcePreview({ kind: "idle" });
-		setActiveArtifactId(null);
-	}, [activeSnapshotId]);
-
-	const selectSourceFile = useCallback(
-		(path: string) => {
-			const requestId = sourcePreviewRequestRef.current + 1;
-			sourcePreviewRequestRef.current = requestId;
-			setActiveArtifactId(null);
-			setSourcePreview({ kind: "loading", path });
-			setCanvasOpen(true);
-			void (async () => {
-				try {
-					const result = await loadSnapshotFileContent({
-						data: { codebaseId: codebase.id, path },
-					});
-					if (sourcePreviewRequestRef.current !== requestId) return;
-					if (
-						result.status === "ok" &&
-						result.snapshotId !== activeSnapshotId
-					) {
-						setSourcePreview({ kind: "idle" });
-						setCanvasOpen(false);
-						return;
-					}
-					setSourcePreview(toSourcePreviewState(result, path));
-				} catch {
-					if (sourcePreviewRequestRef.current !== requestId) return;
-					setSourcePreview({
-						kind: "failed",
-						path,
-						message: "Pratinjau file tidak dapat dimuat.",
-					});
-				}
-			})();
-		},
-		[codebase.id, activeSnapshotId],
-	);
-
-	const clearSourcePreview = useCallback(() => {
-		sourcePreviewRequestRef.current += 1;
-		setSourcePreview({ kind: "idle" });
-	}, []);
-
-	const explorerFiles = useMemo(() => {
-		if (manifestFiles.length > 0) return manifestFiles;
-		return manifestToExplorerFiles(analysisOutput?.relevantFiles ?? []);
-	}, [manifestFiles, analysisOutput]);
-	const explorerStack = useMemo(() => {
-		const fromPackageJson = detectStackFromPackageJsonText(packageJsonText);
-		const raw = analysisOutput
-			? [
-					analysisOutput.framework,
-					analysisOutput.language,
-					analysisOutput.database,
-					analysisOutput.auth,
-					analysisOutput.packageManager,
-					...(analysisOutput.dependencies ?? []).slice(0, 5),
-				].filter(
-					(value): value is string =>
-						typeof value === "string" &&
-						value.trim().length > 0 &&
-						value.trim() !== "Tidak terdeteksi",
-				)
-			: [];
-		return mergeStackWithFallback(fromPackageJson, raw);
-	}, [packageJsonText, analysisOutput]);
-	const contextFiles = useMemo(
-		() => (analysisOutput?.relevantFiles ?? []).slice(0, 2),
-		[analysisOutput],
-	);
+	const {
+		manifestFileCount,
+		sourcePreview,
+		selectSourceFile,
+		clearSourcePreview,
+		explorerFiles,
+		explorerStack,
+		contextFiles,
+	} = useWorkspaceSource({
+		codebaseId: codebase.id,
+		snapshotReady,
+		polledSnapshotId: status?.snapshotId,
+		analysisOutput,
+		setActiveArtifactId,
+		setCanvasOpen,
+	});
 	const featureSlug = useMemo(() => {
 		const base = (resolvedFeature?.name ?? codebase.name)
 			.toLowerCase()

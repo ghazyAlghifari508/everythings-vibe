@@ -796,11 +796,15 @@ describe("read-only source preview contract", () => {
 	});
 
 	it("drops in-flight and previously selected content when the snapshot changes", () => {
-		expect(detailSource).toContain("const appliedSnapshotRef = useRef");
-		expect(detailSource).toContain(
+		const sourceHook = readFileSync(
+			"src/features/codebase/hooks/use-workspace-source.ts",
+			"utf8",
+		);
+		expect(sourceHook).toContain("const appliedSnapshotRef = useRef");
+		expect(sourceHook).toContain(
 			"sourcePreviewRequestRef.current !== requestId",
 		);
-		expect(detailSource).toContain("result.snapshotId !== activeSnapshotId");
+		expect(sourceHook).toContain("result.snapshotId !== activeSnapshotId");
 	});
 
 	it("shares the existing right panel with artifacts and never mixes them", () => {
