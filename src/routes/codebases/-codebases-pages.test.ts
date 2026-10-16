@@ -519,13 +519,15 @@ describe("workspace resume after refresh", () => {
 	});
 
 	it("binds every artifact read to the project that started it", () => {
-		// A response for a plan the user already left must be dropped instead of
-		// overwriting the plan now on screen.
-		expect(workspaceSource).toContain("activeProjectIdRef");
-		expect(workspaceSource).toMatch(
+		const artifactSource = readFileSync(
+			"src/features/codebase/hooks/use-workspace-artifacts.ts",
+			"utf8",
+		);
+		expect(artifactSource).toContain("activeProjectIdRef");
+		expect(artifactSource).toMatch(
 			/if \(activeProjectIdRef\.current !== requestedProjectId\) return null/,
 		);
-		expect(workspaceSource).toMatch(
+		expect(artifactSource).toMatch(
 			/if \(activeProjectIdRef\.current !== projectId\) return null/,
 		);
 	});

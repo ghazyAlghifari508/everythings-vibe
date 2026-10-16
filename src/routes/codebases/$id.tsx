@@ -11,11 +11,7 @@ import { CodebaseDocPreview } from "@/components/codebase/codebase-doc-preview";
 import { CodebaseExplorerSidebar } from "@/components/codebase/codebase-explorer-sidebar";
 import type { CodebaseArtifactRef } from "@/components/codebase/codebase-file-card";
 import { CodebaseKanbanBoard } from "@/components/codebase/codebase-kanban-board";
-import {
-	parseVersionRows,
-	selectLatestVersionContent,
-	stripInternalSectionMarkers,
-} from "@/components/codebase/codebase-markdown";
+import { stripInternalSectionMarkers } from "@/components/codebase/codebase-markdown";
 import { CodebasePlanSwitcher } from "@/components/codebase/codebase-plan-switcher";
 import { CodebaseResyncDrawer } from "@/components/codebase/codebase-resync-drawer";
 import { CodebaseSourcePreview } from "@/components/codebase/codebase-source-preview";
@@ -26,11 +22,7 @@ import { ScreenIncompleteSync } from "@/components/codebase/screen-incomplete-sy
 import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
 import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
-import type { ProjectFeatureTree } from "@/db/schema";
-import {
-	loadFeatureTree,
-	loadTaskTree,
-} from "@/features/codebase/services/workspace-artifacts.functions";
+import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
 import {
 	loadSnapshotFileContent,
@@ -44,7 +36,6 @@ import {
 	buildAskHandoffAnswers,
 	type CodebaseSessionStartAction,
 	decideCodebaseDetailEntry,
-	describeArtifactReadFailure,
 	formatCodebaseSyncBadge,
 	getCodebaseSessionRequestBody,
 	resolveWorkspaceSnapshotReady,
@@ -113,8 +104,6 @@ import {
 	shouldFetchWorkspaceAnalysis,
 } from "@/lib/codebase-workspace-analysis";
 import {
-	type ArtifactHydrationStatus,
-	type ArtifactKind,
 	emptyArtifactHydration,
 	resolveWorkspaceView,
 	type WorkspaceArtifactHydration,
@@ -123,7 +112,6 @@ import {
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import { validateAskQuestions } from "@/lib/services/ask-service";
-import type { TaskTree } from "@/lib/services/task-service";
 import { consumeSseStream } from "@/lib/sse-consume";
 
 export type {
@@ -649,45 +637,33 @@ function CodebaseDetailPage() {
 	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
 		"kanban",
 	);
-	const [prdContent, setPrdContent] = useState<string | null>(null);
-	const [prdLoading, setPrdLoading] = useState(false);
-	const [prdError, setPrdError] = useState<string | null>(null);
-	const [acContent, setAcContent] = useState<string | null>(null);
-	const [acLoading, setAcLoading] = useState(false);
-	const [acError, setAcError] = useState<string | null>(null);
-	const [featureTree, setFeatureTree] = useState<ProjectFeatureTree | null>(
-		null,
-	);
-	const [taskTree, setTaskTree] = useState<TaskTree | null>(null);
-	/**
-	 * Real hydration status per artifact. Every loader writes its own outcome, so
-	 * "still loading", "the server says there is none", and "the read failed"
-	 * stay distinguishable and a failure can never render as an empty plan.
-	 */
-	const [artifactHydration, setArtifactHydration] =
-		useState<WorkspaceArtifactHydration>(emptyArtifactHydration);
-	const markArtifact = useCallback(
-		(kind: ArtifactKind, status: ArtifactHydrationStatus) => {
-			setArtifactHydration((current) =>
-				current[kind] === status ? current : { ...current, [kind]: status },
-			);
-		},
-		[],
-	);
+	const {
+		prdContent,
+		setPrdContent,
+		prdLoading,
+		prdError,
+		setPrdError,
+		acContent,
+		setAcContent,
+		acLoading,
+		acError,
+		setAcError,
+		featureTree,
+		setFeatureTree,
+		taskTree,
+		setTaskTree,
+		artifactHydration,
+		setArtifactHydration,
+		activeProjectIdRef,
+		loadPrd,
+		loadAc,
+		refreshFeatureTree,
+		refreshTaskTree,
+	} = useWorkspaceArtifacts(snapshotReady, effectiveFeatureId);
 	const [pipelineStage, setPipelineStage] =
 		useState<PipelineStage>("questions");
 	const [stageBusy, setStageBusy] = useState<PipelineStage | null>(null);
 	const [stageError, setStageError] = useState<string | null>(null);
-	/**
-	 * The project the artifact loaders currently speak for. Every asynchronous
-	 * read captures it when it starts and drops its result if the active project
-	 * changed meanwhile, so a slow response for the previous plan can never be
-	 * written into the plan the user is now looking at.
-	 */
-	const activeProjectIdRef = useRef<string | null>(effectiveFeatureId);
-	useEffect(() => {
-		activeProjectIdRef.current = effectiveFeatureId;
-	}, [effectiveFeatureId]);
 	/**
 	 * Guards a pipeline generation against a duplicate submit from the same
 	 * render, where `stageBusy` state has not re-rendered yet. A second request
@@ -768,168 +744,6 @@ function CodebaseDetailPage() {
 	}, [persistedStage]);
 
 	const analysisOutput = analysis?.output ?? null;
-
-	const loadPrd = useCallback(async (): Promise<string | null> => {
-		if (!snapshotReady || !effectiveFeatureId) {
-			// The read has not happened yet, so the artifact's real state is
-			// still unknown. Reporting "empty" here is what let an unread plan
-			// render as an empty one.
-			setPrdContent(null);
-			setPrdError(null);
-			setPrdLoading(false);
-			markArtifact("prd", "pending");
-			return null;
-		}
-		setPrdLoading(true);
-		setPrdError(null);
-		markArtifact("prd", "pending");
-		const requestedProjectId = effectiveFeatureId;
-		try {
-			const response = await fetch(
-				`/api/projects/${encodeURIComponent(requestedProjectId)}/versions`,
-			);
-			const body: unknown = await response.json().catch(() => null);
-			if (activeProjectIdRef.current !== requestedProjectId) return null;
-			if (!response.ok) {
-				setPrdError(
-					describeArtifactReadFailure("Dokumen PRD", response.status),
-				);
-				setPrdContent(null);
-				markArtifact("prd", "failed");
-				return null;
-			}
-			const rows = parseVersionRows(body);
-			if (!rows) {
-				setPrdError("Dokumen PRD tidak valid.");
-				setPrdContent(null);
-				markArtifact("prd", "failed");
-				return null;
-			}
-			const content = selectLatestVersionContent(rows);
-			setPrdContent(content);
-			markArtifact("prd", content ? "ready" : "empty");
-			return content;
-		} catch {
-			if (activeProjectIdRef.current !== requestedProjectId) return null;
-			setPrdError("Server tidak dapat dihubungi.");
-			setPrdContent(null);
-			markArtifact("prd", "failed");
-			return null;
-		} finally {
-			if (activeProjectIdRef.current === requestedProjectId) {
-				setPrdLoading(false);
-			}
-		}
-	}, [snapshotReady, effectiveFeatureId, markArtifact]);
-
-	useEffect(() => {
-		void loadPrd();
-	}, [loadPrd]);
-
-	const loadAc = useCallback(async (): Promise<string | null> => {
-		if (!snapshotReady || !effectiveFeatureId) {
-			setAcContent(null);
-			setAcError(null);
-			setAcLoading(false);
-			markArtifact("ac", "pending");
-			return null;
-		}
-		setAcLoading(true);
-		setAcError(null);
-		markArtifact("ac", "pending");
-		const requestedProjectId = effectiveFeatureId;
-		try {
-			const response = await fetch(
-				`/api/projects/${encodeURIComponent(requestedProjectId)}/ac-versions`,
-			);
-			const body: unknown = await response.json().catch(() => null);
-			if (activeProjectIdRef.current !== requestedProjectId) return null;
-			if (!response.ok) {
-				setAcError(describeArtifactReadFailure("Dokumen AC", response.status));
-				setAcContent(null);
-				markArtifact("ac", "failed");
-				return null;
-			}
-			const rows = parseVersionRows(body);
-			if (!rows) {
-				setAcError("Dokumen AC tidak valid.");
-				setAcContent(null);
-				markArtifact("ac", "failed");
-				return null;
-			}
-			const content = selectLatestVersionContent(rows);
-			setAcContent(content);
-			markArtifact("ac", content ? "ready" : "empty");
-			return content;
-		} catch {
-			if (activeProjectIdRef.current !== requestedProjectId) return null;
-			setAcError("Server tidak dapat dihubungi.");
-			setAcContent(null);
-			markArtifact("ac", "failed");
-			return null;
-		} finally {
-			if (activeProjectIdRef.current === requestedProjectId) {
-				setAcLoading(false);
-			}
-		}
-	}, [snapshotReady, effectiveFeatureId, markArtifact]);
-
-	useEffect(() => {
-		void loadAc();
-	}, [loadAc]);
-
-	const refreshFeatureTree = useCallback(
-		async (projectId: string | null) => {
-			if (!projectId) {
-				setFeatureTree(null);
-				markArtifact("feature", "pending");
-				return null;
-			}
-			markArtifact("feature", "pending");
-			try {
-				const data = await loadFeatureTree({ data: projectId });
-				if (activeProjectIdRef.current !== projectId) return null;
-				setFeatureTree(data.featureTree);
-				markArtifact("feature", data.featureTree ? "ready" : "empty");
-				return data.featureTree;
-			} catch {
-				if (activeProjectIdRef.current !== projectId) return null;
-				setFeatureTree(null);
-				markArtifact("feature", "failed");
-				return null;
-			}
-		},
-		[markArtifact],
-	);
-
-	const refreshTaskTree = useCallback(
-		async (projectId: string | null) => {
-			if (!projectId) {
-				setTaskTree(null);
-				markArtifact("tasks", "pending");
-				return null;
-			}
-			markArtifact("tasks", "pending");
-			try {
-				const data = await loadTaskTree({ data: projectId });
-				if (activeProjectIdRef.current !== projectId) return null;
-				setTaskTree(data.taskTree);
-				markArtifact("tasks", data.taskTree ? "ready" : "empty");
-				return data.taskTree;
-			} catch {
-				if (activeProjectIdRef.current !== projectId) return null;
-				setTaskTree(null);
-				markArtifact("tasks", "failed");
-				return null;
-			}
-		},
-		[markArtifact],
-	);
-
-	useEffect(() => {
-		void refreshFeatureTree(effectiveFeatureId);
-		void refreshTaskTree(effectiveFeatureId);
-	}, [effectiveFeatureId, refreshFeatureTree, refreshTaskTree]);
 
 	useEffect(() => {
 		if (!snapshotReady) return;
@@ -1306,7 +1120,16 @@ function CodebaseDetailPage() {
 				setIsWorking(false);
 			}
 		},
-		[snapshotReady, isWorking, codebase.id, codebase.name],
+		[
+			snapshotReady,
+			isWorking,
+			codebase.id,
+			codebase.name,
+			setFeatureTree,
+			setTaskTree,
+			setPrdContent,
+			setAcContent,
+		],
 	);
 
 	/**
@@ -1769,7 +1592,7 @@ function CodebaseDetailPage() {
 				}
 			}
 		},
-		[effectiveFeatureId, stageBusy],
+		[effectiveFeatureId, stageBusy, activeProjectIdRef],
 	);
 
 	const handleGeneratePrd = useCallback(() => {
