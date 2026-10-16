@@ -2,6 +2,16 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
 
+function readWorkspaceSource() {
+	return [
+		"src/routes/codebases/$id.tsx",
+		"src/features/codebase/components/codebase-detail-page.tsx",
+		"src/features/codebase/hooks/use-codebase-workspace.ts",
+	]
+		.map((path) => readFileSync(path, "utf8"))
+		.join("\n");
+}
+
 const workspaceLoaderSource = readFileSync(
 	"src/features/codebase/services/workspace-loader.functions.ts",
 	"utf8",
@@ -206,7 +216,7 @@ describe("codebase list snapshot selection", () => {
 });
 
 describe("existing-codebase workspace re-entry", () => {
-	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const workspaceSource = readWorkspaceSource();
 
 	it("keeps ownership enforced on the workspace read", () => {
 		expect(workspaceLoaderSource).toContain("eq(codebases.userId, user.id)");
@@ -506,7 +516,7 @@ describe("ask options repository grounding", () => {
 });
 
 describe("workspace resume after refresh", () => {
-	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const workspaceSource = readWorkspaceSource();
 
 	it("derives the resume stage from persisted artifacts, not from a guess", () => {
 		expect(workspaceSource).toContain("resolvePersistedStage({");
@@ -558,7 +568,7 @@ describe("workspace resume after refresh", () => {
 });
 
 describe("automatic artifact preview", () => {
-	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const workspaceSource = readWorkspaceSource();
 
 	it("reveals an artifact only after the server state was reloaded", () => {
 		// Each reveal sits in the success branch of a loader that had to return
@@ -628,7 +638,7 @@ describe("composer message routing without intent choice", () => {
 		"utf8",
 	);
 	const workspaceSource =
-		readFileSync("src/routes/codebases/$id.tsx", "utf8") +
+		readWorkspaceSource() +
 		revisionSource +
 		readFileSync(
 			"src/features/codebase/hooks/use-workspace-composer.ts",
@@ -726,7 +736,7 @@ describe("buildAskHandoffAnswers", () => {
 });
 
 describe("codebase detail pending skeleton fidelity", () => {
-	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const detailSource = readWorkspaceSource();
 
 	it("uses CodebaseDetailPending as pendingComponent and renders CodebaseWorkspaceSkeleton", () => {
 		expect(detailSource).toContain("pendingComponent: CodebaseDetailPending");
@@ -744,7 +754,7 @@ describe("codebase detail pending skeleton fidelity", () => {
 });
 
 describe("codebase starter suggestions route wiring", () => {
-	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const detailSource = readWorkspaceSource();
 
 	it("passes validated suggestions from the loaded analysis output to the workspace", () => {
 		expect(detailSource).toContain(
@@ -754,7 +764,7 @@ describe("codebase starter suggestions route wiring", () => {
 });
 
 describe("read-only source preview contract", () => {
-	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const detailSource = readWorkspaceSource();
 	const snapshotSource = readFileSync(
 		"src/features/codebase/services/workspace-snapshot.functions.ts",
 		"utf8",
