@@ -25,3 +25,5 @@ test-results/
 
 # legacy Claude Code agent config
 .claude/
+.pi/
+
