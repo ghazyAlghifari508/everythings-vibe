@@ -22,7 +22,7 @@ import { ScreenIncompleteSync } from "@/components/codebase/screen-incomplete-sy
 import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
 import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
-import { useWorkspaceAnalysis } from "@/features/codebase/hooks/use-workspace-analysis";
+import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
 import {
@@ -35,11 +35,8 @@ import {
 } from "@/features/codebase/types/source-preview";
 import {
 	buildAskHandoffAnswers,
-	type CodebaseSessionStartAction,
 	decideCodebaseDetailEntry,
 	formatCodebaseSyncBadge,
-	getCodebaseSessionRequestBody,
-	resolveWorkspaceSnapshotReady,
 } from "@/features/codebase/utils/workspace-contracts";
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
@@ -47,10 +44,6 @@ import {
 	selectUserFacingPlans,
 } from "@/lib/codebase-active-plan";
 import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
-import {
-	resolveWorkspaceSnapshotIdentity,
-	shouldDiscardWorkspaceAnalysis,
-} from "@/lib/codebase-analysis-selection";
 import {
 	type AdaptiveQuestion,
 	appendRunThinking,
@@ -89,21 +82,11 @@ import {
 	mergeStackWithFallback,
 } from "@/lib/codebase-stack";
 import {
-	getPendingSyncPayloadKey,
-	SNAPSHOT_CONTEXT_STATUSES,
-	type SyncPromptPayload,
-	type SyncStatusResponse,
-	syncPromptPayloadSchema,
-	syncStatusResponseSchema,
-} from "@/lib/codebase-sync";
-import { shouldFetchWorkspaceAnalysis } from "@/lib/codebase-workspace-analysis";
-import {
 	emptyArtifactHydration,
 	resolveWorkspaceView,
 	type WorkspaceArtifactHydration,
 	type WorkspacePlanState,
 } from "@/lib/codebase-workspace-hydration";
-import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import { validateAskQuestions } from "@/lib/services/ask-service";
 import { consumeSseStream } from "@/lib/sse-consume";
@@ -229,8 +212,6 @@ function CodebaseDetailPage() {
 		() => selectUserFacingPlans(plans, onboardingFeatureId),
 		[plans, onboardingFeatureId],
 	);
-	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
-	const [isResyncDrawerOpen, setIsResyncDrawerOpen] = useState(false);
 	const [manifestFiles, setManifestFiles] = useState<Array<{ path: string }>>(
 		[],
 	);
@@ -256,184 +237,30 @@ function CodebaseDetailPage() {
 	const [run, setRun] = useState<CodebaseRunState | null>(null);
 	const [lastFeaturePrompt, setLastFeaturePrompt] = useState("");
 	const [isConfirming, setIsConfirming] = useState(false);
-	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	const [isStarting, setIsStarting] = useState(false);
-	const [isWorking, setIsWorking] = useState(false);
-	const inFlight = useRef(false);
 	const {
 		analysis,
-		setAnalysis,
-		analysisAttemptedFor,
-		analysisIdentityRef,
 		activeWorkspaceSnapshotId,
 		triggerAnalysis,
-		readWorkspaceAnalysis,
 		isRefreshingStarterSuggestions,
 		starterRefreshError,
 		refreshStarterSuggestions,
-	} = useWorkspaceAnalysis({
+		payload,
+		isResyncDrawerOpen,
+		setIsResyncDrawerOpen,
+		status,
+		error,
+		setError,
+		isStarting,
+		isWorking,
+		setIsWorking,
+		readStatus,
+		startSession,
+		snapshotReady,
+	} = useCodebaseSync({
+		codebaseId: codebase.id,
 		projectId: onboardingFeature?.id ?? null,
 		currentSnapshotId,
-		polledSnapshotId: status?.snapshotId ?? null,
 		initialAnalysis,
-		setError,
-		setIsWorking,
-	});
-
-	const readStatus = useCallback(async () => {
-		if (inFlight.current) return;
-		inFlight.current = true;
-		try {
-			const queryParams = new URLSearchParams();
-			if (status?.sessionId) queryParams.set("sessionId", status.sessionId);
-			if (onboardingFeature?.id)
-				queryParams.set("projectId", onboardingFeature.id);
-			const query = queryParams.toString() ? `?${queryParams}` : "";
-			const response = await fetch(
-				`/api/codebases/${encodeURIComponent(codebase.id)}/status${query}`,
-			);
-			const parsed = syncStatusResponseSchema.safeParse(
-				await response.json().catch(() => null),
-			);
-			if (!response.ok || !parsed.success) {
-				setError(
-					response.ok
-						? "Status sync tidak valid. Coba muat ulang."
-						: "Status sync tidak dapat dibaca. Coba lagi.",
-				);
-				return;
-			}
-			// The workspace stays bound to whichever snapshot is persisted, and
-			// polling only moves it forward when the CLI reports a freshly
-			// uploaded one. Session lifecycle is deliberately absent here: an
-			// expired, consumed, or failed session says nothing about the
-			// validity of the analysis already on screen.
-			const activeSnapshotId = resolveWorkspaceSnapshotIdentity({
-				persistedSnapshotId: currentSnapshotId ?? null,
-				polledSnapshotId: parsed.data.snapshotId ?? null,
-			});
-			analysisIdentityRef.current = `${onboardingFeature?.id ?? ""}:${activeSnapshotId ?? ""}`;
-			setStatus(parsed.data);
-			const snapshotId = activeSnapshotId;
-			if (!snapshotId) return;
-			const projectId = onboardingFeature?.id;
-			const retained = analysis ?? initialAnalysis;
-			if (
-				shouldDiscardWorkspaceAnalysis({
-					analysis: retained,
-					projectId: projectId ?? "",
-					activeSnapshotId: snapshotId,
-				})
-			) {
-				setAnalysis(null);
-			}
-			if (
-				projectId &&
-				shouldFetchWorkspaceAnalysis({
-					projectId,
-					snapshotId,
-					analysisStatus: parsed.data.analysisStatus,
-					analysis: retained,
-				})
-			) {
-				void readWorkspaceAnalysis(projectId, snapshotId);
-			}
-			// Opening a workspace never starts an analysis. A fresh analysis is a
-			// billable action, so it is only ever requested from an explicit user
-			// action (`triggerAnalysis` via the retry control) or from the
-			// onboarding flow, never as a side effect of reading a plan.
-		} catch {
-			setError("Server tidak dapat dihubungi. Coba lagi.");
-		} finally {
-			inFlight.current = false;
-		}
-	}, [
-		analysis,
-		codebase.id,
-		currentSnapshotId,
-		initialAnalysis,
-		onboardingFeature?.id,
-		readWorkspaceAnalysis,
-		status?.sessionId,
-		analysisIdentityRef,
-		setAnalysis,
-	]);
-
-	useEffect(() => {
-		try {
-			const raw = sessionStorage.getItem(getPendingSyncPayloadKey(codebase.id));
-			if (!raw) return;
-			const parsed = syncPromptPayloadSchema.safeParse(JSON.parse(raw));
-			if (parsed.success && parsed.data.projectId === codebase.id) {
-				setPayload(parsed.data);
-				setIsResyncDrawerOpen(true);
-			}
-			sessionStorage.removeItem(getPendingSyncPayloadKey(codebase.id));
-		} catch {
-			setError("Instruksi sync tidak dapat dibaca dari browser.");
-		}
-	}, [codebase.id]);
-
-	useEffect(() => {
-		void readStatus();
-		const interval = setInterval(
-			() => void readStatus(),
-			CODEBASE_SYNC_POLL_INTERVAL_MS,
-		);
-		return () => clearInterval(interval);
-	}, [readStatus]);
-
-	// A re-sync prompt is dismissed by its own success: once polling reports a
-	// usable snapshot for the new session, the CLI instructions have served
-	// their purpose and the workspace continues on the adopted snapshot. A
-	// failed or expired session keeps the panel, because the retry still has to
-	// be run.
-	useEffect(() => {
-		if (!payload) return;
-		if (!status?.snapshotId) return;
-		if (!SNAPSHOT_CONTEXT_STATUSES.includes(status.status)) return;
-		setPayload(null);
-		setIsResyncDrawerOpen(false);
-	}, [payload, status?.snapshotId, status?.status]);
-
-	const startSession = async (
-		action: CodebaseSessionStartAction = "initial",
-	) => {
-		setIsStarting(true);
-		setIsResyncDrawerOpen(true);
-		setError(null);
-		try {
-			const response = await fetch(
-				`/api/codebases/${encodeURIComponent(codebase.id)}/session`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(getCodebaseSessionRequestBody(action)),
-				},
-			);
-			const parsed = syncPromptPayloadSchema.safeParse(
-				await response.json().catch(() => null),
-			);
-			if (!response.ok || !parsed.success) {
-				setError("Sesi sync gagal dibuat. Coba lagi.");
-				return;
-			}
-			setPayload(parsed.data);
-			setStatus(null);
-			setAnalysis(null);
-			// A fresh session resets the visible attempt: the prompt returns and the
-			// stage list drops the previous attempt's state.
-			analysisAttemptedFor.current = null;
-		} catch {
-			setError("Server tidak dapat dihubungi.");
-		} finally {
-			setIsStarting(false);
-		}
-	};
-
-	const snapshotReady = resolveWorkspaceSnapshotReady({
-		status,
 		hasStoredSnapshot,
 	});
 	/**
@@ -958,6 +785,8 @@ function CodebaseDetailPage() {
 			setTaskTree,
 			setPrdContent,
 			setAcContent,
+			setError,
+			setIsWorking,
 		],
 	);
 

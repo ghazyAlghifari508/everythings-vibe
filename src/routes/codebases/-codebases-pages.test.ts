@@ -233,11 +233,15 @@ describe("existing-codebase workspace re-entry", () => {
 		// Sync completion is transport-only: a usable snapshot opens the
 		// workspace. AI analysis must never gate entry, so no analysis status
 		// may appear in the snapshotReady derivation.
-		const start = workspaceSource.indexOf("const snapshotReady");
-		const end = workspaceSource.indexOf("const [activeFeature", start);
+		const syncSource = readFileSync(
+			"src/features/codebase/hooks/use-codebase-sync.ts",
+			"utf8",
+		);
+		const start = syncSource.indexOf("const snapshotReady");
+		const end = syncSource.indexOf("return {", start);
 		expect(start).toBeGreaterThan(-1);
 		expect(end).toBeGreaterThan(start);
-		const derivation = workspaceSource.slice(start, end);
+		const derivation = syncSource.slice(start, end);
 		expect(derivation).toContain("hasStoredSnapshot");
 		expect(derivation).not.toContain("analysisStatus");
 		expect(derivation).not.toContain("analysis");
