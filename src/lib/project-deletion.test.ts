@@ -87,6 +87,7 @@ describe("read paths exclude tombstoned projects", () => {
 		"src/routes/task/$id.tsx",
 		"src/routes/kanban/$id.tsx",
 		"src/routes/ask/$id.tsx",
+		"src/features/codebase/services/workspace-loader.functions.ts",
 		"src/routes/codebases/$id.tsx",
 		"src/routes/prd/share/$token.tsx",
 		"src/lib/api-key-auth.ts",

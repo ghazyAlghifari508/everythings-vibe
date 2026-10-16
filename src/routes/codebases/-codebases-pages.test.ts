@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
+
+const workspaceLoaderSource = readFileSync(
+	"src/features/codebase/services/workspace-loader.functions.ts",
+	"utf8",
+);
+
 import {
 	buildCodebaseLibraryItems,
 	mapLibraryStatus,
@@ -203,12 +209,12 @@ describe("existing-codebase workspace re-entry", () => {
 	const workspaceSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
 
 	it("keeps ownership enforced on the workspace read", () => {
-		expect(workspaceSource).toContain("eq(codebases.userId, user.id)");
+		expect(workspaceLoaderSource).toContain("eq(codebases.userId, user.id)");
 	});
 
 	it("recovers stored snapshot context instead of requiring a new sync session", () => {
 		expect(workspaceSource).toContain("hasStoredSnapshot");
-		expect(workspaceSource).toContain("storedSnapshot");
+		expect(workspaceLoaderSource).toContain("storedSnapshot");
 	});
 
 	it("opens the workspace without minting a new sync session on load", () => {
@@ -864,7 +870,7 @@ describe("toSourcePreviewState", () => {
 });
 
 describe("workspace onboarding analysis selection", () => {
-	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
+	const detailSource = workspaceLoaderSource;
 
 	it("loads analysis by the immutable onboarding anchor and active snapshot", () => {
 		expect(detailSource).toContain(

@@ -28,6 +28,7 @@ import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
 import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
 import type { ProjectFeatureTree } from "@/db/schema";
+import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
 import {
 	buildAskHandoffAnswers,
 	type CodebaseSessionStartAction,
@@ -39,7 +40,6 @@ import {
 } from "@/features/codebase/utils/workspace-contracts";
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
-	type ActivePlanCandidate,
 	resolveActivePlan,
 	selectUserFacingPlans,
 } from "@/lib/codebase-active-plan";
@@ -50,10 +50,8 @@ import {
 } from "@/lib/codebase-analysis";
 import {
 	resolveWorkspaceSnapshotIdentity,
-	selectWorkspaceAnalysis,
 	shouldDiscardWorkspaceAnalysis,
 } from "@/lib/codebase-analysis-selection";
-import { resolveOnboardingAnchorProject } from "@/lib/codebase-anchor";
 import {
 	type AdaptiveQuestion,
 	appendRunThinking,
@@ -127,187 +125,6 @@ export {
 	getCodebaseSessionRequestBody,
 	resolveWorkspaceSnapshotReady,
 } from "@/features/codebase/utils/workspace-contracts";
-
-const loadCodebase = createServerFn({ method: "GET" })
-	.validator((id: string) => id)
-	.handler(async ({ data: id }) => {
-		const user = await requireUserServer();
-		const { db } = await import("@/db");
-		const {
-			acVersions,
-			codebaseAnalyses,
-			codebaseGenerationContexts,
-			codebaseSnapshots,
-			codebases,
-			prdVersions,
-			projects,
-			tasks,
-		} = await import("@/db/schema");
-		const { and, desc, eq, inArray, isNull } = await import("drizzle-orm");
-		// Resolved on the server with the rest of the loader data: the workspace
-		// needs it to decide whether the full Kanban route will open for this
-		// account, and the route already gates that same decision server-side.
-		const { hasFullWorkflow } = await import("@/lib/credits");
-		const { getUserPlanAndQuota } = await import("@/lib/session");
-		const { plan } = await getUserPlanAndQuota();
-		const canOpenFullBoard = hasFullWorkflow(plan);
-		const [codebase] = await db
-			.select({
-				id: codebases.id,
-				name: codebases.name,
-				onboardingProjectId: codebases.onboardingProjectId,
-				repositoryIdentity: codebases.repositoryIdentity,
-			})
-			.from(codebases)
-			.where(and(eq(codebases.id, id), eq(codebases.userId, user.id)))
-			.limit(1);
-		if (!codebase) throw new Error("NOT_FOUND");
-		const projectRows = await db
-			.select({
-				id: projects.id,
-				name: projects.name,
-				featuresStatus: projects.featuresStatus,
-				featureTree: projects.featureTree,
-				updatedAt: projects.updatedAt,
-			})
-			.from(projects)
-			.where(
-				and(
-					eq(projects.codebaseId, id),
-					eq(projects.userId, user.id),
-					isNull(projects.deletedAt),
-				),
-			)
-			.orderBy(desc(projects.updatedAt));
-
-		// "Does this plan hold real work?" is answered from the artifact tables
-		// rather than from the project row, so a plan whose row was touched by an
-		// unrelated write is never mistaken for one that carries planning.
-		const projectIds = projectRows.map((row) => row.id);
-		const [prdRows, acRows, taskRows] =
-			projectIds.length === 0
-				? [[], [], []]
-				: await Promise.all([
-						db
-							.select({ projectId: prdVersions.projectId })
-							.from(prdVersions)
-							.where(inArray(prdVersions.projectId, projectIds)),
-						db
-							.select({ projectId: acVersions.projectId })
-							.from(acVersions)
-							.where(inArray(acVersions.projectId, projectIds)),
-						db
-							.select({ projectId: tasks.projectId })
-							.from(tasks)
-							.where(inArray(tasks.projectId, projectIds)),
-					]);
-		const withPrd = new Set(prdRows.map((row) => row.projectId));
-		const withAc = new Set(acRows.map((row) => row.projectId));
-		const withTasks = new Set(taskRows.map((row) => row.projectId));
-
-		const plans: ActivePlanCandidate[] = projectRows.map((row) => {
-			const hasFeature = row.featureTree != null;
-			const hasPrd = withPrd.has(row.id);
-			const hasAc = withAc.has(row.id);
-			const hasTasks = withTasks.has(row.id);
-			return {
-				id: row.id,
-				name: row.name,
-				updatedAt: row.updatedAt?.toISOString() ?? null,
-				hasArtifacts: hasFeature || hasPrd || hasAc || hasTasks,
-				hasFeature,
-				hasPrd,
-				hasAc,
-				hasTasks,
-			};
-		});
-
-		const onboardingFeature = resolveOnboardingAnchorProject({
-			onboardingProjectId: codebase.onboardingProjectId,
-			projects: projectRows,
-			expectedCodebaseId: id,
-		});
-		const [currentSnapshot] = await db
-			.select({ id: codebaseSnapshots.id })
-			.from(codebaseSnapshots)
-			.where(
-				and(
-					eq(codebaseSnapshots.codebaseId, id),
-					inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES]),
-				),
-			)
-			.orderBy(desc(codebaseSnapshots.createdAt))
-			.limit(1);
-		// The snapshot each plan's planning was generated against, read from the
-		// generation-context links rather than assumed. Bound per plan, because a
-		// repository holds several independent plans and each one may have been
-		// written against a different snapshot: the workspace reports "review this
-		// plan" only for the plan actually on screen. Nothing is ever regenerated.
-		const planningSnapshotRows =
-			projectIds.length === 0
-				? []
-				: await db
-						.select({
-							projectId: codebaseGenerationContexts.projectId,
-							snapshotId: codebaseGenerationContexts.snapshotId,
-							updatedAt: codebaseGenerationContexts.updatedAt,
-						})
-						.from(codebaseGenerationContexts)
-						.innerJoin(
-							projects,
-							eq(projects.id, codebaseGenerationContexts.projectId),
-						)
-						.where(
-							and(
-								inArray(codebaseGenerationContexts.projectId, projectIds),
-								eq(projects.userId, user.id),
-							),
-						)
-						.orderBy(desc(codebaseGenerationContexts.updatedAt));
-		const planningSnapshotByProject = new Map<string, string>();
-		for (const row of planningSnapshotRows) {
-			// Newest link wins; the rows are already ordered by it.
-			if (!planningSnapshotByProject.has(row.projectId)) {
-				planningSnapshotByProject.set(row.projectId, row.snapshotId);
-			}
-		}
-		let analysis: AnalysisResponse | null = null;
-		if (onboardingFeature && currentSnapshot) {
-			// Every attempt for this exact project + snapshot is a candidate: a
-			// newer pending or failed run must not hide an older ready result
-			// that already carries the repository-aware starter suggestions.
-			const rows = await db
-				.select()
-				.from(codebaseAnalyses)
-				.where(
-					and(
-						eq(codebaseAnalyses.projectId, onboardingFeature.id),
-						eq(codebaseAnalyses.snapshotId, currentSnapshot.id),
-					),
-				)
-				.orderBy(desc(codebaseAnalyses.createdAt));
-			analysis = selectWorkspaceAnalysis(rows, {
-				projectId: onboardingFeature.id,
-				snapshotId: currentSnapshot.id,
-			}).selected;
-		}
-		// Stored snapshot derived from usable current snapshot independent of sync session expiry
-		// (including empty repositories).
-		const storedSnapshot = currentSnapshot;
-		const hasStoredSnapshot = Boolean(storedSnapshot);
-		return {
-			codebase,
-			plans,
-			onboardingFeatureId: onboardingFeature?.id ?? null,
-			currentSnapshotId: currentSnapshot?.id ?? null,
-			// Serialized as a plain record so the client can look up the snapshot
-			// for whichever plan it resolves as active.
-			planningSnapshotByProject: Object.fromEntries(planningSnapshotByProject),
-			analysis,
-			hasStoredSnapshot,
-			canOpenFullBoard,
-		};
-	});
 
 const loadSnapshotManifest = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
