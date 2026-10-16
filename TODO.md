@@ -14,6 +14,7 @@ Dokumen ini memuat daftar rencana kerja, backlog arsitektur, standarisasi kualit
 7. [Bagian 7: Arsitektur Berbasis Fitur — Modular Feature-Driven Directory Structure](#7-arsitektur-berbasis-fitur--modular-feature-driven-directory-structure)
 8. [Bagian 8: Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure & Zero Dead Code](#8-aturan-tegas-ai-agent--enforcement-policy-anti-slop-strict-structure--zero-dead-code)
 9. [Bagian 9: Decoupling & Standalone Domain — Pemisahan VibeScrape dari VibeDesign](#9-decoupling--standalone-domain--pemisahan-vibescrape-dari-vibedesign)
+10. [Bagian 10: Design System & Iconography Overhaul — Migrasi dari Lucide React ke Hugeicons](#10-design-system--iconography-overhaul--migrasi-dari-lucide-react-ke-hugeicons)
 
 ---
 
@@ -853,6 +854,202 @@ Pemisahan fitur tidak menghilangkan sinergi. VibeDesign Studio tetap dapat meman
 
 ---
 
+## 10. Design System & Iconography Overhaul — Migrasi dari Lucide React ke Hugeicons
+
+### 10.1. Latar Belakang & Rasional Migrasi
+* **Status:** `Proposed / Backlog`
+* **Prioritas:** `P2`
+* **Kompleksitas:** `Sedang - Luas` (~100+ file UI dan komponen di seluruh repositori)
+* **Tujuan:** Menggantikan seluruh pemakaian dan dependensi icon library `lucide-react` dengan **Hugeicons** (`@hugeicons/react` dan `@hugeicons/core-free-icons`) di seluruh aplikasi **everythings-vibe** demi meningkatkan estetika visual, konsistensi hairline stroke, dan diferensiasi desain developer-grade.
+
+#### Mengapa Beralih dari Lucide React ke Hugeicons?
+1. **Estetika Developer-Grade & Menolak Standar "AI Slop Boilerplate":**
+   Lucide React adalah icon library bawaan standar yang digunakan oleh hampir seluruh template shadcn/ui dan proyek starter AI. Hal ini membuat aplikasi tampak seperti produk "template pasaran". Hugeicons menghadirkan estetika stroke yang lebih tajam (*crisp hairline*), sudut kurva yang presisi, dan nuansa visual modern yang dirancang khusus untuk antarmuka produk teknologi tinggi.
+2. **Kekayaan Varian Gaya & Diferensiasi State:**
+   Hugeicons menyediakan lebih dari 4.000+ ikon gratis dengan konsistensi grid yang ketat. Mendukung fitur canggih seperti `altIcon` (perubahan ikon otomatis saat state aktif/toggled) yang sangat cocok untuk tombol interaktif seperti bookmark, copy, pin, expand/collapse, dan status checklist.
+3. **Kesesuaian dengan Identitas Multi-Surface everythings-vibe:**
+   Set ikon Hugeicons mencakup glif teknis yang sangat kaya untuk kebutuhan alur kerja developer: branching git, snapshot terminal, visualisasi token desain, frame multi-screen canvas, hingga pipeline inspeksi kode AST.
+
+---
+
+### 10.2. Target Arsitektur Iconography & Abstraksi Komponen (`Icon`)
+
+#### Masalah Pola Direct Import di Codebase Eksisting:
+Saat ini hampir 100+ file komponen mengimpor langsung dari package pihak ketiga:
+```tsx
+import { Check, Search, Settings } from 'lucide-react';
+```
+Pola ini menciptakan coupling langsung yang kaku: jika di masa mendatang terjadi pembaruan icon library, penyesuaian stroke width bawaan, atau optimasi bundle, perubahan harus dilakukan secara manual di ratusan file.
+
+#### Solusi Arsitektur: Reusable Icon Abstraction (`src/components/ui/icon.tsx`):
+Membangun abstraction component tunggal `Icon` di `src/components/ui/icon.tsx` yang membungkus komponen resmi `HugeiconsIcon`:
+
+```tsx
+import { HugeiconsIcon } from '@hugeicons/react';
+import type { IconSvgObject } from '@hugeicons/react';
+
+export interface IconProps {
+  icon: IconSvgObject;
+  size?: number;
+  strokeWidth?: number;
+  color?: string;
+  className?: string;
+  altIcon?: IconSvgObject;
+  showAlt?: boolean;
+}
+
+/**
+ * Standard Icon Component for everythings-vibe.
+ * Enforces crisp hairline stroke (default 1.5px) and standard size (18px)
+ * per .agents/rules/anti-ai-slop.md.
+ */
+export function Icon({
+  icon,
+  size = 18,
+  strokeWidth = 1.5,
+  color = 'currentColor',
+  className,
+  ...props
+}: IconProps) {
+  return (
+    <HugeiconsIcon
+      icon={icon}
+      size={size}
+      strokeWidth={strokeWidth}
+      color={color}
+      className={className}
+      {...props}
+    />
+  );
+}
+```
+
+**Keuntungan Arsitektural:**
+- Standarisasi stroke width default (1.5px) dan ukuran (18px) secara global sesuai aturan [.agents/rules/anti-ai-slop.md](file:///C:/Coding/Web%20Development/Tanstack-start/everythings-vibe/.agents/rules/anti-ai-slop.md).
+- Dukungan seamless pewarisan warna font (`currentColor`) dan utility classes Tailwind (`className="text-snow hover:text-white"`).
+- Memudahkan mocking pada Vitest suite dan integrasi Storybook / visual regression test.
+
+---
+
+### 10.3. Tabel Pemetaan Ikon Populer (Lucide $\rightarrow$ Hugeicons Mapping Matrix)
+
+Berikut panduan referensi pemetaan ikon Lucide React yang paling sering dipakai ke glif padanannya di `@hugeicons/core-free-icons`:
+
+| Kategori / Makna UI | Ikon Lucide React Eksisting | Ikon Hugeicons Padanan (`@hugeicons/core-free-icons`) |
+| :--- | :--- | :--- |
+| **Checklist & Selesai** | `Check`, `CheckCheck` | `Tick01Icon`, `CheckmarkCircle01Icon` |
+| **Navigasi Panah** | `ChevronDown`, `ChevronUp`, `ChevronLeft`, `ChevronRight` | `ArrowDown01Icon`, `ArrowUp01Icon`, `ArrowLeft01Icon`, `ArrowRight01Icon` |
+| **Pencarian & Filter** | `Search`, `Filter` | `Search01Icon`, `FilterIcon` |
+| **Pengaturan & Identitas** | `Settings`, `User`, `Users` | `Settings01Icon`, `UserIcon`, `UserGroupIcon` |
+| **Operasi CRUD** | `Plus`, `Trash2`, `Trash`, `Edit`, `Copy` | `Add01Icon`, `Delete01Icon`, `PencilEdit01Icon`, `Copy01Icon` |
+| **Loading & Refresh** | `Loader2`, `RefreshCw`, `RotateCcw` | `Loading01Icon`, `RefreshIcon`, `RotateLeft01Icon` |
+| **Peringatan & Batal** | `AlertCircle`, `AlertTriangle`, `X`, `XCircle` | `AlertCircleIcon`, `Alert01Icon`, `Cancel01Icon`, `CancelCircleIcon` |
+| **File & Dokumen** | `Folder`, `FolderGit2`, `FileText`, `Code` | `Folder01Icon`, `FolderGitIcon`, `FileDocumentIcon`, `Code01Icon` |
+| **Terminal & Tooling** | `Terminal`, `ExternalLink`, `Share2` | `TerminalIcon`, `LinkSquare01Icon`, `Share01Icon` |
+| **Tema & Visibilitas** | `Sun`, `Moon`, `Eye`, `EyeOff` | `Sun01Icon`, `Moon01Icon`, `ViewIcon`, `ViewOffSlashIcon` |
+| **Keamanan & Finansial** | `Shield`, `CreditCard`, `Lock` | `ShieldSecurityIcon`, `CreditCardIcon`, `LockKeyIcon` |
+| **Chat & AI Workspace** | `MessageSquare`, `Send`, `Bot`, `Sparkles` | `Message01Icon`, `SentIcon`, `CpuIcon`, `MagicWand01Icon` |
+| **Zoom & Canvas** | `ZoomIn`, `ZoomOut`, `Maximize2`, `Minimize2` | `ZoomInIcon`, `ZoomOutIcon`, `Maximize01Icon`, `Minimize01Icon` |
+
+---
+
+### 10.4. Strategi Migrasi Bertahap (Phased Non-Breaking Rollout)
+
+Karena migrasi ini menyentuh ~100+ file, pekerjaan tidak boleh dilakukan secara "big-bang rewrite" yang rawan memicu regresi UI atau test breaking. Migrasi dibagi menjadi 6 gelombang (*waves*):
+
+#### Gelombang 1 — Setup Dependensi & Wrapper Icon Primitive
+- Install paket resmi: `pnpm add @hugeicons/react @hugeicons/core-free-icons`.
+- Buat komponen wrapper `src/components/ui/icon.tsx`.
+- Migrasi komponen UI shared di `src/components/ui/`:
+  - `src/components/ui/dialog.tsx` (`X` $\rightarrow$ `Cancel01Icon`)
+  - `src/components/ui/dropdown-menu.tsx` (`Check`, `ChevronRight` $\rightarrow$ `Tick01Icon`, `ArrowRight01Icon`)
+  - `src/components/ui/theme-toggle.tsx` (`Sun`, `Moon` $\rightarrow$ `Sun01Icon`, `Moon01Icon`)
+  - `src/components/ui/pricing-card.tsx` (`Check` $\rightarrow$ `Tick01Icon`)
+  - `src/components/ui/agent-thinking.tsx` (`Loader2`, `Brain` $\rightarrow$ `Loading01Icon`, `CpuIcon`)
+
+#### Gelombang 2 — Shell Aplikasi & Navigasi Global
+- `src/components/layout/navbar.tsx` (Logo icon, User dropdown, Nav links).
+- `src/components/home/bento-hub.tsx` & `hub-breadcrumb.tsx`.
+- `src/components/layout/history-drawer.tsx` & `subscription-banner.tsx`.
+- `src/components/layout/not-found.tsx` & `src/components/ui/forbidden-page.tsx`.
+
+#### Gelombang 3 — Domain Greenfield (VibePlan)
+- `src/app/ask/ask-flow.tsx`, `question-card.tsx`, `stack-dropdown.tsx`.
+- `src/components/fitur/fitur-detail.tsx`.
+- `src/components/prd/prd-detail.tsx`, `delete-project-modal.tsx`.
+- `src/components/ac/ac-detail.tsx`.
+- `src/components/task/task-detail.tsx`, `whiteboard-canvas.tsx`, `zoom-controls.tsx`.
+- `src/components/kanban/kanban-board.tsx`, `kanban-card.tsx`, `kanban-banner.tsx`.
+
+#### Gelombang 4 — Domain Existing Codebase & CLI
+- `src/components/codebase/codebase-explorer-sidebar.tsx`.
+- `src/components/codebase/codebase-chat-workspace.tsx`.
+- `src/components/codebase/codebase-kanban-board.tsx`.
+- `src/components/codebase/codebase-resync-drawer.tsx`.
+- `src/components/codebase/codebase-plan-switcher.tsx`.
+- `src/components/codebase/sync-stage-list.tsx`, `screen-connect.tsx`.
+
+#### Gelombang 5 — Domain VibeScrape & VibeDesign Studio
+- `src/components/design/scrape-workspace-form.tsx`, `html-scraper-panel.tsx`, `scrape-progress.tsx`, `scrape-detail.tsx`.
+- `src/components/design/studio-canvas.tsx`, `studio-frame.tsx`, `studio-header.tsx`, `studio-sidebar.tsx`, `studio-design-picker.tsx`.
+- `src/components/templates/template-catalog.tsx`.
+
+#### Gelombang 6 — Settings, Admin, Bantuan & Pembersihan Total
+- `src/components/settings/settings-client.tsx`, `api-keys-client.tsx`, `credit-usage.tsx`, `feedback-form.tsx`.
+- `src/components/admin/admin-client.tsx`, `trend-line-chart.tsx`.
+- `src/components/bantuan/workflow-guides.tsx`, `faq-accordion.tsx`.
+- Eksekusi pembersihan: `pnpm remove lucide-react`.
+- Audit verifikasi: `git grep "lucide-react"` harus bernilai 0 di seluruh repositori.
+
+---
+
+### 10.5. Pertimbangan Tree-Shaking & Bundle Size
+
+* **Ukuran Paket `@hugeicons/core-free-icons`:**  
+  Paket ini memuat ribuan ikon. Jika developer atau agent mengimpor secara wildcard (`import * as Icons from ...`), bundle produksi akan meledak puluhan megabyte.
+* **Aturan Wajib Named Import:**  
+  Setiap komponen **WAJIB** menggunakan named import spesifik:
+  ```tsx
+  // BENAR (Tree-shakeable, hanya memuat beberapa KB)
+  import { Search01Icon, Settings01Icon } from '@hugeicons/core-free-icons';
+
+  // DILARANG KERAS (Memecahkan tree-shaking & merusak bundle size)
+  import * as Hugeicons from '@hugeicons/core-free-icons';
+  ```
+* **Verifikasi Build:**  
+  Setelah migrasi selesai, jalankan `pnpm build` dan periksa chunk report di `dist/` untuk memastikan ukuran vendor bundle tetap ramping dan optimal.
+
+---
+
+### 10.6. Checklist Eksekusi Migrasi Icon
+
+- [ ] **Fase 1 — Instalasi & Primitive Setup:**
+  - [ ] `pnpm add @hugeicons/react @hugeicons/core-free-icons`.
+  - [ ] Buat file wrapper `src/components/ui/icon.tsx`.
+  - [ ] Buat unit test wrapper `src/components/ui/icon.test.tsx`.
+- [ ] **Fase 2 — Migrasi UI Primitives & Layout Shell:**
+  - [ ] Migrasi ikon di `src/components/ui/` (`dialog.tsx`, `dropdown-menu.tsx`, `theme-toggle.tsx`, `agent-thinking.tsx`).
+  - [ ] Migrasi ikon di `src/components/layout/` (`navbar.tsx`, `history-drawer.tsx`, `chat-input.tsx`).
+- [ ] **Fase 3 — Migrasi Domain Greenfield & VibePlan:**
+  - [ ] Migrasi `Ask`, `Fitur`, `PRD`, `AC`, `Task Whiteboard`, dan `Kanban Board`.
+  - [ ] Verifikasi interaksi checklist `Check` $\rightarrow$ `Tick01Icon` tetap berfungsi mulus.
+- [ ] **Fase 4 — Migrasi Domain Codebase Workspace:**
+  - [ ] Migrasi `CodebaseExplorerSidebar`, `CodebaseChatWorkspace`, `SyncStageList`, `CodebaseResyncDrawer`.
+- [ ] **Fase 5 — Migrasi Domain VibeScrape & VibeDesign Studio:**
+  - [ ] Migrasi komponen scraper (`scrape-workspace-form.tsx`, `scrape-progress.tsx`, `scrape-detail.tsx`).
+  - [ ] Migrasi komponen studio canvas (`studio-canvas.tsx`, `studio-header.tsx`, `studio-sidebar.tsx`).
+- [ ] **Fase 6 — Migrasi Settings, Admin & Bantuan:**
+  - [ ] Migrasi `settings/*`, `admin/*`, `bantuan.tsx`, `template-catalog.tsx`.
+- [ ] **Fase 7 — Pembersihan Dependensi Lucide:**
+  - [ ] Jalankan `pnpm remove lucide-react`.
+  - [ ] Jalankan `git grep "lucide-react"` dan pastikan 0 referensi tersisa di `package.json` dan `src/`.
+- [ ] **Fase 8 — Verifikasi Kualitas Akhir:**
+  - [ ] Jalankan `pnpm check` (Biome linting & formatting).
+  - [ ] Jalankan `pnpm test` (Pastikan seluruh suite test lulus tanpa error icon missing).
+  - [ ] Jalankan `pnpm build` (Pastikan tree-shaking berjalan optimal dan bundle size tetap ringan).
+
+---
+
 ## 📋 Ringkasan Prioritas Eksekusi Mendatang
 
 | Prioritas | Backlog Item | Tingkat Dampak | Kompleksitas |
@@ -861,6 +1058,7 @@ Pemisahan fitur tidak menghilangkan sinergi. VibeDesign Studio tetap dapat meman
 | **P1** | **Standarisasi Responsivitas Mobile & Tablet** | Sangat Tinggi (UX Pengguna Mobile) | Sedang - Luas |
 | **P1** | **Dead Code Elimination & Pembersihan File `-` di Routes** | Tinggi (Mengurangi Bundle & Menghapus Kerumitan) | Sedang |
 | **P2** | **Pemisahan Domain VibeScrape dari VibeDesign** | Tinggi (Pemisahan Domain Bersih & Worker Isolation) | Sedang - Luas |
+| **P2** | **Migrasi Lucide React ke Hugeicons (Iconography Overhaul)** | Sedang - Tinggi (Estetika Visual & Tree-Shaking) | Sedang - Luas (100+ File UI) |
 | **P2** | **Migrasi Node.js ke Bun — Runtime & Performance Optimization** | Potensial Tinggi (Performance & Runtime Efficiency) | Tinggi |
 | **P2** | **Rebranding VibeEverything $\rightarrow$ everythings-vibe** | Tinggi (Konsistensi Merek & CLI) | Sedang (Banyak File & Test Update) |
 | **P2** | **Refactoring File Monster (~2.000 Baris)** | Sangat Tinggi (Maintainability & Clean Code) | Tinggi (Arsitektural & Butuh Kehati-hatian) |

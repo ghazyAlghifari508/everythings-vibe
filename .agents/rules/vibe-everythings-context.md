@@ -26,7 +26,7 @@ Platform ini menjembatani ide mentah menjadi rencana implementasi siap-eksekusi 
 | Layer | Teknologi | Peran & Catatan Implementasi |
 | :--- | :--- | :--- |
 | **Framework** | TanStack Start + TanStack Router | File-based routing di `src/routes/`, SSR selektif, hydration, dan server functions. |
-| **UI & Styling** | React 19, Radix UI, shadcn/ui, Tailwind CSS 4, Framer Motion | Token visual di `@tailwindcss/vite`, komposisi CVA (`class-variance-authority`), ikon Lucide React. |
+| **UI & Styling** | React 19, Radix UI, shadcn/ui, Tailwind CSS 4, Framer Motion | Token visual di `@tailwindcss/vite`, komposisi CVA (`class-variance-authority`), ikon Hugeicons (`@hugeicons/react`, target migrasi dari Lucide React). |
 | **State Management** | Zustand (`src/store/index.ts`), TanStack Query v5 | Zustand murni in-memory di client; TanStack Query untuk caching, mutasi, dan sinkronisasi server state. |
 | **Auth** | Better Auth 1.6 | Google + GitHub OAuth (`/api/auth/*`), penanganan sesi aman, tanpa email/password legacy. |
 | **Database & ORM** | PostgreSQL 17 lokal, Drizzle ORM | Skema di `src/db/schema.ts`, migrasi via `drizzle-kit`, zero RLS (app-level tenancy `WHERE user_id = ?`). |

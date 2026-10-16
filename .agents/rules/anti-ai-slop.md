@@ -59,7 +59,7 @@ Any pull request, commit, or generated component containing the following patter
 - **The Slop:** Prepending or appending emojis to navigation items, action buttons, table column headers, and status badges (e.g. `🚀 Start Free`, `✨ AI Magic`, `🔥 98 Score`, `💡 Pro Tip`).
 - **The Rule:**
   - UI chrome must be 100% free of emojis.
-  - Use monochromatic, crisp, hairline SVG line icons (Lucide React or inline SVG).
+  - Use monochromatic, crisp, hairline SVG line icons (Hugeicons, Lucide React, or inline SVG).
   - Icons must be functional indicators, sized strictly at `16px` to `20px` with a `1.5px` to `2px` stroke weight, inheriting the color of the adjacent text (`#0f0f0f` or `#606060`).
 
 ### 1.5 No Pastel Icon Circle Blobs
