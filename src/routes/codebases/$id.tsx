@@ -28,6 +28,15 @@ import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
 import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import { Logo } from "@/components/ui/logo";
 import type { ProjectFeatureTree } from "@/db/schema";
+import {
+	buildAskHandoffAnswers,
+	type CodebaseSessionStartAction,
+	decideCodebaseDetailEntry,
+	describeArtifactReadFailure,
+	formatCodebaseSyncBadge,
+	getCodebaseSessionRequestBody,
+	resolveWorkspaceSnapshotReady,
+} from "@/features/codebase/utils/workspace-contracts";
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
 	type ActivePlanCandidate,
@@ -109,85 +118,15 @@ import type { TaskTree } from "@/lib/services/task-service";
 import { requireUserServer } from "@/lib/session";
 import { consumeSseStream } from "@/lib/sse-consume";
 
-export function decideCodebaseDetailEntry(
-	codebaseId: string | undefined,
-): "allow" | "deny" {
-	return codebaseId?.trim() ? "allow" : "deny";
-}
-
-type CodebaseSessionStartAction = "initial" | "retry";
-
-export function getCodebaseSessionRequestBody(
-	action: CodebaseSessionStartAction,
-): { action?: "retry" } {
-	return action === "retry" ? { action: "retry" } : {};
-}
-
-export function buildAskHandoffAnswers(
-	chatAnswers: Record<string, string>,
-	questions: Array<{ id: string; title: string }>,
-): Array<{ question: string; answer: string }> {
-	return Object.entries(chatAnswers)
-		.map(([questionId, answer]) => {
-			const questionText =
-				questions.find((q) => q.id === questionId)?.title ?? questionId;
-			return {
-				question: questionText.trim() || questionId,
-				answer: answer.trim(),
-			};
-		})
-		.filter((entry) => entry.answer.length > 0 && entry.question.length > 0);
-}
-
-export function canRenderCodebaseReview(
-	analysis: Pick<AnalysisResponse, "snapshotId" | "output"> | null,
-	status: Pick<SyncStatusResponse, "status" | "snapshotId"> | null,
-): boolean {
-	return Boolean(
-		analysis?.output &&
-			status?.snapshotId &&
-			SNAPSHOT_CONTEXT_STATUSES.includes(status.status) &&
-			analysis.snapshotId === status.snapshotId,
-	);
-}
-
-export function formatCodebaseSyncBadge(
-	fileCount: number | null | undefined,
-): string {
-	return typeof fileCount === "number"
-		? `${fileCount} file tersinkron`
-		: "Menunggu snapshot";
-}
-
-export function resolveWorkspaceSnapshotReady(input: {
-	status?: Pick<SyncStatusResponse, "status" | "snapshotId"> | null;
-	hasStoredSnapshot: boolean;
-}): boolean {
-	return (
-		Boolean(
-			input.status?.snapshotId &&
-				SNAPSHOT_CONTEXT_STATUSES.includes(input.status.status),
-		) || input.hasStoredSnapshot
-	);
-}
-
-/**
- * Human, distinguishable copy for a failed artifact read. An unauthenticated
- * session and a missing project are different from a transient failure, so they
- * must not be reported as the same thing.
- */
-export function describeArtifactReadFailure(
-	label: string,
-	status: number,
-): string {
-	if (status === 401 || status === 403) {
-		return `Sesi tidak berlaku saat memuat ${label}. Masuk kembali lalu buka ulang workspace.`;
-	}
-	if (status === 404) {
-		return `${label} tidak ditemukan untuk perencanaan ini.`;
-	}
-	return `${label} gagal dibaca dari server. Coba lagi.`;
-}
+export {
+	buildAskHandoffAnswers,
+	canRenderCodebaseReview,
+	decideCodebaseDetailEntry,
+	describeArtifactReadFailure,
+	formatCodebaseSyncBadge,
+	getCodebaseSessionRequestBody,
+	resolveWorkspaceSnapshotReady,
+} from "@/features/codebase/utils/workspace-contracts";
 
 const loadCodebase = createServerFn({ method: "GET" })
 	.validator((id: string) => id)
