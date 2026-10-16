@@ -734,9 +734,12 @@ describe("codebase starter suggestions route wiring", () => {
 
 describe("read-only source preview contract", () => {
 	const detailSource = readFileSync("src/routes/codebases/$id.tsx", "utf8");
-	const previewSource = detailSource.slice(
-		detailSource.indexOf("const loadSnapshotFileContent"),
-		detailSource.indexOf("const loadFeatureTree"),
+	const snapshotSource = readFileSync(
+		"src/features/codebase/services/workspace-snapshot.functions.ts",
+		"utf8",
+	);
+	const previewSource = snapshotSource.slice(
+		snapshotSource.indexOf("export const loadSnapshotFileContent"),
 	);
 
 	it("binds every read to the authenticated owner of the codebase", () => {
