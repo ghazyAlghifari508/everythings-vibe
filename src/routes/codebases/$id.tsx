@@ -1,5 +1,4 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodebaseArtifactCanvas } from "@/components/codebase/codebase-artifact-canvas";
 import {
@@ -21,7 +20,7 @@ import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { ScreenIncompleteSync } from "@/components/codebase/screen-incomplete-sync";
 import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
 import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
-import { Logo } from "@/components/ui/logo";
+import { WorkspaceHeader } from "@/features/codebase/components/workspace-header";
 import { useCodebaseSync } from "@/features/codebase/hooks/use-codebase-sync";
 import { useWorkspaceArtifacts } from "@/features/codebase/hooks/use-workspace-artifacts";
 import { useWorkspacePipeline } from "@/features/codebase/hooks/use-workspace-pipeline";
@@ -32,7 +31,6 @@ import { loadCodebase } from "@/features/codebase/services/workspace-loader.func
 import {
 	buildAskHandoffAnswers,
 	decideCodebaseDetailEntry,
-	formatCodebaseSyncBadge,
 } from "@/features/codebase/utils/workspace-contracts";
 import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
@@ -1057,40 +1055,15 @@ function CodebaseDetailPage() {
 				data-testid="codebase-workspace-page"
 				className="flex h-dvh flex-col overflow-hidden bg-onyx text-snow"
 			>
-				<header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-graphite bg-charcoal px-4">
-					<div className="flex min-w-0 items-center gap-2">
-						<Logo height={22} />
-						<span aria-hidden="true" className="shrink-0 text-slate">
-							/
-						</span>
-						<span className="flex min-w-0 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 py-1 font-mono text-xs text-mist">
-							<span className="truncate">{codebase.name}</span>
-						</span>
-					</div>
-					<div className="flex shrink-0 items-center gap-2">
-						<button
-							type="button"
-							data-testid="codebase-resync-action"
-							onClick={() => {
-								setIsResyncDrawerOpen(true);
-								if (!payload) {
-									void startSession("retry");
-								}
-							}}
-							disabled={isStarting}
-							className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2.5 font-mono text-[11px] text-fog transition hover:text-snow disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							<RefreshCw size={12} aria-hidden />
-							{isStarting ? "Menyiapkan..." : "Sync ulang"}
-						</button>
-						<span
-							data-testid="codebase-sync-badge"
-							className="shrink-0 rounded-md border border-graphite bg-obsidian px-2.5 py-1 font-mono text-[11px] text-fog"
-						>
-							{formatCodebaseSyncBadge(status?.fileCount ?? manifestFileCount)}
-						</span>
-					</div>
-				</header>
+				<WorkspaceHeader
+					name={codebase.name}
+					isStarting={isStarting}
+					fileCount={status?.fileCount ?? manifestFileCount}
+					onResync={() => {
+						setIsResyncDrawerOpen(true);
+						if (!payload) void startSession("retry");
+					}}
+				/>
 				{error && (
 					<div
 						role="alert"
