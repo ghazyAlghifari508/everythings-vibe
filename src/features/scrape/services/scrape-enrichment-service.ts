@@ -1,10 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-	type ScrapeDocumentRow,
-	scrapeDocuments,
-	scrapes,
-} from "@/db/schema";
+import { type ScrapeDocumentRow, scrapeDocuments, scrapes } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
 import { getScrapeById } from "./scrape-detail-service";
 

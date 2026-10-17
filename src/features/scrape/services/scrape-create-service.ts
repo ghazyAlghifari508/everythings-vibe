@@ -8,13 +8,13 @@ import {
 	scrapes,
 	users,
 } from "@/db/schema";
-import { ScrapeError } from "@/lib/design-errors";
 import {
 	SCRAPE_LIMITS,
 	type ScrapeRequest,
 	scrapeRequestSchema,
 } from "@/features/scrape/types/scrape-contract";
 import { parseAndValidateFormat } from "@/features/scrape/utils/url-validator";
+import { ScrapeError } from "@/lib/design-errors";
 
 function domainOf(sourceUrl: string): string {
 	return new URL(sourceUrl).hostname.toLowerCase();

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isPrivateIp, parseAndValidateFormat } from "@/features/scrape/utils/url-validator";
+import {
+	isPrivateIp,
+	parseAndValidateFormat,
+} from "@/features/scrape/utils/url-validator";
 
 describe("isPrivateIp", () => {
 	it("blocks private direct and IPv4-mapped addresses", () => {

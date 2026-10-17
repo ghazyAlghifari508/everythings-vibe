@@ -1,10 +1,10 @@
+import type { DesignSettings } from "@/features/scrape/types/scrape-contract";
 import {
 	DESIGN_EVIDENCE_LIMITS,
 	type DesignEvidenceLimits,
 	visualEvidenceSchema,
 } from "./design-evidence-contract";
 import type { DesignExtraction } from "./design-extraction";
-import type { DesignSettings } from "@/features/scrape/types/scrape-contract";
 
 export interface VisualElementEvidence {
 	selector: string;

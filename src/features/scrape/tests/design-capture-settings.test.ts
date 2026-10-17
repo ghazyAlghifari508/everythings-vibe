@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	type RenderedPage,
+	renderPage,
+} from "@/features/scrape/services/render-page";
 import { FIXTURE } from "@/lib/design-fixture";
 import { scrapeHtml } from "@/lib/fetch-html";
-import { type RenderedPage, renderPage } from "@/features/scrape/services/render-page";
 
 vi.mock("@/features/scrape/utils/url-validator", () => ({
 	validateUrl: async (raw: string) => ({
@@ -9,7 +12,9 @@ vi.mock("@/features/scrape/utils/url-validator", () => ({
 		ip: "203.0.113.1",
 	}),
 }));
-vi.mock("@/features/scrape/services/render-page", () => ({ renderPage: vi.fn() }));
+vi.mock("@/features/scrape/services/render-page", () => ({
+	renderPage: vi.fn(),
+}));
 
 beforeEach(() => vi.resetAllMocks());
 

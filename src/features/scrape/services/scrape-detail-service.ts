@@ -9,9 +9,9 @@ import {
 	scrapePages,
 	scrapes,
 } from "@/db/schema";
-import { ScrapeError } from "@/lib/design-errors";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
-import { imageResultCounts } from "@/features/scrape/utils/scrape-images";
+import type { imageResultCounts } from "@/features/scrape/utils/scrape-images";
+import { ScrapeError } from "@/lib/design-errors";
 
 export interface ScrapeSummary {
 	id: string;

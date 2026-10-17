@@ -1,6 +1,9 @@
 import { chromium } from "playwright";
 import { afterAll, describe, expect, it } from "vitest";
-import { closeRenderBrowser, renderPage } from "@/features/scrape/services/render-page";
+import {
+	closeRenderBrowser,
+	renderPage,
+} from "@/features/scrape/services/render-page";
 
 afterAll(async () => {
 	await closeRenderBrowser();
@@ -39,7 +42,9 @@ describe("browser function serialization", () => {
 		const browser = await chromium.launch({ headless: true });
 		try {
 			const context = await browser.newContext();
-			const { guardContext } = await import("@/features/scrape/services/render-page");
+			const { guardContext } = await import(
+				"@/features/scrape/services/render-page"
+			);
 			await guardContext(context);
 			const page = await context.newPage();
 			await page.setContent("<h1>probe</h1>");
@@ -54,7 +59,9 @@ describe("browser function serialization", () => {
 		const browser = await chromium.launch({ headless: true });
 		try {
 			const context = await browser.newContext();
-			const { guardContext } = await import("@/features/scrape/services/render-page");
+			const { guardContext } = await import(
+				"@/features/scrape/services/render-page"
+			);
 			await guardContext(context);
 			const page = await context.newPage();
 			await page.setContent("<h1>probe</h1>");

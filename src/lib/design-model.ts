@@ -1,4 +1,8 @@
 import {
+	type DesignSettings,
+	designSettingsSchema,
+} from "@/features/scrape/types/scrape-contract";
+import {
 	type ColorClassification,
 	type ColorRoleClass,
 	classifyColors,
@@ -22,7 +26,6 @@ import {
 	type TypeSpecimen,
 } from "./design-normalize-typography";
 import type { VisualEvidence } from "./design-visual-evidence";
-import { type DesignSettings, designSettingsSchema } from "@/features/scrape/types/scrape-contract";
 
 // The structured design model is the single source of truth for both the
 // DESIGN.md document and the Style Inspector. Both renderers read this model, so

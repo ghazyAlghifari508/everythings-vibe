@@ -2,6 +2,13 @@ import http from "node:http";
 import https from "node:https";
 import type { ScrapeMode } from "@/db/schema";
 import {
+	type DesignSettings,
+	designSettingsSchema,
+	SCRAPE_LIMITS,
+} from "@/features/scrape/types/scrape-contract";
+import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
+import { validateUrl } from "@/features/scrape/utils/url-validator";
+import {
 	SCRAPE_BROWSER_UA,
 	SCRAPE_DESKTOP_HEIGHT,
 	SCRAPE_DESKTOP_WIDTH,
@@ -15,14 +22,7 @@ import {
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
 import type { VisualEvidence } from "@/lib/design-visual-evidence";
-import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import { rewritePreviewAssets } from "./preview-html";
-import {
-	type DesignSettings,
-	designSettingsSchema,
-	SCRAPE_LIMITS,
-} from "@/features/scrape/types/scrape-contract";
-import { validateUrl } from "@/features/scrape/utils/url-validator";
 
 export const DESKTOP_WIDTH = SCRAPE_DESKTOP_WIDTH;
 
@@ -315,7 +315,8 @@ export async function scrapeHtml(
 	);
 	if (views.length > SCRAPE_LIMITS.designViews)
 		throw new ScrapeError("CAPTURE_FAILED");
-	const captures: import("@/features/scrape/services/render-page").RenderedPage[] = [];
+	const captures: import("@/features/scrape/services/render-page").RenderedPage[] =
+		[];
 	for (const [index, view] of views.entries()) {
 		if (instrumentation?.signal?.aborted) throw new ScrapeError("JOB_TIMEOUT");
 		const label = `${view.viewport.width}x${view.viewport.height}, ${view.colorScheme ?? "auto"} (${index + 1}/${views.length})`;

@@ -17,7 +17,9 @@ it("runs all extraction modes through persisted queue claims", async () => {
 	const { claimScrapeJob, releaseScrapeClaim, renewScrapeClaim } = await import(
 		"@/features/scrape/services/scrape-job-service"
 	);
-	const { closeRenderBrowser } = await import("@/features/scrape/services/render-page");
+	const { closeRenderBrowser } = await import(
+		"@/features/scrape/services/render-page"
+	);
 	const [user] = await db.select({ id: users.id }).from(users).limit(1);
 	if (!user) throw new Error("Runtime verification requires an existing user.");
 	const capacityOne = await createScrape(

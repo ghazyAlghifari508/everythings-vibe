@@ -44,7 +44,9 @@ async function run() {
 				controller.abort();
 				void releaseScrapeClaim(claim)
 					.finally(async () => {
-						const { closeRenderBrowser } = await import("@/features/scrape/services/render-page");
+						const { closeRenderBrowser } = await import(
+							"@/features/scrape/services/render-page"
+						);
 						await closeRenderBrowser();
 					})
 					.catch((error: unknown) =>
@@ -90,7 +92,9 @@ void run()
 		process.exitCode = 1;
 	})
 	.finally(async () => {
-		const { closeRenderBrowser } = await import("@/features/scrape/services/render-page");
+		const { closeRenderBrowser } = await import(
+			"@/features/scrape/services/render-page"
+		);
 		await closeRenderBrowser();
 		process.exit(process.exitCode ?? 0);
 	});

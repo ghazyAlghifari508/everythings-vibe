@@ -2,24 +2,24 @@ import { createFileRoute } from "@tanstack/react-router";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { rateLimits, scrapes, users } from "@/db/schema";
 import {
+	ImageStorageError,
+	readStoredScrapeImage,
+	validateStoredImage,
+} from "@/features/scrape/services/scrape-image-storage";
+import {
+	rewritePreviewCss,
+	rewritePreviewModule,
+	verifyPreviewAssetCapability,
+} from "@/features/scrape/utils/preview-capabilities";
+import { parseAndValidateFormat } from "@/features/scrape/utils/url-validator";
+import {
 	SCRAPE_ASSET_RATE_LIMIT,
 	SCRAPE_ASSET_RATE_WINDOW_S,
 	SCRAPE_MAX_ASSET_BYTES,
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
 import { fetchAsset } from "@/lib/fetch-html";
-import {
-	rewritePreviewCss,
-	rewritePreviewModule,
-	verifyPreviewAssetCapability,
-} from "@/features/scrape/utils/preview-capabilities";
-import {
-	ImageStorageError,
-	readStoredScrapeImage,
-	validateStoredImage,
-} from "@/features/scrape/services/scrape-image-storage";
 import { requireUser } from "@/lib/session";
-import { parseAndValidateFormat } from "@/features/scrape/utils/url-validator";
 
 export const Route = createFileRoute("/api/scrape/asset")({
 	server: { handlers: { GET, OPTIONS } },

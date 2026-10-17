@@ -5,7 +5,10 @@ const servicePath = new URL(
 	"../services/scrape-pipeline-service.ts",
 	import.meta.url,
 );
-const retryServicePath = new URL("../services/scrape-service.ts", import.meta.url);
+const retryServicePath = new URL(
+	"../services/scrape-service.ts",
+	import.meta.url,
+);
 const jobServicePath = new URL(
 	"../services/scrape-job-service.ts",
 	import.meta.url,

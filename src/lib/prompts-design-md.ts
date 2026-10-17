@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import {
 	DESIGN_SYNTHESIS_DETAIL_MAX_CHARS,
 	DESIGN_SYNTHESIS_MAX_TOKENS,
@@ -26,7 +27,6 @@ import {
 	synthesisToRenderOptions,
 } from "./design-synthesis";
 import type { VisualEvidence } from "./design-visual-evidence";
-import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import { extractJson } from "./services/json-extract";
 
 export const DESIGN_SYSTEM_PROMPT =

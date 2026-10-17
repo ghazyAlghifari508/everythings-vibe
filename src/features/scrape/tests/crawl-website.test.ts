@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { crawlWebsite, isCrawlScope, robotsAllows } from "@/features/scrape/services/crawl-website";
+import {
+	crawlWebsite,
+	isCrawlScope,
+	robotsAllows,
+} from "@/features/scrape/services/crawl-website";
 import { crawlSettingsSchema } from "@/features/scrape/types/scrape-contract";
 
 describe("website traversal", () => {

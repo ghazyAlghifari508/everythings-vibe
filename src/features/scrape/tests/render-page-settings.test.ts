@@ -1,6 +1,9 @@
 import { afterEach, expect, it, vi } from "vitest";
+import {
+	closeRenderBrowser,
+	renderPage,
+} from "@/features/scrape/services/render-page";
 import { FIXTURE } from "@/lib/design-fixture";
-import { closeRenderBrowser, renderPage } from "@/features/scrape/services/render-page";
 
 const capture = vi.hoisted(() => ({
 	contextOptions: vi.fn(),

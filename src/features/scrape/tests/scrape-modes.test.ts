@@ -17,15 +17,20 @@ const mockCreateScrape = vi.fn();
 const mockRunScrapePipeline = vi.fn();
 const mockGetScrapeById = vi.fn();
 
-vi.mock("@/features/scrape/services/scrape-service", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/features/scrape/services/scrape-service")>()),
-	createScrape: (...args: unknown[]) => mockCreateScrape(...args),
-	runScrapePipeline: (...args: unknown[]) => mockRunScrapePipeline(...args),
-	getScrapeById: (...args: unknown[]) => mockGetScrapeById(...args),
-	retryScrape: vi.fn(),
-	deleteScrape: vi.fn(),
-	listScrapes: vi.fn(),
-}));
+vi.mock(
+	"@/features/scrape/services/scrape-service",
+	async (importOriginal) => ({
+		...(await importOriginal<
+			typeof import("@/features/scrape/services/scrape-service")
+		>()),
+		createScrape: (...args: unknown[]) => mockCreateScrape(...args),
+		runScrapePipeline: (...args: unknown[]) => mockRunScrapePipeline(...args),
+		getScrapeById: (...args: unknown[]) => mockGetScrapeById(...args),
+		retryScrape: vi.fn(),
+		deleteScrape: vi.fn(),
+		listScrapes: vi.fn(),
+	}),
+);
 
 describe("Scrape API Route Modes", () => {
 	it.each([

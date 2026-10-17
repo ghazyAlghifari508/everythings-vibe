@@ -1,5 +1,8 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { closeRenderBrowser, renderPage } from "@/features/scrape/services/render-page";
+import {
+	closeRenderBrowser,
+	renderPage,
+} from "@/features/scrape/services/render-page";
 
 afterAll(async () => {
 	await closeRenderBrowser();

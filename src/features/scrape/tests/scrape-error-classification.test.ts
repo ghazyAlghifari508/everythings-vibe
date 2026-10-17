@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	classifyEmptyCapture,
+	classifyNavigationFailure,
+} from "@/features/scrape/services/render-page";
+import {
 	type DesignErrorCode,
 	designErrorCodeForHttpStatus,
 	errorSourceForCode,
@@ -8,7 +12,6 @@ import {
 	ScrapeError,
 	scrapeFailureReasonForCode,
 } from "@/lib/design-errors";
-import { classifyEmptyCapture, classifyNavigationFailure } from "@/features/scrape/services/render-page";
 
 describe("errorSourceForCode", () => {
 	it("separates website failures from internal ones", () => {

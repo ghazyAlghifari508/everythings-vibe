@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { normalizeScrapeInput, scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
+import {
+	normalizeScrapeInput,
+	scrapeRequestSchema,
+} from "@/features/scrape/types/scrape-contract";
 
 describe("scrape request contract", () => {
 	it("defaults saved design requests and preserves all five selected settings", () => {

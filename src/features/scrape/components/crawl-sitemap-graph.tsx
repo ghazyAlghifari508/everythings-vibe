@@ -4,8 +4,8 @@ import { Scan } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ZoomControls } from "@/components/ui/zoom-controls";
 import type { scrapePages } from "@/db/schema";
-import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import { layoutCrawlGraph } from "@/features/scrape/utils/crawl-graph";
+import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import { cn } from "@/lib/utils";
 
 type Page = typeof scrapePages.$inferSelect;

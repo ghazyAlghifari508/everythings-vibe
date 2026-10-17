@@ -1,12 +1,6 @@
 ﻿import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import {
-	DESIGN_ERROR_CODES,
-	httpStatusForErrorCode,
-	ScrapeError,
-} from "@/lib/design-errors";
-import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
-import {
 	createScrape,
 	deleteScrape,
 	getScrapeById,
@@ -15,6 +9,15 @@ import {
 	retryScrape,
 	type ScrapeDetailPayload,
 } from "@/features/scrape/services/scrape-service";
+import {
+	SCRAPE_LIMITS,
+	scrapeRequestSchema,
+} from "@/features/scrape/types/scrape-contract";
+import {
+	DESIGN_ERROR_CODES,
+	httpStatusForErrorCode,
+	ScrapeError,
+} from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
 
 function scrapeErrorResponse(error: unknown): Response {
@@ -73,7 +76,9 @@ export async function GET({
 		// Crawl and image rows are returned with the status so polling renders
 		// progressively persisted results without a page reload. Image rows get
 		// freshly signed asset URLs, matching the detail loader contract.
-		const { signScrapeImages } = await import("@/features/scrape/services/scrape-service");
+		const { signScrapeImages } = await import(
+			"@/features/scrape/services/scrape-service"
+		);
 		const payload: ScrapeDetailPayload = {
 			...scrape,
 			images: await signScrapeImages(scrape.images, id, user.id),

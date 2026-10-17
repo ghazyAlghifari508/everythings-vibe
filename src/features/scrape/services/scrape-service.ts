@@ -1,12 +1,12 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { type ScrapeMode, scrapes, users } from "@/db/schema";
-import { ScrapeError } from "@/lib/design-errors";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 import {
 	assertScrapeRetryAllowed,
 	resolveScrapeRetryDecision,
 } from "@/features/scrape/utils/scrape-retry";
+import { ScrapeError } from "@/lib/design-errors";
 
 // Public surface for the scrape backend. Each concern lives in its own module;
 // this module keeps the job lifecycle entry points that operate on a whole job

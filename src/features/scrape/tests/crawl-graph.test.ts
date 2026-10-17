@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { scrapePages } from "@/db/schema";
-import { layoutCrawlGraph, shortCrawlLabel } from "@/features/scrape/utils/crawl-graph";
+import {
+	layoutCrawlGraph,
+	shortCrawlLabel,
+} from "@/features/scrape/utils/crawl-graph";
 
 type Page = typeof scrapePages.$inferSelect;
 

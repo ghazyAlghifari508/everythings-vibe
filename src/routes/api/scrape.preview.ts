@@ -45,7 +45,9 @@ export async function GET(
 			deps.requireUser ??
 			((requestHeaders: Headers) => requireUser(requestHeaders))
 		)(headers);
-		const { getScrapeById } = await import("@/features/scrape/services/scrape-service");
+		const { getScrapeById } = await import(
+			"@/features/scrape/services/scrape-service"
+		);
 		const scrape = await (deps.getScrapeById ?? getScrapeById)(id, user.id);
 		const { buildScrapePreviewDocument } = await import(
 			"@/features/scrape/utils/scrape-preview-document"

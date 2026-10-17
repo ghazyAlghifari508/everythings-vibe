@@ -65,7 +65,9 @@ describe("shouldSkipCaptureResourceType", () => {
 
 describe("renderPage", () => {
 	it("returns rendered DOM with client JavaScript executed", async () => {
-		const { renderPage } = await import("@/features/scrape/services/render-page");
+		const { renderPage } = await import(
+			"@/features/scrape/services/render-page"
+		);
 		const filler = "<p>lorem ipsum dolor sit amet</p>".repeat(20);
 		const activities: string[] = [];
 		const target = `data:text/html,${encodeURIComponent(
@@ -89,7 +91,9 @@ describe("renderPage", () => {
 	}, 60_000);
 
 	it("captures content appended by a lazy-load handler near the document bottom", async () => {
-		const { renderPage } = await import("@/features/scrape/services/render-page");
+		const { renderPage } = await import(
+			"@/features/scrape/services/render-page"
+		);
 		const target = `data:text/html,${encodeURIComponent(
 			`<html><head><style>body{margin:0}.spacer{height:2600px}</style></head><body><div class="spacer"></div><script>let loaded=false;window.addEventListener('scroll',()=>{if(!loaded&&window.scrollY+window.innerHeight>=document.documentElement.scrollHeight){loaded=true;const item=document.createElement('p');item.id='lazy-loaded';item.textContent='loaded after scrolling';document.body.appendChild(item);document.body.style.paddingBottom='600px';}});</script></body></html>`,
 		)}`;

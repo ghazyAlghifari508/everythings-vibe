@@ -3,8 +3,8 @@
 import { useNavigate } from "@tanstack/react-router";
 import { AlertCircle, ArrowRight, Globe, Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
-import { DESIGN_ERROR_CODES } from "@/lib/design-errors";
 import { SCRAPE_RETURN_FALLBACK } from "@/features/scrape/utils/scrape-return-path";
+import { DESIGN_ERROR_CODES } from "@/lib/design-errors";
 
 function errorMessage(status: number): string {
 	if (status === 400) return DESIGN_ERROR_CODES.INVALID_URL;

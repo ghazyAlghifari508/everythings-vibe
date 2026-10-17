@@ -19,11 +19,16 @@ vi.mock("@tanstack/react-start", () => ({
 vi.mock("@/lib/session", () => ({
 	requireUserServer: mocks.requireUserServer,
 }));
-vi.mock("@/features/scrape/services/scrape-service", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/features/scrape/services/scrape-service")>()),
-	getScrapeById: mocks.getScrapeById,
-	getScrapeResults: mocks.getScrapeResults,
-}));
+vi.mock(
+	"@/features/scrape/services/scrape-service",
+	async (importOriginal) => ({
+		...(await importOriginal<
+			typeof import("@/features/scrape/services/scrape-service")
+		>()),
+		getScrapeById: mocks.getScrapeById,
+		getScrapeResults: mocks.getScrapeResults,
+	}),
+);
 vi.mock("@/features/scrape/utils/scrape-preview-document", () => ({
 	buildScrapePreviewDocument: mocks.buildPreviewSrcDoc,
 }));

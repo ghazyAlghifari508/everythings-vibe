@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { imageResultCounts, normalizeImageCandidates } from "@/features/scrape/utils/scrape-images";
+import {
+	imageResultCounts,
+	normalizeImageCandidates,
+} from "@/features/scrape/utils/scrape-images";
 
 describe("image result counts", () => {
 	it("separates stored bytes from legacy verification and pending discovery", () => {

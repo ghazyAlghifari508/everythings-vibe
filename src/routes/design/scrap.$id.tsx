@@ -24,7 +24,9 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 			user.id,
 			mode,
 		);
-		const { signScrapeImages } = await import("@/features/scrape/services/scrape-service");
+		const { signScrapeImages } = await import(
+			"@/features/scrape/services/scrape-service"
+		);
 		const images = await signScrapeImages(imageRows, id, user.id);
 		let appOrigin = "http://localhost:3000";
 		try {

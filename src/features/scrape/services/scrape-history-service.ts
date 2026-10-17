@@ -6,16 +6,16 @@ import {
 	scrapeImages,
 	scrapes,
 } from "@/db/schema";
-import {
-	SCRAPE_HISTORY_MAX_LIMIT,
-	SCRAPE_HISTORY_SEARCH_MAX_CHARS,
-} from "@/lib/constants";
 import type {
 	ScrapeHistoryMode,
 	ScrapeHistorySort,
 	ScrapeHistoryStatusGroup,
 } from "@/features/scrape/types/scrape-contract";
 import { imageResultCounts } from "@/features/scrape/utils/scrape-images";
+import {
+	SCRAPE_HISTORY_MAX_LIMIT,
+	SCRAPE_HISTORY_SEARCH_MAX_CHARS,
+} from "@/lib/constants";
 import type { ScrapeSummary } from "./scrape-detail-service";
 
 export interface ScrapeHistoryQuery {

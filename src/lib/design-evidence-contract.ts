@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { designSettingsSchema, SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
+import {
+	designSettingsSchema,
+	SCRAPE_LIMITS,
+} from "@/features/scrape/types/scrape-contract";
 
 export const DESIGN_EVIDENCE_LIMITS = {
 	elements: 250,

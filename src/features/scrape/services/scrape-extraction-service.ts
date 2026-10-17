@@ -7,19 +7,25 @@ import {
 	scrapePages,
 	scrapes,
 } from "@/db/schema";
-import { crawlWebsite, isCrawlScope } from "@/features/scrape/services/crawl-website";
+import {
+	crawlWebsite,
+	isCrawlScope,
+} from "@/features/scrape/services/crawl-website";
+import { renderPage } from "@/features/scrape/services/render-page";
+import {
+	SCRAPE_LIMITS,
+	scrapeRequestSchema,
+} from "@/features/scrape/types/scrape-contract";
+import {
+	classifyImageOutcome,
+	normalizeImageCandidates,
+} from "@/features/scrape/utils/scrape-images";
 import {
 	designErrorCodeForHttpStatus,
 	parseRetryAfterSeconds,
 	ScrapeError,
 } from "@/lib/design-errors";
 import { fetchAsset } from "@/lib/fetch-html";
-import { renderPage } from "@/features/scrape/services/render-page";
-import { SCRAPE_LIMITS, scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
-import {
-	classifyImageOutcome,
-	normalizeImageCandidates,
-} from "@/features/scrape/utils/scrape-images";
 import {
 	classifyCrawlFailures,
 	classifyImageFailures,

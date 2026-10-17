@@ -8,7 +8,10 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
-import { imageCountsLabel, imageResultCounts } from "@/features/scrape/utils/scrape-images";
+import {
+	imageCountsLabel,
+	imageResultCounts,
+} from "@/features/scrape/utils/scrape-images";
 import { ScrapeHistoryList } from "../components/scrape-history-list";
 
 const baseSearch: ScrapeHistorySearch = {

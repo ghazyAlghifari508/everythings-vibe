@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { assessHtmlCapture, htmlCaptureFailureMessage } from "@/features/scrape/services/render-page";
+import {
+	assessHtmlCapture,
+	htmlCaptureFailureMessage,
+} from "@/features/scrape/services/render-page";
 
 const FILLER = "<p>lorem ipsum dolor sit amet consectetur</p>".repeat(6);
 

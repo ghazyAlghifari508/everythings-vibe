@@ -6,12 +6,15 @@ import {
 	scrapeDocuments,
 	scrapes,
 } from "@/db/schema";
+import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
 import { ScrapeError } from "@/lib/design-errors";
 import { scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
-import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
 import { getScrapeById } from "./scrape-detail-service";
-import { type ScrapeJobClaim, scrapeClaimPredicate } from "./scrape-job-service";
+import {
+	type ScrapeJobClaim,
+	scrapeClaimPredicate,
+} from "./scrape-job-service";
 
 export async function saveScrapeDocument(
 	scrapeId: string,

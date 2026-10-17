@@ -17,6 +17,14 @@ import {
 } from "drizzle-orm/pg-core";
 import type { CodebaseNameSource } from "@/features/codebase/services/library";
 import type {
+	DesignSettings,
+	ScrapeRequest,
+} from "@/features/scrape/types/scrape-contract";
+import type {
+	ScrapeImageDiscovery,
+	ScrapeImageOutcome,
+} from "@/features/scrape/utils/scrape-images";
+import type {
 	CreditComplexityMetrics,
 	CreditLedgerEntryType,
 	CreditOperationKind,
@@ -28,11 +36,6 @@ import type {
 	ScrapeFailureReason,
 } from "@/lib/design-errors";
 import type { VisualEvidence } from "@/lib/design-visual-evidence";
-import type { DesignSettings, ScrapeRequest } from "@/features/scrape/types/scrape-contract";
-import type {
-	ScrapeImageDiscovery,
-	ScrapeImageOutcome,
-} from "@/features/scrape/utils/scrape-images";
 import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import type {
 	StudioDesignReferenceMetadata,

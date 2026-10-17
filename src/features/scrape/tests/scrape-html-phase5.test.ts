@@ -7,8 +7,11 @@ import {
 	getCachedFormattedMarkup,
 	getCachedHighlightedRows,
 } from "@/features/codebase/services/source-view";
+import {
+	assessHtmlCapture,
+	htmlCaptureFailureMessage,
+} from "@/features/scrape/services/render-page";
 import { buildPreviewSrcDoc } from "@/features/scrape/utils/preview-capabilities";
-import { assessHtmlCapture, htmlCaptureFailureMessage } from "@/features/scrape/services/render-page";
 
 describe("Phase 5 - HTML Capture Acceptance Criteria & Empty Document Rejection", () => {
 	it("rejects empty documents and whitespace-only captures", () => {

@@ -7,6 +7,8 @@ import {
 	type ScrapeStatus,
 	scrapes,
 } from "@/db/schema";
+import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
+import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import {
 	errorSourceForCode,
 	ScrapeError,
@@ -14,10 +16,11 @@ import {
 } from "@/lib/design-errors";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "@/lib/prompts-design-md";
-import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
-import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
 import { saveScrapeDocument } from "./scrape-document-service";
-import { type ScrapeJobClaim, scrapeClaimPredicate } from "./scrape-job-service";
+import {
+	type ScrapeJobClaim,
+	scrapeClaimPredicate,
+} from "./scrape-job-service";
 
 export async function runScrapePipeline(
 	scrapeId: string,

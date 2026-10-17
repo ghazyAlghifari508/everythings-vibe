@@ -1,7 +1,10 @@
 import { expect, it } from "vitest";
+import {
+	closeRenderBrowser,
+	renderPage,
+} from "@/features/scrape/services/render-page";
 import { inspectorFromEvidence } from "./design-md-inspector";
 import { designIssues, generateDesignMd } from "./prompts-design-md";
-import { closeRenderBrowser, renderPage } from "@/features/scrape/services/render-page";
 
 it("verifies public capture measurements agree with the document and inspector", async () => {
 	const urls = process.env.SCRAPE_VERIFY_URLS?.split(",").filter(Boolean) ?? [];

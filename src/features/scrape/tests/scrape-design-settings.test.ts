@@ -1,9 +1,13 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { ScrapeRow } from "@/db/schema";
+import {
+	createScrape,
+	retryScrape,
+	runScrapePipeline,
+} from "@/features/scrape/services/scrape-service";
+import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
 import { FIXTURE } from "@/lib/design-fixture";
 import { scrapeHtml } from "@/lib/fetch-html";
-import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
-import { createScrape, retryScrape, runScrapePipeline } from "@/features/scrape/services/scrape-service";
 
 const storage = vi.hoisted(
 	(): {

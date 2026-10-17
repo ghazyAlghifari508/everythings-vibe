@@ -21,10 +21,6 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import type { ScrapeMode } from "@/db/schema";
-import {
-	SCRAPE_HISTORY_PAGE_SIZES,
-	SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS,
-} from "@/lib/constants";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
 import {
 	buildHistoryDetailSearch,
@@ -33,7 +29,14 @@ import {
 	historyTotalPages,
 	isHistoryFiltered,
 } from "@/features/scrape/utils/scrape-history";
-import { imageCountsLabel, type imageResultCounts } from "@/features/scrape/utils/scrape-images";
+import {
+	imageCountsLabel,
+	type imageResultCounts,
+} from "@/features/scrape/utils/scrape-images";
+import {
+	SCRAPE_HISTORY_PAGE_SIZES,
+	SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS,
+} from "@/lib/constants";
 import { displaySiteName } from "@/lib/site-name";
 import { formatDate } from "@/lib/utils";
 import { ScrapeFilterSelect } from "./scrape-filter-select";

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { type Browser, chromium } from "playwright";
 import type { StudioAssetRow } from "@/db/schema";
+import { isBlockedRequestUrl } from "@/features/scrape/services/render-page";
 import {
 	STUDIO_CAPTURE_DSF,
 	STUDIO_CAPTURE_MAX_HEIGHT,
@@ -10,7 +11,6 @@ import {
 	STUDIO_VISUAL_WIDTH,
 } from "@/lib/constants";
 import { fetchAsset } from "@/lib/fetch-html";
-import { isBlockedRequestUrl } from "@/features/scrape/services/render-page";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 
 export { STUDIO_VISUAL_WIDTH };

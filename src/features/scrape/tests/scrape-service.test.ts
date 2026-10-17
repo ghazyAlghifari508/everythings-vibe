@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { verifyPreviewAssetCapability } from "@/features/scrape/utils/preview-capabilities";
-import { generateDesignMd } from "@/lib/prompts-design-md";
 import {
 	resolveEnrichmentRetry,
 	type ScrapeImageRow,
 	signScrapeImages,
 } from "@/features/scrape/services/scrape-service";
+import { verifyPreviewAssetCapability } from "@/features/scrape/utils/preview-capabilities";
+import { generateDesignMd } from "@/lib/prompts-design-md";
 
 it("signs stored image identities and retains remote targets only for legacy rows", async () => {
 	vi.stubEnv("BETTER_AUTH_SECRET", "test-signing-secret-with-enough-entropy");
