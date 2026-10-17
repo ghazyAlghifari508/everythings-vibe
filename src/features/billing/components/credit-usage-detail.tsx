@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import type { CreditOperationItem } from "./credit-usage";
+import type { CreditOperationItem } from "@/features/billing/types/credit-usage";
 
 export function CreditUsageDetail({
 	selectedOp,

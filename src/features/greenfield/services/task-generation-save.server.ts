@@ -17,14 +17,14 @@ import {
 } from "@/features/greenfield/services/task-generation";
 import { saveTaskTree } from "@/features/greenfield/services/task-service";
 import { parseTaskJson } from "@/features/greenfield/services/task-tree";
+import {
+	extractPageInventory,
+	findUnknownSurfaces,
+} from "@/features/greenfield/utils/page-inventory";
 import { applyScopeRefinement } from "@/features/greenfield/utils/scope-refinement";
 import type { ScopeEvidence } from "@/features/greenfield/utils/scope-validation";
 import { buildTaskMetrics } from "@/lib/adaptive-credit";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
-import {
-	extractPageInventory,
-	findUnknownSurfaces,
-} from "@/lib/page-inventory";
 import { tryStreamWithFallback } from "@/lib/services/ai-orchestrator";
 import { settleCreditOperation } from "@/lib/services/credit-service";
 import { extractJson } from "@/lib/services/json-extract";

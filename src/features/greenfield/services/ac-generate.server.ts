@@ -203,7 +203,9 @@ async function completeAcGeneration(
 		const { extractTechStackSection, groundStack } = await import(
 			"@/features/greenfield/services/grounding"
 		);
-		const { raceWithAbort } = await import("@/lib/abort-utils");
+		const { raceWithAbort } = await import(
+			"@/features/greenfield/services/abort-utils"
+		);
 		grounded = await raceWithAbort(
 			groundStack(extractTechStackSection(input.prdContent)),
 			signal,

@@ -109,7 +109,7 @@ describe("savePrdVersion contract", () => {
 describe("feature generation retry safety", () => {
 	it("returns a completed tree as-is instead of generating a duplicate", async () => {
 		const source = await readFile(
-			new URL("../../../routes/api/features/generate.ts", import.meta.url),
+			new URL("../services/feature-generate.server.ts", import.meta.url),
 			"utf8",
 		);
 		// A retry after success must not burn another model call or overwrite the
@@ -121,7 +121,7 @@ describe("feature generation retry safety", () => {
 
 	it("rejects a concurrent generation with a conflict instead of racing it", async () => {
 		const source = await readFile(
-			new URL("../../../routes/api/features/generate.ts", import.meta.url),
+			new URL("../services/feature-generate.server.ts", import.meta.url),
 			"utf8",
 		);
 		// The claim is a conditional update, so exactly one request owns the run
@@ -133,7 +133,7 @@ describe("feature generation retry safety", () => {
 
 	it("releases the claim only while it still owns it", async () => {
 		const source = await readFile(
-			new URL("../../../routes/api/features/generate.ts", import.meta.url),
+			new URL("../services/feature-generate.server.ts", import.meta.url),
 			"utf8",
 		);
 		// A stale failure path must not clear a newer run's claim.

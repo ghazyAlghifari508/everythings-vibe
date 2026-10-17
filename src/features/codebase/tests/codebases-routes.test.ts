@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decideCodebaseDeletion } from "@/routes/api/codebases/$codebaseId";
+import { decideCodebaseDeletion } from "@/features/codebase/services/library-item-route.server";
+import { validateCodebaseNameInput } from "@/features/codebase/services/library-route.server";
 import { CODEBASE_SESSION_ROUTE_PATH } from "@/routes/api/codebases/$codebaseId/session";
-import { validateCodebaseNameInput } from "@/routes/api/codebases/index";
 
 describe("codebase routes", () => {
 	it("exposes the codebase-scoped session path", () => {
@@ -100,12 +100,12 @@ describe("decideCodebaseDeletion", () => {
 
 describe("codebase name provenance persistence contract", () => {
 	const source = readFileSync(
-		"src/routes/api/codebases/$codebaseId.ts",
+		"src/features/codebase/services/library-item-route.server.ts",
 		"utf8",
 	);
 	const renameHandler = source.slice(
-		source.indexOf("PATCH: async"),
-		source.indexOf("DELETE: async"),
+		source.indexOf("export async function handleCodebaseRename"),
+		source.indexOf("export async function handleCodebaseDelete"),
 	);
 
 	it("marks a rename as user-sourced so auto-detection cannot revert it", () => {
@@ -114,7 +114,7 @@ describe("codebase name provenance persistence contract", () => {
 
 	it("persists the name source chosen at creation", () => {
 		const createSource = readFileSync(
-			"src/routes/api/codebases/index.ts",
+			"src/features/codebase/services/library-route.server.ts",
 			"utf8",
 		);
 		expect(createSource).toContain("nameSource: nameCheck.nameSource");
@@ -150,7 +150,7 @@ describe("codebase status route contract", () => {
 
 describe("codebase deletion route contract", () => {
 	const source = readFileSync(
-		"src/routes/api/codebases/$codebaseId.ts",
+		"src/features/codebase/services/library-item-route.server.ts",
 		"utf8",
 	);
 

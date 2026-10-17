@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { and, eq, isNull } from "drizzle-orm";
-import { db } from "@/db";
-import { projects } from "@/db/schema";
+import { setProjectLastUrl } from "@/features/greenfield/services/project-history";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
 import { requireUser } from "@/lib/session";
 
@@ -30,30 +28,10 @@ export const Route = createFileRoute("/api/projects/$id/last-route")({
 					return Response.json({ error: "Invalid URL" }, { status: 400 });
 				}
 
-				const [existing] = await db
-					.select({ id: projects.id })
-					.from(projects)
-					.where(
-						and(
-							eq(projects.id, projectId),
-							eq(projects.userId, user.id),
-							isNull(projects.deletedAt),
-						),
-					)
-					.limit(1);
-				if (!existing)
+				const saved = await setProjectLastUrl(projectId, user.id, url);
+				if (!saved)
 					return Response.json({ error: "Project not found" }, { status: 404 });
 
-				await db
-					.update(projects)
-					.set({ lastUrl: url, updatedAt: new Date() })
-					.where(
-						and(
-							eq(projects.id, projectId),
-							eq(projects.userId, user.id),
-							isNull(projects.deletedAt),
-						),
-					);
 				return Response.json({ success: true, url });
 			},
 		},

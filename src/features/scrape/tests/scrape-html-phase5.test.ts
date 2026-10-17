@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { safeScrapeFilename } from "@/components/design/scrape-detail";
 import {
 	buildSourceViewRows,
 	clearFormatMarkupCache,
@@ -11,6 +10,7 @@ import {
 	assessHtmlCapture,
 	htmlCaptureFailureMessage,
 } from "@/features/scrape/services/render-page";
+import { safeScrapeFilename } from "@/features/scrape/utils/filename";
 import { buildPreviewSrcDoc } from "@/features/scrape/utils/preview-capabilities";
 
 describe("Phase 5 - HTML Capture Acceptance Criteria & Empty Document Rejection", () => {

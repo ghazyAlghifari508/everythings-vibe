@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { and, eq, isNull } from "drizzle-orm";
-import { db } from "@/db";
-import { projects } from "@/db/schema";
+import { getKanbanData } from "@/features/greenfield/services/task-kanban";
+import { verifyProjectOwnership } from "@/lib/api-key-auth";
 import { requireUser } from "@/lib/session";
 
 export const Route = createFileRoute("/api/kanban/$pid")({
@@ -13,23 +12,9 @@ export const Route = createFileRoute("/api/kanban/$pid")({
 				const { pid: projectId } = params;
 
 				// App-level ownership check before delegating to shared helper.
-				const [project] = await db
-					.select({ id: projects.id })
-					.from(projects)
-					.where(
-						and(
-							eq(projects.id, projectId),
-							eq(projects.userId, user.id),
-							isNull(projects.deletedAt),
-						),
-					)
-					.limit(1);
-				if (!project)
+				if (!(await verifyProjectOwnership(user.id, projectId)))
 					return Response.json({ error: "Project not found" }, { status: 404 });
 
-				const { getKanbanData } = await import(
-					"@/features/greenfield/services/task-kanban"
-				);
 				const data = await getKanbanData(projectId);
 				return Response.json(data);
 			},

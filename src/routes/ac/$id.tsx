@@ -1,68 +1,8 @@
 import { createFileRoute, redirect, useLocation } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { and, eq, isNull } from "drizzle-orm";
 import { useEffect } from "react";
-import { db } from "@/db";
-import { projects } from "@/db/schema";
 import { AcDetail } from "@/features/greenfield/components/ac/ac-detail";
 import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
-import { getLatestAcContent } from "@/features/greenfield/services/ac-service";
-import { getLatestPrdContent } from "@/features/greenfield/services/prd-service";
-import { getUserPlanAndQuota, requireUserServer } from "@/lib/session";
-
-// ponytail: server-only db logic - loader runs on client too, must not import db there.
-const loadAc = createServerFn({ method: "GET" })
-	.validator((id: string) => id)
-	.handler(async ({ data: id }) => {
-		const user = await requireUserServer();
-		const { plan } = await getUserPlanAndQuota();
-
-		const { hasFullWorkflow } = await import(
-			"@/features/billing/services/credits"
-		);
-		if (!hasFullWorkflow(plan)) {
-			throw redirect({
-				to: "/prd/$id",
-				params: { id },
-				search: { paywall: "ac" },
-			});
-		}
-
-		// Authorize project ownership FIRST before querying child PRD/AC version tables
-		const [project] = await db
-			.select({
-				id: projects.id,
-				name: projects.name,
-				acStatus: projects.acStatus,
-				step: projects.step,
-			})
-			.from(projects)
-			.where(
-				and(
-					eq(projects.id, id),
-					eq(projects.userId, user.id),
-					isNull(projects.deletedAt),
-				),
-			)
-			.limit(1);
-
-		if (!project) throw new Error("NOT_FOUND");
-
-		const [prdContent, acContent] = await Promise.all([
-			getLatestPrdContent(id),
-			getLatestAcContent(id),
-		]);
-
-		return {
-			projectId: id,
-			projectName: project.name,
-			step: project.step ?? null,
-			latestAcContent: acContent ?? undefined,
-			latestPrdContent: prdContent ?? undefined,
-			plan,
-			acStatus: project.acStatus ?? "pending",
-		};
-	});
+import { loadAc } from "@/features/greenfield/services/pipeline-loaders.functions";
 
 export const Route = createFileRoute("/ac/$id")({
 	validateSearch: (
@@ -114,7 +54,7 @@ function AcDetailPage() {
 			latestAcContent={d.latestAcContent}
 			latestPrdContent={d.latestPrdContent}
 			plan={d.plan}
-			acStatus={(d as { acStatus?: string | null }).acStatus ?? null}
+			acStatus={d.acStatus}
 		/>
 	);
 }

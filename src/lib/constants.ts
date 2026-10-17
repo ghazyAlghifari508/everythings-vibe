@@ -56,9 +56,6 @@ export const MAX_CREDIT_AMOUNT = 10_000_000;
 // carries streamed PRD text (tens of KB); preferences is a small JSON bag.
 export const MAX_RESUME_CONTENT_CHARS = 200_000;
 export const MAX_PREFERENCES_CHARS = 10_000;
-// Bounded accumulation for the Fitur JSON generation: abort the upstream
-// generation past what the parser could ever need.
-export const MAX_FEATURE_RESPONSE_CHARS = 200_000;
 
 // Pre-byte-retry for AI generation: if the upstream router drops/errors before
 // any text-delta leaves the server, retry once before failing the whole request.
@@ -72,155 +69,8 @@ export const AI_STALL_TIMEOUT_MS = 120_000;
 // Hard ceiling per generation (covers full stream including burst + tokens).
 export const AI_TOTAL_TIMEOUT_MS = 600_000;
 
-// Bounded wait before a 409 when another generation still holds the claim —
-// an aborted request releases ac_status/task_status asynchronously, so an
-// immediate retry (StrictMode double-mount) must give it time to free up.
-export const CLAIM_POLL_MS = 500;
-export const CLAIM_RETRY_MS = 2000;
-// Max time a second generate caller (AC or Task) waits for an in-flight
-// sibling attempt to settle before giving up silently (prevents stacked
-// duplicate requests).
-export const GUARD_WAIT_MS = 3000;
-
 export const MIN_PROMPT_LENGTH = 20;
 export const MAX_PROMPT_LENGTH = 3000;
-
-/** Filename stem for exported project archives, used by the export route and
- * the client download fallback so both sides emit the same name. */
-export const EXPORT_FILENAME_PREFIX = "vibeeverything";
-export const HOME_DRAFT_DEBOUNCE_MS = 300;
-export const HISTORY_PAGE_SIZE = 12;
-// === Scrape history (Phase 7) ===
-// Bounded server-side pagination for the scrape history workspace. The list
-// surface stays dense and predictable: only these page sizes ever reach the
-// query, so counts and offsets cannot be abused into over-fetching.
-export const SCRAPE_HISTORY_PAGE_SIZES = [10, 20, 50] as const;
-export const SCRAPE_HISTORY_DEFAULT_PAGE_SIZE = 10;
-export const SCRAPE_HISTORY_MAX_LIMIT = 50;
-// Literal substring search bound shared by the validator and the query so a
-// pasted paragraph never becomes an unbounded LIKE pattern.
-export const SCRAPE_HISTORY_SEARCH_MAX_CHARS = 128;
-// Debounce for the history search input: visible keystrokes stay instant while
-// URL/loader updates wait for a pause in typing.
-export const SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS = 300;
-// Existing-codebase library page size. Separate from HISTORY_PAGE_SIZE: the
-// two lists show different entity types with different card density, so they
-// must be able to diverge without coupling the Greenfield history list.
-export const CODEBASE_LIBRARY_PAGE_SIZE = 10;
-// Codebase name bounds shared by create and rename so the same project cannot
-// be named inconsistently through two entry points.
-export const CODEBASE_NAME_MIN_CHARS = 3;
-export const CODEBASE_NAME_MAX_CHARS = 100;
-
-export const KANBAN_SSE_INTERVAL_MS = 3_000;
-export const KANBAN_POLL_INTERVAL_MS = 10_000;
-// Reconciliation poll while a generation is in flight but its SSE owner is
-// gone (user navigated away and back). Fires router.invalidate() so the
-// loader — the single source of truth — refreshes from Postgres. Reused by
-// Task/AC/PRD detail views; 2.5s balances freshness vs loader pressure.
-export const GENERATION_STATUS_POLL_INTERVAL_MS = 2_500;
-
-// === Existing codebase sync (MVP locked decisions) ===
-// Browser polls the persisted sync status; no sync SSE endpoint in MVP.
-//
-// Cadence follows what the server is actually doing. While an attempt is in
-// flight the CLI is moving between real persisted states and the browser has a
-// short window in which to observe each one, so it reconciles faster. While the
-// session is still `waiting_for_cli` nothing on the server can change until the
-// user runs the CLI, so a slower cadence loses no information and stops
-// spending the status-read budget on an idle session (which lasts up to the
-// full 30-minute session expiry).
-export const CODEBASE_SYNC_POLL_INTERVAL_MS = 2_000;
-// Active-attempt cadence: the window in which `connected` -> `uploading` ->
-// `uploaded` transitions can be missed is bounded by the CLI's own upload time,
-// so this is the reconciliation budget for a genuinely in-flight attempt.
-export const CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS = 500;
-// Bounded lifetime for one browser status request. A hung fetch must never
-// wedge polling: the request is aborted past this budget and the next poll
-// is scheduled. Real network failures stay honest errors; aborts stay silent.
-export const CODEBASE_SYNC_REQUEST_TIMEOUT_MS = 10_000;
-// A sync session (and its credential) expires after 30 minutes.
-export const CODEBASE_SYNC_SESSION_EXPIRY_MS = 30 * 60 * 1000;
-// Transport bounds enforced by both CLI and server.
-export const CODEBASE_MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
-export const CODEBASE_MAX_FILE_BYTES = 1024 * 1024;
-export const CODEBASE_MAX_CHUNK_BYTES = 256 * 1024;
-// Maximum characters of a stored package.json handed to the workspace loader
-// for stack detection. A manifest is a small document; anything longer is not
-// a package manifest and must not be parsed as one.
-export const CODEBASE_PACKAGE_JSON_PREVIEW_MAX_CHARS = 20_000;
-// Maximum characters of one synchronized source file served to the read-only
-// preview. Keeps the response bounded for the largest allowed snapshot file
-// (1 MiB) and the DOM bounded for rendering; the preview states truncation
-// explicitly instead of silently showing a partial file.
-export const CODEBASE_FILE_PREVIEW_MAX_CHARS = 64_000;
-// Maximum rendered lines per preview. A long file is clipped on a line
-// boundary and reported, so line numbers never drift from real content.
-export const CODEBASE_FILE_PREVIEW_MAX_LINES = 3_000;
-// Minimum supported CLI version for `vibeeverything codebase sync`. The floor
-// stays 2.0.0 on purpose: capabilities added later (repositoryName handshake
-// identity, canonical ignore file, preparation-failure reporting) are
-// advisory — the server tolerates their absence and keeps the existing name —
-// so raising the minimum would break working syncs for no transport need.
-export const CODEBASE_CLI_MIN_VERSION = "2.0.0";
-// A pending idempotency claim older than this is treated as abandoned by a
-// crashed request and may be atomically stolen by a retry. Bound from the
-// CLI's 30s per-request timeout: a live owner finalizes or releases well
-// within one timeout, so two timeouts is generous headroom with no false
-// steals.
-export const CODEBASE_SYNC_CLAIM_STALE_MS = 2 * 30_000;
-// Maximum user-facing sync error message length served to browsers. Longer
-// server-written messages are truncated so status polling stays bounded.
-export const CODEBASE_MAX_ERROR_MESSAGE_CHARS = 500;
-// Maximum source-context characters fed to the analysis model per attempt.
-// Snapshot rows stay the source of truth; the prompt carries a bounded
-// excerpt and marks truncation explicitly.
-export const CODEBASE_ANALYSIS_MAX_CONTEXT_CHARS = 60_000;
-// Token headroom for analysis generation. Mirrors the ask/options budget:
-// reasoning models spend from the same maxOutputTokens budget before any
-// JSON content is emitted.
-export const CODEBASE_ANALYSIS_MAX_TOKENS = 12_000;
-// Maximum manifest entries listed in the analysis prompt. Overflow is marked
-// explicitly so the model never mistakes a truncated list for the full tree.
-export const CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES = 500;
-// Maximum characters of a rejected model output echoed back in the single
-// bounded repair request. Repair re-states the contract with the failure
-// locations; the full output is never replayed unbounded.
-export const CODEBASE_ANALYSIS_REPAIR_MAX_RAW_CHARS = 12_000;
-// Maximum characters for the model-generated application summary stored in
-// the analysis output. Two to three Indonesian sentences fit comfortably;
-// longer prose belongs in findings, not in the review header card.
-export const CODEBASE_ANALYSIS_SUMMARY_MAX_CHARS = 1000;
-export const CODEBASE_STARTER_TITLE_MAX_CHARS = 80;
-export const CODEBASE_STARTER_DESCRIPTION_MAX_CHARS = 180;
-export const CODEBASE_STARTER_PROMPT_MAX_CHARS = 1500;
-// === Existing-codebase generation grounding (Task 8) ===
-// Bounded snapshot-bound context injected into Ask/PRD/AC/Task prompts via
-// one formatting boundary (buildCodebasePromptBlock). Null context (greenfield)
-// is a no-op so greenfield prompts stay byte-identical.
-export const CODEBASE_GENERATION_MAX_CONTEXT_CHARS = 6_000;
-export const CODEBASE_GENERATION_MAX_PATHS = 40;
-export const CODEBASE_GENERATION_MAX_FINDINGS = 5;
-export const CODEBASE_GENERATION_MAX_PROMPT_CHARS = 2_000;
-export const CODEBASE_GENERATION_MAX_ANSWER_CHARS = 1_000;
-// Per-section caps inside the bounded block (Task 9 hardening): the global
-// char ceiling alone would let one oversized section (e.g. a huge analysis
-// summary) silently crowd out constraints/findings. Snapshot identity stays
-// above truncation (buildCodebasePromptBlock), so identity always survives.
-export const CODEBASE_GENERATION_MAX_SUMMARY_CHARS = 2_000;
-export const CODEBASE_GENERATION_MAX_CONSTRAINTS = 10;
-// === Ask handoff persistence (Task 8) ===
-// Authoritative Ask answers/compiled prompt stored server-side for
-// existing-codebase projects so refresh and multi-device access keep them.
-// sessionStorage remains for UI continuity.
-export const CODEBASE_ASK_HANDOFF_MAX_PROMPT_CHARS = 8_000;
-export const CODEBASE_ASK_HANDOFF_MAX_ANSWERS = 60;
-export const CODEBASE_ASK_HANDOFF_MAX_STATE_CHARS = 20_000;
-export const CODEBASE_ASK_HANDOFF_MAX_OPTIONS = 8;
-// Upper bound for the best-effort handoff save at Ask submit (Task 9): the
-// save must never stall navigation to PRD. Abort/timeout/failure all fall
-// through; sessionStorage already preserves UI continuity.
-export const CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS = 8_000;
 
 // === Client error reports ===
 // Bounds for error telemetry persisted by /api/report-error. The endpoint
@@ -245,81 +95,134 @@ export {
 	TOPUP_SKU,
 	type TopUpPackage,
 } from "@/features/billing/types/billing-constants";
+export {
+	CODEBASE_ANALYSIS_MAX_CONTEXT_CHARS,
+	CODEBASE_ANALYSIS_MAX_MANIFEST_ENTRIES,
+	CODEBASE_ANALYSIS_MAX_TOKENS,
+	CODEBASE_ANALYSIS_REPAIR_MAX_RAW_CHARS,
+	CODEBASE_ANALYSIS_SUMMARY_MAX_CHARS,
+	CODEBASE_ASK_HANDOFF_MAX_ANSWERS,
+	CODEBASE_ASK_HANDOFF_MAX_OPTIONS,
+	CODEBASE_ASK_HANDOFF_MAX_PROMPT_CHARS,
+	CODEBASE_ASK_HANDOFF_MAX_STATE_CHARS,
+	CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS,
+	CODEBASE_CLI_MIN_VERSION,
+	CODEBASE_FILE_PREVIEW_MAX_CHARS,
+	CODEBASE_FILE_PREVIEW_MAX_LINES,
+	CODEBASE_GENERATION_MAX_ANSWER_CHARS,
+	CODEBASE_GENERATION_MAX_CONSTRAINTS,
+	CODEBASE_GENERATION_MAX_CONTEXT_CHARS,
+	CODEBASE_GENERATION_MAX_FINDINGS,
+	CODEBASE_GENERATION_MAX_PATHS,
+	CODEBASE_GENERATION_MAX_PROMPT_CHARS,
+	CODEBASE_GENERATION_MAX_SUMMARY_CHARS,
+	CODEBASE_LIBRARY_PAGE_SIZE,
+	CODEBASE_MAX_CHUNK_BYTES,
+	CODEBASE_MAX_ERROR_MESSAGE_CHARS,
+	CODEBASE_MAX_FILE_BYTES,
+	CODEBASE_MAX_SNAPSHOT_BYTES,
+	CODEBASE_NAME_MAX_CHARS,
+	CODEBASE_NAME_MIN_CHARS,
+	CODEBASE_PACKAGE_JSON_PREVIEW_MAX_CHARS,
+	CODEBASE_STARTER_DESCRIPTION_MAX_CHARS,
+	CODEBASE_STARTER_PROMPT_MAX_CHARS,
+	CODEBASE_STARTER_TITLE_MAX_CHARS,
+	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
+	CODEBASE_SYNC_CLAIM_STALE_MS,
+	CODEBASE_SYNC_POLL_INTERVAL_MS,
+	CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
+	CODEBASE_SYNC_SESSION_EXPIRY_MS,
+} from "@/features/codebase/types/codebase-constants";
+export {
+	CLAIM_POLL_MS,
+	CLAIM_RETRY_MS,
+	EXPORT_FILENAME_PREFIX,
+	GENERATION_STATUS_POLL_INTERVAL_MS,
+	GUARD_WAIT_MS,
+	HISTORY_PAGE_SIZE,
+	HOME_DRAFT_DEBOUNCE_MS,
+	KANBAN_POLL_INTERVAL_MS,
+	KANBAN_SSE_INTERVAL_MS,
+	MAX_FEATURE_RESPONSE_CHARS,
+} from "@/features/greenfield/types/greenfield-constants";
+export {
+	CRAWL_DESCRIPTION_MAX_CHARS,
+	CRAWL_HEADING_MAX_CHARS,
+	CRAWL_SECTION_TEXT_MAX_CHARS,
+	DESIGN_SYNTHESIS_DETAIL_MAX_CHARS,
+	DESIGN_SYNTHESIS_MAX_COLORS,
+	DESIGN_SYNTHESIS_MAX_RADII,
+	DESIGN_SYNTHESIS_MAX_SPACING,
+	DESIGN_SYNTHESIS_MAX_TOKENS,
+	DESIGN_SYNTHESIS_MAX_TYPOGRAPHY,
+	DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS,
+	SCRAPE_ASSET_RATE_LIMIT,
+	SCRAPE_ASSET_RATE_WINDOW_S,
+	SCRAPE_BROWSER_UA,
+	SCRAPE_DESKTOP_HEIGHT,
+	SCRAPE_DESKTOP_WIDTH,
+	SCRAPE_FETCH_TIMEOUT_MS,
+	SCRAPE_HISTORY_DEFAULT_PAGE_SIZE,
+	SCRAPE_HISTORY_MAX_LIMIT,
+	SCRAPE_HISTORY_PAGE_SIZES,
+	SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS,
+	SCRAPE_HISTORY_SEARCH_MAX_CHARS,
+	SCRAPE_MAX_ASSET_BYTES,
+	SCRAPE_MAX_HTML_BYTES,
+	SCRAPE_MAX_INLINE_CSS_BYTES,
+	SCRAPE_MAX_REDIRECTS,
+	SCRAPE_MAX_STYLESHEETS,
+	SCRAPE_MOBILE_VIEWPORT,
+	SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS,
+	SCRAPE_PREVIEW_ASSET_MAX_URL_CHARS,
+	SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS,
+	SCRAPE_PREVIEW_READY_MAX_PINGS,
+	SCRAPE_PREVIEW_READY_PING_INTERVAL_MS,
+} from "@/features/scrape/types/scrape-constants";
+export {
+	STUDIO_CANVAS_COMPOSER_BOTTOM_PX,
+	STUDIO_CANVAS_COMPOSER_INSET_PX,
+	STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX,
+	STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX,
+	STUDIO_CANVAS_FIT_PADDING_PX,
+	STUDIO_CANVAS_FRAME_GAP_PX,
+	STUDIO_CANVAS_FRAME_HEADER_PX,
+	STUDIO_CANVAS_HEADER_INSET_PX,
+	STUDIO_CANVAS_INITIAL_ZOOM,
+	STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX,
+	STUDIO_CANVAS_MAX_ZOOM,
+	STUDIO_CANVAS_MIN_VISIBLE_PX,
+	STUDIO_CANVAS_MIN_ZOOM,
+	STUDIO_CANVAS_OVERLAY_GAP_PX,
+	STUDIO_CANVAS_TOOLBAR_INSET_PX,
+	STUDIO_CANVAS_ZOOM_BOTTOM_PX,
+	STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX,
+	STUDIO_CANVAS_ZOOM_ROW_WIDTH_PX,
+	STUDIO_CAPTURE_DSF,
+	STUDIO_CAPTURE_MAX_HEIGHT,
+	STUDIO_CAPTURE_QUALITY,
+	STUDIO_CAPTURE_TIMEOUT_MS,
+	STUDIO_DESIGN_MD_MAX_CHARS,
+	STUDIO_FRAME_CONCURRENCY,
+	STUDIO_FRAME_MAX_TOKENS,
+	STUDIO_FRAME_RETRY_MAX,
+	STUDIO_JOB_CLAIM_TTL_MS,
+	STUDIO_LOGO_ALLOWED_MIMES,
+	STUDIO_LOGO_MAX_BYTES,
+	STUDIO_PLANNING_MAX_TOKENS,
+	STUDIO_PRD_FILE_MAX_BYTES,
+	STUDIO_PRD_MAX_CHARS,
+	STUDIO_PRD_MIN_CHARS,
+	STUDIO_PREVIOUS_HTML_MAX_CHARS,
+	STUDIO_VISUAL_FALLBACK_HEIGHT,
+	STUDIO_VISUAL_VIEWPORT_HEIGHT,
+	STUDIO_VISUAL_WIDTH,
+} from "@/features/studio/types/studio-constants";
 
 // Single display timezone for every user-facing date and time. The database
 // stores instants (timestamptz); rendering must not depend on the host or
 // browser timezone, or the same payment can show a different calendar day.
 export const APP_TIME_ZONE = "Asia/Jakarta";
-
-// === VibeDesign scrape bounds (Opsi 1) ===
-// SSRF-safe fetch limits ported from Docrivo: single source of truth so the
-// fetcher, asset proxy, and services never scatter magic numbers.
-export const SCRAPE_BROWSER_UA =
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
-export const SCRAPE_FETCH_TIMEOUT_MS = 25_000;
-export const SCRAPE_MAX_HTML_BYTES = 5_000_000;
-export const SCRAPE_MAX_ASSET_BYTES = 15_000_000;
-export const SCRAPE_MAX_REDIRECTS = 3;
-export const SCRAPE_MAX_STYLESHEETS = 8;
-export const SCRAPE_MAX_INLINE_CSS_BYTES = 512_000;
-export const SCRAPE_DESKTOP_WIDTH = 1440;
-export const SCRAPE_DESKTOP_HEIGHT = 900;
-export const SCRAPE_MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
-export const SCRAPE_ASSET_RATE_LIMIT = 1000;
-export const SCRAPE_ASSET_RATE_WINDOW_S = 60;
-export const SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS = 60 * 60 * 1000;
-export const SCRAPE_PREVIEW_ASSET_MAX_URL_CHARS = 4096;
-export const SCRAPE_PREVIEW_READY_PING_INTERVAL_MS = 250;
-export const SCRAPE_PREVIEW_READY_MAX_PINGS = 20;
-// Structured crawl extraction bounds keep persisted page content bounded
-// without scattering magic numbers across the extractor.
-export const CRAWL_DESCRIPTION_MAX_CHARS = 2000;
-export const CRAWL_HEADING_MAX_CHARS = 500;
-export const CRAWL_SECTION_TEXT_MAX_CHARS = 8000;
-// A single "empty" report is provisional: layout can still settle after it.
-// The verdict is only treated as final after this many consecutive empty
-// observations, which keeps a slow first render from being mislabelled empty.
-export const SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS = 3;
-
-// === DESIGN.md synthesis bounds ===
-// Bounded budgets for the evidence-grounded AI synthesis step. Single source
-// of truth so the prompt builder, parser and persistence never scatter magic
-// numbers.
-export const DESIGN_SYNTHESIS_MAX_TOKENS = 2000;
-export const DESIGN_SYNTHESIS_DETAIL_MAX_CHARS = 500;
-export const DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS = 60_000;
-export const DESIGN_SYNTHESIS_MAX_COLORS = 40;
-export const DESIGN_SYNTHESIS_MAX_TYPOGRAPHY = 20;
-export const DESIGN_SYNTHESIS_MAX_SPACING = 30;
-export const DESIGN_SYNTHESIS_MAX_RADII = 20;
-
-// === VibeDesign Studio bounds ===
-export const STUDIO_LOGO_MAX_BYTES = 2 * 1024 * 1024;
-export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;
-export const STUDIO_PRD_FILE_MAX_BYTES = 500 * 1024;
-export const STUDIO_PRD_MAX_CHARS = 100_000;
-export const STUDIO_PRD_MIN_CHARS = 10;
-
-/**
- * Canonical capture widths for Studio frame visuals.
- *
- * The client sizes each artboard from these same values before its visual
- * exists, so a frame never changes width when the screenshot arrives and the
- * captured pixels always match the displayed box.
- */
-export const STUDIO_VISUAL_WIDTH = {
-	mobile: 390,
-	web: 1440,
-} as const;
-export const STUDIO_VISUAL_VIEWPORT_HEIGHT = {
-	mobile: 844,
-	web: 900,
-} as const;
-/** Fallback artboard height used before a frame's real height is measured. */
-export const STUDIO_VISUAL_FALLBACK_HEIGHT = {
-	mobile: 844,
-	web: 900,
-} as const;
 
 /**
  * Canonical canvas zoom bounds. Every zoom entry point (toolbar, wheel,
@@ -328,58 +231,6 @@ export const STUDIO_VISUAL_FALLBACK_HEIGHT = {
  */
 export const CANVAS_MIN_ZOOM = 0.54;
 export const CANVAS_MAX_ZOOM = 1.54;
-/** Studio artboards span several screens, so its usable range is wider. */
-export const STUDIO_CANVAS_MIN_ZOOM = 0.2;
-export const STUDIO_CANVAS_MAX_ZOOM = 2;
-/**
- * Initial canvas scale per platform. Mobile artboards are close to the real
- * device width, so they can start near 1:1; web artboards must start smaller
- * to stay readable inside a laptop viewport.
- */
-export const STUDIO_CANVAS_INITIAL_ZOOM = {
-	mobile: 0.9,
-	web: 0.65,
-} as const;
-
-/**
- * Canvas layout metrics used by fit-to-content. They mirror the real overlay
- * geometry (floating header, floating composer, right-centre toolbar) and the
- * frame track styling, so fitting never parks content under an overlay.
- */
-export const STUDIO_CANVAS_FRAME_GAP_PX = 56;
-export const STUDIO_CANVAS_FIT_PADDING_PX = 192;
-export const STUDIO_CANVAS_FRAME_HEADER_PX = 28;
-export const STUDIO_CANVAS_HEADER_INSET_PX = 64;
-export const STUDIO_CANVAS_COMPOSER_INSET_PX = 168;
-export const STUDIO_CANVAS_TOOLBAR_INSET_PX = 64;
-/** Smallest visible artboard band a fit is allowed to compress to. */
-export const STUDIO_CANVAS_MIN_VISIBLE_PX = 120;
-
-/**
- * Pointer travel, in canvas-local pixels, before an empty-canvas press becomes
- * a marquee selection instead of a click. Keeps a plain click on the canvas
- * clearing the selection while a deliberate drag starts a rectangle.
- */
-export const STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX = 4;
-
-/**
- * Floating overlay geometry for the canvas bottom edge.
- *
- * The composer is bottom-centred and the zoom controls occupy the bottom-right
- * corner. The composer's width is capped so its right edge always clears that
- * row: on a narrow viewport the composer narrows instead of piling on top of
- * the zoom controls.
- */
-export const STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX = 672;
-export const STUDIO_CANVAS_ZOOM_ROW_WIDTH_PX = 180;
-export const STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX = 52;
-export const STUDIO_CANVAS_ZOOM_BOTTOM_PX = 12;
-export const STUDIO_CANVAS_COMPOSER_BOTTOM_PX = 24;
-/** Breathing room between the composer band and the zoom row beside it. */
-export const STUDIO_CANVAS_OVERLAY_GAP_PX = 12;
-/** Horizontal room the composer must leave for the bottom-right zoom row. */
-export const STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX =
-	STUDIO_CANVAS_ZOOM_ROW_WIDTH_PX + STUDIO_CANVAS_OVERLAY_GAP_PX * 2;
 
 /** Wheel normalization: DOM deltaMode 1 is lines, 2 is pages. */
 export const WHEEL_LINE_HEIGHT_PX = 16;
@@ -391,30 +242,3 @@ export const WHEEL_PAGE_HEIGHT_PX = 800;
 export const WHEEL_ZOOM_SENSITIVITY_PX = 600;
 /** Largest zoom change a single animation frame may apply. */
 export const WHEEL_ZOOM_MAX_FRAME_FACTOR = 1.6;
-export const STUDIO_LOGO_ALLOWED_MIMES = [
-	"image/png",
-	"image/jpeg",
-	"image/webp",
-	"image/svg+xml",
-] as const;
-
-/** Max parallel frame generations; conservative default respects provider limits. */
-export const STUDIO_FRAME_CONCURRENCY = 3;
-/** Token budget for single structured planning generation. */
-export const STUDIO_PLANNING_MAX_TOKENS = 4000;
-/** Token budget for per-frame HTML generation. */
-export const STUDIO_FRAME_MAX_TOKENS = 12000;
-/** Max chars of previous HTML kept for revision context. */
-export const STUDIO_PREVIOUS_HTML_MAX_CHARS = 60000;
-/** Timeout for Playwright visual capture per frame. */
-export const STUDIO_CAPTURE_TIMEOUT_MS = 30000;
-/** Max document height accepted by visual capture. */
-export const STUDIO_CAPTURE_MAX_HEIGHT = 30000;
-/** JPEG quality for captured frame visuals. */
-export const STUDIO_CAPTURE_QUALITY = 90;
-/** Device pixel ratio for captured frame visuals. */
-export const STUDIO_CAPTURE_DSF = 2;
-/** TTL for worker job claim lease before stale recovery. */
-export const STUDIO_JOB_CLAIM_TTL_MS = 150000;
-/** Max corrective retries for a single failed frame. */
-export const STUDIO_FRAME_RETRY_MAX = 1;

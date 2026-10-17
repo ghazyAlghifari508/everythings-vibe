@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { type StudioFrameRow, studioFrames } from "@/db/schema";
-import { extractCleanHtml } from "@/lib/clean-html";
+import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import {
 	STUDIO_FRAME_MAX_TOKENS,
 	STUDIO_FRAME_RETRY_MAX,

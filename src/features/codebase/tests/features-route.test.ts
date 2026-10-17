@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { resolveAnalysisFeaturePrompt } from "@/features/codebase/services/analysis-prompt";
 import {
 	buildFeatureProjectValues,
-	resolveAnalysisFeaturePrompt,
 	resolveFeaturePromptMessage,
-} from "@/routes/api/codebases/$codebaseId/features";
+} from "@/features/codebase/services/feature-project-route.server";
 
 describe("buildFeatureProjectValues", () => {
 	it("creates an existing-codebase project bound to the codebase", () => {

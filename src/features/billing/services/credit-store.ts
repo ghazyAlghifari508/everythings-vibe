@@ -1,3 +1,4 @@
+import { estimateCreditQuote } from "@/features/billing/services/adaptive-credit";
 import {
 	appendLedger,
 	assertActiveReservation,
@@ -20,7 +21,6 @@ import type {
 	SettleCreditOperationInput,
 } from "@/features/billing/types/credit-contracts";
 import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
-import { estimateCreditQuote } from "@/lib/adaptive-credit";
 
 export function createCreditService(store: CreditServiceStore) {
 	return {

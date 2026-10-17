@@ -150,7 +150,7 @@ describe("Export PDF removal", () => {
 			"src/features/templates/data/gallery-templates.ts",
 			"src/features/templates/data/vibe-templates.ts",
 			"src/features/studio/tests/studio-launch-composer.test.tsx",
-			"src/lib/studio-prd-validation.test.ts",
+			"src/features/studio/tests/studio-prd-validation.test.ts",
 			"src/features/studio/services/studio-prd-helpers.ts",
 			"src/features/studio/services/studio-prd-validation.server.ts",
 			"src/features/studio/tests/studio-generate-route.test.ts",

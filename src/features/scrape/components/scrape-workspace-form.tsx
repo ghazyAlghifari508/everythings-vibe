@@ -1,7 +1,7 @@
 "use client";
 
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowUp, ChevronDown, Loader2 } from "lucide-react";
+import { ArrowUp, Loader2 } from "lucide-react";
 import { type FormEvent, useId, useRef, useState } from "react";
 import { z } from "zod";
 import type { ScrapeMode } from "@/db/schema";
@@ -13,159 +13,18 @@ import {
 	SCRAPE_LIMITS,
 	scrapeRequestSchema,
 } from "@/features/scrape/types/scrape-contract";
-import { cn } from "@/lib/utils";
 import {
 	ADVANCED_PARAMETER_GROUPS,
-	type AdvancedParameterGroup,
 	type AnyScrapeSettings,
 	type NumericParameterSpec,
-	readNumber,
-	readToggle,
 	type ToggleParameterSpec,
-	URL_FILTER_SPEC,
 	validateParameterGroup,
 } from "../types/parameter-spec";
-import { ScrapeFilterSelect } from "./scrape-filter-select";
 import { ScrapeFormNotice } from "./scrape-form-notice";
+import { ScrapeWorkspaceAdvancedPanel } from "./scrape-workspace-advanced-panel";
 
 const responseSchema = z.object({ scrapeId: z.string() });
 const errorSchema = z.object({ error: z.string() });
-const fieldClass =
-	"min-h-11 w-full rounded-lg border border-graphite bg-charcoal px-3 text-sm text-snow tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo";
-
-// Controlled disclosure following the existing in-repo accordion pattern: a
-// real button with aria-expanded, a rotating chevron and a focus ring, instead
-// of a native <details> whose summary cannot carry a proper affordance.
-function ParameterGroup({
-	group,
-	settings,
-	issues,
-	onNumberChange,
-	onToggleChange,
-	onSelectChange,
-}: {
-	group: AdvancedParameterGroup;
-	settings: AnyScrapeSettings;
-	issues: Record<string, string>;
-	onNumberChange: (key: NumericParameterSpec["key"], value: number) => void;
-	onToggleChange: (key: ToggleParameterSpec["key"], value: boolean) => void;
-	onSelectChange: (key: string, value: string) => void;
-}) {
-	const baseId = useId();
-	return (
-		<div className="min-w-0">
-			<p className="text-xs font-semibold tracking-wide text-fog uppercase">
-				{group.title}
-			</p>
-			<p className="mt-1 text-xs leading-5 text-fog">{group.description}</p>
-			<div className="mt-4 grid gap-4 sm:grid-cols-2">
-				{"viewport" in settings
-					? group.selects?.map((spec) => (
-							<div key={spec.key} className="min-w-0">
-								<ScrapeFilterSelect
-									label={spec.label}
-									value={settings[spec.key]}
-									options={spec.options}
-									onChange={(value) => onSelectChange(spec.key, value)}
-									className="w-full"
-								/>
-								<p className="mt-1.5 text-xs leading-5 text-fog">
-									{spec.helper}
-								</p>
-							</div>
-						))
-					: null}
-				{group.numbers.map((spec) => (
-					<NumberField
-						key={spec.key}
-						spec={spec}
-						value={readNumber(settings, spec.key)}
-						issue={issues[spec.key]}
-						onChange={(value) => onNumberChange(spec.key, value)}
-						id={`${baseId}-${spec.key}`}
-					/>
-				))}
-				{group.toggles.map((toggle) => (
-					<label
-						key={toggle.key}
-						className="flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border border-graphite p-3 focus-within:ring-2 focus-within:ring-indigo sm:col-span-2"
-					>
-						<input
-							type="checkbox"
-							checked={readToggle(settings, toggle.key)}
-							onChange={(event) =>
-								onToggleChange(toggle.key, event.target.checked)
-							}
-							className="mt-0.5 size-4 shrink-0 accent-current"
-						/>
-						<span className="min-w-0">
-							<span className="block text-sm font-medium text-snow">
-								{toggle.label}
-							</span>
-							<span className="mt-0.5 block text-xs leading-5 text-fog">
-								{toggle.helper}
-							</span>
-						</span>
-					</label>
-				))}
-			</div>
-		</div>
-	);
-}
-
-function NumberField({
-	spec,
-	value,
-	issue,
-	onChange,
-	id,
-}: {
-	spec: NumericParameterSpec;
-	value: number;
-	issue?: string;
-	onChange: (value: number) => void;
-	id: string;
-}) {
-	const helperId = `${id}-helper`;
-	const errorId = `${id}-error`;
-	return (
-		<div className="min-w-0">
-			<label
-				htmlFor={id}
-				className="flex items-baseline justify-between gap-2 text-sm font-medium text-snow"
-			>
-				{spec.label}
-				<span className="shrink-0 font-mono text-xs text-fog">{spec.unit}</span>
-			</label>
-			<input
-				id={id}
-				type="number"
-				inputMode="numeric"
-				min={spec.min}
-				max={spec.max}
-				step={1}
-				value={Number.isFinite(value) ? value : ""}
-				onChange={(event) => onChange(event.target.valueAsNumber)}
-				aria-invalid={issue ? true : undefined}
-				aria-describedby={issue ? errorId : helperId}
-				className={cn(
-					fieldClass,
-					"mt-1.5",
-					issue && "border-crimson focus-visible:ring-crimson",
-				)}
-			/>
-			{issue ? (
-				<p id={errorId} role="alert" className="mt-1.5 text-xs text-crimson">
-					{issue}
-				</p>
-			) : (
-				<p id={helperId} className="mt-1.5 text-xs leading-5 text-fog">
-					{spec.helper}
-				</p>
-			)}
-		</div>
-	);
-}
 
 export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 	const navigate = useNavigate();
@@ -347,95 +206,29 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 				</div>
 
 				{hasAdvanced ? (
-					<div className="mt-5 min-w-0 rounded-lg border border-graphite">
-						<h2 className="min-w-0">
-							<button
-								type="button"
-								onClick={() => setAdvancedOpen((open) => !open)}
-								aria-expanded={advancedOpen}
-								aria-controls={advancedPanelId}
-								className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								<span className="min-w-0">
-									<span className="block text-sm font-semibold text-snow">
-										Parameter lanjutan
-									</span>
-									<span className="mt-0.5 block text-xs text-fog">
-										{mode === "design"
-											? "Tampilan, tema, dan isi panduan desain"
-											: mode === "crawl"
-												? "Cakupan crawl dan jenis data yang disimpan"
-												: mode === "html"
-													? "Cara halaman diambil sebelum disimpan"
-													: "Seberapa detail setiap gambar diperiksa"}
-									</span>
-								</span>
-								<ChevronDown
-									size={18}
-									aria-hidden
-									className={cn(
-										"shrink-0 text-fog transition-transform motion-reduce:transition-none",
-										advancedOpen && "rotate-180",
-									)}
-								/>
-							</button>
-						</h2>
-						{advancedOpen ? (
-							<div
-								id={advancedPanelId}
-								className="flex min-w-0 flex-col gap-6 border-t border-graphite p-4"
-							>
-								{groups.map((group) => (
-									<ParameterGroup
-										key={group.key}
-										group={group}
-										settings={activeSettings}
-										issues={issues}
-										onNumberChange={updateNumber}
-										onToggleChange={updateToggle}
-										onSelectChange={(key, value) => {
-											const parsed = designSettingsSchema.safeParse({
-												...design,
-												[key]: value,
-											});
-											if (parsed.success) setDesign(parsed.data);
-										}}
-									/>
-								))}
-								{mode === "crawl" ? (
-									<div className="min-w-0">
-										<label
-											htmlFor="crawl-url-regex"
-											className="text-sm font-medium text-snow"
-										>
-											{URL_FILTER_SPEC.label}
-										</label>
-										<input
-											id="crawl-url-regex"
-											value={crawl.urlRegex}
-											maxLength={SCRAPE_LIMITS.regexChars}
-											onChange={(event) =>
-												setCrawl({ ...crawl, urlRegex: event.target.value })
-											}
-											className={cn(fieldClass, "mt-1.5 font-mono")}
-										/>
-										<p className="mt-1.5 text-xs leading-5 text-fog">
-											{URL_FILTER_SPEC.helper}
-										</p>
-									</div>
-								) : null}
-								<div className="flex justify-end">
-									<button
-										type="button"
-										onClick={reset}
-										className="min-h-11 rounded-lg px-3 text-sm text-fog underline underline-offset-4 hover:text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										Kembalikan ke pengaturan awal
-									</button>
-								</div>
-							</div>
-						) : null}
-					</div>
+					<ScrapeWorkspaceAdvancedPanel
+						mode={mode}
+						open={advancedOpen}
+						onToggle={() => setAdvancedOpen((open) => !open)}
+						panelId={advancedPanelId}
+						groups={groups}
+						settings={activeSettings}
+						issues={issues}
+						urlRegex={crawl.urlRegex}
+						onUrlRegexChange={(value) =>
+							setCrawl({ ...crawl, urlRegex: value })
+						}
+						onNumberChange={updateNumber}
+						onToggleChange={updateToggle}
+						onSelectChange={(key, value) => {
+							const parsed = designSettingsSchema.safeParse({
+								...design,
+								[key]: value,
+							});
+							if (parsed.success) setDesign(parsed.data);
+						}}
+						onReset={reset}
+					/>
 				) : null}
 			</fieldset>
 			{error ? (

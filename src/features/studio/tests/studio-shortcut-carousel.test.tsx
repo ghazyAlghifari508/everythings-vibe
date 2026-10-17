@@ -3,14 +3,14 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioShortcutCarousel } from "@/features/studio/components/studio-shortcut-carousel";
 import {
+	STUDIO_PROMPT_SHORTCUTS,
+	type StudioPromptShortcut,
+} from "@/features/studio/services/studio-prompt-shortcuts";
+import {
 	canScrollNext,
 	canScrollPrev,
 	getCarouselStep,
 } from "@/features/studio/utils/studio-shortcut-carousel-state";
-import {
-	STUDIO_PROMPT_SHORTCUTS,
-	type StudioPromptShortcut,
-} from "@/lib/studio-prompt-shortcuts";
 
 function renderCarousel(selectedId: string | null = null) {
 	const onSelect = vi.fn((_shortcut: StudioPromptShortcut) => undefined);

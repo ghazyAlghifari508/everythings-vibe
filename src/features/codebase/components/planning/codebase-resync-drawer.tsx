@@ -10,7 +10,7 @@ import {
 	type SyncPromptPayload,
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
-import { copyToClipboard } from "@/lib/clipboard";
+import { copyToClipboard } from "@/features/codebase/utils/clipboard";
 import { cn } from "@/lib/utils";
 import { SyncStageList } from "../workspace/sync-stage-list";
 

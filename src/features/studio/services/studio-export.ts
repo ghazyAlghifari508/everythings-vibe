@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import type { StudioFrameRow } from "@/db/schema";
-import { extractCleanHtml } from "@/lib/clean-html";
+import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 
 export function sanitizeFilename(name: string): string {
 	return (

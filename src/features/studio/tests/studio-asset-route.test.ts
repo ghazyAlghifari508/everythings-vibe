@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { issueStudioAssetCapability } from "@/lib/studio-asset-capability";
+import { issueStudioAssetCapability } from "@/features/studio/services/studio-asset-capability";
 import { GET, OPTIONS } from "@/routes/api/studio.asset";
 
 describe("Studio Asset Route", () => {

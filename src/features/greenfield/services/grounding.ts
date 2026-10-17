@@ -3,8 +3,11 @@
 // Label source is STACK_ICONS keys (existing stack-data) — no hardcoded list.
 // Never throws: any failure returns "" so generation is byte-for-byte unchanged.
 
+import {
+	queryDocs,
+	resolveLibraryId,
+} from "@/features/greenfield/services/context7-client";
 import { STACK_ICONS } from "@/features/greenfield/utils/stack-data";
-import { queryDocs, resolveLibraryId } from "@/lib/context7-client";
 
 const STACK_LABELS = Object.keys(STACK_ICONS);
 

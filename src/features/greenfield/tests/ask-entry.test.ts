@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideAskEntry } from "@/routes/ask/$id";
+import { decideAskEntry } from "@/features/greenfield/services/ask-loader.functions";
 
 describe("decideAskEntry", () => {
 	it("allows greenfield projects without analysis", () => {

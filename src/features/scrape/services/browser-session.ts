@@ -1,9 +1,9 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { type Browser, type BrowserContext, chromium } from "playwright";
+import { fetchAsset } from "@/features/scrape/services/http-transport";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 import { isPrivateIp } from "@/features/scrape/utils/url-validator";
-import { fetchAsset } from "@/lib/fetch-html";
 
 const BLOCK_HOSTS = new Set(["localhost", "ip6-localhost", "ip6-loopback"]);
 

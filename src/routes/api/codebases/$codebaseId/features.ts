@@ -1,223 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
-import { db } from "@/db";
-import {
-	codebaseSnapshots,
-	codebases,
-	projects,
-	subscriptions,
-} from "@/db/schema";
-import { ONBOARDING_FEATURE_MESSAGE } from "@/features/codebase/services/analysis";
-import { saveAskHandoff } from "@/features/codebase/services/generation-context";
-import { isProvisionalCodebaseName } from "@/features/codebase/services/naming";
-import {
-	CODEBASE_SYNC_RATE_LIMIT_ACTION,
-	SNAPSHOT_CONTEXT_STATUSES,
-} from "@/features/codebase/services/sync";
-import { deriveProjectNameSync } from "@/features/greenfield/services/prd-naming";
-import { normalizeLanguage } from "@/lib/language";
-import { checkRateLimit } from "@/lib/rate-limit";
-import { requireUser } from "@/lib/session";
-import type { Plan } from "@/types/database";
+import { handleCodebaseFeatureCreate } from "@/features/codebase/services/feature-project-route.server";
 
-export { resolveAnalysisFeaturePrompt } from "@/features/codebase/services/analysis";
-
-/**
- * Normalize an onboarding feature message at the trust boundary. A
- * provisional repository placeholder is storage-only and must never become
- * the feature prompt — it is replaced with the neutral onboarding intent.
- * Blank input passes through so the route still rejects it below.
- */
-export function resolveFeaturePromptMessage(message: unknown): string {
-	const prompt = typeof message === "string" ? message.trim() : "";
-	if (isProvisionalCodebaseName(prompt)) return ONBOARDING_FEATURE_MESSAGE;
-	return prompt;
-}
-
-export function buildFeatureProjectValues(input: {
-	id: string;
-	userId: string;
-	name: string;
-	codebaseId: string;
-	language: string;
-}): typeof projects.$inferInsert {
-	return {
-		id: input.id,
-		userId: input.userId,
-		name: input.name,
-		status: "draft",
-		mode: "ai_auto",
-		projectMode: "existing_codebase",
-		codebaseId: input.codebaseId,
-		language: input.language,
-	};
-}
-
-function resolvePlan(rawPlan: string | undefined): Plan {
-	if (rawPlan === "pro" || rawPlan === "hengker") return rawPlan;
-	return "free";
-}
+// Browser feature-plan boundary for a synced repository.
+//
+// Server-import exception: top-level `.server` imports are correct here — this
+// module registers server handlers only (no client component), following the
+// neighboring `/api/codebases/$codebaseId/status` pattern. Never import this
+// route module (or the `.server` modules) from client code.
+//
+// Auth (`requireUser`), the sync rate-limit budget, ownership and synced-snapshot
+// checks, project creation, and the ask-handoff write live in
+// `src/features/codebase/services/feature-project-route.server.ts`.
 
 export const Route = createFileRoute("/api/codebases/$codebaseId/features")({
 	server: {
 		handlers: {
-			POST: async ({
+			POST: ({
 				request,
 				params,
 			}: {
 				request: Request;
 				params: { codebaseId: string };
-			}) => {
-				let user: { id: string };
-				try {
-					user = await requireUser(request.headers);
-				} catch {
-					return Response.json({ error: "Unauthorized" }, { status: 401 });
-				}
-
-				const [subscription] = await db
-					.select({ plan: subscriptions.plan })
-					.from(subscriptions)
-					.where(eq(subscriptions.userId, user.id))
-					.orderBy(desc(subscriptions.createdAt))
-					.limit(1);
-				const rateCheck = await checkRateLimit(
-					user.id,
-					resolvePlan(subscription?.plan),
-					CODEBASE_SYNC_RATE_LIMIT_ACTION,
-				);
-				if (!rateCheck.allowed) {
-					return Response.json(
-						{ error: "Terlalu banyak permintaan", retryAfter: 60 },
-						{ status: 429 },
-					);
-				}
-
-				const [codebase] = await db
-					.select({ id: codebases.id })
-					.from(codebases)
-					.where(
-						and(
-							eq(codebases.id, params.codebaseId),
-							eq(codebases.userId, user.id),
-						),
-					)
-					.limit(1);
-				if (!codebase) {
-					return Response.json(
-						{ error: "Codebase tidak ditemukan" },
-						{ status: 404 },
-					);
-				}
-
-				const [snapshot] = await db
-					.select({ id: codebaseSnapshots.id })
-					.from(codebaseSnapshots)
-					.where(
-						and(
-							eq(codebaseSnapshots.codebaseId, codebase.id),
-							inArray(codebaseSnapshots.status, [...SNAPSHOT_CONTEXT_STATUSES]),
-						),
-					)
-					.orderBy(desc(codebaseSnapshots.createdAt))
-					.limit(1);
-				if (!snapshot) {
-					return Response.json(
-						{
-							error: "Codebase belum selesai disinkronkan",
-							code: "CODEBASE_NOT_SYNCED",
-						},
-						{ status: 400 },
-					);
-				}
-
-				const body: unknown = await request.json().catch(() => null);
-				const message =
-					typeof body === "object" && body !== null && "message" in body
-						? body.message
-						: undefined;
-				const prompt = resolveFeaturePromptMessage(message);
-				if (prompt.length < 3) {
-					return Response.json(
-						{ error: "Prompt harus diisi minimal 3 karakter" },
-						{ status: 400 },
-					);
-				}
-				const language =
-					typeof body === "object" && body !== null && "language" in body
-						? normalizeLanguage(body.language)
-						: normalizeLanguage(undefined);
-				const name = deriveProjectNameSync(prompt);
-				const id = crypto.randomUUID();
-				const project = await db.transaction(async (tx) => {
-					const [lockedCodebase] = await tx
-						.select({
-							id: codebases.id,
-							onboardingProjectId: codebases.onboardingProjectId,
-						})
-						.from(codebases)
-						.where(
-							and(eq(codebases.id, codebase.id), eq(codebases.userId, user.id)),
-						)
-						.for("update")
-						.limit(1);
-					if (!lockedCodebase) return null;
-
-					const [createdProject] = await tx
-						.insert(projects)
-						.values(
-							buildFeatureProjectValues({
-								id,
-								userId: user.id,
-								name,
-								codebaseId: lockedCodebase.id,
-								language,
-							}),
-						)
-						.returning({ id: projects.id, name: projects.name });
-					if (!createdProject) return null;
-
-					if (!lockedCodebase.onboardingProjectId) {
-						await tx
-							.update(codebases)
-							.set({
-								onboardingProjectId: createdProject.id,
-								updatedAt: new Date(),
-							})
-							.where(
-								and(
-									eq(codebases.id, lockedCodebase.id),
-									eq(codebases.userId, user.id),
-									isNull(codebases.onboardingProjectId),
-								),
-							);
-					}
-
-					await saveAskHandoff(
-						user.id,
-						{
-							projectId: createdProject.id,
-							answers: [],
-							snapshotId: snapshot.id,
-							state: {
-								prompt,
-								session: 1,
-								questions: [],
-							},
-						},
-						tx,
-					);
-					return createdProject;
-				});
-				if (!project) {
-					return Response.json(
-						{ error: "Gagal membuat project" },
-						{ status: 500 },
-					);
-				}
-
-				return Response.json({ projectId: project.id, name: project.name });
-			},
+			}) => handleCodebaseFeatureCreate({ request, params }),
 		},
 	},
 });

@@ -14,7 +14,9 @@ function source(path: string): string {
 }
 
 describe("Fitur generation route", () => {
-	const src = source("src/routes/api/features/generate.ts");
+	const src = source(
+		"src/features/greenfield/services/feature-generate.server.ts",
+	);
 
 	it("composes the fitur-stage scope directive from the project mode", () => {
 		expect(src).toContain("buildStageScopeDirective");

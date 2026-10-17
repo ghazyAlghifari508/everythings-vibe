@@ -1,7 +1,7 @@
 /** Highlighted rows: highlight the whole file once, then cut it back into source lines. */
 
 import hljs from "highlight.js/lib/common";
-import type { SourceToken } from "./source-view";
+import type { SourceToken } from "@/features/codebase/types/source-view";
 
 /**
  * The complete entity set the highlighter emits when escaping source text.

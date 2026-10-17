@@ -12,31 +12,14 @@ import {
 import { useMemo, useState } from "react";
 import type { CreditOperationStage } from "@/db/schema";
 import type {
-	CreditComplexityMetrics,
 	CreditOperationKind,
 	CreditOperationState,
-	CreditPricingVersion,
-} from "@/lib/adaptive-credit";
+} from "@/features/billing/services/adaptive-credit";
+import type { CreditOperationItem } from "@/features/billing/types/credit-usage";
 import { cn, formatDate } from "@/lib/utils";
 import { CreditUsageDetail } from "./credit-usage-detail";
 
-export interface CreditOperationItem {
-	id: string;
-	projectId: string;
-	projectName?: string | null;
-	kind: CreditOperationKind;
-	stage: CreditOperationStage;
-	state: CreditOperationState;
-	estimatedCredits: number;
-	reservedCredits: number;
-	maximumCredits: number;
-	finalCharge?: number | null;
-	pricingVersion: CreditPricingVersion;
-	metrics: CreditComplexityMetrics;
-	capApplied: boolean;
-	createdAt: string | null;
-	settledAt?: string | null;
-}
+export type { CreditOperationItem };
 
 export interface CreditUsageProps {
 	availableCredits?: number;

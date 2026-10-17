@@ -2,12 +2,12 @@
 
 import { Bot, Check, Code, Copy, Download, Eye } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { markdownComponents } from "./design-md-markdown-components";
+import { copyText, downloadFile } from "./scrape-file-actions";
 
 export interface DesignMdSourcePanelProps {
 	designMd: string;
@@ -26,141 +26,6 @@ type SourceViewTab = "rendered" | "source";
 
 const ICON_BUTTON_CLASS =
 	"inline-flex size-8 items-center justify-center rounded-md border border-transparent text-fog transition-colors hover:border-graphite hover:bg-onyx hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50";
-
-const markdownComponents: Components = {
-	a: ({ children, ...props }) => (
-		<a
-			{...props}
-			target="_blank"
-			rel="noreferrer noopener"
-			className="text-indigo underline underline-offset-2"
-		>
-			{children}
-		</a>
-	),
-	h1: ({ children, ...props }) => (
-		<h1 {...props} className="mt-2 text-xl font-bold tracking-tight text-snow">
-			{children}
-		</h1>
-	),
-	h2: ({ children, ...props }) => (
-		<h2
-			{...props}
-			className="mt-6 border-b border-graphite pb-2 text-lg font-bold tracking-tight text-snow"
-		>
-			{children}
-		</h2>
-	),
-	h3: ({ children, ...props }) => (
-		<h3 {...props} className="mt-5 text-base font-semibold text-snow">
-			{children}
-		</h3>
-	),
-	h4: ({ children, ...props }) => (
-		<h4 {...props} className="mt-4 text-sm font-semibold text-mist">
-			{children}
-		</h4>
-	),
-	p: ({ children, ...props }) => (
-		<p {...props} className="mt-2 text-sm leading-6 text-mist">
-			{children}
-		</p>
-	),
-	ul: ({ children, ...props }) => (
-		<ul {...props} className="mt-2 list-disc space-y-1 pl-5 text-sm text-mist">
-			{children}
-		</ul>
-	),
-	ol: ({ children, ...props }) => (
-		<ol
-			{...props}
-			className="mt-2 list-decimal space-y-1 pl-5 text-sm text-mist"
-		>
-			{children}
-		</ol>
-	),
-	li: ({ children, ...props }) => (
-		<li {...props} className="leading-6">
-			{children}
-		</li>
-	),
-	table: ({ children, ...props }) => (
-		<div className="mt-3 overflow-x-auto rounded-lg border border-graphite">
-			<table {...props} className="w-full min-w-[480px] text-xs">
-				{children}
-			</table>
-		</div>
-	),
-	thead: ({ children, ...props }) => (
-		<thead {...props} className="bg-onyx text-slate">
-			{children}
-		</thead>
-	),
-	th: ({ children, ...props }) => (
-		<th
-			{...props}
-			className="border-b border-graphite px-3 py-2 text-left font-mono font-semibold"
-		>
-			{children}
-		</th>
-	),
-	td: ({ children, ...props }) => (
-		<td
-			{...props}
-			className="border-b border-graphite px-3 py-2 align-top font-mono text-mist last:border-b-0"
-		>
-			{children}
-		</td>
-	),
-	code: ({ className, children, ...props }) => (
-		<code
-			{...props}
-			className={cn(
-				"rounded bg-onyx px-1 py-0.5 font-mono text-[11px] text-mist",
-				className,
-			)}
-		>
-			{children}
-		</code>
-	),
-	pre: ({ children, ...props }) => (
-		<pre
-			{...props}
-			className="mt-3 overflow-x-auto rounded-lg border border-graphite bg-onyx p-3 font-mono text-xs leading-5 text-mist"
-		>
-			{children}
-		</pre>
-	),
-	blockquote: ({ children, ...props }) => (
-		<blockquote
-			{...props}
-			className="mt-3 border-l-2 border-graphite pl-3 text-sm text-fog italic"
-		>
-			{children}
-		</blockquote>
-	),
-};
-
-async function copyText(value: string): Promise<boolean> {
-	try {
-		await navigator.clipboard.writeText(value);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function downloadFile(filename: string, content: string, mimeType: string) {
-	const blob = new Blob([content], { type: mimeType });
-	const url = URL.createObjectURL(blob);
-	const anchor = document.createElement("a");
-	anchor.href = url;
-	anchor.download = filename;
-	document.body.appendChild(anchor);
-	anchor.click();
-	anchor.remove();
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 function safeFilename(domain: string): string {
 	const safe = domain.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();

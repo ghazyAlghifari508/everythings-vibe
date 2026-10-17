@@ -15,6 +15,7 @@
  * `source-view-*` modules and are re-exported here unchanged.
  */
 
+import type { SourceToken } from "@/features/codebase/types/source-view";
 import { detectSourceLanguage } from "./snapshot-preview";
 import {
 	clearFormatMarkupCache,
@@ -30,12 +31,7 @@ import {
 
 export type SourceViewMode = "original" | "formatted";
 
-export interface SourceToken {
-	/** Raw source text, already decoded for safe rendering. */
-	text: string;
-	/** Highlighter token class, or null for unhighlighted text. */
-	className: string | null;
-}
+export type { SourceToken } from "@/features/codebase/types/source-view";
 
 export interface SourceRow {
 	/** 1-based logical line number, matching the source file. */

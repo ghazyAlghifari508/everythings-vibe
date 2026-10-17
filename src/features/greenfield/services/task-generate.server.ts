@@ -215,7 +215,9 @@ async function completeTaskGeneration(
 		const { extractTechStackSection, groundStack } = await import(
 			"@/features/greenfield/services/grounding"
 		);
-		const { raceWithAbort } = await import("@/lib/abort-utils");
+		const { raceWithAbort } = await import(
+			"@/features/greenfield/services/abort-utils"
+		);
 		// Ground on the PRD's declared stack table (section 6.2), not prose
 		// mentions across PRD+AC that widen fan-out.
 		grounded = await raceWithAbort(

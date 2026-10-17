@@ -3,7 +3,7 @@
  * instant. One instance per process: every reader goes through these functions.
  */
 
-import type { SourceToken } from "./source-view";
+import type { SourceToken } from "@/features/codebase/types/source-view";
 import { formatMarkupSource } from "./source-view-format";
 import { buildHighlightedRows } from "./source-view-highlight";
 

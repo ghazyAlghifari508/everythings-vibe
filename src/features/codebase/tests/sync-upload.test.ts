@@ -25,14 +25,14 @@ describe("idempotent claim protocol surface", () => {
 	});
 
 	it("every upload route claims before its mutation and releases on failure", async () => {
+		// One module per upload endpoint, shared by the codebase-scoped route
+		// and the legacy project-scoped facade, so each endpoint's claim
+		// ordering is asserted exactly once.
 		for (const route of [
-			"../../../routes/api/v1/projects/$id/codebase/manifest.ts",
-			"../../../routes/api/v1/projects/$id/codebase/files.ts",
-			"../../../routes/api/v1/projects/$id/codebase/complete.ts",
-			"../../../routes/api/v1/codebases/$id/codebase/manifest.ts",
-			"../../../routes/api/v1/codebases/$id/codebase/files.ts",
-			"../../../routes/api/v1/codebases/$id/codebase/complete.ts",
-			"../../../routes/api/v1/codebases/$id/codebase/failure.ts",
+			"../services/sync-upload-manifest-route.server.ts",
+			"../services/sync-upload-files-route.server.ts",
+			"../services/sync-upload-complete-route.server.ts",
+			"../services/sync-upload-failure-route.server.ts",
 		]) {
 			const source = await readFile(new URL(route, import.meta.url), "utf8");
 			const claimIndex = source.indexOf("await claimIdempotency(");
@@ -150,7 +150,7 @@ describe("handshake snapshot serialization contract", () => {
 	it("serializes handshake state transition and snapshot creation via advisory lock in transaction", async () => {
 		const source = await readFile(
 			new URL(
-				"../../../routes/api/v1/projects/$id/codebase/sync.ts",
+				"../services/sync-handshake-project-route.server.ts",
 				import.meta.url,
 			),
 			"utf8",
@@ -173,7 +173,7 @@ describe("preparation failure reporting route contract", () => {
 	async function readFailureRoute(): Promise<string> {
 		return readFile(
 			new URL(
-				"../../../routes/api/v1/codebases/$id/codebase/failure.ts",
+				"../services/sync-upload-failure-route.server.ts",
 				import.meta.url,
 			),
 			"utf8",
