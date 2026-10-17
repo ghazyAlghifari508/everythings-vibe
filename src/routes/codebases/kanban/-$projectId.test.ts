@@ -91,10 +91,22 @@ describe("existing-codebase Kanban ownership", () => {
 });
 
 describe("existing-codebase Kanban route contract", () => {
-	const routeSource = readFileSync(
-		"src/routes/codebases/kanban/$codebaseId/$projectId.tsx",
-		"utf8",
-	);
+	// The route file is a thin declaration now; the loader gate and the board
+	// shell live under the feature, so the pins read them as one surface.
+	const routeSource = [
+		readFileSync(
+			"src/routes/codebases/kanban/$codebaseId/$projectId.tsx",
+			"utf8",
+		),
+		readFileSync(
+			"src/features/codebase/services/kanban-loader.functions.ts",
+			"utf8",
+		),
+		readFileSync(
+			"src/features/codebase/components/planning/codebase-kanban-page.tsx",
+			"utf8",
+		),
+	].join("\n");
 
 	it("loads repository and project scoped to the authenticated owner", () => {
 		expect(routeSource).toContain("requireUserServer()");

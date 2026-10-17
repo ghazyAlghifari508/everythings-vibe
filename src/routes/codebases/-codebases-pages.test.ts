@@ -138,7 +138,19 @@ describe("codebase review snapshot pairing", () => {
 });
 
 describe("codebase list ownership boundary", () => {
-	const source = readFileSync("src/routes/codebases/index.tsx", "utf8");
+	// The route file is a thin declaration now; the loader query and the view
+	// live under the feature, so the pins read both halves as one surface.
+	const source = [
+		readFileSync("src/routes/codebases/index.tsx", "utf8"),
+		readFileSync(
+			"src/features/codebase/services/library-loader.functions.ts",
+			"utf8",
+		),
+		readFileSync(
+			"src/features/codebase/components/planning/codebase-library-page.tsx",
+			"utf8",
+		),
+	].join("\n");
 
 	it("scopes the library loader to the authenticated user", () => {
 		expect(source).toContain("requireUserServer()");
@@ -332,7 +344,13 @@ describe("selectLibraryAnalysisSlice", () => {
 });
 
 describe("codebase list filtering gate", () => {
-	const source = readFileSync("src/routes/codebases/index.tsx", "utf8");
+	const source = [
+		readFileSync("src/routes/codebases/index.tsx", "utf8"),
+		readFileSync(
+			"src/features/codebase/services/library-loader.functions.ts",
+			"utf8",
+		),
+	].join("\n");
 
 	it("builds library rows through the canonical readiness helper instead of mapping every owned row", () => {
 		expect(source).toContain("buildCodebaseLibraryItems");
