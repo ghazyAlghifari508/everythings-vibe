@@ -498,7 +498,7 @@ describe("codebase detail incomplete sync handling", () => {
 
 describe("ask options repository grounding", () => {
 	const askOptionsSource = readFileSync(
-		"src/routes/api/ask/options.ts",
+		"src/features/greenfield/services/ask-options-route.server.ts",
 		"utf8",
 	);
 
