@@ -21,9 +21,9 @@ import {
 	resolveAnalysisScope,
 } from "./analysis";
 
-export type AnalysisRow = typeof codebaseAnalyses.$inferSelect;
+type AnalysisRow = typeof codebaseAnalyses.$inferSelect;
 
-export type AnalysisProject = {
+type AnalysisProject = {
 	id: string;
 	projectMode: string | null;
 	codebaseId: string | null;

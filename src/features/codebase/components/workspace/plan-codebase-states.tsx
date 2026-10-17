@@ -7,13 +7,13 @@
  */
 
 /** Terminal create-failure heading; the body carries the safe server message. */
-export const CODEBASE_ONBOARDING_ERROR_TITLE = "Gagal menyiapkan repository";
+const CODEBASE_ONBOARDING_ERROR_TITLE = "Gagal menyiapkan repository";
 
 /**
  * Shared body copy for both loading cards: the page is connecting a repository
  * and initialising the CLI instructions either way, only the heading differs.
  */
-export const CODEBASE_ONBOARDING_LOADING_DETAIL =
+const CODEBASE_ONBOARDING_LOADING_DETAIL =
 	"Menghubungkan repository dan menginisialisasi instruksi CLI";
 
 export function CodebaseOnboardingErrorCard({

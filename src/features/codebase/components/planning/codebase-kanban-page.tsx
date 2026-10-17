@@ -8,7 +8,7 @@ import { KanbanBoard } from "@/components/kanban/kanban-board";
  * payload into it plus the failure state the route declares.
  */
 
-export type ExistingCodebaseKanbanData = {
+type ExistingCodebaseKanbanData = {
 	codebaseId: string;
 	codebaseName: string;
 	projectId: string;

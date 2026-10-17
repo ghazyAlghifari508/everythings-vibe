@@ -32,7 +32,7 @@ import {
 import type { AnalysisRefreshRequest } from "./analysis-refresh";
 import { failRefreshClaim, toResponse } from "./analysis-route-scope.server";
 
-export type AnalysisAttemptInput = {
+type AnalysisAttemptInput = {
 	userId: string;
 	projectId: string;
 	scope: AnalysisScope;
