@@ -2,7 +2,10 @@
 
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { useMemo } from "react";
-import { type TaskCard, useKanbanTasks } from "@/hooks/use-kanban-polling";
+import {
+	type TaskCard,
+	useKanbanTasks,
+} from "@/features/greenfield/hooks/use-kanban-polling";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import { useKanbanHorizontalScroll } from "../../hooks/use-kanban-horizontal-scroll";
 import {

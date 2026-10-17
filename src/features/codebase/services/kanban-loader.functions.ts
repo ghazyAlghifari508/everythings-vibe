@@ -98,8 +98,8 @@ export const loadExistingCodebaseKanban = createServerFn({ method: "GET" })
 
 		const [{ getLatestPrdContent }, { getLatestAcContent }] = await Promise.all(
 			[
-				import("@/lib/services/prd-service"),
-				import("@/lib/services/ac-service"),
+				import("@/features/greenfield/services/prd-service"),
+				import("@/features/greenfield/services/ac-service"),
 			],
 		);
 		const [latestPrdContent, latestAcContent] = await Promise.all([

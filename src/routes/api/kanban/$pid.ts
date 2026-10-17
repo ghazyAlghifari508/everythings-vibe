@@ -27,7 +27,9 @@ export const Route = createFileRoute("/api/kanban/$pid")({
 				if (!project)
 					return Response.json({ error: "Project not found" }, { status: 404 });
 
-				const { getKanbanData } = await import("@/lib/services/task-service");
+				const { getKanbanData } = await import(
+					"@/features/greenfield/services/task-service"
+				);
 				const data = await getKanbanData(projectId);
 				return Response.json(data);
 			},

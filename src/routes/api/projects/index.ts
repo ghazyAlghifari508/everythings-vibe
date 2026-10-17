@@ -13,12 +13,12 @@ import {
 	generateSyncToken,
 	hashSyncToken,
 } from "@/features/codebase/services/sync.server";
+import { deriveProjectNameSync } from "@/features/greenfield/services/prd-service";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
 } from "@/lib/constants";
 import { normalizeLanguage } from "@/lib/language";
-import { deriveProjectNameSync } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 
 // Project mode validation for Home creation. A missing mode defaults to

@@ -16,7 +16,7 @@ import {
 	resolveWorkspaceView,
 	type WorkspaceArtifactHydration,
 } from "@/features/codebase/services/workspace-hydration";
-import { useKanbanTasks } from "@/hooks/use-kanban-polling";
+import { useKanbanTasks } from "@/features/greenfield/hooks/use-kanban-polling";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import type { CodebaseWorkspaceData } from "../services/workspace-loader.functions";
 import { useCodebaseSync } from "./use-codebase-sync";

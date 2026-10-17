@@ -20,20 +20,20 @@ import { CreditExhaustedModal } from "@/components/chat/credit-exhausted-modal";
 import { DocumentReviewModal } from "@/components/project/document-review-modal";
 import { ProjectDocumentsDrawer } from "@/components/project/project-documents-drawer";
 import type { ProjectFeatureTree } from "@/db/schema";
+import type { TaskTree } from "@/features/greenfield/services/task-service";
+import {
+	isBackgroundGeneration,
+	isStaleCompletedLoader,
+	resolveInitialGenerating,
+} from "@/features/greenfield/utils/generation-recovery";
 import {
 	GENERATION_STATUS_POLL_INTERVAL_MS,
 	GUARD_WAIT_MS,
 } from "@/lib/constants";
 import {
-	isBackgroundGeneration,
-	isStaleCompletedLoader,
-	resolveInitialGenerating,
-} from "@/lib/generation-recovery";
-import {
 	consumeResumeIntent,
 	consumeSuppressAutoGen,
 } from "@/lib/prompt-handoff";
-import type { TaskTree } from "@/lib/services/task-service";
 import { parseStreamEvent, type StreamEvent } from "@/lib/sse-events";
 import { readSseStream } from "@/lib/sse-stream";
 import { cn } from "@/lib/utils";

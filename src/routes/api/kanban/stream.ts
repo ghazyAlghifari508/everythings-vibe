@@ -82,7 +82,7 @@ export const Route = createFileRoute("/api/kanban/stream")({
 									return;
 								}
 								const { getKanbanData } = await import(
-									"@/lib/services/task-service"
+									"@/features/greenfield/services/task-service"
 								);
 								const data = await getKanbanData(projectId);
 								if (stopped) return;

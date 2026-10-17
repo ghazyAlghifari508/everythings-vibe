@@ -24,7 +24,7 @@ const Mermaid = lazy(() =>
 	import("./mermaid").then((m) => ({ default: m.Mermaid })),
 );
 
-import { usePanelResize } from "@/hooks/use-panel-resize";
+import { usePanelResize } from "@/features/greenfield/hooks/use-panel-resize";
 import { cn } from "@/lib/utils";
 import type { Plan } from "@/types/database";
 import { VersionHistory } from "./version-history";

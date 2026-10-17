@@ -15,7 +15,17 @@ import {
 	type CodebaseAnalysis,
 	inferTechAnswersFromCodebase,
 } from "@/features/codebase/services/analysis";
-import { buildCompiledAskPrompt } from "@/lib/ask-prompt-builder";
+import { buildCompiledAskPrompt } from "@/features/greenfield/utils/ask-prompt-builder";
+import {
+	BACKEND_OPTIONS,
+	DATABASE_OPTIONS,
+	DEPLOYMENT_MOBILE_OPTIONS,
+	DEPLOYMENT_OPTIONS,
+	FRONTEND_MOBILE_OPTIONS,
+	FRONTEND_WEB_OPTIONS,
+	FULLSTACK_FRAMEWORK_OPTIONS,
+	FULLSTACK_MOBILE_OPTIONS,
+} from "@/features/greenfield/utils/stack-data";
 import { CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS } from "@/lib/constants";
 import { getFlowStepCta, stepToRouteTarget } from "@/lib/flow-step";
 import {
@@ -26,16 +36,6 @@ import {
 	saveAskState,
 	savePendingPrdPrompt,
 } from "@/lib/prompt-handoff";
-import {
-	BACKEND_OPTIONS,
-	DATABASE_OPTIONS,
-	DEPLOYMENT_MOBILE_OPTIONS,
-	DEPLOYMENT_OPTIONS,
-	FRONTEND_MOBILE_OPTIONS,
-	FRONTEND_WEB_OPTIONS,
-	FULLSTACK_FRAMEWORK_OPTIONS,
-	FULLSTACK_MOBILE_OPTIONS,
-} from "@/lib/stack-data";
 import { useUIStore } from "@/store";
 import { type NonTechAnswer, QuestionCard } from "./question-card";
 import { StackDropdown } from "./stack-dropdown";

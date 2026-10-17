@@ -9,7 +9,7 @@ export const loadFeatureTree = createServerFn({ method: "GET" })
 		const { projects } = await import("@/db/schema");
 		const { and, eq, isNull } = await import("drizzle-orm");
 		const { featureTreeSchema } = await import(
-			"@/lib/services/feature-service"
+			"@/features/greenfield/services/feature-service"
 		);
 		const [row] = await db
 			.select({ featureTree: projects.featureTree })
@@ -34,7 +34,9 @@ export const loadTaskTree = createServerFn({ method: "GET" })
 		const { db } = await import("@/db");
 		const { projects } = await import("@/db/schema");
 		const { and, eq, isNull } = await import("drizzle-orm");
-		const { getTaskTree } = await import("@/lib/services/task-service");
+		const { getTaskTree } = await import(
+			"@/features/greenfield/services/task-service"
+		);
 		const [row] = await db
 			.select({ id: projects.id })
 			.from(projects)

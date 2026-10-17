@@ -1,5 +1,5 @@
 "use client";
-import { computeDiff } from "@/lib/diff-utils";
+import { computeDiff } from "@/features/greenfield/utils/diff-utils";
 export function PrdDiffViewer({
 	oldContent,
 	newContent,

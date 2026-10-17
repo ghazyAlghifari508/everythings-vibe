@@ -5,6 +5,16 @@ import {
 	linkGenerationContext,
 	requireProjectGenerationContext,
 } from "@/features/codebase/services/generation-context";
+import { AC_GENERATION_PROMPT } from "@/features/greenfield/prompts/ac";
+import { saveAcVersion } from "@/features/greenfield/services/ac-service";
+import {
+	FEATURE_TREE_MISSING_MESSAGE,
+	featureTreeSchema,
+	formatFeatureTreeBlock,
+} from "@/features/greenfield/services/feature-service";
+import { getLatestPrdContent } from "@/features/greenfield/services/prd-service";
+import { buildStageScopeDirective } from "@/features/greenfield/utils/planning-mode";
+import { depthDirective } from "@/features/greenfield/utils/prompt-depth";
 import {
 	buildAcMetrics,
 	formatInsufficientCreditsError,
@@ -14,23 +24,13 @@ import { CLAIM_POLL_MS, CLAIM_RETRY_MS } from "@/lib/constants";
 import { hasFullWorkflow } from "@/lib/credits";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
 import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
-import { buildStageScopeDirective } from "@/lib/planning-mode";
-import { depthDirective } from "@/lib/prompt-depth";
-import { AC_GENERATION_PROMPT } from "@/lib/prompts-ac";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { saveAcVersion } from "@/lib/services/ac-service";
 import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
 import type { CreditOperationResult } from "@/lib/services/credit-service";
 import { sanitizeErrorForClient } from "@/lib/services/error-sanitizer";
-import {
-	FEATURE_TREE_MISSING_MESSAGE,
-	featureTreeSchema,
-	formatFeatureTreeBlock,
-} from "@/lib/services/feature-service";
-import { getLatestPrdContent } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 
 export const Route = createFileRoute("/api/ac/generate")({
@@ -570,7 +570,7 @@ export const Route = createFileRoute("/api/ac/generate")({
 							let grounded = "";
 							try {
 								const { extractTechStackSection, groundStack } = await import(
-									"@/lib/grounding"
+									"@/features/greenfield/services/grounding"
 								);
 								const { raceWithAbort } = await import("@/lib/abort-utils");
 								grounded = await raceWithAbort(

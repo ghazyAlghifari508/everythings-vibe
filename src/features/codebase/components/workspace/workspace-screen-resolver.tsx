@@ -4,8 +4,8 @@ import type { ProjectFeatureTree } from "@/db/schema";
 import { CodebaseDocPreview } from "@/features/codebase/components/explorer/codebase-doc-preview";
 import { CodebaseSourcePreview } from "@/features/codebase/components/explorer/codebase-source-preview";
 import { CodebaseKanbanBoard } from "@/features/codebase/components/planning/codebase-kanban-board";
-import type { useKanbanTasks } from "@/hooks/use-kanban-polling";
-import type { TaskTree } from "@/lib/services/task-service";
+import type { useKanbanTasks } from "@/features/greenfield/hooks/use-kanban-polling";
+import type { TaskTree } from "@/features/greenfield/services/task-service";
 import type { SourcePreviewState } from "../../types/source-preview";
 
 export function WorkspaceScreenResolver({

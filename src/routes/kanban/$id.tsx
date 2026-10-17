@@ -5,10 +5,10 @@ import { useEffect } from "react";
 import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
-import { getLatestAcContent } from "@/lib/services/ac-service";
-import { getLatestPrdContent } from "@/lib/services/prd-service";
+import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
+import { getLatestAcContent } from "@/features/greenfield/services/ac-service";
+import { getLatestPrdContent } from "@/features/greenfield/services/prd-service";
 import { requireUserServer } from "@/lib/session";
-import { useLastRoute } from "@/lib/use-last-route";
 
 // ponytail: server-only db logic - loader runs on client too, must not import db there.
 const loadKanban = createServerFn({ method: "GET" })

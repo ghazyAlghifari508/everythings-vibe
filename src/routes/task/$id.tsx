@@ -5,11 +5,11 @@ import { useEffect } from "react";
 import { TaskDetail } from "@/components/task/task-detail";
 import { db } from "@/db";
 import { type ProjectFeatureTree, projects } from "@/db/schema";
-import { getLatestAcContent } from "@/lib/services/ac-service";
-import { getLatestPrdContent } from "@/lib/services/prd-service";
-import { getTaskTree } from "@/lib/services/task-service";
+import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
+import { getLatestAcContent } from "@/features/greenfield/services/ac-service";
+import { getLatestPrdContent } from "@/features/greenfield/services/prd-service";
+import { getTaskTree } from "@/features/greenfield/services/task-service";
 import { requireUserServer } from "@/lib/session";
-import { useLastRoute } from "@/lib/use-last-route";
 
 // ponytail: server-only db logic - loader runs on client too, must not import db there.
 const loadTask = createServerFn({ method: "GET" })

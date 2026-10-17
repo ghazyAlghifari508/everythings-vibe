@@ -16,7 +16,7 @@ import {
 	settleRun,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
-import { validateAskQuestions } from "@/lib/services/ask-service";
+import { validateAskQuestions } from "@/features/greenfield/services/ask-service";
 
 export function useWorkspaceQuestions(
 	effectiveFeatureId: string | null,

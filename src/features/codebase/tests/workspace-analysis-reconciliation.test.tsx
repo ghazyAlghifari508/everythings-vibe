@@ -84,7 +84,7 @@ vi.mock("@tanstack/react-start", () => ({
 	createServerOnlyFn: (fn: unknown) => fn,
 }));
 
-vi.mock("@/hooks/use-kanban-polling", () => ({
+vi.mock("@/features/greenfield/hooks/use-kanban-polling", () => ({
 	useKanbanTasks: () => ({
 		data: null,
 		isLoading: false,

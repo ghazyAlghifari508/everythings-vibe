@@ -13,7 +13,7 @@ vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock("@/hooks/use-panel-resize", () => ({
+vi.mock("@/features/greenfield/hooks/use-panel-resize", () => ({
 	usePanelResize: () => ({
 		leftWidth: 260,
 		onStartDragLeft: () => {},
@@ -150,7 +150,7 @@ describe("Export PDF removal", () => {
 			"src/lib/template-gallery.ts",
 			"src/app/ask/-ask-restore.test.ts",
 			"src/components/prd/prd-viewer.test.tsx",
-			"src/lib/prompts-ask.ts",
+			"src/features/greenfield/prompts/ask.ts",
 		]);
 		const walk = (dir: string) => {
 			for (const entry of readdirSync(dir, { withFileTypes: true })) {

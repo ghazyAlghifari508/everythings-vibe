@@ -3,15 +3,15 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import {
+	extractFeatureSection,
+	getLatestAcContent,
+} from "@/features/greenfield/services/ac-service";
+import { storedTaskPriority } from "@/features/greenfield/utils/task-priority";
+import {
 	apiKeyAuth,
 	hasScope,
 	verifyProjectOwnership,
 } from "@/lib/api-key-auth";
-import {
-	extractFeatureSection,
-	getLatestAcContent,
-} from "@/lib/services/ac-service";
-import { storedTaskPriority } from "@/lib/task-priority";
 
 export const Route = createFileRoute("/api/v1/projects/$id/tasks")({
 	server: {

@@ -138,7 +138,10 @@ describe("existing-codebase Kanban route contract", () => {
 	});
 
 	it("shares the project-keyed task API instead of triggering generation", () => {
-		const apiSource = readFileSync("src/hooks/use-kanban-polling.ts", "utf8");
+		const apiSource = readFileSync(
+			"src/features/greenfield/hooks/use-kanban-polling.ts",
+			"utf8",
+		);
 		expect(routeSource).toContain("projectId={data.projectId}");
 		expect(apiSource).toContain("/api/kanban/stream?projectId=");
 		expect(apiSource).toContain("encodeURIComponent(requestedProjectId)");

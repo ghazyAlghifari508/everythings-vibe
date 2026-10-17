@@ -11,16 +11,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { syncPaymentStatus } from "@/app/actions/payment";
 import { CreditExhaustedModal } from "@/components/chat/credit-exhausted-modal";
 import { TableOfContents } from "@/components/prd/table-of-contents";
-import { usePanelResize } from "@/hooks/use-panel-resize";
-import {
-	GENERATION_STATUS_POLL_INTERVAL_MS,
-	GUARD_WAIT_MS,
-} from "@/lib/constants";
+import { usePanelResize } from "@/features/greenfield/hooks/use-panel-resize";
 import {
 	isBackgroundGeneration,
 	isStaleCompletedLoader,
 	resolveInitialGenerating,
-} from "@/lib/generation-recovery";
+} from "@/features/greenfield/utils/generation-recovery";
+import {
+	GENERATION_STATUS_POLL_INTERVAL_MS,
+	GUARD_WAIT_MS,
+} from "@/lib/constants";
 import {
 	consumeResumeIntent,
 	consumeSuppressAutoGen,

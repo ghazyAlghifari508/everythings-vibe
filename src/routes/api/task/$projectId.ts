@@ -3,7 +3,7 @@ import { getRequestHeaders } from "@tanstack/react-start/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
-import { getTaskTree } from "@/lib/services/task-service";
+import { getTaskTree } from "@/features/greenfield/services/task-service";
 import { requireUser } from "@/lib/session";
 
 export const Route = createFileRoute("/api/task/$projectId")({

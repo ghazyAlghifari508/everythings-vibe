@@ -5,8 +5,8 @@ import { useEffect } from "react";
 import { PrdDetail } from "@/components/prd/prd-detail";
 import { db } from "@/db";
 import { conversations, messages, prdVersions, projects } from "@/db/schema";
+import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
 import { getUserPlanAndQuota, requireUserServer } from "@/lib/session";
-import { useLastRoute } from "@/lib/use-last-route";
 
 // ponytail: requireUserServer is a server fn → its auth/db imports get pruned
 // from the client bundle. Plain `requireUser` would drag pg (→ Buffer) in.

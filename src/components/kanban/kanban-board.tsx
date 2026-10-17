@@ -32,7 +32,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useKanbanTasks } from "@/hooks/use-kanban-polling";
+import { useKanbanTasks } from "@/features/greenfield/hooks/use-kanban-polling";
 import {
 	computeKanbanProgress,
 	extractPhases,

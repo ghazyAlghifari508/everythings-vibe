@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useImperativeHandle, useRef } from "react";
-import type { TaskCard } from "@/hooks/use-kanban-polling";
+import type { TaskCard } from "@/features/greenfield/hooks/use-kanban-polling";
 import { groupCardsByFeature } from "@/lib/kanban-utils";
 import { FeatureGroup } from "./feature-group";
 

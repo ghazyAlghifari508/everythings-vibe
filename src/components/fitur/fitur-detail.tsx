@@ -5,16 +5,16 @@ import { AlertTriangle, ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ThoughtLine } from "@/components/ui/thought-line";
 import type { ProjectFeatureTree } from "@/db/schema";
-import {
-	GENERATION_STATUS_POLL_INTERVAL_MS,
-	GUARD_WAIT_MS,
-} from "@/lib/constants";
-import { featureTreeSchema } from "@/lib/feature-tree";
+import { featureTreeSchema } from "@/features/greenfield/types/feature-tree";
 import {
 	isBackgroundGeneration,
 	isStaleCompletedLoader,
 	resolveInitialGenerating,
-} from "@/lib/generation-recovery";
+} from "@/features/greenfield/utils/generation-recovery";
+import {
+	GENERATION_STATUS_POLL_INTERVAL_MS,
+	GUARD_WAIT_MS,
+} from "@/lib/constants";
 import { consumeSuppressAutoGen } from "@/lib/prompt-handoff";
 import { useUIStore } from "@/store";
 import { FeatureMapCanvas } from "./feature-map-canvas";

@@ -8,28 +8,28 @@ import {
 	parseStoredHandoffAnswers,
 	requireProjectGenerationContext,
 } from "@/features/codebase/services/generation-context";
-import { MAX_FEATURE_RESPONSE_CHARS, MAX_PROMPT_LENGTH } from "@/lib/constants";
-import { isTruncatedGeneration } from "@/lib/flow-progress";
-import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
-import { buildStageScopeDirective } from "@/lib/planning-mode";
 import {
 	FEATURE_GENERATION_PROMPT,
 	FEATURE_GENERATION_USER_MESSAGE,
-} from "@/lib/prompts-fitur";
+} from "@/features/greenfield/prompts/feature";
+import {
+	FeatureProjectNotFoundError,
+	featureTreeSchema,
+	parseFeatureTreeJson,
+	saveFeatureTree,
+} from "@/features/greenfield/services/feature-service";
+import { sanitizeModelOutput } from "@/features/greenfield/services/prd-service";
+import { buildStageScopeDirective } from "@/features/greenfield/utils/planning-mode";
+import { MAX_FEATURE_RESPONSE_CHARS, MAX_PROMPT_LENGTH } from "@/lib/constants";
+import { isTruncatedGeneration } from "@/lib/flow-progress";
+import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
 import { sanitizeErrorForClient } from "@/lib/services/error-sanitizer";
-import {
-	FeatureProjectNotFoundError,
-	featureTreeSchema,
-	parseFeatureTreeJson,
-	saveFeatureTree,
-} from "@/lib/services/feature-service";
 import { extractJson } from "@/lib/services/json-extract";
-import { sanitizeModelOutput } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 import type { Plan } from "@/types/database";
 

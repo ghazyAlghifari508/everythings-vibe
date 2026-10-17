@@ -1,4 +1,4 @@
-import { stripSectionMarkers } from "@/lib/revision-reply";
+import { stripSectionMarkers } from "@/features/greenfield/utils/revision-reply";
 
 export const MIN_PROMPT_LENGTH = 20;
 

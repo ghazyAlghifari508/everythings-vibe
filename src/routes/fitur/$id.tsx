@@ -6,8 +6,8 @@ import { FiturDetail } from "@/components/fitur/fitur-detail";
 import { db } from "@/db";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { projects } from "@/db/schema";
+import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
 import { requireUserServer } from "@/lib/session";
-import { useLastRoute } from "@/lib/use-last-route";
 
 // ponytail: server-only db logic - loader runs on client too, must not import db there.
 const loadFitur = createServerFn({ method: "GET" })

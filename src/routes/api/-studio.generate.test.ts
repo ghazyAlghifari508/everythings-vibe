@@ -124,7 +124,8 @@ describe("POST /api/studio/generate", () => {
 				prompt: "Buat personal finance app berbasis PRD",
 				prdAttachment: {
 					filename: "PRD-CatatDompet.md",
-					content: "# PRD CatatDompet\nFitur: pencatatan transaksi harian dan budget.",
+					content:
+						"# PRD CatatDompet\nFitur: pencatatan transaksi harian dan budget.",
 				},
 			}),
 		});

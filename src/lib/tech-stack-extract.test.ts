@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractTechStackSection } from "./grounding";
+import { extractTechStackSection } from "@/features/greenfield/services/grounding";
 
 const FULL_PRD = [
 	"<!-- SECTION: Overview -->",

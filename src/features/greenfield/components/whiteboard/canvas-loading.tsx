@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { TaskTree } from "@/lib/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-service";
 import { layoutTaskGraph } from "../../utils/whiteboard-layout";
 import { Edges } from "./canvas-connectors";
 

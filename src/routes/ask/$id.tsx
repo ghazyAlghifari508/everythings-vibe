@@ -6,8 +6,8 @@ import { AskFlow } from "@/app/ask/ask-flow";
 import { db } from "@/db";
 import { codebaseAnalyses, prdVersions, projects } from "@/db/schema";
 import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
+import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
 import { requireUserServer } from "@/lib/session";
-import { useLastRoute } from "@/lib/use-last-route";
 
 // Ask entry decision for existing-codebase projects (unit-tested in
 // ./-ask-entry.test.ts): without a ready analysis the generic Ask flow would

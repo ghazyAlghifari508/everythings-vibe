@@ -17,7 +17,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import type { TaskCard } from "@/hooks/use-kanban-polling";
+import type { TaskCard } from "@/features/greenfield/hooks/use-kanban-polling";
 import { getTaskPriorityConfig } from "@/lib/kanban-utils";
 import { cn } from "@/lib/utils";
 

@@ -5,6 +5,38 @@ import {
 	linkGenerationContext,
 	requireProjectGenerationContext,
 } from "@/features/codebase/services/generation-context";
+import { getLatestAcMarkdown } from "@/features/greenfield/services/ac-service";
+import {
+	FEATURE_TREE_MISSING_MESSAGE,
+	featureTreeSchema,
+	formatFeatureTreeBlock,
+} from "@/features/greenfield/services/feature-service";
+import {
+	getLatestPrdContent,
+	sanitizeModelOutput,
+} from "@/features/greenfield/services/prd-service";
+import {
+	buildTaskRepairUserMessage,
+	buildTaskSystemPrompt,
+	MAX_TASK_COVERAGE_REPAIR_ATTEMPTS,
+	repairTaskCoverage,
+	TASK_FIRST_PASS_USER_MESSAGE,
+} from "@/features/greenfield/services/task-generation";
+import {
+	parseTaskJson,
+	saveTaskTree,
+	type TaskTree,
+} from "@/features/greenfield/services/task-service";
+import {
+	buildScopeEvidence,
+	describeScopeRefinement,
+	refineTaskScope,
+} from "@/features/greenfield/utils/scope-refinement";
+import {
+	type ScopeEvidence,
+	type ScopeTaskView,
+	validateScopeConsistency,
+} from "@/features/greenfield/utils/scope-validation";
 import {
 	buildTaskMetrics,
 	formatInsufficientCreditsError,
@@ -20,44 +52,12 @@ import {
 } from "@/lib/page-inventory";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
-	buildScopeEvidence,
-	describeScopeRefinement,
-	refineTaskScope,
-} from "@/lib/scope-refinement";
-import {
-	type ScopeEvidence,
-	type ScopeTaskView,
-	validateScopeConsistency,
-} from "@/lib/scope-validation";
-import { getLatestAcMarkdown } from "@/lib/services/ac-service";
-import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
 import type { CreditOperationResult } from "@/lib/services/credit-service";
 import { sanitizeErrorForClient } from "@/lib/services/error-sanitizer";
-import {
-	FEATURE_TREE_MISSING_MESSAGE,
-	featureTreeSchema,
-	formatFeatureTreeBlock,
-} from "@/lib/services/feature-service";
 import { extractJson } from "@/lib/services/json-extract";
-import {
-	getLatestPrdContent,
-	sanitizeModelOutput,
-} from "@/lib/services/prd-service";
-import {
-	buildTaskRepairUserMessage,
-	buildTaskSystemPrompt,
-	MAX_TASK_COVERAGE_REPAIR_ATTEMPTS,
-	repairTaskCoverage,
-	TASK_FIRST_PASS_USER_MESSAGE,
-} from "@/lib/services/task-generation";
-import {
-	parseTaskJson,
-	saveTaskTree,
-	type TaskTree,
-} from "@/lib/services/task-service";
 import { requireUser } from "@/lib/session";
 
 /**
@@ -783,7 +783,7 @@ export const Route = createFileRoute("/api/task/generate")({
 							let grounded = "";
 							try {
 								const { extractTechStackSection, groundStack } = await import(
-									"@/lib/grounding"
+									"@/features/greenfield/services/grounding"
 								);
 								const { raceWithAbort } = await import("@/lib/abort-utils");
 								// Ground on the PRD's declared stack table (section 6.2),

@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { getKanbanData } from "@/features/greenfield/services/task-service";
 import {
 	apiKeyAuth,
 	hasScope,
 	verifyProjectOwnership,
 } from "@/lib/api-key-auth";
-import { getKanbanData } from "@/lib/services/task-service";
 
 export const Route = createFileRoute("/api/v1/projects/$id/kanban")({
 	server: {

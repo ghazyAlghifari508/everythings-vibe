@@ -10,27 +10,27 @@ import {
 	resolveActiveSnapshotId,
 	saveAskHandoff,
 } from "@/features/codebase/services/generation-context";
+import {
+	ASK_CODEBASE_OPTIONS_GENERATION_PROMPT,
+	ASK_OPTIONS_GENERATION_PROMPT,
+} from "@/features/greenfield/prompts/ask";
+import {
+	type AskOptionsCollection,
+	generateValidatedAskQuestions,
+} from "@/features/greenfield/services/ask-service";
+import { sanitizeModelOutput } from "@/features/greenfield/services/prd-service";
 import { MAX_PROMPT_LENGTH } from "@/lib/constants";
 import {
 	isTruncatedGeneration,
 	shouldMarkQuestionStep,
 } from "@/lib/flow-progress";
 import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
-import {
-	ASK_CODEBASE_OPTIONS_GENERATION_PROMPT,
-	ASK_OPTIONS_GENERATION_PROMPT,
-} from "@/lib/prompts-ask";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
-import {
-	type AskOptionsCollection,
-	generateValidatedAskQuestions,
-} from "@/lib/services/ask-service";
 import { sanitizeErrorForClient } from "@/lib/services/error-sanitizer";
-import { sanitizeModelOutput } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 import type { Plan } from "@/types/database";
 

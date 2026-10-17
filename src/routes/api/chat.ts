@@ -7,6 +7,37 @@ import {
 	requireProjectGenerationContext,
 } from "@/features/codebase/services/generation-context";
 import {
+	PRD_REVISION_PROMPT,
+	PRD_SYSTEM_PROMPT,
+} from "@/features/greenfield/prompts/prd";
+import {
+	ConversationProjectOwnershipError,
+	ensureConversation,
+	getConversationHistory,
+	rollbackStreamInserts,
+	saveMessages,
+} from "@/features/greenfield/services/chat-service";
+import {
+	FEATURE_TREE_MISSING_MESSAGE,
+	featureTreeSchema,
+	formatFeatureTreeBlock,
+} from "@/features/greenfield/services/feature-service";
+import {
+	deriveProjectName,
+	deriveProjectNameSync,
+	getLatestPrdContent,
+	getPrdVersionContent,
+	hasExplicitProductName,
+	resolveProjectId,
+	savePrdVersion,
+} from "@/features/greenfield/services/prd-service";
+import { buildStageScopeDirective } from "@/features/greenfield/utils/planning-mode";
+import { depthDirective } from "@/features/greenfield/utils/prompt-depth";
+import {
+	buildRevisionAssistantReply,
+	stripSectionMarkers,
+} from "@/features/greenfield/utils/revision-reply";
+import {
 	buildPrdMetrics,
 	type CreditQuote,
 	formatInsufficientCreditsError,
@@ -19,41 +50,13 @@ import {
 } from "@/lib/constants";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
 import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
-import { buildStageScopeDirective } from "@/lib/planning-mode";
-import { depthDirective } from "@/lib/prompt-depth";
-import { PRD_REVISION_PROMPT, PRD_SYSTEM_PROMPT } from "@/lib/prompts";
 import { checkRateLimit } from "@/lib/rate-limit";
-import {
-	buildRevisionAssistantReply,
-	stripSectionMarkers,
-} from "@/lib/revision-reply";
 import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
-import {
-	ConversationProjectOwnershipError,
-	ensureConversation,
-	getConversationHistory,
-	rollbackStreamInserts,
-	saveMessages,
-} from "@/lib/services/chat-service";
 import type { CreditOperationResult } from "@/lib/services/credit-service";
 import { sanitizeErrorForClient } from "@/lib/services/error-sanitizer";
-import {
-	FEATURE_TREE_MISSING_MESSAGE,
-	featureTreeSchema,
-	formatFeatureTreeBlock,
-} from "@/lib/services/feature-service";
-import {
-	deriveProjectName,
-	deriveProjectNameSync,
-	getLatestPrdContent,
-	getPrdVersionContent,
-	hasExplicitProductName,
-	resolveProjectId,
-	savePrdVersion,
-} from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 import type { Plan } from "@/types/database";
 
@@ -470,7 +473,9 @@ export const Route = createFileRoute("/api/chat")({
 				// enters the client bundle. groundStack() returns "" on any failure;
 				// the import itself is wrapped so a module-load error can't 500 the route.
 				try {
-					const { groundStack } = await import("@/lib/grounding");
+					const { groundStack } = await import(
+						"@/features/greenfield/services/grounding"
+					);
 					systemPrompt += await groundStack(groundingSource);
 				} catch (err) {
 					console.warn(
@@ -880,7 +885,7 @@ export const Route = createFileRoute("/api/chat")({
 										)
 											return;
 										const { generateProjectSummary } = await import(
-											"@/lib/services/project-summary"
+											"@/features/greenfield/services/project-summary"
 										);
 										const summary = await generateProjectSummary({
 											prdContent: finalPrdToSave,

@@ -17,7 +17,10 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { stackIconNeedsDarkInvert, stackIconUrl } from "@/lib/stack-data";
+import {
+	stackIconNeedsDarkInvert,
+	stackIconUrl,
+} from "@/features/greenfield/utils/stack-data";
 import { cn } from "@/lib/utils";
 
 interface StackDropdownProps {

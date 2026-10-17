@@ -3,14 +3,14 @@ import { getRequestHeaders } from "@tanstack/react-start/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
-import { getLatestAcMarkdown } from "@/lib/services/ac-service";
+import { getLatestAcMarkdown } from "@/features/greenfield/services/ac-service";
 import {
 	formatAcMarkdown,
 	formatPrdMarkdown,
 	formatTasksJson,
-} from "@/lib/services/export-service";
-import { getLatestPrdContent } from "@/lib/services/prd-service";
-import { getTaskTree } from "@/lib/services/task-service";
+} from "@/features/greenfield/services/export-service";
+import { getLatestPrdContent } from "@/features/greenfield/services/prd-service";
+import { getTaskTree } from "@/features/greenfield/services/task-service";
 import { requireUser } from "@/lib/session";
 
 export const Route = createFileRoute("/api/export/prd")({

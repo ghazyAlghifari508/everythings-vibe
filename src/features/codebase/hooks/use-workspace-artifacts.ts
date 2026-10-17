@@ -15,7 +15,7 @@ import {
 	type WorkspaceArtifactHydration,
 } from "@/features/codebase/services/workspace-hydration";
 import { describeArtifactReadFailure } from "@/features/codebase/utils/workspace-contracts";
-import type { TaskTree } from "@/lib/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-service";
 
 export function useWorkspaceArtifacts(
 	snapshotReady: boolean,

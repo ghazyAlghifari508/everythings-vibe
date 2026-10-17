@@ -3,7 +3,7 @@
  *
  * Canonical types come from the backend: `ProjectFeatureTree`, `FeatureNode`,
  * and `SubfeatureNode` are imported type-only from `@/db/schema`, and task
- * rows use `TaskTree` from `@/lib/services/task-service`. This module holds
+ * rows use `TaskTree` from `@/features/greenfield/services/task-service`. This module holds
  * no schema of its own — only pure view helpers over those contracts.
  */
 import type {
@@ -11,7 +11,7 @@ import type {
 	ProjectFeatureTree,
 	SubfeatureNode,
 } from "@/db/schema";
-import type { TaskTree } from "@/lib/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-service";
 
 export type { FeatureNode, ProjectFeatureTree, SubfeatureNode };
 export type FeatureTask = TaskTree["features"][number]["tasks"][number];

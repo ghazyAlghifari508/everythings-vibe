@@ -1,6 +1,6 @@
 "use client";
 
-import type { TaskCard } from "@/hooks/use-kanban-polling";
+import type { TaskCard } from "@/features/greenfield/hooks/use-kanban-polling";
 import { KanbanCard } from "./kanban-card";
 
 interface FeatureGroupProps {

@@ -5,13 +5,13 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 // pattern). Never import this module from client code.
 import { db } from "@/db";
 import { projects, subscriptions, tasks } from "@/db/schema";
-import { checkRateLimit } from "@/lib/rate-limit";
 import {
 	hasNonPendingSubtask,
 	needsProgressReset,
 	normalizeSubtasksForReset,
 	TASK_STATUS_PENDING,
-} from "@/lib/services/task-reset";
+} from "@/features/greenfield/services/task-reset";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";
 import type { Plan } from "@/types/database";
 
