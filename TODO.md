@@ -415,7 +415,7 @@ Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenG
   - [ ] Ubah pesan status stage sync: *"Agent berhasil tersambung ke everythings-vibe"*, *"Mengirim source code ke everythings-vibe"*.
 - [ ] **Sistem Pembayaran &amp; Notifikasi:**
   - [ ] `src/routes/api/payments/create.ts`: Item label Midtrans `"Top Up X Kredit everythings-vibe"`.
-  - [ ] `src/lib/email.ts`: Pengirim email `"everythings-vibe <onboarding@resend.dev>"` dan footer *"Email otomatis dari everythings-vibe"*.
+  - [ ] `src/features/billing/services/email.ts`: Pengirim email `"everythings-vibe <onboarding@resend.dev>"` dan footer *"Email otomatis dari everythings-vibe"*.
 - [ ] **Constants File (`src/lib/constants.ts`):**
   - [ ] Ubah `EXPORT_FILENAME_PREFIX`: Dari `"vibeeverything"` menjadi `"everythings-vibe"`.
 

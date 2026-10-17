@@ -35,7 +35,13 @@ export const RATE_LIMITS = {
 	general: 60,
 	// Unauthenticated API-key guesses per key-fingerprint per minute.
 	apiKeyAuth: 30,
-	// Polling must not consume the CLI upload transport's separate budget.
+	// Browser sync-status reconciliation gets its own budget, separate from
+	// `general`. Sharing one budget meant the browser's own polling competed
+	// with the CLI upload transport it was watching: `waiting_for_cli` is the
+	// normal state for a session's full 30-minute life, so a single tab at the
+	// standby cadence consumed half the `general` allowance before the CLI
+	// could send a single manifest batch. Observation must never starve the
+	// observed.
 	syncStatusRead: 240,
 } as const;
 
@@ -114,7 +120,16 @@ export const KANBAN_POLL_INTERVAL_MS = 10_000;
 // Task/AC/PRD detail views; 2.5s balances freshness vs loader pressure.
 export const GENERATION_STATUS_POLL_INTERVAL_MS = 2_500;
 
-// Waiting sessions poll slowly; active attempts poll fast enough to observe transitions.
+// === Existing codebase sync (MVP locked decisions) ===
+// Browser polls the persisted sync status; no sync SSE endpoint in MVP.
+//
+// Cadence follows what the server is actually doing. While an attempt is in
+// flight the CLI is moving between real persisted states and the browser has a
+// short window in which to observe each one, so it reconciles faster. While the
+// session is still `waiting_for_cli` nothing on the server can change until the
+// user runs the CLI, so a slower cadence loses no information and stops
+// spending the status-read budget on an idle session (which lasts up to the
+// full 30-minute session expiry).
 export const CODEBASE_SYNC_POLL_INTERVAL_MS = 2_000;
 // Active-attempt cadence: the window in which `connected` -> `uploading` ->
 // `uploaded` transitions can be missed is bounded by the CLI's own upload time,
@@ -142,9 +157,17 @@ export const CODEBASE_FILE_PREVIEW_MAX_CHARS = 64_000;
 // Maximum rendered lines per preview. A long file is clipped on a line
 // boundary and reported, so line numbers never drift from real content.
 export const CODEBASE_FILE_PREVIEW_MAX_LINES = 3_000;
-// Later CLI capabilities are advisory, so keep compatibility with 2.0.0 clients.
+// Minimum supported CLI version for `vibeeverything codebase sync`. The floor
+// stays 2.0.0 on purpose: capabilities added later (repositoryName handshake
+// identity, canonical ignore file, preparation-failure reporting) are
+// advisory — the server tolerates their absence and keeps the existing name —
+// so raising the minimum would break working syncs for no transport need.
 export const CODEBASE_CLI_MIN_VERSION = "2.0.0";
-// Two CLI request timeouts distinguish an abandoned claim from a live owner.
+// A pending idempotency claim older than this is treated as abandoned by a
+// crashed request and may be atomically stolen by a retry. Bound from the
+// CLI's 30s per-request timeout: a live owner finalizes or releases well
+// within one timeout, so two timeouts is generous headroom with no false
+// steals.
 export const CODEBASE_SYNC_CLAIM_STALE_MS = 2 * 30_000;
 // Maximum user-facing sync error message length served to browsers. Longer
 // server-written messages are truncated so status polling stays bounded.
