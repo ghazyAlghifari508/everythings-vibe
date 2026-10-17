@@ -121,7 +121,17 @@ describe("onboarding sources carry one sync progress surface", () => {
 		"src/features/codebase/components/workspace/sync-stage-list.tsx",
 		"utf8",
 	);
-	const planPage = readFileSync("src/routes/plan/codebase.tsx", "utf8");
+	// The onboarding page is a thin route facade now; the reconciliation loop it
+	// used to own lives in the onboarding hook, so the pin follows the loop.
+	const onboarding = readFileSync(
+		"src/features/codebase/hooks/use-codebase-onboarding.ts",
+		"utf8",
+	);
+	const pageShell = readFileSync(
+		"src/features/codebase/components/workspace/plan-codebase-page.tsx",
+		"utf8",
+	);
+	const routeFacade = readFileSync("src/routes/plan/codebase.tsx", "utf8");
 
 	it("keeps the step screens free of their own polling loop", () => {
 		// Two loops racing the same endpoint is how a flow ends up showing a
@@ -133,18 +143,25 @@ describe("onboarding sources carry one sync progress surface", () => {
 	});
 
 	it("lets exactly one component own the reconciliation loop for onboarding", () => {
-		const owners = [planPage, screenConnect, stageList].filter((source) =>
-			source.includes("useCodebaseSyncStatus"),
+		const owners = [onboarding, pageShell, screenConnect, stageList].filter(
+			(source) => source.includes("useCodebaseSyncStatus"),
 		);
 		expect(owners).toHaveLength(1);
 	});
 
+	it("keeps the route file a facade with no loop of its own", () => {
+		expect(routeFacade).not.toContain("useCodebaseSyncStatus");
+		expect(routeFacade).not.toContain("fetch(");
+	});
+
 	it("no longer contains the removed monitor screen or its labels", () => {
-		expect(planPage).not.toMatch(/Pantau Sync/i);
-		expect(planPage).not.toMatch(/Kembali ke Prompt Sync/i);
-		expect(planPage).not.toMatch(/Prompt Sync/i);
-		expect(planPage).not.toContain("components/codebase/sync-status");
-		expect(planPage).not.toMatch(/<SyncStatus[\s/>]/);
+		for (const source of [routeFacade, pageShell, onboarding]) {
+			expect(source).not.toMatch(/Pantau Sync/i);
+			expect(source).not.toMatch(/Kembali ke Prompt Sync/i);
+			expect(source).not.toMatch(/Prompt Sync/i);
+			expect(source).not.toContain("components/codebase/sync-status");
+			expect(source).not.toMatch(/<SyncStatus[\s/>]/);
+		}
 		expect(screenConnect).not.toMatch(/Pantau Sync/i);
 		expect(screenConnect).not.toMatch(/Prompt Sync/i);
 	});
