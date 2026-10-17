@@ -13,7 +13,7 @@ import {
 	generateSyncToken,
 	hashSyncToken,
 } from "@/features/codebase/services/sync.server";
-import { deriveProjectNameSync } from "@/features/greenfield/services/prd-service";
+import { deriveProjectNameSync } from "@/features/greenfield/services/prd-naming";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,

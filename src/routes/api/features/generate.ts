@@ -18,7 +18,7 @@ import {
 	parseFeatureTreeJson,
 	saveFeatureTree,
 } from "@/features/greenfield/services/feature-service";
-import { sanitizeModelOutput } from "@/features/greenfield/services/prd-service";
+import { sanitizeModelOutput } from "@/features/greenfield/services/prd-text";
 import { buildStageScopeDirective } from "@/features/greenfield/utils/planning-mode";
 import { MAX_FEATURE_RESPONSE_CHARS, MAX_PROMPT_LENGTH } from "@/lib/constants";
 import { isTruncatedGeneration } from "@/lib/flow-progress";

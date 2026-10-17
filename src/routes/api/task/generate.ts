@@ -11,10 +11,8 @@ import {
 	featureTreeSchema,
 	formatFeatureTreeBlock,
 } from "@/features/greenfield/services/feature-service";
-import {
-	getLatestPrdContent,
-	sanitizeModelOutput,
-} from "@/features/greenfield/services/prd-service";
+import { getLatestPrdContent } from "@/features/greenfield/services/prd-service";
+import { sanitizeModelOutput } from "@/features/greenfield/services/prd-text";
 import {
 	buildTaskRepairUserMessage,
 	buildTaskSystemPrompt,

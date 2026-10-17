@@ -14,7 +14,7 @@ import {
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	SNAPSHOT_CONTEXT_STATUSES,
 } from "@/features/codebase/services/sync";
-import { deriveProjectNameSync } from "@/features/greenfield/services/prd-service";
+import { deriveProjectNameSync } from "@/features/greenfield/services/prd-naming";
 import { normalizeLanguage } from "@/lib/language";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";

@@ -25,9 +25,11 @@ import {
 import {
 	deriveProjectName,
 	deriveProjectNameSync,
+	hasExplicitProductName,
+} from "@/features/greenfield/services/prd-naming";
+import {
 	getLatestPrdContent,
 	getPrdVersionContent,
-	hasExplicitProductName,
 	resolveProjectId,
 	savePrdVersion,
 } from "@/features/greenfield/services/prd-service";

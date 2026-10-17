@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	deriveProjectNameSync,
 	hasExplicitProductName,
-} from "@/features/greenfield/services/prd-service";
+} from "@/features/greenfield/services/prd-naming";
 
 describe("deriveProjectNameSync", () => {
 	it("prefers a quoted product name", () => {

@@ -5,7 +5,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { acVersions, projects } from "@/db/schema";
-import { sanitizeModelOutput } from "@/features/greenfield/services/prd-service";
+import { sanitizeModelOutput } from "@/features/greenfield/services/prd-text";
 import { advanceStep } from "@/lib/flow-progress";
 
 /** Thrown when the project does not exist or belongs to another tenant. */

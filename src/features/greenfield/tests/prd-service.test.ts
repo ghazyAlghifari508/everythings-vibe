@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { generateShareToken } from "@/features/greenfield/services/prd-service";
 import {
 	assertCompletePrdOutput,
 	countPrdSectionMarkers,
-	generateShareToken,
-} from "@/features/greenfield/services/prd-service";
+} from "@/features/greenfield/services/prd-text";
 
 describe("generateShareToken", () => {
 	it("returns a 12 character string", () => {

@@ -18,7 +18,7 @@ import {
 	type AskOptionsCollection,
 	generateValidatedAskQuestions,
 } from "@/features/greenfield/services/ask-service";
-import { sanitizeModelOutput } from "@/features/greenfield/services/prd-service";
+import { sanitizeModelOutput } from "@/features/greenfield/services/prd-text";
 import { MAX_PROMPT_LENGTH } from "@/lib/constants";
 import {
 	isTruncatedGeneration,
