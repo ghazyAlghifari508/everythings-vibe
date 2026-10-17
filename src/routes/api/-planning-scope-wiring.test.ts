@@ -29,7 +29,9 @@ describe("Fitur generation route", () => {
 });
 
 describe("PRD generation route", () => {
-	const src = source("src/routes/api/chat.ts");
+	const src = source(
+		"src/features/greenfield/services/prd-chat-context.server.ts",
+	);
 
 	it("composes the prd-stage scope directive from the resolved project mode", () => {
 		expect(src).toContain("buildStageScopeDirective");

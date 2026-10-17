@@ -49,3 +49,57 @@ export async function* readSseStream(
 		reader.releaseLock();
 	}
 }
+
+/**
+ * Server-side writer for the generation streams (PRD chat, AC, Task).
+ *
+ * A client that disconnects mid-stream (refresh, tab close, network blip)
+ * closes the controller under the generator, so every enqueue is guarded: a
+ * failed write must never surface as a stream error, because the server-side
+ * work after it (credit settlement, persistence) still has to complete.
+ */
+export interface SseEmitter {
+	/** Emit one typed event frame. */
+	send(payload: Record<string, unknown>): void;
+	/** Emit a content delta. */
+	delta(content: string): void;
+	/** Emit a reasoning/progress fragment. */
+	thinking(content: string): void;
+	/** Tell the client the previous thinking fragments are superseded. */
+	thinkingReset(): void;
+	/** Close the stream, ignoring an already-closed controller. */
+	close(): void;
+}
+
+export function createSseEmitter(
+	controller: ReadableStreamDefaultController<Uint8Array>,
+): SseEmitter {
+	const encoder = new TextEncoder();
+	const write = (frame: Record<string, unknown>) => {
+		try {
+			controller.enqueue(encoder.encode(`data: ${JSON.stringify(frame)}\n\n`));
+		} catch {}
+	};
+	return {
+		send: write,
+		delta: (content) => write({ type: "delta", content }),
+		thinking: (content) => write({ type: "thinking", content }),
+		thinkingReset: () => write({ type: "thinking_reset" }),
+		close: () => {
+			try {
+				controller.close();
+			} catch {}
+		},
+	};
+}
+
+/** Standard SSE response wrapper; every generation stream uses these headers. */
+export function sseResponse(stream: ReadableStream<Uint8Array>): Response {
+	return new Response(stream, {
+		headers: {
+			"Content-Type": "text/event-stream",
+			"Cache-Control": "no-cache",
+			Connection: "keep-alive",
+		},
+	});
+}

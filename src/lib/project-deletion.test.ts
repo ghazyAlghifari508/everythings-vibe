@@ -91,7 +91,7 @@ describe("read paths exclude tombstoned projects", () => {
 		"src/features/codebase/services/workspace-artifacts.functions.ts",
 		"src/routes/prd/share/$token.tsx",
 		"src/lib/api-key-auth.ts",
-		"src/routes/api/chat.ts",
+		"src/features/greenfield/services/prd-chat-context.server.ts",
 		"src/routes/api/ac/generate.ts",
 		"src/routes/api/task/generate.ts",
 		"src/routes/api/kanban/$pid.ts",
