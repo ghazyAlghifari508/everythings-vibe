@@ -25,15 +25,15 @@ import {
 	SCRAPE_HISTORY_PAGE_SIZES,
 	SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS,
 } from "@/lib/constants";
-import type { ScrapeHistorySearch } from "@/lib/scrape-contract";
+import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
 import {
 	buildHistoryDetailSearch,
 	clampHistoryPage,
 	historyPageRange,
 	historyTotalPages,
 	isHistoryFiltered,
-} from "@/lib/scrape-history";
-import { imageCountsLabel, type imageResultCounts } from "@/lib/scrape-images";
+} from "@/features/scrape/utils/scrape-history";
+import { imageCountsLabel, type imageResultCounts } from "@/features/scrape/utils/scrape-images";
 import { displaySiteName } from "@/lib/site-name";
 import { formatDate } from "@/lib/utils";
 import { ScrapeFilterSelect } from "./scrape-filter-select";

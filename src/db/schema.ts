@@ -28,11 +28,11 @@ import type {
 	ScrapeFailureReason,
 } from "@/lib/design-errors";
 import type { VisualEvidence } from "@/lib/design-visual-evidence";
-import type { DesignSettings, ScrapeRequest } from "@/lib/scrape-contract";
+import type { DesignSettings, ScrapeRequest } from "@/features/scrape/types/scrape-contract";
 import type {
 	ScrapeImageDiscovery,
 	ScrapeImageOutcome,
-} from "@/lib/scrape-images";
+} from "@/features/scrape/utils/scrape-images";
 import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import type {
 	StudioDesignReferenceMetadata,

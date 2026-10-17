@@ -10,7 +10,7 @@ import {
 	STUDIO_VISUAL_WIDTH,
 } from "@/lib/constants";
 import { fetchAsset } from "@/lib/fetch-html";
-import { isBlockedRequestUrl } from "@/lib/render-page";
+import { isBlockedRequestUrl } from "@/features/scrape/services/render-page";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 
 export { STUDIO_VISUAL_WIDTH };

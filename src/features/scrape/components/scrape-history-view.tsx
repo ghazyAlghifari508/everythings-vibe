@@ -1,4 +1,4 @@
-import type { ScrapeHistorySearch } from "@/lib/scrape-contract";
+import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeHistoryItem } from "./scrape-history-list";
 import { ScrapeHistoryList } from "./scrape-history-list";
 

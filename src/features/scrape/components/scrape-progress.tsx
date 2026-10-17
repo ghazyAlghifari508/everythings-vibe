@@ -1,8 +1,8 @@
 import { AlertTriangle, Check, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
-import { resolveScrapeErrorPresentation } from "@/lib/scrape-error-presentation";
-import type { imageResultCounts } from "@/lib/scrape-images";
+import { resolveScrapeErrorPresentation } from "@/features/scrape/utils/scrape-error-presentation";
+import type { imageResultCounts } from "@/features/scrape/utils/scrape-images";
 import { displaySiteName } from "@/lib/site-name";
 import { cn } from "@/lib/utils";
 import { ScrapeErrorCard } from "./scrape-error-card";

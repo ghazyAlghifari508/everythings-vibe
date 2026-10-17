@@ -14,13 +14,13 @@ import {
 	parseScrapeHistorySearch,
 	resolveScrapeHistoryOffset,
 	type ScrapeHistorySearch,
-} from "@/lib/scrape-contract";
+} from "@/features/scrape/types/scrape-contract";
 import {
 	clampHistoryPage,
 	historyTotalPages,
 	resolvePageAfterDelete,
 	toScrapeHistorySearchParams,
-} from "@/lib/scrape-history";
+} from "@/features/scrape/utils/scrape-history";
 import { requireUserServer } from "@/lib/session";
 
 export interface ScrapeHistoryLoaderData {
@@ -38,7 +38,7 @@ const loadScrapesHistory = createServerFn({ method: "GET" })
 	.validator((data: unknown) => parseScrapeHistorySearch(data))
 	.handler(async ({ data }): Promise<ScrapeHistoryLoaderData> => {
 		const user = await requireUserServer();
-		const { listScrapeHistory } = await import("@/lib/services/scrape-service");
+		const { listScrapeHistory } = await import("@/features/scrape/services/scrape-service");
 		const filters = {
 			mode: data.mode,
 			status: data.status,
@@ -86,7 +86,7 @@ const deleteScrapeItem = createServerFn({ method: "POST" })
 	.validator((id: string) => id)
 	.handler(async ({ data: id }): Promise<{ ok: true }> => {
 		const user = await requireUserServer();
-		const { deleteScrape } = await import("@/lib/services/scrape-service");
+		const { deleteScrape } = await import("@/features/scrape/services/scrape-service");
 		return deleteScrape(id, user.id);
 	});
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ScrapeDetail } from "@/lib/services/scrape-service";
+import type { ScrapeDetail } from "@/features/scrape/services/scrape-service";
 import { GET, type ScrapePreviewRouteDeps } from "@/routes/api/scrape.preview";
 
 const user = { id: "owner-1", email: "owner@example.invalid" };

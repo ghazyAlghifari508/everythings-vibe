@@ -8,7 +8,7 @@ vi.mock("@tanstack/react-router", () => ({
 		createElement("a", { href: to, ...rest }, children),
 }));
 
-import { imageResultCounts } from "@/lib/scrape-images";
+import { imageResultCounts } from "@/features/scrape/utils/scrape-images";
 import { ScrapeProgress } from "../components/scrape-progress";
 
 it("uses row counts rather than legacy saved metadata for partial image results", () => {

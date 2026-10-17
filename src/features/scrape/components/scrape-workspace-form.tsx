@@ -12,7 +12,7 @@ import {
 	imagesSettingsSchema,
 	SCRAPE_LIMITS,
 	scrapeRequestSchema,
-} from "@/lib/scrape-contract";
+} from "@/features/scrape/types/scrape-contract";
 import { cn } from "@/lib/utils";
 import {
 	ADVANCED_PARAMETER_GROUPS,

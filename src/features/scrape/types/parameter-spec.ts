@@ -4,8 +4,8 @@ import type {
 	DesignSettings,
 	HtmlSettings,
 	ImagesSettings,
-} from "@/lib/scrape-contract";
-import { SCRAPE_LIMITS } from "@/lib/scrape-contract";
+} from "@/features/scrape/types/scrape-contract";
+import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 
 // Advanced-parameter presentation. Labels describe what each setting actually
 // does to the run, in plain Indonesian, while the underlying keys, ranges and

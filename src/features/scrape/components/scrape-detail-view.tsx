@@ -3,10 +3,10 @@
 import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 import type { ScrapeMetadata, ScrapeMode, ScrapeStatus } from "@/db/schema";
-import type { ScrapeHistorySearch } from "@/lib/scrape-contract";
-import { imageResultCounts } from "@/lib/scrape-images";
-import type { ScrapePreviewDocument } from "@/lib/scrape-preview-document";
-import type { ScrapeDetailPayload } from "@/lib/services/scrape-service";
+import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
+import { imageResultCounts } from "@/features/scrape/utils/scrape-images";
+import type { ScrapePreviewDocument } from "@/features/scrape/utils/scrape-preview-document";
+import type { ScrapeDetailPayload } from "@/features/scrape/services/scrape-service";
 import { useScrapePreview } from "../hooks/use-scrape-preview";
 import {
 	toScrapeStatusSnapshot,

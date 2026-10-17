@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type { ScrapeDetail } from "@/lib/services/scrape-service";
+import type { ScrapeDetail } from "@/features/scrape/services/scrape-service";
 import { requireUser } from "@/lib/session";
 
 export const Route = createFileRoute("/api/scrape/preview")({
@@ -45,10 +45,10 @@ export async function GET(
 			deps.requireUser ??
 			((requestHeaders: Headers) => requireUser(requestHeaders))
 		)(headers);
-		const { getScrapeById } = await import("@/lib/services/scrape-service");
+		const { getScrapeById } = await import("@/features/scrape/services/scrape-service");
 		const scrape = await (deps.getScrapeById ?? getScrapeById)(id, user.id);
 		const { buildScrapePreviewDocument } = await import(
-			"@/lib/scrape-preview-document"
+			"@/features/scrape/utils/scrape-preview-document"
 		);
 		const now = deps.now?.() ?? Date.now();
 		const preview = buildScrapePreviewDocument(

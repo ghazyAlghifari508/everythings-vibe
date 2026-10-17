@@ -17,8 +17,8 @@ vi.mock("@/lib/session", () => ({
 	requireUserServer: mocks.requireUserServer,
 }));
 
-vi.mock("@/lib/services/scrape-service", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/services/scrape-service")>()),
+vi.mock("@/features/scrape/services/scrape-service", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/features/scrape/services/scrape-service")>()),
 	listScrapeHistory: mocks.listScrapeHistory,
 	deleteScrape: mocks.deleteScrape,
 }));

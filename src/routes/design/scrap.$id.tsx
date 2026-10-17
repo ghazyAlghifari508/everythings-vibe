@@ -5,9 +5,9 @@ import {
 	ScrapeDetailErrorView,
 	ScrapeDetailView,
 } from "@/features/scrape/components/scrape-detail-view";
-import { parseScrapeHistorySearch } from "@/lib/scrape-contract";
-import { toScrapeHistorySearchParams } from "@/lib/scrape-history";
-import { parseScrapeReturnSearch } from "@/lib/scrape-return-path";
+import { parseScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
+import { toScrapeHistorySearchParams } from "@/features/scrape/utils/scrape-history";
+import { parseScrapeReturnSearch } from "@/features/scrape/utils/scrape-return-path";
 import { requireUserServer } from "@/lib/session";
 
 export const loadScrapeDetail = createServerFn({ method: "GET" })
@@ -15,7 +15,7 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
 		const { getScrapeById, getScrapeResults } = await import(
-			"@/lib/services/scrape-service"
+			"@/features/scrape/services/scrape-service"
 		);
 		const scrape = await getScrapeById(id, user.id);
 		const mode = (scrape.mode ?? "design") as ScrapeMode;
@@ -24,7 +24,7 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 			user.id,
 			mode,
 		);
-		const { signScrapeImages } = await import("@/lib/services/scrape-service");
+		const { signScrapeImages } = await import("@/features/scrape/services/scrape-service");
 		const images = await signScrapeImages(imageRows, id, user.id);
 		let appOrigin = "http://localhost:3000";
 		try {
@@ -43,7 +43,7 @@ export const loadScrapeDetail = createServerFn({ method: "GET" })
 			// Fallback when called outside of start server request context
 		}
 		const { buildScrapePreviewDocument } = await import(
-			"@/lib/scrape-preview-document"
+			"@/features/scrape/utils/scrape-preview-document"
 		);
 		const previewHtml = scrape.html ?? scrape.previewHtml ?? "";
 		const preview = buildScrapePreviewDocument(scrape, user.id, appOrigin);

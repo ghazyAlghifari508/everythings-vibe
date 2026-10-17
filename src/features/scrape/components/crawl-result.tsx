@@ -1,7 +1,7 @@
 import { Download, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { scrapePages } from "@/db/schema";
-import { buildWebsiteBlueprint } from "@/lib/crawl-blueprint";
+import { buildWebsiteBlueprint } from "@/features/scrape/utils/crawl-blueprint";
 import { cn } from "@/lib/utils";
 import { CrawlSitemapGraph } from "./crawl-sitemap-graph";
 import { ScrapeFilterSelect } from "./scrape-filter-select";

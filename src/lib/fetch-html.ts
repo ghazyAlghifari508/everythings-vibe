@@ -15,14 +15,14 @@ import {
 } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
 import type { VisualEvidence } from "@/lib/design-visual-evidence";
-import type { ScrapeInstrumentation } from "@/lib/scrape-instrumentation";
+import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import { rewritePreviewAssets } from "./preview-html";
 import {
 	type DesignSettings,
 	designSettingsSchema,
 	SCRAPE_LIMITS,
-} from "./scrape-contract";
-import { validateUrl } from "./url-validator";
+} from "@/features/scrape/types/scrape-contract";
+import { validateUrl } from "@/features/scrape/utils/url-validator";
 
 export const DESKTOP_WIDTH = SCRAPE_DESKTOP_WIDTH;
 
@@ -289,7 +289,7 @@ export async function scrapeHtml(
 	},
 ): Promise<ScrapeCapture> {
 	const { url } = await validateUrl(rawUrl);
-	const { renderPage } = await import("./render-page");
+	const { renderPage } = await import("@/features/scrape/services/render-page");
 	const design = (instrumentation?.mode ?? "design") === "design";
 	const settings = designSettingsSchema.parse(
 		instrumentation?.designSettings ?? {},
@@ -315,7 +315,7 @@ export async function scrapeHtml(
 	);
 	if (views.length > SCRAPE_LIMITS.designViews)
 		throw new ScrapeError("CAPTURE_FAILED");
-	const captures: import("./render-page").RenderedPage[] = [];
+	const captures: import("@/features/scrape/services/render-page").RenderedPage[] = [];
 	for (const [index, view] of views.entries()) {
 		if (instrumentation?.signal?.aborted) throw new ScrapeError("JOB_TIMEOUT");
 		const label = `${view.viewport.width}x${view.viewport.height}, ${view.colorScheme ?? "auto"} (${index + 1}/${views.length})`;

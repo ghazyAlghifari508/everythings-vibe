@@ -4,7 +4,7 @@ import { ScrapeError } from "@/lib/design-errors";
 import {
 	issuePreviewAssetCapability,
 	storedImageAssetUrl,
-} from "@/lib/preview-capabilities";
+} from "@/features/scrape/utils/preview-capabilities";
 import { GET } from "@/routes/api/scrape.asset";
 
 const secret = "test secret with enough entropy for preview capabilities";

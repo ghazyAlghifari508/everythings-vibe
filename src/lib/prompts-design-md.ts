@@ -26,7 +26,7 @@ import {
 	synthesisToRenderOptions,
 } from "./design-synthesis";
 import type { VisualEvidence } from "./design-visual-evidence";
-import type { ScrapeInstrumentation } from "./scrape-instrumentation";
+import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import { extractJson } from "./services/json-extract";
 
 export const DESIGN_SYSTEM_PROMPT =

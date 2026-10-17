@@ -12,14 +12,14 @@ import {
 	rewritePreviewCss,
 	rewritePreviewModule,
 	verifyPreviewAssetCapability,
-} from "@/lib/preview-capabilities";
+} from "@/features/scrape/utils/preview-capabilities";
 import {
 	ImageStorageError,
 	readStoredScrapeImage,
 	validateStoredImage,
-} from "@/lib/services/scrape-image-storage";
+} from "@/features/scrape/services/scrape-image-storage";
 import { requireUser } from "@/lib/session";
-import { parseAndValidateFormat } from "@/lib/url-validator";
+import { parseAndValidateFormat } from "@/features/scrape/utils/url-validator";
 
 export const Route = createFileRoute("/api/scrape/asset")({
 	server: { handlers: { GET, OPTIONS } },

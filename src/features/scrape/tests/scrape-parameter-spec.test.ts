@@ -5,7 +5,7 @@ import {
 	htmlSettingsSchema,
 	imagesSettingsSchema,
 	SCRAPE_LIMITS,
-} from "@/lib/scrape-contract";
+} from "@/features/scrape/types/scrape-contract";
 import {
 	ADVANCED_PARAMETER_GROUPS,
 	readNumber,

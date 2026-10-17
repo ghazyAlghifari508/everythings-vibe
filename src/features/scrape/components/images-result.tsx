@@ -1,8 +1,8 @@
 import { Check, Copy, Download, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { imageCountsLabel, imageResultCounts } from "@/lib/scrape-images";
-import type { ScrapeImageResult } from "@/lib/services/scrape-service";
+import { imageCountsLabel, imageResultCounts } from "@/features/scrape/utils/scrape-images";
+import type { ScrapeImageResult } from "@/features/scrape/services/scrape-service";
 import { ScrapeFilterSelect } from "./scrape-filter-select";
 
 export type ImageResult = ScrapeImageResult;

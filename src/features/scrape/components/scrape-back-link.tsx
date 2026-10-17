@@ -2,12 +2,12 @@
 
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
-import type { ScrapeHistorySearch } from "@/lib/scrape-contract";
+import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
 import {
 	SCRAPE_HISTORY_RETURN_FROM,
 	toScrapeHistorySearchParams,
-} from "@/lib/scrape-history";
-import { resolveScrapeReturnPath } from "@/lib/scrape-return-path";
+} from "@/features/scrape/utils/scrape-history";
+import { resolveScrapeReturnPath } from "@/features/scrape/utils/scrape-return-path";
 
 export function ScrapeBackLink({
 	from,

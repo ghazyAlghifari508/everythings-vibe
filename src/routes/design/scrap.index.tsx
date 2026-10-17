@@ -3,7 +3,7 @@ import { ScrapeWorkspaceView } from "@/features/scrape/components/scrape-workspa
 import {
 	parseScrapeWorkspaceSearch,
 	resolveScrapeWorkspaceMode,
-} from "@/lib/scrape-contract";
+} from "@/features/scrape/types/scrape-contract";
 
 export const Route = createFileRoute("/design/scrap/")({
 	head: () => ({

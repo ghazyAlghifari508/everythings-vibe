@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ScrapePreviewDocument } from "@/lib/scrape-preview-document";
+import type { ScrapePreviewDocument } from "@/features/scrape/utils/scrape-preview-document";
 
 export type ScrapePreviewState = "idle" | "loading" | "ready" | "failed";
 

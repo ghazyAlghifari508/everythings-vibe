@@ -4,8 +4,8 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ScrapeMode } from "@/db/schema";
-import type { ScrapePartialResult } from "@/lib/scrape-error-presentation";
-import { SCRAPE_RETURN_FALLBACK } from "@/lib/scrape-return-path";
+import type { ScrapePartialResult } from "@/features/scrape/utils/scrape-error-presentation";
+import { SCRAPE_RETURN_FALLBACK } from "@/features/scrape/utils/scrape-return-path";
 import { cn } from "@/lib/utils";
 
 // Anchor id owned by the detail route. Kept here so the failure card and the
