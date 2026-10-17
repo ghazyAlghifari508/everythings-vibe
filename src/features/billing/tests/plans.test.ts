@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { FEATURES, PLAN_CREDITS, PLAN_PRICES } from "./database";
+import {
+	FEATURES,
+	PLAN_CREDITS,
+	PLAN_PRICES,
+} from "@/features/billing/types/plans";
 
 describe("PLAN_CREDITS", () => {
 	it("free gets 2 lifetime credits", () => {

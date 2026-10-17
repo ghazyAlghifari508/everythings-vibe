@@ -57,65 +57,12 @@ export interface Payment {
 	updatedAt: string;
 }
 
-/** Credits granted per billing period. 1 credit = 1 stage (PRD, AC, or Task). Leftovers expire at period end. */
-export const PLAN_CREDITS: Record<Plan, number> = {
-	free: 2,
-	pro: 30,
-	hengker: 105,
-};
-
-/** Monthly subscription price in IDR. */
-export const PLAN_PRICES: Record<Plan, number> = {
-	free: 0,
-	pro: 49000,
-	hengker: 149000,
-};
-
-export interface NotificationPreferences {
-	id: string;
-	userId: string;
-	quotaWarning: boolean;
-	prdCompleted: boolean;
-	paymentUpdates: boolean;
-	productUpdates: boolean;
-	createdAt: Date | null;
-	updatedAt: Date | null;
-}
-
-export const FEATURES: Record<
-	Plan,
-	{
-		downloadMd: boolean;
-		shareLink: boolean;
-		/** false = locked, number = version cap, -1 = unlimited */
-		versionHistory: false | number;
-		priorityQueue: boolean;
-		/** AC + Task + Kanban. Free is PRD-only. */
-		fullWorkflow: boolean;
-	}
-> = {
-	free: {
-		downloadMd: true,
-		shareLink: false,
-		versionHistory: false,
-		priorityQueue: false,
-		fullWorkflow: false,
-	},
-	pro: {
-		downloadMd: true,
-		shareLink: true,
-		versionHistory: 30,
-		priorityQueue: false,
-		fullWorkflow: true,
-	},
-	hengker: {
-		downloadMd: true,
-		shareLink: true,
-		versionHistory: -1,
-		priorityQueue: true,
-		fullWorkflow: true,
-	},
-};
+export type { NotificationPreferences } from "@/features/auth-settings/types/notification-preferences";
+export {
+	FEATURES,
+	PLAN_CREDITS,
+	PLAN_PRICES,
+} from "@/features/billing/types/plans";
 
 // ============================================================
 // VibeCoding platform tables (migration 20260720120000)

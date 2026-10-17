@@ -35,13 +35,7 @@ export const RATE_LIMITS = {
 	general: 60,
 	// Unauthenticated API-key guesses per key-fingerprint per minute.
 	apiKeyAuth: 30,
-	// Browser sync-status reconciliation gets its own budget, separate from
-	// `general`. Sharing one budget meant the browser's own polling competed
-	// with the CLI upload transport it was watching: `waiting_for_cli` is the
-	// normal state for a session's full 30-minute life, so a single tab at the
-	// standby cadence consumed half the `general` allowance before the CLI
-	// could send a single manifest batch. Observation must never starve the
-	// observed.
+	// Polling must not consume the CLI upload transport's separate budget.
 	syncStatusRead: 240,
 } as const;
 
@@ -120,16 +114,7 @@ export const KANBAN_POLL_INTERVAL_MS = 10_000;
 // Task/AC/PRD detail views; 2.5s balances freshness vs loader pressure.
 export const GENERATION_STATUS_POLL_INTERVAL_MS = 2_500;
 
-// === Existing codebase sync (MVP locked decisions) ===
-// Browser polls the persisted sync status; no sync SSE endpoint in MVP.
-//
-// Cadence follows what the server is actually doing. While an attempt is in
-// flight the CLI is moving between real persisted states and the browser has a
-// short window in which to observe each one, so it reconciles faster. While the
-// session is still `waiting_for_cli` nothing on the server can change until the
-// user runs the CLI, so a slower cadence loses no information and stops
-// spending the status-read budget on an idle session (which lasts up to the
-// full 30-minute session expiry).
+// Waiting sessions poll slowly; active attempts poll fast enough to observe transitions.
 export const CODEBASE_SYNC_POLL_INTERVAL_MS = 2_000;
 // Active-attempt cadence: the window in which `connected` -> `uploading` ->
 // `uploaded` transitions can be missed is bounded by the CLI's own upload time,
@@ -157,17 +142,9 @@ export const CODEBASE_FILE_PREVIEW_MAX_CHARS = 64_000;
 // Maximum rendered lines per preview. A long file is clipped on a line
 // boundary and reported, so line numbers never drift from real content.
 export const CODEBASE_FILE_PREVIEW_MAX_LINES = 3_000;
-// Minimum supported CLI version for `vibeeverything codebase sync`. The floor
-// stays 2.0.0 on purpose: capabilities added later (repositoryName handshake
-// identity, canonical ignore file, preparation-failure reporting) are
-// advisory — the server tolerates their absence and keeps the existing name —
-// so raising the minimum would break working syncs for no transport need.
+// Later CLI capabilities are advisory, so keep compatibility with 2.0.0 clients.
 export const CODEBASE_CLI_MIN_VERSION = "2.0.0";
-// A pending idempotency claim older than this is treated as abandoned by a
-// crashed request and may be atomically stolen by a retry. Bound from the
-// CLI's 30s per-request timeout: a live owner finalizes or releases well
-// within one timeout, so two timeouts is generous headroom with no false
-// steals.
+// Two CLI request timeouts distinguish an abandoned claim from a live owner.
 export const CODEBASE_SYNC_CLAIM_STALE_MS = 2 * 30_000;
 // Maximum user-facing sync error message length served to browsers. Longer
 // server-written messages are truncated so status polling stays bounded.
@@ -229,125 +206,27 @@ export const CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS = 8_000;
 export const ERROR_REPORT_MAX_MESSAGE_CHARS = 2000;
 export const ERROR_REPORT_MAX_CONTEXT_CHARS = 8000;
 
-// === Profile ===
-export const PROFILE_ROLES = [
-	"pm",
-	"developer",
-	"founder",
-	"designer",
-	"student",
-	"other",
-] as const;
-export const PROFILE_MAX_NAME_CHARS = 100;
-
-// === User feedback ===
-export const FEEDBACK_TYPES = ["general", "bug", "feature"] as const;
-export const FEEDBACK_MAX_MESSAGE_CHARS = 2000;
-
-// === Billing (monthly subscription) ===
-// Length of one paid/free billing period. All period math lives in lib/billing.ts.
-export const BILLING_PERIOD_DAYS = 30;
-// Days before period end when the pre-expiry notice email fires (cron job).
-export const PRE_EXPIRY_NOTICE_DAYS = 3;
-// Post-expiry pause reminder schedule, in days after the period ended.
-// reminder_count tracks how many of these have been sent (see lib/services/billing-emails.ts).
-export const REMINDER_SCHEDULE_DAYS = [1, 7, 14] as const;
+export {
+	FEEDBACK_MAX_MESSAGE_CHARS,
+	FEEDBACK_TYPES,
+	PROFILE_MAX_NAME_CHARS,
+	PROFILE_ROLES,
+} from "@/features/auth-settings/types/settings-constants";
+export {
+	ADAPTIVE_CREDIT_PRICING,
+	BILLING_PERIOD_DAYS,
+	findTopUpPackage,
+	PRE_EXPIRY_NOTICE_DAYS,
+	REMINDER_SCHEDULE_DAYS,
+	TOPUP_PACKAGES,
+	TOPUP_SKU,
+	type TopUpPackage,
+} from "@/features/billing/types/billing-constants";
 
 // Single display timezone for every user-facing date and time. The database
 // stores instants (timestamptz); rendering must not depend on the host or
 // browser timezone, or the same payment can show a different calendar day.
 export const APP_TIME_ZONE = "Asia/Jakarta";
-
-// === Credit top-up (mid-period purchase) ===
-// Multi-tier SKUs: bought by ACTIVE Pro/Hengker subscribers only
-// (state active_paid). Credits join the SAME pool as the monthly allocation
-// (shared credits/creditsUsed) and are forfeited together at period end.
-// Buying NEVER extends the current period. Anti-undercut cap per period =
-// PLAN_CREDITS[plan]; tracked from successful topup payments within
-// [current_period_start, current_period_end] (spec topup-design §4).
-export interface TopUpPackage {
-	id: string;
-	name: string;
-	credits: number;
-	priceIdr: number;
-	description: string;
-	recommended?: boolean;
-}
-
-export const TOPUP_PACKAGES: readonly TopUpPackage[] = [
-	{
-		id: "topup-15",
-		name: "Paket 15 Kredit",
-		credits: 15,
-		priceIdr: 20000,
-		description: "Tambahan 15 kredit instan untuk sprint kecil",
-	},
-	{
-		id: "topup-40",
-		name: "Paket 40 Kredit",
-		credits: 40,
-		priceIdr: 50000,
-		description: "Pilihan terbaik untuk eksplorasi banyak fitur",
-		recommended: true,
-	},
-	{
-		id: "topup-90",
-		name: "Paket 90 Kredit",
-		credits: 90,
-		priceIdr: 100000,
-		description: "Kapasitas penuh untuk proyek besar & enterprise",
-	},
-] as const;
-
-export const TOPUP_SKU = TOPUP_PACKAGES[0];
-
-export function findTopUpPackage(
-	planId: string | null | undefined,
-): TopUpPackage | undefined {
-	return TOPUP_PACKAGES.find((p) => p.id === planId);
-}
-
-// Versioned product-level pricing inputs for adaptive credit quotes.
-export const ADAPTIVE_CREDIT_PRICING = {
-	version: "adaptive-v1",
-	thresholds: {
-		promptChars: 4_000,
-		prdSourceChars: 12_000,
-		featureCount: 4,
-		personaCount: 3,
-		workflowCount: 3,
-		requirementCount: 8,
-		constraintCount: 5,
-		taskCount: 8,
-		fileCount: 100,
-		sourceBytes: 250_000,
-		languageCount: 3,
-		dependencyCount: 20,
-		relationshipCount: 100,
-	} as const,
-	weights: {
-		promptChars: 0.25,
-		prdSourceChars: 0.5,
-		taskCount: 0.5,
-		featureCount: 0.5,
-		personaCount: 0.25,
-		workflowCount: 0.5,
-		requirementCount: 0.25,
-		constraintCount: 0.25,
-		fileCount: 0.5,
-		sourceBytes: 0.5,
-		languageCount: 0.25,
-		dependencyCount: 0.25,
-		relationshipCount: 0.25,
-		codebaseContext: 0.5,
-	} as const,
-	operations: {
-		codebase_analysis: { baseCredits: 2, maximumCredits: 12 },
-		prd_generation: { baseCredits: 1, maximumCredits: 8 },
-		ac_generation: { baseCredits: 1, maximumCredits: 6 },
-		task_generation: { baseCredits: 1, maximumCredits: 8 },
-	} as const,
-} as const;
 
 // === VibeDesign scrape bounds (Opsi 1) ===
 // SSRF-safe fetch limits ported from Docrivo: single source of truth so the

@@ -1,4 +1,19 @@
+import {
+	getSessionStorage as getStorage,
+	isPlausibleTimestamp,
+} from "@/lib/session-storage";
 import type { OutputLanguage } from "@/types/database";
+
+export {
+	clearOnboardingState,
+	getOnboardingState,
+	type OnboardingState,
+	saveOnboardingState,
+} from "@/features/auth-settings/services/onboarding-state";
+export {
+	consumeResumeIntent,
+	saveResumeIntent,
+} from "@/features/billing/services/payment-resume";
 
 export type PendingPrdPromptMode = "auto" | "chat";
 
@@ -21,62 +36,6 @@ interface PendingPrdPrompt {
 	createdAt: number;
 	/** Original user message for display in chat bubble (without template/tags) */
 	displayMessage?: string;
-}
-
-interface SafeStorage {
-	getItem: (key: string) => string | null;
-	setItem: (key: string, value: string) => void;
-	removeItem: (key: string) => void;
-}
-
-// sessionStorage access throws in blocked-storage/privacy mode, on quota
-// exhaustion, or when the getter itself is revoked. Every touchpoint goes
-// through this wrapper so persistence degrades to a no-op instead of
-// crashing navigation and submit flows.
-function getStorage(): SafeStorage | null {
-	try {
-		if (typeof window === "undefined") return null;
-		const raw = window.sessionStorage;
-		if (!raw) return null;
-		return {
-			getItem: (key) => {
-				try {
-					return raw.getItem(key);
-				} catch {
-					return null;
-				}
-			},
-			setItem: (key, value) => {
-				try {
-					raw.setItem(key, value);
-				} catch {
-					/* best-effort persistence */
-				}
-			},
-			removeItem: (key) => {
-				try {
-					raw.removeItem(key);
-				} catch {
-					/* already gone or unremovable */
-				}
-			},
-		};
-	} catch {
-		return null;
-	}
-}
-
-// Timestamps from storage are user-controlled: require finite values and
-// reject future times (past a small clock-skew allowance), otherwise a
-// tampered createdAt defeats stale-prompt expiry.
-const CLOCK_SKEW_ALLOWANCE_MS = 60_000;
-
-function isPlausibleTimestamp(value: unknown): value is number {
-	return (
-		typeof value === "number" &&
-		Number.isFinite(value) &&
-		value <= Date.now() + CLOCK_SKEW_ALLOWANCE_MS
-	);
 }
 
 export function saveSetupPrompt(prompt: string) {
@@ -383,105 +342,6 @@ export function getHomeDraft(): string {
 
 export function clearHomeDraft() {
 	getStorage()?.removeItem(HOME_DRAFT_KEY);
-}
-
-/* ---------- Onboarding multi-step state (survives refresh) ---------- */
-const ONBOARDING_STATE_KEY = "prdfy:onboarding-state";
-
-export interface OnboardingState {
-	step: number;
-	fullName: string;
-	role: string;
-	goals: string[];
-}
-
-/** Persist the 3-step onboarding wizard state so a refresh mid-wizard
- *  (before the final submit) restores step + name + role + goals instead of
- *  restarting at step 1. Tab-scoped. */
-export function saveOnboardingState(state: OnboardingState) {
-	getStorage()?.setItem(ONBOARDING_STATE_KEY, JSON.stringify(state));
-}
-
-const ONBOARDING_TOTAL_STEPS = 3;
-
-export function getOnboardingState(): OnboardingState | null {
-	const storage = getStorage();
-	const raw = storage?.getItem(ONBOARDING_STATE_KEY);
-	if (!raw) return null;
-	try {
-		const parsed: unknown = JSON.parse(raw);
-		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-			return null;
-		const p = parsed as Record<string, unknown>;
-		if (
-			!Number.isInteger(p.step) ||
-			(p.step as number) < 1 ||
-			(p.step as number) > ONBOARDING_TOTAL_STEPS
-		)
-			return null;
-		if (typeof p.fullName !== "string" || typeof p.role !== "string")
-			return null;
-		if (!isStringArray(p.goals)) return null;
-		return parsed as OnboardingState;
-	} catch {
-		storage?.removeItem(ONBOARDING_STATE_KEY);
-		return null;
-	}
-}
-
-export function clearOnboardingState() {
-	getStorage()?.removeItem(ONBOARDING_STATE_KEY);
-}
-
-/* ---------- Resume intent (credit-exhaustion → payment → auto-resume) ---------- */
-const RESUME_INTENT_KEY = "prdfy:resume-intent";
-const RESUME_INTENT_MAX_AGE_MS = 15 * 60 * 1000;
-
-interface ResumeIntentPayload {
-	projectId: string;
-	stage: "prd" | "ac" | "task";
-	createdAt: number;
-}
-
-export function saveResumeIntent(
-	projectId: string,
-	stage: "prd" | "ac" | "task",
-) {
-	const payload: ResumeIntentPayload = {
-		projectId,
-		stage,
-		createdAt: Date.now(),
-	};
-	getStorage()?.setItem(RESUME_INTENT_KEY, JSON.stringify(payload));
-}
-
-/**
- * Consume-pattern: reads and removes. Returns the stage if the stored intent
- * matches `projectId` and hasn't expired, otherwise null (and clears stale data).
- */
-export function consumeResumeIntent(
-	projectId: string,
-): "prd" | "ac" | "task" | null {
-	const storage = getStorage();
-	const raw = storage?.getItem(RESUME_INTENT_KEY);
-	if (!raw) return null;
-	storage?.removeItem(RESUME_INTENT_KEY);
-	try {
-		const parsed = JSON.parse(raw) as Partial<ResumeIntentPayload>;
-		if (!parsed.projectId || typeof parsed.projectId !== "string") return null;
-		if (
-			parsed.stage !== "prd" &&
-			parsed.stage !== "ac" &&
-			parsed.stage !== "task"
-		)
-			return null;
-		if (!isPlausibleTimestamp(parsed.createdAt)) return null;
-		if (parsed.projectId !== projectId) return null;
-		if (Date.now() - parsed.createdAt > RESUME_INTENT_MAX_AGE_MS) return null;
-		return parsed.stage;
-	} catch {
-		return null;
-	}
 }
 
 /* ---------- Suppress auto-generate on history resume landing ---------- */
