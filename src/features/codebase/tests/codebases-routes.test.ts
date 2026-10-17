@@ -123,7 +123,7 @@ describe("codebase name provenance persistence contract", () => {
 
 describe("codebase status route contract", () => {
 	const source = readFileSync(
-		"src/routes/api/codebases/$codebaseId/status.ts",
+		"src/features/codebase/services/sync-status.server.ts",
 		"utf8",
 	);
 

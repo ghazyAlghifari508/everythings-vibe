@@ -105,7 +105,7 @@ describe("read paths exclude tombstoned projects", () => {
 		"src/features/greenfield/services/feature-service.ts",
 		"src/routes/api/export/prd.ts",
 		"src/routes/api/export/zip.ts",
-		"src/routes/api/codebases/$codebaseId/status.ts",
+		"src/features/codebase/services/sync-status.server.ts",
 		"src/routes/api/codebases/$codebaseId.ts",
 		"src/features/codebase/services/analysis-route-read.server.ts",
 		"src/features/codebase/services/analysis-route-trigger.server.ts",
