@@ -2,14 +2,17 @@ import { createFileRoute } from "@tanstack/react-router";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { codebaseSyncSessions, codebases, projects } from "@/db/schema";
-import { saveAskHandoff } from "@/lib/codebase-generation-context";
+import { saveAskHandoff } from "@/features/codebase/services/generation-context";
 import {
 	buildSyncCommand,
 	type ExistingCodebaseProjectMode,
 	existingCodebaseProjectModeSchema,
 	type SyncPromptPayload,
-} from "@/lib/codebase-sync";
-import { generateSyncToken, hashSyncToken } from "@/lib/codebase-sync.server";
+} from "@/features/codebase/services/sync";
+import {
+	generateSyncToken,
+	hashSyncToken,
+} from "@/features/codebase/services/sync.server";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,

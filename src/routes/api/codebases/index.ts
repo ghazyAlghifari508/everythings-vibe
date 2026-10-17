@@ -9,13 +9,19 @@ import {
 	codebaseSyncSessions,
 	codebases,
 } from "@/db/schema";
-import type { CodebaseNameSource } from "@/lib/codebase-library";
+import type { CodebaseNameSource } from "@/features/codebase/services/library";
 import {
 	normalizeRepositoryName,
 	PROVISIONAL_CODEBASE_NAME,
-} from "@/lib/codebase-library";
-import { buildSyncCommand, type SyncPromptPayload } from "@/lib/codebase-sync";
-import { generateSyncToken, hashSyncToken } from "@/lib/codebase-sync.server";
+} from "@/features/codebase/services/library";
+import {
+	buildSyncCommand,
+	type SyncPromptPayload,
+} from "@/features/codebase/services/sync";
+import {
+	generateSyncToken,
+	hashSyncToken,
+} from "@/features/codebase/services/sync.server";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,

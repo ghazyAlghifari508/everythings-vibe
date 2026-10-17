@@ -1,4 +1,4 @@
-import { resolveCodebaseDisplayName } from "@/lib/codebase-naming";
+import { resolveCodebaseDisplayName } from "@/features/codebase/services/naming";
 import type { SyncPromptPayload } from "../types/sync-schemas";
 
 // === External-agent prompt ===

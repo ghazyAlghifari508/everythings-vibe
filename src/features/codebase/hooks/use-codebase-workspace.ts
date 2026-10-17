@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatStreamMessage } from "@/components/codebase/codebase-chat-workspace";
-import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import {
 	type CodebasePipelineStage,
 	type CodebaseRunState,
 	reconcilePipelineStage,
 	resolvePersistedStage,
 	shouldAutoRevealArtifact,
-} from "@/lib/codebase-chat-flow";
+} from "@/features/codebase/services/chat-flow";
 import {
 	assessRevisionImpact,
 	type CodebaseComposerMode,
-} from "@/lib/codebase-revision-intent";
+} from "@/features/codebase/services/revision-intent";
 import {
 	emptyArtifactHydration,
 	resolveWorkspaceView,
 	type WorkspaceArtifactHydration,
-} from "@/lib/codebase-workspace-hydration";
+} from "@/features/codebase/services/workspace-hydration";
+import { useKanbanTasks } from "@/hooks/use-kanban-polling";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import type { CodebaseWorkspaceData } from "../services/workspace-loader.functions";
 import { useCodebaseSync } from "./use-codebase-sync";

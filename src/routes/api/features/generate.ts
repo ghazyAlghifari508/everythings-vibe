@@ -7,7 +7,7 @@ import {
 	getAskHandoff,
 	parseStoredHandoffAnswers,
 	requireProjectGenerationContext,
-} from "@/lib/codebase-generation-context";
+} from "@/features/codebase/services/generation-context";
 import { MAX_FEATURE_RESPONSE_CHARS, MAX_PROMPT_LENGTH } from "@/lib/constants";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
 import { getLanguageDirective, normalizeLanguage } from "@/lib/language";

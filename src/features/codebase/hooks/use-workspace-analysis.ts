@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	type AnalysisResponse,
 	codebaseStarterSuggestionsSchema,
-} from "@/lib/codebase-analysis";
+} from "@/features/codebase/services/analysis";
 import {
 	resolveWorkspaceSnapshotIdentity,
 	shouldDiscardWorkspaceAnalysis,
-} from "@/lib/codebase-analysis-selection";
-import { matchesWorkspaceAnalysis } from "@/lib/codebase-workspace-analysis";
+} from "@/features/codebase/services/analysis-selection";
+import { matchesWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
 import { safeParseAnalysisResponse } from "../utils/analysis-response";
 
 export function useWorkspaceAnalysis({

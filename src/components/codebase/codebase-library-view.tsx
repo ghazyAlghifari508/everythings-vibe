@@ -23,8 +23,8 @@ import {
 	libraryAnalysisLabels,
 	mapLibraryStatus,
 	NEW_REPOSITORY_HREF,
-} from "@/lib/codebase-library";
-import { clearPlanCodebasePointerIfMatches } from "@/lib/codebase-plan-storage";
+} from "@/features/codebase/services/library";
+import { clearPlanCodebasePointerIfMatches } from "@/features/codebase/services/plan-storage";
 import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/lib/constants";
 import { paginate } from "@/lib/history-filter";
 import { useUIStore } from "@/store";

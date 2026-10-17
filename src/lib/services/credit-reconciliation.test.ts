@@ -4,13 +4,13 @@ import {
 	getActivityLabel,
 	getStatusLabel,
 } from "@/components/settings/credit-usage";
+import { decideAnalysisRequest } from "@/features/codebase/services/analysis";
 import {
 	buildCodebaseMetrics,
 	buildPrdMetrics,
 	buildTaskMetrics,
 	estimateCreditQuote,
 } from "@/lib/adaptive-credit";
-import { decideAnalysisRequest } from "@/lib/codebase-analysis";
 import { ADAPTIVE_CREDIT_PRICING, TOPUP_SKU } from "@/lib/constants";
 import {
 	type CreditLedgerEntry,

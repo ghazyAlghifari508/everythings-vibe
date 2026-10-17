@@ -1,6 +1,6 @@
 import { type Dispatch, type SetStateAction, useCallback } from "react";
 import type { ChatStreamMessage } from "@/components/codebase/codebase-chat-workspace";
-import type { CodebasePipelineStage } from "@/lib/codebase-chat-flow";
+import type { CodebasePipelineStage } from "@/features/codebase/services/chat-flow";
 import type { useWorkspaceArtifacts } from "./use-workspace-artifacts";
 import type { useWorkspacePlan } from "./use-workspace-plan";
 

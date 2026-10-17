@@ -10,7 +10,7 @@ export const loadSnapshotManifest = createServerFn({ method: "GET" })
 		const { codebases, codebaseSnapshotFiles, codebaseSnapshots } =
 			await import("@/db/schema");
 		const { manifestEntrySchema, SNAPSHOT_CONTEXT_STATUSES } = await import(
-			"@/lib/codebase-sync"
+			"@/features/codebase/services/sync"
 		);
 		const { and, asc, desc, eq, inArray } = await import("drizzle-orm");
 		const { CODEBASE_PACKAGE_JSON_PREVIEW_MAX_CHARS } = await import(
@@ -102,12 +102,12 @@ export const loadSnapshotFileContent = createServerFn({ method: "GET" })
 			isStrictBase64,
 			manifestEntrySchema,
 			SNAPSHOT_CONTEXT_STATUSES,
-		} = await import("@/lib/codebase-sync");
+		} = await import("@/features/codebase/services/sync");
 		const {
 			assembleSnapshotFileChunks,
 			isDisplayableTextContent,
 			truncatePreviewContent,
-		} = await import("@/lib/codebase-source-preview");
+		} = await import("@/features/codebase/services/snapshot-preview");
 		const { and, asc, desc, eq, inArray } = await import("drizzle-orm");
 		const { CODEBASE_FILE_PREVIEW_MAX_CHARS } = await import("@/lib/constants");
 		const requestedPath = input.path.trim();

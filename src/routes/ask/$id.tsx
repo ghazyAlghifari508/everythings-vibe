@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { AskFlow } from "@/app/ask/ask-flow";
 import { db } from "@/db";
 import { codebaseAnalyses, prdVersions, projects } from "@/db/schema";
-import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
+import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 import { requireUserServer } from "@/lib/session";
 import { useLastRoute } from "@/lib/use-last-route";
 
@@ -82,7 +82,9 @@ const loadAsk = createServerFn({ method: "GET" })
 			}
 		}
 
-		const { getAskHandoff } = await import("@/lib/codebase-generation-context");
+		const { getAskHandoff } = await import(
+			"@/features/codebase/services/generation-context"
+		);
 		const loadedHandoff = await getAskHandoff(id, user.id);
 		let savedHandoff = loadedHandoff;
 		if (!savedHandoff) {

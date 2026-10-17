@@ -5,7 +5,7 @@ import {
 	buildSourceViewRows,
 	type SourceToken,
 	type SourceViewMode,
-} from "@/lib/codebase-source-view";
+} from "@/features/codebase/services/source-view";
 import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "@/lib/constants";
 
 export interface CodebaseSourcePreviewProps {

@@ -11,11 +11,11 @@ import {
 	Rocket,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { buildCompiledAskPrompt } from "@/lib/ask-prompt-builder";
 import {
 	type CodebaseAnalysis,
 	inferTechAnswersFromCodebase,
-} from "@/lib/codebase-analysis";
+} from "@/features/codebase/services/analysis";
+import { buildCompiledAskPrompt } from "@/lib/ask-prompt-builder";
 import { CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS } from "@/lib/constants";
 import { getFlowStepCta, stepToRouteTarget } from "@/lib/flow-step";
 import {

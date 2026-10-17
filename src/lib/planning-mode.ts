@@ -1,7 +1,7 @@
 import {
 	EXISTING_CODEBASE_PROJECT_MODES,
 	type ExistingCodebaseProjectMode,
-} from "./codebase-sync";
+} from "@/features/codebase/services/sync";
 
 /**
  * Planning-mode directives shared by Fitur, PRD, AC, and Task generation.

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	determineOnboardingProjectAssignment,
 	resolveOnboardingAnchorProject,
-} from "@/lib/codebase-anchor";
+} from "@/features/codebase/services/anchor";
 
 describe("feature route onboarding anchor assignment policy", () => {
 	it("assigns the first created feature project as the onboarding project anchor", () => {

@@ -7,20 +7,20 @@ import {
 	projects,
 	subscriptions,
 } from "@/db/schema";
-import { ONBOARDING_FEATURE_MESSAGE } from "@/lib/codebase-analysis";
-import { saveAskHandoff } from "@/lib/codebase-generation-context";
-import { isProvisionalCodebaseName } from "@/lib/codebase-naming";
+import { ONBOARDING_FEATURE_MESSAGE } from "@/features/codebase/services/analysis";
+import { saveAskHandoff } from "@/features/codebase/services/generation-context";
+import { isProvisionalCodebaseName } from "@/features/codebase/services/naming";
 import {
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	SNAPSHOT_CONTEXT_STATUSES,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
 import { normalizeLanguage } from "@/lib/language";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { deriveProjectNameSync } from "@/lib/services/prd-service";
 import { requireUser } from "@/lib/session";
 import type { Plan } from "@/types/database";
 
-export { resolveAnalysisFeaturePrompt } from "@/lib/codebase-analysis";
+export { resolveAnalysisFeaturePrompt } from "@/features/codebase/services/analysis";
 
 /**
  * Normalize an onboarding feature message at the trust boundary. A

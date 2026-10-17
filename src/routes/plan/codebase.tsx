@@ -3,16 +3,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CodebaseConclusion } from "@/components/codebase/codebase-conclusion";
 import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
-import { useCodebaseSyncStatus } from "@/hooks/use-codebase-sync-status";
+import { useCodebaseSyncStatus } from "@/features/codebase/hooks/use-codebase-sync-status";
 import {
 	type AnalysisResponse,
 	analysisResponseSchema,
 	canContinueToCodebaseConclusion,
 	codebaseStarterSuggestionsSchema,
 	ONBOARDING_FEATURE_MESSAGE,
-} from "@/lib/codebase-analysis";
-import { CODEBASE_ONBOARDING_LABEL } from "@/lib/codebase-library";
-import { isProvisionalCodebaseName } from "@/lib/codebase-naming";
+} from "@/features/codebase/services/analysis";
+import { CODEBASE_ONBOARDING_LABEL } from "@/features/codebase/services/library";
+import { isProvisionalCodebaseName } from "@/features/codebase/services/naming";
 import {
 	clearPlanCodebaseProjectPointer,
 	clearPlanOnboardingPointers,
@@ -23,7 +23,7 @@ import {
 	storePlanCodebasePointer,
 	storePlanCodebaseProjectPointer,
 	storePlanCodebaseStepPointer,
-} from "@/lib/codebase-plan-storage";
+} from "@/features/codebase/services/plan-storage";
 import {
 	isSyncStatusComplete,
 	SNAPSHOT_CONTEXT_STATUSES,
@@ -31,7 +31,7 @@ import {
 	type SyncStatusResponse,
 	syncPromptPayloadSchema,
 	syncStatusResponseSchema,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
 import { useUIStore } from "@/store";
 
 /** Terminal create-failure heading; the body carries the safe server message. */

@@ -4,14 +4,14 @@ import { CodebaseLibraryView } from "@/components/codebase/codebase-library-view
 import {
 	buildCodebaseLibraryItems,
 	type CodebaseLibraryItem,
-} from "@/lib/codebase-library";
+} from "@/features/codebase/services/library";
 import { requireUserServer } from "@/lib/session";
 
 export {
 	selectLatestCodebaseSnapshots,
 	selectLibraryAnalysisSlice,
 	selectNewestFeatureProjectIdPerCodebase,
-} from "@/lib/codebase-library";
+} from "@/features/codebase/services/library";
 
 export function decideCodebaseListEntry(): "allow" {
 	return "allow";

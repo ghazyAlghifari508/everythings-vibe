@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getPendingSyncPayloadKey } from "@/lib/codebase-sync";
+import { getPendingSyncPayloadKey } from "@/features/codebase/services/sync";
 import {
 	decideHomePostCreationTarget,
 	HOME_PROJECT_MODE_OPTIONS,

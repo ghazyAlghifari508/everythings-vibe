@@ -1,17 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import {
+	buildCodebasePromptBlock,
+	getProjectGenerationContext,
+	linkGenerationContext,
+	requireProjectGenerationContext,
+} from "@/features/codebase/services/generation-context";
+import {
 	buildPrdMetrics,
 	type CreditQuote,
 	formatInsufficientCreditsError,
 	formatSubscriptionPausedError,
 } from "@/lib/adaptive-credit";
-import {
-	buildCodebasePromptBlock,
-	getProjectGenerationContext,
-	linkGenerationContext,
-	requireProjectGenerationContext,
-} from "@/lib/codebase-generation-context";
 import {
 	MAX_PREFERENCES_CHARS,
 	MAX_PROMPT_LENGTH,

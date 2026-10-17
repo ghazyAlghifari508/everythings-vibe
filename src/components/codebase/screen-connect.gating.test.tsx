@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
 	SyncPromptPayload,
 	SyncStatusResponse,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
 import { ScreenConnect } from "./screen-connect";
 
 const samplePayload: SyncPromptPayload = {

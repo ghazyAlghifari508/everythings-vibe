@@ -3,14 +3,14 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AlertCircle, Check, Copy, Loader2, RefreshCw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { copyToClipboard } from "@/lib/clipboard";
-import type { AnalysisResponse } from "@/lib/codebase-analysis";
+import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import {
 	buildAgentPrompt,
 	resolveSyncStageView,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
+import { copyToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import { SyncStageList } from "./sync-stage-list";
 

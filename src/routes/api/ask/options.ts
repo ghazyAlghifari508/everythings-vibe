@@ -9,7 +9,7 @@ import {
 	requireProjectGenerationContext,
 	resolveActiveSnapshotId,
 	saveAskHandoff,
-} from "@/lib/codebase-generation-context";
+} from "@/features/codebase/services/generation-context";
 import { MAX_PROMPT_LENGTH } from "@/lib/constants";
 import {
 	isTruncatedGeneration,

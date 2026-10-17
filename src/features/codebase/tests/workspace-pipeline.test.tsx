@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
 	CodebasePipelineStage,
 	CodebaseRunState,
-} from "@/lib/codebase-chat-flow";
+} from "@/features/codebase/services/chat-flow";
 import { useWorkspacePipeline } from "../hooks/use-workspace-pipeline";
 
 function usePipeline() {

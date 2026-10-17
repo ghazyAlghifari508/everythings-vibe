@@ -17,15 +17,15 @@ import {
 	manifestEntrySchema,
 	SnapshotCompletionError,
 	snapshotCompleteRequestSchema,
-} from "@/lib/codebase-sync";
-import { verifyFileContentHash } from "@/lib/codebase-sync.server";
+} from "@/features/codebase/services/sync";
+import { verifyFileContentHash } from "@/features/codebase/services/sync.server";
 import {
 	claimIdempotency,
 	finalizeIdempotencyClaim,
 	guardSyncUpload,
 	readBoundedJson,
 	releaseIdempotencyClaim,
-} from "@/lib/codebase-sync-upload.server";
+} from "@/features/codebase/services/sync-upload.server";
 
 export const Route = createFileRoute("/api/v1/projects/$id/codebase/complete")({
 	server: {

@@ -9,7 +9,6 @@ import {
 	projects,
 	subscriptions,
 } from "@/db/schema";
-import { resolveSubscriptionState } from "@/lib/billing";
 import {
 	type AnalysisResponse,
 	type AnalysisScope,
@@ -18,21 +17,22 @@ import {
 	codebaseAnalysisSchema,
 	decideAnalysisRequest,
 	resolveAnalysisScope,
-} from "@/lib/codebase-analysis";
+} from "@/features/codebase/services/analysis";
 import {
 	AnalysisServiceError,
 	claimStarterSuggestionRefresh,
 	requestCodebaseAnalysis,
-} from "@/lib/codebase-analysis.server";
+} from "@/features/codebase/services/analysis.server";
 import {
 	analysisRefreshRequestSchema,
 	decideStarterSuggestionRefresh,
-} from "@/lib/codebase-analysis-refresh";
-import { selectWorkspaceAnalysis } from "@/lib/codebase-analysis-selection";
+} from "@/features/codebase/services/analysis-refresh";
+import { selectWorkspaceAnalysis } from "@/features/codebase/services/analysis-selection";
 import {
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	isSyncCapableProject,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
+import { resolveSubscriptionState } from "@/lib/billing";
 import { checkRateLimit } from "@/lib/rate-limit";
 import type { CreditOperationResult } from "@/lib/services/credit-service";
 import {

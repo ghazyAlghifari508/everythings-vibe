@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { ActivePlanCandidate } from "@/lib/codebase-active-plan";
-import type { AnalysisResponse } from "@/lib/codebase-analysis";
-import { selectWorkspaceAnalysis } from "@/lib/codebase-analysis-selection";
-import { resolveOnboardingAnchorProject } from "@/lib/codebase-anchor";
-import { SNAPSHOT_CONTEXT_STATUSES } from "@/lib/codebase-sync";
+import type { ActivePlanCandidate } from "@/features/codebase/services/active-plan";
+import type { AnalysisResponse } from "@/features/codebase/services/analysis";
+import { selectWorkspaceAnalysis } from "@/features/codebase/services/analysis-selection";
+import { resolveOnboardingAnchorProject } from "@/features/codebase/services/anchor";
+import { SNAPSHOT_CONTEXT_STATUSES } from "@/features/codebase/services/sync";
 import { requireUserServer } from "@/lib/session";
 
 export const loadCodebase = createServerFn({ method: "GET" })

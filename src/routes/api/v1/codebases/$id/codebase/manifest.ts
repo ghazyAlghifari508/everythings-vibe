@@ -13,14 +13,14 @@ import {
 	manifestBatchRequestSchema,
 	manifestEntrySchema,
 	uploadTransitionSteps,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
 import {
 	claimIdempotency,
 	finalizeIdempotencyClaim,
 	guardSyncUpload,
 	readBoundedJson,
 	releaseIdempotencyClaim,
-} from "@/lib/codebase-sync-upload.server";
+} from "@/features/codebase/services/sync-upload.server";
 
 export const Route = createFileRoute("/api/v1/codebases/$id/codebase/manifest")(
 	{

@@ -4,8 +4,8 @@ import { CodebaseExplorerSidebar } from "@/components/codebase/codebase-explorer
 import { CodebasePlanSwitcher } from "@/components/codebase/codebase-plan-switcher";
 import { CodebaseResyncDrawer } from "@/components/codebase/codebase-resync-drawer";
 import { CodebaseWorkspaceShell } from "@/components/codebase/codebase-workspace-shell";
-import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
-import { describeRevisionImpact } from "@/lib/codebase-revision-intent";
+import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
+import { describeRevisionImpact } from "@/features/codebase/services/revision-intent";
 import { useCodebaseWorkspace } from "../hooks/use-codebase-workspace";
 import type { CodebaseWorkspaceData } from "../services/workspace-loader.functions";
 import { WorkspaceConnectionScreen } from "./workspace-connection-screen";

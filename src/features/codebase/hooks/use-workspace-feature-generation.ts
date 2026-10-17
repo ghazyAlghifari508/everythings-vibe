@@ -14,7 +14,7 @@ import {
 	serializeAskQuestions,
 	settleRun,
 	startRun,
-} from "@/lib/codebase-chat-flow";
+} from "@/features/codebase/services/chat-flow";
 import { buildAskHandoffAnswers } from "../utils/workspace-contracts";
 
 export function useWorkspaceFeatureGeneration({

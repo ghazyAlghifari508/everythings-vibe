@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AnalysisResponse } from "@/lib/codebase-analysis";
+import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import { useWorkspaceAnalysis } from "../hooks/use-workspace-analysis";
 
 afterEach(() => vi.unstubAllGlobals());

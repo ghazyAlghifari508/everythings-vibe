@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCodebasePromptBlock } from "./codebase-generation-context";
+import { buildCodebasePromptBlock } from "@/features/codebase/services/generation-context";
 import {
 	buildPlanningModeDirective,
 	buildStageScopeDirective,

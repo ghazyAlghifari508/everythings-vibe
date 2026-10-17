@@ -2,7 +2,10 @@ import { useCallback, useMemo } from "react";
 import type { CodebaseArtifactRef } from "@/components/codebase/codebase-file-card";
 import { stripInternalSectionMarkers } from "@/components/codebase/codebase-markdown";
 import type { ProjectFeatureTree } from "@/db/schema";
-import { artifactMimeTypeFor, downloadArtifact } from "@/lib/codebase-download";
+import {
+	artifactMimeTypeFor,
+	downloadArtifact,
+} from "@/features/codebase/services/download";
 import type { TaskTree } from "@/lib/services/task-service";
 import type { SourcePreviewState } from "../types/source-preview";
 

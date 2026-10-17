@@ -8,7 +8,7 @@ import {
 	resolveSyncStageView,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
 import { CodebaseResyncDrawer } from "./codebase-resync-drawer";
 
 let container: HTMLDivElement;

@@ -3,7 +3,7 @@ import {
 	askHandoffSchema,
 	sanitizeAskHandoff,
 	sanitizeAskHandoffState,
-} from "@/lib/codebase-generation-context";
+} from "@/features/codebase/services/generation-context";
 
 describe("Ask handoff restore logic", () => {
 	it("restores greenfield in-flight state with partial answers", () => {

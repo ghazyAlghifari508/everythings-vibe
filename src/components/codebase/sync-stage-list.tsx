@@ -7,7 +7,7 @@ import {
 	type SyncStageRow,
 	type SyncStageState,
 	type SyncStatusResponse,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
 import { cn } from "@/lib/utils";
 
 /**

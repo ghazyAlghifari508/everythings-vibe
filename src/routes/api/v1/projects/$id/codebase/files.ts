@@ -11,15 +11,15 @@ import {
 	isFileReplayCompatible,
 	isSlotIdempotencyKey,
 	uploadTransitionSteps,
-} from "@/lib/codebase-sync";
-import { decodeBase64ByteLength } from "@/lib/codebase-sync.server";
+} from "@/features/codebase/services/sync";
+import { decodeBase64ByteLength } from "@/features/codebase/services/sync.server";
 import {
 	claimIdempotency,
 	finalizeIdempotencyClaim,
 	guardSyncUpload,
 	readBoundedJson,
 	releaseIdempotencyClaim,
-} from "@/lib/codebase-sync-upload.server";
+} from "@/features/codebase/services/sync-upload.server";
 import {
 	CODEBASE_MAX_FILE_BYTES,
 	CODEBASE_MAX_SNAPSHOT_BYTES,

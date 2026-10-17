@@ -2,12 +2,12 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CodebaseStarterSuggestion } from "@/lib/codebase-analysis";
+import type { CodebaseStarterSuggestion } from "@/features/codebase/services/analysis";
 import {
 	CODEBASE_STAGE_ACTIVITY,
 	settleRun,
 	startRun,
-} from "@/lib/codebase-chat-flow";
+} from "@/features/codebase/services/chat-flow";
 import {
 	type AdaptiveQuestion,
 	CodebaseChatWorkspace,

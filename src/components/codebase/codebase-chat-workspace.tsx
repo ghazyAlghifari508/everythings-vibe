@@ -11,8 +11,8 @@ import {
 import { type ReactNode, useState } from "react";
 import { AgentThinking } from "@/components/ui/agent-thinking";
 import { PromptBar } from "@/components/ui/prompt-bar";
-import type { CodebaseStarterSuggestion } from "@/lib/codebase-analysis";
-import { codebaseStarterSuggestionsSchema } from "@/lib/codebase-analysis";
+import type { CodebaseStarterSuggestion } from "@/features/codebase/services/analysis";
+import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
 import {
 	type AdaptiveQuestion,
 	type AdaptiveQuestionOption,
@@ -21,13 +21,13 @@ import {
 	type CodebasePipelineStage,
 	type CodebaseRunState,
 	nextQuestionIndex,
-} from "@/lib/codebase-chat-flow";
-import { resolveCodebaseDisplayName } from "@/lib/codebase-naming";
-import type { CodebaseComposerMode } from "@/lib/codebase-revision-intent";
+} from "@/features/codebase/services/chat-flow";
+import { resolveCodebaseDisplayName } from "@/features/codebase/services/naming";
+import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
 import type {
 	ArtifactKind,
 	WorkspaceView,
-} from "@/lib/codebase-workspace-hydration";
+} from "@/features/codebase/services/workspace-hydration";
 import { CodebaseAdaptiveQuestion } from "./codebase-adaptive-question";
 import {
 	type CodebaseArtifactRef,

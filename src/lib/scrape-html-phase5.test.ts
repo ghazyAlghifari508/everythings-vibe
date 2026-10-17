@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { assessHtmlCapture, htmlCaptureFailureMessage } from "./render-page";
+import { safeScrapeFilename } from "@/components/design/scrape-detail";
 import {
 	buildSourceViewRows,
 	clearFormatMarkupCache,
 	clearHighlightCache,
 	getCachedFormattedMarkup,
 	getCachedHighlightedRows,
-} from "./codebase-source-view";
+} from "@/features/codebase/services/source-view";
 import { buildPreviewSrcDoc } from "./preview-capabilities";
-import { safeScrapeFilename } from "@/components/design/scrape-detail";
+import { assessHtmlCapture, htmlCaptureFailureMessage } from "./render-page";
 
 describe("Phase 5 - HTML Capture Acceptance Criteria & Empty Document Rejection", () => {
 	it("rejects empty documents and whitespace-only captures", () => {

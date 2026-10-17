@@ -15,6 +15,7 @@ import {
 	unique,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { CodebaseNameSource } from "@/features/codebase/services/library";
 import type {
 	CreditComplexityMetrics,
 	CreditLedgerEntryType,
@@ -22,7 +23,6 @@ import type {
 	CreditOperationState,
 	CreditPricingVersion,
 } from "@/lib/adaptive-credit";
-import type { CodebaseNameSource } from "@/lib/codebase-library";
 import type {
 	ScrapeErrorSource,
 	ScrapeFailureReason,

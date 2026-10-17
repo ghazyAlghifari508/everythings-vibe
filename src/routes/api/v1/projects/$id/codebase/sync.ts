@@ -16,8 +16,8 @@ import {
 	getSessionUsability,
 	isSyncCapableProject,
 	requireSupportedCliVersion,
-} from "@/lib/codebase-sync";
-import { hashSyncToken } from "@/lib/codebase-sync.server";
+} from "@/features/codebase/services/sync";
+import { hashSyncToken } from "@/features/codebase/services/sync.server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import type { Plan } from "@/types/database";
 

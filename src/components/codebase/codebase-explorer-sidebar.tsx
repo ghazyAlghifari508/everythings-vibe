@@ -8,14 +8,14 @@ import {
 	Search,
 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
 import {
 	collectFolderPaths,
 	explorerExpansionStorageKey,
 	parseExplorerExpansion,
 	pruneExplorerExpansion,
 	serializeExplorerExpansion,
-} from "@/lib/codebase-explorer-expansion";
+} from "@/features/codebase/services/explorer-expansion";
+import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
 
 export interface ExplorerFileEntry {
 	path: string;

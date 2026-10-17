@@ -2,7 +2,7 @@ import { type Dispatch, type SetStateAction, useCallback } from "react";
 import {
 	buildFeatureMessage,
 	type CodebasePipelineStage,
-} from "@/lib/codebase-chat-flow";
+} from "@/features/codebase/services/chat-flow";
 import type { useWorkspaceArtifacts } from "./use-workspace-artifacts";
 import type { useWorkspacePipeline } from "./use-workspace-pipeline";
 

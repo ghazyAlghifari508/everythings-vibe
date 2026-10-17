@@ -10,11 +10,11 @@ import {
 import {
 	normalizeRepositoryName,
 	PROVISIONAL_CODEBASE_NAME,
-} from "@/lib/codebase-library";
+} from "@/features/codebase/services/library";
 import {
 	compareRepositoryIdentity,
 	normalizeRepositoryIdentity,
-} from "@/lib/codebase-repository-identity";
+} from "@/features/codebase/services/repository-identity";
 import {
 	appendSyncLifecycleEvent,
 	assertSyncTransition,
@@ -26,8 +26,8 @@ import {
 	cliHandshakeResponseSchema,
 	getSessionUsability,
 	requireSupportedCliVersion,
-} from "@/lib/codebase-sync";
-import { hashSyncToken } from "@/lib/codebase-sync.server";
+} from "@/features/codebase/services/sync";
+import { hashSyncToken } from "@/features/codebase/services/sync.server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import type { Plan } from "@/types/database";
 

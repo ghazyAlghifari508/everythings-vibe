@@ -1,15 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import {
+	buildCodebasePromptBlock,
+	linkGenerationContext,
+	requireProjectGenerationContext,
+} from "@/features/codebase/services/generation-context";
+import {
 	buildAcMetrics,
 	formatInsufficientCreditsError,
 	formatSubscriptionPausedError,
 } from "@/lib/adaptive-credit";
-import {
-	buildCodebasePromptBlock,
-	linkGenerationContext,
-	requireProjectGenerationContext,
-} from "@/lib/codebase-generation-context";
 import { CLAIM_POLL_MS, CLAIM_RETRY_MS } from "@/lib/constants";
 import { hasFullWorkflow } from "@/lib/credits";
 import { isTruncatedGeneration } from "@/lib/flow-progress";

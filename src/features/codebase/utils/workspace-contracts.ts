@@ -1,8 +1,8 @@
-import type { AnalysisResponse } from "@/lib/codebase-analysis";
+import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import {
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncStatusResponse,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
 
 export function decideCodebaseDetailEntry(
 	codebaseId: string | undefined,

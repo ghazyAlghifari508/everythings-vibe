@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
+import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 
 function readWorkspaceSource() {
 	return [
@@ -20,7 +20,7 @@ const workspaceLoaderSource = readFileSync(
 import {
 	buildCodebaseLibraryItems,
 	mapLibraryStatus,
-} from "@/lib/codebase-library";
+} from "@/features/codebase/services/library";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
 import {
 	selectLatestCodebaseSnapshots,

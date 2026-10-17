@@ -16,12 +16,12 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useUserPlan } from "@/hooks/use-user-plan";
-import { authClient } from "@/lib/auth-client";
 import {
 	getPendingSyncPayloadKey,
 	syncPromptPayloadSchema,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
+import { useUserPlan } from "@/hooks/use-user-plan";
+import { authClient } from "@/lib/auth-client";
 import {
 	HOME_DRAFT_DEBOUNCE_MS,
 	MAX_PROMPT_LENGTH,

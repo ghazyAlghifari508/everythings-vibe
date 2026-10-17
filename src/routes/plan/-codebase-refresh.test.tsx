@@ -6,7 +6,7 @@ import {
 	PLAN_CODEBASE_NAME_STORAGE_KEY,
 	PLAN_CODEBASE_PROJECT_STORAGE_KEY,
 	PLAN_CODEBASE_STEP_STORAGE_KEY,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
 import { useUIStore } from "@/store";
 import { PlanCodebasePage } from "./codebase";
 

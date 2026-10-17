@@ -8,13 +8,13 @@ import {
 	loadFeatureTree,
 	loadTaskTree,
 } from "@/features/codebase/services/workspace-artifacts.functions";
-import { describeArtifactReadFailure } from "@/features/codebase/utils/workspace-contracts";
 import {
 	type ArtifactHydrationStatus,
 	type ArtifactKind,
 	emptyArtifactHydration,
 	type WorkspaceArtifactHydration,
-} from "@/lib/codebase-workspace-hydration";
+} from "@/features/codebase/services/workspace-hydration";
+import { describeArtifactReadFailure } from "@/features/codebase/utils/workspace-contracts";
 import type { TaskTree } from "@/lib/services/task-service";
 
 export function useWorkspaceArtifacts(

@@ -2,15 +2,15 @@
 
 import { AlertCircle, ArrowRight, Check, Copy, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { copyToClipboard } from "@/lib/clipboard";
-import type { AnalysisResponse } from "@/lib/codebase-analysis";
-import { resolveCodebaseDisplayName } from "@/lib/codebase-naming";
+import type { AnalysisResponse } from "@/features/codebase/services/analysis";
+import { resolveCodebaseDisplayName } from "@/features/codebase/services/naming";
 import {
 	buildAgentPrompt,
 	resolveSyncStageView,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
+import { copyToClipboard } from "@/lib/clipboard";
 import { AiHarnessLogos } from "./ai-harness-logos";
 import { SyncStageList } from "./sync-stage-list";
 

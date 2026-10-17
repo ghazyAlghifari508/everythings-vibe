@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { decideAnalysisRequest } from "@/features/codebase/services/analysis";
 import {
 	buildAcMetrics,
 	buildCodebaseMetrics,
@@ -8,7 +9,6 @@ import {
 	formatInsufficientCreditsError,
 	formatSubscriptionPausedError,
 } from "@/lib/adaptive-credit";
-import { decideAnalysisRequest } from "@/lib/codebase-analysis";
 import {
 	type CreditServiceStore,
 	createCreditService,

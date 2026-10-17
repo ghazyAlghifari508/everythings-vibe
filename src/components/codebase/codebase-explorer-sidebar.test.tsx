@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { explorerExpansionStorageKey } from "@/lib/codebase-explorer-expansion";
+import { explorerExpansionStorageKey } from "@/features/codebase/services/explorer-expansion";
 import {
 	buildTree,
 	CodebaseExplorerSidebar,

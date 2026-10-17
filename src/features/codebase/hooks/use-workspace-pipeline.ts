@@ -14,7 +14,7 @@ import {
 	setRunPhase,
 	settleRun,
 	startRun,
-} from "@/lib/codebase-chat-flow";
+} from "@/features/codebase/services/chat-flow";
 import { consumeSseStream } from "@/lib/sse-consume";
 
 export function useWorkspacePipeline({

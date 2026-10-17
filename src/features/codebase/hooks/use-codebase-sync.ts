@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AnalysisResponse } from "@/lib/codebase-analysis";
+import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import {
 	resolveWorkspaceSnapshotIdentity,
 	shouldDiscardWorkspaceAnalysis,
-} from "@/lib/codebase-analysis-selection";
+} from "@/features/codebase/services/analysis-selection";
 import {
 	getPendingSyncPayloadKey,
 	SNAPSHOT_CONTEXT_STATUSES,
@@ -11,8 +11,8 @@ import {
 	type SyncStatusResponse,
 	syncPromptPayloadSchema,
 	syncStatusResponseSchema,
-} from "@/lib/codebase-sync";
-import { shouldFetchWorkspaceAnalysis } from "@/lib/codebase-workspace-analysis";
+} from "@/features/codebase/services/sync";
+import { shouldFetchWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
 import {
 	type CodebaseSessionStartAction,

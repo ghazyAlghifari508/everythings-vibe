@@ -1,7 +1,7 @@
 import {
 	type AnalysisResponse,
 	safeParseCodebaseAnalysis,
-} from "@/lib/codebase-analysis";
+} from "@/features/codebase/services/analysis";
 
 export function safeParseAnalysisResponse(
 	input: unknown,

@@ -6,7 +6,7 @@ import {
 	CODEBASE_NAME_MAX_ERROR,
 	CODEBASE_NAME_MIN_ERROR,
 	codebaseRenameSchema,
-} from "@/lib/codebase-library";
+} from "@/features/codebase/services/library";
 import { deletionTimestamp } from "@/lib/project-deletion";
 import { requireUser } from "@/lib/session";
 import { purgeProjectArtifacts } from "@/routes/api/projects/$id";

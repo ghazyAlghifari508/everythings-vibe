@@ -15,7 +15,7 @@ import {
 	restoreAskState,
 	settleRun,
 	startRun,
-} from "@/lib/codebase-chat-flow";
+} from "@/features/codebase/services/chat-flow";
 import { validateAskQuestions } from "@/lib/services/ask-service";
 
 export function useWorkspaceQuestions(

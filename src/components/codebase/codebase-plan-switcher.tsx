@@ -13,7 +13,7 @@ import {
 import {
 	type ActivePlanCandidate,
 	describePlanReadiness,
-} from "@/lib/codebase-active-plan";
+} from "@/features/codebase/services/active-plan";
 
 function formatPlanDate(value: string | null): string | null {
 	if (!value) return null;

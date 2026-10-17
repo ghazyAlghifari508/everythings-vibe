@@ -1,5 +1,5 @@
+import type { SnapshotGenerationContext } from "@/features/codebase/services/generation-context";
 import { extractAcIds } from "./ac-coverage";
-import type { SnapshotGenerationContext } from "./codebase-generation-context";
 import type {
 	CapabilityState,
 	ScopeConsistencyReport,

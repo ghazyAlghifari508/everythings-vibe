@@ -17,7 +17,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { CodebaseLibraryItem } from "@/lib/codebase-library";
+import type { CodebaseLibraryItem } from "@/features/codebase/services/library";
 
 function readServerErrorMessage(value: unknown, fallback: string): string {
 	if (

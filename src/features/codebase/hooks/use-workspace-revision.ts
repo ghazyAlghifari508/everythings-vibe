@@ -7,8 +7,8 @@ import {
 	setRunPhase,
 	settleRun,
 	startRun,
-} from "@/lib/codebase-chat-flow";
-import { buildRevisionRequest } from "@/lib/codebase-revision-intent";
+} from "@/features/codebase/services/chat-flow";
+import { buildRevisionRequest } from "@/features/codebase/services/revision-intent";
 import { consumeSseStream } from "@/lib/sse-consume";
 
 export function useWorkspaceRevision({

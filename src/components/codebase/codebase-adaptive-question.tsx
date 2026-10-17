@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { AdaptiveQuestion } from "@/lib/codebase-chat-flow";
+import type { AdaptiveQuestion } from "@/features/codebase/services/chat-flow";
 
 /** Sentinel option id for the free-text choice. Option ids are
  *  `${questionId}-optN`, so this suffix can never collide with one. */

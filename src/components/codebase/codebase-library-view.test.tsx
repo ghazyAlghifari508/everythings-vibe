@@ -7,13 +7,13 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CodebaseLibraryItem } from "@/lib/codebase-library";
+import type { CodebaseLibraryItem } from "@/features/codebase/services/library";
 import {
 	readPlanCodebasePointer,
 	readPlanCodebaseProjectPointer,
 	storePlanCodebasePointer,
 	storePlanCodebaseProjectPointer,
-} from "@/lib/codebase-plan-storage";
+} from "@/features/codebase/services/plan-storage";
 import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/lib/constants";
 import { useUIStore } from "@/store";
 import { CodebaseLibraryView } from "./codebase-library-view";

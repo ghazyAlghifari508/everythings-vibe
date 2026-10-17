@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
 	resolveActivePlan,
 	selectUserFacingPlans,
-} from "@/lib/codebase-active-plan";
+} from "@/features/codebase/services/active-plan";
 import {
 	readActivePlanPointer,
 	storeActivePlanPointer,
-} from "@/lib/codebase-plan-storage";
-import type { WorkspacePlanState } from "@/lib/codebase-workspace-hydration";
+} from "@/features/codebase/services/plan-storage";
+import type { WorkspacePlanState } from "@/features/codebase/services/workspace-hydration";
 import type { CodebaseWorkspaceData } from "../services/workspace-loader.functions";
 
 export function useWorkspacePlan({

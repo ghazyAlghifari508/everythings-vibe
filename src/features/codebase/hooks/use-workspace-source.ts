@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
+import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 import {
 	detectStackFromPackageJsonText,
 	manifestToExplorerFiles,
 	mergeStackWithFallback,
-} from "@/lib/codebase-stack";
+} from "@/features/codebase/services/stack";
 import {
 	loadSnapshotFileContent,
 	loadSnapshotManifest,

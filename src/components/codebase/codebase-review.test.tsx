@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
+import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 import { CodebaseReview } from "./codebase-review";
 
 const analysis: CodebaseAnalysis = {

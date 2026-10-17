@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, Check, FileCode, Folder } from "lucide-react";
-import type { CodebaseAnalysis } from "@/lib/codebase-analysis";
+import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 
 function valueOrUnknown(value?: string | null): string {
 	return value && value.trim().length > 0 ? value : "Tidak terdeteksi";

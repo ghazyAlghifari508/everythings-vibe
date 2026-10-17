@@ -12,7 +12,7 @@ import {
 	projects,
 	subscriptions,
 } from "@/db/schema";
-import { selectNewestReadyAnalysis } from "@/lib/codebase-generation-context";
+import { selectNewestReadyAnalysis } from "@/features/codebase/services/generation-context";
 import {
 	CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION,
 	type CodebaseSyncStatus,
@@ -24,7 +24,7 @@ import {
 	sanitizeSyncErrorCode,
 	sanitizeSyncErrorMessage,
 	syncStatusResponseSchema,
-} from "@/lib/codebase-sync";
+} from "@/features/codebase/services/sync";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";
 import type { Plan } from "@/types/database";

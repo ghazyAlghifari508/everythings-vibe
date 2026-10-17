@@ -8,12 +8,12 @@ import {
 	projects,
 	tasks,
 } from "@/db/schema";
+import { SNAPSHOT_CONTEXT_STATUSES } from "@/features/codebase/services/sync";
 import {
 	apiKeyAuth,
 	hasScope,
 	verifyProjectOwnership,
 } from "@/lib/api-key-auth";
-import { SNAPSHOT_CONTEXT_STATUSES } from "@/lib/codebase-sync";
 import { getLatestPrdContent } from "@/lib/services/prd-service";
 
 export const Route = createFileRoute("/api/v1/projects/$id")({

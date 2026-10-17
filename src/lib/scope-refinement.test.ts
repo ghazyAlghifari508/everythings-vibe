@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SnapshotGenerationContext } from "./codebase-generation-context";
+import type { SnapshotGenerationContext } from "@/features/codebase/services/generation-context";
 import {
 	buildScopeEvidence,
 	describeScopeRefinement,

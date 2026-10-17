@@ -2,8 +2,8 @@
 
 import { AlertCircle, ArrowRight, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { AnalysisResponse } from "@/lib/codebase-analysis";
-import type { SyncStatusResponse } from "@/lib/codebase-sync";
+import type { AnalysisResponse } from "@/features/codebase/services/analysis";
+import type { SyncStatusResponse } from "@/features/codebase/services/sync";
 import { CodebaseReview } from "./codebase-review";
 
 type ConclusionState = "analyzing" | "failed" | "ready";
