@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StudioHeader } from "./studio-header";
+import { StudioHeader } from "@/features/studio/components/workspace/studio-header";
 
 vi.mock("@/lib/auth-client", () => ({
 	authClient: {

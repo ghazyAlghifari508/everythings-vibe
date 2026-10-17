@@ -42,7 +42,7 @@ vi.mock("@/lib/auth-client", () => ({
 	authClient: { useSession: () => ({ data: null }) },
 }));
 
-import { Route } from "./studio.index";
+import { Route } from "@/routes/design/studio.index";
 
 describe("StudioPage UI & Workflow", () => {
 	const defaultHistory = [

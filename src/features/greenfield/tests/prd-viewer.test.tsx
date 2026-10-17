@@ -149,7 +149,7 @@ describe("Export PDF removal", () => {
 		const allowlist = new Set([
 			"src/features/templates/data/gallery-templates.ts",
 			"src/features/templates/data/vibe-templates.ts",
-			"src/components/design/studio-launch-composer.test.tsx",
+			"src/features/studio/tests/studio-launch-composer.test.tsx",
 			"src/lib/studio-prd-validation.test.ts",
 			"src/lib/studio-prd-validation.ts",
 			"src/routes/api/-studio.generate.test.ts",

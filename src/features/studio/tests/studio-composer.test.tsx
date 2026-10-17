@@ -7,7 +7,10 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveComposerScope, StudioComposer } from "./studio-composer";
+import {
+	resolveComposerScope,
+	StudioComposer,
+} from "@/features/studio/components/composer/studio-composer";
 
 describe("resolveComposerScope", () => {
 	it("targets the whole project when no frame is selected", () => {

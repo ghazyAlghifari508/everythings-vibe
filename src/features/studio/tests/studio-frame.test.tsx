@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
 import {
 	isFrameVisualPending,
 	resolveFrameArtboardMode,
 	StudioFrame,
-} from "./studio-frame";
-import { StudioFrameShimmer } from "./studio-frame-shimmer";
+} from "@/features/studio/components/canvas/studio-frame";
+import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
+import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
 
 describe("StudioFrameShimmer", () => {
 	afterEach(() => cleanup());

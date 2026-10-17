@@ -2,15 +2,15 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { StudioPromptShortcut } from "@/lib/studio-prompt-shortcuts";
-import { cn } from "@/lib/utils";
 import {
 	type CarouselScrollMetrics,
 	canScrollNext,
 	canScrollPrev,
 	getCarouselStep,
 	SHORTCUT_CAROUSEL_GAP_FALLBACK_PX,
-} from "./studio-shortcut-carousel-state";
+} from "@/features/studio/utils/studio-shortcut-carousel-state";
+import type { StudioPromptShortcut } from "@/lib/studio-prompt-shortcuts";
+import { cn } from "@/lib/utils";
 
 interface StudioShortcutCarouselProps {
 	shortcuts: readonly StudioPromptShortcut[];

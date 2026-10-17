@@ -10,18 +10,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { FolderOpen, User, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
-import type { AttachedDesignReference } from "@/components/design/start-with-design-modal";
-import { StudioBackLink } from "@/components/design/studio-back-link";
-import { StudioDesignPickerDialog } from "@/components/design/studio-design-picker-dialog";
-import {
-	type LaunchComposerConfig,
-	StudioLaunchComposer,
-} from "@/components/design/studio-launch-composer";
-import { StudioShortcutCarousel } from "@/components/design/studio-shortcut-carousel";
-import {
-	type StudioHistoryItem,
-	StudioSidebar,
-} from "@/components/design/studio-sidebar";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -32,6 +20,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import {
+	type LaunchComposerConfig,
+	StudioLaunchComposer,
+} from "@/features/studio/components/composer/studio-launch-composer";
+import type { AttachedDesignReference } from "@/features/studio/components/design-system/start-with-design-modal";
+import { StudioDesignPickerDialog } from "@/features/studio/components/design-system/studio-design-picker-dialog";
+import { StudioShortcutCarousel } from "@/features/studio/components/studio-shortcut-carousel";
+import { StudioBackLink } from "@/features/studio/components/workspace/studio-back-link";
+import {
+	type StudioHistoryItem,
+	StudioSidebar,
+} from "@/features/studio/components/workspace/studio-sidebar";
 import { authClient } from "@/lib/auth-client";
 import { requireUserServer } from "@/lib/session";
 import {

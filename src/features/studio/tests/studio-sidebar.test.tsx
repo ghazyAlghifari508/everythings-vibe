@@ -7,7 +7,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StudioSidebar } from "./studio-sidebar";
+import { StudioSidebar } from "@/features/studio/components/workspace/studio-sidebar";
 
 const mockProjects = [
 	{

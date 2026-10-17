@@ -7,9 +7,9 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { StudioPageCountSelect } from "@/features/studio/components/composer/studio-page-count-select";
+import { StudioSkillSelect } from "@/features/studio/components/composer/studio-skill-select";
 import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
-import { StudioPageCountSelect } from "./studio-page-count-select";
-import { StudioSkillSelect } from "./studio-skill-select";
 
 function installRadixDomPolyfills() {
 	class ResizeObserverStub {

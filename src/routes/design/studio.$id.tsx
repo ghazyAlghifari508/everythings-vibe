@@ -7,14 +7,6 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { AlertCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AttachedDesignReference } from "@/components/design/start-with-design-modal";
-import { StudioCanvas } from "@/components/design/studio-canvas";
-import {
-	StudioComposer,
-	type StudioComposerScope,
-} from "@/components/design/studio-composer";
-import { StudioDesignPicker } from "@/components/design/studio-design-picker";
-import { StudioHeader } from "@/components/design/studio-header";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -30,6 +22,14 @@ import type {
 	StudioProjectRow,
 	StudioRevisionRow,
 } from "@/db/schema";
+import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
+import {
+	StudioComposer,
+	type StudioComposerScope,
+} from "@/features/studio/components/composer/studio-composer";
+import type { AttachedDesignReference } from "@/features/studio/components/design-system/start-with-design-modal";
+import { StudioDesignPicker } from "@/features/studio/components/design-system/studio-design-picker";
+import { StudioHeader } from "@/features/studio/components/workspace/studio-header";
 import { requireUserServer } from "@/lib/session";
 import { exportProjectAsZip } from "@/lib/studio-export";
 import type { StudioDesignSkillId } from "@/lib/studio-generation-options";

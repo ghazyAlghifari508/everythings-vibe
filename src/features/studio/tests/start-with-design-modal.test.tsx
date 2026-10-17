@@ -7,7 +7,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StartWithDesignModal } from "./start-with-design-modal";
+import { StartWithDesignModal } from "@/features/studio/components/design-system/start-with-design-modal";
 
 describe("StartWithDesignModal", () => {
 	beforeEach(() => {

@@ -35,7 +35,7 @@ vi.mock("@tanstack/react-router", () => ({
 	useRouter: () => routerMock,
 }));
 
-import { StudioBackLink } from "./studio-back-link";
+import { StudioBackLink } from "@/features/studio/components/workspace/studio-back-link";
 
 afterEach(() => {
 	cleanup();

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	type LaunchComposerConfig,
 	StudioLaunchComposer,
-} from "./studio-launch-composer";
+} from "@/features/studio/components/composer/studio-launch-composer";
 
 const baseConfig: LaunchComposerConfig = {
 	designMode: "web",

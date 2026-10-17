@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	STUDIO_PROMPT_SHORTCUTS,
-	type StudioPromptShortcut,
-} from "@/lib/studio-prompt-shortcuts";
-import { StudioShortcutCarousel } from "./studio-shortcut-carousel";
+import { StudioShortcutCarousel } from "@/features/studio/components/studio-shortcut-carousel";
 import {
 	canScrollNext,
 	canScrollPrev,
 	getCarouselStep,
-} from "./studio-shortcut-carousel-state";
+} from "@/features/studio/utils/studio-shortcut-carousel-state";
+import {
+	STUDIO_PROMPT_SHORTCUTS,
+	type StudioPromptShortcut,
+} from "@/lib/studio-prompt-shortcuts";
 
 function renderCarousel(selectedId: string | null = null) {
 	const onSelect = vi.fn((_shortcut: StudioPromptShortcut) => undefined);

@@ -15,6 +15,7 @@ import {
 	type RefObject,
 	useRef,
 } from "react";
+import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
 import { STUDIO_PRD_FILE_MAX_BYTES } from "@/lib/constants";
 import type { StudioDesignMode } from "@/lib/prompts-ui-studio";
 import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
@@ -22,7 +23,6 @@ import {
 	validateStudioPrdContent,
 	validateStudioPrdFilename,
 } from "@/lib/studio-prd-validation";
-import { shouldSubmitComposerEvent } from "./composer-keyboard";
 import { StudioPageCountSelect } from "./studio-page-count-select";
 import { StudioSkillSelect } from "./studio-skill-select";
 

@@ -7,6 +7,16 @@ import type {
 	StudioProjectRow,
 } from "@/db/schema";
 import { getCanvasDotStyle } from "@/features/greenfield/components/whiteboard/canvas-connectors";
+import { canvasZoomRowBottomCss } from "@/features/studio/utils/studio-canvas-layout";
+import {
+	exceedsDragThreshold,
+	isMarqueeIgnoredTarget,
+	type MarqueeFrameBounds,
+	normalizeRect,
+	type Point,
+	type Rect,
+	resolveMarqueeSelection,
+} from "@/features/studio/utils/studio-canvas-marquee";
 import { normalizeWheelDelta, useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import {
 	STUDIO_CANVAS_COMPOSER_INSET_PX,
@@ -23,16 +33,6 @@ import {
 	STUDIO_VISUAL_FALLBACK_HEIGHT,
 	STUDIO_VISUAL_WIDTH,
 } from "@/lib/constants";
-import { canvasZoomRowBottomCss } from "./studio-canvas-layout";
-import {
-	exceedsDragThreshold,
-	isMarqueeIgnoredTarget,
-	type MarqueeFrameBounds,
-	normalizeRect,
-	type Point,
-	type Rect,
-	resolveMarqueeSelection,
-} from "./studio-canvas-marquee";
 import { StudioFrame } from "./studio-frame";
 
 export interface StudioCanvasProps {

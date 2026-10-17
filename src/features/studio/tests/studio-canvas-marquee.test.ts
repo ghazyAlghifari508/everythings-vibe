@@ -10,7 +10,7 @@ import {
 	resolveMarqueeSelection,
 	screenToWorld,
 	worldToScreen,
-} from "./studio-canvas-marquee";
+} from "@/features/studio/utils/studio-canvas-marquee";
 
 describe("normalizeRect", () => {
 	const cases = [

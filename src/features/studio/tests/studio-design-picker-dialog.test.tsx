@@ -7,7 +7,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StudioDesignPickerDialog } from "./studio-design-picker-dialog";
+import { StudioDesignPickerDialog } from "@/features/studio/components/design-system/studio-design-picker-dialog";
 
 function renderDialog(
 	overrides: Partial<Parameters<typeof StudioDesignPickerDialog>[0]> = {},

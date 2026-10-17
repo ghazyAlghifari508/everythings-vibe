@@ -39,7 +39,7 @@ vi.mock("@/lib/session", () => ({
 	requireUserServer: vi.fn(),
 }));
 
-import { Route } from "./studio.$id";
+import { Route } from "@/routes/design/studio.$id";
 
 describe("StudioDetailPage Multi-Screen Canvas", () => {
 	beforeEach(() => {

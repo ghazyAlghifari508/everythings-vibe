@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldSubmitComposerEvent } from "./composer-keyboard";
+import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
 
 describe("shouldSubmitComposerEvent", () => {
 	it("submits on a plain Enter key", () => {
