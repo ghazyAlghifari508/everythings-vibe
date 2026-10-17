@@ -1,0 +1,666 @@
+"use client";
+
+import {
+	Link,
+	useLocation,
+	useNavigate,
+	useRouter,
+} from "@tanstack/react-router";
+import {
+	AlertTriangle,
+	ArrowRight,
+	Check,
+	ChevronDown,
+	Circle,
+	FileText,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { syncPaymentStatus } from "@/app/actions/payment";
+import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
+import type { ProjectFeatureTree } from "@/db/schema";
+import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
+import { DocumentReviewModal } from "@/features/greenfield/components/documents/document-review-modal";
+import { ProjectDocumentsDrawer } from "@/features/greenfield/components/documents/project-documents-drawer";
+import type { TaskTree } from "@/features/greenfield/services/task-service";
+import {
+	isBackgroundGeneration,
+	isStaleCompletedLoader,
+	resolveInitialGenerating,
+} from "@/features/greenfield/utils/generation-recovery";
+import {
+	GENERATION_STATUS_POLL_INTERVAL_MS,
+	GUARD_WAIT_MS,
+} from "@/lib/constants";
+import {
+	consumeResumeIntent,
+	consumeSuppressAutoGen,
+} from "@/lib/prompt-handoff";
+import { parseStreamEvent, type StreamEvent } from "@/lib/sse-events";
+import { readSseStream } from "@/lib/sse-stream";
+import { cn } from "@/lib/utils";
+import { useChatStore, useUIStore } from "@/store";
+import { ImplementationOptions } from "./implementation-options";
+import { IDLE_GENERATING_TITLE, thinkingTitleText } from "./thinking-title";
+
+interface TaskDetailProps {
+	projectId: string;
+	projectName: string;
+	taskTree: TaskTree | null;
+	featureTree: ProjectFeatureTree | null;
+	hasAc: boolean;
+	taskStatus?: string | null;
+	latestPrdContent?: string | null;
+	latestAcContent?: string | null;
+}
+
+// ponytail: honest status per no-hardcode.md Rule 7 — while generating, the
+// topbar title shows the model's REAL streamed reasoning (SSE `thinking`
+// events) via thinkingTitleText; one neutral static label (IDLE_GENERATING_TITLE)
+// is the fallback while nothing has streamed. The board shows the skeleton.
+
+// ponytail: module-level in-flight guard, mirrors ac-detail.tsx. StrictMode's
+// phantom unmount->remount aborts the first fetch but the remount fires a
+// second generate before the server frees its claim — dedupe at module scope
+// so both mounts share one generation per project instead of racing two.
+// Keyed by the owning controller so an aborted older request's cleanup can
+// never release a guard that a newer request has since acquired.
+const inFlightTaskProjects = new Map<string, AbortController>();
+
+/** Release the guard only when this request still owns it. */
+function releaseTaskGuard(projectId: string, owner: AbortController) {
+	if (inFlightTaskProjects.get(projectId) === owner) {
+		inFlightTaskProjects.delete(projectId);
+	}
+}
+
+function isTaskTree(value: unknown): value is TaskTree {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"features" in value &&
+		Array.isArray(value.features)
+	);
+}
+
+/**
+ * Task detail container - orchestrates generate flow, canvas, mobile fallback.
+ */
+export function TaskDetail({
+	projectId,
+	projectName,
+	taskTree,
+	featureTree,
+	hasAc,
+	taskStatus,
+	latestPrdContent,
+	latestAcContent,
+}: TaskDetailProps) {
+	const showToast = useUIStore((s) => s.showToast);
+	const isProjectDrawerOpen = useUIStore((s) => s.isProjectDrawerOpen);
+	const setProjectDrawerOpen = useUIStore((s) => s.setProjectDrawerOpen);
+	const activeReviewModal = useUIStore((s) => s.activeReviewModal);
+	const setActiveReviewModal = useUIStore((s) => s.setActiveReviewModal);
+	const navigate = useNavigate();
+	const router = useRouter();
+	const setTaskGenerated = useChatStore((s) => s.setTaskGenerated);
+	const creditsExhausted = useChatStore((s) => s.creditsExhausted);
+	const setCreditsExhausted = useChatStore((s) => s.setCreditsExhausted);
+	const searchStr = useLocation({ select: (l) => l.searchStr });
+
+	// Sync store flag from server-loaded status on mount/project switch, avoids
+	// stale true/false leaking across different projects' Task pages.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: projectId triggers re-sync on project switch
+	useEffect(() => {
+		setTaskGenerated(taskStatus === "completed");
+	}, [projectId, taskStatus, setTaskGenerated]);
+
+	// Loader props are the first frame: never paint a spinner for a finished
+	// tree, and never trust a completed-but-empty loader row — it is the
+	// stale-cache signature the reconciler below resolves via invalidate().
+	const [isGenerating, setIsGenerating] = useState(() =>
+		resolveInitialGenerating(hasAc, taskStatus, Boolean(taskTree)),
+	);
+	// Real streamed reasoning from the model's SSE `thinking` events — the
+	// only honest "AI is working" signal we have (no-hardcode.md Rule 7).
+	const [thinkingText, setThinkingText] = useState("");
+	const [hasError, setHasError] = useState(false);
+	const [generatedTaskTree, setGeneratedTaskTree] = useState<TaskTree | null>(
+		null,
+	);
+	const [revealCount, setRevealCount] = useState<number | null>(null);
+	const isGeneratingRef = useRef(false);
+	const abortRef = useRef<AbortController | null>(null);
+	const staggerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const hasAutoGenerated = useRef(false);
+	// Recovery reconciler: navigation unmounts this view and drops local
+	// state, while the server keeps generating. A completed-but-empty loader
+	// row is stale cache, invalidate once to pull the saved tree. A still-live
+	// generation (or a sibling stream owned by a double-mount) revalidates the
+	// loader on an interval; the loader is the single source of truth and the
+	// effect stops the moment the tree lands.
+	useEffect(() => {
+		const hasContent = Boolean(taskTree);
+		const staleCompleted = isStaleCompletedLoader(taskStatus, hasContent);
+		const siblingLive = inFlightTaskProjects.has(projectId) && !hasContent;
+		const backgroundLive = isBackgroundGeneration(taskStatus, hasContent);
+		if (!staleCompleted && !backgroundLive && !siblingLive) return;
+		let cancelled = false;
+		if (staleCompleted) {
+			void router.invalidate();
+			return;
+		}
+		setIsGenerating(true);
+		const timer = setInterval(() => {
+			if (cancelled) return;
+			void router.invalidate();
+		}, GENERATION_STATUS_POLL_INTERVAL_MS);
+		return () => {
+			cancelled = true;
+			clearInterval(timer);
+		};
+	}, [projectId, taskStatus, taskTree, router]);
+
+	// Abort in-flight generation only when switching to a different project
+	// so stale project data is discarded without killing in-flight streams on
+	// component remounts or responsive reflows.
+	const previousProjectIdRef = useRef(projectId);
+	useEffect(() => {
+		if (
+			previousProjectIdRef.current &&
+			projectId &&
+			previousProjectIdRef.current !== projectId
+		) {
+			const owner = abortRef.current;
+			owner?.abort();
+			abortRef.current = null;
+			if (owner) releaseTaskGuard(previousProjectIdRef.current, owner);
+			isGeneratingRef.current = false;
+			hasAutoGenerated.current = false;
+		}
+		previousProjectIdRef.current = projectId;
+	}, [projectId]);
+
+	useEffect(() => {
+		return () => {
+			if (staggerRef.current) clearInterval(staggerRef.current);
+		};
+	}, []);
+
+	const handleGenerate = useCallback(async () => {
+		if (isGeneratingRef.current) return;
+		if (!hasAc) {
+			showToast("AC belum tersedia. Generate AC terlebih dahulu.", "error");
+			return;
+		}
+
+		if (inFlightTaskProjects.has(projectId)) {
+			const deadline = Date.now() + GUARD_WAIT_MS;
+			while (inFlightTaskProjects.has(projectId) && Date.now() < deadline) {
+				await new Promise((r) => setTimeout(r, 50));
+			}
+			if (inFlightTaskProjects.has(projectId)) return;
+		}
+		isGeneratingRef.current = true;
+		setIsGenerating(true);
+		setThinkingText("");
+		setHasError(false);
+
+		abortRef.current?.abort();
+		const controller = new AbortController();
+		abortRef.current = controller;
+		// Acquire the guard keyed by this controller — only this request can
+		// release it, so an aborted older stream can't free a newer one's slot.
+		inFlightTaskProjects.set(projectId, controller);
+
+		try {
+			const response = await fetch("/api/task/generate", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					projectId,
+				}),
+				signal: controller.signal,
+			});
+
+			if (!response.ok) {
+				const error = await response.json().catch(() => ({}));
+				if (response.status === 403) {
+					if (error.code === "UPGRADE_REQUIRED") {
+						showToast(
+							"Generate Task hanya tersedia di paket Pro dan Hengker.",
+							"error",
+						);
+					} else {
+						setCreditsExhausted({
+							stage: "task",
+							message: error.error || "Kredit habis.",
+						});
+					}
+					isGeneratingRef.current = false;
+					setIsGenerating(false);
+					setTaskGenerated(false);
+					return;
+				}
+				// A 409 means the server saw taskStatus='generating'. Release
+				// our own guard slot (we own it), then check whether any *other*
+				// live request still owns a generation: a live sibling
+				// (double-mount / double-click) owns the result → stay silent
+				// and let it paint the outcome. No live owner → the claim is
+				// stale/dead → surface a retryable error instead of pretending
+				// anything is in flight. (The old unconditional `delete` + same
+				// tick re-check made the no-owner case the only reachable one
+				// and released the sibling's guard.)
+				if (response.status === 409) {
+					releaseTaskGuard(projectId, controller);
+					if (!inFlightTaskProjects.has(projectId)) {
+						setHasError(true);
+						showToast(
+							"Sesi generate sebelumnya terputus. Generate ulang.",
+							"error",
+						);
+					}
+					isGeneratingRef.current = false;
+					setIsGenerating(false);
+					return;
+				}
+				throw new Error(error.error || "Gagal generate");
+			}
+
+			let receivedTerminalEvent = false;
+			// The shared parser flushes the trailing buffer so a final done/error
+			// frame without a newline is never dropped.
+			for await (const data of readSseStream(response.body)) {
+				const event: StreamEvent | null = parseStreamEvent(data);
+				// Unknown or malformed frames are skipped — the stream stays live.
+				if (!event) continue;
+				if (event.type === "thinking") {
+					setThinkingText((prev) => prev + event.content);
+				} else if (event.type === "thinking_reset") {
+					// A failed upstream attempt already streamed reasoning; the
+					// retry starts fresh instead of appending a duplicate.
+					setThinkingText("");
+				} else if (event.type === "delta") {
+					// Real output flowing — reasoning display has served its purpose.
+					setThinkingText("");
+				} else if (event.type === "done") {
+					receivedTerminalEvent = true;
+					if (!isTaskTree(event.taskTree)) {
+						setHasError(true);
+						showToast("Task tree tidak valid. Generate ulang.", "error");
+						break;
+					}
+					const tree = event.taskTree;
+					setGeneratedTaskTree(tree);
+					setRevealCount(0);
+					let count = 0;
+					if (staggerRef.current) clearInterval(staggerRef.current);
+					staggerRef.current = setInterval(() => {
+						count++;
+						setRevealCount(count);
+						if (count >= tree.features.length) {
+							if (staggerRef.current) clearInterval(staggerRef.current);
+							staggerRef.current = null;
+							setRevealCount(null);
+						}
+					}, 300);
+					setTaskGenerated(true);
+					void router.invalidate();
+					showToast("Task tree berhasil digenerate!", "success");
+					break;
+				} else if (event.type === "error") {
+					receivedTerminalEvent = true;
+					setHasError(true);
+					showToast(event.error || "Gagal generate", "error");
+					break;
+				}
+			}
+			// A stream that closed without a terminal event was truncated by the
+			// network/proxy — never treat it as success or the canvas ends up
+			// empty with no retry affordance.
+			if (!receivedTerminalEvent) {
+				setHasError(true);
+				showToast(
+					"Koneksi generate terputus sebelum selesai. Generate ulang.",
+					"error",
+				);
+			}
+		} catch (error: unknown) {
+			if (error instanceof DOMException && error.name === "AbortError") {
+				// A newer handleGenerate call already superseded this one (see abortRef.current?.abort()
+				// above) - that call owns isGenerating state now, so don't stomp on it.
+				if (abortRef.current !== controller) {
+					// Abort came from unmount/route transition, not a newer
+					// handleGenerate taking over (abortRef was cleared). Surface a
+					// retryable error so the user isn't left at a dead-end.
+					if (abortRef.current === null) {
+						isGeneratingRef.current = false;
+						setIsGenerating(false);
+						setHasError(true);
+					}
+					return;
+				}
+				isGeneratingRef.current = false;
+				setIsGenerating(false);
+				return;
+			}
+			console.error("Generate task error:", error);
+			showToast(
+				error instanceof Error ? error.message : "Gagal generate task",
+				"error",
+			);
+			setHasError(true);
+			isGeneratingRef.current = false;
+			setIsGenerating(false);
+			abortRef.current = null;
+			return;
+		} finally {
+			releaseTaskGuard(projectId, controller);
+		}
+		isGeneratingRef.current = false;
+		setIsGenerating(false);
+		abortRef.current = null;
+	}, [
+		hasAc,
+		projectId,
+		showToast,
+		setCreditsExhausted,
+		setTaskGenerated,
+		router,
+	]);
+
+	// Auto-generate on mount if no tasks yet.
+	// Uses ref to access latest handleGenerate, avoiding stale closure issue.
+	const handleGenerateRef = useRef(handleGenerate);
+	handleGenerateRef.current = handleGenerate;
+
+	useEffect(() => {
+		if (
+			!hasAc ||
+			taskTree ||
+			taskStatus === "completed" ||
+			taskStatus === "generating" ||
+			hasAutoGenerated.current
+		)
+			return;
+		if (consumeSuppressAutoGen(projectId)) return;
+		hasAutoGenerated.current = true;
+		handleGenerateRef.current();
+	}, [hasAc, taskStatus, taskTree, projectId]);
+	// Auto-resume Task generation after payment return.
+	// Keyed by the raw search string + a per-orderId guard: `new
+	// URLSearchParams(searchStr)` is a fresh object every render, so the old
+	// dep re-ran the resume flow (duplicate sync + generate) while the
+	// Midtrans query params were still in the URL.
+	const resumedTaskPaymentsRef = useRef<Set<string>>(new Set());
+	useEffect(() => {
+		const params = new URLSearchParams(searchStr);
+		const orderId = params.get("order_id");
+		const payment = params.get("payment");
+		if (!orderId || payment !== "success") return;
+		if (resumedTaskPaymentsRef.current.has(orderId)) return;
+		resumedTaskPaymentsRef.current.add(orderId);
+		(async () => {
+			try {
+				const res = await syncPaymentStatus({ data: orderId });
+				if (!res.success) return;
+				const resumedStage = consumeResumeIntent(projectId);
+				if (resumedStage === "task") {
+					hasAutoGenerated.current = true;
+					handleGenerateRef.current();
+				}
+				// Strip Midtrans query params via TanStack Router to keep history in sync
+				navigate({ to: ".", search: {}, replace: true });
+			} catch (e) {
+				console.error("Auto-resume payment sync failed:", e);
+			}
+		})();
+	}, [searchStr, navigate, projectId]);
+
+	// No AC state
+	if (!hasAc) {
+		return (
+			<div className="flex h-full items-center justify-center bg-onyx text-snow">
+				<div className="text-center">
+					<FileText size={64} className="mx-auto mb-4 text-fog" />
+					<h2 className="mb-2 text-xl font-[510]">AC Belum Tersedia</h2>
+					<p className="mb-6 text-fog">
+						Generate Acceptance Criteria terlebih dahulu.
+					</p>
+					<Link
+						to="/ac/$id"
+						params={{ id: projectId }}
+						className="btn-primary inline-flex items-center gap-2 rounded-md px-4 py-2"
+					>
+						<ArrowRight size={16} />
+						Ke AC
+					</Link>
+				</div>
+			</div>
+		);
+	}
+
+	const currentTaskTree = generatedTaskTree ?? taskTree;
+	const visibleTaskTree =
+		currentTaskTree && revealCount !== null
+			? { features: currentTaskTree.features.slice(0, revealCount) }
+			: currentTaskTree;
+	const hasContent = Boolean(
+		visibleTaskTree && visibleTaskTree.features.length > 0,
+	);
+	// Missing status means freshly generated (AI JSON carries no status): read as pending.
+	const hasUnfinishedProgress = Boolean(
+		taskTree?.features.some((feature) =>
+			feature.tasks.some((task) => (task.status ?? "pending") !== "pending"),
+		),
+	);
+
+	// Title: the model's real streamed reasoning while generating (tail of the
+	// latest line), neutral static label before any thinking arrives, project
+	// name when done.
+	const generatingTitle = thinkingText
+		? thinkingTitleText(thinkingText)
+		: IDLE_GENERATING_TITLE;
+	const displayTitle = isGenerating ? generatingTitle : projectName;
+
+	return (
+		<>
+			<div className="flex h-full flex-col bg-onyx text-snow">
+				{/* Topbar */}
+				<div className="flex items-center justify-between border-b border-graphite bg-obsidian px-4 py-3">
+					<h1
+						className={cn(
+							"truncate font-inter text-lg font-[510]",
+							isGenerating && "text-fog",
+						)}
+					>
+						{displayTitle}
+						{isGenerating && (
+							<span aria-hidden="true">
+								<span className="animate-pulse">.</span>
+								<span className="animate-pulse animate-delay-200">.</span>
+								<span className="animate-pulse animate-delay-400">.</span>
+							</span>
+						)}
+					</h1>
+					<div className="flex items-center gap-3">
+						<Link
+							to="/kanban/$id"
+							params={{ id: projectId }}
+							className="btn-primary px-3 py-1.5 rounded-md text-xs font-[510]"
+						>
+							Task
+						</Link>
+						<ImplementationOptions
+							projectId={projectId}
+							projectName={projectName}
+							hasContent={hasContent}
+							hasUnfinishedProgress={hasUnfinishedProgress}
+						/>
+					</div>
+				</div>
+
+				{/* Canvas / generate */}
+				{/* ponytail: no opaque overlay while generating — the board's
+				    skeleton diagram stays visible; progress lives in the
+				    topbar title (rotating phrases), distinct from PRD/AC. */}
+				<div className="relative flex-1 overflow-hidden">
+					{/* Mobile: stacked accordion <md */}
+					{visibleTaskTree && hasContent && (
+						<div
+							className="h-full overflow-y-auto md:hidden"
+							style={{ overscrollBehavior: "contain" }}
+						>
+							<div className="space-y-3 p-3">
+								{visibleTaskTree.features.map((feature, fi) => (
+									<details
+										key={feature.name}
+										className="rounded-lg border border-graphite bg-obsidian"
+									>
+										<summary
+											className="flex cursor-pointer items-center gap-2 px-3 py-2 font-inter text-sm font-[510]"
+											style={{
+												borderLeft: `3px solid ${["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#14b8a6"][fi % 10]}`,
+											}}
+										>
+											<ChevronDown size={14} /> {feature.name}
+										</summary>
+										<div className="border-t border-graphite px-3 py-2">
+											{!feature.tasks || feature.tasks.length === 0 ? (
+												<p className="text-xs text-fog italic">
+													Tidak ada task
+												</p>
+											) : (
+												<ul className="space-y-2">
+													{feature.tasks.map((task) => {
+														const isDone =
+															task.status === "completed" ||
+															task.status === "done";
+														return (
+															<li key={`${feature.name}-${task.name}`}>
+																<div className="flex items-center gap-2">
+																	<span
+																		aria-hidden
+																		className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-colors ${
+																			isDone
+																				? "border-emerald/60 bg-emerald/15 text-emerald"
+																				: "border-fog/40 bg-onyx/40 text-transparent"
+																		}`}
+																	>
+																		{isDone ? (
+																			<Check size={10} className="stroke-[3]" />
+																		) : null}
+																	</span>
+																	<p
+																		className={`text-sm font-[510] ${isDone ? "text-snow/75" : "text-snow"}`}
+																	>
+																		{task.name}
+																	</p>
+																	{isDone ? (
+																		<span className="ml-auto shrink-0 text-[10px] font-medium text-emerald/90">
+																			Selesai
+																		</span>
+																	) : null}
+																</div>
+																{task.subtasks && task.subtasks.length > 0 && (
+																	<ul className="mt-1 space-y-1 pl-3">
+																		{task.subtasks.map((sub) => (
+																			<li
+																				key={`${task.name}-${sub.name}`}
+																				className="text-xs text-fog"
+																			>
+																				<div className="flex items-center gap-1.5">
+																					<Circle
+																						size={5}
+																						className="shrink-0 fill-fog/40"
+																					/>{" "}
+																					{sub.name}
+																				</div>
+																				{sub.details &&
+																					sub.details.length > 0 && (
+																						<ul className="mt-0.5 space-y-0.5 pl-4">
+																							{sub.details.map((detail, di) => (
+																								<li
+																									// biome-ignore lint/suspicious/noArrayIndexKey: detail strings can duplicate; index as tiebreaker
+																									key={`${detail.substring(0, 30)}-${di}`}
+																									className="text-[11px] text-fog/70"
+																								>
+																									– {detail}
+																								</li>
+																							))}
+																						</ul>
+																					)}
+																			</li>
+																		))}
+																	</ul>
+																)}
+															</li>
+														);
+													})}
+												</ul>
+											)}
+										</div>
+									</details>
+								))}
+							</div>
+						</div>
+					)}
+
+					{/* Desktop: interactive canvas >md */}
+					<div className={cn("h-full", hasContent && "hidden md:block")}>
+						{hasError && !isGenerating && !hasContent ? (
+							<div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+								<AlertTriangle size={40} className="text-crimson" />
+								<p className="text-fog">Gagal generate task tree.</p>
+								<button
+									type="button"
+									onClick={() => handleGenerate()}
+									className="btn-primary rounded-md px-4 py-2 text-sm"
+								>
+									Coba Lagi
+								</button>
+							</div>
+						) : (
+							<WhiteboardCanvas
+								projectName={projectName}
+								taskTree={visibleTaskTree}
+								featureTree={featureTree}
+							/>
+						)}
+					</div>
+				</div>
+			</div>
+			<CreditExhaustedModal
+				isOpen={creditsExhausted?.stage === "task"}
+				onClose={() => setCreditsExhausted(null)}
+				errorMessage={creditsExhausted?.message || ""}
+				projectId={projectId}
+				stage="task"
+			/>
+
+			{/* Project Resources Drawer & Document Review Modal */}
+			<ProjectDocumentsDrawer
+				isOpen={isProjectDrawerOpen}
+				onClose={() => setProjectDrawerOpen(false)}
+				projectName={projectName}
+				hasPrd={Boolean(latestPrdContent)}
+				hasAc={Boolean(hasAc || latestAcContent)}
+				onSelectDocument={(docType) => {
+					setProjectDrawerOpen(false);
+					setActiveReviewModal(docType);
+				}}
+			/>
+
+			<DocumentReviewModal
+				isOpen={activeReviewModal !== null}
+				onClose={() => setActiveReviewModal(null)}
+				type={activeReviewModal}
+				projectName={projectName}
+				content={
+					activeReviewModal === "prd"
+						? (latestPrdContent ?? null)
+						: (latestAcContent ?? null)
+				}
+			/>
+		</>
+	);
+}

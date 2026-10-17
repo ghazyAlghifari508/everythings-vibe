@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ZoomControls } from "@/components/task/zoom-controls";
+import { ZoomControls } from "@/components/ui/zoom-controls";
 import type { ProjectFeatureTree } from "@/db/schema";
 import type { TaskTree } from "@/features/greenfield/services/task-service";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";

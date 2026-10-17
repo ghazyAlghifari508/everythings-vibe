@@ -163,7 +163,7 @@ describe("generateValidatedAskQuestions", () => {
 	});
 
 	it("accepts a fenced JSON completion through the shared extractor", async () => {
-		const fenced = "```json\n" + VALID_PAYLOAD + "\n```";
+		const fenced = `\`\`\`json\n${VALID_PAYLOAD}\n\`\`\``;
 		const { collect } = collectFrom(fenced);
 		const outcome = await generateValidatedAskQuestions({
 			collect,

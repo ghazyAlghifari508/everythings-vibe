@@ -3,7 +3,7 @@
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { DeleteProjectModal } from "@/components/prd/delete-project-modal";
+import { DeleteProjectModal } from "@/features/greenfield/components/prd/delete-project-modal";
 import { useUserPlan } from "@/hooks/use-user-plan";
 import { HISTORY_PAGE_SIZE } from "@/lib/constants";
 import { parseHistoryHref, resolveHistoryUrl } from "@/lib/flow-progress";

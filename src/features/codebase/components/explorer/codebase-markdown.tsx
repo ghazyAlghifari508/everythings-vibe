@@ -8,7 +8,9 @@ import remarkGfm from "remark-gfm";
 import { z } from "zod";
 
 const Mermaid = lazy(() =>
-	import("@/components/prd/mermaid").then((m) => ({ default: m.Mermaid })),
+	import("@/features/greenfield/components/prd/mermaid").then((m) => ({
+		default: m.Mermaid,
+	})),
 );
 
 const SECTION_MARKER_INLINE_RE =

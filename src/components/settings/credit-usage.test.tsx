@@ -2,11 +2,11 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CreditExhaustedModal } from "@/components/chat/credit-exhausted-modal";
 import {
 	type CreditOperationItem,
 	CreditUsageSection,
 } from "@/components/settings/credit-usage";
+import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 
 vi.mock("@/hooks/use-user-plan", () => ({
 	useUserPlan: () => ({

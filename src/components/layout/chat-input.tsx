@@ -9,13 +9,13 @@ import {
 	Smartphone,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { CreditExhaustedModal } from "@/components/chat/credit-exhausted-modal";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import {
 	getPendingSyncPayloadKey,
 	syncPromptPayloadSchema,

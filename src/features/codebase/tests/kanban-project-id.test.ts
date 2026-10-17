@@ -122,7 +122,7 @@ describe("existing-codebase Kanban route contract", () => {
 		expect(routeSource).toContain("navigationContext=");
 		expect(routeSource).toContain('to: "/prd/$id"');
 		const boardSource = readFileSync(
-			"src/components/kanban/kanban-board.tsx",
+			"src/features/greenfield/components/kanban/kanban-board.tsx",
 			"utf8",
 		);
 		expect(boardSource).toContain('to="/codebases/$id"');

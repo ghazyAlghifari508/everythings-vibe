@@ -1,4 +1,4 @@
-import { KanbanBoard } from "@/components/kanban/kanban-board";
+import { KanbanBoard } from "@/features/greenfield/components/kanban/kanban-board";
 
 /**
  * The existing-codebase Kanban page shell for

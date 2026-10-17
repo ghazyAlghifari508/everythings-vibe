@@ -1,7 +1,7 @@
 import { AlertCircle, Hand, MousePointer2, RotateCcw } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { getCanvasDotStyle } from "@/components/task/whiteboard-canvas";
-import { ZoomControls } from "@/components/task/zoom-controls";
+import { ZoomControls } from "@/components/ui/zoom-controls";
 import type {
 	StudioFrameRow,
 	StudioJobRow,

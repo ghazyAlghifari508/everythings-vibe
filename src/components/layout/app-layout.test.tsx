@@ -139,7 +139,7 @@ describe("scrollable region contract", () => {
 		// that scrolls; otherwise the Next button can never be reached.
 		// Vite rewrites import.meta.url to a /@fs/ URL, so read from cwd.
 		const source = await readFile(
-			`${process.cwd()}/src/app/ask/ask-flow.tsx`,
+			`${process.cwd()}/src/features/greenfield/components/ask/ask-flow.tsx`,
 			"utf8",
 		);
 		expect(source).toMatch(/overflow-y-auto/);

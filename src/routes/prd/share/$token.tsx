@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { PrdViewer } from "@/components/prd/prd-viewer";
 import { Logo } from "@/components/ui/logo";
 import { db } from "@/db";
 import { prdVersions, projects } from "@/db/schema";
+import { PrdViewer } from "@/features/greenfield/components/prd/prd-viewer";
 
 // ponytail: server-only db logic - loader runs on client too, must not import db there.
 const loadSharedPrd = createServerFn({ method: "GET" })

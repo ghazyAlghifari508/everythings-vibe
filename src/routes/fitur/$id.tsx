@@ -2,10 +2,10 @@ import { createFileRoute, redirect, useLocation } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, isNull } from "drizzle-orm";
 import { useEffect } from "react";
-import { FiturDetail } from "@/components/fitur/fitur-detail";
 import { db } from "@/db";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { projects } from "@/db/schema";
+import { FiturDetail } from "@/features/greenfield/components/feature-tree/feature-tree-detail";
 import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
 import { requireUserServer } from "@/lib/session";
 

@@ -1,9 +1,9 @@
-import { FeatureMapCanvas } from "@/components/fitur/feature-map-canvas";
 import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { CodebaseDocPreview } from "@/features/codebase/components/explorer/codebase-doc-preview";
 import { CodebaseSourcePreview } from "@/features/codebase/components/explorer/codebase-source-preview";
 import { CodebaseKanbanBoard } from "@/features/codebase/components/planning/codebase-kanban-board";
+import { FeatureMapCanvas } from "@/features/greenfield/components/feature-tree/feature-map-canvas";
 import type { useKanbanTasks } from "@/features/greenfield/hooks/use-kanban-polling";
 import type { TaskTree } from "@/features/greenfield/services/task-service";
 import type { SourcePreviewState } from "../../types/source-preview";

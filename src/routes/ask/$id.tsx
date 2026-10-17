@@ -2,10 +2,10 @@ import { createFileRoute, redirect, useLocation } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { useEffect } from "react";
-import { AskFlow } from "@/app/ask/ask-flow";
 import { db } from "@/db";
 import { codebaseAnalyses, prdVersions, projects } from "@/db/schema";
 import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
+import { AskFlow } from "@/features/greenfield/components/ask/ask-flow";
 import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
 import { requireUserServer } from "@/lib/session";
 

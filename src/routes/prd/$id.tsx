@@ -2,9 +2,9 @@ import { createFileRoute, redirect, useLocation } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { useEffect } from "react";
-import { PrdDetail } from "@/components/prd/prd-detail";
 import { db } from "@/db";
 import { conversations, messages, prdVersions, projects } from "@/db/schema";
+import { PrdDetail } from "@/features/greenfield/components/prd/prd-detail";
 import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
 import { getUserPlanAndQuota, requireUserServer } from "@/lib/session";
 
