@@ -4,19 +4,19 @@ import { describe, expect, test } from "vitest";
 import {
 	buildExportPlanCommand,
 	buildPlanHandoffPrompt,
-} from "./codebase-chat-workspace";
+} from "../components/chat/codebase-chat-workspace";
 import {
 	type ExplorerFileEntry,
 	filterExplorerFiles,
-} from "./codebase-explorer-sidebar";
-import { formatFileSize } from "./codebase-file-card";
-import { getCodebaseKanbanProgress } from "./codebase-kanban-board";
+} from "../components/explorer/codebase-explorer-sidebar";
+import { formatFileSize } from "../components/explorer/codebase-file-card";
 import {
 	CodebaseMarkdown,
 	parseVersionRows,
 	selectLatestVersionContent,
 	stripInternalSectionMarkers,
-} from "./codebase-markdown";
+} from "../components/explorer/codebase-markdown";
+import { getCodebaseKanbanProgress } from "../components/planning/codebase-kanban-board";
 
 function renderMarkdown(content: string): string {
 	return renderToStaticMarkup(createElement(CodebaseMarkdown, { content }));

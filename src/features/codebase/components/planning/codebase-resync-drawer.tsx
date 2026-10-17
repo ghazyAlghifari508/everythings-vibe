@@ -12,7 +12,7 @@ import {
 } from "@/features/codebase/services/sync";
 import { copyToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
-import { SyncStageList } from "./sync-stage-list";
+import { SyncStageList } from "../workspace/sync-stage-list";
 
 interface CodebaseResyncDrawerProps {
 	isOpen: boolean;

@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import type { SyncStatusResponse } from "@/features/codebase/services/sync";
-import { CodebaseConclusion } from "./codebase-conclusion";
+import { CodebaseConclusion } from "../components/planning/codebase-conclusion";
 
 const OUTPUT = {
 	projectId: "proj_conclusion_1",

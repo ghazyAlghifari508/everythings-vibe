@@ -1,6 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
-import { formatCodebaseSyncBadge } from "../utils/workspace-contracts";
+import { formatCodebaseSyncBadge } from "../../utils/workspace-contracts";
 
 export function WorkspaceHeader({
 	name,

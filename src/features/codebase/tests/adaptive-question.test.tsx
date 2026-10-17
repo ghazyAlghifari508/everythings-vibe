@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AdaptiveQuestion } from "@/features/codebase/services/chat-flow";
-import { CodebaseAdaptiveQuestion } from "./codebase-adaptive-question";
+import { CodebaseAdaptiveQuestion } from "../components/chat/codebase-adaptive-question";
 
 describe("CodebaseAdaptiveQuestion Component", () => {
 	afterEach(() => {

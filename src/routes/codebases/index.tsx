@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { CodebaseLibraryView } from "@/components/codebase/codebase-library-view";
+import { CodebaseLibraryView } from "@/features/codebase/components/planning/codebase-library-view";
 import {
 	buildCodebaseLibraryItems,
 	type CodebaseLibraryItem,

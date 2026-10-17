@@ -28,12 +28,12 @@ import type {
 	ArtifactKind,
 	WorkspaceView,
 } from "@/features/codebase/services/workspace-hydration";
-import { CodebaseAdaptiveQuestion } from "./codebase-adaptive-question";
 import {
 	type CodebaseArtifactRef,
 	CodebaseFileCard,
-} from "./codebase-file-card";
-import { CodebaseStageHandoff } from "./codebase-stage-handoff";
+} from "../explorer/codebase-file-card";
+import { CodebaseStageHandoff } from "../workspace/codebase-stage-handoff";
+import { CodebaseAdaptiveQuestion } from "./codebase-adaptive-question";
 
 export type { AdaptiveQuestion, AdaptiveQuestionOption };
 

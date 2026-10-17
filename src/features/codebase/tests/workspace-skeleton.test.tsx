@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodebaseDetailPending, Route } from "@/routes/codebases/$id";
-import { CodebaseWorkspaceSkeleton } from "./codebase-workspace-skeleton";
+import { CodebaseWorkspaceSkeleton } from "../components/workspace/codebase-workspace-skeleton";
 
 let container: HTMLDivElement;
 let root: Root | null = null;

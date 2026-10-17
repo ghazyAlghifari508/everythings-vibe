@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CodebaseDocPreview } from "./codebase-doc-preview";
+import { CodebaseDocPreview } from "../components/explorer/codebase-doc-preview";
 
 let container: HTMLDivElement;
 let root: Root | null = null;

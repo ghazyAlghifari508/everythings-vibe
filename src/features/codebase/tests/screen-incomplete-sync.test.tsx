@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScreenIncompleteSync } from "./screen-incomplete-sync";
+import { ScreenIncompleteSync } from "../components/workspace/screen-incomplete-sync";
 
 afterEach(() => {
 	cleanup();

@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CodebaseArtifactCanvas } from "./codebase-artifact-canvas";
+import { CodebaseArtifactCanvas } from "../components/explorer/codebase-artifact-canvas";
 
 let container: HTMLDivElement;
 let root: Root | null = null;

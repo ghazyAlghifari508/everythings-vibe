@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ChatStreamMessage } from "@/components/codebase/codebase-chat-workspace";
+import type { ChatStreamMessage } from "@/features/codebase/components/chat/codebase-chat-workspace";
 import {
 	type CodebasePipelineStage,
 	type CodebaseRunState,

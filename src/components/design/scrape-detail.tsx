@@ -10,7 +10,7 @@ import {
 	RotateCw,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CodebaseSourcePreview } from "@/components/codebase/codebase-source-preview";
+import { CodebaseSourcePreview } from "@/features/codebase/components/explorer/codebase-source-preview";
 import type { ScrapePreviewState } from "@/hooks/use-scrape-preview";
 import {
 	SCRAPE_DESKTOP_HEIGHT,

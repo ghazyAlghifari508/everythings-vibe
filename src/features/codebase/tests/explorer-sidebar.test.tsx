@@ -12,7 +12,7 @@ import {
 	filterExplorerFiles,
 	sortTreeNodes,
 	type TreeNode,
-} from "./codebase-explorer-sidebar";
+} from "../components/explorer/codebase-explorer-sidebar";
 
 const nestedTreeFiles: ExplorerFileEntry[] = [
 	{ path: "src/pages/PortfolioPage.tsx" },

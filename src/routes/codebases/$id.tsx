@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { CodebaseWorkspaceSkeleton } from "@/components/codebase/codebase-workspace-skeleton";
-import { CodebaseDetailPage } from "@/features/codebase/components/codebase-detail-page";
+import { CodebaseDetailPage } from "@/features/codebase/components/workspace/codebase-detail-page";
+import { CodebaseWorkspaceSkeleton } from "@/features/codebase/components/workspace/codebase-workspace-skeleton";
 import { loadCodebase } from "@/features/codebase/services/workspace-loader.functions";
 import { decideCodebaseDetailEntry } from "@/features/codebase/utils/workspace-contracts";
 

@@ -6,7 +6,7 @@ import type {
 	SyncPromptPayload,
 	SyncStatusResponse,
 } from "@/features/codebase/services/sync";
-import { CodebaseResyncDrawer } from "./codebase-resync-drawer";
+import { CodebaseResyncDrawer } from "../components/planning/codebase-resync-drawer";
 
 const samplePayload: SyncPromptPayload = {
 	projectId: "cb_resync_123",

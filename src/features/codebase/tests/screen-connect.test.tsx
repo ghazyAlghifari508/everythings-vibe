@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SyncPromptPayload } from "@/features/codebase/services/sync";
-import { ScreenConnect } from "./screen-connect";
+import { ScreenConnect } from "../components/workspace/screen-connect";
 
 const samplePayload: SyncPromptPayload = {
 	projectId: "proj_123",

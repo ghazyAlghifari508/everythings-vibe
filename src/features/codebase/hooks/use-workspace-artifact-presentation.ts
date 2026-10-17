@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
-import type { CodebaseArtifactRef } from "@/components/codebase/codebase-file-card";
-import { stripInternalSectionMarkers } from "@/components/codebase/codebase-markdown";
 import type { ProjectFeatureTree } from "@/db/schema";
+import type { CodebaseArtifactRef } from "@/features/codebase/components/explorer/codebase-file-card";
+import { stripInternalSectionMarkers } from "@/features/codebase/components/explorer/codebase-markdown";
 import {
 	artifactMimeTypeFor,
 	downloadArtifact,

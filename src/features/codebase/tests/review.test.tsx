@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
-import { CodebaseReview } from "./codebase-review";
+import { CodebaseReview } from "../components/planning/codebase-review";
 
 const analysis: CodebaseAnalysis = {
 	projectId: "proj_123",

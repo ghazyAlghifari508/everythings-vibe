@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CodebaseConclusion } from "@/components/codebase/codebase-conclusion";
-import { ScreenConnect } from "@/components/codebase/screen-connect";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { CodebaseConclusion } from "@/features/codebase/components/planning/codebase-conclusion";
+import { ScreenConnect } from "@/features/codebase/components/workspace/screen-connect";
 import { useCodebaseSyncStatus } from "@/features/codebase/hooks/use-codebase-sync-status";
 import {
 	type AnalysisResponse,

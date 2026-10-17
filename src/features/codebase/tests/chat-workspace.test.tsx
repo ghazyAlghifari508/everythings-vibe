@@ -11,7 +11,7 @@ import {
 import {
 	type AdaptiveQuestion,
 	CodebaseChatWorkspace,
-} from "./codebase-chat-workspace";
+} from "../components/chat/codebase-chat-workspace";
 
 let container: HTMLDivElement;
 let root: Root | null = null;

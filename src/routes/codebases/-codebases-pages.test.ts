@@ -5,7 +5,7 @@ import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 function readWorkspaceSource() {
 	return [
 		"src/routes/codebases/$id.tsx",
-		"src/features/codebase/components/codebase-detail-page.tsx",
+		"src/features/codebase/components/workspace/codebase-detail-page.tsx",
 		"src/features/codebase/hooks/use-codebase-workspace.ts",
 	]
 		.map((path) => readFileSync(path, "utf8"))
@@ -457,7 +457,7 @@ describe("codebase library readiness vs workspace availability", () => {
 
 describe("codebase detail incomplete sync handling", () => {
 	const detailSource = readFileSync(
-		"src/features/codebase/components/workspace-connection-screen.tsx",
+		"src/features/codebase/components/workspace/workspace-connection-screen.tsx",
 		"utf8",
 	);
 
@@ -470,7 +470,7 @@ describe("codebase detail incomplete sync handling", () => {
 		expect(detailSource).toContain('startSession("retry")');
 		expect(detailSource).toContain("ScreenIncompleteSync");
 		const component = readFileSync(
-			"src/components/codebase/screen-incomplete-sync.tsx",
+			"src/features/codebase/components/workspace/screen-incomplete-sync.tsx",
 			"utf8",
 		);
 		expect(component).toContain("Repository belum selesai disinkronkan");
@@ -745,7 +745,7 @@ describe("codebase detail pending skeleton fidelity", () => {
 
 	it("does not render generic max-w-4xl centered card or h-64 box in pending skeleton", () => {
 		const skeletonSource = readFileSync(
-			"src/components/codebase/codebase-workspace-skeleton.tsx",
+			"src/features/codebase/components/workspace/codebase-workspace-skeleton.tsx",
 			"utf8",
 		);
 		expect(skeletonSource).not.toContain("max-w-4xl");
@@ -851,7 +851,7 @@ describe("read-only source preview contract", () => {
 		expect(detailSource.split("!isSourcePreviewOpen &&").length - 1).toBe(1);
 		expect(
 			readFileSync(
-				"src/features/codebase/components/workspace-screen-resolver.tsx",
+				"src/features/codebase/components/workspace/workspace-screen-resolver.tsx",
 				"utf8",
 			),
 		).toContain("<CodebaseSourcePreview");

@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SyncStatusResponse } from "@/features/codebase/services/sync";
-import { SyncStageList } from "./sync-stage-list";
+import { SyncStageList } from "../components/workspace/sync-stage-list";
 
 /**
  * The sync screen's honest-progress contract.

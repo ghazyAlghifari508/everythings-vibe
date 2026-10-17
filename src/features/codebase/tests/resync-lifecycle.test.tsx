@@ -9,7 +9,7 @@ import {
 	type SyncPromptPayload,
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
-import { CodebaseResyncDrawer } from "./codebase-resync-drawer";
+import { CodebaseResyncDrawer } from "../components/planning/codebase-resync-drawer";
 
 let container: HTMLDivElement;
 let root: Root | null = null;

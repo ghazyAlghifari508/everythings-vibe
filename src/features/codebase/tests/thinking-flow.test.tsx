@@ -14,7 +14,7 @@ import {
 	startRun,
 } from "@/features/codebase/services/chat-flow";
 import { consumeSseStream } from "@/lib/sse-consume";
-import { CodebaseChatWorkspace } from "./codebase-chat-workspace";
+import { CodebaseChatWorkspace } from "../components/chat/codebase-chat-workspace";
 
 afterEach(() => {
 	cleanup();

@@ -16,7 +16,7 @@ import {
 } from "@/features/codebase/services/plan-storage";
 import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/lib/constants";
 import { useUIStore } from "@/store";
-import { CodebaseLibraryView } from "./codebase-library-view";
+import { CodebaseLibraryView } from "../components/planning/codebase-library-view";
 
 vi.mock("@tanstack/react-router", () => ({
 	useRouter: () => ({ invalidate: vi.fn() }),

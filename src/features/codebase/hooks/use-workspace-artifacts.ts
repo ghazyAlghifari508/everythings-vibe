@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ProjectFeatureTree } from "@/db/schema";
 import {
 	parseVersionRows,
 	selectLatestVersionContent,
-} from "@/components/codebase/codebase-markdown";
-import type { ProjectFeatureTree } from "@/db/schema";
+} from "@/features/codebase/components/explorer/codebase-markdown";
 import {
 	loadFeatureTree,
 	loadTaskTree,

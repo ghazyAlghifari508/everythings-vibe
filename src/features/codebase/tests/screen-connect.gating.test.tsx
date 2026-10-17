@@ -6,7 +6,7 @@ import type {
 	SyncPromptPayload,
 	SyncStatusResponse,
 } from "@/features/codebase/services/sync";
-import { ScreenConnect } from "./screen-connect";
+import { ScreenConnect } from "../components/workspace/screen-connect";
 
 const samplePayload: SyncPromptPayload = {
 	projectId: "proj_gate_1",

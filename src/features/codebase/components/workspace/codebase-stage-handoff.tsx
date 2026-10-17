@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import {
 	type CodebaseArtifactRef,
 	CodebaseFileCard,
-} from "./codebase-file-card";
+} from "../explorer/codebase-file-card";
 
 /**
  * The artifact a finished stage produced, plus the file the user can open.

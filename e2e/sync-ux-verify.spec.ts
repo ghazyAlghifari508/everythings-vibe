@@ -18,7 +18,7 @@ const MOUNT_SCRIPT = `(async () => {
   const React = (await import("/@id/react")).default;
   // CJS interop: the namespace is exposed on \`default\`.
   const { createRoot } = (await import("/@id/react-dom/client")).default;
-  const { ScreenConnect } = await import("/src/components/codebase/screen-connect.tsx");
+  const { ScreenConnect } = await import("/src/features/codebase/components/workspace/screen-connect.tsx");
 
   const connectRoot = document.createElement("div");
   connectRoot.id = "verify-connect";
@@ -59,7 +59,7 @@ const MOUNT_SCRIPT = `(async () => {
 const MOUNT_PRESTART_SCRIPT = `(async () => {
   const React = (await import("/@id/react")).default;
   const { createRoot } = (await import("/@id/react-dom/client")).default;
-  const { ScreenConnect } = await import("/src/components/codebase/screen-connect.tsx");
+  const { ScreenConnect } = await import("/src/features/codebase/components/workspace/screen-connect.tsx");
 
   const connectRoot = document.createElement("div");
   connectRoot.id = "verify-prestart";
@@ -107,7 +107,7 @@ async function mountPrestart(page: import("@playwright/test").Page) {
 const MOUNT_FAILED_SCRIPT = `(async () => {
   const React = (await import("/@id/react")).default;
   const { createRoot } = (await import("/@id/react-dom/client")).default;
-  const { ScreenConnect } = await import("/src/components/codebase/screen-connect.tsx");
+  const { ScreenConnect } = await import("/src/features/codebase/components/workspace/screen-connect.tsx");
 
   const connectRoot = document.createElement("div");
   connectRoot.id = "verify-failed";

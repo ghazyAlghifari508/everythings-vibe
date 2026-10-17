@@ -94,11 +94,14 @@ vi.mock("@/hooks/use-kanban-polling", () => ({
 	}),
 }));
 
-vi.mock("@/components/codebase/codebase-workspace-shell", () => ({
-	CodebaseWorkspaceShell: ({ chatPane }: { chatPane: ReactNode }) => (
-		<>{chatPane}</>
-	),
-}));
+vi.mock(
+	"@/features/codebase/components/workspace/codebase-workspace-shell",
+	() => ({
+		CodebaseWorkspaceShell: ({ chatPane }: { chatPane: ReactNode }) => (
+			<>{chatPane}</>
+		),
+	}),
+);
 
 import "./$id";
 

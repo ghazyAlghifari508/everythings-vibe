@@ -114,11 +114,11 @@ describe("CodebaseStepNav onboarding shape", () => {
 
 describe("onboarding sources carry one sync progress surface", () => {
 	const screenConnect = readFileSync(
-		"src/components/codebase/screen-connect.tsx",
+		"src/features/codebase/components/workspace/screen-connect.tsx",
 		"utf8",
 	);
 	const stageList = readFileSync(
-		"src/components/codebase/sync-stage-list.tsx",
+		"src/features/codebase/components/workspace/sync-stage-list.tsx",
 		"utf8",
 	);
 	const planPage = readFileSync("src/routes/plan/codebase.tsx", "utf8");

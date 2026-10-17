@@ -10,12 +10,12 @@ import {
 	Terminal,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { LibraryPagination } from "@/components/codebase/library-pagination";
+import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { LibraryPagination } from "@/features/codebase/components/planning/library-pagination";
 import {
 	ProjectActionsMenu,
 	readServerErrorMessage,
-} from "@/components/codebase/project-actions-menu";
-import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+} from "@/features/codebase/components/planning/project-actions-menu";
 import {
 	CODEBASE_LIBRARY_LABEL,
 	type CodebaseLibraryItem,

@@ -1,6 +1,6 @@
-import { ScreenConnect } from "@/components/codebase/screen-connect";
-import { ScreenIncompleteSync } from "@/components/codebase/screen-incomplete-sync";
-import type { useCodebaseSync } from "../hooks/use-codebase-sync";
+import { ScreenConnect } from "@/features/codebase/components/workspace/screen-connect";
+import { ScreenIncompleteSync } from "@/features/codebase/components/workspace/screen-incomplete-sync";
+import type { useCodebaseSync } from "../../hooks/use-codebase-sync";
 
 type ConnectionState = Pick<
 	ReturnType<typeof useCodebaseSync>,

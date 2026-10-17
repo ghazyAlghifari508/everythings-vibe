@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
-import { CodebaseKanbanBoard } from "./codebase-kanban-board";
+import { CodebaseKanbanBoard } from "../components/planning/codebase-kanban-board";
 
 declare global {
 	var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
