@@ -654,10 +654,10 @@ Di repositori ini, prefix `-` digunakan untuk menaruh file test langsung di sebe
 
 - [ ] **Fase 1: Scaffolding Direktori Fitur (`src/features/`):**
   - [ ] Buat struktur dasar `src/features/greenfield/`, `src/features/codebase/`, `src/features/studio/`, `src/features/scrape/`, `src/features/billing/`, `src/features/templates/`.
-- [ ] **Fase 2: Migrasi Domain Codebase:**
-  - [ ] Pindahkan komponen `src/components/codebase/*` ke `src/features/codebase/components/`.
-  - [ ] Pindahkan helpers `src/lib/codebase-*` ke `src/features/codebase/services/`.
-  - [ ] Pindahkan file test `-codebase-*.test.tsx` dari `src/routes/plan/` ke `src/features/codebase/tests/`.
+- [x] **Fase 2: Migrasi Domain Codebase:**
+  - [x] Pindahkan komponen `src/components/codebase/*` ke `src/features/codebase/components/`.
+  - [x] Pindahkan helpers `src/lib/codebase-*` ke `src/features/codebase/services/`.
+  - [x] Pindahkan file test `-codebase-*.test.tsx` dari `src/routes/plan/` ke `src/features/codebase/tests/`.
 - [ ] **Fase 3: Migrasi Domain Greenfield:**
   - [ ] Pindahkan komponen `prd/`, `ac/`, `task/`, `kanban/`, `ask/`, `fitur/` ke `src/features/greenfield/components/`.
   - [ ] Pindahkan services `prd-service.ts`, `ac-service.ts`, `task-service.ts` ke `src/features/greenfield/services/`.
