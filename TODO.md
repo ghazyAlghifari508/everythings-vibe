@@ -507,7 +507,7 @@ Sebelum migrasi dilakukan, setiap risiko kompatibilitas wajib diaudit dan diveri
 
 - [ ] **Audit Scripts &amp; Referensi Eksplisit Node.js:**
   - [ ] Periksa script `package.json`: `"dev": "node --dns-result-order=ipv4first node_modules/vite/bin/vite.js dev --port 3000"`. Evaluasi penggantian dengan `bun --bun vite dev` atau `bun run vite dev`.
-  - [ ] Periksa referensi `process.execPath`, `node:child_process` (misal `spawn` di `src/lib/services/scrape-dev-all.ts` dan test runner), serta `node:worker_threads` (di `src/lib/crawl-url-filter.ts`).
+  - [ ] Periksa referensi `process.execPath`, `node:child_process` (misal `spawn` di `src/features/scrape/services/scrape-dev-all.ts` dan test runner), serta `node:worker_threads` (di `src/features/scrape/utils/crawl-url-filter.ts`).
   - [ ] Periksa modul utilitas Node.js: `node:crypto` (`createHash`, `createHmac`, `randomBytes`, `timingSafeEqual`), `node:timers/promises`, `node:util` (`isDeepStrictEqual`), serta modul jaringan `node:net` dan `node:dns/promises` (SSRF protection di `render-page.ts` dan `url-validator.ts`).
 - [ ] **TanStack Start &amp; Vite Compatibility:**
   - [ ] Verifikasi kompatibilitas SSR handler TanStack Start di bawah runtime Bun (apakah Nitro/Vinxi server adapter berjalan mulus).
@@ -665,11 +665,11 @@ Di repositori ini, prefix `-` digunakan untuk menaruh file test langsung di sebe
   - [x] Pindahkan komponen `src/components/design/studio-*` ke `src/features/studio/components/`.
   - [x] Pindahkan services `studio-service.ts`, `studio-design-blueprint.ts`, `studio-export.ts` ke `src/features/studio/services/`.
   - [x] Pindahkan file test `-studio.*.test.tsx` dari `src/routes/` ke `src/features/studio/tests/`.
-- [ ] **Fase 5: Migrasi Domain VibeScrape (Web Scraping &amp; Extraction):**
-  - [ ] Pindahkan komponen `src/components/design/scrape-*` dan `html-scraper*.tsx` ke `src/features/scrape/components/`.
-  - [ ] Pindahkan hooks `use-scrape-status.ts` dan `use-scrape-preview.ts` ke `src/features/scrape/hooks/`.
-  - [ ] Pindahkan logic scraping, crawling, dan worker (`scrape-service.ts`, `scrape-job-service.ts`, `scrape-worker.ts`, `crawl-website.ts`) ke `src/features/scrape/services/`.
-  - [ ] Pindahkan file test `-scrap.*.test.tsx` dari `src/routes/design/` dan `-scrape.*.test.ts` dari `src/routes/api/` ke `src/features/scrape/tests/`.
+- [x] **Fase 5: Migrasi Domain VibeScrape (Web Scraping &amp; Extraction):**
+  - [x] Pindahkan komponen `src/components/design/scrape-*` dan `html-scraper*.tsx` ke `src/features/scrape/components/` (file lama tersisa sebagai re-export shim).
+  - [x] Pindahkan hooks `use-scrape-status.ts` dan `use-scrape-preview.ts` ke `src/features/scrape/hooks/` (file lama tersisa sebagai re-export shim).
+  - [x] Pindahkan logic scraping, crawling, dan worker (`scrape-service.ts`, `scrape-job-service.ts`, `scrape-worker.ts`, `crawl-website.ts`) ke `src/features/scrape/services/`.
+  - [x] Pindahkan file test `-scrap.*.test.tsx` dari `src/routes/design/` dan `-scrape.*.test.ts` dari `src/routes/api/` ke `src/features/scrape/tests/`.
 - [ ] **Fase 6: Pembersihan `src/routes/` (Thin Routes Only) &amp; Route Separation:**
   - [ ] Pastikan setiap file di `src/routes/` hanya bertindak sebagai wire up (mengambil params/search params, memanggil loader/query, lalu me-render View dari `src/features/`).
   - [ ] Pisahkan namespace routing VibeScrape (`/scrape/*`) dari VibeDesign Studio (`/design/studio/*`) dengan redirect backward-compatibility.
