@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-	AI_AGENT_PROMPT_TEMPLATE,
-	shouldConfirmReset,
-} from "@/features/greenfield/components/task/implementation-options";
+import { AI_AGENT_PROMPT_TEMPLATE } from "@/features/greenfield/components/task/ai-agent-prompt-template";
+import { shouldConfirmReset } from "@/features/greenfield/components/task/implementation-options";
 
 describe("shouldConfirmReset", () => {
 	it("asks for confirmation when progress exists", () => {
