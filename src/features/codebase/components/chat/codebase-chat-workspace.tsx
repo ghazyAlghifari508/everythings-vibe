@@ -1,202 +1,50 @@
 "use client";
 
+import { useState } from "react";
 import {
-	AlertTriangle,
-	ArrowRight,
-	Check,
-	Copy,
-	Layers,
-	RotateCcw,
-} from "lucide-react";
-import { type ReactNode, useState } from "react";
-import { AgentThinking } from "@/components/ui/agent-thinking";
-import { PromptBar } from "@/components/ui/prompt-bar";
-import type { CodebaseStarterSuggestion } from "@/features/codebase/services/analysis";
-import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
-import {
-	type AdaptiveQuestion,
-	type AdaptiveQuestionOption,
 	areAllQuestionsAnswered,
-	CODEBASE_STAGE_DONE_LABEL,
 	type CodebasePipelineStage,
-	type CodebaseRunState,
 	nextQuestionIndex,
 } from "@/features/codebase/services/chat-flow";
-import { resolveCodebaseDisplayName } from "@/features/codebase/services/naming";
-import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
-import type {
-	ArtifactKind,
-	WorkspaceView,
-} from "@/features/codebase/services/workspace-hydration";
+import type { WorkspaceView } from "@/features/codebase/services/workspace-hydration";
 import {
-	type CodebaseArtifactRef,
-	CodebaseFileCard,
-} from "../explorer/codebase-file-card";
-import { CodebaseStageHandoff } from "../workspace/codebase-stage-handoff";
-import { CodebaseAdaptiveQuestion } from "./codebase-adaptive-question";
+	CodebaseChatWorkspaceArtifactStream,
+	CodebaseChatWorkspaceArtifactsFailed,
+} from "./codebase-chat-workspace-artifacts";
+import { CodebaseChatWorkspaceComposer } from "./codebase-chat-workspace-composer";
+import {
+	CodebaseChatWorkspaceSpecError,
+	CodebaseChatWorkspaceStageError,
+} from "./codebase-chat-workspace-error-rows";
+import {
+	buildExportPlanCommand,
+	buildPlanHandoffPrompt,
+	CodebaseChatWorkspaceHandoffCard,
+} from "./codebase-chat-workspace-handoff";
+import { CodebaseChatWorkspaceHeader } from "./codebase-chat-workspace-header";
+import { CodebaseChatWorkspaceMessages } from "./codebase-chat-workspace-messages";
+import { CodebaseChatWorkspacePristine } from "./codebase-chat-workspace-pristine";
+import type { CodebaseChatWorkspaceProps } from "./codebase-chat-workspace-props";
+import {
+	CodebaseChatWorkspaceQuestions,
+	CodebaseChatWorkspaceQuestionsComplete,
+} from "./codebase-chat-workspace-questions";
+import { CodebaseChatWorkspaceStageHandoffs } from "./codebase-chat-workspace-stage-handoffs";
+import {
+	CodebaseChatWorkspaceLoading,
+	CodebaseChatWorkspacePlanSelection,
+	CodebaseChatWorkspacePlanUnavailable,
+} from "./codebase-chat-workspace-view-states";
 
-export type { AdaptiveQuestion, AdaptiveQuestionOption };
-
-/** Human label per run stage, used in the Thinking headline. */
-const STAGE_LABEL: Record<CodebaseRunState["stage"], string> = {
-	questions: "pertanyaan klarifikasi",
-	feature: "spesifikasi fitur",
-	prd: "PRD",
-	ac: "Acceptance Criteria",
-	task: "task",
-};
-
-/** Human label per artifact, used when reporting which artifact failed to load. */
-const ARTIFACT_LABEL: Record<ArtifactKind, string> = {
-	feature: "spesifikasi fitur",
-	prd: "PRD",
-	ac: "Acceptance Criteria",
-	tasks: "task",
-};
-
-function artifactLabel(kind: ArtifactKind): string {
-	return ARTIFACT_LABEL[kind];
-}
-
-export interface ChatStreamMessage {
-	id: string;
-	role: "user" | "assistant";
-	content: string;
-}
+export type {
+	AdaptiveQuestion,
+	AdaptiveQuestionOption,
+} from "@/features/codebase/services/chat-flow";
+export type { ChatStreamMessage } from "./codebase-chat-workspace-messages";
+export { buildExportPlanCommand, buildPlanHandoffPrompt };
 
 /** Workspace pipeline position; the canonical union lives in the flow module. */
 export type PipelineStage = CodebasePipelineStage;
-
-interface CodebaseChatWorkspaceProps {
-	featureName: string;
-	/**
-	 * What the workspace is allowed to show. Supplied by the route from the
-	 * resolved plan plus the real per-artifact hydration statuses, so a pending
-	 * or failed read can never render as an empty repository. Omitted by callers
-	 * that only render the workspace body, which then derives it from the props
-	 * below.
-	 */
-	view?: WorkspaceView;
-	/** Plan switcher, rendered in the header when the repository has several plans. */
-	planSwitcher?: ReactNode;
-	contextFiles?: string[];
-	fileCount?: number;
-	kanbanProgress?: { done: number; total: number; pct: number } | null;
-	messages: ChatStreamMessage[];
-	questions: AdaptiveQuestion[];
-	answers: Record<string, string>;
-	/**
-	 * The single in-flight or settled AI request for this workspace, with the
-	 * wall-clock start, the real settle time, and the model's own streamed
-	 * reasoning. One run renders one ThoughtLine — the question stage and the
-	 * Feature/PRD/AC/Task stages share it instead of stacking indicators.
-	 */
-	run?: CodebaseRunState | null;
-	artifacts?: CodebaseArtifactRef[];
-	activeArtifactId?: string | null;
-	projectIdForHandoff?: string | null;
-	stage?: PipelineStage;
-	stageBusy?: PipelineStage | null;
-	stageError?: string | null;
-	/**
-	 * True while the task read has not settled, so the workspace cannot yet
-	 * prove whether tasks already exist. The Task CTA stays hidden until the
-	 * read says tasks are genuinely absent, because offering "Buat Task" before
-	 * that would invite regenerating work that is already in the database.
-	 */
-	tasksUnresolved?: boolean;
-	codebaseName?: string;
-	starterSuggestions?: CodebaseStarterSuggestion[];
-	starterRefresh?: {
-		analysisId: string;
-		snapshotId: string;
-		status: "pending" | "ready" | "failed";
-		isRefreshing?: boolean;
-		error?: string | null;
-	};
-	/**
-	 * A newer analysis attempt for the same snapshot failed while the starter
-	 * cards still come from an earlier ready analysis. Shown so the failure is
-	 * not hidden by the cards.
-	 */
-	newerAttemptFailure?: { errorMessage: string | null } | null;
-	isSending?: boolean;
-	isConfirming?: boolean;
-	specError?: string | null;
-	onOpenArtifact?: (artifact: CodebaseArtifactRef) => void;
-	onDownloadArtifact?: (artifact: CodebaseArtifactRef) => void;
-	onSubmitAnswer?: (questionId: string, answer: string) => void;
-	onSendMessage?: (message: string) => void;
-	/**
-	 * What the next message means. The route derives it from the workspace
-	 * state: a message in a user-facing plan revises or clarifies that plan,
-	 * and only the explicit "Buat fitur baru" action starts a new one. The
-	 * composer never asks the user to choose.
-	 */
-	composerMode?: CodebaseComposerMode;
-	/** Name of the plan the next message targets. Null while creating. */
-	composerTargetName?: string | null;
-	/** Copy describing a revision's impact on existing tasks. */
-	revisionImpactNotice?: string | null;
-	/**
-	 * The snapshot the existing planning was generated against, and the newest
-	 * usable snapshot. A difference means the repository moved on after the plan
-	 * was written, which is reported as "review this plan" — nothing is ever
-	 * regenerated automatically.
-	 */
-	planningSnapshotId?: string | null;
-	currentSnapshotId?: string | null;
-	onReviewPlan?: () => void;
-	onConfirmGenerate?: () => void;
-	onRetryQuestions?: () => void;
-	onRetryGenerate?: () => void;
-	onRetryStage?: () => void;
-	onGeneratePrd?: () => void;
-	onGenerateAc?: () => void;
-	onGenerateTask?: () => void;
-	onRefreshStarterSuggestions?: (
-		analysisId: string,
-		snapshotId: string,
-	) => void;
-}
-
-export function buildExportPlanCommand(projectId: string): string {
-	return `npx vibeeverything export plan ${projectId.trim()} --root .`;
-}
-
-/**
- * The one copy-pasteable handoff for an AI coding agent.
- *
- * The agent is told to read the repository's own rules, confirm it is in the
- * right repository, export the plan through the CLI, and then read the written
- * documents instead of being handed the PRD inline. The real project id is
- * embedded so the export resolves this exact feature plan; no credential or
- * placeholder appears anywhere in the text.
- */
-export function buildPlanHandoffPrompt(
-	projectId: string,
-	codebaseName: string | null,
-): string {
-	const id = projectId.trim();
-	const repository = codebaseName?.trim();
-	return [
-		"Kamu mengerjakan satu feature plan VibeEverything di repository ini.",
-		"",
-		"1. Baca AGENTS.md dan file aturan agent lain di repository ini, lalu pahami arsitektur, konvensi, dan perintah verifikasi yang berlaku sebelum mengubah apa pun.",
-		repository
-			? `2. Pastikan kamu berada di repository ${repository}. Kalau bukan, berhenti dan konfirmasi dulu.`
-			: "2. Pastikan kamu berada di repository yang benar. Kalau ragu, berhenti dan konfirmasi dulu.",
-		`3. Jalankan perintah ini dari root repository untuk menulis planning ke docs/vibeplan/: ${buildExportPlanCommand(id)}`,
-		"4. Baca docs/vibeplan/manifest.json, lalu baca seluruh file planning untuk fitur tersebut: feature.md, PRD.md, AC.md, dan tasks.json.",
-		"5. Analisis implementasi yang sudah ada di repository sebelum menulis kode. Jangan membuat ulang PRD, jangan menambah scope di luar dokumen, dan jangan mengganti arsitektur yang sudah berjalan.",
-		"6. Kerjakan task sesuai urutan dan dependency di tasks.json, dan penuhi Acceptance Criteria yang relevan untuk setiap task.",
-		"7. Verifikasi hasilnya terhadap PRD dan AC sebelum menandai task selesai.",
-		`8. Perbarui status task lewat CLI, bukan dengan mengedit tasks.json manual: \`npx vibeeverything task next ${id}\` untuk melihat task berikutnya, lalu \`npx vibeeverything task update <taskId> --status in_progress\` / \`--status completed\`, dan \`npx vibeeverything subtask update <taskId> --index <i> --status <status>\` untuk subtask. Kanban di workspace ikut terbarui.`,
-		"9. Ikuti aturan repository untuk testing, commit, dan push. Jangan commit atau push kalau repository ini melarangnya.",
-		"",
-		`Project ID: ${id}`,
-	].join("\n");
-}
 
 export function CodebaseChatWorkspace({
 	featureName,
@@ -248,11 +96,6 @@ export function CodebaseChatWorkspace({
 	const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
 		null,
 	);
-	const parsedStarterSuggestions =
-		codebaseStarterSuggestionsSchema.safeParse(starterSuggestions);
-	const validStarterSuggestions = parsedStarterSuggestions.success
-		? parsedStarterSuggestions.data
-		: null;
 
 	const exportCmd = projectIdForHandoff
 		? buildExportPlanCommand(projectIdForHandoff)
@@ -306,6 +149,14 @@ export function CodebaseChatWorkspace({
 		}
 	};
 
+	const handleEditQuestion = (questionId: string) =>
+		setEditingQuestionId(questionId);
+	const handleCancelEditQuestion = () => setEditingQuestionId(null);
+	const handleSubmitAnswer = (questionId: string, answer: string) => {
+		setEditingQuestionId(null);
+		onSubmitAnswer?.(questionId, answer);
+	};
+
 	const currentIndex = nextQuestionIndex(answers, questions);
 	const visibleQuestions =
 		questions.length === 0
@@ -314,34 +165,6 @@ export function CodebaseChatWorkspace({
 				? questions
 				: questions.slice(0, currentIndex + 1);
 	const flowComplete = areAllQuestionsAnswered(answers, questions);
-	const hasLiveData = kanbanProgress !== null && kanbanProgress.total > 0;
-
-	/**
-	 * Artifact the active stage handoff already renders. Every other artifact
-	 * still lists in the stream, so a finished file stays reachable without the
-	 * same card appearing twice.
-	 */
-	const handoffArtifactPrefix =
-		stage === "feature"
-			? "feature-"
-			: stage === "prd"
-				? "prd-"
-				: stage === "ac"
-					? "ac-"
-					: null;
-	const streamArtifacts = handoffArtifactPrefix
-		? artifacts.filter((item) => !item.id.startsWith(handoffArtifactPrefix))
-		: artifacts;
-
-	// Repository identity only. A feature plan title is a different identity,
-	// so it is never borrowed as the repository name; when the repository is not
-	// identified the header stays neutral instead of mislabeling the plan. The
-	// feature name still labels the subtitle, where it is context, not identity.
-	const resolvedRepoName = resolveCodebaseDisplayName(codebaseName);
-	const resolvedFeatureName = resolveCodebaseDisplayName(featureName);
-	const headerTitle = resolvedRepoName
-		? `Workspace · ${resolvedRepoName}`
-		: "Workspace · Perencanaan codebase";
 
 	const isPristine =
 		messages.length === 0 &&
@@ -393,49 +216,18 @@ export function CodebaseChatWorkspace({
 			: "Jelaskan perubahan yang kamu inginkan...";
 
 	const renderComposer = (minRows = 1, className = "") => (
-		<div className="flex w-full flex-col gap-2.5">
-			{composerTargetName ? (
-				<p
-					data-testid="codebase-composer-target"
-					className="truncate text-[11px] text-fog"
-				>
-					{`Fitur aktif: ${composerTargetName}`}
-				</p>
-			) : (
-				<p
-					data-testid="codebase-composer-target"
-					className="truncate text-[11px] text-fog"
-				>
-					Fitur baru
-				</p>
-			)}
-			{composerMode === "revise" && revisionImpactNotice ? (
-				<p
-					data-testid="codebase-revision-impact"
-					className="rounded-lg border border-graphite bg-obsidian p-2.5 text-[11px] leading-4 text-fog"
-				>
-					{revisionImpactNotice}
-				</p>
-			) : null}
-			<PromptBar
-				id="codebase-chat-composer"
-				value={draft}
-				onValueChange={setDraft}
-				onSend={handleSend}
-				// The composer stays editable while a request is in flight so the
-				// user can prepare the next message; only the submit action closes.
-				// Duplicate submissions are blocked by the shared busy guard in
-				// `handleSend` and by PromptBar's `canSend`, which Enter also uses.
-				isSending={isSending || isRunWorking}
-				minCharsToSend={3}
-				minRows={minRows}
-				maxRows={6}
-				className={className}
-				placeholder={composerPlaceholder}
-				ariaLabel={composerPlaceholder}
-				submitAppearance="icon"
-			/>
-		</div>
+		<CodebaseChatWorkspaceComposer
+			composerTargetName={composerTargetName}
+			composerMode={composerMode}
+			revisionImpactNotice={revisionImpactNotice}
+			draft={draft}
+			onDraftChange={setDraft}
+			onSend={handleSend}
+			isSending={isSending || isRunWorking}
+			minRows={minRows}
+			className={className}
+			placeholder={composerPlaceholder}
+		/>
 	);
 
 	return (
@@ -443,528 +235,102 @@ export function CodebaseChatWorkspace({
 			data-testid="codebase-chat-workspace"
 			className="flex h-full min-h-0 flex-col bg-onyx"
 		>
-			<div className="shrink-0 border-b border-graphite bg-charcoal px-4 py-3">
-				<div className="flex items-start justify-between gap-3">
-					<div className="min-w-0">
-						<p
-							data-testid="codebase-chat-title"
-							className="truncate text-sm font-semibold text-snow"
-						>
-							{headerTitle}
-						</p>
-						{resolvedRepoName ? (
-							<p className="truncate text-[11px] text-fog">
-								Planning workspace
-							</p>
-						) : resolvedFeatureName ? (
-							<p className="truncate text-[11px] text-fog">
-								{`Perencanaan · ${resolvedFeatureName}`}
-							</p>
-						) : null}
-					</div>
-					<div className="flex shrink-0 items-center gap-2">
-						{planSwitcher}
-						{hasLiveData && kanbanProgress ? (
-							<span
-								data-testid="codebase-kanban-badge"
-								className="shrink-0 rounded-md border border-graphite bg-obsidian px-2 py-1 font-mono text-[11px] text-fog"
-							>
-								{`Kanban Live: ${kanbanProgress.done}/${kanbanProgress.total} Selesai (${kanbanProgress.pct}%)`}
-							</span>
-						) : null}
-					</div>
-				</div>
-			</div>
-			{planningMovedOn ? (
-				<div
-					data-testid="codebase-planning-review-notice"
-					className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-amber/30 bg-amber/10 px-4 py-2 text-[11px] text-amber"
-				>
-					<span>
-						Repository sudah disinkronkan ulang setelah planning ini dibuat.
-						Planning lama tetap tersimpan — tinjau apakah masih sesuai.
-					</span>
-					{onReviewPlan ? (
-						<button
-							type="button"
-							onClick={onReviewPlan}
-							className="min-h-7 shrink-0 rounded-md border border-amber/40 px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							Tinjau planning
-						</button>
-					) : null}
-				</div>
-			) : null}
+			<CodebaseChatWorkspaceHeader
+				codebaseName={codebaseName}
+				featureName={featureName}
+				planSwitcher={planSwitcher}
+				kanbanProgress={kanbanProgress}
+				planningMovedOn={planningMovedOn}
+				onReviewPlan={onReviewPlan}
+			/>
 			{showLoading ? (
-				<div
-					data-testid="codebase-chat-loading"
-					aria-busy="true"
-					className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-6"
-				>
-					<p className="text-xs text-fog">Memuat planning yang tersimpan...</p>
-					<div className="flex flex-col gap-2.5">
-						{["a", "b", "c"].map((row) => (
-							<div
-								key={row}
-								className="h-16 animate-pulse rounded-lg border border-graphite bg-charcoal/60"
-							/>
-						))}
-					</div>
-				</div>
+				<CodebaseChatWorkspaceLoading />
 			) : showPlanUnavailable ? (
-				<div
-					data-testid="codebase-chat-plan-unavailable"
-					className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center"
-				>
-					<p className="text-sm font-semibold text-snow">
-						Planning tidak dapat dimuat
-					</p>
-					<p className="max-w-sm text-xs leading-5 text-fog">
-						Data planning tersimpan di server, tetapi tidak dapat dibaca saat
-						ini. Coba muat ulang halaman.
-					</p>
-					<button
-						type="button"
-						onClick={() => window.location.reload()}
-						className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-md border border-graphite px-3 text-xs text-snow hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						<RotateCcw size={13} aria-hidden />
-						Muat ulang
-					</button>
-				</div>
+				<CodebaseChatWorkspacePlanUnavailable />
 			) : showPlanSelection ? (
-				<div
-					data-testid="codebase-chat-plan-selection"
-					className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center"
-				>
-					<Layers size={20} aria-hidden className="text-fog" />
-					<p className="text-sm font-semibold text-snow">
-						Pilih fitur yang ingin dikerjakan
-					</p>
-					<p className="max-w-sm text-xs leading-5 text-fog">
-						Repository ini punya beberapa fitur plan. Pilih satu dari daftar di
-						atas untuk melanjutkan — setiap fitur punya planning sendiri.
-					</p>
-				</div>
+				<CodebaseChatWorkspacePlanSelection />
 			) : showPristine ? (
-				<div
-					data-testid="codebase-chat-pristine"
-					className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-10 pb-8 sm:pt-14 md:pt-16 lg:pt-20"
-				>
-					<div className="flex w-full max-w-3xl flex-col items-center gap-6 text-center">
-						<div className="flex flex-col items-center gap-2.5">
-							<h2 className="text-2xl font-bold tracking-tight text-snow sm:text-3xl lg:text-[32px]">
-								Apa yang ingin kamu bangun?
-							</h2>
-							<p className="max-w-xl text-sm leading-relaxed text-fog sm:text-[15px]">
-								Jelaskan fitur, perubahan, atau masalah yang ingin kamu
-								kerjakan. VibeEverything akan menyesuaikannya dengan struktur
-								codebase ini.
-							</p>
-						</div>
-
-						<div className="w-full shrink-0 bg-transparent text-left">
-							{renderComposer(2, "p-3.5 sm:p-4")}
-						</div>
-
-						{newerAttemptFailure ? (
-							<output
-								data-testid="codebase-newer-attempt-failed"
-								className="block w-full text-left text-xs leading-5 text-crimson"
-							>
-								Analisis terbaru gagal
-								{newerAttemptFailure.errorMessage
-									? `: ${newerAttemptFailure.errorMessage}`
-									: "."}{" "}
-								Saran di bawah berasal dari analisis sebelumnya untuk snapshot
-								yang sama.
-							</output>
-						) : null}
-
-						{validStarterSuggestions ? (
-							<div
-								data-testid="codebase-intent-starters"
-								className="flex w-full flex-col gap-2.5 pt-1 text-left"
-							>
-								<p className="text-[11px] font-semibold uppercase tracking-wider text-slate">
-									Mulai dari
-								</p>
-								<div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-									{validStarterSuggestions.map((item) => (
-										<button
-											key={item.id}
-											type="button"
-											onClick={() => handlePrefillDraft(item.prompt)}
-											data-testid={`intent-starter-${item.id}`}
-											className="flex min-h-[62px] flex-col items-start justify-center rounded-lg border border-slate bg-charcoal/40 p-3 text-left text-snow transition-colors hover:bg-obsidian active:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-										>
-											<span className="line-clamp-1 text-xs font-medium text-snow">
-												{item.title}
-											</span>
-											<span className="mt-0.5 line-clamp-1 text-[11px] text-fog">
-												{item.description}
-											</span>
-										</button>
-									))}
-								</div>
-							</div>
-						) : starterRefresh?.status === "ready" &&
-							onRefreshStarterSuggestions ? (
-							<div className="flex w-full flex-col items-start gap-2 pt-1 text-left">
-								{starterRefresh.error ? (
-									<p role="alert" className="text-sm text-red-400">
-										{starterRefresh.error}
-									</p>
-								) : null}
-								<button
-									type="button"
-									disabled={starterRefresh.isRefreshing}
-									aria-busy={starterRefresh.isRefreshing ?? false}
-									data-testid="codebase-refresh-starters"
-									className="rounded-md border border-graphite px-3 py-2 text-sm text-snow hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-wait disabled:opacity-60"
-									onClick={() =>
-										onRefreshStarterSuggestions(
-											starterRefresh.analysisId,
-											starterRefresh.snapshotId,
-										)
-									}
-								>
-									{starterRefresh.isRefreshing
-										? "Memperbarui saran..."
-										: starterRefresh.error
-											? "Coba perbarui saran"
-											: "Buat saran tugas dari analisis codebase"}
-								</button>
-							</div>
-						) : null}
-					</div>
-				</div>
+				<CodebaseChatWorkspacePristine
+					composer={renderComposer(2, "p-3.5 sm:p-4")}
+					starterSuggestions={starterSuggestions}
+					starterRefresh={starterRefresh}
+					newerAttemptFailure={newerAttemptFailure}
+					onRefreshStarterSuggestions={onRefreshStarterSuggestions}
+					onPrefillDraft={handlePrefillDraft}
+				/>
 			) : (
 				<>
-					{failedArtifacts.length > 0 ? (
-						<div
-							data-testid="codebase-artifacts-failed"
-							className="shrink-0 border-b border-crimson/30 bg-crimson/10 px-4 py-2 text-[11px] text-crimson"
-						>
-							<span className="inline-flex items-center gap-1.5">
-								<AlertTriangle size={12} aria-hidden />
-								Sebagian planning tidak dapat dimuat:{" "}
-								{failedArtifacts.map(artifactLabel).join(", ")}. Bagian lain
-								tetap tersimpan di server.
-							</span>
-						</div>
-					) : null}
+					<CodebaseChatWorkspaceArtifactsFailed
+						failedArtifacts={failedArtifacts}
+					/>
 					<div
 						data-testid="codebase-chat-messages"
 						className="min-h-0 flex-1 overflow-y-auto px-4 py-5"
 					>
 						<div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-							{messages.map((message) =>
-								message.role === "user" ? (
-									<div key={message.id} className="flex justify-end">
-										<div className="max-w-[82%] sm:max-w-[75%] rounded-2xl rounded-tr-sm bg-snow px-4 py-2.5 text-[13.5px] sm:text-sm leading-relaxed text-onyx">
-											{message.content}
-										</div>
-									</div>
-								) : (
-									<div key={message.id} className="flex flex-col gap-1.5 py-1">
-										<p className="text-[11px] font-semibold uppercase tracking-wider text-fog">
-											VibeEverything Assistant
-										</p>
-										<div className="text-[13.5px] sm:text-sm leading-relaxed text-snow/90 whitespace-pre-wrap">
-											{message.content}
-										</div>
-									</div>
-								),
-							)}
-							{run ? (
-								<div data-testid="codebase-run-thinking">
-									<AgentThinking
-										status={run.status}
-										phase={run.phase}
-										thinkingLabel={`Menyusun ${STAGE_LABEL[run.stage]}`}
-										generatingLabel={`Menyusun ${STAGE_LABEL[run.stage]}`}
-										doneLabel={CODEBASE_STAGE_DONE_LABEL[run.stage]}
-										failedLabel={`Gagal menyusun ${STAGE_LABEL[run.stage]}`}
-										activity={run.activity}
-										thinkingText={run.thinkingText}
-										startedAt={run.startedAt}
-										finishedAt={run.finishedAt}
-									/>
-								</div>
-							) : null}
-							{runFailed && run.error ? (
-								<div
-									data-testid="codebase-questions-error"
-									className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
-								>
-									<span role="alert">{run.error}</span>
-									{onRetryQuestions ? (
-										<button
-											type="button"
-											onClick={onRetryQuestions}
-											className="inline-flex min-h-7 items-center rounded border border-crimson/40 px-2 text-[11px] font-medium text-crimson hover:bg-crimson/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
-										>
-											Coba lagi
-										</button>
-									) : null}
-								</div>
-							) : null}
-							{visibleQuestions.map((question, qIndex) => {
-								const isEditing = editingQuestionId === question.id;
-								const isActive =
-									isEditing ||
-									(editingQuestionId === null && qIndex === currentIndex);
-								return (
-									<CodebaseAdaptiveQuestion
-										key={question.id}
-										question={question}
-										index={qIndex + 1}
-										totalQuestions={questions.length}
-										submitted={(answers[question.id] ?? "").trim()}
-										active={isActive}
-										isEditing={isEditing}
-										onEdit={(qId) => setEditingQuestionId(qId)}
-										onCancelEdit={() => setEditingQuestionId(null)}
-										onSubmit={(questionId, answer) => {
-											setEditingQuestionId(null);
-											onSubmitAnswer?.(questionId, answer);
-										}}
-									/>
-								);
-							})}
-							{streamArtifacts.length > 0 ? (
-								<div className="flex flex-col">
-									{streamArtifacts.map((artifact) => (
-										<CodebaseFileCard
-											key={artifact.id}
-											artifact={artifact}
-											active={artifact.id === activeArtifactId}
-											onOpen={onOpenArtifact}
-											onDownload={onDownloadArtifact}
-										/>
-									))}
-								</div>
-							) : null}
+							<CodebaseChatWorkspaceMessages
+								messages={messages}
+								run={run}
+								onRetryQuestions={onRetryQuestions}
+							/>
+							<CodebaseChatWorkspaceQuestions
+								visibleQuestions={visibleQuestions}
+								totalQuestions={questions.length}
+								answers={answers}
+								currentIndex={currentIndex}
+								editingQuestionId={editingQuestionId}
+								onEditQuestion={handleEditQuestion}
+								onCancelEdit={handleCancelEditQuestion}
+								onSubmit={handleSubmitAnswer}
+							/>
+							<CodebaseChatWorkspaceArtifactStream
+								artifacts={artifacts}
+								activeArtifactId={activeArtifactId}
+								stage={stage}
+								onOpenArtifact={onOpenArtifact}
+								onDownloadArtifact={onDownloadArtifact}
+							/>
 							{specErrorVisible ? (
-								<div
-									role="alert"
-									data-testid="codebase-spec-error"
-									className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
-								>
-									<span>{specError}</span>
-									{onRetryGenerate ? (
-										<button
-											type="button"
-											onClick={onRetryGenerate}
-											className="inline-flex min-h-7 items-center rounded border border-crimson/40 px-2 text-[11px] font-medium text-crimson hover:bg-crimson/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
-										>
-											Coba lagi
-										</button>
-									) : null}
-								</div>
+								<CodebaseChatWorkspaceSpecError
+									message={specError}
+									onRetry={onRetryGenerate}
+								/>
 							) : null}
 							{flowComplete && stage === "questions" ? (
-								<div
-									data-testid="codebase-questions-complete"
-									className="flex flex-col gap-1 py-1"
-								>
-									<div className="flex flex-wrap items-center justify-between gap-3">
-										<span className="text-xs text-fog">
-											<span className="font-medium text-snow/90">
-												Berikutnya:
-											</span>{" "}
-											Spesifikasi fitur
-										</span>
-										<button
-											type="button"
-											disabled={isConfirming}
-											onClick={() => onConfirmGenerate?.()}
-											className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-										>
-											{isConfirming
-												? "Menyusun spesifikasi..."
-												: "Buat Spesifikasi Fitur"}
-											{!isConfirming ? (
-												<ArrowRight size={12} aria-hidden="true" />
-											) : null}
-										</button>
-									</div>
-									<p className="text-[11.5px] leading-relaxed text-fog/80">
-										Semua pertanyaan sudah dijawab. Spesifikasi fitur disusun
-										dari jawaban tersebut dan konteks repository.
-									</p>
-								</div>
+								<CodebaseChatWorkspaceQuestionsComplete
+									isConfirming={isConfirming}
+									onConfirmGenerate={onConfirmGenerate}
+								/>
 							) : null}
 							{stageErrorVisible ? (
-								<div
-									role="alert"
-									data-testid="codebase-stage-error"
-									className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
-								>
-									<span>{stageError}</span>
-									{onRetryStage ? (
-										<button
-											type="button"
-											onClick={onRetryStage}
-											className="inline-flex min-h-9 items-center rounded-md border border-crimson/50 px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-										>
-											Coba lagi
-										</button>
-									) : null}
-								</div>
-							) : null}
-							{stage === "feature" && onGeneratePrd ? (
-								<CodebaseStageHandoff
-									testId="codebase-stage-prd"
-									outcome={{
-										title: "Spesifikasi fitur siap",
-										artifact:
-											artifacts.find((item) =>
-												item.id.startsWith("feature-"),
-											) ?? null,
-									}}
-									nextLabel="PRD"
-									nextDescription="Menyusun PRD 8 seksi dari spesifikasi fitur dan konteks repository."
-									actionLabel="Buat PRD"
-									busyLabel="Menyusun PRD..."
-									busy={stageBusy === "prd"}
-									onAction={onGeneratePrd}
-									onOpenArtifact={onOpenArtifact}
-									onDownloadArtifact={onDownloadArtifact}
+								<CodebaseChatWorkspaceStageError
+									message={stageError}
+									onRetry={onRetryStage}
 								/>
 							) : null}
-							{stage === "prd" && onGenerateAc ? (
-								<CodebaseStageHandoff
-									testId="codebase-stage-ac"
-									outcome={{
-										title: "PRD selesai",
-										artifact:
-											artifacts.find((item) => item.id.startsWith("prd-")) ??
-											null,
-									}}
-									nextLabel="Acceptance Criteria"
-									nextDescription="Menyusun Acceptance Criteria dari PRD dan konteks repository."
-									actionLabel="Buat AC"
-									busyLabel="Menyusun AC..."
-									busy={stageBusy === "ac"}
-									onAction={onGenerateAc}
-									onOpenArtifact={onOpenArtifact}
-									onDownloadArtifact={onDownloadArtifact}
-								/>
-							) : null}
-							{stage === "ac" && onGenerateTask && !tasksUnresolved ? (
-								<CodebaseStageHandoff
-									testId="codebase-stage-task"
-									outcome={{
-										title: "Acceptance Criteria selesai",
-										artifact:
-											artifacts.find((item) => item.id.startsWith("ac-")) ??
-											null,
-									}}
-									nextLabel="Task dan Kanban"
-									nextDescription="Menyusun breakdown task dari PRD dan Acceptance Criteria, lalu mengaktifkan papan Kanban."
-									actionLabel="Buat Task"
-									busyLabel="Menyusun task..."
-									busy={stageBusy === "task"}
-									onAction={onGenerateTask}
-									onOpenArtifact={onOpenArtifact}
-									onDownloadArtifact={onDownloadArtifact}
-								/>
-							) : null}
+							<CodebaseChatWorkspaceStageHandoffs
+								stage={stage}
+								stageBusy={stageBusy}
+								tasksUnresolved={tasksUnresolved}
+								artifacts={artifacts}
+								onGeneratePrd={onGeneratePrd}
+								onGenerateAc={onGenerateAc}
+								onGenerateTask={onGenerateTask}
+								onOpenArtifact={onOpenArtifact}
+								onDownloadArtifact={onDownloadArtifact}
+							/>
 							{handoffPrompt && exportCmd ? (
-								<div
-									data-testid="codebase-handoff-card"
-									className="rounded-xl border border-emerald/30 bg-obsidian p-4"
-								>
-									<div className="flex items-center justify-between gap-2">
-										<p className="text-[13px] font-semibold text-emerald">
-											Handoff ke AI Coding Agent
-										</p>
-										<button
-											type="button"
-											onClick={handleCopyCmd}
-											className="inline-flex min-h-9 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-										>
-											{copiedCmd ? (
-												<>
-													<Check
-														size={12}
-														aria-hidden="true"
-														className="text-emerald"
-													/>
-													<span className="text-emerald">Tersalin</span>
-												</>
-											) : (
-												<>
-													<Copy size={12} aria-hidden="true" />
-													<span>Salin prompt handoff</span>
-												</>
-											)}
-										</button>
-									</div>
-									<p className="mt-1.5 text-xs leading-5 text-fog">
-										Seluruh tahap selesai: pohon fitur, PRD, Acceptance
-										Criteria, dan task sudah tersimpan. Prompt berikut menyuruh
-										AI Coding Agent mengekspor planning ke{" "}
-										<code className="font-mono text-[11px] text-mist">
-											docs/vibeplan/
-										</code>{" "}
-										lalu mengerjakannya di repository
-										{codebaseName ? ` ${codebaseName}` : ""}.
-									</p>
-									<div className="mt-3">
-										<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
-											Perintah ekspor
-										</p>
-										<div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-graphite bg-onyx p-2.5">
-											<code className="min-w-0 flex-1 select-all break-all font-mono text-[11.5px] text-mist">
-												{exportCmd}
-											</code>
-											<button
-												type="button"
-												onClick={() =>
-													handleCopy(exportCmd, (value) =>
-														setCopiedExport(value),
-													)
-												}
-												aria-label="Salin perintah export plan"
-												className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-											>
-												{copiedExport ? (
-													<>
-														<Check
-															size={11}
-															aria-hidden="true"
-															className="text-emerald"
-														/>
-														<span className="text-emerald">Tersalin</span>
-													</>
-												) : (
-													<>
-														<Copy size={11} aria-hidden="true" />
-														<span>Salin</span>
-													</>
-												)}
-											</button>
-										</div>
-									</div>
-									<div className="mt-3 rounded-lg border border-graphite bg-onyx p-3">
-										<p className="font-mono text-[10px] uppercase tracking-wider text-slate">
-											Prompt untuk agent
-										</p>
-										<pre className="mt-1.5 max-h-56 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-5 text-mist">
-											{handoffPrompt}
-										</pre>
-									</div>
-									<p className="mt-3 text-[11px] leading-5 text-slate">
-										Agent memakai CLI untuk memperbarui status task, jadi kartu
-										di Papan Kanban kanan ikut berpindah kolom lewat polling.
-										tasks.json adalah snapshot saat ekspor; sumber kebenaran
-										status tetap backend, dan planning yang berubah bisa
-										di-export ulang dengan perintah yang sama.
-									</p>
-								</div>
+								<CodebaseChatWorkspaceHandoffCard
+									exportCmd={exportCmd}
+									handoffPrompt={handoffPrompt}
+									codebaseName={codebaseName}
+									copiedCmd={copiedCmd}
+									copiedExport={copiedExport}
+									onCopyCmd={handleCopyCmd}
+									onCopyExport={() =>
+										handleCopy(exportCmd, (value) => setCopiedExport(value))
+									}
+								/>
 							) : null}
 						</div>
 					</div>
