@@ -1,35 +1,6 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
-import {
-	AlertTriangle,
-	ArrowLeft,
-	ArrowUpDown,
-	Check,
-	ChevronDown,
-	Info,
-	KanbanSquare,
-	Layers,
-	Loader2,
-	RotateCcw,
-} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FeatureIcon } from "@/components/task/whiteboard-canvas";
-import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { DocumentReviewModal } from "@/features/greenfield/components/documents/document-review-modal";
 import { ProjectDocumentsDrawer } from "@/features/greenfield/components/documents/project-documents-drawer";
 import { useKanbanTasks } from "@/features/greenfield/hooks/use-kanban-polling";
@@ -38,9 +9,18 @@ import {
 	extractPhases,
 	filterColumnsByPhase,
 } from "@/lib/kanban-utils";
-import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store";
+import {
+	KanbanBoardError,
+	KanbanBoardSkeleton,
+	KanbanEmptyPhase,
+	KanbanEmptyState,
+	KanbanGeneratingSkeleton,
+} from "./kanban-board-states";
 import { KanbanColumn, type KanbanColumnHandle } from "./kanban-column";
+import { KanbanAcChangedBanner, KanbanHeader } from "./kanban-header";
+import { KanbanResetDialog } from "./kanban-reset-dialog";
+import { KanbanToolbar } from "./kanban-toolbar";
 
 // Whether a progress reset would change anything. Mirrors the server's
 // `needsProgressReset` for the UI's disabled state: a board with everything
@@ -259,49 +239,11 @@ export function KanbanBoard({
 	};
 
 	if (isLoading && !data) {
-		return (
-			<div className="flex h-dvh w-full flex-col bg-onyx text-snow overflow-hidden">
-				<header className="border-b border-graphite bg-obsidian px-4 sm:px-6 py-3.5 shrink-0">
-					<div className="mx-auto flex w-full max-w-[1400px] items-center justify-between">
-						<div className="h-6 w-48 animate-pulse rounded bg-steel/20" />
-						<div className="h-8 w-24 animate-pulse rounded bg-steel/20" />
-					</div>
-				</header>
-				<main className="mx-auto flex w-full max-w-[1400px] flex-1 min-h-0 gap-4 py-6 px-4 sm:px-6 lg:px-8 overflow-hidden">
-					{["pending", "in_progress", "completed", "failed"].map((status) => (
-						<div
-							key={status}
-							className="flex h-full flex-1 min-w-[260px] shrink-0 flex-col rounded-xl border border-graphite bg-obsidian/30 animate-pulse"
-						>
-							<div className="h-12 border-b border-graphite/40 bg-obsidian/50 rounded-t-xl" />
-							<div className="flex-1 p-3 space-y-3">
-								<div className="h-24 rounded bg-steel/10" />
-								<div className="h-20 rounded bg-steel/10" />
-							</div>
-						</div>
-					))}
-				</main>
-			</div>
-		);
+		return <KanbanBoardSkeleton />;
 	}
 
 	if (isError && !data) {
-		return (
-			<div className="flex h-full w-full flex-col bg-onyx text-snow items-center justify-center p-6">
-				<AlertTriangleIllustration />
-				<h2 className="mt-4 text-lg font-bold text-snow">
-					Gagal memuat Kanban
-				</h2>
-				<p className="mt-2 text-sm text-fog max-w-xs text-center">
-					Koneksi ke server bermasalah. Pastikan internet Anda aktif dan coba
-					lagi.
-				</p>
-				<Button onClick={refetch} variant="default" className="mt-6 gap-1.5">
-					<Loader2 size={14} className="hidden" />
-					Coba Lagi
-				</Button>
-			</div>
-		);
+		return <KanbanBoardError onRetry={refetch} />;
 	}
 
 	return (
@@ -311,268 +253,41 @@ export function KanbanBoard({
 			onTouchMove={handleTouchMove}
 		>
 			{/* Kanban Header / Navigation bar */}
-			<header className="border-b border-graphite bg-obsidian px-4 sm:px-6 py-3.5 shrink-0">
-				<div className="mx-auto flex w-full max-w-[1400px] flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-					<div className="flex flex-col min-w-0">
-						<div className="flex items-center gap-2.5 min-w-0">
-							<KanbanSquare size={18} className="text-indigo shrink-0" />
-							<h1 className="truncate font-inter text-base sm:text-lg font-[600] text-snow">
-								{navigationContext ? projectName : `Kanban - ${projectName}`}
-							</h1>
-						</div>
-						{navigationContext ? (
-							<p className="mt-1 truncate text-xs text-fog">
-								{navigationContext.codebaseName} / {projectName} ·{" "}
-								{projectProgress.done}/{projectProgress.total} task selesai (
-								{projectProgress.pct}%)
-							</p>
-						) : null}
-
-						{/* CLI / Connection status as supporting metadata */}
-						<div className="mt-1 flex items-center gap-1.5 text-xs min-w-0">
-							{staleness === "disconnected" ? (
-								<output className="flex items-center gap-1.5 text-crimson min-w-0">
-									<AlertTriangle
-										size={13}
-										className="shrink-0"
-										aria-hidden="true"
-									/>
-									<span className="truncate">
-										Koneksi terputus · Pastikan server aktif
-									</span>
-									<button
-										type="button"
-										onClick={refetch}
-										disabled={isLoading}
-										className="underline hover:text-snow cursor-pointer text-xs ml-1 shrink-0"
-									>
-										Hubungkan kembali
-									</button>
-								</output>
-							) : staleness === "stale" ? (
-								<output className="flex items-center gap-1.5 text-amber min-w-0">
-									<AlertTriangle
-										size={13}
-										className="shrink-0"
-										aria-hidden="true"
-									/>
-									<span className="truncate">
-										Koneksi lambat · Menampilkan data terakhir
-									</span>
-									<button
-										type="button"
-										onClick={refetch}
-										disabled={isLoading}
-										className="underline hover:text-snow cursor-pointer text-xs ml-1 shrink-0"
-									>
-										Coba lagi
-									</button>
-								</output>
-							) : !hasUpdates ? (
-								<output className="flex items-center gap-1.5 text-fog min-w-0">
-									<Info
-										size={13}
-										className="shrink-0 text-slate"
-										aria-hidden="true"
-									/>
-									<span className="truncate">
-										Belum ada update status · Jalankan VibeEverything CLI untuk
-										update otomatis
-									</span>
-								</output>
-							) : (
-								<output className="flex items-center gap-1.5 text-fog min-w-0">
-									<span
-										className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"
-										aria-hidden="true"
-									/>
-									<span className="truncate">Tersinkronisasi dengan CLI</span>
-								</output>
-							)}
-						</div>
-					</div>
-
-					<div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 self-start sm:self-center">
-						{lastUpdateAt && (
-							<span className="text-[10px] text-fog/60 font-mono hidden md:inline">
-								Update: {new Date(lastUpdateAt).toLocaleTimeString()}
-							</span>
-						)}
-						{canResetProgress(columns ?? null) && (
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => setResetDialogOpen(true)}
-								disabled={isResetting}
-								className="gap-1.5"
-							>
-								<RotateCcw size={14} />
-								{isResetting ? "Mereset..." : "Reset Progress"}
-							</Button>
-						)}
-						{navigationContext ? (
-							<Link
-								to="/codebases/$id"
-								params={{ id: navigationContext.codebaseId }}
-								aria-label={`Kembali ke workspace ${navigationContext.codebaseName}`}
-								className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-snow/40 px-3 py-1.5 text-xs font-[510] text-snow transition-colors hover:border-snow/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								<ArrowLeft size={14} aria-hidden="true" />
-								Kembali ke Workspace
-							</Link>
-						) : (
-							<>
-								<Link
-									to="/task/$id"
-									params={{ id: projectId }}
-									className="btn-primary px-3 py-1.5 rounded-md text-xs font-[510]"
-								>
-									Roadmap
-								</Link>
-								<Link
-									to="/plan/new"
-									className="px-3 py-1.5 rounded-md text-xs font-[510] flex items-center gap-1.5 border border-snow/40 text-snow hover:border-snow/70 transition-colors bg-transparent"
-								>
-									Kembali ke Chat
-								</Link>
-							</>
-						)}
-					</div>
-				</div>
-			</header>
+			<KanbanHeader
+				projectId={projectId}
+				projectName={projectName}
+				navigationContext={navigationContext}
+				projectProgress={projectProgress}
+				lastUpdateAt={lastUpdateAt}
+				staleness={staleness}
+				isLoading={isLoading}
+				hasUpdates={Boolean(hasUpdates)}
+				canReset={canResetProgress(columns ?? null)}
+				isResetting={isResetting}
+				onRefetch={refetch}
+				onOpenResetDialog={() => setResetDialogOpen(true)}
+			/>
 
 			{/* AC Changed Banner (Only shown if AC was updated after tasks generated) */}
 			{!dismissedBanners.includes("ac-changed") && acChanged && (
-				<div className="w-full shrink-0 px-4 pt-3">
-					<div className="flex items-center justify-between rounded-md border border-amber/30 bg-amber/10 p-3 text-sm text-amber animate-slide-down">
-						<div className="flex items-center gap-2">
-							<AlertTriangle size={16} className="shrink-0" />
-							<span>
-								AC telah berubah. Task mungkin tidak sesuai kriteria terbaru.
-							</span>
-						</div>
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() =>
-								setDismissedBanners((prev) => [...prev, "ac-changed"])
-							}
-							className="h-8 text-amber/80 hover:text-amber hover:bg-amber/10"
-						>
-							<ArrowUpDown size={12} className="mr-1" />
-							Tutup
-						</Button>
-					</div>
-				</div>
+				<KanbanAcChangedBanner
+					onDismiss={() =>
+						setDismissedBanners((prev) => [...prev, "ac-changed"])
+					}
+				/>
 			)}
 
 			{/* Centered Main Content Container */}
 			<main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col min-h-0 overflow-hidden px-4 sm:px-6 lg:px-8">
 				{/* Toolbar: Phase Filter & Progress Bar */}
 				{hasProjectTasks && (
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-center pt-4 pb-3 shrink-0">
-						{/* Left: Phase Filter */}
-						<div className="flex items-center gap-2 shrink-0">
-							<span className="text-xs font-medium text-fog">Fase:</span>
-							<DropdownMenu>
-								<DropdownMenuTrigger asChild>
-									<button
-										type="button"
-										className="inline-flex items-center justify-between gap-2 rounded-md border border-graphite bg-charcoal px-3 py-1.5 text-xs font-medium text-snow hover:border-steel hover:bg-steel/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo transition-colors cursor-pointer"
-										aria-label="Filter berdasarkan fase project"
-									>
-										<span className="flex items-center gap-1.5 min-w-0">
-											<span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-fog">
-												{selectedPhase ? (
-													<FeatureIcon label={selectedPhase} size={13} />
-												) : (
-													<Layers size={13} aria-hidden="true" />
-												)}
-											</span>
-											<span
-												className="max-w-[150px] sm:max-w-[190px] truncate"
-												title={selectedPhaseLabel}
-											>
-												{selectedPhaseLabel}
-											</span>
-										</span>
-										<ChevronDown
-											size={13}
-											className="text-fog shrink-0"
-											aria-hidden="true"
-										/>
-									</button>
-								</DropdownMenuTrigger>
-								<DropdownMenuContent
-									align="start"
-									className="w-56 sm:w-64 max-h-72 overflow-y-auto custom-scrollbar p-1"
-								>
-									{[
-										{ id: null, label: "Semua", name: "Semua" },
-										...phases.map((phase) => ({
-											id: phase.id,
-											label: phase.label,
-											name: phase.name,
-										})),
-									].map((item) => {
-										const isSelected = selectedPhase === item.id;
-										return (
-											<DropdownMenuItem
-												key={item.id ?? "all"}
-												onClick={() => setSelectedPhase(item.id)}
-												className={cn(
-													"flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs rounded cursor-pointer transition-colors",
-													isSelected
-														? "bg-steel/15 text-snow font-semibold dark:bg-steel/25"
-														: "text-mist hover:text-snow hover:bg-steel/10",
-												)}
-											>
-												<div className="flex items-center gap-2 min-w-0 flex-1">
-													<span className="flex h-4 w-4 shrink-0 items-center justify-center text-fog">
-														{item.id === null ? (
-															<Layers size={13} aria-hidden="true" />
-														) : (
-															<FeatureIcon label={item.name} size={13} />
-														)}
-													</span>
-													<span className="truncate" title={item.label}>
-														{item.label}
-													</span>
-												</div>
-												{isSelected && (
-													<Check
-														size={13}
-														className="text-snow shrink-0 ml-auto"
-														aria-hidden="true"
-													/>
-												)}
-											</DropdownMenuItem>
-										);
-									})}
-								</DropdownMenuContent>
-							</DropdownMenu>
-						</div>
-
-						{/* Right: Progress info & bar spanning remaining horizontal space */}
-						<div className="flex-1 flex items-center gap-3 sm:ml-4 min-w-0">
-							<div
-								className="flex-1 min-w-[100px] h-2 rounded-full bg-steel/30 dark:bg-steel/40 overflow-hidden"
-								role="progressbar"
-								aria-valuenow={progress.pct}
-								aria-valuemin={0}
-								aria-valuemax={100}
-								aria-label="Progress penyelesaian task"
-							>
-								<div
-									className="h-full rounded-full bg-indigo transition-all duration-500 ease-out"
-									style={{ width: `${progress.pct}%` }}
-								/>
-							</div>
-							<span className="shrink-0 text-xs text-fog font-mono tabular-nums whitespace-nowrap">
-								{progress.done}/{progress.total} task selesai ({progress.pct}%)
-							</span>
-						</div>
-					</div>
+					<KanbanToolbar
+						phases={phases}
+						selectedPhase={selectedPhase}
+						selectedPhaseLabel={selectedPhaseLabel}
+						progress={progress}
+						onSelectPhase={setSelectedPhase}
+					/>
 				)}
 
 				{/* Main Column Layout Area */}
@@ -582,50 +297,14 @@ export function KanbanBoard({
 				>
 					{!hasProjectTasks && data?.taskStatus === "generating" ? (
 						// Tasks are being generated by AI — show skeleton columns
-						<div className="flex h-full min-w-full gap-4">
-							{["pending", "in_progress", "completed", "failed"].map(
-								(status) => (
-									<div
-										key={status}
-										className="flex h-full flex-1 min-w-[260px] shrink-0 flex-col rounded-xl border border-graphite bg-obsidian/30 animate-pulse"
-									>
-										<div className="h-12 border-b border-graphite/40 bg-obsidian/50 rounded-t-xl flex items-center px-4">
-											<div className="h-4 w-24 rounded bg-steel/20" />
-										</div>
-										<div className="flex-1 p-3 space-y-3">
-											<div className="h-24 rounded bg-steel/10" />
-											<div className="h-20 rounded bg-steel/10" />
-											<div className="h-16 rounded bg-steel/10" />
-										</div>
-									</div>
-								),
-							)}
-						</div>
+						<KanbanGeneratingSkeleton />
 					) : !hasProjectTasks ? (
-						<div className="flex h-full w-full flex-col items-center justify-center text-center">
-							<KanbanSquare size={56} className="text-fog/40 mb-3" />
-							<h2 className="text-base font-[510] text-snow">Belum ada task</h2>
-							<p className="text-xs text-fog max-w-sm mt-1.5 leading-relaxed">
-								Task akan muncul di sini setelah proses generate selesai.
-							</p>
-						</div>
+						<KanbanEmptyState />
 					) : !hasVisibleTasks ? (
-						<div className="flex h-full w-full flex-col items-center justify-center text-center">
-							<p className="text-sm font-[510] text-snow">
-								Tidak ada task pada fase ini
-							</p>
-							<p className="text-xs text-fog max-w-sm mt-1.5 leading-relaxed">
-								Tidak ada task yang terhubung dengan &ldquo;{selectedPhaseLabel}
-								&rdquo;.
-							</p>
-							<button
-								type="button"
-								onClick={() => setSelectedPhase(null)}
-								className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-3 py-1.5 text-xs font-[510] text-snow hover:border-steel transition-colors"
-							>
-								Tampilkan Semua
-							</button>
-						</div>
+						<KanbanEmptyPhase
+							phaseLabel={selectedPhaseLabel}
+							onShowAll={() => setSelectedPhase(null)}
+						/>
 					) : (
 						<div className="flex h-full min-w-full gap-4">
 							<KanbanColumn
@@ -694,58 +373,12 @@ export function KanbanBoard({
 				}
 			/>
 
-			<Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-				<DialogContent className="max-w-md">
-					<DialogHeader>
-						<DialogTitle>Reset progress task?</DialogTitle>
-						<DialogDescription>
-							Status semua task dikembalikan ke <strong>pending</strong> supaya
-							agent bisa mengerjakannya dari awal. Task, PRD, dan AC tidak
-							diubah, dan tidak ada kredit yang terpakai.
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<Button
-							variant="ghost"
-							onClick={() => setResetDialogOpen(false)}
-							disabled={isResetting}
-						>
-							Batal
-						</Button>
-						<Button
-							onClick={() => void handleResetProgress()}
-							disabled={isResetting}
-						>
-							{isResetting ? "Mereset..." : "Reset Progress"}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-		</div>
-	);
-}
-
-function AlertTriangleIllustration() {
-	return (
-		<div className="rounded-full bg-crimson/15 p-4 text-crimson">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="32"
-				height="32"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="2"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				role="img"
-				aria-label="Peringatan Galat"
-			>
-				<title>Peringatan Galat</title>
-				<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-				<line x1="12" y1="9" x2="12" y2="13" />
-				<line x1="12" y1="17" x2="12.01" y2="17" />
-			</svg>
+			<KanbanResetDialog
+				open={resetDialogOpen}
+				isResetting={isResetting}
+				onOpenChange={setResetDialogOpen}
+				onConfirm={() => void handleResetProgress()}
+			/>
 		</div>
 	);
 }
