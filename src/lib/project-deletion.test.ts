@@ -115,8 +115,9 @@ describe("read paths exclude tombstoned projects", () => {
 		"src/lib/services/prd-service.ts",
 		"src/lib/services/task-service.ts",
 		"src/lib/language.ts",
-		"src/lib/codebase-generation-context.ts",
-		"src/lib/codebase-analysis.server.ts",
+		"src/features/codebase/services/generation-context-requirement.ts",
+		"src/features/codebase/services/generation-context-store.server.ts",
+		"src/features/codebase/services/analysis.server.ts",
 	];
 
 	it("filters on deleted_at at every project read boundary", () => {
