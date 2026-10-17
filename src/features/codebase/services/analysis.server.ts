@@ -33,11 +33,6 @@ import {
 	codebases,
 	projects,
 } from "@/db/schema";
-import { CODEBASE_ANALYSIS_MAX_TOKENS } from "@/lib/constants";
-import {
-	selectModels,
-	tryStreamWithFallback,
-} from "@/lib/services/ai-orchestrator";
 import {
 	type AnalysisAttemptStage,
 	type AnalysisSourceFile,
@@ -51,7 +46,20 @@ import {
 	resolveAnalysisFeaturePrompt,
 	toSafeAnalysisErrorMessage,
 } from "./analysis";
-import { decideStarterSuggestionRefresh } from "./analysis-refresh";
+import {
+	claimStarterSuggestionRefresh,
+	type RequestAnalysisScope,
+	type StarterSuggestionRefreshClaim,
+} from "./analysis-server-claim";
+import {
+	type AnalysisServiceCode,
+	AnalysisServiceError,
+} from "./analysis-server-errors";
+import {
+	type AnalysisGenerator,
+	type AnalysisMessage,
+	defaultGenerate,
+} from "./analysis-server-generate";
 import { resolveCodebaseDisplayName } from "./naming";
 import {
 	assertSyncTransition,
@@ -60,158 +68,19 @@ import {
 	sanitizeSyncErrorMessage,
 } from "./sync";
 
-export type AnalysisServiceCode =
-	| "SNAPSHOT_NOT_UPLOADED"
-	| "ANALYSIS_FAILED"
-	| "ANALYSIS_REFRESH_NOT_ALLOWED";
-
-export class AnalysisServiceError extends Error {
-	readonly code: AnalysisServiceCode;
-	/** Failed-attempt analysis row id (Task 9): lets the route attach the
-	 *  exact failed attempt instead of the latest row, which under a
-	 *  concurrent duplicate trigger could be the sibling's ready record. */
-	readonly analysisId?: string;
-
-	constructor(code: AnalysisServiceCode, message: string, analysisId?: string) {
-		super(message);
-		this.name = "AnalysisServiceError";
-		this.code = code;
-		this.analysisId = analysisId;
-	}
-}
-
-export interface AnalysisMessage {
-	role: "system" | "user" | "assistant";
-	content: string;
-}
-
-export type AnalysisGenerator = (
-	messages: AnalysisMessage[],
-) => Promise<string>;
-
-// Default generator: the shared combo-model boundary (same as /api/chat and
-// /api/ask/options). Fully collected (non-streaming) since analysis output is
-// a single JSON document validated once at the end.
-async function defaultGenerate(messages: AnalysisMessage[]): Promise<string> {
-	const { generator, firstChunk } = await tryStreamWithFallback(
-		selectModels(),
-		messages,
-		undefined,
-		CODEBASE_ANALYSIS_MAX_TOKENS,
-	);
-	let fullResponse = firstChunk;
-	for await (const chunk of generator) fullResponse += chunk;
-	return fullResponse;
-}
+// Consumers import this path directly: extracted names are re-exported here so
+// the module's public surface stays identical.
+export type {
+	AnalysisGenerator,
+	AnalysisMessage,
+	AnalysisServiceCode,
+	RequestAnalysisScope,
+	StarterSuggestionRefreshClaim,
+};
+export { AnalysisServiceError, claimStarterSuggestionRefresh };
 
 export interface RequestAnalysisDeps {
 	generate?: AnalysisGenerator;
-}
-
-export interface RequestAnalysisScope {
-	codebaseId?: string;
-	claimedAnalysisId?: string;
-}
-
-export type StarterSuggestionRefreshClaim =
-	| { action: "create"; analysisId: string }
-	| { action: "reuse"; analysisId: string };
-
-export async function claimStarterSuggestionRefresh(input: {
-	projectId: string;
-	snapshotId: string;
-	targetAnalysisId: string;
-	scope: RequestAnalysisScope;
-}): Promise<StarterSuggestionRefreshClaim> {
-	return db.transaction(async (tx) => {
-		const lockId = `${input.scope.codebaseId ?? input.projectId}:${input.projectId}:${input.snapshotId}`;
-		await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockId}))`);
-		const [snapshot] = await tx
-			.select({
-				id: codebaseSnapshots.id,
-				status: codebaseSnapshots.status,
-				syncSessionId: codebaseSnapshots.syncSessionId,
-			})
-			.from(codebaseSnapshots)
-			.where(
-				and(
-					eq(codebaseSnapshots.id, input.snapshotId),
-					input.scope.codebaseId
-						? eq(codebaseSnapshots.codebaseId, input.scope.codebaseId)
-						: eq(codebaseSnapshots.projectId, input.projectId),
-				),
-			)
-			.limit(1);
-		const [session] = snapshot
-			? await tx
-					.select({
-						id: codebaseSyncSessions.id,
-						status: codebaseSyncSessions.status,
-					})
-					.from(codebaseSyncSessions)
-					.where(
-						and(
-							eq(codebaseSyncSessions.id, snapshot.syncSessionId),
-							input.scope.codebaseId
-								? eq(codebaseSyncSessions.codebaseId, input.scope.codebaseId)
-								: eq(codebaseSyncSessions.projectId, input.projectId),
-						),
-					)
-					.limit(1)
-			: [];
-		if (snapshot?.status !== "uploaded" || session?.status !== "uploaded") {
-			throw new AnalysisServiceError(
-				"SNAPSHOT_NOT_UPLOADED",
-				"Snapshot belum siap dianalisis. Selesaikan sync terlebih dahulu.",
-			);
-		}
-
-		const analyses = await tx
-			.select()
-			.from(codebaseAnalyses)
-			.where(
-				and(
-					eq(codebaseAnalyses.projectId, input.projectId),
-					eq(codebaseAnalyses.snapshotId, input.snapshotId),
-				),
-			)
-			.orderBy(asc(codebaseAnalyses.createdAt));
-		const target = analyses.find(
-			(analysis) => analysis.id === input.targetAnalysisId,
-		);
-		const decision = decideStarterSuggestionRefresh({
-			projectId: input.projectId,
-			snapshotId: input.snapshotId,
-			targetAnalysisId: input.targetAnalysisId,
-			snapshotStatus: snapshot.status,
-			target: target ?? null,
-			analyses,
-		});
-		if (decision.action === "reject") {
-			if (decision.reason === "snapshot_not_uploaded") {
-				throw new AnalysisServiceError(
-					"SNAPSHOT_NOT_UPLOADED",
-					"Snapshot belum siap dianalisis. Selesaikan sync terlebih dahulu.",
-				);
-			}
-			throw new AnalysisServiceError(
-				"ANALYSIS_REFRESH_NOT_ALLOWED",
-				"Starter suggestions cannot be refreshed for this analysis.",
-			);
-		}
-		if (decision.action === "reuse") {
-			return { action: "reuse", analysisId: decision.analysisId };
-		}
-
-		const analysisId = crypto.randomUUID();
-		await tx.insert(codebaseAnalyses).values({
-			id: analysisId,
-			projectId: input.projectId,
-			snapshotId: input.snapshotId,
-			status: "pending",
-		});
-		return { action: "create", analysisId };
-	});
 }
 
 export async function requestCodebaseAnalysis(
