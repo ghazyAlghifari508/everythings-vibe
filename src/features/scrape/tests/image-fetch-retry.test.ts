@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	IMAGE_FETCH_PLAN,
 	shouldRetryImageFetch,
-} from "@/features/scrape/services/scrape-extraction-service";
+} from "@/features/scrape/services/scrape-image-extraction";
 
 describe("shouldRetryImageFetch", () => {
 	it("retries a transient transport fault while attempts remain", () => {

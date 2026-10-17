@@ -1,8 +1,9 @@
 import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
-import type { ScrapeStatus } from "@/db/schema";
+import type { ScrapeRow, ScrapeStatus } from "@/db/schema";
 import { scrapes } from "@/db/schema";
 import {
 	errorSourceForCode,
+	ScrapeError,
 	scrapeFailureReasonForCode,
 } from "@/lib/design-errors";
 
@@ -69,6 +70,35 @@ export function scrapeClaimPredicate(claim: ScrapeJobClaim) {
 		eq(scrapes.jobToken, claim.token),
 		gt(scrapes.leaseExpiresAt, new Date()),
 	);
+}
+
+export type ScrapeJobUpdate = (
+	values: Partial<typeof scrapes.$inferInsert>,
+) => Promise<void>;
+
+export function createScrapeJobUpdate(
+	scrape: ScrapeRow,
+	claim: ScrapeJobClaim,
+): ScrapeJobUpdate {
+	return async (values) => {
+		if (values.status)
+			values.metadata = {
+				...scrape.metadata,
+				...values.metadata,
+				stage: values.status,
+				stageStartedAt: new Date().toISOString(),
+			};
+		if (values.metadata)
+			scrape.metadata = { ...scrape.metadata, ...values.metadata };
+		const { db } = await import("@/db");
+		const rows = await db
+			.update(scrapes)
+			.set({ ...values, updatedAt: new Date() })
+			.where(scrapeClaimPredicate(claim))
+			.returning({ id: scrapes.id });
+		if (!rows.length)
+			throw new ScrapeError("STORAGE_FAILED", "Job lease sudah tidak berlaku.");
+	};
 }
 
 export async function claimScrapeJob(): Promise<ScrapeJobClaim | null> {
