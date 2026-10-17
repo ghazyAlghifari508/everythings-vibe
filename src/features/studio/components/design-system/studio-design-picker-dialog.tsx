@@ -10,7 +10,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import type { AttachedLogo } from "@/features/studio/components/design-system/start-with-design-modal";
 import {
 	StudioDesignCustomPanel,
 	type StudioDesignCustomState,
@@ -19,6 +18,7 @@ import {
 	StudioDesignTemplatePanel,
 	StudioDesignThemePanel,
 } from "@/features/studio/components/design-system/studio-design-picker-panels";
+import type { AttachedLogo } from "@/features/studio/types/studio";
 import { extractDesignSystemTokens } from "@/lib/studio-design-system";
 import {
 	getStudioPresetDesignMd,

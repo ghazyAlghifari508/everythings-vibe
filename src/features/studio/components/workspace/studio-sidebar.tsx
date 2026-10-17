@@ -27,15 +27,9 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { StudioHistoryItem } from "@/features/studio/types/studio";
 
-export interface StudioHistoryItem {
-	id: string;
-	title: string;
-	designMode?: string;
-	hasDesignMd?: boolean;
-	hasLogo?: boolean;
-	createdAt: string;
-}
+export type { StudioHistoryItem } from "@/features/studio/types/studio";
 
 export interface StudioSidebarProps {
 	history: StudioHistoryItem[];

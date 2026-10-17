@@ -1,4 +1,4 @@
-import type { AttachedLogo } from "@/features/studio/components/design-system/start-with-design-modal";
+import type { AttachedLogo } from "@/features/studio/types/studio";
 import { formatStudioBytes } from "@/features/studio/utils/format-studio-bytes";
 import { STUDIO_LOGO_MAX_BYTES } from "@/lib/constants";
 import { validateStudioDesignMd } from "@/lib/prompts-ui-studio";

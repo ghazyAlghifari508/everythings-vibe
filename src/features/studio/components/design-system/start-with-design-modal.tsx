@@ -5,21 +5,12 @@ import { Check, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { StudioDesignLogoSection } from "@/features/studio/components/design-system/studio-design-logo-section";
 import { StudioDesignMdSection } from "@/features/studio/components/design-system/studio-design-md-section";
+import type {
+	AttachedDesignReference,
+	AttachedLogo,
+} from "@/features/studio/types/studio";
 import { STUDIO_LOGO_MAX_BYTES } from "@/lib/constants";
 import { validateStudioDesignMd } from "@/lib/prompts-ui-studio";
-
-export interface AttachedLogo {
-	filename: string;
-	mimeType: string;
-	data: string; // base64
-	previewUrl?: string;
-	byteLength?: number;
-}
-
-export interface AttachedDesignReference {
-	designMd: string;
-	logo: AttachedLogo | null;
-}
 
 export interface StartWithDesignModalProps {
 	open: boolean;

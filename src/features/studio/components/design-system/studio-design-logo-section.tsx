@@ -1,6 +1,6 @@
 import { AlertCircle, ImageIcon, Trash2, Upload } from "lucide-react";
 import { useRef } from "react";
-import type { AttachedLogo } from "@/features/studio/components/design-system/start-with-design-modal";
+import type { AttachedLogo } from "@/features/studio/types/studio";
 import { formatStudioBytes } from "@/features/studio/utils/format-studio-bytes";
 
 interface StudioDesignLogoSectionProps {

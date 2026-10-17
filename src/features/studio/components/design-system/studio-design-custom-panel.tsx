@@ -1,6 +1,6 @@
 import { FileCode2, ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { useRef } from "react";
-import type { AttachedLogo } from "@/features/studio/components/design-system/start-with-design-modal";
+import type { AttachedLogo } from "@/features/studio/types/studio";
 import {
 	readStudioDesignMdFile,
 	readStudioLogoFile,

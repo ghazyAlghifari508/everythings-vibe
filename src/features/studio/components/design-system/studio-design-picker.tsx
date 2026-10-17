@@ -8,14 +8,12 @@ import {
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { AttachedDesignReference } from "@/features/studio/types/studio";
 import {
 	getStudioPresetDesignMd,
 	STUDIO_DESIGN_PRESETS,
 } from "@/lib/studio-presets";
-import {
-	type AttachedDesignReference,
-	StartWithDesignModal,
-} from "./start-with-design-modal";
+import { StartWithDesignModal } from "./start-with-design-modal";
 
 /**
  * Design-system selection lives in the project menu rather than the composer.
