@@ -1,19 +1,10 @@
 "use client";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { FolderOpen, User, X } from "lucide-react";
+import { useNavigate, useRouter } from "@tanstack/react-router";
+import { FolderOpen, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Logo } from "@/components/ui/logo";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
 	type LaunchComposerConfig,
 	StudioLaunchComposer,
@@ -21,12 +12,12 @@ import {
 import { StudioDesignPickerDialog } from "@/features/studio/components/design-system/studio-design-picker-dialog";
 import { StudioShortcutCarousel } from "@/features/studio/components/studio-shortcut-carousel";
 import { StudioBackLink } from "@/features/studio/components/workspace/studio-back-link";
+import { StudioLandingProfile } from "@/features/studio/components/workspace/studio-landing-profile";
 import { StudioSidebar } from "@/features/studio/components/workspace/studio-sidebar";
 import type {
 	AttachedDesignReference,
 	StudioHistoryItem,
 } from "@/features/studio/types/studio";
-import { authClient } from "@/lib/auth-client";
 import {
 	STUDIO_DEFAULT_PAGE_COUNT,
 	type StudioDesignSkillId,
@@ -50,43 +41,6 @@ export type StagedReference =
 			designMd: string;
 			logo: AttachedDesignReference["logo"];
 	  };
-
-function StudioLandingProfile() {
-	const { data: session } = authClient.useSession();
-	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<button
-					type="button"
-					aria-label="Profil dan tampilan"
-					title="Profil dan tampilan"
-					className="flex size-9 items-center justify-center rounded-full border border-graphite bg-charcoal text-mist transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					{session?.user.image ? (
-						<img
-							src={session.user.image}
-							alt=""
-							className="size-8 rounded-full"
-						/>
-					) : (
-						<User size={16} aria-hidden />
-					)}
-				</button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuLabel>{session?.user.name ?? "Akun"}</DropdownMenuLabel>
-				<DropdownMenuItem asChild>
-					<Link to="/settings">Pengaturan akun</Link>
-				</DropdownMenuItem>
-				<DropdownMenuSeparator />
-				<div className="flex items-center justify-between gap-4 px-2 py-1 text-sm text-fog">
-					<span>Tampilan workspace</span>
-					<ThemeToggle />
-				</div>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-}
 
 /**
  * Landing screen for VibeDesign Studio: project history, the launch composer,
