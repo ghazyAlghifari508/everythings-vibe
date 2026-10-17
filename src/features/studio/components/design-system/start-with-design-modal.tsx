@@ -1,20 +1,11 @@
 "use client";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import {
-	AlertCircle,
-	Check,
-	FileCode2,
-	ImageIcon,
-	Trash2,
-	Upload,
-	X,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import {
-	STUDIO_DESIGN_MD_MAX_CHARS,
-	STUDIO_LOGO_MAX_BYTES,
-} from "@/lib/constants";
+import { Check, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { StudioDesignLogoSection } from "@/features/studio/components/design-system/studio-design-logo-section";
+import { StudioDesignMdSection } from "@/features/studio/components/design-system/studio-design-md-section";
+import { STUDIO_LOGO_MAX_BYTES } from "@/lib/constants";
 import { validateStudioDesignMd } from "@/lib/prompts-ui-studio";
 
 export interface AttachedLogo {
@@ -37,12 +28,6 @@ export interface StartWithDesignModalProps {
 	onApply: (reference: AttachedDesignReference) => Promise<void> | void;
 }
 
-function formatBytes(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 export function StartWithDesignModal({
 	open,
 	onOpenChange,
@@ -57,9 +42,6 @@ export function StartWithDesignModal({
 	const [error, setError] = useState<string | null>(null);
 	const [logoError, setLogoError] = useState<string | null>(null);
 	const [applying, setApplying] = useState(false);
-
-	const mdFileInputRef = useRef<HTMLInputElement>(null);
-	const logoFileInputRef = useRef<HTMLInputElement>(null);
 
 	// Sync when opened with initial reference
 	useEffect(() => {
@@ -240,215 +222,24 @@ export function StartWithDesignModal({
 
 					{/* Modal Body */}
 					<div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
-						{/* Section A: DESIGN.md */}
-						<section aria-labelledby="section-design-md" className="space-y-3">
-							<div className="flex flex-wrap items-center justify-between gap-2">
-								<div>
-									<h3
-										id="section-design-md"
-										className="text-sm font-semibold text-snow flex items-center gap-2"
-									>
-										<FileCode2 size={16} className="text-fog" aria-hidden />
-										<span>DESIGN.md (Tokens & Styling Reference)</span>
-									</h3>
-									<p className="text-xs text-fog mt-0.5">
-										Paste isi file DESIGN.md atau upload file markdown (.md).
-									</p>
-								</div>
-
-								{/* Upload MD Button */}
-								<div>
-									<input
-										ref={mdFileInputRef}
-										type="file"
-										accept=".md,.markdown,text/markdown"
-										onChange={handleMdFileUpload}
-										className="hidden"
-										aria-label="Upload file markdown DESIGN.md"
-									/>
-									<button
-										type="button"
-										onClick={() => mdFileInputRef.current?.click()}
-										className="inline-flex items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									>
-										<Upload size={13} aria-hidden />
-										<span>
-											{uploadedMdName ? "Ganti File .md" : "Upload File .md"}
-										</span>
-									</button>
-								</div>
-							</div>
-
-							{uploadedMdName && (
-								<div className="flex items-center gap-2 rounded-md bg-onyx px-3 py-1.5 text-xs text-mist border border-graphite">
-									<Check size={14} className="text-emerald-400" aria-hidden />
-									<span>
-										File terpilih:{" "}
-										<strong className="text-snow">{uploadedMdName}</strong>
-									</span>
-								</div>
-							)}
-
-							<div className="relative">
-								<textarea
-									value={designMd}
-									onChange={(e) => {
-										setDesignMd(e.target.value);
-										if (error) setError(null);
-									}}
-									rows={12}
-									placeholder={`# Brand Design System
-## Tokens - Colors
-| Name | Hex | Role |
-| Canvas | #ffffff | Background utama |
-| Primary | #0f0f0f | Tombol dan teks utama |
-| Accent | #3b82f6 | Highlight dan link |
-
-## Tokens - Typography
-- Heading font: Inter, sans-serif
-- Body font: Inter, sans-serif
-
-## Components
-- Primary Button: rounded-full, solid ink, white text
-- Card: rounded-xl, 1px border hairline`}
-									className="w-full resize-y rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-5 text-mist placeholder:text-slate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-									aria-label="Isi dokumen DESIGN.md"
-								/>
-								<div className="mt-1 flex items-center justify-between text-[11px] text-fog">
-									<span>
-										Format Markdown · Warna, tipografi, radius, komponen, dan
-										Do/Don&apos;t
-									</span>
-									<span
-										className={
-											designMd.length > STUDIO_DESIGN_MD_MAX_CHARS
-												? "text-red-400 font-semibold"
-												: ""
-										}
-									>
-										{designMd.length.toLocaleString("id-ID")} /{" "}
-										{STUDIO_DESIGN_MD_MAX_CHARS.toLocaleString("id-ID")}{" "}
-										karakter
-									</span>
-								</div>
-							</div>
-
-							{error && (
-								<p
-									role="alert"
-									className="flex items-center gap-1.5 text-xs text-red-400"
-								>
-									<AlertCircle size={14} aria-hidden />
-									<span>{error}</span>
-								</p>
-							)}
-						</section>
+						<StudioDesignMdSection
+							designMd={designMd}
+							uploadedMdName={uploadedMdName}
+							error={error}
+							onDesignMdChange={setDesignMd}
+							onErrorClear={() => setError(null)}
+							onFileUpload={handleMdFileUpload}
+						/>
 
 						{/* Divider */}
 						<div className="border-t border-graphite" />
 
-						{/* Section B: Logo */}
-						<section aria-labelledby="section-logo" className="space-y-3">
-							<div>
-								<h3
-									id="section-logo"
-									className="text-sm font-semibold text-snow flex items-center gap-2"
-								>
-									<ImageIcon size={16} className="text-fog" aria-hidden />
-									<span>Application Logo (Opsional)</span>
-								</h3>
-								<p className="text-xs text-fog mt-0.5">
-									Sertakan logo resmi aplikasi untuk ditempatkan pada
-									navbar/header hasil rancangan.
-								</p>
-							</div>
-
-							<input
-								ref={logoFileInputRef}
-								type="file"
-								accept="image/png,image/jpeg,image/webp,image/svg+xml"
-								onChange={handleLogoFileUpload}
-								className="hidden"
-								aria-label="Upload logo aplikasi"
-							/>
-
-							{logo ? (
-								<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-graphite bg-charcoal p-3.5">
-									<div className="flex items-center gap-3">
-										<div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-graphite bg-onyx p-1.5 overflow-hidden">
-											{logo.previewUrl ? (
-												<img
-													src={logo.previewUrl}
-													alt="Preview logo"
-													className="max-h-full max-w-full object-contain"
-												/>
-											) : (
-												<ImageIcon size={24} className="text-fog" aria-hidden />
-											)}
-										</div>
-										<div>
-											<p className="text-xs font-semibold text-snow truncate max-w-[220px] sm:max-w-md">
-												{logo.filename}
-											</p>
-											<p className="text-[11px] text-fog font-mono mt-0.5">
-												{logo.mimeType}
-												{logo.byteLength
-													? ` · ${formatBytes(logo.byteLength)}`
-													: ""}
-											</p>
-										</div>
-									</div>
-
-									<div className="flex items-center gap-2">
-										<button
-											type="button"
-											onClick={() => logoFileInputRef.current?.click()}
-											className="rounded-lg border border-graphite bg-onyx px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-										>
-											Ganti Logo
-										</button>
-										<button
-											type="button"
-											onClick={() => setLogo(null)}
-											aria-label="Hapus logo"
-											title="Hapus logo"
-											className="inline-flex size-8 items-center justify-center rounded-lg border border-graphite bg-onyx text-fog transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
-										>
-											<Trash2 size={14} aria-hidden />
-										</button>
-									</div>
-								</div>
-							) : (
-								<button
-									type="button"
-									onClick={() => logoFileInputRef.current?.click()}
-									className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-graphite bg-charcoal/50 p-6 text-center transition-colors hover:border-mist hover:bg-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									<div className="flex size-10 items-center justify-center rounded-full bg-onyx text-fog">
-										<Upload size={18} aria-hidden />
-									</div>
-									<div>
-										<p className="text-xs font-semibold text-snow">
-											Klik untuk memilih file logo
-										</p>
-										<p className="text-[11px] text-fog mt-0.5">
-											PNG, JPEG, WebP, atau SVG (maks 2MB). File .fig tidak
-											didukung.
-										</p>
-									</div>
-								</button>
-							)}
-
-							{logoError && (
-								<p
-									role="alert"
-									className="flex items-center gap-1.5 text-xs text-red-400"
-								>
-									<AlertCircle size={14} aria-hidden />
-									<span>{logoError}</span>
-								</p>
-							)}
-						</section>
+						<StudioDesignLogoSection
+							logo={logo}
+							logoError={logoError}
+							onLogoChange={setLogo}
+							onFileUpload={handleLogoFileUpload}
+						/>
 					</div>
 
 					{/* Modal Footer */}

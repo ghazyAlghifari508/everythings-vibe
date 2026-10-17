@@ -5,14 +5,19 @@ import {
 	RotateCcw,
 	Smartphone,
 } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo } from "react";
 import type { StudioFrameRow } from "@/db/schema";
+import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
+import { useStudioFrameVisual } from "@/features/studio/hooks/use-studio-frame-visual";
+import { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 import { extractCleanHtml } from "@/lib/clean-html";
-import {
-	STUDIO_VISUAL_FALLBACK_HEIGHT,
-	STUDIO_VISUAL_WIDTH,
-} from "@/lib/constants";
-import { StudioFrameShimmer } from "./studio-frame-shimmer";
+import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
+
+export type { StudioFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
+export {
+	isFrameVisualPending,
+	resolveFrameArtboardMode,
+} from "@/features/studio/utils/studio-frame-artboard";
 
 export interface StudioFrameProps {
 	frame: StudioFrameRow;
@@ -22,50 +27,6 @@ export interface StudioFrameProps {
 	isCanvasPanning?: boolean;
 	className?: string;
 	onMeasure?: (id: string, width: number, height: number) => void;
-}
-
-/**
- * Whether the frame's artboard is still waiting for its real visual. This is
- * the single source of truth for the shimmer lifecycle: queued and generating
- * frames shimmer, a frame with HTML but no displayable preview keeps
- * shimmering, and a frame whose preview failed must not shimmer at all.
- */
-export function isFrameVisualPending(
-	status: string,
-	hasVisual: boolean,
-	hasVisualError: boolean,
-): boolean {
-	if (status === "failed") return false;
-	if (status === "ready") return !hasVisual && !hasVisualError;
-	return true;
-}
-
-export type StudioFrameArtboardMode =
-	| "shimmer"
-	| "preview"
-	| "visual-error"
-	| "generation-failed"
-	| "preview-unavailable";
-
-/**
- * Resolves what the artboard must render. Exactly one mode wins, so a frame can
- * never shimmer forever with no explanation: a ready frame whose stored HTML is
- * missing resolves to `preview-unavailable`, and a capture failure resolves to
- * `visual-error` with a targeted retry instead of an endless shimmer.
- */
-export function resolveFrameArtboardMode(input: {
-	status: string;
-	hasRenderableHtml: boolean;
-	hasVisual: boolean;
-	hasVisualError: boolean;
-}): StudioFrameArtboardMode {
-	if (input.status === "failed") return "generation-failed";
-	if (input.status === "ready" && !input.hasRenderableHtml)
-		return "preview-unavailable";
-	if (isFrameVisualPending(input.status, input.hasVisual, input.hasVisualError))
-		return "shimmer";
-	if (input.hasVisual) return "preview";
-	return "visual-error";
 }
 
 /**
@@ -92,77 +53,14 @@ export const StudioFrame = memo(function StudioFrame({
 	const frameWidth = isMobile
 		? STUDIO_VISUAL_WIDTH.mobile
 		: STUDIO_VISUAL_WIDTH.web;
-	const [visual, setVisual] = useState<{
-		url: string;
-		width: number;
-		height: number;
-	} | null>(null);
-	const [visualError, setVisualError] = useState("");
-	const [visualAttempt, setVisualAttempt] = useState(0);
-	const artboardRef = useRef<HTMLElement>(null);
-	const frameHeight =
-		visual?.height ??
-		(isMobile
-			? STUDIO_VISUAL_FALLBACK_HEIGHT.mobile
-			: STUDIO_VISUAL_FALLBACK_HEIGHT.web);
-	/**
-	 * The visual fetch is skipped for a ready frame without HTML: there is
-	 * nothing to capture, so the request would only burn a round trip.
-	 */
-	useEffect(() => {
-		if (!frame.htmlCode || !artboardRef.current) return;
-		const controller = new AbortController();
-		let started = false;
-		async function load() {
-			if (started) return;
-			started = true;
-			setVisualError("");
-			try {
-				const response = await fetch(
-					`/api/studio/frame?projectId=${encodeURIComponent(frame.projectId)}&frameId=${encodeURIComponent(frame.id)}&attempt=${visualAttempt}`,
-					{ signal: controller.signal },
-				);
-				const data: unknown = await response.json();
-				if (
-					!response.ok ||
-					typeof data !== "object" ||
-					data === null ||
-					!("url" in data) ||
-					typeof data.url !== "string" ||
-					!("width" in data) ||
-					typeof data.width !== "number" ||
-					!("height" in data) ||
-					typeof data.height !== "number"
-				) {
-					throw new Error(readVisualError(data));
-				}
-				setVisual({ url: data.url, width: data.width, height: data.height });
-				onMeasure?.(frame.id, data.width, data.height);
-			} catch (failure) {
-				if (!controller.signal.aborted)
-					setVisualError(
-						failure instanceof Error
-							? failure.message
-							: "Visual frame gagal dimuat.",
-					);
-			}
-		}
-		const observer =
-			typeof IntersectionObserver === "undefined"
-				? null
-				: new IntersectionObserver(
-						(entries) => {
-							if (entries.some((entry) => entry.isIntersecting)) void load();
-						},
-						{ rootMargin: "600px" },
-					);
-		if (observer) observer.observe(artboardRef.current);
-		else void load();
-		return () => {
-			controller.abort();
-			observer?.disconnect();
-		};
-	}, [frame.id, frame.projectId, frame.htmlCode, visualAttempt, onMeasure]);
+	const {
+		visual,
+		visualError,
+		setVisualError,
+		retryVisual,
+		artboardRef,
+		frameHeight,
+	} = useStudioFrameVisual({ frame, isMobile, onMeasure });
 
 	const cleanHtml = frame.htmlCode ? extractCleanHtml(frame.htmlCode) : "";
 	// A ready frame whose HTML is missing or empty cannot produce a preview.
@@ -279,7 +177,7 @@ export const StudioFrame = memo(function StudioFrame({
 						<p role="alert">{visualError}</p>
 						<button
 							type="button"
-							onClick={() => setVisualAttempt((attempt) => attempt + 1)}
+							onClick={retryVisual}
 							className="rounded-lg border border-iron px-3 py-2 text-snow"
 						>
 							Coba lagi visual
@@ -345,17 +243,3 @@ export const StudioFrame = memo(function StudioFrame({
 		</article>
 	);
 });
-
-/**
- * Reads the server's capture-failure explanation from the frame visual
- * response. The pipeline distinguishes a failed capture from a missing HTML
- * payload, so the artboard can say which problem actually happened instead of
- * collapsing every failure into one generic sentence.
- */
-function readVisualError(data: unknown): string {
-	if (typeof data === "object" && data !== null && "error" in data) {
-		const message = data.error;
-		if (typeof message === "string" && message.trim()) return message;
-	}
-	return "Gagal menyiapkan visual frame.";
-}
