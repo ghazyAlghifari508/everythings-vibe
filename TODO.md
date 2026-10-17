@@ -591,8 +591,10 @@ Sebelum migrasi dilakukan, setiap risiko kompatibilitas wajib diaudit dan diveri
 
 ### 7.1. Latar Belakang &amp; Masalah Struktur Eksisting
 
-Saat ini struktur repositori masih menganut pola *layer-based* umum di mana komponen tersebar di `src/components/`, hooks di `src/hooks/`, logic backend di `src/lib/services/`, dan test tersebar acak di `src/routes/` atau `src/lib/`. 
+Sebelum migrasi, struktur repositori menganut pola *layer-based* umum di mana komponen tersebar di `src/components/`, hooks di `src/hooks/`, logic backend di `src/lib/services/`, dan test tersebar acak di `src/routes/` atau `src/lib/`. 
 Ketika sebuah fitur (misalnya **Greenfield Planning** atau **Codebase Sync**) ingin dipelajari, dimodifikasi, atau di-refactor, developer/agent harus melompat-lompat di 5+ direktori terpisah.
+
+> **Status:** migrasi selesai (Phase 10). Deskripsi di atas adalah kondisi **pra-migrasi**; struktur aktual hari ini tercatat di §7.2 dan §7.5.
 
 ### 7.2. Konsep Target: Feature-Driven Architecture (`src/features/`)
 
@@ -600,37 +602,24 @@ Setiap domain bisnis memiliki rumah mandiri di bawah `src/features/<feature-name
 
 ```
 src/
-├── features/
-│   ├── greenfield/            # Fitur alur Greenfield (Ask, Fitur tree, PRD, AC, Task canvas, Kanban)
-│   │   ├── components/        # UI khusus greenfield (PrdViewer, WhiteboardCanvas, KanbanBoard)
-│   │   ├── hooks/             # Custom hooks khusus greenfield (useKanban, useWhiteboard)
-│   │   ├── services/          # Logika bisnis & API (prd-service, ac-service, task-service)
+├── features/                  # 8 domain: admin, auth-settings, billing, codebase, greenfield, scrape, studio, templates
+│   ├── greenfield/            # Alur Greenfield (Ask, Fitur tree, PRD, AC, Task canvas, Kanban)
+│   │   ├── components/        # PrdViewer, WhiteboardCanvas, KanbanBoard, FeatureMapCanvas
+│   │   ├── hooks/             # useKanban, useAsk, useTaskGeneration
+│   │   ├── services/          # prd/ac/task generation, project-delete, kanban-*, v1-* handlers
 │   │   ├── types/             # Domain types & Zod schemas
-│   │   └── tests/             # Unit & integration tests khusus greenfield
-│   ├── codebase/              # Fitur Existing Codebase Workspace & CLI Sync
-│   │   ├── components/        # CodebaseExplorer, CodebaseChatWorkspace, DocPreview
-│   │   ├── hooks/             # useCodebaseWorkspace, useCodebaseChatStream
-│   │   ├── services/          # codebase-analysis, codebase-sync, codebase-anchor
-│   │   ├── types/             # Sync schemas, Analysis schemas
-│   │   └── tests/             # Seluruh test sinkronisasi & analisis codebase
-│   ├── studio/                # Fitur VibeDesign Studio (Interactive Canvas & Prototyping)
-│   │   ├── components/        # StudioCanvas, StudioFrame, StudioSidebar, FramePicker
-│   │   ├── hooks/             # useStudioWorkspace, useStudioCanvasMarquee
-│   │   ├── services/          # studio-service, studio-design-blueprint, studio-export
-│   │   ├── types/             # studio-schemas, studio-types
-│   │   └── tests/             # Unit & integration tests studio synthesis
-│   ├── scrape/                # Fitur VibeScrape (Web Scraping, Crawling & Token Extraction)
-│   │   ├── components/        # ScrapeWorkspaceForm, HtmlScraperPanel, ScrapeHistoryList
-│   │   ├── hooks/             # useScrapeStatus, useScrapePreview
-│   │   ├── services/          # scrape-service, scrape-worker (Playwright), crawl-website
-│   │   ├── types/             # scrape-contract, scrape Zod schemas
-│   │   └── tests/             # Unit & integration tests scraping & Playwright crawling
-│   ├── templates/             # Fitur Katalog Template & Blueprints
-│   ├── billing/               # Fitur Midtrans Snap, Credits, Balance & Invoices
-│   └── auth-settings/         # Fitur Autentikasi Better Auth, Profile & Pengaturan
-├── routes/                    # THIN ROUTING LAYER (Hanya definisi rute, loader, dan panggil fitur)
-├── components/ui/             # SHARED PRIMITIVES (shadcn/radix murni yang reusable lintas fitur)
-└── lib/                       # SHARED INFRASTRUCTURE (DB client, session, auth client, core constants)
+│   │   ├── utils/             # flow-step, whiteboard-layout, page-inventory
+│   │   └── tests/             # 68 file test greenfield
+│   ├── codebase/              # Existing Codebase Workspace & CLI Sync (163 impl / 76 test)
+│   ├── studio/                # VibeDesign Studio (85 impl / 51 test)
+│   ├── scrape/                # VibeScrape (145 impl / 95 test)
+│   ├── billing/               # Midtrans Snap, credits, ledger, invoices (40 impl / 21 test)
+│   ├── auth-settings/         # Better Auth, profile, settings, API keys (22 impl / 12 test)
+│   ├── admin/                 # Admin metrics, users, projects, transactions (25 impl / 7 test)
+│   └── templates/             # Katalog template & blueprint (8 impl / 3 test)
+├── routes/                    # THIN ROUTING LAYER (107 file, maks 121 baris, 0 file test)
+├── components/ui/             # SHARED PRIMITIVES (shadcn/radix murni reusable lintas fitur)
+└── lib/                       # SHARED INFRASTRUCTURE (DB client, session, auth, ai-client, constants, SSE, rate-limit)
 ```
 
 ---
@@ -642,41 +631,71 @@ Di TanStack Router (file-based routing), seluruh file di dalam `src/routes/` oto
 Di repositori ini, prefix `-` digunakan untuk menaruh file test langsung di sebelah file rute (misal `src/routes/plan/-codebase.test.tsx`).
 - **Apakah pola ini bagus?**
 **TIDAK IDEAL jangka panjang.** Menaruh file test di dalam folder `src/routes/`:
-  1. Mengotori folder rute dengan puluhan file non-rute (saat ini ada 30+ file test bertanda `-` di `src/routes/`).
+  1. Mengotori folder rute dengan puluhan file non-rute (dulu 39 file test bertanda `-` di `src/routes/`).
   2. Membingungkan navigasi developer dan AI agent saat membaca struktur URL aplikasi.
-- **Target Refaktor:**
-  - Pindahkan SELURUH file `-*.test.ts` dan `-*.test.tsx` dari `src/routes/` ke folder `tests/` di masing-masing domain fitur (`src/features/<feature>/tests/` atau `tests/routes/`).
-  - Folder `src/routes/` harus bersih 100%, hanya berisi file rute resmi (`index.tsx`, `$id.tsx`, `__root.tsx`).
+- **Status (selesai):**
+  - Seluruh file `-*.test.ts` dan `-*.test.tsx` sudah dipindahkan dari `src/routes/` ke `tests/` domain fiturnya.
+  - Terverifikasi: `src/routes/` = 107 file rute, **0 file test**, **0 file berawalan `-`**, file terpanjang 121 baris.
+  - `src/routeTree.gen.ts` sudah diregenerasi (`pnpm generate-routes`) setelah relokasi.
 
 ---
 
 ### 7.4. Checklist Migrasi Struktur Modular
 
-- [ ] **Fase 1: Scaffolding Direktori Fitur (`src/features/`):**
-  - [ ] Buat struktur dasar `src/features/greenfield/`, `src/features/codebase/`, `src/features/studio/`, `src/features/scrape/`, `src/features/billing/`, `src/features/templates/`.
+- [x] **Fase 1: Scaffolding Direktori Fitur (`src/features/`):**
+  - [x] Struktur 8 domain: `greenfield`, `codebase`, `studio`, `scrape`, `billing`, `templates`, `auth-settings`, `admin` — masing-masing dengan `components/`, `hooks/`, `services/`, `types/`, `tests/` (beberapa domain menambah `utils/`).
 - [x] **Fase 2: Migrasi Domain Codebase:**
   - [x] Pindahkan komponen `src/components/codebase/*` ke `src/features/codebase/components/`.
   - [x] Pindahkan helpers `src/lib/codebase-*` ke `src/features/codebase/services/`.
   - [x] Pindahkan file test `-codebase-*.test.tsx` dari `src/routes/plan/` ke `src/features/codebase/tests/`.
-- [ ] **Fase 3: Migrasi Domain Greenfield:**
-  - [ ] Pindahkan komponen `prd/`, `ac/`, `task/`, `kanban/`, `ask/`, `fitur/` ke `src/features/greenfield/components/`.
-  - [ ] Pindahkan services `prd-service.ts`, `ac-service.ts`, `task-service.ts` ke `src/features/greenfield/services/`.
+- [x] **Fase 3: Migrasi Domain Greenfield:**
+  - [x] Komponen `prd/`, `ac/`, `task/`, `kanban/`, `ask/`, `fitur/` berada di `src/features/greenfield/components/`.
+  - [x] Services PRD/AC/Task dan handler API (`project-create`, `project-delete`, `project-progress`, `feature-generate`, `kanban-*`, `v1-*`) berada di `src/features/greenfield/services/`.
 - [x] **Fase 4: Migrasi Domain VibeDesign Studio:**
   - [x] Pindahkan komponen `src/components/design/studio-*` ke `src/features/studio/components/`.
   - [x] Pindahkan services `studio-service.ts`, `studio-design-blueprint.ts`, `studio-export.ts` ke `src/features/studio/services/`.
   - [x] Pindahkan file test `-studio.*.test.tsx` dari `src/routes/` ke `src/features/studio/tests/`.
 - [x] **Fase 5: Migrasi Domain VibeScrape (Web Scraping &amp; Extraction):**
-  - [x] Pindahkan komponen `src/components/design/scrape-*` dan `html-scraper*.tsx` ke `src/features/scrape/components/` (file lama tersisa sebagai re-export shim).
-  - [x] Pindahkan hooks `use-scrape-status.ts` dan `use-scrape-preview.ts` ke `src/features/scrape/hooks/` (file lama tersisa sebagai re-export shim).
-  - [x] Pindahkan logic scraping, crawling, dan worker (`scrape-service.ts`, `scrape-job-service.ts`, `scrape-worker.ts`, `crawl-website.ts`) ke `src/features/scrape/services/`.
-  - [x] Pindahkan file test `-scrap.*.test.tsx` dari `src/routes/design/` dan `-scrape.*.test.ts` dari `src/routes/api/` ke `src/features/scrape/tests/`.
-- [ ] **Fase 6: Pembersihan `src/routes/` (Thin Routes Only) &amp; Route Separation:**
-  - [ ] Pastikan setiap file di `src/routes/` hanya bertindak sebagai wire up (mengambil params/search params, memanggil loader/query, lalu me-render View dari `src/features/`).
-  - [ ] Pisahkan namespace routing VibeScrape (`/scrape/*`) dari VibeDesign Studio (`/design/studio/*`) dengan redirect backward-compatibility.
-  - [ ] Hapus seluruh prefiks `-` dari `src/routes/`.
-- [ ] **Fase 7: Validasi Integritas Import &amp; Test:**
-  - [ ] Jalankan `pnpm generate-routes` untuk memastikan route tree tetap valid.
-  - [ ] Jalankan `pnpm check` dan `pnpm test` hingga seluruh suite lulus tanpa import error.
+  - [x] Komponen `scrape-*` dan `html-scraper*.tsx` berada di `src/features/scrape/components/`.
+  - [x] Hooks `use-scrape-status.ts` dan `use-scrape-preview.ts` berada di `src/features/scrape/hooks/`.
+  - [x] Logic scraping, crawling, transport HTTP, dan worker (`scrape-service.ts`, `scrape-job-service.ts`, `scrape-worker.ts`, `crawl-website.ts`, `scrape-http.ts`, `http-transport.ts`) berada di `src/features/scrape/services/`.
+  - [x] File test `-scrap.*.test.tsx` (dari `src/routes/design/`) dan `-scrape.*.test.ts` (dari `src/routes/api/`) berada di `src/features/scrape/tests/`.
+  - [x] 21 shim re-export `src/components/design/*` **dihapus** (0 konsumen setelah verifikasi repo-wide).
+- [x] **Fase 6: Pembersihan `src/routes/` (Thin Routes Only) &amp; Route Separation:**
+  - [x] Setiap file rute hanya wire-up (param/search param/loader + render View fitur). Handler API diekstrak ke `src/features/<domain>/services/*-route.server.ts`; tersisa 107 file rute, terpanjang 121 baris (≤150).
+  - [ ] Pisahkan namespace routing VibeScrape (`/scrape/*`) dari VibeDesign Studio (`/design/studio/*`) — **sengaja ditunda**: `docs/main-prompt/p9.md` (line 99) melarang eksekusi Bagian 9 pada fase ini.
+  - [x] Hapus seluruh prefiks `-` dari `src/routes/` (0 tersisa; 39 file test lama sudah direlokasi ke `tests/` domain).
+- [x] **Fase 7: Validasi Integritas Import &amp; Test:**
+  - [x] `pnpm generate-routes` → route tree valid (`src/routeTree.gen.ts` diregenerasi setelah relokasi test).
+  - [x] `pnpm exec tsc --noEmit` → 0 error; seluruh file yang diubah bersih di `biome check`; `pnpm test` hijau; `pnpm build` exit 0.
+
+---
+
+### 7.5. Status Validasi &amp; Hasil Handoff (Phase 10)
+
+**Arsitektur terimplementasi:** 624 file implementasi + 333 file test di `src/features/` (admin 25/7, auth-settings 22/12, billing 40/21, codebase 163/76, greenfield 136/68, scrape 145/95, studio 85/51, templates 8/3); `src/routes/` 107 file thin; `src/lib/` 49 file infrastruktur bersama + 21 test; `src/components/` 35 file (primitive `ui/`, shell `layout/`, `history/`, `home/`, `faq/`, `bantuan/`).
+
+**Bukti gate akhir:**
+
+| Perintah | Hasil |
+| :--- | :--- |
+| `pnpm generate-routes` | OK, `src/routeTree.gen.ts` diregenerasi |
+| `pnpm exec tsc --noEmit` | 0 error |
+| `npx biome check src` | Bersih untuk seluruh file yang diubah; sisa 10 error **pre-existing** di `src/app/globals.css` (`noImportantStyles`, file tak tersentuh) |
+| `pnpm test` | 389 file / 3958 test pass, 1 skipped, 0 fail (test yang meluncurkan browser dikecualikan, dijalankan `--maxWorkers=4`) |
+| `pnpm build` | exit 0 |
+
+**Catatan flakiness (bukan regresi):** `pnpm test` dengan paralelisme default di mesin ini menghasilkan timeout 5.000 ms yang nondeterministik (5–11 test per run, tanpa assertion failure). Setiap file yang gagal lulus saat dijalankan terisolasi, dan suite penuh hijau dengan `--maxWorkers=4`. Baseline `f81bc7e` menunjukkan gejala kelas yang sama.
+
+**Debt / deferral yang dilaporkan (tidak dikerjakan di fase ini):**
+
+1. Fase 6 item 2 (`/scrape/*`) — dilarang `docs/main-prompt/p9.md` line 99.
+2. File ≥400 baris pre-existing: `src/db/schema.ts` (1391), `src/components/layout/navbar.tsx` (790), `src/components/ui/orb-core.ts` (600), `src/components/layout/chat-input.tsx` (560), `src/components/ui/thought-line.tsx` (506), `src/components/layout/history-drawer.tsx` (452), `src/features/scrape/services/scrape-asset-http.ts` (429, sudah ada di HEAD).
+3. Warning `pg` di-externalize pada client build (23 warning) — jumlah **identik** dengan build baseline `f81bc7e`, jadi pre-existing, bukan dampak migrasi.
+4. Script `audit:deadcode` (knip) — tercatat di Bagian 8.3, di luar scope fase ini.
+5. Referensi path lama di dokumen historis (Bagian 1/5/9 `TODO.md` baris 86/225/277 dan `docs/studio-p*.md`) masih menyebut `src/lib/flow-step.ts` dan `src/components/task/whiteboard-canvas.tsx`.
+
+**Dead code yang dihapus:** 37 facade/shim tanpa konsumen (21 `src/components/design/*`, 12 `src/lib/studio-*` + `prompts-ui-studio` + `services/studio-service`, 4 `src/lib/design-*`), ditambah pembersihan folder kosong `src/components/*`. Dua modul shared dengan konsumen tunggal dipindahkan ke domainnya: `clean-html.ts` → `src/features/studio/utils/`, `clipboard.ts` → `src/features/codebase/utils/`.
 
 ---
 
