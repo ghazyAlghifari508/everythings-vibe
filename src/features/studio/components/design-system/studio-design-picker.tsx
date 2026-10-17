@@ -8,11 +8,11 @@ import {
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { AttachedDesignReference } from "@/features/studio/types/studio";
 import {
 	getStudioPresetDesignMd,
 	STUDIO_DESIGN_PRESETS,
-} from "@/lib/studio-presets";
+} from "@/features/studio/services/studio-presets";
+import type { AttachedDesignReference } from "@/features/studio/types/studio";
 import { StartWithDesignModal } from "./start-with-design-modal";
 
 /**

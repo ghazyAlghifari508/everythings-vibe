@@ -12,7 +12,7 @@ import {
 	STUDIO_DEFAULT_PAGE_COUNT,
 	STUDIO_MAX_PAGE_COUNT,
 	STUDIO_MIN_PAGE_COUNT,
-} from "@/lib/studio-generation-options";
+} from "@/features/studio/services/studio-generation-options";
 
 const PAGE_COUNT_OPTIONS: number[] = Array.from(
 	{ length: STUDIO_MAX_PAGE_COUNT - STUDIO_MIN_PAGE_COUNT + 1 },

@@ -15,14 +15,14 @@ import {
 	type RefObject,
 	useRef,
 } from "react";
+import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
+import {
+	validateStudioPrdFilename,
+	validateStudioPrdText,
+} from "@/features/studio/services/studio-prd-helpers";
+import type { StudioDesignMode } from "@/features/studio/types/studio-prompts";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
 import { STUDIO_PRD_FILE_MAX_BYTES } from "@/lib/constants";
-import type { StudioDesignMode } from "@/lib/prompts-ui-studio";
-import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
-import {
-	validateStudioPrdContent,
-	validateStudioPrdFilename,
-} from "@/lib/studio-prd-validation";
 import { StudioPageCountSelect } from "./studio-page-count-select";
 import { StudioSkillSelect } from "./studio-skill-select";
 
@@ -103,7 +103,7 @@ export function StudioLaunchComposer({
 
 		try {
 			const text = await file.text();
-			const validContent = validateStudioPrdContent(text);
+			const validContent = validateStudioPrdText(text);
 			if (!validContent.ok) {
 				onError?.(validContent.error);
 				return;

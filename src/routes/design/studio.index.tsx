@@ -9,7 +9,7 @@ const loadStudioHistory = createServerFn({ method: "GET" }).handler(
 	async (): Promise<{ history: StudioHistoryItem[] }> => {
 		const user = await requireUserServer();
 		const { listStudioProjects } = await import(
-			"@/lib/services/studio-service"
+			"@/features/studio/services/studio-project-lifecycle"
 		);
 		const rows = await listStudioProjects(user.id);
 		return {

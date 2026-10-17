@@ -11,7 +11,7 @@ const loadStudioDetail = createServerFn({ method: "GET" })
 	.handler(async ({ data: id }): Promise<StudioDetailLoaderData> => {
 		const user = await requireUserServer();
 		const { getStudioProjectDetail } = await import(
-			"@/lib/services/studio-service"
+			"@/features/studio/services/studio-project-detail"
 		);
 		const detail = await getStudioProjectDetail(id, user.id);
 		return {

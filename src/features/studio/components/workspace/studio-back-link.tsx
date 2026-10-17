@@ -2,7 +2,7 @@
 
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
-import { resolveStudioReturnPath } from "@/lib/studio-return-path";
+import { resolveStudioReturnPath } from "@/features/studio/services/studio-return-path";
 
 const DEFAULT_LABEL = "Kembali";
 const DEFAULT_ARIA_LABEL = "Kembali ke halaman desain";

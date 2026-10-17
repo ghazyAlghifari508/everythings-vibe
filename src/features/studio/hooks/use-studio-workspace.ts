@@ -7,12 +7,12 @@ import type {
 } from "@/db/schema";
 import type { StudioComposerScope } from "@/features/studio/components/composer/studio-composer";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
+import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
+import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import type {
 	AttachedDesignReference,
 	StudioDetailLoaderData,
 } from "@/features/studio/types/studio";
-import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
-import { STUDIO_DESIGN_PRESETS } from "@/lib/studio-presets";
 
 export interface StudioWorkspaceState {
 	project: StudioProjectRow;

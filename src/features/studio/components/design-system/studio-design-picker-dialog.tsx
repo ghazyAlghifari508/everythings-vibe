@@ -18,12 +18,12 @@ import {
 	StudioDesignTemplatePanel,
 	StudioDesignThemePanel,
 } from "@/features/studio/components/design-system/studio-design-picker-panels";
-import type { AttachedLogo } from "@/features/studio/types/studio";
-import { extractDesignSystemTokens } from "@/lib/studio-design-system";
+import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
 import {
 	getStudioPresetDesignMd,
 	STUDIO_DESIGN_PRESETS,
-} from "@/lib/studio-presets";
+} from "@/features/studio/services/studio-presets";
+import type { AttachedLogo } from "@/features/studio/types/studio";
 
 export type DesignPickerTab = "tema" | "template" | "milik";
 

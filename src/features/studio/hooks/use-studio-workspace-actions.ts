@@ -2,9 +2,9 @@ import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
 import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
 import type { StudioComposerScope } from "@/features/studio/components/composer/studio-composer";
+import { exportProjectAsZip } from "@/features/studio/services/studio-export";
+import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import type { AttachedDesignReference } from "@/features/studio/types/studio";
-import { exportProjectAsZip } from "@/lib/studio-export";
-import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
 import { useUIStore } from "@/store";
 
 /** Reads the API's own error message, falling back to a caller-owned sentence. */

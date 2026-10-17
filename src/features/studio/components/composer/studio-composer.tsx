@@ -1,12 +1,12 @@
 import { ArrowUp, FileCode2, Loader2, X } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
+import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
 import {
 	canvasComposerBottomCss,
 	canvasComposerWidthCss,
 } from "@/features/studio/utils/studio-canvas-layout";
-import { STUDIO_MIN_PROMPT_CHARS } from "@/lib/prompts-ui-studio";
-import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
 import { StudioSkillSelect } from "./studio-skill-select";
 
 export type StudioComposerScope = "add" | "revise" | "project";

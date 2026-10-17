@@ -14,8 +14,8 @@ import {
 	STUDIO_DESIGN_SKILLS,
 	type StudioDesignSkillAsset,
 	type StudioDesignSkillIcon,
-} from "@/lib/studio-design-skills";
-import type { StudioDesignSkillId } from "@/lib/studio-generation-options";
+} from "@/features/studio/services/studio-design-skills";
+import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 
 // Fallback marks for skills without an official, licensable logo asset. These
 // are deliberately distinct so each skill is visually identifiable; none of

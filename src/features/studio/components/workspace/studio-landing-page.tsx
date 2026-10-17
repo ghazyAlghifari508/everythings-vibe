@@ -14,22 +14,22 @@ import { StudioShortcutCarousel } from "@/features/studio/components/studio-shor
 import { StudioBackLink } from "@/features/studio/components/workspace/studio-back-link";
 import { StudioLandingProfile } from "@/features/studio/components/workspace/studio-landing-profile";
 import { StudioSidebar } from "@/features/studio/components/workspace/studio-sidebar";
+import {
+	STUDIO_DEFAULT_PAGE_COUNT,
+	type StudioDesignSkillId,
+} from "@/features/studio/services/studio-generation-options";
+import {
+	getStudioPresetDesignMd,
+	STUDIO_DESIGN_PRESETS,
+} from "@/features/studio/services/studio-presets";
+import {
+	STUDIO_PROMPT_SHORTCUTS,
+	type StudioPromptShortcut,
+} from "@/features/studio/services/studio-prompt-shortcuts";
 import type {
 	AttachedDesignReference,
 	StudioHistoryItem,
 } from "@/features/studio/types/studio";
-import {
-	STUDIO_DEFAULT_PAGE_COUNT,
-	type StudioDesignSkillId,
-} from "@/lib/studio-generation-options";
-import {
-	getStudioPresetDesignMd,
-	STUDIO_DESIGN_PRESETS,
-} from "@/lib/studio-presets";
-import {
-	STUDIO_PROMPT_SHORTCUTS,
-	type StudioPromptShortcut,
-} from "@/lib/studio-prompt-shortcuts";
 import { useUIStore } from "@/store";
 
 /** A design reference staged on the landing screen, not yet sent. */

@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { STUDIO_DESIGN_PRESETS } from "@/lib/studio-presets";
+import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 
 interface StudioDesignThemePanelProps {
 	activeThemeId: string | null;
