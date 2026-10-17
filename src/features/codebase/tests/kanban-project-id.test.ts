@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	decideExistingCodebaseKanbanAccess,
 	existingCodebaseKanbanInputSchema,
-} from "./$codebaseId/$projectId";
+} from "@/routes/codebases/kanban/$codebaseId/$projectId";
 
 describe("existing-codebase Kanban route input", () => {
 	it("accepts non-empty bounded repository and project ids", () => {

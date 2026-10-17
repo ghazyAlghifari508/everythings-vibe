@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PlanCodebasePage } from "@/features/codebase/components/workspace/plan-codebase-page";
 import { useUIStore } from "@/store";
-import { PlanCodebasePage } from "./codebase";
 
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,

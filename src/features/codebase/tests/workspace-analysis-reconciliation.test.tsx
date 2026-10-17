@@ -103,7 +103,7 @@ vi.mock(
 	}),
 );
 
-import "./$id";
+import "@/routes/codebases/$id";
 
 const SUGGESTIONS = [
 	{

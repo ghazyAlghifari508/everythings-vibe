@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decideCodebaseDeletion } from "./$codebaseId";
-import { CODEBASE_SESSION_ROUTE_PATH } from "./$codebaseId/session";
-import { validateCodebaseNameInput } from "./index";
+import { decideCodebaseDeletion } from "@/routes/api/codebases/$codebaseId";
+import { CODEBASE_SESSION_ROUTE_PATH } from "@/routes/api/codebases/$codebaseId/session";
+import { validateCodebaseNameInput } from "@/routes/api/codebases/index";
 
 describe("codebase routes", () => {
 	it("exposes the codebase-scoped session path", () => {

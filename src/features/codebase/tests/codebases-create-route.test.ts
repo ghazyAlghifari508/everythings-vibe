@@ -76,7 +76,7 @@ vi.mock("@/db", async () => {
 });
 
 import { codebases } from "@/db/schema";
-import "./index";
+import "@/routes/api/codebases/index";
 
 function createHandler(): CreateHandler {
 	if (!captured.post)

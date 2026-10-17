@@ -3,7 +3,7 @@ import {
 	buildFeatureProjectValues,
 	resolveAnalysisFeaturePrompt,
 	resolveFeaturePromptMessage,
-} from "./$codebaseId/features";
+} from "@/routes/api/codebases/$codebaseId/features";
 
 describe("buildFeatureProjectValues", () => {
 	it("creates an existing-codebase project bound to the codebase", () => {

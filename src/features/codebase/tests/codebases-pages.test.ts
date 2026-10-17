@@ -23,11 +23,6 @@ import {
 } from "@/features/codebase/services/library";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
 import {
-	selectLatestCodebaseSnapshots,
-	selectLibraryAnalysisSlice,
-	selectNewestFeatureProjectIdPerCodebase,
-} from "../codebases/index";
-import {
 	buildAskHandoffAnswers,
 	canRenderCodebaseReview,
 	decideCodebaseDetailEntry,
@@ -36,7 +31,12 @@ import {
 	getCodebaseSessionRequestBody,
 	resolveWorkspaceSnapshotReady,
 	toSourcePreviewState,
-} from "./$id";
+} from "@/routes/codebases/$id";
+import {
+	selectLatestCodebaseSnapshots,
+	selectLibraryAnalysisSlice,
+	selectNewestFeatureProjectIdPerCodebase,
+} from "@/routes/codebases/index";
 
 describe("decideCodebaseDetailEntry", () => {
 	it("allows a present codebase id", () => {
