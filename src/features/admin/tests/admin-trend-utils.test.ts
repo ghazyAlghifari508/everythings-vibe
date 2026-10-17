@@ -4,7 +4,7 @@ import {
 	formatDateKey,
 	formatDateLabel,
 	mergeTrendData,
-} from "./admin-trend-utils";
+} from "../utils/admin-trend-utils";
 
 describe("Admin Trend Utils", () => {
 	it("formats date key as YYYY-MM-DD", () => {

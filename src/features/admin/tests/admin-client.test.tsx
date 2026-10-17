@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AdminClient } from "./admin-client";
+import { AdminClient } from "../components/admin-client";
 
 let mockPathname = "/admin";
 

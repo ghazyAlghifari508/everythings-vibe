@@ -13,13 +13,10 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { memo } from "react";
-import {
-	StreamerModeProvider,
-	useStreamerMode,
-} from "@/components/admin/streamer-mode-context";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { cn } from "@/lib/utils";
+import { StreamerModeProvider, useStreamerMode } from "./streamer-mode-context";
 
 interface NavItem {
 	href: string;

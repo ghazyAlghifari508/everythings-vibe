@@ -2,9 +2,9 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StreamerModeProvider } from "@/components/admin/streamer-mode-context";
-import type { DailyTrendPoint } from "@/lib/services/admin-trend-utils";
-import { TrendLineChart } from "./trend-line-chart";
+import { StreamerModeProvider } from "../components/streamer-mode-context";
+import { TrendLineChart } from "../components/trend-line-chart";
+import type { DailyTrendPoint } from "../types";
 
 const mockTrendData: DailyTrendPoint[] = [
 	{ date: "2026-08-21", label: "21 Agu", revenue: 100000, newUsers: 2 },

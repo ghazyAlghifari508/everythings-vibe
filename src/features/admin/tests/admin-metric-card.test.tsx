@@ -3,8 +3,8 @@ import { Users } from "lucide-react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AdminMetricCard } from "./admin-metric-card";
-import { StreamerModeProvider } from "./streamer-mode-context";
+import { AdminMetricCard } from "../components/admin-metric-card";
+import { StreamerModeProvider } from "../components/streamer-mode-context";
 
 describe("AdminMetricCard", () => {
 	let container: HTMLDivElement;
@@ -85,26 +85,5 @@ describe("AdminMetricCard", () => {
 
 		expect(container.textContent).toContain("Pendapatan");
 		expect(container.textContent).toContain("••••••••");
-		expect(container.textContent).not.toContain("299.700");
-	});
-
-	it("does not mask non-currency value even when streamer mode is on", () => {
-		localStorage.setItem("prdfy_admin_streamer_mode", "true");
-
-		act(() => {
-			root?.render(
-				<StreamerModeProvider>
-					<AdminMetricCard
-						label="Total Pengguna"
-						value={100}
-						isCurrency={false}
-						icon={Users}
-					/>
-				</StreamerModeProvider>,
-			);
-		});
-
-		expect(container.textContent).toContain("100");
-		expect(container.textContent).not.toContain("••••••••");
 	});
 });

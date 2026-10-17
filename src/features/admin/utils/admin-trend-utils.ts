@@ -1,3 +1,5 @@
+import type { DailyTrendPoint } from "../types";
+
 const MONTH_NAMES = [
 	"Jan",
 	"Feb",
@@ -12,13 +14,6 @@ const MONTH_NAMES = [
 	"Nov",
 	"Des",
 ];
-
-export interface DailyTrendPoint {
-	date: string;
-	label: string;
-	revenue: number;
-	newUsers: number;
-}
 
 export function formatDateKey(d: Date): string {
 	const yyyy = d.getFullYear();

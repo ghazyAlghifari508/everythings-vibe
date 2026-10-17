@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { AdminClient } from "@/components/admin/admin-client";
 import { ForbiddenPage } from "@/components/ui/forbidden-page";
+import { AdminClient } from "@/features/admin";
 import { requireAdminServer } from "@/lib/session";
 
 export const Route = createFileRoute("/admin")({

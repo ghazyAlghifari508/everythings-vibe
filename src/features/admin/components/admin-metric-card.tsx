@@ -1,7 +1,7 @@
 import type React from "react";
 import { memo } from "react";
-import { useStreamerMode } from "@/components/admin/streamer-mode-context";
 import { cn } from "@/lib/utils";
+import { useStreamerMode } from "./streamer-mode-context";
 
 interface AdminMetricCardProps {
 	label: string;

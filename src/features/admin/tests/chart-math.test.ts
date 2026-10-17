@@ -3,7 +3,7 @@ import {
 	calculateYScale,
 	generateAreaPath,
 	generateSplinePath,
-} from "./chart-math";
+} from "../utils/chart-math";
 
 describe("Chart Geometry Math", () => {
 	it("generates smooth SVG cubic bezier path string", () => {

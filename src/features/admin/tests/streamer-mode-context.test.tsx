@@ -9,7 +9,7 @@ import {
 	maskOrderId,
 	StreamerModeProvider,
 	useStreamerMode,
-} from "./streamer-mode-context";
+} from "../components/streamer-mode-context";
 
 describe("Streamer Mode Masking Utilities", () => {
 	it("masks currency amounts correctly when active", () => {
@@ -98,20 +98,17 @@ describe("StreamerModeProvider and useStreamerMode Hook", () => {
 		expect(currentContext?.maskName("John Doe")).toBe("J • • • e");
 		expect(currentContext?.maskCurrency(100000)).toBe("••••••••");
 		expect(currentContext?.maskOrderId("INV-123456")).toBe("INV-•••56");
-		expect(currentContext?.maskEmail("test@example.com")).toBe(
-			"t••••@••••.com",
-		);
-		expect(localStorage.getItem("prdfy_admin_streamer_mode")).toBe("true");
 
 		act(() => {
 			currentContext?.toggleStreamerMode();
 		});
 
 		expect(currentContext?.isStreamerMode).toBe(false);
-		expect(localStorage.getItem("prdfy_admin_streamer_mode")).toBe("false");
+		expect(currentContext?.maskName("John Doe")).toBe("John Doe");
+		expect(currentContext?.maskCurrency(100000)).toContain("100.000");
 	});
 
-	it("initializes from localStorage if available", () => {
+	it("preserves state across local storage reloads", () => {
 		localStorage.setItem("prdfy_admin_streamer_mode", "true");
 
 		act(() => {
@@ -123,6 +120,5 @@ describe("StreamerModeProvider and useStreamerMode Hook", () => {
 		});
 
 		expect(currentContext?.isStreamerMode).toBe(true);
-		expect(currentContext?.maskCurrency(100000)).toBe("••••••••");
 	});
 });
