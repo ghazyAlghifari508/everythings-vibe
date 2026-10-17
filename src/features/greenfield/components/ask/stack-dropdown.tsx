@@ -1,13 +1,6 @@
-"use client";
+﻿"use client";
 
-import {
-	ArrowDownUp,
-	Check,
-	ChevronDown,
-	type LucideIcon,
-	Search,
-	X,
-} from "lucide-react";
+import { ChevronDown, type LucideIcon, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
 	useCallback,
@@ -22,6 +15,7 @@ import {
 	stackIconUrl,
 } from "@/features/greenfield/utils/stack-data";
 import { cn } from "@/lib/utils";
+import { StackDropdownList } from "./stack-dropdown-list";
 
 interface StackDropdownProps {
 	label: string;
@@ -325,142 +319,25 @@ export function StackDropdown({
 				</button>
 
 				{open && (
-					<div
-						ref={listRef}
-						role="listbox"
-						id={`${selectId}-listbox`}
-						aria-labelledby={selectId}
-						className={cn(
-							"absolute z-50 max-h-60 w-full overflow-y-auto rounded-lg border border-(--border-subtle) py-1 shadow-(--shadow-overlay)",
-							dropUp ? "bottom-full mb-1" : "mt-1",
-						)}
-						style={{ background: "var(--bg-elevated)" }}
-					>
-						{/* Search */}
-						<div
-							className="sticky top-0 z-10 border-b border-(--border-subtle) px-3 py-2"
-							style={{ background: "var(--bg-elevated)" }}
-						>
-							<div
-								className="flex items-center gap-2 rounded-md border border-(--border-subtle) px-3 py-1.5"
-								style={{ background: "var(--bg-input)" }}
-							>
-								<Search size={14} className="shrink-0 text-fog" />
-								<input
-									type="text"
-									value={searchQuery}
-									onChange={(e) => {
-										setSearchQuery(e.target.value);
-										setHighlightIdx(-1);
-									}}
-									placeholder="Cari..."
-									className="w-full bg-transparent font-inter text-sm outline-none"
-									style={{ color: "var(--text-primary)" }}
-								/>
-							</div>
-						</div>
-
-						{filtered.length === 0 && (
-							<p className="px-4 py-3 font-inter text-sm text-fog italic">
-								Tidak ditemukan
-							</p>
-						)}
-
-						{filtered.map((opt, i) => {
-							const selected = opt === value;
-							const iconUrl = stackIconUrl(opt);
-							return (
-								<div
-									// biome-ignore lint/suspicious/noArrayIndexKey: labels are caller data and may repeat; index qualifies duplicates
-									key={`${i}:${opt}`}
-									id={`${selectId}-opt-${i}`}
-									role="option"
-									tabIndex={0}
-									aria-selected={selected}
-									onPointerDown={(e) => {
-										e.preventDefault();
-										selectOption(opt);
-									}}
-									onKeyDown={(e) => handleOptionKeyDown(e, opt)}
-									className={cn(
-										"flex cursor-pointer items-center justify-between gap-2 px-4 py-2.5 min-h-[44px] font-inter text-sm transition-colors",
-										i === highlightIdx
-											? "bg-white/10 text-snow"
-											: selected
-												? "text-snow"
-												: "text-fog hover:bg-white/5 hover:text-snow",
-									)}
-								>
-									<span className="flex items-center gap-2 truncate">
-										{iconUrl && (
-											<img
-												src={iconUrl}
-												alt=""
-												width={16}
-												height={16}
-												className="shrink-0"
-												style={invertIfDark(opt)}
-												loading="lazy"
-											/>
-										)}
-										{opt}
-									</span>
-									{selected && (
-										<Check size={14} className="shrink-0 text-fog" />
-									)}
-								</div>
-							);
-						})}
-
-						{customMode ? (
-							<div className="px-3 py-2">
-								<input
-									type="text"
-									value={customDraft}
-									onChange={(e) => setCustomDraft(e.target.value)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											e.preventDefault();
-											commitCustom();
-										}
-										if (e.key === "Escape") {
-											e.preventDefault();
-											cancelCustom();
-										}
-									}}
-									onBlur={commitCustom}
-									placeholder="Tulis pilihanmu..."
-									className="w-full rounded-md border border-(--border-subtle) px-3 py-2 font-inter text-sm outline-none"
-									style={{
-										background: "var(--bg-input)",
-										color: "var(--text-primary)",
-									}}
-									// biome-ignore lint/a11y/noAutofocus: custom select needs focus on custom input
-									autoFocus
-								/>
-							</div>
-						) : (
-							<div
-								id={`${selectId}-opt-${filtered.length}`}
-								role="option"
-								tabIndex={0}
-								onPointerDown={(e) => {
-									e.preventDefault();
-									selectOption("__custom__");
-								}}
-								onKeyDown={(e) => handleOptionKeyDown(e, "__custom__")}
-								className={cn(
-									"flex cursor-pointer items-center gap-2 px-4 py-2.5 font-inter text-sm transition-colors",
-									highlightIdx === filtered.length
-										? "bg-white/10 text-snow"
-										: "text-fog hover:bg-white/5 hover:text-snow",
-								)}
-							>
-								<ArrowDownUp size={14} className="shrink-0" />
-								<span>Lainnya...</span>
-							</div>
-						)}
-					</div>
+					<StackDropdownList
+						listRef={listRef}
+						selectId={selectId}
+						dropUp={dropUp}
+						filtered={filtered}
+						value={value}
+						highlightIdx={highlightIdx}
+						searchQuery={searchQuery}
+						customMode={customMode}
+						customDraft={customDraft}
+						onSearchChange={setSearchQuery}
+						onHighlightReset={() => setHighlightIdx(-1)}
+						onCustomDraftChange={setCustomDraft}
+						onSelect={selectOption}
+						onOptionKeyDown={handleOptionKeyDown}
+						onCommitCustom={commitCustom}
+						onCancelCustom={cancelCustom}
+						invertIfDark={invertIfDark}
+					/>
 				)}
 			</div>
 		</div>

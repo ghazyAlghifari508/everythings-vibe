@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -10,12 +10,14 @@ import {
 	Palette,
 	Rocket,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 import {
-	type CodebaseAnalysis,
-	inferTechAnswersFromCodebase,
-} from "@/features/codebase/services/analysis";
-import { buildCompiledAskPrompt } from "@/features/greenfield/utils/ask-prompt-builder";
+	type AskHandoffState,
+	type AskQuestion,
+	type TechAnswers,
+	useAskSession,
+} from "@/features/greenfield/hooks/use-ask-session";
+import { submitAskHandoff } from "@/features/greenfield/services/ask-handoff";
 import {
 	BACKEND_OPTIONS,
 	DATABASE_OPTIONS,
@@ -26,34 +28,10 @@ import {
 	FULLSTACK_FRAMEWORK_OPTIONS,
 	FULLSTACK_MOBILE_OPTIONS,
 } from "@/features/greenfield/utils/stack-data";
-import { CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS } from "@/lib/constants";
 import { getFlowStepCta, stepToRouteTarget } from "@/lib/flow-step";
-import {
-	getAskLanguage,
-	getAskPlatform,
-	getAskState,
-	getSetupPrompt,
-	saveAskState,
-	savePendingPrdPrompt,
-} from "@/lib/prompt-handoff";
 import { useUIStore } from "@/store";
 import { type NonTechAnswer, QuestionCard } from "./question-card";
 import { StackDropdown } from "./stack-dropdown";
-
-interface AskQuestion {
-	id: string;
-	question: string;
-	type: "select" | "text" | "multiselect";
-	options?: string[];
-}
-
-interface TechAnswers {
-	frontend?: string;
-	backend?: string;
-	fullstackFramework?: string;
-	database?: string;
-	deployment?: string;
-}
 
 interface AskFlowProps {
 	projectId: string;
@@ -62,20 +40,7 @@ interface AskFlowProps {
 	 *  Absent/unknown behaves as greenfield (sessionStorage only). */
 	projectMode?: string | null;
 	analysis?: CodebaseAnalysis | null;
-	initialHandoff?: {
-		projectId: string;
-		answers?: Array<{ question: string; answer: string }>;
-		compiledPrompt?: string;
-		state?: {
-			prompt?: string;
-			platform?: "web" | "mobile";
-			session?: 1 | 2 | 3;
-			questions?: AskQuestion[];
-			nonTechAnswers?: Record<string, NonTechAnswer>;
-			techAnswers?: TechAnswers;
-			skippedTech?: string[];
-		};
-	} | null;
+	initialHandoff?: AskHandoffState | null;
 	step?: string | null;
 	hasPrd?: boolean;
 }
@@ -90,13 +55,6 @@ export function AskFlow({
 	hasPrd,
 }: AskFlowProps) {
 	const navigate = useNavigate();
-	const promptRef = useRef("");
-	const hasFetched = useRef<string | null>(null);
-	// Server restore must win over a stale local snapshot: autosave stays
-	// off until the initial load settles, and submit cancels any autosave
-	// still in flight so an older write cannot land after the final one.
-	const restoreSettled = useRef(false);
-	const autosaveCtrl = useRef<AbortController | null>(null);
 	const showToast = useUIStore((s) => s.showToast);
 
 	const flowCta = getFlowStepCta("question", step, hasPrd);
@@ -106,272 +64,23 @@ export function AskFlow({
 		const targetStep = flowCta?.targetStep ?? "prd";
 		navigate(stepToRouteTarget(targetStep, projectId));
 	};
-	const [session, setSession] = useState<1 | 2>(1);
-	const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
-	const [loadError, setLoadError] = useState("");
-	const [questions, setQuestions] = useState<AskQuestion[]>([]);
-	const [nonTechAnswers, setNonTechAnswers] = useState<
-		Record<string, NonTechAnswer>
-	>({});
-	const [techAnswers, setTechAnswers] = useState<TechAnswers>(() => {
-		const savedFromHandoff = initialHandoff?.state?.techAnswers;
-		if (savedFromHandoff && Object.keys(savedFromHandoff).length > 0) {
-			return savedFromHandoff;
-		}
-		if (analysis) {
-			return inferTechAnswersFromCodebase(analysis, "web");
-		}
-		return {};
-	});
-	const [skippedTech, setSkippedTech] = useState<Set<string>>(new Set());
-	const [platform, setPlatform] = useState<"web" | "mobile">("web");
 
-	const toggleSkipTech = (field: string) => {
-		setSkippedTech((prev) => {
-			const next = new Set(prev);
-			if (next.has(field)) next.delete(field);
-			else {
-				next.add(field);
-				setTechAnswers((p) => ({ ...p, [field]: undefined }));
-			}
-			return next;
-		});
-	};
-
-	// ponytail: deps kosong disengaja. `useNavigate()` bikin objek baru tiap render,
-	// kalau masuk dep array, effect re-run terus dan cleanup abort membunuh fetch
-	// yang sedang jalan, sementara guard hasFetched memblokir fetch ulang → layar
-	// "Gagal memuat pertanyaan." padahal tidak ada error. Fetch cukup sekali per
-	// mount; hasFetched menjaga StrictMode double-invoke.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: lihat catatan di atas
-	useEffect(() => {
-		if (hasFetched.current === projectId) return;
-		hasFetched.current = projectId;
-
-		// Restore state persisted across refresh/hard-refresh. If a saved set
-		// exists for THIS project, replay it and skip regenerating questions.
-		const saved = getAskState(projectId);
-		if (saved) {
-			promptRef.current = saved.prompt;
-			setPlatform(saved.platform);
-			setSession(saved.session);
-			setQuestions(saved.questions);
-			setNonTechAnswers(saved.nonTechAnswers);
-			const baseTech = analysis
-				? inferTechAnswersFromCodebase(analysis, saved.platform)
-				: {};
-			setTechAnswers({ ...baseTech, ...(saved.techAnswers ?? {}) });
-			setSkippedTech(new Set(saved.skippedTech ?? []));
-			setIsLoadingQuestions(false);
-			return;
-		}
-
-		// Helper to apply state snapshot from server
-		const applyState = (st: unknown): boolean => {
-			if (!st || typeof st !== "object") return false;
-			const s = st as Record<string, unknown>;
-			if (typeof s.prompt === "string" && s.prompt) {
-				promptRef.current = s.prompt;
-			}
-			if (s.platform === "web" || s.platform === "mobile") {
-				setPlatform(s.platform);
-			}
-			if (s.session === 1 || s.session === 2) {
-				setSession(s.session);
-			} else if (s.session === 3) {
-				setSession(2);
-			}
-			if (s.nonTechAnswers && typeof s.nonTechAnswers === "object") {
-				setNonTechAnswers(s.nonTechAnswers as Record<string, NonTechAnswer>);
-			}
-			const targetPlatform = (s.platform as "web" | "mobile") || platform;
-			const baseTech = analysis
-				? inferTechAnswersFromCodebase(analysis, targetPlatform)
-				: {};
-			if (s.techAnswers && typeof s.techAnswers === "object") {
-				const t = s.techAnswers as Record<string, unknown>;
-				setTechAnswers({
-					...baseTech,
-					...(typeof t.frontend === "string" ? { frontend: t.frontend } : {}),
-					...(typeof t.backend === "string" ? { backend: t.backend } : {}),
-					...(typeof t.fullstackFramework === "string"
-						? { fullstackFramework: t.fullstackFramework }
-						: {}),
-					...(typeof t.database === "string" ? { database: t.database } : {}),
-					...(typeof t.deployment === "string"
-						? { deployment: t.deployment }
-						: {}),
-				});
-			} else if (analysis) {
-				setTechAnswers(baseTech);
-			}
-			if (Array.isArray(s.skippedTech)) {
-				setSkippedTech(
-					new Set(
-						s.skippedTech.filter((x): x is string => typeof x === "string"),
-					),
-				);
-			}
-			if (Array.isArray(s.questions) && s.questions.length > 0) {
-				const validTypes = ["select", "text", "multiselect"];
-				const validQuestions = s.questions.filter((q): q is AskQuestion => {
-					if (!q || typeof q !== "object") return false;
-					const cand = q as Partial<AskQuestion>;
-					if (
-						typeof cand.id !== "string" ||
-						typeof cand.question !== "string"
-					) {
-						return false;
-					}
-					if (!validTypes.includes(cand.type ?? "")) return false;
-					if (cand.options !== undefined) {
-						if (!Array.isArray(cand.options)) return false;
-						if (!cand.options.every((o) => typeof o === "string")) return false;
-					}
-					return true;
-				});
-				if (validQuestions.length > 0) {
-					setQuestions(validQuestions);
-					setIsLoadingQuestions(false);
-					return true;
-				}
-			}
-			return false;
-		};
-
-		// Authoritative server handoff: survives tab close, History navigation,
-		// and multi-device access where sessionStorage cannot.
-		const restoreFromServer = async (): Promise<boolean> => {
-			if (initialHandoff?.state) {
-				if (applyState(initialHandoff.state)) return true;
-			}
-			try {
-				const res = await fetch("/api/ask/options", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ projectId, action: "get-handoff" }),
-				});
-				if (!res.ok) return false;
-				const data = (await res.json().catch(() => null)) as {
-					handoff?: { state?: unknown } | null;
-				};
-				if (data?.handoff?.state) {
-					return applyState(data.handoff.state);
-				}
-				return false;
-			} catch {
-				return false;
-			}
-		};
-
-		const run = async () => {
-			if (await restoreFromServer()) return;
-
-			// Prompt fallback chain: promptRef (from server handoff) -> sessionStorage -> projectName
-			const prompt = promptRef.current || getSetupPrompt() || projectName;
-			if (!prompt) {
-				navigate({ to: "/", replace: true });
-				return;
-			}
-			promptRef.current = prompt;
-			setPlatform(getAskPlatform());
-
-			try {
-				const res = await fetch("/api/ask/options", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						projectId,
-						prompt,
-						platform: getAskPlatform(),
-						language: getAskLanguage(),
-					}),
-				});
-				const data = (await res.json().catch(() => ({}))) as {
-					questions?: AskQuestion[];
-					error?: string;
-				};
-				if (!res.ok) throw new Error(data.error || "Gagal memuat pertanyaan");
-				setQuestions(data.questions ?? []);
-			} catch (err) {
-				console.error("Fetch ask options error:", err);
-				setLoadError(
-					err instanceof Error ? err.message : "Gagal memuat pertanyaan",
-				);
-			} finally {
-				setIsLoadingQuestions(false);
-			}
-		};
-		void run().finally(() => {
-			restoreSettled.current = true;
-		});
-	}, []);
-
-	// Persist across refresh/hard-refresh: write state whenever it changes.
-	// Only once questions exist, avoids persisting an empty placeholder.
-	// Server writes wait for the initial restore so a stale local snapshot
-	// can never overwrite newer server state on mount.
-	useEffect(() => {
-		if (questions.length === 0 || !promptRef.current) return;
-		saveAskState({
-			projectId,
-			prompt: promptRef.current,
-			platform,
-			session,
-			questions,
-			nonTechAnswers,
-			skippedTech: [...skippedTech],
-			techAnswers,
-		});
-		if (!restoreSettled.current) return;
-
-		// Debounced server auto-save so answers survive tab close & multi-device.
-		// Each new change aborts the previous in-flight save: only the latest
-		// snapshot may land.
-		autosaveCtrl.current?.abort();
-		const ctrl = new AbortController();
-		autosaveCtrl.current = ctrl;
-		const timer = setTimeout(() => {
-			void fetch("/api/ask/options", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				signal: ctrl.signal,
-				body: JSON.stringify({
-					projectId,
-					action: "save-handoff",
-					handoff: {
-						projectId,
-						answers: [],
-						state: {
-							prompt: promptRef.current,
-							platform,
-							session,
-							questions,
-							nonTechAnswers,
-							techAnswers,
-							skippedTech: [...skippedTech],
-						},
-					},
-				}),
-			}).catch((err) => {
-				if (err instanceof Error && err.name === "AbortError") return;
-				console.error("Auto-save ask handoff failed:", err);
-			});
-		}, 600);
-
-		return () => {
-			clearTimeout(timer);
-			ctrl.abort();
-		};
-	}, [
-		questions,
+	const {
+		autosaveCtrl,
+		isLoadingQuestions,
+		loadError,
 		nonTechAnswers,
-		techAnswers,
-		skippedTech,
-		session,
 		platform,
-		projectId,
-	]);
+		promptRef,
+		questions,
+		session,
+		setNonTechAnswers,
+		setSession,
+		setTechAnswers,
+		skippedTech,
+		techAnswers,
+		toggleSkipTech,
+	} = useAskSession({ projectId, projectName, analysis, initialHandoff });
 
 	const fullstackDisabled = Boolean(
 		techAnswers.frontend ||
@@ -406,103 +115,19 @@ export function AskFlow({
 	const allTechAnswered = true;
 
 	const submit = async (tech: TechAnswers) => {
-		const isEn = getAskLanguage() === "en";
-		const nonTechQuestionItems = questions.map((q) => {
-			const a = nonTechAnswers[q.id];
-			const picked =
-				a && !a.skipped
-					? Array.isArray(a.values) && a.values.length > 0
-						? a.values.join(", ")
-						: (a.value ?? "")
-					: "";
-			return {
-				question: q.question,
-				answer: picked,
-				skipped: !a || Boolean(a.skipped),
-			};
-		});
-
-		const compiledPrompt = buildCompiledAskPrompt({
+		await submitAskHandoff({
+			projectId,
+			projectName,
 			platform,
-			language: isEn ? "en" : "id",
-			rawPrompt: promptRef.current,
-			nonTechQuestions: nonTechQuestionItems,
+			session,
+			prompt: promptRef.current,
+			questions,
+			nonTechAnswers,
 			techAnswers: tech,
 			skippedTech,
+			autosaveCtrl,
+			showToast,
 		});
-
-		savePendingPrdPrompt(compiledPrompt, "auto", projectName);
-		// Authoritative server handoff: survives refresh and multi-device access.
-		// Cancel any autosave still in flight so its older snapshot cannot
-		// land after this final write. Best-effort with a timeout — the save
-		// must never stall navigation: abort/timeout/failure surface a
-		// warning toast and fall through to the PRD page, whose prompt is
-		// already preserved in sessionStorage.
-		autosaveCtrl.current?.abort();
-		const ctrl = new AbortController();
-		const timer = setTimeout(
-			() => ctrl.abort(),
-			CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS,
-		);
-		try {
-			const skipLabel = isEn ? "(Let AI decide)" : "(Biarkan AI yang memilih)";
-			const answers = questions.map((q) => {
-				const a = nonTechAnswers[q.id];
-				const picked =
-					a && !a.skipped
-						? Array.isArray(a.values) && a.values.length > 0
-							? a.values.join(", ")
-							: (a.value ?? "")
-						: "";
-				return {
-					question: q.question,
-					answer: picked || skipLabel,
-				};
-			});
-			const res = await fetch("/api/ask/options", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				signal: ctrl.signal,
-				body: JSON.stringify({
-					projectId,
-					action: "save-handoff",
-					handoff: {
-						answers,
-						compiledPrompt,
-						state: {
-							prompt: promptRef.current,
-							platform,
-							session,
-							questions: questions.map((q) => ({
-								id: q.id,
-								question: q.question,
-								type: q.type,
-								...(q.options ? { options: q.options } : {}),
-							})),
-							nonTechAnswers,
-							techAnswers: tech,
-							skippedTech: [...skippedTech],
-						},
-					},
-				}),
-			});
-			if (!res.ok) {
-				showToast(
-					"Progres tidak tersimpan di server, tapi PRD tetap bisa dibuat.",
-					"error",
-				);
-			}
-		} catch (err) {
-			console.warn("Ask handoff save skipped:", err);
-			if (!(err instanceof Error && err.name === "AbortError")) {
-				showToast(
-					"Progres tidak tersimpan di server, tapi PRD tetap bisa dibuat.",
-					"error",
-				);
-			}
-		} finally {
-			clearTimeout(timer);
-		}
 		navigate({ to: "/fitur/$id", params: { id: projectId } });
 	};
 
@@ -560,14 +185,14 @@ export function AskFlow({
 							Pilih &ldquo;Lewati&rdquo; jika tidak yakin, AI akan menentukan
 							yang terbaik berdasarkan kebutuhan aplikasi Anda.
 						</p>
-						{questions.map((q) => (
+						{questions.map((q: AskQuestion) => (
 							<QuestionCard
 								key={q.id}
 								question={q.question}
 								type={q.type}
 								options={q.options}
 								answer={nonTechAnswers[q.id]}
-								onAnswer={(answer) =>
+								onAnswer={(answer: NonTechAnswer) =>
 									setNonTechAnswers((prev) => ({ ...prev, [q.id]: answer }))
 								}
 							/>
