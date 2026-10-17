@@ -1,5 +1,5 @@
 "use client";
-import { TEMPLATE_GALLERY } from "@/lib/template-gallery";
+import { TEMPLATE_GALLERY } from "@/features/templates";
 export function TemplateGallery({
 	onSelect,
 }: {

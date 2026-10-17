@@ -1,6 +1,6 @@
 "use client";
 
-import { CODEBASE_FEATURE_TEMPLATES } from "@/lib/template-gallery";
+import { CODEBASE_FEATURE_TEMPLATES } from "@/features/templates";
 
 export function CodebaseFeatureGallery({
 	onSelect,

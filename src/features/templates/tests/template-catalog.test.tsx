@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TemplateCatalog } from "./template-catalog";
+import { TemplateCatalog } from "../components/template-catalog";
 
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(),

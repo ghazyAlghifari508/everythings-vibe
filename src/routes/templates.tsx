@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
-import { TemplateCatalog } from "@/components/templates/template-catalog";
+import { TemplateCatalog } from "@/features/templates";
 
 export const Route = createFileRoute("/templates")({
 	head: () => ({

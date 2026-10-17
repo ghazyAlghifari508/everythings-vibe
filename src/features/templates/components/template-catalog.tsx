@@ -22,11 +22,8 @@ import {
 	Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import {
-	searchTemplates,
-	type TemplateCategory,
-	type VibeTemplateEntry,
-} from "@/lib/template-gallery";
+import { searchTemplates } from "../services/template-service";
+import type { TemplateCategory, VibeTemplateEntry } from "../types";
 
 const ICON_MAP: Record<string, typeof BarChart3> = {
 	BarChart3,

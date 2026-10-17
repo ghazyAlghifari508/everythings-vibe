@@ -5,7 +5,7 @@ import {
 	type TemplateCategory,
 	VIBE_TEMPLATES,
 	type VibeTemplateEntry,
-} from "./template-gallery";
+} from "../index";
 
 describe("VIBE_TEMPLATES Catalog", () => {
 	it("contains all three required categories with minimum quotas", () => {

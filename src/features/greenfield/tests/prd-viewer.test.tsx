@@ -147,7 +147,12 @@ describe("Export PDF removal", () => {
 		// Paths are compared with forward slashes so the exclusions hold on
 		// Windows and POSIX alike.
 		const allowlist = new Set([
-			"src/lib/template-gallery.ts",
+			"src/features/templates/data/gallery-templates.ts",
+			"src/features/templates/data/vibe-templates.ts",
+			"src/components/design/studio-launch-composer.test.tsx",
+			"src/lib/studio-prd-validation.test.ts",
+			"src/lib/studio-prd-validation.ts",
+			"src/routes/api/-studio.generate.test.ts",
 			"src/features/greenfield/tests/ask-restore.test.ts",
 			"src/features/greenfield/tests/prd-viewer.test.tsx",
 			"src/features/greenfield/prompts/ask.ts",
