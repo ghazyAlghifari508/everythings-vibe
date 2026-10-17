@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BantuanPage } from "./bantuan";
+import { BantuanPage } from "@/routes/bantuan";
 
 let sessionUser: { id: string; email: string; isAdmin: boolean } | null = null;
 

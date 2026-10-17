@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { planNewSearchSchema } from "./new";
+import { planNewSearchSchema } from "@/routes/plan/new";
 
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,

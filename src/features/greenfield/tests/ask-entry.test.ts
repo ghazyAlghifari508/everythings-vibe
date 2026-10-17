@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideAskEntry } from "./$id";
+import { decideAskEntry } from "@/routes/ask/$id";
 
 describe("decideAskEntry", () => {
 	it("allows greenfield projects without analysis", () => {

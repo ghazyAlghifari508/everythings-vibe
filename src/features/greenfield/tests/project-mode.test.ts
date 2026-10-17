@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PROJECT_SYNC_CHILD_TABLES } from "./$id";
-import { parseProjectModeInput } from "./index";
+import { PROJECT_SYNC_CHILD_TABLES } from "@/routes/api/projects/$id";
+import { parseProjectModeInput } from "@/routes/api/projects/index";
 
 describe("parseProjectModeInput", () => {
 	it("defaults missing mode to greenfield", () => {
