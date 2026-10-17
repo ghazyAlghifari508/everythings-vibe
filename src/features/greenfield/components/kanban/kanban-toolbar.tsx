@@ -1,13 +1,13 @@
 "use client";
 
 import { Check, ChevronDown, Layers } from "lucide-react";
-import { FeatureIcon } from "@/components/task/whiteboard-canvas";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { FeatureIcon } from "@/features/greenfield/components/whiteboard/whiteboard-icons";
 import { cn } from "@/lib/utils";
 
 export interface KanbanPhase {

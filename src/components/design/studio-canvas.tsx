@@ -1,12 +1,12 @@
 import { AlertCircle, Hand, MousePointer2, RotateCcw } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { getCanvasDotStyle } from "@/components/task/whiteboard-canvas";
 import { ZoomControls } from "@/components/ui/zoom-controls";
 import type {
 	StudioFrameRow,
 	StudioJobRow,
 	StudioProjectRow,
 } from "@/db/schema";
+import { getCanvasDotStyle } from "@/features/greenfield/components/whiteboard/canvas-connectors";
 import { normalizeWheelDelta, useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import {
 	STUDIO_CANVAS_COMPOSER_INSET_PX,

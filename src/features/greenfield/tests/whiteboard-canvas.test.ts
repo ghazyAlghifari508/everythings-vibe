@@ -1,14 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
+import type { ProjectFeatureTree } from "@/db/schema";
+import { getCanvasDotStyle } from "@/features/greenfield/components/whiteboard/canvas-connectors";
+import { featureIconName } from "@/features/greenfield/components/whiteboard/whiteboard-icons";
+import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import {
 	containerH,
-	featureIconName,
-	getCanvasDotStyle,
 	layoutTaskGraph,
 	MAX_VISIBLE_CONTAINER_ROWS,
-} from "@/components/task/whiteboard-canvas";
-import type { ProjectFeatureTree } from "@/db/schema";
-import type { TaskTree } from "@/features/greenfield/services/task-tree";
+} from "@/features/greenfield/utils/whiteboard-layout";
 
 function makeTask(
 	name: string,

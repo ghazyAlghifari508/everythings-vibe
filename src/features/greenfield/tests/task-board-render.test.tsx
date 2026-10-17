@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import type { ProjectFeatureTree } from "@/db/schema";
+import { WhiteboardCanvas } from "@/features/greenfield/components/whiteboard/whiteboard-canvas";
 import type { TaskTree } from "@/features/greenfield/services/task-tree";
 
 const TREE: TaskTree = {

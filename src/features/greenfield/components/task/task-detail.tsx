@@ -3,11 +3,11 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowRight, FileText } from "lucide-react";
 import { useEffect } from "react";
-import { WhiteboardCanvas } from "@/components/task/whiteboard-canvas";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { DocumentReviewModal } from "@/features/greenfield/components/documents/document-review-modal";
 import { ProjectDocumentsDrawer } from "@/features/greenfield/components/documents/project-documents-drawer";
+import { WhiteboardCanvas } from "@/features/greenfield/components/whiteboard/whiteboard-canvas";
 import { useTaskGeneration } from "@/features/greenfield/hooks/use-task-generation";
 import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import { cn } from "@/lib/utils";

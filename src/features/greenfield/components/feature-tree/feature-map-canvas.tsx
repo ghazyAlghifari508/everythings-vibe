@@ -2,23 +2,29 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-	COLORS,
-	ContainerModal,
-	ContainerNode,
-	containerH,
-	Edges,
-	FeatureNode,
-	getCanvasDotStyle,
-	type LayoutEdge,
-	type LayoutNode,
-	LEVEL_GAP_X,
-	RootNode,
-	SIBLING_GAP_Y,
-	SUBFEATURE_CONTAINER_W,
-} from "@/components/task/whiteboard-canvas";
 import { ZoomControls } from "@/components/ui/zoom-controls";
 import type { ProjectFeatureTree } from "@/db/schema";
+import {
+	Edges,
+	getCanvasDotStyle,
+} from "@/features/greenfield/components/whiteboard/canvas-connectors";
+import { ContainerModal } from "@/features/greenfield/components/whiteboard/canvas-modal";
+import {
+	ContainerNode,
+	FeatureNode,
+	RootNode,
+} from "@/features/greenfield/components/whiteboard/canvas-node";
+import type {
+	LayoutEdge,
+	LayoutNode,
+} from "@/features/greenfield/types/whiteboard";
+import {
+	COLORS,
+	containerH,
+	LEVEL_GAP_X,
+	SIBLING_GAP_Y,
+	SUBFEATURE_CONTAINER_W,
+} from "@/features/greenfield/utils/whiteboard-layout";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import { featureTreeHasContent } from "./feature-view";
 
