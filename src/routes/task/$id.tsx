@@ -17,7 +17,9 @@ const loadTask = createServerFn({ method: "GET" })
 	.handler(async ({ data: id }) => {
 		const user = await requireUserServer();
 		const { getUserPlanAndQuota } = await import("@/lib/session");
-		const { hasFullWorkflow } = await import("@/lib/credits");
+		const { hasFullWorkflow } = await import(
+			"@/features/billing/services/credits"
+		);
 		const { plan } = await getUserPlanAndQuota();
 		if (!hasFullWorkflow(plan)) {
 			throw redirect({

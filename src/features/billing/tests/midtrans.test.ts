@@ -3,7 +3,7 @@ import {
 	getMidtransConfig,
 	midtransAuthHeader,
 	midtransRequestHeaders,
-} from "@/lib/midtrans";
+} from "@/features/billing/services/midtrans";
 
 const SANDBOX_KEY = "Midtrans-Server-Key-Sandbox";
 const PROD_KEY = "Midtrans-Server-Key-Production";

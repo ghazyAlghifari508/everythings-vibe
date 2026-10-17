@@ -2,13 +2,13 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import {
 	type CreditOperationItem,
 	CreditUsageSection,
-} from "@/components/settings/credit-usage";
-import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
+} from "@/features/billing/components/credit-usage";
 
-vi.mock("@/hooks/use-user-plan", () => ({
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
 	useUserPlan: () => ({
 		data: {
 			plan: "free",

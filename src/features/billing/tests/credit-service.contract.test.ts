@@ -1,8 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-const servicePath = new URL("./credit-service.ts", import.meta.url);
-const billingDir = new URL("../../features/billing/", import.meta.url);
+const servicePath = new URL(
+	"../../../lib/services/credit-service.ts",
+	import.meta.url,
+);
+const billingDir = new URL("../", import.meta.url);
 const billingModulePaths = [
 	"types/credit-contracts.ts",
 	"services/credit-guards.ts",
@@ -27,15 +30,15 @@ async function readBillingSources(): Promise<string> {
 	return parts.join("\n");
 }
 const migrationPath = new URL(
-	"../../../drizzle/0016_lame_squirrel_girl.sql",
+	"../../../../drizzle/0016_lame_squirrel_girl.sql",
 	import.meta.url,
 );
 const followUpMigrationPath = new URL(
-	"../../../drizzle/0017_credit_operation_quarantine_fix.sql",
+	"../../../../drizzle/0017_credit_operation_quarantine_fix.sql",
 	import.meta.url,
 );
 const journalPath = new URL(
-	"../../../drizzle/meta/_journal.json",
+	"../../../../drizzle/meta/_journal.json",
 	import.meta.url,
 );
 

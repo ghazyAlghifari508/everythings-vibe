@@ -2,12 +2,14 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { ADAPTIVE_CREDIT_PRICING, TOPUP_SKU } from "@/lib/constants";
 import {
-	createPaymentService,
 	creditsForPlan,
 	isTopUpOrder,
-	type PaymentServiceStore,
 	planFromAmount,
-} from "./payment-service";
+} from "../services/payment-pricing";
+import {
+	createPaymentService,
+	type PaymentServiceStore,
+} from "../services/payment-store";
 
 describe("planFromAmount", () => {
 	it("maps the Pro price to the pro plan", () => {
@@ -280,7 +282,7 @@ describe("payment service grant lifecycle (in-memory)", () => {
 describe("payment service database contracts", () => {
 	it("ensures applyPaymentSuccess resets creditsReserved and inserts ledger grant", async () => {
 		const serviceSource = await readFile(
-			new URL("./payment-service.ts", import.meta.url),
+			new URL("../services/payment-service.ts", import.meta.url),
 			"utf8",
 		);
 		expect(serviceSource).toContain("creditsReserved: 0");
@@ -294,11 +296,11 @@ describe("payment service database contracts", () => {
 
 	it("validates opening balance backfill migration 0018 and journal", async () => {
 		const migrationPath = new URL(
-			"../../../drizzle/0018_opening_balance_backfill.sql",
+			"../../../../drizzle/0018_opening_balance_backfill.sql",
 			import.meta.url,
 		);
 		const journalPath = new URL(
-			"../../../drizzle/meta/_journal.json",
+			"../../../../drizzle/meta/_journal.json",
 			import.meta.url,
 		);
 
@@ -319,7 +321,7 @@ describe("payment service database contracts", () => {
 
 	it("enforces subscription row-level lock and plan validation in applyPaymentSuccess", async () => {
 		const serviceSource = await readFile(
-			new URL("./payment-service.ts", import.meta.url),
+			new URL("../services/payment-service.ts", import.meta.url),
 			"utf8",
 		);
 		expect(serviceSource).toContain('.for("update")');
@@ -335,7 +337,7 @@ describe("payments timezone migration contract", () => {
 	// column in the zone it was actually written in.
 	it("converts payment/subscription timestamps to timestamptz", async () => {
 		const schema = await readFile(
-			new URL("../../db/schema.ts", import.meta.url),
+			new URL("../../../db/schema.ts", import.meta.url),
 			"utf8",
 		);
 		const paymentsTable = schema.slice(schema.indexOf("export const payments"));
@@ -369,7 +371,7 @@ describe("payments timezone migration contract", () => {
 	it("interprets stored digits in the zone each producer wrote them in", async () => {
 		const migration = await readFile(
 			new URL(
-				"../../../drizzle/0022_payments_subscriptions_timestamptz.sql",
+				"../../../../drizzle/0022_payments_subscriptions_timestamptz.sql",
 				import.meta.url,
 			),
 			"utf8",
@@ -384,7 +386,7 @@ describe("payments timezone migration contract", () => {
 		expect(migration).toContain(`data_type = 'timestamp without time zone'`);
 
 		const journal = await readFile(
-			new URL("../../../drizzle/meta/_journal.json", import.meta.url),
+			new URL("../../../../drizzle/meta/_journal.json", import.meta.url),
 			"utf8",
 		);
 		expect(journal).toContain(

@@ -17,7 +17,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
 	};
 });
 
-vi.mock("@/hooks/use-user-plan", () => ({
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
 	useUserPlan: () => ({ refetch: vi.fn() }),
 }));
 

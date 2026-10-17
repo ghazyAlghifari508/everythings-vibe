@@ -43,7 +43,9 @@ export const loadExistingCodebaseKanban = createServerFn({ method: "GET" })
 	.handler(async ({ data }) => {
 		const user = await requireUserServer();
 		const { getUserPlanAndQuota } = await import("@/lib/session");
-		const { hasFullWorkflow } = await import("@/lib/credits");
+		const { hasFullWorkflow } = await import(
+			"@/features/billing/services/credits"
+		);
 		const { db } = await import("@/db");
 		const { codebases, projects } = await import("@/db/schema");
 		const { and, eq, isNull } = await import("drizzle-orm");

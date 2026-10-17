@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasFullWorkflow } from "@/lib/credits";
+import { hasFullWorkflow } from "@/features/billing/services/credits";
 
 function decideWorkflowRouteAccess(plan: "free" | "pro" | "hengker"): {
 	allow: boolean;

@@ -13,7 +13,7 @@ import {
 	resolveSubscriptionState,
 	type SubscriptionRowLike,
 	shouldTopUpInsteadOfResubscribe,
-} from "./billing";
+} from "../services/billing";
 
 const NOW = new Date("2026-08-25T00:00:00Z");
 
@@ -394,7 +394,7 @@ describe("applyFreeRollover", () => {
 describe("credits.ts database contract", () => {
 	it("ensures rollOverFreeIfNeeded resets creditsReserved and inserts ledger grant", async () => {
 		const creditsSource = await readFile(
-			new URL("./credits.ts", import.meta.url),
+			new URL("../services/credits.ts", import.meta.url),
 			"utf8",
 		);
 

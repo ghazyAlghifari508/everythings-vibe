@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { hasFullWorkflow } from "@/features/billing/services/credits";
 import {
 	buildCodebasePromptBlock,
 	linkGenerationContext,
@@ -41,7 +42,6 @@ import {
 	formatSubscriptionPausedError,
 } from "@/lib/adaptive-credit";
 import { CLAIM_POLL_MS, CLAIM_RETRY_MS } from "@/lib/constants";
-import { hasFullWorkflow } from "@/lib/credits";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
 import { normalizeLanguage } from "@/lib/language";
 import {
@@ -144,7 +144,9 @@ export const Route = createFileRoute("/api/task/generate")({
 						{ status: 400 },
 					);
 
-				const { resolveSubscriptionState } = await import("@/lib/billing");
+				const { resolveSubscriptionState } = await import(
+					"@/features/billing/services/billing"
+				);
 				const [sub] = await db
 					.select({
 						plan: subscriptions.plan,

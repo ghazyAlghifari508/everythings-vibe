@@ -7,10 +7,10 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TopUpModal } from "./top-up-modal";
+import { TopUpModal } from "../components/top-up-modal";
 
 const mockUseUserPlan = vi.fn();
-vi.mock("@/hooks/use-user-plan", () => ({
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
 	useUserPlan: () => mockUseUserPlan(),
 }));
 

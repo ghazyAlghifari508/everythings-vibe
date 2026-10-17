@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Suspense } from "react";
 import { Footer } from "@/components/layout/footer";
-import PricingWrapper from "@/components/ui/pricing-card";
+import PricingWrapper from "@/features/billing/components/pricing-wrapper";
 
 export const Route = createFileRoute("/pricing")({
 	component: PricingPage,

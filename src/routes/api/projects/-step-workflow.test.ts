@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasFullWorkflow } from "@/lib/credits";
+import { hasFullWorkflow } from "@/features/billing/services/credits";
 
 describe("Workflow step permission gate", () => {
 	it("denies full workflow for free tier", () => {

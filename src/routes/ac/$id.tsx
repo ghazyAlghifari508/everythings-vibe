@@ -17,7 +17,9 @@ const loadAc = createServerFn({ method: "GET" })
 		const user = await requireUserServer();
 		const { plan } = await getUserPlanAndQuota();
 
-		const { hasFullWorkflow } = await import("@/lib/credits");
+		const { hasFullWorkflow } = await import(
+			"@/features/billing/services/credits"
+		);
 		if (!hasFullWorkflow(plan)) {
 			throw redirect({
 				to: "/prd/$id",

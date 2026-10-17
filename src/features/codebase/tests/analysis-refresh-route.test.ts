@@ -115,7 +115,7 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/rate-limit", () => ({
 	checkRateLimit: vi.fn(async () => ({ allowed: true })),
 }));
-vi.mock("@/lib/billing", () => ({
+vi.mock("@/features/billing/services/billing", () => ({
 	resolveSubscriptionState: vi.fn(() => ({ state: state.effectiveState })),
 }));
 vi.mock("@/features/codebase/services/analysis.server", () => ({

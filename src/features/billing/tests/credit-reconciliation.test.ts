@@ -3,7 +3,14 @@ import {
 	type CreditOperationItem,
 	getActivityLabel,
 	getStatusLabel,
-} from "@/components/settings/credit-usage";
+} from "@/features/billing/components/credit-usage";
+import {
+	createPaymentService,
+	type PaymentLedgerEntry,
+	type PaymentRow,
+	type PaymentServiceStore,
+	type PaymentSubscriptionRow,
+} from "@/features/billing/services/payment-store";
 import { decideAnalysisRequest } from "@/features/codebase/services/analysis";
 import {
 	buildCodebaseMetrics,
@@ -19,13 +26,6 @@ import {
 	type CreditSubscription,
 	createCreditService,
 } from "@/lib/services/credit-service";
-import {
-	createPaymentService,
-	type PaymentLedgerEntry,
-	type PaymentRow,
-	type PaymentServiceStore,
-	type PaymentSubscriptionRow,
-} from "@/lib/services/payment-service";
 
 interface TestSubscriptionState
 	extends CreditSubscription,

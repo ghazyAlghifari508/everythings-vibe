@@ -9,7 +9,7 @@ import {
 	type SubscriptionRowLike,
 	type SubscriptionStateKind,
 	shouldTopUpInsteadOfResubscribe,
-} from "@/lib/billing";
+} from "@/features/billing/services/billing";
 import { ADAPTIVE_CREDIT_PRICING } from "@/lib/constants";
 import { FEATURES, PLAN_CREDITS, type Plan } from "@/types/database";
 

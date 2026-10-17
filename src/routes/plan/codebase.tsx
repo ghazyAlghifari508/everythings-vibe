@@ -2,8 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PlanCodebasePage } from "@/features/codebase/components/workspace/plan-codebase-page";
 import { CODEBASE_ONBOARDING_LABEL } from "@/features/codebase/services/library";
 
-export { PlanCodebasePage };
-
 export const Route = createFileRoute("/plan/codebase")({
 	head: () => ({
 		meta: [

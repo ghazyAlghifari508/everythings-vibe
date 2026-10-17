@@ -10,7 +10,7 @@ import {
 	X,
 } from "lucide-react";
 import * as React from "react";
-import { useUserPlan } from "@/hooks/use-user-plan";
+import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import { TOPUP_PACKAGES, type TopUpPackage } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 

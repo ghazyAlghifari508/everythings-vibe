@@ -22,7 +22,9 @@ export const loadCodebase = createServerFn({ method: "GET" })
 			tasks,
 		} = await import("@/db/schema");
 		const { and, desc, eq, inArray, isNull } = await import("drizzle-orm");
-		const { hasFullWorkflow } = await import("@/lib/credits");
+		const { hasFullWorkflow } = await import(
+			"@/features/billing/services/credits"
+		);
 		const { getUserPlanAndQuota } = await import("@/lib/session");
 		const { plan } = await getUserPlanAndQuota();
 		const canOpenFullBoard = hasFullWorkflow(plan);

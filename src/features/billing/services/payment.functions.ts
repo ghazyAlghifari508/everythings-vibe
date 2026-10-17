@@ -25,7 +25,7 @@ export const syncPaymentStatus = createServerFn({ method: "POST" })
 		const { db } = await import("@/db");
 		const { payments, subscriptions } = await import("@/db/schema");
 		const { applyOrderSuccess } = await import(
-			"@/lib/services/payment-service"
+			"@/features/billing/services/payment-service"
 		);
 
 		const [payment] = await db
@@ -52,7 +52,7 @@ export const syncPaymentStatus = createServerFn({ method: "POST" })
 
 		// Verify with Midtrans before applying.
 		const { getMidtransConfig, midtransRequestHeaders } = await import(
-			"@/lib/midtrans"
+			"@/features/billing/services/midtrans"
 		);
 		const gateway = getMidtransConfig();
 		const controller = new AbortController();
@@ -110,7 +110,9 @@ export const cancelSubscription = createServerFn({ method: "POST" }).handler(
 		const user = await requireUser(getRequestHeaders());
 		const { db } = await import("@/db");
 		const { subscriptions } = await import("@/db/schema");
-		const { computeFreeRolloverPeriod } = await import("@/lib/billing");
+		const { computeFreeRolloverPeriod } = await import(
+			"@/features/billing/services/billing"
+		);
 		const { PLAN_CREDITS } = await import("@/types/database");
 
 		const now = new Date();

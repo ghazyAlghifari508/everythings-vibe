@@ -1,9 +1,7 @@
 "use client";
 
-import { useLocation, useNavigate } from "@tanstack/react-router";
 import { Check, X } from "lucide-react";
-import * as React from "react";
-import { syncPaymentStatus } from "@/app/actions/payment";
+import type * as React from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -13,12 +11,9 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { TopUpCard } from "@/components/ui/top-up-card";
-import { useUserPlan } from "@/hooks/use-user-plan";
+import type { Feature, PriceTier } from "@/features/billing/data/pricing-data";
 import { TOPUP_SKU } from "@/lib/constants";
-import { type Feature, type PriceTier, prdFyPlans } from "@/lib/pricing-data";
 import { cn } from "@/lib/utils";
-import { useUIStore } from "@/store";
 
 // --- Utility Components ---
 
@@ -304,96 +299,3 @@ export const PricingComponent: React.FC<PricingComponentProps> = ({
 		</div>
 	);
 };
-
-// --- Wrapper with state ---
-
-export default function PricingWrapper() {
-	const navigate = useNavigate();
-	const searchStr = useLocation({ select: (l) => l.searchStr });
-	const searchParams = new URLSearchParams(searchStr);
-	const showToast = useUIStore((state) => state.showToast);
-	// ponytail: shared TanStack Query hook — deduped across all components.
-	// Previously raw fetch("/api/user/plan") in useEffect.
-	const { data: planData, refetch: refetchPlan } = useUserPlan();
-	const currentPlan = planData?.plan ?? "free";
-
-	// Sync payment status when redirected back from Midtrans
-	React.useEffect(() => {
-		const orderId = searchParams.get("order_id");
-		const payment = searchParams.get("payment");
-		const txStatus = searchParams.get("transaction_status");
-
-		if (
-			orderId &&
-			(payment === "success" ||
-				txStatus === "settlement" ||
-				txStatus === "capture")
-		) {
-			const sync = async () => {
-				try {
-					const res = await syncPaymentStatus({ data: orderId });
-					if (res.success && res.plan) {
-						refetchPlan();
-						showToast(
-							`Berhasil beli kredit untuk paket ${res.plan.charAt(0).toUpperCase() + res.plan.slice(1)}!`,
-							"success",
-						);
-						navigate({ to: "/pricing", replace: true });
-					}
-				} catch (e) {
-					console.error("Gagal sinkronisasi pembayaran:", e);
-				}
-			};
-			sync();
-		}
-	}, [searchParams, showToast, navigate, refetchPlan]);
-
-	const handlePlanSelect = async (planId: string) => {
-		if (planId === "free") {
-			navigate({ to: "/" });
-			return;
-		}
-
-		try {
-			const res = await fetch("/api/payments/create", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ planId }),
-			});
-			const data = await res.json();
-
-			if (!res.ok) {
-				if (res.status === 401) {
-					navigate({ to: "/login", search: { redirect: "/pricing" } });
-				} else {
-					showToast(
-						data.error || "Terjadi kesalahan saat memproses pembayaran.",
-						"error",
-					);
-				}
-				return;
-			}
-
-			if (data.redirect_url) {
-				window.location.href = data.redirect_url;
-			}
-		} catch (e: unknown) {
-			console.error(e);
-			showToast("Gagal menghubungi server.", "error");
-		}
-	};
-
-	return (
-		<>
-			<PricingComponent
-				plans={prdFyPlans}
-				onPlanSelect={handlePlanSelect}
-				currentPlan={currentPlan}
-				creditsExhausted={planData?.creditsExhausted === true}
-			/>
-			{/* Mid-period top-up: visible to any paid plan that can still buy
-			    credits (active period or legacy grandfathered). */}
-			{planData?.topUpEligible && <TopUpCard className="mt-6" />}
-		</>
-	);
-}

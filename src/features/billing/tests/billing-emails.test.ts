@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	type BillingCandidateRow,
 	selectBillingEmailTargets,
-} from "./billing-emails";
+} from "../services/billing-emails";
 
 const NOW = new Date("2026-08-25T00:00:00Z");
 const DAY = 24 * 60 * 60 * 1000;

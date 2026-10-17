@@ -80,13 +80,13 @@ const mockPlanData: {
 	topUpEligible: false,
 };
 
-vi.mock("@/hooks/use-user-plan", () => ({
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
 	useUserPlan: () => ({
 		data: mockPlanData,
 	}),
 }));
 
-vi.mock("@/components/billing/top-up-modal", () => ({
+vi.mock("@/features/billing/components/top-up-modal", () => ({
 	TopUpModal: () => null,
 }));
 

@@ -36,7 +36,9 @@ export const Route = createFileRoute("/api/projects/$id/step")({
 
 				if (step === "ac" || step === "task") {
 					const { getUserPlanAndQuota } = await import("@/lib/session");
-					const { hasFullWorkflow } = await import("@/lib/credits");
+					const { hasFullWorkflow } = await import(
+						"@/features/billing/services/credits"
+					);
 					const { plan } = await getUserPlanAndQuota();
 					if (!hasFullWorkflow(plan)) {
 						return Response.json(

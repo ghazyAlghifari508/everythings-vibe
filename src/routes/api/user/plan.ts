@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { getCreditBalance } from "@/lib/credits";
+import { getCreditBalance } from "@/features/billing/services/credits";
 import { getSessionFromHeaders } from "@/lib/session";
 
 export const Route = createFileRoute("/api/user/plan")({

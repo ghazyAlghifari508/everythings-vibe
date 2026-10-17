@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
-import { useUserPlan } from "@/hooks/use-user-plan";
+import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 
 /**
  * Global pause notice (spec §8). Rendered inside AppLayout's content

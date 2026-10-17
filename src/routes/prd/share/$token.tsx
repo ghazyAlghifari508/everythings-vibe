@@ -20,7 +20,9 @@ const loadSharedPrd = createServerFn({ method: "GET" })
 
 		const { subscriptions } = await import("@/db/schema");
 		const { FEATURES } = await import("@/types/database");
-		const { resolveSubscriptionState } = await import("@/lib/billing");
+		const { resolveSubscriptionState } = await import(
+			"@/features/billing/services/billing"
+		);
 		const [sub] = await db
 			.select({
 				plan: subscriptions.plan,

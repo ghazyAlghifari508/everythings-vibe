@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useUserPlan } from "./use-user-plan";
+import { useUserPlan } from "../hooks/use-user-plan";
 
 vi.mock("@/lib/auth-client", () => ({
 	authClient: { useSession: () => ({ data: null }) },

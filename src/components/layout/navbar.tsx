@@ -21,11 +21,11 @@ import {
 	X,
 } from "lucide-react";
 import { useState, useTransition } from "react";
-import { TopUpModal } from "@/components/billing/top-up-modal";
 import { canShowNavbarTopUp } from "@/components/layout/navbar-topup-helper";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useUserPlan } from "@/hooks/use-user-plan";
+import { TopUpModal } from "@/features/billing/components/top-up-modal";
+import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import { authClient } from "@/lib/auth-client";
 import {
 	isVibeDesignHistoryActive,

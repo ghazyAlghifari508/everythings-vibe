@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 
 const mockUseUserPlan = vi.fn();
-vi.mock("@/hooks/use-user-plan", () => ({
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
 	useUserPlan: () => mockUseUserPlan(),
 }));
 
