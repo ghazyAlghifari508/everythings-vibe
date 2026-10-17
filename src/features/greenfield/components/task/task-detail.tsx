@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowRight, FileText } from "lucide-react";
@@ -27,7 +27,7 @@ interface TaskDetailProps {
 	latestAcContent?: string | null;
 }
 
-// ponytail: honest status per no-hardcode.md Rule 7 — while generating, the
+// ponytail: honest status per no-hardcode.md Rule 7 â€” while generating, the
 // topbar title shows the model's REAL streamed reasoning (SSE `thinking`
 // events) via thinkingTitleText; one neutral static label (IDLE_GENERATING_TITLE)
 // is the fallback while nothing has streamed. The board shows the skeleton.
@@ -45,7 +45,6 @@ export function TaskDetail({
 	latestPrdContent,
 	latestAcContent,
 }: TaskDetailProps) {
-	const showToast = useUIStore((s) => s.showToast);
 	const isProjectDrawerOpen = useUIStore((s) => s.isProjectDrawerOpen);
 	const setProjectDrawerOpen = useUIStore((s) => s.setProjectDrawerOpen);
 	const activeReviewModal = useUIStore((s) => s.activeReviewModal);
@@ -163,7 +162,7 @@ export function TaskDetail({
 				</div>
 
 				{/* Canvas / generate */}
-				{/* ponytail: no opaque overlay while generating — the board's
+				{/* ponytail: no opaque overlay while generating â€” the board's
 				    skeleton diagram stays visible; progress lives in the
 				    topbar title (rotating phrases), distinct from PRD/AC. */}
 				<div className="relative flex-1 overflow-hidden">
