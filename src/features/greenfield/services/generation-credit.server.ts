@@ -29,9 +29,7 @@ import {
 } from "@/lib/services/credit-service";
 
 /** Burnable credits right now (never negative). */
-export function availableCredits(
-	sub: SubscriptionRowLike | undefined,
-): number {
+export function availableCredits(sub: SubscriptionRowLike | undefined): number {
 	return Math.max(
 		0,
 		(sub?.credits ?? 0) - (sub?.creditsUsed ?? 0) - (sub?.creditsReserved ?? 0),
@@ -106,7 +104,8 @@ export async function reserveGenerationCredit(
 	}
 
 	const idempotencyKey =
-		input.callerIdempotencyKey || `${projectId}:${stage}:${input.callerAttempt ?? 1}`;
+		input.callerIdempotencyKey ||
+		`${projectId}:${stage}:${input.callerAttempt ?? 1}`;
 
 	try {
 		// A reused key whose operation already terminated cannot generate again:
@@ -148,7 +147,10 @@ export async function reserveGenerationCredit(
 		if (message === "Credit operation ownership mismatch") {
 			return {
 				ok: false,
-				response: Response.json({ error: "Project not found" }, { status: 404 }),
+				response: Response.json(
+					{ error: "Project not found" },
+					{ status: 404 },
+				),
 			};
 		}
 		if (
@@ -205,7 +207,9 @@ export async function claimGenerationLock(input: {
 }): Promise<Response | null> {
 	const { field, userId, projectId, reservation, conflictMessage } = input;
 	const releaseReason =
-		field === "acStatus" ? "AC generation conflict" : "Task generation conflict";
+		field === "acStatus"
+			? "AC generation conflict"
+			: "Task generation conflict";
 
 	const claim = () =>
 		db

@@ -5,7 +5,7 @@
 // claim-before-generate check, and the `started`/`quote` frames. The stage's own
 // success and failure tails are injected as hooks, so their persistence and
 // error wording stay with the stage that owns them.
-import { createSseEmitter, type SseEmitter } from "@/lib/sse-stream";
+
 import type { CreditQuote } from "@/lib/adaptive-credit";
 import {
 	type CreditOperationResult,
@@ -14,6 +14,7 @@ import {
 	quarantineCreditOperation,
 	releaseCreditOperation,
 } from "@/lib/services/credit-service";
+import { createSseEmitter, type SseEmitter } from "@/lib/sse-stream";
 
 export interface GenerationGuards {
 	/** Release the reservation; never a running one (a concurrent request owns it). */
