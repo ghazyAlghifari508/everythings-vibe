@@ -1,6 +1,6 @@
 import type { ProjectFeatureTree } from "@/db/schema";
 import { groupTasksBySubfeature } from "@/features/greenfield/components/feature-tree/feature-view";
-import type { TaskTree } from "@/features/greenfield/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import type {
 	ContainerRow,
 	LayoutEdge,

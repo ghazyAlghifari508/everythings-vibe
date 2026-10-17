@@ -10,7 +10,7 @@ import { buildTaskRepairPromptForMode } from "@/features/greenfield/prompts/task
 import {
 	evaluateTaskCoverage,
 	type TaskTree,
-} from "@/features/greenfield/services/task-service";
+} from "@/features/greenfield/services/task-tree";
 import type { AcCoverageReport } from "@/features/greenfield/utils/ac-coverage";
 import { buildStageScopeDirective } from "@/features/greenfield/utils/planning-mode";
 import { depthDirective } from "@/features/greenfield/utils/prompt-depth";

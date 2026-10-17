@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectFeatureTree } from "@/db/schema";
-import {
-	parseTaskJson,
-	resolveKanbanFeatureName,
-} from "@/features/greenfield/services/task-service";
+import { resolveKanbanFeatureName } from "@/features/greenfield/services/task-kanban";
+import { parseTaskJson } from "@/features/greenfield/services/task-tree";
 
 const validTree = {
 	features: [

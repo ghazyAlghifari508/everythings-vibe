@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getKanbanData } from "@/features/greenfield/services/task-service";
+import { getKanbanData } from "@/features/greenfield/services/task-kanban";
 import {
 	apiKeyAuth,
 	hasScope,

@@ -2,7 +2,7 @@
  * Export service - pure formatters + ZIP generation.
  * Copied as-is from old project (no InsForge deps).
  */
-import type { TaskTree } from "./task-service";
+import type { TaskTree } from "./task-tree";
 
 export function formatPrdMarkdown(prdContent: string): string {
 	return prdContent;

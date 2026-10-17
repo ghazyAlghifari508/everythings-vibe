@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTaskJson } from "@/features/greenfield/services/task-service";
+import { parseTaskJson } from "@/features/greenfield/services/task-tree";
 
 describe("parseTaskJson", () => {
 	it("parses a tree with structured coverage", () => {

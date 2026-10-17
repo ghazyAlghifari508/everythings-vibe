@@ -22,11 +22,11 @@ import {
 	repairTaskCoverage,
 	TASK_FIRST_PASS_USER_MESSAGE,
 } from "@/features/greenfield/services/task-generation";
+import { saveTaskTree } from "@/features/greenfield/services/task-service";
 import {
 	parseTaskJson,
-	saveTaskTree,
 	type TaskTree,
-} from "@/features/greenfield/services/task-service";
+} from "@/features/greenfield/services/task-tree";
 import {
 	buildScopeEvidence,
 	describeScopeRefinement,

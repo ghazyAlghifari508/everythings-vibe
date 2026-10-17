@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ZoomControls } from "@/components/ui/zoom-controls";
 import type { ProjectFeatureTree } from "@/db/schema";
-import type { TaskTree } from "@/features/greenfield/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import type { LayoutNode } from "../../types/whiteboard";
 import { layoutTaskGraph } from "../../utils/whiteboard-layout";

@@ -8,7 +8,7 @@ import {
 	MAX_VISIBLE_CONTAINER_ROWS,
 } from "@/components/task/whiteboard-canvas";
 import type { ProjectFeatureTree } from "@/db/schema";
-import type { TaskTree } from "@/features/greenfield/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-tree";
 
 function makeTask(
 	name: string,

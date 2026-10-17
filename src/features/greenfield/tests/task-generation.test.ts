@@ -6,7 +6,7 @@ import {
 	MAX_TASK_COVERAGE_REPAIR_ATTEMPTS,
 	repairTaskCoverage,
 } from "@/features/greenfield/services/task-generation";
-import type { TaskTree } from "@/features/greenfield/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-tree";
 
 const AC = [
 	"## 1. Checkout",

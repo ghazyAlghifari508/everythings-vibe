@@ -6,7 +6,7 @@ import {
 	artifactMimeTypeFor,
 	downloadArtifact,
 } from "@/features/codebase/services/download";
-import type { TaskTree } from "@/features/greenfield/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import type { SourcePreviewState } from "../types/source-preview";
 
 export function useWorkspaceArtifactPresentation({

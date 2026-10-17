@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SnapshotGenerationContext } from "@/features/codebase/services/generation-context";
-import type { TaskTree } from "@/features/greenfield/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import { buildStageScopeDirective } from "@/features/greenfield/utils/planning-mode";
 import { depthDirective } from "@/features/greenfield/utils/prompt-depth";
 import {

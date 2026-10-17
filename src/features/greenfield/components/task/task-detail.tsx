@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ArrowRight, FileText } from "lucide-react";
@@ -9,7 +9,7 @@ import { CreditExhaustedModal } from "@/features/billing/components/credit-exhau
 import { DocumentReviewModal } from "@/features/greenfield/components/documents/document-review-modal";
 import { ProjectDocumentsDrawer } from "@/features/greenfield/components/documents/project-documents-drawer";
 import { useTaskGeneration } from "@/features/greenfield/hooks/use-task-generation";
-import type { TaskTree } from "@/features/greenfield/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import { cn } from "@/lib/utils";
 import { useChatStore, useUIStore } from "@/store";
 import { ImplementationOptions } from "./implementation-options";

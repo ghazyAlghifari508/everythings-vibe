@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, ChevronDown, Circle } from "lucide-react";
-import type { TaskTree } from "@/features/greenfield/services/task-service";
+import type { TaskTree } from "@/features/greenfield/services/task-tree";
 
 const FEATURE_ACCENTS = [
 	"#6366f1",
