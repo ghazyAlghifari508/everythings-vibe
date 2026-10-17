@@ -1,10 +1,9 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
-import { syncPaymentStatus } from "@/app/actions/payment";
+import { usePaymentResume } from "@/features/greenfield/hooks/use-payment-resume";
 import {
 	clearSetupPrompt,
 	consumePendingPrdPrompt,
-	consumeResumeIntent,
 	getSetupPrompt,
 } from "@/lib/prompt-handoff";
 import { useChatStore } from "@/store";
@@ -40,7 +39,6 @@ export function useChatAutoSubmit({
 	const searchStr = useLocation({ select: (l) => l.searchStr });
 	const setGeneratingPRD = useChatStore((s) => s.setGeneratingPRD);
 	const autoSubmitAttemptedRef = useRef(false);
-	const resumedPrdPaymentsRef = useRef<Set<string>>(new Set());
 
 	// Reset auto-submit guard when switching projects
 	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on project switch
@@ -100,36 +98,23 @@ export function useChatAutoSubmit({
 	]);
 
 	// Auto-resume PRD generation after payment return
-	useEffect(() => {
-		const params = new URLSearchParams(searchStr);
-		const orderId = params.get("order_id");
-		const payment = params.get("payment");
-		if (!orderId || payment !== "success" || !projectId) return;
-		if (resumedPrdPaymentsRef.current.has(orderId)) return;
-		resumedPrdPaymentsRef.current.add(orderId);
-
-		(async () => {
-			try {
-				const res = await syncPaymentStatus({ data: orderId });
-				if (!res.success) return;
-				const resumedStage = consumeResumeIntent(projectId);
-				if (resumedStage === "prd") {
-					setGeneratingPRD(true);
-					const pending = consumePendingPrdPrompt();
-					if (pending) {
-						void onSubmitPrompt(
-							pending.prompt,
-							"generate",
-							pending.displayMessage || pending.prompt,
-						);
-					}
-				}
-				navigate({ to: ".", search: {}, replace: true });
-			} catch (e) {
-				console.error("Auto-resume payment sync failed:", e);
+	usePaymentResume({
+		projectId,
+		stage: "prd",
+		searchStr,
+		navigate,
+		onResume: () => {
+			setGeneratingPRD(true);
+			const pending = consumePendingPrdPrompt();
+			if (pending) {
+				void onSubmitPrompt(
+					pending.prompt,
+					"generate",
+					pending.displayMessage || pending.prompt,
+				);
 			}
-		})();
-	}, [searchStr, onSubmitPrompt, navigate, projectId, setGeneratingPRD]);
+		},
+	});
 }
 
 export const useChatAutosubmit = useChatAutoSubmit;
