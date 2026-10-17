@@ -661,10 +661,10 @@ Di repositori ini, prefix `-` digunakan untuk menaruh file test langsung di sebe
 - [ ] **Fase 3: Migrasi Domain Greenfield:**
   - [ ] Pindahkan komponen `prd/`, `ac/`, `task/`, `kanban/`, `ask/`, `fitur/` ke `src/features/greenfield/components/`.
   - [ ] Pindahkan services `prd-service.ts`, `ac-service.ts`, `task-service.ts` ke `src/features/greenfield/services/`.
-- [ ] **Fase 4: Migrasi Domain VibeDesign Studio:**
-  - [ ] Pindahkan komponen `src/components/design/studio-*` ke `src/features/studio/components/`.
-  - [ ] Pindahkan services `studio-service.ts`, `studio-design-blueprint.ts`, `studio-export.ts` ke `src/features/studio/services/`.
-  - [ ] Pindahkan file test `-studio.*.test.tsx` dari `src/routes/` ke `src/features/studio/tests/`.
+- [x] **Fase 4: Migrasi Domain VibeDesign Studio:**
+  - [x] Pindahkan komponen `src/components/design/studio-*` ke `src/features/studio/components/`.
+  - [x] Pindahkan services `studio-service.ts`, `studio-design-blueprint.ts`, `studio-export.ts` ke `src/features/studio/services/`.
+  - [x] Pindahkan file test `-studio.*.test.tsx` dari `src/routes/` ke `src/features/studio/tests/`.
 - [ ] **Fase 5: Migrasi Domain VibeScrape (Web Scraping &amp; Extraction):**
   - [ ] Pindahkan komponen `src/components/design/scrape-*` dan `html-scraper*.tsx` ke `src/features/scrape/components/`.
   - [ ] Pindahkan hooks `use-scrape-status.ts` dan `use-scrape-preview.ts` ke `src/features/scrape/hooks/`.
