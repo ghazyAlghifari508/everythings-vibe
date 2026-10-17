@@ -3,7 +3,7 @@ import {
 	pausedReminderEmail,
 	preExpiryNoticeEmail,
 	resolveAppUrl,
-} from "./email";
+} from "@/features/billing/services/email";
 
 describe("email template safety", () => {
 	it("escapes plan names in subject and body", () => {
