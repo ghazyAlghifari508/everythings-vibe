@@ -263,8 +263,8 @@ describe("isBuiltInExcluded", () => {
 			matchesCustomIgnore(".vercel/project.json", false, ["!.vercel/"]),
 		).toBe(false);
 		// Additional user rules still apply on top of the built-ins.
-		expect(
-			matchesCustomIgnore("internal/notes.md", false, ["internal/"]),
-		).toBe(true);
+		expect(matchesCustomIgnore("internal/notes.md", false, ["internal/"])).toBe(
+			true,
+		);
 	});
 });

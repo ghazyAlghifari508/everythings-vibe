@@ -1,10 +1,6 @@
 ﻿import { chromium } from "playwright";
 import { describe, expect, it } from "vitest";
 import {
-	DESIGN_EVIDENCE_LIMITS,
-	visualEvidenceSchema,
-} from "./design-evidence-contract";
-import {
 	collectVisualEvidence,
 	deriveEvidenceGuidelines,
 	extractionFromVisualEvidence,
@@ -12,7 +8,11 @@ import {
 	renderEvidenceDesignMd,
 	type VisualElementEvidence,
 	type VisualEvidence,
-} from "./design-visual-evidence";
+} from "../services/design-visual-evidence";
+import {
+	DESIGN_EVIDENCE_LIMITS,
+	visualEvidenceSchema,
+} from "../types/design-evidence-contract";
 
 it("measures rendered styles and excludes hidden and unused declarations", async () => {
 	const browser = await chromium.launch({ headless: true });

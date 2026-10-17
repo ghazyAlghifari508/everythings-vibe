@@ -15,7 +15,7 @@ import {
 	scrapeFailureReasonForCode,
 } from "@/lib/design-errors";
 import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
-import { generateDesignMd } from "@/lib/prompts-design-md";
+import { generateDesignMd } from "./prompts-design-md";
 import { saveScrapeDocument } from "./scrape-document-service";
 import {
 	type ScrapeJobClaim,

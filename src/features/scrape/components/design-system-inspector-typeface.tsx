@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import type { InspectorTypeface } from "@/lib/design-md-inspector";
+import type { InspectorTypeface } from "@/features/scrape/utils/design-md-inspector";
 import {
 	FALLBACK_SAMPLE,
 	isSafeFontFamily,

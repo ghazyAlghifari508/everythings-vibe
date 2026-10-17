@@ -5,7 +5,7 @@ import {
 	type DesignInspectorModel,
 	inspectorFromEvidence,
 	parseDesignMd,
-} from "@/lib/design-md-inspector";
+} from "@/features/scrape/utils/design-md-inspector";
 import { displaySiteName } from "@/lib/site-name";
 import { cn } from "@/lib/utils";
 import { DesignAgentPromptDialog } from "./design-agent-prompt-dialog";

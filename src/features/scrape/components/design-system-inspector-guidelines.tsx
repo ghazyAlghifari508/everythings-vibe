@@ -1,5 +1,5 @@
 import { Check, X } from "lucide-react";
-import type { InspectorGuideline } from "@/lib/design-md-inspector";
+import type { InspectorGuideline } from "@/features/scrape/utils/design-md-inspector";
 
 export function GuidelineList({
 	rules,

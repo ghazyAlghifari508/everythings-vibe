@@ -1,7 +1,7 @@
 import {
 	firstCssLength,
 	type InspectorTypeEntry,
-} from "@/lib/design-md-inspector";
+} from "@/features/scrape/utils/design-md-inspector";
 import {
 	FALLBACK_SAMPLE,
 	isSafeFontFamily,

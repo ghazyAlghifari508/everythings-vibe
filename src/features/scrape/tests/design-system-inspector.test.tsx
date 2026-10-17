@@ -10,8 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
 	DesignInspectorModel,
 	InspectorColorToken,
-} from "@/lib/design-md-inspector";
-import { parseDesignMd } from "@/lib/design-md-inspector";
+} from "@/features/scrape/utils/design-md-inspector";
+import { parseDesignMd } from "@/features/scrape/utils/design-md-inspector";
 import {
 	classifyPaletteGroup,
 	DesignSystemInspector,

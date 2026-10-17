@@ -1,8 +1,8 @@
 import type {
 	InspectorRadiusToken,
 	InspectorToken,
-} from "@/lib/design-md-inspector";
-import { isPillRadius } from "@/lib/design-normalize-shape";
+} from "@/features/scrape/utils/design-md-inspector";
+import { isPillRadius } from "@/features/scrape/utils/design-normalize-shape";
 
 export function SpacingRow({ token }: { token: InspectorToken }) {
 	const px = token.value.trim().match(/^([\d.]+)px$/);

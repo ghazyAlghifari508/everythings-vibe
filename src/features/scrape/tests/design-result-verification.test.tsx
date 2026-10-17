@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { VisualEvidence } from "@/lib/design-visual-evidence";
-import { renderEvidenceDesignMd } from "@/lib/design-visual-evidence";
+import type { VisualEvidence } from "@/features/scrape/services/design-visual-evidence";
+import { renderEvidenceDesignMd } from "@/features/scrape/services/design-visual-evidence";
 import { DesignResult, resolveInspector } from "../components/design-result";
 
 afterEach(() => {

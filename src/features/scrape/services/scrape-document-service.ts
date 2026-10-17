@@ -9,7 +9,7 @@ import {
 import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
 import { ScrapeError } from "@/lib/design-errors";
 import { scrapeHtml } from "@/lib/fetch-html";
-import { generateDesignMd } from "@/lib/prompts-design-md";
+import { generateDesignMd } from "./prompts-design-md";
 import { getScrapeById } from "./scrape-detail-service";
 import {
 	type ScrapeJobClaim,

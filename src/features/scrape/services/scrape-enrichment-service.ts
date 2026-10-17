@@ -80,7 +80,7 @@ async function runEnrichmentRetry(
 			"RATE_LIMITED",
 			"Batas request tercapai. Coba lagi setelah satu menit.",
 		);
-	const { generateDesignMd } = await import("@/lib/prompts-design-md");
+	const { generateDesignMd } = await import("./prompts-design-md");
 	const generated = await generateDesignMd(
 		evidence,
 		{

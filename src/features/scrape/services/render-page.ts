@@ -1,5 +1,14 @@
 import type { Browser, BrowserContext } from "playwright";
 import type { ScrapeMode } from "@/db/schema";
+import {
+	collectVisualEvidence,
+	type VisualEvidence,
+} from "@/features/scrape/services/design-visual-evidence";
+import {
+	DESIGN_DETAILED_EVIDENCE_LIMITS,
+	DESIGN_EVIDENCE_LIMITS,
+	visualEvidenceSchema,
+} from "@/features/scrape/types/design-evidence-contract";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import {
@@ -21,15 +30,6 @@ import {
 	parseRetryAfterSeconds,
 	ScrapeError,
 } from "@/lib/design-errors";
-import {
-	DESIGN_DETAILED_EVIDENCE_LIMITS,
-	DESIGN_EVIDENCE_LIMITS,
-	visualEvidenceSchema,
-} from "@/lib/design-evidence-contract";
-import {
-	collectVisualEvidence,
-	type VisualEvidence,
-} from "@/lib/design-visual-evidence";
 import { type CaptureStats, getBrowser, guardContext } from "./browser-session";
 import {
 	autoScroll,

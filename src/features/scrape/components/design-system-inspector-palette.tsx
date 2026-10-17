@@ -1,6 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { InspectorColorToken } from "@/lib/design-md-inspector";
+import type { InspectorColorToken } from "@/features/scrape/utils/design-md-inspector";
 import { cn } from "@/lib/utils";
 
 export type PaletteGroupKey =

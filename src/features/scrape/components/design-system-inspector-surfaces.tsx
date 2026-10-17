@@ -1,4 +1,4 @@
-import type { DesignInspectorModel } from "@/lib/design-md-inspector";
+import type { DesignInspectorModel } from "@/features/scrape/utils/design-md-inspector";
 
 export function SurfaceList({
 	surfaces,
