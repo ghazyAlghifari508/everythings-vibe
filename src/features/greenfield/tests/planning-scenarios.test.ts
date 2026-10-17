@@ -4,6 +4,7 @@ import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import { buildStageScopeDirective } from "@/features/greenfield/utils/planning-mode";
 import { depthDirective } from "@/features/greenfield/utils/prompt-depth";
 import {
+	applyScopeRefinement,
 	buildScopeEvidence,
 	refineTaskScope,
 	uncoveredAcAfterRefinement,
@@ -17,7 +18,6 @@ import {
 	buildTaskGenerationPrompt,
 	taskDepthDirectiveForMode,
 } from "@/features/greenfield/utils/task-decomposition";
-import { applyScopeRefinement } from "@/routes/api/task/generate";
 
 /**
  * Workstream H — scenario-based verification.

@@ -1,4 +1,5 @@
 import type { SnapshotGenerationContext } from "@/features/codebase/services/generation-context";
+import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import { extractAcIds } from "./ac-coverage";
 import type {
 	CapabilityState,
@@ -6,6 +7,7 @@ import type {
 	ScopeEvidence,
 	ScopeTaskView,
 } from "./scope-validation";
+import { validateScopeConsistency } from "./scope-validation";
 
 /**
  * Scope refinement policy: turn an evidence-based scope report into a
@@ -160,4 +162,52 @@ export function uncoveredAcAfterRefinement(
 		for (const id of task.covers ?? []) covered.add(CANONICAL(id));
 	}
 	return defined.filter((id) => !covered.has(CANONICAL(id)));
+}
+
+/**
+ * Apply evidence-based scope refinement to a generated task tree.
+ *
+ * Coverage-safe by construction: a task is dropped only when it requires a
+ * capability the repository analysis positively reports absent, the request or
+ * confirmed answers never asked for it, AND every AC it declared is still
+ * covered by a surviving task. `unverified_path` findings never drop a task
+ * (a new file may simply be proposed). Decisions are reported through the SSE
+ * `thinking` stream so a plan is never silently altered.
+ *
+ * Returns the tree unchanged when scope evidence is unavailable (greenfield),
+ * so greenfield behavior is untouched.
+ */
+export function applyScopeRefinement(input: {
+	tree: TaskTree;
+	scopeEvidence: ScopeEvidence | null;
+	emit: (payload: Record<string, unknown>) => void;
+}): TaskTree {
+	const { tree, scopeEvidence, emit } = input;
+	if (!scopeEvidence) return tree;
+
+	const views: ScopeTaskView[] = tree.features.flatMap((feature) =>
+		feature.tasks.map((task) => ({
+			name: task.name,
+			description: task.description,
+			covers: task.covers,
+			subtasks: task.subtasks,
+		})),
+	);
+	const report = validateScopeConsistency(views, scopeEvidence);
+	if (report.consistent) return tree;
+
+	const refined = refineTaskScope(views, report);
+	const summary = describeScopeRefinement(refined);
+	if (summary) emit({ type: "thinking", content: summary });
+	if (refined.dropped.length === 0) return tree;
+
+	const dropped = new Set(refined.dropped);
+	return {
+		features: tree.features
+			.map((feature) => ({
+				...feature,
+				tasks: feature.tasks.filter((task) => !dropped.has(task.name)),
+			}))
+			.filter((feature) => feature.tasks.length > 0),
+	};
 }

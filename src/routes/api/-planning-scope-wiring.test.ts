@@ -46,7 +46,7 @@ describe("PRD generation route", () => {
 });
 
 describe("AC generation route", () => {
-	const src = source("src/routes/api/ac/generate.ts");
+	const src = source("src/features/greenfield/services/ac-generate.server.ts");
 
 	it("composes the ac-stage scope directive from the project mode", () => {
 		expect(src).toContain("buildStageScopeDirective");
@@ -56,11 +56,21 @@ describe("AC generation route", () => {
 });
 
 describe("Task generation route", () => {
-	const src = source("src/routes/api/task/generate.ts");
+	// The handler body now lives in feature modules; the pipeline contract spans
+	// the stream owner, the persistence tail, and the refinement utility.
+	const src = [
+		"src/features/greenfield/services/task-generate.server.ts",
+		"src/features/greenfield/services/task-generation-save.server.ts",
+		"src/features/greenfield/utils/scope-refinement.ts",
+	]
+		.map(source)
+		.join("\n");
 
 	it("passes the project mode into the task prompt composer", () => {
 		expect(src).toContain("buildTaskSystemPrompt");
-		expect(src).toContain("mode: project.projectMode");
+		// The composer's `mode` is the mode read from the project row.
+		expect(src).toContain("projectMode: project.projectMode");
+		expect(src).toContain("mode: input.projectMode");
 	});
 
 	it("passes the project mode into the coverage repair prompt", () => {
@@ -74,7 +84,7 @@ describe("Task generation route", () => {
 		expect(src).toContain("validateScopeConsistency");
 		expect(src).toContain("refineTaskScope");
 		// The refined tree — not the raw model tree — is what gets saved.
-		expect(src).toContain("saveTaskTree(projectId, scopedTree)");
+		expect(src).toContain("saveTaskTree(input.projectId, scopedTree)");
 	});
 
 	it("reports scope decisions on the stream instead of mutating silently", () => {
