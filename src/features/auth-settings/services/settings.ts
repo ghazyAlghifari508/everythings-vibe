@@ -15,7 +15,9 @@ const _updateProfile = createServerFn({ method: "POST" })
 	.validator((d: { fullName: string; role: string }) => d)
 	.handler(async ({ data }) => {
 		const user = await requireUser(getRequestHeaders());
-		const { parseProfileUpdate } = await import("@/lib/profile");
+		const { parseProfileUpdate } = await import(
+			"@/features/auth-settings/services/profile"
+		);
 		const clean = parseProfileUpdate(data);
 		const { db } = await import("@/db");
 		const { users } = await import("@/db/schema");

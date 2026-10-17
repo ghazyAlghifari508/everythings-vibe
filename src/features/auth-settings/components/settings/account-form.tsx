@@ -1,8 +1,8 @@
 "use client";
 
 import { memo, useState } from "react";
-import { deleteAccount } from "@/app/actions/settings";
 import { Input } from "@/components/ui/input";
+import { deleteAccount } from "@/features/auth-settings/services/settings";
 
 export const AccountForm = memo(function AccountForm({
 	email,

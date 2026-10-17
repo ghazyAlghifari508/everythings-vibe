@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { parseFeedbackBody } from "@/features/auth-settings/services/feedback";
 import { FEEDBACK_MAX_MESSAGE_CHARS } from "@/lib/constants";
-import { parseFeedbackBody } from "@/lib/feedback";
 
 describe("parseFeedbackBody", () => {
 	it("accepts a bounded message with default type", () => {

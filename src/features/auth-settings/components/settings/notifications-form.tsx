@@ -1,8 +1,8 @@
 "use client";
 
 import { memo } from "react";
-import { updateNotificationPreferences } from "@/app/actions/notifications";
 import { Button } from "@/components/ui/button";
+import { updateNotificationPreferences } from "@/features/auth-settings/services/notifications";
 import type { NotificationPreferences } from "@/types/database";
 
 interface NotificationsFormProps {

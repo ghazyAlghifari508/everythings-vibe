@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { OnboardingForm } from "./onboarding-form";
+import { OnboardingForm } from "../components/auth/onboarding-form";
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
 	const actual =

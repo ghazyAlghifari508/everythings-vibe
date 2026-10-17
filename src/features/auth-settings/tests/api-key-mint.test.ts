@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { mintApiKey } from "./api-key-mint";
+import { mintApiKey } from "../services/api-key-mint";
 
 describe("mintApiKey", () => {
 	// The raw key is shown once in Settings and pasted into a user's config, so

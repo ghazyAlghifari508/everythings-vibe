@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { parseProfileUpdate } from "@/features/auth-settings/services/profile";
 import { PROFILE_MAX_NAME_CHARS } from "@/lib/constants";
-import { parseProfileUpdate } from "@/lib/profile";
 
 describe("parseProfileUpdate", () => {
 	it("accepts a bounded name with a known role", () => {

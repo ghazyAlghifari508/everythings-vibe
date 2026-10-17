@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSafeRedirectPath } from "@/lib/redirect";
+import { getSafeRedirectPath } from "@/features/auth-settings/services/redirect";
 
 describe("getSafeRedirectPath", () => {
 	it("accepts same-origin paths", () => {

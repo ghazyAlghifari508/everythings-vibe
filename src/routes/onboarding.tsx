@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { OnboardingForm } from "@/components/auth";
 import { Logo } from "@/components/ui/logo";
+import { OnboardingForm } from "@/features/auth-settings/components/auth/onboarding-form";
 
 export const Route = createFileRoute("/onboarding")({
 	component: OnboardingPage,

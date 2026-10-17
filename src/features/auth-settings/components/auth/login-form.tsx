@@ -3,8 +3,8 @@
 import { useLocation } from "@tanstack/react-router";
 import { useState } from "react";
 import { Logo } from "@/components/ui/logo";
+import { getSafeRedirectPath } from "@/features/auth-settings/services/redirect";
 import { authClient } from "@/lib/auth-client";
-import { getSafeRedirectPath } from "@/lib/redirect";
 
 const GoogleIcon = () => (
 	<svg

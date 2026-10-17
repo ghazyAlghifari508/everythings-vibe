@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { AccountForm } from "@/components/settings/account-form";
+import { AccountForm } from "@/features/auth-settings/components/settings/account-form";
 import { requireUserServer } from "@/lib/session";
 
 export const Route = createFileRoute("/settings/account")({

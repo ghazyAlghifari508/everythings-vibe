@@ -1,9 +1,12 @@
 "use client";
 
 import { memo, useState } from "react";
-import { updateProfile, uploadAvatar } from "@/app/actions/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+	updateProfile,
+	uploadAvatar,
+} from "@/features/auth-settings/services/settings";
 import { PROFILE_ROLES } from "@/lib/constants";
 
 export const ProfileForm = memo(function ProfileForm({

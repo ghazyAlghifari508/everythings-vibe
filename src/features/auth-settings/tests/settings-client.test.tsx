@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SettingsClient } from "./settings-client";
+import { SettingsClient } from "../components/settings/settings-client";
 
 let mockLocation = { pathname: "/settings/profile" };
 const mockBack = vi.fn();

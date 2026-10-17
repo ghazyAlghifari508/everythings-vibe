@@ -24,7 +24,7 @@ vi.mock("@/components/ui/logo", () => ({
 	Logo: () => <div data-testid="logo" />,
 }));
 
-import { LoginForm } from "./login-form";
+import { LoginForm } from "../components/auth/login-form";
 
 let container: HTMLDivElement;
 let root: Root | null = null;

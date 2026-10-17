@@ -1,23 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
-import { NotificationsForm } from "@/components/settings/notifications-form";
-import { db } from "@/db";
-import { notificationPreferences } from "@/db/schema";
-import { requireUserServer } from "@/lib/session";
-
-// ponytail: server-only db logic - loader runs on client too, must not import db there.
-const loadNotifications = createServerFn({ method: "GET" }).handler(
-	async () => {
-		const user = await requireUserServer();
-		const [prefs] = await db
-			.select()
-			.from(notificationPreferences)
-			.where(eq(notificationPreferences.userId, user.id))
-			.limit(1);
-		return { preferences: prefs ?? null };
-	},
-);
+import { NotificationsForm } from "@/features/auth-settings/components/settings/notifications-form";
+import { loadNotifications } from "@/features/auth-settings/services/settings-loaders.functions";
 
 export const Route = createFileRoute("/settings/notifications")({
 	loader: async () => {
