@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { POST, studioGenerateBodySchema } from "./studio.generate";
+import { POST, studioGenerateBodySchema } from "@/routes/api/studio.generate";
 
 vi.mock("@/lib/session", () => ({
 	requireUser: async () => ({ id: "user-123", email: "test@example.com" }),
@@ -9,7 +9,7 @@ vi.mock("@tanstack/react-start/server", () => ({
 	getRequestHeaders: () => new Headers(),
 }));
 
-vi.mock("@/lib/services/studio-service", () => ({
+vi.mock("@/features/studio/services/studio-project-enqueue", () => ({
 	createStudioProjectWithJob: async () => ({
 		project: { id: "proj-100", title: "Test Project" },
 		job: { id: "job-100", status: "queued" },
@@ -18,16 +18,13 @@ vi.mock("@/lib/services/studio-service", () => ({
 			{ id: "frame-2", projectId: "proj-100", order: 1 },
 		],
 	}),
-	createStudioProject: async () => ({
-		project: { id: "proj-100", title: "Test Project" },
-		revision: { version: 1, htmlCode: "<html>mock</html>" },
-	}),
+}));
+
+vi.mock("@/features/studio/services/studio-revision-service", () => ({
 	reviseStudioProject: async () => ({
 		version: 2,
 		htmlCode: "<html>revised mock</html>",
 	}),
-	getStudioProject: vi.fn(),
-	listStudioProjects: vi.fn(),
 }));
 
 describe("POST /api/studio/generate", () => {

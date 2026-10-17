@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { issueStudioAssetCapability } from "@/lib/studio-asset-capability";
-import { GET, OPTIONS } from "./studio.asset";
+import { GET, OPTIONS } from "@/routes/api/studio.asset";
 
 describe("Studio Asset Route", () => {
 	const secret = "test-secret-at-least-16-bytes-long";

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { GET, POST } from "./studio.frame";
+import { GET, POST } from "@/routes/api/studio.frame";
 
 const getStudioFrameVisual = vi.fn(
 	async (
@@ -24,13 +24,16 @@ vi.mock("@tanstack/react-start/server", () => ({
 	getRequestHeaders: () => new Headers(),
 }));
 
-vi.mock("@/lib/services/studio-service", () => ({
+vi.mock("@/features/studio/services/studio-frame-visual", () => ({
 	getStudioFrameVisual: (
 		projectId: string,
 		frameId: string,
 		userId: string,
 		options?: { forceRecapture?: boolean },
 	) => getStudioFrameVisual(projectId, frameId, userId, options),
+}));
+
+vi.mock("@/features/studio/services/studio-frame-service", () => ({
 	addStudioFrame: async (
 		projectId: string,
 		_userId: string,
@@ -56,6 +59,9 @@ vi.mock("@/lib/services/studio-service", () => ({
 		order: 0,
 		htmlCode: "<html>revised</html>",
 	}),
+}));
+
+vi.mock("@/features/studio/services/studio-retry-service", () => ({
 	retryStudioFrame: async (
 		projectId: string,
 		_userId: string,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { GET, POST } from "./studio.project";
+import { GET, POST } from "@/routes/api/studio.project";
 
 const duplicate = vi.hoisted(() =>
 	vi.fn(async () => ({ id: "independent-project" })),
@@ -16,9 +16,12 @@ vi.mock("@tanstack/react-start/server", () => ({
 	getRequestHeaders: () => new Headers(),
 }));
 
-vi.mock("@/lib/services/studio-service", () => ({
+vi.mock("@/features/studio/services/studio-project-lifecycle", () => ({
 	duplicateStudioProject: duplicate,
 	deleteStudioProject: remove,
+}));
+
+vi.mock("@/features/studio/services/studio-project-detail", () => ({
 	getStudioProjectDetail: async (id: string, _userId: string) => ({
 		project: { id, title: "Test Canvas", designMode: "mobile" },
 		frames: [
