@@ -82,13 +82,14 @@ describe("BantuanPage Hub", () => {
 	it("expands FAQ answer when question accordion is clicked", () => {
 		sessionUser = { id: "u1", email: "user@example.invalid", isAdmin: false };
 		render(<BantuanPage />);
-		const question = screen.getByText(/Bagaimana cara kerja VibeDesign Scrap/i);
+		const question = screen.getByRole("button", {
+			name: /VibeScrape.*VibeDesign Studio/,
+		});
+		expect(question.getAttribute("aria-expanded")).toBe("false");
 		fireEvent.click(question);
-
-		expect(
-			screen.getByText(
-				/menghasilkan 2 file langsung: index.html dan design.md/i,
-			),
-		).toBeDefined();
+		expect(question.getAttribute("aria-expanded")).toBe("true");
+		const answer = screen.getByText(/workspace mandiri di \/scrape/i);
+		expect(answer.textContent).toContain("/scrape/history");
+		expect(answer.textContent).toContain("/design/studio");
 	});
 });

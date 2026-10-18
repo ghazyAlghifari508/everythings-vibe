@@ -7,7 +7,14 @@ import {
 
 export const Route = createFileRoute("/scrape/")({
 	head: () => ({
-		meta: [{ title: "Scrap website | VibeDesign" }],
+		meta: [
+			{ title: "Scrape website | VibeScrape" },
+			{
+				name: "description",
+				content:
+					"Ekstrak HTML, token desain, dan aset gambar dari website publik.",
+			},
+		],
 	}),
 	validateSearch: (search) => parseScrapeWorkspaceSearch(search),
 	component: ScrapIndexPage,

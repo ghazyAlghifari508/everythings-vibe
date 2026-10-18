@@ -27,7 +27,13 @@ export function validateScrapeHistoryRouteSearch(search: unknown) {
 
 export const Route = createFileRoute("/scrape/history")({
 	head: () => ({
-		meta: [{ title: "Riwayat Scrape | VibeDesign" }],
+		meta: [
+			{ title: "Riwayat | VibeScrape" },
+			{
+				name: "description",
+				content: "Temukan dan kelola riwayat ekstraksi website di VibeScrape.",
+			},
+		],
 	}),
 	validateSearch: (search) => validateScrapeHistoryRouteSearch(search),
 	loaderDeps: ({ search }) => ({ ...search }),

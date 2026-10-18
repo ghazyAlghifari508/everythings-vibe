@@ -10,7 +10,14 @@ import { parseScrapeReturnSearch } from "@/features/scrape/utils/scrape-return-p
 
 export const Route = createFileRoute("/scrape/$id")({
 	head: () => ({
-		meta: [{ title: "Hasil Scrape | VibeDesign" }],
+		meta: [
+			{ title: "Hasil ekstraksi | VibeScrape" },
+			{
+				name: "description",
+				content:
+					"Periksa hasil ekstraksi website dan unduh artefak VibeScrape.",
+			},
+		],
 	}),
 	validateSearch: (search) => ({
 		...parseScrapeReturnSearch(search),

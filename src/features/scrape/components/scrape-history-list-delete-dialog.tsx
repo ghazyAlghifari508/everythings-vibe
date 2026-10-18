@@ -30,7 +30,7 @@ export function ScrapeHistoryDeleteDialog({
 		>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle>Hapus Riwayat Scrape?</DialogTitle>
+					<DialogTitle>Hapus Riwayat VibeScrape?</DialogTitle>
 					<DialogDescription>
 						Apakah kamu yakin ingin menghapus riwayat scrape untuk{" "}
 						{target ? displaySiteName(target.domain) : "website ini"}? Tindakan

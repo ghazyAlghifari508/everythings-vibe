@@ -16,10 +16,10 @@ const FAQS: readonly BantuanFaq[] = [
 			"Greenfield memulai dari ide mentah: kamu menulis prompt, menjawab pertanyaan klarifikasi, lalu menerima PRD 8 seksi. Codebase Existing menghubungkan repository lokal lewat CLI sync, sehingga pertanyaan klarifikasi dan PRD disusun dari konteks kode yang sudah ada, bukan dari nol.",
 	},
 	{
-		id: "vibedesign-scrap",
-		question: "Bagaimana cara kerja VibeDesign Scrap?",
+		id: "vibescrape",
+		question: "Apa perbedaan VibeScrape dan VibeDesign Studio?",
 		answer:
-			"Masukkan URL website live, server mengambil HTML dan mem-proxy asetnya agar preview tidak terblokir, lalu menghasilkan 2 file langsung: index.html dan design.md. Keduanya bisa diunduh sebagai bundle ZIP dari halaman detail scrape.",
+			"VibeScrape adalah workspace mandiri di /scrape untuk mengekstrak HTML, token desain, dan aset gambar dari website publik. Riwayat hasilnya ada di /scrape/history. VibeDesign Studio di /design/studio digunakan untuk membuat dan merevisi antarmuka dari prompt, dan dapat memakai hasil VibeScrape sebagai referensi desain.",
 	},
 	{
 		id: "prompt-ui-studio",

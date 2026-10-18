@@ -22,7 +22,7 @@ export function ScrapeHistoryView({
 			<div className="flex w-full flex-col gap-6 py-4">
 				<header className="max-w-2xl">
 					<h1 className="text-2xl font-semibold tracking-tight text-snow sm:text-3xl">
-						Riwayat Scrape
+						Riwayat VibeScrape
 					</h1>
 					<p className="mt-2 text-sm leading-6 text-fog">
 						Temukan dan kelola hasil ekstraksi website.
@@ -44,7 +44,7 @@ export function ScrapeHistoryView({
 export function ScrapeHistoryPendingView() {
 	return (
 		<main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
-			<output className="sr-only">Memuat riwayat scrape...</output>
+			<output className="sr-only">Memuat riwayat VibeScrape...</output>
 			<div aria-hidden="true" className="flex w-full flex-col gap-6 py-4">
 				<div className="max-w-2xl">
 					<div className="h-8 w-48 animate-pulse rounded-lg bg-onyx" />
@@ -74,10 +74,10 @@ export function ScrapeHistoryErrorView({ onReset }: { onReset: () => void }) {
 				className="rounded-xl border border-graphite bg-charcoal p-8 text-center"
 			>
 				<h1 className="text-base font-semibold text-snow">
-					Riwayat scrape gagal dimuat
+					Riwayat VibeScrape gagal dimuat
 				</h1>
 				<p className="mx-auto mt-1 max-w-md text-sm leading-6 text-fog">
-					Periksa koneksi lalu coba muat ulang daftar riwayat scrape.
+					Periksa koneksi lalu coba muat ulang daftar riwayat VibeScrape.
 				</p>
 				<button
 					type="button"

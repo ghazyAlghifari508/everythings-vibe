@@ -21,15 +21,15 @@ const GUIDES: readonly WorkflowGuide[] = [
 		],
 	},
 	{
-		id: "vibedesign-scrap",
-		title: "Alur Kerja VibeDesign Scrap",
+		id: "vibescrape",
+		title: "Alur Kerja VibeScrape",
 		description:
 			"Ekstrak website live menjadi fondasi desain yang bisa dipakai ulang.",
 		steps: [
-			"Masukkan URL website live di /scrape",
-			"Server mengambil HTML dan mem-proxy aset lewat /api/scrape/asset",
-			"Terima 2 file langsung: index.html dan design.md",
-			"Unduh bundle ZIP berisi keduanya",
+			"Buka workspace mandiri /scrape dan masukkan URL website publik",
+			"Pilih mode ekstraksi: desain, HTML, crawl, atau gambar",
+			"Periksa hasil ekstraksi dan unduh artefak yang tersedia",
+			"Temukan kembali hasil di /scrape/history",
 		],
 	},
 	{

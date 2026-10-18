@@ -13,10 +13,9 @@ vi.mock("@tanstack/react-router", () => ({
 import { Route } from "@/routes/scrape/index";
 
 function ScrapIndexComponent(): React.ComponentType {
-	const options = Route.options as unknown as {
-		component: React.ComponentType;
-	};
-	return options.component;
+	const Component = Route.options.component;
+	if (!Component) throw new Error("Scrape route must render its workspace");
+	return Component;
 }
 
 afterEach(() => {
@@ -28,7 +27,7 @@ describe("scrap index heading stability", () => {
 		const Component = ScrapIndexComponent();
 		render(<Component />);
 		const headings = screen.getAllByRole("heading", {
-			name: "Website Extraction Workspace",
+			name: "VibeScrape",
 		});
 		expect(headings.length).toBe(1);
 		expect(headings[0].tagName).toBe("H1");
@@ -40,7 +39,7 @@ describe("scrap index heading stability", () => {
 		fireEvent.click(screen.getByRole("tab", { name: /crawl website/i }));
 		fireEvent.click(screen.getByRole("tab", { name: /scrape images/i }));
 		const headings = screen.getAllByRole("heading", {
-			name: "Website Extraction Workspace",
+			name: "VibeScrape",
 		});
 		expect(headings.length).toBe(1);
 	});
