@@ -5,11 +5,11 @@ import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 export const Route = createFileRoute("/design/")({
 	head: () => ({
 		meta: [
-			{ title: "VibeDesign | VibeEverything" },
+			{ title: "VibeDesign Studio | VibeEverything" },
 			{
 				name: "description",
 				content:
-					"Scrap website live menjadi index.html + design.md, atau rancang UI dari prompt di studio.",
+					"Rancang antarmuka HTML/Tailwind dari prompt dengan canvas interaktif dan preview responsif.",
 			},
 		],
 	}),
@@ -18,33 +18,35 @@ export const Route = createFileRoute("/design/")({
 
 const OPTIONS = [
 	{
-		icon: Globe,
-		title: "Scrap HTML & design.md",
+		icon: Sparkles,
+		title: "VibeDesign Studio",
 		description:
-			"Ekstrak URL web live menjadi dua file keluaran: design.md (aturan desain dan token) serta index.html (kode HTML utuh beserta preview 1440px desktop).",
-		to: "/scrape",
+			"Buat dan revisi antarmuka HTML/Tailwind dari prompt di canvas interaktif dengan preview desktop, tablet, dan mobile.",
+		to: "/design/studio",
+		action: "Buka Studio",
 	},
 	{
-		icon: Sparkles,
-		title: "Prompt UI Studio",
+		icon: Globe,
+		title: "VibeScrape",
 		description:
-			"Studio antarmuka interaktif: rancang aplikasi web atau mobile hanya lewat prompt teks alami, pilih inspirasi, dan lihat preview interaktif.",
-		to: "/design/studio",
+			"Butuh ekstraksi website publik? Buka VibeScrape, produk terpisah untuk mengambil HTML, token desain, dan aset gambar.",
+		to: "/scrape",
+		action: "Buka VibeScrape",
 	},
 ] as const;
 
 function DesignPage() {
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
-			<HubBreadcrumb current="VibeDesign" />
+			<HubBreadcrumb current="VibeDesign Studio" />
 
 			<header className="mx-auto max-w-2xl text-center">
 				<h1 className="text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
-					Rancang antarmuka dari prompt atau website live
+					Rancang antarmuka dari prompt di Studio
 				</h1>
 				<p className="mt-3 text-sm leading-6 text-fog">
-					Dua jalur menuju sistem visual yang siap dipakai: serap website
-					existing menjadi design.md, atau generate UI baru dari prompt.
+					Buat antarmuka HTML/Tailwind, periksa preview responsif, lalu revisi
+					desain di canvas interaktif.
 				</p>
 			</header>
 
@@ -69,7 +71,7 @@ function DesignPage() {
 								</span>
 							</span>
 							<span className="inline-flex items-center gap-1 text-sm font-semibold text-snow">
-								Mulai
+								{item.action}
 								<ArrowRight
 									size={16}
 									aria-hidden

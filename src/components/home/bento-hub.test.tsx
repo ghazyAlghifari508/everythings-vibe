@@ -1,43 +1,50 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Route as DesignRoute } from "@/routes/design/index";
 import { BentoHub } from "./bento-hub";
 
-vi.mock("@tanstack/react-router", () => ({
-	Link: ({
-		children,
-		to,
-		className,
-	}: {
-		children: React.ReactNode;
-		to: string;
-		className?: string;
-	}) => (
-		<a href={to} className={className}>
-			{children}
-		</a>
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@tanstack/react-router")>()),
+	Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+		<a href={to}>{children}</a>
 	),
 }));
 
-const DESTINATIONS = ["/plan", "/design", "/templates", "/bantuan"];
+afterEach(cleanup);
 
-function hubHrefs(): Array<string | null> {
-	return screen
-		.getAllByRole("link")
-		.map((link) => link.getAttribute("href"))
-		.sort();
-}
+const DESTINATIONS = [
+	"/plan",
+	"/design/studio",
+	"/scrape",
+	"/templates",
+	"/bantuan",
+];
 
-afterEach(() => {
-	cleanup();
+describe("home product destinations", () => {
+	it.each([
+		["VibePlan", "/plan"],
+		["VibeDesign Studio", "/design/studio"],
+		["VibeScrape", "/scrape"],
+		["VibeTemplate", "/templates"],
+		["VibeBantuan", "/bantuan"],
+	])("opens %s directly at %s", (product, destination) => {
+		render(<BentoHub />);
+		expect(
+			screen
+				.getByRole("link", { name: new RegExp(product) })
+				.getAttribute("href"),
+		).toBe(destination);
+	});
 });
 
 describe("BentoHub", () => {
 	it("renders a heading that states the hub purpose", () => {
 		render(<BentoHub />);
 
-		const heading = screen.getByRole("heading", { level: 1 });
-		expect(heading.textContent).toBe("Mau ngapain hari ini?");
+		expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+			"Mau ngapain hari ini?",
+		);
 		expect(
 			screen.getByText(
 				/Pilih workspace untuk mulai menyusun requirements produk/i,
@@ -45,101 +52,61 @@ describe("BentoHub", () => {
 		).toBeDefined();
 	});
 
-	it("exposes each card as a link named after its module", () => {
-		render(<BentoHub />);
-
-		for (const title of [
-			"VibePlan",
-			"VibeDesign",
-			"VibeTemplate",
-			"VibeBantuan",
-		]) {
-			expect(
-				screen.getByRole("link", { name: new RegExp(title) }),
-			).toBeDefined();
-		}
-	});
-
-	it("points every card at a registered destination route", () => {
-		render(<BentoHub />);
-
-		expect(hubHrefs()).toEqual([...DESTINATIONS].sort());
-	});
-
-	it("keeps the title and its destination in the same card", () => {
-		render(<BentoHub />);
-
-		expect(
-			screen.getByRole("link", { name: /VibePlan/ }).getAttribute("href"),
-		).toBe("/plan");
-		expect(
-			screen.getByRole("link", { name: /VibeDesign/ }).getAttribute("href"),
-		).toBe("/design");
-		expect(
-			screen.getByRole("link", { name: /VibeTemplate/ }).getAttribute("href"),
-		).toBe("/templates");
-		expect(
-			screen.getByRole("link", { name: /VibeBantuan/ }).getAttribute("href"),
-		).toBe("/bantuan");
-	});
-
 	// A div with an onClick has no implicit link role, so this count catches that regression.
-	it("renders exactly four real links so no card is a click-only div", () => {
+	it("renders exactly one real link per product card", () => {
 		render(<BentoHub />);
 
-		expect(screen.getAllByRole("link")).toHaveLength(4);
+		expect(screen.getAllByRole("link")).toHaveLength(DESTINATIONS.length);
 	});
 
 	// Sorting before comparing would let a reordered CARDS array pass, so assert DOM sequence.
-	it("orders the cards as VibePlan, VibeDesign, VibeTemplate, VibeBantuan", () => {
+	it("orders the cards as plan, Studio, Scrape, Template, Bantuan", () => {
 		render(<BentoHub />);
 
 		expect(
 			screen.getAllByRole("link").map((link) => link.getAttribute("href")),
-		).toEqual(["/plan", "/design", "/templates", "/bantuan"]);
+		).toEqual(DESTINATIONS);
 	});
 });
 
 // A card must not advertise a capability its own destination page denies.
 describe("BentoHub copy vs destination reality", () => {
-	function card(title: string): HTMLElement {
-		return screen.getByRole("link", { name: new RegExp(title) });
-	}
-
-	it("marks the modules that do not work yet as planned", () => {
+	it("does not advertise any product as planned or inactive", () => {
 		render(<BentoHub />);
 
-		for (const title of ["VibeDesign"]) {
-			expect(within(card(title)).getByText("Direncanakan")).toBeDefined();
-		}
-		// The modules that do work must not carry the badge.
-		for (const title of ["VibePlan", "VibeTemplate", "VibeBantuan"]) {
-			expect(within(card(title)).queryByText("Direncanakan")).toBeNull();
-		}
+		expect(screen.queryByText(/belum aktif/i)).toBeNull();
+		expect(screen.queryByText(/direncanakan/i)).toBeNull();
 	});
 
-	it("states on the VibeDesign card that the module is not active", () => {
-		render(<BentoHub />);
-
-		expect(within(card("VibeDesign")).getByText(/belum aktif/i)).toBeDefined();
-	});
-
-	it("no longer claims the VibeTemplate catalog is missing", () => {
+	it("keeps the extraction promise on the VibeScrape card only", () => {
 		render(<BentoHub />);
 
 		expect(
-			within(card("VibeTemplate")).queryByText(/belum ada di aplikasi ini/i),
+			within(screen.getByRole("link", { name: /VibeScrape/ })).getByText(
+				/ekstrak website/i,
+			),
+		).toBeDefined();
+		expect(
+			within(
+				screen.getByRole("link", { name: /VibeDesign Studio/ }),
+			).queryByText(/ekstrak website/i),
 		).toBeNull();
 	});
+});
 
-	it("still states the purpose of each planned module", () => {
-		render(<BentoHub />);
+describe("design landing destinations", () => {
+	it("keeps Studio and the independent VibeScrape destination separate", () => {
+		const DesignPage = DesignRoute.options.component;
+		if (!DesignPage) throw new Error("Design route must render its landing");
+		render(<DesignPage />);
 
 		expect(
-			within(card("VibeDesign")).getByText(/merancang antarmuka/i),
-		).toBeDefined();
+			screen
+				.getByRole("link", { name: /VibeDesign Studio/ })
+				.getAttribute("href"),
+		).toBe("/design/studio");
 		expect(
-			within(card("VibeTemplate")).getByText(/kerangka kerja/i),
-		).toBeDefined();
+			screen.getByRole("link", { name: /VibeScrape/ }).getAttribute("href"),
+		).toBe("/scrape");
 	});
 });

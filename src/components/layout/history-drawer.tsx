@@ -39,7 +39,7 @@ type CategoryFilter = "all" | DrawerCategory;
 const CATEGORY_LABEL: Record<DrawerCategory, string> = {
 	plan: "VibePlan",
 	design: "VibeDesign",
-	scrap: "Scrap",
+	scrap: "VibeScrape",
 };
 
 const CATEGORY_FILTERS: ReadonlyArray<{
@@ -58,7 +58,7 @@ const EMPTY_STATE_BY_FILTER: Record<CategoryFilter, string> = {
 	all: "Belum ada riwayat projek.",
 	plan: "Belum ada VibePlan tersimpan.",
 	design: "Belum ada desain tersimpan.",
-	scrap: "Belum ada hasil scrap.",
+	scrap: "Belum ada hasil VibeScrape.",
 };
 
 const NO_MATCH_MESSAGE = "Tidak ada proyek yang cocok dengan pencarian.";
@@ -281,7 +281,7 @@ export function HistoryDrawer({
 						className="drawer-content fixed inset-y-0 left-0 z-50 flex w-80 max-w-[85vw] flex-col border-r border-graphite bg-obsidian text-snow shadow-[var(--shadow-overlay)] outline-none data-[state=closed]:pointer-events-none md:w-96"
 					>
 						<DialogPrimitive.Description className="sr-only">
-							Riwayat projek, desain, dan hasil scrap yang tersimpan.
+							Riwayat projek, desain, dan hasil VibeScrape yang tersimpan.
 						</DialogPrimitive.Description>
 
 						<header className="flex shrink-0 items-center justify-between border-b border-graphite px-5 py-4">
@@ -436,13 +436,24 @@ export function HistoryDrawer({
 									? "Riwayat tidak ditampilkan"
 									: `${visibleItems.length} ditampilkan`}
 							</span>
-							<Link
-								to="/history"
-								onClick={onClose}
-								className="font-mono text-[11px] text-fog underline-offset-2 transition-colors hover:text-snow hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								Semua History →
-							</Link>
+							<div className="flex items-center gap-3">
+								{/* Shortcut into the standalone VibeScrape history; the merged feed
+								    itself stays on /history. */}
+								<Link
+									to="/scrape/history"
+									onClick={onClose}
+									className="font-mono text-[11px] text-fog underline-offset-2 transition-colors hover:text-snow hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									Riwayat VibeScrape →
+								</Link>
+								<Link
+									to="/history"
+									onClick={onClose}
+									className="font-mono text-[11px] text-fog underline-offset-2 transition-colors hover:text-snow hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									Semua History →
+								</Link>
+							</div>
 						</footer>
 					</aside>
 				</DialogPrimitive.Content>

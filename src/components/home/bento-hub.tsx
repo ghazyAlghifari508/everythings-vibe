@@ -2,13 +2,19 @@ import { Link } from "@tanstack/react-router";
 import {
 	ArrowRight,
 	CircleQuestionMark,
+	Globe,
 	LayoutGrid,
 	type LucideIcon,
 	Pencil,
 	Sparkles,
 } from "lucide-react";
 
-type HubDestination = "/plan" | "/design" | "/templates" | "/bantuan";
+type HubDestination =
+	| "/plan"
+	| "/design/studio"
+	| "/scrape"
+	| "/templates"
+	| "/bantuan";
 
 interface HubCard {
 	readonly to: HubDestination;
@@ -28,12 +34,20 @@ const CARDS: readonly HubCard[] = [
 		tags: ["Projek Baru", "Codebase Existing"],
 	},
 	{
-		to: "/design",
-		title: "VibeDesign",
+		to: "/design/studio",
+		title: "VibeDesign Studio",
 		icon: Sparkles,
 		description:
-			"Modul perancangan antarmuka: merancang antarmuka lewat prompt teks, atau ekstrak website live menjadi design.md dan index.html. Modul ini belum aktif.",
-		tags: ["Direncanakan", "Scrap HTML + design.md", "Prompt UI"],
+			"Rancang antarmuka HTML/Tailwind dari prompt, lihat preview responsif, dan revisi desain di canvas interaktif.",
+		tags: ["Prompt UI", "Canvas Interaktif", "Preview Responsif"],
+	},
+	{
+		to: "/scrape",
+		title: "VibeScrape",
+		icon: Globe,
+		description:
+			"Ekstrak website publik menjadi HTML, token desain, atau aset gambar. Kelola hasilnya di workspace scraping mandiri.",
+		tags: ["HTML", "design.md", "Crawl", "Gambar"],
 	},
 	{
 		to: "/templates",
@@ -66,7 +80,8 @@ export function BentoHub() {
 				</h1>
 				<p className="mt-3 text-sm leading-6 text-fog md:text-base">
 					Pilih workspace untuk mulai menyusun requirements produk, merancang
-					antarmuka UI, memilih template proyek, atau meminta bantuan teknis.
+					antarmuka UI, mengekstrak website, memilih template proyek, atau
+					meminta bantuan teknis.
 				</p>
 			</div>
 

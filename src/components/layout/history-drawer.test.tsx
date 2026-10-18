@@ -20,12 +20,21 @@ vi.mock("@tanstack/react-router", () => ({
 		children,
 		to,
 		className,
+		onClick,
 	}: {
 		children: React.ReactNode;
 		to: string;
 		className?: string;
+		onClick?: React.MouseEventHandler<HTMLAnchorElement>;
 	}) => (
-		<a href={to} className={className}>
+		<a
+			href={to}
+			className={className}
+			onClick={(event) => {
+				event.preventDefault();
+				onClick?.(event);
+			}}
+		>
 			{children}
 		</a>
 	),
@@ -153,7 +162,7 @@ describe("HistoryDrawer rendering", () => {
 			screen.getByPlaceholderText("Cari riwayat, nama projek, atau desain..."),
 		).toBeDefined();
 
-		for (const label of ["Semua", "VibePlan", "VibeDesign", "Scrap"]) {
+		for (const label of ["Semua", "VibePlan", "VibeDesign", "VibeScrape"]) {
 			expect(filterPills().getByText(label)).toBeDefined();
 		}
 
@@ -253,12 +262,12 @@ describe("HistoryDrawer empty states", () => {
 		expect(screen.getByText("Belum ada desain tersimpan.")).toBeDefined();
 	});
 
-	it("reports an honest empty state for the Scrap category", () => {
+	it("reports an honest empty state for the VibeScrape category", () => {
 		renderDrawer({ override: { items: phaseOneItems } });
 
-		fireEvent.click(filterPills().getByRole("button", { name: "Scrap" }));
+		fireEvent.click(filterPills().getByRole("button", { name: "VibeScrape" }));
 
-		expect(screen.getByText("Belum ada hasil scrap.")).toBeDefined();
+		expect(screen.getByText("Belum ada hasil VibeScrape.")).toBeDefined();
 	});
 });
 
@@ -449,6 +458,16 @@ describe("HistoryDrawer session scoping", () => {
 });
 
 describe("HistoryDrawer item navigation", () => {
+	it("opens the existing scrape history and closes without creating a second feed", () => {
+		const onClose = vi.fn();
+		renderDrawer({ onClose });
+		const shortcut = screen.getByRole("link", { name: /Riwayat VibeScrape/ });
+		expect(shortcut.getAttribute("href")).toBe("/scrape/history");
+		fireEvent.click(shortcut);
+		expect(onClose).toHaveBeenCalledTimes(1);
+		expect(loadHistorySpy).not.toHaveBeenCalled();
+	});
+
 	it("navigates a parsed project route through the router", async () => {
 		renderDrawer({ override: { items: [mockItems[0]] } });
 
