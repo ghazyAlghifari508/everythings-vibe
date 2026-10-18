@@ -4,7 +4,7 @@ import {
 	CODEBASE_STARTER_DESCRIPTION_MAX_CHARS,
 	CODEBASE_STARTER_PROMPT_MAX_CHARS,
 	CODEBASE_STARTER_TITLE_MAX_CHARS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 import { codebaseAnalysisStatusSchema } from "./sync";
 
 // === Codebase analysis (validated advisory output) ===

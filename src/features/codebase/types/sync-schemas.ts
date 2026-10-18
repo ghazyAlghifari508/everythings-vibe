@@ -3,7 +3,7 @@ import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_MAX_CHUNK_BYTES,
 	CODEBASE_MAX_FILE_BYTES,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 import { isSafeRelativePath } from "../services/sync-validation";
 
 // === Project mode ===

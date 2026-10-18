@@ -7,11 +7,11 @@ import {
 	crawlWebsite,
 	isCrawlScope,
 } from "@/features/scrape/services/crawl-website";
+import { fetchAsset } from "@/features/scrape/services/http-transport";
+import { SCRAPE_MAX_HTML_BYTES } from "@/features/scrape/types/scrape-constants";
 import type { CrawlSettings } from "@/features/scrape/types/scrape-contract";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
-import { SCRAPE_MAX_HTML_BYTES } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
-import { fetchAsset } from "@/lib/fetch-html";
 import { classifyCrawlFailures } from "./scrape-failure-summary";
 import type { ScrapeJobClaim, ScrapeJobUpdate } from "./scrape-job-service";
 import { scrapeClaimPredicate } from "./scrape-job-service";

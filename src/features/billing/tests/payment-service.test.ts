@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { ADAPTIVE_CREDIT_PRICING, TOPUP_SKU } from "@/lib/constants";
+import {
+	ADAPTIVE_CREDIT_PRICING,
+	TOPUP_SKU,
+} from "@/features/billing/types/billing-constants";
 import {
 	creditsForPlan,
 	isTopUpOrder,

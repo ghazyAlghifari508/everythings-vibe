@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import { DeleteProjectModal } from "@/features/greenfield/components/prd/delete-project-modal";
-import { HISTORY_PAGE_SIZE } from "@/lib/constants";
+import { HISTORY_PAGE_SIZE } from "@/features/greenfield/types/greenfield-constants";
 import { parseHistoryHref, resolveHistoryUrl } from "@/lib/flow-progress";
 import { filterHistory, paginate } from "@/lib/history-filter";
 import { saveSuppressAutoGen } from "@/lib/prompt-handoff";

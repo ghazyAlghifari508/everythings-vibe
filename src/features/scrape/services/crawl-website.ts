@@ -1,13 +1,16 @@
 import type { CrawlHeading, CrawlPageContent, CrawlSection } from "@/db/schema";
-import type { CrawlSettings } from "@/features/scrape/types/scrape-contract";
-import { matchesCrawlUrl } from "@/features/scrape/utils/crawl-url-filter";
+import {
+	decodeHtmlEntities,
+	extractPageTitle,
+} from "@/features/scrape/services/html-document";
 import {
 	CRAWL_DESCRIPTION_MAX_CHARS,
 	CRAWL_HEADING_MAX_CHARS,
 	CRAWL_SECTION_TEXT_MAX_CHARS,
-} from "@/lib/constants";
+} from "@/features/scrape/types/scrape-constants";
+import type { CrawlSettings } from "@/features/scrape/types/scrape-contract";
+import { matchesCrawlUrl } from "@/features/scrape/utils/crawl-url-filter";
 import { designErrorCodeForHttpStatus, ScrapeError } from "@/lib/design-errors";
-import { decodeHtmlEntities, extractPageTitle } from "@/lib/fetch-html";
 
 export interface CrawledPage {
 	url: string;

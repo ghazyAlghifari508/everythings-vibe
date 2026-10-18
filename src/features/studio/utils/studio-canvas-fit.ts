@@ -6,7 +6,7 @@ import {
 	STUDIO_CANVAS_HEADER_INSET_PX,
 	STUDIO_CANVAS_MIN_VISIBLE_PX,
 	STUDIO_CANVAS_TOOLBAR_INSET_PX,
-} from "@/lib/constants";
+} from "@/features/studio/types/studio-constants";
 
 export interface StudioCanvasFrameBounds {
 	width: number;

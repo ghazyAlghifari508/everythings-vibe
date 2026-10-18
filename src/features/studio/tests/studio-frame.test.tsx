@@ -7,7 +7,7 @@ import {
 	StudioFrame,
 } from "@/features/studio/components/canvas/studio-frame";
 import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
-import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
+import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 
 describe("StudioFrameShimmer", () => {
 	afterEach(() => cleanup());

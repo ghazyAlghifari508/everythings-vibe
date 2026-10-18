@@ -1,7 +1,7 @@
 import {
 	SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS,
 	SCRAPE_PREVIEW_READY_MAX_PINGS,
-} from "@/lib/constants";
+} from "@/features/scrape/types/scrape-constants";
 
 // Reports the framed snapshot sends back to the parent.
 export type PreviewFrameReport =

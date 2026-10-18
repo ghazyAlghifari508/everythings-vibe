@@ -8,7 +8,7 @@ import {
 	studioProjects,
 	studioRevisions,
 } from "@/db/schema";
-import { STUDIO_FRAME_CONCURRENCY } from "@/lib/constants";
+import { STUDIO_FRAME_CONCURRENCY } from "@/features/studio/types/studio-constants";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import {

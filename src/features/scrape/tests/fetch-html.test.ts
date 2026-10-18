@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-	DESKTOP_WIDTH,
 	decodeHtmlEntities,
 	extractPageTitle,
 	forceDesktopViewport,
 	stylesheetHrefs,
 	withBaseHref,
-} from "@/lib/fetch-html";
+} from "@/features/scrape/services/html-document";
+import { DESKTOP_WIDTH } from "@/features/scrape/services/page-capture";
 
 describe("fetch-html helpers", () => {
 	it("pins the desktop viewport width", () => {

@@ -1,5 +1,5 @@
 import { prdFyPlans } from "@/features/billing/data/pricing-data";
-import { findTopUpPackage } from "@/lib/constants";
+import { findTopUpPackage } from "@/features/billing/types/billing-constants";
 import type { Plan } from "@/types/database";
 
 export function planFromAmount(amount: number): Plan {

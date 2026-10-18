@@ -12,7 +12,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import type { Feature, PriceTier } from "@/features/billing/data/pricing-data";
-import { TOPUP_SKU } from "@/lib/constants";
+import { TOPUP_SKU } from "@/features/billing/types/billing-constants";
 import { cn } from "@/lib/utils";
 
 // --- Utility Components ---

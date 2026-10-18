@@ -1,8 +1,8 @@
 import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
 import { validateStudioDesignMd } from "@/features/studio/services/studio-prompt-validation";
 import type { AttachedLogo } from "@/features/studio/types/studio";
+import { STUDIO_LOGO_MAX_BYTES } from "@/features/studio/types/studio-constants";
 import { formatStudioBytes } from "@/features/studio/utils/format-studio-bytes";
-import { STUDIO_LOGO_MAX_BYTES } from "@/lib/constants";
 
 /** Counts the design tokens a custom DESIGN.md actually declares. */
 function countDeclaredTokens(tokens: {

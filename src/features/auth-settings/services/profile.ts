@@ -1,4 +1,7 @@
-import { PROFILE_MAX_NAME_CHARS, PROFILE_ROLES } from "@/lib/constants";
+import {
+	PROFILE_MAX_NAME_CHARS,
+	PROFILE_ROLES,
+} from "@/features/auth-settings/types/settings-constants";
 
 export type ProfileRole = (typeof PROFILE_ROLES)[number];
 

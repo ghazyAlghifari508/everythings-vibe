@@ -6,9 +6,9 @@ import {
 	scrapeDocuments,
 	scrapes,
 } from "@/db/schema";
+import { scrapeHtml } from "@/features/scrape/services/page-capture";
 import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
 import { ScrapeError } from "@/lib/design-errors";
-import { scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "./prompts-design-md";
 import { getScrapeById } from "./scrape-detail-service";
 import {

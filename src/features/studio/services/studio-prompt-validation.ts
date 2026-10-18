@@ -1,8 +1,8 @@
+import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/features/studio/types/studio-constants";
 import type {
 	StudioDesignMode,
 	StudioPromptValidation,
 } from "@/features/studio/types/studio-prompts";
-import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
 
 export const STUDIO_MIN_PROMPT_CHARS = 10;
 export const STUDIO_MAX_PROMPT_CHARS = 4000;

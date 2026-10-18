@@ -1,7 +1,10 @@
 import { PgDialect } from "drizzle-orm/pg-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { creditLedgerEntries, subscriptions } from "@/db/schema";
-import { ADAPTIVE_CREDIT_PRICING, BILLING_PERIOD_DAYS } from "@/lib/constants";
+import {
+	ADAPTIVE_CREDIT_PRICING,
+	BILLING_PERIOD_DAYS,
+} from "@/features/billing/types/billing-constants";
 import { PLAN_CREDITS } from "@/types/database";
 
 const state = vi.hoisted(() => {

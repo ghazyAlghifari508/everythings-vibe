@@ -11,7 +11,7 @@ import {
 	CODEBASE_STARTER_DESCRIPTION_MAX_CHARS,
 	CODEBASE_STARTER_PROMPT_MAX_CHARS,
 	CODEBASE_STARTER_TITLE_MAX_CHARS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 
 const ids = { projectId: "proj_repair", snapshotId: "snap_repair" };
 const trustedManifestPaths = new Set([

@@ -6,11 +6,6 @@ import {
 	StudioCanvas,
 } from "@/features/studio/components/canvas/studio-canvas";
 import {
-	canvasComposerBottomCss,
-	canvasComposerWidthCss,
-	canvasZoomRowBottomCss,
-} from "@/features/studio/utils/studio-canvas-layout";
-import {
 	STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX,
 	STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX,
 	STUDIO_CANVAS_HEADER_INSET_PX,
@@ -19,7 +14,12 @@ import {
 	STUDIO_CANVAS_OVERLAY_GAP_PX,
 	STUDIO_CANVAS_ZOOM_BOTTOM_PX,
 	STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX,
-} from "@/lib/constants";
+} from "@/features/studio/types/studio-constants";
+import {
+	canvasComposerBottomCss,
+	canvasComposerWidthCss,
+	canvasZoomRowBottomCss,
+} from "@/features/studio/utils/studio-canvas-layout";
 
 describe("StudioCanvas", () => {
 	afterEach(() => cleanup());

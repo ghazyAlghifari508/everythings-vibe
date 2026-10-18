@@ -29,7 +29,7 @@ import {
 import {
 	CODEBASE_MAX_CHUNK_BYTES,
 	CODEBASE_SYNC_CLAIM_STALE_MS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 import { checkRateLimit } from "@/lib/rate-limit";
 import type { Plan } from "@/types/database";
 import {

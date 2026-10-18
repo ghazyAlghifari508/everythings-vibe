@@ -1,7 +1,7 @@
 import {
 	STUDIO_LOGO_ALLOWED_MIMES,
 	STUDIO_LOGO_MAX_BYTES,
-} from "@/lib/constants";
+} from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
 import type { StudioLogoInput } from "../types/studio-service";
 import { issueStudioAssetCapability } from "./studio-asset-capability";

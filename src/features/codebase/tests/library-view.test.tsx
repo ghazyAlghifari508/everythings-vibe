@@ -14,7 +14,7 @@ import {
 	storePlanCodebasePointer,
 	storePlanCodebaseProjectPointer,
 } from "@/features/codebase/services/plan-storage";
-import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/lib/constants";
+import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/features/codebase/types/codebase-constants";
 import { useUIStore } from "@/store";
 import { CodebaseLibraryView } from "../components/planning/codebase-library-view";
 

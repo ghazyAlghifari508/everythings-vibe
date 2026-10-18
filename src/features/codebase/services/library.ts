@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
 	CODEBASE_NAME_MAX_CHARS,
 	CODEBASE_NAME_MIN_CHARS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 import { type CodebaseAnalysis, safeParseCodebaseAnalysis } from "./analysis";
 import { isSingleSafeNameSegment } from "./naming";
 import { isSafeRelativePath, SNAPSHOT_CONTEXT_STATUSES } from "./sync";

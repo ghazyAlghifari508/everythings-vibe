@@ -1,4 +1,7 @@
-import { FEEDBACK_MAX_MESSAGE_CHARS, FEEDBACK_TYPES } from "@/lib/constants";
+import {
+	FEEDBACK_MAX_MESSAGE_CHARS,
+	FEEDBACK_TYPES,
+} from "@/features/auth-settings/types/settings-constants";
 
 export type FeedbackType = (typeof FEEDBACK_TYPES)[number];
 

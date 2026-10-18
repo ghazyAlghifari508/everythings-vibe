@@ -1,4 +1,4 @@
-import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
+import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 
 /**
  * Shared platform contracts. Both the initial user prompt and the per-screen

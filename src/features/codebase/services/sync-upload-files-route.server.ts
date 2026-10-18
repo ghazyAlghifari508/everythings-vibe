@@ -20,7 +20,7 @@ import { codebaseSnapshotFiles, codebaseSyncSessions } from "@/db/schema";
 import {
 	CODEBASE_MAX_FILE_BYTES,
 	CODEBASE_MAX_SNAPSHOT_BYTES,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 import {
 	appendSyncLifecycleEvent,
 	assertSyncTransition,

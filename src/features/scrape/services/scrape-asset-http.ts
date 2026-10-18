@@ -7,24 +7,24 @@
 // CSS/JS is rewritten to route its own sub-resources back through this proxy.
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { rateLimits, scrapes, users } from "@/db/schema";
+import { fetchAsset } from "@/features/scrape/services/http-transport";
 import {
 	ImageStorageError,
 	readStoredScrapeImage,
 	validateStoredImage,
 } from "@/features/scrape/services/scrape-image-storage";
 import {
+	SCRAPE_ASSET_RATE_LIMIT,
+	SCRAPE_ASSET_RATE_WINDOW_S,
+	SCRAPE_MAX_ASSET_BYTES,
+} from "@/features/scrape/types/scrape-constants";
+import {
 	rewritePreviewCss,
 	rewritePreviewModule,
 	verifyPreviewAssetCapability,
 } from "@/features/scrape/utils/preview-capabilities";
 import { parseAndValidateFormat } from "@/features/scrape/utils/url-validator";
-import {
-	SCRAPE_ASSET_RATE_LIMIT,
-	SCRAPE_ASSET_RATE_WINDOW_S,
-	SCRAPE_MAX_ASSET_BYTES,
-} from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
-import { fetchAsset } from "@/lib/fetch-html";
 import { requireUser } from "@/lib/session";
 
 const ASSET_HEADERS: Record<string, string> = {

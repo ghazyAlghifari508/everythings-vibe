@@ -13,7 +13,7 @@ import {
 	syncStatusResponseSchema,
 } from "@/features/codebase/services/sync";
 import { shouldFetchWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
-import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/lib/constants";
+import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/features/codebase/types/codebase-constants";
 import {
 	type CodebaseSessionStartAction,
 	getCodebaseSessionRequestBody,

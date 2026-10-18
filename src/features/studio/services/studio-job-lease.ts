@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { type StudioJobRow, studioJobs } from "@/db/schema";
-import { STUDIO_JOB_CLAIM_TTL_MS } from "@/lib/constants";
+import { STUDIO_JOB_CLAIM_TTL_MS } from "@/features/studio/types/studio-constants";
 
 // Claims are short atomic updates; no transaction is held during AI calls.
 export async function claimStudioJob(

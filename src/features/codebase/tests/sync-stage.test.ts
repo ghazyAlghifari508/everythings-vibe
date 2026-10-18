@@ -12,9 +12,8 @@ import {
 import {
 	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_POLL_INTERVAL_MS,
-	RATE_LIMIT_WINDOW_MS,
-	RATE_LIMITS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
+import { RATE_LIMIT_WINDOW_MS, RATE_LIMITS } from "@/lib/constants";
 
 function status(
 	overrides: Partial<SyncStatusResponse> = {},

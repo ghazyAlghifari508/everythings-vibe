@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
 	SCRAPE_HISTORY_DEFAULT_PAGE_SIZE,
 	SCRAPE_HISTORY_SEARCH_MAX_CHARS,
-} from "@/lib/constants";
+} from "@/features/scrape/types/scrape-constants";
 
 export const SCRAPE_LIMITS = {
 	urlChars: 4096,

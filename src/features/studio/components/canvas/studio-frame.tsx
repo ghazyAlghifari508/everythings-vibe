@@ -9,9 +9,9 @@ import { memo } from "react";
 import type { StudioFrameRow } from "@/db/schema";
 import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
 import { useStudioFrameVisual } from "@/features/studio/hooks/use-studio-frame-visual";
+import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
-import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
 
 export type { StudioFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
 export {

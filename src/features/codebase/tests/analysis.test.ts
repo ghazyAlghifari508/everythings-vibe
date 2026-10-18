@@ -24,6 +24,11 @@ import {
 } from "@/features/codebase/services/analysis";
 import { AnalysisServiceError } from "@/features/codebase/services/analysis.server";
 import type { SyncStatusResponse } from "@/features/codebase/services/sync";
+import {
+	CODEBASE_STARTER_DESCRIPTION_MAX_CHARS,
+	CODEBASE_STARTER_PROMPT_MAX_CHARS,
+	CODEBASE_STARTER_TITLE_MAX_CHARS,
+} from "@/features/codebase/types/codebase-constants";
 // Server-module import is safe in vitest: .env.local provides DATABASE_URL
 // (see vitest.config.ts) and no connection opens until a query runs.
 import {
@@ -32,11 +37,6 @@ import {
 	formatInsufficientCreditsError,
 	formatSubscriptionPausedError,
 } from "@/lib/adaptive-credit";
-import {
-	CODEBASE_STARTER_DESCRIPTION_MAX_CHARS,
-	CODEBASE_STARTER_PROMPT_MAX_CHARS,
-	CODEBASE_STARTER_TITLE_MAX_CHARS,
-} from "@/lib/constants";
 import {
 	type CreditServiceStore,
 	createCreditService,

@@ -3,13 +3,18 @@ export const SCRAPE_HISTORY_DEFAULT_PAGE_SIZE = 10;
 export const SCRAPE_HISTORY_MAX_LIMIT = 50;
 export const SCRAPE_HISTORY_SEARCH_MAX_CHARS = 128;
 export const SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS = 300;
+// Completed design scrapes offered as a Studio design reference source.
+export const SCRAPE_DESIGN_SOURCE_LIMIT = 20;
 
-export const SCRAPE_BROWSER_UA =
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
-export const SCRAPE_FETCH_TIMEOUT_MS = 25_000;
-export const SCRAPE_MAX_HTML_BYTES = 5_000_000;
-export const SCRAPE_MAX_ASSET_BYTES = 15_000_000;
-export const SCRAPE_MAX_REDIRECTS = 3;
+// Transport policy is owned by the shared fetch transport (src/lib/fetch-html.ts);
+// the scrape names stay exported so crawl code keeps its domain vocabulary.
+export {
+	FETCH_BROWSER_UA as SCRAPE_BROWSER_UA,
+	FETCH_MAX_ASSET_BYTES as SCRAPE_MAX_ASSET_BYTES,
+	FETCH_MAX_HTML_BYTES as SCRAPE_MAX_HTML_BYTES,
+	FETCH_MAX_REDIRECTS as SCRAPE_MAX_REDIRECTS,
+	FETCH_TIMEOUT_MS as SCRAPE_FETCH_TIMEOUT_MS,
+} from "@/lib/constants";
 export const SCRAPE_MAX_STYLESHEETS = 8;
 export const SCRAPE_MAX_INLINE_CSS_BYTES = 512_000;
 export const SCRAPE_DESKTOP_WIDTH = 1440;

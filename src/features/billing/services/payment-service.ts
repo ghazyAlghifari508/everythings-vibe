@@ -23,7 +23,7 @@ import {
 	ADAPTIVE_CREDIT_PRICING,
 	findTopUpPackage,
 	TOPUP_PACKAGES,
-} from "@/lib/constants";
+} from "@/features/billing/types/billing-constants";
 import type { Plan } from "@/types/database";
 import { isTopUpOrder, planFromAmount } from "./payment-pricing";
 

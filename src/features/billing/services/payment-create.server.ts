@@ -15,7 +15,7 @@ import {
 	midtransRequestHeaders,
 } from "@/features/billing/services/midtrans";
 import { getTopUpCreditsUsedThisPeriod } from "@/features/billing/services/payment-service";
-import { findTopUpPackage } from "@/lib/constants";
+import { findTopUpPackage } from "@/features/billing/types/billing-constants";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
 import { requireUser } from "@/lib/session";
 import { PLAN_CREDITS } from "@/types/database";

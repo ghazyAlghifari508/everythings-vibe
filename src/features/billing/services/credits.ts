@@ -10,7 +10,7 @@ import {
 	type SubscriptionStateKind,
 	shouldTopUpInsteadOfResubscribe,
 } from "@/features/billing/services/billing";
-import { ADAPTIVE_CREDIT_PRICING } from "@/lib/constants";
+import { ADAPTIVE_CREDIT_PRICING } from "@/features/billing/types/billing-constants";
 import { FEATURES, PLAN_CREDITS, type Plan } from "@/types/database";
 
 /** Hot-path payload consumed by /api/user/plan, chat.ts, ac/task generate. */

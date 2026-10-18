@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, CalendarClock, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { cancelSubscription } from "@/features/billing/services/payment.functions";
-import { TOPUP_SKU } from "@/lib/constants";
+import { TOPUP_SKU } from "@/features/billing/types/billing-constants";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { useUIStore } from "@/store";
 import {

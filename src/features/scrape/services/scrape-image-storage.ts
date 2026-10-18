@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, eq, sum } from "drizzle-orm";
 import { scrapeImageAssets, scrapeImages, scrapes, users } from "@/db/schema";
-import { SCRAPE_MAX_ASSET_BYTES } from "@/lib/constants";
+import { SCRAPE_MAX_ASSET_BYTES } from "@/features/scrape/types/scrape-constants";
 import { ScrapeError } from "@/lib/design-errors";
 import {
 	isScrapeClaimCurrent,

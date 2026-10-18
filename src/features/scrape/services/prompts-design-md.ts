@@ -1,9 +1,9 @@
 import { z } from "zod";
-import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import {
 	DESIGN_SYNTHESIS_DETAIL_MAX_CHARS,
 	DESIGN_SYNTHESIS_MAX_TOKENS,
-} from "@/lib/constants";
+} from "@/features/scrape/types/scrape-constants";
+import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import { ScrapeError } from "@/lib/design-errors";
 import { extractJson } from "@/lib/services/json-extract";
 import { visualEvidenceSchema } from "../types/design-evidence-contract";

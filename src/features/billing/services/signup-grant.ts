@@ -1,7 +1,10 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { creditLedgerEntries, subscriptions } from "@/db/schema";
-import { ADAPTIVE_CREDIT_PRICING, BILLING_PERIOD_DAYS } from "@/lib/constants";
+import {
+	ADAPTIVE_CREDIT_PRICING,
+	BILLING_PERIOD_DAYS,
+} from "@/features/billing/types/billing-constants";
 import { PLAN_CREDITS } from "@/types/database";
 import { addDays } from "./billing";
 

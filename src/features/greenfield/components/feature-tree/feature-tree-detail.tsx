@@ -7,14 +7,14 @@ import { ThoughtLine } from "@/components/ui/thought-line";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { featureTreeSchema } from "@/features/greenfield/types/feature-tree";
 import {
+	GENERATION_STATUS_POLL_INTERVAL_MS,
+	GUARD_WAIT_MS,
+} from "@/features/greenfield/types/greenfield-constants";
+import {
 	isBackgroundGeneration,
 	isStaleCompletedLoader,
 	resolveInitialGenerating,
 } from "@/features/greenfield/utils/generation-recovery";
-import {
-	GENERATION_STATUS_POLL_INTERVAL_MS,
-	GUARD_WAIT_MS,
-} from "@/lib/constants";
 import { consumeSuppressAutoGen } from "@/lib/prompt-handoff";
 import { useUIStore } from "@/store";
 import { FeatureMapCanvas } from "./feature-map-canvas";

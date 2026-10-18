@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { ADAPTIVE_CREDIT_PRICING } from "@/lib/constants";
+import { ADAPTIVE_CREDIT_PRICING } from "@/features/billing/types/billing-constants";
 import { PLAN_CREDITS } from "@/types/database";
 import {
 	addDays,

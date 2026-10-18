@@ -1,8 +1,8 @@
+import { STUDIO_PREVIOUS_HTML_MAX_CHARS } from "@/features/studio/types/studio-constants";
 import type {
 	StudioFramePromptOptions,
 	StudioPromptOptions,
 } from "@/features/studio/types/studio-prompts";
-import { STUDIO_PREVIOUS_HTML_MAX_CHARS } from "@/lib/constants";
 import {
 	extractStudioPrdSummary,
 	sanitizeStudioPrd,

@@ -1,8 +1,8 @@
 import type { Page } from "playwright";
 import type { ScrapeMode } from "@/db/schema";
+import { SCRAPE_MAX_HTML_BYTES } from "@/features/scrape/types/scrape-constants";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
-import { SCRAPE_MAX_HTML_BYTES } from "@/lib/constants";
 
 const AUTO_SCROLL_STEP_PX = 600;
 const AUTO_SCROLL_DELAY_MS = 100;

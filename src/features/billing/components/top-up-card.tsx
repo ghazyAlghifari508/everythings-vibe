@@ -2,7 +2,7 @@
 
 import { CreditCard } from "lucide-react";
 import * as React from "react";
-import { TOPUP_SKU } from "@/lib/constants";
+import { TOPUP_SKU } from "@/features/billing/types/billing-constants";
 import { useUIStore } from "@/store";
 
 /**

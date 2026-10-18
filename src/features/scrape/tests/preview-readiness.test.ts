@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS } from "@/features/scrape/types/scrape-constants";
 import {
 	INITIAL_PREVIEW_READINESS,
 	type PreviewFrameReport,
@@ -8,7 +9,6 @@ import {
 	previewShouldKeepPolling,
 	reducePreviewReport,
 } from "@/features/scrape/utils/preview-readiness";
-import { SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS } from "@/lib/constants";
 
 function fold(reports: PreviewFrameReport[]): PreviewReadinessState {
 	return reports.reduce(reducePreviewReport, INITIAL_PREVIEW_READINESS);

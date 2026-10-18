@@ -14,12 +14,15 @@ import type {
 	SubscriptionRowLike,
 } from "@/features/billing/services/billing";
 import {
+	CLAIM_POLL_MS,
+	CLAIM_RETRY_MS,
+} from "@/features/greenfield/types/greenfield-constants";
+import {
 	type CreditComplexityMetrics,
 	type CreditQuote,
 	formatInsufficientCreditsError,
 	formatSubscriptionPausedError,
 } from "@/lib/adaptive-credit";
-import { CLAIM_POLL_MS, CLAIM_RETRY_MS } from "@/lib/constants";
 import {
 	type CreditOperationResult,
 	CreditSubscriptionOriginError,

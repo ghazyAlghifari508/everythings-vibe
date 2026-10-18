@@ -3,7 +3,7 @@ import {
 	SCRAPE_DESKTOP_WIDTH,
 	SCRAPE_MAX_INLINE_CSS_BYTES,
 	SCRAPE_MAX_STYLESHEETS,
-} from "@/lib/constants";
+} from "@/features/scrape/types/scrape-constants";
 
 function htmlAttr(tag: string, name: string): string {
 	const match = tag.match(

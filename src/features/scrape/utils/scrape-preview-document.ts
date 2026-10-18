@@ -1,6 +1,6 @@
 import type { ScrapeMode } from "@/db/schema";
+import { SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS } from "@/features/scrape/types/scrape-constants";
 import { buildPreviewSrcDoc } from "@/features/scrape/utils/preview-capabilities";
-import { SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS } from "@/lib/constants";
 
 export interface ScrapePreviewSource {
 	id: string;

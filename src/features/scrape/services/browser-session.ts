@@ -1,79 +1,26 @@
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
-import { type Browser, type BrowserContext, chromium } from "playwright";
+import type { Browser, BrowserContext } from "playwright";
 import { fetchAsset } from "@/features/scrape/services/http-transport";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
-import { isPrivateIp } from "@/features/scrape/utils/url-validator";
+import { BROWSER_NAME_SHIM, createBrowserSession } from "@/lib/browser-session";
+import { isBlockedRequestUrl } from "@/lib/url-validator";
 
-const BLOCK_HOSTS = new Set(["localhost", "ip6-localhost", "ip6-loopback"]);
+export { BROWSER_NAME_SHIM, isBlockedRequestUrl };
 
-let browserPromise: Promise<Browser> | null = null;
+// Scrape owns exactly one Chromium process, reused across jobs. The flags keep a
+// container-safe, proxy-aware instance alive; the shared session primitive is
+// also used by Studio so neither domain can tear down the other's browser.
+const session = createBrowserSession({
+	headless: true,
+	args: [
+		"--no-sandbox",
+		"--disable-dev-shm-usage",
+		"--headless=chrome",
+		"--proxy-auto-detect",
+	],
+});
 
-// Functions passed to page.evaluate/addInitScript are serialized with
-// Function.prototype.toString and re-parsed inside the browser. The tsx dev
-// worker loads this module through esbuild with keepNames enabled, which wraps
-// every inner function binding in a `__name(...)` helper call that only exists
-// in the Node module scope. Without this shim the browser throws
-// "ReferenceError: __name is not defined" and the whole capture aborts.
-export const BROWSER_NAME_SHIM =
-	"if (typeof globalThis.__name !== 'function') globalThis.__name = (value) => value;";
-
-export async function getBrowser(): Promise<Browser> {
-	if (!browserPromise) {
-		browserPromise = chromium
-			.launch({
-				headless: true,
-				args: [
-					"--no-sandbox",
-					"--disable-dev-shm-usage",
-					"--headless=chrome",
-					"--proxy-auto-detect",
-				],
-			})
-			.then((browser) => {
-				browser.on("disconnected", () => {
-					browserPromise = null;
-				});
-				return browser;
-			})
-			.catch((err) => {
-				browserPromise = null;
-				throw err;
-			});
-	}
-	return browserPromise;
-}
-
-const hostBlockCache = new Map<string, { blocked: boolean; at: number }>();
-const HOST_CACHE_TTL_MS = 60_000;
-
-export async function isBlockedRequestUrl(raw: string): Promise<boolean> {
-	let parsed: URL;
-	try {
-		parsed = new URL(raw);
-	} catch {
-		return true;
-	}
-	if (parsed.protocol === "data:" || parsed.protocol === "blob:") return false;
-	if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return true;
-	const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-	if (BLOCK_HOSTS.has(host) || host.endsWith(".localhost")) return true;
-	if (isIP(host)) return isPrivateIp(host);
-
-	const cached = hostBlockCache.get(host);
-	if (cached && Date.now() - cached.at < HOST_CACHE_TTL_MS)
-		return cached.blocked;
-	let blocked: boolean;
-	try {
-		const addresses = await lookup(host, { all: true });
-		blocked =
-			!addresses.length ||
-			addresses.some(({ address }) => isPrivateIp(address));
-	} catch {
-		blocked = true;
-	}
-	hostBlockCache.set(host, { blocked, at: Date.now() });
-	return blocked;
+export function getBrowser(): Promise<Browser> {
+	return session.get();
 }
 
 export interface CaptureStats {
@@ -182,7 +129,5 @@ export function shouldSkipCaptureResourceType(resourceType: string): boolean {
 }
 
 export async function closeRenderBrowser(): Promise<void> {
-	const browser = await browserPromise?.catch(() => null);
-	browserPromise = null;
-	await browser?.close();
+	await session.close();
 }

@@ -1,6 +1,6 @@
 import { AlertCircle, Check, FileCode2, Upload } from "lucide-react";
 import { useRef } from "react";
-import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
+import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/features/studio/types/studio-constants";
 
 interface StudioDesignMdSectionProps {
 	designMd: string;

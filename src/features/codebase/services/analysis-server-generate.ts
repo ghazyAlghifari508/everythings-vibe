@@ -1,7 +1,7 @@
 // Model boundary of the codebase analysis service: the generator/message
 // contracts and the default generator used when none is injected.
 
-import { CODEBASE_ANALYSIS_MAX_TOKENS } from "@/lib/constants";
+import { CODEBASE_ANALYSIS_MAX_TOKENS } from "@/features/codebase/types/codebase-constants";
 import {
 	selectModels,
 	tryStreamWithFallback,

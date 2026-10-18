@@ -20,9 +20,9 @@ import {
 	validateStudioPrdFilename,
 	validateStudioPrdText,
 } from "@/features/studio/services/studio-prd-helpers";
+import { STUDIO_PRD_FILE_MAX_BYTES } from "@/features/studio/types/studio-constants";
 import type { StudioDesignMode } from "@/features/studio/types/studio-prompts";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
-import { STUDIO_PRD_FILE_MAX_BYTES } from "@/lib/constants";
 import { StudioPageCountSelect } from "./studio-page-count-select";
 import { StudioSkillSelect } from "./studio-skill-select";
 

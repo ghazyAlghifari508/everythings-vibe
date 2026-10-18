@@ -12,7 +12,7 @@ import {
 } from "@/features/greenfield/services/export-service";
 import { getLatestPrdContent } from "@/features/greenfield/services/prd-service";
 import { getTaskTree } from "@/features/greenfield/services/task-service";
-import { EXPORT_FILENAME_PREFIX } from "@/lib/constants";
+import { EXPORT_FILENAME_PREFIX } from "@/features/greenfield/types/greenfield-constants";
 import { requireUser } from "@/lib/session";
 
 export const Route = createFileRoute("/api/export/zip")({

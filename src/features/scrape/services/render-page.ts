@@ -9,6 +9,12 @@ import {
 	DESIGN_EVIDENCE_LIMITS,
 	visualEvidenceSchema,
 } from "@/features/scrape/types/design-evidence-contract";
+import {
+	SCRAPE_BROWSER_UA,
+	SCRAPE_DESKTOP_HEIGHT,
+	SCRAPE_DESKTOP_WIDTH,
+	SCRAPE_MAX_HTML_BYTES,
+} from "@/features/scrape/types/scrape-constants";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import {
@@ -19,12 +25,6 @@ import {
 	httpStatusMessage,
 	isTimeoutError,
 } from "@/features/scrape/utils/html-capture-assessment";
-import {
-	SCRAPE_BROWSER_UA,
-	SCRAPE_DESKTOP_HEIGHT,
-	SCRAPE_DESKTOP_WIDTH,
-	SCRAPE_MAX_HTML_BYTES,
-} from "@/lib/constants";
 import {
 	designErrorCodeForHttpStatus,
 	parseRetryAfterSeconds,

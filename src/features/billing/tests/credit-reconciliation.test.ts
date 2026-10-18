@@ -11,6 +11,10 @@ import {
 	type PaymentServiceStore,
 	type PaymentSubscriptionRow,
 } from "@/features/billing/services/payment-store";
+import {
+	ADAPTIVE_CREDIT_PRICING,
+	TOPUP_SKU,
+} from "@/features/billing/types/billing-constants";
 import { decideAnalysisRequest } from "@/features/codebase/services/analysis";
 import {
 	buildCodebaseMetrics,
@@ -18,7 +22,6 @@ import {
 	buildTaskMetrics,
 	estimateCreditQuote,
 } from "@/lib/adaptive-credit";
-import { ADAPTIVE_CREDIT_PRICING, TOPUP_SKU } from "@/lib/constants";
 import {
 	type CreditLedgerEntry,
 	type CreditOperation,

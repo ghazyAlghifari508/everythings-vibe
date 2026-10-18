@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CODEBASE_CLI_MIN_VERSION } from "@/lib/constants";
+import { CODEBASE_CLI_MIN_VERSION } from "@/features/codebase/types/codebase-constants";
 import type { CodebaseSyncStatus } from "../types/sync-schemas";
 import { CODEBASE_SYNC_COMPLETE_STATUSES } from "./sync-lifecycle";
 

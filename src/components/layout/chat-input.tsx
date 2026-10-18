@@ -21,12 +21,9 @@ import {
 	getPendingSyncPayloadKey,
 	syncPromptPayloadSchema,
 } from "@/features/codebase/services/sync";
+import { HOME_DRAFT_DEBOUNCE_MS } from "@/features/greenfield/types/greenfield-constants";
 import { authClient } from "@/lib/auth-client";
-import {
-	HOME_DRAFT_DEBOUNCE_MS,
-	MAX_PROMPT_LENGTH,
-	MIN_PROMPT_LENGTH,
-} from "@/lib/constants";
+import { MAX_PROMPT_LENGTH, MIN_PROMPT_LENGTH } from "@/lib/constants";
 import { type OutputLanguage, SUPPORTED_LANGUAGES } from "@/lib/language";
 import {
 	clearHomeDraft,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
+import { SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS } from "@/features/scrape/types/scrape-constants";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
-import { SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS } from "@/lib/constants";
 
 // The URL search is the source of truth; the input keeps a local draft and only
 // commits it after the debounce window so typing does not rewrite the route on

@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { KANBAN_POLL_INTERVAL_MS } from "@/lib/constants";
+import { KANBAN_POLL_INTERVAL_MS } from "@/features/greenfield/types/greenfield-constants";
 
 export interface TaskCard {
 	id: string;

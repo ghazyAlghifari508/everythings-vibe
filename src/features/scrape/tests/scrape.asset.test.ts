@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { GET } from "@/features/scrape/services/scrape-asset-http";
+import { SCRAPE_MAX_ASSET_BYTES } from "@/features/scrape/types/scrape-constants";
 import {
 	issuePreviewAssetCapability,
 	storedImageAssetUrl,
 } from "@/features/scrape/utils/preview-capabilities";
-import { SCRAPE_MAX_ASSET_BYTES } from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
 
 const secret = "test secret with enough entropy for preview capabilities";

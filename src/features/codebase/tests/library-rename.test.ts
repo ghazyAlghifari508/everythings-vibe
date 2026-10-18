@@ -5,7 +5,7 @@ import {
 	CODEBASE_NAME_MIN_ERROR,
 	codebaseRenameSchema,
 } from "@/features/codebase/services/library";
-import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/lib/constants";
+import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/features/codebase/types/codebase-constants";
 
 describe("codebaseRenameSchema", () => {
 	it("trims a valid name before it reaches the database", () => {

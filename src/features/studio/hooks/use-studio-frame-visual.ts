@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { StudioFrameRow } from "@/db/schema";
+import { STUDIO_VISUAL_FALLBACK_HEIGHT } from "@/features/studio/types/studio-constants";
 import { readFrameVisualError } from "@/features/studio/utils/studio-frame-artboard";
-import { STUDIO_VISUAL_FALLBACK_HEIGHT } from "@/lib/constants";
 
 interface UseStudioFrameVisualInput {
 	frame: StudioFrameRow;

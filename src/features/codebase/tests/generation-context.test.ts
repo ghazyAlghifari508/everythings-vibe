@@ -32,7 +32,7 @@ import {
 	CODEBASE_GENERATION_MAX_PATHS,
 	CODEBASE_GENERATION_MAX_PROMPT_CHARS,
 	CODEBASE_GENERATION_MAX_SUMMARY_CHARS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 
 const analysis: CodebaseAnalysis = {
 	projectId: "proj_123",

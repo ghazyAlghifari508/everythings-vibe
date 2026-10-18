@@ -5,7 +5,7 @@ import {
 	guardSyncUpload,
 	readBoundedJson,
 } from "@/features/codebase/services/sync-upload.server";
-import { CODEBASE_MAX_CHUNK_BYTES } from "@/lib/constants";
+import { CODEBASE_MAX_CHUNK_BYTES } from "@/features/codebase/types/codebase-constants";
 
 describe("idempotent claim protocol surface", () => {
 	it("exposes atomic claim/finalize/release and drops the old read-then-insert pair", () => {

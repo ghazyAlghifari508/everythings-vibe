@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
-import { type Browser, chromium } from "playwright";
 import type { StudioAssetRow } from "@/db/schema";
-import { isBlockedRequestUrl } from "@/features/scrape/services/render-page";
 import {
 	STUDIO_CAPTURE_DSF,
 	STUDIO_CAPTURE_MAX_HEIGHT,
@@ -9,14 +7,16 @@ import {
 	STUDIO_CAPTURE_TIMEOUT_MS,
 	STUDIO_VISUAL_VIEWPORT_HEIGHT,
 	STUDIO_VISUAL_WIDTH,
-} from "@/lib/constants";
+} from "@/features/studio/types/studio-constants";
+import { createBrowserSession } from "@/lib/browser-session";
 import { fetchAsset } from "@/lib/fetch-html";
+import { isBlockedRequestUrl } from "@/lib/url-validator";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 
 export { STUDIO_VISUAL_WIDTH };
 const TAILWIND_RUNTIME = "https://cdn.tailwindcss.com";
 const LUCIDE_RUNTIME = "https://unpkg.com/lucide@latest";
-let browser: Promise<Browser> | null = null;
+const session = createBrowserSession({ headless: true });
 
 export interface StudioVisualCaptureConfig {
 	width: number;
@@ -70,9 +70,7 @@ export function studioVisualHash(html: string, viewport: string) {
 }
 
 export async function closeStudioVisualBrowser() {
-	const current = browser;
-	browser = null;
-	await (await current)?.close();
+	await session.close();
 }
 
 export async function captureStudioVisual(
@@ -81,20 +79,8 @@ export async function captureStudioVisual(
 	designMd: string | null,
 	assets: StudioAssetRow[],
 ) {
-	if (!browser)
-		browser = chromium
-			.launch({ headless: true })
-			.then((instance) => {
-				instance.on("disconnected", () => {
-					browser = null;
-				});
-				return instance;
-			})
-			.catch((failure) => {
-				browser = null;
-				throw failure;
-			});
-	const parser = await (await browser).newContext({
+	const instance = await session.get();
+	const parser = await instance.newContext({
 		javaScriptEnabled: false,
 		serviceWorkers: "block",
 	});
@@ -142,7 +128,7 @@ export async function captureStudioVisual(
 	}
 	const tokens = extractDesignSystemTokens(designMd);
 	const config = studioVisualCaptureConfig(viewport);
-	const context = await (await browser).newContext({
+	const context = await instance.newContext({
 		viewport: { width: config.width, height: config.height },
 		deviceScaleFactor: config.deviceScaleFactor,
 		serviceWorkers: "block",

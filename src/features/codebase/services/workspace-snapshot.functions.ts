@@ -14,7 +14,7 @@ export const loadSnapshotManifest = createServerFn({ method: "GET" })
 		);
 		const { and, asc, desc, eq, inArray } = await import("drizzle-orm");
 		const { CODEBASE_PACKAGE_JSON_PREVIEW_MAX_CHARS } = await import(
-			"@/lib/constants"
+			"@/features/codebase/types/codebase-constants"
 		);
 		const [codebase] = await db
 			.select({ id: codebases.id })
@@ -109,7 +109,9 @@ export const loadSnapshotFileContent = createServerFn({ method: "GET" })
 			truncatePreviewContent,
 		} = await import("@/features/codebase/services/snapshot-preview");
 		const { and, asc, desc, eq, inArray } = await import("drizzle-orm");
-		const { CODEBASE_FILE_PREVIEW_MAX_CHARS } = await import("@/lib/constants");
+		const { CODEBASE_FILE_PREVIEW_MAX_CHARS } = await import(
+			"@/features/codebase/types/codebase-constants"
+		);
 		const requestedPath = input.path.trim();
 		if (!isSafeRelativePath(requestedPath)) {
 			return { status: "unavailable", snapshotId: null, path: requestedPath };

@@ -15,15 +15,15 @@ import {
 import { StudioFrame } from "@/features/studio/components/canvas/studio-frame";
 import { useStudioCanvasInput } from "@/features/studio/hooks/use-studio-canvas-input";
 import { useStudioCanvasMarquee } from "@/features/studio/hooks/use-studio-canvas-marquee";
-import { computeCanvasFit } from "@/features/studio/utils/studio-canvas-fit";
-import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import {
 	STUDIO_CANVAS_INITIAL_ZOOM,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
 	STUDIO_VISUAL_FALLBACK_HEIGHT,
 	STUDIO_VISUAL_WIDTH,
-} from "@/lib/constants";
+} from "@/features/studio/types/studio-constants";
+import { computeCanvasFit } from "@/features/studio/utils/studio-canvas-fit";
+import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 
 export type {
 	StudioCanvasFitInput,

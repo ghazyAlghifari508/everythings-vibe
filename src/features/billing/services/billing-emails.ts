@@ -6,7 +6,7 @@
 import {
 	PRE_EXPIRY_NOTICE_DAYS,
 	REMINDER_SCHEDULE_DAYS,
-} from "@/lib/constants";
+} from "@/features/billing/types/billing-constants";
 
 export interface BillingCandidateRow {
 	userId: string;

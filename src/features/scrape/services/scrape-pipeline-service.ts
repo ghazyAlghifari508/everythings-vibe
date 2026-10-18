@@ -7,6 +7,10 @@ import {
 	type ScrapeStatus,
 	scrapes,
 } from "@/db/schema";
+import {
+	type ScrapeCapture,
+	scrapeHtml,
+} from "@/features/scrape/services/page-capture";
 import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import {
@@ -14,7 +18,6 @@ import {
 	ScrapeError,
 	scrapeFailureReasonForCode,
 } from "@/lib/design-errors";
-import { type ScrapeCapture, scrapeHtml } from "@/lib/fetch-html";
 import { generateDesignMd } from "./prompts-design-md";
 import { saveScrapeDocument } from "./scrape-document-service";
 import {

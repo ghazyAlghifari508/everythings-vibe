@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	SCRAPE_DESKTOP_HEIGHT,
 	SCRAPE_PREVIEW_READY_PING_INTERVAL_MS,
-} from "@/lib/constants";
+} from "@/features/scrape/types/scrape-constants";
 import {
 	INITIAL_PREVIEW_READINESS,
 	type PreviewReadinessState,

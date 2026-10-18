@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { renderDesignMd } from "@/features/scrape/utils/design-md-render";
 import { buildFixtureModel } from "@/lib/design-fixture";
+import { renderDesignMd } from "@/lib/design-md-render";
 import type { StudioDesignBlueprint } from "../services/studio-design-blueprint";
 import {
 	enforceDesignSystemOnHtml,

@@ -11,7 +11,10 @@
  * grandfathering (one-time purchase, credits never expire). A NULL period on
  * a free row is rolled forward lazily by getCreditBalance.
  */
-import { ADAPTIVE_CREDIT_PRICING, BILLING_PERIOD_DAYS } from "@/lib/constants";
+import {
+	ADAPTIVE_CREDIT_PRICING,
+	BILLING_PERIOD_DAYS,
+} from "@/features/billing/types/billing-constants";
 import { PLAN_CREDITS, type Plan } from "@/types/database";
 
 /** Minimal shape any caller's Drizzle select must provide. */

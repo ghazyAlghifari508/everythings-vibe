@@ -6,7 +6,7 @@ import {
 	type SourceToken,
 	type SourceViewMode,
 } from "@/features/codebase/services/source-view";
-import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "@/lib/constants";
+import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "@/features/codebase/types/codebase-constants";
 
 export interface CodebaseSourcePreviewProps {
 	/** Repository-relative path of the snapshot file being inspected. */

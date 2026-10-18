@@ -10,7 +10,7 @@ import { codebaseSyncSessions, codebases } from "@/db/schema";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";
 import { resolvePlan } from "./analysis-route-scope.server";

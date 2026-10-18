@@ -1,10 +1,10 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { init as initModuleLexer, parse as parseModule } from "es-module-lexer";
-import { parseAndValidateFormat } from "@/features/scrape/utils/url-validator";
 import {
 	SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS,
 	SCRAPE_PREVIEW_ASSET_MAX_URL_CHARS,
-} from "@/lib/constants";
+} from "@/features/scrape/types/scrape-constants";
+import { parseAndValidateFormat } from "@/features/scrape/utils/url-validator";
 import { rewriteCssUrls, rewritePreviewAssets } from "@/lib/preview-html";
 
 const TOKEN_VERSION = 1;

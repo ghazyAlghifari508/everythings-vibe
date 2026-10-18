@@ -5,7 +5,7 @@ import {
 	shouldSoftWrapLanguage,
 	supportsFormattedView,
 } from "@/features/codebase/services/source-view";
-import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "@/lib/constants";
+import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "@/features/codebase/types/codebase-constants";
 
 const MAX = 5000;
 

@@ -12,8 +12,11 @@ import * as React from "react";
 import { PricingComponent } from "@/features/billing/components/pricing-card";
 import { prdFyPlans } from "@/features/billing/data/pricing-data";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
+import {
+	TOPUP_PACKAGES,
+	type TopUpPackage,
+} from "@/features/billing/types/billing-constants";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
-import { TOPUP_PACKAGES, type TopUpPackage } from "@/lib/constants";
 import { saveResumeIntent } from "@/lib/prompt-handoff";
 import { cn, formatDate } from "@/lib/utils";
 import { useUIStore } from "@/store";

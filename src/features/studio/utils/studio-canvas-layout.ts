@@ -5,7 +5,7 @@ import {
 	STUDIO_CANVAS_OVERLAY_GAP_PX,
 	STUDIO_CANVAS_ZOOM_BOTTOM_PX,
 	STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX,
-} from "@/lib/constants";
+} from "@/features/studio/types/studio-constants";
 
 /**
  * Shared geometry for the two floating overlays on the canvas bottom edge.

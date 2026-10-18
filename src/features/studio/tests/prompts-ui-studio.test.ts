@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
+import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import { parseStudioScreenPlan } from "../services/studio-planning-parser";
 import { buildStudioPlanningPrompt } from "../services/studio-planning-prompt";
 import {

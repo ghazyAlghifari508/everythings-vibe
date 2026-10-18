@@ -4,8 +4,8 @@ import {
 	CODEBASE_ASK_HANDOFF_MAX_OPTIONS,
 	CODEBASE_ASK_HANDOFF_MAX_PROMPT_CHARS,
 	CODEBASE_ASK_HANDOFF_MAX_STATE_CHARS,
-	MAX_PROMPT_LENGTH,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
+import { MAX_PROMPT_LENGTH } from "@/lib/constants";
 import { truncateText } from "./generation-context-build";
 
 // === Ask handoff validation (pure) ===

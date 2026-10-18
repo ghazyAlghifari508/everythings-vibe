@@ -11,7 +11,7 @@ import {
 	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_REQUEST_TIMEOUT_MS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 
 export interface UseCodebaseSyncStatusOptions {
 	/** Codebase whose status is authoritative for this flow. */

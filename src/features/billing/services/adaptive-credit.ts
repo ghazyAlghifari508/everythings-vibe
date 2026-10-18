@@ -1,6 +1,6 @@
-import { ADAPTIVE_CREDIT_PRICING } from "@/lib/constants";
+import { ADAPTIVE_CREDIT_PRICING } from "@/features/billing/types/billing-constants";
 
-export { ADAPTIVE_CREDIT_PRICING } from "@/lib/constants";
+export { ADAPTIVE_CREDIT_PRICING } from "@/features/billing/types/billing-constants";
 
 export type CreditOperationKind =
 	| "codebase_analysis"

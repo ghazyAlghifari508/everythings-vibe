@@ -2,7 +2,7 @@
 
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GENERATION_STATUS_POLL_INTERVAL_MS } from "@/lib/constants";
+import { GENERATION_STATUS_POLL_INTERVAL_MS } from "@/features/greenfield/types/greenfield-constants";
 import { getPendingPrdPrompt } from "@/lib/prompt-handoff";
 import { useChatStore, useUIStore } from "@/store";
 import type { PrdVersion } from "@/types/database";

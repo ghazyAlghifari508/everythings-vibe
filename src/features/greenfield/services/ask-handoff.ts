@@ -1,10 +1,10 @@
+import { CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS } from "@/features/codebase/types/codebase-constants";
 import type { NonTechAnswer } from "@/features/greenfield/components/ask/question-card";
 import type {
 	AskQuestion,
 	TechAnswers,
 } from "@/features/greenfield/hooks/use-ask-session";
 import { buildCompiledAskPrompt } from "@/features/greenfield/utils/ask-prompt-builder";
-import { CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS } from "@/lib/constants";
 import { getAskLanguage, savePendingPrdPrompt } from "@/lib/prompt-handoff";
 
 interface SubmitAskHandoffParams {

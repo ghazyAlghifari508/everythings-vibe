@@ -3,7 +3,7 @@ import {
 	STUDIO_FRAME_CONCURRENCY,
 	STUDIO_FRAME_MAX_TOKENS,
 	STUDIO_PLANNING_MAX_TOKENS,
-} from "@/lib/constants";
+} from "@/features/studio/types/studio-constants";
 import { studioDesignBlueprintSchema } from "../services/studio-design-blueprint";
 
 describe("p2 constants", () => {

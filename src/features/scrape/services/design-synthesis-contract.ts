@@ -4,7 +4,7 @@ import {
 	DESIGN_SYNTHESIS_MAX_RADII,
 	DESIGN_SYNTHESIS_MAX_SPACING,
 	DESIGN_SYNTHESIS_MAX_TYPOGRAPHY,
-} from "@/lib/constants";
+} from "@/features/scrape/types/scrape-constants";
 import type { DesignTokenModel } from "./design-model";
 
 // Evidence-grounded AI synthesis.

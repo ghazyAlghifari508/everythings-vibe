@@ -3,7 +3,7 @@ import {
 	STUDIO_PRD_FILE_MAX_BYTES,
 	STUDIO_PRD_MAX_CHARS,
 	STUDIO_PRD_MIN_CHARS,
-} from "@/lib/constants";
+} from "@/features/studio/types/studio-constants";
 import {
 	extractStudioPrdSummary,
 	sanitizeStudioPrd,

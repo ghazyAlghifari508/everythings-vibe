@@ -1,4 +1,5 @@
 import { type RefObject, useCallback, useEffect, useRef } from "react";
+import { STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX } from "@/features/studio/types/studio-constants";
 import {
 	exceedsDragThreshold,
 	isMarqueeIgnoredTarget,
@@ -8,7 +9,6 @@ import {
 	type Rect,
 	resolveMarqueeSelection,
 } from "@/features/studio/utils/studio-canvas-marquee";
-import { STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX } from "@/lib/constants";
 
 interface UseStudioCanvasMarqueeInput {
 	canvasRef: RefObject<HTMLElement | null>;

@@ -6,14 +6,14 @@ import { usePaymentResume } from "@/features/greenfield/hooks/use-payment-resume
 import { saveAcContent } from "@/features/greenfield/services/ac-save";
 import { consumeAcStream } from "@/features/greenfield/services/ac-stream";
 import {
+	GENERATION_STATUS_POLL_INTERVAL_MS,
+	GUARD_WAIT_MS,
+} from "@/features/greenfield/types/greenfield-constants";
+import {
 	isBackgroundGeneration,
 	isStaleCompletedLoader,
 	resolveInitialGenerating,
 } from "@/features/greenfield/utils/generation-recovery";
-import {
-	GENERATION_STATUS_POLL_INTERVAL_MS,
-	GUARD_WAIT_MS,
-} from "@/lib/constants";
 import { consumeSuppressAutoGen } from "@/lib/prompt-handoff";
 import { useChatStore, useUIStore } from "@/store";
 import type { Plan } from "@/types/database";

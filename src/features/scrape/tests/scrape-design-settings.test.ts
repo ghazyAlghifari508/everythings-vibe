@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { ScrapeRow } from "@/db/schema";
+import { scrapeHtml } from "@/features/scrape/services/page-capture";
 import {
 	createScrape,
 	retryScrape,
@@ -7,7 +8,6 @@ import {
 } from "@/features/scrape/services/scrape-service";
 import { scrapeRequestSchema } from "@/features/scrape/types/scrape-contract";
 import { FIXTURE } from "@/lib/design-fixture";
-import { scrapeHtml } from "@/lib/fetch-html";
 
 const storage = vi.hoisted(
 	(): {
@@ -57,7 +57,9 @@ vi.mock("@/db", () => {
 	};
 	return { db };
 });
-vi.mock("@/lib/fetch-html", () => ({ scrapeHtml: vi.fn() }));
+vi.mock("@/features/scrape/services/page-capture", () => ({
+	scrapeHtml: vi.fn(),
+}));
 vi.mock("@/features/scrape/utils/url-validator", () => ({
 	parseAndValidateFormat: (raw: string) => new URL(raw),
 }));

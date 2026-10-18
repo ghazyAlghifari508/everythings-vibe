@@ -28,8 +28,9 @@ import {
 } from "@/features/greenfield/services/feature-service";
 import { resolvePlanTier } from "@/features/greenfield/services/plan-tier";
 import { sanitizeModelOutput } from "@/features/greenfield/services/prd-text";
+import { MAX_FEATURE_RESPONSE_CHARS } from "@/features/greenfield/types/greenfield-constants";
 import { buildStageScopeDirective } from "@/features/greenfield/utils/planning-mode";
-import { MAX_FEATURE_RESPONSE_CHARS, MAX_PROMPT_LENGTH } from "@/lib/constants";
+import { MAX_PROMPT_LENGTH } from "@/lib/constants";
 import { isTruncatedGeneration } from "@/lib/flow-progress";
 import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
 import { checkRateLimit } from "@/lib/rate-limit";

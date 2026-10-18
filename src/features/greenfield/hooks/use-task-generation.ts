@@ -5,14 +5,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePaymentResume } from "@/features/greenfield/hooks/use-payment-resume";
 import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import {
+	GENERATION_STATUS_POLL_INTERVAL_MS,
+	GUARD_WAIT_MS,
+} from "@/features/greenfield/types/greenfield-constants";
+import {
 	isBackgroundGeneration,
 	isStaleCompletedLoader,
 	resolveInitialGenerating,
 } from "@/features/greenfield/utils/generation-recovery";
-import {
-	GENERATION_STATUS_POLL_INTERVAL_MS,
-	GUARD_WAIT_MS,
-} from "@/lib/constants";
 import { consumeSuppressAutoGen } from "@/lib/prompt-handoff";
 import { parseStreamEvent, type StreamEvent } from "@/lib/sse-events";
 import { readSseStream } from "@/lib/sse-stream";

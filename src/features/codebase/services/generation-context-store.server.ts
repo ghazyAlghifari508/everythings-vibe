@@ -1,7 +1,7 @@
 import {
 	CODEBASE_GENERATION_MAX_ANSWER_CHARS,
 	CODEBASE_GENERATION_MAX_PATHS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 import { safeParseCodebaseAnalysis } from "./analysis";
 import {
 	buildGenerationContext,

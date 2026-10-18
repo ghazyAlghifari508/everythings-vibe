@@ -1,4 +1,4 @@
-import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
+import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 
 export interface ValidateGeneratedHtmlOptions {

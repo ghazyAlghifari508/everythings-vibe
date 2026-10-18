@@ -15,11 +15,11 @@ import {
 	generateSyncToken,
 	hashSyncToken,
 } from "@/features/codebase/services/sync.server";
-import { deriveProjectNameSync } from "@/features/greenfield/services/prd-naming";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
+import { deriveProjectNameSync } from "@/features/greenfield/services/prd-naming";
 import { normalizeLanguage } from "@/lib/language";
 import { requireUser } from "@/lib/session";
 

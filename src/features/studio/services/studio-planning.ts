@@ -9,7 +9,7 @@ import {
 	studioJobs,
 	studioProjects,
 } from "@/db/schema";
-import { STUDIO_PLANNING_MAX_TOKENS } from "@/lib/constants";
+import { STUDIO_PLANNING_MAX_TOKENS } from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
 import {
 	selectModels,

@@ -1,4 +1,4 @@
-import { CODEBASE_MAX_ERROR_MESSAGE_CHARS } from "@/lib/constants";
+import { CODEBASE_MAX_ERROR_MESSAGE_CHARS } from "@/features/codebase/types/codebase-constants";
 
 // === Path safety ===
 // Manifest/source payloads must carry repository-relative paths only: no

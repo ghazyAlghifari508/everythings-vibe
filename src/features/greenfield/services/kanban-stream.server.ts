@@ -5,7 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { getKanbanData } from "@/features/greenfield/services/task-kanban";
-import { KANBAN_SSE_INTERVAL_MS } from "@/lib/constants";
+import { KANBAN_SSE_INTERVAL_MS } from "@/features/greenfield/types/greenfield-constants";
 import { requireUser } from "@/lib/session";
 
 export async function handleKanbanStreamRequest(

@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import type { ScrapeRow } from "@/db/schema";
 import { scrapeImages } from "@/db/schema";
+import { fetchAsset } from "@/features/scrape/services/http-transport";
 import { renderPage } from "@/features/scrape/services/render-page";
 import type { ImagesSettings } from "@/features/scrape/types/scrape-contract";
 import {
@@ -14,7 +15,6 @@ import {
 	parseRetryAfterSeconds,
 	ScrapeError,
 } from "@/lib/design-errors";
-import { fetchAsset } from "@/lib/fetch-html";
 import {
 	classifyImageFailures,
 	type FailedResourceEvidence,

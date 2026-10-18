@@ -15,7 +15,7 @@ import {
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 import { requireUser } from "@/lib/session";
 import {
 	type CodebaseNameSource,

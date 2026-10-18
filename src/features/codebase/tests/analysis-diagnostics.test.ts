@@ -9,7 +9,7 @@ import {
 	toSafeAnalysisErrorMessage,
 } from "@/features/codebase/services/analysis";
 import { AnalysisServiceError } from "@/features/codebase/services/analysis.server";
-import { CODEBASE_STARTER_TITLE_MAX_CHARS } from "@/lib/constants";
+import { CODEBASE_STARTER_TITLE_MAX_CHARS } from "@/features/codebase/types/codebase-constants";
 
 const ids = { projectId: "proj_diag", snapshotId: "snap_diag" };
 const trustedManifestPaths = new Set([

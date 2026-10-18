@@ -1,5 +1,5 @@
+import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import type { StudioDesignMode } from "@/features/studio/types/studio-prompts";
-import { STUDIO_VISUAL_WIDTH } from "@/lib/constants";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import {
 	extractStudioPrdSummary,

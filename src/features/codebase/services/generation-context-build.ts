@@ -6,7 +6,7 @@ import {
 	CODEBASE_GENERATION_MAX_PATHS,
 	CODEBASE_GENERATION_MAX_PROMPT_CHARS,
 	CODEBASE_GENERATION_MAX_SUMMARY_CHARS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 import type { CodebaseAnalysis, CodebaseAnalysisFinding } from "./analysis";
 import type { SnapshotContext } from "./sync";
 

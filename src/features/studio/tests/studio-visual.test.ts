@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
 	STUDIO_CAPTURE_DSF,
 	STUDIO_VISUAL_VIEWPORT_HEIGHT,
-} from "@/lib/constants";
+} from "@/features/studio/types/studio-constants";
 import {
 	captureStudioVisual,
 	closeStudioVisualBrowser,

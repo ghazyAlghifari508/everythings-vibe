@@ -7,7 +7,7 @@ import {
 	updateProfile,
 	uploadAvatar,
 } from "@/features/auth-settings/services/settings";
-import { PROFILE_ROLES } from "@/lib/constants";
+import { PROFILE_ROLES } from "@/features/auth-settings/types/settings-constants";
 
 export const ProfileForm = memo(function ProfileForm({
 	profile,

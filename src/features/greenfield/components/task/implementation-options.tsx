@@ -17,7 +17,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EXPORT_FILENAME_PREFIX } from "@/lib/constants";
+import { EXPORT_FILENAME_PREFIX } from "@/features/greenfield/types/greenfield-constants";
 import { useUIStore } from "@/store";
 import { AI_AGENT_PROMPT_TEMPLATE } from "./ai-agent-prompt-template";
 

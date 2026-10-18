@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-	AI_MODELS,
 	CODEBASE_ASK_HANDOFF_SAVE_TIMEOUT_MS,
 	CODEBASE_GENERATION_MAX_CONSTRAINTS,
 	CODEBASE_GENERATION_MAX_SUMMARY_CHARS,
+} from "@/features/codebase/types/codebase-constants";
+import {
 	HISTORY_PAGE_SIZE,
 	HOME_DRAFT_DEBOUNCE_MS,
+} from "@/features/greenfield/types/greenfield-constants";
+import {
+	AI_MODELS,
 	MAX_PROMPT_LENGTH,
 	MIN_PROMPT_LENGTH,
 	RATE_LIMIT_WINDOW_MS,

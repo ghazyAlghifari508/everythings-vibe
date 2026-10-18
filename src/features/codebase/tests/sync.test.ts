@@ -63,7 +63,7 @@ import {
 	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_POLL_INTERVAL_MS,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
-} from "@/lib/constants";
+} from "@/features/codebase/types/codebase-constants";
 
 describe("codebase sync boundary constants (Locked MVP Decisions)", () => {
 	it("polls browser status every 2000ms", () => {

@@ -7,7 +7,7 @@ import {
 	screen,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS } from "@/lib/constants";
+import { SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS } from "@/features/scrape/types/scrape-constants";
 import { ScrapeDetail } from "../components/scrape-detail";
 
 function report(state: string, failed = 0) {

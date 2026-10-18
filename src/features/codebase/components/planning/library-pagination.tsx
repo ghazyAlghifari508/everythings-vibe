@@ -1,6 +1,6 @@
 "use client";
 
-import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/lib/constants";
+import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/features/codebase/types/codebase-constants";
 
 export function LibraryPagination({
 	clampedPage,

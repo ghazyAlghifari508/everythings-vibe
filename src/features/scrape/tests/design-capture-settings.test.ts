@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { scrapeHtml } from "@/features/scrape/services/page-capture";
 import {
 	type RenderedPage,
 	renderPage,
 } from "@/features/scrape/services/render-page";
 import { FIXTURE } from "@/lib/design-fixture";
-import { scrapeHtml } from "@/lib/fetch-html";
 
 vi.mock("@/features/scrape/utils/url-validator", () => ({
 	validateUrl: async (raw: string) => ({

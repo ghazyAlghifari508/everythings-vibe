@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { SCRAPE_HISTORY_PAGE_SIZES } from "@/features/scrape/types/scrape-constants";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
-import { SCRAPE_HISTORY_PAGE_SIZES } from "@/lib/constants";
 import { ScrapeFilterSelect } from "./scrape-filter-select";
 
 const NAV_BUTTON_DESKTOP_CLASS =

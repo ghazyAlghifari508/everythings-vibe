@@ -1,6 +1,6 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/lib/constants";
+import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
 import {

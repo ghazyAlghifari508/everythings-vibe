@@ -7,6 +7,11 @@ import {
 } from "@/features/scrape/services/html-document";
 import type { RenderedPage } from "@/features/scrape/services/render-page";
 import {
+	SCRAPE_DESKTOP_HEIGHT,
+	SCRAPE_DESKTOP_WIDTH,
+	SCRAPE_MOBILE_VIEWPORT,
+} from "@/features/scrape/types/scrape-constants";
+import {
 	type DesignSettings,
 	designSettingsSchema,
 	SCRAPE_LIMITS,
@@ -14,11 +19,6 @@ import {
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import { rewritePreviewAssets } from "@/features/scrape/utils/preview-html";
 import { validateUrl } from "@/features/scrape/utils/url-validator";
-import {
-	SCRAPE_DESKTOP_HEIGHT,
-	SCRAPE_DESKTOP_WIDTH,
-	SCRAPE_MOBILE_VIEWPORT,
-} from "@/lib/constants";
 import { ScrapeError } from "@/lib/design-errors";
 import type { VisualEvidence } from "@/lib/design-visual-evidence";
 

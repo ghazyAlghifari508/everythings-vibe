@@ -1,6 +1,6 @@
 import { robotsAllows } from "@/features/scrape/services/crawl-website";
+import { fetchAsset } from "@/features/scrape/services/http-transport";
 import { ScrapeError } from "@/lib/design-errors";
-import { fetchAsset } from "@/lib/fetch-html";
 
 const ROBOTS_MAX_BYTES = 512_000;
 

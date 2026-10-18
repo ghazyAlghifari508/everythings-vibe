@@ -3,7 +3,10 @@ import {
 	computePurchaseGrant,
 	resolveSubscriptionState,
 } from "@/features/billing/services/billing";
-import { ADAPTIVE_CREDIT_PRICING, TOPUP_SKU } from "@/lib/constants";
+import {
+	ADAPTIVE_CREDIT_PRICING,
+	TOPUP_SKU,
+} from "@/features/billing/types/billing-constants";
 import type { Plan } from "@/types/database";
 import { isTopUpOrder, planFromAmount } from "./payment-pricing";
 
