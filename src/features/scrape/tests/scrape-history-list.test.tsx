@@ -354,7 +354,7 @@ describe("ScrapeHistoryList dashboard", () => {
 		});
 		fireEvent.click(screen.getByRole("button", { name: /hapus riwayat/i }));
 		expect(
-			screen.getByRole("dialog", { name: /hapus riwayat scrape/i }),
+			screen.getByRole("dialog", { name: /hapus riwayat vibescrape/i }),
 		).toBeDefined();
 		expect(screen.getByText(/tidak dapat dibatalkan/i)).toBeDefined();
 		fireEvent.click(screen.getByRole("button", { name: /konfirmasi hapus/i }));
