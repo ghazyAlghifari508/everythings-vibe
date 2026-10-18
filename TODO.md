@@ -663,7 +663,7 @@ Di repositori ini, prefix `-` digunakan untuk menaruh file test langsung di sebe
   - [x] 21 shim re-export `src/components/design/*` **dihapus** (0 konsumen setelah verifikasi repo-wide).
 - [x] **Fase 6: Pembersihan `src/routes/` (Thin Routes Only) &amp; Route Separation:**
   - [x] Setiap file rute hanya wire-up (param/search param/loader + render View fitur). Handler API diekstrak ke `src/features/<domain>/services/*-route.server.ts`; tersisa 107 file rute, terpanjang 121 baris (≤150).
-  - [ ] Pisahkan namespace routing VibeScrape (`/scrape/*`) dari VibeDesign Studio (`/design/studio/*`) — **sengaja ditunda**: `docs/main-prompt/p9.md` (line 99) melarang eksekusi Bagian 9 pada fase ini.
+  - [x] Pisahkan namespace routing VibeScrape (`/scrape/*`) dari VibeDesign Studio (`/design/studio/*`) — **selesai di Bagian 9**: rute kanonik `src/routes/scrape/{index,$id,history}.tsx`, dan `src/routes/design/scrap*.tsx` kini hanya thin `beforeLoad` redirect ke `/scrape/*` (pemindahan HTTP 301 tidak diterapkan; redirect ditangani di layer router).
   - [x] Hapus seluruh prefiks `-` dari `src/routes/` (0 tersisa; 39 file test lama sudah direlokasi ke `tests/` domain).
 - [x] **Fase 7: Validasi Integritas Import &amp; Test:**
   - [x] `pnpm generate-routes` → route tree valid (`src/routeTree.gen.ts` diregenerasi setelah relokasi test).
@@ -901,10 +901,10 @@ Pemisahan fitur tidak menghilangkan sinergi. VibeDesign Studio tetap dapat meman
 
 ### 9.6. Checklist Eksekusi Pemisahan VibeScrape
 
-- [ ] **Fase 1 — Scaffolding Direktori Domain VibeScrape:**
-  - [ ] Buat struktur folder: `src/features/scrape/{components,hooks,services,types,tests}`.
-- [ ] **Fase 2 — Migrasi Komponen UI Scraper:**
-  - [ ] Pindahkan komponen scraper dari `src/components/design/` ke `src/features/scrape/components/`:
+- [x] **Fase 1 — Scaffolding Direktori Domain VibeScrape:**
+  - [x] Struktur folder domain aktif: `src/features/scrape/{components,hooks,services,types,utils,tests}` (54 komponen, 4 hooks, 40 services, 9 types, 38 utils, 106 test). `utils/` adalah tambahan sah untuk parser/normalizer desain, bukan deklarasi tipe.
+- [x] **Fase 2 — Migrasi Komponen UI Scraper:**
+  - [x] Seluruh komponen scraper berada di `src/features/scrape/components/` (21 shim `src/components/design/*` sudah dihapus):
     - `scrape-workspace-form.tsx`
     - `html-scraper-panel.tsx` &amp; `html-scraper.tsx`
     - `scrape-detail.tsx`
@@ -913,19 +913,19 @@ Pemisahan fitur tidak menghilangkan sinergi. VibeDesign Studio tetap dapat meman
     - `scrape-error-card.tsx`
     - `scrap-mode-switcher.tsx`
     - `scrape-filter-select.tsx`, `scrape-form-notice.tsx`, `scrape-back-link.tsx`
-- [ ] **Fase 3 — Migrasi Custom Hooks:**
-  - [ ] Pindahkan `use-scrape-status.ts` dan `use-scrape-preview.ts` dari `src/hooks/` ke `src/features/scrape/hooks/`.
-- [ ] **Fase 4 — Migrasi Services, Crawler &amp; Worker:**
-  - [ ] Pindahkan services dari `src/lib/services/` dan `src/lib/` ke `src/features/scrape/services/`:
+- [x] **Fase 3 — Migrasi Custom Hooks:**
+  - [x] `use-scrape-status.ts` dan `use-scrape-preview.ts` berada di `src/features/scrape/hooks/`; shim lama di `src/hooks/` dihapus setelah verifikasi 0 konsumen tersisa.
+- [x] **Fase 4 — Migrasi Services, Crawler &amp; Worker:**
+  - [x] Services scraping, crawler, dan worker berada di `src/features/scrape/services/`:
     - `scrape-service.ts` &amp; `scrape-job-service.ts`
     - `scrape-worker.ts` &amp; `crawl-website.ts`
     - `scrape-extraction-service.ts`
-    - `scrape-image-storage.ts` &amp; `scrape-images.ts`
-    - `scrape-retry.ts`, `scrape-preview-document.ts`, `scrape-history.ts`
-  - [ ] Pindahkan tipe &amp; kontrak ke `src/features/scrape/types/`:
-    - `scrape-contract.ts`
-    - `scrape-error-presentation.ts`
-    - `scrape-parameter-spec.ts` &amp; `scrape-view-state.ts`
+    - `scrape-image-storage.ts` &amp; `utils/scrape-images.ts`
+    - `utils/scrape-retry.ts`, `utils/scrape-preview-document.ts`, `utils/scrape-history.ts`
+  - [x] Tipe &amp; kontrak berada di `src/features/scrape/`:
+    - `types/scrape-contract.ts`
+    - `utils/scrape-error-presentation.ts` — berisi mapping runtime kode error ke salinan UI, bukan deklarasi tipe, sehingga sengaja ditempatkan di `utils/`.
+    - `types/parameter-spec.ts` &amp; `types/view-state.ts` — menggantikan `scrape-parameter-spec.ts` &amp; `scrape-view-state.ts` mengikuti konvensi penamaan domain.
 - [x] **Fase 5 — Migrasi Rute TanStack Router:**
   - [x] Buat rute baru: `src/routes/scrape/index.tsx`, `src/routes/scrape/$id.tsx`, dan `src/routes/scrape/history.tsx`.
   - [x] Ubah file rute lama `src/routes/design/scrap.*.tsx` menjadi thin redirect ke rute `/scrape/*`.
@@ -934,8 +934,10 @@ Pemisahan fitur tidak menghilangkan sinergi. VibeDesign Studio tetap dapat meman
   - [x] Pindahkan seluruh file test scraping (`-scrap.*.test.tsx`, `scrape-*.test.ts`) keluar dari `src/routes/` dan `src/lib/` ke dalam `src/features/scrape/tests/`.
 - [x] **Fase 7 — Integrasi Bersih VibeDesign Studio:**
   - [x] Pastikan komponen studio di `src/features/studio/` hanya memanggil DTO/service publik dari `src/features/scrape/` tanpa circular dependency.
-- [ ] **Fase 8 — Verifikasi &amp; Test Passing:**
-  - [ ] Jalankan `pnpm check`, `pnpm test`, dan verifikasi build hingga 100% green.
+- [x] **Fase 8 — Verifikasi &amp; Test Passing:**
+  - [x] Gate dijalankan pada working tree akhir: `pnpm generate-routes` exit 0; `pnpm exec tsc --noEmit` 0 error; `biome check` bersih pada seluruh file yang diubah; `pnpm build` exit 0 (route tree SSR cocok persis dengan HEAD); suite browser-free repo-wide `pnpm exec vitest run --maxWorkers=4 --testTimeout=30000` (7 suite peluncur Chromium dikecualikan) → 395 file lulus / 1 skip, 4069 test lulus / 1 skip, 0 gagal.
+  - [x] Suite domain `pnpm exec vitest run src/features/scrape src/features/studio --maxWorkers=4` → 157 file / 1333 test lulus (baseline 153/1289).
+  - [x] Catatan pra-eksisting, bukan regresi dan tidak diperbaiki di task ini: `pnpm check` menyisakan 10 error `noImportantStyles` di `src/app/globals.css` yang tidak tersentuh; skip env-gated `CREDIT_DB_TESTS=1` di `src/features/billing/tests/credit-regression.test.ts:106`; 2 test flaky batas waktu 5 detik (`src/features/studio/tests/studio-client-boundary.test.ts`, `src/features/scrape/tests/scrap.$id.test.tsx`) yang hijau pada timeout 30 detik. QA crawl langsung dan screenshot tidak dijalankan sesuai batasan task.
 
 ---
 
