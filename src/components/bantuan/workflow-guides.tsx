@@ -26,7 +26,7 @@ const GUIDES: readonly WorkflowGuide[] = [
 		description:
 			"Ekstrak website live menjadi fondasi desain yang bisa dipakai ulang.",
 		steps: [
-			"Masukkan URL website live di /design/scrap",
+			"Masukkan URL website live di /scrape",
 			"Server mengambil HTML dan mem-proxy aset lewat /api/scrape/asset",
 			"Terima 2 file langsung: index.html dan design.md",
 			"Unduh bundle ZIP berisi keduanya",
