@@ -42,7 +42,7 @@ export function DesignGeneratorPanel() {
 				return;
 			}
 			void navigate({
-				to: "/design/scrap/$id",
+				to: "/scrape/$id",
 				params: { id: data.scrapeId },
 				search: { from: SCRAPE_RETURN_FALLBACK },
 			});

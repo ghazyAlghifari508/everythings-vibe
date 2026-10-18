@@ -116,9 +116,9 @@ describe("extraction workspace", () => {
 		fireEvent.click(submit);
 		await waitFor(() =>
 			expect(navigate).toHaveBeenCalledWith({
-				to: "/design/scrap/$id",
+				to: "/scrape/$id",
 				params: { id: "result-1" },
-				search: { from: "/design/scrap" },
+				search: { from: "/scrape" },
 			}),
 		);
 		expect(fetchMock).toHaveBeenCalledTimes(1);

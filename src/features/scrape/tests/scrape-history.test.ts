@@ -92,7 +92,7 @@ describe("buildHistoryDetailSearch", () => {
 				pageSize: 20,
 			}),
 		).toEqual({
-			from: "/design/scrap/history",
+			from: "/scrape/history",
 			mode: "html",
 			status: "failed",
 			q: "stitch",
@@ -109,7 +109,7 @@ describe("buildHistoryDetailSearch", () => {
 			page: 1,
 			pageSize: 10,
 		});
-		expect(built).toEqual({ from: "/design/scrap/history" });
+		expect(built).toEqual({ from: "/scrape/history" });
 	});
 });
 

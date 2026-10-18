@@ -141,9 +141,9 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 				return;
 			}
 			await navigate({
-				to: "/design/scrap/$id",
+				to: "/scrape/$id",
 				params: { id: result.data.scrapeId },
-				search: { from: "/design/scrap" },
+				search: { from: "/scrape" },
 			});
 		} catch {
 			setError("Jaringan bermasalah. Coba lagi dari URL yang sama.");

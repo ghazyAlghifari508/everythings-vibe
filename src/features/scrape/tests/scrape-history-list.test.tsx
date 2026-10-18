@@ -101,6 +101,7 @@ describe("ScrapeHistoryList", () => {
 			screen.getByRole("heading", { name: /Belum ada riwayat scrape/i }),
 		).toBeDefined();
 		const cta = screen.getByRole("link", { name: /Mulai Scrap Sekarang/i });
+		expect(cta.getAttribute("href")).toBe("/scrape");
 		expect(cta.className).toContain("btn-primary");
 		expect(container.innerHTML).not.toContain("border-dashed");
 	});
@@ -154,7 +155,7 @@ describe("ScrapeHistoryList", () => {
 			total: 1,
 		});
 		const rowLink = screen.getByRole("link", { name: /Notion/i });
-		expect(rowLink.getAttribute("href")).toBe("/design/scrap/$id");
+		expect(rowLink.getAttribute("href")).toBe("/scrape/$id");
 		expect(within(rowLink).getByText("HTML")).toBeDefined();
 		expect(within(rowLink).getByText("Selesai")).toBeDefined();
 	});
@@ -304,7 +305,7 @@ describe("ScrapeHistoryList dashboard", () => {
 		});
 		const rowLink = screen.getByRole("link", { name: /Example/i });
 		expect(JSON.parse(rowLink.dataset.search ?? "{}")).toEqual({
-			from: "/design/scrap/history",
+			from: "/scrape/history",
 			mode: "html",
 			status: "failed",
 			q: "stitch",

@@ -81,7 +81,7 @@ export function ScrapeHistoryList({
 					tersimpan di sini.
 				</p>
 				<Link
-					to="/design/scrap"
+					to="/scrape"
 					className="btn-primary mt-3 inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition-all hover:brightness-105 active:scale-[0.98]"
 				>
 					Mulai Scrap Sekarang

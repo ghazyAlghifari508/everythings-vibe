@@ -4,7 +4,7 @@ import type {
 } from "@/features/scrape/types/scrape-contract";
 import { SCRAPE_HISTORY_DEFAULT_PAGE_SIZE } from "@/lib/constants";
 
-export const SCRAPE_HISTORY_RETURN_FROM = "/design/scrap/history" as const;
+export const SCRAPE_HISTORY_RETURN_FROM = "/scrape/history" as const;
 
 export function resolveHistoryStatusGroup(
 	status: string,

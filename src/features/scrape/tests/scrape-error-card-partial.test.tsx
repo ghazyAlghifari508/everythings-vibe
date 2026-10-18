@@ -112,7 +112,7 @@ describe("recovery actions", () => {
 			screen
 				.getByRole("link", { name: "Gunakan URL lain" })
 				.getAttribute("href"),
-		).toBe("/design/scrap?mode=images");
+		).toBe("/scrape?mode=images");
 	});
 
 	it("keeps the workspace link when the mode is unknown", () => {
@@ -128,7 +128,7 @@ describe("recovery actions", () => {
 			screen
 				.getByRole("link", { name: "Gunakan URL lain" })
 				.getAttribute("href"),
-		).toBe("/design/scrap");
+		).toBe("/scrape");
 	});
 
 	it("hides retry while a real cooldown is running", () => {

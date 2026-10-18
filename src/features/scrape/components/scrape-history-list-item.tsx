@@ -81,7 +81,7 @@ export function ScrapeHistoryRow({
 	return (
 		<li className="group flex items-center gap-2 p-4 transition-colors hover:bg-onyx/60">
 			<Link
-				to="/design/scrap/$id"
+				to="/scrape/$id"
 				params={{ id: item.id }}
 				search={detailSearch}
 				className="flex min-w-0 flex-1 flex-col gap-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"

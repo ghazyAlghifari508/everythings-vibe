@@ -449,8 +449,11 @@ describe("Navbar Greenfield Workspace Navlinks", () => {
 });
 
 describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
-	it("renders only Scrap and History on /design/scrap with Scrap active and no Pricing", () => {
-		mockPathname = "/design/scrap";
+	it.each([
+		"/scrape",
+		"/design/scrap",
+	])("renders only Scrap and History on %s with Scrap active and no Pricing", (pathname) => {
+		mockPathname = pathname;
 		renderNavbar();
 
 		// Desktop navlinks: scoped VibeDesign nav is Scrap + History only
@@ -459,6 +462,8 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 
 		expect(scrapLink).toBeDefined();
 		expect(historyLink).toBeDefined();
+		expect(scrapLink.getAttribute("href")).toBe("/scrape");
+		expect(historyLink.getAttribute("href")).toBe("/scrape/history");
 		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 
 		// Scrap active state: has bg-white/10; History does not
@@ -476,18 +481,19 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		expect(allHistoryLinks).toHaveLength(2); // 1 desktop + 1 mobile
 		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 
-		// Mobile history link points to /design/scrap/history, NOT generic /history
-		expect(allHistoryLinks[1].getAttribute("href")).toBe(
-			"/design/scrap/history",
-		);
+		expect(allScrapLinks[1].getAttribute("href")).toBe("/scrape");
+		expect(allHistoryLinks[1].getAttribute("href")).toBe("/scrape/history");
 		expect(screen.queryByRole("link", { name: /^Riwayat$/i })).toBeNull();
 		// Mobile drawer on VibeDesign routes must NOT include FAQ or Settings
 		expect(screen.queryByRole("link", { name: /^FAQ$/i })).toBeNull();
 		expect(screen.queryByRole("link", { name: /^Settings$/i })).toBeNull();
 	});
 
-	it("renders only Scrap and History on /design/scrap/history with History active and Scrap inactive", () => {
-		mockPathname = "/design/scrap/history";
+	it.each([
+		"/scrape/history",
+		"/design/scrap/history",
+	])("renders only Scrap and History on %s with History active and Scrap inactive", (pathname) => {
+		mockPathname = pathname;
 		renderNavbar();
 
 		const scrapLink = screen.getByRole("link", { name: /^Scrap$/i });
@@ -500,8 +506,11 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		expect(scrapLink.className).not.toContain("bg-white/10");
 	});
 
-	it("keeps Scrap context active on /design/scrap/$id result/processing subroute without Pricing", () => {
-		mockPathname = "/design/scrap/job-xyz-123";
+	it.each([
+		"/scrape/job-xyz-123",
+		"/design/scrap/job-xyz-123",
+	])("keeps Scrap context active on %s result/processing subroute without Pricing", (pathname) => {
+		mockPathname = pathname;
 		renderNavbar();
 
 		const scrapLink = screen.getByRole("link", { name: /^Scrap$/i });
@@ -512,8 +521,11 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 	});
 
-	it("exclusively scopes mobile drawer on VibeDesign routes to Home, Scrap, History and closes on click", () => {
-		mockPathname = "/design/scrap/history";
+	it.each([
+		"/scrape/history",
+		"/design/scrap/history",
+	])("exclusively scopes mobile drawer on %s to Home, Scrap, History and closes on click", (pathname) => {
+		mockPathname = pathname;
 		renderNavbar();
 
 		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
@@ -539,8 +551,14 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		expect(screen.queryAllByRole("link", { name: /^Scrap$/i })).toHaveLength(1);
 	});
 
-	it("does not show VibeDesign navlinks on unrelated routes and renders FAQ/Settings in mobile menu", () => {
-		mockPathname = "/";
+	it.each([
+		"/",
+		"/design/studio",
+		"/design/studio/studio-1",
+		"/scrape-extra",
+		"/design/scrap-extra",
+	])("does not show scrape navlinks on %s and renders FAQ/Settings in mobile menu", (pathname) => {
+		mockPathname = pathname;
 		renderNavbar();
 
 		expect(screen.queryByRole("link", { name: /^Scrap$/i })).toBeNull();

@@ -22,7 +22,7 @@ const OPTIONS = [
 		title: "Scrap HTML & design.md",
 		description:
 			"Ekstrak URL web live menjadi dua file keluaran: design.md (aturan desain dan token) serta index.html (kode HTML utuh beserta preview 1440px desktop).",
-		to: "/design/scrap",
+		to: "/scrape",
 	},
 	{
 		icon: Sparkles,

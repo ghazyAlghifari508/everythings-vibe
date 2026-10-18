@@ -294,7 +294,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							{isVibeDesignScrapRoute(pathname) ? (
 								<>
 									<Link
-										to="/design/scrap"
+										to="/scrape"
 										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
 											isVibeDesignScrapActive(pathname)
 												? "bg-white/10 text-snow"
@@ -304,7 +304,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 										Scrap
 									</Link>
 									<Link
-										to="/design/scrap/history"
+										to="/scrape/history"
 										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
 											isVibeDesignHistoryActive(pathname)
 												? "bg-white/10 text-snow"
@@ -694,7 +694,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					{isVibeDesignScrapRoute(pathname) ? (
 						<>
 							<Link
-								to="/design/scrap"
+								to="/scrape"
 								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
 									isVibeDesignScrapActive(pathname)
 										? "bg-white/10 text-snow"
@@ -705,7 +705,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 								Scrap
 							</Link>
 							<Link
-								to="/design/scrap/history"
+								to="/scrape/history"
 								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
 									isVibeDesignHistoryActive(pathname)
 										? "bg-white/10 text-snow"

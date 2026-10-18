@@ -6,6 +6,33 @@ import {
 } from "@/features/scrape/utils/design-nav";
 
 describe("VibeDesign Scrap Route Predicates", () => {
+	it.each([
+		"/scrape",
+		"/design/scrap",
+	])("recognizes %s route boundaries while separating history from results", (root) => {
+		for (const suffix of ["", "/", "/history", "/history/", "/abc-123"])
+			expect(isVibeDesignScrapRoute(`${root}${suffix}`)).toBe(true);
+		for (const suffix of ["", "/", "/abc-123", "/history-extra"])
+			expect(isVibeDesignScrapActive(`${root}${suffix}`)).toBe(true);
+		for (const suffix of ["/history", "/history/", "/history/abc"])
+			expect(isVibeDesignHistoryActive(`${root}${suffix}`)).toBe(true);
+		expect(isVibeDesignScrapActive(`${root}/history`)).toBe(false);
+		expect(isVibeDesignHistoryActive(`${root}/history-extra`)).toBe(false);
+		expect(isVibeDesignScrapRoute(`${root}-extra`)).toBe(false);
+		expect(isVibeDesignScrapActive(`${root}-extra`)).toBe(false);
+	});
+
+	it.each([
+		"/design/studio",
+		"/design/studio/abc",
+		"/scraper",
+		"/scrape-extra",
+	])("excludes %s from every scrape nav predicate", (pathname) => {
+		expect(isVibeDesignScrapRoute(pathname)).toBe(false);
+		expect(isVibeDesignScrapActive(pathname)).toBe(false);
+		expect(isVibeDesignHistoryActive(pathname)).toBe(false);
+	});
+
 	it("identifies all VibeDesign Scrap routes correctly", () => {
 		expect(isVibeDesignScrapRoute("/design/scrap")).toBe(true);
 		expect(isVibeDesignScrapRoute("/design/scrap/")).toBe(true);

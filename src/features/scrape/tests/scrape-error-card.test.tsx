@@ -81,7 +81,7 @@ describe("ScrapeErrorCard", () => {
 			screen
 				.getByRole("link", { name: "Gunakan URL lain" })
 				.getAttribute("href"),
-		).toBe("/design/scrap");
+		).toBe("/scrape");
 	});
 
 	it("shows the real wait only when the backend supplied it", () => {
