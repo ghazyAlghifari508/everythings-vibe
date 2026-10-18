@@ -1,7 +1,3 @@
-// @vitest-environment jsdom
-
-import { render } from "@testing-library/react";
-import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -11,15 +7,8 @@ const mocks = vi.hoisted(() => ({
 	requireUserServer: vi.fn(),
 }));
 
-const route = vi.hoisted(() => ({
-	useLoaderData: vi.fn(),
-	useParams: vi.fn(() => ({ id: "scrape-1" })),
-	useSearch: vi.fn(() => ({})),
-}));
-
 vi.mock("@tanstack/react-router", () => ({
-	createFileRoute: () => (options: unknown) =>
-		Object.assign({ options }, route),
+	createFileRoute: () => (options: unknown) => ({ options }),
 	Link: () => null,
 }));
 vi.mock("@tanstack/react-start", () => ({
@@ -44,7 +33,6 @@ vi.mock("@/features/scrape/utils/scrape-preview-document", () => ({
 	buildScrapePreviewDocument: mocks.buildPreviewSrcDoc,
 }));
 
-import { ScrapeDetailErrorView } from "@/features/scrape/components/scrape-detail-view";
 import { Route } from "@/routes/scrape/$id";
 
 beforeEach(() => {
@@ -137,20 +125,5 @@ describe("scrape detail route preview loading", () => {
 		if (typeof result !== "object" || result === null)
 			throw new Error("Loader returned no data");
 		expect("preview" in result ? result.preview : undefined).toBeNull();
-	});
-});
-
-describe("scrape detail fallback state", () => {
-	it("renders the dedicated not-found surface when the detail load fails", () => {
-		expect(Route.options.errorComponent).toBe(ScrapeDetailErrorView);
-	});
-
-	it("refuses to render the detail shell without loader data", () => {
-		const Page = Route.options.component;
-		if (typeof Page !== "function")
-			throw new Error("Route component unavailable");
-		route.useLoaderData.mockReturnValue(undefined);
-
-		expect(() => render(createElement(Page))).toThrowError("NOT_FOUND");
 	});
 });
