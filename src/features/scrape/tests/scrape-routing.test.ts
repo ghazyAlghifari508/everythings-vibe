@@ -258,6 +258,34 @@ describe("legacy scrape bookmarks", () => {
 	});
 });
 
+describe("workspace entry", () => {
+	it.each([
+		"/scrape",
+		"/scrape/",
+		"/scrape?mode=images",
+	])("resolves %s to the workspace route without consulting a loader", async (url) => {
+		const router = await normalizedLoad(url);
+		expect(router.state.matches.at(-1)?.routeId).toBe("/scrape/");
+		expect(router.state.redirect).toBeUndefined();
+		// The workspace resolves its mode on the client, so no loader runs.
+		expect(loaders.detail).not.toHaveBeenCalled();
+		expect(loaders.history).not.toHaveBeenCalled();
+	});
+
+	it("validates the workspace search when the route is matched", async () => {
+		const { Route } = await import("@/routes/scrape/index");
+		const validateSearch: unknown = Route.options.validateSearch;
+		if (typeof validateSearch !== "function")
+			throw new Error("workspace route does not validate its search");
+		const apply = (value: unknown) =>
+			Reflect.apply(validateSearch, undefined, [value]);
+
+		expect(apply({ mode: "images" })).toEqual({ mode: "images" });
+		expect(apply({ mode: "unsupported", injected: 1 })).toEqual({});
+		expect(apply(undefined)).toEqual({});
+	});
+});
+
 describe("neighbor route isolation", () => {
 	it.each([
 		["/design/studio", "/design/studio/"],

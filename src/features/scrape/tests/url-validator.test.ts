@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	isPrivateIp,
+	normalizeUrl,
 	parseAndValidateFormat,
 } from "@/features/scrape/utils/url-validator";
 
@@ -51,5 +52,98 @@ describe("parseAndValidateFormat", () => {
 				expect.objectContaining({ code: "PRIVATE_URL_BLOCKED" }),
 			);
 		}
+	});
+
+	it("rejects values that are not absolute URLs", () => {
+		for (const raw of [
+			"",
+			"   ",
+			"example.com",
+			"//example.com/x",
+			"not a url",
+		]) {
+			expect(() => parseAndValidateFormat(raw), raw).toThrowError(
+				expect.objectContaining({ code: "INVALID_URL" }),
+			);
+		}
+	});
+
+	it("rejects every scheme outside http and https", () => {
+		for (const raw of [
+			"ftp://example.com/x",
+			"file:///etc/passwd",
+			"javascript:alert(1)",
+			"data:text/html,<b>x</b>",
+		]) {
+			expect(() => parseAndValidateFormat(raw), raw).toThrowError(
+				expect.objectContaining({ code: "PRIVATE_URL_BLOCKED" }),
+			);
+		}
+	});
+
+	it("rejects destinations carrying credentials", () => {
+		for (const raw of [
+			"http://user:secret@example.com/",
+			"https://user@example.com/",
+		]) {
+			expect(() => parseAndValidateFormat(raw), raw).toThrowError(
+				expect.objectContaining({ code: "PRIVATE_URL_BLOCKED" }),
+			);
+		}
+	});
+
+	it("rejects loopback hostnames before DNS is ever consulted", () => {
+		for (const raw of [
+			"http://localhost/",
+			"http://LOCALHOST:3000/admin",
+			"http://app.localhost/",
+			"http://ip6-localhost/",
+		]) {
+			expect(() => parseAndValidateFormat(raw), raw).toThrowError(
+				expect.objectContaining({ code: "PRIVATE_URL_BLOCKED" }),
+			);
+		}
+	});
+
+	it("rejects private literal addresses", () => {
+		for (const raw of [
+			"http://127.0.0.1/",
+			"http://10.1.2.3/",
+			"http://172.20.0.1/",
+			"http://192.168.0.5/",
+			"http://169.254.169.254/latest/meta-data/",
+			"http://100.100.0.1/",
+			"http://0.0.0.0/",
+			"http://[::1]/",
+			"http://[fd00::1]/",
+			"http://[fe80::1]/",
+		]) {
+			expect(() => parseAndValidateFormat(raw), raw).toThrowError(
+				expect.objectContaining({ code: "PRIVATE_URL_BLOCKED" }),
+			);
+		}
+	});
+
+	it("accepts a public http or https destination", () => {
+		expect(parseAndValidateFormat("https://example.com/a/b?q=1").href).toBe(
+			"https://example.com/a/b?q=1",
+		);
+		expect(parseAndValidateFormat("  http://example.com:8080/x  ").port).toBe(
+			"8080",
+		);
+	});
+});
+
+describe("normalizeUrl", () => {
+	it("collapses one destination to a single canonical key", () => {
+		expect(normalizeUrl(new URL("https://Example.COM/a/b///?q=1#frag"))).toBe(
+			"https://example.com/a/b?q=1",
+		);
+		expect(normalizeUrl(new URL("https://example.com/"))).toBe(
+			"https://example.com",
+		);
+		expect(normalizeUrl(new URL("http://example.com:8080/"))).toBe(
+			"http://example.com:8080",
+		);
 	});
 });
