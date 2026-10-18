@@ -47,24 +47,30 @@ afterEach(() => {
 });
 
 describe("ScrapeBackLink", () => {
-	it("returns to History when the result was opened from History", () => {
-		render(<ScrapeBackLink from="/design/scrap/history" />);
-		expect(screen.getByRole("link").dataset.to).toBe("/design/scrap/history");
+	it.each([
+		"/scrape/history",
+		"/design/scrap/history",
+	])("returns to canonical History from %s", (from) => {
+		render(<ScrapeBackLink from={from} />);
+		expect(screen.getByRole("link").dataset.to).toBe("/scrape/history");
 	});
 
-	it("returns to Scrap when the result was opened from Scrap", () => {
-		render(<ScrapeBackLink from="/design/scrap" />);
-		expect(screen.getByRole("link").dataset.to).toBe("/design/scrap");
+	it.each([
+		"/scrape",
+		"/design/scrap",
+	])("returns to canonical Scrap from %s", (from) => {
+		render(<ScrapeBackLink from={from} />);
+		expect(screen.getByRole("link").dataset.to).toBe("/scrape");
 	});
 
 	it("falls back to Scrap for a direct URL or new tab", () => {
 		render(<ScrapeBackLink />);
-		expect(screen.getByRole("link").dataset.to).toBe("/design/scrap");
+		expect(screen.getByRole("link").dataset.to).toBe("/scrape");
 	});
 
 	it("falls back to Scrap for an unsafe recorded destination", () => {
 		render(<ScrapeBackLink from="https://evil.example" />);
-		expect(screen.getByRole("link").dataset.to).toBe("/design/scrap");
+		expect(screen.getByRole("link").dataset.to).toBe("/scrape");
 	});
 
 	it("uses the visible label Kembali", () => {
@@ -78,7 +84,7 @@ describe("ScrapeBackLink", () => {
 		fireEvent.click(screen.getByRole("link"));
 		expect(routerMock.history.back).not.toHaveBeenCalled();
 		expect(screen.getByRole("link").getAttribute("href")).toBe(
-			"/design/scrap/history",
+			"/scrape/history",
 		);
 		expect(screen.getByRole("link").dataset.replace).toBe("true");
 	});
@@ -90,10 +96,13 @@ describe("ScrapeBackLink", () => {
 		expect(routerMock.history.back).not.toHaveBeenCalled();
 	});
 
-	it("restores the history filter state when returning from History", () => {
+	it.each([
+		"/scrape/history",
+		"/design/scrap/history",
+	])("restores the history filter state when returning from %s", (from) => {
 		render(
 			<ScrapeBackLink
-				from="/design/scrap/history"
+				from={from}
 				historySearch={{
 					mode: "html",
 					status: "failed",
@@ -105,7 +114,7 @@ describe("ScrapeBackLink", () => {
 			/>,
 		);
 		const link = screen.getByRole("link");
-		expect(link.dataset.to).toBe("/design/scrap/history");
+		expect(link.dataset.to).toBe("/scrape/history");
 		expect(JSON.parse(link.dataset.search ?? "{}")).toEqual({
 			mode: "html",
 			status: "failed",
@@ -128,7 +137,7 @@ describe("ScrapeBackLink", () => {
 			/>,
 		);
 		const link = screen.getByRole("link");
-		expect(link.dataset.to).toBe("/design/scrap");
+		expect(link.dataset.to).toBe("/scrape");
 		expect(link.dataset.search).toBeUndefined();
 	});
 });

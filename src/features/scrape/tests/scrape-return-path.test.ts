@@ -6,12 +6,22 @@ import {
 } from "@/features/scrape/utils/scrape-return-path";
 
 describe("scrape return search parsing", () => {
-	it("accepts the known internal routes", () => {
+	it("accepts the canonical internal routes", () => {
+		expect(SCRAPE_RETURN_FALLBACK).toBe("/scrape");
+		expect(parseScrapeReturnSearch({ from: "/scrape" })).toEqual({
+			from: "/scrape",
+		});
+		expect(parseScrapeReturnSearch({ from: "/scrape/history" })).toEqual({
+			from: "/scrape/history",
+		});
+	});
+
+	it("normalizes exact legacy return contexts to canonical routes", () => {
 		expect(parseScrapeReturnSearch({ from: "/design/scrap" })).toEqual({
-			from: "/design/scrap",
+			from: "/scrape",
 		});
 		expect(parseScrapeReturnSearch({ from: "/design/scrap/history" })).toEqual({
-			from: "/design/scrap/history",
+			from: "/scrape/history",
 		});
 	});
 
@@ -37,19 +47,21 @@ describe("scrape return search parsing", () => {
 			{ from: "/design/scrap?x=<script>" },
 		]) {
 			const parsed = parseScrapeReturnSearch(search);
-			expect(["/design/scrap", "/design/scrap/history"]).toContain(parsed.from);
+			expect(["/scrape", "/scrape/history"]).toContain(parsed.from);
 		}
 	});
 });
 
 describe("resolveScrapeReturnPath", () => {
 	it("returns the originating scrap route", () => {
-		expect(resolveScrapeReturnPath("/design/scrap")).toBe("/design/scrap");
+		expect(resolveScrapeReturnPath("/scrape")).toBe("/scrape");
+		expect(resolveScrapeReturnPath("/design/scrap")).toBe("/scrape");
 	});
 
 	it("returns the originating history route", () => {
+		expect(resolveScrapeReturnPath("/scrape/history")).toBe("/scrape/history");
 		expect(resolveScrapeReturnPath("/design/scrap/history")).toBe(
-			"/design/scrap/history",
+			"/scrape/history",
 		);
 	});
 
@@ -82,6 +94,7 @@ describe("resolveScrapeReturnPath", () => {
 	});
 
 	it("rejects the result route itself to avoid a self-referencing loop", () => {
+		expect(resolveScrapeReturnPath("/scrape/abc")).toBe(SCRAPE_RETURN_FALLBACK);
 		expect(resolveScrapeReturnPath("/design/scrap/abc")).toBe(
 			SCRAPE_RETURN_FALLBACK,
 		);
@@ -89,6 +102,18 @@ describe("resolveScrapeReturnPath", () => {
 
 	it("rejects control characters and traversal attempts", () => {
 		for (const from of [
+			"/scrape\n/evil",
+			"/scrape ",
+			"/scrape/../../admin",
+			"/scrape?x=<script>",
+			"/scrape#frag",
+			"/scrape/history/../admin",
+			"/scrape/",
+			"/scrape/history/",
+			"/scrape/history-extra",
+			"/design/scrap/",
+			"/design/scrap/history/",
+			"/design/scrap/history-extra",
 			"/design/scrap\n/evil",
 			"/design/scrap ",
 			"/design/scrap/../../admin",
