@@ -326,8 +326,8 @@ Seiring iterasi pengembangan fitur, banyak sisa artefak sementara, rute coba-cob
 - [ ] **Audit `src/routes/demo/`:**
   - [ ] Periksa file `src/routes/demo/tanstack-query.tsx`. Jika ini hanya rute testing internal yang tidak digunakan lagi di production, jadwalkan untuk dihapus beserta foldernya.
   - [ ] Jalankan `pnpm generate-routes` untuk memastikan rute terhapus rapi dari `src/routeTree.gen.ts`.
-- [ ] **Pemisahan Scrap dari Design Studio &amp; Pembersihan Rute Usang:**
-  - [ ] Rute `src/routes/design/scrap.*.tsx` bukan bagian dari studio dan tidak boleh dibiarkan bercampur di bawah `/design/`. Rute ini akan dipindahkan ke domain mandiri `/scrape/*` (VibeScrape) dengan redirect 301 backward compatibility (lihat Bagian 9).
+- [x] **Pemisahan Scrap dari Design Studio &amp; Pembersihan Rute Usang:**
+  - [x] Rute `src/routes/design/scrap.*.tsx` bukan bagian dari studio dan tidak boleh dibiarkan bercampur di bawah `/design/`. Rute ini akan dipindahkan ke domain mandiri `/scrape/*` (VibeScrape) dengan redirect 301 backward compatibility (lihat Bagian 9). — **Selesai di Bagian 9**: rute kanonik `src/routes/scrape/{index,$id,history}.tsx`, dan `src/routes/design/scrap*.tsx` kini thin `beforeLoad` redirect (`replace: true`) ke `/scrape/*`; backward compatibility ditangani di layer router, bukan HTTP 301.
 - [ ] **Audit File Testing Berawalan Dash (`-*`):**
   - [ ] Pindahkan file test di `src/routes/` yang berawalan `-` (seperti `-codebase.test.tsx`, `-bantuan.test.tsx`, `-templates.test.tsx`) keluar dari folder `src/routes/` menuju folder test fitur masing-masing agar `src/routes/` murni hanya berisi file route.
 
@@ -935,9 +935,9 @@ Pemisahan fitur tidak menghilangkan sinergi. VibeDesign Studio tetap dapat meman
 - [x] **Fase 7 — Integrasi Bersih VibeDesign Studio:**
   - [x] Pastikan komponen studio di `src/features/studio/` hanya memanggil DTO/service publik dari `src/features/scrape/` tanpa circular dependency.
 - [x] **Fase 8 — Verifikasi &amp; Test Passing:**
-  - [x] Gate dijalankan pada working tree akhir: `pnpm generate-routes` exit 0; `pnpm exec tsc --noEmit` 0 error; `biome check` bersih pada seluruh file yang diubah; `pnpm build` exit 0 (route tree SSR cocok persis dengan HEAD); suite browser-free repo-wide `pnpm exec vitest run --maxWorkers=4 --testTimeout=30000` (7 suite peluncur Chromium dikecualikan) → 395 file lulus / 1 skip, 4069 test lulus / 1 skip, 0 gagal.
-  - [x] Suite domain `pnpm exec vitest run src/features/scrape src/features/studio --maxWorkers=4` → 157 file / 1333 test lulus (baseline 153/1289).
-  - [x] Catatan pra-eksisting, bukan regresi dan tidak diperbaiki di task ini: `pnpm check` menyisakan 10 error `noImportantStyles` di `src/app/globals.css` yang tidak tersentuh; skip env-gated `CREDIT_DB_TESTS=1` di `src/features/billing/tests/credit-regression.test.ts:106`; 2 test flaky batas waktu 5 detik (`src/features/studio/tests/studio-client-boundary.test.ts`, `src/features/scrape/tests/scrap.$id.test.tsx`) yang hijau pada timeout 30 detik. QA crawl langsung dan screenshot tidak dijalankan sesuai batasan task.
+  - [x] Gate dijalankan pada working tree akhir: `pnpm generate-routes` exit 0; `pnpm exec tsc --noEmit` 0 error; `biome check` bersih pada seluruh file yang diubah (16 file, exit 0); `pnpm build` exit 0; suite browser-free repo-wide `pnpm exec vitest run --maxWorkers=4 --testTimeout=30000` (7 suite peluncur Chromium dikecualikan) → 395 file lulus / 1 skip, 4069 test lulus / 1 skip, 0 gagal.
+  - [x] Suite domain `pnpm exec vitest run src/features/scrape src/features/studio --maxWorkers=4` → 157 file / 1332 test lulus, 1 gagal pra-eksisting (lihat catatan flaky di bawah). Baseline `32f250f` pada perintah yang sama: 153 file / 1289 test.
+  - [x] Catatan pra-eksisting, bukan regresi dan tidak diperbaiki di task ini: `pnpm check` menyisakan 10 error `noImportantStyles` di `src/app/globals.css` yang tidak tersentuh; skip env-gated `CREDIT_DB_TESTS=1` di `src/features/billing/tests/credit-regression.test.ts:106`; `src/features/studio/tests/studio-client-boundary.test.ts` → `keeps server-only Scrape internals out of the Studio graph` butuh ~2,9 detik sendirian (batas 5 detik) sehingga timeout saat 4 worker paralel — diverifikasi gagal identik pada baseline `32f250f`, jadi marginalitas timing, bukan regresi. QA crawl langsung dan screenshot tidak dijalankan sesuai batasan task.
 
 ---
 
