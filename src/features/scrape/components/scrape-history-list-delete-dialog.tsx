@@ -7,7 +7,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { displaySiteName } from "@/lib/site-name";
+import { displaySiteName } from "@/features/scrape/utils/site-name";
 import type { ScrapeHistoryItem } from "./scrape-history-list-item";
 
 export function ScrapeHistoryDeleteDialog({

@@ -1,4 +1,7 @@
-import { buildDesignModel, type DesignTokenModel } from "@/lib/design-model";
+import {
+	buildDesignModel,
+	type DesignTokenModel,
+} from "@/features/scrape/services/design-model";
 import type { VisualEvidence } from "@/lib/design-visual-evidence";
 
 // Shared capture fixture for the design pipeline tests: one page with a hero, a

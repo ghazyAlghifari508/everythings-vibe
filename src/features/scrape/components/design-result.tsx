@@ -6,7 +6,7 @@ import {
 	inspectorFromEvidence,
 	parseDesignMd,
 } from "@/features/scrape/utils/design-md-inspector";
-import { displaySiteName } from "@/lib/site-name";
+import { displaySiteName } from "@/features/scrape/utils/site-name";
 import { cn } from "@/lib/utils";
 import { DesignAgentPromptDialog } from "./design-agent-prompt-dialog";
 import { DesignMdSourcePanel } from "./design-md-source-panel";

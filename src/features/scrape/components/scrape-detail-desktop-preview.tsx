@@ -10,7 +10,7 @@ import {
 	previewFrameResponded,
 	previewShouldKeepPolling,
 	reducePreviewReport,
-} from "@/lib/preview-readiness";
+} from "@/features/scrape/utils/preview-readiness";
 import {
 	type FrameReport,
 	PreviewCanvasOverlay,

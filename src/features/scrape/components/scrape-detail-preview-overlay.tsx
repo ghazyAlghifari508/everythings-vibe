@@ -1,5 +1,5 @@
 import { AlertTriangle, Loader2 } from "lucide-react";
-import type { PreviewFrameReport } from "@/lib/preview-readiness";
+import type { PreviewFrameReport } from "@/features/scrape/utils/preview-readiness";
 import { ScreenshotView } from "./scrape-detail-screenshot-view";
 
 export type FrameReport = PreviewFrameReport;

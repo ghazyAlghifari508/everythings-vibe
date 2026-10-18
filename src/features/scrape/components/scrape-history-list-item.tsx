@@ -12,7 +12,7 @@ import {
 	imageCountsLabel,
 	type imageResultCounts,
 } from "@/features/scrape/utils/scrape-images";
-import { displaySiteName } from "@/lib/site-name";
+import { displaySiteName } from "@/features/scrape/utils/site-name";
 import { formatDate } from "@/lib/utils";
 
 export interface ScrapeHistoryItem {

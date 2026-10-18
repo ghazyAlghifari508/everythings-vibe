@@ -5,7 +5,7 @@ import {
 	SCRAPE_PREVIEW_ASSET_MAX_URL_CHARS,
 } from "@/features/scrape/types/scrape-constants";
 import { parseAndValidateFormat } from "@/features/scrape/utils/url-validator";
-import { rewriteCssUrls, rewritePreviewAssets } from "@/lib/preview-html";
+import { rewriteCssUrls, rewritePreviewAssets } from "./preview-html";
 
 const TOKEN_VERSION = 1;
 const TOKEN_MAX_CHARS = 8192;
