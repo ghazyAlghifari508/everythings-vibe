@@ -181,10 +181,15 @@ describe("Navbar Paywall Integration Contract", () => {
 	});
 
 	it("integrates paywall modal trigger button with Lock icon in navbar source", async () => {
-		const source = await readFile(
-			`${process.cwd()}/src/components/layout/navbar.tsx`,
-			"utf8",
-		);
+		const [shell, actions] = await Promise.all([
+			readFile(`${process.cwd()}/src/components/layout/navbar.tsx`, "utf8"),
+			readFile(
+				`${process.cwd()}/src/components/layout/navbar-flow-actions.tsx`,
+				"utf8",
+			),
+		]);
+		expect(shell).toContain("NavbarFlowActions");
+		const source = actions;
 		expect(source).toContain('openPaywallModal("ac")');
 		expect(source).toContain("<Lock");
 		expect(source).toContain("text-amber-400");
@@ -210,10 +215,15 @@ describe("Navbar Fitur Generate PRD Contract", () => {
 	});
 
 	it("wires the fitur CTA through savePendingPrdPrompt into /prd/$id source", async () => {
-		const source = await readFile(
-			`${process.cwd()}/src/components/layout/navbar.tsx`,
-			"utf8",
-		);
+		const [shell, actions] = await Promise.all([
+			readFile(`${process.cwd()}/src/components/layout/navbar.tsx`, "utf8"),
+			readFile(
+				`${process.cwd()}/src/components/layout/navbar-flow-actions.tsx`,
+				"utf8",
+			),
+		]);
+		expect(shell).toContain("NavbarFlowActions");
+		const source = actions;
 		expect(source).toContain('routeStep === "fitur"');
 		expect(source).toContain("savePendingPrdPrompt");
 		expect(source).toContain('to: "/prd/$id"');
@@ -221,7 +231,7 @@ describe("Navbar Fitur Generate PRD Contract", () => {
 });
 
 describe("Navbar Rebranding & Layout", () => {
-	it("renders VibeEverything logo and only Pricing navlink", () => {
+	it("discovers each independent product at its canonical destination", () => {
 		mockPathname = "/";
 		renderNavbar();
 		expect(screen.getByText("VibeEverything")).toBeDefined();
@@ -229,8 +239,16 @@ describe("Navbar Rebranding & Layout", () => {
 		expect(screen.queryByRole("link", { name: /Home/i })).toBeNull();
 		expect(screen.queryByRole("link", { name: /FAQ/i })).toBeNull();
 		expect(screen.queryByRole("link", { name: /History/i })).toBeNull();
-		expect(screen.queryByRole("link", { name: /VibePlan/i })).toBeNull();
-		expect(screen.queryByRole("link", { name: /VibeDesign/i })).toBeNull();
+		for (const [name, destination] of [
+			["VibePlan", "/plan"],
+			["VibeDesign Studio", "/design/studio"],
+			["VibeScrape", "/scrape"],
+			["VibeTemplate", "/templates"],
+		]) {
+			expect(screen.getByRole("link", { name }).getAttribute("href")).toBe(
+				destination,
+			);
+		}
 	});
 
 	it("renders hamburger menu button for history drawer on home", () => {
@@ -313,7 +331,9 @@ describe("Navbar Greenfield Workspace Navlinks", () => {
 		expect(allChatLinks).toHaveLength(2); // 1 desktop + 1 mobile
 		expect(allRiwayatLinks).toHaveLength(2); // 1 desktop + 1 mobile
 		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
-		expect(screen.queryByRole("link", { name: /^History$/i })).toBeNull();
+		expect(document.querySelectorAll('a[href="/scrape/history"]')).toHaveLength(
+			0,
+		);
 	});
 
 	it("renders Chat and Riwayat on /history?workspace=greenfield without Pricing", () => {
@@ -448,7 +468,7 @@ describe("Navbar Greenfield Workspace Navlinks", () => {
 	});
 });
 
-describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
+describe("Navbar VibeScrape Workspace Navlinks", () => {
 	it.each([
 		"/scrape",
 		"/design/scrap",
@@ -456,9 +476,9 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		mockPathname = pathname;
 		renderNavbar();
 
-		// Desktop navlinks: scoped VibeDesign nav is Scrap + History only
-		const scrapLink = screen.getByRole("link", { name: /^Scrap$/i });
-		const historyLink = screen.getByRole("link", { name: /^History$/i });
+		// Desktop navlinks: the scoped VibeScrape nav is workspace + history only
+		const scrapLink = screen.getByRole("link", { name: /^VibeScrape$/i });
+		const historyLink = screen.getByRole("link", { name: /^Riwayat$/i });
 
 		expect(scrapLink).toBeDefined();
 		expect(historyLink).toBeDefined();
@@ -474,8 +494,10 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
 		fireEvent.click(toggleBtn);
 
-		const allScrapLinks = screen.getAllByRole("link", { name: /^Scrap$/i });
-		const allHistoryLinks = screen.getAllByRole("link", { name: /^History$/i });
+		const allScrapLinks = screen.getAllByRole("link", {
+			name: /^VibeScrape$/i,
+		});
+		const allHistoryLinks = screen.getAllByRole("link", { name: /^Riwayat$/i });
 
 		expect(allScrapLinks).toHaveLength(2); // 1 desktop + 1 mobile
 		expect(allHistoryLinks).toHaveLength(2); // 1 desktop + 1 mobile
@@ -483,7 +505,8 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 
 		expect(allScrapLinks[1].getAttribute("href")).toBe("/scrape");
 		expect(allHistoryLinks[1].getAttribute("href")).toBe("/scrape/history");
-		expect(screen.queryByRole("link", { name: /^Riwayat$/i })).toBeNull();
+		// The greenfield history entry must not leak into the scrape workspace nav.
+		expect(document.querySelectorAll('a[href="/history"]')).toHaveLength(0);
 		// Mobile drawer on VibeDesign routes must NOT include FAQ or Settings
 		expect(screen.queryByRole("link", { name: /^FAQ$/i })).toBeNull();
 		expect(screen.queryByRole("link", { name: /^Settings$/i })).toBeNull();
@@ -496,8 +519,8 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		mockPathname = pathname;
 		renderNavbar();
 
-		const scrapLink = screen.getByRole("link", { name: /^Scrap$/i });
-		const historyLink = screen.getByRole("link", { name: /^History$/i });
+		const scrapLink = screen.getByRole("link", { name: /^VibeScrape$/i });
+		const historyLink = screen.getByRole("link", { name: /^Riwayat$/i });
 
 		expect(screen.queryByRole("link", { name: /^Pricing$/i })).toBeNull();
 
@@ -513,8 +536,8 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		mockPathname = pathname;
 		renderNavbar();
 
-		const scrapLink = screen.getByRole("link", { name: /^Scrap$/i });
-		const historyLink = screen.getByRole("link", { name: /^History$/i });
+		const scrapLink = screen.getByRole("link", { name: /^VibeScrape$/i });
+		const historyLink = screen.getByRole("link", { name: /^Riwayat$/i });
 
 		expect(scrapLink.className).toContain("bg-white/10");
 		expect(historyLink.className).not.toContain("bg-white/10");
@@ -532,8 +555,10 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		fireEvent.click(toggleBtn);
 
 		const homeLink = screen.getByRole("link", { name: /^Home$/i });
-		const allScrapLinks = screen.getAllByRole("link", { name: /^Scrap$/i });
-		const allHistoryLinks = screen.getAllByRole("link", { name: /^History$/i });
+		const allScrapLinks = screen.getAllByRole("link", {
+			name: /^VibeScrape$/i,
+		});
+		const allHistoryLinks = screen.getAllByRole("link", { name: /^Riwayat$/i });
 
 		expect(homeLink).toBeDefined();
 		expect(allScrapLinks).toHaveLength(2);
@@ -542,13 +567,16 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 
 		expect(screen.queryByRole("link", { name: /^FAQ$/i })).toBeNull();
 		expect(screen.queryByRole("link", { name: /^Settings$/i })).toBeNull();
-		expect(screen.queryByRole("link", { name: /^Riwayat$/i })).toBeNull();
+		// The greenfield history entry must not leak into the scrape workspace nav.
+		expect(document.querySelectorAll('a[href="/history"]')).toHaveLength(0);
 
 		expect(allHistoryLinks[1].className).toContain("bg-white/10");
 		expect(allScrapLinks[1].className).not.toContain("bg-white/10");
 
 		fireEvent.click(allScrapLinks[1]);
-		expect(screen.queryAllByRole("link", { name: /^Scrap$/i })).toHaveLength(1);
+		expect(
+			screen.queryAllByRole("link", { name: /^VibeScrape$/i }),
+		).toHaveLength(1);
 	});
 
 	it.each([
@@ -557,12 +585,14 @@ describe("Navbar VibeDesign Scrap Workspace Navlinks", () => {
 		"/design/studio/studio-1",
 		"/scrape-extra",
 		"/design/scrap-extra",
-	])("does not show scrape navlinks on %s and renders FAQ/Settings in mobile menu", (pathname) => {
+	])("does not scope the nav to the scrape workspace on %s and renders FAQ/Settings in mobile menu", (pathname) => {
 		mockPathname = pathname;
 		renderNavbar();
 
-		expect(screen.queryByRole("link", { name: /^Scrap$/i })).toBeNull();
-		expect(screen.queryByRole("link", { name: /^History$/i })).toBeNull();
+		// No second navigation system: the scoped VibeScrape history pair stays out.
+		expect(document.querySelectorAll('a[href="/scrape/history"]')).toHaveLength(
+			0,
+		);
 		expect(screen.getByRole("link", { name: /^Pricing$/i })).toBeDefined();
 
 		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });

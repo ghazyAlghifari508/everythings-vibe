@@ -9,9 +9,7 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import {
-	ArrowRight,
 	CreditCard,
-	Lock,
 	LogOut,
 	Menu,
 	MessageSquare,
@@ -20,33 +18,19 @@ import {
 	User,
 	X,
 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { canShowNavbarTopUp } from "@/components/layout/navbar-topup-helper";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { TopUpModal } from "@/features/billing/components/top-up-modal";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import { authClient } from "@/lib/auth-client";
-import {
-	isVibeDesignHistoryActive,
-	isVibeDesignScrapActive,
-	isVibeDesignScrapRoute,
-} from "@/lib/design-nav";
 import { historyFilterSchema } from "@/lib/history";
-import {
-	getPendingPrdPrompt,
-	getSetupPrompt,
-	savePendingPrdPrompt,
-} from "@/lib/prompt-handoff";
 import { isAdmin } from "@/lib/session";
-import { useChatStore, useUIStore } from "@/store";
-import {
-	CodebaseStepNav,
-	FlowStepNav,
-	getFlowStepCta,
-	routeToStep,
-	stepToRouteTarget,
-} from "./flow-step-nav";
+import { useUIStore } from "@/store";
+import { CodebaseStepNav, FlowStepNav, routeToStep } from "./flow-step-nav";
+import { NavbarFlowActions } from "./navbar-flow-actions";
+import { NavbarProductLinks } from "./navbar-product-links";
 
 export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	const { data: session, isPending: isLoading } = authClient.useSession();
@@ -56,25 +40,17 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 			: null;
 	const queryClient = useQueryClient();
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-	const [isStepLoading, setIsStepLoading] = useState(false);
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 	const [isTopUpOpen, setIsTopUpOpen] = useState(false);
-	const isGeneratingPRD = useChatStore((s) => s.isGeneratingPRD);
-	const hasStreamingPRDContent = useChatStore((s) => !!s.streamingPRDContent);
-	const isGeneratingAC = useChatStore((s) => s.isGeneratingAC);
 	const router = useRouter();
 	const navigate = useNavigate();
 	const pathname = useLocation({ select: (l) => l.pathname });
 	const routeSearch = useLocation({ select: (l) => l.search });
 	const historyWorkspace =
 		historyFilterSchema.safeParse(routeSearch).data?.workspace;
-	// Greenfield workspace links to /plan/new ("Chat") and its scoped history ("Riwayat");
-	// every other route keeps the global nav (with "Pricing").
 	const isGreenfieldWorkspace =
 		pathname === "/plan/new" ||
 		(pathname === "/history" && historyWorkspace === "greenfield");
-	const [, startTransition] = useTransition();
-	// Single source of truth: reuse routeToStep for route-based actions
 	const routeStep = routeToStep(pathname);
 	const projectNavData = useMatches({
 		select: (matches) => {
@@ -118,13 +94,8 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 			return null;
 		},
 	});
-	const flowCta = getFlowStepCta(routeStep, projectNavData?.step);
 	const { data: planData } = useUserPlan();
-	const plan = planData?.plan ?? "free";
-	const isFree = plan === "free";
-	const isGeneratingFeatures =
-		routeStep === "fitur" && projectNavData?.featuresStatus === "generating";
-	// FlowStepNav pages = PRD/AC/Task/Kanban (workspace)
+	const isFree = (planData?.plan ?? "free") === "free";
 	const isFlowStepRoute =
 		pathname.startsWith("/ask/") ||
 		pathname.startsWith("/fitur/") ||
@@ -132,73 +103,16 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 		pathname.startsWith("/ac/") ||
 		pathname.startsWith("/task/") ||
 		pathname.startsWith("/kanban/");
-
 	const isCodebaseSyncRoute = pathname === "/plan/codebase";
 	const codebasePlanStep = useUIStore((s) => s.codebasePlanStep);
 	const setCodebasePlanStep = useUIStore((s) => s.setCodebasePlanStep);
-
 	const showToast = useUIStore((s) => s.showToast);
-
-	// Extract projectId from route path
 	const projectId = pathname.split("/")[2];
-
-	const handleStepAc = async () => {
-		if (!projectId || isStepLoading) return;
-		setIsStepLoading(true);
-		try {
-			const res = await fetch(`/api/projects/${projectId}/step`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ step: "ac" }),
-			});
-			if (!res.ok) throw new Error("Gagal memperbarui tahap proyek");
-			startTransition(() => {
-				navigate({ to: "/ac/$id", params: { id: projectId } });
-			});
-		} catch (err) {
-			console.error("Step to AC failed:", err);
-			showToast("Gagal lanjut ke Acceptance Criteria.", "error");
-		} finally {
-			setIsStepLoading(false);
-		}
-	};
-
-	const handleStepTask = async () => {
-		if (!projectId || isStepLoading) return;
-		if (
-			routeStep === "ac" &&
-			!projectNavData?.hasAc &&
-			projectNavData?.acStatus !== "completed"
-		) {
-			showToast("AC belum selesai digenerate. Tunggu hingga selesai.", "error");
-			return;
-		}
-		setIsStepLoading(true);
-		try {
-			const res = await fetch(`/api/projects/${projectId}/step`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ step: "task" }),
-			});
-			if (!res.ok) throw new Error("Gagal memperbarui tahap proyek");
-			startTransition(() => {
-				navigate({ to: "/task/$id", params: { id: projectId } });
-			});
-		} catch (err) {
-			console.error("Step to Task failed:", err);
-			showToast("Gagal lanjut ke Task.", "error");
-		} finally {
-			setIsStepLoading(false);
-		}
-	};
 
 	const handleLogout = async () => {
 		try {
 			await authClient.signOut();
-			// The QueryClient is created once per router instance and survives
-			// client-side navigation, so signing out does not dispose of it.
-			// Every cached query here is user-scoped, so without this clear the
-			// next person to sign in on this tab can read the previous user's rows.
+			// The router survives logout, so its user-scoped cache must not reach the next session.
 			queryClient.clear();
 			navigate({ to: "/login" });
 			router.invalidate();
@@ -207,13 +121,11 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 			showToast("Gagal logout. Coba lagi.", "error");
 		}
 	};
-
 	const isTopUpEligible = canShowNavbarTopUp({
 		user,
 		plan: planData?.plan,
 		topUpEligible: planData?.topUpEligible,
 	});
-
 	const topUpButton = isTopUpEligible ? (
 		<button
 			type="button"
@@ -229,7 +141,6 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	return (
 		<nav className="fixed left-0 right-0 top-0 z-40 h-14 border-b border-graphite bg-charcoal/95">
 			<div className="mx-auto flex h-full max-w-[1200px] items-center px-6">
-				{/* Left: Project Menu (on Task route) + logo */}
 				<div className="flex items-center gap-2.5 shrink-0 md:w-[220px]">
 					{routeStep === "task" && projectId && (
 						<button
@@ -242,10 +153,6 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							<Menu size={16} />
 						</button>
 					)}
-					{/* History is a signed-in read: loadHistory rejects a visitor with
-					    no session, so offering the trigger would only produce an error
-					    panel whose retry can never succeed. History drawer trigger is
-					    only offered on home ("/") to prevent double hamburger on workspace. */}
 					{user && pathname === "/" && (
 						<button
 							type="button"
@@ -259,8 +166,6 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					)}
 					<Logo height={28} />
 				</div>
-
-				{/* Mobile: step dots (flow routes or codebase sync) */}
 				{isCodebaseSyncRoute ? (
 					<div className="flex md:hidden flex-1 items-center justify-center">
 						<CodebaseStepNav
@@ -276,8 +181,6 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						/>
 					</div>
 				) : null}
-
-				{/* Center: navlinks - Desktop */}
 				<div className="hidden md:flex flex-1 items-center justify-center">
 					{isCodebaseSyncRoute ? (
 						<CodebaseStepNav
@@ -291,281 +194,32 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						/>
 					) : (
 						<div className="flex items-center gap-1">
-							{isVibeDesignScrapRoute(pathname) ? (
-								<>
-									<Link
-										to="/scrape"
-										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-											isVibeDesignScrapActive(pathname)
-												? "bg-white/10 text-snow"
-												: "text-fog hover:bg-white/5 hover:text-snow"
-										}`}
-									>
-										Scrap
-									</Link>
-									<Link
-										to="/scrape/history"
-										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-											isVibeDesignHistoryActive(pathname)
-												? "bg-white/10 text-snow"
-												: "text-fog hover:bg-white/5 hover:text-snow"
-										}`}
-									>
-										History
-									</Link>
-								</>
-							) : isGreenfieldWorkspace ? (
-								<>
-									<Link
-										to="/plan/new"
-										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-											pathname === "/plan/new"
-												? "bg-white/10 text-snow"
-												: "text-fog hover:bg-white/5 hover:text-snow"
-										}`}
-									>
-										Chat
-									</Link>
-									<Link
-										to="/history"
-										search={{ workspace: "greenfield" }}
-										className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-											pathname === "/history"
-												? "bg-white/10 text-snow"
-												: "text-fog hover:bg-white/5 hover:text-snow"
-										}`}
-									>
-										Riwayat
-									</Link>
-								</>
-							) : (
-								<Link
-									to="/pricing"
-									className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-										pathname.startsWith("/pricing")
-											? "bg-white/10 text-snow"
-											: "text-fog hover:bg-white/5 hover:text-snow"
-									}`}
-								>
-									Pricing
-								</Link>
-							)}
+							<NavbarProductLinks
+								pathname={pathname}
+								isGreenfieldWorkspace={isGreenfieldWorkspace}
+							/>
 						</div>
 					)}
 				</div>
-
-				{/* Right: actions */}
 				<div className="flex md:w-[220px] shrink-0 items-center justify-end gap-2 ml-auto md:ml-0">
-					{/* Mobile hamburger */}
 					{!isFlowStepRoute && !isCodebaseSyncRoute && (
 						<button
 							type="button"
 							className="md:hidden p-2 text-fog hover:text-snow transition-colors shrink-0"
 							onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
 							aria-label="Toggle menu"
+							aria-expanded={isMobileMenuOpen}
 						>
 							{isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
 						</button>
 					)}
-					{/* Workspace action buttons - visible all screens */}
-					{isFlowStepRoute ? (
-						<>
-							{routeStep === "question" &&
-								projectId &&
-								flowCta?.kind === "navigate" && (
-									<button
-										type="button"
-										onClick={() => {
-											startTransition(() => {
-												const targetPath =
-													flowCta.targetStep === "task"
-														? "/task/$id"
-														: flowCta.targetStep === "ac"
-															? "/ac/$id"
-															: flowCta.targetStep === "fitur"
-																? "/fitur/$id"
-																: "/prd/$id";
-												navigate({
-													to: targetPath,
-													params: { id: projectId },
-												});
-											});
-										}}
-										className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
-									>
-										<span className="whitespace-nowrap">{flowCta.label}</span>
-										<ArrowRight size={12} />
-									</button>
-								)}
-							{routeStep === "fitur" && projectId && (
-								<button
-									type="button"
-									disabled={isGeneratingFeatures || isStepLoading}
-									title={
-										isGeneratingFeatures
-											? "Daftar fitur masih disusun. Tunggu hingga selesai."
-											: "Lanjut ke PRD"
-									}
-									onClick={() => {
-										if (!projectId || isGeneratingFeatures || isStepLoading)
-											return;
-										if (!getPendingPrdPrompt()) {
-											const setup = getSetupPrompt();
-											if (setup) {
-												savePendingPrdPrompt(
-													setup,
-													"auto",
-													projectNavData?.projectName ?? undefined,
-												);
-											}
-										}
-										startTransition(() => {
-											navigate({ to: "/prd/$id", params: { id: projectId } });
-										});
-									}}
-									className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-40 disabled:bg-graphite/40 disabled:text-fog/50"
-								>
-									{isGeneratingFeatures ? (
-										"Menyusun fitur..."
-									) : (
-										<>
-											<span className="whitespace-nowrap">Generate PRD</span>
-											<ArrowRight size={12} />
-										</>
-									)}
-								</button>
-							)}
-							{routeStep === "prd" && projectId && (
-								<>
-									<button
-										type="button"
-										onClick={() => useUIStore.getState().toggleChatPanel()}
-										className="hidden md:flex items-center gap-1.5 rounded-md bg-charcoal px-3 py-1.5 text-xs font-[510] text-fog shadow-[var(--shadow-inset)] transition-colors hover:bg-white/5 hover:text-snow"
-										aria-label="Buka/tutup chat"
-									>
-										<MessageSquare size={14} />
-										<span>Chat</span>
-									</button>
-									{isFree ? (
-										<button
-											type="button"
-											onClick={() =>
-												useUIStore.getState().openPaywallModal("ac")
-											}
-											className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
-										>
-											<Lock size={12} className="text-amber-400" />
-											<span className="whitespace-nowrap">Upgrade ke Pro</span>
-											<ArrowRight size={12} />
-										</button>
-									) : flowCta?.kind === "navigate" ? (
-										<button
-											type="button"
-											onClick={() => {
-												startTransition(() => {
-													navigate(
-														stepToRouteTarget(flowCta.targetStep, projectId),
-													);
-												});
-											}}
-											className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
-										>
-											<span className="whitespace-nowrap">{flowCta.label}</span>
-											<ArrowRight size={12} />
-										</button>
-									) : (
-										<button
-											type="button"
-											onClick={handleStepAc}
-											disabled={
-												isStepLoading ||
-												isGeneratingPRD ||
-												hasStreamingPRDContent
-											}
-											className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-40 disabled:bg-graphite/40 disabled:text-fog/50"
-										>
-											{isStepLoading ? (
-												"Memuat..."
-											) : (
-												<>
-													<span>Generate AC</span>
-													<ArrowRight size={12} />
-												</>
-											)}
-										</button>
-									)}
-								</>
-							)}
-							{routeStep === "ac" &&
-								projectId &&
-								(isFree ? (
-									<Link
-										to="/pricing"
-										className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
-									>
-										<span className="whitespace-nowrap">Upgrade ke Pro</span>
-										<ArrowRight size={12} />
-									</Link>
-								) : flowCta?.kind === "navigate" ? (
-									<button
-										type="button"
-										onClick={() => {
-											startTransition(() => {
-												navigate({
-													to: "/task/$id",
-													params: { id: projectId },
-												});
-											});
-										}}
-										className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
-									>
-										<span className="whitespace-nowrap">{flowCta.label}</span>
-										<ArrowRight size={12} />
-									</button>
-								) : (
-									<button
-										type="button"
-										onClick={handleStepTask}
-										disabled={
-											isStepLoading ||
-											isGeneratingAC ||
-											isGeneratingPRD ||
-											hasStreamingPRDContent ||
-											(routeStep === "ac" &&
-												!projectNavData?.hasAc &&
-												projectNavData?.acStatus !== "completed")
-										}
-										className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-40 disabled:bg-graphite/40 disabled:text-fog/50"
-									>
-										{isStepLoading ||
-										isGeneratingAC ||
-										isGeneratingPRD ||
-										hasStreamingPRDContent ||
-										(routeStep === "ac" &&
-											!projectNavData?.hasAc &&
-											projectNavData?.acStatus !== "completed") ? (
-											isGeneratingAC ||
-											(routeStep === "ac" &&
-												!projectNavData?.hasAc &&
-												projectNavData?.acStatus !== "completed") ? (
-												"Menyusun AC..."
-											) : (
-												"Memuat..."
-											)
-										) : (
-											<>
-												<span>Generate Task</span>
-												<ArrowRight size={12} />
-											</>
-										)}
-									</button>
-								))}
-						</>
-					) : null}
-
-					{/* Codebase sync flow: this wizard mints a new codebase on mount and
-					    hides the global nav, so the saved-project library is the only
-					    way back into work that already exists. */}
+					{isFlowStepRoute && (
+						<NavbarFlowActions
+							pathname={pathname}
+							project={projectNavData}
+							isFree={isFree}
+						/>
+					)}
 					{isCodebaseSyncRoute && (
 						<Link
 							to="/codebases"
@@ -574,11 +228,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							Project Tersimpan
 						</Link>
 					)}
-
-					{/* Codebase sync flow: show only Top Up button (if eligible) */}
 					{isCodebaseSyncRoute && topUpButton}
-
-					{/* Desktop-only items for standard routes */}
 					{!isFlowStepRoute && !isCodebaseSyncRoute && (
 						<div className="hidden md:flex items-center gap-2">
 							{topUpButton}
@@ -618,7 +268,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 											<div className="absolute right-0 top-full z-50 mt-2 flex w-56 flex-col overflow-hidden rounded-xl bg-obsidian py-2 font-inter shadow-[var(--shadow-overlay)]">
 												<div className="px-4 py-2 mb-1">
 													<p className="truncate text-sm font-[510] text-snow">
-														{user?.email}
+														{user.email}
 													</p>
 												</div>
 												<div className="mb-1 h-px w-full bg-graphite" />
@@ -646,7 +296,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 													className="flex items-center gap-3 px-4 py-2.5 text-sm font-[510] text-mist transition-colors hover:bg-white/5 hover:text-snow"
 												>
 													<MessageSquare size={16} className="text-fog" />
-													Bantuan & Feedback
+													Bantuan &amp; Feedback
 												</Link>
 												<div className="my-1 h-px w-full bg-graphite" />
 												<button
@@ -669,9 +319,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 					)}
 				</div>
 			</div>
-
-			{/* Mobile Menu Drawer */}
-			{isMobileMenuOpen && !isCodebaseSyncRoute && (
+			{isMobileMenuOpen && !isCodebaseSyncRoute && !isFlowStepRoute && (
 				<div className="md:hidden border-t border-graphite bg-obsidian px-6 py-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
 					<div className="flex items-center justify-between">
 						<span className="text-sm font-[510] text-fog">Tampilan</span>
@@ -680,110 +328,14 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							<ThemeToggle />
 						</div>
 					</div>
-					<Link
-						to="/"
-						className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
-							pathname === "/"
-								? "bg-white/10 text-snow"
-								: "text-snow hover:bg-white/5"
-						}`}
-						onClick={() => setIsMobileMenuOpen(false)}
-					>
-						Home
-					</Link>
-					{isVibeDesignScrapRoute(pathname) ? (
-						<>
-							<Link
-								to="/scrape"
-								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
-									isVibeDesignScrapActive(pathname)
-										? "bg-white/10 text-snow"
-										: "text-snow hover:bg-white/5"
-								}`}
-								onClick={() => setIsMobileMenuOpen(false)}
-							>
-								Scrap
-							</Link>
-							<Link
-								to="/scrape/history"
-								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
-									isVibeDesignHistoryActive(pathname)
-										? "bg-white/10 text-snow"
-										: "text-snow hover:bg-white/5"
-								}`}
-								onClick={() => setIsMobileMenuOpen(false)}
-							>
-								History
-							</Link>
-						</>
-					) : (
-						<>
-							{isGreenfieldWorkspace ? (
-								<Link
-									to="/plan/new"
-									className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
-										pathname === "/plan/new"
-											? "bg-white/10 text-snow"
-											: "text-snow hover:bg-white/5"
-									}`}
-									onClick={() => setIsMobileMenuOpen(false)}
-								>
-									Chat
-								</Link>
-							) : (
-								<Link
-									to="/pricing"
-									className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
-										pathname.startsWith("/pricing")
-											? "bg-white/10 text-snow"
-											: "text-snow hover:bg-white/5"
-									}`}
-									onClick={() => setIsMobileMenuOpen(false)}
-								>
-									Pricing
-								</Link>
-							)}
-							<Link
-								to="/history"
-								{...(isGreenfieldWorkspace
-									? { search: { workspace: "greenfield" } }
-									: {})}
-								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
-									pathname === "/history"
-										? "bg-white/10 text-snow"
-										: "text-snow hover:bg-white/5"
-								}`}
-								onClick={() => setIsMobileMenuOpen(false)}
-							>
-								Riwayat
-							</Link>
-							<Link
-								to="/faq"
-								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
-									pathname.startsWith("/faq")
-										? "bg-white/10 text-snow"
-										: "text-snow hover:bg-white/5"
-								}`}
-								onClick={() => setIsMobileMenuOpen(false)}
-							>
-								FAQ
-							</Link>
-							<Link
-								to="/settings"
-								className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-[510] ${
-									pathname.startsWith("/settings")
-										? "bg-white/10 text-snow"
-										: "text-snow hover:bg-white/5"
-								}`}
-								onClick={() => setIsMobileMenuOpen(false)}
-							>
-								Settings
-							</Link>
-						</>
-					)}
+					<NavbarProductLinks
+						pathname={pathname}
+						isGreenfieldWorkspace={isGreenfieldWorkspace}
+						mobile
+						onNavigate={() => setIsMobileMenuOpen(false)}
+					/>
 				</div>
 			)}
-
 			<TopUpModal open={isTopUpOpen} onOpenChange={setIsTopUpOpen} />
 		</nav>
 	);
