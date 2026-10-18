@@ -41,6 +41,7 @@ export function StudioWorkspace({
 					<StudioDesignPicker
 						designMd={workspace.project.designMd}
 						disabled={workspace.isProcessing || workspace.preferenceSaving}
+						scrapeSources={initialData.scrapeSources}
 						onApply={workspace.handleApplyDesignSystem}
 					/>
 				}

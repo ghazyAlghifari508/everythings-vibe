@@ -8,6 +8,7 @@ import {
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import {
 	getStudioPresetDesignMd,
 	STUDIO_DESIGN_PRESETS,
@@ -23,10 +24,12 @@ import { StartWithDesignModal } from "./start-with-design-modal";
 export function StudioDesignPicker({
 	designMd,
 	disabled,
+	scrapeSources,
 	onApply,
 }: {
 	designMd: string | null;
 	disabled: boolean;
+	scrapeSources: ScrapeDesignSource[];
 	onApply: (reference: AttachedDesignReference) => Promise<boolean>;
 }) {
 	const [open, setOpen] = useState(false);
@@ -39,6 +42,7 @@ export function StudioDesignPicker({
 	async function apply(next: {
 		designMd: string;
 		logo?: AttachedDesignReference["logo"];
+		designReference?: AttachedDesignReference["designReference"];
 	}) {
 		if (pending) return false;
 		setPending(true);
@@ -47,6 +51,9 @@ export function StudioDesignPicker({
 			return await onApply({
 				designMd: next.designMd,
 				logo: next.logo ?? null,
+				...(next.designReference
+					? { designReference: next.designReference }
+					: {}),
 			});
 		} catch (failure) {
 			setError(
@@ -119,10 +126,14 @@ export function StudioDesignPicker({
 				open={open}
 				onOpenChange={setOpen}
 				initialReference={reference}
+				scrapeSources={scrapeSources}
 				onApply={async (next) => {
 					const accepted = await apply({
 						designMd: next.designMd,
 						...(next.logo ? { logo: next.logo } : {}),
+						...(next.designReference
+							? { designReference: next.designReference }
+							: {}),
 					});
 					if (!accepted)
 						throw new Error("Referensi belum tersimpan. Coba lagi.");

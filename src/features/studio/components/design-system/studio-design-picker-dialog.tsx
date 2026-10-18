@@ -10,6 +10,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import {
 	StudioDesignCustomPanel,
 	type StudioDesignCustomState,
@@ -18,6 +19,7 @@ import {
 	StudioDesignTemplatePanel,
 	StudioDesignThemePanel,
 } from "@/features/studio/components/design-system/studio-design-picker-panels";
+import { StudioScrapeDesignSources } from "@/features/studio/components/design-system/studio-scrape-design-sources";
 import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
 import {
 	getStudioPresetDesignMd,
@@ -49,21 +51,27 @@ export function StudioDesignPickerDialog({
 	open,
 	onOpenChange,
 	selectedThemeId,
+	selectedScrapeId,
 	customFilename,
+	scrapeSources,
 	onSelectTheme,
 	onSelectCustom,
+	onSelectScrape,
 	onClear,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	selectedThemeId: string | null;
+	selectedScrapeId: string | null;
 	customFilename: string | null;
+	scrapeSources: ScrapeDesignSource[];
 	onSelectTheme: (presetId: string) => void;
 	onSelectCustom: (input: {
 		filename: string;
 		designMd: string;
 		logo: AttachedLogo | null;
 	}) => void;
+	onSelectScrape: (source: ScrapeDesignSource) => void;
 	onClear: () => void;
 }) {
 	const [tab, setTab] = useState<DesignPickerTab>("tema");
@@ -73,6 +81,9 @@ export function StudioDesignPickerDialog({
 	const activeThemeId = pendingThemeId ?? selectedThemeId;
 	const activeTheme = STUDIO_DESIGN_PRESETS.find(
 		(preset) => preset.id === activeThemeId,
+	);
+	const selectedScrape = scrapeSources.find(
+		(source) => source.id === selectedScrapeId,
 	);
 	const customTokens = custom.mdText
 		? extractDesignSystemTokens(custom.mdText)
@@ -161,30 +172,40 @@ export function StudioDesignPickerDialog({
 						{tab === "template" ? <StudioDesignTemplatePanel /> : null}
 
 						{tab === "milik" ? (
-							<StudioDesignCustomPanel
-								state={custom}
-								colorCount={colorCount}
-								fontFamily={customTokens?.typography.fontFamily ?? null}
-								onMdNameChange={(mdName, mdText) =>
-									setCustom((previous) => ({ ...previous, mdName, mdText }))
-								}
-								onMdError={(mdError) =>
-									setCustom((previous) => ({ ...previous, mdError }))
-								}
-								onReadingChange={(reading) =>
-									setCustom((previous) => ({ ...previous, reading }))
-								}
-								onLogoChange={(logo) =>
-									setCustom((previous) => ({ ...previous, logo }))
-								}
-								onLogoError={(logoError) =>
-									setCustom((previous) => ({ ...previous, logoError }))
-								}
-							/>
+							<div className="flex flex-col gap-6">
+								<StudioScrapeDesignSources
+									sources={scrapeSources}
+									selectedId={selectedScrapeId}
+									onSelect={(source) => {
+										onSelectScrape(source);
+										onOpenChange(false);
+									}}
+								/>
+								<StudioDesignCustomPanel
+									state={custom}
+									colorCount={colorCount}
+									fontFamily={customTokens?.typography.fontFamily ?? null}
+									onMdNameChange={(mdName, mdText) =>
+										setCustom((previous) => ({ ...previous, mdName, mdText }))
+									}
+									onMdError={(mdError) =>
+										setCustom((previous) => ({ ...previous, mdError }))
+									}
+									onReadingChange={(reading) =>
+										setCustom((previous) => ({ ...previous, reading }))
+									}
+									onLogoChange={(logo) =>
+										setCustom((previous) => ({ ...previous, logo }))
+									}
+									onLogoError={(logoError) =>
+										setCustom((previous) => ({ ...previous, logoError }))
+									}
+								/>
+							</div>
 						) : null}
 
 						<DialogFooter className="mt-4 flex flex-row items-center justify-between gap-2 border-t border-graphite/40 pt-4 sm:flex-row sm:justify-between">
-							{selectedThemeId || customFilename ? (
+							{selectedThemeId || customFilename || selectedScrapeId ? (
 								<button
 									type="button"
 									onClick={() => {
@@ -205,7 +226,10 @@ export function StudioDesignPickerDialog({
 									<span className="font-semibold text-mist">
 										{activeTheme
 											? activeTheme.name
-											: (customFilename ?? "belum ada")}
+											: (selectedScrape?.title ??
+												selectedScrape?.domain ??
+												customFilename ??
+												"belum ada")}
 									</span>
 								</span>
 								<Button

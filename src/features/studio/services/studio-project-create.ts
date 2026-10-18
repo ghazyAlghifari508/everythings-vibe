@@ -43,9 +43,10 @@ export async function createStudioProject(
 
 	const options = studioGenerationOptionsSchema.parse(input);
 	const designMode = options.designMode;
-	const resolved = resolveStudioDesignReference(
+	const resolved = await resolveStudioDesignReference(
 		options.designReference,
 		options.designMd,
+		userId,
 	);
 	const cleanDesignMd = resolved.designMd;
 

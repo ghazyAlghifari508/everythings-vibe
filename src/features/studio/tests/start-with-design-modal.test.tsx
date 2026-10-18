@@ -22,6 +22,7 @@ describe("StartWithDesignModal", () => {
 		render(
 			<StartWithDesignModal
 				open={true}
+				scrapeSources={[]}
 				onOpenChange={vi.fn()}
 				onApply={vi.fn()}
 			/>,
@@ -43,6 +44,7 @@ describe("StartWithDesignModal", () => {
 		render(
 			<StartWithDesignModal
 				open={true}
+				scrapeSources={[]}
 				onOpenChange={vi.fn()}
 				onApply={onApply}
 			/>,
@@ -67,6 +69,7 @@ describe("StartWithDesignModal", () => {
 		render(
 			<StartWithDesignModal
 				open={true}
+				scrapeSources={[]}
 				onOpenChange={onOpenChange}
 				onApply={onApply}
 			/>,
@@ -93,6 +96,7 @@ describe("StartWithDesignModal", () => {
 		render(
 			<StartWithDesignModal
 				open={true}
+				scrapeSources={[]}
 				onOpenChange={vi.fn()}
 				onApply={vi.fn()}
 			/>,
@@ -116,6 +120,7 @@ describe("StartWithDesignModal", () => {
 		render(
 			<StartWithDesignModal
 				open={true}
+				scrapeSources={[]}
 				onOpenChange={onOpenChange}
 				onApply={onApply}
 			/>,
@@ -144,6 +149,7 @@ describe("StartWithDesignModal", () => {
 			<StartWithDesignModal
 				open={true}
 				initialReference={initialRef}
+				scrapeSources={[]}
 				onOpenChange={vi.fn()}
 				onApply={vi.fn()}
 			/>,
@@ -154,5 +160,42 @@ describe("StartWithDesignModal", () => {
 		) as HTMLTextAreaElement;
 		expect(textarea.value).toBe(initialRef.designMd);
 		expect(screen.getByText("saved-logo.png")).toBeDefined();
+	});
+
+	it("applies a stored VibeScrape source by reference, never by pasting its text", async () => {
+		const onApply = vi.fn().mockResolvedValue(undefined);
+		const onOpenChange = vi.fn();
+
+		render(
+			<StartWithDesignModal
+				open={true}
+				scrapeSources={[
+					{
+						id: "scrape-9",
+						title: "Tokopedia",
+						domain: "tokopedia.com",
+						sourceUrl: "https://tokopedia.com",
+					},
+				]}
+				onOpenChange={onOpenChange}
+				onApply={onApply}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Gunakan" }));
+		await waitFor(() => {
+			expect(screen.getByText(/DESIGN.md dari/)).toBeDefined();
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Gunakan desain ini" }));
+
+		await waitFor(() => {
+			expect(onApply).toHaveBeenCalledTimes(1);
+		});
+		expect(onApply.mock.calls[0][0]).toEqual({
+			designMd: "",
+			logo: null,
+			designReference: { kind: "scrape", id: "scrape-9" },
+		});
+		expect(onOpenChange).toHaveBeenCalledWith(false);
 	});
 });

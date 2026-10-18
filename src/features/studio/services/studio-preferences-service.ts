@@ -37,7 +37,11 @@ export async function updateStudioPreferences(
 	const hasReference =
 		input.designReference !== undefined || input.designMd !== undefined;
 	const resolved = hasReference
-		? resolveStudioDesignReference(input.designReference, input.designMd)
+		? await resolveStudioDesignReference(
+				input.designReference,
+				input.designMd,
+				userId,
+			)
 		: undefined;
 	const skillId =
 		input.designSkillId === undefined

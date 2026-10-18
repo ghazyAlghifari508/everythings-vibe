@@ -14,6 +14,7 @@ function renderDialog(
 ) {
 	const onSelectTheme = vi.fn();
 	const onSelectCustom = vi.fn();
+	const onSelectScrape = vi.fn();
 	const onClear = vi.fn();
 	const onOpenChange = vi.fn();
 	render(
@@ -21,14 +22,23 @@ function renderDialog(
 			open
 			onOpenChange={onOpenChange}
 			selectedThemeId={null}
+			selectedScrapeId={null}
 			customFilename={null}
+			scrapeSources={[]}
 			onSelectTheme={onSelectTheme}
 			onSelectCustom={onSelectCustom}
+			onSelectScrape={onSelectScrape}
 			onClear={onClear}
 			{...overrides}
 		/>,
 	);
-	return { onSelectTheme, onSelectCustom, onClear, onOpenChange };
+	return {
+		onSelectTheme,
+		onSelectCustom,
+		onSelectScrape,
+		onClear,
+		onOpenChange,
+	};
 }
 
 describe("StudioDesignPickerDialog", () => {
@@ -157,6 +167,36 @@ describe("StudioDesignPickerDialog", () => {
 		expect(centeredContainer).not.toBeNull();
 		expect(centeredContainer.className).toContain("mx-auto");
 		expect(centeredContainer.className).toContain("max-w-4xl");
+	});
+
+	it("offers stored VibeScrape design documents on the Punya Saya tab", () => {
+		const { onSelectScrape, onOpenChange } = renderDialog({
+			scrapeSources: [
+				{
+					id: "scrape-9",
+					title: "Tokopedia",
+					domain: "tokopedia.com",
+					sourceUrl: "https://tokopedia.com",
+				},
+			],
+		});
+		fireEvent.click(screen.getByRole("tab", { name: "Punya Saya" }));
+		expect(screen.getByText("https://tokopedia.com")).toBeDefined();
+		fireEvent.click(screen.getByRole("button", { name: "Gunakan" }));
+		expect(onSelectScrape).toHaveBeenCalledWith({
+			id: "scrape-9",
+			title: "Tokopedia",
+			domain: "tokopedia.com",
+			sourceUrl: "https://tokopedia.com",
+		});
+		expect(onOpenChange).toHaveBeenCalledWith(false);
+	});
+
+	it("tells the operator when no VibeScrape result can be used yet", () => {
+		renderDialog();
+		fireEvent.click(screen.getByRole("tab", { name: "Punya Saya" }));
+		expect(screen.getByText(/Belum ada hasil VibeScrape/)).toBeDefined();
+		expect(screen.queryByRole("button", { name: "Gunakan" })).toBeNull();
 	});
 
 	it("keeps tabs compact and supports keyboard arrow navigation", () => {

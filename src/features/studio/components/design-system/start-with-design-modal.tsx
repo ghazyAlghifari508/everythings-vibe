@@ -3,19 +3,22 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Check, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import { StudioDesignLogoSection } from "@/features/studio/components/design-system/studio-design-logo-section";
 import { StudioDesignMdSection } from "@/features/studio/components/design-system/studio-design-md-section";
+import { StudioScrapeDesignSources } from "@/features/studio/components/design-system/studio-scrape-design-sources";
 import { validateStudioDesignMd } from "@/features/studio/services/studio-prompt-validation";
 import type {
 	AttachedDesignReference,
 	AttachedLogo,
 } from "@/features/studio/types/studio";
-import { STUDIO_LOGO_MAX_BYTES } from "@/lib/constants";
+import { STUDIO_LOGO_MAX_BYTES } from "@/features/studio/types/studio-constants";
 
 export interface StartWithDesignModalProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	initialReference?: AttachedDesignReference | null;
+	scrapeSources: ScrapeDesignSource[];
 	onApply: (reference: AttachedDesignReference) => Promise<void> | void;
 }
 
@@ -23,10 +26,13 @@ export function StartWithDesignModal({
 	open,
 	onOpenChange,
 	initialReference,
+	scrapeSources,
 	onApply,
 }: StartWithDesignModalProps) {
 	const [designMd, setDesignMd] = useState(initialReference?.designMd ?? "");
 	const [uploadedMdName, setUploadedMdName] = useState<string | null>(null);
+	const [scrapeSelection, setScrapeSelection] =
+		useState<ScrapeDesignSource | null>(null);
 	const [logo, setLogo] = useState<AttachedLogo | null>(
 		initialReference?.logo ?? null,
 	);
@@ -42,6 +48,7 @@ export function StartWithDesignModal({
 			setError(null);
 			setLogoError(null);
 			setUploadedMdName(null);
+			setScrapeSelection(null);
 		}
 	}, [open, initialReference]);
 
@@ -50,6 +57,7 @@ export function StartWithDesignModal({
 		setError(null);
 		const file = e.target.files?.[0];
 		if (!file) return;
+		setScrapeSelection(null);
 
 		if (
 			!file.name.toLowerCase().endsWith(".md") &&
@@ -156,6 +164,29 @@ export function StartWithDesignModal({
 		setError(null);
 		setLogoError(null);
 
+		// A VibeScrape result is applied by reference: the server resolves the
+		// stored DESIGN.md under ownership, so nothing is pasted or trusted here.
+		if (scrapeSelection) {
+			setApplying(true);
+			try {
+				await onApply({
+					designMd: "",
+					logo,
+					designReference: { kind: "scrape", id: scrapeSelection.id },
+				});
+				onOpenChange(false);
+			} catch (failure) {
+				setError(
+					failure instanceof Error
+						? failure.message
+						: "Gagal menyimpan referensi.",
+				);
+			} finally {
+				setApplying(false);
+			}
+			return;
+		}
+
 		const checked = validateStudioDesignMd(designMd);
 		if (!checked.ok) {
 			setError(checked.error);
@@ -213,11 +244,28 @@ export function StartWithDesignModal({
 
 					{/* Modal Body */}
 					<div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+						<StudioScrapeDesignSources
+							sources={scrapeSources}
+							selectedId={scrapeSelection?.id ?? null}
+							onSelect={(source) => {
+								setScrapeSelection(source);
+								setDesignMd("");
+								setUploadedMdName(null);
+								setError(null);
+							}}
+						/>
+
+						{/* Divider */}
+						<div className="border-t border-graphite" />
+
 						<StudioDesignMdSection
 							designMd={designMd}
 							uploadedMdName={uploadedMdName}
 							error={error}
-							onDesignMdChange={setDesignMd}
+							onDesignMdChange={(next) => {
+								setScrapeSelection(null);
+								setDesignMd(next);
+							}}
 							onErrorClear={() => setError(null)}
 							onFileUpload={handleMdFileUpload}
 						/>
@@ -236,7 +284,15 @@ export function StartWithDesignModal({
 					{/* Modal Footer */}
 					<div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-graphite bg-charcoal px-5 py-4 sm:px-6">
 						<div className="text-xs text-fog">
-							{designMd.trim() ? (
+							{scrapeSelection ? (
+								<span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+									<Check size={14} aria-hidden />
+									<span>
+										DESIGN.md dari{" "}
+										{scrapeSelection.title ?? scrapeSelection.domain}
+									</span>
+								</span>
+							) : designMd.trim() ? (
 								<span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
 									<Check size={14} aria-hidden />
 									<span>DESIGN.md terisi</span>

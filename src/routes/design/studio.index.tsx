@@ -27,7 +27,13 @@ export const Route = createFileRoute("/design/studio/")({
 });
 
 function StudioPage() {
-	const { history } = Route.useLoaderData();
+	const { history, scrapeSources } = Route.useLoaderData();
 	const search = Route.useSearch();
-	return <StudioLandingPage history={history} search={search} />;
+	return (
+		<StudioLandingPage
+			history={history}
+			scrapeSources={scrapeSources}
+			search={search}
+		/>
+	);
 }

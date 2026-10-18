@@ -5,6 +5,7 @@ import { useNavigate, useRouter } from "@tanstack/react-router";
 import { FolderOpen, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/ui/logo";
+import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import {
 	type LaunchComposerConfig,
 	StudioLaunchComposer,
@@ -35,6 +36,7 @@ import { useUIStore } from "@/store";
 /** A design reference staged on the landing screen, not yet sent. */
 export type StagedReference =
 	| { kind: "theme"; id: string; designMd: string }
+	| { kind: "scrape"; id: string; label: string }
 	| {
 			kind: "custom";
 			filename: string;
@@ -51,9 +53,11 @@ export type StagedReference =
  */
 export function StudioLandingPage({
 	history,
+	scrapeSources,
 	search,
 }: {
 	history: StudioHistoryItem[];
+	scrapeSources: ScrapeDesignSource[];
 	search: { prompt?: string; from?: string };
 }) {
 	const navigate = useNavigate();
@@ -156,12 +160,24 @@ export function StudioLandingPage({
 		textareaRef.current?.focus();
 	}
 
+	function handleSelectScrape(source: ScrapeDesignSource) {
+		setStagedReference({
+			kind: "scrape",
+			id: source.id,
+			label: source.title ?? source.domain,
+		});
+		setError("");
+		textareaRef.current?.focus();
+	}
+
 	const referenceLabel = stagedReference
 		? stagedReference.kind === "theme"
 			? (STUDIO_DESIGN_PRESETS.find(
 					(preset) => preset.id === stagedReference.id,
 				)?.name ?? "Tema")
-			: stagedReference.filename
+			: stagedReference.kind === "scrape"
+				? stagedReference.label
+				: stagedReference.filename
 		: null;
 
 	async function submit() {
@@ -185,9 +201,16 @@ export function StudioLandingPage({
 					designReference: stagedReference
 						? stagedReference.kind === "theme"
 							? { kind: "theme", id: stagedReference.id }
-							: { kind: "custom", filename: stagedReference.filename }
+							: stagedReference.kind === "scrape"
+								? { kind: "scrape", id: stagedReference.id }
+								: { kind: "custom", filename: stagedReference.filename }
 						: null,
-					designMd: stagedReference?.designMd ?? null,
+					// A scrape reference carries no document: the server reads the
+					// stored DESIGN.md for the caller.
+					designMd:
+						stagedReference && "designMd" in stagedReference
+							? stagedReference.designMd
+							: null,
 					prdAttachment: stagedPrd
 						? {
 								filename: stagedPrd.filename,
@@ -354,11 +377,16 @@ export function StudioLandingPage({
 				selectedThemeId={
 					stagedReference?.kind === "theme" ? stagedReference.id : null
 				}
+				selectedScrapeId={
+					stagedReference?.kind === "scrape" ? stagedReference.id : null
+				}
 				customFilename={
 					stagedReference?.kind === "custom" ? stagedReference.filename : null
 				}
+				scrapeSources={scrapeSources}
 				onSelectTheme={handleSelectTheme}
 				onSelectCustom={handleSelectCustom}
+				onSelectScrape={handleSelectScrape}
 				onClear={() => setStagedReference(null)}
 			/>
 		</div>

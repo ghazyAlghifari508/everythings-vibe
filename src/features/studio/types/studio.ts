@@ -4,6 +4,8 @@ import type {
 	StudioProjectRow,
 	StudioRevisionRow,
 } from "@/db/schema";
+import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
+import type { StudioDesignReference } from "@/features/studio/services/studio-generation-options";
 
 /**
  * A logo the operator attached as part of a design reference. `data` is base64
@@ -22,6 +24,9 @@ export interface AttachedLogo {
 export interface AttachedDesignReference {
 	designMd: string;
 	logo: AttachedLogo | null;
+	// Set when the DESIGN.md must be resolved server-side (a stored VibeScrape
+	// document) instead of being sent as text from the browser.
+	designReference?: StudioDesignReference | null;
 }
 
 /** One row of the Studio project history sidebar. */
@@ -42,4 +47,5 @@ export interface StudioDetailLoaderData {
 	logoUrl: string | null;
 	revisions: StudioRevisionRow[];
 	latest: StudioRevisionRow | null;
+	scrapeSources: ScrapeDesignSource[];
 }

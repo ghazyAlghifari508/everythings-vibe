@@ -9,7 +9,13 @@ export const loadStudioDetail = createServerFn({ method: "GET" })
 		const { getStudioProjectDetail } = await import(
 			"@/features/studio/services/studio-project-detail"
 		);
-		const detail = await getStudioProjectDetail(id, user.id);
+		const { listScrapeDesignSources } = await import(
+			"@/features/scrape/services/scrape-design-md-service"
+		);
+		const [detail, scrapeSources] = await Promise.all([
+			getStudioProjectDetail(id, user.id),
+			listScrapeDesignSources(user.id),
+		]);
 		return {
 			project: detail.project,
 			frames: detail.frames,
@@ -17,5 +23,6 @@ export const loadStudioDetail = createServerFn({ method: "GET" })
 			logoUrl: detail.logoUrl,
 			revisions: detail.revisions,
 			latest: detail.latest,
+			scrapeSources,
 		};
 	});

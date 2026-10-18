@@ -67,7 +67,17 @@ describe("StudioPage UI & Workflow", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockNavigate.mockReset();
-		mockUseLoaderData.mockReturnValue({ history: defaultHistory });
+		mockUseLoaderData.mockReturnValue({
+			history: defaultHistory,
+			scrapeSources: [
+				{
+					id: "scrape-1",
+					title: "Tokopedia",
+					domain: "tokopedia.com",
+					sourceUrl: "https://tokopedia.com",
+				},
+			],
+		});
 		mockUseSearch.mockReturnValue({});
 	});
 

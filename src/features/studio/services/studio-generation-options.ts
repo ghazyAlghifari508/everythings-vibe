@@ -3,7 +3,7 @@ import {
 	STUDIO_DESIGN_MD_MAX_CHARS,
 	STUDIO_PRD_MAX_CHARS,
 	STUDIO_PRD_MIN_CHARS,
-} from "@/lib/constants";
+} from "@/features/studio/types/studio-constants";
 import { validateStudioPrdFilename } from "./studio-prd-helpers";
 
 export const STUDIO_DEFAULT_PAGE_COUNT = 3;
@@ -38,6 +38,10 @@ export const studioDesignFilenameSchema = z
 export const studioDesignReferenceSchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("theme"), id: z.string().trim().min(1).max(100) }),
 	z.object({ kind: z.literal("custom"), filename: studioDesignFilenameSchema }),
+	z.object({
+		kind: z.literal("scrape"),
+		id: z.string().trim().min(1).max(200),
+	}),
 ]);
 export type StudioDesignReference = z.infer<typeof studioDesignReferenceSchema>;
 export const studioDesignReferenceMetadataSchema = z.discriminatedUnion(
@@ -55,6 +59,13 @@ export const studioDesignReferenceMetadataSchema = z.discriminatedUnion(
 			source: z.literal("upload"),
 			version: z.literal(1),
 			filename: studioDesignFilenameSchema,
+		}),
+		z.object({
+			kind: z.literal("scrape"),
+			id: z.string().min(1),
+			source: z.literal("vibescrape"),
+			version: z.literal(1),
+			sourceUrl: z.string().min(1),
 		}),
 	],
 );

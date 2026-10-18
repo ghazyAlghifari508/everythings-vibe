@@ -177,6 +177,7 @@ export function useStudioWorkspace(
 			return preset ? `${preset.name}` : null;
 		}
 		if (reference?.kind === "custom") return reference.filename;
+		if (reference?.kind === "scrape") return reference.sourceUrl;
 		if (project.designMd) return "Referensi desain";
 		return null;
 	}, [project.designReference, project.designMd]);
