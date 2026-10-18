@@ -18,6 +18,11 @@ const SCRAPE_PUBLIC_MODULES = new Set([
 const SERVER_ONLY_SPECIFIERS = /^(node:|pg$|playwright$)/;
 const SERVER_ONLY_PATHS = /[\\/]db[\\/]|\.server\.ts$/;
 
+// The generated routing table references every route and therefore every
+// feature by construction, so a chain through it proves nothing about which
+// domain depends on which.
+const GENERATED_ROUTE_TABLE = join(sourceRoot, "routeTree.gen.ts");
+
 function sourceFiles(directory: string): string[] {
 	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
 		const path = join(directory, entry.name);
@@ -30,11 +35,12 @@ function sourceFiles(directory: string): string[] {
 }
 
 function resolveSource(specifier: string, importer: string) {
-	const path = specifier.startsWith("@/")
-		? join(sourceRoot, specifier.slice(2))
-		: specifier.startsWith(".")
-			? resolve(dirname(importer), specifier)
-			: null;
+	const path =
+		specifier.startsWith("@/") || specifier.startsWith("#/")
+			? join(sourceRoot, specifier.slice(2))
+			: specifier.startsWith(".")
+				? resolve(dirname(importer), specifier)
+				: null;
 	return path
 		? [path, `${path}.ts`, `${path}.tsx`, join(path, "index.ts")].find(
 				(candidate) => existsSync(candidate) && /\.tsx?$/.test(candidate),
@@ -49,7 +55,7 @@ function runtimeImports(path: string) {
 		ts.ScriptTarget.Latest,
 		true,
 	);
-	return source.statements.flatMap((statement) => {
+	const specifiers = source.statements.flatMap((statement) => {
 		if (
 			(!ts.isImportDeclaration(statement) &&
 				!ts.isExportDeclaration(statement)) ||
@@ -77,6 +83,22 @@ function runtimeImports(path: string) {
 			return [];
 		return [statement.moduleSpecifier.text];
 	});
+	// Lazy `import("...")` and `require("...")` are runtime edges that a scan of
+	// top-level declarations would miss; only string-literal specifiers resolve.
+	const walk = (node: ts.Node) => {
+		if (ts.isCallExpression(node) && node.arguments.length === 1) {
+			const [argument] = node.arguments;
+			const callee = node.expression;
+			const loadsModule =
+				callee.kind === ts.SyntaxKind.ImportKeyword ||
+				(ts.isIdentifier(callee) && callee.text === "require");
+			if (loadsModule && argument && ts.isStringLiteral(argument))
+				specifiers.push(argument.text);
+		}
+		ts.forEachChild(node, walk);
+	};
+	walk(source);
+	return specifiers;
 }
 
 function moduleEdges(path: string) {
@@ -137,7 +159,11 @@ function scanRuntimeGraph(roots: string[], rules: ScanRules): string[] {
 		for (const { specifier, resolved } of moduleEdges(path)) {
 			if (rules.violation(specifier, resolved))
 				violations.push([...chain, path, specifier].join(" -> "));
-			else if (resolved && !rules.boundary?.(resolved))
+			else if (
+				resolved &&
+				resolved !== GENERATED_ROUTE_TABLE &&
+				!rules.boundary?.(resolved)
+			)
 				visit(resolved, [...chain, path]);
 		}
 	}
