@@ -25,6 +25,8 @@
   "dependencies": {
     "@ai-sdk/openai": "^4.0.20",
     "@heroui/react": "^3.2.6",
+    "@hugeicons/core-free-icons": "^4.3.5",
+    "@hugeicons/react": "^1.1.10",
     "@icons-pack/react-simple-icons": "^13.13.0",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
