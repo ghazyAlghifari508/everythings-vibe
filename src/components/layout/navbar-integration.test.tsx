@@ -249,6 +249,21 @@ describe("Navbar Rebranding & Layout", () => {
 				destination,
 			);
 		}
+		fireEvent.click(screen.getByRole("button", { name: "Toggle menu" }));
+		for (const [name, destination] of [
+			["VibePlan", "/plan"],
+			["VibeDesign Studio", "/design/studio"],
+			["VibeScrape", "/scrape"],
+			["VibeTemplate", "/templates"],
+		]) {
+			const links = screen.getAllByRole("link", { name });
+			expect(links.map((link) => link.getAttribute("href"))).toEqual([
+				destination,
+				destination,
+			]);
+		}
+		fireEvent.click(screen.getAllByRole("link", { name: "VibeScrape" })[1]);
+		expect(screen.getAllByRole("link", { name: "VibeScrape" })).toHaveLength(1);
 	});
 
 	it("renders hamburger menu button for history drawer on home", () => {

@@ -11,7 +11,7 @@ import { parseHistoryHref, resolveHistoryUrl } from "@/lib/flow-progress";
 import { type HistoryItem, loadHistory } from "@/lib/history";
 import { cn } from "@/lib/utils";
 
-export type DrawerCategory = "plan" | "design" | "scrap";
+export type DrawerCategory = "plan";
 
 export interface DrawerHistoryItem {
 	id: string;
@@ -20,16 +20,11 @@ export interface DrawerHistoryItem {
 	updatedAt: Date;
 	url: string;
 	step?: string | null;
-	/** AI-written project summary, present only once a PRD has been generated. */
 	preview?: string | null;
 	acStatus?: string | null;
 	taskStatus?: string | null;
 }
 
-/**
- * A server function serializes timestamps to strings across the wire, so the
- * drawer narrows the transport shape instead of assuming an in-process Date.
- */
 interface WireHistoryItem extends Omit<HistoryItem, "updatedAt"> {
 	updatedAt: Date | string;
 }
@@ -38,8 +33,6 @@ type CategoryFilter = "all" | DrawerCategory;
 
 const CATEGORY_LABEL: Record<DrawerCategory, string> = {
 	plan: "VibePlan",
-	design: "VibeDesign",
-	scrap: "VibeScrape",
 };
 
 const CATEGORY_FILTERS: ReadonlyArray<{
@@ -48,17 +41,11 @@ const CATEGORY_FILTERS: ReadonlyArray<{
 }> = [
 	{ value: "all", label: "Semua" },
 	{ value: "plan", label: CATEGORY_LABEL.plan },
-	{ value: "design", label: CATEGORY_LABEL.design },
-	{ value: "scrap", label: CATEGORY_LABEL.scrap },
 ];
 
-// Categories with no rows in Phase 1 get their own honest copy, so a real
-// filter that matches nothing never looks like a loading failure.
 const EMPTY_STATE_BY_FILTER: Record<CategoryFilter, string> = {
 	all: "Belum ada riwayat projek.",
 	plan: "Belum ada VibePlan tersimpan.",
-	design: "Belum ada desain tersimpan.",
-	scrap: "Belum ada hasil VibeScrape.",
 };
 
 const NO_MATCH_MESSAGE = "Tidak ada proyek yang cocok dengan pencarian.";
@@ -76,16 +63,8 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const RELATIVE_WINDOW_MS = 7 * DAY_MS;
 
-/** Key segment for a drawer opened before any session has resolved. */
 const ANONYMOUS_VIEWER = "anonymous";
 
-/**
- * Why the history read failed, in the terms the user can act on. A retry only
- * helps a transport/server failure: a lost session needs a sign-in, and a
- * blocked account needs an admin. Matches the `"Unauthorized"` / `"Forbidden"`
- * that `requireUser` throws, the same way every guarded route in this app
- * detects them.
- */
 type HistoryFailure = "session" | "blocked" | "server";
 
 function classifyHistoryFailure(error: unknown): HistoryFailure {
@@ -99,8 +78,6 @@ export function toDrawerItems(items: WireHistoryItem[]): DrawerHistoryItem[] {
 	return items.map((item) => ({
 		id: item.id,
 		name: item.name,
-		// Phase 1 has exactly one real history category. Mapping a project to
-		// anything else would render a filter that matches fake rows.
 		type: "plan",
 		updatedAt:
 			item.updatedAt instanceof Date
@@ -134,10 +111,7 @@ function formatRelativeTime(value: Date): string {
 	return DAY_FORMAT.format(value);
 }
 
-// `step` only records the furthest stage reached (it defaults to "prd" at
-// creation), so it can never imply a PRD is still pending. The one real
-// per-project signal is `preview`: projects.description is written
-// fire-and-forget after PRD generate, so its presence means a PRD exists.
+// Stage alone does not prove generation completed; preview and statuses do.
 function describeStatus(item: DrawerHistoryItem): string {
 	switch (item.step) {
 		case "question":
@@ -161,30 +135,9 @@ function describeStatus(item: DrawerHistoryItem): string {
 	}
 }
 
-function badgeClass(type: DrawerCategory): string {
-	switch (type) {
-		case "plan":
-			return "border-indigo/30 bg-indigo/15 text-indigo";
-		case "design":
-			return "border-cyan/30 bg-cyan/15 text-cyan";
-		case "scrap":
-			return "border-emerald/30 bg-emerald/15 text-emerald";
-	}
-}
-
-function labelFor(type: DrawerCategory): string {
-	return CATEGORY_LABEL[type];
-}
-
 interface HistoryDrawerProps {
 	isOpen: boolean;
 	onClose: () => void;
-	/**
-	 * Test-only injection that bypasses the query. Production never sets it,
-	 * so the lazy `useQuery` stays the single real data path. `items` is
-	 * required inside the object, which makes "loading with no items" — the
-	 * state where `isLoading` used to be silently ignored — unrepresentable.
-	 */
 	override?: { items: DrawerHistoryItem[]; isLoading?: boolean };
 }
 
@@ -198,13 +151,9 @@ export function HistoryDrawer({
 	const navigate = useNavigate();
 	const { data: session } = authClient.useSession();
 
-	// Scope the cache to the signed-in user. This client cache outlives
-	// signOut(), so a global key would hand the next session on this tab the
-	// previous user's project names and AI summaries.
+	// The client cache outlives signOut(), so every viewer needs a separate key.
 	const viewerId = session?.user?.id ?? ANONYMOUS_VIEWER;
 
-	// `enabled: isOpen` is what keeps the history query off every unrelated
-	// page view; the override path must not fetch either.
 	const historyQuery = useQuery({
 		queryKey: ["drawer-history", viewerId],
 		queryFn: () => loadHistory(),
@@ -212,8 +161,6 @@ export function HistoryDrawer({
 		staleTime: 30_000,
 	});
 
-	// Mapped inside its own memo: the filtered list below compares by
-	// reference, and rebuilding the array each render defeated it.
 	const remoteItems = useMemo(
 		() => (historyQuery.data ? toDrawerItems(historyQuery.data.items) : []),
 		[historyQuery.data],
@@ -223,10 +170,7 @@ export function HistoryDrawer({
 	const loading = override
 		? (override.isLoading ?? false)
 		: isOpen && historyQuery.isLoading;
-	// `isError` alone also goes true when a background refetch fails over rows
-	// that already loaded. Replacing that list with the error panel made one
-	// panel assert three contradictory things at once, so the failure state is
-	// gated on the absence of data.
+	// A failed background refetch must not replace an already-loaded list.
 	const failed =
 		!override && historyQuery.isError && historyQuery.data === undefined;
 	const staleAfterFailure =
@@ -260,17 +204,7 @@ export function HistoryDrawer({
 				if (!open) onClose();
 			}}
 		>
-			{/*
-			 * No forceMount anywhere below. It keeps Radix's Presence `present`
-			 * true forever, so RemoveScrollBar never unmounts (body keeps
-			 * data-scroll-locked plus an `overflow: hidden !important` sheet)
-			 * and hideOthers() never restores aria-hidden — both leak for the
-			 * whole session, on every route, because AppLayout always renders
-			 * this. The slide-out still plays: globals.css keys
-			 * drawer-content/drawer-overlay animations on [data-state], and
-			 * Presence holds the node until animationend, then unmounts it and
-			 * tears the side effects down.
-			 */}
+			{/* Do not forceMount: the closed drawer must release scroll and accessibility locks. */}
 			<DialogPrimitive.Portal>
 				<DialogPrimitive.Overlay className="drawer-overlay fixed inset-0 z-50 bg-black/60 data-[state=closed]:pointer-events-none" />
 				<DialogPrimitive.Content asChild>
@@ -281,7 +215,7 @@ export function HistoryDrawer({
 						className="drawer-content fixed inset-y-0 left-0 z-50 flex w-80 max-w-[85vw] flex-col border-r border-graphite bg-obsidian text-snow shadow-[var(--shadow-overlay)] outline-none data-[state=closed]:pointer-events-none md:w-96"
 					>
 						<DialogPrimitive.Description className="sr-only">
-							Riwayat projek, desain, dan hasil VibeScrape yang tersimpan.
+							Riwayat VibePlan dan pintasan ke Studio serta riwayat VibeScrape.
 						</DialogPrimitive.Description>
 
 						<header className="flex shrink-0 items-center justify-between border-b border-graphite px-5 py-4">
@@ -342,6 +276,20 @@ export function HistoryDrawer({
 										{filter.label}
 									</button>
 								))}
+								<Link
+									to="/design/studio"
+									onClick={onClose}
+									className="rounded-md px-2.5 py-1 font-mono text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo text-fog hover:bg-white/5 hover:text-snow"
+								>
+									VibeDesign Studio
+								</Link>
+								<Link
+									to="/scrape/history"
+									onClick={onClose}
+									className="rounded-md px-2.5 py-1 font-mono text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo text-fog hover:bg-white/5 hover:text-snow"
+								>
+									VibeScrape
+								</Link>
 							</fieldset>
 						</div>
 
@@ -410,10 +358,10 @@ export function HistoryDrawer({
 											<span
 												className={cn(
 													"shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase",
-													badgeClass(item.type),
+													"border-indigo/30 bg-indigo/15 text-indigo",
 												)}
 											>
-												{labelFor(item.type)}
+												{CATEGORY_LABEL[item.type]}
 											</span>
 											<span className="shrink-0 font-mono text-[10px] text-fog">
 												{formatRelativeTime(item.updatedAt)}
@@ -436,24 +384,13 @@ export function HistoryDrawer({
 									? "Riwayat tidak ditampilkan"
 									: `${visibleItems.length} ditampilkan`}
 							</span>
-							<div className="flex items-center gap-3">
-								{/* Shortcut into the standalone VibeScrape history; the merged feed
-								    itself stays on /history. */}
-								<Link
-									to="/scrape/history"
-									onClick={onClose}
-									className="font-mono text-[11px] text-fog underline-offset-2 transition-colors hover:text-snow hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									Riwayat VibeScrape →
-								</Link>
-								<Link
-									to="/history"
-									onClick={onClose}
-									className="font-mono text-[11px] text-fog underline-offset-2 transition-colors hover:text-snow hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									Semua History →
-								</Link>
-							</div>
+							<Link
+								to="/history"
+								onClick={onClose}
+								className="font-mono text-[11px] text-fog underline-offset-2 transition-colors hover:text-snow hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								Semua History →
+							</Link>
 						</footer>
 					</aside>
 				</DialogPrimitive.Content>

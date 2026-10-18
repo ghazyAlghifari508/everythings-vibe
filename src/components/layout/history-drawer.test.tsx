@@ -77,7 +77,7 @@ const mockItems = [
 	{
 		id: AIRBNB_ID,
 		name: "Airbnb Landing Scrap",
-		type: "scrap" as const,
+		type: "plan" as const,
 		updatedAt: new Date("2026-09-20T04:00:00.000Z"),
 		url: `/prd/${AIRBNB_ID}`,
 		step: "task",
@@ -155,16 +155,30 @@ afterEach(() => {
 });
 
 describe("HistoryDrawer rendering", () => {
-	it("renders the search input, all four category pills, and every item", () => {
+	it("keeps planning filters and links to the independent history surfaces", () => {
 		renderDrawer({});
 
 		expect(
 			screen.getByPlaceholderText("Cari riwayat, nama projek, atau desain..."),
 		).toBeDefined();
 
-		for (const label of ["Semua", "VibePlan", "VibeDesign", "VibeScrape"]) {
-			expect(filterPills().getByText(label)).toBeDefined();
-		}
+		expect(filterPills().getByRole("button", { name: "Semua" })).toBeDefined();
+		expect(
+			filterPills().getByRole("button", { name: "VibePlan" }),
+		).toBeDefined();
+		expect(
+			filterPills()
+				.getByRole("link", { name: "VibeDesign Studio" })
+				.getAttribute("href"),
+		).toBe("/design/studio");
+		expect(
+			filterPills()
+				.getByRole("link", { name: "VibeScrape" })
+				.getAttribute("href"),
+		).toBe("/scrape/history");
+		expect(
+			filterPills().queryByRole("button", { name: "VibeScrape" }),
+		).toBeNull();
 
 		expect(screen.getByText("E-Commerce SIMRS")).toBeDefined();
 		expect(screen.getByText("Airbnb Landing Scrap")).toBeDefined();
@@ -207,13 +221,13 @@ describe("HistoryDrawer filtering", () => {
 		expect(screen.queryByText("Airbnb Landing Scrap")).toBeNull();
 	});
 
-	it("narrows the list from a category pill", () => {
+	it("retains every planning record when selecting VibePlan", () => {
 		renderDrawer({});
 
 		fireEvent.click(filterPills().getByRole("button", { name: "VibePlan" }));
 
 		expect(screen.getByText("E-Commerce SIMRS")).toBeDefined();
-		expect(screen.queryByText("Airbnb Landing Scrap")).toBeNull();
+		expect(screen.getByText("Airbnb Landing Scrap")).toBeDefined();
 	});
 });
 
@@ -249,25 +263,12 @@ describe("HistoryDrawer empty states", () => {
 		expect(screen.getByText(/Belum ada riwayat projek/i)).toBeDefined();
 	});
 
-	// Phase 1 has no design/scrap tables, so the real query only ever yields
-	// plan rows. These pills must therefore report an honest empty result
-	// rather than a spinner or an invented row.
-	const phaseOneItems = [mockItems[0]];
-
-	it("reports an honest empty state for the VibeDesign category", () => {
-		renderDrawer({ override: { items: phaseOneItems } });
-
-		fireEvent.click(filterPills().getByRole("button", { name: "VibeDesign" }));
-
-		expect(screen.getByText("Belum ada desain tersimpan.")).toBeDefined();
-	});
-
-	it("reports an honest empty state for the VibeScrape category", () => {
-		renderDrawer({ override: { items: phaseOneItems } });
-
-		fireEvent.click(filterPills().getByRole("button", { name: "VibeScrape" }));
-
-		expect(screen.getByText("Belum ada hasil VibeScrape.")).toBeDefined();
+	it("keeps the scrape history accessible even with an empty planning feed", () => {
+		renderDrawer({ override: { items: [] } });
+		expect(
+			screen.getByRole("link", { name: "VibeScrape" }).getAttribute("href"),
+		).toBe("/scrape/history");
+		expect(loadHistorySpy).not.toHaveBeenCalled();
 	});
 });
 
@@ -461,7 +462,8 @@ describe("HistoryDrawer item navigation", () => {
 	it("opens the existing scrape history and closes without creating a second feed", () => {
 		const onClose = vi.fn();
 		renderDrawer({ onClose });
-		const shortcut = screen.getByRole("link", { name: /Riwayat VibeScrape/ });
+		const shortcut = screen.getByRole("link", { name: "VibeScrape" });
+		expect(screen.getAllByRole("link", { name: "VibeScrape" })).toHaveLength(1);
 		expect(shortcut.getAttribute("href")).toBe("/scrape/history");
 		fireEvent.click(shortcut);
 		expect(onClose).toHaveBeenCalledTimes(1);
