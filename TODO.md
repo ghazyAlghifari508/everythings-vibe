@@ -930,10 +930,10 @@ Pemisahan fitur tidak menghilangkan sinergi. VibeDesign Studio tetap dapat meman
   - [x] Buat rute baru: `src/routes/scrape/index.tsx`, `src/routes/scrape/$id.tsx`, dan `src/routes/scrape/history.tsx`.
   - [x] Ubah file rute lama `src/routes/design/scrap.*.tsx` menjadi thin redirect ke rute `/scrape/*`.
   - [x] Jalankan `pnpm generate-routes` untuk meregenerasi route tree TanStack Router.
-- [ ] **Fase 6 — Pemindahan Test Suites:**
-  - [ ] Pindahkan seluruh file test scraping (`-scrap.*.test.tsx`, `scrape-*.test.ts`) keluar dari `src/routes/` dan `src/lib/` ke dalam `src/features/scrape/tests/`.
-- [ ] **Fase 7 — Integrasi Bersih VibeDesign Studio:**
-  - [ ] Pastikan komponen studio di `src/features/studio/` hanya memanggil DTO/service publik dari `src/features/scrape/` tanpa circular dependency.
+- [x] **Fase 6 — Pemindahan Test Suites:**
+  - [x] Pindahkan seluruh file test scraping (`-scrap.*.test.tsx`, `scrape-*.test.ts`) keluar dari `src/routes/` dan `src/lib/` ke dalam `src/features/scrape/tests/`.
+- [x] **Fase 7 — Integrasi Bersih VibeDesign Studio:**
+  - [x] Pastikan komponen studio di `src/features/studio/` hanya memanggil DTO/service publik dari `src/features/scrape/` tanpa circular dependency.
 - [ ] **Fase 8 — Verifikasi &amp; Test Passing:**
   - [ ] Jalankan `pnpm check`, `pnpm test`, dan verifikasi build hingga 100% green.
 
