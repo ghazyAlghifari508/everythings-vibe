@@ -498,7 +498,7 @@ describe("codebase detail incomplete sync handling", () => {
 
 describe("ask options repository grounding", () => {
 	const askOptionsSource = readFileSync(
-		"src/routes/api/ask/options.ts",
+		"src/features/greenfield/services/ask-options-route.server.ts",
 		"utf8",
 	);
 
@@ -662,7 +662,10 @@ describe("composer message routing without intent choice", () => {
 			"src/features/codebase/hooks/use-workspace-composer.ts",
 			"utf8",
 		);
-	const chatSource = readFileSync("src/routes/api/chat.ts", "utf8");
+	const chatSource = readFileSync(
+		"src/features/greenfield/services/prd-chat-context.server.ts",
+		"utf8",
+	);
 
 	it("routes a message by workspace state instead of a per-message choice", () => {
 		// No persistent intent card, no radio gate, no inferred choice.
@@ -707,7 +710,7 @@ describe("composer message routing without intent choice", () => {
 		// The lock still blocks a silent revision, and only an explicit
 		// confirmation lifts it for that request.
 		expect(chatSource).toMatch(
-			/isPrdLocked\(projCheck\?\.step\) && !confirmedImpact/,
+			/mode === "revise"[\s\S]*isPrdLocked\(project\.step\)[\s\S]*!input\.confirmedImpact/,
 		);
 		expect(chatSource).toContain("confirmedImpact");
 		expect(workspaceSource).toContain("confirmedImpact: true");

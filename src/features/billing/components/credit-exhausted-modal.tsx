@@ -9,11 +9,11 @@ import {
 	X,
 } from "lucide-react";
 import * as React from "react";
-import { PricingComponent } from "@/components/ui/pricing-card";
+import { PricingComponent } from "@/features/billing/components/pricing-card";
+import { prdFyPlans } from "@/features/billing/data/pricing-data";
+import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
-import { useUserPlan } from "@/hooks/use-user-plan";
 import { TOPUP_PACKAGES, type TopUpPackage } from "@/lib/constants";
-import { prdFyPlans } from "@/lib/pricing-data";
 import { saveResumeIntent } from "@/lib/prompt-handoff";
 import { cn, formatDate } from "@/lib/utils";
 import { useUIStore } from "@/store";

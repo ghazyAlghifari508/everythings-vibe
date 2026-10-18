@@ -1,0 +1,246 @@
+// Server-only POST body for `/api/projects` (project creation from the Home
+// prompt). One handler covers all three creation paths: greenfield,
+// repository-first (`codebaseId`), and repository sync (legacy mode).
+import { and, eq, isNull } from "drizzle-orm";
+import { db } from "@/db";
+import { codebaseSyncSessions, codebases, projects } from "@/db/schema";
+import { saveAskHandoff } from "@/features/codebase/services/generation-context";
+import {
+	buildSyncCommand,
+	type ExistingCodebaseProjectMode,
+	existingCodebaseProjectModeSchema,
+	type SyncPromptPayload,
+} from "@/features/codebase/services/sync";
+import {
+	generateSyncToken,
+	hashSyncToken,
+} from "@/features/codebase/services/sync.server";
+import { deriveProjectNameSync } from "@/features/greenfield/services/prd-naming";
+import {
+	CODEBASE_CLI_MIN_VERSION,
+	CODEBASE_SYNC_SESSION_EXPIRY_MS,
+} from "@/lib/constants";
+import { normalizeLanguage } from "@/lib/language";
+import { requireUser } from "@/lib/session";
+
+// Project mode validation for Home creation. A missing mode defaults to
+// greenfield so legacy clients keep byte-identical behavior; any other
+// non-member value is rejected (unit-tested in feature/tests/project-mode.test.ts).
+export function parseProjectModeInput(
+	value: unknown,
+): ExistingCodebaseProjectMode {
+	if (value === undefined || value === null) return "greenfield";
+	const parsed = existingCodebaseProjectModeSchema.safeParse(value);
+	if (!parsed.success) throw new Error("INVALID_PROJECT_MODE");
+	return parsed.data;
+}
+
+export async function handleProjectCreateRequest(
+	request: Request,
+): Promise<Response> {
+	let user: { id: string };
+	try {
+		user = await requireUser(request.headers);
+	} catch {
+		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	}
+	const body = await request.json().catch(() => null);
+	const message = body?.message;
+	const language = normalizeLanguage(body?.language);
+
+	if (!message || typeof message !== "string" || message.length < 3) {
+		return Response.json(
+			{ error: "Prompt harus diisi minimal 3 karakter" },
+			{ status: 400 },
+		);
+	}
+
+	let projectMode: ExistingCodebaseProjectMode;
+	try {
+		projectMode = parseProjectModeInput(body?.projectMode);
+	} catch {
+		return Response.json({ error: "Mode proyek tidak valid" }, { status: 400 });
+	}
+
+	const id = crypto.randomUUID();
+	// ponytail: sync regex-only name, skip AI call. chat.ts calls
+	// deriveProjectName (with AI) again inside the SSE stream, so the
+	// final name is AI-quality — user never sees the rough one.
+	const projectName = deriveProjectNameSync(message);
+	const platform =
+		body?.platform === "mobile" ||
+		(typeof message === "string" && message.includes("[Platform: Mobile App]"))
+			? "mobile"
+			: "web";
+	const codebaseId =
+		typeof body?.codebaseId === "string" ? body.codebaseId : null;
+
+	const initHandoff = async (projId: string) => {
+		try {
+			await saveAskHandoff(user.id, {
+				projectId: projId,
+				answers: [],
+				state: {
+					prompt: message,
+					platform,
+					session: 1,
+					questions: [],
+				},
+			});
+		} catch (e) {
+			console.error("Failed to initialize ask handoff:", e);
+		}
+	};
+
+	if (codebaseId) {
+		if (projectMode !== "existing_codebase") {
+			return Response.json(
+				{ error: "Mode proyek tidak valid" },
+				{ status: 400 },
+			);
+		}
+		const result = await db.transaction(async (tx) => {
+			const [lockedCodebase] = await tx
+				.select({
+					id: codebases.id,
+					onboardingProjectId: codebases.onboardingProjectId,
+				})
+				.from(codebases)
+				.where(and(eq(codebases.id, codebaseId), eq(codebases.userId, user.id)))
+				.for("update")
+				.limit(1);
+
+			if (!lockedCodebase) return { kind: "not_found" as const };
+
+			const [createdProject] = await tx
+				.insert(projects)
+				.values({
+					id,
+					userId: user.id,
+					name: projectName,
+					status: "draft",
+					mode: "ai_auto",
+					projectMode,
+					codebaseId: lockedCodebase.id,
+					language,
+				})
+				.returning({ id: projects.id, name: projects.name });
+			if (!createdProject) return { kind: "error" as const };
+
+			if (!lockedCodebase.onboardingProjectId) {
+				await tx
+					.update(codebases)
+					.set({
+						onboardingProjectId: createdProject.id,
+						updatedAt: new Date(),
+					})
+					.where(
+						and(
+							eq(codebases.id, lockedCodebase.id),
+							eq(codebases.userId, user.id),
+							isNull(codebases.onboardingProjectId),
+						),
+					);
+			}
+
+			return { kind: "ok" as const, project: createdProject };
+		});
+
+		if (result.kind === "not_found") {
+			return Response.json(
+				{ error: "Codebase tidak ditemukan" },
+				{ status: 404 },
+			);
+		}
+		if (result.kind === "error" || !result.project) {
+			return Response.json({ error: "Gagal membuat project" }, { status: 500 });
+		}
+		await initHandoff(result.project.id);
+		return Response.json({
+			id: result.project.id,
+			name: result.project.name,
+			projectMode,
+		});
+	}
+
+	if (projectMode === "greenfield") {
+		const [project] = await db
+			.insert(projects)
+			.values({
+				id,
+				userId: user.id,
+				name: projectName,
+				status: "draft",
+				mode: "ai_auto",
+				projectMode,
+				language,
+			})
+			.returning({ id: projects.id, name: projects.name });
+
+		if (!project)
+			return Response.json({ error: "Gagal membuat project" }, { status: 500 });
+		await initHandoff(project.id);
+		return Response.json({
+			id: project.id,
+			name: project.name,
+			projectMode,
+		});
+	}
+
+	// Existing-codebase: the project and its first short-lived sync
+	// session are created atomically. The raw credential is returned
+	// once inside the sync payload; only its hash is persisted.
+	const rawCredential = generateSyncToken();
+	const expiresAt = new Date(Date.now() + CODEBASE_SYNC_SESSION_EXPIRY_MS);
+	const created = await db.transaction(async (tx) => {
+		const [project] = await tx
+			.insert(projects)
+			.values({
+				id,
+				userId: user.id,
+				name: projectName,
+				status: "draft",
+				mode: "ai_auto",
+				projectMode,
+				language,
+			})
+			.returning({ id: projects.id, name: projects.name });
+		if (!project) return null;
+		const [session] = await tx
+			.insert(codebaseSyncSessions)
+			.values({
+				id: crypto.randomUUID(),
+				projectId: id,
+				userId: user.id,
+				credentialHash: hashSyncToken(rawCredential),
+				status: "waiting_for_cli",
+				expiresAt,
+				cliMinVersion: CODEBASE_CLI_MIN_VERSION,
+				attempt: 1,
+			})
+			.returning({
+				expiresAt: codebaseSyncSessions.expiresAt,
+				cliMinVersion: codebaseSyncSessions.cliMinVersion,
+			});
+		if (!session) return null;
+		return { project, session };
+	});
+
+	if (!created)
+		return Response.json({ error: "Gagal membuat project" }, { status: 500 });
+	await initHandoff(created.project.id);
+	const sync: SyncPromptPayload = {
+		projectId: id,
+		apiBaseUrl: new URL(request.url).origin,
+		syncToken: rawCredential,
+		cliMinVersion: created.session.cliMinVersion,
+		syncCommand: buildSyncCommand(id),
+		expiresAt: created.session.expiresAt.toISOString(),
+	};
+	return Response.json({
+		id: created.project.id,
+		name: created.project.name,
+		projectMode,
+		sync,
+	});
+}

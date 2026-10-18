@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { stepRank } from "@/features/greenfield/utils/flow-step";
 import {
 	advanceStep,
 	isPrdLocked,
@@ -7,7 +8,6 @@ import {
 	parseHistoryHref,
 	resolveHistoryUrl,
 	shouldMarkQuestionStep,
-	stepRank,
 } from "./flow-progress";
 
 describe("stepRank", () => {

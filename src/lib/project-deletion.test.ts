@@ -29,7 +29,10 @@ describe("deletionTimestamp", () => {
 });
 
 describe("project deletion contract", () => {
-	const source = readFileSync("src/routes/api/projects/$id.ts", "utf8");
+	const source = readFileSync(
+		"src/features/greenfield/services/project-delete.server.ts",
+		"utf8",
+	);
 
 	it("never deletes the append-only credit ledger", () => {
 		expect(source).not.toContain("delete(creditLedgerEntries)");
@@ -82,35 +85,32 @@ describe("project deletion contract", () => {
 describe("read paths exclude tombstoned projects", () => {
 	const files = [
 		"src/lib/history.ts",
-		"src/routes/prd/$id.tsx",
-		"src/routes/ac/$id.tsx",
-		"src/routes/task/$id.tsx",
-		"src/routes/kanban/$id.tsx",
-		"src/routes/ask/$id.tsx",
+		"src/features/greenfield/services/ask-loader.functions.ts",
+		"src/features/greenfield/services/prd-loader.functions.ts",
+		"src/features/greenfield/services/pipeline-loaders.functions.ts",
 		"src/features/codebase/services/workspace-loader.functions.ts",
 		"src/features/codebase/services/workspace-artifacts.functions.ts",
 		"src/routes/prd/share/$token.tsx",
 		"src/lib/api-key-auth.ts",
-		"src/routes/api/chat.ts",
-		"src/routes/api/ac/generate.ts",
-		"src/routes/api/task/generate.ts",
-		"src/routes/api/kanban/$pid.ts",
-		"src/routes/api/kanban/stream.ts",
-		"src/routes/api/kanban/update-status.ts",
-		"src/routes/api/task/$projectId.ts",
-		"src/routes/api/projects/$id/versions.ts",
-		"src/routes/api/projects/$id/step.ts",
-		"src/routes/api/projects/$id/last-route.ts",
-		"src/routes/api/ask/options.ts",
-		"src/routes/api/features/generate.ts",
+		"src/features/greenfield/services/prd-chat-context.server.ts",
+		"src/features/greenfield/services/generation-scope.server.ts",
+		// kanban/$pid.ts and task/$projectId.ts delegate their project boundary to
+		// verifyProjectOwnership (@/lib/api-key-auth, listed above) and their reads
+		// to the feature services below.
+		"src/features/greenfield/services/kanban-stream.server.ts",
+		"src/features/greenfield/services/kanban-update-status.server.ts",
+		"src/features/greenfield/services/project-history.ts",
+		"src/features/greenfield/services/project-progress.server.ts",
+		"src/features/greenfield/services/ask-options-route.server.ts",
+		"src/features/greenfield/services/feature-generate.server.ts",
 		"src/features/greenfield/services/feature-service.ts",
 		"src/routes/api/export/prd.ts",
 		"src/routes/api/export/zip.ts",
-		"src/routes/api/codebases/$codebaseId/status.ts",
-		"src/routes/api/codebases/$codebaseId.ts",
+		"src/features/codebase/services/sync-status.server.ts",
+		"src/features/codebase/services/library-item-route.server.ts",
 		"src/features/codebase/services/analysis-route-read.server.ts",
 		"src/features/codebase/services/analysis-route-trigger.server.ts",
-		"src/routes/api/v1/projects/$id/codebase/sync.ts",
+		"src/features/codebase/services/sync-handshake-project-route.server.ts",
 		"src/features/greenfield/services/chat-service.ts",
 		"src/features/greenfield/services/ac-service.ts",
 		"src/features/greenfield/services/prd-service.ts",

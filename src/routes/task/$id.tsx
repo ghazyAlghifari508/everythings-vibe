@@ -1,71 +1,8 @@
 import { createFileRoute, redirect, useLocation } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { and, eq, isNull } from "drizzle-orm";
 import { useEffect } from "react";
-import { db } from "@/db";
-import { type ProjectFeatureTree, projects } from "@/db/schema";
 import { TaskDetail } from "@/features/greenfield/components/task/task-detail";
 import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
-import { getLatestAcContent } from "@/features/greenfield/services/ac-service";
-import { getLatestPrdContent } from "@/features/greenfield/services/prd-service";
-import { getTaskTree } from "@/features/greenfield/services/task-service";
-import { requireUserServer } from "@/lib/session";
-
-// ponytail: server-only db logic - loader runs on client too, must not import db there.
-const loadTask = createServerFn({ method: "GET" })
-	.validator((id: string) => id)
-	.handler(async ({ data: id }) => {
-		const user = await requireUserServer();
-		const { getUserPlanAndQuota } = await import("@/lib/session");
-		const { hasFullWorkflow } = await import("@/lib/credits");
-		const { plan } = await getUserPlanAndQuota();
-		if (!hasFullWorkflow(plan)) {
-			throw redirect({
-				to: "/prd/$id",
-				params: { id },
-				search: { paywall: "task" },
-			});
-		}
-		const [project, prdContent, acContent, taskTree] = await Promise.all([
-			// ponytail: select only needed cols — name + statuses + SSOT featureTree.
-			// Avoids pulling description/shareToken/lastUrl on every Task page load.
-			db
-				.select({
-					id: projects.id,
-					name: projects.name,
-					taskStatus: projects.taskStatus,
-					step: projects.step,
-					featureTree: projects.featureTree,
-				})
-				.from(projects)
-				.where(
-					and(
-						eq(projects.id, id),
-						eq(projects.userId, user.id),
-						isNull(projects.deletedAt),
-					),
-				)
-				.limit(1),
-			getLatestPrdContent(id),
-			getLatestAcContent(id),
-			getTaskTree(id),
-		]);
-
-		if (!project[0]) throw new Error("NOT_FOUND");
-		const featureTree: ProjectFeatureTree | null =
-			project[0].featureTree ?? null;
-		return {
-			projectId: id,
-			projectName: project[0].name,
-			step: project[0].step ?? null,
-			taskTree,
-			featureTree,
-			hasAc: Boolean(acContent),
-			taskStatus: project[0].taskStatus,
-			latestPrdContent: prdContent ?? null,
-			latestAcContent: acContent ?? null,
-		};
-	});
+import { loadTask } from "@/features/greenfield/services/pipeline-loaders.functions";
 
 export const Route = createFileRoute("/task/$id")({
 	validateSearch: (

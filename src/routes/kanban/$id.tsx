@@ -1,54 +1,8 @@
 import { createFileRoute, redirect, useLocation } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { and, eq, isNull } from "drizzle-orm";
 import { useEffect } from "react";
-import { db } from "@/db";
-import { projects } from "@/db/schema";
 import { KanbanBoard } from "@/features/greenfield/components/kanban/kanban-board";
 import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
-import { getLatestAcContent } from "@/features/greenfield/services/ac-service";
-import { getLatestPrdContent } from "@/features/greenfield/services/prd-service";
-import { requireUserServer } from "@/lib/session";
-
-// ponytail: server-only db logic - loader runs on client too, must not import db there.
-const loadKanban = createServerFn({ method: "GET" })
-	.validator((id: string) => id)
-	.handler(async ({ data: id }) => {
-		const user = await requireUserServer();
-		const { getUserPlanAndQuota } = await import("@/lib/session");
-		const { hasFullWorkflow } = await import("@/lib/credits");
-		const { plan } = await getUserPlanAndQuota();
-		if (!hasFullWorkflow(plan)) {
-			throw redirect({
-				to: "/prd/$id",
-				params: { id },
-				search: { paywall: "kanban" },
-			});
-		}
-		const [project, prdContent, acContent] = await Promise.all([
-			db
-				.select({ id: projects.id, name: projects.name, step: projects.step })
-				.from(projects)
-				.where(
-					and(
-						eq(projects.id, id),
-						eq(projects.userId, user.id),
-						isNull(projects.deletedAt),
-					),
-				)
-				.limit(1),
-			getLatestPrdContent(id),
-			getLatestAcContent(id),
-		]);
-		if (!project[0]) throw new Error("NOT_FOUND");
-		return {
-			projectId: id,
-			projectName: project[0].name,
-			step: (project[0] as { step?: string | null }).step ?? null,
-			latestPrdContent: prdContent ?? null,
-			latestAcContent: acContent ?? null,
-		};
-	});
+import { loadKanban } from "@/features/greenfield/services/pipeline-loaders.functions";
 
 export const Route = createFileRoute("/kanban/$id")({
 	loader: async ({ params }) => {

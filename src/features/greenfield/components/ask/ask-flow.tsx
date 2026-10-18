@@ -19,6 +19,10 @@ import {
 } from "@/features/greenfield/hooks/use-ask-session";
 import { submitAskHandoff } from "@/features/greenfield/services/ask-handoff";
 import {
+	getFlowStepCta,
+	stepToRouteTarget,
+} from "@/features/greenfield/utils/flow-step";
+import {
 	BACKEND_OPTIONS,
 	DATABASE_OPTIONS,
 	DEPLOYMENT_MOBILE_OPTIONS,
@@ -28,7 +32,6 @@ import {
 	FULLSTACK_FRAMEWORK_OPTIONS,
 	FULLSTACK_MOBILE_OPTIONS,
 } from "@/features/greenfield/utils/stack-data";
-import { getFlowStepCta, stepToRouteTarget } from "@/lib/flow-step";
 import { useUIStore } from "@/store";
 import { type NonTechAnswer, QuestionCard } from "./question-card";
 import { StackDropdown } from "./stack-dropdown";

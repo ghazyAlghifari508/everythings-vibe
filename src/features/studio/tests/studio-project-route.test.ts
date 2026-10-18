@@ -1,0 +1,114 @@
+import { describe, expect, it, vi } from "vitest";
+import { GET, POST } from "@/routes/api/studio.project";
+
+const duplicate = vi.hoisted(() =>
+	vi.fn(async () => ({ id: "independent-project" })),
+);
+const remove = vi.hoisted(() =>
+	vi.fn(async (projectId: string) => ({ id: projectId })),
+);
+
+vi.mock("@/lib/session", () => ({
+	requireUser: async () => ({ id: "user-123", email: "test@example.com" }),
+}));
+
+vi.mock("@tanstack/react-start/server", () => ({
+	getRequestHeaders: () => new Headers(),
+}));
+
+vi.mock("@/features/studio/services/studio-project-lifecycle", () => ({
+	duplicateStudioProject: duplicate,
+	deleteStudioProject: remove,
+}));
+
+vi.mock("@/features/studio/services/studio-project-detail", () => ({
+	getStudioProjectDetail: async (id: string, _userId: string) => ({
+		project: { id, title: "Test Canvas", designMode: "mobile" },
+		frames: [
+			{
+				id: "f-1",
+				name: "Dashboard",
+				status: "ready",
+				order: 0,
+				htmlCode: "<html></html>",
+			},
+			{
+				id: "f-2",
+				name: "Transactions",
+				status: "generating",
+				order: 1,
+				htmlCode: null,
+			},
+		],
+		activeJob: { id: "job-1", status: "generating" },
+		logoUrl: null,
+		revisions: [],
+		latest: null,
+	}),
+}));
+
+describe("GET /api/studio/project", () => {
+	it("duplicates through the authenticated owner and returns the independent identifier", async () => {
+		const response = await POST({
+			request: new Request("https://app.test/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "duplicate",
+					projectId: "source-project",
+				}),
+			}),
+		});
+		expect(response.status).toBe(201);
+		expect(await response.json()).toEqual({ projectId: "independent-project" });
+		expect(duplicate).toHaveBeenCalledWith("source-project", "user-123");
+	});
+
+	it("deletes through the authenticated owner and reports the removed identifier", async () => {
+		const response = await POST({
+			request: new Request("https://app.test/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "delete",
+					projectId: "owned-project",
+				}),
+			}),
+		});
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({
+			deletedProjectId: "owned-project",
+		});
+		expect(remove).toHaveBeenCalledWith("owned-project", "user-123");
+	});
+
+	it("rejects a delete payload without a project id", async () => {
+		remove.mockClear();
+		const response = await POST({
+			request: new Request("https://app.test/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action: "delete" }),
+			}),
+		});
+		expect(response.status).toBe(400);
+		expect(remove).not.toHaveBeenCalled();
+	});
+
+	it("returns project detail with frames and active job", async () => {
+		const req = new Request("https://app.test/api/studio/project?id=proj-1");
+		const res = await GET({ request: req });
+		expect(res.status).toBe(200);
+		const data = await res.json();
+		expect(data.project.id).toBe("proj-1");
+		expect(data.frames).toHaveLength(2);
+		expect(data.frames[0].name).toBe("Dashboard");
+		expect(data.activeJob.status).toBe("generating");
+	});
+
+	it("returns 400 when id param is missing", async () => {
+		const req = new Request("https://app.test/api/studio/project");
+		const res = await GET({ request: req });
+		expect(res.status).toBe(400);
+	});
+});

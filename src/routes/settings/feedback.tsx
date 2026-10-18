@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { FeedbackForm } from "@/components/settings/feedback-form";
+import { FeedbackForm } from "@/features/auth-settings/components/settings/feedback-form";
 import { requireUserServer } from "@/lib/session";
 
 export const Route = createFileRoute("/settings/feedback")({

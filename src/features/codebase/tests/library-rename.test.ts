@@ -52,12 +52,12 @@ describe("codebase library page size", () => {
 
 describe("codebase rename route contract", () => {
 	const source = readFileSync(
-		"src/routes/api/codebases/$codebaseId.ts",
+		"src/features/codebase/services/library-item-route.server.ts",
 		"utf8",
 	);
 	const patchHandler = source.slice(
-		source.indexOf("PATCH: async"),
-		source.indexOf("DELETE: async"),
+		source.indexOf("export async function handleCodebaseRename"),
+		source.indexOf("export async function handleCodebaseDelete"),
 	);
 
 	it("exposes a PATCH handler on the codebase resource", () => {
@@ -86,7 +86,7 @@ describe("codebase rename route contract", () => {
 
 describe("codebase delete route contract", () => {
 	const source = readFileSync(
-		"src/routes/api/codebases/$codebaseId.ts",
+		"src/features/codebase/services/library-item-route.server.ts",
 		"utf8",
 	);
 

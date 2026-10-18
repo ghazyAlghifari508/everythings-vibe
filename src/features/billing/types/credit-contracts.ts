@@ -5,7 +5,7 @@ import type {
 	CreditOperationKind,
 	CreditOperationState,
 	CreditQuote,
-} from "@/lib/adaptive-credit";
+} from "@/features/billing/services/adaptive-credit";
 
 export {
 	type BuildAcMetricsInput,
@@ -18,7 +18,7 @@ export {
 	buildTaskMetrics,
 	formatInsufficientCreditsError,
 	formatSubscriptionPausedError,
-} from "@/lib/adaptive-credit";
+} from "@/features/billing/services/adaptive-credit";
 
 export interface CreditSubscription {
 	id: string;

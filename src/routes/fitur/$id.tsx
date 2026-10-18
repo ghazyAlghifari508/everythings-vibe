@@ -1,47 +1,8 @@
 import { createFileRoute, redirect, useLocation } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { and, eq, isNull } from "drizzle-orm";
 import { useEffect } from "react";
-import { db } from "@/db";
-import type { ProjectFeatureTree } from "@/db/schema";
-import { projects } from "@/db/schema";
 import { FiturDetail } from "@/features/greenfield/components/feature-tree/feature-tree-detail";
 import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
-import { requireUserServer } from "@/lib/session";
-
-// ponytail: server-only db logic - loader runs on client too, must not import db there.
-const loadFitur = createServerFn({ method: "GET" })
-	.validator((id: string) => id)
-	.handler(async ({ data: id }) => {
-		const user = await requireUserServer();
-		const [project] = await db
-			.select({
-				id: projects.id,
-				name: projects.name,
-				step: projects.step,
-				featuresStatus: projects.featuresStatus,
-				featureTree: projects.featureTree,
-			})
-			.from(projects)
-			.where(
-				and(
-					eq(projects.id, id),
-					eq(projects.userId, user.id),
-					isNull(projects.deletedAt),
-				),
-			)
-			.limit(1);
-
-		if (!project) throw new Error("NOT_FOUND");
-		const featureTree: ProjectFeatureTree | null = project.featureTree ?? null;
-		return {
-			projectId: id,
-			projectName: project.name,
-			step: project.step ?? null,
-			featuresStatus: project.featuresStatus ?? "pending",
-			featureTree,
-		};
-	});
+import { loadFitur } from "@/features/greenfield/services/pipeline-loaders.functions";
 
 export const Route = createFileRoute("/fitur/$id")({
 	loader: async ({ params }) => {

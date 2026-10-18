@@ -1,21 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
-import { ProfileForm } from "@/components/settings/profile-form";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { requireUserServer } from "@/lib/session";
-
-// ponytail: server-only db logic - loader runs on client too, must not import db there.
-const loadProfile = createServerFn({ method: "GET" }).handler(async () => {
-	const user = await requireUserServer();
-	const [profile] = await db
-		.select({ fullName: users.fullName, image: users.image, role: users.role })
-		.from(users)
-		.where(eq(users.id, user.id))
-		.limit(1);
-	return { profile, email: user.email };
-});
+import { ProfileForm } from "@/features/auth-settings/components/settings/profile-form";
+import { loadProfile } from "@/features/auth-settings/services/settings-loaders.functions";
 
 export const Route = createFileRoute("/settings/profile")({
 	loader: async () => {

@@ -31,7 +31,7 @@ describe("ensureConversation contract", () => {
 describe("chat route contract", () => {
 	it("maps ownership failures on the eager generate path to 403", async () => {
 		const source = await readFile(
-			new URL("../../../routes/api/chat.ts", import.meta.url),
+			new URL("../services/prd-chat-route.server.ts", import.meta.url),
 			"utf8",
 		);
 		const errorIndex = source.indexOf(

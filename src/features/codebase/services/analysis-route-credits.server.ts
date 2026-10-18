@@ -10,7 +10,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { codebaseAnalyses, subscriptions } from "@/db/schema";
-import { resolveSubscriptionState } from "@/lib/billing";
+import { resolveSubscriptionState } from "@/features/billing/services/billing";
 import type { CreditOperationResult } from "@/lib/services/credit-service";
 import {
 	buildCodebaseMetrics,

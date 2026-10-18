@@ -1,90 +1,8 @@
 import { createFileRoute, redirect, useLocation } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { useEffect } from "react";
-import { db } from "@/db";
-import { conversations, messages, prdVersions, projects } from "@/db/schema";
 import { PrdDetail } from "@/features/greenfield/components/prd/prd-detail";
 import { useLastRoute } from "@/features/greenfield/hooks/use-last-route";
-import { getUserPlanAndQuota, requireUserServer } from "@/lib/session";
-
-// ponytail: requireUserServer is a server fn → its auth/db imports get pruned
-// from the client bundle. Plain `requireUser` would drag pg (→ Buffer) in.
-const loadPrd = createServerFn({ method: "GET" })
-	.validator((id: string) => id)
-	.handler(async ({ data: id }) => {
-		const user = await requireUserServer();
-		const { plan, quota } = await getUserPlanAndQuota();
-
-		const [projectRows, versionRows, convRows] = await Promise.all([
-			db
-				.select({ id: projects.id, name: projects.name, step: projects.step })
-				.from(projects)
-				.where(
-					and(
-						eq(projects.id, id),
-						eq(projects.userId, user.id),
-						isNull(projects.deletedAt),
-					),
-				)
-				.limit(1),
-			db
-				.select({
-					id: prdVersions.id,
-					project_id: prdVersions.projectId,
-					version: prdVersions.version,
-					content: prdVersions.content,
-					change_summary: prdVersions.changeSummary,
-					created_at: prdVersions.createdAt,
-				})
-				.from(prdVersions)
-				.where(eq(prdVersions.projectId, id))
-				.orderBy(desc(prdVersions.version)),
-			db
-				.select({ id: conversations.id })
-				.from(conversations)
-				.where(eq(conversations.projectId, id))
-				.orderBy(desc(conversations.createdAt))
-				.limit(1),
-		]);
-
-		const project = projectRows[0];
-		if (!project) throw new Error("NOT_FOUND");
-
-		let initialMessages: Array<{
-			id: string;
-			role: string;
-			content: string;
-			created_at: string;
-		}> = [];
-		const conv = convRows[0];
-		if (conv) {
-			const msgs = await db
-				.select({
-					id: messages.id,
-					role: messages.role,
-					content: messages.content,
-					created_at: messages.createdAt,
-				})
-				.from(messages)
-				.where(eq(messages.conversationId, conv.id))
-				.orderBy(asc(messages.createdAt))
-				.limit(200);
-			initialMessages = msgs as never;
-		}
-
-		return {
-			projectId: id,
-			projectName: project.name,
-			step: (project as { step?: string | null }).step ?? null,
-			latestVersion: versionRows[0],
-			allVersions: versionRows,
-			conversationId: conv?.id,
-			plan,
-			revisionLimit: quota?.revisionLimit ?? undefined,
-			initialMessages,
-		};
-	});
+import { loadPrd } from "@/features/greenfield/services/prd-loader.functions";
 
 export const Route = createFileRoute("/prd/$id")({
 	validateSearch: (
@@ -146,8 +64,8 @@ function PrdPage() {
 			projectId={d.projectId}
 			projectName={d.projectName}
 			step={d.step}
-			latestVersion={d.latestVersion as never}
-			allVersions={d.allVersions as never}
+			latestVersion={d.latestVersion}
+			allVersions={d.allVersions}
 			conversationId={d.conversationId}
 			plan={d.plan}
 			revisionLimit={d.revisionLimit}

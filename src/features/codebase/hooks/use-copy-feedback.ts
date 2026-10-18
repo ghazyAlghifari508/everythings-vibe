@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { copyToClipboard } from "@/lib/clipboard";
+import { copyToClipboard } from "@/features/codebase/utils/clipboard";
 
 /** How long a success or failure badge stays on screen before it clears. */
 const COPIED_FEEDBACK_MS = 2000;

@@ -1,6 +1,5 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import * as facade from "@/components/task/whiteboard-canvas";
 import {
 	BoardHandle,
 	DOT_BG_IMAGE,
@@ -14,6 +13,7 @@ import {
 	RootNode,
 } from "@/features/greenfield/components/whiteboard/canvas-node";
 import { WhiteboardCanvas } from "@/features/greenfield/components/whiteboard/whiteboard-canvas";
+import * as facade from "@/features/greenfield/components/whiteboard/whiteboard-canvas-facade";
 import {
 	FeatureIcon,
 	faseBadgeClass,

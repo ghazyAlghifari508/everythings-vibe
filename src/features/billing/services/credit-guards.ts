@@ -1,3 +1,12 @@
+import {
+	ADAPTIVE_CREDIT_PRICING,
+	type CreditOperationKind,
+	type CreditOperationState,
+	type CreditQuote,
+	calculateFinalCreditCost,
+	estimateCreditQuote,
+	surcharge,
+} from "@/features/billing/services/adaptive-credit";
 import type {
 	CreditLedgerEntry,
 	CreditOperation,
@@ -10,15 +19,6 @@ import type {
 	SettleCreditOperationInput,
 } from "@/features/billing/types/credit-contracts";
 import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
-import {
-	ADAPTIVE_CREDIT_PRICING,
-	type CreditOperationKind,
-	type CreditOperationState,
-	type CreditQuote,
-	calculateFinalCreditCost,
-	estimateCreditQuote,
-	surcharge,
-} from "@/lib/adaptive-credit";
 
 export function now(): Date {
 	return new Date();

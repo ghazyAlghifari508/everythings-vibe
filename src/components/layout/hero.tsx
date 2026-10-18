@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ChatInput, type HomeProjectMode } from "./chat-input";
-import { CodebaseFeatureGallery } from "./codebase-feature-gallery";
-import { TemplateGallery } from "./template-gallery";
+import {
+	ChatInput,
+	type HomeProjectMode,
+} from "@/components/layout/chat-input";
+import { CodebaseFeatureGallery } from "@/features/templates/components/codebase-feature-gallery";
+import { TemplateGallery } from "@/features/templates/components/template-gallery";
 
 export function HeroContent({
 	initialPrompt,

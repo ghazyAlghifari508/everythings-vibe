@@ -1,78 +1,25 @@
-import { stripSectionMarkers } from "@/features/greenfield/utils/revision-reply";
+import {
+	mergePrdRevision,
+	PRD_SECTION_NAMES,
+	type PrdSectionName,
+} from "@/features/greenfield/utils/prd-revision-merge";
 
 export const MIN_PROMPT_LENGTH = 20;
 
-export const ALL_PRD_SECTIONS = [
-	"Overview",
-	"Goals & Success Metrics",
-	"Requirements",
-	"Core Features",
-	"User Flow",
-	"Architecture & Tech Stack",
-	"Database Schema",
-	"Design & Technical Constraints",
-] as const;
+export type { PrdSectionName };
 
-export type PrdSectionName = (typeof ALL_PRD_SECTIONS)[number];
+export const ALL_PRD_SECTIONS = PRD_SECTION_NAMES;
 
 /**
  * Applies live section update patches (`:::UPDATE_SECTION[...]::: ... :::END_UPDATE:::`)
- * to a base PRD document. Supports strict (<!-- /SECTION -->) and lenient next-section boundaries.
+ * to a base PRD document, using the same merge the server persists with so the
+ * preview and the stored document cannot disagree.
  */
 export function livePatchPrd(
 	baseContent: string,
 	streamContent: string,
 ): string {
-	if (!baseContent) return streamContent;
-
-	let patched = baseContent;
-	const regex =
-		/:::UPDATE_SECTION\[(.*?)\]:::\s*([\s\S]*?)(?::::END_UPDATE:::|$)/g;
-
-	for (const match of streamContent.matchAll(regex)) {
-		const sectionName = match[1].trim();
-		// The viewer's markers are written below, so drop any the model repeated
-		// inside its own patch body (otherwise the live preview shows doubles).
-		const newContent = stripSectionMarkers(match[2]);
-
-		const escaped = sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-		const openingTag = `<!-- SECTION: ${escaped} -->`;
-
-		// Strategy 1: strict with closing tag (well-formed PRD).
-		let sectionRegex = new RegExp(
-			`${openingTag}[\\s\\S]*?<!-- \\/SECTION -->`,
-			"gi",
-		);
-		if (sectionRegex.test(patched)) {
-			patched = patched.replace(
-				sectionRegex,
-				`${openingTag}\n${newContent}\n<!-- /SECTION -->`,
-			);
-			continue;
-		}
-
-		// Strategy 2: lenient - opening tag to next section or end-of-doc.
-		// Handles PRD whose stored content lacks closing tags (zero <!-- /SECTION --> found).
-		const sectionIdx = ALL_PRD_SECTIONS.indexOf(sectionName as PrdSectionName);
-		const nextSection =
-			sectionIdx >= 0 && sectionIdx < ALL_PRD_SECTIONS.length - 1
-				? ALL_PRD_SECTIONS[sectionIdx + 1]
-				: null;
-		const endBoundary = nextSection
-			? `(?:[\\s\\S]*?<!-- SECTION: ${nextSection.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} -->)`
-			: "(?:[\\s\\S]*|$)";
-		sectionRegex = new RegExp(`${openingTag}[\\s\\S]*?${endBoundary}`, "gi");
-		if (sectionRegex.test(patched)) {
-			const endMarker = nextSection
-				? `\n\n<!-- SECTION: ${nextSection} -->`
-				: "";
-			patched = patched.replace(
-				sectionRegex,
-				`${openingTag}\n${newContent}${endMarker}`,
-			);
-		}
-	}
-	return patched;
+	return mergePrdRevision(baseContent, streamContent).merged;
 }
 
 /**

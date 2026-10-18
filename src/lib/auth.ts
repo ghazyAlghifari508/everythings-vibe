@@ -2,14 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "@/db";
-import {
-	accounts,
-	sessions,
-	subscriptions,
-	users,
-	verifications,
-} from "@/db/schema";
-import { PLAN_CREDITS } from "@/types/database";
+import { accounts, sessions, users, verifications } from "@/db/schema";
 
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {
@@ -26,48 +19,10 @@ export const auth = betterAuth({
 		user: {
 			create: {
 				after: async (user) => {
-					const { addDays } = await import("@/lib/billing");
-					const { ADAPTIVE_CREDIT_PRICING, BILLING_PERIOD_DAYS } = await import(
-						"@/lib/constants"
+					const { grantSignupSubscription } = await import(
+						"@/features/billing/services/signup-grant"
 					);
-					const { creditLedgerEntries } = await import("@/db/schema");
-					const { eq } = await import("drizzle-orm");
-					const now = new Date();
-					// Single transaction + existence check: a retried/replayed
-					// hook must never mint a second free subscription or grant.
-					await db.transaction(async (tx) => {
-						const [existing] = await tx
-							.select({ id: subscriptions.id })
-							.from(subscriptions)
-							.where(eq(subscriptions.userId, user.id))
-							.limit(1);
-						if (existing) return;
-						const subId = crypto.randomUUID();
-						await tx.insert(subscriptions).values({
-							id: subId,
-							userId: user.id,
-							plan: "free",
-							status: "active",
-							credits: PLAN_CREDITS.free,
-							creditsUsed: 0,
-							creditsReserved: 0,
-							currentPeriodStart: now,
-							currentPeriodEnd: addDays(now, BILLING_PERIOD_DAYS),
-							reminderCount: 0,
-						});
-						await tx.insert(creditLedgerEntries).values({
-							id: crypto.randomUUID(),
-							userId: user.id,
-							operationId: null,
-							amount: PLAN_CREDITS.free,
-							entryType: "grant",
-							sourceCategory: "system_grant",
-							pricingVersion: ADAPTIVE_CREDIT_PRICING.version,
-							metadata: {
-								reason: "initial_signup_grant",
-							},
-						});
-					});
+					await grantSignupSubscription(user.id);
 				},
 			},
 		},

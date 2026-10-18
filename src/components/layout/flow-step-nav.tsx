@@ -2,12 +2,15 @@
 
 import { useLocation } from "@tanstack/react-router";
 import { Check } from "lucide-react";
-import { stepRank } from "@/lib/flow-progress";
-import { type FlowStep, routeToStep } from "@/lib/flow-step";
+import {
+	type FlowStep,
+	routeToStep,
+	stepRank,
+} from "@/features/greenfield/utils/flow-step";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/store";
 
-// ponytail: pure step<->route logic extracted to @/lib/flow-step so server
+// ponytail: pure step<->route logic lives in the greenfield feature so server
 // code + tests can use it without next/navigation. Re-export keeps existing
 // `import { routeToStep } from "./flow-step-nav"` call sites working.
 export {
@@ -17,7 +20,7 @@ export {
 	type StepRouteTarget,
 	stepToRoute,
 	stepToRouteTarget,
-} from "@/lib/flow-step";
+} from "@/features/greenfield/utils/flow-step";
 
 export type StepId = FlowStep;
 
@@ -42,7 +45,7 @@ export function FlowStepNav(props?: {
 	const isTaskGenerated = useChatStore((s) => s.isTaskGenerated);
 	const currentRouteStep = routeToStep(pathname ?? "");
 	const routeRank = stepRank(currentRouteStep);
-	const dbRank = stepRank(props?.step as FlowStep);
+	const dbRank = stepRank(props?.step);
 
 	const isTaskDone =
 		isKanbanRoute || isTaskGenerated || props?.taskStatus === "completed";

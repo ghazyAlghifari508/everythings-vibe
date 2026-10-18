@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { syncPaymentStatus } from "@/app/actions/payment";
+import { syncPaymentStatus } from "@/features/billing/services/payment.functions";
 import { consumeResumeIntent } from "@/lib/prompt-handoff";
 
 /** Stage a paid generation can resume, as recorded by the payment handoff. */

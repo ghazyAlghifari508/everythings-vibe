@@ -6,17 +6,11 @@
  * Task was done rewound step 'task' -> 'ac' and History sent the user back to
  * the AC page. Step is now monotonic: it only ever moves forward.
  */
-import { type FlowStep, stepToRoute } from "@/lib/flow-step";
-
-/** Flow order. Index = progress rank; higher wins. */
-const STEP_ORDER: FlowStep[] = ["question", "fitur", "prd", "ac", "task"];
-
-export function stepRank(step: string | null | undefined): number {
-	const i = STEP_ORDER.indexOf(step as FlowStep);
-	// ponytail: unknown/null ranks as "prd" (the default landing), matching
-	// stepToRoute's fallback so rank and route never disagree.
-	return i === -1 ? STEP_ORDER.indexOf("prd") : i;
-}
+import {
+	type FlowStep,
+	stepRank,
+	stepToRoute,
+} from "@/features/greenfield/utils/flow-step";
 
 /**
  * True when the project has progressed past the PRD stage (e.g. AC or Task).

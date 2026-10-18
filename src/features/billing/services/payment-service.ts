@@ -1,0 +1,323 @@
+/**
+ * Midtrans payment application - server-only DB logic.
+ *
+ * ponytail: split out of app/actions/payment.ts because that module is imported
+ * by the client pricing-card (for the syncPaymentStatus server fn). Plain server
+ * helpers here import `db` (→ pg → Buffer) which crashes the browser bundle.
+ * Keep all db/Buffer-touching code out of any module a client component imports.
+ *
+ * Credit model: monthly subscription. A plan purchase SETS the plan's credit
+ * allocation and (re)writes the billing period via computePurchaseGrant
+ * (lib/billing.ts). A top-up order (payments.plan === TOPUP_SKU.id) instead
+ * ADDS credits to the same pool and never touches plan/period columns.
+ * Rows whose current_period_end stays NULL are legacy one-time purchases
+ * honored until their credits run out.
+ */
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import {
+	canPurchaseTopUp,
+	computePurchaseGrant,
+	resolveSubscriptionState,
+} from "@/features/billing/services/billing";
+import {
+	ADAPTIVE_CREDIT_PRICING,
+	findTopUpPackage,
+	TOPUP_PACKAGES,
+} from "@/lib/constants";
+import type { Plan } from "@/types/database";
+import { isTopUpOrder, planFromAmount } from "./payment-pricing";
+
+/**
+ * Total successful top-up credits bought within the CURRENT billing period
+ * (spec §4 anti-undercut cap). Returns 0 when there is no bounded period
+ * (missing sub row or NULL bounds — e.g. legacy grandfathered).
+ */
+export async function getTopUpCreditsUsedThisPeriod(
+	userId: string,
+): Promise<number> {
+	const { db } = await import("@/db");
+	const { payments, subscriptions } = await import("@/db/schema");
+
+	const [sub] = await db
+		.select({
+			start: subscriptions.currentPeriodStart,
+			end: subscriptions.currentPeriodEnd,
+		})
+		.from(subscriptions)
+		.where(eq(subscriptions.userId, userId))
+		.orderBy(desc(subscriptions.createdAt))
+		.limit(1);
+	if (!sub?.start || !sub?.end) return 0;
+
+	const rows = await db
+		.select({ plan: payments.plan })
+		.from(payments)
+		.where(
+			and(
+				eq(payments.userId, userId),
+				eq(payments.status, "success"),
+				inArray(
+					payments.plan,
+					TOPUP_PACKAGES.map((p) => p.id),
+				),
+				gte(payments.createdAt, sub.start),
+				lte(payments.createdAt, sub.end),
+			),
+		);
+	let total = 0;
+	for (const r of rows) {
+		const pkg = findTopUpPackage(r.plan);
+		if (pkg) total += pkg.credits;
+	}
+	return total;
+}
+
+/**
+ * Grants credits after Midtrans confirms. Idempotent: bails if already success.
+ * Called by syncPaymentStatus + payments/webhook.
+ */
+export async function applyPaymentSuccess(orderId: string) {
+	const { db } = await import("@/db");
+	const { creditLedgerEntries, payments, subscriptions } = await import(
+		"@/db/schema"
+	);
+
+	return db.transaction(async (tx) => {
+		// Row lock: a second concurrent call for the same orderId BLOCKS here
+		// until the first transaction commits, then re-reads status === success
+		// and returns early instead of granting a second time.
+		const [payment] = await tx
+			.select()
+			.from(payments)
+			.where(eq(payments.orderId, orderId))
+			.for("update")
+			.limit(1);
+		if (!payment) return null;
+		if (payment.status === "success") return { plan: payment.plan as Plan };
+		// Defense in depth: both callers verify settlement before invoking,
+		// but the grant itself must never fire for a terminally failed
+		// (expired/cancelled/denied) row if called directly.
+		if (payment.status === "failed") return null;
+
+		const derivedPlan = planFromAmount(payment.amount ?? 0);
+		if (payment.plan && payment.plan !== derivedPlan) {
+			throw new Error(
+				`Payment plan "${payment.plan}" does not match amount tier "${derivedPlan}"`,
+			);
+		}
+		const plan = derivedPlan;
+		const now = new Date();
+
+		// Re-read the CURRENT period end with row lock so an early renewal
+		// extends from the still-active period and concurrent orders cannot
+		// overwrite each other's period or credits (spec §6.1).
+		const [existingSub] = await tx
+			.select({
+				id: subscriptions.id,
+				currentPeriodEnd: subscriptions.currentPeriodEnd,
+			})
+			.from(subscriptions)
+			.where(eq(subscriptions.userId, payment.userId))
+			.orderBy(desc(subscriptions.createdAt))
+			.for("update")
+			.limit(1);
+
+		const grant = computePurchaseGrant({
+			plan,
+			now,
+			activePeriodEnd: existingSub?.currentPeriodEnd ?? null,
+		});
+
+		if (existingSub) {
+			await tx
+				.update(subscriptions)
+				.set({
+					plan,
+					status: "active",
+					midtransOrderId: orderId,
+					credits: grant.credits,
+					creditsUsed: 0,
+					creditsReserved: 0,
+					currentPeriodStart: grant.periodStart,
+					currentPeriodEnd: grant.periodEnd,
+					cancelledAt: null,
+					reminderCount: 0,
+					updatedAt: now,
+				})
+				.where(eq(subscriptions.id, existingSub.id));
+		} else {
+			await tx.insert(subscriptions).values({
+				id: crypto.randomUUID(),
+				userId: payment.userId,
+				plan,
+				status: "active",
+				midtransOrderId: orderId,
+				credits: grant.credits,
+				creditsUsed: 0,
+				creditsReserved: 0,
+				currentPeriodStart: grant.periodStart,
+				currentPeriodEnd: grant.periodEnd,
+				reminderCount: 0,
+			});
+		}
+
+		await tx.insert(creditLedgerEntries).values({
+			id: crypto.randomUUID(),
+			userId: payment.userId,
+			operationId: null,
+			amount: grant.credits,
+			entryType: "grant",
+			sourceCategory: "system_grant",
+			pricingVersion: ADAPTIVE_CREDIT_PRICING.version,
+			metadata: { reason: `payment_order:${orderId}` },
+		});
+
+		// Mark success LAST so a retry re-runs the grant if it died mid-way.
+		await tx
+			.update(payments)
+			.set({ status: "success", updatedAt: now })
+			.where(eq(payments.orderId, orderId));
+		return { plan };
+	});
+}
+
+/**
+ * Grants a top-up AFTER Midtrans confirms (spec §5.3). ADDITIVE: bumps
+ * `credits` by TOPUP_SKU.credits and touches NOTHING else on the
+ * subscription row (plan/status/period/cancelled_at/reminder_count stay).
+ *
+ * - Idempotent: FOR UPDATE + bail when already success (retry-safe).
+ * - Strict eligibility AT GRANT TIME: if the effective state drifted away
+ *   from active_paid while checkout was open (e.g. period expired seconds
+ *   before the webhook), the grant is REJECTED, the payment is marked failed
+ *   with a midtransResponse note, and money is refunded manually via the
+ *   Midtrans dashboard (spec §9). Granting into a paused account would burn
+ *   the buyer's money silently.
+ * - Cap is enforced strictly at checkout creation, tolerantly here (spec
+ *   §5.3 point 4): a paid order is always honored; worst-case race overshoot
+ *   is one SKU.
+ */
+export async function applyTopUpSuccess(orderId: string) {
+	const { db } = await import("@/db");
+	const { creditLedgerEntries, payments, subscriptions } = await import(
+		"@/db/schema"
+	);
+
+	return db.transaction(async (tx) => {
+		const [payment] = await tx
+			.select()
+			.from(payments)
+			.where(eq(payments.orderId, orderId))
+			.for("update")
+			.limit(1);
+		if (!payment) return null;
+		if (payment.status === "success") {
+			// Idempotent replay: report the current effective plan so the
+			// caller contract ({ plan }) matches applyPaymentSuccess.
+			const [sub] = await tx
+				.select({ plan: subscriptions.plan })
+				.from(subscriptions)
+				.where(eq(subscriptions.userId, payment.userId))
+				.orderBy(desc(subscriptions.createdAt))
+				.limit(1);
+			return { plan: (sub?.plan ?? "pro") as Plan };
+		}
+
+		// Defensive: only genuine top-up orders may take this path.
+		const pkg = findTopUpPackage(payment.plan);
+		if (!pkg || payment.amount !== pkg.priceIdr) return null;
+
+		const now = new Date();
+		const [sub] = await tx
+			.select({
+				id: subscriptions.id,
+				plan: subscriptions.plan,
+				status: subscriptions.status,
+				credits: subscriptions.credits,
+				creditsUsed: subscriptions.creditsUsed,
+				creditsReserved: subscriptions.creditsReserved,
+				currentPeriodStart: subscriptions.currentPeriodStart,
+				currentPeriodEnd: subscriptions.currentPeriodEnd,
+				cancelledAt: subscriptions.cancelledAt,
+			})
+			.from(subscriptions)
+			.where(eq(subscriptions.userId, payment.userId))
+			.orderBy(desc(subscriptions.createdAt))
+			.limit(1);
+
+		const eff = resolveSubscriptionState(sub, now);
+		if (!canPurchaseTopUp(eff) || !sub) {
+			await tx
+				.update(payments)
+				.set({
+					status: "failed",
+					midtransResponse: {
+						...(typeof payment.midtransResponse === "object" &&
+						payment.midtransResponse !== null
+							? payment.midtransResponse
+							: {}),
+						topupRejected: "not_active_paid",
+					},
+					updatedAt: now,
+				})
+				.where(eq(payments.orderId, orderId));
+			console.error(
+				`[topup] grant rejected for ${orderId}: subscription state ${eff.state}`,
+			);
+			return null;
+		}
+
+		await tx
+			.update(subscriptions)
+			.set({
+				credits: sql`${subscriptions.credits} + ${pkg.credits}`,
+				updatedAt: now,
+			})
+			.where(eq(subscriptions.id, sub.id));
+
+		await tx.insert(creditLedgerEntries).values({
+			id: crypto.randomUUID(),
+			userId: payment.userId,
+			operationId: null,
+			amount: pkg.credits,
+			entryType: "grant",
+			sourceCategory: "system_grant",
+			pricingVersion: ADAPTIVE_CREDIT_PRICING.version,
+			metadata: { reason: `topup_order:${orderId}` },
+		});
+
+		// Mark success LAST so a retry re-runs the grant if it died mid-way.
+		await tx
+			.update(payments)
+			.set({ status: "success", updatedAt: now })
+			.where(eq(payments.orderId, orderId));
+
+		const [after] = await tx
+			.select({ plan: subscriptions.plan })
+			.from(subscriptions)
+			.where(eq(subscriptions.userId, payment.userId))
+			.orderBy(desc(subscriptions.createdAt))
+			.limit(1);
+		return { plan: (after?.plan ?? "pro") as Plan };
+	});
+}
+
+/**
+ * Single entry point for "money arrived, apply it" (spec §5.4). Routes by the
+ * stored SKU so BOTH completion paths (payments webhook + syncPaymentStatus)
+ * share one decision. Unknown orders fall through to the plan path, whose
+ * planFromAmount throws loudly — same semantics as before this feature.
+ */
+export async function applyOrderSuccess(orderId: string) {
+	const { db } = await import("@/db");
+	const { payments } = await import("@/db/schema");
+	const [row] = await db
+		.select({ plan: payments.plan })
+		.from(payments)
+		.where(eq(payments.orderId, orderId))
+		.limit(1);
+	if (!row) return applyPaymentSuccess(orderId);
+	return isTopUpOrder(row.plan)
+		? applyTopUpSuccess(orderId)
+		: applyPaymentSuccess(orderId);
+}

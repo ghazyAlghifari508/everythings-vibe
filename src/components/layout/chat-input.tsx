@@ -16,11 +16,11 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
+import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import {
 	getPendingSyncPayloadKey,
 	syncPromptPayloadSchema,
 } from "@/features/codebase/services/sync";
-import { useUserPlan } from "@/hooks/use-user-plan";
 import { authClient } from "@/lib/auth-client";
 import {
 	HOME_DRAFT_DEBOUNCE_MS,

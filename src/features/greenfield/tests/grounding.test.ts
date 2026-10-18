@@ -9,12 +9,14 @@ import {
 import { STACK_ICONS } from "@/features/greenfield/utils/stack-data";
 
 // Synthetic resolution id + docs — never touches real Context7.
-vi.mock("@/lib/context7-client", () => ({
+vi.mock("@/features/greenfield/services/context7-client", () => ({
 	resolveLibraryId: vi.fn(async () => "/example/sdk"),
 	queryDocs: vi.fn(async () => "Synthetic documentation."),
 }));
 
-const { resolveLibraryId, queryDocs } = await import("@/lib/context7-client");
+const { resolveLibraryId, queryDocs } = await import(
+	"@/features/greenfield/services/context7-client"
+);
 const mockResolve = vi.mocked(resolveLibraryId);
 const mockQuery = vi.mocked(queryDocs);
 

@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { and, desc, eq, isNull } from "drizzle-orm";
-import { db } from "@/db";
-import { prdVersions, projects } from "@/db/schema";
+import { getPrdVersionHistory } from "@/features/greenfield/services/project-history";
 import { requireUser } from "@/lib/session";
 
 // Client-side version history refresh after PRD revisions (prd-detail.tsx).
@@ -18,31 +16,9 @@ export const Route = createFileRoute("/api/projects/$id/versions")({
 						{ status: 400 },
 					);
 
-				const [project] = await db
-					.select({ id: projects.id })
-					.from(projects)
-					.where(
-						and(
-							eq(projects.id, projectId),
-							eq(projects.userId, user.id),
-							isNull(projects.deletedAt),
-						),
-					)
-					.limit(1);
-				if (!project)
+				const rows = await getPrdVersionHistory(projectId, user.id);
+				if (!rows)
 					return Response.json({ error: "Project not found" }, { status: 404 });
-
-				const rows = await db
-					.select({
-						id: prdVersions.id,
-						version: prdVersions.version,
-						content: prdVersions.content,
-						change_summary: prdVersions.changeSummary,
-						created_at: prdVersions.createdAt,
-					})
-					.from(prdVersions)
-					.where(eq(prdVersions.projectId, projectId))
-					.orderBy(desc(prdVersions.version));
 
 				return Response.json(rows);
 			},
