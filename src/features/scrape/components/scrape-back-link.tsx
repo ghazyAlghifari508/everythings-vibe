@@ -35,6 +35,7 @@ export function ScrapeBackLink({
 	return (
 		<Link
 			to={target}
+			search={historySearch?.mode ? { mode: historySearch.mode } : {}}
 			replace
 			className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-fog transition-colors hover:text-snow"
 		>

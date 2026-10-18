@@ -143,7 +143,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 			await navigate({
 				to: "/scrape/$id",
 				params: { id: result.data.scrapeId },
-				search: { from: "/scrape" },
+				search: { from: "/scrape", mode },
 			});
 		} catch {
 			setError("Jaringan bermasalah. Coba lagi dari URL yang sama.");

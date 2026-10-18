@@ -118,7 +118,7 @@ describe("extraction workspace", () => {
 			expect(navigate).toHaveBeenCalledWith({
 				to: "/scrape/$id",
 				params: { id: "result-1" },
-				search: { from: "/scrape" },
+				search: { from: "/scrape", mode },
 			}),
 		);
 		expect(fetchMock).toHaveBeenCalledTimes(1);

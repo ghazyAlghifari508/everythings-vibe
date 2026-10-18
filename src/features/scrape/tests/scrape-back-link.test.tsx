@@ -123,7 +123,7 @@ describe("ScrapeBackLink", () => {
 		});
 	});
 
-	it("ignores stored filters when returning to Scrap", () => {
+	it("restores workspace mode without leaking history filters", () => {
 		render(
 			<ScrapeBackLink
 				from="/design/scrap"
@@ -138,6 +138,6 @@ describe("ScrapeBackLink", () => {
 		);
 		const link = screen.getByRole("link");
 		expect(link.dataset.to).toBe("/scrape");
-		expect(link.dataset.search).toBeUndefined();
+		expect(JSON.parse(link.dataset.search ?? "{}")).toEqual({ mode: "html" });
 	});
 });
