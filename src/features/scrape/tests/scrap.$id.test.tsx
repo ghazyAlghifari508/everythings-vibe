@@ -33,7 +33,7 @@ vi.mock("@/features/scrape/utils/scrape-preview-document", () => ({
 	buildScrapePreviewDocument: mocks.buildPreviewSrcDoc,
 }));
 
-import { Route } from "@/routes/design/scrap.$id";
+import { Route } from "@/routes/scrape/$id";
 
 beforeEach(() => {
 	vi.clearAllMocks();

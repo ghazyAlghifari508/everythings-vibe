@@ -10,7 +10,7 @@ vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(async () => {}),
 }));
 
-import { Route } from "@/routes/design/scrap.index";
+import { Route } from "@/routes/scrape/index";
 
 function ScrapIndexComponent(): React.ComponentType {
 	const options = Route.options as unknown as {

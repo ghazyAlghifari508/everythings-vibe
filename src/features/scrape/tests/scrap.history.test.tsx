@@ -31,7 +31,7 @@ vi.mock(
 import {
 	Route,
 	validateScrapeHistoryRouteSearch,
-} from "@/routes/design/scrap.history";
+} from "@/routes/scrape/history";
 
 beforeEach(() => {
 	vi.clearAllMocks();

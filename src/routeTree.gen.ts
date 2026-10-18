@@ -20,6 +20,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as ScrapeRouteImport } from './routes/scrape'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as AcIdRouteImport } from './routes/ac/$id'
@@ -46,6 +47,9 @@ import { Route as PlanIndexRouteImport } from './routes/plan/index'
 import { Route as PlanCodebaseRouteImport } from './routes/plan/codebase'
 import { Route as PlanNewRouteImport } from './routes/plan/new'
 import { Route as PrdIdRouteImport } from './routes/prd/$id'
+import { Route as ScrapeIndexRouteImport } from './routes/scrape/index'
+import { Route as ScrapeIdRouteImport } from './routes/scrape/$id'
+import { Route as ScrapeHistoryRouteImport } from './routes/scrape/history'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsAccountRouteImport } from './routes/settings/account'
 import { Route as SettingsApiKeysRouteImport } from './routes/settings/api-keys'
@@ -169,6 +173,11 @@ const OnboardingRoute = OnboardingRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScrapeRoute = ScrapeRouteImport.update({
+  id: '/scrape',
+  path: '/scrape',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -300,6 +309,21 @@ const PrdIdRoute = PrdIdRouteImport.update({
   id: '/prd/$id',
   path: '/prd/$id',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ScrapeIndexRoute = ScrapeIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ScrapeRoute,
+} as any)
+const ScrapeIdRoute = ScrapeIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ScrapeRoute,
+} as any)
+const ScrapeHistoryRoute = ScrapeHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => ScrapeRoute,
 } as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
@@ -674,6 +698,7 @@ export interface FileRoutesByFullPath {
   '/maintenance': typeof MaintenanceRoute
   '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
+  '/scrape': typeof ScrapeRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/ac/$id': typeof AcIdRoute
@@ -696,6 +721,8 @@ export interface FileRoutesByFullPath {
   '/plan/codebase': typeof PlanCodebaseRoute
   '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
+  '/scrape/$id': typeof ScrapeIdRoute
+  '/scrape/history': typeof ScrapeHistoryRoute
   '/settings/account': typeof SettingsAccountRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/billing': typeof SettingsBillingRoute
@@ -707,6 +734,7 @@ export interface FileRoutesByFullPath {
   '/codebases/': typeof CodebasesIndexRoute
   '/design/': typeof DesignIndexRoute
   '/plan/': typeof PlanIndexRoute
+  '/scrape/': typeof ScrapeIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/ac/generate': typeof ApiAcGenerateRoute
   '/api/ac/save': typeof ApiAcSaveRoute
@@ -799,6 +827,8 @@ export interface FileRoutesByTo {
   '/plan/codebase': typeof PlanCodebaseRoute
   '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
+  '/scrape/$id': typeof ScrapeIdRoute
+  '/scrape/history': typeof ScrapeHistoryRoute
   '/settings/account': typeof SettingsAccountRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/billing': typeof SettingsBillingRoute
@@ -810,6 +840,7 @@ export interface FileRoutesByTo {
   '/codebases': typeof CodebasesIndexRoute
   '/design': typeof DesignIndexRoute
   '/plan': typeof PlanIndexRoute
+  '/scrape': typeof ScrapeIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/ac/generate': typeof ApiAcGenerateRoute
   '/api/ac/save': typeof ApiAcSaveRoute
@@ -886,6 +917,7 @@ export interface FileRoutesById {
   '/maintenance': typeof MaintenanceRoute
   '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
+  '/scrape': typeof ScrapeRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/ac/$id': typeof AcIdRoute
@@ -908,6 +940,8 @@ export interface FileRoutesById {
   '/plan/codebase': typeof PlanCodebaseRoute
   '/plan/new': typeof PlanNewRoute
   '/prd/$id': typeof PrdIdRoute
+  '/scrape/$id': typeof ScrapeIdRoute
+  '/scrape/history': typeof ScrapeHistoryRoute
   '/settings/account': typeof SettingsAccountRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/billing': typeof SettingsBillingRoute
@@ -919,6 +953,7 @@ export interface FileRoutesById {
   '/codebases/': typeof CodebasesIndexRoute
   '/design/': typeof DesignIndexRoute
   '/plan/': typeof PlanIndexRoute
+  '/scrape/': typeof ScrapeIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/ac/generate': typeof ApiAcGenerateRoute
   '/api/ac/save': typeof ApiAcSaveRoute
@@ -996,6 +1031,7 @@ export interface FileRouteTypes {
     | '/maintenance'
     | '/onboarding'
     | '/pricing'
+    | '/scrape'
     | '/settings'
     | '/templates'
     | '/ac/$id'
@@ -1018,6 +1054,8 @@ export interface FileRouteTypes {
     | '/plan/codebase'
     | '/plan/new'
     | '/prd/$id'
+    | '/scrape/$id'
+    | '/scrape/history'
     | '/settings/account'
     | '/settings/api-keys'
     | '/settings/billing'
@@ -1029,6 +1067,7 @@ export interface FileRouteTypes {
     | '/codebases/'
     | '/design/'
     | '/plan/'
+    | '/scrape/'
     | '/settings/'
     | '/api/ac/generate'
     | '/api/ac/save'
@@ -1121,6 +1160,8 @@ export interface FileRouteTypes {
     | '/plan/codebase'
     | '/plan/new'
     | '/prd/$id'
+    | '/scrape/$id'
+    | '/scrape/history'
     | '/settings/account'
     | '/settings/api-keys'
     | '/settings/billing'
@@ -1132,6 +1173,7 @@ export interface FileRouteTypes {
     | '/codebases'
     | '/design'
     | '/plan'
+    | '/scrape'
     | '/settings'
     | '/api/ac/generate'
     | '/api/ac/save'
@@ -1207,6 +1249,7 @@ export interface FileRouteTypes {
     | '/maintenance'
     | '/onboarding'
     | '/pricing'
+    | '/scrape'
     | '/settings'
     | '/templates'
     | '/ac/$id'
@@ -1229,6 +1272,8 @@ export interface FileRouteTypes {
     | '/plan/codebase'
     | '/plan/new'
     | '/prd/$id'
+    | '/scrape/$id'
+    | '/scrape/history'
     | '/settings/account'
     | '/settings/api-keys'
     | '/settings/billing'
@@ -1240,6 +1285,7 @@ export interface FileRouteTypes {
     | '/codebases/'
     | '/design/'
     | '/plan/'
+    | '/scrape/'
     | '/settings/'
     | '/api/ac/generate'
     | '/api/ac/save'
@@ -1316,6 +1362,7 @@ export interface RootRouteChildren {
   MaintenanceRoute: typeof MaintenanceRoute
   OnboardingRoute: typeof OnboardingRoute
   PricingRoute: typeof PricingRoute
+  ScrapeRoute: typeof ScrapeRouteWithChildren
   SettingsRoute: typeof SettingsRouteWithChildren
   TemplatesRoute: typeof TemplatesRoute
   AcIdRoute: typeof AcIdRoute
@@ -1451,6 +1498,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scrape': {
+      id: '/scrape'
+      path: '/scrape'
+      fullPath: '/scrape'
+      preLoaderRoute: typeof ScrapeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -1634,6 +1688,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/prd/$id'
       preLoaderRoute: typeof PrdIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/scrape/': {
+      id: '/scrape/'
+      path: '/'
+      fullPath: '/scrape/'
+      preLoaderRoute: typeof ScrapeIndexRouteImport
+      parentRoute: typeof ScrapeRoute
+    }
+    '/scrape/$id': {
+      id: '/scrape/$id'
+      path: '/$id'
+      fullPath: '/scrape/$id'
+      preLoaderRoute: typeof ScrapeIdRouteImport
+      parentRoute: typeof ScrapeRoute
+    }
+    '/scrape/history': {
+      id: '/scrape/history'
+      path: '/history'
+      fullPath: '/scrape/history'
+      preLoaderRoute: typeof ScrapeHistoryRouteImport
+      parentRoute: typeof ScrapeRoute
     }
     '/settings/': {
       id: '/settings/'
@@ -2156,6 +2231,21 @@ const CodebasesRouteWithChildren = CodebasesRoute._addFileChildren(
   CodebasesRouteChildren,
 )
 
+interface ScrapeRouteChildren {
+  ScrapeIdRoute: typeof ScrapeIdRoute
+  ScrapeHistoryRoute: typeof ScrapeHistoryRoute
+  ScrapeIndexRoute: typeof ScrapeIndexRoute
+}
+
+const ScrapeRouteChildren: ScrapeRouteChildren = {
+  ScrapeIdRoute: ScrapeIdRoute,
+  ScrapeHistoryRoute: ScrapeHistoryRoute,
+  ScrapeIndexRoute: ScrapeIndexRoute,
+}
+
+const ScrapeRouteWithChildren =
+  ScrapeRoute._addFileChildren(ScrapeRouteChildren)
+
 interface SettingsRouteChildren {
   SettingsAccountRoute: typeof SettingsAccountRoute
   SettingsApiKeysRoute: typeof SettingsApiKeysRoute
@@ -2302,6 +2392,7 @@ const rootRouteChildren: RootRouteChildren = {
   MaintenanceRoute: MaintenanceRoute,
   OnboardingRoute: OnboardingRoute,
   PricingRoute: PricingRoute,
+  ScrapeRoute: ScrapeRouteWithChildren,
   SettingsRoute: SettingsRouteWithChildren,
   TemplatesRoute: TemplatesRoute,
   AcIdRoute: AcIdRoute,
