@@ -97,6 +97,10 @@ export async function fetchAsset(
 
 	return new Promise<FetchedAsset>((resolve, reject) => {
 		const onResponse = (res: http.IncomingMessage) => {
+			// A mid-body stream error (connection reset) is emitted on the response,
+			// not the request; without a listener it becomes an uncaught exception
+			// instead of a rejection the pipeline can classify.
+			res.on("error", reject);
 			const next = redirectTarget(res, url);
 			if (next) {
 				res.resume();
@@ -111,7 +115,10 @@ export async function fetchAsset(
 				size += chunk.length;
 				if (size > maxBytes) {
 					failed = true;
-					req.destroy(
+					// Destroy without an error: the rejection carries the reason, and a
+					// socket error would arrive after "end" was already swallowed.
+					req.destroy();
+					reject(
 						new ScrapeError("NO_ANALYZABLE_CONTENT", "Asset terlalu besar."),
 					);
 				} else chunks.push(chunk);
@@ -180,6 +187,8 @@ export async function fetchHtml(
 	return new Promise<{ html: string; status: number; finalUrl: string }>(
 		(resolve, reject) => {
 			const onResponse = (res: http.IncomingMessage) => {
+				// See fetchAsset: the response stream carries the abort reason.
+				res.on("error", reject);
 				const next = redirectTarget(res, url);
 				if (next) {
 					res.resume();
@@ -201,7 +210,9 @@ export async function fetchHtml(
 					size += chunk.length;
 					if (size > FETCH_MAX_HTML_BYTES) {
 						failed = true;
-						req.destroy(
+						// See fetchAsset: reject explicitly, never through a socket error.
+						req.destroy();
+						reject(
 							new ScrapeError("NO_ANALYZABLE_CONTENT", "HTML terlalu besar."),
 						);
 					} else chunks.push(chunk);
