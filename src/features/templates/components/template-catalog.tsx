@@ -1,47 +1,48 @@
-import { useNavigate } from "@tanstack/react-router";
 import {
-	ArrowRight,
-	BarChart3,
-	Bot,
-	Building2,
-	Check,
-	Copy,
-	CreditCard,
-	GraduationCap,
-	HeartPulse,
-	Layers,
-	LayoutDashboard,
-	Receipt,
-	Search,
-	ShoppingBag,
-	ShoppingCart,
-	Smartphone,
-	Sparkles,
-	Store,
-	Terminal,
-	Users,
-} from "lucide-react";
+	ArrowRight01Icon,
+	BarChartIcon,
+	BotIcon,
+	Building01Icon,
+	Copy01Icon,
+	CreditCardIcon,
+	DashboardSquare01Icon,
+	GraduationCapIcon,
+	HeartPulseIcon,
+	Invoice01Icon,
+	Layers01Icon,
+	Search01Icon,
+	ShoppingBag01Icon,
+	ShoppingCart01Icon,
+	SmartPhone01Icon,
+	SparklesIcon,
+	Store01Icon,
+	TerminalIcon,
+	Tick01Icon,
+	UserGroupIcon,
+} from "@hugeicons/core-free-icons";
+import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { Icon, type IconProps } from "@/components/ui/icon";
 import { searchTemplates } from "../services/template-service";
 import type { TemplateCategory, VibeTemplateEntry } from "../types";
 
-const ICON_MAP: Record<string, typeof BarChart3> = {
-	BarChart3,
-	Store,
-	Smartphone,
-	GraduationCap,
-	Users,
-	Receipt,
-	LayoutDashboard,
-	HeartPulse,
-	ShoppingBag,
-	CreditCard,
-	Terminal,
-	Sparkles,
-	Building2,
-	Layers,
-	ShoppingCart,
-	Bot,
+const ICON_MAP: Record<string, IconProps["icon"]> = {
+	BarChart3: BarChartIcon,
+	Store: Store01Icon,
+	Smartphone: SmartPhone01Icon,
+	GraduationCap: GraduationCapIcon,
+	Users: UserGroupIcon,
+	Receipt: Invoice01Icon,
+	LayoutDashboard: DashboardSquare01Icon,
+	HeartPulse: HeartPulseIcon,
+	ShoppingBag: ShoppingBag01Icon,
+	CreditCard: CreditCardIcon,
+	Terminal: TerminalIcon,
+	Sparkles: SparklesIcon,
+	Building2: Building01Icon,
+	Layers: Layers01Icon,
+	ShoppingCart: ShoppingCart01Icon,
+	Bot: BotIcon,
 };
 
 export function TemplateCatalog({
@@ -125,7 +126,11 @@ export function TemplateCatalog({
 
 				{/* Search Filter */}
 				<div className="relative w-full sm:w-72">
-					<Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fog" />
+					<Icon
+						icon={Search01Icon}
+						size={16}
+						className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fog"
+					/>
 					<input
 						type="text"
 						value={searchQuery}
@@ -146,7 +151,7 @@ export function TemplateCatalog({
 			) : (
 				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 					{filteredTemplates.map((template) => {
-						const IconComponent = ICON_MAP[template.icon] ?? Sparkles;
+						const icon = ICON_MAP[template.icon] ?? SparklesIcon;
 						const isCopied = copiedId === template.id;
 
 						return (
@@ -158,7 +163,7 @@ export function TemplateCatalog({
 									{/* Top Metadata Header */}
 									<div className="flex items-start justify-between gap-3">
 										<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-graphite bg-obsidian text-snow">
-											<IconComponent size={20} />
+											<Icon icon={icon} size={20} />
 										</div>
 										<div className="flex flex-wrap items-center gap-1.5">
 											<span className="rounded-full border border-graphite bg-obsidian px-2.5 py-0.5 text-[10px] font-medium capitalize text-mist">
@@ -216,7 +221,7 @@ export function TemplateCatalog({
 												? "Rancang di Studio"
 												: "Gunakan di VibePlan"}
 										</span>
-										<ArrowRight size={14} />
+										<Icon icon={ArrowRight01Icon} size={14} />
 									</button>
 									<button
 										type="button"
@@ -226,9 +231,13 @@ export function TemplateCatalog({
 										className="flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-xl border border-graphite bg-obsidian text-fog hover:border-steel hover:text-snow transition"
 									>
 										{isCopied ? (
-											<Check size={14} className="text-emerald-400" />
+											<Icon
+												icon={Tick01Icon}
+												size={14}
+												className="text-emerald-400"
+											/>
 										) : (
-											<Copy size={14} />
+											<Icon icon={Copy01Icon} size={14} />
 										)}
 									</button>
 								</div>
