@@ -1,8 +1,13 @@
 "use client";
 
+import {
+	Alert02Icon,
+	ArrowRight01Icon,
+	File01Icon,
+} from "@hugeicons/core-free-icons";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowRight, FileText } from "lucide-react";
 import { useEffect } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { DocumentReviewModal } from "@/features/greenfield/components/documents/document-review-modal";
@@ -83,7 +88,7 @@ export function TaskDetail({
 		return (
 			<div className="flex h-full items-center justify-center bg-onyx text-snow">
 				<div className="text-center">
-					<FileText size={64} className="mx-auto mb-4 text-fog" />
+					<Icon icon={File01Icon} size={64} className="mx-auto mb-4 text-fog" />
 					<h2 className="mb-2 text-xl font-[510]">AC Belum Tersedia</h2>
 					<p className="mb-6 text-fog">
 						Generate Acceptance Criteria terlebih dahulu.
@@ -93,7 +98,7 @@ export function TaskDetail({
 						params={{ id: projectId }}
 						className="btn-primary inline-flex items-center gap-2 rounded-md px-4 py-2"
 					>
-						<ArrowRight size={16} />
+						<Icon icon={ArrowRight01Icon} size={16} />
 						Ke AC
 					</Link>
 				</div>
@@ -175,7 +180,7 @@ export function TaskDetail({
 					<div className={cn("h-full", hasContent && "hidden md:block")}>
 						{hasError && !isGenerating && !hasContent ? (
 							<div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-								<AlertTriangle size={40} className="text-crimson" />
+								<Icon icon={Alert02Icon} size={40} className="text-crimson" />
 								<p className="text-fog">Gagal generate task tree.</p>
 								<button
 									type="button"

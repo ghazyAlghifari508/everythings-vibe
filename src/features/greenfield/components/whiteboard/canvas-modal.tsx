@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, X } from "lucide-react";
+import { Cancel01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { LayoutNode } from "../../types/whiteboard";
 import { COLORS } from "../../utils/whiteboard-layout";
 
@@ -49,7 +50,7 @@ export function ContainerModal({
 							aria-label="Tutup daftar"
 							className="shrink-0 text-fog transition-colors hover:text-snow"
 						>
-							<X size={18} />
+							<Icon icon={Cancel01Icon} size={18} />
 						</button>
 					</div>
 					{isTasks ? (
@@ -71,7 +72,7 @@ export function ContainerModal({
 												}`}
 											>
 												{isDone ? (
-													<Check size={11} className="stroke-[3]" />
+													<Icon icon={Tick01Icon} size={11} strokeWidth={3} />
 												) : null}
 											</span>
 											<span

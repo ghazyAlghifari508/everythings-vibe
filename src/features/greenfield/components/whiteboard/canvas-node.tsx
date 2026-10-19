@@ -1,7 +1,14 @@
 "use client";
 
-import { Box, Check, ChevronRight, LayoutGrid, ListChecks } from "lucide-react";
+import {
+	ArrowRight01Icon,
+	CubeIcon,
+	LayoutGridIcon,
+	ListChecksIcon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import { memo } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { LayoutNode } from "../../types/whiteboard";
 import { MAX_VISIBLE_CONTAINER_ROWS } from "../../utils/whiteboard-layout";
 import { BoardHandle } from "./canvas-connectors";
@@ -17,7 +24,7 @@ export const RootNode = memo(function RootNode({ node }: { node: LayoutNode }) {
 		>
 			<div className="flex h-full items-center gap-3">
 				<span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow">
-					<Box size={18} aria-hidden />
+					<Icon icon={CubeIcon} size={18} aria-hidden />
 				</span>
 				<span className="min-w-0">
 					<span className="block truncate font-inter text-sm font-semibold text-snow">
@@ -111,9 +118,9 @@ export const ContainerNode = memo(function ContainerNode({
 			<div className="flex items-center justify-between px-1 pb-2">
 				<span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-fog">
 					{isTasks ? (
-						<ListChecks size={12} aria-hidden />
+						<Icon icon={ListChecksIcon} size={12} aria-hidden />
 					) : (
-						<LayoutGrid size={12} aria-hidden />
+						<Icon icon={LayoutGridIcon} size={12} aria-hidden />
 					)}
 					{node.label}
 				</span>
@@ -160,7 +167,9 @@ export const ContainerNode = memo(function ContainerNode({
 											: "border-fog/40 bg-onyx/40 text-transparent"
 									}`}
 								>
-									{row.done ? <Check size={10} className="stroke-[3]" /> : null}
+									{row.done ? (
+										<Icon icon={Tick01Icon} size={10} strokeWidth={3} />
+									) : null}
 								</span>
 							) : (
 								<span
@@ -195,7 +204,8 @@ export const ContainerNode = memo(function ContainerNode({
 						onPointerDown={(e) => e.stopPropagation()}
 						className="flex items-center gap-0.5 text-[11px] font-[510] text-indigo transition-colors hover:text-indigo/80"
 					>
-						Lihat semua ({total}) <ChevronRight size={11} aria-hidden />
+						Lihat semua ({total}){" "}
+						<Icon icon={ArrowRight01Icon} size={11} aria-hidden />
 					</button>
 				</div>
 			) : null}

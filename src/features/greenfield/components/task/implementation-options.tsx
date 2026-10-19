@@ -1,6 +1,12 @@
 ﻿"use client";
 
-import { Bot, ChevronDown, Copy, Download, Loader2 } from "lucide-react";
+import {
+	ArrowDown01Icon,
+	BotIcon,
+	Copy01Icon,
+	Download01Icon,
+	Loading01Icon,
+} from "@hugeicons/core-free-icons";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +23,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import { EXPORT_FILENAME_PREFIX } from "@/features/greenfield/types/greenfield-constants";
 import { useUIStore } from "@/store";
 import { AI_AGENT_PROMPT_TEMPLATE } from "./ai-agent-prompt-template";
@@ -238,24 +245,24 @@ export function ImplementationOptions({
 						className="gap-1.5"
 					>
 						{isLoading ? (
-							<Loader2 size={14} className="animate-spin" />
+							<Icon icon={Loading01Icon} size={14} className="animate-spin" />
 						) : (
-							<ChevronDown size={14} />
+							<Icon icon={ArrowDown01Icon} size={14} />
 						)}
 						{isLoading ? "Memproses..." : "Pilih Implementasi"}
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" className="w-52">
 					<DropdownMenuItem onClick={handleCopyPrd} disabled={isLoading}>
-						<Copy size={14} className="mr-2 shrink-0" />
+						<Icon icon={Copy01Icon} size={14} className="mr-2 shrink-0" />
 						Copy PRD
 					</DropdownMenuItem>
 					<DropdownMenuItem onClick={handleDownloadZip} disabled={isLoading}>
-						<Download size={14} className="mr-2 shrink-0" />
+						<Icon icon={Download01Icon} size={14} className="mr-2 shrink-0" />
 						Download ZIP
 					</DropdownMenuItem>
 					<DropdownMenuItem onClick={handlePromptAi} disabled={isLoading}>
-						<Bot size={14} className="mr-2 shrink-0" />
+						<Icon icon={BotIcon} size={14} className="mr-2 shrink-0" />
 						Prompt AI Agent
 					</DropdownMenuItem>
 				</DropdownMenuContent>
@@ -266,7 +273,7 @@ export function ImplementationOptions({
 				<DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
 					<DialogHeader>
 						<DialogTitle className="flex items-center gap-2">
-							<Bot size={20} />
+							<Icon icon={BotIcon} size={20} />
 							Prompt AI Agent
 						</DialogTitle>
 						<DialogDescription>
@@ -313,7 +320,7 @@ export function ImplementationOptions({
 							onClick={handleCopyPrompt}
 							className="gap-1.5"
 						>
-							<Copy size={14} />
+							<Icon icon={Copy01Icon} size={14} />
 							Copy & Tutup
 						</Button>
 					</DialogFooter>

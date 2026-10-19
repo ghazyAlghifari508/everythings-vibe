@@ -1,6 +1,11 @@
 "use client";
 
-import { Check, ChevronDown, Circle } from "lucide-react";
+import {
+	ArrowDown01Icon,
+	CircleIcon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { TaskTree } from "@/features/greenfield/services/task-tree";
 
 const FEATURE_ACCENTS = [
@@ -35,7 +40,7 @@ export function TaskMobileTree({ taskTree }: { taskTree: TaskTree }) {
 								borderLeft: `3px solid ${FEATURE_ACCENTS[fi % FEATURE_ACCENTS.length]}`,
 							}}
 						>
-							<ChevronDown size={14} /> {feature.name}
+							<Icon icon={ArrowDown01Icon} size={14} /> {feature.name}
 						</summary>
 						<div className="border-t border-graphite px-3 py-2">
 							{!feature.tasks || feature.tasks.length === 0 ? (
@@ -57,7 +62,11 @@ export function TaskMobileTree({ taskTree }: { taskTree: TaskTree }) {
 														}`}
 													>
 														{isDone ? (
-															<Check size={10} className="stroke-[3]" />
+															<Icon
+																icon={Tick01Icon}
+																size={10}
+																strokeWidth={3}
+															/>
 														) : null}
 													</span>
 													<p
@@ -79,9 +88,11 @@ export function TaskMobileTree({ taskTree }: { taskTree: TaskTree }) {
 																className="text-xs text-fog"
 															>
 																<div className="flex items-center gap-1.5">
-																	<Circle
+																	<Icon
+																		icon={CircleIcon}
 																		size={5}
-																		className="shrink-0 fill-fog/40"
+																		fill="currentColor"
+																		className="shrink-0 text-fog/40 fill-fog/40"
 																	/>{" "}
 																	{sub.name}
 																</div>
