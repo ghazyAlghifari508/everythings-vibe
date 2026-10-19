@@ -16,7 +16,7 @@ import {
 	ShoppingCart01Icon,
 	UserGroupIcon,
 } from "@hugeicons/core-free-icons";
-import type { IconSvgObject } from "@hugeicons/react";
+import type { IconSvgElement } from "@hugeicons/react";
 import { Icon } from "@/components/ui/icon";
 
 type FeatureIconName =
@@ -70,7 +70,7 @@ const FEATURE_ICON_RULES: Array<{ match: RegExp; icon: FeatureIconName }> = [
 	{ match: /lokasi|alamat|peta|maps|wilayah|cabang|toko/i, icon: "map" },
 ];
 
-export type FeatureIconComponent = IconSvgObject;
+export type FeatureIconComponent = IconSvgElement;
 
 const FEATURE_ICON_COMPONENTS: Record<FeatureIconName, FeatureIconComponent> = {
 	dashboard: LayoutGridIcon,

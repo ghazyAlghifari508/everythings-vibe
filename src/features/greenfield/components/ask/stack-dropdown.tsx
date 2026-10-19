@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { ArrowDown01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
-import type { IconSvgObject } from "@hugeicons/react";
+import type { IconSvgElement } from "@hugeicons/react";
 import { useTheme } from "next-themes";
 import {
 	useCallback,
@@ -22,7 +22,7 @@ import { StackDropdownList } from "./stack-dropdown-list";
 interface StackDropdownProps {
 	label: string;
 	subtitle: string;
-	icon: IconSvgObject;
+	icon: IconSvgElement;
 	accent: string;
 	placeholder: string;
 	options: string[];
