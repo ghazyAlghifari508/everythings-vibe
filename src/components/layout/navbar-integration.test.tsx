@@ -191,7 +191,9 @@ describe("Navbar Paywall Integration Contract", () => {
 		expect(shell).toContain("NavbarFlowActions");
 		const source = actions;
 		expect(source).toContain('openPaywallModal("ac")');
-		expect(source).toContain("<Lock");
+		// The lock glyph now comes from the shared Hugeicons Icon primitive.
+		expect(source).toContain("LockIcon");
+		expect(source).toContain("icon={LockIcon}");
 		expect(source).toContain("text-amber-400");
 	});
 });
