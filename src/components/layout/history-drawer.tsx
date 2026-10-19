@@ -1,10 +1,15 @@
 "use client";
 
+import {
+	Cancel01Icon,
+	Clock01Icon,
+	Search01Icon,
+} from "@hugeicons/core-free-icons";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Clock, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { authClient } from "@/lib/auth-client";
 import { APP_TIME_ZONE } from "@/lib/constants";
 import { parseHistoryHref, resolveHistoryUrl } from "@/lib/flow-progress";
@@ -220,7 +225,12 @@ export function HistoryDrawer({
 
 						<header className="flex shrink-0 items-center justify-between border-b border-graphite px-5 py-4">
 							<div className="flex min-w-0 items-center gap-2">
-								<Clock size={16} className="shrink-0 text-fog" aria-hidden />
+								<Icon
+									icon={Clock01Icon}
+									size={16}
+									className="shrink-0 text-fog"
+									aria-hidden
+								/>
 								<h2 className="truncate text-sm font-bold text-snow">
 									Riwayat Projek
 								</h2>
@@ -234,7 +244,7 @@ export function HistoryDrawer({
 								aria-label="Tutup riwayat"
 								className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-graphite text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 							>
-								<X size={14} aria-hidden />
+								<Icon icon={Cancel01Icon} size={14} aria-hidden />
 							</button>
 						</header>
 
@@ -251,7 +261,8 @@ export function HistoryDrawer({
 									placeholder="Cari riwayat, nama projek, atau desain..."
 									className="w-full rounded-md border border-graphite bg-onyx py-2 pl-9 pr-3 text-xs text-snow outline-none transition-colors placeholder:text-slate focus:border-steel"
 								/>
-								<Search
+								<Icon
+									icon={Search01Icon}
 									size={14}
 									aria-hidden
 									className="pointer-events-none absolute left-3 top-2.5 text-fog"

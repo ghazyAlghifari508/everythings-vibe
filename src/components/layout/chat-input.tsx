@@ -1,13 +1,13 @@
-import { Link, useNavigate } from "@tanstack/react-router";
 import {
-	Check,
-	ChevronDown,
-	FolderGit2,
-	Info,
-	Monitor,
-	Plus,
-	Smartphone,
-} from "lucide-react";
+	Add01Icon,
+	ArrowDown01Icon,
+	FolderGitIcon,
+	InformationCircleIcon,
+	MonitorIcon,
+	SmartphoneIcon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
 	DropdownMenu,
@@ -15,6 +15,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import {
@@ -291,7 +292,8 @@ export function ChatInput({
 					<div className="flex items-center gap-1 rounded-lg bg-charcoal p-1 shadow-[var(--shadow-inset)]">
 						{HOME_PROJECT_MODE_OPTIONS.map((option) => {
 							const active = projectMode === option.id;
-							const Icon = option.id === "greenfield" ? Plus : FolderGit2;
+							const modeIcon =
+								option.id === "greenfield" ? Add01Icon : FolderGitIcon;
 							return (
 								<button
 									key={option.id}
@@ -315,7 +317,7 @@ export function ChatInput({
 											: "border border-transparent text-fog hover:text-snow",
 									)}
 								>
-									<Icon size={13} />
+									<Icon icon={modeIcon} size={13} />
 									{option.label}
 								</button>
 							);
@@ -365,7 +367,7 @@ export function ChatInput({
 												: "border border-transparent text-fog hover:text-snow",
 										)}
 									>
-										<Smartphone size={12} />
+										<Icon icon={SmartphoneIcon} size={12} />
 										App
 									</button>
 									<button
@@ -380,7 +382,7 @@ export function ChatInput({
 												: "border border-transparent text-fog hover:text-snow",
 										)}
 									>
-										<Monitor size={12} />
+										<Icon icon={MonitorIcon} size={12} />
 										Web
 									</button>
 								</div>
@@ -390,7 +392,11 @@ export function ChatInput({
 						{/* Informational callout for existing codebase mode */}
 						{projectMode === "existing_codebase" && (
 							<div className="flex items-start gap-2.5 rounded-md border border-iron/40 bg-charcoal/80 px-3 py-2 text-left">
-								<Info size={14} className="mt-0.5 shrink-0 text-mist" />
+								<Icon
+									icon={InformationCircleIcon}
+									size={14}
+									className="mt-0.5 shrink-0 text-mist"
+								/>
 								<p className="font-inter text-[12px] leading-relaxed text-fog">
 									<span className="font-[510] text-mist">
 										Tambahkan fitur di codebase kamu:
@@ -446,7 +452,11 @@ export function ChatInput({
 											<span>
 												{language === "en" ? "English" : "Bahasa Indonesia"}
 											</span>
-											<ChevronDown size={11} className="text-slate" />
+											<Icon
+												icon={ArrowDown01Icon}
+												size={11}
+												className="text-slate"
+											/>
 										</button>
 									</DropdownMenuTrigger>
 									<DropdownMenuContent
@@ -475,7 +485,11 @@ export function ChatInput({
 													<span>{langOpt.label}</span>
 												</span>
 												{language === langOpt.id && (
-													<Check size={13} className="text-snow" />
+													<Icon
+														icon={Tick01Icon}
+														size={13}
+														className="text-snow"
+													/>
 												)}
 											</DropdownMenuItem>
 										))}

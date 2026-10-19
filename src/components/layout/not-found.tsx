@@ -1,8 +1,13 @@
 "use client";
 
+import {
+	ArrowRight01Icon,
+	Compass01Icon,
+	House01Icon,
+} from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Compass, House } from "lucide-react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { Icon } from "@/components/ui/icon";
 
 export interface NotFoundComponentProps {
 	data?: unknown;
@@ -32,7 +37,7 @@ export function NotFoundComponent(_props?: NotFoundComponentProps) {
 				>
 					<div>
 						<span className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow">
-							<House size={24} aria-hidden />
+							<Icon icon={House01Icon} size={24} aria-hidden />
 						</span>
 						<p className="mb-2 font-mono text-xs uppercase tracking-widest text-fog">
 							Halaman Utama
@@ -49,7 +54,8 @@ export function NotFoundComponent(_props?: NotFoundComponentProps) {
 						<span className="font-mono text-fog">Menuju /</span>
 						<span className="flex items-center gap-1 font-mono text-snow">
 							Buka
-							<ArrowRight
+							<Icon
+								icon={ArrowRight01Icon}
 								size={14}
 								aria-hidden
 								className="transition-transform group-hover:translate-x-1"
@@ -64,7 +70,7 @@ export function NotFoundComponent(_props?: NotFoundComponentProps) {
 				>
 					<div>
 						<span className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow">
-							<Compass size={24} aria-hidden />
+							<Icon icon={Compass01Icon} size={24} aria-hidden />
 						</span>
 						<p className="mb-2 font-mono text-xs uppercase tracking-widest text-fog">
 							Workspace Planner
@@ -79,7 +85,8 @@ export function NotFoundComponent(_props?: NotFoundComponentProps) {
 						<span className="font-mono text-fog">Menuju /plan</span>
 						<span className="flex items-center gap-1 font-mono text-snow">
 							Buka
-							<ArrowRight
+							<Icon
+								icon={ArrowRight01Icon}
 								size={14}
 								aria-hidden
 								className="transition-transform group-hover:translate-x-1"

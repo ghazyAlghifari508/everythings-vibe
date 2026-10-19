@@ -1,5 +1,15 @@
 "use client";
 
+import {
+	Cancel01Icon,
+	CreditCardIcon,
+	Logout01Icon,
+	Menu01Icon,
+	MessageSquareIcon,
+	Settings01Icon,
+	Shield01Icon,
+	UserIcon,
+} from "@hugeicons/core-free-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import {
 	Link,
@@ -8,18 +18,9 @@ import {
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
-import {
-	CreditCard,
-	LogOut,
-	Menu,
-	MessageSquare,
-	Settings,
-	Shield,
-	User,
-	X,
-} from "lucide-react";
 import { useState } from "react";
 import { canShowNavbarTopUp } from "@/components/layout/navbar-topup-helper";
+import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { TopUpModal } from "@/features/billing/components/top-up-modal";
@@ -133,7 +134,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 			aria-label="Isi ulang kredit"
 			className="flex h-8 items-center gap-1.5 rounded-md border border-graphite bg-transparent px-2.5 font-inter text-xs font-[510] text-fog transition-colors hover:border-fog/50 hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40"
 		>
-			<CreditCard size={13} aria-hidden />
+			<Icon icon={CreditCardIcon} size={13} aria-hidden />
 			<span>Top Up</span>
 		</button>
 	) : null;
@@ -150,7 +151,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							aria-label="Menu dokumen proyek"
 							title="Dokumen Proyek"
 						>
-							<Menu size={16} />
+							<Icon icon={Menu01Icon} size={16} />
 						</button>
 					)}
 					{user && pathname === "/" && (
@@ -161,7 +162,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							aria-label="Riwayat"
 							title="Riwayat Proyek"
 						>
-							<Menu size={16} />
+							<Icon icon={Menu01Icon} size={16} />
 						</button>
 					)}
 					<Logo height={28} />
@@ -210,7 +211,11 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							aria-label="Toggle menu"
 							aria-expanded={isMobileMenuOpen}
 						>
-							{isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+							{isMobileMenuOpen ? (
+								<Icon icon={Cancel01Icon} size={20} />
+							) : (
+								<Icon icon={Menu01Icon} size={20} />
+							)}
 						</button>
 					)}
 					{isFlowStepRoute && (
@@ -255,7 +260,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 										aria-expanded={isDropdownOpen}
 										className="flex h-8 w-8 items-center justify-center rounded-full bg-obsidian text-fog shadow-[var(--shadow-inset)] transition-colors duration-300 hover:text-snow"
 									>
-										<User size={16} />
+										<Icon icon={UserIcon} size={16} />
 									</button>
 									{isDropdownOpen && (
 										<>
@@ -277,7 +282,11 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 													onClick={() => setIsDropdownOpen(false)}
 													className="flex items-center gap-3 px-4 py-2.5 text-sm font-[510] text-mist transition-colors hover:bg-white/5 hover:text-snow"
 												>
-													<Settings size={16} className="text-fog" />
+													<Icon
+														icon={Settings01Icon}
+														size={16}
+														className="text-fog"
+													/>
 													Setting
 												</Link>
 												{session?.user && isAdmin(session.user) && (
@@ -286,7 +295,11 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 														onClick={() => setIsDropdownOpen(false)}
 														className="flex items-center gap-3 px-4 py-2.5 text-sm font-[510] text-mist transition-colors hover:bg-white/5 hover:text-snow"
 													>
-														<Shield size={16} className="text-fog" />
+														<Icon
+															icon={Shield01Icon}
+															size={16}
+															className="text-fog"
+														/>
 														Admin
 													</Link>
 												)}
@@ -295,7 +308,11 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 													onClick={() => setIsDropdownOpen(false)}
 													className="flex items-center gap-3 px-4 py-2.5 text-sm font-[510] text-mist transition-colors hover:bg-white/5 hover:text-snow"
 												>
-													<MessageSquare size={16} className="text-fog" />
+													<Icon
+														icon={MessageSquareIcon}
+														size={16}
+														className="text-fog"
+													/>
 													Bantuan &amp; Feedback
 												</Link>
 												<div className="my-1 h-px w-full bg-graphite" />
@@ -307,7 +324,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 													}}
 													className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-[510] text-crimson transition-colors hover:bg-crimson/10"
 												>
-													<LogOut size={16} />
+													<Icon icon={Logout01Icon} size={16} />
 													Log Out
 												</button>
 											</div>

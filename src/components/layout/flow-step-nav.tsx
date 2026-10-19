@@ -1,7 +1,8 @@
 "use client";
 
+import { Tick01Icon } from "@hugeicons/core-free-icons";
 import { useLocation } from "@tanstack/react-router";
-import { Check } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import {
 	type FlowStep,
 	routeToStep,
@@ -95,7 +96,11 @@ export function FlowStepNav(props?: {
 								)}
 								aria-hidden="true"
 							>
-								{isCompleted ? <Check size={12} strokeWidth={3} /> : idx + 1}
+								{isCompleted ? (
+									<Icon icon={Tick01Icon} size={12} strokeWidth={3} />
+								) : (
+									idx + 1
+								)}
 							</span>
 							<span
 								className={cn(
@@ -193,7 +198,11 @@ export function CodebaseStepNav(props: {
 								)}
 								aria-hidden="true"
 							>
-								{isCompleted ? <Check size={12} strokeWidth={3} /> : idx + 1}
+								{isCompleted ? (
+									<Icon icon={Tick01Icon} size={12} strokeWidth={3} />
+								) : (
+									idx + 1
+								)}
 							</span>
 							<span
 								className={cn(

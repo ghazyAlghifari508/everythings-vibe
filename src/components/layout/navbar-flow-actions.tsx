@@ -1,6 +1,11 @@
+import {
+	ArrowRight01Icon,
+	LockIcon,
+	MessageSquareIcon,
+} from "@hugeicons/core-free-icons";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Lock, MessageSquare } from "lucide-react";
 import { useState, useTransition } from "react";
+import { Icon } from "@/components/ui/icon";
 import {
 	getPendingPrdPrompt,
 	getSetupPrompt,
@@ -86,7 +91,7 @@ export function NavbarFlowActions({
 					className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
 				>
 					<span className="whitespace-nowrap">{flowCta.label}</span>
-					<ArrowRight size={12} />
+					<Icon icon={ArrowRight01Icon} size={12} />
 				</button>
 			)}
 			{routeStep === "fitur" && (
@@ -120,7 +125,7 @@ export function NavbarFlowActions({
 					) : (
 						<>
 							<span className="whitespace-nowrap">Generate PRD</span>
-							<ArrowRight size={12} />
+							<Icon icon={ArrowRight01Icon} size={12} />
 						</>
 					)}
 				</button>
@@ -133,7 +138,7 @@ export function NavbarFlowActions({
 						className="hidden md:flex items-center gap-1.5 rounded-md bg-charcoal px-3 py-1.5 text-xs font-[510] text-fog shadow-[var(--shadow-inset)] transition-colors hover:bg-white/5 hover:text-snow"
 						aria-label="Buka/tutup chat"
 					>
-						<MessageSquare size={14} />
+						<Icon icon={MessageSquareIcon} size={14} />
 						<span>Chat</span>
 					</button>
 					{isFree ? (
@@ -142,9 +147,9 @@ export function NavbarFlowActions({
 							onClick={() => useUIStore.getState().openPaywallModal("ac")}
 							className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
 						>
-							<Lock size={12} className="text-amber-400" />
+							<Icon icon={LockIcon} size={12} className="text-amber-400" />
 							<span className="whitespace-nowrap">Upgrade ke Pro</span>
-							<ArrowRight size={12} />
+							<Icon icon={ArrowRight01Icon} size={12} />
 						</button>
 					) : flowCta?.kind === "navigate" ? (
 						<button
@@ -157,7 +162,7 @@ export function NavbarFlowActions({
 							className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
 						>
 							<span className="whitespace-nowrap">{flowCta.label}</span>
-							<ArrowRight size={12} />
+							<Icon icon={ArrowRight01Icon} size={12} />
 						</button>
 					) : (
 						<button
@@ -173,7 +178,7 @@ export function NavbarFlowActions({
 							) : (
 								<>
 									<span>Generate AC</span>
-									<ArrowRight size={12} />
+									<Icon icon={ArrowRight01Icon} size={12} />
 								</>
 							)}
 						</button>
@@ -187,7 +192,7 @@ export function NavbarFlowActions({
 						className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
 					>
 						<span className="whitespace-nowrap">Upgrade ke Pro</span>
-						<ArrowRight size={12} />
+						<Icon icon={ArrowRight01Icon} size={12} />
 					</Link>
 				) : flowCta?.kind === "navigate" ? (
 					<button
@@ -200,7 +205,7 @@ export function NavbarFlowActions({
 						className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
 					>
 						<span className="whitespace-nowrap">{flowCta.label}</span>
-						<ArrowRight size={12} />
+						<Icon icon={ArrowRight01Icon} size={12} />
 					</button>
 				) : (
 					<button
@@ -228,7 +233,7 @@ export function NavbarFlowActions({
 						) : (
 							<>
 								<span>Generate Task</span>
-								<ArrowRight size={12} />
+								<Icon icon={ArrowRight01Icon} size={12} />
 							</>
 						)}
 					</button>
