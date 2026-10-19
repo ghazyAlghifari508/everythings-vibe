@@ -1,5 +1,6 @@
-import { Download, Search } from "lucide-react";
+import { Download01Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useMemo, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { scrapePages } from "@/db/schema";
 import { buildWebsiteBlueprint } from "@/features/scrape/utils/crawl-blueprint";
 import { cn } from "@/lib/utils";
@@ -125,7 +126,7 @@ export function CrawlResult({
 						onClick={download}
 						className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-graphite px-4 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
 					>
-						<Download size={16} aria-hidden />
+						<Icon icon={Download01Icon} size={16} aria-hidden />
 						Download .md
 					</button>
 				</div>
@@ -167,7 +168,8 @@ export function CrawlResult({
 					<div className="mb-3 flex flex-col gap-2 sm:flex-row">
 						<label className="relative min-w-0 flex-1">
 							<span className="sr-only">Cari halaman</span>
-							<Search
+							<Icon
+								icon={Search01Icon}
 								size={16}
 								aria-hidden
 								className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fog"

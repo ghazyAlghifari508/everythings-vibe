@@ -1,7 +1,8 @@
 "use client";
 
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
 import {
 	SCRAPE_HISTORY_RETURN_FROM,
@@ -26,7 +27,7 @@ export function ScrapeBackLink({
 				replace
 				className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-fog transition-colors hover:text-snow"
 			>
-				<ArrowLeft size={16} aria-hidden />
+				<Icon icon={ArrowLeft01Icon} size={16} aria-hidden />
 				Kembali
 			</Link>
 		);
@@ -39,7 +40,7 @@ export function ScrapeBackLink({
 			replace
 			className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-fog transition-colors hover:text-snow"
 		>
-			<ArrowLeft size={16} aria-hidden />
+			<Icon icon={ArrowLeft01Icon} size={16} aria-hidden />
 			Kembali
 		</Link>
 	);

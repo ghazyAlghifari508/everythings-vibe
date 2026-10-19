@@ -1,11 +1,19 @@
 "use client";
 
-import { Bot, Check, Code, Copy, Download, Eye } from "lucide-react";
+import {
+	BotIcon,
+	CodeIcon,
+	Copy01Icon,
+	Download01Icon,
+	Tick01Icon,
+	ViewIcon,
+} from "@hugeicons/core-free-icons";
 import { useEffect, useId, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { markdownComponents } from "./design-md-markdown-components";
 import { copyText, downloadFile } from "./scrape-file-actions";
 
@@ -122,9 +130,14 @@ export function DesignMdSourcePanel({
 						className={ICON_BUTTON_CLASS}
 					>
 						{copied ? (
-							<Check size={15} aria-hidden className="text-emerald-400" />
+							<Icon
+								icon={Tick01Icon}
+								size={15}
+								aria-hidden
+								className="text-emerald-400"
+							/>
 						) : (
-							<Copy size={15} aria-hidden />
+							<Icon icon={Copy01Icon} size={15} aria-hidden />
 						)}
 					</button>
 					<button
@@ -135,7 +148,7 @@ export function DesignMdSourcePanel({
 						title="Download DESIGN.md"
 						className={ICON_BUTTON_CLASS}
 					>
-						<Download size={15} aria-hidden />
+						<Icon icon={Download01Icon} size={15} aria-hidden />
 					</button>
 					<Button
 						type="button"
@@ -144,7 +157,7 @@ export function DesignMdSourcePanel({
 						onClick={onImplementAgent}
 						className="ml-1 gap-1.5"
 					>
-						<Bot size={14} aria-hidden />
+						<Icon icon={BotIcon} size={14} aria-hidden />
 						Implement ke AI Agent
 					</Button>
 				</div>
@@ -177,7 +190,7 @@ export function DesignMdSourcePanel({
 								: "text-fog hover:text-mist"
 						}`}
 					>
-						<Eye size={15} aria-hidden />
+						<Icon icon={ViewIcon} size={15} aria-hidden />
 						<span>Rendered</span>
 					</button>
 					<button
@@ -202,7 +215,7 @@ export function DesignMdSourcePanel({
 								: "text-fog hover:text-mist"
 						}`}
 					>
-						<Code size={15} aria-hidden />
+						<Icon icon={CodeIcon} size={15} aria-hidden />
 						<span>Source</span>
 					</button>
 				</div>

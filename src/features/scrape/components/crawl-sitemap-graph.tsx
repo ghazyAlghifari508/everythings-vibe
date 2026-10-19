@@ -1,7 +1,8 @@
 "use client";
 
-import { Scan } from "lucide-react";
+import { ScanIcon } from "@hugeicons/core-free-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { ZoomControls } from "@/components/ui/zoom-controls";
 import type { scrapePages } from "@/db/schema";
 import { layoutCrawlGraph } from "@/features/scrape/utils/crawl-graph";
@@ -187,7 +188,7 @@ export function CrawlSitemapGraph({
 							aria-label="Pusatkan grafik"
 							className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-2.5 text-xs font-medium text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:ring-2 focus-visible:ring-indigo"
 						>
-							<Scan size={14} aria-hidden />
+							<Icon icon={ScanIcon} size={14} aria-hidden />
 							<span>Fit</span>
 						</button>
 						<ZoomControls

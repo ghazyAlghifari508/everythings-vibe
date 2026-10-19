@@ -1,4 +1,5 @@
-import { Search } from "lucide-react";
+import { Search01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
 import { ScrapeFilterSelect } from "./scrape-filter-select";
 
@@ -34,7 +35,8 @@ export function ScrapeHistorySearchControls({
 				<label htmlFor="scrape-history-search" className="sr-only">
 					Cari nama website atau domain
 				</label>
-				<Search
+				<Icon
+					icon={Search01Icon}
 					size={16}
 					aria-hidden="true"
 					className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fog"

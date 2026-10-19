@@ -1,4 +1,9 @@
-import { AlertTriangle, Check, Loader2 } from "lucide-react";
+import {
+	Alert02Icon,
+	Loading01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeMode, ScrapeStatus } from "@/db/schema";
 import { cn } from "@/lib/utils";
 
@@ -43,10 +48,13 @@ type StepState = "done" | "active" | "pending" | "failed";
 
 function StepMarker({ state }: { state: StepState }) {
 	if (state === "done")
-		return <Check size={14} aria-hidden className="text-mist" />;
+		return (
+			<Icon icon={Tick01Icon} size={14} aria-hidden className="text-mist" />
+		);
 	if (state === "active")
 		return (
-			<Loader2
+			<Icon
+				icon={Loading01Icon}
 				size={14}
 				aria-hidden
 				data-active-stage-spinner
@@ -55,7 +63,8 @@ function StepMarker({ state }: { state: StepState }) {
 		);
 	if (state === "failed")
 		return (
-			<AlertTriangle
+			<Icon
+				icon={Alert02Icon}
 				size={14}
 				aria-hidden
 				data-failed-stage-marker

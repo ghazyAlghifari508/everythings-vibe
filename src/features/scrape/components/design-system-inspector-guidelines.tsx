@@ -1,4 +1,5 @@
-import { Check, X } from "lucide-react";
+import { Cancel01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { InspectorGuideline } from "@/features/scrape/utils/design-md-inspector";
 
 export function GuidelineList({
@@ -13,16 +14,16 @@ export function GuidelineList({
 			{rules.map((rule) => (
 				<li key={rule.rule} className="flex items-start gap-2">
 					{tone === "do" ? (
-						<Check
+						<Icon
+							icon={Tick01Icon}
 							size={15}
-							strokeWidth={2.5}
 							className="mt-0.5 shrink-0 text-emerald-400"
 							aria-hidden="true"
 						/>
 					) : (
-						<X
+						<Icon
+							icon={Cancel01Icon}
 							size={15}
-							strokeWidth={2.5}
 							className="mt-0.5 shrink-0 text-crimson"
 							aria-hidden="true"
 						/>

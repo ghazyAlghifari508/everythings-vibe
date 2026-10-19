@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { Loading03Icon } from "@hugeicons/core-free-icons";
 import {
 	Dialog,
 	DialogContent,
@@ -7,6 +7,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Icon } from "@/components/ui/icon";
 import { displaySiteName } from "@/features/scrape/utils/site-name";
 import type { ScrapeHistoryItem } from "./scrape-history-list-item";
 
@@ -52,7 +53,9 @@ export function ScrapeHistoryDeleteDialog({
 						disabled={deleting}
 						className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-500 disabled:opacity-50"
 					>
-						{deleting ? <Loader2 size={12} className="animate-spin" /> : null}
+						{deleting ? (
+							<Icon icon={Loading03Icon} size={12} className="animate-spin" />
+						) : null}
 						Konfirmasi Hapus
 					</button>
 				</DialogFooter>

@@ -1,9 +1,10 @@
 "use client";
 
+import { ArrowUp01Icon, Loading01Icon } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowUp, Loader2 } from "lucide-react";
 import { type FormEvent, useId, useRef, useState } from "react";
 import { z } from "zod";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeMode } from "@/db/schema";
 import {
 	crawlSettingsSchema,
@@ -193,13 +194,14 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 							className="btn-primary inline-flex size-14 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
 						>
 							{pending ? (
-								<Loader2
+								<Icon
+									icon={Loading01Icon}
 									size={20}
 									aria-hidden
 									className="motion-safe:animate-spin"
 								/>
 							) : (
-								<ArrowUp size={20} aria-hidden />
+								<Icon icon={ArrowUp01Icon} size={20} aria-hidden />
 							)}
 						</button>
 					</div>

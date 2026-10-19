@@ -1,11 +1,12 @@
 import {
-	Check,
-	Code,
-	Copy,
-	Download,
-	Eye,
-	Image as ImageIcon,
-} from "lucide-react";
+	CodeIcon,
+	Copy01Icon,
+	Download01Icon,
+	Image01Icon,
+	Tick01Icon,
+	ViewIcon,
+} from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 
 export type HtmlViewTab = "preview" | "code";
 
@@ -67,7 +68,7 @@ export function ScrapeHtmlToolbar({
 							: "text-fog hover:text-mist"
 					}`}
 				>
-					<Eye size={16} aria-hidden />
+					<Icon icon={ViewIcon} size={16} aria-hidden />
 					<span>Visual</span>
 				</button>
 				<button
@@ -91,7 +92,7 @@ export function ScrapeHtmlToolbar({
 							: "text-fog hover:text-mist"
 					}`}
 				>
-					<Code size={16} aria-hidden />
+					<Icon icon={CodeIcon} size={16} aria-hidden />
 					<span className="hidden sm:inline">HTML Source</span>
 					<span className="sm:hidden">HTML</span>
 				</button>
@@ -106,7 +107,7 @@ export function ScrapeHtmlToolbar({
 						title={`Download screenshot ${screenshotFilename}`}
 						className={ICON_BUTTON_CLASS}
 					>
-						<ImageIcon size={15} aria-hidden />
+						<Icon icon={Image01Icon} size={15} aria-hidden />
 					</button>
 				) : null}
 				<button
@@ -118,9 +119,14 @@ export function ScrapeHtmlToolbar({
 					className={ICON_BUTTON_CLASS}
 				>
 					{copied ? (
-						<Check size={15} aria-hidden className="text-emerald-400" />
+						<Icon
+							icon={Tick01Icon}
+							size={15}
+							aria-hidden
+							className="text-emerald-400"
+						/>
 					) : (
-						<Copy size={15} aria-hidden />
+						<Icon icon={Copy01Icon} size={15} aria-hidden />
 					)}
 				</button>
 				<button
@@ -131,7 +137,7 @@ export function ScrapeHtmlToolbar({
 					title={downloadLabel}
 					className={ICON_BUTTON_CLASS}
 				>
-					<Download size={15} aria-hidden />
+					<Icon icon={Download01Icon} size={15} aria-hidden />
 				</button>
 			</div>
 		</div>

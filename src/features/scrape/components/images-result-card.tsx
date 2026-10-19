@@ -1,5 +1,11 @@
-import { Check, Copy, Download, ExternalLink } from "lucide-react";
+import {
+	Copy01Icon,
+	Download01Icon,
+	LinkSquare01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import {
 	diagnosticLabels,
 	type ImageResult,
@@ -157,7 +163,7 @@ export function ImageCard({
 						title="Download gambar"
 						className="inline-flex size-11 items-center justify-center rounded-md border border-graphite text-snow focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50"
 					>
-						<Download size={16} aria-hidden />
+						<Icon icon={Download01Icon} size={16} aria-hidden />
 					</button>
 					<a
 						href={image.url}
@@ -167,7 +173,7 @@ export function ImageCard({
 						title="Buka gambar asli"
 						className="inline-flex size-11 items-center justify-center rounded-md border border-graphite text-snow focus-visible:ring-2 focus-visible:ring-indigo"
 					>
-						<ExternalLink size={16} aria-hidden />
+						<Icon icon={LinkSquare01Icon} size={16} aria-hidden />
 					</a>
 					<button
 						type="button"
@@ -177,9 +183,9 @@ export function ImageCard({
 						className="inline-flex size-11 items-center justify-center rounded-md border border-graphite text-snow focus-visible:ring-2 focus-visible:ring-indigo"
 					>
 						{copied ? (
-							<Check size={16} aria-hidden />
+							<Icon icon={Tick01Icon} size={16} aria-hidden />
 						) : (
-							<Copy size={16} aria-hidden />
+							<Icon icon={Copy01Icon} size={16} aria-hidden />
 						)}
 					</button>
 				</div>

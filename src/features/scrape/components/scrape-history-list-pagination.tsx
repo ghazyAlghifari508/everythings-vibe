@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import { SCRAPE_HISTORY_PAGE_SIZES } from "@/features/scrape/types/scrape-constants";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
 import { ScrapeFilterSelect } from "./scrape-filter-select";
@@ -65,7 +66,7 @@ export function ScrapeHistoryPagination({
 					aria-label="Halaman sebelumnya"
 					className={NAV_BUTTON_DESKTOP_CLASS}
 				>
-					<ChevronLeft size={16} aria-hidden="true" />
+					<Icon icon={ArrowLeft01Icon} size={16} aria-hidden="true" />
 				</button>
 				{pageWindow(page, totalPages).map((entry) =>
 					entry.type === "gap" ? (
@@ -100,7 +101,7 @@ export function ScrapeHistoryPagination({
 					aria-label="Halaman berikutnya"
 					className={NAV_BUTTON_DESKTOP_CLASS}
 				>
-					<ChevronRight size={16} aria-hidden="true" />
+					<Icon icon={ArrowRight01Icon} size={16} aria-hidden="true" />
 				</button>
 			</div>
 			<div className="flex items-center gap-2 sm:hidden">
@@ -111,7 +112,7 @@ export function ScrapeHistoryPagination({
 					aria-label="Halaman sebelumnya"
 					className={NAV_BUTTON_MOBILE_CLASS}
 				>
-					<ChevronLeft size={16} aria-hidden="true" />
+					<Icon icon={ArrowLeft01Icon} size={16} aria-hidden="true" />
 				</button>
 				<button
 					type="button"
@@ -120,7 +121,7 @@ export function ScrapeHistoryPagination({
 					aria-label="Halaman berikutnya"
 					className={NAV_BUTTON_MOBILE_CLASS}
 				>
-					<ChevronRight size={16} aria-hidden="true" />
+					<Icon icon={ArrowRight01Icon} size={16} aria-hidden="true" />
 				</button>
 			</div>
 			<ScrapeFilterSelect

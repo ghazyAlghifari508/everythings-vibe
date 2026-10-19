@@ -1,5 +1,6 @@
-import { ChevronDown } from "lucide-react";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { useId } from "react";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 export interface ScrapeFilterOption {
@@ -45,7 +46,8 @@ export function ScrapeFilterSelect({
 						</option>
 					))}
 				</select>
-				<ChevronDown
+				<Icon
+					icon={ArrowDown01Icon}
 					size={16}
 					aria-hidden
 					className="pointer-events-none absolute top-1/2 right-3 shrink-0 -translate-y-1/2 text-fog"

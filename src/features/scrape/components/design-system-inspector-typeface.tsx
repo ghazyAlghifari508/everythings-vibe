@@ -1,4 +1,5 @@
-import { AlertTriangle } from "lucide-react";
+import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { InspectorTypeface } from "@/features/scrape/utils/design-md-inspector";
 import {
 	FALLBACK_SAMPLE,
@@ -59,7 +60,12 @@ export function TypefaceCard({ typeface }: { typeface: InspectorTypeface }) {
 				</p>
 				{typeface.uncertainty ? (
 					<p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-4 text-fog">
-						<AlertTriangle size={12} aria-hidden className="mt-0.5 shrink-0" />
+						<Icon
+							icon={Alert02Icon}
+							size={12}
+							aria-hidden
+							className="mt-0.5 shrink-0"
+						/>
 						{typeface.uncertainty}
 					</p>
 				) : null}

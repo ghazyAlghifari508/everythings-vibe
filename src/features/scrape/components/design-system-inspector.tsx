@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, Info } from "lucide-react";
+import { Alert02Icon, InformationCircleIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { DesignInspectorModel } from "@/features/scrape/utils/design-md-inspector";
 import {
 	GuidelineList,
@@ -110,9 +111,15 @@ export function DesignSystemInspector({
 					</summary>
 					<p className="mt-1.5 flex items-start gap-2 text-xs leading-5 text-fog">
 						{model.verification === "observed" ? (
-							<Info size={14} aria-hidden className="mt-0.5 shrink-0" />
+							<Icon
+								icon={InformationCircleIcon}
+								size={14}
+								aria-hidden
+								className="mt-0.5 shrink-0"
+							/>
 						) : (
-							<AlertTriangle
+							<Icon
+								icon={Alert02Icon}
 								size={14}
 								aria-hidden
 								className="mt-0.5 shrink-0"

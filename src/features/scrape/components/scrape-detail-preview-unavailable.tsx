@@ -1,4 +1,10 @@
-import { AlertTriangle, Code, Loader2, RotateCw } from "lucide-react";
+import {
+	Alert02Icon,
+	CodeIcon,
+	Loading01Icon,
+	RotateRight01Icon,
+} from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 
 export function PreviewUnavailable({
 	message,
@@ -19,13 +25,19 @@ export function PreviewUnavailable({
 			className="flex min-h-[280px] flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center"
 		>
 			{isLoading ? (
-				<Loader2
+				<Icon
+					icon={Loading01Icon}
 					size={20}
 					aria-hidden
 					className="text-fog motion-safe:animate-spin motion-reduce:animate-none"
 				/>
 			) : (
-				<AlertTriangle size={20} aria-hidden className="text-amber-400" />
+				<Icon
+					icon={Alert02Icon}
+					size={20}
+					aria-hidden
+					className="text-amber-400"
+				/>
 			)}
 			<output className="text-sm font-semibold text-snow">{message}</output>
 			<p className="max-w-md text-xs leading-5 text-fog">
@@ -41,7 +53,7 @@ export function PreviewUnavailable({
 						title="View HTML Source"
 						className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
-						<Code size={14} aria-hidden />
+						<Icon icon={CodeIcon} size={14} aria-hidden />
 						Buka Source HTML
 					</button>
 				) : null}
@@ -51,7 +63,7 @@ export function PreviewUnavailable({
 						onClick={onRetry}
 						className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
-						<RotateCw size={14} aria-hidden />
+						<Icon icon={RotateRight01Icon} size={14} aria-hidden />
 						Coba lagi
 					</button>
 				) : null}

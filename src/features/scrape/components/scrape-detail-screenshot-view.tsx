@@ -1,4 +1,5 @@
-import { Code, RotateCw } from "lucide-react";
+import { CodeIcon, RotateRight01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 
 export function ScreenshotView({
 	screenshot,
@@ -29,7 +30,7 @@ export function ScreenshotView({
 							onClick={onOpenSource}
 							className="inline-flex items-center gap-1 text-[11px] text-fog hover:text-snow"
 						>
-							<Code size={13} aria-hidden />
+							<Icon icon={CodeIcon} size={13} aria-hidden />
 							Lihat HTML Source
 						</button>
 					) : null}
@@ -39,7 +40,7 @@ export function ScreenshotView({
 							onClick={onRetry}
 							className="inline-flex items-center gap-1 text-[11px] text-fog hover:text-snow"
 						>
-							<RotateCw size={13} aria-hidden />
+							<Icon icon={RotateRight01Icon} size={13} aria-hidden />
 							Coba lagi preview
 						</button>
 					) : null}

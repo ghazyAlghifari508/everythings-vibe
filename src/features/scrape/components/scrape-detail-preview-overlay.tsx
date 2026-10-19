@@ -1,4 +1,5 @@
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { Alert02Icon, Loading01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { PreviewFrameReport } from "@/features/scrape/utils/preview-readiness";
 import { ScreenshotView } from "./scrape-detail-screenshot-view";
 
@@ -56,7 +57,8 @@ export function PreviewCanvasOverlay({
 	if (report === "degraded") {
 		return (
 			<div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-graphite bg-obsidian/95 px-2.5 py-1.5 text-xs">
-				<AlertTriangle
+				<Icon
+					icon={Alert02Icon}
 					size={14}
 					aria-hidden
 					className="shrink-0 text-amber-400"
@@ -71,7 +73,8 @@ export function PreviewCanvasOverlay({
 	if (report === "preparing") {
 		return (
 			<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
-				<Loader2
+				<Icon
+					icon={Loading01Icon}
 					size={20}
 					aria-hidden
 					className="text-fog motion-safe:animate-spin motion-reduce:animate-none"
@@ -95,7 +98,12 @@ export function PreviewCanvasOverlay({
 	}
 	return (
 		<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
-			<AlertTriangle size={20} aria-hidden className="text-amber-400" />
+			<Icon
+				icon={Alert02Icon}
+				size={20}
+				aria-hidden
+				className="text-amber-400"
+			/>
 			<output className="text-sm font-semibold text-snow">{label}</output>
 			<p className="max-w-md text-xs leading-5 text-fog">
 				Visual preview unavailable. The website could not be shown accurately.{" "}

@@ -1,11 +1,12 @@
-import { Link } from "@tanstack/react-router";
 import {
-	AlertTriangle,
-	Check,
-	ChevronRight,
-	Loader2,
-	Trash2,
-} from "lucide-react";
+	Alert02Icon,
+	ArrowRight01Icon,
+	Delete02Icon,
+	Loading03Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeMode } from "@/db/schema";
 import type { buildHistoryDetailSearch } from "@/features/scrape/utils/scrape-history";
 import {
@@ -99,11 +100,16 @@ export function ScrapeHistoryRow({
 						}`}
 					>
 						{processing ? (
-							<Loader2 size={12} aria-hidden="true" className="animate-spin" />
+							<Icon
+								icon={Loading03Icon}
+								size={12}
+								aria-hidden="true"
+								className="animate-spin"
+							/>
 						) : failed ? (
-							<AlertTriangle size={12} aria-hidden="true" />
+							<Icon icon={Alert02Icon} size={12} aria-hidden="true" />
 						) : (
-							<Check size={12} aria-hidden="true" />
+							<Icon icon={Tick01Icon} size={12} aria-hidden="true" />
 						)}
 						{statusLabel(item.status)}
 					</span>
@@ -119,7 +125,8 @@ export function ScrapeHistoryRow({
 				)}
 			</Link>
 
-			<ChevronRight
+			<Icon
+				icon={ArrowRight01Icon}
 				size={16}
 				aria-hidden="true"
 				className="shrink-0 text-fog"
@@ -133,9 +140,9 @@ export function ScrapeHistoryRow({
 				className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent text-fog transition-colors hover:border-graphite hover:bg-onyx hover:text-rose-400 disabled:opacity-50"
 			>
 				{deleting ? (
-					<Loader2 size={14} className="animate-spin" />
+					<Icon icon={Loading03Icon} size={14} className="animate-spin" />
 				) : (
-					<Trash2 size={14} aria-hidden="true" />
+					<Icon icon={Delete02Icon} size={14} aria-hidden="true" />
 				)}
 			</button>
 		</li>

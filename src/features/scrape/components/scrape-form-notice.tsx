@@ -1,4 +1,5 @@
-import { Info } from "lucide-react";
+import { InformationCircleIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 export function ScrapeFormNotice({
@@ -16,7 +17,12 @@ export function ScrapeFormNotice({
 					className,
 				)}
 			>
-				<Info size={16} aria-hidden className="mt-0.5 shrink-0" />
+				<Icon
+					icon={InformationCircleIcon}
+					size={16}
+					aria-hidden
+					className="mt-0.5 shrink-0"
+				/>
 				<span>
 					<span className="block font-semibold text-snow">
 						Tidak semua website dapat di-scrape
@@ -35,7 +41,12 @@ export function ScrapeFormNotice({
 				className,
 			)}
 		>
-			<Info size={16} aria-hidden className="mt-0.5 shrink-0" />
+			<Icon
+				icon={InformationCircleIcon}
+				size={16}
+				aria-hidden
+				className="mt-0.5 shrink-0"
+			/>
 			<span>
 				<span className="block font-semibold text-snow">
 					Tidak semua website dapat di-scrape

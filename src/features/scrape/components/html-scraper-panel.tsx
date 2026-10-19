@@ -1,8 +1,14 @@
 "use client";
 
+import {
+	AlertCircleIcon,
+	ArrowRight01Icon,
+	Globe02Icon,
+	Loading01Icon,
+} from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
-import { AlertCircle, ArrowRight, Globe, Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { SCRAPE_RETURN_FALLBACK } from "@/features/scrape/utils/scrape-return-path";
 import { DESIGN_ERROR_CODES } from "@/lib/design-errors";
 
@@ -61,7 +67,12 @@ export function HtmlScraperPanel() {
 			>
 				<div className="flex flex-col gap-3 sm:flex-row">
 					<div className="flex h-14 min-h-[56px] w-full items-center gap-3 rounded-xl border border-graphite bg-charcoal px-4 transition-all focus-within:border-slate focus-within:ring-1 focus-within:ring-slate/20 sm:h-14 sm:flex-1">
-						<Globe size={20} className="shrink-0 text-fog" aria-hidden="true" />
+						<Icon
+							icon={Globe02Icon}
+							size={20}
+							className="shrink-0 text-fog"
+							aria-hidden="true"
+						/>
 						<label htmlFor="html-url" className="sr-only">
 							Website yang ingin di-scrape HTML
 						</label>
@@ -89,7 +100,8 @@ export function HtmlScraperPanel() {
 					>
 						{loading ? (
 							<>
-								<Loader2
+								<Icon
+									icon={Loading01Icon}
 									size={18}
 									className="animate-spin"
 									aria-hidden="true"
@@ -99,7 +111,7 @@ export function HtmlScraperPanel() {
 						) : (
 							<>
 								<span>Scrape HTML</span>
-								<ArrowRight size={18} aria-hidden="true" />
+								<Icon icon={ArrowRight01Icon} size={18} aria-hidden="true" />
 							</>
 						)}
 					</button>
@@ -112,7 +124,7 @@ export function HtmlScraperPanel() {
 							role="alert"
 							className="inline-flex items-center gap-1.5 text-xs font-medium text-red-400"
 						>
-							<AlertCircle size={15} aria-hidden="true" />
+							<Icon icon={AlertCircleIcon} size={15} aria-hidden="true" />
 							{error}
 						</p>
 					) : (

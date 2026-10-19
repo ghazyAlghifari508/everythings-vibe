@@ -1,8 +1,9 @@
 "use client";
 
+import { Alert02Icon, RotateLeft01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeMode } from "@/db/schema";
 import type { ScrapePartialResult } from "@/features/scrape/utils/scrape-error-presentation";
 import { SCRAPE_RETURN_FALLBACK } from "@/features/scrape/utils/scrape-return-path";
@@ -72,7 +73,12 @@ export function ScrapeErrorCard({
 	return (
 		<div className={cn("min-w-0", className)}>
 			<p role="alert" className="flex items-start gap-2 text-sm text-snow">
-				<AlertTriangle size={16} aria-hidden className="mt-0.5 shrink-0" />
+				<Icon
+					icon={Alert02Icon}
+					size={16}
+					aria-hidden
+					className="mt-0.5 shrink-0"
+				/>
 				<span className="font-semibold">{partial ? partial.title : title}</span>
 			</p>
 			<p className="mt-2 text-sm leading-6 text-fog">{guidance}</p>
@@ -119,7 +125,7 @@ export function ScrapeErrorCard({
 						aria-disabled={retryDisabled}
 						className="inline-flex min-h-11 items-center gap-2 rounded-full border border-graphite px-4 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
 					>
-						<RotateCcw size={16} aria-hidden />
+						<Icon icon={RotateLeft01Icon} size={16} aria-hidden />
 						{isRetrying
 							? "Mengantrekan ulang"
 							: cooldownActive

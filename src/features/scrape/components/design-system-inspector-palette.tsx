@@ -1,5 +1,6 @@
-import { Check, Copy } from "lucide-react";
+import { Copy01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { InspectorColorToken } from "@/features/scrape/utils/design-md-inspector";
 import { cn } from "@/lib/utils";
 
@@ -114,9 +115,9 @@ function PaletteColorCard({
 					className="absolute top-2 right-2 inline-flex size-8 items-center justify-center rounded-md border border-graphite bg-obsidian/90 text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
 				>
 					{copied ? (
-						<Check size={15} aria-hidden="true" />
+						<Icon icon={Tick01Icon} size={15} aria-hidden="true" />
 					) : (
-						<Copy size={15} aria-hidden="true" />
+						<Icon icon={Copy01Icon} size={15} aria-hidden="true" />
 					)}
 				</button>
 			</div>

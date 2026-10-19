@@ -1,7 +1,13 @@
 "use client";
 
-import { Code, FileText, Images, Network } from "lucide-react";
+import {
+	ChartNetworkIcon,
+	CodeIcon,
+	File01Icon,
+	Image01Icon,
+} from "@hugeicons/core-free-icons";
 import { type KeyboardEvent, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeMode } from "@/db/schema";
 import { ScrapeWorkspaceForm } from "./scrape-workspace-form";
 
@@ -11,23 +17,23 @@ const modeInfo = {
 		label: "Crawl Website",
 		description:
 			"Petakan halaman dan struktur website dari link yang ditemukan.",
-		icon: Network,
+		icon: ChartNetworkIcon,
 	},
 	design: {
 		label: "Generate DESIGN.md",
 		description: "Ambil design system sebagai panduan untuk AI coding.",
-		icon: FileText,
+		icon: File01Icon,
 	},
 	html: {
 		label: "Scrape HTML",
 		description: "Simpan HTML hasil render dan lihat snapshot visual website.",
-		icon: Code,
+		icon: CodeIcon,
 	},
 	images: {
 		label: "Scrape Images",
 		description:
 			"Temukan gambar, sumber aset, dan metadata dari halaman website.",
-		icon: Images,
+		icon: Image01Icon,
 	},
 };
 
@@ -64,7 +70,7 @@ export function ScrapModeSwitcher({
 				className="mb-7 flex w-full max-w-3xl gap-2 overflow-x-auto py-1"
 			>
 				{modes.map((value) => {
-					const Icon = modeInfo[value].icon;
+					const icon = modeInfo[value].icon;
 					return (
 						<button
 							key={value}
@@ -78,7 +84,7 @@ export function ScrapModeSwitcher({
 							onKeyDown={onTabKeyDown}
 							className={`inline-flex min-h-11 flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-indigo ${mode === value ? "border-snow bg-snow text-obsidian" : "border-graphite text-fog hover:border-steel hover:text-snow"}`}
 						>
-							<Icon size={16} aria-hidden />
+							<Icon icon={icon} size={16} aria-hidden />
 							{modeInfo[value].label}
 						</button>
 					);

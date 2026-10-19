@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Copy } from "lucide-react";
+import { BotIcon, Copy01Icon } from "@hugeicons/core-free-icons";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Icon } from "@/components/ui/icon";
 import { useUIStore } from "@/store";
 
 export interface DesignAgentPromptInput {
@@ -92,7 +93,7 @@ export function DesignAgentPromptDialog({
 			<DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
-						<Bot size={20} aria-hidden />
+						<Icon icon={BotIcon} size={20} aria-hidden />
 						Implement ke AI Agent
 					</DialogTitle>
 					<DialogDescription>
@@ -117,7 +118,7 @@ export function DesignAgentPromptDialog({
 						disabled={isCopying}
 						className="gap-1.5"
 					>
-						<Copy size={14} aria-hidden />
+						<Icon icon={Copy01Icon} size={14} aria-hidden />
 						{isCopying ? "Menyalin..." : "Salin Prompt"}
 					</Button>
 				</DialogFooter>

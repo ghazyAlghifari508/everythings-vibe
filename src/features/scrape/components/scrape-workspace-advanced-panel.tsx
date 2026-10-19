@@ -1,4 +1,5 @@
-import { ChevronDown } from "lucide-react";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeMode } from "@/db/schema";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 import { cn } from "@/lib/utils";
@@ -68,7 +69,8 @@ export function ScrapeWorkspaceAdvancedPanel({
 							{DISCLOSURE_HINTS[mode]}
 						</span>
 					</span>
-					<ChevronDown
+					<Icon
+						icon={ArrowDown01Icon}
 						size={18}
 						aria-hidden
 						className={cn(
