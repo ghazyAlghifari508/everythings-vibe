@@ -1,12 +1,17 @@
 "use client";
 
-import { Check, ChevronDown, Layers } from "lucide-react";
+import {
+	ArrowDown01Icon,
+	Layers01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import { FeatureIcon } from "@/features/greenfield/components/whiteboard/whiteboard-icons";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +59,7 @@ export function KanbanToolbar({
 									{selectedPhase ? (
 										<FeatureIcon label={selectedPhase} size={13} />
 									) : (
-										<Layers size={13} aria-hidden="true" />
+										<Icon icon={Layers01Icon} size={13} aria-hidden="true" />
 									)}
 								</span>
 								<span
@@ -64,7 +69,8 @@ export function KanbanToolbar({
 									{selectedPhaseLabel}
 								</span>
 							</span>
-							<ChevronDown
+							<Icon
+								icon={ArrowDown01Icon}
 								size={13}
 								className="text-fog shrink-0"
 								aria-hidden="true"
@@ -91,7 +97,11 @@ export function KanbanToolbar({
 									<div className="flex items-center gap-2 min-w-0 flex-1">
 										<span className="flex h-4 w-4 shrink-0 items-center justify-center text-fog">
 											{item.id === null ? (
-												<Layers size={13} aria-hidden="true" />
+												<Icon
+													icon={Layers01Icon}
+													size={13}
+													aria-hidden="true"
+												/>
 											) : (
 												<FeatureIcon label={item.name} size={13} />
 											)}
@@ -101,7 +111,8 @@ export function KanbanToolbar({
 										</span>
 									</div>
 									{isSelected && (
-										<Check
+										<Icon
+											icon={Tick01Icon}
 											size={13}
 											className="text-snow shrink-0 ml-auto"
 											aria-hidden="true"

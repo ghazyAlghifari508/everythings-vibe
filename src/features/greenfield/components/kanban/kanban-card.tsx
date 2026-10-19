@@ -1,14 +1,14 @@
 "use client";
 
 import {
-	AlertTriangle,
-	ArrowRight,
-	Calendar,
-	CheckCircle2,
-	CheckSquare,
-	Layers,
-	Play,
-} from "lucide-react";
+	Alert02Icon,
+	ArrowRight01Icon,
+	Calendar01Icon,
+	CheckmarkCircle01Icon,
+	CheckmarkSquare02Icon,
+	Layers01Icon,
+	PlayIcon,
+} from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import {
 	Dialog,
@@ -17,6 +17,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Icon } from "@/components/ui/icon";
 import type { TaskCard } from "@/features/greenfield/hooks/use-kanban-polling";
 import { getTaskPriorityConfig } from "@/lib/kanban-utils";
 import { cn } from "@/lib/utils";
@@ -151,7 +152,7 @@ export function KanbanCard({
 					{/* Subtasks Count */}
 					{card.type === "task" && card.subtaskCount ? (
 						<span className="inline-flex items-center gap-1 text-[10px] text-fog">
-							<CheckSquare size={10} />
+							<Icon icon={CheckmarkSquare02Icon} size={10} />
 							{card.subtaskCompleted}/{card.subtaskCount}
 						</span>
 					) : null}
@@ -161,7 +162,7 @@ export function KanbanCard({
 						card.dependencies &&
 						card.dependencies.length > 0 && (
 							<span className="inline-flex items-center gap-1 text-[10px] text-amber/80">
-								<ArrowRight size={10} />
+								<Icon icon={ArrowRight01Icon} size={10} />
 								dep: {card.dependencies.length}
 							</span>
 						)}
@@ -189,7 +190,7 @@ export function KanbanCard({
 				<DialogContent className="!flex !flex-col max-w-lg max-h-[85vh] p-6 bg-obsidian border border-graphite rounded-xl overflow-hidden">
 					<DialogHeader className="shrink-0 pb-3 border-b border-graphite/40">
 						<div className="flex items-center gap-2 text-xs font-semibold text-indigo uppercase tracking-wider mb-1">
-							<Layers size={14} />
+							<Icon icon={Layers01Icon} size={14} />
 							Detail Task
 						</div>
 						<DialogTitle className="text-xl font-bold text-snow leading-snug">
@@ -225,9 +226,15 @@ export function KanbanCard({
 													: "bg-steel/15 text-mist border border-steel/30"
 									}`}
 								>
-									{card.status === "completed" && <CheckCircle2 size={13} />}
-									{card.status === "in_progress" && <Play size={13} />}
-									{card.status === "failed" && <AlertTriangle size={13} />}
+									{card.status === "completed" && (
+										<Icon icon={CheckmarkCircle01Icon} size={13} />
+									)}
+									{card.status === "in_progress" && (
+										<Icon icon={PlayIcon} size={13} />
+									)}
+									{card.status === "failed" && (
+										<Icon icon={Alert02Icon} size={13} />
+									)}
 									{STATUS_LABELS[card.status] ?? card.status}
 								</span>
 							</div>
@@ -266,14 +273,23 @@ export function KanbanCard({
 											>
 												<div className="mt-0.5 shrink-0">
 													{sub.status === "completed" ? (
-														<CheckSquare size={15} className="text-emerald" />
+														<Icon
+															icon={CheckmarkSquare02Icon}
+															size={15}
+															className="text-emerald"
+														/>
 													) : sub.status === "in_progress" ? (
-														<Play
+														<Icon
+															icon={PlayIcon}
 															size={15}
 															className="text-indigo animate-pulse"
 														/>
 													) : sub.status === "failed" ? (
-														<AlertTriangle size={15} className="text-crimson" />
+														<Icon
+															icon={Alert02Icon}
+															size={15}
+															className="text-crimson"
+														/>
 													) : (
 														<div className="h-3.5 w-3.5 rounded-sm border border-graphite/80 bg-transparent mt-0.5" />
 													)}
@@ -296,7 +312,11 @@ export function KanbanCard({
 									Mulai Kerja
 								</span>
 								<span className="font-mono text-xs text-snow/90 flex items-center gap-1.5 mt-1.5">
-									<Calendar size={13} className="text-indigo" />
+									<Icon
+										icon={Calendar01Icon}
+										size={13}
+										className="text-indigo"
+									/>
 									{card.startedAt
 										? `${formatDate(card.startedAt)} ${formatTime(card.startedAt)}`
 										: "-"}
@@ -307,7 +327,11 @@ export function KanbanCard({
 									Selesai / Gagal
 								</span>
 								<span className="font-mono text-xs text-snow/90 flex items-center gap-1.5 mt-1.5">
-									<Calendar size={13} className="text-indigo" />
+									<Icon
+										icon={Calendar01Icon}
+										size={13}
+										className="text-indigo"
+									/>
 									{card.completedAt
 										? `${formatDate(card.completedAt)} ${formatTime(card.completedAt)}`
 										: "-"}

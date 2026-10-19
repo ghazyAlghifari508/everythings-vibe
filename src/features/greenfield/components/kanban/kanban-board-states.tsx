@@ -1,7 +1,8 @@
 ﻿"use client";
 
-import { KanbanSquare, Loader2 } from "lucide-react";
+import { KanbanIcon, Loading01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 
 /** Placeholder columns shown while the first Kanban payload is loading. */
 export function KanbanBoardSkeleton() {
@@ -42,7 +43,7 @@ export function KanbanBoardError({ onRetry }: { onRetry: () => void }) {
 				lagi.
 			</p>
 			<Button onClick={onRetry} variant="default" className="mt-6 gap-1.5">
-				<Loader2 size={14} className="hidden" />
+				<Icon icon={Loading01Icon} size={14} className="hidden" />
 				Coba Lagi
 			</Button>
 		</div>
@@ -76,7 +77,7 @@ export function KanbanGeneratingSkeleton() {
 export function KanbanEmptyState() {
 	return (
 		<div className="flex h-full w-full flex-col items-center justify-center text-center">
-			<KanbanSquare size={56} className="text-fog/40 mb-3" />
+			<Icon icon={KanbanIcon} size={56} className="text-fog/40 mb-3" />
 			<h2 className="text-base font-[510] text-snow">Belum ada task</h2>
 			<p className="text-xs text-fog max-w-sm mt-1.5 leading-relaxed">
 				Task akan muncul di sini setelah proses generate selesai.

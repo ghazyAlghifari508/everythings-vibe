@@ -1,15 +1,16 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
 import {
-	AlertTriangle,
-	ArrowLeft,
-	ArrowUpDown,
-	Info,
-	KanbanSquare,
-	RotateCcw,
-} from "lucide-react";
+	Alert02Icon,
+	ArrowLeft01Icon,
+	InformationCircleIcon,
+	KanbanIcon,
+	RotateLeft01Icon,
+	Sorting05Icon,
+} from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 
 interface KanbanHeaderProps {
 	projectId: string;
@@ -49,7 +50,11 @@ export function KanbanHeader({
 			<div className="mx-auto flex w-full max-w-[1400px] flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
 				<div className="flex flex-col min-w-0">
 					<div className="flex items-center gap-2.5 min-w-0">
-						<KanbanSquare size={18} className="text-indigo shrink-0" />
+						<Icon
+							icon={KanbanIcon}
+							size={18}
+							className="text-indigo shrink-0"
+						/>
 						<h1 className="truncate font-inter text-base sm:text-lg font-[600] text-snow">
 							{navigationContext ? projectName : `Kanban - ${projectName}`}
 						</h1>
@@ -66,7 +71,8 @@ export function KanbanHeader({
 					<div className="mt-1 flex items-center gap-1.5 text-xs min-w-0">
 						{staleness === "disconnected" ? (
 							<output className="flex items-center gap-1.5 text-crimson min-w-0">
-								<AlertTriangle
+								<Icon
+									icon={Alert02Icon}
 									size={13}
 									className="shrink-0"
 									aria-hidden="true"
@@ -85,7 +91,8 @@ export function KanbanHeader({
 							</output>
 						) : staleness === "stale" ? (
 							<output className="flex items-center gap-1.5 text-amber min-w-0">
-								<AlertTriangle
+								<Icon
+									icon={Alert02Icon}
 									size={13}
 									className="shrink-0"
 									aria-hidden="true"
@@ -104,7 +111,8 @@ export function KanbanHeader({
 							</output>
 						) : !hasUpdates ? (
 							<output className="flex items-center gap-1.5 text-fog min-w-0">
-								<Info
+								<Icon
+									icon={InformationCircleIcon}
 									size={13}
 									className="shrink-0 text-slate"
 									aria-hidden="true"
@@ -140,7 +148,7 @@ export function KanbanHeader({
 							disabled={isResetting}
 							className="gap-1.5"
 						>
-							<RotateCcw size={14} />
+							<Icon icon={RotateLeft01Icon} size={14} />
 							{isResetting ? "Mereset..." : "Reset Progress"}
 						</Button>
 					)}
@@ -151,7 +159,7 @@ export function KanbanHeader({
 							aria-label={`Kembali ke workspace ${navigationContext.codebaseName}`}
 							className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-snow/40 px-3 py-1.5 text-xs font-[510] text-snow transition-colors hover:border-snow/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 						>
-							<ArrowLeft size={14} aria-hidden="true" />
+							<Icon icon={ArrowLeft01Icon} size={14} aria-hidden="true" />
 							Kembali ke Workspace
 						</Link>
 					) : (
@@ -187,7 +195,7 @@ export function KanbanAcChangedBanner({
 		<div className="w-full shrink-0 px-4 pt-3">
 			<div className="flex items-center justify-between rounded-md border border-amber/30 bg-amber/10 p-3 text-sm text-amber animate-slide-down">
 				<div className="flex items-center gap-2">
-					<AlertTriangle size={16} className="shrink-0" />
+					<Icon icon={Alert02Icon} size={16} className="shrink-0" />
 					<span>
 						AC telah berubah. Task mungkin tidak sesuai kriteria terbaru.
 					</span>
@@ -198,7 +206,7 @@ export function KanbanAcChangedBanner({
 					onClick={onDismiss}
 					className="h-8 text-amber/80 hover:text-amber hover:bg-amber/10"
 				>
-					<ArrowUpDown size={12} className="mr-1" />
+					<Icon icon={Sorting05Icon} size={12} className="mr-1" />
 					Tutup
 				</Button>
 			</div>
