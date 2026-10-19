@@ -1,8 +1,9 @@
 "use client";
 
+import { Alert02Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { useRouter } from "@tanstack/react-router";
-import { AlertTriangle, ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { ThoughtLine } from "@/components/ui/thought-line";
 import type { ProjectFeatureTree } from "@/db/schema";
 import { featureTreeSchema } from "@/features/greenfield/types/feature-tree";
@@ -262,7 +263,7 @@ export function FiturDetail({
 					</div>
 				) : hasError && !hasContent ? (
 					<div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-						<AlertTriangle size={40} className="text-crimson" />
+						<Icon icon={Alert02Icon} size={40} className="text-crimson" />
 						<h2 className="font-inter text-lg font-[510] text-snow">
 							Gagal menyusun daftar fitur
 						</h2>
@@ -329,7 +330,7 @@ export function FiturDetail({
 							className="btn-primary inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm"
 						>
 							Susun Daftar Fitur
-							<ArrowRight size={14} />
+							<Icon icon={ArrowRight01Icon} size={14} />
 						</button>
 					</div>
 				) : (

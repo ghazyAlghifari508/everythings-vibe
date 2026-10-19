@@ -1,21 +1,23 @@
 "use client";
 
 import {
-	Bell,
-	Calendar,
-	CreditCard,
-	FileText,
-	LayoutGrid,
-	MapPin,
-	MessageSquare,
-	Package,
-	Search,
-	Settings,
-	Shield,
-	ShoppingCart,
-	Truck,
-	Users,
-} from "lucide-react";
+	BellIcon,
+	Calendar01Icon,
+	CreditCardIcon,
+	DeliveryTruck01Icon,
+	File01Icon,
+	LayoutGridIcon,
+	Location01Icon,
+	MessageSquareIcon,
+	PackageIcon,
+	Search01Icon,
+	Settings01Icon,
+	Shield01Icon,
+	ShoppingCart01Icon,
+	UserGroupIcon,
+} from "@hugeicons/core-free-icons";
+import type { IconSvgObject } from "@hugeicons/react";
+import { Icon } from "@/components/ui/icon";
 
 type FeatureIconName =
 	| "dashboard"
@@ -68,37 +70,23 @@ const FEATURE_ICON_RULES: Array<{ match: RegExp; icon: FeatureIconName }> = [
 	{ match: /lokasi|alamat|peta|maps|wilayah|cabang|toko/i, icon: "map" },
 ];
 
-export type FeatureIconComponent =
-	| typeof LayoutGrid
-	| typeof Package
-	| typeof ShoppingCart
-	| typeof Users
-	| typeof MessageSquare
-	| typeof Shield
-	| typeof Truck
-	| typeof Search
-	| typeof Settings
-	| typeof Bell
-	| typeof Calendar
-	| typeof CreditCard
-	| typeof FileText
-	| typeof MapPin;
+export type FeatureIconComponent = IconSvgObject;
 
 const FEATURE_ICON_COMPONENTS: Record<FeatureIconName, FeatureIconComponent> = {
-	dashboard: LayoutGrid,
-	package: Package,
-	cart: ShoppingCart,
-	users: Users,
-	chat: MessageSquare,
-	shield: Shield,
-	truck: Truck,
-	search: Search,
-	settings: Settings,
-	bell: Bell,
-	calendar: Calendar,
-	card: CreditCard,
-	file: FileText,
-	map: MapPin,
+	dashboard: LayoutGridIcon,
+	package: PackageIcon,
+	cart: ShoppingCart01Icon,
+	users: UserGroupIcon,
+	chat: MessageSquareIcon,
+	shield: Shield01Icon,
+	truck: DeliveryTruck01Icon,
+	search: Search01Icon,
+	settings: Settings01Icon,
+	bell: BellIcon,
+	calendar: Calendar01Icon,
+	card: CreditCardIcon,
+	file: File01Icon,
+	map: Location01Icon,
 };
 
 export function featureIconName(label: string): FeatureIconName {
@@ -115,8 +103,8 @@ export function FeatureIcon({
 	label: string;
 	size?: number;
 }) {
-	const Icon = FEATURE_ICON_COMPONENTS[featureIconName(label)];
-	return <Icon size={size} aria-hidden />;
+	const icon = FEATURE_ICON_COMPONENTS[featureIconName(label)];
+	return <Icon icon={icon} size={size} aria-hidden />;
 }
 
 const FASE_STYLES: Record<number, string> = {
