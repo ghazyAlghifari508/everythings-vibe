@@ -1,27 +1,28 @@
 "use client";
 
 import {
-	BarChart3,
-	ChevronDown,
-	CircleDollarSign,
-	FileText,
-	Lightbulb,
-	MessageSquarePlus,
-} from "lucide-react";
+	ArrowDown01Icon,
+	BulbIcon,
+	ChartColumnIcon,
+	CircleDollarSignIcon,
+	FileTextIcon,
+	MessageSquarePlusIcon,
+} from "@hugeicons/core-free-icons";
 import { useLayoutEffect, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { FAQ_ITEMS } from "./faq-data";
 
 const FAQ_ICONS = {
-	spark: Lightbulb,
-	workflow: BarChart3,
-	document: FileText,
-	board: BarChart3,
-	credit: CircleDollarSign,
-	feedback: MessageSquarePlus,
+	spark: BulbIcon,
+	workflow: ChartColumnIcon,
+	document: FileTextIcon,
+	board: ChartColumnIcon,
+	credit: CircleDollarSignIcon,
+	feedback: MessageSquarePlusIcon,
 } as const;
 
 function FaqItem({ item }: { item: (typeof FAQ_ITEMS)[number] }) {
-	const Icon = FAQ_ICONS[item.icon];
+	const glyph = FAQ_ICONS[item.icon];
 	const [isOpen, setIsOpen] = useState(false);
 	const [panelHeight, setPanelHeight] = useState("0px");
 	const panelContentRef = useRef<HTMLDivElement>(null);
@@ -47,6 +48,8 @@ function FaqItem({ item }: { item: (typeof FAQ_ITEMS)[number] }) {
 					onClick={() => setIsOpen((value) => !value)}
 				>
 					<Icon
+						icon={glyph}
+						size={44}
 						aria-hidden="true"
 						className="size-11 shrink-0 text-indigo transition-transform duration-300 ease-out group-hover/item:rotate-[-10deg] group-hover/item:scale-110"
 						strokeWidth={1.7}
@@ -62,7 +65,12 @@ function FaqItem({ item }: { item: (typeof FAQ_ITEMS)[number] }) {
 					<span
 						className={`text-fog transition-transform duration-300 ease-out motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}
 					>
-						<ChevronDown aria-hidden="true" className="size-4" />
+						<Icon
+							icon={ArrowDown01Icon}
+							size={16}
+							aria-hidden="true"
+							className="size-4"
+						/>
 					</span>
 				</button>
 			</h2>

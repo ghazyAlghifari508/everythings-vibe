@@ -1,6 +1,11 @@
+import {
+	Add01Icon,
+	ArrowRight01Icon,
+	FolderGitIcon,
+} from "@hugeicons/core-free-icons";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, FolderGit2, Plus } from "lucide-react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { Icon } from "@/components/ui/icon";
 
 export const Route = createFileRoute("/plan/")({
 	head: () => ({
@@ -19,7 +24,7 @@ export const Route = createFileRoute("/plan/")({
 const OPTIONS = [
 	{
 		to: "/plan/new",
-		icon: Plus,
+		icon: Add01Icon,
 		label: "Opsi 1",
 		title: "Projek Baru (Greenfield)",
 		description:
@@ -28,7 +33,7 @@ const OPTIONS = [
 	},
 	{
 		to: "/codebases",
-		icon: FolderGit2,
+		icon: FolderGitIcon,
 		label: "Opsi 2",
 		title: "Codebase Existing",
 		description:
@@ -54,7 +59,6 @@ export function PlanOptionsPage() {
 
 			<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
 				{OPTIONS.map((option) => {
-					const Icon = option.icon;
 					return (
 						<Link
 							key={option.to}
@@ -63,7 +67,7 @@ export function PlanOptionsPage() {
 						>
 							<div>
 								<span className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow">
-									<Icon size={24} aria-hidden />
+									<Icon icon={option.icon} size={24} aria-hidden />
 								</span>
 								<p className="mb-2 font-mono text-xs uppercase tracking-widest text-fog">
 									{option.label}
@@ -79,7 +83,8 @@ export function PlanOptionsPage() {
 								<span className="font-mono text-fog">{option.footer}</span>
 								<span className="flex items-center gap-1 font-mono text-snow">
 									Lanjut
-									<ArrowRight
+									<Icon
+										icon={ArrowRight01Icon}
 										size={14}
 										aria-hidden
 										className="transition-transform group-hover:translate-x-1"

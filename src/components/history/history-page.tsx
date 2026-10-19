@@ -1,8 +1,14 @@
 "use client";
 
+import {
+	ArrowLeft01Icon,
+	ArrowRight01Icon,
+	Delete01Icon,
+	Search01Icon,
+} from "@hugeicons/core-free-icons";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import { DeleteProjectModal } from "@/features/greenfield/components/prd/delete-project-modal";
 import { HISTORY_PAGE_SIZE } from "@/features/greenfield/types/greenfield-constants";
@@ -145,7 +151,7 @@ export function HistoryPage({
 							to="/plan/new"
 							className="mb-3 inline-flex items-center gap-1.5 font-inter text-sm text-fog transition-colors hover:text-snow"
 						>
-							<ArrowLeft size={14} aria-hidden />
+							<Icon icon={ArrowLeft01Icon} size={14} aria-hidden />
 							Buat Projek Baru
 						</Link>
 					)}
@@ -161,7 +167,8 @@ export function HistoryPage({
 
 				<div className="mb-6 flex flex-col gap-4">
 					<div className="relative">
-						<Search
+						<Icon
+							icon={Search01Icon}
 							size={16}
 							className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fog"
 							aria-hidden
@@ -273,7 +280,8 @@ export function HistoryPage({
 										</p>
 									</div>
 
-									<ArrowRight
+									<Icon
+										icon={ArrowRight01Icon}
 										size={16}
 										className="shrink-0 text-fog opacity-0 transition-opacity group-hover:opacity-100"
 										aria-hidden
@@ -311,7 +319,7 @@ export function HistoryPage({
 										className="shrink-0 rounded-md p-1.5 text-crimson transition-colors hover:bg-crimson/10"
 										aria-label={`Hapus proyek ${item.name}`}
 									>
-										<Trash2 size={16} />
+										<Icon icon={Delete01Icon} size={16} />
 									</button>
 								</li>
 							);

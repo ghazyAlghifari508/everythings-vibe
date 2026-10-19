@@ -1,5 +1,6 @@
+import { Wrench01Icon } from "@hugeicons/core-free-icons";
 import { createFileRoute } from "@tanstack/react-router";
-import { Wrench } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 
 export const Route = createFileRoute("/maintenance")({
 	component: MaintenancePage,
@@ -22,7 +23,7 @@ function MaintenancePage() {
 			}}
 		>
 			<div style={{ marginBottom: "16px" }}>
-				<Wrench size={64} color="#a0a0a0" />
+				<Icon icon={Wrench01Icon} size={64} color="#a0a0a0" aria-hidden />
 			</div>
 			<h1
 				style={{

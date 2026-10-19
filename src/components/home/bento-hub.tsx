@@ -1,13 +1,13 @@
-import { Link } from "@tanstack/react-router";
 import {
-	ArrowRight,
-	CircleQuestionMark,
-	Globe,
-	LayoutGrid,
-	type LucideIcon,
-	Pencil,
-	Sparkles,
-} from "lucide-react";
+	ArrowRight01Icon,
+	CircleQuestionMarkIcon,
+	GlobeIcon,
+	GridViewIcon,
+	PencilIcon,
+	SparklesIcon,
+} from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
+import { Icon, type IconProps } from "@/components/ui/icon";
 
 type HubDestination =
 	| "/plan"
@@ -19,7 +19,7 @@ type HubDestination =
 interface HubCard {
 	readonly to: HubDestination;
 	readonly title: string;
-	readonly icon: LucideIcon;
+	readonly icon: IconProps["icon"];
 	readonly description: React.ReactNode;
 	readonly tags: readonly string[];
 }
@@ -28,7 +28,7 @@ const CARDS: readonly HubCard[] = [
 	{
 		to: "/plan",
 		title: "VibePlan",
-		icon: Pencil,
+		icon: PencilIcon,
 		description:
 			"Ubah ide produk jadi PRD 8-seksi lengkap, Acceptance Criteria (AC), dan breakdown task Kanban terstruktur secara otomatis.",
 		tags: ["Projek Baru", "Codebase Existing"],
@@ -36,7 +36,7 @@ const CARDS: readonly HubCard[] = [
 	{
 		to: "/design/studio",
 		title: "VibeDesign Studio",
-		icon: Sparkles,
+		icon: SparklesIcon,
 		description:
 			"Rancang antarmuka HTML/Tailwind dari prompt, lihat preview responsif, dan revisi desain di canvas interaktif.",
 		tags: ["Prompt UI", "Canvas Interaktif", "Preview Responsif"],
@@ -44,7 +44,7 @@ const CARDS: readonly HubCard[] = [
 	{
 		to: "/scrape",
 		title: "VibeScrape",
-		icon: Globe,
+		icon: GlobeIcon,
 		description:
 			"Ekstrak website publik menjadi HTML, token desain, atau aset gambar. Kelola hasilnya di workspace scraping mandiri.",
 		tags: ["HTML", "design.md", "Crawl", "Gambar"],
@@ -52,7 +52,7 @@ const CARDS: readonly HubCard[] = [
 	{
 		to: "/templates",
 		title: "VibeTemplate",
-		icon: LayoutGrid,
+		icon: GridViewIcon,
 		description:
 			"Katalog kerangka kerja teruji: preset spesifikasi planning, kit desain antarmuka, dan boilerplate proyek lengkap.",
 		tags: ["Template Planning", "Template Design", "Boilerplate Projek"],
@@ -60,7 +60,7 @@ const CARDS: readonly HubCard[] = [
 	{
 		to: "/bantuan",
 		title: "VibeBantuan",
-		icon: CircleQuestionMark,
+		icon: CircleQuestionMarkIcon,
 		description:
 			"Pusat bantuan pengguna, pelaporan bug kendala teknis, dan feedback langsung ke antarmuka admin menggunakan formulir bawaan VibeEverything.",
 		tags: ["Feedback & Bug Report", "Triage Admin"],
@@ -95,7 +95,6 @@ export function BentoHub() {
 }
 
 function HubCardLink({ card }: { card: HubCard }) {
-	const Icon = card.icon;
 	return (
 		<Link
 			to={card.to}
@@ -103,11 +102,11 @@ function HubCardLink({ card }: { card: HubCard }) {
 		>
 			<div className="mb-4 flex items-start justify-between gap-4">
 				<span className="flex h-10 w-10 items-center justify-center rounded-lg border border-graphite bg-obsidian text-snow transition-colors group-hover:border-steel">
-					<Icon size={20} aria-hidden />
+					<Icon icon={card.icon} size={20} aria-hidden />
 				</span>
 				<span className="flex items-center gap-1 font-mono text-xs text-fog transition-colors group-hover:text-snow">
 					Buka {card.to}
-					<ArrowRight size={14} aria-hidden />
+					<Icon icon={ArrowRight01Icon} size={14} aria-hidden />
 				</span>
 			</div>
 

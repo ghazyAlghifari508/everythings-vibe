@@ -1,5 +1,6 @@
-import { ChevronDown } from "lucide-react";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 interface BantuanFaq {
@@ -71,7 +72,8 @@ export function FaqAccordion() {
 							<span className="text-sm font-semibold text-snow">
 								{faq.question}
 							</span>
-							<ChevronDown
+							<Icon
+								icon={ArrowDown01Icon}
 								size={18}
 								aria-hidden
 								className={cn(

@@ -1,5 +1,6 @@
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { ChevronRight } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 
 export interface HubBreadcrumbAncestor {
 	label: string;
@@ -27,7 +28,7 @@ export function HubBreadcrumb({
 				{(ancestors ?? []).map((ancestor) => (
 					<li key={ancestor.to} className="flex items-center gap-1.5">
 						<span aria-hidden>
-							<ChevronRight size={12} />
+							<Icon icon={ArrowRight01Icon} size={12} />
 						</span>
 						<Link to={ancestor.to} className={linkClass}>
 							{ancestor.label}
@@ -35,7 +36,7 @@ export function HubBreadcrumb({
 					</li>
 				))}
 				<li aria-hidden>
-					<ChevronRight size={12} />
+					<Icon icon={ArrowRight01Icon} size={12} />
 				</li>
 				<li aria-current="page" className="text-snow">
 					{current}

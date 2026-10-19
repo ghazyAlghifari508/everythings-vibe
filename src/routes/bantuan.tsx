@@ -1,8 +1,13 @@
+import {
+	ArrowRight01Icon,
+	MessageSquareIcon,
+	Shield01Icon,
+} from "@hugeicons/core-free-icons";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, MessageSquare, Shield } from "lucide-react";
 import { FaqAccordion } from "@/components/bantuan/faq-accordion";
 import { WorkflowGuides } from "@/components/bantuan/workflow-guides";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { Icon } from "@/components/ui/icon";
 import { authClient } from "@/lib/auth-client";
 import { isAdmin } from "@/lib/session";
 
@@ -60,7 +65,7 @@ export function BantuanPage() {
 				>
 					<span className="flex items-start gap-4">
 						<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
-							<MessageSquare size={20} aria-hidden />
+							<Icon icon={MessageSquareIcon} size={20} aria-hidden />
 						</span>
 						<span>
 							<span className="block text-base font-semibold text-snow">
@@ -72,7 +77,8 @@ export function BantuanPage() {
 							</span>
 						</span>
 					</span>
-					<ArrowRight
+					<Icon
+						icon={ArrowRight01Icon}
 						size={18}
 						aria-hidden
 						className="shrink-0 text-fog transition-all group-hover:translate-x-1 group-hover:text-snow"
@@ -86,7 +92,7 @@ export function BantuanPage() {
 					>
 						<span className="flex items-start gap-4">
 							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
-								<Shield size={20} aria-hidden />
+								<Icon icon={Shield01Icon} size={20} aria-hidden />
 							</span>
 							<span>
 								<span className="block text-base font-semibold text-snow">
@@ -97,7 +103,8 @@ export function BantuanPage() {
 								</span>
 							</span>
 						</span>
-						<ArrowRight
+						<Icon
+							icon={ArrowRight01Icon}
 							size={18}
 							aria-hidden
 							className="shrink-0 text-fog transition-all group-hover:translate-x-1 group-hover:text-snow"

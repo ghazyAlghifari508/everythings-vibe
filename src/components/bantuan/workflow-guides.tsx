@@ -1,4 +1,9 @@
-import { FileCode2, PenLine, TerminalSquare } from "lucide-react";
+import {
+	FileCodeIcon,
+	PenLineIcon,
+	TerminalIcon,
+} from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 
 interface WorkflowGuide {
 	readonly id: string;
@@ -45,20 +50,20 @@ const GUIDES: readonly WorkflowGuide[] = [
 	},
 ];
 
-const GUIDE_ICONS = [PenLine, FileCode2, TerminalSquare] as const;
+const GUIDE_ICONS = [PenLineIcon, FileCodeIcon, TerminalIcon] as const;
 
 export function WorkflowGuides() {
 	return (
 		<div className="grid gap-4 md:grid-cols-3">
 			{GUIDES.map((guide, index) => {
-				const Icon = GUIDE_ICONS[index] ?? PenLine;
+				const glyph = GUIDE_ICONS[index] ?? PenLineIcon;
 				return (
 					<article
 						key={guide.id}
 						className="flex flex-col gap-4 rounded-xl border border-graphite bg-charcoal p-6"
 					>
 						<span className="flex h-10 w-10 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
-							<Icon size={20} aria-hidden />
+							<Icon icon={glyph} size={20} aria-hidden />
 						</span>
 						<div>
 							<h3 className="text-base font-semibold text-snow">
