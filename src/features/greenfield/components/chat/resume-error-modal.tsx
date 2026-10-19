@@ -1,6 +1,11 @@
 "use client";
 
-import { AlertCircle, Play, X } from "lucide-react";
+import {
+	AlertCircleIcon,
+	Cancel01Icon,
+	PlayIcon,
+} from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 interface ResumeErrorModalProps {
@@ -45,7 +50,7 @@ export function ResumeErrorModal({
 					<div className="p-6">
 						<div className="flex items-start justify-between mb-4">
 							<div className="flex h-12 w-12 items-center justify-center rounded-full bg-crimson/10 text-crimson">
-								<AlertCircle size={24} strokeWidth={2} />
+								<Icon icon={AlertCircleIcon} size={24} strokeWidth={2} />
 							</div>
 							<button
 								type="button"
@@ -53,7 +58,7 @@ export function ResumeErrorModal({
 								aria-label="Tutup"
 								className="text-fog transition-colors hover:text-snow"
 							>
-								<X size={20} />
+								<Icon icon={Cancel01Icon} size={20} />
 							</button>
 						</div>
 
@@ -83,7 +88,7 @@ export function ResumeErrorModal({
 								onClick={onResume}
 								className="btn-primary flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 font-inter text-sm font-[510] transition-all hover:brightness-105"
 							>
-								<Play size={16} fill="currentColor" />
+								<Icon icon={PlayIcon} size={16} fill="currentColor" />
 								Lanjutkan Generate
 							</button>
 							<button

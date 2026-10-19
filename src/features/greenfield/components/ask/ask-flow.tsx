@@ -1,15 +1,16 @@
 ﻿"use client";
 
-import { useNavigate } from "@tanstack/react-router";
 import {
-	ArrowRight,
-	Check,
-	Cloud,
-	Database,
-	Layers,
-	Palette,
-	Rocket,
-} from "lucide-react";
+	ArrowRight01Icon,
+	CloudIcon,
+	Database01Icon,
+	Layers01Icon,
+	PaletteIcon,
+	Rocket01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
+import { useNavigate } from "@tanstack/react-router";
+import { Icon } from "@/components/ui/icon";
 import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 import {
 	type AskHandoffState,
@@ -216,7 +217,7 @@ export function AskFlow({
 						{analysis ? (
 							<div className="flex items-start gap-3 rounded-xl border border-graphite bg-card p-4 shadow-sm text-card-foreground">
 								<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 mt-0.5">
-									<Check size={14} className="stroke-[2.5]" />
+									<Icon icon={Tick01Icon} size={14} strokeWidth={2.5} />
 								</div>
 								<div className="flex flex-col gap-0.5">
 									<span className="text-xs font-semibold text-snow">
@@ -243,7 +244,7 @@ export function AskFlow({
 							<StackDropdown
 								label="Frontend"
 								subtitle="UI & tampilan user"
-								icon={Palette}
+								icon={PaletteIcon}
 								accent="#5e6ad2"
 								placeholder="Pilih frontend..."
 								options={frontendOptions}
@@ -259,7 +260,7 @@ export function AskFlow({
 							<StackDropdown
 								label="Backend"
 								subtitle="Logic & API server"
-								icon={Cloud}
+								icon={CloudIcon}
 								accent="#2dd4a7"
 								placeholder="Pilih backend..."
 								options={BACKEND_OPTIONS}
@@ -283,7 +284,7 @@ export function AskFlow({
 										? "Mobile FE + backend jadi satu"
 										: "Frontend + backend jadi satu"
 								}
-								icon={Layers}
+								icon={Layers01Icon}
 								accent="#e879a6"
 								placeholder="Pilih framework..."
 								options={fullstackOptions}
@@ -299,7 +300,7 @@ export function AskFlow({
 							<StackDropdown
 								label="Database"
 								subtitle="Penyimpanan data"
-								icon={Database}
+								icon={Database01Icon}
 								accent="#f5b544"
 								placeholder="Pilih database..."
 								options={DATABASE_OPTIONS}
@@ -315,7 +316,7 @@ export function AskFlow({
 							<StackDropdown
 								label="Deployment"
 								subtitle="Hosting & infra"
-								icon={Rocket}
+								icon={Rocket01Icon}
 								accent="#a78bfa"
 								placeholder="Pilih platform..."
 								options={deploymentOptions}
@@ -346,7 +347,7 @@ export function AskFlow({
 									className="btn-primary flex items-center gap-1.5 rounded-md px-6 py-2.5 font-inter text-sm font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
 								>
 									<span>{flowCta?.label}</span>
-									<ArrowRight size={14} />
+									<Icon icon={ArrowRight01Icon} size={14} />
 								</button>
 							) : (
 								<button

@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { ChevronDown, type LucideIcon, X } from "lucide-react";
+import { ArrowDown01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
+import type { IconSvgObject } from "@hugeicons/react";
 import { useTheme } from "next-themes";
 import {
 	useCallback,
@@ -10,6 +11,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Icon } from "@/components/ui/icon";
 import {
 	stackIconNeedsDarkInvert,
 	stackIconUrl,
@@ -20,7 +22,7 @@ import { StackDropdownList } from "./stack-dropdown-list";
 interface StackDropdownProps {
 	label: string;
 	subtitle: string;
-	icon: LucideIcon;
+	icon: IconSvgObject;
 	accent: string;
 	placeholder: string;
 	options: string[];
@@ -36,7 +38,7 @@ interface StackDropdownProps {
 export function StackDropdown({
 	label,
 	subtitle,
-	icon: Icon,
+	icon,
 	accent,
 	placeholder,
 	options,
@@ -214,7 +216,7 @@ export function StackDropdown({
 					className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
 					style={{ background: `${accent}24`, color: accent }}
 				>
-					<Icon size={18} />
+					<Icon icon={icon} size={18} />
 				</div>
 				<div className="min-w-0 flex-1">
 					<p
@@ -253,7 +255,7 @@ export function StackDropdown({
 						className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-crimson transition-colors hover:bg-crimson/10"
 						aria-label={`Hapus pilihan ${label}`}
 					>
-						<X size={14} />
+						<Icon icon={Cancel01Icon} size={14} />
 					</button>
 				)}
 			</div>
@@ -308,7 +310,8 @@ export function StackDropdown({
 									? value
 									: placeholder}
 					</span>
-					<ChevronDown
+					<Icon
+						icon={ArrowDown01Icon}
 						size={16}
 						aria-hidden="true"
 						className={cn(

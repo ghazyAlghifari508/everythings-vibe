@@ -1,7 +1,12 @@
 "use client";
 
-import { ArrowDownUp, Check, Search } from "lucide-react";
+import {
+	Search01Icon,
+	Sorting05Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import type { CSSProperties, KeyboardEvent, RefObject } from "react";
+import { Icon } from "@/components/ui/icon";
 import { stackIconUrl } from "@/features/greenfield/utils/stack-data";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +71,7 @@ export function StackDropdownList({
 					className="flex items-center gap-2 rounded-md border border-(--border-subtle) px-3 py-1.5"
 					style={{ background: "var(--bg-input)" }}
 				>
-					<Search size={14} className="shrink-0 text-fog" />
+					<Icon icon={Search01Icon} size={14} className="shrink-0 text-fog" />
 					<input
 						type="text"
 						value={searchQuery}
@@ -126,7 +131,9 @@ export function StackDropdownList({
 							)}
 							{opt}
 						</span>
-						{selected && <Check size={14} className="shrink-0 text-fog" />}
+						{selected && (
+							<Icon icon={Tick01Icon} size={14} className="shrink-0 text-fog" />
+						)}
 					</div>
 				);
 			})}
@@ -175,7 +182,7 @@ export function StackDropdownList({
 							: "text-fog hover:bg-white/5 hover:text-snow",
 					)}
 				>
-					<ArrowDownUp size={14} className="shrink-0" />
+					<Icon icon={Sorting05Icon} size={14} className="shrink-0" />
 					<span>Lainnya...</span>
 				</div>
 			)}

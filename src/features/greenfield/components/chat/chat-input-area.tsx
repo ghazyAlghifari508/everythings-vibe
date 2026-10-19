@@ -1,4 +1,5 @@
-import { Lock } from "lucide-react";
+import { LockKeyIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 export interface ChatInputAreaProps {
@@ -33,7 +34,11 @@ export function ChatInputArea({
 					aria-label="PRD dikunci"
 					className="flex items-start gap-3 rounded-md border border-graphite/60 bg-charcoal/80 p-3.5 text-xs text-fog"
 				>
-					<Lock size={16} className="mt-0.5 shrink-0 text-amber-400" />
+					<Icon
+						icon={LockKeyIcon}
+						size={16}
+						className="mt-0.5 shrink-0 text-amber-400"
+					/>
 					<div className="flex flex-col gap-1">
 						<span className="font-[510] text-snow">
 							Dokumen PRD Dikunci (Read-Only)

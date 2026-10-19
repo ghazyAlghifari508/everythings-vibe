@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { Database } from "lucide-react";
+import { Database01Icon } from "@hugeicons/core-free-icons";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -29,7 +29,7 @@ function renderDropdown(onChange: (value: string | undefined) => void) {
 			<StackDropdown
 				label="<sample label>"
 				subtitle="<sample subtitle>"
-				icon={Database}
+				icon={Database01Icon}
 				accent="#000000"
 				placeholder="<sample placeholder>"
 				options={["<option a>", "<option b>"]}

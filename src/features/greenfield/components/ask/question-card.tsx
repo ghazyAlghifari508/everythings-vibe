@@ -1,7 +1,8 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Tick01Icon } from "@hugeicons/core-free-icons";
 import { useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 export interface NonTechAnswer {
@@ -128,7 +129,11 @@ export function QuestionCard({
 			) : type === "text" ? (
 				answer?.isCustom && answer?.value ? (
 					<div className="flex items-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-500/5 px-3 py-2">
-						<Check size={16} className="shrink-0 text-emerald-400" />
+						<Icon
+							icon={Tick01Icon}
+							size={16}
+							className="shrink-0 text-emerald-400"
+						/>
 						<span
 							className="flex-1 truncate font-inter text-sm"
 							style={{ color: "var(--text-primary)" }}
