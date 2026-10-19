@@ -1,15 +1,16 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
 import {
-	ArrowLeft,
-	Crown,
-	Search,
-	Shield,
-	UserCheck,
-	Users,
-} from "lucide-react";
+	ArrowLeft01Icon,
+	CrownIcon,
+	Search01Icon,
+	Shield01Icon,
+	UserCheck01Icon,
+	UserGroupIcon,
+} from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { useUIStore } from "@/store";
 import type { AdminUserRow } from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
@@ -71,7 +72,7 @@ export function AdminUsersView({
 					to="/"
 					className="inline-flex items-center gap-1.5 text-xs font-[510] text-fog transition-colors hover:text-snow"
 				>
-					<ArrowLeft size={14} />
+					<Icon icon={ArrowLeft01Icon} size={14} />
 					<span>Kembali ke Workspace</span>
 				</Link>
 			</div>
@@ -90,38 +91,39 @@ export function AdminUsersView({
 					label="Total Pengguna"
 					value={rows.length}
 					subtext="Akun pengguna terdaftar"
-					icon={Users}
+					icon={UserGroupIcon}
 				/>
 				<AdminMetricCard
 					label="Paket Free"
 					value={freeCount}
 					subtext="Pengguna tier gratis"
-					icon={Users}
+					icon={UserGroupIcon}
 				/>
 				<AdminMetricCard
 					label="Paket Pro"
 					value={proCount}
 					subtext="Pengguna paket Pro"
-					icon={UserCheck}
+					icon={UserCheck01Icon}
 				/>
 				<AdminMetricCard
 					label="Paket Hengker"
 					value={hengkerCount}
 					subtext="Pengguna tier tertinggi"
-					icon={Crown}
+					icon={CrownIcon}
 				/>
 				<AdminMetricCard
 					label="Administrator"
 					value={adminCount}
 					subtext="Akses penuh ke sistem"
-					icon={Shield}
+					icon={Shield01Icon}
 				/>
 			</div>
 
 			{/* Filters */}
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div className="relative flex-1 max-w-md">
-					<Search
+					<Icon
+						icon={Search01Icon}
 						size={15}
 						className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fog"
 					/>

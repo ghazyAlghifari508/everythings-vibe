@@ -1,16 +1,17 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
 import {
-	ArrowLeft,
-	ArrowUpRight,
-	CreditCard,
-	FolderGit2,
-	Layers,
-	MessageSquare,
-	Users,
-} from "lucide-react";
+	ArrowLeft01Icon,
+	ArrowUpRight01Icon,
+	BubbleChatIcon,
+	CreditCardIcon,
+	GitBranchIcon,
+	Layers01Icon,
+	UserGroupIcon,
+} from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { getAdminTrendMetrics } from "../services";
 import type { AdminDashboardMetrics, DailyTrendPoint } from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
@@ -147,7 +148,7 @@ export function AdminDashboardView({
 					to="/"
 					className="inline-flex items-center gap-1.5 text-xs font-[510] text-fog transition-colors hover:text-snow"
 				>
-					<ArrowLeft size={14} />
+					<Icon icon={ArrowLeft01Icon} size={14} />
 					<span>Kembali ke Workspace</span>
 				</Link>
 			</div>
@@ -169,31 +170,31 @@ export function AdminDashboardView({
 					label="Total Pengguna"
 					value={metrics.usersCount}
 					subtext={`${hengkerCount} Hengker · ${proCount} Pro`}
-					icon={Users}
+					icon={UserGroupIcon}
 				/>
 				<AdminMetricCard
 					label="Status Pipeline"
 					value={totalPipelineOutputs}
 					subtext={`${metrics.prdCount} PRD · ${metrics.acCount} AC · ${metrics.tasksCount} Task`}
-					icon={Layers}
+					icon={Layers01Icon}
 				/>
 				<AdminMetricCard
 					label="Proyek Siap"
 					value={metrics.projectsCount}
 					subtext="Proyek ide produk aktif"
-					icon={FolderGit2}
+					icon={GitBranchIcon}
 				/>
 				<AdminMetricCard
 					label="Tiket Terbuka"
 					value={openTicketsCount}
 					subtext={`${metrics.feedbackCount} Saran · ${metrics.errorCount} Error`}
-					icon={MessageSquare}
+					icon={BubbleChatIcon}
 				/>
 				<AdminMetricCard
 					label="Pendapatan Bulan Ini"
 					value={metrics.currentMonthRevenue}
 					subtext="Total pembayaran sukses bulan ini"
-					icon={CreditCard}
+					icon={CreditCardIcon}
 					isCurrency={true}
 				/>
 			</div>
@@ -339,7 +340,7 @@ export function AdminDashboardView({
 												className="rounded p-1 text-fog hover:bg-white/5 hover:text-snow transition-colors"
 												title="Buka proyek"
 											>
-												<ArrowUpRight size={16} />
+												<Icon icon={ArrowUpRight01Icon} size={16} />
 											</Link>
 										</div>
 									</div>

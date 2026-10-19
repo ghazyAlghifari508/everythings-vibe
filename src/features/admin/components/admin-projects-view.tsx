@@ -1,16 +1,17 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
 import {
-	ArrowLeft,
-	ExternalLink,
-	FileText,
-	FolderGit2,
-	ListTodo,
-	Search,
-	ShieldCheck,
-} from "lucide-react";
+	ArrowLeft01Icon,
+	File02Icon,
+	GitBranchIcon,
+	LinkSquare02Icon,
+	Search01Icon,
+	ShieldCheckIcon,
+	Task01Icon,
+} from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { AdminProjectItem } from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
 import { useStreamerMode } from "./streamer-mode-context";
@@ -66,7 +67,7 @@ export function AdminProjectsView({
 					to="/"
 					className="inline-flex items-center gap-1.5 text-xs font-[510] text-fog transition-colors hover:text-snow"
 				>
-					<ArrowLeft size={14} />
+					<Icon icon={ArrowLeft01Icon} size={14} />
 					<span>Kembali ke Workspace</span>
 				</Link>
 			</div>
@@ -88,32 +89,33 @@ export function AdminProjectsView({
 					label="Total Proyek"
 					value={projects.length}
 					subtext="Proyek dibuat di workspace"
-					icon={FolderGit2}
+					icon={GitBranchIcon}
 				/>
 				<AdminMetricCard
 					label="Tahap PRD"
 					value={prdCount}
 					subtext="Perancangan spesifikasi produk"
-					icon={FileText}
+					icon={File02Icon}
 				/>
 				<AdminMetricCard
 					label="Tahap AC"
 					value={acCount}
 					subtext="Acceptance criteria gherkin"
-					icon={ShieldCheck}
+					icon={ShieldCheckIcon}
 				/>
 				<AdminMetricCard
 					label="Tahap Task / Kanban"
 					value={taskCount}
 					subtext="Pengerjaan breakdown task"
-					icon={ListTodo}
+					icon={Task01Icon}
 				/>
 			</div>
 
 			{/* Filters */}
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div className="relative flex-1 max-w-md">
-					<Search
+					<Icon
+						icon={Search01Icon}
 						size={15}
 						className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fog"
 					/>
@@ -237,7 +239,11 @@ export function AdminProjectsView({
 													className="inline-flex items-center gap-1.5 rounded-md border border-graphite bg-white/5 px-2.5 py-1 text-[11px] font-medium text-snow transition-colors hover:bg-white/10 hover:border-fog/40"
 												>
 													<span>Buka</span>
-													<ExternalLink size={12} className="text-fog" />
+													<Icon
+														icon={LinkSquare02Icon}
+														size={12}
+														className="text-fog"
+													/>
 												</Link>
 											</td>
 										</tr>

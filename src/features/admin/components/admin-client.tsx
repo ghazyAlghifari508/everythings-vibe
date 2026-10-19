@@ -1,18 +1,19 @@
 "use client";
 
-import { Link, useLocation } from "@tanstack/react-router";
 import {
-	CreditCard,
-	Eye,
-	EyeOff,
-	FolderGit2,
-	LayoutDashboard,
-	MessageSquare,
-	Settings,
-	Users,
-} from "lucide-react";
+	BubbleChatIcon,
+	CreditCardIcon,
+	DashboardSquare01Icon,
+	GitBranchIcon,
+	Settings02Icon,
+	UserGroupIcon,
+	ViewIcon,
+	ViewOffIcon,
+} from "@hugeicons/core-free-icons";
+import { Link, useLocation } from "@tanstack/react-router";
 import type React from "react";
 import { memo } from "react";
+import { Icon, type IconProps } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { cn } from "@/lib/utils";
@@ -21,7 +22,7 @@ import { StreamerModeProvider, useStreamerMode } from "./streamer-mode-context";
 interface NavItem {
 	href: string;
 	label: string;
-	icon: React.ComponentType<{ size?: number; className?: string }>;
+	icon: IconProps["icon"];
 	isActive: (pathname: string) => boolean;
 }
 
@@ -29,41 +30,41 @@ const NAV_ITEMS: NavItem[] = [
 	{
 		href: "/admin",
 		label: "Ringkasan",
-		icon: LayoutDashboard,
+		icon: DashboardSquare01Icon,
 		isActive: (p: string) => p === "/admin" || p === "/admin/",
 	},
 	{
 		href: "/admin/users",
 		label: "Pengguna",
-		icon: Users,
+		icon: UserGroupIcon,
 		isActive: (p: string) =>
 			p === "/admin/users" || p.startsWith("/admin/users/"),
 	},
 	{
 		href: "/admin/feedback",
 		label: "Tiket",
-		icon: MessageSquare,
+		icon: BubbleChatIcon,
 		isActive: (p: string) =>
 			p === "/admin/feedback" || p.startsWith("/admin/feedback/"),
 	},
 	{
 		href: "/admin/projects",
 		label: "Proyek",
-		icon: FolderGit2,
+		icon: GitBranchIcon,
 		isActive: (p: string) =>
 			p === "/admin/projects" || p.startsWith("/admin/projects/"),
 	},
 	{
 		href: "/admin/transactions",
 		label: "Transaksi",
-		icon: CreditCard,
+		icon: CreditCardIcon,
 		isActive: (p: string) =>
 			p === "/admin/transactions" || p.startsWith("/admin/transactions/"),
 	},
 	{
 		href: "/settings/profile",
 		label: "Pengaturan",
-		icon: Settings,
+		icon: Settings02Icon,
 		isActive: (p: string) =>
 			p.startsWith("/admin/settings") || p.startsWith("/settings"),
 	},
@@ -105,7 +106,11 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 										: "Aktifkan Streamer Mode untuk menyamarkan nominal dan data pengguna"
 								}
 							>
-								{isStreamerMode ? <EyeOff size={14} /> : <Eye size={14} />}
+								{isStreamerMode ? (
+									<Icon icon={ViewOffIcon} size={14} />
+								) : (
+									<Icon icon={ViewIcon} size={14} />
+								)}
 								<span className="hidden xs:inline sm:inline">
 									Streamer Mode
 								</span>
@@ -126,7 +131,6 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 					{/* Header Row 2: Horizontal Navigation Tabs */}
 					<nav className="flex items-center gap-1.5 overflow-x-auto py-2.5 hide-scrollbar">
 						{NAV_ITEMS.map((item) => {
-							const Icon = item.icon;
 							const isActive = item.isActive(pathname);
 
 							return (
@@ -143,6 +147,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 									)}
 								>
 									<Icon
+										icon={item.icon}
 										size={14}
 										className={isActive ? "text-snow" : "text-fog"}
 									/>

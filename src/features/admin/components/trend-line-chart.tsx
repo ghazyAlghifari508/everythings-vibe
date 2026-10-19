@@ -1,8 +1,9 @@
 "use client";
 
-import { TrendingUp } from "lucide-react";
+import { TradeUpIcon } from "@hugeicons/core-free-icons";
 import type React from "react";
 import { useCallback, useId, useMemo, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { DailyTrendPoint } from "../types";
 import {
@@ -204,7 +205,7 @@ export function TrendLineChart({
 			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					<div className="flex items-center gap-2">
-						<TrendingUp size={16} className="text-emerald-400" />
+						<Icon icon={TradeUpIcon} size={16} className="text-emerald-400" />
 						<h2 className="text-base font-[510] text-snow">
 							Tren {selectedRange} Hari Terakhir
 						</h2>

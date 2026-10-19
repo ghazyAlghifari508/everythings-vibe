@@ -1,6 +1,7 @@
 "use client";
 
-import { Ban, Shield } from "lucide-react";
+import { Cancel01Icon, Shield01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import {
 	resetUserCredit,
 	setUserAdmin,
@@ -77,7 +78,7 @@ export function AdminUserRowItem({
 			<td className="px-4 py-3">
 				{isAdmin ? (
 					<span className="inline-flex items-center gap-1 text-[11px] font-[510] text-indigo-300">
-						<Shield size={12} />
+						<Icon icon={Shield01Icon} size={12} />
 						Admin
 					</span>
 				) : (
@@ -89,7 +90,7 @@ export function AdminUserRowItem({
 			<td className="px-4 py-3">
 				{isBanned ? (
 					<span className="inline-flex items-center gap-1 rounded bg-rose-500/10 px-2 py-0.5 text-[10px] font-[510] text-rose-300 border border-rose-500/20">
-						<Ban size={10} />
+						<Icon icon={Cancel01Icon} size={10} />
 						Banned
 					</span>
 				) : (

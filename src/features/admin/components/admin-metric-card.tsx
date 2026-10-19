@@ -1,5 +1,6 @@
 import type React from "react";
 import { memo } from "react";
+import { Icon, type IconProps } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { useStreamerMode } from "./streamer-mode-context";
 
@@ -7,7 +8,9 @@ interface AdminMetricCardProps {
 	label: string;
 	value: string | number;
 	subtext?: string;
-	icon: React.ComponentType<{ size?: number; className?: string }>;
+	icon:
+		| IconProps["icon"]
+		| React.ComponentType<{ size?: number; className?: string }>;
 	isCurrency?: boolean;
 	className?: string;
 }
@@ -16,7 +19,7 @@ export const AdminMetricCard = memo(function AdminMetricCard({
 	label,
 	value,
 	subtext,
-	icon: Icon,
+	icon,
 	isCurrency = false,
 	className,
 }: AdminMetricCardProps) {
@@ -31,6 +34,22 @@ export const AdminMetricCard = memo(function AdminMetricCard({
 		}
 	}
 
+	const renderIcon = () => {
+		if (
+			typeof icon === "function" ||
+			(typeof icon === "object" && icon !== null && "$$typeof" in icon)
+		) {
+			const ComponentIcon = icon as React.ComponentType<{
+				size?: number;
+				className?: string;
+			}>;
+			return <ComponentIcon size={16} className="text-fog" />;
+		}
+		return (
+			<Icon icon={icon as IconProps["icon"]} size={16} className="text-fog" />
+		);
+	};
+
 	return (
 		<div
 			className={cn(
@@ -40,7 +59,7 @@ export const AdminMetricCard = memo(function AdminMetricCard({
 		>
 			<div className="flex items-center justify-between text-fog">
 				<span className="text-xs font-medium text-mist">{label}</span>
-				<Icon size={16} className="text-fog" />
+				{renderIcon()}
 			</div>
 			<div className="mt-3">
 				<p className="text-2xl font-light tracking-tight text-snow">

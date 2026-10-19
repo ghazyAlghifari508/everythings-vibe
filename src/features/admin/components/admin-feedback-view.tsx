@@ -1,16 +1,17 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
 import {
-	ArrowLeft,
-	Bug,
-	CheckCircle2,
-	Inbox,
-	MessageSquare,
-	Search,
-	Sparkles,
-} from "lucide-react";
+	ArrowLeft01Icon,
+	BubbleChatIcon,
+	Bug02Icon,
+	CheckmarkCircle02Icon,
+	InboxIcon,
+	Search01Icon,
+	SparklesIcon,
+} from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { AdminErrorReportItem, AdminFeedbackItem } from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
 import { useStreamerMode } from "./streamer-mode-context";
@@ -59,7 +60,7 @@ export function AdminFeedbackView({
 					to="/"
 					className="inline-flex items-center gap-1.5 text-xs font-[510] text-fog transition-colors hover:text-snow"
 				>
-					<ArrowLeft size={14} />
+					<Icon icon={ArrowLeft01Icon} size={14} />
 					<span>Kembali ke Workspace</span>
 				</Link>
 			</div>
@@ -80,25 +81,25 @@ export function AdminFeedbackView({
 					label="Total Masukan"
 					value={feedback.length + errors.length}
 					subtext="Feedback & log error"
-					icon={Inbox}
+					icon={InboxIcon}
 				/>
 				<AdminMetricCard
 					label="Feedback Umum"
 					value={generalCount}
 					subtext="Masukan & saran pengguna"
-					icon={MessageSquare}
+					icon={BubbleChatIcon}
 				/>
 				<AdminMetricCard
 					label="Permintaan Fitur"
 					value={featureCount}
 					subtext="Ide & wishlist pengguna"
-					icon={Sparkles}
+					icon={SparklesIcon}
 				/>
 				<AdminMetricCard
 					label="Bug & Crash"
 					value={bugCount}
 					subtext="Tiket bug & error sistem"
-					icon={Bug}
+					icon={Bug02Icon}
 				/>
 			</div>
 
@@ -158,7 +159,8 @@ export function AdminFeedbackView({
 					)}
 
 					<div className="relative w-48 sm:w-64">
-						<Search
+						<Icon
+							icon={Search01Icon}
 							size={14}
 							className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fog"
 						/>
@@ -179,7 +181,7 @@ export function AdminFeedbackView({
 					{filteredFeedback.length === 0 ? (
 						<div className="flex flex-col items-center justify-center rounded-xl border border-graphite bg-charcoal/40 py-16 text-center">
 							<div className="flex h-10 w-10 items-center justify-center rounded-full bg-obsidian border border-graphite text-fog mb-3">
-								<Inbox size={18} />
+								<Icon icon={InboxIcon} size={18} />
 							</div>
 							<p className="text-sm font-[510] text-snow">Belum ada feedback</p>
 							<p className="mt-1 text-xs text-fog max-w-sm">
@@ -215,11 +217,11 @@ export function AdminFeedbackView({
 													}`}
 												>
 													{f.type === "bug" ? (
-														<Bug size={10} />
+														<Icon icon={Bug02Icon} size={10} />
 													) : f.type === "feature" ? (
-														<Sparkles size={10} />
+														<Icon icon={SparklesIcon} size={10} />
 													) : (
-														<MessageSquare size={10} />
+														<Icon icon={BubbleChatIcon} size={10} />
 													)}
 													{f.type}
 												</span>
@@ -267,7 +269,7 @@ export function AdminFeedbackView({
 					{filteredErrors.length === 0 ? (
 						<div className="flex flex-col items-center justify-center rounded-xl border border-graphite bg-charcoal/40 py-16 text-center">
 							<div className="flex h-10 w-10 items-center justify-center rounded-full bg-obsidian border border-graphite text-emerald-400 mb-3">
-								<CheckCircle2 size={18} />
+								<Icon icon={CheckmarkCircle02Icon} size={18} />
 							</div>
 							<p className="text-sm font-[510] text-snow">
 								Semua sistem berjalan normal

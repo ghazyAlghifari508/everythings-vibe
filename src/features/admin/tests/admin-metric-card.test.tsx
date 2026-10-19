@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { Users } from "lucide-react";
+import { UserGroupIcon } from "@hugeicons/core-free-icons";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -36,7 +36,7 @@ describe("AdminMetricCard", () => {
 						label="Total Pengguna"
 						value={42}
 						subtext="40 Aktif, 2 Pending"
-						icon={Users}
+						icon={UserGroupIcon}
 					/>
 				</StreamerModeProvider>,
 			);
@@ -56,7 +56,7 @@ describe("AdminMetricCard", () => {
 						label="Pendapatan"
 						value={299700}
 						isCurrency={true}
-						icon={Users}
+						icon={UserGroupIcon}
 					/>
 				</StreamerModeProvider>,
 			);
@@ -77,7 +77,7 @@ describe("AdminMetricCard", () => {
 						label="Pendapatan"
 						value={299700}
 						isCurrency={true}
-						icon={Users}
+						icon={UserGroupIcon}
 					/>
 				</StreamerModeProvider>,
 			);
@@ -85,5 +85,28 @@ describe("AdminMetricCard", () => {
 
 		expect(container.textContent).toContain("Pendapatan");
 		expect(container.textContent).toContain("••••••••");
+	});
+
+	it("supports custom function component icons for backward compatibility", () => {
+		const MockLegacyIcon = ({ className }: { className?: string }) => (
+			<span data-testid="mock-icon" className={className}>
+				icon
+			</span>
+		);
+
+		act(() => {
+			root?.render(
+				<StreamerModeProvider>
+					<AdminMetricCard
+						label="Custom Metric"
+						value={99}
+						icon={MockLegacyIcon}
+					/>
+				</StreamerModeProvider>,
+			);
+		});
+
+		expect(container.textContent).toContain("Custom Metric");
+		expect(container.querySelector('[data-testid="mock-icon"]')).not.toBeNull();
 	});
 });

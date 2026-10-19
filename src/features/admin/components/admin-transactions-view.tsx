@@ -1,14 +1,15 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
 import {
-	ArrowLeft,
-	CheckCircle2,
-	Clock,
-	CreditCard,
-	Search,
-} from "lucide-react";
+	ArrowLeft01Icon,
+	CheckmarkCircle02Icon,
+	Clock01Icon,
+	CreditCardIcon,
+	Search01Icon,
+} from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { AdminTransactionItem } from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
 import { useStreamerMode } from "./streamer-mode-context";
@@ -69,7 +70,7 @@ export function AdminTransactionsView({
 					to="/"
 					className="inline-flex items-center gap-1.5 text-xs font-[510] text-fog transition-colors hover:text-snow"
 				>
-					<ArrowLeft size={14} />
+					<Icon icon={ArrowLeft01Icon} size={14} />
 					<span>Kembali ke Workspace</span>
 				</Link>
 			</div>
@@ -91,25 +92,25 @@ export function AdminTransactionsView({
 					label="Total Transaksi"
 					value={transactions.length}
 					subtext="Pesanan tercatat di sistem"
-					icon={CreditCard}
+					icon={CreditCardIcon}
 				/>
 				<AdminMetricCard
 					label="Transaksi Sukses"
 					value={successCount}
 					subtext="Berhasil terbayar"
-					icon={CheckCircle2}
+					icon={CheckmarkCircle02Icon}
 				/>
 				<AdminMetricCard
 					label="Menunggu Pembayaran"
 					value={pendingCount}
 					subtext="Status pending di payment gateway"
-					icon={Clock}
+					icon={Clock01Icon}
 				/>
 				<AdminMetricCard
 					label="Total Penerimaan"
 					value={totalRevenue}
 					subtext="Akumulasi pembayaran sukses"
-					icon={CreditCard}
+					icon={CreditCardIcon}
 					isCurrency={true}
 				/>
 			</div>
@@ -117,7 +118,8 @@ export function AdminTransactionsView({
 			{/* Filters */}
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div className="relative flex-1 max-w-md">
-					<Search
+					<Icon
+						icon={Search01Icon}
 						size={15}
 						className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fog"
 					/>
