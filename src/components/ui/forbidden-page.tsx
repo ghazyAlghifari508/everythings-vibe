@@ -1,8 +1,9 @@
 "use client";
 
+import { ArrowLeft01Icon, ShieldAlertIcon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ShieldAlert } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,7 @@ export function ForbiddenPage({
 				</div>
 
 				<div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-graphite bg-obsidian text-fog">
-					<ShieldAlert size={28} className="text-crimson/90" />
+					<Icon icon={ShieldAlertIcon} size={28} className="text-crimson/90" />
 				</div>
 
 				<span className="mb-2 font-mono text-xs font-semibold tracking-wider text-fog uppercase">
@@ -50,7 +51,7 @@ export function ForbiddenPage({
 							"w-full inline-flex items-center justify-center gap-2",
 						)}
 					>
-						<ArrowLeft size={16} />
+						<Icon icon={ArrowLeft01Icon} size={16} />
 						<span>{backLabel}</span>
 					</Link>
 				</div>

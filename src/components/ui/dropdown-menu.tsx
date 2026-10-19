@@ -1,7 +1,8 @@
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
-import { ChevronRight } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { Icon } from "./icon";
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
@@ -24,7 +25,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
 		{...props}
 	>
 		{children}
-		<ChevronRight className="ml-auto h-4 w-4" />
+		<Icon icon={ArrowRight01Icon} size={16} className="ml-auto" />
 	</DropdownMenuPrimitive.SubTrigger>
 ));
 DropdownMenuSubTrigger.displayName =

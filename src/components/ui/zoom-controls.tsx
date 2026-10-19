@@ -1,7 +1,12 @@
 "use client";
 
-import { Minus, Plus, RotateCcw } from "lucide-react";
+import {
+	Add01Icon,
+	MinusSignIcon,
+	RotateCcwIcon,
+} from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
+import { Icon } from "./icon";
 
 interface ZoomControlsProps {
 	zoom: number;
@@ -38,7 +43,7 @@ export function ZoomControls({
 				aria-label="Perkecil"
 				className="flex h-8 w-8 items-center justify-center rounded text-fog transition-colors hover:bg-white/5 hover:text-snow"
 			>
-				<Minus size={16} />
+				<Icon icon={MinusSignIcon} size={16} />
 			</button>
 			<span className="min-w-[48px] text-center text-xs font-[510] text-fog tabular-nums">
 				{Math.round(zoom * 100)}%
@@ -49,7 +54,7 @@ export function ZoomControls({
 				aria-label="Perbesar"
 				className="flex h-8 w-8 items-center justify-center rounded text-fog transition-colors hover:bg-white/5 hover:text-snow"
 			>
-				<Plus size={16} />
+				<Icon icon={Add01Icon} size={16} />
 			</button>
 			<div className="mx-1 h-5 w-px bg-graphite" />
 			<button
@@ -59,7 +64,7 @@ export function ZoomControls({
 				title={resetLabel}
 				className="flex h-8 w-8 items-center justify-center rounded text-fog transition-colors hover:bg-white/5 hover:text-snow"
 			>
-				<RotateCcw size={15} />
+				<Icon icon={RotateCcwIcon} size={15} />
 			</button>
 		</div>
 	);

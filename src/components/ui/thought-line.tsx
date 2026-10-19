@@ -1,11 +1,16 @@
 "use client";
 
 import {
+	AlertCircleIcon,
+	ArrowDown01Icon,
+	SparklesIcon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
+import {
 	type AnimationPlaybackControls,
 	animate,
 	useReducedMotionConfig,
 } from "framer-motion";
-import { AlertCircle, Check, ChevronDown, Sparkles } from "lucide-react";
 import {
 	type CSSProperties,
 	type ReactNode,
@@ -15,6 +20,7 @@ import {
 	useState,
 } from "react";
 import { cn } from "@/lib/utils";
+import { Icon } from "./icon";
 
 // Behaviour contract ported from the ReactBits ThoughtLine micro-interaction
 // (https://reactbits.dev/micro/thought-line): a reasoning-trace header with a
@@ -352,9 +358,9 @@ export function ThoughtLine({
 					aria-hidden="true"
 				>
 					{isFailed ? (
-						<AlertCircle className="size-full" />
+						<Icon icon={AlertCircleIcon} size="100%" />
 					) : glyph === "sparkle" ? (
-						<Sparkles className="size-full" />
+						<Icon icon={SparklesIcon} size="100%" />
 					) : glyph === "dot" ? (
 						<span className="thought-line__dot" />
 					) : (
@@ -402,7 +408,7 @@ export function ThoughtLine({
 					data-on={hasTrace ? "" : undefined}
 					aria-hidden="true"
 				>
-					<ChevronDown className="size-[1em]" />
+					<Icon icon={ArrowDown01Icon} size="1em" />
 				</span>
 			) : null}
 			<output className="thought-line__sr" aria-live="polite">
@@ -460,7 +466,11 @@ export function ThoughtLine({
 										>
 											<span className="thought-line__mark" aria-hidden="true">
 												{done ? (
-													<Check className="size-full" strokeWidth={2.5} />
+													<Icon
+														icon={Tick01Icon}
+														size="100%"
+														strokeWidth={2.5}
+													/>
 												) : (
 													<i className="thought-line__pulse" />
 												)}
@@ -484,7 +494,12 @@ export function ThoughtLine({
 										<span className="thought-line__thinking-label">
 											{THINKING_LABEL}
 										</span>
-										<ChevronDown className="size-3.5 shrink-0" aria-hidden />
+										<Icon
+											icon={ArrowDown01Icon}
+											size={14}
+											className="shrink-0"
+											aria-hidden
+										/>
 									</button>
 								) : (
 									<span className="thought-line__thinking-label">

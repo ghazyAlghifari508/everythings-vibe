@@ -1,9 +1,14 @@
 "use client";
 
-import { AlertCircle, Check, ChevronDown } from "lucide-react";
+import {
+	AlertCircleIcon,
+	ArrowDown01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import { useEffect, useId, useRef, useState } from "react";
 import { Orb } from "@/components/ui/orb";
 import { cn } from "@/lib/utils";
+import { Icon } from "./icon";
 
 export type AgentOperationStatus = "idle" | "running" | "done" | "failed";
 export type AgentOperationPhase = "thinking" | "generating";
@@ -158,7 +163,12 @@ export function AgentThinking({
 				<div className="flex flex-col gap-1.5">
 					<div className="flex items-center justify-between gap-3 text-xs text-fog">
 						<span className="flex items-center gap-2">
-							<Check className="size-3.5 text-emerald" aria-hidden="true" />
+							<Icon
+								icon={Tick01Icon}
+								size={14}
+								className="shrink-0 text-emerald"
+								aria-hidden="true"
+							/>
 							<span>{thinkingLabel}</span>
 						</span>
 						{showTimer ? (
@@ -196,13 +206,17 @@ export function AgentThinking({
 						{isWorking ? (
 							<Orb state="reasoning" size={16} />
 						) : isFailed ? (
-							<AlertCircle
-								className="size-4 shrink-0 text-crimson"
+							<Icon
+								icon={AlertCircleIcon}
+								size={16}
+								className="shrink-0 text-crimson"
 								aria-hidden="true"
 							/>
 						) : (
-							<Check
-								className="size-4 shrink-0 text-emerald"
+							<Icon
+								icon={Tick01Icon}
+								size={16}
+								className="shrink-0 text-emerald"
 								aria-hidden="true"
 							/>
 						)}
@@ -246,7 +260,8 @@ export function AgentThinking({
 						aria-controls={detailsId}
 						className="inline-flex w-fit cursor-pointer items-center gap-1.5 text-xs text-fog hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
 					>
-						<ChevronDown
+						<Icon
+							icon={ArrowDown01Icon}
 							size={13}
 							className={cn(
 								"transition-transform duration-200",
