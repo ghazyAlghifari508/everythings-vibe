@@ -1,14 +1,15 @@
 "use client";
 
 import {
-	AlertCircle,
-	Check,
-	Coins,
-	CreditCard,
-	Loader2,
-	X,
-} from "lucide-react";
+	AlertCircleIcon,
+	Cancel01Icon,
+	Coins01Icon,
+	CreditCardIcon,
+	Loading01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import * as React from "react";
+import { Icon } from "@/components/ui/icon";
 import { PricingComponent } from "@/features/billing/components/pricing-card";
 import { prdFyPlans } from "@/features/billing/data/pricing-data";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
@@ -176,7 +177,7 @@ export function CreditExhaustedModal({
 						className="absolute right-4 top-4 text-fog transition-colors hover:text-snow cursor-pointer"
 						aria-label="Tutup"
 					>
-						<X size={20} />
+						<Icon icon={Cancel01Icon} size={20} />
 					</button>
 					<div
 						className={cn(
@@ -187,9 +188,9 @@ export function CreditExhaustedModal({
 						)}
 					>
 						{view === "topup" ? (
-							<CreditCard size={20} strokeWidth={2} />
+							<Icon icon={CreditCardIcon} size={20} strokeWidth={2} />
 						) : (
-							<AlertCircle size={20} strokeWidth={2} />
+							<Icon icon={AlertCircleIcon} size={20} strokeWidth={2} />
 						)}
 					</div>
 					<h3
@@ -235,7 +236,12 @@ export function CreditExhaustedModal({
 						<div className="rounded-lg border border-graphite/60 bg-charcoal/50 p-3 text-xs">
 							<div className="flex items-center justify-between">
 								<span className="flex items-center gap-1.5 text-fog">
-									<Coins size={14} className="text-fog" aria-hidden />
+									<Icon
+										icon={Coins01Icon}
+										size={14}
+										className="text-fog"
+										aria-hidden
+									/>
 									Saldo Kredit Saat Ini:
 								</span>
 								<span className="font-mono font-medium text-snow">
@@ -285,7 +291,13 @@ export function CreditExhaustedModal({
 																: "border-graphite bg-transparent",
 														)}
 													>
-														{isSelected && <Check size={10} strokeWidth={3} />}
+														{isSelected && (
+															<Icon
+																icon={Tick01Icon}
+																size={10}
+																strokeWidth={3}
+															/>
+														)}
 													</div>
 													<div>
 														<div className="flex items-center gap-2">
@@ -349,7 +361,12 @@ export function CreditExhaustedModal({
 						>
 							{loading ? (
 								<>
-									<Loader2 size={16} className="animate-spin" aria-hidden />
+									<Icon
+										icon={Loading01Icon}
+										size={16}
+										className="animate-spin"
+										aria-hidden
+									/>
 									<span>Memproses Pembayaran...</span>
 								</>
 							) : (

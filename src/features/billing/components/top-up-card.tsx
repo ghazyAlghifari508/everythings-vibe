@@ -1,7 +1,8 @@
 "use client";
 
-import { CreditCard } from "lucide-react";
+import { CreditCardIcon } from "@hugeicons/core-free-icons";
 import * as React from "react";
+import { Icon } from "@/components/ui/icon";
 import { TOPUP_SKU } from "@/features/billing/types/billing-constants";
 import { useUIStore } from "@/store";
 
@@ -56,7 +57,7 @@ export function TopUpCard({ className }: { className?: string }) {
 			<div className="flex flex-wrap items-center justify-between gap-4">
 				<div>
 					<h3 className="flex items-center gap-2 font-inter text-base font-[510] text-snow">
-						<CreditCard size={16} aria-hidden />
+						<Icon icon={CreditCardIcon} size={16} aria-hidden />
 						Top Up Kredit
 					</h3>
 					<p className="mt-1 text-sm text-fog">

@@ -1,6 +1,7 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { CreditOperationItem } from "@/features/billing/types/credit-usage";
 
 export function CreditUsageDetail({
@@ -44,7 +45,7 @@ export function CreditUsageDetail({
 						className="rounded p-1 text-fog hover:text-snow transition-colors"
 						aria-label="Tutup modal"
 					>
-						<X size={18} />
+						<Icon icon={Cancel01Icon} size={18} />
 					</button>
 				</div>
 

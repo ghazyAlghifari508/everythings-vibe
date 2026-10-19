@@ -1,6 +1,11 @@
+import {
+	Alert01Icon,
+	CalendarClockIcon,
+	Delete02Icon,
+} from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, CalendarClock, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { cancelSubscription } from "@/features/billing/services/payment.functions";
 import { TOPUP_SKU } from "@/features/billing/types/billing-constants";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
@@ -105,9 +110,9 @@ export function BillingPage({
 								}`}
 							>
 								{isPaused ? (
-									<AlertTriangle size={14} />
+									<Icon icon={Alert01Icon} size={14} />
 								) : (
-									<CalendarClock size={14} />
+									<Icon icon={CalendarClockIcon} size={14} />
 								)}
 								{statusText}
 							</p>
@@ -220,7 +225,7 @@ export function BillingPage({
 												className="rounded p-1.5 text-fog hover:bg-red-500/10 hover:text-red-400 transition-colors"
 												aria-label="Hapus riwayat"
 											>
-												<Trash2 size={14} />
+												<Icon icon={Delete02Icon} size={14} />
 											</button>
 										)}
 									</div>

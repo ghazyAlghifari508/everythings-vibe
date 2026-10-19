@@ -1,15 +1,16 @@
 "use client";
 
-import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
-	AlertCircle,
-	Check,
-	Coins,
-	CreditCard,
-	Loader2,
-	X,
-} from "lucide-react";
+	AlertCircleIcon,
+	Cancel01Icon,
+	Coins01Icon,
+	CreditCardIcon,
+	Loading01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as React from "react";
+import { Icon } from "@/components/ui/icon";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import {
 	TOPUP_PACKAGES,
@@ -113,7 +114,7 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 					<div className="flex items-start justify-between gap-4 pb-4 border-b border-graphite/60 shrink-0">
 						<div className="flex items-center gap-3">
 							<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-graphite bg-charcoal text-snow">
-								<CreditCard size={18} aria-hidden />
+								<Icon icon={CreditCardIcon} size={18} aria-hidden />
 							</div>
 							<div>
 								<DialogPrimitive.Title className="text-base font-semibold text-snow">
@@ -129,7 +130,7 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 							className="rounded-md p-1.5 text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40"
 							aria-label="Tutup modal"
 						>
-							<X size={18} />
+							<Icon icon={Cancel01Icon} size={18} />
 						</DialogPrimitive.Close>
 					</div>
 
@@ -137,7 +138,12 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 					<div className="mt-4 rounded-lg border border-graphite/60 bg-charcoal/50 p-3 text-xs shrink-0">
 						<div className="flex items-center justify-between">
 							<span className="flex items-center gap-1.5 text-fog">
-								<Coins size={14} className="text-fog" aria-hidden />
+								<Icon
+									icon={Coins01Icon}
+									size={14}
+									className="text-fog"
+									aria-hidden
+								/>
 								Saldo Kredit Saat Ini:
 							</span>
 							<span className="font-mono font-medium text-snow">
@@ -186,7 +192,9 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 														: "border-graphite bg-transparent",
 												)}
 											>
-												{isSelected && <Check size={10} strokeWidth={3} />}
+												{isSelected && (
+													<Icon icon={Tick01Icon} size={10} strokeWidth={3} />
+												)}
 											</div>
 											<div>
 												<div className="flex items-center gap-2">
@@ -230,7 +238,12 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 							role="alert"
 							className="mt-3 flex items-start gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 shrink-0"
 						>
-							<AlertCircle size={16} className="shrink-0 mt-0.5" aria-hidden />
+							<Icon
+								icon={AlertCircleIcon}
+								size={16}
+								className="shrink-0 mt-0.5"
+								aria-hidden
+							/>
 							<span className="leading-relaxed">{error}</span>
 						</div>
 					)}
@@ -246,7 +259,12 @@ export function TopUpModal({ open, onOpenChange }: TopUpModalProps) {
 						>
 							{loading ? (
 								<>
-									<Loader2 size={16} className="animate-spin" aria-hidden />
+									<Icon
+										icon={Loading01Icon}
+										size={16}
+										className="animate-spin"
+										aria-hidden
+									/>
 									<span>Memproses Pembayaran...</span>
 								</>
 							) : (

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, X } from "lucide-react";
+import { Cancel01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import type * as React from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Icon } from "@/components/ui/icon";
 import type { Feature, PriceTier } from "@/features/billing/data/pricing-data";
 import { TOPUP_SKU } from "@/features/billing/types/billing-constants";
 import { cn } from "@/lib/utils";
@@ -18,12 +19,14 @@ import { cn } from "@/lib/utils";
 // --- Utility Components ---
 
 const FeatureItem: React.FC<{ feature: Feature }> = ({ feature }) => {
-	const Icon = feature.isIncluded ? Check : X;
+	const iconGlyph = feature.isIncluded ? Tick01Icon : Cancel01Icon;
 	const iconColor = feature.isIncluded ? "text-mist" : "text-slate/60";
 
 	return (
 		<li className="flex items-start space-x-3 py-2">
 			<Icon
+				icon={iconGlyph}
+				size={16}
 				className={cn("h-4 w-4 flex-shrink-0 mt-0.5", iconColor)}
 				aria-hidden="true"
 			/>
@@ -230,7 +233,7 @@ export const PricingComponent: React.FC<PricingComponentProps> = ({
 									(f) => f.name === featureName,
 								);
 								const isIncluded = feature?.isIncluded ?? false;
-								const Icon = isIncluded ? Check : X;
+								const iconGlyph = isIncluded ? Tick01Icon : Cancel01Icon;
 								const iconColor = isIncluded ? "text-mist" : "text-slate/60";
 
 								return (
@@ -242,6 +245,8 @@ export const PricingComponent: React.FC<PricingComponentProps> = ({
 										)}
 									>
 										<Icon
+											icon={iconGlyph}
+											size={20}
 											className={cn("h-5 w-5 mx-auto", iconColor)}
 											aria-hidden="true"
 										/>
