@@ -1,7 +1,13 @@
 "use client";
 
-import { Check, CircleSlash, Eraser, Frame, Layers } from "lucide-react";
-import type { ComponentType } from "react";
+import {
+	EraserIcon,
+	FrameIcon,
+	Layers01Icon,
+	Tick01Icon,
+	UnavailableIcon,
+} from "@hugeicons/core-free-icons";
+import type { IconSvgElement } from "@hugeicons/react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -10,6 +16,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import {
 	STUDIO_DESIGN_SKILLS,
 	type StudioDesignSkillAsset,
@@ -20,18 +27,11 @@ import type { StudioDesignSkillId } from "@/features/studio/services/studio-gene
 // Fallback marks for skills without an official, licensable logo asset. These
 // are deliberately distinct so each skill is visually identifiable; none of
 // them claims to be a brand mark. See docs/studio-p2-component-discovery.md.
-const FALLBACK_ICONS: Record<
-	StudioDesignSkillIcon,
-	ComponentType<{
-		size?: number | string;
-		"aria-hidden"?: boolean;
-		className?: string;
-	}>
-> = {
-	none: CircleSlash,
-	"frontend-design": Frame,
-	"ui-ux-pro-max": Layers,
-	"anti-slop": Eraser,
+const FALLBACK_ICONS: Record<StudioDesignSkillIcon, IconSvgElement> = {
+	none: UnavailableIcon,
+	"frontend-design": FrameIcon,
+	"ui-ux-pro-max": Layers01Icon,
+	"anti-slop": EraserIcon,
 };
 
 // One consistent asset slot shared by every skill. Images and icons both render
@@ -50,10 +50,10 @@ function SkillAssetMark({ asset }: { asset: StudioDesignSkillAsset }) {
 			</span>
 		);
 	}
-	const Icon = FALLBACK_ICONS[asset.icon];
+	const icon = FALLBACK_ICONS[asset.icon];
 	return (
 		<span className="flex size-5 shrink-0 items-center justify-center rounded-md border border-graphite bg-onyx text-mist">
-			<Icon size={13} aria-hidden />
+			<Icon icon={icon} size={13} />
 		</span>
 	);
 }
@@ -126,7 +126,8 @@ export function StudioSkillSelect({
 							</span>
 							<span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
 								{selected ? (
-									<Check
+									<Icon
+										icon={Tick01Icon}
 										size={14}
 										aria-label="Terpilih"
 										className="text-snow"

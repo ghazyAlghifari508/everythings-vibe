@@ -1,16 +1,16 @@
 "use client";
 
 import {
-	FileText,
-	ImageIcon,
-	Loader2,
-	Monitor,
-	MoreHorizontal,
-	Search,
-	Smartphone,
-	Trash2,
-	X,
-} from "lucide-react";
+	Cancel01Icon,
+	ComputerIcon,
+	Delete02Icon,
+	File01Icon,
+	Image01Icon,
+	Loading01Icon,
+	MoreHorizontalIcon,
+	Search01Icon,
+	SmartPhone01Icon,
+} from "@hugeicons/core-free-icons";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import type { StudioHistoryItem } from "@/features/studio/types/studio";
 
 export type { StudioHistoryItem } from "@/features/studio/types/studio";
@@ -97,7 +98,8 @@ export function StudioSidebar({
 			{/* Search Input */}
 			<div className="shrink-0 p-3 border-b border-graphite/60">
 				<div className="relative flex items-center">
-					<Search
+					<Icon
+						icon={Search01Icon}
 						size={14}
 						className="absolute left-2.5 text-fog pointer-events-none"
 						aria-hidden
@@ -117,7 +119,7 @@ export function StudioSidebar({
 							aria-label="Hapus pencarian"
 							className="absolute right-2 text-fog hover:text-snow"
 						>
-							<X size={13} aria-hidden />
+							<Icon icon={Cancel01Icon} size={13} aria-hidden />
 						</button>
 					) : null}
 				</div>
@@ -180,9 +182,13 @@ export function StudioSidebar({
 													title={isMobile ? "Mobile Design" : "Web Design"}
 												>
 													{isMobile ? (
-														<Smartphone size={13} aria-hidden />
+														<Icon
+															icon={SmartPhone01Icon}
+															size={13}
+															aria-hidden
+														/>
 													) : (
-														<Monitor size={13} aria-hidden />
+														<Icon icon={ComputerIcon} size={13} aria-hidden />
 													)}
 												</span>
 											</div>
@@ -206,7 +212,7 @@ export function StudioSidebar({
 														className="inline-flex items-center gap-0.5 rounded bg-charcoal px-1 py-0.5 text-mist border border-graphite/80"
 														title="Menggunakan DESIGN.md"
 													>
-														<FileText size={10} aria-hidden />
+														<Icon icon={File01Icon} size={10} aria-hidden />
 														<span>Ref</span>
 													</span>
 												)}
@@ -215,7 +221,7 @@ export function StudioSidebar({
 														className="inline-flex items-center gap-0.5 rounded bg-charcoal px-1 py-0.5 text-mist border border-graphite/80"
 														title="Menggunakan Logo"
 													>
-														<ImageIcon size={10} aria-hidden />
+														<Icon icon={Image01Icon} size={10} aria-hidden />
 														<span>Logo</span>
 													</span>
 												)}
@@ -236,13 +242,18 @@ export function StudioSidebar({
 													className="my-1 mr-1 flex size-8 shrink-0 items-center justify-center self-center rounded-md text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
 												>
 													{isDeleting ? (
-														<Loader2
+														<Icon
+															icon={Loading01Icon}
 															size={14}
 															className="motion-safe:animate-spin"
 															aria-hidden
 														/>
 													) : (
-														<MoreHorizontal size={15} aria-hidden />
+														<Icon
+															icon={MoreHorizontalIcon}
+															size={15}
+															aria-hidden
+														/>
 													)}
 												</button>
 											</DropdownMenuTrigger>
@@ -254,7 +265,12 @@ export function StudioSidebar({
 														setConfirmTarget(item);
 													}}
 												>
-													<Trash2 size={14} aria-hidden className="mr-2" />
+													<Icon
+														icon={Delete02Icon}
+														size={14}
+														aria-hidden
+														className="mr-2"
+													/>
 													Hapus project
 												</DropdownMenuItem>
 											</DropdownMenuContent>

@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertCircle } from "lucide-react";
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
 import { StudioComposer } from "@/features/studio/components/composer/studio-composer";
 import { StudioDesignPicker } from "@/features/studio/components/design-system/studio-design-picker";
@@ -90,7 +91,7 @@ export function StudioWorkspace({
 					className="absolute left-1/2 z-40 flex w-[calc(100%-24px)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-xl border border-crimson bg-obsidian px-4 py-2.5 text-sm text-crimson"
 					style={{ top: "calc(4rem + env(safe-area-inset-top))" }}
 				>
-					<AlertCircle size={15} aria-hidden />
+					<Icon icon={AlertCircleIcon} size={15} aria-hidden />
 					<span>{workspace.error}</span>
 					<button
 						type="button"

@@ -1,4 +1,5 @@
-import { Check } from "lucide-react";
+import { Tick01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 
 interface StudioDesignThemePanelProps {
@@ -88,7 +89,8 @@ export function StudioDesignThemePanel({
 									{preset.name}
 								</span>
 								{selected ? (
-									<Check
+									<Icon
+										icon={Tick01Icon}
 										size={14}
 										aria-label="Terpilih"
 										className="ml-auto text-snow"

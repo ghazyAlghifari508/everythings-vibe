@@ -1,6 +1,7 @@
 "use client";
 
-import { Globe } from "lucide-react";
+import { Globe02Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 
 /**
@@ -38,7 +39,11 @@ export function StudioScrapeDesignSources({
 							className="flex items-center justify-between gap-3 rounded-lg border border-graphite bg-onyx px-3 py-2"
 						>
 							<span className="flex min-w-0 items-center gap-2">
-								<Globe size={16} className="shrink-0 text-fog" aria-hidden />
+								<Icon
+									icon={Globe02Icon}
+									size={16}
+									className="shrink-0 text-fog"
+								/>
 								<span className="min-w-0">
 									<span className="block truncate text-sm text-snow">
 										{source.title ?? source.domain}

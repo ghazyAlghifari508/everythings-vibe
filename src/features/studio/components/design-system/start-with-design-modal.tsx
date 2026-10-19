@@ -1,8 +1,9 @@
 "use client";
 
+import { Cancel01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Check, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import { StudioDesignLogoSection } from "@/features/studio/components/design-system/studio-design-logo-section";
 import { StudioDesignMdSection } from "@/features/studio/components/design-system/studio-design-md-section";
@@ -238,7 +239,7 @@ export function StartWithDesignModal({
 							className="rounded-md p-1.5 text-fog transition-colors hover:bg-onyx hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 							aria-label="Tutup modal"
 						>
-							<X size={18} aria-hidden />
+							<Icon icon={Cancel01Icon} size={18} />
 						</DialogPrimitive.Close>
 					</div>
 
@@ -286,7 +287,7 @@ export function StartWithDesignModal({
 						<div className="text-xs text-fog">
 							{scrapeSelection ? (
 								<span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
-									<Check size={14} aria-hidden />
+									<Icon icon={Tick01Icon} size={14} />
 									<span>
 										DESIGN.md dari{" "}
 										{scrapeSelection.title ?? scrapeSelection.domain}
@@ -294,7 +295,7 @@ export function StartWithDesignModal({
 								</span>
 							) : designMd.trim() ? (
 								<span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
-									<Check size={14} aria-hidden />
+									<Icon icon={Tick01Icon} size={14} />
 									<span>DESIGN.md terisi</span>
 									{logo ? <span>· Logo terpasang</span> : null}
 								</span>

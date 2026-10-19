@@ -1,5 +1,12 @@
-import { FileCode2, ImageIcon, Loader2, Upload, X } from "lucide-react";
+import {
+	Cancel01Icon,
+	FileCodeIcon,
+	Image01Icon,
+	Loading01Icon,
+	Upload01Icon,
+} from "@hugeicons/core-free-icons";
 import { useRef } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { AttachedLogo } from "@/features/studio/types/studio";
 import {
 	readStudioDesignMdFile,
@@ -81,7 +88,7 @@ export function StudioDesignCustomPanel({
 		>
 			<div className="flex flex-col gap-2 rounded-xl border border-graphite bg-onyx p-3.5">
 				<span className="flex items-center gap-2 text-sm font-semibold text-snow">
-					<FileCode2 size={15} aria-hidden className="text-fog" />
+					<Icon icon={FileCodeIcon} size={15} className="text-fog" />
 					File DESIGN.md
 				</span>
 				{state.mdName ? (
@@ -111,7 +118,7 @@ export function StudioDesignCustomPanel({
 							aria-label="Hapus file desain"
 							className="rounded p-1 text-fog hover:text-snow"
 						>
-							<X size={13} aria-hidden />
+							<Icon icon={Cancel01Icon} size={13} />
 						</button>
 					</span>
 				) : (
@@ -122,13 +129,13 @@ export function StudioDesignCustomPanel({
 						className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-graphite px-3 text-xs text-fog transition-colors hover:border-steel hover:text-mist disabled:opacity-50"
 					>
 						{state.reading ? (
-							<Loader2
+							<Icon
+								icon={Loading01Icon}
 								size={16}
-								aria-hidden
 								className="motion-safe:animate-spin"
 							/>
 						) : (
-							<Upload size={16} aria-hidden />
+							<Icon icon={Upload01Icon} size={16} />
 						)}
 						<span>
 							{state.reading
@@ -157,7 +164,7 @@ export function StudioDesignCustomPanel({
 
 			<div className="flex flex-col gap-2 rounded-xl border border-graphite bg-onyx p-3.5">
 				<span className="flex items-center gap-2 text-sm font-semibold text-snow">
-					<ImageIcon size={15} aria-hidden className="text-fog" />
+					<Icon icon={Image01Icon} size={15} className="text-fog" />
 					Logo aplikasi
 					<span className="text-xs font-normal text-fog">(opsional)</span>
 				</span>
@@ -172,7 +179,7 @@ export function StudioDesignCustomPanel({
 							aria-label="Hapus logo"
 							className="rounded p-1 text-fog hover:text-snow"
 						>
-							<X size={13} aria-hidden />
+							<Icon icon={Cancel01Icon} size={13} />
 						</button>
 					</span>
 				) : (
@@ -181,7 +188,7 @@ export function StudioDesignCustomPanel({
 						onClick={() => logoInputRef.current?.click()}
 						className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-graphite px-3 text-xs font-semibold text-mist transition-colors hover:text-snow"
 					>
-						<Upload size={14} aria-hidden />
+						<Icon icon={Upload01Icon} size={14} />
 						Pilih logo
 					</button>
 				)}

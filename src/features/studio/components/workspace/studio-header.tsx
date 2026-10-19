@@ -1,15 +1,15 @@
-import { Link } from "@tanstack/react-router";
 import {
-	ArrowLeft,
-	ChevronDown,
-	Copy,
-	Download,
-	Loader2,
-	Menu,
-	Plus,
-	Trash2,
-	User,
-} from "lucide-react";
+	ArrowDown01Icon,
+	ArrowLeft01Icon,
+	Copy01Icon,
+	Delete02Icon,
+	Download01Icon,
+	Loading01Icon,
+	Menu01Icon,
+	PlusSignIcon,
+	UserIcon,
+} from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +28,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { authClient } from "@/lib/auth-client";
 
@@ -95,7 +96,7 @@ export function StudioHeader({
 							aria-label="Menu project"
 							title="Menu project"
 						>
-							<Menu size={18} />
+							<Icon icon={Menu01Icon} size={18} />
 						</button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -104,13 +105,13 @@ export function StudioHeader({
 					>
 						<DropdownMenuItem asChild className={item}>
 							<Link to="/design/studio">
-								<ArrowLeft size={16} />
+								<Icon icon={ArrowLeft01Icon} size={16} />
 								Kembali ke Semua Project
 							</Link>
 						</DropdownMenuItem>
 						{onAddFrame ? (
 							<DropdownMenuItem className={item} onSelect={onAddFrame}>
-								<Plus size={16} />
+								<Icon icon={PlusSignIcon} size={16} />
 								Tambah Halaman
 							</DropdownMenuItem>
 						) : null}
@@ -122,9 +123,13 @@ export function StudioHeader({
 							onSelect={onDuplicate}
 						>
 							{duplicating ? (
-								<Loader2 size={16} className="motion-safe:animate-spin" />
+								<Icon
+									icon={Loading01Icon}
+									size={16}
+									className="motion-safe:animate-spin"
+								/>
 							) : (
-								<Copy size={16} />
+								<Icon icon={Copy01Icon} size={16} />
 							)}
 							{duplicating ? "Menduplikasi project…" : "Duplicate Project"}
 						</DropdownMenuItem>
@@ -139,7 +144,7 @@ export function StudioHeader({
 										setDeleteOpen(true);
 									}}
 								>
-									<Trash2 size={16} />
+									<Icon icon={Delete02Icon} size={16} />
 									Hapus project
 								</DropdownMenuItem>
 							</>
@@ -162,10 +167,14 @@ export function StudioHeader({
 							aria-label="Export project"
 						>
 							{exporting ? (
-								<Loader2 size={16} className="motion-safe:animate-spin" />
+								<Icon
+									icon={Loading01Icon}
+									size={16}
+									className="motion-safe:animate-spin"
+								/>
 							) : null}
 							<span className="hidden sm:inline">Export</span>
-							<ChevronDown size={14} />
+							<Icon icon={ArrowDown01Icon} size={14} />
 						</button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end" className="max-w-[calc(100vw-16px)]">
@@ -174,7 +183,7 @@ export function StudioHeader({
 							disabled={!canExport || exporting}
 							onSelect={onExport}
 						>
-							<Download size={16} />
+							<Icon icon={Download01Icon} size={16} />
 							{exporting ? "Menyiapkan ZIP…" : "Download ZIP"}
 						</DropdownMenuItem>
 						<DropdownMenuSeparator />
@@ -199,7 +208,7 @@ export function StudioHeader({
 									className="size-7 rounded-full"
 								/>
 							) : (
-								<User size={18} />
+								<Icon icon={UserIcon} size={18} />
 							)}
 						</button>
 					</DropdownMenuTrigger>

@@ -1,5 +1,11 @@
-import { ArrowUp, FileCode2, Loader2, X } from "lucide-react";
+import {
+	ArrowUp01Icon,
+	Cancel01Icon,
+	FileCodeIcon,
+	Loading01Icon,
+} from "@hugeicons/core-free-icons";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
@@ -134,7 +140,7 @@ export function StudioComposer({
 									onClick={() => onRemoveFrame?.(frame.id)}
 									className="rounded p-0.5 hover:bg-steel focus-visible:outline-2 focus-visible:outline-snow"
 								>
-									<X size={12} aria-hidden />
+									<Icon icon={Cancel01Icon} size={12} />
 								</button>
 							</span>
 						))}
@@ -151,7 +157,7 @@ export function StudioComposer({
 						) : null}
 						{referenceLabel ? (
 							<span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-1 text-xs text-mist">
-								<FileCode2 size={12} aria-hidden className="shrink-0" />
+								<Icon icon={FileCodeIcon} size={12} className="shrink-0" />
 								<span className="truncate">{referenceLabel}</span>
 							</span>
 						) : null}
@@ -190,9 +196,13 @@ export function StudioComposer({
 						className="flex size-10 shrink-0 items-center justify-center rounded-lg hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						{loading || sending ? (
-							<Loader2 size={18} className="motion-safe:animate-spin" />
+							<Icon
+								icon={Loading01Icon}
+								size={18}
+								className="motion-safe:animate-spin"
+							/>
 						) : (
-							<ArrowUp size={18} />
+							<Icon icon={ArrowUp01Icon} size={18} />
 						)}
 					</button>
 				</div>

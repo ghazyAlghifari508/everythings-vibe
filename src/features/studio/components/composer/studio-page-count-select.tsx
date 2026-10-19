@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LayoutGrid } from "lucide-react";
+import { GridIcon, Tick01Icon } from "@hugeicons/core-free-icons";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -8,6 +8,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import {
 	STUDIO_DEFAULT_PAGE_COUNT,
 	STUDIO_MAX_PAGE_COUNT,
@@ -40,7 +41,7 @@ export function StudioPageCountSelect({
 					title="Pilih jumlah halaman awal"
 					className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-graphite bg-onyx px-2.5 py-1.5 text-xs font-semibold text-mist transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
 				>
-					<LayoutGrid size={14} aria-hidden />
+					<Icon icon={GridIcon} size={14} />
 					<span>{value} halaman</span>
 				</button>
 			</DropdownMenuTrigger>
@@ -68,7 +69,8 @@ export function StudioPageCountSelect({
 						>
 							<span className="flex size-4 shrink-0 items-center justify-center">
 								{selected ? (
-									<Check
+									<Icon
+										icon={Tick01Icon}
 										size={14}
 										aria-label="Terpilih"
 										className="text-snow"

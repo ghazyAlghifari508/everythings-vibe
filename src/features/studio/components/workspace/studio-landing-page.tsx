@@ -1,9 +1,10 @@
 "use client";
 
+import { Cancel01Icon, Folder02Icon } from "@hugeicons/core-free-icons";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useNavigate, useRouter } from "@tanstack/react-router";
-import { FolderOpen, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import {
@@ -260,7 +261,12 @@ export function StudioLandingPage({
 						onClick={() => setIsMobileDrawerOpen(true)}
 						className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-steel md:hidden"
 					>
-						<FolderOpen size={14} className="text-fog" aria-hidden />
+						<Icon
+							icon={Folder02Icon}
+							size={14}
+							className="text-fog"
+							aria-hidden
+						/>
 						<span>Project ({history.length})</span>
 					</button>
 				</div>
@@ -301,7 +307,7 @@ export function StudioLandingPage({
 									aria-label="Tutup riwayat"
 									className="rounded-md p-1 text-fog hover:text-snow"
 								>
-									<X size={16} aria-hidden />
+									<Icon icon={Cancel01Icon} size={16} aria-hidden />
 								</DialogPrimitive.Close>
 							</div>
 							<div className="flex-1 overflow-hidden">

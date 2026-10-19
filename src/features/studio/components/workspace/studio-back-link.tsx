@@ -1,7 +1,8 @@
 "use client";
 
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { resolveStudioReturnPath } from "@/features/studio/services/studio-return-path";
 
 const DEFAULT_LABEL = "Kembali";
@@ -23,7 +24,7 @@ export function StudioBackLink({
 			aria-label={label === DEFAULT_LABEL ? DEFAULT_ARIA_LABEL : label}
 			className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-fog transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 		>
-			<ArrowLeft size={16} aria-hidden />
+			<Icon icon={ArrowLeft01Icon} size={16} aria-hidden />
 			{label}
 		</Link>
 	);

@@ -1,4 +1,10 @@
-import { AlertCircle, Hand, MousePointer2, RotateCcw } from "lucide-react";
+import {
+	AlertCircleIcon,
+	CursorPointer01Icon,
+	HandIcon,
+	RotateLeft01Icon,
+} from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import { ZoomControls } from "@/components/ui/zoom-controls";
 import { canvasZoomRowBottomCss } from "@/features/studio/utils/studio-canvas-layout";
 
@@ -31,7 +37,7 @@ export function StudioCanvasToolPalette({
 				onClick={() => onSelectTool("select")}
 				className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow ${tool === "select" ? "bg-steel" : "hover:bg-steel"}`}
 			>
-				<MousePointer2 size={18} aria-hidden />
+				<Icon icon={CursorPointer01Icon} size={18} />
 			</button>
 			<button
 				type="button"
@@ -41,7 +47,7 @@ export function StudioCanvasToolPalette({
 				onClick={() => onSelectTool("hand")}
 				className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow ${tool === "hand" ? "bg-steel" : "hover:bg-steel"}`}
 			>
-				<Hand size={18} aria-hidden />
+				<Icon icon={HandIcon} size={18} />
 			</button>
 		</div>
 	);
@@ -114,7 +120,7 @@ export function StudioCanvasPlanningFailure({
 	return (
 		<div className="flex w-80 flex-col items-start gap-3 rounded-xl border border-graphite bg-obsidian p-5 text-left">
 			<div className="flex items-center gap-2">
-				<AlertCircle size={16} className="text-crimson" aria-hidden />
+				<Icon icon={AlertCircleIcon} size={16} className="text-crimson" />
 				<p className="text-sm font-semibold text-snow">
 					Perencanaan layar gagal
 				</p>
@@ -128,7 +134,7 @@ export function StudioCanvasPlanningFailure({
 					onClick={onRetryPlanning}
 					className="inline-flex items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-steel"
 				>
-					<RotateCcw size={13} aria-hidden />
+					<Icon icon={RotateLeft01Icon} size={13} />
 					<span>Coba lagi</span>
 				</button>
 			)}

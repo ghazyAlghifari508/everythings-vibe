@@ -99,8 +99,7 @@ describe("StudioLaunchComposer", () => {
 		expect(trigger.getAttribute("title")).toBe("Pilih tampilan");
 		const icon = trigger.querySelector("svg");
 		expect(icon).not.toBeNull();
-		expect(icon?.classList.contains("lucide-plus")).toBe(false);
-		expect(icon?.classList.contains("lucide-palette")).toBe(true);
+		expect(icon?.getAttribute("aria-hidden")).toBe("true");
 		fireEvent.click(trigger);
 		expect(onOpenDesignPicker).toHaveBeenCalledTimes(1);
 	});
@@ -113,7 +112,8 @@ describe("StudioLaunchComposer", () => {
 			name: "Ganti referensi desain",
 		});
 		const icon = trigger.querySelector("svg");
-		expect(icon?.classList.contains("lucide-palette")).toBe(true);
+		expect(icon).not.toBeNull();
+		expect(icon?.getAttribute("aria-hidden")).toBe("true");
 	});
 
 	it("renders PRD attachment trigger in toolbar", () => {

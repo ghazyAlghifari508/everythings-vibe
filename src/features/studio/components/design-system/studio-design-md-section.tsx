@@ -1,5 +1,11 @@
-import { AlertCircle, Check, FileCode2, Upload } from "lucide-react";
+import {
+	AlertCircleIcon,
+	FileCodeIcon,
+	Tick01Icon,
+	Upload01Icon,
+} from "@hugeicons/core-free-icons";
 import { useRef } from "react";
+import { Icon } from "@/components/ui/icon";
 import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/features/studio/types/studio-constants";
 
 interface StudioDesignMdSectionProps {
@@ -35,7 +41,7 @@ export function StudioDesignMdSection({
 						id="section-design-md"
 						className="text-sm font-semibold text-snow flex items-center gap-2"
 					>
-						<FileCode2 size={16} className="text-fog" aria-hidden />
+						<Icon icon={FileCodeIcon} size={16} className="text-fog" />
 						<span>DESIGN.md (Tokens & Styling Reference)</span>
 					</h3>
 					<p className="text-xs text-fog mt-0.5">
@@ -57,7 +63,7 @@ export function StudioDesignMdSection({
 						onClick={() => mdFileInputRef.current?.click()}
 						className="inline-flex items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
-						<Upload size={13} aria-hidden />
+						<Icon icon={Upload01Icon} size={13} />
 						<span>{uploadedMdName ? "Ganti File .md" : "Upload File .md"}</span>
 					</button>
 				</div>
@@ -65,7 +71,7 @@ export function StudioDesignMdSection({
 
 			{uploadedMdName && (
 				<div className="flex items-center gap-2 rounded-md bg-onyx px-3 py-1.5 text-xs text-mist border border-graphite">
-					<Check size={14} className="text-emerald-400" aria-hidden />
+					<Icon icon={Tick01Icon} size={14} className="text-emerald-400" />
 					<span>
 						File terpilih:{" "}
 						<strong className="text-snow">{uploadedMdName}</strong>
@@ -121,7 +127,7 @@ export function StudioDesignMdSection({
 					role="alert"
 					className="flex items-center gap-1.5 text-xs text-red-400"
 				>
-					<AlertCircle size={14} aria-hidden />
+					<Icon icon={AlertCircleIcon} size={14} />
 					<span>{error}</span>
 				</p>
 			)}

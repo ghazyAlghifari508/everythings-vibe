@@ -1,11 +1,12 @@
 import {
-	AlertCircle,
-	Loader2,
-	Monitor,
-	RotateCcw,
-	Smartphone,
-} from "lucide-react";
+	AlertCircleIcon,
+	ComputerIcon,
+	Loading01Icon,
+	RotateLeft01Icon,
+	SmartPhone01Icon,
+} from "@hugeicons/core-free-icons";
 import { memo } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { StudioFrameRow } from "@/db/schema";
 import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
 import { useStudioFrameVisual } from "@/features/studio/hooks/use-studio-frame-visual";
@@ -92,15 +93,16 @@ export const StudioFrame = memo(function StudioFrame({
 						className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-snow hover:text-mist focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow"
 					>
 						{isMobile ? (
-							<Smartphone size={13} className="text-fog" aria-hidden />
+							<Icon icon={SmartPhone01Icon} size={13} className="text-fog" />
 						) : (
-							<Monitor size={13} className="text-fog" aria-hidden />
+							<Icon icon={ComputerIcon} size={13} className="text-fog" />
 						)}
 						<span className="truncate">{frame.name}</span>
 					</button>
 
 					{frame.status === "generating" ? (
-						<Loader2
+						<Icon
+							icon={Loading01Icon}
 							size={13}
 							role="status"
 							aria-label="Sedang digenerate"
@@ -114,7 +116,8 @@ export const StudioFrame = memo(function StudioFrame({
 						/>
 					) : null}
 					{frame.status === "failed" ? (
-						<AlertCircle
+						<Icon
+							icon={AlertCircleIcon}
 							size={13}
 							role="img"
 							aria-label="Generate gagal"
@@ -134,7 +137,7 @@ export const StudioFrame = memo(function StudioFrame({
 						title={`Coba lagi generate ${frame.name}`}
 						className="inline-flex shrink-0 items-center gap-1 rounded-md border border-crimson/40 px-1.5 py-0.5 text-xs font-medium text-crimson transition-colors hover:bg-crimson/10"
 					>
-						<RotateCcw size={11} aria-hidden />
+						<Icon icon={RotateLeft01Icon} size={11} />
 						<span>Coba lagi</span>
 					</button>
 				) : null}
@@ -185,7 +188,7 @@ export const StudioFrame = memo(function StudioFrame({
 					</div>
 				) : artboardMode === "generation-failed" ? (
 					<div className="flex size-full flex-col items-center justify-center gap-3 p-6 text-center">
-						<AlertCircle size={20} className="text-crimson" aria-hidden />
+						<Icon icon={AlertCircleIcon} size={20} className="text-crimson" />
 						<div className="space-y-1">
 							<p className="text-sm font-semibold text-snow">
 								Gagal menggenerate layar
@@ -203,7 +206,7 @@ export const StudioFrame = memo(function StudioFrame({
 								}}
 								className="inline-flex items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-4 py-1.5 text-xs font-semibold text-snow hover:bg-onyx"
 							>
-								<RotateCcw size={13} aria-hidden />
+								<Icon icon={RotateLeft01Icon} size={13} />
 								<span>Coba lagi</span>
 							</button>
 						) : null}
@@ -212,7 +215,7 @@ export const StudioFrame = memo(function StudioFrame({
 					// Ready but no renderable HTML: a real terminal failure, never
 					// an endless shimmer.
 					<div className="flex size-full flex-col items-center justify-center gap-3 p-6 text-center">
-						<AlertCircle size={20} className="text-crimson" aria-hidden />
+						<Icon icon={AlertCircleIcon} size={20} className="text-crimson" />
 						<div className="space-y-1">
 							<p className="text-sm font-semibold text-snow">
 								Pratinjau tidak tersedia
@@ -231,7 +234,7 @@ export const StudioFrame = memo(function StudioFrame({
 								}}
 								className="inline-flex items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-4 py-1.5 text-xs font-semibold text-snow hover:bg-onyx"
 							>
-								<RotateCcw size={13} aria-hidden />
+								<Icon icon={RotateLeft01Icon} size={13} />
 								<span>Generate ulang</span>
 							</button>
 						) : null}

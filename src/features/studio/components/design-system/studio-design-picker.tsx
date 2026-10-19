@@ -1,4 +1,8 @@
-import { Check, FileCode2, Loader2 } from "lucide-react";
+import {
+	FileCodeIcon,
+	Loading01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import { useMemo, useState } from "react";
 import {
 	DropdownMenuItem,
@@ -8,6 +12,7 @@ import {
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import {
 	getStudioPresetDesignMd,
@@ -72,9 +77,13 @@ export function StudioDesignPicker({
 					disabled={disabled || pending}
 				>
 					{pending ? (
-						<Loader2 size={16} className="motion-safe:animate-spin" />
+						<Icon
+							icon={Loading01Icon}
+							size={16}
+							className="motion-safe:animate-spin"
+						/>
 					) : (
-						<FileCode2 size={16} />
+						<Icon icon={FileCodeIcon} size={16} />
 					)}
 					Design system
 				</DropdownMenuSubTrigger>
@@ -83,7 +92,7 @@ export function StudioDesignPicker({
 						className="gap-2 focus:bg-steel"
 						onSelect={() => setOpen(true)}
 					>
-						<FileCode2 size={16} />
+						<Icon icon={FileCodeIcon} size={16} />
 						Start with your design
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
@@ -116,7 +125,7 @@ export function StudioDesignPicker({
 								</span>
 							</div>
 							{designMd === getStudioPresetDesignMd(preset.id) ? (
-								<Check size={16} aria-label="Terpilih" />
+								<Icon icon={Tick01Icon} size={16} aria-label="Terpilih" />
 							) : null}
 						</DropdownMenuItem>
 					))}

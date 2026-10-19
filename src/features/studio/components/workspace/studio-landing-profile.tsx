@@ -1,7 +1,7 @@
 "use client";
 
+import { UserIcon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { User } from "lucide-react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -10,6 +10,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { authClient } from "@/lib/auth-client";
 
@@ -31,7 +32,7 @@ export function StudioLandingProfile() {
 							className="size-8 rounded-full"
 						/>
 					) : (
-						<User size={16} aria-hidden />
+						<Icon icon={UserIcon} size={16} aria-hidden />
 					)}
 				</button>
 			</DropdownMenuTrigger>

@@ -1,5 +1,11 @@
-import { AlertCircle, ImageIcon, Trash2, Upload } from "lucide-react";
+import {
+	AlertCircleIcon,
+	Delete02Icon,
+	Image01Icon,
+	Upload01Icon,
+} from "@hugeicons/core-free-icons";
 import { useRef } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { AttachedLogo } from "@/features/studio/types/studio";
 import { formatStudioBytes } from "@/features/studio/utils/format-studio-bytes";
 
@@ -29,7 +35,7 @@ export function StudioDesignLogoSection({
 					id="section-logo"
 					className="text-sm font-semibold text-snow flex items-center gap-2"
 				>
-					<ImageIcon size={16} className="text-fog" aria-hidden />
+					<Icon icon={Image01Icon} size={16} className="text-fog" />
 					<span>Application Logo (Opsional)</span>
 				</h3>
 				<p className="text-xs text-fog mt-0.5">
@@ -58,7 +64,7 @@ export function StudioDesignLogoSection({
 									className="max-h-full max-w-full object-contain"
 								/>
 							) : (
-								<ImageIcon size={24} className="text-fog" aria-hidden />
+								<Icon icon={Image01Icon} size={24} className="text-fog" />
 							)}
 						</div>
 						<div>
@@ -89,7 +95,7 @@ export function StudioDesignLogoSection({
 							title="Hapus logo"
 							className="inline-flex size-8 items-center justify-center rounded-lg border border-graphite bg-onyx text-fog transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
 						>
-							<Trash2 size={14} aria-hidden />
+							<Icon icon={Delete02Icon} size={14} />
 						</button>
 					</div>
 				</div>
@@ -100,7 +106,7 @@ export function StudioDesignLogoSection({
 					className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-graphite bg-charcoal/50 p-6 text-center transition-colors hover:border-mist hover:bg-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					<div className="flex size-10 items-center justify-center rounded-full bg-onyx text-fog">
-						<Upload size={18} aria-hidden />
+						<Icon icon={Upload01Icon} size={18} />
 					</div>
 					<div>
 						<p className="text-xs font-semibold text-snow">
@@ -118,7 +124,7 @@ export function StudioDesignLogoSection({
 					role="alert"
 					className="flex items-center gap-1.5 text-xs text-red-400"
 				>
-					<AlertCircle size={14} aria-hidden />
+					<Icon icon={AlertCircleIcon} size={14} />
 					<span>{logoError}</span>
 				</p>
 			)}

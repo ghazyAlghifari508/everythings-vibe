@@ -1,7 +1,8 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { StudioPromptShortcut } from "@/features/studio/services/studio-prompt-shortcuts";
 import {
 	type CarouselScrollMetrics,
@@ -92,7 +93,7 @@ export function StudioShortcutCarousel({
 						onClick={() => scrollOneStep(-1)}
 						className="inline-flex size-8 items-center justify-center rounded-full border border-graphite bg-charcoal text-fog transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
 					>
-						<ChevronLeft size={16} aria-hidden />
+						<Icon icon={ArrowLeft01Icon} size={16} />
 					</button>
 					<button
 						type="button"
@@ -102,7 +103,7 @@ export function StudioShortcutCarousel({
 						onClick={() => scrollOneStep(1)}
 						className="inline-flex size-8 items-center justify-center rounded-full border border-graphite bg-charcoal text-fog transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
 					>
-						<ChevronRight size={16} aria-hidden />
+						<Icon icon={ArrowRight01Icon} size={16} />
 					</button>
 				</div>
 			</div>

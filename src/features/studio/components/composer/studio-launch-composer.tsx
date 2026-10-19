@@ -1,20 +1,21 @@
 "use client";
 
 import {
-	ArrowUp,
-	Loader2,
-	Monitor,
-	Palette,
-	Paperclip,
-	Smartphone,
-	X,
-} from "lucide-react";
+	ArrowUp01Icon,
+	AttachmentIcon,
+	Cancel01Icon,
+	ComputerIcon,
+	Loading01Icon,
+	PaintBoardIcon,
+	SmartPhone01Icon,
+} from "@hugeicons/core-free-icons";
 import {
 	type ChangeEvent,
 	type FormEvent,
 	type RefObject,
 	useRef,
 } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import {
 	validateStudioPrdFilename,
@@ -193,7 +194,7 @@ export function StudioLaunchComposer({
 							title="Hapus lampiran PRD"
 							className="rounded p-1 text-fog hover:text-snow disabled:opacity-50"
 						>
-							<X size={14} aria-hidden />
+							<Icon icon={Cancel01Icon} size={14} />
 						</button>
 					</span>
 				</section>
@@ -224,7 +225,7 @@ export function StudioLaunchComposer({
 							aria-label="Lepas referensi desain"
 							className="rounded p-1 text-fog hover:text-snow"
 						>
-							<X size={13} aria-hidden />
+							<Icon icon={Cancel01Icon} size={13} />
 						</button>
 					</span>
 				</div>
@@ -246,7 +247,7 @@ export function StudioLaunchComposer({
 								: "text-fog hover:text-mist"
 						}`}
 					>
-						<Monitor size={14} aria-hidden />
+						<Icon icon={ComputerIcon} size={14} />
 						<span>Web</span>
 					</button>
 					<button
@@ -260,7 +261,7 @@ export function StudioLaunchComposer({
 								: "text-fog hover:text-mist"
 						}`}
 					>
-						<Smartphone size={14} aria-hidden />
+						<Icon icon={SmartPhone01Icon} size={14} />
 						<span>Mobile</span>
 					</button>
 				</fieldset>
@@ -280,9 +281,9 @@ export function StudioLaunchComposer({
 						title={prd ? "Ganti lampiran PRD" : "Lampirkan PRD (.md)"}
 						className="flex size-9 items-center justify-center rounded-lg border border-graphite bg-onyx text-mist transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
 					>
-						<Paperclip
+						<Icon
+							icon={AttachmentIcon}
 							size={15}
-							aria-hidden
 							className={prd ? "text-indigo" : undefined}
 						/>
 					</button>
@@ -294,9 +295,9 @@ export function StudioLaunchComposer({
 						title={reference ? "Ganti referensi desain" : "Pilih tampilan"}
 						className="flex size-9 items-center justify-center rounded-lg border border-graphite bg-onyx text-mist transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
 					>
-						<Palette
+						<Icon
+							icon={PaintBoardIcon}
 							size={15}
-							aria-hidden
 							className={reference ? "text-indigo" : undefined}
 						/>
 					</button>
@@ -313,13 +314,13 @@ export function StudioLaunchComposer({
 						className="flex size-9 items-center justify-center rounded-lg bg-snow text-onyx transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						{loading ? (
-							<Loader2
+							<Icon
+								icon={Loading01Icon}
 								size={16}
-								aria-hidden
 								className="motion-safe:animate-spin"
 							/>
 						) : (
-							<ArrowUp size={16} aria-hidden />
+							<Icon icon={ArrowUp01Icon} size={16} />
 						)}
 					</button>
 				</span>
