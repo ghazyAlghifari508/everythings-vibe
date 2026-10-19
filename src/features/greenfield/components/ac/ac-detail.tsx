@@ -1,8 +1,9 @@
 "use client";
 
+import { ArrowRight01Icon, File01Icon } from "@hugeicons/core-free-icons";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, FileText } from "lucide-react";
 import { useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { TableOfContents } from "@/features/greenfield/components/prd/table-of-contents";
 import { useAcGeneration } from "@/features/greenfield/hooks/use-ac-generation";
@@ -64,7 +65,8 @@ export function AcDetail({
 		return (
 			<div className="flex h-dvh items-center justify-center bg-onyx text-(--text-primary)">
 				<div className="text-center">
-					<FileText
+					<Icon
+						icon={File01Icon}
 						size={64}
 						className="mx-auto mb-4 text-(--text-secondary)"
 					/>
@@ -79,7 +81,7 @@ export function AcDetail({
 						params={{ id: projectId }}
 						className="btn-primary inline-flex items-center gap-2 rounded-md px-4 py-2"
 					>
-						<ArrowRight size={16} /> Ke PRD
+						<Icon icon={ArrowRight01Icon} size={16} /> Ke PRD
 					</Link>
 				</div>
 			</div>
@@ -180,7 +182,7 @@ export function AcDetail({
 										className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
 									>
 										<span className="whitespace-nowrap">Upgrade ke Pro</span>
-										<ArrowRight size={12} />
+										<Icon icon={ArrowRight01Icon} size={12} />
 									</button>
 								</div>
 							</div>
