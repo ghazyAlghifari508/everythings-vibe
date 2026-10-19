@@ -1,7 +1,7 @@
 import type { StudioDesignSkillId } from "./studio-generation-options";
 
 // Asset identity for a skill entry. `image` points at a locally bundled,
-// licensed logo; `icon` is a stable key resolved to a lucide icon in the
+// licensed logo; `icon` is a stable key resolved to a Hugeicons icon in the
 // selector. Keeping this typed here avoids scattering skill-specific image
 // URLs through JSX and keeps the catalog serializable.
 export type StudioDesignSkillAsset =
