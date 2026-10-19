@@ -1,8 +1,9 @@
 "use client";
 
+import { ArrowRight01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, X } from "lucide-react";
 import { useState, useTransition } from "react";
+import { Icon } from "@/components/ui/icon";
 import { CreditExhaustedModal } from "@/features/billing/components/credit-exhausted-modal";
 import { ChatPanel } from "@/features/greenfield/components/chat/chat-panel";
 import { GenerationProgress } from "@/features/greenfield/components/generation-progress";
@@ -170,7 +171,7 @@ export function PrdDetail({
 										className="btn-primary flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-[510] transition-all hover:brightness-105 active:scale-[0.98]"
 									>
 										<span className="whitespace-nowrap">Upgrade ke Pro</span>
-										<ArrowRight size={12} />
+										<Icon icon={ArrowRight01Icon} size={12} />
 									</button>
 								</div>
 							</div>
@@ -255,7 +256,7 @@ export function PrdDetail({
 									aria-label="Tutup chat"
 									className="text-fog hover:text-snow"
 								>
-									<X size={16} />
+									<Icon icon={Cancel01Icon} size={16} />
 								</button>
 							</div>
 							<div className="h-[calc(60vh-44px)]">

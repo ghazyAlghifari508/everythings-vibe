@@ -1,6 +1,7 @@
 "use client";
 
-import { Trash2, X } from "lucide-react";
+import { Cancel01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 
 interface DeleteProjectModalProps {
 	isOpen: boolean;
@@ -40,10 +41,10 @@ export function DeleteProjectModal({
 					<div className="p-6">
 						<div className="mb-4 flex items-start justify-between">
 							<div className="flex h-12 w-12 items-center justify-center rounded-full bg-crimson/10 text-crimson">
-								<Trash2 size={24} strokeWidth={2} />
+								<Icon icon={Delete02Icon} size={24} strokeWidth={2} />
 							</div>
 							<button type="button" onClick={onClose} aria-label="Tutup dialog">
-								<X size={20} />
+								<Icon icon={Cancel01Icon} size={20} />
 							</button>
 						</div>
 

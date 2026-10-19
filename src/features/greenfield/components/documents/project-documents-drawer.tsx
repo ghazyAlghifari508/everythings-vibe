@@ -1,7 +1,12 @@
 "use client";
 
+import {
+	Cancel01Icon,
+	CheckmarkSquare02Icon,
+	File01Icon,
+} from "@hugeicons/core-free-icons";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { CheckSquare, FileText, X } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 interface ProjectDocumentsDrawerProps {
@@ -47,7 +52,7 @@ export function ProjectDocumentsDrawer({
 							className="rounded-md p-1.5 text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 							aria-label="Tutup menu dokumen"
 						>
-							<X size={16} />
+							<Icon icon={Cancel01Icon} size={16} />
 						</DialogPrimitive.Close>
 					</div>
 
@@ -74,7 +79,11 @@ export function ProjectDocumentsDrawer({
 						>
 							<div className="flex items-center justify-between gap-2">
 								<div className="flex items-center gap-2 min-w-0">
-									<FileText size={16} className="text-indigo shrink-0" />
+									<Icon
+										icon={File01Icon}
+										size={16}
+										className="text-indigo shrink-0"
+									/>
 									<span className="text-xs font-semibold text-snow truncate">
 										Product Requirements (PRD)
 									</span>
@@ -112,7 +121,11 @@ export function ProjectDocumentsDrawer({
 						>
 							<div className="flex items-center justify-between gap-2">
 								<div className="flex items-center gap-2 min-w-0">
-									<CheckSquare size={16} className="text-emerald shrink-0" />
+									<Icon
+										icon={CheckmarkSquare02Icon}
+										size={16}
+										className="text-emerald shrink-0"
+									/>
 									<span className="text-xs font-semibold text-snow truncate">
 										Acceptance Criteria (AC)
 									</span>

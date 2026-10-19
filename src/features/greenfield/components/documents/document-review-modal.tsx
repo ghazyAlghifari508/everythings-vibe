@@ -1,12 +1,17 @@
 "use client";
 
+import {
+	Cancel01Icon,
+	CheckmarkSquare02Icon,
+	File01Icon,
+} from "@hugeicons/core-free-icons";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { CheckSquare, FileText, X } from "lucide-react";
 import { lazy, memo, Suspense, useMemo } from "react";
 import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 const Mermaid = lazy(() =>
@@ -183,9 +188,13 @@ export const DocumentReviewModal = memo(function DocumentReviewModal({
 						<div className="flex items-center gap-3 min-w-0 pr-4">
 							<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-graphite bg-charcoal">
 								{isPrd ? (
-									<FileText size={16} className="text-indigo" />
+									<Icon icon={File01Icon} size={16} className="text-indigo" />
 								) : (
-									<CheckSquare size={16} className="text-emerald" />
+									<Icon
+										icon={CheckmarkSquare02Icon}
+										size={16}
+										className="text-emerald"
+									/>
 								)}
 							</div>
 							<div className="min-w-0">
@@ -203,7 +212,7 @@ export const DocumentReviewModal = memo(function DocumentReviewModal({
 								className="rounded-md p-1.5 text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 								aria-label="Tutup pratinjau dokumen"
 							>
-								<X size={18} />
+								<Icon icon={Cancel01Icon} size={18} />
 							</DialogPrimitive.Close>
 						</div>
 					</div>
