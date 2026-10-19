@@ -56,7 +56,7 @@ describe("FeatureMapCanvas modular", () => {
 			<FeatureMapCanvas productName="Kurir Tracking" featureTree={TREE} />,
 		);
 		const svgNames = Array.from(container.querySelectorAll("svg")).map(
-			(s) => s.getAttribute("data-lucide") ?? s.innerHTML.slice(0, 80),
+			(s) => s.getAttribute("data-icon") ?? s.innerHTML.slice(0, 80),
 		);
 		const joined = svgNames.join(" ");
 		expect(joined.toLowerCase()).not.toContain("sparkle");
