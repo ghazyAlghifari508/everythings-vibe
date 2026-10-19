@@ -1,16 +1,17 @@
 "use client";
 
-import { Link, useLocation } from "@tanstack/react-router";
 import {
-	ArrowLeft,
-	Bell,
-	CreditCard,
-	KeyRound,
-	MessageSquare,
-	Shield,
-	User,
-} from "lucide-react";
+	ArrowLeft01Icon,
+	CreditCardIcon,
+	Key01Icon,
+	Message01Icon,
+	Notification01Icon,
+	Shield01Icon,
+	UserIcon,
+} from "@hugeicons/core-free-icons";
+import { Link, useLocation } from "@tanstack/react-router";
 import { memo } from "react";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 interface SettingsClientProps {
@@ -19,12 +20,16 @@ interface SettingsClientProps {
 }
 
 const NAV_ITEMS = [
-	{ href: "/settings/profile", label: "Profil", icon: User },
-	{ href: "/settings/account", label: "Akun", icon: Shield },
-	{ href: "/settings/api-keys", label: "API Keys", icon: KeyRound },
-	{ href: "/settings/notifications", label: "Notifikasi", icon: Bell },
-	{ href: "/settings/billing", label: "Billing", icon: CreditCard },
-	{ href: "/settings/feedback", label: "Feedback", icon: MessageSquare },
+	{ href: "/settings/profile", label: "Profil", icon: UserIcon },
+	{ href: "/settings/account", label: "Akun", icon: Shield01Icon },
+	{ href: "/settings/api-keys", label: "API Keys", icon: Key01Icon },
+	{
+		href: "/settings/notifications",
+		label: "Notifikasi",
+		icon: Notification01Icon,
+	},
+	{ href: "/settings/billing", label: "Billing", icon: CreditCardIcon },
+	{ href: "/settings/feedback", label: "Feedback", icon: Message01Icon },
 ] as const;
 
 export const SettingsClient = memo(function SettingsClient({
@@ -51,13 +56,12 @@ export const SettingsClient = memo(function SettingsClient({
 						title="Kembali"
 						aria-label="Kembali"
 					>
-						<ArrowLeft size={20} />
+						<Icon icon={ArrowLeft01Icon} size={20} />
 					</Link>
 				</div>
 
 				<nav className="flex md:flex-1 md:flex-col flex-row gap-2 md:space-y-1.5 px-4 pb-4 md:pb-0 overflow-x-auto md:overflow-y-auto hide-scrollbar items-center md:items-stretch">
 					{NAV_ITEMS.map((item) => {
-						const Icon = item.icon;
 						const isActive = pathname === item.href;
 						return (
 							<Link
@@ -71,6 +75,7 @@ export const SettingsClient = memo(function SettingsClient({
 								)}
 							>
 								<Icon
+									icon={item.icon}
 									size={18}
 									className={isActive ? "text-mist" : "text-fog"}
 								/>
@@ -85,7 +90,7 @@ export const SettingsClient = memo(function SettingsClient({
 						to="/"
 						className="hidden items-center gap-3 rounded-md px-4 py-3 text-[15px] font-[510] text-fog transition-all duration-300 hover:bg-white/5 hover:text-snow md:flex"
 					>
-						<ArrowLeft size={18} className="text-fog" />
+						<Icon icon={ArrowLeft01Icon} size={18} className="text-fog" />
 						<span>Kembali</span>
 					</Link>
 				</nav>

@@ -1,6 +1,13 @@
 "use client";
 
-import { Check, Copy, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import {
+	Add01Icon,
+	Copy01Icon,
+	Delete02Icon,
+	Tick01Icon,
+	ViewIcon,
+	ViewOffSlashIcon,
+} from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +18,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Icon } from "@/components/ui/icon";
 import { useUIStore } from "@/store";
 
 interface ApiKeyRecord {
@@ -121,7 +129,7 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 					</p>
 				</div>
 				<Button onClick={() => setShowCreate(true)} className="gap-1.5">
-					<Plus size={14} />
+					<Icon icon={Add01Icon} size={14} />
 					Buat API Key Baru
 				</Button>
 			</div>
@@ -130,7 +138,7 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 			{showCreatedKey && createdKey && (
 				<div className="rounded-lg border border-emerald/30 bg-emerald/10 p-4">
 					<div className="flex items-center gap-2 text-sm font-[510] text-emerald mb-2">
-						<Check size={16} />
+						<Icon icon={Tick01Icon} size={16} />
 						API Key Berhasil Dibuat
 					</div>
 					<p className="text-xs text-fog mb-3">
@@ -146,7 +154,11 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 							onClick={() => setShowCreatedKey(!showCreatedKey)}
 							className="shrink-0"
 						>
-							{showCreatedKey ? <EyeOff size={14} /> : <Eye size={14} />}
+							{showCreatedKey ? (
+								<Icon icon={ViewOffSlashIcon} size={14} />
+							) : (
+								<Icon icon={ViewIcon} size={14} />
+							)}
 						</Button>
 						<Button
 							variant="ghost"
@@ -155,9 +167,9 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 							className="shrink-0"
 						>
 							{copied ? (
-								<Check size={14} className="text-emerald" />
+								<Icon icon={Tick01Icon} size={14} className="text-emerald" />
 							) : (
-								<Copy size={14} />
+								<Icon icon={Copy01Icon} size={14} />
 							)}
 						</Button>
 					</div>
@@ -220,7 +232,7 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 											onClick={() => setRevokeId(key.id)}
 											className="text-crimson hover:bg-crimson/10"
 										>
-											<Trash2 size={14} />
+											<Icon icon={Delete02Icon} size={14} />
 										</Button>
 									</td>
 								</tr>

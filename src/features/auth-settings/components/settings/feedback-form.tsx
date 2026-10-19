@@ -1,8 +1,15 @@
 "use client";
 
-import { Bug, Check, Loader2, MessageSquare, Sparkles } from "lucide-react";
+import {
+	Bug01Icon,
+	Loading01Icon,
+	Message01Icon,
+	SparklesIcon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import { memo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { useUIStore } from "@/store";
 
 export const FeedbackForm = memo(function FeedbackForm() {
@@ -59,15 +66,15 @@ export const FeedbackForm = memo(function FeedbackForm() {
 						>
 							{t === "bug" ? (
 								<>
-									<Bug size={14} /> Bug Report
+									<Icon icon={Bug01Icon} size={14} /> Bug Report
 								</>
 							) : t === "feature" ? (
 								<>
-									<Sparkles size={14} /> Fitur Baru
+									<Icon icon={SparklesIcon} size={14} /> Fitur Baru
 								</>
 							) : (
 								<>
-									<MessageSquare size={14} /> Umum
+									<Icon icon={Message01Icon} size={14} /> Umum
 								</>
 							)}
 						</button>
@@ -105,11 +112,12 @@ export const FeedbackForm = memo(function FeedbackForm() {
 			>
 				{sending ? (
 					<>
-						<Loader2 className="animate-spin" size={16} /> Mengirim...
+						<Icon icon={Loading01Icon} className="animate-spin" size={16} />{" "}
+						Mengirim...
 					</>
 				) : sent ? (
 					<>
-						<Check size={16} /> Terkirim!
+						<Icon icon={Tick01Icon} size={16} /> Terkirim!
 					</>
 				) : (
 					"Kirim Feedback"
