@@ -1,6 +1,10 @@
 "use client";
 
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import {
+	Delete02Icon,
+	Edit02Icon,
+	MoreHorizontalIcon,
+} from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +21,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import type { CodebaseLibraryItem } from "@/features/codebase/services/library";
 
 function readServerErrorMessage(value: unknown, fallback: string): string {
@@ -104,19 +109,24 @@ export function ProjectActionsMenu({
 						aria-label={`Aksi project ${item.name}`}
 						className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
-						<MoreHorizontal size={16} aria-hidden />
+						<Icon icon={MoreHorizontalIcon} size={16} aria-hidden />
 					</button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end">
 					<DropdownMenuItem onSelect={() => setRenameOpen(true)}>
-						<Pencil size={14} aria-hidden className="mr-2 text-fog" />
+						<Icon
+							icon={Edit02Icon}
+							size={14}
+							aria-hidden
+							className="mr-2 text-fog"
+						/>
 						Ganti nama
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						onSelect={() => setDeleteOpen(true)}
 						className="text-crimson focus:text-crimson"
 					>
-						<Trash2 size={14} aria-hidden className="mr-2" />
+						<Icon icon={Delete02Icon} size={14} aria-hidden className="mr-2" />
 						Hapus project
 					</DropdownMenuItem>
 				</DropdownMenuContent>

@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { AdaptiveQuestion } from "@/features/codebase/services/chat-flow";
 import { CodebaseAdaptiveQuestion } from "./codebase-adaptive-question";
 
@@ -76,7 +77,9 @@ export function CodebaseChatWorkspaceQuestionsComplete({
 					className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					{isConfirming ? "Menyusun spesifikasi..." : "Buat Spesifikasi Fitur"}
-					{!isConfirming ? <ArrowRight size={12} aria-hidden="true" /> : null}
+					{!isConfirming ? (
+						<Icon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
+					) : null}
 				</button>
 			</div>
 			<p className="text-[11.5px] leading-relaxed text-fog/80">

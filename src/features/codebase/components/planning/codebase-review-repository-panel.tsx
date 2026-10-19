@@ -1,6 +1,7 @@
 "use client";
 
-import { FileCode, Folder } from "lucide-react";
+import { FileCodeIcon, Folder01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 
 function splitPath(fullPath: string): {
@@ -57,13 +58,15 @@ export function CodebaseReviewRepositoryPanel({
 									>
 										<div className="flex items-center gap-2 min-w-0 sm:max-w-[52%]">
 											{parsed.isFile ? (
-												<FileCode
+												<Icon
+													icon={FileCodeIcon}
 													size={14}
 													className="text-slate shrink-0"
 													aria-hidden="true"
 												/>
 											) : (
-												<Folder
+												<Icon
+													icon={Folder01Icon}
 													size={14}
 													className="text-slate shrink-0"
 													aria-hidden="true"
@@ -110,7 +113,8 @@ export function CodebaseReviewRepositoryPanel({
 											key={file}
 											className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-steel/10 dark:hover:bg-steel/20 transition-colors"
 										>
-											<FileCode
+											<Icon
+												icon={FileCodeIcon}
 												size={13}
 												className="text-slate shrink-0"
 												aria-hidden="true"

@@ -1,6 +1,7 @@
 "use client";
 
-import { Layers, RotateCcw } from "lucide-react";
+import { Layers01Icon, RotateLeft01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 
 export function CodebaseChatWorkspaceLoading() {
 	return (
@@ -40,7 +41,7 @@ export function CodebaseChatWorkspacePlanUnavailable() {
 				onClick={() => window.location.reload()}
 				className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-md border border-graphite px-3 text-xs text-snow hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 			>
-				<RotateCcw size={13} aria-hidden />
+				<Icon icon={RotateLeft01Icon} size={13} aria-hidden="true" />
 				Muat ulang
 			</button>
 		</div>
@@ -53,7 +54,12 @@ export function CodebaseChatWorkspacePlanSelection() {
 			data-testid="codebase-chat-plan-selection"
 			className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center"
 		>
-			<Layers size={20} aria-hidden className="text-fog" />
+			<Icon
+				icon={Layers01Icon}
+				size={20}
+				aria-hidden="true"
+				className="text-fog"
+			/>
 			<p className="text-sm font-semibold text-snow">
 				Pilih fitur yang ingin dikerjakan
 			</p>

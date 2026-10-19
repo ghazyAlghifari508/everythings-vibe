@@ -1,6 +1,7 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Tick01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { AdaptiveQuestion } from "@/features/codebase/services/chat-flow";
 
 interface CodebaseAdaptiveQuestionAnsweredProps {
@@ -23,7 +24,7 @@ export function CodebaseAdaptiveQuestionAnswered({
 		>
 			<div className="flex items-center gap-2 min-w-0">
 				<span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald/15 text-emerald text-[11px] font-bold">
-					<Check size={11} aria-hidden="true" />
+					<Icon icon={Tick01Icon} size={11} aria-hidden="true" />
 				</span>
 				<span className="font-medium text-snow/90 shrink-0">
 					Q{index} · {question.title}:

@@ -1,7 +1,8 @@
 "use client";
 
-import { Download, FileText } from "lucide-react";
+import { Download01Icon, File01Icon } from "@hugeicons/core-free-icons";
 import type { KeyboardEvent, MouseEvent } from "react";
+import { Icon } from "@/components/ui/icon";
 
 export interface CodebaseArtifactRef {
 	id: string;
@@ -48,7 +49,12 @@ export function CodebaseFileCard({
 	const content = (
 		<>
 			<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-indigo">
-				<FileText size={20} strokeWidth={1.75} aria-hidden="true" />
+				<Icon
+					icon={File01Icon}
+					size={20}
+					strokeWidth={1.75}
+					aria-hidden="true"
+				/>
 			</div>
 			<div className="min-w-0 text-left">
 				<p
@@ -111,7 +117,12 @@ export function CodebaseFileCard({
 				disabled={!onDownload}
 				className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-graphite bg-obsidian px-3 py-1.5 text-[13px] font-medium text-snow transition-colors hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
 			>
-				<Download size={15} strokeWidth={1.75} aria-hidden="true" />
+				<Icon
+					icon={Download01Icon}
+					size={15}
+					strokeWidth={1.75}
+					aria-hidden="true"
+				/>
 				<span>Unduh</span>
 			</button>
 		</div>

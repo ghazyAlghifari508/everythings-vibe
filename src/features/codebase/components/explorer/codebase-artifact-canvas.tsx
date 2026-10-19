@@ -1,7 +1,13 @@
 "use client";
 
-import { Check, Copy, Download, X } from "lucide-react";
+import {
+	Cancel01Icon,
+	Copy01Icon,
+	Download01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 
 interface CodebaseArtifactCanvasProps {
 	fileName: string;
@@ -115,14 +121,16 @@ export function CodebaseArtifactCanvas({
 							className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-graphite disabled:hover:text-fog"
 						>
 							{copyState === "copied" ? (
-								<Check
+								<Icon
+									icon={Tick01Icon}
 									size={14}
 									strokeWidth={1.75}
 									aria-hidden="true"
 									className="text-emerald"
 								/>
 							) : (
-								<Copy
+								<Icon
+									icon={Copy01Icon}
 									size={14}
 									strokeWidth={1.75}
 									aria-hidden="true"
@@ -149,7 +157,12 @@ export function CodebaseArtifactCanvas({
 								data-testid="codebase-canvas-download"
 								className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 							>
-								<Download size={14} strokeWidth={1.75} aria-hidden="true" />
+								<Icon
+									icon={Download01Icon}
+									size={14}
+									strokeWidth={1.75}
+									aria-hidden="true"
+								/>
 							</button>
 						) : (
 							<span
@@ -158,7 +171,12 @@ export function CodebaseArtifactCanvas({
 								aria-hidden="true"
 								className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-slate"
 							>
-								<Download size={14} strokeWidth={1.75} aria-hidden="true" />
+								<Icon
+									icon={Download01Icon}
+									size={14}
+									strokeWidth={1.75}
+									aria-hidden="true"
+								/>
 							</span>
 						)}
 						<button
@@ -169,7 +187,12 @@ export function CodebaseArtifactCanvas({
 							data-testid="codebase-canvas-close"
 							className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 						>
-							<X size={14} strokeWidth={1.75} aria-hidden="true" />
+							<Icon
+								icon={Cancel01Icon}
+								size={14}
+								strokeWidth={1.75}
+								aria-hidden="true"
+							/>
 						</button>
 					</div>
 				</div>

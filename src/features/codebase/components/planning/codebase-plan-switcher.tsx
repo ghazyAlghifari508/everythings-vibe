@@ -1,6 +1,11 @@
 "use client";
 
-import { Check, ChevronDown, Layers, Plus } from "lucide-react";
+import {
+	Add01Icon,
+	ArrowDown01Icon,
+	Layers01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import {
 	DropdownMenu,
@@ -10,6 +15,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icon } from "@/components/ui/icon";
 import {
 	type ActivePlanCandidate,
 	describePlanReadiness,
@@ -64,11 +70,21 @@ export function CodebasePlanSwitcher({
 					aria-haspopup="menu"
 					className="inline-flex min-h-8 max-w-44 shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
-					<Layers size={12} aria-hidden className="shrink-0" />
+					<Icon
+						icon={Layers01Icon}
+						size={12}
+						aria-hidden
+						className="shrink-0"
+					/>
 					<span className="truncate font-medium text-snow">
 						{activePlanName ?? "Pilih fitur"}
 					</span>
-					<ChevronDown size={12} aria-hidden className="shrink-0" />
+					<Icon
+						icon={ArrowDown01Icon}
+						size={12}
+						aria-hidden
+						className="shrink-0"
+					/>
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="w-72">
@@ -101,7 +117,8 @@ export function CodebasePlanSwitcher({
 								<span className="text-[10.5px] text-slate">{status}</span>
 							</span>
 							{isActive ? (
-								<Check
+								<Icon
+									icon={Tick01Icon}
 									size={13}
 									aria-hidden
 									className="mt-0.5 shrink-0 text-emerald"
@@ -116,7 +133,12 @@ export function CodebasePlanSwitcher({
 					onSelect={() => onCreateFeature()}
 					className="flex items-center gap-2"
 				>
-					<Plus size={13} aria-hidden className="shrink-0 text-fog" />
+					<Icon
+						icon={Add01Icon}
+						size={13}
+						aria-hidden
+						className="shrink-0 text-fog"
+					/>
 					<span className="text-[13px] font-medium text-snow">
 						Buat fitur baru
 					</span>

@@ -1,16 +1,17 @@
 "use client";
 
-import { Link, useRouter } from "@tanstack/react-router";
 import {
-	ArrowRight,
-	Database,
-	FileCode2,
-	FolderGit2,
-	Search,
-	Terminal,
-} from "lucide-react";
+	ArrowRight01Icon,
+	DatabaseIcon,
+	FileCodeIcon,
+	FolderGitIcon,
+	Search01Icon,
+	TerminalIcon,
+} from "@hugeicons/core-free-icons";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { Icon } from "@/components/ui/icon";
 import { LibraryPagination } from "@/features/codebase/components/planning/library-pagination";
 import {
 	ProjectActionsMenu,
@@ -149,7 +150,8 @@ export function CodebaseLibraryView({
 
 			{hasProjects && (
 				<div className="relative">
-					<Search
+					<Icon
+						icon={Search01Icon}
 						size={16}
 						className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fog"
 						aria-hidden
@@ -174,7 +176,7 @@ export function CodebaseLibraryView({
 						className="flex h-12 w-12 items-center justify-center rounded-xl border border-graphite bg-charcoal/60 text-snow"
 						aria-hidden
 					>
-						<FolderGit2 size={24} className="text-fog" />
+						<Icon icon={FolderGitIcon} size={24} className="text-fog" />
 					</div>
 					<h2
 						id="empty-codebase-heading"
@@ -192,19 +194,34 @@ export function CodebaseLibraryView({
 						className="btn-primary mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
 						Hubungkan repository
-						<ArrowRight size={16} aria-hidden />
+						<Icon icon={ArrowRight01Icon} size={16} aria-hidden />
 					</Link>
 					<div className="mt-10 flex w-full flex-col items-center justify-center gap-4 border-t border-graphite/40 pt-8 sm:mt-12 sm:flex-row sm:gap-8">
 						<div className="flex items-center gap-2 text-xs text-fog">
-							<FileCode2 size={16} className="text-slate" aria-hidden />
+							<Icon
+								icon={FileCodeIcon}
+								size={16}
+								className="text-slate"
+								aria-hidden
+							/>
 							<span>Codebase terbaca</span>
 						</div>
 						<div className="flex items-center gap-2 text-xs text-fog">
-							<Database size={16} className="text-slate" aria-hidden />
+							<Icon
+								icon={DatabaseIcon}
+								size={16}
+								className="text-slate"
+								aria-hidden
+							/>
 							<span>Konteks tersimpan</span>
 						</div>
 						<div className="flex items-center gap-2 text-xs text-fog">
-							<Terminal size={16} className="text-slate" aria-hidden />
+							<Icon
+								icon={TerminalIcon}
+								size={16}
+								className="text-slate"
+								aria-hidden
+							/>
 							<span>Workspace siap</span>
 						</div>
 					</div>
@@ -266,7 +283,8 @@ export function CodebaseLibraryView({
 									</span>
 									<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
 										Buka Workspace
-										<ArrowRight
+										<Icon
+											icon={ArrowRight01Icon}
 											size={14}
 											aria-hidden
 											className="transition-transform group-hover:translate-x-0.5"

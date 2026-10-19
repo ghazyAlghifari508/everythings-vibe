@@ -1,8 +1,16 @@
 "use client";
 
+import {
+	AlertCircleIcon,
+	Cancel01Icon,
+	Copy01Icon,
+	Loading01Icon,
+	RefreshIcon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { AlertCircle, Check, Copy, Loader2, RefreshCw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import {
 	buildAgentPrompt,
@@ -109,7 +117,7 @@ export function CodebaseResyncDrawer({
 							className="rounded-md border border-graphite p-1.5 text-fog transition hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 							aria-label="Tutup sync ulang"
 						>
-							<X size={16} aria-hidden />
+							<Icon icon={Cancel01Icon} size={16} aria-hidden />
 						</DialogPrimitive.Close>
 					</div>
 
@@ -130,12 +138,16 @@ export function CodebaseResyncDrawer({
 									>
 										{copied ? (
 											<>
-												<Check size={13} className="text-emerald-400" />
+												<Icon
+													icon={Tick01Icon}
+													size={13}
+													className="text-emerald-400"
+												/>
 												<span className="text-emerald-400">Tersalin</span>
 											</>
 										) : (
 											<>
-												<Copy size={13} />
+												<Icon icon={Copy01Icon} size={13} />
 												<span>Salin prompt</span>
 											</>
 										)}
@@ -160,7 +172,11 @@ export function CodebaseResyncDrawer({
 									</>
 								) : isStarting ? (
 									<div className="flex items-center justify-center gap-2 py-8 font-sans text-xs text-fog">
-										<Loader2 size={14} className="animate-spin text-blue-400" />
+										<Icon
+											icon={Loading01Icon}
+											size={14}
+											className="animate-spin text-blue-400"
+										/>
 										<span>Menyiapkan sesi sync...</span>
 									</div>
 								) : (
@@ -175,7 +191,7 @@ export function CodebaseResyncDrawer({
 												disabled={isStarting}
 												className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-iron bg-obsidian px-3.5 font-sans text-xs font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 											>
-												<RefreshCw size={12} />
+												<Icon icon={RefreshIcon} size={12} />
 												<span>Dapatkan token baru</span>
 											</button>
 										)}
@@ -219,7 +235,8 @@ export function CodebaseResyncDrawer({
 									className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px]"
 								>
 									<div className="flex items-start gap-2.5">
-										<AlertCircle
+										<Icon
+											icon={AlertCircleIcon}
 											size={14}
 											className="mt-0.5 shrink-0 text-crimson"
 											aria-hidden="true"

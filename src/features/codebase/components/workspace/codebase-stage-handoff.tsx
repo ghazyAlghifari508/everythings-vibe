@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import type { ReactNode } from "react";
+import { Icon } from "@/components/ui/icon";
 import {
 	type CodebaseArtifactRef,
 	CodebaseFileCard,
@@ -94,7 +95,9 @@ export function CodebaseStageHandoff({
 							className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-snow px-3 text-xs font-semibold text-onyx transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 						>
 							{busy ? busyLabel : actionLabel}
-							{!busy ? <ArrowRight size={12} aria-hidden="true" /> : null}
+							{!busy ? (
+								<Icon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
+							) : null}
 						</button>
 					</div>
 				</div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Tick01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 
 function valueOrUnknown(value?: string | null): string {
@@ -30,7 +31,11 @@ export function CodebaseReviewEnvironmentPanel({
 					<h3 className="font-inter text-sm font-[600] text-snow">
 						Detected environment
 					</h3>
-					<Check size={14} className="text-emerald-500 font-bold" />
+					<Icon
+						icon={Tick01Icon}
+						size={14}
+						className="text-emerald-500 font-bold"
+					/>
 				</div>
 				<div className="flex flex-col divide-y divide-graphite/60 p-0">
 					{envRows.map(([label, value]) => {

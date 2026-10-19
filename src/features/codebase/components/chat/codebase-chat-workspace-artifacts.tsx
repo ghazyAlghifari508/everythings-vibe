@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { CodebasePipelineStage } from "@/features/codebase/services/chat-flow";
 import type { ArtifactKind } from "@/features/codebase/services/workspace-hydration";
 import {
@@ -34,7 +35,7 @@ export function CodebaseChatWorkspaceArtifactsFailed({
 			className="shrink-0 border-b border-crimson/30 bg-crimson/10 px-4 py-2 text-[11px] text-crimson"
 		>
 			<span className="inline-flex items-center gap-1.5">
-				<AlertTriangle size={12} aria-hidden />
+				<Icon icon={Alert02Icon} size={12} aria-hidden="true" />
 				Sebagian planning tidak dapat dimuat:{" "}
 				{failedArtifacts.map(artifactLabel).join(", ")}. Bagian lain tetap
 				tersimpan di server.

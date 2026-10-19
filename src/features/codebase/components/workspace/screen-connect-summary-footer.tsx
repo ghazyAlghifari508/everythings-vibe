@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 
 interface ScreenConnectSummaryFooterProps {
 	/** True once a usable snapshot exists and the owner offered the next step. */
@@ -35,7 +36,7 @@ export function ScreenConnectSummaryFooter({
 				className="ml-auto inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-snow px-5 py-2 font-inter text-xs font-semibold text-onyx shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 			>
 				<span>Lanjut ke Kesimpulan</span>
-				<ArrowRight size={14} aria-hidden="true" />
+				<Icon icon={ArrowRight01Icon} size={14} aria-hidden="true" />
 			</button>
 		</div>
 	);

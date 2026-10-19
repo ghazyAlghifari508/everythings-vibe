@@ -1,7 +1,12 @@
 "use client";
 
-import { AlertCircle, ArrowRight, Loader2 } from "lucide-react";
+import {
+	AlertCircleIcon,
+	ArrowRight01Icon,
+	Loading01Icon,
+} from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import type { SyncStatusResponse } from "@/features/codebase/services/sync";
 import { CodebaseReview } from "./codebase-review";
@@ -145,7 +150,8 @@ export function CodebaseConclusion({
 				{state === "failed" ? (
 					<>
 						<span className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full border border-crimson/30 bg-crimson/10">
-							<AlertCircle
+							<Icon
+								icon={AlertCircleIcon}
 								size={18}
 								className="shrink-0 text-crimson"
 								aria-hidden="true"
@@ -167,7 +173,8 @@ export function CodebaseConclusion({
 				) : (
 					<>
 						<span className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full border border-graphite bg-obsidian">
-							<Loader2
+							<Icon
+								icon={Loading01Icon}
 								size={18}
 								className="shrink-0 animate-spin text-fog"
 								aria-hidden="true"
@@ -216,7 +223,7 @@ export function CodebaseConclusion({
 						{state === "analyzing"
 							? "Masuk ke Workspace tanpa menunggu"
 							: "Masuk ke Workspace"}
-						<ArrowRight size={14} aria-hidden="true" />
+						<Icon icon={ArrowRight01Icon} size={14} aria-hidden="true" />
 					</button>
 				</div>
 			</section>

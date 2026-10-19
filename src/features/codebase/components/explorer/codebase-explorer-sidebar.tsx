@@ -1,13 +1,14 @@
 "use client";
 
 import {
-	ChevronDown,
-	ChevronRight,
-	FileCode,
-	Folder,
-	Search,
-} from "lucide-react";
+	ArrowDown01Icon,
+	ArrowRight01Icon,
+	FileCodeIcon,
+	Folder01Icon,
+	Search01Icon,
+} from "@hugeicons/core-free-icons";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import {
 	collectFolderPaths,
 	explorerExpansionStorageKey,
@@ -157,19 +158,22 @@ function TreeRow({
 					style={{ paddingLeft: `${8 + depth * 12}px` }}
 				>
 					{expanded ? (
-						<ChevronDown
+						<Icon
+							icon={ArrowDown01Icon}
 							size={13}
 							aria-hidden="true"
 							className="shrink-0 text-slate"
 						/>
 					) : (
-						<ChevronRight
+						<Icon
+							icon={ArrowRight01Icon}
 							size={13}
 							aria-hidden="true"
 							className="shrink-0 text-slate"
 						/>
 					)}
-					<Folder
+					<Icon
+						icon={Folder01Icon}
 						size={13}
 						aria-hidden="true"
 						className="shrink-0 text-slate"
@@ -205,13 +209,19 @@ function TreeRow({
 		>
 			<span className="w-[13px] shrink-0" aria-hidden="true" />
 			{node.isFile ? (
-				<FileCode
+				<Icon
+					icon={FileCodeIcon}
 					size={13}
 					aria-hidden="true"
 					className="shrink-0 text-slate"
 				/>
 			) : (
-				<Folder size={13} aria-hidden="true" className="shrink-0 text-slate" />
+				<Icon
+					icon={Folder01Icon}
+					size={13}
+					aria-hidden="true"
+					className="shrink-0 text-slate"
+				/>
 			)}
 			<span className="truncate">{node.name}</span>
 		</button>
@@ -295,7 +305,8 @@ export function CodebaseExplorerSidebar({
 		>
 			<div className="shrink-0 border-b border-graphite px-3 py-2.5">
 				<div className="relative">
-					<Search
+					<Icon
+						icon={Search01Icon}
 						size={14}
 						aria-hidden="true"
 						className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate"

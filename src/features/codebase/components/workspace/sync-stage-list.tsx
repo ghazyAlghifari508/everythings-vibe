@@ -1,5 +1,11 @@
-import { AlertCircle, Check, Circle, Loader2 } from "lucide-react";
+import {
+	AlertCircleIcon,
+	CircleIcon,
+	Loading01Icon,
+	Tick01Icon,
+} from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import {
 	resolveSyncStageView,
 	SYNC_STAGE_ORDER,
@@ -28,7 +34,8 @@ const STAGE_TITLE: Record<SyncStageState, string> = {
 function StageIcon({ state }: { state: SyncStageState }) {
 	if (state === "done") {
 		return (
-			<Check
+			<Icon
+				icon={Tick01Icon}
 				size={14}
 				className="shrink-0 font-bold text-emerald-400"
 				aria-hidden="true"
@@ -37,7 +44,8 @@ function StageIcon({ state }: { state: SyncStageState }) {
 	}
 	if (state === "active") {
 		return (
-			<Loader2
+			<Icon
+				icon={Loading01Icon}
 				size={14}
 				className="shrink-0 animate-spin text-blue-400"
 				aria-hidden="true"
@@ -46,7 +54,8 @@ function StageIcon({ state }: { state: SyncStageState }) {
 	}
 	if (state === "failed") {
 		return (
-			<AlertCircle
+			<Icon
+				icon={AlertCircleIcon}
 				size={14}
 				className="shrink-0 text-crimson"
 				aria-hidden="true"
@@ -54,7 +63,12 @@ function StageIcon({ state }: { state: SyncStageState }) {
 		);
 	}
 	return (
-		<Circle size={14} className="shrink-0 text-graphite" aria-hidden="true" />
+		<Icon
+			icon={CircleIcon}
+			size={14}
+			className="shrink-0 text-graphite"
+			aria-hidden="true"
+		/>
 	);
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertCircle } from "lucide-react";
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import type {
 	SyncStageView,
@@ -122,7 +123,8 @@ export function ScreenConnectSyncStep({
 						className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-[11px]"
 					>
 						<div className="flex items-start gap-2.5">
-							<AlertCircle
+							<Icon
+								icon={AlertCircleIcon}
 								size={14}
 								className="mt-0.5 shrink-0 text-crimson"
 								aria-hidden="true"
@@ -159,7 +161,8 @@ export function ScreenConnectSyncStep({
 							className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-[11px]"
 						>
 							<div className="flex items-start gap-2.5">
-								<AlertCircle
+								<Icon
+									icon={AlertCircleIcon}
 									size={14}
 									className="mt-0.5 shrink-0 text-amber-400"
 									aria-hidden="true"

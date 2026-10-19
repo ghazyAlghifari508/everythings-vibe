@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
+import { Copy01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 
 export function buildExportPlanCommand(projectId: string): string {
 	return `npx vibeeverything export plan ${projectId.trim()} --root .`;
@@ -75,12 +76,17 @@ export function CodebaseChatWorkspaceHandoffCard({
 				>
 					{copiedCmd ? (
 						<>
-							<Check size={12} aria-hidden="true" className="text-emerald" />
+							<Icon
+								icon={Tick01Icon}
+								size={12}
+								aria-hidden="true"
+								className="text-emerald"
+							/>
 							<span className="text-emerald">Tersalin</span>
 						</>
 					) : (
 						<>
-							<Copy size={12} aria-hidden="true" />
+							<Icon icon={Copy01Icon} size={12} aria-hidden="true" />
 							<span>Salin prompt handoff</span>
 						</>
 					)}
@@ -110,12 +116,17 @@ export function CodebaseChatWorkspaceHandoffCard({
 					>
 						{copiedExport ? (
 							<>
-								<Check size={11} aria-hidden="true" className="text-emerald" />
+								<Icon
+									icon={Tick01Icon}
+									size={11}
+									aria-hidden="true"
+									className="text-emerald"
+								/>
 								<span className="text-emerald">Tersalin</span>
 							</>
 						) : (
 							<>
-								<Copy size={11} aria-hidden="true" />
+								<Icon icon={Copy01Icon} size={11} aria-hidden="true" />
 								<span>Salin</span>
 							</>
 						)}

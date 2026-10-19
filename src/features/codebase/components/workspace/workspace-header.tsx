@@ -1,4 +1,5 @@
-import { RefreshCw } from "lucide-react";
+import { RefreshIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import { formatCodebaseSyncBadge } from "../../utils/workspace-contracts";
 
@@ -32,7 +33,7 @@ export function WorkspaceHeader({
 					disabled={isStarting}
 					className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-graphite bg-obsidian px-2.5 font-mono text-[11px] text-fog transition hover:text-snow disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
-					<RefreshCw size={12} aria-hidden />
+					<Icon icon={RefreshIcon} size={12} aria-hidden="true" />
 					{isStarting ? "Menyiapkan..." : "Sync ulang"}
 				</button>
 				<span

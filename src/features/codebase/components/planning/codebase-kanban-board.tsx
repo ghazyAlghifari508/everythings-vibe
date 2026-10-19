@@ -1,7 +1,12 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import {
+	ArrowLeft01Icon,
+	ArrowRight01Icon,
+	LinkSquare01Icon,
+} from "@hugeicons/core-free-icons";
 import { useMemo } from "react";
+import { Icon } from "@/components/ui/icon";
 import {
 	type TaskCard,
 	useKanbanTasks,
@@ -204,7 +209,7 @@ export function CodebaseKanbanBoard({
 									data-testid="codebase-kanban-scroll-left"
 									className="inline-flex h-6 w-6 items-center justify-center rounded text-mist transition hover:bg-obsidian hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-mist"
 								>
-									<ChevronLeft size={13} aria-hidden="true" />
+									<Icon icon={ArrowLeft01Icon} size={13} aria-hidden="true" />
 								</button>
 								<button
 									type="button"
@@ -215,7 +220,7 @@ export function CodebaseKanbanBoard({
 									data-testid="codebase-kanban-scroll-right"
 									className="inline-flex h-6 w-6 items-center justify-center rounded text-mist transition hover:bg-obsidian hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-mist"
 								>
-									<ChevronRight size={13} aria-hidden="true" />
+									<Icon icon={ArrowRight01Icon} size={13} aria-hidden="true" />
 								</button>
 							</div>
 						) : null}
@@ -231,7 +236,7 @@ export function CodebaseKanbanBoard({
 								data-testid="codebase-kanban-full-board"
 								className="inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-charcoal px-2 text-[11px] font-medium text-mist transition hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 							>
-								<ExternalLink size={12} aria-hidden="true" />
+								<Icon icon={LinkSquare01Icon} size={12} aria-hidden="true" />
 								Buka Kanban Penuh
 							</a>
 						) : null}
