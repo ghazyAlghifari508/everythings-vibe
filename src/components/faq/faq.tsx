@@ -7,7 +7,9 @@ import {
 	CircleDollarSignIcon,
 	FileTextIcon,
 	MessageSquarePlusIcon,
+	TerminalIcon,
 } from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { FAQ_ITEMS } from "./faq-data";
@@ -19,6 +21,7 @@ const FAQ_ICONS = {
 	board: ChartColumnIcon,
 	credit: CircleDollarSignIcon,
 	feedback: MessageSquarePlusIcon,
+	terminal: TerminalIcon,
 } as const;
 
 function FaqItem({ item }: { item: (typeof FAQ_ITEMS)[number] }) {
@@ -114,12 +117,19 @@ export function Faq() {
 
 				<p className="mt-6 text-center font-inter text-sm text-fog">
 					Masih ada yang ingin ditanyakan?{" "}
-					<a
-						href="/settings/feedback"
+					<Link
+						to="/settings/feedback"
 						className="font-[510] text-snow underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
 						Kirim feedback
-					</a>
+					</Link>
+					{" · "}
+					<Link
+						to="/bantuan"
+						className="font-[510] text-snow underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						Pusat Bantuan
+					</Link>
 				</p>
 			</div>
 		</main>
