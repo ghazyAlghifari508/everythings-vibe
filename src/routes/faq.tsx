@@ -4,11 +4,11 @@ import { Faq } from "@/components/faq/faq";
 export const Route = createFileRoute("/faq")({
 	head: () => ({
 		meta: [
-			{ title: "FAQ | VibeEverything" },
+			{ title: "FAQ | everythings-vibe" },
 			{
 				name: "description",
 				content:
-					"Pertanyaan yang sering diajukan seputar penyimpanan project, revisi AI, sistem credit, dan keamanan di VibeEverything.",
+					"Pertanyaan yang sering diajukan seputar penyimpanan project, revisi AI, sistem credit, dan keamanan di everythings-vibe.",
 			},
 		],
 	}),

@@ -65,26 +65,14 @@ describe("Faq", () => {
 		const uniqueTitles = new Set(titles);
 		expect(uniqueTitles.size).toBe(FAQ_ITEMS.length);
 
-		const allowedIcons = new Set([
-			"spark",
-			"workflow",
-			"document",
-			"board",
-			"credit",
-			"feedback",
-			"terminal",
-		]);
-
 		for (const item of FAQ_ITEMS) {
 			expect(item.id.trim().length).toBeGreaterThan(0);
 			expect(item.title.trim().length).toBeGreaterThan(0);
-			expect(item.subtitle.trim().length).toBeGreaterThan(0);
 			expect(item.content.trim().length).toBeGreaterThan(0);
-			expect(allowedIcons.has(item.icon)).toBe(true);
 		}
 	});
 
-	it("renders an accessible accordion with properly bound triggers and panels", () => {
+	it("renders an accessible disclosure list with properly bound triggers and panels", () => {
 		const rendered = renderFaq();
 		const buttons = Array.from(rendered.querySelectorAll("button"));
 		expect(buttons.length).toBe(FAQ_ITEMS.length);
@@ -97,9 +85,11 @@ describe("Faq", () => {
 
 		const panel = panelId ? rendered.querySelector(`#${panelId}`) : null;
 		expect(panel).not.toBeNull();
+		expect(panel?.tagName.toLowerCase()).toBe("section");
 		expect(panel?.getAttribute("aria-labelledby")).toBe(firstTrigger?.id);
 		expect(panel?.getAttribute("aria-hidden")).toBe("true");
 
+		// Open on click
 		act(() => {
 			firstTrigger?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
@@ -107,6 +97,7 @@ describe("Faq", () => {
 		expect(firstTrigger?.getAttribute("aria-expanded")).toBe("true");
 		expect(panel?.getAttribute("aria-hidden")).toBe("false");
 
+		// Close on second click
 		act(() => {
 			firstTrigger?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
@@ -115,14 +106,24 @@ describe("Faq", () => {
 		expect(panel?.getAttribute("aria-hidden")).toBe("true");
 	});
 
-	it("renders all FAQ items into the DOM with corresponding titles", () => {
+	it("renders all FAQ items into the DOM with corresponding titles and content", () => {
 		const rendered = renderFaq();
 		for (const item of FAQ_ITEMS) {
 			expect(rendered.textContent).toContain(item.title);
+			expect(rendered.textContent).toContain(item.content);
 		}
 	});
 
-	it("renders valid navigation links to feedback and bantuan hubs", () => {
+	it("renders page heading and clear purpose statement", () => {
+		const rendered = renderFaq();
+		const heading = rendered.querySelector("h1");
+		expect(heading?.textContent).toContain("Pertanyaan yang Sering Diajukan");
+		expect(rendered.textContent).toContain(
+			"Informasi penting seputar penyimpanan project, credit, dan sinkronisasi di everythings-vibe.",
+		);
+	});
+
+	it("renders valid understated navigation links to help and feedback hubs", () => {
 		const rendered = renderFaq();
 		const links = Array.from(rendered.querySelectorAll("a")).map((a) =>
 			a.getAttribute("href"),

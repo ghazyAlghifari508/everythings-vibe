@@ -1,72 +1,34 @@
 "use client";
 
-import {
-	ArrowDown01Icon,
-	BulbIcon,
-	ChartColumnIcon,
-	CircleDollarSignIcon,
-	FileTextIcon,
-	MessageSquarePlusIcon,
-	TerminalIcon,
-} from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import { FAQ_ITEMS } from "./faq-data";
+import { FAQ_ITEMS, type FaqItem as FaqItemType } from "./faq-data";
 
-const FAQ_ICONS = {
-	spark: BulbIcon,
-	workflow: ChartColumnIcon,
-	document: FileTextIcon,
-	board: ChartColumnIcon,
-	credit: CircleDollarSignIcon,
-	feedback: MessageSquarePlusIcon,
-	terminal: TerminalIcon,
-} as const;
-
-function FaqItem({ item }: { item: (typeof FAQ_ITEMS)[number] }) {
-	const glyph = FAQ_ICONS[item.icon];
+function FaqRow({ item }: { item: FaqItemType }) {
 	const [isOpen, setIsOpen] = useState(false);
-	const [panelHeight, setPanelHeight] = useState("0px");
-	const panelContentRef = useRef<HTMLDivElement>(null);
 	const panelId = `${item.id}-answer`;
 	const triggerId = `${item.id}-trigger`;
 
-	useLayoutEffect(() => {
-		const nextHeight = isOpen
-			? `${panelContentRef.current?.scrollHeight ?? 0}px`
-			: "0px";
-		setPanelHeight(nextHeight);
-	}, [isOpen]);
-
 	return (
-		<section className="group/item border-b border-graphite last:border-b-0">
+		<div className="border-b border-graphite">
 			<h2>
 				<button
 					type="button"
 					id={triggerId}
 					aria-controls={panelId}
 					aria-expanded={isOpen}
-					className="group flex min-h-[76px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo sm:px-5"
-					onClick={() => setIsOpen((value) => !value)}
+					className="group flex min-h-[52px] w-full items-center justify-between gap-4 py-4 text-left transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 focus-visible:ring-offset-onyx sm:min-h-[56px] sm:py-5"
+					onClick={() => setIsOpen((prev) => !prev)}
 				>
-					<Icon
-						icon={glyph}
-						size={44}
-						aria-hidden="true"
-						className="size-11 shrink-0 text-indigo transition-transform duration-300 ease-out group-hover/item:rotate-[-10deg] group-hover/item:scale-110"
-						strokeWidth={1.7}
-					/>
-					<span className="flex min-w-0 flex-1 flex-col gap-0">
-						<span className="font-inter text-sm font-[510] leading-5 text-snow">
-							{item.title}
-						</span>
-						<span className="font-inter text-sm leading-6 text-fog">
-							{item.subtitle}
-						</span>
+					<span className="font-inter text-base font-[510] leading-snug text-snow transition-colors sm:text-[17px]">
+						{item.title}
 					</span>
 					<span
-						className={`text-fog transition-transform duration-300 ease-out motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}
+						className={`shrink-0 text-fog transition-transform duration-200 ease-out motion-reduce:transition-none ${
+							isOpen ? "rotate-180 text-snow" : ""
+						}`}
 					>
 						<Icon
 							icon={ArrowDown01Icon}
@@ -81,56 +43,61 @@ function FaqItem({ item }: { item: (typeof FAQ_ITEMS)[number] }) {
 				id={panelId}
 				aria-labelledby={triggerId}
 				aria-hidden={!isOpen}
-				className="overflow-hidden transition-[height] duration-300 ease-out motion-reduce:transition-none"
-				style={{ height: panelHeight }}
+				className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${
+					isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+				}`}
 			>
-				<div
-					ref={panelContentRef}
-					className="border-t border-graphite/70 px-4 pb-5 pt-3 pl-[76px] font-inter text-sm leading-7 text-fog sm:px-5 sm:pl-[76px]"
-				>
-					{item.content}
+				<div className="overflow-hidden">
+					<p className="pb-5 pt-1 font-inter text-sm leading-relaxed text-fog sm:text-[15px] sm:leading-7">
+						{item.content}
+					</p>
 				</div>
 			</section>
-		</section>
+		</div>
 	);
 }
 
 export function Faq() {
 	return (
-		<main className="min-h-[calc(100vh-3.5rem)] bg-onyx px-4 py-12 sm:px-6 sm:py-20">
-			<div className="mx-auto max-w-xl">
-				<header className="mb-8 text-center">
-					<h1 className="font-inter text-3xl font-[620] tracking-tight text-snow sm:text-4xl">
+		<main className="min-h-[calc(100vh-3.5rem)] bg-onyx px-4 py-10 sm:px-6 sm:py-16">
+			<div className="mx-auto max-w-3xl">
+				<header className="mb-10 sm:mb-12">
+					<h1 className="font-inter text-2xl font-[620] tracking-tight text-snow sm:text-3xl">
 						Pertanyaan yang Sering Diajukan
 					</h1>
-					<p className="mx-auto mt-3 max-w-md font-inter text-sm leading-6 text-fog sm:text-base">
-						Jawaban praktis seputar penyimpanan project, revisi AI, kuota
-						credit, dan keamanan data di VibeEverything.
+					<p className="mt-2.5 font-inter text-sm leading-relaxed text-fog sm:text-base">
+						Informasi penting seputar penyimpanan project, credit, dan
+						sinkronisasi di everythings-vibe.
 					</p>
 				</header>
 
-				<div className="w-full overflow-hidden rounded-2xl border border-graphite bg-charcoal">
+				<section
+					aria-label="Daftar pertanyaan dan jawaban"
+					className="w-full border-t border-graphite"
+				>
 					{FAQ_ITEMS.map((item) => (
-						<FaqItem key={item.id} item={item} />
+						<FaqRow key={item.id} item={item} />
 					))}
-				</div>
+				</section>
 
-				<p className="mt-6 text-center font-inter text-sm text-fog">
-					Masih ada yang ingin ditanyakan?{" "}
-					<Link
-						to="/settings/feedback"
-						className="font-[510] text-snow underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						Kirim feedback
-					</Link>
-					{" · "}
-					<Link
-						to="/bantuan"
-						className="font-[510] text-snow underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						Pusat Bantuan
-					</Link>
-				</p>
+				<footer className="mt-12 sm:mt-16">
+					<p className="font-inter text-sm text-fog">
+						Butuh bantuan lebih lanjut?{" "}
+						<Link
+							to="/bantuan"
+							className="font-[510] text-snow underline underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 focus-visible:ring-offset-onyx"
+						>
+							Pusat Bantuan
+						</Link>
+						{" · "}
+						<Link
+							to="/settings/feedback"
+							className="font-[510] text-snow underline underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 focus-visible:ring-offset-onyx"
+						>
+							Kirim Feedback
+						</Link>
+					</p>
+				</footer>
 			</div>
 		</main>
 	);
