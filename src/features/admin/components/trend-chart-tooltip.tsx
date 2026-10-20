@@ -7,13 +7,11 @@ import { SVG_WIDTH } from "./trend-chart-constants";
 export interface TrendChartTooltipProps {
 	hoveredItem: DailyTrendPoint;
 	hoveredX: number;
-	streamerActive: boolean;
 }
 
 export function TrendChartTooltip({
 	hoveredItem,
 	hoveredX,
-	streamerActive,
 }: TrendChartTooltipProps) {
 	return (
 		<div
@@ -36,7 +34,7 @@ export function TrendChartTooltip({
 				<span className="h-2 w-2 rounded-full bg-emerald-500" />
 				<span className="text-mist">Pendapatan:</span>
 				<span className="font-mono font-medium text-emerald-400">
-					{streamerActive ? "••••••••" : formatCurrency(hoveredItem.revenue)}
+					{formatCurrency(hoveredItem.revenue)}
 				</span>
 			</div>
 			<div className="flex items-center gap-2">

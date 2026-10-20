@@ -14,7 +14,6 @@ import {
 export interface TrendChartSvgProps {
 	revGradId: string;
 	userGradId: string;
-	streamerActive: boolean;
 	pointCount: number;
 	currentData: DailyTrendPoint[];
 	revScaleInfo: { ticks: number[]; scale: (val: number) => number };
@@ -35,7 +34,6 @@ export interface TrendChartSvgProps {
 export function TrendChartSvg({
 	revGradId,
 	userGradId,
-	streamerActive,
 	pointCount,
 	currentData,
 	revScaleInfo,
@@ -105,7 +103,7 @@ export function TrendChartSvg({
 							textAnchor="end"
 							className="fill-fog text-[11px] font-mono select-none"
 						>
-							{streamerActive ? "••••" : formatCompactCurrency(revTick)}
+							{formatCompactCurrency(revTick)}
 						</text>
 						{/* Right Y Label: Users */}
 						<text
@@ -170,7 +168,7 @@ export function TrendChartSvg({
 					className="pointer-events-none transition-all duration-300"
 				/>
 			)}
-			{!streamerActive && revArea && (
+			{revArea && (
 				<path
 					d={revArea}
 					fill={`url(#${revGradId})`}
@@ -190,7 +188,7 @@ export function TrendChartSvg({
 					className="pointer-events-none transition-all duration-300"
 				/>
 			)}
-			{!streamerActive && revSpline && (
+			{revSpline && (
 				<path
 					d={revSpline}
 					fill="none"
@@ -218,25 +216,21 @@ export function TrendChartSvg({
 					/>
 
 					{/* Revenue Indicator Dots */}
-					{!streamerActive && (
-						<>
-							<circle
-								cx={hoveredX}
-								cy={hoveredRevY}
-								r="8"
-								fill="#10b981"
-								fillOpacity="0.25"
-							/>
-							<circle
-								cx={hoveredX}
-								cy={hoveredRevY}
-								r="4.5"
-								fill="#10b981"
-								stroke="#0f1011"
-								strokeWidth="2"
-							/>
-						</>
-					)}
+					<circle
+						cx={hoveredX}
+						cy={hoveredRevY}
+						r="8"
+						fill="#10b981"
+						fillOpacity="0.25"
+					/>
+					<circle
+						cx={hoveredX}
+						cy={hoveredRevY}
+						r="4.5"
+						fill="#10b981"
+						stroke="#0f1011"
+						strokeWidth="2"
+					/>
 
 					{/* Users Indicator Dots */}
 					<circle

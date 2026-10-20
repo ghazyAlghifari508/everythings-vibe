@@ -1,8 +1,7 @@
 import type React from "react";
 import { memo } from "react";
 import { Icon, type IconProps } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
-import { useStreamerMode } from "./streamer-mode-context";
+import { cn, formatCurrency } from "@/lib/utils";
 
 interface AdminMetricCardProps {
 	label: string;
@@ -23,15 +22,9 @@ export const AdminMetricCard = memo(function AdminMetricCard({
 	isCurrency = false,
 	className,
 }: AdminMetricCardProps) {
-	const { isStreamerMode, maskCurrency } = useStreamerMode();
-
 	let displayValue = value;
-	if (isCurrency) {
-		if (isStreamerMode) {
-			displayValue = "••••••••";
-		} else if (typeof value === "number") {
-			displayValue = maskCurrency(value);
-		}
+	if (isCurrency && typeof value === "number") {
+		displayValue = formatCurrency(value);
 	}
 
 	const renderIcon = () => {

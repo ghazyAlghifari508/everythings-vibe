@@ -12,10 +12,10 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { formatCurrency } from "@/lib/utils";
 import { getAdminTrendMetrics } from "../services";
 import type { AdminDashboardMetrics, DailyTrendPoint } from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
-import { useStreamerMode } from "./streamer-mode-context";
 import { TrendLineChart } from "./trend-line-chart";
 
 function getStatusBadge(status: string) {
@@ -97,8 +97,6 @@ export function AdminDashboardView({
 }: {
 	metrics: AdminDashboardMetrics;
 }) {
-	const { maskOrderId, maskName, maskCurrency } = useStreamerMode();
-
 	const [trendData, setTrendData] = useState<DailyTrendPoint[]>(
 		metrics.trendData || [],
 	);
@@ -268,12 +266,12 @@ export function AdminDashboardView({
 										<div className="min-w-0 flex-1 pr-2">
 											<div className="flex items-center gap-2">
 												<span className="font-mono text-xs font-medium text-snow">
-													{maskOrderId(tx.orderId)}
+													{tx.orderId}
 												</span>
 												{getPlanBadge(tx.plan)}
 											</div>
 											<p className="mt-1 truncate text-xs text-fog">
-												{maskName(tx.userName || tx.userEmail)} ·{" "}
+												{tx.userName || tx.userEmail || "Anonymous"} ·{" "}
 												{formatShortDate(tx.createdAt)}
 											</p>
 										</div>
@@ -281,7 +279,7 @@ export function AdminDashboardView({
 										<div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
 											{getStatusBadge(tx.status)}
 											<span className="font-mono text-xs font-medium text-snow">
-												{maskCurrency(tx.amount)}
+												{formatCurrency(tx.amount)}
 											</span>
 										</div>
 									</div>
@@ -327,7 +325,7 @@ export function AdminDashboardView({
 												{p.name}
 											</p>
 											<p className="mt-0.5 truncate text-xs text-fog">
-												{maskName(p.userName || p.userEmail)} ·{" "}
+												{p.userName || p.userEmail} ·{" "}
 												{formatShortDate(p.createdAt)}
 											</p>
 										</div>

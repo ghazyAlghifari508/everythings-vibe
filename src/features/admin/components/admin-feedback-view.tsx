@@ -14,7 +14,6 @@ import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { AdminErrorReportItem, AdminFeedbackItem } from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
-import { useStreamerMode } from "./streamer-mode-context";
 
 export function AdminFeedbackView({
 	feedback,
@@ -23,7 +22,6 @@ export function AdminFeedbackView({
 	feedback: AdminFeedbackItem[];
 	errors: AdminErrorReportItem[];
 }) {
-	const { isStreamerMode, maskName, maskEmail } = useStreamerMode();
 	const [activeTab, setActiveTab] = useState<"feedback" | "errors">("feedback");
 	const [typeFilter, setTypeFilter] = useState<string>("all");
 	const [search, setSearch] = useState("");
@@ -235,14 +233,10 @@ export function AdminFeedbackView({
 
 											<td className="px-4 py-3 whitespace-nowrap">
 												<p className="font-[510] text-snow">
-													{isStreamerMode
-														? maskName(f.userName)
-														: f.userName || "Tanpa Nama"}
+													{f.userName || "Tanpa Nama"}
 												</p>
 												<p className="text-[11px] text-fog">
-													{isStreamerMode
-														? maskEmail(f.userEmail)
-														: f.userEmail || "Anonymous"}
+													{f.userEmail || "Anonymous"}
 												</p>
 											</td>
 
@@ -302,9 +296,7 @@ export function AdminFeedbackView({
 												{e.context || "-"}
 											</td>
 											<td className="px-4 py-3 text-fog whitespace-nowrap">
-												{isStreamerMode
-													? maskEmail(e.userEmail)
-													: e.userEmail || "-"}
+												{e.userEmail || "-"}
 											</td>
 											<td className="px-4 py-3 text-right text-fog whitespace-nowrap">
 												{e.createdAt

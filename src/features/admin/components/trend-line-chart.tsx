@@ -11,7 +11,6 @@ import {
 	generateAreaPath,
 	generateSplinePath,
 } from "../utils/chart-math";
-import { useStreamerMode } from "./streamer-mode-context";
 import {
 	PADDING_BOTTOM,
 	PADDING_LEFT,
@@ -28,7 +27,6 @@ export interface TrendLineChartProps {
 	initialData?: DailyTrendPoint[];
 	data?: DailyTrendPoint[];
 	onRangeChange?: (days: number) => void;
-	isStreamerMode?: boolean;
 	className?: string;
 }
 
@@ -36,16 +34,11 @@ export function TrendLineChart({
 	initialData = [],
 	data,
 	onRangeChange,
-	isStreamerMode: propStreamerMode,
 	className,
 }: TrendLineChartProps) {
 	const chartId = useId().replace(/:/g, "_");
 	const revGradId = `rev-grad-${chartId}`;
 	const userGradId = `user-grad-${chartId}`;
-
-	const { isStreamerMode: contextStreamerMode } = useStreamerMode();
-	const streamerActive =
-		propStreamerMode !== undefined ? propStreamerMode : contextStreamerMode;
 
 	const [selectedRange, setSelectedRange] = useState<number>(7);
 	const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -244,7 +237,7 @@ export function TrendLineChart({
 							<span className="h-2 w-2 rounded-full bg-emerald-500" />
 							<span className="text-fog">Pendapatan:</span>
 							<span className="font-mono font-medium text-snow">
-								{streamerActive ? "••••••••" : formatCurrency(totalRevenue)}
+								{formatCurrency(totalRevenue)}
 							</span>
 						</div>
 						<div className="h-3 w-[1px] bg-graphite" />
@@ -270,7 +263,6 @@ export function TrendLineChart({
 						<TrendChartSvg
 							revGradId={revGradId}
 							userGradId={userGradId}
-							streamerActive={streamerActive}
 							pointCount={pointCount}
 							currentData={currentData}
 							revScaleInfo={revScaleInfo}
@@ -292,7 +284,6 @@ export function TrendLineChart({
 							<TrendChartTooltip
 								hoveredItem={hoveredItem}
 								hoveredX={hoveredX}
-								streamerActive={streamerActive}
 							/>
 						)}
 					</>

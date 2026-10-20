@@ -12,16 +12,12 @@ import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { AdminTransactionItem } from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
-import { useStreamerMode } from "./streamer-mode-context";
 
 export function AdminTransactionsView({
 	transactions,
 }: {
 	transactions: AdminTransactionItem[];
 }) {
-	const { isStreamerMode, maskOrderId, maskName, maskEmail, maskCurrency } =
-		useStreamerMode();
-
 	const [search, setSearch] = useState("");
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [planFilter, setPlanFilter] = useState<string>("all");
@@ -218,18 +214,14 @@ export function AdminTransactionsView({
 											className="transition-colors hover:bg-white/[0.02]"
 										>
 											<td className="px-5 py-3.5 font-mono text-[11px] text-snow">
-												{isStreamerMode ? maskOrderId(tx.orderId) : tx.orderId}
+												{tx.orderId}
 											</td>
 											<td className="px-5 py-3.5">
 												<div className="font-medium text-snow">
-													{isStreamerMode
-														? maskName(tx.userName)
-														: (tx.userName ?? "Tanpa Nama")}
+													{tx.userName ?? "Tanpa Nama"}
 												</div>
 												<div className="text-[11px] text-fog">
-													{isStreamerMode
-														? maskEmail(tx.userEmail)
-														: (tx.userEmail ?? "-")}
+													{tx.userEmail ?? "-"}
 												</div>
 											</td>
 											<td className="px-5 py-3.5">
@@ -244,13 +236,11 @@ export function AdminTransactionsView({
 												</span>
 											</td>
 											<td className="px-5 py-3.5 font-mono font-medium text-snow">
-												{isStreamerMode
-													? maskCurrency(tx.amount)
-													: new Intl.NumberFormat("id-ID", {
-															style: "currency",
-															currency: "IDR",
-															maximumFractionDigits: 0,
-														}).format(tx.amount)}
+												{new Intl.NumberFormat("id-ID", {
+													style: "currency",
+													currency: "IDR",
+													maximumFractionDigits: 0,
+												}).format(tx.amount)}
 											</td>
 											<td className="px-5 py-3.5">
 												<span

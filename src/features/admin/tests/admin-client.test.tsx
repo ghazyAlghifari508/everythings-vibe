@@ -11,12 +11,16 @@ vi.mock("@tanstack/react-router", () => ({
 		to,
 		children,
 		className,
+		title,
+		"aria-label": ariaLabel,
 	}: {
 		to: string;
 		children: React.ReactNode;
 		className?: string;
+		title?: string;
+		"aria-label"?: string;
 	}) => (
-		<a href={to} className={className}>
+		<a href={to} className={className} title={title} aria-label={ariaLabel}>
 			{children}
 		</a>
 	),
@@ -37,7 +41,6 @@ describe("AdminClient Top-Nav Shell", () => {
 	beforeEach(() => {
 		mockPathname = "/admin";
 		(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
-		localStorage.clear();
 		container = document.createElement("div");
 		document.body.appendChild(container);
 		root = createRoot(container);
@@ -53,7 +56,7 @@ describe("AdminClient Top-Nav Shell", () => {
 		container?.remove();
 	});
 
-	it("renders the top-nav header tabs, brand, and children", () => {
+	it("renders a single navigation landmark with compact Admin label, all 6 tabs, theme toggle, and exit link", () => {
 		act(() => {
 			root?.render(
 				<AdminClient>
@@ -63,16 +66,32 @@ describe("AdminClient Top-Nav Shell", () => {
 		});
 
 		expect(container.querySelector("#admin-test-content")).not.toBeNull();
-		expect(container.textContent).toContain("Admin Panel");
+
+		// Exactly one nav landmark
+		const navElements = container.querySelectorAll("nav");
+		expect(navElements.length).toBe(1);
+		expect(navElements[0].getAttribute("aria-label")).toBe("Navigasi Admin");
+
+		// Compact "Admin" label, no generic "Admin Panel"
+		expect(container.textContent).toContain("Admin");
+		expect(container.textContent).not.toContain("Admin Panel");
+
+		// All 6 navigation tabs
 		expect(container.textContent).toContain("Ringkasan");
 		expect(container.textContent).toContain("Pengguna");
 		expect(container.textContent).toContain("Tiket");
 		expect(container.textContent).toContain("Proyek");
 		expect(container.textContent).toContain("Transaksi");
 		expect(container.textContent).toContain("Pengaturan");
+
+		// Exit link to workspace
+		const exitLink = container.querySelector('a[href="/"]');
+		expect(exitLink).not.toBeNull();
+		expect(exitLink?.getAttribute("title")).toBe("Kembali ke Workspace");
+		expect(exitLink?.textContent).toContain("Keluar");
 	});
 
-	it("toggles streamer mode when clicking the toggle button", () => {
+	it("has no streamer mode toggle, provider, or indicators in the shell", () => {
 		act(() => {
 			root?.render(
 				<AdminClient>
@@ -84,26 +103,8 @@ describe("AdminClient Top-Nav Shell", () => {
 		const toggleButton = container.querySelector(
 			"button[title*='Streamer Mode']",
 		);
-		expect(toggleButton).not.toBeNull();
-		expect(toggleButton?.textContent).toContain("OFF");
-
-		act(() => {
-			toggleButton?.dispatchEvent(
-				new MouseEvent("click", { bubbles: true, cancelable: true }),
-			);
-		});
-
-		expect(toggleButton?.textContent).toContain("ON");
-		expect(localStorage.getItem("prdfy_admin_streamer_mode")).toBe("true");
-
-		act(() => {
-			toggleButton?.dispatchEvent(
-				new MouseEvent("click", { bubbles: true, cancelable: true }),
-			);
-		});
-
-		expect(toggleButton?.textContent).toContain("OFF");
-		expect(localStorage.getItem("prdfy_admin_streamer_mode")).toBe("false");
+		expect(toggleButton).toBeNull();
+		expect(container.textContent).not.toContain("Streamer Mode");
 	});
 
 	it("highlights active tab based on current pathname", () => {

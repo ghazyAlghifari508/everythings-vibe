@@ -1,23 +1,20 @@
 "use client";
 
 import {
+	ArrowLeft01Icon,
 	BubbleChatIcon,
 	CreditCardIcon,
 	DashboardSquare01Icon,
 	GitBranchIcon,
 	Settings02Icon,
 	UserGroupIcon,
-	ViewIcon,
-	ViewOffIcon,
 } from "@hugeicons/core-free-icons";
 import { Link, useLocation } from "@tanstack/react-router";
 import type React from "react";
 import { memo } from "react";
 import { Icon, type IconProps } from "@/components/ui/icon";
-import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { cn } from "@/lib/utils";
-import { StreamerModeProvider, useStreamerMode } from "./streamer-mode-context";
 
 interface NavItem {
 	href: string;
@@ -72,90 +69,69 @@ const NAV_ITEMS: NavItem[] = [
 
 function AdminShellInner({ children }: { children: React.ReactNode }) {
 	const pathname = useLocation({ select: (l) => l.pathname });
-	const { isStreamerMode, toggleStreamerMode } = useStreamerMode();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-onyx font-inter text-snow">
-			{/* Sticky Top-Nav Header */}
+			{/* Single Sticky Top-Nav Header */}
 			<header className="sticky top-0 z-40 w-full border-b border-graphite bg-charcoal/95 backdrop-blur">
-				<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-					{/* Header Row 1: Brand + Workspace Link + Streamer Mode Toggle */}
-					<div className="flex h-14 items-center justify-between gap-4 border-b border-graphite/60">
-						{/* Left: Brand */}
-						<div className="flex items-center gap-2.5">
-							<Logo height={22} />
-							<span className="text-sm font-[510] text-snow">Admin Panel</span>
+				<div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+					{/* Left: Admin Label + Single Nav Landmark */}
+					<nav
+						aria-label="Navigasi Admin"
+						className="flex items-center gap-3 sm:gap-4 overflow-hidden min-w-0 flex-1"
+					>
+						<span className="text-sm font-[510] text-snow shrink-0 select-none">
+							Admin
+						</span>
+
+						<div
+							className="h-4 w-px bg-graphite/60 shrink-0"
+							aria-hidden="true"
+						/>
+
+						<div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto hide-scrollbar py-1">
+							{NAV_ITEMS.map((item) => {
+								const isActive = item.isActive(pathname);
+
+								return (
+									<Link
+										key={item.label}
+										to={item.href}
+										preload="intent"
+										aria-current={isActive ? "page" : undefined}
+										className={cn(
+											"flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-[510] transition-colors",
+											isActive
+												? "border border-graphite/80 bg-obsidian text-snow shadow-[var(--shadow-inset)]"
+												: "text-fog hover:bg-white/5 hover:text-snow",
+										)}
+									>
+										<Icon
+											icon={item.icon}
+											size={14}
+											className={isActive ? "text-snow" : "text-fog"}
+										/>
+										<span>{item.label}</span>
+									</Link>
+								);
+							})}
 						</div>
-
-						{/* Right: Theme Toggle + Streamer Mode Toggle Button */}
-						<div className="flex items-center gap-2">
-							<ThemeToggle />
-
-							<button
-								type="button"
-								onClick={toggleStreamerMode}
-								className={cn(
-									"flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-[510] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40",
-									isStreamerMode
-										? "border-fog/50 bg-white/10 text-snow"
-										: "border-graphite bg-transparent text-fog hover:border-fog/40 hover:text-snow",
-								)}
-								title={
-									isStreamerMode
-										? "Streamer Mode aktif (Data sensitif disamarkan)"
-										: "Aktifkan Streamer Mode untuk menyamarkan nominal dan data pengguna"
-								}
-							>
-								{isStreamerMode ? (
-									<Icon icon={ViewOffIcon} size={14} />
-								) : (
-									<Icon icon={ViewIcon} size={14} />
-								)}
-								<span className="hidden xs:inline sm:inline">
-									Streamer Mode
-								</span>
-								<span
-									className={cn(
-										"rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-										isStreamerMode
-											? "bg-white/20 text-snow"
-											: "bg-white/5 text-fog",
-									)}
-								>
-									{isStreamerMode ? "ON" : "OFF"}
-								</span>
-							</button>
-						</div>
-					</div>
-
-					{/* Header Row 2: Horizontal Navigation Tabs */}
-					<nav className="flex items-center gap-1.5 overflow-x-auto py-2.5 hide-scrollbar">
-						{NAV_ITEMS.map((item) => {
-							const isActive = item.isActive(pathname);
-
-							return (
-								<Link
-									key={item.label}
-									to={item.href}
-									preload="intent"
-									aria-current={isActive ? "page" : undefined}
-									className={cn(
-										"flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-[510] transition-colors",
-										isActive
-											? "border border-graphite/80 bg-obsidian text-snow shadow-[var(--shadow-inset)]"
-											: "text-fog hover:bg-white/5 hover:text-snow",
-									)}
-								>
-									<Icon
-										icon={item.icon}
-										size={14}
-										className={isActive ? "text-snow" : "text-fog"}
-									/>
-									<span>{item.label}</span>
-								</Link>
-							);
-						})}
 					</nav>
+
+					{/* Right: Theme Toggle + Exit Link */}
+					<div className="flex items-center gap-2 shrink-0">
+						<ThemeToggle />
+
+						<Link
+							to="/"
+							className="flex items-center gap-1.5 rounded-lg border border-graphite px-2.5 py-1.5 text-xs font-[510] text-fog transition-colors hover:border-fog/40 hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40"
+							title="Kembali ke Workspace"
+							aria-label="Kembali ke Workspace"
+						>
+							<Icon icon={ArrowLeft01Icon} size={14} />
+							<span className="hidden sm:inline">Keluar</span>
+						</Link>
+					</div>
 				</div>
 			</header>
 
@@ -172,9 +148,5 @@ export const AdminClient = memo(function AdminClient({
 }: {
 	children: React.ReactNode;
 }) {
-	return (
-		<StreamerModeProvider>
-			<AdminShellInner>{children}</AdminShellInner>
-		</StreamerModeProvider>
-	);
+	return <AdminShellInner>{children}</AdminShellInner>;
 });

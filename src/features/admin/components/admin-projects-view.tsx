@@ -14,7 +14,6 @@ import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { AdminProjectItem } from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
-import { useStreamerMode } from "./streamer-mode-context";
 
 function getProjectTargetRoute(
 	step: string | null | undefined,
@@ -29,8 +28,6 @@ export function AdminProjectsView({
 }: {
 	projects: AdminProjectItem[];
 }) {
-	const { isStreamerMode, maskName, maskEmail } = useStreamerMode();
-
 	const [search, setSearch] = useState("");
 	const [stepFilter, setStepFilter] = useState<string>("all");
 
@@ -201,14 +198,10 @@ export function AdminProjectsView({
 											</td>
 											<td className="px-5 py-3.5">
 												<div className="font-medium text-snow">
-													{isStreamerMode
-														? maskName(proj.userName)
-														: (proj.userName ?? "Tanpa Nama")}
+													{proj.userName ?? "Tanpa Nama"}
 												</div>
 												<div className="text-[11px] text-fog">
-													{isStreamerMode
-														? maskEmail(proj.userEmail)
-														: (proj.userEmail ?? "-")}
+													{proj.userEmail ?? "-"}
 												</div>
 											</td>
 											<td className="px-5 py-3.5">

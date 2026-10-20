@@ -25,8 +25,6 @@ import {
 	TradeUpIcon,
 	UserCheck01Icon,
 	UserGroupIcon,
-	ViewIcon,
-	ViewOffIcon,
 } from "@hugeicons/core-free-icons";
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
@@ -75,13 +73,12 @@ describe("TASK 10F: Admin domain icon system verification", () => {
 				<Icon icon={GitBranchIcon} size={14} />
 				<Icon icon={CreditCardIcon} size={14} />
 				<Icon icon={Settings02Icon} size={14} />
-				<Icon icon={ViewIcon} size={14} />
-				<Icon icon={ViewOffIcon} size={14} />
+				<Icon icon={ArrowLeft01Icon} size={14} />
 			</div>,
 		);
 
 		const svgs = container.querySelectorAll("svg");
-		expect(svgs.length).toBe(8);
+		expect(svgs.length).toBe(7);
 		for (const svg of svgs) {
 			expect(svg.getAttribute("aria-hidden")).toBe("true");
 		}

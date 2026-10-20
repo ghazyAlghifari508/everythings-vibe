@@ -2,7 +2,6 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StreamerModeProvider } from "../components/streamer-mode-context";
 import { TrendLineChart } from "../components/trend-line-chart";
 import type { DailyTrendPoint } from "../types";
 
@@ -79,11 +78,9 @@ describe("TrendLineChart Component", () => {
 		expect(container.textContent).toContain("Tren 14 Hari Terakhir");
 	});
 
-	it("displays unmasked currency in legend when streamer mode is inactive", () => {
+	it("displays currency in legend", () => {
 		act(() => {
-			root?.render(
-				<TrendLineChart initialData={mockTrendData} isStreamerMode={false} />,
-			);
+			root?.render(<TrendLineChart initialData={mockTrendData} />);
 		});
 
 		// Total revenue: 100k + 200k + 150k + 300k + 50k + 400k + 250k = 1.450.000
@@ -91,36 +88,9 @@ describe("TrendLineChart Component", () => {
 		expect(container.textContent).toContain("35"); // total new users: 2+5+3+8+1+10+6 = 35
 	});
 
-	it("masks currency in legend when streamer mode is active via prop", () => {
-		act(() => {
-			root?.render(
-				<TrendLineChart initialData={mockTrendData} isStreamerMode={true} />,
-			);
-		});
-
-		expect(container.textContent).toContain("••••••••");
-		expect(container.textContent).not.toContain("1.450.000");
-	});
-
-	it("masks currency when StreamerModeProvider context is active", () => {
-		localStorage.setItem("prdfy_admin_streamer_mode", "true");
-
-		act(() => {
-			root?.render(
-				<StreamerModeProvider>
-					<TrendLineChart initialData={mockTrendData} />
-				</StreamerModeProvider>,
-			);
-		});
-
-		expect(container.textContent).toContain("••••••••");
-	});
-
 	it("renders SVG spline and area paths with valid cubic bezier commands", () => {
 		act(() => {
-			root?.render(
-				<TrendLineChart initialData={mockTrendData} isStreamerMode={false} />,
-			);
+			root?.render(<TrendLineChart initialData={mockTrendData} />);
 		});
 
 		const paths = container.querySelectorAll("path");

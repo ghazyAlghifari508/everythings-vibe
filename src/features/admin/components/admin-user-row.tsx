@@ -9,7 +9,6 @@ import {
 	updateUserPlan,
 } from "../services";
 import type { AdminSubscriptionItem, AdminUserItem } from "../types";
-import { useStreamerMode } from "./streamer-mode-context";
 
 export interface AdminUserRowProps {
 	user: AdminUserItem;
@@ -26,8 +25,6 @@ export function AdminUserRowItem({
 	isMutating,
 	onAction,
 }: AdminUserRowProps) {
-	const { isStreamerMode, maskName, maskEmail } = useStreamerMode();
-
 	const plan = sub?.plan ?? "free";
 	const isBanned = Boolean(user.bannedAt);
 	const isAdmin = Boolean(user.isAdmin);
@@ -44,11 +41,9 @@ export function AdminUserRowItem({
 					</div>
 					<div className="min-w-0">
 						<p className="truncate font-[510] text-snow">
-							{isStreamerMode ? maskName(user.name) : user.name || "Tanpa Nama"}
+							{user.name || "Tanpa Nama"}
 						</p>
-						<p className="truncate text-fog text-[11px]">
-							{isStreamerMode ? maskEmail(user.email) : user.email}
-						</p>
+						<p className="truncate text-fog text-[11px]">{user.email}</p>
 					</div>
 				</div>
 			</td>
