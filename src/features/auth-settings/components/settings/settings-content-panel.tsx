@@ -24,7 +24,7 @@ export function SettingsContentPanel({
 		<section
 			data-testid="settings-content-panel"
 			className={cn(
-				"w-full max-w-4xl rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6",
+				"w-full rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6",
 				className,
 			)}
 		>

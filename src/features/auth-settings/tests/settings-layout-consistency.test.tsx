@@ -71,7 +71,7 @@ describe("Settings layout consistency across child pages", () => {
 		);
 
 		const panel = screen.getByTestId("settings-content-panel");
-		expect(panel.className).toContain("max-w-4xl");
+		expect(panel.className).toContain("w-full");
 		expect(panel.className).toContain("rounded-xl");
 		expect(panel.className).toContain("border");
 		expect(panel.className).toContain("p-6");
@@ -112,14 +112,14 @@ describe("Settings layout consistency across child pages", () => {
 			expect(heading).toBeDefined();
 
 			const panel = screen.getByTestId("settings-content-panel");
-			expect(panel.className).toContain("max-w-4xl");
+			expect(panel.className).toContain("w-full");
 			expect(panel.className).toContain("rounded-xl");
 
 			unmount();
 		}
 	});
 
-	it("guarantees BillingPage root container matches max-w-4xl boundary", () => {
+	it("guarantees BillingPage root container matches w-full boundary", () => {
 		const { container } = render(
 			<BillingPage
 				subscription={undefined}
@@ -135,7 +135,6 @@ describe("Settings layout consistency across child pages", () => {
 
 		const rootDiv = container.firstElementChild as HTMLElement;
 		expect(rootDiv).not.toBeNull();
-		expect(rootDiv.className).toContain("max-w-4xl");
 		expect(rootDiv.className).toContain("w-full");
 	});
 });

@@ -33,7 +33,7 @@ describe("SettingsContentPanel primitive", () => {
 		expect(screen.getByText("Konten Pengaturan")).toBeDefined();
 	});
 
-	it("applies canonical max-w-4xl surface and border styling", () => {
+	it("applies canonical w-full surface and border styling", () => {
 		render(
 			<SettingsContentPanel title="Test Panel">
 				<div>Content</div>
@@ -41,7 +41,7 @@ describe("SettingsContentPanel primitive", () => {
 		);
 
 		const panel = screen.getByTestId("settings-content-panel");
-		expect(panel.className).toContain("max-w-4xl");
+		expect(panel.className).toContain("w-full");
 		expect(panel.className).toContain("rounded-xl");
 		expect(panel.className).toContain("border");
 		expect(panel.className).toContain("p-6");

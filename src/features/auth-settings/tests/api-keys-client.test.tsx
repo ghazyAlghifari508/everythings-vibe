@@ -41,7 +41,7 @@ describe("ApiKeysClient layout and presentation", () => {
 
 		// Verify outer container is SettingsContentPanel
 		const panel = screen.getByTestId("settings-content-panel");
-		expect(panel.className).toContain("max-w-4xl");
+		expect(panel.className).toContain("w-full");
 		expect(panel.className).toContain("rounded-xl");
 	});
 
