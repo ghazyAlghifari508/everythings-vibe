@@ -22,6 +22,12 @@ export function Footer() {
 							Pricing
 						</Link>
 						<Link
+							to="/bantuan"
+							className="font-inter text-[14px] text-fog transition-colors hover:text-snow"
+						>
+							Bantuan
+						</Link>
+						<Link
 							to="/faq"
 							className="font-inter text-[14px] text-fog transition-colors hover:text-snow"
 						>

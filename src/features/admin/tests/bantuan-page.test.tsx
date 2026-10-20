@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BantuanPage } from "@/routes/bantuan";
 
@@ -70,26 +70,37 @@ describe("BantuanPage admin triage gate", () => {
 });
 
 describe("BantuanPage Hub", () => {
-	it("renders workflow guides, FAQs, and feedback links", () => {
+	it("renders workflow guides, support channels, and a link to standalone FAQ", () => {
 		sessionUser = { id: "u1", email: "user@example.invalid", isAdmin: false };
 		render(<BantuanPage />);
 		expect(screen.getByText("Pusat Bantuan")).toBeDefined();
 		expect(screen.getByText(/Panduan Alur Kerja/i)).toBeDefined();
-		expect(screen.getByText(/Pertanyaan Umum \(FAQ\)/i)).toBeDefined();
 		expect(screen.getByText(/Feedback & Bug Report/i)).toBeDefined();
+		expect(linkHrefs()).toContain("/faq");
+		expect(linkHrefs()).toContain("/settings/billing");
 	});
 
-	it("expands FAQ answer when question accordion is clicked", () => {
+	it("does not embed FAQ accordion content or accordion toggle buttons", () => {
 		sessionUser = { id: "u1", email: "user@example.invalid", isAdmin: false };
 		render(<BantuanPage />);
-		const question = screen.getByRole("button", {
-			name: /VibeScrape.*VibeDesign Studio/,
-		});
-		expect(question.getAttribute("aria-expanded")).toBe("false");
-		fireEvent.click(question);
-		expect(question.getAttribute("aria-expanded")).toBe("true");
-		const answer = screen.getByText(/workspace mandiri di \/scrape/i);
-		expect(answer.textContent).toContain("/scrape/history");
-		expect(answer.textContent).toContain("/design");
+		expect(
+			screen.queryByRole("button", {
+				name: /VibeScrape.*VibeDesign Studio/,
+			}),
+		).toBeNull();
+		expect(
+			screen.queryByRole("button", {
+				name: /Apa perbedaan VibePlan Greenfield/,
+			}),
+		).toBeNull();
+	});
+
+	it("renders workflow guides for VibePlan, VibeDesign, VibeScrape, and CLI", () => {
+		sessionUser = { id: "u1", email: "user@example.invalid", isAdmin: false };
+		render(<BantuanPage />);
+		expect(screen.getByText("Alur Kerja VibePlan")).toBeDefined();
+		expect(screen.getByText("Alur Kerja VibeDesign")).toBeDefined();
+		expect(screen.getByText("Alur Kerja VibeScrape")).toBeDefined();
+		expect(screen.getByText("Alur Kerja VibeEverything CLI")).toBeDefined();
 	});
 });

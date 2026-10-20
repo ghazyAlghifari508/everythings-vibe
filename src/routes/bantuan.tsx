@@ -1,10 +1,10 @@
 import {
 	ArrowRight01Icon,
+	InformationCircleIcon,
 	MessageSquareIcon,
 	Shield01Icon,
 } from "@hugeicons/core-free-icons";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { FaqAccordion } from "@/components/bantuan/faq-accordion";
 import { WorkflowGuides } from "@/components/bantuan/workflow-guides";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { Icon } from "@/components/ui/icon";
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/bantuan")({
 			{
 				name: "description",
 				content:
-					"Pusat bantuan VibeEverything: FAQ, laporan bug dan feedback, serta triase admin.",
+					"Pusat bantuan VibeEverything: panduan alur kerja modul, bantuan teknis, serta kanal feedback.",
 			},
 		],
 	}),
@@ -31,7 +31,7 @@ export function BantuanPage() {
 	const canTriage = Boolean(session?.user && isAdmin(session.user));
 
 	return (
-		<main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
+		<main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
 			<HubBreadcrumb current="Bantuan" />
 
 			<header>
@@ -39,8 +39,8 @@ export function BantuanPage() {
 					Pusat Bantuan
 				</h1>
 				<p className="mt-3 max-w-2xl text-sm leading-6 text-fog">
-					Pelajari cara memakai setiap modul, temukan jawaban cepat, dan kirim
-					masukan langsung ke tim admin.
+					Pelajari cara memakai setiap modul, ikuti alur langkah demi langkah,
+					dan kirim kendala atau masukan langsung ke tim pengembang.
 				</p>
 			</header>
 
@@ -51,14 +51,37 @@ export function BantuanPage() {
 				<WorkflowGuides />
 			</section>
 
-			<section className="flex flex-col gap-4">
-				<h2 className="font-mono text-xs uppercase tracking-widest text-fog">
-					Pertanyaan Umum (FAQ)
-				</h2>
-				<FaqAccordion />
-			</section>
-
 			<section className="flex flex-col gap-3">
+				<h2 className="font-mono text-xs uppercase tracking-widest text-fog">
+					Dukungan & Kanal Bantuan
+				</h2>
+
+				<Link
+					to="/faq"
+					className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+				>
+					<span className="flex items-start gap-4">
+						<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
+							<Icon icon={InformationCircleIcon} size={20} aria-hidden />
+						</span>
+						<span>
+							<span className="block text-base font-semibold text-snow">
+								Pertanyaan Umum (FAQ)
+							</span>
+							<span className="mt-1 block text-sm text-fog">
+								Temukan jawaban ringkas seputar konsep modul, sistem kredit, dan
+								akun di halaman FAQ mandiri.
+							</span>
+						</span>
+					</span>
+					<Icon
+						icon={ArrowRight01Icon}
+						size={18}
+						aria-hidden
+						className="shrink-0 text-fog transition-all group-hover:translate-x-1 group-hover:text-snow"
+					/>
+				</Link>
+
 				<Link
 					to="/settings/feedback"
 					className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
@@ -72,7 +95,7 @@ export function BantuanPage() {
 								Feedback & Bug Report
 							</span>
 							<span className="mt-1 block text-sm text-fog">
-								Laporkan kendala, kirim kritik, atau minta fitur baru.
+								Laporkan kendala teknis, kirim kritik, atau minta fitur baru.
 								Memerlukan login.
 							</span>
 						</span>
@@ -99,7 +122,7 @@ export function BantuanPage() {
 									Triase Admin
 								</span>
 								<span className="mt-1 block text-sm text-fog">
-									Antrean feedback dan laporan error. Hanya untuk akun admin.
+									Antrean feedback dan laporan error. Khusus staf admin.
 								</span>
 							</span>
 						</span>

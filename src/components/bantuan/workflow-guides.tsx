@@ -1,5 +1,6 @@
 import {
 	FileCodeIcon,
+	PaintBoardIcon,
 	PenLineIcon,
 	TerminalIcon,
 } from "@hugeicons/core-free-icons";
@@ -23,6 +24,18 @@ const GUIDES: readonly WorkflowGuide[] = [
 			"Jawab pertanyaan klarifikasi di sesi Ask",
 			"Terima PRD profesional 8 seksi",
 			"Generate Acceptance Criteria, lalu Task dan Kanban Board",
+		],
+	},
+	{
+		id: "vibedesign",
+		title: "Alur Kerja VibeDesign",
+		description:
+			"Ubah prompt teks menjadi antarmuka HTML/Tailwind interaktif di canvas responsif.",
+		steps: [
+			"Buka studio antarmuka di /design",
+			"Tulis deskripsi antarmuka atau gunakan referensi desain",
+			"Inspeksi hasil di preview Desktop, Tablet, dan Mobile",
+			"Beralih antara tab Preview dan Code untuk salin markup",
 		],
 	},
 	{
@@ -50,11 +63,16 @@ const GUIDES: readonly WorkflowGuide[] = [
 	},
 ];
 
-const GUIDE_ICONS = [PenLineIcon, FileCodeIcon, TerminalIcon] as const;
+const GUIDE_ICONS = [
+	PenLineIcon,
+	PaintBoardIcon,
+	FileCodeIcon,
+	TerminalIcon,
+] as const;
 
 export function WorkflowGuides() {
 	return (
-		<div className="grid gap-4 md:grid-cols-3">
+		<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 			{GUIDES.map((guide, index) => {
 				const glyph = GUIDE_ICONS[index] ?? PenLineIcon;
 				return (
