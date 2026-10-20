@@ -17,65 +17,75 @@ export const FAQ_ITEMS: FaqItem[] = [
 	{
 		id: "project-persistence",
 		title: "Apakah project yang saya buat tersimpan otomatis?",
-		subtitle: "Status penyimpanan dokumen dan kelanjutan sesi",
+		subtitle: "Penyimpanan dokumen dan kelanjutan sesi kerja",
 		content:
-			"Ya, semua tahapan project mulai dari PRD, kriteria penerimaan, hingga task tersimpan otomatis ke akun Anda. Anda bisa melanjutkan atau membuka kembali project kapan saja melalui halaman Riwayat atau Dashboard.",
+			"Ya. Setiap tahapan yang selesai di-generate (PRD, kriteria penerimaan, dan daftar task) otomatis tersimpan ke akun Anda. Anda bisa keluar kapan saja dan melanjutkan project melalui Dashboard atau menu Riwayat.",
 		icon: "document",
 	},
 	{
 		id: "interrupted-generation",
-		title: "Apa yang terjadi jika halaman tertutup saat AI sedang generate?",
-		subtitle: "Penanganan sesi saat koneksi atau browser terputus",
+		title: "Apa yang terjadi jika koneksi terputus saat AI sedang generate?",
+		subtitle: "Penanganan status credit dan sesi yang belum selesai",
 		content:
-			"Proses generate yang terputus otomatis dibatalkan dan kuota credit Anda tidak akan terpotong. Project tetap tersimpan di tahap terakhir, dan Anda bisa menekan tombol generate ulang saat membuka kembali halaman tersebut.",
+			"Credit yang digunakan berada dalam status reservasi sementara. Jika server berhasil menyelesaikan dokumen sebelum koneksi terputus, hasilnya tetap tersimpan. Jika proses gagal atau waktu tunggu habis, reservasi akan dilepas kembali ke saldo Anda dan project tetap berada di tahap terakhir agar bisa di-generate ulang.",
 		icon: "workflow",
 	},
 	{
 		id: "prd-revision",
-		title: "Bisakah hasil PRD dari AI direvisi jika belum sesuai?",
-		subtitle: "Perbaikan seksi spesifik tanpa mulai dari awal",
+		title: "Apakah revisi PRD melalui chat memotong credit?",
+		subtitle: "Ketentuan revisi seksi dan pembuatan dokumen baru",
 		content:
-			"Bisa. Anda dapat meminta revisi bagian tertentu melalui chat panel tanpa harus mengulang proses dari awal. Setiap revisi PRD tidak memotong credit dan langsung memperbarui versi dokumen Anda.",
+			"Tidak. Revisi seksi PRD melalui chat panel sepenuhnya gratis dan membuat versi dokumen baru. Credit hanya dipotong saat pertama kali membuat PRD baru atau menjalankan generate untuk tahap berikutnya seperti kriteria penerimaan dan task.",
 		icon: "spark",
 	},
 	{
-		id: "failed-generation-credit",
-		title: "Apakah credit tetap terpotong jika generate gagal?",
-		subtitle: "Jaminan kuota saat sistem atau koneksi error",
+		id: "credit-expiry-and-topup",
+		title:
+			"Apakah credit memiliki masa aktif, dan bagaimana cara kerja top-up?",
+		subtitle: "Masa berlaku paket bulanan, kuota Free, dan pembelian top-up",
 		content:
-			"Tidak. Credit hanya dipotong secara permanen jika dokumen atau task berhasil dibuat dan tersimpan. Jika sistem mengalami kendala atau waktu tunggu habis, reservasi credit akan dilepas kembali ke saldo Anda.",
+			"Credit paket langganan berlaku selama siklus 30 hari berjalan dan hangus jika tidak diperpanjang. Paket Free mendapat alokasi 2 credit setiap 30 hari tanpa akumulasi sisa bulan sebelumnya. Paket top-up menambahkan credit ke saldo periode aktif saat ini, tetapi tidak memperpanjang masa aktif langganan.",
 		icon: "credit",
 	},
 	{
-		id: "credit-expiry",
-		title: "Apakah credit yang belum terpakai akan hangus?",
-		subtitle: "Masa aktif kuota untuk paket Free dan Berlangganan",
+		id: "cancel-subscription",
+		title: "Apa yang terjadi jika saya membatalkan langganan berbayar?",
+		subtitle: "Dampak pembatalan paket pada akun dan saldo credit",
 		content:
-			"Pada paket langganan Pro dan Hengker, credit berlaku selama periode aktif 30 hari. Pada paket Free, kuota 2 credit diperbarui setiap siklus 30 hari dan tidak diakumulasikan ke periode berikutnya.",
-		icon: "credit",
-	},
-	{
-		id: "manage-subscription",
-		title: "Bagaimana cara membatalkan langganan?",
-		subtitle: "Penghentian paket berbayar dari menu Pengaturan",
-		content:
-			"Buka Pengaturan lalu pilih Billing, kemudian klik Batalkan Langganan. Paket Anda akan tetap aktif sampai akhir periode tagihan berjalan tanpa ada tagihan otomatis berikutnya.",
+			"Pembatalan melalui menu Pengaturan > Billing langsung berlaku seketika. Akun Anda kembali ke paket Free dan sisa credit langganan berbayar akan hangus. Semua dokumen dan riwayat project yang sudah dibuat tetap tersimpan di akun Anda.",
 		icon: "credit",
 	},
 	{
 		id: "repository-security",
-		title: "Apakah kode repositori saya aman saat menggunakan CLI?",
-		subtitle: "Penyaringan file lokal dan isolasi data privat",
+		title: "File apa saja yang otomatis dikecualikan saat sync repository?",
+		subtitle: "Penyaringan lokal file sensitif dan kontrol ignore",
 		content:
-			"Aman. CLI VibeEverything otomatis mengecualikan file sensitif seperti .env, sertifikat, kunci rahasia, dan folder build sebelum snapshot diunggah. Kode dan dokumen yang dihasilkan hanya dapat diakses oleh akun Anda sendiri.",
+			"CLI secara lokal menyaring dan memblokir upload untuk file env (.env*), kunci privat dan sertifikat (.pem, .key), dump database (.sql, .db), serta folder dependensi dan build (node_modules, dist, .git). Anda dapat menambahkan aturan pengecualian tambahan melalui file .everythingsvibeignore di root repository.",
 		icon: "terminal",
 	},
 	{
-		id: "project-deletion",
-		title: "Bisakah saya menghapus project dan seluruh datanya?",
-		subtitle: "Pembersihan dokumen dan riwayat dari sistem",
+		id: "resync-repository",
+		title:
+			"Jika saya melakukan sync ulang pada repository yang sama, apakah data lama hilang?",
+		subtitle: "Pengaruh sinkronisasi berkala terhadap project yang ada",
 		content:
-			"Bisa. Anda dapat menghapus project melalui menu opsi di halaman project atau Riwayat. Seluruh percakapan, versi PRD, kriteria penerimaan, dan daftar task akan langsung dibersihkan dari akun Anda.",
+			"Tidak. Setiap kali Anda menjalankan sync ulang, sistem membuat snapshot dan analisis arsitektur baru untuk repository tersebut. Project, PRD, dan task yang sudah pernah Anda buat sebelumnya tidak akan tertimpa atau terhapus.",
+		icon: "terminal",
+	},
+	{
+		id: "scrape-limitations",
+		title: "Mengapa ada website yang gagal diproses oleh VibeScrape?",
+		subtitle: "Batasan keamanan jaringan dan proteksi akses publik",
+		content:
+			"VibeScrape memblokir URL lokal atau IP privat (SSRF protection) untuk keamanan sistem. Website yang mewajibkan login, proteksi bot seperti Cloudflare CAPTCHA, atau memblokir crawler headless tidak dapat diambil secara lengkap. Jika sebagian aset gagal diunduh, sistem tetap menyimpan halaman dan token desain yang berhasil diekstrak.",
+		icon: "workflow",
+	},
+	{
+		id: "project-deletion",
+		title: "Apa yang terjadi saat saya menghapus project?",
+		subtitle: "Pembersihan dokumen kerja dan retensi catatan sistem",
+		content:
+			"Seluruh dokumen produk seperti percakapan, versi PRD, kriteria penerimaan, dan task langsung dihapus secara permanen dari ruang kerja Anda. Catatan transaksi credit tetap disimpan untuk audit keuangan, dan riwayat sync repository Anda tetap utuh.",
 		icon: "document",
 	},
 ];

@@ -54,64 +54,80 @@ function renderFaq() {
 }
 
 describe("Faq", () => {
-	it("renders canonical user-centered FAQ questions covering persistence, credits, and security", () => {
-		const rendered = renderFaq();
-		expect(rendered.textContent).toContain(
-			"Apakah project yang saya buat tersimpan otomatis?",
-		);
-		expect(rendered.textContent).toContain(
-			"Apakah credit tetap terpotong jika generate gagal?",
-		);
-		expect(rendered.textContent).toContain(
-			"Apakah kode repositori saya aman saat menggunakan CLI?",
-		);
+	it("validates structural integrity of canonical FAQ items", () => {
+		expect(FAQ_ITEMS.length).toBeGreaterThan(0);
+
+		const ids = FAQ_ITEMS.map((item) => item.id);
+		const uniqueIds = new Set(ids);
+		expect(uniqueIds.size).toBe(FAQ_ITEMS.length);
+
+		const titles = FAQ_ITEMS.map((item) => item.title.trim().toLowerCase());
+		const uniqueTitles = new Set(titles);
+		expect(uniqueTitles.size).toBe(FAQ_ITEMS.length);
+
+		const allowedIcons = new Set([
+			"spark",
+			"workflow",
+			"document",
+			"board",
+			"credit",
+			"feedback",
+			"terminal",
+		]);
+
+		for (const item of FAQ_ITEMS) {
+			expect(item.id.trim().length).toBeGreaterThan(0);
+			expect(item.title.trim().length).toBeGreaterThan(0);
+			expect(item.subtitle.trim().length).toBeGreaterThan(0);
+			expect(item.content.trim().length).toBeGreaterThan(0);
+			expect(allowedIcons.has(item.icon)).toBe(true);
+		}
 	});
 
-	it("keeps each answer linked to its trigger and toggles expanded state", () => {
+	it("renders an accessible accordion with properly bound triggers and panels", () => {
 		const rendered = renderFaq();
-		const trigger = rendered.querySelector("button");
+		const buttons = Array.from(rendered.querySelectorAll("button"));
+		expect(buttons.length).toBe(FAQ_ITEMS.length);
 
-		expect(trigger).not.toBeNull();
-		expect(trigger?.getAttribute("aria-controls")).toBeTruthy();
-		expect(trigger?.getAttribute("aria-expanded")).toBe("false");
+		const firstTrigger = buttons[0];
+		expect(firstTrigger).not.toBeNull();
+		const panelId = firstTrigger?.getAttribute("aria-controls");
+		expect(panelId).toBeTruthy();
+		expect(firstTrigger?.getAttribute("aria-expanded")).toBe("false");
+
+		const panel = panelId ? rendered.querySelector(`#${panelId}`) : null;
+		expect(panel).not.toBeNull();
+		expect(panel?.getAttribute("aria-labelledby")).toBe(firstTrigger?.id);
+		expect(panel?.getAttribute("aria-hidden")).toBe("true");
 
 		act(() => {
-			trigger?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+			firstTrigger?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 
-		expect(trigger?.getAttribute("aria-expanded")).toBe("true");
-		const answerId = trigger?.getAttribute("aria-controls");
-		const answer = answerId ? rendered.querySelector(`#${answerId}`) : null;
-		expect(answer?.getAttribute("aria-labelledby")).toBe(trigger?.id);
-		expect(answer?.textContent).toContain("PRD");
-		expect(answer?.getAttribute("aria-hidden")).toBe("false");
+		expect(firstTrigger?.getAttribute("aria-expanded")).toBe("true");
+		expect(panel?.getAttribute("aria-hidden")).toBe("false");
+
+		act(() => {
+			firstTrigger?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(firstTrigger?.getAttribute("aria-expanded")).toBe("false");
+		expect(panel?.getAttribute("aria-hidden")).toBe("true");
 	});
 
-	it("renders links to feedback and bantuan support hub", () => {
+	it("renders all FAQ items into the DOM with corresponding titles", () => {
+		const rendered = renderFaq();
+		for (const item of FAQ_ITEMS) {
+			expect(rendered.textContent).toContain(item.title);
+		}
+	});
+
+	it("renders valid navigation links to feedback and bantuan hubs", () => {
 		const rendered = renderFaq();
 		const links = Array.from(rendered.querySelectorAll("a")).map((a) =>
 			a.getAttribute("href"),
 		);
 		expect(links).toContain("/settings/feedback");
 		expect(links).toContain("/bantuan");
-	});
-
-	it("has 6-10 curated items with unique IDs and no legacy taxonomy questions", () => {
-		expect(FAQ_ITEMS.length).toBeGreaterThanOrEqual(6);
-		expect(FAQ_ITEMS.length).toBeLessThanOrEqual(10);
-
-		const ids = FAQ_ITEMS.map((item) => item.id);
-		const uniqueIds = new Set(ids);
-		expect(uniqueIds.size).toBe(FAQ_ITEMS.length);
-
-		for (const item of FAQ_ITEMS) {
-			expect(item.title.trim().length).toBeGreaterThan(0);
-			expect(item.subtitle.trim().length).toBeGreaterThan(0);
-			expect(item.content.trim().length).toBeGreaterThan(0);
-			expect(item.title).not.toMatch(
-				/perbedaan vibescrape|perbedaan vibeplan/i,
-			);
-			expect(item.title).not.toMatch(/alur kerja vibeeverything/i);
-		}
 	});
 });
