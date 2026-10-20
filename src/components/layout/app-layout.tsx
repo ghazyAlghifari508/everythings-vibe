@@ -26,7 +26,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 	// workspace render their own navigation, so the global product navbar
 	// (Pricing / Top Up) must not appear on either route.
 	const isStudioWorkspace =
-		pathname === "/design/studio" || pathname.startsWith("/design/studio/");
+		(pathname === "/design" || pathname.startsWith("/design/")) &&
+		!pathname.startsWith("/design/scrap");
 	const hideNavbar =
 		hideNavbarRoutes.includes(pathname) ||
 		pathname.startsWith("/settings/") ||

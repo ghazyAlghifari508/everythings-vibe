@@ -90,6 +90,6 @@ describe("BantuanPage Hub", () => {
 		expect(question.getAttribute("aria-expanded")).toBe("true");
 		const answer = screen.getByText(/workspace mandiri di \/scrape/i);
 		expect(answer.textContent).toContain("/scrape/history");
-		expect(answer.textContent).toContain("/design/studio");
+		expect(answer.textContent).toContain("/design");
 	});
 });

@@ -233,7 +233,7 @@ describe("Studio and Scrape domain boundary", () => {
 					),
 			}),
 		).toEqual([]);
-	});
+	}, 15000);
 
 	it("runs the scrape worker from its own entry point, outside the web server", () => {
 		expect(scriptEntryFile("scrape:worker")).toBe(

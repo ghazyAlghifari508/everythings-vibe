@@ -44,24 +44,19 @@ afterEach(() => {
 });
 
 describe("StudioBackLink", () => {
-	it("returns to Studio when the landing was opened from Studio", () => {
-		render(<StudioBackLink from="/design/studio" />);
-		expect(screen.getByRole("link").dataset.to).toBe("/design/studio");
+	it("returns to templates when the landing was opened from templates", () => {
+		render(<StudioBackLink from="/templates" />);
+		expect(screen.getByRole("link").dataset.to).toBe("/templates");
 	});
 
-	it("returns to the design hub when the landing was opened from there", () => {
-		render(<StudioBackLink from="/design" />);
-		expect(screen.getByRole("link").dataset.to).toBe("/design");
-	});
-
-	it("falls back to the design hub for a direct URL or new tab", () => {
+	it("falls back to home for a direct URL or new tab", () => {
 		render(<StudioBackLink />);
-		expect(screen.getByRole("link").dataset.to).toBe("/design");
+		expect(screen.getByRole("link").dataset.to).toBe("/");
 	});
 
-	it("falls back to the design hub for an unsafe recorded destination", () => {
+	it("falls back to home for an unsafe recorded destination", () => {
 		render(<StudioBackLink from="https://evil.example" />);
-		expect(screen.getByRole("link").dataset.to).toBe("/design");
+		expect(screen.getByRole("link").dataset.to).toBe("/");
 	});
 
 	it("uses the visible label Kembali", () => {
@@ -71,18 +66,16 @@ describe("StudioBackLink", () => {
 
 	it("honors the recorded origin even when an unrelated back entry exists", () => {
 		routerMock.history.canGoBack.mockReturnValue(true);
-		render(<StudioBackLink from="/design/studio" />);
+		render(<StudioBackLink from="/templates" />);
 		fireEvent.click(screen.getByRole("link"));
 		expect(routerMock.history.back).not.toHaveBeenCalled();
-		expect(screen.getByRole("link").getAttribute("href")).toBe(
-			"/design/studio",
-		);
+		expect(screen.getByRole("link").getAttribute("href")).toBe("/templates");
 		expect(screen.getByRole("link").dataset.replace).toBe("true");
 	});
 
 	it("navigates to the resolved route when no back entry exists", () => {
 		routerMock.history.canGoBack.mockReturnValue(false);
-		render(<StudioBackLink from="/design/studio" />);
+		render(<StudioBackLink from="/templates" />);
 		fireEvent.click(screen.getByRole("link"));
 		expect(routerMock.history.back).not.toHaveBeenCalled();
 	});

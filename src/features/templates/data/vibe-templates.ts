@@ -98,7 +98,7 @@ export const VIBE_TEMPLATES: readonly VibeTemplateEntry[] = freezeCatalog([
 		prompt:
 			"Buatkan halaman lengkap Dashboard Web SaaS Analytics bergaya modern dark-mode ultra-clean. Gunakan palet warna latar charcoal gelap (#0f1115), card surface onyx (#16181d), dan hairline border 1px halus (#262a33). Di bagian atas buat header dengan nama aplikasi, search bar global, notifikasi, dan profil user. Di bawahnya buat 4 kartu KPI (Total Revenue, Active Users, Conversion Rate, Churn) dengan persentase tren naik hijau neon. Di bagian tengah sediakan area grafik besar tren pendapatan dan diagram distribusi pengguna. Di bagian bawah tampilkan tabel riwayat transaksi terbaru lengkap dengan badge status (Berhasil, Pending, Gagal) dan tombol aksi. Pastikan menggunakan Tailwind CDN dan icon Lucide.",
 		tags: ["Dark Mode", "Analytics", "Dashboard", "KPI Cards", "Tailwind CSS"],
-		recommendedTarget: "/design/studio",
+		recommendedTarget: "/design",
 	},
 	{
 		id: "simrs-portal-ui",
@@ -111,7 +111,7 @@ export const VIBE_TEMPLATES: readonly VibeTemplateEntry[] = freezeCatalog([
 		prompt:
 			"Rancang antarmuka desktop portal dashboard Sistem Informasi Manajemen Rumah Sakit (SIMRS) yang bersih, ergonomis, dan profesional untuk perawat dan dokter. Bagian atas menampilkan ringkasan operasional: Total Pasien Hari Ini, Ketersediaan Tempat Tidur Rawat Inap (Bed Availability per kelas VIP, I, II, III), Pasien IGD Aktif, dan Dokter Sedang Bertugas. Tampilkan tabel live antrean poliklinik rawat jalan dengan nomor antrean, nama pasien, poli spesialis, nama dokter, dan status (Menunggu, Dipanggil, Sedang Periksa). Sertakan panel samping ringkasan data vital pasien terpilih (tekanan darah, suhu, alergi obat). Gunakan warna aksen biru medis (#0284c7) dan hijau toska (#0d9488) yang menenangkan.",
 		tags: ["SIMRS", "Hospital", "Healthcare", "Patient Queue", "Medical UI"],
-		recommendedTarget: "/design/studio",
+		recommendedTarget: "/design",
 	},
 	{
 		id: "ecommerce-mobile-ui",
@@ -129,7 +129,7 @@ export const VIBE_TEMPLATES: readonly VibeTemplateEntry[] = freezeCatalog([
 			"Bottom Nav",
 			"Storefront",
 		],
-		recommendedTarget: "/design/studio",
+		recommendedTarget: "/design",
 	},
 	{
 		id: "fintech-wallet-ui",
@@ -141,7 +141,7 @@ export const VIBE_TEMPLATES: readonly VibeTemplateEntry[] = freezeCatalog([
 			"Tampilan dompet digital modern dengan kartu saldo virtual gradien, menu transfer cepat, dan riwayat mutasi bank.",
 		prompt: `Rancang antarmuka mobile dompet digital fintech modern premium (${STUDIO_VISUAL_WIDTH.mobile}px). Header atas menampilkan sapaan pengguna, avatar foto, dan tombol scan QRIS. Bagian utama adalah kartu saldo virtual bergradien ungu-biru elegan yang menampilkan total saldo rupiah, nomor kartu tersembunyi (**** 4892), dan tombol Top Up, Transfer, Tarik Tunai, serta Minta Uang. Di bawahnya tampilkan deretan icon lingkaran aksi cepat kontak favorit untuk transfer 1-klik. Di bagian bawah sediakan daftar riwayat transaksi terbaru yang dikelompokkan berdasarkan tanggal (Hari Ini, Kemarin), lengkap dengan logo merchant, kategori, dan nominal uang berwarna merah (keluar) atau hijau (masuk).`,
 		tags: ["Fintech", "Wallet", "Virtual Card", "Transfer Flow", "QRIS"],
-		recommendedTarget: "/design/studio",
+		recommendedTarget: "/design",
 	},
 	{
 		id: "ai-coding-canvas-ui",
@@ -154,7 +154,7 @@ export const VIBE_TEMPLATES: readonly VibeTemplateEntry[] = freezeCatalog([
 		prompt:
 			"Rancang antarmuka desktop split-view untuk tool AI Coding Assistant (seperti Cursor / Claude Code web). Sebelah kiri (lebar 420px) adalah panel chat agen AI dengan riwayat balon chat, blok perintah terminal bash dengan tombol salin, status eksekusi task bertingkat (checklist animasi), dan textarea input prompt mengambang di bawah. Sebelah kanan adalah live canvas preview interaktif yang memiliki browser mock bar (tombol back, forward, URL address bar localhost:3000, reload), selector ukuran layar (Desktop, Tablet, Mobile), dan toggle inspeksi kode HTML/CSS. Gunakan tema dark obsidian modern dengan aksen indigo.",
 		tags: ["AI Agent", "Coding Canvas", "Split-View", "Terminal UI", "DevTool"],
-		recommendedTarget: "/design/studio",
+		recommendedTarget: "/design",
 	},
 	{
 		id: "editorial-landing-ui",
@@ -167,7 +167,7 @@ export const VIBE_TEMPLATES: readonly VibeTemplateEntry[] = freezeCatalog([
 		prompt:
 			"Buatkan halaman landing page produk perangkat lunak bernuansa editorial magazine premium. Gunakan tipografi serif yang berani dan kontras tinggi untuk judul hero display, dipadukan dengan sans-serif geometris untuk teks bodi. Bagian hero memiliki headline puitis yang besar, subtitle deskriptif, dan dua tombol CTA (Primary hitam elegan dan Secondary outline hairline). Di bawahnya tampilkan logo klien monokrom bergaya minimalis. Di bagian fitur, gunakan layout bento asimetris dengan kartu bersudut membulat halus, ikon minimalis, dan visual skematis. Di bagian footer sertakan navigasi tautan multi-kolom dan form pendaftaran newsletter sederhana.",
 		tags: ["Landing Page", "Editorial", "Typography", "Bento Grid", "Branding"],
-		recommendedTarget: "/design/studio",
+		recommendedTarget: "/design",
 	},
 	{
 		id: "simrs-hospital",

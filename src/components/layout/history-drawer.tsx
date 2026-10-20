@@ -288,7 +288,7 @@ export function HistoryDrawer({
 									</button>
 								))}
 								<Link
-									to="/design/studio"
+									to="/design"
 									onClick={onClose}
 									className="rounded-md px-2.5 py-1 font-mono text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo text-fog hover:bg-white/5 hover:text-snow"
 								>

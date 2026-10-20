@@ -69,14 +69,14 @@ describe("AppLayout workspace scroll ownership", () => {
 				),
 			);
 
-		location.pathname = "/design/studio/project-1";
+		location.pathname = "/design/project-1";
 		renderLayout();
 		expect(container.querySelector("nav")).toBeNull();
 		expect(document.body.style.overflow).toBe("hidden");
 
 		// The Studio landing page owns its own navigation too: the global
 		// Pricing/Top Up navbar must not appear there either.
-		location.pathname = "/design/studio";
+		location.pathname = "/design";
 		renderLayout();
 		expect(container.querySelector("nav")).toBeNull();
 		expect(document.body.style.overflow).toBe("hidden");

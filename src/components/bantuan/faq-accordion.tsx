@@ -20,7 +20,7 @@ const FAQS: readonly BantuanFaq[] = [
 		id: "vibescrape",
 		question: "Apa perbedaan VibeScrape dan VibeDesign Studio?",
 		answer:
-			"VibeScrape adalah workspace mandiri di /scrape untuk mengekstrak HTML, token desain, dan aset gambar dari website publik. Riwayat hasilnya ada di /scrape/history. VibeDesign Studio di /design/studio digunakan untuk membuat dan merevisi antarmuka dari prompt, dan dapat memakai hasil VibeScrape sebagai referensi desain.",
+			"VibeScrape adalah workspace mandiri di /scrape untuk mengekstrak HTML, token desain, dan aset gambar dari website publik. Riwayat hasilnya ada di /scrape/history. VibeDesign Studio di /design digunakan untuk membuat dan merevisi antarmuka dari prompt, dan dapat memakai hasil VibeScrape sebagai referensi desain.",
 	},
 	{
 		id: "prompt-ui-studio",

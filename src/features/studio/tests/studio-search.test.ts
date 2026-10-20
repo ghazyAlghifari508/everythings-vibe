@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { studioSearchSchema } from "@/routes/design/studio.index";
+import { studioSearchSchema } from "@/routes/design/index";
 
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,

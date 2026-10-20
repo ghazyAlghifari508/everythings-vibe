@@ -114,13 +114,13 @@ Fitur mandiri untuk ekstraksi dan dekonstruksi antarmuka web publik:
 
 ---
 
-### D. VibeDesign Studio (`/design/*` atau `/design/studio/*`)
+### D. VibeDesign Studio (`/design` & `/design/$id`)
 
 Sub-ekosistem pembuatan prototipe antarmuka interaktif:
-1. **Interactive Prototyping Canvas (`/design/studio`):**
+1. **Interactive Prototyping Canvas (`/design`):**
    - Pengguna memasukkan instruksi styling/komponen -> AI menghasilkan markup HTML/Tailwind siap pakai dengan live preview di multi-screen canvas (desktop/tablet/mobile).
    - Opsi konsumsi token desain: Pengguna dapat menyuntikkan token dari hasil VibeScrape sebagai referensi styling.
-2. **Revisi Visual & Design Skills (`/design/studio/$id`):**
+2. **Revisi Visual & Design Skills (`/design/$id`):**
    - Integrasi presets keahlian desain (*design skills* seperti Taste, Anti-Slop, Modern-Minimalist).
    - Mendukung riwayat revisi berbasis versi (`studio_projects`, `studio_revisions`).
 

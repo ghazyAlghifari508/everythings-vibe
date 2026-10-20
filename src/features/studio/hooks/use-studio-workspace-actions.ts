@@ -72,7 +72,7 @@ export function useStudioWorkspaceActions({
 				throw new Error("Gagal menduplikasi project. Coba lagi.");
 			}
 			await navigate({
-				to: "/design/studio/$id",
+				to: "/design/$id",
 				params: { id: result.projectId },
 			});
 		} catch (failure) {
@@ -103,7 +103,7 @@ export function useStudioWorkspaceActions({
 			}
 			showToast("Project dihapus.", "success");
 			await router.invalidate();
-			await navigate({ to: "/design/studio" });
+			await navigate({ to: "/design" });
 		} catch (failure) {
 			setError(
 				failure instanceof Error ? failure.message : "Gagal menghapus project.",

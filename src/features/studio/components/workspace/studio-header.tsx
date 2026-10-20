@@ -104,7 +104,7 @@ export function StudioHeader({
 						className="max-w-[calc(100vw-16px)]"
 					>
 						<DropdownMenuItem asChild className={item}>
-							<Link to="/design/studio">
+							<Link to="/design">
 								<Icon icon={ArrowLeft01Icon} size={16} />
 								Kembali ke Semua Project
 							</Link>

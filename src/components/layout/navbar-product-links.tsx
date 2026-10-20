@@ -7,7 +7,7 @@ import {
 
 const PRODUCTS = [
 	{ to: "/plan", label: "VibePlan" },
-	{ to: "/design/studio", label: "VibeDesign Studio" },
+	{ to: "/design", label: "VibeDesign Studio" },
 	{ to: "/scrape", label: "VibeScrape" },
 	{ to: "/templates", label: "VibeTemplate" },
 ] as const;

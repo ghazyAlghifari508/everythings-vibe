@@ -79,9 +79,9 @@ export function TemplateCatalog({
 			onUseTemplate(template);
 			return;
 		}
-		if (template.recommendedTarget === "/design/studio") {
+		if (template.recommendedTarget === "/design") {
 			navigate({
-				to: "/design/studio",
+				to: "/design",
 				search: { prompt: template.prompt },
 			});
 		} else {

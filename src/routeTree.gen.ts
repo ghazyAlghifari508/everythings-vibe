@@ -39,8 +39,8 @@ import { Route as CodebasesIndexRouteImport } from './routes/codebases/index'
 import { Route as CodebasesIdRouteImport } from './routes/codebases/$id'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
 import { Route as DesignIndexRouteImport } from './routes/design/index'
+import { Route as DesignIdRouteImport } from './routes/design/$id'
 import { Route as DesignScrapRouteImport } from './routes/design/scrap'
-import { Route as DesignStudioRouteImport } from './routes/design/studio'
 import { Route as FiturIdRouteImport } from './routes/fitur/$id'
 import { Route as KanbanIdRouteImport } from './routes/kanban/$id'
 import { Route as PlanIndexRouteImport } from './routes/plan/index'
@@ -87,8 +87,6 @@ import { Route as ApiUserPlanRouteImport } from './routes/api/user/plan'
 import { Route as DesignScrapIndexRouteImport } from './routes/design/scrap.index'
 import { Route as DesignScrapIdRouteImport } from './routes/design/scrap.$id'
 import { Route as DesignScrapHistoryRouteImport } from './routes/design/scrap.history'
-import { Route as DesignStudioIndexRouteImport } from './routes/design/studio.index'
-import { Route as DesignStudioIdRouteImport } from './routes/design/studio.$id'
 import { Route as PrdShareTokenRouteImport } from './routes/prd/share/$token'
 import { Route as ApiCodebasesCodebaseIdFeaturesRouteImport } from './routes/api/codebases/$codebaseId/features'
 import { Route as ApiCodebasesCodebaseIdSessionRouteImport } from './routes/api/codebases/$codebaseId/session'
@@ -270,14 +268,14 @@ const DesignIndexRoute = DesignIndexRouteImport.update({
   path: '/design/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DesignIdRoute = DesignIdRouteImport.update({
+  id: '/design/$id',
+  path: '/design/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DesignScrapRoute = DesignScrapRouteImport.update({
   id: '/design/scrap',
   path: '/design/scrap',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DesignStudioRoute = DesignStudioRouteImport.update({
-  id: '/design/studio',
-  path: '/design/studio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FiturIdRoute = FiturIdRouteImport.update({
@@ -510,16 +508,6 @@ const DesignScrapHistoryRoute = DesignScrapHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => DesignScrapRoute,
 } as any)
-const DesignStudioIndexRoute = DesignStudioIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => DesignStudioRoute,
-} as any)
-const DesignStudioIdRoute = DesignStudioIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => DesignStudioRoute,
-} as any)
 const PrdShareTokenRoute = PrdShareTokenRouteImport.update({
   id: '/prd/share/$token',
   path: '/prd/share/$token',
@@ -714,8 +702,8 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/design/$id': typeof DesignIdRoute
   '/design/scrap': typeof DesignScrapRouteWithChildren
-  '/design/studio': typeof DesignStudioRouteWithChildren
   '/fitur/$id': typeof FiturIdRoute
   '/kanban/$id': typeof KanbanIdRoute
   '/plan/codebase': typeof PlanCodebaseRoute
@@ -762,12 +750,10 @@ export interface FileRoutesByFullPath {
   '/api/user/plan': typeof ApiUserPlanRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
-  '/design/studio/$id': typeof DesignStudioIdRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
   '/api/codebases/': typeof ApiCodebasesIndexRoute
   '/api/projects/': typeof ApiProjectsIndexRoute
   '/design/scrap/': typeof DesignScrapIndexRoute
-  '/design/studio/': typeof DesignStudioIndexRoute
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
@@ -822,6 +808,7 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/design/$id': typeof DesignIdRoute
   '/fitur/$id': typeof FiturIdRoute
   '/kanban/$id': typeof KanbanIdRoute
   '/plan/codebase': typeof PlanCodebaseRoute
@@ -868,12 +855,10 @@ export interface FileRoutesByTo {
   '/api/user/plan': typeof ApiUserPlanRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
-  '/design/studio/$id': typeof DesignStudioIdRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
   '/api/codebases': typeof ApiCodebasesIndexRoute
   '/api/projects': typeof ApiProjectsIndexRoute
   '/design/scrap': typeof DesignScrapIndexRoute
-  '/design/studio': typeof DesignStudioIndexRoute
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
@@ -933,8 +918,8 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/design/$id': typeof DesignIdRoute
   '/design/scrap': typeof DesignScrapRouteWithChildren
-  '/design/studio': typeof DesignStudioRouteWithChildren
   '/fitur/$id': typeof FiturIdRoute
   '/kanban/$id': typeof KanbanIdRoute
   '/plan/codebase': typeof PlanCodebaseRoute
@@ -981,12 +966,10 @@ export interface FileRoutesById {
   '/api/user/plan': typeof ApiUserPlanRoute
   '/design/scrap/$id': typeof DesignScrapIdRoute
   '/design/scrap/history': typeof DesignScrapHistoryRoute
-  '/design/studio/$id': typeof DesignStudioIdRoute
   '/prd/share/$token': typeof PrdShareTokenRoute
   '/api/codebases/': typeof ApiCodebasesIndexRoute
   '/api/projects/': typeof ApiProjectsIndexRoute
   '/design/scrap/': typeof DesignScrapIndexRoute
-  '/design/studio/': typeof DesignStudioIndexRoute
   '/api/codebases/$codebaseId/features': typeof ApiCodebasesCodebaseIdFeaturesRoute
   '/api/codebases/$codebaseId/session': typeof ApiCodebasesCodebaseIdSessionRoute
   '/api/codebases/$codebaseId/status': typeof ApiCodebasesCodebaseIdStatusRoute
@@ -1047,8 +1030,8 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/codebases/$id'
     | '/demo/tanstack-query'
+    | '/design/$id'
     | '/design/scrap'
-    | '/design/studio'
     | '/fitur/$id'
     | '/kanban/$id'
     | '/plan/codebase'
@@ -1095,12 +1078,10 @@ export interface FileRouteTypes {
     | '/api/user/plan'
     | '/design/scrap/$id'
     | '/design/scrap/history'
-    | '/design/studio/$id'
     | '/prd/share/$token'
     | '/api/codebases/'
     | '/api/projects/'
     | '/design/scrap/'
-    | '/design/studio/'
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
@@ -1155,6 +1136,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/codebases/$id'
     | '/demo/tanstack-query'
+    | '/design/$id'
     | '/fitur/$id'
     | '/kanban/$id'
     | '/plan/codebase'
@@ -1201,12 +1183,10 @@ export interface FileRouteTypes {
     | '/api/user/plan'
     | '/design/scrap/$id'
     | '/design/scrap/history'
-    | '/design/studio/$id'
     | '/prd/share/$token'
     | '/api/codebases'
     | '/api/projects'
     | '/design/scrap'
-    | '/design/studio'
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
@@ -1265,8 +1245,8 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/codebases/$id'
     | '/demo/tanstack-query'
+    | '/design/$id'
     | '/design/scrap'
-    | '/design/studio'
     | '/fitur/$id'
     | '/kanban/$id'
     | '/plan/codebase'
@@ -1313,12 +1293,10 @@ export interface FileRouteTypes {
     | '/api/user/plan'
     | '/design/scrap/$id'
     | '/design/scrap/history'
-    | '/design/studio/$id'
     | '/prd/share/$token'
     | '/api/codebases/'
     | '/api/projects/'
     | '/design/scrap/'
-    | '/design/studio/'
     | '/api/codebases/$codebaseId/features'
     | '/api/codebases/$codebaseId/session'
     | '/api/codebases/$codebaseId/status'
@@ -1373,8 +1351,8 @@ export interface RootRouteChildren {
   AskIdRoute: typeof AskIdRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
+  DesignIdRoute: typeof DesignIdRoute
   DesignScrapRoute: typeof DesignScrapRouteWithChildren
-  DesignStudioRoute: typeof DesignStudioRouteWithChildren
   FiturIdRoute: typeof FiturIdRoute
   KanbanIdRoute: typeof KanbanIdRoute
   PlanCodebaseRoute: typeof PlanCodebaseRoute
@@ -1633,18 +1611,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/design/$id': {
+      id: '/design/$id'
+      path: '/design/$id'
+      fullPath: '/design/$id'
+      preLoaderRoute: typeof DesignIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/design/scrap': {
       id: '/design/scrap'
       path: '/design/scrap'
       fullPath: '/design/scrap'
       preLoaderRoute: typeof DesignScrapRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/design/studio': {
-      id: '/design/studio'
-      path: '/design/studio'
-      fullPath: '/design/studio'
-      preLoaderRoute: typeof DesignStudioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/fitur/$id': {
@@ -1969,20 +1947,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignScrapHistoryRouteImport
       parentRoute: typeof DesignScrapRoute
     }
-    '/design/studio/': {
-      id: '/design/studio/'
-      path: '/'
-      fullPath: '/design/studio/'
-      preLoaderRoute: typeof DesignStudioIndexRouteImport
-      parentRoute: typeof DesignStudioRoute
-    }
-    '/design/studio/$id': {
-      id: '/design/studio/$id'
-      path: '/$id'
-      fullPath: '/design/studio/$id'
-      preLoaderRoute: typeof DesignStudioIdRouteImport
-      parentRoute: typeof DesignStudioRoute
-    }
     '/prd/share/$token': {
       id: '/prd/share/$token'
       path: '/prd/share/$token'
@@ -2300,20 +2264,6 @@ const DesignScrapRouteWithChildren = DesignScrapRoute._addFileChildren(
   DesignScrapRouteChildren,
 )
 
-interface DesignStudioRouteChildren {
-  DesignStudioIdRoute: typeof DesignStudioIdRoute
-  DesignStudioIndexRoute: typeof DesignStudioIndexRoute
-}
-
-const DesignStudioRouteChildren: DesignStudioRouteChildren = {
-  DesignStudioIdRoute: DesignStudioIdRoute,
-  DesignStudioIndexRoute: DesignStudioIndexRoute,
-}
-
-const DesignStudioRouteWithChildren = DesignStudioRoute._addFileChildren(
-  DesignStudioRouteChildren,
-)
-
 interface ApiCodebasesCodebaseIdRouteChildren {
   ApiCodebasesCodebaseIdFeaturesRoute: typeof ApiCodebasesCodebaseIdFeaturesRoute
   ApiCodebasesCodebaseIdSessionRoute: typeof ApiCodebasesCodebaseIdSessionRoute
@@ -2403,8 +2353,8 @@ const rootRouteChildren: RootRouteChildren = {
   AskIdRoute: AskIdRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
+  DesignIdRoute: DesignIdRoute,
   DesignScrapRoute: DesignScrapRouteWithChildren,
-  DesignStudioRoute: DesignStudioRouteWithChildren,
   FiturIdRoute: FiturIdRoute,
   KanbanIdRoute: KanbanIdRoute,
   PlanCodebaseRoute: PlanCodebaseRoute,

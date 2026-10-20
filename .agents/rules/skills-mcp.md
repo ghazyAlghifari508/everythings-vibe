@@ -217,7 +217,7 @@ harness.
   CLI sync session authentication, chunked snapshot ingestion, AST/manifest analysis, context generation, and codebase-aware planning.
 - **Flow 08 VibeScrape Web Scraping (`/scrape`):** `context7-mcp` + `web-design-guidelines` + TDD ->
   URL crawl, HTML cleaning, stylesheet extraction, structured color/typography normalization, and token generation into `DESIGN.md`.
-- **Flow 09 VibeDesign Studio Prototyping (`/design/studio`):** `antislop-ui` + `antislop-layoutmobile` + `chrome-devtools-qa` ->
+- **Flow 09 VibeDesign Studio Prototyping (`/design` & `/design/$id`):** `antislop-ui` + `antislop-layoutmobile` + `chrome-devtools-qa` ->
   interactive HTML/Tailwind prototype generation, live browser iframe preview, versioned design revisions (`studio_revisions`), and style inspection.
 - **Flow 10 VibeTemplate Catalog:** `ui-design-system` + `antislop-copywriting` ->
   structured blueprint library, category filtering, search, and one-click injection into VibePlan or VibeDesign.

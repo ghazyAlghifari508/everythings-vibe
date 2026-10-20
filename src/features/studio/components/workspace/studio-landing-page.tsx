@@ -94,7 +94,7 @@ export function StudioLandingPage({
 	const handleOpenProject = (id: string) => {
 		setIsMobileDrawerOpen(false);
 		void navigate({
-			to: "/design/studio/$id",
+			to: "/design/$id",
 			params: { id },
 		});
 	};
@@ -237,7 +237,7 @@ export function StudioLandingPage({
 				return;
 			}
 			void navigate({
-				to: "/design/studio/$id",
+				to: "/design/$id",
 				params: { id: data.projectId },
 			});
 		} catch {

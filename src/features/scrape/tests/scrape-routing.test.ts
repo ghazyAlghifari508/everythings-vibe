@@ -288,8 +288,8 @@ describe("workspace entry", () => {
 
 describe("neighbor route isolation", () => {
 	it.each([
-		["/design/studio", "/design/studio/"],
-		["/design/studio/sample-id", "/design/studio/$id"],
+		["/design", "/design/"],
+		["/design/sample-id", "/design/$id"],
 		["/api/scrape", "/api/scrape"],
 		["/api/scrape/preview", "/api/scrape/preview"],
 		["/api/scrape/asset", "/api/scrape/asset"],
@@ -297,5 +297,17 @@ describe("neighbor route isolation", () => {
 		const router = await load(url);
 		expect(router.state.matches.at(-1)?.routeId).toBe(routeId);
 		expect(router.state.redirect).toBeUndefined();
+	});
+
+	it("eliminates /design/studio and /design/studio/$id routes from discovery", async () => {
+		const router = await load("/design/studio");
+		expect(router.state.matches.at(-1)?.routeId).toBe("/design/$id");
+		expect(
+			router.state.matches.some(
+				(m) =>
+					(m.routeId as string) === "/design/studio" ||
+					(m.routeId as string) === "/design/studio/",
+			),
+		).toBe(false);
 	});
 });

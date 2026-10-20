@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { StudioWorkspace } from "@/features/studio/components/workspace/studio-workspace";
 import { loadStudioDetail } from "@/features/studio/services/studio-detail-loader.functions";
 
-export const Route = createFileRoute("/design/studio/$id")({
+export const Route = createFileRoute("/design/$id")({
 	head: () => ({
 		meta: [{ title: "Studio Canvas | VibeDesign" }],
 	}),

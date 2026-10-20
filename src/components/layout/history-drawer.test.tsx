@@ -170,7 +170,7 @@ describe("HistoryDrawer rendering", () => {
 			filterPills()
 				.getByRole("link", { name: "VibeDesign Studio" })
 				.getAttribute("href"),
-		).toBe("/design/studio");
+		).toBe("/design");
 		expect(
 			filterPills()
 				.getByRole("link", { name: "VibeScrape" })

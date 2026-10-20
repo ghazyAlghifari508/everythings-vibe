@@ -195,7 +195,7 @@ Saat ini sebagian antarmuka terfokus pada viewport desktop (layar lebar). Ketika
 - [ ] **VibeScrape Workspace (`src/routes/scrape/*` / legacy `/design/scrap.*`):**
   - [ ] Form input URL scrape, status progress bar, parameter tuning, dan extraction error card tampil rapi di mobile tanpa horizontal overflow.
   - [ ] Tampilan hasil ekstraksi `DESIGN.md`, inspeksi color token swatch, dan asset gallery adaptif di mobile/tablet.
-- [ ] **VibeDesign Studio (`src/routes/design/studio.*`):**
+- [ ] **VibeDesign Studio (`src/routes/design/index.tsx` & `$id.tsx`):**
   - [ ] Layout editor desain responsif: panel tools, multi-screen canvas preview, dan inspect panel beradaptasi pada viewport tablet.
   - [ ] Di layar mobile, berikan tampilan preview yang optimal atau notifikasi visual bahwa mode canvas editing lebih disarankan di tablet/desktop.
 
@@ -853,10 +853,10 @@ src/features/
 - `/scrape/history`: Riwayat lengkap proses scraping yang pernah dijalankan oleh pengguna.
 - API Endpoints: `/api/scrape`, `/api/scrape/preview`, `/api/scrape/asset` (tetap bersih di bawah namespace `/api/scrape/*`).
 
-#### 2. Rute Resmi VibeDesign Studio (`/design/studio/*` atau `/design/*`):
+#### 2. Rute Resmi VibeDesign Studio (`/design` &amp; `/design/$id`):
 
-- `/design/studio`: Dashboard &amp; inisiasi kanvas prototipe visual interaktif.
-- `/design/studio/$id`: Workspace studio aktif dengan editor kanvas multi-screen.
+- `/design`: Dashboard &amp; inisiasi kanvas prototipe visual interaktif.
+- `/design/$id`: Workspace studio aktif dengan editor kanvas multi-screen.
 - API Endpoints: `/api/studio/project`, `/api/studio/generate`, `/api/studio/frame`, `/api/studio/asset`.
 
 #### 3. Backward Compatibility &amp; Seamless Redirects:

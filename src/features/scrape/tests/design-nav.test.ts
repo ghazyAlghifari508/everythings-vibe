@@ -23,8 +23,8 @@ describe("VibeDesign Scrap Route Predicates", () => {
 	});
 
 	it.each([
-		"/design/studio",
-		"/design/studio/abc",
+		"/design",
+		"/design/abc",
 		"/scraper",
 		"/scrape-extra",
 	])("excludes %s from every scrape nav predicate", (pathname) => {
@@ -42,7 +42,7 @@ describe("VibeDesign Scrap Route Predicates", () => {
 		// Negative checks: unrelated routes
 		expect(isVibeDesignScrapRoute("/")).toBe(false);
 		expect(isVibeDesignScrapRoute("/pricing")).toBe(false);
-		expect(isVibeDesignScrapRoute("/design/studio")).toBe(false);
+		expect(isVibeDesignScrapRoute("/design")).toBe(false);
 		expect(isVibeDesignScrapRoute("/history")).toBe(false);
 		expect(isVibeDesignScrapRoute("/plan/new")).toBe(false);
 	});

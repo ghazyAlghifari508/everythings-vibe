@@ -243,7 +243,7 @@ describe("Navbar Rebranding & Layout", () => {
 		expect(screen.queryByRole("link", { name: /History/i })).toBeNull();
 		for (const [name, destination] of [
 			["VibePlan", "/plan"],
-			["VibeDesign Studio", "/design/studio"],
+			["VibeDesign Studio", "/design"],
 			["VibeScrape", "/scrape"],
 			["VibeTemplate", "/templates"],
 		]) {
@@ -254,7 +254,7 @@ describe("Navbar Rebranding & Layout", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Toggle menu" }));
 		for (const [name, destination] of [
 			["VibePlan", "/plan"],
-			["VibeDesign Studio", "/design/studio"],
+			["VibeDesign Studio", "/design"],
 			["VibeScrape", "/scrape"],
 			["VibeTemplate", "/templates"],
 		]) {
@@ -598,8 +598,8 @@ describe("Navbar VibeScrape Workspace Navlinks", () => {
 
 	it.each([
 		"/",
-		"/design/studio",
-		"/design/studio/studio-1",
+		"/design",
+		"/design/project-1",
 		"/scrape-extra",
 		"/design/scrap-extra",
 	])("does not scope the nav to the scrape workspace on %s and renders FAQ/Settings in mobile menu", (pathname) => {

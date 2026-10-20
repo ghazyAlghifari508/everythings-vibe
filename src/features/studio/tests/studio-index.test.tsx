@@ -42,7 +42,7 @@ vi.mock("@/lib/auth-client", () => ({
 	authClient: { useSession: () => ({ data: null }) },
 }));
 
-import { Route } from "@/routes/design/studio.index";
+import { Route } from "@/routes/design/index";
 
 describe("StudioPage UI & Workflow", () => {
 	const defaultHistory = [
@@ -193,7 +193,7 @@ describe("StudioPage UI & Workflow", () => {
 		});
 
 		expect(mockNavigate).toHaveBeenCalledWith({
-			to: "/design/studio/$id",
+			to: "/design/$id",
 			params: { id: "new-proj-789" },
 		});
 	});
@@ -327,14 +327,14 @@ describe("StudioPage UI & Workflow", () => {
 		).toBeDefined();
 	});
 
-	it("falls back to the design hub for the back control on direct visits", () => {
+	it("falls back to home for the back control on direct visits", () => {
 		const StudioComponent = (
 			Route as unknown as { component: React.ComponentType }
 		).component;
 		render(<StudioComponent />);
 
 		const back = screen.getByRole("link", { name: /kembali/i });
-		expect(back.getAttribute("href")).toBe("/design");
+		expect(back.getAttribute("href")).toBe("/");
 	});
 
 	it("renders all shortcuts in one horizontal carousel with arrow controls", () => {

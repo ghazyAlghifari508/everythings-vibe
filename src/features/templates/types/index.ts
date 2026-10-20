@@ -27,6 +27,6 @@ export interface VibeTemplateEntry {
 	readonly description: string;
 	readonly prompt: string;
 	readonly tags: readonly string[];
-	readonly recommendedTarget: "/plan/new" | "/design/studio";
+	readonly recommendedTarget: "/plan/new" | "/design";
 	readonly techStack?: readonly string[];
 }

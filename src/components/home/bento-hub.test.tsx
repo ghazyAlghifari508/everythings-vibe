@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Route as DesignRoute } from "@/routes/design/index";
 import { BentoHub } from "./bento-hub";
 
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
@@ -13,18 +12,12 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 
 afterEach(cleanup);
 
-const DESTINATIONS = [
-	"/plan",
-	"/design/studio",
-	"/scrape",
-	"/templates",
-	"/bantuan",
-];
+const DESTINATIONS = ["/plan", "/design", "/scrape", "/templates", "/bantuan"];
 
 describe("home product destinations", () => {
 	it.each([
 		["VibePlan", "/plan"],
-		["VibeDesign Studio", "/design/studio"],
+		["VibeDesign Studio", "/design"],
 		["VibeScrape", "/scrape"],
 		["VibeTemplate", "/templates"],
 		["VibeBantuan", "/bantuan"],
@@ -95,16 +88,14 @@ describe("BentoHub copy vs destination reality", () => {
 });
 
 describe("design landing destinations", () => {
-	it("keeps Studio and the independent VibeScrape destination separate", () => {
-		const DesignPage = DesignRoute.options.component;
-		if (!DesignPage) throw new Error("Design route must render its landing");
-		render(<DesignPage />);
+	it("points VibeDesign directly to /design and VibeScrape directly to /scrape", () => {
+		render(<BentoHub />);
 
 		expect(
 			screen
 				.getByRole("link", { name: /VibeDesign Studio/ })
 				.getAttribute("href"),
-		).toBe("/design/studio");
+		).toBe("/design");
 		expect(
 			screen.getByRole("link", { name: /VibeScrape/ }).getAttribute("href"),
 		).toBe("/scrape");

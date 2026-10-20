@@ -87,7 +87,7 @@ describe("resolveScrapeReturnPath", () => {
 			"/pricing",
 			"/fitur/abc",
 			"/design",
-			"/design/studio/abc",
+			"/design/abc",
 			"/",
 		])
 			expect(resolveScrapeReturnPath(from)).toBe(SCRAPE_RETURN_FALLBACK);

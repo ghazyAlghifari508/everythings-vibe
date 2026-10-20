@@ -11,7 +11,7 @@ import { Icon, type IconProps } from "@/components/ui/icon";
 
 type HubDestination =
 	| "/plan"
-	| "/design/studio"
+	| "/design"
 	| "/scrape"
 	| "/templates"
 	| "/bantuan";
@@ -34,7 +34,7 @@ const CARDS: readonly HubCard[] = [
 		tags: ["Projek Baru", "Codebase Existing"],
 	},
 	{
-		to: "/design/studio",
+		to: "/design",
 		title: "VibeDesign Studio",
 		icon: SparklesIcon,
 		description:
