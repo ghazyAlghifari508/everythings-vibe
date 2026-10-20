@@ -163,9 +163,9 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 				<div className="rounded-xl border border-graphite bg-charcoal focus-within:ring-2 focus-within:ring-indigo">
 					<ScrapeFormNotice tone="plain" />
 					<div aria-hidden className="mx-4 mt-4 border-t border-graphite" />
-					<div className="flex items-stretch gap-3 p-3 sm:p-4">
-						<div className="flex h-14 min-w-0 flex-1 items-center overflow-hidden rounded-lg bg-transparent">
-							<span className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-sm text-fog">
+					<div className="flex items-stretch gap-2.5 p-3 sm:gap-3 sm:p-3.5">
+						<div className="flex h-11 min-w-0 flex-1 items-center overflow-hidden rounded-lg bg-transparent sm:h-12">
+							<span className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-xs text-fog sm:text-sm">
 								{protocol}
 							</span>
 							<label htmlFor="scrape-url" className="sr-only">
@@ -183,7 +183,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 								maxLength={SCRAPE_LIMITS.urlChars}
 								aria-invalid={!!error}
 								aria-describedby={error ? "scrape-form-error" : undefined}
-								className="h-full min-w-0 flex-1 bg-transparent px-3 text-base text-snow outline-none placeholder:text-fog [--autofill-bg:var(--color-charcoal)]"
+								className="h-full min-w-0 flex-1 bg-transparent px-3 text-base text-snow outline-none placeholder:text-fog sm:text-sm [--autofill-bg:var(--color-charcoal)]"
 							/>
 						</div>
 						<button
@@ -191,17 +191,17 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 							disabled={pending || !input.trim()}
 							aria-label={`Jalankan ${mode === "design" ? "Generate DESIGN.md" : mode === "crawl" ? "Crawl Website" : mode === "images" ? "Scrape Images" : "Scrape HTML"}`}
 							title="Mulai ekstraksi"
-							className="btn-primary inline-flex size-14 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
+							className="btn-primary inline-flex size-11 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40 sm:size-12"
 						>
 							{pending ? (
 								<Icon
 									icon={Loading01Icon}
-									size={20}
+									size={18}
 									aria-hidden
 									className="motion-safe:animate-spin"
 								/>
 							) : (
-								<Icon icon={ArrowUp01Icon} size={20} aria-hidden />
+								<Icon icon={ArrowUp01Icon} size={18} aria-hidden />
 							)}
 						</button>
 					</div>
