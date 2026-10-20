@@ -71,10 +71,6 @@ export function BentoHub() {
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6">
 			<div className="mx-auto mb-10 max-w-2xl text-center sm:mb-12">
-				<span className="mb-4 inline-flex items-center gap-2 rounded-full border border-graphite bg-charcoal px-3 py-1 font-mono text-xs text-fog">
-					<span aria-hidden className="h-1.5 w-1.5 rounded-full bg-indigo" />
-					VibeEverything Developer Console
-				</span>
 				<h1 className="text-4xl font-bold tracking-tight text-snow sm:text-5xl lg:text-6xl">
 					Mau ngapain hari ini?
 				</h1>
