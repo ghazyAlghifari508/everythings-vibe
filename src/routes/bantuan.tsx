@@ -1,15 +1,13 @@
 import {
 	ArrowRight01Icon,
+	CreditCardIcon,
 	InformationCircleIcon,
 	MessageSquareIcon,
-	Shield01Icon,
 } from "@hugeicons/core-free-icons";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkflowGuides } from "@/components/bantuan/workflow-guides";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { Icon } from "@/components/ui/icon";
-import { authClient } from "@/lib/auth-client";
-import { isAdmin } from "@/lib/session";
 
 export const Route = createFileRoute("/bantuan")({
 	head: () => ({
@@ -25,13 +23,33 @@ export const Route = createFileRoute("/bantuan")({
 	component: BantuanPage,
 });
 
-export function BantuanPage() {
-	// Display-only gate mirroring navbar.tsx; /admin's beforeLoad is the real authorization.
-	const { data: session } = authClient.useSession();
-	const canTriage = Boolean(session?.user && isAdmin(session.user));
+const SUPPORT_LINKS = [
+	{
+		to: "/settings/feedback",
+		title: "Laporkan Masalah atau Kirim Masukan",
+		description:
+			"Kirim laporan bug, kendala teknis, atau saran pengembangan fitur.",
+		icon: MessageSquareIcon,
+	},
+	{
+		to: "/settings/billing",
+		title: "Tagihan & Pembayaran",
+		description:
+			"Kelola status paket langganan aktif, saldo kredit, dan riwayat pembayaran.",
+		icon: CreditCardIcon,
+	},
+	{
+		to: "/faq",
+		title: "Pertanyaan Umum (FAQ)",
+		description:
+			"Jawaban seputar konsep modul, masa aktif kredit, dan aturan platform di halaman mandiri.",
+		icon: InformationCircleIcon,
+	},
+] as const;
 
+export function BantuanPage() {
 	return (
-		<main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
+		<main className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
 			<HubBreadcrumb current="Bantuan" />
 
 			<header>
@@ -39,113 +57,65 @@ export function BantuanPage() {
 					Pusat Bantuan
 				</h1>
 				<p className="mt-3 max-w-2xl text-sm leading-6 text-fog">
-					Pelajari cara memakai setiap modul, ikuti alur langkah demi langkah,
-					dan kirim kendala atau masukan langsung ke tim pengembang.
+					Panduan penggunaan modul dan bantuan saat Anda mengalami kendala
+					teknis.
 				</p>
 			</header>
 
-			<section className="flex flex-col gap-4">
-				<h2 className="font-mono text-xs uppercase tracking-widest text-fog">
-					Panduan Alur Kerja
+			<section
+				aria-labelledby="panduan-heading"
+				className="flex flex-col gap-4"
+			>
+				<h2
+					id="panduan-heading"
+					className="font-mono text-xs uppercase tracking-widest text-fog"
+				>
+					Panduan Penggunaan
 				</h2>
 				<WorkflowGuides />
 			</section>
 
-			<section className="flex flex-col gap-3">
-				<h2 className="font-mono text-xs uppercase tracking-widest text-fog">
-					Dukungan & Kanal Bantuan
+			<section
+				aria-labelledby="dukungan-heading"
+				className="flex flex-col gap-4"
+			>
+				<h2
+					id="dukungan-heading"
+					className="font-mono text-xs uppercase tracking-widest text-fog"
+				>
+					Dukungan & Bantuan
 				</h2>
 
-				<Link
-					to="/faq"
-					className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					<span className="flex items-start gap-4">
-						<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
-							<Icon icon={InformationCircleIcon} size={20} aria-hidden />
-						</span>
-						<span>
-							<span className="block text-base font-semibold text-snow">
-								Pertanyaan Umum (FAQ)
-							</span>
-							<span className="mt-1 block text-sm text-fog">
-								Temukan jawaban ringkas seputar konsep modul, sistem kredit, dan
-								akun di halaman FAQ mandiri.
-							</span>
-						</span>
-					</span>
-					<Icon
-						icon={ArrowRight01Icon}
-						size={18}
-						aria-hidden
-						className="shrink-0 text-fog transition-all group-hover:translate-x-1 group-hover:text-snow"
-					/>
-				</Link>
-
-				<Link
-					to="/settings/feedback"
-					className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					<span className="flex items-start gap-4">
-						<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
-							<Icon icon={MessageSquareIcon} size={20} aria-hidden />
-						</span>
-						<span>
-							<span className="block text-base font-semibold text-snow">
-								Feedback & Bug Report
-							</span>
-							<span className="mt-1 block text-sm text-fog">
-								Laporkan kendala teknis, kirim kritik, atau minta fitur baru.
-								Memerlukan login.
-							</span>
-						</span>
-					</span>
-					<Icon
-						icon={ArrowRight01Icon}
-						size={18}
-						aria-hidden
-						className="shrink-0 text-fog transition-all group-hover:translate-x-1 group-hover:text-snow"
-					/>
-				</Link>
-
-				{canTriage && (
-					<Link
-						to="/admin/feedback"
-						className="group flex items-center justify-between gap-4 rounded-xl border border-graphite bg-charcoal p-5 transition-colors hover:border-steel hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						<span className="flex items-start gap-4">
-							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
-								<Icon icon={Shield01Icon} size={20} aria-hidden />
-							</span>
-							<span>
-								<span className="block text-base font-semibold text-snow">
-									Triase Admin
+				<div className="overflow-hidden rounded-xl border border-graphite bg-charcoal divide-y divide-graphite/60">
+					{SUPPORT_LINKS.map((item) => (
+						<Link
+							key={item.to}
+							to={item.to}
+							className="group flex items-center justify-between gap-4 p-4.5 sm:p-5 transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							<div className="flex items-center gap-3.5">
+								<span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-fog">
+									<Icon icon={item.icon} size={18} aria-hidden />
 								</span>
-								<span className="mt-1 block text-sm text-fog">
-									Antrean feedback dan laporan error. Khusus staf admin.
-								</span>
-							</span>
-						</span>
-						<Icon
-							icon={ArrowRight01Icon}
-							size={18}
-							aria-hidden
-							className="shrink-0 text-fog transition-all group-hover:translate-x-1 group-hover:text-snow"
-						/>
-					</Link>
-				)}
+								<div>
+									<span className="block text-sm font-semibold text-snow transition-colors group-hover:text-mist">
+										{item.title}
+									</span>
+									<span className="mt-0.5 block text-xs leading-5 text-fog">
+										{item.description}
+									</span>
+								</div>
+							</div>
+							<Icon
+								icon={ArrowRight01Icon}
+								size={16}
+								aria-hidden
+								className="shrink-0 text-fog transition-transform group-hover:translate-x-1 group-hover:text-snow"
+							/>
+						</Link>
+					))}
+				</div>
 			</section>
-
-			<p className="text-sm text-fog">
-				Butuh bantuan soal pembayaran atau tagihan?{" "}
-				<Link
-					to="/settings/billing"
-					className="text-snow underline underline-offset-4 transition-colors hover:text-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					Buka pengaturan billing
-				</Link>
-				.
-			</p>
 		</main>
 	);
 }

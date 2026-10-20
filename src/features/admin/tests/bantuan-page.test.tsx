@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BantuanPage } from "@/routes/bantuan";
-
-let sessionUser: { id: string; email: string; isAdmin: boolean } | null = null;
 
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
@@ -22,85 +20,105 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
-vi.mock("@/lib/auth-client", () => ({
-	authClient: {
-		useSession: () => ({ data: sessionUser ? { user: sessionUser } : null }),
-	},
-}));
-
-// isAdmin is the real implementation from @/lib/session; only the session it
-// reads is controlled. Destinations are matched by href, not by visible copy.
 function linkHrefs(): Array<string | null> {
 	return screen.getAllByRole("link").map((link) => link.getAttribute("href"));
 }
 
 afterEach(() => {
 	cleanup();
-	sessionUser = null;
 });
 
-describe("BantuanPage admin triage gate", () => {
-	it("hides the staff triage route from a signed-in non-admin", () => {
-		sessionUser = { id: "u1", email: "user@example.invalid", isAdmin: false };
+describe("BantuanPage public access & admin triage removal", () => {
+	it("never renders admin triage or staff-only links for any visitor", () => {
 		render(<BantuanPage />);
 
 		expect(linkHrefs()).not.toContain("/admin/feedback");
+		expect(screen.queryByText(/Triase Admin/i)).toBeNull();
+		expect(screen.queryByText(/Khusus staf admin/i)).toBeNull();
 	});
 
-	it("hides the staff triage route from a signed-out visitor", () => {
-		render(<BantuanPage />);
-
-		expect(linkHrefs()).not.toContain("/admin/feedback");
-	});
-
-	it("shows the staff triage route to an admin", () => {
-		sessionUser = { id: "u2", email: "admin@example.invalid", isAdmin: true };
-		render(<BantuanPage />);
-
-		expect(linkHrefs()).toContain("/admin/feedback");
-	});
-
-	it("keeps the feedback and home routes reachable for every visitor", () => {
+	it("keeps feedback, billing, faq, and home links accessible", () => {
 		render(<BantuanPage />);
 
 		const hrefs = linkHrefs();
 		expect(hrefs).toContain("/settings/feedback");
+		expect(hrefs).toContain("/settings/billing");
+		expect(hrefs).toContain("/faq");
 		expect(hrefs).toContain("/");
+	});
+
+	it("does not render the awkward isolated billing paragraph", () => {
+		render(<BantuanPage />);
+
+		expect(
+			screen.queryByText(/Butuh bantuan soal pembayaran atau tagihan/i),
+		).toBeNull();
+		expect(screen.queryByText(/Buka pengaturan billing/i)).toBeNull();
 	});
 });
 
-describe("BantuanPage Hub", () => {
-	it("renders workflow guides, support channels, and a link to standalone FAQ", () => {
-		sessionUser = { id: "u1", email: "user@example.invalid", isAdmin: false };
+describe("BantuanPage Information Architecture & Guides", () => {
+	it("renders main headings and structured support section", () => {
 		render(<BantuanPage />);
-		expect(screen.getByText("Pusat Bantuan")).toBeDefined();
-		expect(screen.getByText(/Panduan Alur Kerja/i)).toBeDefined();
-		expect(screen.getByText(/Feedback & Bug Report/i)).toBeDefined();
-		expect(linkHrefs()).toContain("/faq");
-		expect(linkHrefs()).toContain("/settings/billing");
+
+		expect(
+			screen.getByRole("heading", { level: 1, name: "Pusat Bantuan" }),
+		).toBeDefined();
+		expect(screen.getByText("Panduan Penggunaan")).toBeDefined();
+		expect(screen.getByText("Dukungan & Bantuan")).toBeDefined();
+		expect(
+			screen.getByText("Laporkan Masalah atau Kirim Masukan"),
+		).toBeDefined();
+		expect(screen.getByText("Tagihan & Pembayaran")).toBeDefined();
+		expect(screen.getByText("Pertanyaan Umum (FAQ)")).toBeDefined();
 	});
 
-	it("does not embed FAQ accordion content or accordion toggle buttons", () => {
-		sessionUser = { id: "u1", email: "user@example.invalid", isAdmin: false };
+	it("renders all four core product help topics", () => {
 		render(<BantuanPage />);
-		expect(
-			screen.queryByRole("button", {
-				name: /VibeScrape.*VibeDesign Studio/,
-			}),
-		).toBeNull();
-		expect(
-			screen.queryByRole("button", {
-				name: /Apa perbedaan VibePlan Greenfield/,
-			}),
-		).toBeNull();
-	});
 
-	it("renders workflow guides for VibePlan, VibeDesign, VibeScrape, and CLI", () => {
-		sessionUser = { id: "u1", email: "user@example.invalid", isAdmin: false };
-		render(<BantuanPage />);
 		expect(screen.getByText("Alur Kerja VibePlan")).toBeDefined();
 		expect(screen.getByText("Alur Kerja VibeDesign")).toBeDefined();
 		expect(screen.getByText("Alur Kerja VibeScrape")).toBeDefined();
 		expect(screen.getByText("Alur Kerja VibeEverything CLI")).toBeDefined();
+	});
+
+	it("defaults to VibePlan guide and allows selecting another guide", () => {
+		render(<BantuanPage />);
+
+		// Default active guide is VibePlan
+		expect(
+			screen.getByRole("heading", {
+				level: 3,
+				name: /Panduan Langkah: Alur Kerja VibePlan/i,
+			}),
+		).toBeDefined();
+		expect(screen.getByText(/Inisiasi ide produk/i)).toBeDefined();
+
+		// Click to select VibeDesign
+		const buttons = screen.getAllByRole("button");
+		const vibeDesignBtn = buttons.find((btn) =>
+			btn.closest("article")?.textContent?.includes("VibeDesign"),
+		);
+		expect(vibeDesignBtn).toBeDefined();
+
+		if (vibeDesignBtn) {
+			fireEvent.click(vibeDesignBtn);
+		}
+
+		expect(
+			screen.getByRole("heading", {
+				level: 3,
+				name: /Panduan Langkah: Alur Kerja VibeDesign/i,
+			}),
+		).toBeDefined();
+		expect(screen.getByText(/Inspeksi kanvas multi-screen/i)).toBeDefined();
+	});
+
+	it("does not duplicate FAQ question accordion or embed full FAQ entries", () => {
+		render(<BantuanPage />);
+
+		// FAQ should only be linked, not embedded as FAQ accordion items
+		expect(screen.queryByText(/Apakah credit memiliki masa aktif/i)).toBeNull();
+		expect(screen.queryByText(/Bagaimana cara kerja patch PRD/i)).toBeNull();
 	});
 });

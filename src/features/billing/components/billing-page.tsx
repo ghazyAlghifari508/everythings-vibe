@@ -7,7 +7,6 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { cancelSubscription } from "@/features/billing/services/payment.functions";
-import { TOPUP_SKU } from "@/features/billing/types/billing-constants";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { useUIStore } from "@/store";
 import {
@@ -170,12 +169,9 @@ export function BillingPage({
 								<p className="mt-1 text-xs text-(--text-secondary)">
 									<Link
 										to="/pricing"
-										hash="topup"
 										className="font-medium underline underline-offset-2"
 									>
-										Atau top up {TOPUP_SKU.credits} kredit (Rp{" "}
-										{(TOPUP_SKU.priceIdr as number).toLocaleString("id-ID")})
-										tanpa menambah masa aktif
+										Perpanjang atau ubah paket langganan di halaman pricing
 									</Link>
 								</p>
 							)}

@@ -7,7 +7,6 @@ import { useUIStore } from "@/store";
 import { prdFyPlans } from "../data/pricing-data";
 import { syncPaymentStatus } from "../services/payment.functions";
 import { PricingComponent } from "./pricing-card";
-import { TopUpCard } from "./top-up-card";
 
 export default function PricingWrapper() {
 	const navigate = useNavigate();
@@ -83,14 +82,12 @@ export default function PricingWrapper() {
 	};
 
 	return (
-		<>
+		<div className="mx-auto max-w-7xl">
 			<PricingComponent
 				plans={prdFyPlans}
 				onPlanSelect={handlePlanSelect}
 				currentPlan={currentPlan}
-				creditsExhausted={planData?.creditsExhausted === true}
 			/>
-			{planData?.topUpEligible && <TopUpCard className="mt-6" />}
-		</>
+		</div>
 	);
 }
