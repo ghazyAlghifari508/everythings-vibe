@@ -12,7 +12,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 
 afterEach(cleanup);
 
-const DESTINATIONS = ["/plan", "/design", "/scrape", "/templates", "/bantuan"];
+const DESTINATIONS = ["/plan", "/design", "/scrape", "/templates"];
 
 describe("home product destinations", () => {
 	it.each([
@@ -20,7 +20,6 @@ describe("home product destinations", () => {
 		["VibeDesign Studio", "/design"],
 		["VibeScrape", "/scrape"],
 		["VibeTemplate", "/templates"],
-		["VibeBantuan", "/bantuan"],
 	])("opens %s directly at %s", (product, destination) => {
 		render(<BentoHub />);
 		expect(
@@ -28,6 +27,13 @@ describe("home product destinations", () => {
 				.getByRole("link", { name: new RegExp(product) })
 				.getAttribute("href"),
 		).toBe(destination);
+	});
+
+	it("does not render VibeBantuan card", () => {
+		render(<BentoHub />);
+		expect(screen.queryByText(/VibeBantuan/i)).toBeNull();
+		expect(screen.queryByRole("link", { name: /VibeBantuan/i })).toBeNull();
+		expect(screen.queryByRole("link", { name: /\/bantuan/i })).toBeNull();
 	});
 });
 
@@ -53,7 +59,7 @@ describe("BentoHub", () => {
 	});
 
 	// Sorting before comparing would let a reordered CARDS array pass, so assert DOM sequence.
-	it("orders the cards as plan, Studio, Scrape, Template, Bantuan", () => {
+	it("orders the cards as plan, Studio, Scrape, Template", () => {
 		render(<BentoHub />);
 
 		expect(

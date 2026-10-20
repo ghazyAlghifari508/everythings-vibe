@@ -1,6 +1,5 @@
 import {
 	ArrowRight01Icon,
-	CircleQuestionMarkIcon,
 	GlobeIcon,
 	GridViewIcon,
 	PencilIcon,
@@ -9,12 +8,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { Icon, type IconProps } from "@/components/ui/icon";
 
-type HubDestination =
-	| "/plan"
-	| "/design"
-	| "/scrape"
-	| "/templates"
-	| "/bantuan";
+type HubDestination = "/plan" | "/design" | "/scrape" | "/templates";
 
 interface HubCard {
 	readonly to: HubDestination;
@@ -57,14 +51,6 @@ const CARDS: readonly HubCard[] = [
 			"Katalog kerangka kerja teruji: preset spesifikasi planning, kit desain antarmuka, dan boilerplate proyek lengkap.",
 		tags: ["Template Planning", "Template Design", "Boilerplate Projek"],
 	},
-	{
-		to: "/bantuan",
-		title: "VibeBantuan",
-		icon: CircleQuestionMarkIcon,
-		description:
-			"Pusat bantuan pengguna, pelaporan bug kendala teknis, dan feedback langsung ke antarmuka admin menggunakan formulir bawaan VibeEverything.",
-		tags: ["Feedback & Bug Report", "Triage Admin"],
-	},
 ];
 
 export function BentoHub() {
@@ -76,8 +62,7 @@ export function BentoHub() {
 				</h1>
 				<p className="mt-3 text-sm leading-6 text-fog md:text-base">
 					Pilih workspace untuk mulai menyusun requirements produk, merancang
-					antarmuka UI, mengekstrak website, memilih template proyek, atau
-					meminta bantuan teknis.
+					antarmuka UI, mengekstrak website, atau memilih template proyek.
 				</p>
 			</div>
 
