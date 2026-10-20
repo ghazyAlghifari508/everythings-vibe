@@ -8,7 +8,7 @@ export const Route = createFileRoute("/faq")({
 			{
 				name: "description",
 				content:
-					"Pertanyaan yang sering diajukan seputar akun, credit, dan alur kerja VibeEverything.",
+					"Pertanyaan yang sering diajukan seputar penyimpanan project, revisi AI, sistem credit, dan keamanan di VibeEverything.",
 			},
 		],
 	}),

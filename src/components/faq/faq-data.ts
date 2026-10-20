@@ -15,75 +15,67 @@ export interface FaqItem {
 
 export const FAQ_ITEMS: FaqItem[] = [
 	{
-		id: "product-output",
-		title: "Apa yang bisa dibuat dengan VibeEverything?",
-		subtitle: "Ubah ide produk menjadi dokumen kerja",
+		id: "project-persistence",
+		title: "Apakah project yang saya buat tersimpan otomatis?",
+		subtitle: "Status penyimpanan dokumen dan kelanjutan sesi",
 		content:
-			"VibeEverything membantu menyusun PRD, acceptance criteria, task tree, dan Kanban dari satu ide produk. Hasilnya bisa kamu baca, revisi, dan lanjutkan sebagai dasar kerja tim.",
-		icon: "spark",
+			"Ya, semua tahapan project mulai dari PRD, kriteria penerimaan, hingga task tersimpan otomatis ke akun Anda. Anda bisa melanjutkan atau membuka kembali project kapan saja melalui halaman Riwayat atau Dashboard.",
+		icon: "document",
 	},
 	{
-		id: "greenfield-vs-codebase",
-		title: "Apa perbedaan VibePlan Greenfield dan Codebase Existing?",
-		subtitle: "Mulai dari ide mentah vs sinkronisasi repositori lokal",
+		id: "interrupted-generation",
+		title: "Apa yang terjadi jika halaman tertutup saat AI sedang generate?",
+		subtitle: "Penanganan sesi saat koneksi atau browser terputus",
 		content:
-			"Greenfield memulai dari ide mentah: kamu menulis prompt, menjawab pertanyaan klarifikasi, lalu menerima PRD 8 seksi. Codebase Existing menghubungkan repository lokal lewat CLI sync, sehingga pertanyaan klarifikasi dan PRD disusun dari konteks kode yang sudah ada, bukan dari nol.",
-		icon: "workflow",
-	},
-	{
-		id: "vibescrape-vs-studio",
-		title: "Apa perbedaan VibeScrape dan VibeDesign Studio?",
-		subtitle: "Ekstraksi website publik vs prototyping antarmuka",
-		content:
-			"VibeScrape adalah workspace mandiri di /scrape untuk mengekstrak HTML, token desain, dan aset gambar dari website publik. Riwayat hasilnya ada di /scrape/history. VibeDesign Studio di /design digunakan untuk membuat dan merevisi antarmuka dari prompt, dan dapat memakai hasil VibeScrape sebagai referensi desain.",
-		icon: "spark",
-	},
-	{
-		id: "cli-connect",
-		title: "Bagaimana cara menghubungkan repository lokal lewat CLI?",
-		subtitle: "Autentikasi dan sinkronisasi snapshot repositori",
-		content:
-			"Jalankan vibeeverything login di terminal untuk autentikasi, lalu vibeeverything codebase sync dari root repository. CLI mengirim snapshot repository yang difilter ke server, dan analisis sinkronisasi berjalan otomatis hingga statusnya selesai.",
-		icon: "terminal",
-	},
-	{
-		id: "guided-flow",
-		title: "Bagaimana alur kerja VibeEverything?",
-		subtitle: "Jawab pertanyaan yang menentukan arah produk",
-		content:
-			"Mulai dari ide produk, jawab pertanyaan klarifikasi, lalu VibeEverything menyusun PRD dengan delapan bagian. Setelah itu kamu bisa melanjutkan ke acceptance criteria, task tree, dan Kanban.",
+			"Proses generate yang terputus otomatis dibatalkan dan kuota credit Anda tidak akan terpotong. Project tetap tersimpan di tahap terakhir, dan Anda bisa menekan tombol generate ulang saat membuka kembali halaman tersebut.",
 		icon: "workflow",
 	},
 	{
 		id: "prd-revision",
-		title: "Apakah PRD bisa direvisi?",
-		subtitle: "Perbaiki bagian tertentu tanpa menulis ulang semuanya",
+		title: "Bisakah hasil PRD dari AI direvisi jika belum sesuai?",
+		subtitle: "Perbaikan seksi spesifik tanpa mulai dari awal",
 		content:
-			"Bisa. Kamu dapat meminta revisi pada PRD melalui chat. Revisi hanya memperbarui bagian yang diminta dan tidak memakai credit tambahan.",
-		icon: "document",
+			"Bisa. Anda dapat meminta revisi bagian tertentu melalui chat panel tanpa harus mengulang proses dari awal. Setiap revisi PRD tidak memotong credit dan langsung memperbarui versi dokumen Anda.",
+		icon: "spark",
 	},
 	{
-		id: "task-kanban",
-		title: "Apa hubungan PRD, Task, dan Kanban?",
-		subtitle: "Dari keputusan produk sampai pekerjaan yang bisa dilacak",
+		id: "failed-generation-credit",
+		title: "Apakah credit tetap terpotong jika generate gagal?",
+		subtitle: "Jaminan kuota saat sistem atau koneksi error",
 		content:
-			"PRD menjelaskan produk, acceptance criteria merinci kondisi penerimaan, dan task tree memecah pekerjaan. Task tersebut kemudian dapat dilacak melalui board Kanban.",
-		icon: "board",
-	},
-	{
-		id: "credits",
-		title: "Kapan credit digunakan?",
-		subtitle: "Satu credit untuk satu proses generate",
-		content:
-			"Satu credit digunakan untuk satu generate PRD, acceptance criteria, atau task. Revisi dokumen tetap gratis dan tidak mengurangi credit. Paket Free mendapat 2 credit, Pro 30 credit, dan Hengker 105 credit.",
+			"Tidak. Credit hanya dipotong secara permanen jika dokumen atau task berhasil dibuat dan tersimpan. Jika sistem mengalami kendala atau waktu tunggu habis, reservasi credit akan dilepas kembali ke saldo Anda.",
 		icon: "credit",
 	},
 	{
-		id: "feedback",
-		title: "Bagaimana cara memberi masukan?",
-		subtitle: "Laporkan bug atau usulkan fitur dari Settings",
+		id: "credit-expiry",
+		title: "Apakah credit yang belum terpakai akan hangus?",
+		subtitle: "Masa aktif kuota untuk paket Free dan Berlangganan",
 		content:
-			"Buka Settings lalu pilih Feedback. Kamu bisa mengirim laporan bug atau usulan fitur dari halaman tersebut.",
-		icon: "feedback",
+			"Pada paket langganan Pro dan Hengker, credit berlaku selama periode aktif 30 hari. Pada paket Free, kuota 2 credit diperbarui setiap siklus 30 hari dan tidak diakumulasikan ke periode berikutnya.",
+		icon: "credit",
+	},
+	{
+		id: "manage-subscription",
+		title: "Bagaimana cara membatalkan langganan?",
+		subtitle: "Penghentian paket berbayar dari menu Pengaturan",
+		content:
+			"Buka Pengaturan lalu pilih Billing, kemudian klik Batalkan Langganan. Paket Anda akan tetap aktif sampai akhir periode tagihan berjalan tanpa ada tagihan otomatis berikutnya.",
+		icon: "credit",
+	},
+	{
+		id: "repository-security",
+		title: "Apakah kode repositori saya aman saat menggunakan CLI?",
+		subtitle: "Penyaringan file lokal dan isolasi data privat",
+		content:
+			"Aman. CLI VibeEverything otomatis mengecualikan file sensitif seperti .env, sertifikat, kunci rahasia, dan folder build sebelum snapshot diunggah. Kode dan dokumen yang dihasilkan hanya dapat diakses oleh akun Anda sendiri.",
+		icon: "terminal",
+	},
+	{
+		id: "project-deletion",
+		title: "Bisakah saya menghapus project dan seluruh datanya?",
+		subtitle: "Pembersihan dokumen dan riwayat dari sistem",
+		content:
+			"Bisa. Anda dapat menghapus project melalui menu opsi di halaman project atau Riwayat. Seluruh percakapan, versi PRD, kriteria penerimaan, dan daftar task akan langsung dibersihkan dari akun Anda.",
+		icon: "document",
 	},
 ];

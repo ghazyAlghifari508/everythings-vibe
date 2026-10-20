@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Faq } from "./faq";
+import { FAQ_ITEMS } from "./faq-data";
 
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({
@@ -53,16 +54,16 @@ function renderFaq() {
 }
 
 describe("Faq", () => {
-	it("renders all canonical FAQ questions including codebase, studio, and CLI topics", () => {
+	it("renders canonical user-centered FAQ questions covering persistence, credits, and security", () => {
 		const rendered = renderFaq();
 		expect(rendered.textContent).toContain(
-			"Apa perbedaan VibePlan Greenfield dan Codebase Existing?",
+			"Apakah project yang saya buat tersimpan otomatis?",
 		);
 		expect(rendered.textContent).toContain(
-			"Apa perbedaan VibeScrape dan VibeDesign Studio?",
+			"Apakah credit tetap terpotong jika generate gagal?",
 		);
 		expect(rendered.textContent).toContain(
-			"Bagaimana cara menghubungkan repository lokal lewat CLI?",
+			"Apakah kode repositori saya aman saat menggunakan CLI?",
 		);
 	});
 
@@ -93,5 +94,24 @@ describe("Faq", () => {
 		);
 		expect(links).toContain("/settings/feedback");
 		expect(links).toContain("/bantuan");
+	});
+
+	it("has 6-10 curated items with unique IDs and no legacy taxonomy questions", () => {
+		expect(FAQ_ITEMS.length).toBeGreaterThanOrEqual(6);
+		expect(FAQ_ITEMS.length).toBeLessThanOrEqual(10);
+
+		const ids = FAQ_ITEMS.map((item) => item.id);
+		const uniqueIds = new Set(ids);
+		expect(uniqueIds.size).toBe(FAQ_ITEMS.length);
+
+		for (const item of FAQ_ITEMS) {
+			expect(item.title.trim().length).toBeGreaterThan(0);
+			expect(item.subtitle.trim().length).toBeGreaterThan(0);
+			expect(item.content.trim().length).toBeGreaterThan(0);
+			expect(item.title).not.toMatch(
+				/perbedaan vibescrape|perbedaan vibeplan/i,
+			);
+			expect(item.title).not.toMatch(/alur kerja vibeeverything/i);
+		}
 	});
 });

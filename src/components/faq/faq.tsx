@@ -101,11 +101,11 @@ export function Faq() {
 			<div className="mx-auto max-w-xl">
 				<header className="mb-8 text-center">
 					<h1 className="font-inter text-3xl font-[620] tracking-tight text-snow sm:text-4xl">
-						Cara kerja VibeEverything
+						Pertanyaan yang Sering Diajukan
 					</h1>
 					<p className="mx-auto mt-3 max-w-md font-inter text-sm leading-6 text-fog sm:text-base">
-						Jawaban singkat tentang cara VibeEverything mengubah ide menjadi
-						rencana produk yang bisa dikerjakan.
+						Jawaban praktis seputar penyimpanan project, revisi AI, kuota
+						credit, dan keamanan data di VibeEverything.
 					</p>
 				</header>
 
