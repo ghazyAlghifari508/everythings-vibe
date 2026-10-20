@@ -305,16 +305,14 @@ describe("StudioPage UI & Workflow", () => {
 		expect(screen.getByText("SIMRS Dashboard")).toBeDefined();
 	});
 
-	it("renders the page-shell header with back control, logo and profile outside the composer column", () => {
+	it("renders the page-shell header with logo and profile without an adjacent back button", () => {
 		const StudioComponent = (
 			Route as unknown as { component: React.ComponentType }
 		).component;
 		render(<StudioComponent />);
 
 		const banner = screen.getByRole("banner");
-		expect(
-			within(banner).getByRole("link", { name: /kembali/i }),
-		).toBeDefined();
+		expect(within(banner).queryByRole("link", { name: /kembali/i })).toBeNull();
 		expect(within(banner).getByText("VibeEverything")).toBeDefined();
 		expect(
 			within(banner).getByRole("button", { name: "Profil dan tampilan" }),
@@ -327,14 +325,31 @@ describe("StudioPage UI & Workflow", () => {
 		).toBeDefined();
 	});
 
-	it("falls back to home for the back control on direct visits", () => {
+	it("renders the breadcrumb above the main heading linking to home and marking VibeDesign as current", () => {
 		const StudioComponent = (
 			Route as unknown as { component: React.ComponentType }
 		).component;
 		render(<StudioComponent />);
 
-		const back = screen.getByRole("link", { name: /kembali/i });
-		expect(back.getAttribute("href")).toBe("/");
+		const main = screen.getByRole("main");
+		const breadcrumb = within(main).getByRole("navigation", {
+			name: "Breadcrumb",
+		});
+		expect(breadcrumb).toBeDefined();
+
+		const homeLink = within(breadcrumb).getByRole("link", { name: "Home" });
+		expect(homeLink.getAttribute("href")).toBe("/");
+
+		const currentItem = within(breadcrumb).getByText("VibeDesign");
+		expect(currentItem.getAttribute("aria-current")).toBe("page");
+
+		const heading = within(main).getByRole("heading", {
+			name: "What will you design?",
+		});
+		expect(
+			breadcrumb.compareDocumentPosition(heading) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
 	});
 
 	it("renders all shortcuts in one horizontal carousel with arrow controls", () => {

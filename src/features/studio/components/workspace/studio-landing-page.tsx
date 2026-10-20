@@ -1,9 +1,9 @@
 "use client";
 
-import { Cancel01Icon, Folder02Icon } from "@hugeicons/core-free-icons";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Folder02Icon } from "@hugeicons/core-free-icons";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
@@ -13,8 +13,8 @@ import {
 } from "@/features/studio/components/composer/studio-launch-composer";
 import { StudioDesignPickerDialog } from "@/features/studio/components/design-system/studio-design-picker-dialog";
 import { StudioShortcutCarousel } from "@/features/studio/components/studio-shortcut-carousel";
-import { StudioBackLink } from "@/features/studio/components/workspace/studio-back-link";
 import { StudioLandingProfile } from "@/features/studio/components/workspace/studio-landing-profile";
+import { StudioMobileHistoryDrawer } from "@/features/studio/components/workspace/studio-mobile-history-drawer";
 import { StudioSidebar } from "@/features/studio/components/workspace/studio-sidebar";
 import {
 	STUDIO_DEFAULT_PAGE_COUNT,
@@ -248,10 +248,9 @@ export function StudioLandingPage({
 	}
 
 	return (
-		<div className="min-h-dvh w-full overflow-x-clip bg-onyx text-snow">
-			<header className="flex items-center justify-between gap-3 px-4 py-3 md:px-6">
-				<div className="flex min-w-0 items-center gap-2">
-					<StudioBackLink from={search.from} />
+		<div className="flex min-h-dvh w-full flex-col overflow-x-clip bg-onyx text-snow">
+			<header className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 md:px-6">
+				<div className="flex min-w-0 items-center">
 					<Logo height={26} />
 				</div>
 				<div className="flex items-center gap-1.5">
@@ -272,67 +271,38 @@ export function StudioLandingPage({
 				</div>
 			</header>
 
-			<div className="flex w-full items-start gap-3 px-3 pb-6 md:gap-4 md:px-4">
+			<div className="flex w-full flex-1 items-start gap-3 px-3 pb-6 md:gap-4 md:px-4">
 				<StudioSidebar
 					history={history}
 					onSelectProject={handleOpenProject}
 					onDeleteProject={handleDeleteProject}
-					className="sticky top-4 hidden max-h-[calc(100dvh-2rem)] w-72 shrink-0 overflow-hidden md:flex lg:w-80"
+					className="sticky top-4 hidden max-h-[calc(100dvh-5rem)] w-72 shrink-0 overflow-hidden md:flex lg:w-80"
 				/>
 
-				<DialogPrimitive.Root
+				<StudioMobileHistoryDrawer
 					open={isMobileDrawerOpen}
 					onOpenChange={setIsMobileDrawerOpen}
-				>
-					<DialogPrimitive.Portal>
-						<DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs transition-opacity data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:hidden" />
-						<DialogPrimitive.Content
-							className="fixed inset-y-0 left-0 z-50 flex h-full w-80 max-w-[85vw] flex-col border-r border-graphite bg-charcoal text-snow shadow-2xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left md:hidden"
-							aria-describedby="mobile-drawer-desc"
-						>
-							<DialogPrimitive.Title className="sr-only">
-								Riwayat Project Studio
-							</DialogPrimitive.Title>
-							<DialogPrimitive.Description
-								id="mobile-drawer-desc"
-								className="sr-only"
-							>
-								Daftar project studio kamu yang tersimpan
-							</DialogPrimitive.Description>
-							<div className="flex items-center justify-between border-b border-graphite bg-charcoal px-4 py-3">
-								<span className="text-xs font-semibold uppercase tracking-wider text-snow">
-									My Projects
-								</span>
-								<DialogPrimitive.Close
-									aria-label="Tutup riwayat"
-									className="rounded-md p-1 text-fog hover:text-snow"
-								>
-									<Icon icon={Cancel01Icon} size={16} aria-hidden />
-								</DialogPrimitive.Close>
-							</div>
-							<div className="flex-1 overflow-hidden">
-								<StudioSidebar
-									history={history}
-									onSelectProject={handleOpenProject}
-									onDeleteProject={handleDeleteProject}
-									className="h-full w-full rounded-none border-0"
-								/>
-							</div>
-						</DialogPrimitive.Content>
-					</DialogPrimitive.Portal>
-				</DialogPrimitive.Root>
+					history={history}
+					onSelectProject={handleOpenProject}
+					onDeleteProject={handleDeleteProject}
+				/>
 
-				<main className="min-w-0 flex-1">
-					<div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-1 py-2 sm:px-2 md:py-6">
-						<div className="space-y-2 text-center sm:text-left">
-							<h1 className="text-3xl font-bold tracking-tight text-snow sm:text-4xl lg:text-5xl">
-								What will you design?
-							</h1>
-							<p className="mx-auto max-w-2xl text-sm leading-6 text-fog sm:mx-0">
-								Jelaskan antarmuka yang ingin kamu buat dalam Bahasa Indonesia.
-								Studio menghasilkan halaman HTML interaktif lengkap dengan
-								Tailwind dan data realistis.
-							</p>
+				<main className="flex min-w-0 flex-1 self-stretch flex-col py-4 md:py-6">
+					<div className="mx-auto my-0 flex w-full max-w-3xl flex-col gap-6 px-1 sm:my-auto sm:px-2">
+						<div className="space-y-3 text-center sm:text-left">
+							<div className="flex justify-center sm:justify-start">
+								<HubBreadcrumb current="VibeDesign" />
+							</div>
+							<div className="space-y-2">
+								<h1 className="text-3xl font-bold tracking-tight text-snow sm:text-4xl lg:text-5xl">
+									What will you design?
+								</h1>
+								<p className="mx-auto max-w-2xl text-sm leading-6 text-fog sm:mx-0">
+									Jelaskan antarmuka yang ingin kamu buat dalam Bahasa
+									Indonesia. Studio menghasilkan halaman HTML interaktif lengkap
+									dengan Tailwind dan data realistis.
+								</p>
+							</div>
 						</div>
 
 						<StudioLaunchComposer
