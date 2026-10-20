@@ -114,13 +114,30 @@ describe("Faq", () => {
 		}
 	});
 
-	it("renders page heading and clear purpose statement", () => {
+	it("renders page heading, clear purpose statement, and standard public shell layout", () => {
 		const rendered = renderFaq();
+		const main = rendered.querySelector("main");
+		expect(main?.className).toContain("max-w-4xl");
+		expect(main?.className).toContain("mx-auto");
+		expect(main?.className).toContain("px-4");
+		expect(main?.className).toContain("sm:px-6");
+		expect(main?.className).toContain("py-10");
+		expect(main?.className).toContain("sm:py-14");
+
 		const heading = rendered.querySelector("h1");
 		expect(heading?.textContent).toContain("Pertanyaan yang Sering Diajukan");
+		expect(heading?.className).toContain("text-3xl");
+		expect(heading?.className).toContain("sm:text-4xl");
 		expect(rendered.textContent).toContain(
 			"Informasi penting seputar penyimpanan project, credit, dan sinkronisasi di everythings-vibe.",
 		);
+
+		// FAQ answers remain constrained to max-w-3xl for reading comfort
+		const readingCol = rendered.querySelector("div.max-w-3xl");
+		expect(readingCol).not.toBeNull();
+
+		// No breadcrumbs on FAQ
+		expect(rendered.querySelector("nav[aria-label='Breadcrumb']")).toBeNull();
 	});
 
 	it("renders valid understated navigation links to help and feedback hubs", () => {

@@ -3,6 +3,7 @@
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { PublicPageHeader, PublicPageShell } from "@/components/layout";
 import { Icon } from "@/components/ui/icon";
 import { FAQ_ITEMS, type FaqItem as FaqItemType } from "./faq-data";
 
@@ -59,18 +60,13 @@ function FaqRow({ item }: { item: FaqItemType }) {
 
 export function Faq() {
 	return (
-		<main className="min-h-[calc(100vh-3.5rem)] bg-onyx px-4 py-10 sm:px-6 sm:py-16">
-			<div className="mx-auto max-w-3xl">
-				<header className="mb-10 sm:mb-12">
-					<h1 className="font-inter text-2xl font-[620] tracking-tight text-snow sm:text-3xl">
-						Pertanyaan yang Sering Diajukan
-					</h1>
-					<p className="mt-2.5 font-inter text-sm leading-relaxed text-fog sm:text-base">
-						Informasi penting seputar penyimpanan project, credit, dan
-						sinkronisasi di everythings-vibe.
-					</p>
-				</header>
+		<PublicPageShell>
+			<PublicPageHeader
+				title="Pertanyaan yang Sering Diajukan"
+				description="Informasi penting seputar penyimpanan project, credit, dan sinkronisasi di everythings-vibe."
+			/>
 
+			<div className="w-full max-w-3xl">
 				<section
 					aria-label="Daftar pertanyaan dan jawaban"
 					className="w-full border-t border-graphite"
@@ -80,7 +76,7 @@ export function Faq() {
 					))}
 				</section>
 
-				<footer className="mt-12 sm:mt-16">
+				<footer className="mt-10 sm:mt-12">
 					<p className="font-inter text-sm text-fog">
 						Butuh bantuan lebih lanjut?{" "}
 						<Link
@@ -99,6 +95,6 @@ export function Faq() {
 					</p>
 				</footer>
 			</div>
-		</main>
+		</PublicPageShell>
 	);
 }
