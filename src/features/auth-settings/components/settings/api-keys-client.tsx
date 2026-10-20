@@ -4,6 +4,7 @@ import {
 	Add01Icon,
 	Copy01Icon,
 	Delete02Icon,
+	Key01Icon,
 	Tick01Icon,
 	ViewIcon,
 	ViewOffSlashIcon,
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
 import { useUIStore } from "@/store";
+import { SettingsContentPanel } from "./settings-content-panel";
 
 interface ApiKeyRecord {
 	id: string;
@@ -120,132 +122,148 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 			: "Never";
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center justify-between">
-				<div>
-					<h2 className="text-lg font-[510] text-snow">API Keys</h2>
-					<p className="text-xs text-fog">
-						Kelola API key untuk MCP server dan CLI tool.
-					</p>
-				</div>
+		<SettingsContentPanel
+			title="API Keys"
+			description="Kelola API key untuk MCP server dan CLI tool."
+			actions={
 				<Button onClick={() => setShowCreate(true)} className="gap-1.5">
 					<Icon icon={Add01Icon} size={14} />
 					Buat API Key Baru
 				</Button>
-			</div>
-
-			{/* Key created - show raw key ONCE */}
-			{showCreatedKey && createdKey && (
-				<div className="rounded-lg border border-emerald/30 bg-emerald/10 p-4">
-					<div className="flex items-center gap-2 text-sm font-[510] text-emerald mb-2">
-						<Icon icon={Tick01Icon} size={16} />
-						API Key Berhasil Dibuat
+			}
+		>
+			<div className="space-y-6">
+				{/* Key created - show raw key ONCE */}
+				{showCreatedKey && createdKey && (
+					<div className="rounded-lg border border-emerald/30 bg-emerald/10 p-4">
+						<div className="flex items-center gap-2 text-sm font-[510] text-emerald mb-2">
+							<Icon icon={Tick01Icon} size={16} />
+							API Key Berhasil Dibuat
+						</div>
+						<p className="text-xs text-fog mb-3">
+							Simpan key ini sekarang. Tidak akan ditampilkan lagi.
+						</p>
+						<div className="flex items-center gap-2">
+							<code className="flex-1 rounded bg-onyx px-3 py-2 font-mono text-xs text-snow break-all">
+								{showCreatedKey ? createdKey : "••••••••••••••••"}
+							</code>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={() => setShowCreatedKey(!showCreatedKey)}
+								className="shrink-0"
+							>
+								{showCreatedKey ? (
+									<Icon icon={ViewOffSlashIcon} size={14} />
+								) : (
+									<Icon icon={ViewIcon} size={14} />
+								)}
+							</Button>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={handleCopy}
+								className="shrink-0"
+							>
+								{copied ? (
+									<Icon icon={Tick01Icon} size={14} className="text-emerald" />
+								) : (
+									<Icon icon={Copy01Icon} size={14} />
+								)}
+							</Button>
+						</div>
 					</div>
-					<p className="text-xs text-fog mb-3">
-						Simpan key ini sekarang. Tidak akan ditampilkan lagi.
-					</p>
-					<div className="flex items-center gap-2">
-						<code className="flex-1 rounded bg-onyx px-3 py-2 font-mono text-xs text-snow break-all">
-							{showCreatedKey ? createdKey : "••••••••••••••••"}
-						</code>
+				)}
+
+				{/* Keys Table / Empty State */}
+				{keys.length === 0 ? (
+					<div className="rounded-lg border border-(--border-subtle) bg-(--bg-surface) p-8 sm:p-12 text-center">
+						<div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-(--bg-card) border border-(--border-subtle) text-fog mb-3">
+							<Icon icon={Key01Icon} size={20} />
+						</div>
+						<p className="text-sm font-medium text-snow">Belum ada API key</p>
+						<p className="mt-1 text-xs text-fog max-w-sm mx-auto">
+							Buat API key baru untuk menghubungkan CLI tool atau MCP server ke
+							workspace kamu.
+						</p>
 						<Button
-							variant="ghost"
+							onClick={() => setShowCreate(true)}
+							variant="outline"
 							size="sm"
-							onClick={() => setShowCreatedKey(!showCreatedKey)}
-							className="shrink-0"
+							className="mt-4 gap-1.5"
 						>
-							{showCreatedKey ? (
-								<Icon icon={ViewOffSlashIcon} size={14} />
-							) : (
-								<Icon icon={ViewIcon} size={14} />
-							)}
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={handleCopy}
-							className="shrink-0"
-						>
-							{copied ? (
-								<Icon icon={Tick01Icon} size={14} className="text-emerald" />
-							) : (
-								<Icon icon={Copy01Icon} size={14} />
-							)}
+							<Icon icon={Add01Icon} size={14} />
+							Buat API Key
 						</Button>
 					</div>
-				</div>
-			)}
-
-			{/* Keys Table */}
-			{keys.length === 0 ? (
-				<div className="rounded-lg border border-graphite bg-obsidian/50 p-8 text-center">
-					<p className="text-sm text-fog">
-						Belum ada API key. Buat key baru untuk mulai.
-					</p>
-				</div>
-			) : (
-				<div className="overflow-x-auto rounded-lg border border-graphite">
-					<table className="w-full text-sm">
-						<thead>
-							<tr className="border-b border-graphite bg-obsidian/50 text-left text-xs text-fog">
-								<th className="px-4 py-3">Nama</th>
-								<th className="px-4 py-3">Prefix</th>
-								<th className="px-4 py-3">Scopes</th>
-								<th className="px-4 py-3">Last Used</th>
-								<th className="px-4 py-3">Created</th>
-								<th className="px-4 py-3 text-right">Aksi</th>
-							</tr>
-						</thead>
-						<tbody>
-							{keys.map((key) => (
-								<tr
-									key={key.id}
-									className="border-b border-graphite/50 last:border-0"
-								>
-									<td className="px-4 py-3 font-[510] text-snow">{key.name}</td>
-									<td className="px-4 py-3 font-mono text-xs text-fog">
-										{key.key_prefix}...
-									</td>
-									<td className="px-4 py-3">
-										<div className="flex flex-wrap gap-1">
-											{(key.scopes || []).map((s) => (
-												<span
-													key={s}
-													className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-fog"
-												>
-													{s}
-												</span>
-											))}
-										</div>
-									</td>
-									<td className="px-4 py-3 text-xs text-fog">
-										{key.last_used_at ? formatTime(key.last_used_at) : "Never"}
-									</td>
-									<td className="px-4 py-3 text-xs text-fog">
-										{formatDate(key.created_at)}
-									</td>
-									<td className="px-4 py-3 text-right">
-										<Button
-											variant="ghost"
-											size="sm"
-											aria-label={`Hapus key ${key.name}`}
-											onClick={() => setRevokeId(key.id)}
-											className="text-crimson hover:bg-crimson/10"
-										>
-											<Icon icon={Delete02Icon} size={14} />
-										</Button>
-									</td>
+				) : (
+					<div className="overflow-x-auto rounded-lg border border-(--border-subtle)">
+						<table className="w-full text-sm">
+							<thead>
+								<tr className="border-b border-(--border-subtle) bg-(--bg-surface) text-left text-xs text-fog">
+									<th className="px-4 py-3 font-medium">Nama</th>
+									<th className="px-4 py-3 font-medium">Prefix</th>
+									<th className="px-4 py-3 font-medium">Scopes</th>
+									<th className="px-4 py-3 font-medium">Last Used</th>
+									<th className="px-4 py-3 font-medium">Created</th>
+									<th className="px-4 py-3 text-right font-medium">Aksi</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			)}
+							</thead>
+							<tbody className="divide-y divide-(--border-subtle)">
+								{keys.map((key) => (
+									<tr
+										key={key.id}
+										className="hover:bg-(--bg-surface)/50 transition-colors"
+									>
+										<td className="px-4 py-3 font-[510] text-snow">
+											{key.name}
+										</td>
+										<td className="px-4 py-3 font-mono text-xs text-fog">
+											{key.key_prefix}...
+										</td>
+										<td className="px-4 py-3">
+											<div className="flex flex-wrap gap-1">
+												{(key.scopes || []).map((s) => (
+													<span
+														key={s}
+														className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-fog"
+													>
+														{s}
+													</span>
+												))}
+											</div>
+										</td>
+										<td className="px-4 py-3 text-xs text-fog">
+											{key.last_used_at
+												? formatTime(key.last_used_at)
+												: "Never"}
+										</td>
+										<td className="px-4 py-3 text-xs text-fog">
+											{formatDate(key.created_at)}
+										</td>
+										<td className="px-4 py-3 text-right">
+											<Button
+												variant="ghost"
+												size="sm"
+												aria-label={`Hapus key ${key.name}`}
+												onClick={() => setRevokeId(key.id)}
+												className="text-crimson hover:bg-crimson/10"
+											>
+												<Icon icon={Delete02Icon} size={14} />
+											</Button>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 
-			<p className="text-[10px] text-fog/50">
-				Note: API keys hanya ditampilkan sekali saat pembuatan. Simpan dengan
-				aman.
-			</p>
+				<p className="text-[11px] text-fog/60">
+					Note: API keys hanya ditampilkan sekali saat pembuatan. Simpan dengan
+					aman.
+				</p>
+			</div>
 
 			{/* Create Modal */}
 			<Dialog open={showCreate} onOpenChange={setShowCreate}>
@@ -339,6 +357,6 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
-		</div>
+		</SettingsContentPanel>
 	);
 }
