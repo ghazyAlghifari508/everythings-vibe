@@ -6,7 +6,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkflowGuides } from "@/components/bantuan/workflow-guides";
-import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { PublicPageHeader, PublicPageShell } from "@/components/layout";
 import { Icon } from "@/components/ui/icon";
 
 export const Route = createFileRoute("/bantuan")({
@@ -49,18 +49,11 @@ const SUPPORT_LINKS = [
 
 export function BantuanPage() {
 	return (
-		<main className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
-			<HubBreadcrumb current="Bantuan" />
-
-			<header>
-				<h1 className="text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
-					Pusat Bantuan
-				</h1>
-				<p className="mt-3 max-w-2xl text-sm leading-6 text-fog">
-					Panduan penggunaan modul dan bantuan saat Anda mengalami kendala
-					teknis.
-				</p>
-			</header>
+		<PublicPageShell>
+			<PublicPageHeader
+				title="Pusat Bantuan"
+				description="Panduan penggunaan modul dan bantuan saat Anda mengalami kendala teknis."
+			/>
 
 			<section
 				aria-labelledby="panduan-heading"
@@ -116,6 +109,6 @@ export function BantuanPage() {
 					))}
 				</div>
 			</section>
-		</main>
+		</PublicPageShell>
 	);
 }

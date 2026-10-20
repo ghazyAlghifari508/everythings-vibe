@@ -37,14 +37,17 @@ describe("BantuanPage public access & admin triage removal", () => {
 		expect(screen.queryByText(/Khusus staf admin/i)).toBeNull();
 	});
 
-	it("keeps feedback, billing, faq, and home links accessible", () => {
+	it("keeps feedback, billing, and faq links accessible while eliminating breadcrumb home link", () => {
 		render(<BantuanPage />);
 
 		const hrefs = linkHrefs();
 		expect(hrefs).toContain("/settings/feedback");
 		expect(hrefs).toContain("/settings/billing");
 		expect(hrefs).toContain("/faq");
-		expect(hrefs).toContain("/");
+		expect(hrefs).not.toContain("/");
+		expect(
+			screen.queryByRole("navigation", { name: /breadcrumb/i }),
+		).toBeNull();
 	});
 
 	it("does not render the awkward isolated billing paragraph", () => {
