@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { ProfileForm } from "@/features/auth-settings/components/settings/profile-form";
+import { SettingsContentPanel } from "@/features/auth-settings/components/settings/settings-content-panel";
 import { loadProfile } from "@/features/auth-settings/services/settings-loaders.functions";
 
 export const Route = createFileRoute("/settings/profile")({
@@ -18,16 +19,7 @@ export const Route = createFileRoute("/settings/profile")({
 function ProfilePage() {
 	const { profile, email } = Route.useLoaderData();
 	return (
-		<div
-			className="rounded-xl border border-[var(--border-subtle)] p-6"
-			style={{ background: "var(--bg-elevated)" }}
-		>
-			<h2
-				className="mb-6 font-inter font-[510] text-xl font-bold"
-				style={{ color: "var(--text-primary)" }}
-			>
-				Edit Profil
-			</h2>
+		<SettingsContentPanel title="Edit Profil">
 			<ProfileForm
 				profile={{
 					full_name: profile?.fullName ?? null,
@@ -36,6 +28,6 @@ function ProfilePage() {
 					role: profile?.role ?? null,
 				}}
 			/>
-		</div>
+		</SettingsContentPanel>
 	);
 }

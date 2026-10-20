@@ -85,7 +85,7 @@ export function BillingPage({
 	};
 
 	return (
-		<div className="flex flex-col gap-6">
+		<div className="w-full max-w-4xl flex flex-col gap-6">
 			<div className="grid gap-6 lg:grid-cols-2 h-full">
 				<div className="rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6">
 					<h2 className="mb-6 font-inter font-[510] text-xl font-bold">
