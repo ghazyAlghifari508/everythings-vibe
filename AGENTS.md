@@ -25,6 +25,7 @@ The agent **MUST** read and strictly apply the authoritative rule files in `.age
 - `.agents/rules/anti-satisficing.md` — Root cause before patch; completeness over convenience
 
 ### Read for UI, layout, copy, or accessibility:
+- `.agents/rules/design-layout-consistency.md` — Page family classification, layout contracts, container strategies, breadcrumb rules, Hugeicons contract
 - `.agents/rules/anti-ai-slop.md` — Responsive layout, contrast, no generic AI styling
 
 ### Read for product/domain/workflow semantics:

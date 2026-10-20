@@ -2,11 +2,12 @@
 
 > **MANDATORY SYSTEM DIRECTIVE FOR ALL AI AGENTS, ENGINEERS, AND REVIEWERS**
 >
-> This document is the authoritative rulebook for all user interface, layout, typography, interaction, and visual styling work in **PRDFY**.
+> This document is the authoritative rulebook for all user interface, layout, typography, interaction, and visual styling work in **everythings-vibe** (formerly PRDFY).
+> For page family layout contracts, container sizing, breadcrumb rules, and structural consistency across sibling views, see the complementary mandatory rule [.agents/rules/design-layout-consistency.md](design-layout-consistency.md).
 >
 > ### Core Synthesis:
-> 1. **PRODUCT CONCEPT & FEATURE VALUE: PRDFY**
->    PRDFY is an AI-powered product development workspace that transforms initial product ideas into complete, professional PRDs (8 sections), acceptance criteria (AC), task trees, and interactive Kanban boards. It delivers guided clarifying questions, depth directives, live section revision patches, Mermaid diagrams, and real-time SSE generation.
+> 1. **PRODUCT CONCEPT & FEATURE VALUE: everythings-vibe**
+>    everythings-vibe is an AI vibe-coding and product development ecosystem that transforms initial product ideas into complete, professional PRDs (8 sections), acceptance criteria (AC), task trees, and interactive Kanban boards, alongside VibeDesign Studio, VibeScrape, and Existing Codebase synchronization. It delivers guided clarifying questions, depth directives, live section revision patches, Mermaid diagrams, and real-time SSE generation.
 >
 > 2. **VISUAL DESIGN LANGUAGE & TOKENS: Clean Developer Workspace Console (`DESIGN.md`)**
 >    The interface embodies the clean, content-first, utilitarian aesthetic of developer-grade tools (Linear, GitHub, Vercel):
@@ -59,14 +60,14 @@ Any pull request, commit, or generated component containing the following patter
 - **The Slop:** Prepending or appending emojis to navigation items, action buttons, table column headers, and status badges (e.g. `🚀 Start Free`, `✨ AI Magic`, `🔥 98 Score`, `💡 Pro Tip`).
 - **The Rule:**
   - UI chrome must be 100% free of emojis.
-  - Use monochromatic, crisp, hairline SVG line icons (Hugeicons, Lucide React, or inline SVG).
-  - Icons must be functional indicators, sized strictly at `16px` to `20px` with a `1.5px` to `2px` stroke weight, inheriting the color of the adjacent text (`#0f0f0f` or `#606060`).
+  - Use monochromatic, crisp, hairline SVG line icons via the canonical Hugeicons primitive (`src/components/ui/icon.tsx`). `lucide-react` is deprecated across the codebase.
+  - Icons must be functional indicators, sized strictly at `16px` to `20px` (default `18px`) with a `1.5px` hairline stroke weight, inheriting the color of the adjacent text (`#0f0f0f`, `#606060`, or `text-fog`/`text-snow`).
 
 ### 1.5 No Pastel Icon Circle Blobs
 - **The Slop:** Wrapping every single SVG icon inside a rounded pastel-colored circle or square (e.g. a light-purple circle with a purple icon, a light-green circle with a green icon) stacked across a feature grid.
 - **The Rule:**
   - Icons should sit cleanly and naturally alongside typography or inside a neutral, monochromatic container.
-  - If a dedicated icon container is required, it must use a crisp hairline border (`border border-[#d3d3d3] bg-[#f8f8f8]`) with an ink `#0f0f0f` or graphite `#606060` icon stroke.
+  - If a dedicated icon container is required, it must use a crisp hairline border (`border border-[#d3d3d3] bg-[#f8f8f8]` or `border-graphite bg-obsidian`) with an ink `#0f0f0f` or graphite `#606060` icon stroke.
 
 ### 1.6 No "Hospital Wireframe" Laziness (The Empty Void)
 - **The Slop:** Rendering a page as a lone input box or two lines of plain text centered in an ocean of blank white space, calling it "minimalism".
@@ -76,23 +77,23 @@ Any pull request, commit, or generated component containing the following patter
 
 ---
 
-## 2. Creative Architecture: How to Build Rich PRDFY Utility Surfaces
+## 2. Creative Architecture: How to Build Rich everythings-vibe Utility Surfaces
 
-When designing any screen in PRDFY, apply the following design engineering principles to achieve density, confidence, and authority:
+When designing any screen in everythings-vibe, apply the following design engineering principles to achieve density, confidence, and authority:
 
 ### 2.1 Confident Typographic Scale & Hierarchy
 Do NOT let timid rules restrict your text sizes. Establish clear, bold contrast across information levels:
 - **Hero Title (Landing Page):** Bold, prominent, and commanding. `text-4xl sm:text-5xl lg:text-6xl` (`36px`–`56px`), `font-bold` to `font-extrabold`, tracking `tracking-tight`, line-height `1.15`. It must clearly state the product's primary value proposition.
-- **Section Headers:** `text-2xl sm:text-3xl` (`24px`–`30px`), `font-bold`, color `#0f0f0f`.
+- **Section Headers:** `text-2xl sm:text-3xl` (`24px`–`30px`), `font-bold`, color `#0f0f0f` or `text-snow`.
 - **Panel & Subsection Headers:** `text-lg sm:text-xl` (`18px`–`20px`), `font-semibold` (`--text-heading`).
 - **Standard Body & Interface Labels:** `text-sm sm:text-base` (`14px`–`16px`), font weight `400` or `500`.
-- **Secondary Metadata, Metrics, & Timestamps:** `text-xs` (`11px`–`12px`), font weight `500` in graphite `#606060`, using tabular numbers (`font-mono` or `tabular-nums`) for timestamps, credits, and version numbers.
+- **Secondary Metadata, Metrics, & Timestamps:** `text-xs` (`11px`–`12px`), font weight `500` in graphite `#606060` or `text-fog`, using tabular numbers (`font-mono` or `tabular-nums`) for timestamps, credits, and version numbers.
 
 ### 2.2 Rich Layout Composition & Visual Density
 - **Global Header (Workspace Navigation):**
-  - Height: `56px` fixed, background `#ffffff`, border-bottom `1px solid #e5e5e5`.
-  - Left: Clean wordmark logo (`PRDFY` with crisp modern mark).
-  - Center/Nav: Structured stage links (`Ask -> PRD -> AC -> Task -> Kanban`) with crisp hover states (`hover:text-[#0f0f0f]`).
+  - Height: `56px` fixed, background `#ffffff` or `bg-charcoal`, border-bottom `1px solid #e5e5e5` or `border-graphite`.
+  - Left: Clean wordmark logo (`everythings-vibe` with crisp modern mark).
+  - Center/Nav: Structured stage links (`Ask -> PRD -> AC -> Task -> Kanban`) with crisp hover states (`hover:text-[#0f0f0f]` or `hover:text-snow`).
   - Right: Quick CTA buttons, credit balance counter (e.g. tabular badge `Kredit: 10/10`), and Google/GitHub profile avatar.
 - **Hero Ideation & Generation Showcase (Show, Don't Tell):**
   - Instead of abstract illustrations, display the real product mechanism: an interactive prompt input paired with a live, streaming 8-section PRD preview and Mermaid architecture diagram.
@@ -160,7 +161,8 @@ Before finalizing any frontend work, verify every item:
 - [ ] **No AI Slop Check:** Are there zero 3D drop-shadows, zero pastel icon circles, zero emoji in UI chrome, and zero nested pills?
 - [ ] **No Scared Minimalist Check:** Does the screen look like a real, rich, finished commercial SaaS product rather than an abandoned wireframe?
 - [ ] **Typography Check:** Is the headline large and bold? Is there strong visual hierarchy between title, body, and metadata?
-- [ ] **Console Styling Check:** Are borders hairline 1px? Is the background clean white and text deep ink black?
-- [ ] **PRDFY Value Check:** Is the AI product generation concept (idea to 8-section PRD, AC, task breakdown, Kanban) prominently displayed?
+- [ ] **Console Styling Check:** Are borders hairline 1px? Is the background clean white/dark-obsidian and text deep ink black/crisp snow?
+- [ ] **everythings-vibe Value Check:** Is the AI product generation concept (idea to 8-section PRD, AC, task breakdown, Kanban) or workspace tool prominently displayed?
+- [ ] **Layout Consistency Check:** Does the page respect its design family shell, container constraints, and breadcrumb rules in [.agents/rules/design-layout-consistency.md](design-layout-consistency.md)?
 - [ ] **State Completeness Check:** Are loading, empty, and error states fully designed with actionable next steps?
 - [ ] **Responsive Verification:** Does the interface adapt seamlessly from 320px mobile up to 1440px desktop without horizontal scrolling?

@@ -11,6 +11,7 @@ Boot instructions for AI agents working on **everythings-vibe**.
 - `.agents/rules/atomic-commit.md` -> atomic commits per logical change and mandatory git push before handoff
 - `.agents/rules/no-hardcode.md` -> configuration, provider, and constants discipline
 - `.agents/rules/no-type-bypass.md` -> strict type safety (`as never`, `as any`, and `@ts-ignore` are forbidden)
+- `.agents/rules/design-layout-consistency.md` -> page family classification, layout contracts, container strategies, breadcrumb governance, and Hugeicons standard
 - `.agents/rules/anti-ai-slop.md` -> design constraints and UI standards
 - `.agents/rules/anti-satisficing.md` -> completeness, quality, and verification discipline; never stop at the first acceptable implementation
 - `docs/` and `TODO.md` -> behavior, scope, acceptance, test plan, and architecture specs
