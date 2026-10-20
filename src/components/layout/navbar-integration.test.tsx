@@ -233,39 +233,62 @@ describe("Navbar Fitur Generate PRD Contract", () => {
 });
 
 describe("Navbar Rebranding & Layout", () => {
-	it("discovers each independent product at its canonical destination", () => {
+	it("renders minimal global navigation (Pricing, Bantuan, FAQ) and excludes product links", () => {
 		mockPathname = "/";
 		renderNavbar();
-		expect(screen.getByText("VibeEverything")).toBeDefined();
-		expect(screen.getByRole("link", { name: /Pricing/i })).toBeDefined();
+
+		// Brand logo links to homepage
+		const logoLink = screen.getByRole("link", { name: /VibeEverything/i });
+		expect(logoLink).toBeDefined();
+		expect(logoLink.getAttribute("href")).toBe("/");
+
+		// Global navigation links on desktop: Pricing, Bantuan, FAQ
+		expect(
+			screen.getByRole("link", { name: /^Pricing$/i }).getAttribute("href"),
+		).toBe("/pricing");
+		expect(
+			screen.getByRole("link", { name: /^Bantuan$/i }).getAttribute("href"),
+		).toBe("/bantuan");
+		expect(
+			screen.getByRole("link", { name: /^FAQ$/i }).getAttribute("href"),
+		).toBe("/faq");
+
 		expect(screen.queryByRole("link", { name: /Home/i })).toBeNull();
-		expect(screen.queryByRole("link", { name: /FAQ/i })).toBeNull();
 		expect(screen.queryByRole("link", { name: /History/i })).toBeNull();
-		for (const [name, destination] of [
-			["VibePlan", "/plan"],
-			["VibeDesign Studio", "/design"],
-			["VibeScrape", "/scrape"],
-			["VibeTemplate", "/templates"],
+
+		// Removed product links must NOT appear in desktop navbar
+		for (const name of [
+			"VibePlan",
+			"VibeDesign Studio",
+			"VibeScrape",
+			"VibeTemplate",
 		]) {
-			expect(screen.getByRole("link", { name }).getAttribute("href")).toBe(
-				destination,
-			);
+			expect(screen.queryByRole("link", { name })).toBeNull();
 		}
+
+		// Open mobile menu
 		fireEvent.click(screen.getByRole("button", { name: "Toggle menu" }));
-		for (const [name, destination] of [
-			["VibePlan", "/plan"],
-			["VibeDesign Studio", "/design"],
-			["VibeScrape", "/scrape"],
-			["VibeTemplate", "/templates"],
+
+		// Removed product links must NOT appear in mobile menu
+		for (const name of [
+			"VibePlan",
+			"VibeDesign Studio",
+			"VibeScrape",
+			"VibeTemplate",
 		]) {
-			const links = screen.getAllByRole("link", { name });
-			expect(links.map((link) => link.getAttribute("href"))).toEqual([
-				destination,
-				destination,
-			]);
+			expect(screen.queryByRole("link", { name })).toBeNull();
 		}
-		fireEvent.click(screen.getAllByRole("link", { name: "VibeScrape" })[1]);
-		expect(screen.getAllByRole("link", { name: "VibeScrape" })).toHaveLength(1);
+
+		// Mobile menu exposes Pricing, Bantuan, FAQ without duplicate lists (1 desktop + 1 mobile)
+		expect(screen.getAllByRole("link", { name: /^Pricing$/i })).toHaveLength(2);
+		expect(screen.getAllByRole("link", { name: /^Bantuan$/i })).toHaveLength(2);
+		expect(screen.getAllByRole("link", { name: /^FAQ$/i })).toHaveLength(2);
+		expect(screen.getByRole("link", { name: /^Home$/i })).toBeDefined();
+		expect(screen.getByRole("link", { name: /^Settings$/i })).toBeDefined();
+
+		// Clicking a mobile navlink closes the menu
+		fireEvent.click(screen.getAllByRole("link", { name: /^Pricing$/i })[1]);
+		expect(screen.getAllByRole("link", { name: /^Pricing$/i })).toHaveLength(1);
 	});
 
 	it("renders hamburger menu button for history drawer on home", () => {
@@ -615,7 +638,7 @@ describe("Navbar VibeScrape Workspace Navlinks", () => {
 		const toggleBtn = screen.getByRole("button", { name: /Toggle menu/i });
 		fireEvent.click(toggleBtn);
 
-		expect(screen.getByRole("link", { name: /^FAQ$/i })).toBeDefined();
+		expect(screen.getAllByRole("link", { name: /^FAQ$/i })).toHaveLength(2);
 		expect(screen.getByRole("link", { name: /^Settings$/i })).toBeDefined();
 	});
 });

@@ -5,14 +5,13 @@ import {
 	isVibeDesignScrapRoute,
 } from "@/lib/design-nav";
 
-const PRODUCTS = [
-	{ to: "/plan", label: "VibePlan" },
-	{ to: "/design", label: "VibeDesign Studio" },
-	{ to: "/scrape", label: "VibeScrape" },
-	{ to: "/templates", label: "VibeTemplate" },
+const GLOBAL_NAV_LINKS = [
+	{ to: "/pricing", label: "Pricing" },
+	{ to: "/bantuan", label: "Bantuan" },
+	{ to: "/faq", label: "FAQ" },
 ] as const;
 
-export function NavbarProductLinks({
+export function NavbarNavLinks({
 	pathname,
 	isGreenfieldWorkspace,
 	mobile = false,
@@ -76,7 +75,7 @@ export function NavbarProductLinks({
 					</Link>
 				</>
 			) : (
-				PRODUCTS.map(({ to, label }) => (
+				GLOBAL_NAV_LINKS.map(({ to, label }) => (
 					<Link
 						key={to}
 						to={to}
@@ -88,15 +87,6 @@ export function NavbarProductLinks({
 						{label}
 					</Link>
 				))
-			)}
-			{!isGreenfieldWorkspace && !scrape && (
-				<Link
-					to="/pricing"
-					className={linkClass(pathname.startsWith("/pricing"))}
-					onClick={onNavigate}
-				>
-					Pricing
-				</Link>
 			)}
 			{mobile && !scrape && (
 				<>
@@ -110,13 +100,6 @@ export function NavbarProductLinks({
 						</Link>
 					)}
 					<Link
-						to="/faq"
-						className={linkClass(pathname.startsWith("/faq"))}
-						onClick={onNavigate}
-					>
-						FAQ
-					</Link>
-					<Link
 						to="/settings"
 						className={linkClass(pathname.startsWith("/settings"))}
 						onClick={onNavigate}
@@ -128,3 +111,6 @@ export function NavbarProductLinks({
 		</>
 	);
 }
+
+// Keep export alias for any legacy references
+export { NavbarNavLinks as NavbarProductLinks };

@@ -31,7 +31,7 @@ import { isAdmin } from "@/lib/session";
 import { useUIStore } from "@/store";
 import { CodebaseStepNav, FlowStepNav, routeToStep } from "./flow-step-nav";
 import { NavbarFlowActions } from "./navbar-flow-actions";
-import { NavbarProductLinks } from "./navbar-product-links";
+import { NavbarNavLinks } from "./navbar-nav-links";
 
 export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 	const { data: session, isPending: isLoading } = authClient.useSession();
@@ -195,7 +195,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 						/>
 					) : (
 						<div className="flex items-center gap-1">
-							<NavbarProductLinks
+							<NavbarNavLinks
 								pathname={pathname}
 								isGreenfieldWorkspace={isGreenfieldWorkspace}
 							/>
@@ -345,7 +345,7 @@ export function Navbar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 							<ThemeToggle />
 						</div>
 					</div>
-					<NavbarProductLinks
+					<NavbarNavLinks
 						pathname={pathname}
 						isGreenfieldWorkspace={isGreenfieldWorkspace}
 						mobile
