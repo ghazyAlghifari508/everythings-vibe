@@ -178,13 +178,14 @@ describe("radius classification", () => {
 		).toEqual([]);
 	});
 
-	it("keeps a large section radius distinguishable from a card radius", () => {
+	it("preserves a section radius without inferring a card component", () => {
 		const elements = [
 			element({ "border-radius": "24px" }, { role: "section" }),
 			element({ "border-radius": "24px" }, { role: "section" }),
 		];
 		const tokens = normalizeRadii(elements);
-		expect(tokens[0]?.purpose).toBe("Large cards");
+		expect(tokens[0]?.purpose).toBe("Measured radius");
+		expect(tokens[0]?.roles).toEqual(["section"]);
 	});
 
 	it("names an input radius from a measured input element", () => {
@@ -192,7 +193,7 @@ describe("radius classification", () => {
 			element({ "border-radius": "6px" }, { role: "input" }),
 			element({ "border-radius": "6px" }, { role: "input" }),
 		]);
-		expect(tokens[0]?.purpose).toBe("Measured radius");
+		expect(tokens[0]?.purpose).toBe("Inputs");
 	});
 
 	it("reports the measurement frequency behind each radius", () => {
@@ -231,7 +232,7 @@ describe("radius classification", () => {
 				{ role: "section", width: 1200, height: 400 },
 			),
 		]);
-		expect(tokens[0]?.purpose).toBe("Large cards");
+		expect(tokens[0]?.purpose).toBe("Measured radius");
 		expect(tokens[0]?.pill).toBe(false);
 	});
 
