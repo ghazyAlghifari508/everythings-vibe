@@ -14,7 +14,15 @@ export function renderCodeSections(
 
 	// --- 13. Agent Prompt Guide ---------------------------------------------
 	lines.push("", heading(2, "Agent Prompt Guide"));
-	const brandColor = model.colors.find((color) => color.roleClass === "brand");
+	// Only a colour that was actually measured as an action fill can describe an
+	// action. A brand-named colour used for body text proves brand association,
+	// not an action hierarchy.
+	const primaryActionColor = model.colors.find(
+		(color) => color.role === "Primary action",
+	);
+	const actionFillColor = model.colors.find(
+		(color) => color.role === "Action accent",
+	);
 	const textColor =
 		model.colors.find((color) => color.role === "Base text") ??
 		model.colors.find((color) => color.role === "Text");
@@ -23,7 +31,12 @@ export function renderCodeSections(
 	lines.push(
 		`- text: ${textColor ? `\`${textColor.value}\`` : "not measured"}`,
 		`- surface: ${surfaceColor ? `\`${surfaceColor.value}\`` : "not measured"}`,
-		`- primary action: ${brandColor ? `\`${brandColor.value}\`` : "not measured"}`,
+		`- action fill: ${
+			actionFillColor ? `\`${actionFillColor.value}\`` : "not measured"
+		}`,
+		`- primary action: ${
+			primaryActionColor ? `\`${primaryActionColor.value}\`` : "not measured"
+		}`,
 		`- base spacing unit: ${Number.isFinite(model.baseUnitPx) ? `${model.baseUnitPx}px` : "not measured"}`,
 	);
 	if (options.implementationGuidance?.length) {
