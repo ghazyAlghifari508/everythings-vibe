@@ -91,7 +91,7 @@ export function deriveObservedComponents(
 					)
 					.join("\n") +
 				" Missing properties, interaction states and primary/secondary hierarchy are not established; do not generalize across treatments or captures.",
-			evidence: `Measured on ${elements.length} ${role} samples: ${elements.map((element) => element.selector).join(", ")}. Semantic role inferred from DOM.`,
+			evidence: `Measured on ${elements.length} ${role} elements in the capture samples: ${elements.map((element) => element.selector).join(", ")}. Semantic role inferred from DOM.`,
 			frequency: elements.length,
 			roles: [role],
 		});
