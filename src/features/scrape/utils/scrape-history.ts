@@ -1,10 +1,26 @@
+import type { ScrapeMode } from "@/db/schema";
 import { SCRAPE_HISTORY_DEFAULT_PAGE_SIZE } from "@/features/scrape/types/scrape-constants";
 import type {
 	ScrapeHistorySearch,
 	ScrapeHistoryStatusGroup,
 } from "@/features/scrape/types/scrape-contract";
+import { APP_TIME_ZONE } from "@/lib/constants";
 
 export const SCRAPE_HISTORY_RETURN_FROM = "/scrape/history" as const;
+
+// The row date is a compact column, so the month is abbreviated. The instant is
+// still rendered in the product timezone so two users never disagree about
+// which day a scrape ran on.
+export function formatHistoryDate(value: string | Date): string {
+	const date = value instanceof Date ? value : new Date(value);
+	if (!Number.isFinite(date.getTime())) return "—";
+	return date.toLocaleDateString("id-ID", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+		timeZone: APP_TIME_ZONE,
+	});
+}
 
 export function resolveHistoryStatusGroup(
 	status: string,
@@ -12,6 +28,28 @@ export function resolveHistoryStatusGroup(
 	if (status === "completed") return "completed";
 	if (status === "failed") return "failed";
 	return "processing";
+}
+
+// One vocabulary for the row status: the group decides the label, so a status
+// the product adds later is never described with a second wording. An unknown
+// status is reported as still running, because claiming a finished job would
+// be worse than showing an unfinished one.
+export const SCRAPE_HISTORY_STATUS_GROUP_LABELS = {
+	completed: "Selesai",
+	processing: "Diproses",
+	failed: "Gagal",
+} as const satisfies Record<ScrapeHistoryStatusGroup, string>;
+
+export function historyStatusLabel(status: string): string {
+	return SCRAPE_HISTORY_STATUS_GROUP_LABELS[resolveHistoryStatusGroup(status)];
+}
+
+// The extraction mode is named once so the filter rail and the result row can
+// never drift apart.
+export function modeLabel(mode?: ScrapeMode): string {
+	if (mode === "crawl") return "Crawl";
+	if (mode === "images") return "Images";
+	return mode === "html" ? "HTML" : "DESIGN.md";
 }
 
 export function historyTotalPages(total: number, pageSize: number): number {

@@ -4,6 +4,7 @@ import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { useScrapeHistorySearchDraft } from "@/features/scrape/hooks/use-scrape-history-search-draft";
 import type { ScrapeHistorySelectionController } from "@/features/scrape/hooks/use-scrape-history-selection";
 import type {
 	ScrapeHistoryBulkDeleteResult,
@@ -17,25 +18,20 @@ import {
 	historyTotalPages,
 	isHistoryFiltered,
 } from "@/features/scrape/utils/scrape-history";
-import { useScrapeHistorySearchDraft } from "../hooks/use-scrape-history-search-draft";
 import {
 	ScrapeHistoryDeleteDialog,
 	type ScrapeHistoryDeleteRequest,
 } from "./scrape-history-list-delete-dialog";
+import { ScrapeHistoryFilters } from "./scrape-history-list-filters";
 import {
 	type ScrapeHistoryItem,
 	ScrapeHistoryRow,
 } from "./scrape-history-list-item";
 import { ScrapeHistoryPagination } from "./scrape-history-list-pagination";
-import { ScrapeHistorySearchControls } from "./scrape-history-list-search";
 import { ScrapeHistorySelectAll } from "./scrape-history-select-all";
 import { ScrapeHistorySelectionBar } from "./scrape-history-selection-bar";
 
 export type { ScrapeHistoryItem } from "./scrape-history-list-item";
-export {
-	formatTimeAgo,
-	SCRAPE_STATUS_INDONESIAN_LABELS,
-} from "./scrape-history-list-item";
 
 interface ScrapeHistoryMessage {
 	text: string;
@@ -156,7 +152,7 @@ export function ScrapeHistoryList({
 					role={message.tone === "error" ? "alert" : "status"}
 					className={`rounded-lg border p-3 text-xs ${
 						message.tone === "error"
-							? "border-rose-500/30 bg-rose-500/10 text-rose-400"
+							? "border-crimson/30 bg-crimson/10 text-crimson"
 							: "border-graphite bg-charcoal text-fog"
 					}`}
 				>
@@ -164,13 +160,11 @@ export function ScrapeHistoryList({
 				</p>
 			) : null}
 
-			<ScrapeHistorySearchControls
+			<ScrapeHistoryFilters
 				draft={draft}
 				onDraftChange={setDraft}
 				search={search}
 				onQueryChange={onQueryChange}
-				total={total}
-				range={range}
 			/>
 
 			{selection.active && items.length > 0 ? (
@@ -213,22 +207,25 @@ export function ScrapeHistoryList({
 					</button>
 				</div>
 			) : (
-				<ul className="flex flex-col divide-y divide-graphite rounded-xl border border-graphite bg-charcoal">
-					{items.map((item) => (
-						<ScrapeHistoryRow
-							key={item.id}
-							item={item}
-							detailSearch={detailSearch}
-							deleting={deletingId === item.id}
-							onRequestDelete={(target) =>
-								setDeleteRequest({ kind: "single", item: target })
-							}
-							selectionMode={selection.active}
-							selected={selection.ids.has(item.id)}
-							onToggleSelect={selection.toggle}
-						/>
-					))}
-				</ul>
+				<>
+					<p className="text-xs text-fog tabular-nums">{total} hasil</p>
+					<ul className="flex flex-col divide-y divide-graphite rounded-xl border border-graphite bg-charcoal">
+						{items.map((item) => (
+							<ScrapeHistoryRow
+								key={item.id}
+								item={item}
+								detailSearch={detailSearch}
+								deleting={deletingId === item.id}
+								onRequestDelete={(target) =>
+									setDeleteRequest({ kind: "single", item: target })
+								}
+								selectionMode={selection.active}
+								selected={selection.ids.has(item.id)}
+								onToggleSelect={selection.toggle}
+							/>
+						))}
+					</ul>
+				</>
 			)}
 
 			{selection.active ? (
@@ -248,6 +245,8 @@ export function ScrapeHistoryList({
 			<ScrapeHistoryPagination
 				page={page}
 				totalPages={totalPages}
+				total={total}
+				range={range}
 				search={search}
 				onQueryChange={onQueryChange}
 			/>
