@@ -23,8 +23,6 @@ const PREVIEW_MAX_HEIGHT = 760;
 
 export function DesktopPreview({
 	title,
-	domain,
-	screenshot,
 	srcDoc,
 	report,
 	active = true,
@@ -33,8 +31,6 @@ export function DesktopPreview({
 	onOpenSource,
 }: {
 	title: string;
-	domain?: string;
-	screenshot?: string | null;
 	srcDoc: string;
 	report: FrameReport;
 	active?: boolean;
@@ -222,8 +218,6 @@ export function DesktopPreview({
 					/>
 					<PreviewCanvasOverlay
 						report={report}
-						screenshot={screenshot}
-						domain={domain}
 						onRetry={onRetry}
 						onOpenSource={onOpenSource}
 					/>

@@ -1,7 +1,6 @@
 import { Alert02Icon, Loading01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import type { PreviewFrameReport } from "@/features/scrape/utils/preview-readiness";
-import { ScreenshotView } from "./scrape-detail-screenshot-view";
 
 export type FrameReport = PreviewFrameReport;
 
@@ -18,7 +17,7 @@ export const READINESS_MESSAGE: Record<
 	preparing: {
 		label: "Menyiapkan preview website",
 		tone: "pending",
-		detail: "Memuat tampilan dan resource halaman.",
+		detail: "Memuat tampilan halaman.",
 	},
 	ready: {
 		label: "Preview siap dimuat",
@@ -29,26 +28,28 @@ export const READINESS_MESSAGE: Record<
 		label: "Preview tidak berisi konten",
 		tone: "warn",
 		detail:
-			"Dokumen hasil capture tidak memuat teks, media, atau latar yang bisa ditampilkan.",
+			"Halaman ini tidak menampilkan teks, media, atau latar yang bisa ditampilkan.",
 	},
 	degraded: {
 		label: "Preview dimuat sebagian",
 		tone: "warn",
-		detail:
-			"Sebagian resource website gagal dimuat, tampilan bisa tidak lengkap.",
+		detail: "Sebagian aset halaman gagal dimuat, tampilan bisa tidak lengkap.",
 	},
 };
 
+/**
+ * Canvas overlay for the framed preview.
+ *
+ * It only reports what the captured document is doing right now. Choosing what
+ * to show when the document fails belongs to the preview panel, which is the
+ * only layer that knows whether a screenshot is available as an alternative.
+ */
 export function PreviewCanvasOverlay({
 	report,
-	screenshot,
-	domain,
 	onRetry,
 	onOpenSource,
 }: {
 	report: FrameReport;
-	screenshot?: string | null;
-	domain?: string;
 	onRetry?: () => void;
 	onOpenSource?: () => void;
 }) {
@@ -84,18 +85,6 @@ export function PreviewCanvasOverlay({
 			</div>
 		);
 	}
-	if (screenshot && domain) {
-		return (
-			<div className="absolute inset-0 z-10 flex flex-col bg-onyx">
-				<ScreenshotView
-					screenshot={screenshot}
-					domain={domain}
-					onOpenSource={onOpenSource}
-					onRetry={onRetry}
-				/>
-			</div>
-		);
-	}
 	return (
 		<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
 			<Icon
@@ -105,10 +94,7 @@ export function PreviewCanvasOverlay({
 				className="text-amber-400"
 			/>
 			<output className="text-sm font-semibold text-snow">{label}</output>
-			<p className="max-w-md text-xs leading-5 text-fog">
-				Visual preview unavailable. The website could not be shown accurately.{" "}
-				{detail}
-			</p>
+			<p className="max-w-md text-xs leading-5 text-fog">{detail}</p>
 			{onRetry ? (
 				<div className="flex flex-wrap items-center justify-center gap-2">
 					<button

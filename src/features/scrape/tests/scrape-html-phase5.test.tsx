@@ -61,10 +61,12 @@ describe("Phase 5 UI — Separate HTML Source and Visual Reference", () => {
 		const screenshotImg = screen.getByTestId("scrape-visual-screenshot");
 		expect(screenshotImg).toBeDefined();
 		expect(screenshotImg.getAttribute("src")).toBe(fakeScreenshot);
-		expect(screen.getByText(/Tangkapan Layar Browser/i)).toBeDefined();
+
+		// The screenshot surface owns no navigation of its own.
 		expect(
-			screen.getByText(/Referensi visual asli dari browser saat capture/i),
-		).toBeDefined();
+			screen.queryByRole("button", { name: /lihat html source/i }),
+		).toBeNull();
+		expect(screen.queryByText(/Referensi visual asli/i)).toBeNull();
 
 		// HTML Source remains accessible
 		expect(screen.getByRole("tab", { name: /HTML Source/i })).toBeDefined();
@@ -81,10 +83,8 @@ describe("Phase 5 UI — Separate HTML Source and Visual Reference", () => {
 			/>,
 		);
 
-		expect(screen.getByText(/Visual preview unavailable/i)).toBeDefined();
-		expect(
-			screen.getByText(/The website could not be shown accurately/i),
-		).toBeDefined();
+		expect(screen.getByTestId("preview-unavailable")).toBeDefined();
+		expect(screen.getByText(/Gagal memuat/i)).toBeDefined();
 		expect(
 			screen.getByRole("button", {
 				name: /View HTML Source|Buka Source HTML/i,
