@@ -25,6 +25,11 @@ export interface RadiusToken {
 	frequency: number;
 	roles: string[];
 	selectors: string[];
+	/**
+	 * The capture this value was measured in, e.g. "capture 1: 1440x800, auto".
+	 * A radius measured in two captures is two scoped facts, not one value.
+	 */
+	scope: string;
 	/** True when the value came from elements that were not generic containers. */
 	contextual: boolean;
 	/**
@@ -32,6 +37,15 @@ export interface RadiusToken {
 	 * that rounds at least half its shortest side. Shorthands remain unclassified.
 	 */
 	pill: boolean;
+}
+
+// The capture a flattened selector belongs to. buildDesignModel prefixes every
+// selector with the capture it came from, so the scope survives the merge.
+const CAPTURE_PREFIX = /^\[capture ([^\]]+)\]/;
+
+function scopeOf(selector: string): string {
+	const match = selector.match(CAPTURE_PREFIX);
+	return match?.[1] ? `capture ${match[1]}` : "";
 }
 
 export function classifyRadiusToken(
@@ -80,6 +94,7 @@ export function classifyRadiusToken(
 		frequency: group.frequency,
 		roles: roles.slice(0, 6),
 		selectors: group.selectors.slice(0, AUDIT_LIMIT),
+		scope: scopeOf(group.selectors[0] ?? ""),
 		contextual,
 		pill,
 	};
