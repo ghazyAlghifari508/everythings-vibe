@@ -3,6 +3,9 @@ export const SCRAPE_HISTORY_DEFAULT_PAGE_SIZE = 10;
 export const SCRAPE_HISTORY_MAX_LIMIT = 50;
 export const SCRAPE_HISTORY_SEARCH_MAX_CHARS = 128;
 export const SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS = 300;
+// A row that is still processing can finish while the page is open, so the
+// list re-reads the server on this interval only while such a row is visible.
+export const SCRAPE_HISTORY_REFRESH_INTERVAL_MS = 5000;
 // A bulk selection is a server-computed snapshot of the ids matching the
 // current filter, so a scrape created after the snapshot can never join a
 // confirmed deletion. The snapshot and the delete request are both bounded so

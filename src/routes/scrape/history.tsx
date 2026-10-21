@@ -8,6 +8,7 @@ import {
 	ScrapeHistoryPendingView,
 	ScrapeHistoryView,
 } from "@/features/scrape/components/scrape-history-view";
+import { useScrapeHistoryLiveRefresh } from "@/features/scrape/hooks/use-scrape-history-live-refresh";
 import {
 	deleteScrapeItem,
 	deleteScrapeItems,
@@ -66,6 +67,10 @@ function ScrapHistoryPage() {
 	const search = parseScrapeHistorySearch(Route.useSearch());
 	const navigate = useNavigate();
 	const router = useRouter();
+
+	useScrapeHistoryLiveRefresh(loaderData.items, () =>
+		router.invalidate({ filter: (match) => match.routeId === Route.id }),
+	);
 
 	function handleQueryChange(next: ScrapeHistorySearch) {
 		void navigate({ to: ".", search: toScrapeHistorySearchParams(next) });
