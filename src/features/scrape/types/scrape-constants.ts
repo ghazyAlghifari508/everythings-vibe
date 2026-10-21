@@ -3,6 +3,14 @@ export const SCRAPE_HISTORY_DEFAULT_PAGE_SIZE = 10;
 export const SCRAPE_HISTORY_MAX_LIMIT = 50;
 export const SCRAPE_HISTORY_SEARCH_MAX_CHARS = 128;
 export const SCRAPE_HISTORY_SEARCH_DEBOUNCE_MS = 300;
+// A bulk selection is a server-computed snapshot of the ids matching the
+// current filter, so a scrape created after the snapshot can never join a
+// confirmed deletion. The snapshot and the delete request are both bounded so
+// one request cannot carry an unbounded payload; the bound is reported to the
+// user instead of silently truncating the deletion target.
+export const SCRAPE_HISTORY_BULK_SELECTION_MAX_IDS = 1000;
+export const SCRAPE_HISTORY_BULK_DELETE_MAX_IDS = 1000;
+export const SCRAPE_HISTORY_ID_MAX_CHARS = 64;
 // Completed design scrapes offered as a Studio design reference source.
 export const SCRAPE_DESIGN_SOURCE_LIMIT = 20;
 

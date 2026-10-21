@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
+	SCRAPE_HISTORY_BULK_DELETE_MAX_IDS,
 	SCRAPE_HISTORY_DEFAULT_PAGE_SIZE,
+	SCRAPE_HISTORY_ID_MAX_CHARS,
 	SCRAPE_HISTORY_SEARCH_MAX_CHARS,
 } from "@/features/scrape/types/scrape-constants";
 
@@ -221,6 +223,38 @@ export function resolveScrapeHistoryOffset(search: ScrapeHistorySearch): {
 		limit: search.pageSize,
 		offset: (search.page - 1) * search.pageSize,
 	};
+}
+
+/** A bulk selection is an explicit id snapshot, never a re-evaluated filter. */
+export interface ScrapeHistoryBulkSelection {
+	ids: string[];
+	total: number;
+	truncated: boolean;
+}
+
+export interface ScrapeHistoryBulkDeleteRequest {
+	ids: string[];
+}
+
+export interface ScrapeHistoryBulkDeleteResult {
+	deleted: number;
+	skipped: number;
+	deletedIds: string[];
+}
+
+const scrapeHistoryBulkDeleteSchema = z.object({
+	ids: z
+		.array(z.string().trim().min(1).max(SCRAPE_HISTORY_ID_MAX_CHARS))
+		.min(1)
+		.max(SCRAPE_HISTORY_BULK_DELETE_MAX_IDS),
+});
+
+export function parseScrapeHistoryBulkDelete(
+	raw: unknown,
+): ScrapeHistoryBulkDeleteRequest {
+	const parsed = scrapeHistoryBulkDeleteSchema.safeParse(raw);
+	if (!parsed.success) throw new Error("Permintaan hapus tidak valid.");
+	return { ids: parsed.data.ids };
 }
 
 // Optional so existing links keep working without a mode, while a recovery link

@@ -6,6 +6,7 @@ import {
 	historyTotalPages,
 	isHistoryFiltered,
 	resolveHistoryStatusGroup,
+	resolvePageAfterBulkDelete,
 	resolvePageAfterDelete,
 	toScrapeHistorySearchParams,
 } from "@/features/scrape/utils/scrape-history";
@@ -149,5 +150,23 @@ describe("resolvePageAfterDelete", () => {
 
 	it("returns to the first page when nothing remains", () => {
 		expect(resolvePageAfterDelete(1, 1, 10)).toBe(1);
+	});
+});
+
+describe("resolvePageAfterBulkDelete", () => {
+	it("stays on the page when the batch left other pages intact", () => {
+		expect(resolvePageAfterBulkDelete(33, 3, 2, 10)).toBe(2);
+	});
+
+	it("steps back when the batch emptied the last page", () => {
+		expect(resolvePageAfterBulkDelete(31, 11, 4, 10)).toBe(2);
+	});
+
+	it("returns to the first page when the whole result set was deleted", () => {
+		expect(resolvePageAfterBulkDelete(20, 20, 2, 10)).toBe(1);
+	});
+
+	it("ignores a deleted count larger than the total", () => {
+		expect(resolvePageAfterBulkDelete(5, 99, 3, 10)).toBe(1);
 	});
 });

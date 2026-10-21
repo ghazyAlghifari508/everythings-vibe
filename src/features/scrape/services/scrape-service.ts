@@ -7,6 +7,7 @@ import {
 	resolveScrapeRetryDecision,
 } from "@/features/scrape/utils/scrape-retry";
 import { ScrapeError } from "@/lib/design-errors";
+import { deleteOwnedScrapes } from "./scrape-history-delete-service";
 
 // Public surface for the scrape backend. Each concern lives in its own module;
 // this module keeps the job lifecycle entry points that operate on a whole job
@@ -15,6 +16,7 @@ export * from "./scrape-create-service";
 export * from "./scrape-detail-service";
 export * from "./scrape-document-service";
 export * from "./scrape-enrichment-service";
+export * from "./scrape-history-delete-service";
 export * from "./scrape-history-service";
 export * from "./scrape-pipeline-service";
 
@@ -122,11 +124,11 @@ export async function deleteScrape(
 	id: string,
 	userId: string,
 ): Promise<{ ok: true }> {
-	const deleted = await db
-		.delete(scrapes)
-		.where(and(eq(scrapes.id, id), eq(scrapes.userId, userId)))
-		.returning({ id: scrapes.id });
-	if (deleted.length === 0)
+	// The one-item delete shares the ownership-scoped statement with the bulk
+	// delete, so both refuse rows the caller does not own and both leave the
+	// cascade cleanup of pages, documents and images to the database.
+	const result = await deleteOwnedScrapes([id], userId);
+	if (result.deleted === 0)
 		throw new ScrapeError("WEBSITE_BLOCKED", "Scrape tidak ditemukan.");
 	return { ok: true };
 }
