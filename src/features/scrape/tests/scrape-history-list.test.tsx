@@ -7,7 +7,9 @@ import {
 	within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useScrapeHistorySelection } from "@/features/scrape/hooks/use-scrape-history-selection";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
+import { historyFilterKey } from "@/features/scrape/utils/scrape-history";
 import {
 	imageCountsLabel,
 	imageResultCounts,
@@ -21,16 +23,30 @@ const baseSearch: ScrapeHistorySearch = {
 	pageSize: 10,
 };
 
-function renderList(
-	overrides: Partial<Parameters<typeof ScrapeHistoryList>[0]> = {},
-) {
+type ListProps = Parameters<typeof ScrapeHistoryList>[0];
+type ListOwnProps = Omit<ListProps, "selection">;
+
+// The list renders inside the page shell in the product, so the selection
+// controller is created here exactly the way the view creates it.
+function HistoryListHarness(props: ListOwnProps) {
+	const selection = useScrapeHistorySelection(historyFilterKey(props.search));
+	return <ScrapeHistoryList {...props} selection={selection} />;
+}
+
+function renderList(overrides: Partial<ListOwnProps> = {}) {
 	const onQueryChange = vi.fn();
 	const rendered = render(
-		<ScrapeHistoryList
+		<HistoryListHarness
 			items={[]}
 			total={0}
 			search={baseSearch}
 			onQueryChange={onQueryChange}
+			onDeleteMany={vi
+				.fn()
+				.mockResolvedValue({ deleted: 0, skipped: 0, deletedIds: [] })}
+			onPrepareSelection={vi
+				.fn()
+				.mockResolvedValue({ ids: [], total: 0, truncated: false })}
 			{...overrides}
 		/>,
 	);
@@ -47,7 +63,7 @@ it("keeps historical stored and legacy counts distinct", () => {
 		4,
 	);
 	render(
-		<ScrapeHistoryList
+		<HistoryListHarness
 			items={[
 				{
 					id: "sample",
@@ -63,6 +79,12 @@ it("keeps historical stored and legacy counts distinct", () => {
 			total={1}
 			search={baseSearch}
 			onQueryChange={vi.fn()}
+			onDeleteMany={vi
+				.fn()
+				.mockResolvedValue({ deleted: 0, skipped: 0, deletedIds: [] })}
+			onPrepareSelection={vi
+				.fn()
+				.mockResolvedValue({ ids: [], total: 0, truncated: false })}
 		/>,
 	);
 	expect(screen.getByText(imageCountsLabel(counts))).toBeDefined();
@@ -227,6 +249,28 @@ describe("ScrapeHistoryList dashboard", () => {
 			sort: "oldest",
 			page: 1,
 		});
+	});
+
+	it("keeps the category filters on the left and status and sort on the right of the same row", () => {
+		renderList({ total: 3 });
+
+		const modeFilters = screen.getByRole("group", {
+			name: /filter mode ekstraksi/i,
+		});
+		const status = screen.getByLabelText("Status");
+		const sort = screen.getByLabelText("Urutkan");
+		const row = modeFilters.parentElement;
+		const group = status.closest("label")?.parentElement;
+
+		expect(row).not.toBeNull();
+		expect(group).not.toBeNull();
+		expect(sort.closest("label")?.parentElement).toBe(group);
+		expect(group?.parentElement).toBe(row);
+		// The row distributes the two groups apart and is allowed to wrap so a
+		// narrow screen moves the dropdowns to their own line instead of
+		// overflowing.
+		expect(row?.className).toContain("justify-between");
+		expect(row?.className).toContain("flex-wrap");
 	});
 
 	it("debounces search input without delaying visible keystrokes", () => {

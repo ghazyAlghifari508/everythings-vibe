@@ -10,13 +10,18 @@ import {
 } from "@/features/scrape/components/scrape-history-view";
 import {
 	deleteScrapeItem,
+	deleteScrapeItems,
 	loadScrapesHistory,
+	prepareScrapeHistorySelection,
 } from "@/features/scrape/services/scrape-history-loader.functions";
 import {
 	parseScrapeHistorySearch,
+	type ScrapeHistoryBulkDeleteResult,
+	type ScrapeHistoryBulkSelection,
 	type ScrapeHistorySearch,
 } from "@/features/scrape/types/scrape-contract";
 import {
+	resolvePageAfterBulkDelete,
 	resolvePageAfterDelete,
 	toScrapeHistorySearchParams,
 } from "@/features/scrape/utils/scrape-history";
@@ -83,6 +88,33 @@ function ScrapHistoryPage() {
 		}
 	}
 
+	async function handleDeleteMany(
+		ids: string[],
+	): Promise<ScrapeHistoryBulkDeleteResult> {
+		const result = await deleteScrapeItems({ data: { ids } });
+		const nextPage = resolvePageAfterBulkDelete(
+			loaderData.total,
+			result.deleted,
+			search.page,
+			search.pageSize,
+		);
+		if (nextPage !== search.page) {
+			await navigate({
+				to: ".",
+				search: (prev) => ({ ...prev, page: nextPage }),
+			});
+		} else {
+			await router.invalidate();
+		}
+		return result;
+	}
+
+	async function handlePrepareSelection(): Promise<ScrapeHistoryBulkSelection> {
+		return prepareScrapeHistorySelection({
+			data: parseScrapeHistorySearch(search),
+		});
+	}
+
 	return (
 		<ScrapeHistoryView
 			items={loaderData.items}
@@ -90,6 +122,8 @@ function ScrapHistoryPage() {
 			search={search}
 			onQueryChange={handleQueryChange}
 			onDelete={handleDelete}
+			onDeleteMany={handleDeleteMany}
+			onPrepareSelection={handlePrepareSelection}
 		/>
 	);
 }

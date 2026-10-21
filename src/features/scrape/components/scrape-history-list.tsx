@@ -4,7 +4,12 @@ import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
+import type { ScrapeHistorySelectionController } from "@/features/scrape/hooks/use-scrape-history-selection";
+import type {
+	ScrapeHistoryBulkDeleteResult,
+	ScrapeHistoryBulkSelection,
+	ScrapeHistorySearch,
+} from "@/features/scrape/types/scrape-contract";
 import {
 	buildHistoryDetailSearch,
 	clampHistoryPage,
@@ -13,13 +18,18 @@ import {
 	isHistoryFiltered,
 } from "@/features/scrape/utils/scrape-history";
 import { useScrapeHistorySearchDraft } from "../hooks/use-scrape-history-search-draft";
-import { ScrapeHistoryDeleteDialog } from "./scrape-history-list-delete-dialog";
+import {
+	ScrapeHistoryDeleteDialog,
+	type ScrapeHistoryDeleteRequest,
+} from "./scrape-history-list-delete-dialog";
 import {
 	type ScrapeHistoryItem,
 	ScrapeHistoryRow,
 } from "./scrape-history-list-item";
 import { ScrapeHistoryPagination } from "./scrape-history-list-pagination";
 import { ScrapeHistorySearchControls } from "./scrape-history-list-search";
+import { ScrapeHistorySelectAll } from "./scrape-history-select-all";
+import { ScrapeHistorySelectionBar } from "./scrape-history-selection-bar";
 
 export type { ScrapeHistoryItem } from "./scrape-history-list-item";
 export {
@@ -27,47 +37,94 @@ export {
 	SCRAPE_STATUS_INDONESIAN_LABELS,
 } from "./scrape-history-list-item";
 
+interface ScrapeHistoryMessage {
+	text: string;
+	tone: "error" | "info";
+}
+
 export function ScrapeHistoryList({
 	items,
 	total,
 	search,
 	onQueryChange,
 	onDelete,
+	onDeleteMany,
+	onPrepareSelection,
+	selection,
 }: {
 	items: ScrapeHistoryItem[];
 	total: number;
 	search: ScrapeHistorySearch;
 	onQueryChange: (next: ScrapeHistorySearch) => void;
 	onDelete?: (id: string) => Promise<unknown>;
+	onDeleteMany: (ids: string[]) => Promise<ScrapeHistoryBulkDeleteResult>;
+	onPrepareSelection: () => Promise<ScrapeHistoryBulkSelection>;
+	selection: ScrapeHistorySelectionController;
 }) {
 	const [draft, setDraft] = useScrapeHistorySearchDraft(search, onQueryChange);
 	const [deletingId, setDeletingId] = useState<string | null>(null);
-	const [confirmTarget, setConfirmTarget] = useState<ScrapeHistoryItem | null>(
-		null,
-	);
-	const [error, setError] = useState<string | null>(null);
+	const [deleteRequest, setDeleteRequest] =
+		useState<ScrapeHistoryDeleteRequest | null>(null);
+	const [deleting, setDeleting] = useState(false);
+	const [preparing, setPreparing] = useState(false);
+	const [message, setMessage] = useState<ScrapeHistoryMessage | null>(null);
 
 	const totalPages = historyTotalPages(total, search.pageSize);
 	const page = clampHistoryPage(search.page, totalPages);
 	const range = historyPageRange(page, search.pageSize, total);
 	const filtered = isHistoryFiltered(search);
 	const detailSearch = buildHistoryDetailSearch({ ...search, page });
+	const pageIds = items.map((item) => item.id);
 
 	async function confirmDelete() {
-		if (!confirmTarget) return;
-		const id = confirmTarget.id;
-		setDeletingId(id);
-		setError(null);
+		if (!deleteRequest) return;
+		setDeleting(true);
+		setMessage(null);
 		try {
-			if (onDelete) {
-				await onDelete(id);
+			if (deleteRequest.kind === "single") {
+				const id = deleteRequest.item.id;
+				setDeletingId(id);
+				await onDelete?.(id);
+				setDeleteRequest(null);
+			} else {
+				const ids = [...selection.ids];
+				const result = await onDeleteMany(ids);
+				setDeleteRequest(null);
+				const deletedIds = new Set(result.deletedIds);
+				const remaining = ids.filter((id) => !deletedIds.has(id));
+				if (remaining.length > 0) {
+					selection.replace(remaining);
+					setMessage({
+						text: `${result.deleted} dari ${ids.length} hasil dihapus. ${result.skipped} hasil sudah tidak ada.`,
+						tone: "info",
+					});
+				} else {
+					selection.exit();
+				}
 			}
-			setConfirmTarget(null);
 		} catch {
-			setConfirmTarget(null);
-			setError("Gagal menghapus riwayat scrape. Coba lagi.");
+			setDeleteRequest(null);
+			setMessage({
+				text: "Gagal menghapus riwayat scrape. Coba lagi.",
+				tone: "error",
+			});
 		} finally {
+			setDeleting(false);
 			setDeletingId(null);
+		}
+	}
+
+	async function handleSelectAllFiltered() {
+		setPreparing(true);
+		try {
+			selection.applyFiltered(await onPrepareSelection());
+		} catch {
+			setMessage({
+				text: "Gagal menyiapkan pilihan. Coba lagi.",
+				tone: "error",
+			});
+		} finally {
+			setPreparing(false);
 		}
 	}
 
@@ -94,12 +151,16 @@ export function ScrapeHistoryList({
 
 	return (
 		<div className="flex flex-col gap-4">
-			{error ? (
+			{message ? (
 				<p
-					role="alert"
-					className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-400"
+					role={message.tone === "error" ? "alert" : "status"}
+					className={`rounded-lg border p-3 text-xs ${
+						message.tone === "error"
+							? "border-rose-500/30 bg-rose-500/10 text-rose-400"
+							: "border-graphite bg-charcoal text-fog"
+					}`}
 				>
-					{error}
+					{message.text}
 				</p>
 			) : null}
 
@@ -111,6 +172,20 @@ export function ScrapeHistoryList({
 				total={total}
 				range={range}
 			/>
+
+			{selection.active && items.length > 0 ? (
+				<ScrapeHistorySelectAll
+					pageIds={pageIds}
+					selectedIds={selection.ids}
+					total={total}
+					filteredScopeActive={selection.scope === "filtered"}
+					preparing={preparing}
+					onTogglePage={(selected) =>
+						selection.setPageSelection(pageIds, selected)
+					}
+					onSelectAllFiltered={() => void handleSelectAllFiltered()}
+				/>
+			) : null}
 
 			{total === 0 ? (
 				<div className="flex flex-col items-start gap-2 rounded-xl border border-graphite bg-charcoal p-6">
@@ -145,11 +220,30 @@ export function ScrapeHistoryList({
 							item={item}
 							detailSearch={detailSearch}
 							deleting={deletingId === item.id}
-							onRequestDelete={setConfirmTarget}
+							onRequestDelete={(target) =>
+								setDeleteRequest({ kind: "single", item: target })
+							}
+							selectionMode={selection.active}
+							selected={selection.ids.has(item.id)}
+							onToggleSelect={selection.toggle}
 						/>
 					))}
 				</ul>
 			)}
+
+			{selection.active ? (
+				<ScrapeHistorySelectionBar
+					count={selection.count}
+					filteredTotal={selection.filteredTotal}
+					truncated={selection.truncated}
+					notice={selection.notice}
+					deleting={deleting}
+					onClear={selection.clear}
+					onDelete={() =>
+						setDeleteRequest({ kind: "bulk", count: selection.count })
+					}
+				/>
+			) : null}
 
 			<ScrapeHistoryPagination
 				page={page}
@@ -159,9 +253,9 @@ export function ScrapeHistoryList({
 			/>
 
 			<ScrapeHistoryDeleteDialog
-				target={confirmTarget}
-				deleting={deletingId !== null}
-				onCancel={() => setConfirmTarget(null)}
+				request={deleteRequest}
+				deleting={deleting}
+				onCancel={() => setDeleteRequest(null)}
 				onConfirm={() => void confirmDelete()}
 			/>
 		</div>

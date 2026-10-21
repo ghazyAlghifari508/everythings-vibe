@@ -52,69 +52,73 @@ export function ScrapeHistorySearchControls({
 				/>
 			</search>
 
-			<fieldset className="flex gap-2 overflow-x-auto pb-1">
-				<legend className="sr-only">Filter mode ekstraksi</legend>
-				{MODE_TABS.map((tab) => {
-					const active =
-						(search.mode ?? undefined) === (tab.value ?? undefined);
-					return (
-						<button
-							key={tab.label}
-							type="button"
-							aria-pressed={active}
-							onClick={() =>
-								onQueryChange({ ...search, mode: tab.value, page: 1 })
-							}
-							className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-								active
-									? "bg-snow text-onyx"
-									: "border border-graphite bg-charcoal text-fog hover:border-fog/40 hover:text-snow"
-							}`}
-						>
-							{tab.label}
-						</button>
-					);
-				})}
-			</fieldset>
+			<div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+				<fieldset className="flex w-full min-w-0 gap-2 overflow-x-auto pb-1 sm:w-auto sm:flex-none">
+					<legend className="sr-only">Filter mode ekstraksi</legend>
+					{MODE_TABS.map((tab) => {
+						const active =
+							(search.mode ?? undefined) === (tab.value ?? undefined);
+						return (
+							<button
+								key={tab.label}
+								type="button"
+								aria-pressed={active}
+								onClick={() =>
+									onQueryChange({ ...search, mode: tab.value, page: 1 })
+								}
+								className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+									active
+										? "bg-snow text-onyx"
+										: "border border-graphite bg-charcoal text-fog hover:border-fog/40 hover:text-snow"
+								}`}
+							>
+								{tab.label}
+							</button>
+						);
+					})}
+				</fieldset>
 
-			<div className="flex flex-wrap items-end gap-3">
-				<ScrapeFilterSelect
-					label="Status"
-					value={search.status ?? "all"}
-					onChange={(value) =>
-						onQueryChange({
-							...search,
-							status:
-								value === "completed" ||
-								value === "failed" ||
-								value === "processing"
-									? value
-									: undefined,
-							page: 1,
-						})
-					}
-					options={[
-						{ value: "all", label: "Semua" },
-						{ value: "completed", label: "Selesai" },
-						{ value: "processing", label: "Diproses" },
-						{ value: "failed", label: "Gagal" },
-					]}
-				/>
-				<ScrapeFilterSelect
-					label="Urutkan"
-					value={search.sort}
-					onChange={(value) =>
-						onQueryChange({
-							...search,
-							sort: value === "oldest" ? "oldest" : "newest",
-							page: 1,
-						})
-					}
-					options={[
-						{ value: "newest", label: "Terbaru" },
-						{ value: "oldest", label: "Terlama" },
-					]}
-				/>
+				<div className="flex shrink-0 items-center gap-3">
+					<ScrapeFilterSelect
+						inline
+						label="Status"
+						value={search.status ?? "all"}
+						onChange={(value) =>
+							onQueryChange({
+								...search,
+								status:
+									value === "completed" ||
+									value === "failed" ||
+									value === "processing"
+										? value
+										: undefined,
+								page: 1,
+							})
+						}
+						options={[
+							{ value: "all", label: "Semua" },
+							{ value: "completed", label: "Selesai" },
+							{ value: "processing", label: "Diproses" },
+							{ value: "failed", label: "Gagal" },
+						]}
+					/>
+					<ScrapeFilterSelect
+						inline
+						label="Urutkan"
+						value={search.sort}
+						onChange={(value) =>
+							onQueryChange({
+								...search,
+								sort: value === "oldest" ? "oldest" : "newest",
+								page: 1,
+							})
+						}
+						options={[
+							{ value: "newest", label: "Terbaru" },
+							{ value: "oldest", label: "Terlama" },
+						]}
+					/>
+				</div>
 			</div>
 
 			<div className="flex items-center justify-between text-xs text-fog">

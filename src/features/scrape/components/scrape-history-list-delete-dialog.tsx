@@ -11,32 +11,44 @@ import { Icon } from "@/components/ui/icon";
 import { displaySiteName } from "@/features/scrape/utils/site-name";
 import type { ScrapeHistoryItem } from "./scrape-history-list-item";
 
+export type ScrapeHistoryDeleteRequest =
+	| { kind: "single"; item: ScrapeHistoryItem }
+	| { kind: "bulk"; count: number };
+
 export function ScrapeHistoryDeleteDialog({
-	target,
+	request,
 	deleting,
 	onCancel,
 	onConfirm,
 }: {
-	target: ScrapeHistoryItem | null;
+	request: ScrapeHistoryDeleteRequest | null;
 	deleting: boolean;
 	onCancel: () => void;
 	onConfirm: () => void;
 }) {
+	const single = request?.kind === "single" ? request.item : null;
+	const bulkCount = request?.kind === "bulk" ? request.count : null;
+	const title =
+		single === null && bulkCount !== null
+			? `Hapus ${bulkCount} hasil scrape?`
+			: "Hapus Riwayat VibeScrape?";
+	const description =
+		single === null
+			? "Hasil yang dipilih akan dihapus permanen."
+			: `Apakah kamu yakin ingin menghapus riwayat scrape untuk ${displaySiteName(single.domain)}? Tindakan ini tidak dapat dibatalkan.`;
+	const confirmLabel =
+		single === null ? `Hapus ${bulkCount} hasil` : "Konfirmasi Hapus";
 	return (
 		<Dialog
-			open={target !== null}
+			open={request !== null}
 			onOpenChange={(open) => {
 				if (!open) onCancel();
 			}}
 		>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle>Hapus Riwayat VibeScrape?</DialogTitle>
-					<DialogDescription>
-						Apakah kamu yakin ingin menghapus riwayat scrape untuk{" "}
-						{target ? displaySiteName(target.domain) : "website ini"}? Tindakan
-						ini tidak dapat dibatalkan.
-					</DialogDescription>
+					<DialogTitle>{title}</DialogTitle>
+					<DialogDescription>{description}</DialogDescription>
 				</DialogHeader>
 				<DialogFooter>
 					<button
@@ -56,7 +68,7 @@ export function ScrapeHistoryDeleteDialog({
 						{deleting ? (
 							<Icon icon={Loading03Icon} size={12} className="animate-spin" />
 						) : null}
-						Konfirmasi Hapus
+						{confirmLabel}
 					</button>
 				</DialogFooter>
 			</DialogContent>

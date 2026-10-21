@@ -21,6 +21,8 @@ vi.mock("@/features/scrape/services/scrape-detail-loader.functions", () => ({
 vi.mock("@/features/scrape/services/scrape-history-loader.functions", () => ({
 	loadScrapesHistory: loaders.history,
 	deleteScrapeItem: vi.fn(),
+	deleteScrapeItems: vi.fn(),
+	prepareScrapeHistorySelection: vi.fn(),
 }));
 
 const root = createRootRoute();
