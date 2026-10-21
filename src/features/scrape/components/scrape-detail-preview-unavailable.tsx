@@ -1,6 +1,5 @@
 import {
 	Alert02Icon,
-	CodeIcon,
 	Loading01Icon,
 	RotateRight01Icon,
 } from "@hugeicons/core-free-icons";
@@ -9,21 +8,19 @@ import { Icon } from "@/components/ui/icon";
 /**
  * Shown when no visual mode can be presented.
  *
- * The retry only appears for a real failure, and the source tab stays one
- * click away because the captured document is always still available.
+ * The retry only appears for a real failure. The source is one click away in
+ * the tab bar above, so this surface never repeats that action.
  */
 export function PreviewUnavailable({
 	message,
 	isRetryable,
 	isLoading = false,
 	onRetry,
-	onOpenSource,
 }: {
 	message: string;
 	isRetryable: boolean;
 	isLoading?: boolean;
 	onRetry?: () => void;
-	onOpenSource?: () => void;
 }) {
 	return (
 		<div
@@ -58,18 +55,6 @@ export function PreviewUnavailable({
 					>
 						<Icon icon={RotateRight01Icon} size={14} aria-hidden />
 						Coba lagi
-					</button>
-				) : null}
-				{onOpenSource ? (
-					<button
-						type="button"
-						onClick={onOpenSource}
-						aria-label="Buka Source HTML"
-						title="View HTML Source"
-						className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						<Icon icon={CodeIcon} size={14} aria-hidden />
-						Buka Source HTML
 					</button>
 				) : null}
 			</div>

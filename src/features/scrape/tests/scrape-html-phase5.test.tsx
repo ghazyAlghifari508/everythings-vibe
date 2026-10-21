@@ -85,11 +85,12 @@ describe("Phase 5 UI — Separate HTML Source and Visual Reference", () => {
 
 		expect(screen.getByTestId("preview-unavailable")).toBeDefined();
 		expect(screen.getByText(/Gagal memuat/i)).toBeDefined();
+		// The source stays one click away in the tab bar, so the failure
+		// surface must not repeat that action.
 		expect(
-			screen.getByRole("button", {
-				name: /View HTML Source|Buka Source HTML/i,
-			}),
-		).toBeDefined();
+			screen.queryByRole("button", { name: /Buka Source HTML/i }),
+		).toBeNull();
+		expect(screen.getByRole("tab", { name: /HTML Source/i })).toBeDefined();
 	});
 
 	it("allows switching between live DOM preview and Screenshot when both exist", () => {

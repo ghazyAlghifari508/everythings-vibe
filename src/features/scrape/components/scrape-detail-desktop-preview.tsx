@@ -28,7 +28,6 @@ export function DesktopPreview({
 	active = true,
 	onReport,
 	onRetry,
-	onOpenSource,
 }: {
 	title: string;
 	srcDoc: string;
@@ -36,7 +35,6 @@ export function DesktopPreview({
 	active?: boolean;
 	onReport?: (report: FrameReport) => void;
 	onRetry?: () => void;
-	onOpenSource?: () => void;
 }) {
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const [scale, setScale] = useState(1);
@@ -216,11 +214,7 @@ export function DesktopPreview({
 							transformOrigin: "top left",
 						}}
 					/>
-					<PreviewCanvasOverlay
-						report={report}
-						onRetry={onRetry}
-						onOpenSource={onOpenSource}
-					/>
+					<PreviewCanvasOverlay report={report} onRetry={onRetry} />
 				</div>
 			</div>
 		</div>

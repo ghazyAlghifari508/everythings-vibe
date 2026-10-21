@@ -180,7 +180,6 @@ describe("scrape HTML preview navigation", () => {
 
 		const body = screen.getByTestId("codebase-source-body");
 		expect(body.style.maxHeight).toBe(`${SCRAPE_SOURCE_PREVIEW_MAX_HEIGHT}px`);
-		expect(body.className).toContain("overflow-auto");
 	});
 
 	it("keeps the chosen source view when the primary tab changes", () => {

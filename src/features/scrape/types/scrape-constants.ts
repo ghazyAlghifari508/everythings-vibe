@@ -32,7 +32,10 @@ export const CRAWL_SECTION_TEXT_MAX_CHARS = 8000;
 // Consecutive empty observations distinguish settled layout from a slow render.
 export const SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS = 3;
 // The source preview renders a bounded number of rows; the complete document
-// stays reachable through the download action.
+// stays reachable through the download action. This is the scrape surface's
+// own budget, independent of the codebase file preview: a scraped page is one
+// whole document, and the Terformat view expands a page roughly threefold, so
+// the budget has to cover the formatted view of a typical page.
 export const SCRAPE_SOURCE_PREVIEW_MAX_LINES = 3_000;
 // Height of the scrollable source area. The area shrinks to shorter sources
 // and scrolls once the document outgrows the cap.

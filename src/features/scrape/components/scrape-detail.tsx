@@ -149,10 +149,6 @@ export function ScrapeDetail({
 			?.focus();
 	}
 
-	function openSourceTab() {
-		selectTab("code");
-	}
-
 	return (
 		<div className="space-y-5">
 			{sourceUrl && (
@@ -209,7 +205,6 @@ export function ScrapeDetail({
 						onRetryPreview?.();
 					}}
 					onRetryPreview={onRetryPreview}
-					onOpenSource={openSourceTab}
 				/>
 
 				<div

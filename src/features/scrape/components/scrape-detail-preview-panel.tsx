@@ -30,7 +30,6 @@ export function ScrapeHtmlPreviewPanel({
 	onFrameReport,
 	onRetryFrame,
 	onRetryPreview,
-	onOpenSource,
 }: {
 	active: boolean;
 	domain: string;
@@ -46,7 +45,6 @@ export function ScrapeHtmlPreviewPanel({
 	onFrameReport: (report: FrameReport) => void;
 	onRetryFrame: () => void;
 	onRetryPreview?: () => void;
-	onOpenSource: () => void;
 }) {
 	const hasScreenshot = Boolean(screenshot);
 	const hasDomDocument = Boolean(previewSrcDoc) && previewState !== "failed";
@@ -111,7 +109,6 @@ export function ScrapeHtmlPreviewPanel({
 					active={active}
 					onReport={onFrameReport}
 					onRetry={onRetryFrame}
-					onOpenSource={onOpenSource}
 				/>
 			) : hasScreenshot && screenshot ? (
 				<>
@@ -138,7 +135,6 @@ export function ScrapeHtmlPreviewPanel({
 					isRetryable={domFailed}
 					isLoading={previewState === "loading" && frameReport !== "failed"}
 					onRetry={retryAction}
-					onOpenSource={onOpenSource}
 				/>
 			)}
 		</div>

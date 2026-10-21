@@ -47,11 +47,9 @@ export const READINESS_MESSAGE: Record<
 export function PreviewCanvasOverlay({
 	report,
 	onRetry,
-	onOpenSource,
 }: {
 	report: FrameReport;
 	onRetry?: () => void;
-	onOpenSource?: () => void;
 }) {
 	const { label, detail } = READINESS_MESSAGE[report];
 	if (report === "ready") return null;
@@ -96,24 +94,13 @@ export function PreviewCanvasOverlay({
 			<output className="text-sm font-semibold text-snow">{label}</output>
 			<p className="max-w-md text-xs leading-5 text-fog">{detail}</p>
 			{onRetry ? (
-				<div className="flex flex-wrap items-center justify-center gap-2">
-					<button
-						type="button"
-						onClick={onRetry}
-						className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						Coba lagi
-					</button>
-					{onOpenSource ? (
-						<button
-							type="button"
-							onClick={onOpenSource}
-							className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							Buka Source HTML
-						</button>
-					) : null}
-				</div>
+				<button
+					type="button"
+					onClick={onRetry}
+					className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+				>
+					Coba lagi
+				</button>
 			) : null}
 		</div>
 	);
