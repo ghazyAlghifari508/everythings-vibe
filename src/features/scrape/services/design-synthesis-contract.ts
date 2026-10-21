@@ -1,9 +1,11 @@
 import { z } from "zod";
 import {
 	DESIGN_SYNTHESIS_MAX_COLORS,
+	DESIGN_SYNTHESIS_MAX_OBSERVED_COMPONENTS,
 	DESIGN_SYNTHESIS_MAX_RADII,
 	DESIGN_SYNTHESIS_MAX_SPACING,
 	DESIGN_SYNTHESIS_MAX_TYPOGRAPHY,
+	DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS,
 } from "@/features/scrape/types/scrape-constants";
 import type { DesignTokenModel } from "./design-model";
 
@@ -73,6 +75,7 @@ export function buildSynthesisInstruction(): string {
 		"Write analysis grounded strictly in that model. Rules:",
 		"- Never invent a colour value, font, size, spacing, radius, shadow or token name.",
 		"- Never claim responsive, hover, focus, loading or animation behaviour; those states were not measured.",
+		"- Never widen a measured value into a universal rule: state the measured component class and capture scope instead of 'all' or 'every'.",
 		"- Keep observed component treatments scoped to their selectors/captures. Do not infer primary/secondary hierarchy, brand identity or global rules from frequency. Semantic roles are inferences, not measurements.",
 		'- Cite evidence for every component pattern, Do and Don\'t as {"kind","index"} pairs into the model arrays you were given.',
 		"- Use English for all prose.",
@@ -107,9 +110,21 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 	const typefaces = truncate(model.typefaces, DESIGN_SYNTHESIS_MAX_TYPOGRAPHY);
 	const spacing = truncate(model.spacing, DESIGN_SYNTHESIS_MAX_SPACING);
 	const radii = truncate(model.radii, DESIGN_SYNTHESIS_MAX_RADII);
+	// The observed components carry measured properties and selectors, so their
+	// text is bounded like every other array. A cut component list is reported
+	// instead of being silently shortened.
+	const observedComponents = truncate(
+		model.observedComponents,
+		DESIGN_SYNTHESIS_MAX_OBSERVED_COMPONENTS,
+	);
 	const payloadTruncated =
-		colors.cut || typography.cut || typefaces.cut || spacing.cut || radii.cut;
-	return JSON.stringify({
+		colors.cut ||
+		typography.cut ||
+		typefaces.cut ||
+		spacing.cut ||
+		radii.cut ||
+		observedComponents.cut;
+	const payload = {
 		settings: model.settings,
 		capturedViews: model.capturedViews,
 		analysisScope:
@@ -123,7 +138,14 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 		theme: model.theme,
 		baseUnitPx: Number.isFinite(model.baseUnitPx) ? model.baseUnitPx : null,
 		payloadTruncated,
-		observedComponents: model.observedComponents,
+		observedComponents: observedComponents.slice.map((component) => ({
+			name: component.name,
+			description: component.description,
+			evidence: component.evidence,
+			frequency: component.frequency,
+			roles: component.roles,
+			treatmentCount: component.treatmentCount,
+		})),
 		colors: colors.slice.map((color, index) => ({
 			index,
 			role: color.role,
@@ -167,6 +189,7 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 			value: token.value,
 			frequency: token.frequency,
 			roles: token.roles,
+			scope: token.scope,
 			confidence: token.confidence,
 		})),
 		elevation: model.elevation.map((token) => ({
@@ -184,5 +207,18 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 			donts: model.guidelines.donts,
 		},
 		limitations: model.limitations,
-	});
+	};
+	// The payload must fit the provider budget. Component text carries the
+	// longest free-form strings, so it is what gives way first, and the cut is
+	// reported rather than hidden.
+	let serialized = JSON.stringify(payload);
+	while (
+		serialized.length > DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS &&
+		payload.observedComponents.length > 0
+	) {
+		payload.observedComponents.pop();
+		payload.payloadTruncated = true;
+		serialized = JSON.stringify(payload);
+	}
+	return serialized;
 }
