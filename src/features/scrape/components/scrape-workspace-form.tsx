@@ -163,8 +163,8 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 				<div className="rounded-xl border border-graphite bg-charcoal focus-within:ring-2 focus-within:ring-indigo">
 					<ScrapeFormNotice tone="plain" />
 					<div aria-hidden className="mx-4 mt-4 border-t border-graphite" />
-					<div className="flex items-stretch gap-2.5 p-3 sm:gap-3 sm:p-3.5">
-						<div className="flex h-11 min-w-0 flex-1 items-center overflow-hidden rounded-lg bg-transparent sm:h-12">
+					<div className="flex items-stretch gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5">
+						<div className="flex h-8 sm:h-9 min-w-0 flex-1 items-center overflow-hidden rounded-md bg-transparent">
 							<span className="flex h-full shrink-0 items-center border-r border-graphite px-2.5 font-mono text-xs text-fog">
 								{protocol}
 							</span>
@@ -183,7 +183,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 								maxLength={SCRAPE_LIMITS.urlChars}
 								aria-invalid={!!error}
 								aria-describedby={error ? "scrape-form-error" : undefined}
-								className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-xs text-snow outline-none placeholder:text-fog/70 sm:text-xs [--autofill-bg:var(--color-charcoal)]"
+								className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-xs text-snow outline-none placeholder:text-fog/70 [--autofill-bg:var(--color-charcoal)]"
 							/>
 						</div>
 						<button
@@ -191,17 +191,17 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 							disabled={pending || !input.trim()}
 							aria-label={`Jalankan ${mode === "design" ? "Generate DESIGN.md" : mode === "crawl" ? "Crawl Website" : mode === "images" ? "Scrape Images" : "Scrape HTML"}`}
 							title="Mulai ekstraksi"
-							className="btn-primary inline-flex size-11 shrink-0 items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40 sm:size-12"
+							className="btn-primary inline-flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40"
 						>
 							{pending ? (
 								<Icon
 									icon={Loading01Icon}
-									size={18}
+									size={16}
 									aria-hidden
 									className="motion-safe:animate-spin"
 								/>
 							) : (
-								<Icon icon={ArrowUp01Icon} size={18} aria-hidden />
+								<Icon icon={ArrowUp01Icon} size={16} aria-hidden />
 							)}
 						</button>
 					</div>

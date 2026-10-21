@@ -81,14 +81,14 @@ describe("scrap index heading stability & contextual navigation", () => {
 		const { container } = render(<Component />);
 
 		const inputWrapper = container.querySelector(
-			'div.h-11.sm\\:h-12, div[class*="h-11"][class*="sm:h-12"]',
+			'div.h-8.sm\\:h-9, div[class*="h-8"][class*="sm:h-9"]',
 		);
 		expect(inputWrapper).not.toBeNull();
 
 		const submitButton = screen.getByRole("button", {
 			name: /jalankan generate/i,
 		});
-		expect(submitButton.className).toContain("size-11");
-		expect(submitButton.className).toContain("sm:size-12");
+		expect(submitButton.className).toContain("size-8");
+		expect(submitButton.className).toContain("sm:size-9");
 	});
 });
