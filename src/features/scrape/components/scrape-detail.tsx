@@ -154,7 +154,7 @@ export function ScrapeDetail({
 					<a
 						href={sourceUrl}
 						target="_blank"
-						rel="noreferrer"
+						rel="noreferrer noopener"
 						className="mt-2 block break-all text-sm text-fog"
 					>
 						{sourceUrl}
