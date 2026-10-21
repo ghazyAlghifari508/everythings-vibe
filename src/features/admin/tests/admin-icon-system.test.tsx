@@ -73,12 +73,11 @@ describe("TASK 10F: Admin domain icon system verification", () => {
 				<Icon icon={GitBranchIcon} size={14} />
 				<Icon icon={CreditCardIcon} size={14} />
 				<Icon icon={Settings02Icon} size={14} />
-				<Icon icon={ArrowLeft01Icon} size={14} />
 			</div>,
 		);
 
 		const svgs = container.querySelectorAll("svg");
-		expect(svgs.length).toBe(7);
+		expect(svgs.length).toBe(6);
 		for (const svg of svgs) {
 			expect(svg.getAttribute("aria-hidden")).toBe("true");
 		}

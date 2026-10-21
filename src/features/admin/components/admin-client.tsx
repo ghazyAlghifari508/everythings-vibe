@@ -1,7 +1,6 @@
 "use client";
 
 import {
-	ArrowLeft01Icon,
 	BubbleChatIcon,
 	CreditCardIcon,
 	DashboardSquare01Icon,
@@ -118,19 +117,9 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 						</div>
 					</nav>
 
-					{/* Right: Theme Toggle + Exit Link */}
+					{/* Right: Theme Toggle */}
 					<div className="flex items-center gap-2 shrink-0">
 						<ThemeToggle />
-
-						<Link
-							to="/"
-							className="flex items-center gap-1.5 rounded-lg border border-graphite px-2.5 py-1.5 text-xs font-[510] text-fog transition-colors hover:border-fog/40 hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40"
-							title="Kembali ke Workspace"
-							aria-label="Kembali ke Workspace"
-						>
-							<Icon icon={ArrowLeft01Icon} size={14} />
-							<span className="hidden sm:inline">Keluar</span>
-						</Link>
 					</div>
 				</div>
 			</header>

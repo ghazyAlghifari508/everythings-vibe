@@ -84,11 +84,10 @@ describe("AdminClient Top-Nav Shell", () => {
 		expect(container.textContent).toContain("Transaksi");
 		expect(container.textContent).toContain("Pengaturan");
 
-		// Exit link to workspace
+		// No exit link in header shell
 		const exitLink = container.querySelector('a[href="/"]');
-		expect(exitLink).not.toBeNull();
-		expect(exitLink?.getAttribute("title")).toBe("Kembali ke Workspace");
-		expect(exitLink?.textContent).toContain("Keluar");
+		expect(exitLink).toBeNull();
+		expect(container.textContent).not.toContain("Keluar");
 	});
 
 	it("has no streamer mode toggle, provider, or indicators in the shell", () => {
