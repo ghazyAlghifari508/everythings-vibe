@@ -117,6 +117,18 @@ describe("synthesis validation", () => {
 		);
 		expect(validateSynthesis(parsed, model)).toEqual([]);
 	});
+
+	it("rejects CSS measurements absent from the measured model", () => {
+		const parsed = designSynthesisSchema.parse(
+			synthesis({ implementationGuidance: ["Use a radius of 137px."] }),
+		);
+		expect(validateSynthesis(parsed, model)).toEqual([
+			{
+				code: "unknown-value",
+				detail: "Prose cites measurement 137px, which was not measured.",
+			},
+		]);
+	});
 });
 
 describe("synthesis parsing", () => {
@@ -252,5 +264,14 @@ describe("synthesis to renderer mapping", () => {
 		const options = synthesisToRenderOptions(parsed, model);
 		expect(options.essence).toBe("A measured interface.");
 		expect(options.layoutPrinciples).toEqual([]);
+	});
+
+	it("preserves synthesis limitations separately from measured facts", () => {
+		const parsed = designSynthesisSchema.parse(
+			synthesis({ limitations: ["Additional states remain unknown."] }),
+		);
+		expect(synthesisToRenderOptions(parsed, model).limitations).toEqual(
+			parsed.limitations,
+		);
 	});
 });

@@ -72,12 +72,34 @@ export function validateSynthesis(
 		...synthesis.implementationGuidance,
 		...synthesis.dos.map((rule) => rule.rule),
 		...synthesis.donts.map((rule) => rule.rule),
+		...synthesis.limitations,
 	].join("\n");
 	for (const match of prose.matchAll(/#[0-9a-f]{3,8}\b/gi)) {
 		if (!knownColors.has(match[0].toLowerCase()))
 			issues.push({
 				code: "unknown-value",
 				detail: `Prose cites colour ${match[0]}, which was not measured.`,
+			});
+	}
+	const measurements = [
+		...model.typography.flatMap((entry) => [
+			entry.fontSize,
+			entry.lineHeight,
+			entry.letterSpacing,
+		]),
+		...model.spacing.map((token) => token.value),
+		...model.radii.map((token) => token.value),
+		...model.elevation.map((token) => token.value),
+	];
+	const cssLength = /-?(?:\d*\.)?\d+(?:px|rem|em|%|vh|vw|ch)\b/gi;
+	const knownMeasurements = new Set(
+		measurements.flatMap((value) => value.match(cssLength) ?? []),
+	);
+	for (const match of prose.matchAll(cssLength)) {
+		if (!knownMeasurements.has(match[0]))
+			issues.push({
+				code: "unknown-value",
+				detail: `Prose cites measurement ${match[0]}, which was not measured.`,
 			});
 	}
 	return issues;
@@ -130,6 +152,7 @@ export function synthesisToRenderOptions(
 		layoutPrinciples: synthesis.layoutPrinciples,
 		imageryNotes: synthesis.imageryNotes,
 		implementationGuidance: synthesis.implementationGuidance,
+		limitations: synthesis.limitations,
 	};
 }
 

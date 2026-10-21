@@ -81,7 +81,9 @@ export async function generateDesignMd(
 	// Without instrumentation there is no AI step at all, so the measured model
 	// produces the document on its own.
 	if (!instrumentation) {
-		const document = renderModelDesignMd(model);
+		const document = renderModelDesignMd(model, {
+			enrichmentUnavailable: true,
+		});
 		assertDocumentValid(document);
 		return { document, enrichment: { status: "unavailable" }, model };
 	}

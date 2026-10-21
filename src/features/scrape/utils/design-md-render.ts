@@ -19,6 +19,7 @@ export interface RenderDesignMdOptions {
 	layoutPrinciples?: string[];
 	imageryNotes?: string[];
 	implementationGuidance?: string[];
+	limitations?: string[];
 	/** True when the AI synthesis step did not run or did not succeed. */
 	enrichmentUnavailable?: boolean;
 	/**
@@ -48,13 +49,15 @@ export function renderDesignMd(
 	if (options.enrichmentUnavailable) {
 		lines.push(
 			"",
-			"The AI synthesis step did not produce a narrative for this capture. The measured tokens below are complete and unaffected.",
+			"The AI synthesis step did not produce a narrative for this capture. AI synthesis is unavailable or did not run. Available measurements remain usable within the capture scope, not a complete website specification.",
 		);
 		if (options.enrichmentDetail?.trim())
 			lines.push(`- ${escapeCell(options.enrichmentDetail.trim())}`);
 	}
 	for (const limitation of model.limitations)
 		lines.push(`- ${escapeCell(limitation)}`);
+	for (const limitation of options.limitations ?? [])
+		lines.push(`- AI inference limitation: ${escapeCell(limitation)}`);
 
 	// --- 17. Measurement provenance -----------------------------------------
 	lines.push("", heading(2, "Measurement Provenance"), "");

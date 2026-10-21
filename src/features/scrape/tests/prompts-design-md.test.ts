@@ -148,6 +148,12 @@ it("renders a measured document from the structured model without any AI step", 
 	expect(model.colors.length).toBeGreaterThan(0);
 });
 
+it("persists unavailable synthesis in a measurement-only document", async () => {
+	const result = await generateDesignMd(evidence);
+	expect(result.enrichment.status).toBe("unavailable");
+	expect(result.document).toMatch(/AI synthesis.*(?:unavailable|not.*run)/i);
+});
+
 it("fails closed when evidence is empty", async () => {
 	await expect(
 		generateDesignMd({ ...evidence, elements: [] }),
