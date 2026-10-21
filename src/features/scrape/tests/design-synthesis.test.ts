@@ -118,16 +118,31 @@ describe("synthesis validation", () => {
 		expect(validateSynthesis(parsed, model)).toEqual([]);
 	});
 
-	it("rejects CSS measurements absent from the measured model", () => {
+	it.each(["137px", "137%"])("rejects unmeasured CSS length %s", (value) => {
 		const parsed = designSynthesisSchema.parse(
-			synthesis({ implementationGuidance: ["Use a radius of 137px."] }),
+			synthesis({ implementationGuidance: [`Use a radius of ${value}.`] }),
 		);
 		expect(validateSynthesis(parsed, model)).toEqual([
 			{
 				code: "unknown-value",
-				detail: "Prose cites measurement 137px, which was not measured.",
+				detail: `Prose cites measurement ${value}, which was not measured.`,
 			},
 		]);
+	});
+
+	it("accepts percentages present in measured typography", () => {
+		const parsed = designSynthesisSchema.parse(
+			synthesis({ implementationGuidance: ["Use a line height of 137%."] }),
+		);
+		expect(
+			validateSynthesis(parsed, {
+				...model,
+				typography: model.typography.map((entry) => ({
+					...entry,
+					lineHeight: "137%",
+				})),
+			}),
+		).toEqual([]);
 	});
 });
 

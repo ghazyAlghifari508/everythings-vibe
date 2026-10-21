@@ -1,10 +1,12 @@
 import type { RenderDesignMdOptions } from "../utils/design-md-render";
 import type { DesignTokenModel } from "./design-model";
+import { validateSynthesisClaims } from "./design-synthesis-claims";
 import {
 	type DesignSynthesis,
 	designSynthesisSchema,
 	type EvidenceReference,
 } from "./design-synthesis-contract";
+import { validateSynthesisValues } from "./design-synthesis-values";
 
 export type {
 	DesignSynthesis,
@@ -21,13 +23,14 @@ export {
 } from "./design-synthesis-contract";
 
 export interface SynthesisValidationIssue {
-	code: "unknown-reference" | "unknown-value" | "schema";
+	code: "unknown-reference" | "unknown-value" | "unsupported-claim" | "schema";
 	detail: string;
 }
 
-// Checks every citation resolves to a real model entry, and that no prose
-// repeats a colour or measurement that is not in the model. This is the gate
-// that keeps a plausible-looking fabrication out of the document.
+// Checks every citation resolves to a real model entry, that no prose repeats
+// a value the model never measured, and that no rule claims a scope the
+// capture cannot support. This is the gate that keeps a plausible-looking
+// fabrication out of the document.
 export function validateSynthesis(
 	synthesis: DesignSynthesis,
 	model: DesignTokenModel,
@@ -57,11 +60,8 @@ export function validateSynthesis(
 	for (const rule of synthesis.donts)
 		check(rule.references, `Don't rule "${rule.rule}"`);
 
-	// Any colour literal in the prose must be a colour the model actually
-	// measured; otherwise the model invented one.
-	const knownColors = new Set(
-		model.colors.map((color) => color.value.toLowerCase()),
-	);
+	// Any colour, length or family literal in the prose must be a value the
+	// model actually measured; otherwise the model invented one.
 	const prose = [
 		synthesis.essence,
 		synthesis.overview,
@@ -73,35 +73,19 @@ export function validateSynthesis(
 		...synthesis.dos.map((rule) => rule.rule),
 		...synthesis.donts.map((rule) => rule.rule),
 		...synthesis.limitations,
-	].join("\n");
-	for (const match of prose.matchAll(/#[0-9a-f]{3,8}\b/gi)) {
-		if (!knownColors.has(match[0].toLowerCase()))
-			issues.push({
-				code: "unknown-value",
-				detail: `Prose cites colour ${match[0]}, which was not measured.`,
-			});
-	}
-	const measurements = [
-		...model.typography.flatMap((entry) => [
-			entry.fontSize,
-			entry.lineHeight,
-			entry.letterSpacing,
-		]),
-		...model.spacing.map((token) => token.value),
-		...model.radii.map((token) => token.value),
-		...model.elevation.map((token) => token.value),
 	];
-	const cssLength = /-?(?:\d*\.)?\d+(?:px|rem|em|%|vh|vw|ch)\b/gi;
-	const knownMeasurements = new Set(
-		measurements.flatMap((value) => value.match(cssLength) ?? []),
+	issues.push(...validateSynthesisValues(prose, model));
+	issues.push(
+		...validateSynthesisClaims(
+			[
+				...synthesis.dos.map((rule) => rule.rule),
+				...synthesis.donts.map((rule) => rule.rule),
+				...synthesis.implementationGuidance,
+				...synthesis.componentPatterns.map((pattern) => pattern.description),
+			],
+			model,
+		),
 	);
-	for (const match of prose.matchAll(cssLength)) {
-		if (!knownMeasurements.has(match[0]))
-			issues.push({
-				code: "unknown-value",
-				detail: `Prose cites measurement ${match[0]}, which was not measured.`,
-			});
-	}
 	return issues;
 }
 
@@ -161,6 +145,7 @@ export type SynthesisCause =
 	| "invalid_json"
 	| "schema"
 	| "unknown_reference"
+	| "unsupported_claim"
 	| "provider"
 	| "timeout"
 	| "cancelled";
@@ -201,6 +186,11 @@ export function enrichmentDetailForCause(
 			return "AI tidak memenuhi kontrak sintesis design system.";
 		case "unknown_reference":
 			return safeDetail ?? "AI merujuk evidence yang tidak tersedia.";
+		case "unsupported_claim":
+			return (
+				safeDetail ??
+				"AI menyatakan aturan yang lebih luas daripada bukti terukur."
+			);
 		case "timeout":
 			return "AI synthesis melampaui batas waktu.";
 		case "cancelled":
@@ -268,7 +258,10 @@ export function parseSynthesisResponse(
 			synthesis: null,
 			status: "unavailable",
 			detail: issues[0]?.detail ?? "AI merujuk evidence yang tidak tersedia.",
-			cause: "unknown_reference",
+			cause:
+				issues[0]?.code === "unsupported-claim"
+					? "unsupported_claim"
+					: "unknown_reference",
 		};
 	return { synthesis: result.data, status: "applied" };
 }
