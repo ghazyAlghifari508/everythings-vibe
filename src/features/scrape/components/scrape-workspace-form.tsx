@@ -165,7 +165,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 					<div aria-hidden className="mx-4 mt-4 border-t border-graphite" />
 					<div className="flex items-stretch gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5">
 						<div className="flex h-8 sm:h-9 min-w-0 flex-1 items-center overflow-hidden rounded-md bg-transparent">
-							<span className="flex h-full shrink-0 items-center border-r border-graphite px-2.5 font-mono text-xs text-fog">
+							<span className="flex h-full shrink-0 items-center border-r border-graphite px-3 font-mono text-xs text-fog sm:text-sm">
 								{protocol}
 							</span>
 							<label htmlFor="scrape-url" className="sr-only">
@@ -183,7 +183,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 								maxLength={SCRAPE_LIMITS.urlChars}
 								aria-invalid={!!error}
 								aria-describedby={error ? "scrape-form-error" : undefined}
-								className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-xs text-snow outline-none placeholder:text-fog/70 [--autofill-bg:var(--color-charcoal)]"
+								className="h-full min-w-0 flex-1 bg-transparent px-3 text-base text-snow outline-none placeholder:text-fog sm:text-sm [--autofill-bg:var(--color-charcoal)]"
 							/>
 						</div>
 						<button
