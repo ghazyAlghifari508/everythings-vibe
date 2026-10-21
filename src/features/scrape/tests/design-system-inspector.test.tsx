@@ -129,6 +129,7 @@ const MODEL: DesignInspectorModel = {
 			valuePx: 8,
 			context: "2 element",
 			frequency: 2,
+			pill: false,
 		},
 	],
 	elevation: [
@@ -603,7 +604,7 @@ describe("task E inspector composition", () => {
 		expect(screen.queryByText(/rasio antar peran tetap/i)).toBeNull();
 	});
 
-	it("treats mid-size radii as pills through the shared threshold", () => {
+	it("previews a pill only when the measured geometry proves it", () => {
 		renderInspector({
 			...EMPTY_MODEL,
 			radii: [
@@ -613,11 +614,30 @@ describe("task E inspector composition", () => {
 					valuePx: 150,
 					context: "",
 					frequency: 2,
+					pill: true,
 				},
 			],
 		});
 		const preview = screen.getByRole("img", { name: "Buttons 150px" });
 		expect((preview as HTMLElement).style.borderRadius).toBe("999px");
+	});
+
+	it("does not preview a large radius as a pill without geometric proof", () => {
+		renderInspector({
+			...EMPTY_MODEL,
+			radii: [
+				{
+					label: "Buttons",
+					value: "150px",
+					valuePx: 150,
+					context: "",
+					frequency: 2,
+					pill: false,
+				},
+			],
+		});
+		const preview = screen.getByRole("img", { name: "Buttons 150px" });
+		expect((preview as HTMLElement).style.borderRadius).toBe("24px");
 	});
 
 	it("does not label surfaces from array position", () => {
@@ -688,6 +708,7 @@ describe("task F static readability", () => {
 					valuePx: 8,
 					context: "",
 					frequency: 2,
+					pill: false,
 				},
 			],
 		});

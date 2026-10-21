@@ -2,7 +2,6 @@ import type {
 	InspectorRadiusToken,
 	InspectorToken,
 } from "@/features/scrape/utils/design-md-inspector";
-import { isPillRadius } from "@/features/scrape/utils/design-normalize-shape";
 
 export function SpacingRow({ token }: { token: InspectorToken }) {
 	const px = token.value.trim().match(/^([\d.]+)px$/);
@@ -58,7 +57,7 @@ export function RadiusRow({ token }: { token: InspectorRadiusToken }) {
 		normalized.includes("full") ||
 		normalized.includes("pill") ||
 		normalized === "50%" ||
-		isPillRadius(token.valuePx);
+		token.pill;
 	const previewRadius = isPill
 		? "999px"
 		: Number.isFinite(token.valuePx)

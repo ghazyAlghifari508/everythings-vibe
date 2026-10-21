@@ -6,7 +6,6 @@ import {
 	table,
 } from "./design-md-markdown";
 import type { RenderDesignMdOptions } from "./design-md-render";
-import { isPillRadius } from "./design-normalize-shape";
 import { primaryFontFamily } from "./design-normalize-typography";
 
 // Identity, theme narrative and the measured token tables (sections 1-6).
@@ -144,12 +143,15 @@ export function renderTokenSections(
 			lines.push("", heading(3, "Border Radius"), "");
 			lines.push(
 				table(
-					["Context", "Value", "Measured on"],
+					["Context", "Value", "Captured in", "Measured on"],
 					model.radii.map((token) => [
 						escapeCell(token.purpose),
-						token.pill || isPillRadius(token.valuePx)
+						// The shape annotation comes from the measured geometry. A
+						// large number alone does not make a shape a pill.
+						token.pill
 							? `\`${escapeCell(token.value)}\` (fully rounded / pill)`
 							: `\`${escapeCell(token.value)}\``,
+						escapeCell(token.scope || "single capture"),
 						String(token.frequency),
 					]),
 				),
