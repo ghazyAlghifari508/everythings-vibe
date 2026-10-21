@@ -12,7 +12,7 @@ Boot instructions for AI agents working on **everythings-vibe**.
 - `.agents/rules/no-hardcode.md` -> configuration, provider, and constants discipline
 - `.agents/rules/no-type-bypass.md` -> strict type safety (`as never`, `as any`, and `@ts-ignore` are forbidden)
 - `.agents/rules/design-layout-consistency.md` -> page family classification, layout contracts, container strategies, breadcrumb governance, and Hugeicons standard
-- `.agents/rules/anti-ai-slop.md` -> design constraints and UI standards
+- `.agents/rules/anti-ai-slop.md` -> design constraints, anti-functional-slop & UI necessity, and UI standards
 - `.agents/rules/anti-satisficing.md` -> completeness, quality, and verification discipline; never stop at the first acceptable implementation
 - `docs/` and `TODO.md` -> behavior, scope, acceptance, test plan, and architecture specs
 
@@ -92,7 +92,8 @@ If documents disagree, use the most specific approved requirement and document t
   boundaries and fail closed on auth, ownership, credit deduction, rate limiting,
   provider output, and state transition failures.
 - **Always unslop:** Follow `.agents/rules/anti-ai-slop.md` across code, prompt
-  strings, docs, and UI copy. Cut AI filler words, puffery, and passive voice.
+  strings, docs, and UI copy. Cut AI filler words, puffery, passive voice, and
+  functional slop (redundant controls, stacked toolbars, spurious retry/search).
 - **Native tool calling only:** When executing actions or tools, always invoke the
   native tool calling schema provided by the platform. Never emit simulated XML,
   markdown, or pseudo-code tags such as `<skill>` or `<invoke>` into the message
