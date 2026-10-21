@@ -97,12 +97,12 @@ export function collectVisualEvidence(
 		(a, b) =>
 			Number(
 				b.matches(
-					"body, header, nav, main, h1, h2, h3, p, button, a, section, footer",
+					"body, header, nav, main, h1, h2, h3, p, button, a, input, select, textarea, section, footer",
 				),
 			) -
 			Number(
 				a.matches(
-					"body, header, nav, main, h1, h2, h3, p, button, a, section, footer",
+					"body, header, nav, main, h1, h2, h3, p, button, a, input, select, textarea, section, footer",
 				),
 			),
 	);
@@ -134,21 +134,23 @@ export function collectVisualEvidence(
 		}
 		if (hidden) continue;
 		const tag = element.tagName.toLowerCase();
-		const role = element.matches(
-			"button, [role='button'], a[class*='button'], a[class*='btn'], a[class*='cta']",
-		)
-			? "cta"
-			: element.closest("nav")
-				? "nav"
-				: /^h[1-6]$/.test(tag)
-					? tag
-					: tag === "body" || tag === "html"
-						? "canvas"
-						: tag === "p"
-							? "body"
-							: element.matches("header, main, section, article, footer")
-								? tag
-								: "element";
+		const role = element.matches("input, select, textarea")
+			? "input"
+			: element.matches(
+						"button, [role='button'], a[class*='button'], a[class*='btn'], a[class*='cta']",
+					)
+				? "cta"
+				: element.closest("nav")
+					? "nav"
+					: /^h[1-6]$/.test(tag)
+						? tag
+						: tag === "body" || tag === "html"
+							? "canvas"
+							: tag === "p"
+								? "body"
+								: element.matches("header, main, section, article, footer")
+									? tag
+									: "element";
 		const values: Record<string, string> = {};
 		for (const property of properties)
 			values[property] = style
