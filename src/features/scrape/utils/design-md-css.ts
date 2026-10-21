@@ -41,6 +41,31 @@ export function isValidCssLength(value: string): boolean {
 	return CSS_LENGTH.test(trimmed);
 }
 
+// A border-radius accepts one to four corner values and an optional slash
+// syntax for elliptical corners. These are valid CSS radius values even though
+// they are not a single length, so they get their own validation instead of
+// being dropped by the scalar length rule.
+const RADIUS_VALUE =
+	/^-?(?:\d+(?:\.\d+)?|\.\d+)(px|rem|em|%|vw|vh|vmin|vmax|dvh|dvw|ch|ex|cap|lh)$/;
+
+export function isValidCssRadius(value: string): boolean {
+	const trimmed = value.trim();
+	if (isValidCssLength(trimmed)) return true;
+	const [corners, ...extra] = trimmed.split("/");
+	if (extra.length > 1) return false;
+	const parts = (corners ?? "").trim().split(/\s+/).filter(Boolean);
+	if (parts.length < 1 || parts.length > 4) return false;
+	if (!parts.every((part) => RADIUS_VALUE.test(part))) return false;
+	// The slash form carries a horizontal and a vertical radius, so it needs
+	// exactly two values on the right-hand side.
+	if (extra.length === 1) {
+		const ellipse = extra[0]?.trim().split(/\s+/).filter(Boolean) ?? [];
+		if (ellipse.length < 1 || ellipse.length > 2) return false;
+		if (!ellipse.every((part) => RADIUS_VALUE.test(part))) return false;
+	}
+	return true;
+}
+
 // A CSS custom property name must be a valid identifier. Names derived from a
 // role label are slugged, and a name that cannot be slugged is dropped.
 export function tokenName(prefix: string, label: string): string | null {
@@ -122,8 +147,13 @@ export function buildTokenDeclarations(
 	);
 	const radiusEntries = uniqueTokenNames(
 		model.radii.flatMap((token) => {
-			if (!isValidCssLength(token.value)) return [];
-			const name = tokenName("--radius", token.purpose);
+			if (!isValidCssRadius(token.value)) return [];
+			// A value measured in more than one capture keeps its capture in the
+			// alias name, so two scoped facts never collapse into one property.
+			const label = token.scope
+				? `${token.purpose} ${token.scope}`
+				: token.purpose;
+			const name = tokenName("--radius", label);
 			return name ? [{ name, value: token.value }] : [];
 		}),
 	);
