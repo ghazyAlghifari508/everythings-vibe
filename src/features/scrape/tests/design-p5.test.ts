@@ -177,8 +177,12 @@ describe("phase 5 components", () => {
 		const model = buildFixtureModel();
 		expect(model.observedComponents.length).toBeGreaterThan(0);
 		for (const component of model.observedComponents) {
-			expect(component.frequency).toBeGreaterThanOrEqual(2);
 			expect(component.evidence).toMatch(/Measured on/);
+			// A component observed once is kept as a scoped sample and says so;
+			// a repeated component is stated as a measured pattern.
+			if (component.frequency === 1)
+				expect(component.description).toMatch(/single measured observation/i);
+			else expect(component.description).not.toMatch(/single measured/i);
 		}
 		const markdown = renderDesignMd(model);
 		expect(markdown).toContain("## Components");
@@ -186,7 +190,9 @@ describe("phase 5 components", () => {
 
 	it("keeps deterministic component derivation evidence-grounded", () => {
 		const components = deriveObservedComponents(FIXTURE);
-		expect(components.every((c) => c.frequency >= 2)).toBe(true);
+		expect(
+			components.every((c) => c.frequency >= 1 && c.treatmentCount >= 1),
+		).toBe(true);
 		expect(components.length).toBeLessThanOrEqual(8);
 	});
 });
