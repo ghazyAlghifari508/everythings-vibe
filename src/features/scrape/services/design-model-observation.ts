@@ -1,9 +1,9 @@
 import type { ModelComponent } from "@/features/scrape/types/design-model";
 import { normalizeColor } from "../utils/design-color-parse";
-import type { VisualEvidence } from "./design-visual-evidence";
-
-// Deterministic observations taken from the capture. Nothing here is inferred
-// from a single sighting, and nothing is guessed when the evidence is missing.
+import type {
+	VisualElementEvidence,
+	VisualEvidence,
+} from "./design-visual-evidence";
 
 export const RULE_FREQUENCY_MINIMUM = 2;
 
@@ -38,17 +38,16 @@ export function inferTheme(
 	return "unknown";
 }
 
-// Deterministic component patterns observed in the capture. Only roles seen at
-// least twice become patterns, and every pattern cites measured frequency and
-// roles so it is evidence-grounded without AI.
 export function deriveObservedComponents(
 	evidence: VisualEvidence,
 ): ModelComponent[] {
 	const components: ModelComponent[] = [];
-	const byRole = new Map<string, number>();
+	const byRole = new Map<string, VisualElementEvidence[]>();
 	for (const element of evidence.elements) {
 		if (element.role === "element" || element.role === "canvas") continue;
-		byRole.set(element.role, (byRole.get(element.role) ?? 0) + 1);
+		const group = byRole.get(element.role) ?? [];
+		group.push(element);
+		byRole.set(element.role, group);
 	}
 	const roleLabel: Record<string, string> = {
 		nav: "Navigation",
@@ -57,21 +56,43 @@ export function deriveObservedComponents(
 		h3: "Subheading",
 		body: "Body copy",
 		cta: "Buttons and CTAs",
+		input: "Inputs",
+		card: "Cards",
 		section: "Layout containers",
 		main: "Layout containers",
 		header: "Header",
 		footer: "Footer",
 	};
-	for (const [role, frequency] of [...byRole.entries()].sort(
-		(a, b) => b[1] - a[1],
+	for (const [role, elements] of [...byRole.entries()].sort(
+		(a, b) => b[1].length - a[1].length,
 	)) {
-		if (frequency < RULE_FREQUENCY_MINIMUM) continue;
+		if (elements.length < RULE_FREQUENCY_MINIMUM) continue;
+		const treatments = new Map<string, string[]>();
+		for (const element of elements) {
+			const properties = Object.entries(element.properties)
+				.filter(([, value]) => value.trim())
+				.sort(([a], [b]) => a.localeCompare(b))
+				.map(([property, value]) => `${property}: ${value}`)
+				.join("; ");
+			if (!properties) continue;
+			const selectors = treatments.get(properties) ?? [];
+			selectors.push(element.selector);
+			treatments.set(properties, selectors);
+		}
+		if (!treatments.size) continue;
 		const name = roleLabel[role] ?? `Observed ${role}`;
 		components.push({
 			name,
-			description: `Observed ${frequency} ${role} elements in the captured viewport with consistent measured styling.`,
-			evidence: `Measured on ${frequency} ${role} elements.`,
-			frequency,
+			description:
+				[...treatments]
+					.map(
+						([properties, selectors]) =>
+							`Apply only to matching ${role} samples (${selectors.join(", ")}): ${properties}.`,
+					)
+					.join("\n") +
+				" Missing properties, interaction states and primary/secondary hierarchy are not established; do not generalize across treatments or captures.",
+			evidence: `Measured on ${elements.length} ${role} samples: ${elements.map((element) => element.selector).join(", ")}. Semantic role inferred from DOM.`,
+			frequency: elements.length,
 			roles: [role],
 		});
 		if (components.length >= 8) break;

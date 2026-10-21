@@ -109,7 +109,10 @@ export function buildDesignModel(
 	const elevation = normalizeElevation(evidence.elements);
 	const surfaces = normalizeSurfaces(evidence.elements);
 	const specimens = groupTypeSpecimens(evidence.elements);
-	const typefaces = normalizeTypefaces(specimens, evidence.fonts);
+	const typefaces = normalizeTypefaces(
+		groupTypeSpecimens(evidence.elements, true),
+		evidence.fonts,
+	);
 
 	const colorTokens: ModelColorToken[] = colors.map((entry, index) => ({
 		name: colorNameFor(entry, index),
