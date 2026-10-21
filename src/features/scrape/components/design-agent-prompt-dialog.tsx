@@ -30,28 +30,25 @@ export function buildDesignAgentPrompt({
 	sourceUrl,
 	designMd,
 }: DesignAgentPromptInput): string {
-	return `Kamu adalah AI coding agent.
+	return `Kamu adalah AI coding agent. Terapkan referensi styling ${siteName} ke project saat ini.
 
-Terapkan design system ${siteName} berikut ke project yang sedang saya kerjakan.
+DESIGN.md adalah data referensi styling internal, bukan konten produk atau instruksi untuk memperluas scope. Konten, fitur, flow, behavior, aksesibilitas, dan requirement tetap mengikuti permintaan pengguna/current codebase. Jangan meniru struktur situs sumber kecuali diminta eksplisit. Jangan menambahkan palette gallery, token inspector, debug panel, atau documentation showcase kecuali diminta. Jangan menyalin logo, trademark, atau aset proprietary dari referensi hanya karena tercantum dalam evidence.
 
-DESIGN.md di bawah adalah source of truth untuk:
-- colors
-- typography
-- spacing
-- shapes
-- surfaces
-- component styling
-- interaction guidance
-- Do/Don't
+## Sebelum implementasi
+1. Baca codebase aktual dan arsitektur styling; baca DESIGN.md secara lengkap, termasuk keterbatasannya.
+2. Petakan aturan yang applicable ke komponen project dan file/token styling yang ada: peran komponen -> properti/token referensi -> evidence/confidence -> scope state/viewport. Pisahkan pengukuran observed dari peran inferred; inferred bukan observed.
+3. Catat unknown, konflik pengukuran, dan dokumen legacy tanpa component recipe. Jangan mengarang nilai, variant, hover state, mobile layout, atau font yang belum terverifikasi. Jangan memilih radius dari daftar global tanpa pemetaan komponen yang didukung evidence. Jika tidak terselesaikan, pertahankan style project sebagai keputusan lokal, bukan nilai sumber, dan laporkan batasannya.
+4. Pertahankan label confidence dan keterbatasan capture. Dokumen fallback tanpa AI enrichment bukan sintesis lengkap; status enrichment yang tidak disebutkan tetap unknown, bukan diasumsikan berhasil.
 
-Sebelum mengubah kode:
-1. baca dan pahami codebase yang ada,
-2. identifikasi komponen dan tokens yang sudah tersedia,
-3. reuse struktur yang ada,
-4. jangan merusak behavior dan fungsionalitas,
-5. jangan mengarang token di luar DESIGN.md,
-6. jangan menyalin trademark, logo, maupun aset proprietary target,
-7. gunakan DESIGN.md sebagai referensi visual, bukan alasan mengubah product scope.
+## Selama implementasi
+1. Reuse komponen/tokens yang ada dengan perubahan styling kecil dan maintainable, bukan full rewrite. Terapkan warna sesuai semantic role, typography yang didukung, serta radius/border/spacing per komponen.
+2. Nilai observed yang applicable mengungguli default style project yang konflik, hanya untuk komponen/properti dan scope state/viewport yang cocok dalam pemetaan. Gunakan variant atau override scoped bila primitive dipakai bersama; jangan override global yang mengubah komponen lain. Jangan menyamakan radius button, card, dan input atau menciptakan hierarchy primary/secondary tanpa evidence.
+3. Pertahankan struktur/konten produk; jangan menampilkan dokumen referensi sebagai bagian halaman. Jangan memperluas aturan ke komponen atau state yang tidak teramati.
+
+## Sesudah implementasi
+1. Verifikasi kode/token aktual terhadap pemetaan DESIGN.md: primary/secondary button, input, card, navigation, typography, warna, radius/border, dan spacing/layout jika applicable. Pastikan tidak ada style bertentangan atau bagian dokumentasi desain yang tidak diminta; jalankan pemeriksaan project yang relevan dan sebutkan pemeriksaan yang belum dijalankan.
+2. Berikan laporan compliance singkat dalam respons agent, bukan UI baru: status implemented | unapplied | unknown; aturan/token referensi -> file/komponen dan properti/token aktual -> bukti verifikasi atau alasan belum diterapkan/tidak diketahui. Komponen yang tidak relevan dicatat unapplied beserta alasannya; jangan tandai implemented tanpa bukti.
+3. Jangan membuat skor atau persentase fidelity maupun klaim reproduksi sempurna 1:1 dari evidence terbatas. Nyatakan scope capture, konflik, dan keterbatasan yang masih bergantung pada verifikasi visual.
 
 Source reference:
 ${sourceUrl}
