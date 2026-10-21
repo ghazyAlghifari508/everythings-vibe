@@ -7,7 +7,10 @@ import type {
 	RadiusToken,
 	SpacingToken,
 } from "../utils/design-normalize-shape";
-import type { TypeSpecimen } from "../utils/design-normalize-typography";
+import type {
+	NormalizedTypeface,
+	TypeSpecimen,
+} from "../utils/design-normalize-typography";
 import { RULE_FREQUENCY_MINIMUM } from "./design-model-observation";
 import type { VisualEvidence } from "./design-visual-evidence";
 
@@ -26,6 +29,7 @@ export function deriveModelGuidelines(
 	specimens: TypeSpecimen[],
 	spacing: SpacingToken[],
 	radii: RadiusToken[],
+	typefaces: NormalizedTypeface[] = [],
 ): ModelGuidelines {
 	const dos: ModelGuideline[] = [];
 	const donts: ModelGuideline[] = [];
@@ -121,8 +125,13 @@ export function deriveModelGuidelines(
 				.join(", ")} elements.`,
 		});
 
+	// The font restriction must list every family that was actually measured on
+	// rendered text, not only the families that survived type-scale curation:
+	// a family seen once still belongs to the measured set.
 	const distinctFamilies = new Set(
-		specimens.map((specimen) => specimen.fontFamily.split(",")[0]?.trim()),
+		typefaces.length
+			? typefaces.map((typeface) => typeface.family)
+			: specimens.map((specimen) => specimen.fontFamily.split(",")[0]?.trim()),
 	);
 	if (distinctFamilies.size > 1)
 		donts.push({
