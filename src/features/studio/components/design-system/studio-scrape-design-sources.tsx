@@ -28,48 +28,55 @@ export function StudioScrapeDesignSources({
 			</p>
 		);
 	return (
-		<div className="flex flex-col gap-2">
+		<div className="flex flex-col gap-2.5">
 			<p className="text-xs font-semibold text-mist">Dari VibeScrape</p>
-			<ul className="flex flex-col gap-2">
+			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 				{sources.map((source) => {
 					const selected = selectedId === source.id;
 					return (
-						<li
+						<div
 							key={source.id}
-							className="flex items-center justify-between gap-3 rounded-lg border border-graphite bg-onyx px-3 py-2"
+							className={`flex flex-col justify-between gap-3 rounded-xl border bg-onyx p-3.5 transition-colors ${
+								selected
+									? "border-snow/60 shadow-xs"
+									: "border-graphite hover:border-steel"
+							}`}
 						>
-							<span className="flex min-w-0 items-center gap-2">
-								<Icon
-									icon={Globe02Icon}
-									size={16}
-									className="shrink-0 text-fog"
-								/>
-								<span className="min-w-0">
-									<span className="block truncate text-sm text-snow">
+							<div className="flex flex-col gap-1 min-w-0">
+								<span className="flex items-center gap-2 min-w-0">
+									<Icon
+										icon={Globe02Icon}
+										size={16}
+										className="shrink-0 text-fog"
+									/>
+									<span className="truncate text-sm font-semibold text-snow">
 										{source.title ?? source.domain}
 									</span>
-									<span className="block truncate text-xs text-fog">
-										{source.sourceUrl}
-									</span>
 								</span>
-							</span>
+								<span
+									className="truncate text-xs text-fog"
+									title={source.sourceUrl}
+								>
+									{source.sourceUrl}
+								</span>
+							</div>
 							<button
 								type="button"
 								disabled={disabled}
 								aria-pressed={selected}
 								onClick={() => onSelect(source)}
-								className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50 ${
+								className={`inline-flex min-h-9 w-full items-center justify-center rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50 ${
 									selected
-										? "border-indigo bg-charcoal text-snow"
+										? "border-snow bg-snow text-obsidian"
 										: "border-graphite text-fog hover:bg-charcoal hover:text-snow"
 								}`}
 							>
 								{selected ? "Dipilih" : "Gunakan"}
 							</button>
-						</li>
+						</div>
 					);
 				})}
-			</ul>
+			</div>
 		</div>
 	);
 }

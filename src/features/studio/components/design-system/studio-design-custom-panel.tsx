@@ -84,130 +84,133 @@ export function StudioDesignCustomPanel({
 		<div
 			role="tabpanel"
 			aria-label="Punya Saya"
-			className="flex flex-col gap-3"
+			className="flex flex-col gap-2.5"
 		>
-			<div className="flex flex-col gap-2 rounded-xl border border-graphite bg-onyx p-3.5">
-				<span className="flex items-center gap-2 text-sm font-semibold text-snow">
-					<Icon icon={FileCodeIcon} size={15} className="text-fog" />
-					File DESIGN.md
-				</span>
-				{state.mdName ? (
-					<span className="flex flex-wrap items-center gap-2 text-xs">
-						<span className="max-w-56 truncate font-semibold text-snow">
-							{state.mdName}
-						</span>
-						{colorCount > 0 || fontFamily ? (
-							<span className="text-fog">
-								{colorCount} warna
-								{fontFamily ? ` · ${fontFamily}` : ""}
+			<p className="text-xs font-semibold text-mist">Unggah File Kustom</p>
+			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+				<div className="flex flex-col justify-between gap-2.5 rounded-xl border border-graphite bg-onyx p-3.5">
+					<span className="flex items-center gap-2 text-sm font-semibold text-snow">
+						<Icon icon={FileCodeIcon} size={15} className="text-fog" />
+						File DESIGN.md
+					</span>
+					{state.mdName ? (
+						<span className="flex flex-wrap items-center gap-2 text-xs">
+							<span className="max-w-56 truncate font-semibold text-snow">
+								{state.mdName}
 							</span>
-						) : null}
+							{colorCount > 0 || fontFamily ? (
+								<span className="text-fog">
+									{colorCount} warna
+									{fontFamily ? ` · ${fontFamily}` : ""}
+								</span>
+							) : null}
+							<button
+								type="button"
+								onClick={() => mdInputRef.current?.click()}
+								className="rounded px-1.5 py-0.5 font-semibold text-mist underline underline-offset-2 hover:text-snow"
+							>
+								Ganti
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									onMdNameChange(null, "");
+									onMdError(null);
+								}}
+								aria-label="Hapus file desain"
+								className="rounded p-1 text-fog hover:text-snow"
+							>
+								<Icon icon={Cancel01Icon} size={13} />
+							</button>
+						</span>
+					) : (
 						<button
 							type="button"
 							onClick={() => mdInputRef.current?.click()}
-							className="rounded px-1.5 py-0.5 font-semibold text-mist underline underline-offset-2 hover:text-snow"
+							disabled={state.reading}
+							className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-graphite px-3 text-xs text-fog transition-colors hover:border-steel hover:text-mist disabled:opacity-50"
 						>
-							Ganti
+							{state.reading ? (
+								<Icon
+									icon={Loading01Icon}
+									size={16}
+									className="motion-safe:animate-spin"
+								/>
+							) : (
+								<Icon icon={Upload01Icon} size={16} />
+							)}
+							<span>
+								{state.reading
+									? "Membaca file..."
+									: "Pilih file .md (maks 500 KB)"}
+							</span>
 						</button>
-						<button
-							type="button"
-							onClick={() => {
-								onMdNameChange(null, "");
-								onMdError(null);
-							}}
-							aria-label="Hapus file desain"
-							className="rounded p-1 text-fog hover:text-snow"
-						>
-							<Icon icon={Cancel01Icon} size={13} />
-						</button>
-					</span>
-				) : (
-					<button
-						type="button"
-						onClick={() => mdInputRef.current?.click()}
-						disabled={state.reading}
-						className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-graphite px-3 text-xs text-fog transition-colors hover:border-steel hover:text-mist disabled:opacity-50"
-					>
-						{state.reading ? (
-							<Icon
-								icon={Loading01Icon}
-								size={16}
-								className="motion-safe:animate-spin"
-							/>
-						) : (
-							<Icon icon={Upload01Icon} size={16} />
-						)}
-						<span>
-							{state.reading
-								? "Membaca file..."
-								: "Pilih file .md (maks 500 KB)"}
-						</span>
-					</button>
-				)}
-				<input
-					ref={mdInputRef}
-					type="file"
-					accept=".md,.markdown,text/markdown"
-					aria-label="Unggah file DESIGN.md"
-					className="sr-only"
-					onChange={(event) => {
-						void handleMdFile(event.target.files?.[0]);
-						event.target.value = "";
-					}}
-				/>
-				{state.mdError ? (
-					<p role="alert" className="text-xs text-crimson">
-						{state.mdError}
-					</p>
-				) : null}
-			</div>
+					)}
+					<input
+						ref={mdInputRef}
+						type="file"
+						accept=".md,.markdown,text/markdown"
+						aria-label="Unggah file DESIGN.md"
+						className="sr-only"
+						onChange={(event) => {
+							void handleMdFile(event.target.files?.[0]);
+							event.target.value = "";
+						}}
+					/>
+					{state.mdError ? (
+						<p role="alert" className="text-xs text-crimson">
+							{state.mdError}
+						</p>
+					) : null}
+				</div>
 
-			<div className="flex flex-col gap-2 rounded-xl border border-graphite bg-onyx p-3.5">
-				<span className="flex items-center gap-2 text-sm font-semibold text-snow">
-					<Icon icon={Image01Icon} size={15} className="text-fog" />
-					Logo aplikasi
-					<span className="text-xs font-normal text-fog">(opsional)</span>
-				</span>
-				{state.logo ? (
-					<span className="flex flex-wrap items-center gap-2 text-xs">
-						<span className="max-w-56 truncate font-semibold text-snow">
-							{state.logo.filename}
+				<div className="flex flex-col justify-between gap-2.5 rounded-xl border border-graphite bg-onyx p-3.5">
+					<span className="flex items-center gap-2 text-sm font-semibold text-snow">
+						<Icon icon={Image01Icon} size={15} className="text-fog" />
+						Logo aplikasi
+						<span className="text-xs font-normal text-fog">(opsional)</span>
+					</span>
+					{state.logo ? (
+						<span className="flex flex-wrap items-center gap-2 text-xs">
+							<span className="max-w-56 truncate font-semibold text-snow">
+								{state.logo.filename}
+							</span>
+							<button
+								type="button"
+								onClick={() => onLogoChange(null)}
+								aria-label="Hapus logo"
+								className="rounded p-1 text-fog hover:text-snow"
+							>
+								<Icon icon={Cancel01Icon} size={13} />
+							</button>
 						</span>
+					) : (
 						<button
 							type="button"
-							onClick={() => onLogoChange(null)}
-							aria-label="Hapus logo"
-							className="rounded p-1 text-fog hover:text-snow"
+							onClick={() => logoInputRef.current?.click()}
+							className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-graphite px-3 text-xs text-fog transition-colors hover:border-steel hover:text-mist"
 						>
-							<Icon icon={Cancel01Icon} size={13} />
+							<Icon icon={Upload01Icon} size={16} />
+							<span>Pilih file gambar logo</span>
 						</button>
-					</span>
-				) : (
-					<button
-						type="button"
-						onClick={() => logoInputRef.current?.click()}
-						className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-graphite px-3 text-xs font-semibold text-mist transition-colors hover:text-snow"
-					>
-						<Icon icon={Upload01Icon} size={14} />
-						Pilih logo
-					</button>
-				)}
-				<input
-					ref={logoInputRef}
-					type="file"
-					accept="image/*"
-					aria-label="Unggah logo aplikasi"
-					className="sr-only"
-					onChange={(event) => {
-						handleLogoFile(event.target.files?.[0]);
-						event.target.value = "";
-					}}
-				/>
-				{state.logoError ? (
-					<p role="alert" className="text-xs text-crimson">
-						{state.logoError}
-					</p>
-				) : null}
+					)}
+					<input
+						ref={logoInputRef}
+						type="file"
+						accept="image/*"
+						aria-label="Unggah logo aplikasi"
+						className="sr-only"
+						onChange={(event) => {
+							handleLogoFile(event.target.files?.[0]);
+							event.target.value = "";
+						}}
+					/>
+					{state.logoError ? (
+						<p role="alert" className="text-xs text-crimson">
+							{state.logoError}
+						</p>
+					) : null}
+				</div>
 			</div>
 		</div>
 	);
