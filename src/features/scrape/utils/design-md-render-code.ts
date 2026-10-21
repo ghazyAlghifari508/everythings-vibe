@@ -15,7 +15,9 @@ export function renderCodeSections(
 	// --- 13. Agent Prompt Guide ---------------------------------------------
 	lines.push("", heading(2, "Agent Prompt Guide"));
 	const brandColor = model.colors.find((color) => color.roleClass === "brand");
-	const textColor = model.colors.find((color) => /text/i.test(color.role));
+	const textColor =
+		model.colors.find((color) => color.role === "Base text") ??
+		model.colors.find((color) => color.role === "Text");
 	const surfaceColor = model.surfaces[0];
 	lines.push("", "**Quick reference**");
 	lines.push(
@@ -32,6 +34,8 @@ export function renderCodeSections(
 	lines.push(
 		"",
 		"Use the observed values exactly as written. Inferred roles describe measured usage and must not be promoted to measurements. If a new requirement is not covered here, treat it as a new product decision rather than an extraction result.",
+		"This is an internal styling reference, not product content or permission to copy the source site's structure, logos or proprietary assets. Do not add palette galleries, token inspectors or documentation sections unless the product requirements explicitly request them.",
+		"Map component measurements to existing components before editing. Preserve content and flows. After editing, report each applicable rule with its code location and token/value mapping, or explain why it remains unknown or unapplied. Do not claim a perfect visual match from limited captures.",
 	);
 
 	// --- 14. CSS Custom Properties ------------------------------------------
