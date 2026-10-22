@@ -1,27 +1,20 @@
 import {
 	Alert02Icon,
 	ArrowRight01Icon,
+	Delete02Icon,
 	Loading03Icon,
 	Tick01Icon,
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { Icon } from "@/components/ui/icon";
 import type { ScrapeMode } from "@/db/schema";
-import {
-	type buildHistoryDetailSearch,
-	formatHistoryDate,
-	historyStatusLabel,
-	modeLabel,
-	resolveHistoryStatusGroup,
-} from "@/features/scrape/utils/scrape-history";
+import type { buildHistoryDetailSearch } from "@/features/scrape/utils/scrape-history";
 import {
 	imageCountsLabel,
-	imageCountsSummary,
 	type imageResultCounts,
 } from "@/features/scrape/utils/scrape-images";
 import { displaySiteName } from "@/features/scrape/utils/site-name";
-import { formatDateTime } from "@/lib/utils";
-import { ScrapeHistoryRowActions } from "./scrape-history-row-actions";
+import { formatDate } from "@/lib/utils";
 
 export interface ScrapeHistoryItem {
 	id: string;
@@ -34,42 +27,42 @@ export interface ScrapeHistoryItem {
 	imageCounts?: ReturnType<typeof imageResultCounts>;
 }
 
-// The row is one grid so the columns line up across every row of the list.
-// Below the medium breakpoint the same cells collapse into two readable lines,
-// and the mode travels with the domain so neither of them gets squeezed.
-const ROW_CONTENT_CLASS =
-	"grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-x-3 gap-y-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo md:grid-cols-[minmax(0,1fr)_auto_auto_auto] md:gap-x-4";
+export const SCRAPE_STATUS_INDONESIAN_LABELS: Record<string, string> = {
+	completed: "Selesai",
+	failed: "Gagal",
+	queued: "Diproses",
+	capturing: "Diproses",
+	extracting: "Diproses",
+	generating: "Diproses",
+	saving: "Diproses",
+	processing: "Diproses",
+};
 
-function ScrapeHistoryStatus({
-	status,
-	processing,
-	failed,
-}: {
-	status: string;
-	processing: boolean;
-	failed: boolean;
-}) {
-	return (
-		<span
-			className={`inline-flex items-center gap-1.5 text-xs ${
-				failed ? "text-crimson" : "text-fog"
-			}`}
-		>
-			{processing ? (
-				<Icon
-					icon={Loading03Icon}
-					size={12}
-					aria-hidden="true"
-					className="animate-spin"
-				/>
-			) : failed ? (
-				<Icon icon={Alert02Icon} size={12} aria-hidden="true" />
-			) : (
-				<Icon icon={Tick01Icon} size={12} aria-hidden="true" />
-			)}
-			{historyStatusLabel(status)}
-		</span>
-	);
+export function formatTimeAgo(dateString: string): string {
+	const timestamp = new Date(dateString).getTime();
+	if (Number.isNaN(timestamp)) return "baru saja";
+	const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+	if (diffSeconds < 60) return "baru saja";
+	const minutes = Math.floor(diffSeconds / 60);
+	if (minutes < 60) return `${minutes} menit lalu`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours} jam lalu`;
+	const days = Math.floor(hours / 24);
+	return `${days} hari lalu`;
+}
+
+export function modeLabel(mode?: ScrapeMode): string {
+	if (mode === "crawl") return "Crawl";
+	if (mode === "images") return "Images";
+	return mode === "html" ? "HTML" : "DESIGN.md";
+}
+
+export function statusLabel(status: string): string {
+	return SCRAPE_STATUS_INDONESIAN_LABELS[status] ?? "Diproses";
+}
+
+function isProcessingStatus(status: string): boolean {
+	return status !== "completed" && status !== "failed";
 }
 
 export function ScrapeHistoryRow({
@@ -90,70 +83,63 @@ export function ScrapeHistoryRow({
 	onToggleSelect?: (id: string) => void;
 }) {
 	const siteName = displaySiteName(item.domain);
-	const statusGroup = resolveHistoryStatusGroup(item.status);
-	const processing = statusGroup === "processing";
-	const failed = statusGroup === "failed";
-
-	const content = (
+	const processing = isProcessingStatus(item.status);
+	const failed = item.status === "failed";
+	const summary = (
 		<>
-			<span className="col-start-1 row-start-1 min-w-0 truncate text-sm font-semibold text-snow md:row-start-1">
-				{siteName}
-			</span>
-
-			<span className="col-start-1 row-start-2 flex min-w-0 items-center gap-1.5 md:contents">
-				<span className="flex shrink-0 items-center gap-1.5 md:w-28 md:flex-col md:items-start md:gap-0.5 md:row-start-1 md:row-span-2 md:col-start-2">
-					<span className="truncate text-xs text-fog">
-						{modeLabel(item.mode)}
-					</span>
-					{item.imageCounts ? (
-						<span
-							className="truncate text-[11px] text-fog/80"
-							title={imageCountsLabel(item.imageCounts)}
-						>
-							{imageCountsSummary(item.imageCounts)}
-						</span>
-					) : null}
+			<span className="flex items-center gap-2">
+				<span className="truncate text-sm font-semibold text-snow">
+					{siteName}
 				</span>
-				<span className="min-w-0 truncate font-mono text-[11px] text-fog md:col-start-1 md:row-start-2">
-					{item.domain}
+				<span className="shrink-0 text-xs text-fog">
+					{modeLabel(item.mode)}
+				</span>
+				<span
+					className={`inline-flex shrink-0 items-center gap-1 text-xs ${
+						failed ? "text-rose-400" : "text-fog"
+					}`}
+				>
+					{processing ? (
+						<Icon
+							icon={Loading03Icon}
+							size={12}
+							aria-hidden="true"
+							className="animate-spin"
+						/>
+					) : failed ? (
+						<Icon icon={Alert02Icon} size={12} aria-hidden="true" />
+					) : (
+						<Icon icon={Tick01Icon} size={12} aria-hidden="true" />
+					)}
+					{statusLabel(item.status)}
 				</span>
 			</span>
-
-			<span className="col-start-2 row-start-1 md:col-start-3 md:row-start-1 md:row-span-2 md:w-28">
-				<ScrapeHistoryStatus
-					status={item.status}
-					processing={processing}
-					failed={failed}
-				/>
+			<span className="truncate font-mono text-[11px] text-fog">
+				{item.domain} ·{" "}
+				<time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time>
 			</span>
-
-			<time
-				dateTime={item.createdAt}
-				title={formatDateTime(item.createdAt)}
-				className="col-start-2 row-start-2 text-xs text-fog tabular-nums md:col-start-4 md:row-start-1 md:row-span-2 md:w-24"
-			>
-				{formatHistoryDate(item.createdAt)}
-			</time>
+			{item.imageCounts && (
+				<span className="text-xs text-fog">
+					{imageCountsLabel(item.imageCounts)}
+				</span>
+			)}
 		</>
 	);
-
 	return (
 		<li
 			data-selected={selectionMode ? selected : undefined}
-			className={`group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-graphite/40 ${
-				selected ? "bg-snow/5" : ""
+			className={`group flex items-center gap-3 p-4 transition-colors ${
+				selected ? "bg-snow/5" : "hover:bg-onyx/60"
 			}`}
 		>
 			{selectionMode ? (
-				<label className="flex size-11 shrink-0 items-center justify-center">
-					<input
-						type="checkbox"
-						checked={selected}
-						onChange={() => onToggleSelect?.(item.id)}
-						aria-label={`Pilih riwayat ${siteName}`}
-						className="size-5 accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					/>
-				</label>
+				<input
+					type="checkbox"
+					checked={selected}
+					onChange={() => onToggleSelect?.(item.id)}
+					aria-label={`Pilih riwayat ${siteName}`}
+					className="size-5 shrink-0 accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+				/>
 			) : null}
 
 			{selectionMode ? (
@@ -161,35 +147,44 @@ export function ScrapeHistoryRow({
 					type="button"
 					onClick={() => onToggleSelect?.(item.id)}
 					aria-pressed={selected}
-					className={ROW_CONTENT_CLASS}
+					className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
-					{content}
+					{summary}
 				</button>
 			) : (
 				<Link
 					to="/scrape/$id"
 					params={{ id: item.id }}
 					search={detailSearch}
-					className={ROW_CONTENT_CLASS}
+					className="flex min-w-0 flex-1 flex-col gap-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
-					{content}
+					{summary}
 				</Link>
 			)}
 
 			{selectionMode ? null : (
-				<div className="flex shrink-0 items-center gap-1">
-					<Icon
-						icon={ArrowRight01Icon}
-						size={16}
-						aria-hidden="true"
-						className="hidden shrink-0 text-fog transition-transform group-hover:translate-x-0.5 md:block"
-					/>
-					<ScrapeHistoryRowActions
-						item={item}
-						deleting={deleting}
-						onRequestDelete={onRequestDelete}
-					/>
-				</div>
+				<Icon
+					icon={ArrowRight01Icon}
+					size={16}
+					aria-hidden="true"
+					className="shrink-0 text-fog"
+				/>
+			)}
+
+			{selectionMode ? null : (
+				<button
+					type="button"
+					onClick={() => onRequestDelete(item)}
+					disabled={deleting}
+					aria-label={`Hapus riwayat ${siteName}`}
+					className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent text-fog transition-colors hover:border-graphite hover:bg-onyx hover:text-rose-400 disabled:opacity-50"
+				>
+					{deleting ? (
+						<Icon icon={Loading03Icon} size={14} className="animate-spin" />
+					) : (
+						<Icon icon={Delete02Icon} size={14} aria-hidden="true" />
+					)}
+				</button>
 			)}
 		</li>
 	);

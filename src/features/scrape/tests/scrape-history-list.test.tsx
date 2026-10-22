@@ -1,18 +1,94 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	within,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { useScrapeHistorySelection } from "@/features/scrape/hooks/use-scrape-history-selection";
+import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
+import { historyFilterKey } from "@/features/scrape/utils/scrape-history";
 import {
 	imageCountsLabel,
-	imageCountsSummary,
 	imageResultCounts,
 } from "@/features/scrape/utils/scrape-images";
-import {
-	baseSearch,
-	installRadixDomPolyfills,
-	openRowActions,
-	renderHistoryList,
-	resetHistorySelection,
-} from "./scrape-history-test-harness";
+import { ScrapeHistoryList } from "../components/scrape-history-list";
+
+const baseSearch: ScrapeHistorySearch = {
+	q: "",
+	sort: "newest",
+	page: 1,
+	pageSize: 10,
+};
+
+type ListProps = Parameters<typeof ScrapeHistoryList>[0];
+type ListOwnProps = Omit<ListProps, "selection">;
+
+// The list renders inside the page shell in the product, so the selection
+// controller is created here exactly the way the view creates it.
+function HistoryListHarness(props: ListOwnProps) {
+	const selection = useScrapeHistorySelection(historyFilterKey(props.search));
+	return <ScrapeHistoryList {...props} selection={selection} />;
+}
+
+function renderList(overrides: Partial<ListOwnProps> = {}) {
+	const onQueryChange = vi.fn();
+	const rendered = render(
+		<HistoryListHarness
+			items={[]}
+			total={0}
+			search={baseSearch}
+			onQueryChange={onQueryChange}
+			onDeleteMany={vi
+				.fn()
+				.mockResolvedValue({ deleted: 0, skipped: 0, deletedIds: [] })}
+			onPrepareSelection={vi
+				.fn()
+				.mockResolvedValue({ ids: [], total: 0, truncated: false })}
+			{...overrides}
+		/>,
+	);
+	return { onQueryChange, ...rendered };
+}
+
+it("keeps historical stored and legacy counts distinct", () => {
+	const counts = imageResultCounts(
+		[
+			{ status: "completed", assetId: "bytes" },
+			{ status: "completed", assetId: null },
+			{ status: "failed" },
+		],
+		4,
+	);
+	render(
+		<HistoryListHarness
+			items={[
+				{
+					id: "sample",
+					domain: "example.test",
+					sourceUrl: "https://example.test",
+					title: null,
+					status: "failed",
+					mode: "images",
+					createdAt: new Date().toISOString(),
+					imageCounts: counts,
+				},
+			]}
+			total={1}
+			search={baseSearch}
+			onQueryChange={vi.fn()}
+			onDeleteMany={vi
+				.fn()
+				.mockResolvedValue({ deleted: 0, skipped: 0, deletedIds: [] })}
+			onPrepareSelection={vi
+				.fn()
+				.mockResolvedValue({ ids: [], total: 0, truncated: false })}
+		/>,
+	);
+	expect(screen.getByText(imageCountsLabel(counts))).toBeDefined();
+});
 
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({
@@ -36,18 +112,13 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
-beforeEach(() => {
-	installRadixDomPolyfills();
-	resetHistorySelection();
-});
-
 afterEach(() => {
 	cleanup();
 });
 
 describe("ScrapeHistoryList", () => {
 	it("renders an empty state with a contrast-safe CTA and no dashed dropzone", () => {
-		const { container } = renderHistoryList();
+		const { container } = renderList();
 		expect(
 			screen.getByRole("heading", { name: /Belum ada riwayat scrape/i }),
 		).toBeDefined();
@@ -58,7 +129,7 @@ describe("ScrapeHistoryList", () => {
 	});
 
 	it("uses the website name instead of the SEO page title with plain metadata", () => {
-		const { container } = renderHistoryList({
+		const { container } = renderList({
 			items: [
 				{
 					id: "id-1",
@@ -81,7 +152,7 @@ describe("ScrapeHistoryList", () => {
 		expect(within(rowLink).getByText("Selesai")).toBeDefined();
 		expect(screen.queryByRole("link", { name: /^Buka$/i })).toBeNull();
 		expect(
-			screen.getByRole("button", { name: /Aksi riwayat Notion/i }),
+			screen.getByRole("button", { name: /Hapus riwayat/i }),
 		).toBeDefined();
 		const html = container.innerHTML;
 		expect(html).not.toContain("rounded-full");
@@ -91,7 +162,7 @@ describe("ScrapeHistoryList", () => {
 	});
 
 	it("makes the whole row the open target pointing at the result route", () => {
-		renderHistoryList({
+		renderList({
 			items: [
 				{
 					id: "id-2",
@@ -110,60 +181,151 @@ describe("ScrapeHistoryList", () => {
 		expect(within(rowLink).getByText("HTML")).toBeDefined();
 		expect(within(rowLink).getByText("Selesai")).toBeDefined();
 	});
+});
 
-	it("keeps the row actions outside the result link", () => {
-		renderHistoryList({
+describe("ScrapeHistoryList dashboard", () => {
+	it("reports the filtered total instead of the page length", () => {
+		renderList({
 			items: [
 				{
-					id: "id-3",
-					sourceUrl: "https://www.notion.com/",
-					domain: "www.notion.com",
+					id: "id-1",
+					sourceUrl: "https://example.test/",
+					domain: "example.test",
 					title: null,
 					status: "completed",
-					mode: "design",
-					createdAt: new Date().toISOString(),
-				},
-			],
-			total: 1,
-		});
-		const trigger = screen.getByRole("button", { name: /Aksi riwayat/i });
-		expect(trigger.closest("a")).toBeNull();
-		expect(trigger.tagName).toBe("BUTTON");
-	});
-
-	it("gives every row of the same website a distinguishable action", () => {
-		renderHistoryList({
-			items: [
-				{
-					id: "id-4",
-					sourceUrl: "https://www.notion.com/",
-					domain: "www.notion.com",
-					title: null,
-					status: "completed",
-					mode: "design",
+					mode: "crawl",
 					createdAt: new Date("2026-10-14T00:00:00.000Z").toISOString(),
 				},
-				{
-					id: "id-5",
-					sourceUrl: "https://www.notion.com/",
-					domain: "www.notion.com",
-					title: null,
-					status: "completed",
-					mode: "html",
-					createdAt: new Date("2026-10-13T00:00:00.000Z").toISOString(),
-				},
 			],
-			total: 2,
+			total: 33,
+			search: { ...baseSearch, page: 2 },
 		});
-		const triggers = screen.getAllByRole("button", { name: /Aksi riwayat/i });
-		expect(triggers).toHaveLength(2);
-		expect(triggers[0]?.getAttribute("aria-label")).not.toBe(
-			triggers[1]?.getAttribute("aria-label"),
-		);
+		expect(screen.getByText(/33 hasil/)).toBeDefined();
+		expect(screen.getByText(/Menampilkan 11–20 dari 33/)).toBeDefined();
+	});
+
+	it("filters by mode and resets to the first page", () => {
+		const { onQueryChange } = renderList({ total: 3 });
+		fireEvent.click(screen.getByRole("button", { name: "HTML" }));
+		expect(onQueryChange).toHaveBeenCalledWith({
+			...baseSearch,
+			mode: "html",
+			page: 1,
+		});
+	});
+
+	it("marks the active mode filter as pressed", () => {
+		renderList({ total: 2, search: { ...baseSearch, mode: "crawl" } });
+		expect(
+			screen
+				.getByRole("button", { name: "Crawl" })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+		expect(
+			screen
+				.getByRole("button", { name: "Semua" })
+				.getAttribute("aria-pressed"),
+		).toBe("false");
+	});
+
+	it("combines status and sort filters with the mode", () => {
+		const { onQueryChange, container } = renderList({
+			total: 33,
+			search: { ...baseSearch, mode: "html" },
+		});
+		const selects = container.querySelectorAll("select");
+		expect(selects).toHaveLength(3);
+		fireEvent.change(selects[0], { target: { value: "failed" } });
+		expect(onQueryChange).toHaveBeenCalledWith({
+			...baseSearch,
+			mode: "html",
+			status: "failed",
+			page: 1,
+		});
+		fireEvent.change(selects[1], { target: { value: "oldest" } });
+		expect(onQueryChange).toHaveBeenCalledWith({
+			...baseSearch,
+			mode: "html",
+			sort: "oldest",
+			page: 1,
+		});
+	});
+
+	it("keeps the category filters on the left and status and sort on the right of the same row", () => {
+		renderList({ total: 3 });
+
+		const modeFilters = screen.getByRole("group", {
+			name: /filter mode ekstraksi/i,
+		});
+		const status = screen.getByLabelText("Status");
+		const sort = screen.getByLabelText("Urutkan");
+		const row = modeFilters.parentElement;
+		const group = status.closest("label")?.parentElement;
+
+		expect(row).not.toBeNull();
+		expect(group).not.toBeNull();
+		expect(sort.closest("label")?.parentElement).toBe(group);
+		expect(group?.parentElement).toBe(row);
+		// The row distributes the two groups apart and is allowed to wrap so a
+		// narrow screen moves the dropdowns to their own line instead of
+		// overflowing.
+		expect(row?.className).toContain("justify-between");
+		expect(row?.className).toContain("flex-wrap");
+	});
+
+	it("debounces search input without delaying visible keystrokes", () => {
+		vi.useFakeTimers();
+		try {
+			const { onQueryChange } = renderList({ total: 4 });
+			const input = screen.getByRole("searchbox");
+			if (!(input instanceof HTMLInputElement)) {
+				throw new Error("History search must be a text input.");
+			}
+			fireEvent.change(input, { target: { value: "stitch" } });
+			expect(input.value).toBe("stitch");
+			expect(onQueryChange).not.toHaveBeenCalled();
+			vi.advanceTimersByTime(300);
+			expect(onQueryChange).toHaveBeenCalledWith({
+				...baseSearch,
+				q: "stitch",
+				page: 1,
+			});
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("pages through server results while retaining the filter state", () => {
+		const { onQueryChange } = renderList({
+			items: [],
+			total: 33,
+			search: { ...baseSearch, mode: "html", status: "failed", page: 1 },
+		});
+		const nav = screen.getByRole("navigation", { name: /pagination/i });
+		expect(nav).toBeDefined();
+		fireEvent.click(screen.getByRole("button", { name: "Halaman 2" }));
+		expect(onQueryChange).toHaveBeenCalledWith({
+			...baseSearch,
+			mode: "html",
+			status: "failed",
+			page: 2,
+		});
+	});
+
+	it("changes rows per page from the pagination control", () => {
+		const { onQueryChange, container } = renderList({ total: 33 });
+		const selects = container.querySelectorAll("select");
+		const pageSizeSelect = selects[selects.length - 1];
+		fireEvent.change(pageSizeSelect, { target: { value: "20" } });
+		expect(onQueryChange).toHaveBeenCalledWith({
+			...baseSearch,
+			pageSize: 20,
+			page: 1,
+		});
 	});
 
 	it("carries the filter state on every detail link", () => {
-		renderHistoryList({
+		renderList({
 			items: [
 				{
 					id: "id-9",
@@ -195,81 +357,31 @@ describe("ScrapeHistoryList", () => {
 			pageSize: 20,
 		});
 	});
-});
 
-describe("ScrapeHistoryList row states", () => {
-	function renderRow(status: string) {
-		renderHistoryList({
-			items: [
-				{
-					id: "row-1",
-					sourceUrl: "https://example.test/",
-					domain: "example.test",
-					title: null,
-					status,
-					mode: "design",
-					createdAt: new Date("2026-10-14T00:00:00.000Z").toISOString(),
-				},
-			],
-			total: 1,
+	it("differentiates a filtered dead-end from first-time emptiness", () => {
+		const { onQueryChange } = renderList({
+			total: 0,
+			search: { ...baseSearch, q: "stitch" },
 		});
-		return screen.getByRole("link", { name: /Example/i });
-	}
-
-	it("never presents a failed result as finished", () => {
-		const row = renderRow("failed");
-		expect(within(row).getByText("Gagal")).toBeDefined();
-		expect(within(row).queryByText("Selesai")).toBeNull();
-	});
-
-	it("reports an in-flight result as still processing", () => {
-		const row = renderRow("extracting");
-		expect(within(row).getByText("Diproses")).toBeDefined();
-		expect(within(row).queryByText("Selesai")).toBeNull();
-	});
-
-	it("shows the creation date of the result in a readable column", () => {
-		const row = renderRow("completed");
-		const time = within(row).getByText("14 Okt 2026");
-		expect(time.tagName).toBe("TIME");
-		expect(time.getAttribute("datetime")).toContain("2026-10-14");
-	});
-
-	it("keeps historical stored and legacy counts distinct", () => {
-		const counts = imageResultCounts(
-			[
-				{ status: "completed", assetId: "bytes" },
-				{ status: "completed", assetId: null },
-				{ status: "failed" },
-			],
-			4,
-		);
-		renderHistoryList({
-			items: [
-				{
-					id: "row-2",
-					domain: "example.test",
-					sourceUrl: "https://example.test",
-					title: null,
-					status: "failed",
-					mode: "images",
-					createdAt: new Date().toISOString(),
-					imageCounts: counts,
-				},
-			],
-			total: 1,
+		expect(
+			screen.getByRole("heading", { name: /tidak ada hasil sesuai filter/i }),
+		).toBeDefined();
+		expect(
+			screen.queryByRole("heading", { name: /belum ada riwayat/i }),
+		).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: /atur ulang filter/i }));
+		expect(onQueryChange).toHaveBeenCalledWith({
+			...baseSearch,
+			mode: undefined,
+			status: undefined,
+			q: "",
+			page: 1,
 		});
-		// The row carries the two numbers that fit its column and keeps the
-		// full breakdown available without widening the list.
-		const summary = screen.getByText(imageCountsSummary(counts));
-		expect(summary.getAttribute("title")).toBe(imageCountsLabel(counts));
 	});
-});
 
-describe("ScrapeHistoryList deletion", () => {
 	it("confirms deletion with the website context before calling back", async () => {
 		const onDelete = vi.fn().mockResolvedValue({ ok: true });
-		renderHistoryList({
+		renderList({
 			items: [
 				{
 					id: "id-7",
@@ -284,8 +396,7 @@ describe("ScrapeHistoryList deletion", () => {
 			total: 1,
 			onDelete,
 		});
-		openRowActions(/Aksi riwayat Notion/i);
-		fireEvent.click(screen.getByRole("menuitem", { name: /Hapus hasil/i }));
+		fireEvent.click(screen.getByRole("button", { name: /hapus riwayat/i }));
 		expect(
 			screen.getByRole("dialog", { name: /hapus riwayat vibescrape/i }),
 		).toBeDefined();
@@ -296,7 +407,7 @@ describe("ScrapeHistoryList deletion", () => {
 
 	it("surfaces a retryable error when deletion fails", async () => {
 		const onDelete = vi.fn().mockRejectedValue(new Error("offline"));
-		renderHistoryList({
+		renderList({
 			items: [
 				{
 					id: "id-8",
@@ -311,8 +422,7 @@ describe("ScrapeHistoryList deletion", () => {
 			total: 1,
 			onDelete,
 		});
-		openRowActions(/Aksi riwayat/i);
-		fireEvent.click(screen.getByRole("menuitem", { name: /Hapus hasil/i }));
+		fireEvent.click(screen.getByRole("button", { name: /hapus riwayat/i }));
 		fireEvent.click(screen.getByRole("button", { name: /konfirmasi hapus/i }));
 		await vi.waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
 	});

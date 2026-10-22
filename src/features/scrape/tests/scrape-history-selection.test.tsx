@@ -6,9 +6,8 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ScrapeMode } from "@/db/schema";
-import { resetScrapeHistorySelection } from "@/features/scrape/hooks/use-scrape-history-selection";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeHistoryItem } from "../components/scrape-history-list";
 import {
@@ -96,10 +95,6 @@ function checked(box: HTMLElement): boolean {
 	return box.checked;
 }
 
-beforeEach(() => {
-	resetScrapeHistorySelection();
-});
-
 afterEach(() => {
 	cleanup();
 });
@@ -157,12 +152,12 @@ describe("VibeScrape history selection mode", () => {
 		renderView({ items: [row("a")], total: 1 });
 
 		expect(
-			screen.getByRole("button", { name: /Aksi riwayat Notion/i }),
+			screen.getByRole("button", { name: /Hapus riwayat Notion/i }),
 		).toBeDefined();
 
 		enterSelectionMode();
 		expect(
-			screen.queryByRole("button", { name: /Aksi riwayat Notion/i }),
+			screen.queryByRole("button", { name: /Hapus riwayat Notion/i }),
 		).toBeNull();
 		expect(screen.getByRole("button", { name: "Hapus" })).toBeDefined();
 	});
@@ -252,7 +247,7 @@ describe("VibeScrape history selection mode", () => {
 		const dialog = screen.getByRole("dialog");
 		expect(within(dialog).getByText("Hapus 2 hasil scrape?")).toBeDefined();
 		expect(
-			within(dialog).getByText("2 hasil yang dipilih akan dihapus permanen."),
+			within(dialog).getByText("Hasil yang dipilih akan dihapus permanen."),
 		).toBeDefined();
 		fireEvent.click(
 			within(dialog).getByRole("button", { name: "Hapus 2 hasil" }),
@@ -317,5 +312,63 @@ describe("VibeScrape history selection mode", () => {
 		);
 
 		await vi.waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
+	});
+
+	it("keeps an explicit selection while the page changes", () => {
+		const { props, rerender } = renderView({
+			items: [row("a")],
+			total: 12,
+			search: { ...baseSearch, page: 1 },
+		});
+
+		enterSelectionMode();
+		fireEvent.click(
+			screen.getByRole("checkbox", { name: /Pilih riwayat Notion/i }),
+		);
+		expect(screen.getByText("1 dipilih")).toBeDefined();
+
+		rerender(
+			<ScrapeHistoryView
+				{...props}
+				items={[row("b", "framer.com")]}
+				search={{ ...baseSearch, page: 2 }}
+			/>,
+		);
+
+		expect(screen.getByText("1 dipilih")).toBeDefined();
+		expect(
+			screen.getByRole("checkbox", { name: /Pilih riwayat Framer/i }),
+		).toBeDefined();
+	});
+
+	it("resets a filtered scope explicitly when the filter changes", async () => {
+		const onPrepareSelection = vi
+			.fn()
+			.mockResolvedValue({ ids: ["a", "b"], total: 2, truncated: false });
+		const { props, rerender } = renderView({
+			items: [row("a")],
+			total: 2,
+			onPrepareSelection,
+		});
+
+		enterSelectionMode();
+		fireEvent.click(
+			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
+		);
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: /Pilih semua 2 hasil sesuai filter/i,
+			}),
+		);
+		await vi.waitFor(() => expect(screen.getByText("2 dipilih")).toBeDefined());
+
+		rerender(
+			<ScrapeHistoryView {...props} search={{ ...baseSearch, q: "stitch" }} />,
+		);
+
+		await vi.waitFor(() => expect(screen.getByText("0 dipilih")).toBeDefined());
+		expect(
+			screen.getByText("Filter berubah, pilihan dibersihkan."),
+		).toBeDefined();
 	});
 });

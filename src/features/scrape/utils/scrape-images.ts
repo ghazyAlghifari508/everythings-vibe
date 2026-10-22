@@ -23,15 +23,6 @@ export function imageCountsLabel(counts: ReturnType<typeof imageResultCounts>) {
 	return `${counts.discovered} ditemukan · ${counts.persisted} tersimpan · ${counts.linked} tautan terverifikasi · ${counts.failed} gagal · ${counts.pending} tertunda`;
 }
 
-// The history row is a dense one-line list, so the full breakdown above is too
-// wide to sit next to the other columns. The row keeps the two numbers a user
-// actually needs there and keeps the complete breakdown as the tooltip.
-export function imageCountsSummary(
-	counts: ReturnType<typeof imageResultCounts>,
-) {
-	return `${counts.persisted}/${counts.discovered} gambar`;
-}
-
 // How a page-level image capture ended. Kept explicit so the UI never presents
 // a failed extraction as a successful empty result.
 export type ScrapeImageDiscovery =

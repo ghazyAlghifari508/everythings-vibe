@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Loading03Icon } from "@hugeicons/core-free-icons";
 import {
 	Dialog,
 	DialogContent,
@@ -7,6 +7,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Icon } from "@/components/ui/icon";
 import { displaySiteName } from "@/features/scrape/utils/site-name";
 import type { ScrapeHistoryItem } from "./scrape-history-list-item";
 
@@ -33,7 +34,7 @@ export function ScrapeHistoryDeleteDialog({
 			: "Hapus Riwayat VibeScrape?";
 	const description =
 		single === null
-			? `${bulkCount ?? 0} hasil yang dipilih akan dihapus permanen.`
+			? "Hasil yang dipilih akan dihapus permanen."
 			: `Apakah kamu yakin ingin menghapus riwayat scrape untuk ${displaySiteName(single.domain)}? Tindakan ini tidak dapat dibatalkan.`;
 	const confirmLabel =
 		single === null ? `Hapus ${bulkCount} hasil` : "Konfirmasi Hapus";
@@ -50,23 +51,25 @@ export function ScrapeHistoryDeleteDialog({
 					<DialogDescription>{description}</DialogDescription>
 				</DialogHeader>
 				<DialogFooter>
-					<Button
+					<button
 						type="button"
-						variant="outline"
 						onClick={onCancel}
 						disabled={deleting}
+						className="rounded-lg border border-graphite px-3 py-1.5 text-xs font-medium text-snow hover:bg-onyx disabled:opacity-50"
 					>
 						Batal
-					</Button>
-					<Button
+					</button>
+					<button
 						type="button"
-						variant="destructive"
 						onClick={onConfirm}
 						disabled={deleting}
-						isLoading={deleting}
+						className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-500 disabled:opacity-50"
 					>
+						{deleting ? (
+							<Icon icon={Loading03Icon} size={12} className="animate-spin" />
+						) : null}
 						{confirmLabel}
-					</Button>
+					</button>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>
