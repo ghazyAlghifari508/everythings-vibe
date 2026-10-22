@@ -57,6 +57,7 @@ export function useScrapeStatus(
 	>(initialData);
 	const [error, setError] = useState<string | null>(null);
 	const [isRetrying, setIsRetrying] = useState(false);
+	const [isRetryingEnrichment, setIsRetryingEnrichment] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	// Monotonic request id: a slow response from an earlier poll must never
 	// overwrite a newer one, which would resurrect stale status or stale rows.
@@ -140,6 +141,30 @@ export function useScrapeStatus(
 		}
 	}, [fetchStatus, scrapeId]);
 
+	const retryEnrichment = useCallback(async () => {
+		setIsRetryingEnrichment(true);
+		setError(null);
+		try {
+			const res = await fetch("/api/scrape", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action: "retry-enrichment", scrapeId }),
+			});
+			if (!res.ok) {
+				const errData = (await res.json().catch(() => null)) as {
+					error?: string;
+				} | null;
+				setError(errData?.error ?? "Gagal melengkapi analisis desain.");
+				return;
+			}
+			await fetchStatus();
+		} catch {
+			setError("Jaringan bermasalah. Coba lagi.");
+		} finally {
+			setIsRetryingEnrichment(false);
+		}
+	}, [fetchStatus, scrapeId]);
+
 	return {
 		data,
 		status: (data?.status ?? "queued") as ScrapeStatus,
@@ -147,6 +172,8 @@ export function useScrapeStatus(
 		isPolling: !!data && !isTerminalScrapeStatus(data.status),
 		isRetrying,
 		retry,
+		isRetryingEnrichment,
+		retryEnrichment,
 		refresh: fetchStatus,
 	};
 }

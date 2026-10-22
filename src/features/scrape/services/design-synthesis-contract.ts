@@ -20,49 +20,133 @@ import type { DesignTokenModel } from "./design-model";
 // A reference the model may cite. Both the kind and the index must resolve to a
 // real entry in the model, so an invented citation is rejected rather than
 // silently dropped.
-export const evidenceReferenceSchema = z.strictObject({
-	kind: z.enum(["color", "typography", "typeface", "spacing", "radius"]),
-	index: z.number().int().nonnegative(),
-});
+const normalizeKind = (val: unknown): string => {
+	if (typeof val !== "string") return String(val ?? "");
+	const lower = val.trim().toLowerCase();
+	if (lower === "colors" || lower === "colour" || lower === "colours")
+		return "color";
+	if (lower === "radii" || lower === "border-radius" || lower === "roundness")
+		return "radius";
+	if (lower === "typefaces" || lower === "fonts" || lower === "font")
+		return "typeface";
+	if (lower === "spacings" || lower === "space") return "spacing";
+	if (lower === "type") return "typography";
+	return lower;
+};
+
+export const evidenceReferenceSchema = z.preprocess(
+	(raw) => {
+		if (raw && typeof raw === "object") {
+			const obj = raw as Record<string, unknown>;
+			const kind = normalizeKind(obj.kind);
+			const index =
+				typeof obj.index === "string" && /^\d+$/.test(obj.index.trim())
+					? Number.parseInt(obj.index.trim(), 10)
+					: obj.index;
+			return { ...obj, kind, index };
+		}
+		return raw;
+	},
+	z.strictObject({
+		kind: z.enum(["color", "typography", "typeface", "spacing", "radius"]),
+		index: z.number().int().nonnegative(),
+	}),
+);
 
 export type EvidenceReference = z.infer<typeof evidenceReferenceSchema>;
 
-const boundedText = (max: number) => z.string().min(1).max(max);
+const boundedText = (max: number) =>
+	z.preprocess((val) => {
+		if (typeof val === "string") {
+			const trimmed = val.trim();
+			if (
+				trimmed.length > max &&
+				trimmed.length <= max + Math.max(100, Math.floor(max * 0.15))
+			) {
+				return trimmed.slice(0, max).trim();
+			}
+			return trimmed;
+		}
+		return val;
+	}, z.string().min(1).max(max));
 
 export const designSynthesisSchema = z.strictObject({
 	essence: boundedText(320),
 	overview: boundedText(1200),
-	theme: z.enum(["light", "dark", "unknown"]),
+	theme: z.preprocess(
+		(val) => {
+			if (typeof val === "string") {
+				const lower = val.trim().toLowerCase();
+				if (lower === "light" || lower === "dark") return lower;
+				return "unknown";
+			}
+			return val;
+		},
+		z.enum(["light", "dark", "unknown"]),
+	),
 	identityNarrative: boundedText(1200),
-	componentPatterns: z
-		.array(
-			z.strictObject({
-				name: boundedText(80),
-				description: boundedText(400),
-				references: z.array(evidenceReferenceSchema).min(1).max(6),
-			}),
-		)
-		.max(12),
-	layoutPrinciples: z.array(boundedText(300)).max(10),
-	imageryNotes: z.array(boundedText(300)).max(8),
-	implementationGuidance: z.array(boundedText(300)).max(10),
-	dos: z
-		.array(
-			z.strictObject({
-				rule: boundedText(300),
-				references: z.array(evidenceReferenceSchema).min(1).max(6),
-			}),
-		)
-		.max(12),
-	donts: z
-		.array(
-			z.strictObject({
-				rule: boundedText(300),
-				references: z.array(evidenceReferenceSchema).min(1).max(6),
-			}),
-		)
-		.max(12),
-	limitations: z.array(boundedText(300)).max(12),
+	componentPatterns: z.preprocess(
+		(val) => (val == null ? [] : val),
+		z
+			.array(
+				z.strictObject({
+					name: boundedText(80),
+					description: boundedText(400),
+					references: z.preprocess(
+						(refs) =>
+							Array.isArray(refs) && refs.length > 6 ? refs.slice(0, 6) : refs,
+						z.array(evidenceReferenceSchema).min(1).max(6),
+					),
+				}),
+			)
+			.max(12),
+	),
+	layoutPrinciples: z.preprocess(
+		(val) => (val == null ? [] : val),
+		z.array(boundedText(300)).max(10),
+	),
+	imageryNotes: z.preprocess(
+		(val) => (val == null ? [] : val),
+		z.array(boundedText(300)).max(8),
+	),
+	implementationGuidance: z.preprocess(
+		(val) => (val == null ? [] : val),
+		z.array(boundedText(300)).max(10),
+	),
+	dos: z.preprocess(
+		(val) => (val == null ? [] : val),
+		z
+			.array(
+				z.strictObject({
+					rule: boundedText(300),
+					references: z.preprocess(
+						(refs) =>
+							Array.isArray(refs) && refs.length > 6 ? refs.slice(0, 6) : refs,
+						z.array(evidenceReferenceSchema).min(1).max(6),
+					),
+				}),
+			)
+			.max(12),
+	),
+	donts: z.preprocess(
+		(val) => (val == null ? [] : val),
+		z
+			.array(
+				z.strictObject({
+					rule: boundedText(300),
+					references: z.preprocess(
+						(refs) =>
+							Array.isArray(refs) && refs.length > 6 ? refs.slice(0, 6) : refs,
+						z.array(evidenceReferenceSchema).min(1).max(6),
+					),
+				}),
+			)
+			.max(12),
+	),
+	limitations: z.preprocess(
+		(val) => (val == null ? [] : val),
+		z.array(boundedText(300)).max(12),
+	),
 });
 
 export type DesignSynthesis = z.infer<typeof designSynthesisSchema>;
@@ -78,14 +162,16 @@ export function buildSynthesisInstruction(): string {
 		"- Never widen a measured value into a universal rule: state the measured component class and capture scope instead of 'all' or 'every'.",
 		"- Keep observed component treatments scoped to their selectors/captures. Do not infer primary/secondary hierarchy, brand identity or global rules from frequency. Semantic roles are inferences, not measurements.",
 		'- Cite evidence for every component pattern, Do and Don\'t as {"kind","index"} pairs into the model arrays you were given.',
+		'- Allowed "kind" values: "color", "typography", "typeface", "spacing", "radius". "index" is the 0-based integer index.',
+		'- Allowed "theme" values: "light", "dark", "unknown".',
 		"- Use English for all prose.",
 		'- Report what the evidence does not establish in "limitations" instead of guessing.',
 		"Return one JSON object with exactly these keys:",
 		'{"essence":string,"overview":string,"theme":"light"|"dark"|"unknown","identityNarrative":string,',
-		'"componentPatterns":[{"name":string,"description":string,"references":[{"kind":string,"index":number}]}],',
+		'"componentPatterns":[{"name":string,"description":string,"references":[{"kind":"color"|"typography"|"typeface"|"spacing"|"radius","index":number}]}],',
 		'"layoutPrinciples":[string],"imageryNotes":[string],"implementationGuidance":[string],',
-		'"dos":[{"rule":string,"references":[{"kind":string,"index":number}]}],',
-		'"donts":[{"rule":string,"references":[{"kind":string,"index":number}]}],',
+		'"dos":[{"rule":string,"references":[{"kind":"color"|"typography"|"typeface"|"spacing"|"radius","index":number}]}],',
+		'"donts":[{"rule":string,"references":[{"kind":"color"|"typography"|"typeface"|"spacing"|"radius","index":number}]}],',
 		'"limitations":[string]}',
 		"No prose, no markdown fences, no commentary.",
 	].join("\n");

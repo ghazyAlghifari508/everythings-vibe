@@ -61,6 +61,8 @@ export function ScrapeDetailView({
 		status: polledStatus,
 		isRetrying,
 		retry,
+		isRetryingEnrichment,
+		retryEnrichment,
 		error: requestError,
 	} = useScrapeStatus(id, {
 		initialData: initial
@@ -290,6 +292,8 @@ export function ScrapeDetailView({
 					visualEvidence={metadata?.visualEvidence}
 					enrichment={metadata?.aiEnrichment}
 					enrichmentDetail={metadata?.aiEnrichmentDetail}
+					onRetryEnrichment={() => void retryEnrichment()}
+					isRetryingEnrichment={isRetryingEnrichment}
 				/>
 			) : view === "result-html" ||
 				(currentStatus === "failed" &&

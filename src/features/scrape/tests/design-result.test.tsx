@@ -232,4 +232,51 @@ describe("DesignResult", () => {
 			),
 		).toBeTruthy();
 	});
+
+	it("forwards enrichment retry handler and avoids internal status leakage", () => {
+		const onRetryEnrichment = vi.fn();
+		render(
+			<DesignResult
+				sourceUrl="https://acme.example/"
+				domain="acme.example"
+				designMd={DESIGN_MD}
+				enrichment="unavailable"
+				enrichmentDetail="Model timeout."
+				onRetryEnrichment={onRetryEnrichment}
+			/>,
+		);
+
+		expect(
+			screen.getByText(/panduan desain belum sepenuhnya selesai/i),
+		).toBeDefined();
+		expect(screen.queryByText(/ai tidak memenuhi kontrak/i)).toBeNull();
+		expect(screen.queryByText(/schema validation failed/i)).toBeNull();
+		expect(screen.queryByText(/enrichment unavailable/i)).toBeNull();
+
+		const retryBtn = screen.getByRole("button", {
+			name: /lengkapi analisis/i,
+		});
+		expect(retryBtn).toBeDefined();
+		fireEvent.click(retryBtn);
+		expect(onRetryEnrichment).toHaveBeenCalledTimes(1);
+	});
+
+	it("renders clean without warnings when enrichment is applied", () => {
+		render(
+			<DesignResult
+				sourceUrl="https://acme.example/"
+				domain="acme.example"
+				designMd={DESIGN_MD}
+				enrichment="applied"
+			/>,
+		);
+
+		expect(
+			screen.queryByText(/panduan desain belum sepenuhnya selesai/i),
+		).toBeNull();
+		expect(screen.queryByText(/analisis ai belum lengkap/i)).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /lengkapi analisis/i }),
+		).toBeNull();
+	});
 });

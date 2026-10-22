@@ -183,7 +183,7 @@ export function enrichmentDetailForCause(
 		case "invalid_json":
 			return "AI tidak mengembalikan JSON yang valid.";
 		case "schema":
-			return "AI tidak memenuhi kontrak sintesis design system.";
+			return safeDetail ?? "Format sintesis AI tidak sesuai skema analisis.";
 		case "unknown_reference":
 			return safeDetail ?? "AI merujuk evidence yang tidak tersedia.";
 		case "unsupported_claim":
@@ -207,6 +207,19 @@ export interface SynthesisOutcome {
 	cause?: SynthesisCause;
 }
 
+function tryParseJson(text: string): unknown {
+	try {
+		return JSON.parse(text);
+	} catch {
+		const sanitized = text.replace(/,(\s*[}\]])/g, "$1");
+		try {
+			return JSON.parse(sanitized);
+		} catch {
+			return null;
+		}
+	}
+}
+
 // Parses the model's response. A fenced or prose-wrapped object is still the
 // same response, so it is unwrapped rather than rejected, but a response that
 // fails the schema is rejected outright.
@@ -224,17 +237,11 @@ export function parseSynthesisResponse(
 			cause: "truncated",
 		};
 	const direct = response.trim();
-	let parsed: unknown = null;
-	try {
-		parsed = JSON.parse(direct);
-	} catch {
+	let parsed: unknown = tryParseJson(direct);
+	if (parsed === null) {
 		const extracted = extractJson(response);
 		if (extracted !== direct) {
-			try {
-				parsed = JSON.parse(extracted);
-			} catch {
-				parsed = null;
-			}
+			parsed = tryParseJson(extracted);
 		}
 	}
 	if (parsed === null)
@@ -245,13 +252,19 @@ export function parseSynthesisResponse(
 			cause: "invalid_json",
 		};
 	const result = designSynthesisSchema.safeParse(parsed);
-	if (!result.success)
+	if (!result.success) {
+		const firstIssue = result.error.issues[0];
+		const fieldPath = firstIssue?.path?.join(".") || "root";
+		const diagnostic = firstIssue
+			? `Format sintesis tidak sesuai pada ${fieldPath}: ${firstIssue.message}`
+			: "Format respons AI tidak sesuai skema analisis.";
 		return {
 			synthesis: null,
 			status: "unavailable",
-			detail: "AI tidak memenuhi kontrak sintesis design system.",
+			detail: enrichmentDetailForCause("schema", diagnostic),
 			cause: "schema",
 		};
+	}
 	const issues = validateSynthesis(result.data, model);
 	if (issues.length)
 		return {

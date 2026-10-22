@@ -23,6 +23,7 @@ export interface DesignAgentPromptInput {
 export interface DesignAgentPromptDialogProps extends DesignAgentPromptInput {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	enrichment?: "applied" | "unavailable";
 }
 
 export function buildDesignAgentPrompt({
@@ -64,6 +65,7 @@ export function DesignAgentPromptDialog({
 	siteName,
 	sourceUrl,
 	designMd,
+	enrichment,
 }: DesignAgentPromptDialogProps) {
 	const showToast = useUIStore((s) => s.showToast);
 	const [isCopying, setIsCopying] = useState(false);
@@ -96,6 +98,9 @@ export function DesignAgentPromptDialog({
 					<DialogDescription>
 						Salin prompt ini ke coding agent untuk menerapkan design system ke
 						project kamu.
+						{enrichment === "unavailable"
+							? " (Catatan: Narasi AI belum lengkap; instruksi dibatasi pada token terukur yang terverifikasi)."
+							: null}
 					</DialogDescription>
 				</DialogHeader>
 

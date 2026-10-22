@@ -27,6 +27,8 @@ export interface DesignMdSourcePanelProps {
 	// Explicit AI enrichment status: full narrative vs measurement-only fallback.
 	enrichment?: "applied" | "unavailable";
 	enrichmentDetail?: string;
+	onRetryEnrichment?: () => Promise<void> | void;
+	isRetryingEnrichment?: boolean;
 	className?: string;
 }
 
@@ -46,7 +48,9 @@ export function DesignMdSourcePanel({
 	onImplementAgent,
 	inspectorSource = "observed",
 	enrichment,
-	enrichmentDetail,
+	enrichmentDetail: _enrichmentDetail,
+	onRetryEnrichment,
+	isRetryingEnrichment = false,
 	className,
 }: DesignMdSourcePanelProps) {
 	const [notice, setNotice] = useState("");
@@ -112,13 +116,11 @@ export function DesignMdSourcePanel({
 					<span className="truncate font-mono text-xs font-semibold text-mist">
 						DESIGN.md
 					</span>
-					<span className="truncate text-xs text-fog">
-						{inspectorSource === "observed"
-							? enrichment === "unavailable"
-								? "Analisis AI belum lengkap"
-								: "Sesuai evidence browser"
-							: "Arsip: belum terverifikasi terhadap evidence"}
-					</span>
+					{inspectorSource === "unverified" ? (
+						<span className="truncate text-xs text-fog">
+							Arsip: belum terverifikasi terhadap evidence
+						</span>
+					) : null}
 				</span>
 				<div className="flex shrink-0 flex-wrap items-center gap-1">
 					<button
@@ -220,12 +222,22 @@ export function DesignMdSourcePanel({
 					</button>
 				</div>
 			</div>
-			{inspectorSource === "observed" && enrichment === "unavailable" ? (
-				<p className="block border-b border-graphite px-3 py-2 text-xs text-fog">
-					Analisis AI belum lengkap
-					{enrichmentDetail ? `: ${enrichmentDetail}` : "."} Token terukur di
-					bawah lengkap dan tidak terpengaruh.
-				</p>
+			{enrichment === "unavailable" ? (
+				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-graphite bg-onyx/40 px-3 py-2 text-xs text-fog">
+					<span>Panduan desain belum sepenuhnya selesai.</span>
+					{onRetryEnrichment ? (
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => void onRetryEnrichment()}
+							disabled={isRetryingEnrichment || busy}
+							className="h-6 px-2.5 text-xs text-fog hover:text-snow"
+						>
+							{isRetryingEnrichment ? "Melengkapi..." : "Lengkapi analisis"}
+						</Button>
+					) : null}
+				</div>
 			) : null}
 
 			<div

@@ -119,7 +119,8 @@ describe("DesignMdSourcePanel", () => {
 		expect(onImplementAgent).toHaveBeenCalledTimes(1);
 	});
 
-	it("states incomplete AI analysis only when enrichment is unavailable", () => {
+	it("states incomplete analysis gracefully without leaking internal errors", () => {
+		const onRetry = vi.fn();
 		const { rerender } = render(
 			<DesignMdSourcePanel
 				designMd={DESIGN_MD}
@@ -128,17 +129,27 @@ describe("DesignMdSourcePanel", () => {
 				inspectorSource="observed"
 				enrichment="unavailable"
 				enrichmentDetail="Model timeout."
+				onRetryEnrichment={onRetry}
 			/>,
 		);
 		expect(
-			screen.getAllByText(/analisis ai belum lengkap/i).length,
-		).toBeGreaterThan(0);
+			screen.getByText(/panduan desain belum sepenuhnya selesai/i),
+		).toBeDefined();
+		expect(screen.queryByText(/analisis ai belum lengkap/i)).toBeNull();
 		expect(
 			screen.queryByText(/pengukuran lengkap tanpa narasi ai/i),
 		).toBeNull();
-		expect(
-			screen.queryByRole("button", { name: /coba lagi|retry/i }),
-		).toBeNull();
+		expect(screen.queryByText(/ai tidak memenuhi kontrak/i)).toBeNull();
+		expect(screen.queryByText(/enrichment unavailable/i)).toBeNull();
+		expect(screen.queryByText(/schema validation failed/i)).toBeNull();
+
+		const retryButton = screen.getByRole("button", {
+			name: /lengkapi analisis/i,
+		});
+		expect(retryButton).toBeDefined();
+		fireEvent.click(retryButton);
+		expect(onRetry).toHaveBeenCalledTimes(1);
+
 		rerender(
 			<DesignMdSourcePanel
 				designMd={DESIGN_MD}
@@ -148,7 +159,12 @@ describe("DesignMdSourcePanel", () => {
 				enrichment="applied"
 			/>,
 		);
-		expect(screen.queryByText(/analisis ai belum lengkap/i)).toBeNull();
+		expect(
+			screen.queryByText(/panduan desain belum sepenuhnya selesai/i),
+		).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /lengkapi analisis/i }),
+		).toBeNull();
 	});
 
 	it("switches between rendered markdown and raw source", () => {
