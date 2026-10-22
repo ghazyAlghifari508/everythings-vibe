@@ -247,12 +247,168 @@ Kontrol aksi harus terikat secara ketat pada state aktif dari komponen:
 
 > **Batasan Penting:** Jangan salah menafsirkan aturan ini sebagai larangan terhadap seluruh tombol retry, error state, accessibility alternatives, atau bantuan kontekstual. Aksi-aksi tersebut **tetap valid dan wajib ada** apabila kebutuhan dan kondisi state-nya memang mendukung secara riil.
 
-### 3.5 Human-Centered Copywriting
+### 3.5 Interaction Pattern Minimalism (Direct Interaction Over Mode Overengineering)
+
+**Aturan Pokok:**
+> **Do not introduce additional interaction modes when a direct, established interaction pattern can accomplish the same user goal with fewer steps.**
+
+Agen sering kali membuat mode interaksi tambahan yang tidak diperlukan (seperti tombol toggle "Selection Mode" atau modal terpisah) hanya untuk melakukan aksi umum seperti memilih beberapa item atau menghapus item massal. Pola ini menambah friksi, langkah navigasi, dan beban kognitif pengguna.
+
+#### Contoh Perbandingan:
+
+- **DILARANG (Prohibited — Mode Berlebih Tanpa Kebutuhan Riil):**
+  ```
+  [Pilih] (Tombol masuk mode)
+     ↓
+  Selection Mode aktif
+     ↓
+  ☐ Item A
+  ☐ Item B
+     ↓
+  [Hapus] [Selesai memilih] (Tombol keluar mode)
+  ```
+  *Mengapa dilarang:* Memaksa pengguna melalui siklus masuk-keluar mode (*entry/exit state*) hanya untuk memilih 1–2 item dalam daftar standar.
+
+- **DIREKOMENDASIKAN (Preferred — Interaksi Langsung & Kontekstual):**
+  ```
+  ☐ Item A
+  ☐ Item B
+  ☐ Item C
+
+  Pengguna mencentang A dan B
+          ↓
+  [2 dipilih] [Batal] [Hapus] (Floating/Contextual bulk action bar)
+  ```
+  *Mengapa lebih baik:* Checkbox selalu siap pakai; aksi massal muncul secara kontekstual hanya saat ada item terpilih; tidak membutuhkan mode khusus.
+
+#### Prinsip Interaksi Wajib:
+1. **Seleksi Langsung:** Utamakan seleksi langsung melalui checkbox pada list/tabel standar tanpa tombol saklar mode.
+2. **Aksi Massal Kontekstual:** Tombol aksi massal (*bulk actions*) hanya ditampilkan saat relevan (misal: saat minimal 1 item tercentang).
+3. **Tanpa Entry/Exit Barrier:** Jangan mewajibkan mode masuk/keluar untuk aksi sederhana kecuali secara material dibutuhkan oleh konteks keamanan data tingkat tinggi.
+4. **Minimalisasi Langkah Konfirmasi:** Hindari langkah interaksi atau konfirmasi tambahan tanpa manfaat nyata bagi keselamatan data atau kenyamanan pengguna.
+5. **Aksesibilitas Terjaga:** Tetap sediakan navigasi keyboard (fokus Tab/Space), pembaca layar (*screen-reader* dengan label ARIA akurat), dan touch target $\ge$ 44px.
+6. **Pengecualian Mode yang Sah (*Justified Modes*):** Mode khusus tetap diperbolehkan HANYA pada alur kerja pengeditan kompleks di mana pemisahan mode mencegah kesalahan destruktif pengguna (misal: kanvas transform/crop pada studio gambar, mode kalibrasi multi-screen, atau inspeksi frame visual).
+
+### 3.6 Internal Diagnostics Are Not Product Copy (Pemisahan Status Teknis vs Konten Pengguna)
+
+**Aturan Pokok:**
+> **Never expose implementation details, AI schema validation messages, model/provider failures, internal fallback names, or developer-oriented pipeline statuses directly as primary end-user content.**
+
+Pengguna akhir menggunakan platform untuk menyelesaikan tugas produk mereka, bukan untuk membaca log debugging backend atau melacak siklus validasi skema internal AI.
+
+#### Contoh Pesan Publik yang DILARANG KERAS:
+```
+❌ "AI tidak memenuhi kontrak sintesis design system."
+❌ "Enrichment unavailable."
+❌ "Schema validation failed: missing key 'colors.primary'."
+❌ "Measurement-only fallback."
+❌ "Playwright chromium worker exited with code 1."
+```
+
+#### Protokol Penanganan Diagnostik Internal:
+1. **Perbaiki Sumber Masalah:** Utamakan memperbaiki kesalahan pada sistem backend atau adapter model daripada sekadar memoles tampilan pesan.
+2. **Evaluasi Dampak Material Pengguna:**
+   - Tentukan apakah kegagalan internal tersebut secara material merusak atau mengurangi kegunaan hasil bagi pengguna.
+   - **Jika hasil masih dapat digunakan:** Jika output utama tetap dapat dipakai dan kegagalan internal hanya berupa metadata sekunder yang tidak esensial, **SEMBUNYIKAN status teknis** dari antarmuka utama pengguna.
+   - **Jika hasil secara material tidak lengkap:** Jelaskan konsekuensi fungsionalnya dalam **Bahasa Indonesia yang alami, tenang, dan berorientasi pengguna** (misal: *"Beberapa aset gambar tidak dapat diambil dari situs sumber, namun struktur dan palet warna berhasil diekstraksi"*).
+3. **Aksi Pemulihan Riil:** Sediakan tombol pemulihan (*recovery button*) HANYA jika aksi tersebut benar-benar berfungsi dan dapat memperbaiki keadaan (patuhi isolasi state: dilarang menampilkan tombol retry saat output sudah sukses/usable).
+4. **Simpan Diagnostik di Lapisan Tepat:** Pindahkan detail teknis, pesan error mentah, dan stack trace ke log server atau panel inspeksi pengembang khusus (*developer console* / expandable raw metadata), bukan pada kartu atau hero utama.
+5. **Invarian Kejujuran Status:** Dilarang menyembunyikan keluaran yang gagal atau rusak total hanya demi membuat UI terlihat bersih. Sampaikan kegagalan material secara jujur tanpa membocorkan jargon teknis internal.
+
+### 3.7 Information Necessity Gate (Filter Kebutuhan Informasi UI)
+
+Sebelum menambahkan atau menampilkan elemen informasi apa pun pada antarmuka:
+- Label status / badge
+- Banner pemberitahuan
+- Paragraf informasi
+- Tooltip bantuan
+- Peringatan (*warning banner*)
+- Catatan teknis
+- Tombol pemulihan (*recovery button*)
+
+Agen **WAJIB** mengevaluasi diagram alur kebutuhan informasi berikut:
+
+```
+       INFORMASI YANG AKAN DITAMPILKAN
+                      │
+                      ▼
+            Relevan dengan tujuan user?
+                      │
+                   ┌──┴──┐
+                   NO   YES
+                   │     │
+                 OMIT    ▼
+                   Dapat dipahami user umum?
+                         │
+                      ┌──┴──┐
+                      NO   YES
+                      │     │
+                  REWRITE   ▼
+                     Apakah user membutuhkannya?
+                             │
+                          ┌──┴──┐
+                          NO   YES
+                          │     │
+                        OMIT   SHOW
+```
+
+#### Evaluasi Tambahan Sebelum Merender:
+1. **Apakah informasi sudah terlihat di tempat lain?** Jika sudah ada di header atau breadcrumb, jangan buat banner baru.
+2. **Apakah menjelaskan apa yang sebenarnya terjadi?** Fokus pada fakta hasil, bukan proses internal sistem.
+3. **Apakah dapat ditindaklanjuti (*actionable*)?** Jika pengguna tidak bisa melakukan apa-apa terhadap informasi tersebut, pertimbangkan untuk menghapusnya.
+4. **Apakah dapat dipindahkan ke detail diagnostik?** Taruh pada accordion detail sekunder alih-alih mengambil porsi visual utama.
+5. **Dilarang membuat surface UI baru hanya untuk menampilkan metadata internal.**
+
+### 3.8 No Duplicate Status Disclosure (Pencegahan Duplikasi Status)
+
+**Aturan Pokok:**
+> **For materially degraded output, show ONE clear, contextual indication of the consequence. Do not repeat the same technical status across multiple UI locations unless each serves a distinct and necessary purpose.**
+
+#### Pola Terlarang:
+Dilarang mengulang-ulang status teknis atau pesan penurunan performa yang sama di:
+- Header halaman
+- Subtitle panel
+- Banner peringatan
+- Toast notification
+- Body dokumen/hasil
+
+#### Contoh Perbandingan:
+
+- **SALAH (Duplikasi Status Berlebihan):**
+  ```
+  Header: DESIGN.md [Analisis AI belum lengkap]
+  Toolbar: [Rendered | Source]
+  Banner: ⚠️ Analisis AI belum lengkap: schema validation fallback
+  Dokumen Body: [Catatan: AI gagal memproses token warna...]
+  ```
+  *Masalah:* Status yang sama diteriakkan 3–4 kali di layar yang sama, merusak ketenangan antarmuka dan menciptakan kepanikan yang tidak perlu bagi pengguna.
+
+- **BENAR (Pengungkapan Tunggal & Kontekstual):**
+  ```
+  Header: DESIGN.md
+  Toolbar: [Rendered | Source]
+  Dokumen Body: [Konten dokumen aktual]
+  ```
+  *(Jika terjadi penurunan material riil, tampilkan SATU banner kontekstual tunggal yang ringkas tepat di atas seksi yang terpengaruh, tanpa mencemari header dan toolbar).*
+
+### 3.9 Prevent Cosmetic Error Fixes (Larangan Perbaikan Kosmetik Tanpa Root Cause)
+
+**Prinsip Rekayasa Perangkat Lunak Wajib:**
+> **Removing a confusing error message does not count as fixing the underlying failure.**
+
+Ketika menemukan pesan error yang membingungkan atau banner peringatan pada antarmuka:
+1. **Lacak Akar Masalah (*Root Cause*):** Telusuri dari mana pesan tersebut berasal di backend, worker, atau generator pipeline.
+2. **Verifikasi Kondisi Status Riil:** Periksa apakah kondisi tersebut merepresentasikan kegagalan total (*failed*), keluaran parsial yang masih bisa dipakai (*usable degraded*), atau *false alarm*.
+3. **Perbaiki Masalah Backend:** Perbaiki validasi skema, prompt AI, penanganan parsing, atau query database agar sistem bekerja dengan benar, bukan hanya membungkam tampilannya di UI.
+4. **Pertahankan Diagnostik Internal yang Akurat:** Jangan memanipulasi status internal sistem atau mengubah status backend dari `failed` menjadi `success` hanya demi menghilangkan banner merah di UI.
+5. **Tingkatkan UI Copy Secara Sejajar:** Sempurnakan bahasa antarmuka agar ramah pengguna dan tidak membocorkan jargon teknis, dengan tetap menjaga kebenaran status sistem yang mendasarinya.
+
+### 3.10 Human-Centered Copywriting
 
 Bahasa antarmuka mencerminkan profesionalisme dan kejelasan produk bagi pengguna akhir:
 
 - **Larangan Copywriting:**
-  - Istilah teknis internal, nama variabel backend, atau error code yang tidak membantu pengguna.
+  - Istilah teknis internal, nama variabel backend, atau error code yang tidak membantu pengguna (lihat Bagian 3.6).
   - Penjelasan panjang lebar tentang pipeline crawling, worker queue, atau implementation details pada antarmuka utama.
   - Status dramatis, generik, atau hiperbolis untuk proses operasional sederhana.
   - Label tombol atau kartu yang menjelaskan cara kerja mesin sistem alih-alih manfaat langsung bagi pengguna.
@@ -262,7 +418,7 @@ Bahasa antarmuka mencerminkan profesionalisme dan kejelasan produk bagi pengguna
   - Tampilkan secara transparan apa yang sedang terjadi dan apa tindakan konkret yang dapat diambil oleh pengguna.
   - Technical details tetap diperbolehkan, namun ditempatkan pada area detail/inspeksi sekunder yang relevan (misal accordion metadata atau raw response viewer), bukan pada hero atau action bar utama.
 
-### 3.6 Agent Design Handoff Boundaries
+### 3.11 Agent Design Handoff Boundaries
 
 Agen sering kali keliru menafsirkan aset referensi desain dan menyulapnya menjadi konten produk:
 
@@ -300,12 +456,21 @@ When writing CSS / Tailwind classes, map strictly to these authoritative values:
 Before finalizing any frontend work or opening a PR, verify every item across both checklists:
 
 ### 5.1 PR Self-Review Checklist (Anti-Functional-Slop & UI Necessity)
-- [ ] **Existing action audit completed** (Evaluated with the 5 mandatory audit questions)
+- [ ] **Existing action audit completed** (Evaluated with the 5 mandatory audit questions in 3.2)
+- [ ] **No unnecessary interaction mode** (Direct actions used; no selection mode or entry/exit barriers where direct controls suffice)
+- [ ] **Direct actions used where appropriate** (Checkboxes and inline triggers available directly without special activation modes)
+- [ ] **No extra clicks without user benefit** (Zero redundant confirmation steps, extra modals, or superfluous mode switches)
+- [ ] **Contextual actions appear only when needed** (Bulk action bars and contextual tools surface only when items are selected or relevant)
 - [ ] **No duplicate user actions** (No action repeated in the same view or toolbar)
 - [ ] **No unnecessary new controls** (No speculative search, filters, or buttons added without need)
 - [ ] **No more navigation layers than necessary** (Single toolbar where sufficient; secondary only when strictly justified)
 - [ ] **Every state-specific control appears in the right state** (Recovery actions isolated to error states; no retry on success)
-- [ ] **No internal/debug copy in primary UI** (User-facing copy is natural Indonesian, devoid of backend jargon)
+- [ ] **No internal AI/provider/schema jargon in primary UI** (User-facing copy is natural Indonesian, devoid of internal diagnostics, schema errors, or fallback names)
+- [ ] **No duplicated technical statuses** (Status not repeated across header, subtitle, banner, toast, and body)
+- [ ] **No warning for irrelevant internal metadata** (No banners/toasts for minor internal failures that have no material impact on the user's deliverable)
+- [ ] **Materially incomplete output is disclosed honestly** (Truthful disclosure in clear Indonesian if the deliverable is degraded, without hiding failures)
+- [ ] **Error UI changes do not conceal backend failure** (Cosmetic UI changes do not fake backend success; root cause investigated and resolved)
+- [ ] **No new UI surface added without clear necessity** (Information Necessity Gate evaluated; no new containers just to display internal metadata)
 - [ ] **No invented product features or sections** (Scope strictly bounded; design tokens are styles, not page content)
 - [ ] **Existing components reused where appropriate** (No duplicate wrappers or custom buttons when primitives exist)
 - [ ] **Mobile and desktop interaction considered** (Touch targets $\ge$ 44px, no horizontal overflow)
