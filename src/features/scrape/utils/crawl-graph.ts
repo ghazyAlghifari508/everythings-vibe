@@ -1,9 +1,13 @@
 import dagre from "dagre";
 import type { scrapePages } from "@/db/schema";
+import {
+	buildCrawlRelations,
+	type CrawlRelationKind,
+	type CrawlRelations,
+	shortCrawlLabel,
+} from "./crawl-relations";
 
 type Page = typeof scrapePages.$inferSelect;
-
-export type CrawlEdgeKind = "primary" | "secondary" | "cross";
 
 export interface CrawlGraphNode {
 	id: string;
@@ -26,7 +30,7 @@ export interface CrawlGraphNode {
 export interface CrawlGraphEdge {
 	from: string;
 	to: string;
-	kind: CrawlEdgeKind;
+	kind: CrawlRelationKind;
 	x1: number;
 	y1: number;
 	x2: number;
@@ -37,15 +41,17 @@ export interface CrawlGraphEdge {
 
 export interface CrawlGraphLayout {
 	nodes: CrawlGraphNode[];
-	edges: CrawlGraphEdge[];
+	/** Edges that mirror the crawler's discovery parent relationship. */
 	primaryEdges: CrawlGraphEdge[];
+	/** Edges for links observed in the page HTML outside the discovery tree. */
 	secondaryEdges: CrawlGraphEdge[];
+	/** Per-page relationship summary derived from the same observed edges. */
+	relations: CrawlRelations;
 	width: number;
 	height: number;
 }
 
 export interface CrawlLayoutOptions {
-	viewMode?: "discovery" | "all";
 	rankdir?: "TB" | "LR";
 	nodeWidth?: number;
 	nodeHeight?: number;
@@ -56,26 +62,6 @@ export const CRAWL_GRAPH_NODE_H = 64;
 export const CRAWL_GRAPH_GAP_X = 48;
 export const CRAWL_GRAPH_GAP_Y = 64;
 export const CRAWL_GRAPH_PAD = 48;
-export const CRAWL_GRAPH_LABEL_MAX = 28;
-
-export function shortCrawlLabel(title: string | null, url: string): string {
-	const raw = title?.trim() ? title.trim() : pathnameOf(url);
-	if (raw.length <= CRAWL_GRAPH_LABEL_MAX) return raw;
-	return `${raw.slice(0, CRAWL_GRAPH_LABEL_MAX)}…`;
-}
-
-export function pathnameOf(url: string): string {
-	try {
-		const parsed = new URL(url);
-		const path = parsed.pathname;
-		if (path === "/" || !path) {
-			return parsed.hostname;
-		}
-		return path;
-	} catch {
-		return url;
-	}
-}
 
 function buildCubicPath(
 	x1: number,
@@ -92,6 +78,13 @@ function buildCubicPath(
 	return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
 }
 
+/**
+ * Places the crawled pages on a canvas.
+ *
+ * The layout is driven by the discovery edges only, so the picture shows the
+ * hierarchy the crawler actually walked. Observed links are routed afterwards
+ * and never influence the placement, because they carry no hierarchy.
+ */
 export function layoutCrawlGraph(
 	pages: Page[],
 	options?: CrawlLayoutOptions,
@@ -99,76 +92,26 @@ export function layoutCrawlGraph(
 	if (pages.length === 0) {
 		return {
 			nodes: [],
-			edges: [],
 			primaryEdges: [],
 			secondaryEdges: [],
+			relations: { primaryEdges: [], secondaryEdges: [], byUrl: new Map() },
 			width: 0,
 			height: 0,
 		};
 	}
 
 	const rankdir = options?.rankdir ?? "TB";
-	const viewMode = options?.viewMode ?? "discovery";
 	const nodeW = options?.nodeWidth ?? CRAWL_GRAPH_NODE_W;
 	const nodeH = options?.nodeHeight ?? CRAWL_GRAPH_NODE_H;
 
-	const known = new Set(pages.map((p) => p.url));
-	const incomingCounts = new Map<string, number>();
-	const outgoingCounts = new Map<string, number>();
+	const relations = buildCrawlRelations(pages);
 
-	for (const p of pages) {
-		incomingCounts.set(p.url, 0);
-		outgoingCounts.set(p.url, 0);
-	}
+	// Stable deterministic order: sort by depth ascending, then by URL
+	const sortedPages = [...pages].sort((a, b) => {
+		if (a.depth !== b.depth) return a.depth - b.depth;
+		return a.url.localeCompare(b.url);
+	});
 
-	// 1. Identify primary discovery edges (child discovered by parent)
-	const primaryEdgeSet = new Set<string>();
-	const primaryEdgesRaw: { from: string; to: string }[] = [];
-
-	for (const row of pages) {
-		if (
-			row.parentUrl &&
-			known.has(row.parentUrl) &&
-			row.parentUrl !== row.url
-		) {
-			const key = `${row.parentUrl} -> ${row.url}`;
-			if (!primaryEdgeSet.has(key)) {
-				primaryEdgeSet.add(key);
-				primaryEdgesRaw.push({ from: row.parentUrl, to: row.url });
-			}
-		}
-	}
-
-	// 2. Identify secondary observed links & cross-links
-	const secondaryEdgeSet = new Set<string>();
-	const secondaryEdgesRaw: { from: string; to: string; isCross: boolean }[] =
-		[];
-
-	for (const row of pages) {
-		const targets = row.content?.outgoingPages ?? [];
-		for (const target of targets) {
-			if (!known.has(target) || target === row.url) continue;
-			const key = `${row.url} -> ${target}`;
-			if (primaryEdgeSet.has(key) || secondaryEdgeSet.has(key)) continue;
-			secondaryEdgeSet.add(key);
-
-			const targetRow = pages.find((p) => p.url === target);
-			const isCross = targetRow ? targetRow.depth === row.depth : false;
-			secondaryEdgesRaw.push({ from: row.url, to: target, isCross });
-		}
-	}
-
-	// Update incoming and outgoing connection counts
-	for (const e of primaryEdgesRaw) {
-		outgoingCounts.set(e.from, (outgoingCounts.get(e.from) ?? 0) + 1);
-		incomingCounts.set(e.to, (incomingCounts.get(e.to) ?? 0) + 1);
-	}
-	for (const e of secondaryEdgesRaw) {
-		outgoingCounts.set(e.from, (outgoingCounts.get(e.from) ?? 0) + 1);
-		incomingCounts.set(e.to, (incomingCounts.get(e.to) ?? 0) + 1);
-	}
-
-	// 3. Initialize Dagre graph layout
 	const g = new dagre.graphlib.Graph({ multigraph: false, compound: false });
 	g.setGraph({
 		rankdir,
@@ -179,25 +122,17 @@ export function layoutCrawlGraph(
 	});
 	g.setDefaultEdgeLabel(() => ({}));
 
-	// Stable deterministic order: sort by depth ascending, then by URL
-	const sortedPages = [...pages].sort((a, b) => {
-		if (a.depth !== b.depth) return a.depth - b.depth;
-		return a.url.localeCompare(b.url);
-	});
-
 	for (const p of sortedPages) {
 		g.setNode(p.url, { width: nodeW, height: nodeH });
 	}
 
 	// Primary edges determine the hierarchical layout
-	for (const e of primaryEdgesRaw) {
+	for (const e of relations.primaryEdges) {
 		g.setEdge(e.from, e.to, { weight: 10, minlen: 1 });
 	}
 
-	// Compute positions via Sugiyama layered layout
 	dagre.layout(g);
 
-	// 4. Build output nodes
 	const nodes: CrawlGraphNode[] = [];
 	const nodeMap = new Map<string, CrawlGraphNode>();
 
@@ -206,6 +141,7 @@ export function layoutCrawlGraph(
 		const x = Math.round(dNode ? dNode.x - nodeW / 2 : CRAWL_GRAPH_PAD);
 		const y = Math.round(dNode ? dNode.y - nodeH / 2 : CRAWL_GRAPH_PAD);
 		const isRoot = row.depth === 0 || !row.parentUrl;
+		const pageRelations = relations.byUrl.get(row.url);
 
 		const node: CrawlGraphNode = {
 			id: row.url,
@@ -217,8 +153,8 @@ export function layoutCrawlGraph(
 			title: row.title,
 			isRoot,
 			parentUrl: row.parentUrl,
-			incomingCount: incomingCounts.get(row.url) ?? 0,
-			outgoingCount: outgoingCounts.get(row.url) ?? 0,
+			incomingCount: pageRelations?.incomingCount ?? 0,
+			outgoingCount: pageRelations?.outgoingCount ?? 0,
 			x,
 			y,
 			w: nodeW,
@@ -228,25 +164,69 @@ export function layoutCrawlGraph(
 		nodeMap.set(row.url, node);
 	}
 
-	// 5. Build primary edges with routed coordinates
-	const primaryEdges: CrawlGraphEdge[] = [];
-	for (const e of primaryEdgesRaw) {
+	const primaryEdgePoints = new Map<string, { x: number; y: number }[]>();
+	for (const e of relations.primaryEdges) {
+		const dEdge = g.edge(e.from, e.to);
+		const raw = dEdge?.points ?? [];
+		primaryEdgePoints.set(
+			`${e.from} -> ${e.to}`,
+			raw.map((pt) => ({ x: Math.round(pt.x), y: Math.round(pt.y) })),
+		);
+	}
+
+	const primaryEdges = buildPrimaryEdges(
+		relations.primaryEdges,
+		nodeMap,
+		primaryEdgePoints,
+		rankdir,
+	);
+	const secondaryEdges = buildSecondaryEdges(
+		relations.secondaryEdges,
+		nodeMap,
+		rankdir,
+	);
+
+	const gInfo = g.graph();
+	const dagreWidth = Math.round(gInfo.width ?? 0);
+	const dagreHeight = Math.round(gInfo.height ?? 0);
+
+	const maxX = Math.max(...nodes.map((n) => n.x + n.w), 0);
+	const maxY = Math.max(...nodes.map((n) => n.y + n.h), 0);
+
+	const width = Math.max(dagreWidth, maxX + CRAWL_GRAPH_PAD);
+	const height = Math.max(dagreHeight, maxY + CRAWL_GRAPH_PAD);
+
+	return {
+		nodes,
+		primaryEdges,
+		secondaryEdges,
+		relations,
+		width,
+		height,
+	};
+}
+
+function buildPrimaryEdges(
+	edges: { from: string; to: string }[],
+	nodeMap: Map<string, CrawlGraphNode>,
+	edgePoints: Map<string, { x: number; y: number }[]>,
+	rankdir: "TB" | "LR",
+): CrawlGraphEdge[] {
+	const result: CrawlGraphEdge[] = [];
+	for (const e of edges) {
 		const source = nodeMap.get(e.from);
 		const target = nodeMap.get(e.to);
 		if (!source || !target) continue;
 
-		const dEdge = g.edge(e.from, e.to);
+		const routed = edgePoints.get(`${e.from} -> ${e.to}`) ?? [];
 		let x1: number;
 		let y1: number;
 		let x2: number;
 		let y2: number;
 		let points: { x: number; y: number }[] = [];
 
-		if (dEdge?.points && dEdge.points.length >= 2) {
-			points = dEdge.points.map((pt) => ({
-				x: Math.round(pt.x),
-				y: Math.round(pt.y),
-			}));
+		if (routed.length >= 2) {
+			points = routed;
 			x1 = points[0].x;
 			y1 = points[0].y;
 			x2 = points[points.length - 1].x;
@@ -269,7 +249,7 @@ export function layoutCrawlGraph(
 			];
 		}
 
-		primaryEdges.push({
+		result.push({
 			from: e.from,
 			to: e.to,
 			kind: "primary",
@@ -281,10 +261,16 @@ export function layoutCrawlGraph(
 			path: buildCubicPath(x1, y1, x2, y2, rankdir),
 		});
 	}
+	return result;
+}
 
-	// 6. Build secondary edges
-	const secondaryEdges: CrawlGraphEdge[] = [];
-	for (const e of secondaryEdgesRaw) {
+function buildSecondaryEdges(
+	edges: { from: string; to: string; kind: CrawlRelationKind }[],
+	nodeMap: Map<string, CrawlGraphNode>,
+	rankdir: "TB" | "LR",
+): CrawlGraphEdge[] {
+	const result: CrawlGraphEdge[] = [];
+	for (const e of edges) {
 		const source = nodeMap.get(e.from);
 		const target = nodeMap.get(e.to);
 		if (!source || !target) continue;
@@ -325,10 +311,10 @@ export function layoutCrawlGraph(
 			{ x: x2, y: y2 },
 		];
 
-		secondaryEdges.push({
+		result.push({
 			from: e.from,
 			to: e.to,
-			kind: e.isCross ? "cross" : "secondary",
+			kind: e.kind,
 			x1,
 			y1,
 			x2,
@@ -337,27 +323,5 @@ export function layoutCrawlGraph(
 			path: buildCubicPath(x1, y1, x2, y2, rankdir),
 		});
 	}
-
-	// 7. Calculate bounded layout size
-	const gInfo = g.graph();
-	const dagreWidth = Math.round(gInfo.width ?? 0);
-	const dagreHeight = Math.round(gInfo.height ?? 0);
-
-	const maxX = Math.max(...nodes.map((n) => n.x + n.w), 0);
-	const maxY = Math.max(...nodes.map((n) => n.y + n.h), 0);
-
-	const width = Math.max(dagreWidth, maxX + CRAWL_GRAPH_PAD);
-	const height = Math.max(dagreHeight, maxY + CRAWL_GRAPH_PAD);
-
-	const edges =
-		viewMode === "all" ? [...primaryEdges, ...secondaryEdges] : primaryEdges;
-
-	return {
-		nodes,
-		edges,
-		primaryEdges,
-		secondaryEdges,
-		width,
-		height,
-	};
+	return result;
 }

@@ -169,6 +169,40 @@ describe("CrawlResult async page arrival", () => {
 		expect(screen.getByRole("heading", { name: "Second" })).toBeDefined();
 	});
 
+	it("synchronizes the inventory and the explorer with a sitemap node click", () => {
+		const pages = [
+			page("a", "https://example.test/a", "First"),
+			page("b", "https://example.test/b", "Second"),
+		];
+		render(<CrawlResult pages={pages} sourceUrl="https://example.test/" />);
+
+		const sitemapNode = screen.getAllByRole("button", {
+			name: /Second — Berhasil/,
+		})[0];
+		fireEvent.click(sitemapNode);
+
+		// The explorer follows the sitemap selection
+		expect(screen.getByRole("heading", { name: "Second" })).toBeDefined();
+		// The inventory marks the same page as the current one
+		const inventoryItem = screen
+			.getAllByRole("button", { name: /Second/ })
+			.find((button) => button.getAttribute("aria-current") === "true");
+		expect(inventoryItem).toBeDefined();
+	});
+
+	it("moves the reader to the page details on request", () => {
+		const pages = [page("a", "https://example.test/a", "First")];
+		render(<CrawlResult pages={pages} sourceUrl="https://example.test/" />);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Lihat detail halaman" }),
+		);
+
+		expect(document.activeElement).toBe(
+			screen.getByRole("region", { name: "Page Explorer" }),
+		);
+	});
+
 	it("presents explorer status in Indonesian consistent with inventory", () => {
 		render(
 			<CrawlResult

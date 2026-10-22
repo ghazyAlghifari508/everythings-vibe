@@ -1,4 +1,5 @@
 import type { scrapePages } from "@/db/schema";
+import { buildCrawlRelations } from "./crawl-relations";
 
 type Page = typeof scrapePages.$inferSelect;
 
@@ -87,7 +88,8 @@ export function buildWebsiteBlueprint(input: BuildBlueprintInput): string {
 	lines.push("");
 	lines.push("## Observed Link Relationships");
 	lines.push("");
-	const edges = collectEdges(pages);
+	const relations = buildCrawlRelations(pages);
+	const edges = [...relations.primaryEdges, ...relations.secondaryEdges];
 	if (edges.length === 0)
 		lines.push("Tidak ada relasi tautan teramati antar halaman tersimpan.");
 	else for (const edge of edges) lines.push(`- ${edge.from} -> ${edge.to}`);
@@ -186,28 +188,4 @@ function safeDomain(sourceUrl: string): string {
 	} catch {
 		return sourceUrl;
 	}
-}
-
-function collectEdges(pages: Page[]): { from: string; to: string }[] {
-	const known = new Set(pages.map((row) => row.url));
-	const seen = new Set<string>();
-	const edges: { from: string; to: string }[] = [];
-	for (const row of pages) {
-		if (row.parentUrl && known.has(row.parentUrl)) {
-			const key = `${row.parentUrl} -> ${row.url}`;
-			if (!seen.has(key)) {
-				seen.add(key);
-				edges.push({ from: row.parentUrl, to: row.url });
-			}
-		}
-		const outgoing = row.content?.outgoingPages ?? [];
-		for (const target of outgoing) {
-			if (!known.has(target)) continue;
-			const key = `${row.url} -> ${target}`;
-			if (seen.has(key)) continue;
-			seen.add(key);
-			edges.push({ from: row.url, to: target });
-		}
-	}
-	return edges;
 }

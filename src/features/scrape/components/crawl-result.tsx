@@ -1,5 +1,5 @@
 import { Download01Icon, Search01Icon } from "@hugeicons/core-free-icons";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { scrapePages } from "@/db/schema";
 import { buildWebsiteBlueprint } from "@/features/scrape/utils/crawl-blueprint";
@@ -44,10 +44,18 @@ export function CrawlResult({
 	const [statusFilter, setStatusFilter] = useState<Page["status"] | "all">(
 		"all",
 	);
+	const explorerRef = useRef<HTMLElement>(null);
 	useEffect(() => {
 		setSelected((current) => resolveSelectedPageId(pages, current));
 	}, [pages]);
 	const page = pages.find((row) => row.id === selected);
+
+	function focusExplorer(): void {
+		const explorer = explorerRef.current;
+		if (!explorer) return;
+		explorer.scrollIntoView?.({ behavior: "smooth", block: "start" });
+		explorer.focus?.();
+	}
 
 	const counts = useMemo(() => {
 		return {
@@ -156,6 +164,7 @@ export function CrawlResult({
 						pages={pages}
 						selectedId={selected}
 						onSelect={setSelected}
+						onViewDetails={focusExplorer}
 					/>
 				</div>
 			</section>
@@ -268,8 +277,18 @@ export function CrawlResult({
 					)}
 				</section>
 
-				<section className="min-w-0 rounded-lg border border-graphite p-5">
-					<h2 className="text-lg font-semibold text-snow">Page Explorer</h2>
+				<section
+					ref={explorerRef}
+					tabIndex={-1}
+					aria-labelledby="crawl-page-explorer-title"
+					className="min-w-0 rounded-lg border border-graphite p-5 focus-visible:ring-2 focus-visible:ring-indigo"
+				>
+					<h2
+						id="crawl-page-explorer-title"
+						className="text-lg font-semibold text-snow"
+					>
+						Page Explorer
+					</h2>
 					{page ? (
 						<PageDetail page={page} />
 					) : (
