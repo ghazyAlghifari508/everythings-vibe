@@ -6,7 +6,7 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScrapeMode } from "@/db/schema";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeHistoryItem } from "../components/scrape-history-list";
@@ -16,23 +16,18 @@ import {
 } from "../components/scrape-history-view";
 
 vi.mock("@tanstack/react-router", () => ({
-	Link: ({
-		children,
-		to,
-		className,
-		search,
-	}: {
+	Link: (props: {
 		children: React.ReactNode;
 		to: string;
 		className?: string;
 		search?: unknown;
 	}) => (
 		<a
-			href={to}
-			className={className}
-			data-search={search ? JSON.stringify(search) : undefined}
+			href={props.to}
+			className={props.className}
+			data-search={props.search ? JSON.stringify(props.search) : undefined}
 		>
-			{children}
+			{props.children}
 		</a>
 	),
 }));
@@ -44,133 +39,192 @@ const baseSearch: ScrapeHistorySearch = {
 	pageSize: 10,
 };
 
-function row(
+const defaultResolved = { deleted: 0, skipped: 0, deletedIds: [] };
+const defaultPrepare = { ids: [], total: 0, truncated: false };
+
+const row = (
 	id: string,
 	domain = "www.notion.com",
 	mode: ScrapeMode = "design",
-): ScrapeHistoryItem {
-	return {
-		id,
-		sourceUrl: `https://${domain}/`,
-		domain,
-		title: null,
-		status: "completed",
-		mode,
-		createdAt: new Date("2026-10-14T00:00:00.000Z").toISOString(),
-	};
-}
+): ScrapeHistoryItem => ({
+	id,
+	sourceUrl: `https://${domain}/`,
+	domain,
+	title: null,
+	status: "completed",
+	mode,
+	createdAt: "2026-10-14T00:00:00.000Z",
+});
 
-function viewProps(
-	overrides: Partial<ScrapeHistoryViewProps> = {},
-): ScrapeHistoryViewProps {
-	return {
+function renderView(overrides: Partial<ScrapeHistoryViewProps> = {}) {
+	const props: ScrapeHistoryViewProps = {
 		items: [],
 		total: 0,
 		search: baseSearch,
 		onQueryChange: vi.fn(),
 		onDelete: vi.fn().mockResolvedValue({ ok: true }),
-		onDeleteMany: vi
-			.fn()
-			.mockResolvedValue({ deleted: 0, skipped: 0, deletedIds: [] }),
-		onPrepareSelection: vi
-			.fn()
-			.mockResolvedValue({ ids: [], total: 0, truncated: false }),
+		onDeleteMany: vi.fn().mockResolvedValue(defaultResolved),
+		onPrepareSelection: vi.fn().mockResolvedValue(defaultPrepare),
 		...overrides,
 	};
+	return { props, ...render(<ScrapeHistoryView {...props} />) };
 }
 
-function renderView(overrides: Partial<ScrapeHistoryViewProps> = {}) {
-	const props = viewProps(overrides);
-	const rendered = render(<ScrapeHistoryView {...props} />);
-	return { props, ...rendered };
+function installRadixDomPolyfills() {
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			observe() {}
+			unobserve() {}
+			disconnect() {}
+		},
+	);
+	vi.stubGlobal(
+		"DOMRect",
+		class {
+			x = 0;
+			y = 0;
+			width = 0;
+			height = 0;
+			top = 0;
+			left = 0;
+			right = 0;
+			bottom = 0;
+		},
+	);
+	if (!Element.prototype.hasPointerCapture) {
+		Element.prototype.hasPointerCapture = () => false;
+		Element.prototype.setPointerCapture = () => {};
+		Element.prototype.releasePointerCapture = () => {};
+	}
+	if (!Element.prototype.scrollIntoView)
+		Element.prototype.scrollIntoView = () => {};
 }
 
-function enterSelectionMode() {
-	fireEvent.click(screen.getByRole("button", { name: "Pilih" }));
+function openActionsMenu(index = 0) {
+	fireEvent.pointerDown(
+		screen.getAllByRole("button", { name: /Aksi riwayat/i })[index],
+		{ button: 0, ctrlKey: false, pointerType: "mouse" },
+	);
 }
 
-function checked(box: HTMLElement): boolean {
-	if (!(box instanceof HTMLInputElement))
-		throw new Error("Selection control must be a checkbox input.");
-	return box.checked;
+function selectFirstItem() {
+	fireEvent.click(
+		screen.getByRole("checkbox", { name: /Pilih riwayat Notion/i }),
+	);
 }
+
+function selectAllPage() {
+	fireEvent.click(
+		screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
+	);
+}
+
+function confirmBulkDelete(label: string) {
+	fireEvent.click(screen.getByRole("button", { name: label }));
+	fireEvent.click(
+		within(screen.getByRole("dialog")).getByRole("button", { name: label }),
+	);
+}
+
+const checked = (box: HTMLElement) =>
+	box instanceof HTMLInputElement && box.checked;
+
+beforeEach(installRadixDomPolyfills);
 
 afterEach(() => {
 	cleanup();
+	vi.unstubAllGlobals();
 });
 
-describe("VibeScrape history selection mode", () => {
-	it("keeps the normal list free of selection controls", () => {
+describe("VibeScrape history selection UX", () => {
+	it("initial state prioritizes browsing without persistent selection controls or select-all checkbox", () => {
 		renderView({ items: [row("a")], total: 1 });
 
-		expect(screen.queryByRole("checkbox")).toBeNull();
 		expect(screen.getByRole("link", { name: /Notion/i })).toBeDefined();
-		expect(screen.getByRole("button", { name: "Pilih" })).toBeDefined();
+		for (const name of [/^Pilih$/i, /Selesai memilih/i, /^Batal$/i]) {
+			expect(screen.queryByRole("button", { name })).toBeNull();
+		}
+		expect(
+			screen.queryByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
+		).toBeNull();
+
+		const box = screen.getByRole("checkbox", {
+			name: /Pilih riwayat Notion/i,
+		});
+		expect(box.className).toContain("opacity-0");
+		expect(
+			screen.getByRole("button", { name: /Aksi riwayat Notion/i }),
+		).toBeDefined();
 	});
 
-	it("enters and leaves selection mode from the page header", () => {
+	it("selects a row from its checkbox and automatically activates contextual selection bar", () => {
 		renderView({ items: [row("a")], total: 1 });
 
-		enterSelectionMode();
-		expect(
-			screen.getByRole("checkbox", { name: /Pilih riwayat Notion/i }),
-		).toBeDefined();
-		expect(screen.queryByRole("link", { name: /Notion/i })).toBeNull();
-		expect(
-			screen.getByRole("button", { name: "Selesai memilih" }),
-		).toBeDefined();
-
-		fireEvent.click(screen.getByRole("button", { name: "Selesai memilih" }));
-		expect(screen.queryByRole("checkbox")).toBeNull();
-		expect(screen.getByRole("link", { name: /Notion/i })).toBeDefined();
-	});
-
-	it("selects a row from its checkbox and keeps the count visible", () => {
-		renderView({ items: [row("a")], total: 1 });
-
-		enterSelectionMode();
 		const box = screen.getByRole("checkbox", {
 			name: /Pilih riwayat Notion/i,
 		});
 		fireEvent.click(box);
 
 		expect(checked(box)).toBe(true);
-		expect(screen.getByText("1 dipilih")).toBeDefined();
-	});
-
-	it("selects the row from the row itself instead of navigating", () => {
-		renderView({ items: [row("a")], total: 1 });
-
-		enterSelectionMode();
-		fireEvent.click(screen.getByRole("button", { name: /Notion/i }));
-
-		expect(screen.getByText("1 dipilih")).toBeDefined();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+		expect(screen.getByRole("button", { name: /^Batal$/i })).toBeDefined();
+		expect(screen.getByRole("button", { name: "Hapus 1" })).toBeDefined();
 		expect(screen.queryByRole("link", { name: /Notion/i })).toBeNull();
+		expect(screen.getByRole("button", { name: /Notion/i })).toBeDefined();
 	});
 
-	it("hides the single row delete action while a bulk delete is available", () => {
+	it("restores clean default state when clicking Batal in selection bar", () => {
 		renderView({ items: [row("a")], total: 1 });
 
-		expect(
-			screen.getByRole("button", { name: /Hapus riwayat Notion/i }),
-		).toBeDefined();
+		selectFirstItem();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
 
-		enterSelectionMode();
+		fireEvent.click(screen.getByRole("button", { name: /^Batal$/i }));
+		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
+		expect(screen.getByRole("link", { name: /Notion/i })).toBeDefined();
 		expect(
-			screen.queryByRole("button", { name: /Hapus riwayat Notion/i }),
+			screen.queryByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
 		).toBeNull();
-		expect(screen.getByRole("button", { name: "Hapus" })).toBeDefined();
 	});
 
-	it("selects every row on the current page", () => {
+	it("enters active selection via mobile overflow menu (⋯ -> Pilih)", () => {
+		renderView({ items: [row("a")], total: 1 });
+
+		openActionsMenu(0);
+		fireEvent.click(screen.getByRole("menuitem", { name: "Pilih" }));
+
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+		const box = screen.getByRole("checkbox", {
+			name: /Pilih riwayat Notion/i,
+		});
+		expect(checked(box)).toBe(true);
+	});
+
+	it("toggles selection by clicking the row summary button in active selection mode", () => {
+		renderView({
+			items: [row("a"), row("b", "framer.com")],
+			total: 2,
+		});
+
+		selectFirstItem();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+
+		fireEvent.click(screen.getByRole("button", { name: /Framer/i }));
+		expect(screen.getByText("2 hasil dipilih")).toBeDefined();
+
+		fireEvent.click(screen.getByRole("button", { name: /Notion/i }));
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+	});
+
+	it("selects every row on the current page once active selection is entered", () => {
 		renderView({ items: [row("a"), row("b", "framer.com")], total: 12 });
 
-		enterSelectionMode();
-		fireEvent.click(
-			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
-		);
+		selectFirstItem();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
 
-		expect(screen.getByText("2 dipilih")).toBeDefined();
+		selectAllPage();
+		expect(screen.getByText("2 hasil dipilih")).toBeDefined();
 		expect(screen.getByText("2 hasil dipilih di halaman ini.")).toBeDefined();
 	});
 
@@ -184,36 +238,27 @@ describe("VibeScrape history selection mode", () => {
 			onPrepareSelection,
 		});
 
-		enterSelectionMode();
-		fireEvent.click(
-			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
-		);
+		selectFirstItem();
+		selectAllPage();
 		fireEvent.click(
 			screen.getByRole("button", {
 				name: /Pilih semua 3 hasil sesuai filter/i,
 			}),
 		);
 
-		await vi.waitFor(() => expect(screen.getByText("3 dipilih")).toBeDefined());
+		await vi.waitFor(() =>
+			expect(screen.getByText("3 hasil dipilih")).toBeDefined(),
+		);
 		expect(onPrepareSelection).toHaveBeenCalledTimes(1);
 	});
 
 	it("reports a truncated snapshot instead of claiming the whole set", async () => {
-		const onPrepareSelection = vi.fn().mockResolvedValue({
-			ids: ["a"],
-			total: 120,
-			truncated: true,
-		});
-		renderView({
-			items: [row("a")],
-			total: 120,
-			onPrepareSelection,
-		});
+		const onPrepareSelection = vi
+			.fn()
+			.mockResolvedValue({ ids: ["a"], total: 120, truncated: true });
+		renderView({ items: [row("a")], total: 120, onPrepareSelection });
 
-		enterSelectionMode();
-		fireEvent.click(
-			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
-		);
+		selectFirstItem();
 		fireEvent.click(
 			screen.getByRole("button", {
 				name: /Pilih semua 120 hasil sesuai filter/i,
@@ -225,7 +270,7 @@ describe("VibeScrape history selection mode", () => {
 				screen.getByText(/1 dari 120 hasil bisa dipilih sekaligus/),
 			).toBeDefined(),
 		);
-		expect(screen.getByText("1 dipilih")).toBeDefined();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
 	});
 
 	it("confirms the exact number of selected results before deleting", async () => {
@@ -238,32 +283,20 @@ describe("VibeScrape history selection mode", () => {
 			onDeleteMany,
 		});
 
-		enterSelectionMode();
-		fireEvent.click(
-			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
-		);
-		fireEvent.click(screen.getByRole("button", { name: "Hapus" }));
+		selectFirstItem();
+		selectAllPage();
+		fireEvent.click(screen.getByRole("button", { name: "Hapus 2" }));
 
 		const dialog = screen.getByRole("dialog");
 		expect(within(dialog).getByText("Hapus 2 hasil scrape?")).toBeDefined();
 		expect(
 			within(dialog).getByText("Hasil yang dipilih akan dihapus permanen."),
 		).toBeDefined();
-		fireEvent.click(
-			within(dialog).getByRole("button", { name: "Hapus 2 hasil" }),
-		);
+		fireEvent.click(within(dialog).getByRole("button", { name: "Hapus 2" }));
 
 		await vi.waitFor(() =>
 			expect(onDeleteMany).toHaveBeenCalledWith(["a", "b"]),
 		);
-	});
-
-	it("keeps the delete action disabled while nothing is selected", () => {
-		renderView({ items: [row("a")], total: 1 });
-
-		enterSelectionMode();
-		const remove = screen.getByRole("button", { name: "Hapus" });
-		expect(remove.hasAttribute("disabled")).toBe(true);
 	});
 
 	it("reports a partial delete instead of claiming full success", async () => {
@@ -276,21 +309,15 @@ describe("VibeScrape history selection mode", () => {
 			onDeleteMany,
 		});
 
-		enterSelectionMode();
-		fireEvent.click(
-			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
-		);
-		fireEvent.click(screen.getByRole("button", { name: "Hapus" }));
-		const dialog = screen.getByRole("dialog");
-		fireEvent.click(
-			within(dialog).getByRole("button", { name: "Hapus 2 hasil" }),
-		);
+		selectFirstItem();
+		selectAllPage();
+		confirmBulkDelete("Hapus 2");
 
 		await vi.waitFor(() => expect(screen.getByRole("status")).toBeDefined());
 		expect(
 			screen.getByText("1 dari 2 hasil dihapus. 1 hasil sudah tidak ada."),
 		).toBeDefined();
-		expect(screen.getByText("1 dipilih")).toBeDefined();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
 	});
 
 	it("surfaces a retryable error when the bulk delete fails", async () => {
@@ -301,15 +328,8 @@ describe("VibeScrape history selection mode", () => {
 			onDeleteMany,
 		});
 
-		enterSelectionMode();
-		fireEvent.click(
-			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
-		);
-		fireEvent.click(screen.getByRole("button", { name: "Hapus" }));
-		const dialog = screen.getByRole("dialog");
-		fireEvent.click(
-			within(dialog).getByRole("button", { name: "Hapus 1 hasil" }),
-		);
+		selectFirstItem();
+		confirmBulkDelete("Hapus 1");
 
 		await vi.waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
 	});
@@ -321,11 +341,8 @@ describe("VibeScrape history selection mode", () => {
 			search: { ...baseSearch, page: 1 },
 		});
 
-		enterSelectionMode();
-		fireEvent.click(
-			screen.getByRole("checkbox", { name: /Pilih riwayat Notion/i }),
-		);
-		expect(screen.getByText("1 dipilih")).toBeDefined();
+		selectFirstItem();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
 
 		rerender(
 			<ScrapeHistoryView
@@ -335,7 +352,7 @@ describe("VibeScrape history selection mode", () => {
 			/>,
 		);
 
-		expect(screen.getByText("1 dipilih")).toBeDefined();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
 		expect(
 			screen.getByRole("checkbox", { name: /Pilih riwayat Framer/i }),
 		).toBeDefined();
@@ -351,22 +368,23 @@ describe("VibeScrape history selection mode", () => {
 			onPrepareSelection,
 		});
 
-		enterSelectionMode();
-		fireEvent.click(
-			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
-		);
+		selectFirstItem();
 		fireEvent.click(
 			screen.getByRole("button", {
 				name: /Pilih semua 2 hasil sesuai filter/i,
 			}),
 		);
-		await vi.waitFor(() => expect(screen.getByText("2 dipilih")).toBeDefined());
+		await vi.waitFor(() =>
+			expect(screen.getByText("2 hasil dipilih")).toBeDefined(),
+		);
 
 		rerender(
 			<ScrapeHistoryView {...props} search={{ ...baseSearch, q: "stitch" }} />,
 		);
 
-		await vi.waitFor(() => expect(screen.getByText("0 dipilih")).toBeDefined());
+		await vi.waitFor(() =>
+			expect(screen.getByText("0 hasil dipilih")).toBeDefined(),
+		);
 		expect(
 			screen.getByText("Filter berubah, pilihan dibersihkan."),
 		).toBeDefined();

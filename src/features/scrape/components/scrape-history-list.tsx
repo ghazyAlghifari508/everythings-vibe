@@ -173,7 +173,7 @@ export function ScrapeHistoryList({
 				range={range}
 			/>
 
-			{items.length > 0 ? (
+			{selection.count > 0 && items.length > 0 ? (
 				<ScrapeHistorySelectAll
 					pageIds={pageIds}
 					selectedIds={selection.ids}
@@ -224,13 +224,14 @@ export function ScrapeHistoryList({
 								setDeleteRequest({ kind: "single", item: target })
 							}
 							selected={selection.ids.has(item.id)}
+							selectionActive={selection.count > 0}
 							onToggleSelect={selection.toggle}
 						/>
 					))}
 				</ul>
 			)}
 
-			{selection.count > 0 ? (
+			{selection.count > 0 || selection.notice !== null ? (
 				<ScrapeHistorySelectionBar
 					count={selection.count}
 					filteredTotal={selection.filteredTotal}

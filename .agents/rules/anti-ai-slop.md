@@ -427,6 +427,22 @@ Agen sering kali keliru menafsirkan aset referensi desain dan menyulapnya menjad
 - **Dilarang Membocorkan Artefak Internal:** Dilarang keras memindahkan palette inspector, token tables, debug panels, atau dokumentasi desain internal ke dalam website/aplikasi end-user kecuali pengguna memintanya secara eksplisit.
 - **Preserve Scope:** Selalu pertahankan batasan ruang lingkup produk (*product scope*) dan functional requirements yang sudah disepakati.
 
+### 3.12 Progressive Disclosure & Primary User Intent
+
+Antarmuka harus memprioritaskan tugas utama pengguna (*primary intent*) pada state bawaan dan mengungkap kontrol sekunder (*secondary intent*) secara kontekstual dan bertahap (*progressive disclosure*):
+
+1. **Prioritaskan Primary Intent di Default State:** Setiap halaman harus mengutamakan tugas utama pengguna pada initial/default state (misalnya: browsing, membaca, mencari). Kontrol pengelolaan sekunder (seperti bulk selection, mass delete) tidak boleh mendominasi antarmuka awal.
+2. **Kontrol Sekunder Tidak Mendominasi Initial UI:** Jangan menampilkan checkbox persisten atau tombol "Pilih semua" saat pengguna baru membuka halaman tanpa intensi seleksi yang jelas.
+3. **Contextual Disclosure untuk Operasi Massal:** Gunakan pengungkapan kontekstual untuk operasi massal (*bulk actions*) di mana hal ini meningkatkan kejelasan dan ketenangan antarmuka.
+4. **Pola Interaksi Mapan vs Mode Khusus:** Utamakan interaksi langsung dan mapan (direct interaction) dibandingkan membuat tombol toggle mode masuk/keluar ("Pilih" / "Selesai memilih").
+5. **Jangan Menampilkan Semua Kontrol Sekaligus:** Jangan mengekspos setiap kontrol yang tersedia secara bersamaan hanya karena fungsionalitas tersebut eksis di backend.
+6. **Evaluasi Lengkap Siklus State Interaksi:** Evaluasi state *default*, *hover*, *keyboard focus*, *active selection*, *empty*, *error*, dan *touch/mobile* sebelum mengimplementasikan UI.
+7. **Bebas Ketergantungan Hover-Only:** Dilarang menyembunyikan aksi penting di balik perilaku hover-only. Perangkat sentuh (mobile/touch) harus memiliki jalur penemuan yang setara dan mudah diakses (misal via menu tindakan item `⋯`).
+8. **Eskalasi Prominensi Berdasarkan Niat Pengguna:** Aksi sekunder hanya boleh menjadi dominan di layar setelah ada intensi pengguna yang jelas (misal: memilih $\ge 1$ item otomatis memicu active selection state).
+9. **Gunakan Ulang Aksi Existing:** Pakai kembali aksi dan menu yang sudah ada daripada membuat kontrol atau toolbar ganda.
+10. **Fitur Terlihat Lebih Banyak ≠ UX Lebih Baik:** Ketenangan, densitas terarah, dan kejelasan tugas jauh lebih berharga daripada antarmuka yang dipenuhi tombol dan checkbox administratif.
+11. **Peringatan Kontekstual:** Jangan terapkan kontrol hover-only secara membabi-buta di semua tempat. Pola ini dievaluasi per fitur sesuai kebutuhan nyata pengguna.
+
 ---
 
 ## 4. Concrete Design Tokens Reference
@@ -486,3 +502,17 @@ Before finalizing any frontend work or opening a PR, verify every item across bo
 - [ ] **Layout Consistency Check:** Does the page respect its design family shell, container constraints, and breadcrumb rules in [.agents/rules/design-layout-consistency.md](design-layout-consistency.md)?
 - [ ] **State Completeness Check:** Are loading, empty, and error states fully designed with actionable next steps while respecting state isolation?
 - [ ] **Responsive Verification:** Does the interface adapt seamlessly from 320px mobile up to 1440px desktop without horizontal scrolling?
+
+### 5.3 Mandatory Interaction-State Review Checklist
+Before adding or modifying UI, agents must inspect how all major interaction states compose together, not just how an individual component looks in isolation:
+- [ ] **Initial state prioritizes the primary task:** Browsing/reading task is primary; secondary bulk actions do not dominate initial UI.
+- [ ] **Secondary actions do not dominate initial UI:** No persistent checkboxes or select-all on default load.
+- [ ] **No redundant selection mode or toggle:** No "Pilih" / "Selesai memilih" mode switch buttons.
+- [ ] **Desktop hover behavior is deliberate:** Reveals contextual controls cleanly without layout shift.
+- [ ] **Keyboard focus reveals discoverable actions:** Focused row or control clearly visible and accessible.
+- [ ] **Touch users can access the same functionality:** Mobile touch controls / overflow menus provide discoverable access without hover dependency.
+- [ ] **Active selection exposes appropriate bulk actions:** Selection count, select-all, cancel, and bulk delete visible only when items selected.
+- [ ] **Clearing selection restores the clean default state:** Zero selection returns cleanly to browsing appearance.
+- [ ] **Selection does not cause layout shift:** Stable horizontal space and row heights preserved.
+- [ ] **No duplicated controls or unnecessary UI layers:** Single action location; no redundant toolbar stacking or duplicate delete paths.
+- [ ] **Accessibility and destructive-action safety preserved:** Touch targets $\ge$ 44px, confirmation before destructive action, accessible labels.
