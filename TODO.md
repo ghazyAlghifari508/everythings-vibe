@@ -16,6 +16,7 @@ Dokumen ini memuat daftar rencana kerja, backlog arsitektur, standarisasi kualit
 5. [Bagian 8: Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure &amp; Zero Dead Code](#8-aturan-tegas-ai-agent--enforcement-policy-anti-slop-strict-structure--zero-dead-code)
 6. [Bagian 9: Decoupling &amp; Standalone Domain — Pemisahan VibeScrape dari VibeDesign](#9-decoupling--standalone-domain--pemisahan-vibescrape-dari-vibedesign)
 7. [Bagian 10: Design System &amp; Iconography Overhaul — Migrasi dari Lucide React ke Hugeicons](#10-design-system--iconography-overhaul--migrasi-dari-lucide-react-ke-hugeicons)
+8. [Bagian 11: Infra &amp; Scraping Optimization — Hybrid Remote Browser (Cloudflare Browser Run &amp; Browserless.io Fallback)](#11-infra--scraping-optimization--hybrid-remote-browser-cloudflare-browser-run--browserlessio-fallback)
 
 ---
 
@@ -1152,6 +1153,156 @@ Setelah migrasi selesai, jalankan `pnpm build` dan periksa chunk report di `dist
 
 ---
 
+## 11. Infra &amp; Scraping Optimization — Hybrid Remote Browser (Cloudflare Browser Run &amp; Browserless.io Fallback)
+
+### Metadata
+
+- **Status:** `Proposed / Backlog`
+- **Prioritas:** `P1` (Kritis untuk Deployment VPS Hemat Memori)
+- **Kompleksitas:** `Sedang`
+- **Inisiator:** Infrastruktur, Efisiensi Deployment VPS &amp; Kestabilan Scraper
+- **Tujuan:** Menghilangkan beban konsumsi RAM Chromium lokal (~500 MB – 1 GB) dari server VPS production dengan mengadopsi arsitektur *Hybrid Remote Browser* (kombinasi Cloudflare Browser Run dan Browserless.io) melalui protokol CDP (Chrome DevTools Protocol) / WebSocket standar Playwright, dengan *zero-RAM overhead* pada VPS dan sistem *automatic failover*.
+
+---
+
+### 11.1. Latar Belakang &amp; Analisis Masalah
+
+Saat ini, background worker VibeScrape (`src/features/scrape/services/scrape-worker.ts`) menggunakan binary Chromium lokal yang diluncurkan langsung oleh Playwright melalui `chromium.launch()` di dalam file `src/features/scrape/services/browser-session.ts`.
+
+#### Masalah Kritis Saat Deploy ke VPS:
+1. **Konsumsi RAM Sangat Tinggi (500 MB – 1 GB+ per sesi):**  
+   Proses headless Chromium lokal memakan memori sangat besar ketika melakukan rendering SPA, scrolling, dan screenshot. Pada VPS dengan RAM 2 GB – 4 GB yang juga menjalankan PostgreSQL, SSR TanStack Start, dan agent lain (seperti Hermes), lonjakan memori ini memicu **Linux Out of Memory (OOM) Killer** yang mematikan proses web atau worker secara mendadak.
+2. **Library Ringan (Cheerio/JSDOM) Bukan Solusi:**  
+   VibeScrape secara fundamental membutuhkan:
+   - Screenshot visual halaman web (`captureScreenshot`).
+   - Eksekusi JavaScript halaman modern (SPA React/Next.js/Vue).
+   - Pengambilan computed styles dan layout visual (`collectVisualEvidence` untuk warna, font, padding, bounding rects).  
+   Cheerio dan JSDOM tidak memiliki rendering engine/layout parser, sehingga Playwright tetap wajib dipertahankan.
+3. **Solusi Optimal — Remote Browser Execution:**  
+   Playwright di VPS hanya bertindak sebagai *client / remote controller* tipis via WebSocket CDP, sedangkan komputasi berat rendering Chromium didelegasikan ke cloud eksternal (*zero local browser RAM overhead*).
+
+---
+
+### 11.2. Target Arsitektur: Hybrid Remote Browser Pool
+
+Arsitektur yang dirancang menggabungkan dua penyedia browser remote gratis terkemuka dengan sistem fallback bertingkat:
+
+```mermaid
+flowchart TD
+    A["Request Scrape Diterima (scrape-worker)"] --> B{"Pilih Engine Browser"}
+    B --> C["Tingkat 1: Cloudflare Browser Run (CDP WebSocket)"]
+    C -->|"Koneksi Sukses & Render OK"| Z["Ekstraksi CSS Token & Screenshot Sukses"]
+    C -->|"Gagal / Limit Kuota 429 / Terdeteksi Bot"| D["Tingkat 2: Browserless.io (Stealth WebSocket)"]
+    D -->|"Koneksi Sukses & Render OK"| Z
+    D -->|"Kuota Habis / Gagal Koneksi"| E["Tingkat 3: Local Chromium (Headless Diet)"]
+    E -->|"Render OK"| Z
+    E -->|"Gagal Total"| F["Laporkan Scrape Error & Graceful Abort"]
+```
+
+---
+
+### 11.3. Spesifikasi &amp; Alokasi Kuota Free-Tier
+
+Dengan menggabungkan kedua platform, sistem mendapatkan keunggulan komparatif dari masing-masing layanan tanpa biaya sepeser pun ($0):
+
+| Parameter | Cloudflare Browser Run | Browserless.io | Gabungan (Hybrid) |
+| :--- | :--- | :--- | :--- |
+| **Biaya** | $0 (Free Tier Cloudflare Workers) | $0 (Free Tier Cloud Plan) | **$0 / bulan** |
+| **Jatah Kuota** | **10 menit / hari** (Reset tiap 00:00 UTC) | **1.000 unit / bulan** (Reset bulanan) | **~75 – 90 scrape / hari** |
+| **Estimasi Eksekusi** | ~40 – 60 scrape / hari (durasi 10–15 dtk) | ~33 – 50 scrape / hari | **~2.200 – 2.800 scrape / bulan** |
+| **Keunggulan Utama** | Latensi edge ultra-cepat, kuota reset harian | Built-in **Stealth Mode** &amp; Anti-Bot bypass | Performa cepat + tahan blokir bot |
+| **Peran dalam Arsitektur** | **Primary Engine** (Digunakan pertama kali) | **Secondary &amp; Stealth Engine** (Bypass &amp; Overflow) | *Seamless failover* |
+
+---
+
+### 11.4. Desain Teknis &amp; Implementasi
+
+#### A. Abstraksi Browser Session (`src/features/scrape/services/browser-session.ts`)
+Karena Playwright menggunakan interface `Browser` yang terstandarisasi, metode `chromium.connectOverCDP` dan `chromium.connect` menghasilkan objek yang kompatibel 100% dengan kode `render-page.ts` yang sudah ada:
+
+```typescript
+// Konseptual implementasi pool failover
+export async function getResilientBrowser(): Promise<Browser> {
+  // 1. Coba Cloudflare Browser Run
+  if (env.CF_ACCOUNT_ID && env.CF_API_TOKEN) {
+    try {
+      const cfWss = `wss://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/browser-run/devtools/browser`;
+      return await chromium.connectOverCDP(cfWss, {
+        headers: { Authorization: `Bearer ${env.CF_API_TOKEN}` },
+        timeout: 12_000,
+      });
+    } catch (cfErr) {
+      console.warn("[Scrape Worker] Cloudflare Browser Run gagal atau limit harian habis, failover ke Browserless...", cfErr);
+    }
+  }
+
+  // 2. Coba Browserless.io dengan mode stealth
+  if (env.BROWSERLESS_API_KEY) {
+    try {
+      const blWss = `wss://chrome.browserless.io?token=${env.BROWSERLESS_API_KEY}&stealth`;
+      return await chromium.connect(blWss, { timeout: 12_000 });
+    } catch (blErr) {
+      console.warn("[Scrape Worker] Browserless gagal atau limit bulanan habis, failover ke Local Chromium...", blErr);
+    }
+  }
+
+  // 3. Fallback Darurat: Chromium Lokal (dengan flag diet ketat)
+  return await chromium.launch({
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-software-rasterizer",
+      "--no-zygote",
+      "--disable-extensions",
+      "--disable-background-networking",
+      '--js-flags="--max-old-space-size=256"',
+    ],
+  });
+}
+```
+
+#### B. Konfigurasi Environment (`.env.example`)
+Variabel lingkungan baru yang bersifat opsional tapi terdeteksi otomatis:
+```bash
+# Scraping Remote Browser Configuration (Optional - Defaults to local if not set)
+CF_ACCOUNT_ID="your-cloudflare-account-id"
+CF_API_TOKEN="your-cloudflare-api-token"
+BROWSERLESS_API_KEY="your-browserless-api-key"
+SCRAPE_BROWSER_MODE="hybrid" # Opsi: "hybrid" | "cloudflare" | "browserless" | "local"
+```
+
+---
+
+### 11.5. Lingkup Perubahan &amp; Dampak (Impact Assessment)
+
+1. **`src/features/scrape/services/browser-session.ts`:**
+   - Tambahkan provider loader untuk Cloudflare Browser Run dan Browserless.io.
+   - Pertahankan shimming `BROWSER_NAME_SHIM` dan `guardContext` untuk menjaga proteksi sandbox WebSocket/Worker.
+2. **`src/lib/browser-session.ts`:**
+   - Dukung pembuatan sesi berbasis remote CDP/WebSocket selain `launch`.
+3. **`src/features/scrape/services/render-page.ts`:**
+   - Tidak ada perubahan kontrak publik (interface `RenderedPage` dan `RenderPageOptions` tetap persis sama).
+4. **`src/features/scrape/services/scrape-worker.ts`:**
+   - Penyesuaian error logging ketika terjadi failover antar provider.
+5. **Dampak Performa VPS:**
+   - Penggunaan RAM VPS untuk worker turun dari ~800 MB menjadi **~10–20 MB** (hanya overhead socket Node.js).
+   - Menghilangkan risiko OOM crash saat deploy multi-app di VPS 2 GB – 4 GB.
+
+---
+
+### 11.6. Checklist Eksekusi Bertahap
+
+- [ ] **Fase 1 — Abstraksi Provider Remote:** Buat modul adapter koneksi remote (`cloudflare-browser-provider.ts` &amp; `browserless-provider.ts`).
+- [ ] **Fase 2 — Integrasi Failover Logic:** Terapkan logika failover berantai di `browser-session.ts` dengan penanganan error timeout dan status HTTP 429.
+- [ ] **Fase 3 — Diet Flag Chromium Lokal:** Perbarui argumen `chromium.launch()` cadangan dengan flag penghemat memori (`--no-zygote`, `--disable-gpu`, heap limit 256MB).
+- [ ] **Fase 4 — Environment &amp; Validasi Skema:** Tambahkan variabel lingkungan ke schema Zod environment dan dokumentasikan di `.env.example`.
+- [ ] **Fase 5 — Unit &amp; Integration Testing:** Buat test mock untuk memverifikasi bahwa failover terpanggil saat provider pertama melempar error koneksi atau timeout.
+- [ ] **Fase 6 — Verifikasi Real-World Scrape:** Uji scraping website publik via remote Cloudflare &amp; Browserless, pastikan screenshot dan `visualEvidence` terekstraksi dengan presisi 100%.
+
+---
+
 ## 📋 Ringkasan Prioritas Eksekusi Mendatang
 
 
@@ -1159,6 +1310,7 @@ Setelah migrasi selesai, jalankan `pnpm build` dan periksa chunk report di `dist
 | :--------- | :------------------------------------------------------------------- | :------------------------------------------------------- | :----------------------------------------------- |
 | **P1**    | **Pembuatan Rules Agent (`architecture-folder-structure.md`)**      | Kritis (Mencegah Sampah Baru Sejak Hari Ini)            | Rendah (Dokumentasi &amp; Regulasi)             |
 | **P1**    | **Standarisasi Responsivitas Mobile &amp; Tablet**                  | Sangat Tinggi (UX Pengguna Mobile)                      | Sedang - Luas                                   |
+| **P1**    | **Hybrid Remote Browser (Cloudflare &amp; Browserless Fallback)**   | Kritis (Memangkas RAM Worker dari 1 GB ke ~0 MB &amp; Anti-OOM) | Sedang                                          |
 | **P1**    | **Dead Code Elimination &amp; Pembersihan File `-` di Routes**      | Tinggi (Mengurangi Bundle &amp; Menghapus Kerumitan)    | Sedang                                          |
 | **P2**    | **Pemisahan Domain VibeScrape dari VibeDesign**                     | Tinggi (Pemisahan Domain Bersih &amp; Worker Isolation) | Sedang - Luas                                   |
 | **P2**    | **Migrasi Lucide React ke Hugeicons (Iconography Overhaul)**        | Sedang - Tinggi (Estetika Visual &amp; Tree-Shaking)    | Sedang - Luas (100+ File UI)                    |
