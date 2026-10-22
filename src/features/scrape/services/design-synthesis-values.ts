@@ -82,7 +82,8 @@ function colorIdentity(value: string): string | null {
 
 function measuredLengths(model: DesignTokenModel): Set<string> {
 	const values = new Set<string>();
-	const collect = (value: string) => {
+	const collect = (value?: string | null) => {
+		if (!value || typeof value !== "string") return;
 		for (const match of value.match(LENGTH_LITERAL) ?? [])
 			values.add(match.toLowerCase());
 	};
@@ -92,9 +93,9 @@ function measuredLengths(model: DesignTokenModel): Set<string> {
 		collect(entry.letterSpacing);
 	}
 	for (const typeface of model.typefaces) {
-		for (const size of typeface.measuredSizes) collect(size);
-		for (const lineHeight of typeface.lineHeights) collect(lineHeight);
-		for (const spacing of typeface.letterSpacings) collect(spacing);
+		for (const size of typeface.measuredSizes ?? []) collect(size);
+		for (const lineHeight of typeface.lineHeights ?? []) collect(lineHeight);
+		for (const spacing of typeface.letterSpacings ?? []) collect(spacing);
 	}
 	for (const token of model.spacing) collect(token.value);
 	for (const token of model.radii) collect(token.value);
@@ -105,9 +106,10 @@ function measuredLengths(model: DesignTokenModel): Set<string> {
 function measuredFamilies(model: DesignTokenModel): Set<string> {
 	const families = new Set<string>();
 	for (const typeface of model.typefaces)
-		families.add(typeface.family.toLowerCase());
+		if (typeface.family) families.add(typeface.family.toLowerCase());
 	for (const entry of model.typography)
-		families.add(entry.fontFamily.split(",")[0]?.trim().toLowerCase() ?? "");
+		if (entry.fontFamily)
+			families.add(entry.fontFamily.split(",")[0]?.trim().toLowerCase() ?? "");
 	return families;
 }
 

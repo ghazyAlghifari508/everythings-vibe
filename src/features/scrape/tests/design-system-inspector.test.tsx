@@ -227,11 +227,12 @@ describe("DesignSystemInspector", () => {
 
 	it("states the verification source instead of implying unverified data is measured", () => {
 		const { rerender } = renderInspector();
+		expect(screen.queryByText(/tentang analisis/i)).toBeNull();
 		expect(
-			screen.getByText(
+			screen.queryByText(
 				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
 			),
-		).toBeDefined();
+		).toBeNull();
 		rerender(
 			<DesignSystemInspector
 				siteName="Acme"
@@ -743,13 +744,14 @@ describe("task D ambiguous copy", () => {
 		).toBeNull();
 	});
 
-	it("explains observed analysis in user language", () => {
+	it("does not render generic analysis disclaimer for observed results", () => {
 		renderInspector();
+		expect(screen.queryByText(/tentang analisis/i)).toBeNull();
 		expect(
-			screen.getByText(
+			screen.queryByText(
 				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
 			),
-		).toBeDefined();
+		).toBeNull();
 		expect(
 			screen.queryByText(/pengukuran browser yang terverifikasi/i),
 		).toBeNull();
@@ -757,17 +759,17 @@ describe("task D ambiguous copy", () => {
 });
 
 describe("phase 6 inspector overhaul", () => {
-	it("collapses provenance into a compact disclosure instead of a long banner", () => {
+	it("removes generic Tentang analisis accordion from normal results", () => {
 		renderInspector();
 		expect(
 			screen.queryByText(/bukan klaim brand yang belum terbukti/i),
 		).toBeNull();
-		expect(screen.getByText(/tentang analisis/i)).toBeDefined();
+		expect(screen.queryByText(/tentang analisis/i)).toBeNull();
 		expect(
-			screen.getByText(
+			screen.queryByText(
 				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
 			),
-		).toBeDefined();
+		).toBeNull();
 	});
 
 	it("renders spacing bars with a high-contrast fill and a zero indicator", () => {

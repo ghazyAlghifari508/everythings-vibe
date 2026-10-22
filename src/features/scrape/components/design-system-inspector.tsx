@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert02Icon, InformationCircleIcon } from "@hugeicons/core-free-icons";
+import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import type { DesignInspectorModel } from "@/features/scrape/utils/design-md-inspector";
 import {
@@ -102,37 +102,23 @@ export function DesignSystemInspector({
 				{theme ? (
 					<p className="mt-2 font-mono text-xs text-fog">Tema: {theme}</p>
 				) : null}
+				{model.verification === "unverified" ? (
+					<p className="mt-2 flex items-start gap-1.5 text-xs text-fog">
+						<Icon
+							icon={Alert02Icon}
+							size={14}
+							aria-hidden
+							className="mt-0.5 shrink-0"
+						/>
+						<span>
+							Hasil lama belum terverifikasi terhadap evidence browser. Nilai di
+							bawah adalah hasil parsing dokumen arsip, bukan pengukuran.
+						</span>
+					</p>
+				) : null}
 			</div>
 
 			<div className="mt-6 flex flex-col gap-6">
-				<details className="rounded-lg border border-graphite px-3 py-2">
-					<summary className="cursor-pointer text-xs font-medium text-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo">
-						Tentang analisis
-					</summary>
-					<p className="mt-1.5 flex items-start gap-2 text-xs leading-5 text-fog">
-						{model.verification === "observed" ? (
-							<Icon
-								icon={InformationCircleIcon}
-								size={14}
-								aria-hidden
-								className="mt-0.5 shrink-0"
-							/>
-						) : (
-							<Icon
-								icon={Alert02Icon}
-								size={14}
-								aria-hidden
-								className="mt-0.5 shrink-0"
-							/>
-						)}
-						<span>
-							{model.verification === "observed"
-								? "Analisis berdasarkan tampilan website yang berhasil diperiksa."
-								: "Hasil lama belum terverifikasi terhadap evidence browser. Nilai di bawah adalah hasil parsing dokumen arsip, bukan pengukuran."}
-						</span>
-					</p>
-				</details>
-
 				{model.colors.length > 0 ? (
 					<InspectorSection
 						id="colors"

@@ -75,7 +75,7 @@ describe("resolveInspector", () => {
 });
 
 describe("DesignResult verification labelling", () => {
-	it("labels a capture-backed document as measured browser evidence", () => {
+	it("labels a capture-backed document as measured browser evidence without generic accordion", () => {
 		const evidence = capturedEvidence();
 		render(
 			<DesignResult
@@ -85,11 +85,12 @@ describe("DesignResult verification labelling", () => {
 				visualEvidence={evidence}
 			/>,
 		);
+		expect(screen.queryByText(/tentang analisis/i)).toBeNull();
 		expect(
-			screen.getByText(
+			screen.queryByText(
 				/analisis berdasarkan tampilan website yang berhasil diperiksa/i,
 			),
-		).toBeDefined();
+		).toBeNull();
 		expect(screen.queryByText(/arsip/i)).toBeNull();
 	});
 

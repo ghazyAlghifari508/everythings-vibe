@@ -10,8 +10,8 @@ function cleanCell(value: string): string {
 	return value.replace(/`/g, "").replace(/\*\*/g, "").trim();
 }
 
-export function firstCssLength(value: string): string {
-	return value.match(/[\d.]+(?:px|rem|em|%)/)?.[0] ?? "";
+export function firstCssLength(value: string | undefined | null): string {
+	return value?.match(/[\d.]+(?:px|rem|em|%)/)?.[0] ?? "";
 }
 
 export function parsePxOnly(value: string): number {

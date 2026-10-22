@@ -8,12 +8,13 @@ import {
 	Tick01Icon,
 	ViewIcon,
 } from "@hugeicons/core-free-icons";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { assessDocumentUsability } from "../utils/design-md-usability";
 import { markdownComponents } from "./design-md-markdown-components";
 import { copyText, downloadFile } from "./scrape-file-actions";
 
@@ -65,6 +66,17 @@ export function DesignMdSourcePanel({
 	const sourcePanelId = `${panelBaseId}-source-panel`;
 	const renderedTabRef = useRef<HTMLButtonElement>(null);
 	const sourceTabRef = useRef<HTMLButtonElement>(null);
+
+	const assessment = useMemo(
+		() =>
+			assessDocumentUsability({
+				designMd,
+				enrichment,
+				enrichmentDetail: _enrichmentDetail,
+				isRetryingEnrichment,
+			}),
+		[designMd, enrichment, _enrichmentDetail, isRetryingEnrichment],
+	);
 
 	useEffect(() => {
 		return () => {
@@ -222,10 +234,10 @@ export function DesignMdSourcePanel({
 					</button>
 				</div>
 			</div>
-			{enrichment === "unavailable" ? (
+			{assessment.notice ? (
 				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-graphite bg-onyx/40 px-3 py-2 text-xs text-fog">
-					<span>Panduan desain belum sepenuhnya selesai.</span>
-					{onRetryEnrichment ? (
+					<span>{assessment.notice}</span>
+					{assessment.canRetry && onRetryEnrichment ? (
 						<Button
 							type="button"
 							variant="outline"
@@ -234,7 +246,7 @@ export function DesignMdSourcePanel({
 							disabled={isRetryingEnrichment || busy}
 							className="h-6 px-2.5 text-xs text-fog hover:text-snow"
 						>
-							{isRetryingEnrichment ? "Melengkapi..." : "Lengkapi analisis"}
+							{assessment.actionLabel ?? "Lengkapi panduan komponen"}
 						</Button>
 					) : null}
 				</div>

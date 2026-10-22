@@ -99,7 +99,7 @@ export function DesignAgentPromptDialog({
 						Salin prompt ini ke coding agent untuk menerapkan design system ke
 						project kamu.
 						{enrichment === "unavailable"
-							? " (Catatan: Narasi AI belum lengkap; instruksi dibatasi pada token terukur yang terverifikasi)."
+							? " (Catatan: Panduan komponen belum tersedia; instruksi dibatasi pada token terukur yang terverifikasi)."
 							: null}
 					</DialogDescription>
 				</DialogHeader>

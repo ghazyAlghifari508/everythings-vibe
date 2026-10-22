@@ -133,8 +133,11 @@ describe("DesignMdSourcePanel", () => {
 			/>,
 		);
 		expect(
-			screen.getByText(/panduan desain belum sepenuhnya selesai/i),
+			screen.getByText(/sebagian panduan komponen belum tersedia/i),
 		).toBeDefined();
+		expect(
+			screen.queryByText(/panduan desain belum sepenuhnya selesai/i),
+		).toBeNull();
 		expect(screen.queryByText(/analisis ai belum lengkap/i)).toBeNull();
 		expect(
 			screen.queryByText(/pengukuran lengkap tanpa narasi ai/i),
@@ -144,7 +147,7 @@ describe("DesignMdSourcePanel", () => {
 		expect(screen.queryByText(/schema validation failed/i)).toBeNull();
 
 		const retryButton = screen.getByRole("button", {
-			name: /lengkapi analisis/i,
+			name: /lengkapi panduan komponen/i,
 		});
 		expect(retryButton).toBeDefined();
 		fireEvent.click(retryButton);
@@ -160,10 +163,13 @@ describe("DesignMdSourcePanel", () => {
 			/>,
 		);
 		expect(
+			screen.queryByText(/sebagian panduan komponen belum tersedia/i),
+		).toBeNull();
+		expect(
 			screen.queryByText(/panduan desain belum sepenuhnya selesai/i),
 		).toBeNull();
 		expect(
-			screen.queryByRole("button", { name: /lengkapi analisis/i }),
+			screen.queryByRole("button", { name: /lengkapi panduan komponen/i }),
 		).toBeNull();
 	});
 

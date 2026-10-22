@@ -930,6 +930,7 @@ export interface ScrapeMetadata {
 	// canonical, evidence-backed DESIGN.md.
 	aiEnrichment?: "applied" | "unavailable";
 	aiEnrichmentDetail?: string;
+	aiEnrichmentAttempts?: number;
 	// Structured model version the current DESIGN.md was rendered from.
 	// Lets the inspector distinguish verified current-model documents from
 	// unverified legacy archives without parsing markdown footers.

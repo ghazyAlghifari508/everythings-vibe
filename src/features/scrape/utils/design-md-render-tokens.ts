@@ -21,9 +21,9 @@ export function renderTokenSections(
 	// --- 1. Website identity & visual essence --------------------------------
 	const essence =
 		options.essence?.trim() ||
-		model.essence.trim() ||
+		model.essence?.trim() ||
 		options.identityNarrative?.trim();
-	lines.push(heading(1, `${model.title} - Style Reference`));
+	lines.push(heading(1, `${model.title || "Design"} - Style Reference`));
 	if (essence) {
 		lines.push("", `> ${essence}`);
 	}
@@ -31,9 +31,9 @@ export function renderTokenSections(
 
 	// --- 2. Theme & overview -------------------------------------------------
 	lines.push(heading(2, "Theme & Overview"));
-	lines.push("", `**Theme:** ${model.theme}`);
-	if (options.overview?.trim() || model.overview.trim())
-		lines.push("", options.overview?.trim() || model.overview.trim());
+	lines.push("", `**Theme:** ${model.theme || "light"}`);
+	if (options.overview?.trim() || model.overview?.trim())
+		lines.push("", options.overview?.trim() || model.overview?.trim() || "");
 	lines.push(
 		"",
 		`Measured from ${model.viewport.width}x${model.viewport.height} on ${model.sourceUrl}. Observed values are browser measurements; role names are classifications of measured usage.`,

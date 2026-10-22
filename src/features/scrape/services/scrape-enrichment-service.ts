@@ -4,25 +4,34 @@ import { type ScrapeDocumentRow, scrapeDocuments, scrapes } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
 import { getScrapeById } from "./scrape-detail-service";
 
+export const MAX_ENRICHMENT_ATTEMPTS = 2;
+
 export interface EnrichmentRetryInput {
 	enrichment: "applied" | "unavailable" | undefined;
 	hasDocument: boolean;
 	hasEvidence: boolean;
+	attempts?: number;
+	maxAttempts?: number;
 }
 
 export type EnrichmentRetryDecision =
 	| { proceed: true }
-	| { proceed: false; mode: "replay" | "missing-evidence" };
+	| { proceed: false; mode: "replay" | "missing-evidence" | "exhausted" };
 
 // Decides an AI-only enrichment retry from persisted state, without touching
 // the network. Applied enrichment replays the stored document; a retry without
-// persisted evidence is refused instead of fabricating one.
+// persisted evidence is refused instead of fabricating one. Retries are strictly
+// bounded to prevent infinite recovery loops.
 export function resolveEnrichmentRetry(
 	input: EnrichmentRetryInput,
 ): EnrichmentRetryDecision {
 	if (!input.hasEvidence) return { proceed: false, mode: "missing-evidence" };
 	if (input.enrichment === "applied" && input.hasDocument)
 		return { proceed: false, mode: "replay" };
+	const limit = input.maxAttempts ?? MAX_ENRICHMENT_ATTEMPTS;
+	if (input.attempts !== undefined && input.attempts >= limit) {
+		return { proceed: false, mode: "exhausted" };
+	}
 	return { proceed: true };
 }
 
@@ -55,13 +64,20 @@ async function runEnrichmentRetry(
 ): Promise<ScrapeDocumentRow> {
 	const scrape = await getScrapeById(scrapeId, userId);
 	const evidence = scrape.metadata?.visualEvidence;
+	const attempts = scrape.metadata?.aiEnrichmentAttempts ?? 0;
 	const decision = resolveEnrichmentRetry({
 		enrichment: scrape.metadata?.aiEnrichment,
 		hasDocument: scrape.document !== null,
 		hasEvidence: evidence !== undefined,
+		attempts,
 	});
 	if (!decision.proceed) {
 		if (decision.mode === "replay" && scrape.document) return scrape.document;
+		if (decision.mode === "exhausted")
+			throw new ScrapeError(
+				"RETRY_EXHAUSTED",
+				"Batas percobaan pemulihan telah tercapai.",
+			);
 		throw new ScrapeError(
 			"NO_ANALYZABLE_CONTENT",
 			"Evidence visual tersimpan tidak tersedia untuk retry.",
@@ -90,6 +106,7 @@ async function runEnrichmentRetry(
 		undefined,
 		{ title: scrape.title ?? undefined },
 	);
+	const nextAttempts = attempts + 1;
 	return db.transaction(async (tx) => {
 		if (generated.enrichment.status === "applied") {
 			const [inserted] = await tx
@@ -104,6 +121,7 @@ async function runEnrichmentRetry(
 						...scrape.metadata,
 						aiEnrichment: "applied",
 						aiEnrichmentDetail: undefined,
+						aiEnrichmentAttempts: nextAttempts,
 						designModelVersion: generated.model.version,
 					},
 					updatedAt: new Date(),
@@ -118,6 +136,7 @@ async function runEnrichmentRetry(
 					...scrape.metadata,
 					aiEnrichment: "unavailable",
 					aiEnrichmentDetail: generated.enrichment.detail,
+					aiEnrichmentAttempts: nextAttempts,
 					designModelVersion: generated.model.version,
 				},
 				updatedAt: new Date(),
