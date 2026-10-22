@@ -15,6 +15,7 @@ import {
 	imageResultCounts,
 } from "@/features/scrape/utils/scrape-images";
 import { ScrapeHistoryList } from "../components/scrape-history-list";
+import { ScrapeHistoryView } from "../components/scrape-history-view";
 
 const baseSearch: ScrapeHistorySearch = {
 	q: "",
@@ -425,5 +426,247 @@ describe("ScrapeHistoryList dashboard", () => {
 		fireEvent.click(screen.getByRole("button", { name: /hapus riwayat/i }));
 		fireEvent.click(screen.getByRole("button", { name: /konfirmasi hapus/i }));
 		await vi.waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
+	});
+});
+
+describe("ScrapeHistory direct selection without selection mode", () => {
+	const sampleItems = [
+		{
+			id: "item-1",
+			sourceUrl: "https://anpundung.com",
+			domain: "anpundung.com",
+			title: null,
+			status: "completed",
+			mode: "images" as const,
+			createdAt: new Date().toISOString(),
+		},
+		{
+			id: "item-2",
+			sourceUrl: "https://desainpakeai.com",
+			domain: "desainpakeai.com",
+			title: null,
+			status: "completed",
+			mode: "design" as const,
+			createdAt: new Date().toISOString(),
+		},
+		{
+			id: "item-3",
+			sourceUrl: "https://notion.so",
+			domain: "notion.so",
+			title: null,
+			status: "completed",
+			mode: "crawl" as const,
+			createdAt: new Date().toISOString(),
+		},
+	];
+
+	it("renders checkbox directly on each item without 'Pilih' mode", () => {
+		renderList({
+			items: sampleItems,
+			total: 3,
+		});
+
+		expect(screen.queryByRole("button", { name: /^Pilih$/i })).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /^Selesai memilih$/i }),
+		).toBeNull();
+
+		const checkboxes = screen.getAllByRole("checkbox");
+		expect(checkboxes).toHaveLength(4);
+		expect(
+			screen.getByRole("checkbox", { name: /pilih riwayat anpundung/i }),
+		).toBeDefined();
+		expect(
+			screen.getByRole("checkbox", { name: /pilih semua di halaman ini/i }),
+		).toBeDefined();
+	});
+
+	it("hides bulk toolbar when count is 0 and shows it when items are selected", () => {
+		renderList({
+			items: sampleItems,
+			total: 3,
+		});
+
+		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
+		expect(screen.queryByRole("button", { name: /^Batal$/i })).toBeNull();
+
+		const item1Checkbox = screen.getByRole("checkbox", {
+			name: /pilih riwayat anpundung/i,
+		});
+		fireEvent.click(item1Checkbox);
+
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+		expect(screen.getByRole("button", { name: /^Batal$/i })).toBeDefined();
+		expect(screen.getByRole("button", { name: /Hapus 1/i })).toBeDefined();
+
+		const item2Checkbox = screen.getByRole("checkbox", {
+			name: /pilih riwayat desainpakeai/i,
+		});
+		fireEvent.click(item2Checkbox);
+
+		expect(screen.getByText("2 hasil dipilih")).toBeDefined();
+		expect(screen.getByRole("button", { name: /Hapus 2/i })).toBeDefined();
+	});
+
+	it("clears selection when Batal is clicked and keeps checkboxes available", () => {
+		renderList({
+			items: sampleItems,
+			total: 3,
+		});
+
+		const item1Checkbox = screen.getByRole("checkbox", {
+			name: /pilih riwayat anpundung/i,
+		});
+		fireEvent.click(item1Checkbox);
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+
+		const batalButton = screen.getByRole("button", { name: /^Batal$/i });
+		fireEvent.click(batalButton);
+
+		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
+		expect(item1Checkbox).toBeDefined();
+		expect((item1Checkbox as HTMLInputElement).checked).toBe(false);
+	});
+
+	it("keeps item detail link and checkbox click targets independent", () => {
+		renderList({
+			items: sampleItems,
+			total: 3,
+		});
+
+		const checkbox = screen.getByRole("checkbox", {
+			name: /pilih riwayat anpundung/i,
+		});
+		const link = screen.getByRole("link", { name: /anpundung/i });
+
+		expect(link.getAttribute("href")).toBe("/scrape/$id");
+		expect(link.contains(checkbox)).toBe(false);
+
+		fireEvent.click(checkbox);
+		expect((checkbox as HTMLInputElement).checked).toBe(true);
+	});
+
+	it("selects all items on the current page via select-all checkbox", () => {
+		renderList({
+			items: sampleItems,
+			total: 3,
+		});
+
+		const selectAll = screen.getByRole("checkbox", {
+			name: /pilih semua di halaman ini/i,
+		});
+		fireEvent.click(selectAll);
+
+		expect(screen.getByText("3 hasil dipilih")).toBeDefined();
+		expect(screen.getByRole("button", { name: /Hapus 3/i })).toBeDefined();
+
+		const checkboxes = screen.getAllByRole("checkbox");
+		for (const cb of checkboxes) {
+			expect((cb as HTMLInputElement).checked).toBe(true);
+		}
+
+		fireEvent.click(selectAll);
+		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
+	});
+
+	it("supports cross-page selection for filtered results", async () => {
+		const onPrepareSelection = vi.fn().mockResolvedValue({
+			ids: ["item-1", "item-2", "item-3", "item-4"],
+			total: 4,
+			truncated: false,
+		});
+
+		renderList({
+			items: sampleItems,
+			total: 4,
+			onPrepareSelection,
+		});
+
+		const selectAll = screen.getByRole("checkbox", {
+			name: /pilih semua di halaman ini/i,
+		});
+		fireEvent.click(selectAll);
+
+		const selectAllFilteredBtn = screen.getByRole("button", {
+			name: /pilih semua 4 hasil sesuai filter/i,
+		});
+		fireEvent.click(selectAllFilteredBtn);
+
+		await vi.waitFor(() => {
+			expect(onPrepareSelection).toHaveBeenCalled();
+			expect(screen.getByText("4 hasil dipilih")).toBeDefined();
+		});
+	});
+
+	it("confirms bulk deletion and invokes onDeleteMany with selected ids", async () => {
+		const onDeleteMany = vi.fn().mockResolvedValue({
+			deleted: 2,
+			skipped: 0,
+			deletedIds: ["item-1", "item-2"],
+		});
+
+		renderList({
+			items: sampleItems,
+			total: 3,
+			onDeleteMany,
+		});
+
+		fireEvent.click(
+			screen.getByRole("checkbox", { name: /pilih riwayat anpundung/i }),
+		);
+		fireEvent.click(
+			screen.getByRole("checkbox", { name: /pilih riwayat desainpakeai/i }),
+		);
+
+		const bulkDeleteBtn = screen.getByRole("button", { name: /Hapus 2/i });
+		fireEvent.click(bulkDeleteBtn);
+
+		expect(screen.getByRole("dialog")).toBeDefined();
+		expect(screen.getByText(/Hapus 2 hasil scrape\?/i)).toBeDefined();
+		expect(
+			screen.getByText(/Hasil yang dipilih akan dihapus permanen\./i),
+		).toBeDefined();
+
+		const confirmBtn = screen.getByRole("button", { name: /^Hapus 2$/i });
+		fireEvent.click(confirmBtn);
+
+		await vi.waitFor(() => {
+			expect(onDeleteMany).toHaveBeenCalledWith(["item-1", "item-2"]);
+		});
+	});
+});
+
+describe("ScrapeHistoryView", () => {
+	it("does not render Pilih or Selesai memilih buttons in header", () => {
+		render(
+			<ScrapeHistoryView
+				items={[
+					{
+						id: "item-1",
+						sourceUrl: "https://anpundung.com",
+						domain: "anpundung.com",
+						title: null,
+						status: "completed",
+						mode: "images",
+						createdAt: new Date().toISOString(),
+					},
+				]}
+				total={1}
+				search={baseSearch}
+				onQueryChange={vi.fn()}
+				onDelete={vi.fn()}
+				onDeleteMany={vi
+					.fn()
+					.mockResolvedValue({ deleted: 0, skipped: 0, deletedIds: [] })}
+				onPrepareSelection={vi
+					.fn()
+					.mockResolvedValue({ ids: [], total: 0, truncated: false })}
+			/>,
+		);
+
+		expect(screen.queryByRole("button", { name: /^Pilih$/i })).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /^Selesai memilih$/i }),
+		).toBeNull();
 	});
 });

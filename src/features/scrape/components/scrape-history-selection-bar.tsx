@@ -19,7 +19,7 @@ export function ScrapeHistorySelectionBar({
 		<div className="flex flex-col gap-3 rounded-xl border border-graphite bg-charcoal p-3 sm:flex-row sm:items-center sm:justify-between">
 			<div className="flex flex-col gap-0.5">
 				<p className="text-sm font-medium text-snow tabular-nums">
-					{count} dipilih
+					{count} hasil dipilih
 				</p>
 				{truncated ? (
 					<p className="text-xs text-fog">
@@ -34,7 +34,6 @@ export function ScrapeHistorySelectionBar({
 					type="button"
 					onClick={onClear}
 					disabled={deleting}
-					aria-label="Batal pilihan"
 					className="inline-flex min-h-11 items-center rounded-lg border border-graphite px-3 text-xs font-medium text-snow transition-colors hover:bg-onyx disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					Batal
@@ -45,7 +44,7 @@ export function ScrapeHistorySelectionBar({
 					disabled={deleting || count === 0}
 					className="inline-flex min-h-11 items-center rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-rose-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
-					Hapus
+					Hapus {count}
 				</button>
 			</div>
 		</div>

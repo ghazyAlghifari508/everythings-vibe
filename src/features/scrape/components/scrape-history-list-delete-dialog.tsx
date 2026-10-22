@@ -37,7 +37,7 @@ export function ScrapeHistoryDeleteDialog({
 			? "Hasil yang dipilih akan dihapus permanen."
 			: `Apakah kamu yakin ingin menghapus riwayat scrape untuk ${displaySiteName(single.domain)}? Tindakan ini tidak dapat dibatalkan.`;
 	const confirmLabel =
-		single === null ? `Hapus ${bulkCount} hasil` : "Konfirmasi Hapus";
+		single === null ? `Hapus ${bulkCount}` : "Konfirmasi Hapus";
 	return (
 		<Dialog
 			open={request !== null}

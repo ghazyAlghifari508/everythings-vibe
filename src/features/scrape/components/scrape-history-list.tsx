@@ -99,7 +99,7 @@ export function ScrapeHistoryList({
 						tone: "info",
 					});
 				} else {
-					selection.exit();
+					selection.clear();
 				}
 			}
 		} catch {
@@ -173,7 +173,7 @@ export function ScrapeHistoryList({
 				range={range}
 			/>
 
-			{selection.active && items.length > 0 ? (
+			{items.length > 0 ? (
 				<ScrapeHistorySelectAll
 					pageIds={pageIds}
 					selectedIds={selection.ids}
@@ -223,7 +223,6 @@ export function ScrapeHistoryList({
 							onRequestDelete={(target) =>
 								setDeleteRequest({ kind: "single", item: target })
 							}
-							selectionMode={selection.active}
 							selected={selection.ids.has(item.id)}
 							onToggleSelect={selection.toggle}
 						/>
@@ -231,7 +230,7 @@ export function ScrapeHistoryList({
 				</ul>
 			)}
 
-			{selection.active ? (
+			{selection.count > 0 ? (
 				<ScrapeHistorySelectionBar
 					count={selection.count}
 					filteredTotal={selection.filteredTotal}

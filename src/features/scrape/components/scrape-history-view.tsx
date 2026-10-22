@@ -40,25 +40,6 @@ export function ScrapeHistoryView({
 							Temukan dan kelola hasil ekstraksi website.
 						</p>
 					</div>
-					{total > 0 ? (
-						selection.active ? (
-							<button
-								type="button"
-								onClick={selection.exit}
-								className="inline-flex min-h-11 items-center rounded-lg border border-graphite bg-charcoal px-3 text-xs font-medium text-snow transition-colors hover:bg-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								Selesai memilih
-							</button>
-						) : (
-							<button
-								type="button"
-								onClick={selection.enter}
-								className="inline-flex min-h-11 items-center rounded-lg border border-graphite bg-charcoal px-3 text-xs font-medium text-snow transition-colors hover:bg-onyx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								Pilih
-							</button>
-						)
-					) : null}
 				</header>
 
 				<ScrapeHistoryList

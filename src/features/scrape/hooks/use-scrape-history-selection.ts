@@ -4,15 +4,12 @@ import type { ScrapeHistoryBulkSelection } from "@/features/scrape/types/scrape-
 export type ScrapeHistorySelectionScope = "none" | "filtered";
 
 export interface ScrapeHistorySelectionController {
-	active: boolean;
 	scope: ScrapeHistorySelectionScope;
 	ids: ReadonlySet<string>;
 	count: number;
 	filteredTotal: number;
 	truncated: boolean;
 	notice: string | null;
-	enter: () => void;
-	exit: () => void;
 	clear: () => void;
 	toggle: (id: string) => void;
 	replace: (ids: readonly string[]) => void;
@@ -29,7 +26,6 @@ const FILTER_RESET_NOTICE = "Filter berubah, pilihan dibersihkan.";
 export function useScrapeHistorySelection(
 	filterKey: string,
 ): ScrapeHistorySelectionController {
-	const [active, setActive] = useState(false);
 	const [ids, setIds] = useState<ReadonlySet<string>>(() => new Set<string>());
 	const [scope, setScope] = useState<ScrapeHistorySelectionScope>("none");
 	const [filteredTotal, setFilteredTotal] = useState(0);
@@ -56,20 +52,6 @@ export function useScrapeHistorySelection(
 		setFilteredTotal(0);
 		setTruncated(false);
 	}, []);
-
-	const enter = useCallback(() => {
-		setActive(true);
-		setIds(new Set<string>());
-		resetScope();
-		setNotice(null);
-	}, [resetScope]);
-
-	const exit = useCallback(() => {
-		setActive(false);
-		setIds(new Set<string>());
-		resetScope();
-		setNotice(null);
-	}, [resetScope]);
 
 	const clear = useCallback(() => {
 		setIds(new Set<string>());
@@ -130,15 +112,12 @@ export function useScrapeHistorySelection(
 
 	return useMemo(
 		() => ({
-			active,
 			scope,
 			ids,
 			count: ids.size,
 			filteredTotal,
 			truncated,
 			notice,
-			enter,
-			exit,
 			clear,
 			toggle,
 			replace,
@@ -146,14 +125,11 @@ export function useScrapeHistorySelection(
 			applyFiltered,
 		}),
 		[
-			active,
 			scope,
 			ids,
 			filteredTotal,
 			truncated,
 			notice,
-			enter,
-			exit,
 			clear,
 			toggle,
 			replace,
