@@ -139,19 +139,17 @@ export function ScrapeHistoryRow({
 				selected ? "bg-snow/5" : "hover:bg-onyx/60"
 			}`}
 		>
-			<label className="flex size-10 shrink-0 cursor-pointer items-center justify-center">
-				<input
-					type="checkbox"
-					checked={selected}
-					onChange={() => onToggleSelect?.(item.id)}
-					aria-label={`Pilih riwayat ${siteName}`}
-					className={`size-5 shrink-0 accent-snow transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
-						selectionActive || selected
-							? "opacity-100"
-							: "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
-					}`}
-				/>
-			</label>
+			{selectionActive ? (
+				<label className="flex size-10 shrink-0 cursor-pointer items-center justify-center">
+					<input
+						type="checkbox"
+						checked={selected}
+						onChange={() => onToggleSelect?.(item.id)}
+						aria-label={`Pilih riwayat ${siteName}`}
+						className="size-5 shrink-0 accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					/>
+				</label>
+			) : null}
 
 			{selectionActive ? (
 				<button

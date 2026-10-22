@@ -109,9 +109,8 @@ function openActionsMenu(index = 0) {
 }
 
 function selectFirstItem() {
-	fireEvent.click(
-		screen.getByRole("checkbox", { name: /Pilih riwayat Notion/i }),
-	);
+	openActionsMenu(0);
+	fireEvent.click(screen.getByRole("menuitem", { name: "Pilih" }));
 }
 
 function selectAllPage() {
@@ -145,27 +144,21 @@ describe("VibeScrape history selection UX", () => {
 		for (const name of [/^Pilih$/i, /Selesai memilih/i, /^Batal$/i]) {
 			expect(screen.queryByRole("button", { name })).toBeNull();
 		}
-		expect(
-			screen.queryByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
-		).toBeNull();
-
-		const box = screen.getByRole("checkbox", {
-			name: /Pilih riwayat Notion/i,
-		});
-		expect(box.className).toContain("opacity-0");
+		expect(screen.queryByRole("checkbox")).toBeNull();
 		expect(
 			screen.getByRole("button", { name: /Aksi riwayat Notion/i }),
 		).toBeDefined();
 	});
 
-	it("selects a row from its checkbox and automatically activates contextual selection bar", () => {
+	it("selects a row via overflow menu and automatically activates checkboxes and contextual selection bar", () => {
 		renderView({ items: [row("a")], total: 1 });
+
+		expect(screen.queryByRole("checkbox")).toBeNull();
+		selectFirstItem();
 
 		const box = screen.getByRole("checkbox", {
 			name: /Pilih riwayat Notion/i,
 		});
-		fireEvent.click(box);
-
 		expect(checked(box)).toBe(true);
 		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
 		expect(screen.getByRole("button", { name: /^Batal$/i })).toBeDefined();
@@ -179,13 +172,14 @@ describe("VibeScrape history selection UX", () => {
 
 		selectFirstItem();
 		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+		expect(
+			screen.getByRole("checkbox", { name: /Pilih riwayat Notion/i }),
+		).toBeDefined();
 
 		fireEvent.click(screen.getByRole("button", { name: /^Batal$/i }));
 		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
 		expect(screen.getByRole("link", { name: /Notion/i })).toBeDefined();
-		expect(
-			screen.queryByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
-		).toBeNull();
+		expect(screen.queryByRole("checkbox")).toBeNull();
 	});
 
 	it("enters active selection via mobile overflow menu (⋯ -> Pilih)", () => {

@@ -514,7 +514,12 @@ describe("ScrapeHistory direct selection without selection mode", () => {
 		},
 	];
 
-	it("renders item checkboxes with progressive disclosure and no select-all on initial state", () => {
+	function selectFirstItemViaMenu() {
+		openActionsMenu(0);
+		fireEvent.click(screen.getByRole("menuitem", { name: "Pilih" }));
+	}
+
+	it("renders clean list without checkboxes or select-all on initial state", () => {
 		renderList({
 			items: sampleItems,
 			total: 3,
@@ -525,15 +530,11 @@ describe("ScrapeHistory direct selection without selection mode", () => {
 			screen.queryByRole("button", { name: /^Selesai memilih$/i }),
 		).toBeNull();
 
-		// On initial load, select-all is not rendered; only the 3 row checkboxes exist
-		const checkboxes = screen.getAllByRole("checkbox");
-		expect(checkboxes).toHaveLength(3);
+		// On initial load, no checkboxes are rendered
+		expect(screen.queryByRole("checkbox")).toBeNull();
 		expect(
-			screen.getByRole("checkbox", { name: /pilih riwayat anpundung/i }),
-		).toBeDefined();
-		expect(
-			screen.queryByRole("checkbox", { name: /pilih semua di halaman ini/i }),
-		).toBeNull();
+			screen.getAllByRole("button", { name: /Aksi riwayat/i }),
+		).toHaveLength(3);
 	});
 
 	it("hides bulk toolbar when count is 0 and shows it when items are selected", () => {
@@ -545,10 +546,7 @@ describe("ScrapeHistory direct selection without selection mode", () => {
 		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
 		expect(screen.queryByRole("button", { name: /^Batal$/i })).toBeNull();
 
-		const item1Checkbox = screen.getByRole("checkbox", {
-			name: /pilih riwayat anpundung/i,
-		});
-		fireEvent.click(item1Checkbox);
+		selectFirstItemViaMenu();
 
 		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
 		expect(screen.getByRole("button", { name: /^Batal$/i })).toBeDefined();
@@ -563,42 +561,38 @@ describe("ScrapeHistory direct selection without selection mode", () => {
 		expect(screen.getByRole("button", { name: /Hapus 2/i })).toBeDefined();
 	});
 
-	it("clears selection when Batal is clicked and keeps checkboxes available", () => {
+	it("clears selection when Batal is clicked and restores clean state", () => {
 		renderList({
 			items: sampleItems,
 			total: 3,
 		});
 
-		const item1Checkbox = screen.getByRole("checkbox", {
-			name: /pilih riwayat anpundung/i,
-		});
-		fireEvent.click(item1Checkbox);
+		selectFirstItemViaMenu();
 		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+		expect(
+			screen.getByRole("checkbox", { name: /pilih riwayat anpundung/i }),
+		).toBeDefined();
 
 		const batalButton = screen.getByRole("button", { name: /^Batal$/i });
 		fireEvent.click(batalButton);
 
 		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
-		expect(item1Checkbox).toBeDefined();
-		expect((item1Checkbox as HTMLInputElement).checked).toBe(false);
+		expect(screen.queryByRole("checkbox")).toBeNull();
 	});
 
-	it("keeps item detail link and checkbox click targets independent", () => {
+	it("keeps item detail link and actions menu independent", () => {
 		renderList({
 			items: sampleItems,
 			total: 3,
 		});
 
-		const checkbox = screen.getByRole("checkbox", {
-			name: /pilih riwayat anpundung/i,
-		});
 		const link = screen.getByRole("link", { name: /anpundung/i });
+		const actionBtn = screen.getByRole("button", {
+			name: /Aksi riwayat anpundung/i,
+		});
 
 		expect(link.getAttribute("href")).toBe("/scrape/$id");
-		expect(link.contains(checkbox)).toBe(false);
-
-		fireEvent.click(checkbox);
-		expect((checkbox as HTMLInputElement).checked).toBe(true);
+		expect(link.contains(actionBtn)).toBe(false);
 	});
 
 	it("selects all items on the current page via select-all checkbox once selection begins", () => {
@@ -608,15 +602,10 @@ describe("ScrapeHistory direct selection without selection mode", () => {
 		});
 
 		// Initially, select-all is not visible
-		expect(
-			screen.queryByRole("checkbox", { name: /pilih semua di halaman ini/i }),
-		).toBeNull();
+		expect(screen.queryByRole("checkbox")).toBeNull();
 
 		// Selecting 1 item enters active selection and reveals select-all
-		const item1 = screen.getByRole("checkbox", {
-			name: /pilih riwayat anpundung/i,
-		});
-		fireEvent.click(item1);
+		selectFirstItemViaMenu();
 		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
 
 		const selectAll = screen.getByRole("checkbox", {
@@ -634,10 +623,8 @@ describe("ScrapeHistory direct selection without selection mode", () => {
 
 		fireEvent.click(selectAll);
 		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
-		// Returning to 0 selection cleans up select-all
-		expect(
-			screen.queryByRole("checkbox", { name: /pilih semua di halaman ini/i }),
-		).toBeNull();
+		// Returning to 0 selection cleans up all checkboxes
+		expect(screen.queryByRole("checkbox")).toBeNull();
 	});
 
 	it("supports cross-page selection for filtered results", async () => {
@@ -654,11 +641,7 @@ describe("ScrapeHistory direct selection without selection mode", () => {
 		});
 
 		// First select 1 item to activate selection
-		fireEvent.click(
-			screen.getByRole("checkbox", {
-				name: /pilih riwayat anpundung/i,
-			}),
-		);
+		selectFirstItemViaMenu();
 
 		const selectAll = screen.getByRole("checkbox", {
 			name: /pilih semua di halaman ini/i,
@@ -689,9 +672,7 @@ describe("ScrapeHistory direct selection without selection mode", () => {
 			onDeleteMany,
 		});
 
-		fireEvent.click(
-			screen.getByRole("checkbox", { name: /pilih riwayat anpundung/i }),
-		);
+		selectFirstItemViaMenu();
 		fireEvent.click(
 			screen.getByRole("checkbox", { name: /pilih riwayat desainpakeai/i }),
 		);
