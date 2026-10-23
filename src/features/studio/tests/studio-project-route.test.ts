@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { ScrapeError } from "@/lib/design-errors";
 import { GET, POST } from "@/routes/api/studio.project";
+
+const detailFailure = vi.hoisted(() => ({ error: null as Error | null }));
 
 const duplicate = vi.hoisted(() =>
 	vi.fn(async () => ({ id: "independent-project" })),
@@ -22,29 +25,32 @@ vi.mock("@/features/studio/services/studio-project-lifecycle", () => ({
 }));
 
 vi.mock("@/features/studio/services/studio-project-detail", () => ({
-	getStudioProjectDetail: async (id: string, _userId: string) => ({
-		project: { id, title: "Test Canvas", designMode: "mobile" },
-		frames: [
-			{
-				id: "f-1",
-				name: "Dashboard",
-				status: "ready",
-				order: 0,
-				htmlCode: "<html></html>",
-			},
-			{
-				id: "f-2",
-				name: "Transactions",
-				status: "generating",
-				order: 1,
-				htmlCode: null,
-			},
-		],
-		activeJob: { id: "job-1", status: "generating" },
-		logoUrl: null,
-		revisions: [],
-		latest: null,
-	}),
+	getStudioProjectDetail: async (id: string, _userId: string) => {
+		if (detailFailure.error) throw detailFailure.error;
+		return {
+			project: { id, title: "Test Canvas", designMode: "mobile" },
+			frames: [
+				{
+					id: "f-1",
+					name: "Dashboard",
+					status: "ready",
+					order: 0,
+					htmlCode: "<html></html>",
+				},
+				{
+					id: "f-2",
+					name: "Transactions",
+					status: "generating",
+					order: 1,
+					htmlCode: null,
+				},
+			],
+			activeJob: { id: "job-1", status: "generating" },
+			logoUrl: null,
+			revisions: [],
+			latest: null,
+		};
+	},
 }));
 
 describe("GET /api/studio/project", () => {
@@ -110,5 +116,62 @@ describe("GET /api/studio/project", () => {
 		const req = new Request("https://app.test/api/studio/project");
 		const res = await GET({ request: req });
 		expect(res.status).toBe(400);
+	});
+
+	it("rejects blank or oversized project identifiers", async () => {
+		for (const id of ["   ", "x".repeat(201)]) {
+			const response = await GET({
+				request: new Request(
+					`https://app.test/api/studio/project?id=${encodeURIComponent(id)}`,
+				),
+			});
+			expect(response.status).toBe(400);
+			expect(await response.json()).toMatchObject({
+				code: "INVALID_PROJECT_ID",
+			});
+		}
+	});
+
+	it("does not cache live partial frame state", async () => {
+		const response = await GET({
+			request: new Request("https://app.test/api/studio/project?id=proj-1"),
+		});
+		expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+		const body = await response.json();
+		expect(
+			body.frames.map((frame: { status: string }) => frame.status),
+		).toEqual(["ready", "generating"]);
+	});
+
+	it("classifies missing and unavailable project reads without exposing internals", async () => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		try {
+			for (const [failure, status, code] of [
+				[
+					new ScrapeError("WEBSITE_BLOCKED", "private resource"),
+					404,
+					"STUDIO_NOT_FOUND",
+				],
+				[new Error("Unauthorized"), 401, "UNAUTHORIZED"],
+				[
+					new Error("private database details"),
+					500,
+					"STUDIO_STATUS_UNAVAILABLE",
+				],
+			] as const) {
+				detailFailure.error = failure;
+				const response = await GET({
+					request: new Request("https://app.test/api/studio/project?id=proj-1"),
+				});
+				expect(response.status).toBe(status);
+				expect(await response.json()).toMatchObject({ code });
+			}
+			expect(JSON.stringify(log.mock.calls)).not.toContain(
+				"private database details",
+			);
+		} finally {
+			detailFailure.error = null;
+			log.mockRestore();
+		}
 	});
 });
