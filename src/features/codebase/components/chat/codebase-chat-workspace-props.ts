@@ -13,6 +13,7 @@ import type { CodebaseStarterRefreshState } from "./codebase-chat-workspace-pris
 
 export interface CodebaseChatWorkspaceProps {
 	featureName: string;
+	isCreatingNew?: boolean;
 	/**
 	 * What the workspace is allowed to show. Supplied by the route from the
 	 * resolved plan plus the real per-artifact hydration statuses, so a pending
@@ -64,7 +65,9 @@ export interface CodebaseChatWorkspaceProps {
 	onOpenArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onDownloadArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onSubmitAnswer?: (questionId: string, answer: string) => void;
-	onSendMessage?: (message: string) => void;
+	onSendMessage?:
+		| ((message: string) => void)
+		| ((message: string) => boolean | Promise<boolean>);
 	/**
 	 * What the next message means. The route derives it from the workspace
 	 * state: a message in a user-facing plan revises or clarifies that plan,

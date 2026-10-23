@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useCallback } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useRef } from "react";
 import type { ChatStreamMessage } from "@/features/codebase/components/chat/codebase-chat-workspace";
 import type { CodebasePipelineStage } from "@/features/codebase/services/chat-flow";
 import type { useWorkspaceArtifacts } from "./use-workspace-artifacts";
@@ -26,6 +26,8 @@ export function useWorkspaceComposer({
 	setLastFeaturePrompt,
 	fetchAiQuestions,
 	runRevision,
+	resetFeatureWorkspace,
+	registerCreatedPlan,
 }: {
 	codebase: { id: string; name: string };
 	snapshotReady: boolean;
@@ -48,11 +50,25 @@ export function useWorkspaceComposer({
 	setLastFeaturePrompt: (prompt: string) => void;
 	fetchAiQuestions: (id: string, prompt: string) => Promise<void>;
 	runRevision: (instruction: string) => Promise<void>;
+	resetFeatureWorkspace: () => void;
+	registerCreatedPlan: (plan: { id: string; name: string }) => void;
 }) {
+	const creationInFlight = useRef(false);
+	const creationId = useRef<string | null>(null);
+	const workspaceEpoch = useRef(0);
 	const ensureFeatureInWorkspace = useCallback(
 		async (message: string): Promise<string | null> => {
 			const trimmed = message.trim();
-			if (!snapshotReady || trimmed.length < 3 || isWorking) return null;
+			if (
+				!snapshotReady ||
+				trimmed.length < 3 ||
+				isWorking ||
+				creationInFlight.current
+			)
+				return null;
+			const epoch = workspaceEpoch.current;
+			creationId.current ??= crypto.randomUUID();
+			creationInFlight.current = true;
 			setIsWorking(true);
 			setError(null);
 			try {
@@ -61,10 +77,14 @@ export function useWorkspaceComposer({
 					{
 						method: "POST",
 						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ message: trimmed }),
+						body: JSON.stringify({
+							message: trimmed,
+							requestId: creationId.current,
+						}),
 					},
 				);
 				const body: unknown = await response.json().catch(() => null);
+				if (workspaceEpoch.current !== epoch) return null;
 				if (
 					!response.ok ||
 					typeof body !== "object" ||
@@ -76,6 +96,10 @@ export function useWorkspaceComposer({
 					return null;
 				}
 				const created = body as { projectId: string; name?: unknown };
+				registerCreatedPlan({
+					id: created.projectId,
+					name: typeof created.name === "string" ? created.name : codebase.name,
+				});
 				setActiveFeature({
 					id: created.projectId,
 					name:
@@ -92,9 +116,11 @@ export function useWorkspaceComposer({
 				setChatAnswers({});
 				return created.projectId;
 			} catch {
+				if (workspaceEpoch.current !== epoch) return null;
 				setError("Server tidak dapat dihubungi.");
 				return null;
 			} finally {
+				creationInFlight.current = false;
 				setIsWorking(false);
 			}
 		},
@@ -112,15 +138,26 @@ export function useWorkspaceComposer({
 			setChatAnswers,
 			setActiveFeature,
 			setPipelineStage,
+			registerCreatedPlan,
 		],
 	);
 	const handleCreateFeature = useCallback(() => {
+		workspaceEpoch.current += 1;
+		creationId.current = null;
+		resetFeatureWorkspace();
+		setActiveFeature(null);
 		setIsCreatingNew(true);
-	}, [setIsCreatingNew]);
+	}, [resetFeatureWorkspace, setActiveFeature, setIsCreatingNew]);
 	const handleSendMessage = useCallback(
 		async (message: string) => {
 			const trimmed = message.trim();
-			if (!trimmed || trimmed.length < 3) return;
+			if (
+				!trimmed ||
+				trimmed.length < 3 ||
+				creationInFlight.current ||
+				isWorking
+			)
+				return false;
 			setChatMessages((current) => [
 				...current,
 				{ id: `user-${Date.now()}`, role: "user", content: trimmed },
@@ -140,14 +177,15 @@ export function useWorkspaceComposer({
 					setIsCreatingNew(false);
 					void fetchAiQuestions(projectId, trimmed);
 				}
-				return;
+				return projectId !== null;
 			}
 			if (activeHasPlanning) {
 				await runRevision(trimmed);
-				return;
+				return true;
 			}
 			setLastFeaturePrompt(trimmed);
 			void fetchAiQuestions(effectiveFeatureId, trimmed);
+			return true;
 		},
 		[
 			artifactCount,
@@ -155,6 +193,7 @@ export function useWorkspaceComposer({
 			ensureFeatureInWorkspace,
 			fetchAiQuestions,
 			isCreatingNew,
+			isWorking,
 			onboardingFeatureId,
 			runRevision,
 			setLastFeaturePrompt,
@@ -162,5 +201,12 @@ export function useWorkspaceComposer({
 			setChatMessages,
 		],
 	);
-	return { handleCreateFeature, handleSendMessage };
+	return {
+		handleCreateFeature,
+		handleSendMessage,
+		invalidateCreation: () => {
+			workspaceEpoch.current += 1;
+			creationId.current = null;
+		},
+	};
 }

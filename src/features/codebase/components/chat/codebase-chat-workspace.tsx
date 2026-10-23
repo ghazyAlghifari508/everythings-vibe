@@ -48,6 +48,7 @@ export type PipelineStage = CodebasePipelineStage;
 
 export function CodebaseChatWorkspace({
 	featureName,
+	isCreatingNew = false,
 	view,
 	planSwitcher,
 	contextFiles: _contextFiles = [],
@@ -132,8 +133,12 @@ export function CodebaseChatWorkspace({
 	const handleSend = (text?: string) => {
 		const message = (text ?? draft).trim();
 		if (message.length < 3 || isSending || isRunWorking) return;
-		onSendMessage?.(message);
-		setDraft("");
+		const accepted = onSendMessage?.(message);
+		if (accepted instanceof Promise) {
+			void accepted.then((success) => {
+				if (success) setDraft("");
+			});
+		} else if (accepted !== false) setDraft("");
 	};
 
 	const handlePrefillDraft = (text: string) => {
@@ -248,9 +253,10 @@ export function CodebaseChatWorkspace({
 				<CodebaseChatWorkspacePlanSelection />
 			) : showPristine ? (
 				<CodebaseChatWorkspacePristine
+					newFeatureRepository={isCreatingNew ? codebaseName : undefined}
 					composer={renderComposer(2, "p-3.5 sm:p-4")}
-					starterSuggestions={starterSuggestions}
-					starterRefresh={starterRefresh}
+					starterSuggestions={isCreatingNew ? undefined : starterSuggestions}
+					starterRefresh={isCreatingNew ? undefined : starterRefresh}
 					newerAttemptFailure={newerAttemptFailure}
 					onRefreshStarterSuggestions={onRefreshStarterSuggestions}
 					onPrefillDraft={handlePrefillDraft}

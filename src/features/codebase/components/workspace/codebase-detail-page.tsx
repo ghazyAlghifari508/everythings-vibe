@@ -16,6 +16,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 	const { codebase, planningSnapshotByProject, canOpenFullBoard } = data;
 	const {
 		snapshotReady,
+		isCreatingNew,
 		isStarting,
 		status,
 		manifestFileCount,
@@ -160,6 +161,8 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 						}
 						chatPane={
 							<CodebaseChatWorkspace
+								key={effectiveFeatureId ?? "new-feature"}
+								isCreatingNew={isCreatingNew}
 								featureName={resolvedFeature?.name ?? codebase.name}
 								view={workspaceView}
 								planSwitcher={
@@ -250,7 +253,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								}}
 								onDownloadArtifact={handleDownloadArtifact}
 								onSubmitAnswer={handleSubmitAnswer}
-								onSendMessage={(message) => void handleSendMessage(message)}
+								onSendMessage={handleSendMessage}
 								onConfirmGenerate={() => void handleConfirmGenerate()}
 								onRetryGenerate={() => void handleConfirmGenerate()}
 								onRetryStage={() => void handleRetryStage()}

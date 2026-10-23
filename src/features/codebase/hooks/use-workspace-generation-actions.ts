@@ -1,4 +1,9 @@
-import { type Dispatch, type SetStateAction, useCallback } from "react";
+import {
+	type Dispatch,
+	type RefObject,
+	type SetStateAction,
+	useCallback,
+} from "react";
 import {
 	buildFeatureMessage,
 	type CodebasePipelineStage,
@@ -8,6 +13,7 @@ import type { useWorkspacePipeline } from "./use-workspace-pipeline";
 
 export function useWorkspaceGenerationActions({
 	effectiveFeatureId,
+	activeProjectIdRef,
 	featureName,
 	codebaseName,
 	chatAnswers,
@@ -24,6 +30,7 @@ export function useWorkspaceGenerationActions({
 	handleConfirmGenerate,
 }: {
 	effectiveFeatureId: string | null;
+	activeProjectIdRef: RefObject<string | null>;
 	featureName: string | undefined;
 	codebaseName: string;
 	chatAnswers: Record<string, string>;
@@ -59,6 +66,7 @@ export function useWorkspaceGenerationActions({
 			},
 			async () => {
 				const content = await loadPrd();
+				if (activeProjectIdRef.current !== effectiveFeatureId) return false;
 				if (!content) {
 					setStageError("PRD belum tersimpan di server. Coba generate ulang.");
 					return false;
@@ -78,6 +86,7 @@ export function useWorkspaceGenerationActions({
 		chatAnswers,
 		runPipelineStage,
 		loadPrd,
+		activeProjectIdRef,
 		setStageError,
 		setPipelineStage,
 		pushAssistantMessage,
@@ -95,6 +104,7 @@ export function useWorkspaceGenerationActions({
 			},
 			async () => {
 				const content = await loadAc();
+				if (activeProjectIdRef.current !== effectiveFeatureId) return false;
 				if (!content) {
 					setStageError(
 						"Acceptance Criteria belum tersimpan di server. Coba generate ulang.",
@@ -114,6 +124,7 @@ export function useWorkspaceGenerationActions({
 		featureName,
 		runPipelineStage,
 		loadAc,
+		activeProjectIdRef,
 		setStageError,
 		setPipelineStage,
 		pushAssistantMessage,
@@ -131,7 +142,9 @@ export function useWorkspaceGenerationActions({
 			},
 			async () => {
 				await refetchKanban();
+				if (activeProjectIdRef.current !== effectiveFeatureId) return false;
 				const persistedTaskTree = await refreshTaskTree(effectiveFeatureId);
+				if (activeProjectIdRef.current !== effectiveFeatureId) return false;
 				if (!persistedTaskTree) {
 					setStageError(
 						"Task belum tersimpan di server. Coba breakdown task ulang.",
@@ -152,6 +165,7 @@ export function useWorkspaceGenerationActions({
 		runPipelineStage,
 		refetchKanban,
 		refreshTaskTree,
+		activeProjectIdRef,
 		setStageError,
 		setPipelineStage,
 		pushAssistantMessage,

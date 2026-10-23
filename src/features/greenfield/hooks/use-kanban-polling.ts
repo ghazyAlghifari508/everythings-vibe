@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { KANBAN_POLL_INTERVAL_MS } from "@/features/greenfield/types/greenfield-constants";
 
 export interface TaskCard {
@@ -46,7 +46,16 @@ export function useKanbanTasks({
 	enabled = true,
 }: UseKanbanTasksOptions) {
 	const queryClient = useQueryClient();
-	const [sseData, setSseData] = useState<KanbanData | null>(null);
+	const [ssePayload, setSsePayload] = useState<{
+		projectId: string;
+		data: KanbanData;
+	} | null>(null);
+	const sseData = ssePayload?.projectId === projectId ? ssePayload.data : null;
+	const setSseData = useCallback(
+		(data: KanbanData | null) =>
+			setSsePayload(data ? { projectId, data } : null),
+		[projectId],
+	);
 	const [sseFailed, setSseFailed] = useState(false);
 	const [sseLoading, setSseLoading] = useState(true);
 	const refreshInFlight = useRef<Promise<void> | null>(null);
@@ -147,7 +156,7 @@ export function useKanbanTasks({
 				es.close();
 			}
 		};
-	}, [projectId, enabled, queryClient]);
+	}, [projectId, enabled, queryClient, setSseData]);
 
 	// Fallback polling — only active after SSE has failed. Keeps the same
 	// 10s cadence the board used pre-SSE, preserving staleness semantics.
@@ -164,7 +173,8 @@ export function useKanbanTasks({
 		enabled: enabled && !!projectId && sseFailed,
 	});
 
-	const data = sseFailed ? (query.data ?? null) : sseData;
+	const data =
+		!enabled || !projectId ? null : sseFailed ? (query.data ?? null) : sseData;
 
 	const isLoading = sseFailed
 		? query.isLoading

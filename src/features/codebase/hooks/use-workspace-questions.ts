@@ -25,8 +25,19 @@ export function useWorkspaceQuestions(
 	const [aiQuestions, setAiQuestions] = useState<AdaptiveQuestion[]>([]);
 	const [chatAnswers, setChatAnswers] = useState<Record<string, string>>({});
 	const [lastFeaturePrompt, setLastFeaturePrompt] = useState("");
+	const requestEpoch = useRef(0);
+	const activeProject = useRef(effectiveFeatureId);
+	activeProject.current = effectiveFeatureId;
+	useEffect(
+		() => () => {
+			requestEpoch.current += 1;
+		},
+		[],
+	);
 	const fetchAiQuestions = useCallback(
 		async (projectId: string, prompt: string) => {
+			activeProject.current = projectId;
+			const epoch = ++requestEpoch.current;
 			setRun(startRun("questions", Date.now()));
 			try {
 				const response = await fetch("/api/ask/options", {
@@ -35,6 +46,11 @@ export function useWorkspaceQuestions(
 					body: JSON.stringify({ projectId, prompt, platform: "web" }),
 				});
 				const body: unknown = await response.json().catch(() => null);
+				if (
+					requestEpoch.current !== epoch ||
+					activeProject.current !== projectId
+				)
+					return;
 				const serverError =
 					typeof body === "object" &&
 					body !== null &&
@@ -75,6 +91,11 @@ export function useWorkspaceQuestions(
 				setChatAnswers({});
 				setRun((current) => settleRun(current, "done", Date.now()));
 			} catch {
+				if (
+					requestEpoch.current !== epoch ||
+					activeProject.current !== projectId
+				)
+					return;
 				setRun((current) =>
 					settleRun(
 						current,
@@ -101,7 +122,12 @@ export function useWorkspaceQuestions(
 		aiQuestions.length > 0 || Object.keys(chatAnswers).length > 0;
 	useEffect(() => {
 		const projectId = effectiveFeatureId;
-		if (!projectId || handoffRestoredFor.current === projectId) return;
+		if (!projectId) {
+			handoffRestoredFor.current = null;
+			return;
+		}
+		if (handoffRestoredFor.current === projectId) return;
+		const epoch = requestEpoch.current;
 		handoffRestoredFor.current = projectId;
 		void (async () => {
 			try {
@@ -112,7 +138,13 @@ export function useWorkspaceQuestions(
 				});
 				if (!response.ok) return;
 				const body: unknown = await response.json().catch(() => null);
-				if (typeof body !== "object" || body === null) return;
+				if (
+					requestEpoch.current !== epoch ||
+					activeProject.current !== projectId ||
+					typeof body !== "object" ||
+					body === null
+				)
+					return;
 				const handoff = (body as { handoff?: unknown }).handoff;
 				if (typeof handoff !== "object" || handoff === null) return;
 				const record = handoff as {
@@ -143,6 +175,9 @@ export function useWorkspaceQuestions(
 	return {
 		aiQuestions,
 		setAiQuestions,
+		invalidateRequests: () => {
+			requestEpoch.current += 1;
+		},
 		chatAnswers,
 		setChatAnswers,
 		lastFeaturePrompt,

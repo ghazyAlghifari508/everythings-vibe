@@ -64,8 +64,10 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	});
 	const kanbanProgress = useMemo(
 		() =>
-			kanban.data?.columns ? computeKanbanProgress(kanban.data.columns) : null,
-		[kanban.data],
+			effectiveFeatureId && kanban.data?.columns
+				? computeKanbanProgress(kanban.data.columns)
+				: null,
+		[kanban.data, effectiveFeatureId],
 	);
 	const hasTasksInDb = Boolean(
 		(kanbanProgress && kanbanProgress.total > 0) || artifact.taskTree !== null,
@@ -169,6 +171,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		stageBusy,
 		featureName: resolvedFeature?.name ?? codebase.name,
 		resolvedFeatureName: resolvedFeature?.name,
+		activeProjectIdRef: artifact.activeProjectIdRef,
 		loadPrd: artifact.loadPrd,
 		pushAssistantMessage,
 		openArtifactPreview,
@@ -176,6 +179,32 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		setStageError,
 		setRun,
 	});
+	const resetFeatureWorkspace = () => {
+		source.clearSourcePreview();
+		featureGeneration.setIsConfirming(false);
+		featureGeneration.setSpecError(null);
+		questions.invalidateRequests();
+		artifact.activeProjectIdRef.current = null;
+		artifact.setFeatureTree(null);
+		artifact.setTaskTree(null);
+		artifact.setPrdContent(null);
+		artifact.setAcContent(null);
+		artifact.setPrdError(null);
+		artifact.setAcError(null);
+		artifact.setArtifactHydration(emptyArtifactHydration());
+		questions.setAiQuestions([]);
+		questions.setChatAnswers({});
+		questions.setLastFeaturePrompt("");
+		setChatMessages([]);
+		setRun(null);
+		setStageBusy(null);
+		setStageError(null);
+		setActiveArtifactId(null);
+		setCanvasOpen(false);
+		setCanvasView("kanban");
+		setPipelineStage("questions");
+		userTookOverCanvas.current = false;
+	};
 	const composer = useWorkspaceComposer({
 		codebase,
 		snapshotReady: sync.snapshotReady,
@@ -195,11 +224,14 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		artifactCount: presentation.artifacts.length,
 		isCreatingNew: plan.isCreatingNew,
 		setIsCreatingNew: plan.setIsCreatingNew,
+		resetFeatureWorkspace,
+		registerCreatedPlan: plan.registerCreatedPlan,
 		setLastFeaturePrompt: questions.setLastFeaturePrompt,
 		fetchAiQuestions: questions.fetchAiQuestions,
 		runRevision,
 	});
 	const featureGeneration = useWorkspaceFeatureGeneration({
+		activeProjectIdRef: artifact.activeProjectIdRef,
 		effectiveFeatureId,
 		chatAnswers: questions.chatAnswers,
 		aiQuestions: questions.aiQuestions,
@@ -222,6 +254,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		setRun,
 	});
 	const generation = useWorkspaceGenerationActions({
+		activeProjectIdRef: artifact.activeProjectIdRef,
 		effectiveFeatureId,
 		featureName: resolvedFeature?.name,
 		codebaseName: codebase.name,
@@ -239,25 +272,12 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		handleConfirmGenerate: featureGeneration.handleConfirmGenerate,
 	});
 	const selectPlan = (projectId: string) => {
+		composer.invalidateCreation();
 		plan.setIsCreatingNew(false);
 		plan.setRequestedProjectId(projectId);
 		plan.setActiveFeature(null);
-		artifact.setFeatureTree(null);
-		artifact.setTaskTree(null);
-		artifact.setPrdContent(null);
-		artifact.setAcContent(null);
-		artifact.setPrdError(null);
-		artifact.setAcError(null);
-		questions.setAiQuestions([]);
-		questions.setChatAnswers({});
-		setChatMessages([]);
-		setRun(null);
-		setStageError(null);
+		resetFeatureWorkspace();
 		featureGeneration.setSpecError(null);
-		setActiveArtifactId(null);
-		setCanvasOpen(false);
-		artifact.setArtifactHydration(emptyArtifactHydration());
-		setPipelineStage("questions");
 	};
 	return {
 		...plan,

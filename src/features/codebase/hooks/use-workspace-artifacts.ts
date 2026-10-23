@@ -43,9 +43,13 @@ export function useWorkspaceArtifacts(
 	);
 	// Every read belongs to the plan that started it, including late failures.
 	const activeProjectIdRef = useRef<string | null>(effectiveFeatureId);
-	useEffect(() => {
-		activeProjectIdRef.current = effectiveFeatureId;
-	}, [effectiveFeatureId]);
+	activeProjectIdRef.current = effectiveFeatureId;
+	useEffect(
+		() => () => {
+			activeProjectIdRef.current = null;
+		},
+		[],
+	);
 
 	const loadPrd = useCallback(async (): Promise<string | null> => {
 		if (!snapshotReady || !effectiveFeatureId) {

@@ -32,7 +32,7 @@ export function useWorkspacePipeline({
 	setStageError: Dispatch<SetStateAction<string | null>>;
 	setRun: Dispatch<SetStateAction<CodebaseRunState | null>>;
 }) {
-	const stageRunInFlight = useRef(false);
+	const stageRunInFlight = useRef<string | null>(null);
 	return useCallback(
 		async (
 			target: CodebaseRunStage,
@@ -40,20 +40,32 @@ export function useWorkspacePipeline({
 			init: RequestInit,
 			onSuccess: () => Promise<boolean>,
 		) => {
-			if (!effectiveFeatureId || stageBusy || stageRunInFlight.current) return;
+			if (
+				!effectiveFeatureId ||
+				stageBusy ||
+				stageRunInFlight.current === effectiveFeatureId
+			)
+				return;
 			const requestedProjectId = effectiveFeatureId;
-			stageRunInFlight.current = true;
+			stageRunInFlight.current = effectiveFeatureId;
 			setStageBusy(target);
 			setStageError(null);
 			setRun(startRun(target, Date.now()));
 			try {
 				const response = await fetch(url, init);
 				const result = await consumeSseStream(response, {
-					onThinking: (text) =>
-						setRun((current) => appendRunThinking(current, text)),
-					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
-					onDelta: () =>
-						setRun((current) => setRunPhase(current, "generating")),
+					onThinking: (text) => {
+						if (activeProjectIdRef.current === requestedProjectId)
+							setRun((current) => appendRunThinking(current, text));
+					},
+					onThinkingReset: () => {
+						if (activeProjectIdRef.current === requestedProjectId)
+							setRun((current) => resetRunThinking(current));
+					},
+					onDelta: () => {
+						if (activeProjectIdRef.current === requestedProjectId)
+							setRun((current) => setRunPhase(current, "generating"));
+					},
 				});
 				if (activeProjectIdRef.current !== requestedProjectId) return;
 				if (result.error) {
@@ -85,7 +97,8 @@ export function useWorkspacePipeline({
 				setStageError(message);
 				setRun((current) => settleRun(current, "failed", Date.now(), message));
 			} finally {
-				stageRunInFlight.current = false;
+				if (stageRunInFlight.current === requestedProjectId)
+					stageRunInFlight.current = null;
 				if (activeProjectIdRef.current === requestedProjectId)
 					setStageBusy(null);
 			}
