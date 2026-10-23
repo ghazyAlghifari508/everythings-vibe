@@ -167,6 +167,7 @@ describe("StudioDesignPickerDialog", () => {
 		expect(centeredContainer).not.toBeNull();
 		expect(centeredContainer.className).toContain("mx-auto");
 		expect(centeredContainer.className).toContain("max-w-4xl");
+		expect(centeredContainer.className).toContain("my-auto");
 	});
 
 	it("offers stored VibeScrape design documents on the Punya Saya tab", () => {
@@ -233,5 +234,47 @@ describe("StudioDesignPickerDialog", () => {
 				.getByRole("tab", { name: "Template" })
 				.getAttribute("aria-selected"),
 		).toBe("true");
+	});
+
+	it("renders custom upload surfaces stacked vertically without multi-column grid", () => {
+		renderDialog();
+		fireEvent.click(screen.getByRole("tab", { name: "Punya Saya" }));
+		const panel = screen.getByRole("tabpanel", { name: "Punya Saya" });
+		expect(panel.className).toContain("flex-col");
+		expect(panel.className).not.toContain("grid-cols-2");
+		expect(panel.className).not.toContain("sm:grid-cols-2");
+
+		// Stacking check: DESIGN.md label comes before logo label in DOM
+		const mdLabel = screen.getByText("File DESIGN.md");
+		const logoLabel = screen.getByText("Logo aplikasi");
+		expect(
+			Boolean(
+				mdLabel.compareDocumentPosition(logoLabel) &
+					Node.DOCUMENT_POSITION_FOLLOWING,
+			),
+		).toBe(true);
+	});
+
+	it("handles logo file attachment and removal within the custom panel", async () => {
+		renderDialog();
+		fireEvent.click(screen.getByRole("tab", { name: "Punya Saya" }));
+
+		const logoInput = screen.getByLabelText("Unggah logo aplikasi");
+		const logoFile = new File(["dummy png content"], "brand-logo.png", {
+			type: "image/png",
+		});
+		fireEvent.change(logoInput, { target: { files: [logoFile] } });
+
+		await waitFor(() => {
+			expect(screen.getByText("brand-logo.png")).toBeDefined();
+		});
+
+		const removeLogoBtn = screen.getByRole("button", { name: "Hapus logo" });
+		fireEvent.click(removeLogoBtn);
+
+		await waitFor(() => {
+			expect(screen.queryByText("brand-logo.png")).toBeNull();
+		});
+		expect(screen.getByText("Pilih file gambar logo")).toBeDefined();
 	});
 });

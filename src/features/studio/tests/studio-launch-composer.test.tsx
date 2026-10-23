@@ -85,6 +85,20 @@ describe("StudioLaunchComposer", () => {
 		expect(onRemoveReference).toHaveBeenCalledTimes(1);
 	});
 
+	it("renders active reference as a compact contextual chip with palette icon", () => {
+		renderComposer({
+			reference: { label: "Design System Alpha", logoFilename: "brand.png" },
+		});
+		const referenceGroup = screen.getByRole("region", {
+			name: "Referensi desain aktif",
+		});
+		expect(referenceGroup).toBeDefined();
+		expect(referenceGroup.className).toContain("inline-flex");
+		expect(referenceGroup.className).not.toContain("w-full");
+		expect(screen.getByText("Design System Alpha")).toBeDefined();
+		expect(screen.getByText(/brand\.png/)).toBeDefined();
+	});
+
 	it("forwards platform, page count, and skill changes without submitting", () => {
 		const { onSubmit, onConfigChange } = renderComposer();
 		fireEvent.click(screen.getByRole("button", { name: /Mobile/i }));

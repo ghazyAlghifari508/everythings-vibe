@@ -166,80 +166,100 @@ export function StudioLaunchComposer({
 				/>
 			</label>
 
-			{prd ? (
-				<section
-					aria-label="Lampiran PRD aktif"
-					className="flex items-center gap-2.5 rounded-xl border border-graphite bg-onyx px-3 py-2 text-xs text-mist"
-				>
-					<span className="flex size-6 shrink-0 items-center justify-center rounded bg-charcoal font-mono text-[10px] font-bold text-indigo">
-						MD
-					</span>
-					<div className="flex min-w-0 flex-col">
-						<span
-							className="max-w-48 truncate font-semibold text-snow sm:max-w-64 md:max-w-80"
-							title={prd.filename}
+			{prd || reference ? (
+				<div className="flex flex-wrap items-center gap-2">
+					{prd ? (
+						<section
+							aria-label="Lampiran PRD aktif"
+							className="inline-flex items-center gap-2 rounded-xl border border-graphite bg-onyx px-3 py-1.5 text-xs text-mist"
 						>
-							{prd.filename}
-						</span>
-						<span className="text-[11px] text-fog">
-							Product requirements · Ready
-						</span>
-					</div>
-					<span className="ml-auto flex items-center gap-1.5">
-						<button
-							type="button"
-							onClick={() => fileInputRef.current?.click()}
-							disabled={loading}
-							aria-label="Ganti lampiran PRD"
-							className="rounded px-1.5 py-0.5 font-semibold text-mist underline underline-offset-2 hover:text-snow disabled:opacity-50"
-						>
-							Ganti
-						</button>
-						<button
-							type="button"
-							onClick={() => {
-								onError?.("");
-								onPrdChange?.(null);
-							}}
-							disabled={loading}
-							aria-label="Hapus lampiran PRD"
-							title="Hapus lampiran PRD"
-							className="rounded p-1 text-fog hover:text-snow disabled:opacity-50"
-						>
-							<Icon icon={Cancel01Icon} size={14} />
-						</button>
-					</span>
-				</section>
-			) : null}
-
-			{reference ? (
-				<div className="flex flex-wrap items-center gap-2 rounded-xl border border-graphite bg-onyx px-3 py-2 text-xs text-mist">
-					<span className="text-fog">Referensi aktif:</span>
-					<span className="max-w-48 truncate font-semibold text-snow">
-						{reference.label}
-					</span>
-					{reference.logoFilename ? (
-						<span className="max-w-40 truncate text-fog">
-							· Logo ({reference.logoFilename})
-						</span>
+							<span className="flex size-5 shrink-0 items-center justify-center rounded bg-charcoal font-mono text-[9px] font-bold text-indigo">
+								MD
+							</span>
+							<div className="flex min-w-0 items-center gap-1.5">
+								<span
+									className="max-w-44 truncate font-semibold text-snow sm:max-w-64"
+									title={prd.filename}
+								>
+									{prd.filename}
+								</span>
+								<span className="text-[11px] text-fog">
+									Product requirements · Ready
+								</span>
+							</div>
+							<span className="flex items-center gap-1">
+								<button
+									type="button"
+									onClick={() => fileInputRef.current?.click()}
+									disabled={loading}
+									aria-label="Ganti lampiran PRD"
+									className="rounded px-1.5 py-0.5 font-semibold text-mist underline underline-offset-2 hover:text-snow disabled:opacity-50"
+								>
+									Ganti
+								</button>
+								<button
+									type="button"
+									onClick={() => {
+										onError?.("");
+										onPrdChange?.(null);
+									}}
+									disabled={loading}
+									aria-label="Hapus lampiran PRD"
+									title="Hapus lampiran PRD"
+									className="rounded p-0.5 text-fog hover:text-snow disabled:opacity-50"
+								>
+									<Icon icon={Cancel01Icon} size={13} />
+								</button>
+							</span>
+						</section>
 					) : null}
-					<span className="ml-auto flex items-center gap-1">
-						<button
-							type="button"
-							onClick={onOpenDesignPicker}
-							className="rounded px-1.5 py-0.5 font-semibold text-mist underline underline-offset-2 hover:text-snow"
+
+					{reference ? (
+						<section
+							aria-label="Referensi desain aktif"
+							className="inline-flex items-center gap-2 rounded-xl border border-graphite bg-onyx px-3 py-1.5 text-xs text-mist transition-colors hover:border-steel"
 						>
-							Ganti
-						</button>
-						<button
-							type="button"
-							onClick={onRemoveReference}
-							aria-label="Lepas referensi desain"
-							className="rounded p-1 text-fog hover:text-snow"
-						>
-							<Icon icon={Cancel01Icon} size={13} />
-						</button>
-					</span>
+							<Icon
+								icon={PaintBoardIcon}
+								size={14}
+								className="shrink-0 text-indigo"
+							/>
+							<div className="flex min-w-0 items-center gap-1">
+								<span
+									className="max-w-44 truncate font-semibold text-snow sm:max-w-60"
+									title={reference.label}
+								>
+									{reference.label}
+								</span>
+								{reference.logoFilename ? (
+									<span
+										className="max-w-36 truncate text-[11px] text-fog"
+										title={reference.logoFilename}
+									>
+										· Logo ({reference.logoFilename})
+									</span>
+								) : null}
+							</div>
+							<span className="flex items-center gap-1">
+								<button
+									type="button"
+									onClick={onOpenDesignPicker}
+									className="rounded px-1.5 py-0.5 font-semibold text-mist underline underline-offset-2 hover:text-snow"
+								>
+									Ganti
+								</button>
+								<button
+									type="button"
+									onClick={onRemoveReference}
+									aria-label="Lepas referensi desain"
+									title="Lepas referensi desain"
+									className="rounded p-0.5 text-fog hover:text-snow"
+								>
+									<Icon icon={Cancel01Icon} size={13} />
+								</button>
+							</span>
+						</section>
+					) : null}
 				</div>
 			) : null}
 
