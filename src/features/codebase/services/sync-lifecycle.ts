@@ -100,6 +100,29 @@ export function isSyncStatusComplete(
 	);
 }
 
+/**
+ * Verifies that a re-sync session has completed and persisted a verified snapshot.
+ *
+ * Prevents completion gating bugs:
+ * - A stale snapshot from an old session never satisfies a new re-sync attempt.
+ * - Failed, expired, in-flight, or unverified sessions are rejected.
+ * - Snapshot deduplication is supported because completion gates on verified
+ *   session completion rather than assuming a new snapshot ID was minted.
+ */
+// ponytail: validates active session and snapshot presence; upgrade when multi-attempt replay diff inspection is required.
+export function isResyncSessionVerified(input: {
+	status:
+		| Pick<SyncStatusResponse, "status" | "snapshotId" | "sessionId">
+		| null
+		| undefined;
+	activeSessionId?: string | null;
+}): boolean {
+	const { status, activeSessionId } = input;
+	if (!status || !status.snapshotId) return false;
+	if (activeSessionId && status.sessionId !== activeSessionId) return false;
+	return isSyncStatusComplete(status);
+}
+
 export function canTransitionSyncStatus(
 	from: CodebaseSyncStatus,
 	to: CodebaseSyncStatus,

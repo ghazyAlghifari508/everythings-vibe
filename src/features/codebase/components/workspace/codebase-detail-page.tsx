@@ -2,7 +2,7 @@ import { CodebaseChatWorkspace } from "@/features/codebase/components/chat/codeb
 import { CodebaseArtifactCanvas } from "@/features/codebase/components/explorer/codebase-artifact-canvas";
 import { CodebaseExplorerSidebar } from "@/features/codebase/components/explorer/codebase-explorer-sidebar";
 import { CodebasePlanSwitcher } from "@/features/codebase/components/planning/codebase-plan-switcher";
-import { CodebaseResyncDrawer } from "@/features/codebase/components/planning/codebase-resync-drawer";
+import { CodebaseResyncModal } from "@/features/codebase/components/planning/codebase-resync-modal";
 import { CodebaseWorkspaceShell } from "@/features/codebase/components/workspace/codebase-workspace-shell";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
 import { useCodebaseWorkspace } from "../../hooks/use-codebase-workspace";
@@ -19,6 +19,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		isCreatingNew,
 		isStarting,
 		status,
+		activeSessionId,
 		manifestFileCount,
 		setIsResyncDrawerOpen,
 		payload,
@@ -132,7 +133,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 						</button>
 					</div>
 				)}
-				<CodebaseResyncDrawer
+				<CodebaseResyncModal
 					isOpen={isResyncDrawerOpen}
 					onClose={() => setIsResyncDrawerOpen(false)}
 					projectName={codebase.name}
@@ -144,6 +145,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 					onRetrySync={() => void startSession("retry")}
 					analysis={analysis}
 					isAnalyzing={isWorking}
+					activeSessionId={activeSessionId}
 					onRetryAnalysis={
 						activeWorkspaceSnapshotId
 							? () => void triggerAnalysis(activeWorkspaceSnapshotId)

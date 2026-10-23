@@ -249,6 +249,7 @@ export async function handleCodebaseSessionCreate({
 
 	const payload: SyncPromptPayload = {
 		projectId: codebaseId,
+		sessionId: inserted.id,
 		apiBaseUrl: new URL(request.url).origin,
 		syncToken: rawCredential,
 		cliMinVersion: inserted.cliMinVersion,

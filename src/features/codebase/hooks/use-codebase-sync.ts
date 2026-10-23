@@ -6,7 +6,6 @@ import {
 } from "@/features/codebase/services/analysis-selection";
 import {
 	getPendingSyncPayloadKey,
-	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
 	syncPromptPayloadSchema,
@@ -35,7 +34,8 @@ export function useCodebaseSync({
 	hasStoredSnapshot: boolean;
 }) {
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
-	const [isResyncDrawerOpen, setIsResyncDrawerOpen] = useState(false);
+	const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+	const [isResyncModalOpen, setIsResyncModalOpen] = useState(false);
 	const [status, setStatus] = useState<SyncStatusResponse | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [isStarting, setIsStarting] = useState(false);
@@ -61,7 +61,8 @@ export function useCodebaseSync({
 		inFlight.current = true;
 		try {
 			const queryParams = new URLSearchParams();
-			if (status?.sessionId) queryParams.set("sessionId", status.sessionId);
+			const sessionToQuery = activeSessionId ?? status?.sessionId;
+			if (sessionToQuery) queryParams.set("sessionId", sessionToQuery);
 			if (projectId) queryParams.set("projectId", projectId);
 			const query = queryParams.toString() ? `?${queryParams}` : "";
 			const response = await fetch(
@@ -84,6 +85,9 @@ export function useCodebaseSync({
 			});
 			analysisIdentityRef.current = `${projectId ?? ""}:${activeSnapshotId ?? ""}`;
 			setStatus(parsed.data);
+			if (!activeSessionId && parsed.data.sessionId) {
+				setActiveSessionId(parsed.data.sessionId);
+			}
 			const snapshotId = activeSnapshotId;
 			if (!snapshotId) return;
 			const retained = analysis ?? initialAnalysis;
@@ -113,6 +117,7 @@ export function useCodebaseSync({
 			inFlight.current = false;
 		}
 	}, [
+		activeSessionId,
 		analysis,
 		codebaseId,
 		currentSnapshotId,
@@ -130,7 +135,10 @@ export function useCodebaseSync({
 			const parsed = syncPromptPayloadSchema.safeParse(JSON.parse(raw));
 			if (parsed.success && parsed.data.projectId === codebaseId) {
 				setPayload(parsed.data);
-				setIsResyncDrawerOpen(true);
+				if (parsed.data.sessionId) {
+					setActiveSessionId(parsed.data.sessionId);
+				}
+				setIsResyncModalOpen(true);
 			}
 			sessionStorage.removeItem(getPendingSyncPayloadKey(codebaseId));
 		} catch {
@@ -145,21 +153,11 @@ export function useCodebaseSync({
 		);
 		return () => clearInterval(interval);
 	}, [readStatus]);
-	useEffect(() => {
-		if (
-			!payload ||
-			!status?.snapshotId ||
-			!SNAPSHOT_CONTEXT_STATUSES.includes(status.status)
-		)
-			return;
-		setPayload(null);
-		setIsResyncDrawerOpen(false);
-	}, [payload, status?.snapshotId, status?.status]);
 	const startSession = async (
 		action: CodebaseSessionStartAction = "initial",
 	) => {
 		setIsStarting(true);
-		setIsResyncDrawerOpen(true);
+		setIsResyncModalOpen(true);
 		setError(null);
 		try {
 			const response = await fetch(
@@ -178,6 +176,9 @@ export function useCodebaseSync({
 				return;
 			}
 			setPayload(parsed.data);
+			if (parsed.data.sessionId) {
+				setActiveSessionId(parsed.data.sessionId);
+			}
 			setStatus(null);
 			setAnalysis(null);
 			analysisAttemptedFor.current = null;
@@ -194,8 +195,11 @@ export function useCodebaseSync({
 	return {
 		...analysisState,
 		payload,
-		isResyncDrawerOpen,
-		setIsResyncDrawerOpen,
+		activeSessionId,
+		isResyncModalOpen,
+		setIsResyncModalOpen,
+		isResyncDrawerOpen: isResyncModalOpen,
+		setIsResyncDrawerOpen: setIsResyncModalOpen,
 		status,
 		error,
 		setError,

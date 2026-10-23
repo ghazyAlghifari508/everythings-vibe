@@ -237,10 +237,10 @@ export function SyncStageList({
 
 	const formatCount = (value: number): string => value.toLocaleString("id-ID");
 	const summaryParts: string[] = [];
-	if (view.syncComplete && status?.fileCount !== undefined) {
+	if (view.syncComplete && typeof status?.fileCount === "number") {
 		summaryParts.push(`${formatCount(status.fileCount)} file tersinkron`);
 	}
-	if (view.syncComplete && view.excludedCount !== undefined) {
+	if (view.syncComplete && typeof view.excludedCount === "number") {
 		summaryParts.push(`${formatCount(view.excludedCount)} file dikecualikan`);
 	}
 

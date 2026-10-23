@@ -22,10 +22,87 @@ import type { SyncPromptPayload } from "../types/sync-schemas";
 // - The raw credential appears inline because a single copy-pasteable command
 //   is the whole point; every other surface renders `<token>` instead (see
 //   `buildSyncCommand`).
-export function buildAgentPrompt(
+export function buildResyncPrompt(
 	payload: SyncPromptPayload,
 	context?: { projectName?: string },
 ): string {
+	const command = `vibeeverything codebase sync --project-id ${payload.projectId} --sync-token ${payload.syncToken}`;
+	const repositoryName = resolveCodebaseDisplayName(context?.projectName);
+	const infoLines = [
+		`Project ID   : ${payload.projectId}`,
+		`Server       : ${payload.apiBaseUrl}`,
+		`Sync Token   : ${payload.syncToken}`,
+		`Expired At   : ${payload.expiresAt}`,
+	];
+	if (repositoryName) {
+		infoLines.unshift(`Repository   : ${repositoryName}`);
+	}
+
+	return [
+		"Perbarui snapshot repository existing di VibeEverything menggunakan CLI resmi.",
+		"Repository ini sudah terhubung. Fokus hanya pada pembaruan snapshot codebase terkini.",
+		"",
+		"## Informasi Sinkronisasi",
+		...infoLines,
+		"",
+		"## Prasyarat Eksekusi",
+		"1. Jalankan perintah di root repositori Git yang sama dengan sinkronisasi sebelumnya.",
+		"2. Gunakan VibeEverything CLI resmi dengan session dan token terbaru di atas.",
+		"3. Jika perintah `vibeeverything` belum tersedia secara global di terminal:",
+		"   npm i -g @ghazynabiel/vibeeverything",
+		"",
+		"## Perintah Yang Harus Dieksekusi",
+		command,
+		"",
+		"## Aturan Yang Wajib Dipatuhi",
+		"- [ ] Fokus hanya pada pembaruan snapshot codebase.",
+		"- [ ] Jangan mengubah source code proyek.",
+		"- [ ] Jangan mengubah PRD, Acceptance Criteria (AC), atau Task yang sudah ada.",
+		"- [ ] Jangan membuat repository, project, atau riwayat baru.",
+		"- [ ] Jangan membuat commit atau push.",
+		"- [ ] Jangan mengedit `.gitignore` atau `.everythingsvibeignore`.",
+		"- [ ] Jangan menulis Sync Token ke file proyek atau konfigurasi permanen.",
+		"- [ ] Laporkan hasil output CLI asli secara akurat.",
+		"- [ ] Jangan menyatakan analisis AI selesai jika yang baru selesai adalah upload snapshot.",
+		"",
+		"## Penanganan Kegagalan",
+		"Jika sinkronisasi gagal:",
+		"- Tampilkan pesan error CLI asli secara lengkap tanpa diringkas.",
+		"- Jangan mengubah file kode proyek untuk mencoba mengatasi kegagalan sinkronisasi.",
+		"- Jika sesi/token kedaluwarsa: Minta user kembali ke VibeEverything untuk mendapatkan token baru.",
+		"- Jika direktori bukan root git: Pastikan agent berada tepat di root folder repositori Git.",
+		"",
+		"## Format Laporan Akhir",
+		"Kembalikan laporan kepada user dengan format berikut:",
+		"",
+		"Status:",
+		"Berhasil / Gagal",
+		"",
+		"Project:",
+		payload.projectId,
+		"",
+		"Server:",
+		payload.apiBaseUrl,
+		"",
+		"CLI Version:",
+		"<x.x.x dari output CLI, atau - jika tidak tersedia>",
+		"",
+		"Hasil CLI:",
+		"<output CLI asli secara lengkap>",
+		"",
+		"Tindakan Untuk User:",
+		"<Jika berhasil: 'Pembaruan snapshot codebase berhasil dikirim ke VibeEverything. Analisis AI berjalan terpisah di website dan mungkin belum selesai — jangan menyatakan analisis AI selesai.'>",
+		"<Jika gagal: sampaikan pesan error CLI asli dan langkah pemulihan.>",
+	].join("\n");
+}
+
+export function buildAgentPrompt(
+	payload: SyncPromptPayload,
+	context?: { projectName?: string; mode?: "initial" | "resync" },
+): string {
+	if (context?.mode === "resync") {
+		return buildResyncPrompt(payload, context);
+	}
 	const command = `vibeeverything codebase sync --project-id ${payload.projectId} --sync-token ${payload.syncToken}`;
 	// The repository name is genuinely unknown until the CLI handshakes: a
 	// provisional creation placeholder is storage-only and must never be
