@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { StudioReferenceError } from "@/features/studio/services/studio-design-reference.server";
 import { ScrapeError } from "@/lib/design-errors";
 import { GET, POST } from "@/routes/api/studio.project";
 
 const detailFailure = vi.hoisted(() => ({ error: null as Error | null }));
+
+const referenceFailure = vi.hoisted(() => ({ error: null as Error | null }));
 
 const duplicate = vi.hoisted(() =>
 	vi.fn(async () => ({ id: "independent-project" })),
@@ -22,6 +25,14 @@ vi.mock("@tanstack/react-start/server", () => ({
 vi.mock("@/features/studio/services/studio-project-lifecycle", () => ({
 	duplicateStudioProject: duplicate,
 	deleteStudioProject: remove,
+}));
+
+vi.mock("@/features/studio/services/studio-preferences-service", () => ({
+	updateStudioDesignSystem: async () => {
+		if (referenceFailure.error) throw referenceFailure.error;
+		return { id: "proj-1" };
+	},
+	updateStudioPreferences: async () => ({ id: "proj-1" }),
 }));
 
 vi.mock("@/features/studio/services/studio-project-detail", () => ({
@@ -99,6 +110,33 @@ describe("GET /api/studio/project", () => {
 		});
 		expect(response.status).toBe(400);
 		expect(remove).not.toHaveBeenCalled();
+	});
+
+	it("keeps a stale reference a 400 the client can recover from, never a 404", async () => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		referenceFailure.error = new StudioReferenceError("source-unavailable");
+		try {
+			const response = await POST({
+				request: new Request("https://app.test/api/studio/project", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						action: "design-system",
+						projectId: "proj-1",
+						designReference: { kind: "scrape", id: "scrape-gone" },
+					}),
+				}),
+			});
+			expect(response.status).toBe(400);
+			expect(await response.json()).toEqual({
+				error:
+					"Referensi desain ini sudah tidak tersedia. Pilih referensi lain.",
+				code: "STUDIO_REFERENCE_REJECTED",
+			});
+		} finally {
+			referenceFailure.error = null;
+			log.mockRestore();
+		}
 	});
 
 	it("returns project detail with frames and active job", async () => {

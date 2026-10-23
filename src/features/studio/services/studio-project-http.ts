@@ -3,6 +3,7 @@ import { z } from "zod";
 import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
+import { StudioReferenceError } from "./studio-design-reference.server";
 import {
 	studioDesignReferenceSchema,
 	studioDesignSkillIdSchema,
@@ -17,16 +18,33 @@ import {
 	duplicateStudioProject,
 } from "./studio-project-lifecycle";
 
-function studioErrorResponse(error: unknown): Response {
+// Nothing raw is ever logged: unknown provider, scrape or database failures are
+// only ever observed as a category, so a user document cannot reach the log.
+function studioErrorResponse(error: unknown, operation: string): Response {
+	const correlationId = crypto.randomUUID();
+	if (error instanceof StudioReferenceError) {
+		console.error("[studio.project]", {
+			operation,
+			correlationId,
+			category: error.failure,
+			// Curated validation copy, never the user's own DESIGN.md content.
+			diagnostic: error.diagnostic,
+		});
+		// 400, never 404: the client reads 404 as "project deleted" and would drop
+		// a live project because its reference went stale.
+		return Response.json(
+			{ error: error.message, code: "STUDIO_REFERENCE_REJECTED" },
+			{ status: 400 },
+		);
+	}
 	const unauthorized =
 		error instanceof Error && /Unauthorized|Forbidden/.test(error.message);
-	console.error("[studio.project]", {
-		code: unauthorized
-			? "UNAUTHORIZED"
-			: error instanceof ScrapeError
-				? error.code
-				: "STUDIO_STATUS_UNAVAILABLE",
-	});
+	const code = unauthorized
+		? "UNAUTHORIZED"
+		: error instanceof ScrapeError
+			? error.code
+			: "STUDIO_STATUS_UNAVAILABLE";
+	console.error("[studio.project]", { operation, correlationId, code });
 	if (error instanceof ScrapeError) {
 		// A missing project is a stale-reference signal, not a server fault: the
 		// client uses 404 to drop deleted projects from its polling loop.
@@ -146,7 +164,7 @@ export async function POST({
 		);
 		return Response.json({ projectId: project.id }, { status: 201 });
 	} catch (error) {
-		return studioErrorResponse(error);
+		return studioErrorResponse(error, "POST /api/studio/project");
 	}
 }
 
@@ -186,6 +204,6 @@ export async function GET({
 			{ headers: { "Cache-Control": "private, no-store" } },
 		);
 	} catch (error) {
-		return studioErrorResponse(error);
+		return studioErrorResponse(error, "GET /api/studio/project");
 	}
 }

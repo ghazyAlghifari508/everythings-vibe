@@ -16,10 +16,41 @@ import { validateStudioDesignMd } from "./studio-prompt-validation";
 
 const DESIGN_COLOR = /^#(?:[a-f0-9]{3}|[a-f0-9]{4}|[a-f0-9]{6}|[a-f0-9]{8})$/i;
 
+export type StudioReferenceFailure =
+	| "source-unavailable"
+	| "invalid-design-file"
+	| "unknown-theme";
+
+// Recoverable reference failures are their own category. A reference the user
+// cannot use is not a missing project, and it must never surface scrape or
+// storage vocabulary in the composer.
+const REFERENCE_MESSAGES: Record<StudioReferenceFailure, string> = {
+	"source-unavailable":
+		"Referensi desain ini sudah tidak tersedia. Pilih referensi lain.",
+	"invalid-design-file":
+		"File desain belum bisa digunakan. Periksa isinya lalu unggah kembali.",
+	"unknown-theme": "Tema desain tidak tersedia. Pilih tema lain.",
+};
+
+// The diagnostic stays server-side: the public message is always the category
+// copy above, so no internal detail can leak through an error string.
+export class StudioReferenceError extends Error {
+	constructor(
+		readonly failure: StudioReferenceFailure,
+		readonly diagnostic?: string,
+	) {
+		super(REFERENCE_MESSAGES[failure]);
+		this.name = "StudioReferenceError";
+	}
+}
+
 // Every source — a curated preset, an uploaded file, or a stored VibeScrape
 // document — passes the same token gate so no reference can smuggle a DESIGN.md
 // the design-system enforcer cannot read.
-function assertUsableDesignMdTokens(designMd: string): void {
+function assertUsableDesignMdTokens(
+	designMd: string,
+	failure: StudioReferenceFailure,
+): void {
 	const tokens = extractDesignSystemTokens(designMd);
 	const colors = tokens
 		? [
@@ -30,7 +61,10 @@ function assertUsableDesignMdTokens(designMd: string): void {
 			]
 		: [];
 	if (colors.some((color) => !DESIGN_COLOR.test(color)))
-		throw new ScrapeError("INVALID_URL", "Token warna DESIGN.md tidak valid.");
+		throw new StudioReferenceError(
+			failure,
+			"Token warna DESIGN.md tidak valid.",
+		);
 	if (
 		!tokens ||
 		(!tokens.typography.fontFamily &&
@@ -39,22 +73,36 @@ function assertUsableDesignMdTokens(designMd: string): void {
 			) &&
 			!Object.keys(tokens.colors.accents).length)
 	)
-		throw new ScrapeError(
-			"INVALID_URL",
+		throw new StudioReferenceError(
+			failure,
 			"DESIGN.md harus memuat token warna atau tipografi yang valid.",
 		);
 }
 
-function assertDesignMdWithinBudget(raw: string | null | undefined): string {
+function assertDesignMdWithinBudget(
+	raw: string | null | undefined,
+	failure: StudioReferenceFailure,
+): string {
 	const checked = validateStudioDesignMd(raw);
-	if (!checked.ok) throw new ScrapeError("INVALID_URL", checked.error);
+	if (!checked.ok) throw new StudioReferenceError(failure, checked.error);
 	if (!checked.designMd)
-		throw new ScrapeError("INVALID_URL", "DESIGN.md diperlukan.");
+		throw new StudioReferenceError(failure, "DESIGN.md diperlukan.");
 	if (Buffer.byteLength(raw ?? "", "utf8") > STUDIO_DESIGN_FILE_MAX_BYTES)
-		throw new ScrapeError("INVALID_URL", "Ukuran file desain melebihi batas.");
-	assertUsableDesignMdTokens(checked.designMd);
+		throw new StudioReferenceError(
+			failure,
+			"Ukuran file desain melebihi batas.",
+		);
+	assertUsableDesignMdTokens(checked.designMd, failure);
 	return checked.designMd;
 }
+
+// Codes the scrape helper returns when the reference is gone, owned by someone
+// else, or was never completed. getScrapeById reports a missing row and a
+// foreign row with the same code because tenant isolation is a WHERE clause.
+const UNAVAILABLE_SOURCE_CODES = new Set<string>([
+	"WEBSITE_BLOCKED",
+	"AI_GENERATION_FAILED",
+]);
 
 export async function resolveStudioDesignReference(
 	reference: StudioDesignReference | null | undefined,
@@ -67,11 +115,11 @@ export async function resolveStudioDesignReference(
 	if (reference === null) return { designMd: null, designReference: null };
 	if (reference?.kind === "theme") {
 		const parsed = studioDesignReferenceSchema.parse(reference);
-		if (parsed.kind !== "theme") throw new ScrapeError("INVALID_URL");
+		if (parsed.kind !== "theme")
+			throw new StudioReferenceError("unknown-theme");
 		const preset = STUDIO_DESIGN_PRESETS.find((item) => item.id === parsed.id);
 		const designMd = getStudioPresetDesignMd(parsed.id);
-		if (!preset || !designMd)
-			throw new ScrapeError("INVALID_URL", "Tema desain tidak tersedia.");
+		if (!preset || !designMd) throw new StudioReferenceError("unknown-theme");
 		return {
 			designMd,
 			designReference: {
@@ -86,9 +134,23 @@ export async function resolveStudioDesignReference(
 	// DESIGN.md is read back under the caller's ownership.
 	if (reference?.kind === "scrape") {
 		const parsed = studioDesignReferenceSchema.parse(reference);
-		if (parsed.kind !== "scrape") throw new ScrapeError("INVALID_URL");
-		const source = await getScrapeDesignMd(parsed.id, userId);
-		const designMd = assertDesignMdWithinBudget(source.designMd);
+		if (parsed.kind !== "scrape")
+			throw new StudioReferenceError("source-unavailable");
+		let source: Awaited<ReturnType<typeof getScrapeDesignMd>>;
+		try {
+			source = await getScrapeDesignMd(parsed.id, userId);
+		} catch (error) {
+			if (
+				error instanceof ScrapeError &&
+				UNAVAILABLE_SOURCE_CODES.has(error.code)
+			)
+				throw new StudioReferenceError("source-unavailable", error.message);
+			throw error;
+		}
+		const designMd = assertDesignMdWithinBudget(
+			source.designMd,
+			"source-unavailable",
+		);
 		return {
 			designMd,
 			designReference: {
@@ -101,12 +163,13 @@ export async function resolveStudioDesignReference(
 		};
 	}
 	const checked = validateStudioDesignMd(raw);
-	if (!checked.ok) throw new ScrapeError("INVALID_URL", checked.error);
+	if (!checked.ok)
+		throw new StudioReferenceError("invalid-design-file", checked.error);
 	if (!reference) return { designMd: checked.designMd, designReference: null };
 	const parsed = studioDesignReferenceSchema.parse(reference);
 	if (parsed.kind !== "custom")
-		throw new ScrapeError("INVALID_URL", "Referensi desain tidak valid.");
-	const designMd = assertDesignMdWithinBudget(raw);
+		throw new StudioReferenceError("invalid-design-file");
+	const designMd = assertDesignMdWithinBudget(raw, "invalid-design-file");
 	return {
 		designMd,
 		designReference: {

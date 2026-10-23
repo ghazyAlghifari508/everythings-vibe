@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { StudioReferenceError } from "@/features/studio/services/studio-design-reference.server";
 import { POST, studioGenerateBodySchema } from "@/routes/api/studio.generate";
 
 const creationFailure = vi.hoisted(() => ({ error: null as Error | null }));
@@ -51,7 +52,46 @@ describe("POST /api/studio/generate", () => {
 				code: "STUDIO_GENERATION_UNAVAILABLE",
 			});
 			expect(log).toHaveBeenCalledWith("[studio.generate]", {
+				operation: "POST /api/studio/generate",
+				correlationId: expect.any(String),
 				code: "STUDIO_GENERATION_UNAVAILABLE",
+			});
+			expect(JSON.stringify(log.mock.calls)).not.toContain(
+				"sensitive upstream content",
+			);
+		} finally {
+			creationFailure.error = null;
+			log.mockRestore();
+		}
+	});
+	it("answers a recoverable reference failure with 400 and the category copy", async () => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		creationFailure.error = new StudioReferenceError(
+			"source-unavailable",
+			"scrape row is gone",
+		);
+		try {
+			const response = await POST({
+				request: new Request("https://app.test/api/studio/generate", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						prompt: "Build a sample application workspace",
+						designReference: { kind: "scrape", id: "scrape-1" },
+					}),
+				}),
+			});
+			expect(response.status).toBe(400);
+			expect(await response.json()).toEqual({
+				error:
+					"Referensi desain ini sudah tidak tersedia. Pilih referensi lain.",
+				code: "STUDIO_REFERENCE_REJECTED",
+			});
+			expect(log).toHaveBeenCalledWith("[studio.generate]", {
+				operation: "POST /api/studio/generate",
+				correlationId: expect.any(String),
+				category: "source-unavailable",
+				diagnostic: "scrape row is gone",
 			});
 		} finally {
 			creationFailure.error = null;
