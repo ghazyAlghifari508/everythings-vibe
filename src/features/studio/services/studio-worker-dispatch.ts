@@ -4,6 +4,7 @@ import { studioJobs } from "@/db/schema";
 import { STUDIO_FRAME_CONCURRENCY } from "../types/studio-constants";
 import { recoverStalledStudioJobs } from "./studio-job-lease";
 import { runStudioJobPipeline } from "./studio-job-pipeline";
+import { studioWorkerFailure } from "./studio-worker-diagnostics";
 
 const STUDIO_DISPATCH_LOCK = "everythings-vibe:studio-dispatch";
 
@@ -49,11 +50,7 @@ export async function dispatchStudioWorkerBatch(): Promise<number> {
 		for (const result of results)
 			if (result.status === "rejected")
 				console.error(
-					JSON.stringify({
-						scope: "studio",
-						stage: "dispatch-failure",
-						code: "WORKER_JOB_FAILED",
-					}),
+					JSON.stringify(studioWorkerFailure(result.reason, "dispatch-job")),
 				);
 		return batch.length;
 	} finally {
