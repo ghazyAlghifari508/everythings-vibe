@@ -70,8 +70,8 @@ export function useWorkspaceArtifactPresentation({
 				id: `tasks-${resolvedFeature.id}`,
 				fileName: `tasks-${featureSlug}.json`,
 				fileSizeBytes: null,
-				badge: "KANBAN LIVE",
-				description: "Task tree dan papan Kanban live",
+				badge: "TASK",
+				description: `Task untuk ${resolvedFeature.name}`,
 			});
 		return list;
 	}, [

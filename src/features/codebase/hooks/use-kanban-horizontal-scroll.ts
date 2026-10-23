@@ -8,8 +8,6 @@ import {
 	useState,
 } from "react";
 
-// `columnCount` is the fallback for strips that do not overflow yet, before the
-// browser reports a scroll width.
 export function useKanbanHorizontalScroll({
 	columnCount,
 }: {
@@ -27,18 +25,13 @@ export function useKanbanHorizontalScroll({
 			return;
 		}
 		const maxScroll = el.scrollWidth - el.clientWidth;
-		if (maxScroll <= 0) {
-			setCanScrollLeft(el.scrollLeft > 2);
-			setCanScrollRight(columnCount > 1);
-			return;
-		}
-		setCanScrollLeft(el.scrollLeft > 2);
-		setCanScrollRight(el.scrollLeft < maxScroll - 2);
-	}, [columnCount]);
+		setCanScrollLeft(maxScroll > 0 && el.scrollLeft > 2);
+		setCanScrollRight(maxScroll > 0 && el.scrollLeft < maxScroll - 2);
+	}, []);
 
 	useEffect(() => {
 		const el = scrollRef.current;
-		if (!el) return;
+		if (!el || columnCount === 0) return;
 
 		updateScrollButtons();
 
@@ -62,7 +55,7 @@ export function useKanbanHorizontalScroll({
 				window.removeEventListener("resize", updateScrollButtons);
 			}
 		};
-	}, [updateScrollButtons]);
+	}, [updateScrollButtons, columnCount]);
 
 	const handleScrollLeft = () => {
 		const el = scrollRef.current;

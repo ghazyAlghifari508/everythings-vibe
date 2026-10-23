@@ -10,7 +10,6 @@ import type { CodebaseWorkspaceData } from "../../services/workspace-loader.func
 import { WorkspaceConnectionScreen } from "./workspace-connection-screen";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceScreenResolver } from "./workspace-screen-resolver";
-import { WorkspaceTaskSubnav } from "./workspace-task-subnav";
 
 export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 	const { codebase, planningSnapshotByProject, canOpenFullBoard } = data;
@@ -280,13 +279,17 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								fileName={
 									isSourcePreviewOpen
 										? sourcePreviewPath
-										: (activeArtifact?.fileName ?? "Preview artefak")
+										: isTasksArtifactActive
+											? `Task · ${resolvedFeature?.name ?? codebase.name}`
+											: (activeArtifact?.fileName ?? "Preview artefak")
 								}
 								badge={
 									isSourcePreviewOpen
 										? "SUMBER"
 										: (activeArtifact?.badge ?? "PRATINJAU")
 								}
+								contentScroll={!isTasksArtifactActive}
+								hideBadge={isTasksArtifactActive}
 								copyValue={canvasCopy.value}
 								copyLabel={canvasCopy.label}
 								copyUnavailableReason={canvasCopy.unavailableReason}
@@ -324,21 +327,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 												? () => void loadAc()
 												: undefined
 								}
-								subnav={
-									isTasksArtifactActive ? (
-										<>
-											<WorkspaceTaskSubnav
-												canvasView={canvasView}
-												setCanvasView={setCanvasView}
-											/>
-											<span className="font-mono text-[10px] text-slate">
-												{kanban.staleness === "live"
-													? "Live dari database"
-													: "Data terakhir"}
-											</span>
-										</>
-									) : undefined
-								}
 							>
 								<WorkspaceScreenResolver
 									sourcePreview={sourcePreview}
@@ -351,6 +339,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 									prdContent={prdContent}
 									acContent={acContent}
 									canvasView={canvasView}
+									setCanvasView={setCanvasView}
 									codebaseId={codebase.id}
 									kanban={kanban}
 									canOpenFullBoard={canOpenFullBoard}
