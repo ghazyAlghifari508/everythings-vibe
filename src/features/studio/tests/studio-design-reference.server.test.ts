@@ -156,15 +156,15 @@ it("resolves a stored scrape DESIGN.md for its owner only", async () => {
 		title: null,
 		designMd: "This text contains no design tokens.",
 	};
-	expect(
-		(
-			await referenceFailure(
-				resolveStudioDesignReference(
-					{ kind: "scrape", id: "scrape-3" },
-					null,
-					"user-7",
-				),
-			)
-		).failure,
-	).toBe("source-unavailable");
+	const unusable = await referenceFailure(
+		resolveStudioDesignReference(
+			{ kind: "scrape", id: "scrape-3" },
+			null,
+			"user-7",
+		),
+	);
+	expect(unusable.failure).toBe("unusable-stored-design");
+	expect(unusable.message).toBe(
+		"Referensi desain belum bisa digunakan. Pilih referensi lain atau periksa hasil VibeScrape.",
+	);
 });

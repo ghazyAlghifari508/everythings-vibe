@@ -18,6 +18,7 @@ const DESIGN_COLOR = /^#(?:[a-f0-9]{3}|[a-f0-9]{4}|[a-f0-9]{6}|[a-f0-9]{8})$/i;
 
 export type StudioReferenceFailure =
 	| "source-unavailable"
+	| "unusable-stored-design"
 	| "invalid-design-file"
 	| "unknown-theme";
 
@@ -27,6 +28,10 @@ export type StudioReferenceFailure =
 const REFERENCE_MESSAGES: Record<StudioReferenceFailure, string> = {
 	"source-unavailable":
 		"Referensi desain ini sudah tidak tersedia. Pilih referensi lain.",
+	// The document exists but cannot drive a design system, which is a different
+	// problem from a reference that is gone.
+	"unusable-stored-design":
+		"Referensi desain belum bisa digunakan. Pilih referensi lain atau periksa hasil VibeScrape.",
 	"invalid-design-file":
 		"File desain belum bisa digunakan. Periksa isinya lalu unggah kembali.",
 	"unknown-theme": "Tema desain tidak tersedia. Pilih tema lain.",
@@ -149,7 +154,7 @@ export async function resolveStudioDesignReference(
 		}
 		const designMd = assertDesignMdWithinBudget(
 			source.designMd,
-			"source-unavailable",
+			"unusable-stored-design",
 		);
 		return {
 			designMd,
