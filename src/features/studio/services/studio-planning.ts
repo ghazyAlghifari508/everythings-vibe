@@ -68,6 +68,8 @@ export async function planStudioScreens(
 					role: "system",
 					content: resolveStudioPlanningSystemPrompt(
 						project.designSkillId ?? "none",
+						job.prompt,
+						designMode,
 					),
 				},
 				{ role: "user", content: planPrompt },
@@ -110,6 +112,8 @@ export async function planStudioScreens(
 						role: "system",
 						content: resolveStudioPlanningSystemPrompt(
 							project.designSkillId ?? "none",
+							job.prompt,
+							designMode,
 						),
 					},
 					{ role: "user", content: correctivePrompt },
