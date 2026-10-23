@@ -25,6 +25,8 @@ interface CodebaseArtifactCanvasProps {
 	copyLabel?: string;
 	/** Explains why copy is unavailable when `copyValue` is null. */
 	copyUnavailableReason?: string;
+	/** Explains why download is unavailable when disabled. */
+	downloadUnavailableReason?: string;
 	subnav?: ReactNode;
 	isLoading?: boolean;
 	error?: string | null;
@@ -42,6 +44,7 @@ export function CodebaseArtifactCanvas({
 	copyValue,
 	copyLabel,
 	copyUnavailableReason,
+	downloadUnavailableReason,
 	subnav,
 	isLoading = false,
 	error,
@@ -93,6 +96,19 @@ export function CodebaseArtifactCanvas({
 			: copyState === "failed"
 				? "Gagal menyalin"
 				: resolvedLabel;
+
+	const isDownloadDisabled =
+		isLoading || Boolean(error) || copyValue === null || !onDownload;
+	const downloadTitle = isDownloadDisabled
+		? (downloadUnavailableReason ??
+			(isLoading
+				? "Memuat dokumen..."
+				: error
+					? "Gagal memuat dokumen"
+					: copyValue === null
+						? "Isi dokumen belum siap untuk diunduh"
+						: "Unduh tidak tersedia"))
+		: `Unduh ${fileName}`;
 
 	return (
 		<section
@@ -154,37 +170,22 @@ export function CodebaseArtifactCanvas({
 								Gagal menyalin
 							</output>
 						) : null}
-						{onDownload ? (
-							<button
-								type="button"
-								onClick={onDownload}
-								aria-label={`Unduh ${fileName}`}
-								title="Unduh file"
-								data-testid="codebase-canvas-download"
-								className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								<Icon
-									icon={Download01Icon}
-									size={14}
-									strokeWidth={1.75}
-									aria-hidden="true"
-								/>
-							</button>
-						) : (
-							<span
-								title="Unduh via panel konten"
-								data-testid="codebase-canvas-download-hint"
+						<button
+							type="button"
+							onClick={onDownload}
+							disabled={isDownloadDisabled}
+							aria-label={`Unduh ${fileName}`}
+							title={downloadTitle}
+							data-testid="codebase-canvas-download"
+							className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-graphite disabled:hover:text-fog"
+						>
+							<Icon
+								icon={Download01Icon}
+								size={14}
+								strokeWidth={1.75}
 								aria-hidden="true"
-								className="inline-flex h-7 w-7 items-center justify-center rounded border border-graphite bg-charcoal text-slate"
-							>
-								<Icon
-									icon={Download01Icon}
-									size={14}
-									strokeWidth={1.75}
-									aria-hidden="true"
-								/>
-							</span>
-						)}
+							/>
+						</button>
 						<button
 							type="button"
 							onClick={onClose}

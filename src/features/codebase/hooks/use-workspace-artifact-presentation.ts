@@ -44,34 +44,46 @@ export function useWorkspaceArtifactPresentation({
 		if (featureTree)
 			list.push({
 				id: `feature-${resolvedFeature.id}`,
+				title: `Spesifikasi Fitur · ${resolvedFeature.name}`,
 				fileName: `feature-${featureSlug}.json`,
-				fileSizeBytes: null,
+				fileSizeBytes: new TextEncoder().encode(
+					JSON.stringify(featureTree, null, 2),
+				).length,
 				badge: "FITUR",
-				description: `Spesifikasi fitur ${resolvedFeature.name}`,
+				description: "Dokumen siap",
 			});
 		if (prdContent)
 			list.push({
 				id: `prd-${resolvedFeature.id}`,
+				title: `PRD · ${resolvedFeature.name}`,
 				fileName: `PRD-${featureSlug}.md`,
-				fileSizeBytes: null,
+				fileSizeBytes: new TextEncoder().encode(
+					stripInternalSectionMarkers(prdContent),
+				).length,
 				badge: "MARKDOWN",
-				description: "Dokumen PRD 8 seksi",
+				description: "Dokumen siap",
 			});
 		if (acContent)
 			list.push({
 				id: `ac-${resolvedFeature.id}`,
+				title: `Acceptance Criteria · ${resolvedFeature.name}`,
 				fileName: `AC-${featureSlug}.md`,
-				fileSizeBytes: null,
+				fileSizeBytes: new TextEncoder().encode(
+					stripInternalSectionMarkers(acContent),
+				).length,
 				badge: "MARKDOWN",
-				description: "Kriteria penerimaan formal",
+				description: "Dokumen siap",
 			});
 		if (hasTasksInDb)
 			list.push({
 				id: `tasks-${resolvedFeature.id}`,
+				title: `Task · ${resolvedFeature.name}`,
 				fileName: `tasks-${featureSlug}.json`,
-				fileSizeBytes: null,
+				fileSizeBytes: taskTree
+					? new TextEncoder().encode(JSON.stringify(taskTree, null, 2)).length
+					: null,
 				badge: "TASK",
-				description: `Task untuk ${resolvedFeature.name}`,
+				description: "Dokumen siap",
 			});
 		return list;
 	}, [
@@ -81,6 +93,7 @@ export function useWorkspaceArtifactPresentation({
 		hasTasksInDb,
 		prdContent,
 		acContent,
+		taskTree,
 	]);
 	const activeArtifact =
 		artifacts.find((item) => item.id === activeArtifactId) ?? null;

@@ -279,9 +279,10 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								fileName={
 									isSourcePreviewOpen
 										? sourcePreviewPath
-										: isTasksArtifactActive
-											? `Task · ${resolvedFeature?.name ?? codebase.name}`
-											: (activeArtifact?.fileName ?? "Preview artefak")
+										: (activeArtifact?.title ??
+											(isTasksArtifactActive
+												? `Task · ${resolvedFeature?.name ?? codebase.name}`
+												: (activeArtifact?.fileName ?? "Preview artefak")))
 								}
 								badge={
 									isSourcePreviewOpen
