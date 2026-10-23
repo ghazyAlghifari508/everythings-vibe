@@ -116,13 +116,23 @@ describe("StudioLaunchComposer", () => {
 		expect(icon?.getAttribute("aria-hidden")).toBe("true");
 	});
 
-	it("renders PRD attachment trigger in toolbar", () => {
+	it("renders PRD attachment trigger in toolbar with clear label and tooltip", () => {
 		renderComposer();
 		const trigger = screen.getByRole("button", {
-			name: "Lampirkan PRD (.md)",
+			name: "Tambahkan dokumen kebutuhan aplikasi (.md)",
 		});
 		expect(trigger).toBeDefined();
-		expect(trigger.getAttribute("title")).toBe("Lampirkan PRD (.md)");
+		expect(trigger.getAttribute("title")).toBe(
+			"Tambahkan dokumen kebutuhan aplikasi (.md)",
+		);
+
+		const tooltip = screen.getByRole("tooltip");
+		expect(tooltip.textContent).toContain(
+			"Tambahkan dokumen kebutuhan aplikasi (.md)",
+		);
+		expect(tooltip.textContent).toContain(
+			"AI menggunakan dokumen ini untuk memahami fitur dan kebutuhan aplikasimu.",
+		);
 	});
 
 	it("displays compact PRD chip with filename, status, and remove action", () => {

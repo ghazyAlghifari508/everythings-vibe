@@ -112,9 +112,9 @@ export function StudioShortcutCarousel({
 				aria-roledescription="carousel"
 				aria-label="Daftar brief siap pakai"
 				onScroll={refreshDirections}
-				className="snap-x snap-proximity overflow-x-auto scroll-smooth [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo [&::-webkit-scrollbar]:hidden"
+				className="snap-x snap-proximity overflow-x-auto scroll-smooth py-1 [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo [&::-webkit-scrollbar]:hidden"
 			>
-				<ul className="flex gap-2.5">
+				<ul className="flex gap-2.5 px-0.5">
 					{shortcuts.map((shortcut) => {
 						const isSelected = shortcut.id === selectedId;
 						return (
@@ -134,7 +134,7 @@ export function StudioShortcutCarousel({
 									<span className="text-sm font-semibold text-snow">
 										{shortcut.title}
 									</span>
-									<span className="text-xs leading-5 text-fog">
+									<span className="line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-fog">
 										{shortcut.preview}
 									</span>
 									<span className="mt-auto flex flex-wrap items-center gap-1.5 pt-1 font-mono text-[10px] uppercase tracking-wider text-fog">

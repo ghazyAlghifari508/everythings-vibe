@@ -14,8 +14,10 @@ import {
 	type FormEvent,
 	type RefObject,
 	useRef,
+	useState,
 } from "react";
 import { Icon } from "@/components/ui/icon";
+import { useTypewriterPlaceholder } from "@/features/studio/hooks/use-typewriter-placeholder";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import {
 	validateStudioPrdFilename,
@@ -77,6 +79,14 @@ export function StudioLaunchComposer({
 	textareaRef: RefObject<HTMLTextAreaElement | null>;
 }) {
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [isFocused, setIsFocused] = useState(false);
+
+	const dynamicPlaceholder = useTypewriterPlaceholder({
+		mode: config.designMode,
+		isEmpty: prompt.trim().length === 0,
+		isFocused,
+	});
+
 	const canSubmit = prompt.trim().length > 0 && !loading;
 
 	function handleSubmit(event: FormEvent) {
@@ -141,13 +151,15 @@ export function StudioLaunchComposer({
 					id="studio-prompt"
 					value={prompt}
 					onChange={(event) => onPromptChange(event.target.value)}
+					onFocus={() => setIsFocused(true)}
+					onBlur={() => setIsFocused(false)}
 					onKeyDown={(event) => {
 						if (shouldSubmitComposerEvent(event)) {
 							event.preventDefault();
 							if (canSubmit) onSubmit();
 						}
 					}}
-					placeholder="Jelaskan kebutuhan antarmukamu... Contoh: Dashboard analitik penjualan dengan kartu metrik ringkasan, grafik tren bulanan, dan tabel transaksi terkini dengan filter status..."
+					placeholder={dynamicPlaceholder}
 					rows={5}
 					disabled={loading}
 					className="w-full resize-none bg-transparent font-sans text-sm leading-relaxed text-snow placeholder:text-fog focus:outline-none disabled:opacity-50 sm:text-base"
@@ -273,20 +285,44 @@ export function StudioLaunchComposer({
 				/>
 
 				<span className="ml-auto flex items-center gap-2">
-					<button
-						type="button"
-						onClick={() => fileInputRef.current?.click()}
-						disabled={loading}
-						aria-label={prd ? "Ganti lampiran PRD" : "Lampirkan PRD (.md)"}
-						title={prd ? "Ganti lampiran PRD" : "Lampirkan PRD (.md)"}
-						className="flex size-9 items-center justify-center rounded-lg border border-graphite bg-onyx text-mist transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
-					>
-						<Icon
-							icon={AttachmentIcon}
-							size={15}
-							className={prd ? "text-indigo" : undefined}
-						/>
-					</button>
+					<div className="group relative">
+						<button
+							type="button"
+							onClick={() => fileInputRef.current?.click()}
+							disabled={loading}
+							aria-label={
+								prd
+									? "Ganti lampiran PRD"
+									: "Tambahkan dokumen kebutuhan aplikasi (.md)"
+							}
+							title={
+								prd
+									? "Ganti lampiran PRD"
+									: "Tambahkan dokumen kebutuhan aplikasi (.md)"
+							}
+							className="flex size-9 items-center justify-center rounded-lg border border-graphite bg-onyx text-mist transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							<Icon
+								icon={AttachmentIcon}
+								size={15}
+								className={prd ? "text-indigo" : undefined}
+							/>
+						</button>
+						{!prd ? (
+							<div
+								role="tooltip"
+								className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-64 -translate-x-1/2 rounded-lg border border-graphite bg-charcoal p-2.5 text-center text-xs shadow-xl opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:block"
+							>
+								<p className="font-semibold text-snow">
+									Tambahkan dokumen kebutuhan aplikasi (.md)
+								</p>
+								<p className="mt-1 text-[11px] leading-relaxed text-fog">
+									AI menggunakan dokumen ini untuk memahami fitur dan kebutuhan
+									aplikasimu.
+								</p>
+							</div>
+						) : null}
+					</div>
 					<button
 						type="button"
 						onClick={onOpenDesignPicker}

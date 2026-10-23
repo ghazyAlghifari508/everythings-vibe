@@ -126,9 +126,9 @@ export function StudioSidebar({
 			</div>
 
 			{/* Project List */}
-			<div className="flex-1 overflow-y-auto p-2">
+			<div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-2">
 				{history.length === 0 ? (
-					<div className="flex flex-col items-center justify-center p-6 text-center">
+					<div className="flex h-full min-h-[220px] flex-1 flex-col items-center justify-center p-6 text-center">
 						<p className="text-xs font-semibold text-mist">
 							Belum ada project studio.
 						</p>
@@ -137,7 +137,7 @@ export function StudioSidebar({
 						</p>
 					</div>
 				) : filtered.length === 0 ? (
-					<div className="p-4 text-center">
+					<div className="flex h-full min-h-[160px] flex-1 flex-col items-center justify-center p-4 text-center">
 						<p className="text-xs text-fog">
 							Tidak ada project yang cocok dengan &quot;
 							<span className="text-snow">{query}</span>&quot;.
