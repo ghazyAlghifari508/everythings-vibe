@@ -18,20 +18,36 @@ import { validateStudioPrompt } from "./studio-prompt-validation";
 import { reviseStudioProject } from "./studio-revision-service";
 
 function studioErrorResponse(error: unknown): Response {
-	console.error("[studio.generate error]", error);
+	const unauthorized =
+		error instanceof Error && /Unauthorized|Forbidden/.test(error.message);
+	const code = unauthorized
+		? "UNAUTHORIZED"
+		: error instanceof ScrapeError
+			? error.code
+			: "STUDIO_GENERATION_UNAVAILABLE";
+	console.error("[studio.generate]", { code });
 	if (error instanceof ScrapeError) {
 		const isClientError =
 			error.code === "INVALID_URL" || error.code === "WEBSITE_BLOCKED";
 		return Response.json(
-			{ error: error.message, code: error.code },
+			{
+				error: isClientError
+					? error.message
+					: "Studio belum dapat memproses permintaan. Coba lagi.",
+				code,
+			},
 			{ status: isClientError ? 400 : 500 },
 		);
 	}
-	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message)) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	if (unauthorized) {
+		return Response.json(
+			{ error: "Silakan masuk kembali untuk membuka Studio.", code },
+			{ status: 401 },
+		);
 	}
 	return Response.json(
 		{
+			code,
 			error:
 				"Terjadi kendala saat memproses permintaan Studio. Silakan coba beberapa saat lagi.",
 		},
