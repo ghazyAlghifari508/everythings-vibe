@@ -58,6 +58,7 @@ export const STUDIO_CAPTURE_MAX_HEIGHT = 30000;
 export const STUDIO_CAPTURE_QUALITY = 90;
 export const STUDIO_CAPTURE_DSF = 2;
 export const STUDIO_JOB_CLAIM_TTL_MS = 150000;
+export const STUDIO_JOB_QUEUE_HEALTH_MS = 60_000;
 export const STUDIO_FRAME_RETRY_MAX = 1;
 
 export const STUDIO_STATUS_POLL_MS = 1500;

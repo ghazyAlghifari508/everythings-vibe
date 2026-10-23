@@ -7,7 +7,10 @@ import type {
 	StudioProjectRow,
 } from "@/db/schema";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
-import { studioStatusSchema } from "@/features/studio/types/studio-status";
+import {
+	resolveStudioQueueHealth,
+	studioStatusSchema,
+} from "@/features/studio/types/studio-status";
 
 function statusFixture() {
 	const date = new Date("2026-01-01T00:00:00Z");
@@ -104,6 +107,73 @@ describe("Studio status contract", () => {
 			},
 		])
 			expect(studioStatusSchema.safeParse(payload).success).toBe(false);
+	});
+});
+
+describe("Studio queue health", () => {
+	const now = new Date("2026-01-02T00:00:00Z").getTime();
+	const job = (overrides: Partial<StudioJobRow>): StudioJobRow => ({
+		...statusFixture().activeJob,
+		...overrides,
+	});
+
+	it("stays silent while a worker holds a live lease on a long generation", () => {
+		expect(
+			resolveStudioQueueHealth(
+				job({
+					status: "generating",
+					claimedBy: "worker-1",
+					createdAt: new Date("2026-01-01T22:00:00Z"),
+					leaseExpiresAt: new Date("2026-01-02T00:10:00Z"),
+				}),
+				now,
+			),
+		).toBeNull();
+	});
+
+	it("stays silent until the worker poll is overdue, then names the stall", () => {
+		expect(
+			resolveStudioQueueHealth(
+				job({
+					status: "queued",
+					claimedBy: null,
+					leaseExpiresAt: null,
+					createdAt: new Date("2026-01-01T23:59:30Z"),
+				}),
+				now,
+			),
+		).toBeNull();
+		const unclaimed = resolveStudioQueueHealth(
+			job({
+				status: "queued",
+				claimedBy: null,
+				leaseExpiresAt: null,
+				createdAt: new Date("2026-01-01T23:00:00Z"),
+			}),
+			now,
+		);
+		const deadHeartbeat = resolveStudioQueueHealth(
+			job({ leaseExpiresAt: new Date("2026-01-01T23:59:00Z") }),
+			now,
+		);
+		expect(unclaimed).not.toBeNull();
+		expect(deadHeartbeat).not.toBeNull();
+		expect(unclaimed).not.toBe(deadHeartbeat);
+	});
+
+	it("stays silent without an active job or once the job is terminal", () => {
+		expect(resolveStudioQueueHealth(null, now)).toBeNull();
+		expect(
+			resolveStudioQueueHealth(
+				job({
+					status: "failed",
+					claimedBy: null,
+					leaseExpiresAt: null,
+					createdAt: new Date("2026-01-01T00:00:00Z"),
+				}),
+				now,
+			),
+		).toBeNull();
 	});
 });
 

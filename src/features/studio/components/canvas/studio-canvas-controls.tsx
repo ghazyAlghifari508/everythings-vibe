@@ -6,6 +6,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import { ZoomControls } from "@/components/ui/zoom-controls";
+import type { StudioJobRow } from "@/db/schema";
+import { resolveStudioQueueHealth } from "@/features/studio/types/studio-status";
 import { canvasZoomRowBottomCss } from "@/features/studio/utils/studio-canvas-layout";
 
 export type StudioCanvasTool = "select" | "hand";
@@ -93,14 +95,46 @@ export function StudioCanvasZoomCorner({
  * never from a timer or an invented stage sequence. Kept in the bottom-left
  * corner, clear of the composer and zoom controls.
  */
-export function StudioCanvasPlanningStatus() {
+function StudioCanvasPlanningStatus({ label }: { label: string }) {
 	return (
 		<p
-			className="pointer-events-none absolute left-3 z-20 rounded-full border border-graphite bg-obsidian px-3 py-1 text-xs text-fog"
+			className="pointer-events-none absolute left-3 z-20 max-w-md rounded-full border border-graphite bg-obsidian px-3 py-1 text-xs text-fog"
 			style={{ bottom: canvasZoomRowBottomCss() }}
 		>
-			Menyusun rencana layar
+			{label}
 		</p>
+	);
+}
+
+interface StudioCanvasQueueReadoutProps {
+	activeJob: StudioJobRow;
+	hasFrames: boolean;
+}
+
+/**
+ * The job readout: names a stalled queue so an empty or late canvas is never
+ * mistaken for steady work. Silent while a worker holds a live lease, and while
+ * frames already carry their own shimmer.
+ */
+export function StudioCanvasQueueReadout({
+	activeJob,
+	hasFrames,
+}: StudioCanvasQueueReadoutProps) {
+	const queueHealth = resolveStudioQueueHealth(activeJob);
+	if (queueHealth) return <StudioCanvasPlanningStatus label={queueHealth} />;
+	if (
+		hasFrames ||
+		(activeJob.status !== "queued" && activeJob.status !== "planning")
+	)
+		return null;
+	return (
+		<StudioCanvasPlanningStatus
+			label={
+				activeJob.status === "queued"
+					? "Menunggu antrean generate"
+					: "Menyusun rencana layar"
+			}
+		/>
 	);
 }
 
