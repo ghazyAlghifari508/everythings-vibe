@@ -1,6 +1,6 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { ScrapeError } from "@/lib/design-errors";
+import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
 import { addStudioFrame, reviseStudioFrame } from "./studio-frame-service";
 import { getStudioFrameVisual } from "./studio-frame-visual";
@@ -8,22 +8,40 @@ import { enqueueStudioOperation } from "./studio-operation-enqueue";
 import { retryStudioFrame, retryStudioPlanning } from "./studio-retry-service";
 
 function studioErrorResponse(error: unknown): Response {
-	console.error("[studio.frame error]", error);
+	const unauthorized =
+		error instanceof Error && /Unauthorized|Forbidden/.test(error.message);
+	const code =
+		error instanceof ScrapeError
+			? error.code
+			: unauthorized
+				? "UNAUTHORIZED"
+				: "STUDIO_FRAME_FAILED";
+	console.error("[studio.frame]", { code });
 	if (error instanceof ScrapeError) {
 		const isClientError =
 			error.code === "INVALID_URL" ||
 			error.code === "WEBSITE_BLOCKED" ||
 			error.code === "VISUAL_CAPTURE_FAILED";
 		return Response.json(
-			{ error: error.message, code: error.code },
+			{
+				error:
+					error.code === "VISUAL_CAPTURE_FAILED"
+						? DESIGN_ERROR_CODES.VISUAL_CAPTURE_FAILED
+						: "Aksi frame belum dapat diselesaikan. Silakan coba lagi.",
+				code,
+			},
 			{ status: isClientError ? 400 : 500 },
 		);
 	}
-	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message)) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	if (unauthorized) {
+		return Response.json(
+			{ error: "Silakan masuk kembali untuk membuka Studio.", code },
+			{ status: 401 },
+		);
 	}
 	return Response.json(
 		{
+			code,
 			error:
 				"Terjadi kendala saat memproses frame Studio. Silakan coba beberapa saat lagi.",
 		},
@@ -36,27 +54,39 @@ export async function GET({
 }: {
 	request: Request;
 }): Promise<Response> {
+	const startedAt = performance.now();
+	let status = 500;
 	try {
 		const user = await requireUser(getRequestHeaders());
 		const url = new URL(request.url);
 		const projectId = url.searchParams.get("projectId");
 		const frameId = url.searchParams.get("frameId");
-		if (!projectId || !frameId)
+		if (!projectId || !frameId) {
+			status = 400;
 			return Response.json(
 				{ error: "Identitas project dan frame diperlukan." },
 				{ status: 400 },
 			);
+		}
 		// A user-initiated visual retry must bypass the cached render so a
 		// capture that could not be decoded is genuinely re-rendered.
 		const attempt = Number(url.searchParams.get("attempt") ?? "0");
-		return Response.json(
-			await getStudioFrameVisual(projectId, frameId, user.id, {
-				forceRecapture: Number.isFinite(attempt) && attempt > 0,
-			}),
-			{ headers: { "Cache-Control": "private, no-store" } },
-		);
+		const visual = await getStudioFrameVisual(projectId, frameId, user.id, {
+			forceRecapture: Number.isFinite(attempt) && attempt > 0,
+		});
+		status = 200;
+		return Response.json(visual, {
+			headers: { "Cache-Control": "private, no-store" },
+		});
 	} catch (error) {
-		return studioErrorResponse(error);
+		const response = studioErrorResponse(error);
+		status = response.status;
+		return response;
+	} finally {
+		console.info("[studio.preview.http]", {
+			status,
+			elapsedMs: Math.round(performance.now() - startedAt),
+		});
 	}
 }
 

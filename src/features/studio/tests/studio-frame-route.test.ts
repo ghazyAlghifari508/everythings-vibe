@@ -1,5 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
 import { GET, POST } from "@/routes/api/studio.frame";
+
+const requireUser = vi.fn(async () => ({
+	id: "user-123",
+	email: "test@example.com",
+}));
+afterEach(() => vi.restoreAllMocks());
 
 const getStudioFrameVisual = vi.fn(
 	async (
@@ -17,7 +24,7 @@ const getStudioFrameVisual = vi.fn(
 );
 
 vi.mock("@/lib/session", () => ({
-	requireUser: async () => ({ id: "user-123", email: "test@example.com" }),
+	requireUser: () => requireUser(),
 }));
 
 vi.mock("@tanstack/react-start/server", () => ({
@@ -153,6 +160,64 @@ describe("POST /api/studio/frame", () => {
 });
 
 describe("GET /api/studio/frame", () => {
+	it("logs only classified capture failures and returns safe recovery copy", async () => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		getStudioFrameVisual.mockRejectedValueOnce(
+			new ScrapeError("VISUAL_CAPTURE_FAILED", "private upstream payload", {
+				cause: new Error("private nested detail"),
+				finalUrl: "https://private.test/resource",
+			}),
+		);
+		const res = await GET({
+			request: new Request(
+				"https://app.test/api/studio/frame?projectId=proj-1&frameId=f-1",
+			),
+		});
+		expect(res.status).toBe(400);
+		expect(await res.json()).toEqual({
+			code: "VISUAL_CAPTURE_FAILED",
+			error: DESIGN_ERROR_CODES.VISUAL_CAPTURE_FAILED,
+		});
+		expect(log.mock.calls).toEqual([
+			["[studio.frame]", { code: "VISUAL_CAPTURE_FAILED" }],
+		]);
+	});
+
+	it("records successful preview HTTP duration without resource identifiers", async () => {
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		const clock = vi
+			.spyOn(performance, "now")
+			.mockReturnValueOnce(10)
+			.mockReturnValueOnce(35);
+		const res = await GET({
+			request: new Request(
+				"https://app.test/api/studio/frame?projectId=proj-1&frameId=f-1",
+			),
+		});
+		expect(res.status).toBe(200);
+		expect(log.mock.calls).toEqual([
+			["[studio.preview.http]", { status: 200, elapsedMs: 25 }],
+		]);
+		clock.mockRestore();
+	});
+
+	it("records failed preview HTTP duration", async () => {
+		vi.spyOn(console, "error").mockImplementation(() => {});
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		vi.spyOn(performance, "now")
+			.mockReturnValueOnce(10)
+			.mockReturnValueOnce(40);
+		getStudioFrameVisual.mockRejectedValueOnce(new Error("private response"));
+		const res = await GET({
+			request: new Request(
+				"https://app.test/api/studio/frame?projectId=proj-1&frameId=f-1",
+			),
+		});
+		expect(res.status).toBe(500);
+		expect(log.mock.calls).toEqual([
+			["[studio.preview.http]", { status: 500, elapsedMs: 30 }],
+		]);
+	});
 	it("serves the cached capture without forcing a re-render", async () => {
 		getStudioFrameVisual.mockClear();
 		const res = await GET({
@@ -194,5 +259,56 @@ describe("GET /api/studio/frame", () => {
 			),
 		});
 		expect(res.status).toBe(400);
+	});
+});
+
+describe("safe frame POST errors", () => {
+	it.each([
+		{
+			failure: new ScrapeError(
+				"AI_GENERATION_FAILED",
+				"private provider payload",
+			),
+			code: "AI_GENERATION_FAILED",
+			status: 500,
+		},
+		{
+			failure: new Error("private provider payload"),
+			code: "STUDIO_FRAME_FAILED",
+			status: 500,
+		},
+		{
+			failure: new Error("Unauthorized private session detail"),
+			code: "UNAUTHORIZED",
+			status: 401,
+		},
+	])("does not expose POST failure details for $code", async ({
+		failure,
+		code,
+		status,
+	}) => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		if (status === 401) requireUser.mockRejectedValueOnce(failure);
+		else {
+			const service = await import("../services/studio-frame-service");
+			vi.spyOn(service, "reviseStudioFrame").mockRejectedValueOnce(failure);
+		}
+		const res = await POST({
+			request: new Request("https://app.test/api/studio/frame", {
+				method: "POST",
+				body: JSON.stringify({
+					action: "revise",
+					projectId: "proj-1",
+					frameId: "f-1",
+					prompt: "Sample revision",
+				}),
+			}),
+		});
+		expect(res.status).toBe(status);
+		const body = await res.json();
+		expect(body.code).toBe(code);
+		expect(body.error).toEqual(expect.any(String));
+		expect(JSON.stringify(body)).not.toContain("private");
+		expect(log.mock.calls).toEqual([["[studio.frame]", { code }]]);
 	});
 });
