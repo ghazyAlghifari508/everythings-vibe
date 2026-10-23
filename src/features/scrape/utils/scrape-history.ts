@@ -55,6 +55,17 @@ export function isHistoryFiltered(search: {
 	);
 }
 
+// The filter that decides which rows a "select all matching" scope covers.
+// Sorting is deliberately absent because it reorders the same rows instead of
+// changing which rows match.
+export function historyFilterKey(search: {
+	mode?: string;
+	status?: string;
+	q?: string;
+}): string {
+	return `${search.mode ?? ""}|${search.status ?? ""}|${search.q ?? ""}`;
+}
+
 export function buildHistoryDetailSearch(search: ScrapeHistorySearch): {
 	from: typeof SCRAPE_HISTORY_RETURN_FROM;
 	mode?: ScrapeHistorySearch["mode"];
@@ -97,6 +108,23 @@ export function resolvePageAfterDelete(
 ): number {
 	const remaining = Number.isSafeInteger(total) ? Math.max(0, total - 1) : 0;
 	const totalPages = historyTotalPages(remaining, pageSize);
+	if (totalPages <= 0) return 1;
+	const safePage = Number.isSafeInteger(page) && page >= 1 ? page : 1;
+	return Math.min(safePage, totalPages);
+}
+
+// A bulk delete can empty several pages at once, so the landing page is
+// resolved against the number of rows that actually disappeared rather than
+// against a single removed row.
+export function resolvePageAfterBulkDelete(
+	total: number,
+	deleted: number,
+	page: number,
+	pageSize: number,
+): number {
+	const safeTotal = Number.isSafeInteger(total) ? Math.max(0, total) : 0;
+	const safeDeleted = Number.isSafeInteger(deleted) ? Math.max(0, deleted) : 0;
+	const totalPages = historyTotalPages(safeTotal - safeDeleted, pageSize);
 	if (totalPages <= 0) return 1;
 	const safePage = Number.isSafeInteger(page) && page >= 1 ? page : 1;
 	return Math.min(safePage, totalPages);

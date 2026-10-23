@@ -29,6 +29,7 @@ import {
 	deriveObservedComponents,
 	inferTheme,
 	RULE_FREQUENCY_MINIMUM,
+	TREATMENT_LIMIT,
 } from "./design-model-observation";
 import type { VisualEvidence } from "./design-visual-evidence";
 
@@ -109,7 +110,10 @@ export function buildDesignModel(
 	const elevation = normalizeElevation(evidence.elements);
 	const surfaces = normalizeSurfaces(evidence.elements);
 	const specimens = groupTypeSpecimens(evidence.elements);
-	const typefaces = normalizeTypefaces(specimens, evidence.fonts);
+	const typefaces = normalizeTypefaces(
+		groupTypeSpecimens(evidence.elements, true),
+		evidence.fonts,
+	);
 
 	const colorTokens: ModelColorToken[] = colors.map((entry, index) => ({
 		name: colorNameFor(entry, index),
@@ -158,6 +162,7 @@ export function buildDesignModel(
 		valuePx: token.valuePx,
 		frequency: token.frequency,
 		roles: token.roles,
+		scope: token.scope,
 		confidence: "observed",
 		pill: token.pill,
 	}));
@@ -185,15 +190,23 @@ export function buildDesignModel(
 		specimens,
 		spacingResult.tokens,
 		radii,
+		typefaces,
 	);
 
 	const observedComponents =
 		settings.focus === "visual-tokens"
 			? []
 			: deriveObservedComponents(evidence);
+	const truncatedComponents = observedComponents.filter(
+		(component) => component.treatmentCount > TREATMENT_LIMIT,
+	);
 	const inferredTheme =
 		themes.size === 1 ? inferTheme(views[0] ?? evidence) : "unknown";
 	const limitations = [...evidence.limitations, ...guidelines.limitations];
+	if (truncatedComponents.length)
+		limitations.push(
+			`${truncatedComponents.length} observed component class${truncatedComponents.length === 1 ? "" : "es"} measured more distinct treatments than the document lists, so the remaining treatments are omitted rather than summarised.`,
+		);
 	if (surfaces.length === 1)
 		limitations.push(
 			"Only a single surface colour was measured, so a surface stack cannot be established from this capture.",

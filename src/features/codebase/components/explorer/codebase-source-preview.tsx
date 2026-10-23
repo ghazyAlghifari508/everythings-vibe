@@ -8,6 +8,9 @@ import {
 } from "@/features/codebase/services/source-view";
 import { CODEBASE_FILE_PREVIEW_MAX_LINES } from "@/features/codebase/types/codebase-constants";
 
+/** Where the complete source lives when the preview can only show part of it. */
+const DEFAULT_TRUNCATION_HINT = "File lengkap tersedia di repository lokal.";
+
 export interface CodebaseSourcePreviewProps {
 	/** Repository-relative path of the snapshot file being inspected. */
 	path: string;
@@ -15,6 +18,16 @@ export interface CodebaseSourcePreviewProps {
 	truncated: boolean;
 	sizeBytes: number | null;
 	onRetry?: () => void;
+	/** Upper bound on rendered rows. A longer source is clipped and reported. */
+	maxLines?: number;
+	/**
+	 * Height cap for the scrollable source area, in pixels. Without it the area
+	 * fills its parent; with it the area shrinks to the content and scrolls
+	 * once the content outgrows the cap.
+	 */
+	maxBodyHeight?: number;
+	/** Where the full source can be obtained when the preview is clipped. */
+	truncationHint?: string;
 }
 
 function formatSize(sizeBytes: number | null): string | null {
@@ -57,6 +70,9 @@ export function CodebaseSourcePreview({
 	truncated,
 	sizeBytes,
 	onRetry,
+	maxLines = CODEBASE_FILE_PREVIEW_MAX_LINES,
+	maxBodyHeight,
+	truncationHint = DEFAULT_TRUNCATION_HINT,
 }: CodebaseSourcePreviewProps) {
 	const [mode, setMode] = useState<SourceViewMode>("original");
 	const [pendingMode, setPendingMode] = useState<SourceViewMode | null>(null);
@@ -77,9 +93,9 @@ export function CodebaseSourcePreview({
 				content,
 				path,
 				mode,
-				maxLines: CODEBASE_FILE_PREVIEW_MAX_LINES,
+				maxLines,
 			}),
-		[content, path, mode],
+		[content, path, mode, maxLines],
 	);
 
 	const handleModeChange = (next: SourceViewMode) => {
@@ -93,6 +109,9 @@ export function CodebaseSourcePreview({
 
 	const sizeLabel = formatSize(sizeBytes);
 	const isClipped = truncated || view.truncatedLines;
+	const truncationText = view.truncatedLines
+		? `Pratinjau menampilkan ${view.rows.length.toLocaleString("id-ID")} dari ${view.totalLines.toLocaleString("id-ID")} baris.`
+		: "Pratinjau dipotong agar tetap ringan.";
 
 	return (
 		<div
@@ -139,13 +158,15 @@ export function CodebaseSourcePreview({
 					data-testid="codebase-source-truncated"
 					className="block shrink-0 rounded-md border border-graphite bg-charcoal px-2.5 py-1.5 text-[11px] leading-4 text-fog"
 				>
-					Pratinjau dipotong agar tetap ringan. File lengkap tersedia di
-					repository lokal.
+					{truncationText} {truncationHint}
 				</output>
 			) : null}
 			<div
 				data-testid="codebase-source-body"
-				className="min-h-0 flex-1 overflow-auto rounded-md border border-graphite bg-charcoal"
+				className={`min-h-0 overflow-auto rounded-md border border-graphite bg-charcoal${
+					maxBodyHeight ? "" : " flex-1"
+				}`}
+				style={maxBodyHeight ? { maxHeight: maxBodyHeight } : undefined}
 			>
 				<div
 					data-testid="codebase-source-rows"

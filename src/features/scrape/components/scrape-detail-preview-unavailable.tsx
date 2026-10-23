@@ -1,23 +1,26 @@
 import {
 	Alert02Icon,
-	CodeIcon,
 	Loading01Icon,
 	RotateRight01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 
+/**
+ * Shown when no visual mode can be presented.
+ *
+ * The retry only appears for a real failure. The source is one click away in
+ * the tab bar above, so this surface never repeats that action.
+ */
 export function PreviewUnavailable({
 	message,
 	isRetryable,
 	isLoading = false,
 	onRetry,
-	onOpenSource,
 }: {
 	message: string;
 	isRetryable: boolean;
 	isLoading?: boolean;
 	onRetry?: () => void;
-	onOpenSource?: () => void;
 }) {
 	return (
 		<div
@@ -41,22 +44,9 @@ export function PreviewUnavailable({
 			)}
 			<output className="text-sm font-semibold text-snow">{message}</output>
 			<p className="max-w-md text-xs leading-5 text-fog">
-				Visual preview unavailable. The website could not be shown accurately.
-				Source HTML asli tetap tersedia di tab Source HTML.
+				Source HTML asli tetap tersedia di tab HTML Source.
 			</p>
 			<div className="mt-1 flex flex-wrap items-center justify-center gap-2">
-				{onOpenSource ? (
-					<button
-						type="button"
-						onClick={onOpenSource}
-						aria-label="Buka Source HTML"
-						title="View HTML Source"
-						className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						<Icon icon={CodeIcon} size={14} aria-hidden />
-						Buka Source HTML
-					</button>
-				) : null}
 				{isRetryable && onRetry ? (
 					<button
 						type="button"

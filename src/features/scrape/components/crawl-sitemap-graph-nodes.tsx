@@ -73,17 +73,15 @@ export function CrawlSitemapNodes({
 
 							{node.isRoot && (
 								<span className="shrink-0 rounded bg-indigo/20 px-1 py-0.5 text-[10px] font-medium text-indigo">
-									Root
+									Awal
 								</span>
 							)}
 						</div>
 
-						<div className="flex w-full items-center justify-between text-[11px] text-fog">
-							<span className="tabular-nums">depth {row.depth}</span>
-							<span className="tabular-nums text-[10px]">
-								{node.outgoingCount > 0
-									? `${node.outgoingCount} links`
-									: statusText(row.status)}
+						<div className="flex w-full items-center justify-between gap-2 text-[11px] text-fog">
+							<span className="shrink-0 tabular-nums">depth {row.depth}</span>
+							<span className="truncate text-[10px] tabular-nums">
+								{node.incomingCount} masuk · {node.outgoingCount} keluar
 							</span>
 						</div>
 					</button>

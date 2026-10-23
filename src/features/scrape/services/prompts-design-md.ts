@@ -81,7 +81,9 @@ export async function generateDesignMd(
 	// Without instrumentation there is no AI step at all, so the measured model
 	// produces the document on its own.
 	if (!instrumentation) {
-		const document = renderModelDesignMd(model);
+		const document = renderModelDesignMd(model, {
+			enrichmentUnavailable: true,
+		});
 		assertDocumentValid(document);
 		return { document, enrichment: { status: "unavailable" }, model };
 	}
@@ -97,14 +99,16 @@ export async function generateDesignMd(
 	const renderOptions = synthesis.synthesis
 		? synthesisToRenderOptions(synthesis.synthesis, model)
 		: {};
-	// A rejected citation names the fabrication it caught, so it is never
-	// rendered verbatim: the document carries a fixed safe line while the
-	// diagnostic detail stays in the enrichment result only.
+	// Internal diagnostic details are retained in the returned enrichment object
+	// for metadata and logging, while the document avoids leaking internal schema
+	// or validation errors into the rendered markdown text.
 	const renderDetail =
 		synthesis.status === "unavailable"
-			? synthesis.cause === "unknown_reference"
-				? enrichmentDetailForCause("unknown_reference")
-				: synthesis.detail
+			? synthesis.cause === "timeout"
+				? "AI synthesis melampaui batas waktu."
+				: synthesis.cause === "truncated"
+					? "AI memotong respons karena batas token."
+					: undefined
 			: undefined;
 	const document = renderModelDesignMd(model, {
 		...renderOptions,

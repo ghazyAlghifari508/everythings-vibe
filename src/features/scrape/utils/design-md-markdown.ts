@@ -27,7 +27,8 @@ export type DesignMdSection = (typeof DESIGN_MD_SECTIONS)[number];
 
 // Escapes a value so it can never break out of a markdown table cell or inject
 // markup into the document.
-export function escapeCell(value: string): string {
+export function escapeCell(value: string | undefined | null): string {
+	if (!value) return "";
 	return value
 		.replace(/&/g, "&amp;")
 		.replace(/</g, "&lt;")

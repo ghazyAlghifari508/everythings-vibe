@@ -135,10 +135,6 @@ export function classifyColorToken(
 	// Only a filled action surface can establish a primary action colour. Text
 	// painted on an action element is not the action colour itself, so the check
 	// reads the paired role/property context rather than the two lists.
-	const actionFill = contextFrequency(
-		token.usage,
-		colorContext("cta", "background-color"),
-	);
 	if (BRAND_NAME.test(haystack)) {
 		// An equal-valued custom property is an association, not proof of use:
 		// a single sighting stays an accent even when it fills one action
@@ -162,14 +158,6 @@ export function classifyColorToken(
 			userAgentDefault: false,
 		};
 	}
-	if (actionFill >= 2)
-		return {
-			token,
-			roleClass: "brand",
-			roleLabel: "Primary action",
-			rationale: `Painted the background of ${actionFill} measured action elements, which is repeated evidence of a primary action colour.`,
-			userAgentDefault: false,
-		};
 	// Only a background fill on an action element associates the colour with
 	// the action. Text painted on an action element (for example white label
 	// copy on a filled button) is text, not the action colour itself.
@@ -182,7 +170,7 @@ export function classifyColorToken(
 			roleClass: "accent",
 			roleLabel: "Action accent",
 			rationale:
-				"Appeared on action elements without repeated fill evidence, so it is recorded as an accent rather than a confirmed primary colour.",
+				"Measured on action backgrounds; frequency alone does not establish brand identity or primary/secondary hierarchy.",
 			userAgentDefault: false,
 		};
 	if (NEUTRAL_NAME.test(haystack))

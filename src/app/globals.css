@@ -441,7 +441,8 @@ input.bg-steel:autofill:active {
 	color: var(--text-secondary);
 }
 
-/* Read-only source preview in the existing-codebase workspace.
+/* Read-only source preview, shared by the existing-codebase workspace and the
+   scrape source view.
    Scoped to the preview so PRD/document code blocks keep their own styling.
    Semantic token colors are defined as scoped variables so the viewer reads as
    a real code editor in both themes: light and dark each get their own coherent

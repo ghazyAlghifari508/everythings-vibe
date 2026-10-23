@@ -1,4 +1,14 @@
-import { and, asc, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
+import {
+	and,
+	asc,
+	count,
+	desc,
+	eq,
+	ilike,
+	inArray,
+	or,
+	type SQL,
+} from "drizzle-orm";
 import { db } from "@/db";
 import {
 	type ScrapeMetadata,
@@ -7,6 +17,7 @@ import {
 	scrapes,
 } from "@/db/schema";
 import {
+	SCRAPE_HISTORY_BULK_SELECTION_MAX_IDS,
 	SCRAPE_HISTORY_MAX_LIMIT,
 	SCRAPE_HISTORY_SEARCH_MAX_CHARS,
 } from "@/features/scrape/types/scrape-constants";
@@ -41,6 +52,11 @@ export interface ScrapeHistoryPage {
 	total: number;
 	limit: number;
 	offset: number;
+}
+
+export interface ScrapeHistoryIdPage {
+	ids: string[];
+	total: number;
 }
 
 const SCRAPE_HISTORY_PROCESSING_STATUSES = [
@@ -94,6 +110,14 @@ export function normalizeScrapeHistoryQuery(
 
 function escapeHistoryLike(value: string): string {
 	return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+// A stable total order keeps pagination and the bulk selection snapshot
+// pointing at the same rows even when several scrapes share a timestamp.
+function historyOrdering(sort: ScrapeHistorySort): SQL[] {
+	return sort === "oldest"
+		? [asc(scrapes.createdAt), asc(scrapes.id)]
+		: [desc(scrapes.createdAt), desc(scrapes.id)];
 }
 
 function scrapeHistoryConditions(
@@ -189,10 +213,7 @@ export async function listScrapeHistory(
 	raw: ScrapeHistoryQuery = {},
 ): Promise<ScrapeHistoryPage> {
 	const query = normalizeScrapeHistoryQuery(raw);
-	const ordering =
-		query.sort === "oldest"
-			? [asc(scrapes.createdAt), asc(scrapes.id)]
-			: [desc(scrapes.createdAt), desc(scrapes.id)];
+	const ordering = historyOrdering(query.sort);
 	const [countRow, rows] = await Promise.all([
 		db
 			.select({ total: count() })
@@ -221,6 +242,31 @@ export async function listScrapeHistory(
 		total,
 		limit: query.limit,
 		offset: query.offset,
+	};
+}
+
+// The id-only listing backs the bulk selection scope. It reuses the exact
+// filter conditions and ordering of the visible list so the prepared snapshot
+// covers the same rows the user sees, but it is bounded by the selection cap
+// instead of the page size so one page never limits the deletion target.
+export async function listScrapeHistoryIds(
+	userId: string,
+	raw: ScrapeHistoryQuery = {},
+): Promise<ScrapeHistoryIdPage> {
+	const query = normalizeScrapeHistoryQuery(raw);
+	const conditions = and(...scrapeHistoryConditions(userId, query));
+	const [countRow, rows] = await Promise.all([
+		db.select({ total: count() }).from(scrapes).where(conditions),
+		db
+			.select({ id: scrapes.id })
+			.from(scrapes)
+			.where(conditions)
+			.orderBy(...historyOrdering(query.sort))
+			.limit(SCRAPE_HISTORY_BULK_SELECTION_MAX_IDS),
+	]);
+	return {
+		ids: rows.map((row) => row.id),
+		total: countRow[0]?.total ?? 0,
 	};
 }
 

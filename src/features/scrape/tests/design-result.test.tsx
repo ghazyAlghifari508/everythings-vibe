@@ -232,4 +232,74 @@ describe("DesignResult", () => {
 			),
 		).toBeTruthy();
 	});
+
+	it("forwards enrichment retry handler and avoids internal status leakage when components missing", () => {
+		const onRetryEnrichment = vi.fn();
+		const incompleteMd = `# Acme - Style Reference
+> A crisp ledger console under morning light.
+
+**Theme:** light
+
+## Tokens - Colors
+| Name | Value | Token | Role |
+| --- | --- | --- | --- |
+| Canvas | #ffffff | --color-canvas | Page background |
+| Cobalt | #155eef | --color-cobalt | Primary CTA |
+
+## Tokens - Typography
+| Style | Family | Size | Weight | Line Height |
+| --- | --- | --- | --- | --- |
+| Display | Inter | 48px | 700 | 1.1 |
+`;
+
+		render(
+			<DesignResult
+				sourceUrl="https://acme.example/"
+				domain="acme.example"
+				designMd={incompleteMd}
+				enrichment="unavailable"
+				enrichmentDetail="Model timeout."
+				onRetryEnrichment={onRetryEnrichment}
+			/>,
+		);
+
+		expect(
+			screen.getByText(/sebagian panduan komponen belum tersedia/i),
+		).toBeDefined();
+		expect(
+			screen.queryByText(/panduan desain belum sepenuhnya selesai/i),
+		).toBeNull();
+		expect(screen.queryByText(/ai tidak memenuhi kontrak/i)).toBeNull();
+		expect(screen.queryByText(/schema validation failed/i)).toBeNull();
+		expect(screen.queryByText(/enrichment unavailable/i)).toBeNull();
+
+		const retryBtn = screen.getByRole("button", {
+			name: /lengkapi panduan komponen/i,
+		});
+		expect(retryBtn).toBeDefined();
+		fireEvent.click(retryBtn);
+		expect(onRetryEnrichment).toHaveBeenCalledTimes(1);
+	});
+
+	it("renders clean without warnings when enrichment is applied", () => {
+		render(
+			<DesignResult
+				sourceUrl="https://acme.example/"
+				domain="acme.example"
+				designMd={DESIGN_MD}
+				enrichment="applied"
+			/>,
+		);
+
+		expect(
+			screen.queryByText(/sebagian panduan komponen belum tersedia/i),
+		).toBeNull();
+		expect(
+			screen.queryByText(/panduan desain belum sepenuhnya selesai/i),
+		).toBeNull();
+		expect(screen.queryByText(/analisis ai belum lengkap/i)).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /lengkapi panduan komponen/i }),
+		).toBeNull();
+	});
 });

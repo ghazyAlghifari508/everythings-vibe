@@ -128,6 +128,7 @@ export function typeRoleRank(role: TypeScaleRole): number {
 // type style, keeping the largest and most frequent representative per role.
 export function groupTypeSpecimens(
 	elements: VisualElementEvidence[],
+	preserveVariants = false,
 ): TypeSpecimen[] {
 	const groups = new Map<string, TypeSpecimen>();
 	for (const element of elements) {
@@ -182,6 +183,7 @@ export function groupTypeSpecimens(
 			selectors: [element.selector],
 		});
 	}
+	if (preserveVariants) return [...groups.values()];
 	// One representative per role keeps the scale a scale: the specimen with the
 	// most measured usage wins, ties broken by the larger size.
 	const byRole = new Map<TypeScaleRole, TypeSpecimen>();

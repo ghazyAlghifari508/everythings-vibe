@@ -30,6 +30,7 @@ export const DESIGN_ERROR_CODES = {
 	VISUAL_CAPTURE_FAILED:
 		"Pratinjau visual frame gagal dirender. HTML frame tetap tersimpan.",
 	STORAGE_FAILED: "Terjadi kendala saat menyimpan hasil.",
+	RETRY_EXHAUSTED: "Batas percobaan pemulihan telah tercapai.",
 	UNEXPECTED_ERROR:
 		"Pemrosesan berhenti karena kendala teknis yang tidak terduga.",
 } as const;
@@ -94,6 +95,7 @@ const ERROR_SOURCES: Record<DesignErrorCode, ScrapeErrorSource> = {
 	AI_GENERATION_FAILED: "internal",
 	VISUAL_CAPTURE_FAILED: "capture",
 	STORAGE_FAILED: "storage",
+	RETRY_EXHAUSTED: "internal",
 	UNEXPECTED_ERROR: "internal",
 };
 
@@ -117,6 +119,7 @@ const FAILURE_REASONS: Record<DesignErrorCode, ScrapeFailureReason> = {
 	AI_GENERATION_FAILED: "generation-failed",
 	VISUAL_CAPTURE_FAILED: "content-capture",
 	STORAGE_FAILED: "storage-failed",
+	RETRY_EXHAUSTED: "unknown",
 	UNEXPECTED_ERROR: "unknown",
 };
 
@@ -140,6 +143,7 @@ const HTTP_STATUSES: Record<DesignErrorCode, number> = {
 	AI_GENERATION_FAILED: 500,
 	VISUAL_CAPTURE_FAILED: 500,
 	STORAGE_FAILED: 500,
+	RETRY_EXHAUSTED: 400,
 	UNEXPECTED_ERROR: 500,
 };
 
@@ -151,6 +155,7 @@ const NON_RETRYABLE_CODES = new Set<string>([
 	"PRIVATE_URL_BLOCKED",
 	"WEBSITE_ACCESS_DENIED",
 	"WEBSITE_NOT_FOUND",
+	"RETRY_EXHAUSTED",
 ]);
 
 export function isDesignErrorCode(value: unknown): value is DesignErrorCode {

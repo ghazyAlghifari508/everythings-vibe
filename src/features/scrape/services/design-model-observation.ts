@@ -1,11 +1,19 @@
 import type { ModelComponent } from "@/features/scrape/types/design-model";
 import { normalizeColor } from "../utils/design-color-parse";
-import type { VisualEvidence } from "./design-visual-evidence";
-
-// Deterministic observations taken from the capture. Nothing here is inferred
-// from a single sighting, and nothing is guessed when the evidence is missing.
+import type {
+	VisualElementEvidence,
+	VisualEvidence,
+} from "./design-visual-evidence";
 
 export const RULE_FREQUENCY_MINIMUM = 2;
+
+// Representative selectors kept per treatment. The full element list stays in
+// the capture; the document only needs enough samples to identify the
+// treatment without growing the payload with every repeated element.
+const TREATMENT_SELECTOR_LIMIT = 3;
+// Upper bound on the treatments one component describes, so a page with many
+// measured variants cannot produce an unbounded component section.
+export const TREATMENT_LIMIT = 6;
 
 // Infers light/dark from the measured background luminance. A transparent
 // canvas contributes nothing visible, so transparent and unparsable paints are
@@ -38,17 +46,16 @@ export function inferTheme(
 	return "unknown";
 }
 
-// Deterministic component patterns observed in the capture. Only roles seen at
-// least twice become patterns, and every pattern cites measured frequency and
-// roles so it is evidence-grounded without AI.
 export function deriveObservedComponents(
 	evidence: VisualEvidence,
 ): ModelComponent[] {
 	const components: ModelComponent[] = [];
-	const byRole = new Map<string, number>();
+	const byRole = new Map<string, VisualElementEvidence[]>();
 	for (const element of evidence.elements) {
 		if (element.role === "element" || element.role === "canvas") continue;
-		byRole.set(element.role, (byRole.get(element.role) ?? 0) + 1);
+		const group = byRole.get(element.role) ?? [];
+		group.push(element);
+		byRole.set(element.role, group);
 	}
 	const roleLabel: Record<string, string> = {
 		nav: "Navigation",
@@ -57,22 +64,64 @@ export function deriveObservedComponents(
 		h3: "Subheading",
 		body: "Body copy",
 		cta: "Buttons and CTAs",
-		section: "Layout containers",
-		main: "Layout containers",
+		input: "Inputs",
+		card: "Cards",
+		section: "Page sections",
+		main: "Main content area",
 		header: "Header",
 		footer: "Footer",
 	};
-	for (const [role, frequency] of [...byRole.entries()].sort(
-		(a, b) => b[1] - a[1],
+	for (const [role, elements] of [...byRole.entries()].sort(
+		(a, b) => b[1].length - a[1].length,
 	)) {
-		if (frequency < RULE_FREQUENCY_MINIMUM) continue;
-		const name = roleLabel[role] ?? `Observed ${role}`;
+		// A component class needs repeated support before it can be treated as a
+		// pattern. A single fully measured sample is still real evidence for that
+		// one element, so it is kept as a scoped observation instead of a
+		// repeated pattern.
+		const repeated = elements.length >= RULE_FREQUENCY_MINIMUM;
+		const treatments = new Map<string, string[]>();
+		for (const element of elements) {
+			const properties = Object.entries(element.properties)
+				.filter(([, value]) => value.trim())
+				.sort(([a], [b]) => a.localeCompare(b))
+				.map(([property, value]) => `${property}: ${value}`)
+				.join("; ");
+			if (!properties) continue;
+			const selectors = treatments.get(properties) ?? [];
+			selectors.push(element.selector);
+			treatments.set(properties, selectors);
+		}
+		if (!treatments.size) continue;
+		// Two roles can share a label, so the name is disambiguated before it
+		// reaches the document: duplicate headings and duplicate keys make a
+		// component list ambiguous.
+		const baseName = roleLabel[role] ?? `Observed ${role}`;
+		let name = baseName;
+		for (let suffix = 2; components.some((c) => c.name === name); suffix++)
+			name = `${baseName} ${suffix}`;
+		const scope = repeated
+			? ""
+			: " This is a single measured observation, not a repeated pattern; it applies to the cited sample only and supports no shared rule.";
 		components.push({
 			name,
-			description: `Observed ${frequency} ${role} elements in the captured viewport with consistent measured styling.`,
-			evidence: `Measured on ${frequency} ${role} elements.`,
-			frequency,
+			description:
+				[...treatments]
+					.slice(0, TREATMENT_LIMIT)
+					.map(
+						([properties, selectors]) =>
+							`Apply only to matching ${role} samples (${selectors
+								.slice(0, TREATMENT_SELECTOR_LIMIT)
+								.join(", ")}): ${properties}.`,
+					)
+					.join("\n") +
+				` Missing properties, interaction states and primary/secondary hierarchy are not established; do not generalize across treatments or captures.${scope}`,
+			evidence: `Measured on ${elements.length} ${role} element${elements.length === 1 ? "" : "s"} in the capture samples: ${elements
+				.slice(0, TREATMENT_SELECTOR_LIMIT)
+				.map((element) => element.selector)
+				.join(", ")}. Semantic role inferred from DOM.`,
+			frequency: elements.length,
 			roles: [role],
+			treatmentCount: treatments.size,
 		});
 		if (components.length >= 8) break;
 	}

@@ -6,7 +6,6 @@ import {
 	table,
 } from "./design-md-markdown";
 import type { RenderDesignMdOptions } from "./design-md-render";
-import { isPillRadius } from "./design-normalize-shape";
 import { primaryFontFamily } from "./design-normalize-typography";
 
 // Identity, theme narrative and the measured token tables (sections 1-6).
@@ -22,9 +21,9 @@ export function renderTokenSections(
 	// --- 1. Website identity & visual essence --------------------------------
 	const essence =
 		options.essence?.trim() ||
-		model.essence.trim() ||
+		model.essence?.trim() ||
 		options.identityNarrative?.trim();
-	lines.push(heading(1, `${model.title} - Style Reference`));
+	lines.push(heading(1, `${model.title || "Design"} - Style Reference`));
 	if (essence) {
 		lines.push("", `> ${essence}`);
 	}
@@ -32,9 +31,9 @@ export function renderTokenSections(
 
 	// --- 2. Theme & overview -------------------------------------------------
 	lines.push(heading(2, "Theme & Overview"));
-	lines.push("", `**Theme:** ${model.theme}`);
-	if (options.overview?.trim() || model.overview.trim())
-		lines.push("", options.overview?.trim() || model.overview.trim());
+	lines.push("", `**Theme:** ${model.theme || "light"}`);
+	if (options.overview?.trim() || model.overview?.trim())
+		lines.push("", options.overview?.trim() || model.overview?.trim() || "");
 	lines.push(
 		"",
 		`Measured from ${model.viewport.width}x${model.viewport.height} on ${model.sourceUrl}. Observed values are browser measurements; role names are classifications of measured usage.`,
@@ -144,12 +143,15 @@ export function renderTokenSections(
 			lines.push("", heading(3, "Border Radius"), "");
 			lines.push(
 				table(
-					["Context", "Value", "Measured on"],
+					["Context", "Value", "Captured in", "Measured on"],
 					model.radii.map((token) => [
 						escapeCell(token.purpose),
-						token.pill || isPillRadius(token.valuePx)
+						// The shape annotation comes from the measured geometry. A
+						// large number alone does not make a shape a pill.
+						token.pill
 							? `\`${escapeCell(token.value)}\` (fully rounded / pill)`
 							: `\`${escapeCell(token.value)}\``,
+						escapeCell(token.scope || "single capture"),
 						String(token.frequency),
 					]),
 				),

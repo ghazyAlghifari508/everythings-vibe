@@ -118,12 +118,13 @@ describe("color normalization", () => {
 });
 
 describe("color role classification", () => {
-	it("promotes a repeated action colour to a primary action role", () => {
+	it("keeps repeated unnamed action fills below a brand or primary claim", () => {
 		const [entry] = classifyColors([
 			element({ role: "cta", properties: { "background-color": "#155eef" } }),
 			element({ role: "cta", properties: { "background-color": "#155eef" } }),
 		]);
-		expect(entry?.roleClass).toBe("brand");
+		expect(entry?.roleClass).toBe("accent");
+		expect(entry?.roleLabel).toBe("Action accent");
 		expect(entry?.rationale).toMatch(/action/i);
 	});
 

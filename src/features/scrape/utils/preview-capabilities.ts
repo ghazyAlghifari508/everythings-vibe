@@ -254,20 +254,18 @@ export function buildPreviewSrcDoc(
 		}
 		return capability;
 	};
-	const output = rewritePreviewAssets(
+	if (!visualSnapshot) {
+		return rewritePreviewAssets(html, options.baseUrl, resolve, capabilities);
+	}
+	const nonce = randomBytes(18).toString("base64");
+	const origin = new URL(options.appOrigin).origin;
+	const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline' ${origin}; img-src data: blob: ${origin}; font-src data: ${origin}; media-src data: ${origin}; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
+	const secured = rewritePreviewAssets(
 		html,
 		options.baseUrl,
 		resolve,
 		capabilities,
-		visualSnapshot,
-	);
-	if (!visualSnapshot) return output;
-	const nonce = randomBytes(18).toString("base64");
-	const origin = new URL(options.appOrigin).origin;
-	const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline' ${origin}; img-src data: blob: ${origin}; font-src data: ${origin}; media-src data: ${origin}; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
-	const secured = output.replace(
-		"<script>(()=>{if(window.parent",
-		`<script nonce="${nonce}">(()=>{if(window.parent`,
+		{ visualSnapshot: true, nonce },
 	);
 	const meta = `<meta http-equiv="Content-Security-Policy" content="${policy}">`;
 	return /<head[^>]*>/i.test(secured)

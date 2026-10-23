@@ -1,4 +1,10 @@
-import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
+import { useScrapeHistorySelection } from "@/features/scrape/hooks/use-scrape-history-selection";
+import type {
+	ScrapeHistoryBulkDeleteResult,
+	ScrapeHistoryBulkSelection,
+	ScrapeHistorySearch,
+} from "@/features/scrape/types/scrape-contract";
+import { historyFilterKey } from "@/features/scrape/utils/scrape-history";
 import type { ScrapeHistoryItem } from "./scrape-history-list";
 import { ScrapeHistoryList } from "./scrape-history-list";
 
@@ -8,6 +14,8 @@ export interface ScrapeHistoryViewProps {
 	search: ScrapeHistorySearch;
 	onQueryChange: (next: ScrapeHistorySearch) => void;
 	onDelete: (id: string) => Promise<unknown>;
+	onDeleteMany: (ids: string[]) => Promise<ScrapeHistoryBulkDeleteResult>;
+	onPrepareSelection: () => Promise<ScrapeHistoryBulkSelection>;
 }
 
 export function ScrapeHistoryView({
@@ -16,17 +24,22 @@ export function ScrapeHistoryView({
 	search,
 	onQueryChange,
 	onDelete,
+	onDeleteMany,
+	onPrepareSelection,
 }: ScrapeHistoryViewProps) {
+	const selection = useScrapeHistorySelection(historyFilterKey(search));
 	return (
 		<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
 			<div className="flex w-full flex-col gap-6 py-4">
-				<header className="max-w-2xl">
-					<h1 className="text-2xl font-semibold tracking-tight text-snow sm:text-3xl">
-						Riwayat VibeScrape
-					</h1>
-					<p className="mt-2 text-sm leading-6 text-fog">
-						Temukan dan kelola hasil ekstraksi website.
-					</p>
+				<header className="flex flex-wrap items-start justify-between gap-4">
+					<div className="max-w-2xl">
+						<h1 className="text-2xl font-semibold tracking-tight text-snow sm:text-3xl">
+							Riwayat VibeScrape
+						</h1>
+						<p className="mt-2 text-sm leading-6 text-fog">
+							Temukan dan kelola hasil ekstraksi website.
+						</p>
+					</div>
 				</header>
 
 				<ScrapeHistoryList
@@ -35,6 +48,9 @@ export function ScrapeHistoryView({
 					search={search}
 					onQueryChange={onQueryChange}
 					onDelete={onDelete}
+					onDeleteMany={onDeleteMany}
+					onPrepareSelection={onPrepareSelection}
+					selection={selection}
 				/>
 			</div>
 		</div>

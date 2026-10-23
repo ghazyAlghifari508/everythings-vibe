@@ -19,6 +19,8 @@ export interface DesignResultProps {
 	visualEvidence?: unknown;
 	enrichment?: "applied" | "unavailable";
 	enrichmentDetail?: string;
+	onRetryEnrichment?: () => Promise<void> | void;
+	isRetryingEnrichment?: boolean;
 }
 
 export interface ResolvedInspector {
@@ -65,6 +67,8 @@ export function DesignResult({
 	visualEvidence,
 	enrichment,
 	enrichmentDetail,
+	onRetryEnrichment,
+	isRetryingEnrichment,
 }: DesignResultProps) {
 	const [agentOpen, setAgentOpen] = useState(false);
 	const [mobileTab, setMobileTab] = useState<MobileTab>("inspector");
@@ -205,6 +209,8 @@ export function DesignResult({
 						inspectorSource={source}
 						enrichment={enrichment}
 						enrichmentDetail={enrichmentDetail}
+						onRetryEnrichment={onRetryEnrichment}
+						isRetryingEnrichment={isRetryingEnrichment}
 						onImplementAgent={() => setAgentOpen(true)}
 						className="lg:max-h-[calc(100vh-6rem)]"
 					/>
@@ -215,6 +221,7 @@ export function DesignResult({
 					siteName={siteName}
 					sourceUrl={sourceUrl}
 					designMd={designMd}
+					enrichment={enrichment}
 				/>
 			</div>
 		</div>

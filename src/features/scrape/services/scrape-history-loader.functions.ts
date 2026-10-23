@@ -1,8 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { ScrapeHistoryItem } from "@/features/scrape/components/scrape-history-list";
 import {
+	parseScrapeHistoryBulkDelete,
 	parseScrapeHistorySearch,
 	resolveScrapeHistoryOffset,
+	type ScrapeHistoryBulkDeleteResult,
+	type ScrapeHistoryBulkSelection,
 	type ScrapeHistorySearch,
 } from "@/features/scrape/types/scrape-contract";
 import {
@@ -80,4 +83,32 @@ export const deleteScrapeItem = createServerFn({ method: "POST" })
 			"@/features/scrape/services/scrape-service"
 		);
 		return deleteScrape(id, user.id);
+	});
+
+// Prepares the cross-page selection scope on the server. The snapshot is
+// derived from the validated filter and the caller's own rows, so the client
+// never decides which rows a bulk delete may reach.
+export const prepareScrapeHistorySelection = createServerFn({ method: "GET" })
+	.validator((data: unknown) => parseScrapeHistorySearch(data))
+	.handler(async ({ data }): Promise<ScrapeHistoryBulkSelection> => {
+		const user = await requireUserServer();
+		const { prepareScrapeHistoryBulkSelection } = await import(
+			"@/features/scrape/services/scrape-service"
+		);
+		return prepareScrapeHistoryBulkSelection(user.id, {
+			mode: data.mode,
+			status: data.status,
+			search: data.q,
+			sort: data.sort,
+		});
+	});
+
+export const deleteScrapeItems = createServerFn({ method: "POST" })
+	.validator((data: unknown) => parseScrapeHistoryBulkDelete(data))
+	.handler(async ({ data }): Promise<ScrapeHistoryBulkDeleteResult> => {
+		const user = await requireUserServer();
+		const { deleteOwnedScrapes } = await import(
+			"@/features/scrape/services/scrape-service"
+		);
+		return deleteOwnedScrapes(data.ids, user.id);
 	});

@@ -54,12 +54,15 @@ describe("inspectorFromEvidence curation", () => {
 			expect(token.label).not.toMatch(/^padding · \d+ elemen$/);
 	});
 
-	it("curates a repeated action fill into a primary action colour", () => {
+	it("preserves repeated action fill without inventing primary hierarchy", () => {
 		const model = inspectorFromEvidence(ctaEvidence());
-		const brand = model?.colors.find((color) => color.roleClass === "brand");
+		const action = model?.colors.find((color) => color.roleClass === "accent");
 		// The value is the canonical equivalent of the measured rgb() triple.
-		expect(brand?.value).toBe("#0a141e");
-		expect(brand?.rationale).toMatch(/action/i);
+		expect(action?.value).toBe("#0a141e");
+		expect(action?.rationale).toMatch(/action/i);
+		expect(model?.colors.some((color) => color.roleClass === "brand")).toBe(
+			false,
+		);
 	});
 
 	it("surfaces evidence-based Do guidance tied to a measured value", () => {

@@ -88,6 +88,8 @@ export interface ModelRadiusToken {
 	valuePx: number;
 	frequency: number;
 	roles: string[];
+	/** The capture this value was measured in, empty for a single capture. */
+	scope: string;
 	confidence: Confidence;
 	/** True when element geometry proves the shape is fully rounded. */
 	pill?: boolean;
@@ -121,6 +123,8 @@ export interface ModelComponent {
 	evidence: string;
 	frequency: number;
 	roles: string[];
+	/** How many distinct measured treatments this component describes. */
+	treatmentCount: number;
 }
 
 export interface ModelGuidelines {

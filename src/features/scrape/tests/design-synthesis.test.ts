@@ -117,6 +117,33 @@ describe("synthesis validation", () => {
 		);
 		expect(validateSynthesis(parsed, model)).toEqual([]);
 	});
+
+	it.each(["137px", "137%"])("rejects unmeasured CSS length %s", (value) => {
+		const parsed = designSynthesisSchema.parse(
+			synthesis({ implementationGuidance: [`Use a radius of ${value}.`] }),
+		);
+		expect(validateSynthesis(parsed, model)).toEqual([
+			{
+				code: "unknown-value",
+				detail: `Prose cites measurement ${value}, which was not measured.`,
+			},
+		]);
+	});
+
+	it("accepts percentages present in measured typography", () => {
+		const parsed = designSynthesisSchema.parse(
+			synthesis({ implementationGuidance: ["Use a line height of 137%."] }),
+		);
+		expect(
+			validateSynthesis(parsed, {
+				...model,
+				typography: model.typography.map((entry) => ({
+					...entry,
+					lineHeight: "137%",
+				})),
+			}),
+		).toEqual([]);
+	});
 });
 
 describe("synthesis parsing", () => {
@@ -156,7 +183,65 @@ describe("synthesis parsing", () => {
 			extractJson,
 		);
 		expect(outcome.status).toBe("unavailable");
-		expect(outcome.detail).toMatch(/kontrak/i);
+		expect(outcome.cause).toBe("schema");
+		expect(outcome.detail).toMatch(/format sintesis|skema/i);
+		expect(outcome.detail).not.toContain(
+			"AI tidak memenuhi kontrak sintesis design system.",
+		);
+	});
+
+	it("recovers and normalizes reference kind aliases and string indices safely", () => {
+		const outcome = parseSynthesisResponse(
+			JSON.stringify(
+				synthesis({
+					componentPatterns: [
+						{
+							name: "Button",
+							description: "Primary action button treatment.",
+							references: [
+								{ kind: "colors", index: "0" },
+								{ kind: "radii", index: 0 },
+								{ kind: "font", index: 0 },
+							],
+						},
+					],
+				}),
+			),
+			model,
+			extractJson,
+		);
+		expect(outcome.status).toBe("applied");
+		expect(outcome.synthesis?.componentPatterns[0]?.references[0]?.kind).toBe(
+			"color",
+		);
+		expect(outcome.synthesis?.componentPatterns[0]?.references[0]?.index).toBe(
+			0,
+		);
+		expect(outcome.synthesis?.componentPatterns[0]?.references[1]?.kind).toBe(
+			"radius",
+		);
+		expect(outcome.synthesis?.componentPatterns[0]?.references[2]?.kind).toBe(
+			"typeface",
+		);
+	});
+
+	it("safely cleans trailing commas in model json responses", () => {
+		const rawJson = `{
+			"essence": "A measured interface.",
+			"overview": "Hierarchy comes from a measured type scale.",
+			"theme": "LIGHT",
+			"identityNarrative": "One action colour leads the page.",
+			"componentPatterns": [],
+			"layoutPrinciples": [],
+			"imageryNotes": [],
+			"implementationGuidance": [],
+			"dos": [],
+			"donts": [],
+			"limitations": [],
+		}`;
+		const outcome = parseSynthesisResponse(rawJson, model, extractJson);
+		expect(outcome.status).toBe("applied");
+		expect(outcome.synthesis?.theme).toBe("light");
 	});
 
 	it("degrades to unavailable when a citation is invented", () => {
@@ -252,5 +337,14 @@ describe("synthesis to renderer mapping", () => {
 		const options = synthesisToRenderOptions(parsed, model);
 		expect(options.essence).toBe("A measured interface.");
 		expect(options.layoutPrinciples).toEqual([]);
+	});
+
+	it("preserves synthesis limitations separately from measured facts", () => {
+		const parsed = designSynthesisSchema.parse(
+			synthesis({ limitations: ["Additional states remain unknown."] }),
+		);
+		expect(synthesisToRenderOptions(parsed, model).limitations).toEqual(
+			parsed.limitations,
+		);
 	});
 });

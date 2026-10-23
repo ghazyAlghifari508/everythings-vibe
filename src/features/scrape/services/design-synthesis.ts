@@ -1,10 +1,12 @@
 import type { RenderDesignMdOptions } from "../utils/design-md-render";
 import type { DesignTokenModel } from "./design-model";
+import { validateSynthesisClaims } from "./design-synthesis-claims";
 import {
 	type DesignSynthesis,
 	designSynthesisSchema,
 	type EvidenceReference,
 } from "./design-synthesis-contract";
+import { validateSynthesisValues } from "./design-synthesis-values";
 
 export type {
 	DesignSynthesis,
@@ -21,13 +23,14 @@ export {
 } from "./design-synthesis-contract";
 
 export interface SynthesisValidationIssue {
-	code: "unknown-reference" | "unknown-value" | "schema";
+	code: "unknown-reference" | "unknown-value" | "unsupported-claim" | "schema";
 	detail: string;
 }
 
-// Checks every citation resolves to a real model entry, and that no prose
-// repeats a colour or measurement that is not in the model. This is the gate
-// that keeps a plausible-looking fabrication out of the document.
+// Checks every citation resolves to a real model entry, that no prose repeats
+// a value the model never measured, and that no rule claims a scope the
+// capture cannot support. This is the gate that keeps a plausible-looking
+// fabrication out of the document.
 export function validateSynthesis(
 	synthesis: DesignSynthesis,
 	model: DesignTokenModel,
@@ -57,11 +60,8 @@ export function validateSynthesis(
 	for (const rule of synthesis.donts)
 		check(rule.references, `Don't rule "${rule.rule}"`);
 
-	// Any colour literal in the prose must be a colour the model actually
-	// measured; otherwise the model invented one.
-	const knownColors = new Set(
-		model.colors.map((color) => color.value.toLowerCase()),
-	);
+	// Any colour, length or family literal in the prose must be a value the
+	// model actually measured; otherwise the model invented one.
 	const prose = [
 		synthesis.essence,
 		synthesis.overview,
@@ -72,14 +72,20 @@ export function validateSynthesis(
 		...synthesis.implementationGuidance,
 		...synthesis.dos.map((rule) => rule.rule),
 		...synthesis.donts.map((rule) => rule.rule),
-	].join("\n");
-	for (const match of prose.matchAll(/#[0-9a-f]{3,8}\b/gi)) {
-		if (!knownColors.has(match[0].toLowerCase()))
-			issues.push({
-				code: "unknown-value",
-				detail: `Prose cites colour ${match[0]}, which was not measured.`,
-			});
-	}
+		...synthesis.limitations,
+	];
+	issues.push(...validateSynthesisValues(prose, model));
+	issues.push(
+		...validateSynthesisClaims(
+			[
+				...synthesis.dos.map((rule) => rule.rule),
+				...synthesis.donts.map((rule) => rule.rule),
+				...synthesis.implementationGuidance,
+				...synthesis.componentPatterns.map((pattern) => pattern.description),
+			],
+			model,
+		),
+	);
 	return issues;
 }
 
@@ -130,6 +136,7 @@ export function synthesisToRenderOptions(
 		layoutPrinciples: synthesis.layoutPrinciples,
 		imageryNotes: synthesis.imageryNotes,
 		implementationGuidance: synthesis.implementationGuidance,
+		limitations: synthesis.limitations,
 	};
 }
 
@@ -138,6 +145,7 @@ export type SynthesisCause =
 	| "invalid_json"
 	| "schema"
 	| "unknown_reference"
+	| "unsupported_claim"
 	| "provider"
 	| "timeout"
 	| "cancelled";
@@ -175,9 +183,14 @@ export function enrichmentDetailForCause(
 		case "invalid_json":
 			return "AI tidak mengembalikan JSON yang valid.";
 		case "schema":
-			return "AI tidak memenuhi kontrak sintesis design system.";
+			return safeDetail ?? "Format sintesis AI tidak sesuai skema analisis.";
 		case "unknown_reference":
 			return safeDetail ?? "AI merujuk evidence yang tidak tersedia.";
+		case "unsupported_claim":
+			return (
+				safeDetail ??
+				"AI menyatakan aturan yang lebih luas daripada bukti terukur."
+			);
 		case "timeout":
 			return "AI synthesis melampaui batas waktu.";
 		case "cancelled":
@@ -192,6 +205,19 @@ export interface SynthesisOutcome {
 	status: "applied" | "unavailable";
 	detail?: string;
 	cause?: SynthesisCause;
+}
+
+function tryParseJson(text: string): unknown {
+	try {
+		return JSON.parse(text);
+	} catch {
+		const sanitized = text.replace(/,(\s*[}\]])/g, "$1");
+		try {
+			return JSON.parse(sanitized);
+		} catch {
+			return null;
+		}
+	}
 }
 
 // Parses the model's response. A fenced or prose-wrapped object is still the
@@ -211,17 +237,11 @@ export function parseSynthesisResponse(
 			cause: "truncated",
 		};
 	const direct = response.trim();
-	let parsed: unknown = null;
-	try {
-		parsed = JSON.parse(direct);
-	} catch {
+	let parsed: unknown = tryParseJson(direct);
+	if (parsed === null) {
 		const extracted = extractJson(response);
 		if (extracted !== direct) {
-			try {
-				parsed = JSON.parse(extracted);
-			} catch {
-				parsed = null;
-			}
+			parsed = tryParseJson(extracted);
 		}
 	}
 	if (parsed === null)
@@ -232,20 +252,29 @@ export function parseSynthesisResponse(
 			cause: "invalid_json",
 		};
 	const result = designSynthesisSchema.safeParse(parsed);
-	if (!result.success)
+	if (!result.success) {
+		const firstIssue = result.error.issues[0];
+		const fieldPath = firstIssue?.path?.join(".") || "root";
+		const diagnostic = firstIssue
+			? `Format sintesis tidak sesuai pada ${fieldPath}: ${firstIssue.message}`
+			: "Format respons AI tidak sesuai skema analisis.";
 		return {
 			synthesis: null,
 			status: "unavailable",
-			detail: "AI tidak memenuhi kontrak sintesis design system.",
+			detail: enrichmentDetailForCause("schema", diagnostic),
 			cause: "schema",
 		};
+	}
 	const issues = validateSynthesis(result.data, model);
 	if (issues.length)
 		return {
 			synthesis: null,
 			status: "unavailable",
 			detail: issues[0]?.detail ?? "AI merujuk evidence yang tidak tersedia.",
-			cause: "unknown_reference",
+			cause:
+				issues[0]?.code === "unsupported-claim"
+					? "unsupported_claim"
+					: "unknown_reference",
 		};
 	return { synthesis: result.data, status: "applied" };
 }

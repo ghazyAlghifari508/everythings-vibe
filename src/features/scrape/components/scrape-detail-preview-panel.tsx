@@ -1,9 +1,20 @@
 import type { ScrapePreviewState } from "../hooks/use-scrape-preview";
 import { DesktopPreview } from "./scrape-detail-desktop-preview";
-import type { FrameReport } from "./scrape-detail-preview-overlay";
+import {
+	type FrameReport,
+	READINESS_MESSAGE,
+} from "./scrape-detail-preview-overlay";
 import { PreviewUnavailable } from "./scrape-detail-preview-unavailable";
 import { ScreenshotView } from "./scrape-detail-screenshot-view";
 
+/**
+ * Visual tab content.
+ *
+ * Two navigation layers exist at most: the primary Visual / HTML Source tabs
+ * above, and one secondary selector that only appears when both a DOM preview
+ * and a browser screenshot are genuinely available. When only one visual mode
+ * exists it is shown directly, without a one-option selector.
+ */
 export function ScrapeHtmlPreviewPanel({
 	active,
 	domain,
@@ -19,7 +30,6 @@ export function ScrapeHtmlPreviewPanel({
 	onFrameReport,
 	onRetryFrame,
 	onRetryPreview,
-	onOpenSource,
 }: {
 	active: boolean;
 	domain: string;
@@ -35,33 +45,50 @@ export function ScrapeHtmlPreviewPanel({
 	onFrameReport: (report: FrameReport) => void;
 	onRetryFrame: () => void;
 	onRetryPreview?: () => void;
-	onOpenSource: () => void;
 }) {
+	const hasScreenshot = Boolean(screenshot);
+	const hasDomDocument = Boolean(previewSrcDoc) && previewState !== "failed";
+	const domFailed = previewState === "failed" || frameReport === "failed";
+	// A frame that failed cannot be shown again, so the DOM mode stops being
+	// available the moment the report turns fatal.
+	const domUsable = hasDomDocument && frameReport !== "failed";
+	const showModeSelector = domUsable && hasScreenshot;
+	const showDom =
+		domUsable && (visualSubView !== "screenshot" || !hasScreenshot);
+
+	const retryAction = previewState === "failed" ? onRetryPreview : onRetryFrame;
+	const unavailableMessage =
+		previewState === "failed"
+			? (previewError ?? "Gagal menyiapkan preview scrape.")
+			: frameReport === "failed"
+				? READINESS_MESSAGE.failed.label
+				: "Preview belum tersedia.";
+
 	return (
 		<div role="tabpanel" aria-label="Preview index.html" hidden={!active}>
-			{screenshot && previewSrcDoc && previewState !== "failed" ? (
-				<div className="flex items-center justify-between border-b border-graphite bg-obsidian px-3 py-1.5 text-xs text-fog">
-					<span className="font-mono text-[11px] text-snow">
-						Mode Tampilan Visual
-					</span>
-					<div className="flex gap-1 rounded border border-graphite bg-charcoal p-0.5">
+			{showModeSelector ? (
+				<div className="flex items-center justify-end border-b border-graphite bg-obsidian px-3 py-1.5">
+					<fieldset className="flex gap-0.5 rounded-md border border-graphite bg-charcoal p-0.5">
+						<legend className="sr-only">Mode tampilan visual</legend>
 						<button
 							type="button"
 							onClick={() => onVisualSubView("dom")}
 							aria-pressed={visualSubView === "dom"}
-							className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${
+							aria-label="Tampilan DOM"
+							className={`min-h-7 rounded px-2 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
 								visualSubView === "dom"
 									? "bg-steel/40 text-snow"
 									: "text-fog hover:text-snow"
 							}`}
 						>
-							Tampilan DOM
+							DOM
 						</button>
 						<button
 							type="button"
 							onClick={() => onVisualSubView("screenshot")}
 							aria-pressed={visualSubView === "screenshot"}
-							className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${
+							aria-label="Tangkapan Layar"
+							className={`min-h-7 rounded px-2 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
 								visualSubView === "screenshot"
 									? "bg-steel/40 text-snow"
 									: "text-fog hover:text-snow"
@@ -69,50 +96,45 @@ export function ScrapeHtmlPreviewPanel({
 						>
 							Tangkapan Layar
 						</button>
-					</div>
+					</fieldset>
 				</div>
 			) : null}
 
-			{visualSubView === "screenshot" && screenshot ? (
-				<ScreenshotView
-					screenshot={screenshot}
-					domain={domain}
-					onOpenSource={onOpenSource}
-					onRetry={onRetryPreview}
-				/>
-			) : previewState === "failed" || !previewSrcDoc ? (
-				screenshot ? (
-					<ScreenshotView
-						screenshot={screenshot}
-						domain={domain}
-						onOpenSource={onOpenSource}
-						onRetry={onRetryPreview}
-					/>
-				) : (
-					<PreviewUnavailable
-						message={
-							previewState === "failed"
-								? (previewError ?? "Gagal menyiapkan preview scrape.")
-								: "Preview belum tersedia."
-						}
-						isRetryable={previewState === "failed"}
-						isLoading={previewState === "loading"}
-						onRetry={onRetryPreview}
-						onOpenSource={onOpenSource}
-					/>
-				)
-			) : (
+			{showDom ? (
 				<DesktopPreview
 					key={previewAttempt}
 					title={`Preview ${domain}`}
-					domain={domain}
-					screenshot={screenshot}
 					srcDoc={frameSrcDoc}
 					report={frameReport}
 					active={active}
 					onReport={onFrameReport}
 					onRetry={onRetryFrame}
-					onOpenSource={onOpenSource}
+				/>
+			) : hasScreenshot && screenshot ? (
+				<>
+					<ScreenshotView screenshot={screenshot} domain={domain} />
+					{domFailed && retryAction ? (
+						<div
+							data-testid="scrape-visual-recovery"
+							className="flex flex-wrap items-center justify-between gap-2 border-t border-graphite bg-obsidian px-3 py-2 text-xs text-fog"
+						>
+							<span>Preview DOM gagal dimuat.</span>
+							<button
+								type="button"
+								onClick={retryAction}
+								className="rounded-md border border-graphite px-2.5 py-1 font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								Coba lagi
+							</button>
+						</div>
+					) : null}
+				</>
+			) : (
+				<PreviewUnavailable
+					message={unavailableMessage}
+					isRetryable={domFailed}
+					isLoading={previewState === "loading" && frameReport !== "failed"}
+					onRetry={retryAction}
 				/>
 			)}
 		</div>

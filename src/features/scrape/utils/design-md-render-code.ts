@@ -14,14 +14,29 @@ export function renderCodeSections(
 
 	// --- 13. Agent Prompt Guide ---------------------------------------------
 	lines.push("", heading(2, "Agent Prompt Guide"));
-	const brandColor = model.colors.find((color) => color.roleClass === "brand");
-	const textColor = model.colors.find((color) => /text/i.test(color.role));
+	// Only a colour that was actually measured as an action fill can describe an
+	// action. A brand-named colour used for body text proves brand association,
+	// not an action hierarchy.
+	const primaryActionColor = model.colors.find(
+		(color) => color.role === "Primary action",
+	);
+	const actionFillColor = model.colors.find(
+		(color) => color.role === "Action accent",
+	);
+	const textColor =
+		model.colors.find((color) => color.role === "Base text") ??
+		model.colors.find((color) => color.role === "Text");
 	const surfaceColor = model.surfaces[0];
 	lines.push("", "**Quick reference**");
 	lines.push(
 		`- text: ${textColor ? `\`${textColor.value}\`` : "not measured"}`,
 		`- surface: ${surfaceColor ? `\`${surfaceColor.value}\`` : "not measured"}`,
-		`- primary action: ${brandColor ? `\`${brandColor.value}\`` : "not measured"}`,
+		`- action fill: ${
+			actionFillColor ? `\`${actionFillColor.value}\`` : "not measured"
+		}`,
+		`- primary action: ${
+			primaryActionColor ? `\`${primaryActionColor.value}\`` : "not measured"
+		}`,
 		`- base spacing unit: ${Number.isFinite(model.baseUnitPx) ? `${model.baseUnitPx}px` : "not measured"}`,
 	);
 	if (options.implementationGuidance?.length) {
@@ -32,6 +47,8 @@ export function renderCodeSections(
 	lines.push(
 		"",
 		"Use the observed values exactly as written. Inferred roles describe measured usage and must not be promoted to measurements. If a new requirement is not covered here, treat it as a new product decision rather than an extraction result.",
+		"This is an internal styling reference, not product content or permission to copy the source site's structure, logos or proprietary assets. Do not add palette galleries, token inspectors or documentation sections unless the product requirements explicitly request them.",
+		"Map component measurements to existing components before editing. Preserve content and flows. After editing, report each applicable rule with its code location and token/value mapping, or explain why it remains unknown or unapplied. Do not claim a perfect visual match from limited captures.",
 	);
 
 	// --- 14. CSS Custom Properties ------------------------------------------

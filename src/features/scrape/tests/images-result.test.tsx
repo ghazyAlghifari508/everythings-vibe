@@ -143,7 +143,7 @@ describe("ImagesResult gallery", () => {
 				.hasAttribute("disabled"),
 		).toBe(true);
 	});
-	it("searches source and alt metadata", () => {
+	it("exposes no search field for a gallery without searchable names", () => {
 		render(
 			<ImagesResult
 				images={[
@@ -156,11 +156,79 @@ describe("ImagesResult gallery", () => {
 				sourceUrl="https://sample.example/"
 			/>,
 		);
-		fireEvent.change(screen.getByLabelText("Cari gambar"), {
-			target: { value: "banner" },
-		});
-		expect(screen.getAllByRole("article")).toHaveLength(1);
+		expect(screen.queryByLabelText("Cari gambar")).toBeNull();
+		expect(screen.queryByRole("searchbox")).toBeNull();
+		expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+		expect(screen.getAllByRole("article")).toHaveLength(2);
 	});
+
+	it("explains an empty filtered result and keeps the reset available", () => {
+		render(
+			<ImagesResult
+				images={[
+					row({ id: "a", format: "png", classification: "logo" }),
+					row({ id: "b", format: "webp", classification: "icon" }),
+				]}
+				sourceUrl="https://sample.example/"
+			/>,
+		);
+		fireEvent.change(screen.getByLabelText("Format"), {
+			target: { value: "png" },
+		});
+		fireEvent.change(screen.getByLabelText("Jenis"), {
+			target: { value: "icon" },
+		});
+		expect(screen.queryByRole("article")).toBeNull();
+		expect(
+			screen.getByText("Tidak ada gambar yang sesuai filter."),
+		).toBeDefined();
+		fireEvent.click(screen.getByRole("button", { name: "Reset filter" }));
+		expect(screen.getAllByRole("article")).toHaveLength(2);
+	});
+
+	it("opens the original image and copies its source URL", async () => {
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		vi.stubGlobal("navigator", { clipboard: { writeText } });
+		render(
+			<ImagesResult
+				images={[row({ id: "a" })]}
+				sourceUrl="https://sample.example/"
+			/>,
+		);
+		const original = screen.getByRole("link", { name: "Buka gambar asli" });
+		expect(original.getAttribute("href")).toBe("https://sample.example/a.png");
+		expect(original.getAttribute("target")).toBe("_blank");
+		fireEvent.click(screen.getByRole("button", { name: "Salin URL sumber" }));
+		await waitFor(() =>
+			expect(writeText).toHaveBeenCalledWith("https://sample.example/a.png"),
+		);
+	});
+
+	it("keeps a minimal labelled control set across themes and viewports", () => {
+		document.documentElement.classList.add("dark");
+		render(
+			<ImagesResult
+				images={[row({ id: "a", format: "png", classification: "logo" })]}
+				sourceUrl="https://sample.example/"
+			/>,
+		);
+		expect(
+			screen.getByRole("region", { name: "Images Explorer" }),
+		).toBeDefined();
+		expect(screen.getAllByRole("combobox")).toHaveLength(2);
+		expect(screen.getByText("1 gambar tersedia")).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: "Download gambar" }),
+		).toBeDefined();
+		expect(
+			screen.getByRole("link", { name: "Buka gambar asli" }),
+		).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: "Salin URL sumber" }),
+		).toBeDefined();
+		document.documentElement.classList.remove("dark");
+	});
+
 	it("refreshes an expired capability and retries only the failed image", async () => {
 		const fetcher = vi
 			.fn()

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { scrapePages } from "@/db/schema";
-import {
-	layoutCrawlGraph,
-	shortCrawlLabel,
-} from "@/features/scrape/utils/crawl-graph";
+import { layoutCrawlGraph } from "@/features/scrape/utils/crawl-graph";
 
 type Page = typeof scrapePages.$inferSelect;
 
@@ -26,6 +23,20 @@ function page(
 		content: null,
 		error: null,
 		...options,
+	};
+}
+
+function withOutgoing(outgoing: string[]): Partial<Page> {
+	return {
+		content: {
+			outgoingPages: outgoing,
+			description: null,
+			headings: [],
+			text: "",
+			links: [],
+			images: [],
+			patterns: [],
+		},
 	};
 }
 
@@ -65,7 +76,7 @@ describe("layoutCrawlGraph", () => {
 
 		// Primary edges connect parent to children
 		expect(graph.primaryEdges).toHaveLength(2);
-		expect(graph.edges).toHaveLength(2);
+		expect(graph.secondaryEdges).toHaveLength(0);
 		const primaryKeys = graph.primaryEdges.map((e) => `${e.from}->${e.to}`);
 		expect(primaryKeys).toContain(
 			"https://example.test/->https://example.test/pricing",
@@ -75,7 +86,7 @@ describe("layoutCrawlGraph", () => {
 		);
 
 		// Edges have valid SVG paths and endpoints
-		for (const edge of graph.edges) {
+		for (const edge of graph.primaryEdges) {
 			expect(edge.kind).toBe("primary");
 			expect(edge.path).toMatch(/^M \d+ \d+ C/);
 			expect(edge.x1).toBeGreaterThanOrEqual(0);
@@ -85,82 +96,75 @@ describe("layoutCrawlGraph", () => {
 		}
 	});
 
-	it("differentiates primary discovery edges from secondary observed links", () => {
+	it("keeps observed links separate from the discovery hierarchy", () => {
 		const pages = [
 			page("https://example.test/", null, 0, {
-				content: {
-					outgoingPages: [
-						"https://example.test/pricing",
-						"https://example.test/docs",
-					],
-					description: null,
-					headings: [],
-					text: "",
-					links: [],
-					images: [],
-					patterns: [],
-				},
+				title: "Home",
+				...withOutgoing([
+					"https://example.test/pricing",
+					"https://example.test/docs",
+				]),
 			}),
 			page("https://example.test/pricing", "https://example.test/", 1, {
-				content: {
-					outgoingPages: ["https://example.test/docs"], // Secondary cross-link between siblings
-					description: null,
-					headings: [],
-					text: "",
-					links: [],
-					images: [],
-					patterns: [],
-				},
+				title: "Pricing",
+				// Observed link between siblings, not a discovery parent
+				...withOutgoing(["https://example.test/docs"]),
 			}),
 			page("https://example.test/docs", "https://example.test/", 1),
 		];
 
-		const discoveryGraph = layoutCrawlGraph(pages, { viewMode: "discovery" });
-		expect(discoveryGraph.primaryEdges).toHaveLength(2);
-		expect(discoveryGraph.secondaryEdges).toHaveLength(1);
-		// In discovery mode, only primary edges are in active edges list
-		expect(discoveryGraph.edges).toHaveLength(2);
-		expect(discoveryGraph.secondaryEdges[0].kind).toBe("cross");
+		const graph = layoutCrawlGraph(pages);
 
-		const allLinksGraph = layoutCrawlGraph(pages, { viewMode: "all" });
-		// In all mode, both primary and secondary edges are in active edges list
-		expect(allLinksGraph.edges).toHaveLength(3);
-		expect(allLinksGraph.edges.some((e) => e.kind === "cross")).toBe(true);
+		expect(graph.primaryEdges).toHaveLength(2);
+		expect(graph.secondaryEdges).toHaveLength(1);
+		expect(graph.secondaryEdges[0].kind).toBe("cross");
+		expect(graph.secondaryEdges[0].from).toBe("https://example.test/pricing");
+		expect(graph.secondaryEdges[0].to).toBe("https://example.test/docs");
+	});
+
+	it("does not let observed links move the pages around", () => {
+		const tree = [
+			page("https://example.test/", null, 0, { title: "Home" }),
+			page("https://example.test/a", "https://example.test/", 1),
+			page("https://example.test/b", "https://example.test/", 1),
+		];
+		const withObservedLinks = [
+			page("https://example.test/", null, 0, { title: "Home" }),
+			page("https://example.test/a", "https://example.test/", 1, {
+				// Observed link to a page that was discovered elsewhere
+				...withOutgoing(["https://example.test/b"]),
+			}),
+			page("https://example.test/b", "https://example.test/", 1),
+		];
+
+		const plain = layoutCrawlGraph(tree);
+		const observed = layoutCrawlGraph(withObservedLinks);
+
+		expect(observed.secondaryEdges.length).toBeGreaterThan(0);
+		expect(observed.nodes.map((node) => [node.x, node.y])).toEqual(
+			plain.nodes.map((node) => [node.x, node.y]),
+		);
 	});
 
 	it("handles cycles and deduplicates edges without infinite loops", () => {
 		const pages = [
 			page("https://example.test/a", "https://example.test/b", 1, {
-				content: {
-					outgoingPages: [
-						"https://example.test/b",
-						"https://example.test/b", // Duplicate link
-						"https://example.test/a", // Self link
-					],
-					description: null,
-					headings: [],
-					text: "",
-					links: [],
-					images: [],
-					patterns: [],
-				},
+				...withOutgoing([
+					"https://example.test/b",
+					"https://example.test/b", // Duplicate link
+					"https://example.test/a", // Self link
+				]),
 			}),
 			page("https://example.test/b", "https://example.test/a", 1, {
-				content: {
-					outgoingPages: ["https://example.test/a"],
-					description: null,
-					headings: [],
-					text: "",
-					links: [],
-					images: [],
-					patterns: [],
-				},
+				...withOutgoing(["https://example.test/a"]),
 			}),
 		];
-		const graph = layoutCrawlGraph(pages, { viewMode: "all" });
+		const graph = layoutCrawlGraph(pages);
 		expect(graph.nodes).toHaveLength(2);
 		// No self-links as chords, duplicate edges deduplicated
-		const edgeKeys = graph.edges.map((e) => `${e.from}->${e.to}`);
+		const edgeKeys = [...graph.primaryEdges, ...graph.secondaryEdges].map(
+			(e) => `${e.from}->${e.to}`,
+		);
 		const uniqueEdgeKeys = new Set(edgeKeys);
 		expect(uniqueEdgeKeys.size).toBe(edgeKeys.length);
 		expect(edgeKeys).not.toContain(
@@ -195,14 +199,15 @@ describe("layoutCrawlGraph", () => {
 	it("handles root-only graph and empty pages gracefully", () => {
 		const empty = layoutCrawlGraph([]);
 		expect(empty.nodes).toHaveLength(0);
-		expect(empty.edges).toHaveLength(0);
+		expect(empty.primaryEdges).toHaveLength(0);
+		expect(empty.secondaryEdges).toHaveLength(0);
 		expect(empty.width).toBe(0);
 		expect(empty.height).toBe(0);
 
 		const rootOnly = layoutCrawlGraph([page("https://example.test/", null, 0)]);
 		expect(rootOnly.nodes).toHaveLength(1);
 		expect(rootOnly.nodes[0].isRoot).toBe(true);
-		expect(rootOnly.edges).toHaveLength(0);
+		expect(rootOnly.primaryEdges).toHaveLength(0);
 		expect(rootOnly.width).toBeGreaterThan(0);
 		expect(rootOnly.height).toBeGreaterThan(0);
 	});
@@ -259,10 +264,32 @@ describe("layoutCrawlGraph", () => {
 		expect(graph.primaryEdges).toHaveLength(2);
 	});
 
+	it("reports the observed link counts on every node", () => {
+		const pages = [
+			page("https://example.test/", null, 0, {
+				...withOutgoing(["https://example.test/pricing"]),
+			}),
+			page("https://example.test/pricing", "https://example.test/", 1, {
+				...withOutgoing(["https://example.test/docs"]),
+			}),
+			page("https://example.test/docs", "https://example.test/", 1),
+		];
+
+		const graph = layoutCrawlGraph(pages);
+		const home = graph.nodes.find((n) => n.id === "https://example.test/");
+		const pricing = graph.nodes.find(
+			(n) => n.id === "https://example.test/pricing",
+		);
+
+		expect(home?.outgoingCount).toBe(2);
+		expect(home?.incomingCount).toBe(0);
+		expect(pricing?.outgoingCount).toBe(1);
+		expect(pricing?.incomingCount).toBe(1);
+	});
+
 	it("truncates long labels for viewport readability", () => {
 		const longUrl = `https://example.test/${"a".repeat(200)}`;
 		const graph = layoutCrawlGraph([page(longUrl, null, 0)]);
 		expect(graph.nodes[0].label.length).toBeLessThanOrEqual(32);
-		expect(shortCrawlLabel(null, longUrl).length).toBeLessThanOrEqual(32);
 	});
 });

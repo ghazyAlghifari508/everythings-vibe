@@ -1,5 +1,5 @@
 import { Download01Icon, Search01Icon } from "@hugeicons/core-free-icons";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { scrapePages } from "@/db/schema";
 import { buildWebsiteBlueprint } from "@/features/scrape/utils/crawl-blueprint";
@@ -44,10 +44,18 @@ export function CrawlResult({
 	const [statusFilter, setStatusFilter] = useState<Page["status"] | "all">(
 		"all",
 	);
+	const explorerRef = useRef<HTMLElement>(null);
 	useEffect(() => {
 		setSelected((current) => resolveSelectedPageId(pages, current));
 	}, [pages]);
 	const page = pages.find((row) => row.id === selected);
+
+	function focusExplorer(): void {
+		const explorer = explorerRef.current;
+		if (!explorer) return;
+		explorer.scrollIntoView?.({ behavior: "smooth", block: "start" });
+		explorer.focus?.();
+	}
 
 	const counts = useMemo(() => {
 		return {
@@ -55,6 +63,7 @@ export function CrawlResult({
 			completed: pages.filter((row) => row.status === "completed").length,
 			skipped: pages.filter((row) => row.status === "skipped").length,
 			failed: pages.filter((row) => row.status === "failed").length,
+			queued: pages.filter((row) => row.status === "queued").length,
 		};
 	}, [pages]);
 
@@ -102,8 +111,6 @@ export function CrawlResult({
 		if (next) setSelected(next.id);
 	}
 
-	const siteDomain = domain ?? safeDomain(sourceUrl);
-
 	return (
 		<section className="space-y-6">
 			<header className="space-y-4">
@@ -130,22 +137,48 @@ export function CrawlResult({
 						Download .md
 					</button>
 				</div>
-				<div className="rounded-xl border border-graphite bg-onyx p-4">
-					<p className="text-sm font-medium text-snow">{siteDomain}</p>
-					<p className="mt-2 text-xs text-fog tabular-nums">
-						{counts.discovered} ditemukan Â· {counts.completed} berhasil Â·{" "}
-						{counts.skipped} dilewati Â· {counts.failed} gagal
-					</p>
-					<p className="mt-1 text-xs text-fog">
-						{scope
-							? `Cakupan: max ${scope.maxPages} pages Â· depth ${scope.maxDepth}`
-							: "Cakupan: berdasarkan hasil tersimpan"}
-					</p>
-					<p className="mt-2 text-xs leading-5 text-fog">
-						Jumlah ditemukan adalah halaman yang teramati dalam batas crawl,
-						bukan jumlah seluruh halaman website. robots.txt dihormati. Crawler
-						membaca HTML statis tanpa eksekusi JavaScript.
-					</p>
+				<div className="rounded-xl border border-graphite bg-onyx p-4 sm:p-5">
+					<div className="flex flex-wrap items-center gap-6 sm:gap-10">
+						<div>
+							<div className="text-2xl font-semibold text-snow tabular-nums">
+								{counts.discovered}
+							</div>
+							<div className="text-xs text-fog">Ditemukan</div>
+						</div>
+						<div>
+							<div className="text-2xl font-semibold text-snow tabular-nums">
+								{counts.completed}
+							</div>
+							<div className="text-xs text-fog">Berhasil</div>
+						</div>
+						{counts.skipped > 0 ? (
+							<div>
+								<div className="text-2xl font-semibold text-snow tabular-nums">
+									{counts.skipped}
+								</div>
+								<div className="text-xs text-fog">Dilewati</div>
+							</div>
+						) : null}
+						<div>
+							<div className="text-2xl font-semibold text-snow tabular-nums">
+								{counts.failed}
+							</div>
+							<div className="text-xs text-fog">Gagal</div>
+						</div>
+						{counts.queued > 0 ? (
+							<div>
+								<div className="text-2xl font-semibold text-snow tabular-nums">
+									{counts.queued}
+								</div>
+								<div className="text-xs text-fog">Antre</div>
+							</div>
+						) : null}
+					</div>
+					{scope?.maxPages ? (
+						<p className="mt-4 text-xs text-fog">
+							{`Pencarian dibatasi hingga ${scope.maxPages} halaman.`}
+						</p>
+					) : null}
 				</div>
 			</header>
 
@@ -156,6 +189,7 @@ export function CrawlResult({
 						pages={pages}
 						selectedId={selected}
 						onSelect={setSelected}
+						onViewDetails={focusExplorer}
 					/>
 				</div>
 			</section>
@@ -257,8 +291,8 @@ export function CrawlResult({
 											</span>
 											<span className="mt-1 block text-xs text-fog">
 												{statusText(row.status)}
-												{row.httpStatus ? ` Â· HTTP ${row.httpStatus}` : ""}
-												{` Â· depth ${row.depth}`}
+												{row.httpStatus ? ` · HTTP ${row.httpStatus}` : ""}
+												{` · depth ${row.depth}`}
 											</span>
 										</button>
 									</li>
@@ -268,8 +302,18 @@ export function CrawlResult({
 					)}
 				</section>
 
-				<section className="min-w-0 rounded-lg border border-graphite p-5">
-					<h2 className="text-lg font-semibold text-snow">Page Explorer</h2>
+				<section
+					ref={explorerRef}
+					tabIndex={-1}
+					aria-labelledby="crawl-page-explorer-title"
+					className="min-w-0 rounded-lg border border-graphite p-5 focus-visible:ring-2 focus-visible:ring-indigo"
+				>
+					<h2
+						id="crawl-page-explorer-title"
+						className="text-lg font-semibold text-snow"
+					>
+						Page Explorer
+					</h2>
 					{page ? (
 						<PageDetail page={page} />
 					) : (
@@ -281,12 +325,4 @@ export function CrawlResult({
 			</div>
 		</section>
 	);
-}
-
-function safeDomain(sourceUrl: string): string {
-	try {
-		return new URL(sourceUrl).hostname.toLowerCase();
-	} catch {
-		return sourceUrl;
-	}
 }

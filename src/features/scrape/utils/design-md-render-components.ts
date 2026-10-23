@@ -22,14 +22,12 @@ export function renderComponentSections(
 		}),
 	);
 	const aiComponents = options.componentPatterns ?? [];
-	const seenNames = new Set(
-		aiComponents.map((component) => component.name.toLowerCase()),
-	);
 	const mergedComponents = [
-		...aiComponents,
-		...observedComponents.filter(
-			(component) => !seenNames.has(component.name.toLowerCase()),
-		),
+		...observedComponents,
+		...aiComponents.map((component) => ({
+			...component,
+			name: `${component.name} (AI inference)`,
+		})),
 	];
 	if (focus !== "visual-tokens" && mergedComponents.length) {
 		lines.push("", heading(2, "Components"), "");
@@ -39,7 +37,7 @@ export function renderComponentSections(
 			lines.push(`**Evidence:** ${escapeCell(component.evidence)}`);
 			lines.push(
 				"",
-				"Reuse this treatment for the same class of elements to retain visual consistency.",
+				"Map this treatment only to matching components and the cited capture scope. Component roles and hierarchy are inferred; measurements do not establish unseen variants or interaction states.",
 			);
 		}
 	}

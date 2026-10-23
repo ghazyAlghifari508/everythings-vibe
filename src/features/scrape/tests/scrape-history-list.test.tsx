@@ -6,13 +6,16 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useScrapeHistorySelection } from "@/features/scrape/hooks/use-scrape-history-selection";
 import type { ScrapeHistorySearch } from "@/features/scrape/types/scrape-contract";
+import { historyFilterKey } from "@/features/scrape/utils/scrape-history";
 import {
 	imageCountsLabel,
 	imageResultCounts,
 } from "@/features/scrape/utils/scrape-images";
 import { ScrapeHistoryList } from "../components/scrape-history-list";
+import { ScrapeHistoryView } from "../components/scrape-history-view";
 
 const baseSearch: ScrapeHistorySearch = {
 	q: "",
@@ -21,16 +24,30 @@ const baseSearch: ScrapeHistorySearch = {
 	pageSize: 10,
 };
 
-function renderList(
-	overrides: Partial<Parameters<typeof ScrapeHistoryList>[0]> = {},
-) {
+type ListProps = Parameters<typeof ScrapeHistoryList>[0];
+type ListOwnProps = Omit<ListProps, "selection">;
+
+// The list renders inside the page shell in the product, so the selection
+// controller is created here exactly the way the view creates it.
+function HistoryListHarness(props: ListOwnProps) {
+	const selection = useScrapeHistorySelection(historyFilterKey(props.search));
+	return <ScrapeHistoryList {...props} selection={selection} />;
+}
+
+function renderList(overrides: Partial<ListOwnProps> = {}) {
 	const onQueryChange = vi.fn();
 	const rendered = render(
-		<ScrapeHistoryList
+		<HistoryListHarness
 			items={[]}
 			total={0}
 			search={baseSearch}
 			onQueryChange={onQueryChange}
+			onDeleteMany={vi
+				.fn()
+				.mockResolvedValue({ deleted: 0, skipped: 0, deletedIds: [] })}
+			onPrepareSelection={vi
+				.fn()
+				.mockResolvedValue({ ids: [], total: 0, truncated: false })}
 			{...overrides}
 		/>,
 	);
@@ -47,7 +64,7 @@ it("keeps historical stored and legacy counts distinct", () => {
 		4,
 	);
 	render(
-		<ScrapeHistoryList
+		<HistoryListHarness
 			items={[
 				{
 					id: "sample",
@@ -63,6 +80,12 @@ it("keeps historical stored and legacy counts distinct", () => {
 			total={1}
 			search={baseSearch}
 			onQueryChange={vi.fn()}
+			onDeleteMany={vi
+				.fn()
+				.mockResolvedValue({ deleted: 0, skipped: 0, deletedIds: [] })}
+			onPrepareSelection={vi
+				.fn()
+				.mockResolvedValue({ ids: [], total: 0, truncated: false })}
 		/>,
 	);
 	expect(screen.getByText(imageCountsLabel(counts))).toBeDefined();
@@ -90,8 +113,62 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
+function installRadixDomPolyfills() {
+	class ResizeObserverStub {
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	}
+	vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+	vi.stubGlobal(
+		"DOMRect",
+		class {
+			constructor(
+				public x = 0,
+				public y = 0,
+				public width = 0,
+				public height = 0,
+			) {}
+			get top() {
+				return this.y;
+			}
+			get left() {
+				return this.x;
+			}
+			get right() {
+				return this.x + this.width;
+			}
+			get bottom() {
+				return this.y + this.height;
+			}
+		},
+	);
+	if (!Element.prototype.hasPointerCapture) {
+		Element.prototype.hasPointerCapture = () => false;
+		Element.prototype.setPointerCapture = () => {};
+		Element.prototype.releasePointerCapture = () => {};
+	}
+	if (!Element.prototype.scrollIntoView) {
+		Element.prototype.scrollIntoView = () => {};
+	}
+}
+
+function openActionsMenu(index = 0) {
+	const triggers = screen.getAllByRole("button", { name: /Aksi riwayat/i });
+	fireEvent.pointerDown(triggers[index], {
+		button: 0,
+		ctrlKey: false,
+		pointerType: "mouse",
+	});
+}
+
+beforeEach(() => {
+	installRadixDomPolyfills();
+});
+
 afterEach(() => {
 	cleanup();
+	vi.unstubAllGlobals();
 });
 
 describe("ScrapeHistoryList", () => {
@@ -129,9 +206,7 @@ describe("ScrapeHistoryList", () => {
 		expect(within(rowLink).getByText("DESIGN.md")).toBeDefined();
 		expect(within(rowLink).getByText("Selesai")).toBeDefined();
 		expect(screen.queryByRole("link", { name: /^Buka$/i })).toBeNull();
-		expect(
-			screen.getByRole("button", { name: /Hapus riwayat/i }),
-		).toBeDefined();
+		expect(screen.getByRole("button", { name: /Aksi riwayat/i })).toBeDefined();
 		const html = container.innerHTML;
 		expect(html).not.toContain("rounded-full");
 		expect(html).not.toContain("bg-emerald-400");
@@ -227,6 +302,28 @@ describe("ScrapeHistoryList dashboard", () => {
 			sort: "oldest",
 			page: 1,
 		});
+	});
+
+	it("keeps the category filters on the left and status and sort on the right of the same row", () => {
+		renderList({ total: 3 });
+
+		const modeFilters = screen.getByRole("group", {
+			name: /filter mode ekstraksi/i,
+		});
+		const status = screen.getByLabelText("Status");
+		const sort = screen.getByLabelText("Urutkan");
+		const row = modeFilters.parentElement;
+		const group = status.closest("label")?.parentElement;
+
+		expect(row).not.toBeNull();
+		expect(group).not.toBeNull();
+		expect(sort.closest("label")?.parentElement).toBe(group);
+		expect(group?.parentElement).toBe(row);
+		// The row distributes the two groups apart and is allowed to wrap so a
+		// narrow screen moves the dropdowns to their own line instead of
+		// overflowing.
+		expect(row?.className).toContain("justify-between");
+		expect(row?.className).toContain("flex-wrap");
 	});
 
 	it("debounces search input without delaying visible keystrokes", () => {
@@ -352,7 +449,8 @@ describe("ScrapeHistoryList dashboard", () => {
 			total: 1,
 			onDelete,
 		});
-		fireEvent.click(screen.getByRole("button", { name: /hapus riwayat/i }));
+		openActionsMenu(0);
+		fireEvent.click(screen.getByRole("menuitem", { name: /Hapus riwayat/i }));
 		expect(
 			screen.getByRole("dialog", { name: /hapus riwayat vibescrape/i }),
 		).toBeDefined();
@@ -378,8 +476,256 @@ describe("ScrapeHistoryList dashboard", () => {
 			total: 1,
 			onDelete,
 		});
-		fireEvent.click(screen.getByRole("button", { name: /hapus riwayat/i }));
+		openActionsMenu(0);
+		fireEvent.click(screen.getByRole("menuitem", { name: /Hapus riwayat/i }));
 		fireEvent.click(screen.getByRole("button", { name: /konfirmasi hapus/i }));
 		await vi.waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
+	});
+});
+
+describe("ScrapeHistory direct selection without selection mode", () => {
+	const sampleItems = [
+		{
+			id: "item-1",
+			sourceUrl: "https://anpundung.com",
+			domain: "anpundung.com",
+			title: null,
+			status: "completed",
+			mode: "images" as const,
+			createdAt: new Date().toISOString(),
+		},
+		{
+			id: "item-2",
+			sourceUrl: "https://desainpakeai.com",
+			domain: "desainpakeai.com",
+			title: null,
+			status: "completed",
+			mode: "design" as const,
+			createdAt: new Date().toISOString(),
+		},
+		{
+			id: "item-3",
+			sourceUrl: "https://notion.so",
+			domain: "notion.so",
+			title: null,
+			status: "completed",
+			mode: "crawl" as const,
+			createdAt: new Date().toISOString(),
+		},
+	];
+
+	function selectFirstItemViaMenu() {
+		openActionsMenu(0);
+		fireEvent.click(screen.getByRole("menuitem", { name: "Pilih" }));
+	}
+
+	it("renders clean list without checkboxes or select-all on initial state", () => {
+		renderList({
+			items: sampleItems,
+			total: 3,
+		});
+
+		expect(screen.queryByRole("button", { name: /^Pilih$/i })).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /^Selesai memilih$/i }),
+		).toBeNull();
+
+		// On initial load, no checkboxes are rendered
+		expect(screen.queryByRole("checkbox")).toBeNull();
+		expect(
+			screen.getAllByRole("button", { name: /Aksi riwayat/i }),
+		).toHaveLength(3);
+	});
+
+	it("hides bulk toolbar when count is 0 and shows it when items are selected", () => {
+		renderList({
+			items: sampleItems,
+			total: 3,
+		});
+
+		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
+		expect(screen.queryByRole("button", { name: /^Batal$/i })).toBeNull();
+
+		selectFirstItemViaMenu();
+
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+		expect(screen.getByRole("button", { name: /^Batal$/i })).toBeDefined();
+		expect(screen.getByRole("button", { name: /Hapus 1/i })).toBeDefined();
+
+		const item2Checkbox = screen.getByRole("checkbox", {
+			name: /pilih riwayat desainpakeai/i,
+		});
+		fireEvent.click(item2Checkbox);
+
+		expect(screen.getByText("2 hasil dipilih")).toBeDefined();
+		expect(screen.getByRole("button", { name: /Hapus 2/i })).toBeDefined();
+	});
+
+	it("clears selection when Batal is clicked and restores clean state", () => {
+		renderList({
+			items: sampleItems,
+			total: 3,
+		});
+
+		selectFirstItemViaMenu();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+		expect(
+			screen.getByRole("checkbox", { name: /pilih riwayat anpundung/i }),
+		).toBeDefined();
+
+		const batalButton = screen.getByRole("button", { name: /^Batal$/i });
+		fireEvent.click(batalButton);
+
+		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
+		expect(screen.queryByRole("checkbox")).toBeNull();
+	});
+
+	it("keeps item detail link and actions menu independent", () => {
+		renderList({
+			items: sampleItems,
+			total: 3,
+		});
+
+		const link = screen.getByRole("link", { name: /anpundung/i });
+		const actionBtn = screen.getByRole("button", {
+			name: /Aksi riwayat anpundung/i,
+		});
+
+		expect(link.getAttribute("href")).toBe("/scrape/$id");
+		expect(link.contains(actionBtn)).toBe(false);
+	});
+
+	it("selects all items on the current page via select-all checkbox once selection begins", () => {
+		renderList({
+			items: sampleItems,
+			total: 3,
+		});
+
+		// Initially, select-all is not visible
+		expect(screen.queryByRole("checkbox")).toBeNull();
+
+		// Selecting 1 item enters active selection and reveals select-all
+		selectFirstItemViaMenu();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+
+		const selectAll = screen.getByRole("checkbox", {
+			name: /pilih semua di halaman ini/i,
+		});
+		fireEvent.click(selectAll);
+
+		expect(screen.getByText("3 hasil dipilih")).toBeDefined();
+		expect(screen.getByRole("button", { name: /Hapus 3/i })).toBeDefined();
+
+		const checkboxes = screen.getAllByRole("checkbox");
+		for (const cb of checkboxes) {
+			expect((cb as HTMLInputElement).checked).toBe(true);
+		}
+
+		fireEvent.click(selectAll);
+		expect(screen.queryByText(/hasil dipilih/i)).toBeNull();
+		// Returning to 0 selection cleans up all checkboxes
+		expect(screen.queryByRole("checkbox")).toBeNull();
+	});
+
+	it("supports cross-page selection for filtered results", async () => {
+		const onPrepareSelection = vi.fn().mockResolvedValue({
+			ids: ["item-1", "item-2", "item-3", "item-4"],
+			total: 4,
+			truncated: false,
+		});
+
+		renderList({
+			items: sampleItems,
+			total: 4,
+			onPrepareSelection,
+		});
+
+		// First select 1 item to activate selection
+		selectFirstItemViaMenu();
+
+		const selectAll = screen.getByRole("checkbox", {
+			name: /pilih semua di halaman ini/i,
+		});
+		fireEvent.click(selectAll);
+
+		const selectAllFilteredBtn = screen.getByRole("button", {
+			name: /pilih semua 4 hasil sesuai filter/i,
+		});
+		fireEvent.click(selectAllFilteredBtn);
+
+		await vi.waitFor(() => {
+			expect(onPrepareSelection).toHaveBeenCalled();
+			expect(screen.getByText("4 hasil dipilih")).toBeDefined();
+		});
+	});
+
+	it("confirms bulk deletion and invokes onDeleteMany with selected ids", async () => {
+		const onDeleteMany = vi.fn().mockResolvedValue({
+			deleted: 2,
+			skipped: 0,
+			deletedIds: ["item-1", "item-2"],
+		});
+
+		renderList({
+			items: sampleItems,
+			total: 3,
+			onDeleteMany,
+		});
+
+		selectFirstItemViaMenu();
+		fireEvent.click(
+			screen.getByRole("checkbox", { name: /pilih riwayat desainpakeai/i }),
+		);
+
+		const bulkDeleteBtn = screen.getByRole("button", { name: /Hapus 2/i });
+		fireEvent.click(bulkDeleteBtn);
+
+		expect(screen.getByRole("dialog")).toBeDefined();
+		expect(screen.getByText(/Hapus 2 hasil scrape\?/i)).toBeDefined();
+		expect(
+			screen.getByText(/Hasil yang dipilih akan dihapus permanen\./i),
+		).toBeDefined();
+
+		const confirmBtn = screen.getByRole("button", { name: /^Hapus 2$/i });
+		fireEvent.click(confirmBtn);
+
+		await vi.waitFor(() => {
+			expect(onDeleteMany).toHaveBeenCalledWith(["item-1", "item-2"]);
+		});
+	});
+});
+
+describe("ScrapeHistoryView", () => {
+	it("does not render Pilih or Selesai memilih buttons in header", () => {
+		render(
+			<ScrapeHistoryView
+				items={[
+					{
+						id: "item-1",
+						sourceUrl: "https://anpundung.com",
+						domain: "anpundung.com",
+						title: null,
+						status: "completed",
+						mode: "images",
+						createdAt: new Date().toISOString(),
+					},
+				]}
+				total={1}
+				search={baseSearch}
+				onQueryChange={vi.fn()}
+				onDelete={vi.fn()}
+				onDeleteMany={vi
+					.fn()
+					.mockResolvedValue({ deleted: 0, skipped: 0, deletedIds: [] })}
+				onPrepareSelection={vi
+					.fn()
+					.mockResolvedValue({ ids: [], total: 0, truncated: false })}
+			/>,
+		);
+
+		expect(screen.queryByRole("button", { name: /^Pilih$/i })).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /^Selesai memilih$/i }),
+		).toBeNull();
 	});
 });

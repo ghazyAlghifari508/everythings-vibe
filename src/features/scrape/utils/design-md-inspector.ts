@@ -69,6 +69,8 @@ export interface InspectorToken {
 
 export interface InspectorRadiusToken extends InspectorToken {
 	valuePx: number;
+	/** True when the measured geometry proves the shape is fully rounded. */
+	pill: boolean;
 }
 
 export interface InspectorElevationToken {
@@ -270,8 +272,11 @@ export function inspectorFromModel(
 			label: token.purpose,
 			value: token.value,
 			valuePx: token.valuePx,
-			context: `${token.frequency} element`,
+			context: token.scope
+				? `${token.frequency} element in ${token.scope}`
+				: `${token.frequency} element`,
 			frequency: token.frequency,
+			pill: token.pill === true,
 		})),
 		elevation: model.elevation.map((token) => ({
 			value: token.value,

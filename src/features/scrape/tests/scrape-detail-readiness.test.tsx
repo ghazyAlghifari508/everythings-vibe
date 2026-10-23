@@ -201,7 +201,7 @@ describe("ScrapeDetail preview readiness", () => {
 		expect(onRetryPreview).toHaveBeenCalledOnce();
 	});
 
-	it("opens the Source HTML tab from the failed preview fallback", () => {
+	it("keeps the source tab reachable from the failed preview fallback", () => {
 		render(
 			<ScrapeDetail
 				domain="example.com"
@@ -212,7 +212,12 @@ describe("ScrapeDetail preview readiness", () => {
 				onRetryPreview={vi.fn()}
 			/>,
 		);
-		fireEvent.click(screen.getByRole("button", { name: /buka source html/i }));
+		// The tab bar already owns the source action, so the failure surface
+		// must not repeat it.
+		expect(
+			screen.queryByRole("button", { name: /buka source html/i }),
+		).toBeNull();
+		fireEvent.click(screen.getByRole("tab", { name: /Source HTML/i }));
 		expect(
 			screen
 				.getByRole("tab", { name: /Source HTML/i })
@@ -223,7 +228,7 @@ describe("ScrapeDetail preview readiness", () => {
 		).toBeDefined();
 	});
 
-	it("opens the Source HTML tab from the failed iframe overlay", () => {
+	it("keeps the source tab reachable after the preview frame failed", () => {
 		render(
 			<ScrapeDetail
 				domain="example.com"
@@ -233,7 +238,11 @@ describe("ScrapeDetail preview readiness", () => {
 			/>,
 		);
 		act(() => report("failed"));
-		fireEvent.click(screen.getByRole("button", { name: /buka source html/i }));
+		expect(screen.getByTestId("preview-unavailable")).toBeDefined();
+		expect(
+			screen.queryByRole("button", { name: /buka source html/i }),
+		).toBeNull();
+		fireEvent.click(screen.getByRole("tab", { name: /Source HTML/i }));
 		expect(
 			screen
 				.getByRole("tab", { name: /Source HTML/i })

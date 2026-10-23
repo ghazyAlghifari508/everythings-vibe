@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodebaseSourcePreview } from "@/features/codebase/components/explorer/codebase-source-preview";
+import {
+	SCRAPE_SOURCE_PREVIEW_MAX_HEIGHT,
+	SCRAPE_SOURCE_PREVIEW_MAX_LINES,
+} from "@/features/scrape/types/scrape-constants";
 import type { ScrapePreviewState } from "../hooks/use-scrape-preview";
 import { safeScrapeFilename } from "../utils/filename";
 import type { FrameReport } from "./scrape-detail-preview-overlay";
 import { ScrapeHtmlPreviewPanel } from "./scrape-detail-preview-panel";
 import { type HtmlViewTab, ScrapeHtmlToolbar } from "./scrape-detail-toolbar";
 import { copyText, downloadFile } from "./scrape-file-actions";
-
-export { safeScrapeFilename };
-export { ScreenshotView } from "./scrape-detail-screenshot-view";
 
 export interface ScrapeDetailProps {
 	domain: string;
@@ -43,6 +44,9 @@ export function ScrapeDetail({
 	onRetryPreview,
 }: ScrapeDetailProps) {
 	const [htmlViewTab, setHtmlViewTab] = useState<HtmlViewTab>("preview");
+	// The source viewer is mounted the first time the source tab is opened, so
+	// a visitor who never reads the source never pays for rendering it.
+	const [hasOpenedSource, setHasOpenedSource] = useState(false);
 	const [visualSubView, setVisualSubView] = useState<"dom" | "screenshot">(
 		"dom",
 	);
@@ -133,15 +137,16 @@ export function ScrapeDetail({
 		}
 	}
 
-	function focusHtmlTab(tab: HtmlViewTab) {
+	function selectTab(tab: HtmlViewTab) {
 		setHtmlViewTab(tab);
+		if (tab === "code") setHasOpenedSource(true);
+	}
+
+	function focusHtmlTab(tab: HtmlViewTab) {
+		selectTab(tab);
 		document
 			.getElementById(tab === "code" ? "html-code-tab" : "html-preview-tab")
 			?.focus();
-	}
-
-	function openSourceTab() {
-		setHtmlViewTab("code");
 	}
 
 	return (
@@ -154,7 +159,7 @@ export function ScrapeDetail({
 					<a
 						href={sourceUrl}
 						target="_blank"
-						rel="noreferrer"
+						rel="noreferrer noopener"
 						className="mt-2 block break-all text-sm text-fog"
 					>
 						{sourceUrl}
@@ -167,7 +172,7 @@ export function ScrapeDetail({
 			>
 				<ScrapeHtmlToolbar
 					activeTab={htmlViewTab}
-					onSelectTab={setHtmlViewTab}
+					onSelectTab={selectTab}
 					onFocusTab={focusHtmlTab}
 					screenshot={screenshot}
 					screenshotFilename={screenshotFilename}
@@ -200,7 +205,6 @@ export function ScrapeDetail({
 						onRetryPreview?.();
 					}}
 					onRetryPreview={onRetryPreview}
-					onOpenSource={openSourceTab}
 				/>
 
 				<div
@@ -208,13 +212,18 @@ export function ScrapeDetail({
 					aria-label="Source code index.html"
 					hidden={htmlViewTab === "preview"}
 				>
-					<div className="max-h-[720px] bg-onyx p-3">
-						<CodebaseSourcePreview
-							path="index.html"
-							content={previewHtml}
-							truncated={false}
-							sizeBytes={sourceSizeBytes}
-						/>
+					<div className="bg-onyx p-3">
+						{hasOpenedSource ? (
+							<CodebaseSourcePreview
+								path="index.html"
+								content={previewHtml}
+								truncated={false}
+								sizeBytes={sourceSizeBytes}
+								maxLines={SCRAPE_SOURCE_PREVIEW_MAX_LINES}
+								maxBodyHeight={SCRAPE_SOURCE_PREVIEW_MAX_HEIGHT}
+								truncationHint="Unduh file HTML untuk melihat seluruh isi."
+							/>
+						) : null}
 					</div>
 				</div>
 

@@ -27,7 +27,6 @@ export function ImagesResult({
 }) {
 	const [formatFilter, setFormatFilter] = useState("");
 	const [kindFilter, setKindFilter] = useState("");
-	const [search, setSearch] = useState("");
 	const [downloading, setDownloading] = useState<string | null>(null);
 	const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
 	const [downloadFailures, setDownloadFailures] = useState<
@@ -62,13 +61,13 @@ export function ImagesResult({
 	const visible = images.filter(
 		(image) =>
 			image.status === "completed" &&
-			`${image.url} ${image.evidence.alt ?? ""}`
-				.toLowerCase()
-				.includes(search.toLowerCase()) &&
 			(!formatFilter || image.format === formatFilter) &&
 			(!kindFilter || image.classification === kindFilter),
 	);
-	const hasFilter = formatFilter !== "" || kindFilter !== "" || search !== "";
+	const hasFilter = formatFilter !== "" || kindFilter !== "";
+	const gallerySummary = hasFilter
+		? `Menampilkan ${visible.length} dari ${counts.verified} gambar`
+		: `${counts.verified} gambar tersedia`;
 	async function download(image: ImageResult) {
 		if (downloading || (downloadFailures[image.id]?.retryAt ?? 0) > Date.now())
 			return;
@@ -120,6 +119,9 @@ export function ImagesResult({
 		<section className="space-y-5" aria-label="Images Explorer">
 			<header>
 				<h2 className="text-2xl font-bold text-snow">Images Explorer</h2>
+				<p className="mt-2 text-sm font-medium text-snow tabular-nums">
+					{gallerySummary}
+				</p>
 				<a
 					href={sourceUrl}
 					target="_blank"
@@ -129,7 +131,7 @@ export function ImagesResult({
 				>
 					{sourceUrl}
 				</a>
-				<p className="mt-3 font-mono text-xs text-fog tabular-nums">
+				<p className="mt-1 font-mono text-xs text-fog tabular-nums">
 					{imageCountsLabel(counts)}
 				</p>
 				{imageOutcome === "partial" && (
@@ -139,18 +141,13 @@ export function ImagesResult({
 					</p>
 				)}
 			</header>
+			{/* The gallery exposes no reliable image names, so a query would only
+			    match raw source URLs. Reintroduce a search field once images carry
+			    searchable names the user can recognise. */}
 			<div className="flex flex-wrap items-end gap-3">
-				<label className="flex min-w-0 flex-col gap-1.5 text-xs text-fog">
-					Cari gambar
-					<input
-						type="search"
-						value={search}
-						onChange={(event) => setSearch(event.target.value)}
-						className="min-h-11 rounded-lg border border-graphite bg-charcoal px-3 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-					/>
-				</label>
 				<ScrapeFilterSelect
 					label="Format"
+					className="w-36 sm:w-40"
 					value={formatFilter}
 					onChange={setFormatFilter}
 					options={[
@@ -160,6 +157,7 @@ export function ImagesResult({
 				/>
 				<ScrapeFilterSelect
 					label="Jenis"
+					className="w-36 sm:w-40"
 					value={kindFilter}
 					onChange={setKindFilter}
 					options={[
@@ -173,7 +171,6 @@ export function ImagesResult({
 						onClick={() => {
 							setFormatFilter("");
 							setKindFilter("");
-							setSearch("");
 						}}
 						className="inline-flex min-h-11 items-center rounded-full px-4 text-sm text-fog underline underline-offset-4 hover:text-snow focus-visible:ring-2 focus-visible:ring-indigo"
 					>

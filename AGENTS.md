@@ -26,7 +26,7 @@ The agent **MUST** read and strictly apply the authoritative rule files in `.age
 
 ### Read for UI, layout, copy, or accessibility:
 - `.agents/rules/design-layout-consistency.md` — Page family classification, layout contracts, container strategies, breadcrumb rules, Hugeicons contract
-- `.agents/rules/anti-ai-slop.md` — Responsive layout, contrast, no generic AI styling
+- `.agents/rules/anti-ai-slop.md` — Responsive layout, contrast, no generic AI styling, anti-functional-slop & UI necessity contract
 
 ### Read for product/domain/workflow semantics:
 - `.agents/rules/vibe-everythings-context.md` — Greenfield, Codebase sync, VibeScrape, Studio, Billing flows
@@ -43,7 +43,7 @@ It's important we maintain the things that make this platform reliable as we ite
 Real signals and persisted DB state across all surfaces (Plan, Design, Codebase, Templates). Never fake streaming, reasoning typewriter deltas, progress, or state.
 
 ### 2. Performance and taste without compromise
-Lots of AI apps have gotten bogged down with bad tech decisions and "slop". We have not. Content-first, clean UI without AI slop, decorative gradients, neon glow, or filler prose (`anti-ai-slop.md`).
+Lots of AI apps have gotten bogged down with bad tech decisions and "slop". We have not. Content-first, clean UI without visual slop, functional slop (redundant controls/toolbars), decorative gradients, neon glow, or filler prose (`anti-ai-slop.md`).
 
 ### 3. Safe, atomic credit and tenant isolation
 1 credit = 1 generate action (unlimited free revisions and patches). Database queries strictly enforce tenant isolation (`WHERE user_id = ?`). Credit deductions must be atomic (`WHERE credits_used + :charge <= credits`).

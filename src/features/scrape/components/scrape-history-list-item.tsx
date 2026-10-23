@@ -3,9 +3,16 @@ import {
 	ArrowRight01Icon,
 	Delete02Icon,
 	Loading03Icon,
+	MoreHorizontalIcon,
 	Tick01Icon,
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import type { ScrapeMode } from "@/db/schema";
 import type { buildHistoryDetailSearch } from "@/features/scrape/utils/scrape-history";
@@ -70,81 +77,157 @@ export function ScrapeHistoryRow({
 	detailSearch,
 	deleting,
 	onRequestDelete,
+	selected = false,
+	selectionActive = false,
+	onToggleSelect,
 }: {
 	item: ScrapeHistoryItem;
 	detailSearch: ReturnType<typeof buildHistoryDetailSearch>;
 	deleting: boolean;
 	onRequestDelete: (item: ScrapeHistoryItem) => void;
+	selected?: boolean;
+	selectionActive?: boolean;
+	onToggleSelect?: (id: string) => void;
 }) {
 	const siteName = displaySiteName(item.domain);
 	const processing = isProcessingStatus(item.status);
 	const failed = item.status === "failed";
+	const summary = (
+		<>
+			<span className="flex items-center gap-2">
+				<span className="truncate text-sm font-semibold text-snow">
+					{siteName}
+				</span>
+				<span className="shrink-0 text-xs text-fog">
+					{modeLabel(item.mode)}
+				</span>
+				<span
+					className={`inline-flex shrink-0 items-center gap-1 text-xs ${
+						failed ? "text-rose-400" : "text-fog"
+					}`}
+				>
+					{processing ? (
+						<Icon
+							icon={Loading03Icon}
+							size={12}
+							aria-hidden="true"
+							className="animate-spin"
+						/>
+					) : failed ? (
+						<Icon icon={Alert02Icon} size={12} aria-hidden="true" />
+					) : (
+						<Icon icon={Tick01Icon} size={12} aria-hidden="true" />
+					)}
+					{statusLabel(item.status)}
+				</span>
+			</span>
+			<span className="truncate font-mono text-[11px] text-fog">
+				{item.domain} ·{" "}
+				<time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time>
+			</span>
+			{item.imageCounts && (
+				<span className="text-xs text-fog">
+					{imageCountsLabel(item.imageCounts)}
+				</span>
+			)}
+		</>
+	);
 	return (
-		<li className="group flex items-center gap-2 p-4 transition-colors hover:bg-onyx/60">
-			<Link
-				to="/scrape/$id"
-				params={{ id: item.id }}
-				search={detailSearch}
-				className="flex min-w-0 flex-1 flex-col gap-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-			>
-				<span className="flex items-center gap-2">
-					<span className="truncate text-sm font-semibold text-snow">
-						{siteName}
-					</span>
-					<span className="shrink-0 text-xs text-fog">
-						{modeLabel(item.mode)}
-					</span>
-					<span
-						className={`inline-flex shrink-0 items-center gap-1 text-xs ${
-							failed ? "text-rose-400" : "text-fog"
-						}`}
-					>
-						{processing ? (
-							<Icon
-								icon={Loading03Icon}
-								size={12}
-								aria-hidden="true"
-								className="animate-spin"
-							/>
-						) : failed ? (
-							<Icon icon={Alert02Icon} size={12} aria-hidden="true" />
-						) : (
-							<Icon icon={Tick01Icon} size={12} aria-hidden="true" />
-						)}
-						{statusLabel(item.status)}
-					</span>
-				</span>
-				<span className="truncate font-mono text-[11px] text-fog">
-					{item.domain} ·{" "}
-					<time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time>
-				</span>
-				{item.imageCounts && (
-					<span className="text-xs text-fog">
-						{imageCountsLabel(item.imageCounts)}
-					</span>
-				)}
-			</Link>
+		<li
+			data-selected={selected ? "true" : undefined}
+			className={`group flex items-center gap-3 p-4 transition-colors ${
+				selected ? "bg-snow/5" : "hover:bg-onyx/60"
+			}`}
+		>
+			{selectionActive ? (
+				<label className="flex size-10 shrink-0 cursor-pointer items-center justify-center">
+					<input
+						type="checkbox"
+						checked={selected}
+						onChange={() => onToggleSelect?.(item.id)}
+						aria-label={`Pilih riwayat ${siteName}`}
+						className="size-5 shrink-0 accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					/>
+				</label>
+			) : null}
 
-			<Icon
-				icon={ArrowRight01Icon}
-				size={16}
-				aria-hidden="true"
-				className="shrink-0 text-fog"
-			/>
+			{selectionActive ? (
+				<button
+					type="button"
+					onClick={() => onToggleSelect?.(item.id)}
+					className="flex min-w-0 flex-1 flex-col gap-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+				>
+					{summary}
+				</button>
+			) : (
+				<Link
+					to="/scrape/$id"
+					params={{ id: item.id }}
+					search={detailSearch}
+					className="flex min-w-0 flex-1 flex-col gap-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+				>
+					{summary}
+				</Link>
+			)}
 
-			<button
-				type="button"
-				onClick={() => onRequestDelete(item)}
-				disabled={deleting}
-				aria-label={`Hapus riwayat ${siteName}`}
-				className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent text-fog transition-colors hover:border-graphite hover:bg-onyx hover:text-rose-400 disabled:opacity-50"
-			>
-				{deleting ? (
-					<Icon icon={Loading03Icon} size={14} className="animate-spin" />
-				) : (
-					<Icon icon={Delete02Icon} size={14} aria-hidden="true" />
-				)}
-			</button>
+			{!selectionActive ? (
+				<>
+					<Icon
+						icon={ArrowRight01Icon}
+						size={16}
+						aria-hidden="true"
+						className="shrink-0 text-fog"
+					/>
+
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<button
+								type="button"
+								disabled={deleting}
+								aria-label={`Aksi riwayat ${siteName}`}
+								className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-transparent text-fog transition-colors hover:border-graphite hover:bg-onyx hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								{deleting ? (
+									<Icon
+										icon={Loading03Icon}
+										size={14}
+										className="animate-spin"
+									/>
+								) : (
+									<Icon
+										icon={MoreHorizontalIcon}
+										size={16}
+										aria-hidden="true"
+									/>
+								)}
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end">
+							<DropdownMenuItem onSelect={() => onToggleSelect?.(item.id)}>
+								<Icon
+									icon={Tick01Icon}
+									size={14}
+									aria-hidden="true"
+									className="mr-2 text-fog"
+								/>
+								{selected ? "Batalkan pilihan" : "Pilih"}
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								onSelect={() => onRequestDelete(item)}
+								className="text-rose-400 focus:text-rose-400"
+							>
+								<Icon
+									icon={Delete02Icon}
+									size={14}
+									aria-hidden="true"
+									className="mr-2"
+								/>
+								Hapus riwayat
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</>
+			) : null}
 		</li>
 	);
 }

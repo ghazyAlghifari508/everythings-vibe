@@ -172,6 +172,9 @@ export function parseSpacingShapes(lines: string[]): {
 					valuePx: parsePxOnly(rawValue),
 					context: frequency > 0 ? `${frequency} element` : "",
 					frequency,
+					// An archived document states the shape in its own words. The
+					// annotation is the only pill evidence an archive carries.
+					pill: /fully rounded|pill/i.test(rawValue),
 				});
 			} else {
 				const property = propertyIdx >= 0 ? (row[propertyIdx] ?? "") : "";

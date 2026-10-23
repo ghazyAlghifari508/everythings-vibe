@@ -11,6 +11,7 @@ export interface ScrapeFilterOption {
 export function ScrapeFilterSelect({
 	label,
 	hideLabel = false,
+	inline = false,
 	value,
 	onChange,
 	options,
@@ -18,6 +19,7 @@ export function ScrapeFilterSelect({
 }: {
 	label: string;
 	hideLabel?: boolean;
+	inline?: boolean;
 	value: string;
 	onChange: (value: string) => void;
 	options: ReadonlyArray<ScrapeFilterOption>;
@@ -28,11 +30,23 @@ export function ScrapeFilterSelect({
 		<label
 			htmlFor={id}
 			className={cn(
-				"inline-flex min-w-0 flex-col gap-1.5 text-xs text-fog",
+				inline
+					? "inline-flex min-w-0 items-center gap-2 text-xs text-fog"
+					: "inline-flex min-w-0 flex-col gap-1.5 text-xs text-fog",
 				className,
 			)}
 		>
-			<span className={hideLabel ? "sr-only" : undefined}>{label}</span>
+			<span
+				className={
+					hideLabel
+						? "sr-only"
+						: inline
+							? "shrink-0 whitespace-nowrap"
+							: undefined
+				}
+			>
+				{label}
+			</span>
 			<span className="relative block min-w-0">
 				<select
 					id={id}
