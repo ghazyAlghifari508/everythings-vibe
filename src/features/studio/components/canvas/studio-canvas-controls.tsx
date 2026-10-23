@@ -1,6 +1,6 @@
 import {
 	AlertCircleIcon,
-	CursorPointer01Icon,
+	Cursor01Icon,
 	HandIcon,
 	RotateLeft01Icon,
 } from "@hugeicons/core-free-icons";
@@ -33,18 +33,18 @@ export function StudioCanvasToolPalette({
 		>
 			<button
 				type="button"
-				title="Cursor (V)"
-				aria-label="Cursor"
+				title="Pilih frame (V)"
+				aria-label="Pilih frame (V)"
 				aria-pressed={tool === "select"}
 				onClick={() => onSelectTool("select")}
 				className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow ${tool === "select" ? "bg-steel" : "hover:bg-steel"}`}
 			>
-				<Icon icon={CursorPointer01Icon} size={18} />
+				<Icon icon={Cursor01Icon} size={18} />
 			</button>
 			<button
 				type="button"
-				title="Hand (H)"
-				aria-label="Hand"
+				title="Geser canvas (H)"
+				aria-label="Geser canvas (H)"
 				aria-pressed={tool === "hand"}
 				onClick={() => onSelectTool("hand")}
 				className={`flex size-10 items-center justify-center rounded-md text-snow focus-visible:outline-2 focus-visible:outline-snow ${tool === "hand" ? "bg-steel" : "hover:bg-steel"}`}

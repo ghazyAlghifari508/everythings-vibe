@@ -1,4 +1,8 @@
 import { type RefObject, useCallback, useEffect } from "react";
+import {
+	classifyWheelGesture,
+	isScrollableOrEditableTarget,
+} from "@/features/studio/utils/studio-canvas-gesture";
 import { normalizeWheelDelta } from "@/hooks/use-canvas-zoom";
 
 interface UseStudioCanvasInputInput {
@@ -53,20 +57,26 @@ export function useStudioCanvasInput({
 		const canvas = canvasRef.current;
 		if (!canvas) return;
 		function handleWheel(event: WheelEvent) {
-			userPositioned.current = true;
-			if (event.ctrlKey || event.metaKey) {
-				event.preventDefault();
-				onWheel(event);
+			// Do not intercept scrolling inside active textareas, dropdowns,
+			// or other scrollable overlays.
+			if (isScrollableOrEditableTarget(event.target, canvas)) {
 				return;
 			}
 			event.preventDefault();
+			userPositioned.current = true;
+
+			const gesture = classifyWheelGesture(event);
+			if (gesture === "zoom") {
+				onWheel(event);
+				return;
+			}
+
 			const deltaX = normalizeWheelDelta({
 				deltaY: event.deltaX,
 				deltaMode: event.deltaMode,
 			});
 			const deltaY = normalizeWheelDelta(event);
-			// Two-axis trackpad scrolling pans the board; it must not change
-			// the scale, which is reserved for ctrl/pinch.
+			// Two-axis trackpad scrolling pans the board.
 			setPan((previous) => ({
 				x: previous.x - deltaX,
 				y: previous.y - deltaY,
