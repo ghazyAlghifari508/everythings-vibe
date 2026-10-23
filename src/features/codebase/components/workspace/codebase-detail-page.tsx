@@ -5,7 +5,6 @@ import { CodebasePlanSwitcher } from "@/features/codebase/components/planning/co
 import { CodebaseResyncDrawer } from "@/features/codebase/components/planning/codebase-resync-drawer";
 import { CodebaseWorkspaceShell } from "@/features/codebase/components/workspace/codebase-workspace-shell";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
-import { describeRevisionImpact } from "@/features/codebase/services/revision-intent";
 import { useCodebaseWorkspace } from "../../hooks/use-codebase-workspace";
 import type { CodebaseWorkspaceData } from "../../services/workspace-loader.functions";
 import { WorkspaceConnectionScreen } from "./workspace-connection-screen";
@@ -48,7 +47,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		run,
 		composerMode,
 		composerTargetName,
-		revisionImpact,
 		artifacts,
 		activeArtifactId,
 		hasTasksInDb,
@@ -184,7 +182,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								run={run}
 								composerMode={composerMode}
 								composerTargetName={composerTargetName}
-								revisionImpactNotice={describeRevisionImpact(revisionImpact)}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
 								projectIdForHandoff={hasTasksInDb ? effectiveFeatureId : null}

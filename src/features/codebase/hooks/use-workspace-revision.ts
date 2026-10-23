@@ -15,7 +15,6 @@ export function useWorkspaceRevision({
 	effectiveFeatureId,
 	stageBusy,
 	featureName,
-	requiresTaskReplacementConfirmation,
 	loadPrd,
 	pushAssistantMessage,
 	openArtifactPreview,
@@ -27,7 +26,6 @@ export function useWorkspaceRevision({
 	effectiveFeatureId: string | null;
 	stageBusy: CodebasePipelineStage | null;
 	featureName: string;
-	requiresTaskReplacementConfirmation: boolean;
 	loadPrd: () => Promise<string | null>;
 	pushAssistantMessage: (content: string) => void;
 	openArtifactPreview: (kind: "feature" | "prd" | "ac" | "tasks") => void;
@@ -51,9 +49,6 @@ export function useWorkspaceRevision({
 						mode: "revise",
 						message: buildRevisionRequest({ featureName, instruction }),
 						displayMessage: instruction,
-						...(requiresTaskReplacementConfirmation
-							? { confirmedImpact: true }
-							: {}),
 					}),
 				});
 				const result = await consumeSseStream(response, {
@@ -98,7 +93,6 @@ export function useWorkspaceRevision({
 			effectiveFeatureId,
 			stageBusy,
 			featureName,
-			requiresTaskReplacementConfirmation,
 			loadPrd,
 			pushAssistantMessage,
 			openArtifactPreview,

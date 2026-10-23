@@ -706,20 +706,13 @@ describe("composer message routing without intent choice", () => {
 		expect(body).not.toContain("reset-progress");
 	});
 
-	it("gates a locked-document revision behind an explicit confirmation", () => {
-		// The lock still blocks a silent revision, and only an explicit
-		// confirmation lifts it for that request.
+	it("keeps the lock unconditional and never submits automatic consent", () => {
 		expect(chatSource).toMatch(
-			/mode === "revise"[\s\S]*isPrdLocked\(project\.step\)[\s\S]*!input\.confirmedImpact/,
+			/mode === "revise" &&\s*\(isPrdLocked\(project\.step\)/,
 		);
-		expect(chatSource).toContain("confirmedImpact");
-		expect(workspaceSource).toContain("confirmedImpact: true");
-	});
-
-	it("computes the task impact from the real Kanban rows", () => {
-		expect(workspaceSource).toContain("assessRevisionImpact");
-		expect(workspaceSource).toContain("describeRevisionImpact(revisionImpact)");
-		expect(workspaceSource).toMatch(/kanban\.data\?\.columns/);
+		expect(chatSource).not.toContain("confirmedImpact");
+		expect(workspaceSource).not.toContain("confirmedImpact: true");
+		expect(workspaceSource).not.toContain("revisionImpactNotice");
 	});
 
 	it("reports a locked document instead of silently rewriting it", () => {

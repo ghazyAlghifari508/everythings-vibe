@@ -1,5 +1,3 @@
-import type { TaskCardStatus } from "@/lib/kanban-utils";
-
 /**
  * How the workspace directs a new chat message.
  *
@@ -9,68 +7,6 @@ import type { TaskCardStatus } from "@/lib/kanban-utils";
  * artifacts, so the explicit action is the only thing that may create one.
  */
 export type CodebaseComposerMode = "create" | "clarify" | "revise";
-
-export interface TaskImpactInput {
-	status: TaskCardStatus;
-}
-
-export interface RevisionImpact {
-	/** Tasks that are not pending — the work a revision can invalidate. */
-	affectedTaskCount: number;
-	inProgressCount: number;
-	completedCount: number;
-	failedCount: number;
-	/**
-	 * True when replacing the task list would destroy real progress, so the
-	 * user must confirm before any task is replaced.
-	 */
-	requiresTaskReplacementConfirmation: boolean;
-}
-
-/**
- * Impact of a revision on the existing task list.
- *
- * Only non-pending tasks count: replacing a list where everything is still
- * pending loses no work, while replacing in-progress or completed tasks
- * destroys progress the user cannot get back.
- */
-export function assessRevisionImpact(
-	tasks: readonly TaskImpactInput[],
-): RevisionImpact {
-	const inProgressCount = tasks.filter(
-		(task) => task.status === "in_progress",
-	).length;
-	const completedCount = tasks.filter(
-		(task) => task.status === "completed",
-	).length;
-	const failedCount = tasks.filter((task) => task.status === "failed").length;
-	const affectedTaskCount = inProgressCount + completedCount + failedCount;
-	return {
-		affectedTaskCount,
-		inProgressCount,
-		completedCount,
-		failedCount,
-		requiresTaskReplacementConfirmation: affectedTaskCount > 0,
-	};
-}
-
-/**
- * Impact copy for the confirmation the user must give before tasks are
- * replaced. Names the real counts so the decision is informed, and states the
- * default (tasks untouched) explicitly.
- */
-export function describeRevisionImpact(impact: RevisionImpact): string {
-	if (!impact.requiresTaskReplacementConfirmation) {
-		return "Revisi ini tidak menyentuh task yang sudah berjalan, jadi status Kanban tetap utuh.";
-	}
-	const parts: string[] = [];
-	if (impact.completedCount > 0)
-		parts.push(`${impact.completedCount} task selesai`);
-	if (impact.inProgressCount > 0)
-		parts.push(`${impact.inProgressCount} task sedang dikerjakan`);
-	if (impact.failedCount > 0) parts.push(`${impact.failedCount} task gagal`);
-	return `Revisi ini berdampak pada ${parts.join(", ")}. Menyusun ulang task akan mereset progres tersebut. Tanpa konfirmasi, task dan status Kanban saat ini tidak diubah.`;
-}
 
 export interface RevisionContextInput {
 	/** The feature name the user is revising. */

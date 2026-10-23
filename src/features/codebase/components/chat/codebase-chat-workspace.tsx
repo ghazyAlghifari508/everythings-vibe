@@ -68,7 +68,6 @@ export function CodebaseChatWorkspace({
 	starterSuggestions,
 	composerMode = "create",
 	composerTargetName = null,
-	revisionImpactNotice = null,
 	isSending = false,
 	isConfirming = false,
 	specError = null,
@@ -218,8 +217,6 @@ export function CodebaseChatWorkspace({
 	const renderComposer = (minRows = 1, className = "") => (
 		<CodebaseChatWorkspaceComposer
 			composerTargetName={composerTargetName}
-			composerMode={composerMode}
-			revisionImpactNotice={revisionImpactNotice}
 			draft={draft}
 			onDraftChange={setDraft}
 			onSend={handleSend}

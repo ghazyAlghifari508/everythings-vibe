@@ -7,10 +7,7 @@ import {
 	resolvePersistedStage,
 	shouldAutoRevealArtifact,
 } from "@/features/codebase/services/chat-flow";
-import {
-	assessRevisionImpact,
-	type CodebaseComposerMode,
-} from "@/features/codebase/services/revision-intent";
+import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
 import {
 	emptyArtifactHydration,
 	resolveWorkspaceView,
@@ -144,17 +141,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 				: "clarify";
 	const composerTargetName =
 		composerMode === "create" ? null : (resolvedFeature?.name ?? null);
-	const revisionImpact = useMemo(() => {
-		const all = kanban.data?.columns
-			? [
-					...kanban.data.columns.pending,
-					...kanban.data.columns.in_progress,
-					...kanban.data.columns.completed,
-					...kanban.data.columns.failed,
-				]
-			: [];
-		return assessRevisionImpact(all.map((task) => ({ status: task.status })));
-	}, [kanban.data]);
 	const pushAssistantMessage = useCallback((content: string) => {
 		setChatMessages((current) => [
 			...current,
@@ -183,8 +169,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		stageBusy,
 		featureName: resolvedFeature?.name ?? codebase.name,
 		resolvedFeatureName: resolvedFeature?.name,
-		requiresTaskReplacementConfirmation:
-			revisionImpact.requiresTaskReplacementConfirmation,
 		loadPrd: artifact.loadPrd,
 		pushAssistantMessage,
 		openArtifactPreview,
@@ -304,7 +288,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		analysisOutput,
 		composerMode,
 		composerTargetName,
-		revisionImpact,
 		userTookOverCanvas,
 		selectPlan,
 	};
