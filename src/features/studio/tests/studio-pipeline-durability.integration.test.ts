@@ -192,13 +192,16 @@ it("manual operation retry clears its old lease and permits only one concurrent 
 		.update(studioFrames)
 		.set({ status: "failed" })
 		.where(eq(studioFrames.id, frame.id));
-	const results = await Promise.allSettled([
+	const results = await Promise.all([
 		retryStudioFrame(project.id, userId, frame.id),
 		retryStudioFrame(project.id, userId, frame.id),
 	]);
-	expect(
-		results.filter((result) => result.status === "fulfilled"),
-	).toHaveLength(1);
+	// The project row lock serializes the pair: exactly one request requeues the
+	// frame, the other reports the retry that is already running.
+	expect(results.map((result) => result.retry).sort()).toEqual([
+		"already-running",
+		"queued",
+	]);
 	const [stored] = await db
 		.select()
 		.from(studioJobs)
@@ -208,6 +211,32 @@ it("manual operation retry clears its old lease and permits only one concurrent 
 	expect(stored.claimedBy).toBeNull();
 	expect(stored.leaseExpiresAt).toBeNull();
 	expect(stored.finishedAt).toBeNull();
+	const frameJobs = await db
+		.select({ id: studioJobs.id })
+		.from(studioJobs)
+		.where(eq(studioJobs.targetFrameId, frame.id));
+	expect(frameJobs).toHaveLength(1);
+});
+
+it("refuses to retry another owner's frame", async () => {
+	const { project, frame } = await seed("revise");
+	const strangerId = crypto.randomUUID();
+	owners.push(strangerId);
+	await db
+		.insert(users)
+		.values({ id: strangerId, email: `${strangerId}@example.test` });
+	await db
+		.update(studioFrames)
+		.set({ status: "failed" })
+		.where(eq(studioFrames.id, frame.id));
+	await expect(
+		retryStudioFrame(project.id, strangerId, frame.id),
+	).rejects.toMatchObject({ code: "STUDIO_NOT_FOUND" });
+	const [stored] = await db
+		.select()
+		.from(studioFrames)
+		.where(eq(studioFrames.id, frame.id));
+	expect(stored.status).toBe("failed");
 });
 
 it("persists one ready frame while another frame is still generating", async () => {

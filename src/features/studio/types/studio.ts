@@ -39,6 +39,16 @@ export interface StudioHistoryItem {
 	createdAt: string;
 }
 
+/**
+ * What a retry request actually did: `queued` started a new run,
+ * `already-running` was a duplicate request while a run is in flight, and
+ * `completed` means the frame still renders and was left untouched.
+ */
+export type StudioFrameRetryOutcome =
+	| "queued"
+	| "already-running"
+	| "completed";
+
 /** Everything the Studio canvas route needs to render a project workspace. */
 export interface StudioDetailLoaderData {
 	project: StudioProjectRow;

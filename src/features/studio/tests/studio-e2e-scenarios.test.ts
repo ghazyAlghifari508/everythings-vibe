@@ -299,7 +299,12 @@ describe("End-to-End Multi-Screen Generation Scenarios", () => {
 		expect(failedFrame.htmlCode).toBeNull();
 
 		// Retry only the failed frame through the same durable worker path.
-		const retried = await retryStudioFrame(project.id, userId, failedFrame.id);
+		const { frame: retried, retry } = await retryStudioFrame(
+			project.id,
+			userId,
+			failedFrame.id,
+		);
+		expect(retry).toBe("queued");
 		expect(retried.status).toBe("queued");
 		await runStudioWorker(project.id);
 		const [persisted] = await db

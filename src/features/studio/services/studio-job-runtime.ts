@@ -13,6 +13,7 @@ export function studioJobTiming(
 		frameId?: string;
 		attempt?: number;
 		code?: string;
+		detail?: string;
 	},
 ) {
 	console.info(

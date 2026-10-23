@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { type StudioFrameRow, studioFrames } from "@/db/schema";
 import {
+	STUDIO_FRAME_CORRECTION_MAX,
 	STUDIO_FRAME_MAX_TOKENS,
 	STUDIO_FRAME_RETRY_MAX,
 } from "@/features/studio/types/studio-constants";
@@ -16,6 +17,11 @@ import type {
 } from "../types/studio-service";
 import { resolveStudioFrameSystemPrompt } from "./studio-design-skill-registry.server";
 import { enforceDesignSystemOnHtml } from "./studio-design-system-html";
+import {
+	publicStudioFrameErrorMessage,
+	StudioFrameError,
+	studioFrameErrorCodeFor,
+} from "./studio-frame-errors";
 import { validateGeneratedHtml } from "./studio-generated-html-validation";
 import type { StudioDesignSkillId } from "./studio-generation-options";
 import { StudioLeaseLostError, withStudioJobWrite } from "./studio-job-lease";
@@ -64,11 +70,25 @@ export function isRetryableProviderError(error: unknown): boolean {
 	);
 }
 
+// Internal instruction for the single bounded correction attempt: it names the
+// exact violations and forbids a redesign, so valid content and the approved
+// theme survive. Never surfaced to the user.
+function buildCorrectionInstruction(issues: string[]): string {
+	return [
+		"Validation:",
+		...issues.map((issue) => `- ${issue}`),
+		"- Preserve the approved theme, the shared navigation, and all valid content.",
+		"",
+		"Repair these failures without redesigning unrelated sections.",
+		"Return a complete valid document.",
+	].join("\n");
+}
+
 export async function generateValidatedFrameHtml(
 	input: ValidatedFrameInput,
 ): Promise<string> {
 	let framePrompt = input.framePrompt;
-	for (let round = 0; round < 2; round++) {
+	for (let round = 0; round <= STUDIO_FRAME_CORRECTION_MAX; round++) {
 		input.signal?.throwIfAborted();
 		const startedAt = Date.now();
 		const rawHtml = await generateStudioHtml(
@@ -100,16 +120,14 @@ export async function generateValidatedFrameHtml(
 				...input.timing,
 				attempt: round + 1,
 				code: issues.length ? "INVALID_OUTPUT" : "VALID",
+				detail: issues.join(" "),
 			});
 		if (issues.length === 0) return htmlCode;
-		if (round === 0) {
-			framePrompt = `${input.framePrompt}\n\nPrevious output violated the contract (${issues.join(" ")}). Correct these issues and return the FULL single-file HTML document.`;
+		if (round < STUDIO_FRAME_CORRECTION_MAX) {
+			framePrompt = `${input.framePrompt}\n\n${buildCorrectionInstruction(issues)}`;
 			continue;
 		}
-		throw new ScrapeError(
-			"AI_GENERATION_FAILED",
-			`Output tidak memenuhi kontrak: ${issues.join(" ")}`,
-		);
+		throw new StudioFrameError("STUDIO_CONTRACT_VIOLATION", issues.join(" "));
 	}
 	throw new ScrapeError("AI_GENERATION_FAILED", "Gagal generate frame.");
 }
@@ -209,13 +227,15 @@ export async function generateInitialFrame(
 				await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
 				continue;
 			}
-			const errorMsg = "Gagal membuat layar. Silakan coba lagi.";
+			const code = studioFrameErrorCodeFor(frameErr);
+			const errorMsg = publicStudioFrameErrorMessage(frameErr);
 			studioJobTiming("frame-failure", Date.now(), {
 				jobId: ctx.lease.jobId,
 				projectId: ctx.lease.projectId,
 				frameId: frame.id,
 				attempt: attempt + 1,
-				code: retryable ? "PROVIDER_RETRIES_EXHAUSTED" : "GENERATION_FAILED",
+				code,
+				detail: frameErr instanceof Error ? frameErr.message : String(frameErr),
 			});
 			await withStudioJobWrite(ctx.lease, async (tx) => {
 				await tx

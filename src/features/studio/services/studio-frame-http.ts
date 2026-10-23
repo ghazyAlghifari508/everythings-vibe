@@ -1,51 +1,27 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { DESIGN_ERROR_CODES, ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
+import {
+	STUDIO_FRAME_ERRORS,
+	studioFrameErrorReport,
+} from "./studio-frame-errors";
 import { addStudioFrame, reviseStudioFrame } from "./studio-frame-service";
 import { getStudioFrameVisual } from "./studio-frame-visual";
 import { enqueueStudioOperation } from "./studio-operation-enqueue";
 import { retryStudioFrame, retryStudioPlanning } from "./studio-retry-service";
 
 function studioErrorResponse(error: unknown): Response {
-	const unauthorized =
-		error instanceof Error && /Unauthorized|Forbidden/.test(error.message);
-	const code =
-		error instanceof ScrapeError
-			? error.code
-			: unauthorized
-				? "UNAUTHORIZED"
-				: "STUDIO_FRAME_FAILED";
-	console.error("[studio.frame]", { code });
-	if (error instanceof ScrapeError) {
-		const isClientError =
-			error.code === "INVALID_URL" ||
-			error.code === "WEBSITE_BLOCKED" ||
-			error.code === "VISUAL_CAPTURE_FAILED";
-		return Response.json(
-			{
-				error:
-					error.code === "VISUAL_CAPTURE_FAILED"
-						? DESIGN_ERROR_CODES.VISUAL_CAPTURE_FAILED
-						: "Aksi frame belum dapat diselesaikan. Silakan coba lagi.",
-				code,
-			},
-			{ status: isClientError ? 400 : 500 },
-		);
-	}
-	if (unauthorized) {
-		return Response.json(
-			{ error: "Silakan masuk kembali untuk membuka Studio.", code },
-			{ status: 401 },
-		);
-	}
+	// Public copy and HTTP status come from the taxonomy; the raw message stays
+	// in this server-side diagnostic line.
+	const report = studioFrameErrorReport(error);
+	console.error("[studio.frame]", {
+		code: report.code,
+		status: report.status,
+		diagnostic: report.diagnostic,
+	});
 	return Response.json(
-		{
-			code,
-			error:
-				"Terjadi kendala saat memproses frame Studio. Silakan coba beberapa saat lagi.",
-		},
-		{ status: 500 },
+		{ error: report.message, code: report.code },
+		{ status: report.status },
 	);
 }
 
@@ -64,8 +40,11 @@ export async function GET({
 		if (!projectId || !frameId) {
 			status = 400;
 			return Response.json(
-				{ error: "Identitas project dan frame diperlukan." },
-				{ status: 400 },
+				{
+					error: "Identitas project dan frame diperlukan.",
+					code: "STUDIO_INVALID_INPUT",
+				},
+				{ status: STUDIO_FRAME_ERRORS.STUDIO_INVALID_INPUT.status },
 			);
 		}
 		// A user-initiated visual retry must bypass the cached render so a
@@ -134,8 +113,11 @@ export async function POST({
 		const parseRes = studioFrameBodySchema.safeParse(rawBody);
 		if (!parseRes.success) {
 			return Response.json(
-				{ error: "Payload aksi frame tidak valid." },
-				{ status: 400 },
+				{
+					error: "Payload aksi frame tidak valid.",
+					code: "STUDIO_INVALID_INPUT",
+				},
+				{ status: STUDIO_FRAME_ERRORS.STUDIO_INVALID_INPUT.status },
 			);
 		}
 		const body = parseRes.data;
@@ -169,12 +151,12 @@ export async function POST({
 		}
 
 		if (body.action === "retry") {
-			const frame = await retryStudioFrame(
+			const { frame, retry } = await retryStudioFrame(
 				body.projectId,
 				user.id,
 				body.frameId,
 			);
-			return Response.json({ frame }, { status: 200 });
+			return Response.json({ frame, retry }, { status: 200 });
 		}
 
 		if (body.action === "retry-planning") {

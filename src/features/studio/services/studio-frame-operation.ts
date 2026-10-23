@@ -145,15 +145,21 @@ export async function runStudioFrameOperation(
 		designMode: validateStudioDesignMode(frame.viewport),
 		designMd: project.designMd,
 		logoUrl,
+		// Retry reuses the frame's last HTML so a failed revision keeps its
+		// last-good content instead of restarting from nothing.
 		previousHtml:
-			job.jobType === "revise" ? (frame.htmlCode ?? undefined) : undefined,
+			job.jobType === "add" ? undefined : (frame.htmlCode ?? undefined),
 		blueprint: project.designBlueprint,
 		activeScreen: name,
 		prdContent: project.prdContent,
 	});
+	const changeInstruction =
+		job.jobType === "retry"
+			? "Regenerate this screen so it satisfies the shared contract. Preserve the approved theme and all valid content."
+			: job.prompt;
 	const dsTokens = extractDesignSystemTokens(project.designMd);
 	const htmlCode = await generateValidatedFrameHtml({
-		framePrompt: `${prompt}\n\nUSER CHANGE INSTRUCTION: ${job.prompt}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
+		framePrompt: `${prompt}\n\nUSER CHANGE INSTRUCTION: ${changeInstruction}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
 		blueprint: project.designBlueprint,
 		viewport: validateStudioDesignMode(frame.viewport),
 		expectTokens: dsTokens !== null,

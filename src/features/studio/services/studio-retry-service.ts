@@ -7,7 +7,13 @@ import {
 	studioJobs,
 	studioProjects,
 } from "@/db/schema";
-import { ScrapeError } from "@/lib/design-errors";
+import type { StudioFrameRetryOutcome } from "../types/studio";
+import { StudioFrameError } from "./studio-frame-errors";
+
+export interface StudioFrameRetryResult {
+	frame: StudioFrameRow;
+	retry: StudioFrameRetryOutcome;
+}
 
 const resetClaim = {
 	status: "queued",
@@ -24,8 +30,10 @@ export async function retryStudioFrame(
 	projectId: string,
 	userId: string,
 	frameId: string,
-): Promise<StudioFrameRow> {
-	return db.transaction(async (tx) => {
+): Promise<StudioFrameRetryResult> {
+	return db.transaction(async (tx): Promise<StudioFrameRetryResult> => {
+		// The project row lock serializes two retries for the same frame, so the
+		// second request observes the queued frame instead of queueing a duplicate.
 		const [project] = await tx
 			.select()
 			.from(studioProjects)
@@ -36,8 +44,7 @@ export async function retryStudioFrame(
 				),
 			)
 			.for("update");
-		if (!project)
-			throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+		if (!project) throw new StudioFrameError("STUDIO_NOT_FOUND");
 		const [frame] = await tx
 			.select()
 			.from(studioFrames)
@@ -47,10 +54,12 @@ export async function retryStudioFrame(
 					eq(studioFrames.projectId, projectId),
 				),
 			);
-		if (!frame)
-			throw new ScrapeError("WEBSITE_BLOCKED", "Frame tidak ditemukan.");
-		if (frame.status !== "failed")
-			throw new ScrapeError("INVALID_URL", "Frame ini tidak memerlukan retry.");
+		if (!frame) throw new StudioFrameError("STUDIO_NOT_FOUND");
+		// A frame that still renders is never thrown away by a stale retry.
+		if (frame.status === "ready" && frame.htmlCode)
+			return { frame, retry: "completed" };
+		if (frame.status === "queued" || frame.status === "generating")
+			return { frame, retry: "already-running" };
 		const [active] = await tx
 			.select({ id: studioJobs.id })
 			.from(studioJobs)
@@ -58,14 +67,12 @@ export async function retryStudioFrame(
 				and(
 					eq(studioJobs.projectId, projectId),
 					eq(studioJobs.userId, userId),
+					eq(studioJobs.targetFrameId, frameId),
 					inArray(studioJobs.status, ["queued", "planning", "generating"]),
 				),
-			);
-		if (active)
-			throw new ScrapeError(
-				"INVALID_URL",
-				"Tunggu pemrosesan selesai sebelum mencoba lagi.",
-			);
+			)
+			.limit(1);
+		if (active) return { frame, retry: "already-running" };
 		const [operation] = await tx
 			.select()
 			.from(studioJobs)
@@ -107,6 +114,8 @@ export async function retryStudioFrame(
 				prompt: initial?.prompt ?? frame.description ?? frame.name,
 			});
 		}
+		// Only the failed state is reset; the frame keeps its last HTML so a
+		// failed revision still has content to correct.
 		const [updated] = await tx
 			.update(studioFrames)
 			.set({ status: "queued", error: null, updatedAt: new Date() })
@@ -117,8 +126,8 @@ export async function retryStudioFrame(
 				),
 			)
 			.returning();
-		if (!updated) throw new ScrapeError("STORAGE_FAILED");
-		return updated;
+		if (!updated) throw new StudioFrameError("STUDIO_STORAGE_FAILED");
+		return { frame: updated, retry: "queued" };
 	});
 }
 
@@ -137,8 +146,7 @@ export async function retryStudioPlanning(
 				),
 			)
 			.for("update");
-		if (!project)
-			throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+		if (!project) throw new StudioFrameError("STUDIO_NOT_FOUND");
 		const [job] = await tx
 			.select()
 			.from(studioJobs)
@@ -151,10 +159,14 @@ export async function retryStudioPlanning(
 			)
 			.orderBy(desc(studioJobs.createdAt))
 			.limit(1);
-		if (!job || job.status !== "failed")
-			throw new ScrapeError(
-				"INVALID_URL",
-				"Perencanaan ini tidak memerlukan retry.",
+		if (!job) throw new StudioFrameError("STUDIO_NOT_FOUND");
+		if (job.status !== "failed")
+			throw new StudioFrameError(
+				job.status === "queued" ||
+					job.status === "planning" ||
+					job.status === "generating"
+					? "STUDIO_RETRY_RUNNING"
+					: "STUDIO_INVALID_INPUT",
 			);
 		const [active] = await tx
 			.select({ id: studioJobs.id })
@@ -166,11 +178,7 @@ export async function retryStudioPlanning(
 					inArray(studioJobs.status, ["queued", "planning", "generating"]),
 				),
 			);
-		if (active)
-			throw new ScrapeError(
-				"INVALID_URL",
-				"Tunggu pemrosesan selesai sebelum mencoba lagi.",
-			);
+		if (active) throw new StudioFrameError("STUDIO_RETRY_RUNNING");
 		const [updated] = await tx
 			.update(studioJobs)
 			.set({ ...resetClaim, updatedAt: new Date() })
@@ -182,7 +190,7 @@ export async function retryStudioPlanning(
 				),
 			)
 			.returning();
-		if (!updated) throw new ScrapeError("STORAGE_FAILED");
+		if (!updated) throw new StudioFrameError("STUDIO_STORAGE_FAILED");
 		return updated;
 	});
 }
