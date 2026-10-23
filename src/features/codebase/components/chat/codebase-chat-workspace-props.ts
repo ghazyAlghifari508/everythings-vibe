@@ -50,6 +50,8 @@ export interface CodebaseChatWorkspaceProps {
 	 * that would invite regenerating work that is already in the database.
 	 */
 	tasksUnresolved?: boolean;
+	answersReadOnly?: boolean;
+	composerAvailable?: boolean;
 	codebaseName?: string;
 	starterSuggestions?: CodebaseStarterSuggestion[];
 	starterRefresh?: CodebaseStarterRefreshState;

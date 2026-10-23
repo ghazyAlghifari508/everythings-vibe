@@ -6,6 +6,7 @@ import type { useWorkspacePlan } from "./use-workspace-plan";
 
 export function useWorkspaceComposer({
 	codebase,
+	composerAvailable = true,
 	snapshotReady,
 	isWorking,
 	setIsWorking,
@@ -30,6 +31,7 @@ export function useWorkspaceComposer({
 	registerCreatedPlan,
 }: {
 	codebase: { id: string; name: string };
+	composerAvailable?: boolean;
 	snapshotReady: boolean;
 	isWorking: boolean;
 	setIsWorking: (working: boolean) => void;
@@ -152,6 +154,7 @@ export function useWorkspaceComposer({
 		async (message: string) => {
 			const trimmed = message.trim();
 			if (
+				!composerAvailable ||
 				!trimmed ||
 				trimmed.length < 3 ||
 				creationInFlight.current ||
@@ -189,6 +192,7 @@ export function useWorkspaceComposer({
 		},
 		[
 			artifactCount,
+			composerAvailable,
 			effectiveFeatureId,
 			ensureFeatureInWorkspace,
 			fetchAiQuestions,

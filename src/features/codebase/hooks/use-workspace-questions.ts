@@ -21,6 +21,7 @@ import { validateAskQuestions } from "@/features/greenfield/services/ask-service
 export function useWorkspaceQuestions(
 	effectiveFeatureId: string | null,
 	setRun: Dispatch<SetStateAction<CodebaseRunState | null>>,
+	readOnly = false,
 ) {
 	const [aiQuestions, setAiQuestions] = useState<AdaptiveQuestion[]>([]);
 	const [chatAnswers, setChatAnswers] = useState<Record<string, string>>({});
@@ -36,6 +37,7 @@ export function useWorkspaceQuestions(
 	);
 	const fetchAiQuestions = useCallback(
 		async (projectId: string, prompt: string) => {
+			if (readOnly) return;
 			activeProject.current = projectId;
 			const epoch = ++requestEpoch.current;
 			setRun(startRun("questions", Date.now()));
@@ -106,15 +108,15 @@ export function useWorkspaceQuestions(
 				);
 			}
 		},
-		[setRun],
+		[setRun, readOnly],
 	);
 	const handleSubmitAnswer = useCallback(
 		(questionId: string, answer: string) => {
 			const trimmed = answer.trim();
-			if (!trimmed) return;
+			if (readOnly || !trimmed) return;
 			setChatAnswers((current) => ({ ...current, [questionId]: trimmed }));
 		},
-		[],
+		[readOnly],
 	);
 	const handoffRestoredFor = useRef<string | null>(null);
 	const hasLocalAskStateRef = useRef(false);

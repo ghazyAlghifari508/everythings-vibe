@@ -86,8 +86,20 @@ it("clears feature UI immediately, creates B lazily, and restores A/B/A without 
 	vi.stubGlobal("fetch", fetcher);
 	const { result } = renderHook(() => useCodebaseWorkspace(data));
 	await waitFor(() => expect(result.current.prdContent).toBe("Document A"));
+	await waitFor(() => expect(result.current.hydration.tasks).toBe("ready"));
+	expect(result.current.hasTasksInDb).toBe(true);
+	expect(result.current.stage).toBe("handoff");
+	expect(result.current.composerAvailable).toBe(false);
+	await act(async () => {
+		expect(
+			await result.current.handleSendMessage("Change completed plan"),
+		).toBe(false);
+	});
+	expect(result.current.chatMessages).toEqual([]);
 	act(() => result.current.handleCreateFeature());
 	expect(result.current.effectiveFeatureId).toBeNull();
+	expect(result.current.composerAvailable).toBe(true);
+	expect(result.current.answersReadOnly).toBe(false);
 	expect(result.current.prdContent).toBeNull();
 	expect(result.current.acContent).toBeNull();
 	expect(result.current.taskTree).toBeNull();

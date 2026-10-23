@@ -20,6 +20,7 @@ import { buildAskHandoffAnswers } from "../utils/workspace-contracts";
 
 export function useWorkspaceFeatureGeneration({
 	effectiveFeatureId,
+	readOnly = false,
 	activeProjectIdRef,
 	chatAnswers,
 	aiQuestions,
@@ -34,6 +35,7 @@ export function useWorkspaceFeatureGeneration({
 	setRun,
 }: {
 	effectiveFeatureId: string | null;
+	readOnly?: boolean;
 	activeProjectIdRef: RefObject<string | null>;
 	chatAnswers: Record<string, string>;
 	aiQuestions: AdaptiveQuestion[];
@@ -50,7 +52,7 @@ export function useWorkspaceFeatureGeneration({
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [specError, setSpecError] = useState<string | null>(null);
 	const handleConfirmGenerate = useCallback(async () => {
-		if (!effectiveFeatureId || isConfirming) return;
+		if (!effectiveFeatureId || isConfirming || readOnly) return;
 		setIsConfirming(true);
 		setSpecError(null);
 		setStageError(null);
@@ -151,6 +153,7 @@ export function useWorkspaceFeatureGeneration({
 		}
 	}, [
 		effectiveFeatureId,
+		readOnly,
 		activeProjectIdRef,
 		isConfirming,
 		chatAnswers,

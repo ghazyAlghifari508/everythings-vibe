@@ -580,7 +580,7 @@ describe("workspace resume after refresh", () => {
 		);
 		expect(pipelineSource).toContain("stageRunInFlight");
 		expect(pipelineSource).toMatch(
-			/if \(!effectiveFeatureId \|\| stageBusy \|\| stageRunInFlight\.current\) return/,
+			/if \(\s*!effectiveFeatureId \|\|\s*stageBusy \|\|\s*stageRunInFlight\.current === effectiveFeatureId\s*\)\s*return/,
 		);
 	});
 });

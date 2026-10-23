@@ -42,7 +42,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		initialAnalysis: data.analysis,
 		hasStoredSnapshot: data.hasStoredSnapshot,
 	});
-	const questions = useWorkspaceQuestions(effectiveFeatureId, setRun);
 	const [canvasOpen, setCanvasOpen] = useState(false);
 	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 	const [canvasView, setCanvasView] = useState<"kanban" | "checklist">(
@@ -51,6 +50,15 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	const artifact = useWorkspaceArtifacts(
 		sync.snapshotReady,
 		effectiveFeatureId,
+	);
+	const answersReadOnly =
+		Boolean(effectiveFeatureId) &&
+		(artifact.artifactHydration.feature !== "empty" ||
+			(run?.stage === "feature" && run.status === "running"));
+	const questions = useWorkspaceQuestions(
+		effectiveFeatureId,
+		setRun,
+		answersReadOnly,
 	);
 	const [pipelineStage, setPipelineStage] =
 		useState<CodebasePipelineStage>("questions");
@@ -79,6 +87,10 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 			return { ...artifact.artifactHydration, tasks: "ready" };
 		return artifact.artifactHydration;
 	}, [artifact.artifactHydration, hasTasksInDb]);
+	const composerAvailable =
+		!effectiveFeatureId ||
+		plan.isCreatingNew ||
+		(hydration.tasks === "empty" && !hasTasksInDb);
 	const workspaceView = useMemo(
 		() =>
 			resolveWorkspaceView({
@@ -207,6 +219,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	};
 	const composer = useWorkspaceComposer({
 		codebase,
+		composerAvailable,
 		snapshotReady: sync.snapshotReady,
 		isWorking: sync.isWorking,
 		setIsWorking: sync.setIsWorking,
@@ -233,6 +246,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 	const featureGeneration = useWorkspaceFeatureGeneration({
 		activeProjectIdRef: artifact.activeProjectIdRef,
 		effectiveFeatureId,
+		readOnly: answersReadOnly,
 		chatAnswers: questions.chatAnswers,
 		aiQuestions: questions.aiQuestions,
 		lastFeaturePrompt: questions.lastFeaturePrompt,
@@ -268,7 +282,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		setPipelineStage,
 		pushAssistantMessage,
 		openArtifactPreview,
-		pipelineStage,
+		pipelineStage: run?.status === "failed" ? run.stage : pipelineStage,
 		handleConfirmGenerate: featureGeneration.handleConfirmGenerate,
 	});
 	const selectPlan = (projectId: string) => {
@@ -307,6 +321,8 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		stage,
 		analysisOutput,
 		composerMode,
+		composerAvailable,
+		answersReadOnly,
 		composerTargetName,
 		userTookOverCanvas,
 		selectPlan,

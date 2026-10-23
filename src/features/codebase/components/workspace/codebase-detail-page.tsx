@@ -47,6 +47,8 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		chatAnswers,
 		run,
 		composerMode,
+		composerAvailable,
+		answersReadOnly,
 		composerTargetName,
 		artifacts,
 		activeArtifactId,
@@ -184,6 +186,8 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								answers={chatAnswers}
 								run={run}
 								composerMode={composerMode}
+								composerAvailable={composerAvailable}
+								answersReadOnly={answersReadOnly}
 								composerTargetName={composerTargetName}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
