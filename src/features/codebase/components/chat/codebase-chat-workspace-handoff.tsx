@@ -1,6 +1,7 @@
 "use client";
 
 import { Copy01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 
 export function buildExportPlanCommand(projectId: string): string {
@@ -49,6 +50,8 @@ interface CodebaseChatWorkspaceHandoffCardProps {
 	copiedExport: boolean;
 	onCopyCmd: () => void;
 	onCopyExport: () => void;
+	taskCount?: number;
+	onOpenKanban?: () => void;
 }
 
 export function CodebaseChatWorkspaceHandoffCard({
@@ -59,20 +62,20 @@ export function CodebaseChatWorkspaceHandoffCard({
 	copiedExport,
 	onCopyCmd,
 	onCopyExport,
+	taskCount,
+	onOpenKanban,
 }: CodebaseChatWorkspaceHandoffCardProps) {
 	return (
 		<div
 			data-testid="codebase-handoff-card"
-			className="rounded-xl border border-emerald/30 bg-obsidian p-4"
+			className="border-t border-graphite py-4"
 		>
 			<div className="flex items-center justify-between gap-2">
-				<p className="text-[13px] font-semibold text-emerald">
-					Handoff ke AI Coding Agent
-				</p>
+				<p className="text-sm font-semibold text-snow">Planning selesai</p>
 				<button
 					type="button"
 					onClick={onCopyCmd}
-					className="inline-flex min-h-9 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					className="inline-flex min-h-11 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					{copiedCmd ? (
 						<>
@@ -92,10 +95,22 @@ export function CodebaseChatWorkspaceHandoffCard({
 					)}
 				</button>
 			</div>
+			{taskCount !== undefined ? (
+				<p className="mt-1.5 text-sm text-fog">
+					{taskCount} task siap dikerjakan
+				</p>
+			) : null}
+			{onOpenKanban ? (
+				<Button
+					variant="outline"
+					className="mt-3 min-h-11"
+					onClick={onOpenKanban}
+				>
+					Buka Kanban
+				</Button>
+			) : null}
 			<p className="mt-1.5 text-xs leading-5 text-fog">
-				Seluruh tahap selesai: pohon fitur, PRD, Acceptance Criteria, dan task
-				sudah tersimpan. Prompt berikut menyuruh AI Coding Agent mengekspor
-				planning ke{" "}
+				Task siap dikerjakan. Salin prompt handoff untuk mengekspor planning ke{" "}
 				<code className="font-mono text-[11px] text-mist">docs/vibeplan/</code>{" "}
 				lalu mengerjakannya di repository
 				{codebaseName ? ` ${codebaseName}` : ""}.
@@ -112,7 +127,7 @@ export function CodebaseChatWorkspaceHandoffCard({
 						type="button"
 						onClick={onCopyExport}
 						aria-label="Salin perintah export plan"
-						className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded border border-graphite bg-charcoal px-2 text-[10px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
 						{copiedExport ? (
 							<>

@@ -16,6 +16,7 @@ export interface CodebaseStarterRefreshState {
 
 interface CodebaseChatWorkspacePristineProps {
 	composer: ReactNode;
+	newFeatureRepository?: string;
 	starterSuggestions?: CodebaseStarterSuggestion[];
 	starterRefresh?: CodebaseStarterRefreshState;
 	/**
@@ -33,6 +34,7 @@ interface CodebaseChatWorkspacePristineProps {
 
 export function CodebaseChatWorkspacePristine({
 	composer,
+	newFeatureRepository,
 	starterSuggestions,
 	starterRefresh,
 	newerAttemptFailure,
@@ -53,11 +55,14 @@ export function CodebaseChatWorkspacePristine({
 			<div className="flex w-full max-w-3xl flex-col items-center gap-6 text-center">
 				<div className="flex flex-col items-center gap-2.5">
 					<h2 className="text-2xl font-bold tracking-tight text-snow sm:text-3xl lg:text-[32px]">
-						Apa yang ingin kamu bangun?
+						{newFeatureRepository
+							? "Apa yang ingin kamu tambahkan?"
+							: "Apa yang ingin kamu bangun?"}
 					</h2>
 					<p className="max-w-xl text-sm leading-relaxed text-fog sm:text-[15px]">
-						Jelaskan fitur, perubahan, atau masalah yang ingin kamu kerjakan.
-						VibeEverything akan menyesuaikannya dengan struktur codebase ini.
+						{newFeatureRepository
+							? `Rencanakan fitur baru untuk ${newFeatureRepository}.`
+							: "Jelaskan fitur, perubahan, atau masalah yang ingin kamu kerjakan. VibeEverything akan menyesuaikannya dengan struktur codebase ini."}
 					</p>
 				</div>
 

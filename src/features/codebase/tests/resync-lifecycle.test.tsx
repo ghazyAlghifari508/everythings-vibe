@@ -146,7 +146,7 @@ describe("Re-sync Drawer non-interference & interactions", () => {
 			'[data-testid="codebase-resync-panel"]',
 		);
 		expect(drawer).not.toBeNull();
-		expect(drawer?.textContent).toContain("Perbarui source code");
+		expect(drawer?.textContent).toContain("Perbarui repository");
 	});
 
 	it("preserves formatted multiline prompt, indentation, and clean scrolling", () => {

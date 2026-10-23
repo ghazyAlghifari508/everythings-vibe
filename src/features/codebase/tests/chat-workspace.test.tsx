@@ -1491,25 +1491,22 @@ describe("CodebaseChatWorkspace composer without intent choice", () => {
 		expect(target?.textContent).toContain("Fitur baru");
 	});
 
-	it("shows the task impact inline while revising", () => {
+	it("does not present an unrequested impact assessment while revising", () => {
 		renderWorkspace({
 			artifacts: [planArtifact],
 			composerMode: "revise",
 			composerTargetName: "Filter Artikel",
-			revisionImpactNotice:
-				"Revisi ini berdampak pada 2 task selesai. Menyusun ulang task akan mereset progres tersebut.",
 		});
 		const notice = container.querySelector(
 			"[data-testid='codebase-revision-impact']",
 		);
-		expect(notice?.textContent).toContain("2 task selesai");
+		expect(notice).toBeNull();
 	});
 
 	it("hides the task impact while creating a new feature", () => {
 		renderWorkspace({
 			artifacts: [],
 			composerMode: "create",
-			revisionImpactNotice: "Revisi ini berdampak pada 1 task selesai.",
 		});
 		expect(
 			container.querySelector("[data-testid='codebase-revision-impact']"),

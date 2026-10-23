@@ -13,6 +13,7 @@ import type { CodebaseStarterRefreshState } from "./codebase-chat-workspace-pris
 
 export interface CodebaseChatWorkspaceProps {
 	featureName: string;
+	isCreatingNew?: boolean;
 	/**
 	 * What the workspace is allowed to show. Supplied by the route from the
 	 * resolved plan plus the real per-artifact hydration statuses, so a pending
@@ -49,6 +50,8 @@ export interface CodebaseChatWorkspaceProps {
 	 * that would invite regenerating work that is already in the database.
 	 */
 	tasksUnresolved?: boolean;
+	answersReadOnly?: boolean;
+	composerAvailable?: boolean;
 	codebaseName?: string;
 	starterSuggestions?: CodebaseStarterSuggestion[];
 	starterRefresh?: CodebaseStarterRefreshState;
@@ -64,7 +67,9 @@ export interface CodebaseChatWorkspaceProps {
 	onOpenArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onDownloadArtifact?: (artifact: CodebaseArtifactRef) => void;
 	onSubmitAnswer?: (questionId: string, answer: string) => void;
-	onSendMessage?: (message: string) => void;
+	onSendMessage?:
+		| ((message: string) => void)
+		| ((message: string) => boolean | Promise<boolean>);
 	/**
 	 * What the next message means. The route derives it from the workspace
 	 * state: a message in a user-facing plan revises or clarifies that plan,
@@ -74,8 +79,6 @@ export interface CodebaseChatWorkspaceProps {
 	composerMode?: CodebaseComposerMode;
 	/** Name of the plan the next message targets. Null while creating. */
 	composerTargetName?: string | null;
-	/** Copy describing a revision's impact on existing tasks. */
-	revisionImpactNotice?: string | null;
 	/**
 	 * The snapshot the existing planning was generated against, and the newest
 	 * usable snapshot. A difference means the repository moved on after the plan

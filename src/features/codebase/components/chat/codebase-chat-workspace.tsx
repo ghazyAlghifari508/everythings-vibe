@@ -48,6 +48,7 @@ export type PipelineStage = CodebasePipelineStage;
 
 export function CodebaseChatWorkspace({
 	featureName,
+	isCreatingNew = false,
 	view,
 	planSwitcher,
 	contextFiles: _contextFiles = [],
@@ -64,11 +65,12 @@ export function CodebaseChatWorkspace({
 	stageBusy = null,
 	stageError = null,
 	tasksUnresolved = false,
+	answersReadOnly = stage !== "questions",
+	composerAvailable = !projectIdForHandoff && !tasksUnresolved,
 	codebaseName,
 	starterSuggestions,
 	composerMode = "create",
 	composerTargetName = null,
-	revisionImpactNotice = null,
 	isSending = false,
 	isConfirming = false,
 	specError = null,
@@ -97,6 +99,7 @@ export function CodebaseChatWorkspace({
 		null,
 	);
 
+	const tasksArtifact = artifacts.find((item) => item.id.startsWith("tasks-"));
 	const exportCmd = projectIdForHandoff
 		? buildExportPlanCommand(projectIdForHandoff)
 		: null;
@@ -132,9 +135,14 @@ export function CodebaseChatWorkspace({
 
 	const handleSend = (text?: string) => {
 		const message = (text ?? draft).trim();
-		if (message.length < 3 || isSending || isRunWorking) return;
-		onSendMessage?.(message);
-		setDraft("");
+		if (!composerAvailable || message.length < 3 || isSending || isRunWorking)
+			return;
+		const accepted = onSendMessage?.(message);
+		if (accepted instanceof Promise) {
+			void accepted.then((success) => {
+				if (success) setDraft("");
+			});
+		} else if (accepted !== false) setDraft("");
 	};
 
 	const handlePrefillDraft = (text: string) => {
@@ -149,10 +157,12 @@ export function CodebaseChatWorkspace({
 		}
 	};
 
-	const handleEditQuestion = (questionId: string) =>
-		setEditingQuestionId(questionId);
+	const handleEditQuestion = (questionId: string) => {
+		if (!answersReadOnly) setEditingQuestionId(questionId);
+	};
 	const handleCancelEditQuestion = () => setEditingQuestionId(null);
 	const handleSubmitAnswer = (questionId: string, answer: string) => {
+		if (answersReadOnly) return;
 		setEditingQuestionId(null);
 		onSubmitAnswer?.(questionId, answer);
 	};
@@ -218,8 +228,6 @@ export function CodebaseChatWorkspace({
 	const renderComposer = (minRows = 1, className = "") => (
 		<CodebaseChatWorkspaceComposer
 			composerTargetName={composerTargetName}
-			composerMode={composerMode}
-			revisionImpactNotice={revisionImpactNotice}
 			draft={draft}
 			onDraftChange={setDraft}
 			onSend={handleSend}
@@ -251,9 +259,10 @@ export function CodebaseChatWorkspace({
 				<CodebaseChatWorkspacePlanSelection />
 			) : showPristine ? (
 				<CodebaseChatWorkspacePristine
+					newFeatureRepository={isCreatingNew ? codebaseName : undefined}
 					composer={renderComposer(2, "p-3.5 sm:p-4")}
-					starterSuggestions={starterSuggestions}
-					starterRefresh={starterRefresh}
+					starterSuggestions={isCreatingNew ? undefined : starterSuggestions}
+					starterRefresh={isCreatingNew ? undefined : starterRefresh}
 					newerAttemptFailure={newerAttemptFailure}
 					onRefreshStarterSuggestions={onRefreshStarterSuggestions}
 					onPrefillDraft={handlePrefillDraft}
@@ -278,7 +287,8 @@ export function CodebaseChatWorkspace({
 								totalQuestions={questions.length}
 								answers={answers}
 								currentIndex={currentIndex}
-								editingQuestionId={editingQuestionId}
+								editingQuestionId={answersReadOnly ? null : editingQuestionId}
+								readOnly={answersReadOnly}
 								onEditQuestion={handleEditQuestion}
 								onCancelEdit={handleCancelEditQuestion}
 								onSubmit={handleSubmitAnswer}
@@ -296,7 +306,7 @@ export function CodebaseChatWorkspace({
 									onRetry={onRetryGenerate}
 								/>
 							) : null}
-							{flowComplete && stage === "questions" ? (
+							{flowComplete && !answersReadOnly && stage === "questions" ? (
 								<CodebaseChatWorkspaceQuestionsComplete
 									isConfirming={isConfirming}
 									onConfirmGenerate={onConfirmGenerate}
@@ -322,6 +332,12 @@ export function CodebaseChatWorkspace({
 							{handoffPrompt && exportCmd ? (
 								<CodebaseChatWorkspaceHandoffCard
 									exportCmd={exportCmd}
+									taskCount={kanbanProgress?.total}
+									onOpenKanban={
+										tasksArtifact && onOpenArtifact
+											? () => onOpenArtifact(tasksArtifact)
+											: undefined
+									}
 									handoffPrompt={handoffPrompt}
 									codebaseName={codebaseName}
 									copiedCmd={copiedCmd}
@@ -334,11 +350,13 @@ export function CodebaseChatWorkspace({
 							) : null}
 						</div>
 					</div>
-					<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
-						<div className="mx-auto w-full max-w-3xl">
-							{renderComposer(2, "p-3 sm:p-3.5")}
+					{composerAvailable ? (
+						<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
+							<div className="mx-auto w-full max-w-3xl">
+								{renderComposer(2, "p-3 sm:p-3.5")}
+							</div>
 						</div>
-					</div>
+					) : null}
 				</>
 			)}
 		</div>

@@ -31,12 +31,6 @@ export interface PrdChatRequest {
 	selectedVersionNum?: number;
 	idempotencyKey?: string;
 	attempt?: number;
-	/**
-	 * The user was shown the revision's impact on existing tasks and confirmed
-	 * it. Without this the PRD lock still applies, so a revision can never
-	 * change a locked document silently.
-	 */
-	confirmedImpact?: boolean;
 }
 
 export type PrdChatRequestResult =
@@ -86,6 +80,14 @@ export async function parsePrdChatRequest(
 		);
 	}
 
+	if (
+		body.selectedVersionNum !== undefined &&
+		(optionalNumber(body.selectedVersionNum) === undefined ||
+			Number(body.selectedVersionNum) < 1)
+	) {
+		return invalid("Versi PRD tidak valid.");
+	}
+
 	const partialContent = body.partialContent;
 	if (
 		partialContent !== undefined &&
@@ -117,7 +119,6 @@ export async function parsePrdChatRequest(
 			selectedVersionNum: optionalNumber(body.selectedVersionNum),
 			idempotencyKey: optionalString(body.idempotencyKey),
 			attempt: optionalNumber(body.attempt),
-			confirmedImpact: body.confirmedImpact === true,
 		},
 	};
 }

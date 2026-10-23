@@ -12,9 +12,19 @@ import type { CodebaseWorkspaceData } from "../services/workspace-loader.functio
 
 export function useWorkspacePlan({
 	codebase,
-	plans,
+	plans: persistedPlans,
 	onboardingFeatureId,
 }: Pick<CodebaseWorkspaceData, "codebase" | "plans" | "onboardingFeatureId">) {
+	const [createdPlans, setCreatedPlans] = useState<typeof persistedPlans>([]);
+	const plans = useMemo(
+		() => [
+			...persistedPlans,
+			...createdPlans.filter(
+				(created) => !persistedPlans.some((plan) => plan.id === created.id),
+			),
+		],
+		[persistedPlans, createdPlans],
+	);
 	const [requestedProjectId, setRequestedProjectId] = useState<string | null>(
 		null,
 	);
@@ -30,9 +40,9 @@ export function useWorkspacePlan({
 		[codebase.id, onboardingFeatureId, plans, requestedProjectId],
 	);
 	useEffect(() => {
-		if (planResolution.kind === "resolved")
+		if (!isCreatingNew && planResolution.kind === "resolved")
 			storeActivePlanPointer(codebase.id, planResolution.plan.id);
-	}, [codebase.id, planResolution]);
+	}, [codebase.id, planResolution, isCreatingNew]);
 	const resolvedPlan =
 		planResolution.kind === "resolved" ? planResolution.plan : null;
 	const onboardingFeature = useMemo(
@@ -51,10 +61,13 @@ export function useWorkspacePlan({
 		name: string;
 		featuresStatus?: string | null;
 	} | null>(null);
-	const resolvedFeature = activeFeature ?? resolvedPlan;
+	const resolvedFeature = isCreatingNew
+		? null
+		: (activeFeature ?? resolvedPlan);
 	const effectiveFeatureId = resolvedFeature?.id ?? null;
-	const planState: WorkspacePlanState =
-		planResolution.kind === "resolved"
+	const planState: WorkspacePlanState = isCreatingNew
+		? "empty"
+		: resolvedFeature
 			? "resolved"
 			: planResolution.kind === "empty"
 				? "empty"
@@ -68,6 +81,15 @@ export function useWorkspacePlan({
 		onboardingFeature,
 		userFacingPlans,
 		setActiveFeature,
+		registerCreatedPlan: (plan: { id: string; name: string }) => {
+			setCreatedPlans((current) =>
+				current.some((entry) => entry.id === plan.id)
+					? current
+					: [...current, { ...plan, updatedAt: null, hasArtifacts: false }],
+			);
+			setRequestedProjectId(plan.id);
+			storeActivePlanPointer(codebase.id, plan.id);
+		},
 		resolvedFeature,
 		effectiveFeatureId,
 		planState,

@@ -31,6 +31,27 @@ const doneStream = () =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("workspace generation streams", () => {
+	it("ignores old streaming events and completion after entering an empty workspace", async () => {
+		let finish: (response: Response) => void = () => {};
+		const pending = new Promise<Response>((resolve) => {
+			finish = resolve;
+		});
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => pending),
+		);
+		const reload = vi.fn(async () => true);
+		const { result } = renderHook(usePipeline);
+		await act(async () => {
+			const request = result.current.generate("prd", "/api/chat", {}, reload);
+			result.current.project.current = null;
+			finish(doneStream());
+			await request;
+		});
+		expect(reload).not.toHaveBeenCalled();
+		expect(result.current.run?.thinkingText).toBe("");
+		expect(result.current.run?.status).toBe("running");
+	});
 	it("deduplicates same-render submissions and waits for persisted content", async () => {
 		let finish: (response: Response) => void = () => {};
 		const pending = new Promise<Response>((resolve) => {

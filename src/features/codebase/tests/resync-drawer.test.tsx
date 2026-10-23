@@ -71,8 +71,8 @@ describe("CodebaseResyncDrawer", () => {
 			'[data-testid="codebase-resync-panel"]',
 		);
 		expect(panel).not.toBeNull();
-		expect(panel?.textContent).toContain("Perbarui source code");
-		expect(panel?.textContent).toContain("Salin instruksi untuk AI agent");
+		expect(panel?.textContent).toContain("Perbarui repository");
+		expect(panel?.textContent).toContain("Salin instruksi sync ulang");
 	});
 
 	it("renders multiline formatted prompt with proper scroll container", () => {

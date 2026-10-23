@@ -1,4 +1,9 @@
-import { type Dispatch, type SetStateAction, useCallback } from "react";
+import {
+	type Dispatch,
+	type RefObject,
+	type SetStateAction,
+	useCallback,
+} from "react";
 import {
 	appendRunThinking,
 	type CodebasePipelineStage,
@@ -13,9 +18,9 @@ import { consumeSseStream } from "@/lib/sse-consume";
 
 export function useWorkspaceRevision({
 	effectiveFeatureId,
+	activeProjectIdRef,
 	stageBusy,
 	featureName,
-	requiresTaskReplacementConfirmation,
 	loadPrd,
 	pushAssistantMessage,
 	openArtifactPreview,
@@ -25,9 +30,9 @@ export function useWorkspaceRevision({
 	resolvedFeatureName,
 }: {
 	effectiveFeatureId: string | null;
+	activeProjectIdRef: RefObject<string | null>;
 	stageBusy: CodebasePipelineStage | null;
 	featureName: string;
-	requiresTaskReplacementConfirmation: boolean;
 	loadPrd: () => Promise<string | null>;
 	pushAssistantMessage: (content: string) => void;
 	openArtifactPreview: (kind: "feature" | "prd" | "ac" | "tasks") => void;
@@ -51,18 +56,23 @@ export function useWorkspaceRevision({
 						mode: "revise",
 						message: buildRevisionRequest({ featureName, instruction }),
 						displayMessage: instruction,
-						...(requiresTaskReplacementConfirmation
-							? { confirmedImpact: true }
-							: {}),
 					}),
 				});
 				const result = await consumeSseStream(response, {
-					onThinking: (text) =>
-						setRun((current) => appendRunThinking(current, text)),
-					onThinkingReset: () => setRun((current) => resetRunThinking(current)),
-					onDelta: () =>
-						setRun((current) => setRunPhase(current, "generating")),
+					onThinking: (text) => {
+						if (activeProjectIdRef.current === effectiveFeatureId)
+							setRun((current) => appendRunThinking(current, text));
+					},
+					onThinkingReset: () => {
+						if (activeProjectIdRef.current === effectiveFeatureId)
+							setRun((current) => resetRunThinking(current));
+					},
+					onDelta: () => {
+						if (activeProjectIdRef.current === effectiveFeatureId)
+							setRun((current) => setRunPhase(current, "generating"));
+					},
 				});
+				if (activeProjectIdRef.current !== effectiveFeatureId) return;
 				if (result.error) {
 					const failure = result.error;
 					setStageError(failure);
@@ -72,6 +82,7 @@ export function useWorkspaceRevision({
 					return;
 				}
 				const content = await loadPrd();
+				if (activeProjectIdRef.current !== effectiveFeatureId) return;
 				if (!content) {
 					const failure =
 						"Revisi belum tersimpan di server. Coba kirim ulang permintaan.";
@@ -87,18 +98,20 @@ export function useWorkspaceRevision({
 				);
 				openArtifactPreview("prd");
 			} catch {
+				if (activeProjectIdRef.current !== effectiveFeatureId) return;
 				const failure = "Server tidak dapat dihubungi. Coba lagi.";
 				setStageError(failure);
 				setRun((current) => settleRun(current, "failed", Date.now(), failure));
 			} finally {
-				setStageBusy(null);
+				if (activeProjectIdRef.current === effectiveFeatureId)
+					setStageBusy(null);
 			}
 		},
 		[
 			effectiveFeatureId,
+			activeProjectIdRef,
 			stageBusy,
 			featureName,
-			requiresTaskReplacementConfirmation,
 			loadPrd,
 			pushAssistantMessage,
 			openArtifactPreview,

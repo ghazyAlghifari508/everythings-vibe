@@ -2,23 +2,23 @@ import { CodebaseChatWorkspace } from "@/features/codebase/components/chat/codeb
 import { CodebaseArtifactCanvas } from "@/features/codebase/components/explorer/codebase-artifact-canvas";
 import { CodebaseExplorerSidebar } from "@/features/codebase/components/explorer/codebase-explorer-sidebar";
 import { CodebasePlanSwitcher } from "@/features/codebase/components/planning/codebase-plan-switcher";
-import { CodebaseResyncDrawer } from "@/features/codebase/components/planning/codebase-resync-drawer";
+import { CodebaseResyncModal } from "@/features/codebase/components/planning/codebase-resync-modal";
 import { CodebaseWorkspaceShell } from "@/features/codebase/components/workspace/codebase-workspace-shell";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
-import { describeRevisionImpact } from "@/features/codebase/services/revision-intent";
 import { useCodebaseWorkspace } from "../../hooks/use-codebase-workspace";
 import type { CodebaseWorkspaceData } from "../../services/workspace-loader.functions";
 import { WorkspaceConnectionScreen } from "./workspace-connection-screen";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceScreenResolver } from "./workspace-screen-resolver";
-import { WorkspaceTaskSubnav } from "./workspace-task-subnav";
 
 export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 	const { codebase, planningSnapshotByProject, canOpenFullBoard } = data;
 	const {
 		snapshotReady,
+		isCreatingNew,
 		isStarting,
 		status,
+		activeSessionId,
 		manifestFileCount,
 		setIsResyncDrawerOpen,
 		payload,
@@ -47,8 +47,9 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		chatAnswers,
 		run,
 		composerMode,
+		composerAvailable,
+		answersReadOnly,
 		composerTargetName,
-		revisionImpact,
 		artifacts,
 		activeArtifactId,
 		hasTasksInDb,
@@ -131,7 +132,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 						</button>
 					</div>
 				)}
-				<CodebaseResyncDrawer
+				<CodebaseResyncModal
 					isOpen={isResyncDrawerOpen}
 					onClose={() => setIsResyncDrawerOpen(false)}
 					projectName={codebase.name}
@@ -143,6 +144,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 					onRetrySync={() => void startSession("retry")}
 					analysis={analysis}
 					isAnalyzing={isWorking}
+					activeSessionId={activeSessionId}
 					onRetryAnalysis={
 						activeWorkspaceSnapshotId
 							? () => void triggerAnalysis(activeWorkspaceSnapshotId)
@@ -162,6 +164,8 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 						}
 						chatPane={
 							<CodebaseChatWorkspace
+								key={effectiveFeatureId ?? "new-feature"}
+								isCreatingNew={isCreatingNew}
 								featureName={resolvedFeature?.name ?? codebase.name}
 								view={workspaceView}
 								planSwitcher={
@@ -183,8 +187,9 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								answers={chatAnswers}
 								run={run}
 								composerMode={composerMode}
+								composerAvailable={composerAvailable}
+								answersReadOnly={answersReadOnly}
 								composerTargetName={composerTargetName}
-								revisionImpactNotice={describeRevisionImpact(revisionImpact)}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
 								projectIdForHandoff={hasTasksInDb ? effectiveFeatureId : null}
@@ -253,7 +258,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								}}
 								onDownloadArtifact={handleDownloadArtifact}
 								onSubmitAnswer={handleSubmitAnswer}
-								onSendMessage={(message) => void handleSendMessage(message)}
+								onSendMessage={handleSendMessage}
 								onConfirmGenerate={() => void handleConfirmGenerate()}
 								onRetryGenerate={() => void handleConfirmGenerate()}
 								onRetryStage={() => void handleRetryStage()}
@@ -274,13 +279,18 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								fileName={
 									isSourcePreviewOpen
 										? sourcePreviewPath
-										: (activeArtifact?.fileName ?? "Preview artefak")
+										: (activeArtifact?.title ??
+											(isTasksArtifactActive
+												? `Task · ${resolvedFeature?.name ?? codebase.name}`
+												: (activeArtifact?.fileName ?? "Preview artefak")))
 								}
 								badge={
 									isSourcePreviewOpen
 										? "SUMBER"
 										: (activeArtifact?.badge ?? "PRATINJAU")
 								}
+								contentScroll={!isTasksArtifactActive}
+								hideBadge={isTasksArtifactActive}
 								copyValue={canvasCopy.value}
 								copyLabel={canvasCopy.label}
 								copyUnavailableReason={canvasCopy.unavailableReason}
@@ -318,21 +328,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 												? () => void loadAc()
 												: undefined
 								}
-								subnav={
-									isTasksArtifactActive ? (
-										<>
-											<WorkspaceTaskSubnav
-												canvasView={canvasView}
-												setCanvasView={setCanvasView}
-											/>
-											<span className="font-mono text-[10px] text-slate">
-												{kanban.staleness === "live"
-													? "Live dari database"
-													: "Data terakhir"}
-											</span>
-										</>
-									) : undefined
-								}
 							>
 								<WorkspaceScreenResolver
 									sourcePreview={sourcePreview}
@@ -345,6 +340,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 									prdContent={prdContent}
 									acContent={acContent}
 									canvasView={canvasView}
+									setCanvasView={setCanvasView}
 									codebaseId={codebase.id}
 									kanban={kanban}
 									canOpenFullBoard={canOpenFullBoard}

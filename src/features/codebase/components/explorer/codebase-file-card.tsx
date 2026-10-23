@@ -1,7 +1,7 @@
 "use client";
 
-import { Download01Icon, File01Icon } from "@hugeicons/core-free-icons";
-import type { KeyboardEvent, MouseEvent } from "react";
+import { ArrowRight01Icon, File01Icon } from "@hugeicons/core-free-icons";
+import type { KeyboardEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 
 export interface CodebaseArtifactRef {
@@ -10,9 +10,10 @@ export interface CodebaseArtifactRef {
 	fileSizeBytes: number | null;
 	badge: string;
 	description: string;
+	title?: string;
 }
 
-interface CodebaseFileCardProps {
+export interface CodebaseFileCardProps {
 	artifact: CodebaseArtifactRef;
 	active?: boolean;
 	onOpen?: (artifact: CodebaseArtifactRef) => void;
@@ -31,7 +32,6 @@ export function CodebaseFileCard({
 	artifact,
 	active = false,
 	onOpen,
-	onDownload,
 }: CodebaseFileCardProps) {
 	const openArtifact = () => onOpen?.(artifact);
 
@@ -41,90 +41,88 @@ export function CodebaseFileCard({
 		openArtifact();
 	};
 
-	const handleDownloadClick = (event: MouseEvent<HTMLButtonElement>) => {
-		event.stopPropagation();
-		onDownload?.(artifact);
-	};
+	const displayTitle = artifact.title ?? artifact.fileName;
+	const hasRealSize =
+		typeof artifact.fileSizeBytes === "number" &&
+		Number.isFinite(artifact.fileSizeBytes) &&
+		artifact.fileSizeBytes >= 0;
 
 	const content = (
 		<>
-			<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-indigo">
+			<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-graphite bg-obsidian text-indigo">
 				<Icon
 					icon={File01Icon}
-					size={20}
+					size={18}
 					strokeWidth={1.75}
 					aria-hidden="true"
 				/>
 			</div>
-			<div className="min-w-0 text-left">
+			<div className="min-w-0 flex-1 text-left">
 				<p
 					data-testid="codebase-file-name"
 					className="truncate font-mono text-[13px] font-semibold text-snow"
 					title={artifact.fileName}
 				>
-					{artifact.fileName}
+					{displayTitle}
 				</p>
-				<div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-fog">
-					<span className="rounded border border-graphite bg-obsidian px-1.5 py-px font-mono text-[10px] font-medium uppercase text-fog">
-						{artifact.badge}
+				<div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-fog">
+					<span className="truncate">
+						{artifact.description || "Dokumen siap"}
 					</span>
-					<span aria-hidden="true">•</span>
-					<span data-testid="codebase-file-size">
-						{typeof artifact.fileSizeBytes === "number"
-							? formatFileSize(artifact.fileSizeBytes)
-							: "Ukuran menyusul"}
-					</span>
+					{hasRealSize ? (
+						<>
+							<span aria-hidden="true">•</span>
+							<span
+								data-testid="codebase-file-size"
+								className="font-mono text-[10px]"
+							>
+								{formatFileSize(artifact.fileSizeBytes as number)}
+							</span>
+						</>
+					) : null}
 				</div>
-				<p className="mt-0.5 truncate text-[11px] text-slate">
-					{artifact.description}
-				</p>
 			</div>
+			<Icon
+				icon={ArrowRight01Icon}
+				size={16}
+				strokeWidth={1.75}
+				className="shrink-0 text-slate transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-snow"
+				aria-hidden="true"
+			/>
 		</>
 	);
+
+	if (onOpen) {
+		return (
+			<button
+				type="button"
+				onClick={openArtifact}
+				onKeyDown={handleOpenKeyDown}
+				aria-label={`Buka preview ${displayTitle}`}
+				data-testid="codebase-file-card"
+				data-artifact-id={artifact.id}
+				data-active={active}
+				className={`group my-2 flex w-full max-w-md cursor-pointer items-center justify-between gap-3 rounded-xl border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
+					active
+						? "border-indigo bg-indigo/10"
+						: "border-graphite bg-charcoal hover:border-steel hover:bg-obsidian/70"
+				}`}
+			>
+				{content}
+			</button>
+		);
+	}
 
 	return (
 		<div
 			data-testid="codebase-file-card"
 			data-artifact-id={artifact.id}
 			data-active={active}
-			className={`my-3 flex w-full max-w-md items-center justify-between gap-2 rounded-xl border p-2 transition-colors ${
-				active
-					? "border-indigo bg-indigo/10"
-					: "border-graphite bg-charcoal hover:border-steel"
+			className={`my-2 flex w-full max-w-md items-center justify-between gap-3 rounded-xl border p-2.5 transition-colors ${
+				active ? "border-indigo bg-indigo/10" : "border-graphite bg-charcoal"
 			}`}
 		>
-			{onOpen ? (
-				<button
-					type="button"
-					onClick={openArtifact}
-					onKeyDown={handleOpenKeyDown}
-					aria-label={`Buka preview ${artifact.fileName}`}
-					className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg px-1.5 text-left hover:bg-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					{content}
-				</button>
-			) : (
-				<div className="flex min-h-11 min-w-0 flex-1 items-center gap-3 px-1.5">
-					{content}
-				</div>
-			)}
-			<button
-				type="button"
-				onClick={handleDownloadClick}
-				aria-label={`Unduh ${artifact.fileName}`}
-				title="Unduh file"
-				data-testid="codebase-file-download"
-				disabled={!onDownload}
-				className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-graphite bg-obsidian px-3 py-1.5 text-[13px] font-medium text-snow transition-colors hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
-			>
-				<Icon
-					icon={Download01Icon}
-					size={15}
-					strokeWidth={1.75}
-					aria-hidden="true"
-				/>
-				<span>Unduh</span>
-			</button>
+			{content}
 		</div>
 	);
 }

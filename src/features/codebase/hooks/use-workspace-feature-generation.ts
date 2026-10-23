@@ -1,5 +1,6 @@
 import {
 	type Dispatch,
+	type RefObject,
 	type SetStateAction,
 	useCallback,
 	useState,
@@ -19,6 +20,8 @@ import { buildAskHandoffAnswers } from "../utils/workspace-contracts";
 
 export function useWorkspaceFeatureGeneration({
 	effectiveFeatureId,
+	readOnly = false,
+	activeProjectIdRef,
 	chatAnswers,
 	aiQuestions,
 	lastFeaturePrompt,
@@ -32,6 +35,8 @@ export function useWorkspaceFeatureGeneration({
 	setRun,
 }: {
 	effectiveFeatureId: string | null;
+	readOnly?: boolean;
+	activeProjectIdRef: RefObject<string | null>;
 	chatAnswers: Record<string, string>;
 	aiQuestions: AdaptiveQuestion[];
 	lastFeaturePrompt: string;
@@ -47,7 +52,7 @@ export function useWorkspaceFeatureGeneration({
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [specError, setSpecError] = useState<string | null>(null);
 	const handleConfirmGenerate = useCallback(async () => {
-		if (!effectiveFeatureId || isConfirming) return;
+		if (!effectiveFeatureId || isConfirming || readOnly) return;
 		setIsConfirming(true);
 		setSpecError(null);
 		setStageError(null);
@@ -82,6 +87,8 @@ export function useWorkspaceFeatureGeneration({
 					}
 				},
 				generateFeature: async () => {
+					if (activeProjectIdRef.current !== effectiveFeatureId)
+						return { status: 0 };
 					try {
 						const response = await fetch("/api/features/generate", {
 							method: "POST",
@@ -95,6 +102,7 @@ export function useWorkspaceFeatureGeneration({
 				},
 				reloadFeatureTree: () => refreshFeatureTree(effectiveFeatureId),
 			});
+			if (activeProjectIdRef.current !== effectiveFeatureId) return;
 			if (outcome.kind === "handoff_failed") {
 				const message =
 					"Jawaban gagal disimpan, jadi spesifikasi tidak dibuat. Coba lagi.";
@@ -140,10 +148,13 @@ export function useWorkspaceFeatureGeneration({
 			);
 			openArtifactPreview("feature");
 		} finally {
-			setIsConfirming(false);
+			if (activeProjectIdRef.current === effectiveFeatureId)
+				setIsConfirming(false);
 		}
 	}, [
 		effectiveFeatureId,
+		readOnly,
+		activeProjectIdRef,
 		isConfirming,
 		chatAnswers,
 		aiQuestions,
@@ -157,5 +168,11 @@ export function useWorkspaceFeatureGeneration({
 		setStageError,
 		setRun,
 	]);
-	return { isConfirming, specError, setSpecError, handleConfirmGenerate };
+	return {
+		isConfirming,
+		setIsConfirming,
+		specError,
+		setSpecError,
+		handleConfirmGenerate,
+	};
 }

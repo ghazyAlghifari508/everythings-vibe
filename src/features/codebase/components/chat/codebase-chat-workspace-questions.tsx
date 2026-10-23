@@ -11,6 +11,7 @@ interface CodebaseChatWorkspaceQuestionsProps {
 	answers: Record<string, string>;
 	currentIndex: number;
 	editingQuestionId: string | null;
+	readOnly: boolean;
 	onEditQuestion: (questionId: string) => void;
 	onCancelEdit: () => void;
 	onSubmit: (questionId: string, answer: string) => void;
@@ -22,6 +23,7 @@ export function CodebaseChatWorkspaceQuestions({
 	answers,
 	currentIndex,
 	editingQuestionId,
+	readOnly,
 	onEditQuestion,
 	onCancelEdit,
 	onSubmit,
@@ -29,7 +31,7 @@ export function CodebaseChatWorkspaceQuestions({
 	return (
 		<>
 			{visibleQuestions.map((question, qIndex) => {
-				const isEditing = editingQuestionId === question.id;
+				const isEditing = !readOnly && editingQuestionId === question.id;
 				const isActive =
 					isEditing || (editingQuestionId === null && qIndex === currentIndex);
 				return (
@@ -39,9 +41,9 @@ export function CodebaseChatWorkspaceQuestions({
 						index={qIndex + 1}
 						totalQuestions={totalQuestions}
 						submitted={(answers[question.id] ?? "").trim()}
-						active={isActive}
+						active={!readOnly && isActive}
 						isEditing={isEditing}
-						onEdit={onEditQuestion}
+						onEdit={readOnly ? undefined : onEditQuestion}
 						onCancelEdit={onCancelEdit}
 						onSubmit={onSubmit}
 					/>

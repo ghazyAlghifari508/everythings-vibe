@@ -1,11 +1,13 @@
 "use client";
 
+import { ScrollShadow, Tooltip } from "@heroui/react";
 import {
 	ArrowLeft01Icon,
 	ArrowRight01Icon,
 	LinkSquare01Icon,
 } from "@hugeicons/core-free-icons";
 import { useMemo } from "react";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import {
 	type TaskCard,
@@ -31,24 +33,9 @@ interface CodebaseKanbanBoardProps {
 	isLoadingExternal?: boolean;
 	isErrorExternal?: boolean;
 	onRetryExternal?: () => void;
-	/**
-	 * Whether the full board route is reachable for this account. The route
-	 * itself gates on the plan, so a link is only offered when it will not
-	 * bounce the user into an upgrade redirect.
-	 */
 	canOpenFullBoard?: boolean;
 }
 
-/**
- * Kanban preview for the workspace's right panel.
- *
- * The panel is narrow (roughly 360-560px), so columns keep a readable card
- * width and the board scrolls horizontally instead of squeezing three columns
- * into the available space. Card titles stay fully visible, and the same
- * statuses, feature grouping, subtask progress, and live signal the full board
- * uses are preserved — the panel is a preview of the real data, never a
- * simplified copy of it.
- */
 export function CodebaseKanbanBoard({
 	projectId,
 	codebaseId,
@@ -114,7 +101,9 @@ export function CodebaseKanbanBoard({
 		handleScrollLeft,
 		handleScrollRight,
 		handleToolbarKeyDown,
-	} = useKanbanHorizontalScroll({ columnCount: columnSpecs.length });
+	} = useKanbanHorizontalScroll({
+		columnCount: progress.total > 0 ? columnSpecs.length : 0,
+	});
 
 	if (!projectId) {
 		return (
@@ -124,8 +113,7 @@ export function CodebaseKanbanBoard({
 			>
 				<p className="text-sm font-semibold text-snow">Belum ada project</p>
 				<p className="max-w-xs text-xs leading-5 text-fog">
-					Buat fitur dari konteks codebase agar Papan Kanban live muncul di
-					sini.
+					Buat fitur dari konteks codebase untuk melihat task di sini.
 				</p>
 			</div>
 		);
@@ -166,13 +154,14 @@ export function CodebaseKanbanBoard({
 						? "Koneksi terputus. Pastikan server aktif."
 						: "Koneksi ke server bermasalah. Coba lagi."}
 				</p>
-				<button
+				<Button
 					type="button"
+					variant="outline"
 					onClick={handleRetry}
-					className="mt-1 inline-flex min-h-11 items-center rounded-md border border-graphite bg-charcoal px-3 text-xs font-medium text-snow hover:border-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					className="mt-1 min-h-11"
 				>
 					Coba lagi
-				</button>
+				</Button>
 			</div>
 		);
 	}
@@ -180,16 +169,18 @@ export function CodebaseKanbanBoard({
 	const hasAnyTask = progress.total > 0;
 
 	return (
-		<div data-testid="codebase-kanban-board" className="flex flex-col gap-3">
-			<div className="sticky top-0 z-10 -mt-1 flex flex-col gap-2 bg-obsidian/95 pb-2 pt-1 backdrop-blur-sm">
-				<div className="flex items-center justify-between gap-2">
+		<div
+			data-testid="codebase-kanban-board"
+			className="flex h-full min-h-0 flex-col"
+		>
+			<div className="flex shrink-0 flex-col gap-2 border-b border-graphite px-3 py-2">
+				<div className="flex flex-wrap items-center justify-between gap-2">
 					<div className="flex items-center gap-2">
-						<h3 className="text-xs font-semibold text-snow">Papan Kanban</h3>
 						<span
 							data-testid="codebase-kanban-progress"
-							className="font-mono text-[11px] tabular-nums text-fog"
+							className="text-xs tabular-nums text-fog"
 						>
-							{progress.done}/{progress.total} selesai ({progress.pct}%)
+							{progress.done} dari {progress.total} selesai
 						</span>
 					</div>
 					<div className="flex items-center gap-1.5">
@@ -198,47 +189,57 @@ export function CodebaseKanbanBoard({
 								role="toolbar"
 								aria-label="Navigasi horizontal Kanban"
 								onKeyDown={handleToolbarKeyDown}
-								className="flex items-center gap-1 rounded-md border border-graphite bg-charcoal p-0.5"
+								className="flex items-center gap-1"
 							>
-								<button
+								<Button
+									variant="ghost"
+									size="icon"
 									type="button"
 									onClick={handleScrollLeft}
 									disabled={!canScrollLeft}
 									aria-label="Gulir kolom ke kiri"
 									title="Gulir ke kiri (Panah Kiri)"
 									data-testid="codebase-kanban-scroll-left"
-									className="inline-flex h-6 w-6 items-center justify-center rounded text-mist transition hover:bg-obsidian hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-mist"
+									className="h-11 w-11"
 								>
-									<Icon icon={ArrowLeft01Icon} size={13} aria-hidden="true" />
-								</button>
-								<button
+									<Icon icon={ArrowLeft01Icon} size={18} aria-hidden="true" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
 									type="button"
 									onClick={handleScrollRight}
 									disabled={!canScrollRight}
 									aria-label="Gulir kolom ke kanan"
 									title="Gulir ke kanan (Panah Kanan)"
 									data-testid="codebase-kanban-scroll-right"
-									className="inline-flex h-6 w-6 items-center justify-center rounded text-mist transition hover:bg-obsidian hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-mist"
+									className="h-11 w-11"
 								>
-									<Icon icon={ArrowRight01Icon} size={13} aria-hidden="true" />
-								</button>
+									<Icon icon={ArrowRight01Icon} size={18} aria-hidden="true" />
+								</Button>
 							</div>
 						) : null}
 						{canOpenFullBoard ? (
-							<a
-								href={
-									codebaseId
-										? `/codebases/kanban/${encodeURIComponent(codebaseId)}/${encodeURIComponent(projectId)}`
-										: `/kanban/${encodeURIComponent(projectId)}`
-								}
-								target="_blank"
-								rel="noopener noreferrer"
-								data-testid="codebase-kanban-full-board"
-								className="inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-md border border-graphite bg-charcoal px-2 text-[11px] font-medium text-mist transition hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-							>
-								<Icon icon={LinkSquare01Icon} size={12} aria-hidden="true" />
-								Buka Kanban Penuh
-							</a>
+							<Tooltip>
+								<Tooltip.Trigger<"a">
+									render={(props) => <a {...props} />}
+									aria-label="Buka Kanban Penuh"
+									href={
+										codebaseId
+											? `/codebases/kanban/${encodeURIComponent(codebaseId)}/${encodeURIComponent(projectId)}`
+											: `/kanban/${encodeURIComponent(projectId)}`
+									}
+									target="_blank"
+									rel="noopener noreferrer"
+									data-testid="codebase-kanban-full-board"
+									className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-fog hover:bg-steel/30 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									<Icon icon={LinkSquare01Icon} size={18} aria-hidden="true" />
+								</Tooltip.Trigger>
+								<Tooltip.Content className="rounded-md border border-graphite bg-charcoal px-3 py-2 text-xs text-snow">
+									Buka Kanban Penuh
+								</Tooltip.Content>
+							</Tooltip>
 						) : null}
 					</div>
 				</div>
@@ -257,50 +258,40 @@ export function CodebaseKanbanBoard({
 				</div>
 			</div>
 			{staleness !== "live" ? (
-				<p className="rounded-md border border-graphite bg-charcoal p-2 text-[11px] text-fog">
+				<output className="shrink-0 px-3 py-2 text-xs text-fog">
 					{staleness === "stale"
 						? "Koneksi lambat. Menampilkan data terakhir."
 						: "Koneksi terputus. Menampilkan data terakhir."}{" "}
-					<button
+					<Button
 						type="button"
+						variant="link"
 						onClick={handleRetry}
-						className="underline hover:text-snow"
+						className="min-h-11"
 					>
 						Coba lagi
-					</button>
-				</p>
+					</Button>
+				</output>
 			) : null}
 			{hasAnyTask ? (
-				<div className="relative min-w-0">
-					{canScrollLeft ? (
-						<div
-							aria-hidden="true"
-							data-testid="codebase-kanban-fade-left"
-							className="pointer-events-none absolute left-0 top-0 bottom-1 z-10 w-6 bg-gradient-to-r from-obsidian to-transparent"
+				<ScrollShadow
+					ref={scrollRef}
+					isEnabled={false}
+					orientation="horizontal"
+					tabIndex={0}
+					role="region"
+					aria-label="Kolom Kanban"
+					data-testid="codebase-kanban-columns"
+					className="flex min-h-0 min-w-0 flex-1 items-start gap-3 overflow-x-auto overflow-y-auto p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo"
+				>
+					{columnSpecs.map((spec) => (
+						<CodebaseKanbanColumn
+							key={spec.key}
+							title={spec.title}
+							cards={spec.cards}
+							highlightInProgress={spec.highlightInProgress}
 						/>
-					) : null}
-					{canScrollRight ? (
-						<div
-							aria-hidden="true"
-							data-testid="codebase-kanban-fade-right"
-							className="pointer-events-none absolute right-0 top-0 bottom-1 z-10 w-6 bg-gradient-to-l from-obsidian to-transparent"
-						/>
-					) : null}
-					<div
-						ref={scrollRef}
-						data-testid="codebase-kanban-columns"
-						className="flex gap-3 overflow-x-auto pb-1 scroll-smooth focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo/40 rounded-lg"
-					>
-						{columnSpecs.map((spec) => (
-							<CodebaseKanbanColumn
-								key={spec.key}
-								title={spec.title}
-								cards={spec.cards}
-								highlightInProgress={spec.highlightInProgress}
-							/>
-						))}
-					</div>
-				</div>
+					))}
+				</ScrollShadow>
 			) : (
 				<div
 					data-testid="codebase-kanban-empty"
@@ -317,7 +308,7 @@ export function CodebaseKanbanBoard({
 			{failed.length > 0 ? (
 				<p
 					data-testid="codebase-kanban-failed-note"
-					className="rounded-md border border-crimson/30 bg-crimson/10 p-2 text-[11px] leading-5 text-crimson"
+					className="shrink-0 border-t border-graphite px-3 py-2 text-xs leading-5 text-crimson"
 				>
 					{failed.length} task gagal dan tetap ditampilkan di kolom Gagal.
 				</p>

@@ -133,6 +133,7 @@ export type ManifestEntry = z.infer<typeof manifestEntrySchema>;
 
 export const syncPromptPayloadSchema = z.object({
 	projectId: z.string().min(1),
+	sessionId: z.string().min(1).optional(),
 	apiBaseUrl: z.string().url(),
 	// Raw credential transferred once to the local agent. Never persisted.
 	syncToken: z.string().min(1),

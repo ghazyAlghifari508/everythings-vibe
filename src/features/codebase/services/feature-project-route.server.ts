@@ -5,6 +5,7 @@
 // here — server handlers only, no client component. Never import this module
 // from client code.
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db";
 import { codebaseSnapshots, codebases, projects } from "@/db/schema";
 import { deriveProjectNameSync } from "@/features/greenfield/services/prd-naming";
@@ -130,7 +131,12 @@ export async function handleCodebaseFeatureCreate({
 			? normalizeLanguage(body.language)
 			: normalizeLanguage(undefined);
 	const name = deriveProjectNameSync(prompt);
-	const id = crypto.randomUUID();
+	const requestId = z
+		.object({ requestId: z.uuid().optional() })
+		.safeParse(body);
+	if (!requestId.success)
+		return Response.json({ error: "Request tidak valid" }, { status: 400 });
+	const id = requestId.data.requestId ?? crypto.randomUUID();
 	const project = await db.transaction(async (tx) => {
 		const [lockedCodebase] = await tx
 			.select({
@@ -142,6 +148,20 @@ export async function handleCodebaseFeatureCreate({
 			.for("update")
 			.limit(1);
 		if (!lockedCodebase) return null;
+
+		const [existing] = await tx
+			.select({ id: projects.id, name: projects.name })
+			.from(projects)
+			.where(
+				and(
+					eq(projects.id, id),
+					eq(projects.userId, user.id),
+					eq(projects.codebaseId, lockedCodebase.id),
+					isNull(projects.deletedAt),
+				),
+			)
+			.limit(1);
+		if (existing) return existing;
 
 		const [createdProject] = await tx
 			.insert(projects)

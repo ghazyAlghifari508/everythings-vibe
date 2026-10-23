@@ -7,6 +7,7 @@ import { WhiteboardCanvas } from "@/features/greenfield/components/whiteboard/wh
 import type { useKanbanTasks } from "@/features/greenfield/hooks/use-kanban-polling";
 import type { TaskTree } from "@/features/greenfield/services/task-tree";
 import type { SourcePreviewState } from "../../types/source-preview";
+import { WorkspaceTaskSubnav } from "./workspace-task-subnav";
 
 export function WorkspaceScreenResolver({
 	sourcePreview,
@@ -19,6 +20,7 @@ export function WorkspaceScreenResolver({
 	prdContent,
 	acContent,
 	canvasView,
+	setCanvasView,
 	codebaseId,
 	kanban,
 	canOpenFullBoard,
@@ -37,6 +39,7 @@ export function WorkspaceScreenResolver({
 	prdContent: string | null;
 	acContent: string | null;
 	canvasView: "kanban" | "checklist";
+	setCanvasView: (view: "kanban" | "checklist") => void;
 	codebaseId: string;
 	kanban: ReturnType<typeof useKanbanTasks>;
 	canOpenFullBoard: boolean;
@@ -105,25 +108,32 @@ export function WorkspaceScreenResolver({
 	if (isAcArtifactActive)
 		return acContent ? <CodebaseDocPreview content={acContent} /> : null;
 	if (isTasksArtifactActive)
-		return canvasView === "kanban" ? (
-			<CodebaseKanbanBoard
-				projectId={resolvedFeature.id}
-				codebaseId={codebaseId}
-				columns={kanban.data?.columns ?? null}
-				staleness={kanban.staleness}
-				isLoadingExternal={kanban.isLoading}
-				isErrorExternal={kanban.isError}
-				onRetryExternal={() => void kanban.refetch()}
-				canOpenFullBoard={canOpenFullBoard}
-			/>
-		) : (
-			<div data-testid="codebase-checklist-tree" className="h-full min-h-0">
-				<WhiteboardCanvas
-					projectName={resolvedFeature.name}
-					taskTree={taskTree}
-					featureTree={featureTree}
-				/>
-			</div>
+		return (
+			<WorkspaceTaskSubnav
+				canvasView={canvasView}
+				setCanvasView={setCanvasView}
+			>
+				{canvasView === "kanban" ? (
+					<CodebaseKanbanBoard
+						projectId={resolvedFeature.id}
+						codebaseId={codebaseId}
+						columns={kanban.data?.columns ?? null}
+						staleness={kanban.staleness}
+						isLoadingExternal={kanban.isLoading}
+						isErrorExternal={kanban.isError}
+						onRetryExternal={() => void kanban.refetch()}
+						canOpenFullBoard={canOpenFullBoard}
+					/>
+				) : (
+					<div data-testid="codebase-checklist-tree" className="h-full min-h-0">
+						<WhiteboardCanvas
+							projectName={resolvedFeature.name}
+							taskTree={taskTree}
+							featureTree={featureTree}
+						/>
+					</div>
+				)}
+			</WorkspaceTaskSubnav>
 		);
 	if (isFeatureArtifactActive)
 		return (

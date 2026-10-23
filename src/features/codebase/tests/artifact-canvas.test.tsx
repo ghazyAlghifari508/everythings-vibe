@@ -51,6 +51,12 @@ function copyButton() {
 	);
 }
 
+function downloadButton() {
+	return container.querySelector<HTMLButtonElement>(
+		"[data-testid='codebase-canvas-download']",
+	);
+}
+
 describe("CodebaseArtifactCanvas canonical copy", () => {
 	it("copies the active artifact content, never the file name", async () => {
 		const writeText = vi.fn().mockResolvedValue(undefined);
@@ -97,5 +103,66 @@ describe("CodebaseArtifactCanvas canonical copy", () => {
 		expect(
 			container.querySelectorAll("[data-testid='codebase-canvas-copy']"),
 		).toHaveLength(1);
+	});
+});
+
+describe("CodebaseArtifactCanvas download action", () => {
+	it("triggers download when clicked and content is ready", () => {
+		const onDownload = vi.fn();
+		render({ onDownload });
+
+		const button = downloadButton();
+		expect(button).not.toBeNull();
+		expect(button?.disabled).toBe(false);
+		expect(button?.getAttribute("aria-label")).toBe("Unduh PRD-watchlist.md");
+
+		act(() => {
+			button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onDownload).toHaveBeenCalledTimes(1);
+	});
+
+	it("disables download when isLoading is true", () => {
+		const onDownload = vi.fn();
+		render({ onDownload, isLoading: true });
+
+		const button = downloadButton();
+		expect(button?.disabled).toBe(true);
+		expect(button?.getAttribute("title")).toBe("Memuat dokumen...");
+
+		act(() => {
+			button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onDownload).not.toHaveBeenCalled();
+	});
+
+	it("disables download when error is present", () => {
+		const onDownload = vi.fn();
+		render({ onDownload, error: "Gagal memuat dokumen" });
+
+		const button = downloadButton();
+		expect(button?.disabled).toBe(true);
+		expect(button?.getAttribute("title")).toBe("Gagal memuat dokumen");
+
+		act(() => {
+			button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onDownload).not.toHaveBeenCalled();
+	});
+
+	it("disables download when copyValue is null", () => {
+		const onDownload = vi.fn();
+		render({ onDownload, copyValue: null });
+
+		const button = downloadButton();
+		expect(button?.disabled).toBe(true);
+		expect(button?.getAttribute("title")).toBe(
+			"Isi dokumen belum siap untuk diunduh",
+		);
+
+		act(() => {
+			button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onDownload).not.toHaveBeenCalled();
 	});
 });

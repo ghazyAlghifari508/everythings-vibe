@@ -75,7 +75,6 @@ export async function handlePrdChatRequest(
 		selectedVersionNum,
 		idempotencyKey: callerIdempotencyKey,
 		attempt: callerAttempt,
-		confirmedImpact,
 	} = parsed.data;
 
 	const rateCheck = await checkRateLimit(user.id, plan, "ai_generate");
@@ -93,11 +92,12 @@ export async function handlePrdChatRequest(
 
 	if (ids.conversationId) {
 		const result = await getConversationHistory(ids.conversationId, user.id);
-		if (!result.valid)
+		if (!result.valid || (ids.projectId && ids.projectId !== result.projectId))
 			return Response.json(
 				{ error: "Conversation not found or unauthorized" },
 				{ status: 403 },
 			);
+		ids.projectId = result.projectId;
 		conversationHistory = result.messages;
 	}
 
@@ -130,7 +130,6 @@ export async function handlePrdChatRequest(
 		mode,
 		message,
 		selectedVersionNum,
-		confirmedImpact,
 	});
 	if (!context.ok) return context.response;
 	const {
@@ -138,6 +137,7 @@ export async function handlePrdChatRequest(
 		projectLanguage,
 		projectMode,
 		revisionBaseContent,
+		revisionBaseVersion,
 		codebaseBlock,
 		featureTreeBlock,
 		codebaseSnapshotId,
@@ -259,6 +259,8 @@ export async function handlePrdChatRequest(
 			partialContent,
 			preferences,
 			selectedVersionNum,
+			revisionBaseContent,
+			revisionBaseVersion,
 			projectLanguage,
 			systemPrompt,
 			conversationHistory,
