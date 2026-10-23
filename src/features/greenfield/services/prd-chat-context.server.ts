@@ -6,7 +6,7 @@
 // tombstoned project id fails closed instead of leaking generation context.
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { codebaseSnapshots, projects } from "@/db/schema";
+import { acVersions, codebaseSnapshots, projects, tasks } from "@/db/schema";
 import {
 	buildCodebasePromptBlock,
 	getProjectGenerationContext,
@@ -24,7 +24,7 @@ import {
 import type { PrdChatMode } from "@/features/greenfield/services/prd-chat-request";
 import {
 	getLatestPrdContent,
-	getPrdVersionContent,
+	getLatestPrdVersion,
 } from "@/features/greenfield/services/prd-service";
 import { buildStageScopeDirective } from "@/features/greenfield/utils/planning-mode";
 import { depthDirective } from "@/features/greenfield/utils/prompt-depth";
@@ -42,6 +42,7 @@ export interface PrdChatContext {
 	projectMode: string | null;
 	/** Current PRD document a revision patches; null when none exists. */
 	revisionBaseContent: string | null;
+	revisionBaseVersion?: number;
 	codebaseBlock: string;
 	featureTreeBlock: string;
 	codebaseSnapshotId?: string;
@@ -59,7 +60,6 @@ export async function preparePrdChatContext(input: {
 	mode: PrdChatMode;
 	message: string;
 	selectedVersionNum?: number;
-	confirmedImpact?: boolean;
 }): Promise<PrdChatContextResult> {
 	const { userId, projectId, mode, message, selectedVersionNum } = input;
 
@@ -71,7 +71,17 @@ export async function preparePrdChatContext(input: {
 		codebaseBlock: "",
 		featureTreeBlock: "",
 	};
-	if (!projectId) return { ok: true, data: context };
+	if (!projectId) {
+		return mode === "revise"
+			? {
+					ok: false,
+					response: Response.json(
+						{ error: "Project revisi diperlukan." },
+						{ status: 400 },
+					),
+				}
+			: { ok: true, data: context };
+	}
 
 	const [project] = await db
 		.select({
@@ -79,6 +89,8 @@ export async function preparePrdChatContext(input: {
 			language: projects.language,
 			projectMode: projects.projectMode,
 			step: projects.step,
+			acStatus: projects.acStatus,
+			taskStatus: projects.taskStatus,
 			featureTree: projects.featureTree,
 		})
 		.from(projects)
@@ -121,10 +133,29 @@ export async function preparePrdChatContext(input: {
 		context.featureTreeBlock = formatFeatureTreeBlock(parsedTree.data);
 	}
 
+	const [existingAc] =
+		mode === "revise"
+			? await db
+					.select({ id: acVersions.id })
+					.from(acVersions)
+					.where(eq(acVersions.projectId, projectId))
+					.limit(1)
+			: [];
+	const [existingTask] =
+		mode === "revise"
+			? await db
+					.select({ id: tasks.id })
+					.from(tasks)
+					.where(eq(tasks.projectId, projectId))
+					.limit(1)
+			: [];
 	if (
 		mode === "revise" &&
-		isPrdLocked(project.step) &&
-		!input.confirmedImpact
+		(isPrdLocked(project.step) ||
+			project.acStatus !== "pending" ||
+			project.taskStatus !== "pending" ||
+			existingAc ||
+			existingTask)
 	) {
 		const stageLabel =
 			project.step === "task" ? "Task / Kanban" : "Acceptance Criteria";
@@ -186,13 +217,36 @@ export async function preparePrdChatContext(input: {
 	}
 
 	if (mode === "revise" || mode === "chat") {
+		const latest =
+			mode === "revise" ? await getLatestPrdVersion(projectId) : null;
 		const activeContent =
-			mode === "revise" && selectedVersionNum
-				? await getPrdVersionContent(projectId, selectedVersionNum)
+			mode === "revise"
+				? latest?.content
 				: await getLatestPrdContent(projectId);
+		if (
+			mode === "revise" &&
+			(!activeContent ||
+				(selectedVersionNum !== undefined &&
+					selectedVersionNum !== latest?.version))
+		) {
+			return {
+				ok: false,
+				response: Response.json(
+					{
+						error:
+							"Versi PRD tidak tersedia atau sudah berubah. Muat ulang planning.",
+						code: "PRD_VERSION_CONFLICT",
+					},
+					{ status: 409 },
+				),
+			};
+		}
 		if (activeContent) {
 			context.groundingSource = `${activeContent}\n\n${message}`;
-			if (mode === "revise") context.revisionBaseContent = activeContent;
+			if (mode === "revise") {
+				context.revisionBaseContent = activeContent;
+				context.revisionBaseVersion = latest?.version;
+			}
 		}
 	}
 

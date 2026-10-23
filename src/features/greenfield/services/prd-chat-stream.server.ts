@@ -54,6 +54,8 @@ export interface PrdChatStreamInput {
 	partialContent?: string;
 	preferences: Record<string, unknown> | null;
 	selectedVersionNum?: number;
+	revisionBaseContent?: string | null;
+	revisionBaseVersion?: number;
 	projectLanguage: OutputLanguage;
 	systemPrompt: string;
 	conversationHistory: PrdChatMessage[];
@@ -235,6 +237,8 @@ export function createPrdChatStream(
 					message: input.message,
 					displayMessage: input.displayMessage,
 					selectedVersionNum: input.selectedVersionNum,
+					revisionBaseContent: input.revisionBaseContent,
+					revisionBaseVersion: input.revisionBaseVersion,
 					partialContent: input.partialContent,
 					projectLanguage: input.projectLanguage,
 					conversationId: ids.conversationId,

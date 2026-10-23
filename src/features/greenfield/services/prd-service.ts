@@ -8,12 +8,27 @@
 import { randomBytes } from "node:crypto";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { conversations, prdVersions, projects } from "@/db/schema";
+import {
+	acVersions,
+	conversations,
+	prdVersions,
+	projects,
+	tasks,
+} from "@/db/schema";
 import {
 	assertCompletePrdOutput,
 	sanitizeModelOutput,
 } from "@/features/greenfield/services/prd-text";
-import { advanceStep } from "@/lib/flow-progress";
+import { advanceStep, isPrdLocked } from "@/lib/flow-progress";
+
+export class PrdRevisionConflictError extends Error {}
+
+export interface PrdRevisionGuard {
+	userId: string;
+	projectId: string;
+	baseContent: string;
+	version: number;
+}
 
 // ponytail: moved from utils.ts - node:crypto crashes browser bundles via utils.ts.
 export function generateShareToken(): string {
@@ -35,10 +50,14 @@ export async function savePrdVersion(
 	mode: "generate" | "revise",
 	allowShareLink = true,
 	changeSummaryOverride?: string,
+	revisionGuard?: PrdRevisionGuard,
 ): Promise<{ prdVersionId: string; version: number } | undefined> {
 	let projectId: string | undefined;
 	const [conv] = await db
-		.select({ projectId: conversations.projectId })
+		.select({
+			projectId: conversations.projectId,
+			userId: conversations.userId,
+		})
 		.from(conversations)
 		.where(eq(conversations.id, idOrConversationId))
 		.limit(1);
@@ -64,6 +83,17 @@ export async function savePrdVersion(
 		return undefined;
 	}
 
+	if (
+		mode === "revise" &&
+		(!revisionGuard ||
+			revisionGuard.projectId !== projectId ||
+			(conv && conv.userId !== revisionGuard.userId))
+	) {
+		throw new PrdRevisionConflictError(
+			"Project revisi tidak sesuai atau tidak diizinkan.",
+		);
+	}
+
 	// HTML-page output (a model that ignored the markdown instruction) is
 	// unwrapped to text when possible, then the section contract is enforced
 	// before any write.
@@ -82,22 +112,62 @@ export async function savePrdVersion(
 	// existing public link.
 	return db.transaction(async (tx) => {
 		const [project] = await tx
-			.select({ step: projects.step })
+			.select({
+				step: projects.step,
+				userId: projects.userId,
+				acStatus: projects.acStatus,
+				taskStatus: projects.taskStatus,
+			})
 			.from(projects)
 			.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
 			.for("update")
 			.limit(1);
 		if (!project) throw new Error("Project not found for PRD save");
 
+		if (mode === "revise") {
+			// ponytail: locked planning has no approved revision workflow; add server-bound impact review before allowing downstream changes.
+			if (
+				!revisionGuard ||
+				project.userId !== revisionGuard.userId ||
+				isPrdLocked(project.step) ||
+				project.acStatus !== "pending" ||
+				project.taskStatus !== "pending"
+			)
+				throw new PrdRevisionConflictError(
+					"PRD terkunci atau project tidak diizinkan. Muat ulang planning.",
+				);
+			const [ac] = await tx
+				.select({ id: acVersions.id })
+				.from(acVersions)
+				.where(eq(acVersions.projectId, projectId))
+				.limit(1);
+			const [task] = await tx
+				.select({ id: tasks.id })
+				.from(tasks)
+				.where(eq(tasks.projectId, projectId))
+				.limit(1);
+			if (ac || task)
+				throw new PrdRevisionConflictError(
+					"PRD terkunci karena AC atau Task sudah tersedia.",
+				);
+		}
 		let nextVersion = 1;
 		if (mode === "revise") {
 			const [latest] = await tx
-				.select({ version: prdVersions.version })
+				.select({ version: prdVersions.version, content: prdVersions.content })
 				.from(prdVersions)
 				.where(eq(prdVersions.projectId, projectId))
 				.orderBy(desc(prdVersions.version))
 				.limit(1);
-			if (latest) nextVersion = latest.version + 1;
+			if (
+				!latest ||
+				latest.content !== revisionGuard?.baseContent ||
+				latest.version !== revisionGuard.version
+			)
+				throw new PrdRevisionConflictError(
+					"Versi PRD sudah berubah. Muat ulang planning sebelum revisi.",
+				);
+			nextVersion = latest.version + 1;
 		}
 
 		const prdVersionId = crypto.randomUUID();
@@ -149,16 +219,22 @@ export async function getPrdVersionContent(
 	return row?.content ?? null;
 }
 
-export async function getLatestPrdContent(
+export async function getLatestPrdVersion(
 	projectId: string,
-): Promise<string | null> {
+): Promise<{ content: string; version: number } | null> {
 	const [row] = await db
-		.select({ content: prdVersions.content })
+		.select({ content: prdVersions.content, version: prdVersions.version })
 		.from(prdVersions)
 		.where(eq(prdVersions.projectId, projectId))
 		.orderBy(desc(prdVersions.version))
 		.limit(1);
-	return row?.content ?? null;
+	return row ?? null;
+}
+
+export async function getLatestPrdContent(
+	projectId: string,
+): Promise<string | null> {
+	return (await getLatestPrdVersion(projectId))?.content ?? null;
 }
 
 export async function resolveProjectId(

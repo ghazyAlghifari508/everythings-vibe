@@ -18,8 +18,7 @@ import {
 	hasExplicitProductName,
 } from "@/features/greenfield/services/prd-naming";
 import {
-	getLatestPrdContent,
-	getPrdVersionContent,
+	PrdRevisionConflictError,
 	savePrdVersion,
 } from "@/features/greenfield/services/prd-service";
 import { mergePrdRevision } from "@/features/greenfield/utils/prd-revision-merge";
@@ -51,6 +50,8 @@ export interface PrdTurnPersistInput {
 	message: string;
 	displayMessage?: string;
 	selectedVersionNum?: number;
+	revisionBaseContent?: string | null;
+	revisionBaseVersion?: number;
 	partialContent?: string;
 	projectLanguage: OutputLanguage;
 	conversationId?: string;
@@ -104,14 +105,18 @@ export async function persistPrdTurn(
 			? input.partialContent + input.fullResponse
 			: input.fullResponse;
 
+	const revisionBaseContent = input.revisionBaseContent;
 	let patchedSections: string[] = [];
 	if (mode === "revise" && projectId) {
-		const currentPrd = input.selectedVersionNum
-			? await getPrdVersionContent(projectId, input.selectedVersionNum)
-			: await getLatestPrdContent(projectId);
-		const merged = mergePrdRevision(currentPrd, input.fullResponse);
+		if (!revisionBaseContent || !input.revisionBaseVersion) {
+			await guards.fail(
+				"Versi PRD revisi tidak tersedia. Muat ulang planning.",
+			);
+			return { stopped: true };
+		}
+		const merged = mergePrdRevision(revisionBaseContent, input.fullResponse);
 		patchedSections = merged.patchedSections;
-		if (patchedSections.length > 0) finalPrdToSave = merged.merged;
+		finalPrdToSave = merged.merged;
 	}
 
 	const assistantReply =
@@ -123,10 +128,40 @@ export async function persistPrdTurn(
 				})
 			: "Selesai menyusun PRD awal.";
 
-	// ponytail: persisting the seed prompt here leaked the home prompt and
-	// "Selesai menyusun PRD awal." into the chat panel after a refresh
-	// repopulated the store; PRD content itself is saved via savePrdVersion,
-	// and the chat panel is for follow-up Q&A only.
+	const allowShare = FEATURES[input.plan].shareLink !== false;
+	const targetId = conversationId || projectId;
+	if (!targetId) {
+		await guards.fail("Project or conversation ID is missing");
+		return { stopped: true };
+	}
+
+	let saveResult: Awaited<ReturnType<typeof savePrdVersion>>;
+	try {
+		saveResult = await savePrdVersion(
+			targetId,
+			finalPrdToSave,
+			message,
+			mode === "resume" ? "generate" : mode,
+			allowShare,
+			mode === "revise" ? assistantReply : undefined,
+			mode === "revise" && projectId && revisionBaseContent
+				? {
+						userId: input.userId,
+						projectId,
+						baseContent: revisionBaseContent,
+						version: input.revisionBaseVersion ?? 0,
+					}
+				: undefined,
+		);
+	} catch (error) {
+		if (!(error instanceof PrdRevisionConflictError)) throw error;
+		await guards.fail(error.message);
+		return { stopped: true };
+	}
+	if (!saveResult) {
+		await guards.fail("PRD gagal disimpan. Muat ulang planning.");
+		return { stopped: true };
+	}
 	if (mode === "revise") {
 		await saveMessages(
 			conversationId,
@@ -135,22 +170,6 @@ export async function persistPrdTurn(
 			input.modelsToTry[0],
 		);
 	}
-
-	const allowShare = FEATURES[input.plan].shareLink !== false;
-	const targetId = conversationId || projectId;
-	if (!targetId) {
-		await guards.fail("Project or conversation ID is missing");
-		return { stopped: true };
-	}
-
-	const saveResult = await savePrdVersion(
-		targetId,
-		finalPrdToSave,
-		message,
-		mode === "resume" ? "generate" : mode,
-		allowShare,
-		mode === "revise" ? assistantReply : undefined,
-	);
 
 	// Task 8: link snapshot identity (non-fatal, no credit change: generate
 	// burns 1, revision free).

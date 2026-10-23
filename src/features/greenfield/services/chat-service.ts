@@ -20,14 +20,18 @@ export async function getConversationHistory(
 	conversationId: string,
 	userId: string,
 	limit = 20,
-): Promise<{ messages: ConversationMessage[]; valid: boolean }> {
+): Promise<{
+	messages: ConversationMessage[];
+	valid: boolean;
+	projectId?: string;
+}> {
 	// Clamp caller-controlled limits; newest-first then reversed so long
 	// conversations keep the latest turns instead of the oldest ones.
 	const take = Number.isSafeInteger(limit)
 		? Math.min(Math.max(limit, 1), MAX_HISTORY_LIMIT)
 		: 20;
 	const [conv] = await db
-		.select({ id: conversations.id })
+		.select({ id: conversations.id, projectId: conversations.projectId })
 		.from(conversations)
 		.where(
 			and(
@@ -48,6 +52,7 @@ export async function getConversationHistory(
 
 	return {
 		valid: true,
+		projectId: conv.projectId ?? undefined,
 		messages: rows.map((m) => ({
 			role: m.role as ConversationMessage["role"],
 			content: m.content,
