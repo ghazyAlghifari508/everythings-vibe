@@ -6,11 +6,9 @@ import {
 	scrapes,
 	studioFrames,
 	studioJobs,
-	users,
 } from "@/db/schema";
 import { buildFixtureModel } from "@/lib/design-fixture";
 import { renderDesignMd } from "@/lib/design-md-render";
-import { StudioReferenceError } from "../services/studio-design-reference.server";
 import type {
 	StudioDesignReference,
 	StudioDesignSkillId,
@@ -19,146 +17,31 @@ import { runStudioJobPipeline } from "../services/studio-job-pipeline";
 import { getStudioPresetDesignMd } from "../services/studio-presets";
 import { createStudioProjectWithJob } from "../services/studio-project-enqueue";
 import { getStudioProject } from "../services/studio-project-query";
+import {
+	aiCalls,
+	createStudioUser,
+	documentHead,
+	insertCompletedScrape,
+	referenceFailure,
+	resetStudioProvider,
+	studioProvider,
+} from "./studio-reference-harness";
 
-const provider = vi.hoisted(() => ({
-	messages: [] as Array<Array<{ role: string; content: string }>>,
-	labels: [] as string[],
-}));
-
-// The planning reply mirrors the requested screen count so the pipeline never
-// needs a corrective round; frame replies repeat the planned nav labels.
-vi.mock("@/lib/services/ai-orchestrator", () => ({
-	selectModels: () => [],
-	tryStreamWithFallback: async (
-		_models: unknown,
-		messages: Array<{ role: string; content: string }>,
-	) => {
-		provider.messages.push(messages);
-		if (messages[0]?.content.includes("planning application screens")) {
-			const requested = /exactly (\d+)/.exec(messages[1]?.content ?? "");
-			const count = Number(requested?.[1] ?? 2);
-			const viewport = "web";
-			const screens = Array.from({ length: count }, (_, order) => ({
-				name: `Screen ${order}`,
-				description: "Sample",
-				viewport,
-				order,
-			}));
-			provider.labels = screens.map((screen) => screen.name);
-			const destinations = screens.map((_, order) => `screen-${order}`);
-			return {
-				firstChunk: JSON.stringify({
-					projectTitle: "Sample",
-					screens,
-					blueprint: {
-						productIdentity: {
-							productName: "Sample",
-							targetAudience: "General",
-							platform: viewport,
-							visualDirection: "Clean",
-						},
-						designTokens: {
-							primary: "#0f0f0f",
-							secondary: "#606060",
-							background: "#ffffff",
-							surface: "#f8f8f8",
-							fontFamily: "Arial",
-							radius: 12,
-							border: "1px solid #d3d3d3",
-							elevation: "none",
-						},
-						sharedComponents: {
-							header: "Bar",
-							navigation: "Tabs",
-							buttons: "Ink",
-							inputs: "8px",
-							cards: "12px",
-							tabs: "Seg",
-							icons: "Lucide",
-						},
-						navigationContract: {
-							destinations,
-							labels: screens.map((screen) => screen.name),
-							iconMapping: {},
-							ordering: destinations,
-							activeItemRule: "Highlight active",
-						},
-						screenPlan: screens.map((screen) => ({
-							name: screen.name,
-							role: screen.description,
-							order: screen.order,
-						})),
-					},
-				}),
-				generator: (async function* () {})(),
-			};
-		}
-		return {
-			firstChunk: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><nav>${provider.labels
-				.map((label) => `<a href="#">${label}</a>`)
-				.join("")}</nav><main>Konten</main></body></html>`,
-			generator: (async function* () {})(),
-		};
-	},
-}));
+// The factory is hoisted above the imports, so the mock module is loaded by
+// import rather than read from the local binding.
+vi.mock("@/lib/services/ai-orchestrator", async () => {
+	const { studioProviderMock: mock } = await import(
+		"./studio-reference-harness"
+	);
+	return mock;
+});
 
 beforeEach(() => {
-	provider.messages = [];
-	provider.labels = [];
+	resetStudioProvider();
 });
 
 const CANONICAL = renderDesignMd(buildFixtureModel());
 const THEME_DOC = getStudioPresetDesignMd("workspace") ?? "";
-
-async function createUser(): Promise<string> {
-	const userId = crypto.randomUUID();
-	await db
-		.insert(users)
-		.values({ id: userId, email: `${userId}@example.test` });
-	return userId;
-}
-
-async function insertCompletedScrape(
-	userId: string,
-	designMd: string,
-): Promise<string> {
-	const [scrape] = await db
-		.insert(scrapes)
-		.values({
-			userId,
-			sourceUrl: "https://acme.example/pricing",
-			domain: "acme.example",
-			mode: "design",
-			status: "completed",
-		})
-		.returning();
-	if (!scrape) throw new Error("scrape row not created");
-	await db.insert(scrapeDocuments).values({ scrapeId: scrape.id, designMd });
-	return scrape.id;
-}
-
-// The document head is the cheapest proof that this exact reference — not a
-// default, and not another user's reference — reached the model.
-function documentHead(designMd: string): string {
-	return designMd.trim().slice(0, 40);
-}
-
-function aiCalls(kind: "planning" | "frame") {
-	return provider.messages.filter((messages) =>
-		kind === "planning"
-			? messages[0]?.content.includes("planning application screens")
-			: !messages[0]?.content.includes("planning application screens"),
-	);
-}
-
-async function referenceFailure(
-	run: Promise<unknown>,
-): Promise<StudioReferenceError> {
-	const error = await run.catch((cause: unknown) => cause);
-	expect(error).toBeInstanceOf(StudioReferenceError);
-	if (error instanceof StudioReferenceError) return error;
-	throw error;
-}
 
 interface Combo {
 	skill: StudioDesignSkillId;
@@ -230,7 +113,7 @@ const COMBOS: Combo[] = [
 describe("studio design reference compatibility matrix", () => {
 	for (const combo of COMBOS) {
 		it(`applies ${combo.reference.kind} + ${combo.skill} to planning and every frame`, async () => {
-			const userId = await createUser();
+			const userId = await createStudioUser();
 			const reference =
 				combo.reference.kind === "scrape"
 					? {
@@ -293,7 +176,7 @@ describe("studio design reference compatibility matrix", () => {
 	}
 
 	it("keeps an uploaded logo attached to the persisted project and every frame prompt", async () => {
-		const userId = await createUser();
+		const userId = await createStudioUser();
 		const { project, job } = await createStudioProjectWithJob(userId, {
 			prompt: "Sample application brief",
 			initialPageCount: 1,
@@ -323,7 +206,7 @@ describe("studio design reference compatibility matrix", () => {
 	});
 
 	it("reads back the persisted reference and document after a reload", async () => {
-		const userId = await createUser();
+		const userId = await createStudioUser();
 		const { project } = await createStudioProjectWithJob(userId, {
 			prompt: "Sample application brief",
 			designReference: { kind: "custom", filename: "acme.md" },
@@ -339,7 +222,7 @@ describe("studio design reference compatibility matrix", () => {
 	});
 
 	it("keeps the reference in a retried frame generation", async () => {
-		const userId = await createUser();
+		const userId = await createStudioUser();
 		const { project, job } = await createStudioProjectWithJob(userId, {
 			prompt: "Sample application brief",
 			initialPageCount: 1,
@@ -363,7 +246,9 @@ describe("studio design reference compatibility matrix", () => {
 			})
 			.returning();
 		if (!retry) throw new Error("retry job not created");
-		provider.messages = [];
+		// Only the transcript is cleared: the frame repair round needs the
+		// planned navigation labels recorded by the first run.
+		studioProvider.messages = [];
 
 		await runStudioJobPipeline(retry.id, project.id, userId);
 
@@ -373,7 +258,7 @@ describe("studio design reference compatibility matrix", () => {
 	});
 
 	it("reports an invalid custom document as its own recoverable failure", async () => {
-		const userId = await createUser();
+		const userId = await createStudioUser();
 		const error = await referenceFailure(
 			createStudioProjectWithJob(userId, {
 				prompt: "Sample application brief",
@@ -396,8 +281,8 @@ describe("studio design reference compatibility matrix", () => {
 	});
 
 	it("refuses a scrape reference owned by another user without touching the owner's row", async () => {
-		const owner = await createUser();
-		const intruder = await createUser();
+		const owner = await createStudioUser();
+		const intruder = await createStudioUser();
 		const scrapeId = await insertCompletedScrape(owner, CANONICAL);
 
 		const error = await referenceFailure(
@@ -422,7 +307,7 @@ describe("studio design reference compatibility matrix", () => {
 	});
 
 	it("reports a deleted or incomplete source as unavailable", async () => {
-		const userId = await createUser();
+		const userId = await createStudioUser();
 		const missing = await referenceFailure(
 			createStudioProjectWithJob(userId, {
 				prompt: "Sample application brief",
