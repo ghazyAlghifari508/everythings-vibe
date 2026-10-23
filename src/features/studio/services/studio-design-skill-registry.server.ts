@@ -1,19 +1,34 @@
-import antiSlopHuman from "../skills/anti-slop/antislop-human.md?raw";
-import antiSlopLayoutMobile from "../skills/anti-slop/antislop-layoutmobile.md?raw";
-import antiSlopUi from "../skills/anti-slop/antislop-ui.md?raw";
-import antiSlopSkill from "../skills/anti-slop/SKILL.md?raw";
-import frontendDesignSkill from "../skills/frontend-design/SKILL.md?raw";
+import { STUDIO_SKILL_ASSETS } from "./studio-skill-assets.generated";
 
-// Verbatim upstream documents imported via Vite ?raw.
-// Pinned commit hashes and integrity metadata are tracked in STUDIO_SKILL_MANIFEST.
-import impeccableCraftFloor from "../skills/impeccable/craft-floor.md?raw";
-import impeccableOperate from "../skills/impeccable/operate.md?raw";
-import impeccableSkill from "../skills/impeccable/SKILL.md?raw";
-import tasteSkill from "../skills/taste/SKILL.md?raw";
+const antiSlopHuman =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/anti-slop/antislop-human.md"];
+const antiSlopLayoutMobile =
+	STUDIO_SKILL_ASSETS[
+		"src/features/studio/skills/anti-slop/antislop-layoutmobile.md"
+	];
+const antiSlopUi =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/anti-slop/antislop-ui.md"];
+const antiSlopSkill =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/anti-slop/SKILL.md"];
+const frontendDesignSkill =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/frontend-design/SKILL.md"];
+const impeccableCraftFloor =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/impeccable/craft-floor.md"];
+const impeccableOperate =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/impeccable/operate.md"];
+const impeccableSkill =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/impeccable/SKILL.md"];
+const tasteSkill =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/taste/SKILL.md"];
+const uiUxProMaxProRules =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/ui-ux-pro-max/pro-rules.md"];
+const uiUxProMaxQuickRef =
+	STUDIO_SKILL_ASSETS[
+		"src/features/studio/skills/ui-ux-pro-max/quick-reference.md"
+	];
+const uiUxProMaxSkill =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/ui-ux-pro-max/SKILL.md"];
 
-import uiUxProMaxProRules from "../skills/ui-ux-pro-max/pro-rules.md?raw";
-import uiUxProMaxQuickRef from "../skills/ui-ux-pro-max/quick-reference.md?raw";
-import uiUxProMaxSkill from "../skills/ui-ux-pro-max/SKILL.md?raw";
 import { STUDIO_SKILL_DOCUMENT_BUDGET_CHARS } from "../types/studio-constants";
 import {
 	type StudioDesignSkillId,
