@@ -4,11 +4,14 @@ import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
 import type { StudioComposerScope } from "@/features/studio/components/composer/studio-composer";
 import { exportProjectAsZip } from "@/features/studio/services/studio-export";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
-import type { AttachedDesignReference } from "@/features/studio/types/studio";
+import type {
+	AttachedDesignReference,
+	StudioFrameRetryOutcome,
+} from "@/features/studio/types/studio";
 import { useUIStore } from "@/store";
 
 /** Reads the API's own error message, falling back to a caller-owned sentence. */
-export async function readApiError(
+async function readApiError(
 	response: Response,
 	fallback: string,
 ): Promise<string> {
@@ -19,6 +22,21 @@ export async function readApiError(
 		typeof body.error === "string"
 		? body.error
 		: fallback;
+}
+
+/** Reads what a retry request actually did, so the UI can explain the outcome. */
+async function readRetryOutcome(
+	response: Response,
+): Promise<StudioFrameRetryOutcome | null> {
+	const body: unknown = await response.json().catch(() => null);
+	if (typeof body !== "object" || body === null || !("retry" in body))
+		return null;
+	const retry = body.retry;
+	return retry === "queued" ||
+		retry === "already-running" ||
+		retry === "completed"
+		? retry
+		: null;
 }
 
 export interface UseStudioWorkspaceActionsOptions {
@@ -261,27 +279,39 @@ export function useStudioWorkspaceActions({
 
 	const handleRetryFrame = useCallback(
 		async (frameId: string) => {
-			try {
-				const response = await fetch("/api/studio/frame", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "retry",
-						projectId: project.id,
-						frameId,
-					}),
-				});
-				if (!response.ok) throw new Error("Permintaan retry gagal. Coba lagi.");
-				await syncProjectStatus();
-			} catch (failure) {
-				setError(
-					failure instanceof Error
-						? failure.message
-						: "Permintaan retry gagal.",
-				);
+			setError("");
+			// A network drop is reported as a connection problem instead of
+			// discarding the classified server response.
+			const response = await fetch("/api/studio/frame", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "retry",
+					projectId: project.id,
+					frameId,
+				}),
+			}).catch(() => null);
+			if (!response) {
+				setError("Koneksi terputus. Periksa koneksi lalu coba lagi.");
+				return;
 			}
+			if (!response.ok) {
+				setError(
+					await readApiError(
+						response,
+						"Desain belum berhasil dibuat. Coba lagi.",
+					),
+				);
+				return;
+			}
+			const outcome = await readRetryOutcome(response);
+			if (outcome === "already-running")
+				showToast("Halaman ini sedang dibuat ulang.", "info");
+			else if (outcome === "completed")
+				showToast("Halaman ini sudah siap.", "success");
+			await syncProjectStatus();
 		},
-		[project.id, setError, syncProjectStatus],
+		[project.id, setError, showToast, syncProjectStatus],
 	);
 
 	const handleRetryPlanning = useCallback(async () => {
