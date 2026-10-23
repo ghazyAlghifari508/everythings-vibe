@@ -1,9 +1,29 @@
-import colorsCsv from "../skills/ui-ux-pro-max/data/colors.csv?raw";
-import landingCsv from "../skills/ui-ux-pro-max/data/landing.csv?raw";
-import productsCsv from "../skills/ui-ux-pro-max/data/products.csv?raw";
-import tailwindCsv from "../skills/ui-ux-pro-max/data/stacks/html-tailwind.csv?raw";
-import typographyCsv from "../skills/ui-ux-pro-max/data/typography.csv?raw";
-import uxGuidelinesCsv from "../skills/ui-ux-pro-max/data/ux-guidelines.csv?raw";
+import { STUDIO_SKILL_ASSETS } from "./studio-skill-assets.generated";
+
+const colorsCsv =
+	STUDIO_SKILL_ASSETS[
+		"src/features/studio/skills/ui-ux-pro-max/data/colors.csv"
+	];
+const landingCsv =
+	STUDIO_SKILL_ASSETS[
+		"src/features/studio/skills/ui-ux-pro-max/data/landing.csv"
+	];
+const productsCsv =
+	STUDIO_SKILL_ASSETS[
+		"src/features/studio/skills/ui-ux-pro-max/data/products.csv"
+	];
+const tailwindCsv =
+	STUDIO_SKILL_ASSETS[
+		"src/features/studio/skills/ui-ux-pro-max/data/stacks/html-tailwind.csv"
+	];
+const typographyCsv =
+	STUDIO_SKILL_ASSETS[
+		"src/features/studio/skills/ui-ux-pro-max/data/typography.csv"
+	];
+const uxGuidelinesCsv =
+	STUDIO_SKILL_ASSETS[
+		"src/features/studio/skills/ui-ux-pro-max/data/ux-guidelines.csv"
+	];
 
 function parseCsv(text: string): string[][] {
 	const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);

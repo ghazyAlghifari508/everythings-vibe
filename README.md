@@ -410,8 +410,16 @@ Studio HTTP handlers only persist jobs; they do not run model work after respond
 Deploy a persistent Node worker from the same source revision alongside the web app:
 
 ```bash
-node --import tsx src/features/studio/services/studio-worker.ts
+pnpm studio:worker
 ```
+
+Skill Markdown and CSV sources are pinned by SHA-256 in the skill manifest.
+`pnpm studio:assets` verifies them and regenerates the committed TypeScript asset
+module used by both Node and SSR; no runtime filesystem paths or Vite loaders are
+needed after bundling. Development and worker scripts prepare it automatically.
+CI must run `pnpm test` or `pnpm build`: both reject stale generated assets rather
+than silently repairing them. After intentionally updating pinned sources and the
+manifest, run `pnpm studio:assets` and commit the generated module together.
 
 Install the existing `tsx` dependency on the worker host (including dev dependencies),
 provide the same `DATABASE_URL` and AI router configuration as the web app, and

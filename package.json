@@ -6,12 +6,16 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev:all": "tsx src/features/scrape/services/scrape-dev-all.ts",
+    "studio:assets": "tsx src/features/studio/services/studio-skill-assets-build.ts",
+    "studio:assets:check": "tsx src/features/studio/services/studio-skill-assets-build.ts --check",
+    "studio:smoke": "tsx src/features/studio/tests/studio-native-runtime.smoke.ts",
+    "studio:worker:smoke": "tsx src/features/studio/tests/studio-worker-startup.smoke.ts",
+    "dev:all": "pnpm studio:assets && tsx src/features/scrape/services/scrape-dev-all.ts",
     "scrape:worker": "tsx src/features/scrape/services/scrape-worker.ts",
-    "studio:worker": "tsx src/features/studio/services/studio-worker.ts",
-    "dev": "node --dns-result-order=ipv4first node_modules/vite/bin/vite.js dev --port 3000",
+    "studio:worker": "pnpm studio:assets && tsx src/features/studio/services/studio-worker.ts",
+    "dev": "pnpm studio:assets && node --dns-result-order=ipv4first node_modules/vite/bin/vite.js dev --port 3000",
     "generate-routes": "tsr generate",
-    "build": "vite build",
+    "build": "pnpm studio:assets:check && vite build",
     "preview": "vite preview",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -21,7 +25,7 @@
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
-    "test": "vitest run"
+    "test": "pnpm studio:assets:check && vitest run"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.20",
@@ -87,11 +91,5 @@
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
     "vitest": "^4.1.10"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "lightningcss"
-    ]
   }
 }
