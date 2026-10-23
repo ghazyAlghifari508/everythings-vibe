@@ -25,13 +25,13 @@ export const STUDIO_DESIGN_SKILLS = [
 	{
 		id: "none",
 		label: "No Skill",
-		description: "Tanpa panduan tambahan",
+		description: "AI merancang tanpa panduan desain tambahan",
 		asset: { kind: "icon", icon: "none" },
 	},
 	{
 		id: "impeccable",
 		label: "Impeccable",
-		description: "Craft dan hierarki antarmuka",
+		description: "Untuk desain yang lebih rapi, detail, dan matang",
 		asset: {
 			kind: "image",
 			src: "/icons/skills/impeccable.svg",
@@ -41,25 +41,25 @@ export const STUDIO_DESIGN_SKILLS = [
 	{
 		id: "frontend-design",
 		label: "Frontend Design",
-		description: "Arah visual sesuai konteks produk",
+		description: "Untuk tampilan web dengan karakter visual yang kuat",
 		asset: { kind: "icon", icon: "frontend-design" },
 	},
 	{
 		id: "ui-ux-pro-max",
 		label: "UI UX Pro Max",
-		description: "Prinsip UX dan accessibility terkurasi",
+		description: "Untuk navigasi, kemudahan penggunaan, dan aksesibilitas",
 		asset: { kind: "icon", icon: "ui-ux-pro-max" },
 	},
 	{
 		id: "anti-slop",
 		label: "Anti-Slop",
-		description: "Filter pola desain generik",
+		description: "Untuk mengurangi pola tampilan generik yang tidak diperlukan",
 		asset: { kind: "icon", icon: "anti-slop" },
 	},
 	{
 		id: "taste",
 		label: "Taste",
-		description: "Panduan komposisi dan tipografi terkurasi",
+		description: "Untuk komposisi, tipografi, dan keseimbangan visual",
 		asset: {
 			kind: "image",
 			src: "/icons/skills/taste.png",

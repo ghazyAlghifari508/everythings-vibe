@@ -84,18 +84,43 @@ export function StudioDesignCustomPanel({
 		<div
 			role="tabpanel"
 			aria-label="Punya Saya"
-			className="flex flex-col gap-2.5"
+			className="mx-auto flex w-full max-w-2xl flex-col gap-4"
 		>
 			<p className="text-xs font-semibold text-mist">Unggah File Kustom</p>
-			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-				<div className="flex flex-col justify-between gap-2.5 rounded-xl border border-graphite bg-onyx p-3.5">
-					<span className="flex items-center gap-2 text-sm font-semibold text-snow">
-						<Icon icon={FileCodeIcon} size={15} className="text-fog" />
-						File DESIGN.md
-					</span>
+			<div className="flex flex-col gap-4">
+				<div className="flex flex-col gap-2.5 rounded-xl border border-graphite bg-onyx p-4">
+					<div className="flex items-center justify-between">
+						<span className="flex items-center gap-2 text-sm font-semibold text-snow">
+							<Icon icon={FileCodeIcon} size={15} className="text-fog" />
+							File DESIGN.md
+						</span>
+						{state.mdName ? (
+							<span className="flex items-center gap-2">
+								<button
+									type="button"
+									onClick={() => mdInputRef.current?.click()}
+									className="rounded px-1.5 py-0.5 text-xs font-semibold text-mist underline underline-offset-2 hover:text-snow"
+								>
+									Ganti
+								</button>
+								<button
+									type="button"
+									onClick={() => {
+										onMdNameChange(null, "");
+										onMdError(null);
+									}}
+									aria-label="Hapus file desain"
+									className="rounded p-1 text-fog hover:text-snow"
+								>
+									<Icon icon={Cancel01Icon} size={13} />
+								</button>
+							</span>
+						) : null}
+					</div>
+
 					{state.mdName ? (
-						<span className="flex flex-wrap items-center gap-2 text-xs">
-							<span className="max-w-56 truncate font-semibold text-snow">
+						<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-graphite/60 bg-charcoal/60 px-3 py-2 text-xs">
+							<span className="max-w-xs truncate font-semibold text-snow sm:max-w-md">
 								{state.mdName}
 							</span>
 							{colorCount > 0 || fontFamily ? (
@@ -104,31 +129,13 @@ export function StudioDesignCustomPanel({
 									{fontFamily ? ` · ${fontFamily}` : ""}
 								</span>
 							) : null}
-							<button
-								type="button"
-								onClick={() => mdInputRef.current?.click()}
-								className="rounded px-1.5 py-0.5 font-semibold text-mist underline underline-offset-2 hover:text-snow"
-							>
-								Ganti
-							</button>
-							<button
-								type="button"
-								onClick={() => {
-									onMdNameChange(null, "");
-									onMdError(null);
-								}}
-								aria-label="Hapus file desain"
-								className="rounded p-1 text-fog hover:text-snow"
-							>
-								<Icon icon={Cancel01Icon} size={13} />
-							</button>
-						</span>
+						</div>
 					) : (
 						<button
 							type="button"
 							onClick={() => mdInputRef.current?.click()}
 							disabled={state.reading}
-							className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-graphite px-3 text-xs text-fog transition-colors hover:border-steel hover:text-mist disabled:opacity-50"
+							className="flex min-h-18 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-graphite px-3 py-3 text-xs text-fog transition-colors hover:border-steel hover:text-mist disabled:opacity-50"
 						>
 							{state.reading ? (
 								<Icon
@@ -164,17 +171,14 @@ export function StudioDesignCustomPanel({
 					) : null}
 				</div>
 
-				<div className="flex flex-col justify-between gap-2.5 rounded-xl border border-graphite bg-onyx p-3.5">
-					<span className="flex items-center gap-2 text-sm font-semibold text-snow">
-						<Icon icon={Image01Icon} size={15} className="text-fog" />
-						Logo aplikasi
-						<span className="text-xs font-normal text-fog">(opsional)</span>
-					</span>
-					{state.logo ? (
-						<span className="flex flex-wrap items-center gap-2 text-xs">
-							<span className="max-w-56 truncate font-semibold text-snow">
-								{state.logo.filename}
-							</span>
+				<div className="flex flex-col gap-2.5 rounded-xl border border-graphite bg-onyx p-4">
+					<div className="flex items-center justify-between">
+						<span className="flex items-center gap-2 text-sm font-semibold text-snow">
+							<Icon icon={Image01Icon} size={15} className="text-fog" />
+							Logo aplikasi
+							<span className="text-xs font-normal text-fog">(opsional)</span>
+						</span>
+						{state.logo ? (
 							<button
 								type="button"
 								onClick={() => onLogoChange(null)}
@@ -183,12 +187,36 @@ export function StudioDesignCustomPanel({
 							>
 								<Icon icon={Cancel01Icon} size={13} />
 							</button>
-						</span>
+						) : null}
+					</div>
+
+					{state.logo ? (
+						<div className="flex items-center justify-between gap-3 rounded-lg border border-graphite/60 bg-charcoal/60 px-3 py-2 text-xs">
+							<div className="flex items-center gap-2.5 min-w-0">
+								{state.logo.data ? (
+									<img
+										src={state.logo.data}
+										alt="Preview logo"
+										className="size-7 rounded object-contain border border-graphite bg-onyx p-0.5"
+									/>
+								) : null}
+								<span className="max-w-xs truncate font-semibold text-snow sm:max-w-md">
+									{state.logo.filename}
+								</span>
+							</div>
+							<button
+								type="button"
+								onClick={() => logoInputRef.current?.click()}
+								className="rounded px-1.5 py-0.5 text-xs font-semibold text-mist underline underline-offset-2 hover:text-snow"
+							>
+								Ganti
+							</button>
+						</div>
 					) : (
 						<button
 							type="button"
 							onClick={() => logoInputRef.current?.click()}
-							className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-graphite px-3 text-xs text-fog transition-colors hover:border-steel hover:text-mist"
+							className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-graphite px-3 py-2.5 text-xs text-fog transition-colors hover:border-steel hover:text-mist"
 						>
 							<Icon icon={Upload01Icon} size={16} />
 							<span>Pilih file gambar logo</span>

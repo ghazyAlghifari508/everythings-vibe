@@ -36,11 +36,23 @@ Maintain exact visual continuity (colors, header/footer layout, typography, comp
 	// frame in this project must follow. Screen content must not redefine
 	// these shared decisions; only the active navigation item may differ.
 	if (opts.blueprint) {
+		const activeScreen = opts.activeScreen ?? opts.screenName;
+		const { labels, destinations, iconMapping } =
+			opts.blueprint.navigationContract;
 		sections.push(
 			`<SHARED_DESIGN_BLUEPRINT>
 Every screen in this project uses this exact specification. Apply it verbatim:
 ${JSON.stringify(opts.blueprint)}
-Active screen for this frame: "${opts.activeScreen ?? opts.screenName}". Render the shared navigation with identical icons, labels, ordering, sizing, and geometry; highlight only the active item.
+
+SHARED NAVIGATION CONTRACT — identical on every screen, never redesigned per screen:
+- Labels, in this exact order: ${labels.map((label) => `"${label}"`).join(" | ")}
+- Destinations: ${destinations.join(", ")}
+- Render each label as its own <a> or <button> inside ONE <nav> element, in the declared order.
+- Label text must read exactly as declared. Escape special characters the normal HTML way ("&" becomes "&amp;"); the rendered text stays identical.
+- Icons come from the shared icon mapping (${JSON.stringify(iconMapping)}); one icon per destination, identical on every screen.
+- Mark only the item for this screen ("${activeScreen}") as active; every other item renders exactly like on the other screens.
+- Do not add, rename, reorder, translate, or duplicate navigation items, and do not emit a second navigation bar.
+Active screen for this frame: "${activeScreen}". Render the shared navigation with identical icons, labels, ordering, sizing, and geometry.
 </SHARED_DESIGN_BLUEPRINT>`,
 		);
 	}
@@ -112,7 +124,7 @@ Return the FULL revised single-file HTML document for "${opts.screenName}".`,
 	}
 
 	sections.push(
-		`Design precedence, highest to lowest: explicit user requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override explicit user colors or brand requirements. Resolve conflicts deterministically in that order.`,
+		`Design precedence, highest to lowest: safety and platform validity > explicit user requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override safety, platform validity, explicit user colors, or brand requirements. Resolve conflicts deterministically in that order.`,
 	);
 
 	return sections.join("\n\n");

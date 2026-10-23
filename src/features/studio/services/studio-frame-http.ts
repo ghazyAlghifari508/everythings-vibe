@@ -1,33 +1,27 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
+import {
+	STUDIO_FRAME_ERRORS,
+	studioFrameErrorReport,
+} from "./studio-frame-errors";
 import { addStudioFrame, reviseStudioFrame } from "./studio-frame-service";
 import { getStudioFrameVisual } from "./studio-frame-visual";
 import { enqueueStudioOperation } from "./studio-operation-enqueue";
 import { retryStudioFrame, retryStudioPlanning } from "./studio-retry-service";
 
 function studioErrorResponse(error: unknown): Response {
-	console.error("[studio.frame error]", error);
-	if (error instanceof ScrapeError) {
-		const isClientError =
-			error.code === "INVALID_URL" ||
-			error.code === "WEBSITE_BLOCKED" ||
-			error.code === "VISUAL_CAPTURE_FAILED";
-		return Response.json(
-			{ error: error.message, code: error.code },
-			{ status: isClientError ? 400 : 500 },
-		);
-	}
-	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message)) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
-	}
+	// Public copy and HTTP status come from the taxonomy; the raw message stays
+	// in this server-side diagnostic line.
+	const report = studioFrameErrorReport(error);
+	console.error("[studio.frame]", {
+		code: report.code,
+		status: report.status,
+		diagnostic: report.diagnostic,
+	});
 	return Response.json(
-		{
-			error:
-				"Terjadi kendala saat memproses frame Studio. Silakan coba beberapa saat lagi.",
-		},
-		{ status: 500 },
+		{ error: report.message, code: report.code },
+		{ status: report.status },
 	);
 }
 
@@ -36,27 +30,42 @@ export async function GET({
 }: {
 	request: Request;
 }): Promise<Response> {
+	const startedAt = performance.now();
+	let status = 500;
 	try {
 		const user = await requireUser(getRequestHeaders());
 		const url = new URL(request.url);
 		const projectId = url.searchParams.get("projectId");
 		const frameId = url.searchParams.get("frameId");
-		if (!projectId || !frameId)
+		if (!projectId || !frameId) {
+			status = 400;
 			return Response.json(
-				{ error: "Identitas project dan frame diperlukan." },
-				{ status: 400 },
+				{
+					error: "Identitas project dan frame diperlukan.",
+					code: "STUDIO_INVALID_INPUT",
+				},
+				{ status: STUDIO_FRAME_ERRORS.STUDIO_INVALID_INPUT.status },
 			);
+		}
 		// A user-initiated visual retry must bypass the cached render so a
 		// capture that could not be decoded is genuinely re-rendered.
 		const attempt = Number(url.searchParams.get("attempt") ?? "0");
-		return Response.json(
-			await getStudioFrameVisual(projectId, frameId, user.id, {
-				forceRecapture: Number.isFinite(attempt) && attempt > 0,
-			}),
-			{ headers: { "Cache-Control": "private, no-store" } },
-		);
+		const visual = await getStudioFrameVisual(projectId, frameId, user.id, {
+			forceRecapture: Number.isFinite(attempt) && attempt > 0,
+		});
+		status = 200;
+		return Response.json(visual, {
+			headers: { "Cache-Control": "private, no-store" },
+		});
 	} catch (error) {
-		return studioErrorResponse(error);
+		const response = studioErrorResponse(error);
+		status = response.status;
+		return response;
+	} finally {
+		console.info("[studio.preview.http]", {
+			status,
+			elapsedMs: Math.round(performance.now() - startedAt),
+		});
 	}
 }
 
@@ -104,8 +113,11 @@ export async function POST({
 		const parseRes = studioFrameBodySchema.safeParse(rawBody);
 		if (!parseRes.success) {
 			return Response.json(
-				{ error: "Payload aksi frame tidak valid." },
-				{ status: 400 },
+				{
+					error: "Payload aksi frame tidak valid.",
+					code: "STUDIO_INVALID_INPUT",
+				},
+				{ status: STUDIO_FRAME_ERRORS.STUDIO_INVALID_INPUT.status },
 			);
 		}
 		const body = parseRes.data;
@@ -139,12 +151,12 @@ export async function POST({
 		}
 
 		if (body.action === "retry") {
-			const frame = await retryStudioFrame(
+			const { frame, retry } = await retryStudioFrame(
 				body.projectId,
 				user.id,
 				body.frameId,
 			);
-			return Response.json({ frame }, { status: 200 });
+			return Response.json({ frame, retry }, { status: 200 });
 		}
 
 		if (body.action === "retry-planning") {

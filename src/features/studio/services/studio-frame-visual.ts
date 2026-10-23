@@ -53,29 +53,45 @@ export async function getStudioFrameVisual(
 				)[0];
 	if (cached) {
 		const bounds = /-(\d+)x(\d+)\.jpg$/.exec(cached.filename);
-		if (bounds)
+		if (bounds) {
+			console.info("[studio.preview.capture]", {
+				outcome: "cached",
+				assetCount: assets.length,
+			});
 			return {
 				url: buildStudioAssetUrl(cached.id, userId),
 				width: Number(bounds[1]),
 				height: Number(bounds[2]),
 				hash,
 			};
+		}
 	}
+	const startedAt = performance.now();
 	const visual = await captureStudioVisual(
 		frame.htmlCode,
 		frame.viewport,
 		detail.project.designMd,
 		assets,
-	).catch((failure: unknown) => {
-		// Capture failure must not imply that the persisted frame HTML was lost.
-		throw new ScrapeError(
-			"VISUAL_CAPTURE_FAILED",
-			failure instanceof Error
-				? `Pratinjau visual frame gagal dirender: ${failure.message}`
-				: undefined,
-			{ cause: failure },
-		);
-	});
+	)
+		.then((captured) => {
+			console.info("[studio.preview.capture]", {
+				outcome: "captured",
+				elapsedMs: Math.round(performance.now() - startedAt),
+				assetCount: assets.length,
+			});
+			return captured;
+		})
+		.catch((failure: unknown) => {
+			console.info("[studio.preview.capture]", {
+				outcome: "failed",
+				elapsedMs: Math.round(performance.now() - startedAt),
+				assetCount: assets.length,
+			});
+			// Capture failure must not imply that the persisted frame HTML was lost.
+			throw new ScrapeError("VISUAL_CAPTURE_FAILED", undefined, {
+				cause: failure,
+			});
+		});
 	const [asset] = await db
 		.insert(studioAssets)
 		.values({

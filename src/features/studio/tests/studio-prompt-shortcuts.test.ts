@@ -26,4 +26,12 @@ describe("STUDIO_PROMPT_SHORTCUTS", () => {
 			expect(shortcut.preview.length).toBeLessThanOrEqual(280);
 		}
 	});
+
+	it("avoids hardcoded page count commands and generation directives in prompt text", () => {
+		for (const shortcut of STUDIO_PROMPT_SHORTCUTS) {
+			expect(shortcut.prompt).not.toMatch(/Layar yang direncanakan/i);
+			expect(shortcut.prompt).not.toMatch(/\d+\s*halaman,\s*saling terhubung/i);
+			expect(shortcut.prompt).not.toMatch(/make all pages connected/i);
+		}
+	});
 });

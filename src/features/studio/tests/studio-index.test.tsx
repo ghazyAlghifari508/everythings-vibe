@@ -93,7 +93,7 @@ describe("StudioPage UI & Workflow", () => {
 
 		expect(screen.getByText("What will you design?")).toBeDefined();
 		expect(
-			screen.getByPlaceholderText(/Jelaskan kebutuhan antarmukamu/i),
+			screen.getByRole("textbox", { name: "Prompt Desain UI" }),
 		).toBeDefined();
 		expect(
 			screen.getByRole("button", { name: "Pilih tampilan" }),
@@ -158,9 +158,9 @@ describe("StudioPage UI & Workflow", () => {
 		).component;
 		render(<StudioComponent />);
 
-		const textarea = screen.getByPlaceholderText(
-			/Jelaskan kebutuhan antarmukamu/i,
-		);
+		const textarea = screen.getByRole("textbox", {
+			name: "Prompt Desain UI",
+		});
 		fireEvent.change(textarea, {
 			target: { value: "Aplikasi mobile fitness tracking dengan kalender" },
 		});
@@ -222,9 +222,9 @@ describe("StudioPage UI & Workflow", () => {
 			screen.getByRole("button", { name: /Kopi Specialty Ordering/i }),
 		);
 
-		const textarea = screen.getByPlaceholderText(
-			/Jelaskan kebutuhan antarmukamu/i,
-		) as HTMLTextAreaElement;
+		const textarea = screen.getByRole("textbox", {
+			name: "Prompt Desain UI",
+		}) as HTMLTextAreaElement;
 		expect(textarea.value).toContain("Ruang Seduh");
 		expect(
 			screen

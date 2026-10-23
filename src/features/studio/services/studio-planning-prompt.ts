@@ -84,7 +84,7 @@ Product Requirements Planning Directives:
 	);
 
 	sections.push(
-		`Design precedence, highest to lowest: explicit user requirements > authoritative PRD requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override explicit user colors or brand requirements. Resolve conflicts deterministically in that order.`,
+		`Design precedence, highest to lowest: safety and platform validity > explicit user requirements > authoritative PRD requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override safety, platform validity, explicit user colors, or brand requirements. Resolve conflicts deterministically in that order.`,
 	);
 
 	return sections.join("\n\n");

@@ -85,6 +85,20 @@ describe("StudioLaunchComposer", () => {
 		expect(onRemoveReference).toHaveBeenCalledTimes(1);
 	});
 
+	it("renders active reference as a compact contextual chip with palette icon", () => {
+		renderComposer({
+			reference: { label: "Design System Alpha", logoFilename: "brand.png" },
+		});
+		const referenceGroup = screen.getByRole("region", {
+			name: "Referensi desain aktif",
+		});
+		expect(referenceGroup).toBeDefined();
+		expect(referenceGroup.className).toContain("inline-flex");
+		expect(referenceGroup.className).not.toContain("w-full");
+		expect(screen.getByText("Design System Alpha")).toBeDefined();
+		expect(screen.getByText(/brand\.png/)).toBeDefined();
+	});
+
 	it("forwards platform, page count, and skill changes without submitting", () => {
 		const { onSubmit, onConfigChange } = renderComposer();
 		fireEvent.click(screen.getByRole("button", { name: /Mobile/i }));
@@ -116,13 +130,23 @@ describe("StudioLaunchComposer", () => {
 		expect(icon?.getAttribute("aria-hidden")).toBe("true");
 	});
 
-	it("renders PRD attachment trigger in toolbar", () => {
+	it("renders PRD attachment trigger in toolbar with clear label and tooltip", () => {
 		renderComposer();
 		const trigger = screen.getByRole("button", {
-			name: "Lampirkan PRD (.md)",
+			name: "Tambahkan dokumen kebutuhan aplikasi (.md)",
 		});
 		expect(trigger).toBeDefined();
-		expect(trigger.getAttribute("title")).toBe("Lampirkan PRD (.md)");
+		expect(trigger.getAttribute("title")).toBe(
+			"Tambahkan dokumen kebutuhan aplikasi (.md)",
+		);
+
+		const tooltip = screen.getByRole("tooltip");
+		expect(tooltip.textContent).toContain(
+			"Tambahkan dokumen kebutuhan aplikasi (.md)",
+		);
+		expect(tooltip.textContent).toContain(
+			"AI menggunakan dokumen ini untuk memahami fitur dan kebutuhan aplikasimu.",
+		);
 	});
 
 	it("displays compact PRD chip with filename, status, and remove action", () => {

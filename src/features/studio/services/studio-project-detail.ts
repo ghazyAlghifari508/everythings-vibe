@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	studioFrames,
@@ -8,8 +8,6 @@ import {
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
 import type { StudioProjectFullDetail } from "../types/studio-service";
-import { recoverStalledStudioJobs } from "./studio-job-lease";
-import { runStudioJobPipeline } from "./studio-job-pipeline";
 import { buildStudioAssetUrl } from "./studio-logo-service";
 
 export async function getStudioProjectDetail(
@@ -70,45 +68,6 @@ export async function getStudioProjectDetail(
 		.limit(1);
 
 	const activeJob = jobs[0] ?? null;
-	if (
-		activeJob &&
-		(activeJob.status === "queued" ||
-			activeJob.status === "planning" ||
-			activeJob.status === "generating")
-	) {
-		try {
-			await recoverStalledStudioJobs();
-		} catch (err) {
-			console.warn(
-				"[studio] stall recovery failed",
-				err instanceof Error ? err.message : err,
-			);
-		}
-	}
-	const pendingOperations = await db
-		.select()
-		.from(studioJobs)
-		.where(
-			and(
-				eq(studioJobs.projectId, projectId),
-				eq(studioJobs.userId, userId),
-				inArray(studioJobs.status, ["queued", "generating"]),
-			),
-		)
-		.orderBy(asc(studioJobs.createdAt))
-		.limit(100);
-	for (const operation of pendingOperations)
-		if (operation.jobType !== "initial")
-			void runStudioJobPipeline(operation.id, projectId, userId);
-
-	if (
-		activeJob &&
-		(activeJob.status === "queued" ||
-			((activeJob.status === "planning" || activeJob.status === "generating") &&
-				Date.now() - new Date(activeJob.updatedAt).getTime() > 150_000))
-	) {
-		void runStudioJobPipeline(activeJob.id, projectId, userId);
-	}
 
 	const logoUrl = project.logoAssetId
 		? buildStudioAssetUrl(project.logoAssetId, userId)

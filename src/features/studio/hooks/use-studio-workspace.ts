@@ -1,11 +1,11 @@
-import { useRouter } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
 	StudioFrameRow,
 	StudioJobRow,
 	StudioProjectRow,
 } from "@/db/schema";
 import type { StudioComposerScope } from "@/features/studio/components/composer/studio-composer";
+import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
@@ -52,26 +52,40 @@ export interface StudioWorkspaceState {
 	handleDownloadAllZip: () => Promise<void>;
 }
 
-/**
- * State, polling and server actions for one Studio project workspace.
- *
- * Every write goes through the authoritative API and then re-reads project
- * status, so the canvas, the composer and the header all reconcile from
- * persisted state instead of an optimistic guess.
- */
 export function useStudioWorkspace(
 	initialData: StudioDetailLoaderData,
 ): StudioWorkspaceState {
-	const [project, setProject] = useState(initialData.project);
-	const [frames, setFrames] = useState<StudioFrameRow[]>(initialData.frames);
-	const [activeJob, setActiveJob] = useState<StudioJobRow | null>(
-		initialData.activeJob,
-	);
+	const {
+		project,
+		frames,
+		activeJob,
+		isProcessing,
+		syncProjectStatus,
+		error: syncError,
+		clearError: clearSyncError,
+	} = useStudioStatus(initialData);
 	const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
 	const [isAddFrameOpen, setIsAddFrameOpen] = useState(false);
-	const [error, setError] = useState("");
-	const router = useRouter();
+	const [error, setActionError] = useState("");
+	const setError = useCallback(
+		(message: string) => {
+			setActionError(message);
+			if (!message) clearSyncError();
+		},
+		[clearSyncError],
+	);
+	const loader = useRef(initialData);
+	useEffect(() => {
+		if (loader.current === initialData) return;
+		if (loader.current.project.id !== initialData.project.id) {
+			setSelectedFrameId(null);
+			setSelectedFrameIds([]);
+			setIsAddFrameOpen(false);
+		}
+		loader.current = initialData;
+		setActionError("");
+	}, [initialData]);
 
 	const selectFrame = useCallback((id: string | null, additive = false) => {
 		setSelectedFrameIds((previous) =>
@@ -95,20 +109,6 @@ export function useStudioWorkspace(
 		setSelectedFrameId(unique.length === 1 ? unique[0] : null);
 	}, []);
 
-	const isProcessing = useMemo(() => {
-		if (
-			activeJob &&
-			(activeJob.status === "queued" ||
-				activeJob.status === "planning" ||
-				activeJob.status === "generating")
-		) {
-			return true;
-		}
-		return frames.some(
-			(f) => f.status === "queued" || f.status === "generating",
-		);
-	}, [activeJob, frames]);
-
 	const readyFramesCount = useMemo(
 		() => frames.filter((f) => f.status === "ready").length,
 		[frames],
@@ -125,38 +125,6 @@ export function useStudioWorkspace(
 		setSelectedFrameIds((previous) => previous.filter((entry) => entry !== id));
 		setSelectedFrameId((previous) => (previous === id ? null : previous));
 	}, []);
-
-	const syncProjectStatus = useCallback(async () => {
-		try {
-			const res = await fetch(`/api/studio/status?id=${project.id}`);
-			// 404 means the project no longer exists (deleted here or in another
-			// tab). Leave the workspace instead of polling a dead id forever.
-			if (res.status === 404) {
-				void router.invalidate();
-				return;
-			}
-			if (!res.ok) return;
-			const data = (await res.json()) as {
-				project: StudioProjectRow;
-				frames: StudioFrameRow[];
-				activeJob: StudioJobRow | null;
-			};
-			if (data.project) setProject(data.project);
-			if (data.frames) setFrames(data.frames);
-			if (data.activeJob !== undefined) setActiveJob(data.activeJob);
-		} catch {
-			// Network hiccup during polling
-		}
-	}, [project.id, router]);
-
-	// Poll authoritative status while jobs or frames are actively processing
-	useEffect(() => {
-		if (!isProcessing) return;
-		const timer = setInterval(() => {
-			void syncProjectStatus();
-		}, 1500);
-		return () => clearInterval(timer);
-	}, [isProcessing, syncProjectStatus]);
 
 	const actions = useStudioWorkspaceActions({
 		project,
@@ -195,7 +163,7 @@ export function useStudioWorkspace(
 		deleting: actions.deleting,
 		duplicating: actions.duplicating,
 		isAddFrameOpen,
-		error,
+		error: error || syncError,
 		isProcessing,
 		readyFramesCount,
 		storedReferenceLabel,

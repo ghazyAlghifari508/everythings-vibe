@@ -3,6 +3,7 @@ import { z } from "zod";
 import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
+import { StudioReferenceError } from "./studio-design-reference.server";
 import {
 	studioDesignReferenceSchema,
 	studioDesignSkillIdSchema,
@@ -17,8 +18,33 @@ import {
 	duplicateStudioProject,
 } from "./studio-project-lifecycle";
 
-function studioErrorResponse(error: unknown): Response {
-	console.error("[studio.project error]", error);
+// Nothing raw is ever logged: unknown provider, scrape or database failures are
+// only ever observed as a category, so a user document cannot reach the log.
+function studioErrorResponse(error: unknown, operation: string): Response {
+	const correlationId = crypto.randomUUID();
+	if (error instanceof StudioReferenceError) {
+		console.error("[studio.project]", {
+			operation,
+			correlationId,
+			category: error.failure,
+			// Curated validation copy, never the user's own DESIGN.md content.
+			diagnostic: error.diagnostic,
+		});
+		// 400, never 404: the client reads 404 as "project deleted" and would drop
+		// a live project because its reference went stale.
+		return Response.json(
+			{ error: error.message, code: "STUDIO_REFERENCE_REJECTED" },
+			{ status: 400 },
+		);
+	}
+	const unauthorized =
+		error instanceof Error && /Unauthorized|Forbidden/.test(error.message);
+	const code = unauthorized
+		? "UNAUTHORIZED"
+		: error instanceof ScrapeError
+			? error.code
+			: "STUDIO_STATUS_UNAVAILABLE";
+	console.error("[studio.project]", { operation, correlationId, code });
 	if (error instanceof ScrapeError) {
 		// A missing project is a stale-reference signal, not a server fault: the
 		// client uses 404 to drop deleted projects from its polling loop.
@@ -27,15 +53,28 @@ function studioErrorResponse(error: unknown): Response {
 				? 404
 				: 500;
 		return Response.json(
-			{ error: error.message, code: error.code },
+			{
+				error:
+					status === 404
+						? "Studio tidak ditemukan."
+						: "Project Studio belum dapat dimuat. Coba lagi.",
+				code: status === 404 ? "STUDIO_NOT_FOUND" : error.code,
+			},
 			{ status },
 		);
 	}
-	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message)) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	if (unauthorized) {
+		return Response.json(
+			{
+				error: "Silakan masuk kembali untuk membuka Studio.",
+				code: "UNAUTHORIZED",
+			},
+			{ status: 401 },
+		);
 	}
 	return Response.json(
 		{
+			code: "STUDIO_STATUS_UNAVAILABLE",
 			error:
 				"Terjadi kendala saat memuat project Studio. Silakan coba beberapa saat lagi.",
 		},
@@ -125,7 +164,7 @@ export async function POST({
 		);
 		return Response.json({ projectId: project.id }, { status: 201 });
 	} catch (error) {
-		return studioErrorResponse(error);
+		return studioErrorResponse(error, "POST /api/studio/project");
 	}
 }
 
@@ -137,23 +176,34 @@ export async function GET({
 	try {
 		const user = await requireUser(getRequestHeaders());
 		const url = new URL(request.url);
-		const id = url.searchParams.get("id");
-		if (!id) {
+		const id = z
+			.string()
+			.trim()
+			.min(1)
+			.max(200)
+			.safeParse(url.searchParams.get("id"));
+		if (!id.success) {
 			return Response.json(
-				{ error: "Parameter project id diperlukan." },
+				{
+					error: "Parameter project id diperlukan.",
+					code: "INVALID_PROJECT_ID",
+				},
 				{ status: 400 },
 			);
 		}
-		const detail = await getStudioProjectDetail(id, user.id);
-		return Response.json({
-			project: detail.project,
-			frames: detail.frames,
-			activeJob: detail.activeJob,
-			logoUrl: detail.logoUrl,
-			revisions: detail.revisions,
-			latest: detail.latest,
-		});
+		const detail = await getStudioProjectDetail(id.data, user.id);
+		return Response.json(
+			{
+				project: detail.project,
+				frames: detail.frames,
+				activeJob: detail.activeJob,
+				logoUrl: detail.logoUrl,
+				revisions: detail.revisions,
+				latest: detail.latest,
+			},
+			{ headers: { "Cache-Control": "private, no-store" } },
+		);
 	} catch (error) {
-		return studioErrorResponse(error);
+		return studioErrorResponse(error, "GET /api/studio/project");
 	}
 }

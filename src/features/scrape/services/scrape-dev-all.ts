@@ -20,6 +20,11 @@ const children = [
 		["--import", "tsx", "src/features/scrape/services/scrape-worker.ts"],
 		{ stdio: "inherit", env: process.env },
 	),
+	spawn(
+		process.execPath,
+		["--import", "tsx", "src/features/studio/services/studio-worker.ts"],
+		{ stdio: "inherit", env: process.env },
+	),
 ];
 let stopping = false;
 function stop(code: number) {

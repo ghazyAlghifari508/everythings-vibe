@@ -10,7 +10,6 @@ import {
 	studioProjects,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
-import { runStudioJobPipeline } from "./studio-job-pipeline";
 import { validateStudioPrompt } from "./studio-prompt-validation";
 
 export async function enqueueStudioOperation(
@@ -130,7 +129,5 @@ export async function enqueueStudioOperation(
 		}
 		return { jobs };
 	});
-	for (const job of accepted.jobs)
-		void runStudioJobPipeline(job.id, projectId, userId);
 	return accepted;
 }

@@ -11,23 +11,30 @@ const scrapeService = vi.hoisted(() => ({
 	failure: null as Error | null,
 }));
 
-function readScrapeId(raw: unknown): string {
-	if (typeof raw === "object" && raw !== null && "scrapeId" in raw) {
-		const value: unknown = raw.scrapeId;
-		if (typeof value === "string") return value;
-	}
-	return String(raw);
-}
-
 vi.mock("@/features/scrape/services/scrape-design-md-service", () => ({
-	getScrapeDesignMd: async (raw: unknown, userId: string) => {
-		scrapeService.calls.push({ scrapeId: readScrapeId(raw), userId });
+	// Mirrors the real two-argument contract: a stale request envelope must fail
+	// this test rather than be tolerated.
+	getScrapeDesignMd: async (scrapeId: string, userId: string) => {
+		scrapeService.calls.push({ scrapeId, userId });
 		if (scrapeService.failure) throw scrapeService.failure;
 		return scrapeService.result;
 	},
 }));
 
-import { resolveStudioDesignReference } from "../services/studio-design-reference.server";
+import { ScrapeError } from "@/lib/design-errors";
+import {
+	resolveStudioDesignReference,
+	StudioReferenceError,
+} from "../services/studio-design-reference.server";
+
+async function referenceFailure(
+	run: Promise<unknown>,
+): Promise<StudioReferenceError> {
+	const error = await run.catch((cause: unknown) => cause);
+	expect(error).toBeInstanceOf(StudioReferenceError);
+	if (error instanceof StudioReferenceError) return error;
+	throw error;
+}
 
 it("resolves canonical themes and rejects unknown identity or meaningless uploads", async () => {
 	const theme = await resolveStudioDesignReference(
@@ -42,27 +49,39 @@ it("resolves canonical themes and rejects unknown identity or meaningless upload
 		source: "studio-presets",
 		version: 1,
 	});
-	await expect(
-		resolveStudioDesignReference(
-			{ kind: "theme", id: "unknown" },
-			null,
-			"user-1",
-		),
-	).rejects.toThrow();
-	await expect(
-		resolveStudioDesignReference(
-			{ kind: "custom", filename: "style.md" },
-			"This text contains no design tokens.",
-			"user-1",
-		),
-	).rejects.toThrow();
-	await expect(
-		resolveStudioDesignReference(
-			{ kind: "custom", filename: "style.md" },
-			"# Sample\n| Canvas | #12345 | Background |",
-			"user-1",
-		),
-	).rejects.toThrow();
+	expect(
+		(
+			await referenceFailure(
+				resolveStudioDesignReference(
+					{ kind: "theme", id: "unknown" },
+					null,
+					"user-1",
+				),
+			)
+		).failure,
+	).toBe("unknown-theme");
+	expect(
+		(
+			await referenceFailure(
+				resolveStudioDesignReference(
+					{ kind: "custom", filename: "style.md" },
+					"This text contains no design tokens.",
+					"user-1",
+				),
+			)
+		).failure,
+	).toBe("invalid-design-file");
+	expect(
+		(
+			await referenceFailure(
+				resolveStudioDesignReference(
+					{ kind: "custom", filename: "style.md" },
+					"# Sample\n| Canvas | #12345 | Background |",
+					"user-1",
+				),
+			)
+		).failure,
+	).toBe("invalid-design-file");
 	const custom = await resolveStudioDesignReference(
 		{ kind: "custom", filename: "style.md" },
 		"# Sample\nFont: Arial\n| Canvas | #ffffff | Background |",
@@ -102,17 +121,34 @@ it("resolves a stored scrape DESIGN.md for its owner only", async () => {
 		sourceUrl: "https://example.com",
 	});
 
-	// An unavailable document fails closed instead of generating without a
-	// design system, and the same token gate as the upload path still applies.
+	// An unavailable document is a recoverable reference failure, and the same
+	// token gate as the upload path still applies.
 	scrapeService.result = null;
-	scrapeService.failure = new Error("DESIGN.md belum siap.");
-	await expect(
+	scrapeService.failure = new ScrapeError(
+		"AI_GENERATION_FAILED",
+		"DESIGN.md belum siap.",
+	);
+	const incomplete = await referenceFailure(
 		resolveStudioDesignReference(
 			{ kind: "scrape", id: "scrape-2" },
 			null,
 			"user-7",
 		),
-	).rejects.toThrow("DESIGN.md belum siap.");
+	);
+	expect(incomplete.failure).toBe("source-unavailable");
+	expect(incomplete.message).toBe(
+		"Referensi desain ini sudah tidak tersedia. Pilih referensi lain.",
+	);
+	// Only the known unavailable codes are converted: anything else stays a real
+	// failure instead of being dressed up as a reference the user can replace.
+	scrapeService.failure = new Error("provider exploded");
+	await expect(
+		resolveStudioDesignReference(
+			{ kind: "scrape", id: "scrape-4" },
+			null,
+			"user-7",
+		),
+	).rejects.toThrow("provider exploded");
 	scrapeService.failure = null;
 	scrapeService.result = {
 		scrapeId: "scrape-3",
@@ -120,11 +156,15 @@ it("resolves a stored scrape DESIGN.md for its owner only", async () => {
 		title: null,
 		designMd: "This text contains no design tokens.",
 	};
-	await expect(
+	const unusable = await referenceFailure(
 		resolveStudioDesignReference(
 			{ kind: "scrape", id: "scrape-3" },
 			null,
 			"user-7",
 		),
-	).rejects.toThrow();
+	);
+	expect(unusable.failure).toBe("unusable-stored-design");
+	expect(unusable.message).toBe(
+		"Referensi desain belum bisa digunakan. Pilih referensi lain atau periksa hasil VibeScrape.",
+	);
 });
