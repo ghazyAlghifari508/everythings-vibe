@@ -17,7 +17,6 @@ import { ScrapeError } from "@/lib/design-errors";
 import type { CreateStudioProjectInput } from "../types/studio-service";
 import { resolveStudioDesignReference } from "./studio-design-reference.server";
 import { studioGenerationOptionsSchema } from "./studio-generation-options";
-import { runStudioJobPipeline } from "./studio-job-pipeline";
 import { validateAndProcessLogo } from "./studio-logo-service";
 import { validateStudioPrdFilename } from "./studio-prd-helpers";
 import { validateStudioPrdContent } from "./studio-prd-validation.server";
@@ -214,8 +213,6 @@ export async function createStudioProjectWithJob(
 
 		return { project: newProject, job: newJob, frames: slots };
 	});
-
-	void runStudioJobPipeline(job.id, project.id, userId);
 
 	return { project, job, frames };
 }

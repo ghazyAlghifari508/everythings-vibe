@@ -67,6 +67,7 @@ export async function tryStreamWithFallback(
 						}
 					: undefined,
 			);
+			let handedOff = false;
 
 			try {
 				const first = await gen.next();
@@ -75,8 +76,15 @@ export async function tryStreamWithFallback(
 					throw new Error("Respons kosong dari chunk model.");
 				}
 
+				handedOff = true;
 				return {
-					generator: gen,
+					generator: (async function* () {
+						try {
+							yield* gen;
+						} finally {
+							externalSignal?.removeEventListener("abort", propagateAbort);
+						}
+					})(),
 					firstChunk: first.value,
 					abortController,
 					outcome,
@@ -95,7 +103,8 @@ export async function tryStreamWithFallback(
 				if (attemptThinking && willRetry) onThinkingReset?.();
 				if (attempt < attemptCeiling - 1) continue;
 			} finally {
-				externalSignal?.removeEventListener("abort", propagateAbort);
+				if (!handedOff)
+					externalSignal?.removeEventListener("abort", propagateAbort);
 			}
 		}
 	}

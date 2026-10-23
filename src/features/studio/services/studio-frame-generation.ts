@@ -1,5 +1,4 @@
-import { eq, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { and, eq, sql } from "drizzle-orm";
 import { type StudioFrameRow, studioFrames } from "@/db/schema";
 import {
 	STUDIO_FRAME_MAX_TOKENS,
@@ -19,7 +18,8 @@ import { resolveStudioFrameSystemPrompt } from "./studio-design-skill-registry.s
 import { enforceDesignSystemOnHtml } from "./studio-design-system-html";
 import { validateGeneratedHtml } from "./studio-generated-html-validation";
 import type { StudioDesignSkillId } from "./studio-generation-options";
-import { refreshStudioJobLease } from "./studio-job-lease";
+import { StudioLeaseLostError, withStudioJobWrite } from "./studio-job-lease";
+import { studioJobTiming } from "./studio-job-runtime";
 import { validateStudioDesignMode } from "./studio-prompt-validation";
 import { buildStudioFramePrompt } from "./studio-screen-prompts";
 
@@ -51,7 +51,9 @@ export async function runWithConcurrency<T>(
 			}
 		},
 	);
-	await Promise.all(workers);
+	const settled = await Promise.allSettled(workers);
+	const failure = settled.find((result) => result.status === "rejected");
+	if (failure?.status === "rejected") throw failure.reason;
 	return results;
 }
 
@@ -67,11 +69,21 @@ export async function generateValidatedFrameHtml(
 ): Promise<string> {
 	let framePrompt = input.framePrompt;
 	for (let round = 0; round < 2; round++) {
+		input.signal?.throwIfAborted();
+		const startedAt = Date.now();
 		const rawHtml = await generateStudioHtml(
 			framePrompt,
 			STUDIO_FRAME_MAX_TOKENS,
 			input.designSkillId,
+			input.signal,
+			input.timing,
 		);
+		if (input.timing)
+			studioJobTiming("generation", startedAt, {
+				...input.timing,
+				attempt: round + 1,
+			});
+		const validationStartedAt = Date.now();
 		const htmlCode = enforceDesignSystemOnHtml(
 			rawHtml,
 			input.dsTokens,
@@ -83,6 +95,12 @@ export async function generateValidatedFrameHtml(
 			viewport: input.viewport,
 			expectTokens: input.expectTokens,
 		});
+		if (input.timing)
+			studioJobTiming("validation", validationStartedAt, {
+				...input.timing,
+				attempt: round + 1,
+				code: issues.length ? "INVALID_OUTPUT" : "VALID",
+			});
 		if (issues.length === 0) return htmlCode;
 		if (round === 0) {
 			framePrompt = `${input.framePrompt}\n\nPrevious output violated the contract (${issues.join(" ")}). Correct these issues and return the FULL single-file HTML document.`;
@@ -100,17 +118,25 @@ export async function generateInitialFrame(
 	ctx: InitialFrameContext,
 ): Promise<{ ok: true; htmlCode: string } | { ok: false; error: string }> {
 	const { frame } = ctx;
+	ctx.signal.throwIfAborted();
 	if (frame.status === "ready" && frame.htmlCode) {
 		return { ok: true, htmlCode: frame.htmlCode };
 	}
-	await db
-		.update(studioFrames)
-		.set({
-			status: "generating",
-			attempts: sql`${studioFrames.attempts} + 1`,
-			updatedAt: new Date(),
-		})
-		.where(eq(studioFrames.id, frame.id));
+	await withStudioJobWrite(ctx.lease, async (tx) => {
+		await tx
+			.update(studioFrames)
+			.set({
+				status: "generating",
+				attempts: sql`${studioFrames.attempts} + 1`,
+				updatedAt: new Date(),
+			})
+			.where(
+				and(
+					eq(studioFrames.id, frame.id),
+					eq(studioFrames.projectId, ctx.lease.projectId),
+				),
+			);
+	});
 	const designMode = validateStudioDesignMode(frame.viewport);
 	const basePrompt = buildStudioFramePrompt({
 		screenName: frame.name,
@@ -127,6 +153,7 @@ export async function generateInitialFrame(
 	let attempt = 0;
 	for (;;) {
 		try {
+			ctx.signal.throwIfAborted();
 			const htmlCode = await generateValidatedFrameHtml({
 				framePrompt: basePrompt,
 				blueprint: ctx.blueprint,
@@ -135,35 +162,72 @@ export async function generateInitialFrame(
 				designSkillId: ctx.designSkillId,
 				dsTokens: ctx.dsTokens,
 				logoUrl: ctx.logoUrl,
+				signal: ctx.signal,
+				timing: {
+					jobId: ctx.lease.jobId,
+					projectId: ctx.lease.projectId,
+					frameId: frame.id,
+				},
 			});
-			await db
-				.update(studioFrames)
-				.set({ htmlCode, status: "ready", error: null, updatedAt: new Date() })
-				.where(eq(studioFrames.id, frame.id));
-			if (ctx.lease) {
-				refreshStudioJobLease(ctx.lease.jobId, ctx.lease.workerId).catch(
-					(err) => {
-						console.warn(
-							"[studio] lease heartbeat failed",
-							err instanceof Error ? err.message : err,
-						);
-					},
-				);
-			}
+			ctx.signal.throwIfAborted();
+			const persistenceStartedAt = Date.now();
+			await withStudioJobWrite(ctx.lease, async (tx) => {
+				await tx
+					.update(studioFrames)
+					.set({
+						htmlCode,
+						status: "ready",
+						error: null,
+						updatedAt: new Date(),
+					})
+					.where(
+						and(
+							eq(studioFrames.id, frame.id),
+							eq(studioFrames.projectId, ctx.lease.projectId),
+						),
+					);
+			});
+			studioJobTiming("frame-persistence", persistenceStartedAt, {
+				jobId: ctx.lease.jobId,
+				projectId: ctx.lease.projectId,
+				frameId: frame.id,
+			});
 			return { ok: true, htmlCode };
 		} catch (frameErr) {
+			ctx.signal.throwIfAborted();
+			if (frameErr instanceof StudioLeaseLostError) throw frameErr;
 			const retryable = isRetryableProviderError(frameErr);
 			if (retryable && attempt < STUDIO_FRAME_RETRY_MAX) {
 				attempt++;
+				studioJobTiming("frame-retry", Date.now(), {
+					jobId: ctx.lease.jobId,
+					projectId: ctx.lease.projectId,
+					frameId: frame.id,
+					attempt,
+					code: "PROVIDER_TRANSIENT",
+				});
 				await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
 				continue;
 			}
-			const errorMsg =
-				frameErr instanceof Error ? frameErr.message : "Gagal generate frame";
-			await db
-				.update(studioFrames)
-				.set({ status: "failed", error: errorMsg, updatedAt: new Date() })
-				.where(eq(studioFrames.id, frame.id));
+			const errorMsg = "Gagal membuat layar. Silakan coba lagi.";
+			studioJobTiming("frame-failure", Date.now(), {
+				jobId: ctx.lease.jobId,
+				projectId: ctx.lease.projectId,
+				frameId: frame.id,
+				attempt: attempt + 1,
+				code: retryable ? "PROVIDER_RETRIES_EXHAUSTED" : "GENERATION_FAILED",
+			});
+			await withStudioJobWrite(ctx.lease, async (tx) => {
+				await tx
+					.update(studioFrames)
+					.set({ status: "failed", error: errorMsg, updatedAt: new Date() })
+					.where(
+						and(
+							eq(studioFrames.id, frame.id),
+							eq(studioFrames.projectId, ctx.lease.projectId),
+						),
+					);
+			});
 			return { ok: false, error: errorMsg };
 		}
 	}
@@ -173,7 +237,11 @@ export async function generateStudioHtml(
 	prompt: string,
 	maxTokens = STUDIO_FRAME_MAX_TOKENS,
 	designSkillId: StudioDesignSkillId = "none",
+	signal?: AbortSignal,
+	timing?: ValidatedFrameInput["timing"],
 ): Promise<string> {
+	signal?.throwIfAborted();
+	const startedAt = Date.now();
 	const { generator, firstChunk } = await tryStreamWithFallback(
 		selectModels(),
 		[
@@ -183,11 +251,13 @@ export async function generateStudioHtml(
 			},
 			{ role: "user", content: prompt },
 		],
-		undefined,
+		signal,
 		maxTokens,
 	);
+	if (timing) studioJobTiming("first-token", startedAt, timing);
 	let raw = firstChunk;
 	for await (const chunk of generator) raw += chunk;
+	signal?.throwIfAborted();
 	const cleaned = extractCleanHtml(raw);
 	if (cleaned.trim().length === 0)
 		throw new ScrapeError(
