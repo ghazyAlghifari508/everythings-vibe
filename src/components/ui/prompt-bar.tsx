@@ -289,5 +289,3 @@ export function PromptBar({
 		</form>
 	);
 }
-
-export default PromptBar;
