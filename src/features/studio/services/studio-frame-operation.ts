@@ -160,6 +160,7 @@ export async function runStudioFrameOperation(
 	const dsTokens = extractDesignSystemTokens(project.designMd);
 	const htmlCode = await generateValidatedFrameHtml({
 		framePrompt: `${prompt}\n\nUSER CHANGE INSTRUCTION: ${changeInstruction}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
+		activeScreen: name,
 		blueprint: project.designBlueprint,
 		viewport: validateStudioDesignMode(frame.viewport),
 		expectTokens: dsTokens !== null,

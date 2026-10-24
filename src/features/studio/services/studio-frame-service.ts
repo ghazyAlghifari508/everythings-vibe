@@ -77,6 +77,7 @@ export async function addStudioFrame(
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
 		const htmlCode = await generateValidatedFrameHtml({
 			framePrompt,
+			activeScreen: cleanName,
 			blueprint: detail.designBlueprint,
 			viewport,
 			expectTokens: dsTokens !== null,
@@ -165,6 +166,7 @@ export async function reviseStudioFrame(
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
 		const htmlCode = await generateValidatedFrameHtml({
 			framePrompt,
+			activeScreen: frame.name,
 			blueprint: detail.designBlueprint,
 			viewport: validateStudioDesignMode(frame.viewport),
 			expectTokens: dsTokens !== null,

@@ -16,6 +16,10 @@ import type {
 	ValidatedFrameInput,
 } from "../types/studio-service";
 import {
+	assembleCanonicalShell,
+	validateCanonicalShell,
+} from "./studio-canonical-shell";
+import {
 	resolveStudioDesignSkill,
 	resolveStudioFrameSystemPrompt,
 } from "./studio-design-skill-registry.server";
@@ -27,6 +31,7 @@ import {
 } from "./studio-frame-errors";
 import { validateGeneratedHtml } from "./studio-generated-html-validation";
 import type { StudioDesignSkillId } from "./studio-generation-options";
+import { inspectStudioHtml } from "./studio-html-diagnostics";
 import { StudioLeaseLostError, withStudioJobWrite } from "./studio-job-lease";
 import { studioJobTiming } from "./studio-job-runtime";
 import { validateStudioDesignMode } from "./studio-prompt-validation";
@@ -112,17 +117,55 @@ export async function generateValidatedFrameHtml(
 				attempt: round + 1,
 			});
 		const validationStartedAt = Date.now();
-		const htmlCode = enforceDesignSystemOnHtml(
+		let htmlCode = enforceDesignSystemOnHtml(
 			rawHtml,
 			input.dsTokens,
 			input.logoUrl,
 			input.blueprint,
 		);
-		const issues = validateGeneratedHtml(htmlCode, {
-			blueprint: input.blueprint,
-			viewport: input.viewport,
-			expectTokens: input.expectTokens,
-		});
+		const assemblyIssues: string[] = [];
+		if (input.blueprint && input.activeScreen) {
+			try {
+				htmlCode = assembleCanonicalShell(
+					htmlCode,
+					input.blueprint,
+					input.activeScreen,
+					input.dsTokens,
+					input.logoUrl,
+				);
+				assemblyIssues.push(
+					...validateCanonicalShell(
+						htmlCode,
+						input.blueprint,
+						input.activeScreen,
+						input.dsTokens,
+					),
+				);
+			} catch (error) {
+				assemblyIssues.push(
+					error instanceof Error
+						? error.message
+						: "Canonical shell assembly failed.",
+				);
+			}
+		}
+		const diagnostics = input.activeScreen
+			? inspectStudioHtml(htmlCode)
+			: { hard: [], warnings: [] };
+		if (diagnostics.warnings.length)
+			console.info("[studio.output.quality]", {
+				...input.timing,
+				warnings: diagnostics.warnings,
+			});
+		const issues = [
+			...assemblyIssues,
+			...diagnostics.hard,
+			...validateGeneratedHtml(htmlCode, {
+				blueprint: input.blueprint,
+				viewport: input.viewport,
+				expectTokens: input.expectTokens,
+			}),
+		];
 		if (input.timing)
 			studioJobTiming("validation", validationStartedAt, {
 				...input.timing,
@@ -182,6 +225,7 @@ export async function generateInitialFrame(
 			ctx.signal.throwIfAborted();
 			const htmlCode = await generateValidatedFrameHtml({
 				framePrompt: basePrompt,
+				activeScreen: frame.name,
 				blueprint: ctx.blueprint,
 				viewport: designMode,
 				expectTokens: ctx.dsTokens !== null,

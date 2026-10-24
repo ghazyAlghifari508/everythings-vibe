@@ -44,15 +44,13 @@ Maintain exact visual continuity (colors, header/footer layout, typography, comp
 Every screen in this project uses this exact specification. Apply it verbatim:
 ${JSON.stringify(opts.blueprint)}
 
-SHARED NAVIGATION CONTRACT — identical on every screen, never redesigned per screen:
-- Labels, in this exact order: ${labels.map((label) => `"${label}"`).join(" | ")}
-- Destinations: ${destinations.join(", ")}
-- Render each label as its own <a> or <button> inside ONE <nav> element, in the declared order.
-- Label text must read exactly as declared. Escape special characters the normal HTML way ("&" becomes "&amp;"); the rendered text stays identical.
-- Icons come from the shared icon mapping (${JSON.stringify(iconMapping)}); one icon per destination, identical on every screen.
-- Mark only the item for this screen ("${activeScreen}") as active; every other item renders exactly like on the other screens.
-- Do not add, rename, reorder, translate, or duplicate navigation items, and do not emit a second navigation bar.
-Active screen for this frame: "${activeScreen}". Render the shared navigation with identical icons, labels, ordering, sizing, and geometry.
+CONTROLLED ASSEMBLY CONTRACT:
+- Studio inserts the canonical app header and navigation; do not generate them or simulated device status bars.
+- Put ALL screen-specific body content in exactly one <main data-studio-content>. Do not place visible content outside it.
+- Do not put app navigation/header inside that region; contextual tabs and section headings remain screen-specific.
+- Canonical labels ${JSON.stringify(labels)}, destinations ${JSON.stringify(destinations)}, icons ${JSON.stringify(iconMapping)} and active screen ${JSON.stringify(activeScreen)} are supplied by assembly, not independently rendered by you.
+- Use --app-primary, --app-canvas, --app-surface, --app-ink, --app-muted, --app-font, --app-gutter and --app-radius for shared identity. Use data-primary on primary actions and data-card on common surfaces.
+- Preserve the selected skill for content composition, not for redesigning the shared shell. No autofocus, decorative cursor, stray separators after numeric amounts or fixed/sticky decorations.
 </SHARED_DESIGN_BLUEPRINT>`,
 		);
 	}
@@ -72,6 +70,10 @@ Ensure features, forms, lists, metrics, terminology, and realistic Indonesian co
 	}
 
 	// Platform instructions
+	if (opts.blueprint)
+		sections.push(
+			"Assembly overrides shared component instructions below: Studio inserts the app header/navigation. Generate only marked main content; no independent app shell or device chrome.",
+		);
 	if (opts.designMode === "mobile") {
 		sections.push(MOBILE_PLATFORM_CONTRACT);
 	} else {
