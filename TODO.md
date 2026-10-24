@@ -8,15 +8,16 @@ Dokumen ini memuat daftar rencana kerja, backlog arsitektur, standarisasi kualit
 
 1. [Bagian 1: Architectural Backlog — Greenfield Workspace Routing Architecture Refactor](#1-architectural-backlog--greenfield-workspace-routing-architecture-refactor)
 2. [Bagian 2: UI/UX Standarisasi — WAJIB Mobile &amp; Tablet Responsive Seluruh Halaman](#2-uiux-standarisasi--wajib-mobile--tablet-responsive-seluruh-halaman)
-
-1. [Bagian 4: Dead Code Elimination — Pembersihan Total Deathcode, File/Folder Sampah &amp; Unused Dependencies](#4-dead-code-elimination--pembersihan-total-deathcode-filefolder-sampah--unused-dependencies)
-2. [Bagian 5: Rebranding Ecosystem — Migrasi Menyeluruh dari VibeEverything ke everythings-vibe](#5-rebranding-ecosystem--migrasi-menyeluruh-dari-vibeeverything-ke-everythings-vibe)
-3. [Bagian 6: Runtime &amp; Performance Optimization — Migrasi Node.js ke Bun](#6-runtime--performance-optimization--migrasi-nodejs-ke-bun)
-4. [Bagian 7: Arsitektur Berbasis Fitur — Modular Feature-Driven Directory Structure](#7-arsitektur-berbasis-fitur--modular-feature-driven-directory-structure)
-5. [Bagian 8: Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure &amp; Zero Dead Code](#8-aturan-tegas-ai-agent--enforcement-policy-anti-slop-strict-structure--zero-dead-code)
-6. [Bagian 9: Decoupling &amp; Standalone Domain — Pemisahan VibeScrape dari VibeDesign](#9-decoupling--standalone-domain--pemisahan-vibescrape-dari-vibedesign)
-7. [Bagian 10: Design System &amp; Iconography Overhaul — Migrasi dari Lucide React ke Hugeicons](#10-design-system--iconography-overhaul--migrasi-dari-lucide-react-ke-hugeicons)
-8. [Bagian 11: Infra &amp; Scraping Optimization — Hybrid Remote Browser (Cloudflare Browser Run &amp; Browserless.io Fallback)](#11-infra--scraping-optimization--hybrid-remote-browser-cloudflare-browser-run--browserlessio-fallback)
+3. [Bagian 3: Refactoring &amp; Clean Code — Dekonstruksi File Monster (~2.000 Baris) &amp; Reusable Architecture](#3-refactoring--clean-code--dekonstruksi-file-monster-2000-baris--reusable-architecture)
+4. [Bagian 4: Dead Code Elimination — Pembersihan Total Deathcode, File/Folder Sampah &amp; Unused Dependencies](#4-dead-code-elimination--pembersihan-total-deathcode-filefolder-sampah--unused-dependencies)
+5. [Bagian 5: Rebranding Ecosystem — Migrasi Menyeluruh dari VibeEverything ke everythings-vibe](#5-rebranding-ecosystem--migrasi-menyeluruh-dari-vibeeverything-ke-everythings-vibe)
+6. [Bagian 6: Runtime &amp; Performance Optimization — Migrasi Node.js ke Bun](#6-runtime--performance-optimization--migrasi-nodejs-ke-bun)
+7. [Bagian 7: Arsitektur Berbasis Fitur — Modular Feature-Driven Directory Structure](#7-arsitektur-berbasis-fitur--modular-feature-driven-directory-structure)
+8. [Bagian 8: Aturan Tegas AI Agent — Enforcement Policy: Anti-Slop, Strict Structure &amp; Zero Dead Code](#8-aturan-tegas-ai-agent--enforcement-policy-anti-slop-strict-structure--zero-dead-code)
+9. [Bagian 9: Decoupling &amp; Standalone Domain — Pemisahan VibeScrape dari VibeDesign](#9-decoupling--standalone-domain--pemisahan-vibescrape-dari-vibedesign)
+10. [Bagian 10: Design System &amp; Iconography Overhaul — Migrasi dari Lucide React ke Hugeicons](#10-design-system--iconography-overhaul--migrasi-dari-lucide-react-ke-hugeicons)
+11. [Bagian 11: Infra &amp; Scraping Optimization — Hybrid Remote Browser (Cloudflare Browser Run &amp; Browserless.io Fallback)](#11-infra--scraping-optimization--hybrid-remote-browser-cloudflare-browser-run--browserlessio-fallback)
+12. [Bagian 12: Infra &amp; Deployment Overhaul — Migrasi Total dari Vercel ke Self-Hosted VPS (Docker, Caddy &amp; Zero Vercel)](#12-infra--deployment-overhaul--migrasi-total-dari-vercel-ke-self-hosted-vps-docker-caddy--zero-vercel)
 
 ---
 
@@ -1303,11 +1304,245 @@ SCRAPE_BROWSER_MODE="hybrid" # Opsi: "hybrid" | "cloudflare" | "browserless" | "
 
 ---
 
+## 12. Infra &amp; Deployment Overhaul — Migrasi Total dari Vercel ke Self-Hosted VPS (Docker, Caddy &amp; Zero Vercel)
+
+### Metadata
+
+- **Status:** `Proposed / Backlog`
+- **Prioritas:** `P1` (Kritis untuk Menghapus Vendor Lock-in &amp; Mendukung Long-Running Workers)
+- **Kompleksitas:** `Sedang - Tinggi`
+- **Inisiator:** DevSecOps, Infrastruktur &amp; Efisiensi Biaya Operasional
+- **Tujuan:** Mengeliminasi ketergantungan pada Vercel secara 100%, menghapus seluruh artefak/konfigurasi Vercel dari repositori (`vercel.json`, Vercel Cron, env hacks), dan memigrasikan seluruh platform **everythings-vibe** (TanStack Start SSR, background worker Playwright VibeScrape, AI worker VibeDesign Studio, dan cron billing) ke VPS Linux mandiri berbasis Docker Compose dengan reverse proxy Caddy (automatic HTTPS Let's Encrypt).
+
+---
+
+### 12.1. Latar Belakang &amp; Analisis Masalah (Mengapa Vercel Harus Dieliminasi)
+
+Saat ini deployment web mengandalkan Vercel dengan konfigurasi serverless dan cron job di `vercel.json`. Arsitektur serverless Vercel memiliki batasan fundamental yang bertabrakan langsung dengan beban kerja platform:
+
+#### 1. Serverless Execution Timeout vs Long-Running Background Workers
+- **Batasan Vercel:** Serverless function memiliki hard execution limit (10 detik pada Free/Hobby, 60 detik pada Pro).
+- **Kebutuhan Sistem:**
+  - **VibeScrape Worker:** Crawling deep web, rendering SPA dinamis via Playwright, dan ekstraksi screenshot membutuhkan waktu proses 30–120 detik per sesi crawling.
+  - **VibeDesign Studio Worker:** AI streaming, validasi HTML, dan frame synthesis bertingkat dapat memakan waktu hingga beberapa menit.
+- **Dampak di Vercel:** Worker sering terkena HTTP 504 Gateway Timeout dan proses terpotong mendadak di tengah transaksi database, merusak status job di database.
+
+#### 2. Keterbatasan Headless Browser &amp; Ephemeral Filesystem
+- Playwright Chromium membutuhkan dependensi OS sistem Linux (`libnss3`, `libasound2`, dll.) dan memori besar yang tidak kompatibel secara optimal dengan runtime serverless Vercel.
+- Filesystem Vercel bersifat stateless dan read-only (kecuali `/tmp` yang terbatas dan ephemeral), menyulitkan caching lokal, file staging, dan dump log sementara.
+
+#### 3. Pemborosan Biaya &amp; Vendor Lock-In
+- Model pricing Vercel mengenakan biaya eksponensial untuk bandwidth, fast compute, build minutes, dan seat tim.
+- VPS mandiri (seperti Hetzner, DigitalOcean, Linode) seharga $5–$20/bulan menyediakan dedicated vCPU, RAM 4–8 GB, unmetered/terabyte traffic, dan kontrol penuh tanpa risiko penagihan tak terduga (*bill shock*).
+
+#### 4. Kebersihan Repositori (Zero Vercel Artifacts)
+- Konfigurasi `vercel.json` dan referensi Vercel di kode merupakan *dead baggage* jika aplikasi sudah di-self-host. Repositori harus 100% bersih dari artefak platform yang sudah ditinggalkan.
+
+---
+
+### 12.2. Target Arsitektur: Self-Hosted Containerized Stack di VPS
+
+Seluruh layanan berjalan di VPS menggunakan Docker Compose dengan pemisahan peran yang jelas:
+
+```mermaid
+flowchart TD
+    Client["Pengguna / Browser / Webhook Midtrans"] -->|"HTTPS (Port 443)"| Caddy["Caddy Reverse Proxy (Auto Let's Encrypt SSL, HTTP/3, Brotli)"]
+    
+    subgraph VPS ["Linux VPS (Ubuntu 24.04 LTS / Debian 12)"]
+        Caddy -->|"Reverse Proxy :3000"| WebApp["everythings-vibe Web App (TanStack Start SSR Server)"]
+        
+        subgraph Workers ["Background Worker Daemons"]
+            WorkerScrape["Scrape Worker (Playwright / Remote CDP)"]
+            WorkerStudio["Studio Worker (AI Frame Synthesis Queue)"]
+        end
+
+        subgraph CronJob ["Linux Host / Systemd / Container Scheduler"]
+            Scheduler["VPS Cron / Systemd Timer (Setiap Jam 03:00 UTC)"]
+        end
+
+        WebApp <-->|"Postgres Connection Pool"| DB[("PostgreSQL 17 Database")]
+        WorkerScrape <-->|"DB State / Queue"| DB
+        WorkerStudio <-->|"DB State / Queue"| DB
+        Scheduler -->|"Trigger POST/GET dengan CRON_BILLING_SECRET"| WebApp
+    end
+```
+
+---
+
+### 12.3. Rencana Pembersihan Total Vercel (Dead Vercel Elimination)
+
+Bagian ini memetakan seluruh file dan dependensi Vercel yang wajib dimusnahkan:
+
+1. **Hapus File Konfigurasi Vercel:**
+   - Hapus permanen `vercel.json` dari root repositori (`rm vercel.json`).
+   - Hapus referensi file `vercel.json` dari git tracking.
+
+2. **Ganti Vercel Cron (`/api/cron/billing`):**
+   - Di Vercel, cron di-trigger otomatis melalui `vercel.json` dengan header `Authorization: Bearer $CRON_SECRET`.
+   - **Solusi VPS:** Gunakan Native Linux Cron atau Systemd Timer yang memanggil internal endpoint melalui `curl`:
+     ```bash
+     # crontab -e pada host VPS
+     0 3 * * * curl -fsS -H "Authorization: Bearer $CRON_BILLING_SECRET" http://127.0.0.1:3000/api/cron/billing > /var/log/everythings-vibe-billing-cron.log 2>&1
+     ```
+   - Alternatif: Buat lightweight worker runner di dalam container atau node script mandiri `pnpm billing:cron`.
+
+3. **Sanitasi Environment Variables &amp; Kode:**
+   - Di `src/features/billing/services/billing-cron.server.ts`:
+     - Hapus fallback ke `process.env.CRON_SECRET` (nama variabel default bawaan Vercel).
+     - Wajibkan hanya `process.env.CRON_BILLING_SECRET` murni.
+   - Di `.env.example`:
+     - Hapus komentar dan instruksi spesifik Vercel: `# Shared secret for GET /api/cron/billing (Vercel Cron sends...)`.
+     - Ganti dengan dokumentasi cron mandiri (VPS Cron / Systemd / External HTTP runner).
+   - Pastikan URL callback auth (`BETTER_AUTH_URL`) dan host CORS dikonfigurasi ke domain VPS sendiri, bukan wildcard `*.vercel.app`.
+
+4. **Pembersihan Dokumentasi &amp; Spec:**
+   - Bersihkan referensi deployment Vercel dari dokumen rencana di `docs/superpowers/plans/` dan `docs/superpowers/specs/` agar tidak membingungkan kontributor dan agent di masa depan.
+
+---
+
+### 12.4. Desain Spesifikasi Docker &amp; Orchestration
+
+#### A. Multi-Stage `Dockerfile` untuk TanStack Start SSR
+```dockerfile
+# Stage 1: Base Prerequisite
+FROM node:22-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+
+# Stage 2: Dependencies
+FROM base AS deps
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+# Stage 3: Build
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+ENV NODE_ENV=production
+RUN pnpm studio:assets
+RUN pnpm build
+
+# Stage 4: Production Runner
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Security: Jalankan sebagai non-root
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nodejs
+USER nodejs
+
+COPY --from=builder /app/.output ./.output
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
+
+EXPOSE 3000
+CMD ["node", ".output/server/index.mjs"]
+```
+
+#### B. `docker-compose.yml` (Production Topology)
+```yaml
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  worker-scrape:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    command: ["pnpm", "scrape:worker"]
+    restart: unless-stopped
+    env_file: .env.production
+
+  worker-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    command: ["pnpm", "studio:worker"]
+    restart: unless-stopped
+    env_file: .env.production
+
+volumes:
+  caddy_data:
+  caddy_config:
+```
+
+#### C. Reverse Proxy Caddy (`Caddyfile`)
+Konfigurasi Caddy yang sangat ringkas, otomatis menangani sertifikat SSL Let's Encrypt, HTTP/3, dan gzip/zstd kompresi:
+```caddy
+everythingsvibe.com {
+    encode zstd gzip
+    reverse_proxy web:3000
+
+    # Header Keamanan
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
+```
+
+---
+
+### 12.5. Otomasi CI/CD (GitHub Actions $\rightarrow$ VPS Deployment)
+
+Menggantikan otomatisasi Vercel Git Integration dengan GitHub Actions workflow (`.github/workflows/deploy.yml`):
+1. **Trigger:** Push ke branch `main`.
+2. **Quality Gate:** Jalankan `pnpm lint`, `pnpm check`, `pnpm test`.
+3. **Deploy Step:** Menggunakan SSH Action / SSH Key:
+   ```bash
+   ssh deploy@vps-ip "cd /opt/everythings-vibe && git pull origin main && docker compose build && docker compose up -d"
+   ```
+4. **Post-Deploy Healthcheck:** Curl endpoint status `/api/health` untuk memastikan aplikasi hidup dengan exit code 200.
+
+---
+
+### 12.6. Checklist Eksekusi Bertahap
+
+- [ ] **Fase 1 — Docker &amp; Container Packaging:** Buat `Dockerfile` multi-stage dan `docker-compose.yml` untuk web app dan worker. Uji build lokal hingga lolos tanpa error.
+- [ ] **Fase 2 — Transisi Cron Billing:** Buat skrip cron mandiri atau systemd timer untuk menggantikan trigger Vercel Cron pada `/api/cron/billing`.
+- [ ] **Fase 3 — Eliminasi Total Konfigurasi Vercel:** Hapus `vercel.json`, hapus fallback `CRON_SECRET` di `billing-cron.server.ts`, dan sanitasi instruksi Vercel di `.env.example`.
+- [ ] **Fase 4 — Konfigurasi VPS &amp; Reverse Proxy Caddy:** Siapkan instance VPS (Ubuntu/Debian), pasang Docker engine &amp; Caddy, serta konfigurasikan firewall (UFW: port 80, 443, 22).
+- [ ] **Fase 5 — Pipeline CI/CD:** Buat workflow GitHub Actions untuk auto-deploy ke VPS via SSH saat merge ke branch `main`.
+- [ ] **Fase 6 — DNS Cutover &amp; Verifikasi Live:** Arahkan A/AAAA record domain utama ke IP VPS, verifikasi sertifikat SSL otomatis, uji autentikasi Better Auth, Midtrans webhook, dan background scraping/studio workers.
+
+---
+
 ## 📋 Ringkasan Prioritas Eksekusi Mendatang
 
 
 | Prioritas | Backlog Item                                                        | Tingkat Dampak                                          | Kompleksitas                                    |
 | :--------- | :------------------------------------------------------------------- | :------------------------------------------------------- | :----------------------------------------------- |
+| **P1**    | **Migrasi Total Vercel ke VPS (Docker, Caddy &amp; Zero Vercel)**    | Kritis (Bebaskan Worker dari Timeout &amp; Hapus Lock-in)| Sedang - Tinggi                                 |
 | **P1**    | **Pembuatan Rules Agent (`architecture-folder-structure.md`)**      | Kritis (Mencegah Sampah Baru Sejak Hari Ini)            | Rendah (Dokumentasi &amp; Regulasi)             |
 | **P1**    | **Standarisasi Responsivitas Mobile &amp; Tablet**                  | Sangat Tinggi (UX Pengguna Mobile)                      | Sedang - Luas                                   |
 | **P1**    | **Hybrid Remote Browser (Cloudflare &amp; Browserless Fallback)**   | Kritis (Memangkas RAM Worker dari 1 GB ke ~0 MB &amp; Anti-OOM) | Sedang                                          |
