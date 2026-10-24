@@ -194,41 +194,68 @@ export async function inlineIframes(
 	},
 ): Promise<string> {
 	let output = html;
-	if (options.includeIframes) {
-		const origin = new URL(page.url()).origin;
-		let capturedFrames = 0;
-		for (const frame of page.frames().slice(1, SCRAPE_LIMITS.maxFrames + 1)) {
-			if (capturedFrames >= SCRAPE_LIMITS.maxFrames) break;
+	if (!options.includeIframes) {
+		return output;
+	}
+
+	let pageOrigin: string;
+	try {
+		pageOrigin = new URL(page.url()).origin;
+	} catch {
+		return output;
+	}
+	if (!pageOrigin || pageOrigin === "null") {
+		return output;
+	}
+
+	let capturedFrames = 0;
+	for (const frame of page.frames().slice(1, SCRAPE_LIMITS.maxFrames + 1)) {
+		if (capturedFrames >= SCRAPE_LIMITS.maxFrames) break;
+		try {
+			let frameOrigin: string;
 			try {
-				if (new URL(frame.url()).origin !== origin) {
-					await options.onActivity?.("Iframe cross-origin dilewati");
-					continue;
-				}
-				const content = await frame.content();
-				if (Buffer.byteLength(content) > SCRAPE_MAX_HTML_BYTES / 10) {
-					await options.onActivity?.("Iframe terlalu besar dilewati");
-					continue;
-				}
-				const element = await frame.frameElement();
-				const original = await element.evaluate((node) =>
-					node instanceof Element ? node.outerHTML : "",
-				);
-				if (original) {
-					const escaped = content
-						.replace(/&/g, "&amp;")
-						.replace(/"/g, "&quot;")
-						.replace(/</g, "&lt;");
-					const captured = original
-						.replace(/\s(?:src|srcdoc)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-						.replace(/<iframe\b/i, `<iframe srcdoc="${escaped}"`);
-					output = output.replace(original, captured);
-				}
-				capturedFrames += 1;
+				frameOrigin = new URL(frame.url()).origin;
 			} catch {
-				await options.onActivity?.("Iframe tidak dapat diakses, dilewati");
+				await options.onActivity?.("Iframe cross-origin dilewati");
+				continue;
 			}
+			if (
+				!frameOrigin ||
+				frameOrigin === "null" ||
+				frameOrigin !== pageOrigin
+			) {
+				await options.onActivity?.("Iframe cross-origin dilewati");
+				continue;
+			}
+			const content = await frame.content();
+			if (Buffer.byteLength(content) > SCRAPE_MAX_HTML_BYTES / 10) {
+				await options.onActivity?.("Iframe terlalu besar dilewati");
+				continue;
+			}
+			const element = await frame.frameElement();
+			const original = await element.evaluate((node) =>
+				node instanceof Element ? node.outerHTML : "",
+			);
+			if (original && /<iframe\b/i.test(original)) {
+				const escaped = content
+					.replace(/&/g, "&amp;")
+					.replace(/"/g, "&quot;")
+					.replace(/</g, "&lt;");
+				const captured = original
+					.replace(/\s(?:src|srcdoc)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+					.replace(/<iframe\b/i, `<iframe srcdoc="${escaped}"`);
+				const matchIndex = output.indexOf(original);
+				if (matchIndex !== -1) {
+					output =
+						output.slice(0, matchIndex) +
+						captured +
+						output.slice(matchIndex + original.length);
+					capturedFrames += 1;
+				}
+			}
+		} catch {
+			await options.onActivity?.("Iframe tidak dapat diakses, dilewati");
 		}
-	} else if (options.mode === "html")
-		output = output.replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe\s*>/gi, "");
+	}
 	return output;
 }
