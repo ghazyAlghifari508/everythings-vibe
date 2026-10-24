@@ -105,7 +105,8 @@ export function renderComponentSections(
 	}
 
 	// --- 10. Elevation -------------------------------------------------------
-	lines.push("", heading(2, "Elevation"));
+	if (model.elevation.length || !options.omitUnmeasuredElevation)
+		lines.push("", heading(2, "Elevation"));
 	if (model.elevation.length) {
 		lines.push("");
 		lines.push(
@@ -118,7 +119,7 @@ export function renderComponentSections(
 				]),
 			),
 		);
-	} else {
+	} else if (!options.omitUnmeasuredElevation) {
 		lines.push(
 			"",
 			"No box-shadow was measured on visible elements, so elevation is not defined by shadows in this capture.",
