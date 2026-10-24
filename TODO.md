@@ -692,7 +692,7 @@ Di repositori ini, prefix `-` digunakan untuk menaruh file test langsung di sebe
 **Debt / deferral yang dilaporkan (tidak dikerjakan di fase ini):**
 
 1. Fase 6 item 2 (`/scrape/*`) — dilarang `docs/main-prompt/p9.md` line 99.
-2. File ≥400 baris pre-existing: `src/db/schema.ts` (1391), `src/components/layout/navbar.tsx` (790), `src/components/ui/orb-core.ts` (600), `src/components/layout/chat-input.tsx` (560), `src/components/ui/thought-line.tsx` (506), `src/components/layout/history-drawer.tsx` (452), `src/features/scrape/services/scrape-asset-http.ts` (429, sudah ada di HEAD).
+2. File ≥400 baris pre-existing: `src/db/schema.ts` (1391), `src/components/layout/navbar.tsx` (790), `src/components/ui/thought-line.tsx` (506), `src/features/scrape/services/scrape-asset-http.ts` (429, sudah ada di HEAD). *(Catatan: `chat-input.tsx`, `orb-core.ts`, dan `history-drawer.tsx` telah berhasil didekonstruksi menjadi modul-modul modular < 400 baris di TASK 02).*
 3. Warning `pg` di-externalize pada client build (23 warning) — jumlah **identik** dengan build baseline `f81bc7e`, jadi pre-existing, bukan dampak migrasi.
 4. Script `audit:deadcode` (knip) — tercatat di Bagian 8.3, di luar scope fase ini.
 5. Referensi path lama di dokumen historis (Bagian 1/5/9 `TODO.md` baris 86/225/277 dan `docs/studio-p*.md`) masih menyebut `src/lib/flow-step.ts` dan `src/components/task/whiteboard-canvas.tsx`.
