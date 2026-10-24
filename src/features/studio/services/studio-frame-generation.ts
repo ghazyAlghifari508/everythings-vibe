@@ -294,13 +294,19 @@ export async function generateStudioHtml(
 	if (timing) studioJobTiming("first-token", startedAt, timing);
 	const outputStartedAt = Date.now();
 	let raw = firstChunk;
-	for await (const chunk of generator) raw += chunk;
-	if (timing)
-		studioJobTiming("frame-output", outputStartedAt, {
-			...timing,
-			outputChars: raw.length,
-			...outcome,
-		});
+	let completed = false;
+	try {
+		for await (const chunk of generator) raw += chunk;
+		completed = true;
+	} finally {
+		if (timing)
+			studioJobTiming("frame-output", outputStartedAt, {
+				...timing,
+				outputChars: raw.length,
+				...outcome,
+				code: completed ? "COMPLETED" : "FAILED",
+			});
+	}
 	signal?.throwIfAborted();
 	const cleaned = extractCleanHtml(raw);
 	if (cleaned.trim().length === 0)

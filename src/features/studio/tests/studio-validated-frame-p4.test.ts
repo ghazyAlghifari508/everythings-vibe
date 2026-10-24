@@ -34,6 +34,42 @@ async function mockRawSequence(raws: string[]) {
 }
 
 describe("generateValidatedFrameHtml recovery", () => {
+	it("records failed stream duration without accepting partial HTML", async () => {
+		vi.mocked(tryStreamWithFallback)
+			.mockReset()
+			.mockResolvedValueOnce({
+				firstChunk: "<html><body>Partial",
+				generator: (async function* () {
+					yield " sample";
+					throw new Error("synthetic disconnect");
+				})(),
+				abortController: new AbortController(),
+				outcome: { providerRetries: 0, providerFallbacks: 0 },
+			});
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			await expect(
+				generateStudioHtml("Sample", undefined, "none", undefined, {
+					jobId: "job",
+					projectId: "project",
+					frameId: "frame",
+				}),
+			).rejects.toThrow("synthetic disconnect");
+			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			expect(events).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						stage: "frame-output",
+						code: "FAILED",
+						durationMs: expect.any(Number),
+						providerRetries: 0,
+					}),
+				]),
+			);
+		} finally {
+			log.mockRestore();
+		}
+	});
 	it("records prompt size and output duration without logging private content", async () => {
 		await mockRawSequence(["<html><body>Sample</body></html>"]);
 		const log = vi.spyOn(console, "info").mockImplementation(() => {});
