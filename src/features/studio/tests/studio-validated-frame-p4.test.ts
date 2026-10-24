@@ -104,6 +104,34 @@ describe("generateValidatedFrameHtml recovery", () => {
 		expect(mocked).toHaveBeenCalledTimes(2);
 	});
 
+	it("separates corrective request duration from initial generation", async () => {
+		await mockRawSequence([
+			"<html><body>Sample",
+			"<html><body>Sample</body></html>",
+		]);
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			await generateValidatedFrameHtml({
+				framePrompt: "Sample",
+				blueprint: null,
+				viewport: "web",
+				expectTokens: false,
+				designSkillId: "none",
+				dsTokens: null,
+				logoUrl: null,
+				timing: { jobId: "job", projectId: "project", frameId: "frame" },
+			});
+			const corrections = log.mock.calls
+				.map(([line]) => JSON.parse(String(line)))
+				.filter((event) => event.stage === "correction");
+			expect(corrections).toEqual([
+				expect.objectContaining({ attempt: 2, durationMs: expect.any(Number) }),
+			]);
+		} finally {
+			log.mockRestore();
+		}
+	});
+
 	it("gagal jujur bila output tetap melanggar kontrak", async () => {
 		await mockRawSequence([
 			"<html><head></head><body><p>Belum selesai",

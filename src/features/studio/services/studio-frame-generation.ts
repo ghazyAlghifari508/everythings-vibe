@@ -106,6 +106,11 @@ export async function generateValidatedFrameHtml(
 				...input.timing,
 				attempt: round + 1,
 			});
+		if (input.timing && round > 0)
+			studioJobTiming("correction", startedAt, {
+				...input.timing,
+				attempt: round + 1,
+			});
 		const validationStartedAt = Date.now();
 		const htmlCode = enforceDesignSystemOnHtml(
 			rawHtml,
