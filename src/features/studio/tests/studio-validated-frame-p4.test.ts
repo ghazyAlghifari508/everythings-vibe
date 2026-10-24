@@ -49,6 +49,28 @@ describe("generateValidatedFrameHtml recovery", () => {
 		expect(mocked).toHaveBeenCalledTimes(2);
 	});
 
+	it("meneruskan dokumen sebelumnya ke koreksi agar pekerjaan valid tidak hilang", async () => {
+		const previous = '<html><body><main data-screen="sample">Sample</main>';
+		const mocked = await mockRawSequence([
+			previous,
+			"<html><body><main>Sample</main></body></html>",
+		]);
+		await generateValidatedFrameHtml({
+			framePrompt: "Build sample",
+			blueprint: null,
+			viewport: "web",
+			expectTokens: false,
+			designSkillId: "none",
+			dsTokens: null,
+			logoUrl: null,
+		});
+		const correctionMessages = mocked.mock.calls[1]?.[1];
+		expect(
+			correctionMessages?.some((message) => message.content.includes(previous)),
+		).toBe(true);
+		expect(mocked).toHaveBeenCalledTimes(2);
+	});
+
 	it("gagal jujur bila output tetap melanggar kontrak", async () => {
 		await mockRawSequence([
 			"<html><head></head><body><p>Belum selesai",
