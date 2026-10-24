@@ -154,7 +154,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		// Wait for ScreenConnect to mount
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 
@@ -244,7 +244,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		await waitFor(
 			() => {
 				expect(
-					screen.getByText("Sync codebase dengan VibeEverything"),
+					screen.getByText("Sync codebase dengan everythings-vibe"),
 				).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
@@ -409,7 +409,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		await waitFor(
 			() => {
 				expect(
-					screen.getByText("Sync codebase dengan VibeEverything"),
+					screen.getByText("Sync codebase dengan everythings-vibe"),
 				).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
@@ -468,7 +468,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 		expect(screen.getByText(/fresh-token-xyz/)).toBeDefined();

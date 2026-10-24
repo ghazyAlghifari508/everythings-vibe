@@ -93,7 +93,7 @@ export function LoginForm() {
 					<Logo height={36} />
 					<div>
 						<h1 className="font-inter text-3xl font-light text-snow">
-							Masuk ke VibeEverything
+							Masuk ke everythings-vibe
 						</h1>
 						<p className="mt-2 text-sm leading-relaxed text-fog">
 							Akses akun Anda dengan Google atau GitHub.

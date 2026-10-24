@@ -309,7 +309,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		await waitFor(
 			() => {
 				expect(
-					screen.getByText("Sync codebase dengan VibeEverything"),
+					screen.getByText("Sync codebase dengan everythings-vibe"),
 				).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },

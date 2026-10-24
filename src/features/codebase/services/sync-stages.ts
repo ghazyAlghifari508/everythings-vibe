@@ -146,7 +146,7 @@ function buildAgentRow(
 	return {
 		state: "done",
 		title: "Agent terhubung",
-		detail: "Agent berhasil tersambung ke VibeEverything.",
+		detail: "Agent berhasil tersambung ke everythings-vibe.",
 		...(agentConnectedAt ? { completedAt: agentConnectedAt } : {}),
 	};
 }
@@ -202,7 +202,7 @@ function buildSyncingRow(
 		const row: SyncStageRow = {
 			state: "active",
 			title: `${SYNC_TITLE}...`,
-			detail: "Mengirim source code ke VibeEverything.",
+			detail: "Mengirim source code ke everythings-vibe.",
 			// Upload start is the persisted moment transport actually began, so
 			// the elapsed timer measures real transfer time.
 			...(uploadStartedAt ? { startedAt: uploadStartedAt } : {}),

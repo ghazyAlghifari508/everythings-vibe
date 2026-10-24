@@ -92,10 +92,10 @@ export function ChatInputHeader({
 						<span className="font-[510] text-mist">
 							Tambahkan fitur di codebase kamu:
 						</span>{" "}
-						Tuliskan fitur baru atau perubahan yang ingin dibuat. VibeEverything
-						akan memandu AI agent kamu menjalankan CLI untuk membaca struktur
-						aplikasi, lalu menyusun PRD, AC, dan Task yang presisi sesuai
-						arsitektur yang sudah ada.
+						Tuliskan fitur baru atau perubahan yang ingin dibuat.
+						everythings-vibe akan memandu AI agent kamu menjalankan CLI untuk
+						membaca struktur aplikasi, lalu menyusun PRD, AC, dan Task yang
+						presisi sesuai arsitektur yang sudah ada.
 					</p>
 				</div>
 			)}

@@ -103,7 +103,7 @@ describe("PlanCodebasePage repository name", () => {
 		// and a placeholder is never presented as the repository.
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 		expect(document.body.textContent).toContain("Repository belum terdeteksi");
@@ -162,7 +162,7 @@ describe("PlanCodebasePage repository name", () => {
 
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 

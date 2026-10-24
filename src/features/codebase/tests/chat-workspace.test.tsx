@@ -154,7 +154,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			"Jelaskan fitur, perubahan, atau masalah yang ingin kamu kerjakan.",
 		);
 		expect(text).toContain(
-			"VibeEverything akan menyesuaikannya dengan struktur codebase ini.",
+			"everythings-vibe akan menyesuaikannya dengan struktur codebase ini.",
 		);
 		// 4. Context signal / pill is removed completely
 		expect(

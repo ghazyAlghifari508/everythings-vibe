@@ -123,7 +123,7 @@ describe("PlanCodebasePage onboarding feature intent", () => {
 		render(<PlanCodebasePage />);
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 

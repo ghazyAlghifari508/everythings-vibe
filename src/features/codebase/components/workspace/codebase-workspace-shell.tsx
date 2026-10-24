@@ -18,7 +18,8 @@ export interface CodebaseWorkspaceShellProps {
 	canvasPane: ReactNode;
 }
 
-const STORAGE_KEY = "vibeeverything_canvas_width";
+const STORAGE_KEY = "everythings_vibe_canvas_width";
+const LEGACY_STORAGE_KEY = "vibeeverything_canvas_width";
 const DEFAULT_CANVAS_WIDTH = 560;
 const MIN_CANVAS_WIDTH = 360;
 const MAX_CANVAS_RATIO = 0.6;
@@ -28,7 +29,9 @@ const KEYBOARD_STEP = 20;
 function getInitialWidth(): number {
 	if (typeof window === "undefined") return DEFAULT_CANVAS_WIDTH;
 	try {
-		const saved = localStorage.getItem(STORAGE_KEY);
+		const saved =
+			localStorage.getItem(STORAGE_KEY) ??
+			localStorage.getItem(LEGACY_STORAGE_KEY);
 		if (!saved) return DEFAULT_CANVAS_WIDTH;
 		const parsed = Number.parseInt(saved, 10);
 		return Number.isFinite(parsed) && parsed >= MIN_CANVAS_WIDTH

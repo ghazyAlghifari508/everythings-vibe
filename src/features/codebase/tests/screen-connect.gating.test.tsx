@@ -150,7 +150,7 @@ describe("Step 1 live sync status", () => {
 			expect(allStageStates()).toEqual(["done", "active", "waiting"]);
 			expect(container.textContent).toContain("Agent terhubung");
 			expect(container.textContent).toContain(
-				"Agent berhasil tersambung ke VibeEverything.",
+				"Agent berhasil tersambung ke everythings-vibe.",
 			);
 			expect(container.textContent).toContain("Menyiapkan source code...");
 			expect(container.textContent).toContain(

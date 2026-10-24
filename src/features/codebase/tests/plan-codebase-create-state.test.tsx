@@ -27,7 +27,7 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
-const PROMPT_HEADING = "Sync codebase dengan VibeEverything";
+const PROMPT_HEADING = "Sync codebase dengan everythings-vibe";
 const ERROR_TITLE = "Gagal menyiapkan repository";
 const LOADING_CARD_TEXT = "Menunggu sesi sync...";
 

@@ -112,3 +112,5 @@ export const WHEEL_PAGE_HEIGHT_PX = 800;
 export const WHEEL_ZOOM_SENSITIVITY_PX = 600;
 /** Largest zoom change a single animation frame may apply. */
 export const WHEEL_ZOOM_MAX_FRAME_FACTOR = 1.6;
+
+export { EXPORT_FILENAME_PREFIX } from "@/features/greenfield/types/greenfield-constants";

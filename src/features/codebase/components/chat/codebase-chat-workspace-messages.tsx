@@ -52,7 +52,7 @@ export function CodebaseChatWorkspaceMessages({
 				) : (
 					<div key={message.id} className="flex flex-col gap-1.5 py-1">
 						<p className="text-[11px] font-semibold uppercase tracking-wider text-fog">
-							VibeEverything Assistant
+							everythings-vibe Assistant
 						</p>
 						<div className="text-[13.5px] sm:text-sm leading-relaxed text-snow/90 whitespace-pre-wrap">
 							{message.content}
