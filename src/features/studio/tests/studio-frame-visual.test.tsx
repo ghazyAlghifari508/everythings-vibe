@@ -104,7 +104,15 @@ describe("frame preview requests", () => {
 		fetchMock.mockResolvedValue(Response.json(preview));
 		const log = vi.spyOn(console, "info").mockImplementation(() => {});
 		try {
-			render(<StudioFrame frame={frame()} />);
+			render(
+				<StudioFrame
+					frame={frame()}
+					initialJobTiming={{
+						id: "initial-job",
+						createdAt: new Date(Date.now() - 500),
+					}}
+				/>,
+			);
 			await intersect();
 			const events = () =>
 				log.mock.calls
@@ -117,7 +125,8 @@ describe("frame preview requests", () => {
 			expect(events()).toEqual([
 				expect.objectContaining({
 					frameId: "frame-a",
-					durationMs: expect.any(Number),
+					jobId: "initial-job",
+					durationMs: 500,
 				}),
 			]);
 		} finally {

@@ -23,6 +23,7 @@ export {
 
 export interface StudioFrameProps {
 	frame: StudioFrameRow;
+	initialJobTiming?: { id: string; createdAt: Date };
 	isSelected?: boolean;
 	onSelect?: (frameId: string, additive?: boolean) => void;
 	onRetry?: (frameId: string) => void;
@@ -44,6 +45,7 @@ export interface StudioFrameProps {
  */
 export const StudioFrame = memo(function StudioFrame({
 	frame,
+	initialJobTiming,
 	isSelected = false,
 	onSelect,
 	onRetry,
@@ -177,10 +179,15 @@ export const StudioFrame = memo(function StudioFrame({
 							onLoad={() => {
 								if (visibleUrl.current === visual.url) return;
 								visibleUrl.current = visual.url;
-								studioJobTiming("frame-visible", frame.createdAt.getTime(), {
-									projectId: frame.projectId,
-									frameId: frame.id,
-								});
+								studioJobTiming(
+									"frame-visible",
+									(initialJobTiming?.createdAt ?? frame.createdAt).getTime(),
+									{
+										projectId: frame.projectId,
+										frameId: frame.id,
+										jobId: initialJobTiming?.id,
+									},
+								);
 							}}
 							onError={() => setVisualError("Gambar frame gagal dimuat.")}
 						/>
