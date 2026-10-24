@@ -1,16 +1,25 @@
 #!/usr/bin/env node
 
 /**
- * vibeeverything-cli — CLI tool for VibeEverything
+ * everythings-vibe — CLI tool for everythings-vibe
+ *
+ * Supported executables:
+ *   everythings-vibe (canonical)
+ *   vibeeverything (backward-compatible alias)
+ *   vibe (backward-compatible alias)
+ *   prdfy (legacy backward-compatible alias)
  *
  * Usage:
- *   vibeeverything login [--api-key <key>] [--api-url <url>]
- *   vibeeverything project get <id>
- *   vibeeverything task list <projectId> [--status <status>]
- *   vibeeverything task next <projectId>
- *   vibeeverything task update <taskId> --status <status>
- *   vibeeverything subtask update <taskId> --index <subtaskIndex> --status <status>
- *   vibeeverything kanban <projectId>
+ *   everythings-vibe login [--api-key <key>] [--api-url <url>]
+ *   everythings-vibe project get <id>
+ *   everythings-vibe task list <projectId> [--status <status>]
+ *   everythings-vibe task next <projectId>
+ *   everythings-vibe task update <taskId> --status <status>
+ *   everythings-vibe subtask update <taskId> --index <subtaskIndex> --status <status>
+ *   everythings-vibe kanban <projectId>
+ *   everythings-vibe codebase sync --project-id <id>
+ *   everythings-vibe export rules <projectId>
+ *   everythings-vibe export plan <projectId>
  */
 
 import { pathToFileURL } from "node:url";
@@ -35,21 +44,21 @@ import { CLI_VERSION } from "./lib/version.js";
 export const program = new Command();
 
 program
-	.name("vibeeverything")
+	.name("everythings-vibe")
 	.description(
-		"CLI tool for VibeEverything — manage projects, codebases, and tasks from terminal",
+		"CLI tool for everythings-vibe — manage projects, codebases, and tasks from terminal",
 	)
 	.version(CLI_VERSION);
 
-// vibeeverything login
+// everythings-vibe login
 program
 	.command("login")
 	.description("Save API key to local config (interactive if no flag)")
-	.option("--api-key <key>", "VibeEverything API key")
+	.option("--api-key <key>", "everythings-vibe API key")
 	.option("--api-url <url>", "API base URL (default: http://localhost:3000)")
 	.action(loginCommand);
 
-// vibeeverything project
+// everythings-vibe project
 const projectCmd = program.command("project").description("Project commands");
 projectCmd
 	.command("get")
@@ -57,21 +66,21 @@ projectCmd
 	.description("Get project data as JSON")
 	.action(projectGetCommand);
 
-// vibeeverything prd
+// everythings-vibe prd
 program
 	.command("prd")
 	.argument("<projectId>", "Project UUID")
 	.description("Fetch and print PRD content")
 	.action(prdCommand);
 
-// vibeeverything ac
+// everythings-vibe ac
 program
 	.command("ac")
 	.argument("<projectId>", "Project UUID")
 	.description("Fetch and print Acceptance Criteria content")
 	.action(acCommand);
 
-// vibeeverything task
+// everythings-vibe task
 const taskCmd = program.command("task").description("Task commands");
 taskCmd
 	.command("list")
@@ -97,7 +106,7 @@ taskCmd
 	)
 	.action(taskUpdateCommand);
 
-// vibeeverything subtask
+// everythings-vibe subtask
 const subtaskCmd = program.command("subtask").description("Subtask commands");
 subtaskCmd
 	.command("update")
@@ -110,31 +119,31 @@ subtaskCmd
 	)
 	.action(subtaskUpdateCommand);
 
-// vibeeverything kanban
+// everythings-vibe kanban
 program
 	.command("kanban")
 	.argument("<projectId>", "Project UUID")
 	.description("Show kanban board in terminal")
 	.action(kanbanCommand);
 
-// vibeeverything codebase
+// everythings-vibe codebase
 const codebaseCmd = program
 	.command("codebase")
 	.description("Codebase commands");
 codebaseCmd
 	.command("sync")
-	.description("Sync a filtered local repository snapshot to VibeEverything")
+	.description("Sync a filtered local repository snapshot to everythings-vibe")
 	.requiredOption("--project-id <id>", "Project UUID")
 	.option(
 		"--sync-token <token>",
-		"Project-scoped sync token (prefer PRDFY_SYNC_TOKEN env var; never stored)",
+		"Project-scoped sync token (prefer EVERYTHINGS_VIBE_SYNC_TOKEN env var; never stored)",
 	)
 	.option("--root <path>", "Repository root (default: current directory)")
 	.option("--output <mode>", "Output mode (human|json)", "human")
 	.option("--api-url <url>", "API base URL")
 	.action(codebaseSyncAction);
 
-// vibeeverything export
+// everythings-vibe export
 const exportCmd = program
 	.command("export")
 	.description("Export project artifacts");

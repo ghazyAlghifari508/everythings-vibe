@@ -155,7 +155,7 @@ function mockRecovery(input: RecoveryCase) {
 					projectId: input.codebaseId,
 					apiBaseUrl: "http://localhost:3000",
 					syncToken: `fresh-${input.codebaseId}`,
-					syncCommand: "vibeeverything codebase sync",
+					syncCommand: "everythings-vibe codebase sync",
 					expiresAt: new Date(Date.now() + 3600000).toISOString(),
 				}),
 			};

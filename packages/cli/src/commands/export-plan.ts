@@ -1,5 +1,5 @@
 /**
- * `vibeeverything export plan <projectId>` — write the canonical server
+ * `everythings-vibe export plan <projectId>` — write the canonical server
  * planning artifacts under `docs/vibeplan/`.
  *
  * The command reads the persisted PRD, AC, feature tree, and tasks through the
@@ -503,7 +503,7 @@ function printResult(result: ExportPlanResult, output: "human" | "json"): void {
 		for (const path of result.conflicted) lines.push(`  ! ${path}`);
 	}
 	lines.push(
-		`Re-export    : vibeeverything export plan ${result.projectId} --root .`,
+		`Re-export    : everythings-vibe export plan ${result.projectId} --root .`,
 	);
 	console.log(lines.join("\n"));
 }
@@ -677,7 +677,7 @@ export async function exportPlan(
 }
 
 /**
- * Commander action for `vibeeverything export plan`. Commander v12 camelCases
+ * Commander action for `everythings-vibe export plan`. Commander v12 camelCases
  * dashed flags (`--api-url` → `opts.apiUrl`). Owns the nonzero exit on a failed
  * export; `exportPlan` itself never exits.
  */

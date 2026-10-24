@@ -111,7 +111,7 @@ describe("ScreenConnect", () => {
 		expect(rendered).toContain("Sinkronkan codebase repositori lokal ini");
 		expect(rendered).toContain("proj_123");
 		expect(rendered).toContain(
-			"vibeeverything codebase sync --project-id proj_123",
+			"everythings-vibe codebase sync --project-id proj_123",
 		);
 		// The required sections are all present.
 		expect(rendered).toContain("## Informasi Sinkronisasi");
@@ -154,7 +154,7 @@ describe("ScreenConnect", () => {
 		expect(copied).toContain("tok_123");
 		expect(copied).toContain("Sinkronkan codebase repositori lokal ini");
 		expect(copied).toContain(
-			"vibeeverything codebase sync --project-id proj_123",
+			"everythings-vibe codebase sync --project-id proj_123",
 		);
 		// The clipboard payload is the complete execution document.
 		expect(copied).toContain("## Format Laporan Akhir");

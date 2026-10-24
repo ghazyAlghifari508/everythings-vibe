@@ -37,7 +37,7 @@ function syncPayload() {
 		apiBaseUrl: "http://localhost:3000",
 		syncToken: "fresh-token",
 		syncCommand:
-			"vibeeverything codebase sync --project-id cb-new-1 --sync-token fresh-token",
+			"everythings-vibe codebase sync --project-id cb-new-1 --sync-token fresh-token",
 		expiresAt: new Date(Date.now() + 3600000).toISOString(),
 	};
 }

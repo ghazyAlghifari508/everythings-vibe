@@ -420,16 +420,16 @@ describe("renderHandoffDocument", () => {
 
 		expect(md).toContain("11111111-2222-3333-4444-555555555555");
 		expect(md).toContain(
-			"vibeeverything task next 11111111-2222-3333-4444-555555555555",
+			"everythings-vibe task next 11111111-2222-3333-4444-555555555555",
 		);
 		expect(md).toContain(
-			"vibeeverything task update <taskId> --status in_progress",
+			"everythings-vibe task update <taskId> --status in_progress",
 		);
 		expect(md).toContain(
-			"vibeeverything subtask update <taskId> --index <i> --status in_progress",
+			"everythings-vibe subtask update <taskId> --index <i> --status in_progress",
 		);
 		expect(md).toContain(
-			"vibeeverything kanban 11111111-2222-3333-4444-555555555555",
+			"everythings-vibe kanban 11111111-2222-3333-4444-555555555555",
 		);
 	});
 
@@ -451,7 +451,7 @@ describe("renderHandoffDocument", () => {
 		expect(md).toContain("surfaces");
 		expect(md).toContain("snapshot");
 		expect(md).toMatch(/source of truth|sumber kebenaran/i);
-		expect(md).toContain("vibeeverything export plan");
+		expect(md).toContain("everythings-vibe export plan");
 		expect(md).toMatch(/arsitektur/i);
 		expect(md).toContain("AGENTS.md");
 	});
@@ -498,7 +498,7 @@ describe("buildManifestEntry", () => {
 				createdAt: "2026-10-01T00:00:00.000Z",
 			},
 			reExportCommand:
-				"vibeeverything export plan 11111111-2222-3333-4444-555555555555 --root .",
+				"everythings-vibe export plan 11111111-2222-3333-4444-555555555555 --root .",
 		});
 
 		const payload = manifest as {
@@ -573,7 +573,7 @@ describe("buildManifestEntry", () => {
 describe("buildReExportCommand", () => {
 	it("targets the same project id", () => {
 		expect(buildReExportCommand("proj-abc")).toBe(
-			"vibeeverything export plan proj-abc --root .",
+			"everythings-vibe export plan proj-abc --root .",
 		);
 	});
 });

@@ -132,7 +132,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			apiBaseUrl: "http://localhost:3000",
 			syncToken: "test-token-abc",
 			syncCommand:
-				"vibeeverything codebase sync --project-id cb-123 --token test-token-abc",
+				"everythings-vibe codebase sync --project-id cb-123 --token test-token-abc",
 			expiresAt: new Date(Date.now() + 3600000).toISOString(),
 		};
 
@@ -434,7 +434,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			apiBaseUrl: "http://localhost:3000",
 			syncToken: "fresh-token-xyz",
 			syncCommand:
-				"vibeeverything codebase sync --project-id cb-wait-1 --sync-token <token>",
+				"everythings-vibe codebase sync --project-id cb-wait-1 --sync-token <token>",
 			expiresAt: new Date(Date.now() + 3600000).toISOString(),
 		};
 		vi.stubGlobal(

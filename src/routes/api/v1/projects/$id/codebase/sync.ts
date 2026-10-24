@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { handleProjectSyncHandshake } from "@/features/codebase/services/sync-handshake-project-route.server";
 
 // Legacy project-scoped CLI handshake boundary:
-// `prdfy codebase sync --project-id <id> --sync-token <token>`.
+// `everythings-vibe codebase sync --project-id <id> --sync-token <token>`.
 //
 // Server-import exception: the top-level `.server` import is correct here — this
 // module registers a server handler only (no client component). Never import

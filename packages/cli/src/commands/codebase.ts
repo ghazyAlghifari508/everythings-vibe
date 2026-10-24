@@ -1,5 +1,5 @@
 /**
- * `prdfy codebase sync` — sync a filtered repository snapshot to PrdFy.
+ * `everythings-vibe codebase sync` — sync a filtered repository snapshot to everythings-vibe.
  *
  * Pipeline (all local filtering first, then chunked upload):
  * scan → manifest → blocked-content refusal → handshake → manifest batches
@@ -193,7 +193,7 @@ function printResult(result: SyncResult, output: SyncOutputMode): void {
 	if (result.ignoreCreated !== undefined) {
 		if (result.ignoreCreated) {
 			lines.push(
-				"Ignore file  : .everythingsvibeignore dibuat dari template VibeEverything (lokal, jangan di-commit)",
+				"Ignore file  : .everythingsvibeignore dibuat dari template everythings-vibe (lokal, jangan di-commit)",
 			);
 		} else if (result.ignoreSource === "legacy") {
 			lines.push(
@@ -212,7 +212,7 @@ function printResult(result: SyncResult, output: SyncOutputMode): void {
 	}
 	if (result.cliUpdate) {
 		lines.push(
-			`Update CLI   : versi ${result.cliUpdate.current} di bawah minimum ${result.cliUpdate.minimum}. Jalankan: npm i -g @ghazynabiel/vibeeverything`,
+			`Update CLI   : versi ${result.cliUpdate.current} di bawah minimum ${result.cliUpdate.minimum}. Jalankan: npm i -g @ghazynabiel/everythings-vibe`,
 		);
 	}
 	if (result.ok) {
@@ -236,7 +236,11 @@ export async function syncCodebase(
 	deps: { createClient?: (token: string, apiUrl: string) => SyncClient } = {},
 ): Promise<SyncResult> {
 	const output: SyncOutputMode = options.output ?? "human";
-	const syncToken = options.syncToken || process.env.PRDFY_SYNC_TOKEN;
+	const syncToken =
+		options.syncToken ||
+		process.env.EVERYTHINGS_VIBE_SYNC_TOKEN ||
+		process.env.VIBEEVERYTHING_SYNC_TOKEN ||
+		process.env.PRDFY_SYNC_TOKEN;
 	if (
 		!options.projectId ||
 		!syncToken ||
@@ -519,7 +523,7 @@ export async function syncCodebase(
 }
 
 /**
- * Commander action for `prdfy codebase sync`. Commander v12 camelCases
+ * Commander action for `everythings-vibe codebase sync`. Commander v12 camelCases
  * dashed flags (`--project-id` → `opts.projectId`), so this reads camelCase
  * fields — matching the `login.ts` precedent (`options.apiKey`). Owns the
  * nonzero exit on incomplete sync; `syncCodebase` itself never exits.

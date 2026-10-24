@@ -33,7 +33,7 @@ const SYNC_PAYLOAD = {
 	apiBaseUrl: "http://localhost:3000",
 	syncToken: "nav-token-1",
 	syncCommand:
-		"vibeeverything codebase sync --project-id cb-nav-1 --sync-token nav-token-1",
+		"everythings-vibe codebase sync --project-id cb-nav-1 --sync-token nav-token-1",
 	expiresAt: new Date(Date.now() + 3600000).toISOString(),
 };
 const VALID_STARTER_SUGGESTIONS = [

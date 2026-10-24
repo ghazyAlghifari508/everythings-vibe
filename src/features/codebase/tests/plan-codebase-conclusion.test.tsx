@@ -77,7 +77,7 @@ function freshTokenPayload(projectId: string) {
 		projectId,
 		apiBaseUrl: "http://localhost:3000",
 		syncToken: `fresh-${projectId}`,
-		syncCommand: "vibeeverything codebase sync",
+		syncCommand: "everythings-vibe codebase sync",
 		expiresAt: new Date(Date.now() + 3600000).toISOString(),
 	};
 }

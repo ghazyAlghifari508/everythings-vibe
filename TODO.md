@@ -407,11 +407,11 @@ Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenG
 
 #### C. In-App Copy, Helper Text &amp; CLI Commands
 
-- [ ] **CLI Sync Instructions (`src/lib/codebase-sync.ts`, `src/routes/plan/codebase.tsx`, `src/components/task/implementation-options.tsx`):**
-  - [ ] Ubah perintah sinkronisasi terminal:
+- [x] **CLI Sync Instructions (`src/features/codebase/services/sync-prompts.ts`, `src/features/codebase/services/sync-commands.ts`, `src/features/greenfield/components/task/implementation-options.tsx`):**
+  - [x] Ubah perintah sinkronisasi terminal:
     - Dari: `vibeeverything codebase sync --project-id ...`
     - Menjadi: `everythings-vibe codebase sync --project-id ...`
-  - [ ] Ubah instruksi instalasi global:
+  - [x] Ubah instruksi instalasi global:
     - Dari: `npm i -g @ghazynabiel/vibeeverything`
     - Menjadi: `npm i -g @ghazynabiel/everythings-vibe` (atau nama package npm yang ditargetkan).
   - [x] Ubah pesan status stage sync: *"Agent berhasil tersambung ke everythings-vibe"*, *"Mengirim source code ke everythings-vibe"*.
@@ -423,22 +423,23 @@ Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenG
 
 #### D. CLI Package (`packages/cli/`)
 
-- [ ] **`packages/cli/package.json`:**
-  - [ ] Update `"name"`: `@ghazynabiel/everythings-vibe`.
-  - [ ] Update `"description"`: *"CLI tool for everythings-vibe — manage projects, codebases, and tasks from terminal"*.
-  - [ ] Update `"bin"`:
+- [x] **`packages/cli/package.json`:**
+  - [x] Update `"name"`: `@ghazynabiel/everythings-vibe`.
+  - [x] Update `"description"`: *"CLI tool for everythings-vibe — manage projects, codebases, and tasks from terminal"*.
+  - [x] Update `"bin"`:
     ```json
     "bin": {
       "everythings-vibe": "dist/index.js",
+      "vibeeverything": "dist/index.js",
       "vibe": "dist/index.js",
-      "vibeeverything": "dist/index.js"
+      "prdfy": "dist/index.js"
     }
     ```
   
-    *(Catatan: Pertahankan alias `vibeeverything` sementara agar backward compatible dengan instalasi user lama).*
-- [ ] **CLI Program Metadata (`packages/cli/src/index.ts`):**
-  - [ ] Perbarui `program.name("everythings-vibe")`.
-  - [ ] Perbarui banner sambutan CLI dan pesan `--help`.
+    *(Catatan: Pertahankan alias `vibeeverything` dan `prdfy` agar backward compatible dengan instalasi user lama).*
+- [x] **CLI Program Metadata (`packages/cli/src/index.ts`):**
+  - [x] Perbarui `program.name("everythings-vibe")`.
+  - [x] Perbarui banner sambutan CLI dan pesan `--help`.
 
 #### E. Dokumentasi &amp; Rules Repository
 
