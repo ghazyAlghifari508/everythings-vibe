@@ -10,7 +10,6 @@ function makeImage(
 	partial: Partial<ImageResult> & { id: string },
 ): ImageResult {
 	return {
-		id: partial.id,
 		scrapeId: "scrape-1",
 		userId: "user-1",
 		url: partial.url ?? `https://images.ctfassets.net/item-${partial.id}.svg`,
