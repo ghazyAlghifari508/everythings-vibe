@@ -33,8 +33,8 @@ async function run() {
 		console.info("Studio worker ready");
 		stage = "dispatch";
 		while (!stopping) {
-			await dispatchStudioWorkerBatch();
-			if (!stopping)
+			const processed = await dispatchStudioWorkerBatch();
+			if (!stopping && processed === 0)
 				await new Promise((resolve) =>
 					setTimeout(resolve, STUDIO_WORKER_POLL_MS),
 				);
