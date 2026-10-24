@@ -36,7 +36,11 @@ export function compareCaptures(views: VisualEvidence[]): DesignComparison[] {
 			if (sameViewport === samePreference) continue;
 			const kind = sameViewport ? "theme" : "responsive";
 			for (const [elementIndex, element] of left.elements.entries()) {
-				if (!element.text.trim() || element.role === "element") continue;
+				if (
+					(!element.text.trim() && element.role !== "canvas") ||
+					element.role === "element"
+				)
+					continue;
 				// ponytail: exact identity and content only; add stable element IDs before matching dynamic content.
 				const matches = right.elements.filter(
 					(candidate) =>

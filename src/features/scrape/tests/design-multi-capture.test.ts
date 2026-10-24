@@ -143,6 +143,29 @@ describe("semantic multi-capture normalization", () => {
 		mobile.colorScheme = "dark";
 		expect(buildDesignModel(evidence).comparisons).toEqual([]);
 	});
+	it("compares empty canvas paints without requiring product copy", () => {
+		const evidence = structuredClone(FIXTURE);
+		evidence.colorScheme = "light";
+		evidence.elements = evidence.elements.filter(
+			(element) => element.role === "canvas",
+		);
+		for (const element of evidence.elements) element.text = "";
+		const dark = structuredClone(evidence);
+		dark.colorScheme = "dark";
+		for (const element of dark.elements)
+			element.properties["background-color"] = "rgb(0, 0, 0)";
+		const model = buildDesignModel({ ...evidence, additionalViews: [dark] });
+		expect(
+			model.comparisons?.some(
+				(entry) =>
+					entry.role === "canvas" &&
+					entry.property === "background-color" &&
+					entry.kind === "theme",
+			),
+		).toBe(true);
+		expect(validateDesignMd(renderDesignMd(model))).toEqual([]);
+	});
+
 	it("reports measured theme differences only within the same viewport", () => {
 		const evidence = captures();
 		const dark = structuredClone(FIXTURE);
