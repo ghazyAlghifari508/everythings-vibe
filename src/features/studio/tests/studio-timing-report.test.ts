@@ -112,6 +112,43 @@ it("reports rejection and retry frequency with explicit observed denominators", 
 	expect(report.requestsWithAdapterRetryPercent).toBe(50);
 });
 
+it("isolates revisions of the same frame across jobs", () => {
+	const events = [
+		{
+			jobId: "initial",
+			stage: "frame-context",
+			skillId: "none",
+			durationMs: 0,
+		},
+		{
+			jobId: "initial",
+			stage: "frame-output",
+			outputTokens: 100,
+			durationMs: 10,
+		},
+		{
+			jobId: "revision",
+			stage: "frame-context",
+			skillId: "impeccable",
+			durationMs: 0,
+		},
+		{
+			jobId: "revision",
+			stage: "frame-output",
+			outputTokens: 200,
+			durationMs: 20,
+		},
+	]
+		.map((event) =>
+			JSON.stringify({ scope: "studio", frameId: "same-frame", ...event }),
+		)
+		.join("\n");
+	const report = summarizeStudioTimings(events);
+	expect(report.meanMeasuredOutputTokensPerFrame).toBe(150);
+	expect(report.perSkill.none.outputLatency?.mean).toBe(10);
+	expect(report.perSkill.impeccable.outputLatency?.mean).toBe(20);
+});
+
 it("ignores non-telemetry, malformed, and non-finite input", () => {
 	const report = summarizeStudioTimings(
 		'private log\n{}\n{"scope":"studio","stage":"x","durationMs":-1}\nnot-json',

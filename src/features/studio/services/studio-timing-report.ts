@@ -15,6 +15,10 @@ const eventSchema = z.object({
 	providerFallbacks: z.number().nonnegative().optional(),
 });
 
+function frameMeasurementKey(event: { jobId?: string; frameId?: string }) {
+	return JSON.stringify([event.jobId ?? null, event.frameId]);
+}
+
 function summarize(values: number[]) {
 	const sorted = [...values].sort((a, b) => a - b);
 	const mean = sorted.reduce((sum, value) => sum + value, 0) / sorted.length;
@@ -51,7 +55,7 @@ export function summarizeStudioTimings(log: string) {
 				(event) =>
 					event.stage === "frame-context" && event.frameId && event.skillId,
 			)
-			.map((event) => [event.frameId, event.skillId]),
+			.map((event) => [frameMeasurementKey(event), event.skillId]),
 	);
 	const perSkill = new Map<
 		string,
@@ -73,7 +77,8 @@ export function summarizeStudioTimings(log: string) {
 				event.jobId,
 				Math.min(firstVisible.get(event.jobId) ?? Infinity, event.durationMs),
 			);
-		const skillId = event.skillId ?? skills.get(event.frameId);
+		const frameKey = frameMeasurementKey(event);
+		const skillId = event.skillId ?? skills.get(frameKey);
 		if (skillId) {
 			const entry = perSkill.get(skillId) ?? {
 				latencies: [],
@@ -91,12 +96,12 @@ export function summarizeStudioTimings(log: string) {
 			event.outputTokens !== undefined
 		)
 			frameTokens.set(
-				event.frameId,
-				(frameTokens.get(event.frameId) ?? 0) + event.outputTokens,
+				frameKey,
+				(frameTokens.get(frameKey) ?? 0) + event.outputTokens,
 			);
 		if (event.stage === "validation" && event.frameId) {
-			validated.add(event.frameId);
-			if ((event.attempt ?? 1) > 1) corrected.add(event.frameId);
+			validated.add(frameKey);
+			if ((event.attempt ?? 1) > 1) corrected.add(frameKey);
 		}
 		if (event.stage.endsWith("-output")) {
 			if (event.outputTokens !== undefined) tokens.push(event.outputTokens);
