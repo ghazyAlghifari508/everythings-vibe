@@ -55,22 +55,30 @@ export async function planStudioScreens(
 		project.prdContent,
 	);
 
+	const systemPrompt = resolveStudioPlanningSystemPrompt(
+		project.designSkillId ?? "none",
+		job.prompt,
+		designMode,
+	);
+	studioJobTiming("planning-context", Date.now(), {
+		jobId: job.id,
+		projectId: project.id,
+		skillId: project.designSkillId,
+		systemChars: systemPrompt.length,
+		promptChars: planPrompt.length,
+	});
 	let screenPlan: StudioScreenPlan | null = null;
 	let designBlueprint: StudioDesignBlueprint | null = null;
 	let planError: string | null = null;
 
 	try {
 		const requestStartedAt = Date.now();
-		const { generator, firstChunk } = await tryStreamWithFallback(
+		const { generator, firstChunk, outcome } = await tryStreamWithFallback(
 			selectModels(),
 			[
 				{
 					role: "system",
-					content: resolveStudioPlanningSystemPrompt(
-						project.designSkillId ?? "none",
-						job.prompt,
-						designMode,
-					),
+					content: systemPrompt,
 				},
 				{ role: "user", content: planPrompt },
 			],
@@ -82,8 +90,16 @@ export async function planStudioScreens(
 			projectId: project.id,
 			attempt: 1,
 		});
+		const outputStartedAt = Date.now();
 		let planRaw = firstChunk;
 		for await (const chunk of generator) planRaw += chunk;
+		studioJobTiming("planning-output", outputStartedAt, {
+			jobId: job.id,
+			projectId: project.id,
+			attempt: 1,
+			outputChars: planRaw.length,
+			...outcome,
+		});
 		signal.throwIfAborted();
 		const parsed = parseStudioPlanningWithBlueprint(
 			planRaw,
@@ -105,16 +121,12 @@ export async function planStudioScreens(
 		try {
 			const requestStartedAt = Date.now();
 			const correctivePrompt = `${planPrompt}\n\nPrevious plan violated the contract (${planError ?? "format error"}). Correct the plan and return ONLY valid JSON matching the required count, platform and order, including the complete shared design blueprint object.`;
-			const { generator, firstChunk } = await tryStreamWithFallback(
+			const { generator, firstChunk, outcome } = await tryStreamWithFallback(
 				selectModels(),
 				[
 					{
 						role: "system",
-						content: resolveStudioPlanningSystemPrompt(
-							project.designSkillId ?? "none",
-							job.prompt,
-							designMode,
-						),
+						content: systemPrompt,
 					},
 					{ role: "user", content: correctivePrompt },
 				],
@@ -126,8 +138,16 @@ export async function planStudioScreens(
 				projectId: project.id,
 				attempt: 2,
 			});
+			const outputStartedAt = Date.now();
 			let planRaw = firstChunk;
 			for await (const chunk of generator) planRaw += chunk;
+			studioJobTiming("planning-output", outputStartedAt, {
+				jobId: job.id,
+				projectId: project.id,
+				attempt: 2,
+				outputChars: planRaw.length,
+				...outcome,
+			});
 			signal.throwIfAborted();
 			const parsed = parseStudioPlanningWithBlueprint(
 				planRaw,
