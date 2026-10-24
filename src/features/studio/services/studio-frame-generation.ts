@@ -274,7 +274,7 @@ export async function generateStudioHtml(
 			systemChars: system.length,
 			promptChars: prompt.length,
 		});
-	const { generator, firstChunk } = await tryStreamWithFallback(
+	const { generator, firstChunk, outcome } = await tryStreamWithFallback(
 		selectModels(),
 		[
 			{
@@ -294,6 +294,7 @@ export async function generateStudioHtml(
 		studioJobTiming("frame-output", outputStartedAt, {
 			...timing,
 			outputChars: raw.length,
+			...outcome,
 		});
 	signal?.throwIfAborted();
 	const cleaned = extractCleanHtml(raw);

@@ -19,6 +19,10 @@ export function studioJobTiming(
 		promptChars?: number;
 		systemChars?: number;
 		outputChars?: number;
+		inputTokens?: number;
+		outputTokens?: number;
+		providerRetries?: number;
+		providerFallbacks?: number;
 		referenceChars?: number;
 		prdChars?: number;
 	},

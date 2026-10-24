@@ -30,6 +30,7 @@ export async function tryStreamWithFallback(
 		);
 	}
 	let lastError = "";
+	let providerRetries = 0;
 
 	for (let i = 0; i < models.length; i++) {
 		if (externalSignal?.aborted) break;
@@ -48,7 +49,10 @@ export async function tryStreamWithFallback(
 				if (externalSignal.aborted) abortController.abort();
 				else externalSignal.addEventListener("abort", propagateAbort);
 			}
-			const outcome: StreamOutcome = {};
+			const outcome: StreamOutcome = {
+				providerRetries,
+				providerFallbacks: i,
+			};
 			// Thinking streams live: reasoning tokens reach the client during the
 			// 30-80s reasoning phase instead of waiting for the first text-delta.
 			// A failed attempt that already emitted thinking triggers a reset so
@@ -101,7 +105,9 @@ export async function tryStreamWithFallback(
 				// to the next model (or the final throw below).
 				const willRetry = attempt < attemptCeiling - 1 || i < models.length - 1;
 				if (attemptThinking && willRetry) onThinkingReset?.();
-				if (attempt < attemptCeiling - 1) continue;
+				if (attempt < attemptCeiling - 1) {
+					providerRetries++;
+				}
 			} finally {
 				if (!handedOff)
 					externalSignal?.removeEventListener("abort", propagateAbort);

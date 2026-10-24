@@ -33,6 +33,10 @@ interface ChatMessage {
  */
 export interface StreamOutcome {
 	finishReason?: string;
+	inputTokens?: number;
+	outputTokens?: number;
+	providerRetries?: number;
+	providerFallbacks?: number;
 }
 
 // 9router streams thought tokens as choices[0].delta.reasoning_content, which
@@ -178,6 +182,10 @@ export async function* streamChat(
 				throw new Error("AI stream aborted");
 			}
 			if (part.type === "finish") {
+				if (outcome) {
+					outcome.inputTokens = part.totalUsage.inputTokens;
+					outcome.outputTokens = part.totalUsage.outputTokens;
+				}
 				// Capture the provider's terminal reason while consuming so
 				// an early consumer exit still leaves an observable outcome.
 				// Never clobber an explicit error recorded above.

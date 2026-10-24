@@ -38,6 +38,28 @@ describe("streamChat", () => {
 		expect(outcome.finishReason).toBe("error");
 	});
 
+	it("preserves provider usage from the terminal stream event", async () => {
+		mockStreamText([
+			{ type: "text-delta", text: "sample" },
+			{
+				type: "finish",
+				finishReason: "stop",
+				totalUsage: { inputTokens: 120, outputTokens: 40 },
+			},
+		]);
+		const outcome: StreamOutcome = {};
+		for await (const _ of streamChat(
+			[{ role: "user", content: "sample" }],
+			"test",
+			undefined,
+			100,
+			outcome,
+		)) {
+			/* drain stream */
+		}
+		expect(outcome).toMatchObject({ inputTokens: 120, outputTokens: 40 });
+	});
+
 	it("throws when only an empty text-delta arrives (used to be silent)", async () => {
 		mockStreamText([{ type: "text-delta", text: "" }]);
 		const it = streamChat([{ role: "user", content: "hi" }]);
