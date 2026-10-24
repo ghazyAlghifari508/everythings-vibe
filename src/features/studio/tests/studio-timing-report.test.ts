@@ -98,6 +98,20 @@ it("separates frame token totals from planning and groups skill latency", () => 
 	expect(report.perSkill.impeccable.guidanceChars).toEqual([23457]);
 });
 
+it("reports rejection and retry frequency with explicit observed denominators", () => {
+	const events = [
+		{ stage: "validation", code: "INVALID_OUTPUT", durationMs: 1 },
+		{ stage: "validation", code: "VALID", durationMs: 1 },
+		{ stage: "frame-output", providerRetries: 1, durationMs: 10 },
+		{ stage: "frame-output", providerRetries: 0, durationMs: 10 },
+	]
+		.map((event) => JSON.stringify({ scope: "studio", ...event }))
+		.join("\n");
+	const report = summarizeStudioTimings(events);
+	expect(report.validationRejectionPercent).toBe(50);
+	expect(report.requestsWithAdapterRetryPercent).toBe(50);
+});
+
 it("ignores non-telemetry, malformed, and non-finite input", () => {
 	const report = summarizeStudioTimings(
 		'private log\n{}\n{"scope":"studio","stage":"x","durationMs":-1}\nnot-json',

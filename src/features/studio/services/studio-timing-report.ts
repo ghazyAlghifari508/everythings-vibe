@@ -104,7 +104,23 @@ export function summarizeStudioTimings(log: string) {
 			providerFallbacks += event.providerFallbacks ?? 0;
 		}
 	}
+	const validations = events.filter((event) => event.stage === "validation");
+	const measuredRequests = events.filter(
+		(event) =>
+			event.stage.endsWith("-output") && event.providerRetries !== undefined,
+	);
 	return {
+		validationRejectionPercent: validations.length
+			? (validations.filter((event) => event.code === "INVALID_OUTPUT").length /
+					validations.length) *
+				100
+			: null,
+		requestsWithAdapterRetryPercent: measuredRequests.length
+			? (measuredRequests.filter((event) => (event.providerRetries ?? 0) > 0)
+					.length /
+					measuredRequests.length) *
+				100
+			: null,
 		stages: Object.fromEntries(
 			[...buckets].map(([stage, values]) => [stage, summarize(values)]),
 		),
