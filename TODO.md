@@ -325,47 +325,47 @@ Seiring iterasi pengembangan fitur, banyak sisa artefak sementara, rute coba-cob
 
 #### Tahap 1: Audit Rute &amp; Folder Sementara (Route Spikes)
 
-- [ ] **Audit `src/routes/demo/`:**
-  - [ ] Periksa file `src/routes/demo/tanstack-query.tsx`. Jika ini hanya rute testing internal yang tidak digunakan lagi di production, jadwalkan untuk dihapus beserta foldernya.
-  - [ ] Jalankan `pnpm generate-routes` untuk memastikan rute terhapus rapi dari `src/routeTree.gen.ts`.
+- [x] **Audit `src/routes/demo/`:**
+  - [x] Periksa file `src/routes/demo/tanstack-query.tsx`. Jika ini hanya rute testing internal yang tidak digunakan lagi di production, jadwalkan untuk dihapus beserta foldernya.
+  - [x] Jalankan `pnpm generate-routes` untuk memastikan rute terhapus rapi dari `src/routeTree.gen.ts`.
 - [x] **Pemisahan Scrap dari Design Studio &amp; Pembersihan Rute Usang:**
   - [x] Rute `src/routes/design/scrap.*.tsx` bukan bagian dari studio dan tidak boleh dibiarkan bercampur di bawah `/design/`. Rute ini akan dipindahkan ke domain mandiri `/scrape/*` (VibeScrape) dengan redirect 301 backward compatibility (lihat Bagian 9). — **Selesai di Bagian 9**: rute kanonik `src/routes/scrape/{index,$id,history}.tsx`, dan `src/routes/design/scrap*.tsx` kini thin `beforeLoad` redirect (`replace: true`) ke `/scrape/*`; backward compatibility ditangani di layer router, bukan HTTP 301.
-- [ ] **Audit File Testing Berawalan Dash (`-*`):**
-  - [ ] Pindahkan file test di `src/routes/` yang berawalan `-` (seperti `-codebase.test.tsx`, `-bantuan.test.tsx`, `-templates.test.tsx`) keluar dari folder `src/routes/` menuju folder test fitur masing-masing agar `src/routes/` murni hanya berisi file route.
+- [x] **Audit File Testing Berawalan Dash (`-*`):**
+  - [x] Pindahkan file test di `src/routes/` yang berawalan `-` (seperti `-codebase.test.tsx`, `-bantuan.test.tsx`, `-templates.test.tsx`) keluar dari folder `src/routes/` menuju folder test fitur masing-masing agar `src/routes/` murni hanya berisi file route.
 
 #### Tahap 2: Audit Komponen &amp; Hooks Yatim (Unreferenced Components &amp; Hooks)
 
-- [ ] **Audit `src/components/ui/`:**
-  - [ ] Periksa seluruh primitive UI (apakah ada komponen shadcn/radix yang di-generate tapi tidak pernah diimpor di rute/komponen mana pun).
-- [ ] **Audit `src/components/` per Feature Domain:**
-  - [ ] Cari komponen yang tidak lagi memiliki caller/consumer di `src/components/prd/`, `ac/`, `task/`, `kanban/`, `codebase/`.
-- [ ] **Audit `src/hooks/`:**
-  - [ ] Periksa seluruh custom hooks di `src/hooks/` yang sudah tidak memiliki import aktif.
+- [x] **Audit `src/components/ui/`:**
+  - [x] Periksa seluruh primitive UI (apakah ada komponen shadcn/radix yang di-generate tapi tidak pernah diimpor di rute/komponen mana pun).
+- [x] **Audit `src/components/` per Feature Domain:**
+  - [x] Cari komponen yang tidak lagi memiliki caller/consumer di `src/components/prd/`, `ac/`, `task/`, `kanban/`, `codebase/`.
+- [x] **Audit `src/hooks/`:**
+  - [x] Periksa seluruh custom hooks di `src/hooks/` yang sudah tidak memiliki import aktif.
 
 #### Tahap 3: Audit Lib, Helpers &amp; Tipe Data Obsolete
 
-- [ ] **Audit `src/lib/`:**
-  - [ ] Grep fungsi-fungsi helper yang tidak pernah dipanggil di mana pun.
-  - [ ] Hapus mock data lama yang sudah digantikan oleh integrasi API/DB riil.
-- [ ] **Audit `src/db/schema.ts` &amp; `src/types/`:**
-  - [ ] Periksa kolom/tipe yang didefinisikan tetapi tidak pernah dibaca/ditulis di application code.
-  - [ ] Pastikan tidak ada skema Zod yatim yang tidak terikat pada validasi rute atau API.
+- [x] **Audit `src/lib/`:**
+  - [x] Grep fungsi-fungsi helper yang tidak pernah dipanggil di mana pun.
+  - [x] Hapus mock data lama yang sudah digantikan oleh integrasi API/DB riil.
+- [x] **Audit `src/db/schema.ts` &amp; `src/types/`:**
+  - [x] Periksa kolom/tipe yang didefinisikan tetapi tidak pernah dibaca/ditulis di application code.
+  - [x] Pastikan tidak ada skema Zod yatim yang tidak terikat pada validasi rute atau API.
 
 #### Tahap 4: Audit Package Dependencies (`package.json`)
 
-- [ ] Jalankan tool pendeteksi dead code / unused packages:
-  - [ ] Jalankan `npx knip` atau script analisa unused imports/dependencies.
-  - [ ] Periksa dependencies di root `package.json` yang tidak lagi diimpor di `src/`.
-  - [ ] Periksa dependencies di `packages/cli/package.json` yang tidak lagi dipakai di CLI.
-- [ ] Hapus package yang tidak terpakai menggunakan `pnpm remove <package-name>`.
+- [x] Jalankan tool pendeteksi dead code / unused packages:
+  - [x] Jalankan `npx knip` atau script analisa unused imports/dependencies.
+  - [x] Periksa dependencies di root `package.json` yang tidak lagi diimpor di `src/`.
+  - [x] Periksa dependencies di `packages/cli/package.json` yang tidak lagi dipakai di CLI.
+- [x] Hapus package yang tidak terpakai menggunakan `pnpm remove <package-name>`.
 
 #### Tahap 5: Gate Verifikasi Pasca Eliminasi
 
-- [ ] [ ] Jalankan `pnpm generate-routes` $\rightarrow$ Pastikan route tree ter-update tanpa dangling routes.
-- [ ] [ ] Jalankan `pnpm check` (Biome format &amp; lint) $\rightarrow$ Pastikan tidak ada error import broken.
-- [ ] [ ] Jalankan `pnpm exec tsc --noEmit` $\rightarrow$ Pastikan kompilasi TypeScript 100% bebas error tipe hilang.
-- [ ] [ ] Jalankan `pnpm test` $\rightarrow$ Pastikan semua unit &amp; integration tests tetap PASS.
-- [ ] [ ] Jalankan `pnpm build` $\rightarrow$ Pastikan build production bundling TanStack Start selesai dengan sukses.
+- [x] Jalankan `pnpm generate-routes` $\rightarrow$ Pastikan route tree ter-update tanpa dangling routes.
+- [x] Jalankan `pnpm check` (Biome format &amp; lint) $\rightarrow$ Pastikan tidak ada error import broken.
+- [x] Jalankan `pnpm exec tsc --noEmit` $\rightarrow$ Pastikan kompilasi TypeScript 100% bebas error tipe hilang.
+- [x] Jalankan `pnpm test` $\rightarrow$ Pastikan semua unit &amp; integration tests tetap PASS.
+- [x] Jalankan `pnpm build` $\rightarrow$ Pastikan build production bundling TanStack Start selesai dengan sukses.
 
 ---
 
