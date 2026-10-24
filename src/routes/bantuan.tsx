@@ -12,11 +12,11 @@ import { Icon } from "@/components/ui/icon";
 export const Route = createFileRoute("/bantuan")({
 	head: () => ({
 		meta: [
-			{ title: "Bantuan | VibeEverything" },
+			{ title: "Bantuan | everythings-vibe" },
 			{
 				name: "description",
 				content:
-					"Pusat bantuan VibeEverything: panduan alur kerja modul, bantuan teknis, serta kanal feedback.",
+					"Pusat bantuan everythings-vibe: panduan alur kerja modul, bantuan teknis, serta kanal feedback.",
 			},
 		],
 	}),
