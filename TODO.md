@@ -444,7 +444,7 @@ Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenG
 #### E. Dokumentasi &amp; Rules Repository
 
 - [x] Perbarui referensi di `AGENTS.md` (bagian header, kontrak, dan identifier yang relevan).
-- [ ] Perbarui file-file spesifikasi di `docs/` yang menyebutkan VibeEverything.
+- [x] Perbarui file-file spesifikasi di `docs/` dan README yang menyebutkan VibeEverything/CLI.
 - [x] Perbarui `README.md` repositori dengan nama dan instruksi baru.
 
 #### F. Test Suites &amp; Contract Alignment
