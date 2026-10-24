@@ -5,6 +5,7 @@ const eventSchema = z.object({
 	stage: z.string(),
 	durationMs: z.number().finite().nonnegative(),
 	jobId: z.string().optional(),
+	projectId: z.string().optional(),
 	frameId: z.string().optional(),
 	attempt: z.number().optional(),
 	code: z.string().optional(),
@@ -72,10 +73,11 @@ export function summarizeStudioTimings(log: string) {
 				event.jobId,
 				Math.min(firstReady.get(event.jobId) ?? Infinity, event.durationMs),
 			);
-		if (event.stage === "frame-visible" && event.jobId)
+		const visibleKey = event.jobId ?? event.projectId;
+		if (event.stage === "frame-visible" && visibleKey)
 			firstVisible.set(
-				event.jobId,
-				Math.min(firstVisible.get(event.jobId) ?? Infinity, event.durationMs),
+				visibleKey,
+				Math.min(firstVisible.get(visibleKey) ?? Infinity, event.durationMs),
 			);
 		const frameKey = frameMeasurementKey(event);
 		const skillId = event.skillId ?? skills.get(frameKey);
