@@ -10,6 +10,9 @@ const tracker = vi.hoisted(() => ({
 	inFlight: 0,
 	maxObserved: 0,
 	failScreen: "",
+	awaitOverlap: false,
+	releaseOverlap: () => {},
+	overlap: Promise.resolve(),
 }));
 
 vi.mock("@/lib/services/ai-orchestrator", () => ({
@@ -86,7 +89,10 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 		}
 		tracker.inFlight++;
 		tracker.maxObserved = Math.max(tracker.maxObserved, tracker.inFlight);
-		await new Promise((r) => setTimeout(r, 150));
+		if (tracker.awaitOverlap) {
+			if (tracker.inFlight === 2) tracker.releaseOverlap();
+			await tracker.overlap;
+		} else await new Promise((r) => setTimeout(r, 150));
 		tracker.inFlight--;
 		return {
 			firstChunk:
@@ -100,6 +106,10 @@ beforeEach(() => {
 	tracker.inFlight = 0;
 	tracker.maxObserved = 0;
 	tracker.failScreen = "";
+	tracker.awaitOverlap = false;
+	tracker.overlap = new Promise<void>((resolve) => {
+		tracker.releaseOverlap = resolve;
+	});
 });
 
 describe("runWithConcurrency", () => {
@@ -206,6 +216,7 @@ describe("claimStudioJob", () => {
 describe("initial pipeline concurrency", () => {
 	it("frame berjalan paralel, gagal satu tidak membatalkan lain, urutan stabil", async () => {
 		tracker.failScreen = "Screen 1";
+		tracker.awaitOverlap = true;
 		const userId = crypto.randomUUID();
 		await db.insert(users).values({
 			id: userId,
