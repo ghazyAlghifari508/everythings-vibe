@@ -35,7 +35,7 @@ import type { ScrapeJobClaim, ScrapeJobUpdate } from "./scrape-job-service";
 // retried, so we do not add load to a server that already refused the request.
 const IMAGE_FETCH_ATTEMPTS = 2;
 const IMAGE_FETCH_RETRY_DELAY_MS = 400;
-const RETRYABLE_FETCH_CODES = new Set(["FETCH_TIMEOUT", "WEBSITE_BLOCKED"]);
+const RETRYABLE_FETCH_CODES = new Set(["FETCH_TIMEOUT"]);
 
 export interface ImageFetchPlan {
 	attempts: number;
@@ -143,9 +143,6 @@ export async function runImageExtraction(params: {
 		captured.images,
 		settings.classifyType,
 	);
-	const validImages: typeof images = [];
-	let failedImages = 0;
-	const failedResources: FailedResourceEvidence[] = [];
 	const loadResults = () =>
 		db
 			.select({
@@ -161,7 +158,11 @@ export async function runImageExtraction(params: {
 					eq(scrapeImages.scrapeId, claim.id),
 				),
 			);
-	const initialCounts = imageResultCounts(await loadResults(), images);
+	const initialRows = await loadResults();
+	const savedUrls = new Set(
+		initialRows.filter((row) => row.assetId).map((row) => row.url),
+	);
+	const initialCounts = imageResultCounts(initialRows, captured.images);
 	await update({
 		status: "extracting",
 		metadata: {
@@ -172,16 +173,23 @@ export async function runImageExtraction(params: {
 			...initialCounts,
 		},
 	});
+	let quotaFailure: ImageStorageError | undefined;
+	let retryAfterSeconds: number | undefined;
 	for (const image of images) {
+		if (savedUrls.has(image.url)) continue;
+		let stage: "fetch" | "validation" | "storage" = "fetch";
 		let error: string | null = null;
 		let imageAsset: Awaited<ReturnType<typeof fetchAsset>> | undefined;
 		let failureCode: string | null = null;
+		let httpStatus: number | null = null;
 		let failureEvidence: FailedResourceEvidence = {
 			code: null,
 			httpStatus: null,
 		};
 		try {
+			if (quotaFailure) throw quotaFailure;
 			const asset = await fetchImageAsset(image.url, claim.signal, allowUrl);
+			httpStatus = asset.status;
 			if (asset.status < 200 || asset.status >= 300)
 				throw new ScrapeError(
 					designErrorCodeForHttpStatus(asset.status),
@@ -191,12 +199,14 @@ export async function runImageExtraction(params: {
 						retryAfterSeconds: parseRetryAfterSeconds(asset.retryAfter),
 					},
 				);
+			stage = "validation";
 			const verified = validateStoredImage(asset.body, asset.contentType);
 			image.format = verified.mimeType
 				.split(";")[0]
 				.replace(/^image\//i, "")
 				.replace("svg+xml", "svg")
 				.replace("jpeg", "jpg");
+			stage = "storage";
 			await persistScrapeImage(
 				claim,
 				{
@@ -210,18 +220,38 @@ export async function runImageExtraction(params: {
 				asset,
 			);
 			imageAsset = asset;
-			validImages.push(image);
 		} catch (failure) {
 			if (claim.signal?.aborted) throw failure;
-			failedImages += 1;
+			if (
+				failure instanceof ScrapeError &&
+				failure.retryAfterSeconds !== undefined
+			)
+				retryAfterSeconds = Math.max(
+					retryAfterSeconds ?? 0,
+					failure.retryAfterSeconds,
+				);
+			if (
+				failure instanceof ImageStorageError &&
+				failure.code === "STORAGE_FAILED"
+			)
+				quotaFailure = failure;
 			failureCode =
-				failure instanceof ImageStorageError
-					? failure.assetCode
-					: failure instanceof ScrapeError
-						? failure.code
-						: "STORAGE_FAILED";
+				failure instanceof ScrapeError &&
+				failure.failureReason === "asset-too-large"
+					? "IMAGE_TOO_LARGE"
+					: failure instanceof ImageStorageError
+						? failure.assetCode
+						: failure instanceof ScrapeError
+							? failure.code
+							: stage === "storage"
+								? "STORAGE_FAILED"
+								: "NETWORK_FAILURE";
 			error =
-				failure instanceof Error ? failure.message : "Resource gagal diambil.";
+				failure instanceof ImageStorageError
+					? failure.message
+					: stage === "storage"
+						? "Gambar tidak dapat disimpan."
+						: "Resource gambar tidak dapat diambil atau diverifikasi.";
 			// Only parsed statuses and typed codes are recorded, so the
 			// aggregate classification never reads message text.
 			failureEvidence = {
@@ -229,12 +259,11 @@ export async function runImageExtraction(params: {
 				httpStatus:
 					failure instanceof ScrapeError && failure.httpStatus !== undefined
 						? failure.httpStatus
-						: null,
+						: httpStatus,
 			};
-			failedResources.push(failureEvidence);
 		}
 		if (!imageAsset) {
-			const saved = await persistScrapeImage(claim, {
+			await persistScrapeImage(claim, {
 				...image,
 				pageUrl: captured.finalUrl,
 				status: "failed",
@@ -242,17 +271,12 @@ export async function runImageExtraction(params: {
 				failureCode,
 				httpStatus: failureEvidence.httpStatus,
 			});
-			if (saved.assetId) {
-				failedImages -= 1;
-				failedResources.pop();
-				validImages.push(image);
-			}
 		}
 		await update({
 			metadata: {
 				...scrape.metadata,
 				mode: "images",
-				...imageResultCounts(await loadResults(), images),
+				...imageResultCounts(await loadResults(), captured.images),
 				activity: image.url,
 				activityStartedAt: new Date().toISOString(),
 			},
@@ -264,32 +288,11 @@ export async function runImageExtraction(params: {
 	// asset failed, the failure is classified from the evidence each fetch
 	// actually produced instead of one generic message.
 	const finalRows = await loadResults();
-	const finalCounts = imageResultCounts(finalRows, images);
+	const finalCounts = imageResultCounts(finalRows, captured.images);
 	const imageOutcome = classifyImageOutcome(
 		finalCounts.discoveredImages,
 		finalCounts.savedImages,
 	);
-	if (imageOutcome === "all-failed") {
-		const failure = classifyImageFailures(
-			finalRows
-				.filter((row) => !row.assetId)
-				.map((row) => ({
-					code: row.failureCode?.endsWith("STORAGE_QUOTA")
-						? "STORAGE_FAILED"
-						: row.failureCode,
-					httpStatus: row.httpStatus,
-				})),
-		);
-		throw new ScrapeError(
-			failure.code,
-			`Seluruh ${failedImages} resource gambar gagal diverifikasi. Detail kegagalan tersimpan.`,
-			{
-				...(failure.httpStatus === undefined
-					? {}
-					: { httpStatus: failure.httpStatus }),
-			},
-		);
-	}
 	await update({
 		sourceUrl: captured.finalUrl,
 		metadata: {
@@ -299,4 +302,28 @@ export async function runImageExtraction(params: {
 			...finalCounts,
 		},
 	});
+	if (imageOutcome === "all-failed") {
+		const failure = classifyImageFailures(
+			finalRows
+				.filter((row) => !row.assetId)
+				.map((row) => ({
+					code:
+						row.failureCode === "STORAGE_FAILED" ||
+						row.failureCode?.endsWith("STORAGE_QUOTA")
+							? "STORAGE_FAILED"
+							: row.failureCode,
+					httpStatus: row.httpStatus,
+				})),
+		);
+		throw new ScrapeError(
+			failure.code,
+			`Seluruh ${finalCounts.failedResources} resource gambar tidak dapat disimpan. Detail kegagalan tersimpan.`,
+			{
+				retryAfterSeconds,
+				...(failure.httpStatus === undefined
+					? {}
+					: { httpStatus: failure.httpStatus }),
+			},
+		);
+	}
 }
