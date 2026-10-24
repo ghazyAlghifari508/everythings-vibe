@@ -6,6 +6,7 @@ import {
 	studioFrames,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
+import { studioJobTiming } from "./studio-job-runtime";
 import { buildStudioAssetUrl } from "./studio-logo-service";
 import { getStudioProjectDetail } from "./studio-project-detail";
 
@@ -66,6 +67,7 @@ export async function getStudioFrameVisual(
 			};
 		}
 	}
+	const captureStartedAt = Date.now();
 	const startedAt = performance.now();
 	const visual = await captureStudioVisual(
 		frame.htmlCode,
@@ -92,6 +94,8 @@ export async function getStudioFrameVisual(
 				cause: failure,
 			});
 		});
+	studioJobTiming("preview-capture", captureStartedAt, { projectId, frameId });
+	const persistenceStartedAt = Date.now();
 	const [asset] = await db
 		.insert(studioAssets)
 		.values({
@@ -103,6 +107,10 @@ export async function getStudioFrameVisual(
 			data: visual.data.toString("base64"),
 		} satisfies InsertStudioAssetRow)
 		.returning();
+	studioJobTiming("preview-persistence", persistenceStartedAt, {
+		projectId,
+		frameId,
+	});
 	if (!asset)
 		throw new ScrapeError("STORAGE_FAILED", "Gagal menyimpan visual frame.");
 	return {
