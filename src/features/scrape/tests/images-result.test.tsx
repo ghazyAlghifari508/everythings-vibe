@@ -88,7 +88,7 @@ describe("ImagesResult gallery", () => {
 			/>,
 		);
 		expect(screen.getAllByRole("article")).toHaveLength(1);
-		expect(screen.getByText(/1 gambar tidak dapat diambil/)).toBeDefined();
+		expect(screen.getByText(/1 gambar belum dapat disimpan/)).toBeDefined();
 	});
 
 	it("separates a truthful empty result from a failed capture", () => {
@@ -314,5 +314,105 @@ describe("ImagesResult gallery", () => {
 				.getByRole("button", { name: "Download gambar" })
 				.hasAttribute("disabled"),
 		).toBe(true);
+	});
+
+	it("shows clean success counters and NO failure warning for complete success", () => {
+		render(
+			<ImagesResult
+				images={[
+					row({ id: "1", format: "png" }),
+					row({ id: "2", format: "webp" }),
+				]}
+				sourceUrl="https://example.com"
+				imageOutcome="complete"
+			/>,
+		);
+		expect(screen.getByText("Ditemukan")).toBeDefined();
+		expect(screen.getByText("Tersimpan")).toBeDefined();
+		expect(screen.getByText("Tidak tersedia")).toBeDefined();
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(screen.queryByText(/gambar belum dapat disimpan/)).toBeNull();
+	});
+
+	it("groups identical failures without duplicating error text and supports progressive disclosure", () => {
+		const failedSvgs = Array.from({ length: 23 }, (_, i) =>
+			row({
+				id: `svg-${i}`,
+				status: "failed",
+				format: "svg",
+				failureCode: "UNSUPPORTED_FORMAT",
+				url: `https://images.ctfassets.net/image-${i}.svg`,
+				error: "SVG tidak disimpan karena keamanan",
+			}),
+		);
+		const successful = [
+			row({ id: "ok-1", format: "png" }),
+			row({ id: "ok-2", format: "png" }),
+		];
+
+		render(
+			<ImagesResult
+				images={[...successful, ...failedSvgs]}
+				sourceUrl="https://example.com"
+				imageOutcome="partial"
+			/>,
+		);
+
+		// Shows summary alert with total failed count
+		expect(screen.getByText(/23 gambar belum dapat disimpan/)).toBeDefined();
+		// Shows grouped bullet point instead of 23 identical lines
+		expect(screen.getByText("Format belum didukung")).toBeDefined();
+		// Gallery of successful images is still visible
+		expect(screen.getAllByRole("article")).toHaveLength(2);
+
+		// Progressive disclosure starts closed
+		const toggleButton = screen.getByRole("button", { name: /Lihat rincian/ });
+		expect(toggleButton.getAttribute("aria-expanded")).toBe("false");
+		expect(screen.queryByText("images.ctfassets.net")).toBeNull();
+
+		// Opening disclosure reveals affected items and actions
+		fireEvent.click(toggleButton);
+		expect(toggleButton.getAttribute("aria-expanded")).toBe("true");
+		expect(screen.getAllByText("images.ctfassets.net").length).toBeGreaterThan(
+			0,
+		);
+		expect(screen.getAllByTitle("Buka gambar asli di tab baru").length).toBe(
+			23,
+		);
+		expect(screen.getAllByTitle("Salin URL sumber").length).toBe(23 + 2); // 23 in disclosure + 2 in gallery
+
+		// Clicking again collapses disclosure
+		fireEvent.click(toggleButton);
+		expect(toggleButton.getAttribute("aria-expanded")).toBe("false");
+		expect(screen.queryByText("images.ctfassets.net")).toBeNull();
+	});
+
+	it("renders multiple failure groups with accurate breakdown matching target visual", () => {
+		const failed = [
+			row({ id: "f1", status: "failed", httpStatus: 403 }),
+			row({ id: "f2", status: "failed", failureCode: "WEBSITE_RATE_LIMITED" }),
+			row({ id: "f3", status: "failed", failureCode: "WEBSITE_ACCESS_DENIED" }),
+			row({ id: "f4", status: "failed", failureCode: "REMOTE_ACCESS_DENIED" }),
+			row({ id: "f5", status: "failed", failureCode: "UNSUPPORTED_FORMAT" }),
+			row({ id: "f6", status: "failed", failureCode: "UNSUPPORTED_MIME" }),
+			row({ id: "f7", status: "failed", failureCode: "FETCH_TIMEOUT" }),
+		];
+		const successful = Array.from({ length: 23 }, (_, i) =>
+			row({ id: `ok-${i}`, format: "jpg" }),
+		);
+
+		render(
+			<ImagesResult
+				images={[...successful, ...failed]}
+				sourceUrl="https://www.example.com"
+				imageOutcome="partial"
+			/>,
+		);
+
+		expect(screen.getByText(/7 gambar belum dapat disimpan/)).toBeDefined();
+		expect(screen.getByText("Website membatasi akses")).toBeDefined();
+		expect(screen.getByText("Format belum didukung")).toBeDefined();
+		expect(screen.getByText("Gagal karena gangguan sementara")).toBeDefined();
+		expect(screen.getAllByRole("article")).toHaveLength(23);
 	});
 });

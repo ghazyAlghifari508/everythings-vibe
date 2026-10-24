@@ -1,15 +1,19 @@
+import { LinkSquare01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import {
 	imageCountsLabel,
 	imageResultCounts,
 } from "@/features/scrape/utils/scrape-images";
+import { extractHost } from "../utils/scrape-image-failures";
+import { ImagesFailureSummary } from "./images-failure-summary";
 import {
 	diagnosticLabels,
 	type ImageResult,
 	readAssetFailure,
 	refreshImageUrl,
 } from "./images-result-asset";
-import { ImageCard, shortUrl } from "./images-result-card";
+import { ImageCard } from "./images-result-card";
 import { ScrapeFilterSelect } from "./scrape-filter-select";
 
 export type { ImageResult };
@@ -115,95 +119,114 @@ export function ImagesResult({
 			setNotice("URL sumber gagal disalin.");
 		}
 	}
+	const hostName = extractHost(sourceUrl);
+
 	return (
-		<section className="space-y-5" aria-label="Images Explorer">
-			<header>
-				<h2 className="text-2xl font-bold text-snow">Images Explorer</h2>
-				<p className="mt-2 text-sm font-medium text-snow tabular-nums">
-					{gallerySummary}
-				</p>
-				<a
-					href={sourceUrl}
-					target="_blank"
-					rel="noreferrer"
-					className="mt-2 block max-w-full truncate font-mono text-xs text-fog"
-					title={sourceUrl}
-				>
-					{sourceUrl}
-				</a>
-				<p className="mt-1 font-mono text-xs text-fog tabular-nums">
-					{imageCountsLabel(counts)}
-				</p>
-				{imageOutcome === "partial" && (
-					<p className="mt-2 text-sm text-fog">
-						Sebagian gambar berhasil diambil. {saved} gambar terverifikasi.{" "}
-						{failed} resource gagal diverifikasi.
+		<section className="space-y-6" aria-label="Images Explorer">
+			<header className="space-y-4">
+				<div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+					<div>
+						<h2 className="text-xl font-bold tracking-tight text-snow sm:text-2xl">
+							Hasil pengambilan gambar
+						</h2>
+						<a
+							href={sourceUrl}
+							target="_blank"
+							rel="noreferrer"
+							className="mt-1 inline-flex items-center gap-1.5 font-mono text-xs text-fog transition-colors hover:text-snow"
+							title={sourceUrl}
+						>
+							<span>{hostName}</span>
+							<Icon
+								icon={LinkSquare01Icon}
+								size={12}
+								aria-hidden
+								className="shrink-0"
+							/>
+						</a>
+					</div>
+					<p className="font-mono text-xs text-fog tabular-nums sm:text-right">
+						{imageCountsLabel(counts)}
 					</p>
-				)}
+				</div>
+
+				<div className="grid grid-cols-3 gap-3 rounded-xl border border-graphite bg-charcoal p-4 text-center sm:p-5">
+					<div>
+						<p className="text-xs font-medium text-fog">Ditemukan</p>
+						<p className="mt-1 font-mono text-xl font-bold text-snow tabular-nums sm:text-2xl">
+							{counts.discovered}
+						</p>
+					</div>
+					<div className="border-x border-graphite px-2">
+						<p className="text-xs font-medium text-fog">Tersimpan</p>
+						<p className="mt-1 font-mono text-xl font-bold text-snow tabular-nums sm:text-2xl">
+							{counts.verified}
+						</p>
+					</div>
+					<div>
+						<p className="text-xs font-medium text-fog">Tidak tersedia</p>
+						<p className="mt-1 font-mono text-xl font-bold text-snow tabular-nums sm:text-2xl">
+							{counts.failed}
+						</p>
+					</div>
+				</div>
 			</header>
-			{/* The gallery exposes no reliable image names, so a query would only
-			    match raw source URLs. Reintroduce a search field once images carry
-			    searchable names the user can recognise. */}
-			<div className="flex flex-wrap items-end gap-3">
-				<ScrapeFilterSelect
-					label="Format"
-					className="w-36 sm:w-40"
-					value={formatFilter}
-					onChange={setFormatFilter}
-					options={[
-						{ value: "", label: "Semua" },
-						...formats.map((format) => ({ value: format, label: format })),
-					]}
+
+			{failed > 0 && (
+				<ImagesFailureSummary
+					failedImages={images.filter((image) => image.status === "failed")}
 				/>
-				<ScrapeFilterSelect
-					label="Jenis"
-					className="w-36 sm:w-40"
-					value={kindFilter}
-					onChange={setKindFilter}
-					options={[
-						{ value: "", label: "Semua" },
-						...kinds.map((type) => ({ value: type, label: type })),
-					]}
-				/>
-				{hasFilter && (
-					<button
-						type="button"
-						onClick={() => {
-							setFormatFilter("");
-							setKindFilter("");
-						}}
-						className="inline-flex min-h-11 items-center rounded-full px-4 text-sm text-fog underline underline-offset-4 hover:text-snow focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						Reset filter
-					</button>
-				)}
-			</div>
+			)}
+
+			{images.length > 0 && (
+				<div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+					<p className="text-sm font-medium text-snow tabular-nums">
+						{gallerySummary}
+					</p>
+
+					<div className="flex flex-wrap items-end gap-3">
+						<ScrapeFilterSelect
+							label="Format"
+							className="w-36 sm:w-40"
+							value={formatFilter}
+							onChange={setFormatFilter}
+							options={[
+								{ value: "", label: "Semua" },
+								...formats.map((format) => ({ value: format, label: format })),
+							]}
+						/>
+						<ScrapeFilterSelect
+							label="Jenis"
+							className="w-36 sm:w-40"
+							value={kindFilter}
+							onChange={setKindFilter}
+							options={[
+								{ value: "", label: "Semua" },
+								...kinds.map((type) => ({ value: type, label: type })),
+							]}
+						/>
+						{hasFilter && (
+							<button
+								type="button"
+								onClick={() => {
+									setFormatFilter("");
+									setKindFilter("");
+								}}
+								className="inline-flex min-h-11 items-center rounded-full px-4 text-sm text-fog underline underline-offset-4 hover:text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								Reset filter
+							</button>
+						)}
+					</div>
+				</div>
+			)}
+
 			{notice && (
 				<p role="alert" className="text-sm text-fog">
 					{notice}
 				</p>
 			)}
-			{failed > 0 && (
-				<details className="text-sm text-fog">
-					<summary className="cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo">
-						{failed} gambar tidak dapat diambil
-					</summary>
-					<ul className="mt-3 space-y-2">
-						{images
-							.filter((image) => image.status === "failed")
-							.map((image) => (
-								<li key={image.id} className="min-w-0">
-									<p className="truncate font-mono text-xs" title={image.url}>
-										{shortUrl(image.url)}
-									</p>
-									{image.error ? (
-										<p className="mt-1 font-mono text-xs">{image.error}</p>
-									) : null}
-								</li>
-							))}
-					</ul>
-				</details>
-			)}
+
 			{visible.length ? (
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 					{visible.map((image) => (
@@ -242,8 +265,8 @@ export function ImagesResult({
 								Semua gambar gagal diambil
 							</p>
 							<p className="mt-1 text-sm text-fog">
-								Tidak ada byte gambar yang tersedia dari ekstraksi ini. Periksa
-								alasan kegagalan di atas.
+								Gambar ditemukan tetapi belum ada yang dapat disimpan secara
+								permanen. Periksa rincian kegagalan di atas.
 							</p>
 						</>
 					) : (
