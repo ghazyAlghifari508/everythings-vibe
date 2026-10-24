@@ -24,10 +24,19 @@ it("drains a nonempty batch immediately and backs off after an empty dispatch", 
 	const previousInterrupts = process.listeners("SIGINT");
 	const previousTerminates = process.listeners("SIGTERM");
 	const log = vi.spyOn(console, "info").mockImplementation(() => {});
-	mocks.dispatch.mockResolvedValueOnce(1).mockResolvedValue(0);
+	const starts: number[] = [];
+	mocks.dispatch.mockImplementation(async () => {
+		starts.push(Date.now());
+		if (starts.length === 1) {
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			return 1;
+		}
+		return 0;
+	});
 	try {
 		await import("../services/studio-worker");
 		await vi.waitFor(() => expect(mocks.dispatch).toHaveBeenCalledTimes(2));
+		expect(starts[1] - starts[0]).toBe(100);
 		expect(vi.getTimerCount()).toBe(1);
 		await vi.advanceTimersToNextTimerAsync();
 		expect(mocks.dispatch).toHaveBeenCalledTimes(3);
