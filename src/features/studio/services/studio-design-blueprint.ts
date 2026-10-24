@@ -1,5 +1,42 @@
 import { z } from "zod";
 
+const canonicalIconIds = new Set([
+	"home",
+	"plus",
+	"search",
+	"user",
+	"wallet",
+	"chart",
+	"analytics",
+	"calendar",
+	"location",
+	"plane",
+	"settings",
+	"circle",
+]);
+
+export function canonicalIconId(value: string | undefined): string {
+	return value && canonicalIconIds.has(value) ? value : "circle";
+}
+
+const safeCss = z
+	.string()
+	.min(1)
+	.max(200)
+	.regex(/^[^;{}<>\\\\]*$/)
+	.refine((value) => !/url\s*\(|expression\s*\(/i.test(value));
+const color = z
+	.string()
+	.regex(/^#[0-9a-f]{3}(?:[0-9a-f]{3})?(?:[0-9a-f]{2})?$/i);
+
+export const studioCanonicalShellSchema = z.object({
+	version: z.literal(1),
+	navigation: z.enum(["bottom", "sidebar", "top"]),
+	statusBar: z.literal("none"),
+	density: z.enum(["compact", "comfortable"]),
+	activeDestinations: z.record(z.string(), z.string().nullable()),
+});
+
 export const studioNavigationContractSchema = z.object({
 	destinations: z.array(z.string().min(1)).min(1).max(8),
 	labels: z.array(z.string().min(1)).min(1).max(8),
@@ -16,14 +53,14 @@ export const studioDesignBlueprintSchema = z.object({
 		visualDirection: z.string().min(1).max(500),
 	}),
 	designTokens: z.object({
-		primary: z.string().min(1).max(50),
-		secondary: z.string().min(1).max(50),
-		background: z.string().min(1).max(50),
-		surface: z.string().min(1).max(50),
-		fontFamily: z.string().min(1).max(200),
+		primary: color,
+		secondary: color,
+		background: color,
+		surface: color,
+		fontFamily: safeCss,
 		radius: z.number().min(0).max(32),
-		border: z.string().min(1).max(100),
-		elevation: z.string().min(1).max(100),
+		border: safeCss,
+		elevation: safeCss,
 	}),
 	sharedComponents: z.object({
 		header: z.string().min(1).max(500),
@@ -35,6 +72,7 @@ export const studioDesignBlueprintSchema = z.object({
 		icons: z.string().min(1).max(300),
 	}),
 	navigationContract: studioNavigationContractSchema,
+	canonicalShell: studioCanonicalShellSchema.optional(),
 	screenPlan: z
 		.array(
 			z.object({
@@ -90,5 +128,61 @@ export function validateBlueprint(
 	const orders = parsed.data.screenPlan.map((s) => s.order);
 	if (new Set(orders).size !== orders.length)
 		return { ok: false, error: "Order screen harus unik dan berurutan." };
-	return { ok: true, blueprint: parsed.data };
+	const blueprint = parsed.data;
+	const mobile = blueprint.productIdentity.platform === "mobile";
+	const shell = blueprint.canonicalShell;
+	if (
+		shell &&
+		(mobile ? shell.navigation !== "bottom" : shell.navigation === "bottom")
+	)
+		return { ok: false, error: "Shell navigasi tidak sesuai platform." };
+	if (
+		shell &&
+		Object.values(shell.activeDestinations).some(
+			(id) => id !== null && !destinations.includes(id),
+		)
+	)
+		return { ok: false, error: "Destinasi aktif tidak dikenal." };
+	const names = blueprint.screenPlan.map((screen) => screen.name);
+	if (new Set(names).size !== names.length)
+		return { ok: false, error: "Nama layar harus unik." };
+	const activeDestinations = Object.fromEntries(
+		names.map((name) => {
+			const index = blueprint.navigationContract.labels.findIndex(
+				(label) => label.toLowerCase() === name.toLowerCase(),
+			);
+			return [
+				name,
+				shell?.activeDestinations[name] ??
+					(index >= 0
+						? destinations[index]
+						: destinations.find(
+								(id) => id.toLowerCase() === name.toLowerCase(),
+							)) ??
+					null,
+			];
+		}),
+	);
+	return {
+		ok: true,
+		blueprint: {
+			...blueprint,
+			navigationContract: {
+				...blueprint.navigationContract,
+				iconMapping: Object.fromEntries(
+					destinations.map((id) => [
+						id,
+						canonicalIconId(blueprint.navigationContract.iconMapping[id]),
+					]),
+				),
+			},
+			canonicalShell: shell ?? {
+				version: 1,
+				navigation: mobile ? "bottom" : "sidebar",
+				statusBar: "none",
+				density: "comfortable",
+				activeDestinations,
+			},
+		},
+	};
 }
