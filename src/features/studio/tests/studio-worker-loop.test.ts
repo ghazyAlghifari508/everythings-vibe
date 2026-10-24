@@ -35,7 +35,11 @@ it("drains a nonempty batch immediately and backs off after an empty dispatch", 
 	});
 	try {
 		await import("../services/studio-worker");
-		await vi.waitFor(() => expect(mocks.dispatch).toHaveBeenCalledTimes(2));
+		await vi.waitFor(() => expect(mocks.dispatch).toHaveBeenCalledTimes(1), {
+			timeout: 10_000,
+		});
+		await vi.advanceTimersByTimeAsync(100);
+		expect(mocks.dispatch).toHaveBeenCalledTimes(2);
 		expect(starts[1] - starts[0]).toBe(100);
 		expect(vi.getTimerCount()).toBe(1);
 		await vi.advanceTimersToNextTimerAsync();
