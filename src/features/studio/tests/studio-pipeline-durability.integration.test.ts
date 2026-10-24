@@ -163,6 +163,7 @@ it("publishes a completed frame while another provider request remains pending",
 		}
 		return "<html><body>Sample</body></html>";
 	};
+	const log = vi.spyOn(console, "info").mockImplementation(() => {});
 	const pending = runStudioJobPipeline(job.id, project.id, userId);
 	try {
 		await started;
@@ -179,6 +180,18 @@ it("publishes a completed frame while another provider request remains pending",
 	} finally {
 		release();
 		await pending;
+		const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+		log.mockRestore();
+		expect(events).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					stage: "project-completion",
+					code: "completed",
+					jobId: job.id,
+					durationMs: expect.any(Number),
+				}),
+			]),
+		);
 	}
 });
 

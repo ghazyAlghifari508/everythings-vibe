@@ -199,6 +199,16 @@ export async function runStudioJobPipeline(
 					jobId,
 					projectId,
 				});
+				studioJobTiming("project-completion", job.createdAt.getTime(), {
+					jobId,
+					projectId,
+					code:
+						ready.length === frames.length
+							? "completed"
+							: ready.length > 0
+								? "partial"
+								: "failed",
+				});
 			},
 		);
 	} catch (failure) {
