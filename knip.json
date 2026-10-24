@@ -2,16 +2,12 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "workspaces": {
     ".": {
-      "entry": [
-        "src/router.tsx",
-        "src/routes/**/*.{ts,tsx}"
-      ],
-      "project": ["src/**/*.{ts,tsx,css}!", "e2e/**/*.{ts,tsx}!"]
+      "entry": ["src/router.tsx", "src/routes/**/*.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx,css}!", "e2e/**/*.{ts,tsx}!"],
+      "ignoreDependencies": ["chalk", "commander"]
     },
     "packages/cli": {
-      "entry": [
-        "src/commands/*.ts"
-      ],
+      "entry": ["src/commands/*.ts"],
       "project": ["src/**/*.ts!"]
     }
   }
