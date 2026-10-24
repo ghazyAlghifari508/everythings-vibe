@@ -382,28 +382,28 @@ Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenG
 
 #### A. Logo &amp; UI Display Branding
 
-- [ ] **Logo Component (`src/components/ui/logo.tsx`):**
-  - [ ] Perbarui teks merek dari `VibeEverything` menjadi `everythings-vibe` (atau `EverythingsVibe`).
-  - [ ] Perbarui komentar dan metadata fungsi `VibeEverythingMark` menjadi `EverythingsVibeMark`.
-- [ ] **Navigation &amp; Footer (`src/components/layout/navbar.tsx`, `footer.tsx`):**
-  - [ ] Sesuaikan tampilan brand name dan link home.
-  - [ ] Perbarui tooltip, aria-label, dan alt text logo.
+- [x] **Logo Component (`src/components/ui/logo.tsx`):**
+  - [x] Perbarui teks merek dari `VibeEverything` menjadi `everythings-vibe` (atau `EverythingsVibe`).
+  - [x] Perbarui komentar dan metadata fungsi `VibeEverythingMark` menjadi `EverythingsVibeMark`.
+- [x] **Navigation &amp; Footer (`src/components/layout/navbar.tsx`, `footer.tsx`):**
+  - [x] Sesuaikan tampilan brand name dan link home.
+  - [x] Perbarui tooltip, aria-label, dan alt text logo.
 
 #### B. Page Titles &amp; Meta Tags (SEO &amp; Head)
 
-- [ ] **Root Shell Meta (`src/routes/__root.tsx`):**
-  - [ ] Ganti title utama: `"everythings-vibe - All-in-One AI Vibe-Coding Workspace"`.
-  - [ ] Perbarui description, OpenGraph title, Twitter card, dan manifest name.
-- [ ] **Seluruh Route Head Title di `src/routes/`:**
-  - [ ] `src/routes/index.tsx`: Title &amp; description `everythings-vibe`.
-  - [ ] `src/routes/pricing.tsx`: `"Pricing | everythings-vibe"`.
-  - [ ] `src/routes/faq.tsx`: `"FAQ | everythings-vibe"`.
-  - [ ] `src/routes/bantuan.tsx`: `"Bantuan | everythings-vibe"`.
-  - [ ] `src/routes/history.tsx`: `"History | everythings-vibe"`.
-  - [ ] `src/routes/codebases/index.tsx`: `"Project Tersimpan | everythings-vibe"`.
-  - [ ] `src/routes/templates.tsx`: `"Templates | everythings-vibe"`.
-  - [ ] `src/routes/maintenance.tsx`: `"everythings-vibe Sedang Dalam Perbaikan"`.
-  - [ ] `src/routes/settings/feedback.tsx`: Teks copy *"Bantu kami meningkatkan everythings-vibe..."*.
+- [x] **Root Shell Meta (`src/routes/__root.tsx`):**
+  - [x] Ganti title utama: `"everythings-vibe - All-in-One AI Vibe-Coding Workspace"`.
+  - [x] Perbarui description, OpenGraph title, Twitter card, dan manifest name.
+- [x] **Seluruh Route Head Title di `src/routes/`:**
+  - [x] `src/routes/index.tsx`: Title &amp; description `everythings-vibe`.
+  - [x] `src/routes/pricing.tsx`: `"Pricing | everythings-vibe"`.
+  - [x] `src/routes/faq.tsx`: `"FAQ | everythings-vibe"`.
+  - [x] `src/routes/bantuan.tsx`: `"Bantuan | everythings-vibe"`.
+  - [x] `src/routes/history.tsx`: `"History | everythings-vibe"`.
+  - [x] `src/routes/codebases/index.tsx`: `"Project Tersimpan | everythings-vibe"`.
+  - [x] `src/routes/templates.tsx`: `"Templates | everythings-vibe"`.
+  - [x] `src/routes/maintenance.tsx`: `"everythings-vibe Sedang Dalam Perbaikan"`.
+  - [x] `src/routes/settings/feedback.tsx`: Teks copy *"Bantu kami meningkatkan everythings-vibe..."*.
 
 #### C. In-App Copy, Helper Text &amp; CLI Commands
 
@@ -414,12 +414,12 @@ Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenG
   - [ ] Ubah instruksi instalasi global:
     - Dari: `npm i -g @ghazynabiel/vibeeverything`
     - Menjadi: `npm i -g @ghazynabiel/everythings-vibe` (atau nama package npm yang ditargetkan).
-  - [ ] Ubah pesan status stage sync: *"Agent berhasil tersambung ke everythings-vibe"*, *"Mengirim source code ke everythings-vibe"*.
-- [ ] **Sistem Pembayaran &amp; Notifikasi:**
-  - [ ] `src/routes/api/payments/create.ts`: Item label Midtrans `"Top Up X Kredit everythings-vibe"`.
-  - [ ] `src/features/billing/services/email.ts`: Pengirim email `"everythings-vibe <onboarding@resend.dev>"` dan footer *"Email otomatis dari everythings-vibe"*.
-- [ ] **Constants File (`src/lib/constants.ts`):**
-  - [ ] Ubah `EXPORT_FILENAME_PREFIX`: Dari `"vibeeverything"` menjadi `"everythings-vibe"`.
+  - [x] Ubah pesan status stage sync: *"Agent berhasil tersambung ke everythings-vibe"*, *"Mengirim source code ke everythings-vibe"*.
+- [x] **Sistem Pembayaran &amp; Notifikasi:**
+  - [x] `src/routes/api/payments/create.ts`: Item label Midtrans `"Top Up X Kredit everythings-vibe"`.
+  - [x] `src/features/billing/services/email.ts`: Pengirim email `"everythings-vibe <onboarding@resend.dev>"` dan footer *"Email otomatis dari everythings-vibe"*.
+- [x] **Constants File (`src/lib/constants.ts`):**
+  - [x] Ubah `EXPORT_FILENAME_PREFIX`: Dari `"vibeeverything"` menjadi `"everythings-vibe"`.
 
 #### D. CLI Package (`packages/cli/`)
 
@@ -442,13 +442,13 @@ Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenG
 
 #### E. Dokumentasi &amp; Rules Repository
 
-- [ ] Perbarui referensi di `AGENTS.md` (bagian header, kontrak, dan identifier yang relevan).
+- [x] Perbarui referensi di `AGENTS.md` (bagian header, kontrak, dan identifier yang relevan).
 - [ ] Perbarui file-file spesifikasi di `docs/` yang menyebutkan VibeEverything.
-- [ ] Perbarui `README.md` repositori dengan nama dan instruksi baru.
+- [x] Perbarui `README.md` repositori dengan nama dan instruksi baru.
 
 #### F. Test Suites &amp; Contract Alignment
 
-- [ ] **Update Test Expectations:**
+- [x] **Update Test Expectations:**
   - Periksa dan sesuaikan test file yang memvalidasi teks copy lama:
     - `src/lib/codebase-naming.test.ts`
     - `src/lib/codebase-sync.test.ts`
@@ -456,7 +456,7 @@ Seluruh artefak merek, judul halaman, logo, instruksi CLI, email, metadata OpenG
     - `src/routes/plan/-codebase-*.test.tsx` (seluruh suite pengujian sinkronisasi codebase)
     - `src/components/task/implementation-options.test.tsx`
   - Pastikan semua assertion string yang awalnya mengecek `"vibeeverything"` atau `"VibeEverything"` disesuaikan ke `"everythings-vibe"` / `"EverythingsVibe"`.
-- [ ] Jalankan `pnpm test` untuk membuktikan bahwa tidak ada assertion yang tertinggal atau gagal.
+- [x] Jalankan `pnpm test` untuk membuktikan bahwa tidak ada assertion yang tertinggal atau gagal.
 
 ---
 
