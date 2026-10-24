@@ -758,8 +758,8 @@ Aturan ini memuat 5 Kontrak Wajib Agen:
   - [x] Tambahkan pasal larangan file monster (&gt; 400 baris) dan larangan menumpuk file test di `src/routes/`.
 - [x] Perbarui `.agents/rules/basic-rules.md`:
   - [x] Perbarui peta direktori target dari layer-based ke `src/features/`.
-- [ ] Integrasikan script audit dead code ke dalam command verifikasi lokal:
-  - [ ] Tambahkan script `"audit:deadcode": "knip"` pada `package.json` agar mudah dijalankan oleh developer maupun agent sebelum handoff.
+- [x] Integrasikan script audit dead code ke dalam command verifikasi lokal:
+  - [x] Tambahkan script `"audit:deadcode": "knip"` pada `package.json` agar mudah dijalankan oleh developer maupun agent sebelum handoff.
 
 ---
 
