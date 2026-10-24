@@ -36,7 +36,7 @@ export function inferTheme(
 		const normalized = normalizeColor(
 			element.properties["background-color"] ?? "",
 		);
-		if (!normalized || normalized.isNoOp) continue;
+		if (!normalized || normalized.isNoOp || normalized.hasAlpha) continue;
 		const luminance =
 			(0.2126 * normalized.r + 0.7152 * normalized.g + 0.0722 * normalized.b) /
 			255;
