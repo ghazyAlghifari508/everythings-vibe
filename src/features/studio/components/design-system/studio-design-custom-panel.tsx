@@ -84,7 +84,7 @@ export function StudioDesignCustomPanel({
 		<div
 			role="tabpanel"
 			aria-label="Punya Saya"
-			className="mx-auto flex w-full max-w-2xl flex-col gap-4"
+			className="flex w-full flex-col gap-4"
 		>
 			<p className="text-xs font-semibold text-mist">Unggah File Kustom</p>
 			<div className="flex flex-col gap-4">
