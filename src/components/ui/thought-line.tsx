@@ -83,6 +83,13 @@ export interface ThoughtLineProps {
 	finishedAt?: number | string | Date | null;
 	/** Embeds the line inline instead of rendering it as a standalone card. */
 	bare?: boolean;
+	/**
+	 * Lets the reported line run to several lines instead of truncating. Used
+	 * when the line carries a sentence rather than a short trace header.
+	 */
+	wrap?: boolean;
+	/** Fades the reported line whenever its text actually changes. */
+	fadeTextOnChange?: boolean;
 }
 
 function resolveStartEpoch(
@@ -138,6 +145,8 @@ export function ThoughtLine({
 	startedAt,
 	finishedAt,
 	bare = false,
+	wrap = false,
+	fadeTextOnChange = false,
 }: ThoughtLineProps) {
 	const reduce = useReducedMotionConfig();
 	const [open, setOpen] = useState(true);
@@ -315,6 +324,23 @@ export function ThoughtLine({
 		return () => observer?.disconnect();
 	}, [isWorking]);
 
+	// Only a real text change fades. The reported line is data from the server,
+	// so this never animates on a timer and never replays on re-render.
+	const lastTextRef = useRef(workingText);
+	useEffect(() => {
+		const previous = lastTextRef.current;
+		lastTextRef.current = workingText;
+		if (!fadeTextOnChange || previous === workingText) return;
+		const el = breathRef.current;
+		if (!el || reduce === true) return;
+		const control = animate(
+			el,
+			{ opacity: [0.4, 1] },
+			{ duration: 0.3, ease: EASE_OUT },
+		);
+		return () => control.stop();
+	}, [workingText, fadeTextOnChange, reduce]);
+
 	useEffect(() => {
 		if (isWorking) {
 			setAnnounce(workingText);
@@ -423,6 +449,7 @@ export function ThoughtLine({
 			data-working={isWorking ? "" : undefined}
 			data-failed={isFailed ? "" : undefined}
 			data-open={open && hasTrace ? "" : undefined}
+			data-wrap={wrap ? "" : undefined}
 			style={styleVars}
 		>
 			{collapsible ? (
