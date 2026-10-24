@@ -8,8 +8,10 @@ import {
 } from "@/features/scrape/types/scrape-contract";
 import {
 	ADVANCED_PARAMETER_GROUPS,
+	fromDisplayValue,
 	readNumber,
 	readToggle,
+	toDisplayValue,
 	validateNumericParameter,
 	validateParameterGroup,
 } from "../types/parameter-spec";
@@ -88,7 +90,12 @@ describe("advanced parameter grouping", () => {
 		expect(maxPages?.max).toBe(SCRAPE_LIMITS.maxPages);
 		expect(maxDepth?.max).toBe(SCRAPE_LIMITS.maxDepth);
 		const [htmlGroup] = ADVANCED_PARAMETER_GROUPS.html;
-		expect(htmlGroup?.numbers[0]?.max).toBe(SCRAPE_LIMITS.waitMs);
+		const waitMs = htmlGroup?.numbers[0];
+		expect(waitMs?.max).toBe(SCRAPE_LIMITS.waitMs / 1000);
+		expect(waitMs?.unit).toBe("detik");
+		expect((waitMs?.max ?? 0) * (waitMs?.scale ?? 1)).toBe(
+			SCRAPE_LIMITS.waitMs,
+		);
 	});
 });
 
@@ -187,6 +194,33 @@ describe("numeric parameter validation", () => {
 			for (const group of ADVANCED_PARAMETER_GROUPS[mode])
 				expect(validateParameterGroup(group, settings)).toEqual([]);
 		}
+	});
+});
+
+describe("display conversion and scaling", () => {
+	const waitSpec = ADVANCED_PARAMETER_GROUPS.html[0]?.numbers[0];
+	if (!waitSpec) throw new Error("html waitSpec fixture missing");
+
+	it("converts between internal milliseconds and display seconds", () => {
+		expect(toDisplayValue(waitSpec, 0)).toBe(0);
+		expect(toDisplayValue(waitSpec, 3000)).toBe(3);
+		expect(toDisplayValue(waitSpec, 10000)).toBe(10);
+
+		expect(fromDisplayValue(waitSpec, 0)).toBe(0);
+		expect(fromDisplayValue(waitSpec, 3)).toBe(3000);
+		expect(fromDisplayValue(waitSpec, 10)).toBe(10000);
+	});
+
+	it("validates display values in seconds against contract bounds", () => {
+		expect(validateNumericParameter(waitSpec, 0)).toBeNull();
+		expect(validateNumericParameter(waitSpec, 5)).toBeNull();
+		expect(validateNumericParameter(waitSpec, 10)).toBeNull();
+		expect(validateNumericParameter(waitSpec, 11)?.message).toMatch(
+			/antara 0 dan 10 detik/i,
+		);
+		expect(validateNumericParameter(waitSpec, -1)?.message).toMatch(
+			/antara 0 dan 10 detik/i,
+		);
 	});
 });
 
