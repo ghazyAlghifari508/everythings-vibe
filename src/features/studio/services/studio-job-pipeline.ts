@@ -35,7 +35,9 @@ export async function runStudioJobPipeline(
 	userId: string,
 ): Promise<void> {
 	const workerId = crypto.randomUUID();
+	const acquisitionStartedAt = Date.now();
 	const job = await claimStudioJob(jobId, userId, workerId);
+	studioJobTiming("job-acquire", acquisitionStartedAt, { jobId, projectId });
 	if (!job || job.projectId !== projectId) return;
 	const claim: StudioJobClaim = { jobId, projectId, userId, workerId };
 	const startedAt = Date.now();
@@ -68,6 +70,13 @@ export async function runStudioJobPipeline(
 					: null;
 				const designMode = validateStudioDesignMode(project.designMode);
 				const dsTokens = extractDesignSystemTokens(project.designMd);
+				studioJobTiming("project-context", Date.now(), {
+					jobId,
+					projectId,
+					skillId: project.designSkillId,
+					referenceChars: project.designMd?.length ?? 0,
+					prdChars: project.prdContent?.length ?? 0,
+				});
 				let frames = await db
 					.select()
 					.from(studioFrames)

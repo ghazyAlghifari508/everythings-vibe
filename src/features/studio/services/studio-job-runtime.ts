@@ -14,6 +14,13 @@ export function studioJobTiming(
 		attempt?: number;
 		code?: string;
 		detail?: string;
+		skillId?: string;
+		skillChars?: number;
+		promptChars?: number;
+		systemChars?: number;
+		outputChars?: number;
+		referenceChars?: number;
+		prdChars?: number;
 	},
 ) {
 	console.info(

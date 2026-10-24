@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { tryStreamWithFallback } from "@/lib/services/ai-orchestrator";
-import { generateValidatedFrameHtml } from "../services/studio-frame-generation";
+import {
+	generateStudioHtml,
+	generateValidatedFrameHtml,
+} from "../services/studio-frame-generation";
 
 vi.mock("@/lib/services/ai-orchestrator", () => ({
 	selectModels: () => [],
@@ -31,6 +34,36 @@ async function mockRawSequence(raws: string[]) {
 }
 
 describe("generateValidatedFrameHtml recovery", () => {
+	it("records prompt size and output duration without logging private content", async () => {
+		await mockRawSequence(["<html><body>Sample</body></html>"]);
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			await generateStudioHtml("private brief", undefined, "none", undefined, {
+				jobId: "job",
+				projectId: "project",
+				frameId: "frame",
+			});
+			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			expect(events).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						stage: "frame-context",
+						promptChars: 13,
+						skillId: "none",
+						skillChars: 0,
+					}),
+					expect.objectContaining({
+						stage: "frame-output",
+						durationMs: expect.any(Number),
+						outputChars: 32,
+					}),
+				]),
+			);
+			expect(JSON.stringify(events)).not.toContain("private brief");
+		} finally {
+			log.mockRestore();
+		}
+	});
 	it("melakukan koreksi terbatas lalu mengembalikan output valid", async () => {
 		const mocked = await mockRawSequence([
 			"<html><head></head><body><p>Belum selesai",

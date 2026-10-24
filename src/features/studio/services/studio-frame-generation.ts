@@ -15,7 +15,10 @@ import type {
 	InitialFrameContext,
 	ValidatedFrameInput,
 } from "../types/studio-service";
-import { resolveStudioFrameSystemPrompt } from "./studio-design-skill-registry.server";
+import {
+	resolveStudioDesignSkill,
+	resolveStudioFrameSystemPrompt,
+} from "./studio-design-skill-registry.server";
 import { enforceDesignSystemOnHtml } from "./studio-design-system-html";
 import {
 	publicStudioFrameErrorMessage,
@@ -262,12 +265,21 @@ export async function generateStudioHtml(
 ): Promise<string> {
 	signal?.throwIfAborted();
 	const startedAt = Date.now();
+	const system = resolveStudioFrameSystemPrompt(designSkillId);
+	if (timing)
+		studioJobTiming("frame-context", startedAt, {
+			...timing,
+			skillId: designSkillId,
+			skillChars: resolveStudioDesignSkill(designSkillId).guidance.length,
+			systemChars: system.length,
+			promptChars: prompt.length,
+		});
 	const { generator, firstChunk } = await tryStreamWithFallback(
 		selectModels(),
 		[
 			{
 				role: "system",
-				content: resolveStudioFrameSystemPrompt(designSkillId),
+				content: system,
 			},
 			{ role: "user", content: prompt },
 		],
@@ -275,8 +287,14 @@ export async function generateStudioHtml(
 		maxTokens,
 	);
 	if (timing) studioJobTiming("first-token", startedAt, timing);
+	const outputStartedAt = Date.now();
 	let raw = firstChunk;
 	for await (const chunk of generator) raw += chunk;
+	if (timing)
+		studioJobTiming("frame-output", outputStartedAt, {
+			...timing,
+			outputChars: raw.length,
+		});
 	signal?.throwIfAborted();
 	const cleaned = extractCleanHtml(raw);
 	if (cleaned.trim().length === 0)
