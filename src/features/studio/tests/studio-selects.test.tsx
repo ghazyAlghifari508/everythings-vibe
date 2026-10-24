@@ -152,6 +152,105 @@ describe("StudioSkillSelect", () => {
 			expect(item?.querySelector("svg")).not.toBeNull();
 		}
 	});
+
+	it("renders full wrapped descriptions with accessible title and description attributes", async () => {
+		render(<StudioSkillSelect value="none" onChange={vi.fn()} />);
+		openMenu(/Design skill: No Skill/i);
+		await waitFor(() => {
+			expect(
+				screen.getByRole("menuitemradio", { name: /No Skill/i }),
+			).toBeDefined();
+		});
+
+		const items = screen.getAllByRole("menuitemradio");
+		for (const item of items) {
+			expect(item.getAttribute("title")).toBeTruthy();
+			expect(item.getAttribute("aria-describedby")).toBe(
+				"skill-description-tooltip",
+			);
+		}
+
+		const descriptions = [
+			"AI merancang tanpa panduan desain tambahan",
+			"Untuk desain yang lebih rapi, detail, dan matang",
+			"Untuk tampilan web dengan karakter visual yang kuat",
+			"Untuk navigasi, kemudahan penggunaan, dan aksesibilitas",
+			"Untuk mengurangi pola tampilan generik yang tidak diperlukan",
+			"Untuk komposisi, tipografi, dan keseimbangan visual",
+		];
+		for (const desc of descriptions) {
+			const matchingElements = screen.getAllByText(desc);
+			expect(matchingElements.length).toBeGreaterThanOrEqual(1);
+			const lineClampedEl = matchingElements.find((el) =>
+				el.className.includes("line-clamp-2"),
+			);
+			expect(lineClampedEl).toBeDefined();
+		}
+	});
+
+	it("renders an accessible tooltip that reveals full description and updates on pointer hover and keyboard focus", async () => {
+		render(<StudioSkillSelect value="none" onChange={vi.fn()} />);
+		openMenu(/Design skill: No Skill/i);
+		await waitFor(() => {
+			expect(screen.getByRole("tooltip")).toBeDefined();
+		});
+
+		const tooltip = screen.getByRole("tooltip");
+		expect(tooltip.textContent).toContain("No Skill");
+		expect(tooltip.textContent).toContain(
+			"AI merancang tanpa panduan desain tambahan",
+		);
+
+		// Pointer hover updates tooltip
+		const impeccableItem = screen.getByRole("menuitemradio", {
+			name: /Impeccable/i,
+		});
+		fireEvent.pointerEnter(impeccableItem);
+		expect(tooltip.textContent).toContain("Impeccable");
+		expect(tooltip.textContent).toContain(
+			"Untuk desain yang lebih rapi, detail, dan matang",
+		);
+
+		// Keyboard focus updates tooltip
+		const tasteItem = screen.getByRole("menuitemradio", { name: /Taste/i });
+		fireEvent.focus(tasteItem);
+		expect(tooltip.textContent).toContain("Taste");
+		expect(tooltip.textContent).toContain(
+			"Untuk komposisi, tipografi, dan keseimbangan visual",
+		);
+
+		// Pointer leave resets to selected skill
+		const scrollContainer = impeccableItem.closest(".overflow-y-auto");
+		expect(scrollContainer).not.toBeNull();
+		if (scrollContainer) {
+			fireEvent.pointerLeave(scrollContainer);
+			expect(tooltip.textContent).toContain("No Skill");
+		}
+	});
+
+	it("disables the trigger button when disabled prop is true", () => {
+		render(<StudioSkillSelect value="none" onChange={vi.fn()} disabled />);
+		const button = screen.getByRole("button", {
+			name: /Design skill: No Skill/i,
+		});
+		expect(button.getAttribute("disabled")).not.toBeNull();
+		expect(button.className).toContain("disabled:cursor-not-allowed");
+	});
+
+	it("maintains a compact scrollable container within bounds", async () => {
+		render(<StudioSkillSelect value="none" onChange={vi.fn()} />);
+		openMenu(/Design skill: No Skill/i);
+		await waitFor(() => {
+			expect(
+				screen.getByRole("menuitemradio", { name: /No Skill/i }),
+			).toBeDefined();
+		});
+
+		const scrollContainer = document.querySelector(".max-h-64.overflow-y-auto");
+		expect(scrollContainer).not.toBeNull();
+		const menuContent = document.querySelector('[role="menu"]');
+		expect(menuContent?.className).toContain("w-80");
+	});
 });
 
 describe("StudioPageCountSelect", () => {
