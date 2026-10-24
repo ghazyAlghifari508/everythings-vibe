@@ -1,3 +1,4 @@
+import { SEMANTIC_PROPERTIES } from "../services/design-capture-comparison";
 import type { DesignTokenModel } from "../services/design-model";
 import { escapeCell, heading, table } from "./design-md-markdown";
 import type { RenderDesignMdOptions } from "./design-md-render";
@@ -17,8 +18,20 @@ export function renderComponentSections(
 	const observedComponents = (model.observedComponents ?? []).map(
 		(component) => ({
 			name: component.name,
-			description: component.description,
-			evidence: component.evidence,
+			description:
+				component.treatments
+					?.map((treatment, index) =>
+						[
+							`Treatment ${index + 1} (${treatment.samples} measured samples):`,
+							...Object.entries(treatment.properties).map(
+								([property, value]) =>
+									`${SEMANTIC_PROPERTIES[property] ?? property}: ${value}`,
+							),
+							`Measured size: ${treatment.width}px wide, ${treatment.height}px high (content-dependent).`,
+						].join("\n"),
+					)
+					.join("\n\n") ?? component.description,
+			evidence: `Measured on ${component.frequency} ${component.roles.join(", ")} elements; ${component.treatmentCount} distinct treatments. Role inferred from DOM; provenance retained in raw capture evidence.`,
 		}),
 	);
 	const aiComponents = options.componentPatterns ?? [];
@@ -33,7 +46,14 @@ export function renderComponentSections(
 		lines.push("", heading(2, "Components"), "");
 		for (const component of mergedComponents) {
 			lines.push(heading(3, escapeCell(component.name)));
-			lines.push("", escapeCell(component.description), "");
+			lines.push(
+				"",
+				...component.description
+					.split("\n")
+					.filter(Boolean)
+					.map((line) => `- ${escapeCell(line)}`),
+				"",
+			);
 			lines.push(`**Evidence:** ${escapeCell(component.evidence)}`);
 			lines.push(
 				"",

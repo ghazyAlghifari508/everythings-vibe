@@ -84,6 +84,7 @@ export function collectVisualEvidence(
 		"box-shadow",
 		"max-width",
 		"display",
+		"grid-template-columns",
 	];
 	const candidates: HTMLElement[] = [];
 	if (document.documentElement instanceof HTMLElement)

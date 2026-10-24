@@ -95,6 +95,29 @@ const evidence: VisualEvidence = {
 	limitations: [],
 };
 
+it("validates synthesis independently per capture instead of accepting values from another view", async () => {
+	stubStream(validSynthesis());
+	const mobile = structuredClone(evidence);
+	mobile.viewport = { width: 390, height: 844 };
+	for (const element of mobile.elements)
+		element.properties["background-color"] = "rgb(20, 30, 40)";
+	const result = await generateDesignMd(
+		{ ...evidence, additionalViews: [mobile] },
+		instrumentation,
+	);
+	expect(mocks.tryStreamWithFallback).toHaveBeenCalledTimes(2);
+	const payloads = mocks.tryStreamWithFallback.mock.calls.map((call) =>
+		JSON.parse(call[1][1].content),
+	);
+	expect(payloads[0].viewport.width).toBe(1440);
+	expect(payloads[1].viewport.width).toBe(390);
+	expect(
+		payloads[0].colors.map((color: { value: string }) => color.value),
+	).not.toContain("#141e28");
+	expect(result.enrichment.status).toBe("applied");
+	expect(result.document).toContain("AI inference");
+});
+
 it("forwards the captured title instead of a generic heading", async () => {
 	const { document, model } = await generateDesignMd(
 		evidence,

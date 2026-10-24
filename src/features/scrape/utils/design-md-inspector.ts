@@ -9,6 +9,7 @@ import {
 	isCurrentModelDocument,
 } from "../services/prompts-design-md";
 import { parseVisualEvidence } from "../types/design-evidence-contract";
+import { inspectorFromViews } from "./design-md-inspector-views";
 
 // The Style Inspector reads the same validated structured model the document is
 // rendered from, so the two cannot disagree about a measured value.
@@ -221,6 +222,10 @@ export function inspectorFromModel(
 	model: DesignTokenModel,
 	verification: InspectorVerification,
 ): DesignInspectorModel {
+	if (model.views?.length) {
+		const scoped = inspectorFromViews(model, verification, inspectorFromModel);
+		if (scoped) return scoped;
+	}
 	return {
 		verification,
 		modelVersion: model.version,

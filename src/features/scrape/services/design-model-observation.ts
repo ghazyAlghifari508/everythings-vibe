@@ -1,5 +1,6 @@
 import type { ModelComponent } from "@/features/scrape/types/design-model";
 import { normalizeColor } from "../utils/design-color-parse";
+import { SEMANTIC_PROPERTIES } from "./design-capture-comparison";
 import type {
 	VisualElementEvidence,
 	VisualEvidence,
@@ -82,7 +83,13 @@ export function deriveObservedComponents(
 		const treatments = new Map<string, string[]>();
 		for (const element of elements) {
 			const properties = Object.entries(element.properties)
-				.filter(([, value]) => value.trim())
+				.filter(
+					([property, value]) =>
+						property in SEMANTIC_PROPERTIES &&
+						value.trim() &&
+						value !== "none" &&
+						value !== "normal",
+				)
 				.sort(([a], [b]) => a.localeCompare(b))
 				.map(([property, value]) => `${property}: ${value}`)
 				.join("; ");
@@ -103,15 +110,35 @@ export function deriveObservedComponents(
 			? ""
 			: " This is a single measured observation, not a repeated pattern; it applies to the cited sample only and supports no shared rule.";
 		components.push({
+			treatments: [...treatments]
+				.slice(0, TREATMENT_LIMIT)
+				.map(([, selectors]) => {
+					const sample = elements.find(
+						(element) => element.selector === selectors[0],
+					);
+					return {
+						properties: Object.fromEntries(
+							Object.entries(sample?.properties ?? {}).filter(
+								([property, value]) =>
+									property in SEMANTIC_PROPERTIES &&
+									value.trim() &&
+									value !== "none" &&
+									value !== "normal",
+							),
+						),
+						width: sample?.width ?? 0,
+						height: sample?.height ?? 0,
+						samples: selectors.length,
+						selectors,
+					};
+				}),
 			name,
 			description:
 				[...treatments]
 					.slice(0, TREATMENT_LIMIT)
 					.map(
 						([properties, selectors]) =>
-							`Apply only to matching ${role} samples (${selectors
-								.slice(0, TREATMENT_SELECTOR_LIMIT)
-								.join(", ")}): ${properties}.`,
+							`Measured ${role} treatment (${selectors.length} samples): ${properties}.`,
 					)
 					.join("\n") +
 				` Missing properties, interaction states and primary/secondary hierarchy are not established; do not generalize across treatments or captures.${scope}`,
