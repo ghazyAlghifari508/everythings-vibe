@@ -8,6 +8,8 @@ const eventSchema = z.object({
 	frameId: z.string().optional(),
 	attempt: z.number().optional(),
 	code: z.string().optional(),
+	skillId: z.string().optional(),
+	skillChars: z.number().nonnegative().optional(),
 	outputTokens: z.number().nonnegative().optional(),
 	providerRetries: z.number().nonnegative().optional(),
 	providerFallbacks: z.number().nonnegative().optional(),
@@ -41,6 +43,20 @@ export function summarizeStudioTimings(log: string) {
 	const validated = new Set<string>();
 	const corrected = new Set<string>();
 	const tokens: number[] = [];
+	const frameTokens = new Map<string, number>();
+	const firstVisible = new Map<string, number>();
+	const skills = new Map(
+		events
+			.filter(
+				(event) =>
+					event.stage === "frame-context" && event.frameId && event.skillId,
+			)
+			.map((event) => [event.frameId, event.skillId]),
+	);
+	const perSkill = new Map<
+		string,
+		{ latencies: number[]; guidance: Set<number> }
+	>();
 	let providerRetries = 0;
 	let providerFallbacks = 0;
 	for (const event of events) {
@@ -51,6 +67,32 @@ export function summarizeStudioTimings(log: string) {
 			firstReady.set(
 				event.jobId,
 				Math.min(firstReady.get(event.jobId) ?? Infinity, event.durationMs),
+			);
+		if (event.stage === "frame-visible" && event.jobId)
+			firstVisible.set(
+				event.jobId,
+				Math.min(firstVisible.get(event.jobId) ?? Infinity, event.durationMs),
+			);
+		const skillId = event.skillId ?? skills.get(event.frameId);
+		if (skillId) {
+			const entry = perSkill.get(skillId) ?? {
+				latencies: [],
+				guidance: new Set<number>(),
+			};
+			if (event.stage === "frame-output")
+				entry.latencies.push(event.durationMs);
+			if (event.stage === "frame-context" && event.skillChars !== undefined)
+				entry.guidance.add(event.skillChars);
+			perSkill.set(skillId, entry);
+		}
+		if (
+			event.stage === "frame-output" &&
+			event.frameId &&
+			event.outputTokens !== undefined
+		)
+			frameTokens.set(
+				event.frameId,
+				(frameTokens.get(event.frameId) ?? 0) + event.outputTokens,
 			);
 		if (event.stage === "validation" && event.frameId) {
 			validated.add(event.frameId);
@@ -67,7 +109,22 @@ export function summarizeStudioTimings(log: string) {
 			[...buckets].map(([stage, values]) => [stage, summarize(values)]),
 		),
 		firstReadyMs: [...firstReady.values()],
-		firstVisibleMs: buckets.get("frame-visible") ?? [],
+		firstVisibleMs: [...firstVisible.values()],
+		perSkill: Object.fromEntries(
+			[...perSkill].map(([id, entry]) => [
+				id,
+				{
+					outputLatency: entry.latencies.length
+						? summarize(entry.latencies)
+						: null,
+					guidanceChars: [...entry.guidance],
+				},
+			]),
+		),
+		meanMeasuredOutputTokensPerFrame: frameTokens.size
+			? [...frameTokens.values()].reduce((sum, value) => sum + value, 0) /
+				frameTokens.size
+			: null,
 		meanMeasuredOutputTokensPerRequest: tokens.length
 			? tokens.reduce((sum, value) => sum + value, 0) / tokens.length
 			: null,

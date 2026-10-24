@@ -68,6 +68,36 @@ it("reports observed latency and rates without inventing absent measurements", (
 	});
 });
 
+it("separates frame token totals from planning and groups skill latency", () => {
+	const events = [
+		{ stage: "planning-output", outputTokens: 900, durationMs: 10 },
+		{
+			stage: "frame-context",
+			skillId: "impeccable",
+			skillChars: 23457,
+			durationMs: 0,
+		},
+		{ stage: "frame-output", outputTokens: 100, durationMs: 20 },
+		{ stage: "frame-output", outputTokens: 50, durationMs: 30 },
+		{ stage: "frame-visible", durationMs: 500 },
+		{ stage: "frame-visible", durationMs: 600 },
+	]
+		.map((event) =>
+			JSON.stringify({
+				scope: "studio",
+				jobId: "job",
+				frameId: "frame",
+				...event,
+			}),
+		)
+		.join("\n");
+	const report = summarizeStudioTimings(events);
+	expect(report.meanMeasuredOutputTokensPerFrame).toBe(150);
+	expect(report.firstVisibleMs).toEqual([500]);
+	expect(report.perSkill.impeccable.outputLatency?.mean).toBe(25);
+	expect(report.perSkill.impeccable.guidanceChars).toEqual([23457]);
+});
+
 it("ignores non-telemetry, malformed, and non-finite input", () => {
 	const report = summarizeStudioTimings(
 		'private log\n{}\n{"scope":"studio","stage":"x","durationMs":-1}\nnot-json',
