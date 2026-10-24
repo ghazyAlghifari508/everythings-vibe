@@ -25,6 +25,8 @@
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
+    "audit": "knip",
+    "audit:deadcode": "knip",
     "test": "pnpm studio:assets:check && vitest run"
   },
   "dependencies": {
@@ -87,6 +89,7 @@
     "commander": "^12.1.0",
     "dotenv": "^17.3.1",
     "jsdom": "^29.1.1",
+    "knip": "^6.42.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
