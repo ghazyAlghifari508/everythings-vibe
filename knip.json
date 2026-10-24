@@ -3,8 +3,7 @@
   "workspaces": {
     ".": {
       "entry": ["src/router.tsx", "src/routes/**/*.{ts,tsx}"],
-      "project": ["src/**/*.{ts,tsx,css}!", "e2e/**/*.{ts,tsx}!"],
-      "ignoreDependencies": ["chalk", "commander"]
+      "project": ["src/**/*.{ts,tsx,css}!", "e2e/**/*.{ts,tsx}!"]
     },
     "packages/cli": {
       "entry": ["src/commands/*.ts"],
