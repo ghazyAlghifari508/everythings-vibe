@@ -11,6 +11,7 @@ import {
 } from "@/features/studio/types/studio-preview";
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { readFrameVisualError } from "@/features/studio/utils/studio-frame-artboard";
+import { studioJobTiming } from "../services/studio-timing";
 
 interface UseStudioFrameVisualInput {
 	frame: StudioFrameRow;
@@ -88,6 +89,7 @@ export function useStudioFrameVisual({
 		async function load() {
 			if (started || controller.signal.aborted) return;
 			started = true;
+			const startedAt = Date.now();
 			deadline = setTimeout(() => {
 				fail("Pratinjau belum dapat dimuat. Silakan coba lagi.");
 				controller.abort();
@@ -113,6 +115,10 @@ export function useStudioFrameVisual({
 					attempt: visualAttempt,
 					visual: parsed.data,
 					error: "",
+				});
+				studioJobTiming("preview-available", startedAt, {
+					projectId: input.projectId,
+					frameId: input.id,
 				});
 				setMeasuredHeight(parsed.data.height);
 				measure(parsed.data.width, parsed.data.height);

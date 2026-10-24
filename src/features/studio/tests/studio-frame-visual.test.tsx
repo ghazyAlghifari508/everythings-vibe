@@ -100,6 +100,28 @@ async function intersect(index = intersections.length - 1) {
 }
 
 describe("frame preview requests", () => {
+	it("records preview availability without including the asset URL", async () => {
+		fetchMock.mockResolvedValue(Response.json(preview));
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			mount();
+			await intersect();
+			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			expect(events).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						scope: "studio",
+						stage: "preview-available",
+						frameId: "frame-a",
+						durationMs: expect.any(Number),
+					}),
+				]),
+			);
+			expect(JSON.stringify(events)).not.toContain(preview.url);
+		} finally {
+			log.mockRestore();
+		}
+	});
 	it("loads a newly ready frame lazily without remount and starts only once", async () => {
 		fetchMock.mockResolvedValue(Response.json(preview));
 		const { result, rerender } = mount(
