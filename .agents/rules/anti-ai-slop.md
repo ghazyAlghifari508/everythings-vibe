@@ -155,11 +155,13 @@ Every interactive surface must be explicitly designed for four fundamental state
 3. **Jangan menambahkan tab hanya karena terdapat dua bentuk data internal yang berbeda.**
 4. **Jangan menambahkan toolbar berlapis tanpa navigational hierarchy yang nyata.**
 5. **Jangan menampilkan recovery action pada state sukses kecuali ada alasan yang terbukti.**
-6. **Jangan menjadikan informasi teknis internal sebagai copy utama user-facing.**
+6. **Jangan menjadikan informasi teknis internal sebagai copy utama user-facing.** Dilarang membocorkan implementasi teknis internal ke copy user-facing (misal: "resource website", "subresource", "DOM preview", "timeout 8 detik"). Selalu gunakan bahasa yang berorientasi pada sudut pandang dan benefit user.
 7. **Jangan menambahkan Search, Filter, Sort, Retry, Refresh, Export, atau CTA secara otomatis hanya agar tampilan terlihat lebih lengkap.**
-8. **Jangan menampilkan output analisis/internal reference sebagai konten produk yang sedang dibangun kecuali pengguna memintanya.**
-9. **Jangan membuat dua komponen independen yang mengontrol aksi identik tanpa justification yang dapat diuji.**
-10. **Jangan membuat abstraksi, dependency, state atau hook baru apabila solusi existing lebih sederhana dan memadai.**
+8. **Jangan membuat tombol aksi dengan label yang ambigu atau tidak jelas** (misal: "Coba lagi jika tersedia", "Coba lagi — belum tersedia"). Buat aksi tegas: "Coba lagi" (dengan status cooldown atau tooltip terpisah jika ada rate limit).
+9. **Jangan menambahkan elemen feedback atau konfirmasi redundant** (misal: menampilkan icon centang sekaligus banner/toast teks statis yang bertahan lama padahal aksi copy sudah self-explanatory melalui status icon button dan `sr-only` aria-live).
+10. **Jangan menampilkan output analisis/internal reference sebagai konten produk yang sedang dibangun kecuali pengguna memintanya.**
+11. **Jangan membuat dua komponen independen yang mengontrol aksi identik tanpa justification yang dapat diuji.**
+12. **Jangan membuat abstraksi, dependency, state atau hook baru apabila solusi existing lebih sederhana dan memadai.**
 
 ### 3.2 Mandatory Existing-Action Audit
 
@@ -303,6 +305,9 @@ Pengguna akhir menggunakan platform untuk menyelesaikan tugas produk mereka, buk
 ❌ "Schema validation failed: missing key 'colors.primary'."
 ❌ "Measurement-only fallback."
 ❌ "Playwright chromium worker exited with code 1."
+❌ "Preview dimuat sebagian karena kegagalan resource website."
+❌ "DOM preview gagal setelah timeout 8 detik."
+❌ "Subresource fetch error: HTTP 403."
 ```
 
 #### Protokol Penanganan Diagnostik Internal:
@@ -417,6 +422,8 @@ Bahasa antarmuka mencerminkan profesionalisme dan kejelasan produk bagi pengguna
   - Copy ditulis singkat, jelas, padat, dan natural dalam **Bahasa Indonesia**.
   - Tampilkan secara transparan apa yang sedang terjadi dan apa tindakan konkret yang dapat diambil oleh pengguna.
   - Technical details tetap diperbolehkan, namun ditempatkan pada area detail/inspeksi sekunder yang relevan (misal accordion metadata atau raw response viewer), bukan pada hero atau action bar utama.
+  - **Label Aksi Tegas & Bebas Ambiguitas:** Dilarang menggunakan label aksi yang ragu-ragu atau bersyarat kabur seperti *"Coba lagi jika tersedia"*, *"Coba lagi — belum tersedia"*. Label tombol harus tegas (*"Coba lagi"*, *"Mencoba lagi..."*). Jika tombol dinonaktifkan sementara karena waktu tunggu/rate limit, sampaikan sisa waktu secara terpisah pada teks keterangan atau tooltip, bukan memperpanjang label tombol dengan kalimat bersyarat.
+  - **Feedback Aksi Efisien & Anti-Redundansi:** Untuk aksi instan seperti penyalinan clipboard (*Copy*), hindari menampilkan banner atau toast teks statis yang bertahan lama jika feedback visual sudah jelas (misal pergantian icon ke centang selama 2 detik). Cukup gunakan perubahan icon button dan pengumuman aksesibilitas (`sr-only` aria-live) tanpa menambahkan banner/notifikasi visual baru yang mengacaukan layout.
 
 ### 3.11 Agent Design Handoff Boundaries
 
@@ -481,7 +488,9 @@ Before finalizing any frontend work or opening a PR, verify every item across bo
 - [ ] **No unnecessary new controls** (No speculative search, filters, or buttons added without need)
 - [ ] **No more navigation layers than necessary** (Single toolbar where sufficient; secondary only when strictly justified)
 - [ ] **Every state-specific control appears in the right state** (Recovery actions isolated to error states; no retry on success)
-- [ ] **No internal AI/provider/schema jargon in primary UI** (User-facing copy is natural Indonesian, devoid of internal diagnostics, schema errors, or fallback names)
+- [ ] **No internal AI/provider/schema jargon in primary UI** (User-facing copy is natural Indonesian, devoid of internal diagnostics, schema errors, fallback names, "resource website", "DOM preview", "timeout 8 detik", etc.)
+- [ ] **Action labels are clear and decisive** (Definite button copy like "Coba lagi" instead of ambiguous "Coba lagi jika tersedia")
+- [ ] **No redundant feedback elements** (Visual icon transition + screen-reader announcement without long-lived static text banners)
 - [ ] **No duplicated technical statuses** (Status not repeated across header, subtitle, banner, toast, and body)
 - [ ] **No warning for irrelevant internal metadata** (No banners/toasts for minor internal failures that have no material impact on the user's deliverable)
 - [ ] **Materially incomplete output is disclosed honestly** (Truthful disclosure in clear Indonesian if the deliverable is degraded, without hiding failures)
