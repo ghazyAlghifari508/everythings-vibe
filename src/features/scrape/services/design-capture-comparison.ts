@@ -35,7 +35,7 @@ export function compareCaptures(views: VisualEvidence[]): DesignComparison[] {
 				(left.colorScheme ?? "auto") === (right.colorScheme ?? "auto");
 			if (sameViewport === samePreference) continue;
 			const kind = sameViewport ? "theme" : "responsive";
-			for (const element of left.elements) {
+			for (const [elementIndex, element] of left.elements.entries()) {
 				if (!element.text.trim() || element.role === "element") continue;
 				// ponytail: exact identity and content only; add stable element IDs before matching dynamic content.
 				const matches = right.elements.filter(
@@ -59,14 +59,24 @@ export function compareCaptures(views: VisualEvidence[]): DesignComparison[] {
 							{ capture: leftIndex + 1, value: a },
 							{ capture: rightIndex + 1, value: b },
 						],
+						provenance: [
+							{ capture: leftIndex + 1, element: elementIndex },
+							{
+								capture: rightIndex + 1,
+								element: right.elements.indexOf(match),
+							},
+						],
 						confidence: "observed",
 					};
-					if (
-						!comparisons.some(
-							(existing) => JSON.stringify(existing) === JSON.stringify(entry),
-						)
-					)
-						comparisons.push(entry);
+					const existing = comparisons.find(
+						(candidate) =>
+							candidate.kind === kind &&
+							candidate.role === entry.role &&
+							candidate.property === property &&
+							JSON.stringify(candidate.values) === JSON.stringify(entry.values),
+					);
+					if (existing) existing.provenance.push(...entry.provenance);
+					else comparisons.push(entry);
 				}
 			}
 		}

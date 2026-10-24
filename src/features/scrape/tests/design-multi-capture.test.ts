@@ -107,6 +107,17 @@ describe("semantic multi-capture normalization", () => {
 					entry.values.map((value) => value.value).join(",") === "8px,16px",
 			),
 		).toBe(true);
+		const radiusChange = changes.find(
+			(entry) => entry.role === "cta" && entry.property === "border-radius",
+		);
+		expect(radiusChange?.provenance).toHaveLength(4);
+		for (const reference of radiusChange?.provenance ?? []) {
+			const evidence = captures();
+			const view = [evidence, ...evidence.additionalViews][
+				reference.capture - 1
+			];
+			expect(view?.elements[reference.element]?.role).toBe("cta");
+		}
 		const document = renderDesignMd(model);
 		const inspector = inspectorFromEvidence(captures(), document);
 		expect(

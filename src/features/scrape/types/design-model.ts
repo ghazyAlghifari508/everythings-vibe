@@ -145,6 +145,7 @@ export interface DesignComparison {
 	role: string;
 	property: string;
 	values: { capture: number; value: string }[];
+	provenance: { capture: number; element: number }[];
 	confidence: Confidence;
 }
 
