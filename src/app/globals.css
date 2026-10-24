@@ -238,7 +238,7 @@ input:autofill:active {
 	transition: background-color 5000s ease-in-out 0s;
 }
 
-/* Surface-aware autofill backgrounds matching VibeEverything container tokens */
+/* Surface-aware autofill backgrounds matching everythings-vibe container tokens */
 .bg-charcoal input:-webkit-autofill,
 .bg-charcoal input:-webkit-autofill:hover,
 .bg-charcoal input:-webkit-autofill:focus,

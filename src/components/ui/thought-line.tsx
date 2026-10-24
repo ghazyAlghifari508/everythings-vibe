@@ -25,7 +25,7 @@ import { Icon } from "./icon";
 // Behaviour contract ported from the ReactBits ThoughtLine micro-interaction
 // (https://reactbits.dev/micro/thought-line): a reasoning-trace header with a
 // breathing glyph, a live clock that glides between the working and settled
-// labels, and a fold-out step trace. Paint comes from the VibeEverything theme
+// labels, and a fold-out step trace. Paint comes from the everythings-vibe theme
 // tokens (see .thought-line in globals.css) instead of ReactBits' own palette.
 const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
 const EASE_IN_OUT: [number, number, number, number] = [0.77, 0, 0.175, 1];
