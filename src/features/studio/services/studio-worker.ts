@@ -10,6 +10,7 @@ process.on("SIGTERM", () => {
 	stopping = true;
 });
 
+const startupStartedAt = Date.now();
 let stage = "module-load";
 async function run() {
 	if (!process.env.DATABASE_URL) {
@@ -27,6 +28,8 @@ async function run() {
 	try {
 		stage = "database";
 		await db.execute(sql`select 1`);
+		const { studioJobTiming } = await import("./studio-job-runtime");
+		studioJobTiming("worker-startup", startupStartedAt, {});
 		console.info("Studio worker ready");
 		stage = "dispatch";
 		while (!stopping) {

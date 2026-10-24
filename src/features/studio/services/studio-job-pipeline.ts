@@ -128,22 +128,28 @@ export async function runStudioJobPipeline(
 				const frameStartedAt = Date.now();
 				const allScreenNames = frames.map((frame) => frame.name);
 				const results = await runWithConcurrency(
-					frames.map(
-						(frame) => () =>
-							generateInitialFrame({
-								frame,
-								jobPrompt: job.prompt,
-								allScreenNames,
-								designSkillId: project.designSkillId,
-								designMd: project.designMd,
-								logoUrl,
-								dsTokens,
-								blueprint,
-								prdContent: project.prdContent,
-								lease: claim,
-								signal,
-							}),
-					),
+					frames.map((frame) => async () => {
+						const result = await generateInitialFrame({
+							frame,
+							jobPrompt: job.prompt,
+							allScreenNames,
+							designSkillId: project.designSkillId,
+							designMd: project.designMd,
+							logoUrl,
+							dsTokens,
+							blueprint,
+							prdContent: project.prdContent,
+							lease: claim,
+							signal,
+						});
+						if (result.ok && frame.status !== "ready")
+							studioJobTiming("frame-ready", job.createdAt.getTime(), {
+								jobId,
+								projectId,
+								frameId: frame.id,
+							});
+						return result;
+					}),
 					STUDIO_FRAME_CONCURRENCY,
 				);
 				signal.throwIfAborted();
