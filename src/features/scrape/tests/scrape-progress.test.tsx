@@ -362,12 +362,10 @@ describe("failed state delegates to the shared error card", () => {
 		);
 		expect(screen.getAllByRole("alert")).toHaveLength(1);
 		expect(screen.queryByText("Aktivitas terbaru")).toBeNull();
-		expect(
-			screen.getAllByRole("button", { name: "Coba lagi jika tersedia" }),
-		).toHaveLength(1);
-		fireEvent.click(
-			screen.getByRole("button", { name: "Coba lagi jika tersedia" }),
+		expect(screen.getAllByRole("button", { name: "Coba lagi" })).toHaveLength(
+			1,
 		);
+		fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
 		expect(retry).toHaveBeenCalledTimes(1);
 		expect(screen.queryByRole("timer")).toBeNull();
 	});
