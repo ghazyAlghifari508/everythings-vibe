@@ -174,6 +174,7 @@ export async function runImageExtraction(params: {
 		},
 	});
 	let quotaFailure: ImageStorageError | undefined;
+	const rateLimitedOrigins = new Map<string, ScrapeError>();
 	let retryAfterSeconds: number | undefined;
 	for (const image of images) {
 		if (savedUrls.has(image.url)) continue;
@@ -188,6 +189,11 @@ export async function runImageExtraction(params: {
 		};
 		try {
 			if (quotaFailure) throw quotaFailure;
+			const rateLimited = rateLimitedOrigins.get(new URL(image.url).origin);
+			if (rateLimited)
+				throw new ScrapeError("WEBSITE_RATE_LIMITED", undefined, {
+					retryAfterSeconds: rateLimited.retryAfterSeconds,
+				});
 			const asset = await fetchImageAsset(image.url, claim.signal, allowUrl);
 			httpStatus = asset.status;
 			if (asset.status < 200 || asset.status >= 300)
@@ -222,6 +228,8 @@ export async function runImageExtraction(params: {
 			imageAsset = asset;
 		} catch (failure) {
 			if (claim.signal?.aborted) throw failure;
+			if (failure instanceof ScrapeError && failure.httpStatus === 429)
+				rateLimitedOrigins.set(new URL(image.url).origin, failure);
 			if (
 				failure instanceof ScrapeError &&
 				failure.retryAfterSeconds !== undefined

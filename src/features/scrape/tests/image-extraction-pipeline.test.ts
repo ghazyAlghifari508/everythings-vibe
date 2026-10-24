@@ -145,7 +145,10 @@ it.each([
 	expect(state.rows.size).toBe(3);
 	expect(
 		[...state.rows.values()].every(
-			(row) => row.httpStatus === status && !row.assetId,
+			(row) =>
+				(row.httpStatus === status ||
+					(status === 429 && row.httpStatus === null)) &&
+				!row.assetId,
 		),
 	).toBe(true);
 	expect(update).toHaveBeenLastCalledWith(
@@ -160,7 +163,7 @@ it.each([
 	);
 	expect(
 		state.fetch.mock.calls.filter(([url]) => !url.endsWith("robots.txt")),
-	).toHaveLength(status === 500 ? 6 : 3);
+	).toHaveLength(status === 500 ? 6 : status === 429 ? 1 : 3);
 });
 
 it("stops downloading after storage quota and keeps the first saved asset", async () => {
