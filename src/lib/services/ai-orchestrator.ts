@@ -41,13 +41,9 @@ export async function tryStreamWithFallback(
 		const attemptCeiling = 1 + AI_STREAM_RETRY_ATTEMPTS;
 		for (let attempt = 0; attempt < attemptCeiling; attempt++) {
 			const abortController = new AbortController();
-			// Named listener removed in finally: without this, every attempt
-			// leaks a closure (and its AbortController) onto externalSignal.
-			const propagateAbort = () => abortController.abort();
-			if (externalSignal) {
-				if (externalSignal.aborted) abortController.abort();
-				else externalSignal.addEventListener("abort", propagateAbort);
-			}
+			const signal = externalSignal
+				? AbortSignal.any([externalSignal, abortController.signal])
+				: abortController.signal;
 			const outcome: StreamOutcome = {};
 			// Thinking streams live: reasoning tokens reach the client during the
 			// 30-80s reasoning phase instead of waiting for the first text-delta.
@@ -57,7 +53,7 @@ export async function tryStreamWithFallback(
 			const gen = streamChat(
 				messages,
 				modelToTry,
-				abortController.signal,
+				signal,
 				maxTokens,
 				outcome,
 				onThinking
@@ -94,8 +90,6 @@ export async function tryStreamWithFallback(
 				const willRetry = attempt < attemptCeiling - 1 || i < models.length - 1;
 				if (attemptThinking && willRetry) onThinkingReset?.();
 				if (attempt < attemptCeiling - 1) continue;
-			} finally {
-				externalSignal?.removeEventListener("abort", propagateAbort);
 			}
 		}
 	}
