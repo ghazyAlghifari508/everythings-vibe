@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+!.env.example
+node_modules
+.output
+.nitro
+.tanstack
+.vite
+dist
+dist-ssr
+coverage
+playwright-report
+test-results
+.backups

@@ -1,0 +1,106 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Set BETTER_AUTH_URL}
+      APP_URL: ${APP_URL:?Set APP_URL}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      NINE_ROUTER_URL: ${NINE_ROUTER_URL:-http://localhost:20128}
+      NINE_ROUTER_API_KEY: ${NINE_ROUTER_API_KEY:-}
+      MIDTRANS_ENVIRONMENT: ${MIDTRANS_ENVIRONMENT:-sandbox}
+      MIDTRANS_SERVER_KEY_SANDBOX: ${MIDTRANS_SERVER_KEY_SANDBOX:-}
+      MIDTRANS_CLIENT_KEY_SANDBOX: ${MIDTRANS_CLIENT_KEY_SANDBOX:-}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      FEEDBACK_EMAIL: ${FEEDBACK_EMAIL:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      CRON_BILLING_SECRET: ${CRON_BILLING_SECRET:-}
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  scrape-worker:
+    build: .
+    command: ["node", "--import", "tsx", "src/features/scrape/services/scrape-worker.ts"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+    profiles: ["workers"]
+
+  studio-worker:
+    build: .
+    command: ["node", "--import", "tsx", "src/features/studio/services/studio-worker.ts"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      NINE_ROUTER_URL: ${NINE_ROUTER_URL:-http://localhost:20128}
+      NINE_ROUTER_API_KEY: ${NINE_ROUTER_API_KEY:-}
+    profiles: ["workers"]
+    depends_on:
+      web:
+        condition: service_started
+
+  codebase-worker:
+    build: .
+    command: ["node", "--import", "tsx", "src/features/codebase/services/durable-worker.ts"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      NINE_ROUTER_URL: ${NINE_ROUTER_URL:-http://localhost:20128}
+      NINE_ROUTER_API_KEY: ${NINE_ROUTER_API_KEY:-}
+    profiles: ["workers"]
+
+  billing-scheduler:
+    build: .
+    command: ["sh", "-c", "last_run=''; while true; do now=$$(date -u +%H:%M); today=$$(date -u +%F); if [ \"$$now\" = 03:00 ] && [ \"$$today\" != \"$$last_run\" ]; then last_run=$$today; node --import tsx scripts/run-billing-cron.ts || echo 'Billing cron invocation failed'; fi; sleep 10; done"]
+    restart: unless-stopped
+    environment:
+      APP_URL: http://web:3000
+      CRON_BILLING_SECRET: ${CRON_BILLING_SECRET:?Set CRON_BILLING_SECRET}
+      CRON_TIMEOUT_MS: ${CRON_TIMEOUT_MS:-30000}
+    profiles: ["scheduler"]
+    depends_on:
+      web:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -259,7 +259,7 @@ export async function getResilientBrowser(): Promise<Browser> {
 
 ### Inisiatif 12: Infra & Deployment Overhaul — Migrasi Total dari Vercel ke Self-Hosted VPS (Docker, Caddy & Zero Vercel)
 
-- **Status:** `Not Started`
+- **Status:** `In Progress — local self-hosting preparation; VPS migration pending`
 - **Prioritas:** `P1` (Kritis untuk Mengeliminasi Serverless Timeout & Vendor Lock-In)
 - **Kompleksitas:** `Sedang - Tinggi`
 - **Tujuan:** Mengeliminasi ketergantungan pada Vercel secara 100%, menghapus seluruh artefak Vercel (`vercel.json`, Vercel Cron, env hacks), dan memigrasikan web TanStack Start SSR, Playwright Scrape Worker, Studio Worker, dan billing cron ke VPS Linux mandiri berbasis Docker Compose dan reverse proxy Caddy (automatic SSL Let's Encrypt).
@@ -291,16 +291,19 @@ flowchart TD
 
 #### Checklist Eksekusi Bertahap
 
-- [ ] **Fase 1 — Docker Packaging:** Buat multi-stage `Dockerfile` (Node 22, pnpm, build output `.output/server/index.mjs`) dan `docker-compose.yml` untuk web app dan worker daemons. Uji build lokal hingga lolos tanpa error.
+Persiapan lokal pada Inisiatif 12 dikerjakan melalui `docs/prompt-random/p4.md`; item belum selesai membutuhkan validasi Docker atau infrastruktur sungguhan.
+
+- [ ] **Fase 1 — Docker Packaging:** Implementasi multi-stage `Dockerfile` (Node 22, pnpm, Nitro Node server `.output/server/index.mjs`) dan Compose service web plus tiga worker; verifikasi `docker compose config`, build image, serta container smoke test pada host Docker (belum diverifikasi: Docker CLI tidak tersedia di lingkungan implementasi).
 - [ ] **Fase 2 — Transisi Cron Billing:**
+  - [ ] Compose scheduler mandiri opsional pada profile `scheduler`, target 03:00 UTC dan endpoint/secret terautentikasi; konfigurasi/build scheduler belum tervalidasi karena Docker CLI tidak tersedia.
   - [x] Buat skrip cron mandiri provider-independent (`scripts/run-billing-cron.ts`, `pnpm cron:billing`) dengan timeout handling, zero-secret-leakage logging, dan dokumentasi host scheduler (`docs/deployment/billing-scheduler.md`).
   - [ ] Aktivasi live scheduler / systemd timer pada host VPS (tertunda hingga VPS diprovisioning).
 - [x] **Fase 3 — Eliminasi Total Konfigurasi Vercel:**
   - [x] Hapus permanen `vercel.json` dari root repositori.
   - [x] Hapus fallback ke `process.env.CRON_SECRET` di `src/features/billing/services/billing-cron.server.ts` (gunakan hanya `CRON_BILLING_SECRET`).
   - [x] Sanitasi instruksi dan referensi Vercel di `.env.example` dan dokumentasi teknis.
-- [ ] **Fase 4 — Konfigurasi VPS & Reverse Proxy Caddy:** Siapkan instance VPS (Ubuntu/Debian), konfigurasi firewall (UFW 80, 443, 22), dan siapkan `Caddyfile` dengan automatic HTTPS Let's Encrypt, HTTP/3, dan reverse proxy ke port 3000.
-- [ ] **Fase 5 — Pipeline CI/CD:** Buat workflow GitHub Actions (`.github/workflows/deploy.yml`) untuk auto-deploy via SSH ke VPS saat push ke branch `main`.
+- [ ] **Fase 4 — Konfigurasi VPS & Reverse Proxy Caddy:** Template `Caddyfile` localhost/parameterized domain dan panduan konfigurasi tersedia; provisioning VPS, firewall (UFW 80/443/22), DNS/domain, dan verifikasi HTTPS publik menunggu infrastruktur nyata.
+- [ ] **Fase 5 — Pipeline CI/CD:** Tidak ada remote deploy workflow tanpa VPS/otorisasi; build-only CI dapat ditambahkan setelah kebutuhan runner ditentukan.
 - [ ] **Fase 6 — Cutover & Verifikasi Live:** Arahkan DNS domain utama ke IP VPS, verifikasi sertifikat SSL otomatis, uji Better Auth login, Midtrans webhook callback, dan background workers.
 
 ---
