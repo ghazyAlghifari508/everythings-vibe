@@ -106,7 +106,8 @@ The most common defect in this repo is a change that works on the path you teste
 
 - `pnpm install` installs dependencies.
 - `pnpm dev` starts the Vite / TanStack Start development server on port 3000 (`node --dns-result-order=ipv4first node_modules/vite/bin/vite.js dev --port 3000`).
-- `pnpm dev:all` starts both the web development server and the background scraping worker process.
+- `pnpm dev:all` starts the web development server plus the background scraping and durable codebase-generation workers.
+- `pnpm codebase:worker` runs just the durable codebase-generation worker. Existing-codebase generation executes in this worker, not in the request that accepted it, so refresh or disconnect cannot cancel accepted work.
 - Stop what you started, by the PID you tracked. See rule 1.
 
 ---
