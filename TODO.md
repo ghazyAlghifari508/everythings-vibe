@@ -150,13 +150,13 @@ File monster historis dari fase awal telah berhasil didekonstruksi sepenuhnya:
 
 #### Sisa File Melebihi Batas 400 Baris (Target Refactor Aktif)
 
-Berdasarkan audit riil codebase per Oktober 2026, tersisa 2 file implementasi produksi yang melebihi batas 400 baris:
+Berdasarkan audit riil codebase per Oktober 2026, tersisa 1 file implementasi produksi yang melebihi batas 400 baris:
 
-1. **`src/components/ui/thought-line.tsx` (521 baris):**
+1. **`src/components/ui/thought-line.tsx` (548 baris $\rightarrow$ 142 baris):** $\checkmark$ Selesai 2026-10-25.
    - Menampung visualisasi stream reasoning AI, animasi pulse, expand/collapse state, markdown typewriter, dan telemetry.
-   - [ ] Ekstraksi renderer animasi dan collapsible header ke sub-komponen terpisah di `src/components/ui/thought-line/`.
-   - [ ] Ekstraksi kalkulasi step timing ke custom hook `use-thought-stream.ts`.
-   - [ ] Ringankan `thought-line.tsx` hingga $\le$ 300 baris.
+   - [x] Ekstraksi renderer animasi dan collapsible header ke sub-komponen terpisah di `src/components/ui/thought-line/` (`thought-line-header.tsx`, `thought-line-trace.tsx`).
+   - [x] Ekstraksi kalkulasi step timing ke custom hook `use-thought-stream.ts`, plus `thought-line-timing.ts` dan `thought-line-types.ts`.
+   - [x] Ringankan `thought-line.tsx` hingga $\le$ 300 baris.
 
 2. **`src/features/billing/components/credit-exhausted-modal.tsx` (408 baris):**
    - Menampung dialog penolakan kredit habis, kalkulasi selisih top-up, pemilihan paket kredit Midtrans, trigger checkout Snap, dan fallback manual transfer.
