@@ -205,7 +205,7 @@ export class CliVersionError extends Error {
 
 	constructor() {
 		super(
-			`This CLI version is below the required minimum ${CODEBASE_CLI_MIN_VERSION}. Update with: npm i -g @ghazynabiel/vibeeverything`,
+			`This CLI version is below the required minimum ${CODEBASE_CLI_MIN_VERSION}. Update with: npm i -g @ghazynabiel/everythings-vibe`,
 		);
 		this.name = "CliVersionError";
 	}

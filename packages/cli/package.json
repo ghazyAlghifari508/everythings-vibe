@@ -1,10 +1,11 @@
 {
-  "name": "@ghazynabiel/vibeeverything",
+  "name": "@ghazynabiel/everythings-vibe",
   "version": "3.2.1",
-  "description": "CLI tool for VibeEverything — manage projects, codebases, and tasks from terminal",
+  "description": "CLI tool for everythings-vibe — manage projects, codebases, and tasks from terminal",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
+    "everythings-vibe": "dist/index.js",
     "vibeeverything": "dist/index.js",
     "vibe": "dist/index.js",
     "prdfy": "dist/index.js"
@@ -26,7 +27,9 @@
     "@types/node": "^20.0.0"
   },
   "keywords": [
+    "everythings-vibe",
     "vibeeverything",
+    "prdfy",
     "cli",
     "kanban"
   ],

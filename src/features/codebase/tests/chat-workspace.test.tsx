@@ -154,7 +154,7 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 			"Jelaskan fitur, perubahan, atau masalah yang ingin kamu kerjakan.",
 		);
 		expect(text).toContain(
-			"VibeEverything akan menyesuaikannya dengan struktur codebase ini.",
+			"everythings-vibe akan menyesuaikannya dengan struktur codebase ini.",
 		);
 		// 4. Context signal / pill is removed completely
 		expect(
@@ -1567,7 +1567,7 @@ describe("CodebaseChatWorkspace artifacts", () => {
 			container.querySelector("[data-testid='codebase-handoff-card']"),
 		).not.toBeNull();
 		expect(container.textContent).toContain(
-			"npx vibeeverything export plan proj-123 --root .",
+			"npx everythings-vibe export plan proj-123 --root .",
 		);
 	});
 
@@ -1769,7 +1769,7 @@ describe("CodebaseChatWorkspace pipeline stages", () => {
 		// The handoff uses the real project id with the CLI plan export, not the
 		// old rules export and not a placeholder.
 		expect(card?.textContent).toContain(
-			"npx vibeeverything export plan proj-123 --root .",
+			"npx everythings-vibe export plan proj-123 --root .",
 		);
 		expect(card?.textContent).not.toContain("export rules");
 		expect(card?.textContent).toContain("docs/vibeplan/");

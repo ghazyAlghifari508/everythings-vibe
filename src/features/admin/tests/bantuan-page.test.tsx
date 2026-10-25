@@ -82,7 +82,7 @@ describe("BantuanPage Information Architecture & Guides", () => {
 		expect(screen.getByText("Alur Kerja VibePlan")).toBeDefined();
 		expect(screen.getByText("Alur Kerja VibeDesign")).toBeDefined();
 		expect(screen.getByText("Alur Kerja VibeScrape")).toBeDefined();
-		expect(screen.getByText("Alur Kerja VibeEverything CLI")).toBeDefined();
+		expect(screen.getByText("Alur Kerja everythings-vibe CLI")).toBeDefined();
 	});
 
 	it("defaults to VibePlan guide and allows selecting another guide", () => {

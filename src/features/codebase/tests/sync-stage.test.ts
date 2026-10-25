@@ -198,7 +198,7 @@ describe("uploading", () => {
 		);
 		expect(stage(view, 2).title).toBe("Menyinkronkan codebase...");
 		expect(stage(view, 2).detail).toBe(
-			"Mengirim source code ke VibeEverything.",
+			"Mengirim source code ke everythings-vibe.",
 		);
 	});
 

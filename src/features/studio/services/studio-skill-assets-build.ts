@@ -38,6 +38,14 @@ if (process.argv.includes("--check")) {
 		"Stale Studio skill assets; run pnpm studio:assets",
 	);
 } else {
-	writeFileSync(output, generated);
+	// Skip identical rewrites: a new mtime invalidates Vite's transform cache for
+	// this 700KB module on every dev restart even though the bytes never changed.
+	let existing: string | undefined;
+	try {
+		existing = readFileSync(output, "utf8");
+	} catch {
+		existing = undefined;
+	}
+	if (existing !== generated) writeFileSync(output, generated);
 }
 console.info(`Verified ${entries.length} pinned Studio skill assets`);

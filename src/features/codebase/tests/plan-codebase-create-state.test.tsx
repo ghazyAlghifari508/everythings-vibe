@@ -27,7 +27,7 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
-const PROMPT_HEADING = "Sync codebase dengan VibeEverything";
+const PROMPT_HEADING = "Sync codebase dengan everythings-vibe";
 const ERROR_TITLE = "Gagal menyiapkan repository";
 const LOADING_CARD_TEXT = "Menunggu sesi sync...";
 
@@ -37,7 +37,7 @@ function syncPayload() {
 		apiBaseUrl: "http://localhost:3000",
 		syncToken: "fresh-token",
 		syncCommand:
-			"vibeeverything codebase sync --project-id cb-new-1 --sync-token fresh-token",
+			"everythings-vibe codebase sync --project-id cb-new-1 --sync-token fresh-token",
 		expiresAt: new Date(Date.now() + 3600000).toISOString(),
 	};
 }

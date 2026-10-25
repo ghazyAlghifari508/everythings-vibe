@@ -6,7 +6,7 @@ import {
 /**
  * Planning-mode directives shared by Fitur, PRD, AC, and Task generation.
  *
- * VibeEverything plans two fundamentally different jobs:
+ * everythings-vibe plans two fundamentally different jobs:
  *
  * - Greenfield: design a new application from the user's idea.
  * - Existing codebase: plan a CHANGE to an application that already exists.

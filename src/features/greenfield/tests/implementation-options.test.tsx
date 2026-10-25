@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { AI_AGENT_PROMPT_TEMPLATE } from "@/features/greenfield/components/task/ai-agent-prompt-template";
 import { shouldConfirmReset } from "@/features/greenfield/components/task/implementation-options";
+import { EXPORT_FILENAME_PREFIX } from "@/features/greenfield/types/greenfield-constants";
+
+describe("EXPORT_FILENAME_PREFIX", () => {
+	it("is canonically everythings-vibe", () => {
+		expect(EXPORT_FILENAME_PREFIX).toBe("everythings-vibe");
+	});
+});
 
 describe("shouldConfirmReset", () => {
 	it("asks for confirmation when progress exists", () => {

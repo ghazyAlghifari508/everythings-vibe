@@ -26,7 +26,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{ charSet: "utf-8" },
 			{ name: "viewport", content: "width=device-width, initial-scale=1" },
 			{
-				title: "VibeEverything - All-in-One AI Vibe-Coding Workspace",
+				title: "everythings-vibe - All-in-One AI Vibe-Coding Workspace",
 			},
 			{
 				name: "description",
@@ -37,8 +37,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		links: [
 			{ rel: "stylesheet", href: appCss },
 			{ rel: "stylesheet", href: appLayoutCss },
-			{ rel: "icon", type: "image/svg+xml", href: "/favicon-prdfy.svg" },
-			{ rel: "icon", type: "image/png", href: "/favicon-prdfy.png" },
+			{ rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+			{ rel: "icon", type: "image/png", href: "/favicon.png" },
 		],
 	}),
 	shellComponent: RootDocument,

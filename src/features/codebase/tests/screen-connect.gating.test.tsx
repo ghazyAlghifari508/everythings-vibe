@@ -13,7 +13,7 @@ const samplePayload: SyncPromptPayload = {
 	apiBaseUrl: "https://prdfy.example.com",
 	syncToken: "tok_gate",
 	cliMinVersion: "2.0.0",
-	syncCommand: "vibeeverything codebase sync",
+	syncCommand: "everythings-vibe codebase sync",
 	expiresAt: new Date(Date.now() + 60000).toISOString(),
 };
 
@@ -150,7 +150,7 @@ describe("Step 1 live sync status", () => {
 			expect(allStageStates()).toEqual(["done", "active", "waiting"]);
 			expect(container.textContent).toContain("Agent terhubung");
 			expect(container.textContent).toContain(
-				"Agent berhasil tersambung ke VibeEverything.",
+				"Agent berhasil tersambung ke everythings-vibe.",
 			);
 			expect(container.textContent).toContain("Menyiapkan source code...");
 			expect(container.textContent).toContain(

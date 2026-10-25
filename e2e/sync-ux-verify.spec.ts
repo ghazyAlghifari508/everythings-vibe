@@ -29,7 +29,7 @@ const MOUNT_SCRIPT = `(async () => {
     apiBaseUrl: "https://prdfy.example.com",
     syncToken: "tok_verify",
     cliMinVersion: "2.0.0",
-    syncCommand: "vibeeverything codebase sync --project-id proj_verify_123 --sync-token <token>",
+    syncCommand: "everythings-vibe codebase sync --project-id proj_verify_123 --sync-token <token>",
     expiresAt: new Date(Date.now() + 60000).toISOString(),
   };
 
@@ -70,7 +70,7 @@ const MOUNT_PRESTART_SCRIPT = `(async () => {
     apiBaseUrl: "https://prdfy.example.com",
     syncToken: "tok_verify",
     cliMinVersion: "2.0.0",
-    syncCommand: "vibeeverything codebase sync --project-id proj_verify_prestart --sync-token <token>",
+    syncCommand: "everythings-vibe codebase sync --project-id proj_verify_prestart --sync-token <token>",
     expiresAt: new Date(Date.now() + 60000).toISOString(),
   };
 
@@ -118,7 +118,7 @@ const MOUNT_FAILED_SCRIPT = `(async () => {
     apiBaseUrl: "https://prdfy.example.com",
     syncToken: "tok_verify",
     cliMinVersion: "2.0.0",
-    syncCommand: "vibeeverything codebase sync --project-id proj_verify_failed --sync-token <token>",
+    syncCommand: "everythings-vibe codebase sync --project-id proj_verify_failed --sync-token <token>",
     expiresAt: new Date(Date.now() + 60000).toISOString(),
   };
 
@@ -258,7 +258,7 @@ test.describe("existing-codebase onboarding — real browser render", () => {
 		const text = (await connect.innerText()) ?? "";
 		expect(text).toContain("proj_verify_123");
 		expect(text).toContain(
-			"vibeeverything codebase sync --project-id proj_verify_123",
+			"everythings-vibe codebase sync --project-id proj_verify_123",
 		);
 		expect(text).toContain("Wishlist Fitur");
 		// Every required section renders in the real browser.

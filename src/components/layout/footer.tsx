@@ -35,7 +35,7 @@ export function Footer() {
 						</Link>
 					</div>
 					<p className="font-inter text-[14px] text-slate">
-						&copy; {new Date().getFullYear()} VibeEverything. All rights
+						&copy; {new Date().getFullYear()} everythings-vibe. All rights
 						reserved.
 					</p>
 				</div>

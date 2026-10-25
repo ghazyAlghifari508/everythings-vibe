@@ -28,7 +28,7 @@ export const Route = createFileRoute("/codebases/")({
 	},
 	head: () => ({
 		meta: [
-			{ title: "Project Tersimpan | VibeEverything" },
+			{ title: "Project Tersimpan | everythings-vibe" },
 			{
 				name: "description",
 				content:

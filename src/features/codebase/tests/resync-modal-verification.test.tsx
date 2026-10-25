@@ -21,7 +21,7 @@ const samplePayload: SyncPromptPayload = {
 	apiBaseUrl: "https://vibeeverything.test",
 	syncToken: "tok_secret_p4_verify",
 	cliMinVersion: "0.1.0",
-	syncCommand: "vibeeverything codebase sync --project-id cb_p4_test_project",
+	syncCommand: "everythings-vibe codebase sync --project-id cb_p4_test_project",
 	expiresAt: "2026-12-31T23:59:59.000Z",
 };
 
@@ -69,7 +69,7 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 
 			// Initial prompt intent
 			expect(initialPrompt).toContain(
-				"Sinkronkan codebase repositori lokal ini ke project VibeEverything",
+				"Sinkronkan codebase repositori lokal ini ke project everythings-vibe",
 			);
 			expect(initialPrompt).not.toContain(
 				"Perbarui snapshot repository existing",
@@ -77,7 +77,7 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 
 			// Re-sync prompt intent & 10 required constraints
 			expect(resyncPrompt).toContain(
-				"Perbarui snapshot repository existing di VibeEverything menggunakan CLI resmi.",
+				"Perbarui snapshot repository existing di everythings-vibe menggunakan CLI resmi.",
 			);
 			expect(resyncPrompt).toContain("Repository ini sudah terhubung.");
 			expect(resyncPrompt).toContain(
@@ -103,7 +103,7 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 		});
 
 		it("preserves identical, valid CLI command format across both prompt builders", () => {
-			const expectedCommand = `vibeeverything codebase sync --project-id ${samplePayload.projectId} --sync-token ${samplePayload.syncToken}`;
+			const expectedCommand = `everythings-vibe codebase sync --project-id ${samplePayload.projectId} --sync-token ${samplePayload.syncToken}`;
 			const initialPrompt = buildAgentPrompt(samplePayload);
 			const resyncPrompt = buildResyncPrompt(samplePayload);
 

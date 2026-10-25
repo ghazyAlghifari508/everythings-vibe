@@ -39,7 +39,7 @@ const samplePayload: SyncPromptPayload = {
 	apiBaseUrl: "https://vibeeverything.example.com",
 	syncToken: "tok_resync_safe_123",
 	cliMinVersion: "2.0.0",
-	syncCommand: "vibeeverything codebase sync",
+	syncCommand: "everythings-vibe codebase sync",
 	expiresAt: new Date(Date.now() + 1800000).toISOString(),
 };
 
@@ -170,7 +170,7 @@ describe("Re-sync Drawer non-interference & interactions", () => {
 		expect(promptText).toContain("## Informasi Sinkronisasi");
 		expect(promptText).toContain("Project ID   : cb_existing_999");
 		expect(promptText).toContain("Sync Token   : tok_resync_safe_123");
-		expect(promptText).toContain("vibeeverything codebase sync");
+		expect(promptText).toContain("everythings-vibe codebase sync");
 	});
 
 	it("copies plain text prompt via clipboard helper without mangling tokens", async () => {

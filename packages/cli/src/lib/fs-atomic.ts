@@ -1,5 +1,5 @@
 /**
- * Atomic write + path-containment helpers for `vibeeverything export plan`.
+ * Atomic write + path-containment helpers for `everythings-vibe export plan`.
  *
  * Every write goes to a temp file in the same directory and is then renamed
  * over the target, so an interrupted export can never leave a half-written

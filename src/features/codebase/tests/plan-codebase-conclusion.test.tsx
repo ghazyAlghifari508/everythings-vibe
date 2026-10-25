@@ -77,7 +77,7 @@ function freshTokenPayload(projectId: string) {
 		projectId,
 		apiBaseUrl: "http://localhost:3000",
 		syncToken: `fresh-${projectId}`,
-		syncCommand: "vibeeverything codebase sync",
+		syncCommand: "everythings-vibe codebase sync",
 		expiresAt: new Date(Date.now() + 3600000).toISOString(),
 	};
 }
@@ -309,7 +309,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		await waitFor(
 			() => {
 				expect(
-					screen.getByText("Sync codebase dengan VibeEverything"),
+					screen.getByText("Sync codebase dengan everythings-vibe"),
 				).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },

@@ -26,6 +26,11 @@ describe("email template safety", () => {
 		expect(subject).toContain("2 Maret 2026");
 	});
 
+	it("renders canonical everythings-vibe sender footer", () => {
+		const { html } = preExpiryNoticeEmail("pro", new Date());
+		expect(html).toContain("Email otomatis dari everythings-vibe.");
+	});
+
 	it("omits links when APP_URL is missing or invalid", () => {
 		vi.stubEnv("APP_URL", "");
 		expect(resolveAppUrl()).toBeNull();

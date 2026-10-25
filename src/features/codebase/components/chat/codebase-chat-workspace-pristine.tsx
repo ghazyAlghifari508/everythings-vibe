@@ -62,7 +62,7 @@ export function CodebaseChatWorkspacePristine({
 					<p className="max-w-xl text-sm leading-relaxed text-fog sm:text-[15px]">
 						{newFeatureRepository
 							? `Rencanakan fitur baru untuk ${newFeatureRepository}.`
-							: "Jelaskan fitur, perubahan, atau masalah yang ingin kamu kerjakan. VibeEverything akan menyesuaikannya dengan struktur codebase ini."}
+							: "Jelaskan fitur, perubahan, atau masalah yang ingin kamu kerjakan. everythings-vibe akan menyesuaikannya dengan struktur codebase ini."}
 					</p>
 				</div>
 

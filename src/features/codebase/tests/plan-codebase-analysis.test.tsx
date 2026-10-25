@@ -33,7 +33,7 @@ const SYNC_PAYLOAD = {
 	apiBaseUrl: "http://localhost:3000",
 	syncToken: "onboard-token-1",
 	syncCommand:
-		"vibeeverything codebase sync --project-id cb-onboard-1 --sync-token onboard-token-1",
+		"everythings-vibe codebase sync --project-id cb-onboard-1 --sync-token onboard-token-1",
 	expiresAt: new Date(Date.now() + 3600000).toISOString(),
 };
 const VALID_STARTER_SUGGESTIONS = [
@@ -207,7 +207,7 @@ async function startSyncStep() {
 	render(<PlanCodebasePage />);
 	await waitFor(() => {
 		expect(
-			screen.getByText("Sync codebase dengan VibeEverything"),
+			screen.getByText("Sync codebase dengan everythings-vibe"),
 		).toBeDefined();
 	});
 }
@@ -392,7 +392,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		await waitFor(
 			() => {
 				expect(
-					screen.getByText("Sync codebase dengan VibeEverything"),
+					screen.getByText("Sync codebase dengan everythings-vibe"),
 				).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
@@ -760,7 +760,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		screen.getByRole("button", { name: /Kembali ke Sinkronisasi/i }).click();
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 		expect(screen.queryByText("Detected environment")).toBeNull();

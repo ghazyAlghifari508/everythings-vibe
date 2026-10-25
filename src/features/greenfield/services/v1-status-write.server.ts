@@ -81,7 +81,7 @@ export async function handleV1TaskStatusRequest(
 		return Response.json(
 			{
 				error:
-					"Task harus in_progress dulu sebelum completed. Jalankan: vibeeverything task update <id> --status in_progress",
+					"Task harus in_progress dulu sebelum completed. Jalankan: everythings-vibe task update <id> --status in_progress",
 			},
 			{ status: 400 },
 		);

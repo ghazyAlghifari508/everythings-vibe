@@ -310,24 +310,26 @@ PrdFy supports generating PRDs, acceptance criteria, and task boards for existin
 
 ### 1. CLI Installation
 
-Install the official PrdFy CLI globally:
+Install the official everythings-vibe CLI globally:
 
 ```bash
-npm install -g @ghazynabiel/prdfy
+npm install -g @ghazynabiel/everythings-vibe
 ```
 
 Verify that the installed version meets the minimum required version (`>= 2.0.0`):
 
 ```bash
-prdfy --version
+everythings-vibe --version
 ```
+
+*Note: Backward-compatible aliases (`vibeeverything`, `vibe`, `prdfy`) are automatically registered and can also be used.*
 
 ### 2. Synchronization Command
 
-When you choose **Codebase existing** on the Home page, PrdFy creates a project and issues a temporary, single-use sync token (valid for 30 minutes). Run the command from your repository root:
+When you choose **Codebase existing** on the Home page, everythings-vibe creates a project and issues a temporary, single-use sync token (valid for 30 minutes). Run the command from your repository root:
 
 ```bash
-prdfy codebase sync --project-id <id> --sync-token <token>
+everythings-vibe codebase sync --project-id <id> --sync-token <token>
 ```
 
 Available flags:
@@ -372,7 +374,7 @@ automatically. It is also excluded from the upload itself.
 
 | Issue | Cause | Resolution |
 |---|---|---|
-| `CLI_UPDATE_REQUIRED` | CLI version is older than 2.0.0 | Run `npm install -g @ghazynabiel/prdfy` to update |
+| `CLI_UPDATE_REQUIRED` | CLI version is older than 2.0.0 | Run `npm install -g @ghazynabiel/everythings-vibe` to update |
 | `INVALID_SYNC_CREDENTIAL` | Token expired (30 min) or wrong codebase | Click "Sync ulang" on the codebase page or open "Codebase" in the navbar to find a codebase |
 | `SYNC_SESSION_ACTIVE` (409) | A sync session is already active in another tab | Wait for the active sync session to finish, or click "Sync ulang" on the codebase page to issue a fresh session |
 | `SNAPSHOT_BLOCKED` | A file matching high-risk secret patterns was found | Add the file to `.everythingsvibeignore` or redact sensitive tokens before syncing |

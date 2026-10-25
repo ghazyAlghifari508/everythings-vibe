@@ -40,11 +40,11 @@ export const LEGACY_IGNORE_FILENAME = ".prdfyignore";
  * binaries, and an active pattern here would silently change which files get
  * uploaded.
  */
-export const CODEBASE_IGNORE_TEMPLATE = `# .everythingsvibeignore — exclusions untuk sync codebase VibeEverything.
+export const CODEBASE_IGNORE_TEMPLATE = `# .everythingsvibeignore — exclusions untuk sync codebase everythings-vibe.
 #
 # File ini bersifat lokal. JANGAN commit ke repositori.
 #
-# VibeEverything CLI sudah mengecualikan hal berikut secara otomatis, jadi tidak perlu
+# everythings-vibe CLI sudah mengecualikan hal berikut secara otomatis, jadi tidak perlu
 # ditulis ulang di sini:
 #   - file rahasia      : .env*, *.pem, *.key, *.p12, *.pfx, sertifikat
 #   - dependensi & build: node_modules/, dist/, build/, coverage/, .git/

@@ -313,7 +313,7 @@ describe("StudioPage UI & Workflow", () => {
 
 		const banner = screen.getByRole("banner");
 		expect(within(banner).queryByRole("link", { name: /kembali/i })).toBeNull();
-		expect(within(banner).getByText("VibeEverything")).toBeDefined();
+		expect(within(banner).getByText("everythings-vibe")).toBeDefined();
 		expect(
 			within(banner).getByRole("button", { name: "Profil dan tampilan" }),
 		).toBeDefined();

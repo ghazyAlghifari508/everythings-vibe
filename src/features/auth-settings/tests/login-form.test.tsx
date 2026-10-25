@@ -52,6 +52,11 @@ function renderForm() {
 }
 
 describe("LoginForm", () => {
+	it("renders canonical branding heading", () => {
+		const rendered = renderForm();
+		expect(rendered.textContent).toContain("Masuk ke everythings-vibe");
+	});
+
 	it("recovers to an enabled state when social sign-in resolves an error", async () => {
 		socialMock.mockResolvedValue({ data: null, error: { message: "denied" } });
 		const rendered = renderForm();

@@ -16,7 +16,7 @@ function syncPayload(): SyncPromptPayload {
 		syncToken: "naming-token",
 		cliMinVersion: "2.0.0",
 		syncCommand:
-			"vibeeverything codebase sync --project-id cb-naming-1 --sync-token <token>",
+			"everythings-vibe codebase sync --project-id cb-naming-1 --sync-token <token>",
 		expiresAt: new Date(Date.now() + 3600000).toISOString(),
 	};
 }

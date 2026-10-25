@@ -10,7 +10,7 @@ import { Icon } from "@/components/ui/icon";
 export const Route = createFileRoute("/plan/")({
 	head: () => ({
 		meta: [
-			{ title: "VibePlan | VibeEverything" },
+			{ title: "VibePlan | everythings-vibe" },
 			{
 				name: "description",
 				content:

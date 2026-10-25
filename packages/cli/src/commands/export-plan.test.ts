@@ -676,7 +676,7 @@ describe("exportPlan output modes", () => {
 		expect(printed).toContain(root);
 		expect(printed).toContain(FEATURE_DIR);
 		expect(printed).toContain(
-			`vibeeverything export plan ${PROJECT_ID} --root .`,
+			`everythings-vibe export plan ${PROJECT_ID} --root .`,
 		);
 		expect(printed).toContain("manifest.json");
 	});

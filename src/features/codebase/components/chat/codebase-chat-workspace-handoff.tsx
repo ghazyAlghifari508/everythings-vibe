@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 
 export function buildExportPlanCommand(projectId: string): string {
-	return `npx vibeeverything export plan ${projectId.trim()} --root .`;
+	return `npx everythings-vibe export plan ${projectId.trim()} --root .`;
 }
 
 /**
@@ -24,7 +24,7 @@ export function buildPlanHandoffPrompt(
 	const id = projectId.trim();
 	const repository = codebaseName?.trim();
 	return [
-		"Kamu mengerjakan satu feature plan VibeEverything di repository ini.",
+		"Kamu mengerjakan satu feature plan everythings-vibe di repository ini.",
 		"",
 		"1. Baca AGENTS.md dan file aturan agent lain di repository ini, lalu pahami arsitektur, konvensi, dan perintah verifikasi yang berlaku sebelum mengubah apa pun.",
 		repository
@@ -35,7 +35,7 @@ export function buildPlanHandoffPrompt(
 		"5. Analisis implementasi yang sudah ada di repository sebelum menulis kode. Jangan membuat ulang PRD, jangan menambah scope di luar dokumen, dan jangan mengganti arsitektur yang sudah berjalan.",
 		"6. Kerjakan task sesuai urutan dan dependency di tasks.json, dan penuhi Acceptance Criteria yang relevan untuk setiap task.",
 		"7. Verifikasi hasilnya terhadap PRD dan AC sebelum menandai task selesai.",
-		`8. Perbarui status task lewat CLI, bukan dengan mengedit tasks.json manual: \`npx vibeeverything task next ${id}\` untuk melihat task berikutnya, lalu \`npx vibeeverything task update <taskId> --status in_progress\` / \`--status completed\`, dan \`npx vibeeverything subtask update <taskId> --index <i> --status <status>\` untuk subtask. Kanban di workspace ikut terbarui.`,
+		`8. Perbarui status task lewat CLI, bukan dengan mengedit tasks.json manual: \`npx everythings-vibe task next ${id}\` untuk melihat task berikutnya, lalu \`npx everythings-vibe task update <taskId> --status in_progress\` / \`--status completed\`, dan \`npx everythings-vibe subtask update <taskId> --index <i> --status <status>\` untuk subtask. Kanban di workspace ikut terbarui.`,
 		"9. Ikuti aturan repository untuk testing, commit, dan push. Jangan commit atau push kalau repository ini melarangnya.",
 		"",
 		`Project ID: ${id}`,

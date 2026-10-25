@@ -184,7 +184,7 @@ export function CodebaseConclusion({
 							Menganalisis codebase
 						</h2>
 						<p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-fog">
-							Sinkronisasi repository sudah selesai. VibeEverything sedang
+							Sinkronisasi repository sudah selesai. everythings-vibe sedang
 							memahami teknologi, struktur project, dependensi, dan modul utama.
 						</p>
 						{elapsed !== null ? (

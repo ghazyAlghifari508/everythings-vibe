@@ -6,7 +6,7 @@ export const Route = createFileRoute("/plan/codebase")({
 	head: () => ({
 		meta: [
 			{
-				title: `${CODEBASE_ONBOARDING_LABEL} | VibeEverything`,
+				title: `${CODEBASE_ONBOARDING_LABEL} | everythings-vibe`,
 			},
 			{
 				name: "description",

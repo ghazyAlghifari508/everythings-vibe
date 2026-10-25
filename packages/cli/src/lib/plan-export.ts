@@ -1,5 +1,5 @@
 /**
- * Pure planning + rendering for `vibeeverything export plan`.
+ * Pure planning + rendering for `everythings-vibe export plan`.
  *
  * No filesystem writes happen here: the module turns validated server
  * artifacts into the exact set of files (and contents) the command writes.
@@ -451,7 +451,7 @@ export function renderHandoffDocument(
 		`4. \`${ac}\` — Acceptance Criteria: kriteria verifikasi per requirement.`,
 		`5. \`${tasks}\` — snapshot task beserta dependency, subtask, \`covers\`, dan \`surfaces\`.`,
 		"",
-		"Jangan membuat ulang PRD, AC, atau task. Semua artefak di atas adalah hasil planning yang sudah tersimpan di VibeEverything.",
+		"Jangan membuat ulang PRD, AC, atau task. Semua artefak di atas adalah hasil planning yang sudah tersimpan di everythings-vibe.",
 		"",
 		"## 3. Scope Implementasi",
 		"",
@@ -469,14 +469,14 @@ export function renderHandoffDocument(
 		"Ambil task berikutnya dan perbarui statusnya lewat CLI, bukan dengan mengedit file JSON:",
 		"",
 		"```bash",
-		`vibeeverything task next ${project.id}`,
-		`vibeeverything task update <taskId> --status in_progress`,
-		`vibeeverything subtask update <taskId> --index <i> --status in_progress`,
-		`vibeeverything task update <taskId> --status completed`,
-		`vibeeverything kanban ${project.id}`,
+		`everythings-vibe task next ${project.id}`,
+		`everythings-vibe task update <taskId> --status in_progress`,
+		`everythings-vibe subtask update <taskId> --index <i> --status in_progress`,
+		`everythings-vibe task update <taskId> --status completed`,
+		`everythings-vibe kanban ${project.id}`,
 		"```",
 		"",
-		`Status yang diterima: \`pending\`, \`in_progress\`, \`completed\`, \`failed\`. Lihat board lengkap dengan \`vibeeverything kanban ${project.id}\`.`,
+		`Status yang diterima: \`pending\`, \`in_progress\`, \`completed\`, \`failed\`. Lihat board lengkap dengan \`everythings-vibe kanban ${project.id}\`.`,
 		"",
 		"## 5. Verifikasi Pekerjaan",
 		"",
@@ -494,7 +494,7 @@ export function renderHandoffDocument(
 		"",
 		"## 7. Source of Truth & Re-Export",
 		"",
-		`- \`${tasks}\` adalah snapshot planning saat export, bukan sumber kebenaran. Status task yang otoritatif tetap di backend VibeEverything.`,
+		`- \`${tasks}\` adalah snapshot planning saat export, bukan sumber kebenaran. Status task yang otoritatif tetap di backend everythings-vibe.`,
 		"- Jangan menjadikan edit manual pada file snapshot sebagai cara melaporkan progress. Selalu pakai CLI di atas.",
 		"- Kalau planning berubah di workspace (PRD, AC, atau task direvisi), jalankan re-export berikut supaya file lokal ikut terbarui:",
 		"",
@@ -613,7 +613,7 @@ export function buildManifestEntry(
 
 /** Command that regenerates this export after planning changes. */
 export function buildReExportCommand(projectId: string): string {
-	return `vibeeverything export plan ${projectId} --root .`;
+	return `everythings-vibe export plan ${projectId} --root .`;
 }
 
 /**

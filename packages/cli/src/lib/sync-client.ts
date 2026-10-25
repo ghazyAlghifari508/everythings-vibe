@@ -335,7 +335,7 @@ export function createSyncClient(options: SyncClientOptions): SyncClient {
 		const minVersion = res.cliMinVersion ?? CODEBASE_CLI_MIN_VERSION;
 		if (compareCliVersions(CODEBASE_CLI_VERSION, minVersion) < 0) {
 			throw new ApiError(
-				`VibeEverything CLI ${CODEBASE_CLI_VERSION} is below the required version ${minVersion}. Update with: npm i -g @ghazynabiel/vibeeverything`,
+				`everythings-vibe CLI ${CODEBASE_CLI_VERSION} is below the required version ${minVersion}. Update with: npm i -g @ghazynabiel/everythings-vibe`,
 				{ code: "CLI_UPDATE_REQUIRED", retryable: false },
 			);
 		}

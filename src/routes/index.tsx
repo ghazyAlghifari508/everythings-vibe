@@ -6,11 +6,11 @@ export const Route = createFileRoute("/")({
 	component: HomePage,
 	head: () => ({
 		meta: [
-			{ title: "VibeEverything - All-in-One AI Vibe-Coding Workspace" },
+			{ title: "everythings-vibe - All-in-One AI Vibe-Coding Workspace" },
 			{
 				name: "description",
 				content:
-					"Pilih workspace VibeEverything: menyusun PRD dan acceptance criteria, merancang antarmuka, template proyek, atau bantuan teknis.",
+					"Pilih workspace everythings-vibe: menyusun PRD dan acceptance criteria, merancang antarmuka, template proyek, atau bantuan teknis.",
 			},
 		],
 	}),
