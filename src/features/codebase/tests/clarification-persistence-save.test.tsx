@@ -160,10 +160,12 @@ describe("Clarification Persistence & Answer Safety", () => {
 			const body = init?.body ? JSON.parse(String(init.body)) : {};
 			fetchCalls.push(
 				body.action ??
-					(url.includes("features") ? "generate_feature" : "unknown"),
+					(url.includes("/api/codebase/generation")
+						? "generate_feature"
+						: "unknown"),
 			);
 			if (body.action === "save-handoff") return Response.json({ saved: true });
-			if (url.includes("features/generate")) {
+			if (url.includes("/api/codebase/generation")) {
 				generateAttempt += 1;
 				if (generateAttempt === 1) {
 					return new Response(
@@ -174,7 +176,22 @@ describe("Clarification Persistence & Answer Safety", () => {
 						{ status: 504, headers: { "Content-Type": "application/json" } },
 					);
 				}
-				return Response.json({ featureTree: { phases: [] } });
+				return Response.json({
+					operation: {
+						id: "op-1",
+						projectId: "proj-1",
+						stage: "feature",
+						status: "completed",
+						result: { featureTree: { phases: [] } },
+						error: null,
+						errorCode: null,
+						artifactId: "art-1",
+						createdAt: new Date().toISOString(),
+						updatedAt: new Date().toISOString(),
+						startedAt: new Date().toISOString(),
+						finishedAt: new Date().toISOString(),
+					},
+				});
 			}
 			return Response.json({});
 		});

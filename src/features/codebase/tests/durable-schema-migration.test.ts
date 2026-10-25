@@ -25,6 +25,7 @@ describe("codebase_generation_operations schema", () => {
 				"claimed_by",
 				"lease_expires_at",
 				"heartbeat_at",
+				"baseline_artifact_id",
 				"artifact_id",
 				"result",
 				"error",
@@ -82,6 +83,11 @@ describe("codebase_generation_operations schema", () => {
 			(i) => i.config.name === "codebase_gen_ops_active_stage_idx",
 		);
 		expect(activeIndex?.config.unique).toBe(true);
+
+		const identityIndex = config.indexes.find(
+			(i) => i.config.name === "codebase_gen_ops_identity_hash_idx",
+		);
+		expect(identityIndex?.config.unique).toBe(true);
 	});
 });
 

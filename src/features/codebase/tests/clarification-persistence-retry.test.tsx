@@ -59,7 +59,22 @@ describe("Clarification Stage-Aware Retry & Error Contract", () => {
 						status: 500,
 					});
 				}
-				return Response.json({ featureTree: { phases: [] } });
+				return Response.json({
+					operation: {
+						id: "op-1",
+						projectId: "proj-1",
+						stage: "feature",
+						status: "completed",
+						result: { featureTree: { phases: [] } },
+						error: null,
+						errorCode: null,
+						artifactId: "art-1",
+						createdAt: new Date().toISOString(),
+						updatedAt: new Date().toISOString(),
+						startedAt: new Date().toISOString(),
+						finishedAt: new Date().toISOString(),
+					},
+				});
 			}),
 		);
 
@@ -203,13 +218,30 @@ describe("Clarification Stage-Aware Retry & Error Contract", () => {
 		let releaseGenerate: () => void = () => {};
 		const inFlight = new Promise<Response>((resolve) => {
 			releaseGenerate = () =>
-				resolve(Response.json({ featureTree: { phases: [] } }));
+				resolve(
+					Response.json({
+						operation: {
+							id: "op-1",
+							projectId: "proj-1",
+							stage: "feature",
+							status: "completed",
+							result: { featureTree: { phases: [] } },
+							error: null,
+							errorCode: null,
+							artifactId: "art-1",
+							createdAt: new Date().toISOString(),
+							updatedAt: new Date().toISOString(),
+							startedAt: new Date().toISOString(),
+							finishedAt: new Date().toISOString(),
+						},
+					}),
+				);
 		});
 
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async (url: string) => {
-				if (url.includes("features/generate")) {
+				if (url.includes("/api/codebase/generation")) {
 					generateCalls += 1;
 					return inFlight;
 				}
