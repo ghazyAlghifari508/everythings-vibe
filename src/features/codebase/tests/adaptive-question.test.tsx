@@ -74,9 +74,9 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 				/>,
 			);
 
-			// Progress counter
+			// Progress counter: question index and total, without a stage badge.
 			expect(screen.getByText("2 dari 4")).toBeDefined();
-			expect(screen.getByText("Klarifikasi")).toBeDefined();
+			expect(screen.queryByText("Klarifikasi")).toBeNull();
 			expect(screen.getByText("Pertanyaan 2")).toBeDefined();
 			expect(
 				screen.getByText("Bagaimana filter kategori bekerja?"),
@@ -181,6 +181,83 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 			expect(onSubmit).toHaveBeenCalledWith(
 				"filter_type",
 				"Dropdown select hierarkis",
+			);
+		});
+
+		it("moves to the option the user switched to after leaving Lainnya", () => {
+			const onSubmit = vi.fn();
+			render(
+				<CodebaseAdaptiveQuestion
+					question={selectQuestion}
+					index={1}
+					totalQuestions={3}
+					submitted=""
+					active={true}
+					onSubmit={onSubmit}
+				/>,
+			);
+
+			act(() => {
+				fireEvent.click(screen.getByRole("radio", { name: /Lainnya/i }));
+			});
+			const customInput = screen.getByLabelText("Jawaban lain");
+			act(() => {
+				fireEvent.change(customInput, {
+					target: { value: "Dropdown hierarkis" },
+				});
+			});
+
+			act(() => {
+				fireEvent.click(
+					screen.getByRole("radio", { name: /Beberapa kategori bersamaan/i }),
+				);
+			});
+			expect(screen.queryByLabelText("Jawaban lain")).toBeNull();
+
+			act(() => {
+				fireEvent.click(screen.getByRole("button", { name: /Konfirmasi/i }));
+			});
+			expect(onSubmit).toHaveBeenCalledWith(
+				"filter_type",
+				"Beberapa kategori bersamaan",
+			);
+		});
+
+		it("keeps Lainnya usable in multiselect and joins it with the choices", () => {
+			const onSubmit = vi.fn();
+			render(
+				<CodebaseAdaptiveQuestion
+					question={multiQuestion}
+					index={1}
+					totalQuestions={3}
+					submitted=""
+					active={true}
+					onSubmit={onSubmit}
+				/>,
+			);
+
+			act(() => {
+				fireEvent.click(screen.getByRole("checkbox", { name: /Judul/i }));
+				fireEvent.click(screen.getByRole("checkbox", { name: /Lainnya/i }));
+			});
+
+			const submitBtn = screen.getByRole("button", { name: /Konfirmasi/i });
+			expect((submitBtn as HTMLButtonElement).disabled).toBe(true);
+
+			const customInput = screen.getByLabelText("Jawaban lain");
+			act(() => {
+				fireEvent.change(customInput, {
+					target: { value: "Penulis tamu" },
+				});
+			});
+			expect((submitBtn as HTMLButtonElement).disabled).toBe(false);
+
+			act(() => {
+				fireEvent.click(submitBtn);
+			});
+			expect(onSubmit).toHaveBeenCalledWith(
+				"export_fields",
+				"Judul, Penulis tamu",
 			);
 		});
 	});
@@ -299,6 +376,34 @@ describe("CodebaseAdaptiveQuestion Component", () => {
 			});
 
 			expect(onSubmit).toHaveBeenCalledWith("export_fields", "Judul, Tanggal");
+		});
+
+		it("does not submit on Enter while an IME composition is still open", () => {
+			const onSubmit = vi.fn();
+			render(
+				<CodebaseAdaptiveQuestion
+					question={textQuestion}
+					index={1}
+					totalQuestions={1}
+					submitted=""
+					active={true}
+					onSubmit={onSubmit}
+				/>,
+			);
+
+			const input = screen.getByPlaceholderText("Tuliskan preferensi Anda...");
+			act(() => {
+				fireEvent.change(input, { target: { value: "ぺる" } });
+			});
+			act(() => {
+				fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+			});
+			expect(onSubmit).not.toHaveBeenCalled();
+
+			act(() => {
+				fireEvent.keyDown(input, { key: "Enter" });
+			});
+			expect(onSubmit).toHaveBeenCalledWith("custom_notes", "ぺる");
 		});
 
 		it("supports free-text input questions with Enter key submit", () => {

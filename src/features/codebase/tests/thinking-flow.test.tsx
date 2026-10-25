@@ -211,9 +211,7 @@ describe("P5 Unified Agent Thinking & Cardless Generation Workflow", () => {
 			"[data-testid='codebase-questions-complete']",
 		);
 		expect(questionsComplete).not.toBeNull();
-		expect(questionsComplete?.textContent).toContain(
-			"Berikutnya: Spesifikasi fitur",
-		);
+		expect(questionsComplete?.textContent).toContain("Buat Spesifikasi Fitur");
 		expect(questionsComplete?.className).not.toContain("border-graphite");
 
 		// Stage: feature -> offers PRD

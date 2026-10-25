@@ -59,7 +59,7 @@ export function CodebaseAdaptiveQuestionOptions({
 		/>
 	));
 	const customRow = (
-		<div className="flex flex-col gap-1.5">
+		<div className="flex flex-col gap-2">
 			<CodebaseAdaptiveQuestionOptionRow
 				inputType={isMulti ? "checkbox" : "radio"}
 				name={groupName}
@@ -70,22 +70,22 @@ export function CodebaseAdaptiveQuestionOptions({
 				onChange={() => onSelect(customId)}
 			/>
 			{customChosen ? (
-				<div className="pl-7 pr-1 pt-1">
+				// The free-text field belongs to the same question, so it continues the
+				// chosen row as an underline instead of becoming a second card.
+				// `pl-[2.625rem]` matches the option label inset: row px-3.5 + radio
+				// 1rem + gap 0.75rem.
+				<div className="pl-[2.625rem] pr-1">
 					<CodebaseAdaptiveQuestionAnswerInput
 						id={customInputId}
 						label="Jawaban lain"
 						disabled={disabled}
 						value={customText}
 						placeholder={customPlaceholder ?? "Tulis jawabanmu sendiri..."}
-						className="text-xs h-10 bg-steel/60 text-snow border-graphite"
+						className="h-11 rounded-none border-0 border-b border-graphite bg-transparent px-0 text-[13px] text-snow shadow-none placeholder:text-slate focus:ring-0 focus-visible:border-indigo"
+						autoFocus={!disabled}
 						onChange={onCustomTextChange}
 						onSubmit={onCustomSubmit}
 					/>
-					{customText.trim().length === 0 ? (
-						<p className="mt-1 text-[11px] leading-4 text-fog">
-							Isi jawaban sendiri agar bisa dikirim.
-						</p>
-					) : null}
 				</div>
 			) : null}
 		</div>

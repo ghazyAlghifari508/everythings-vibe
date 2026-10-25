@@ -1061,9 +1061,6 @@ describe("CodebaseChatWorkspace one-by-one questions", () => {
 			/Kirim Jawaban/.test(b.textContent ?? ""),
 		);
 		expect(submit?.disabled).toBe(true);
-		expect(card?.textContent).toContain(
-			"Isi jawaban sendiri agar bisa dikirim.",
-		);
 	});
 
 	it("advances to the next question after answering and supports Lainnya", () => {
@@ -1334,10 +1331,9 @@ describe("CodebaseChatWorkspace confirmation and spec errors", () => {
 			"[data-testid='codebase-questions-complete']",
 		);
 		expect(complete).not.toBeNull();
-		expect(complete?.textContent).toContain("Berikutnya: Spesifikasi fitur");
-		expect(complete?.textContent).toContain(
-			"Spesifikasi fitur disusun dari jawaban tersebut dan konteks repository.",
-		);
+		// The single CTA carries the handoff; no restated stage label or
+		// explanatory paragraph.
+		expect(complete?.textContent).toBe("Buat Spesifikasi Fitur");
 
 		const cta = [...(complete?.querySelectorAll("button") ?? [])].find((b) =>
 			/Buat Spesifikasi Fitur/.test(b.textContent ?? ""),
@@ -1429,7 +1425,6 @@ describe("CodebaseChatWorkspace composer without intent choice", () => {
 		renderWorkspace({
 			artifacts: [planArtifact],
 			composerMode: "revise",
-			composerTargetName: "Filter Artikel",
 			onSendMessage,
 		});
 		const composer = container.querySelector<HTMLTextAreaElement>(
@@ -1471,31 +1466,23 @@ describe("CodebaseChatWorkspace composer without intent choice", () => {
 		expect(onSendMessage).toHaveBeenCalledWith("Tambah mode gelap");
 	});
 
-	it("names the active feature above the composer", () => {
+	it("keeps the composer free of a redundant feature label", () => {
 		renderWorkspace({
 			artifacts: [planArtifact],
 			composerMode: "revise",
-			composerTargetName: "Filter Artikel",
 		});
-		const target = container.querySelector(
-			"[data-testid='codebase-composer-target']",
-		);
-		expect(target?.textContent).toContain("Filter Artikel");
-	});
-
-	it("labels a new-feature composer instead of borrowing a plan name", () => {
-		renderWorkspace({ artifacts: [], composerMode: "create" });
-		const target = container.querySelector(
-			"[data-testid='codebase-composer-target']",
-		);
-		expect(target?.textContent).toContain("Fitur baru");
+		// The workspace header already identifies the active feature, so the
+		// composer must not repeat it.
+		expect(
+			container.querySelector("[data-testid='codebase-composer-target']"),
+		).toBeNull();
+		expect(container.textContent).not.toContain("Fitur aktif:");
 	});
 
 	it("does not present an unrequested impact assessment while revising", () => {
 		renderWorkspace({
 			artifacts: [planArtifact],
 			composerMode: "revise",
-			composerTargetName: "Filter Artikel",
 		});
 		const notice = container.querySelector(
 			"[data-testid='codebase-revision-impact']",

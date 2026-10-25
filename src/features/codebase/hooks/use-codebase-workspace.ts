@@ -155,8 +155,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 			: activeHasPlanning
 				? "revise"
 				: "clarify";
-	const composerTargetName =
-		composerMode === "create" ? null : (resolvedFeature?.name ?? null);
 	const pushAssistantMessage = useCallback((content: string) => {
 		setChatMessages((current) => [
 			...current,
@@ -351,7 +349,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		composerMode,
 		composerAvailable,
 		answersReadOnly,
-		composerTargetName,
 		userTookOverCanvas,
 		selectPlan,
 	};

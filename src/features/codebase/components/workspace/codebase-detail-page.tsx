@@ -49,7 +49,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		composerMode,
 		composerAvailable,
 		answersReadOnly,
-		composerTargetName,
 		artifacts,
 		activeArtifactId,
 		hasTasksInDb,
@@ -189,7 +188,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								composerMode={composerMode}
 								composerAvailable={composerAvailable}
 								answersReadOnly={answersReadOnly}
-								composerTargetName={composerTargetName}
 								artifacts={artifacts}
 								activeArtifactId={activeArtifactId}
 								projectIdForHandoff={hasTasksInDb ? effectiveFeatureId : null}

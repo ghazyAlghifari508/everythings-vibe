@@ -77,8 +77,6 @@ export interface CodebaseChatWorkspaceProps {
 	 * composer never asks the user to choose.
 	 */
 	composerMode?: CodebaseComposerMode;
-	/** Name of the plan the next message targets. Null while creating. */
-	composerTargetName?: string | null;
 	/**
 	 * The snapshot the existing planning was generated against, and the newest
 	 * usable snapshot. A difference means the repository moved on after the plan
