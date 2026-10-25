@@ -700,6 +700,50 @@ describe("P3 Authentic thinking, activity history and stale-run safety", () => {
 		expect(screen.queryByRole("button", { name: "Aktivitas" })).toBeNull();
 	});
 
+	// State D: one contextual failure disclosure, never the same error twice
+	it("shows a failed stage error exactly once and never as a running state", () => {
+		const prdRun = settleRun(
+			startRun("prd", 1_000),
+			"failed",
+			4_000,
+			"Model timeout saat menyusun PRD",
+		);
+		const { rerender } = render(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={prdRun}
+			/>,
+		);
+
+		expect(screen.getAllByRole("alert")).toHaveLength(1);
+		const thinking =
+			screen.getByTestId("codebase-run-thinking").textContent ?? "";
+		expect(thinking).toContain("Gagal menyusun PRD");
+		expect(thinking).not.toContain("Menyusun PRD...");
+
+		// The feature stage owns its failure at the spec section instead.
+		const featureRun = settleRun(
+			startRun("feature", 1_000),
+			"failed",
+			4_000,
+			"Spesifikasi fitur gagal dibuat",
+		);
+		rerender(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={featureRun}
+			/>,
+		);
+
+		expect(screen.getAllByRole("alert")).toHaveLength(1);
+	});
+
 	// 4 + 5. Timer advances only while running and freezes at completion
 	it("ties duration to the run's own timestamps across a stage change", () => {
 		const questionRun = settleRun(
