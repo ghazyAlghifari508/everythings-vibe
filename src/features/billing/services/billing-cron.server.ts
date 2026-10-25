@@ -20,7 +20,7 @@ function secretsMatch(provided: string, secret: string): boolean {
 }
 
 export async function handleBillingCron({ request }: { request: Request }) {
-	const secret = process.env.CRON_BILLING_SECRET ?? process.env.CRON_SECRET;
+	const secret = process.env.CRON_BILLING_SECRET?.trim();
 	const header = request.headers.get("authorization") ?? "";
 	const match = /^Bearer\s+(.+)$/i.exec(header);
 	const provided = match?.[1]?.trim() ?? "";
