@@ -90,7 +90,7 @@ export function ScreenConnect({
 						Project / {displayName}
 					</div>
 					<h2 className="font-inter text-lg font-[600] text-snow sm:text-xl">
-						Sync codebase dengan VibeEverything
+						Sync codebase dengan everythings-vibe
 					</h2>
 					<p className="mt-1.5 text-xs leading-relaxed text-fog sm:text-sm">
 						Salin prompt ini dan paste ke Claude Code, Cursor, Windsurf, atau AI

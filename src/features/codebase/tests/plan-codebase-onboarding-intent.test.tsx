@@ -28,7 +28,7 @@ function syncPayload() {
 		apiBaseUrl: "http://localhost:3000",
 		syncToken: "intent-token",
 		syncCommand:
-			"vibeeverything codebase sync --project-id cb-intent-1 --sync-token intent-token",
+			"everythings-vibe codebase sync --project-id cb-intent-1 --sync-token intent-token",
 		expiresAt: new Date(Date.now() + 3600000).toISOString(),
 	};
 }
@@ -123,7 +123,7 @@ describe("PlanCodebasePage onboarding feature intent", () => {
 		render(<PlanCodebasePage />);
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 

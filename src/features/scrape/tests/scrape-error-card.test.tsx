@@ -46,9 +46,7 @@ describe("ScrapeErrorCard", () => {
 		);
 		expect(screen.getAllByRole("alert")).toHaveLength(1);
 		expect(screen.getAllByRole("button")).toHaveLength(1);
-		fireEvent.click(
-			screen.getByRole("button", { name: "Coba lagi jika tersedia" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
 		expect(retry).toHaveBeenCalledTimes(1);
 	});
 
@@ -122,10 +120,25 @@ describe("ScrapeErrorCard", () => {
 			/>,
 		);
 		const button = screen.getByRole("button", {
-			name: "Coba lagi — belum tersedia",
+			name: "Coba lagi",
 		});
 		expect(button.hasAttribute("disabled")).toBe(true);
+		expect(screen.getByText(/tersedia dalam 60 detik/i)).toBeDefined();
 		fireEvent.click(button);
 		expect(retry).not.toHaveBeenCalled();
+	});
+
+	it("displays loading label while retrying", () => {
+		render(
+			<ScrapeErrorCard
+				title="Website membatasi akses"
+				guidance="Tunggu sebelum mencoba lagi."
+				retryable
+				isRetrying
+				onRetry={vi.fn()}
+			/>,
+		);
+		const button = screen.getByRole("button", { name: "Mencoba lagi..." });
+		expect(button.hasAttribute("disabled")).toBe(true);
 	});
 });

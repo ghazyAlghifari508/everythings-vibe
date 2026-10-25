@@ -123,6 +123,12 @@ describe("website traversal", () => {
 				"/restricted",
 			),
 		).toBe(false);
+		expect(
+			robotsAllows(
+				"User-agent: everythings-vibe\nDisallow: /custom-blocked",
+				"/custom-blocked",
+			),
+		).toBe(false);
 	});
 	it("depth zero captures only the seed and include flags change output", async () => {
 		const calls: string[] = [];

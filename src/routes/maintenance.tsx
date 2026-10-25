@@ -3,6 +3,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Icon } from "@/components/ui/icon";
 
 export const Route = createFileRoute("/maintenance")({
+	head: () => ({
+		meta: [{ title: "Maintenance | everythings-vibe" }],
+	}),
 	component: MaintenancePage,
 });
 
@@ -33,7 +36,7 @@ function MaintenancePage() {
 					color: "#ffffff",
 				}}
 			>
-				VibeEverything Sedang Dalam Perbaikan
+				everythings-vibe Sedang Dalam Perbaikan
 			</h1>
 			<p
 				style={{

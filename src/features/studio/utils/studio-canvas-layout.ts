@@ -2,9 +2,7 @@ import {
 	STUDIO_CANVAS_COMPOSER_BOTTOM_PX,
 	STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX,
 	STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX,
-	STUDIO_CANVAS_OVERLAY_GAP_PX,
 	STUDIO_CANVAS_ZOOM_BOTTOM_PX,
-	STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX,
 } from "@/features/studio/types/studio-constants";
 
 /**
@@ -20,15 +18,12 @@ export function canvasComposerWidthCss(): string {
 }
 
 /**
- * Distance from the canvas bottom edge to the composer, keeping it clear of
- * the zoom row and honouring the device safe area.
+ * Distance from the canvas bottom edge to the composer, anchoring it lower in
+ * the workspace alongside the bottom-right zoom controls while honouring the
+ * device safe area.
  */
 export function canvasComposerBottomCss(): string {
-	const zoomRowTop =
-		STUDIO_CANVAS_ZOOM_BOTTOM_PX +
-		STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX +
-		STUDIO_CANVAS_OVERLAY_GAP_PX;
-	return `max(${STUDIO_CANVAS_COMPOSER_BOTTOM_PX}px, calc(${zoomRowTop}px + env(safe-area-inset-bottom)))`;
+	return `calc(${STUDIO_CANVAS_COMPOSER_BOTTOM_PX}px + env(safe-area-inset-bottom))`;
 }
 
 /** Distance from the canvas bottom edge to the zoom row. */

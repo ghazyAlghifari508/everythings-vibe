@@ -3,11 +3,11 @@
 import { Link } from "@tanstack/react-router";
 import type { FileRouteTypes } from "@/routeTree.gen";
 
-// VibeEverything mark: document outline with terminal cursor block.
+// everythings-vibe mark: document outline with terminal cursor block.
 // viewBox is cropped tight to the glyph bbox (content: x 14-47, y 10-48)
 // so the mark fills its box — no dead padding baked into the canvas.
 // fill="currentColor" follows the theme's text color automatically.
-function VibeEverythingMark({ size }: { size: number }) {
+export function EverythingsVibeMark({ size }: { size: number }) {
 	return (
 		<svg
 			width={size}
@@ -26,6 +26,9 @@ function VibeEverythingMark({ size }: { size: number }) {
 	);
 }
 
+// ponytail: backward compatibility alias for internal imports during migration.
+export const VibeEverythingMark = EverythingsVibeMark;
+
 export function Logo({
 	href = "/",
 	className = "",
@@ -41,7 +44,7 @@ export function Logo({
 			className={`inline-flex items-center ${className}`}
 			style={{ gap: `${Math.round(height * 0.34)}px` }}
 		>
-			<VibeEverythingMark size={height} />
+			<EverythingsVibeMark size={height} />
 			<span
 				className="font-medium leading-none select-none"
 				style={{
@@ -50,7 +53,7 @@ export function Logo({
 					letterSpacing: "-0.03em",
 				}}
 			>
-				VibeEverything
+				everythings-vibe
 			</span>
 		</Link>
 	);

@@ -1,19 +1,23 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	computeCanvasFit,
 	StudioCanvas,
 } from "@/features/studio/components/canvas/studio-canvas";
 import {
+	STUDIO_CANVAS_COMPOSER_BOTTOM_PX,
 	STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX,
 	STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX,
 	STUDIO_CANVAS_HEADER_INSET_PX,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
-	STUDIO_CANVAS_OVERLAY_GAP_PX,
-	STUDIO_CANVAS_ZOOM_BOTTOM_PX,
-	STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX,
 } from "@/features/studio/types/studio-constants";
 import {
 	canvasComposerBottomCss,
@@ -119,8 +123,8 @@ describe("StudioCanvas", () => {
 			/>,
 		);
 
-		const cursor = screen.getByRole("button", { name: "Cursor" });
-		const hand = screen.getByRole("button", { name: "Hand" });
+		const cursor = screen.getByRole("button", { name: /Pilih frame/i });
+		const hand = screen.getByRole("button", { name: /Geser canvas/i });
 		// Both tools live in one compact vertical group on the right edge.
 		const toolbar = cursor.parentElement;
 		expect(toolbar).toBe(hand.parentElement);
@@ -153,7 +157,7 @@ describe("StudioCanvas", () => {
 		expect(group?.style.bottom).toBe(canvasZoomRowBottomCss());
 		// The tools must not share the zoom group's anchor.
 		const cursorToolbar = screen.getByRole("button", {
-			name: "Cursor",
+			name: /Pilih frame/i,
 		}).parentElement;
 		expect(cursorToolbar?.style.bottom).toBe("");
 	});
@@ -168,12 +172,12 @@ describe("StudioCanvas", () => {
 			/>,
 		);
 
-		const cursor = screen.getByRole("button", { name: "Cursor" });
-		const hand = screen.getByRole("button", { name: "Hand" });
+		const cursor = screen.getByRole("button", { name: /Pilih frame/i });
+		const hand = screen.getByRole("button", { name: /Geser canvas/i });
 		expect(cursor.getAttribute("aria-pressed")).toBe("true");
 		expect(hand.getAttribute("aria-pressed")).toBe("false");
-		expect(cursor.getAttribute("title")).toContain("V");
-		expect(hand.getAttribute("title")).toContain("H");
+		expect(cursor.getAttribute("title")).toBe("Pilih frame (V)");
+		expect(hand.getAttribute("title")).toBe("Geser canvas (H)");
 
 		fireEvent.click(hand);
 		expect(hand.getAttribute("aria-pressed")).toBe("true");
@@ -196,7 +200,7 @@ describe("StudioCanvas", () => {
 		fireEvent.keyDown(input, { key: "h" });
 		expect(
 			screen
-				.getByRole("button", { name: "Cursor" })
+				.getByRole("button", { name: /Pilih frame/i })
 				.getAttribute("aria-pressed"),
 		).toBe("true");
 		input.remove();
@@ -218,7 +222,7 @@ describe("StudioCanvas", () => {
 		expect(onSelectFrame).toHaveBeenCalledWith("f-1", false);
 		fireEvent.click(dashboardBtn, { shiftKey: true });
 		expect(onSelectFrame).toHaveBeenLastCalledWith("f-1", true);
-		fireEvent.click(screen.getByRole("button", { name: "Hand" }));
+		fireEvent.click(screen.getByRole("button", { name: /Geser canvas/i }));
 		fireEvent.click(dashboardBtn);
 		expect(onSelectFrame).toHaveBeenCalledTimes(2);
 	});
@@ -259,8 +263,8 @@ describe("StudioCanvas", () => {
 		expect(container.querySelector('[data-testid$="-shimmer"]')).toBeNull();
 		// The canvas surface and its controls stay available immediately.
 		expect(screen.getByTestId("studio-canvas")).toBeDefined();
-		expect(screen.getByRole("button", { name: "Cursor" })).toBeDefined();
-		expect(screen.getByRole("button", { name: "Hand" })).toBeDefined();
+		expect(screen.getByRole("button", { name: /Pilih frame/i })).toBeDefined();
+		expect(screen.getByRole("button", { name: /Geser canvas/i })).toBeDefined();
 		expect(screen.getByRole("button", { name: /Perbesar/i })).toBeDefined();
 		// One honest, factual status line derived from the persisted job.
 		expect(screen.getByText("Menyusun rencana layar")).toBeDefined();
@@ -381,13 +385,7 @@ describe("StudioCanvas", () => {
 		it("keeps the composer clear of the zoom row and the safe area", () => {
 			const bottom = canvasComposerBottomCss();
 			expect(bottom).toContain("env(safe-area-inset-bottom)");
-			// The composer must sit at or above the zoom row's top edge plus the
-			// breathing gap, so the two overlays can never share pixels.
-			const zoomRowTop =
-				STUDIO_CANVAS_ZOOM_BOTTOM_PX +
-				STUDIO_CANVAS_ZOOM_ROW_HEIGHT_PX +
-				STUDIO_CANVAS_OVERLAY_GAP_PX;
-			expect(bottom).toContain(`${zoomRowTop}px`);
+			expect(bottom).toContain(`${STUDIO_CANVAS_COMPOSER_BOTTOM_PX}px`);
 		});
 
 		it("honours the safe area for the zoom row too", () => {
@@ -404,7 +402,7 @@ describe("StudioCanvas", () => {
 				onSelectFrame={vi.fn()}
 			/>,
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Hand" }));
+		fireEvent.click(screen.getByRole("button", { name: /Geser canvas/i }));
 		const canvas = screen.getByTestId("studio-canvas");
 		fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 10, clientY: 10 });
 		fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 40, clientY: 40 });
@@ -423,7 +421,7 @@ describe("StudioCanvas", () => {
 				onSelectFrame={vi.fn()}
 			/>,
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Hand" }));
+		fireEvent.click(screen.getByRole("button", { name: /Geser canvas/i }));
 		const canvas = screen.getByTestId("studio-canvas");
 		expect(canvas.style.cursor).toBe("grab");
 		// Overlay pointerdown must be isolated from the canvas gesture.
@@ -479,6 +477,85 @@ describe("StudioCanvas", () => {
 		addEventListener.mockRestore();
 	});
 
+	it("zooms on physical mouse wheel scroll without needing modifier keys", async () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		const canvas = screen.getByTestId("studio-canvas");
+		const surface = screen.getByTestId("studio-canvas-surface");
+		const before = surface.style.transform;
+
+		fireEvent.wheel(canvas, {
+			deltaX: 0,
+			deltaY: -100,
+			deltaMode: 0,
+			clientX: 400,
+			clientY: 300,
+		});
+		await vi.waitFor(() => {
+			expect(surface.style.transform).not.toBe(before);
+		});
+	});
+
+	it("pans instead of zooming when 2D trackpad gesture has horizontal delta", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		const canvas = screen.getByTestId("studio-canvas");
+		const surface = screen.getByTestId("studio-canvas-surface");
+		const before = surface.style.transform;
+
+		fireEvent.wheel(canvas, {
+			deltaX: 15,
+			deltaY: 20,
+			deltaMode: 0,
+			clientX: 400,
+			clientY: 300,
+		});
+		expect(surface.style.transform).not.toBe(before);
+		const beforeScale = before.match(/scale\(([^)]+)\)/)?.[1];
+		const afterScale = surface.style.transform.match(/scale\(([^)]+)\)/)?.[1];
+		expect(afterScale).toBe(beforeScale);
+	});
+
+	it("does not intercept wheel scrolling when target is inside an editable input or textarea", () => {
+		render(
+			<StudioCanvas
+				project={mockProject}
+				frames={mockFrames}
+				selectedFrameId={null}
+				onSelectFrame={vi.fn()}
+			/>,
+		);
+		const canvas = screen.getByTestId("studio-canvas");
+		const surface = screen.getByTestId("studio-canvas-surface");
+		const before = surface.style.transform;
+
+		const textarea = document.createElement("textarea");
+		canvas.appendChild(textarea);
+
+		fireEvent.wheel(textarea, {
+			deltaX: 0,
+			deltaY: -100,
+			deltaMode: 0,
+			clientX: 400,
+			clientY: 300,
+		});
+		act(() => {});
+		expect(surface.style.transform).toBe(before);
+		textarea.remove();
+	});
+
 	it("does not move the view again once the user has positioned it", () => {
 		const { rerender } = render(
 			<StudioCanvas
@@ -516,7 +593,7 @@ describe("StudioCanvas", () => {
 		);
 		const surface = screen.getByTestId("studio-canvas-surface");
 		const before = surface.style.transform;
-		const hand = screen.getByRole("button", { name: "Hand" });
+		const hand = screen.getByRole("button", { name: /Geser canvas/i });
 		fireEvent.keyDown(hand, { key: "ArrowRight" });
 		expect(surface.style.transform).toBe(before);
 	});
@@ -530,7 +607,7 @@ describe("StudioCanvas", () => {
 				onSelectFrame={vi.fn()}
 			/>,
 		);
-		const hand = screen.getByRole("button", { name: "Hand" });
+		const hand = screen.getByRole("button", { name: /Geser canvas/i });
 		hand.focus();
 		fireEvent.keyDown(hand, { key: "v" });
 		expect(hand.getAttribute("aria-pressed")).toBe("false");
@@ -867,7 +944,7 @@ describe("StudioCanvas", () => {
 				/>,
 			);
 			const canvas = installLayout();
-			fireEvent.click(screen.getByRole("button", { name: "Hand" }));
+			fireEvent.click(screen.getByRole("button", { name: /Geser canvas/i }));
 			drag(canvas, { x: 50, y: 50 }, { x: 650, y: 450 });
 			expect(onSelectFrames).not.toHaveBeenCalled();
 			expect(screen.getByTestId("studio-marquee").style.display).toBe("none");

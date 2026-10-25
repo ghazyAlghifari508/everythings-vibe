@@ -122,7 +122,7 @@ export const GUIDES: readonly WorkflowGuide[] = [
 	},
 	{
 		id: "cli",
-		title: "Alur Kerja VibeEverything CLI",
+		title: "Alur Kerja everythings-vibe CLI",
 		summary:
 			"Hubungkan repositori lokal agar perencanaan AI memahami basis kode nyata tanpa halusinasi.",
 		targetUrl: "/codebases",

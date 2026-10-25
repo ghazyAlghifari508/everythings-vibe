@@ -13,7 +13,7 @@ const samplePayload: SyncPromptPayload = {
 	apiBaseUrl: "https://prdfy.example.com",
 	syncToken: "tok_resync_secret",
 	cliMinVersion: "2.0.0",
-	syncCommand: "vibeeverything codebase sync",
+	syncCommand: "everythings-vibe codebase sync",
 	expiresAt: new Date(Date.now() + 60000).toISOString(),
 };
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
+import { StudioReferenceError } from "./studio-design-reference.server";
 import {
 	studioDesignReferenceSchema,
 	studioDesignSkillIdSchema,
@@ -17,23 +18,56 @@ import { getStudioProject } from "./studio-project-query";
 import { validateStudioPrompt } from "./studio-prompt-validation";
 import { reviseStudioProject } from "./studio-revision-service";
 
-function studioErrorResponse(error: unknown): Response {
-	console.error("[studio.generate error]", error);
+// Nothing raw is ever logged: unknown provider, scrape or database failures are
+// only ever observed as a category, so a user document cannot reach the log.
+function studioErrorResponse(error: unknown, operation: string): Response {
+	const correlationId = crypto.randomUUID();
+	if (error instanceof StudioReferenceError) {
+		console.error("[studio.generate]", {
+			operation,
+			correlationId,
+			category: error.failure,
+			// Curated validation copy, never the user's own DESIGN.md content.
+			diagnostic: error.diagnostic,
+		});
+		// A reference the user cannot use is a recoverable input problem, not a
+		// server fault: the composer shows the category copy and stays usable.
+		return Response.json(
+			{ error: error.message, code: "STUDIO_REFERENCE_REJECTED" },
+			{ status: 400 },
+		);
+	}
+	const unauthorized =
+		error instanceof Error && /Unauthorized|Forbidden/.test(error.message);
+	const code = unauthorized
+		? "UNAUTHORIZED"
+		: error instanceof ScrapeError
+			? error.code
+			: "STUDIO_GENERATION_UNAVAILABLE";
+	console.error("[studio.generate]", { operation, correlationId, code });
 	if (error instanceof ScrapeError) {
 		const isClientError =
 			error.code === "INVALID_URL" || error.code === "WEBSITE_BLOCKED";
 		return Response.json(
-			{ error: error.message, code: error.code },
+			{
+				error: isClientError
+					? error.message
+					: "Studio belum dapat memproses permintaan. Coba lagi.",
+				code,
+			},
 			{ status: isClientError ? 400 : 500 },
 		);
 	}
-	if (error instanceof Error && /Unauthorized|Forbidden/.test(error.message)) {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	if (unauthorized) {
+		return Response.json(
+			{ error: "Silakan masuk kembali untuk membuka Studio.", code },
+			{ status: 401 },
+		);
 	}
 	return Response.json(
 		{
-			error:
-				"Terjadi kendala saat memproses permintaan Studio. Silakan coba beberapa saat lagi.",
+			code,
+			error: "Desain belum berhasil diproses. Coba lagi.",
 		},
 		{ status: 500 },
 	);
@@ -75,7 +109,7 @@ export async function GET({
 		const projects = await listStudioProjects(user.id);
 		return Response.json({ projects });
 	} catch (error) {
-		return studioErrorResponse(error);
+		return studioErrorResponse(error, "GET /api/studio/generate");
 	}
 }
 
@@ -157,6 +191,6 @@ export async function POST({
 			{ status: 201 },
 		);
 	} catch (error) {
-		return studioErrorResponse(error);
+		return studioErrorResponse(error, "POST /api/studio/generate");
 	}
 }

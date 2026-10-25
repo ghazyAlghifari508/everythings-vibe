@@ -1,5 +1,5 @@
 /**
- * prdfy login — save API key to config (interactive if no --api-key flag)
+ * everythings-vibe login — save API key to config (interactive if no --api-key flag)
  */
 
 import { createInterface } from "node:readline";
@@ -81,6 +81,8 @@ export async function loginCommand(options: {
 	try {
 		const apiKey =
 			options.apiKey ||
+			process.env.EVERYTHINGS_VIBE_API_KEY ||
+			process.env.VIBEEVERYTHING_API_KEY ||
 			process.env.PRDFY_API_KEY ||
 			(await promptHidden("Masukkan API key: "));
 		if (!apiKey.trim()) {
@@ -89,7 +91,11 @@ export async function loginCommand(options: {
 		}
 
 		const rawApiUrl =
-			options.apiUrl || process.env.PRDFY_API_URL || "http://localhost:3000";
+			options.apiUrl ||
+			process.env.EVERYTHINGS_VIBE_API_URL ||
+			process.env.VIBEEVERYTHING_API_URL ||
+			process.env.PRDFY_API_URL ||
+			"http://localhost:3000";
 		let apiUrl: string;
 		try {
 			const parsed = new URL(rawApiUrl);
@@ -114,7 +120,7 @@ export async function loginCommand(options: {
 
 		saveConfig({ apiKey: apiKey.trim(), apiUrl });
 		console.log(chalk.green("✓ API key berhasil disimpan."));
-		console.log(chalk.dim(`Config: ~/.prdfy/config.json`));
+		console.log(chalk.dim("Config: ~/.everythings-vibe/config.json"));
 		console.log(chalk.dim(`API URL: ${apiUrl}`));
 	} catch (err) {
 		console.error(

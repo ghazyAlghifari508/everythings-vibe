@@ -24,7 +24,7 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
-interface DialogContentProps
+export interface DialogContentProps
 	extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
 	closeAriaLabel?: string;
 	hideCloseButton?: boolean;

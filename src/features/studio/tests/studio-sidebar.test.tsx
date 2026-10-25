@@ -254,4 +254,79 @@ describe("StudioSidebar", () => {
 		);
 		expect(screen.getByText("Dashboard SIMRS Pasien Rawat Inap")).toBeDefined();
 	});
+
+	it("aligns the platform icon and vertical ellipsis menu in one action area", () => {
+		render(
+			<StudioSidebar
+				history={mockProjects}
+				onSelectProject={vi.fn()}
+				onDeleteProject={vi.fn(async () => {})}
+			/>,
+		);
+
+		const actionBtn = screen.getByRole("button", {
+			name: `Aksi project ${mockProjects[0].title}`,
+		});
+		const actionGroup = actionBtn.parentElement;
+		expect(actionGroup).not.toBeNull();
+		const webIndicator = actionGroup?.querySelector('[title="Web Design"]');
+		expect(webIndicator).not.toBeNull();
+	});
+
+	it("renders platform indicators correctly for web and mobile projects", () => {
+		render(
+			<StudioSidebar
+				history={mockProjects}
+				onSelectProject={vi.fn()}
+				onDeleteProject={vi.fn(async () => {})}
+			/>,
+		);
+
+		expect(screen.getAllByTitle("Web Design")).toHaveLength(2);
+		expect(screen.getAllByTitle("Mobile Design")).toHaveLength(1);
+	});
+
+	it("preserves user-entered project titles containing em dashes without mutation", () => {
+		const projectsWithEmDash = [
+			{
+				id: "custom-1",
+				title: "E-Commerce — Toko Baju & Fashion Brand",
+				designMode: "web",
+				hasDesignMd: false,
+				hasLogo: false,
+				createdAt: "2026-03-01T08:00:00Z",
+			},
+		];
+		render(
+			<StudioSidebar
+				history={projectsWithEmDash}
+				onSelectProject={vi.fn()}
+				onDeleteProject={vi.fn(async () => {})}
+			/>,
+		);
+
+		expect(
+			screen.getByText("E-Commerce — Toko Baju & Fashion Brand"),
+		).toBeDefined();
+	});
+
+	it("ensures public-facing UI labels and copy do not contain em dashes", () => {
+		const { container } = render(
+			<StudioSidebar
+				history={mockProjects}
+				onSelectProject={vi.fn()}
+				onDeleteProject={vi.fn(async () => {})}
+			/>,
+		);
+
+		const searchInput = screen.getByLabelText("Cari project studio");
+		expect(searchInput.getAttribute("placeholder")).not.toContain("—");
+		const aside = container.querySelector("aside");
+		expect(aside?.getAttribute("aria-label")).not.toContain("—");
+		const spans = container.querySelectorAll("span");
+		const hasEmDash = Array.from(spans).some(
+			(s) => s.textContent?.trim() === "—",
+		);
+		expect(hasEmDash).toBe(false);
+	});
 });

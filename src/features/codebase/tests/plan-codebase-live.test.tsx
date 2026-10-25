@@ -96,7 +96,7 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 			apiBaseUrl: "http://localhost:3000",
 			syncToken: "live-token-1",
 			syncCommand:
-				"vibeeverything codebase sync --project-id cb-live-1 --sync-token live-token-1",
+				"everythings-vibe codebase sync --project-id cb-live-1 --sync-token live-token-1",
 			expiresAt: new Date(Date.now() + 3600000).toISOString(),
 		};
 		let statusCalls = 0;
@@ -199,7 +199,7 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 

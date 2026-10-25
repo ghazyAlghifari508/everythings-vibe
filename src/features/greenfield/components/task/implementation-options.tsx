@@ -65,8 +65,11 @@ export function ImplementationOptions({
 	const [isResetting, setIsResetting] = useState(false);
 
 	// Restore choice from sessionStorage on mount (per-project)
+	// ponytail: reads canonical everythings-vibe key with prdfy legacy fallback.
 	useEffect(() => {
-		const stored = sessionStorage.getItem(`prdfy:impl-choice:${projectId}`);
+		const stored =
+			sessionStorage.getItem(`everythings-vibe:impl-choice:${projectId}`) ??
+			sessionStorage.getItem(`prdfy:impl-choice:${projectId}`);
 		if (
 			stored === "copy_prd" ||
 			stored === "download_zip" ||
@@ -79,7 +82,8 @@ export function ImplementationOptions({
 	const setAndPersistChoice = useCallback(
 		(c: ImplementationChoice) => {
 			setChoice(c);
-			if (c) sessionStorage.setItem(`prdfy:impl-choice:${projectId}`, c);
+			if (c)
+				sessionStorage.setItem(`everythings-vibe:impl-choice:${projectId}`, c);
 		},
 		[projectId],
 	);

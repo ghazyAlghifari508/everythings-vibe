@@ -26,7 +26,7 @@ export function buildResyncPrompt(
 	payload: SyncPromptPayload,
 	context?: { projectName?: string },
 ): string {
-	const command = `vibeeverything codebase sync --project-id ${payload.projectId} --sync-token ${payload.syncToken}`;
+	const command = `everythings-vibe codebase sync --project-id ${payload.projectId} --sync-token ${payload.syncToken}`;
 	const repositoryName = resolveCodebaseDisplayName(context?.projectName);
 	const infoLines = [
 		`Project ID   : ${payload.projectId}`,
@@ -39,7 +39,7 @@ export function buildResyncPrompt(
 	}
 
 	return [
-		"Perbarui snapshot repository existing di VibeEverything menggunakan CLI resmi.",
+		"Perbarui snapshot repository existing di everythings-vibe menggunakan CLI resmi.",
 		"Repository ini sudah terhubung. Fokus hanya pada pembaruan snapshot codebase terkini.",
 		"",
 		"## Informasi Sinkronisasi",
@@ -47,9 +47,9 @@ export function buildResyncPrompt(
 		"",
 		"## Prasyarat Eksekusi",
 		"1. Jalankan perintah di root repositori Git yang sama dengan sinkronisasi sebelumnya.",
-		"2. Gunakan VibeEverything CLI resmi dengan session dan token terbaru di atas.",
-		"3. Jika perintah `vibeeverything` belum tersedia secara global di terminal:",
-		"   npm i -g @ghazynabiel/vibeeverything",
+		"2. Gunakan everythings-vibe CLI resmi dengan session dan token terbaru di atas.",
+		"3. Jika perintah `everythings-vibe` belum tersedia secara global di terminal:",
+		"   npm i -g @ghazynabiel/everythings-vibe",
 		"",
 		"## Perintah Yang Harus Dieksekusi",
 		command,
@@ -69,7 +69,7 @@ export function buildResyncPrompt(
 		"Jika sinkronisasi gagal:",
 		"- Tampilkan pesan error CLI asli secara lengkap tanpa diringkas.",
 		"- Jangan mengubah file kode proyek untuk mencoba mengatasi kegagalan sinkronisasi.",
-		"- Jika sesi/token kedaluwarsa: Minta user kembali ke VibeEverything untuk mendapatkan token baru.",
+		"- Jika sesi/token kedaluwarsa: Minta user kembali ke everythings-vibe untuk mendapatkan token baru.",
 		"- Jika direktori bukan root git: Pastikan agent berada tepat di root folder repositori Git.",
 		"",
 		"## Format Laporan Akhir",
@@ -91,7 +91,7 @@ export function buildResyncPrompt(
 		"<output CLI asli secara lengkap>",
 		"",
 		"Tindakan Untuk User:",
-		"<Jika berhasil: 'Pembaruan snapshot codebase berhasil dikirim ke VibeEverything. Analisis AI berjalan terpisah di website dan mungkin belum selesai — jangan menyatakan analisis AI selesai.'>",
+		"<Jika berhasil: 'Pembaruan snapshot codebase berhasil dikirim ke everythings-vibe. Analisis AI berjalan terpisah di website dan mungkin belum selesai — jangan menyatakan analisis AI selesai.'>",
 		"<Jika gagal: sampaikan pesan error CLI asli dan langkah pemulihan.>",
 	].join("\n");
 }
@@ -103,7 +103,7 @@ export function buildAgentPrompt(
 	if (context?.mode === "resync") {
 		return buildResyncPrompt(payload, context);
 	}
-	const command = `vibeeverything codebase sync --project-id ${payload.projectId} --sync-token ${payload.syncToken}`;
+	const command = `everythings-vibe codebase sync --project-id ${payload.projectId} --sync-token ${payload.syncToken}`;
 	// The repository name is genuinely unknown until the CLI handshakes: a
 	// provisional creation placeholder is storage-only and must never be
 	// presented as repository identity, so no name is invented here.
@@ -119,7 +119,7 @@ export function buildAgentPrompt(
 	}
 
 	return [
-		"Sinkronkan codebase repositori lokal ini ke project VibeEverything menggunakan CLI resmi.",
+		"Sinkronkan codebase repositori lokal ini ke project everythings-vibe menggunakan CLI resmi.",
 		"Fokus hanya pada proses sinkronisasi; jangan melakukan perubahan terhadap source code.",
 		"",
 		"## Informasi Sinkronisasi",
@@ -129,9 +129,9 @@ export function buildAgentPrompt(
 		"1. Pastikan kamu berada di root repositori Git.",
 		"2. Periksa ketersediaan Node.js dan npm di sistem (`node -v` dan `npm -v`). Jangan berasumsi Node.js/npm sudah terpasang:",
 		"   - Jika `node` atau `npm` belum terpasang atau versinya usang, unduh dan install Node.js versi LTS / stable terbaru (dari https://nodejs.org atau via package manager sistem seperti winget/brew/apt) sampai perintah `npm` siap digunakan.",
-		"3. Gunakan VibeEverything CLI untuk menjalankan sinkronisasi.",
-		"4. Jika command `vibeeverything` belum tersedia di terminal, install secara global:",
-		"   npm i -g @ghazynabiel/vibeeverything",
+		"3. Gunakan everythings-vibe CLI untuk menjalankan sinkronisasi.",
+		"4. Jika command `everythings-vibe` belum tersedia di terminal, install secara global:",
+		"   npm i -g @ghazynabiel/everythings-vibe",
 		"",
 		"## Perintah Yang Harus Dieksekusi",
 		command,
@@ -162,10 +162,10 @@ export function buildAgentPrompt(
 		"- Jangan mengubah file kode proyek untuk mencoba mengatasi kegagalan sinkronisasi.",
 		"- Jangan retry dengan command atau flag di luar panduan resmi.",
 		"- Berikan panduan tindakan transparan kepada user sesuai kondisi error:",
-		"  * Jika sesi/token kedaluwarsa (`SYNC_EXPIRED` atau 401): Beri tahu user untuk kembali ke browser VibeEverything dan klik 'Coba Lagi' guna mendapatkan token baru.",
+		"  * Jika sesi/token kedaluwarsa (`SYNC_EXPIRED` atau 401): Beri tahu user untuk kembali ke browser everythings-vibe dan klik 'Coba Lagi' guna mendapatkan token baru.",
 		"  * Jika koneksi server gagal (`ECONNREFUSED` atau Network Error): Beri tahu user untuk memeriksa koneksi internet atau ketersediaan server.",
 		"  * Jika direktori bukan root git: Ingatkan user agar menjalankan agent tepat di folder root repositori Git.",
-		"  * Jika install global npm terkendala izin (`EACCES`): Sarankan alternatif menjalankan via `npx @ghazynabiel/vibeeverything codebase sync ...`.",
+		"  * Jika install global npm terkendala izin (`EACCES`): Sarankan alternatif menjalankan via `npx @ghazynabiel/everythings-vibe codebase sync ...`.",
 		"",
 		"## Format Laporan Akhir",
 		"Kembalikan laporan kepada user dengan format berikut:",
@@ -186,7 +186,7 @@ export function buildAgentPrompt(
 		"<output CLI asli secara lengkap>",
 		"",
 		"Tindakan Untuk User:",
-		"<Jika berhasil: 'Sinkronisasi repository berhasil. Sebutkan jumlah file dari output CLI asli. Hasil upload sudah tersimpan di VibeEverything. Analisis codebase berjalan terpisah di website dan mungkin belum selesai — arahkan user kembali ke VibeEverything untuk memantau status analisis sampai kesimpulan siap. Jangan menyatakan analisis selesai.'>",
+		"<Jika berhasil: 'Sinkronisasi repository berhasil. Sebutkan jumlah file dari output CLI asli. Hasil upload sudah tersimpan di everythings-vibe. Analisis codebase berjalan terpisah di website dan mungkin belum selesai — arahkan user kembali ke everythings-vibe untuk memantau status analisis sampai kesimpulan siap. Jangan menyatakan analisis selesai.'>",
 		"<Jika gagal: sampaikan arahan solusi sesuai diagnosa di atas.>",
 	].join("\n");
 }

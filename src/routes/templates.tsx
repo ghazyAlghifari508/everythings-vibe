@@ -5,11 +5,11 @@ import { TemplateCatalog } from "@/features/templates";
 export const Route = createFileRoute("/templates")({
 	head: () => ({
 		meta: [
-			{ title: "VibeTemplate | VibeEverything" },
+			{ title: "VibeTemplate | everythings-vibe" },
 			{
 				name: "description",
 				content:
-					"Katalog prompt profesional untuk Planning, Visual UI Design, dan Boilerplate Proyek VibeEverything.",
+					"Katalog prompt profesional untuk Planning, Visual UI Design, dan Boilerplate Proyek everythings-vibe.",
 			},
 		],
 	}),

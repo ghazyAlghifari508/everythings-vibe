@@ -87,13 +87,13 @@ describe("filterExplorerFiles", () => {
 describe("buildExportPlanCommand", () => {
 	test("builds the plan export command for a project", () => {
 		expect(buildExportPlanCommand("prj_123")).toBe(
-			"npx vibeeverything export plan prj_123 --root .",
+			"npx everythings-vibe export plan prj_123 --root .",
 		);
 	});
 
 	test("trims surrounding whitespace from the project id", () => {
 		expect(buildExportPlanCommand("  prj_123  ")).toBe(
-			"npx vibeeverything export plan prj_123 --root .",
+			"npx everythings-vibe export plan prj_123 --root .",
 		);
 	});
 });
@@ -101,7 +101,7 @@ describe("buildExportPlanCommand", () => {
 describe("buildPlanHandoffPrompt", () => {
 	test("uses the real project id and the CLI export command", () => {
 		const prompt = buildPlanHandoffPrompt("prj_123", "react-movie-app");
-		expect(prompt).toContain("npx vibeeverything export plan prj_123 --root .");
+		expect(prompt).toContain("npx everythings-vibe export plan prj_123 --root .");
 		expect(prompt).toContain("Project ID: prj_123");
 		// The agent is pointed at the written documents, not handed the PRD.
 		expect(prompt).toContain("docs/vibeplan/");

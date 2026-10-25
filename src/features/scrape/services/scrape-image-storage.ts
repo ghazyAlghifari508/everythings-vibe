@@ -18,7 +18,7 @@ export class ImageStorageError extends ScrapeError {
 	constructor(
 		readonly assetCode:
 			| "INVALID_IMAGE"
-			| "UNSAFE_SVG"
+			| "UNSUPPORTED_FORMAT"
 			| "IMAGE_TOO_LARGE"
 			| "SCRAPE_STORAGE_QUOTA"
 			| "OWNER_STORAGE_QUOTA",
@@ -29,6 +29,21 @@ export class ImageStorageError extends ScrapeError {
 			message,
 		);
 	}
+}
+
+function hasCompletePngChunks(body: Buffer): boolean {
+	let offset = 8;
+	let hasData = false;
+	while (offset + 12 <= body.length) {
+		const length = body.readUInt32BE(offset);
+		const type = body.toString("ascii", offset + 4, offset + 8);
+		if (offset + 12 + length > body.length) return false;
+		if (type === "IDAT" && length > 0) hasData = true;
+		offset += 12 + length;
+		if (type === "IEND")
+			return length === 0 && hasData && offset === body.length;
+	}
+	return false;
 }
 
 export function validateStoredImage(body: Buffer, declaredMime: string) {
@@ -43,14 +58,18 @@ export function validateStoredImage(body: Buffer, declaredMime: string) {
 		/^\s*(?:<\?xml[^>]*>\s*)?<svg\b/i.test(body.toString("utf8", 0, 512))
 	)
 		throw new ImageStorageError(
-			"UNSAFE_SVG",
-			"SVG tidak disimpan karena keamanan konten belum dapat diverifikasi.",
+			"UNSUPPORTED_FORMAT",
+			"Format SVG belum didukung untuk penyimpanan. Gunakan PNG, JPEG, WebP, GIF, atau AVIF.",
 		);
 	let mimeType: string | null = null;
 	if (
 		body.length >= 33 &&
 		body.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex")) &&
-		body.toString("ascii", 12, 16) === "IHDR"
+		body.toString("ascii", 12, 16) === "IHDR" &&
+		body.readUInt32BE(8) === 13 &&
+		body.readUInt32BE(16) > 0 &&
+		body.readUInt32BE(20) > 0 &&
+		hasCompletePngChunks(body)
 	)
 		mimeType = "image/png";
 	else if (
@@ -79,8 +98,18 @@ export function validateStoredImage(body: Buffer, declaredMime: string) {
 	else if (
 		body.length >= 24 &&
 		body.toString("ascii", 4, 8) === "ftyp" &&
+		body.readUInt32BE(0) >= 16 &&
 		body.readUInt32BE(0) <= body.length &&
-		/avif|avis/.test(body.toString("ascii", 8, body.readUInt32BE(0)))
+		body.readUInt32BE(0) % 4 === 0 &&
+		[
+			8,
+			...Array.from(
+				{ length: (body.readUInt32BE(0) - 16) / 4 },
+				(_, index) => 16 + index * 4,
+			),
+		].some((offset) =>
+			["avif", "avis"].includes(body.toString("ascii", offset, offset + 4)),
+		)
 	)
 		mimeType = "image/avif";
 	else if (

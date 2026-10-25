@@ -79,7 +79,8 @@ export function robotsAllows(content: string, path: string): boolean {
 				applies = false;
 				inRules = false;
 			}
-			applies ||= value === "*" || /vibeeverything/i.test(value);
+			applies ||=
+				value === "*" || /(vibeeverything|everythings-vibe)/i.test(value);
 		} else if (key === "allow" || key === "disallow") {
 			inRules = true;
 			if (applies && value) rules.push({ allow: key === "allow", value });

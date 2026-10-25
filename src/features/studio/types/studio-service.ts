@@ -22,17 +22,21 @@ export interface InitialFrameContext {
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
 	blueprint: StudioDesignBlueprint | null;
 	prdContent?: string | null;
-	lease?: { jobId: string; workerId: string };
+	lease: import("../services/studio-job-lease").StudioJobClaim;
+	signal: AbortSignal;
 }
 
 export interface ValidatedFrameInput {
 	framePrompt: string;
+	activeScreen?: string;
 	blueprint: StudioDesignBlueprint | null;
 	viewport: StudioDesignMode;
 	expectTokens: boolean;
 	designSkillId: StudioDesignSkillId;
 	dsTokens: ReturnType<typeof extractDesignSystemTokens>;
 	logoUrl: string | null;
+	signal?: AbortSignal;
+	timing?: { jobId: string; projectId: string; frameId: string };
 }
 
 export interface StudioProjectDetail extends StudioProjectRow {

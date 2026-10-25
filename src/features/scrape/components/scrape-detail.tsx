@@ -84,13 +84,13 @@ export function ScrapeDetail({
 		}
 	}, [previewSrcDoc]);
 
-	async function handleCopy(text: string, successMessage: string) {
+	async function handleCopy(text: string) {
 		setBusy(true);
 		setNotice("");
 		const ok = await copyText(text);
-		setNotice(
-			ok ? successMessage : "Gagal menyalin. Blokir clipboard oleh browser.",
-		);
+		if (!ok) {
+			setNotice("Gagal menyalin. Blokir clipboard oleh browser.");
+		}
 		setBusy(false);
 		if (ok) {
 			setCopied(true);
@@ -180,9 +180,7 @@ export function ScrapeDetail({
 					busy={busy}
 					copied={copied}
 					onDownloadScreenshot={handleDownloadScreenshot}
-					onCopy={() =>
-						void handleCopy(previewHtml, "HTML tersalin ke clipboard.")
-					}
+					onCopy={() => void handleCopy(previewHtml)}
 					onDownload={handleDownload}
 				/>
 

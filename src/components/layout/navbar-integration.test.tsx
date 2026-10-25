@@ -238,7 +238,7 @@ describe("Navbar Rebranding & Layout", () => {
 		renderNavbar();
 
 		// Brand logo links to homepage
-		const logoLink = screen.getByRole("link", { name: /VibeEverything/i });
+		const logoLink = screen.getByRole("link", { name: /everythings-vibe/i });
 		expect(logoLink).toBeDefined();
 		expect(logoLink.getAttribute("href")).toBe("/");
 

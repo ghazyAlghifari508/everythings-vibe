@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
+import { getCanvasDotStyle } from "@/features/greenfield/components/whiteboard/canvas-connectors";
 import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import {
 	type LaunchComposerConfig,
@@ -248,8 +249,11 @@ export function StudioLandingPage({
 	}
 
 	return (
-		<div className="flex min-h-dvh w-full flex-col overflow-x-clip bg-onyx text-snow">
-			<header className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 md:px-6">
+		<div
+			style={getCanvasDotStyle(1, { x: 0, y: 0 })}
+			className="flex min-h-dvh w-full flex-col overflow-x-clip bg-onyx text-snow"
+		>
+			<header className="flex w-full shrink-0 items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
 				<div className="flex min-w-0 items-center">
 					<Logo height={26} />
 				</div>
@@ -271,12 +275,12 @@ export function StudioLandingPage({
 				</div>
 			</header>
 
-			<div className="flex w-full flex-1 items-start gap-3 px-3 pb-6 md:gap-4 md:px-4">
+			<div className="flex w-full flex-1 items-start gap-5 px-4 pb-6 sm:px-6 md:gap-6 lg:gap-8 lg:px-8">
 				<StudioSidebar
 					history={history}
 					onSelectProject={handleOpenProject}
 					onDeleteProject={handleDeleteProject}
-					className="sticky top-4 hidden max-h-[calc(100dvh-5rem)] w-72 shrink-0 overflow-hidden md:flex lg:w-80"
+					className="sticky top-4 hidden h-[calc(100dvh-5.5rem)] min-h-[480px] max-h-[calc(100dvh-5.5rem)] w-72 shrink-0 overflow-hidden md:flex lg:w-80"
 				/>
 
 				<StudioMobileHistoryDrawer
@@ -287,20 +291,19 @@ export function StudioLandingPage({
 					onDeleteProject={handleDeleteProject}
 				/>
 
-				<main className="flex min-w-0 flex-1 self-stretch flex-col py-4 md:py-6">
-					<div className="mx-auto my-0 flex w-full max-w-3xl flex-col gap-6 px-1 sm:my-auto sm:px-2">
+				<main className="flex min-w-0 flex-1 self-stretch flex-col justify-center py-4 md:py-6">
+					<div className="my-auto flex w-full max-w-5xl flex-col gap-6 lg:max-w-6xl xl:max-w-7xl">
 						<div className="space-y-3 text-center sm:text-left">
 							<div className="flex justify-center sm:justify-start">
 								<HubBreadcrumb current="VibeDesign" />
 							</div>
 							<div className="space-y-2">
-								<h1 className="text-3xl font-bold tracking-tight text-snow sm:text-4xl lg:text-5xl">
+								<h1 className="font-inter text-3xl font-light leading-tight tracking-tight text-snow sm:text-[40px] lg:text-[48px]">
 									What will you design?
 								</h1>
-								<p className="mx-auto max-w-2xl text-sm leading-6 text-fog sm:mx-0">
-									Jelaskan antarmuka yang ingin kamu buat dalam Bahasa
-									Indonesia. Studio menghasilkan halaman HTML interaktif lengkap
-									dengan Tailwind dan data realistis.
+								<p className="max-w-2xl font-inter text-sm leading-relaxed text-fog sm:text-base">
+									Ubah idemu menjadi rancangan aplikasi yang bisa kamu lihat,
+									sesuaikan, dan kembangkan.
 								</p>
 							</div>
 						</div>

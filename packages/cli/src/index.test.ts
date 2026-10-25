@@ -149,7 +149,7 @@ describe("prdfy codebase sync argv wiring", () => {
 	});
 });
 
-describe("vibeeverything export plan argv wiring", () => {
+describe("everythings-vibe export plan argv wiring", () => {
 	it("maps export plan <id> --root/--api-url to the command action", async () => {
 		const root = mkdtempSync(join(tmpdir(), "prdfy-plan-wiring-"));
 		repos.push(root);
@@ -281,9 +281,9 @@ describe("vibeeverything export plan argv wiring", () => {
 });
 
 describe("CLI branding and commands", () => {
-	it("has name vibeeverything and proper description", () => {
-		expect(program.name()).toBe("vibeeverything");
-		expect(program.description()).toContain("VibeEverything");
+	it("has name everythings-vibe and proper description", () => {
+		expect(program.name()).toBe("everythings-vibe");
+		expect(program.description()).toContain("everythings-vibe");
 	});
 
 	it("registers codebase sync command", () => {

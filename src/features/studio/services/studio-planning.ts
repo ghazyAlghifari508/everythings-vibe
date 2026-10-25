@@ -1,5 +1,4 @@
 import { and, asc, eq } from "drizzle-orm";
-import { db } from "@/db";
 import {
 	type InsertStudioFrameRow,
 	type StudioFrameRow,
@@ -22,6 +21,12 @@ import type {
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 import { resolveStudioPlanningSystemPrompt } from "./studio-design-skill-registry.server";
 import { isTemporarySlot } from "./studio-frame-generation";
+import {
+	type StudioJobClaim,
+	type StudioJobTransaction,
+	withStudioJobWrite,
+} from "./studio-job-lease";
+import { studioJobTiming } from "./studio-job-runtime";
 import { parseStudioPlanningWithBlueprint } from "./studio-planning-parser";
 import { buildStudioPlanningPrompt } from "./studio-planning-prompt";
 
@@ -29,14 +34,18 @@ export async function planStudioScreens(
 	job: StudioJobRow,
 	project: StudioProjectRow,
 	designMode: StudioDesignMode,
+	claim: StudioJobClaim,
+	signal: AbortSignal,
 ): Promise<{
 	screenPlan: StudioScreenPlan;
 	designBlueprint: StudioDesignBlueprint;
-} | null> {
-	await db
-		.update(studioJobs)
-		.set({ status: "planning", updatedAt: new Date() })
-		.where(eq(studioJobs.id, job.id));
+}> {
+	await withStudioJobWrite(claim, async (tx) => {
+		await tx
+			.update(studioJobs)
+			.set({ status: "planning", updatedAt: new Date() })
+			.where(eq(studioJobs.id, job.id));
+	});
 
 	const planPrompt = buildStudioPlanningPrompt(
 		job.prompt,
@@ -46,27 +55,52 @@ export async function planStudioScreens(
 		project.prdContent,
 	);
 
+	const systemPrompt = resolveStudioPlanningSystemPrompt(
+		project.designSkillId ?? "none",
+		job.prompt,
+		designMode,
+	);
+	studioJobTiming("planning-context", Date.now(), {
+		jobId: job.id,
+		projectId: project.id,
+		skillId: project.designSkillId,
+		systemChars: systemPrompt.length,
+		promptChars: planPrompt.length,
+	});
 	let screenPlan: StudioScreenPlan | null = null;
 	let designBlueprint: StudioDesignBlueprint | null = null;
 	let planError: string | null = null;
 
 	try {
-		const { generator, firstChunk } = await tryStreamWithFallback(
+		const requestStartedAt = Date.now();
+		const { generator, firstChunk, outcome } = await tryStreamWithFallback(
 			selectModels(),
 			[
 				{
 					role: "system",
-					content: resolveStudioPlanningSystemPrompt(
-						project.designSkillId ?? "none",
-					),
+					content: systemPrompt,
 				},
 				{ role: "user", content: planPrompt },
 			],
-			undefined,
+			signal,
 			STUDIO_PLANNING_MAX_TOKENS,
 		);
+		studioJobTiming("planning-first-token", requestStartedAt, {
+			jobId: job.id,
+			projectId: project.id,
+			attempt: 1,
+		});
+		const outputStartedAt = Date.now();
 		let planRaw = firstChunk;
 		for await (const chunk of generator) planRaw += chunk;
+		studioJobTiming("planning-output", outputStartedAt, {
+			jobId: job.id,
+			projectId: project.id,
+			attempt: 1,
+			outputChars: planRaw.length,
+			...outcome,
+		});
+		signal.throwIfAborted();
 		const parsed = parseStudioPlanningWithBlueprint(
 			planRaw,
 			designMode,
@@ -79,28 +113,42 @@ export async function planStudioScreens(
 			planError = parsed.error;
 		}
 	} catch (err) {
+		signal.throwIfAborted();
 		planError = err instanceof Error ? err.message : "Planning stream error";
 	}
 
 	if (!screenPlan || !designBlueprint) {
 		try {
+			const requestStartedAt = Date.now();
 			const correctivePrompt = `${planPrompt}\n\nPrevious plan violated the contract (${planError ?? "format error"}). Correct the plan and return ONLY valid JSON matching the required count, platform and order, including the complete shared design blueprint object.`;
-			const { generator, firstChunk } = await tryStreamWithFallback(
+			const { generator, firstChunk, outcome } = await tryStreamWithFallback(
 				selectModels(),
 				[
 					{
 						role: "system",
-						content: resolveStudioPlanningSystemPrompt(
-							project.designSkillId ?? "none",
-						),
+						content: systemPrompt,
 					},
 					{ role: "user", content: correctivePrompt },
 				],
-				undefined,
+				signal,
 				STUDIO_PLANNING_MAX_TOKENS,
 			);
+			studioJobTiming("planning-first-token", requestStartedAt, {
+				jobId: job.id,
+				projectId: project.id,
+				attempt: 2,
+			});
+			const outputStartedAt = Date.now();
 			let planRaw = firstChunk;
 			for await (const chunk of generator) planRaw += chunk;
+			studioJobTiming("planning-output", outputStartedAt, {
+				jobId: job.id,
+				projectId: project.id,
+				attempt: 2,
+				outputChars: planRaw.length,
+				...outcome,
+			});
+			signal.throwIfAborted();
 			const parsed = parseStudioPlanningWithBlueprint(
 				planRaw,
 				designMode,
@@ -112,23 +160,17 @@ export async function planStudioScreens(
 			} else {
 				planError = parsed.error;
 			}
-		} catch {
-			// The corrective retry is bounded; failure is persisted below.
+		} catch (err) {
+			signal.throwIfAborted();
+			planError = err instanceof Error ? err.message : "Planning stream error";
 		}
 	}
 
 	if (!screenPlan || !designBlueprint || screenPlan.screens.length === 0) {
-		const finalError = `Gagal merencanakan layar aplikasi untuk "${job.prompt.slice(0, 60)}". Silakan coba lagi.`;
-		await db
-			.update(studioJobs)
-			.set({
-				status: "failed",
-				error: finalError,
-				finishedAt: new Date(),
-				updatedAt: new Date(),
-			})
-			.where(eq(studioJobs.id, job.id));
-		return null;
+		throw new ScrapeError(
+			"AI_GENERATION_FAILED",
+			planError ?? "Gagal merencanakan layar aplikasi.",
+		);
 	}
 
 	return { screenPlan, designBlueprint };
@@ -138,8 +180,9 @@ export async function persistStudioPlannedFrames(
 	projectId: string,
 	userId: string,
 	planned: StudioScreenPlan["screens"],
+	transaction: StudioJobTransaction,
 ): Promise<StudioFrameRow[]> {
-	return db.transaction(async (tx) => {
+	const persist = async (tx: StudioJobTransaction) => {
 		const [owned] = await tx
 			.select()
 			.from(studioProjects)
@@ -200,5 +243,6 @@ export async function persistStudioPlannedFrames(
 				),
 			)
 			.returning();
-	});
+	};
+	return persist(transaction);
 }

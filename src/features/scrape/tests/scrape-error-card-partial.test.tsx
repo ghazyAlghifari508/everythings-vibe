@@ -144,7 +144,7 @@ describe("recovery actions", () => {
 			/>,
 		);
 		const button = screen.getByRole("button", {
-			name: "Coba lagi — belum tersedia",
+			name: "Coba lagi",
 		});
 		expect(button.hasAttribute("disabled")).toBe(true);
 		fireEvent.click(button);

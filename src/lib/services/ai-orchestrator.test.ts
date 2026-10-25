@@ -154,6 +154,8 @@ describe("tryStreamWithFallback thinking", () => {
 			},
 		);
 		expect(streamChatMock).toHaveBeenCalledTimes(2);
+		expect(result.outcome.providerRetries).toBe(1);
+		expect(result.outcome.providerFallbacks).toBe(0);
 		expect(resets).toBe(1);
 		expect(seen).toEqual(["live reasoning"]);
 		expect(result.firstChunk).toBe("AC ");

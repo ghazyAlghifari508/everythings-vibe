@@ -31,7 +31,7 @@ function syncPayload() {
 		apiBaseUrl: "http://localhost:3000",
 		syncToken: "name-token-1",
 		syncCommand:
-			"vibeeverything codebase sync --project-id cb-name-1 --sync-token name-token-1",
+			"everythings-vibe codebase sync --project-id cb-name-1 --sync-token name-token-1",
 		expiresAt: new Date(Date.now() + 3600000).toISOString(),
 	};
 }
@@ -103,7 +103,7 @@ describe("PlanCodebasePage repository name", () => {
 		// and a placeholder is never presented as the repository.
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 		expect(document.body.textContent).toContain("Repository belum terdeteksi");
@@ -162,7 +162,7 @@ describe("PlanCodebasePage repository name", () => {
 
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 

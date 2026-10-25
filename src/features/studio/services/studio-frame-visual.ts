@@ -6,6 +6,7 @@ import {
 	studioFrames,
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
+import { studioJobTiming } from "./studio-job-runtime";
 import { buildStudioAssetUrl } from "./studio-logo-service";
 import { getStudioProjectDetail } from "./studio-project-detail";
 
@@ -53,29 +54,48 @@ export async function getStudioFrameVisual(
 				)[0];
 	if (cached) {
 		const bounds = /-(\d+)x(\d+)\.jpg$/.exec(cached.filename);
-		if (bounds)
+		if (bounds) {
+			console.info("[studio.preview.capture]", {
+				outcome: "cached",
+				assetCount: assets.length,
+			});
 			return {
 				url: buildStudioAssetUrl(cached.id, userId),
 				width: Number(bounds[1]),
 				height: Number(bounds[2]),
 				hash,
 			};
+		}
 	}
+	const captureStartedAt = Date.now();
+	const startedAt = performance.now();
 	const visual = await captureStudioVisual(
 		frame.htmlCode,
 		frame.viewport,
 		detail.project.designMd,
 		assets,
-	).catch((failure: unknown) => {
-		// Capture failure must not imply that the persisted frame HTML was lost.
-		throw new ScrapeError(
-			"VISUAL_CAPTURE_FAILED",
-			failure instanceof Error
-				? `Pratinjau visual frame gagal dirender: ${failure.message}`
-				: undefined,
-			{ cause: failure },
-		);
-	});
+	)
+		.then((captured) => {
+			console.info("[studio.preview.capture]", {
+				outcome: "captured",
+				elapsedMs: Math.round(performance.now() - startedAt),
+				assetCount: assets.length,
+			});
+			return captured;
+		})
+		.catch((failure: unknown) => {
+			console.info("[studio.preview.capture]", {
+				outcome: "failed",
+				elapsedMs: Math.round(performance.now() - startedAt),
+				assetCount: assets.length,
+			});
+			// Capture failure must not imply that the persisted frame HTML was lost.
+			throw new ScrapeError("VISUAL_CAPTURE_FAILED", undefined, {
+				cause: failure,
+			});
+		});
+	studioJobTiming("preview-capture", captureStartedAt, { projectId, frameId });
+	const persistenceStartedAt = Date.now();
 	const [asset] = await db
 		.insert(studioAssets)
 		.values({
@@ -87,6 +107,10 @@ export async function getStudioFrameVisual(
 			data: visual.data.toString("base64"),
 		} satisfies InsertStudioAssetRow)
 		.returning();
+	studioJobTiming("preview-persistence", persistenceStartedAt, {
+		projectId,
+		frameId,
+	});
 	if (!asset)
 		throw new ScrapeError("STORAGE_FAILED", "Gagal menyimpan visual frame.");
 	return {

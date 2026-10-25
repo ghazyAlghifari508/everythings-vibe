@@ -4,7 +4,6 @@ import { buildSynthesisPayload } from "@/features/scrape/services/design-synthes
 import { inspectorFromModel } from "@/features/scrape/utils/design-md-inspector";
 import { renderDesignMd } from "@/features/scrape/utils/design-md-render";
 import { FIXTURE } from "@/lib/design-fixture";
-import { escapeCell } from "../utils/design-md-markdown";
 
 it("preserves component-specific properties and source selectors without AI", () => {
 	const model = buildDesignModel(FIXTURE);
@@ -15,9 +14,8 @@ it("preserves component-specific properties and source selectors without AI", ()
 	expect(buttons?.description).toContain("padding: 14px");
 	expect(buttons?.description).toContain("font-size: 15px");
 	expect(buttons?.evidence).toContain("button:nth-child(5)");
-	expect(renderDesignMd(model)).toContain(
-		escapeCell(buttons?.description ?? ""),
-	);
+	expect(renderDesignMd(model)).not.toMatch(/nth-child\(/);
+	expect(buttons?.treatments?.[0]?.properties["border-radius"]).toBe("8px");
 	expect(
 		inspectorFromModel(model, "observed").components.find(
 			(component) => component.name === buttons?.name,

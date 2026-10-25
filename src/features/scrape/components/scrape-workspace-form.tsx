@@ -99,6 +99,10 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 	async function submit(event: FormEvent) {
 		event.preventDefault();
 		if (submitting.current) return;
+		if (Object.keys(issues).length > 0) {
+			setError("Periksa kembali parameter lanjutan yang belum valid.");
+			return;
+		}
 		const suffix = input.trim();
 		const url =
 			/^[a-z][a-z\d+.-]*:/i.test(suffix) && !/^[^/]+:\d+(?:\/|$)/.test(suffix)

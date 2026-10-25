@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { StudioReferenceError } from "@/features/studio/services/studio-design-reference.server";
 import { POST, studioGenerateBodySchema } from "@/routes/api/studio.generate";
+
+const creationFailure = vi.hoisted(() => ({ error: null as Error | null }));
 
 vi.mock("@/lib/session", () => ({
 	requireUser: async () => ({ id: "user-123", email: "test@example.com" }),
@@ -10,14 +13,17 @@ vi.mock("@tanstack/react-start/server", () => ({
 }));
 
 vi.mock("@/features/studio/services/studio-project-enqueue", () => ({
-	createStudioProjectWithJob: async () => ({
-		project: { id: "proj-100", title: "Test Project" },
-		job: { id: "job-100", status: "queued" },
-		frames: [
-			{ id: "frame-1", projectId: "proj-100", order: 0 },
-			{ id: "frame-2", projectId: "proj-100", order: 1 },
-		],
-	}),
+	createStudioProjectWithJob: async () => {
+		if (creationFailure.error) throw creationFailure.error;
+		return {
+			project: { id: "proj-100", title: "Test Project" },
+			job: { id: "job-100", status: "queued" },
+			frames: [
+				{ id: "frame-1", projectId: "proj-100", order: 0 },
+				{ id: "frame-2", projectId: "proj-100", order: 1 },
+			],
+		};
+	},
 }));
 
 vi.mock("@/features/studio/services/studio-revision-service", () => ({
@@ -28,6 +34,70 @@ vi.mock("@/features/studio/services/studio-revision-service", () => ({
 }));
 
 describe("POST /api/studio/generate", () => {
+	it("classifies server failures without logging or returning sensitive details", async () => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		creationFailure.error = new Error("sensitive upstream content");
+		try {
+			const response = await POST({
+				request: new Request("https://app.test/api/studio/generate", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						prompt: "Build a sample application workspace",
+					}),
+				}),
+			});
+			expect(response.status).toBe(500);
+			expect(await response.json()).toMatchObject({
+				code: "STUDIO_GENERATION_UNAVAILABLE",
+			});
+			expect(log).toHaveBeenCalledWith("[studio.generate]", {
+				operation: "POST /api/studio/generate",
+				correlationId: expect.any(String),
+				code: "STUDIO_GENERATION_UNAVAILABLE",
+			});
+			expect(JSON.stringify(log.mock.calls)).not.toContain(
+				"sensitive upstream content",
+			);
+		} finally {
+			creationFailure.error = null;
+			log.mockRestore();
+		}
+	});
+	it("answers a recoverable reference failure with 400 and the category copy", async () => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		creationFailure.error = new StudioReferenceError(
+			"source-unavailable",
+			"scrape row is gone",
+		);
+		try {
+			const response = await POST({
+				request: new Request("https://app.test/api/studio/generate", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						prompt: "Build a sample application workspace",
+						designReference: { kind: "scrape", id: "scrape-1" },
+					}),
+				}),
+			});
+			expect(response.status).toBe(400);
+			expect(await response.json()).toEqual({
+				error:
+					"Referensi desain ini sudah tidak tersedia. Pilih referensi lain.",
+				code: "STUDIO_REFERENCE_REJECTED",
+			});
+			expect(log).toHaveBeenCalledWith("[studio.generate]", {
+				operation: "POST /api/studio/generate",
+				correlationId: expect.any(String),
+				category: "source-unavailable",
+				diagnostic: "scrape row is gone",
+			});
+		} finally {
+			creationFailure.error = null;
+			log.mockRestore();
+		}
+	});
 	it("validates generation payload schema", () => {
 		expect(
 			studioGenerateBodySchema.safeParse({ prompt: "Buat landing page" })

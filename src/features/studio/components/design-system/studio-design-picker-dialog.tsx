@@ -1,15 +1,18 @@
 "use client";
 
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
+	DialogClose,
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 import {
 	StudioDesignCustomPanel,
@@ -116,20 +119,33 @@ export function StudioDesignPickerDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="fixed inset-0 !inset-0 left-0 top-0 !left-0 !top-0 !translate-none !translate-x-0 !translate-y-0 w-screen h-dvh max-h-dvh max-w-none !m-0 rounded-none sm:rounded-none !rounded-none border-0 !border-0 shadow-none !shadow-none flex flex-col gap-0 !gap-0 overflow-hidden p-0 !p-0 bg-obsidian">
-				<div className="min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 sm:py-12">
+			<DialogContent
+				hideCloseButton
+				className="fixed inset-0 !inset-0 left-0 top-0 !left-0 !top-0 !translate-none !translate-x-0 !translate-y-0 w-screen h-dvh max-h-dvh max-w-none !m-0 rounded-none sm:rounded-none !rounded-none border-0 !border-0 shadow-none !shadow-none flex flex-col gap-0 !gap-0 overflow-hidden p-0 !p-0 bg-obsidian"
+			>
+				<div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-10 pb-16 sm:px-6 sm:pt-14 sm:pb-20">
 					<div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-						<DialogHeader className="gap-1.5 text-left sm:text-left">
-							<DialogTitle className="text-xl font-bold tracking-tight text-snow sm:text-2xl">
-								Pilih tampilan
-							</DialogTitle>
-							<DialogDescription className="text-sm text-fog">
-								Pilih referensi visual untuk proyek desainmu. Referensi
-								tersimpan sebagai draf dan baru dipakai saat kamu menekan kirim.
-							</DialogDescription>
-						</DialogHeader>
+						<div className="flex items-start justify-between gap-4">
+							<DialogHeader className="gap-1.5 text-left sm:text-left">
+								<DialogTitle className="text-xl font-bold tracking-tight text-snow sm:text-2xl">
+									Pilih tampilan
+								</DialogTitle>
+								<DialogDescription className="max-w-xl text-left text-sm text-fog">
+									Pilih referensi visual untuk proyek desainmu. Referensi
+									tersimpan sebagai draf dan baru dipakai saat kamu menekan
+									kirim.
+								</DialogDescription>
+							</DialogHeader>
+							<DialogClose
+								className="rounded-lg p-2 text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo shrink-0"
+								aria-label="Close"
+							>
+								<Icon icon={Cancel01Icon} size={18} />
+								<span className="sr-only">Close</span>
+							</DialogClose>
+						</div>
 
-						<div className="flex justify-center">
+						<div className="flex justify-start">
 							<div
 								role="tablist"
 								aria-label="Sumber referensi desain"

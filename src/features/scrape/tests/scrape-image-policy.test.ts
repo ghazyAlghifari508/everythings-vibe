@@ -18,6 +18,36 @@ it("counts durable previous results alongside changed retry candidates", () => {
 		processedImages: 2,
 		savedImages: 1,
 		failedResources: 1,
+		pendingImages: 1,
+		duplicateCandidates: 0,
+	});
+});
+
+it.each([
+	403, 429, 500,
+])("preserves robots HTTP evidence for %s", async (status) => {
+	const policy = createImageSitePolicy(undefined, async (url) => ({
+		status,
+		contentType: "text/plain",
+		finalUrl: url,
+		body: Buffer.alloc(0),
+		retryAfter: "60",
+	}));
+	await expect(policy("https://site.example/a.png")).rejects.toMatchObject({
+		httpStatus: status,
+		retryAfterSeconds: 60,
+	});
+});
+
+it("does not attribute unsupported robots content to a site denial", async () => {
+	const policy = createImageSitePolicy(undefined, async (url) => ({
+		status: 200,
+		contentType: "text/html",
+		finalUrl: url,
+		body: Buffer.from("<html/>"),
+	}));
+	await expect(policy("https://site.example/a.png")).rejects.toMatchObject({
+		code: "ASSET_FETCH_FAILED",
 	});
 });
 

@@ -37,7 +37,6 @@ import { Route as AskIdRouteImport } from './routes/ask/$id'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as CodebasesIndexRouteImport } from './routes/codebases/index'
 import { Route as CodebasesIdRouteImport } from './routes/codebases/$id'
-import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
 import { Route as DesignIndexRouteImport } from './routes/design/index'
 import { Route as DesignIdRouteImport } from './routes/design/$id'
 import { Route as DesignScrapRouteImport } from './routes/design/scrap'
@@ -258,11 +257,6 @@ const CodebasesIdRoute = CodebasesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => CodebasesRoute,
-} as any)
-const DemoTanstackQueryRoute = DemoTanstackQueryRouteImport.update({
-  id: '/demo/tanstack-query',
-  path: '/demo/tanstack-query',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const DesignIndexRoute = DesignIndexRouteImport.update({
   id: '/design/',
@@ -707,7 +701,6 @@ export interface FileRoutesByFullPath {
   '/ask/$id': typeof AskIdRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/design/$id': typeof DesignIdRoute
   '/design/scrap': typeof DesignScrapRouteWithChildren
   '/fitur/$id': typeof FiturIdRoute
@@ -814,7 +807,6 @@ export interface FileRoutesByTo {
   '/ask/$id': typeof AskIdRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/design/$id': typeof DesignIdRoute
   '/fitur/$id': typeof FiturIdRoute
   '/kanban/$id': typeof KanbanIdRoute
@@ -925,7 +917,6 @@ export interface FileRoutesById {
   '/ask/$id': typeof AskIdRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/codebases/$id': typeof CodebasesIdRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/design/$id': typeof DesignIdRoute
   '/design/scrap': typeof DesignScrapRouteWithChildren
   '/fitur/$id': typeof FiturIdRoute
@@ -1038,7 +1029,6 @@ export interface FileRouteTypes {
     | '/ask/$id'
     | '/auth/callback'
     | '/codebases/$id'
-    | '/demo/tanstack-query'
     | '/design/$id'
     | '/design/scrap'
     | '/fitur/$id'
@@ -1145,7 +1135,6 @@ export interface FileRouteTypes {
     | '/ask/$id'
     | '/auth/callback'
     | '/codebases/$id'
-    | '/demo/tanstack-query'
     | '/design/$id'
     | '/fitur/$id'
     | '/kanban/$id'
@@ -1255,7 +1244,6 @@ export interface FileRouteTypes {
     | '/ask/$id'
     | '/auth/callback'
     | '/codebases/$id'
-    | '/demo/tanstack-query'
     | '/design/$id'
     | '/design/scrap'
     | '/fitur/$id'
@@ -1362,7 +1350,6 @@ export interface RootRouteChildren {
   ApiScrapeRoute: typeof ApiScrapeRouteWithChildren
   AskIdRoute: typeof AskIdRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
-  DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
   DesignIdRoute: typeof DesignIdRoute
   DesignScrapRoute: typeof DesignScrapRouteWithChildren
   FiturIdRoute: typeof FiturIdRoute
@@ -1609,13 +1596,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/codebases/$id'
       preLoaderRoute: typeof CodebasesIdRouteImport
       parentRoute: typeof CodebasesRoute
-    }
-    '/demo/tanstack-query': {
-      id: '/demo/tanstack-query'
-      path: '/demo/tanstack-query'
-      fullPath: '/demo/tanstack-query'
-      preLoaderRoute: typeof DemoTanstackQueryRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/design/': {
       id: '/design/'
@@ -2372,7 +2352,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiScrapeRoute: ApiScrapeRouteWithChildren,
   AskIdRoute: AskIdRoute,
   AuthCallbackRoute: AuthCallbackRoute,
-  DemoTanstackQueryRoute: DemoTanstackQueryRoute,
   DesignIdRoute: DesignIdRoute,
   DesignScrapRoute: DesignScrapRouteWithChildren,
   FiturIdRoute: FiturIdRoute,

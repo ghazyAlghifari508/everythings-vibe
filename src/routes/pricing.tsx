@@ -7,7 +7,7 @@ export const Route = createFileRoute("/pricing")({
 	component: PricingPage,
 	head: () => ({
 		meta: [
-			{ title: "Pricing | VibeEverything" },
+			{ title: "Pricing | everythings-vibe" },
 			{
 				name: "description",
 				content:

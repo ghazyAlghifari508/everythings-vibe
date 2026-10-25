@@ -1,13 +1,17 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 import { db } from "@/db";
-import { studioFrames, studioProjects, users } from "@/db/schema";
+import { studioFrames, studioJobs, studioProjects, users } from "@/db/schema";
 import { getStudioProjectDetail } from "../services/studio-project-detail";
 import { createStudioProjectWithJob } from "../services/studio-project-enqueue";
 import { listStudioProjects } from "../services/studio-project-lifecycle";
 import { retryStudioFrame } from "../services/studio-retry-service";
+import { dispatchStudioWorkerBatch } from "../services/studio-worker-dispatch";
 
-const e2eState = vi.hoisted(() => ({ labels: [] as string[] }));
+const e2eState = vi.hoisted(() => ({
+	labels: [] as string[],
+	failOnce: false,
+}));
 
 vi.mock("@/lib/services/ai-orchestrator", () => ({
 	selectModels: () => ["prdfy-combo"],
@@ -103,6 +107,10 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
   <main><h1>Hello World</h1></main>
 </body>
 </html>`;
+		if (e2eState.failOnce) {
+			e2eState.failOnce = false;
+			throw new Error("Simulated provider failure");
+		}
 		return {
 			firstChunk: html,
 			generator: (async function* () {})(),
@@ -146,6 +154,25 @@ describe("End-to-End Multi-Screen Generation Scenarios", () => {
 		return created.id;
 	}
 
+	const terminalStatuses = ["completed", "partial", "failed"];
+
+	// Drive the deployed durable path: the HTTP boundary only persists jobs, so
+	// the worker loop is what advances them. Dispatch is global, so re-dispatch
+	// until this project's newest job reaches a terminal state.
+	async function runStudioWorker(projectId: string): Promise<void> {
+		for (let round = 0; round < 60; round++) {
+			await dispatchStudioWorkerBatch();
+			const [job] = await db
+				.select()
+				.from(studioJobs)
+				.where(eq(studioJobs.projectId, projectId))
+				.orderBy(desc(studioJobs.createdAt))
+				.limit(1);
+			if (job && terminalStatuses.includes(job.status)) return;
+		}
+		throw new Error("Studio worker did not reach a terminal job state");
+	}
+
 	it("Scenario 1 — Web without reference: plans adaptive screens and generates HTML frames", async () => {
 		const userId = await getTestUserId();
 		const { project, job } = await createStudioProjectWithJob(userId, {
@@ -159,16 +186,10 @@ describe("End-to-End Multi-Screen Generation Scenarios", () => {
 		expect(job.id).toBeDefined();
 		expect(job.status).toBe("queued");
 
-		// Wait until at least 1 frame is ready, demonstrating progressive reveal
-		let detail = await getStudioProjectDetail(project.id, userId);
-		const startTime = Date.now();
-		while (Date.now() - startTime < 10_000) {
-			detail = await getStudioProjectDetail(project.id, userId);
-			if (detail.frames.some((f) => f.status === "ready" && f.htmlCode)) {
-				break;
-			}
-			await new Promise((r) => setTimeout(r, 100));
-		}
+		// Progressive persistence: the first ready frame is visible even if a
+		// later frame had failed, because the worker persists each frame alone.
+		await runStudioWorker(project.id);
+		const detail = await getStudioProjectDetail(project.id, userId);
 
 		// Verify persisted state from DB
 		expect(detail.frames.length).toBeGreaterThanOrEqual(1);
@@ -195,15 +216,8 @@ describe("End-to-End Multi-Screen Generation Scenarios", () => {
 
 		expect(project.designMode).toBe("mobile");
 
-		let detail = await getStudioProjectDetail(project.id, userId);
-		const startTime = Date.now();
-		while (Date.now() - startTime < 10_000) {
-			detail = await getStudioProjectDetail(project.id, userId);
-			if (detail.frames.some((f) => f.status === "ready" && f.htmlCode)) {
-				break;
-			}
-			await new Promise((r) => setTimeout(r, 100));
-		}
+		await runStudioWorker(project.id);
+		const detail = await getStudioProjectDetail(project.id, userId);
 
 		expect(detail.frames.length).toBeGreaterThanOrEqual(1);
 		const readyFrames = detail.frames.filter((f) => f.status === "ready");
@@ -236,15 +250,8 @@ describe("End-to-End Multi-Screen Generation Scenarios", () => {
 		expect(project.designMd).toContain("MindMarket");
 		expect(project.logoAssetId).toBeDefined();
 
-		let detail = await getStudioProjectDetail(project.id, userId);
-		const startTime = Date.now();
-		while (Date.now() - startTime < 10_000) {
-			detail = await getStudioProjectDetail(project.id, userId);
-			if (detail.frames.some((f) => f.status === "ready" && f.htmlCode)) {
-				break;
-			}
-			await new Promise((r) => setTimeout(r, 100));
-		}
+		await runStudioWorker(project.id);
+		const detail = await getStudioProjectDetail(project.id, userId);
 
 		expect(detail.logoUrl).toContain("/api/studio/asset?id=");
 		expect(detail.frames.length).toBeGreaterThanOrEqual(1);
@@ -272,39 +279,40 @@ describe("End-to-End Multi-Screen Generation Scenarios", () => {
 			designMode: "web",
 		});
 
-		// Tandai 1 slot bawaan sebagai failed untuk menguji retry frame individual
-		const slots = await db
-			.select()
-			.from(studioFrames)
-			.where(eq(studioFrames.projectId, project.id))
-			.orderBy(studioFrames.order);
-		expect(slots.length).toBeGreaterThanOrEqual(1);
-		const slot = slots[0];
-		await db
-			.update(studioFrames)
-			.set({
-				name: "Detail Catatan",
-				status: "failed",
-				error: "Simulated timeout",
-				updatedAt: new Date(),
-			})
-			.where(eq(studioFrames.id, slot.id));
+		// One provider call fails, so the pipeline persists a genuine frame
+		// failure next to the frames that succeeded.
+		e2eState.failOnce = true;
+		await runStudioWorker(project.id);
+		expect(e2eState.failOnce).toBe(false);
+
 		const [failedFrame] = await db
 			.select()
 			.from(studioFrames)
-			.where(eq(studioFrames.id, slot.id));
+			.where(
+				and(
+					eq(studioFrames.projectId, project.id),
+					eq(studioFrames.status, "failed"),
+				),
+			);
+		expect(failedFrame).toBeDefined();
+		expect(failedFrame.status).toBe("failed");
+		expect(failedFrame.htmlCode).toBeNull();
 
-		// Retry only the failed frame
-		const retried = await retryStudioFrame(project.id, userId, failedFrame.id);
+		// Retry only the failed frame through the same durable worker path.
+		const { frame: retried, retry } = await retryStudioFrame(
+			project.id,
+			userId,
+			failedFrame.id,
+		);
+		expect(retry).toBe("queued");
 		expect(retried.status).toBe("queued");
-		await vi.waitFor(async () => {
-			const [persisted] = await db
-				.select()
-				.from(studioFrames)
-				.where(eq(studioFrames.id, failedFrame.id));
-			expect(persisted.status).toBe("ready");
-			expect(persisted.htmlCode).toContain("<html");
-		});
+		await runStudioWorker(project.id);
+		const [persisted] = await db
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.id, failedFrame.id));
+		expect(persisted.status).toBe("ready");
+		expect(persisted.htmlCode).toContain("<html");
 
 		// Test history listing
 		const history = await listStudioProjects(userId);

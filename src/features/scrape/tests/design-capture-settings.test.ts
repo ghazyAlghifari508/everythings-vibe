@@ -32,6 +32,49 @@ function rendered(): RenderedPage {
 }
 
 describe("bounded design capture", () => {
+	for (const viewport of ["desktop", "mobile", "both"] as const)
+		for (const theme of ["auto", "light", "dark", "both"] as const)
+			it(`captures exactly requested ${viewport}/${theme} contexts`, async () => {
+				vi.mocked(renderPage).mockImplementation(async (_url, options) => {
+					const capture = rendered();
+					if (capture.visualEvidence && options?.viewport)
+						capture.visualEvidence.viewport = options.viewport;
+					return capture;
+				});
+				const result = await scrapeHtml(FIXTURE.sourceUrl, 1, {
+					mode: "design",
+					designSettings: {
+						viewport,
+						theme,
+						depth: "standard",
+						focus: "complete",
+						codeReference: "both",
+					},
+				});
+				const widths =
+					viewport === "both"
+						? [1440, 390]
+						: [viewport === "mobile" ? 390 : 1440];
+				const preferences =
+					theme === "both"
+						? ["light", "dark"]
+						: [theme === "auto" ? null : theme];
+				expect(
+					vi
+						.mocked(renderPage)
+						.mock.calls.map(([, options]) => [
+							options?.viewport?.width,
+							options?.colorScheme,
+						]),
+				).toEqual(
+					widths.flatMap((width) =>
+						preferences.map((scheme) => [width, scheme]),
+					),
+				);
+				expect(result.metadata.visualEvidence?.additionalViews).toHaveLength(
+					widths.length * preferences.length - 1,
+				);
+			});
 	it("captures all four viewport/theme combinations sequentially and retains their provenance", async () => {
 		let active = 0;
 		let peak = 0;

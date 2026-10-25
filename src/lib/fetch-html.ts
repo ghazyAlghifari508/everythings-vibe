@@ -119,7 +119,9 @@ export async function fetchAsset(
 					// socket error would arrive after "end" was already swallowed.
 					req.destroy();
 					reject(
-						new ScrapeError("NO_ANALYZABLE_CONTENT", "Asset terlalu besar."),
+						new ScrapeError("NO_ANALYZABLE_CONTENT", "Asset terlalu besar.", {
+							failureReason: "asset-too-large",
+						}),
 					);
 				} else chunks.push(chunk);
 			});

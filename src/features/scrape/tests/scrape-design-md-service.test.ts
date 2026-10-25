@@ -136,7 +136,6 @@ import {
 	getScrapeDesignMd,
 	listScrapeDesignSources,
 	scrapeDesignMdDtoSchema,
-	scrapeDesignSourceRequestSchema,
 } from "../services/scrape-design-md-service";
 
 const DESIGN_MD = "# Sample\nFont: Arial\n| Canvas | #ffffff | Background |";
@@ -171,7 +170,7 @@ describe("scrape DESIGN.md contract", () => {
 	});
 
 	it("exposes only the fields a consumer needs", async () => {
-		const dto = await getScrapeDesignMd({ scrapeId: "scrape-1" }, "user-1");
+		const dto = await getScrapeDesignMd("scrape-1", "user-1");
 		expect(Object.keys(dto).sort()).toEqual([
 			"designMd",
 			"scrapeId",
@@ -184,16 +183,16 @@ describe("scrape DESIGN.md contract", () => {
 	});
 
 	it("scopes the read to the requesting owner", async () => {
-		await getScrapeDesignMd({ scrapeId: "scrape-1" }, "user-2");
+		await getScrapeDesignMd("scrape-1", "user-2");
 		expect(eqValues("scrapes.user_id")).toEqual(["user-2"]);
 		expect(eqValues("scrapes.id")).toEqual(["scrape-1"]);
 	});
 
 	it("fails closed when the record is missing, not ready, or empty", async () => {
 		recorder.scrapeRow = null;
-		await expect(
-			getScrapeDesignMd({ scrapeId: "scrape-1" }, "user-1"),
-		).rejects.toThrow("Scrape tidak ditemukan.");
+		await expect(getScrapeDesignMd("scrape-1", "user-1")).rejects.toThrow(
+			"Scrape tidak ditemukan.",
+		);
 
 		recorder.scrapeRow = {
 			id: "scrape-1",
@@ -207,32 +206,23 @@ describe("scrape DESIGN.md contract", () => {
 			createdAt: new Date(),
 			leaseExpiresAt: null,
 		};
-		await expect(
-			getScrapeDesignMd({ scrapeId: "scrape-1" }, "user-1"),
-		).rejects.toThrow("DESIGN.md belum siap.");
+		await expect(getScrapeDesignMd("scrape-1", "user-1")).rejects.toThrow(
+			"DESIGN.md belum siap.",
+		);
 
 		recorder.scrapeRow = { ...recorder.scrapeRow, status: "completed" };
 		recorder.documentRow = null;
-		await expect(
-			getScrapeDesignMd({ scrapeId: "scrape-1" }, "user-1"),
-		).rejects.toThrow("DESIGN.md tidak tersedia untuk proses ini.");
+		await expect(getScrapeDesignMd("scrape-1", "user-1")).rejects.toThrow(
+			"DESIGN.md tidak tersedia untuk proses ini.",
+		);
 
 		recorder.documentRow = {
 			id: "doc-1",
 			scrapeId: "scrape-1",
 			designMd: "  ",
 		};
-		await expect(
-			getScrapeDesignMd({ scrapeId: "scrape-1" }, "user-1"),
-		).rejects.toThrow("DESIGN.md tidak tersedia untuk proses ini.");
-	});
-
-	it("rejects requests that carry no scrape id", () => {
-		expect(
-			scrapeDesignSourceRequestSchema.safeParse({ scrapeId: " " }).success,
-		).toBe(false);
-		expect(scrapeDesignSourceRequestSchema.safeParse("scrape-1").success).toBe(
-			false,
+		await expect(getScrapeDesignMd("scrape-1", "user-1")).rejects.toThrow(
+			"DESIGN.md tidak tersedia untuk proses ini.",
 		);
 	});
 

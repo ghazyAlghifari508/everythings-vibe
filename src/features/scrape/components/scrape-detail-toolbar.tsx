@@ -38,7 +38,7 @@ export function ScrapeHtmlToolbar({
 	onCopy: () => void;
 	onDownload: () => void;
 }) {
-	const copyLabel = "Salin HTML";
+	const copyLabel = copied ? "HTML tersalin" : "Salin HTML";
 	const downloadLabel = `Download ${fileName}`;
 	return (
 		<div className="flex flex-wrap items-center justify-between gap-2 border-b border-graphite px-3 py-2">
@@ -128,6 +128,9 @@ export function ScrapeHtmlToolbar({
 					) : (
 						<Icon icon={Copy01Icon} size={15} aria-hidden />
 					)}
+					<span className="sr-only" aria-live="polite">
+						{copied ? "HTML berhasil disalin" : ""}
+					</span>
 				</button>
 				<button
 					type="button"

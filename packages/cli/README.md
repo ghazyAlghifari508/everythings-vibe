@@ -1,41 +1,63 @@
-# @ghazynabiel/vibeeverything
+# @ghazynabiel/everythings-vibe
 
-Official command-line interface for [VibeEverything](https://github.com/ghazyAlghifari508/prdfy).
+Official command-line interface for [everythings-vibe](https://github.com/ghazyAlghifari508/prdfy).
 
 ## Installation
 
 ```bash
-npm install -g @ghazynabiel/vibeeverything
+npm install -g @ghazynabiel/everythings-vibe
 ```
 
 Check version:
 
 ```bash
-vibeeverything --version
+everythings-vibe --version
 ```
 
-The package also installs the `vibe` and `prdfy` binaries as aliases, so existing
-scripts and documentation that call `prdfy <command>` keep working.
+### Backward Compatibility & Executable Aliases
+
+The package installs canonical and backward-compatible binaries:
+- `everythings-vibe` (canonical primary executable)
+- `vibeeverything` (backward-compatible alias)
+- `vibe` (backward-compatible alias)
+- `prdfy` (legacy backward-compatible alias)
+
+Existing scripts, agent workflows, and documentation that call `vibeeverything <command>` or `prdfy <command>` continue to work seamlessly.
 
 Minimum version required for existing codebase sync is **2.0.0**.
+
+## Configuration & Credentials
+
+The CLI reads its configuration from:
+- `~/.everythings-vibe/config.json` (canonical)
+- `~/.vibeeverything/config.json` (legacy fallback)
+- `~/.prdfy/config.json` (legacy fallback)
+- `~/.novaplan/config.json` (legacy fallback)
+
+When an existing legacy configuration is detected, it is migrated idempotently and securely to `~/.everythings-vibe/config.json` without modifying or deleting legacy files.
+
+Supported environment variables:
+- `EVERYTHINGS_VIBE_API_KEY` (fallbacks: `VIBEEVERYTHING_API_KEY`, `PRDFY_API_KEY`)
+- `EVERYTHINGS_VIBE_API_URL` (fallbacks: `VIBEEVERYTHING_API_URL`, `PRDFY_API_URL`)
+- `EVERYTHINGS_VIBE_SYNC_TOKEN` (fallbacks: `VIBEEVERYTHING_SYNC_TOKEN`, `PRDFY_SYNC_TOKEN`)
 
 ## Commands
 
 ### Codebase Sync
 
-Synchronize a filtered repository snapshot to VibeEverything for existing-codebase project planning:
+Synchronize a filtered repository snapshot to everythings-vibe for existing-codebase project planning:
 
 ```bash
-vibeeverything codebase sync --project-id <id> --sync-token <token>
+everythings-vibe codebase sync --project-id <id> --sync-token <token>
 ```
 
 #### Options
 
 - `--project-id <id>`: Project UUID (required)
-- `--sync-token <token>`: Project-scoped temporary sync token (required)
+- `--sync-token <token>`: Project-scoped temporary sync token (required; prefer `EVERYTHINGS_VIBE_SYNC_TOKEN` env var; never stored)
 - `--root <path>`: Repository root. Detected automatically when omitted.
 - `--output <mode>`: Output format (`human` or `json`, default: `human`)
-- `--api-url <url>`: VibeEverything server base URL (default: `http://localhost:3000`)
+- `--api-url <url>`: everythings-vibe server base URL (default: `http://localhost:3000`)
 
 #### Automatic preparation
 
@@ -80,7 +102,7 @@ inert, so a custom rule can never re-include a built-in exclusion.
 Built-in exclusions are evaluated by the CLI while it builds a snapshot. A snapshot that
 was already uploaded keeps the file set it was uploaded with — updating the CLI does not
 rewrite stored snapshots. After upgrading to **3.2.0** (`.vercel/` exclusion), run
-`vibeeverything codebase sync` again to produce a snapshot without the local Vercel
+`everythings-vibe codebase sync` again to produce a snapshot without the local Vercel
 state directory. The repository working tree is never modified by this: the CLI only
 reads files and never edits your `.gitignore`, `.everythingsvibeignore`, or `.vercel/`.
 
@@ -92,19 +114,20 @@ require it to be raised.
 For general task and kanban tracking:
 
 ```bash
-vibeeverything login --api-key <your-api-key>
+everythings-vibe login --api-key <your-api-key>
 ```
 
 ### Projects, Tasks, and Kanban
 
 ```bash
-vibeeverything project get <projectId>
-vibeeverything prd <projectId>
-vibeeverything ac <projectId>
-vibeeverything task list <projectId> [--status <status>]
-vibeeverything task next <projectId>
-vibeeverything task update <taskId> --status <status>
-vibeeverything subtask update <taskId> --index <index> --status <status>
-vibeeverything kanban <projectId>
-vibeeverything export rules <projectId> [--format agents|claude|cursor]
+everythings-vibe project get <projectId>
+everythings-vibe prd <projectId>
+everythings-vibe ac <projectId>
+everythings-vibe task list <projectId> [--status <status>]
+everythings-vibe task next <projectId>
+everythings-vibe task update <taskId> --status <status>
+everythings-vibe subtask update <taskId> --index <index> --status <status>
+everythings-vibe kanban <projectId>
+everythings-vibe export rules <projectId> [--format agents|claude|cursor]
+everythings-vibe export plan <projectId> [--root <path>]
 ```

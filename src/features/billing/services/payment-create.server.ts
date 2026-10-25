@@ -107,7 +107,7 @@ export async function handlePaymentCreate({ request }: { request: Request }) {
 		}
 		amount = topUpPkg.priceIdr;
 		planCredits = topUpPkg.credits;
-		itemLabel = `Top Up ${topUpPkg.credits} Kredit VibeEverything`;
+		itemLabel = `Top Up ${topUpPkg.credits} Kredit everythings-vibe`;
 	} else {
 		const plan = prdFyPlans.find((p) => p.id === planId);
 		if (!plan)

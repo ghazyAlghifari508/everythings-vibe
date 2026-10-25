@@ -9,5 +9,5 @@ export function buildSyncCommand(projectId: string): string {
 	if (!SAFE_PROJECT_ID_PATTERN.test(projectId)) {
 		throw new Error(`Invalid project ID format: "${projectId}"`);
 	}
-	return `vibeeverything codebase sync --project-id ${projectId} --sync-token <token>`;
+	return `everythings-vibe codebase sync --project-id ${projectId} --sync-token <token>`;
 }

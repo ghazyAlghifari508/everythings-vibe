@@ -7,7 +7,7 @@ import type {
 import { getCanvasDotStyle } from "@/features/greenfield/components/whiteboard/canvas-connectors";
 import {
 	StudioCanvasPlanningFailure,
-	StudioCanvasPlanningStatus,
+	StudioCanvasQueueReadout,
 	type StudioCanvasTool,
 	StudioCanvasToolPalette,
 	StudioCanvasZoomCorner,
@@ -289,6 +289,9 @@ export const StudioCanvas = memo(function StudioCanvas({
 						<StudioFrame
 							key={frame.id}
 							frame={frame}
+							initialJobTiming={
+								activeJob?.jobType === "initial" ? activeJob : undefined
+							}
 							onMeasure={measureFrame}
 							isSelected={
 								selectedFrameIds.length
@@ -308,8 +311,11 @@ export const StudioCanvas = memo(function StudioCanvas({
 				) : null}
 			</div>
 
-			{frames.length === 0 && activeJob?.status === "planning" && (
-				<StudioCanvasPlanningStatus />
+			{activeJob && (
+				<StudioCanvasQueueReadout
+					activeJob={activeJob}
+					hasFrames={frames.length > 0}
+				/>
 			)}
 
 			{/* Selection rectangle. Painted imperatively during a drag so a

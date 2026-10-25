@@ -33,7 +33,7 @@ const SYNC_PAYLOAD = {
 	apiBaseUrl: "http://localhost:3000",
 	syncToken: "nav-token-1",
 	syncCommand:
-		"vibeeverything codebase sync --project-id cb-nav-1 --sync-token nav-token-1",
+		"everythings-vibe codebase sync --project-id cb-nav-1 --sync-token nav-token-1",
 	expiresAt: new Date(Date.now() + 3600000).toISOString(),
 };
 const VALID_STARTER_SUGGESTIONS = [
@@ -204,7 +204,7 @@ async function startSyncStep() {
 	render(<PlanCodebasePage />);
 	await waitFor(() => {
 		expect(
-			screen.getByText("Sync codebase dengan VibeEverything"),
+			screen.getByText("Sync codebase dengan everythings-vibe"),
 		).toBeDefined();
 	});
 }
@@ -256,7 +256,7 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 		);
 		expect(flow.getStatusCalls()).toBeGreaterThanOrEqual(2);
 		expect(
-			screen.getByText("Sync codebase dengan VibeEverything"),
+			screen.getByText("Sync codebase dengan everythings-vibe"),
 		).toBeDefined();
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 	}, 20000);
@@ -320,7 +320,7 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 		expect(screen.getByText("snap-nav-1")).toBeDefined();
 		// One hop, straight to the conclusion step.
 		expect(
-			screen.queryByText("Sync codebase dengan VibeEverything"),
+			screen.queryByText("Sync codebase dengan everythings-vibe"),
 		).toBeNull();
 	}, 25000);
 
@@ -363,7 +363,7 @@ describe("PlanCodebasePage two-step navigation policy", () => {
 		screen.getByRole("button", { name: /Kembali ke Sinkronisasi/i }).click();
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 		// Going back lands on a completed sync, and it stays there: a later poll

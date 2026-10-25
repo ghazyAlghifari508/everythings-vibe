@@ -1,18 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import type { StudioFrameRow } from "@/db/schema";
-import { STUDIO_VISUAL_FALLBACK_HEIGHT } from "@/features/studio/types/studio-constants";
+import {
+	STUDIO_VISUAL_FALLBACK_HEIGHT,
+	STUDIO_VISUAL_WIDTH,
+} from "@/features/studio/types/studio-constants";
+import {
+	STUDIO_PREVIEW_REQUEST_TIMEOUT_MS,
+	type StudioFrameVisual,
+	studioPreviewSchema,
+} from "@/features/studio/types/studio-preview";
+import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { readFrameVisualError } from "@/features/studio/utils/studio-frame-artboard";
+import { studioJobTiming } from "../services/studio-timing";
 
 interface UseStudioFrameVisualInput {
 	frame: StudioFrameRow;
 	isMobile: boolean;
 	onMeasure?: (id: string, width: number, height: number) => void;
-}
-
-interface StudioFrameVisual {
-	url: string;
-	width: number;
-	height: number;
 }
 
 export interface StudioFrameVisualState {
@@ -38,52 +42,95 @@ export function useStudioFrameVisual({
 	isMobile,
 	onMeasure,
 }: UseStudioFrameVisualInput): StudioFrameVisualState {
-	const [visual, setVisual] = useState<StudioFrameVisual | null>(null);
-	const [visualError, setVisualError] = useState("");
+	const input = useMemo(
+		() => ({
+			id: frame.id,
+			projectId: frame.projectId,
+			html: frame.htmlCode,
+			viewport: frame.viewport,
+		}),
+		[frame.id, frame.projectId, frame.htmlCode, frame.viewport],
+	);
 	const [visualAttempt, setVisualAttempt] = useState(0);
+	const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+	const [result, setResult] = useState<{
+		input: typeof input;
+		attempt: number;
+		visual: StudioFrameVisual | null;
+		error: string;
+	} | null>(null);
+	const current =
+		result?.input === input && result.attempt === visualAttempt ? result : null;
+	const visual = current?.visual ?? null;
+	const visualError = current?.error ?? "";
+	const measure = useEffectEvent((width: number, height: number) =>
+		onMeasure?.(input.id, width, height),
+	);
 	const artboardRef = useRef<HTMLElement>(null);
 	const frameHeight =
-		visual?.height ??
+		measuredHeight ??
 		(isMobile
 			? STUDIO_VISUAL_FALLBACK_HEIGHT.mobile
 			: STUDIO_VISUAL_FALLBACK_HEIGHT.web);
 
 	useEffect(() => {
-		if (!frame.htmlCode || !artboardRef.current) return;
+		if (!extractCleanHtml(input.html ?? "") || !artboardRef.current) return;
 		const controller = new AbortController();
 		let started = false;
+		let deadline: ReturnType<typeof setTimeout> | undefined;
+		function fail(message: string) {
+			setResult({
+				input,
+				attempt: visualAttempt,
+				visual: null,
+				error: message,
+			});
+		}
 		async function load() {
-			if (started) return;
+			if (started || controller.signal.aborted) return;
 			started = true;
-			setVisualError("");
+			const startedAt = Date.now();
+			deadline = setTimeout(() => {
+				fail("Pratinjau belum dapat dimuat. Silakan coba lagi.");
+				controller.abort();
+			}, STUDIO_PREVIEW_REQUEST_TIMEOUT_MS);
 			try {
 				const response = await fetch(
-					`/api/studio/frame?projectId=${encodeURIComponent(frame.projectId)}&frameId=${encodeURIComponent(frame.id)}&attempt=${visualAttempt}`,
+					`/api/studio/frame?projectId=${encodeURIComponent(input.projectId)}&frameId=${encodeURIComponent(input.id)}&attempt=${visualAttempt}`,
 					{ signal: controller.signal },
 				);
 				const data: unknown = await response.json();
+				if (controller.signal.aborted) return;
+				const parsed = studioPreviewSchema.safeParse(data);
 				if (
 					!response.ok ||
-					typeof data !== "object" ||
-					data === null ||
-					!("url" in data) ||
-					typeof data.url !== "string" ||
-					!("width" in data) ||
-					typeof data.width !== "number" ||
-					!("height" in data) ||
-					typeof data.height !== "number"
+					!parsed.success ||
+					parsed.data.width !==
+						STUDIO_VISUAL_WIDTH[input.viewport === "mobile" ? "mobile" : "web"]
 				) {
 					throw new Error(readFrameVisualError(data));
 				}
-				setVisual({ url: data.url, width: data.width, height: data.height });
-				onMeasure?.(frame.id, data.width, data.height);
+				setResult({
+					input,
+					attempt: visualAttempt,
+					visual: parsed.data,
+					error: "",
+				});
+				studioJobTiming("preview-available", startedAt, {
+					projectId: input.projectId,
+					frameId: input.id,
+				});
+				setMeasuredHeight(parsed.data.height);
+				measure(parsed.data.width, parsed.data.height);
 			} catch (failure) {
 				if (!controller.signal.aborted)
-					setVisualError(
+					fail(
 						failure instanceof Error
 							? failure.message
 							: "Visual frame gagal dimuat.",
 					);
+			} finally {
+				clearTimeout(deadline);
 			}
 		}
 		const observer =
@@ -99,14 +146,16 @@ export function useStudioFrameVisual({
 		else void load();
 		return () => {
 			controller.abort();
+			clearTimeout(deadline);
 			observer?.disconnect();
 		};
-	}, [frame.id, frame.projectId, frame.htmlCode, visualAttempt, onMeasure]);
+	}, [input, visualAttempt]);
 
 	return {
 		visual,
 		visualError,
-		setVisualError,
+		setVisualError: (error) =>
+			setResult({ input, attempt: visualAttempt, visual, error }),
 		retryVisual: () => setVisualAttempt((attempt) => attempt + 1),
 		artboardRef,
 		frameHeight,

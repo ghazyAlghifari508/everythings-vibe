@@ -181,7 +181,7 @@ export async function taskNextCommand(projectId: string) {
 		console.log();
 		console.log(
 			chalk.dim(
-				`  Mulai: vibeeverything task update ${task.id} --status in_progress`,
+				`  Mulai: everythings-vibe task update ${task.id} --status in_progress`,
 			),
 		);
 		console.log();

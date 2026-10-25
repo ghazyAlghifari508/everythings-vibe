@@ -4,10 +4,6 @@ import { SCRAPE_DESIGN_SOURCE_LIMIT } from "../types/scrape-constants";
 import { getScrapeById } from "./scrape-detail-service";
 import { listScrapeHistory } from "./scrape-history-service";
 
-export const scrapeDesignSourceRequestSchema = z.object({
-	scrapeId: z.string().trim().min(1).max(200),
-});
-
 /**
  * The DESIGN.md contract other domains may depend on: the persisted document of
  * one completed scrape plus the labels needed to identify it. Internal crawl,
@@ -47,11 +43,12 @@ export async function listScrapeDesignSources(
 	}));
 }
 
+// The caller already owns a typed scrape id (the reference contract validates
+// it), so this takes the id itself instead of re-parsing a request envelope.
 export async function getScrapeDesignMd(
-	raw: unknown,
+	scrapeId: string,
 	userId: string,
 ): Promise<ScrapeDesignMdDto> {
-	const { scrapeId } = scrapeDesignSourceRequestSchema.parse(raw);
 	const scrape = await getScrapeById(scrapeId, userId);
 	if (scrape.status !== "completed")
 		throw new ScrapeError("AI_GENERATION_FAILED", "DESIGN.md belum siap.");

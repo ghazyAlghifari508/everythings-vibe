@@ -116,5 +116,3 @@ export function useChatAutoSubmit({
 		},
 	});
 }
-
-export const useChatAutosubmit = useChatAutoSubmit;

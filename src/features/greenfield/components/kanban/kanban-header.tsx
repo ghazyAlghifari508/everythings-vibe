@@ -118,7 +118,7 @@ export function KanbanHeader({
 									aria-hidden="true"
 								/>
 								<span className="truncate">
-									Belum ada update status · Jalankan VibeEverything CLI untuk
+									Belum ada update status · Jalankan everythings-vibe CLI untuk
 									update otomatis
 								</span>
 							</output>

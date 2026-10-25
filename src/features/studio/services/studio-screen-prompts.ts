@@ -36,11 +36,21 @@ Maintain exact visual continuity (colors, header/footer layout, typography, comp
 	// frame in this project must follow. Screen content must not redefine
 	// these shared decisions; only the active navigation item may differ.
 	if (opts.blueprint) {
+		const activeScreen = opts.activeScreen ?? opts.screenName;
+		const { labels, destinations, iconMapping } =
+			opts.blueprint.navigationContract;
 		sections.push(
 			`<SHARED_DESIGN_BLUEPRINT>
 Every screen in this project uses this exact specification. Apply it verbatim:
 ${JSON.stringify(opts.blueprint)}
-Active screen for this frame: "${opts.activeScreen ?? opts.screenName}". Render the shared navigation with identical icons, labels, ordering, sizing, and geometry; highlight only the active item.
+
+CONTROLLED ASSEMBLY CONTRACT:
+- Studio inserts the canonical app header and navigation; do not generate them or simulated device status bars.
+- Put ALL screen-specific body content in exactly one <main data-studio-content>. Do not place visible content outside it.
+- Do not put app navigation/header inside that region; contextual tabs and section headings remain screen-specific.
+- Canonical labels ${JSON.stringify(labels)}, destinations ${JSON.stringify(destinations)}, icons ${JSON.stringify(iconMapping)} and active screen ${JSON.stringify(activeScreen)} are supplied by assembly, not independently rendered by you.
+- Use --app-primary, --app-canvas, --app-surface, --app-ink, --app-muted, --app-font, --app-gutter and --app-radius for shared identity. Use data-primary on primary actions and data-card on common surfaces.
+- Preserve the selected skill for content composition, not for redesigning the shared shell. No autofocus, decorative cursor, stray separators after numeric amounts or fixed/sticky decorations.
 </SHARED_DESIGN_BLUEPRINT>`,
 		);
 	}
@@ -60,6 +70,10 @@ Ensure features, forms, lists, metrics, terminology, and realistic Indonesian co
 	}
 
 	// Platform instructions
+	if (opts.blueprint)
+		sections.push(
+			"Assembly overrides shared component instructions below: Studio inserts the app header/navigation. Generate only marked main content; no independent app shell or device chrome.",
+		);
 	if (opts.designMode === "mobile") {
 		sections.push(MOBILE_PLATFORM_CONTRACT);
 	} else {
@@ -112,7 +126,7 @@ Return the FULL revised single-file HTML document for "${opts.screenName}".`,
 	}
 
 	sections.push(
-		`Design precedence, highest to lowest: explicit user requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override explicit user colors or brand requirements. Resolve conflicts deterministically in that order.`,
+		`Design precedence, highest to lowest: safety and platform validity > explicit user requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override safety, platform validity, explicit user colors, or brand requirements. Resolve conflicts deterministically in that order.`,
 	);
 
 	return sections.join("\n\n");

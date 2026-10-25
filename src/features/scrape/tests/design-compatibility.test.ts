@@ -11,6 +11,7 @@ it("keeps the shared design facades bound to their canonical implementations", a
 			import("../services/design-visual-evidence"),
 		],
 		[import("@/lib/design-md-render"), import("../utils/design-md-render")],
+		[import("@/lib/design-color-parse"), import("../utils/design-color-parse")],
 	];
 	for (const pair of modules) {
 		const [legacy, canonical] = await Promise.all(pair);

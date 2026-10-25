@@ -132,7 +132,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			apiBaseUrl: "http://localhost:3000",
 			syncToken: "test-token-abc",
 			syncCommand:
-				"vibeeverything codebase sync --project-id cb-123 --token test-token-abc",
+				"everythings-vibe codebase sync --project-id cb-123 --token test-token-abc",
 			expiresAt: new Date(Date.now() + 3600000).toISOString(),
 		};
 
@@ -154,7 +154,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		// Wait for ScreenConnect to mount
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 
@@ -244,7 +244,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		await waitFor(
 			() => {
 				expect(
-					screen.getByText("Sync codebase dengan VibeEverything"),
+					screen.getByText("Sync codebase dengan everythings-vibe"),
 				).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
@@ -409,7 +409,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		await waitFor(
 			() => {
 				expect(
-					screen.getByText("Sync codebase dengan VibeEverything"),
+					screen.getByText("Sync codebase dengan everythings-vibe"),
 				).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
@@ -434,7 +434,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			apiBaseUrl: "http://localhost:3000",
 			syncToken: "fresh-token-xyz",
 			syncCommand:
-				"vibeeverything codebase sync --project-id cb-wait-1 --sync-token <token>",
+				"everythings-vibe codebase sync --project-id cb-wait-1 --sync-token <token>",
 			expiresAt: new Date(Date.now() + 3600000).toISOString(),
 		};
 		vi.stubGlobal(
@@ -468,7 +468,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 
 		await waitFor(() => {
 			expect(
-				screen.getByText("Sync codebase dengan VibeEverything"),
+				screen.getByText("Sync codebase dengan everythings-vibe"),
 			).toBeDefined();
 		});
 		expect(screen.getByText(/fresh-token-xyz/)).toBeDefined();

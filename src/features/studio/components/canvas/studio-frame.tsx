@@ -1,15 +1,16 @@
 import {
 	AlertCircleIcon,
 	ComputerIcon,
-	Loading01Icon,
+	Loading03Icon,
 	RotateLeft01Icon,
 	SmartPhone01Icon,
 } from "@hugeicons/core-free-icons";
-import { memo } from "react";
+import { memo, useRef } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { StudioFrameRow } from "@/db/schema";
 import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
 import { useStudioFrameVisual } from "@/features/studio/hooks/use-studio-frame-visual";
+import { studioJobTiming } from "@/features/studio/services/studio-timing";
 import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import { extractCleanHtml } from "@/features/studio/utils/clean-html";
 import { resolveFrameArtboardMode } from "@/features/studio/utils/studio-frame-artboard";
@@ -22,6 +23,7 @@ export {
 
 export interface StudioFrameProps {
 	frame: StudioFrameRow;
+	initialJobTiming?: { id: string; createdAt: Date };
 	isSelected?: boolean;
 	onSelect?: (frameId: string, additive?: boolean) => void;
 	onRetry?: (frameId: string) => void;
@@ -43,6 +45,7 @@ export interface StudioFrameProps {
  */
 export const StudioFrame = memo(function StudioFrame({
 	frame,
+	initialJobTiming,
 	isSelected = false,
 	onSelect,
 	onRetry,
@@ -50,6 +53,7 @@ export const StudioFrame = memo(function StudioFrame({
 	className = "",
 	onMeasure,
 }: StudioFrameProps) {
+	const visibleUrl = useRef<string | null>(null);
 	const isMobile = frame.viewport === "mobile";
 	const frameWidth = isMobile
 		? STUDIO_VISUAL_WIDTH.mobile
@@ -102,7 +106,7 @@ export const StudioFrame = memo(function StudioFrame({
 
 					{frame.status === "generating" ? (
 						<Icon
-							icon={Loading01Icon}
+							icon={Loading03Icon}
 							size={13}
 							role="status"
 							aria-label="Sedang digenerate"
@@ -172,6 +176,19 @@ export const StudioFrame = memo(function StudioFrame({
 							draggable={false}
 							decoding="async"
 							className="size-full object-contain pointer-events-none"
+							onLoad={() => {
+								if (visibleUrl.current === visual.url) return;
+								visibleUrl.current = visual.url;
+								studioJobTiming(
+									"frame-visible",
+									(initialJobTiming?.createdAt ?? frame.createdAt).getTime(),
+									{
+										projectId: frame.projectId,
+										frameId: frame.id,
+										jobId: initialJobTiming?.id,
+									},
+								);
+							}}
 							onError={() => setVisualError("Gambar frame gagal dimuat.")}
 						/>
 					</button>

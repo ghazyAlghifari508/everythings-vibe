@@ -6,12 +6,17 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev:all": "tsx src/features/scrape/services/scrape-dev-all.ts",
+    "studio:assets": "tsx src/features/studio/services/studio-skill-assets-build.ts",
+    "studio:assets:check": "tsx src/features/studio/services/studio-skill-assets-build.ts --check",
+    "studio:smoke": "tsx src/features/studio/tests/studio-native-runtime.smoke.ts",
+    "studio:worker:smoke": "tsx src/features/studio/tests/studio-worker-startup.smoke.ts",
+    "dev:all": "pnpm studio:assets && tsx src/features/scrape/services/scrape-dev-all.ts",
     "scrape:worker": "tsx src/features/scrape/services/scrape-worker.ts",
     "codebase:worker": "tsx src/features/codebase/services/durable-worker.ts",
-    "dev": "node --dns-result-order=ipv4first node_modules/vite/bin/vite.js dev --port 3000",
+    "studio:worker": "pnpm studio:assets && tsx src/features/studio/services/studio-worker.ts",
+    "dev": "pnpm studio:assets && node --dns-result-order=ipv4first node_modules/vite/bin/vite.js dev --port 3000",
     "generate-routes": "tsr generate",
-    "build": "vite build",
+    "build": "pnpm studio:assets:check && vite build",
     "preview": "vite preview",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -21,14 +26,15 @@
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
-    "test": "vitest run"
+    "audit": "knip",
+    "audit:deadcode": "knip",
+    "test": "pnpm studio:assets:check && vitest run"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.20",
     "@heroui/react": "^3.2.6",
     "@hugeicons/core-free-icons": "^4.3.5",
     "@hugeicons/react": "^1.1.10",
-    "@icons-pack/react-simple-icons": "^13.13.0",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@radix-ui/react-slot": "^1.3.3",
@@ -51,6 +57,7 @@
     "framer-motion": "^12.42.2",
     "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
+    "jsdom": "^29.1.1",
     "mermaid": "^11.16.0",
     "next-themes": "^0.4.6",
     "pg": "^8.16.3",
@@ -74,25 +81,16 @@
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "14.6.8",
     "@types/dagre": "0.7.54",
-    "@types/dompurify": "^3.2.0",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.15.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.4",
-    "chalk": "5.6.2",
-    "commander": "^12.1.0",
     "dotenv": "^17.3.1",
-    "jsdom": "^29.1.1",
+    "knip": "^6.42.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
     "vitest": "^4.1.10"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "lightningcss"
-    ]
   }
 }

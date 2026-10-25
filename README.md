@@ -262,8 +262,9 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ```bash
 pnpm dev          # start the dev server on port 3000
-pnpm dev:all      # web + extraction worker, shared .env.local/.env, supervised cleanup
+pnpm dev:all      # web + extraction + Studio workers, supervised cleanup
 pnpm scrape:worker # standalone extraction worker
+pnpm studio:worker # standalone durable Studio worker
 pnpm build        # production build
 pnpm preview      # preview the production build
 pnpm db:generate  # generate a Drizzle migration
@@ -309,24 +310,26 @@ PrdFy supports generating PRDs, acceptance criteria, and task boards for existin
 
 ### 1. CLI Installation
 
-Install the official PrdFy CLI globally:
+Install the official everythings-vibe CLI globally:
 
 ```bash
-npm install -g @ghazynabiel/prdfy
+npm install -g @ghazynabiel/everythings-vibe
 ```
 
 Verify that the installed version meets the minimum required version (`>= 2.0.0`):
 
 ```bash
-prdfy --version
+everythings-vibe --version
 ```
+
+*Note: Backward-compatible aliases (`vibeeverything`, `vibe`, `prdfy`) are automatically registered and can also be used.*
 
 ### 2. Synchronization Command
 
-When you choose **Codebase existing** on the Home page, PrdFy creates a project and issues a temporary, single-use sync token (valid for 30 minutes). Run the command from your repository root:
+When you choose **Codebase existing** on the Home page, everythings-vibe creates a project and issues a temporary, single-use sync token (valid for 30 minutes). Run the command from your repository root:
 
 ```bash
-prdfy codebase sync --project-id <id> --sync-token <token>
+everythings-vibe codebase sync --project-id <id> --sync-token <token>
 ```
 
 Available flags:
@@ -371,7 +374,7 @@ automatically. It is also excluded from the upload itself.
 
 | Issue | Cause | Resolution |
 |---|---|---|
-| `CLI_UPDATE_REQUIRED` | CLI version is older than 2.0.0 | Run `npm install -g @ghazynabiel/prdfy` to update |
+| `CLI_UPDATE_REQUIRED` | CLI version is older than 2.0.0 | Run `npm install -g @ghazynabiel/everythings-vibe` to update |
 | `INVALID_SYNC_CREDENTIAL` | Token expired (30 min) or wrong codebase | Click "Sync ulang" on the codebase page or open "Codebase" in the navbar to find a codebase |
 | `SYNC_SESSION_ACTIVE` (409) | A sync session is already active in another tab | Wait for the active sync session to finish, or click "Sync ulang" on the codebase page to issue a fresh session |
 | `SNAPSHOT_BLOCKED` | A file matching high-risk secret patterns was found | Add the file to `.everythingsvibeignore` or redact sensitive tokens before syncing |
@@ -403,6 +406,45 @@ pnpm preview
 
 Point the deployment at a managed Postgres instance, set the environment variables above, and expose the server over HTTPS. Because the AI calls go to your own router, there is no external model provider to configure in production.
 
+### Studio worker (required)
+
+Studio HTTP handlers only persist jobs; they do not run model work after responding.
+Deploy a persistent Node worker from the same source revision alongside the web app:
+
+```bash
+pnpm studio:worker
+```
+
+Skill Markdown and CSV sources are pinned by SHA-256 in the skill manifest.
+`pnpm studio:assets` verifies them and regenerates the committed TypeScript asset
+module used by both Node and SSR; no runtime filesystem paths or Vite loaders are
+needed after bundling. Development and worker scripts prepare it automatically.
+CI must run `pnpm test` or `pnpm build`: both reject stale generated assets rather
+than silently repairing them. After intentionally updating pinned sources and the
+manifest, run `pnpm studio:assets` and commit the generated module together.
+
+Install the existing `tsx` dependency on the worker host (including dev dependencies),
+provide the same `DATABASE_URL` and AI router configuration as the web app, and
+supervise the process with automatic restart. Wait for `Studio worker ready` before
+accepting Studio traffic. Use a direct Postgres connection or session-mode pooler:
+the dispatcher uses a session advisory lock, not transaction-mode pooling. It keeps
+aggregate execution at one initial job (three concurrent frames) or at most three
+single-frame operations, even with multiple worker replicas.
+
+Vercel web functions alone cannot execute this queue durably. Run the worker on a
+persistent Node host with database/router network access; `waitUntil` and longer
+HTTP timeouts are not a substitute. Without the worker, accepted jobs remain queued.
+In development, `pnpm dev:all` starts both workers and the web server; `pnpm dev`
+intentionally starts only the web server.
+
+The worker polls every two seconds, renews 150-second leases every 15 seconds,
+and caps each execution at 30 minutes. Expired claims resume up to three total
+attempts, retaining ready frames; exhaustion fails only unfinished frames. Manual
+retry resets the claim and attempt budget. SIGTERM stops accepting new batches
+and drains the current bounded batch; allow up to 30 minutes for graceful shutdown.
+A forced stop is recovered from the persisted lease after restart. Logs contain
+job/frame identifiers and stage durations, not prompts or generated documents.
+
 ## Troubleshooting
 
 **Scrap jobs remain queued.**
@@ -410,8 +452,8 @@ Use `pnpm dev:all` for VibeDesign Scrap. `pnpm dev` runs only the web process, s
 every job stays queued and the detail page reports that no worker has claimed it
 after 30 seconds. Wait for the Vite URL and `Scrape worker ready` before
 submitting jobs. The worker checks the configured database at startup. A startup
-failure exits the combined command and stops its sibling process. Stop the
-combined command with Ctrl+C. Both processes read `.env.local` before `.env`;
+failure exits the combined command and stops its sibling processes. Stop the
+combined command with Ctrl+C. All processes read `.env.local` before `.env`;
 shell environment variables take precedence. Restarted workers reclaim expired
 leases without request-launched workers.
 

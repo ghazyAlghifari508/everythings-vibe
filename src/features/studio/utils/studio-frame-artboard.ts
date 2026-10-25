@@ -38,6 +38,7 @@ export function resolveFrameArtboardMode(input: {
 		return "preview-unavailable";
 	if (isFrameVisualPending(input.status, input.hasVisual, input.hasVisualError))
 		return "shimmer";
+	if (input.hasVisualError) return "visual-error";
 	if (input.hasVisual) return "preview";
 	return "visual-error";
 }

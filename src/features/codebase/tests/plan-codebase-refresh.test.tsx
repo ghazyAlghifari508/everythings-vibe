@@ -155,7 +155,7 @@ function mockRecovery(input: RecoveryCase) {
 					projectId: input.codebaseId,
 					apiBaseUrl: "http://localhost:3000",
 					syncToken: `fresh-${input.codebaseId}`,
-					syncCommand: "vibeeverything codebase sync",
+					syncCommand: "everythings-vibe codebase sync",
 					expiresAt: new Date(Date.now() + 3600000).toISOString(),
 				}),
 			};
@@ -264,7 +264,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 		await waitFor(
 			() => {
 				expect(
-					screen.getByText("Sync codebase dengan VibeEverything"),
+					screen.getByText("Sync codebase dengan everythings-vibe"),
 				).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
@@ -382,7 +382,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 		await waitFor(
 			() => {
 				expect(
-					screen.getByText("Sync codebase dengan VibeEverything"),
+					screen.getByText("Sync codebase dengan everythings-vibe"),
 				).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },

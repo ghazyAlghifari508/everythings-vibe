@@ -207,30 +207,26 @@ describe("scrape HTML preview navigation", () => {
 		).toBe("true");
 	});
 
-	it(
-		"reports clipped rows honestly and downloads the complete document",
-		async () => {
-			const content = buildDocument(3_100);
-			const createObjectURL = vi.fn((_blob: Blob) => "blob:download");
-			vi.stubGlobal("URL", { createObjectURL, revokeObjectURL: vi.fn() });
-			const click = vi
-				.spyOn(HTMLAnchorElement.prototype, "click")
-				.mockImplementation(() => {});
+	it("reports clipped rows honestly and downloads the complete document", async () => {
+		const content = buildDocument(3_100);
+		const createObjectURL = vi.fn((_blob: Blob) => "blob:download");
+		vi.stubGlobal("URL", { createObjectURL, revokeObjectURL: vi.fn() });
+		const click = vi
+			.spyOn(HTMLAnchorElement.prototype, "click")
+			.mockImplementation(() => {});
 
-			render(<ScrapeDetail domain="example.com" previewHtml={content} />);
-			openSource();
+		render(<ScrapeDetail domain="example.com" previewHtml={content} />);
+		openSource();
 
-			const notice = screen.getByTestId("codebase-source-truncated");
-			expect(notice.textContent).toContain("3.000");
-			expect(notice.textContent).toContain("3.100");
-			expect(notice.textContent).not.toMatch(/repository lokal/i);
-			expect(notice.textContent).toMatch(/unduh file html/i);
+		const notice = screen.getByTestId("codebase-source-truncated");
+		expect(notice.textContent).toContain("3.000");
+		expect(notice.textContent).toContain("3.100");
+		expect(notice.textContent).not.toMatch(/repository lokal/i);
+		expect(notice.textContent).toMatch(/unduh file html/i);
 
-			fireEvent.click(screen.getByRole("button", { name: /Download .*\.html/i }));
-			await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
-			expect(await createObjectURL.mock.calls[0]?.[0].text()).toBe(content);
-			expect(click).toHaveBeenCalledOnce();
-		},
-		15000,
-	);
+		fireEvent.click(screen.getByRole("button", { name: /Download .*\.html/i }));
+		await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+		expect(await createObjectURL.mock.calls[0]?.[0].text()).toBe(content);
+		expect(click).toHaveBeenCalledOnce();
+	}, 15000);
 });

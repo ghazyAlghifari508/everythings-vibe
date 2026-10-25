@@ -11,6 +11,7 @@ import {
 import { ScrapeError } from "@/lib/design-errors";
 import type { StudioDesignMode } from "../types/studio-prompts";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
+import { publicStudioFrameErrorMessage } from "./studio-frame-errors";
 import { generateValidatedFrameHtml } from "./studio-frame-generation";
 import { getStudioProject } from "./studio-project-query";
 import {
@@ -76,6 +77,7 @@ export async function addStudioFrame(
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
 		const htmlCode = await generateValidatedFrameHtml({
 			framePrompt,
+			activeScreen: cleanName,
 			blueprint: detail.designBlueprint,
 			viewport,
 			expectTokens: dsTokens !== null,
@@ -105,8 +107,7 @@ export async function addStudioFrame(
 
 		return updated ?? frame;
 	} catch (err) {
-		const errorMsg =
-			err instanceof Error ? err.message : "Gagal generate frame";
+		const errorMsg = publicStudioFrameErrorMessage(err);
 		const [failed] = await db
 			.update(studioFrames)
 			.set({ status: "failed", error: errorMsg, updatedAt: new Date() })
@@ -165,6 +166,7 @@ export async function reviseStudioFrame(
 		const dsTokens = extractDesignSystemTokens(detail.designMd);
 		const htmlCode = await generateValidatedFrameHtml({
 			framePrompt,
+			activeScreen: frame.name,
 			blueprint: detail.designBlueprint,
 			viewport: validateStudioDesignMode(frame.viewport),
 			expectTokens: dsTokens !== null,
@@ -194,8 +196,7 @@ export async function reviseStudioFrame(
 
 		return updated ?? frame;
 	} catch (err) {
-		const errorMsg =
-			err instanceof Error ? err.message : "Gagal merevisi frame";
+		const errorMsg = publicStudioFrameErrorMessage(err);
 		const [failed] = await db
 			.update(studioFrames)
 			.set({ status: "failed", error: errorMsg, updatedAt: new Date() })
