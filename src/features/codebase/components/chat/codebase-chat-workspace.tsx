@@ -261,8 +261,8 @@ export function CodebaseChatWorkspace({
 				<CodebaseChatWorkspacePristine
 					newFeatureRepository={isCreatingNew ? codebaseName : undefined}
 					composer={renderComposer(2, "p-3.5 sm:p-4")}
-					starterSuggestions={isCreatingNew ? undefined : starterSuggestions}
-					starterRefresh={isCreatingNew ? undefined : starterRefresh}
+					starterSuggestions={starterSuggestions}
+					starterRefresh={starterRefresh}
 					newerAttemptFailure={newerAttemptFailure}
 					onRefreshStarterSuggestions={onRefreshStarterSuggestions}
 					onPrefillDraft={handlePrefillDraft}

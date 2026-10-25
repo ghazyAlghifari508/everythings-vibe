@@ -775,6 +775,20 @@ describe("codebase starter suggestions route wiring", () => {
 			"starterSuggestions={analysisOutput?.starterSuggestions}",
 		);
 	});
+
+	it("does not suppress starter suggestions or refresh in new feature mode", () => {
+		const chatWorkspaceSource = readFileSync(
+			"src/features/codebase/components/chat/codebase-chat-workspace.tsx",
+			"utf8",
+		);
+		expect(chatWorkspaceSource).not.toContain(
+			"isCreatingNew ? undefined : starterSuggestions",
+		);
+		expect(chatWorkspaceSource).toContain(
+			"starterSuggestions={starterSuggestions}",
+		);
+		expect(chatWorkspaceSource).toContain("starterRefresh={starterRefresh}");
+	});
 });
 
 describe("read-only source preview contract", () => {

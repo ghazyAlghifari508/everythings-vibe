@@ -304,6 +304,114 @@ describe("CodebaseChatWorkspace pristine standby", () => {
 		expect(onSendMessage).not.toHaveBeenCalled();
 	});
 
+	it("renders repository-aware starter suggestions in new feature pristine state", () => {
+		renderWorkspace({
+			isCreatingNew: true,
+			codebaseName: "Ocean Guard",
+			starterSuggestions,
+		});
+
+		const pristineHeader = container.querySelector("h2");
+		expect(pristineHeader?.textContent).toBe("Apa yang ingin kamu tambahkan?");
+		expect(container.textContent).toContain(
+			"Rencanakan fitur baru untuk Ocean Guard.",
+		);
+
+		const startersContainer = container.querySelector(
+			"[data-testid='codebase-intent-starters']",
+		);
+		expect(startersContainer).not.toBeNull();
+		expect(startersContainer?.textContent).toContain("Mulai dari");
+		expect(startersContainer?.querySelectorAll("button")).toHaveLength(4);
+
+		for (const suggestion of starterSuggestions) {
+			expect(startersContainer?.textContent).toContain(suggestion.title);
+			expect(startersContainer?.textContent).toContain(suggestion.description);
+		}
+	});
+
+	it("prefills composer and does not create feature or send when suggestion is clicked in new feature mode", () => {
+		const onSendMessage = vi.fn();
+		renderWorkspace({
+			isCreatingNew: true,
+			codebaseName: "Ocean Guard",
+			starterSuggestions,
+			onSendMessage,
+		});
+
+		const buttons = container.querySelectorAll<HTMLButtonElement>(
+			"[data-testid='codebase-intent-starters'] button",
+		);
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		const featureSuggestion = starterSuggestions[0];
+		const featureButton = buttons[0];
+		expect(featureButton?.textContent).toContain(featureSuggestion?.title);
+
+		act(() => {
+			featureButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(composer?.value).toBe(featureSuggestion?.prompt);
+		expect(document.activeElement).toBe(composer);
+		expect(composer?.selectionStart).toBe(featureSuggestion?.prompt.length);
+		expect(composer?.selectionEnd).toBe(featureSuggestion?.prompt.length);
+		expect(onSendMessage).not.toHaveBeenCalled();
+	});
+
+	it("renders clean empty state in new feature mode when suggestions are unavailable", () => {
+		renderWorkspace({
+			isCreatingNew: true,
+			codebaseName: "Ocean Guard",
+		});
+
+		expect(
+			container.querySelector("[data-testid='codebase-intent-starters']"),
+		).toBeNull();
+		expect(
+			container.querySelector("[data-testid='codebase-refresh-starters']"),
+		).toBeNull();
+		const composer = container.querySelector<HTMLTextAreaElement>(
+			"#codebase-chat-composer",
+		);
+		expect(composer?.disabled).toBe(false);
+	});
+
+	it("offers starter refresh in new feature mode when persisted analysis is ready without suggestions", () => {
+		const onRefreshStarterSuggestions = vi.fn();
+		renderWorkspace({
+			isCreatingNew: true,
+			codebaseName: "Ocean Guard",
+			starterRefresh: {
+				analysisId: "analysis-legacy",
+				snapshotId: "snapshot-current",
+				status: "ready",
+			},
+			onRefreshStarterSuggestions,
+		});
+
+		expect(
+			container.querySelector("[data-testid='codebase-intent-starters']"),
+		).toBeNull();
+		const refreshButton = container.querySelector<HTMLButtonElement>(
+			"[data-testid='codebase-refresh-starters']",
+		);
+		expect(refreshButton).not.toBeNull();
+		expect(refreshButton?.textContent).toContain(
+			"Buat saran tugas dari analisis codebase",
+		);
+
+		act(() => {
+			refreshButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		expect(onRefreshStarterSuggestions).toHaveBeenCalledWith(
+			"analysis-legacy",
+			"snapshot-current",
+		);
+	});
+
 	it("keeps starter cards keyboard-focusable buttons", () => {
 		renderWorkspace({ starterSuggestions });
 
