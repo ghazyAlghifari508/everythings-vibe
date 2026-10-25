@@ -1,5 +1,8 @@
 "use client";
 
+import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
+
 interface CodebaseChatWorkspaceErrorRowProps {
 	message: string | null;
 	onRetry?: () => void;
@@ -15,7 +18,15 @@ export function CodebaseChatWorkspaceSpecError({
 			data-testid="codebase-spec-error"
 			className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
 		>
-			<span>{message}</span>
+			<span className="flex items-center gap-1.5">
+				<Icon
+					icon={Alert02Icon}
+					size={14}
+					aria-hidden="true"
+					className="shrink-0"
+				/>
+				<span>{message}</span>
+			</span>
 			{onRetry ? (
 				<button
 					type="button"
@@ -39,7 +50,15 @@ export function CodebaseChatWorkspaceStageError({
 			data-testid="codebase-stage-error"
 			className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
 		>
-			<span>{message}</span>
+			<span className="flex items-center gap-1.5">
+				<Icon
+					icon={Alert02Icon}
+					size={14}
+					aria-hidden="true"
+					className="shrink-0"
+				/>
+				<span>{message}</span>
+			</span>
 			{onRetry ? (
 				<button
 					type="button"
