@@ -2,21 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatStreamMessage } from "@/features/codebase/components/chat/codebase-chat-workspace";
 import {
 	type CodebasePipelineStage,
-	type CodebaseRunStage,
 	type CodebaseRunState,
-	mapAskQuestionsToAdaptive,
 	reconcilePipelineStage,
 	resolvePersistedStage,
 	shouldAutoRevealArtifact,
 } from "@/features/codebase/services/chat-flow";
 import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
-import type { DurableGenerationOperation } from "@/features/codebase/services/workspace-operations";
 import {
 	emptyArtifactHydration,
 	resolveWorkspaceView,
 	type WorkspaceArtifactHydration,
 } from "@/features/codebase/services/workspace-hydration";
-import { validateAskQuestions } from "@/features/greenfield/services/ask-service";
 import { useKanbanTasks } from "@/features/greenfield/hooks/use-kanban-polling";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import type { CodebaseWorkspaceData } from "../services/workspace-loader.functions";
@@ -26,6 +22,7 @@ import { useWorkspaceArtifacts } from "./use-workspace-artifacts";
 import { useWorkspaceComposer } from "./use-workspace-composer";
 import { useWorkspaceFeatureGeneration } from "./use-workspace-feature-generation";
 import { useWorkspaceGenerationActions } from "./use-workspace-generation-actions";
+import { useWorkspaceOperationCompletion } from "./use-workspace-operation-completion";
 import { useWorkspaceOperations } from "./use-workspace-operations";
 import { useWorkspacePipeline } from "./use-workspace-pipeline";
 import { useWorkspacePlan } from "./use-workspace-plan";
@@ -291,84 +288,21 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		handleConfirmGenerate: featureGeneration.handleConfirmGenerate,
 	});
 
-	const onOperationCompleted = useCallback(
-		async (
-			stage: CodebaseRunStage,
-			op: DurableGenerationOperation,
-		): Promise<boolean> => {
-			if (artifact.activeProjectIdRef.current !== op.projectId) return false;
-			if (stage === "questions") {
-				if (op.result?.questions && Array.isArray(op.result.questions)) {
-					const validated = validateAskQuestions(op.result.questions);
-					if (validated && validated.length > 0) {
-						questions.setAiQuestions(mapAskQuestionsToAdaptive(validated));
-						return true;
-					}
-				}
-				return true;
-			}
-			if (stage === "feature") {
-				const tree = await artifact.refreshFeatureTree(op.projectId);
-				if (tree && artifact.activeProjectIdRef.current === op.projectId) {
-					setPipelineStage("feature");
-					openArtifactPreview("feature");
-					pushAssistantMessage(
-						`Pohon fitur ${resolvedFeature?.name ?? codebase.name} berhasil dimuat.`,
-					);
-					return true;
-				}
-				return false;
-			}
-			if (stage === "prd") {
-				const content = await artifact.loadPrd();
-				if (content && artifact.activeProjectIdRef.current === op.projectId) {
-					setPipelineStage("prd");
-					openArtifactPreview("prd");
-					pushAssistantMessage(
-						`PRD untuk ${resolvedFeature?.name ?? "fitur"} siap.`,
-					);
-					return true;
-				}
-				return false;
-			}
-			if (stage === "ac") {
-				const content = await artifact.loadAc();
-				if (content && artifact.activeProjectIdRef.current === op.projectId) {
-					setPipelineStage("ac");
-					openArtifactPreview("ac");
-					pushAssistantMessage(
-						`Acceptance Criteria untuk ${resolvedFeature?.name ?? "fitur"} siap.`,
-					);
-					return true;
-				}
-				return false;
-			}
-			if (stage === "task") {
-				await kanban.refetch();
-				const tree = await artifact.refreshTaskTree(op.projectId);
-				if (tree && artifact.activeProjectIdRef.current === op.projectId) {
-					setPipelineStage("handoff");
-					openArtifactPreview("tasks");
-					pushAssistantMessage(
-						`Task untuk ${resolvedFeature?.name ?? "fitur"} sudah tersimpan dan papan Kanban aktif.`,
-					);
-					return true;
-				}
-				return false;
-			}
-			return false;
-		},
-		[
-			artifact,
-			questions,
-			resolvedFeature,
-			codebase.name,
-			kanban,
-			setPipelineStage,
-			openArtifactPreview,
-			pushAssistantMessage,
-		],
-	);
+	// onOperationCompleted extracted
+	const onOperationCompleted = useWorkspaceOperationCompletion({
+		activeProjectIdRef: artifact.activeProjectIdRef,
+		resolvedFeatureName: resolvedFeature?.name,
+		codebaseName: codebase.name,
+		setAiQuestions: questions.setAiQuestions,
+		refreshFeatureTree: artifact.refreshFeatureTree,
+		loadPrd: artifact.loadPrd,
+		loadAc: artifact.loadAc,
+		refreshTaskTree: artifact.refreshTaskTree,
+		refetchKanban: kanban.refetch,
+		setPipelineStage,
+		openArtifactPreview,
+		pushAssistantMessage,
+	});
 
 	useWorkspaceOperations({
 		effectiveFeatureId,

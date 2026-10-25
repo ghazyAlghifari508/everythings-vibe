@@ -57,7 +57,9 @@ export function useWorkspaceOperations({
 			setStageError(null);
 			setRun((cur) => {
 				if (cur?.status === "running" && cur.stage === op.stage) return cur;
-				const started = op.startedAt ? Number(new Date(op.startedAt)) : Date.now();
+				const started = op.startedAt
+					? Number(new Date(op.startedAt))
+					: Date.now();
 				return startRun(op.stage, started);
 			});
 
@@ -74,17 +76,71 @@ export function useWorkspaceOperations({
 			setStageBusy(null);
 
 			if (settled?.status === "completed") {
-				await onOperationCompleted(settled.stage, settled);
-				if (activeProjectIdRef.current === projectId) {
-					setRun((cur) => settleRun(cur, "done", Date.now()));
+				const persisted = await onOperationCompleted(settled.stage, settled);
+				if (signal.aborted || activeProjectIdRef.current !== projectId) return;
+				const started = settled.startedAt
+					? Number(new Date(settled.startedAt))
+					: Date.now();
+				if (persisted) {
+					setRun((cur) =>
+						settleRun(
+							cur?.status === "running"
+								? cur
+								: startRun(settled.stage, started),
+							"done",
+							Date.now(),
+						),
+					);
+				} else {
+					const errorMsg =
+						"Hasil generasi belum tersimpan di server. Coba generate ulang.";
+					setStageError(errorMsg);
+					setRun((cur) =>
+						settleRun(
+							cur?.status === "running"
+								? cur
+								: startRun(settled.stage, started),
+							"failed",
+							Date.now(),
+							errorMsg,
+						),
+					);
 				}
 			} else if (settled?.status === "failed") {
 				const errorMsg = settled.error ?? "Generasi gagal.";
 				setStageError(errorMsg);
-				setRun((cur) => settleRun(cur, "failed", Date.now(), errorMsg));
+				const started = settled.startedAt
+					? Number(new Date(settled.startedAt))
+					: Date.now();
+				setRun((cur) =>
+					settleRun(
+						cur?.status === "running" ? cur : startRun(settled.stage, started),
+						"failed",
+						Date.now(),
+						errorMsg,
+					),
+				);
+			} else if (settled?.status === "cancelled") {
+				const started = settled.startedAt
+					? Number(new Date(settled.startedAt))
+					: Date.now();
+				setRun((cur) =>
+					settleRun(
+						cur?.status === "running" ? cur : startRun(settled.stage, started),
+						"failed",
+						Date.now(),
+						"Dibatalkan.",
+					),
+				);
 			}
 		},
-		[activeProjectIdRef, setRun, setStageBusy, setStageError, onOperationCompleted],
+		[
+			activeProjectIdRef,
+			setRun,
+			setStageBusy,
+			setStageError,
+			onOperationCompleted,
+		],
 	);
 
 	// On mount and project change: hydrate operations from server without restarting AI
@@ -101,13 +157,88 @@ export function useWorkspaceOperations({
 
 		void (async () => {
 			try {
-				const ops = await fetchGenerationOperations(projectId, ctrl.signal);
-				if (ctrl.signal.aborted || activeProjectIdRef.current !== projectId) return;
+				const fetchRes = await fetchGenerationOperations(
+					projectId,
+					ctrl.signal,
+				);
+				if (ctrl.signal.aborted || activeProjectIdRef.current !== projectId)
+					return;
+				if (fetchRes.status === "unavailable") {
+					// Backend or network temporarily unavailable: retain current run state without wiping
+					return;
+				}
+				const ops = fetchRes.operations;
 
+				// 1. Prioritize active operations (running / queued)
 				for (const stage of RUN_STAGES) {
 					const op = ops[stage];
 					if (op && (op.status === "running" || op.status === "queued")) {
 						await monitorOperation(op, ctrl.signal);
+						return;
+					}
+				}
+
+				// 2. Hydrate completed, failed, or cancelled stages (latest stage first)
+				for (const stage of [...RUN_STAGES].reverse()) {
+					const op = ops[stage];
+					if (op?.status === "completed") {
+						const persisted = await onOperationCompleted(op.stage, op);
+						if (ctrl.signal.aborted || activeProjectIdRef.current !== projectId)
+							return;
+						const started = op.startedAt
+							? Number(new Date(op.startedAt))
+							: Date.now();
+						if (persisted) {
+							setRun((cur) =>
+								settleRun(
+									cur?.status === "running" ? cur : startRun(op.stage, started),
+									"done",
+									Date.now(),
+								),
+							);
+						} else {
+							const notSavedMsg =
+								"Hasil generasi belum tersimpan di server. Coba generate ulang.";
+							setStageError(notSavedMsg);
+							setRun((cur) =>
+								settleRun(
+									cur?.status === "running" ? cur : startRun(op.stage, started),
+									"failed",
+									Date.now(),
+									notSavedMsg,
+								),
+							);
+						}
+						break;
+					}
+					if (op?.status === "failed") {
+						const errorMsg = op.error ?? "Generasi gagal.";
+						setStageError(errorMsg);
+						const started = op.startedAt
+							? Number(new Date(op.startedAt))
+							: Date.now();
+						setRun((cur) =>
+							settleRun(
+								cur?.status === "running" ? cur : startRun(op.stage, started),
+								"failed",
+								Date.now(),
+								errorMsg,
+							),
+						);
+						break;
+					}
+					if (op?.status === "cancelled") {
+						const started = op.startedAt
+							? Number(new Date(op.startedAt))
+							: Date.now();
+						setRun((cur) =>
+							settleRun(
+								cur?.status === "running" ? cur : startRun(op.stage, started),
+								"failed",
+								Date.now(),
+								"Dibatalkan.",
+							),
+						);
 						break;
 					}
 				}
@@ -119,7 +250,14 @@ export function useWorkspaceOperations({
 		return () => {
 			ctrl.abort();
 		};
-	}, [effectiveFeatureId, activeProjectIdRef, monitorOperation]);
+	}, [
+		effectiveFeatureId,
+		activeProjectIdRef,
+		monitorOperation,
+		onOperationCompleted,
+		setRun,
+		setStageError,
+	]);
 
 	// Two-tab coordination: check for remote in-flight operations periodically or on window focus
 	useEffect(() => {
@@ -132,9 +270,11 @@ export function useWorkspaceOperations({
 			if (inFlightStageRef.current !== null) return; // already monitoring
 
 			try {
-				const ops = await fetchGenerationOperations(projectId);
+				const fetchRes = await fetchGenerationOperations(projectId);
 				if (!active || activeProjectIdRef.current !== projectId) return;
 				if (inFlightStageRef.current !== null) return;
+				if (fetchRes.status === "unavailable") return;
+				const ops = fetchRes.operations;
 
 				for (const stage of RUN_STAGES) {
 					const op = ops[stage];

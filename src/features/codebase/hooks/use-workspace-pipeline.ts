@@ -6,20 +6,16 @@ import {
 	useRef,
 } from "react";
 import {
-	appendRunThinking,
 	type CodebasePipelineStage,
 	type CodebaseRunStage,
 	type CodebaseRunState,
-	resetRunThinking,
-	setRunPhase,
 	settleRun,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
 import {
-	type DurableGenerationOperation,
 	pollOperationUntilSettled,
+	submitGenerationOperation,
 } from "@/features/codebase/services/workspace-operations";
-import { consumeSseStream } from "@/lib/sse-consume";
 
 export function useWorkspacePipeline({
 	effectiveFeatureId,
@@ -42,7 +38,7 @@ export function useWorkspacePipeline({
 	return useCallback(
 		async (
 			target: CodebaseRunStage,
-			url: string,
+			_url: string,
 			init: RequestInit,
 			onSuccess: () => Promise<boolean>,
 			retry = false,
@@ -75,84 +71,28 @@ export function useWorkspacePipeline({
 					}
 				}
 
-				// ponytail: supports both durable generation endpoint and existing SSE pipeline endpoints transparently
-				let response: Response;
-				const isDurableDirect = url === "/api/codebase/generation";
-				if (isDurableDirect) {
-					response = await fetch(url, {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({
-							projectId: requestedProjectId,
-							stage: target,
-							input: parsedInput,
-							retry,
-						}),
-						signal: ctrl.signal,
-					});
-				} else {
-					response = await fetch(url, init);
-				}
+				const submitRes = await submitGenerationOperation(
+					{
+						projectId: requestedProjectId,
+						stage: target,
+						input: parsedInput,
+						retry,
+					},
+					ctrl.signal,
+				);
 
 				if (activeProjectIdRef.current !== requestedProjectId) return;
 
-				if (!response.ok) {
-					let errorMsg = `Server mengembalikan status ${response.status}.`;
-					try {
-						const errBody: unknown = await response.clone().json();
-						if (
-							errBody &&
-							typeof errBody === "object" &&
-							"error" in errBody &&
-							typeof errBody.error === "string"
-						) {
-							errorMsg = errBody.error;
-						}
-					} catch {
-						// ignore
-					}
+				if (!submitRes.ok || !submitRes.operation) {
+					const errorMsg =
+						submitRes.error ?? `Generasi gagal (${submitRes.status}).`;
 					setStageError(errorMsg);
 					setRun((cur) => settleRun(cur, "failed", Date.now(), errorMsg));
 					return;
 				}
 
-				// Check if response is a JSON durable operation or an SSE stream
-				let operation: DurableGenerationOperation | null = null;
-				try {
-					const cloned = response.clone();
-					const maybeJson: unknown = await cloned.json();
-					if (maybeJson && typeof maybeJson === "object") {
-						if ("operation" in maybeJson) {
-							operation = (maybeJson as { operation: DurableGenerationOperation })
-								.operation;
-						} else if ("status" in maybeJson && "id" in maybeJson) {
-							operation = maybeJson as DurableGenerationOperation;
-						}
-					}
-				} catch {
-					// Not JSON -> handle as SSE stream
-				}
-
-				if (operation) {
-					if (operation.status === "completed") {
-						const persisted = await onSuccess();
-						if (activeProjectIdRef.current !== requestedProjectId) return;
-						if (!persisted) {
-							setRun((current) =>
-								settleRun(
-									current,
-									"failed",
-									Date.now(),
-									"Hasil generasi belum tersimpan di server. Coba generate ulang.",
-								),
-							);
-							return;
-						}
-						setRun((current) => settleRun(current, "done", Date.now()));
-						return;
-					}
-
-					// Poll if running or queued
+				let operation = submitRes.operation;
+				if (operation.status === "queued" || operation.status === "running") {
 					const settled = await pollOperationUntilSettled({
 						projectId: requestedProjectId,
 						stage: target,
@@ -166,71 +106,31 @@ export function useWorkspacePipeline({
 					)
 						return;
 
-					if (settled?.status === "completed") {
-						const persisted = await onSuccess();
-						if (activeProjectIdRef.current !== requestedProjectId) return;
-						if (!persisted) {
-							setRun((current) =>
-								settleRun(
-									current,
-									"failed",
-									Date.now(),
-									"Hasil generasi belum tersimpan di server. Coba generate ulang.",
-								),
-							);
-							return;
-						}
-						setRun((current) => settleRun(current, "done", Date.now()));
-					} else {
-						const failure = settled?.error ?? "Generasi gagal.";
-						setStageError(failure);
-						setRun((current) =>
-							settleRun(current, "failed", Date.now(), failure),
-						);
+					if (settled) {
+						operation = settled;
 					}
-					return;
 				}
 
-				// SSE stream consumption
-				const result = await consumeSseStream(response, {
-					onThinking: (text) => {
-						if (activeProjectIdRef.current === requestedProjectId)
-							setRun((current) => appendRunThinking(current, text));
-					},
-					onThinkingReset: () => {
-						if (activeProjectIdRef.current === requestedProjectId)
-							setRun((current) => resetRunThinking(current));
-					},
-					onDelta: () => {
-						if (activeProjectIdRef.current === requestedProjectId)
-							setRun((current) => setRunPhase(current, "generating"));
-					},
-				});
-
-				if (activeProjectIdRef.current !== requestedProjectId) return;
-				if (result.error) {
-					const failure = result.error;
+				if (operation.status === "completed") {
+					const persisted = await onSuccess();
+					if (activeProjectIdRef.current !== requestedProjectId) return;
+					if (!persisted) {
+						const notSavedMsg =
+							"Hasil generasi belum tersimpan di server. Coba generate ulang.";
+						setStageError(notSavedMsg);
+						setRun((current) =>
+							settleRun(current, "failed", Date.now(), notSavedMsg),
+						);
+						return;
+					}
+					setRun((current) => settleRun(current, "done", Date.now()));
+				} else {
+					const failure = operation.error ?? "Generasi gagal.";
 					setStageError(failure);
 					setRun((current) =>
 						settleRun(current, "failed", Date.now(), failure),
 					);
-					return;
 				}
-
-				const persisted = await onSuccess();
-				if (activeProjectIdRef.current !== requestedProjectId) return;
-				if (!persisted) {
-					setRun((current) =>
-						settleRun(
-							current,
-							"failed",
-							Date.now(),
-							"Hasil generasi belum tersimpan di server. Coba generate ulang.",
-						),
-					);
-					return;
-				}
-				setRun((current) => settleRun(current, "done", Date.now()));
 			} catch {
 				if (activeProjectIdRef.current !== requestedProjectId) return;
 				const message = "Server tidak dapat dihubungi. Coba lagi.";

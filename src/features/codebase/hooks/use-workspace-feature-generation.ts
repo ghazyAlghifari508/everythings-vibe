@@ -17,7 +17,10 @@ import {
 	settleRun,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
-import { pollOperationUntilSettled } from "@/features/codebase/services/workspace-operations";
+import {
+	pollOperationUntilSettled,
+	submitGenerationOperation,
+} from "@/features/codebase/services/workspace-operations";
 import {
 	buildAskHandoffAnswers,
 	describeHandoffSaveFailure,
@@ -58,209 +61,212 @@ export function useWorkspaceFeatureGeneration({
 	const [specError, setSpecError] = useState<string | null>(null);
 	const confirmingInFlight = useRef(false);
 
-	const handleConfirmGenerate = useCallback(
-		async () => {
-			if (
-				!effectiveFeatureId ||
-				isConfirming ||
-				confirmingInFlight.current ||
-				readOnly
-			)
-				return;
-			confirmingInFlight.current = true;
-			setIsConfirming(true);
-			setSpecError(null);
-			setStageError(null);
-			setRun(startRun("feature", Date.now()));
-			try {
-				const answersList = buildAskHandoffAnswers(chatAnswers, aiQuestions);
-				const outcome = await runConfirmGenerate({
-					checkExistingFeatureTree: () => refreshFeatureTree(effectiveFeatureId),
-					saveHandoff: async () => {
-						try {
-							const response = await fetch("/api/ask/options", {
-								method: "POST",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({
+	const handleConfirmGenerate = useCallback(async () => {
+		if (
+			!effectiveFeatureId ||
+			isConfirming ||
+			confirmingInFlight.current ||
+			readOnly
+		)
+			return;
+		confirmingInFlight.current = true;
+		setIsConfirming(true);
+		setSpecError(null);
+		setStageError(null);
+		setRun(startRun("feature", Date.now()));
+		try {
+			const answersList = buildAskHandoffAnswers(chatAnswers, aiQuestions);
+			const outcome = await runConfirmGenerate({
+				checkExistingFeatureTree: () => refreshFeatureTree(effectiveFeatureId),
+				saveHandoff: async () => {
+					try {
+						const response = await fetch("/api/ask/options", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({
+								projectId: effectiveFeatureId,
+								action: "save-handoff",
+								handoff: {
 									projectId: effectiveFeatureId,
-									action: "save-handoff",
-									handoff: {
-										projectId: effectiveFeatureId,
-										answers: answersList,
-										state: {
-											prompt:
-												lastFeaturePrompt.trim() || featureName || "Fitur baru",
-											platform: "web",
-											session: 1,
-											questions: serializeAskQuestions(aiQuestions),
-											nonTechAnswers: Object.fromEntries(
-												Object.entries(chatAnswers).map(([id, val]) => [
-													id,
-													{ value: val },
-												]),
-											),
-										},
+									answers: answersList,
+									state: {
+										prompt:
+											lastFeaturePrompt.trim() || featureName || "Fitur baru",
+										platform: "web",
+										session: 1,
+										questions: serializeAskQuestions(aiQuestions),
+										nonTechAnswers: Object.fromEntries(
+											Object.entries(chatAnswers).map(([id, val]) => [
+												id,
+												{ value: val },
+											]),
+										),
 									},
-								}),
-							});
-							const body: unknown = await response.json().catch(() => null);
-							if (!response.ok) {
-								const error =
-									typeof body === "object" &&
-									body !== null &&
-									"error" in body &&
-									typeof (body as { error: unknown }).error === "string"
-										? (body as { error: string }).error
-										: null;
-								const code =
-									typeof body === "object" &&
-									body !== null &&
-									"code" in body &&
-									typeof (body as { code: unknown }).code === "string"
-										? (body as { code: string }).code
-										: null;
-								return {
-									ok: false,
-									status: response.status,
-									code: code ?? undefined,
-									error: error ?? undefined,
-								};
-							}
-							return { ok: true };
-						} catch {
-							return {
-								ok: false,
-								status: 0,
-								code: "NETWORK_UNAVAILABLE",
-							};
-						}
-					},
-					generateFeature: async () => {
-						if (activeProjectIdRef.current !== effectiveFeatureId)
-							return { status: 0 };
-						try {
-							const response = await fetch("/api/features/generate", {
-								method: "POST",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ projectId: effectiveFeatureId }),
-							});
-							const body: unknown = await response.json().catch(() => null);
+								},
+							}),
+						});
+						const body: unknown = await response.json().catch(() => null);
+						if (!response.ok) {
 							const error =
 								typeof body === "object" &&
 								body !== null &&
 								"error" in body &&
 								typeof (body as { error: unknown }).error === "string"
 									? (body as { error: string }).error
-									: undefined;
+									: null;
 							const code =
 								typeof body === "object" &&
 								body !== null &&
 								"code" in body &&
 								typeof (body as { code: unknown }).code === "string"
 									? (body as { code: string }).code
-									: undefined;
-							return { status: response.status, error, code };
-						} catch {
-							return { status: 0, code: "NETWORK_UNAVAILABLE" };
+									: null;
+							return {
+								ok: false,
+								status: response.status,
+								code: code ?? undefined,
+								error: error ?? undefined,
+							};
 						}
-					},
-					reloadFeatureTree: () => refreshFeatureTree(effectiveFeatureId),
-				});
-				if (activeProjectIdRef.current !== effectiveFeatureId) return;
-				if (outcome.kind === "handoff_failed") {
-					const message = describeHandoffSaveFailure(
-						outcome.status ?? 0,
-						outcome.code,
-						outcome.error,
-					);
-					setSpecError(message);
-					setRun((current) => settleRun(current, "failed", Date.now(), message));
-					return;
-				}
-				if (outcome.kind === "spec_failed") {
-					const message =
-						outcome.error ?? "Spesifikasi fitur gagal dibuat. Coba lagi.";
-					setSpecError(message);
-					setRun((current) => settleRun(current, "failed", Date.now(), message));
-					return;
-				}
-				if (outcome.kind === "generating") {
-					// ponytail: observe running operation before giving up; upgrade to SSE stream
-					const settled = await pollOperationUntilSettled({
-						projectId: effectiveFeatureId,
-						stage: "feature",
-						maxAttempts: 10,
-					});
-					if (settled?.status === "completed") {
-						const tree = await refreshFeatureTree(effectiveFeatureId);
-						if (tree && activeProjectIdRef.current === effectiveFeatureId) {
-							setPipelineStage("feature");
-							setRun((current) => settleRun(current, "done", Date.now()));
-							const specMessage = buildFeatureMessage(
-								featureName ?? codebaseName,
-								chatAnswers,
-							);
-							pushAssistantMessage(
-								`Pohon fitur ${featureName ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}`,
-							);
-							openArtifactPreview("feature");
-							return;
-						}
+						return { ok: true };
+					} catch {
+						return {
+							ok: false,
+							status: 0,
+							code: "NETWORK_UNAVAILABLE",
+						};
 					}
-					pushAssistantMessage(
-						`Pohon fitur ${featureName ?? "fitur"} sedang disusun. Tunggu sebentar lalu klik Buat Spesifikasi Fitur lagi untuk memuat hasilnya.`,
-					);
-					setRun((current) =>
-						settleRun(
-							current,
-							"failed",
-							Date.now(),
-							"Generasi masih berjalan di server. Coba muat ulang sebentar lagi.",
-						),
-					);
-					return;
-				}
-				if (outcome.kind === "not_persisted") {
-					const message =
-						"Spesifikasi fitur belum tersimpan di server. Coba lagi sebentar lagi.";
-					setSpecError(message);
-					setRun((current) => settleRun(current, "failed", Date.now(), message));
-					return;
-				}
-				setPipelineStage("feature");
-				setRun((current) => settleRun(current, "done", Date.now()));
-				const specMessage = buildFeatureMessage(
-					featureName ?? codebaseName,
-					chatAnswers,
+				},
+				generateFeature: async () => {
+					if (activeProjectIdRef.current !== effectiveFeatureId)
+						return { status: 0 };
+					try {
+						const submitRes = await submitGenerationOperation({
+							projectId: effectiveFeatureId,
+							stage: "feature",
+							input: { projectId: effectiveFeatureId },
+						});
+						if (!submitRes.ok || !submitRes.operation) {
+							return {
+								status: submitRes.status || 500,
+								error: submitRes.error ?? "Generasi fitur gagal.",
+							};
+						}
+						let op = submitRes.operation;
+						if (op.status === "queued" || op.status === "running") {
+							const settled = await pollOperationUntilSettled({
+								projectId: effectiveFeatureId,
+								stage: "feature",
+								operationId: op.id,
+							});
+							if (settled) op = settled;
+						}
+						if (op.status === "completed") {
+							return { status: 200 };
+						}
+						return {
+							status: 500,
+							error: op.error ?? "Generasi fitur gagal.",
+						};
+					} catch {
+						return { status: 0, code: "NETWORK_UNAVAILABLE" };
+					}
+				},
+				reloadFeatureTree: () => refreshFeatureTree(effectiveFeatureId),
+			});
+			if (activeProjectIdRef.current !== effectiveFeatureId) return;
+			if (outcome.kind === "handoff_failed") {
+				const message = describeHandoffSaveFailure(
+					outcome.status ?? 0,
+					outcome.code,
+					outcome.error,
 				);
-				pushAssistantMessage(
-					`Pohon fitur ${featureName ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}`,
-				);
-				openArtifactPreview("feature");
-			} finally {
-				confirmingInFlight.current = false;
-				if (activeProjectIdRef.current === effectiveFeatureId)
-					setIsConfirming(false);
+				setSpecError(message);
+				setRun((current) => settleRun(current, "failed", Date.now(), message));
+				return;
 			}
-		},
-		[
-			effectiveFeatureId,
-			readOnly,
-			activeProjectIdRef,
-			isConfirming,
-			chatAnswers,
-			aiQuestions,
-			lastFeaturePrompt,
-			featureName,
-			codebaseName,
-			refreshFeatureTree,
-			pushAssistantMessage,
-			openArtifactPreview,
-			setPipelineStage,
-			setStageError,
-			setRun,
-		],
-	);
+			if (outcome.kind === "spec_failed") {
+				const message =
+					outcome.error ?? "Spesifikasi fitur gagal dibuat. Coba lagi.";
+				setSpecError(message);
+				setRun((current) => settleRun(current, "failed", Date.now(), message));
+				return;
+			}
+			if (outcome.kind === "generating") {
+				// ponytail: observe running operation before giving up; upgrade to SSE stream
+				const settled = await pollOperationUntilSettled({
+					projectId: effectiveFeatureId,
+					stage: "feature",
+					maxAttempts: 10,
+				});
+				if (settled?.status === "completed") {
+					const tree = await refreshFeatureTree(effectiveFeatureId);
+					if (tree && activeProjectIdRef.current === effectiveFeatureId) {
+						setPipelineStage("feature");
+						setRun((current) => settleRun(current, "done", Date.now()));
+						const specMessage = buildFeatureMessage(
+							featureName ?? codebaseName,
+							chatAnswers,
+						);
+						pushAssistantMessage(
+							`Pohon fitur ${featureName ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}`,
+						);
+						openArtifactPreview("feature");
+						return;
+					}
+				}
+				pushAssistantMessage(
+					`Pohon fitur ${featureName ?? "fitur"} sedang disusun. Tunggu sebentar lalu klik Buat Spesifikasi Fitur lagi untuk memuat hasilnya.`,
+				);
+				setRun((current) =>
+					settleRun(
+						current,
+						"failed",
+						Date.now(),
+						"Generasi masih berjalan di server. Coba muat ulang sebentar lagi.",
+					),
+				);
+				return;
+			}
+			if (outcome.kind === "not_persisted") {
+				const message =
+					"Spesifikasi fitur belum tersimpan di server. Coba lagi sebentar lagi.";
+				setSpecError(message);
+				setRun((current) => settleRun(current, "failed", Date.now(), message));
+				return;
+			}
+			setPipelineStage("feature");
+			setRun((current) => settleRun(current, "done", Date.now()));
+			const specMessage = buildFeatureMessage(
+				featureName ?? codebaseName,
+				chatAnswers,
+			);
+			pushAssistantMessage(
+				`Pohon fitur ${featureName ?? "fitur"} berhasil disusun dari jawaban Anda: ${specMessage}`,
+			);
+			openArtifactPreview("feature");
+		} finally {
+			confirmingInFlight.current = false;
+			if (activeProjectIdRef.current === effectiveFeatureId)
+				setIsConfirming(false);
+		}
+	}, [
+		effectiveFeatureId,
+		readOnly,
+		activeProjectIdRef,
+		isConfirming,
+		chatAnswers,
+		aiQuestions,
+		lastFeaturePrompt,
+		featureName,
+		codebaseName,
+		refreshFeatureTree,
+		pushAssistantMessage,
+		openArtifactPreview,
+		setPipelineStage,
+		setStageError,
+		setRun,
+	]);
 	return {
 		isConfirming,
 		setIsConfirming,

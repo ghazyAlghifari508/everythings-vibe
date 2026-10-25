@@ -1,3 +1,7 @@
+import {
+	type WorkspaceGenerationOperation,
+	workspaceGenerationOperationSchema,
+} from "../types/workspace-generation";
 import type { CodebaseRunStage } from "./chat-flow-run";
 
 export type DurableOperationStatus =
@@ -7,19 +11,7 @@ export type DurableOperationStatus =
 	| "failed"
 	| "cancelled";
 
-export interface DurableGenerationOperation {
-	id: string;
-	projectId: string;
-	stage: CodebaseRunStage;
-	status: DurableOperationStatus;
-	attempt?: number;
-	error?: string | null;
-	result?: Record<string, unknown> | null;
-	createdAt?: string | number | null;
-	startedAt?: string | number | null;
-	finishedAt?: string | number | null;
-	updatedAt?: string | number | null;
-}
+export type DurableGenerationOperation = WorkspaceGenerationOperation;
 
 export interface GenerationSubmitPayload {
 	projectId: string;
@@ -37,6 +29,16 @@ export interface SubmitOperationResult {
 	isFallback?: boolean;
 }
 
+export type OperationsFetchResult =
+	| {
+			status: "available";
+			operations: Record<CodebaseRunStage, DurableGenerationOperation | null>;
+	  }
+	| {
+			status: "unavailable";
+			error: string;
+	  };
+
 export function emptyOperationsMap(): Record<
 	CodebaseRunStage,
 	DurableGenerationOperation | null
@@ -50,6 +52,56 @@ export function emptyOperationsMap(): Record<
 	};
 }
 
+function toIsoString(val: unknown): string | undefined {
+	if (typeof val === "string") return val;
+	if (typeof val === "number" && !Number.isNaN(val))
+		return new Date(val).toISOString();
+	if (val instanceof Date) return val.toISOString();
+	return undefined;
+}
+
+export function parseOperation(
+	data: unknown,
+): DurableGenerationOperation | null {
+	if (!data || typeof data !== "object") return null;
+	const raw =
+		"operation" in data &&
+		typeof (data as { operation: unknown }).operation === "object" &&
+		(data as { operation: unknown }).operation !== null
+			? (data as { operation: unknown }).operation
+			: data;
+	if (!raw || typeof raw !== "object") return null;
+	const candidate = { ...(raw as Record<string, unknown>) };
+
+	if (candidate.createdAt !== undefined && candidate.createdAt !== null) {
+		const iso = toIsoString(candidate.createdAt);
+		if (iso) candidate.createdAt = iso;
+	} else {
+		candidate.createdAt = new Date().toISOString();
+	}
+
+	if (candidate.updatedAt !== undefined && candidate.updatedAt !== null) {
+		const iso = toIsoString(candidate.updatedAt);
+		if (iso) candidate.updatedAt = iso;
+	} else {
+		candidate.updatedAt = candidate.createdAt;
+	}
+
+	if (candidate.startedAt !== undefined && candidate.startedAt !== null) {
+		const iso = toIsoString(candidate.startedAt);
+		if (iso) candidate.startedAt = iso;
+	}
+
+	if (candidate.finishedAt !== undefined && candidate.finishedAt !== null) {
+		const iso = toIsoString(candidate.finishedAt);
+		if (iso) candidate.finishedAt = iso;
+	}
+
+	const parsed = workspaceGenerationOperationSchema.safeParse(candidate);
+	if (!parsed.success) return null;
+	return parsed.data;
+}
+
 export function normalizeOperationsMap(
 	data: unknown,
 ): Record<CodebaseRunStage, DurableGenerationOperation | null> {
@@ -61,43 +113,33 @@ export function normalizeOperationsMap(
 
 	if (Array.isArray(ops)) {
 		for (const item of ops) {
-			if (
-				item &&
-				typeof item === "object" &&
-				"stage" in item &&
-				"status" in item
-			) {
-				const op = item as DurableGenerationOperation;
-				if (op.stage in result) {
-					const current = result[op.stage];
-					const opTime = op.updatedAt ?? op.createdAt ?? 0;
-					const curTime = current ? (current.updatedAt ?? current.createdAt ?? 0) : 0;
-					if (!current || opTime >= curTime) {
-						result[op.stage] = op;
-					}
+			const op = parseOperation(item);
+			if (op && op.stage in result) {
+				const current = result[op.stage];
+				const opTime = op.updatedAt ? Number(new Date(op.updatedAt)) : 0;
+				const curTime = current?.updatedAt
+					? Number(new Date(current.updatedAt))
+					: 0;
+				if (!current || opTime >= curTime) {
+					result[op.stage] = op;
 				}
 			}
 		}
 	} else if (typeof ops === "object" && ops !== null) {
 		for (const [key, val] of Object.entries(ops)) {
-			if (
-				val &&
-				typeof val === "object" &&
-				"stage" in val &&
-				"status" in val
-			) {
-				const op = val as DurableGenerationOperation;
-				if (op.stage in result) {
+			let op = parseOperation(val);
+			if (!op && val && typeof val === "object" && !("stage" in val)) {
+				op = parseOperation({ ...val, stage: key });
+			}
+			if (op && op.stage in result) {
+				const current = result[op.stage];
+				const opTime = op.updatedAt ? Number(new Date(op.updatedAt)) : 0;
+				const curTime = current?.updatedAt
+					? Number(new Date(current.updatedAt))
+					: 0;
+				if (!current || opTime >= curTime) {
 					result[op.stage] = op;
 				}
-			} else if (
-				key in result &&
-				val &&
-				typeof val === "object" &&
-				"status" in val
-			) {
-				const op = { ...val, stage: key } as DurableGenerationOperation;
-				result[key as CodebaseRunStage] = op;
 			}
 		}
 	}
@@ -107,17 +149,35 @@ export function normalizeOperationsMap(
 export async function fetchGenerationOperations(
 	projectId: string,
 	signal?: AbortSignal,
-): Promise<Record<CodebaseRunStage, DurableGenerationOperation | null>> {
+): Promise<OperationsFetchResult> {
 	try {
 		const res = await fetch(
 			`/api/codebase/generation?projectId=${encodeURIComponent(projectId)}`,
-			{ signal },
+			{ signal, headers: { Accept: "application/json" } },
 		);
-		if (!res.ok) return emptyOperationsMap();
+		if (!res.ok) {
+			return {
+				status: "unavailable",
+				error: `Server mengembalikan status ${res.status}.`,
+			};
+		}
 		const body: unknown = await res.json().catch(() => null);
-		return normalizeOperationsMap(body);
-	} catch {
-		return emptyOperationsMap();
+		if (!body || typeof body !== "object") {
+			return {
+				status: "unavailable",
+				error: "Respons status generasi tidak valid.",
+			};
+		}
+		const operations = normalizeOperationsMap(body);
+		return { status: "available", operations };
+	} catch (_err: unknown) {
+		if (signal?.aborted) {
+			return { status: "unavailable", error: "Dibatalkan." };
+		}
+		return {
+			status: "unavailable",
+			error: "Tidak dapat terhubung ke server status generasi.",
+		};
 	}
 }
 
@@ -141,28 +201,42 @@ export async function submitGenerationOperation(
 				typeof body.error === "string"
 					? body.error
 					: `Generasi gagal (${res.status}).`;
-			return { ok: false, operation: null, error: errorMsg, status: res.status };
+			return {
+				ok: false,
+				operation: null,
+				error: errorMsg,
+				status: res.status,
+			};
 		}
-		const op =
-			body && typeof body === "object" && "operation" in body
-				? (body as { operation: DurableGenerationOperation }).operation
-				: (body as DurableGenerationOperation);
-		return { ok: true, operation: op ?? null, status: res.status };
-	} catch (err: unknown) {
+		const op = parseOperation(body);
+		if (!op) {
+			return {
+				ok: false,
+				operation: null,
+				error: "Format operasi dari server tidak valid.",
+				status: 502,
+			};
+		}
+		return { ok: true, operation: op, status: res.status };
+	} catch (_err: unknown) {
 		if (signal?.aborted) {
 			return { ok: false, operation: null, status: 0, error: "Dibatalkan." };
 		}
-		// ponytail: ack-lost recovery polls server before reporting failure; upgrade to SSE replay if server supports it.
+		// Ack-lost recovery: query with ?reconcile=1 and EXACT SAME payload!
+		// DO NOT perform arbitrary lookups or execute a paid POST automatically.
 		try {
-			const ops = await fetchGenerationOperations(payload.projectId);
-			const existing = ops[payload.stage];
-			if (
-				existing &&
-				(existing.status === "running" ||
-					existing.status === "queued" ||
-					existing.status === "completed")
-			) {
-				return { ok: true, operation: existing, status: 200, ackLost: true };
+			const reconcileRes = await fetch("/api/codebase/generation?reconcile=1", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+				signal,
+			});
+			if (reconcileRes.ok) {
+				const recBody: unknown = await reconcileRes.json().catch(() => null);
+				const recOp = parseOperation(recBody);
+				if (recOp) {
+					return { ok: true, operation: recOp, status: 200, ackLost: true };
+				}
 			}
 		} catch {
 			// server genuinely unreachable
@@ -170,19 +244,23 @@ export async function submitGenerationOperation(
 		return {
 			ok: false,
 			operation: null,
-			error: "Koneksi terputus. Menghubungkan kembali...",
+			error:
+				"Koneksi terputus saat mengirim permintaan. Periksa koneksi lalu coba lagi.",
 			status: 0,
+			ackLost: true,
 		};
 	}
 }
+
+const DEFAULT_POLL_INTERVAL_MS = process.env.NODE_ENV === "test" ? 15 : 1200;
 
 export async function pollOperationUntilSettled({
 	projectId,
 	stage,
 	operationId,
 	signal,
-	intervalMs = 1200,
-	maxAttempts = 150,
+	intervalMs = DEFAULT_POLL_INTERVAL_MS,
+	maxAttempts,
 	onTick,
 }: {
 	projectId: string;
@@ -194,25 +272,51 @@ export async function pollOperationUntilSettled({
 	onTick?: (op: DurableGenerationOperation) => void;
 }): Promise<DurableGenerationOperation | null> {
 	let attempts = 0;
-	// ponytail: fixed interval polling; upgrade to websocket/SSE push when backend streaming adapter is available.
-	while (attempts < maxAttempts) {
+	// When maxAttempts is omitted, keep monitoring true pending jobs without fake timeouts
+	while (maxAttempts === undefined || attempts < maxAttempts) {
 		if (signal?.aborted) return null;
 		attempts++;
-		const ops = await fetchGenerationOperations(projectId, signal);
-		if (signal?.aborted) return null;
-		const op = ops[stage];
-		if (op) {
-			if (!operationId || !op.id || op.id === operationId) {
-				onTick?.(op);
-				if (
-					op.status === "completed" ||
-					op.status === "failed" ||
-					op.status === "cancelled"
-				) {
-					return op;
+
+		try {
+			let op: DurableGenerationOperation | null = null;
+			if (operationId) {
+				const res = await fetch(
+					`/api/codebase/generation?projectId=${encodeURIComponent(projectId)}&operationId=${encodeURIComponent(operationId)}`,
+					{ signal, headers: { Accept: "application/json" } },
+				);
+				if (res.ok) {
+					const body: unknown = await res.json().catch(() => null);
+					op = parseOperation(body);
+					if (!op && body && typeof body === "object" && "operations" in body) {
+						const opsMap = normalizeOperationsMap(body);
+						op = opsMap[stage];
+					}
+				}
+			} else {
+				const fetchRes = await fetchGenerationOperations(projectId, signal);
+				if (fetchRes.status === "available") {
+					op = fetchRes.operations[stage];
 				}
 			}
+
+			if (signal?.aborted) return null;
+
+			if (op) {
+				if (!operationId || !op.id || op.id === operationId) {
+					onTick?.(op);
+					if (
+						op.status === "completed" ||
+						op.status === "failed" ||
+						op.status === "cancelled"
+					) {
+						return op;
+					}
+				}
+			}
+		} catch {
+			// Transient network blip during polling: keep monitoring unless aborted
 		}
+
 		await new Promise((resolve) => setTimeout(resolve, intervalMs));
 	}
 	return null;
