@@ -3,6 +3,7 @@ import {
 	type RefObject,
 	type SetStateAction,
 	useCallback,
+	useRef,
 	useState,
 } from "react";
 import type { ProjectFeatureTree } from "@/db/schema";
@@ -16,7 +17,10 @@ import {
 	settleRun,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
-import { buildAskHandoffAnswers } from "../utils/workspace-contracts";
+import {
+	buildAskHandoffAnswers,
+	describeHandoffSaveFailure,
+} from "../utils/workspace-contracts";
 
 export function useWorkspaceFeatureGeneration({
 	effectiveFeatureId,
@@ -51,8 +55,16 @@ export function useWorkspaceFeatureGeneration({
 }) {
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [specError, setSpecError] = useState<string | null>(null);
+	const confirmingInFlight = useRef(false);
 	const handleConfirmGenerate = useCallback(async () => {
-		if (!effectiveFeatureId || isConfirming || readOnly) return;
+		if (
+			!effectiveFeatureId ||
+			isConfirming ||
+			confirmingInFlight.current ||
+			readOnly
+		)
+			return;
+		confirmingInFlight.current = true;
 		setIsConfirming(true);
 		setSpecError(null);
 		setStageError(null);
@@ -60,6 +72,7 @@ export function useWorkspaceFeatureGeneration({
 		try {
 			const answersList = buildAskHandoffAnswers(chatAnswers, aiQuestions);
 			const outcome = await runConfirmGenerate({
+				checkExistingFeatureTree: () => refreshFeatureTree(effectiveFeatureId),
 				saveHandoff: async () => {
 					try {
 						const response = await fetch("/api/ask/options", {
@@ -77,13 +90,46 @@ export function useWorkspaceFeatureGeneration({
 										platform: "web",
 										session: 1,
 										questions: serializeAskQuestions(aiQuestions),
+										nonTechAnswers: Object.fromEntries(
+											Object.entries(chatAnswers).map(([id, val]) => [
+												id,
+												{ value: val },
+											]),
+										),
 									},
 								},
 							}),
 						});
-						return response.ok;
+						const body: unknown = await response.json().catch(() => null);
+						if (!response.ok) {
+							const error =
+								typeof body === "object" &&
+								body !== null &&
+								"error" in body &&
+								typeof (body as { error: unknown }).error === "string"
+									? (body as { error: string }).error
+									: null;
+							const code =
+								typeof body === "object" &&
+								body !== null &&
+								"code" in body &&
+								typeof (body as { code: unknown }).code === "string"
+									? (body as { code: string }).code
+									: null;
+							return {
+								ok: false,
+								status: response.status,
+								code: code ?? undefined,
+								error: error ?? undefined,
+							};
+						}
+						return { ok: true };
 					} catch {
-						return false;
+						return {
+							ok: false,
+							status: 0,
+							code: "NETWORK_UNAVAILABLE",
+						};
 					}
 				},
 				generateFeature: async () => {
@@ -95,23 +141,42 @@ export function useWorkspaceFeatureGeneration({
 							headers: { "Content-Type": "application/json" },
 							body: JSON.stringify({ projectId: effectiveFeatureId }),
 						});
-						return { status: response.status };
+						const body: unknown = await response.json().catch(() => null);
+						const error =
+							typeof body === "object" &&
+							body !== null &&
+							"error" in body &&
+							typeof (body as { error: unknown }).error === "string"
+								? (body as { error: string }).error
+								: undefined;
+						const code =
+							typeof body === "object" &&
+							body !== null &&
+							"code" in body &&
+							typeof (body as { code: unknown }).code === "string"
+								? (body as { code: string }).code
+								: undefined;
+						return { status: response.status, error, code };
 					} catch {
-						return { status: 0 };
+						return { status: 0, code: "NETWORK_UNAVAILABLE" };
 					}
 				},
 				reloadFeatureTree: () => refreshFeatureTree(effectiveFeatureId),
 			});
 			if (activeProjectIdRef.current !== effectiveFeatureId) return;
 			if (outcome.kind === "handoff_failed") {
-				const message =
-					"Jawaban gagal disimpan, jadi spesifikasi tidak dibuat. Coba lagi.";
+				const message = describeHandoffSaveFailure(
+					outcome.status ?? 0,
+					outcome.code,
+					outcome.error,
+				);
 				setSpecError(message);
 				setRun((current) => settleRun(current, "failed", Date.now(), message));
 				return;
 			}
 			if (outcome.kind === "spec_failed") {
-				const message = "Spesifikasi fitur gagal dibuat. Coba lagi.";
+				const message =
+					outcome.error ?? "Spesifikasi fitur gagal dibuat. Coba lagi.";
 				setSpecError(message);
 				setRun((current) => settleRun(current, "failed", Date.now(), message));
 				return;
@@ -148,6 +213,7 @@ export function useWorkspaceFeatureGeneration({
 			);
 			openArtifactPreview("feature");
 		} finally {
+			confirmingInFlight.current = false;
 			if (activeProjectIdRef.current === effectiveFeatureId)
 				setIsConfirming(false);
 		}
