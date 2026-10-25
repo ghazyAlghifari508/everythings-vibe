@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { handleLegacyWorkspaceGeneration } from "@/features/codebase/services/workspace-generation-legacy.server";
 import { handlePrdChatRequest } from "@/features/greenfield/services/prd-chat-route.server";
 
 // PRD chat/generate/revise/resume boundary.
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/api/chat")({
 	server: {
 		handlers: {
 			POST: async ({ request }: { request: Request }) =>
-				handlePrdChatRequest(request),
+				handleLegacyWorkspaceGeneration(request, "prd", handlePrdChatRequest),
 		},
 	},
 });

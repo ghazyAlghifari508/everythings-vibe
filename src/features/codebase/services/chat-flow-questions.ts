@@ -137,7 +137,7 @@ export function serializeAskQuestions(
  */
 export function restoreAskState(
 	questions: readonly PersistedAskQuestion[],
-	answers: readonly { question: string; answer: string }[],
+	answers: readonly { question: string; answer: string; questionId?: string }[],
 ): { questions: AdaptiveQuestion[]; answers: Record<string, string> } {
 	const restoredQuestions = mapAskQuestionsToAdaptive(
 		questions.map((question) => ({
@@ -153,12 +153,21 @@ export function restoreAskState(
 				: {}),
 		})),
 	);
-	const answerByQuestionText = new Map(
-		answers.map((entry) => [entry.question.trim(), entry.answer]),
-	);
+	const answerByQuestionId = new Map<string, string>();
+	const answerByQuestionText = new Map<string, string>();
+	for (const entry of answers) {
+		if (entry.questionId && entry.answer.trim().length > 0) {
+			answerByQuestionId.set(entry.questionId, entry.answer);
+		}
+		if (entry.question.trim().length > 0 && entry.answer.trim().length > 0) {
+			answerByQuestionText.set(entry.question.trim(), entry.answer);
+		}
+	}
 	const restoredAnswers: Record<string, string> = {};
 	for (const question of restoredQuestions) {
-		const answer = answerByQuestionText.get(question.title.trim());
+		const answer =
+			answerByQuestionId.get(question.id) ??
+			answerByQuestionText.get(question.title.trim());
 		if (answer !== undefined && answer.trim().length > 0) {
 			restoredAnswers[question.id] = answer;
 		}
@@ -209,9 +218,10 @@ export function parseRestoredQuestions(value: unknown): PersistedAskQuestion[] {
 
 export function parseRestoredAnswers(
 	value: unknown,
-): Array<{ question: string; answer: string }> {
+): Array<{ question: string; answer: string; questionId?: string }> {
 	if (!Array.isArray(value)) return [];
-	const out: Array<{ question: string; answer: string }> = [];
+	const out: Array<{ question: string; answer: string; questionId?: string }> =
+		[];
 	for (const entry of value) {
 		if (typeof entry !== "object" || entry === null) continue;
 		const record = entry as Record<string, unknown>;
@@ -221,7 +231,15 @@ export function parseRestoredAnswers(
 			record.question.trim() &&
 			record.answer.trim()
 		) {
-			out.push({ question: record.question, answer: record.answer });
+			const questionId =
+				typeof record.questionId === "string" && record.questionId.trim()
+					? record.questionId.trim()
+					: undefined;
+			out.push({
+				question: record.question,
+				answer: record.answer,
+				...(questionId ? { questionId } : {}),
+			});
 		}
 	}
 	return out;

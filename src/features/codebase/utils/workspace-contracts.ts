@@ -34,6 +34,34 @@ export function buildAskHandoffAnswers(
 		.filter((entry) => entry.answer.length > 0 && entry.question.length > 0);
 }
 
+export function describeHandoffSaveFailure(
+	status: number,
+	code?: string | null,
+	serverMessage?: string | null,
+): string {
+	if (status === 401 || code === "SESSION_EXPIRED") {
+		return "Sesi Anda telah berakhir. Silakan login kembali.";
+	}
+	if (status === 404 || code === "PROJECT_NOT_FOUND") {
+		return "Perencanaan fitur tidak ditemukan.";
+	}
+	if (status === 409 || code === "HANDOFF_LOCKED") {
+		return (
+			serverMessage || "Klarifikasi sudah dikunci atau diperbarui di sesi lain."
+		);
+	}
+	if (status === 429 || code === "RATE_LIMITED") {
+		return "Terlalu banyak permintaan penyimpanan. Tunggu sebentar lalu coba lagi.";
+	}
+	if (status === 400 || code === "HANDOFF_VALIDATION_FAILED") {
+		return "Jawaban tidak valid. Periksa kembali jawaban Anda.";
+	}
+	if (code === "NETWORK_UNAVAILABLE" || status === 0) {
+		return "Jaringan terputus. Jawaban tetap tersimpan di layar, coba lagi.";
+	}
+	return "Jawaban gagal disimpan ke server. Jawaban tetap aman di layar, coba lagi.";
+}
+
 export function canRenderCodebaseReview(
 	analysis: Pick<AnalysisResponse, "snapshotId" | "output"> | null,
 	status: Pick<SyncStatusResponse, "status" | "snapshotId"> | null,

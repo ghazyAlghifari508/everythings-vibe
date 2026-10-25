@@ -22,6 +22,8 @@ import { useWorkspaceArtifacts } from "./use-workspace-artifacts";
 import { useWorkspaceComposer } from "./use-workspace-composer";
 import { useWorkspaceFeatureGeneration } from "./use-workspace-feature-generation";
 import { useWorkspaceGenerationActions } from "./use-workspace-generation-actions";
+import { useWorkspaceOperationCompletion } from "./use-workspace-operation-completion";
+import { useWorkspaceOperations } from "./use-workspace-operations";
 import { useWorkspacePipeline } from "./use-workspace-pipeline";
 import { useWorkspacePlan } from "./use-workspace-plan";
 import { useWorkspaceQuestions } from "./use-workspace-questions";
@@ -153,8 +155,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 			: activeHasPlanning
 				? "revise"
 				: "clarify";
-	const composerTargetName =
-		composerMode === "create" ? null : (resolvedFeature?.name ?? null);
 	const pushAssistantMessage = useCallback((content: string) => {
 		setChatMessages((current) => [
 			...current,
@@ -285,6 +285,32 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		pipelineStage: run?.status === "failed" ? run.stage : pipelineStage,
 		handleConfirmGenerate: featureGeneration.handleConfirmGenerate,
 	});
+
+	// onOperationCompleted extracted
+	const onOperationCompleted = useWorkspaceOperationCompletion({
+		activeProjectIdRef: artifact.activeProjectIdRef,
+		resolvedFeatureName: resolvedFeature?.name,
+		codebaseName: codebase.name,
+		setAiQuestions: questions.setAiQuestions,
+		refreshFeatureTree: artifact.refreshFeatureTree,
+		loadPrd: artifact.loadPrd,
+		loadAc: artifact.loadAc,
+		refreshTaskTree: artifact.refreshTaskTree,
+		refetchKanban: kanban.refetch,
+		setPipelineStage,
+		openArtifactPreview,
+		pushAssistantMessage,
+	});
+
+	useWorkspaceOperations({
+		effectiveFeatureId,
+		activeProjectIdRef: artifact.activeProjectIdRef,
+		setRun,
+		setStageBusy,
+		setStageError,
+		onOperationCompleted,
+	});
+
 	const selectPlan = (projectId: string) => {
 		composer.invalidateCreation();
 		plan.setIsCreatingNew(false);
@@ -323,7 +349,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		composerMode,
 		composerAvailable,
 		answersReadOnly,
-		composerTargetName,
 		userTookOverCanvas,
 		selectPlan,
 	};

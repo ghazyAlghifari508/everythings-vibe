@@ -6,16 +6,19 @@ import {
 	useRef,
 } from "react";
 import {
-	appendRunThinking,
 	type CodebasePipelineStage,
 	type CodebaseRunStage,
 	type CodebaseRunState,
-	resetRunThinking,
-	setRunPhase,
-	settleRun,
+	operationSettleEpoch,
+	recordOperationActivities,
+	recordRunActivity,
+	settleRunIfCurrent,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
-import { consumeSseStream } from "@/lib/sse-consume";
+import {
+	pollOperationUntilSettled,
+	submitGenerationOperation,
+} from "@/features/codebase/services/workspace-operations";
 
 export function useWorkspacePipeline({
 	effectiveFeatureId,
@@ -33,12 +36,15 @@ export function useWorkspacePipeline({
 	setRun: Dispatch<SetStateAction<CodebaseRunState | null>>;
 }) {
 	const stageRunInFlight = useRef<string | null>(null);
+	const pollerCtrlRef = useRef<AbortController | null>(null);
+
 	return useCallback(
 		async (
 			target: CodebaseRunStage,
-			url: string,
+			_url: string,
 			init: RequestInit,
 			onSuccess: () => Promise<boolean>,
+			retry = true,
 		) => {
 			if (
 				!effectiveFeatureId ||
@@ -50,52 +56,122 @@ export function useWorkspacePipeline({
 			stageRunInFlight.current = effectiveFeatureId;
 			setStageBusy(target);
 			setStageError(null);
-			setRun(startRun(target, Date.now()));
+			const request = startRun(target, Date.now());
+			setRun(request);
+			const requestId = request.requestId;
+
+			pollerCtrlRef.current?.abort();
+			const ctrl = new AbortController();
+			pollerCtrlRef.current = ctrl;
+
 			try {
-				const response = await fetch(url, init);
-				const result = await consumeSseStream(response, {
-					onThinking: (text) => {
-						if (activeProjectIdRef.current === requestedProjectId)
-							setRun((current) => appendRunThinking(current, text));
+				let parsedInput: Record<string, unknown> = {
+					projectId: requestedProjectId,
+				};
+				if (typeof init.body === "string") {
+					try {
+						parsedInput = JSON.parse(init.body) as Record<string, unknown>;
+					} catch {
+						// keep default
+					}
+				}
+
+				const submitRes = await submitGenerationOperation(
+					{
+						projectId: requestedProjectId,
+						stage: target,
+						input: parsedInput,
+						retry,
 					},
-					onThinkingReset: () => {
-						if (activeProjectIdRef.current === requestedProjectId)
-							setRun((current) => resetRunThinking(current));
-					},
-					onDelta: () => {
-						if (activeProjectIdRef.current === requestedProjectId)
-							setRun((current) => setRunPhase(current, "generating"));
-					},
-				});
+					ctrl.signal,
+				);
+
 				if (activeProjectIdRef.current !== requestedProjectId) return;
-				if (result.error) {
-					const failure = result.error;
-					setStageError(failure);
-					setRun((current) =>
-						settleRun(current, "failed", Date.now(), failure),
+
+				if (!submitRes.ok || !submitRes.operation) {
+					const errorMsg =
+						submitRes.error ?? `Generasi gagal (${submitRes.status}).`;
+					setStageError(errorMsg);
+					setRun((cur) =>
+						settleRunIfCurrent(cur, requestId, "failed", Date.now(), errorMsg),
 					);
 					return;
 				}
-				// Stream completion is not proof that the generated artifact persisted.
-				const persisted = await onSuccess();
-				if (activeProjectIdRef.current !== requestedProjectId) return;
-				if (!persisted) {
+
+				let operation = submitRes.operation;
+				setRun((cur) => recordOperationActivities(cur, operation, requestId));
+				if (operation.status === "queued" || operation.status === "running") {
+					const settled = await pollOperationUntilSettled({
+						projectId: requestedProjectId,
+						stage: target,
+						operationId: operation.id,
+						signal: ctrl.signal,
+						onTick: (tick) =>
+							setRun((cur) => recordOperationActivities(cur, tick, requestId)),
+					});
+
+					if (
+						ctrl.signal.aborted ||
+						activeProjectIdRef.current !== requestedProjectId
+					)
+						return;
+
+					if (settled) {
+						operation = settled;
+					}
+				}
+
+				if (operation.status === "completed") {
+					const persisted = await onSuccess();
+					if (activeProjectIdRef.current !== requestedProjectId) return;
+					if (!persisted) {
+						const notSavedMsg =
+							"Hasil generasi belum tersimpan di server. Coba generate ulang.";
+						setStageError(notSavedMsg);
+						setRun((current) =>
+							settleRunIfCurrent(
+								current,
+								requestId,
+								"failed",
+								Date.now(),
+								notSavedMsg,
+							),
+						);
+						return;
+					}
 					setRun((current) =>
-						settleRun(
-							current,
-							"failed",
-							Date.now(),
-							"Hasil generasi belum tersimpan di server. Coba generate ulang.",
+						settleRunIfCurrent(
+							recordRunActivity(
+								current,
+								"result.persisted",
+								operationSettleEpoch(operation),
+								requestId,
+							),
+							requestId,
+							"done",
+							operationSettleEpoch(operation),
 						),
 					);
-					return;
+				} else {
+					const failure = operation.error ?? "Generasi gagal.";
+					setStageError(failure);
+					setRun((current) =>
+						settleRunIfCurrent(
+							current,
+							requestId,
+							"failed",
+							operationSettleEpoch(operation),
+							failure,
+						),
+					);
 				}
-				setRun((current) => settleRun(current, "done", Date.now()));
 			} catch {
 				if (activeProjectIdRef.current !== requestedProjectId) return;
 				const message = "Server tidak dapat dihubungi. Coba lagi.";
 				setStageError(message);
-				setRun((current) => settleRun(current, "failed", Date.now(), message));
+				setRun((current) =>
+					settleRunIfCurrent(current, requestId, "failed", Date.now(), message),
+				);
 			} finally {
 				if (stageRunInFlight.current === requestedProjectId)
 					stageRunInFlight.current = null;

@@ -1,15 +1,26 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentThinking } from "@/components/ui/agent-thinking";
 import {
+	activitiesFromOperation,
 	appendRunThinking,
 	type CodebaseRunState,
 	isRunWorking,
+	operationSettleEpoch,
+	recordOperationActivities,
+	recordRunActivity,
 	runConfirmGenerate,
 	runDurationSeconds,
 	setRunPhase,
 	settleRun,
+	settleRunIfCurrent,
 	shouldAutoRevealArtifact,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
@@ -200,9 +211,7 @@ describe("P5 Unified Agent Thinking & Cardless Generation Workflow", () => {
 			"[data-testid='codebase-questions-complete']",
 		);
 		expect(questionsComplete).not.toBeNull();
-		expect(questionsComplete?.textContent).toContain(
-			"Berikutnya: Spesifikasi fitur",
-		);
+		expect(questionsComplete?.textContent).toContain("Buat Spesifikasi Fitur");
 		expect(questionsComplete?.className).not.toContain("border-graphite");
 
 		// Stage: feature -> offers PRD
@@ -442,5 +451,310 @@ describe("P5 Unified Agent Thinking & Cardless Generation Workflow", () => {
 				userTookOverCanvas: false,
 			}),
 		).toBe(true);
+	});
+});
+
+describe("P3 Authentic thinking, activity history and stale-run safety", () => {
+	const iso = (epoch: number) => new Date(epoch).toISOString();
+
+	// 9. Real activity events appear in the correct order
+	it("logs only confirmed backend events, in the order they were observed", () => {
+		const run = startRun("questions", 1_000);
+		expect(run.activities).toEqual([]);
+
+		// A queued operation proves acceptance only; no generation has begun.
+		const queued = recordOperationActivities(
+			run,
+			{ createdAt: iso(1_100), startedAt: null, status: "queued" },
+			run.requestId,
+		);
+		expect(queued?.activities.map((entry) => entry.id)).toEqual([
+			"request.accepted",
+		]);
+
+		const runningRun = recordOperationActivities(
+			queued,
+			{ createdAt: iso(1_100), startedAt: iso(1_400), status: "running" },
+			run.requestId,
+		);
+		expect(runningRun?.activities.map((entry) => entry.id)).toEqual([
+			"request.accepted",
+			"generation.started",
+		]);
+
+		// Re-observing the same operation must not duplicate its events.
+		const reobserved = recordOperationActivities(
+			runningRun,
+			{ createdAt: iso(1_100), startedAt: iso(1_400), status: "running" },
+			run.requestId,
+		);
+		expect(reobserved?.activities).toHaveLength(2);
+
+		const persisted = recordRunActivity(
+			reobserved,
+			"result.persisted",
+			2_100,
+			run.requestId,
+		);
+		expect(persisted?.activities.map((entry) => entry.id)).toEqual([
+			"request.accepted",
+			"generation.started",
+			"result.persisted",
+		]);
+	});
+
+	it("never invents events for an operation the client never saw running", () => {
+		const run = startRun("questions", 1_000);
+		const queuedOnly = recordOperationActivities(
+			run,
+			{ createdAt: iso(1_100), startedAt: null, status: "queued" },
+			run.requestId,
+		);
+		const ids = queuedOnly?.activities.map((entry) => entry.id) ?? [];
+
+		expect(ids).not.toContain("generation.started");
+		expect(ids).not.toContain("result.persisted");
+	});
+
+	// 8. No mock activity rotation
+	it("adds no further events while the same operation keeps reporting the same state", () => {
+		const run = recordRunActivity(
+			startRun("prd", 1_000),
+			"request.accepted",
+			1_100,
+		);
+		if (!run) throw new Error("run must be running");
+
+		const stillQueued = recordOperationActivities(
+			run,
+			{ createdAt: iso(1_100), startedAt: null, status: "queued" },
+			run.requestId,
+		);
+
+		expect(stillQueued?.activities.map((entry) => entry.id)).toEqual([
+			"request.accepted",
+		]);
+	});
+
+	// 10. Stale operation events cannot change current status
+	it("drops a late settle carrying an earlier request id", () => {
+		const earlier = startRun("questions", 1_000);
+		const current = startRun("prd", 2_000);
+
+		const stale = settleRunIfCurrent(
+			current,
+			earlier.requestId,
+			"failed",
+			3_000,
+			"late failure from the previous request",
+		);
+
+		expect(stale).toBe(current);
+		expect(current.status).toBe("running");
+		expect(current.finishedAt).toBeNull();
+
+		const own = settleRunIfCurrent(current, current.requestId, "done", 4_000);
+		expect(own?.status).toBe("done");
+		expect(runDurationSeconds(own)).toBe(2);
+	});
+
+	it("ignores activity events that arrive after the run settled", () => {
+		const settled = settleRun(startRun("prd", 1_000), "done", 4_000);
+		const late = recordRunActivity(
+			settled,
+			"result.persisted",
+			5_000,
+			settled?.requestId,
+		);
+
+		expect(late).toBe(settled);
+		expect(settled?.activities).toEqual([]);
+	});
+
+	it("ignores activity events addressed to a different request", () => {
+		const current = startRun("prd", 2_000);
+		const other = startRun("questions", 1_000);
+
+		const ignored = recordRunActivity(
+			current,
+			"generation.started",
+			3_000,
+			other.requestId,
+		);
+
+		expect(ignored).toBe(current);
+		expect(current.activities).toEqual([]);
+	});
+
+	it("replays only the events a persisted operation actually proves", () => {
+		expect(
+			activitiesFromOperation({
+				createdAt: iso(1_000),
+				startedAt: null,
+				status: "queued",
+			}).map((entry) => entry.id),
+		).toEqual(["request.accepted"]);
+
+		expect(
+			activitiesFromOperation({
+				createdAt: iso(1_000),
+				startedAt: iso(1_500),
+				status: "completed",
+			}).map((entry) => entry.id),
+		).toEqual(["request.accepted", "generation.started"]);
+	});
+
+	it("reports the operation's own duration on remount, not the time since the page opened", () => {
+		const operation = {
+			createdAt: iso(1_000_000),
+			startedAt: iso(1_001_000),
+			finishedAt: iso(1_005_000),
+			status: "completed",
+		};
+		vi.spyOn(Date, "now").mockReturnValue(9_000_000);
+
+		const hydrated = settleRun(
+			startRun("questions", Date.parse(operation.startedAt)),
+			"done",
+			operationSettleEpoch(operation),
+		);
+
+		expect(runDurationSeconds(hydrated)).toBe(4);
+	});
+
+	it("falls back to the client clock when the operation has no recorded settle time", () => {
+		vi.spyOn(Date, "now").mockReturnValue(7_500);
+		expect(operationSettleEpoch({ finishedAt: null })).toBe(7_500);
+	});
+
+	// 6. Completed questions no longer show running state
+	it("renders settled questions as a compact summary instead of a running spinner", () => {
+		const run = settleRun(startRun("questions", 10_000), "done", 15_200);
+		render(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={run}
+			/>,
+		);
+
+		const thinking =
+			screen.getByTestId("codebase-run-thinking").textContent ?? "";
+		expect(thinking).toContain("Pertanyaan siap");
+		expect(thinking).not.toContain("Menyusun pertanyaan klarifikasi");
+		expect(screen.getByRole("timer").textContent).toBe("5.2s");
+	});
+
+	// 7. No duplicated Thinking after stage transition
+	it("renders one thinking indicator with distinct thinking and generating labels", () => {
+		const run = setRunPhase(startRun("prd", 1_000), "generating");
+		render(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={run}
+			/>,
+		);
+
+		expect(screen.getAllByTestId("agent-thinking")).toHaveLength(1);
+		const thinking =
+			screen.getByTestId("codebase-run-thinking").textContent ?? "";
+		expect(thinking).toContain("Menyusun PRD");
+		expect(thinking).toContain("Menulis PRD");
+	});
+
+	// 1 + 2. Click and keyboard toggle the details; 11. an empty trace renders no control
+	it("exposes the activity disclosure only when a trace exists", () => {
+		const { rerender } = render(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={startRun("questions", 1_000)}
+			/>,
+		);
+
+		const toggle = screen.getByRole("button", { name: "Aktivitas" });
+		expect(toggle.getAttribute("aria-expanded")).toBe("true");
+		fireEvent.click(toggle);
+		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+		fireEvent.click(toggle);
+		expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+		rerender(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={null}
+			/>,
+		);
+		expect(screen.queryByRole("button", { name: "Aktivitas" })).toBeNull();
+	});
+
+	// State D: one contextual failure disclosure, never the same error twice
+	it("shows a failed stage error exactly once and never as a running state", () => {
+		const prdRun = settleRun(
+			startRun("prd", 1_000),
+			"failed",
+			4_000,
+			"Model timeout saat menyusun PRD",
+		);
+		const { rerender } = render(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={prdRun}
+			/>,
+		);
+
+		expect(screen.getAllByRole("alert")).toHaveLength(1);
+		const thinking =
+			screen.getByTestId("codebase-run-thinking").textContent ?? "";
+		expect(thinking).toContain("Gagal menyusun PRD");
+		expect(thinking).not.toContain("Menyusun PRD...");
+
+		// The feature stage owns its failure at the spec section instead.
+		const featureRun = settleRun(
+			startRun("feature", 1_000),
+			"failed",
+			4_000,
+			"Spesifikasi fitur gagal dibuat",
+		);
+		rerender(
+			<CodebaseChatWorkspace
+				featureName="Search"
+				messages={[]}
+				questions={[]}
+				answers={{}}
+				run={featureRun}
+			/>,
+		);
+
+		expect(screen.getAllByRole("alert")).toHaveLength(1);
+	});
+
+	// 4 + 5. Timer advances only while running and freezes at completion
+	it("ties duration to the run's own timestamps across a stage change", () => {
+		const questionRun = settleRun(
+			startRun("questions", 10_000),
+			"done",
+			13_000,
+		);
+		expect(runDurationSeconds(questionRun)).toBe(3);
+		expect(isRunWorking(questionRun)).toBe(false);
+
+		const prdRun = startRun("prd", 40_000);
+		expect(isRunWorking(prdRun)).toBe(true);
+		expect(runDurationSeconds(prdRun)).toBeNull();
+		expect(runDurationSeconds(settleRun(prdRun, "done", 41_500))).toBe(1.5);
 	});
 });

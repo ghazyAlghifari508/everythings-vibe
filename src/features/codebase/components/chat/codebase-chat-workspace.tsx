@@ -70,7 +70,6 @@ export function CodebaseChatWorkspace({
 	codebaseName,
 	starterSuggestions,
 	composerMode = "create",
-	composerTargetName = null,
 	isSending = false,
 	isConfirming = false,
 	specError = null,
@@ -215,10 +214,12 @@ export function CodebaseChatWorkspace({
 
 	const isRunWorking = run?.status === "running";
 	const runFailed = run?.status === "failed";
-	// A failed request owns its own error row, so the generic stage/spec error
-	// rows must not render a second, duplicate message for the same failure.
+	// A failed request owns its own error row, so the generic stage error
+	// row must not render a second, duplicate message for the same failure.
 	const stageErrorVisible = Boolean(stageError) && !runFailed;
-	const specErrorVisible = Boolean(specError) && !runFailed;
+	const activeSpecError =
+		(run?.stage === "feature" && runFailed ? run.error : null) ?? specError;
+	const specErrorVisible = Boolean(activeSpecError);
 
 	const composerPlaceholder =
 		composerMode === "create"
@@ -227,7 +228,6 @@ export function CodebaseChatWorkspace({
 
 	const renderComposer = (minRows = 1, className = "") => (
 		<CodebaseChatWorkspaceComposer
-			composerTargetName={composerTargetName}
 			draft={draft}
 			onDraftChange={setDraft}
 			onSend={handleSend}
@@ -261,8 +261,8 @@ export function CodebaseChatWorkspace({
 				<CodebaseChatWorkspacePristine
 					newFeatureRepository={isCreatingNew ? codebaseName : undefined}
 					composer={renderComposer(2, "p-3.5 sm:p-4")}
-					starterSuggestions={isCreatingNew ? undefined : starterSuggestions}
-					starterRefresh={isCreatingNew ? undefined : starterRefresh}
+					starterSuggestions={starterSuggestions}
+					starterRefresh={starterRefresh}
 					newerAttemptFailure={newerAttemptFailure}
 					onRefreshStarterSuggestions={onRefreshStarterSuggestions}
 					onPrefillDraft={handlePrefillDraft}
@@ -281,6 +281,8 @@ export function CodebaseChatWorkspace({
 								messages={messages}
 								run={run}
 								onRetryQuestions={onRetryQuestions}
+								onRetryStage={onRetryStage}
+								onRetryGenerate={onRetryGenerate}
 							/>
 							<CodebaseChatWorkspaceQuestions
 								visibleQuestions={visibleQuestions}
@@ -302,11 +304,14 @@ export function CodebaseChatWorkspace({
 							/>
 							{specErrorVisible ? (
 								<CodebaseChatWorkspaceSpecError
-									message={specError}
+									message={activeSpecError}
 									onRetry={onRetryGenerate}
 								/>
 							) : null}
-							{flowComplete && !answersReadOnly && stage === "questions" ? (
+							{flowComplete &&
+							!answersReadOnly &&
+							stage === "questions" &&
+							!specErrorVisible ? (
 								<CodebaseChatWorkspaceQuestionsComplete
 									isConfirming={isConfirming}
 									onConfirmGenerate={onConfirmGenerate}

@@ -40,10 +40,20 @@ import { persistGeneratedTaskTree } from "./task-generation-save.server";
 const STAGE_LABEL = "generate Task";
 const CONFLICT_MESSAGE = "Task sedang digenerate. Tunggu hingga selesai.";
 
+export interface TrustedExecutionContext {
+	userId?: string;
+	signal?: AbortSignal;
+	billingKey?: string;
+	beforePersist?: () => Promise<void> | void;
+}
+
 export async function handleTaskGenerateRequest(
 	request: Request,
+	executionContext?: TrustedExecutionContext,
 ): Promise<Response> {
-	const user = await requireUser(request.headers);
+	const user = executionContext?.userId
+		? { id: executionContext.userId }
+		: await requireUser(request.headers);
 
 	const body = await parseGenerationRequest(request);
 	const projectId = body.projectId;
@@ -115,7 +125,8 @@ export async function handleTaskGenerateRequest(
 		conflictMessage: CONFLICT_MESSAGE,
 		setupFailedMessage: "Gagal menyiapkan generate Task. Coba lagi.",
 		logLabel: "[task/generate]",
-		callerIdempotencyKey: body.clientIdempotencyKey,
+		callerIdempotencyKey:
+			executionContext?.billingKey || body.clientIdempotencyKey,
 		callerAttempt: body.attempt,
 	});
 	if (!reserved.ok) return reserved.response;
@@ -142,6 +153,7 @@ export async function handleTaskGenerateRequest(
 	return sseResponse(
 		createGenerationStream({
 			request,
+			signal: executionContext?.signal ?? request.signal,
 			userId: user.id,
 			reservation,
 			quote,
@@ -154,6 +166,7 @@ export async function handleTaskGenerateRequest(
 				completeTaskGeneration(run, {
 					userId: user.id,
 					projectId,
+					beforePersist: executionContext?.beforePersist,
 					acMarkdown,
 					prdContext,
 					prdContent,
@@ -187,6 +200,7 @@ export async function handleTaskGenerateRequest(
 interface TaskGenerationContext {
 	userId: string;
 	projectId: string;
+	beforePersist?: () => Promise<void> | void;
 	acMarkdown: string;
 	prdContext: string;
 	prdContent: string;
@@ -269,6 +283,7 @@ async function completeTaskGeneration(
 		run,
 		userId: input.userId,
 		projectId: input.projectId,
+		beforePersist: input.beforePersist,
 		fullResponse,
 		finishReason: outcome.finishReason,
 		acMarkdown: input.acMarkdown,

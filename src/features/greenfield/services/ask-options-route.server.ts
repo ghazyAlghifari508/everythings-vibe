@@ -6,9 +6,9 @@
 // after ownership so failed guesses never consume quota), then handoff
 // dispatch or one grounded question-generation pass with at most one bounded
 // repair.
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { prdVersions, projects, subscriptions } from "@/db/schema";
+import { projects, subscriptions } from "@/db/schema";
 import {
 	buildCodebasePromptBlock,
 	requireProjectGenerationContext,
@@ -23,10 +23,7 @@ import {
 } from "@/features/greenfield/services/ask-service";
 import { sanitizeModelOutput } from "@/features/greenfield/services/prd-text";
 import { MAX_PROMPT_LENGTH } from "@/lib/constants";
-import {
-	isTruncatedGeneration,
-	shouldMarkQuestionStep,
-} from "@/lib/flow-progress";
+import { isTruncatedGeneration } from "@/lib/flow-progress";
 import { getLanguageDirective, normalizeLanguage } from "@/lib/language";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
@@ -40,23 +37,36 @@ import {
 	getAskHandoffAction,
 	saveAskHandoffAction,
 } from "./ask-handoff-actions.server";
+import {
+	isClientAbort,
+	persistAskHandoffAndStep,
+} from "./ask-options-helpers.server";
 
-// A cancelled request has no receiver, so it stays silent (499), never logged as a 500.
-function isClientAbort(err: unknown, signal: AbortSignal): boolean {
-	if (signal.aborted) return true;
-	if (err instanceof DOMException) return err.name === "AbortError";
-	return err instanceof Error && err.name === "AbortError";
+export interface TrustedExecutionContext {
+	userId?: string;
+	signal?: AbortSignal;
+	billingKey?: string;
+	beforePersist?: () => Promise<void> | void;
 }
 
 export async function handleAskOptionsRequest(
 	request: Request,
+	executionContext?: TrustedExecutionContext,
 ): Promise<Response> {
 	let user: { id: string };
-	try {
-		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	if (executionContext?.userId) {
+		user = { id: executionContext.userId };
+	} else {
+		try {
+			user = await requireUser(request.headers);
+		} catch {
+			return Response.json(
+				{ error: "Unauthorized", code: "SESSION_EXPIRED" },
+				{ status: 401 },
+			);
+		}
 	}
+	const signal = executionContext?.signal ?? request.signal;
 
 	const body = (await request.json().catch(() => ({}))) as {
 		projectId?: string;
@@ -75,18 +85,23 @@ export async function handleAskOptionsRequest(
 		handoff,
 	} = body;
 	if (!projectId)
-		return Response.json({ error: "Project ID required" }, { status: 400 });
+		return Response.json(
+			{ error: "Project ID required", code: "HANDOFF_VALIDATION_FAILED" },
+			{ status: 400 },
+		);
 	const isHandoffAction = action === "save-handoff" || action === "get-handoff";
 	if (!isHandoffAction) {
 		if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
-			return Response.json({ error: "Prompt required" }, { status: 400 });
+			return Response.json(
+				{ error: "Prompt required", code: "HANDOFF_VALIDATION_FAILED" },
+				{ status: 400 },
+			);
 		}
-		// Documented upper bound (same contract as the home input): unbounded
-		// prompts exhaust model context and inflate cost.
 		if (prompt.length > MAX_PROMPT_LENGTH) {
 			return Response.json(
 				{
 					error: `Prompt terlalu panjang (maksimal ${MAX_PROMPT_LENGTH} karakter).`,
+					code: "HANDOFF_VALIDATION_FAILED",
 				},
 				{ status: 400 },
 			);
@@ -121,14 +136,16 @@ export async function handleAskOptionsRequest(
 		)
 		.limit(1);
 	if (!project)
-		return Response.json({ error: "Project not found" }, { status: 404 });
+		return Response.json(
+			{ error: "Project not found", code: "PROJECT_NOT_FOUND" },
+			{ status: 404 },
+		);
 
-	// Rate-limit AFTER the ownership check so failed guesses and 404s never
-	// consume the caller's quota.
-	const rateCheck = await checkRateLimit(user.id, plan, "api_call");
+	const rateAction = isHandoffAction ? "sync_status_read" : "api_call";
+	const rateCheck = await checkRateLimit(user.id, plan, rateAction);
 	if (!rateCheck.allowed)
 		return Response.json(
-			{ error: "Too many requests", retryAfter: 60 },
+			{ error: "Too many requests", code: "RATE_LIMITED", retryAfter: 60 },
 			{ status: 429 },
 		);
 
@@ -150,20 +167,13 @@ export async function handleAskOptionsRequest(
 
 	const projectLanguage = normalizeLanguage(reqLang || project.language);
 	const platformLabel = platform === "mobile" ? "Mobile App" : "Web App";
-	// Task 8 contextual questions: snapshot-bound context is appended only for
-	// existing-codebase projects with ready analysis. Null (greenfield) appends
-	// "" so the prompt stays byte-identical. Existing-codebase questions are
-	// repository-grounded, so a missing analysis fails closed instead of asking
-	// generic questions.
+
 	let codebaseBlock = "";
 	if (project.projectMode === "existing_codebase") {
 		let required: Awaited<ReturnType<typeof requireProjectGenerationContext>>;
 		try {
 			required = await requireProjectGenerationContext(projectId);
 		} catch (e) {
-			// The loader already fails closed internally; this guard keeps an
-			// unexpected failure from silently producing questions that carry no
-			// repository evidence at all.
 			console.error("ask codebase context failed:", e);
 			return Response.json(
 				{
@@ -171,7 +181,7 @@ export async function handleAskOptionsRequest(
 						"Konteks repositori tidak dapat dibaca. Muat ulang workspace lalu coba lagi.",
 					code: "CODEBASE_CONTEXT_UNAVAILABLE",
 				},
-				{ status: 409 },
+				{ status: 500 },
 			);
 		}
 		if ("code" in required) {
@@ -179,9 +189,7 @@ export async function handleAskOptionsRequest(
 		}
 		codebaseBlock = buildCodebasePromptBlock(required.context);
 	}
-	// Existing-codebase projects need repository-aware PRODUCT questions; the
-	// greenfield prompt lacks the repository context block and the "do not ask
-	// what the analysis already answers" rule.
+
 	const basePrompt =
 		project.projectMode === "existing_codebase"
 			? ASK_CODEBASE_OPTIONS_GENERATION_PROMPT
@@ -199,21 +207,9 @@ export async function handleAskOptionsRequest(
 	];
 
 	const modelsToTry = selectModels();
-
-	// Bounded accumulation: abort the upstream generation if it exceeds what the
-	// parser could ever need.
 	const MAX_ASK_RESPONSE_CHARS = 200_000;
-	// 12000 (not 4000): every model here is reasoning:true (model-config.ts) and
-	// reasoning tokens spend from the same maxOutputTokens budget before any
-	// JSON content is emitted — 4000 left too little headroom and the JSON got
-	// cut off mid-object on verbose reasoning runs.
 	const ASK_OPTIONS_MAX_TOKENS = 12000;
 
-	/**
-	 * One full model pass. Non-streaming by design: the payload is a handful of
-	 * short questions, so progressive reveal buys no UX here — the completion is
-	 * collected, then parsed once.
-	 */
 	const collectOnce = async (
 		conversation: Array<{
 			role: "system" | "user" | "assistant";
@@ -224,7 +220,7 @@ export async function handleAskOptionsRequest(
 			await tryStreamWithFallback(
 				modelsToTry,
 				conversation,
-				request.signal,
+				signal,
 				ASK_OPTIONS_MAX_TOKENS,
 			);
 		let fullResponse = firstChunk;
@@ -237,7 +233,7 @@ export async function handleAskOptionsRequest(
 				}
 			}
 		} catch (e) {
-			if (isClientAbort(e, request.signal)) {
+			if (isClientAbort(e, signal)) {
 				return {
 					ok: false,
 					failure: {
@@ -268,17 +264,12 @@ export async function handleAskOptionsRequest(
 		}
 		return {
 			ok: true,
-			// The model's own HTML-page mis-render is normalized once here, before
-			// the shared parser sees it.
 			text: sanitizeModelOutput(fullResponse),
 			finishReason: outcome.finishReason,
 		};
 	};
 
 	try {
-		// Collect, parse strictly, and on a fixable contract miss run exactly one
-		// bounded repair (see ask-service). Provider and truncation failures
-		// surface unchanged; the repair never invents questions to fill a gap.
 		const outcome = await generateValidatedAskQuestions({
 			collect: collectOnce,
 			messages,
@@ -294,66 +285,31 @@ export async function handleAskOptionsRequest(
 		}
 		const questions = outcome.questions;
 
-		// Mark pre-artifact projects at question-stage server-side so History
-		// routes them to /ask instead of the empty PRD page. Guarded: only when no
-		// PRD version exists and the step has not advanced past prd, so a
-		// concurrent or repeated Ask call can never rewind an ac/task project. The
-		// UPDATE predicate re-checks the step so a generation that completes
-		// between the read and the write still wins.
-		// ponytail: non-fatal - a failed marker write must not block the questions
-		// the user just paid an AI call to generate.
-		try {
-			const [existing] = await db
-				.select({ step: projects.step })
-				.from(projects)
-				.where(
-					and(
-						eq(projects.id, projectId),
-						eq(projects.userId, user.id),
-						isNull(projects.deletedAt),
-					),
-				)
-				.limit(1);
-			const [prdRow] = await db
-				.select({ id: prdVersions.id })
-				.from(prdVersions)
-				.where(eq(prdVersions.projectId, projectId))
-				.limit(1);
-			if (existing && shouldMarkQuestionStep(existing.step, Boolean(prdRow))) {
-				await db
-					.update(projects)
-					.set({ step: "question", updatedAt: new Date() })
-					.where(
-						and(
-							eq(projects.id, projectId),
-							eq(projects.userId, user.id),
-							or(
-								eq(projects.step, "question"),
-								eq(projects.step, "prd"),
-								isNull(projects.step),
-							),
-						),
-					);
-			}
-		} catch (e) {
-			console.error("ask step marker failed:", e);
-		}
+		await persistAskHandoffAndStep({
+			userId: user.id,
+			projectId,
+			projectMode: project.projectMode,
+			prompt: prompt || "",
+			platform: platform || "web",
+			questions,
+			isTrustedUserContext: Boolean(executionContext?.userId),
+			signal,
+			beforePersist: executionContext?.beforePersist,
+		});
 
 		return Response.json({ questions });
 	} catch (err: unknown) {
-		if (isClientAbort(err, request.signal)) {
+		if (isClientAbort(err, signal)) {
 			return Response.json(
 				{ error: "Generasi pertanyaan dibatalkan." },
 				{ status: 499 },
 			);
 		}
 		console.error("Ask options generate error:", err);
-		return Response.json(
-			{
-				error: sanitizeErrorForClient(err),
-				code: "QUESTION_GENERATION_FAILED",
-			},
-			{ status: 500 },
-		);
+		const message =
+			err instanceof Error ? err.message : sanitizeErrorForClient(err);
+		const code =
+			(err as { code?: string }).code || "QUESTION_GENERATION_FAILED";
+		return Response.json({ error: message, code }, { status: 500 });
 	}
 }

@@ -9,6 +9,8 @@ interface CodebaseAdaptiveQuestionAnswerInputProps {
 	value: string;
 	placeholder: string;
 	className: string;
+	/** Ownership of focus is explicit so a revealed field can take it. */
+	autoFocus?: boolean;
 	onChange: (value: string) => void;
 	onSubmit: () => void;
 }
@@ -20,6 +22,7 @@ export function CodebaseAdaptiveQuestionAnswerInput({
 	value,
 	placeholder,
 	className,
+	autoFocus = false,
 	onChange,
 	onSubmit,
 }: CodebaseAdaptiveQuestionAnswerInputProps) {
@@ -34,8 +37,11 @@ export function CodebaseAdaptiveQuestionAnswerInput({
 				disabled={disabled}
 				value={value}
 				onChange={(event) => onChange(event.target.value)}
+				autoFocus={autoFocus}
 				onKeyDown={(event) => {
-					if (event.key === "Enter") {
+					// Enter ends an IME composition (e.g. Japanese input); submitting
+					// there would send a half-composed answer.
+					if (event.key === "Enter" && !event.nativeEvent.isComposing) {
 						event.preventDefault();
 						onSubmit();
 					}

@@ -42,13 +42,9 @@ export async function tryStreamWithFallback(
 		const attemptCeiling = 1 + AI_STREAM_RETRY_ATTEMPTS;
 		for (let attempt = 0; attempt < attemptCeiling; attempt++) {
 			const abortController = new AbortController();
-			// Named listener removed in finally: without this, every attempt
-			// leaks a closure (and its AbortController) onto externalSignal.
-			const propagateAbort = () => abortController.abort();
-			if (externalSignal) {
-				if (externalSignal.aborted) abortController.abort();
-				else externalSignal.addEventListener("abort", propagateAbort);
-			}
+			const signal = externalSignal
+				? AbortSignal.any([externalSignal, abortController.signal])
+				: abortController.signal;
 			const outcome: StreamOutcome = {
 				providerRetries,
 				providerFallbacks: i,
@@ -61,7 +57,7 @@ export async function tryStreamWithFallback(
 			const gen = streamChat(
 				messages,
 				modelToTry,
-				abortController.signal,
+				signal,
 				maxTokens,
 				outcome,
 				onThinking
@@ -71,7 +67,6 @@ export async function tryStreamWithFallback(
 						}
 					: undefined,
 			);
-			let handedOff = false;
 
 			try {
 				const first = await gen.next();
@@ -80,14 +75,9 @@ export async function tryStreamWithFallback(
 					throw new Error("Respons kosong dari chunk model.");
 				}
 
-				handedOff = true;
 				return {
 					generator: (async function* () {
-						try {
-							yield* gen;
-						} finally {
-							externalSignal?.removeEventListener("abort", propagateAbort);
-						}
+						yield* gen;
 					})(),
 					firstChunk: first.value,
 					abortController,
@@ -108,9 +98,6 @@ export async function tryStreamWithFallback(
 				if (attempt < attemptCeiling - 1) {
 					providerRetries++;
 				}
-			} finally {
-				if (!handedOff)
-					externalSignal?.removeEventListener("abort", propagateAbort);
 			}
 		}
 	}

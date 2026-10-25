@@ -61,6 +61,7 @@ import { Route as ApiAcGenerateRouteImport } from './routes/api/ac/generate'
 import { Route as ApiAcSaveRouteImport } from './routes/api/ac/save'
 import { Route as ApiAskOptionsRouteImport } from './routes/api/ask/options'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiCodebaseGenerationRouteImport } from './routes/api/codebase/generation'
 import { Route as ApiCodebasesIndexRouteImport } from './routes/api/codebases/index'
 import { Route as ApiCodebasesCodebaseIdRouteImport } from './routes/api/codebases/$codebaseId'
 import { Route as ApiCronBillingRouteImport } from './routes/api/cron/billing'
@@ -375,6 +376,11 @@ const ApiAskOptionsRoute = ApiAskOptionsRouteImport.update({
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCodebaseGenerationRoute = ApiCodebaseGenerationRouteImport.update({
+  id: '/api/codebase/generation',
+  path: '/api/codebase/generation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCodebasesIndexRoute = ApiCodebasesIndexRouteImport.update({
@@ -721,6 +727,7 @@ export interface FileRoutesByFullPath {
   '/api/ac/save': typeof ApiAcSaveRoute
   '/api/ask/options': typeof ApiAskOptionsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/codebase/generation': typeof ApiCodebaseGenerationRoute
   '/api/codebases/$codebaseId': typeof ApiCodebasesCodebaseIdRouteWithChildren
   '/api/cron/billing': typeof ApiCronBillingRoute
   '/api/export/prd': typeof ApiExportPrdRoute
@@ -825,6 +832,7 @@ export interface FileRoutesByTo {
   '/api/ac/save': typeof ApiAcSaveRoute
   '/api/ask/options': typeof ApiAskOptionsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/codebase/generation': typeof ApiCodebaseGenerationRoute
   '/api/codebases/$codebaseId': typeof ApiCodebasesCodebaseIdRouteWithChildren
   '/api/cron/billing': typeof ApiCronBillingRoute
   '/api/export/prd': typeof ApiExportPrdRoute
@@ -935,6 +943,7 @@ export interface FileRoutesById {
   '/api/ac/save': typeof ApiAcSaveRoute
   '/api/ask/options': typeof ApiAskOptionsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/codebase/generation': typeof ApiCodebaseGenerationRoute
   '/api/codebases/$codebaseId': typeof ApiCodebasesCodebaseIdRouteWithChildren
   '/api/cron/billing': typeof ApiCronBillingRoute
   '/api/export/prd': typeof ApiExportPrdRoute
@@ -1046,6 +1055,7 @@ export interface FileRouteTypes {
     | '/api/ac/save'
     | '/api/ask/options'
     | '/api/auth/$'
+    | '/api/codebase/generation'
     | '/api/codebases/$codebaseId'
     | '/api/cron/billing'
     | '/api/export/prd'
@@ -1150,6 +1160,7 @@ export interface FileRouteTypes {
     | '/api/ac/save'
     | '/api/ask/options'
     | '/api/auth/$'
+    | '/api/codebase/generation'
     | '/api/codebases/$codebaseId'
     | '/api/cron/billing'
     | '/api/export/prd'
@@ -1259,6 +1270,7 @@ export interface FileRouteTypes {
     | '/api/ac/save'
     | '/api/ask/options'
     | '/api/auth/$'
+    | '/api/codebase/generation'
     | '/api/codebases/$codebaseId'
     | '/api/cron/billing'
     | '/api/export/prd'
@@ -1352,6 +1364,7 @@ export interface RootRouteChildren {
   ApiAcSaveRoute: typeof ApiAcSaveRoute
   ApiAskOptionsRoute: typeof ApiAskOptionsRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiCodebaseGenerationRoute: typeof ApiCodebaseGenerationRoute
   ApiCodebasesCodebaseIdRoute: typeof ApiCodebasesCodebaseIdRouteWithChildren
   ApiCronBillingRoute: typeof ApiCronBillingRoute
   ApiExportPrdRoute: typeof ApiExportPrdRoute
@@ -1750,6 +1763,13 @@ declare module '@tanstack/react-router' {
       path: '/api/auth/$'
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/codebase/generation': {
+      id: '/api/codebase/generation'
+      path: '/api/codebase/generation'
+      fullPath: '/api/codebase/generation'
+      preLoaderRoute: typeof ApiCodebaseGenerationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/codebases/': {
@@ -2346,6 +2366,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAcSaveRoute: ApiAcSaveRoute,
   ApiAskOptionsRoute: ApiAskOptionsRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiCodebaseGenerationRoute: ApiCodebaseGenerationRoute,
   ApiCodebasesCodebaseIdRoute: ApiCodebasesCodebaseIdRouteWithChildren,
   ApiCronBillingRoute: ApiCronBillingRoute,
   ApiExportPrdRoute: ApiExportPrdRoute,

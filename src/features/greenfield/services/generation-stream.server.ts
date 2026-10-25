@@ -41,6 +41,7 @@ export interface GenerationRun {
 
 export interface GenerationStreamInput {
 	request: Request;
+	signal?: AbortSignal;
 	userId: string;
 	reservation: CreditOperationResult;
 	quote: CreditQuote;
@@ -154,7 +155,11 @@ export function createGenerationStream(
 				sse.send({ type: "started", model: modelsToTry[0], quote });
 				sse.send({ type: "quote", quote });
 
-				await input.complete({ guards, sse, signal: request.signal });
+				await input.complete({
+					guards,
+					sse,
+					signal: input.signal ?? request.signal,
+				});
 			} catch (error) {
 				await input.onStreamError(error, guards);
 			}

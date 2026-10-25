@@ -13,6 +13,12 @@ import { Icon } from "./icon";
 export type AgentOperationStatus = "idle" | "running" | "done" | "failed";
 export type AgentOperationPhase = "thinking" | "generating";
 
+/** One confirmed backend event, rendered as a line in the activity history. */
+export interface AgentThinkingActivity {
+	id: string;
+	label: string;
+}
+
 export interface AgentThinkingProps {
 	/** Current status of the operation */
 	status?: AgentOperationStatus;
@@ -30,8 +36,10 @@ export interface AgentThinkingProps {
 	doneLabel?: string;
 	/** Settled label upon failure */
 	failedLabel?: string;
-	/** Single honest activity description */
+	/** Single honest activity description, used until real events exist */
 	activity?: string | null;
+	/** Confirmed backend events in observation order; the last one is current while running */
+	activities?: readonly AgentThinkingActivity[] | null;
 	/** Model reasoning streamed from SSE */
 	thinkingText?: string | null;
 	/** Server-reported failure message */
@@ -73,6 +81,7 @@ export function AgentThinking({
 	doneLabel = "Selesai",
 	failedLabel = "Gagal",
 	activity,
+	activities,
 	thinkingText,
 	error,
 	onRetry,
@@ -128,23 +137,33 @@ export function AgentThinking({
 	const finalElapsed =
 		!isWorking && settledDuration !== null ? settledDuration : elapsed;
 
-	// Settle callback and auto-collapse details on finish, expand on run start
+	// The settle handler and the ticking duration change every render, so they are
+	// read through a ref: depending on them below would re-run the disclosure
+	// effect every 200ms and instantly undo a user's collapse.
+	const settleRef = useRef({ onSettle, finalElapsed });
+	settleRef.current = { onSettle, finalElapsed };
+
+	// Expand once when a run starts, collapse once when it settles. Keyed only on
+	// the status transition so a click during a run is never overwritten.
 	useEffect(() => {
 		if (isWorking) {
 			settledRef.current = false;
 			setDetailsOpen(true);
-		} else if (isDone || isFailed) {
-			if (!settledRef.current) {
-				settledRef.current = true;
-				onSettle?.(finalElapsed);
-			}
-			setDetailsOpen(false);
+			return;
 		}
-	}, [isWorking, isDone, isFailed, finalElapsed, onSettle]);
+		if (!isDone && !isFailed) return;
+		if (!settledRef.current) {
+			settledRef.current = true;
+			settleRef.current.onSettle?.(settleRef.current.finalElapsed);
+		}
+		setDetailsOpen(false);
+	}, [isWorking, isDone, isFailed]);
 
 	const hasThinking = Boolean(thinkingText && thinkingText.trim().length > 0);
 	const hasActivity = Boolean(activity && activity.trim().length > 0);
-	const hasExpandableContent = hasThinking || hasActivity;
+	const visibleActivities = activities ?? [];
+	const hasActivities = visibleActivities.length > 0;
+	const hasExpandableContent = hasThinking || hasActivity || hasActivities;
 
 	// If idle and not working, nothing to display
 	if (status === "idle" && !isWorking) {
@@ -250,21 +269,21 @@ export function AgentThinking({
 				</div>
 			)}
 
-			{/* Expandable Activity / Reasoning Details */}
+			{/* Expandable Activity / Reasoning Details: inline disclosure, no nested card */}
 			{hasExpandableContent ? (
-				<div className="flex flex-col gap-1 pl-6">
+				<div className="flex flex-col pl-6">
 					<button
 						type="button"
 						onClick={() => setDetailsOpen((prev) => !prev)}
 						aria-expanded={detailsOpen}
 						aria-controls={detailsId}
-						className="inline-flex w-fit cursor-pointer items-center gap-1.5 text-xs text-fog hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
+						className="inline-flex min-h-11 w-full cursor-pointer items-center gap-1.5 text-left text-xs text-fog transition-colors hover:text-snow focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
 					>
 						<Icon
 							icon={ArrowDown01Icon}
-							size={13}
+							size={14}
 							className={cn(
-								"transition-transform duration-200",
+								"shrink-0 transition-transform duration-200",
 								detailsOpen && "rotate-180",
 							)}
 							aria-hidden="true"
@@ -275,9 +294,43 @@ export function AgentThinking({
 					{detailsOpen ? (
 						<div
 							id={detailsId}
-							className="mt-1 flex flex-col gap-1.5 rounded-md border border-graphite/40 bg-charcoal/30 p-2.5 text-xs text-fog"
+							className="mb-1 flex flex-col gap-1.5 border-l border-graphite/50 pl-3 text-xs text-fog"
 						>
-							{hasActivity ? (
+							{hasActivities ? (
+								<ul className="flex flex-col gap-1.5">
+									{visibleActivities.map((entry, index) => {
+										const isCurrent =
+											isWorking && index === visibleActivities.length - 1;
+										return (
+											<li
+												key={entry.id}
+												className="flex items-start gap-2 leading-relaxed"
+											>
+												<span
+													className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center"
+													aria-hidden="true"
+												>
+													{isCurrent ? (
+														<Orb state="reasoning" size={14} />
+													) : (
+														<Icon
+															icon={Tick01Icon}
+															size={12}
+															strokeWidth={2}
+															className="text-emerald"
+														/>
+													)}
+												</span>
+												<span
+													className={isCurrent ? "text-snow/90" : "text-mist"}
+												>
+													{entry.label}
+												</span>
+											</li>
+										);
+									})}
+								</ul>
+							) : hasActivity ? (
 								<p className="leading-relaxed text-snow/90">{activity}</p>
 							) : null}
 							{hasThinking ? (

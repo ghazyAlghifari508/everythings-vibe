@@ -45,10 +45,20 @@ const CONFLICT_MESSAGE = "AC sedang digenerate. Tunggu hingga selesai.";
 const TRUNCATED_MESSAGE =
 	"Generasi AC terputus di tengah jalan dan tidak disimpan. Coba generate ulang.";
 
+export interface TrustedExecutionContext {
+	userId?: string;
+	signal?: AbortSignal;
+	billingKey?: string;
+	beforePersist?: () => Promise<void> | void;
+}
+
 export async function handleAcGenerateRequest(
 	request: Request,
+	executionContext?: TrustedExecutionContext,
 ): Promise<Response> {
-	const user = await requireUser(request.headers);
+	const user = executionContext?.userId
+		? { id: executionContext.userId }
+		: await requireUser(request.headers);
 
 	const body = await parseGenerationRequest(request);
 	const projectId = body.projectId;
@@ -108,7 +118,8 @@ export async function handleAcGenerateRequest(
 		conflictMessage: CONFLICT_MESSAGE,
 		setupFailedMessage: "Gagal menyiapkan generate AC. Coba lagi.",
 		logLabel: "[ac/generate]",
-		callerIdempotencyKey: body.clientIdempotencyKey,
+		callerIdempotencyKey:
+			executionContext?.billingKey || body.clientIdempotencyKey,
 		callerAttempt: body.attempt,
 	});
 	if (!reserved.ok) return reserved.response;
@@ -135,6 +146,7 @@ export async function handleAcGenerateRequest(
 	return sseResponse(
 		createGenerationStream({
 			request,
+			signal: executionContext?.signal ?? request.signal,
 			userId: user.id,
 			reservation,
 			quote,
@@ -147,6 +159,7 @@ export async function handleAcGenerateRequest(
 				completeAcGeneration(run, {
 					userId: user.id,
 					projectId,
+					beforePersist: executionContext?.beforePersist,
 					prdContent,
 					projectLanguage: project.language,
 					projectMode: project.projectMode,
@@ -179,6 +192,7 @@ export async function handleAcGenerateRequest(
 interface AcGenerationContext {
 	userId: string;
 	projectId: string;
+	beforePersist?: () => Promise<void> | void;
 	prdContent: string;
 	projectLanguage: string | null;
 	projectMode: string | null;
@@ -250,6 +264,26 @@ async function completeAcGeneration(
 		await guards.release("generation truncated");
 		await guards.fail(TRUNCATED_MESSAGE);
 		return;
+	}
+
+	if (signal.aborted) {
+		await guards.release("generation aborted before persist");
+		await guards.fail("Generasi AC dibatalkan.");
+		return;
+	}
+
+	if (input.beforePersist) {
+		try {
+			await input.beforePersist();
+		} catch (fenceErr) {
+			const msg =
+				fenceErr instanceof Error
+					? fenceErr.message
+					: "Persist fence check failed";
+			await guards.release(msg);
+			await guards.fail(msg);
+			return;
+		}
 	}
 
 	let saved = false;

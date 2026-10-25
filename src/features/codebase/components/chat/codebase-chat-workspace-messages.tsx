@@ -2,6 +2,7 @@
 
 import { AgentThinking } from "@/components/ui/agent-thinking";
 import {
+	CODEBASE_RUN_ACTIVITY_LABEL,
 	CODEBASE_STAGE_DONE_LABEL,
 	type CodebaseRunState,
 } from "@/features/codebase/services/chat-flow";
@@ -31,14 +32,23 @@ interface CodebaseChatWorkspaceMessagesProps {
 	 */
 	run: CodebaseRunState | null;
 	onRetryQuestions?: () => void;
+	onRetryStage?: () => void;
+	onRetryGenerate?: () => void;
 }
 
 export function CodebaseChatWorkspaceMessages({
 	messages,
 	run,
 	onRetryQuestions,
+	onRetryStage,
+	onRetryGenerate: _onRetryGenerate,
 }: CodebaseChatWorkspaceMessagesProps) {
 	const runFailed = run?.status === "failed";
+	// Feature spec failures are contextually placed at the spec section, not above questions
+	const showRunError =
+		runFailed && Boolean(run?.error) && run?.stage !== "feature";
+	const retryAction =
+		run?.stage === "questions" ? onRetryQuestions : onRetryStage;
 
 	return (
 		<>
@@ -66,26 +76,32 @@ export function CodebaseChatWorkspaceMessages({
 						status={run.status}
 						phase={run.phase}
 						thinkingLabel={`Menyusun ${STAGE_LABEL[run.stage]}`}
-						generatingLabel={`Menyusun ${STAGE_LABEL[run.stage]}`}
+						/* Once real document bytes arrive the phase is no longer "thinking",
+						   so the two lines must not read as the same sentence. */
+						generatingLabel={`Menulis ${STAGE_LABEL[run.stage]}`}
 						doneLabel={CODEBASE_STAGE_DONE_LABEL[run.stage]}
 						failedLabel={`Gagal menyusun ${STAGE_LABEL[run.stage]}`}
 						activity={run.activity}
+						activities={run.activities.map((entry) => ({
+							id: entry.id,
+							label: CODEBASE_RUN_ACTIVITY_LABEL[entry.id],
+						}))}
 						thinkingText={run.thinkingText}
 						startedAt={run.startedAt}
 						finishedAt={run.finishedAt}
 					/>
 				</div>
 			) : null}
-			{runFailed && run.error ? (
+			{showRunError && run?.error ? (
 				<div
 					data-testid="codebase-questions-error"
 					className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-crimson/30 bg-crimson/10 p-2.5 text-xs text-crimson"
 				>
 					<span role="alert">{run.error}</span>
-					{onRetryQuestions ? (
+					{retryAction ? (
 						<button
 							type="button"
-							onClick={onRetryQuestions}
+							onClick={retryAction}
 							className="inline-flex min-h-7 items-center rounded border border-crimson/40 px-2 text-[11px] font-medium text-crimson hover:bg-crimson/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo"
 						>
 							Coba lagi

@@ -47,6 +47,8 @@ export interface PrdTurnIds {
 
 export interface PrdChatStreamInput {
 	request: Request;
+	signal?: AbortSignal;
+	beforePersist?: () => Promise<void> | void;
 	userId: string;
 	mode: PrdChatMode;
 	message: string;
@@ -193,7 +195,7 @@ export function createPrdChatStream(
 				const { generator, firstChunk, outcome } = await tryStreamWithFallback(
 					input.modelsToTry,
 					fullMessages,
-					request.signal,
+					input.signal ?? request.signal,
 					undefined,
 					sse.thinking,
 					sse.thinkingReset,
@@ -232,6 +234,8 @@ export function createPrdChatStream(
 				const persisted = await persistPrdTurn({
 					guards,
 					userId,
+					signal: input.signal ?? request.signal,
+					beforePersist: input.beforePersist,
 					plan: input.plan,
 					mode,
 					message: input.message,

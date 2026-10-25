@@ -311,6 +311,7 @@ export async function getAskHandoff(
 			compiledPrompt: codebaseAskHandoffs.compiledPrompt,
 			snapshotId: codebaseAskHandoffs.snapshotId,
 			state: codebaseAskHandoffs.state,
+			updatedAt: codebaseAskHandoffs.updatedAt,
 		})
 		.from(codebaseAskHandoffs)
 		.where(
@@ -336,5 +337,6 @@ export async function getAskHandoff(
 		...(row.compiledPrompt ? { compiledPrompt: row.compiledPrompt } : {}),
 		...(row.snapshotId ? { snapshotId: row.snapshotId } : {}),
 		...(stateParsed?.success ? { state: stateParsed.data } : {}),
+		...(row.updatedAt ? { updatedAt: row.updatedAt.toISOString() } : {}),
 	});
 }
