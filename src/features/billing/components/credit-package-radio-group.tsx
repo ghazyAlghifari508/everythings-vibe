@@ -40,7 +40,7 @@ export function CreditPackageRadioGroup({
 					<label
 						key={pkg.id}
 						className={cn(
-							"block w-full text-left rounded-xl border p-3.5 transition-all duration-200 cursor-pointer focus-within:ring-1 focus-within:ring-fog/40",
+							"block w-full text-left rounded-xl border p-3.5 transition-all duration-200 cursor-pointer has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-fog/40",
 							isSelected
 								? "border-snow bg-white/10 shadow-sm"
 								: "border-graphite bg-charcoal/30 hover:border-fog/40 hover:bg-white/[0.03]",
