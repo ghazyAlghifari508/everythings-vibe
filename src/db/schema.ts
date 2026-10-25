@@ -1390,3 +1390,5 @@ export type StudioJobRow = typeof studioJobs.$inferSelect;
 export type InsertStudioJobRow = typeof studioJobs.$inferInsert;
 export type StudioFrameRow = typeof studioFrames.$inferSelect;
 export type InsertStudioFrameRow = typeof studioFrames.$inferInsert;
+
+export * from "./codebase-generation-schema";
