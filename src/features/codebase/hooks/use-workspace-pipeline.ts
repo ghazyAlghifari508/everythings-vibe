@@ -9,7 +9,10 @@ import {
 	type CodebasePipelineStage,
 	type CodebaseRunStage,
 	type CodebaseRunState,
-	settleRun,
+	operationSettleEpoch,
+	recordOperationActivities,
+	recordRunActivity,
+	settleRunIfCurrent,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
 import {
@@ -53,7 +56,9 @@ export function useWorkspacePipeline({
 			stageRunInFlight.current = effectiveFeatureId;
 			setStageBusy(target);
 			setStageError(null);
-			setRun(startRun(target, Date.now()));
+			const request = startRun(target, Date.now());
+			setRun(request);
+			const requestId = request.requestId;
 
 			pollerCtrlRef.current?.abort();
 			const ctrl = new AbortController();
@@ -87,17 +92,22 @@ export function useWorkspacePipeline({
 					const errorMsg =
 						submitRes.error ?? `Generasi gagal (${submitRes.status}).`;
 					setStageError(errorMsg);
-					setRun((cur) => settleRun(cur, "failed", Date.now(), errorMsg));
+					setRun((cur) =>
+						settleRunIfCurrent(cur, requestId, "failed", Date.now(), errorMsg),
+					);
 					return;
 				}
 
 				let operation = submitRes.operation;
+				setRun((cur) => recordOperationActivities(cur, operation, requestId));
 				if (operation.status === "queued" || operation.status === "running") {
 					const settled = await pollOperationUntilSettled({
 						projectId: requestedProjectId,
 						stage: target,
 						operationId: operation.id,
 						signal: ctrl.signal,
+						onTick: (tick) =>
+							setRun((cur) => recordOperationActivities(cur, tick, requestId)),
 					});
 
 					if (
@@ -119,23 +129,49 @@ export function useWorkspacePipeline({
 							"Hasil generasi belum tersimpan di server. Coba generate ulang.";
 						setStageError(notSavedMsg);
 						setRun((current) =>
-							settleRun(current, "failed", Date.now(), notSavedMsg),
+							settleRunIfCurrent(
+								current,
+								requestId,
+								"failed",
+								Date.now(),
+								notSavedMsg,
+							),
 						);
 						return;
 					}
-					setRun((current) => settleRun(current, "done", Date.now()));
+					setRun((current) =>
+						settleRunIfCurrent(
+							recordRunActivity(
+								current,
+								"result.persisted",
+								operationSettleEpoch(operation),
+								requestId,
+							),
+							requestId,
+							"done",
+							operationSettleEpoch(operation),
+						),
+					);
 				} else {
 					const failure = operation.error ?? "Generasi gagal.";
 					setStageError(failure);
 					setRun((current) =>
-						settleRun(current, "failed", Date.now(), failure),
+						settleRunIfCurrent(
+							current,
+							requestId,
+							"failed",
+							operationSettleEpoch(operation),
+							failure,
+						),
 					);
 				}
 			} catch {
 				if (activeProjectIdRef.current !== requestedProjectId) return;
 				const message = "Server tidak dapat dihubungi. Coba lagi.";
 				setStageError(message);
-				setRun((current) => settleRun(current, "failed", Date.now(), message));
+				setRun((current) =>
+					settleRunIfCurrent(current, requestId, "failed", Date.now(), message),
+				);
 			} finally {
 				if (stageRunInFlight.current === requestedProjectId)
 					stageRunInFlight.current = null;

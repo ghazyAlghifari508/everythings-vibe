@@ -7,9 +7,13 @@ import {
 	useRef,
 } from "react";
 import {
+	activitiesFromOperation,
 	type CodebasePipelineStage,
 	type CodebaseRunStage,
 	type CodebaseRunState,
+	operationSettleEpoch,
+	recordOperationActivities,
+	recordRunActivity,
 	settleRun,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
@@ -55,12 +59,17 @@ export function useWorkspaceOperations({
 			inFlightStageRef.current = op.stage;
 			setStageBusy(op.stage);
 			setStageError(null);
+			// Hydration replays only the events the persisted operation already proves,
+			// so a remount never fabricates history the server did not record.
+			const hydrated = startRun(
+				op.stage,
+				op.startedAt ? Number(new Date(op.startedAt)) : Date.now(),
+				"thinking",
+				activitiesFromOperation(op),
+			);
 			setRun((cur) => {
 				if (cur?.status === "running" && cur.stage === op.stage) return cur;
-				const started = op.startedAt
-					? Number(new Date(op.startedAt))
-					: Date.now();
-				return startRun(op.stage, started);
+				return hydrated;
 			});
 
 			// ponytail: single-flight per stage poller; upgrade to multiplexed SSE channel when available.
@@ -69,6 +78,12 @@ export function useWorkspaceOperations({
 				stage: op.stage,
 				operationId: op.id,
 				signal,
+				onTick: (tick) =>
+					setRun((cur) =>
+						cur && cur.status === "running" && cur.stage === op.stage
+							? recordOperationActivities(cur, tick)
+							: cur,
+					),
 			});
 
 			if (signal.aborted || activeProjectIdRef.current !== projectId) return;
@@ -84,11 +99,20 @@ export function useWorkspaceOperations({
 				if (persisted) {
 					setRun((cur) =>
 						settleRun(
-							cur?.status === "running"
-								? cur
-								: startRun(settled.stage, started),
+							recordRunActivity(
+								cur?.status === "running"
+									? cur
+									: startRun(
+											settled.stage,
+											started,
+											"thinking",
+											activitiesFromOperation(settled),
+										),
+								"result.persisted",
+								operationSettleEpoch(settled),
+							),
 							"done",
-							Date.now(),
+							operationSettleEpoch(settled),
 						),
 					);
 				} else {
@@ -99,9 +123,14 @@ export function useWorkspaceOperations({
 						settleRun(
 							cur?.status === "running"
 								? cur
-								: startRun(settled.stage, started),
+								: startRun(
+										settled.stage,
+										started,
+										"thinking",
+										activitiesFromOperation(settled),
+									),
 							"failed",
-							Date.now(),
+							operationSettleEpoch(settled),
 							errorMsg,
 						),
 					);
@@ -116,7 +145,7 @@ export function useWorkspaceOperations({
 					settleRun(
 						cur?.status === "running" ? cur : startRun(settled.stage, started),
 						"failed",
-						Date.now(),
+						operationSettleEpoch(settled),
 						errorMsg,
 					),
 				);
@@ -128,7 +157,7 @@ export function useWorkspaceOperations({
 					settleRun(
 						cur?.status === "running" ? cur : startRun(settled.stage, started),
 						"failed",
-						Date.now(),
+						operationSettleEpoch(settled),
 						"Dibatalkan.",
 					),
 				);
@@ -191,9 +220,20 @@ export function useWorkspaceOperations({
 						if (persisted) {
 							setRun((cur) =>
 								settleRun(
-									cur?.status === "running" ? cur : startRun(op.stage, started),
+									recordRunActivity(
+										cur?.status === "running"
+											? cur
+											: startRun(
+													op.stage,
+													started,
+													"thinking",
+													activitiesFromOperation(op),
+												),
+										"result.persisted",
+										operationSettleEpoch(op),
+									),
 									"done",
-									Date.now(),
+									operationSettleEpoch(op),
 								),
 							);
 						} else {
@@ -202,9 +242,16 @@ export function useWorkspaceOperations({
 							setStageError(notSavedMsg);
 							setRun((cur) =>
 								settleRun(
-									cur?.status === "running" ? cur : startRun(op.stage, started),
+									cur?.status === "running"
+										? cur
+										: startRun(
+												op.stage,
+												started,
+												"thinking",
+												activitiesFromOperation(op),
+											),
 									"failed",
-									Date.now(),
+									operationSettleEpoch(op),
 									notSavedMsg,
 								),
 							);
@@ -221,7 +268,7 @@ export function useWorkspaceOperations({
 							settleRun(
 								cur?.status === "running" ? cur : startRun(op.stage, started),
 								"failed",
-								Date.now(),
+								operationSettleEpoch(op),
 								errorMsg,
 							),
 						);
@@ -235,7 +282,7 @@ export function useWorkspaceOperations({
 							settleRun(
 								cur?.status === "running" ? cur : startRun(op.stage, started),
 								"failed",
-								Date.now(),
+								operationSettleEpoch(op),
 								"Dibatalkan.",
 							),
 						);
