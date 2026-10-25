@@ -1,26 +1,19 @@
 "use client";
 
-import {
-	AlertCircleIcon,
-	Cancel01Icon,
-	Coins01Icon,
-	CreditCardIcon,
-	Loading01Icon,
-	Tick01Icon,
-} from "@hugeicons/core-free-icons";
-import * as React from "react";
+import { Coins01Icon, Loading01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
+import {
+	CreditExhaustedModalHeader,
+	type CreditQuote,
+} from "@/features/billing/components/credit-exhausted-modal-header";
+import { CreditPackageRadioGroup } from "@/features/billing/components/credit-package-radio-group";
 import { PricingComponent } from "@/features/billing/components/pricing-card";
 import { prdFyPlans } from "@/features/billing/data/pricing-data";
+import { useCreditTopupDialog } from "@/features/billing/hooks/use-credit-topup-dialog";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
-import {
-	TOPUP_PACKAGES,
-	type TopUpPackage,
-} from "@/features/billing/types/billing-constants";
+import { TOPUP_PACKAGES } from "@/features/billing/types/billing-constants";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
-import { saveResumeIntent } from "@/lib/prompt-handoff";
-import { cn, formatDate } from "@/lib/utils";
-import { useUIStore } from "@/store";
+import { cn } from "@/lib/utils";
 
 interface CreditExhaustedModalProps {
 	isOpen: boolean;
@@ -34,11 +27,7 @@ interface CreditExhaustedModalProps {
 	title?: string;
 	requiredCredits?: number;
 	availableCredits?: number;
-	quote?: {
-		estimatedCredits?: number;
-		maximumCredits?: number;
-		pricingVersion?: string;
-	};
+	quote?: CreditQuote;
 }
 
 export function CreditExhaustedModal({
@@ -54,94 +43,30 @@ export function CreditExhaustedModal({
 	quote,
 }: CreditExhaustedModalProps) {
 	// ponytail: shared TanStack Query hook — deduped across all components.
-	// Previously raw fetch("/api/user/plan") in useEffect.
 	const { data: planData } = useUserPlan();
-	const plan = planData?.plan ?? currentPlan;
-	const showToast = useUIStore((s) => s.showToast);
 	const dialogRef = useFocusTrap<HTMLDivElement>({
 		isOpen,
 		onEscape: onClose,
 	});
-
-	const isPaidTopUp = Boolean(
-		plan !== "free" &&
-			planData?.topUpEligible &&
-			!title.toLowerCase().includes("pro"),
-	);
-	const [view, setView] = React.useState<"topup" | "subscription">(() =>
-		isPaidTopUp ? "topup" : "subscription",
-	);
-	const [selectedPackageId, setSelectedPackageId] = React.useState<string>(
-		TOPUP_PACKAGES[0]?.id ?? "topup-15",
-	);
-	const [loading, setLoading] = React.useState(false);
-
-	React.useEffect(() => {
-		if (isOpen) {
-			setView(isPaidTopUp ? "topup" : "subscription");
-		}
-	}, [isOpen, isPaidTopUp]);
-
-	const selectedPackage =
-		TOPUP_PACKAGES.find((p) => p.id === selectedPackageId) ?? TOPUP_PACKAGES[0];
-	const remainingCredits =
-		availableCredits ?? planData?.remaining ?? planData?.credits ?? 0;
-	const currentPeriodEnd = planData?.currentPeriodEnd;
-	const formattedExpiry = currentPeriodEnd
-		? formatDate(currentPeriodEnd)
-		: null;
-
-	const handlePlanSelect = async (planId: string) => {
-		if (planId === "free") return;
-		setLoading(true);
-		try {
-			saveResumeIntent(projectId, stage);
-			const returnUrl =
-				typeof window !== "undefined"
-					? `${window.location.pathname}${window.location.search}${window.location.hash}`
-					: "/";
-			const res = await fetch("/api/payments/create", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					planId,
-					returnUrl,
-					projectId,
-				}),
-			});
-			const rawData: unknown = await res.json().catch(() => null);
-			let apiError: string | undefined;
-			let redirectUrl: string | undefined;
-
-			if (typeof rawData === "object" && rawData !== null) {
-				if ("error" in rawData && typeof rawData.error === "string") {
-					apiError = rawData.error;
-				}
-				if (
-					"redirect_url" in rawData &&
-					typeof rawData.redirect_url === "string"
-				) {
-					redirectUrl = rawData.redirect_url;
-				}
-			}
-
-			if (!res.ok) {
-				if (res.status === 401) {
-					window.location.href = `/login?redirect=${encodeURIComponent(returnUrl)}`;
-				} else {
-					showToast(apiError || "Gagal memproses pembayaran.", "error");
-				}
-				return;
-			}
-			if (redirectUrl) {
-				window.location.href = redirectUrl;
-			}
-		} catch {
-			showToast("Gagal menghubungi server.", "error");
-		} finally {
-			setLoading(false);
-		}
-	};
+	const {
+		view,
+		setView,
+		isPaidTopUp,
+		selectedPackage,
+		selectedPackageId,
+		setSelectedPackageId,
+		loading,
+		remainingCredits,
+		formattedExpiry,
+		handlePlanSelect,
+	} = useCreditTopupDialog({
+		isOpen,
+		projectId,
+		stage,
+		title,
+		currentPlan,
+		planData,
+	});
 
 	if (!isOpen) return null;
 
@@ -169,65 +94,15 @@ export function CreditExhaustedModal({
 					view === "topup" ? "max-w-xl" : "max-w-5xl",
 				)}
 			>
-				{/* Header */}
-				<div className="relative p-4 pb-0 text-center">
-					<button
-						type="button"
-						onClick={onClose}
-						className="absolute right-4 top-4 text-fog transition-colors hover:text-snow cursor-pointer"
-						aria-label="Tutup"
-					>
-						<Icon icon={Cancel01Icon} size={20} />
-					</button>
-					<div
-						className={cn(
-							"mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full",
-							view === "topup"
-								? "bg-indigo/10 text-indigo"
-								: "bg-crimson/10 text-crimson",
-						)}
-					>
-						{view === "topup" ? (
-							<Icon icon={CreditCardIcon} size={20} strokeWidth={2} />
-						) : (
-							<Icon icon={AlertCircleIcon} size={20} strokeWidth={2} />
-						)}
-					</div>
-					<h3
-						id="credit-exhausted-modal-title"
-						className="font-inter text-xl font-[510] text-snow"
-					>
-						{view === "topup" ? "Isi Ulang Kredit Instan" : title}
-					</h3>
-					<p className="mt-2 font-inter text-sm text-fog">{errorMessage}</p>
-
-					{(requiredCredits !== undefined || quote) && (
-						<div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200 text-left mx-auto max-w-md">
-							{requiredCredits !== undefined && (
-								<div className="flex justify-between items-center py-0.5">
-									<span className="text-fog">Kebutuhan Kredit:</span>
-									<span className="font-semibold text-snow font-mono">
-										{requiredCredits} kredit
-									</span>
-								</div>
-							)}
-							{availableCredits !== undefined && (
-								<div className="flex justify-between items-center py-0.5">
-									<span className="text-fog">Saldo Tersedia:</span>
-									<span className="font-semibold text-snow font-mono">
-										{availableCredits} kredit
-									</span>
-								</div>
-							)}
-							{quote && (
-								<div className="mt-1 pt-1 border-t border-amber-500/20 flex justify-between items-center text-[11px] text-fog">
-									<span>Estimasi: {quote.estimatedCredits ?? "-"} kredit</span>
-									<span>Maksimum: {quote.maximumCredits ?? "-"} kredit</span>
-								</div>
-							)}
-						</div>
-					)}
-				</div>
+				<CreditExhaustedModalHeader
+					view={view}
+					onClose={onClose}
+					title={title}
+					errorMessage={errorMessage}
+					requiredCredits={requiredCredits}
+					availableCredits={availableCredits}
+					quote={quote}
+				/>
 
 				{/* Content Body */}
 				{view === "topup" ? (
@@ -258,76 +133,19 @@ export function CreditExhaustedModal({
 
 						{/* Package Selector */}
 						<div className="space-y-2.5">
-							<p className="text-xs font-[510] text-fog uppercase tracking-wider">
+							<p
+								id="credit-package-group-label"
+								className="text-xs font-[510] text-fog uppercase tracking-wider"
+							>
 								Pilihan Paket
 							</p>
-							<div className="max-h-[300px] overflow-y-auto space-y-2.5 pr-1">
-								{TOPUP_PACKAGES.map((pkg: TopUpPackage) => {
-									const isSelected = pkg.id === selectedPackage?.id;
-									const priceStr = pkg.priceIdr.toLocaleString("id-ID");
-									const perUnit = Math.round(
-										pkg.priceIdr / pkg.credits,
-									).toLocaleString("id-ID");
-
-									return (
-										<button
-											key={pkg.id}
-											type="button"
-											onClick={() => setSelectedPackageId(pkg.id)}
-											className={cn(
-												"w-full text-left rounded-xl border p-3.5 transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-fog/40 cursor-pointer",
-												isSelected
-													? "border-snow bg-white/10 shadow-sm"
-													: "border-graphite bg-charcoal/30 hover:border-fog/40 hover:bg-white/[0.03]",
-											)}
-										>
-											<div className="flex items-start justify-between gap-3">
-												<div className="flex items-center gap-2.5">
-													<div
-														className={cn(
-															"flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
-															isSelected
-																? "border-snow bg-snow text-onyx"
-																: "border-graphite bg-transparent",
-														)}
-													>
-														{isSelected && (
-															<Icon
-																icon={Tick01Icon}
-																size={10}
-																strokeWidth={3}
-															/>
-														)}
-													</div>
-													<div>
-														<div className="flex items-center gap-2">
-															<span className="text-sm font-semibold text-snow">
-																{pkg.name} ({pkg.credits} Kredit)
-															</span>
-															{pkg.recommended && (
-																<span className="rounded border border-fog/30 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-snow">
-																	Rekomendasi
-																</span>
-															)}
-														</div>
-														<p className="mt-0.5 text-xs text-fog leading-relaxed">
-															{pkg.description}
-														</p>
-													</div>
-												</div>
-												<div className="text-right shrink-0">
-													<div className="font-mono text-sm font-semibold text-snow">
-														Rp {priceStr}
-													</div>
-													<div className="text-[11px] text-fog font-mono">
-														Rp {perUnit}/kredit
-													</div>
-												</div>
-											</div>
-										</button>
-									);
-								})}
-							</div>
+							<CreditPackageRadioGroup
+								packages={TOPUP_PACKAGES}
+								selectedPackageId={selectedPackageId}
+								onSelect={setSelectedPackageId}
+								labelledBy="credit-package-group-label"
+								className="max-h-[300px] overflow-y-auto pr-1"
+							/>
 						</div>
 
 						{/* Upsell Banner to Subscription */}
