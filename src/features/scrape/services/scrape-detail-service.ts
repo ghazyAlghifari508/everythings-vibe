@@ -117,11 +117,11 @@ export async function getScrapeById(
 	const ageMs = Date.now() - row.createdAt.getTime();
 	const health =
 		row.status === "queued" && ageMs > SCRAPE_LIMITS.queueHealthAfterMs
-			? "Belum ada worker yang mengambil job ini. Pastikan worker berjalan; antrean akan dilanjutkan saat worker tersedia."
+			? "Permintaan belum mulai diproses. Status akan diperbarui otomatis saat proses berjalan."
 			: row.leaseExpiresAt &&
 					row.leaseExpiresAt <= new Date() &&
 					!["completed", "failed"].includes(row.status)
-				? "Heartbeat worker tidak aktif. Job menunggu pemulihan lease oleh worker."
+				? "Pemrosesan berhenti mengirim pembaruan. Status akan diperbarui otomatis."
 				: undefined;
 	const results = await getScrapeResults(
 		id,

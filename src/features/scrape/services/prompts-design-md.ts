@@ -91,14 +91,40 @@ export async function generateDesignMd(
 	await instrumentation.onActivity?.(
 		"Menyusun DESIGN.md dari pengukuran browser",
 	);
-	const synthesis = await synthesizeWithEvidence(
-		model,
-		instrumentation,
-		signal,
-	);
-	const renderOptions = synthesis.synthesis
-		? synthesisToRenderOptions(synthesis.synthesis, model)
-		: {};
+	const outcomes: {
+		id: number;
+		model: DesignTokenModel;
+		outcome: SynthesisOutcome;
+	}[] = [];
+	for (const view of model.views ?? [{ id: 1, model }]) {
+		outcomes.push({
+			id: view.id,
+			model: view.model,
+			outcome: await synthesizeWithEvidence(
+				view.model,
+				instrumentation,
+				signal,
+			),
+		});
+	}
+	const synthesis =
+		outcomes.find(({ outcome }) => outcome.status === "unavailable")?.outcome ??
+		outcomes[0]?.outcome;
+	if (!synthesis) throw new ScrapeError("AI_GENERATION_FAILED");
+	const renderOptions: RenderDesignMdOptions = model.views?.length
+		? {
+				viewOptions: Object.fromEntries(
+					outcomes.map(({ id, model: scoped, outcome }) => [
+						id,
+						outcome.synthesis
+							? synthesisToRenderOptions(outcome.synthesis, scoped)
+							: {},
+					]),
+				),
+			}
+		: synthesis.synthesis
+			? synthesisToRenderOptions(synthesis.synthesis, model)
+			: {};
 	// Internal diagnostic details are retained in the returned enrichment object
 	// for metadata and logging, while the document avoids leaking internal schema
 	// or validation errors into the rendered markdown text.

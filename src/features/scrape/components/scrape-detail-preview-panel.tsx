@@ -1,3 +1,5 @@
+import { RefreshIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/ui/icon";
 import type { ScrapePreviewState } from "../hooks/use-scrape-preview";
 import { DesktopPreview } from "./scrape-detail-desktop-preview";
 import {
@@ -122,8 +124,9 @@ export function ScrapeHtmlPreviewPanel({
 							<button
 								type="button"
 								onClick={retryAction}
-								className="rounded-md border border-graphite px-2.5 py-1 font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-2.5 py-1 font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 							>
+								<Icon icon={RefreshIcon} size={13} aria-hidden />
 								Coba lagi
 							</button>
 						</div>

@@ -19,6 +19,8 @@ export const DESIGN_MD_SECTIONS = [
 	"Agent Prompt Guide",
 	"CSS Custom Properties",
 	"Tailwind v4",
+	"Responsive Guidelines",
+	"Theme Variations",
 	"Limitations & Confidence Notes",
 	"Measurement Provenance",
 ] as const;

@@ -943,6 +943,8 @@ export interface ScrapeMetadata {
 	visitedPages?: number;
 	discoveredPages?: number;
 	processedImages?: number;
+	pendingImages?: number;
+	duplicateCandidates?: number;
 	discoveredImages?: number;
 	savedImages?: number;
 	imageStorage?: "postgres-private";

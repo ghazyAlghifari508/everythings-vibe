@@ -3,10 +3,12 @@ import { cn } from "@/lib/utils";
 import {
 	type AdvancedParameterGroup,
 	type AnyScrapeSettings,
+	fromDisplayValue,
 	type NumericParameterSpec,
 	readNumber,
 	readToggle,
 	type ToggleParameterSpec,
+	toDisplayValue,
 } from "../types/parameter-spec";
 import { ScrapeFilterSelect } from "./scrape-filter-select";
 
@@ -65,16 +67,8 @@ export function ParameterGroup({
 				{group.toggles.map((toggle) => (
 					<label
 						key={toggle.key}
-						className="flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border border-graphite p-3 focus-within:ring-2 focus-within:ring-indigo sm:col-span-2"
+						className="flex min-w-0 cursor-pointer items-start justify-between gap-3 rounded-lg border border-graphite p-3.5 transition-colors hover:border-fog/40 focus-within:ring-2 focus-within:ring-indigo sm:col-span-2"
 					>
-						<input
-							type="checkbox"
-							checked={readToggle(settings, toggle.key)}
-							onChange={(event) =>
-								onToggleChange(toggle.key, event.target.checked)
-							}
-							className="mt-0.5 size-4 shrink-0 accent-current"
-						/>
 						<span className="min-w-0">
 							<span className="block text-sm font-medium text-snow">
 								{toggle.label}
@@ -83,6 +77,14 @@ export function ParameterGroup({
 								{toggle.helper}
 							</span>
 						</span>
+						<input
+							type="checkbox"
+							checked={readToggle(settings, toggle.key)}
+							onChange={(event) =>
+								onToggleChange(toggle.key, event.target.checked)
+							}
+							className="mt-0.5 size-4 shrink-0 accent-indigo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						/>
 					</label>
 				))}
 			</div>
@@ -105,6 +107,7 @@ function NumberField({
 }) {
 	const helperId = `${id}-helper`;
 	const errorId = `${id}-error`;
+	const displayValue = toDisplayValue(spec, value);
 	return (
 		<div className="min-w-0">
 			<label
@@ -121,8 +124,12 @@ function NumberField({
 				min={spec.min}
 				max={spec.max}
 				step={1}
-				value={Number.isFinite(value) ? value : ""}
-				onChange={(event) => onChange(event.target.valueAsNumber)}
+				value={Number.isFinite(displayValue) ? displayValue : ""}
+				onChange={(event) => {
+					const val = event.target.valueAsNumber;
+					if (Number.isNaN(val)) onChange(Number.NaN);
+					else onChange(fromDisplayValue(spec, val));
+				}}
 				aria-invalid={issue ? true : undefined}
 				aria-describedby={issue ? errorId : helperId}
 				className={cn(

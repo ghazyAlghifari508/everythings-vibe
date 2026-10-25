@@ -1,7 +1,7 @@
 import {
 	Alert02Icon,
 	Loading01Icon,
-	RotateRight01Icon,
+	RefreshIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 
@@ -53,7 +53,7 @@ export function PreviewUnavailable({
 						onClick={onRetry}
 						className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
-						<Icon icon={RotateRight01Icon} size={14} aria-hidden />
+						<Icon icon={RefreshIcon} size={14} aria-hidden />
 						Coba lagi
 					</button>
 				) : null}

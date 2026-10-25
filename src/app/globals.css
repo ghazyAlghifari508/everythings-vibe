@@ -684,6 +684,34 @@ input.bg-steel:autofill:active {
 	vertical-align: bottom;
 }
 
+/* Wrapped variant: a sentence-length activity line may run to several lines, so
+   the single-line truncation contract of a trace header does not apply. */
+.thought-line[data-wrap] {
+	width: 100%;
+}
+
+.thought-line[data-wrap] .thought-line__head {
+	width: 100%;
+	align-items: flex-start;
+}
+
+.thought-line[data-wrap] .thought-line__label {
+	display: grid;
+	width: 100%;
+}
+
+.thought-line[data-wrap] .thought-line__text {
+	overflow: visible;
+	white-space: normal;
+}
+
+.thought-line[data-wrap] .thought-line__breath {
+	display: block;
+	overflow: visible;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
 .thought-line[data-working] .thought-line__breath[data-shimmer] {
 	background: linear-gradient(
 		100deg,

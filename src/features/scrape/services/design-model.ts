@@ -24,6 +24,7 @@ import {
 	groupTypeSpecimens,
 	normalizeTypefaces,
 } from "../utils/design-normalize-typography";
+import { compareCaptures } from "./design-capture-comparison";
 import { deriveModelGuidelines } from "./design-model-guidance";
 import {
 	deriveObservedComponents,
@@ -237,6 +238,19 @@ export function buildDesignModel(
 		);
 
 	return {
+		views:
+			views.length > 1
+				? views.map((view, index) => ({
+						id: index + 1,
+						label: `Capture ${index + 1}: ${view.viewport.width}x${view.viewport.height}, browser preference ${view.colorScheme ?? "auto"}`,
+						observedTheme: inferTheme(view),
+						model: buildDesignModel(
+							{ ...view, settings, additionalViews: undefined },
+							options,
+						),
+					}))
+				: undefined,
+		comparisons: compareCaptures(views),
 		settings,
 		capturedViews,
 		version: MODEL_VERSION,

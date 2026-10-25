@@ -1,6 +1,12 @@
 import type { DesignTokenModel } from "../services/design-model";
 import { MODEL_VERSION } from "../services/design-model";
-import { escapeCell, heading, table } from "./design-md-markdown";
+import { partitionDesignViews } from "../services/design-shared-context";
+import {
+	DESIGN_MD_SECTIONS,
+	escapeCell,
+	heading,
+	table,
+} from "./design-md-markdown";
 import { renderCodeSections } from "./design-md-render-code";
 import { renderComponentSections } from "./design-md-render-components";
 import { renderTokenSections } from "./design-md-render-tokens";
@@ -10,6 +16,8 @@ import { renderTokenSections } from "./design-md-render-tokens";
 // and the renderer never invents a value the model does not contain.
 
 export interface RenderDesignMdOptions {
+	viewOptions?: Record<number, RenderDesignMdOptions>;
+	omitUnmeasuredElevation?: boolean;
 	/** Enrichment prose from the AI step, already validated against the model. */
 	essence?: string;
 	overview?: string;
@@ -36,9 +44,100 @@ export function renderDesignMd(
 ): string {
 	const lines: string[] = [];
 
-	renderTokenSections(lines, model, options);
-	renderComponentSections(lines, model, options);
-	renderCodeSections(lines, model, options);
+	if (model.views?.length) {
+		const sections = new Map<string, { label: string; body: string }[]>();
+		const { shared, specific } = partitionDesignViews(model.views);
+		const contexts = [
+			{
+				id: 0,
+				label:
+					"Shared across all captured contexts (sample counts from the first capture)",
+				model: shared,
+			},
+			...specific,
+		];
+		for (const view of contexts) {
+			const scoped: string[] = [];
+			const scopedOptions = options.viewOptions?.[view.id] ?? {};
+			renderTokenSections(scoped, view.model, scopedOptions);
+			renderComponentSections(scoped, view.model, {
+				...scopedOptions,
+				omitUnmeasuredElevation: true,
+			});
+			const original = model.views.find(
+				(candidate) => candidate.id === view.id,
+			);
+			if (original) renderCodeSections(scoped, original.model, scopedOptions);
+			for (const section of scoped.join("\n").split(/^## /m).slice(1)) {
+				const [title, ...body] = section.split("\n");
+				if (
+					!title ||
+					(view.id === 0 &&
+						(title === "Theme & Overview" ||
+							(title === "Elevation" && !shared.elevation.length)))
+				)
+					continue;
+				const entries = sections.get(title) ?? [];
+				entries.push({ label: view.label, body: body.join("\n").trim() });
+				sections.set(title, entries);
+			}
+		}
+		lines.push(heading(1, `${model.title} - Style Reference`));
+		for (const title of DESIGN_MD_SECTIONS) {
+			const entries = sections.get(title);
+			if (!entries) continue;
+			lines.push("", heading(2, title));
+			if (
+				entries.length === model.views.length &&
+				entries.every((entry) => entry.body === entries[0]?.body)
+			)
+				lines.push(
+					"",
+					"Shared across the captured contexts:",
+					entries[0]?.body ?? "",
+				);
+			else
+				for (const entry of entries)
+					lines.push(
+						"",
+						heading(3, entry.label),
+						"",
+						entry.body.replace(/^### /gm, "#### "),
+					);
+		}
+		for (const kind of ["responsive", "theme"] as const) {
+			const changes =
+				model.comparisons?.filter((entry) => entry.kind === kind) ?? [];
+			if (!changes.length) continue;
+			lines.push(
+				"",
+				heading(
+					2,
+					kind === "responsive" ? "Responsive Guidelines" : "Theme Variations",
+				),
+				"",
+				"Matched samples with unchanged content only. These are endpoint observations, not original CSS breakpoints or proof of a website theme switch.",
+				"",
+				table(
+					["Component", "Property", "Measured difference"],
+					changes.map((entry) => [
+						entry.role,
+						entry.property,
+						entry.values
+							.map(
+								(value) =>
+									`Capture ${value.capture}: ${escapeCell(value.value)}`,
+							)
+							.join("; "),
+					]),
+				),
+			);
+		}
+	} else {
+		renderTokenSections(lines, model, options);
+		renderComponentSections(lines, model, options);
+		renderCodeSections(lines, model, options);
+	}
 
 	// --- 16. Limitations & confidence notes ---------------------------------
 	lines.push("", heading(2, "Limitations & Confidence Notes"));
@@ -54,7 +153,18 @@ export function renderDesignMd(
 		if (options.enrichmentDetail?.trim())
 			lines.push(`- ${escapeCell(options.enrichmentDetail.trim())}`);
 	}
-	for (const limitation of model.limitations)
+	for (const limitation of model.views?.length
+		? [
+				...new Set(
+					model.views.flatMap((view) => [
+						...view.model.limitations.map((note) => `${view.label}: ${note}`),
+						...(options.viewOptions?.[view.id]?.limitations ?? []).map(
+							(note) => `${view.label}: AI inference limitation: ${note}`,
+						),
+					]),
+				),
+			]
+		: model.limitations)
 		lines.push(`- ${escapeCell(limitation)}`);
 	for (const limitation of options.limitations ?? [])
 		lines.push(`- AI inference limitation: ${escapeCell(limitation)}`);

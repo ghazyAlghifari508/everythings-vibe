@@ -23,6 +23,19 @@ function element(
 }
 
 describe("inferTheme", () => {
+	it("does not classify a translucent paint without its composited background", () => {
+		expect(
+			inferTheme({
+				...FIXTURE,
+				elements: [
+					element(
+						{ "background-color": "rgba(0, 0, 0, 0.1)" },
+						{ role: "canvas" },
+					),
+				],
+			}),
+		).toBe("unknown");
+	});
 	it("looks past a transparent canvas to the first opaque background", () => {
 		const theme = inferTheme({
 			...FIXTURE,
