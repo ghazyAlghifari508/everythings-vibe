@@ -150,7 +150,7 @@ File monster historis dari fase awal telah berhasil didekonstruksi sepenuhnya:
 
 #### Sisa File Melebihi Batas 400 Baris (Target Refactor Aktif)
 
-Berdasarkan audit riil codebase per Oktober 2026, tersisa 1 file implementasi produksi yang melebihi batas 400 baris:
+Berdasarkan audit riil codebase setelah refactor credit modal (per Oktober 2026), tersisa 1 file implementasi produksi yang melebihi batas 400 baris. `src/routeTree.gen.ts` dikecualikan karena generated source.
 
 1. **`src/components/ui/thought-line.tsx` (548 baris $\rightarrow$ 142 baris):** $\checkmark$ Selesai 2026-10-25.
    - Menampung visualisasi stream reasoning AI, animasi pulse, expand/collapse state, markdown typewriter, dan telemetry.
@@ -158,17 +158,24 @@ Berdasarkan audit riil codebase per Oktober 2026, tersisa 1 file implementasi pr
    - [x] Ekstraksi kalkulasi step timing ke custom hook `use-thought-stream.ts`, plus `thought-line-timing.ts` dan `thought-line-types.ts`.
    - [x] Ringankan `thought-line.tsx` hingga $\le$ 300 baris.
 
-2. **`src/features/billing/components/credit-exhausted-modal.tsx` (408 baris):**
+2. **`src/features/billing/components/credit-exhausted-modal.tsx` (408 baris $\rightarrow$ 226 baris):** $\checkmark$ Selesai 2026-10-26.
    - Menampung dialog penolakan kredit habis, kalkulasi selisih top-up, pemilihan paket kredit Midtrans, trigger checkout Snap, dan fallback manual transfer.
-   - [ ] Ekstraksi paket selector card list ke `src/features/billing/components/credit-package-radio-group.tsx`.
-   - [ ] Ekstraksi payment flow trigger ke hook `use-credit-topup-dialog.ts`.
-   - [ ] Ringankan file modal menjadi orchestrator tipis $\le$ 250 baris.
+   - [x] Ekstraksi paket selector card list ke `src/features/billing/components/credit-package-radio-group.tsx` (130 baris, radio native + navigasi panah keyboard + radiogroup semantics).
+   - [x] Ekstraksi payment flow trigger ke hook `src/features/billing/hooks/use-credit-topup-dialog.ts` (150 baris, termasuk guard submit ganda).
+   - [x] Ekstraksi header dialog (close, ikon, judul, error, ringkasan kredit) ke `src/features/billing/components/credit-exhausted-modal-header.tsx` (97 baris).
+   - [x] Ringankan file modal menjadi orchestrator tipis $\le$ 250 baris (226 baris).
+   - Catatan: kontrak `POST /api/payments/create` (`planId`, `returnUrl`, `projectId`), resume-intent, aturan eligibility, dan redirect tidak berubah. Test `credit-exhausted-modal.test.tsx` diperluas menjadi 21 kasus.
+
+3. **`src/features/codebase/components/planning/codebase-resync-modal.tsx` (467 baris):** Belum selesai.
+   - Menampung step indicator 3 langkah, blok salin prompt re-sync, monitoring status snapshot, dan footer verifikasi.
+   - [ ] Ekstraksi step indicator dan blok "Salin instruksi" ke sub-komponen terpisah.
+   - [ ] Ringankan file modal hingga $\le$ 400 baris.
 
 #### Acceptance Criteria Refactor
 
-- [ ] Seluruh file kode produksi di bawah `src/` berukuran $\le$ 400 baris.
-- [ ] Nol type bypass (`as any`, `as never`, `@ts-ignore` dilarang per `no-type-bypass.md`).
-- [ ] Seluruh test suite Vitest tetap hijau tanpa pelunakan assertions.
+- [ ] Seluruh file kode produksi di bawah `src/` berukuran $\le$ 400 baris. Tersisa `codebase-resync-modal.tsx` (467 baris); `routeTree.gen.ts` dikecualikan sebagai generated source.
+- [x] Nol type bypass (`as any`, `as never`, `@ts-ignore` dilarang per `no-type-bypass.md`): terverifikasi nol pada source produksi authored.
+- [ ] Seluruh test suite Vitest tetap hijau tanpa pelunakan assertions. 5259 lulus, 3 gagal pre-existing di luar scope refactor: `agent-thinking.test.tsx` (timeout), `scrap.$id.test.tsx` (timeout), dan `payment-service.test.ts` (membaca facade `src/db/schema.ts` yang sudah dimodularisasi; tabel `payments`/`subscriptions` kini di `src/db/schema/billing.ts`).
 
 ---
 
