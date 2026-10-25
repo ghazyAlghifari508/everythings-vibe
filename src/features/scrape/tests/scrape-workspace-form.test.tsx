@@ -111,8 +111,8 @@ describe("advanced parameters disclosure", () => {
 
 		render(<ScrapeWorkspaceForm mode="images" />);
 		fireEvent.click(advancedTrigger());
-		expect(screen.getByLabelText(/ukur resolusi gambar/i)).toBeDefined();
-		expect(screen.getByLabelText(/identifikasi jenis gambar/i)).toBeDefined();
+		expect(screen.getByLabelText(/periksa ukuran asli gambar/i)).toBeDefined();
+		expect(screen.getByLabelText(/kelompokkan ikon dan logo/i)).toBeDefined();
 		expect(screen.queryByLabelText(/kedalaman penelusuran/i)).toBeNull();
 	});
 
@@ -130,8 +130,8 @@ describe("advanced parameters disclosure", () => {
 	it("names the image settings the way the task requires", () => {
 		render(<ScrapeWorkspaceForm mode="images" />);
 		fireEvent.click(advancedTrigger());
-		expect(screen.getByText(/ukur resolusi gambar/i)).toBeDefined();
-		expect(screen.getByText(/identifikasi jenis gambar/i)).toBeDefined();
+		expect(screen.getByText(/periksa ukuran asli gambar/i)).toBeDefined();
+		expect(screen.getByText(/kelompokkan ikon dan logo/i)).toBeDefined();
 		expect(screen.queryByText(/measure resolution/i)).toBeNull();
 		expect(screen.queryByText(/classify type/i)).toBeNull();
 	});
@@ -145,11 +145,11 @@ describe("advanced parameters disclosure", () => {
 		expect(screen.queryByLabelText(/waktu tunggu tambahan/i)).toBeNull();
 	});
 
-	it("shows the wait setting in milliseconds with its unit", () => {
+	it("shows the wait setting in seconds with its unit", () => {
 		render(<ScrapeWorkspaceForm mode="html" />);
 		fireEvent.click(advancedTrigger());
 		expect(screen.getByText(/waktu tunggu tambahan/i)).toBeDefined();
-		expect(screen.getByText(/milidetik/i)).toBeDefined();
+		expect(screen.getAllByText(/detik/i).length).toBeGreaterThan(0);
 		expect(screen.queryByText(/wait for/i)).toBeNull();
 	});
 });
@@ -208,8 +208,9 @@ describe("reset parameters", () => {
 	it("restores toggles without disturbing the chosen mode", () => {
 		render(<ScrapeWorkspaceForm mode="images" />);
 		fireEvent.click(advancedTrigger());
-		const measure =
-			screen.getByLabelText<HTMLInputElement>(/ukur resolusi gambar/i);
+		const measure = screen.getByLabelText<HTMLInputElement>(
+			/periksa ukuran asli gambar/i,
+		);
 		expect(measure.checked).toBe(true);
 		fireEvent.click(measure);
 		expect(measure.checked).toBe(false);
@@ -217,7 +218,8 @@ describe("reset parameters", () => {
 			screen.getByRole("button", { name: /kembalikan ke pengaturan awal/i }),
 		);
 		expect(
-			screen.getByLabelText<HTMLInputElement>(/ukur resolusi gambar/i).checked,
+			screen.getByLabelText<HTMLInputElement>(/periksa ukuran asli gambar/i)
+				.checked,
 		).toBe(true);
 	});
 

@@ -1,4 +1,8 @@
-import { Alert02Icon, Loading01Icon } from "@hugeicons/core-free-icons";
+import {
+	Alert02Icon,
+	Loading01Icon,
+	RefreshIcon,
+} from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import type { PreviewFrameReport } from "@/features/scrape/utils/preview-readiness";
 
@@ -22,7 +26,7 @@ export const READINESS_MESSAGE: Record<
 	ready: {
 		label: "Preview siap dimuat",
 		tone: "ok",
-		detail: "Dokumen dan resource website berhasil dimuat.",
+		detail: "Dokumen dan konten website berhasil dimuat.",
 	},
 	empty: {
 		label: "Preview tidak berisi konten",
@@ -31,9 +35,10 @@ export const READINESS_MESSAGE: Record<
 			"Halaman ini tidak menampilkan teks, media, atau latar yang bisa ditampilkan.",
 	},
 	degraded: {
-		label: "Preview dimuat sebagian",
+		label: "Sebagian tampilan belum termuat",
 		tone: "warn",
-		detail: "Sebagian aset halaman gagal dimuat, tampilan bisa tidak lengkap.",
+		detail:
+			"Beberapa gambar atau elemen mungkin tidak tampil seperti website aslinya.",
 	},
 };
 
@@ -97,8 +102,9 @@ export function PreviewCanvasOverlay({
 				<button
 					type="button"
 					onClick={onRetry}
-					className="rounded-md border border-graphite px-3 py-2 text-sm text-snow focus-visible:ring-2 focus-visible:ring-indigo"
+					className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-3 py-2 text-sm text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:ring-2 focus-visible:ring-indigo"
 				>
+					<Icon icon={RefreshIcon} size={15} aria-hidden />
 					Coba lagi
 				</button>
 			) : null}

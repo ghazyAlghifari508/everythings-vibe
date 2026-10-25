@@ -35,7 +35,9 @@ export async function runStudioJobPipeline(
 	userId: string,
 ): Promise<void> {
 	const workerId = crypto.randomUUID();
+	const acquisitionStartedAt = Date.now();
 	const job = await claimStudioJob(jobId, userId, workerId);
+	studioJobTiming("job-acquire", acquisitionStartedAt, { jobId, projectId });
 	if (!job || job.projectId !== projectId) return;
 	const claim: StudioJobClaim = { jobId, projectId, userId, workerId };
 	const startedAt = Date.now();
@@ -68,6 +70,13 @@ export async function runStudioJobPipeline(
 					: null;
 				const designMode = validateStudioDesignMode(project.designMode);
 				const dsTokens = extractDesignSystemTokens(project.designMd);
+				studioJobTiming("project-context", Date.now(), {
+					jobId,
+					projectId,
+					skillId: project.designSkillId,
+					referenceChars: project.designMd?.length ?? 0,
+					prdChars: project.prdContent?.length ?? 0,
+				});
 				let frames = await db
 					.select()
 					.from(studioFrames)
@@ -119,22 +128,28 @@ export async function runStudioJobPipeline(
 				const frameStartedAt = Date.now();
 				const allScreenNames = frames.map((frame) => frame.name);
 				const results = await runWithConcurrency(
-					frames.map(
-						(frame) => () =>
-							generateInitialFrame({
-								frame,
-								jobPrompt: job.prompt,
-								allScreenNames,
-								designSkillId: project.designSkillId,
-								designMd: project.designMd,
-								logoUrl,
-								dsTokens,
-								blueprint,
-								prdContent: project.prdContent,
-								lease: claim,
-								signal,
-							}),
-					),
+					frames.map((frame) => async () => {
+						const result = await generateInitialFrame({
+							frame,
+							jobPrompt: job.prompt,
+							allScreenNames,
+							designSkillId: project.designSkillId,
+							designMd: project.designMd,
+							logoUrl,
+							dsTokens,
+							blueprint,
+							prdContent: project.prdContent,
+							lease: claim,
+							signal,
+						});
+						if (result.ok && frame.status !== "ready")
+							studioJobTiming("frame-ready", job.createdAt.getTime(), {
+								jobId,
+								projectId,
+								frameId: frame.id,
+							});
+						return result;
+					}),
 					STUDIO_FRAME_CONCURRENCY,
 				);
 				signal.throwIfAborted();
@@ -183,6 +198,16 @@ export async function runStudioJobPipeline(
 				studioJobTiming("persistence", persistenceStartedAt, {
 					jobId,
 					projectId,
+				});
+				studioJobTiming("project-completion", job.createdAt.getTime(), {
+					jobId,
+					projectId,
+					code:
+						ready.length === frames.length
+							? "completed"
+							: ready.length > 0
+								? "partial"
+								: "failed",
 				});
 			},
 		);

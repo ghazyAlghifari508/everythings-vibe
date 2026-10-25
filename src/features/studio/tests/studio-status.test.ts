@@ -195,6 +195,30 @@ describe("Studio authoritative synchronization", () => {
 			await vi.advanceTimersByTimeAsync(ms);
 		});
 
+	it("records frontend receipt once for each newly ready frame", async () => {
+		const initial = statusFixture();
+		const next = statusFixture();
+		next.frames[1].status = "ready";
+		fetchMock.mockResolvedValue(reply(next));
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			renderHook(() => useStudioStatus(initial));
+			await tick();
+			await tick();
+			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			expect(
+				events.filter((event) => event.stage === "frontend-ready"),
+			).toEqual([
+				expect.objectContaining({
+					frameId: "frame-1",
+					durationMs: expect.any(Number),
+				}),
+			]);
+		} finally {
+			log.mockRestore();
+		}
+	});
+
 	it("shows independent frame completions without replacing unchanged frame objects", async () => {
 		const initial = statusFixture();
 		const next = statusFixture();

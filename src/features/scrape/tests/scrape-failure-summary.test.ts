@@ -71,6 +71,17 @@ describe("classifyCrawlFailures", () => {
 });
 
 describe("classifyImageFailures", () => {
+	it("retains an actual shared HTTP status alongside its typed code", () => {
+		expect(
+			classifyImageFailures([
+				{ code: "WEBSITE_RATE_LIMITED", httpStatus: 429 },
+			]),
+		).toEqual({
+			code: "WEBSITE_RATE_LIMITED",
+			httpStatus: 429,
+			failedCount: 1,
+		});
+	});
 	it("names rate limiting when every failed asset answered 429", () => {
 		const result = classifyImageFailures([
 			evidence({ httpStatus: 429 }),

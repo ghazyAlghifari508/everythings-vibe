@@ -109,7 +109,7 @@ describe("scrape asset capability route", () => {
 	});
 	it("serves stored identity bytes without any remote fetch", async () => {
 		const body = Buffer.from(
-			"89504e470d0a1a0a0000000d4948445200000001000000010806000000000000000000",
+			"89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000b49444154789c636000020000050001a5f645400000000049454e44ae426082",
 			"hex",
 		);
 		const readStoredScrapeImage = vi.fn(async () => ({

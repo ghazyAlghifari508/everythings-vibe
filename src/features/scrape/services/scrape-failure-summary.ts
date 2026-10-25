@@ -92,13 +92,18 @@ export function classifyImageFailures(
 	const sharedCode = allRowsShare(rows, (row) => row.code === rows[0].code)
 		? dominantCode(rows)
 		: undefined;
-	if (sharedCode) return { code: sharedCode, failedCount };
 	const sharedStatus = allRowsShare(
 		rows,
 		(row) => row.httpStatus === rows[0].httpStatus,
 	)
 		? dominantStatus(rows)
 		: undefined;
+	if (sharedCode)
+		return {
+			code: sharedCode,
+			failedCount,
+			...(sharedStatus === undefined ? {} : { httpStatus: sharedStatus }),
+		};
 	if (sharedStatus !== undefined)
 		return {
 			code: designErrorCodeForHttpStatus(sharedStatus),

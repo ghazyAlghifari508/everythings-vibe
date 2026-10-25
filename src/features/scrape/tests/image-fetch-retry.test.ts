@@ -7,7 +7,7 @@ import {
 describe("shouldRetryImageFetch", () => {
 	it("retries a transient transport fault while attempts remain", () => {
 		expect(shouldRetryImageFetch(0, null, "FETCH_TIMEOUT")).toBe(true);
-		expect(shouldRetryImageFetch(0, null, "WEBSITE_BLOCKED")).toBe(true);
+		expect(shouldRetryImageFetch(0, null, "WEBSITE_BLOCKED")).toBe(false);
 	});
 
 	it("retries a 5xx response because the site may recover", () => {

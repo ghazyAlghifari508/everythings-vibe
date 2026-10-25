@@ -253,7 +253,7 @@ export function StudioLandingPage({
 			style={getCanvasDotStyle(1, { x: 0, y: 0 })}
 			className="flex min-h-dvh w-full flex-col overflow-x-clip bg-onyx text-snow"
 		>
-			<header className="mx-auto flex w-full max-w-[1440px] shrink-0 items-center justify-between gap-3 px-4 py-3 md:px-6">
+			<header className="flex w-full shrink-0 items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
 				<div className="flex min-w-0 items-center">
 					<Logo height={26} />
 				</div>
@@ -275,7 +275,7 @@ export function StudioLandingPage({
 				</div>
 			</header>
 
-			<div className="mx-auto flex w-full max-w-[1440px] flex-1 items-start gap-5 px-4 pb-6 md:gap-7 md:px-6 lg:gap-8">
+			<div className="flex w-full flex-1 items-start gap-5 px-4 pb-6 sm:px-6 md:gap-6 lg:gap-8 lg:px-8">
 				<StudioSidebar
 					history={history}
 					onSelectProject={handleOpenProject}
@@ -292,7 +292,7 @@ export function StudioLandingPage({
 				/>
 
 				<main className="flex min-w-0 flex-1 self-stretch flex-col justify-center py-4 md:py-6">
-					<div className="my-auto flex w-full max-w-3xl flex-col gap-6 lg:max-w-4xl">
+					<div className="my-auto flex w-full max-w-5xl flex-col gap-6 lg:max-w-6xl xl:max-w-7xl">
 						<div className="space-y-3 text-center sm:text-left">
 							<div className="flex justify-center sm:justify-start">
 								<HubBreadcrumb current="VibeDesign" />

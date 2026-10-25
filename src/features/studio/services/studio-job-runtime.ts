@@ -4,27 +4,7 @@ import {
 	StudioLeaseLostError,
 } from "./studio-job-lease";
 
-export function studioJobTiming(
-	stage: string,
-	startedAt: number,
-	context: {
-		jobId?: string;
-		projectId?: string;
-		frameId?: string;
-		attempt?: number;
-		code?: string;
-		detail?: string;
-	},
-) {
-	console.info(
-		JSON.stringify({
-			scope: "studio",
-			stage,
-			durationMs: Date.now() - startedAt,
-			...context,
-		}),
-	);
-}
+export { studioJobTiming } from "./studio-timing";
 
 export async function withStudioHeartbeat<T>(
 	renew: () => Promise<boolean>,

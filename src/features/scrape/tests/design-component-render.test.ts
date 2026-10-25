@@ -1,7 +1,6 @@
 import { expect, it } from "vitest";
 import { renderDesignMd } from "@/features/scrape/utils/design-md-render";
 import { buildFixtureModel } from "@/lib/design-fixture";
-import { escapeCell } from "../utils/design-md-markdown";
 
 it("keeps measured component rules when AI supplies the same component name", () => {
 	const model = buildFixtureModel();
@@ -16,8 +15,11 @@ it("keeps measured component rules when AI supplies the same component name", ()
 			},
 		],
 	});
-	expect(document).toContain(escapeCell(observed.description));
-	expect(document).toContain(escapeCell(observed.evidence));
+	for (const treatment of observed.treatments ?? [])
+		for (const value of Object.values(treatment.properties))
+			expect(document).toContain(value);
+	expect(document).not.toMatch(/nth-child\(/);
+	expect(observed.evidence).toContain("nth-child");
 	expect(document).toContain("Sample inference");
 });
 

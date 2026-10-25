@@ -31,6 +31,7 @@ export interface NumericParameterSpec {
 	helper: string;
 	min: number;
 	max: number;
+	scale?: number;
 }
 
 export interface ToggleParameterSpec {
@@ -157,17 +158,19 @@ const HTML_GROUP: AdvancedParameterGroup = {
 		{
 			key: "waitMs",
 			label: "Waktu tunggu tambahan",
-			unit: "milidetik",
-			helper: `Tambahan waktu setelah halaman selesai dimuat. Maksimum ${SCRAPE_LIMITS.waitMs} ms.`,
+			unit: "detik",
+			helper: `Gunakan jika konten website muncul beberapa saat setelah halaman dibuka. Maksimum ${SCRAPE_LIMITS.waitMs / 1000} detik.`,
 			min: 0,
-			max: SCRAPE_LIMITS.waitMs,
+			max: SCRAPE_LIMITS.waitMs / 1000,
+			scale: 1000,
 		},
 	],
 	toggles: [
 		{
 			key: "includeIframes",
-			label: "Sertakan iframe satu origin",
-			helper: "Isi iframe dari domain yang sama ikut disimpan ke dalam HTML.",
+			label: "Sertakan konten tertanam",
+			helper:
+				"Ikutkan konten tambahan dari website yang sama, seperti formulir atau bagian halaman yang ditampilkan terpisah.",
 		},
 	],
 };
@@ -180,23 +183,25 @@ const IMAGES_GROUP: AdvancedParameterGroup = {
 		{
 			key: "waitMs",
 			label: "Waktu tunggu tambahan",
-			unit: "milidetik",
-			helper: `Tambahan waktu setelah halaman selesai dimuat. Maksimum ${SCRAPE_LIMITS.waitMs} ms.`,
+			unit: "detik",
+			helper: `Gunakan jika konten website muncul beberapa saat setelah halaman dibuka. Maksimum ${SCRAPE_LIMITS.waitMs / 1000} detik.`,
 			min: 0,
-			max: SCRAPE_LIMITS.waitMs,
+			max: SCRAPE_LIMITS.waitMs / 1000,
+			scale: 1000,
 		},
 	],
 	toggles: [
 		{
 			key: "measureResolution",
-			label: "Ukur resolusi gambar",
-			helper: "Buka setiap gambar untuk mencatat lebar dan tinggi sebenarnya.",
+			label: "Periksa ukuran asli gambar",
+			helper:
+				"Catat lebar dan tinggi gambar agar lebih mudah memilih aset yang sesuai.",
 		},
 		{
 			key: "classifyType",
-			label: "Identifikasi jenis gambar",
+			label: "Kelompokkan ikon dan logo",
 			helper:
-				"Tandai gambar sebagai ikon, logo, atau konten berdasarkan bukti yang ada.",
+				"Bantu membedakan ikon dan logo menggunakan informasi yang tersedia pada halaman.",
 		},
 	],
 };
@@ -314,15 +319,30 @@ export function validateNumericParameter(
 	return null;
 }
 
+export function toDisplayValue(
+	spec: NumericParameterSpec,
+	internalValue: number,
+): number {
+	if (!Number.isFinite(internalValue)) return internalValue;
+	return spec.scale ? Math.round(internalValue / spec.scale) : internalValue;
+}
+
+export function fromDisplayValue(
+	spec: NumericParameterSpec,
+	displayValue: number,
+): number {
+	if (!Number.isFinite(displayValue)) return displayValue;
+	return spec.scale ? Math.round(displayValue * spec.scale) : displayValue;
+}
+
 export function validateParameterGroup(
 	group: AdvancedParameterGroup,
 	settings: AnyScrapeSettings,
 ): ParameterIssue[] {
 	return group.numbers.flatMap((spec) => {
-		const issue = validateNumericParameter(
-			spec,
-			readNumber(settings, spec.key),
-		);
+		const internal = readNumber(settings, spec.key);
+		const display = toDisplayValue(spec, internal);
+		const issue = validateNumericParameter(spec, display);
 		return issue ? [issue] : [];
 	});
 }

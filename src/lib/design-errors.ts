@@ -66,6 +66,7 @@ export type ScrapeFailureReason =
 	| "browser-init"
 	| "page-content"
 	| "asset-unavailable"
+	| "asset-too-large"
 	| "too-small"
 	| "no-meaningful-content"
 	| "job-timeout"

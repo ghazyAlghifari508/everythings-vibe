@@ -100,6 +100,61 @@ async function intersect(index = intersections.length - 1) {
 }
 
 describe("frame preview requests", () => {
+	it("records image load once without treating preview response as visible pixels", async () => {
+		fetchMock.mockResolvedValue(Response.json(preview));
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			render(
+				<StudioFrame
+					frame={frame()}
+					initialJobTiming={{
+						id: "initial-job",
+						createdAt: new Date(Date.now() - 500),
+					}}
+				/>,
+			);
+			await intersect();
+			const events = () =>
+				log.mock.calls
+					.map(([line]) => JSON.parse(String(line)))
+					.filter((event) => event.stage === "frame-visible");
+			expect(events()).toHaveLength(0);
+			const image = screen.getByRole("img", { name: "Desain Sample" });
+			fireEvent.load(image);
+			fireEvent.load(image);
+			expect(events()).toEqual([
+				expect.objectContaining({
+					frameId: "frame-a",
+					jobId: "initial-job",
+					durationMs: 500,
+				}),
+			]);
+		} finally {
+			log.mockRestore();
+		}
+	});
+	it("records preview availability without including the asset URL", async () => {
+		fetchMock.mockResolvedValue(Response.json(preview));
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			mount();
+			await intersect();
+			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			expect(events).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						scope: "studio",
+						stage: "preview-available",
+						frameId: "frame-a",
+						durationMs: expect.any(Number),
+					}),
+				]),
+			);
+			expect(JSON.stringify(events)).not.toContain(preview.url);
+		} finally {
+			log.mockRestore();
+		}
+	});
 	it("loads a newly ready frame lazily without remount and starts only once", async () => {
 		fetchMock.mockResolvedValue(Response.json(preview));
 		const { result, rerender } = mount(

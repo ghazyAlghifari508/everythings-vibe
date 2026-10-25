@@ -90,7 +90,9 @@ describe("frame preview capture isolation and telemetry", () => {
 		await expect(
 			getStudioFrameVisual("project-a", "frame-a", "user-a"),
 		).resolves.toMatchObject({ width: 390, height: 900 });
-		expect(log.mock.calls).toEqual([
+		expect(
+			log.mock.calls.filter(([scope]) => scope === "[studio.preview.capture]"),
+		).toEqual([
 			[
 				"[studio.preview.capture]",
 				{ outcome: "captured", elapsedMs: 35, assetCount: 0 },
@@ -115,6 +117,30 @@ describe("frame preview capture isolation and telemetry", () => {
 		expect(log.mock.calls).toEqual([
 			["[studio.preview.capture]", { outcome: "cached", assetCount: 1 }],
 		]);
+	});
+
+	it("records capture and storage timing through the shared Studio timing contract", async () => {
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		await getStudioFrameVisual("project-a", "frame-a", "user-a");
+		const events = log.mock.calls
+			.filter(([line]) => typeof line === "string" && line.startsWith("{"))
+			.map(([line]) => JSON.parse(String(line)));
+		expect(events).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					scope: "studio",
+					stage: "preview-capture",
+					projectId: "project-a",
+					frameId: "frame-a",
+					durationMs: expect.any(Number),
+				}),
+				expect.objectContaining({
+					scope: "studio",
+					stage: "preview-persistence",
+					durationMs: expect.any(Number),
+				}),
+			]),
+		);
 	});
 
 	it("bypasses a cached visual only for explicit recapture", async () => {

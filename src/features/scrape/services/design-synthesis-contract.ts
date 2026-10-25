@@ -212,6 +212,17 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 		observedComponents.cut;
 	const payload = {
 		settings: model.settings,
+		viewContexts: model.views?.map((view) => ({
+			id: view.id,
+			label: view.label,
+			observedTheme: view.observedTheme,
+			colors: view.model.colors.map(({ value, role }) => ({ value, role })),
+			typography: view.model.typography.map(
+				({ role, fontSize, fontFamily }) => ({ role, fontSize, fontFamily }),
+			),
+			radii: view.model.radii.map(({ purpose, value }) => ({ purpose, value })),
+		})),
+		comparisons: model.comparisons,
 		capturedViews: model.capturedViews,
 		analysisScope:
 			model.settings?.focus === "visual-tokens"
@@ -228,6 +239,7 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 			name: component.name,
 			description: component.description,
 			evidence: component.evidence,
+			treatments: component.treatments,
 			frequency: component.frequency,
 			roles: component.roles,
 			treatmentCount: component.treatmentCount,

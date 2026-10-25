@@ -219,7 +219,10 @@ describe("ScrapeDetail", () => {
 			name: /Salin HTML/i,
 		});
 		fireEvent.click(copyButton);
-		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
+		expect(
+			await screen.findByRole("button", { name: "HTML tersalin" }),
+		).toBeDefined();
+		expect(screen.queryByText(/tersalin ke clipboard/i)).toBeNull();
 		expect(
 			screen.getByRole("button", {
 				name: /Download (?:index\.html|.*\.html)/i,
@@ -270,7 +273,9 @@ describe("ScrapeDetail", () => {
 		).toContain(source);
 		expect(screen.getByTestId("codebase-source-preview")).toBeDefined();
 		fireEvent.click(screen.getByRole("button", { name: /Salin HTML/i }));
-		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
+		expect(
+			await screen.findByRole("button", { name: "HTML tersalin" }),
+		).toBeDefined();
 		expect(writeText).toHaveBeenCalledWith(source);
 		fireEvent.click(
 			screen.getByRole("button", {
@@ -305,8 +310,26 @@ describe("ScrapeDetail", () => {
 		vi.stubGlobal("navigator", { clipboard: { writeText } });
 		render(<ScrapeDetail domain="example.com" previewHtml={source} />);
 		fireEvent.click(screen.getByRole("button", { name: /Salin HTML/i }));
-		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
+		expect(
+			await screen.findByRole("button", { name: "HTML tersalin" }),
+		).toBeDefined();
 		expect(writeText).toHaveBeenCalledWith(source);
+	});
+
+	it("shows error feedback when clipboard copy fails", async () => {
+		vi.stubGlobal("navigator", {
+			clipboard: {
+				writeText: vi.fn().mockRejectedValue(new Error("Permission denied")),
+			},
+		});
+		render(
+			<ScrapeDetail
+				domain="www.notion.com"
+				previewHtml="<html><body>hi</body></html>"
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: /Salin HTML/i }));
+		expect(await screen.findByText(/Gagal menyalin/i)).toBeDefined();
 	});
 
 	it("downloads the exact original source HTML", async () => {

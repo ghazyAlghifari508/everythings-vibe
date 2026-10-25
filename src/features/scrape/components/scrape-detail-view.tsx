@@ -229,9 +229,6 @@ export function ScrapeDetailView({
 						failedAtStage={failedAtStage}
 						retryAfterSeconds={retryAfterSeconds}
 						retryAfterExpiresAt={retryAfterExpiresAt}
-						layout={
-							mode === "images" || mode === "html" ? "single" : "two-panel"
-						}
 						isRetrying={isRetrying}
 						onRetry={retry}
 						imageDiscovery={data?.metadata?.imageDiscovery ?? null}
@@ -241,7 +238,6 @@ export function ScrapeDetailView({
 							images,
 							data?.metadata?.discoveredImages,
 						)}
-						processedImages={data?.metadata?.processedImages}
 						failedResources={data?.metadata?.failedResources}
 						partialResults={
 							mode === "crawl"
@@ -332,10 +328,6 @@ export function ScrapeDetailView({
 					discoveredPages={
 						data?.metadata?.discoveredPages ?? initial.metadata?.discoveredPages
 					}
-					processedImages={
-						data?.metadata?.processedImages ?? initial.metadata?.processedImages
-					}
-					layout={mode === "html" || mode === "images" ? "single" : "two-panel"}
 					mode={mode}
 					status={currentStatus}
 					sourceUrl={sourceUrl}

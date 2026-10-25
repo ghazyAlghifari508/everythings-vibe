@@ -118,6 +118,13 @@ export interface ModelGuideline {
 }
 
 export interface ModelComponent {
+	treatments?: {
+		properties: Record<string, string>;
+		width: number;
+		height: number;
+		samples: number;
+		selectors: string[];
+	}[];
 	name: string;
 	description: string;
 	evidence: string;
@@ -133,7 +140,25 @@ export interface ModelGuidelines {
 	limitations: string[];
 }
 
+export interface DesignComparison {
+	kind: "responsive" | "theme";
+	role: string;
+	property: string;
+	values: { capture: number; value: string }[];
+	provenance: { capture: number; element: number }[];
+	confidence: Confidence;
+}
+
+export interface DesignView {
+	id: number;
+	label: string;
+	observedTheme: "light" | "dark" | "unknown";
+	model: DesignTokenModel;
+}
+
 export interface DesignTokenModel {
+	views?: DesignView[];
+	comparisons?: DesignComparison[];
 	settings?: DesignSettings;
 	capturedViews?: {
 		width: number;

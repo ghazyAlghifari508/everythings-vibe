@@ -198,7 +198,10 @@ describe("Phase 5 UI — Separate HTML Source and Visual Reference", () => {
 		const copyBtn = screen.getByRole("button", { name: /Salin HTML/i });
 		fireEvent.click(copyBtn);
 
-		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
+		expect(
+			await screen.findByRole("button", { name: "HTML tersalin" }),
+		).toBeDefined();
+		expect(screen.queryByText(/tersalin ke clipboard/i)).toBeNull();
 		expect(writeText).toHaveBeenCalledWith(raw);
 	});
 });

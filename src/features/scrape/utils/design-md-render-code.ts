@@ -48,6 +48,7 @@ export function renderCodeSections(
 		"",
 		"Use the observed values exactly as written. Inferred roles describe measured usage and must not be promoted to measurements. If a new requirement is not covered here, treat it as a new product decision rather than an extraction result.",
 		"This is an internal styling reference, not product content or permission to copy the source site's structure, logos or proprietary assets. Do not add palette galleries, token inspectors or documentation sections unless the product requirements explicitly request them.",
+		"Preserve each applicable component's measured radius; never substitute a global radius for buttons, inputs or cards. This document is a design specification, not a request for a design-system showcase. Build the user's application, not Color Palette, Typography Specimen or UI Documentation pages.",
 		"Map component measurements to existing components before editing. Preserve content and flows. After editing, report each applicable rule with its code location and token/value mapping, or explain why it remains unknown or unapplied. Do not claim a perfect visual match from limited captures.",
 	);
 
