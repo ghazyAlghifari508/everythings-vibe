@@ -340,7 +340,7 @@ describe("payments timezone migration contract", () => {
 	// column in the zone it was actually written in.
 	it("converts payment/subscription timestamps to timestamptz", async () => {
 		const schema = await readFile(
-			new URL("../../../db/schema.ts", import.meta.url),
+			new URL("../../../db/schema/billing.ts", import.meta.url),
 			"utf8",
 		);
 		const paymentsTable = schema.slice(schema.indexOf("export const payments"));

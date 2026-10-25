@@ -125,6 +125,21 @@ describe("ThoughtLine settle contract", () => {
 		expect(seconds).toBeGreaterThanOrEqual(14);
 		expect(seconds).toBeLessThan(20);
 	});
+
+	it("does not fire onSettle when a line mounts already settled", () => {
+		const onSettle = vi.fn();
+		render(
+			<ThoughtLine
+				working={false}
+				label="Menyusun PRD"
+				doneLabel="PRD selesai"
+				startedAt={0}
+				finishedAt={1_000}
+				onSettle={onSettle}
+			/>,
+		);
+		expect(onSettle).not.toHaveBeenCalled();
+	});
 });
 
 describe("ThoughtLine settled outcome", () => {
@@ -196,6 +211,28 @@ describe("ThoughtLine settled outcome", () => {
 		).toBe(false);
 	});
 
+	it("moves a working line into the failed state instead of the success state", () => {
+		const { rerender, container } = renderLine({ activity: "Menyusun PRD" });
+		rerender(
+			<ThoughtLine
+				working={false}
+				failed
+				label="ScrapeLabel"
+				doneLabel="ScrapeLabel selesai"
+				failedLabel="Gagal menyusun PRD"
+				activity="Menyusun PRD"
+			/>,
+		);
+		expect(container.textContent).toContain("Gagal menyusun PRD");
+		expect(container.textContent).not.toContain("ScrapeLabel selesai");
+		expect(
+			hasAttr(container.querySelector(".thought-line"), "data-failed"),
+		).toBe(true);
+		expect(
+			hasAttr(container.querySelector(".thought-line"), "data-working"),
+		).toBe(false);
+	});
+
 	it("shows the model's real streamed reasoning verbatim", () => {
 		const { container } = render(
 			<ThoughtLine
@@ -241,6 +278,19 @@ describe("ThoughtLine trace folding", () => {
 		expect(hasAttr(steps[0] ?? null, "data-done")).toBe(true);
 		expect(hasAttr(steps[1] ?? null, "data-done")).toBe(false);
 		expect(steps[1]?.querySelector(".thought-line__pulse")).not.toBeNull();
+	});
+
+	it("toggles the trace open and closed from the header control", () => {
+		const { container } = renderLine({ steps: STEPS });
+		const head = container.querySelector("button.thought-line__head");
+		expect(head).toBeInstanceOf(HTMLButtonElement);
+		if (!(head instanceof HTMLButtonElement)) throw new Error("missing head");
+		const trace = () => container.querySelector(".thought-line__trace");
+		expect(hasAttr(trace(), "data-open")).toBe(true);
+		act(() => head.click());
+		expect(hasAttr(trace(), "data-open")).toBe(false);
+		act(() => head.click());
+		expect(hasAttr(trace(), "data-open")).toBe(true);
 	});
 
 	it("renders no trace at all when there is no real step or reasoning data", () => {

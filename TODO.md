@@ -150,25 +150,32 @@ File monster historis dari fase awal telah berhasil didekonstruksi sepenuhnya:
 
 #### Sisa File Melebihi Batas 400 Baris (Target Refactor Aktif)
 
-Berdasarkan audit riil codebase per Oktober 2026, tersisa 2 file implementasi produksi yang melebihi batas 400 baris:
+Berdasarkan audit riil codebase setelah refactor credit modal (per Oktober 2026), tersisa 1 file implementasi produksi yang melebihi batas 400 baris. `src/routeTree.gen.ts` dikecualikan karena generated source.
 
-1. **`src/components/ui/thought-line.tsx` (521 baris):**
+1. **`src/components/ui/thought-line.tsx` (548 baris $\rightarrow$ 142 baris):** $\checkmark$ Selesai 2026-10-25.
    - Menampung visualisasi stream reasoning AI, animasi pulse, expand/collapse state, markdown typewriter, dan telemetry.
-   - [ ] Ekstraksi renderer animasi dan collapsible header ke sub-komponen terpisah di `src/components/ui/thought-line/`.
-   - [ ] Ekstraksi kalkulasi step timing ke custom hook `use-thought-stream.ts`.
-   - [ ] Ringankan `thought-line.tsx` hingga $\le$ 300 baris.
+   - [x] Ekstraksi renderer animasi dan collapsible header ke sub-komponen terpisah di `src/components/ui/thought-line/` (`thought-line-header.tsx`, `thought-line-trace.tsx`).
+   - [x] Ekstraksi kalkulasi step timing ke custom hook `use-thought-stream.ts`, plus `thought-line-timing.ts` dan `thought-line-types.ts`.
+   - [x] Ringankan `thought-line.tsx` hingga $\le$ 300 baris.
 
-2. **`src/features/billing/components/credit-exhausted-modal.tsx` (408 baris):**
+2. **`src/features/billing/components/credit-exhausted-modal.tsx` (408 baris $\rightarrow$ 226 baris):** $\checkmark$ Selesai 2026-10-26.
    - Menampung dialog penolakan kredit habis, kalkulasi selisih top-up, pemilihan paket kredit Midtrans, trigger checkout Snap, dan fallback manual transfer.
-   - [ ] Ekstraksi paket selector card list ke `src/features/billing/components/credit-package-radio-group.tsx`.
-   - [ ] Ekstraksi payment flow trigger ke hook `use-credit-topup-dialog.ts`.
-   - [ ] Ringankan file modal menjadi orchestrator tipis $\le$ 250 baris.
+   - [x] Ekstraksi paket selector card list ke `src/features/billing/components/credit-package-radio-group.tsx` (102 baris, radio native + navigasi panah keyboard + radiogroup semantics).
+   - [x] Ekstraksi payment flow trigger ke hook `src/features/billing/hooks/use-credit-topup-dialog.ts` (146 baris, termasuk guard submit ganda).
+   - [x] Ekstraksi header dialog (close, ikon, judul, error, ringkasan kredit) ke `src/features/billing/components/credit-exhausted-modal-header.tsx` (97 baris).
+   - [x] Ringankan file modal menjadi orchestrator tipis $\le$ 250 baris (226 baris).
+   - Catatan: kontrak `POST /api/payments/create` (`planId`, `returnUrl`, `projectId`), resume-intent, aturan eligibility, dan redirect tidak berubah. Test `credit-exhausted-modal.test.tsx` diperluas menjadi 21 kasus.
+
+3. **`src/features/codebase/components/planning/codebase-resync-modal.tsx` (467 baris):** Belum selesai.
+   - Menampung step indicator 3 langkah, blok salin prompt re-sync, monitoring status snapshot, dan footer verifikasi.
+   - [ ] Ekstraksi step indicator dan blok "Salin instruksi" ke sub-komponen terpisah.
+   - [ ] Ringankan file modal hingga $\le$ 400 baris.
 
 #### Acceptance Criteria Refactor
 
-- [ ] Seluruh file kode produksi di bawah `src/` berukuran $\le$ 400 baris.
-- [ ] Nol type bypass (`as any`, `as never`, `@ts-ignore` dilarang per `no-type-bypass.md`).
-- [ ] Seluruh test suite Vitest tetap hijau tanpa pelunakan assertions.
+- [ ] Seluruh file kode produksi di bawah `src/` berukuran $\le$ 400 baris. Tersisa `codebase-resync-modal.tsx` (467 baris); `routeTree.gen.ts` dikecualikan sebagai generated source.
+- [x] Nol type bypass (`as any`, `as never`, `@ts-ignore` dilarang per `no-type-bypass.md`): terverifikasi nol pada source produksi authored.
+- [ ] Seluruh test suite Vitest tetap hijau tanpa pelunakan assertions. 5259 lulus, 3 gagal pre-existing di luar scope refactor: `agent-thinking.test.tsx` (timeout), `scrap.$id.test.tsx` (timeout), dan `payment-service.test.ts` (membaca facade `src/db/schema.ts` yang sudah dimodularisasi; tabel `payments`/`subscriptions` kini di `src/db/schema/billing.ts`).
 
 ---
 
@@ -252,7 +259,7 @@ export async function getResilientBrowser(): Promise<Browser> {
 
 ### Inisiatif 12: Infra & Deployment Overhaul — Migrasi Total dari Vercel ke Self-Hosted VPS (Docker, Caddy & Zero Vercel)
 
-- **Status:** `Not Started`
+- **Status:** `In Progress — local self-hosting preparation; VPS migration pending`
 - **Prioritas:** `P1` (Kritis untuk Mengeliminasi Serverless Timeout & Vendor Lock-In)
 - **Kompleksitas:** `Sedang - Tinggi`
 - **Tujuan:** Mengeliminasi ketergantungan pada Vercel secara 100%, menghapus seluruh artefak Vercel (`vercel.json`, Vercel Cron, env hacks), dan memigrasikan web TanStack Start SSR, Playwright Scrape Worker, Studio Worker, dan billing cron ke VPS Linux mandiri berbasis Docker Compose dan reverse proxy Caddy (automatic SSL Let's Encrypt).
@@ -284,14 +291,19 @@ flowchart TD
 
 #### Checklist Eksekusi Bertahap
 
-- [ ] **Fase 1 — Docker Packaging:** Buat multi-stage `Dockerfile` (Node 22, pnpm, build output `.output/server/index.mjs`) dan `docker-compose.yml` untuk web app dan worker daemons. Uji build lokal hingga lolos tanpa error.
-- [ ] **Fase 2 — Transisi Cron Billing:** Buat skrip cron mandiri atau systemd timer pada host VPS untuk menggantikan trigger Vercel Cron pada `/api/cron/billing` (`0 3 * * * curl -fsS -H "Authorization: Bearer $CRON_BILLING_SECRET" http://127.0.0.1:3000/api/cron/billing`).
-- [ ] **Fase 3 — Eliminasi Total Konfigurasi Vercel:**
-  - [ ] Hapus permanen `vercel.json` dari root repositori.
-  - [ ] Hapus fallback ke `process.env.CRON_SECRET` di `src/features/billing/services/billing-cron.server.ts` (gunakan hanya `CRON_BILLING_SECRET`).
-  - [ ] Sanitasi instruksi dan referensi Vercel di `.env.example` dan dokumentasi teknis.
-- [ ] **Fase 4 — Konfigurasi VPS & Reverse Proxy Caddy:** Siapkan instance VPS (Ubuntu/Debian), konfigurasi firewall (UFW 80, 443, 22), dan siapkan `Caddyfile` dengan automatic HTTPS Let's Encrypt, HTTP/3, dan reverse proxy ke port 3000.
-- [ ] **Fase 5 — Pipeline CI/CD:** Buat workflow GitHub Actions (`.github/workflows/deploy.yml`) untuk auto-deploy via SSH ke VPS saat push ke branch `main`.
+Persiapan lokal pada Inisiatif 12 dikerjakan melalui `docs/prompt-random/p4.md`; item belum selesai membutuhkan validasi Docker atau infrastruktur sungguhan.
+
+- [ ] **Fase 1 — Docker Packaging:** Implementasi multi-stage `Dockerfile` (Node 22, pnpm, Nitro Node server `.output/server/index.mjs`) dan Compose service web plus tiga worker; verifikasi `docker compose config`, build image, serta container smoke test pada host Docker (belum diverifikasi: Docker CLI tidak tersedia di lingkungan implementasi).
+- [ ] **Fase 2 — Transisi Cron Billing:**
+  - [ ] Compose scheduler mandiri opsional pada profile `scheduler`, target 03:00 UTC dan endpoint/secret terautentikasi; konfigurasi/build scheduler belum tervalidasi karena Docker CLI tidak tersedia.
+  - [x] Buat skrip cron mandiri provider-independent (`scripts/run-billing-cron.ts`, `pnpm cron:billing`) dengan timeout handling, zero-secret-leakage logging, dan dokumentasi host scheduler (`docs/deployment/billing-scheduler.md`).
+  - [ ] Aktivasi live scheduler / systemd timer pada host VPS (tertunda hingga VPS diprovisioning).
+- [x] **Fase 3 — Eliminasi Total Konfigurasi Vercel:**
+  - [x] Hapus permanen `vercel.json` dari root repositori.
+  - [x] Hapus fallback ke `process.env.CRON_SECRET` di `src/features/billing/services/billing-cron.server.ts` (gunakan hanya `CRON_BILLING_SECRET`).
+  - [x] Sanitasi instruksi dan referensi Vercel di `.env.example` dan dokumentasi teknis.
+- [ ] **Fase 4 — Konfigurasi VPS & Reverse Proxy Caddy:** Template `Caddyfile` localhost/parameterized domain dan panduan konfigurasi tersedia; provisioning VPS, firewall (UFW 80/443/22), DNS/domain, dan verifikasi HTTPS publik menunggu infrastruktur nyata.
+- [ ] **Fase 5 — Pipeline CI/CD:** Tidak ada remote deploy workflow tanpa VPS/otorisasi; build-only CI dapat ditambahkan setelah kebutuhan runner ditentukan.
 - [ ] **Fase 6 — Cutover & Verifikasi Live:** Arahkan DNS domain utama ke IP VPS, verifikasi sertifikat SSL otomatis, uji Better Auth login, Midtrans webhook callback, dan background workers.
 
 ---
