@@ -11,6 +11,8 @@
 			"**/src/**/*",
 			"**/.vscode/**/*",
 			"**/index.html",
+			"!**/playwright-report",
+			"!**/test-results",
 			"**/vite.config.ts",
 			"!**/src/routeTree.gen.ts",
 			"!**/src/features/studio/services/studio-skill-assets.generated.ts",

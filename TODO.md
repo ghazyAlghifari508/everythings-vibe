@@ -13,6 +13,7 @@ Dokumen ini merupakan **backlog aktif tunggal (Single Source of Truth)** untuk p
   - [Inisiatif 3: Refactoring & Clean Code — Dekonstruksi Sisa Modul Melebihi Batas 400 Baris](#inisiatif-3-refactoring-clean-code-dekonstruksi-sisa-modul-melebihi-batas-400-baris)
   - [Inisiatif 11: Infra & Scraping Optimization — Hybrid Remote Browser (Cloudflare Browser Run & Browserless.io Fallback)](#inisiatif-11-infra-scraping-optimization-hybrid-remote-browser-cloudflare-browser-run-browserlessio-fallback)
   - [Inisiatif 12: Infra & Deployment Overhaul — Migrasi Total dari Vercel ke Self-Hosted VPS (Docker, Caddy & Zero Vercel)](#inisiatif-12-infra-deployment-overhaul-migrasi-total-dari-vercel-ke-self-hosted-vps-docker-caddy-zero-vercel)
+  - [Inisiatif 13: Lint Gate Hygiene — Eliminasi Noise pnpm lint dari Artefak Generate](#inisiatif-13-lint-gate-hygiene--eliminasi-noise-pnpm-lint-dari-artefak-generate)
 - [2. Deferred Work](#2-deferred-work)
   - [Inisiatif 1: Architectural Backlog — Greenfield Workspace Routing Architecture Refactor](#inisiatif-1-architectural-backlog-greenfield-workspace-routing-architecture-refactor)
   - [Inisiatif 6: Runtime & Performance Optimization — Migrasi Node.js ke Bun](#inisiatif-6-runtime-performance-optimization-migrasi-nodejs-ke-bun)
@@ -293,6 +294,25 @@ flowchart TD
 - [ ] **Fase 4 — Konfigurasi VPS & Reverse Proxy Caddy:** Siapkan instance VPS (Ubuntu/Debian), konfigurasi firewall (UFW 80, 443, 22), dan siapkan `Caddyfile` dengan automatic HTTPS Let's Encrypt, HTTP/3, dan reverse proxy ke port 3000.
 - [ ] **Fase 5 — Pipeline CI/CD:** Buat workflow GitHub Actions (`.github/workflows/deploy.yml`) untuk auto-deploy via SSH ke VPS saat push ke branch `main`.
 - [ ] **Fase 6 — Cutover & Verifikasi Live:** Arahkan DNS domain utama ke IP VPS, verifikasi sertifikat SSL otomatis, uji Better Auth login, Midtrans webhook callback, dan background workers.
+
+---
+
+### Inisiatif 13: Lint Gate Hygiene — Eliminasi Noise pnpm lint dari Artefak Generate
+
+- **Status:** `In Progress`
+- **Prioritas:** `P1`
+- **Kompleksitas:** `Rendah` (Pengecualian artefak pada `biome.json`)
+- **Tujuan:** Menghilangkan 3.589 error semu dan 2.999 warning dari `playwright-report/index.html` agar `pnpm lint` bersih, cepat (<2s), dan dapat dipercaya sebagai quality gate.
+
+#### Temuan Audit & Solusi
+- **Penyebab:** Glob `**/index.html` pada `biome.json` mencocokkan artefak minified Playwright (`playwright-report/index.html`). Di dalam `src/` sebenarnya **0 error**.
+- **Perbaikan:** Menambahkan `!**/playwright-report` dan `!**/test-results` pada `files.includes` di `biome.json`.
+- **Hasil Terukur:** `pnpm lint` turun dari 3.589 error menjadi **0 error** (hanya tersisa 10 warning pre-existing di `globals.css`) dan durasi lint turun drastis dari ~57 detik menjadi ~1,1 detik.
+
+#### Checklist Eksekusi
+- [x] **Fase 1 — Pengecualian Artefak di Biome:** Tambahkan `!**/playwright-report` dan `!**/test-results` di `biome.json`.
+- [x] **Fase 2 — Verifikasi Reduksi Noise:** Jalankan `pnpm lint`, verifikasi turun menjadi 0 error.
+- [ ] **Fase 3 — Resolusi Sisa Warning CSS:** Selesaikan 10 warning `noImportantStyles` di `src/app/globals.css`.
 
 ---
 
