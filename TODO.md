@@ -160,8 +160,8 @@ Berdasarkan audit riil codebase setelah refactor credit modal (per Oktober 2026)
 
 2. **`src/features/billing/components/credit-exhausted-modal.tsx` (408 baris $\rightarrow$ 226 baris):** $\checkmark$ Selesai 2026-10-26.
    - Menampung dialog penolakan kredit habis, kalkulasi selisih top-up, pemilihan paket kredit Midtrans, trigger checkout Snap, dan fallback manual transfer.
-   - [x] Ekstraksi paket selector card list ke `src/features/billing/components/credit-package-radio-group.tsx` (130 baris, radio native + navigasi panah keyboard + radiogroup semantics).
-   - [x] Ekstraksi payment flow trigger ke hook `src/features/billing/hooks/use-credit-topup-dialog.ts` (150 baris, termasuk guard submit ganda).
+   - [x] Ekstraksi paket selector card list ke `src/features/billing/components/credit-package-radio-group.tsx` (102 baris, radio native + navigasi panah keyboard + radiogroup semantics).
+   - [x] Ekstraksi payment flow trigger ke hook `src/features/billing/hooks/use-credit-topup-dialog.ts` (146 baris, termasuk guard submit ganda).
    - [x] Ekstraksi header dialog (close, ikon, judul, error, ringkasan kredit) ke `src/features/billing/components/credit-exhausted-modal-header.tsx` (97 baris).
    - [x] Ringankan file modal menjadi orchestrator tipis $\le$ 250 baris (226 baris).
    - Catatan: kontrak `POST /api/payments/create` (`planId`, `returnUrl`, `projectId`), resume-intent, aturan eligibility, dan redirect tidak berubah. Test `credit-exhausted-modal.test.tsx` diperluas menjadi 21 kasus.
