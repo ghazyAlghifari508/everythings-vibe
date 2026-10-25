@@ -16,6 +16,7 @@ import { truncateText } from "./generation-context-build";
 export const askHandoffAnswerSchema = z.object({
 	question: z.string().min(1).max(500),
 	answer: z.string().min(1).max(2000),
+	questionId: z.string().max(128).optional(),
 });
 
 export const askHandoffQuestionSchema = z.object({
@@ -71,6 +72,8 @@ export const askHandoffSchema = z.object({
 		.optional(),
 	snapshotId: z.string().min(1).nullable().optional(),
 	state: askHandoffStateSchema.optional(),
+	expectedUpdatedAt: z.string().optional(),
+	updatedAt: z.string().optional(),
 });
 
 export type AskHandoff = z.infer<typeof askHandoffSchema>;
@@ -149,6 +152,10 @@ export function sanitizeAskHandoff(input: AskHandoff): AskHandoff {
 			: {}),
 		...(input.snapshotId ? { snapshotId: input.snapshotId } : {}),
 		...(input.state ? { state: sanitizeAskHandoffState(input.state) } : {}),
+		...(input.updatedAt ? { updatedAt: input.updatedAt } : {}),
+		...(input.expectedUpdatedAt
+			? { expectedUpdatedAt: input.expectedUpdatedAt }
+			: {}),
 	};
 }
 
@@ -165,9 +172,10 @@ export function buildAskHandoffPrompt(
  *  never thrown, so a corrupt handoff degrades to empty answers. */
 export function parseStoredHandoffAnswers(
 	value: unknown,
-): Array<{ question: string; answer: string }> {
+): Array<{ question: string; answer: string; questionId?: string }> {
 	if (!Array.isArray(value)) return [];
-	const out: Array<{ question: string; answer: string }> = [];
+	const out: Array<{ question: string; answer: string; questionId?: string }> =
+		[];
 	for (const entry of value) {
 		if (
 			typeof entry === "object" &&
@@ -177,7 +185,17 @@ export function parseStoredHandoffAnswers(
 		) {
 			const question = (entry as { question: string }).question.trim();
 			const answer = (entry as { answer: string }).answer.trim();
-			if (question && answer) out.push({ question, answer });
+			const questionId =
+				typeof (entry as { questionId?: unknown }).questionId === "string"
+					? (entry as { questionId: string }).questionId.trim()
+					: undefined;
+			if (question && answer) {
+				out.push({
+					question,
+					answer,
+					...(questionId ? { questionId } : {}),
+				});
+			}
 		}
 	}
 	return out.slice(0, CODEBASE_ASK_HANDOFF_MAX_ANSWERS);

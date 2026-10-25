@@ -55,7 +55,10 @@ export async function handleAskOptionsRequest(
 	try {
 		user = await requireUser(request.headers);
 	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+		return Response.json(
+			{ error: "Unauthorized", code: "SESSION_EXPIRED" },
+			{ status: 401 },
+		);
 	}
 
 	const body = (await request.json().catch(() => ({}))) as {
@@ -75,11 +78,17 @@ export async function handleAskOptionsRequest(
 		handoff,
 	} = body;
 	if (!projectId)
-		return Response.json({ error: "Project ID required" }, { status: 400 });
+		return Response.json(
+			{ error: "Project ID required", code: "HANDOFF_VALIDATION_FAILED" },
+			{ status: 400 },
+		);
 	const isHandoffAction = action === "save-handoff" || action === "get-handoff";
 	if (!isHandoffAction) {
 		if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
-			return Response.json({ error: "Prompt required" }, { status: 400 });
+			return Response.json(
+				{ error: "Prompt required", code: "HANDOFF_VALIDATION_FAILED" },
+				{ status: 400 },
+			);
 		}
 		// Documented upper bound (same contract as the home input): unbounded
 		// prompts exhaust model context and inflate cost.
@@ -87,6 +96,7 @@ export async function handleAskOptionsRequest(
 			return Response.json(
 				{
 					error: `Prompt terlalu panjang (maksimal ${MAX_PROMPT_LENGTH} karakter).`,
+					code: "HANDOFF_VALIDATION_FAILED",
 				},
 				{ status: 400 },
 			);
@@ -121,14 +131,18 @@ export async function handleAskOptionsRequest(
 		)
 		.limit(1);
 	if (!project)
-		return Response.json({ error: "Project not found" }, { status: 404 });
+		return Response.json(
+			{ error: "Project not found", code: "PROJECT_NOT_FOUND" },
+			{ status: 404 },
+		);
 
-	// Rate-limit AFTER the ownership check so failed guesses and 404s never
-	// consume the caller's quota.
-	const rateCheck = await checkRateLimit(user.id, plan, "api_call");
+	// Rate-limit AFTER ownership check: separate AI generation from handoff storage/reads
+	// so persistence never starves from generation quotas.
+	const rateAction = isHandoffAction ? "sync_status_read" : "api_call";
+	const rateCheck = await checkRateLimit(user.id, plan, rateAction);
 	if (!rateCheck.allowed)
 		return Response.json(
-			{ error: "Too many requests", retryAfter: 60 },
+			{ error: "Too many requests", code: "RATE_LIMITED", retryAfter: 60 },
 			{ status: 429 },
 		);
 
