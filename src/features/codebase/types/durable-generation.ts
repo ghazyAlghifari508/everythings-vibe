@@ -31,6 +31,7 @@ export interface DurableGenerationClaim {
 	attempt: number;
 	input: Record<string, unknown>;
 	source?: DurableGenerationSource | null;
+	baselineArtifactId?: string | null;
 	signal: AbortSignal;
 }
 
