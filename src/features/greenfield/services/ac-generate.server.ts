@@ -49,6 +49,7 @@ export interface TrustedExecutionContext {
 	userId?: string;
 	signal?: AbortSignal;
 	billingKey?: string;
+	beforePersist?: () => Promise<void> | void;
 }
 
 export async function handleAcGenerateRequest(
@@ -158,6 +159,7 @@ export async function handleAcGenerateRequest(
 				completeAcGeneration(run, {
 					userId: user.id,
 					projectId,
+					beforePersist: executionContext?.beforePersist,
 					prdContent,
 					projectLanguage: project.language,
 					projectMode: project.projectMode,
@@ -190,6 +192,7 @@ export async function handleAcGenerateRequest(
 interface AcGenerationContext {
 	userId: string;
 	projectId: string;
+	beforePersist?: () => Promise<void> | void;
 	prdContent: string;
 	projectLanguage: string | null;
 	projectMode: string | null;
@@ -261,6 +264,26 @@ async function completeAcGeneration(
 		await guards.release("generation truncated");
 		await guards.fail(TRUNCATED_MESSAGE);
 		return;
+	}
+
+	if (signal.aborted) {
+		await guards.release("generation aborted before persist");
+		await guards.fail("Generasi AC dibatalkan.");
+		return;
+	}
+
+	if (input.beforePersist) {
+		try {
+			await input.beforePersist();
+		} catch (fenceErr) {
+			const msg =
+				fenceErr instanceof Error
+					? fenceErr.message
+					: "Persist fence check failed";
+			await guards.release(msg);
+			await guards.fail(msg);
+			return;
+		}
 	}
 
 	let saved = false;

@@ -57,6 +57,7 @@ export interface TrustedExecutionContext {
 	userId?: string;
 	signal?: AbortSignal;
 	billingKey?: string;
+	beforePersist?: () => Promise<void> | void;
 }
 
 export async function handleFeatureGenerateRequest(
@@ -90,9 +91,9 @@ export async function handleFeatureGenerateRequest(
 			name: projects.name,
 			description: projects.description,
 			language: projects.language,
-			projectMode: projects.projectMode,
-			featuresStatus: projects.featuresStatus,
 			featureTree: projects.featureTree,
+			featuresStatus: projects.featuresStatus,
+			projectMode: projects.projectMode,
 		})
 		.from(projects)
 		.where(
@@ -198,7 +199,16 @@ export async function handleFeatureGenerateRequest(
 				}
 				codebaseBlock = buildCodebasePromptBlock(required.context);
 			} catch (e) {
-				console.warn("fitur codebase context skipped:", e);
+				await releaseClaim();
+				console.error("fitur codebase context failed:", e);
+				return Response.json(
+					{
+						error:
+							"Konteks repositori tidak dapat dibaca. Muat ulang workspace lalu coba lagi.",
+						code: "CODEBASE_CONTEXT_UNAVAILABLE",
+					},
+					{ status: 500 },
+				);
 			}
 		}
 
@@ -273,6 +283,28 @@ export async function handleFeatureGenerateRequest(
 				},
 				{ status: 500 },
 			);
+		}
+
+		if (signal.aborted) {
+			await releaseClaim();
+			return Response.json(
+				{ error: "Generasi daftar fitur dibatalkan." },
+				{ status: 499 },
+			);
+		}
+
+		if (executionContext?.beforePersist) {
+			try {
+				await executionContext.beforePersist();
+			} catch (fenceErr) {
+				await releaseClaim();
+				const msg =
+					fenceErr instanceof Error
+						? fenceErr.message
+						: "Persist fence check failed";
+				const code = (fenceErr as { code?: string }).code || "FENCE_REJECTED";
+				return Response.json({ error: msg, code }, { status: 409 });
+			}
 		}
 
 		const stamped = { ...tree, createdAt: new Date().toISOString() };

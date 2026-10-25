@@ -1,188 +1,58 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db";
-import { creditOperations, projects } from "@/db/schema";
+import { projects } from "@/db/schema";
 import { handleAcGenerateRequest } from "@/features/greenfield/services/ac-generate.server";
 import { handleAskOptionsRequest } from "@/features/greenfield/services/ask-options-route.server";
 import { handleFeatureGenerateRequest } from "@/features/greenfield/services/feature-generate.server";
 import { handlePrdChatRequest } from "@/features/greenfield/services/prd-chat-route.server";
 import { handleTaskGenerateRequest } from "@/features/greenfield/services/task-generate.server";
-import {
-	isReleasableReservation,
-	quarantineCreditOperation,
-	releaseCreditOperation,
-} from "@/lib/services/credit-service";
-import { readSseStream } from "@/lib/sse-stream";
 import type {
 	DurableGenerationClaim,
 	WorkspaceGenerationExecutionResult,
-	WorkspaceGenerationStage,
 } from "../types/durable-generation";
+import { verifyClaimLeaseFence } from "./durable-generation-fence";
 import { readWorkspaceGenerationArtifact } from "./workspace-generation-artifact.server";
+import {
+	computeJobBillingKey,
+	prepareStageCreditGuard,
+	recoverStaleGenerationState,
+} from "./workspace-generation-credit.server";
+import { resolveWorkspaceGenerationSource } from "./workspace-generation-source.server";
+import {
+	drainGenerationSseStream,
+	type GenerationEventListener,
+	type WorkspaceGenerationLiveEvent,
+} from "./workspace-generation-stream.server";
 
-export interface WorkspaceGenerationLiveEvent {
-	type: string;
-	stage: WorkspaceGenerationStage;
-	phase?: "thinking" | "generating" | "done" | "error";
-	summaryMessage?: string;
-	error?: string;
-	[key: string]: unknown;
-}
+export {
+	drainGenerationSseStream,
+	prepareStageCreditGuard,
+	recoverStaleGenerationState,
+	type GenerationEventListener,
+	type WorkspaceGenerationLiveEvent,
+};
 
-export type GenerationEventListener = (
-	event: WorkspaceGenerationLiveEvent,
-) => void;
+const questionsInputSchema = z.object({
+	prompt: z.string().trim().min(1).default(""),
+	platform: z.enum(["web", "mobile"]).default("web"),
+	language: z.enum(["id", "en"]).optional(),
+});
 
-/**
- * Pre-execution audit and guard for credit safety:
- * - If an existing credit operation is quarantined: forbid execution pending accounting review.
- * - If an existing credit operation is stuck in running from a prior crashed attempt without an artifact:
- *   release or quarantine it before initiating a new attempt.
- */
-export async function prepareStageCreditGuard(
-	claim: DurableGenerationClaim,
-): Promise<void> {
-	if (claim.stage !== "prd" && claim.stage !== "ac" && claim.stage !== "task") {
-		return;
-	}
+const featureInputSchema = z.object({
+	retry: z.boolean().optional(),
+});
 
-	const existingCredits = await db
-		.select({
-			id: creditOperations.id,
-			state: creditOperations.state,
-		})
-		.from(creditOperations)
-		.where(
-			and(
-				eq(creditOperations.userId, claim.userId),
-				eq(creditOperations.projectId, claim.projectId),
-				eq(creditOperations.stage, claim.stage),
-			),
-		)
-		.orderBy(desc(creditOperations.createdAt))
-		.limit(5);
-
-	for (const op of existingCredits) {
-		if (op.state === "quarantined") {
-			const err = new Error(
-				`Credit operation ${op.id} is quarantined; retry forbidden pending review.`,
-			);
-			(err as { code?: string }).code = "CREDIT_QUARANTINED";
-			throw err;
-		}
-
-		if (op.state === "running") {
-			const artifact = await readWorkspaceGenerationArtifact(
-				claim.userId,
-				claim.projectId,
-				claim.stage,
-			);
-			if (!artifact) {
-				// Prior worker crashed mid-generation without an artifact.
-				// Settle/release prior reservation once before allowing new attempt.
-				try {
-					await releaseCreditOperation({
-						userId: claim.userId,
-						operationId: op.id,
-						reason: `Pre-execution cleanup: crashed run for operation ${claim.operationId}`,
-					});
-				} catch {
-					await quarantineCreditOperation({
-						userId: claim.userId,
-						operationId: op.id,
-						reason: `Pre-execution quarantine: crashed run for operation ${claim.operationId}`,
-					}).catch(() => {});
-				}
-			}
-		}
-	}
-}
-
-/**
- * Drains an SSE stream from greenfield generation routes (PRD, AC, Task).
- * Forwards genuine streaming events to optional listener while ensuring
- * raw internal model private reasoning tokens are not leaked.
- */
-export async function drainGenerationSseStream(
-	body: ReadableStream<Uint8Array> | null | undefined,
-	stage: WorkspaceGenerationStage,
-	signal?: AbortSignal,
-	onEvent?: GenerationEventListener,
-): Promise<{ ok: boolean; donePayload?: unknown; error?: string }> {
-	if (!body) return { ok: true };
-	let streamError: string | null = null;
-	let donePayload: unknown = null;
-
-	for await (const raw of readSseStream(body)) {
-		if (signal?.aborted) {
-			const abortErr = new Error("Generation operation aborted by worker");
-			abortErr.name = "AbortError";
-			throw abortErr;
-		}
-		try {
-			const parsed = JSON.parse(raw);
-			if (parsed && typeof parsed === "object") {
-				if (parsed.type === "error") {
-					streamError =
-						typeof parsed.error === "string"
-							? parsed.error
-							: "Generasi AI gagal di tengah jalan.";
-					onEvent?.({
-						type: "error",
-						stage,
-						phase: "error",
-						error: streamError,
-					});
-				} else if (parsed.type === "done") {
-					donePayload = parsed;
-					onEvent?.({
-						type: "done",
-						stage,
-						phase: "done",
-						summaryMessage:
-							typeof parsed.summaryMessage === "string"
-								? parsed.summaryMessage
-								: undefined,
-					});
-				} else if (parsed.type === "started") {
-					onEvent?.({
-						type: "started",
-						stage,
-						phase: "generating",
-					});
-				} else if (
-					parsed.type === "thinking" ||
-					parsed.type === "thinking_reset"
-				) {
-					// Safe activity event: emit high-level activity phase without leaking raw private reasoning
-					onEvent?.({
-						type: "activity",
-						stage,
-						phase: "thinking",
-					});
-				} else if (parsed.type === "delta") {
-					onEvent?.({
-						type: "delta",
-						stage,
-						phase: "generating",
-					});
-				}
-			}
-		} catch {
-			// Ignore malformed non-JSON chunk
-		}
-	}
-
-	if (streamError) {
-		throw new Error(streamError);
-	}
-	return { ok: true, donePayload };
-}
+const prdInputSchema = z.object({
+	message: z.string().trim().min(1).default(""),
+	mode: z.literal("generate").default("generate"),
+});
 
 /**
  * Core stage execution adapter.
  * Runs accepted background generation operations using existing greenfield handlers
  * without requiring session credentials, passes worker AbortSignal and stable job billing key,
- * drains live SSE events, and validates persisted artifacts before completion.
+ * checks beforePersist fences, drains live SSE events, and validates persisted artifacts before completion.
  */
 export async function executeWorkspaceGenerationStage(
 	claim: DurableGenerationClaim,
@@ -194,40 +64,103 @@ export async function executeWorkspaceGenerationStage(
 		throw abortErr;
 	}
 
-	// Credit safety guard check
+	// Source revision check BEFORE invoking AI: context cannot change silently
+	if (claim.source?.inputRevision) {
+		const initialSource = await resolveWorkspaceGenerationSource(
+			claim.userId,
+			claim.projectId,
+			claim.stage,
+		);
+		if (
+			!initialSource ||
+			"code" in initialSource ||
+			initialSource.inputRevision !== claim.source.inputRevision
+		) {
+			const err = new Error(
+				"Source context revision changed before AI generation",
+			);
+			(err as { code?: string }).code = "SOURCE_REVISION_MISMATCH";
+			throw err;
+		}
+	}
+
+	// Credit safety guard check scoped to exact billingKey
 	await prepareStageCreditGuard(claim);
 
-	const billingKey = `${claim.projectId}:${claim.stage}:${claim.operationId}`;
+	const billingKey = computeJobBillingKey(
+		claim.projectId,
+		claim.stage,
+		claim.operationId,
+	);
+
+	// Advisory and lease fence check before any persisted artifact is written
+	const beforePersist = async (): Promise<void> => {
+		if (claim.signal?.aborted) {
+			const abortErr = new Error("Generation operation aborted before persist");
+			abortErr.name = "AbortError";
+			throw abortErr;
+		}
+
+		if (claim.token) {
+			const leaseValid = await verifyClaimLeaseFence(
+				claim.operationId,
+				claim.token,
+			);
+			if (!leaseValid) {
+				const leaseErr = new Error(
+					"Worker lease fence check failed before persist",
+				);
+				(leaseErr as { code?: string }).code = "LEASE_EXPIRED";
+				throw leaseErr;
+			}
+		}
+
+		if (claim.source?.inputRevision) {
+			const currentSource = await resolveWorkspaceGenerationSource(
+				claim.userId,
+				claim.projectId,
+				claim.stage,
+			);
+			if (
+				!currentSource ||
+				"code" in currentSource ||
+				currentSource.inputRevision !== claim.source.inputRevision
+			) {
+				const mismatchErr = new Error(
+					"Source context revision changed during AI generation before persist",
+				);
+				(mismatchErr as { code?: string }).code = "SOURCE_REVISION_MISMATCH";
+				throw mismatchErr;
+			}
+		}
+	};
+
 	const context = {
 		userId: claim.userId,
 		signal: claim.signal,
 		billingKey,
+		beforePersist,
 	};
 
+	// claim.baselineArtifactId is a trusted backend field on the claim, with fallback to claim.input.baselineArtifactId
 	const baselineArtifactId =
-		typeof claim.input.baselineArtifactId === "string"
-			? claim.input.baselineArtifactId
-			: null;
+		claim.baselineArtifactId ??
+		((claim.input as Record<string, unknown> | undefined)?.baselineArtifactId as
+			| string
+			| undefined) ??
+		null;
 
 	switch (claim.stage) {
 		case "questions": {
-			const prompt =
-				typeof claim.input.prompt === "string" ? claim.input.prompt : "";
-			const platform =
-				claim.input.platform === "mobile" ? "mobile" : "web";
-			const language =
-				typeof claim.input.language === "string"
-					? claim.input.language
-					: undefined;
-
+			const parsed = questionsInputSchema.parse(claim.input);
 			const req = new Request("http://internal/api/ask/options", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					projectId: claim.projectId,
-					prompt,
-					platform,
-					language,
+					prompt: parsed.prompt,
+					platform: parsed.platform,
+					language: parsed.language,
 				}),
 				signal: claim.signal,
 			});
@@ -246,8 +179,8 @@ export async function executeWorkspaceGenerationStage(
 		}
 
 		case "feature": {
-			// If this is a retry or explicit reset, clear completed status so feature handler doesn't just return stale cache
-			if (claim.input.retry) {
+			const parsed = featureInputSchema.parse(claim.input);
+			if (parsed.retry) {
 				await db
 					.update(projects)
 					.set({ featuresStatus: "pending" })
@@ -265,22 +198,26 @@ export async function executeWorkspaceGenerationStage(
 			if (!response.ok) {
 				const body = (await response.json().catch(() => ({}))) as {
 					error?: string;
+					code?: string;
 				};
-				throw new Error(body.error || "Feature specification generation failed");
+				const err = new Error(
+					body.error || "Feature specification generation failed",
+				);
+				if (body.code) (err as { code?: string }).code = body.code;
+				throw err;
 			}
 			break;
 		}
 
 		case "prd": {
-			const message =
-				typeof claim.input.message === "string" ? claim.input.message : "";
+			const parsed = prdInputSchema.parse(claim.input);
 			const req = new Request("http://internal/api/chat", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					projectId: claim.projectId,
-					message,
-					mode: "generate",
+					message: parsed.message,
+					mode: parsed.mode,
 				}),
 				signal: claim.signal,
 			});
@@ -289,11 +226,19 @@ export async function executeWorkspaceGenerationStage(
 			if (!response.ok) {
 				const body = (await response.json().catch(() => ({}))) as {
 					error?: string;
+					code?: string;
 				};
-				throw new Error(body.error || "PRD generation setup failed");
+				const err = new Error(body.error || "PRD generation setup failed");
+				if (body.code) (err as { code?: string }).code = body.code;
+				throw err;
 			}
 
-			await drainGenerationSseStream(response.body, "prd", claim.signal, onEvent);
+			await drainGenerationSseStream(
+				response.body,
+				"prd",
+				claim.signal,
+				onEvent,
+			);
 			break;
 		}
 
@@ -309,11 +254,19 @@ export async function executeWorkspaceGenerationStage(
 			if (!response.ok) {
 				const body = (await response.json().catch(() => ({}))) as {
 					error?: string;
+					code?: string;
 				};
-				throw new Error(body.error || "AC generation setup failed");
+				const err = new Error(body.error || "AC generation setup failed");
+				if (body.code) (err as { code?: string }).code = body.code;
+				throw err;
 			}
 
-			await drainGenerationSseStream(response.body, "ac", claim.signal, onEvent);
+			await drainGenerationSseStream(
+				response.body,
+				"ac",
+				claim.signal,
+				onEvent,
+			);
 			break;
 		}
 
@@ -329,11 +282,19 @@ export async function executeWorkspaceGenerationStage(
 			if (!response.ok) {
 				const body = (await response.json().catch(() => ({}))) as {
 					error?: string;
+					code?: string;
 				};
-				throw new Error(body.error || "Task generation setup failed");
+				const err = new Error(body.error || "Task generation setup failed");
+				if (body.code) (err as { code?: string }).code = body.code;
+				throw err;
 			}
 
-			await drainGenerationSseStream(response.body, "task", claim.signal, onEvent);
+			await drainGenerationSseStream(
+				response.body,
+				"task",
+				claim.signal,
+				onEvent,
+			);
 			break;
 		}
 
@@ -350,7 +311,7 @@ export async function executeWorkspaceGenerationStage(
 		claim.stage,
 	);
 
-	if (!artifact) {
+	if (!artifact || !artifact.artifactId) {
 		const persistenceErr = new Error(
 			`Artifact was not persisted to database for stage ${claim.stage}`,
 		);
@@ -376,106 +337,4 @@ export async function executeWorkspaceGenerationStage(
 		artifactId: artifact.artifactId,
 		result: artifact.result,
 	};
-}
-
-/**
- * Recovers stale or interrupted generation status after server crash or disconnect.
- * Reconciles DB generation lock and credit state against actual persisted artifacts.
- */
-export async function recoverStaleGenerationState(
-	userId: string,
-	projectId: string,
-	stage: WorkspaceGenerationStage,
-): Promise<{ recovered: boolean; artifactId?: string | null; reset?: boolean }> {
-	// 1. Check if a valid artifact was already persisted before crash
-	const artifact = await readWorkspaceGenerationArtifact(
-		userId,
-		projectId,
-		stage,
-	);
-
-	if (artifact) {
-		// Artifact exists: ensure stage lock is set to completed
-		if (stage === "feature") {
-			await db
-				.update(projects)
-				.set({ featuresStatus: "completed" })
-				.where(eq(projects.id, projectId));
-		} else if (stage === "task") {
-			await db
-				.update(projects)
-				.set({ taskStatus: "completed" })
-				.where(eq(projects.id, projectId));
-		} else if (stage === "ac") {
-			await db
-				.update(projects)
-				.set({ acStatus: "completed" })
-				.where(eq(projects.id, projectId));
-		}
-		return { recovered: true, artifactId: artifact.artifactId };
-	}
-
-	// 2. No artifact persisted: release or quarantine stuck credit operations & reset lock
-	if (stage === "feature") {
-		await db
-			.update(projects)
-			.set({ featuresStatus: "pending" })
-			.where(
-				and(
-					eq(projects.id, projectId),
-					eq(projects.featuresStatus, "generating"),
-				),
-			);
-	} else if (stage === "ac") {
-		await db
-			.update(projects)
-			.set({ acStatus: "pending" })
-			.where(
-				and(eq(projects.id, projectId), eq(projects.acStatus, "generating")),
-			);
-	} else if (stage === "task") {
-		await db
-			.update(projects)
-			.set({ taskStatus: "pending" })
-			.where(
-				and(eq(projects.id, projectId), eq(projects.taskStatus, "generating")),
-			);
-	}
-
-	// Clean up stale credit reservation for paid stages
-	if (stage === "prd" || stage === "ac" || stage === "task") {
-		const stuckOps = await db
-			.select({ id: creditOperations.id, state: creditOperations.state })
-			.from(creditOperations)
-			.where(
-				and(
-					eq(creditOperations.userId, userId),
-					eq(creditOperations.projectId, projectId),
-					eq(creditOperations.stage, stage),
-					inArray(creditOperations.state, ["quoted", "reserved", "running"]),
-				),
-			)
-			.orderBy(desc(creditOperations.createdAt));
-
-		for (const op of stuckOps) {
-			if (isReleasableReservation(op.state)) {
-				try {
-					await releaseCreditOperation({
-						userId,
-						operationId: op.id,
-						reason: "Stale generating recovery: process crashed without artifact",
-					});
-				} catch {
-					// Best-effort release, quarantine on error
-					await quarantineCreditOperation({
-						userId,
-						operationId: op.id,
-						reason: "Stale generating quarantine during recovery",
-					}).catch(() => {});
-				}
-			}
-		}
-	}
-
-	return { recovered: true, reset: true };
 }

@@ -45,6 +45,8 @@ export interface PrdTurnGuards {
 export interface PrdTurnPersistInput {
 	guards: PrdTurnGuards;
 	userId: string;
+	signal?: AbortSignal;
+	beforePersist?: () => Promise<void> | void;
 	plan: Plan;
 	mode: PrdChatMode;
 	message: string;
@@ -133,6 +135,22 @@ export async function persistPrdTurn(
 	if (!targetId) {
 		await guards.fail("Project or conversation ID is missing");
 		return { stopped: true };
+	}
+
+	if (input.signal?.aborted) {
+		await guards.fail("Generasi PRD dibatalkan.");
+		return { stopped: true };
+	}
+
+	if (input.beforePersist) {
+		try {
+			await input.beforePersist();
+		} catch (fenceErr) {
+			const msg =
+				fenceErr instanceof Error ? fenceErr.message : "Persist fence failed";
+			await guards.fail(msg);
+			return { stopped: true };
+		}
 	}
 
 	let saveResult: Awaited<ReturnType<typeof savePrdVersion>>;

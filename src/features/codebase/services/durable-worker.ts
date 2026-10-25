@@ -1,16 +1,8 @@
 import { config } from "dotenv";
 import type {
 	DurableGenerationClaim,
-	WorkspaceGenerationExecutionResult,
 	WorkspaceGenerationExecutor,
 } from "../types/durable-generation";
-import {
-	claimNextGenerationOperation,
-	executeGenerationOperationBounded,
-	recoverStaleGenerationOperations,
-} from "./durable-generation.server";
-
-config({ path: [".env.local", ".env"] });
 
 export const WORKER_POLL_INTERVAL_MS = 2_000;
 export const STALE_RECOVERY_INTERVAL_MS = 30_000;
@@ -21,32 +13,29 @@ export interface DurableWorkerConfig {
 	executor?: WorkspaceGenerationExecutor;
 }
 
-let activeExecutor: WorkspaceGenerationExecutor = async (
-	claim: DurableGenerationClaim,
-): Promise<WorkspaceGenerationExecutionResult> => {
-	console.warn(
-		`[DurableWorker] No custom executor registered for stage ${claim.stage}. Simulating or waiting for stage handler.`,
+const defaultExecutor: WorkspaceGenerationExecutor = async (claim) => {
+	const { executeWorkspaceGenerationStage } = await import(
+		"./workspace-generation-executor.server"
 	);
-	return { artifactId: null, result: null };
+	return executeWorkspaceGenerationStage(claim);
 };
 
-export function registerWorkspaceGenerationExecutor(
-	executor: WorkspaceGenerationExecutor,
-): void {
-	activeExecutor = executor;
-}
-
-export function getActiveWorkspaceGenerationExecutor(): WorkspaceGenerationExecutor {
-	return activeExecutor;
-}
-
 export async function runDurableWorkerLoop(
-	config: DurableWorkerConfig = {},
+	workerConfig: DurableWorkerConfig = {},
 	stopSignal?: AbortSignal,
 ): Promise<void> {
-	const workerId = config.workerId ?? `worker-${process.pid}`;
-	const pollMs = config.pollIntervalMs ?? WORKER_POLL_INTERVAL_MS;
-	const executor = config.executor ?? activeExecutor;
+	// Execute dotenv config before dynamically loading DB and server generation modules
+	config({ path: [".env.local", ".env"] });
+
+	const {
+		claimNextGenerationOperation,
+		executeGenerationOperationBounded,
+		recoverStaleGenerationOperations,
+	} = await import("./durable-generation.server");
+
+	const workerId = workerConfig.workerId ?? `worker-${process.pid}`;
+	const pollMs = workerConfig.pollIntervalMs ?? WORKER_POLL_INTERVAL_MS;
+	const executor = workerConfig.executor ?? defaultExecutor;
 
 	let lastRecovery = 0;
 
@@ -72,7 +61,18 @@ export async function runDurableWorkerLoop(
 		}
 
 		if (!claim) {
-			await new Promise((resolve) => setTimeout(resolve, pollMs));
+			if (stopSignal?.aborted) break;
+			await new Promise<void>((resolve) => {
+				const timer = setTimeout(resolve, pollMs);
+				stopSignal?.addEventListener(
+					"abort",
+					() => {
+						clearTimeout(timer);
+						resolve();
+					},
+					{ once: true },
+				);
+			});
 			continue;
 		}
 
@@ -80,7 +80,13 @@ export async function runDurableWorkerLoop(
 			console.info(
 				`[DurableWorker ${workerId}] Processing operation ${claim.operationId} (stage: ${claim.stage}, attempt: ${claim.attempt})`,
 			);
-			await executeGenerationOperationBounded(claim, executor);
+			const executionClaim: DurableGenerationClaim = {
+				...claim,
+				signal: stopSignal
+					? AbortSignal.any([claim.signal, stopSignal])
+					: claim.signal,
+			};
+			await executeGenerationOperationBounded(executionClaim, executor);
 		} catch (execError) {
 			console.error(
 				`[DurableWorker ${workerId}] Failed processing operation ${claim.operationId}:`,

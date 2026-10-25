@@ -39,6 +39,7 @@ export interface TaskPersistenceInput {
 	run: GenerationRun;
 	projectId: string;
 	userId: string;
+	beforePersist?: () => Promise<void> | void;
 	fullResponse: string;
 	finishReason: string | undefined;
 	acMarkdown: string;
@@ -175,6 +176,26 @@ export async function persistGeneratedTaskTree(
 			scopeEvidence: input.scopeEvidence,
 			emit: sse.send,
 		});
+		if (signal.aborted) {
+			await guards.release("task generation aborted before persist");
+			await guards.fail("Generasi Task dibatalkan.");
+			return;
+		}
+
+		if (input.beforePersist) {
+			try {
+				await input.beforePersist();
+			} catch (fenceErr) {
+				const msg =
+					fenceErr instanceof Error
+						? fenceErr.message
+						: "beforePersist fence failed";
+				await guards.release(msg);
+				await guards.fail(msg);
+				return;
+			}
+		}
+
 		const saveResult = await saveTaskTree(input.projectId, scopedTree);
 		if (input.codebaseSnapshotId && saveResult.success) {
 			await linkGenerationContext(

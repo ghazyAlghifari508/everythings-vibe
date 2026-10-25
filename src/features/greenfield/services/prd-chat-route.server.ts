@@ -49,6 +49,7 @@ export interface TrustedExecutionContext {
 	userId?: string;
 	signal?: AbortSignal;
 	billingKey?: string;
+	beforePersist?: () => Promise<void> | void;
 }
 
 export async function handlePrdChatRequest(
@@ -263,6 +264,7 @@ export async function handlePrdChatRequest(
 		createPrdChatStream({
 			request,
 			signal: executionContext?.signal ?? request.signal,
+			beforePersist: executionContext?.beforePersist,
 			userId: user.id,
 			plan,
 			mode,

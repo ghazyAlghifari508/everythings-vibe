@@ -20,6 +20,13 @@ const children = [
 		["--import", "tsx", "src/features/scrape/services/scrape-worker.ts"],
 		{ stdio: "inherit", env: process.env },
 	),
+	// Durable codebase generation runs in a worker, not in the request that
+	// accepted it, so a browser refresh cannot cancel accepted work.
+	spawn(
+		process.execPath,
+		["--import", "tsx", "src/features/codebase/services/durable-worker.ts"],
+		{ stdio: "inherit", env: process.env },
+	),
 ];
 let stopping = false;
 function stop(code: number) {
