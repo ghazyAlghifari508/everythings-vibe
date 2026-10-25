@@ -84,6 +84,13 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "tabs": "Tab styling",
       "icons": "Icon family and stroke"
     },
+    "canonicalShell": {
+      "version": 1,
+      "navigation": "bottom for mobile; sidebar or top for web",
+      "statusBar": "none",
+      "density": "compact or comfortable, appropriate to the product",
+      "activeDestinations": { "Screen Name": "matching destination id, or null for a contextual screen" }
+    },
     "navigationContract": {
       "destinations": ["home", "search"],
       "labels": ["Home", "Search"],
@@ -98,4 +105,5 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
 }
 - The screens array and blueprint.screenPlan must each contain exactly the requested count, ordered 0..N, using the requested viewport platform.
 - The navigation contract (destinations, labels, ordering, icons) is shared by every screen; only the active item changes per screen.
+- canonicalShell uses literal enum values: navigation bottom on mobile, sidebar or top on web; density compact or comfortable; statusBar none. Map EVERY screen name to its active destination id (or null only for contextual screens). Icon ids: home, plus, search, user, wallet, chart, analytics, calendar, location, plane, settings, circle. Studio renders these components deterministically.
 - Names must be standard, clean UI titles matching the user domain.`;

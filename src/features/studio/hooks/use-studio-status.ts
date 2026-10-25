@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { studioJobTiming } from "../services/studio-timing";
 import {
 	STUDIO_STATUS_BACKOFF_MAX_MS,
 	STUDIO_STATUS_MAX_FAILURES,
@@ -158,7 +159,25 @@ export function useStudioStatus(initialData: StudioStatus) {
 					}),
 				]);
 				if (disposed || token !== sequence) return;
+				const previousFrames = new Map(
+					current.frames.map((frame) => [frame.id, frame]),
+				);
 				current = reconcile(current, data);
+				for (const frame of current.frames)
+					if (
+						frame.status === "ready" &&
+						previousFrames.get(frame.id)?.status !== "ready"
+					)
+						studioJobTiming(
+							"frontend-ready",
+							current.activeJob?.createdAt.getTime() ??
+								frame.createdAt.getTime(),
+							{
+								projectId: current.project.id,
+								frameId: frame.id,
+								jobId: current.activeJob?.id,
+							},
+						);
 				setStatus(current);
 				setError("");
 				failures = 0;

@@ -10,6 +10,7 @@ process.on("SIGTERM", () => {
 	stopping = true;
 });
 
+const startupStartedAt = Date.now();
 let stage = "module-load";
 async function run() {
 	if (!process.env.DATABASE_URL) {
@@ -27,11 +28,13 @@ async function run() {
 	try {
 		stage = "database";
 		await db.execute(sql`select 1`);
+		const { studioJobTiming } = await import("./studio-job-runtime");
+		studioJobTiming("worker-startup", startupStartedAt, {});
 		console.info("Studio worker ready");
 		stage = "dispatch";
 		while (!stopping) {
-			await dispatchStudioWorkerBatch();
-			if (!stopping)
+			const processed = await dispatchStudioWorkerBatch();
+			if (!stopping && processed === 0)
 				await new Promise((resolve) =>
 					setTimeout(resolve, STUDIO_WORKER_POLL_MS),
 				);

@@ -7,7 +7,7 @@ import {
 	File01Icon,
 	Image01Icon,
 	Loading01Icon,
-	MoreHorizontalIcon,
+	MoreVerticalIcon,
 	Search01Icon,
 	SmartPhone01Icon,
 } from "@hugeicons/core-free-icons";
@@ -159,7 +159,7 @@ export function StudioSidebar({
 													? "menu-open"
 													: "idle"
 										}
-										className={`group flex items-stretch gap-1 rounded-lg border transition-colors ${
+										className={`group flex items-start justify-between rounded-lg border transition-colors ${
 											isDeleting
 												? "border-transparent opacity-60"
 												: isMenuOpen
@@ -173,25 +173,9 @@ export function StudioSidebar({
 											disabled={isDeleting}
 											className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-lg p-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed"
 										>
-											<div className="flex items-start justify-between gap-2">
-												<span className="line-clamp-2 text-xs font-semibold text-snow">
-													{item.title}
-												</span>
-												<span
-													className="mt-0.5 shrink-0 text-fog"
-													title={isMobile ? "Mobile Design" : "Web Design"}
-												>
-													{isMobile ? (
-														<Icon
-															icon={SmartPhone01Icon}
-															size={13}
-															aria-hidden
-														/>
-													) : (
-														<Icon icon={ComputerIcon} size={13} aria-hidden />
-													)}
-												</span>
-											</div>
+											<span className="line-clamp-2 text-xs font-semibold text-snow">
+												{item.title}
+											</span>
 
 											<div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-fog">
 												<span>
@@ -228,53 +212,66 @@ export function StudioSidebar({
 											</div>
 										</button>
 
-										<DropdownMenu
-											open={isMenuOpen}
-											onOpenChange={(open) =>
-												setOpenMenuId(open ? item.id : null)
-											}
-										>
-											<DropdownMenuTrigger asChild>
-												<button
-													type="button"
-													disabled={isDeleting}
-													aria-label={`Aksi project ${item.title}`}
-													className="my-1 mr-1 flex size-8 shrink-0 items-center justify-center self-center rounded-md text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
-												>
-													{isDeleting ? (
+										<div className="mr-1.5 mt-1.5 flex shrink-0 items-center gap-0.5">
+											<span
+												className="flex size-7 items-center justify-center text-fog"
+												title={isMobile ? "Mobile Design" : "Web Design"}
+											>
+												{isMobile ? (
+													<Icon icon={SmartPhone01Icon} size={14} aria-hidden />
+												) : (
+													<Icon icon={ComputerIcon} size={14} aria-hidden />
+												)}
+											</span>
+
+											<DropdownMenu
+												open={isMenuOpen}
+												onOpenChange={(open) =>
+													setOpenMenuId(open ? item.id : null)
+												}
+											>
+												<DropdownMenuTrigger asChild>
+													<button
+														type="button"
+														disabled={isDeleting}
+														aria-label={`Aksi project ${item.title}`}
+														className="flex size-7 items-center justify-center rounded-md text-fog transition-colors hover:bg-white/10 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
+													>
+														{isDeleting ? (
+															<Icon
+																icon={Loading01Icon}
+																size={14}
+																className="motion-safe:animate-spin"
+																aria-hidden
+															/>
+														) : (
+															<Icon
+																icon={MoreVerticalIcon}
+																size={15}
+																aria-hidden
+															/>
+														)}
+													</button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end">
+													<DropdownMenuItem
+														className="text-crimson focus:text-crimson"
+														onSelect={() => {
+															setDeleteError(null);
+															setConfirmTarget(item);
+														}}
+													>
 														<Icon
-															icon={Loading01Icon}
+															icon={Delete02Icon}
 															size={14}
-															className="motion-safe:animate-spin"
 															aria-hidden
+															className="mr-2"
 														/>
-													) : (
-														<Icon
-															icon={MoreHorizontalIcon}
-															size={15}
-															aria-hidden
-														/>
-													)}
-												</button>
-											</DropdownMenuTrigger>
-											<DropdownMenuContent align="end">
-												<DropdownMenuItem
-													className="text-crimson focus:text-crimson"
-													onSelect={() => {
-														setDeleteError(null);
-														setConfirmTarget(item);
-													}}
-												>
-													<Icon
-														icon={Delete02Icon}
-														size={14}
-														aria-hidden
-														className="mr-2"
-													/>
-													Hapus project
-												</DropdownMenuItem>
-											</DropdownMenuContent>
-										</DropdownMenu>
+														Hapus project
+													</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
+										</div>
 									</div>
 								</li>
 							);

@@ -140,6 +140,61 @@ it("does not persist a stale planning failure", async () => {
 	expect(stored.error).toBeNull();
 });
 
+it("publishes a completed frame while another provider request remains pending", async () => {
+	const { job, project, frame, userId } = await seed();
+	await db.insert(studioFrames).values({
+		projectId: project.id,
+		name: "Secondary",
+		order: 1,
+		status: "queued",
+	});
+	let release: () => void = () => {};
+	const blocked = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	let markStarted: () => void = () => {};
+	const started = new Promise<void>((resolve) => {
+		markStarted = resolve;
+	});
+	provider.run = async (_signal, prompt) => {
+		if (prompt?.includes('SCREEN TO BUILD: "Secondary"')) {
+			markStarted();
+			await blocked;
+		}
+		return "<html><body>Sample</body></html>";
+	};
+	const log = vi.spyOn(console, "info").mockImplementation(() => {});
+	const pending = runStudioJobPipeline(job.id, project.id, userId);
+	try {
+		await started;
+		await vi.waitFor(async () => {
+			const detail = await getStudioProjectDetail(project.id, userId);
+			expect(detail.frames.find((entry) => entry.id === frame.id)?.status).toBe(
+				"ready",
+			);
+			expect(
+				detail.frames.find((entry) => entry.name === "Secondary")?.status,
+			).toBe("generating");
+			expect(detail.activeJob?.status).toBe("generating");
+		});
+	} finally {
+		release();
+		await pending;
+		const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+		log.mockRestore();
+		expect(events).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					stage: "project-completion",
+					code: "completed",
+					jobId: job.id,
+					durationMs: expect.any(Number),
+				}),
+			]),
+		);
+	}
+});
+
 it("detail reads do not recover or execute queued work", async () => {
 	const { job, project, userId } = await seed();
 	provider.run = async () => {

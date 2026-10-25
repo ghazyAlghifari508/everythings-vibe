@@ -7,6 +7,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { StudioDesignPickerDialog } from "@/features/studio/components/design-system/studio-design-picker-dialog";
 
 function renderDialog(
@@ -115,14 +116,20 @@ describe("StudioDesignPickerDialog", () => {
 		expect(onSelectCustom).not.toHaveBeenCalled();
 	});
 
-	it("exposes a real labelled close control at the dialog edge", () => {
+	it("exposes a real labelled close control inside the centered header row", () => {
 		renderDialog();
 		const dialog = screen.getByRole("dialog");
 		const closeButtons = screen.getAllByRole("button", { name: "Close" });
 		expect(closeButtons).toHaveLength(1);
 		expect(dialog.contains(closeButtons[0])).toBe(true);
-		expect(closeButtons[0].className).toContain("top-4");
-		expect(closeButtons[0].className).toContain("right-4");
+		// Close button is aligned inside the centered header, not pinned to the viewport edges
+		expect(closeButtons[0].className).not.toContain("top-4");
+		expect(closeButtons[0].className).not.toContain("right-4");
+		const title = screen.getByText("Pilih tampilan");
+		const headerRow =
+			title.closest(".flex.items-start.justify-between") ??
+			title.parentElement?.parentElement;
+		expect(headerRow?.contains(closeButtons[0])).toBe(true);
 	});
 
 	it("sizes the dialog beyond a medium popup and keeps header/footer outside the scroll body", () => {
@@ -149,7 +156,7 @@ describe("StudioDesignPickerDialog", () => {
 		expect(onOpenChange).toHaveBeenCalledWith(false);
 	});
 
-	it("renders as true fullscreen shell with horizontally centered content container", () => {
+	it("renders as true fullscreen shell with horizontally centered content container without vertical auto-centering", () => {
 		renderDialog();
 		const dialog = screen.getByRole("dialog");
 		const classes = dialog.className;
@@ -167,7 +174,9 @@ describe("StudioDesignPickerDialog", () => {
 		expect(centeredContainer).not.toBeNull();
 		expect(centeredContainer.className).toContain("mx-auto");
 		expect(centeredContainer.className).toContain("max-w-4xl");
-		expect(centeredContainer.className).toContain("my-auto");
+		// Top-aligned: must NOT have vertical auto-centering (my-auto or justify-center)
+		expect(centeredContainer.className).not.toContain("my-auto");
+		expect(centeredContainer.className).not.toContain("justify-center");
 	});
 
 	it("offers stored VibeScrape design documents on the Punya Saya tab", () => {
@@ -276,5 +285,64 @@ describe("StudioDesignPickerDialog", () => {
 			expect(screen.queryByText("brand-logo.png")).toBeNull();
 		});
 		expect(screen.getByText("Pilih file gambar logo")).toBeDefined();
+	});
+
+	it("suppresses default corner close button when hideCloseButton is specified on DialogContent", () => {
+		render(
+			<Dialog open>
+				<DialogContent hideCloseButton>
+					<p>Content without default close</p>
+				</DialogContent>
+			</Dialog>,
+		);
+		const defaultCornerClose = document.querySelector(
+			".absolute.right-4.top-4",
+		);
+		expect(defaultCornerClose).toBeNull();
+	});
+
+	it("preserves default corner close button on standard DialogContent", () => {
+		render(
+			<Dialog open>
+				<DialogContent>
+					<p>Standard dialog</p>
+				</DialogContent>
+			</Dialog>,
+		);
+		const defaultCornerClose = document.querySelector(
+			".absolute.right-4.top-4",
+		);
+		expect(defaultCornerClose).not.toBeNull();
+	});
+
+	it("keeps header and tab list anchors stable when switching across all tabs", () => {
+		renderDialog();
+		const header = screen.getByText("Pilih tampilan").closest("div");
+		const tablist = screen.getByRole("tablist");
+		const scroller = screen
+			.getByRole("dialog")
+			.querySelector(".overflow-y-auto");
+
+		expect(scroller?.contains(header as HTMLElement)).toBe(true);
+		expect(scroller?.contains(tablist)).toBe(true);
+
+		// Switch to Template
+		fireEvent.click(screen.getByRole("tab", { name: "Template" }));
+		expect(screen.getByText("Pilih tampilan")).toBeDefined();
+		expect(screen.getByRole("tablist")).toBe(tablist);
+
+		// Switch to Punya Saya
+		fireEvent.click(screen.getByRole("tab", { name: "Punya Saya" }));
+		expect(screen.getByText("Pilih tampilan")).toBeDefined();
+		expect(screen.getByRole("tablist")).toBe(tablist);
+	});
+
+	it("Punya Saya panel aligns with the centered container and avoids max-w-2xl narrowing", () => {
+		renderDialog();
+		fireEvent.click(screen.getByRole("tab", { name: "Punya Saya" }));
+		const panel = screen.getByRole("tabpanel", { name: "Punya Saya" });
+		expect(panel.className).toContain("w-full");
+		expect(panel.className).not.toContain("max-w-2xl");
+		expect(panel.className).not.toContain("mx-auto");
 	});
 });

@@ -289,6 +289,9 @@ export const StudioCanvas = memo(function StudioCanvas({
 						<StudioFrame
 							key={frame.id}
 							frame={frame}
+							initialJobTiming={
+								activeJob?.jobType === "initial" ? activeJob : undefined
+							}
 							onMeasure={measureFrame}
 							isSelected={
 								selectedFrameIds.length
