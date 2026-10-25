@@ -4949,6 +4949,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "baseline_artifact_id": {
+          "name": "baseline_artifact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "artifact_id": {
           "name": "artifact_id",
           "type": "text",
@@ -5033,7 +5039,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}

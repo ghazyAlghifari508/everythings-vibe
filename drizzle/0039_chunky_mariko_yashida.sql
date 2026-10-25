@@ -13,6 +13,7 @@ CREATE TABLE "codebase_generation_operations" (
 	"claimed_by" text,
 	"lease_expires_at" timestamp with time zone,
 	"heartbeat_at" timestamp with time zone,
+	"baseline_artifact_id" text,
 	"artifact_id" text,
 	"result" jsonb,
 	"error" text,
@@ -26,7 +27,7 @@ CREATE TABLE "codebase_generation_operations" (
 ALTER TABLE "codebase_generation_operations" ADD CONSTRAINT "codebase_generation_operations_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "codebase_generation_operations" ADD CONSTRAINT "codebase_generation_operations_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "codebase_gen_ops_active_stage_idx" ON "codebase_generation_operations" USING btree ("project_id","stage") WHERE status IN ('queued', 'running');--> statement-breakpoint
-CREATE INDEX "codebase_gen_ops_identity_hash_idx" ON "codebase_generation_operations" USING btree ("identity_hash");--> statement-breakpoint
+CREATE UNIQUE INDEX "codebase_gen_ops_identity_hash_idx" ON "codebase_generation_operations" USING btree ("identity_hash");--> statement-breakpoint
 CREATE INDEX "codebase_gen_ops_user_project_idx" ON "codebase_generation_operations" USING btree ("user_id","project_id");--> statement-breakpoint
 CREATE INDEX "codebase_gen_ops_project_status_idx" ON "codebase_generation_operations" USING btree ("project_id","status");--> statement-breakpoint
 CREATE INDEX "codebase_gen_ops_claim_idx" ON "codebase_generation_operations" USING btree ("status","lease_expires_at");
