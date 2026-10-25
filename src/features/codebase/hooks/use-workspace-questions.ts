@@ -64,6 +64,7 @@ export function useWorkspaceQuestions(
 					projectId,
 					stage: "questions",
 					input: { projectId, prompt, platform: "web" },
+					retry: true,
 				});
 
 				if (

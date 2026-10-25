@@ -196,20 +196,15 @@ describe("durable workspace generation pipeline", () => {
 		expect(reload).not.toHaveBeenCalled();
 	});
 
-	it("propagates the explicit retry flag to the durable submission", async () => {
+	it("asks the server for a bounded retry so a failed stage can run again", async () => {
 		const { requests } = stubDurableFetch([
 			{ method: "POST", operation: operation("prd", "completed") },
 		]);
 		const { result, unmount } = renderHook(usePipeline);
 		await act(async () => {
-			await result.current.generate(
-				"prd",
-				"/api/chat",
-				{},
-				async () => true,
-				true,
-			);
+			await result.current.generate("prd", "/api/chat", {}, async () => true);
 		});
+		// Reuse is authoritative: a completed or in-flight operation still joins.
 		expect(requests[0]?.body).toMatchObject({ retry: true, stage: "prd" });
 		unmount();
 	});

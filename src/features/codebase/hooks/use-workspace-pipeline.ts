@@ -41,7 +41,7 @@ export function useWorkspacePipeline({
 			_url: string,
 			init: RequestInit,
 			onSuccess: () => Promise<boolean>,
-			retry = false,
+			retry = true,
 		) => {
 			if (
 				!effectiveFeatureId ||
