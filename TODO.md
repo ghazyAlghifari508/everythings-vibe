@@ -17,6 +17,7 @@ Dokumen ini memuat daftar rencana kerja, backlog arsitektur, standarisasi kualit
 6. [Bagian 9: Decoupling &amp; Standalone Domain — Pemisahan VibeScrape dari VibeDesign](#9-decoupling--standalone-domain--pemisahan-vibescrape-dari-vibedesign)
 7. [Bagian 10: Design System &amp; Iconography Overhaul — Migrasi dari Lucide React ke Hugeicons](#10-design-system--iconography-overhaul--migrasi-dari-lucide-react-ke-hugeicons)
 8. [Bagian 11: Infra &amp; Scraping Optimization — Hybrid Remote Browser (Cloudflare Browser Run &amp; Browserless.io Fallback)](#11-infra--scraping-optimization--hybrid-remote-browser-cloudflare-browser-run--browserlessio-fallback)
+9. [Bagian 12: Lint Gate Hygiene — Audit Noise `pnpm lint` (Pre-existing, Bukan Regresi)](#12-lint-gate-hygiene--audit-noise-pnpm-lint-pre-existing-bukan-regresi)
 
 ---
 
@@ -1303,11 +1304,180 @@ SCRAPE_BROWSER_MODE="hybrid" # Opsi: "hybrid" | "cloudflare" | "browserless" | "
 
 ---
 
+## 12. Lint Gate Hygiene — Audit Noise `pnpm lint` (Pre-existing, Bukan Regresi)
+
+### 12.1. Ringkasan Eksekutif
+
+- **Status:** `Open`
+- **Prioritas:** `P1`
+- **Kompleksitas:** `Rendah` (perbaikan inti = 1 baris konfigurasi `biome.json`)
+- **Pemicu:** `pnpm lint` melaporkan **3589 error / 2999 warning / 180 info** sehingga gate lint repo-wide selalu gagal dan menyamarkan regresi baru.
+- **Diukur pada:** commit `ffb06de8` (2026-10-25), perintah `pnpm lint` dan `npx biome lint src`.
+
+Hasil audit per-file menunjukkan **seluruh 6768 diagnostik hanya berasal dari 2 file**:
+
+| File | Error | Warning | Info | Total | Sifat File |
+| :--- | ---: | ---: | ---: | ---: | :--- |
+| `playwright-report/index.html` | 3589 | 2989 | 180 | **6758** | Artefak lokal Playwright (525.351 byte / 48 baris, payload JS minified dengan kolom mencapai 126.230); **git-ignored** (`.gitignore:23`), **untracked** |
+| `src/app/globals.css` | 0 | 10 | 0 | **10** | Source tracked; sudah tercatat di §7.5 |
+| **TOTAL** | **3589** | **2999** | **180** | **6768** | |
+
+**Kesimpulan:** tidak ada satu pun error lint di dalam `src/`. Perintah `npx biome lint src` menghasilkan **0 error** dan hanya **10 warning** pre-existing (`lint/complexity/noImportantStyles` di `src/app/globals.css`). Angka 3589 error murni berasal dari file laporan HTML hasil generate Playwright yang seharusnya tidak pernah masuk ke gate lint.
+
+---
+
+### 12.2. Root Cause Analysis
+
+`biome.json` → `files.includes` memuat glob berikut:
+
+```json
+"includes": [
+  "**/src/**/*",
+  "**/.vscode/**/*",
+  "**/index.html",
+  "**/vite.config.ts",
+  "!**/src/routeTree.gen.ts",
+  "!**/src/styles.css"
+]
+```
+
+Glob `**/index.html` dimaksudkan untuk menargetkan entry Vite di **root** (`/index.html`). Karena polanya memakai wildcard direktori (`**/`), glob tersebut juga mencocokkan **setiap** `index.html` di seluruh pohon repositori — termasuk `playwright-report/index.html` yang merupakan hasil generate `playwright test`.
+
+Konsekuensi berantai:
+
+1. `pnpm lint` (= `biome lint`) men-scan artefak laporan tersebut sebagai “source code”.
+2. Bundle JS minified di dalam laporan tersebut (kolom mencapai 126.230) memicu ribuan diagnostik semu (error `noAssignInExpressions`, `noCommaOperator`, dan seterusnya).
+3. Setiap kali laporan Playwright di-generate ulang, jumlah diagnostik berubah secara acak sehingga gate lint tidak dapat dijadikan pembanding yang stabil.
+4. Karena satu file menghabiskan kuota diagnostik, error **nyata** di `src/` bisa tertutup (Biome default memotong output: `Diagnostics not shown: 6748`).
+
+Catatan penting: `dist/` **sudah** otomatis di luar cakupan lint. Karena `files.includes` bersifat allowlist, `biome lint` menolak path `dist` ("These paths were provided but ignored") selama `dist/**` tidak cocok dengan pola mana pun. Yang bocor hanya artefak Playwright, karena ia kebetulan cocok dengan glob `**/index.html`.
+
+Fakta tambahan: di repositori ini **hanya ada satu** berkas `index.html` di luar `node_modules`, yaitu `playwright-report/index.html`. Artinya glob `"**/index.html"` yang dimaksudkan untuk entry Vite di root saat ini **tidak memiliki target sah sama sekali**, dan satu-satunya yang dicocokkan adalah artefak laporan Playwright.
+
+Containment saat ini (terukur): total 1362 berkas ter-scan = 1321 berkas `src/` + 41 berkas lain, dan **hanya 2 berkas** yang memunculkan diagnostik.
+
+---
+
+### 12.3. Rincian Aturan Lint yang Terpicu
+
+#### A. `playwright-report/index.html` — 6758 diagnostik (seluruhnya artefak, bukan source)
+
+| Rule | Severity | Jumlah |
+| :--- | :--- | ---: |
+| `lint/suspicious/noAssignInExpressions` | error | 2557 |
+| `lint/complexity/noCommaOperator` | warning | 2279 |
+| `lint/suspicious/noDoubleEquals` | error | 484 |
+| `lint/correctness/noInnerDeclarations` | error | 397 |
+| `lint/style/useConst` | warning | 329 |
+| `lint/complexity/useArrowFunction` | warning | 206 |
+| `lint/style/useTemplate` | info | 136 |
+| `lint/suspicious/noLabelVar` | error | 41 |
+| `lint/suspicious/noPrototypeBuiltins` | warning | 39 |
+| `lint/correctness/noSwitchDeclarations` | error | 36 |
+| `lint/complexity/useOptionalChain` | warning | 34 |
+| `lint/complexity/noUselessThisAlias` | info | 31 |
+| `lint/suspicious/noFallthroughSwitchClause` | error | 31 |
+| `lint/suspicious/noConfusingLabels` | warning | 28 |
+| `lint/complexity/noArguments` | warning | 26 |
+| `lint/correctness/noUnusedFunctionParameters` | warning | 22 |
+| `lint/complexity/noImportantStyles` | warning | 17 |
+| `lint/complexity/noUselessLabel` | info | 13 |
+| `lint/correctness/useHookAtTopLevel` | error | 9 |
+| `lint/suspicious/useIterableCallbackReturn` | error | 6 |
+| `lint/correctness/noConstantCondition` | error | 6 |
+| `lint/suspicious/noControlCharactersInRegex` | error | 5 |
+| `lint/suspicious/noThenProperty` | error | 5 |
+| `lint/correctness/noConstructorReturn` | error | 4 |
+| `lint/complexity/useRegexLiterals` | warning | 3 |
+| `lint/suspicious/noGlobalIsNan` | warning | 2 |
+| `lint/style/noDescendingSpecificity` | warning | 2 |
+| `lint/correctness/useValidTypeof` | error | 2 |
+| `lint/suspicious/noSelfCompare` | error | 2 |
+| `lint/correctness/noInvalidUseBeforeDeclaration` | error | 2 |
+| `lint/suspicious/noUselessEscapeInString` | warning | 1 |
+| `lint/suspicious/noGlobalIsFinite` | warning | 1 |
+| `lint/a11y/useHtmlLang` | error | 1 |
+| `lint/suspicious/noFunctionAssign` | error | 1 |
+
+#### B. `src/app/globals.css` — 10 diagnostik (satu-satunya temuan di source)
+
+| Rule | Severity | Jumlah |
+| :--- | :--- | ---: |
+| `lint/complexity/noImportantStyles` | warning | 10 |
+
+> **Catatan:** 10 warning ini **bukan** regresi dari pekerjaan terakhir. Angka yang identik sudah tercatat pada §7.5 (“sisa 10 error pre-existing di `src/app/globals.css`”). Penyebabnya adalah pemakaian `!important` pada override token tema; perbaikan opsional dan terpisah karena berisiko mengubah urutan kaskade CSS.
+
+---
+
+### 12.4. Dampak yang Sudah Nyata
+
+- [ ] Gate `pnpm lint` tidak bisa dipakai sebagai penentu lulus/gagal karena selalu exit code 1.
+- [ ] Output Biome default memotong diagnostik (`Diagnostics not shown: 6748`), sehingga error baru di `src/` berpotensi tidak terlihat.
+- [ ] Angka pelaporan tidak stabil antar-run: cukup jalankan ulang `playwright test`, jumlah error berubah.
+- [ ] Setiap perubahan `biome.json` (mis. menambah rule) akan memicu reli linting 6758 diagnostik artefak, memperlambat gate (audit ini memakan ~56 detik hanya untuk memproses satu file laporan).
+- [ ] Kontras kecepatan terukur: `pnpm lint` = **~56 detik** (1362 berkas), sedangkan `npx biome lint src` = **~0,82 detik** (1321 berkas). Sekitar 68× lebih lama hanya karena satu artefak laporan.
+
+---
+
+### 12.5. Rencana Perbaikan
+
+#### Fase 1 — Kecualikan Artefak Generate dari Gate Lint (inti, 1 baris)
+
+- [ ] Scopekan glob `"**/index.html"` pada `biome.json` → `files.includes`. Rekomendasi utama: tambahkan pengecualian eksplisit sehingga intent glob tetap terjaga:
+  ```json
+  "**/index.html",
+  "!**/playwright-report/**",
+  "!**/test-results/**"
+  ```
+  Alternatif: hapus pola `"**/index.html"` — saat ini tidak ada berkas `index.html` sah di luar `node_modules` (§12.2), jadi pola tersebut tidak memiliki target nyata.
+- [ ] Verifikasi hasilnya: `pnpm lint` harus turun dari **3589 error** menjadi **0 error** (menyisakan 10 warning `globals.css`).
+- [ ] Pastikan `npx biome lint src` tetap menghasilkan angka yang sama seperti sebelumnya (tidak ada regresi cakupan untuk source).
+- [ ] Pertimbangkan migrasi ke `files.ignore` (semantik yang lebih tepat untuk mengecualikan artefak) alih-alih menumpuk pola negasi di `files.includes`. Untuk `dist/` **tidak perlu** tindakan tambahan — sudah tertutup oleh allowlist (dibuktikan di §12.2).
+
+#### Fase 2 — Ratakan Sisa Warning di Source
+
+- [ ] Selesaikan 10 warning `lint/complexity/noImportantStyles` di `src/app/globals.css`: ganti `!important` dengan spesifisitas selector yang benar (mis. `:root[data-theme="dark"]`), bukan dengan menonaktifkan rule.
+- [ ] Setelah bersih, jadikan `pnpm lint` hijau (exit 0) sebagai syarat pre-push.
+
+#### Fase 3 — Cegah Regresi Noise Kembali
+
+- [ ] Verifikasi `.gitignore` (tidak perlu perubahan): `playwright-report/` dan `test-results/` sudah di-ignore (`.gitignore` baris 23–24), `dist` dan `dist-ssr` juga. `blob-report/` belum di-ignore; hanya perlu ditambahkan **jika** reporter `blob` mulai dipakai.
+- [ ] Tambahkan script npm eksplisit agar gate lint tidak ambigu, contoh: `"lint:src": "biome lint src"`, dan dokumentasikan di `AGENTS.md` bahwa gate lint yang mengikat adalah scope `src`.
+
+#### Fase 4 — Gate Verifikasi
+
+- [ ] `pnpm lint` → 0 error, 0 warning (setelah Fase 2 selesai).
+- [ ] `npx biome lint src` → 0 error, 0 warning.
+- [ ] `pnpm exec tsc --noEmit` → 0 error.
+- [ ] `pnpm test` → seluruh suite hijau.
+- [ ] `pnpm build` → exit 0.
+
+---
+
+### 12.6. Perintah Audit (Reproduksi)
+
+```bash
+# Angka yang dilaporkan gate repo-wide
+pnpm lint
+
+# Gate yang benar-benar relevan untuk source aplikasi (harus bersih)
+npx biome lint src
+
+# Jika ingin daftar file + rule persis tanpa output terpotong
+npx biome lint --reporter=github --max-diagnostics=none
+
+# Ringkasan rule + jumlah
+npx biome lint --reporter=summary
+```
+
+---
+
 ## 📋 Ringkasan Prioritas Eksekusi Mendatang
 
 
 | Prioritas | Backlog Item                                                        | Tingkat Dampak                                          | Kompleksitas                                    |
 | :--------- | :------------------------------------------------------------------- | :------------------------------------------------------- | :----------------------------------------------- |
+| **P1**    | **Lint Gate Hygiene — Kecualikan Artefak Generate dari `pnpm lint`** | Kritis (Gate Lint Bisa Dipercaya, 3589 Error Semu Hilang) | Rendah (1 Baris `biome.json`) |
 | **P1**    | **Pembuatan Rules Agent (`architecture-folder-structure.md`)**      | Kritis (Mencegah Sampah Baru Sejak Hari Ini)            | Rendah (Dokumentasi &amp; Regulasi)             |
 | **P1**    | **Standarisasi Responsivitas Mobile &amp; Tablet**                  | Sangat Tinggi (UX Pengguna Mobile)                      | Sedang - Luas                                   |
 | **P1**    | **Hybrid Remote Browser (Cloudflare &amp; Browserless Fallback)**   | Kritis (Memangkas RAM Worker dari 1 GB ke ~0 MB &amp; Anti-OOM) | Sedang                                          |
