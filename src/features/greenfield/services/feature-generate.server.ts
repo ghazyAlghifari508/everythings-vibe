@@ -53,15 +53,27 @@ function isClientAbort(err: unknown, signal: AbortSignal): boolean {
 	return err instanceof Error && err.name === "AbortError";
 }
 
+export interface TrustedExecutionContext {
+	userId?: string;
+	signal?: AbortSignal;
+	billingKey?: string;
+}
+
 export async function handleFeatureGenerateRequest(
 	request: Request,
+	executionContext?: TrustedExecutionContext,
 ): Promise<Response> {
 	let user: { id: string };
-	try {
-		user = await requireUser(request.headers);
-	} catch {
-		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	if (executionContext?.userId) {
+		user = { id: executionContext.userId };
+	} else {
+		try {
+			user = await requireUser(request.headers);
+		} catch {
+			return Response.json({ error: "Unauthorized" }, { status: 401 });
+		}
 	}
+	const signal = executionContext?.signal ?? request.signal;
 
 	const parsedInput = featuresGenerateInputSchema.safeParse(
 		await request.json().catch(() => ({})),
@@ -211,7 +223,7 @@ export async function handleFeatureGenerateRequest(
 
 		const modelsToTry = selectModels();
 		const { generator, firstChunk, abortController, outcome } =
-			await tryStreamWithFallback(modelsToTry, messages, request.signal, 12000);
+			await tryStreamWithFallback(modelsToTry, messages, signal, 12000);
 		let fullResponse = firstChunk;
 		try {
 			for await (const chunk of generator) {
@@ -222,7 +234,7 @@ export async function handleFeatureGenerateRequest(
 				}
 			}
 		} catch (e) {
-			if (isClientAbort(e, request.signal)) {
+			if (isClientAbort(e, signal)) {
 				await releaseClaim();
 				return Response.json(
 					{ error: "Generasi daftar fitur dibatalkan." },
@@ -273,7 +285,7 @@ export async function handleFeatureGenerateRequest(
 		}
 		return Response.json({ featureTree: stamped });
 	} catch (err: unknown) {
-		if (isClientAbort(err, request.signal)) {
+		if (isClientAbort(err, signal)) {
 			await releaseClaim();
 			return Response.json(
 				{ error: "Generasi daftar fitur dibatalkan." },

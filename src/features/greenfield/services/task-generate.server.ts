@@ -40,10 +40,19 @@ import { persistGeneratedTaskTree } from "./task-generation-save.server";
 const STAGE_LABEL = "generate Task";
 const CONFLICT_MESSAGE = "Task sedang digenerate. Tunggu hingga selesai.";
 
+export interface TrustedExecutionContext {
+	userId?: string;
+	signal?: AbortSignal;
+	billingKey?: string;
+}
+
 export async function handleTaskGenerateRequest(
 	request: Request,
+	executionContext?: TrustedExecutionContext,
 ): Promise<Response> {
-	const user = await requireUser(request.headers);
+	const user = executionContext?.userId
+		? { id: executionContext.userId }
+		: await requireUser(request.headers);
 
 	const body = await parseGenerationRequest(request);
 	const projectId = body.projectId;
@@ -115,7 +124,8 @@ export async function handleTaskGenerateRequest(
 		conflictMessage: CONFLICT_MESSAGE,
 		setupFailedMessage: "Gagal menyiapkan generate Task. Coba lagi.",
 		logLabel: "[task/generate]",
-		callerIdempotencyKey: body.clientIdempotencyKey,
+		callerIdempotencyKey:
+			executionContext?.billingKey || body.clientIdempotencyKey,
 		callerAttempt: body.attempt,
 	});
 	if (!reserved.ok) return reserved.response;
@@ -142,6 +152,7 @@ export async function handleTaskGenerateRequest(
 	return sseResponse(
 		createGenerationStream({
 			request,
+			signal: executionContext?.signal ?? request.signal,
 			userId: user.id,
 			reservation,
 			quote,

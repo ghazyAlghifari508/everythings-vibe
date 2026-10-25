@@ -45,10 +45,19 @@ const CONFLICT_MESSAGE = "AC sedang digenerate. Tunggu hingga selesai.";
 const TRUNCATED_MESSAGE =
 	"Generasi AC terputus di tengah jalan dan tidak disimpan. Coba generate ulang.";
 
+export interface TrustedExecutionContext {
+	userId?: string;
+	signal?: AbortSignal;
+	billingKey?: string;
+}
+
 export async function handleAcGenerateRequest(
 	request: Request,
+	executionContext?: TrustedExecutionContext,
 ): Promise<Response> {
-	const user = await requireUser(request.headers);
+	const user = executionContext?.userId
+		? { id: executionContext.userId }
+		: await requireUser(request.headers);
 
 	const body = await parseGenerationRequest(request);
 	const projectId = body.projectId;
@@ -108,7 +117,8 @@ export async function handleAcGenerateRequest(
 		conflictMessage: CONFLICT_MESSAGE,
 		setupFailedMessage: "Gagal menyiapkan generate AC. Coba lagi.",
 		logLabel: "[ac/generate]",
-		callerIdempotencyKey: body.clientIdempotencyKey,
+		callerIdempotencyKey:
+			executionContext?.billingKey || body.clientIdempotencyKey,
 		callerAttempt: body.attempt,
 	});
 	if (!reserved.ok) return reserved.response;
@@ -135,6 +145,7 @@ export async function handleAcGenerateRequest(
 	return sseResponse(
 		createGenerationStream({
 			request,
+			signal: executionContext?.signal ?? request.signal,
 			userId: user.id,
 			reservation,
 			quote,

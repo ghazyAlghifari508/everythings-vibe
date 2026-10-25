@@ -48,18 +48,30 @@ function isClientAbort(err: unknown, signal: AbortSignal): boolean {
 	return err instanceof Error && err.name === "AbortError";
 }
 
+export interface TrustedExecutionContext {
+	userId?: string;
+	signal?: AbortSignal;
+	billingKey?: string;
+}
+
 export async function handleAskOptionsRequest(
 	request: Request,
+	executionContext?: TrustedExecutionContext,
 ): Promise<Response> {
 	let user: { id: string };
-	try {
-		user = await requireUser(request.headers);
-	} catch {
-		return Response.json(
-			{ error: "Unauthorized", code: "SESSION_EXPIRED" },
-			{ status: 401 },
-		);
+	if (executionContext?.userId) {
+		user = { id: executionContext.userId };
+	} else {
+		try {
+			user = await requireUser(request.headers);
+		} catch {
+			return Response.json(
+				{ error: "Unauthorized", code: "SESSION_EXPIRED" },
+				{ status: 401 },
+			);
+		}
 	}
+	const signal = executionContext?.signal ?? request.signal;
 
 	const body = (await request.json().catch(() => ({}))) as {
 		projectId?: string;
@@ -238,7 +250,7 @@ export async function handleAskOptionsRequest(
 			await tryStreamWithFallback(
 				modelsToTry,
 				conversation,
-				request.signal,
+				signal,
 				ASK_OPTIONS_MAX_TOKENS,
 			);
 		let fullResponse = firstChunk;
@@ -251,7 +263,7 @@ export async function handleAskOptionsRequest(
 				}
 			}
 		} catch (e) {
-			if (isClientAbort(e, request.signal)) {
+			if (isClientAbort(e, signal)) {
 				return {
 					ok: false,
 					failure: {
@@ -308,6 +320,30 @@ export async function handleAskOptionsRequest(
 		}
 		const questions = outcome.questions;
 
+		if (project.projectMode === "existing_codebase" || executionContext?.userId) {
+			try {
+				const { saveAskHandoff, resolveActiveSnapshotId } = await import(
+					"@/features/codebase/services/generation-context"
+				);
+				const snapshotId = await resolveActiveSnapshotId(projectId).catch(() => null);
+				const validPlatform: "web" | "mobile" = platform === "mobile" ? "mobile" : "web";
+				const validPrompt = prompt || "";
+				await saveAskHandoff(user.id, {
+					projectId,
+					snapshotId,
+					answers: [],
+					compiledPrompt: validPrompt,
+					state: {
+						questions: questions as any,
+						prompt: validPrompt,
+						platform: validPlatform,
+					},
+				});
+			} catch (e) {
+				console.error("ask options handoff save failed:", e);
+			}
+		}
+
 		// Mark pre-artifact projects at question-stage server-side so History
 		// routes them to /ask instead of the empty PRD page. Guarded: only when no
 		// PRD version exists and the step has not advanced past prd, so a
@@ -355,7 +391,7 @@ export async function handleAskOptionsRequest(
 
 		return Response.json({ questions });
 	} catch (err: unknown) {
-		if (isClientAbort(err, request.signal)) {
+		if (isClientAbort(err, signal)) {
 			return Response.json(
 				{ error: "Generasi pertanyaan dibatalkan." },
 				{ status: 499 },

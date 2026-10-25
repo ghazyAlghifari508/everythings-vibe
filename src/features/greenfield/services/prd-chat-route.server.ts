@@ -45,10 +45,19 @@ import { deriveProjectNameSync } from "./prd-naming";
 
 const STAGE_LABEL = "membuat PRD";
 
+export interface TrustedExecutionContext {
+	userId?: string;
+	signal?: AbortSignal;
+	billingKey?: string;
+}
+
 export async function handlePrdChatRequest(
 	request: Request,
+	executionContext?: TrustedExecutionContext,
 ): Promise<Response> {
-	const user = await requireUser(request.headers);
+	const user = executionContext?.userId
+		? { id: executionContext.userId }
+		: await requireUser(request.headers);
 
 	const [sub] = await db
 		.select({
@@ -201,7 +210,9 @@ export async function handlePrdChatRequest(
 		}
 
 		const idempotencyKey =
-			callerIdempotencyKey || `${ids.projectId}:prd:${callerAttempt ?? 1}`;
+			executionContext?.billingKey ||
+			callerIdempotencyKey ||
+			`${ids.projectId}:prd:${callerAttempt ?? 1}`;
 
 		try {
 			// A reused key whose operation already terminated cannot generate
@@ -251,6 +262,7 @@ export async function handlePrdChatRequest(
 	return sseResponse(
 		createPrdChatStream({
 			request,
+			signal: executionContext?.signal ?? request.signal,
 			userId: user.id,
 			plan,
 			mode,
