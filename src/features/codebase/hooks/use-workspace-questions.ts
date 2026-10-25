@@ -17,6 +17,7 @@ import {
 	settleRun,
 	startRun,
 } from "@/features/codebase/services/chat-flow";
+import { fetchGenerationOperations } from "@/features/codebase/services/workspace-operations";
 import {
 	buildAskHandoffAnswers,
 	describeHandoffSaveFailure,
@@ -110,6 +111,29 @@ export function useWorkspaceQuestions(
 					activeProject.current !== projectId
 				)
 					return;
+				// ponytail: ack-lost recovery polls server before failing; upgrade to durable stream
+				try {
+					const ops = await fetchGenerationOperations(projectId);
+					const qOp = ops.questions;
+					if (
+						qOp &&
+						(qOp.status === "running" ||
+							qOp.status === "queued" ||
+							qOp.status === "completed")
+					) {
+						if (qOp.status === "completed" && qOp.result?.questions) {
+							const parsed = validateAskQuestions(qOp.result.questions);
+							if (parsed && parsed.length > 0) {
+								setAiQuestions(mapAskQuestionsToAdaptive(parsed));
+								setChatAnswers({});
+								setRun((current) => settleRun(current, "done", Date.now()));
+								return;
+							}
+						}
+					}
+				} catch {
+					// ignore
+				}
 				setRun((current) =>
 					settleRun(
 						current,
