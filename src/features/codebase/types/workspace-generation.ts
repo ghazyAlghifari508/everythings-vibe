@@ -92,6 +92,7 @@ export const workspaceGenerationOperationSchema = z.object({
 	result: z.record(z.string(), z.unknown()).nullable().optional(),
 	error: z.string().nullable().optional(),
 	errorCode: z.string().nullable().optional(),
+	baselineArtifactId: z.string().nullable().optional(),
 	artifactId: z.string().nullable().optional(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
