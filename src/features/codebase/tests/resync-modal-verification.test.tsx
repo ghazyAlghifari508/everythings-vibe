@@ -509,7 +509,7 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 			const copiedArg = writeText.mock.calls[0][0];
 			expect(copiedArg).toContain("cb_p4_test_project");
 			expect(copiedArg).toContain("tok_secret_p4_verify");
-			expect(copiedArg).toContain("vibeeverything codebase sync");
+			expect(copiedArg).toContain("codebase sync");
 			expect(copiedArg).toContain("Ocean Guard");
 		});
 
@@ -645,7 +645,7 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 				);
 			});
 			expect(document.body.textContent).toContain(
-				"Sync codebase dengan VibeEverything",
+				"Sync codebase dengan everythings-vibe",
 			);
 			expect(document.body.textContent).toContain("Copy prompt untuk AI agent");
 			expect(document.body.textContent).toContain(
