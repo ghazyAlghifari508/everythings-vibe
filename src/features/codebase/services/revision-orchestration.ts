@@ -53,6 +53,9 @@ export async function proposeRevision(
 				instruction: request.userInstruction,
 				base: source.content,
 				upstreamPrd: source.upstream.prd?.content,
+				...(source.references.length > 0
+					? { references: source.references }
+					: {}),
 			},
 		};
 		const res = await generate([
@@ -75,6 +78,9 @@ export async function proposeRevision(
 			user: {
 				instruction: request.userInstruction,
 				baseTree: source.content,
+				...(source.references.length > 0
+					? { references: source.references }
+					: {}),
 			},
 		};
 		const res = await generate([
@@ -110,6 +116,9 @@ export async function proposeRevision(
 				instruction: request.userInstruction,
 				baseTasks: source.content,
 				acContext: source.dependencies.ac?.content,
+				...(source.references.length > 0
+					? { references: source.references }
+					: {}),
 			},
 		};
 		const res = await generate([

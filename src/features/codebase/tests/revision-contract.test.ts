@@ -52,4 +52,74 @@ describe("revision request boundary", () => {
 			}).success,
 		).toBe(true);
 	});
+	it("accepts valid structured reference bindings and rejects cross-project or stale-snapshot bindings", () => {
+		expect(
+			revisionRequestSchema.safeParse({
+				...request,
+				referenceBindings: [
+					{
+						kind: "artifact",
+						id: "prd-project",
+						projectId: "project",
+						targetKind: "prd",
+						label: "@PRD · Pencarian",
+						fileName: "PRD.md",
+					},
+					{
+						kind: "file",
+						id: "file:snapshot:src/app.ts",
+						path: "src/app.ts",
+						codebaseId: "repository",
+						snapshotId: "snapshot",
+					},
+				],
+			}).success,
+		).toBe(true);
+
+		expect(
+			revisionRequestSchema.safeParse({
+				...request,
+				referenceBindings: [
+					{
+						kind: "artifact",
+						id: "prd-other",
+						projectId: "other-project",
+						targetKind: "prd",
+						label: "@PRD · Other",
+						fileName: "PRD.md",
+					},
+				],
+			}).success,
+		).toBe(false);
+
+		expect(
+			revisionRequestSchema.safeParse({
+				...request,
+				referenceBindings: [
+					{
+						kind: "file",
+						id: "file:snapshot:src/app.ts",
+						path: "src/app.ts",
+						codebaseId: "other-repo",
+						snapshotId: "snapshot",
+					},
+				],
+			}).success,
+		).toBe(false);
+
+		expect(
+			revisionRequestSchema.safeParse({
+				...request,
+				referenceBindings: [
+					{
+						kind: "file",
+						id: "file:old-snapshot:src/app.ts",
+						path: "src/app.ts",
+						codebaseId: "repository",
+						snapshotId: "old-snapshot",
+					},
+				],
+			}).success,
+		).toBe(false);
+	});
 });

@@ -127,9 +127,35 @@ export async function resolveRevisionSource(userId: string, input: unknown) {
 	)
 		return { ok: false as const, code: "ANALYSIS_UNAVAILABLE" as const };
 
+	const boundFilePaths =
+		request.referenceBindings
+			?.filter((binding) => binding.kind === "file")
+			.map((binding) => binding.path) ?? [];
+	const mergedReferencePaths = Array.from(
+		new Set([...(request.optionalReferences ?? []), ...boundFilePaths]),
+	);
+
+	const artifactBindings =
+		request.referenceBindings?.filter(
+			(binding) => binding.kind === "artifact",
+		) ?? [];
+	for (const binding of artifactBindings) {
+		const activeVersionId = await resolveRevisionBaseVersion(
+			userId,
+			project.id,
+			binding.targetKind,
+		);
+		if (
+			!activeVersionId ||
+			(binding.versionId && binding.versionId !== activeVersionId)
+		) {
+			return { ok: false as const, code: "REFERENCE_UNAVAILABLE" as const };
+		}
+	}
+
 	const references = await readRevisionReferences({
 		snapshotId: request.sourceSnapshotId,
-		paths: request.optionalReferences ?? [],
+		paths: mergedReferencePaths,
 		manifest: snapshot.manifest,
 	});
 	if (!references.ok) return { ok: false as const, code: references.code };

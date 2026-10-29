@@ -1,4 +1,5 @@
 import type { RevisionProposalView } from "../components/revision/codebase-revision-review-dialog";
+import type { ComposerReferenceBinding } from "../types/revision";
 import {
 	getRevisionBaseAction,
 	getRevisionProposalAction,
@@ -27,6 +28,8 @@ export async function submitRevisionRequest(input: {
 	snapshotId: string | null;
 	targetKind: RevisionTargetKind;
 	instruction: string;
+	optionalReferences?: readonly string[];
+	referenceBindings?: readonly ComposerReferenceBinding[];
 }): Promise<RevisionSubmitResult> {
 	// The version id is resolved server-side so a proposal is always prepared
 	// against a version the user could actually read, never a positional guess.
@@ -55,6 +58,12 @@ export async function submitRevisionRequest(input: {
 				targetArtifactVersionId: baseVersionId,
 				userInstruction: input.instruction,
 				sourceSnapshotId: input.snapshotId ?? "default",
+				...(input.optionalReferences && input.optionalReferences.length > 0
+					? { optionalReferences: [...input.optionalReferences] }
+					: {}),
+				...(input.referenceBindings && input.referenceBindings.length > 0
+					? { referenceBindings: [...input.referenceBindings] }
+					: {}),
 			},
 		});
 	} catch {
