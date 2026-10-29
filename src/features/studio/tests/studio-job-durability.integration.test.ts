@@ -67,6 +67,36 @@ describe("Studio durable claims", () => {
 			"job-inactive",
 		);
 	});
+	it("keeps an intentionally stopped job stopped and never requeues it", async () => {
+		const { userId, job, frame } = await seed();
+		await claimStudioJob(job.id, userId, "stale");
+		// A deliberate stop is not a lease accident: the job left the active set
+		// while the stale worker still believed it held the claim.
+		await db
+			.update(studioJobs)
+			.set({
+				status: "failed",
+				finishedAt: new Date(),
+				leaseExpiresAt: new Date(0),
+			})
+			.where(eq(studioJobs.id, job.id));
+		expect((await refreshStudioJobLease(job.id, "stale")).outcome).toBe(
+			"job-inactive",
+		);
+		expect(await recoverStalledStudioJobs(new Date(), userId)).toBe(0);
+		const [stored] = await db
+			.select()
+			.from(studioJobs)
+			.where(eq(studioJobs.id, job.id));
+		expect(stored.status).toBe("failed");
+		expect(await claimStudioJob(job.id, userId, "next")).toBeNull();
+		const [saved] = await db
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.id, frame.id));
+		expect(saved.status).toBe("ready");
+		expect(saved.htmlCode).toBe(frame.htmlCode);
+	});
 	it("one simultaneous claim wins", async () => {
 		const { userId, job } = await seed();
 		const claims = await Promise.all([
