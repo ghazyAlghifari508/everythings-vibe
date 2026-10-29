@@ -166,7 +166,8 @@ export function useWorkspaceAnalysis({
 							body: JSON.stringify(confirmation.body),
 						},
 					));
-				const body: unknown = await response.json().catch(() => null);
+				const body: unknown =
+					confirmation.raw ?? (await response.json().catch(() => null));
 				const parsed = safeParseAnalysisResponse(body);
 				const parsedSuggestions = codebaseStarterSuggestionsSchema.safeParse(
 					parsed?.output?.starterSuggestions,
