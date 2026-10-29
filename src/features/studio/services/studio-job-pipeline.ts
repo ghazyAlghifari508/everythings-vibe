@@ -33,12 +33,13 @@ export async function runStudioJobPipeline(
 	jobId: string,
 	projectId: string,
 	userId: string,
+	shutdownSignal?: AbortSignal,
 ): Promise<void> {
 	const workerId = crypto.randomUUID();
 	const acquisitionStartedAt = Date.now();
 	const job = await claimStudioJob(jobId, userId, workerId);
 	studioJobTiming("job-acquire", acquisitionStartedAt, { jobId, projectId });
-	if (!job || job.projectId !== projectId) return;
+	if (!job || job.projectId !== projectId || !job.leaseExpiresAt) return;
 	const claim: StudioJobClaim = { jobId, projectId, userId, workerId };
 	const startedAt = Date.now();
 	studioJobTiming("queue-wait", job.createdAt.getTime(), {
@@ -210,9 +211,21 @@ export async function runStudioJobPipeline(
 								: "failed",
 				});
 			},
+			{
+				jobId,
+				workerId,
+				leaseExpiresAt: job.leaseExpiresAt,
+				shutdownSignal,
+			},
 		);
 	} catch (failure) {
-		if (!(failure instanceof StudioLeaseLostError)) {
+		// Lease loss and worker shutdown are not failures of the work: recovery owns
+		// the job again, so finalising here would discard recoverable frames. A job
+		// timeout still holds the lease and is finalised normally.
+		const finalizable =
+			!(failure instanceof StudioLeaseLostError) ||
+			failure.reason === "JOB_TIMEOUT";
+		if (finalizable) {
 			try {
 				await withStudioJobWrite(claim, async (tx) => {
 					await tx
@@ -253,7 +266,7 @@ export async function runStudioJobPipeline(
 			projectId,
 			code:
 				failure instanceof StudioLeaseLostError
-					? "LEASE_LOST"
+					? failure.reason
 					: "GENERATION_FAILED",
 		});
 	} finally {

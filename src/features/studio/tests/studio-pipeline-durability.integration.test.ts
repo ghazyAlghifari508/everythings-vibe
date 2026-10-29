@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterEach, expect, it, vi } from "vitest";
 import { db } from "@/db";
 import { studioFrames, studioJobs, studioProjects, users } from "@/db/schema";
+import type { StudioLeaseRefresh } from "../services/studio-job-lease";
 import { runStudioJobPipeline } from "../services/studio-job-pipeline";
 import { getStudioProjectDetail } from "../services/studio-project-detail";
 import {
@@ -39,10 +40,13 @@ vi.mock("../services/studio-job-runtime", async (importOriginal) => {
 	return {
 		...original,
 		withStudioHeartbeat: <T>(
-			renew: () => Promise<boolean>,
+			renew: (attempt: number) => Promise<StudioLeaseRefresh>,
 			work: (signal: AbortSignal) => Promise<T>,
 		) =>
 			original.withStudioHeartbeat(renew, work, {
+				jobId: "fixture-job",
+				workerId: "fixture-worker",
+				leaseExpiresAt: new Date(Date.now() + STUDIO_JOB_CLAIM_TTL_MS),
 				heartbeatMs: 10,
 				timeoutMs: 5_000,
 			}),

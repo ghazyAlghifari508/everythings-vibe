@@ -157,8 +157,12 @@ describe("p2 worker recovery", () => {
 			new Date(Date.now() + 60000),
 		);
 		try {
-			expect(await refreshStudioJobLease(job.id, "worker-mati")).toBe(true);
-			expect(await refreshStudioJobLease(job.id, "worker-lain")).toBe(false);
+			expect((await refreshStudioJobLease(job.id, "worker-mati")).outcome).toBe(
+				"renewed",
+			);
+			expect((await refreshStudioJobLease(job.id, "worker-lain")).outcome).toBe(
+				"ownership-changed",
+			);
 		} finally {
 			await db.delete(users).where(eq(users.id, userId));
 		}
