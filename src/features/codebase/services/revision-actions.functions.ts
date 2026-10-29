@@ -5,13 +5,16 @@ import {
 	applyRevisionProposal,
 	getLatestPendingProposal,
 	getRevisionProposal,
+	listRevisionProposals,
 	rejectRevisionProposal,
-	type SaveProposalInput,
 	saveRevisionProposal,
 } from "./revision-lifecycle.server";
 import { proposeRevision } from "./revision-orchestration";
 import { generateRevisionWithProvider } from "./revision-provider.server";
-import { resolveRevisionSource } from "./revision-source.server";
+import {
+	resolveRevisionBaseVersion,
+	resolveRevisionSource,
+} from "./revision-source.server";
 
 export const submitRevisionProposalAction = createServerFn({ method: "POST" })
 	.validator((input: unknown) => revisionRequestSchema.parse(input))
@@ -34,6 +37,9 @@ export const submitRevisionProposalAction = createServerFn({ method: "POST" })
 					error: `Sumber tidak valid: ${result.code}`,
 				};
 			}
+			if (result.kind === "unsupported") {
+				return { ok: false as const, error: "Target revisi tidak didukung." };
+			}
 			if (result.kind === "invalid") {
 				return {
 					ok: false as const,
@@ -54,10 +60,7 @@ export const submitRevisionProposalAction = createServerFn({ method: "POST" })
 				impact: {
 					...result.impact,
 					...(result.reconciliation
-						? {
-								reconciliation:
-									result.reconciliation as SaveProposalInput["impact"]["reconciliation"],
-							}
+						? { reconciliation: result.reconciliation }
 						: {}),
 					...(result.sections ? { sections: result.sections } : {}),
 				},
@@ -79,12 +82,36 @@ export const submitRevisionProposalAction = createServerFn({ method: "POST" })
 		}
 	});
 
+export const getRevisionBaseAction = createServerFn({ method: "POST" })
+	.validator(
+		(input: {
+			projectId: string;
+			targetKind: "feature" | "prd" | "ac" | "tasks";
+		}) => input,
+	)
+	.handler(async ({ data }) => {
+		const user = await requireUserServer();
+		const versionId = await resolveRevisionBaseVersion(
+			user.id,
+			data.projectId,
+			data.targetKind,
+		);
+		return { versionId };
+	});
+
 export const getPendingRevisionAction = createServerFn({ method: "GET" })
 	.validator((projectId: string) => projectId)
 	.handler(async ({ data: projectId }) => {
 		const user = await requireUserServer();
 		const proposal = await getLatestPendingProposal(user.id, projectId);
 		return { proposal };
+	});
+
+export const getRevisionHistoryAction = createServerFn({ method: "GET" })
+	.validator((projectId: string) => projectId)
+	.handler(async ({ data: projectId }) => {
+		const user = await requireUserServer();
+		return { proposals: await listRevisionProposals(user.id, projectId) };
 	});
 
 export const getRevisionProposalAction = createServerFn({ method: "GET" })

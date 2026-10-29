@@ -7,6 +7,7 @@ import {
 	codebaseSnapshots,
 	codebaseSyncSessions,
 	codebases,
+	creditOperations,
 	featureVersions,
 	prdVersions,
 	projects,
@@ -18,6 +19,7 @@ import {
 	applyRevisionProposal,
 	getLatestPendingProposal,
 	getRevisionProposal,
+	listRevisionProposals,
 	rejectRevisionProposal,
 	saveRevisionProposal,
 } from "../services/revision-lifecycle.server";
@@ -485,6 +487,102 @@ describe("revision propose, review, apply, and reject lifecycle", () => {
 
 		// Now and only now, handoff reads the approved version!
 		expect(await getLatestPrdContent(projectId)).toContain("Proposed v2");
+	});
+
+	it("keeps an auditable history of who approved which base version", async () => {
+		const saved = await saveRevisionProposal(userId, {
+			projectId,
+			codebaseId,
+			snapshotId,
+			targetKind: "prd",
+			baseVersionId: prdId,
+			instruction: "Update overview",
+			baseContent: "<!-- SECTION: Overview -->\nOriginal v1\n<!-- /SECTION -->",
+			proposedContent:
+				"<!-- SECTION: Overview -->\nProposed v2\n<!-- /SECTION -->",
+			impact: {},
+			idempotencyKey: "history-key",
+		});
+		await applyRevisionProposal(userId, { proposalId: saved.proposalId });
+
+		const history = await listRevisionProposals(userId, projectId);
+		expect(history).toHaveLength(1);
+		// The audit trail names the actor, the moment, the reviewed base version,
+		// and the version the approval produced.
+		expect(history[0]).toMatchObject({
+			id: saved.proposalId,
+			targetKind: "prd",
+			status: "approved",
+			baseVersionId: prdId,
+			approvedBy: userId,
+		});
+		expect(history[0].approvedAt).toBeInstanceOf(Date);
+		expect(history[0].appliedVersionId).toBeTruthy();
+
+		// A rejected proposal stays in the history without touching the document.
+		const rejected = await saveRevisionProposal(userId, {
+			projectId,
+			codebaseId,
+			snapshotId,
+			targetKind: "prd",
+			baseVersionId: history[0].appliedVersionId ?? "",
+			instruction: "Rejected change",
+			baseContent: "before",
+			proposedContent: "after",
+			impact: {},
+			idempotencyKey: "history-key-2",
+		});
+		await rejectRevisionProposal(userId, rejected.proposalId);
+		const after = await listRevisionProposals(userId, projectId);
+		expect(after.map((row) => row.status).sort()).toEqual([
+			"approved",
+			"rejected",
+		]);
+
+		// Another user's history is not readable.
+		expect(await listRevisionProposals(crypto.randomUUID(), projectId)).toEqual(
+			[],
+		);
+	});
+
+	it("is idempotent per key and never consumes credits for a proposal", async () => {
+		const before = await db
+			.select({ id: creditOperations.id })
+			.from(creditOperations)
+			.where(eq(creditOperations.userId, userId));
+
+		const input = {
+			projectId,
+			codebaseId,
+			snapshotId,
+			targetKind: "prd" as const,
+			baseVersionId: prdId,
+			instruction: "Update overview",
+			baseContent: "<!-- SECTION: Overview -->\nOriginal v1\n<!-- /SECTION -->",
+			proposedContent:
+				"<!-- SECTION: Overview -->\nProposed v2\n<!-- /SECTION -->",
+			impact: {},
+			idempotencyKey: "same-key",
+		};
+		// A double submit replays the same proposal instead of forking a second
+		// pending review for one instruction.
+		const first = await saveRevisionProposal(userId, input);
+		const replay = await saveRevisionProposal(userId, input);
+		expect(replay.proposalId).toBe(first.proposalId);
+		expect(
+			await db
+				.select({ id: codebaseRevisionProposals.id })
+				.from(codebaseRevisionProposals)
+				.where(eq(codebaseRevisionProposals.userId, userId)),
+		).toHaveLength(1);
+
+		// Revisions are free: preparing a proposal never records a charge.
+		expect(
+			await db
+				.select({ id: creditOperations.id })
+				.from(creditOperations)
+				.where(eq(creditOperations.userId, userId)),
+		).toEqual(before);
 	});
 
 	it("rejects unauthorized user trying to read, apply, or reject", async () => {

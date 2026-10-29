@@ -224,6 +224,52 @@ describe("revision source authorization", () => {
 			},
 		});
 	});
+	it("resolves the immutable base version the client must send back", async () => {
+		const { resolveRevisionBaseVersion } = await import(
+			"../services/revision-source.server"
+		);
+		// PRD/AC report the real row id, not a positional guess: a proposal is
+		// always prepared against a version the user could actually read.
+		expect(await resolveRevisionBaseVersion(userId, projectId, "prd")).toBe(
+			prdId,
+		);
+		expect(await resolveRevisionBaseVersion(userId, projectId, "ac")).toBe(
+			acId,
+		);
+		// A feature tree stored before the version table existed is still the one
+		// reviewable state until the first approved revision creates a row.
+		const featureTree = {
+			productName: "Project",
+			createdAt: "2026-01-01T00:00:00Z",
+			features: [
+				{
+					id: "feat-1",
+					name: "Feature",
+					phase: 1,
+					description: "Description",
+					subfeatures: [
+						{ id: "subfeat-1.1", name: "First", description: "First" },
+						{ id: "subfeat-1.2", name: "Second", description: "Second" },
+					],
+				},
+			],
+		};
+		await db
+			.update(projects)
+			.set({ featureTree })
+			.where(eq(projects.id, projectId));
+		expect(await resolveRevisionBaseVersion(userId, projectId, "feature")).toBe(
+			"v1",
+		);
+		// No tasks yet: there is nothing to revise.
+		expect(
+			await resolveRevisionBaseVersion(userId, projectId, "tasks"),
+		).toBeNull();
+		// A foreign user gets nothing, and a project without a PRD has no base.
+		expect(
+			await resolveRevisionBaseVersion(crypto.randomUUID(), projectId, "prd"),
+		).toBeNull();
+	});
 	it("rejects malformed requests before accessing project data", async () => {
 		for (const input of [
 			null,

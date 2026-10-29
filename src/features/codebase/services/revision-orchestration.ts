@@ -3,6 +3,7 @@ import { parseTaskJson } from "@/features/greenfield/services/task-tree";
 import { extractJson } from "@/lib/services/json-extract";
 import { revisionRequestSchema } from "../types/revision";
 import { generatePrdRevisionProposal } from "./revision-propose";
+import type { ReconciliationItem } from "./revision-reconciliation";
 import { reconcileTasks } from "./revision-reconciliation";
 import type { resolveRevisionSource } from "./revision-source.server";
 
@@ -27,7 +28,7 @@ export async function proposeRevision(
 				kind: "proposal";
 				content: string;
 				sections?: string[];
-				reconciliation?: unknown[];
+				reconciliation?: ReconciliationItem[];
 		  }
 		| { kind: "conflict"; explanation: string }
 		| { kind: "invalid" };

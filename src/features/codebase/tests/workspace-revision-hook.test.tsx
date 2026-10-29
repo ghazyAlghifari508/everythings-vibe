@@ -6,12 +6,14 @@ import { useWorkspaceRevision } from "../hooks/use-workspace-revision";
 const mockSubmit = vi.hoisted(() => vi.fn());
 const mockGetPending = vi.hoisted(() => vi.fn());
 const mockGetProposal = vi.hoisted(() => vi.fn());
+const mockGetBase = vi.hoisted(() => vi.fn());
 const mockApply = vi.hoisted(() => vi.fn());
 const mockReject = vi.hoisted(() => vi.fn());
 
 vi.mock("../services/revision-actions.functions", () => ({
 	submitRevisionProposalAction: mockSubmit,
 	getPendingRevisionAction: mockGetPending,
+	getRevisionBaseAction: mockGetBase,
 	getRevisionProposalAction: mockGetProposal,
 	applyRevisionAction: mockApply,
 	rejectRevisionAction: mockReject,
@@ -22,6 +24,7 @@ describe("useWorkspaceRevision", () => {
 		mockSubmit.mockReset();
 		mockGetPending.mockReset().mockResolvedValue({ proposal: null });
 		mockGetProposal.mockReset();
+		mockGetBase.mockReset().mockResolvedValue({ versionId: "v1" });
 		mockApply.mockReset();
 		mockReject.mockReset();
 	});
@@ -77,6 +80,12 @@ describe("useWorkspaceRevision", () => {
 		});
 
 		expect(mockSubmit).toHaveBeenCalledOnce();
+		// The request carries the version id the server resolved, not a guess.
+		expect(mockSubmit).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({ targetArtifactVersionId: "v1" }),
+			}),
+		);
 		expect(result.current.pendingProposal?.id).toBe("prop-123");
 		expect(result.current.isReviewOpen).toBe(true);
 
@@ -85,6 +94,38 @@ describe("useWorkspaceRevision", () => {
 		expect(pushAssistantMessage).toHaveBeenCalledWith(
 			expect.stringContaining("Proposal revisi untuk PRD siap ditinjau"),
 		);
+	});
+
+	it("does not send a revision request when the target has no reviewable version", async () => {
+		mockGetBase.mockResolvedValue({ versionId: null });
+		const setStageError = vi.fn();
+		const { result } = renderHook(() =>
+			useWorkspaceRevision({
+				codebaseId: "codebase-1",
+				effectiveFeatureId: "project-1",
+				currentSnapshotId: "snapshot-1",
+				activeProjectIdRef: { current: "project-1" },
+				stageBusy: null,
+				featureName: "Pencarian",
+				resolvedFeatureName: "Pencarian",
+				loadPrd: vi.fn(),
+				pushAssistantMessage: vi.fn(),
+				openArtifactPreview: vi.fn(),
+				setStageBusy: vi.fn(),
+				setStageError,
+				setRun: vi.fn(),
+			}),
+		);
+
+		await act(async () => {
+			await result.current.runRevision("Ubah navigasi");
+		});
+
+		expect(mockSubmit).not.toHaveBeenCalled();
+		expect(setStageError).toHaveBeenCalledWith(
+			"Belum ada dokumen yang bisa direvisi pada target ini.",
+		);
+		expect(result.current.pendingProposal).toBeNull();
 	});
 
 	it("restores pending proposal after refresh", async () => {

@@ -112,6 +112,31 @@ export async function getLatestPendingProposal(
 	return { ...row, diff };
 }
 
+export async function listRevisionProposals(userId: string, projectId: string) {
+	const rows = await db
+		.select({
+			id: codebaseRevisionProposals.id,
+			targetKind: codebaseRevisionProposals.targetKind,
+			instruction: codebaseRevisionProposals.instruction,
+			status: codebaseRevisionProposals.status,
+			baseVersionId: codebaseRevisionProposals.baseVersionId,
+			appliedVersionId: codebaseRevisionProposals.appliedVersionId,
+			approvedBy: codebaseRevisionProposals.approvedBy,
+			approvedAt: codebaseRevisionProposals.approvedAt,
+			impact: codebaseRevisionProposals.impact,
+			createdAt: codebaseRevisionProposals.createdAt,
+		})
+		.from(codebaseRevisionProposals)
+		.where(
+			and(
+				eq(codebaseRevisionProposals.projectId, projectId),
+				eq(codebaseRevisionProposals.userId, userId),
+			),
+		)
+		.orderBy(desc(codebaseRevisionProposals.createdAt));
+	return rows;
+}
+
 export async function rejectRevisionProposal(
 	userId: string,
 	proposalId: string,

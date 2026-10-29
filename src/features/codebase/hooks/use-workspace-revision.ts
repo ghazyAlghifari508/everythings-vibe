@@ -17,6 +17,7 @@ import type { RevisionProposalView } from "../components/revision/codebase-revis
 import {
 	applyRevisionAction,
 	getPendingRevisionAction,
+	getRevisionBaseAction,
 	getRevisionProposalAction,
 	rejectRevisionAction,
 	submitRevisionProposalAction,
@@ -109,12 +110,34 @@ export function useWorkspaceRevision({
 			const requestId = request.requestId;
 
 			try {
+				// The real immutable base version id is resolved server-side before the
+				// request is built, so the proposal is prepared against a version the
+				// user could actually read — never a positional guess.
+				const base = await getRevisionBaseAction({
+					data: { projectId: effectiveFeatureId, targetKind: target },
+				});
+				if (!base.versionId) {
+					const failure =
+						"Belum ada dokumen yang bisa direvisi pada target ini.";
+					setStageError(failure);
+					setRun((current) =>
+						settleRunIfCurrent(
+							current,
+							requestId,
+							"failed",
+							Date.now(),
+							failure,
+						),
+					);
+					return;
+				}
+
 				const response = await submitRevisionProposalAction({
 					data: {
 						projectId: effectiveFeatureId,
 						codebaseId: codebaseId ?? "default",
 						targetArtifactKind: target,
-						targetArtifactVersionId: "v1",
+						targetArtifactVersionId: base.versionId,
 						userInstruction: instruction,
 						sourceSnapshotId: currentSnapshotId ?? "default",
 					},
