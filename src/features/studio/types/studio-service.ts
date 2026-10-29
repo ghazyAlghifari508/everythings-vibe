@@ -73,8 +73,5 @@ export interface CreateStudioProjectInput {
 }
 
 export interface StudioPreferencesInput {
-	designMd?: string | null;
-	designReference?: StudioDesignReference | null;
-	designSkillId?: StudioDesignSkillId;
-	logo?: StudioLogoInput | null;
+	designSkillId: StudioDesignSkillId;
 }
