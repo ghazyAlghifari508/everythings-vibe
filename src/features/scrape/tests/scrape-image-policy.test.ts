@@ -23,9 +23,7 @@ it("counts durable previous results alongside changed retry candidates", () => {
 	});
 });
 
-it.each([
-	403, 429, 500,
-])("preserves robots HTTP evidence for %s", async (status) => {
+it.each([429, 500])("preserves robots HTTP evidence for %s", async (status) => {
 	const policy = createImageSitePolicy(undefined, async (url) => ({
 		status,
 		contentType: "text/plain",
@@ -37,6 +35,32 @@ it.each([
 		httpStatus: status,
 		retryAfterSeconds: 60,
 	});
+});
+
+it.each([
+	401, 403, 404, 410,
+])("treats %s on /robots.txt as unavailable per RFC 9309 so CDN assets can be fetched", async (status) => {
+	const policy = createImageSitePolicy(undefined, async (url) => ({
+		status,
+		contentType: "text/xml",
+		finalUrl: url,
+		body: Buffer.from("<Error><Code>MissingKey</Code></Error>"),
+	}));
+	await expect(
+		policy("https://cdn.site.example/images/hero.png"),
+	).resolves.toBe(true);
+});
+
+it("ignores crawl-delay rules scoped only to unrelated third-party bots", async () => {
+	const policy = createImageSitePolicy(undefined, async (url) => ({
+		status: 200,
+		contentType: "text/plain",
+		finalUrl: url,
+		body: Buffer.from(
+			"User-agent: AhrefsBot\nCrawl-delay: 10\n\nUser-agent: *\nAllow: /",
+		),
+	}));
+	await expect(policy("https://site.example/public.png")).resolves.toBe(true);
 });
 
 it("does not attribute unsupported robots content to a site denial", async () => {

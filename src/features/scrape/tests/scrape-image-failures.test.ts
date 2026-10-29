@@ -67,7 +67,7 @@ describe("classifyImageFailureCode", () => {
 		);
 	});
 
-	it("classifies blocked URLs as security_rejected", () => {
+	it("classifies blocked URLs and unsafe SVGs as security_rejected", () => {
 		expect(classifyImageFailureCode("PRIVATE_URL_BLOCKED", null)).toBe(
 			"security_rejected",
 		);
@@ -75,6 +75,9 @@ describe("classifyImageFailureCode", () => {
 			"security_rejected",
 		);
 		expect(classifyImageFailureCode("REMOTE_REDIRECT_BLOCKED", null)).toBe(
+			"security_rejected",
+		);
+		expect(classifyImageFailureCode("UNSAFE_SVG", 200)).toBe(
 			"security_rejected",
 		);
 	});
