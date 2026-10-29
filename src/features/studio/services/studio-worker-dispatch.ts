@@ -23,7 +23,9 @@ export function selectStudioWorkerBatch<T extends { jobType: string }>(
 	);
 }
 
-export async function dispatchStudioWorkerBatch(): Promise<number> {
+export async function dispatchStudioWorkerBatch(
+	shutdownSignal?: AbortSignal,
+): Promise<number> {
 	const connection = await db.$client.connect();
 	let locked = false;
 	try {
@@ -44,7 +46,7 @@ export async function dispatchStudioWorkerBatch(): Promise<number> {
 		const batch = selectStudioWorkerBatch(pending);
 		const results = await Promise.allSettled(
 			batch.map((job) =>
-				runStudioJobPipeline(job.id, job.projectId, job.userId),
+				runStudioJobPipeline(job.id, job.projectId, job.userId, shutdownSignal),
 			),
 		);
 		for (const result of results)

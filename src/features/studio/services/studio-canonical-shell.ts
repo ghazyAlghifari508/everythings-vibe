@@ -50,7 +50,7 @@ function shellStyle(
 	return `<style id="studio-canonical-style">
 html{box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}
 body{margin:0}
-[data-studio-shell]{--app-primary:${primary};--app-canvas:${canvas};--app-surface:${surface};--app-ink:${ink};--app-muted:${muted};--app-border:${border};--app-font:${font};--app-gutter:${gutter}px;--app-radius:${bp.radius}px;min-width:0;width:100%;background:var(--app-canvas);color:var(--app-ink);font:400 16px/1.5 var(--app-font);overflow-wrap:anywhere}
+[data-studio-shell]{--app-primary:${primary};--app-canvas:${canvas};--app-surface:${surface};--app-ink:${ink};--app-muted:${muted};--app-border:${border};--app-font:${font};--app-gutter:${gutter}px;--app-radius:${bp.radius}px;min-width:0;width:100%;background:var(--app-canvas);color:var(--app-ink);font:400 16px/1.5 var(--app-font);overflow-wrap:break-word}
 [data-studio-shell] :where(button,input,select,textarea){font:inherit;min-height:44px;max-width:100%;border:var(--app-border);border-radius:${tokens?.shapes.borderRadius.buttons ?? "var(--app-radius)"};padding:10px 14px}
 [data-studio-shell] :where(button[type=submit],[data-primary]){background:var(--app-primary);color:var(--app-surface)}
 [data-studio-shell] :where(.card,[data-card]){border:var(--app-border);border-radius:${tokens?.shapes.borderRadius.cards ?? "var(--app-radius)"};background:var(--app-surface)}

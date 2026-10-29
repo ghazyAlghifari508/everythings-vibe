@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import type {
 	StudioFrameRow,
 	StudioJobRow,
@@ -15,14 +15,12 @@ import {
 import { StudioFrame } from "@/features/studio/components/canvas/studio-frame";
 import { useStudioCanvasInput } from "@/features/studio/hooks/use-studio-canvas-input";
 import { useStudioCanvasMarquee } from "@/features/studio/hooks/use-studio-canvas-marquee";
+import { useStudioCanvasView } from "@/features/studio/hooks/use-studio-canvas-view";
 import {
 	STUDIO_CANVAS_INITIAL_ZOOM,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
-	STUDIO_VISUAL_FALLBACK_HEIGHT,
-	STUDIO_VISUAL_WIDTH,
 } from "@/features/studio/types/studio-constants";
-import { computeCanvasFit } from "@/features/studio/utils/studio-canvas-fit";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 
 export type {
@@ -46,6 +44,8 @@ export interface StudioCanvasProps {
 	onSelectFrames?: (frameIds: string[]) => void;
 	onRetryFrame?: (frameId: string) => void;
 	onRetryPlanning?: () => void;
+	retryingFrameIds?: string[];
+	frameRetryErrors?: Record<string, string>;
 	className?: string;
 }
 
@@ -59,10 +59,16 @@ export const StudioCanvas = memo(function StudioCanvas({
 	onSelectFrames,
 	onRetryFrame,
 	onRetryPlanning,
+	retryingFrameIds = [],
+	frameRetryErrors,
 	className = "",
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
 	const marqueeRef = useRef<HTMLDivElement>(null);
+	const preferredZoom =
+		STUDIO_CANVAS_INITIAL_ZOOM[
+			project.designMode === "mobile" ? "mobile" : "web"
+		];
 
 	const {
 		zoom,
@@ -82,98 +88,28 @@ export const StudioCanvas = memo(function StudioCanvas({
 	} = useCanvasZoom({
 		minZoom: STUDIO_CANVAS_MIN_ZOOM,
 		maxZoom: STUDIO_CANVAS_MAX_ZOOM,
-		initialZoom:
-			STUDIO_CANVAS_INITIAL_ZOOM[
-				project.designMode === "mobile" ? "mobile" : "web"
-			],
+		initialZoom: preferredZoom,
 	});
 
 	const [tool, setTool] = useState<StudioCanvasTool>("select");
 	const [spacePan, setSpacePan] = useState(false);
 	const [isPanning, setIsPanning] = useState(false);
 	const panMode = tool === "hand" || spacePan;
-	// Real artboard measurements are reactive state, not a ref: a fit must run
-	// when a preview arrives and its true height is known.
-	const [dimensions, setDimensions] = useState<
-		ReadonlyMap<string, { width: number; height: number }>
-	>(() => new Map());
-	// Once the user pans or zooms, the view belongs to them and automatic
-	// re-fitting stops.
-	const userPositioned = useRef(false);
-	const measureFrame = useCallback(
-		(id: string, width: number, height: number) => {
-			setDimensions((previous) => {
-				const existing = previous.get(id);
-				if (existing?.width === width && existing?.height === height) {
-					return previous;
-				}
-				const next = new Map(previous);
-				next.set(id, { width, height });
-				return next;
-			});
-		},
-		[],
-	);
-	const fitCanvas = useCallback(() => {
-		const canvas = canvasRef.current;
-		if (!canvas || !frames.length) {
-			resetZoom();
-			return;
-		}
-		const bounds = frames.map(
-			(frame) =>
-				dimensions.get(frame.id) ?? {
-					width:
-						frame.viewport === "mobile"
-							? STUDIO_VISUAL_WIDTH.mobile
-							: STUDIO_VISUAL_WIDTH.web,
-					height:
-						frame.viewport === "mobile"
-							? STUDIO_VISUAL_FALLBACK_HEIGHT.mobile
-							: STUDIO_VISUAL_FALLBACK_HEIGHT.web,
-				},
-		);
-		const { zoom: nextZoom, pan: nextPan } = computeCanvasFit({
-			bounds,
-			available: canvas.getBoundingClientRect(),
-			minZoom,
-			maxZoom,
-		});
-		userPositioned.current = false;
-		setZoom(nextZoom);
-		setPan(nextPan);
-	}, [dimensions, frames, maxZoom, minZoom, resetZoom, setPan, setZoom]);
-	// An untouched workspace keeps the whole project in view. The signature
-	// changes only when a frame slot appears or a real artboard size is
-	// measured, so status polls do not repeatedly recentre the view, and a user
-	// who already panned or zoomed is never yanked back at all.
-	const layoutSignature = frames
-		.map((frame) => {
-			const measured = dimensions.get(frame.id);
-			return measured
-				? `${frame.id}:${measured.width}x${measured.height}`
-				: frame.id;
-		})
-		.join("|");
-	const fitSignatureRef = useRef("");
-	useEffect(() => {
-		if (!frames.length) return;
-		if (fitSignatureRef.current === layoutSignature) return;
-		fitSignatureRef.current = layoutSignature;
-		if (userPositioned.current) return;
-		fitCanvas();
-	}, [layoutSignature, frames.length, fitCanvas]);
 
-	// Every user-driven view change opts out of automatic re-fitting, so a
-	// frame that finishes later cannot move the view the user is working in.
-	const zoomInByUser = useCallback(() => {
-		userPositioned.current = true;
-		zoomIn();
-	}, [zoomIn]);
-	const zoomOutByUser = useCallback(() => {
-		userPositioned.current = true;
-		zoomOut();
-	}, [zoomOut]);
+	const { measureFrame, fitAll } = useStudioCanvasView({
+		projectId: project.id,
+		preferredZoom,
+		frames,
+		canvasRef,
+		selectedFrameId,
+		zoom,
+		pan,
+		minZoom,
+		maxZoom,
+		setZoom,
+		setPan,
+		resetZoom,
+	});
 
 	// Stable frame callbacks keep the memoized artboards from re-rendering on
 	// every pan frame; the handlers read the latest values through refs.
@@ -207,7 +143,6 @@ export const StudioCanvas = memo(function StudioCanvas({
 
 	useStudioCanvasInput({
 		canvasRef,
-		userPositioned,
 		onWheel,
 		setPan,
 		nudgePan,
@@ -245,8 +180,6 @@ export const StudioCanvas = memo(function StudioCanvas({
 				handleCanvasPointerDown(event);
 			}}
 			onPointerMove={(event) => {
-				// Any drag also opts out of automatic re-fitting.
-				if (panMode) userPositioned.current = true;
 				updatePan(event);
 				handleCanvasPointerMove(event);
 			}}
@@ -300,6 +233,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 							}
 							onSelect={handleFrameSelect}
 							onRetry={handleFrameRetry}
+							isRetryPending={retryingFrameIds.includes(frame.id)}
+							retryError={frameRetryErrors?.[frame.id]}
 							isCanvasPanning={panMode}
 						/>
 					))
@@ -335,9 +270,9 @@ export const StudioCanvas = memo(function StudioCanvas({
 
 			<StudioCanvasZoomCorner
 				zoom={zoom}
-				onZoomIn={zoomInByUser}
-				onZoomOut={zoomOutByUser}
-				onFit={fitCanvas}
+				onZoomIn={zoomIn}
+				onZoomOut={zoomOut}
+				onFit={fitAll}
 			/>
 		</section>
 	);

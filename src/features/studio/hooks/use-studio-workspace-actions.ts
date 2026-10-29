@@ -1,42 +1,30 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
 import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
-import type { StudioComposerScope } from "@/features/studio/components/composer/studio-composer";
+import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { exportProjectAsZip } from "@/features/studio/services/studio-export";
+import {
+	readStudioApiError,
+	requestStudioFrameRetry,
+} from "@/features/studio/services/studio-frame-retry-client";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
-import type {
-	AttachedDesignReference,
-	StudioFrameRetryOutcome,
-} from "@/features/studio/types/studio";
 import { useUIStore } from "@/store";
 
-/** Reads the API's own error message, falling back to a caller-owned sentence. */
-async function readApiError(
-	response: Response,
-	fallback: string,
-): Promise<string> {
-	const body: unknown = await response.json().catch(() => null);
-	return typeof body === "object" &&
-		body !== null &&
-		"error" in body &&
-		typeof body.error === "string"
-		? body.error
-		: fallback;
-}
-
-/** Reads what a retry request actually did, so the UI can explain the outcome. */
-async function readRetryOutcome(
-	response: Response,
-): Promise<StudioFrameRetryOutcome | null> {
-	const body: unknown = await response.json().catch(() => null);
-	if (typeof body !== "object" || body === null || !("retry" in body))
-		return null;
-	const retry = body.retry;
-	return retry === "queued" ||
-		retry === "already-running" ||
-		retry === "completed"
-		? retry
-		: null;
+/** Reads what one composer request resolved to, so the UI explains clarify/add. */
+function readComposerOutcome(body: unknown): {
+	intent: string | null;
+	message: string | null;
+	addedCount: number;
+} {
+	if (typeof body !== "object" || body === null)
+		return { intent: null, message: null, addedCount: 0 };
+	const intent =
+		"intent" in body && typeof body.intent === "string" ? body.intent : null;
+	const message =
+		"message" in body && typeof body.message === "string" ? body.message : null;
+	const addedCount =
+		"frames" in body && Array.isArray(body.frames) ? body.frames.length : 0;
+	return { intent, message, addedCount };
 }
 
 export interface UseStudioWorkspaceActionsOptions {
@@ -46,7 +34,6 @@ export interface UseStudioWorkspaceActionsOptions {
 	isProcessing: boolean;
 	syncProjectStatus: () => Promise<void>;
 	setError: (error: string) => void;
-	setIsAddFrameOpen: (open: boolean) => void;
 }
 
 export function useStudioWorkspaceActions({
@@ -56,18 +43,33 @@ export function useStudioWorkspaceActions({
 	isProcessing,
 	syncProjectStatus,
 	setError,
-	setIsAddFrameOpen,
 }: UseStudioWorkspaceActionsOptions) {
 	const [composerLoading, setComposerLoading] = useState(false);
 	const [preferenceSaving, setPreferenceSaving] = useState(false);
 	const [exportingZip, setExportingZip] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [duplicating, setDuplicating] = useState(false);
+	const [retryingFrameIds, setRetryingFrameIds] = useState<string[]>([]);
+	const [frameRetryErrors, setFrameRetryErrors] = useState<
+		Record<string, string>
+	>({});
 
 	const navigate = useNavigate();
 	const router = useRouter();
 	const showToast = useUIStore((state) => state.showToast);
 	const pendingRequest = useRef<{ signature: string; id: string } | null>(null);
+	// The in-flight guard is a ref: two clicks in one tick both read the rendered
+	// state before React commits it, and only the ref sees the first request.
+	const retryingFrames = useRef(new Set<string>());
+
+	const clearFrameRetryError = useCallback((frameId: string) => {
+		setFrameRetryErrors((previous) => {
+			if (!(frameId in previous)) return previous;
+			const next = { ...previous };
+			delete next[frameId];
+			return next;
+		});
+	}, []);
 
 	const handleDuplicate = useCallback(async () => {
 		if (duplicating) return;
@@ -116,7 +118,10 @@ export function useStudioWorkspaceActions({
 			});
 			if (!response.ok) {
 				throw new Error(
-					await readApiError(response, "Gagal menghapus project. Coba lagi."),
+					await readStudioApiError(
+						response,
+						"Gagal menghapus project. Coba lagi.",
+					),
 				);
 			}
 			showToast("Project dihapus.", "success");
@@ -133,13 +138,10 @@ export function useStudioWorkspaceActions({
 	}, [deleting, navigate, project.id, router, setError, showToast]);
 
 	const handleComposerSubmit = useCallback(
-		async (
-			promptText: string,
-			scope: StudioComposerScope,
-		): Promise<boolean> => {
+		async (promptText: string): Promise<StudioComposerSubmitResult> => {
 			setComposerLoading(true);
 			setError("");
-			const signature = JSON.stringify({ promptText, scope, selectedFrameIds });
+			const signature = JSON.stringify({ promptText, selectedFrameIds });
 			if (pendingRequest.current?.signature !== signature)
 				pendingRequest.current = { signature, id: crypto.randomUUID() };
 			try {
@@ -149,90 +151,36 @@ export function useStudioWorkspaceActions({
 					body: JSON.stringify({
 						action: "operation",
 						projectId: project.id,
-						scope,
-						frameIds: scope === "revise" ? selectedFrameIds : undefined,
 						prompt: promptText,
+						frameIds: selectedFrameIds,
 						requestId: pendingRequest.current.id,
 					}),
 				});
 				if (!res.ok) {
-					setError(await readApiError(res, "Permintaan desain ditolak."));
-					return false;
+					setError(await readStudioApiError(res, "Permintaan desain ditolak."));
+					return { accepted: false };
 				}
+				const outcome = readComposerOutcome(await res.json().catch(() => null));
 				await syncProjectStatus();
 				pendingRequest.current = null;
-				return true;
+				if (outcome.intent === "clarify")
+					return { accepted: false, clarify: outcome.message ?? undefined };
+				if (outcome.intent === "add_screen" && outcome.addedCount > 0)
+					showToast(
+						outcome.addedCount === 1
+							? "Halaman baru sedang dibuat."
+							: `${outcome.addedCount} halaman baru sedang dibuat.`,
+						"info",
+					);
+				return { accepted: true };
 			} catch {
 				setError("Jaringan bermasalah. Coba lagi.");
-				return false;
+				return { accepted: false };
 			} finally {
 				setComposerLoading(false);
 			}
 		},
-		[project.id, selectedFrameIds, setError, syncProjectStatus],
-	);
-
-	const handleAddFrame = useCallback(
-		async (input: { name: string; prompt: string }) => {
-			setComposerLoading(true);
-			setError("");
-			try {
-				const response = await fetch("/api/studio/frame", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "add",
-						projectId: project.id,
-						name: input.name,
-						prompt: input.prompt,
-					}),
-				});
-				if (!response.ok) {
-					throw new Error(
-						await readApiError(response, "Gagal menambah halaman baru."),
-					);
-				}
-				setIsAddFrameOpen(false);
-				await syncProjectStatus();
-				showToast("Halaman baru ditambahkan.", "success");
-			} catch (failure) {
-				setError(
-					failure instanceof Error
-						? failure.message
-						: "Gagal menambah halaman baru.",
-				);
-			} finally {
-				setComposerLoading(false);
-			}
-		},
-		[project.id, setError, setIsAddFrameOpen, showToast, syncProjectStatus],
-	);
-
-	const handleApplyDesignSystem = useCallback(
-		async (reference: AttachedDesignReference): Promise<boolean> => {
-			setPreferenceSaving(true);
-			try {
-				const response = await fetch("/api/studio/project", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "design-system",
-						projectId: project.id,
-						...reference,
-					}),
-				});
-				if (!response.ok) {
-					throw new Error(
-						await readApiError(response, "Gagal menyimpan design system."),
-					);
-				}
-				await syncProjectStatus();
-				return true;
-			} finally {
-				setPreferenceSaving(false);
-			}
-		},
-		[project.id, syncProjectStatus],
+		[project.id, selectedFrameIds, setError, showToast, syncProjectStatus],
 	);
 
 	const handleSkillChange = useCallback(
@@ -253,7 +201,7 @@ export function useStudioWorkspaceActions({
 				});
 				if (!response.ok) {
 					throw new Error(
-						await readApiError(response, "Gagal menyimpan design skill."),
+						await readStudioApiError(response, "Gagal menyimpan design skill."),
 					);
 				}
 				await syncProjectStatus();
@@ -279,39 +227,33 @@ export function useStudioWorkspaceActions({
 
 	const handleRetryFrame = useCallback(
 		async (frameId: string) => {
+			if (retryingFrames.current.has(frameId)) return;
+			retryingFrames.current.add(frameId);
+			setRetryingFrameIds([...retryingFrames.current]);
+			clearFrameRetryError(frameId);
 			setError("");
-			// A network drop is reported as a connection problem instead of
-			// discarding the classified server response.
-			const response = await fetch("/api/studio/frame", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					action: "retry",
-					projectId: project.id,
-					frameId,
-				}),
-			}).catch(() => null);
-			if (!response) {
-				setError("Koneksi terputus. Periksa koneksi lalu coba lagi.");
-				return;
+			try {
+				const result = await requestStudioFrameRetry(project.id, frameId);
+				if (result.kind === "rejected") {
+					// The rejection belongs to this frame, not to the whole project.
+					setFrameRetryErrors((previous) => ({
+						...previous,
+						[frameId]: result.message,
+					}));
+					return;
+				}
+				if (result.outcome === "already-running")
+					showToast("Halaman ini sedang dibuat ulang.", "info");
+				else if (result.outcome === "completed")
+					showToast("Halaman ini sudah siap.", "success");
+				else showToast("Permintaan dikirim. Menunggu antrean.", "info");
+				await syncProjectStatus();
+			} finally {
+				retryingFrames.current.delete(frameId);
+				setRetryingFrameIds([...retryingFrames.current]);
 			}
-			if (!response.ok) {
-				setError(
-					await readApiError(
-						response,
-						"Desain belum berhasil dibuat. Coba lagi.",
-					),
-				);
-				return;
-			}
-			const outcome = await readRetryOutcome(response);
-			if (outcome === "already-running")
-				showToast("Halaman ini sedang dibuat ulang.", "info");
-			else if (outcome === "completed")
-				showToast("Halaman ini sudah siap.", "success");
-			await syncProjectStatus();
 		},
-		[project.id, setError, showToast, syncProjectStatus],
+		[clearFrameRetryError, project.id, setError, showToast, syncProjectStatus],
 	);
 
 	const handleRetryPlanning = useCallback(async () => {
@@ -325,7 +267,9 @@ export function useStudioWorkspaceActions({
 				}),
 			});
 			if (!res.ok) {
-				setError(await readApiError(res, "Gagal mencoba lagi perencanaan."));
+				setError(
+					await readStudioApiError(res, "Gagal mencoba lagi perencanaan."),
+				);
 				return;
 			}
 			await syncProjectStatus();
@@ -348,15 +292,14 @@ export function useStudioWorkspaceActions({
 
 	return {
 		composerLoading,
-		preferenceSaving,
 		exportingZip,
 		deleting,
 		duplicating,
+		retryingFrameIds,
+		frameRetryErrors,
 		handleDuplicate,
 		handleDelete,
 		handleComposerSubmit,
-		handleAddFrame,
-		handleApplyDesignSystem,
 		handleSkillChange,
 		handleRetryFrame,
 		handleRetryPlanning,

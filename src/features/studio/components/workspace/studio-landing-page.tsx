@@ -30,7 +30,7 @@ import {
 	type StudioPromptShortcut,
 } from "@/features/studio/services/studio-prompt-shortcuts";
 import type {
-	AttachedDesignReference,
+	AttachedLogo,
 	StudioHistoryItem,
 } from "@/features/studio/types/studio";
 import { useUIStore } from "@/store";
@@ -43,7 +43,7 @@ export type StagedReference =
 			kind: "custom";
 			filename: string;
 			designMd: string;
-			logo: AttachedDesignReference["logo"];
+			logo: AttachedLogo | null;
 	  };
 
 /**
@@ -150,7 +150,7 @@ export function StudioLandingPage({
 	function handleSelectCustom(input: {
 		filename: string;
 		designMd: string;
-		logo: AttachedDesignReference["logo"];
+		logo: AttachedLogo | null;
 	}) {
 		setStagedReference({
 			kind: "custom",

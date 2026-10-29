@@ -3,6 +3,7 @@
 **Document ID:** `2026-10-11-vibedesign-studio-multi-screen-canvas-design`  
 **Target Branch:** `feature/vibedesign-design-studio`  
 **Status:** Approved for Implementation Planning  
+**Superseded in part:** the `+ Tambah Halaman` modal and the "no selection = Seluruh Project" composer contract were removed; screen creation and revision now resolve from the composer intent. See `docs/studio-composer-intent.md`.  
 **Author:** Antigravity Engineering  
 
 ---

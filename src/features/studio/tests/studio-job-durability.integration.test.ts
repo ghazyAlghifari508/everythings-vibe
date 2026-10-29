@@ -6,6 +6,7 @@ import {
 	claimStudioJob,
 	recoverStalledStudioJobs,
 	refreshStudioJobLease,
+	STUDIO_JOB_HEARTBEAT_MS,
 	withStudioJobWrite,
 } from "../services/studio-job-lease";
 
@@ -52,7 +53,9 @@ describe("Studio durable claims", () => {
 			.update(studioJobs)
 			.set({ leaseExpiresAt: new Date(0) })
 			.where(eq(studioJobs.id, job.id));
-		expect(await refreshStudioJobLease(job.id, "old")).toBe(false);
+		expect((await refreshStudioJobLease(job.id, "old")).outcome).toBe(
+			"lease-expired",
+		);
 		await db
 			.update(studioJobs)
 			.set({
@@ -60,7 +63,39 @@ describe("Studio durable claims", () => {
 				leaseExpiresAt: new Date(Date.now() + 60_000),
 			})
 			.where(eq(studioJobs.id, job.id));
-		expect(await refreshStudioJobLease(job.id, "old")).toBe(false);
+		expect((await refreshStudioJobLease(job.id, "old")).outcome).toBe(
+			"job-inactive",
+		);
+	});
+	it("keeps an intentionally stopped job stopped and never requeues it", async () => {
+		const { userId, job, frame } = await seed();
+		await claimStudioJob(job.id, userId, "stale");
+		// A deliberate stop is not a lease accident: the job left the active set
+		// while the stale worker still believed it held the claim.
+		await db
+			.update(studioJobs)
+			.set({
+				status: "failed",
+				finishedAt: new Date(),
+				leaseExpiresAt: new Date(0),
+			})
+			.where(eq(studioJobs.id, job.id));
+		expect((await refreshStudioJobLease(job.id, "stale")).outcome).toBe(
+			"job-inactive",
+		);
+		expect(await recoverStalledStudioJobs(new Date(), userId)).toBe(0);
+		const [stored] = await db
+			.select()
+			.from(studioJobs)
+			.where(eq(studioJobs.id, job.id));
+		expect(stored.status).toBe("failed");
+		expect(await claimStudioJob(job.id, userId, "next")).toBeNull();
+		const [saved] = await db
+			.select()
+			.from(studioFrames)
+			.where(eq(studioFrames.id, frame.id));
+		expect(saved.status).toBe("ready");
+		expect(saved.htmlCode).toBe(frame.htmlCode);
 	});
 	it("one simultaneous claim wins", async () => {
 		const { userId, job } = await seed();
@@ -69,6 +104,62 @@ describe("Studio durable claims", () => {
 			claimStudioJob(job.id, userId, "b"),
 		]);
 		expect(claims.filter(Boolean)).toHaveLength(1);
+	});
+	it("classifies a renewal blocked by another writer's row lock instead of hanging", async () => {
+		const { userId, job } = await seed();
+		await claimStudioJob(job.id, userId, "holder");
+		const blocker = await db.$client.connect();
+		try {
+			await blocker.query("begin");
+			// The holder keeps the row lock open, so the heartbeat wait must end in
+			// the configured lock timeout and report the PostgreSQL lock code.
+			await blocker.query(
+				"select id from studio_jobs where id = $1 for update",
+				[job.id],
+			);
+			const startedAt = Date.now();
+			const result = await refreshStudioJobLease(job.id, "holder");
+			expect(result.outcome).toBe("database-error");
+			expect(result.errorCategory).toBe("55P03");
+			expect(Date.now() - startedAt).toBeGreaterThanOrEqual(
+				STUDIO_JOB_HEARTBEAT_MS,
+			);
+		} finally {
+			await blocker.query("rollback");
+			blocker.release();
+		}
+	}, 35_000);
+	it("keeps the lease renewable under simultaneous renewal pressure", async () => {
+		const { userId, job } = await seed();
+		await claimStudioJob(job.id, userId, "holder");
+		const results = await Promise.all(
+			Array.from({ length: 8 }, () => refreshStudioJobLease(job.id, "holder")),
+		);
+		expect(results.every((result) => result.outcome === "renewed")).toBe(true);
+		const [stored] = await db
+			.select()
+			.from(studioJobs)
+			.where(eq(studioJobs.id, job.id));
+		expect(stored.claimedBy).toBe("holder");
+		expect(stored.leaseExpiresAt?.getTime()).toBeGreaterThan(Date.now());
+	});
+	it("hands a reclaimed lease to the new owner and refuses the old worker", async () => {
+		const { userId, job } = await seed();
+		await claimStudioJob(job.id, userId, "old");
+		await db
+			.update(studioJobs)
+			.set({ leaseExpiresAt: new Date(0) })
+			.where(eq(studioJobs.id, job.id));
+		expect(await recoverStalledStudioJobs(new Date(), userId)).toBe(1);
+		expect((await claimStudioJob(job.id, userId, "new"))?.claimedBy).toBe(
+			"new",
+		);
+		expect((await refreshStudioJobLease(job.id, "old")).outcome).toBe(
+			"ownership-changed",
+		);
+		expect((await refreshStudioJobLease(job.id, "new")).outcome).toBe(
+			"renewed",
+		);
 	});
 	it("rejects stale success and failure writes after handoff", async () => {
 		const { userId, project, job, frame } = await seed();

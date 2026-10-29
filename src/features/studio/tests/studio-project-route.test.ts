@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { StudioReferenceError } from "@/features/studio/services/studio-design-reference.server";
 import { ScrapeError } from "@/lib/design-errors";
 import { GET, POST } from "@/routes/api/studio.project";
 
 const detailFailure = vi.hoisted(() => ({ error: null as Error | null }));
 
-const referenceFailure = vi.hoisted(() => ({ error: null as Error | null }));
-
 const duplicate = vi.hoisted(() =>
 	vi.fn(async () => ({ id: "independent-project" })),
 );
 const remove = vi.hoisted(() =>
+	vi.fn(async (projectId: string) => ({ id: projectId })),
+);
+const updatePreferences = vi.hoisted(() =>
 	vi.fn(async (projectId: string) => ({ id: projectId })),
 );
 
@@ -28,11 +28,7 @@ vi.mock("@/features/studio/services/studio-project-lifecycle", () => ({
 }));
 
 vi.mock("@/features/studio/services/studio-preferences-service", () => ({
-	updateStudioDesignSystem: async () => {
-		if (referenceFailure.error) throw referenceFailure.error;
-		return { id: "proj-1" };
-	},
-	updateStudioPreferences: async () => ({ id: "proj-1" }),
+	updateStudioPreferences: updatePreferences,
 }));
 
 vi.mock("@/features/studio/services/studio-project-detail", () => ({
@@ -112,31 +108,50 @@ describe("GET /api/studio/project", () => {
 		expect(remove).not.toHaveBeenCalled();
 	});
 
-	it("keeps a stale reference a 400 the client can recover from, never a 404", async () => {
-		const log = vi.spyOn(console, "error").mockImplementation(() => {});
-		referenceFailure.error = new StudioReferenceError("source-unavailable");
-		try {
-			const response = await POST({
-				request: new Request("https://app.test/api/studio/project", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "design-system",
-						projectId: "proj-1",
-						designReference: { kind: "scrape", id: "scrape-gone" },
-					}),
+	it("rejects the removed design-system action as an unsupported operation", async () => {
+		updatePreferences.mockClear();
+		const response = await POST({
+			request: new Request("https://app.test/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "design-system",
+					projectId: "proj-1",
+					designReference: { kind: "theme", id: "workspace" },
 				}),
-			});
-			expect(response.status).toBe(400);
-			expect(await response.json()).toEqual({
-				error:
-					"Referensi desain ini sudah tidak tersedia. Pilih referensi lain.",
-				code: "STUDIO_REFERENCE_REJECTED",
-			});
-		} finally {
-			referenceFailure.error = null;
-			log.mockRestore();
-		}
+			}),
+		});
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({
+			error: "Aksi project tidak valid.",
+		});
+		expect(updatePreferences).not.toHaveBeenCalled();
+	});
+
+	it("persists skill preference updates for the authenticated owner", async () => {
+		updatePreferences.mockClear();
+		const response = await POST({
+			request: new Request("https://app.test/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "preferences",
+					projectId: "proj-1",
+					designSkillId: "taste",
+				}),
+			}),
+		});
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ project: { id: "proj-1" } });
+		expect(updatePreferences).toHaveBeenCalledWith(
+			"proj-1",
+			"user-123",
+			expect.objectContaining({
+				action: "preferences",
+				projectId: "proj-1",
+				designSkillId: "taste",
+			}),
+		);
 	});
 
 	it("returns project detail with frames and active job", async () => {
