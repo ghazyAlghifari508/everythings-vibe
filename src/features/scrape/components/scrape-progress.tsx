@@ -4,8 +4,13 @@ import { resolveScrapeErrorPresentation } from "@/features/scrape/utils/scrape-e
 import type { imageResultCounts } from "@/features/scrape/utils/scrape-images";
 import { displaySiteName } from "@/features/scrape/utils/site-name";
 import { ScrapeErrorCard } from "./scrape-error-card";
-import { ScrapeActivityLine } from "./scrape-progress-activity";
-import { getScrapeStagesForMode, ScrapeStepper } from "./scrape-progress-steps";
+import { ElapsedTimer } from "./scrape-progress-elapsed";
+import { ScrapeImagesProgress } from "./scrape-progress-images";
+import {
+	getScrapeStagesForMode,
+	LABELS,
+	ScrapeStepper,
+} from "./scrape-progress-steps";
 
 export interface ScrapeProgressProps {
 	status: ScrapeStatus;
@@ -51,49 +56,16 @@ const OPERATIONS: Record<ScrapeMode, string> = {
 	html: "Scrape HTML",
 };
 
-function resolveCounters(
+function resolveCrawlCounters(
 	props: ScrapeProgressProps,
-	mode: ScrapeMode,
 ): [string, number | undefined][] {
-	if (mode === "crawl")
-		return [
-			["Ditemukan", props.discoveredPages],
-			["Dikunjungi", props.visitedPages],
-			["Selesai", props.completedPages],
-			["Dilewati", props.skippedPages],
-			["Gagal", props.failedResources],
-		];
-	if (mode === "images")
-		return [
-			["Ditemukan", props.imageCounts?.discovered ?? props.discoveredImages],
-			["Tersimpan", props.imageCounts?.persisted],
-			["Tautan terverifikasi", props.imageCounts?.linked],
-			["Gagal", props.imageCounts?.failed],
-			["Tertunda", props.imageCounts?.pending],
-		];
-	return [];
-}
-
-// Only material outcomes are explained. These notes describe what the run
-// actually persisted, so they never guess at an internal cause.
-function resolveImageNotes(props: ScrapeProgressProps): string[] {
-	const notes: string[] = [];
-	if (props.imageOutcome === "empty")
-		notes.push(
-			"Tidak ada gambar yang ditemukan. Halaman berhasil diperiksa, tetapi tidak ada gambar yang dapat diambil.",
-		);
-	if (props.imageOutcome === "partial")
-		notes.push(
-			"Sebagian gambar berhasil diproses. Jumlah byte tersimpan dan tautan terverifikasi ditampilkan terpisah. Alasan kegagalan tersedia di hasil gambar.",
-		);
-	if (
-		props.imageDiscovery === "discovery-failed" ||
-		props.imageDiscovery === "capture-failed"
-	)
-		notes.push(
-			"Gambar belum dapat diperiksa. Akses ke website gagal sebelum proses pemeriksaan gambar selesai.",
-		);
-	return notes;
+	return [
+		["Ditemukan", props.discoveredPages],
+		["Dikunjungi", props.visitedPages],
+		["Selesai", props.completedPages],
+		["Dilewati", props.skippedPages],
+		["Gagal", props.failedResources],
+	];
 }
 
 export function ScrapeProgress(props: ScrapeProgressProps) {
@@ -117,15 +89,19 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 	const stages = getScrapeStagesForMode(mode);
 	const isFailed = status === "failed";
 	const isDone = status === "completed";
+	const active = !isDone && !isFailed;
 	const operation = OPERATIONS[mode];
 	const headerState = isFailed ? "Gagal" : isDone ? "Selesai" : "Berjalan";
-	const resolvedActivity = resolveScrapeActivity({ activity, mode });
-	const stalledMessage = isDone || isFailed ? null : (workerHealth ?? null);
+	const activityText = resolveScrapeActivity({ activity, mode });
+	const stalledMessage = active ? (workerHealth ?? null) : null;
 	const startTimestamp = stageStartedAt ?? activityStartedAt ?? null;
-	const visibleCounters = resolveCounters(props, mode).filter(
-		([, value]) => typeof value === "number",
-	);
-	const imageNotes = resolveImageNotes(props);
+	// Each mode keeps the column arrangement it had before the modes were
+	// collapsed into one card: HTML reads as one column, DESIGN.md and Crawl
+	// Website keep the identity/activity column beside the stage card.
+	const layout = mode === "html" ? "single" : "two-panel";
+	const visibleCounters = (
+		mode === "crawl" ? resolveCrawlCounters(props) : []
+	).filter(([, value]) => typeof value === "number");
 	const presentation = resolveScrapeErrorPresentation({
 		code: errorDetail ?? "UNEXPECTED_ERROR",
 		message: errorMessage,
@@ -137,33 +113,104 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 			mode === "crawl" ? "pages" : mode === "html" ? "documents" : "images",
 	});
 
-	// One progress surface for every mode: identity, stage ladder, live activity
-	// (or the failure card) and real counters share a single card so no mode can
-	// grow a second, competing progress panel.
-	return (
-		<section
-			aria-label={`Progres ${operation}`}
-			data-scrape-progress={mode}
-			className="min-w-0 rounded-xl border border-graphite bg-charcoal p-6"
-		>
-			<header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-				<div className="min-w-0">
-					<p className="text-sm text-fog">{operation}</p>
-					<h2 className="mt-1 truncate text-2xl font-bold text-snow">
-						{domain ? displaySiteName(domain) : "Website"}
-					</h2>
-					{sourceUrl ? (
-						<p className="mt-1 break-all font-mono text-xs text-fog">
-							{sourceUrl}
-						</p>
-					) : null}
-				</div>
-				<p className="shrink-0 text-sm text-fog">
-					<span aria-live="polite">{headerState}</span>
-				</p>
-			</header>
+	if (mode === "images") {
+		return (
+			<ScrapeImagesProgress
+				progress={props}
+				stages={stages}
+				operation={operation}
+				headerState={headerState}
+				activityText={activityText}
+				startTimestamp={startTimestamp}
+				stalledMessage={stalledMessage}
+				presentation={presentation}
+			/>
+		);
+	}
 
-			<div className="mt-6 grid min-w-0 gap-6 border-t border-graphite pt-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+	return (
+		<div
+			data-layout={layout}
+			className={
+				layout === "single"
+					? "grid min-w-0 gap-6"
+					: "grid min-w-0 gap-6 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]"
+			}
+		>
+			<div className="min-w-0">
+				<p className="text-sm text-fog">{operation}</p>
+				<h2 className="mt-1 text-2xl font-bold text-snow">
+					{domain ? displaySiteName(domain) : "Website"}
+				</h2>
+				{sourceUrl ? (
+					<p className="mt-2 break-all font-mono text-xs text-fog">
+						{sourceUrl}
+					</p>
+				) : null}
+
+				<div className="mt-6 border-t border-graphite pt-5">
+					<p className="text-sm font-semibold text-snow">Aktivitas terbaru</p>
+					{isFailed ? (
+						<p className="mt-2 break-words text-sm text-fog">
+							Pemrosesan berhenti. Lihat alasan dan opsi pemulihan di panel
+							progres.
+						</p>
+					) : stalledMessage ? (
+						<p
+							data-activity-line
+							data-activity-state="stalled"
+							className="mt-2 break-words text-sm text-fog"
+						>
+							{stalledMessage}
+						</p>
+					) : active && activityText ? (
+						<div
+							data-activity-line
+							className="mt-2 flex min-w-0 items-baseline gap-2"
+						>
+							<output
+								aria-live="polite"
+								className="min-w-0 flex-1 break-words text-sm text-snow"
+							>
+								{activityText}
+							</output>
+							{startTimestamp ? <ElapsedTimer start={startTimestamp} /> : null}
+						</div>
+					) : (
+						<p data-activity-line className="mt-2 break-words text-sm text-fog">
+							{status === "queued"
+								? "Menunggu giliran pemrosesan."
+								: LABELS[status]}
+						</p>
+					)}
+				</div>
+
+				{visibleCounters.length > 0 && (
+					<dl className="mt-6 grid grid-cols-2 gap-4">
+						{visibleCounters.map(([label, value]) => (
+							<div key={String(label)}>
+								<dt className="text-xs text-fog">{label}</dt>
+								<dd className="mt-1 font-mono text-xl text-snow tabular-nums">
+									{value}
+								</dd>
+							</div>
+						))}
+					</dl>
+				)}
+			</div>
+
+			<section
+				aria-label={`Progres ${operation}`}
+				data-scrape-progress={mode}
+				className="min-w-0 rounded-xl border border-graphite bg-charcoal p-6"
+			>
+				<div className="flex items-center justify-between gap-3">
+					<h3 className="text-lg font-semibold text-snow">{operation}</h3>
+					<p className="shrink-0 text-sm text-fog">
+						<span aria-live="polite">{headerState}</span>
+					</p>
+				</div>
+
 				{/* The stepper stays mounted on failure so the failed stage is
 				    visible in the same progress hierarchy the user already saw. */}
 				<ScrapeStepper
@@ -174,50 +221,17 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 					stalled={Boolean(stalledMessage)}
 				/>
 
-				<div className="min-w-0 lg:border-l lg:border-graphite lg:pl-6">
-					{isFailed ? (
+				{isFailed ? (
+					<div className="mt-5 border-t border-graphite pt-5">
 						<ScrapeErrorCard
 							{...presentation}
 							mode={mode}
 							isRetrying={isRetrying}
 							onRetry={onRetry}
 						/>
-					) : (
-						<>
-							<p className="text-sm font-semibold text-snow">
-								Aktivitas terbaru
-							</p>
-							<div data-activity-line className="mt-2">
-								<ScrapeActivityLine
-									status={status}
-									activity={resolvedActivity}
-									stageStartedAt={startTimestamp}
-									stalledMessage={stalledMessage}
-								/>
-							</div>
-						</>
-					)}
-				</div>
-			</div>
-
-			{visibleCounters.length > 0 && (
-				<dl className="mt-6 grid grid-cols-2 gap-4 border-t border-graphite pt-5 sm:grid-cols-3 lg:grid-cols-5">
-					{visibleCounters.map(([label, value]) => (
-						<div key={String(label)}>
-							<dt className="text-xs text-fog">{label}</dt>
-							<dd className="mt-1 font-mono text-xl text-snow tabular-nums">
-								{value}
-							</dd>
-						</div>
-					))}
-				</dl>
-			)}
-
-			{imageNotes.map((note) => (
-				<p key={note} className="mt-4 text-sm text-fog">
-					{note}
-				</p>
-			))}
-		</section>
+					</div>
+				) : null}
+			</section>
+		</div>
 	);
 }
