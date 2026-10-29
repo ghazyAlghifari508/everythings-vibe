@@ -10,6 +10,8 @@ export type StudioFrameErrorCode =
 	| "STUDIO_STORAGE_FAILED"
 	| "STUDIO_PREVIEW_FAILED"
 	| "STUDIO_RETRY_RUNNING"
+	| "STUDIO_DUPLICATE_SCREEN"
+	| "STUDIO_SCREEN_LIMIT"
 	| "STUDIO_NOT_FOUND"
 	| "STUDIO_UNAUTHORIZED";
 
@@ -59,6 +61,15 @@ export const STUDIO_FRAME_ERRORS: Record<
 	STUDIO_RETRY_RUNNING: {
 		status: 409,
 		message: "Halaman ini sedang dibuat ulang.",
+	},
+	STUDIO_DUPLICATE_SCREEN: {
+		status: 409,
+		message:
+			"Nama halaman itu sudah dipakai. Pilih nama lain atau revisi halaman yang ada.",
+	},
+	STUDIO_SCREEN_LIMIT: {
+		status: 400,
+		message: "Terlalu banyak halaman baru dalam satu permintaan.",
 	},
 	STUDIO_NOT_FOUND: {
 		status: 404,

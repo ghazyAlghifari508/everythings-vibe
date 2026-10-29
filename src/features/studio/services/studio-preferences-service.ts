@@ -178,7 +178,6 @@ export async function updateStudioPreferences(
 		targets.some((frame) => frame.status === "ready")
 	) {
 		await enqueueStudioOperation(projectId, userId, {
-			action: "revise",
 			frameIds: targets
 				.filter((frame) => frame.status === "ready")
 				.map((frame) => frame.id),

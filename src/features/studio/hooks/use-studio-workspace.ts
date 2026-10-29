@@ -4,7 +4,7 @@ import type {
 	StudioJobRow,
 	StudioProjectRow,
 } from "@/db/schema";
-import type { StudioComposerScope } from "@/features/studio/components/composer/studio-composer";
+import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
@@ -26,7 +26,6 @@ export interface StudioWorkspaceState {
 	exportingZip: boolean;
 	deleting: boolean;
 	duplicating: boolean;
-	isAddFrameOpen: boolean;
 	error: string;
 	isProcessing: boolean;
 	readyFramesCount: number;
@@ -34,15 +33,12 @@ export interface StudioWorkspaceState {
 	selectFrame: (id: string | null, additive?: boolean) => void;
 	selectFrames: (ids: string[]) => void;
 	removeSelectedFrame: (id: string) => void;
-	setIsAddFrameOpen: (open: boolean) => void;
 	setError: (message: string) => void;
 	handleDuplicate: () => Promise<void>;
 	handleDelete: () => Promise<void>;
 	handleComposerSubmit: (
 		promptText: string,
-		scope: StudioComposerScope,
-	) => Promise<boolean>;
-	handleAddFrame: (input: { name: string; prompt: string }) => Promise<void>;
+	) => Promise<StudioComposerSubmitResult>;
 	handleApplyDesignSystem: (
 		reference: AttachedDesignReference,
 	) => Promise<boolean>;
@@ -66,7 +62,6 @@ export function useStudioWorkspace(
 	} = useStudioStatus(initialData);
 	const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
-	const [isAddFrameOpen, setIsAddFrameOpen] = useState(false);
 	const [error, setActionError] = useState("");
 	const setError = useCallback(
 		(message: string) => {
@@ -81,7 +76,6 @@ export function useStudioWorkspace(
 		if (loader.current.project.id !== initialData.project.id) {
 			setSelectedFrameId(null);
 			setSelectedFrameIds([]);
-			setIsAddFrameOpen(false);
 		}
 		loader.current = initialData;
 		setActionError("");
@@ -133,7 +127,6 @@ export function useStudioWorkspace(
 		isProcessing,
 		syncProjectStatus,
 		setError,
-		setIsAddFrameOpen,
 	});
 
 	const storedReferenceLabel = useMemo(() => {
@@ -162,7 +155,6 @@ export function useStudioWorkspace(
 		exportingZip: actions.exportingZip,
 		deleting: actions.deleting,
 		duplicating: actions.duplicating,
-		isAddFrameOpen,
 		error: error || syncError,
 		isProcessing,
 		readyFramesCount,
@@ -170,12 +162,10 @@ export function useStudioWorkspace(
 		selectFrame,
 		selectFrames,
 		removeSelectedFrame,
-		setIsAddFrameOpen,
 		setError,
 		handleDuplicate: actions.handleDuplicate,
 		handleDelete: actions.handleDelete,
 		handleComposerSubmit: actions.handleComposerSubmit,
-		handleAddFrame: actions.handleAddFrame,
 		handleApplyDesignSystem: actions.handleApplyDesignSystem,
 		handleSkillChange: actions.handleSkillChange,
 		handleRetryFrame: actions.handleRetryFrame,

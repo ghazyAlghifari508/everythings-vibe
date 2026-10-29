@@ -45,7 +45,7 @@ describe("StudioHeader", () => {
 	});
 
 	it("keeps project menu, title, export and account controls reachable", () => {
-		renderHeader({ onAddFrame: vi.fn(), onDelete: vi.fn() });
+		renderHeader({ onDelete: vi.fn() });
 		expect(screen.getByRole("button", { name: "Menu project" })).toBeDefined();
 		expect(
 			screen.getByRole("button", { name: "Export project" }),
@@ -56,6 +56,11 @@ describe("StudioHeader", () => {
 		expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
 			"KopiKultur Coffee Shop App",
 		);
+	});
+
+	it("has no manual add-page action in the rendered controls", () => {
+		renderHeader();
+		expect(screen.queryByText(/Tambah Halaman/i)).toBeNull();
 	});
 
 	it("gives every interactive control a pointer-enabled surface", () => {

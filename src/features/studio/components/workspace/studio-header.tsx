@@ -6,7 +6,6 @@ import {
 	Download01Icon,
 	Loading01Icon,
 	Menu01Icon,
-	PlusSignIcon,
 	UserIcon,
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
@@ -41,7 +40,6 @@ export function StudioHeader({
 	onDuplicate,
 	onExport,
 	onDelete,
-	onAddFrame,
 	designSystemControl,
 }: {
 	title: string;
@@ -52,7 +50,6 @@ export function StudioHeader({
 	onDuplicate: () => void;
 	onExport: () => void;
 	onDelete?: () => Promise<void>;
-	onAddFrame?: () => void;
 	designSystemControl?: ReactNode;
 }) {
 	const { data: session } = authClient.useSession();
@@ -109,12 +106,6 @@ export function StudioHeader({
 								Kembali ke Semua Project
 							</Link>
 						</DropdownMenuItem>
-						{onAddFrame ? (
-							<DropdownMenuItem className={item} onSelect={onAddFrame}>
-								<Icon icon={PlusSignIcon} size={16} />
-								Tambah Halaman
-							</DropdownMenuItem>
-						) : null}
 						{designSystemControl}
 						<DropdownMenuSeparator />
 						<DropdownMenuItem

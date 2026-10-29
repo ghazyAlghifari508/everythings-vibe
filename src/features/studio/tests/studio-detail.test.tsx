@@ -132,9 +132,7 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 		);
 
 		// Floating Composer is present
-		expect(
-			screen.getByPlaceholderText(/Minta revisi untuk seluruh project/i),
-		).toBeDefined();
+		expect(screen.getByPlaceholderText(/sebutkan halaman baru/i)).toBeDefined();
 		// The simplified composer must not bring back the removed controls.
 		expect(screen.queryByText(/Tambah Halaman/i)).toBeNull();
 		expect(
@@ -146,11 +144,12 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 			{ button: 0, ctrlKey: false, pointerType: "mouse" },
 		);
 		expect(
-			await screen.findByRole("menuitem", { name: /Tambah Halaman/i }),
-		).toBeDefined();
-		expect(
 			await screen.findByRole("menuitem", { name: /Design system/i }),
 		).toBeDefined();
+		// The legacy manual add-page action is gone from the menu.
+		expect(
+			screen.queryByRole("menuitem", { name: /Tambah Halaman/i }),
+		).toBeNull();
 	});
 
 	it("selects a frame and targets it in the floating composer", async () => {
@@ -275,7 +274,6 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 		expect(requestBody).toMatchObject({
 			action: "operation",
 			projectId: "proj-1",
-			scope: "revise",
 			frameIds: ["f-1"],
 			prompt: "Ubah tombol jadi warna hitam",
 		});
@@ -353,7 +351,6 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 		const requestBody: unknown = JSON.parse(operationCall?.[1].body);
 		expect(requestBody).toMatchObject({
 			action: "operation",
-			scope: "revise",
 			frameIds: ["f-1", "f-2"],
 		});
 	});

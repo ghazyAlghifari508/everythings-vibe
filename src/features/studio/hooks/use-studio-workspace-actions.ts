@@ -1,7 +1,7 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
 import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
-import type { StudioComposerScope } from "@/features/studio/components/composer/studio-composer";
+import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { exportProjectAsZip } from "@/features/studio/services/studio-export";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import type {
@@ -39,6 +39,23 @@ async function readRetryOutcome(
 		: null;
 }
 
+/** Reads what one composer request resolved to, so the UI explains clarify/add. */
+function readComposerOutcome(body: unknown): {
+	intent: string | null;
+	message: string | null;
+	addedCount: number;
+} {
+	if (typeof body !== "object" || body === null)
+		return { intent: null, message: null, addedCount: 0 };
+	const intent =
+		"intent" in body && typeof body.intent === "string" ? body.intent : null;
+	const message =
+		"message" in body && typeof body.message === "string" ? body.message : null;
+	const addedCount =
+		"frames" in body && Array.isArray(body.frames) ? body.frames.length : 0;
+	return { intent, message, addedCount };
+}
+
 export interface UseStudioWorkspaceActionsOptions {
 	project: StudioProjectRow;
 	frames: StudioFrameRow[];
@@ -46,7 +63,6 @@ export interface UseStudioWorkspaceActionsOptions {
 	isProcessing: boolean;
 	syncProjectStatus: () => Promise<void>;
 	setError: (error: string) => void;
-	setIsAddFrameOpen: (open: boolean) => void;
 }
 
 export function useStudioWorkspaceActions({
@@ -56,7 +72,6 @@ export function useStudioWorkspaceActions({
 	isProcessing,
 	syncProjectStatus,
 	setError,
-	setIsAddFrameOpen,
 }: UseStudioWorkspaceActionsOptions) {
 	const [composerLoading, setComposerLoading] = useState(false);
 	const [preferenceSaving, setPreferenceSaving] = useState(false);
@@ -133,13 +148,10 @@ export function useStudioWorkspaceActions({
 	}, [deleting, navigate, project.id, router, setError, showToast]);
 
 	const handleComposerSubmit = useCallback(
-		async (
-			promptText: string,
-			scope: StudioComposerScope,
-		): Promise<boolean> => {
+		async (promptText: string): Promise<StudioComposerSubmitResult> => {
 			setComposerLoading(true);
 			setError("");
-			const signature = JSON.stringify({ promptText, scope, selectedFrameIds });
+			const signature = JSON.stringify({ promptText, selectedFrameIds });
 			if (pendingRequest.current?.signature !== signature)
 				pendingRequest.current = { signature, id: crypto.randomUUID() };
 			try {
@@ -149,63 +161,36 @@ export function useStudioWorkspaceActions({
 					body: JSON.stringify({
 						action: "operation",
 						projectId: project.id,
-						scope,
-						frameIds: scope === "revise" ? selectedFrameIds : undefined,
 						prompt: promptText,
+						frameIds: selectedFrameIds,
 						requestId: pendingRequest.current.id,
 					}),
 				});
 				if (!res.ok) {
 					setError(await readApiError(res, "Permintaan desain ditolak."));
-					return false;
+					return { accepted: false };
 				}
+				const outcome = readComposerOutcome(await res.json().catch(() => null));
 				await syncProjectStatus();
 				pendingRequest.current = null;
-				return true;
+				if (outcome.intent === "clarify")
+					return { accepted: false, clarify: outcome.message ?? undefined };
+				if (outcome.intent === "add_screen" && outcome.addedCount > 0)
+					showToast(
+						outcome.addedCount === 1
+							? "Halaman baru sedang dibuat."
+							: `${outcome.addedCount} halaman baru sedang dibuat.`,
+						"info",
+					);
+				return { accepted: true };
 			} catch {
 				setError("Jaringan bermasalah. Coba lagi.");
-				return false;
+				return { accepted: false };
 			} finally {
 				setComposerLoading(false);
 			}
 		},
-		[project.id, selectedFrameIds, setError, syncProjectStatus],
-	);
-
-	const handleAddFrame = useCallback(
-		async (input: { name: string; prompt: string }) => {
-			setComposerLoading(true);
-			setError("");
-			try {
-				const response = await fetch("/api/studio/frame", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "add",
-						projectId: project.id,
-						name: input.name,
-						prompt: input.prompt,
-					}),
-				});
-				if (!response.ok) {
-					throw new Error(
-						await readApiError(response, "Gagal menambah halaman baru."),
-					);
-				}
-				setIsAddFrameOpen(false);
-				await syncProjectStatus();
-				showToast("Halaman baru ditambahkan.", "success");
-			} catch (failure) {
-				setError(
-					failure instanceof Error
-						? failure.message
-						: "Gagal menambah halaman baru.",
-				);
-			} finally {
-				setComposerLoading(false);
-			}
-		},
-		[project.id, setError, setIsAddFrameOpen, showToast, syncProjectStatus],
+		[project.id, selectedFrameIds, setError, showToast, syncProjectStatus],
 	);
 
 	const handleApplyDesignSystem = useCallback(
@@ -355,7 +340,6 @@ export function useStudioWorkspaceActions({
 		handleDuplicate,
 		handleDelete,
 		handleComposerSubmit,
-		handleAddFrame,
 		handleApplyDesignSystem,
 		handleSkillChange,
 		handleRetryFrame,

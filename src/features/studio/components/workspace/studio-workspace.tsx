@@ -5,7 +5,6 @@ import { Icon } from "@/components/ui/icon";
 import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
 import { StudioComposer } from "@/features/studio/components/composer/studio-composer";
 import { StudioDesignPicker } from "@/features/studio/components/design-system/studio-design-picker";
-import { StudioAddFrameDialog } from "@/features/studio/components/workspace/studio-add-frame-dialog";
 import { StudioHeader } from "@/features/studio/components/workspace/studio-header";
 import { useStudioWorkspace } from "@/features/studio/hooks/use-studio-workspace";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
@@ -37,7 +36,6 @@ export function StudioWorkspace({
 				onDuplicate={() => void workspace.handleDuplicate()}
 				onExport={() => void workspace.handleDownloadAllZip()}
 				onDelete={workspace.handleDelete}
-				onAddFrame={() => workspace.setIsAddFrameOpen(true)}
 				designSystemControl={
 					<StudioDesignPicker
 						designMd={workspace.project.designMd}
@@ -74,14 +72,6 @@ export function StudioWorkspace({
 					referenceLabel={workspace.storedReferenceLabel}
 				/>
 			</div>
-
-			{/* Explicit add-screen flow, kept out of the composer */}
-			<StudioAddFrameDialog
-				open={workspace.isAddFrameOpen}
-				onOpenChange={workspace.setIsAddFrameOpen}
-				busy={workspace.composerLoading}
-				onSubmit={workspace.handleAddFrame}
-			/>
 
 			{/* Error banner sits below the floating header band so it never
 			    collides with the header controls. */}
