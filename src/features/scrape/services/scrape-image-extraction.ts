@@ -133,12 +133,9 @@ export async function runImageExtraction(params: {
 			"Discovery gambar tidak menghasilkan daftar kandidat. Capture tidak dapat dipakai.",
 		);
 	}
-	const validCandidates = captured.images.flatMap((candidate) => {
-		const normalizedUrl = normalizeImageCandidateUrl(
-			candidate.url,
-			captured.finalUrl,
-		);
-		return normalizedUrl ? [{ ...candidate, url: normalizedUrl }] : [];
+	const validCandidates = captured.images.flatMap((c) => {
+		const normalizedUrl = normalizeImageCandidateUrl(c.url, captured.finalUrl);
+		return normalizedUrl ? [{ ...c, url: normalizedUrl }] : [];
 	});
 	const images = normalizeImageCandidates(
 		validCandidates,
@@ -166,10 +163,14 @@ export async function runImageExtraction(params: {
 					eq(scrapeImages.scrapeId, claim.id),
 				),
 			);
-		if (fallbackRows.size === 0) return persisted;
-		const merged = new Map<string, ResultRow>(fallbackRows);
-		for (const row of persisted) merged.set(row.url, row);
-		return [...merged.values()];
+		return fallbackRows.size === 0
+			? persisted
+			: [
+					...new Map([
+						...fallbackRows,
+						...persisted.map((r) => [r.url, r] as const),
+					]).values(),
+				];
 	};
 	const initialRows = await loadResults();
 	const savedUrls = new Set(
@@ -241,12 +242,12 @@ export async function runImageExtraction(params: {
 			fallbackRows.delete(image.url);
 			imageAsset = asset;
 		} catch (failure) {
-			if (claim.signal?.aborted) throw failure;
 			if (
 				failure instanceof ScrapeError &&
-				failure.failureReason === "lease-lost"
+				(claim.signal?.aborted || failure.failureReason === "lease-lost")
 			)
 				throw failure;
+			if (claim.signal?.aborted) throw failure;
 			if (failure instanceof ScrapeError && failure.httpStatus === 429)
 				rateLimitedOrigins.set(new URL(image.url).origin, failure);
 			if (
@@ -279,8 +280,6 @@ export async function runImageExtraction(params: {
 					: stage === "storage"
 						? "Gambar tidak dapat disimpan."
 						: "Resource gambar tidak dapat diambil atau diverifikasi.";
-			// Only parsed statuses and typed codes are recorded, so the
-			// aggregate classification never reads message text.
 			failureEvidence = {
 				code: failure instanceof ScrapeError ? failure.code : null,
 				httpStatus:
@@ -300,10 +299,10 @@ export async function runImageExtraction(params: {
 					httpStatus: failureEvidence.httpStatus,
 				});
 			} catch (persistFailure) {
-				if (claim.signal?.aborted) throw persistFailure;
 				if (
-					persistFailure instanceof ScrapeError &&
-					persistFailure.failureReason === "lease-lost"
+					claim.signal?.aborted ||
+					(persistFailure instanceof ScrapeError &&
+						persistFailure.failureReason === "lease-lost")
 				)
 					throw persistFailure;
 				fallbackRows.set(image.url, {

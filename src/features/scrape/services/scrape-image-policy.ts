@@ -46,10 +46,7 @@ export function createImageSitePolicy(signal?: AbortSignal, load = fetchAsset) {
 				allowUrl: (redirect) =>
 					["http:", "https:"].includes(new URL(redirect).protocol),
 			}).then((result) => {
-				// RFC 9309 § 2.3.1.3: any 4xx other than 429 on /robots.txt (such as
-				// S3/CloudFront asset CDNs returning 403 or 404 when no robots.txt
-				// object exists) means no robots rules are published; access is
-				// decided by the actual resource response.
+				// RFC 9309 § 2.3.1.3: non-429 4xx on /robots.txt means no rules are published.
 				if (
 					result.status >= 400 &&
 					result.status < 500 &&

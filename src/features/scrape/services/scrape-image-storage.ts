@@ -92,11 +92,12 @@ function validateSafeSvg(body: Buffer): void {
 			"INVALID_IMAGE",
 			"Isi gambar tidak sesuai format yang diizinkan.",
 		);
-	const decoded = decodeNumericEntities(withoutComments).replace(/\s+/g, " ");
 	// ponytail: regex allow/deny checks cover static vector SVGs; switch to a full XML AST sanitizer if inline sanitized SVGs are needed
 	if (
 		UNSAFE_SVG_PATTERN.test(withoutComments) ||
-		UNSAFE_SVG_URI_PATTERN.test(decoded)
+		UNSAFE_SVG_URI_PATTERN.test(
+			decodeNumericEntities(withoutComments).replace(/\s+/g, " "),
+		)
 	)
 		throw new ImageStorageError(
 			"UNSAFE_SVG",
@@ -128,6 +129,19 @@ export function validateStoredImage(body: Buffer, declaredMime: string) {
 			sha256: createHash("sha256").update(body).digest("hex"),
 		};
 	}
+	const isAvif =
+		body.length >= 24 &&
+		body.toString("ascii", 4, 8) === "ftyp" &&
+		body.readUInt32BE(0) >= 16 &&
+		body.readUInt32BE(0) <= body.length &&
+		body.readUInt32BE(0) % 4 === 0 &&
+		[
+			8,
+			...Array.from(
+				{ length: (body.readUInt32BE(0) - 16) / 4 },
+				(_, i) => 16 + i * 4,
+			),
+		].some((o) => ["avif", "avis"].includes(body.toString("ascii", o, o + 4)));
 	let mimeType: string | null = null;
 	if (
 		body.length >= 33 &&
@@ -163,23 +177,7 @@ export function validateStoredImage(body: Buffer, declaredMime: string) {
 		body.length - (body.readUInt32LE(4) + 8) <= 1
 	)
 		mimeType = "image/webp";
-	else if (
-		body.length >= 24 &&
-		body.toString("ascii", 4, 8) === "ftyp" &&
-		body.readUInt32BE(0) >= 16 &&
-		body.readUInt32BE(0) <= body.length &&
-		body.readUInt32BE(0) % 4 === 0 &&
-		[
-			8,
-			...Array.from(
-				{ length: (body.readUInt32BE(0) - 16) / 4 },
-				(_, index) => 16 + index * 4,
-			),
-		].some((offset) =>
-			["avif", "avis"].includes(body.toString("ascii", offset, offset + 4)),
-		)
-	)
-		mimeType = "image/avif";
+	else if (isAvif) mimeType = "image/avif";
 	else if (
 		body.length >= 22 &&
 		body.readUInt32LE(0) === 0x00010000 &&
