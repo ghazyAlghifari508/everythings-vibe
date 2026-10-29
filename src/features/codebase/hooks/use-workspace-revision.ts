@@ -14,21 +14,14 @@ import {
 	startRun,
 } from "@/features/codebase/services/chat-flow";
 import type { RevisionProposalView } from "../components/revision/codebase-revision-review-dialog";
+import { revisionTargetLabel } from "../components/revision/revision-labels";
 import {
 	applyRevisionAction,
 	getPendingRevisionAction,
-	getRevisionBaseAction,
-	getRevisionProposalAction,
 	rejectRevisionAction,
-	submitRevisionProposalAction,
 } from "../services/revision-actions.functions";
-
-const TARGET_LABELS: Record<string, string> = {
-	feature: "Feature Specification",
-	prd: "PRD",
-	ac: "Acceptance Criteria",
-	tasks: "Task Breakdown",
-};
+import { submitRevisionRequest } from "../services/revision-submit";
+import { useRevisionHistory } from "./use-revision-history";
 
 export function useWorkspaceRevision({
 	codebaseId,
@@ -76,6 +69,10 @@ export function useWorkspaceRevision({
 	const [revisionTarget, setRevisionTarget] = useState<
 		"feature" | "prd" | "ac" | "tasks"
 	>("prd");
+	const { history, refreshHistory } = useRevisionHistory(
+		effectiveFeatureId,
+		activeProjectIdRef,
+	);
 
 	const restorePendingProposal = useCallback(async () => {
 		if (!effectiveFeatureId) return;
@@ -99,7 +96,7 @@ export function useWorkspaceRevision({
 		async (instruction: string) => {
 			if (!effectiveFeatureId || stageBusy) return;
 			const target = revisionTarget;
-			const targetLabel = TARGET_LABELS[target] ?? "PRD";
+			const targetLabel = revisionTargetLabel(target);
 			setStageBusy(target === "tasks" ? "task" : target);
 			setStageError(null);
 			const request = startRun(
@@ -110,68 +107,30 @@ export function useWorkspaceRevision({
 			const requestId = request.requestId;
 
 			try {
-				// The real immutable base version id is resolved server-side before the
-				// request is built, so the proposal is prepared against a version the
-				// user could actually read — never a positional guess.
-				const base = await getRevisionBaseAction({
-					data: { projectId: effectiveFeatureId, targetKind: target },
+				const result = await submitRevisionRequest({
+					projectId: effectiveFeatureId,
+					codebaseId: codebaseId ?? null,
+					snapshotId: currentSnapshotId ?? null,
+					targetKind: target,
+					instruction,
 				});
-				if (!base.versionId) {
-					const failure =
-						"Belum ada dokumen yang bisa direvisi pada target ini.";
-					setStageError(failure);
-					setRun((current) =>
-						settleRunIfCurrent(
-							current,
-							requestId,
-							"failed",
-							Date.now(),
-							failure,
-						),
-					);
-					return;
-				}
-
-				const response = await submitRevisionProposalAction({
-					data: {
-						projectId: effectiveFeatureId,
-						codebaseId: codebaseId ?? "default",
-						targetArtifactKind: target,
-						targetArtifactVersionId: base.versionId,
-						userInstruction: instruction,
-						sourceSnapshotId: currentSnapshotId ?? "default",
-					},
-				});
-
-				if (!response.ok) {
-					const failure =
-						response.conflict ??
-						response.error ??
-						"Gagal menyusun usulan revisi.";
-					setStageError(failure);
-					setRun((current) =>
-						settleRunIfCurrent(
-							current,
-							requestId,
-							"failed",
-							Date.now(),
-							failure,
-						),
-					);
-					return;
-				}
-
-				const details = await getRevisionProposalAction({
-					data: response.proposalId,
-				});
-
 				if (activeProjectIdRef.current !== effectiveFeatureId) return;
-
-				if (details.proposal) {
-					setPendingProposal(details.proposal as RevisionProposalView);
-					setIsReviewOpen(true);
+				if (!result.ok) {
+					setStageError(result.failure);
+					setRun((current) =>
+						settleRunIfCurrent(
+							current,
+							requestId,
+							"failed",
+							Date.now(),
+							result.failure,
+						),
+					);
+					return;
 				}
 
+				setPendingProposal(result.proposal);
+				setIsReviewOpen(true);
 				setRun((current) =>
 					settleRunIfCurrent(
 						recordRunActivity(
@@ -185,16 +144,10 @@ export function useWorkspaceRevision({
 						Date.now(),
 					),
 				);
-
-				const downstream = Object.keys(response.impact ?? {});
-				const impactNote =
-					downstream.length > 0
-						? `Dampak: ${downstream.join(", ").toUpperCase()} perlu ditinjau.`
-						: "Tidak ada dampak downstream langsung.";
-
 				pushAssistantMessage(
-					`Proposal revisi untuk ${targetLabel} siap ditinjau. ${impactNote}`,
+					`Proposal revisi untuk ${targetLabel} siap ditinjau. ${result.impactNote}`,
 				);
+				void refreshHistory();
 			} catch {
 				if (activeProjectIdRef.current !== effectiveFeatureId) return;
 				const failure = "Server tidak dapat dihubungi. Coba lagi.";
@@ -219,6 +172,7 @@ export function useWorkspaceRevision({
 			setStageError,
 			setRun,
 			pushAssistantMessage,
+			refreshHistory,
 		],
 	);
 
@@ -253,7 +207,7 @@ export function useWorkspaceRevision({
 			}
 
 			const targetKind = pendingProposal.targetKind;
-			const targetLabel = TARGET_LABELS[targetKind] ?? targetKind;
+			const targetLabel = revisionTargetLabel(targetKind);
 			setPendingProposal(null);
 			setIsReviewOpen(false);
 			pushAssistantMessage(
@@ -264,6 +218,7 @@ export function useWorkspaceRevision({
 			} else {
 				openArtifactPreview(targetKind);
 			}
+			void refreshHistory();
 		} catch {
 			setStageError("Server tidak dapat dihubungi saat menerapkan revisi.");
 		} finally {
@@ -281,6 +236,7 @@ export function useWorkspaceRevision({
 		pushAssistantMessage,
 		openArtifactPreview,
 		setStageError,
+		refreshHistory,
 	]);
 
 	const rejectCurrentProposal = useCallback(async () => {
@@ -290,19 +246,61 @@ export function useWorkspaceRevision({
 			await rejectRevisionAction({
 				data: { proposalId: pendingProposal.id },
 			});
-			const targetLabel =
-				TARGET_LABELS[pendingProposal.targetKind] ?? pendingProposal.targetKind;
+			const targetLabel = revisionTargetLabel(pendingProposal.targetKind);
 			setPendingProposal(null);
 			setIsReviewOpen(false);
 			pushAssistantMessage(
 				`Proposal revisi untuk ${targetLabel} ditolak. Dokumen aktif tidak diubah.`,
 			);
+			void refreshHistory();
 		} catch {
 			setStageError("Gagal menolak proposal.");
 		} finally {
 			setIsRejecting(false);
 		}
-	}, [pendingProposal, isRejecting, pushAssistantMessage, setStageError]);
+	}, [
+		pendingProposal,
+		isRejecting,
+		pushAssistantMessage,
+		setStageError,
+		refreshHistory,
+	]);
+
+	/**
+	 * "Minta Perubahan": the user wants the proposal reworked, not applied.
+	 * The current proposal is superseded so it can never be applied later, and its
+	 * instruction is handed back so the composer can be amended. The active
+	 * document is untouched throughout.
+	 */
+	const requestChangesCurrentProposal = useCallback(async () => {
+		if (!pendingProposal || isRejecting) return null;
+		setIsRejecting(true);
+		try {
+			await rejectRevisionAction({
+				data: { proposalId: pendingProposal.id },
+			});
+			const targetLabel = revisionTargetLabel(pendingProposal.targetKind);
+			const instruction = pendingProposal.instruction;
+			setPendingProposal(null);
+			setIsReviewOpen(false);
+			pushAssistantMessage(
+				`Proposal revisi ${targetLabel} dibatalkan agar bisa diperbaiki. Sunting instruksinya lalu kirim ulang. Dokumen aktif belum diubah.`,
+			);
+			void refreshHistory();
+			return instruction;
+		} catch {
+			setStageError("Gagal membatalkan proposal.");
+			return null;
+		} finally {
+			setIsRejecting(false);
+		}
+	}, [
+		pendingProposal,
+		isRejecting,
+		pushAssistantMessage,
+		setStageError,
+		refreshHistory,
+	]);
 
 	return {
 		pendingProposal,
@@ -316,6 +314,9 @@ export function useWorkspaceRevision({
 		runRevision,
 		applyCurrentProposal,
 		rejectCurrentProposal,
+		requestChangesCurrentProposal,
 		restorePendingProposal,
+		history,
+		refreshHistory,
 	};
 }

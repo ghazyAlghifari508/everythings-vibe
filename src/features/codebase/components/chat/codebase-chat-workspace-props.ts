@@ -8,6 +8,7 @@ import type {
 import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
 import type { WorkspaceView } from "@/features/codebase/services/workspace-hydration";
 import type { CodebaseArtifactRef } from "../explorer/codebase-file-card";
+import type { RevisionHistoryEntry } from "../revision/codebase-revision-history";
 import type { RevisionProposalView } from "../revision/codebase-revision-review-dialog";
 import type { ChatStreamMessage } from "./codebase-chat-workspace-messages";
 import type { CodebaseStarterRefreshState } from "./codebase-chat-workspace-pristine";
@@ -103,9 +104,13 @@ export interface CodebaseChatWorkspaceProps {
 	isApplyingRevision?: boolean;
 	isRejectingRevision?: boolean;
 	revisionTarget?: "feature" | "prd" | "ac" | "tasks";
+	revisionHistory?: readonly RevisionHistoryEntry[];
 	onOpenReview?: () => void;
 	onCloseReview?: () => void;
 	onApplyRevision?: () => void | Promise<void>;
 	onRejectRevision?: () => void | Promise<void>;
+	/** "Minta Perubahan": supersede the proposal so the instruction can be amended.
+	 * Resolves to the superseded instruction, which is handed to the composer. */
+	onRequestChangesRevision?: () => Promise<string | null>;
 	onChangeRevisionTarget?: (target: "feature" | "prd" | "ac" | "tasks") => void;
 }

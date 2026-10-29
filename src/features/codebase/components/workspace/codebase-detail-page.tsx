@@ -137,6 +137,8 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		setRevisionTarget,
 		applyCurrentProposal,
 		rejectCurrentProposal,
+		requestChangesCurrentProposal,
+		history,
 	} = ws;
 
 	if (snapshotReady) {
@@ -230,10 +232,12 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								isApplyingRevision={isApplying}
 								isRejectingRevision={isRejecting}
 								revisionTarget={revisionTarget}
+								revisionHistory={history}
 								onOpenReview={() => setIsReviewOpen(true)}
 								onCloseReview={() => setIsReviewOpen(false)}
 								onApplyRevision={applyCurrentProposal}
 								onRejectRevision={rejectCurrentProposal}
+								onRequestChangesRevision={requestChangesCurrentProposal}
 								onChangeRevisionTarget={setRevisionTarget}
 								onReviewPlan={() => {
 									userTookOverCanvas.current = true;

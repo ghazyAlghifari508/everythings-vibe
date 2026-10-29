@@ -63,6 +63,47 @@ describe("CodebaseRevisionReviewDialog", () => {
 		expect(onReject).toHaveBeenCalledOnce();
 	});
 
+	it("exposes the third review action only when a handler is wired", () => {
+		const onRequestChanges = vi.fn();
+		const { unmount } = render(
+			<CodebaseRevisionReviewDialog
+				isOpen={true}
+				onClose={vi.fn()}
+				proposal={proposal}
+				isApplying={false}
+				isRejecting={false}
+				onApply={vi.fn()}
+				onReject={vi.fn()}
+				onRequestChanges={onRequestChanges}
+			/>,
+		);
+		const button = screen.getByRole("button", { name: /Minta Perubahan/i });
+		fireEvent.click(button);
+		expect(onRequestChanges).toHaveBeenCalledOnce();
+		unmount();
+
+		// Without a handler the action is not offered: a control that does nothing
+		// is worse than no control.
+		const second = render(
+			<CodebaseRevisionReviewDialog
+				isOpen={true}
+				onClose={vi.fn()}
+				proposal={proposal}
+				isApplying={false}
+				isRejecting={false}
+				onApply={vi.fn()}
+				onReject={vi.fn()}
+			/>,
+		);
+		expect(
+			second.container.querySelector("button")
+				? Array.from(second.container.querySelectorAll("button")).some((el) =>
+						/Minta Perubahan/i.test(el.textContent ?? ""),
+					)
+				: false,
+		).toBe(false);
+	});
+
 	it("renders task reconciliation items when revising task breakdown", () => {
 		const taskProposal = {
 			...proposal,

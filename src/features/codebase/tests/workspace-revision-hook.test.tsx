@@ -168,6 +168,60 @@ describe("useWorkspaceRevision", () => {
 		expect(result.current.pendingProposal?.id).toBe("prop-restored");
 	});
 
+	it("supersedes the proposal on request changes and hands the instruction back", async () => {
+		mockReject.mockResolvedValue({ ok: true, status: "rejected" });
+		const pushAssistantMessage = vi.fn();
+		const { result } = renderHook(() =>
+			useWorkspaceRevision({
+				codebaseId: "codebase-1",
+				effectiveFeatureId: "project-1",
+				currentSnapshotId: "snapshot-1",
+				activeProjectIdRef: { current: "project-1" },
+				stageBusy: null,
+				featureName: "Pencarian",
+				resolvedFeatureName: "Pencarian",
+				loadPrd: vi.fn(),
+				pushAssistantMessage,
+				openArtifactPreview: vi.fn(),
+				setStageBusy: vi.fn(),
+				setStageError: vi.fn(),
+				setRun: vi.fn(),
+			}),
+		);
+
+		act(() => {
+			result.current.setPendingProposal({
+				id: "prop-to-rework",
+				targetKind: "prd",
+				baseVersionId: "v1",
+				instruction: "Ubah navigasi",
+				baseContent: "Old",
+				proposedContent: "New",
+				status: "pending",
+				impact: {},
+				diff: [],
+			});
+			result.current.setIsReviewOpen(true);
+		});
+
+		let returned: string | null = null;
+		await act(async () => {
+			returned = await result.current.requestChangesCurrentProposal();
+		});
+
+		// The proposal must be superseded, otherwise it could still be applied
+		// after the user asked for something else.
+		expect(mockReject).toHaveBeenCalledWith({
+			data: { proposalId: "prop-to-rework" },
+		});
+		expect(returned).toBe("Ubah navigasi");
+		expect(result.current.pendingProposal).toBeNull();
+		expect(result.current.isReviewOpen).toBe(false);
+		expect(pushAssistantMessage).toHaveBeenCalledWith(
+			expect.stringContaining("Dokumen aktif belum diubah"),
+		);
+	});
+
 	it("rejects proposal without altering active artifacts", async () => {
 		mockReject.mockResolvedValue({ ok: true, status: "rejected" });
 

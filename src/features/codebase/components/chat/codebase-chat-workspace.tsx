@@ -7,12 +7,12 @@ import {
 	nextQuestionIndex,
 } from "@/features/codebase/services/chat-flow";
 import type { WorkspaceView } from "@/features/codebase/services/workspace-hydration";
-import { CodebaseRevisionReviewDialog } from "../revision/codebase-revision-review-dialog";
 import {
 	CodebaseChatWorkspaceArtifactStream,
 	CodebaseChatWorkspaceArtifactsFailed,
 } from "./codebase-chat-workspace-artifacts";
 import { CodebaseChatWorkspaceComposer } from "./codebase-chat-workspace-composer";
+import { CodebaseChatWorkspaceComposerDock } from "./codebase-chat-workspace-composer-dock";
 import {
 	CodebaseChatWorkspaceSpecError,
 	CodebaseChatWorkspaceStageError,
@@ -30,10 +30,8 @@ import {
 	CodebaseChatWorkspaceQuestions,
 	CodebaseChatWorkspaceQuestionsComplete,
 } from "./codebase-chat-workspace-questions";
-import {
-	CodebaseChatWorkspacePendingRevisionBanner,
-	CodebaseChatWorkspaceRevisionTargetSelector,
-} from "./codebase-chat-workspace-revision-controls";
+import { CodebaseChatWorkspacePendingRevisionBanner } from "./codebase-chat-workspace-revision-controls";
+import { CodebaseRevisionReview } from "./codebase-chat-workspace-revision-review";
 import { CodebaseChatWorkspaceStageHandoffs } from "./codebase-chat-workspace-stage-handoffs";
 import {
 	CodebaseChatWorkspaceLoading,
@@ -100,10 +98,12 @@ export function CodebaseChatWorkspace({
 	isApplyingRevision = false,
 	isRejectingRevision = false,
 	revisionTarget = "prd",
+	revisionHistory = [],
 	onOpenReview,
 	onCloseReview,
 	onApplyRevision,
 	onRejectRevision,
+	onRequestChangesRevision,
 	onChangeRevisionTarget,
 }: CodebaseChatWorkspaceProps) {
 	const tasksArtifact = artifacts.find((item) => item.id.startsWith("tasks-"));
@@ -329,21 +329,17 @@ export function CodebaseChatWorkspace({
 						</div>
 					</div>
 					{composerAvailable ? (
-						<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
-							<div className="mx-auto w-full max-w-3xl">
-								{composerMode === "revise" ? (
-									<CodebaseChatWorkspaceRevisionTargetSelector
-										selected={revisionTarget}
-										onChange={onChangeRevisionTarget}
-									/>
-								) : null}
-								{renderComposer(2, "p-3 sm:p-3.5")}
-							</div>
-						</div>
+						<CodebaseChatWorkspaceComposerDock
+							composerMode={composerMode}
+							revisionTarget={revisionTarget}
+							revisionHistory={revisionHistory}
+							onChangeRevisionTarget={onChangeRevisionTarget}
+							composer={renderComposer(2, "p-3 sm:p-3.5")}
+						/>
 					) : null}
 				</>
 			)}
-			<CodebaseRevisionReviewDialog
+			<CodebaseRevisionReview
 				isOpen={Boolean(isReviewOpen && pendingProposal)}
 				onClose={onCloseReview ?? (() => {})}
 				proposal={pendingProposal ?? null}
@@ -351,6 +347,8 @@ export function CodebaseChatWorkspace({
 				isRejecting={Boolean(isRejectingRevision)}
 				onApply={onApplyRevision ?? (() => {})}
 				onReject={onRejectRevision ?? (() => {})}
+				onRequestChanges={onRequestChangesRevision}
+				onPrefillDraft={handlePrefillDraft}
 			/>
 		</div>
 	);
