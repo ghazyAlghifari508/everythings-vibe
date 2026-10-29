@@ -34,9 +34,22 @@ export type CodebaseReadiness =
 	/** No ready analysis, but stored plans exist and stay readable. */
 	| "existing_plan_readonly";
 
+/**
+ * The analysis facts readiness actually reads. Deliberately narrower than
+ * `AnalysisResponse` so a surface that already validated its own output (the
+ * repository library, holding a parsed `CodebaseAnalysis`) can reuse the same
+ * readiness contract instead of re-deriving a second status model.
+ */
+export type ReadinessAnalysis = Pick<
+	AnalysisResponse,
+	"snapshotId" | "status" | "output"
+> & {
+	errorCode?: string | null;
+};
+
 /** Validated analysis output that is bound to this exact snapshot. */
 export function hasReadyAnalysisForSnapshot(
-	analysis: Pick<AnalysisResponse, "snapshotId" | "status" | "output"> | null,
+	analysis: ReadinessAnalysis | null,
 	snapshotId: string | null | undefined,
 ): boolean {
 	if (!analysis || !snapshotId) return false;
@@ -91,7 +104,7 @@ export function resolveOnboardingReadiness(input: {
 export function resolveCodebaseReadiness(input: {
 	snapshotId: string | null | undefined;
 	snapshotStatus: string | null | undefined;
-	analysis: AnalysisResponse | null;
+	analysis: ReadinessAnalysis | null;
 	/** Newest stored attempt for the same snapshot, when the server reports it. */
 	analysisAttemptStatus?: "pending" | "ready" | "failed" | null;
 	/** The repository already holds persisted planning artifacts. */

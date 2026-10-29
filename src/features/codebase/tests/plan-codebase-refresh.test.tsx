@@ -293,6 +293,64 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 		).toHaveLength(0);
 	}, 20000);
 
+	it("recovers a running analysis (session analyzing) into the progress view", async () => {
+		// The real server reports `analyzing` for a verified upload whose model
+		// call is still running. Resuming from History must restore the analysis
+		// context and show progress, not restart the transport or mint an attempt.
+		seed({
+			codebaseId: "cb-refresh-analyzing",
+			step: "sync",
+			projectId: "proj-refresh-1",
+		});
+		const fetchMock = mockRecovery({
+			codebaseId: "cb-refresh-analyzing",
+			status: {
+				projectId: "cb-refresh-analyzing",
+				sessionId: "sess-refresh-analyzing",
+				status: "analyzing",
+				snapshotId: "snap-refresh-1",
+				fileCount: 42,
+				analysisAttemptStatus: "pending",
+				analysisAttemptCreatedAt: "2026-09-19T10:00:00.000Z",
+			},
+		});
+
+		render(<PlanCodebasePage />);
+
+		await waitFor(
+			() => {
+				expect(
+					screen
+						.getByTestId("sync-stage-analysis")
+						.getAttribute("data-stage-state"),
+				).toBe("active");
+			},
+			{ timeout: 15000, interval: 100 },
+		);
+		expect(screen.getByTestId("sync-stage-analysis").textContent).toContain(
+			"Menganalisis codebase",
+		);
+		// Resume is navigation only: no new repository, sync session, or attempt.
+		expect(fetchMock).not.toHaveBeenCalledWith(
+			"/api/codebases",
+			expect.objectContaining({ method: "POST" }),
+		);
+		expect(
+			fetchMock.mock.calls.filter(
+				([url, init]) =>
+					String(url).endsWith("/session") &&
+					(init as RequestInit | undefined)?.method === "POST",
+			),
+		).toHaveLength(0);
+		expect(
+			fetchMock.mock.calls.filter(
+				([url, init]) =>
+					String(url).includes("/codebase/analysis") &&
+					(init as RequestInit | undefined)?.method === "POST",
+			),
+		).toHaveLength(0);
+	}, 20000);
+
 	it("recovers a ready analysis straight into the review", async () => {
 		seed({
 			codebaseId: "cb-refresh-ready",

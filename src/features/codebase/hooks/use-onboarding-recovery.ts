@@ -33,14 +33,33 @@ import type { OnboardingAnalysisState } from "./use-onboarding-analysis-state";
  * to the completed sync state they were watching, not to a conclusion step they
  * never reached.
  */
+/**
+ * Session states that prove the transport persisted a snapshot.
+ *
+ * `analyzing` is what the session reports right after a verified upload while
+ * the model works; the snapshot underneath is already `uploaded`. Recovery that
+ * ignored it would drop the analysis context and leave the progress screen
+ * unable to show (or retry) the attempt the user came back for. The snapshot
+ * row's own status stays governed by `SNAPSHOT_CONTEXT_STATUSES`.
+ */
+const RECOVERED_SNAPSHOT_SESSION_STATUSES: readonly string[] = [
+	...SNAPSHOT_CONTEXT_STATUSES,
+	"analyzing",
+];
+
+function hasRecoveredSnapshot(recovered: SyncStatusResponse): boolean {
+	return (
+		Boolean(recovered.snapshotId) &&
+		RECOVERED_SNAPSHOT_SESSION_STATUSES.includes(recovered.status)
+	);
+}
+
 function resolveRecoveredStep(
 	recovered: SyncStatusResponse,
 	storedStep: PlanCodebaseStep | null,
 	isAnalysisReady?: boolean,
 ): PlanCodebaseStep {
-	const hasSnapshot =
-		Boolean(recovered.snapshotId) &&
-		SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status);
+	const hasSnapshot = hasRecoveredSnapshot(recovered);
 	if (!hasSnapshot) return "sync";
 	return storedStep === "summary" && Boolean(isAnalysisReady)
 		? "summary"
@@ -109,27 +128,25 @@ export function useOnboardingRecovery({
 			// onboarding analysis context is restored only here. Which of the two
 			// steps the user lands on is then decided by `resolveRecoveredStep`,
 			// which keeps the stored intent from overriding this evidence.
-			if (
-				recovered.snapshotId &&
-				SNAPSHOT_CONTEXT_STATUSES.includes(recovered.status)
-			) {
+			const recoveredSnapshotId = recovered.snapshotId;
+			if (hasRecoveredSnapshot(recovered) && recoveredSnapshotId) {
 				const storedProject = readPlanCodebaseProjectPointer();
 				let existingAnalysis: AnalysisResponse | null = null;
 				if (storedProject) {
 					setFeatureProjectId(storedProject);
 					existingAnalysis = await fetchAnalysisOutput(
 						storedProject,
-						recovered.snapshotId,
+						recoveredSnapshotId,
 					);
 					if (
 						(existingAnalysis?.output &&
-							existingAnalysis.snapshotId === recovered.snapshotId &&
+							existingAnalysis.snapshotId === recoveredSnapshotId &&
 							existingAnalysis.status === "ready") ||
 						recovered.analysisStatus === "pending" ||
 						recovered.analysisAttemptStatus === "pending" ||
 						existingAnalysis?.status === "pending"
 					) {
-						analysisAttemptedFor.current = recovered.snapshotId;
+						analysisAttemptedFor.current = recoveredSnapshotId;
 					}
 				}
 				const isAnalysisReady = canContinueToCodebaseConclusion({
