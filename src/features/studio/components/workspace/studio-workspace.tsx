@@ -58,6 +58,8 @@ export function StudioWorkspace({
 					onSelectFrames={workspace.selectFrames}
 					onRetryFrame={workspace.handleRetryFrame}
 					onRetryPlanning={workspace.handleRetryPlanning}
+					retryingFrameIds={workspace.retryingFrameIds}
+					frameRetryErrors={workspace.frameRetryErrors}
 					className="size-full"
 				/>
 

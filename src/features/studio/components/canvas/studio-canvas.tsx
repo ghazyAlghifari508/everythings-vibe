@@ -44,6 +44,8 @@ export interface StudioCanvasProps {
 	onSelectFrames?: (frameIds: string[]) => void;
 	onRetryFrame?: (frameId: string) => void;
 	onRetryPlanning?: () => void;
+	retryingFrameIds?: string[];
+	frameRetryErrors?: Record<string, string>;
 	className?: string;
 }
 
@@ -57,6 +59,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 	onSelectFrames,
 	onRetryFrame,
 	onRetryPlanning,
+	retryingFrameIds = [],
+	frameRetryErrors,
 	className = "",
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
@@ -229,6 +233,8 @@ export const StudioCanvas = memo(function StudioCanvas({
 							}
 							onSelect={handleFrameSelect}
 							onRetry={handleFrameRetry}
+							isRetryPending={retryingFrameIds.includes(frame.id)}
+							retryError={frameRetryErrors?.[frame.id]}
 							isCanvasPanning={panMode}
 						/>
 					))
