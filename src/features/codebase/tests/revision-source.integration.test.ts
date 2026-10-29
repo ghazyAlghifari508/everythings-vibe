@@ -486,4 +486,72 @@ describe("revision source authorization", () => {
 				).ok,
 			).toBe(false);
 	});
+
+	it("validates structured referenceBindings and rejects cross-project, cross-repo, or stale-snapshot bindings", async () => {
+		const validRes = await resolveRevisionSource(userId, {
+			...request,
+			optionalReferences: undefined,
+			referenceBindings: [
+				{
+					kind: "artifact",
+					id: `prd-${projectId}`,
+					projectId,
+					targetKind: "prd",
+					label: "@PRD · Plan",
+					fileName: "PRD.md",
+					versionId: prdId,
+				},
+				{
+					kind: "file",
+					id: `file:${snapshotId}:src/app.ts`,
+					path: "src/app.ts",
+					codebaseId,
+					snapshotId,
+				},
+			],
+		});
+		expect(validRes).toMatchObject({
+			ok: true,
+			references: [{ path: "src/app.ts", content: "x" }],
+		});
+
+		for (const invalidBinding of [
+			{
+				kind: "artifact" as const,
+				id: "prd-other",
+				projectId: crypto.randomUUID(),
+				targetKind: "prd" as const,
+				label: "@PRD · Other",
+				fileName: "PRD.md",
+			},
+			{
+				kind: "file" as const,
+				id: "file:other",
+				path: "src/app.ts",
+				codebaseId: crypto.randomUUID(),
+				snapshotId,
+			},
+			{
+				kind: "file" as const,
+				id: "file:stale",
+				path: "src/app.ts",
+				codebaseId,
+				snapshotId: crypto.randomUUID(),
+			},
+			{
+				kind: "artifact" as const,
+				id: `tasks-${projectId}`,
+				projectId,
+				targetKind: "tasks" as const,
+				label: "@Task · Plan",
+				fileName: "tasks.json",
+			},
+		]) {
+			const rejected = await resolveRevisionSource(userId, {
+				...request,
+				referenceBindings: [invalidBinding],
+			});
+			expect(rejected.ok).toBe(false);
+		}
+	});
 });
