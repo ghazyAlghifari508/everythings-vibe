@@ -8,7 +8,6 @@ import {
 	requestStudioFrameRetry,
 } from "@/features/studio/services/studio-frame-retry-client";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
-import type { AttachedDesignReference } from "@/features/studio/types/studio";
 import { useUIStore } from "@/store";
 
 /** Reads what one composer request resolved to, so the UI explains clarify/add. */
@@ -184,36 +183,6 @@ export function useStudioWorkspaceActions({
 		[project.id, selectedFrameIds, setError, showToast, syncProjectStatus],
 	);
 
-	const handleApplyDesignSystem = useCallback(
-		async (reference: AttachedDesignReference): Promise<boolean> => {
-			setPreferenceSaving(true);
-			try {
-				const response = await fetch("/api/studio/project", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						action: "design-system",
-						projectId: project.id,
-						...reference,
-					}),
-				});
-				if (!response.ok) {
-					throw new Error(
-						await readStudioApiError(
-							response,
-							"Gagal menyimpan design system.",
-						),
-					);
-				}
-				await syncProjectStatus();
-				return true;
-			} finally {
-				setPreferenceSaving(false);
-			}
-		},
-		[project.id, syncProjectStatus],
-	);
-
 	const handleSkillChange = useCallback(
 		async (skillId: StudioDesignSkillId) => {
 			if (isProcessing || preferenceSaving || project.designSkillId === skillId)
@@ -323,7 +292,6 @@ export function useStudioWorkspaceActions({
 
 	return {
 		composerLoading,
-		preferenceSaving,
 		exportingZip,
 		deleting,
 		duplicating,
@@ -332,7 +300,6 @@ export function useStudioWorkspaceActions({
 		handleDuplicate,
 		handleDelete,
 		handleComposerSubmit,
-		handleApplyDesignSystem,
 		handleSkillChange,
 		handleRetryFrame,
 		handleRetryPlanning,

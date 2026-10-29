@@ -9,7 +9,7 @@ import {
 	UserIcon,
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -40,7 +40,6 @@ export function StudioHeader({
 	onDuplicate,
 	onExport,
 	onDelete,
-	designSystemControl,
 }: {
 	title: string;
 	duplicating: boolean;
@@ -50,7 +49,6 @@ export function StudioHeader({
 	onDuplicate: () => void;
 	onExport: () => void;
 	onDelete?: () => Promise<void>;
-	designSystemControl?: ReactNode;
 }) {
 	const { data: session } = authClient.useSession();
 	const [isDeleteOpen, setDeleteOpen] = useState(false);
@@ -106,7 +104,6 @@ export function StudioHeader({
 								Kembali ke Semua Project
 							</Link>
 						</DropdownMenuItem>
-						{designSystemControl}
 						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							className={item}

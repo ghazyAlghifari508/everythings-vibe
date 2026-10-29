@@ -4,7 +4,6 @@ import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import { StudioCanvas } from "@/features/studio/components/canvas/studio-canvas";
 import { StudioComposer } from "@/features/studio/components/composer/studio-composer";
-import { StudioDesignPicker } from "@/features/studio/components/design-system/studio-design-picker";
 import { StudioHeader } from "@/features/studio/components/workspace/studio-header";
 import { useStudioWorkspace } from "@/features/studio/hooks/use-studio-workspace";
 import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
@@ -36,14 +35,6 @@ export function StudioWorkspace({
 				onDuplicate={() => void workspace.handleDuplicate()}
 				onExport={() => void workspace.handleDownloadAllZip()}
 				onDelete={workspace.handleDelete}
-				designSystemControl={
-					<StudioDesignPicker
-						designMd={workspace.project.designMd}
-						disabled={workspace.isProcessing || workspace.preferenceSaving}
-						scrapeSources={initialData.scrapeSources}
-						onApply={workspace.handleApplyDesignSystem}
-					/>
-				}
 			/>
 
 			{/* Main Fullscreen Canvas Workspace */}

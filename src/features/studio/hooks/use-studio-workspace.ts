@@ -11,10 +11,7 @@ import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-wo
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
-import type {
-	AttachedDesignReference,
-	StudioDetailLoaderData,
-} from "@/features/studio/types/studio";
+import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
 
 const NO_SUGGESTIONS: readonly StudioScreenSuggestion[] = [];
 
@@ -26,7 +23,6 @@ export interface StudioWorkspaceState {
 	selectedFrameIds: string[];
 	selectedFrames: StudioFrameRow[];
 	composerLoading: boolean;
-	preferenceSaving: boolean;
 	exportingZip: boolean;
 	deleting: boolean;
 	duplicating: boolean;
@@ -49,9 +45,6 @@ export interface StudioWorkspaceState {
 	handleComposerSubmit: (
 		promptText: string,
 	) => Promise<StudioComposerSubmitResult>;
-	handleApplyDesignSystem: (
-		reference: AttachedDesignReference,
-	) => Promise<boolean>;
 	handleSkillChange: (skillId: StudioDesignSkillId) => Promise<void>;
 	handleRetryFrame: (frameId: string) => Promise<void>;
 	handleRetryPlanning: () => Promise<void>;
@@ -167,7 +160,6 @@ export function useStudioWorkspace(
 		selectedFrameIds,
 		selectedFrames,
 		composerLoading: actions.composerLoading,
-		preferenceSaving: actions.preferenceSaving,
 		exportingZip: actions.exportingZip,
 		deleting: actions.deleting,
 		duplicating: actions.duplicating,
@@ -185,7 +177,6 @@ export function useStudioWorkspace(
 		handleDuplicate: actions.handleDuplicate,
 		handleDelete: actions.handleDelete,
 		handleComposerSubmit: actions.handleComposerSubmit,
-		handleApplyDesignSystem: actions.handleApplyDesignSystem,
 		handleSkillChange: actions.handleSkillChange,
 		handleRetryFrame: actions.handleRetryFrame,
 		handleRetryPlanning: actions.handleRetryPlanning,
