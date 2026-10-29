@@ -8,6 +8,13 @@ export function studioJobTiming(
 		attempt?: number;
 		code?: string;
 		detail?: string;
+		issueCode?: string;
+		issueCodes?: string[];
+		issueStages?: string[];
+		issueCount?: number;
+		sourceContentNodes?: number;
+		assembledContentNodes?: number;
+		correctionRequired?: boolean;
 		skillId?: string;
 		skillChars?: number;
 		promptChars?: number;
