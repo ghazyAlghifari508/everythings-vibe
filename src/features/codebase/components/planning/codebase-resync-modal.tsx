@@ -3,7 +3,6 @@
 import {
 	AlertCircleIcon,
 	Copy01Icon,
-	Loading01Icon,
 	LockIcon,
 	RefreshIcon,
 	Tick01Icon,
@@ -18,6 +17,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
+import { Spinner } from "@/components/ui/spinner";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import { resolveCodebaseDisplayName } from "@/features/codebase/services/naming";
 import {
@@ -74,12 +74,7 @@ function StepIndicator({ step, state }: { step: number; state: StepState }) {
 				data-step-state="active"
 				className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-blue-500/40 bg-blue-500/10 font-mono text-xs text-blue-400"
 			>
-				<Icon
-					icon={Loading01Icon}
-					size={12}
-					className="shrink-0 animate-spin"
-					aria-hidden="true"
-				/>
+				<Spinner size={12} className="text-blue-400" />
 				<span className="sr-only">Aktif</span>
 			</span>
 		);
@@ -247,11 +242,7 @@ export function CodebaseResyncModal({
 									</>
 								) : isStarting ? (
 									<div className="flex items-center justify-center gap-2 py-8 font-sans text-xs text-fog">
-										<Icon
-											icon={Loading01Icon}
-											size={14}
-											className="animate-spin text-blue-400"
-										/>
+										<Spinner size={14} className="text-blue-400" />
 										<span>Menyiapkan sesi sync...</span>
 									</div>
 								) : (

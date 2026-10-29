@@ -121,10 +121,12 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		);
 		expect(centeringWrapper).not.toBeNull();
 
-		// Check the spinner element itself
-		const spinner = container.querySelector(".animate-spin");
+		// Check the shared spinner primitive renders with the motion-safe gate.
+		const spinner = container.querySelector('[data-testid="spinner"]');
 		expect(spinner).not.toBeNull();
-		expect(spinner?.classList.contains("border-t-indigo")).toBe(true);
+		expect(spinner?.getAttribute("class")).toContain(
+			"motion-safe:animate-spin",
+		);
 	});
 
 	it("transitions to ScreenConnect prompt sync once codebase session is created", async () => {
