@@ -75,6 +75,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		chatAnswers,
 		run,
 		composerMode,
+		setComposerMode,
 		composerAvailable,
 		answersReadOnly,
 		artifacts,
@@ -100,6 +101,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		handleDownloadArtifact,
 		handleSubmitAnswer,
 		handleSendMessage,
+		handleSubmitComposer,
 		handleConfirmGenerate,
 		handleRetryStage,
 		handleGeneratePrd,
@@ -189,6 +191,8 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 						chatPane={
 							<CodebaseChatWorkspace
 								key={effectiveFeatureId ?? "new-feature"}
+								projectId={effectiveFeatureId}
+								codebaseId={codebase.id}
 								isCreatingNew={isCreatingNew}
 								featureName={resolvedFeature?.name ?? codebase.name}
 								view={workspaceView}
@@ -204,6 +208,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 									) : null
 								}
 								contextFiles={contextFiles}
+								repositoryFiles={explorerFiles}
 								fileCount={status?.fileCount ?? manifestFileCount ?? undefined}
 								kanbanProgress={kanbanProgress}
 								messages={chatMessages}
@@ -211,6 +216,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								answers={chatAnswers}
 								run={run}
 								composerMode={composerMode}
+								onComposerModeChange={setComposerMode}
 								composerAvailable={composerAvailable}
 								answersReadOnly={answersReadOnly}
 								artifacts={artifacts}
@@ -291,6 +297,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								onDownloadArtifact={handleDownloadArtifact}
 								onSubmitAnswer={handleSubmitAnswer}
 								onSendMessage={handleSendMessage}
+								onSubmitComposer={handleSubmitComposer}
 								onConfirmGenerate={() => void handleConfirmGenerate()}
 								onRetryGenerate={() => void handleConfirmGenerate()}
 								onRetryStage={() => void handleRetryStage()}

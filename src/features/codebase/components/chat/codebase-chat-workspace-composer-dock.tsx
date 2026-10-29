@@ -15,13 +15,17 @@ export function CodebaseChatWorkspaceComposerDock({
 	composerMode,
 	revisionTarget,
 	revisionHistory,
+	isRevisingCompletedPlan = false,
 	onChangeRevisionTarget,
+	onCancelCompletedRevision,
 	composer,
 }: {
 	composerMode: string;
 	revisionTarget?: "feature" | "prd" | "ac" | "tasks";
 	revisionHistory?: readonly RevisionHistoryEntry[];
+	isRevisingCompletedPlan?: boolean;
 	onChangeRevisionTarget?: (target: "feature" | "prd" | "ac" | "tasks") => void;
+	onCancelCompletedRevision?: () => void;
 	composer: ReactNode;
 }) {
 	return (
@@ -30,10 +34,22 @@ export function CodebaseChatWorkspaceComposerDock({
 				{composerMode === "revise" ? (
 					<>
 						<CodebaseRevisionHistory entries={revisionHistory ?? []} />
-						<CodebaseChatWorkspaceRevisionTargetSelector
-							selected={revisionTarget}
-							onChange={onChangeRevisionTarget}
-						/>
+						<div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+							<CodebaseChatWorkspaceRevisionTargetSelector
+								selected={revisionTarget}
+								onChange={onChangeRevisionTarget}
+							/>
+							{isRevisingCompletedPlan && onCancelCompletedRevision ? (
+								<button
+									type="button"
+									onClick={onCancelCompletedRevision}
+									data-testid="codebase-cancel-completed-revision-dock"
+									className="inline-flex min-h-7 items-center rounded border border-graphite bg-charcoal px-2.5 text-[11px] font-medium text-fog transition-colors hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								>
+									Batal Revisi
+								</button>
+							) : null}
+						</div>
 					</>
 				) : null}
 				{composer}

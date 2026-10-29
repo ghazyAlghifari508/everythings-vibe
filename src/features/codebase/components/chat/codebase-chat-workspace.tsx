@@ -51,10 +51,13 @@ export type PipelineStage = CodebasePipelineStage;
 
 export function CodebaseChatWorkspace({
 	featureName,
+	projectId = null,
+	codebaseId = null,
 	isCreatingNew = false,
 	view,
 	planSwitcher,
-	contextFiles: _contextFiles = [],
+	contextFiles = [],
+	repositoryFiles,
 	fileCount: _fileCount,
 	kanbanProgress = null,
 	messages,
@@ -72,7 +75,7 @@ export function CodebaseChatWorkspace({
 	composerAvailable = !projectIdForHandoff && !tasksUnresolved,
 	codebaseName,
 	starterSuggestions,
-	composerMode = "create",
+	composerMode = "plan",
 	isSending = false,
 	isConfirming = false,
 	specError = null,
@@ -80,6 +83,9 @@ export function CodebaseChatWorkspace({
 	onDownloadArtifact,
 	onSubmitAnswer,
 	onSendMessage,
+	onSubmitComposer,
+	onComposerModeChange,
+	onReferencesChange,
 	onConfirmGenerate,
 	onRetryQuestions,
 	onRetryGenerate,
@@ -109,30 +115,29 @@ export function CodebaseChatWorkspace({
 	const tasksArtifact = artifacts.find((item) => item.id.startsWith("tasks-"));
 	const isRunWorking = run?.status === "running";
 
-	const {
-		draft,
-		setDraft,
-		copiedCmd,
-		copiedExport,
-		setCopiedExport,
-		editingQuestionId,
-		exportCmd,
-		handoffPrompt,
-		handleCopyCmd,
-		handleCopy,
-		handleSend,
-		handlePrefillDraft,
-		handleEditQuestion,
-		handleCancelEditQuestion,
-		handleSubmitAnswer,
-	} = useWorkspaceChatControls({
+	const controls = useWorkspaceChatControls({
+		projectId,
 		projectIdForHandoff,
+		featureName,
+		codebaseId,
 		codebaseName,
+		currentSnapshotId,
+		stage,
+		isCreatingNew,
 		composerAvailable,
+		composerMode,
+		revisionTarget,
+		artifacts,
+		repositoryFiles,
+		contextFiles,
 		isSending,
 		isRunWorking,
 		answersReadOnly,
 		onSendMessage,
+		onSubmitComposer,
+		onComposerModeChange,
+		onChangeRevisionTarget,
+		onReferencesChange,
 		onSubmitAnswer,
 	});
 
@@ -154,13 +159,6 @@ export function CodebaseChatWorkspace({
 		!isSending &&
 		stage === "questions";
 
-	/**
-	 * The view the caller derived from the resolved plan and the real artifact
-	 * hydration statuses. When a caller does not supply one — tests and the
-	 * standalone body render — it is derived from the props above, which keeps
-	 * the previous behaviour without letting a pending read look like an empty
-	 * repository.
-	 */
 	const effectiveView: WorkspaceView =
 		view ??
 		(isPristine
@@ -173,9 +171,6 @@ export function CodebaseChatWorkspace({
 	const failedArtifacts =
 		effectiveView.kind === "active" ? effectiveView.failedArtifacts : [];
 
-	// Only a repository that moved on after this plan was written is reported as
-	// needing review. Both ids must be real, and the notice is informational: the
-	// user opens the stored plan, nothing is regenerated and no credit is spent.
 	const planningMovedOn = Boolean(
 		planningSnapshotId &&
 			currentSnapshotId &&
@@ -183,27 +178,53 @@ export function CodebaseChatWorkspace({
 	);
 
 	const runFailed = run?.status === "failed";
-	// A failed request owns its own error row, so the generic stage error
-	// row must not render a second, duplicate message for the same failure.
 	const stageErrorVisible = Boolean(stageError) && !runFailed;
 	const activeSpecError =
 		(run?.stage === "feature" && runFailed ? run.error : null) ?? specError;
 	const specErrorVisible = Boolean(activeSpecError);
 
 	const composerPlaceholder =
-		composerMode === "create"
-			? "Jelaskan fitur baru yang kamu inginkan..."
-			: "Jelaskan perubahan yang kamu inginkan...";
+		controls.activeMode === "revise"
+			? "Jelaskan perubahan yang kamu inginkan..."
+			: "Jelaskan fitur baru yang kamu inginkan...";
 
 	const renderComposer = (minRows = 1, className = "") => (
 		<CodebaseChatWorkspaceComposer
-			draft={draft}
-			onDraftChange={setDraft}
-			onSend={handleSend}
+			draft={controls.draft}
+			onDraftChange={controls.setDraft}
+			onSend={controls.handleSend}
+			onKeyDown={controls.handleComposerKeyDown}
 			isSending={isSending || isRunWorking}
+			sendDisabled={controls.sendDisabled}
 			minRows={minRows}
 			className={className}
 			placeholder={composerPlaceholder}
+			mode={controls.activeMode}
+			canSwitchToPlan={controls.canSwitchToPlan}
+			targetKind={controls.effectiveTargetKind}
+			targetArtifact={controls.effectiveTargetArtifact}
+			featureName={featureName}
+			references={controls.reconciledReferences}
+			lockedNotice={controls.lockedNotice}
+			isMentionOpen={controls.isMentionPopoverOpen}
+			mentionSearch={controls.mentionSearch}
+			mentionDocuments={controls.mentionDocuments}
+			mentionFiles={controls.mentionFiles}
+			mentionActiveIndex={controls.mentionActiveIndex}
+			isSlashOpen={controls.isSlashPopoverOpen}
+			slashCommands={controls.slashCommands}
+			slashActiveIndex={controls.slashActiveIndex}
+			isHelpOpen={controls.isHelpOpen}
+			allSlashCommands={controls.allSlashCommands}
+			onSelectMode={controls.handleSelectMode}
+			onToggleMention={controls.handleToggleMention}
+			onCloseMention={controls.handleCloseMention}
+			onMentionSearchChange={controls.setMentionSearch}
+			onSelectMentionCandidate={controls.handleSelectMentionCandidate}
+			onRemoveReference={controls.handleRemoveReference}
+			onSelectSlashCommand={controls.handleSelectSlashCommand}
+			onCloseHelp={() => controls.setIsHelpOpen(false)}
+			onDismissNotice={() => controls.setLockedNotice(null)}
 		/>
 	);
 
@@ -234,7 +255,7 @@ export function CodebaseChatWorkspace({
 					starterRefresh={starterRefresh}
 					newerAttemptFailure={newerAttemptFailure}
 					onRefreshStarterSuggestions={onRefreshStarterSuggestions}
-					onPrefillDraft={handlePrefillDraft}
+					onPrefillDraft={controls.handlePrefillDraft}
 				/>
 			) : (
 				<>
@@ -258,11 +279,13 @@ export function CodebaseChatWorkspace({
 								totalQuestions={questions.length}
 								answers={answers}
 								currentIndex={currentIndex}
-								editingQuestionId={answersReadOnly ? null : editingQuestionId}
+								editingQuestionId={
+									answersReadOnly ? null : controls.editingQuestionId
+								}
 								readOnly={answersReadOnly}
-								onEditQuestion={handleEditQuestion}
-								onCancelEdit={handleCancelEditQuestion}
-								onSubmit={handleSubmitAnswer}
+								onEditQuestion={controls.handleEditQuestion}
+								onCancelEdit={controls.handleCancelEditQuestion}
+								onSubmit={controls.handleSubmitAnswer}
 							/>
 							<CodebaseChatWorkspaceArtifactStream
 								artifacts={artifacts}
@@ -307,33 +330,40 @@ export function CodebaseChatWorkspace({
 								onOpenArtifact={onOpenArtifact}
 								onDownloadArtifact={onDownloadArtifact}
 							/>
-							{handoffPrompt && exportCmd ? (
+							{controls.handoffPrompt && controls.exportCmd ? (
 								<CodebaseChatWorkspaceHandoffCard
-									exportCmd={exportCmd}
+									exportCmd={controls.exportCmd}
 									taskCount={kanbanProgress?.total}
 									onOpenKanban={
 										tasksArtifact && onOpenArtifact
 											? () => onOpenArtifact(tasksArtifact)
 											: undefined
 									}
-									handoffPrompt={handoffPrompt}
+									handoffPrompt={controls.handoffPrompt}
 									codebaseName={codebaseName}
-									copiedCmd={copiedCmd}
-									copiedExport={copiedExport}
-									onCopyCmd={handleCopyCmd}
+									copiedCmd={controls.copiedCmd}
+									copiedExport={controls.copiedExport}
+									onCopyCmd={controls.handleCopyCmd}
 									onCopyExport={() =>
-										handleCopy(exportCmd, (value) => setCopiedExport(value))
+										controls.handleCopy(controls.exportCmd ?? "", (value) =>
+											controls.setCopiedExport(value),
+										)
 									}
+									isRevisingCompletedPlan={controls.isCompletedRevisionOpen}
+									onStartCompletedRevision={controls.openCompletedRevision}
+									onCancelCompletedRevision={controls.cancelCompletedRevision}
 								/>
 							) : null}
 						</div>
 					</div>
-					{composerAvailable ? (
+					{controls.effectiveComposerAvailable ? (
 						<CodebaseChatWorkspaceComposerDock
-							composerMode={composerMode}
-							revisionTarget={revisionTarget}
+							composerMode={controls.activeMode}
+							revisionTarget={controls.effectiveTargetKind}
 							revisionHistory={revisionHistory}
-							onChangeRevisionTarget={onChangeRevisionTarget}
+							isRevisingCompletedPlan={controls.isCompletedRevisionOpen}
+							onChangeRevisionTarget={controls.handleChangeRevisionTarget}
+							onCancelCompletedRevision={controls.cancelCompletedRevision}
 							composer={renderComposer(2, "p-3 sm:p-3.5")}
 						/>
 					) : null}
@@ -348,7 +378,7 @@ export function CodebaseChatWorkspace({
 				onApply={onApplyRevision ?? (() => {})}
 				onReject={onRejectRevision ?? (() => {})}
 				onRequestChanges={onRequestChangesRevision}
-				onPrefillDraft={handlePrefillDraft}
+				onPrefillDraft={controls.handlePrefillDraft}
 			/>
 		</div>
 	);

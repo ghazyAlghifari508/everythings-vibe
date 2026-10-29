@@ -5,8 +5,13 @@ import type {
 	CodebasePipelineStage,
 	CodebaseRunState,
 } from "@/features/codebase/services/chat-flow";
+import type {
+	ComposerOperationMode,
+	ComposerSubmissionPayload,
+} from "@/features/codebase/services/composer-interactions";
 import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
 import type { WorkspaceView } from "@/features/codebase/services/workspace-hydration";
+import type { ComposerReferenceBinding } from "@/features/codebase/types/revision";
 import type { CodebaseArtifactRef } from "../explorer/codebase-file-card";
 import type { RevisionHistoryEntry } from "../revision/codebase-revision-history";
 import type { RevisionProposalView } from "../revision/codebase-revision-review-dialog";
@@ -15,6 +20,8 @@ import type { CodebaseStarterRefreshState } from "./codebase-chat-workspace-pris
 
 export interface CodebaseChatWorkspaceProps {
 	featureName: string;
+	projectId?: string | null;
+	codebaseId?: string | null;
 	isCreatingNew?: boolean;
 	/**
 	 * What the workspace is allowed to show. Supplied by the route from the
@@ -27,6 +34,7 @@ export interface CodebaseChatWorkspaceProps {
 	/** Plan switcher, rendered in the header when the repository has several plans. */
 	planSwitcher?: ReactNode;
 	contextFiles?: string[];
+	repositoryFiles?: ReadonlyArray<{ path: string } | string>;
 	fileCount?: number;
 	kanbanProgress?: { done: number; total: number; pct: number } | null;
 	messages: ChatStreamMessage[];
@@ -72,11 +80,14 @@ export interface CodebaseChatWorkspaceProps {
 	onSendMessage?:
 		| ((message: string) => void)
 		| ((message: string) => boolean | Promise<boolean>);
+	onSubmitComposer?:
+		| ((payload: ComposerSubmissionPayload) => void)
+		| ((payload: ComposerSubmissionPayload) => boolean | Promise<boolean>);
+	onComposerModeChange?: (mode: ComposerOperationMode) => void;
+	onReferencesChange?: (references: ComposerReferenceBinding[]) => void;
 	/**
-	 * What the next message means. The route derives it from the workspace
-	 * state: a message in a user-facing plan revises or clarifies that plan,
-	 * and only the explicit "Buat fitur baru" action starts a new one. The
-	 * composer never asks the user to choose.
+	 * Explicit composer mode ("plan" or "revise"; legacy "create"/"clarify"
+	 * normalize to "plan").
 	 */
 	composerMode?: CodebaseComposerMode;
 	/**

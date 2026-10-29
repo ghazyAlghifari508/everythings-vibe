@@ -7,7 +7,7 @@ import {
 	resolvePersistedStage,
 	shouldAutoRevealArtifact,
 } from "@/features/codebase/services/chat-flow";
-import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
+import type { ComposerOperationMode } from "@/features/codebase/services/composer-interactions";
 import {
 	emptyArtifactHydration,
 	resolveWorkspaceView,
@@ -155,17 +155,8 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		activeArtifactId,
 		sourcePreview: source.sourcePreview,
 	});
-	const activeIsAnchorPlan =
-		effectiveFeatureId != null && effectiveFeatureId === onboardingFeatureId;
-	const activeHasPlanning = presentation.artifacts.length > 0;
-	const composerMode: CodebaseComposerMode =
-		plan.isCreatingNew ||
-		!effectiveFeatureId ||
-		(activeIsAnchorPlan && !activeHasPlanning)
-			? "create"
-			: activeHasPlanning
-				? "revise"
-				: "clarify";
+	const [composerMode, setComposerMode] =
+		useState<ComposerOperationMode>("plan");
 	const pushAssistantMessage = useCallback((content: string) => {
 		setChatMessages((current) => [
 			...current,
@@ -232,11 +223,14 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		setCanvasOpen(false);
 		setCanvasView("kanban");
 		setPipelineStage("questions");
+		setComposerMode("plan");
 		userTookOverCanvas.current = false;
 	};
 	const composer = useWorkspaceComposer({
 		codebase,
 		composerAvailable,
+		composerMode,
+		setComposerMode,
 		snapshotReady: sync.snapshotReady,
 		isWorking: sync.isWorking,
 		setIsWorking: sync.setIsWorking,
@@ -365,6 +359,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		stage,
 		analysisOutput,
 		composerMode,
+		setComposerMode,
 		composerAvailable,
 		answersReadOnly,
 		userTookOverCanvas,

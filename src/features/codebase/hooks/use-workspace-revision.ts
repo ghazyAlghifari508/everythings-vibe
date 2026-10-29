@@ -20,7 +20,9 @@ import {
 	getPendingRevisionAction,
 	rejectRevisionAction,
 } from "../services/revision-actions.functions";
+import type { RevisionTargetKind } from "../services/revision-base-version.server";
 import { submitRevisionRequest } from "../services/revision-submit";
+import type { ComposerReferenceBinding } from "../types/revision";
 import { useRevisionHistory } from "./use-revision-history";
 
 export function useWorkspaceRevision({
@@ -93,9 +95,16 @@ export function useWorkspaceRevision({
 	}, [restorePendingProposal]);
 
 	const runRevision = useCallback(
-		async (instruction: string) => {
+		async (
+			instruction: string,
+			options?: {
+				targetKind?: RevisionTargetKind;
+				optionalReferences?: readonly string[];
+				referenceBindings?: readonly ComposerReferenceBinding[];
+			},
+		) => {
 			if (!effectiveFeatureId || stageBusy) return;
-			const target = revisionTarget;
+			const target = options?.targetKind ?? revisionTarget;
 			const targetLabel = revisionTargetLabel(target);
 			setStageBusy(target === "tasks" ? "task" : target);
 			setStageError(null);
@@ -113,6 +122,8 @@ export function useWorkspaceRevision({
 					snapshotId: currentSnapshotId ?? null,
 					targetKind: target,
 					instruction,
+					optionalReferences: options?.optionalReferences,
+					referenceBindings: options?.referenceBindings,
 				});
 				if (activeProjectIdRef.current !== effectiveFeatureId) return;
 				if (!result.ok) {

@@ -15,10 +15,11 @@ import {
 } from "@/db/schema";
 import { revisionRequestSchema } from "../types/revision";
 import { codebaseAnalysisSchema } from "./analysis-schema";
+import { resolveRevisionBaseVersion } from "./revision-base-version.server";
 import { readRevisionReferences } from "./revision-reference-content.server";
 import { SNAPSHOT_CONTEXT_STATUSES } from "./sync-session";
 
-export { resolveRevisionBaseVersion } from "./revision-base-version.server";
+export { resolveRevisionBaseVersion };
 
 /**
  * Resolve and authorize the exact state a revision may be prepared against:
