@@ -19,6 +19,7 @@ export class ImageStorageError extends ScrapeError {
 		readonly assetCode:
 			| "INVALID_IMAGE"
 			| "UNSUPPORTED_FORMAT"
+			| "UNSAFE_SVG"
 			| "IMAGE_TOO_LARGE"
 			| "SCRAPE_STORAGE_QUOTA"
 			| "OWNER_STORAGE_QUOTA",
@@ -46,6 +47,63 @@ function hasCompletePngChunks(body: Buffer): boolean {
 	return false;
 }
 
+function hasValidJpegEnding(body: Buffer): boolean {
+	let end = body.length;
+	while (end > 4 && [0x00, 0x09, 0x0a, 0x0d, 0x20].includes(body[end - 1]))
+		end -= 1;
+	return end >= 4 && body[end - 2] === 0xff && body[end - 1] === 0xd9;
+}
+
+function decodeNumericEntities(input: string): string {
+	return input.replace(/&#(?:x([0-9a-f]+)|(\d+));?/gi, (_, hex, dec) => {
+		const code = hex ? Number.parseInt(hex, 16) : Number.parseInt(dec, 10);
+		if (!Number.isFinite(code) || code <= 0 || code > 0x10ffff) return "";
+		return code <= 0x20 ? " " : String.fromCodePoint(code);
+	});
+}
+
+const UNSAFE_SVG_PATTERN =
+	/<\s*\/?\s*(?:script|foreignObject|iframe|frame|frameset|object|embed|applet|audio|video|meta|link|base)\b|\bon[a-z0-9_-]+\s*=|<\s*(?:set|animate|animateTransform|animateMotion)\b[^>]*\battributeName\s*=\s*["']?\s*(?:xlink:)?(?:href|on[a-z0-9_-]+)/i;
+const UNSAFE_SVG_URI_PATTERN =
+	/(?:javascript|vbscript)\s*:|\bdata\s*:\s*(?!image\/(?:png|jpeg|jpg|gif|webp|avif)(?:[;,]|$))|\b(?:xlink:)?href\s*=\s*["']?\s*(?:https?:|\/\/|[a-z][a-z0-9+.-]*:(?!image\/(?:png|jpeg|jpg|gif|webp|avif)(?:[;,]|$)))|\burl\(\s*["']?\s*(?:https?:|\/\/|data\s*:\s*(?!image\/(?:png|jpeg|jpg|gif|webp|avif)(?:[;,]|$)))|@import\b/i;
+
+function validateSafeSvg(body: Buffer): void {
+	const raw = body.toString("utf8");
+	if (!body.length || raw.includes("\u0000") || raw.includes("\ufffd"))
+		throw new ImageStorageError(
+			"INVALID_IMAGE",
+			"Isi gambar tidak sesuai format yang diizinkan.",
+		);
+	if (/<!(?:doctype|entity)\b/i.test(raw))
+		throw new ImageStorageError(
+			"UNSAFE_SVG",
+			"SVG ditolak karena deklarasi DOCTYPE/ENTITY tidak diizinkan.",
+		);
+	const withoutComments = raw
+		.replace(/^\ufeff/, "")
+		.replace(/^(?:\s*<\?xml[\s\S]*?\?>|\s*<!--[\s\S]*?-->)+/i, "")
+		.replace(/<!--[\s\S]*?-->/g, "")
+		.trim();
+	if (
+		!/^<svg\b[^>]*>[\s\S]*<\/svg>$/i.test(withoutComments) ||
+		/<html\b/i.test(withoutComments)
+	)
+		throw new ImageStorageError(
+			"INVALID_IMAGE",
+			"Isi gambar tidak sesuai format yang diizinkan.",
+		);
+	const decoded = decodeNumericEntities(withoutComments).replace(/\s+/g, " ");
+	// ponytail: regex allow/deny checks cover static vector SVGs; switch to a full XML AST sanitizer if inline sanitized SVGs are needed
+	if (
+		UNSAFE_SVG_PATTERN.test(withoutComments) ||
+		UNSAFE_SVG_URI_PATTERN.test(decoded)
+	)
+		throw new ImageStorageError(
+			"UNSAFE_SVG",
+			"SVG ditolak karena mengandung elemen atau atribut yang tidak aman.",
+		);
+}
+
 export function validateStoredImage(body: Buffer, declaredMime: string) {
 	if (body.length > SCRAPE_MAX_ASSET_BYTES)
 		throw new ImageStorageError(
@@ -53,14 +111,23 @@ export function validateStoredImage(body: Buffer, declaredMime: string) {
 			"Gambar melampaui batas ukuran.",
 		);
 	const mime = declaredMime.split(";")[0].trim().toLowerCase();
-	if (
-		mime === "image/svg+xml" ||
-		/^\s*(?:<\?xml[^>]*>\s*)?<svg\b/i.test(body.toString("utf8", 0, 512))
-	)
-		throw new ImageStorageError(
-			"UNSUPPORTED_FORMAT",
-			"Format SVG belum didukung untuk penyimpanan. Gunakan PNG, JPEG, WebP, GIF, atau AVIF.",
+	const looksLikeSvg =
+		/^\s*(?:\ufeff)?(?:<\?xml[^>]*>\s*|<!--[\s\S]*?-->\s*|<!doctype[\s\S]*?>\s*)*<svg\b/i.test(
+			body.toString("utf8", 0, 1024),
 		);
+	if (mime === "image/svg+xml" || looksLikeSvg) {
+		if (mime !== "image/svg+xml" || !looksLikeSvg)
+			throw new ImageStorageError(
+				"INVALID_IMAGE",
+				"Isi gambar tidak sesuai format yang diizinkan.",
+			);
+		validateSafeSvg(body);
+		return {
+			mimeType: "image/svg+xml",
+			byteLength: body.length,
+			sha256: createHash("sha256").update(body).digest("hex"),
+		};
+	}
 	let mimeType: string | null = null;
 	if (
 		body.length >= 33 &&
@@ -77,8 +144,7 @@ export function validateStoredImage(body: Buffer, declaredMime: string) {
 		body[0] === 0xff &&
 		body[1] === 0xd8 &&
 		body[2] === 0xff &&
-		body[body.length - 2] === 0xff &&
-		body[body.length - 1] === 0xd9
+		hasValidJpegEnding(body)
 	)
 		mimeType = "image/jpeg";
 	else if (
@@ -92,7 +158,9 @@ export function validateStoredImage(body: Buffer, declaredMime: string) {
 		body.toString("ascii", 0, 4) === "RIFF" &&
 		body.toString("ascii", 8, 12) === "WEBP" &&
 		["VP8 ", "VP8L", "VP8X"].includes(body.toString("ascii", 12, 16)) &&
-		body.readUInt32LE(4) + 8 === body.length
+		body.readUInt32LE(4) >= 12 &&
+		body.readUInt32LE(4) + 8 <= body.length &&
+		body.length - (body.readUInt32LE(4) + 8) <= 1
 	)
 		mimeType = "image/webp";
 	else if (
@@ -121,7 +189,10 @@ export function validateStoredImage(body: Buffer, declaredMime: string) {
 	if (
 		!mimeType ||
 		(mime !== mimeType &&
-			!(mimeType === "image/x-icon" && mime === "image/vnd.microsoft.icon"))
+			!(
+				mimeType === "image/x-icon" &&
+				(mime === "image/vnd.microsoft.icon" || mime === "image/ico")
+			))
 	)
 		throw new ImageStorageError(
 			"INVALID_IMAGE",

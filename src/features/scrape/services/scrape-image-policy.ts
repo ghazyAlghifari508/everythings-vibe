@@ -8,6 +8,32 @@ import {
 
 const ROBOTS_MAX_BYTES = 512_000;
 
+function hasApplicableCrawlDelay(content: string): boolean {
+	let applies = false;
+	let inRules = false;
+	for (const raw of content.split(/\r?\n/)) {
+		const line = raw.replace(/#.*$/, "").trim();
+		const separator = line.indexOf(":");
+		if (separator < 0) continue;
+		const key = line.slice(0, separator).toLowerCase();
+		const value = line.slice(separator + 1).trim();
+		if (key === "user-agent") {
+			if (inRules) {
+				applies = false;
+				inRules = false;
+			}
+			applies ||=
+				value === "*" || /(vibeeverything|everythings-vibe)/i.test(value);
+		} else if (key === "allow" || key === "disallow") {
+			inRules = true;
+		} else if (key === "crawl-delay") {
+			inRules = true;
+			if (applies && Number(value) > 0) return true;
+		}
+	}
+	return false;
+}
+
 export function createImageSitePolicy(signal?: AbortSignal, load = fetchAsset) {
 	const origins = new Map<string, Promise<string>>();
 	return async (target: string): Promise<boolean> => {
@@ -17,9 +43,19 @@ export function createImageSitePolicy(signal?: AbortSignal, load = fetchAsset) {
 			rules = load(`${url.origin}/robots.txt`, 0, {
 				signal,
 				maxBytes: ROBOTS_MAX_BYTES,
-				allowUrl: (redirect) => new URL(redirect).origin === url.origin,
+				allowUrl: (redirect) =>
+					["http:", "https:"].includes(new URL(redirect).protocol),
 			}).then((result) => {
-				if (result.status === 404) return "";
+				// RFC 9309 § 2.3.1.3: any 4xx other than 429 on /robots.txt (such as
+				// S3/CloudFront asset CDNs returning 403 or 404 when no robots.txt
+				// object exists) means no robots rules are published; access is
+				// decided by the actual resource response.
+				if (
+					result.status >= 400 &&
+					result.status < 500 &&
+					result.status !== 429
+				)
+					return "";
 				if (result.status !== 200)
 					throw new ScrapeError(
 						designErrorCodeForHttpStatus(result.status),
@@ -35,11 +71,7 @@ export function createImageSitePolicy(signal?: AbortSignal, load = fetchAsset) {
 						"Format aturan robots.txt tidak dapat diverifikasi.",
 					);
 				const content = result.body.toString("utf8");
-				if (
-					[...content.matchAll(/crawl-delay\s*:\s*(\d+(?:\.\d+)?)/gi)].some(
-						(match) => Number(match[1]) > 0,
-					)
-				)
+				if (hasApplicableCrawlDelay(content))
 					throw new ScrapeError(
 						"ASSET_FETCH_FAILED",
 						"Pengambilan gambar belum mendukung crawl delay situs ini.",
