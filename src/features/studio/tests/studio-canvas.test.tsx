@@ -6,16 +6,18 @@ import {
 	render,
 	screen,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	computeCanvasFit,
 	StudioCanvas,
 } from "@/features/studio/components/canvas/studio-canvas";
+import { writeStudioCanvasView } from "@/features/studio/services/studio-canvas-view";
 import {
 	STUDIO_CANVAS_COMPOSER_BOTTOM_PX,
 	STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX,
 	STUDIO_CANVAS_COMPOSER_SIDE_CLEARANCE_PX,
 	STUDIO_CANVAS_HEADER_INSET_PX,
+	STUDIO_CANVAS_INITIAL_MIN_ZOOM,
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
 } from "@/features/studio/types/studio-constants";
@@ -369,6 +371,153 @@ describe("StudioCanvas", () => {
 			});
 			const trackWidth = 390 + 192;
 			expect(pan.x).toBeCloseTo((1200 - trackWidth * zoom) / 2, 6);
+		});
+	});
+
+	describe("opening view", () => {
+		// jsdom reports zeroed layout boxes; the opening view must read a real
+		// canvas rect before it can decide on a scale.
+		const viewport = {
+			width: 1440,
+			height: 900,
+			top: 0,
+			left: 0,
+			right: 1440,
+			bottom: 900,
+			x: 0,
+			y: 0,
+			toJSON: () => ({}),
+		} as DOMRect;
+		let originalRect: () => DOMRect;
+
+		beforeEach(() => {
+			localStorage.clear();
+			originalRect = HTMLElement.prototype.getBoundingClientRect;
+			HTMLElement.prototype.getBoundingClientRect = () => viewport;
+		});
+
+		afterEach(() => {
+			HTMLElement.prototype.getBoundingClientRect = originalRect;
+			localStorage.clear();
+		});
+
+		const longMobileFrames = Array.from({ length: 8 }, (_, index) => ({
+			id: `screen-${index}`,
+			projectId: "p-1",
+			name: `Screen ${index + 1}`,
+			description: null,
+			viewport: "mobile",
+			htmlCode: null,
+			status: "queued",
+			order: index,
+			error: null,
+			attempts: 0,
+			visualHash: null,
+			promptHash: null,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		}));
+
+		function renderedScale(): number {
+			const transform = screen.getByTestId("studio-canvas-surface").style
+				.transform;
+			return Number(transform.match(/scale\(([^)]+)\)/)?.[1]);
+		}
+
+		it("opens a long mobile project at a readable scale, not fit-all", () => {
+			render(<StudioCanvas project={mockProject} frames={longMobileFrames} />);
+			const fitAll = computeCanvasFit({
+				bounds: longMobileFrames.map(() => ({ width: 390, height: 844 })),
+				available: { width: 1440, height: 900 },
+				minZoom: STUDIO_CANVAS_MIN_ZOOM,
+				maxZoom: STUDIO_CANVAS_MAX_ZOOM,
+			});
+			expect(fitAll.zoom).toBeLessThan(0.4);
+			expect(renderedScale()).toBeGreaterThanOrEqual(
+				STUDIO_CANVAS_INITIAL_MIN_ZOOM,
+			);
+			expect(
+				screen.getByText(`${Math.round(renderedScale() * 100)}%`),
+			).toBeDefined();
+		});
+
+		it("restores a previously saved view for the same project", () => {
+			writeStudioCanvasView("p-1", {
+				zoom: 1.35,
+				pan: { x: -100, y: -60 },
+			});
+			render(<StudioCanvas project={mockProject} frames={longMobileFrames} />);
+			expect(renderedScale()).toBeCloseTo(1.35, 6);
+		});
+
+		it("ignores a saved view that would open on empty space", () => {
+			writeStudioCanvasView("p-1", {
+				zoom: 1.2,
+				pan: { x: -100_000, y: -100_000 },
+			});
+			render(<StudioCanvas project={mockProject} frames={longMobileFrames} />);
+			expect(renderedScale()).toBeGreaterThanOrEqual(
+				STUDIO_CANVAS_INITIAL_MIN_ZOOM,
+			);
+		});
+
+		it("keeps the view steady when previews and status updates arrive", () => {
+			const { rerender } = render(
+				<StudioCanvas project={mockProject} frames={longMobileFrames} />,
+			);
+			const opening = screen.getByTestId("studio-canvas-surface").style
+				.transform;
+			// A finished frame changes its status, HTML and identity; none of that
+			// may recentre or rescale a board the user is already looking at.
+			rerender(
+				<StudioCanvas
+					project={mockProject}
+					frames={longMobileFrames.map((frame, index) => ({
+						...frame,
+						status: index === 0 ? "ready" : frame.status,
+						htmlCode: index === 0 ? "<html><body>x</body></html>" : null,
+						updatedAt: new Date(),
+					}))}
+				/>,
+			);
+			expect(screen.getByTestId("studio-canvas-surface").style.transform).toBe(
+				opening,
+			);
+		});
+
+		it("keeps Fit All available as an explicit zoom control", () => {
+			render(<StudioCanvas project={mockProject} frames={longMobileFrames} />);
+			fireEvent.click(
+				screen.getByRole("button", { name: "Tampilkan semua frame" }),
+			);
+			expect(renderedScale()).toBeLessThan(STUDIO_CANVAS_INITIAL_MIN_ZOOM);
+		});
+
+		it("lets the user zoom after initialization without being overridden", async () => {
+			const { rerender } = render(
+				<StudioCanvas project={mockProject} frames={longMobileFrames} />,
+			);
+			const opening = renderedScale();
+			fireEvent.wheel(screen.getByTestId("studio-canvas"), {
+				deltaX: 0,
+				deltaY: -120,
+				deltaMode: 0,
+				clientX: 400,
+				clientY: 300,
+			});
+			await vi.waitFor(() => expect(renderedScale()).toBeGreaterThan(opening));
+			const userScale = renderedScale();
+			// A screen arriving later must not reset the zoom the user chose.
+			rerender(
+				<StudioCanvas
+					project={mockProject}
+					frames={[
+						...longMobileFrames,
+						{ ...longMobileFrames[0], id: "screen-extra", order: 8 },
+					]}
+				/>,
+			);
+			expect(renderedScale()).toBe(userScale);
 		});
 	});
 
