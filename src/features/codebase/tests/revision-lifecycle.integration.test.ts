@@ -138,6 +138,104 @@ describe("revision propose, review, apply, and reject lifecycle", () => {
 		expect(byId?.id).toBe(saved.proposalId);
 	});
 
+	it("leaves every other artifact untouched while a proposal is pending", async () => {
+		const featureTree = {
+			productName: "Product",
+			createdAt: "2026-01-01T00:00:00Z",
+			features: [
+				{
+					id: "feat-1",
+					name: "Feature",
+					phase: 1,
+					description: "Description",
+					subfeatures: [
+						{ id: "subfeat-1.1", name: "A", description: "A" },
+						{ id: "subfeat-1.2", name: "B", description: "B" },
+					],
+				},
+			],
+		};
+		const acId = crypto.randomUUID();
+		const taskId = crypto.randomUUID();
+		await db
+			.update(projects)
+			.set({ featureTree })
+			.where(eq(projects.id, projectId));
+		await db.insert(acVersions).values({
+			id: acId,
+			projectId,
+			version: 1,
+			content: "Criteria v1",
+		});
+		await db.insert(tasks).values({
+			id: taskId,
+			projectId,
+			title: "Running task",
+			status: "in_progress",
+			subtasks: [{ name: "Done part", status: "completed" }],
+		});
+
+		const snapshot = async () => ({
+			featureTree: (
+				await db
+					.select({ featureTree: projects.featureTree })
+					.from(projects)
+					.where(eq(projects.id, projectId))
+					.limit(1)
+			)[0].featureTree,
+			prd: await db
+				.select()
+				.from(prdVersions)
+				.where(eq(prdVersions.projectId, projectId)),
+			ac: await db
+				.select()
+				.from(acVersions)
+				.where(eq(acVersions.projectId, projectId)),
+			tasks: await db
+				.select()
+				.from(tasks)
+				.where(eq(tasks.projectId, projectId)),
+		});
+		const before = await snapshot();
+
+		// A feature revision and a PRD revision are both left pending review.
+		// Nothing upstream or downstream of either target may move until the
+		// user explicitly approves.
+		await saveRevisionProposal(userId, {
+			projectId,
+			codebaseId,
+			snapshotId,
+			targetKind: "feature",
+			baseVersionId: "v1",
+			instruction: "Revise feature",
+			baseContent: JSON.stringify(featureTree),
+			proposedContent: JSON.stringify({
+				...featureTree,
+				productName: "Changed",
+			}),
+			impact: {
+				prd: "NEEDS_REVIEW",
+				ac: "NEEDS_REVIEW",
+				tasks: "NEEDS_REVIEW",
+			},
+			idempotencyKey: "pending-feature",
+		});
+		await saveRevisionProposal(userId, {
+			projectId,
+			codebaseId,
+			snapshotId,
+			targetKind: "prd",
+			baseVersionId: prdId,
+			instruction: "Revise PRD",
+			baseContent: "<!-- SECTION: Overview -->\nOriginal v1\n<!-- /SECTION -->",
+			proposedContent: "<!-- SECTION: Overview -->\nChanged\n<!-- /SECTION -->",
+			impact: { ac: "NEEDS_REVIEW", tasks: "NEEDS_REVIEW" },
+			idempotencyKey: "pending-prd",
+		});
+
+		expect(await snapshot()).toEqual(before);
+	});
+
 	it("rejected proposal marks status rejected and leaves active artifact untouched", async () => {
 		const saved = await saveRevisionProposal(userId, {
 			projectId,
