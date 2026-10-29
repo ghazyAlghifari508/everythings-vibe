@@ -18,11 +18,14 @@ Source order in `deriveStudioScreenSuggestions`:
    strongest signal, and the entry's `role` becomes the prompt focus.
 2. `designBlueprint.navigationContract.labels` that have no screen — a
    navigation destination the app cannot reach.
-3. `SCREEN_RECIPES` matched against `prdContent` — a domain capability lexicon
-   (`transaksi`, `anggaran`, `laporan`, `keranjang`, `stok`, …) where each recipe
-   carries its own concrete focus sentence and, where it matters, its platform.
-   A recipe only fires when this project's PRD mentions it, so two unrelated
-   projects never get the same list.
+3. `SCREEN_RECIPES` matched against `prdContent`, then against the frame
+   descriptions — a domain capability lexicon (`transaksi`, `anggaran`,
+   `laporan`, `keranjang`, `stok`, ...) where each recipe carries its own concrete
+   focus sentence and, where it matters, its platform. A recipe only fires when
+   this project's own text mentions it, so two unrelated projects never get the
+   same list. A frame description holds the prompt that asked for that screen, so
+   earlier requests keep informing the row after the PRD stops being the only
+   text.
 4. `PLATFORM_FALLBACK` — base screens that are missing (`Profil`, `Pengaturan`,
    and `Notifikasi` for mobile or `Aktivitas` for web). This only tops up the row
    when the project itself has nothing more specific to say.
@@ -55,8 +58,8 @@ per-render/per-keystroke cost the brief warns about: rendering, panning, zooming
 or polling cannot start a request.
 
 `studioSuggestionRevision` is the cache key: project id, platform, blueprint
-version, PRD hash (or PRD length when absent), normalized title and normalized
-frame names. `getStudioScreenSuggestions` memoizes the derived list per revision
+version, PRD hash (or PRD length when absent), normalized title, normalized
+frame names and an FNV-1a hash of the frame descriptions. `getStudioScreenSuggestions` memoizes the derived list per revision
 in a small bounded map, so identical content returns the same array instance and
 the row does not re-render on a status poll. Frame add, rename and delete all
 change the frame-name part of the key, so the row refreshes from the same polls
@@ -107,11 +110,12 @@ pnpm vitest run src/features/studio/tests/studio-composer.test.tsx
 ```
 
 Covered: one-screen project, several existing screens, no frames, blueprint plan
-gaps, navigation gaps, near-duplicate prevention, user-created screen names,
-platform-specific fallback, prompt richness, add-screen intent and name round-trip
-through the intent resolver, revision changes for every input, cache reuse and
-invalidation, click-inserts-without-submit, disabled state, arrow key navigation,
-scroll controls, and — against the database — one added frame per bubble,
-untouched existing frames, ownership refusal and duplicate refusal.
+gaps, navigation gaps, PRD and earlier-request recipes, near-duplicate prevention,
+user-created screen names, platform-specific fallback, prompt richness and the
+shared prompt bounds, add-screen intent and name round-trip through the intent
+resolver, revision changes for every input, cache reuse and invalidation,
+click-inserts-without-submit, disabled state, arrow key navigation, scroll
+controls, and — against the database — one added frame per bubble, untouched
+existing frames, ownership refusal and duplicate refusal.
 
 No browser QA.
