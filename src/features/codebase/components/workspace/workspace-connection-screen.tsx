@@ -38,6 +38,11 @@ export function WorkspaceConnectionScreen({
 	activeWorkspaceSnapshotId?: string | null;
 	manifestFileCount?: number;
 }) {
+	// Once the conclusion area owns recovery it also owns the failure message and
+	// its single retry action, so the standalone banner must not render a second
+	// "Coba lagi" beside it.
+	const inAreaRecovery =
+		readiness === "analysis_pending" || readiness === "recovery_required";
 	return (
 		<main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14">
 			<header className="border-b border-graphite pb-6">
@@ -52,7 +57,7 @@ export function WorkspaceConnectionScreen({
 					fitur baru dengan konteks yang nyata.
 				</p>
 			</header>
-			{error && (
+			{error && !inAreaRecovery && (
 				<div
 					role="alert"
 					className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-crimson/40 bg-crimson/10 p-4 text-sm text-crimson"
@@ -81,7 +86,7 @@ export function WorkspaceConnectionScreen({
 					</button>
 				</div>
 			)}
-			{readiness === "analysis_pending" || readiness === "recovery_required" ? (
+			{inAreaRecovery ? (
 				<CodebaseConclusion
 					snapshot={
 						status ?? {

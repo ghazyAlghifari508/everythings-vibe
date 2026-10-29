@@ -2,6 +2,8 @@
 
 import { AlertCircleIcon, Loading01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
+import { Alert } from "@/components/ui/alert";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import type { SyncStatusResponse } from "@/features/codebase/services/sync";
@@ -191,9 +193,13 @@ export function CodebaseConclusion({
 								: "Repository berhasil disinkronkan. Source code tetap tersimpan."}
 						</p>
 						{errorMessage && !isInsufficientCredit && (
-							<p role="alert" className="mt-3 text-xs text-crimson">
+							<Alert
+								variant="subtle"
+								role="alert"
+								className="mx-auto mt-3 max-w-md border-crimson/30 bg-crimson/5 p-3 text-left text-xs text-crimson"
+							>
 								{errorMessage}
-							</p>
+							</Alert>
 						)}
 					</>
 				) : (
@@ -226,9 +232,13 @@ export function CodebaseConclusion({
 							</p>
 						) : null}
 						{errorMessage && (
-							<p role="alert" className="mt-3 text-xs text-crimson">
+							<Alert
+								variant="subtle"
+								role="alert"
+								className="mx-auto mt-3 max-w-md border-crimson/30 bg-crimson/5 p-3 text-left text-xs text-crimson"
+							>
 								{errorMessage}
-							</p>
+							</Alert>
 						)}
 					</>
 				)}
@@ -242,18 +252,21 @@ export function CodebaseConclusion({
 						{isInsufficientCredit ? (
 							<a
 								href="/settings/billing"
-								className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								className={buttonVariants({
+									className:
+										"h-10 bg-snow px-5 text-xs font-semibold text-onyx hover:brightness-110",
+								})}
 							>
 								Tambahkan Kredit
 							</a>
 						) : (
-							<button
+							<Button
 								type="button"
 								onClick={onRetryAnalysis}
-								className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								className="h-10 bg-snow px-5 text-xs font-semibold text-onyx hover:brightness-110"
 							>
 								Coba analisis lagi
-							</button>
+							</Button>
 						)}
 					</div>
 				)}
