@@ -58,23 +58,57 @@ export interface DiscoveredImage {
 	evidence: ImageEvidence;
 }
 
+export function parseSrcsetCandidates(srcset: string): string[] {
+	if (!srcset.trim()) return [];
+	const urls: string[] = [];
+	// ponytail: regex split covers standard W3C srcset; switch to a state-machine tokenizer if unbalanced parentheses in URLs appear
+	for (const part of srcset
+		.trim()
+		.split(/,\s+(?=\S)|(?<=\s\d+(?:\.\d+)?[wx])\s*,\s*/i)) {
+		const url = part.trim().split(/\s+/)[0]?.replace(/,+$/, "");
+		if (url) urls.push(url);
+	}
+	return urls;
+}
+
+export function normalizeImageCandidateUrl(
+	raw: string,
+	baseUrl?: string,
+): string | null {
+	const trimmed = raw.trim();
+	if (!trimmed || trimmed.startsWith("#") || /^%23/i.test(trimmed)) return null;
+	try {
+		const url = baseUrl ? new URL(trimmed, baseUrl) : new URL(trimmed);
+		if (!["http:", "https:"].includes(url.protocol)) return null;
+		if (url.username || url.password) return null;
+		const lastSegment = url.pathname.split("/").pop() ?? "";
+		if (/^%23/i.test(lastSegment)) return null;
+		url.hash = "";
+		return url.href;
+	} catch {
+		return null;
+	}
+}
+
 export function normalizeImageCandidates(
 	candidates: RenderedImage[],
 	classify: boolean,
 ): DiscoveredImage[] {
 	const images = new Map<string, DiscoveredImage>();
 	for (const candidate of candidates) {
-		const existing = images.get(candidate.url);
+		const normalizedUrl = normalizeImageCandidateUrl(candidate.url);
+		if (!normalizedUrl) continue;
+		const existing = images.get(normalizedUrl);
 		const sources = [
 			...new Set([...(existing?.evidence.sources ?? []), candidate.source]),
 		];
 		const isIcon = classify && sources.includes("icon");
 		const alt = existing?.evidence.alt ?? candidate.alt;
 		const isLogo = classify && !!alt && /\blogo\b/i.test(alt);
-		images.set(candidate.url, {
-			url: candidate.url,
+		images.set(normalizedUrl, {
+			url: normalizedUrl,
 			format:
-				new URL(candidate.url).pathname
+				new URL(normalizedUrl).pathname
 					.match(/\.(avif|webp|png|jpe?g|gif|svg|ico)$/i)?.[1]
 					?.toLowerCase() ?? null,
 			width: existing?.width ?? candidate.width,
