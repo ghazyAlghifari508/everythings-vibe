@@ -30,6 +30,10 @@ export interface StudioWorkspaceState {
 	exportingZip: boolean;
 	deleting: boolean;
 	duplicating: boolean;
+	/** Frames with a retry request in flight; their retry control is disabled. */
+	retryingFrameIds: string[];
+	/** Per-frame retry rejections, rendered inside that frame only. */
+	frameRetryErrors: Record<string, string>;
 	error: string;
 	isProcessing: boolean;
 	readyFramesCount: number;
@@ -167,6 +171,8 @@ export function useStudioWorkspace(
 		exportingZip: actions.exportingZip,
 		deleting: actions.deleting,
 		duplicating: actions.duplicating,
+		retryingFrameIds: actions.retryingFrameIds,
+		frameRetryErrors: actions.frameRetryErrors,
 		error: error || syncError,
 		isProcessing,
 		readyFramesCount,

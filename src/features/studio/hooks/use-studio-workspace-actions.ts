@@ -3,41 +3,13 @@ import { useCallback, useRef, useState } from "react";
 import type { StudioFrameRow, StudioProjectRow } from "@/db/schema";
 import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
 import { exportProjectAsZip } from "@/features/studio/services/studio-export";
+import {
+	readStudioApiError,
+	requestStudioFrameRetry,
+} from "@/features/studio/services/studio-frame-retry-client";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
-import type {
-	AttachedDesignReference,
-	StudioFrameRetryOutcome,
-} from "@/features/studio/types/studio";
+import type { AttachedDesignReference } from "@/features/studio/types/studio";
 import { useUIStore } from "@/store";
-
-/** Reads the API's own error message, falling back to a caller-owned sentence. */
-async function readApiError(
-	response: Response,
-	fallback: string,
-): Promise<string> {
-	const body: unknown = await response.json().catch(() => null);
-	return typeof body === "object" &&
-		body !== null &&
-		"error" in body &&
-		typeof body.error === "string"
-		? body.error
-		: fallback;
-}
-
-/** Reads what a retry request actually did, so the UI can explain the outcome. */
-async function readRetryOutcome(
-	response: Response,
-): Promise<StudioFrameRetryOutcome | null> {
-	const body: unknown = await response.json().catch(() => null);
-	if (typeof body !== "object" || body === null || !("retry" in body))
-		return null;
-	const retry = body.retry;
-	return retry === "queued" ||
-		retry === "already-running" ||
-		retry === "completed"
-		? retry
-		: null;
-}
 
 /** Reads what one composer request resolved to, so the UI explains clarify/add. */
 function readComposerOutcome(body: unknown): {
@@ -78,11 +50,27 @@ export function useStudioWorkspaceActions({
 	const [exportingZip, setExportingZip] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [duplicating, setDuplicating] = useState(false);
+	const [retryingFrameIds, setRetryingFrameIds] = useState<string[]>([]);
+	const [frameRetryErrors, setFrameRetryErrors] = useState<
+		Record<string, string>
+	>({});
 
 	const navigate = useNavigate();
 	const router = useRouter();
 	const showToast = useUIStore((state) => state.showToast);
 	const pendingRequest = useRef<{ signature: string; id: string } | null>(null);
+	// The in-flight guard is a ref: two clicks in one tick both read the rendered
+	// state before React commits it, and only the ref sees the first request.
+	const retryingFrames = useRef(new Set<string>());
+
+	const clearFrameRetryError = useCallback((frameId: string) => {
+		setFrameRetryErrors((previous) => {
+			if (!(frameId in previous)) return previous;
+			const next = { ...previous };
+			delete next[frameId];
+			return next;
+		});
+	}, []);
 
 	const handleDuplicate = useCallback(async () => {
 		if (duplicating) return;
@@ -131,7 +119,10 @@ export function useStudioWorkspaceActions({
 			});
 			if (!response.ok) {
 				throw new Error(
-					await readApiError(response, "Gagal menghapus project. Coba lagi."),
+					await readStudioApiError(
+						response,
+						"Gagal menghapus project. Coba lagi.",
+					),
 				);
 			}
 			showToast("Project dihapus.", "success");
@@ -167,7 +158,7 @@ export function useStudioWorkspaceActions({
 					}),
 				});
 				if (!res.ok) {
-					setError(await readApiError(res, "Permintaan desain ditolak."));
+					setError(await readStudioApiError(res, "Permintaan desain ditolak."));
 					return { accepted: false };
 				}
 				const outcome = readComposerOutcome(await res.json().catch(() => null));
@@ -208,7 +199,10 @@ export function useStudioWorkspaceActions({
 				});
 				if (!response.ok) {
 					throw new Error(
-						await readApiError(response, "Gagal menyimpan design system."),
+						await readStudioApiError(
+							response,
+							"Gagal menyimpan design system.",
+						),
 					);
 				}
 				await syncProjectStatus();
@@ -238,7 +232,7 @@ export function useStudioWorkspaceActions({
 				});
 				if (!response.ok) {
 					throw new Error(
-						await readApiError(response, "Gagal menyimpan design skill."),
+						await readStudioApiError(response, "Gagal menyimpan design skill."),
 					);
 				}
 				await syncProjectStatus();
@@ -264,39 +258,33 @@ export function useStudioWorkspaceActions({
 
 	const handleRetryFrame = useCallback(
 		async (frameId: string) => {
+			if (retryingFrames.current.has(frameId)) return;
+			retryingFrames.current.add(frameId);
+			setRetryingFrameIds([...retryingFrames.current]);
+			clearFrameRetryError(frameId);
 			setError("");
-			// A network drop is reported as a connection problem instead of
-			// discarding the classified server response.
-			const response = await fetch("/api/studio/frame", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					action: "retry",
-					projectId: project.id,
-					frameId,
-				}),
-			}).catch(() => null);
-			if (!response) {
-				setError("Koneksi terputus. Periksa koneksi lalu coba lagi.");
-				return;
+			try {
+				const result = await requestStudioFrameRetry(project.id, frameId);
+				if (result.kind === "rejected") {
+					// The rejection belongs to this frame, not to the whole project.
+					setFrameRetryErrors((previous) => ({
+						...previous,
+						[frameId]: result.message,
+					}));
+					return;
+				}
+				if (result.outcome === "already-running")
+					showToast("Halaman ini sedang dibuat ulang.", "info");
+				else if (result.outcome === "completed")
+					showToast("Halaman ini sudah siap.", "success");
+				else showToast("Permintaan dikirim. Menunggu antrean.", "info");
+				await syncProjectStatus();
+			} finally {
+				retryingFrames.current.delete(frameId);
+				setRetryingFrameIds([...retryingFrames.current]);
 			}
-			if (!response.ok) {
-				setError(
-					await readApiError(
-						response,
-						"Desain belum berhasil dibuat. Coba lagi.",
-					),
-				);
-				return;
-			}
-			const outcome = await readRetryOutcome(response);
-			if (outcome === "already-running")
-				showToast("Halaman ini sedang dibuat ulang.", "info");
-			else if (outcome === "completed")
-				showToast("Halaman ini sudah siap.", "success");
-			await syncProjectStatus();
 		},
-		[project.id, setError, showToast, syncProjectStatus],
+		[clearFrameRetryError, project.id, setError, showToast, syncProjectStatus],
 	);
 
 	const handleRetryPlanning = useCallback(async () => {
@@ -310,7 +298,9 @@ export function useStudioWorkspaceActions({
 				}),
 			});
 			if (!res.ok) {
-				setError(await readApiError(res, "Gagal mencoba lagi perencanaan."));
+				setError(
+					await readStudioApiError(res, "Gagal mencoba lagi perencanaan."),
+				);
 				return;
 			}
 			await syncProjectStatus();
@@ -337,6 +327,8 @@ export function useStudioWorkspaceActions({
 		exportingZip,
 		deleting,
 		duplicating,
+		retryingFrameIds,
+		frameRetryErrors,
 		handleDuplicate,
 		handleDelete,
 		handleComposerSubmit,
