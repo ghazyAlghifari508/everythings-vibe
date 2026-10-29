@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { resolveStudioIntentFromContext } from "../services/studio-composer-intent";
 import type { StudioDesignBlueprint } from "../services/studio-design-blueprint";
 import {
+	STUDIO_MAX_PROMPT_CHARS,
+	STUDIO_MIN_PROMPT_CHARS,
+} from "../services/studio-prompt-validation";
+import {
 	deriveStudioScreenSuggestions,
 	getStudioScreenSuggestions,
 	STUDIO_SCREEN_SUGGESTION_LIMIT,
@@ -201,6 +205,14 @@ describe("deriveStudioScreenSuggestions", () => {
 			expect(suggestion.reason.length).toBeGreaterThan(0);
 			expect(suggestion.prompt).toContain("CatatDompet");
 			expect(suggestion.prompt).toContain("Jangan mengubah halaman lain.");
+			// The bubble prompt is submitted through the same frame API, so it must
+			// satisfy the shared prompt bounds before a click can send it.
+			expect(suggestion.prompt.length).toBeGreaterThanOrEqual(
+				STUDIO_MIN_PROMPT_CHARS,
+			);
+			expect(suggestion.prompt.length).toBeLessThanOrEqual(
+				STUDIO_MAX_PROMPT_CHARS,
+			);
 			// The bubble prompt must resolve to the same screen the label names,
 			// so the existing composer intent model performs the addition.
 			const decision = resolveStudioIntentFromContext({
