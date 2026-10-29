@@ -1,10 +1,7 @@
 import { LinkSquare01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import {
-	imageCountsLabel,
-	imageResultCounts,
-} from "@/features/scrape/utils/scrape-images";
+import { imageResultCounts } from "@/features/scrape/utils/scrape-images";
 import { extractHost } from "../utils/scrape-image-failures";
 import { ImagesFailureSummary } from "./images-failure-summary";
 import {
@@ -49,22 +46,26 @@ export function ImagesResult({
 		return () => clearInterval(timer);
 	}, [downloadFailures]);
 	const [copied, setCopied] = useState<string | null>(null);
+	const savedImages = images.filter((image) => image.status === "completed");
+	const failedImages = images.filter((image) => image.status === "failed");
+	// Filter options come from the saved gallery only, so a filter can never
+	// offer a value that matches zero cards.
 	const formats = [
-		...new Set(images.flatMap((image) => (image.format ? [image.format] : []))),
+		...new Set(
+			savedImages.flatMap((image) => (image.format ? [image.format] : [])),
+		),
 	];
 	const kinds = [
 		...new Set(
-			images.flatMap((image) =>
+			savedImages.flatMap((image) =>
 				image.classification ? [image.classification] : [],
 			),
 		),
 	];
 	const counts = imageResultCounts(images, discoveredImages);
 	const saved = counts.verified;
-	const failed = images.filter((image) => image.status === "failed").length;
-	const visible = images.filter(
+	const visible = savedImages.filter(
 		(image) =>
-			image.status === "completed" &&
 			(!formatFilter || image.format === formatFilter) &&
 			(!kindFilter || image.classification === kindFilter),
 	);
@@ -121,90 +122,65 @@ export function ImagesResult({
 	}
 	const hostName = extractHost(sourceUrl);
 
+	const failed = failedImages.length;
+
 	return (
 		<section className="space-y-6" aria-label="Images Explorer">
-			<header className="space-y-4">
-				<div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-					<div>
-						<h2 className="text-xl font-bold tracking-tight text-snow sm:text-2xl">
-							Hasil pengambilan gambar
-						</h2>
-						<a
-							href={sourceUrl}
-							target="_blank"
-							rel="noreferrer"
-							className="mt-1 inline-flex items-center gap-1.5 font-mono text-xs text-fog transition-colors hover:text-snow"
-							title={sourceUrl}
-						>
-							<span>{hostName}</span>
-							<Icon
-								icon={LinkSquare01Icon}
-								size={12}
-								aria-hidden
-								className="shrink-0"
-							/>
-						</a>
-					</div>
-					<p className="font-mono text-xs text-fog tabular-nums sm:text-right">
-						{imageCountsLabel(counts)}
-					</p>
-				</div>
-
-				<div className="grid grid-cols-3 gap-3 rounded-xl border border-graphite bg-charcoal p-4 text-center sm:p-5">
-					<div>
-						<p className="text-xs font-medium text-fog">Ditemukan</p>
-						<p className="mt-1 font-mono text-xl font-bold text-snow tabular-nums sm:text-2xl">
-							{counts.discovered}
-						</p>
-					</div>
-					<div className="border-x border-graphite px-2">
-						<p className="text-xs font-medium text-fog">Tersimpan</p>
-						<p className="mt-1 font-mono text-xl font-bold text-snow tabular-nums sm:text-2xl">
-							{counts.verified}
-						</p>
-					</div>
-					<div>
-						<p className="text-xs font-medium text-fog">Tidak tersedia</p>
-						<p className="mt-1 font-mono text-xl font-bold text-snow tabular-nums sm:text-2xl">
-							{counts.failed}
-						</p>
-					</div>
-				</div>
+			<header className="space-y-1">
+				<h2 className="text-xl font-bold tracking-tight text-snow sm:text-2xl">
+					Hasil pengambilan gambar
+				</h2>
+				<a
+					href={sourceUrl}
+					target="_blank"
+					rel="noreferrer"
+					className="inline-flex items-center gap-1.5 font-mono text-xs text-fog transition-colors hover:text-snow"
+					title={sourceUrl}
+				>
+					<span>{hostName}</span>
+					<Icon
+						icon={LinkSquare01Icon}
+						size={12}
+						aria-hidden
+						className="shrink-0"
+					/>
+				</a>
 			</header>
 
-			{failed > 0 && (
-				<ImagesFailureSummary
-					failedImages={images.filter((image) => image.status === "failed")}
-				/>
-			)}
-
-			{images.length > 0 && (
-				<div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+			{saved > 0 && (
+				<div className="flex flex-wrap items-end justify-between gap-3">
 					<p className="text-sm font-medium text-snow tabular-nums">
 						{gallerySummary}
 					</p>
 
 					<div className="flex flex-wrap items-end gap-3">
-						<ScrapeFilterSelect
-							label="Format"
-							className="w-36 sm:w-40"
-							value={formatFilter}
-							onChange={setFormatFilter}
-							options={[
-								{ value: "", label: "Semua" },
-								...formats.map((format) => ({ value: format, label: format })),
-							]}
-						/>
-						<ScrapeFilterSelect
-							label="Jenis"
-							className="w-36 sm:w-40"
-							value={kindFilter}
-							onChange={setKindFilter}
-							options={[
-								{ value: "", label: "Semua" },
-								...kinds.map((type) => ({ value: type, label: type })),
-							]}
-						/>
+						{formats.length > 0 && (
+							<ScrapeFilterSelect
+								label="Format"
+								className="w-36 sm:w-40"
+								value={formatFilter}
+								onChange={setFormatFilter}
+								options={[
+									{ value: "", label: "Semua" },
+									...formats.map((format) => ({
+										value: format,
+										label: format,
+									})),
+								]}
+							/>
+						)}
+						{kinds.length > 0 && (
+							<ScrapeFilterSelect
+								label="Jenis"
+								className="w-36 sm:w-40"
+								value={kindFilter}
+								onChange={setKindFilter}
+								options={[
+									{ value: "", label: "Semua" },
+									...kinds.map((type) => ({ value: type, label: type })),
+								]}
+							/>
+						)}
 						{hasFilter && (
 							<button
 								type="button"
@@ -221,13 +197,22 @@ export function ImagesResult({
 				</div>
 			)}
 
+			{failed > 0 && (
+				<ImagesFailureSummary
+					failedImages={failedImages}
+					variant={saved > 0 ? "notice" : "empty"}
+					discoveredCount={counts.discovered}
+					savedCount={saved}
+				/>
+			)}
+
 			{notice && (
 				<p role="alert" className="text-sm text-fog">
 					{notice}
 				</p>
 			)}
 
-			{visible.length ? (
+			{visible.length > 0 ? (
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 					{visible.map((image) => (
 						<ImageCard
@@ -247,9 +232,9 @@ export function ImagesResult({
 						/>
 					))}
 				</div>
-			) : (
+			) : images.length === 0 ? (
 				<div className="rounded-xl border border-graphite bg-charcoal p-6">
-					{images.length === 0 && imageOutcome === "empty" ? (
+					{imageOutcome === "empty" ? (
 						<>
 							<p className="text-sm font-semibold text-snow">
 								Tidak ada gambar yang ditemukan
@@ -259,25 +244,20 @@ export function ImagesResult({
 								diambil.
 							</p>
 						</>
-					) : images.length > 0 && saved === 0 && counts.pending === 0 ? (
-						<>
-							<p className="text-sm font-semibold text-snow">
-								Semua gambar gagal diambil
-							</p>
-							<p className="mt-1 text-sm text-fog">
-								Gambar ditemukan tetapi belum ada yang dapat disimpan secara
-								permanen. Periksa rincian kegagalan di atas.
-							</p>
-						</>
 					) : (
 						<p className="text-sm text-fog">
-							{images.length
-								? "Tidak ada gambar yang sesuai filter."
-								: "Tidak ditemukan resource gambar yang dapat diambil dari halaman ini."}
+							Tidak ditemukan resource gambar yang dapat diambil dari halaman
+							ini.
 						</p>
 					)}
 				</div>
-			)}
+			) : saved > 0 ? (
+				<div className="rounded-xl border border-graphite bg-charcoal p-6">
+					<p className="text-sm text-fog">
+						Tidak ada gambar yang sesuai filter.
+					</p>
+				</div>
+			) : null}
 		</section>
 	);
 }

@@ -36,7 +36,7 @@ function row(partial: Partial<ImageResult> & { id: string }): ImageResult {
 }
 
 describe("ImagesResult gallery", () => {
-	it("reports persisted counts without inventing totals", () => {
+	it("summarises saved images once and keeps counters out of the result header", () => {
 		render(
 			<ImagesResult
 				images={[
@@ -47,11 +47,11 @@ describe("ImagesResult gallery", () => {
 				sourceUrl="https://sample.example/"
 			/>,
 		);
-		expect(screen.getByText(/3 ditemukan/)).toBeDefined();
-		expect(
-			screen.getByText(/1 tersimpan · 1 tautan terverifikasi/),
-		).toBeDefined();
-		expect(screen.getByText(/1 gagal/)).toBeDefined();
+		expect(screen.getByText("2 gambar tersedia")).toBeDefined();
+		expect(screen.getByText("1 gambar tidak berhasil diambil")).toBeDefined();
+		// The result area never repeats the counters the progress card owns.
+		expect(screen.queryByText("Ditemukan")).toBeNull();
+		expect(screen.queryByText(/ditemukan ·/)).toBeNull();
 	});
 
 	it("filters by format and kind independently with a reset", () => {
@@ -88,7 +88,10 @@ describe("ImagesResult gallery", () => {
 			/>,
 		);
 		expect(screen.getAllByRole("article")).toHaveLength(1);
-		expect(screen.getByText(/1 gambar belum dapat disimpan/)).toBeDefined();
+		expect(screen.getByText(/1 gambar tidak berhasil diambil/)).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: /Lihat rincian kegagalan/ }),
+		).toBeDefined();
 	});
 
 	it("separates a truthful empty result from a failed capture", () => {
@@ -108,7 +111,7 @@ describe("ImagesResult gallery", () => {
 				imageOutcome="all-failed"
 			/>,
 		);
-		expect(screen.getByText("Semua gambar gagal diambil")).toBeDefined();
+		expect(screen.getByText("Gambar belum berhasil disimpan")).toBeDefined();
 	});
 	it("loads without a duplicate request and removes failed browser image markup", async () => {
 		const fetcher = vi.fn().mockResolvedValue(
@@ -316,7 +319,7 @@ describe("ImagesResult gallery", () => {
 		).toBe(true);
 	});
 
-	it("shows clean success counters and NO failure warning for complete success", () => {
+	it("shows one plain gallery summary and no failure surface on complete success", () => {
 		render(
 			<ImagesResult
 				images={[
@@ -327,11 +330,12 @@ describe("ImagesResult gallery", () => {
 				imageOutcome="complete"
 			/>,
 		);
-		expect(screen.getByText("Ditemukan")).toBeDefined();
-		expect(screen.getByText("Tersimpan")).toBeDefined();
-		expect(screen.getByText("Tidak tersedia")).toBeDefined();
+		expect(screen.getByText("2 gambar tersedia")).toBeDefined();
+		expect(screen.getAllByRole("article")).toHaveLength(2);
 		expect(screen.queryByRole("alert")).toBeNull();
-		expect(screen.queryByText(/gambar belum dapat disimpan/)).toBeNull();
+		expect(screen.queryByText(/tidak berhasil diambil/)).toBeNull();
+		expect(screen.queryByText("Gambar belum berhasil disimpan")).toBeNull();
+		expect(screen.queryByText("Ditemukan")).toBeNull();
 	});
 
 	it("groups identical failures without duplicating error text and supports progressive disclosure", () => {
@@ -358,21 +362,22 @@ describe("ImagesResult gallery", () => {
 			/>,
 		);
 
-		// Shows summary alert with total failed count
-		expect(screen.getByText(/23 gambar belum dapat disimpan/)).toBeDefined();
-		// Shows grouped bullet point instead of 23 identical lines
-		expect(screen.getByText("Format belum didukung")).toBeDefined();
+		// Shows one light partial-failure notice with the real failed count
+		expect(screen.getByText(/23 gambar tidak berhasil diambil/)).toBeDefined();
 		// Gallery of successful images is still visible
 		expect(screen.getAllByRole("article")).toHaveLength(2);
 
 		// Progressive disclosure starts closed
-		const toggleButton = screen.getByRole("button", { name: /Lihat rincian/ });
+		const toggleButton = screen.getByRole("button", {
+			name: /Lihat rincian kegagalan/,
+		});
 		expect(toggleButton.getAttribute("aria-expanded")).toBe("false");
 		expect(screen.queryByText("images.ctfassets.net")).toBeNull();
 
-		// Opening disclosure reveals affected items and actions
+		// Opening disclosure reveals the typed group and affected items
 		fireEvent.click(toggleButton);
 		expect(toggleButton.getAttribute("aria-expanded")).toBe("true");
+		expect(screen.getByText("Format belum didukung (23)")).toBeDefined();
 		expect(screen.getAllByText("images.ctfassets.net").length).toBeGreaterThan(
 			0,
 		);
@@ -387,7 +392,7 @@ describe("ImagesResult gallery", () => {
 		expect(screen.queryByText("images.ctfassets.net")).toBeNull();
 	});
 
-	it("renders multiple failure groups with accurate breakdown matching target visual", () => {
+	it("keeps typed failure groups behind the disclosure on partial failures", () => {
 		const failed = [
 			row({ id: "f1", status: "failed", httpStatus: 403 }),
 			row({ id: "f2", status: "failed", failureCode: "WEBSITE_RATE_LIMITED" }),
@@ -409,10 +414,89 @@ describe("ImagesResult gallery", () => {
 			/>,
 		);
 
-		expect(screen.getByText(/7 gambar belum dapat disimpan/)).toBeDefined();
-		expect(screen.getByText("Website membatasi akses")).toBeDefined();
-		expect(screen.getByText("Format belum didukung")).toBeDefined();
-		expect(screen.getByText("Gagal karena gangguan sementara")).toBeDefined();
+		expect(screen.getByText("7 gambar tidak berhasil diambil")).toBeDefined();
 		expect(screen.getAllByRole("article")).toHaveLength(23);
+		// Partial failures stay one light notice; group counts wait for the toggle.
+		expect(screen.queryByText(/Akses tidak tersedia/)).toBeNull();
+		fireEvent.click(
+			screen.getByRole("button", { name: /Lihat rincian kegagalan/ }),
+		);
+		expect(screen.getByText("Akses tidak tersedia (4)")).toBeDefined();
+		expect(screen.getByText("Format belum didukung (2)")).toBeDefined();
+		expect(screen.getByText("Gangguan sementara (1)")).toBeDefined();
+	});
+
+	it("owns the all-failed state with real counts, causes and no empty gallery chrome", () => {
+		const failed = [
+			...Array.from({ length: 152 }, (_, i) =>
+				row({
+					id: `access-${i}`,
+					status: "failed",
+					httpStatus: 403,
+					url: `https://images.ctfassets.net/access-${i}.webp`,
+				}),
+			),
+			...Array.from({ length: 2 }, (_, i) =>
+				row({
+					id: `temporary-${i}`,
+					status: "failed",
+					failureCode: "FETCH_TIMEOUT",
+				}),
+			),
+		];
+
+		render(
+			<ImagesResult
+				images={failed}
+				discoveredImages={154}
+				sourceUrl="https://www.framer.com/"
+				imageOutcome="all-failed"
+			/>,
+		);
+
+		expect(screen.getByText("Gambar belum berhasil disimpan")).toBeDefined();
+		expect(screen.getByText("Ditemukan")).toBeDefined();
+		expect(screen.getByText("154")).toBeDefined();
+		expect(screen.getByText("Tersimpan")).toBeDefined();
+		expect(screen.getByText("0")).toBeDefined();
+		expect(screen.getByText("Akses tidak tersedia")).toBeDefined();
+		expect(screen.getByText("152")).toBeDefined();
+		expect(screen.getByText("Gangguan sementara")).toBeDefined();
+		expect(screen.getByText("2")).toBeDefined();
+
+		// No filters, no gallery summary, no second empty state.
+		expect(screen.queryByLabelText("Format")).toBeNull();
+		expect(screen.queryByLabelText("Jenis")).toBeNull();
+		expect(screen.queryByText(/gambar tersedia/)).toBeNull();
+		expect(screen.queryByText("Semua gambar gagal diambil")).toBeNull();
+		expect(screen.queryAllByRole("article")).toHaveLength(0);
+
+		// The URL list stays behind the disclosure.
+		expect(screen.queryAllByTitle("Buka gambar asli di tab baru")).toHaveLength(
+			0,
+		);
+		fireEvent.click(screen.getByRole("button", { name: /Lihat rincian/ }));
+		expect(screen.getAllByTitle("Buka gambar asli di tab baru")).toHaveLength(
+			154,
+		);
+	});
+
+	it("never repeats the same failure copy or counter twice", () => {
+		render(
+			<ImagesResult
+				images={Array.from({ length: 4 }, (_, i) =>
+					row({ id: `f-${i}`, status: "failed", httpStatus: 403 }),
+				)}
+				discoveredImages={4}
+				sourceUrl="https://example.com"
+				imageOutcome="all-failed"
+			/>,
+		);
+		expect(screen.getAllByText("Gambar belum berhasil disimpan")).toHaveLength(
+			1,
+		);
+		expect(screen.getAllByText("Akses tidak tersedia")).toHaveLength(1);
+		expect(screen.getAllByText("Ditemukan")).toHaveLength(1);
+		expect(screen.getAllByText("Tersimpan")).toHaveLength(1);
 	});
 });

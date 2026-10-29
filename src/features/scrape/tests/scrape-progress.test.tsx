@@ -507,7 +507,8 @@ describe("per-mode loading presentation", () => {
 		);
 		const card = container.querySelector("[data-scrape-progress]");
 		expect(card?.querySelector("dl")).not.toBeNull();
-		expect(card?.textContent).toContain("Sebagian gambar berhasil diproses");
+		// Counters stay inside the card, and the partial note names images only.
+		expect(card?.textContent).toContain("Sebagian gambar berhasil disimpan");
 		expect(container.querySelectorAll("[data-scrape-progress]")).toHaveLength(
 			1,
 		);

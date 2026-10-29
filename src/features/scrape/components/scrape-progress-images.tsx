@@ -134,7 +134,7 @@ export function ScrapeImagesProgress({
 						Menunggu giliran pemrosesan.
 					</p>
 				) : null}
-				{visibleCounters.length > 0 && (
+				{visibleCounters.length > 0 && !isFailed && (
 					<dl className="mt-6 grid grid-cols-2 gap-4 border-t border-graphite pt-5 sm:grid-cols-4">
 						{visibleCounters.map(([label, value]) => (
 							<div key={String(label)}>
@@ -154,9 +154,8 @@ export function ScrapeImagesProgress({
 				)}
 				{imageOutcome === "partial" && (
 					<p className="mt-6 text-sm text-fog">
-						Sebagian gambar berhasil diproses. Jumlah byte tersimpan dan tautan
-						terverifikasi ditampilkan terpisah. Alasan kegagalan tersedia di
-						hasil gambar.
+						Sebagian gambar berhasil disimpan. Rincian kegagalan tersedia di
+						hasil pengambilan gambar.
 					</p>
 				)}
 				{(imageDiscovery === "discovery-failed" ||
