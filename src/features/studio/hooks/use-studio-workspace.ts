@@ -5,14 +5,18 @@ import type {
 	StudioProjectRow,
 } from "@/db/schema";
 import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
+import { useStudioScreenSuggestions } from "@/features/studio/hooks/use-studio-screen-suggestions";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
+import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import type {
 	AttachedDesignReference,
 	StudioDetailLoaderData,
 } from "@/features/studio/types/studio";
+
+const NO_SUGGESTIONS: readonly StudioScreenSuggestion[] = [];
 
 export interface StudioWorkspaceState {
 	project: StudioProjectRow;
@@ -30,6 +34,8 @@ export interface StudioWorkspaceState {
 	isProcessing: boolean;
 	readyFramesCount: number;
 	storedReferenceLabel: string | null;
+	/** Empty while work is in flight; a new screen is already on its way. */
+	suggestions: readonly StudioScreenSuggestion[];
 	selectFrame: (id: string | null, additive?: boolean) => void;
 	selectFrames: (ids: string[]) => void;
 	removeSelectedFrame: (id: string) => void;
@@ -108,6 +114,12 @@ export function useStudioWorkspace(
 		[frames],
 	);
 
+	const projectSuggestions = useStudioScreenSuggestions(project, frames);
+	// While a job is running the project is mid-plan, and a next-screen request
+	// would race the planning step that rewrites the frame list. Suggestions
+	// come back as soon as the canvas is idle again.
+	const suggestions = isProcessing ? NO_SUGGESTIONS : projectSuggestions;
+
 	// Derived selection state must keep a stable identity: a fresh array on
 	// every poll tick would re-render the composer even when nothing changed.
 	const selectedFrames = useMemo(
@@ -159,6 +171,7 @@ export function useStudioWorkspace(
 		isProcessing,
 		readyFramesCount,
 		storedReferenceLabel,
+		suggestions,
 		selectFrame,
 		selectFrames,
 		removeSelectedFrame,

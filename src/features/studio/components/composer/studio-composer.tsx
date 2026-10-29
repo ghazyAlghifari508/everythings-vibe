@@ -8,12 +8,14 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
+import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
 import {
 	canvasComposerBottomCss,
 	canvasComposerWidthCss,
 } from "@/features/studio/utils/studio-canvas-layout";
 import { StudioSkillSelect } from "./studio-skill-select";
+import { StudioSuggestionRow } from "./studio-suggestion-row";
 
 /**
  * The server resolves the operation, so the composer only reports whether the
@@ -36,6 +38,8 @@ export interface StudioComposerProps {
 	designSkillId?: StudioDesignSkillId;
 	onDesignSkillChange?: (skillId: StudioDesignSkillId) => void;
 	referenceLabel?: string | null;
+	/** Next-screen bubbles derived from the project's own structure. */
+	suggestions?: readonly StudioScreenSuggestion[];
 }
 
 export function StudioComposer({
@@ -47,6 +51,7 @@ export function StudioComposer({
 	designSkillId,
 	onDesignSkillChange,
 	referenceLabel,
+	suggestions = [],
 }: StudioComposerProps) {
 	const [prompt, setPrompt] = useState("");
 	const [sending, setSending] = useState(false);
@@ -99,6 +104,14 @@ export function StudioComposer({
 		void submit();
 	}
 
+	// A suggestion only fills the composer: the user still reviews and submits,
+	// so clicking a bubble never spends a generation credit on its own.
+	function insertSuggestion(suggestion: StudioScreenSuggestion) {
+		setPrompt(suggestion.prompt);
+		setClarify("");
+		inputRef.current?.focus();
+	}
+
 	return (
 		<div
 			data-testid="studio-composer"
@@ -114,6 +127,13 @@ export function StudioComposer({
 			onPointerDown={(event) => event.stopPropagation()}
 			onWheel={(event) => event.stopPropagation()}
 		>
+			{suggestions.length > 0 ? (
+				<StudioSuggestionRow
+					suggestions={suggestions}
+					disabled={loading || sending}
+					onSelect={insertSuggestion}
+				/>
+			) : null}
 			<form
 				onSubmit={handleSubmit}
 				className="flex flex-col gap-3 rounded-xl border border-iron bg-obsidian p-3 text-snow focus-within:border-snow"
