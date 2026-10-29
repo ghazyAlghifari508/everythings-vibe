@@ -131,7 +131,7 @@ describe("groupImageFailures", () => {
 		expect(groups).toHaveLength(3);
 		expect(groups[0].category.key).toBe("access_restricted");
 		expect(groups[0].count).toBe(4);
-		expect(groups[0].category.label).toBe("Website membatasi akses");
+		expect(groups[0].category.label).toBe("Akses tidak tersedia");
 
 		expect(groups[1].category.key).toBe("format_unsupported");
 		expect(groups[1].count).toBe(2);
@@ -139,7 +139,7 @@ describe("groupImageFailures", () => {
 
 		expect(groups[2].category.key).toBe("connection_failed");
 		expect(groups[2].count).toBe(1);
-		expect(groups[2].category.label).toBe("Gagal karena gangguan sementara");
+		expect(groups[2].category.label).toBe("Gangguan sementara");
 	});
 
 	it("handles all images with the same error type without duplication", () => {

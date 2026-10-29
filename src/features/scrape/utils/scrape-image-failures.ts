@@ -21,13 +21,13 @@ export const IMAGE_FAILURE_CATEGORIES: Record<
 > = {
 	access_restricted: {
 		key: "access_restricted",
-		label: "Website membatasi akses",
+		label: "Akses tidak tersedia",
 		description: "Website tujuan membatasi atau menolak akses otomatis.",
 		actionHint: "Gunakan URL yang mengizinkan pengambilan aset.",
 	},
 	connection_failed: {
 		key: "connection_failed",
-		label: "Gagal karena gangguan sementara",
+		label: "Gangguan sementara",
 		description: "Koneksi terputus atau website terlalu lama merespons.",
 		actionHint: "Coba lagi beberapa saat lagi.",
 	},
