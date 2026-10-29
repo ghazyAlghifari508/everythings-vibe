@@ -19,8 +19,17 @@ vi.mock("@tanstack/react-router", () => ({
 		...options,
 		useLoaderData: () => mockUseLoaderData(),
 	}),
-	Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
-		<a href={to}>{children}</a>
+	Link: ({
+		children,
+		to,
+		...props
+	}: {
+		children: React.ReactNode;
+		to: string;
+	}) => (
+		<a href={to} {...props}>
+			{children}
+		</a>
 	),
 	useNavigate: () => vi.fn(),
 	useRouter: () => ({ invalidate: vi.fn(async () => {}) }),
@@ -138,15 +147,23 @@ describe("StudioDetailPage Multi-Screen Canvas", () => {
 		expect(
 			screen.queryByRole("button", { name: /Pilih design system/i }),
 		).toBeNull();
-		// The relocated capabilities stay reachable from the project menu.
+		// The project menu keeps navigation, duplication, and deletion without
+		// the removed manual add-page or project design-system switcher.
 		fireEvent.pointerDown(
 			screen.getByRole("button", { name: "Menu project" }),
 			{ button: 0, ctrlKey: false, pointerType: "mouse" },
 		);
 		expect(
-			await screen.findByRole("menuitem", { name: /Design system/i }),
+			await screen.findByRole("menuitem", {
+				name: /Kembali ke Semua Project/i,
+			}),
 		).toBeDefined();
-		// The legacy manual add-page action is gone from the menu.
+		expect(
+			screen.getByRole("menuitem", { name: /Duplicate Project/i }),
+		).toBeDefined();
+		expect(
+			screen.queryByRole("menuitem", { name: /Design system/i }),
+		).toBeNull();
 		expect(
 			screen.queryByRole("menuitem", { name: /Tambah Halaman/i }),
 		).toBeNull();
