@@ -1,6 +1,6 @@
 import {
 	Alert02Icon,
-	Loading01Icon,
+	Loading02Icon,
 	RefreshIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
@@ -78,7 +78,7 @@ export function PreviewCanvasOverlay({
 		return (
 			<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-onyx px-6 py-12 text-center">
 				<Icon
-					icon={Loading01Icon}
+					icon={Loading02Icon}
 					size={20}
 					aria-hidden
 					className="text-fog motion-safe:animate-spin motion-reduce:animate-none"

@@ -1,4 +1,4 @@
-import { Loading03Icon } from "@hugeicons/core-free-icons";
+import { Loading02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 
 export function ScrapeHistorySelectAll({
@@ -48,10 +48,10 @@ export function ScrapeHistorySelectAll({
 				>
 					{preparing ? (
 						<Icon
-							icon={Loading03Icon}
+							icon={Loading02Icon}
 							size={12}
 							aria-hidden="true"
-							className="animate-spin"
+							className="motion-safe:animate-spin"
 						/>
 					) : null}
 					{preparing
