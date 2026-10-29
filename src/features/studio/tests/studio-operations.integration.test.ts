@@ -190,6 +190,28 @@ it("clarifies instead of regenerating when the instruction has no target", async
 	}
 });
 
+it("serializes concurrent add requests without losing frames or order", async () => {
+	const { userId, project } = await seedProject();
+	const [first, second] = await Promise.all([
+		enqueueStudioOperation(project.id, userId, {
+			prompt: "Tambah halaman Profile",
+			requestId: crypto.randomUUID(),
+		}),
+		enqueueStudioOperation(project.id, userId, {
+			prompt: "Tambah halaman Pengaturan",
+			requestId: crypto.randomUUID(),
+		}),
+	]);
+	expect(first.intent).toBe("add_screen");
+	expect(second.intent).toBe("add_screen");
+	const stored = await storedFrames(project.id);
+	expect(stored).toHaveLength(6);
+	expect(new Set(stored.map((frame) => frame.order)).size).toBe(6);
+	expect(stored.map((frame) => frame.name)).toEqual(
+		expect.arrayContaining(["Profile", "Pengaturan"]),
+	);
+});
+
 it("enforces project ownership and frame membership", async () => {
 	const { userId, project, frames } = await seedProject();
 	await expect(
