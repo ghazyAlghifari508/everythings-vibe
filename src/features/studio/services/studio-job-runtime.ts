@@ -81,6 +81,8 @@ export async function withStudioHeartbeat<T>(
 		}
 		if (result.outcome === "renewed" && result.leaseExpiresAt)
 			confirmedLeaseExpiresAt = result.leaseExpiresAt.getTime();
+		// The worker already stopped: late outcomes must not re-report or re-abort.
+		if (controller.signal.aborted) return;
 		// A transient database failure stays retryable while the confirmed lease
 		// still covers the next beat. Past that we cannot prove ownership, so the
 		// job stops instead of writing under a lease it may have lost.
@@ -94,12 +96,22 @@ export async function withStudioHeartbeat<T>(
 		if (abortReason) abortFor(abortReason);
 	};
 
-	const heartbeat = setInterval(() => {
-		if (renewing || controller.signal.aborted) return;
+	const tick = () => {
+		if (controller.signal.aborted) return;
+		// A renewal that never settles (exhausted pool, black-holed connection) must
+		// not leave the job working under a lease it can no longer confirm.
+		if (renewing) {
+			if (Date.now() + heartbeatMs < confirmedLeaseExpiresAt) return;
+			attempt += 1;
+			report(Date.now(), null, "HEARTBEAT_DB_ERROR");
+			abortFor("HEARTBEAT_DB_ERROR");
+			return;
+		}
 		renewing = beat().finally(() => {
 			renewing = undefined;
 		});
-	}, heartbeatMs);
+	};
+	const heartbeat = setInterval(tick, heartbeatMs);
 	const timeout = setTimeout(() => {
 		attempt += 1;
 		report(Date.now(), null, "JOB_TIMEOUT");
@@ -129,7 +141,7 @@ export async function withStudioHeartbeat<T>(
 		shutdownSignal?.removeEventListener("abort", onShutdown);
 		controller.signal.removeEventListener("abort", onAbort);
 		controller.abort();
-		await renewing;
+		// Renewals are not drained: an unsettled one must not block the worker slot.
 		await Promise.allSettled([running]);
 	}
 }

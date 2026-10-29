@@ -47,7 +47,12 @@ cannot exceed the window in which the worker may still write.
 
 Renewals are single-flight: a renewal still in flight suppresses the next beat,
 and `beat()` clears the guard when it settles. Without that cleanup the guard
-would latch and silently stop every later heartbeat.
+would latch and silently stop every later heartbeat. A renewal that never
+settles at all — an exhausted pool or a black-holed connection — is caught by the
+same guard: once the confirmed lease no longer covers the next beat the job stops
+with `HEARTBEAT_DB_ERROR`, and the unsettled renewal is deliberately not drained
+so it cannot hold the worker slot open. Late outcomes from a stopped job are
+ignored.
 
 ## Clock domain
 

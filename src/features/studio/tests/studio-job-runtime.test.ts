@@ -202,6 +202,20 @@ it("aborts a database failure that would outlive the confirmed lease", async () 
 	expect(vi.getTimerCount()).toBe(0);
 });
 
+it("aborts when a renewal never settles past the confirmed lease", async () => {
+	vi.useFakeTimers();
+	const renew = vi.fn(() => new Promise<StudioLeaseRefresh>(() => {}));
+	const pending = withStudioHeartbeat(renew, drainOnAbort, {
+		...options(35),
+		timeoutMs: 5_000,
+	});
+	const assertion = expect(pending).rejects.toThrow("HEARTBEAT_DB_ERROR");
+	await vi.advanceTimersByTimeAsync(35);
+	await assertion;
+	expect(renew).toHaveBeenCalledTimes(1);
+	expect(vi.getTimerCount()).toBe(0);
+});
+
 it("never overlaps renewals while one is still in flight", async () => {
 	vi.useFakeTimers();
 	let release: () => void = () => {};
