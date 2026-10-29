@@ -13,6 +13,10 @@ export const users = pgTable("users", {
 	role: text("role"),
 	isAdmin: boolean("is_admin").notNull().default(false),
 	bannedAt: timestamp("banned_at"),
+	// Account entitlement survives repository deletion and subscription renewal.
+	initialAnalysisUsedAt: timestamp("initial_analysis_used_at", {
+		withTimezone: true,
+	}),
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 	updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
