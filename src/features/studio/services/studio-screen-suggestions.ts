@@ -30,6 +30,8 @@ export interface StudioSuggestionInput {
 	prdContentHash: string | null;
 	blueprint: StudioDesignBlueprint | null;
 	frameNames: readonly string[];
+	/** Frame descriptions hold the prompt that asked for each screen. */
+	frameDescriptions?: readonly string[];
 }
 
 export const STUDIO_SCREEN_SUGGESTION_LIMIT = 4;
@@ -226,6 +228,16 @@ function suggestionId(name: string): string {
 	return `add-screen:${normalizeStudioScreenName(name).replace(/\s+/g, "-")}`;
 }
 
+/** FNV-1a over the joined history keeps the revision key short. */
+function hashText(value: string): string {
+	let hash = 0x811c9dc5;
+	for (let index = 0; index < value.length; index++) {
+		hash ^= value.charCodeAt(index);
+		hash = Math.imul(hash, 0x01000193);
+	}
+	return (hash >>> 0).toString(16);
+}
+
 interface SuggestionCandidate {
 	name: string;
 	focus: string;
@@ -256,19 +268,26 @@ function collectCandidates(
 	}
 
 	const prd = input.prdContent ?? "";
-	if (prd.trim()) {
+	const previousRequests = (input.frameDescriptions ?? []).join("\n");
+	const pushRecipeMatches = (text: string, reason: (hit: string) => string) => {
+		if (!text.trim()) return;
 		for (const recipe of SCREEN_RECIPES) {
 			if (recipe.platforms && !recipe.platforms.includes(input.designMode))
 				continue;
-			const hit = prd.match(recipe.triggers)?.[0];
+			const hit = text.match(recipe.triggers)?.[0];
 			if (!hit) continue;
 			candidates.push({
 				name: recipe.name,
 				focus: recipe.focus,
-				reason: `PRD menyebut "${hit.toLowerCase()}"`,
+				reason: reason(hit.toLowerCase()),
 			});
 		}
-	}
+	};
+	pushRecipeMatches(prd, (hit) => `PRD menyebut "${hit}"`);
+	pushRecipeMatches(
+		previousRequests,
+		(hit) => `Permintaan halaman sebelumnya menyebut "${hit}"`,
+	);
 
 	for (const fallback of PLATFORM_FALLBACK[input.designMode])
 		candidates.push({
@@ -322,6 +341,7 @@ export function studioSuggestionRevision(input: StudioSuggestionInput): string {
 		input.prdContentHash ?? `len-${input.prdContent?.length ?? 0}`,
 		normalizeStudioScreenName(input.projectTitle),
 		input.frameNames.map(normalizeStudioScreenName).join("|"),
+		hashText((input.frameDescriptions ?? []).join("\n")),
 	].join("::");
 }
 

@@ -172,6 +172,18 @@ describe("deriveStudioScreenSuggestions", () => {
 		expect(cart?.reason).toBe("Destinasi navigasi belum punya layar");
 	});
 
+	it("uses the prompt behind an earlier screen when the PRD is silent", () => {
+		const suggestions = deriveStudioScreenSuggestions(
+			context({
+				frameNames: ["Beranda"],
+				frameDescriptions: ["Buat halaman stok gudang dengan level minimum."],
+			}),
+		);
+		const stok = suggestions.find((entry) => entry.label === "Buat Stok");
+
+		expect(stok?.reason).toBe('Permintaan halaman sebelumnya menyebut "stok"');
+	});
+
 	it("treats a partially matching name as the same screen", () => {
 		const labels = deriveStudioScreenSuggestions(
 			context({ frameNames: ["Catat"], prdContent: PRD }),
@@ -263,7 +275,7 @@ describe("suggestion revision cache", () => {
 		);
 	});
 
-	it("invalidates when the PRD, blueprint, platform, or title changes", () => {
+	it("invalidates when the PRD, blueprint, platform, title, or request history changes", () => {
 		const base = studioSuggestionRevision(context());
 		expect(studioSuggestionRevision(context({ prdContentHash: "a" }))).not.toBe(
 			base,
@@ -276,6 +288,11 @@ describe("suggestion revision cache", () => {
 		);
 		expect(
 			studioSuggestionRevision(context({ projectTitle: "Kasir Cepat" })),
+		).not.toBe(base);
+		expect(
+			studioSuggestionRevision(
+				context({ frameDescriptions: ["Buat halaman stok"] }),
+			),
 		).not.toBe(base);
 		expect(studioSuggestionRevision(context())).toBe(base);
 	});

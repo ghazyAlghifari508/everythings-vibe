@@ -49,6 +49,7 @@ async function suggestionsFor(projectId: string, userId: string) {
 		prdContentHash: detail.project.prdContentHash,
 		blueprint: detail.project.designBlueprint,
 		frameNames: detail.frames.map((frame) => frame.name),
+		frameDescriptions: detail.frames.map((frame) => frame.description ?? ""),
 	});
 }
 

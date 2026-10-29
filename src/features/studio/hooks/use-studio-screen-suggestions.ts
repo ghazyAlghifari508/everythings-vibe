@@ -22,5 +22,6 @@ export function useStudioScreenSuggestions(
 		prdContentHash: project.prdContentHash,
 		blueprint: project.designBlueprint,
 		frameNames: frames.map((frame) => frame.name),
+		frameDescriptions: frames.map((frame) => frame.description ?? ""),
 	});
 }
