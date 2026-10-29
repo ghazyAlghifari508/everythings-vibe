@@ -163,7 +163,19 @@ Every interactive surface must be explicitly designed for four fundamental state
 11. **Jangan membuat dua komponen independen yang mengontrol aksi identik tanpa justification yang dapat diuji.**
 12. **Jangan membuat abstraksi, dependency, state atau hook baru apabila solusi existing lebih sederhana dan memadai.**
 
-### 3.2 Mandatory Existing-Action Audit
+### 3.2 No Duplicated UI or Actions & Mandatory Existing-Action Audit
+
+**Aturan Pokok:**
+> **If an existing interaction already solves the problem, improve or reuse it instead of creating another one.**
+
+Sebelum menambah komponen atau kontrol baru, agen **WAJIB** memeriksa apakah fungsi serupa sudah tersedia di halaman atau konteks yang sama.
+
+#### Contoh Kesalahan Duplikasi yang Dilarang:
+- Sudah ada tab `HTML Source`, lalu agen menambah tombol `Lihat HTML Source`.
+- Sudah ada tombol retry, lalu agen membuat tombol retry kedua.
+- Sudah ada indikator sukses berupa icon check, lalu ditambah toast atau banner sukses yang tidak diperlukan.
+- Sudah ada hasil statistik, lalu dibuat summary card baru dengan angka yang sama.
+- Sudah ada filter, lalu dibuat filter lain dengan fungsi identik.
 
 Sebelum menambahkan atau mengusulkan kontrol UI baru, agen **WAJIB** mengevaluasi alur keputusan audit berikut:
 
@@ -291,12 +303,22 @@ Agen sering kali membuat mode interaksi tambahan yang tidak diperlukan (seperti 
 5. **Aksesibilitas Terjaga:** Tetap sediakan navigasi keyboard (fokus Tab/Space), pembaca layar (*screen-reader* dengan label ARIA akurat), dan touch target $\ge$ 44px.
 6. **Pengecualian Mode yang Sah (*Justified Modes*):** Mode khusus tetap diperbolehkan HANYA pada alur kerja pengeditan kompleks di mana pemisahan mode mencegah kesalahan destruktif pengguna (misal: kanvas transform/crop pada studio gambar, mode kalibrasi multi-screen, atau inspeksi frame visual).
 
-### 3.6 Internal Diagnostics Are Not Product Copy (Pemisahan Status Teknis vs Konten Pengguna)
+### 3.6 No Internal or Technical Noise in Public UI (Internal Diagnostics Are Not Product Copy)
 
 **Aturan Pokok:**
 > **Never expose implementation details, AI schema validation messages, model/provider failures, internal fallback names, or developer-oriented pipeline statuses directly as primary end-user content.**
 
-Pengguna akhir menggunakan platform untuk menyelesaikan tugas produk mereka, bukan untuk membaca log debugging backend atau melacak siklus validasi skema internal AI.
+Pengguna akhir menggunakan platform untuk menyelesaikan tugas produk mereka, bukan untuk membaca log debugging backend atau melacak siklus validasi skema internal AI. Jangan menampilkan informasi internal yang tidak membantu user mengambil keputusan.
+
+#### Kategori Informasi Internal yang Dilarang di UI Publik:
+- Pesan debugging.
+- Selector DOM (misal: `html:nth-child(1) > body:nth-child(2) > ...`).
+- Browser measurements mentah.
+- Pipeline internals.
+- AI synthesis contract.
+- Evidence yang belum diolah.
+- Status ambigu seperti `"Analisis AI belum lengkap"` tanpa tindakan yang jelas.
+- Penjelasan teknis seperti `"robots.txt dihormati"` pada UI publik yang tidak memerlukannya.
 
 #### Contoh Pesan Publik yang DILARANG KERAS:
 ```
@@ -308,7 +330,25 @@ Pengguna akhir menggunakan platform untuk menyelesaikan tugas produk mereka, buk
 ❌ "Preview dimuat sebagian karena kegagalan resource website."
 ❌ "DOM preview gagal setelah timeout 8 detik."
 ❌ "Subresource fetch error: HTTP 403."
+❌ "Analisis AI belum lengkap" (tanpa tindakan jelas)
+❌ "robots.txt dihormati" (pada UI publik yang tidak memerlukannya)
 ```
+
+#### Tempat yang Tepat untuk Informasi Teknis:
+Informasi teknis tetap boleh berada di:
+- Logs.
+- Debug instrumentation.
+- Internal diagnostics.
+- Data audit yang memang memiliki kebutuhan nyata.
+
+Jangan memindahkan semuanya ke UI publik.
+
+#### Kriteria Pesan Publik yang Sah:
+Pesan publik hanya ditampilkan jika menjawab kebutuhan user, seperti:
+- Apa yang terjadi?
+- Apakah proses berhasil?
+- Apa hasil yang tersedia?
+- Apa yang bisa dilakukan selanjutnya?
 
 #### Protokol Penanganan Diagnostik Internal:
 1. **Perbaiki Sumber Masalah:** Utamakan memperbaiki kesalahan pada sistem backend atau adapter model daripada sekadar memoles tampilan pesan.
@@ -450,6 +490,108 @@ Antarmuka harus memprioritaskan tugas utama pengguna (*primary intent*) pada sta
 10. **Fitur Terlihat Lebih Banyak ≠ UX Lebih Baik:** Ketenangan, densitas terarah, dan kejelasan tugas jauh lebih berharga daripada antarmuka yang dipenuhi tombol dan checkbox administratif.
 11. **Peringatan Kontekstual:** Jangan terapkan kontrol hover-only secara membabi-buta di semua tempat. Pola ini dievaluasi per fitur sesuai kebutuhan nyata pengguna.
 
+### 3.13 Preserve Existing Good UX
+
+Setiap tugas UI wajib mengikuti prinsip:
+
+> **Existing Good UX Is Protected by Default.**
+
+Artinya:
+- UI yang tidak termasuk scope task tidak boleh dimodifikasi.
+- Perbaikan ikon tidak boleh berubah menjadi redesign.
+- Perbaikan backend tidak boleh digunakan sebagai alasan mengubah halaman.
+- Perbaikan loading tidak boleh menghapus layout progress khusus yang sudah bagus.
+- Perbaikan error tidak boleh menambah banyak panel dengan informasi berulang.
+- Refactor komponen tidak boleh diam-diam mengubah tampilan dan interaksi user.
+
+Visualisasi:
+
+```
+USER REQUEST
+"Perbaiki ikon loading"
+         │
+         ▼
+PERUBAHAN YANG DIIZINKAN
+[ikon loading lama]
+         ↓
+[spinner circular]
+         │
+         ▼
+SELESAI
+
+PERUBAHAN YANG DILARANG
+[ikon loading lama]
+         ↓
+[layout progress baru]
+         ↓
+[card tambahan]
+         ↓
+[copywriting tambahan]
+         ↓
+[animasi baru]
+         ↓
+[redesign halaman]
+```
+
+Perubahan yang tidak diminta dianggap sebagai **scope creep**, bukan improvement.
+
+### 3.14 Component-First, Never Lazy Custom UI
+
+Sebelum membuat UI, agen **WAJIB** mengeksplorasi:
+- Magic UI
+- HeroUI
+- shadcn/ui
+- React Bits
+- Thinking Orbs: https://www.thinkingorbs.com/#orbs
+- 21st.dev
+- Komponen lain yang tersedia dan kompatibel.
+
+Aturan implementasi:
+1. Prioritaskan komponen yang sudah ada di codebase.
+2. Jika belum ada, cari komponen siap pakai dari library di atas.
+3. WAJIB gunakan komponen siap pakai yang sesuai dan dapat diintegrasikan secara aman.
+4. Custom component baru hanya boleh dibuat jika benar-benar tidak ditemukan solusi yang relevan.
+5. Jangan menginstal dependency baru tanpa kebutuhan nyata.
+6. Periksa kompatibilitas dengan stack proyek, SSR, accessibility, responsiveness, dan lisensi.
+7. Jangan menggunakan library hanya agar terlihat memenuhi checklist apabila tugas cukup menggunakan komponen existing.
+
+Anti-AI-slop bukan berarti menambahkan lebih banyak UI. Kadang desain yang lebih baik justru menghapus komponen duplikat.
+
+### 3.15 Restore Means Restore
+
+Ketika user meminta kembali ke tampilan lama:
+- Periksa Git history.
+- Cari komponen dan layout historis yang dimaksud.
+- Gunakan implementasi tersebut sebagai acuan visual.
+- Lakukan restorasi selektif.
+- Pertahankan perubahan backend yang masih dibutuhkan.
+- Jangan menciptakan interpretasi desain baru.
+- Jangan menjalankan `git revert`, hard reset, atau menghapus perubahan unrelated tanpa instruksi eksplisit.
+
+Jika terdapat konflik antara UI lama dan API baru, adaptasikan integrasinya tanpa mengganti identitas visual UI lama.
+
+### 3.16 Minimal Necessary Change
+
+Sebelum coding, agen harus bisa menjawab:
+1. Masalah spesifik apa yang dilaporkan?
+2. Bagian mana yang harus berubah?
+3. Bagian mana yang wajib tetap sama?
+4. Apakah solusi membuat fitur atau kontrol duplikat?
+5. Apakah ada komponen existing yang bisa digunakan?
+6. Apakah perubahan ini menambah kompleksitas tanpa manfaat user?
+7. Apakah root cause sudah diketahui?
+
+Jika perubahan tidak punya hubungan langsung dengan masalah, jangan lakukan.
+
+### 3.17 Honest Verification
+
+- Jangan mengklaim bug fixed hanya karena kode berhasil dikompilasi.
+- Jangan membuat status loading palsu.
+- Jangan mengklaim resource tersimpan jika belum benar-benar tersimpan.
+- Jangan mengarang hasil pengukuran.
+- Jangan menandai test sebagai passed tanpa menjalankannya.
+- Bedakan fakta, hipotesis, dan bagian yang belum diverifikasi.
+
 ---
 
 ## 4. Concrete Design Tokens Reference
@@ -479,16 +621,17 @@ When writing CSS / Tailwind classes, map strictly to these authoritative values:
 Before finalizing any frontend work or opening a PR, verify every item across both checklists:
 
 ### 5.1 PR Self-Review Checklist (Anti-Functional-Slop & UI Necessity)
+- [ ] **Existing good UX preserved by default** (No unrequested redesign, extra cards/copy/animations, or layout changes outside task scope; see 3.13)
 - [ ] **Existing action audit completed** (Evaluated with the 5 mandatory audit questions in 3.2)
 - [ ] **No unnecessary interaction mode** (Direct actions used; no selection mode or entry/exit barriers where direct controls suffice)
 - [ ] **Direct actions used where appropriate** (Checkboxes and inline triggers available directly without special activation modes)
 - [ ] **No extra clicks without user benefit** (Zero redundant confirmation steps, extra modals, or superfluous mode switches)
 - [ ] **Contextual actions appear only when needed** (Bulk action bars and contextual tools surface only when items are selected or relevant)
-- [ ] **No duplicate user actions** (No action repeated in the same view or toolbar)
+- [ ] **No duplicate user actions or redundant summary cards** (No action, filter, retry, or stat summary repeated in the same view or toolbar; see 3.2)
 - [ ] **No unnecessary new controls** (No speculative search, filters, or buttons added without need)
 - [ ] **No more navigation layers than necessary** (Single toolbar where sufficient; secondary only when strictly justified)
 - [ ] **Every state-specific control appears in the right state** (Recovery actions isolated to error states; no retry on success)
-- [ ] **No internal AI/provider/schema jargon in primary UI** (User-facing copy is natural Indonesian, devoid of internal diagnostics, schema errors, fallback names, "resource website", "DOM preview", "timeout 8 detik", etc.)
+- [ ] **No internal AI/provider/schema/technical noise in primary UI** (User-facing copy is natural Indonesian, devoid of internal diagnostics, DOM selectors, raw measurements, synthesis contracts, "robots.txt dihormati", "Analisis AI belum lengkap", "resource website", "DOM preview", "timeout 8 detik", etc.; see 3.6)
 - [ ] **Action labels are clear and decisive** (Definite button copy like "Coba lagi" instead of ambiguous "Coba lagi jika tersedia")
 - [ ] **No redundant feedback elements** (Visual icon transition + screen-reader announcement without long-lived static text banners)
 - [ ] **No duplicated technical statuses** (Status not repeated across header, subtitle, banner, toast, and body)
@@ -497,7 +640,10 @@ Before finalizing any frontend work or opening a PR, verify every item across bo
 - [ ] **Error UI changes do not conceal backend failure** (Cosmetic UI changes do not fake backend success; root cause investigated and resolved)
 - [ ] **No new UI surface added without clear necessity** (Information Necessity Gate evaluated; no new containers just to display internal metadata)
 - [ ] **No invented product features or sections** (Scope strictly bounded; design tokens are styles, not page content)
-- [ ] **Existing components reused where appropriate** (No duplicate wrappers or custom buttons when primitives exist)
+- [ ] **Component-first discovery & reuse enforced** (Existing codebase components prioritized; Magic UI, HeroUI, shadcn/ui, React Bits, Thinking Orbs, and 21st.dev explored before custom UI; no unnecessary dependencies; see 3.14)
+- [ ] **Restore requests executed as true selective restoration** (Git history used as visual source of truth while keeping needed backend changes; no redesign or destructive `git revert`/hard reset; see 3.15)
+- [ ] **Minimal necessary change discipline applied** (All 7 pre-coding questions in 3.16 answered; zero unrelated changes)
+- [ ] **Honest verification completed** (No false "fixed" claims from compilation alone, no fake loading states, no unverified persistence claims, no fabricated measurements, tests actually executed, facts separated from hypotheses; see 3.17)
 - [ ] **Mobile and desktop interaction considered** (Touch targets $\ge$ 44px, no horizontal overflow)
 - [ ] **Keyboard/a11y behavior preserved** (Focus rings visible, semantic roles, aria-labels on icon buttons)
 - [ ] **No needless abstraction or code expansion** (Simple, idiomatic solutions over complex hooks/state)
