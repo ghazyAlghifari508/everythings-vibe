@@ -39,6 +39,10 @@ import {
 	STUDIO_SYSTEM_PROMPT,
 } from "./studio-prompt-contracts";
 import {
+	buildStudioSkillContext,
+	type StudioSkillStage,
+} from "./studio-skill-context.server";
+import {
 	STUDIO_SKILL_MANIFEST,
 	type StudioSkillManifestEntry,
 } from "./studio-skill-manifest";
@@ -344,16 +348,27 @@ export function resolveStudioDesignSkill(id: unknown) {
 	};
 }
 
-export function studioSkillSystemGuidance(id: unknown): string {
-	const skill = resolveStudioDesignSkill(id);
-	return skill.guidance;
+export function resolveStudioSkillContext(
+	id: unknown,
+	options: { stage?: StudioSkillStage; focus?: string[] } = {},
+) {
+	const skillId = studioDesignSkillIdSchema.parse(id);
+	return buildStudioSkillContext(skillId, options);
+}
+
+export function studioSkillSystemGuidance(
+	id: unknown,
+	options: { stage?: StudioSkillStage; focus?: string[] } = {},
+): string {
+	return resolveStudioSkillContext(id, options).guidance;
 }
 
 export function buildStudioSkillSystemPrompt(
 	baseSystemPrompt: string,
 	id: unknown,
+	options: { stage?: StudioSkillStage; focus?: string[] } = {},
 ): string {
-	const guidance = studioSkillSystemGuidance(id);
+	const guidance = studioSkillSystemGuidance(id, options);
 	return guidance ? `${baseSystemPrompt}${guidance}` : baseSystemPrompt;
 }
 
@@ -363,7 +378,10 @@ export function resolveStudioPlanningSystemPrompt(
 	mode: "web" | "mobile" = "web",
 ): string {
 	const skillId = studioDesignSkillIdSchema.parse(id);
-	let base = buildStudioSkillSystemPrompt(STUDIO_PLAN_SYSTEM_PROMPT, skillId);
+	let base = buildStudioSkillSystemPrompt(STUDIO_PLAN_SYSTEM_PROMPT, skillId, {
+		stage: "planning",
+		focus: promptContext ? [promptContext] : undefined,
+	});
 
 	// For UI UX Pro Max, inject bounded dataset recommendations during planning
 	if (
@@ -379,6 +397,15 @@ export function resolveStudioPlanningSystemPrompt(
 	return base;
 }
 
-export function resolveStudioFrameSystemPrompt(id: unknown): string {
-	return buildStudioSkillSystemPrompt(STUDIO_SYSTEM_PROMPT, id);
+export function resolveStudioFrameSystemPrompt(
+	id: unknown,
+	options: {
+		stage?: Extract<StudioSkillStage, "frame" | "correction" | "revision">;
+		focus?: string[];
+	} = {},
+): string {
+	return buildStudioSkillSystemPrompt(STUDIO_SYSTEM_PROMPT, id, {
+		stage: options.stage ?? "frame",
+		focus: options.focus,
+	});
 }

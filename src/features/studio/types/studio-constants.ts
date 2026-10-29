@@ -3,7 +3,19 @@ export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;
 export const STUDIO_PRD_FILE_MAX_BYTES = 500 * 1024;
 export const STUDIO_PRD_MAX_CHARS = 100_000;
 export const STUDIO_PRD_MIN_CHARS = 10;
+// Full adapter budget: every pinned document of the selected skill, bounded.
 export const STUDIO_SKILL_DOCUMENT_BUDGET_CHARS = 100_000;
+
+// Stage-aware delivery budgets. Selection is greedy + deterministic and only ever
+// drops or keeps whole upstream sections, so these never cut a document
+// mid-sentence. They exist to stop one stage from resending catalogs another
+// stage already needed.
+export const STUDIO_SKILL_STAGE_BUDGET_CHARS = {
+	planning: 20_000,
+	frame: 28_000,
+	revision: 20_000,
+	correction: 12_000,
+} as const;
 
 export const STUDIO_VISUAL_WIDTH = {
 	mobile: 390,
@@ -53,6 +65,10 @@ export const STUDIO_LOGO_ALLOWED_MIMES = [
 export const STUDIO_FRAME_CONCURRENCY = 3;
 export const STUDIO_PLANNING_MAX_TOKENS = 4000;
 export const STUDIO_FRAME_MAX_TOKENS = 12000;
+// Deterministic size estimate used by the skill-context audit. Providers report
+// exact usage through stream outcome.inputTokens when available; this estimate
+// only measures prompt assemblies without a provider call.
+export const STUDIO_CHARS_PER_TOKEN_ESTIMATE = 4;
 export const STUDIO_PREVIOUS_HTML_MAX_CHARS = 60000;
 export const STUDIO_CAPTURE_TIMEOUT_MS = 30000;
 export const STUDIO_CAPTURE_MAX_HEIGHT = 30000;

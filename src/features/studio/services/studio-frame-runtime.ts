@@ -7,8 +7,8 @@ import {
 } from "@/lib/services/ai-orchestrator";
 import type { ValidatedFrameInput } from "../types/studio-service";
 import {
-	resolveStudioDesignSkill,
 	resolveStudioFrameSystemPrompt,
+	resolveStudioSkillContext,
 } from "./studio-design-skill-registry.server";
 import type { StudioDesignSkillId } from "./studio-generation-options";
 import { studioJobTiming } from "./studio-job-runtime";
@@ -90,24 +90,40 @@ export class StudioIncompleteOutputError extends Error {
 	}
 }
 
+export type StudioFrameGenerationStage = "frame" | "correction" | "revision";
+
 export async function generateStudioHtml(
 	prompt: string,
 	maxTokens = STUDIO_FRAME_MAX_TOKENS,
 	designSkillId: StudioDesignSkillId = "none",
 	signal?: AbortSignal,
 	timing?: ValidatedFrameInput["timing"],
+	context: { stage?: StudioFrameGenerationStage; focus?: string[] } = {},
 ): Promise<string> {
 	signal?.throwIfAborted();
 	const startedAt = Date.now();
-	const system = resolveStudioFrameSystemPrompt(designSkillId);
-	if (timing)
+	const stage = context.stage ?? "frame";
+	const system = resolveStudioFrameSystemPrompt(designSkillId, {
+		stage,
+		focus: context.focus,
+	});
+	if (timing) {
+		const plan = resolveStudioSkillContext(designSkillId, {
+			stage,
+			focus: context.focus,
+		}).plan;
 		studioJobTiming("frame-context", startedAt, {
 			...timing,
 			skillId: designSkillId,
-			skillChars: resolveStudioDesignSkill(designSkillId).guidance.length,
+			skillStage: stage,
+			skillChars: plan.characterCount,
+			selectedSectionCount: plan.selectedSections.length,
+			omittedSectionCount: plan.omittedSections.length,
+			estimatedTokens: plan.estimatedTokens,
 			systemChars: system.length,
 			promptChars: prompt.length,
 		});
+	}
 	const { generator, firstChunk, outcome } = await tryStreamWithFallback(
 		selectModels(),
 		[

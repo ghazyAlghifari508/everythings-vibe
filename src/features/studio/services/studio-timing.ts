@@ -16,7 +16,11 @@ export function studioJobTiming(
 		assembledContentNodes?: number;
 		correctionRequired?: boolean;
 		skillId?: string;
+		skillStage?: string;
 		skillChars?: number;
+		selectedSectionCount?: number;
+		omittedSectionCount?: number;
+		estimatedTokens?: number;
 		promptChars?: number;
 		systemChars?: number;
 		outputChars?: number;
