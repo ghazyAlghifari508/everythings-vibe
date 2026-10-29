@@ -18,6 +18,9 @@ export async function setupIsolatedTestSchema(): Promise<{
 		`CREATE TABLE ${testSchema}.users (LIKE public.users INCLUDING ALL)`,
 	);
 	await masterPool.query(
+		`ALTER TABLE ${testSchema}.users ADD COLUMN IF NOT EXISTS initial_analysis_used_at timestamptz`,
+	);
+	await masterPool.query(
 		`CREATE TABLE ${testSchema}.projects (LIKE public.projects INCLUDING ALL)`,
 	);
 	await masterPool.query(

@@ -6,6 +6,7 @@ import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
+import { ANALYSIS_ALLOWANCE_POLICY } from "./analysis-credit-policy";
 
 export interface AnalysisMessage {
 	role: "system" | "user" | "assistant";
@@ -25,7 +26,7 @@ export async function defaultGenerate(
 	const { generator, firstChunk } = await tryStreamWithFallback(
 		selectModels(),
 		messages,
-		undefined,
+		AbortSignal.timeout(ANALYSIS_ALLOWANCE_POLICY.providerTimeoutMs),
 		CODEBASE_ANALYSIS_MAX_TOKENS,
 	);
 	let fullResponse = firstChunk;

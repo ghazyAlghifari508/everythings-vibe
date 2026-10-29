@@ -103,6 +103,8 @@ export interface ReserveCreditOperationInput {
 	idempotencyKey: string;
 	quote: CreditQuote;
 	expiresAt?: Date;
+	initialAnalysisAllowance?: boolean;
+	analysisReference?: string;
 }
 
 export interface SettleCreditOperationInput {
@@ -117,6 +119,7 @@ export interface SettleCreditOperationInput {
 
 export interface CreditOperationResult {
 	id: string;
+	analysisReference?: string | null;
 	state: CreditOperationState;
 	finalCharge: number | null;
 }

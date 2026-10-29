@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import {
 	getDatabase,
 	orValidPeriod,
@@ -13,6 +13,11 @@ import type {
 	ReserveCreditOperationInput,
 } from "@/features/billing/types/credit-contracts";
 import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
+import { resolveSubscriptionState } from "./billing";
+import {
+	lockInitialAnalysisAccount,
+	readInitialAnalysisAllowance,
+} from "./initial-analysis-allowance";
 
 export async function reserveCreditOperation(
 	input: ReserveCreditOperationInput,
@@ -31,11 +36,14 @@ export async function reserveCreditOperation(
 			.limit(1);
 		if (!project) throw new Error("Credit operation ownership mismatch");
 
+		if (input.initialAnalysisAllowance)
+			await lockInitialAnalysisAccount(tx, input.userId);
 		const [existing] = await tx
 			.select({
 				id: schema.creditOperations.id,
 				state: schema.creditOperations.state,
 				finalCharge: schema.creditOperations.finalCharge,
+				analysisReference: schema.creditOperations.analysisReference,
 			})
 			.from(schema.creditOperations)
 			.where(
@@ -50,22 +58,28 @@ export async function reserveCreditOperation(
 				id: existing.id,
 				state: existing.state,
 				finalCharge: existing.finalCharge,
+				analysisReference: existing.analysisReference,
 			};
 		validateQuote(input.quote, input.operation, input.metrics);
-
+		if (input.initialAnalysisAllowance) {
+			if (input.operation !== "codebase_analysis")
+				throw new Error("Invalid allowance operation");
+			const allowance = await readInitialAnalysisAllowance(tx, input.userId);
+			if (allowance.used || allowance.inProgress)
+				throw new Error("Initial analysis allowance unavailable");
+		}
+		const maximumCredits = input.initialAnalysisAllowance
+			? 0
+			: input.quote.maximumCredits;
 		const [subscription] = await tx
-			.select({ id: schema.subscriptions.id })
+			.select()
 			.from(schema.subscriptions)
-			.where(
-				and(
-					eq(schema.subscriptions.userId, input.userId),
-					gt(schema.subscriptions.credits, schema.subscriptions.creditsUsed),
-					orValidPeriod(schema.subscriptions.currentPeriodEnd),
-				),
-			)
+			.where(eq(schema.subscriptions.userId, input.userId))
 			.orderBy(desc(schema.subscriptions.createdAt))
 			.limit(1);
 		if (!subscription) throw new CreditSubscriptionOriginError("missing");
+		if (resolveSubscriptionState(subscription, new Date()).state === "paused")
+			throw new CreditSubscriptionOriginError("invalid_period");
 		const [operation] = await tx
 			.insert(schema.creditOperations)
 			.values({
@@ -77,9 +91,13 @@ export async function reserveCreditOperation(
 				stage: input.stage,
 				idempotencyKey: input.idempotencyKey,
 				state: "quoted",
-				estimatedCredits: input.quote.estimatedCredits,
+				initialAnalysisAllowance: input.initialAnalysisAllowance ?? false,
+				analysisReference: input.analysisReference,
+				estimatedCredits: input.initialAnalysisAllowance
+					? 0
+					: input.quote.estimatedCredits,
 				reservedCredits: 0,
-				maximumCredits: input.quote.maximumCredits,
+				maximumCredits,
 				pricingVersion: input.quote.pricingVersion,
 				metrics: input.quote.metrics,
 				expiresAt: input.expiresAt,
@@ -107,19 +125,21 @@ export async function reserveCreditOperation(
 				id: retry.id,
 				state: retry.state,
 				finalCharge: retry.finalCharge,
+				analysisReference: retry.analysisReference,
 			};
 		}
 
 		const updated = await tx
 			.update(schema.subscriptions)
 			.set({
-				creditsReserved: sql`${schema.subscriptions.creditsReserved} + ${input.quote.maximumCredits}`,
+				creditsReserved: sql`${schema.subscriptions.creditsReserved} + ${maximumCredits}`,
 				updatedAt: new Date(),
 			})
 			.where(
 				and(
 					eq(schema.subscriptions.id, subscription.id),
-					sql`${schema.subscriptions.credits} - ${schema.subscriptions.creditsUsed} - ${schema.subscriptions.creditsReserved} >= ${input.quote.maximumCredits}`,
+					eq(schema.subscriptions.userId, input.userId),
+					sql`${schema.subscriptions.credits} - ${schema.subscriptions.creditsUsed} - ${schema.subscriptions.creditsReserved} >= ${maximumCredits}`,
 					orValidPeriod(schema.subscriptions.currentPeriodEnd),
 				),
 			)
@@ -129,7 +149,7 @@ export async function reserveCreditOperation(
 			.update(schema.creditOperations)
 			.set({
 				state: "reserved",
-				reservedCredits: input.quote.maximumCredits,
+				reservedCredits: maximumCredits,
 				reservedAt: new Date(),
 				updatedAt: new Date(),
 			})
@@ -142,17 +162,23 @@ export async function reserveCreditOperation(
 			.returning({ id: schema.creditOperations.id });
 		if (operationUpdates.length !== 1)
 			throw new Error("Credit operation reservation transition conflict");
-		await tx.insert(schema.creditLedgerEntries).values({
-			id: crypto.randomUUID(),
-			userId: input.userId,
-			operationId: operation.id,
-			amount: -input.quote.maximumCredits,
-			entryType: "reservation",
-			sourceCategory: "adaptive_credit",
-			pricingVersion: input.quote.pricingVersion,
-			metadata: { reason: "credit reservation" },
-		});
-		return { id: operation.id, state: "reserved", finalCharge: null };
+		if (maximumCredits > 0)
+			await tx.insert(schema.creditLedgerEntries).values({
+				id: crypto.randomUUID(),
+				userId: input.userId,
+				operationId: operation.id,
+				amount: -maximumCredits,
+				entryType: "reservation",
+				sourceCategory: "adaptive_credit",
+				pricingVersion: input.quote.pricingVersion,
+				metadata: { reason: "credit reservation" },
+			});
+		return {
+			id: operation.id,
+			state: "reserved",
+			finalCharge: null,
+			analysisReference: operation.analysisReference,
+		};
 	});
 }
 

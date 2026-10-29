@@ -17,6 +17,11 @@ import {
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
 } from "@/features/codebase/types/codebase-constants";
 import { requireUser } from "@/lib/session";
+import { analysisCreditConsentSchema } from "./analysis-credit-policy";
+import {
+	checkPreSyncCredit,
+	getAnalysisCreditPreflight,
+} from "./analysis-credit-preflight.server";
 import {
 	type CodebaseNameSource,
 	normalizeRepositoryName,
@@ -71,6 +76,9 @@ export async function handleCodebaseList({
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
 
+	if (new URL(request.url).searchParams.get("preflight") === "analysis") {
+		return Response.json(await getAnalysisCreditPreflight(user.id));
+	}
 	const rows = await db
 		.select({
 			id: codebases.id,
@@ -150,6 +158,12 @@ export async function handleCodebaseCreate({
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
 	const body: unknown = await request.json().catch(() => null);
+	const preflight = await checkPreSyncCredit(user.id, body);
+	if (preflight.response) return preflight.response;
+	const consent = analysisCreditConsentSchema.parse({
+		maximumCredits: preflight.status.maximumCredits,
+		pricingVersion: preflight.status.pricingVersion,
+	});
 	const nameCheck = validateCodebaseNameInput(body);
 	if (!nameCheck.ok) {
 		return Response.json({ error: nameCheck.error }, { status: 400 });
@@ -186,6 +200,7 @@ export async function handleCodebaseCreate({
 					expiresAt,
 					cliMinVersion: CODEBASE_CLI_MIN_VERSION,
 					attempt: 1,
+					metadata: { analysisCreditConsent: consent },
 				})
 				.returning({
 					expiresAt: codebaseSyncSessions.expiresAt,

@@ -15,9 +15,14 @@ import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-c
 
 export async function settleCreditOperation(
 	input: SettleCreditOperationInput,
+	transaction?: Parameters<
+		Parameters<Awaited<ReturnType<typeof getDatabase>>["db"]["transaction"]>[0]
+	>[0],
 ): Promise<CreditOperationResult> {
 	const { db, schema } = await getDatabase();
-	return db.transaction(async (tx) => {
+	const settle = async (
+		tx: NonNullable<typeof transaction>,
+	): Promise<CreditOperationResult> => {
 		const [operation] = await tx
 			.select()
 			.from(schema.creditOperations)
@@ -30,6 +35,12 @@ export async function settleCreditOperation(
 			.for("update")
 			.limit(1);
 		if (!operation) throw new Error("Credit operation ownership mismatch");
+		if (
+			operation.kind === "codebase_analysis" &&
+			operation.expiresAt &&
+			operation.expiresAt.getTime() <= Date.now()
+		)
+			throw new Error("Analysis reservation expired");
 		if (!["reserved", "running", "settling"].includes(operation.state))
 			throw new Error("Credit operation is already terminal");
 
@@ -124,6 +135,13 @@ export async function settleCreditOperation(
 			});
 		if (updated.length !== 1)
 			throw new Error("Credit operation settlement conflict");
+		if (operation.kind === "codebase_analysis") {
+			await tx
+				.update(schema.users)
+				.set({ initialAnalysisUsedAt: new Date() })
+				.where(eq(schema.users.id, input.userId));
+		}
 		return updated[0];
-	});
+	};
+	return transaction ? settle(transaction) : db.transaction(settle);
 }
