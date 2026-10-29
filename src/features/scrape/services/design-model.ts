@@ -42,6 +42,8 @@ export type {
 	DesignTokenModel,
 	ModelColorToken,
 	ModelComponent,
+	ModelComponentCharacteristic,
+	ModelComponentTreatment,
 	ModelElevationToken,
 	ModelGuideline,
 	ModelGuidelines,

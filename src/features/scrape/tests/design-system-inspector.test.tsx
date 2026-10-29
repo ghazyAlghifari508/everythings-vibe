@@ -796,9 +796,13 @@ describe("phase 6 inspector overhaul", () => {
 			components: [
 				{
 					name: "Navigasi",
+					purpose: "Navigasi utama situs.",
 					description: "Bar atas dengan tautan primer.",
 					evidence: "Terukur pada 3 elemen.",
 					frequency: 3,
+					sharedCharacteristics: [],
+					variants: [],
+					guidance: [],
 				},
 			],
 		});

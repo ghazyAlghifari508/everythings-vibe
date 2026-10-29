@@ -237,12 +237,15 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 		payloadTruncated,
 		observedComponents: observedComponents.slice.map((component) => ({
 			name: component.name,
+			purpose: component.purpose,
+			sharedCharacteristics: component.sharedCharacteristics,
 			description: component.description,
 			evidence: component.evidence,
 			treatments: component.treatments,
 			frequency: component.frequency,
 			roles: component.roles,
 			treatmentCount: component.treatmentCount,
+			guidance: component.guidance,
 		})),
 		colors: colors.slice.map((color, index) => ({
 			index,

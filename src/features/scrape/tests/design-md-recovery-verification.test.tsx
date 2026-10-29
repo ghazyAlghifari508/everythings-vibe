@@ -178,9 +178,13 @@ const SAMPLE_INSPECTOR_MODEL: DesignInspectorModel = {
 	components: [
 		{
 			name: "Action Button",
+			purpose: "Action control.",
 			description: "Button uses solid emerald fill",
 			evidence: "color #10b981",
 			frequency: 5,
+			sharedCharacteristics: [{ label: "Background", value: "#10b981" }],
+			variants: [],
+			guidance: ["Apply to matching action controls only."],
 		},
 	],
 	baseUnitPx: 4,
