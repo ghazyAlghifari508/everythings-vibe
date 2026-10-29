@@ -5,6 +5,7 @@ import { CodebasePlanSwitcher } from "@/features/codebase/components/planning/co
 import { CodebaseResyncModal } from "@/features/codebase/components/planning/codebase-resync-modal";
 import { CodebaseWorkspaceShell } from "@/features/codebase/components/workspace/codebase-workspace-shell";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
+import { canReadExistingPlans } from "@/features/codebase/services/workspace-readiness";
 import { useCodebaseWorkspace } from "../../hooks/use-codebase-workspace";
 import type { CodebaseWorkspaceData } from "../../services/workspace-loader.functions";
 import { WorkspaceConnectionScreen } from "./workspace-connection-screen";
@@ -99,9 +100,29 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		prdContent,
 		acContent,
 		taskTree,
+		readiness,
 	} = useCodebaseWorkspace(data);
 
 	if (snapshotReady) {
+		if (!canReadExistingPlans(readiness)) {
+			return (
+				<WorkspaceConnectionScreen
+					name={codebase.name}
+					error={error}
+					status={status}
+					payload={payload}
+					isStarting={isStarting}
+					triggerAnalysis={triggerAnalysis}
+					startSession={startSession}
+					readStatus={readStatus}
+					readiness={readiness}
+					analysis={analysis}
+					isWorking={isWorking}
+					activeWorkspaceSnapshotId={activeWorkspaceSnapshotId}
+					manifestFileCount={manifestFileCount ?? undefined}
+				/>
+			);
+		}
 		return (
 			<main
 				data-testid="codebase-workspace-page"
@@ -365,6 +386,11 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 			triggerAnalysis={triggerAnalysis}
 			startSession={startSession}
 			readStatus={readStatus}
+			readiness={readiness}
+			analysis={analysis}
+			isWorking={isWorking}
+			activeWorkspaceSnapshotId={activeWorkspaceSnapshotId}
+			manifestFileCount={manifestFileCount ?? undefined}
 		/>
 	);
 }

@@ -126,6 +126,7 @@ export function useOnboardingRecovery({
 							existingAnalysis.snapshotId === recovered.snapshotId &&
 							existingAnalysis.status === "ready") ||
 						recovered.analysisStatus === "pending" ||
+						recovered.analysisAttemptStatus === "pending" ||
 						existingAnalysis?.status === "pending"
 					) {
 						analysisAttemptedFor.current = recovered.snapshotId;

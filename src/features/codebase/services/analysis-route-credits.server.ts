@@ -32,6 +32,7 @@ import {
 	getAnalysisCreditPreflight,
 	readSyncCreditConsent,
 } from "./analysis-credit-preflight.server";
+import { buildAnalysisIdempotencyKey } from "./analysis-diagnostics";
 import type { AnalysisRefreshRequest } from "./analysis-refresh";
 import { failRefreshClaim, toResponse } from "./analysis-route-scope.server";
 
@@ -130,7 +131,12 @@ export async function runCodebaseAnalysisAttempt(
 		}
 	}
 
-	const idempotencyKey = `${projectId}:codebase_analysis:${snapshot.id}:${refreshRequest?.refreshStarterSuggestionsForAnalysisId ?? "initial"}`;
+	const idempotencyKey = buildAnalysisIdempotencyKey({
+		projectId,
+		snapshotId: snapshot.id,
+		refreshAnalysisId:
+			refreshRequest?.refreshStarterSuggestionsForAnalysisId ?? null,
+	});
 
 	let reservation: CreditOperationResult;
 	let analysisId = claimedAnalysisId ?? crypto.randomUUID();
@@ -282,7 +288,7 @@ export async function runCodebaseAnalysisAttempt(
 			return Response.json(
 				{
 					error: error.message,
-					code: "ANALYSIS_FAILED",
+					code: error.recoveryCode ?? "ANALYSIS_FAILED",
 					// Prefer the exact failed attempt carried by the
 					// service (Task 9): under a concurrent duplicate
 					// trigger the latest row could be the sibling's

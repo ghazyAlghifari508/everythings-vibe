@@ -68,6 +68,77 @@ export function classifyAnalysisFailure(
 	return "unknown";
 }
 
+// === Canonical recovery codes (Phase 03 Section E) ===
+// One vocabulary shared by the persisted `codebase_analyses.errorCode`, the
+// route failure envelope, and the readiness projection. The frontend never
+// renders these strings; it maps them to copy and actions.
+export const ANALYSIS_RECOVERY_CODES = [
+	"ANALYSIS_NOT_STARTED",
+	"ANALYSIS_PENDING",
+	"ANALYSIS_FAILED",
+	"ANALYSIS_OUTPUT_INVALID",
+	"CREDIT_REQUIRED",
+	"PROVIDER_UNAVAILABLE",
+	"SNAPSHOT_INCOMPLETE",
+] as const;
+
+export type AnalysisRecoveryCode = (typeof ANALYSIS_RECOVERY_CODES)[number];
+
+const CATEGORY_RECOVERY_CODE: Readonly<
+	Record<AnalysisFailureCategory, AnalysisRecoveryCode>
+> = {
+	provider: "PROVIDER_UNAVAILABLE",
+	timeout: "PROVIDER_UNAVAILABLE",
+	aborted: "PROVIDER_UNAVAILABLE",
+	snapshot: "SNAPSHOT_INCOMPLETE",
+	invalid_json: "ANALYSIS_OUTPUT_INVALID",
+	schema: "ANALYSIS_OUTPUT_INVALID",
+	untrusted_paths: "ANALYSIS_OUTPUT_INVALID",
+	technical_leak: "ANALYSIS_OUTPUT_INVALID",
+	persistence: "ANALYSIS_FAILED",
+	unknown: "ANALYSIS_FAILED",
+};
+
+/** Map a classified failure category onto the public recovery vocabulary. */
+export function toAnalysisRecoveryCode(
+	category: AnalysisFailureCategory,
+): AnalysisRecoveryCode {
+	return CATEGORY_RECOVERY_CODE[category];
+}
+
+/** Classify a thrown attempt failure into the code stored on the failed row. */
+export function classifyAnalysisAttemptCode(
+	error: unknown,
+	stage?: AnalysisAttemptStage,
+): AnalysisRecoveryCode {
+	return toAnalysisRecoveryCode(classifyAnalysisFailure(error, stage));
+}
+
+/** Unknown stored values are dropped so status polling never echoes garbage. */
+export function isAnalysisRecoveryCode(
+	value: unknown,
+): value is AnalysisRecoveryCode {
+	return (
+		typeof value === "string" &&
+		(ANALYSIS_RECOVERY_CODES as readonly string[]).includes(value)
+	);
+}
+
+/**
+ * Operation identity for one analysis attempt. Stable for the same
+ * project + snapshot + refresh target, so a duplicate trigger (double click,
+ * retry of a lost response) resolves to the same reservation instead of
+ * charging twice, while a refresh of a different target stays a distinct,
+ * explicitly-priced operation.
+ */
+export function buildAnalysisIdempotencyKey(input: {
+	projectId: string;
+	snapshotId: string;
+	refreshAnalysisId?: string | null;
+}): string {
+	return `${input.projectId}:codebase_analysis:${input.snapshotId}:${input.refreshAnalysisId ?? "initial"}`;
+}
+
 export interface AnalysisDiagnosticRecord {
 	attemptId: string;
 	projectId: string;

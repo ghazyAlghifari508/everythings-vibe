@@ -193,6 +193,9 @@ export function useOnboardingAnalysis({
 		if (reviewReady) return;
 		if (
 			lastStatus.analysisStatus === "pending" ||
+			// The newest stored attempt is the real pending signal; `analysisStatus`
+			// only ever carries ready content from the status route.
+			lastStatus.analysisAttemptStatus === "pending" ||
 			analysisAttemptedFor.current === snapshotId
 		) {
 			return;

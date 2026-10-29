@@ -1,5 +1,8 @@
+import { CodebaseConclusion } from "@/features/codebase/components/planning/codebase-conclusion";
 import { ScreenConnect } from "@/features/codebase/components/workspace/screen-connect";
 import { ScreenIncompleteSync } from "@/features/codebase/components/workspace/screen-incomplete-sync";
+import type { AnalysisResponse } from "@/features/codebase/services/analysis";
+import type { CodebaseReadiness } from "@/features/codebase/services/workspace-readiness";
 import type { useCodebaseSync } from "../../hooks/use-codebase-sync";
 
 type ConnectionState = Pick<
@@ -22,7 +25,19 @@ export function WorkspaceConnectionScreen({
 	triggerAnalysis,
 	startSession,
 	readStatus,
-}: ConnectionState & { name: string }) {
+	readiness,
+	analysis = null,
+	isWorking = false,
+	activeWorkspaceSnapshotId = null,
+	manifestFileCount = 0,
+}: ConnectionState & {
+	name: string;
+	readiness?: CodebaseReadiness;
+	analysis?: AnalysisResponse | null;
+	isWorking?: boolean;
+	activeWorkspaceSnapshotId?: string | null;
+	manifestFileCount?: number;
+}) {
 	return (
 		<main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14">
 			<header className="border-b border-graphite pb-6">
@@ -46,7 +61,11 @@ export function WorkspaceConnectionScreen({
 					<button
 						type="button"
 						onClick={() => {
-							if (status?.analysisStatus === "failed" && status.snapshotId)
+							if (
+								(status?.analysisAttemptStatus === "failed" ||
+									status?.analysisStatus === "failed") &&
+								status.snapshotId
+							)
 								void triggerAnalysis(status.snapshotId);
 							else if (
 								status?.status === "failed" ||
@@ -62,7 +81,37 @@ export function WorkspaceConnectionScreen({
 					</button>
 				</div>
 			)}
-			{payload !== null || isStarting ? (
+			{readiness === "analysis_pending" || readiness === "recovery_required" ? (
+				<CodebaseConclusion
+					snapshot={
+						status ?? {
+							projectId: "",
+							sessionId: "",
+							status: "uploaded",
+							snapshotId: activeWorkspaceSnapshotId ?? "",
+							fileCount: manifestFileCount,
+							analysisStatus:
+								readiness === "recovery_required" ? "failed" : "pending",
+							analysisAttemptStatus:
+								readiness === "recovery_required" ? "failed" : "pending",
+							analysisAttemptCreatedAt: undefined,
+							analysisAttemptUpdatedAt: undefined,
+							errorCode: null,
+							errorMessage: null,
+						}
+					}
+					analysis={analysis}
+					isAnalyzing={isWorking}
+					errorMessage={error ?? status?.errorMessage ?? null}
+					onRetryAnalysis={() => {
+						const target = status?.snapshotId ?? activeWorkspaceSnapshotId;
+						if (target) void triggerAnalysis(target);
+					}}
+					onRetrySync={() => void startSession("retry")}
+					onEnterWorkspace={() => {}}
+					onBackToSync={() => void startSession("retry")}
+				/>
+			) : payload !== null || isStarting ? (
 				<ScreenConnect
 					projectName={name}
 					payload={payload}

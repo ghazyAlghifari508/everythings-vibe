@@ -352,6 +352,7 @@ export function CodebaseResyncModal({
 									status={status}
 									showAnalysisFailure={
 										(Boolean(analysisError) ||
+											status?.analysisAttemptStatus === "failed" ||
 											status?.analysisStatus === "failed" ||
 											analysis?.status === "failed") &&
 										Boolean(onRetryAnalysis)

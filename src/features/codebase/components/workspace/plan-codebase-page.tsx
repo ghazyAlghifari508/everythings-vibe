@@ -8,9 +8,9 @@ import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/a
 import { CODEBASE_ONBOARDING_LABEL } from "@/features/codebase/services/library";
 import type { PlanCodebaseStep } from "@/features/codebase/services/plan-storage";
 import {
-	isSyncStatusComplete,
-	SNAPSHOT_CONTEXT_STATUSES,
-} from "@/features/codebase/services/sync";
+	hasReadyAnalysisForSnapshot,
+	resolveOnboardingReadiness,
+} from "@/features/codebase/services/workspace-readiness";
 import { useUIStore } from "@/store";
 import { useCodebaseOnboarding } from "../../hooks/use-codebase-onboarding";
 import {
@@ -42,19 +42,25 @@ export function PlanCodebasePage() {
 		retrySession,
 	} = useCodebaseOnboarding({ analysisState, step, setStep });
 
-	// Two independent capabilities, deliberately not collapsed into one
-	// `isReady`: the workspace opens as soon as sync produced a usable
-	// snapshot, while the review conclusion additionally requires validated
-	// analysis output for that exact snapshot.
-	//
-	// `reviewReady` mirrors the workspace canRenderCodebaseReview predicate; a
-	// snapshot alone never counts as a review.
-	const canOpenWorkspace = isSyncStatusComplete(lastStatus);
-	const reviewReady = Boolean(
-		analysis?.output &&
-			lastStatus?.snapshotId &&
-			analysis.snapshotId === lastStatus.snapshotId &&
-			SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status),
+	// Upload success is not onboarding success. Readiness comes from the shared
+	// predicate: a snapshot opens nothing until validated analysis output exists
+	// for that exact snapshot, otherwise the user would land in a composer whose
+	// every request fails with CODEBASE_CONTEXT_UNAVAILABLE.
+	const readiness = resolveOnboardingReadiness({
+		snapshotId: lastStatus?.snapshotId ?? null,
+		snapshotStatus: lastStatus?.status ?? null,
+		analysis,
+		analysisAttemptStatus: lastStatus?.analysisAttemptStatus ?? null,
+		// A billing/eligibility block is a distinct state: nothing is running, so
+		// readiness must not report an analysis still in progress.
+		creditBlocked: Boolean(analysisState.creditStatus),
+	});
+	const canOpenWorkspace = readiness === "planning_ready";
+	// Mirrors the workspace canRenderCodebaseReview predicate so the conclusion
+	// and the workspace never disagree about what counts as a usable review.
+	const reviewReady = hasReadyAnalysisForSnapshot(
+		analysis,
+		lastStatus?.snapshotId ?? null,
 	);
 	const isLegacyAnalysisMissingSuggestions = Boolean(
 		analysis?.output &&

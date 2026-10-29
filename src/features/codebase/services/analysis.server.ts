@@ -40,6 +40,7 @@ import {
 	buildAnalysisUserPrompt,
 	CODEBASE_ANALYSIS_SYSTEM_PROMPT,
 	type CodebaseAnalysis,
+	classifyAnalysisAttemptCode,
 	classifyAnalysisFailure,
 	formatAnalysisDiagnosticLog,
 	generateValidatedAnalysis,
@@ -357,7 +358,7 @@ export async function requestCodebaseAnalysis(
 			.update(codebaseAnalyses)
 			.set({
 				status: "failed",
-				errorCode: "ANALYSIS_FAILED",
+				errorCode: classifyAnalysisAttemptCode(error, stage),
 				errorMessage: safe,
 				updatedAt: new Date(),
 			})
@@ -385,6 +386,11 @@ export async function requestCodebaseAnalysis(
 			}
 		}
 		if (error instanceof AnalysisServiceError) throw error;
-		throw new AnalysisServiceError("ANALYSIS_FAILED", safe, analysisId);
+		throw new AnalysisServiceError(
+			"ANALYSIS_FAILED",
+			safe,
+			analysisId,
+			classifyAnalysisAttemptCode(error, stage),
+		);
 	}
 }

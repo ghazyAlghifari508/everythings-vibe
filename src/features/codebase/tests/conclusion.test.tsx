@@ -105,8 +105,8 @@ describe("CodebaseConclusion pending analysis state", () => {
 			snapshot: status({ analysisStatus: "pending" }),
 			isAnalyzing: true,
 		});
-		expect(c.textContent).toContain("Menganalisis codebase");
-		expect(c.textContent).toContain("Sinkronisasi repository sudah selesai.");
+		expect(c.textContent).toContain("Menganalisis repository");
+		expect(c.textContent).toContain("Repository berhasil disinkronkan");
 		expect(
 			c.querySelector('[data-testid="codebase-analysis-pending"]'),
 		).not.toBeNull();
@@ -124,7 +124,7 @@ describe("CodebaseConclusion pending analysis state", () => {
 		);
 	});
 
-	it("offers workspace entry without waiting for the analysis", () => {
+	it("does not offer workspace entry while analysis is pending", () => {
 		const onEnterWorkspace = vi.fn();
 		const c = renderConclusion({
 			snapshot: status({ analysisStatus: "pending" }),
@@ -132,14 +132,11 @@ describe("CodebaseConclusion pending analysis state", () => {
 			onEnterWorkspace,
 		});
 		const cta = [...c.querySelectorAll("button")].find((b) =>
-			/Masuk ke Workspace tanpa menunggu/i.test(b.textContent ?? ""),
-		) as HTMLButtonElement | undefined;
-		expect(cta).toBeDefined();
-		expect(cta?.disabled).toBe(false);
-		act(() => {
-			cta?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-		expect(onEnterWorkspace).toHaveBeenCalledTimes(1);
+			/Masuk ke Workspace/i.test(b.textContent ?? ""),
+		);
+		expect(cta).toBeUndefined();
+		expect(c.textContent).toContain("Workspace belum tersedia");
+		expect(onEnterWorkspace).not.toHaveBeenCalled();
 	});
 
 	it("requires no manual Next action to advance from pending", () => {
@@ -156,7 +153,7 @@ describe("CodebaseConclusion pending analysis state", () => {
 			analysis: null,
 			isAnalyzing: true,
 		});
-		expect(c.textContent).toContain("Menganalisis codebase");
+		expect(c.textContent).toContain("Menganalisis repository");
 
 		act(() => {
 			root?.render(
@@ -176,7 +173,7 @@ describe("CodebaseConclusion pending analysis state", () => {
 		expect(
 			c.querySelector('[data-testid="codebase-analysis-pending"]'),
 		).toBeNull();
-		expect(c.textContent).not.toContain("Menganalisis codebase");
+		expect(c.textContent).not.toContain("Menganalisis repository");
 		expect(c.textContent).toContain("Detected environment");
 		expect(c.textContent).toContain("Next.js");
 	});
@@ -214,7 +211,7 @@ describe("CodebaseConclusion current-snapshot correctness", () => {
 			}),
 			analysis: null,
 		});
-		expect(c.textContent).toContain("Menganalisis codebase");
+		expect(c.textContent).toContain("Menganalisis repository");
 	});
 });
 
@@ -227,7 +224,7 @@ describe("CodebaseConclusion failed analysis state", () => {
 		});
 		expect(c.textContent).toContain("Analisis belum berhasil");
 		expect(c.textContent).toContain(
-			"Repository sudah berhasil disinkronkan, tetapi ringkasan belum dapat disiapkan.",
+			"Repository berhasil disinkronkan. Source code tetap tersimpan.",
 		);
 		expect(c.textContent).not.toMatch(/sync gagal/i);
 		expect(
@@ -235,7 +232,7 @@ describe("CodebaseConclusion failed analysis state", () => {
 		).not.toBeNull();
 	});
 
-	it("offers retry and workspace entry from the failed state", () => {
+	it("offers retry and blocks workspace entry from the failed state", () => {
 		const onRetryAnalysis = vi.fn();
 		const onEnterWorkspace = vi.fn();
 		const c = renderConclusion({
@@ -247,8 +244,31 @@ describe("CodebaseConclusion failed analysis state", () => {
 		});
 		expect(clickByLabel(c, /coba analisis lagi/i)).toBeDefined();
 		expect(onRetryAnalysis).toHaveBeenCalledTimes(1);
-		expect(clickByLabel(c, /Masuk ke Workspace/i)).toBeDefined();
-		expect(onEnterWorkspace).toHaveBeenCalledTimes(1);
+		expect(clickByLabel(c, /Masuk ke Workspace/i)).toBeUndefined();
+		expect(onEnterWorkspace).not.toHaveBeenCalled();
+	});
+
+	it("renders insufficient credit recovery when credit is lacking", () => {
+		const onRetryAnalysis = vi.fn();
+		const onEnterWorkspace = vi.fn();
+		const c = renderConclusion({
+			snapshot: status({
+				analysisStatus: "failed",
+				errorCode: "INSUFFICIENT_CREDITS",
+			}),
+			analysis: null,
+			errorMessage: "Kredit tidak mencukupi untuk memulai analisis.",
+			onRetryAnalysis,
+			onEnterWorkspace,
+		});
+		expect(c.textContent).toContain("Analisis belum dapat dimulai");
+		expect(c.textContent).toContain(
+			"Analisis belum dapat dimulai karena kredit belum mencukupi.",
+		);
+		const billingLink = c.querySelector('a[href="/settings/billing"]');
+		expect(billingLink).not.toBeNull();
+		expect(billingLink?.textContent).toContain("Tambahkan Kredit");
+		expect(clickByLabel(c, /Masuk ke Workspace/i)).toBeUndefined();
 	});
 
 	it("never makes a return to the sync step the only way out", () => {
@@ -270,6 +290,6 @@ describe("CodebaseConclusion failed analysis state", () => {
 		expect(
 			c.querySelector('[data-testid="codebase-analysis-failed"]'),
 		).toBeNull();
-		expect(c.textContent).toContain("Menganalisis codebase");
+		expect(c.textContent).toContain("Menganalisis repository");
 	});
 });

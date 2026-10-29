@@ -1,10 +1,6 @@
 "use client";
 
-import {
-	AlertCircleIcon,
-	ArrowRight01Icon,
-	Loading01Icon,
-} from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, Loading01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
@@ -48,10 +44,19 @@ interface CodebaseConclusionProps {
 export function resolveConclusionState(input: {
 	snapshotId: string | null | undefined;
 	snapshotAnalysisStatus?: "pending" | "ready" | "failed";
+	/** Newest stored attempt for the snapshot; reports failures that have no
+	 *  ready content, which `snapshotAnalysisStatus` alone can never express. */
+	snapshotAttemptStatus?: "pending" | "ready" | "failed";
 	analysis: AnalysisResponse | null;
 	isAnalyzing: boolean;
 }): ConclusionState {
-	const { snapshotId, snapshotAnalysisStatus, analysis, isAnalyzing } = input;
+	const {
+		snapshotId,
+		snapshotAnalysisStatus,
+		snapshotAttemptStatus,
+		analysis,
+		isAnalyzing,
+	} = input;
 	const matchesCurrentSnapshot =
 		Boolean(snapshotId) &&
 		analysis !== null &&
@@ -68,7 +73,12 @@ export function resolveConclusionState(input: {
 	const analysisFailed = matchesCurrentSnapshot
 		? analysis.status === "failed"
 		: false;
-	if (analysisFailed || snapshotAnalysisStatus === "failed") return "failed";
+	if (
+		analysisFailed ||
+		snapshotAnalysisStatus === "failed" ||
+		snapshotAttemptStatus === "failed"
+	)
+		return "failed";
 	return "analyzing";
 }
 
@@ -112,6 +122,7 @@ export function CodebaseConclusion({
 	const state = resolveConclusionState({
 		snapshotId: snapshot.snapshotId,
 		snapshotAnalysisStatus: snapshot.analysisStatus,
+		snapshotAttemptStatus: snapshot.analysisAttemptStatus,
 		analysis,
 		isAnalyzing,
 	});
@@ -119,6 +130,18 @@ export function CodebaseConclusion({
 	// trigger's own start is only a fallback for the window before the first
 	// poll lands, and only while this client knows it sent the request.
 	const elapsed = useAnalysisElapsedSeconds(snapshot.analysisAttemptCreatedAt);
+	// Real persisted counts only; the sentence degrades to a neutral claim when
+	// the server never reported them.
+	const fileSummary = snapshot.fileCount
+		? `Repository berhasil disinkronkan. ${snapshot.fileCount} file tersimpan.`
+		: "Repository berhasil disinkronkan.";
+
+	const isInsufficientCredit =
+		snapshot.errorCode === "INSUFFICIENT_CREDITS" ||
+		Boolean(
+			errorMessage &&
+				/kredit.*mencukupi|insufficient.*credit/i.test(errorMessage),
+		);
 
 	if (state === "ready" && analysis?.output && snapshot.snapshotId) {
 		return (
@@ -158,13 +181,16 @@ export function CodebaseConclusion({
 							/>
 						</span>
 						<h2 className="font-inter text-lg font-[620] text-snow">
-							Analisis belum berhasil
+							{isInsufficientCredit
+								? "Analisis belum dapat dimulai"
+								: "Analisis belum berhasil"}
 						</h2>
 						<p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-fog">
-							Repository sudah berhasil disinkronkan, tetapi ringkasan belum
-							dapat disiapkan.
+							{isInsufficientCredit
+								? "Repository berhasil disinkronkan. Analisis belum dapat dimulai karena kredit belum mencukupi."
+								: "Repository berhasil disinkronkan. Source code tetap tersimpan."}
 						</p>
-						{errorMessage && (
+						{errorMessage && !isInsufficientCredit && (
 							<p role="alert" className="mt-3 text-xs text-crimson">
 								{errorMessage}
 							</p>
@@ -181,11 +207,14 @@ export function CodebaseConclusion({
 							/>
 						</span>
 						<h2 className="font-inter text-lg font-[620] text-snow">
-							Menganalisis codebase
+							Menganalisis repository...
 						</h2>
 						<p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-fog">
-							Sinkronisasi repository sudah selesai. everythings-vibe sedang
-							memahami teknologi, struktur project, dependensi, dan modul utama.
+							{fileSummary}. everythings-vibe sedang memahami teknologi,
+							struktur project, dependensi, dan modul utama.
+						</p>
+						<p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-fog">
+							Workspace belum tersedia sampai analisis selesai.
 						</p>
 						{elapsed !== null ? (
 							<p
@@ -204,28 +233,30 @@ export function CodebaseConclusion({
 					</>
 				)}
 
-				<div className="mt-6 flex flex-col items-stretch justify-center gap-2.5 sm:flex-row sm:items-center">
-					{state === "failed" && (
-						<button
-							type="button"
-							onClick={onRetryAnalysis}
-							className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-graphite bg-obsidian px-4 text-xs font-medium text-mist transition hover:border-steel hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						>
-							Coba analisis lagi
-						</button>
-					)}
-					<button
-						type="button"
-						data-testid="conclusion-enter-workspace"
-						onClick={onEnterWorkspace}
-						className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						{state === "analyzing"
-							? "Masuk ke Workspace tanpa menunggu"
-							: "Masuk ke Workspace"}
-						<Icon icon={ArrowRight01Icon} size={14} aria-hidden="true" />
-					</button>
-				</div>
+				{/* Only a ready analysis opens the workspace. A pending or failed attempt
+					used to offer "Masuk ke Workspace tanpa menunggu", which dropped the
+					user into a composer whose every request fails with
+					CODEBASE_CONTEXT_UNAVAILABLE. Recovery is the only exit here. */}
+				{state === "failed" && (
+					<div className="mt-6 flex flex-col items-stretch justify-center gap-2.5 sm:flex-row sm:items-center">
+						{isInsufficientCredit ? (
+							<a
+								href="/settings/billing"
+								className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								Tambahkan Kredit
+							</a>
+						) : (
+							<button
+								type="button"
+								onClick={onRetryAnalysis}
+								className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md bg-snow px-5 text-xs font-semibold text-onyx transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								Coba analisis lagi
+							</button>
+						)}
+					</div>
+				)}
 			</section>
 		</div>
 	);

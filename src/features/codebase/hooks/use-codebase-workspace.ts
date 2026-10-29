@@ -16,6 +16,7 @@ import {
 import { useKanbanTasks } from "@/features/greenfield/hooks/use-kanban-polling";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import type { CodebaseWorkspaceData } from "../services/workspace-loader.functions";
+import { resolveCodebaseReadiness } from "../services/workspace-readiness";
 import { useCodebaseSync } from "./use-codebase-sync";
 import { useWorkspaceArtifactPresentation } from "./use-workspace-artifact-presentation";
 import { useWorkspaceArtifacts } from "./use-workspace-artifacts";
@@ -89,6 +90,16 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 			return { ...artifact.artifactHydration, tasks: "ready" };
 		return artifact.artifactHydration;
 	}, [artifact.artifactHydration, hasTasksInDb]);
+	const hasExistingPlan = data.plans.some((entry) => entry.hasArtifacts);
+	const readiness = resolveCodebaseReadiness({
+		snapshotId: sync.status?.snapshotId ?? data.currentSnapshotId,
+		snapshotStatus:
+			sync.status?.status ?? (data.hasStoredSnapshot ? "uploaded" : null),
+		analysis: sync.analysis,
+		analysisAttemptStatus: sync.status?.analysisAttemptStatus ?? null,
+		hasExistingPlan,
+		hasStoredSnapshot: data.hasStoredSnapshot,
+	});
 	const composerAvailable =
 		!effectiveFeatureId ||
 		plan.isCreatingNew ||
@@ -351,5 +362,6 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		answersReadOnly,
 		userTookOverCanvas,
 		selectPlan,
+		readiness,
 	};
 }

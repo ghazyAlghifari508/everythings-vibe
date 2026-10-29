@@ -97,6 +97,7 @@ export function ScreenConnectSyncStep({
 					showAnalysisFailure={
 						!isLegacyAnalysisMissingSuggestions &&
 						(Boolean(analysisError) ||
+							status?.analysisAttemptStatus === "failed" ||
 							status?.analysisStatus === "failed" ||
 							analysis?.status === "failed") &&
 						Boolean(onRetryAnalysis)
