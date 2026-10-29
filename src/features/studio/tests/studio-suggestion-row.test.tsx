@@ -108,23 +108,40 @@ describe("StudioComposer next-screen suggestions", () => {
 		expect(document.activeElement).toBe(first);
 	});
 
-	it("enables the scroll controls only when the row overflows", () => {
+	it("shows the scroll controls only when the row overflows", () => {
 		render(<StudioComposer onSubmit={vi.fn()} suggestions={SUGGESTIONS} />);
 		const viewport = screen.getByRole("region", {
 			name: "Saran layar berikutnya",
 		});
-		const previous = screen.getByRole("button", {
-			name: "Geser saran ke kiri",
-		});
-		const next = screen.getByRole("button", { name: "Geser saran ke kanan" });
 
-		expect(previous.hasAttribute("disabled")).toBe(true);
-		expect(next.hasAttribute("disabled")).toBe(true);
+		expect(
+			screen.queryByRole("button", { name: "Geser saran ke kiri" }),
+		).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: "Geser saran ke kanan" }),
+		).toBeNull();
 
 		setScrollableMetrics(viewport, 120);
 		fireEvent.scroll(viewport);
-		expect(previous.hasAttribute("disabled")).toBe(false);
-		expect(next.hasAttribute("disabled")).toBe(false);
+		expect(
+			screen
+				.getByRole("button", { name: "Geser saran ke kiri" })
+				.hasAttribute("disabled"),
+		).toBe(false);
+		expect(
+			screen
+				.getByRole("button", { name: "Geser saran ke kanan" })
+				.hasAttribute("disabled"),
+		).toBe(false);
+
+		// Back at the start the left control has nothing to reveal.
+		setScrollableMetrics(viewport, 0);
+		fireEvent.scroll(viewport);
+		expect(
+			screen
+				.getByRole("button", { name: "Geser saran ke kiri" })
+				.hasAttribute("disabled"),
+		).toBe(true);
 	});
 
 	it("renders no suggestion row when the project has nothing to propose", () => {

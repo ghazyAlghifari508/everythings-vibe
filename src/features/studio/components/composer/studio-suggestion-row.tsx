@@ -98,21 +98,26 @@ export function StudioSuggestionRow({
 
 	const arrowClass =
 		"inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-iron bg-obsidian text-fog transition-colors hover:text-snow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:cursor-not-allowed disabled:opacity-40";
+	// A row that fits needs no controls, so the arrows only appear once the
+	// bubbles actually overflow.
+	const scrollable = canPrev || canNext;
 
 	return (
 		<div
 			data-testid="studio-suggestion-row"
 			className="mb-2 flex items-center gap-1.5"
 		>
-			<button
-				type="button"
-				aria-label="Geser saran ke kiri"
-				disabled={!canPrev}
-				onClick={() => scrollOneStep(-1)}
-				className={arrowClass}
-			>
-				<Icon icon={ArrowLeft01Icon} size={14} />
-			</button>
+			{scrollable ? (
+				<button
+					type="button"
+					aria-label="Geser saran ke kiri"
+					disabled={!canPrev}
+					onClick={() => scrollOneStep(-1)}
+					className={arrowClass}
+				>
+					<Icon icon={ArrowLeft01Icon} size={14} />
+				</button>
+			) : null}
 			<section
 				ref={viewportRef}
 				aria-label="Saran layar berikutnya"
@@ -139,15 +144,17 @@ export function StudioSuggestionRow({
 					))}
 				</ul>
 			</section>
-			<button
-				type="button"
-				aria-label="Geser saran ke kanan"
-				disabled={!canNext}
-				onClick={() => scrollOneStep(1)}
-				className={arrowClass}
-			>
-				<Icon icon={ArrowRight01Icon} size={14} />
-			</button>
+			{scrollable ? (
+				<button
+					type="button"
+					aria-label="Geser saran ke kanan"
+					disabled={!canNext}
+					onClick={() => scrollOneStep(1)}
+					className={arrowClass}
+				>
+					<Icon icon={ArrowRight01Icon} size={14} />
+				</button>
+			) : null}
 		</div>
 	);
 }

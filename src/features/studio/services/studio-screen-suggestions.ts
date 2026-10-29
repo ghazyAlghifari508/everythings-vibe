@@ -8,14 +8,12 @@ import type { StudioDesignBlueprint } from "./studio-design-blueprint";
  * zooming the canvas can never trigger a generation request.
  */
 
-export type StudioSuggestionIntent = "add_screen";
-
 /** One next-screen bubble: compact label, full editable prompt, stable id. */
 export interface StudioScreenSuggestion {
 	id: string;
 	label: string;
 	prompt: string;
-	intent: StudioSuggestionIntent;
+	intent: "add_screen";
 	/** Why this screen was proposed; internal grounding, not decorative copy. */
 	reason: string;
 }
@@ -35,7 +33,7 @@ export interface StudioSuggestionInput {
 }
 
 export const STUDIO_SCREEN_SUGGESTION_LIMIT = 4;
-export const STUDIO_SUGGESTION_CACHE_LIMIT = 8;
+const SUGGESTION_CACHE_LIMIT = 8;
 
 const FOCUS = {
 	profile:
@@ -171,7 +169,7 @@ const PLATFORM_FALLBACK: Record<
 const GENERIC_FOCUS =
 	"Tampilkan konten utama layar ini lengkap dengan data, state kosong, dan aksi utamanya.";
 
-export function normalizeStudioScreenName(raw: string): string {
+function normalizeStudioScreenName(raw: string): string {
 	return raw
 		.toLowerCase()
 		.normalize("NFKD")
@@ -360,7 +358,7 @@ export function getStudioScreenSuggestions(
 	const cached = suggestionCache.get(revision);
 	if (cached) return cached;
 	const suggestions = deriveStudioScreenSuggestions(input);
-	if (suggestionCache.size >= STUDIO_SUGGESTION_CACHE_LIMIT) {
+	if (suggestionCache.size >= SUGGESTION_CACHE_LIMIT) {
 		const oldest = suggestionCache.keys().next();
 		if (!oldest.done) suggestionCache.delete(oldest.value);
 	}

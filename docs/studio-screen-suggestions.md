@@ -76,9 +76,10 @@ soon as the canvas is idle.
 `StudioSuggestionRow` sits above the composer form inside the same floating
 container, so it inherits the composer width and safe-area inset. It is one
 horizontal row of pill buttons with `overflow-x-auto`, no scrollbar, and previous
-/ next buttons that enable only when the row overflows. `canScrollPrev`,
-`canScrollNext` and `getCarouselStep` are reused from
-`studio-shortcut-carousel-state` rather than reimplemented.
+/ next buttons that appear only once the bubbles actually overflow — a row that
+fits keeps no dead controls. `canScrollPrev`, `canScrollNext` and
+`getCarouselStep` are reused from `studio-shortcut-carousel-state` rather than
+reimplemented.
 
 Accessibility: the row is a labelled `region` containing a `ul` of buttons, so
 Tab and Left/Right arrows both move between bubbles, focus rings are visible, and
