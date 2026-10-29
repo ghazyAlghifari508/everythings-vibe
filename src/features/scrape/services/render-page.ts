@@ -14,6 +14,7 @@ import {
 	SCRAPE_DESKTOP_HEIGHT,
 	SCRAPE_DESKTOP_WIDTH,
 	SCRAPE_MAX_HTML_BYTES,
+	SCRAPE_SCREENSHOT_FULL_PAGE_MAX_HEIGHT,
 } from "@/features/scrape/types/scrape-constants";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
@@ -286,9 +287,27 @@ export async function renderPage(
 			(mode === "html" || mode === "design")
 		) {
 			try {
+				// The fallback is the whole page when that stays affordable: a tall page
+				// would otherwise be cropped to its first viewport. Beyond the ceiling a
+				// stitched bitmap would be unreasonably large, so the bounded viewport
+				// shot is kept instead.
+				const pageHeight = await page
+					.evaluate(() =>
+						Math.ceil(
+							Math.max(
+								document.documentElement.scrollHeight,
+								document.body ? document.body.scrollHeight : 0,
+							),
+						),
+					)
+					.catch(() => 0);
+				const fullPage =
+					pageHeight > 0 &&
+					pageHeight <= SCRAPE_SCREENSHOT_FULL_PAGE_MAX_HEIGHT;
 				const buffer = await page.screenshot({
 					type: "jpeg",
-					quality: 85,
+					quality: fullPage ? 80 : 85,
+					...(fullPage ? { fullPage: true } : {}),
 				});
 				screenshot = `data:image/jpeg;base64,${buffer.toString("base64")}`;
 			} catch {

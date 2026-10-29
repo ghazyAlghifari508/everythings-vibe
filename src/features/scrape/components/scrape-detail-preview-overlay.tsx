@@ -13,10 +13,10 @@ export const READINESS_MESSAGE: Record<
 	{ label: string; tone: "pending" | "ok" | "warn"; detail: string }
 > = {
 	failed: {
-		label: "Preview gagal ditampilkan",
+		label: "Preview interaktif gagal dimuat",
 		tone: "warn",
 		detail:
-			"Tampilan website tidak berhasil dimuat. Coba lagi atau buka Source HTML.",
+			"Dokumen hasil scrape tidak melaporkan tampilannya. Coba lagi, atau baca isi lengkapnya di tab HTML Source.",
 	},
 	preparing: {
 		label: "Menyiapkan preview website",
@@ -60,7 +60,7 @@ export function PreviewCanvasOverlay({
 	if (report === "ready") return null;
 	if (report === "degraded") {
 		return (
-			<div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-graphite bg-obsidian/95 px-2.5 py-1.5 text-xs">
+			<div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-graphite bg-obsidian/95 px-2.5 py-1.5 text-xs">
 				<Icon
 					icon={Alert02Icon}
 					size={14}

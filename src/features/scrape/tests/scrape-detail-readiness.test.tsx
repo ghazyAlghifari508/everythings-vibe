@@ -336,7 +336,7 @@ describe("ScrapeDetail preview readiness", () => {
 		}
 	});
 
-	it("does not remount the iframe when switching Preview to Source HTML and back", () => {
+	it("keeps the rendered preview across Preview and Source HTML without reloading it", () => {
 		render(
 			<ScrapeDetail
 				domain="example.com"
@@ -346,8 +346,13 @@ describe("ScrapeDetail preview readiness", () => {
 			/>,
 		);
 		const before = screen.getByTitle("Preview example.com");
+		act(() => report("ready", 0));
 		fireEvent.click(screen.getByRole("tab", { name: /Source HTML/i }));
-		expect(before.getAttribute("srcdoc")).toBe("");
+		// Emptying srcdoc would throw the rendered document away, so the preview
+		// reloaded - and sometimes failed - every time the reader came back.
+		expect(before.getAttribute("srcdoc")).toBe(
+			"<html><body>signed</body></html>",
+		);
 		expect(
 			screen.getByRole("tabpanel", { name: /Source code index\.html/i }),
 		).toBeDefined();
@@ -357,5 +362,7 @@ describe("ScrapeDetail preview readiness", () => {
 		expect(after.getAttribute("srcdoc")).toBe(
 			"<html><body>signed</body></html>",
 		);
+		// The verdict survives the round trip instead of restarting detection.
+		expect(screen.queryByRole("status")).toBeNull();
 	});
 });

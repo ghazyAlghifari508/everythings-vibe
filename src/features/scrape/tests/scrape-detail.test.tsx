@@ -64,7 +64,7 @@ describe("ScrapeDetail", () => {
 			screen.queryByRole("button", { name: /Salin DESIGN\.md/i }),
 		).toBeNull();
 	});
-	it("hydrates the desktop preview before resizing it to the viewport", () => {
+	it("hydrates the desktop preview canvas without a server/client mismatch", () => {
 		const browserWindow = window;
 		window.innerHeight = 844;
 		vi.stubGlobal("window", undefined);
@@ -131,19 +131,17 @@ describe("ScrapeDetail", () => {
 			if (!hydratedIframe) throw new Error("Preview iframe was not hydrated");
 			const hydratedCanvas = hydratedIframe.parentElement;
 			expect(hydrationErrors).toEqual([]);
-			expect(hydratedIframe.style.height).toBe("633px");
-			expect(hydratedCanvas?.style.height).toBe("633px");
-			window.innerHeight = 700;
-			act(() => window.dispatchEvent(new Event("resize")));
-			expect(hydratedIframe.style.height).toBe("525px");
-			expect(hydratedCanvas?.style.height).toBe("525px");
+			// The canvas starts at the capture viewport and only grows when the
+			// document reports its own height, so hydration cannot disagree with
+			// the server about the frame size.
+			expect(hydratedIframe.style.height).toBe("675px");
+			expect(hydratedCanvas?.style.height).toBe("675px");
 		} finally {
 			if (root) act(() => root?.unmount());
 			hydrationContainer.remove();
 		}
 	});
-	it("resizes from the measured container and viewport while preserving readable preview scale", async () => {
-		window.innerHeight = 900;
+	it("scales from the measured container while keeping the preview readable", async () => {
 		vi.stubGlobal("ResizeObserver", TestResizeObserver);
 		render(
 			<ScrapeDetail
@@ -166,10 +164,6 @@ describe("ScrapeDetail", () => {
 		expect(canvas?.style.height).toBe("563px");
 		expect(iframe.style.width).toBe("1440px");
 		expect(iframe.style.height).toBe("675px");
-		window.innerHeight = 700;
-		act(() => window.dispatchEvent(new Event("resize")));
-		await waitFor(() => expect(iframe.style.height).toBe("525px"));
-		expect(canvas?.style.height).toBe("438px");
 
 		const container = resizeObservers[0]?.target;
 		expect(container).not.toBeNull();
@@ -185,7 +179,7 @@ describe("ScrapeDetail", () => {
 		await waitFor(() => expect(iframe.style.transform).toBe("scale(0.75)"));
 		expect(iframe.style.width).toBe("1440px");
 		expect(canvas?.style.width).toBe("1080px");
-		expect(canvas?.style.height).toBe("394px");
+		expect(canvas?.style.height).toBe("506px");
 		expect(container.classList.contains("overflow-x-auto")).toBe(true);
 	});
 

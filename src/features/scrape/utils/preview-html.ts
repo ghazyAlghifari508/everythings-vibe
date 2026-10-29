@@ -312,7 +312,7 @@ function runtimeShim(
 // degraded axis. The reporter also re-reports on DOM change so a late layout
 // upgrade is never lost.
 function previewLoadReporter(nonce?: string): string {
-	return `<script${nonceAttr(nonce)}>(()=>{if(window.parent===window)return;let failed=0;let fatal=false;let lastState="";const isResourceError=el=>el instanceof Element&&(el.tagName==="IMG"||(el.tagName==="LINK"&&el.getAttribute("rel")==="stylesheet"));const visible=()=>{const body=document.body;if(!body)return false;const bodyStyle=getComputedStyle(body);if(bodyStyle.display==="none"||bodyStyle.visibility==="hidden"||Number(bodyStyle.opacity)===0)return false;for(const node of body.childNodes)if(node.nodeType===3&&node.textContent.trim())return true;const nodes=body.querySelectorAll("*");for(let i=0;i<Math.min(nodes.length,5000);i++){const el=nodes[i];if(/^(SCRIPT|STYLE|LINK|META|NOSCRIPT|TEMPLATE)$/.test(el.tagName))continue;const rect=el.getBoundingClientRect();if(rect.width<2||rect.height<2)continue;let hidden=false;for(let p=el;p&&p!==document.documentElement;p=p.parentElement){const s=getComputedStyle(p);if(s.display==="none"||s.visibility==="hidden"||Number(s.opacity)===0){hidden=true;break}}if(hidden)continue;const text=Array.from(el.childNodes).some(n=>n.nodeType===3&&n.textContent.trim());const media=el.tagName==="IMG"||/^(SVG|CANVAS|VIDEO|PICTURE|IFRAME|EMBED|OBJECT)$/.test(el.tagName);if(text||media||getComputedStyle(el).backgroundImage!=="none")return true}return false};const compute=()=>{if(visible())return failed>0?"degraded":"ready";if(fatal)return"failed";return document.readyState==="complete"?"empty":"preparing"};const report=force=>{const state=compute();if(!force&&state===lastState)return;lastState=state;parent.postMessage({type:"vibedesign-preview",state,failed},"*")};window.addEventListener("error",e=>{if(isResourceError(e.target))failed+=1;else fatal=true;requestAnimationFrame(()=>report(true))},true);window.addEventListener("unhandledrejection",()=>{fatal=true;requestAnimationFrame(()=>report(true))});window.addEventListener("message",e=>{if(e.source===parent&&e.data&&e.data.type==="vibedesign-preview-ping")report(true)});window.addEventListener("load",()=>requestAnimationFrame(()=>report(true)),{once:true});if(document.readyState==="complete")requestAnimationFrame(()=>report(true));if(typeof MutationObserver==="function"){const observer=new MutationObserver(()=>requestAnimationFrame(()=>report(false)));observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:["src","srcset","style","class"]})}})();</script>`;
+	return `<script${nonceAttr(nonce)}>(()=>{if(window.parent===window)return;let failed=0;let fatal=false;let lastState="",lastHeight=0;const RESOURCES=/^(IMG|LINK|SOURCE|VIDEO|AUDIO|TRACK|SCRIPT|IFRAME|EMBED|OBJECT|PICTURE)$/;const isResourceError=el=>el instanceof Element&&RESOURCES.test(el.tagName.toUpperCase());const height=()=>{const d=document.documentElement,b=document.body;return Math.round(Math.max(d?d.scrollHeight:0,b?b.scrollHeight:0,d?d.offsetHeight:0))};const visible=()=>{const body=document.body;if(!body)return false;const bodyStyle=getComputedStyle(body);if(bodyStyle.display==="none"||bodyStyle.visibility==="hidden"||Number(bodyStyle.opacity)===0)return false;for(const node of body.childNodes)if(node.nodeType===3&&node.textContent.trim())return true;const nodes=body.querySelectorAll("*");for(let i=0;i<Math.min(nodes.length,5000);i++){const el=nodes[i];if(/^(SCRIPT|STYLE|LINK|META|NOSCRIPT|TEMPLATE)$/.test(el.tagName))continue;const rect=el.getBoundingClientRect();if(rect.width<2||rect.height<2)continue;let hidden=false;for(let p=el;p&&p!==document.documentElement;p=p.parentElement){const s=getComputedStyle(p);if(s.display==="none"||s.visibility==="hidden"||Number(s.opacity)===0){hidden=true;break}}if(hidden)continue;const text=Array.from(el.childNodes).some(n=>n.nodeType===3&&n.textContent.trim());const media=el.tagName==="IMG"||/^(SVG|CANVAS|VIDEO|PICTURE|IFRAME|EMBED|OBJECT)$/.test(el.tagName);if(text||media||getComputedStyle(el).backgroundImage!=="none")return true}return false};const compute=()=>{if(visible())return failed>0?"degraded":"ready";if(fatal)return"failed";return document.readyState==="complete"?"empty":"preparing"};const report=force=>{const state=compute(),h=height();if(!force&&state===lastState&&Math.abs(h-lastHeight)<24)return;lastState=state;lastHeight=h;parent.postMessage({type:"vibedesign-preview",state,failed,height:h},"*")};window.addEventListener("error",e=>{if(isResourceError(e.target))failed+=1;else fatal=true;requestAnimationFrame(()=>report(true))},true);window.addEventListener("unhandledrejection",()=>{fatal=true;requestAnimationFrame(()=>report(true))});window.addEventListener("message",e=>{if(e.source===parent&&e.data&&e.data.type==="vibedesign-preview-ping")report(true)});window.addEventListener("load",()=>requestAnimationFrame(()=>report(true)),{once:true});if(document.readyState==="complete")requestAnimationFrame(()=>report(true));if(typeof MutationObserver==="function"){const observer=new MutationObserver(()=>requestAnimationFrame(()=>report(false)));observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:["src","srcset","style","class"]})}})();</script>`;
 }
 
 // Keeps the captured document read-only inside the preview frame. The frame
@@ -323,11 +323,13 @@ function previewNavigationGuard(nonce?: string): string {
 	return `<script${nonceAttr(nonce)}>(()=>{const VIBE_NAV_GUARD="vibedesign-preview-navigation";if(window.parent===window)return;const sameDocument=v=>typeof v==="string"&&v.trim().startsWith("#");document.addEventListener("click",e=>{const node=e.target;if(!(node instanceof Element))return;const link=node.closest("a[href],area[href]");if(!link)return;if(sameDocument(link.getAttribute("href")))return;e.preventDefault()},true);document.addEventListener("submit",e=>{e.preventDefault()},true)})();</script>`;
 }
 
-// Matches the reporter by its stable opening, so re-rewriting an already
-// processed document replaces the reporter instead of stacking a second one.
+// Restores html/body scrolling when captured pages lock the root scroller for JS animations.
+const PREVIEW_SCROLL_SHELL =
+	"<style data-vibe-preview-scroll>html,body{overflow-y:auto!important;height:auto!important;max-height:none!important;overscroll-behavior-y:auto!important}</style>";
+const PREVIEW_SCROLL_SHELL_PATTERN =
+	/<style\s+data-vibe-preview-scroll>[\s\S]*?<\/style>/i;
 const LOAD_REPORTER_PATTERN =
 	/<script(?:\s+nonce="[^"]*")?>\(\(\)=>\{if\(window\.parent===window\)return;let failed=0;[\s\S]*?<\/script>/i;
-// Same for the navigation guard, so a second pass never stacks two guards.
 const NAV_GUARD_PATTERN =
 	/<script(?:\s+nonce="[^"]*")?>\(\(\)=>\{const VIBE_NAV_GUARD=[\s\S]*?<\/script>/i;
 
@@ -352,6 +354,7 @@ export function rewritePreviewAssets(
 	let stripped = html
 		.replace(shimPattern, hasExistingShim ? "" : "$&")
 		.replace(LOAD_REPORTER_PATTERN, "")
+		.replace(PREVIEW_SCROLL_SHELL_PATTERN, "")
 		.replace(NAV_GUARD_PATTERN, "");
 	if (visualSnapshot) {
 		stripped = stripped.replace(
@@ -384,7 +387,7 @@ export function rewritePreviewAssets(
 		hasExistingShim && capabilities.size === 0 && existingShim
 			? existingShim
 			: runtimeShim(effectiveBase, capabilities, nonce);
-	const injected = `${visualSnapshot ? "" : shim}${previewLoadReporter(nonce)}${previewNavigationGuard(nonce)}`;
+	const injected = `${visualSnapshot ? PREVIEW_SCROLL_SHELL : shim}${previewLoadReporter(nonce)}${previewNavigationGuard(nonce)}`;
 	return /<head[^>]*>/i.test(rewritten)
 		? rewritten.replace(/<head[^>]*>/i, (head) => `${head}${injected}`)
 		: `${injected}${rewritten}`;
