@@ -199,7 +199,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		expect(screen.getByText("Menyinkronkan codebase...")).toBeDefined();
+		expect(screen.getByText("Mengunggah repository...")).toBeDefined();
 		expect(
 			(screen.getByTestId("sync-continue-to-summary") as HTMLButtonElement)
 				.disabled,
@@ -273,7 +273,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 		expect(screen.getByText("Copy prompt untuk AI agent")).toBeDefined();
 		const analysisStage = screen.getByTestId("sync-stage-analysis");
 		expect(analysisStage.getAttribute("data-stage-state")).toBe("active");
-		expect(analysisStage.textContent).toContain("Menganalisis codebase");
+		expect(analysisStage.textContent).toContain("Menganalisis repository");
 
 		// Next disabled and no conclusion test ID
 		const cta = screen.getByTestId(
@@ -328,7 +328,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 			{ timeout: 15000, interval: 100 },
 		);
 		expect(screen.getByTestId("sync-stage-analysis").textContent).toContain(
-			"Menganalisis codebase",
+			"Menganalisis repository",
 		);
 		// Resume is navigation only: no new repository, sync session, or attempt.
 		expect(fetchMock).not.toHaveBeenCalledWith(
@@ -413,7 +413,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Paste prompt lalu jalankan")).toBeDefined();
+				expect(screen.getByText("Pantau progres")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);
@@ -446,5 +446,52 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 			{ timeout: 15000, interval: 100 },
 		);
 		expect(screen.queryByTestId("codebase-sync-summary")).toBeNull();
+	}, 20000);
+
+	it("keeps one inline credit recovery instead of a duplicate consent card", async () => {
+		seed({ codebaseId: "cb-credit-blocked", step: "sync" });
+		mockRecovery({
+			codebaseId: "cb-credit-blocked",
+			status: {
+				projectId: "cb-credit-blocked",
+				sessionId: "sess-credit-blocked",
+				status: "uploaded",
+				snapshotId: "snap-refresh-1",
+				fileCount: 12,
+			},
+			// The initial analysis is blocked before any model call.
+			analysis: {
+				code: "INSUFFICIENT_CREDITS",
+				availableCredits: 2,
+				maximumCredits: 12,
+				pricingVersion: "adaptive-v1",
+				canStart: false,
+			},
+		});
+
+		render(<PlanCodebasePage />);
+
+		await waitFor(
+			() => {
+				expect(
+					screen
+						.getByTestId("sync-stage-analysis")
+						.getAttribute("data-stage-state"),
+				).toBe("blocked");
+			},
+			{ timeout: 15000, interval: 100 },
+		);
+		const blocked = screen.getByTestId("sync-stage-analysis");
+		expect(blocked.textContent).toContain("Analisis membutuhkan kredit");
+		const action = blocked.querySelector('a[href="/settings/billing"]');
+		expect(action?.textContent).toBe("Tambahkan Kredit");
+		// One primary recovery action: no separate consent card, no workspace CTA.
+		expect(
+			screen.queryByRole("button", { name: /Setujui hingga/i }),
+		).toBeNull();
+		expect(
+			(screen.getByTestId("sync-continue-to-summary") as HTMLButtonElement)
+				.disabled,
+		).toBe(true);
 	}, 20000);
 });

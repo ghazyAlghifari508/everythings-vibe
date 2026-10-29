@@ -277,7 +277,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 		await startSyncStep();
 		await waitFor(
 			() => {
-				expect(screen.getByText("Paste prompt lalu jalankan")).toBeDefined();
+				expect(screen.getByText("Pantau progres")).toBeDefined();
 			},
 			{ timeout: 10000, interval: 100 },
 		);

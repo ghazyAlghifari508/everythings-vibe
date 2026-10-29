@@ -1,10 +1,11 @@
 "use client";
 
-import { AlertCircleIcon, Loading01Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { Spinner } from "@/components/ui/spinner";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import type { SyncStatusResponse } from "@/features/codebase/services/sync";
 import { CodebaseReview } from "./codebase-review";
@@ -153,7 +154,7 @@ export function CodebaseConclusion({
 				snapshotCreatedAt={snapshot.snapshotCreatedAt}
 				fileCount={snapshot.fileCount}
 				excludedCount={snapshot.excludedCount}
-				continueLabel="Masuk ke Workspace"
+				continueLabel="Buka Workspace"
 				onRetryAnalysis={onRetryAnalysis}
 				onRetrySync={onRetrySync}
 				onContinue={onEnterWorkspace}
@@ -205,12 +206,7 @@ export function CodebaseConclusion({
 				) : (
 					<>
 						<span className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full border border-graphite bg-obsidian">
-							<Icon
-								icon={Loading01Icon}
-								size={18}
-								className="shrink-0 animate-spin text-fog"
-								aria-hidden="true"
-							/>
+							<Spinner size={18} className="text-fog" />
 						</span>
 						<h2 className="font-inter text-lg font-[620] text-snow">
 							Menganalisis repository...

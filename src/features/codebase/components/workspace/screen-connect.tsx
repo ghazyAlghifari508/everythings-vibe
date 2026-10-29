@@ -47,6 +47,8 @@ interface ScreenConnectProps {
 	onContinueToSummary?: () => void;
 	analysis?: AnalysisResponse | null;
 	analysisError?: string | null;
+	/** Billing/eligibility blocked the analysis; the snapshot is still usable. */
+	analysisBlocked?: boolean;
 	isAnalyzing?: boolean;
 	onRetryAnalysis?: () => void;
 	isLegacyAnalysisMissingSuggestions?: boolean;
@@ -65,6 +67,7 @@ export function ScreenConnect({
 	onContinueToSummary,
 	analysis = null,
 	analysisError = null,
+	analysisBlocked = false,
 	isAnalyzing = false,
 	onRetryAnalysis,
 	isLegacyAnalysisMissingSuggestions = false,
@@ -118,6 +121,7 @@ export function ScreenConnect({
 						canContinueToSummary={canContinueToSummary}
 						analysis={analysis}
 						analysisError={analysisError}
+						analysisBlocked={analysisBlocked}
 						isAnalyzing={isAnalyzing}
 						onRetryAnalysis={onRetryAnalysis}
 						isLegacyAnalysisMissingSuggestions={

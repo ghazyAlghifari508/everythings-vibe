@@ -56,6 +56,17 @@ export function PlanCodebasePage() {
 		creditBlocked: Boolean(analysisState.creditStatus),
 	});
 	const canOpenWorkspace = readiness === "planning_ready";
+	// A credit block is not a retryable model failure: the only useful recovery
+	// is topping up, so the status list owns that action instead of the consent
+	// card. Consent is only shown when it can actually start the analysis.
+	const analysisCreditCode = analysisState.creditStatus?.code ?? null;
+	const analysisBlocked =
+		analysisCreditCode === "INSUFFICIENT_CREDITS" ||
+		analysisCreditCode === "SUBSCRIPTION_PAUSED" ||
+		lastStatus?.errorCode === "INSUFFICIENT_CREDITS";
+	const showAnalysisConsent =
+		analysisCreditCode === "FREE_ALLOWANCE_AVAILABLE" ||
+		analysisCreditCode === "CREDIT_REQUIRED";
 	// Mirrors the workspace canRenderCodebaseReview predicate so the conclusion
 	// and the workspace never disagree about what counts as a usable review.
 	const reviewReady = hasReadyAnalysisForSnapshot(
@@ -137,7 +148,7 @@ export function PlanCodebasePage() {
 				<CodebaseOnboardingLoadingCard title="Menyiapkan instruksi CLI..." />
 			) : (
 				<>
-					{analysisState.creditStatus && (
+					{showAnalysisConsent && analysisState.creditStatus && (
 						<AnalysisCreditNotice
 							status={analysisState.creditStatus}
 							onStart={retryAnalysis}
@@ -161,6 +172,7 @@ export function PlanCodebasePage() {
 							onContinueToSummary={() => setStep("summary")}
 							analysis={analysis}
 							analysisError={analysisError}
+							analysisBlocked={analysisBlocked}
 							isAnalyzing={analysisWorking}
 							onRetryAnalysis={retryAnalysis}
 							isLegacyAnalysisMissingSuggestions={

@@ -206,7 +206,7 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 		// The prompt is waiting on the agent first.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Paste prompt lalu jalankan")).toBeDefined();
+				expect(screen.getByText("Pantau progres")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);

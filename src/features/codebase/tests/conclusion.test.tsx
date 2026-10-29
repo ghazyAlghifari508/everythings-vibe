@@ -132,7 +132,7 @@ describe("CodebaseConclusion pending analysis state", () => {
 			onEnterWorkspace,
 		});
 		const cta = [...c.querySelectorAll("button")].find((b) =>
-			/Masuk ke Workspace/i.test(b.textContent ?? ""),
+			/Buka Workspace/i.test(b.textContent ?? ""),
 		);
 		expect(cta).toBeUndefined();
 		expect(c.textContent).toContain("Workspace belum tersedia");
@@ -183,7 +183,7 @@ describe("CodebaseConclusion pending analysis state", () => {
 			snapshot: status({ analysisStatus: "ready" }),
 			analysis: readyAnalysis(),
 		});
-		expect(c.textContent).toContain("Masuk ke Workspace");
+		expect(c.textContent).toContain("Buka Workspace");
 		expect(c.textContent).not.toContain("tanpa menunggu");
 	});
 });
@@ -244,7 +244,7 @@ describe("CodebaseConclusion failed analysis state", () => {
 		});
 		expect(clickByLabel(c, /coba analisis lagi/i)).toBeDefined();
 		expect(onRetryAnalysis).toHaveBeenCalledTimes(1);
-		expect(clickByLabel(c, /Masuk ke Workspace/i)).toBeUndefined();
+		expect(clickByLabel(c, /Buka Workspace/i)).toBeUndefined();
 		expect(onEnterWorkspace).not.toHaveBeenCalled();
 	});
 
@@ -268,7 +268,7 @@ describe("CodebaseConclusion failed analysis state", () => {
 		const billingLink = c.querySelector('a[href="/settings/billing"]');
 		expect(billingLink).not.toBeNull();
 		expect(billingLink?.textContent).toContain("Tambahkan Kredit");
-		expect(clickByLabel(c, /Masuk ke Workspace/i)).toBeUndefined();
+		expect(clickByLabel(c, /Buka Workspace/i)).toBeUndefined();
 	});
 
 	it("never makes a return to the sync step the only way out", () => {
