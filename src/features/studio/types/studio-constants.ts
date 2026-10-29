@@ -38,12 +38,23 @@ export const STUDIO_CANVAS_INITIAL_ZOOM = {
 } as const;
 
 export const STUDIO_CANVAS_FRAME_GAP_PX = 56;
-export const STUDIO_CANVAS_FIT_PADDING_PX = 192;
+// Matches the canvas surface `p-24` track padding.
+export const STUDIO_CANVAS_FRAME_PADDING_PX = 96;
+export const STUDIO_CANVAS_FIT_PADDING_PX = STUDIO_CANVAS_FRAME_PADDING_PX * 2;
 export const STUDIO_CANVAS_FRAME_HEADER_PX = 28;
 export const STUDIO_CANVAS_HEADER_INSET_PX = 64;
 export const STUDIO_CANVAS_COMPOSER_INSET_PX = 168;
 export const STUDIO_CANVAS_TOOLBAR_INSET_PX = 64;
 export const STUDIO_CANVAS_MIN_VISIBLE_PX = 120;
+// The opening view stops zooming out here. Below this a mobile artboard is
+// no longer readable, and panning is the better answer than a miniature
+// overview.
+export const STUDIO_CANVAS_INITIAL_MIN_ZOOM = 0.5;
+// Leading frames the opening view tries to keep on screen. Bounding the window
+// (instead of the whole project) is what keeps frame count and frame height
+// from forcing an unusable zoom-out.
+export const STUDIO_CANVAS_INITIAL_FRAME_WINDOW = 3;
+export const STUDIO_CANVAS_VIEW_SAVE_DELAY_MS = 400;
 export const STUDIO_CANVAS_MARQUEE_DRAG_THRESHOLD_PX = 4;
 
 export const STUDIO_CANVAS_COMPOSER_MAX_WIDTH_PX = 672;

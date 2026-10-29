@@ -84,7 +84,7 @@ export function StudioCanvasZoomCorner({
 				onZoomIn={onZoomIn}
 				onZoomOut={onZoomOut}
 				onReset={onFit}
-				resetLabel="Sesuaikan tampilan"
+				resetLabel="Tampilkan semua frame"
 			/>
 		</div>
 	);
