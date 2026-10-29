@@ -71,8 +71,17 @@ fast and reports the PostgreSQL lock code (`55P03`) as
 from the `cause` chain. Frames, revisions, and job finalisation stay inside
 `withStudioJobWrite`, whose claim predicate fences stale writers.
 
+The dispatch advisory lock is session-scoped and held for one batch, not for a
+transaction: it costs one pooled connection while replicas run AI-length work,
+which is why it is never acquired inside a transaction that spans a provider
+stream. Only the lock holder recovers and dispatches, so a second replica cannot
+claim the same job.
+
 The connection pool was deliberately not raised: no evidence points to pool
 exhaustion, and a larger pool would hide the contention the timeout now surfaces.
+With the default `pg` pool and a batch of three jobs, AI generation itself holds
+no connection — only the short heartbeat and fenced write transactions borrow
+one — so the pool cannot starve a heartbeat while a model streams.
 
 ## Reading the telemetry
 
