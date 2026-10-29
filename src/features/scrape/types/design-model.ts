@@ -51,6 +51,7 @@ export interface ModelTypeEntry {
 	letterSpacing: string;
 	frequency: number;
 	elementRoles: string[];
+	/** Raw page text for validation only; the displayed specimen is role-based. */
 	sample: string;
 	confidence: Confidence;
 }
@@ -67,7 +68,7 @@ export interface ModelTypeface {
 	declaredFaces: { family: string; weight: string; status: string }[];
 	confidence: Confidence;
 	uncertainty: string | null;
-	/** A real sample rendered in this family, when the capture recorded one. */
+	/** Raw page text for this family; validation only, never a public specimen. */
 	sample: string;
 }
 

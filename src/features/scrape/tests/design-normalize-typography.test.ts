@@ -8,6 +8,8 @@ import {
 	normalizeTypefaces,
 	parsePx,
 	primaryFontFamily,
+	specimenTextForRole,
+	type TypeScaleRole,
 } from "@/features/scrape/utils/design-normalize-typography";
 
 function textElement(
@@ -169,6 +171,40 @@ describe("type scale grouping", () => {
 		expect(classifyTypeRole(11, ["element"], "Inter, sans-serif")).toBe(
 			"Caption",
 		);
+	});
+});
+
+describe("role specimens", () => {
+	it("gives every type role neutral copy with no page text", () => {
+		const roles: TypeScaleRole[] = [
+			"Display",
+			"Large heading",
+			"Heading",
+			"Subheading",
+			"Body large",
+			"Body",
+			"Body small",
+			"Caption",
+			"UI label",
+			"Monospace",
+			"Unknown",
+		];
+		for (const role of roles)
+			expect(specimenTextForRole(role).length).toBeGreaterThan(0);
+		expect(specimenTextForRole("Display")).toBe("Design starts here");
+		expect(specimenTextForRole("Body")).toContain("quick brown fox");
+		expect(specimenTextForRole("Display")).not.toBe(
+			specimenTextForRole("Body"),
+		);
+	});
+
+	it("resolves a capture-scoped role and falls back for an unknown one", () => {
+		expect(
+			specimenTextForRole(
+				"Display (Capture 2: 768x1024, browser preference dark)",
+			),
+		).toBe("Design starts here");
+		expect(specimenTextForRole("Not a role")).toBe(specimenTextForRole("Body"));
 	});
 });
 

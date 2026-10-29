@@ -41,7 +41,7 @@ export interface InspectorTypeEntry {
 	lineHeight: string;
 	letterSpacing: string;
 	frequency: number;
-	/** A real sample taken from the measured page. */
+	/** Raw page text for validation only; the displayed specimen is role-based. */
 	sample: string;
 }
 
@@ -56,7 +56,7 @@ export interface InspectorTypeface {
 	loadedEvidence: boolean;
 	declaredFaces: { family: string; weight: string; status: string }[];
 	uncertainty: string | null;
-	/** A real sample rendered in this family, when the capture recorded one. */
+	/** Raw page text for this family; validation only, never a public specimen. */
 	sample: string;
 }
 

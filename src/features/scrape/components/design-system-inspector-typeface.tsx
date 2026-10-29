@@ -1,10 +1,8 @@
 import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import type { InspectorTypeface } from "@/features/scrape/utils/design-md-inspector";
-import {
-	FALLBACK_SAMPLE,
-	isSafeFontFamily,
-} from "./design-system-inspector-css-values";
+import { specimenTextForRole } from "@/features/scrape/utils/design-normalize-typography";
+import { isSafeFontFamily } from "./design-system-inspector-css-values";
 
 export function TypefaceCard({ typeface }: { typeface: InspectorTypeface }) {
 	const rows: [string, string][] = [
@@ -14,9 +12,8 @@ export function TypefaceCard({ typeface }: { typeface: InspectorTypeface }) {
 		["Line height", [...new Set(typeface.lineHeights)].join(", ") || "—"],
 		["Letter spacing", [...new Set(typeface.letterSpacings)].join(", ") || "—"],
 	];
-	// Prefer a real sample from the page; the fallback sentence is only used when
-	// the capture recorded no text for this family.
-	const specimen = typeface.sample.trim() || FALLBACK_SAMPLE;
+	// Neutral copy for the family's first role, so the card never shows page copy.
+	const specimen = specimenTextForRole(typeface.roles[0] ?? "Body");
 	return (
 		<div className="min-w-0 rounded-lg border border-graphite p-4">
 			<div className="flex flex-wrap items-baseline justify-between gap-2">
