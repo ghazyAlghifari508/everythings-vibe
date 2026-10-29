@@ -84,3 +84,11 @@ Covered by deterministic tests: finish-reason classification (including cancella
 Shared blueprint, PRD/reference precedence, platform dimensions, HTML validation, navigation consistency, tenant/lease fencing, and bounded correction remain in force. A baseline-to-HEAD diff against `77b41831` is empty for `studio-generated-html-validation.ts`, `studio-design-system-html.ts`, `studio-design-blueprint.ts`, `studio-screen-prompts.ts`, `studio-prompt-contracts.ts`, and `studio-skill-manifest.ts`. The same structural output checker therefore remains unchanged; blueprint, PRD, design-reference matrix and output-contract suites pass 39 tests on HEAD. This establishes preservation of deterministic gates, not equivalence of stochastic aesthetic results. Deterministic tests establish structural correctness, not visual taste or live provider speed. No browser QA, screenshots, or aesthetic equivalence claim is made.
 
 Build completed successfully with existing browser-externalization warnings for Node modules in the wider application bundle. This is not a claim that those warnings are harmless; the Studio client-boundary tests pass, and the wider bundle boundary remains a separate investigation.
+
+## Commits
+
+- `8163670e` … `aa940268` (2026-10-24): latency measurement surface, stream-usage capture, correction document retention, worker batch drain, and the circular generation indicator.
+- `234d4787` (TASK 03): provider finish-reason taxonomy, per-request token-ceiling observability, and a bounded correction context, with tests.
+- The report commit that adds this section.
+
+TASK 01/02 work already on this branch (`1b735eda`, `e548c286`, `2c1ee248`, `3da44c9e`) added the structured validation diagnostics and stage-aware skill context this report builds on and does not undo.
