@@ -48,30 +48,78 @@ export type StudioStreamCompletion =
 	| "COMPLETED"
 	| "FAILED"
 	| "INCOMPLETE_OUTPUT"
-	| "FILTERED_OUTPUT";
+	| "FILTERED_OUTPUT"
+	| "CANCELLED"
+	| "PROVIDER_ERROR"
+	| "UNKNOWN";
 
 const INCOMPLETE_FINISH_REASONS = new Set([
 	"length",
 	"max_tokens",
 	"max-tokens",
 	"max_output_tokens",
+	"max-output-tokens",
+	"token_limit",
+]);
+
+const CANCELLED_FINISH_REASONS = new Set([
+	"aborted",
+	"abort",
+	"cancel",
+	"cancelled",
+	"canceled",
+]);
+
+// Provider-side failures can arrive as a terminal reason instead of a thrown
+// error (9router and OpenAI-compatible gateways vary). These are classified
+// separately so a failed request never reads as a normal completion.
+const PROVIDER_ERROR_FINISH_REASONS = new Set([
+	"error",
+	"failed",
+	"failure",
+	"timeout",
+	"timed_out",
+	"connection_error",
+	"overloaded",
+	"rate_limit",
+	"rate_limited",
+	"rate-limit",
+	"unavailable",
+]);
+
+const NORMAL_FINISH_REASONS = new Set([
+	"stop",
+	"end_turn",
+	"end-turn",
+	"eos",
+	"stop_sequence",
+	"stop-sequence",
+	"tool_calls",
+	"tool-calls",
+	"tool_call",
+	"function_call",
 ]);
 
 /**
  * Distinguishes a provider response that stopped before the document was
  * finished from a completed one, so a truncated or filtered stream is never
- * reported as a normal completion or a contract violation.
+ * reported as a normal completion or a contract violation. Gateway finish
+ * reasons are not standardized, so unknown provider-specific reasons are
+ * surfaced as UNKNOWN rather than silently treated as success.
  */
 export function classifyStudioStreamCompletion(
 	finishReason: string | undefined,
 	completed: boolean,
 ): StudioStreamCompletion {
-	if (!completed) return "FAILED";
 	const reason = (finishReason ?? "").trim().toLowerCase();
+	if (CANCELLED_FINISH_REASONS.has(reason)) return "CANCELLED";
+	if (!completed) return "FAILED";
 	if (INCOMPLETE_FINISH_REASONS.has(reason)) return "INCOMPLETE_OUTPUT";
 	if (/content[-_ ]?filter|safety|blocked/.test(reason))
 		return "FILTERED_OUTPUT";
-	return "COMPLETED";
+	if (PROVIDER_ERROR_FINISH_REASONS.has(reason)) return "PROVIDER_ERROR";
+	if (reason === "" || NORMAL_FINISH_REASONS.has(reason)) return "COMPLETED";
+	return "UNKNOWN";
 }
 
 // A provider response that stopped early is a verified defect, not a design
@@ -149,6 +197,12 @@ export async function generateStudioHtml(
 				...timing,
 				outputChars: raw.length,
 				...outcome,
+				// The applied ceiling travels with the usage so a gateway that
+				// ignores or reinterprets maxOutputTokens is visible in the log.
+				maxTokens,
+				tokenLimitExceeded:
+					outcome?.outputTokens !== undefined &&
+					outcome.outputTokens > maxTokens,
 				code: classifyStudioStreamCompletion(outcome?.finishReason, completed),
 			});
 	}

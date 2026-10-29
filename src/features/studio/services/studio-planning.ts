@@ -111,6 +111,10 @@ export async function planStudioScreens(
 			attempt: 1,
 			outputChars: planRaw.length,
 			...outcome,
+			maxTokens: STUDIO_PLANNING_MAX_TOKENS,
+			tokenLimitExceeded:
+				outcome?.outputTokens !== undefined &&
+				outcome.outputTokens > STUDIO_PLANNING_MAX_TOKENS,
 		});
 		signal.throwIfAborted();
 		const parsed = parseStudioPlanningWithBlueprint(
@@ -159,6 +163,10 @@ export async function planStudioScreens(
 				attempt: 2,
 				outputChars: planRaw.length,
 				...outcome,
+				maxTokens: STUDIO_PLANNING_MAX_TOKENS,
+				tokenLimitExceeded:
+					outcome?.outputTokens !== undefined &&
+					outcome.outputTokens > STUDIO_PLANNING_MAX_TOKENS,
 			});
 			signal.throwIfAborted();
 			const parsed = parseStudioPlanningWithBlueprint(

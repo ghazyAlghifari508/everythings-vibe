@@ -64,7 +64,11 @@ const blueprint: StudioDesignBlueprint = {
 };
 
 function mockSequence(
-	responses: Array<{ html: string; finishReason?: string }>,
+	responses: Array<{
+		html: string;
+		finishReason?: string;
+		outputTokens?: number;
+	}>,
 ) {
 	const mocked = vi.mocked(tryStreamWithFallback);
 	mocked.mockReset();
@@ -73,7 +77,10 @@ function mockSequence(
 			firstChunk: response.html,
 			generator: (async function* () {})(),
 			abortController: new AbortController(),
-			outcome: { finishReason: response.finishReason },
+			outcome: {
+				finishReason: response.finishReason,
+				outputTokens: response.outputTokens,
+			},
 		}));
 	}
 	return mocked;
@@ -94,6 +101,30 @@ describe("classifyStudioStreamCompletion", () => {
 			"FILTERED_OUTPUT",
 		);
 		expect(classifyStudioStreamCompletion("length", false)).toBe("FAILED");
+	});
+
+	it("names cancellation, provider failure, and unknown finish reasons instead of success", () => {
+		expect(classifyStudioStreamCompletion("aborted", false)).toBe("CANCELLED");
+		expect(classifyStudioStreamCompletion("aborted", true)).toBe("CANCELLED");
+		expect(classifyStudioStreamCompletion("max_output_tokens", true)).toBe(
+			"INCOMPLETE_OUTPUT",
+		);
+		expect(classifyStudioStreamCompletion("safety", true)).toBe(
+			"FILTERED_OUTPUT",
+		);
+		for (const reason of [
+			"error",
+			"timeout",
+			"connection_error",
+			"overloaded",
+			"rate_limit",
+		])
+			expect(classifyStudioStreamCompletion(reason, true)).toBe(
+				"PROVIDER_ERROR",
+			);
+		expect(classifyStudioStreamCompletion("some-new-reason", true)).toBe(
+			"UNKNOWN",
+		);
 	});
 });
 
@@ -170,6 +201,43 @@ describe("structured output diagnostics", () => {
 });
 
 describe("incomplete provider output", () => {
+	it("records the applied token ceiling beside provider usage so a mismatch is observable", async () => {
+		await mockSequence([
+			{
+				html: "<html><head></head><body><p>Konten lengkap</p></body></html>",
+				finishReason: "stop",
+				outputTokens: 29000,
+			},
+		]);
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			await generateValidatedFrameHtml({
+				framePrompt: "Bangun layar",
+				blueprint: null,
+				viewport: "web",
+				expectTokens: false,
+				designSkillId: "none",
+				dsTokens: null,
+				logoUrl: null,
+				timing: timing(),
+			});
+			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			expect(events).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						stage: "frame-output",
+						code: "COMPLETED",
+						outputTokens: 29000,
+						maxTokens: 12000,
+						tokenLimitExceeded: true,
+					}),
+				]),
+			);
+		} finally {
+			log.mockRestore();
+		}
+	});
+
 	it("classifies a length-truncated response, repairs it, and never reports it as complete", async () => {
 		await mockSequence([
 			{
