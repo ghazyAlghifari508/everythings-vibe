@@ -189,13 +189,19 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		},
 		[effectiveFeatureId],
 	);
-	const runRevision = useWorkspaceRevision({
+	const revision = useWorkspaceRevision({
+		codebaseId: codebase.id,
 		effectiveFeatureId,
+		currentSnapshotId: sync.status?.snapshotId ?? data.currentSnapshotId,
 		stageBusy,
 		featureName: resolvedFeature?.name ?? codebase.name,
 		resolvedFeatureName: resolvedFeature?.name,
 		activeProjectIdRef: artifact.activeProjectIdRef,
 		loadPrd: artifact.loadPrd,
+		loadAc: artifact.loadAc,
+		refreshFeatureTree: artifact.refreshFeatureTree,
+		onTaskUpdate: artifact.refreshTaskTree,
+		refetchKanban: kanban.refetch,
 		pushAssistantMessage,
 		openArtifactPreview,
 		setStageBusy,
@@ -252,7 +258,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		registerCreatedPlan: plan.registerCreatedPlan,
 		setLastFeaturePrompt: questions.setLastFeaturePrompt,
 		fetchAiQuestions: questions.fetchAiQuestions,
-		runRevision,
+		runRevision: revision.runRevision,
 	});
 	const featureGeneration = useWorkspaceFeatureGeneration({
 		activeProjectIdRef: artifact.activeProjectIdRef,
@@ -340,6 +346,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		...composer,
 		...featureGeneration,
 		...generation,
+		...revision,
 		chatMessages,
 		run,
 		canvasOpen,

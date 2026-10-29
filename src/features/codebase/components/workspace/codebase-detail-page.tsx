@@ -1,8 +1,10 @@
+"use client";
+
 import { CodebaseChatWorkspace } from "@/features/codebase/components/chat/codebase-chat-workspace";
 import { CodebaseArtifactCanvas } from "@/features/codebase/components/explorer/codebase-artifact-canvas";
 import { CodebaseExplorerSidebar } from "@/features/codebase/components/explorer/codebase-explorer-sidebar";
 import { CodebasePlanSwitcher } from "@/features/codebase/components/planning/codebase-plan-switcher";
-import { CodebaseResyncModal } from "@/features/codebase/components/planning/codebase-resync-modal";
+import { CodebaseWorkspaceResync } from "@/features/codebase/components/workspace/codebase-workspace-resync";
 import { CodebaseWorkspaceShell } from "@/features/codebase/components/workspace/codebase-workspace-shell";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
 import { canReadExistingPlans } from "@/features/codebase/services/workspace-readiness";
@@ -12,25 +14,50 @@ import { WorkspaceConnectionScreen } from "./workspace-connection-screen";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceScreenResolver } from "./workspace-screen-resolver";
 
+function ConnectionScreen({
+	name,
+	ws,
+}: {
+	name: string;
+	ws: ReturnType<typeof useCodebaseWorkspace>;
+}) {
+	return (
+		<WorkspaceConnectionScreen
+			name={name}
+			error={ws.error}
+			status={ws.status}
+			payload={ws.payload}
+			isStarting={ws.isStarting}
+			triggerAnalysis={ws.triggerAnalysis}
+			startSession={ws.startSession}
+			readStatus={ws.readStatus}
+			readiness={ws.readiness}
+			analysis={ws.analysis}
+			isWorking={ws.isWorking}
+			activeWorkspaceSnapshotId={ws.activeWorkspaceSnapshotId}
+			manifestFileCount={ws.manifestFileCount ?? undefined}
+		/>
+	);
+}
+
 export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 	const { codebase, planningSnapshotByProject, canOpenFullBoard } = data;
+	const ws = useCodebaseWorkspace(data);
+
 	const {
 		snapshotReady,
 		isCreatingNew,
 		isStarting,
 		status,
-		activeSessionId,
 		manifestFileCount,
 		setIsResyncDrawerOpen,
 		payload,
 		startSession,
 		error,
 		readStatus,
-		isResyncDrawerOpen,
 		analysis,
 		isWorking,
 		activeWorkspaceSnapshotId,
-		triggerAnalysis,
 		canvasOpen,
 		explorerFiles,
 		explorerStack,
@@ -101,27 +128,20 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		acContent,
 		taskTree,
 		readiness,
-	} = useCodebaseWorkspace(data);
+		pendingProposal,
+		isReviewOpen,
+		setIsReviewOpen,
+		isApplying,
+		isRejecting,
+		revisionTarget,
+		setRevisionTarget,
+		applyCurrentProposal,
+		rejectCurrentProposal,
+	} = ws;
 
 	if (snapshotReady) {
 		if (!canReadExistingPlans(readiness)) {
-			return (
-				<WorkspaceConnectionScreen
-					name={codebase.name}
-					error={error}
-					status={status}
-					payload={payload}
-					isStarting={isStarting}
-					triggerAnalysis={triggerAnalysis}
-					startSession={startSession}
-					readStatus={readStatus}
-					readiness={readiness}
-					analysis={analysis}
-					isWorking={isWorking}
-					activeWorkspaceSnapshotId={activeWorkspaceSnapshotId}
-					manifestFileCount={manifestFileCount ?? undefined}
-				/>
-			);
+			return <ConnectionScreen name={codebase.name} ws={ws} />;
 		}
 		return (
 			<main
@@ -152,25 +172,7 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 						</button>
 					</div>
 				)}
-				<CodebaseResyncModal
-					isOpen={isResyncDrawerOpen}
-					onClose={() => setIsResyncDrawerOpen(false)}
-					projectName={codebase.name}
-					payload={payload}
-					isStarting={isStarting}
-					status={status}
-					statusError={error}
-					onRequestNewToken={() => void startSession("retry")}
-					onRetrySync={() => void startSession("retry")}
-					analysis={analysis}
-					isAnalyzing={isWorking}
-					activeSessionId={activeSessionId}
-					onRetryAnalysis={
-						activeWorkspaceSnapshotId
-							? () => void triggerAnalysis(activeWorkspaceSnapshotId)
-							: undefined
-					}
-				/>
+				<CodebaseWorkspaceResync projectName={codebase.name} ws={ws} />
 				<div className="min-h-0 flex-1">
 					<CodebaseWorkspaceShell
 						canvasOpen={canvasOpen}
@@ -223,9 +225,17 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 										: null
 								}
 								currentSnapshotId={activeWorkspaceSnapshotId}
+								pendingProposal={pendingProposal}
+								isReviewOpen={isReviewOpen}
+								isApplyingRevision={isApplying}
+								isRejectingRevision={isRejecting}
+								revisionTarget={revisionTarget}
+								onOpenReview={() => setIsReviewOpen(true)}
+								onCloseReview={() => setIsReviewOpen(false)}
+								onApplyRevision={applyCurrentProposal}
+								onRejectRevision={rejectCurrentProposal}
+								onChangeRevisionTarget={setRevisionTarget}
 								onReviewPlan={() => {
-									// Reviewing is a read: it reveals the stored plan and
-									// never regenerates anything.
 									userTookOverCanvas.current = true;
 									if (resolvedFeature && featureTree) {
 										setActiveArtifactId(`feature-${resolvedFeature.id}`);
@@ -263,7 +273,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								isConfirming={isConfirming}
 								specError={specError}
 								onOpenArtifact={(artifact) => {
-									// An explicit user choice owns the panel from now on.
 									userTookOverCanvas.current = true;
 									clearSourcePreview();
 									setActiveArtifactId(artifact.id);
@@ -314,8 +323,6 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 								copyLabel={canvasCopy.label}
 								copyUnavailableReason={canvasCopy.unavailableReason}
 								onClose={() => {
-									// Closing the panel is a deliberate user action: the
-									// workspace stops auto-revealing artifacts after it.
 									userTookOverCanvas.current = true;
 									setCanvasOpen(false);
 								}}
@@ -376,21 +383,5 @@ export function CodebaseDetailPage({ data }: { data: CodebaseWorkspaceData }) {
 		);
 	}
 
-	return (
-		<WorkspaceConnectionScreen
-			name={codebase.name}
-			error={error}
-			status={status}
-			payload={payload}
-			isStarting={isStarting}
-			triggerAnalysis={triggerAnalysis}
-			startSession={startSession}
-			readStatus={readStatus}
-			readiness={readiness}
-			analysis={analysis}
-			isWorking={isWorking}
-			activeWorkspaceSnapshotId={activeWorkspaceSnapshotId}
-			manifestFileCount={manifestFileCount ?? undefined}
-		/>
-	);
+	return <ConnectionScreen name={codebase.name} ws={ws} />;
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useWorkspaceChatControls } from "@/features/codebase/hooks/use-workspace-chat-controls";
 import {
 	areAllQuestionsAnswered,
 	type CodebasePipelineStage,
 	nextQuestionIndex,
 } from "@/features/codebase/services/chat-flow";
 import type { WorkspaceView } from "@/features/codebase/services/workspace-hydration";
+import { CodebaseRevisionReviewDialog } from "../revision/codebase-revision-review-dialog";
 import {
 	CodebaseChatWorkspaceArtifactStream,
 	CodebaseChatWorkspaceArtifactsFailed,
@@ -29,6 +30,10 @@ import {
 	CodebaseChatWorkspaceQuestions,
 	CodebaseChatWorkspaceQuestionsComplete,
 } from "./codebase-chat-workspace-questions";
+import {
+	CodebaseChatWorkspacePendingRevisionBanner,
+	CodebaseChatWorkspaceRevisionTargetSelector,
+} from "./codebase-chat-workspace-revision-controls";
 import { CodebaseChatWorkspaceStageHandoffs } from "./codebase-chat-workspace-stage-handoffs";
 import {
 	CodebaseChatWorkspaceLoading,
@@ -90,81 +95,46 @@ export function CodebaseChatWorkspace({
 	planningSnapshotId = null,
 	currentSnapshotId = null,
 	onReviewPlan,
+	pendingProposal,
+	isReviewOpen = false,
+	isApplyingRevision = false,
+	isRejectingRevision = false,
+	revisionTarget = "prd",
+	onOpenReview,
+	onCloseReview,
+	onApplyRevision,
+	onRejectRevision,
+	onChangeRevisionTarget,
 }: CodebaseChatWorkspaceProps) {
-	const [draft, setDraft] = useState("");
-	const [copiedCmd, setCopiedCmd] = useState(false);
-	const [copiedExport, setCopiedExport] = useState(false);
-	const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
-		null,
-	);
-
 	const tasksArtifact = artifacts.find((item) => item.id.startsWith("tasks-"));
-	const exportCmd = projectIdForHandoff
-		? buildExportPlanCommand(projectIdForHandoff)
-		: null;
-	const handoffPrompt = projectIdForHandoff
-		? buildPlanHandoffPrompt(projectIdForHandoff, codebaseName ?? null)
-		: null;
+	const isRunWorking = run?.status === "running";
 
-	const handleCopyCmd = async () => {
-		if (!handoffPrompt) return;
-		try {
-			if (!navigator.clipboard?.writeText) return;
-			await navigator.clipboard.writeText(handoffPrompt);
-			setCopiedCmd(true);
-			setTimeout(() => setCopiedCmd(false), 2000);
-		} catch {
-			return;
-		}
-	};
-
-	const handleCopy = async (
-		text: string,
-		setState: (value: boolean) => void,
-	) => {
-		try {
-			if (!navigator.clipboard?.writeText) return;
-			await navigator.clipboard.writeText(text);
-			setState(true);
-			setTimeout(() => setState(false), 2000);
-		} catch {
-			return;
-		}
-	};
-
-	const handleSend = (text?: string) => {
-		const message = (text ?? draft).trim();
-		if (!composerAvailable || message.length < 3 || isSending || isRunWorking)
-			return;
-		const accepted = onSendMessage?.(message);
-		if (accepted instanceof Promise) {
-			void accepted.then((success) => {
-				if (success) setDraft("");
-			});
-		} else if (accepted !== false) setDraft("");
-	};
-
-	const handlePrefillDraft = (text: string) => {
-		setDraft(text);
-		const composerEl = document.getElementById(
-			"codebase-chat-composer",
-		) as HTMLTextAreaElement | null;
-		if (composerEl) {
-			composerEl.focus();
-			const len = text.length;
-			composerEl.setSelectionRange?.(len, len);
-		}
-	};
-
-	const handleEditQuestion = (questionId: string) => {
-		if (!answersReadOnly) setEditingQuestionId(questionId);
-	};
-	const handleCancelEditQuestion = () => setEditingQuestionId(null);
-	const handleSubmitAnswer = (questionId: string, answer: string) => {
-		if (answersReadOnly) return;
-		setEditingQuestionId(null);
-		onSubmitAnswer?.(questionId, answer);
-	};
+	const {
+		draft,
+		setDraft,
+		copiedCmd,
+		copiedExport,
+		setCopiedExport,
+		editingQuestionId,
+		exportCmd,
+		handoffPrompt,
+		handleCopyCmd,
+		handleCopy,
+		handleSend,
+		handlePrefillDraft,
+		handleEditQuestion,
+		handleCancelEditQuestion,
+		handleSubmitAnswer,
+	} = useWorkspaceChatControls({
+		projectIdForHandoff,
+		codebaseName,
+		composerAvailable,
+		isSending,
+		isRunWorking,
+		answersReadOnly,
+		onSendMessage,
+		onSubmitAnswer,
+	});
 
 	const currentIndex = nextQuestionIndex(answers, questions);
 	const visibleQuestions =
@@ -212,7 +182,6 @@ export function CodebaseChatWorkspace({
 			planningSnapshotId !== currentSnapshotId,
 	);
 
-	const isRunWorking = run?.status === "running";
 	const runFailed = run?.status === "failed";
 	// A failed request owns its own error row, so the generic stage error
 	// row must not render a second, duplicate message for the same failure.
@@ -302,6 +271,10 @@ export function CodebaseChatWorkspace({
 								onOpenArtifact={onOpenArtifact}
 								onDownloadArtifact={onDownloadArtifact}
 							/>
+							<CodebaseChatWorkspacePendingRevisionBanner
+								proposal={pendingProposal}
+								onOpenReview={onOpenReview}
+							/>
 							{specErrorVisible ? (
 								<CodebaseChatWorkspaceSpecError
 									message={activeSpecError}
@@ -358,12 +331,27 @@ export function CodebaseChatWorkspace({
 					{composerAvailable ? (
 						<div className="shrink-0 bg-transparent px-4 pb-4 pt-2">
 							<div className="mx-auto w-full max-w-3xl">
+								{composerMode === "revise" ? (
+									<CodebaseChatWorkspaceRevisionTargetSelector
+										selected={revisionTarget}
+										onChange={onChangeRevisionTarget}
+									/>
+								) : null}
 								{renderComposer(2, "p-3 sm:p-3.5")}
 							</div>
 						</div>
 					) : null}
 				</>
 			)}
+			<CodebaseRevisionReviewDialog
+				isOpen={Boolean(isReviewOpen && pendingProposal)}
+				onClose={onCloseReview ?? (() => {})}
+				proposal={pendingProposal ?? null}
+				isApplying={Boolean(isApplyingRevision)}
+				isRejecting={Boolean(isRejectingRevision)}
+				onApply={onApplyRevision ?? (() => {})}
+				onReject={onRejectRevision ?? (() => {})}
+			/>
 		</div>
 	);
 }

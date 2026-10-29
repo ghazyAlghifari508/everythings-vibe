@@ -8,6 +8,7 @@ import type {
 import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
 import type { WorkspaceView } from "@/features/codebase/services/workspace-hydration";
 import type { CodebaseArtifactRef } from "../explorer/codebase-file-card";
+import type { RevisionProposalView } from "../revision/codebase-revision-review-dialog";
 import type { ChatStreamMessage } from "./codebase-chat-workspace-messages";
 import type { CodebaseStarterRefreshState } from "./codebase-chat-workspace-pristine";
 
@@ -97,4 +98,14 @@ export interface CodebaseChatWorkspaceProps {
 		analysisId: string,
 		snapshotId: string,
 	) => void;
+	pendingProposal?: RevisionProposalView | null;
+	isReviewOpen?: boolean;
+	isApplyingRevision?: boolean;
+	isRejectingRevision?: boolean;
+	revisionTarget?: "feature" | "prd" | "ac" | "tasks";
+	onOpenReview?: () => void;
+	onCloseReview?: () => void;
+	onApplyRevision?: () => void | Promise<void>;
+	onRejectRevision?: () => void | Promise<void>;
+	onChangeRevisionTarget?: (target: "feature" | "prd" | "ac" | "tasks") => void;
 }
