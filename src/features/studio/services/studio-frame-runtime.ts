@@ -1,0 +1,153 @@
+import { STUDIO_FRAME_MAX_TOKENS } from "@/features/studio/types/studio-constants";
+import { extractCleanHtml } from "@/features/studio/utils/clean-html";
+import { ScrapeError } from "@/lib/design-errors";
+import {
+	selectModels,
+	tryStreamWithFallback,
+} from "@/lib/services/ai-orchestrator";
+import type { ValidatedFrameInput } from "../types/studio-service";
+import {
+	resolveStudioDesignSkill,
+	resolveStudioFrameSystemPrompt,
+} from "./studio-design-skill-registry.server";
+import type { StudioDesignSkillId } from "./studio-generation-options";
+import { studioJobTiming } from "./studio-job-runtime";
+
+// Started tasks are never cancelled by another task's failure.
+export async function runWithConcurrency<T>(
+	tasks: Array<() => Promise<T>>,
+	limit: number,
+): Promise<T[]> {
+	const results: T[] = new Array(tasks.length);
+	let cursor = 0;
+	const workers = Array.from(
+		{ length: Math.max(1, Math.min(limit, tasks.length)) },
+		async () => {
+			while (cursor < tasks.length) {
+				const index = cursor++;
+				const task = tasks[index];
+				if (!task) continue;
+				results[index] = await task();
+			}
+		},
+	);
+	const settled = await Promise.allSettled(workers);
+	const failure = settled.find((result) => result.status === "rejected");
+	if (failure?.status === "rejected") throw failure.reason;
+	return results;
+}
+
+export function isRetryableProviderError(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : String(error);
+	return /429|rate.?limit|too many requests|timeout|timed out|econn|socket|temporar|unavailable|overloaded|try again/i.test(
+		message,
+	);
+}
+
+export type StudioStreamCompletion =
+	| "COMPLETED"
+	| "FAILED"
+	| "INCOMPLETE_OUTPUT"
+	| "FILTERED_OUTPUT";
+
+const INCOMPLETE_FINISH_REASONS = new Set([
+	"length",
+	"max_tokens",
+	"max-tokens",
+	"max_output_tokens",
+]);
+
+/**
+ * Distinguishes a provider response that stopped before the document was
+ * finished from a completed one, so a truncated or filtered stream is never
+ * reported as a normal completion or a contract violation.
+ */
+export function classifyStudioStreamCompletion(
+	finishReason: string | undefined,
+	completed: boolean,
+): StudioStreamCompletion {
+	if (!completed) return "FAILED";
+	const reason = (finishReason ?? "").trim().toLowerCase();
+	if (INCOMPLETE_FINISH_REASONS.has(reason)) return "INCOMPLETE_OUTPUT";
+	if (/content[-_ ]?filter|safety|blocked/.test(reason))
+		return "FILTERED_OUTPUT";
+	return "COMPLETED";
+}
+
+// A provider response that stopped early is a verified defect, not a design
+// mistake. It carries the partial document so the bounded correction can
+// repair it instead of discarding valid content.
+export class StudioIncompleteOutputError extends Error {
+	constructor(
+		readonly completion: Extract<
+			StudioStreamCompletion,
+			"INCOMPLETE_OUTPUT" | "FILTERED_OUTPUT"
+		>,
+		readonly partialHtml: string,
+	) {
+		super(`Studio provider output ${completion}.`);
+		this.name = "StudioIncompleteOutputError";
+	}
+}
+
+export async function generateStudioHtml(
+	prompt: string,
+	maxTokens = STUDIO_FRAME_MAX_TOKENS,
+	designSkillId: StudioDesignSkillId = "none",
+	signal?: AbortSignal,
+	timing?: ValidatedFrameInput["timing"],
+): Promise<string> {
+	signal?.throwIfAborted();
+	const startedAt = Date.now();
+	const system = resolveStudioFrameSystemPrompt(designSkillId);
+	if (timing)
+		studioJobTiming("frame-context", startedAt, {
+			...timing,
+			skillId: designSkillId,
+			skillChars: resolveStudioDesignSkill(designSkillId).guidance.length,
+			systemChars: system.length,
+			promptChars: prompt.length,
+		});
+	const { generator, firstChunk, outcome } = await tryStreamWithFallback(
+		selectModels(),
+		[
+			{
+				role: "system",
+				content: system,
+			},
+			{ role: "user", content: prompt },
+		],
+		signal,
+		maxTokens,
+	);
+	if (timing) studioJobTiming("first-token", startedAt, timing);
+	const outputStartedAt = Date.now();
+	let raw = firstChunk;
+	let completed = false;
+	try {
+		for await (const chunk of generator) raw += chunk;
+		completed = true;
+	} finally {
+		if (timing)
+			studioJobTiming("frame-output", outputStartedAt, {
+				...timing,
+				outputChars: raw.length,
+				...outcome,
+				code: classifyStudioStreamCompletion(outcome?.finishReason, completed),
+			});
+	}
+	signal?.throwIfAborted();
+	const cleaned = extractCleanHtml(raw);
+	if (cleaned.trim().length === 0)
+		throw new ScrapeError(
+			"AI_GENERATION_FAILED",
+			"Studio gagal menghasilkan HTML.",
+		);
+	const completion = classifyStudioStreamCompletion(
+		outcome?.finishReason,
+		completed,
+	);
+	if (completion === "INCOMPLETE_OUTPUT" || completion === "FILTERED_OUTPUT")
+		throw new StudioIncompleteOutputError(completion, cleaned);
+	return cleaned;
+}
