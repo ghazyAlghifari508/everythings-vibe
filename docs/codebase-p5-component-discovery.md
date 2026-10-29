@@ -41,5 +41,6 @@ written from scratch.
 ## 5. Consequence
 
 `Loading01Icon` remains in unrelated billing/studio surfaces; the codebase
-onboarding surfaces (sync status rows, token preparation, analysis conclusion)
-now share the single spinner primitive.
+sync surfaces (status rows, token preparation, analysis conclusion, re-sync
+modal) and the onboarding loading card now share the single spinner primitive,
+so the hourglass is gone from this surface and reduced motion is handled once.
