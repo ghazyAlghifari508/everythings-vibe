@@ -18,6 +18,7 @@ import {
 	useOnboardingSummaryGate,
 } from "../../hooks/use-onboarding-analysis";
 import { useOnboardingAnalysisState } from "../../hooks/use-onboarding-analysis-state";
+import { AnalysisCreditNotice } from "./analysis-credit-notice";
 import {
 	CodebaseOnboardingErrorCard,
 	CodebaseOnboardingLoadingCard,
@@ -37,6 +38,7 @@ export function PlanCodebasePage() {
 		lastStatus,
 		statusPollError,
 		createCodebase,
+		creditStatus,
 		retrySession,
 	} = useCodebaseOnboarding({ analysisState, step, setStep });
 
@@ -103,6 +105,19 @@ export function PlanCodebasePage() {
 						error={error}
 						onRetry={() => void createCodebase()}
 					/>
+				) : creditStatus ? (
+					<>
+						<AnalysisCreditNotice
+							status={creditStatus}
+							onStart={() => void createCodebase()}
+							isStarting={isStarting}
+						/>
+						{error && (
+							<p role="alert" className="text-sm text-snow">
+								{error}
+							</p>
+						)}
+					</>
 				) : (
 					<CodebaseOnboardingLoadingCard
 						title={
@@ -116,6 +131,14 @@ export function PlanCodebasePage() {
 				<CodebaseOnboardingLoadingCard title="Menyiapkan instruksi CLI..." />
 			) : (
 				<>
+					{analysisState.creditStatus && (
+						<AnalysisCreditNotice
+							status={analysisState.creditStatus}
+							onStart={retryAnalysis}
+							isStarting={analysisWorking}
+							analysisOnly
+						/>
+					)}
 					{/* Step 1 owns the whole sync lifecycle: the prompt, the agent, and
 					the live server status of the upload it started. There is no second
 					screen to navigate to in order to see the same progress. */}

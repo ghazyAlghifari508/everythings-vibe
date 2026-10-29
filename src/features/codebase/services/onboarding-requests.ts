@@ -47,11 +47,14 @@ export type CreateCodebaseOutcome =
 	| { kind: "unauthorized" }
 	| { kind: "rejected"; message: string };
 
-export async function requestCreateCodebase(): Promise<CreateCodebaseOutcome> {
+export async function requestCreateCodebase(acceptance: {
+	acceptAnalysisPolicy: true;
+	creditConsent: { maximumCredits: number; pricingVersion: string };
+}): Promise<CreateCodebaseOutcome> {
 	const response = await fetch("/api/codebases", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({}),
+		body: JSON.stringify(acceptance),
 	});
 	if (response.status === 401) {
 		redirectToLogin();
@@ -116,17 +119,21 @@ export async function requestCodebaseStatus(
 
 export type RetrySessionOutcome =
 	| { kind: "minted"; payload: SyncPromptPayload }
+	| { kind: "cancelled" }
 	| { kind: "failed" };
 
 export async function requestRetrySession(
 	codebaseId: string,
 ): Promise<RetrySessionOutcome> {
+	const { confirmPreSyncCredit } = await import("./analysis-credit-requests");
+	const acceptance = await confirmPreSyncCredit();
+	if (!acceptance) return { kind: "cancelled" };
 	const response = await fetch(
 		`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ action: "retry" }),
+			body: JSON.stringify({ action: "retry", ...acceptance }),
 		},
 	);
 	const parsed = syncPromptPayloadSchema.safeParse(
@@ -178,7 +185,11 @@ export async function requestFeatureProject(
 export type AnalysisTriggerOutcome =
 	| { kind: "ready"; analysis: AnalysisResponse }
 	| { kind: "unauthorized" }
-	| { kind: "credit"; message: string }
+	| {
+			kind: "credit";
+			message: string;
+			status?: import("./analysis-credit-policy").AnalysisCreditStatus;
+	  }
 	| { kind: "failed"; message: string }
 	| { kind: "mismatch" };
 
@@ -186,10 +197,12 @@ export async function requestOnboardingAnalysis({
 	projectId,
 	snapshotId,
 	refreshStarterSuggestionsForAnalysisId,
+	confirmCredit = false,
 }: {
 	projectId: string;
 	snapshotId: string;
 	refreshStarterSuggestionsForAnalysisId?: string;
+	confirmCredit?: boolean;
 }): Promise<AnalysisTriggerOutcome> {
 	const bodyPayload: {
 		snapshotId: string;
@@ -199,12 +212,29 @@ export async function requestOnboardingAnalysis({
 		bodyPayload.refreshStarterSuggestionsForAnalysisId =
 			refreshStarterSuggestionsForAnalysisId;
 	}
+	let confirmedPayload: unknown = bodyPayload;
+	if (refreshStarterSuggestionsForAnalysisId || confirmCredit) {
+		const { confirmPaidAnalysis } = await import("./analysis-credit-requests");
+		const confirmation = await confirmPaidAnalysis(
+			projectId,
+			snapshotId,
+			refreshStarterSuggestionsForAnalysisId,
+		);
+		if (!confirmation) return { kind: "mismatch" };
+		if (confirmation.response) {
+			const ready = analysisResponseSchema.safeParse(confirmation.raw);
+			return ready.success
+				? { kind: "ready", analysis: ready.data }
+				: { kind: "failed", message: "Analisis belum tersedia." };
+		}
+		confirmedPayload = confirmation.body;
+	}
 	const response = await fetch(
 		`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(bodyPayload),
+			body: JSON.stringify(confirmedPayload),
 		},
 	);
 	// The caller owns the redirect here: the analysis trigger discards a
@@ -213,10 +243,15 @@ export async function requestOnboardingAnalysis({
 	if (response.status === 401) return { kind: "unauthorized" };
 	const body: unknown = await response.json().catch(() => null);
 	const serverError = readServerError(body);
-	if (response.status === 403) {
+	const { analysisCreditStatusSchema } = await import(
+		"./analysis-credit-policy"
+	);
+	const creditStatus = analysisCreditStatusSchema.safeParse(body);
+	if (response.status === 403 || creditStatus.success) {
 		return {
 			kind: "credit",
 			message: serverError ?? "Kredit tidak mencukupi untuk analisis codebase.",
+			status: creditStatus.success ? creditStatus.data : undefined,
 		};
 	}
 	const parsed = analysisResponseSchema.safeParse(body);

@@ -8,6 +8,7 @@ import {
 	shouldDiscardWorkspaceAnalysis,
 } from "@/features/codebase/services/analysis-selection";
 import { matchesWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
+import { confirmPaidAnalysis } from "../services/analysis-credit-requests";
 import { safeParseAnalysisResponse } from "../utils/analysis-response";
 
 export function useWorkspaceAnalysis({
@@ -53,15 +54,23 @@ export function useWorkspaceAnalysis({
 			setIsWorking(true);
 			setError(null);
 			try {
-				const response = await fetch(
-					`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
-					{
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ snapshotId }),
-					},
-				);
-				const body: unknown = await response.json().catch(() => null);
+				const confirmation = await confirmPaidAnalysis(projectId, snapshotId);
+				if (!confirmation) {
+					analysisAttemptedFor.current = null;
+					return;
+				}
+				const response =
+					confirmation.response ??
+					(await fetch(
+						`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
+						{
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify(confirmation.body),
+						},
+					));
+				const body: unknown =
+					confirmation.raw ?? (await response.json().catch(() => null));
 				const parsed = safeParseAnalysisResponse(body);
 				if (
 					!response.ok ||
@@ -74,9 +83,13 @@ export function useWorkspaceAnalysis({
 				}
 				if (analysisIdentityRef.current === requestIdentity)
 					setAnalysis(parsed);
-			} catch {
+			} catch (error) {
 				if (analysisIdentityRef.current === requestIdentity)
-					setError("Server tidak dapat dihubungi.");
+					setError(
+						error instanceof Error
+							? error.message
+							: "Server tidak dapat dihubungi.",
+					);
 			} finally {
 				setIsWorking(false);
 			}
@@ -137,17 +150,22 @@ export function useWorkspaceAnalysis({
 			setIsRefreshingStarterSuggestions(true);
 			setStarterRefreshError(null);
 			try {
-				const response = await fetch(
-					`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
-					{
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({
-							snapshotId,
-							refreshStarterSuggestionsForAnalysisId: analysisId,
-						}),
-					},
+				const confirmation = await confirmPaidAnalysis(
+					projectId,
+					snapshotId,
+					analysisId,
 				);
+				if (!confirmation) return;
+				const response =
+					confirmation.response ??
+					(await fetch(
+						`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
+						{
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify(confirmation.body),
+						},
+					));
 				const body: unknown = await response.json().catch(() => null);
 				const parsed = safeParseAnalysisResponse(body);
 				const parsedSuggestions = codebaseStarterSuggestionsSchema.safeParse(
@@ -164,9 +182,13 @@ export function useWorkspaceAnalysis({
 				}
 				if (analysisIdentityRef.current === `${projectId}:${snapshotId}`)
 					setAnalysis(parsed);
-			} catch {
+			} catch (error) {
 				if (analysisIdentityRef.current === `${projectId}:${snapshotId}`)
-					setStarterRefreshError("Server tidak dapat dihubungi. Coba lagi.");
+					setStarterRefreshError(
+						error instanceof Error
+							? error.message
+							: "Server tidak dapat dihubungi. Coba lagi.",
+					);
 			} finally {
 				analysisRefreshInFlight.current = false;
 				setIsRefreshingStarterSuggestions(false);

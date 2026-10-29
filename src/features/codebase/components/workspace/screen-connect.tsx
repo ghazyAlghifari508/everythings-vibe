@@ -81,7 +81,7 @@ export function ScreenConnect({
 
 	return (
 		<div className="w-full animate-enter">
-			<div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-iron bg-obsidian/90 shadow-2xl backdrop-blur-xl">
+			<div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-iron bg-obsidian">
 				<div className="border-b border-graphite p-5 sm:p-6">
 					{/* The server owns this name once the CLI has handshaken, so the
 					eyebrow drops the creation placeholder and shows the detected

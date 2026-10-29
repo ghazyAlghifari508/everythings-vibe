@@ -147,6 +147,10 @@ export function useOnboardingRecovery({
 				recovered.status === "expired"
 			) {
 				const retryOutcome = await requestRetrySession(stored.id);
+				if (retryOutcome.kind === "cancelled") {
+					setStep("sync");
+					return true;
+				}
 				if (retryOutcome.kind === "minted") {
 					setPayload(retryOutcome.payload);
 					// The fresh session starts from scratch: drop the previous

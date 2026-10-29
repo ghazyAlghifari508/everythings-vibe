@@ -1,14 +1,8 @@
 // @vitest-environment jsdom
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PlanCodebasePage } from "@/features/codebase/components/workspace/plan-codebase-page";
 import { useUIStore } from "@/store";
+import { renderConnectedOnboarding } from "./render-connected-onboarding";
 
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
@@ -204,7 +198,7 @@ function mockOnboardingFlow() {
 }
 
 async function startSyncStep() {
-	render(<PlanCodebasePage />);
+	await renderConnectedOnboarding();
 	await waitFor(() => {
 		expect(
 			screen.getByText("Sync codebase dengan everythings-vibe"),
@@ -387,7 +381,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 				throw new Error(`unexpected fetch ${method} ${url}`);
 			}),
 		);
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 		// Waiting in Sync step initially
 		await waitFor(
 			() => {
@@ -629,6 +623,14 @@ describe("PlanCodebasePage onboarding analysis", () => {
 				) {
 					if (init?.body) {
 						const parsedBody = JSON.parse(String(init.body));
+						if (parsedBody.preflight)
+							return Response.json({
+								code: "CREDIT_REQUIRED",
+								availableCredits: 30,
+								maximumCredits: 12,
+								pricingVersion: "adaptive-v1",
+								canStart: false,
+							});
 						if (parsedBody.refreshStarterSuggestionsForAnalysisId) {
 							refreshCallBody = parsedBody;
 							refreshCalled = true;
@@ -692,6 +694,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 			expect(refreshCallBody).toEqual({
 				snapshotId: "snap-onboard-1",
 				refreshStarterSuggestionsForAnalysisId: "ana-onboard-1",
+				creditConsent: { maximumCredits: 12, pricingVersion: "adaptive-v1" },
 			});
 		});
 
@@ -736,7 +739,7 @@ describe("PlanCodebasePage onboarding analysis", () => {
 				throw new Error(`unexpected fetch ${method} ${url}`);
 			}),
 		);
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 		// Directly rendered into summary with review, no ordinary loading
 		await waitFor(
 			() => {
