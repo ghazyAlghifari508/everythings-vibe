@@ -1,8 +1,9 @@
 /**
- * Whether the frame's artboard is still waiting for its real visual. This is
- * the single source of truth for the shimmer lifecycle: queued and generating
- * frames shimmer, a frame with HTML but no displayable preview keeps
- * shimmering, and a frame whose preview failed must not shimmer at all.
+ * Whether the frame's artboard is still waiting for its real visual. A queued
+ * or generating frame shimmers, a ready frame with HTML but no displayable
+ * preview keeps shimmering, and a frame whose preview failed must not shimmer at
+ * all. A failed frame never shimmers through this predicate; when its last good
+ * HTML still exists the artboard mode below keeps the preview instead.
  */
 export function isFrameVisualPending(
 	status: string,
@@ -17,6 +18,7 @@ export function isFrameVisualPending(
 export type StudioFrameArtboardMode =
 	| "shimmer"
 	| "preview"
+	| "last-good"
 	| "visual-error"
 	| "generation-failed"
 	| "preview-unavailable";
@@ -26,6 +28,10 @@ export type StudioFrameArtboardMode =
  * never shimmer forever with no explanation: a ready frame whose stored HTML is
  * missing resolves to `preview-unavailable`, and a capture failure resolves to
  * `visual-error` with a targeted retry instead of an endless shimmer.
+ *
+ * A frame that already produced HTML resolves to `last-good` while a new
+ * version is built or after that version failed, so an existing good preview is
+ * never replaced by a shimmer or by an empty error surface.
  */
 export function resolveFrameArtboardMode(input: {
 	status: string;
@@ -33,7 +39,19 @@ export function resolveFrameArtboardMode(input: {
 	hasVisual: boolean;
 	hasVisualError: boolean;
 }): StudioFrameArtboardMode {
-	if (input.status === "failed") return "generation-failed";
+	if (input.status === "failed") {
+		if (!input.hasRenderableHtml) return "generation-failed";
+		if (input.hasVisual) return "last-good";
+		// The stored HTML is still being captured: no terminal error panel yet,
+		// but also no infinite shimmer, because a failed capture wins below.
+		return input.hasVisualError ? "visual-error" : "shimmer";
+	}
+	if (
+		input.hasRenderableHtml &&
+		input.hasVisual &&
+		(input.status === "queued" || input.status === "generating")
+	)
+		return "last-good";
 	if (input.status === "ready" && !input.hasRenderableHtml)
 		return "preview-unavailable";
 	if (isFrameVisualPending(input.status, input.hasVisual, input.hasVisualError))

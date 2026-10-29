@@ -20,6 +20,7 @@ import {
 	publicStudioFrameErrorMessage,
 	StudioFrameError,
 	studioFrameErrorCodeFor,
+	studioFrameFailureCategory,
 } from "./studio-frame-errors";
 import {
 	classifyStudioStreamCompletion,
@@ -330,6 +331,10 @@ export async function generateInitialFrame(
 				frameId: frame.id,
 				attempt: attempt + 1,
 				code,
+				category: studioFrameFailureCategory(code),
+				// Only the frame status and its public sentence are written here, so
+				// a failed revision leaves the last good htmlCode in place for the
+				// retry prompt to correct.
 				detail: frameErr instanceof Error ? frameErr.message : String(frameErr),
 			});
 			await withStudioJobWrite(ctx.lease, async (tx) => {

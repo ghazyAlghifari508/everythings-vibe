@@ -9,6 +9,10 @@ import {
 import { STUDIO_FRAME_CONCURRENCY } from "../types/studio-constants";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import {
+	studioFrameErrorCodeFor,
+	studioFrameFailureCategory,
+} from "./studio-frame-errors";
+import {
 	generateInitialFrame,
 	isTemporarySlot,
 	runWithConcurrency,
@@ -267,7 +271,8 @@ export async function runStudioJobPipeline(
 			code:
 				failure instanceof StudioLeaseLostError
 					? failure.reason
-					: "GENERATION_FAILED",
+					: studioFrameErrorCodeFor(failure),
+			category: studioFrameFailureCategory(studioFrameErrorCodeFor(failure)),
 		});
 	} finally {
 		studioJobTiming("job-total", startedAt, {

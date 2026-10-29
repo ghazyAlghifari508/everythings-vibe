@@ -7,6 +7,7 @@ export function studioJobTiming(
 		frameId?: string;
 		attempt?: number;
 		code?: string;
+		category?: string;
 		detail?: string;
 		issueCode?: string;
 		issueCodes?: string[];
