@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { inspectorFromModel } from "@/features/scrape/utils/design-md-inspector";
 import { renderDesignMd } from "@/features/scrape/utils/design-md-render";
 import { buildFixtureModel } from "@/lib/design-fixture";
 
@@ -15,11 +16,20 @@ it("keeps measured component rules when AI supplies the same component name", ()
 			},
 		],
 	});
-	for (const treatment of observed.treatments ?? [])
-		for (const value of Object.values(treatment.properties))
-			expect(document).toContain(value);
+	for (const entry of [
+		...observed.sharedCharacteristics,
+		...(observed.treatments ?? []).flatMap(
+			(treatment) => treatment.characteristics,
+		),
+	])
+		expect(document).toContain(`${entry.label}: ${entry.value}`);
 	expect(document).not.toMatch(/nth-child\(/);
-	expect(observed.evidence).toContain("nth-child");
+	const selectors = (observed.treatments ?? []).flatMap(
+		(treatment) => treatment.selectors,
+	);
+	expect(selectors.join(" ")).toContain("nth-child");
+	const inspector = inspectorFromModel(model, "observed");
+	expect(JSON.stringify(inspector.components)).not.toMatch(/nth-child\(/);
 	expect(document).toContain("Sample inference");
 });
 

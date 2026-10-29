@@ -47,9 +47,15 @@ describe("single-sample component evidence", () => {
 			component.roles.includes("cta"),
 		);
 		expect(observed).toBeDefined();
-		expect(observed?.description).toContain("border-radius: 8px");
-		expect(observed?.description).toContain("padding: 14px");
-		expect(observed?.evidence).toContain(
+		const treatment = observed?.treatments?.[0];
+		expect(treatment?.properties["border-radius"]).toBe("8px");
+		expect(treatment?.properties.padding).toBe("14px");
+		expect(
+			observed?.sharedCharacteristics.map(
+				(entry) => `${entry.label}: ${entry.value}`,
+			),
+		).toEqual(expect.arrayContaining(["Corner radius: 8px", "Padding: 14px"]));
+		expect(treatment?.selectors).toContain(
 			"body:nth-child(1) > button:nth-child(2)",
 		);
 	});

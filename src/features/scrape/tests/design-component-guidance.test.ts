@@ -10,17 +10,24 @@ it("preserves component-specific properties and source selectors without AI", ()
 	const buttons = model.observedComponents.find((component) =>
 		component.roles.includes("cta"),
 	);
-	expect(buttons?.description).toContain("border-radius: 8px");
-	expect(buttons?.description).toContain("padding: 14px");
-	expect(buttons?.description).toContain("font-size: 15px");
-	expect(buttons?.evidence).toContain("button:nth-child(5)");
-	expect(renderDesignMd(model)).not.toMatch(/nth-child\(/);
+	const values = (buttons?.sharedCharacteristics ?? []).map(
+		(entry) => `${entry.label}: ${entry.value}`,
+	);
+	expect(values).toContain("Padding: 14px");
+	expect(values).toContain("Corner radius: 8px");
+	expect(values.join(" ")).toContain("15px");
 	expect(buttons?.treatments?.[0]?.properties["border-radius"]).toBe("8px");
+	expect(buttons?.treatments?.[0]?.selectors.join(" ")).toContain(
+		"button:nth-child(5)",
+	);
+	const document = renderDesignMd(model);
+	expect(document).not.toMatch(/nth-child\(/);
+	expect(document).toContain("Corner radius: 8px");
 	expect(
 		inspectorFromModel(model, "observed").components.find(
 			(component) => component.name === buttons?.name,
-		)?.description,
-	).toBe(buttons?.description);
+		)?.sharedCharacteristics,
+	).toEqual(buttons?.sharedCharacteristics);
 });
 
 it("retains alternate measured typefaces and weights within the same type role", () => {
@@ -79,10 +86,18 @@ it("keeps conflicting button treatments instead of asserting consistency", () =>
 	const buttons = model.observedComponents.find((component) =>
 		component.roles.includes("cta"),
 	);
-	expect(buttons?.description).toContain("8px");
-	expect(buttons?.description).toContain("22px");
+	expect(
+		buttons?.treatments?.map(
+			(treatment) => treatment.properties["border-radius"],
+		),
+	).toEqual(["8px", "22px"]);
 	expect(buttons?.description).not.toMatch(/consistent measured styling/);
-	expect(buttons?.evidence).toContain("button:nth-child(6)");
+	expect(
+		buttons?.treatments?.flatMap((treatment) => treatment.selectors).join(" "),
+	).toContain("button:nth-child(6)");
+	const document = renderDesignMd(model);
+	expect(document).toContain("Corner radius: 8px");
+	expect(document).toContain("Corner radius: 22px");
 });
 
 it("supplies observed components and confidence to synthesis instead of flat tokens alone", () => {

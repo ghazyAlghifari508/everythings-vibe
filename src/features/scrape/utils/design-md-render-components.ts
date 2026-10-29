@@ -1,7 +1,32 @@
-import { SEMANTIC_PROPERTIES } from "../services/design-capture-comparison";
-import type { DesignTokenModel } from "../services/design-model";
+import type {
+	DesignTokenModel,
+	ModelComponentCharacteristic,
+	ModelComponentTreatment,
+} from "../services/design-model";
 import { escapeCell, heading, table } from "./design-md-markdown";
 import type { RenderDesignMdOptions } from "./design-md-render";
+
+// Components are rendered from the normalized component specification, never
+// from raw computed CSS. Measured values carry a semantic label, identical
+// measurements are stated once, and nothing the capture did not measure is
+// asserted.
+interface ComponentBlock {
+	name: string;
+	purpose?: string;
+	shared: ModelComponentCharacteristic[];
+	treatments: ModelComponentTreatment[];
+	description: string;
+	evidence: string;
+	guidance: string[];
+}
+
+function characteristicLines(
+	characteristics: ModelComponentCharacteristic[],
+): string[] {
+	return characteristics.map(
+		(entry) => `- ${escapeCell(`${entry.label}: ${entry.value}`)}`,
+	);
+}
 
 // Components, rules, surfaces, elevation, imagery and layout (sections 7-12).
 
@@ -15,50 +40,64 @@ export function renderComponentSections(
 	// --- 7. Components -------------------------------------------------------
 	// Observed patterns are always rendered when justified by evidence; AI
 	// patterns enrich them when synthesis succeeded.
-	const observedComponents = (model.observedComponents ?? []).map(
+	const observedComponents: ComponentBlock[] = (
+		model.observedComponents ?? []
+	).map((component) => ({
+		name: component.name,
+		purpose: component.purpose,
+		shared: component.sharedCharacteristics,
+		treatments: component.treatments ?? [],
+		description: component.description,
+		evidence: `Measured on ${component.frequency} ${component.roles.join(", ")} element${component.frequency === 1 ? "" : "s"}; ${component.treatmentCount} distinct measured treatment${component.treatmentCount === 1 ? "" : "s"}. Role inferred from DOM.`,
+		guidance: component.guidance,
+	}));
+	const aiComponents: ComponentBlock[] = (options.componentPatterns ?? []).map(
 		(component) => ({
-			name: component.name,
-			description:
-				component.treatments
-					?.map((treatment, index) =>
-						[
-							`Treatment ${index + 1} (${treatment.samples} measured samples):`,
-							...Object.entries(treatment.properties).map(
-								([property, value]) =>
-									`${SEMANTIC_PROPERTIES[property] ?? property}: ${value}`,
-							),
-							`Measured size: ${treatment.width}px wide, ${treatment.height}px high (content-dependent).`,
-						].join("\n"),
-					)
-					.join("\n\n") ?? component.description,
-			evidence: `Measured on ${component.frequency} ${component.roles.join(", ")} elements; ${component.treatmentCount} distinct treatments. Role inferred from DOM; provenance retained in raw capture evidence.`,
+			name: `${component.name} (AI inference)`,
+			shared: [],
+			treatments: [],
+			description: component.description,
+			evidence: component.evidence,
+			guidance: [],
 		}),
 	);
-	const aiComponents = options.componentPatterns ?? [];
-	const mergedComponents = [
-		...observedComponents,
-		...aiComponents.map((component) => ({
-			...component,
-			name: `${component.name} (AI inference)`,
-		})),
-	];
+	const mergedComponents = [...observedComponents, ...aiComponents];
 	if (focus !== "visual-tokens" && mergedComponents.length) {
 		lines.push("", heading(2, "Components"), "");
 		for (const component of mergedComponents) {
-			lines.push(heading(3, escapeCell(component.name)));
-			lines.push(
-				"",
-				...component.description
-					.split("\n")
-					.filter(Boolean)
-					.map((line) => `- ${escapeCell(line)}`),
-				"",
-			);
+			lines.push(heading(3, escapeCell(component.name)), "");
+			if (component.purpose)
+				lines.push(`**Purpose:** ${escapeCell(component.purpose)}`, "");
+			if (component.shared.length) {
+				lines.push("**Visual characteristics:**");
+				lines.push(...characteristicLines(component.shared), "");
+			}
+			if (component.treatments.length > 1)
+				for (const treatment of component.treatments) {
+					lines.push(
+						`**${escapeCell(treatment.label)}** (${treatment.samples} measured sample${treatment.samples === 1 ? "" : "s"}):`,
+					);
+					lines.push(
+						...(treatment.characteristics.length
+							? characteristicLines(treatment.characteristics)
+							: ["- Shares every measured characteristic listed above."]),
+						"",
+					);
+				}
+			for (const line of component.description.split("\n").filter(Boolean))
+				lines.push(escapeCell(line), "");
 			lines.push(`**Evidence:** ${escapeCell(component.evidence)}`);
-			lines.push(
-				"",
-				"Map this treatment only to matching components and the cited capture scope. Component roles and hierarchy are inferred; measurements do not establish unseen variants or interaction states.",
-			);
+			if (component.guidance.length) {
+				lines.push("", "**Implementation guidance:**");
+				for (const rule of component.guidance)
+					lines.push(`- ${escapeCell(rule)}`);
+			} else {
+				lines.push(
+					"",
+					"Map this treatment only to matching components and the cited capture scope. Component roles and hierarchy are inferred; measurements do not establish unseen variants or interaction states.",
+				);
+			}
+			lines.push("");
 		}
 	}
 

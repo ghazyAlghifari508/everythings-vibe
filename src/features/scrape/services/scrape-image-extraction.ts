@@ -9,6 +9,7 @@ import type { ImagesSettings } from "@/features/scrape/types/scrape-contract";
 import {
 	classifyImageOutcome,
 	normalizeImageCandidates,
+	normalizeImageCandidateUrl,
 } from "@/features/scrape/utils/scrape-images";
 import {
 	designErrorCodeForHttpStatus,
@@ -30,9 +31,7 @@ import {
 } from "./scrape-image-storage";
 import type { ScrapeJobClaim, ScrapeJobUpdate } from "./scrape-job-service";
 
-// Transient transport failures are retried a bounded number of times. Status
-// responses such as 404 or 403 are final answers from the site and are never
-// retried, so we do not add load to a server that already refused the request.
+// Retries only transient transport faults and 5xx answers; final 4xx status answers are never retried.
 const IMAGE_FETCH_ATTEMPTS = 2;
 const IMAGE_FETCH_RETRY_DELAY_MS = 400;
 const RETRYABLE_FETCH_CODES = new Set(["FETCH_TIMEOUT"]);
@@ -49,8 +48,6 @@ export const IMAGE_FETCH_PLAN: ImageFetchPlan = {
 	retryableCodes: RETRYABLE_FETCH_CODES,
 };
 
-// A site that answered with a final status is never retried; only transport
-// faults and 5xx responses, which may be transient, get another attempt.
 export function shouldRetryImageFetch(
 	attempt: number,
 	status: number | null,
@@ -66,20 +63,21 @@ async function fetchImageAsset(
 	url: string,
 	signal: AbortSignal | undefined,
 	allowUrl: (url: string) => Promise<boolean>,
+	plan: ImageFetchPlan = IMAGE_FETCH_PLAN,
 ): Promise<Awaited<ReturnType<typeof fetchAsset>>> {
 	let lastError: unknown;
-	for (let attempt = 0; attempt < IMAGE_FETCH_ATTEMPTS; attempt += 1) {
+	for (let attempt = 0; attempt < plan.attempts; attempt += 1) {
 		if (attempt > 0)
-			await wait(IMAGE_FETCH_RETRY_DELAY_MS, undefined, { signal });
+			await wait(plan.retryDelayMs * attempt, undefined, { signal });
 		try {
 			const asset = await fetchAsset(url, 0, { signal, allowUrl });
-			if (shouldRetryImageFetch(attempt, asset.status, null)) continue;
+			if (shouldRetryImageFetch(attempt, asset.status, null, plan)) continue;
 			return asset;
 		} catch (error) {
 			lastError = error;
 			const code =
 				error instanceof ScrapeError ? error.code : "UNEXPECTED_ERROR";
-			if (!shouldRetryImageFetch(attempt, null, code)) throw error;
+			if (!shouldRetryImageFetch(attempt, null, code, plan)) throw error;
 		}
 	}
 	throw lastError;
@@ -95,10 +93,6 @@ export async function runImageExtraction(params: {
 	const { scrape, claim, url, settings, update } = params;
 	const allowUrl = createImageSitePolicy(claim.signal);
 	await allowUrl(url);
-	// Distinguishes a page that genuinely has no images from a discovery
-	// failure. The browser capture already succeeded by this point, so an
-	// empty candidate list is a real observation, while a missing list means
-	// discovery never ran.
 	let captured: Awaited<ReturnType<typeof renderPage>>;
 	try {
 		captured = await renderPage(url, {
@@ -139,12 +133,23 @@ export async function runImageExtraction(params: {
 			"Discovery gambar tidak menghasilkan daftar kandidat. Capture tidak dapat dipakai.",
 		);
 	}
+	const validCandidates = captured.images.flatMap((c) => {
+		const normalizedUrl = normalizeImageCandidateUrl(c.url, captured.finalUrl);
+		return normalizedUrl ? [{ ...c, url: normalizedUrl }] : [];
+	});
 	const images = normalizeImageCandidates(
-		captured.images,
+		validCandidates,
 		settings.classifyType,
 	);
-	const loadResults = () =>
-		db
+	type ResultRow = {
+		url: string;
+		assetId: string | null;
+		failureCode: string | null;
+		httpStatus: number | null;
+	};
+	const fallbackRows = new Map<string, ResultRow>();
+	const loadResults = async (): Promise<ResultRow[]> => {
+		const persisted = await db
 			.select({
 				url: scrapeImages.url,
 				assetId: scrapeImages.assetId,
@@ -158,11 +163,20 @@ export async function runImageExtraction(params: {
 					eq(scrapeImages.scrapeId, claim.id),
 				),
 			);
+		return fallbackRows.size === 0
+			? persisted
+			: [
+					...new Map([
+						...fallbackRows,
+						...persisted.map((r) => [r.url, r] as const),
+					]).values(),
+				];
+	};
 	const initialRows = await loadResults();
 	const savedUrls = new Set(
 		initialRows.filter((row) => row.assetId).map((row) => row.url),
 	);
-	const initialCounts = imageResultCounts(initialRows, captured.images);
+	const initialCounts = imageResultCounts(initialRows, validCandidates);
 	await update({
 		status: "extracting",
 		metadata: {
@@ -225,8 +239,14 @@ export async function runImageExtraction(params: {
 				},
 				asset,
 			);
+			fallbackRows.delete(image.url);
 			imageAsset = asset;
 		} catch (failure) {
+			if (
+				failure instanceof ScrapeError &&
+				(claim.signal?.aborted || failure.failureReason === "lease-lost")
+			)
+				throw failure;
 			if (claim.signal?.aborted) throw failure;
 			if (failure instanceof ScrapeError && failure.httpStatus === 429)
 				rateLimitedOrigins.set(new URL(image.url).origin, failure);
@@ -260,8 +280,6 @@ export async function runImageExtraction(params: {
 					: stage === "storage"
 						? "Gambar tidak dapat disimpan."
 						: "Resource gambar tidak dapat diambil atau diverifikasi.";
-			// Only parsed statuses and typed codes are recorded, so the
-			// aggregate classification never reads message text.
 			failureEvidence = {
 				code: failure instanceof ScrapeError ? failure.code : null,
 				httpStatus:
@@ -271,32 +289,43 @@ export async function runImageExtraction(params: {
 			};
 		}
 		if (!imageAsset) {
-			await persistScrapeImage(claim, {
-				...image,
-				pageUrl: captured.finalUrl,
-				status: "failed",
-				error,
-				failureCode,
-				httpStatus: failureEvidence.httpStatus,
-			});
+			try {
+				await persistScrapeImage(claim, {
+					...image,
+					pageUrl: captured.finalUrl,
+					status: "failed",
+					error,
+					failureCode,
+					httpStatus: failureEvidence.httpStatus,
+				});
+			} catch (persistFailure) {
+				if (
+					claim.signal?.aborted ||
+					(persistFailure instanceof ScrapeError &&
+						persistFailure.failureReason === "lease-lost")
+				)
+					throw persistFailure;
+				fallbackRows.set(image.url, {
+					url: image.url,
+					assetId: null,
+					failureCode: failureCode ?? "STORAGE_FAILED",
+					httpStatus: failureEvidence.httpStatus,
+				});
+			}
 		}
 		await update({
 			metadata: {
 				...scrape.metadata,
 				mode: "images",
-				...imageResultCounts(await loadResults(), captured.images),
+				...imageResultCounts(await loadResults(), validCandidates),
 				activity: image.url,
 				activityStartedAt: new Date().toISOString(),
 			},
 		});
 	}
-	// Every distinct outcome is reported honestly instead of collapsing into
-	// one generic completion: an empty page, a partial result and a total
-	// verification failure are different facts about the run. When every
-	// asset failed, the failure is classified from the evidence each fetch
-	// actually produced instead of one generic message.
+	// Classifies all-failed runs from the structured HTTP/code evidence each resource produced.
 	const finalRows = await loadResults();
-	const finalCounts = imageResultCounts(finalRows, captured.images);
+	const finalCounts = imageResultCounts(finalRows, validCandidates);
 	const imageOutcome = classifyImageOutcome(
 		finalCounts.discoveredImages,
 		finalCounts.savedImages,
@@ -308,6 +337,7 @@ export async function runImageExtraction(params: {
 			mode: "images",
 			imageOutcome,
 			...finalCounts,
+			...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
 		},
 	});
 	if (imageOutcome === "all-failed") {

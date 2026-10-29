@@ -65,6 +65,23 @@ export function ScrapeHtmlPreviewPanel({
 			: frameReport === "failed"
 				? READINESS_MESSAGE.failed.label
 				: "Preview belum tersedia.";
+	// One notice owns the fallback explanation and the recovery action. It sits
+	// above the capture, because a tall screenshot used to bury the only way back
+	// to the interactive preview at its very bottom.
+	const screenshotNotice = domFailed
+		? {
+				text: "Preview interaktif belum tersedia. Menampilkan tangkapan layar statis.",
+				onRetry: retryAction,
+			}
+		: previewState === "loading"
+			? {
+					text: "Menyiapkan preview interaktif. Sementara ini tangkapan layar statis.",
+					onRetry: undefined,
+				}
+			: {
+					text: "Tangkapan layar statis, bukan preview interaktif.",
+					onRetry: undefined,
+				};
 
 	return (
 		<div role="tabpanel" aria-label="Preview index.html" hidden={!active}>
@@ -114,23 +131,23 @@ export function ScrapeHtmlPreviewPanel({
 				/>
 			) : hasScreenshot && screenshot ? (
 				<>
-					<ScreenshotView screenshot={screenshot} domain={domain} />
-					{domFailed && retryAction ? (
-						<div
-							data-testid="scrape-visual-recovery"
-							className="flex flex-wrap items-center justify-between gap-2 border-t border-graphite bg-obsidian px-3 py-2 text-xs text-fog"
-						>
-							<span>Preview DOM gagal dimuat.</span>
+					<div
+						data-testid="scrape-visual-notice"
+						className="flex flex-wrap items-center justify-between gap-2 border-b border-graphite bg-obsidian px-3 py-2 text-xs text-fog"
+					>
+						<span className="min-w-0 flex-1">{screenshotNotice.text}</span>
+						{screenshotNotice.onRetry ? (
 							<button
 								type="button"
-								onClick={retryAction}
+								onClick={screenshotNotice.onRetry}
 								className="inline-flex items-center gap-1.5 rounded-md border border-graphite px-2.5 py-1 font-semibold text-snow transition-colors hover:border-steel hover:bg-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 							>
 								<Icon icon={RefreshIcon} size={13} aria-hidden />
 								Coba lagi
 							</button>
-						</div>
-					) : null}
+						) : null}
+					</div>
+					<ScreenshotView screenshot={screenshot} domain={domain} />
 				</>
 			) : (
 				<PreviewUnavailable

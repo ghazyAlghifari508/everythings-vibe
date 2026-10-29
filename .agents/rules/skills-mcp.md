@@ -38,6 +38,8 @@
    - `21st.dev`;
    - HeroUI;
    - Magic UI;
+   - React Bits;
+   - Thinking Orbs (`https://www.thinkingorbs.com/#orbs`);
    - other relevant registries that have been verified.
 3. Use `shadcn-component-discovery` before building a table, form, modal,
    sidebar, dashboard control, tabs, carousel, chart, animation, or standard

@@ -184,15 +184,16 @@ it("stops downloading after storage quota and keeps the first saved asset", asyn
 	]);
 });
 
+const notFoundRobots = (finalUrl: string) => ({
+	status: 404,
+	body: Buffer.alloc(0),
+	contentType: "text/plain",
+	finalUrl,
+});
+
 it("does not confuse unknown network failures with storage failures or expose exceptions", async () => {
 	state.fetch.mockImplementation(async (url: string) => {
-		if (url.endsWith("robots.txt"))
-			return {
-				status: 404,
-				body: Buffer.alloc(0),
-				contentType: "text/plain",
-				finalUrl: url,
-			};
+		if (url.endsWith("robots.txt")) return notFoundRobots(url);
 		throw new Error("private socket diagnostics");
 	});
 	await expect(run()).rejects.toMatchObject({ code: "ASSET_FETCH_FAILED" });
@@ -208,22 +209,92 @@ it("does not confuse unknown network failures with storage failures or expose ex
 	).toBe(true);
 });
 
-it("does not retry invalid content or SVG and persists per-asset classification", async () => {
+it("does not retry invalid content or unsafe SVG and persists per-asset classification", async () => {
 	state.fetch.mockImplementation(async (url: string) => ({
 		status: url.endsWith("robots.txt") ? 404 : 200,
 		contentType: url.endsWith("a.png") ? "image/svg+xml" : "image/png",
-		body: Buffer.from("<svg/>"),
+		body: url.endsWith("a.png")
+			? Buffer.from("<svg onload='alert(1)'><script>alert(1)</script></svg>")
+			: Buffer.from("<html><body>Error page</body></html>"),
 		finalUrl: url,
 	}));
 	await expect(run()).rejects.toMatchObject({ code: "ASSET_FETCH_FAILED" });
 	expect([...state.rows.values()].map((row) => row.failureCode)).toEqual([
-		"UNSUPPORTED_FORMAT",
-		"UNSUPPORTED_FORMAT",
-		"UNSUPPORTED_FORMAT",
+		"UNSAFE_SVG",
+		"INVALID_IMAGE",
+		"INVALID_IMAGE",
 	]);
 	expect(
 		state.fetch.mock.calls.filter(([url]) => !url.endsWith("robots.txt")),
 	).toHaveLength(3);
+});
+
+it("stores valid safe SVG alongside raster assets even when CDN /robots.txt returns 403", async () => {
+	const safeSvg = Buffer.from(
+		"<svg xmlns='http://www.w3.org/2000/svg' width='57' height='21' fill='none'><path fill='#FFF' d='M0 0h57v21H0z'/></svg>",
+	);
+	state.fetch.mockImplementation(async (url: string) =>
+		url.endsWith("robots.txt")
+			? {
+					status: 403,
+					contentType: "text/xml",
+					body: Buffer.from("<Error><Code>MissingKey</Code></Error>"),
+					finalUrl: url,
+				}
+			: {
+					status: 200,
+					contentType: url.endsWith("a.png") ? "image/svg+xml" : "image/png",
+					body: url.endsWith("a.png") ? safeSvg : png,
+					finalUrl: url,
+				},
+	);
+	await run();
+	expect([...state.rows.values()].filter((row) => row.assetId)).toHaveLength(3);
+	expect(update).toHaveBeenLastCalledWith(
+		expect.objectContaining({
+			metadata: expect.objectContaining({
+				imageOutcome: "complete",
+				savedImages: 3,
+				failedResources: 0,
+			}),
+		}),
+	);
+});
+
+it("handles total database persistence failure as STORAGE_FAILED without crashing mid-loop", async () => {
+	state.persist.mockImplementation(async () => {
+		throw new Error("database connection reset");
+	});
+	await expect(run()).rejects.toMatchObject({ code: "STORAGE_FAILED" });
+	expect(update).toHaveBeenLastCalledWith(
+		expect.objectContaining({
+			metadata: expect.objectContaining({
+				imageOutcome: "all-failed",
+				savedImages: 0,
+				failedResources: 3,
+			}),
+		}),
+	);
+});
+
+it("succeeds on transient timeout retry before budget is exhausted", async () => {
+	const attempts = new Map<string, number>();
+	state.fetch.mockImplementation(async (url: string) => {
+		if (url.endsWith("robots.txt")) return notFoundRobots(url);
+		const count = (attempts.get(url) ?? 0) + 1;
+		attempts.set(url, count);
+		if (url.endsWith("b.png") && count === 1)
+			throw new ScrapeError("FETCH_TIMEOUT");
+		return {
+			status: 200,
+			contentType: "image/png",
+			body: png,
+			finalUrl: url,
+		};
+	});
+	await run();
+	expect([...state.rows.values()].filter((row) => row.assetId)).toHaveLength(3);
+	expect(attempts.get("https://example.test/b.png")).toBe(2);
 });
 
 it("classifies failed database writes as storage failures without losing prior saved rows", async () => {
@@ -242,13 +313,7 @@ it("classifies failed database writes as storage failures without losing prior s
 
 it("records transport size limits as validation outcomes, not capture failures", async () => {
 	state.fetch.mockImplementation(async (url: string) => {
-		if (url.endsWith("robots.txt"))
-			return {
-				status: 404,
-				body: Buffer.alloc(0),
-				contentType: "text/plain",
-				finalUrl: url,
-			};
+		if (url.endsWith("robots.txt")) return notFoundRobots(url);
 		throw new ScrapeError("NO_ANALYZABLE_CONTENT", "Size limit", {
 			failureReason: "asset-too-large",
 		});
@@ -263,13 +328,7 @@ it("records transport size limits as validation outcomes, not capture failures",
 
 it("records timeout once per candidate after bounded retries", async () => {
 	state.fetch.mockImplementation(async (url: string) => {
-		if (url.endsWith("robots.txt"))
-			return {
-				status: 404,
-				body: Buffer.alloc(0),
-				contentType: "text/plain",
-				finalUrl: url,
-			};
+		if (url.endsWith("robots.txt")) return notFoundRobots(url);
 		throw new ScrapeError("FETCH_TIMEOUT");
 	});
 	await expect(run()).rejects.toMatchObject({ code: "FETCH_TIMEOUT" });

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp01Icon, Loading01Icon } from "@hugeicons/core-free-icons";
+import { ArrowUp01Icon, Loading02Icon } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useId, useRef, useState } from "react";
 import { z } from "zod";
@@ -199,7 +199,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 						>
 							{pending ? (
 								<Icon
-									icon={Loading01Icon}
+									icon={Loading02Icon}
 									size={16}
 									aria-hidden
 									className="motion-safe:animate-spin"

@@ -4,7 +4,7 @@ import {
 	AlertCircleIcon,
 	ArrowRight01Icon,
 	Globe02Icon,
-	Loading01Icon,
+	Loading02Icon,
 } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
@@ -101,9 +101,9 @@ export function HtmlScraperPanel() {
 						{loading ? (
 							<>
 								<Icon
-									icon={Loading01Icon}
+									icon={Loading02Icon}
 									size={18}
-									className="animate-spin"
+									className="motion-safe:animate-spin"
 									aria-hidden="true"
 								/>
 								<span>Menyiapkan…</span>

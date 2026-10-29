@@ -1,7 +1,5 @@
-// A specimen sentence only stands in for text the capture did not record; when a
-// real sample exists it is used instead.
-export const FALLBACK_SAMPLE = "The quick brown fox jumps over the lazy dog";
-
+// Specimen copy is chosen per typography role in design-normalize-typography, so
+// no captured page text reaches the UI.
 export function isCssLength(value: string): boolean {
 	return /^[\d.]+(px|rem|em|%)$/.test(value.trim());
 }

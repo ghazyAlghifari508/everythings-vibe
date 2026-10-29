@@ -128,7 +128,11 @@ describe("semantic multi-capture normalization", () => {
 		expect(
 			inspector?.components.some(
 				(entry) =>
-					entry.name.includes("390x844") && entry.description.includes("16px"),
+					entry.name.includes("390x844") &&
+					[
+						...entry.sharedCharacteristics,
+						...entry.variants.flatMap((variant) => variant.characteristics),
+					].some((characteristic) => characteristic.value.includes("16px")),
 			),
 		).toBe(true);
 		expect(document).not.toMatch(/nth-child\(|html\s*>|\[capture \d/);

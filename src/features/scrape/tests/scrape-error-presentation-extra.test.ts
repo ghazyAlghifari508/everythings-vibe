@@ -55,7 +55,9 @@ describe("partial result presentation", () => {
 		expect(partial.partial).not.toBeNull();
 		expect(partial.partial?.title).toMatch(/sebagian/i);
 		expect(partial.partial?.availableLabel).toBe("24 gambar tersedia");
-		expect(partial.partial?.failedLabel).toBe("6 resource gagal diambil");
+		expect(partial.partial?.failedLabel).toBe(
+			"6 gambar tidak berhasil diambil",
+		);
 		expect(partial.partial?.actionLabel).toMatch(/lihat hasil/i);
 	});
 

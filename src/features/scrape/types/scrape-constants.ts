@@ -34,6 +34,19 @@ export const SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS = 60 * 60 * 1000;
 export const SCRAPE_PREVIEW_ASSET_MAX_URL_CHARS = 4096;
 export const SCRAPE_PREVIEW_READY_PING_INTERVAL_MS = 250;
 export const SCRAPE_PREVIEW_READY_MAX_PINGS = 20;
+// The framed preview grows to the height the captured document reports, so the
+// reader scrolls the page instead of hunting for a nested viewport. Past the
+// ceiling the frame keeps its own scrollbar, which bounds the element without
+// making the remaining content unreachable.
+export const SCRAPE_PREVIEW_FRAME_MIN_HEIGHT = 280;
+export const SCRAPE_PREVIEW_FRAME_MAX_HEIGHT = 20_000;
+export const SCRAPE_PREVIEW_FRAME_HEIGHT_STEP = 24;
+// A frame that never fires `load` never ran the readiness reporter. Bounding
+// that wait keeps the surface from loading forever with no verdict.
+export const SCRAPE_PREVIEW_FRAME_LOAD_TIMEOUT_MS = 20_000;
+// A full-page screenshot beyond this height would need an unreasonably large
+// stitched bitmap, so the bounded viewport shot is used instead.
+export const SCRAPE_SCREENSHOT_FULL_PAGE_MAX_HEIGHT = 6_000;
 export const CRAWL_DESCRIPTION_MAX_CHARS = 2000;
 export const CRAWL_HEADING_MAX_CHARS = 500;
 export const CRAWL_SECTION_TEXT_MAX_CHARS = 8000;

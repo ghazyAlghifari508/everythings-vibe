@@ -41,7 +41,7 @@ export interface InspectorTypeEntry {
 	lineHeight: string;
 	letterSpacing: string;
 	frequency: number;
-	/** A real sample taken from the measured page. */
+	/** Raw page text for validation only; the displayed specimen is role-based. */
 	sample: string;
 }
 
@@ -56,7 +56,7 @@ export interface InspectorTypeface {
 	loadedEvidence: boolean;
 	declaredFaces: { family: string; weight: string; status: string }[];
 	uncertainty: string | null;
-	/** A real sample rendered in this family, when the capture recorded one. */
+	/** Raw page text for this family; validation only, never a public specimen. */
 	sample: string;
 }
 
@@ -94,11 +94,29 @@ export interface InspectorGuideline {
 	evidence: string;
 }
 
+export interface InspectorComponentCharacteristic {
+	label: string;
+	value: string;
+}
+
+export interface InspectorComponentVariant {
+	label: string;
+	samples: number;
+	characteristics: InspectorComponentCharacteristic[];
+}
+
 export interface InspectorComponent {
 	name: string;
+	/** Semantic purpose inferred from the measured DOM role. */
+	purpose: string;
+	/** What this component class does not establish. */
 	description: string;
 	evidence: string;
 	frequency: number;
+	/** Characteristics every measured variant shares. */
+	sharedCharacteristics: InspectorComponentCharacteristic[];
+	variants: InspectorComponentVariant[];
+	guidance: string[];
 }
 
 export interface DesignInspectorModel {
@@ -298,9 +316,17 @@ export function inspectorFromModel(
 		})),
 		components: (model.observedComponents ?? []).map((component) => ({
 			name: component.name,
+			purpose: component.purpose,
 			description: component.description,
 			evidence: component.evidence,
 			frequency: component.frequency,
+			sharedCharacteristics: component.sharedCharacteristics,
+			variants: (component.treatments ?? []).map((treatment) => ({
+				label: treatment.label,
+				samples: treatment.samples,
+				characteristics: treatment.characteristics,
+			})),
+			guidance: component.guidance,
 		})),
 		baseUnitPx: model.baseUnitPx,
 		dos: model.guidelines.dos,

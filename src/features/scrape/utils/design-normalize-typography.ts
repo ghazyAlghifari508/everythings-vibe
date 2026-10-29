@@ -30,13 +30,40 @@ export interface TypeSpecimen {
 	frequency: number;
 	/** Distinct element roles, e.g. h1, body, cta. */
 	elementRoles: string[];
-	/** A real text sample taken from the measured page, when one exists. */
+	/**
+	 * Raw page text kept for validation only. It is never rendered as the public
+	 * specimen: the published document must not replay the reference site's copy.
+	 */
 	sample: string;
 	selectors: string[];
 }
 
 const AUDIT_SELECTOR_LIMIT = 3;
 const SAMPLE_CHARS = 64;
+
+// Specimen copy per role. A type specimen exists to show the character of the
+// measured style, not to reproduce the page it came from, so every role gets
+// neutral text short enough to wrap inside a narrow panel.
+const SPECIMEN_TEXT: Record<string, string> = {
+	display: "Design starts here",
+	"large heading": "Build something great",
+	heading: "Structure that reads clearly",
+	subheading: "Supporting detail, kept short",
+	"body large": "The quick brown fox jumps over the lazy dog.",
+	body: "The quick brown fox jumps over the lazy dog.",
+	"body small": "The quick brown fox jumps over the lazy dog.",
+	caption: "Measured in the browser",
+	"ui label": "Get started",
+	monospace: "const value = 42;",
+};
+const SPECIMEN_FALLBACK = SPECIMEN_TEXT.body ?? "";
+
+// Roles reach here as either a bare scale role or one scoped to a capture, e.g.
+// "Display (Capture 2: 768x1024, browser preference dark)".
+export function specimenTextForRole(role: string): string {
+	const base = role.split(" (")[0]?.trim().toLowerCase() ?? "";
+	return SPECIMEN_TEXT[base] ?? SPECIMEN_FALLBACK;
+}
 
 // The properties that define a type style. Tracking and family matter because
 // two headings at the same size but different families are different styles.
@@ -161,7 +188,7 @@ export function groupTypeSpecimens(
 				!existing.selectors.includes(element.selector)
 			)
 				existing.selectors.push(element.selector);
-			// Prefer a longer real sample so the document shows actual page copy.
+			// Keep the longest raw sample for validation, not for display.
 			if (element.text.length > existing.sample.length)
 				existing.sample = element.text.slice(0, SAMPLE_CHARS);
 			// Re-classify with the full set of element roles now that more elements
@@ -229,7 +256,7 @@ export interface NormalizedTypeface {
 	loadedEvidence: boolean;
 	/** True when this family is only a fallback in the measured stack. */
 	fallbackOnly: boolean;
-	/** A real sample rendered in this family, when the capture recorded one. */
+	/** Raw page text for this family; validation only, never a public specimen. */
 	sample: string;
 }
 
@@ -288,7 +315,7 @@ export function normalizeTypefaces(
 			!existing.letterSpacings.includes(specimen.letterSpacing)
 		)
 			existing.letterSpacings.push(specimen.letterSpacing);
-		// Keep the longest real sample, so the specimen shows actual page copy.
+		// Longest raw sample only; display text comes from the role specimen.
 		if (specimen.sample.length > existing.sample.length)
 			existing.sample = specimen.sample;
 		typefaces.set(family, existing);

@@ -71,9 +71,11 @@ export function getScrapeStagesForMode(mode: ScrapeMode): ScrapeStatus[] {
 	return ["queued", "capturing", "completed"];
 }
 
-// `waiting` is the queue stage: it is current, but no worker has started it, so
-// it must not pretend to be running with a spinner.
-type StepState = "done" | "active" | "waiting" | "pending" | "failed";
+// The queue stage is current work too: the request is accepted and waiting on a
+// worker, so it gets the same circular spinner as every later stage. Its copy
+// ("Dalam antrean" plus the "Menunggu giliran" activity line) is what keeps the
+// UI from claiming a capture that has not started.
+type StepState = "done" | "active" | "pending" | "failed";
 
 function StepMarker({
 	state,
@@ -117,14 +119,6 @@ function StepMarker({
 				className="shrink-0 text-crimson"
 			/>
 		);
-	if (state === "waiting")
-		return (
-			<span
-				aria-hidden
-				data-waiting-stage-marker
-				className="size-2 rounded-full border border-mist"
-			/>
-		);
 	return (
 		<span aria-hidden className="size-1.5 rounded-full border border-slate" />
 	);
@@ -163,8 +157,6 @@ export function ScrapeStepper({
 			return i === 0 ? "done" : "pending";
 		}
 		if (isDone) return "done";
-		if (status === "queued" || index < 0)
-			return i === 0 ? "waiting" : "pending";
 		if (i < index) return "done";
 		if (i === index) return "active";
 		return "pending";
@@ -187,9 +179,7 @@ export function ScrapeStepper({
 						key={stage}
 						data-step-state={state}
 						data-stalled={stalled && state === "active" ? "" : undefined}
-						aria-current={
-							state === "active" || state === "waiting" ? "step" : undefined
-						}
+						aria-current={state === "active" ? "step" : undefined}
 						className="relative flex items-start gap-3 pb-5 last:pb-0"
 					>
 						{i < stages.length - 1 ? (
@@ -212,11 +202,9 @@ export function ScrapeStepper({
 									"text-sm",
 									state === "active" || state === "failed"
 										? "font-semibold text-snow"
-										: state === "waiting"
-											? "font-medium text-snow"
-											: state === "done"
-												? "text-fog"
-												: "text-fog/70",
+										: state === "done"
+											? "text-fog"
+											: "text-fog/70",
 								)}
 							>
 								{LABELS[stage]}

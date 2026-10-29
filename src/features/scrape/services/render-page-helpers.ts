@@ -79,6 +79,7 @@ export async function collectPageImages(
 				source: string;
 			}[] = [];
 			const seen = new Set<string>();
+			const uniqueUrls = new Set<string>();
 			const add = (
 				raw: string,
 				source: string,
@@ -86,16 +87,24 @@ export async function collectPageImages(
 				width: number | null = null,
 				height: number | null = null,
 			) => {
+				const trimmed = raw.trim();
+				if (!trimmed || trimmed.startsWith("#") || /^%23/i.test(trimmed))
+					return;
 				try {
-					const url = new URL(raw, document.baseURI);
+					const url = new URL(trimmed, document.baseURI);
+					const lastSegment = url.pathname.split("/").pop() ?? "";
+					if (/^%23/i.test(lastSegment)) return;
+					url.hash = "";
 					if (
 						!["http:", "https:"].includes(url.protocol) ||
 						url.username ||
 						url.password ||
-						result.length >= limits.imageCandidates ||
+						(uniqueUrls.size >= limits.imageCandidates &&
+							!uniqueUrls.has(url.href)) ||
 						seen.has(`${url.href}:${source}`)
 					)
 						return;
+					uniqueUrls.add(url.href);
 					seen.add(`${url.href}:${source}`);
 					result.push({ url: url.href, source, alt, width, height });
 				} catch {
@@ -107,28 +116,41 @@ export async function collectPageImages(
 				limits.domScanElements,
 			)) {
 				if (element instanceof HTMLImageElement) {
-					add(
-						element.currentSrc || element.src,
-						"img",
-						element.alt || null,
-						measure && element.naturalWidth ? element.naturalWidth : null,
-						measure && element.naturalHeight ? element.naturalHeight : null,
-					);
+					const primarySrc =
+						element.currentSrc || element.getAttribute("src") || "";
+					if (primarySrc)
+						add(
+							primarySrc,
+							"img",
+							element.alt || null,
+							measure && element.naturalWidth ? element.naturalWidth : null,
+							measure && element.naturalHeight ? element.naturalHeight : null,
+						);
 					for (const attr of ["data-src", "data-original", "data-lazy-src"]) {
 						const value = element.getAttribute(attr);
 						if (value) add(value, attr, element.alt || null);
 					}
 				}
-				for (const match of (element.getAttribute("srcset") ?? "").split(",")) {
-					const value = match.trim().split(/\s+/)[0];
-					if (value) add(value, "srcset");
+				for (const srcsetAttr of [
+					"srcset",
+					"data-srcset",
+					"data-lazy-srcset",
+				]) {
+					const rawSrcset = element.getAttribute(srcsetAttr) ?? "";
+					if (!rawSrcset.trim()) continue;
+					for (const match of rawSrcset
+						.trim()
+						.split(/,\s+(?=\S)|(?<=\s\d+(?:\.\d+)?[wx])\s*,\s*/i)) {
+						const value = match.trim().split(/\s+/)[0]?.replace(/,+$/, "");
+						if (value) add(value, "srcset");
+					}
 				}
 				for (const match of getComputedStyle(element).backgroundImage.matchAll(
 					/url\(["']?([^"')]+)["']?\)/g,
 				))
 					add(match[1], "background");
 				if (element instanceof HTMLLinkElement && /icon/i.test(element.rel))
-					add(element.href, "icon");
+					add(element.getAttribute("href") || "", "icon");
 			}
 			return result;
 		},
