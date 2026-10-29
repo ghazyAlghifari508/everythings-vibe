@@ -12,7 +12,8 @@ Everything is read from project state the workspace already loaded
 platform, and the frame names on the canvas. No screenshot, no vision call, no
 provider request, and no new endpoint.
 
-Source order in `deriveStudioScreenSuggestions`:
+Source order in `deriveStudioScreenSuggestions` (`studio-screen-suggestions.ts`);
+the lexicon itself lives in `studio-screen-recipes.ts`:
 
 1. `designBlueprint.screenPlan` entries that have no frame yet — the plan is the
    strongest signal, and the entry's `role` becomes the prompt focus.
