@@ -113,6 +113,20 @@ export async function preparePrdChatContext(input: {
 		};
 	}
 
+	// ponytail: direct revisions are blocked until proposal approval exists for existing codebases.
+	if (mode === "revise" && project.projectMode === "existing_codebase") {
+		return {
+			ok: false,
+			response: Response.json(
+				{
+					error: "Revisi planning memerlukan persetujuan proposal.",
+					code: "REVISION_APPROVAL_REQUIRED",
+				},
+				{ status: 409 },
+			),
+		};
+	}
+
 	// Fitur SSOT: Bab 4-5 PRD disusun 1:1 dari daftar fitur. Fail closed with an
 	// actionable message instead of generating a PRD whose features later stages
 	// must discard.
