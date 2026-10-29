@@ -29,7 +29,7 @@ export const STUDIO_AUDITED_SKILL_IDS: StudioDesignSkillId[] = [
 	"taste",
 ];
 
-export interface StudioSkillStageAudit {
+interface StudioSkillStageAudit {
 	stage: StudioSkillStage;
 	contextChars: number;
 	estimatedTokens: number;

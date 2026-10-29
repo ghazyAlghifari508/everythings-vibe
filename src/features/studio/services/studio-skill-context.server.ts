@@ -171,7 +171,7 @@ export interface StudioSkillSection {
 	order: number;
 }
 
-export interface StudioSkillSelectedSection {
+interface StudioSkillSelectedSection {
 	key: string;
 	docPath: string;
 	heading: string | null;
@@ -180,7 +180,7 @@ export interface StudioSkillSelectedSection {
 	rationale: string;
 }
 
-export interface StudioSkillOmittedSection {
+interface StudioSkillOmittedSection {
 	key: string;
 	docPath: string;
 	heading: string | null;
@@ -188,7 +188,7 @@ export interface StudioSkillOmittedSection {
 	reason: string;
 }
 
-export interface StudioSkillContextPlan {
+interface StudioSkillContextPlan {
 	skillId: StudioDesignSkillId;
 	name: string;
 	stage: StudioSkillStage;
@@ -264,9 +264,7 @@ function skillDocuments(id: StudioDesignSkillId): SkillDocument[] {
  * code blocks (several upstream files contain shell comments starting with #).
  * Every returned section is a contiguous verbatim slice of the source document.
  */
-export function splitStudioSkillSections(
-	doc: SkillDocument,
-): StudioSkillSection[] {
+function splitStudioSkillSections(doc: SkillDocument): StudioSkillSection[] {
 	const sections: StudioSkillSection[] = [];
 	let buffer: string[] = [];
 	let level = 0;
