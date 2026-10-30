@@ -27,6 +27,7 @@ import {
 	projects,
 } from "@/db/schema";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { reconcileExpiredCreditOperations } from "@/lib/services/credit-service";
 import { requireUser } from "@/lib/session";
 import { analysisRequestSchema, decideAnalysisRequest } from "./analysis";
 import {
@@ -47,6 +48,7 @@ type SnapshotRow = {
 	status: string;
 	fileCount: number;
 	contentSize: number;
+	syncSessionId: string;
 };
 
 export async function triggerCodebaseAnalysis(
@@ -154,6 +156,7 @@ export async function triggerCodebaseAnalysis(
 			);
 		const [pinned] = await db
 			.select({
+				syncSessionId: codebaseSnapshots.syncSessionId,
 				id: codebaseSnapshots.id,
 				status: codebaseSnapshots.status,
 				fileCount: codebaseSnapshots.fileCount,
@@ -179,6 +182,7 @@ export async function triggerCodebaseAnalysis(
 	} else {
 		const [latest] = await db
 			.select({
+				syncSessionId: codebaseSnapshots.syncSessionId,
 				id: codebaseSnapshots.id,
 				status: codebaseSnapshots.status,
 				fileCount: codebaseSnapshots.fileCount,
@@ -199,6 +203,7 @@ export async function triggerCodebaseAnalysis(
 			);
 	}
 
+	await reconcileExpiredCreditOperations({ userId: user.id });
 	const existing = await db
 		.select()
 		.from(codebaseAnalyses)
@@ -285,7 +290,8 @@ export async function triggerCodebaseAnalysis(
 		projectId,
 		scope,
 		snapshot,
-		existingCount: existing.length,
 		refreshRequest,
+		preflightOnly: parsedRequest.data.preflight ?? false,
+		creditConsent: parsedRequest.data.creditConsent,
 	});
 }

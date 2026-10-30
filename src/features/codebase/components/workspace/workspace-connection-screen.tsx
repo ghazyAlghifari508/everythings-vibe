@@ -1,5 +1,8 @@
+import { CodebaseConclusion } from "@/features/codebase/components/planning/codebase-conclusion";
 import { ScreenConnect } from "@/features/codebase/components/workspace/screen-connect";
 import { ScreenIncompleteSync } from "@/features/codebase/components/workspace/screen-incomplete-sync";
+import type { AnalysisResponse } from "@/features/codebase/services/analysis";
+import type { CodebaseReadiness } from "@/features/codebase/services/workspace-readiness";
 import type { useCodebaseSync } from "../../hooks/use-codebase-sync";
 
 type ConnectionState = Pick<
@@ -22,7 +25,24 @@ export function WorkspaceConnectionScreen({
 	triggerAnalysis,
 	startSession,
 	readStatus,
-}: ConnectionState & { name: string }) {
+	readiness,
+	analysis = null,
+	isWorking = false,
+	activeWorkspaceSnapshotId = null,
+	manifestFileCount = 0,
+}: ConnectionState & {
+	name: string;
+	readiness?: CodebaseReadiness;
+	analysis?: AnalysisResponse | null;
+	isWorking?: boolean;
+	activeWorkspaceSnapshotId?: string | null;
+	manifestFileCount?: number;
+}) {
+	// Once the conclusion area owns recovery it also owns the failure message and
+	// its single retry action, so the standalone banner must not render a second
+	// "Coba lagi" beside it.
+	const inAreaRecovery =
+		readiness === "analysis_pending" || readiness === "recovery_required";
 	return (
 		<main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14">
 			<header className="border-b border-graphite pb-6">
@@ -37,7 +57,7 @@ export function WorkspaceConnectionScreen({
 					fitur baru dengan konteks yang nyata.
 				</p>
 			</header>
-			{error && (
+			{error && !inAreaRecovery && (
 				<div
 					role="alert"
 					className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-crimson/40 bg-crimson/10 p-4 text-sm text-crimson"
@@ -46,7 +66,11 @@ export function WorkspaceConnectionScreen({
 					<button
 						type="button"
 						onClick={() => {
-							if (status?.analysisStatus === "failed" && status.snapshotId)
+							if (
+								(status?.analysisAttemptStatus === "failed" ||
+									status?.analysisStatus === "failed") &&
+								status.snapshotId
+							)
 								void triggerAnalysis(status.snapshotId);
 							else if (
 								status?.status === "failed" ||
@@ -62,7 +86,37 @@ export function WorkspaceConnectionScreen({
 					</button>
 				</div>
 			)}
-			{payload !== null || isStarting ? (
+			{inAreaRecovery ? (
+				<CodebaseConclusion
+					snapshot={
+						status ?? {
+							projectId: "",
+							sessionId: "",
+							status: "uploaded",
+							snapshotId: activeWorkspaceSnapshotId ?? "",
+							fileCount: manifestFileCount,
+							analysisStatus:
+								readiness === "recovery_required" ? "failed" : "pending",
+							analysisAttemptStatus:
+								readiness === "recovery_required" ? "failed" : "pending",
+							analysisAttemptCreatedAt: undefined,
+							analysisAttemptUpdatedAt: undefined,
+							errorCode: null,
+							errorMessage: null,
+						}
+					}
+					analysis={analysis}
+					isAnalyzing={isWorking}
+					errorMessage={error ?? status?.errorMessage ?? null}
+					onRetryAnalysis={() => {
+						const target = status?.snapshotId ?? activeWorkspaceSnapshotId;
+						if (target) void triggerAnalysis(target);
+					}}
+					onRetrySync={() => void startSession("retry")}
+					onEnterWorkspace={() => {}}
+					onBackToSync={() => void startSession("retry")}
+				/>
+			) : payload !== null || isStarting ? (
 				<ScreenConnect
 					projectName={name}
 					payload={payload}

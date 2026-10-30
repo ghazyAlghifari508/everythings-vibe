@@ -19,14 +19,25 @@ import {
 } from "@/features/codebase/components/planning/project-actions-menu";
 import {
 	CODEBASE_LIBRARY_LABEL,
+	CODEBASE_LIBRARY_STATUS_LABELS,
 	type CodebaseLibraryItem,
 	filterLibraryItems,
 	libraryAnalysisLabels,
-	mapLibraryStatus,
 	NEW_REPOSITORY_HREF,
+	resolveLibraryItemAction,
+	resolveLibraryItemStatus,
 } from "@/features/codebase/services/library";
-import { clearPlanCodebasePointerIfMatches } from "@/features/codebase/services/plan-storage";
-import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/features/codebase/types/codebase-constants";
+import {
+	clearPlanCodebasePointerIfMatches,
+	clearPlanCodebaseProjectPointer,
+	storePlanCodebasePointer,
+	storePlanCodebaseProjectPointer,
+	storePlanCodebaseStepPointer,
+} from "@/features/codebase/services/plan-storage";
+import {
+	CODEBASE_LIBRARY_PAGE_SIZE,
+	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
+} from "@/features/codebase/types/codebase-constants";
 import { paginate } from "@/lib/history-filter";
 import { useUIStore } from "@/store";
 
@@ -75,6 +86,39 @@ export function CodebaseLibraryView({
 	useEffect(() => {
 		if (page > totalPages) setPage(totalPages);
 	}, [page, totalPages]);
+
+	// A repository that is mid-analysis cannot become ready on its own here, so
+	// the page re-runs its own loader while any row reports "Menganalisis". That
+	// updates History from persisted server state as soon as the analysis lands,
+	// with no full reload and no second source of truth.
+	const hasAnalyzingItems = localItems.some(
+		(item) => resolveLibraryItemStatus(item) === "analyzing",
+	);
+	useEffect(() => {
+		if (!hasAnalyzingItems) return;
+		const timer = setInterval(() => {
+			void router.invalidate();
+		}, CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS);
+		return () => clearInterval(timer);
+	}, [hasAnalyzingItems, router]);
+
+	/**
+	 * Point the onboarding flow at THIS repository before opening it, so recovery
+	 * resumes the existing codebase and anchor project instead of creating new
+	 * records. The step is pinned to "sync", the one screen that owns live
+	 * progress and the single recovery action.
+	 */
+	const beginRecoveryNavigation = (item: CodebaseLibraryItem) => {
+		storePlanCodebasePointer(item.id, item.name);
+		if (item.onboardingProjectId) {
+			storePlanCodebaseProjectPointer(item.onboardingProjectId);
+		} else {
+			// The project pointer is not codebase-scoped, so a stale value for
+			// another repository would attach this recovery to the wrong plan.
+			clearPlanCodebaseProjectPointer();
+		}
+		storePlanCodebaseStepPointer("sync");
+	};
 
 	const applyRename = (id: string, name: string) => {
 		setLocalItems((current) =>
@@ -237,60 +281,75 @@ export function CodebaseLibraryView({
 						const displayDate =
 							formatLibraryDate(item.snapshotCreatedAt) ??
 							formatLibraryDate(item.updatedAt);
-						const status = mapLibraryStatus(
-							item.snapshotStatus,
-							item.hasReadyAnalysis,
+						const statusKey = resolveLibraryItemStatus(item);
+						const status = CODEBASE_LIBRARY_STATUS_LABELS[statusKey];
+						const action = resolveLibraryItemAction(item);
+						const isAttention = statusKey === "needs_analysis";
+						const metaParts = [
+							item.fileCount !== null ? `${item.fileCount} file` : null,
+							item.planCount > 0 ? `${item.planCount} fitur plan` : null,
+							displayDate ? `Terakhir diperbarui ${displayDate}` : null,
+						].filter((part): part is string => part !== null);
+						const cardClassName =
+							"flex min-w-0 flex-1 flex-col gap-2 rounded-xl p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo";
+						const cardBody = (
+							<>
+								<span className="flex items-center justify-between gap-3">
+									<span className="truncate text-base font-medium text-snow">
+										{item.name}
+									</span>
+									<span
+										className={`shrink-0 text-xs ${isAttention ? "text-crimson" : "text-fog"}`}
+									>
+										{status}
+									</span>
+								</span>
+								{item.summary ? (
+									<span className="line-clamp-2 text-sm leading-6 text-fog">
+										{item.summary}
+									</span>
+								) : null}
+								{stack.length > 0 ? (
+									<span className="text-xs text-slate">
+										{stack.join(" · ")}
+									</span>
+								) : null}
+								<span className="text-[11px] text-slate">
+									{metaParts.join(" · ")}
+								</span>
+								<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
+									{action.label}
+									<Icon
+										icon={ArrowRight01Icon}
+										size={14}
+										aria-hidden
+										className="transition-transform group-hover:translate-x-0.5"
+									/>
+								</span>
+							</>
 						);
-						const isAttention = status === "Perlu perhatian";
 						return (
 							<li
 								key={item.id}
 								className="group flex items-start gap-1 rounded-xl border border-graphite bg-charcoal/60 transition-colors hover:border-fog/40 hover:bg-charcoal"
 							>
-								<Link
-									to="/codebases/$id"
-									params={{ id: item.id }}
-									className="flex min-w-0 flex-1 flex-col gap-2 rounded-xl p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									<span className="flex items-center justify-between gap-3">
-										<span className="truncate text-base font-medium text-snow">
-											{item.name}
-										</span>
-										<span
-											className={`shrink-0 text-xs ${isAttention ? "text-crimson" : "text-fog"}`}
-										>
-											{status}
-										</span>
-									</span>
-									{item.summary ? (
-										<span className="line-clamp-2 text-sm leading-6 text-fog">
-											{item.summary}
-										</span>
-									) : null}
-									{stack.length > 0 ? (
-										<span className="text-xs text-slate">
-											{stack.join(" · ")}
-										</span>
-									) : null}
-									<span className="text-[11px] text-slate">
-										{item.fileCount !== null
-											? `${item.fileCount} file`
-											: "Belum ada sync"}
-										{item.planCount > 0
-											? ` · ${item.planCount} fitur plan`
-											: ""}
-										{displayDate ? ` · Terakhir diperbarui ${displayDate}` : ""}
-									</span>
-									<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
-										Buka Workspace
-										<Icon
-											icon={ArrowRight01Icon}
-											size={14}
-											aria-hidden
-											className="transition-transform group-hover:translate-x-0.5"
-										/>
-									</span>
-								</Link>
+								{action.recovery ? (
+									<Link
+										to={NEW_REPOSITORY_HREF}
+										onClick={() => beginRecoveryNavigation(item)}
+										className={cardClassName}
+									>
+										{cardBody}
+									</Link>
+								) : (
+									<Link
+										to="/codebases/$id"
+										params={{ id: item.id }}
+										className={cardClassName}
+									>
+										{cardBody}
+									</Link>
+								)}
 								<ProjectActionsMenu
 									item={item}
 									onRename={applyRename}

@@ -30,6 +30,7 @@ interface ScreenConnectSyncStepProps {
 	canContinueToSummary: boolean;
 	analysis: AnalysisResponse | null;
 	analysisError: string | null;
+	analysisBlocked?: boolean;
 	isAnalyzing: boolean;
 	onRetryAnalysis?: () => void;
 	isLegacyAnalysisMissingSuggestions: boolean;
@@ -46,6 +47,7 @@ export function ScreenConnectSyncStep({
 	canContinueToSummary,
 	analysis,
 	analysisError,
+	analysisBlocked = false,
 	isAnalyzing,
 	onRetryAnalysis,
 	isLegacyAnalysisMissingSuggestions,
@@ -57,9 +59,7 @@ export function ScreenConnectSyncStep({
 				3
 			</span>
 			<div className="flex flex-1 flex-col gap-2">
-				<div className="text-xs font-semibold text-mist">
-					Paste prompt lalu jalankan
-				</div>
+				<div className="text-xs font-semibold text-mist">Pantau progres</div>
 				<p className="text-[11px] leading-relaxed text-fog">
 					Jalankan prompt dari root repository untuk mulai menyinkronkan
 					codebase.
@@ -94,9 +94,11 @@ export function ScreenConnectSyncStep({
 				<SyncStageList
 					status={status}
 					isAnalysisReady={canContinueToSummary}
+					analysisBlocked={analysisBlocked}
 					showAnalysisFailure={
 						!isLegacyAnalysisMissingSuggestions &&
 						(Boolean(analysisError) ||
+							status?.analysisAttemptStatus === "failed" ||
 							status?.analysisStatus === "failed" ||
 							analysis?.status === "failed") &&
 						Boolean(onRetryAnalysis)

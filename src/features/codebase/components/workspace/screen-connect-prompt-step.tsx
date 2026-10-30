@@ -1,11 +1,8 @@
 "use client";
 
-import {
-	Copy01Icon,
-	Loading01Icon,
-	Tick01Icon,
-} from "@hugeicons/core-free-icons";
+import { Copy01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
+import { Spinner } from "@/components/ui/spinner";
 import { useCopyFeedback } from "@/features/codebase/hooks/use-copy-feedback";
 import {
 	buildAgentPrompt,
@@ -82,11 +79,7 @@ export function ScreenConnectPromptStep({
 						</>
 					) : isStarting ? (
 						<div className="flex items-center justify-center gap-2 py-6 font-sans text-xs text-fog">
-							<Icon
-								icon={Loading01Icon}
-								size={14}
-								className="animate-spin text-blue-400"
-							/>
+							<Spinner size={14} className="text-blue-400" />
 							<span>Menyiapkan token sesi...</span>
 						</div>
 					) : (

@@ -60,17 +60,29 @@ export async function saveTaskTree(
 		);
 		const totalTasks = rows.length;
 		await db.transaction(async (tx) => {
-			await tx.delete(tasks).where(eq(tasks.projectId, projectId));
-			if (rows.length > 0) await tx.insert(tasks).values(rows);
-
-			// Row lock serializes concurrent savers so a stale step read
-			// can never rewind a newer value (mirrors saveAcVersion).
 			const [proj] = await tx
-				.select({ step: projects.step })
+				.select({ step: projects.step, projectMode: projects.projectMode })
 				.from(projects)
 				.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
 				.for("update")
 				.limit(1);
+			if (!proj) throw new Error("Project tidak tersedia.");
+			if (proj.projectMode === "existing_codebase") {
+				const [existing] = await tx
+					.select({ id: tasks.id })
+					.from(tasks)
+					.where(eq(tasks.projectId, projectId))
+					.limit(1);
+				// ponytail: replacement requires approved reconciliation, not generation.
+				if (existing)
+					throw new Error(
+						"Task sudah tersedia dan tidak dapat diganti otomatis.",
+					);
+			} else {
+				await tx.delete(tasks).where(eq(tasks.projectId, projectId));
+			}
+			if (rows.length > 0) await tx.insert(tasks).values(rows);
+
 			const updateData: Record<string, unknown> = {
 				taskStatus: "completed",
 				updatedAt: new Date(),

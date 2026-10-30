@@ -115,9 +115,35 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/rate-limit", () => ({
 	checkRateLimit: vi.fn(async () => ({ allowed: true })),
 }));
-vi.mock("@/features/billing/services/billing", () => ({
-	resolveSubscriptionState: vi.fn(() => ({ state: state.effectiveState })),
-}));
+vi.mock(
+	"@/features/codebase/services/analysis-credit-preflight.server",
+	() => ({
+		getAnalysisCreditPreflight: vi.fn(async () => {
+			const insufficient = state.selects[6]?.some(
+				(row) =>
+					typeof row === "object" &&
+					row !== null &&
+					"credits" in row &&
+					row.credits === 0,
+			);
+			return {
+				code:
+					state.effectiveState === "paused"
+						? "SUBSCRIPTION_PAUSED"
+						: insufficient
+							? "INSUFFICIENT_CREDITS"
+							: "CREDIT_REQUIRED",
+				canStart: state.effectiveState !== "paused" && !insufficient,
+				availableCredits: insufficient ? 0 : 100,
+				maximumCredits: 12,
+				pricingVersion: "adaptive-v1",
+			};
+		}),
+		analysisCreditBlockedResponse: () =>
+			Response.json({ error: "blocked" }, { status: 403 }),
+		readSyncCreditConsent: vi.fn(),
+	}),
+);
 vi.mock("@/features/codebase/services/analysis.server", () => ({
 	AnalysisServiceError: class AnalysisServiceError extends Error {
 		code: string;
@@ -139,7 +165,10 @@ vi.mock("@/lib/services/credit-service", () => ({
 	isReleasableReservation: vi.fn((value: string) => value !== "running"),
 	markCreditOperationRunning: vi.fn(async () => ({ state: "running" })),
 	releaseCreditOperation: state.release,
-	reserveActiveCreditOperation: state.reserve,
+	reserveCreditOperation: state.reserve,
+	reconcileExpiredCreditOperations: vi.fn(async () => ({
+		releasedOperationIds: [],
+	})),
 	settleCreditOperation: state.settle,
 }));
 
@@ -212,9 +241,8 @@ function setup(analyses: unknown[] = [legacy], ordinary = false) {
 		[{ id: "session-1" }],
 		[snapshot],
 		analyses,
-		ordinary ? [legacy] : [subscription],
 		ordinary
-			? [subscription]
+			? [legacy]
 			: [
 					{
 						...legacy,
@@ -274,7 +302,10 @@ describe("analysis refresh POST route", () => {
 		expect(state.requestAnalysis).toHaveBeenCalledWith(
 			"project-1",
 			"snapshot-1",
-			{},
+			expect.objectContaining({
+				analysisId: "analysis-new",
+				settle: expect.any(Function),
+			}),
 			{ codebaseId: "codebase-1", claimedAnalysisId: "analysis-new" },
 		);
 	});
@@ -346,7 +377,7 @@ describe("analysis refresh POST route", () => {
 			}),
 			params: { id: "project-1" },
 		});
-		expect(response.status).toBe(403);
+		expect(response.status).toBe(503);
 		expect(state.updates).toHaveLength(1);
 		expect(state.updates[0]?.values).toMatchObject({
 			status: "failed",

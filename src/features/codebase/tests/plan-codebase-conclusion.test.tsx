@@ -223,7 +223,7 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 		// The server's own verdict is what the step reports: waiting on the agent, with instructions only.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Paste prompt lalu jalankan")).toBeDefined();
+				expect(screen.getByText("Pantau progres")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);

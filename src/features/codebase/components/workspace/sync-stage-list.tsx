@@ -1,11 +1,11 @@
 import {
 	AlertCircleIcon,
 	CircleIcon,
-	Loading01Icon,
 	Tick01Icon,
 } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { Spinner } from "@/components/ui/spinner";
 import {
 	resolveSyncStageView,
 	SYNC_STAGE_ORDER,
@@ -24,30 +24,37 @@ import { cn } from "@/lib/utils";
  * green success cards, and no fabricated progress.
  */
 
+const ANALYSIS_TEST_ID = "sync-stage-analysis";
+
 const STAGE_TITLE: Record<SyncStageState, string> = {
 	done: "font-medium text-snow",
 	active: "font-semibold text-snow",
 	waiting: "font-normal text-fog",
 	failed: "font-semibold text-crimson",
+	blocked: "font-semibold text-amber-400",
 };
 
+/** The one set of row indicators: checkmark, spinner, neutral dot, error. */
 function StageIcon({ state }: { state: SyncStageState }) {
 	if (state === "done") {
 		return (
 			<Icon
 				icon={Tick01Icon}
 				size={14}
-				className="shrink-0 font-bold text-emerald-400"
+				className="shrink-0 text-emerald-400"
 				aria-hidden="true"
 			/>
 		);
 	}
 	if (state === "active") {
+		return <Spinner size={14} className="text-blue-400" />;
+	}
+	if (state === "blocked") {
 		return (
 			<Icon
-				icon={Loading01Icon}
+				icon={AlertCircleIcon}
 				size={14}
-				className="shrink-0 animate-spin text-blue-400"
+				className="shrink-0 text-amber-400"
 				aria-hidden="true"
 			/>
 		);
@@ -154,10 +161,112 @@ function StageRow({ testId, row }: { testId: string; row: SyncStageRow }) {
 	);
 }
 
+/**
+ * The analysis is its own capability with its own persisted attempt, so it is
+ * reported on its own row. Before a verified snapshot exists it can only be
+ * waiting: the CLI upload is a different operation and does not tell us
+ * anything about the model yet.
+ */
+function buildAnalysisRow(input: {
+	status: SyncStatusResponse | null;
+	isAnalysisReady: boolean;
+	analysisBlocked: boolean;
+	syncStarted: boolean;
+}): SyncStageRow | null {
+	const { status, isAnalysisReady, analysisBlocked, syncStarted } = input;
+	if (!status) return null;
+
+	if (analysisBlocked && status.snapshotId) {
+		return {
+			state: "blocked",
+			title: "Analisis membutuhkan kredit",
+			detail: "Source code telah tersimpan.",
+		};
+	}
+
+	// The live attempt is the newest persisted analysis row for this snapshot
+	// (`analysisAttemptStatus`), which is what actually reports pending and
+	// failed. `analysisStatus` only ever carries the ready content, so using it
+	// alone made a running analysis invisible until it was already finished —
+	// the exact "conclusion appeared instantly" symptom. Ready content still
+	// wins whenever it exists, so a failed retry can never hide a usable result.
+	const liveStatus =
+		status.analysisStatus === "ready"
+			? "ready"
+			: (status.analysisAttemptStatus ?? status.analysisStatus);
+
+	if (!status.snapshotId) {
+		return syncStarted ? { state: "waiting", title: "Analisis AI" } : null;
+	}
+
+	if (liveStatus === "pending") {
+		// No narrative detail: the model's internal steps are not observable, so
+		// the row reports only that it is running and, from a persisted start,
+		// for how long.
+		return {
+			state: "active",
+			title: "Menganalisis repository...",
+			...(status.analysisAttemptCreatedAt
+				? { startedAt: status.analysisAttemptCreatedAt }
+				: {}),
+		};
+	}
+
+	if (liveStatus === "failed") {
+		return { state: "failed", title: "Analisis belum selesai" };
+	}
+
+	if (liveStatus === "ready") {
+		return {
+			state: "done",
+			title: "Analisis selesai",
+			...(isAnalysisReady
+				? {}
+				: {
+						detail: "Perlu pembaruan rekomendasi task awal untuk melanjutkan",
+					}),
+			...(status.analysisAttemptUpdatedAt
+				? { completedAt: status.analysisAttemptUpdatedAt }
+				: {}),
+		};
+	}
+
+	return syncStarted ? { state: "waiting", title: "Analisis AI" } : null;
+}
+
+const ACTION_BUTTON =
+	"mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo";
+
+/** One recovery action for a credit-blocked analysis; the source is safe. */
+function AnalysisBlockedRow() {
+	return (
+		<div
+			data-testid={ANALYSIS_TEST_ID}
+			data-stage-state="blocked"
+			role="alert"
+			className="flex items-start gap-2.5 py-1.5 px-0.5 text-[11px]"
+		>
+			<span className="mt-0.5 shrink-0">
+				<StageIcon state="blocked" />
+			</span>
+			<span className="flex min-w-0 flex-1 flex-col gap-1">
+				<span className={STAGE_TITLE.blocked}>Analisis membutuhkan kredit</span>
+				<span className="leading-relaxed text-fog">
+					Source code telah tersimpan.
+				</span>
+				<a href="/settings/billing" className={ACTION_BUTTON}>
+					Tambahkan Kredit
+				</a>
+			</span>
+		</div>
+	);
+}
+
 export function SyncStageList({
 	status,
 	className,
 	isAnalysisReady = false,
+	analysisBlocked = false,
 	showAnalysisFailure = false,
 	analysisError = null,
 	onRetryAnalysis,
@@ -166,6 +275,8 @@ export function SyncStageList({
 	status: SyncStatusResponse | null;
 	className?: string;
 	isAnalysisReady?: boolean;
+	/** Billing/eligibility blocked the analysis; the snapshot is still usable. */
+	analysisBlocked?: boolean;
 	/**
 	 * Render the failed analysis as one integrated error area inside the
 	 * analysis row itself (message + retry), instead of a second alert
@@ -182,58 +293,12 @@ export function SyncStageList({
 
 	if (view.stages.length === 0) return null;
 
-	// The live attempt is the newest persisted analysis row for this snapshot
-	// (`analysisAttemptStatus`), which is what actually reports pending and
-	// failed. `analysisStatus` only ever carries the ready content, so using it
-	// alone made a running analysis invisible until it was already finished —
-	// the exact "conclusion appeared instantly" symptom. Ready content still
-	// wins whenever it exists, so a failed retry can never hide a usable result.
-	const liveAnalysisStatus =
-		status?.analysisStatus === "ready"
-			? "ready"
-			: (status?.analysisAttemptStatus ?? status?.analysisStatus);
-	const hasAnalysisStage = Boolean(status?.snapshotId && liveAnalysisStatus);
-	let analysisRow: SyncStageRow | null = null;
-	if (hasAnalysisStage && liveAnalysisStatus) {
-		if (liveAnalysisStatus === "pending") {
-			analysisRow = {
-				state: "active",
-				title: "Menganalisis codebase",
-				detail: "AI sedang membaca arsitektur dan menyiapkan rekomendasi",
-				// Real start time of this attempt: drives a measured elapsed
-				// timer instead of an indeterminate spinner.
-				...(status?.analysisAttemptCreatedAt
-					? { startedAt: status.analysisAttemptCreatedAt }
-					: {}),
-			};
-		} else if (liveAnalysisStatus === "failed") {
-			analysisRow = {
-				state: "failed",
-				title: "Menganalisis codebase",
-				detail: "Analisis belum berhasil diselesaikan",
-			};
-		} else if (liveAnalysisStatus === "ready") {
-			if (isAnalysisReady) {
-				analysisRow = {
-					state: "done",
-					title: "Kesimpulan siap",
-					detail: "Ringkasan arsitektur dan rekomendasi task awal tersedia",
-					...(status?.analysisAttemptUpdatedAt
-						? { completedAt: status.analysisAttemptUpdatedAt }
-						: {}),
-				};
-			} else {
-				analysisRow = {
-					state: "done",
-					title: "Analisis selesai",
-					detail: "Perlu pembaruan rekomendasi task awal untuk melanjutkan",
-					...(status?.analysisAttemptUpdatedAt
-						? { completedAt: status.analysisAttemptUpdatedAt }
-						: {}),
-				};
-			}
-		}
-	}
+	const analysisRow = buildAnalysisRow({
+		status,
+		isAnalysisReady,
+		analysisBlocked,
+		syncStarted: view.hasStarted,
+	});
 
 	const formatCount = (value: number): string => value.toLocaleString("id-ID");
 	const summaryParts: string[] = [];
@@ -252,9 +317,11 @@ export function SyncStageList({
 					<StageRow key={key} testId={SYNC_STAGE_TEST_IDS[key]} row={row} />
 				) : null;
 			})}
-			{showAnalysisFailure && onRetryAnalysis ? (
+			{analysisBlocked && status?.snapshotId ? (
+				<AnalysisBlockedRow />
+			) : showAnalysisFailure && onRetryAnalysis ? (
 				<div
-					data-testid="sync-stage-analysis"
+					data-testid={ANALYSIS_TEST_ID}
 					data-stage-state="failed"
 					className="flex items-start gap-2.5 py-1.5 px-0.5 text-[11px]"
 				>
@@ -284,18 +351,16 @@ export function SyncStageList({
 								data-testid="retry-analysis-button"
 								onClick={onRetryAnalysis}
 								disabled={isAnalyzing}
-								className="mt-1 inline-flex min-h-8 w-fit items-center rounded border border-iron bg-obsidian px-3 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+								className={ACTION_BUTTON}
 							>
 								{isAnalyzing ? "Menganalisis..." : "Coba lagi analisis"}
 							</button>
 						</span>
 					</span>
 				</div>
-			) : (
-				analysisRow && (
-					<StageRow testId="sync-stage-analysis" row={analysisRow} />
-				)
-			)}
+			) : analysisRow ? (
+				<StageRow testId={ANALYSIS_TEST_ID} row={analysisRow} />
+			) : null}
 			{summaryParts.length > 0 && (
 				<p className="mt-1 font-mono text-[11px] tabular-nums text-fog">
 					{summaryParts.join(" · ")}

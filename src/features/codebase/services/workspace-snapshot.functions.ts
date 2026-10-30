@@ -40,9 +40,10 @@ export const loadSnapshotManifest = createServerFn({ method: "GET" })
 		if (!snapshot)
 			return {
 				snapshotId: null,
-				files: [],
+				files: [] as Array<{ path: string }>,
 				fileCount: 0,
-				packageJsonText: null,
+				packageJsonText: null as string | null,
+				packageJsonTexts: [] as string[],
 			};
 		const parsed = manifestEntrySchema.array().safeParse(snapshot.manifest);
 		const manifest = parsed.success ? parsed.data : [];
@@ -64,29 +65,39 @@ export const loadSnapshotManifest = createServerFn({ method: "GET" })
 			group[row.chunkIndex] = row.data;
 			chunksByPath.set(row.path, group);
 		}
-		let packageJsonText: string | null = null;
-		for (const entry of manifest) {
-			if (
-				entry.path === "package.json" ||
-				entry.path.endsWith("/package.json")
-			) {
-				const group = chunksByPath.get(entry.path);
-				if (!group) continue;
-				try {
-					const text = Buffer.from(group.join(""), "base64").toString("utf8");
-					packageJsonText = text.slice(
-						0,
-						CODEBASE_PACKAGE_JSON_PREVIEW_MAX_CHARS,
-					);
-					break;
-				} catch {}
-			}
+		const packageJsonEntries = manifest
+			.filter(
+				(entry) =>
+					!entry.path.includes("node_modules/") &&
+					(entry.path === "package.json" ||
+						entry.path.endsWith("/package.json")),
+			)
+			.sort((a, b) => {
+				if (a.path === "package.json") return -1;
+				if (b.path === "package.json") return 1;
+				return a.path.length - b.path.length;
+			});
+
+		const packageJsonTexts: string[] = [];
+		let primaryPackageJsonText: string | null = null;
+		for (const entry of packageJsonEntries) {
+			const group = chunksByPath.get(entry.path);
+			if (!group) continue;
+			try {
+				const text = Buffer.from(group.join(""), "base64").toString("utf8");
+				const bounded = text.slice(0, CODEBASE_PACKAGE_JSON_PREVIEW_MAX_CHARS);
+				if (!primaryPackageJsonText) {
+					primaryPackageJsonText = bounded;
+				}
+				packageJsonTexts.push(bounded);
+			} catch {}
 		}
 		return {
 			snapshotId: snapshot.id,
 			files: manifest.map((entry) => ({ path: entry.path })),
 			fileCount: snapshot.fileCount ?? manifest.length,
-			packageJsonText,
+			packageJsonText: primaryPackageJsonText,
+			packageJsonTexts,
 		};
 	});
 

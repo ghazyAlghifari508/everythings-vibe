@@ -20,6 +20,14 @@ export interface OnboardingAnalysisState {
 	analysisWorking: boolean;
 	setAnalysisWorking: (working: boolean) => void;
 	analysisError: string | null;
+	creditStatus:
+		| import("../services/analysis-credit-policy").AnalysisCreditStatus
+		| null;
+	setCreditStatus: (
+		status:
+			| import("../services/analysis-credit-policy").AnalysisCreditStatus
+			| null,
+	) => void;
 	setAnalysisError: (error: string | null) => void;
 	/** Snapshot the trigger effect already attempted, so it stays single-flight. */
 	analysisAttemptedFor: { current: string | null };
@@ -44,6 +52,9 @@ export function useOnboardingAnalysisState(): OnboardingAnalysisState {
 	const [analysisWorking, setAnalysisWorking] = useState(false);
 	const [analysisError, setAnalysisError] = useState<string | null>(null);
 	const analysisAttemptedFor = useRef<string | null>(null);
+	const [creditStatus, setCreditStatus] = useState<
+		import("../services/analysis-credit-policy").AnalysisCreditStatus | null
+	>(null);
 
 	// Read the validated analysis output through the existing read boundary.
 	// Returns null when no row exists yet (trigger effect owns creation).
@@ -73,6 +84,8 @@ export function useOnboardingAnalysisState(): OnboardingAnalysisState {
 		setAnalysisWorking,
 		analysisError,
 		setAnalysisError,
+		creditStatus,
+		setCreditStatus,
 		analysisAttemptedFor,
 		fetchAnalysisOutput,
 	};

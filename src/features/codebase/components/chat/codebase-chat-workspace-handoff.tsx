@@ -52,6 +52,9 @@ interface CodebaseChatWorkspaceHandoffCardProps {
 	onCopyExport: () => void;
 	taskCount?: number;
 	onOpenKanban?: () => void;
+	isRevisingCompletedPlan?: boolean;
+	onStartCompletedRevision?: () => void;
+	onCancelCompletedRevision?: () => void;
 }
 
 export function CodebaseChatWorkspaceHandoffCard({
@@ -64,6 +67,9 @@ export function CodebaseChatWorkspaceHandoffCard({
 	onCopyExport,
 	taskCount,
 	onOpenKanban,
+	isRevisingCompletedPlan = false,
+	onStartCompletedRevision,
+	onCancelCompletedRevision,
 }: CodebaseChatWorkspaceHandoffCardProps) {
 	return (
 		<div
@@ -72,28 +78,49 @@ export function CodebaseChatWorkspaceHandoffCard({
 		>
 			<div className="flex items-center justify-between gap-2">
 				<p className="text-sm font-semibold text-snow">Planning selesai</p>
-				<button
-					type="button"
-					onClick={onCopyCmd}
-					className="inline-flex min-h-11 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				>
-					{copiedCmd ? (
-						<>
-							<Icon
-								icon={Tick01Icon}
-								size={12}
-								aria-hidden="true"
-								className="text-emerald"
-							/>
-							<span className="text-emerald">Tersalin</span>
-						</>
-					) : (
-						<>
-							<Icon icon={Copy01Icon} size={12} aria-hidden="true" />
-							<span>Salin prompt handoff</span>
-						</>
-					)}
-				</button>
+				<div className="flex flex-wrap items-center gap-2">
+					{isRevisingCompletedPlan && onCancelCompletedRevision ? (
+						<button
+							type="button"
+							onClick={onCancelCompletedRevision}
+							data-testid="codebase-cancel-completed-revision"
+							className="inline-flex min-h-11 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] font-medium text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							Batal Revisi
+						</button>
+					) : onStartCompletedRevision ? (
+						<button
+							type="button"
+							onClick={onStartCompletedRevision}
+							data-testid="codebase-open-completed-revision"
+							className="inline-flex min-h-11 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] font-medium text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						>
+							Revisi Planning
+						</button>
+					) : null}
+					<button
+						type="button"
+						onClick={onCopyCmd}
+						className="inline-flex min-h-11 items-center gap-1.5 rounded border border-graphite bg-charcoal px-2.5 text-[11px] text-fog transition hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						{copiedCmd ? (
+							<>
+								<Icon
+									icon={Tick01Icon}
+									size={12}
+									aria-hidden="true"
+									className="text-emerald"
+								/>
+								<span className="text-emerald">Tersalin</span>
+							</>
+						) : (
+							<>
+								<Icon icon={Copy01Icon} size={12} aria-hidden="true" />
+								<span>Salin prompt handoff</span>
+							</>
+						)}
+					</button>
+				</div>
 			</div>
 			{taskCount !== undefined ? (
 				<p className="mt-1.5 text-sm text-fog">

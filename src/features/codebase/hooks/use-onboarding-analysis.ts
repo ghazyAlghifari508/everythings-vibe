@@ -44,6 +44,7 @@ export function useOnboardingAnalysis({
 		setAnalysis,
 		setAnalysisWorking,
 		setAnalysisError,
+		setCreditStatus,
 		analysisAttemptedFor,
 		fetchAnalysisOutput,
 	} = state;
@@ -100,15 +101,18 @@ export function useOnboardingAnalysis({
 			projectId: string,
 			snapshotId: string,
 			refreshStarterSuggestionsForAnalysisId?: string,
+			confirmCredit = false,
 		): Promise<void> => {
 			const generation = ++analysisRequestGeneration.current;
 			setAnalysisWorking(true);
 			setAnalysisError(null);
+			setCreditStatus(null);
 			try {
 				const outcome = await requestOnboardingAnalysis({
 					projectId,
 					snapshotId,
 					refreshStarterSuggestionsForAnalysisId,
+					confirmCredit,
 				});
 				if (generation !== analysisRequestGeneration.current) return;
 				if (outcome.kind === "unauthorized") {
@@ -116,7 +120,12 @@ export function useOnboardingAnalysis({
 					return;
 				}
 				if (outcome.kind === "mismatch") return;
-				if (outcome.kind === "credit" || outcome.kind === "failed") {
+				if (outcome.kind === "credit") {
+					setCreditStatus(outcome.status ?? null);
+					if (!outcome.status) setAnalysisError(outcome.message);
+					return;
+				}
+				if (outcome.kind === "failed") {
 					setAnalysisError(outcome.message);
 					return;
 				}
@@ -131,7 +140,7 @@ export function useOnboardingAnalysis({
 				}
 			}
 		},
-		[setAnalysis, setAnalysisError, setAnalysisWorking],
+		[setAnalysis, setAnalysisError, setAnalysisWorking, setCreditStatus],
 	);
 
 	// Retry resets the per-snapshot guard and clears the previous attempt, then
@@ -141,7 +150,12 @@ export function useOnboardingAnalysis({
 		analysisAttemptedFor.current = lastStatus.snapshotId;
 		setAnalysis(null);
 		setAnalysisError(null);
-		void triggerOnboardingAnalysis(featureProjectId, lastStatus.snapshotId);
+		void triggerOnboardingAnalysis(
+			featureProjectId,
+			lastStatus.snapshotId,
+			undefined,
+			true,
+		);
 	}, [
 		featureProjectId,
 		lastStatus,
@@ -179,6 +193,9 @@ export function useOnboardingAnalysis({
 		if (reviewReady) return;
 		if (
 			lastStatus.analysisStatus === "pending" ||
+			// The newest stored attempt is the real pending signal; `analysisStatus`
+			// only ever carries ready content from the status route.
+			lastStatus.analysisAttemptStatus === "pending" ||
 			analysisAttemptedFor.current === snapshotId
 		) {
 			return;

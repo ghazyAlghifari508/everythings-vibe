@@ -8,9 +8,9 @@ import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/a
 import { CODEBASE_ONBOARDING_LABEL } from "@/features/codebase/services/library";
 import type { PlanCodebaseStep } from "@/features/codebase/services/plan-storage";
 import {
-	isSyncStatusComplete,
-	SNAPSHOT_CONTEXT_STATUSES,
-} from "@/features/codebase/services/sync";
+	hasReadyAnalysisForSnapshot,
+	resolveOnboardingReadiness,
+} from "@/features/codebase/services/workspace-readiness";
 import { useUIStore } from "@/store";
 import { useCodebaseOnboarding } from "../../hooks/use-codebase-onboarding";
 import {
@@ -18,6 +18,7 @@ import {
 	useOnboardingSummaryGate,
 } from "../../hooks/use-onboarding-analysis";
 import { useOnboardingAnalysisState } from "../../hooks/use-onboarding-analysis-state";
+import { AnalysisCreditNotice } from "./analysis-credit-notice";
 import {
 	CodebaseOnboardingErrorCard,
 	CodebaseOnboardingLoadingCard,
@@ -37,22 +38,40 @@ export function PlanCodebasePage() {
 		lastStatus,
 		statusPollError,
 		createCodebase,
+		creditStatus,
 		retrySession,
 	} = useCodebaseOnboarding({ analysisState, step, setStep });
 
-	// Two independent capabilities, deliberately not collapsed into one
-	// `isReady`: the workspace opens as soon as sync produced a usable
-	// snapshot, while the review conclusion additionally requires validated
-	// analysis output for that exact snapshot.
-	//
-	// `reviewReady` mirrors the workspace canRenderCodebaseReview predicate; a
-	// snapshot alone never counts as a review.
-	const canOpenWorkspace = isSyncStatusComplete(lastStatus);
-	const reviewReady = Boolean(
-		analysis?.output &&
-			lastStatus?.snapshotId &&
-			analysis.snapshotId === lastStatus.snapshotId &&
-			SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status),
+	// Upload success is not onboarding success. Readiness comes from the shared
+	// predicate: a snapshot opens nothing until validated analysis output exists
+	// for that exact snapshot, otherwise the user would land in a composer whose
+	// every request fails with CODEBASE_CONTEXT_UNAVAILABLE.
+	const readiness = resolveOnboardingReadiness({
+		snapshotId: lastStatus?.snapshotId ?? null,
+		snapshotStatus: lastStatus?.status ?? null,
+		analysis,
+		analysisAttemptStatus: lastStatus?.analysisAttemptStatus ?? null,
+		// A billing/eligibility block is a distinct state: nothing is running, so
+		// readiness must not report an analysis still in progress.
+		creditBlocked: Boolean(analysisState.creditStatus),
+	});
+	const canOpenWorkspace = readiness === "planning_ready";
+	// A credit block is not a retryable model failure: the only useful recovery
+	// is topping up, so the status list owns that action instead of the consent
+	// card. Consent is only shown when it can actually start the analysis.
+	const analysisCreditCode = analysisState.creditStatus?.code ?? null;
+	const analysisBlocked =
+		analysisCreditCode === "INSUFFICIENT_CREDITS" ||
+		analysisCreditCode === "SUBSCRIPTION_PAUSED" ||
+		lastStatus?.errorCode === "INSUFFICIENT_CREDITS";
+	const showAnalysisConsent =
+		analysisCreditCode === "FREE_ALLOWANCE_AVAILABLE" ||
+		analysisCreditCode === "CREDIT_REQUIRED";
+	// Mirrors the workspace canRenderCodebaseReview predicate so the conclusion
+	// and the workspace never disagree about what counts as a usable review.
+	const reviewReady = hasReadyAnalysisForSnapshot(
+		analysis,
+		lastStatus?.snapshotId ?? null,
 	);
 	const isLegacyAnalysisMissingSuggestions = Boolean(
 		analysis?.output &&
@@ -103,6 +122,19 @@ export function PlanCodebasePage() {
 						error={error}
 						onRetry={() => void createCodebase()}
 					/>
+				) : creditStatus ? (
+					<>
+						<AnalysisCreditNotice
+							status={creditStatus}
+							onStart={() => void createCodebase()}
+							isStarting={isStarting}
+						/>
+						{error && (
+							<p role="alert" className="text-sm text-snow">
+								{error}
+							</p>
+						)}
+					</>
 				) : (
 					<CodebaseOnboardingLoadingCard
 						title={
@@ -116,6 +148,14 @@ export function PlanCodebasePage() {
 				<CodebaseOnboardingLoadingCard title="Menyiapkan instruksi CLI..." />
 			) : (
 				<>
+					{showAnalysisConsent && analysisState.creditStatus && (
+						<AnalysisCreditNotice
+							status={analysisState.creditStatus}
+							onStart={retryAnalysis}
+							isStarting={analysisWorking}
+							analysisOnly
+						/>
+					)}
 					{/* Step 1 owns the whole sync lifecycle: the prompt, the agent, and
 					the live server status of the upload it started. There is no second
 					screen to navigate to in order to see the same progress. */}
@@ -132,6 +172,7 @@ export function PlanCodebasePage() {
 							onContinueToSummary={() => setStep("summary")}
 							analysis={analysis}
 							analysisError={analysisError}
+							analysisBlocked={analysisBlocked}
 							isAnalyzing={analysisWorking}
 							onRetryAnalysis={retryAnalysis}
 							isLegacyAnalysisMissingSuggestions={

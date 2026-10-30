@@ -40,6 +40,7 @@ import {
 	buildAnalysisUserPrompt,
 	CODEBASE_ANALYSIS_SYSTEM_PROMPT,
 	type CodebaseAnalysis,
+	classifyAnalysisAttemptCode,
 	classifyAnalysisFailure,
 	formatAnalysisDiagnosticLog,
 	generateValidatedAnalysis,
@@ -81,6 +82,11 @@ export { AnalysisServiceError, claimStarterSuggestionRefresh };
 
 export interface RequestAnalysisDeps {
 	generate?: AnalysisGenerator;
+	analysisId?: string;
+	settle?: (
+		tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+		analysisId: string,
+	) => Promise<void>;
 }
 
 export async function requestCodebaseAnalysis(
@@ -164,7 +170,8 @@ export async function requestCodebaseAnalysis(
 		repositoryName = resolveCodebaseDisplayName(codebase?.name);
 	}
 
-	const analysisId = scope.claimedAnalysisId ?? crypto.randomUUID();
+	const analysisId =
+		scope.claimedAnalysisId ?? deps.analysisId ?? crypto.randomUUID();
 	const isCodebaseScoped = Boolean(scope.codebaseId);
 	if (!isCodebaseScoped) assertSyncTransition("uploaded", "analyzing");
 
@@ -299,6 +306,7 @@ export async function requestCodebaseAnalysis(
 		stage = "persist";
 
 		await db.transaction(async (tx) => {
+			if (deps.settle) await deps.settle(tx, analysisId);
 			await tx
 				.update(codebaseAnalyses)
 				.set({ status: "ready", output: analysis, updatedAt: new Date() })
@@ -350,7 +358,7 @@ export async function requestCodebaseAnalysis(
 			.update(codebaseAnalyses)
 			.set({
 				status: "failed",
-				errorCode: "ANALYSIS_FAILED",
+				errorCode: classifyAnalysisAttemptCode(error, stage),
 				errorMessage: safe,
 				updatedAt: new Date(),
 			})
@@ -378,6 +386,11 @@ export async function requestCodebaseAnalysis(
 			}
 		}
 		if (error instanceof AnalysisServiceError) throw error;
-		throw new AnalysisServiceError("ANALYSIS_FAILED", safe, analysisId);
+		throw new AnalysisServiceError(
+			"ANALYSIS_FAILED",
+			safe,
+			analysisId,
+			classifyAnalysisAttemptCode(error, stage),
+		);
 	}
 }

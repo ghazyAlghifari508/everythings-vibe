@@ -7,7 +7,7 @@ import {
 	resolvePersistedStage,
 	shouldAutoRevealArtifact,
 } from "@/features/codebase/services/chat-flow";
-import type { CodebaseComposerMode } from "@/features/codebase/services/revision-intent";
+import type { ComposerOperationMode } from "@/features/codebase/services/composer-interactions";
 import {
 	emptyArtifactHydration,
 	resolveWorkspaceView,
@@ -16,6 +16,7 @@ import {
 import { useKanbanTasks } from "@/features/greenfield/hooks/use-kanban-polling";
 import { computeKanbanProgress } from "@/lib/kanban-utils";
 import type { CodebaseWorkspaceData } from "../services/workspace-loader.functions";
+import { resolveCodebaseReadiness } from "../services/workspace-readiness";
 import { useCodebaseSync } from "./use-codebase-sync";
 import { useWorkspaceArtifactPresentation } from "./use-workspace-artifact-presentation";
 import { useWorkspaceArtifacts } from "./use-workspace-artifacts";
@@ -89,6 +90,16 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 			return { ...artifact.artifactHydration, tasks: "ready" };
 		return artifact.artifactHydration;
 	}, [artifact.artifactHydration, hasTasksInDb]);
+	const hasExistingPlan = data.plans.some((entry) => entry.hasArtifacts);
+	const readiness = resolveCodebaseReadiness({
+		snapshotId: sync.status?.snapshotId ?? data.currentSnapshotId,
+		snapshotStatus:
+			sync.status?.status ?? (data.hasStoredSnapshot ? "uploaded" : null),
+		analysis: sync.analysis,
+		analysisAttemptStatus: sync.status?.analysisAttemptStatus ?? null,
+		hasExistingPlan,
+		hasStoredSnapshot: data.hasStoredSnapshot,
+	});
 	const composerAvailable =
 		!effectiveFeatureId ||
 		plan.isCreatingNew ||
@@ -144,17 +155,8 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		activeArtifactId,
 		sourcePreview: source.sourcePreview,
 	});
-	const activeIsAnchorPlan =
-		effectiveFeatureId != null && effectiveFeatureId === onboardingFeatureId;
-	const activeHasPlanning = presentation.artifacts.length > 0;
-	const composerMode: CodebaseComposerMode =
-		plan.isCreatingNew ||
-		!effectiveFeatureId ||
-		(activeIsAnchorPlan && !activeHasPlanning)
-			? "create"
-			: activeHasPlanning
-				? "revise"
-				: "clarify";
+	const [composerMode, setComposerMode] =
+		useState<ComposerOperationMode>("plan");
 	const pushAssistantMessage = useCallback((content: string) => {
 		setChatMessages((current) => [
 			...current,
@@ -178,13 +180,19 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		},
 		[effectiveFeatureId],
 	);
-	const runRevision = useWorkspaceRevision({
+	const revision = useWorkspaceRevision({
+		codebaseId: codebase.id,
 		effectiveFeatureId,
+		currentSnapshotId: sync.status?.snapshotId ?? data.currentSnapshotId,
 		stageBusy,
 		featureName: resolvedFeature?.name ?? codebase.name,
 		resolvedFeatureName: resolvedFeature?.name,
 		activeProjectIdRef: artifact.activeProjectIdRef,
 		loadPrd: artifact.loadPrd,
+		loadAc: artifact.loadAc,
+		refreshFeatureTree: artifact.refreshFeatureTree,
+		onTaskUpdate: artifact.refreshTaskTree,
+		refetchKanban: kanban.refetch,
 		pushAssistantMessage,
 		openArtifactPreview,
 		setStageBusy,
@@ -215,11 +223,14 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		setCanvasOpen(false);
 		setCanvasView("kanban");
 		setPipelineStage("questions");
+		setComposerMode("plan");
 		userTookOverCanvas.current = false;
 	};
 	const composer = useWorkspaceComposer({
 		codebase,
 		composerAvailable,
+		composerMode,
+		setComposerMode,
 		snapshotReady: sync.snapshotReady,
 		isWorking: sync.isWorking,
 		setIsWorking: sync.setIsWorking,
@@ -241,7 +252,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		registerCreatedPlan: plan.registerCreatedPlan,
 		setLastFeaturePrompt: questions.setLastFeaturePrompt,
 		fetchAiQuestions: questions.fetchAiQuestions,
-		runRevision,
+		runRevision: revision.runRevision,
 	});
 	const featureGeneration = useWorkspaceFeatureGeneration({
 		activeProjectIdRef: artifact.activeProjectIdRef,
@@ -329,6 +340,7 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		...composer,
 		...featureGeneration,
 		...generation,
+		...revision,
 		chatMessages,
 		run,
 		canvasOpen,
@@ -347,9 +359,11 @@ export function useCodebaseWorkspace(data: CodebaseWorkspaceData) {
 		stage,
 		analysisOutput,
 		composerMode,
+		setComposerMode,
 		composerAvailable,
 		answersReadOnly,
 		userTookOverCanvas,
 		selectPlan,
+		readiness,
 	};
 }

@@ -13,6 +13,7 @@ import {
 } from "@/features/codebase/types/codebase-constants";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";
+import { checkPreSyncCredit } from "./analysis-credit-preflight.server";
 import { resolvePlan } from "./analysis-route-scope.server";
 import {
 	buildSyncCommand,
@@ -151,6 +152,8 @@ export async function handleCodebaseSessionCreate({
 		);
 
 	const body: unknown = await request.json().catch(() => null);
+	const preflight = await checkPreSyncCredit(user.id, body);
+	if (preflight.response) return preflight.response;
 	const isRetry =
 		typeof body === "object" &&
 		body !== null &&
@@ -223,6 +226,12 @@ export async function handleCodebaseSessionCreate({
 				expiresAt,
 				cliMinVersion: CODEBASE_CLI_MIN_VERSION,
 				attempt: existing.length + 1,
+				metadata: {
+					analysisCreditConsent: {
+						maximumCredits: preflight.status.maximumCredits,
+						pricingVersion: preflight.status.pricingVersion,
+					},
+				},
 			})
 			.returning({
 				id: codebaseSyncSessions.id,

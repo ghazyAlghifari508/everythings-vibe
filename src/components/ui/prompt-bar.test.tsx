@@ -433,4 +433,70 @@ describe("PromptBar icon submit appearance", () => {
 		expect(submit?.getAttribute("aria-label")).toBe("Kirim permintaan");
 		expect(submit?.textContent).toBe("");
 	});
+
+	it("renders a simple arrow-up icon when idle and spinner indicator when sending", () => {
+		act(() => {
+			root?.render(<PromptBar submitAppearance="icon" value="Kirim ini" />);
+		});
+
+		const submit = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		expect(submit?.disabled).toBe(false);
+		expect(submit?.querySelector("[data-testid='spinner']")).toBeNull();
+		expect(submit?.querySelector("svg")).not.toBeNull();
+
+		act(() => {
+			root?.render(
+				<PromptBar submitAppearance="icon" value="Kirim ini" isSending />,
+			);
+		});
+		expect(submit?.disabled).toBe(true);
+		expect(submit?.querySelector("[data-testid='spinner']")).not.toBeNull();
+	});
+
+	it("respects sendDisabled and external onKeyDown defaultPrevented", () => {
+		const onSend = vi.fn();
+		act(() => {
+			root?.render(
+				<PromptBar
+					submitAppearance="icon"
+					value="Kirim ini"
+					sendDisabled
+					onSend={onSend}
+				/>,
+			);
+		});
+
+		const submit = container.querySelector<HTMLButtonElement>(
+			"[data-testid='prompt-bar-submit']",
+		);
+		const textarea = container.querySelector<HTMLTextAreaElement>("textarea");
+		expect(submit?.disabled).toBe(true);
+		act(() => {
+			textarea?.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
+		});
+		expect(onSend).not.toHaveBeenCalled();
+
+		act(() => {
+			root?.render(
+				<PromptBar
+					submitAppearance="icon"
+					value="Kirim ini"
+					onSend={onSend}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") e.preventDefault();
+					}}
+				/>,
+			);
+		});
+		act(() => {
+			textarea?.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
+		});
+		expect(onSend).not.toHaveBeenCalled();
+	});
 });

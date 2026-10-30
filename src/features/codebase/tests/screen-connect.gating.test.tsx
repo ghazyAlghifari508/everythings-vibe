@@ -121,7 +121,7 @@ describe("Step 1 instruction copy", () => {
 describe("Step 1 live sync status", () => {
 	it("shows only instruction copy and zero progress rows during waiting_for_cli", () => {
 		renderConnect({ status: status() });
-		expect(container.textContent).toContain("Paste prompt lalu jalankan");
+		expect(container.textContent).toContain("Pantau progres");
 		expect(container.textContent).toContain(
 			"Jalankan prompt dari root repository untuk mulai menyinkronkan codebase.",
 		);
@@ -131,7 +131,7 @@ describe("Step 1 live sync status", () => {
 		}
 		expect(container.textContent).not.toContain("Menunggu agent");
 		expect(container.textContent).not.toContain("Menyiapkan source code");
-		expect(container.textContent).not.toContain("Menyinkronkan codebase");
+		expect(container.textContent).not.toContain("Mengunggah repository");
 		expect(container.textContent).not.toContain("Sync ID");
 		expect(container.textContent).not.toContain("Menghubungkan server...");
 	});
@@ -156,7 +156,7 @@ describe("Step 1 live sync status", () => {
 			expect(container.textContent).toContain(
 				"Memeriksa file project yang akan disinkronkan.",
 			);
-			expect(container.textContent).toContain("Menyinkronkan codebase");
+			expect(container.textContent).toContain("Mengunggah repository");
 			expect(container.textContent).toContain("Sync ID: sess-connect...");
 		}
 	});
@@ -167,7 +167,7 @@ describe("Step 1 live sync status", () => {
 		});
 		expect(allStageStates()).toEqual(["done", "done", "active"]);
 		expect(container.textContent).toContain("Source code siap");
-		expect(container.textContent).toContain("Menyinkronkan codebase...");
+		expect(container.textContent).toContain("Mengunggah repository...");
 		expect(container.textContent).toContain("37 file sedang dikirim.");
 		expect(container.textContent).not.toContain("%");
 	});
@@ -198,7 +198,7 @@ describe("Step 1 live sync status", () => {
 		});
 		expect(allStageStates()).toEqual(["done", "done", "done"]);
 		expect(container.textContent).not.toContain("Menyiapkan source code...");
-		expect(container.textContent).not.toContain("Menyinkronkan codebase...");
+		expect(container.textContent).not.toContain("Mengunggah repository...");
 	});
 
 	it("says it is connecting instead of claiming a stage the server never reported", () => {
@@ -217,21 +217,25 @@ describe("Step 1 live sync status", () => {
 			}),
 			canContinueToSummary: false,
 		});
-		expect(container.textContent).toMatch(/menganalisis codebase/i);
+		expect(container.textContent).toMatch(/menganalisis repository/i);
 		expect(
 			container.querySelector('[data-testid="sync-stage-analysis"]'),
 		).not.toBeNull();
 	});
 
-	it("does not present analysis when analysisStatus is absent or snapshot is missing", () => {
+	it("keeps analysis pending while the upload is still in flight and no snapshot exists", () => {
 		renderConnect({
 			status: status({
 				status: "uploading",
 			}),
 		});
-		expect(
-			container.querySelector('[data-testid="sync-stage-analysis"]'),
-		).toBeNull();
+		const analysisRow = container.querySelector(
+			'[data-testid="sync-stage-analysis"]',
+		);
+		expect(analysisRow).not.toBeNull();
+		expect(analysisRow?.getAttribute("data-stage-state")).toBe("waiting");
+		expect(analysisRow?.textContent).toContain("Analisis AI");
+		expect(analysisRow?.textContent).not.toContain("Menganalisis repository");
 	});
 
 	it("keeps the attempt identifier as quiet metadata, outside the progress copy", () => {
@@ -264,7 +268,7 @@ describe("Step 1 live sync status", () => {
 		);
 		expect(pendingRow).not.toBeNull();
 		expect(pendingRow?.getAttribute("data-stage-state")).toBe("active");
-		expect(pendingRow?.textContent).toContain("Menganalisis codebase");
+		expect(pendingRow?.textContent).toContain("Menganalisis repository");
 
 		renderConnect({
 			status: status({
@@ -279,7 +283,7 @@ describe("Step 1 live sync status", () => {
 		);
 		expect(readyRow).not.toBeNull();
 		expect(readyRow?.getAttribute("data-stage-state")).toBe("done");
-		expect(readyRow?.textContent).toContain("Kesimpulan siap");
+		expect(readyRow?.textContent).toContain("Analisis selesai");
 
 		renderConnect({
 			status: status({
@@ -305,9 +309,12 @@ describe("Step 1 live sync status", () => {
 				snapshotId: "snap_1",
 			}),
 		});
-		expect(
-			container.querySelector('[data-testid="sync-stage-analysis"]'),
-		).toBeNull();
+		const notStartedRow = container.querySelector(
+			'[data-testid="sync-stage-analysis"]',
+		);
+		expect(notStartedRow).not.toBeNull();
+		expect(notStartedRow?.getAttribute("data-stage-state")).toBe("waiting");
+		expect(notStartedRow?.textContent).toContain("Analisis AI");
 	});
 });
 
@@ -333,6 +340,36 @@ describe("Step 1 continue gating", () => {
 			status: status({ status: "uploading", fileCount: 12 }),
 		});
 		expect(summaryButton()?.disabled).toBe(true);
+	});
+
+	it("locks the next action and offers billing when credits block the analysis", () => {
+		renderConnect({
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_credit",
+				fileCount: 12,
+			}),
+			analysisBlocked: true,
+			canContinueToSummary: false,
+		});
+		const blocked = container.querySelector(
+			'[data-testid="sync-stage-analysis"]',
+		);
+		expect(blocked?.getAttribute("data-stage-state")).toBe("blocked");
+		expect(blocked?.textContent).toContain("Analisis membutuhkan kredit");
+		const action = blocked?.querySelector("a");
+		expect(action?.textContent).toBe("Tambahkan Kredit");
+		expect(action?.getAttribute("href")).toBe("/settings/billing");
+		expect(summaryButton()?.disabled).toBe(true);
+	});
+
+	it("never reports the upload as failed when only the analysis is blocked", () => {
+		renderConnect({
+			status: status({ status: "uploaded", snapshotId: "snap_credit" }),
+			analysisBlocked: true,
+		});
+		expect(allStageStates()).toEqual(["done", "done", "done"]);
+		expect(container.textContent).not.toContain("Sinkronisasi belum berhasil");
 	});
 
 	it("enables it once an uploaded snapshot is the current attempt", () => {

@@ -19,7 +19,8 @@ const workspaceLoaderSource = readFileSync(
 
 import {
 	buildCodebaseLibraryItems,
-	mapLibraryStatus,
+	resolveLibraryItemAction,
+	resolveLibraryItemStatus,
 } from "@/features/codebase/services/library";
 import { isValidHistoryUrl } from "@/lib/flow-progress";
 import {
@@ -404,10 +405,12 @@ describe("codebase library readiness vs workspace availability", () => {
 		// The analysis signal stays honest: listed, but not analysed yet.
 		expect(items[0].hasReadyAnalysis).toBe(false);
 		expect(items[0].hasUsableSnapshot).toBe(true);
-		expect(mapLibraryStatus(items[0].snapshotStatus, false)).toBe("Tersinkron");
+		expect(resolveLibraryItemStatus(items[0])).toBe("analyzing");
 	});
 
-	it("still hides a codebase that never produced a usable snapshot", () => {
+	it("keeps a codebase whose first sync is incomplete as a resumable row", () => {
+		// An unfinished upload is a real, actionable repository state. Hiding the
+		// row would strand the user with no way back into the onboarding flow.
 		const items = buildCodebaseLibraryItems({
 			codebases: [
 				{
@@ -430,7 +433,13 @@ describe("codebase library readiness vs workspace availability", () => {
 			analyses: [],
 		});
 
-		expect(items).toHaveLength(0);
+		expect(items).toHaveLength(1);
+		expect(items[0].readiness).toBe("onboarding");
+		expect(resolveLibraryItemStatus(items[0])).toBe("sync_incomplete");
+		expect(resolveLibraryItemAction(items[0])).toMatchObject({
+			kind: "resume_sync",
+			href: "/plan/codebase",
+		});
 	});
 
 	it("lists the codebase once validated analysis for that snapshot exists", () => {
@@ -470,6 +479,7 @@ describe("codebase library readiness vs workspace availability", () => {
 
 		expect(items).toHaveLength(1);
 		expect(items[0]?.hasReadyAnalysis).toBe(true);
+		expect(items[0]?.readiness).toBe("planning_ready");
 	});
 });
 

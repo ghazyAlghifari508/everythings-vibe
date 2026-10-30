@@ -110,6 +110,9 @@ export const creditOperations = pgTable(
 		subscriptionId: text("subscription_id").references(() => subscriptions.id, {
 			onDelete: "restrict",
 		}),
+		initialAnalysisAllowance: boolean("initial_analysis_allowance")
+			.notNull()
+			.default(false),
 		kind: text("kind").$type<CreditOperationKind>().notNull(),
 		stage: text("stage").$type<CreditOperationStage>().notNull(),
 		idempotencyKey: text("idempotency_key").notNull(),
@@ -152,6 +155,11 @@ export const creditOperations = pgTable(
 			t.stage,
 		),
 		index("credit_operations_state_expires_at_idx").on(t.state, t.expiresAt),
+		uniqueIndex("credit_operations_active_initial_allowance_unique")
+			.on(t.userId)
+			.where(
+				sql`initial_analysis_allowance = true AND state IN ('reserved', 'running', 'settling')`,
+			),
 		check(
 			"credit_operations_credit_bounds_check",
 			sql`estimated_credits >= 0 AND reserved_credits >= 0 AND maximum_credits >= 0 AND estimated_credits <= maximum_credits AND reserved_credits <= maximum_credits AND (final_charge IS NULL OR (final_charge >= 0 AND final_charge <= maximum_credits))`,

@@ -11,6 +11,11 @@ import type {
 	SyncPromptPayload,
 	SyncStatusResponse,
 } from "@/features/codebase/services/sync";
+import type { AnalysisCreditStatus } from "../services/analysis-credit-policy";
+import {
+	preSyncAcceptance,
+	requestAnalysisCreditPreflight,
+} from "../services/analysis-credit-requests";
 import {
 	type CreatedCodebase,
 	requestCreateCodebase,
@@ -49,6 +54,9 @@ export function useCodebaseOnboarding({
 		analysisAttemptedFor,
 	} = analysisState;
 	const [error, setError] = useState<string | null>(null);
+	const [creditStatus, setCreditStatus] = useState<AnalysisCreditStatus | null>(
+		null,
+	);
 	const [isStarting, setIsStarting] = useState(false);
 	const [codebase, setCodebase] = useState<CreatedCodebase | null>(null);
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
@@ -91,7 +99,18 @@ export function useCodebaseOnboarding({
 		setError(null);
 		setIsStarting(true);
 		try {
-			const outcome = await requestCreateCodebase();
+			if (!creditStatus) {
+				setCreditStatus(await requestAnalysisCreditPreflight());
+				return;
+			}
+			if (
+				creditStatus.code !== "FREE_ALLOWANCE_AVAILABLE" &&
+				creditStatus.code !== "CREDIT_REQUIRED"
+			)
+				return;
+			const outcome = await requestCreateCodebase(
+				preSyncAcceptance(creditStatus),
+			);
 			if (outcome.kind === "unauthorized") return;
 			if (outcome.kind === "rejected") {
 				setError(outcome.message);
@@ -115,6 +134,7 @@ export function useCodebaseOnboarding({
 			setIsStarting(false);
 		}
 	}, [
+		creditStatus,
 		setStep,
 		setFeatureProjectId,
 		setAnalysis,
@@ -135,18 +155,30 @@ export function useCodebaseOnboarding({
 	useEffect(() => {
 		if (autoInitAttempted.current) return;
 		autoInitAttempted.current = true;
-		// Fast path preserves the original timing: no stored pointer means
-		// create immediately (synchronously sets loading state). Only stored
-		// pointers pay for the async recovery round-trip.
+		// Recovery reads persisted work; fresh onboarding waits for cost consent.
 		if (!readPlanCodebasePointer()) {
-			void createCodebase();
+			void requestAnalysisCreditPreflight()
+				.then(setCreditStatus)
+				.catch((error: unknown) =>
+					setError(
+						error instanceof Error
+							? error.message
+							: "Kebutuhan kredit belum dapat diperiksa.",
+					),
+				);
 			return;
 		}
 		void (async () => {
 			const recovered = await recoverCodebase();
-			if (!recovered) await createCodebase();
+			if (!recovered) {
+				try {
+					setCreditStatus(await requestAnalysisCreditPreflight());
+				} catch {
+					setError("Kebutuhan kredit belum dapat diperiksa. Coba muat ulang.");
+				}
+			}
 		})();
-	}, [createCodebase, recoverCodebase]);
+	}, [recoverCodebase]);
 
 	const retrySession = async () => {
 		if (!codebase) return;
@@ -154,6 +186,7 @@ export function useCodebaseOnboarding({
 		setIsStarting(true);
 		try {
 			const outcome = await requestRetrySession(codebase.id);
+			if (outcome.kind === "cancelled") return;
 			if (outcome.kind === "failed") {
 				setError("Sesi sync gagal dibuat. Coba lagi.");
 				return;
@@ -164,8 +197,12 @@ export function useCodebaseOnboarding({
 			setAnalysisError(null);
 			analysisAttemptedFor.current = null;
 			setStep("sync");
-		} catch {
-			setError("Server tidak dapat dihubungi.");
+		} catch (error) {
+			setError(
+				error instanceof Error
+					? error.message
+					: "Server tidak dapat dihubungi.",
+			);
 		} finally {
 			setIsStarting(false);
 		}
@@ -199,6 +236,7 @@ export function useCodebaseOnboarding({
 		lastStatus,
 		statusPollError,
 		createCodebase,
+		creditStatus,
 		retrySession,
 	};
 }

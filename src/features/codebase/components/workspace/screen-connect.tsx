@@ -47,6 +47,8 @@ interface ScreenConnectProps {
 	onContinueToSummary?: () => void;
 	analysis?: AnalysisResponse | null;
 	analysisError?: string | null;
+	/** Billing/eligibility blocked the analysis; the snapshot is still usable. */
+	analysisBlocked?: boolean;
 	isAnalyzing?: boolean;
 	onRetryAnalysis?: () => void;
 	isLegacyAnalysisMissingSuggestions?: boolean;
@@ -65,6 +67,7 @@ export function ScreenConnect({
 	onContinueToSummary,
 	analysis = null,
 	analysisError = null,
+	analysisBlocked = false,
 	isAnalyzing = false,
 	onRetryAnalysis,
 	isLegacyAnalysisMissingSuggestions = false,
@@ -81,7 +84,7 @@ export function ScreenConnect({
 
 	return (
 		<div className="w-full animate-enter">
-			<div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-iron bg-obsidian/90 shadow-2xl backdrop-blur-xl">
+			<div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-iron bg-obsidian">
 				<div className="border-b border-graphite p-5 sm:p-6">
 					{/* The server owns this name once the CLI has handshaken, so the
 					eyebrow drops the creation placeholder and shows the detected
@@ -118,6 +121,7 @@ export function ScreenConnect({
 						canContinueToSummary={canContinueToSummary}
 						analysis={analysis}
 						analysisError={analysisError}
+						analysisBlocked={analysisBlocked}
 						isAnalyzing={isAnalyzing}
 						onRetryAnalysis={onRetryAnalysis}
 						isLegacyAnalysisMissingSuggestions={

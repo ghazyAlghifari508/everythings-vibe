@@ -36,7 +36,9 @@ export async function releaseCreditOperation(input: {
 				and(
 					eq(schema.subscriptions.userId, input.userId),
 					eq(schema.subscriptions.id, subscriptionId),
-					orValidPeriod(schema.subscriptions.currentPeriodEnd),
+					operation.kind === "codebase_analysis"
+						? undefined
+						: orValidPeriod(schema.subscriptions.currentPeriodEnd),
 				),
 			)
 			.orderBy(desc(schema.subscriptions.createdAt))

@@ -130,7 +130,7 @@ describe("SyncStageList fast-sync reporting", () => {
 			"[data-testid='sync-stage-analysis']",
 		);
 		expect(analysis?.getAttribute("data-stage-state")).toBe("active");
-		expect(analysis?.textContent).toContain("Menganalisis codebase");
+		expect(analysis?.textContent).toContain("Menganalisis repository");
 		expect(analysis?.querySelector("[role='timer']")).not.toBeNull();
 	});
 

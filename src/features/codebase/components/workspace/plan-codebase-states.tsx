@@ -6,6 +6,8 @@
  * copy that describes a failed or in-flight create has one home.
  */
 
+import { Spinner } from "@/components/ui/spinner";
+
 /** Terminal create-failure heading; the body carries the safe server message. */
 const CODEBASE_ONBOARDING_ERROR_TITLE = "Gagal menyiapkan repository";
 
@@ -57,10 +59,7 @@ export function CodebaseOnboardingLoadingCard({
 	return (
 		<div className="flex min-h-[50vh] flex-1 items-center justify-center py-12">
 			<output className="flex w-full max-w-sm flex-col items-center gap-4 rounded-xl border border-graphite bg-charcoal p-8 text-center sm:p-10">
-				<div
-					className="h-9 w-9 animate-spin rounded-full border-2 border-graphite border-t-indigo"
-					aria-hidden="true"
-				/>
+				<Spinner size={36} className="text-indigo" />
 				<div className="space-y-1">
 					<p className="text-sm font-medium text-snow">{title}</p>
 					<p className="text-xs text-fog">{detail}</p>

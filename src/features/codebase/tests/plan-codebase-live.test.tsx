@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PlanCodebasePage } from "@/features/codebase/components/workspace/plan-codebase-page";
 import { useUIStore } from "@/store";
+import { renderConnectedOnboarding } from "./render-connected-onboarding";
 
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
@@ -195,7 +195,7 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 			}),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		await waitFor(() => {
 			expect(
@@ -206,7 +206,7 @@ describe("PlanCodebasePage live sync reconciliation", () => {
 		// The prompt is waiting on the agent first.
 		await waitFor(
 			() => {
-				expect(screen.getByText("Paste prompt lalu jalankan")).toBeDefined();
+				expect(screen.getByText("Pantau progres")).toBeDefined();
 			},
 			{ timeout: 15000, interval: 100 },
 		);

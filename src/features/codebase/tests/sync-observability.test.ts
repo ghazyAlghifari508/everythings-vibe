@@ -50,7 +50,7 @@ describe("preparation is described by the work it covers, not by an enum name", 
 		const view = resolveSyncStageView(status({ status: "connected" }));
 		const syncing = view.stages[SYNC_STAGE_ORDER.indexOf("syncing")];
 		expect(syncing?.state).toBe("waiting");
-		expect(syncing?.title).toBe("Menyinkronkan codebase");
+		expect(syncing?.title).toBe("Mengunggah repository");
 	});
 });
 
@@ -61,7 +61,7 @@ describe("the upload stage matches real transport", () => {
 		);
 		const syncing = view.stages[SYNC_STAGE_ORDER.indexOf("syncing")];
 		expect(syncing?.state).toBe("active");
-		expect(syncing?.title).toBe("Menyinkronkan codebase...");
+		expect(syncing?.title).toBe("Mengunggah repository...");
 		expect(syncing?.detail).toContain("Mengirim source code");
 		// The count is server data, so it is shown rather than invented.
 		expect(syncing?.meta).toContain("37");

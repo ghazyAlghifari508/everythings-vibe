@@ -26,15 +26,23 @@ async function dbSelectCodebases(
 	userId: string,
 ): Promise<CodebaseLibraryRow[]> {
 	const { db } = await import("@/db");
-	const { codebaseAnalyses, codebaseSnapshots, codebases, projects } =
-		await import("@/db/schema");
-	const { and, desc, eq, inArray, isNull } = await import("drizzle-orm");
+	const {
+		acVersions,
+		codebaseAnalyses,
+		codebaseSnapshots,
+		codebases,
+		prdVersions,
+		projects,
+		tasks,
+	} = await import("@/db/schema");
+	const { and, desc, eq, inArray, isNull, sql } = await import("drizzle-orm");
 	const rows = await db
 		.select({
 			id: codebases.id,
 			name: codebases.name,
 			createdAt: codebases.createdAt,
 			updatedAt: codebases.updatedAt,
+			onboardingProjectId: codebases.onboardingProjectId,
 		})
 		.from(codebases)
 		.where(eq(codebases.userId, userId))
@@ -60,6 +68,9 @@ async function dbSelectCodebases(
 					id: projects.id,
 					codebaseId: projects.codebaseId,
 					updatedAt: projects.updatedAt,
+					// Existence only: a feature tree can be large and the row must not
+					// ship it to the browser just to answer "does a plan exist?".
+					hasFeatureTree: sql<boolean>`${projects.featureTree} is not null`,
 				})
 				.from(projects)
 				.where(
@@ -72,6 +83,32 @@ async function dbSelectCodebases(
 				.orderBy(desc(projects.updatedAt))
 		: [];
 	const projectIds = featureRows.map((row) => row.id);
+	// A stored plan is any persisted artifact, not merely a project row: the
+	// onboarding anchor project exists for the analysis itself and must not make
+	// an unplanned repository look like it already holds a plan.
+	const [prdRows, acRows, taskRows] = projectIds.length
+		? await Promise.all([
+				db
+					.select({ projectId: prdVersions.projectId })
+					.from(prdVersions)
+					.where(inArray(prdVersions.projectId, projectIds)),
+				db
+					.select({ projectId: acVersions.projectId })
+					.from(acVersions)
+					.where(inArray(acVersions.projectId, projectIds)),
+				db
+					.select({ projectId: tasks.projectId })
+					.from(tasks)
+					.where(inArray(tasks.projectId, projectIds)),
+			])
+		: [[], [], []];
+	const artifactProjectIds = new Set<string>();
+	for (const row of featureRows) {
+		if (row.hasFeatureTree) artifactProjectIds.add(row.id);
+	}
+	for (const row of [...prdRows, ...acRows, ...taskRows]) {
+		artifactProjectIds.add(row.projectId);
+	}
 	const analysisRows = projectIds.length
 		? await db
 				.select({
@@ -89,7 +126,11 @@ async function dbSelectCodebases(
 	return buildCodebaseLibraryItems({
 		codebases: rows,
 		snapshots,
-		projects: featureRows,
+		projects: featureRows.map(({ id, codebaseId }) => ({
+			id,
+			codebaseId,
+			hasArtifacts: artifactProjectIds.has(id),
+		})),
 		analyses: analysisRows,
 	});
 }

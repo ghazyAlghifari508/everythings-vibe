@@ -9,6 +9,22 @@ const recorder = vi.hoisted(() => ({
 	logged: [] as unknown[],
 }));
 
+vi.mock(
+	"@/features/codebase/services/analysis-credit-preflight.server",
+	() => ({
+		checkPreSyncCredit: vi.fn(async () => ({
+			status: {
+				code: "FREE_ALLOWANCE_AVAILABLE",
+				maximumCredits: 0,
+				pricingVersion: "adaptive-v1",
+				availableCredits: 0,
+				canStart: true,
+			},
+			response: null,
+		})),
+	}),
+);
+
 type CreateHandler = (args: { request: Request }) => Promise<Response>;
 
 const captured = vi.hoisted(() => ({

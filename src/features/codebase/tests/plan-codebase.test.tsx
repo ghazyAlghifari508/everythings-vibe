@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlanCodebasePage } from "@/features/codebase/components/workspace/plan-codebase-page";
 import { useUIStore } from "@/store";
+import { renderConnectedOnboarding } from "./render-connected-onboarding";
 
 const mockNavigate = vi.fn();
 
@@ -107,7 +108,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		const { container } = render(<PlanCodebasePage />);
 
 		// Spinner and text exist
-		expect(screen.getByText("Menyiapkan sesi sync...")).toBeDefined();
+		expect(screen.getByText("Menunggu sesi sync...")).toBeDefined();
 		expect(
 			screen.getByText(
 				"Menghubungkan repository dan menginisialisasi instruksi CLI",
@@ -120,10 +121,12 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		);
 		expect(centeringWrapper).not.toBeNull();
 
-		// Check the spinner element itself
-		const spinner = container.querySelector(".animate-spin");
+		// Check the shared spinner primitive renders with the motion-safe gate.
+		const spinner = container.querySelector('[data-testid="spinner"]');
 		expect(spinner).not.toBeNull();
-		expect(spinner?.classList.contains("border-t-indigo")).toBe(true);
+		expect(spinner?.getAttribute("class")).toContain(
+			"motion-safe:animate-spin",
+		);
 	});
 
 	it("transitions to ScreenConnect prompt sync once codebase session is created", async () => {
@@ -149,7 +152,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			}),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		// Wait for ScreenConnect to mount
 		await waitFor(() => {
@@ -168,7 +171,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			vi.fn().mockRejectedValue(new Error("Network connection lost")),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		await waitFor(() => {
 			expect(screen.getByText("Server tidak dapat dihubungi.")).toBeDefined();
@@ -464,7 +467,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			}),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		await waitFor(() => {
 			expect(

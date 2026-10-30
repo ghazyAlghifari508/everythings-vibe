@@ -160,12 +160,20 @@ export function useCodebaseSync({
 		setIsResyncModalOpen(true);
 		setError(null);
 		try {
+			const { confirmPreSyncCredit } = await import(
+				"../services/analysis-credit-requests"
+			);
+			const acceptance = await confirmPreSyncCredit();
+			if (!acceptance) return;
 			const response = await fetch(
 				`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(getCodebaseSessionRequestBody(action)),
+					body: JSON.stringify({
+						...getCodebaseSessionRequestBody(action),
+						...acceptance,
+					}),
 				},
 			);
 			const parsed = syncPromptPayloadSchema.safeParse(
@@ -182,8 +190,12 @@ export function useCodebaseSync({
 			setStatus(null);
 			setAnalysis(null);
 			analysisAttemptedFor.current = null;
-		} catch {
-			setError("Server tidak dapat dihubungi.");
+		} catch (error) {
+			setError(
+				error instanceof Error
+					? error.message
+					: "Server tidak dapat dihubungi.",
+			);
 		} finally {
 			setIsStarting(false);
 		}

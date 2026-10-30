@@ -12,11 +12,14 @@ import {
 	codebaseAnalyses,
 	codebaseAskHandoffs,
 	codebaseGenerationContexts,
+	codebaseRevisionProposals,
 	conversations,
+	featureVersions,
 	messages,
 	prdVersions,
 	projects,
 	tasks,
+	taskVersions,
 } from "@/db/schema";
 import { deletionTimestamp } from "@/lib/project-deletion";
 import { requireUser } from "@/lib/session";
@@ -25,6 +28,9 @@ export const PROJECT_SYNC_CHILD_TABLES = [
 	"codebase_ask_handoffs",
 	"codebase_generation_contexts",
 	"codebase_analyses",
+	"codebase_revision_proposals",
+	"feature_versions",
+	"task_versions",
 ] as const;
 
 export async function purgeProjectArtifacts(
@@ -52,6 +58,16 @@ export async function purgeProjectArtifacts(
 	await tx
 		.delete(codebaseAnalyses)
 		.where(eq(codebaseAnalyses.projectId, projectId));
+	// Revisions and their version history are feature artifacts. The project row
+	// survives as a tombstone (accounting references it), so ON DELETE CASCADE
+	// never fires — every project-scoped table must be purged explicitly.
+	await tx
+		.delete(codebaseRevisionProposals)
+		.where(eq(codebaseRevisionProposals.projectId, projectId));
+	await tx
+		.delete(featureVersions)
+		.where(eq(featureVersions.projectId, projectId));
+	await tx.delete(taskVersions).where(eq(taskVersions.projectId, projectId));
 }
 
 export async function handleProjectDeleteRequest(
