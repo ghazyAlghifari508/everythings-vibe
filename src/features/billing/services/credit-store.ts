@@ -46,47 +46,59 @@ export function createCreditService(store: CreditServiceStore) {
 			if (input.quote.estimatedCredits > input.quote.maximumCredits) {
 				throw new Error("Credit quote exceeds its configured maximum");
 			}
-			const subscription = requireSubscription(store, input.userId);
-			const available =
-				subscription.credits -
-				subscription.creditsUsed -
-				subscription.creditsReserved;
-			if (available < input.quote.maximumCredits)
-				throw new Error("Insufficient available credit");
+			const isExempt = Boolean(input.isExempt);
+			let subscription: ReturnType<typeof requireSubscription> | undefined;
+			if (!isExempt) {
+				subscription = requireSubscription(store, input.userId);
+				const available =
+					subscription.credits -
+					subscription.creditsUsed -
+					subscription.creditsReserved;
+				if (available < input.quote.maximumCredits)
+					throw new Error("Insufficient available credit");
+			}
 			const timestamp = now();
+			const reservedCredits = isExempt ? 0 : input.quote.maximumCredits;
+			const maximumCredits = isExempt ? 0 : input.quote.maximumCredits;
 			const operation: CreditOperation = {
 				id: crypto.randomUUID(),
 				userId: input.userId,
 				projectId: input.projectId,
-				subscriptionId: subscription.id,
+				subscriptionId: subscription?.id ?? null,
 				kind: input.quote.operation,
 				stage: input.stage,
 				idempotencyKey: input.idempotencyKey,
 				state: "reserved",
-				estimatedCredits: input.quote.estimatedCredits,
-				reservedCredits: input.quote.maximumCredits,
-				maximumCredits: input.quote.maximumCredits,
+				estimatedCredits: isExempt ? 0 : input.quote.estimatedCredits,
+				reservedCredits,
+				maximumCredits,
 				finalCharge: null,
 				pricingVersion: input.quote.pricingVersion,
 				metrics: input.quote.metrics,
 				capApplied: false,
 				artifactReference: null,
 				failureReason: null,
+				isExempt,
+				exemptionReason: isExempt
+					? (input.exemptionReason ?? "internal")
+					: null,
 				reconciliation: { status: "not_required" },
 				expiresAt: input.expiresAt ?? null,
 				createdAt: timestamp,
 				updatedAt: timestamp,
 			};
 			store.operations.set(operation.id, operation);
-			subscription.creditsReserved += operation.reservedCredits;
-			appendLedger(store, {
-				userId: input.userId,
-				operationId: operation.id,
-				amount: -operation.reservedCredits,
-				entryType: "reservation",
-				reason: "credit reservation",
-				pricingVersion: input.quote.pricingVersion,
-			});
+			if (subscription && reservedCredits > 0) {
+				subscription.creditsReserved += operation.reservedCredits;
+				appendLedger(store, {
+					userId: input.userId,
+					operationId: operation.id,
+					amount: -operation.reservedCredits,
+					entryType: "reservation",
+					reason: "credit reservation",
+					pricingVersion: input.quote.pricingVersion,
+				});
+			}
 			return operationResult(operation);
 		},
 
@@ -117,6 +129,16 @@ export function createCreditService(store: CreditServiceStore) {
 			assertActiveReservation(operation.state);
 			const { artifactReference, finalCharge, measuredUnits } =
 				resolveSettlementParameters(operation, input);
+			if (operation.isExempt) {
+				operation.state = "settled";
+				operation.finalCharge = 0;
+				operation.reservedCredits = 0;
+				operation.artifactReference = artifactReference;
+				operation.usage = { measuredUnits };
+				operation.capApplied = false;
+				operation.updatedAt = now();
+				return operationResult(operation);
+			}
 			if (
 				!Number.isInteger(finalCharge) ||
 				finalCharge < 0 ||
@@ -182,6 +204,13 @@ export function createCreditService(store: CreditServiceStore) {
 				input.operationId,
 			);
 			assertActiveReservation(operation.state);
+			if (operation.isExempt || operation.reservedCredits === 0) {
+				operation.state = "released";
+				operation.reservedCredits = 0;
+				operation.failureReason = input.reason;
+				operation.updatedAt = now();
+				return operationResult(operation);
+			}
 			const subscriptionId = requireBoundSubscriptionId(
 				operation.subscriptionId,
 			);

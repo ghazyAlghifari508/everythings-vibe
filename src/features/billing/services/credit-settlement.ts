@@ -47,6 +47,36 @@ export async function settleCreditOperation(
 		const { artifactReference, finalCharge, measuredUnits } =
 			resolveSettlementParameters(operation, input);
 
+		if (operation.isExempt) {
+			const updated = await tx
+				.update(schema.creditOperations)
+				.set({
+					state: "settled",
+					reservedCredits: 0,
+					finalCharge: 0,
+					artifactReference: artifactReference,
+					usage: { measuredUnits: measuredUnits },
+					capApplied: false,
+					settledAt: new Date(),
+					updatedAt: new Date(),
+				})
+				.where(
+					and(
+						eq(schema.creditOperations.id, operation.id),
+						sql`${schema.creditOperations.state} IN ('reserved', 'running', 'settling')`,
+					),
+				)
+				.returning({
+					id: schema.creditOperations.id,
+					state: schema.creditOperations.state,
+					finalCharge: schema.creditOperations.finalCharge,
+					analysisReference: schema.creditOperations.analysisReference,
+				});
+			if (updated.length !== 1)
+				throw new Error("Credit operation settlement conflict");
+			return updated[0];
+		}
+
 		if (!Number.isInteger(finalCharge) || finalCharge < 0)
 			throw new Error("Final credit charge is invalid");
 		if (!Number.isFinite(measuredUnits) || measuredUnits < 0)

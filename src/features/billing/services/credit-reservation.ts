@@ -38,6 +38,24 @@ export async function reserveCreditOperation(
 
 		if (input.initialAnalysisAllowance)
 			await lockInitialAnalysisAccount(tx, input.userId);
+
+		const { getUserBillingEntitlement } = await import(
+			"@/features/billing/services/billing-entitlement"
+		);
+		const entitlement =
+			input.isExempt !== undefined
+				? {
+						billingExempt: input.isExempt,
+						reason:
+							(input.exemptionReason as
+								| "internal"
+								| "development"
+								| "support"
+								| null) ?? "internal",
+					}
+				: await getUserBillingEntitlement(input.userId);
+		const isExempt = entitlement.billingExempt;
+
 		const [existing] = await tx
 			.select({
 				id: schema.creditOperations.id,
@@ -61,41 +79,51 @@ export async function reserveCreditOperation(
 				analysisReference: existing.analysisReference,
 			};
 		validateQuote(input.quote, input.operation, input.metrics);
-		if (input.initialAnalysisAllowance) {
+		if (!isExempt && input.initialAnalysisAllowance) {
 			if (input.operation !== "codebase_analysis")
 				throw new Error("Invalid allowance operation");
 			const allowance = await readInitialAnalysisAllowance(tx, input.userId);
 			if (allowance.used || allowance.inProgress)
 				throw new Error("Initial analysis allowance unavailable");
 		}
-		const maximumCredits = input.initialAnalysisAllowance
+		const maximumCredits = isExempt
 			? 0
-			: input.quote.maximumCredits;
+			: input.initialAnalysisAllowance
+				? 0
+				: input.quote.maximumCredits;
 		const [subscription] = await tx
 			.select()
 			.from(schema.subscriptions)
 			.where(eq(schema.subscriptions.userId, input.userId))
 			.orderBy(desc(schema.subscriptions.createdAt))
 			.limit(1);
-		if (!subscription) throw new CreditSubscriptionOriginError("missing");
-		if (resolveSubscriptionState(subscription, new Date()).state === "paused")
-			throw new CreditSubscriptionOriginError("invalid_period");
+		if (!isExempt) {
+			if (!subscription) throw new CreditSubscriptionOriginError("missing");
+			if (resolveSubscriptionState(subscription, new Date()).state === "paused")
+				throw new CreditSubscriptionOriginError("invalid_period");
+		}
 		const [operation] = await tx
 			.insert(schema.creditOperations)
 			.values({
 				id: crypto.randomUUID(),
 				userId: input.userId,
 				projectId: input.projectId,
-				subscriptionId: subscription.id,
+				subscriptionId: subscription?.id ?? null,
 				kind: input.operation,
 				stage: input.stage,
 				idempotencyKey: input.idempotencyKey,
 				state: "quoted",
-				initialAnalysisAllowance: input.initialAnalysisAllowance ?? false,
+				initialAnalysisAllowance: isExempt
+					? false
+					: (input.initialAnalysisAllowance ?? false),
+				isExempt,
+				exemptionReason: isExempt ? (entitlement.reason ?? "internal") : null,
 				analysisReference: input.analysisReference,
-				estimatedCredits: input.initialAnalysisAllowance
+				estimatedCredits: isExempt
 					? 0
-					: input.quote.estimatedCredits,
+					: input.initialAnalysisAllowance
+						? 0
+						: input.quote.estimatedCredits,
 				reservedCredits: 0,
 				maximumCredits,
 				pricingVersion: input.quote.pricingVersion,
@@ -128,6 +156,34 @@ export async function reserveCreditOperation(
 				analysisReference: retry.analysisReference,
 			};
 		}
+
+		if (isExempt) {
+			const operationUpdates = await tx
+				.update(schema.creditOperations)
+				.set({
+					state: "reserved",
+					reservedCredits: 0,
+					reservedAt: new Date(),
+					updatedAt: new Date(),
+				})
+				.where(
+					and(
+						eq(schema.creditOperations.id, operation.id),
+						eq(schema.creditOperations.state, "quoted"),
+					),
+				)
+				.returning({ id: schema.creditOperations.id });
+			if (operationUpdates.length !== 1)
+				throw new Error("Credit operation reservation transition conflict");
+			return {
+				id: operation.id,
+				state: "reserved",
+				finalCharge: null,
+				analysisReference: operation.analysisReference,
+			};
+		}
+
+		if (!subscription) throw new CreditSubscriptionOriginError("missing");
 
 		const updated = await tx
 			.update(schema.subscriptions)
