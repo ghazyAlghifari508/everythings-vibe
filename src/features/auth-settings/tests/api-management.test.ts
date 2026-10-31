@@ -129,6 +129,14 @@ function repository(withinTransaction: boolean) {
 	};
 }
 
+vi.mock("pg", () => ({
+	Pool: class {
+		constructor() {
+			throw new Error("Live database forbidden in API management tests");
+		}
+	},
+}));
+
 vi.mock("@/db", () => ({
 	db: {
 		...repository(false),
