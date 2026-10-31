@@ -106,7 +106,6 @@ export function useOnboardingAnalysis({
 			projectId: string,
 			snapshotId: string,
 			refreshStarterSuggestionsForAnalysisId?: string,
-			confirmCredit = false,
 		): Promise<void> => {
 			const generation = ++analysisRequestGeneration.current;
 			setAnalysisWorking(true);
@@ -117,7 +116,6 @@ export function useOnboardingAnalysis({
 					projectId,
 					snapshotId,
 					refreshStarterSuggestionsForAnalysisId,
-					confirmCredit,
 				});
 				if (generation !== analysisRequestGeneration.current) return;
 				if (outcome.kind === "unauthorized") {
@@ -170,12 +168,7 @@ export function useOnboardingAnalysis({
 		setAnalysisWorking(true, { retrying: true });
 		setAnalysis(null);
 		setAnalysisError(null);
-		void triggerOnboardingAnalysis(
-			featureProjectId,
-			lastStatus.snapshotId,
-			undefined,
-			true,
-		);
+		void triggerOnboardingAnalysis(featureProjectId, lastStatus.snapshotId);
 	}, [
 		featureProjectId,
 		lastStatus,

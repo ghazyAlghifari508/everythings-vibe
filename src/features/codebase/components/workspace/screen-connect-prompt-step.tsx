@@ -25,6 +25,8 @@ interface ScreenConnectPromptStepProps {
 	isStarting: boolean;
 	status?: SyncStatusResponse | null;
 	onRequestNewToken?: () => void;
+	locked?: boolean;
+	lockedAction?: React.ReactNode;
 }
 
 export function ScreenConnectPromptStep({
@@ -33,6 +35,8 @@ export function ScreenConnectPromptStep({
 	isStarting,
 	status,
 	onRequestNewToken,
+	locked = false,
+	lockedAction,
 }: ScreenConnectPromptStepProps) {
 	const { copied, copyError, copy } = useCopyFeedback();
 	const promptText = payload ? buildAgentPrompt(payload, { projectName }) : "";
@@ -94,7 +98,17 @@ export function ScreenConnectPromptStep({
 					)}
 				</div>
 				<div className="relative min-h-[90px] rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4">
-					{payload ? (
+					{locked ? (
+						<div
+							data-testid="locked-prompt-region"
+							className="flex flex-col items-center justify-center gap-3 py-6 text-center font-sans"
+						>
+							<p className="text-xs text-fog">
+								Kredit belum cukup untuk analisis.
+							</p>
+							{lockedAction}
+						</div>
+					) : payload ? (
 						<>
 							<div className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow">
 								{promptText}

@@ -17,6 +17,8 @@ export function CodebaseWorkspaceResync({
 			projectName={projectName}
 			payload={ws.payload}
 			isStarting={ws.isStarting}
+			creditMaximum={ws.creditPreflight?.maximumCredits ?? null}
+			creditFree={ws.creditPreflight?.code === "FREE_ALLOWANCE_AVAILABLE"}
 			status={ws.status}
 			statusError={ws.error}
 			onRequestNewToken={() => void ws.startSession("retry")}

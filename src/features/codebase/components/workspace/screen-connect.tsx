@@ -16,6 +16,8 @@ interface ScreenConnectProps {
 	projectName: string;
 	payload: SyncPromptPayload | null;
 	isStarting?: boolean;
+	promptLocked?: boolean;
+	lockedPromptAction?: React.ReactNode;
 	/**
 	 * The reconciled sync status for this attempt, owned by the screen that owns
 	 * the polling loop. `null` means the browser has not received any server
@@ -60,6 +62,8 @@ export function ScreenConnect({
 	projectName,
 	payload,
 	isStarting = false,
+	promptLocked = false,
+	lockedPromptAction,
 	status,
 	statusError = null,
 	onRequestNewToken,
@@ -111,6 +115,8 @@ export function ScreenConnect({
 						isStarting={isStarting}
 						status={status}
 						onRequestNewToken={onRequestNewToken}
+						locked={promptLocked}
+						lockedAction={lockedPromptAction}
 					/>
 
 					<ScreenConnectAgentStep />

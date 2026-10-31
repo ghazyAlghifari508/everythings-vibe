@@ -10,6 +10,9 @@ import {
 } from "@/features/codebase/services/sync";
 import { useUIStore } from "@/store";
 
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({ data: undefined, refetch: vi.fn() }),
+}));
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
 	useNavigate: () => vi.fn(),

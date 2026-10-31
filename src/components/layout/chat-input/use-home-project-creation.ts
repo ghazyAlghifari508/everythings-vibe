@@ -154,15 +154,26 @@ export function useHomeProjectCreation({
 				// If plan check fails, allow flow — server will block with 403 anyway
 			}
 
-			const acceptance =
-				projectMode === "existing_codebase"
-					? await (
-							await import(
-								"@/features/codebase/services/analysis-credit-requests"
-							)
-						).confirmPreSyncCredit()
-					: undefined;
-			if (projectMode === "existing_codebase" && !acceptance) return;
+			let acceptance: {
+				acceptAnalysisPolicy: true;
+				creditConsent: { maximumCredits: number; pricingVersion: string };
+			} | null = null;
+			if (projectMode === "existing_codebase") {
+				const credit = await (
+					await import("@/features/codebase/services/analysis-credit-requests")
+				).requestPreSyncPreflight();
+				if (credit.code === "CREDIT_REQUIRED") {
+					setCreditsExhaustedMsg(
+						`Analisis membutuhkan hingga ${credit.maximumCredits} kredit. Buka halaman sync untuk menyetujui biaya.`,
+					);
+					navigate({ to: "/plan/codebase" });
+					return;
+				}
+				const { preSyncAcceptance } = await import(
+					"@/features/codebase/services/analysis-credit-requests"
+				);
+				acceptance = preSyncAcceptance(credit);
+			}
 			const endpoint =
 				projectMode === "existing_codebase"
 					? "/api/codebases"

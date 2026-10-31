@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useUIStore } from "@/store";
 import { renderConnectedOnboarding } from "./render-connected-onboarding";
 
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({ data: undefined, refetch: vi.fn() }),
+}));
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
 	useNavigate: () => vi.fn(),
@@ -694,7 +697,6 @@ describe("PlanCodebasePage onboarding analysis", () => {
 			expect(refreshCallBody).toEqual({
 				snapshotId: "snap-onboard-1",
 				refreshStarterSuggestionsForAnalysisId: "ana-onboard-1",
-				creditConsent: { maximumCredits: 12, pricingVersion: "adaptive-v1" },
 			});
 		});
 

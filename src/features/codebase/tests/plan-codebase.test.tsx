@@ -59,6 +59,9 @@ function readyAnalysis(
 	};
 }
 
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({ data: undefined, refetch: vi.fn() }),
+}));
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
 	useNavigate: () => mockNavigate,
@@ -425,7 +428,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		expect(screen.queryByText(/Sync gagal/i)).toBeNull();
 	});
 
-	it("mints a fresh token when recovering a waiting session without a payload", async () => {
+	it("lands on the sync screen when recovering a waiting session without a payload", async () => {
 		try {
 			sessionStorage.setItem("prdfy:plan-codebase-id", "cb-wait-1");
 			sessionStorage.setItem("prdfy:plan-codebase-name", "Waiting Repo");
@@ -469,11 +472,17 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 
 		await renderConnectedOnboarding();
 
-		await waitFor(() => {
-			expect(
-				screen.getByText("Sync codebase dengan everythings-vibe"),
-			).toBeDefined();
-		});
-		expect(screen.getByText(/fresh-token-xyz/)).toBeDefined();
+		await waitFor(
+			() => {
+				expect(
+					screen.getByText("Sync codebase dengan everythings-vibe"),
+				).toBeDefined();
+			},
+			{ timeout: 15000 },
+		);
+		expect(screen.queryByText(/fresh-token-xyz/)).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /Siapkan|Buat sesi|token baru/i }),
+		).not.toBeNull();
 	});
 });

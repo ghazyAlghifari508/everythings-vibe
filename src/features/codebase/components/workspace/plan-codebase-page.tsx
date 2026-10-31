@@ -1,7 +1,9 @@
 "use client";
 
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { TopUpModal } from "@/features/billing/components/top-up-modal";
 import { CodebaseConclusion } from "@/features/codebase/components/planning/codebase-conclusion";
 import { ScreenConnect } from "@/features/codebase/components/workspace/screen-connect";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
@@ -18,7 +20,8 @@ import {
 	useOnboardingSummaryGate,
 } from "../../hooks/use-onboarding-analysis";
 import { useOnboardingAnalysisState } from "../../hooks/use-onboarding-analysis-state";
-import { AnalysisCreditNotice } from "./analysis-credit-notice";
+import { CodebaseOnboardingShell } from "./codebase-onboarding-shell";
+import { CreditConsentDialog } from "./credit-consent-dialog";
 import {
 	CodebaseOnboardingErrorCard,
 	CodebaseOnboardingLoadingCard,
@@ -41,35 +44,30 @@ export function PlanCodebasePage() {
 		createCodebase,
 		creditStatus,
 		retrySession,
+		consentOpen,
+		consentAgreed,
+		setConsentAgreed,
+		closeConsent,
+		confirmConsent,
+		refreshCreditStatus,
+		blocked,
 	} = useCodebaseOnboarding({ analysisState, step, setStep });
+	const [consentError, setConsentError] = useState<string | null>(null);
+	const [topUpOpen, setTopUpOpen] = useState(false);
 
-	// Upload success is not onboarding success. Readiness comes from the shared
-	// predicate: a snapshot opens nothing until validated analysis output exists
-	// for that exact snapshot, otherwise the user would land in a composer whose
-	// every request fails with CODEBASE_CONTEXT_UNAVAILABLE.
 	const readiness = resolveOnboardingReadiness({
 		snapshotId: lastStatus?.snapshotId ?? null,
 		snapshotStatus: lastStatus?.status ?? null,
 		analysis,
 		analysisAttemptStatus: lastStatus?.analysisAttemptStatus ?? null,
-		// A billing/eligibility block is a distinct state: nothing is running, so
-		// readiness must not report an analysis still in progress.
 		creditBlocked: Boolean(analysisState.creditStatus),
 	});
 	const canOpenWorkspace = readiness === "planning_ready";
-	// A credit block is not a retryable model failure: the only useful recovery
-	// is topping up, so the status list owns that action instead of the consent
-	// card. Consent is only shown when it can actually start the analysis.
 	const analysisCreditCode = analysisState.creditStatus?.code ?? null;
 	const analysisBlocked =
 		analysisCreditCode === "INSUFFICIENT_CREDITS" ||
 		analysisCreditCode === "SUBSCRIPTION_PAUSED" ||
 		lastStatus?.errorCode === "INSUFFICIENT_CREDITS";
-	const showAnalysisConsent =
-		analysisCreditCode === "FREE_ALLOWANCE_AVAILABLE" ||
-		analysisCreditCode === "CREDIT_REQUIRED";
-	// Mirrors the workspace canRenderCodebaseReview predicate so the conclusion
-	// and the workspace never disagree about what counts as a usable review.
 	const reviewReady = hasReadyAnalysisForSnapshot(
 		analysis,
 		lastStatus?.snapshotId ?? null,
@@ -96,19 +94,15 @@ export function PlanCodebasePage() {
 		reviewReady,
 	});
 
-	// The conclusion step is never rendered without a usable current snapshot for
-	// this attempt. Without this guard a stale step pointer or a direct jump
-	// would show a summary for work that cannot start; the user is returned to
-	// the sync step, which reports the real state instead.
 	const activeStep: PlanCodebaseStep =
 		step === "summary" && !canContinueToSummary ? "sync" : step;
 
-	// Onboarding states are mutually exclusive. A terminal create failure must
-	// never render beside a "waiting for session" spinner: the spinner claims a
-	// request is still in flight after it has already failed, which is exactly
-	// the state the user cannot act on. Derived from `codebase` first so the
-	// ready branch keeps its non-null narrowing.
 	const onboardingFailed = !codebase && !isStarting && error !== null;
+
+	const handleTopUpClose = (open: boolean) => {
+		setTopUpOpen(open);
+		if (!open) void refreshCreditStatus();
+	};
 
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
@@ -123,19 +117,24 @@ export function PlanCodebasePage() {
 						error={error}
 						onRetry={() => void createCodebase()}
 					/>
-				) : creditStatus ? (
-					<>
-						<AnalysisCreditNotice
-							status={creditStatus}
-							onStart={() => void createCodebase()}
-							isStarting={isStarting}
-						/>
-						{error && (
-							<p role="alert" className="text-sm text-snow">
-								{error}
-							</p>
-						)}
-					</>
+				) : blocked && creditStatus ? (
+					<CodebaseOnboardingShell
+						projectName={null}
+						creditStatus={creditStatus}
+						isStarting={isStarting}
+						createError={error}
+						onTopUp={() => setTopUpOpen(true)}
+					/>
+				) : creditStatus &&
+					(creditStatus.code === "FREE_ALLOWANCE_AVAILABLE" ||
+						creditStatus.code === "CREDIT_REQUIRED") ? (
+					<CodebaseOnboardingShell
+						projectName={null}
+						creditStatus={creditStatus}
+						isStarting={isStarting}
+						createError={error}
+						onStart={() => void createCodebase()}
+					/>
 				) : (
 					<CodebaseOnboardingLoadingCard
 						title={
@@ -144,22 +143,9 @@ export function PlanCodebasePage() {
 					/>
 				)
 			) : !payload && !lastStatus ? (
-				// A codebase exists but neither its prompt payload nor a polled
-				// status has landed yet. Still initializing, not an error.
 				<CodebaseOnboardingLoadingCard title="Menyiapkan instruksi CLI..." />
 			) : (
 				<>
-					{showAnalysisConsent && analysisState.creditStatus && (
-						<AnalysisCreditNotice
-							status={analysisState.creditStatus}
-							onStart={retryAnalysis}
-							isStarting={analysisWorking}
-							analysisOnly
-						/>
-					)}
-					{/* Step 1 owns the whole sync lifecycle: the prompt, the agent, and
-					the live server status of the upload it started. There is no second
-					screen to navigate to in order to see the same progress. */}
 					{activeStep === "sync" && (
 						<ScreenConnect
 							projectName={codebase.name}
@@ -183,9 +169,6 @@ export function PlanCodebasePage() {
 							onRefreshLegacySuggestions={refreshLegacySuggestions}
 						/>
 					)}
-					{/* Step 2 owns every analysis state. Pending becomes the canonical
-					review in this same region once the server reports it, so there is
-					no manual step between the two. */}
 					{activeStep === "summary" && lastStatus && (
 						<section data-testid="codebase-sync-summary">
 							<CodebaseConclusion
@@ -208,6 +191,33 @@ export function PlanCodebasePage() {
 					)}
 				</>
 			)}
+			{creditStatus &&
+				(creditStatus.code === "FREE_ALLOWANCE_AVAILABLE" ||
+					creditStatus.code === "CREDIT_REQUIRED") && (
+					<CreditConsentDialog
+						open={consentOpen}
+						onOpenChange={(open) => {
+							if (!open) closeConsent();
+						}}
+						status={creditStatus}
+						agreed={consentAgreed}
+						onAgreedChange={setConsentAgreed}
+						error={consentError}
+						onConfirm={() => {
+							if (!consentAgreed) {
+								setConsentError(
+									"Centang persetujuan biaya sebelum melanjutkan.",
+								);
+								return;
+							}
+							setConsentError(null);
+							confirmConsent();
+							setTimeout(() => void createCodebase(), 0);
+						}}
+						isStarting={isStarting}
+					/>
+				)}
+			<TopUpModal open={topUpOpen} onOpenChange={handleTopUpClose} />
 		</main>
 	);
 }

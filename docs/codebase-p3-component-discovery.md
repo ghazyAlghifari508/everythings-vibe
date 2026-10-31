@@ -1,44 +1,50 @@
 # Existing Codebase — P3 Component Discovery Record
 
-Scope: the recovery UI touched by `docs/prompts-cb-existing/p3.md` (the failed /
-pending analysis status card, its single retry action, and the credit-recovery
-action). Produced per `.agents/rules/skills-mcp.md` §2 rule 6 ("record the
-discovery result and the reason a ready-made solution was insufficient").
+Scope: Redesign of the Existing Codebase credit onboarding and re-sync experience
+(`docs/prompts-cb-existing/p3.md`). Produced per `.agents/rules/skills-mcp.md` §2
+rule 6 ("record the discovery result and the reason a ready-made solution was
+insufficient").
 
-Exploration of the listed registries (`ui.shadcn.com`, `heroui.com`,
-`magicui.design`, `reactbits.dev`, `thinkingorbs.com`) was done against the
-installed primitives in this repository rather than by live browsing, because
-the task forbids browser QA and the recovery surface is a status card, not a new
-visual system.
+Evaluated existing components in this repository as well as candidate libraries
+(`ui.shadcn.com`, `heroui.com`, `magicui.design`, `reactbits.dev`, `thinkingorbs.com`,
+and `affectui.com`).
+
+---
 
 ## 1. Repository baseline (search existing components first)
 
-| Existing asset | Path | Use in the recovery UI |
+| Existing asset | Path | Use in P3 Redesign |
 | --- | --- | --- |
-| `Button` (CVA) | `src/components/ui/button.tsx` | "Coba analisis lagi" action; `buttonVariants` styles the "Tambahkan Kredit" anchor without abusing `asChild` |
-| `Alert` / `AlertDescription` | `src/components/ui/alert.tsx` | In-area failure message (the only error surface) |
-| `Icon` (Hugeicons wrapper) | `src/components/ui/icon.tsx` | `AlertCircleIcon` (failure), `Loading01Icon` (pending) |
-| `CodebaseConclusion` | `src/features/codebase/components/planning/codebase-conclusion.tsx` | The existing analysis status component; already reused by `ScreenConnect` and `WorkspaceConnectionScreen` |
-| `ScreenConnect` / `ScreenIncompleteSync` | `src/features/codebase/components/workspace/` | Initial sync flow; the P3 card keeps its `bg-snow text-onyx` CTA language |
-| `Orb` / `AgentThinking` (Thinking Orbs) | `src/components/ui/orb.tsx`, `src/components/ui/agent-thinking.tsx` | Already used for chat streaming status; left in place, not added here |
+| `Dialog` / `DialogContent` / `DialogHeader` / `DialogTitle` / `DialogDescription` / `DialogFooter` | `src/components/ui/dialog.tsx` | Base primitive for `CreditConsentDialog` and `CodebaseResyncModal`, providing focus trap, ESC dismissal, and accessibility. |
+| `TopUpModal` | `src/features/billing/components/top-up-modal.tsx` | Pre-installed billing modal reused for the "Tambahkan Kredit" action, both from the locked prompt and within the consent dialog. |
+| `Button` (CVA) | `src/components/ui/button.tsx` | Primary action buttons (`Siapkan instruksi`, `Setuju dan lanjutkan`, `Coba lagi`). |
+| `Icon` (Hugeicons wrapper) | `src/components/ui/icon.tsx` | `LockIcon` for the blocked prompt state, `Tick01Icon` for success, and `AlertCircleIcon` for errors. |
+| `Spinner` | `src/components/ui/spinner.tsx` | Standard indeterminate activity indicator during preflight and session creation. |
+| `ScreenConnect` | `src/features/codebase/components/workspace/screen-connect.tsx` | Canonical 3-step onboarding and sync layout. |
+| `CodebaseResyncModal` | `src/features/codebase/components/planning/codebase-resync-modal.tsx` | Modal re-sync container with single accessible close button and compact inline cost disclosure. |
+
+---
 
 ## 2. Third-party libraries evaluated
 
 | Area | Candidates | Verdict |
 | --- | --- | --- |
-| Failure message surface | (a) repo `Alert`; (b) shadcn `Alert`; (c) HeroUI `Alert` | **Chosen: repo `Alert`.** It is the shadcn primitive vendored into `src/components/ui`, already themed with the repo tokens (`border-graphite`, `border-crimson/40`). HeroUI is installed and used elsewhere, but pulling a second alert implementation into the same card would duplicate the primitive. |
-| Primary retry action | (a) repo `Button`; (b) HeroUI `Button`; (c) raw `<button>` | **Chosen: repo `Button`.** `design-layout-consistency.md` §8.2 requires the `Button` primitive and forbids duplicating button markup. |
-| Pending status indicator | (a) existing `Loading01Icon` spinner; (b) `Orb` (Thinking Orbs); (c) Magic UI / React Bits animated text | **Chosen: the existing spinner.** Thinking Orbs is sanctioned only for status animation, and the spinner already communicates "running" without fabricating progress; `Orb`/`AgentThinking` remain reserved for the chat stream they were built for. |
-| Status card container | (a) existing `section` card; (b) shadcn `Card`; (c) Magic UI `BentoGrid`/`ShimmerButton` | **Chosen: the existing `section` card.** p3 §5 forbids decorative or oversized error treatments; a bento/shimmer wrapper is decoration, not status. |
+| Modal & Confirmation Dialog | (a) native `window.confirm()`; (b) shadcn `Dialog`/`AlertDialog`; (c) HeroUI `Modal` | **Chosen: repo shadcn/Radix `Dialog`.** Replaced all native `window.confirm()` calls with `CreditConsentDialog` built on top of the established `Dialog` primitive. HeroUI `Modal` is present in the repo dependencies, but the codebase uses shadcn/Radix primitives for workspace modals, ensuring unified theme tokens (`bg-obsidian`, `border-graphite`, `text-snow`). |
+| Top-Up and Billing Flow | (a) custom modal from scratch; (b) affectUI Usage Meter; (c) existing `TopUpModal` | **Chosen: existing `TopUpModal`.** Already integrated with `/api/payments/create`, package selection (`TOPUP_PACKAGES`), and the user plan query. Reused directly with zero new code or styling divergence. |
+| Locked Prompt Container | (a) blurred token text; (b) CSS overlay; (c) safe locked state inside step 1 | **Chosen: safe locked prompt in step 1.** Strictly obeys the security contract: never generates or renders raw tokens for unauthorized/insufficient-credit users. Renders `LockIcon`, concise Indonesian copy, and a top-up CTA inside the identical step 1 prompt box. |
+| Multi-step Stepper | (a) MagicUI stepper; (b) custom CSS stepper; (c) existing `StepIndicator` & `ScreenConnect` numbers | **Chosen: existing 1-2-3 circular indicators.** Matches the VibeEverything developer-grade aesthetic (`border-iron font-mono text-xs text-mist`) without foreign bloated UI dependencies. |
+
+---
 
 ## 3. New dependencies required
 
-**None.** Every element of the recovery UI is composed from primitives already
-present in `src/components/ui/` plus Hugeicons through the `Icon` wrapper.
+**None.** Every element of the redesigned credit onboarding, consent dialog, and re-sync experience is composed from primitives already installed in `src/components/ui/` and `src/features/billing/`.
+
+---
 
 ## 4. Custom-implementation rationale
 
-No new custom component was created. The only handwritten pieces are the copy
-strings and the readiness projection (`workspace-readiness.ts`), which are
-domain logic, not UI primitives. Where a standard pattern was needed (button,
-alert) the repo primitive is used.
+No unrequested abstractions were introduced. The newly added modules:
+1. `src/features/codebase/components/workspace/credit-consent-dialog.tsx`: App-owned accessible modal replacing `window.confirm()`.
+2. `src/features/codebase/components/workspace/codebase-onboarding-shell.tsx`: Unified onboarding layout handling State A (sufficient credits), State B (insufficient credits with locked prompt), and State C (free initial analysis).
+3. `src/features/codebase/components/planning/codebase-resync-modal-steps.tsx`: Modular extraction of the 3 re-sync steps keeping all files under the 350-line ceiling.

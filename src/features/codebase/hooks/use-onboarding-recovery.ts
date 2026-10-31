@@ -12,13 +12,9 @@ import {
 } from "@/features/codebase/services/plan-storage";
 import {
 	SNAPSHOT_CONTEXT_STATUSES,
-	type SyncPromptPayload,
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
-import {
-	requestCodebaseStatus,
-	requestRetrySession,
-} from "../services/onboarding-requests";
+import { requestCodebaseStatus } from "../services/onboarding-requests";
 import type { OnboardingAnalysisState } from "./use-onboarding-analysis-state";
 
 /**
@@ -80,7 +76,6 @@ function resolveRecoveredStep(
  */
 export function useOnboardingRecovery({
 	analysisState,
-	adoptSession,
 	setError,
 	setIsStarting,
 	setCodebase,
@@ -89,10 +84,6 @@ export function useOnboardingRecovery({
 	setStep,
 }: {
 	analysisState: OnboardingAnalysisState;
-	adoptSession: (
-		payload: SyncPromptPayload | null,
-		seed: SyncStatusResponse | null,
-	) => void;
 	setError: (error: string | null) => void;
 	setIsStarting: (starting: boolean) => void;
 	setCodebase: (codebase: { id: string; name: string }) => void;
@@ -170,18 +161,8 @@ export function useOnboardingRecovery({
 				recovered.status === "failed" ||
 				recovered.status === "expired"
 			) {
-				const retryOutcome = await requestRetrySession(stored.id);
-				if (retryOutcome.kind === "cancelled") {
-					setStep("sync");
-					return true;
-				}
-				if (retryOutcome.kind === "minted") {
-					adoptSession(retryOutcome.payload, null);
-					setStep("sync");
-					return true;
-				}
-				clearPlanOnboardingPointers();
-				return false;
+				setStep("sync");
+				return true;
 			}
 			// The CLI is mid-attempt. Return the user to the screen they left, and
 			// let the prompt screen report the handshake rather than assuming the
@@ -198,7 +179,6 @@ export function useOnboardingRecovery({
 			setIsStarting(false);
 		}
 	}, [
-		adoptSession,
 		setActiveSessionId,
 		setStep,
 		setError,

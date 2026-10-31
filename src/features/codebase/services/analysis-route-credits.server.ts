@@ -158,7 +158,8 @@ export async function runCodebaseAnalysisAttempt(
 			),
 		};
 		reservation = await reserveActiveCreditOperation(reserveInput);
-		analysisId = reservation.analysisReference ?? crypto.randomUUID();
+		analysisId =
+			reservation.analysisReference ?? claimedAnalysisId ?? crypto.randomUUID();
 	} catch (err) {
 		console.error("[codebase/analysis] reserveCreditOperation failed:", err);
 		if (claimedAnalysisId) await failRefreshClaim(claimedAnalysisId);

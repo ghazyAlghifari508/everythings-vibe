@@ -124,10 +124,11 @@ export type RetrySessionOutcome =
 
 export async function requestRetrySession(
 	codebaseId: string,
+	acceptance: {
+		acceptAnalysisPolicy: true;
+		creditConsent: { maximumCredits: number; pricingVersion: string };
+	},
 ): Promise<RetrySessionOutcome> {
-	const { confirmPreSyncCredit } = await import("./analysis-credit-requests");
-	const acceptance = await confirmPreSyncCredit();
-	if (!acceptance) return { kind: "cancelled" };
 	const response = await fetch(
 		`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
 		{
@@ -197,38 +198,25 @@ export async function requestOnboardingAnalysis({
 	projectId,
 	snapshotId,
 	refreshStarterSuggestionsForAnalysisId,
-	confirmCredit = false,
+	creditConsent,
 }: {
 	projectId: string;
 	snapshotId: string;
 	refreshStarterSuggestionsForAnalysisId?: string;
-	confirmCredit?: boolean;
+	creditConsent?: { maximumCredits: number; pricingVersion: string };
 }): Promise<AnalysisTriggerOutcome> {
 	const bodyPayload: {
 		snapshotId: string;
 		refreshStarterSuggestionsForAnalysisId?: string;
+		creditConsent?: { maximumCredits: number; pricingVersion: string };
 	} = { snapshotId };
 	if (refreshStarterSuggestionsForAnalysisId) {
 		bodyPayload.refreshStarterSuggestionsForAnalysisId =
 			refreshStarterSuggestionsForAnalysisId;
 	}
-	let confirmedPayload: unknown = bodyPayload;
-	if (refreshStarterSuggestionsForAnalysisId || confirmCredit) {
-		const { confirmPaidAnalysis } = await import("./analysis-credit-requests");
-		const confirmation = await confirmPaidAnalysis(
-			projectId,
-			snapshotId,
-			refreshStarterSuggestionsForAnalysisId,
-		);
-		if (!confirmation) return { kind: "mismatch" };
-		if (confirmation.response) {
-			const ready = analysisResponseSchema.safeParse(confirmation.raw);
-			return ready.success
-				? { kind: "ready", analysis: ready.data }
-				: { kind: "failed", message: "Analisis belum tersedia." };
-		}
-		confirmedPayload = confirmation.body;
-	}
+	const confirmedPayload: unknown = creditConsent
+		? { ...bodyPayload, creditConsent }
+		: bodyPayload;
 	const response = await fetch(
 		`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
 		{
