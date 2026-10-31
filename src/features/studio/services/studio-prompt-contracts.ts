@@ -28,10 +28,31 @@ export const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Exp
 - Keep exactly one bottom tab <nav> containing every destination label in blueprint order; do not duplicate the full tab set in a second <nav>.`;
 
 export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Web Application Experience.
-- Design for desktop browsers at a ${STUDIO_VISUAL_WIDTH.web}px wide viewport while maintaining smooth responsive adaptation to tablet and mobile.
-- Include a full desktop navigation header, balanced multi-column grid, and clean card hierarchy.
-- Indicate the active section in the navigation header.
-- Let the document grow vertically as tall as the content needs instead of forcing a fixed height.`;
+- Design for desktop browsers at a ${STUDIO_VISUAL_WIDTH.web}px wide viewport with clean, fluid responsive adaptation to tablet (768px-1023px) and mobile (<768px).
+- Sizing & Containment (Anti-Clipping Rules):
+  * Use fluid widths (max-width: 100%, w-full); never use fixed pixel widths (e.g. width: 1200px or w-[800px]) that exceed parent cards or viewport.
+  * Flex and grid containers and their children must use min-width: 0 (min-w-0) so text truncation and scrollable children do not blow out parent tracks.
+  * Wide data tables (e.g. transactions, orders, logs) MUST always be wrapped inside a horizontally scrollable container with overflow-x: auto and max-width: 100%:
+    <div class="overflow-x-auto w-full max-w-full" data-table-container="1"><table class="w-full border-collapse text-left ...">...</table></div>
+    Never let wide multi-column tables clip off the right edge of the screen.
+- Layout Architecture & Content Density:
+  * For data entry and management screens (e.g. Transactions, Inventory, Settings), use a balanced two-column desktop layout:
+    - Summary metrics bar on top (3-4 structured KPI cards with label, value, and delta badge).
+    - Side-by-side grid on desktop (grid-cols-1 lg:grid-cols-12 gap-6): Form in 4-5 cols, Table in 7-8 cols.
+    - On tablet and mobile (<1024px), stack naturally in single-column order (Metrics -> Form -> Table).
+  * Avoid both extremes: neither an empty sparse wireframe nor a cramped unreadable wall of tiny inputs.
+- Typography & Visual Hierarchy:
+  * Clear typographic scale: Screen title (24px-28px font-bold), section titles (18px-22px font-semibold), card headers (15px-16px font-semibold), body (14px-16px), metadata (12px-13px font-medium).
+  * Keep one solid, primary action button per main section; secondary actions use subtle borders or ghost variants.
+  * Hairline structural borders (border border-[var(--app-border)]) instead of large dark drop-shadows.
+- Form & Data Polish:
+  * Group related fields with visible <label for="..."> pairs and accessible names.
+  * Format large currency values with digit separators (e.g. Rp 125.500.000) using font-mono and whitespace-nowrap.
+  * Give long Indonesian labels adequate line-height and width so they never overlap controls.
+  * Truncate or wrap long customer names and descriptions gracefully (truncate with title attribute or break-words).
+  * Provide a dedicated empty state box when tables or lists have no records.
+- Shared Shell Integration:
+  * Studio deterministically injects the global header and navigation; generate only screen-specific content inside <main data-studio-content>. Do not emit a second global sidebar or header.`;
 
 export const STUDIO_SYSTEM_PROMPT = `You are an expert front-end builder generating a complete, production-grade single-file HTML page.
 

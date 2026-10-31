@@ -4,6 +4,10 @@ import type {
 	StudioPromptOptions,
 } from "@/features/studio/types/studio-prompts";
 import {
+	getDomainQualityContract,
+	STUDIO_COMPONENT_FIRST_GUIDANCE,
+} from "./studio-component-guidance";
+import {
 	extractStudioPrdSummary,
 	sanitizeStudioPrd,
 } from "./studio-prd-helpers";
@@ -80,6 +84,18 @@ Ensure features, forms, lists, metrics, terminology, and realistic Indonesian co
 		sections.push(WEB_PLATFORM_CONTRACT);
 	}
 
+	// Domain-aware quality contract & component-first guidance
+	const domainContract = getDomainQualityContract(
+		`${opts.projectPrompt} ${opts.screenName} ${opts.screenDescription ?? ""}`,
+	);
+	sections.push(
+		`<DOMAIN_AWARE_QUALITY_CONTRACT>
+${domainContract}
+
+${STUDIO_COMPONENT_FIRST_GUIDANCE}
+</DOMAIN_AWARE_QUALITY_CONTRACT>`,
+	);
+
 	// Design tokens
 	if (opts.designMd && opts.designMd.trim().length > 0) {
 		const cleanDesignMd = sanitizeStudioDesignMd(opts.designMd.trim());
@@ -147,6 +163,16 @@ export function buildStudioUserPrompt(
 	} else {
 		sections.push(WEB_PLATFORM_CONTRACT);
 	}
+
+	// Domain-aware quality contract & component-first guidance
+	const domainContract = getDomainQualityContract(prompt);
+	sections.push(
+		`<DOMAIN_AWARE_QUALITY_CONTRACT>
+${domainContract}
+
+${STUDIO_COMPONENT_FIRST_GUIDANCE}
+</DOMAIN_AWARE_QUALITY_CONTRACT>`,
+	);
 
 	// PRD context
 	if (opts.prdContent && opts.prdContent.trim().length > 0) {
