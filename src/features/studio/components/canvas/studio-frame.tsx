@@ -27,6 +27,7 @@ export {
 export interface StudioFrameProps {
 	frame: StudioFrameRow;
 	initialJobTiming?: { id: string; createdAt: Date };
+	priorityPreview?: boolean;
 	isSelected?: boolean;
 	onSelect?: (frameId: string, additive?: boolean) => void;
 	onRetry?: (frameId: string) => void;
@@ -64,6 +65,7 @@ function frameStatusMessage(status: string, retryError?: string): string {
 export const StudioFrame = memo(function StudioFrame({
 	frame,
 	initialJobTiming,
+	priorityPreview = false,
 	isSelected = false,
 	onSelect,
 	onRetry,
@@ -85,7 +87,7 @@ export const StudioFrame = memo(function StudioFrame({
 		retryVisual,
 		artboardRef,
 		frameHeight,
-	} = useStudioFrameVisual({ frame, isMobile, onMeasure });
+	} = useStudioFrameVisual({ frame, isMobile, onMeasure, priorityPreview });
 
 	const cleanHtml = frame.htmlCode ? extractCleanHtml(frame.htmlCode) : "";
 	// A ready frame whose HTML is missing or empty cannot produce a preview.
@@ -187,6 +189,10 @@ export const StudioFrame = memo(function StudioFrame({
 							onLoad={() => {
 								if (visibleUrl.current === visual.url) return;
 								visibleUrl.current = visual.url;
+								studioJobTiming("preview-image-loaded", Date.now(), {
+									projectId: frame.projectId,
+									frameId: frame.id,
+								});
 								studioJobTiming(
 									"frame-visible",
 									(initialJobTiming?.createdAt ?? frame.createdAt).getTime(),
@@ -238,10 +244,30 @@ export const StudioFrame = memo(function StudioFrame({
 
 				{artboardMode === "last-good" ? (
 					<StudioFrameStatusStrip
-						message={frameStatusMessage(frame.status, retryError)}
-						tone={frame.status === "failed" ? "danger" : "progress"}
-						actionLabel={frame.status === "failed" ? "Coba lagi" : undefined}
-						onAction={frame.status === "failed" ? retry : undefined}
+						message={
+							frame.status === "ready"
+								? visualError
+								: frameStatusMessage(frame.status, retryError)
+						}
+						tone={
+							frame.status === "failed" || frame.status === "ready"
+								? "danger"
+								: "progress"
+						}
+						actionLabel={
+							frame.status === "ready"
+								? "Muat ulang pratinjau"
+								: frame.status === "failed"
+									? "Coba lagi"
+									: undefined
+						}
+						onAction={
+							frame.status === "ready"
+								? retryVisual
+								: frame.status === "failed"
+									? retry
+									: undefined
+						}
 						actionPending={isRetryPending}
 					/>
 				) : null}

@@ -64,6 +64,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 	className = "",
 }: StudioCanvasProps) {
 	const canvasRef = useRef<HTMLElement>(null);
+	const priorityFrameId = frames.find((frame) => frame.htmlCode)?.id;
 	const marqueeRef = useRef<HTMLDivElement>(null);
 	const preferredZoom =
 		STUDIO_CANVAS_INITIAL_ZOOM[
@@ -222,6 +223,7 @@ export const StudioCanvas = memo(function StudioCanvas({
 						<StudioFrame
 							key={frame.id}
 							frame={frame}
+							priorityPreview={frame.id === priorityFrameId}
 							initialJobTiming={
 								activeJob?.jobType === "initial" ? activeJob : undefined
 							}

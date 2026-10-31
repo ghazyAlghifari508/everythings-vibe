@@ -100,6 +100,15 @@ async function intersect(index = intersections.length - 1) {
 }
 
 describe("frame preview requests", () => {
+	it("requests the priority ready frame without waiting for intersection", async () => {
+		fetchMock.mockResolvedValue(Response.json(preview));
+		await act(async () => {
+			render(<StudioFrame frame={frame()} priorityPreview />);
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(screen.getByRole("img", { name: "Desain Sample" })).toBeDefined();
+	});
+
 	it("records image load once without treating preview response as visible pixels", async () => {
 		fetchMock.mockResolvedValue(Response.json(preview));
 		const log = vi.spyOn(console, "info").mockImplementation(() => {});
@@ -155,6 +164,33 @@ describe("frame preview requests", () => {
 			log.mockRestore();
 		}
 	});
+
+	it("records preview request and image load as distinct timestamped events", async () => {
+		fetchMock.mockResolvedValue(Response.json(preview));
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			render(<StudioFrame frame={frame()} priorityPreview />);
+			await act(async () => {});
+			fireEvent.load(screen.getByRole("img", { name: "Desain Sample" }));
+			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			expect(events).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						stage: "preview-request-started",
+						timestamp: expect.any(String),
+						frameId: "frame-a",
+					}),
+					expect.objectContaining({
+						stage: "preview-image-loaded",
+						timestamp: expect.any(String),
+						frameId: "frame-a",
+					}),
+				]),
+			);
+		} finally {
+			log.mockRestore();
+		}
+	});
 	it("loads a newly ready frame lazily without remount and starts only once", async () => {
 		fetchMock.mockResolvedValue(Response.json(preview));
 		const { result, rerender } = mount(
@@ -188,7 +224,6 @@ describe("frame preview requests", () => {
 	});
 
 	it.each([
-		{ htmlCode: "<main>Changed</main>" },
 		{ id: "frame-b" },
 		{ projectId: "project-b" },
 		{ viewport: "web" },
@@ -293,6 +328,21 @@ describe("frame preview requests", () => {
 		expect(result.current.frameHeight).toBe(1200);
 	});
 
+	it("keeps a previous preview available when a replacement capture fails", async () => {
+		fetchMock
+			.mockResolvedValueOnce(Response.json(preview))
+			.mockResolvedValueOnce(Response.json({}, { status: 500 }));
+		const { result, rerender } = mount();
+		await intersect();
+		rerender({
+			value: frame({ htmlCode: "<main>Replacement</main>" }),
+			measure: vi.fn(),
+		});
+		await intersect();
+		expect(result.current.visual).toEqual(preview);
+		expect(result.current.visualError).not.toBe("");
+	});
+
 	it("allows one ready frame to appear while another becomes ready without remount", async () => {
 		fetchMock.mockImplementation(async (url) =>
 			Response.json({
@@ -366,6 +416,23 @@ describe("frame preview requests", () => {
 });
 
 describe("preview recovery", () => {
+	it("keeps the last preview visible with a capture retry after a revision fails", async () => {
+		fetchMock
+			.mockResolvedValueOnce(Response.json(preview))
+			.mockResolvedValueOnce(Response.json({}, { status: 500 }));
+		const first = frame();
+		const { rerender } = render(<StudioFrame frame={first} />);
+		await intersect();
+		rerender(
+			<StudioFrame frame={{ ...first, htmlCode: "<main>Updated</main>" }} />,
+		);
+		await intersect();
+		expect(screen.getByRole("img", { name: "Desain Sample" })).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: "Muat ulang pratinjau" }),
+		).toBeDefined();
+	});
+
 	it("shows image decode failure and replaces the broken image after recapture", async () => {
 		fetchMock
 			.mockResolvedValueOnce(Response.json(preview))
@@ -376,7 +443,9 @@ describe("preview recovery", () => {
 		await intersect();
 		fireEvent.error(screen.getByRole("img", { name: "Desain Sample" }));
 		expect(screen.getByRole("alert").textContent).not.toBe("");
-		fireEvent.click(screen.getByRole("button", { name: "Coba lagi visual" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Muat ulang pratinjau" }),
+		);
 		expect(screen.queryByRole("img", { name: "Desain Sample" })).toBeNull();
 		await intersect();
 		expect(
@@ -394,7 +463,7 @@ describe("preview recovery", () => {
 		render(<StudioFrame frame={value} onRetry={onRetry} />);
 		await intersect();
 		expect(
-			screen.getByRole("button", { name: "Coba lagi visual" }),
+			screen.getByRole("button", { name: "Muat ulang pratinjau" }),
 		).toBeDefined();
 		expect(onRetry).not.toHaveBeenCalled();
 		expect(value.status).toBe("ready");

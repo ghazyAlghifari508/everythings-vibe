@@ -54,6 +54,8 @@ export function resolveFrameArtboardMode(input: {
 		return "last-good";
 	if (input.status === "ready" && !input.hasRenderableHtml)
 		return "preview-unavailable";
+	if (input.status === "ready" && input.hasVisual && input.hasVisualError)
+		return "last-good";
 	if (isFrameVisualPending(input.status, input.hasVisual, input.hasVisualError))
 		return "shimmer";
 	if (input.hasVisualError) return "visual-error";

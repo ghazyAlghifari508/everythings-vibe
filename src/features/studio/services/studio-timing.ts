@@ -39,6 +39,7 @@ export function studioJobTiming(
 		JSON.stringify({
 			scope: "studio",
 			stage,
+			timestamp: new Date().toISOString(),
 			durationMs: Date.now() - startedAt,
 			...context,
 		}),

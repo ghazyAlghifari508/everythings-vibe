@@ -16,6 +16,7 @@ import { studioJobTiming } from "../services/studio-timing";
 interface UseStudioFrameVisualInput {
 	frame: StudioFrameRow;
 	isMobile: boolean;
+	priorityPreview?: boolean;
 	onMeasure?: (id: string, width: number, height: number) => void;
 }
 
@@ -40,6 +41,7 @@ export interface StudioFrameVisualState {
 export function useStudioFrameVisual({
 	frame,
 	isMobile,
+	priorityPreview = false,
 	onMeasure,
 }: UseStudioFrameVisualInput): StudioFrameVisualState {
 	const input = useMemo(
@@ -59,9 +61,19 @@ export function useStudioFrameVisual({
 		visual: StudioFrameVisual | null;
 		error: string;
 	} | null>(null);
+	const [lastGood, setLastGood] = useState<{
+		input: typeof input;
+		visual: StudioFrameVisual;
+	} | null>(null);
 	const current =
 		result?.input === input && result.attempt === visualAttempt ? result : null;
-	const visual = current?.visual ?? null;
+	const previous =
+		lastGood?.input.id === input.id &&
+		lastGood.input.projectId === input.projectId &&
+		lastGood.input.viewport === input.viewport
+			? lastGood.visual
+			: null;
+	const visual = current?.visual ?? previous;
 	const visualError = current?.error ?? "";
 	const measure = useEffectEvent((width: number, height: number) =>
 		onMeasure?.(input.id, width, height),
@@ -90,6 +102,11 @@ export function useStudioFrameVisual({
 			if (started || controller.signal.aborted) return;
 			started = true;
 			const startedAt = Date.now();
+			studioJobTiming("preview-request-started", startedAt, {
+				projectId: input.projectId,
+				frameId: input.id,
+				attempt: visualAttempt,
+			});
 			deadline = setTimeout(() => {
 				fail("Pratinjau belum dapat dimuat. Silakan coba lagi.");
 				controller.abort();
@@ -116,6 +133,7 @@ export function useStudioFrameVisual({
 					visual: parsed.data,
 					error: "",
 				});
+				setLastGood({ input, visual: parsed.data });
 				studioJobTiming("preview-available", startedAt, {
 					projectId: input.projectId,
 					frameId: input.id,
@@ -142,6 +160,7 @@ export function useStudioFrameVisual({
 						},
 						{ rootMargin: "600px" },
 					);
+		if (priorityPreview) void load();
 		if (observer) observer.observe(artboardRef.current);
 		else void load();
 		return () => {
@@ -149,13 +168,15 @@ export function useStudioFrameVisual({
 			clearTimeout(deadline);
 			observer?.disconnect();
 		};
-	}, [input, visualAttempt]);
+	}, [input, visualAttempt, priorityPreview]);
 
 	return {
 		visual,
 		visualError,
-		setVisualError: (error) =>
-			setResult({ input, attempt: visualAttempt, visual, error }),
+		setVisualError: (error) => {
+			setLastGood(null);
+			setResult({ input, attempt: visualAttempt, visual: null, error });
+		},
 		retryVisual: () => setVisualAttempt((attempt) => attempt + 1),
 		artboardRef,
 		frameHeight,
