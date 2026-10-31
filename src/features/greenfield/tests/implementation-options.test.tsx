@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AI_AGENT_PROMPT_TEMPLATE } from "@/features/greenfield/components/task/ai-agent-prompt-template";
 import { shouldConfirmReset } from "@/features/greenfield/components/task/implementation-options";
+import { AI_AGENT_PROMPT_TEMPLATE } from "@/features/greenfield/services/ai-agent-prompt-template";
 import { EXPORT_FILENAME_PREFIX } from "@/features/greenfield/types/greenfield-constants";
 
 describe("EXPORT_FILENAME_PREFIX", () => {

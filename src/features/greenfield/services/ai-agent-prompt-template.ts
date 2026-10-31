@@ -24,6 +24,17 @@ npm install -g @ghazynabiel/everythings-vibe
 everythings-vibe login --api-key {apiKey} --api-url http://localhost:3000
 \`\`\`
 
+> Key di atas adalah kredensial handoff sementara — scope-nya hanya
+> \`read:project\`, \`write:task:status\`, \`write:subtask:status\`, dan ia
+> **kedaluwarsa otomatis pada {keyExpiresAt}**. Jangan menyalinnya ke file
+> proyek, log, commit, atau ringkasan hasil kerja.
+>
+> Bila perintah CLI menjawab \`401\` padahal header Authorization sudah benar,
+> itu tanda key sudah kedaluwarsa atau dicabut. **Jangan** membuat key sendiri,
+> memakai key project lain, atau mengirim ulang header yang sama: minta user
+> membuka kembali opsi **Prompt AI Agent** di halaman Task untuk handoff key
+> baru, lalu ulangi perintah terakhir.
+
 ## Perintah CLI
 
 ### Baca PRD (Product Requirements Document):
