@@ -102,7 +102,12 @@ export async function resolveGenerationScope(input: {
 		.limit(1);
 	const effective = resolveSubscriptionState(sub, new Date());
 
-	if (!hasFullWorkflow(effective.effectivePlan)) {
+	const { getUserBillingEntitlement } = await import(
+		"@/features/billing/services/billing-entitlement"
+	);
+	const entitlement = await getUserBillingEntitlement(userId);
+
+	if (!entitlement.billingExempt && !hasFullWorkflow(effective.effectivePlan)) {
 		return refuse(
 			Response.json(
 				{

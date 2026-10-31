@@ -78,32 +78,39 @@ export async function reserveGenerationCredit(
 		logLabel,
 	} = input;
 
-	if (input.effective.state === "paused") {
-		return {
-			ok: false,
-			response: Response.json(
-				formatSubscriptionPausedError({
-					quote,
-					availableCredits: credits,
-					stageLabel,
-				}),
-				{ status: 403 },
-			),
-		};
-	}
+	const { getUserBillingEntitlement } = await import(
+		"@/features/billing/services/billing-entitlement"
+	);
+	const entitlement = await getUserBillingEntitlement(userId);
 
-	if (credits < quote.maximumCredits) {
-		return {
-			ok: false,
-			response: Response.json(
-				formatInsufficientCreditsError({
-					quote,
-					availableCredits: credits,
-					stageLabel,
-				}),
-				{ status: 403 },
-			),
-		};
+	if (!entitlement.billingExempt) {
+		if (input.effective.state === "paused") {
+			return {
+				ok: false,
+				response: Response.json(
+					formatSubscriptionPausedError({
+						quote,
+						availableCredits: credits,
+						stageLabel,
+					}),
+					{ status: 403 },
+				),
+			};
+		}
+
+		if (credits < quote.maximumCredits) {
+			return {
+				ok: false,
+				response: Response.json(
+					formatInsufficientCreditsError({
+						quote,
+						availableCredits: credits,
+						stageLabel,
+					}),
+					{ status: 403 },
+				),
+			};
+		}
 	}
 
 	const idempotencyKey =

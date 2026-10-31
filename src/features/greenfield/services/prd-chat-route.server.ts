@@ -186,7 +186,15 @@ export async function handlePrdChatRequest(
 				(sub?.creditsReserved ?? 0),
 		);
 
-		if (isPaused || availableCredits < creditQuote.maximumCredits) {
+		const { getUserBillingEntitlement } = await import(
+			"@/features/billing/services/billing-entitlement"
+		);
+		const entitlement = await getUserBillingEntitlement(user.id);
+
+		if (
+			!entitlement.billingExempt &&
+			(isPaused || availableCredits < creditQuote.maximumCredits)
+		) {
 			if (ids.createdProjectId) {
 				await rollbackStreamInserts(
 					user.id,
