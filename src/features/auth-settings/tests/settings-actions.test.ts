@@ -5,6 +5,7 @@ import {
 	creditLedgerEntries,
 	creditOperations,
 	notificationPreferences,
+	payments,
 	users,
 } from "@/db/schema";
 
@@ -16,6 +17,7 @@ const state = vi.hoisted(() => ({
 	conflicts: [] as { target: unknown; set: Record<string, unknown> }[],
 	transactions: 0,
 	failDelete: false,
+	hasPayments: false,
 	signOut: vi.fn(async () => {}),
 }));
 
@@ -70,8 +72,18 @@ vi.mock("@/db", () => ({
 					},
 				}),
 				select: () => ({
-					from: () => ({
-						where: async () => [{ id: "owned-child" }],
+					from: (table: unknown) => ({
+						where: () => {
+							const rows =
+								table === payments
+									? state.hasPayments
+										? [{ id: "payment" }]
+										: []
+									: [{ id: "owned-child" }];
+							return Object.assign(Promise.resolve(rows), {
+								limit: async () => rows,
+							});
+						},
 					}),
 				}),
 			});
@@ -103,6 +115,7 @@ beforeEach(() => {
 	state.conflicts = [];
 	state.transactions = 0;
 	state.failDelete = false;
+	state.hasPayments = false;
 	state.signOut.mockClear();
 	vi.stubGlobal("window", { location: { assign: vi.fn() } });
 });
@@ -162,6 +175,15 @@ describe("account deletion transaction", () => {
 	it("rejects missing confirmation before opening a transaction", async () => {
 		await expect(deleteAccount(form({ confirm: "" }))).rejects.toThrow();
 		expect(state.transactions).toBe(0);
+		expect(state.signOut).not.toHaveBeenCalled();
+	});
+
+	it("refuses account deletion when payment history exists", async () => {
+		state.hasPayments = true;
+		await expect(deleteAccount(form({ confirm: "HAPUS" }))).rejects.toThrow(
+			/pembayaran/i,
+		);
+		expect(state.deletes).toEqual([]);
 		expect(state.signOut).not.toHaveBeenCalled();
 	});
 

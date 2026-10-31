@@ -76,6 +76,15 @@ const _deleteAccount = createServerFn({ method: "POST" })
 		// their parents), user row last. Tables with ON DELETE CASCADE
 		// (sessions, accounts, codebase rows) follow automatically.
 		await db.transaction(async (tx) => {
+			const [payment] = await tx
+				.select({ id: payments.id })
+				.from(payments)
+				.where(eq(payments.userId, user.id))
+				.limit(1);
+			if (payment)
+				throw new Error(
+					"Akun memiliki riwayat pembayaran. Hubungi support untuk penghapusan akun.",
+				);
 			await tx
 				.delete(notificationPreferences)
 				.where(eq(notificationPreferences.userId, user.id));
@@ -127,7 +136,6 @@ const _deleteAccount = createServerFn({ method: "POST" })
 			}
 			await tx.delete(conversations).where(eq(conversations.userId, user.id));
 			await tx.delete(projects).where(eq(projects.userId, user.id));
-			await tx.delete(payments).where(eq(payments.userId, user.id));
 			await tx.delete(subscriptions).where(eq(subscriptions.userId, user.id));
 			await tx.delete(quotas).where(eq(quotas.userId, user.id));
 			await tx.delete(users).where(eq(users.id, user.id));
