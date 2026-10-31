@@ -397,7 +397,11 @@ describe("useCodebaseSyncStatus", () => {
 		const fetchMock = vi.fn(async (_input: unknown) => ({
 			ok: true,
 			status: 200,
-			json: async () => statusResponse({ status: "uploaded" }),
+			json: async () =>
+				statusResponse({
+					status: "uploaded",
+					sessionId: "sess_seed_hook",
+				}),
 		}));
 		vi.stubGlobal("fetch", fetchMock);
 		const probe = renderProbe({
