@@ -3,7 +3,7 @@
 import {
 	Add01Icon,
 	Copy01Icon,
-	Delete02Icon,
+	Eraser01Icon,
 	Key01Icon,
 	Tick01Icon,
 	ViewIcon,
@@ -21,66 +21,38 @@ import {
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
 import { useUIStore } from "@/store";
+import {
+	type ApiKeyRecord,
+	apiKeyCleanupSchema,
+} from "../../types/api-key-contracts";
+import { ApiKeyCreateDialog } from "./api-key-create-dialog";
+import { ApiKeysTable } from "./api-keys-table";
 import { SettingsContentPanel } from "./settings-content-panel";
-
-interface ApiKeyRecord {
-	id: string;
-	name: string;
-	key_prefix: string;
-	scopes: string[];
-	last_used_at: string | null;
-	created_at: string;
-	expires_at: string | null;
-}
 
 interface ApiKeysClientProps {
 	keys: ApiKeyRecord[];
 }
 
+/** A credential the lifecycle controls can still act on: already expired, or an
+ * automatic handoff key that outlived the expiry policy. */
+export function isObsoleteKey(key: ApiKeyRecord): boolean {
+	return (
+		key.state === "expired" ||
+		(key.source === "automatic" && key.state === "no-expiry")
+	);
+}
+
 export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 	const showToast = useUIStore((s) => s.showToast);
 	const [showCreate, setShowCreate] = useState(false);
-	const [newKeyName, setNewKeyName] = useState("");
-	const [newKeyScopes, setNewKeyScopes] = useState<string[]>([
-		"read:project",
-		"write:task:status",
-		"write:subtask:status",
-	]);
 	const [createdKey, setCreatedKey] = useState<string | null>(null);
-	const [showCreatedKey, setShowCreatedKey] = useState(false);
-	const [isCreating, setIsCreating] = useState(false);
+	const [revealCreatedKey, setRevealCreatedKey] = useState(true);
 	const [revokeId, setRevokeId] = useState<string | null>(null);
 	const [copied, setCopied] = useState(false);
+	const [showCleanup, setShowCleanup] = useState(false);
+	const [isCleaning, setIsCleaning] = useState(false);
 
-	const SCOPE_OPTIONS = [
-		{ value: "read:project", label: "Read project data" },
-		{ value: "write:task:status", label: "Update task status" },
-		{ value: "write:subtask:status", label: "Update subtask status" },
-	];
-
-	const handleCreate = async () => {
-		if (!newKeyName.trim()) return;
-		setIsCreating(true);
-		try {
-			const res = await fetch("/api/settings/api-keys", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ name: newKeyName, scopes: newKeyScopes }),
-			});
-			const data = await res.json();
-			if (!res.ok) throw new Error(data.error);
-			setCreatedKey(data.rawKey);
-			setShowCreatedKey(true);
-			showToast("API key berhasil dibuat", "success");
-		} catch (err) {
-			showToast(
-				err instanceof Error ? err.message : "Gagal membuat API key",
-				"error",
-			);
-		} finally {
-			setIsCreating(false);
-		}
-	};
+	const obsoleteCount = keys.filter(isObsoleteKey).length;
 
 	const handleRevoke = async (id: string) => {
 		try {
@@ -99,6 +71,30 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 		}
 	};
 
+	const handleCleanup = async () => {
+		setIsCleaning(true);
+		try {
+			const res = await fetch("/api/settings/api-keys/cleanup", {
+				method: "POST",
+			});
+			if (!res.ok) throw new Error("Gagal membersihkan API key");
+			const cleanup = apiKeyCleanupSchema.parse(await res.json());
+			showToast(
+				`${cleanup.revoked} key usang diberi batas waktu, ${cleanup.deleted} key kedaluwarsa dihapus.`,
+				"success",
+			);
+			setShowCleanup(false);
+			window.location.reload();
+		} catch (err) {
+			showToast(
+				err instanceof Error ? err.message : "Gagal membersihkan API key",
+				"error",
+			);
+		} finally {
+			setIsCleaning(false);
+		}
+	};
+
 	const handleCopy = async () => {
 		if (!createdKey) return;
 		try {
@@ -111,30 +107,31 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 		}
 	};
 
-	const formatDate = (d: string | null) =>
-		d ? new Date(d).toLocaleDateString("id-ID") : "-";
-	const formatTime = (d: string | null) =>
-		d
-			? new Date(d).toLocaleTimeString("id-ID", {
-					hour: "2-digit",
-					minute: "2-digit",
-				})
-			: "Never";
-
 	return (
 		<SettingsContentPanel
 			title="API Keys"
 			description="Kelola API key untuk MCP server dan CLI tool."
 			actions={
-				<Button onClick={() => setShowCreate(true)} className="gap-1.5">
-					<Icon icon={Add01Icon} size={14} />
-					Buat API Key Baru
-				</Button>
+				<>
+					{obsoleteCount > 0 && (
+						<Button
+							variant="outline"
+							onClick={() => setShowCleanup(true)}
+							className="gap-1.5"
+						>
+							<Icon icon={Eraser01Icon} size={14} />
+							Bersihkan {obsoleteCount} key usang
+						</Button>
+					)}
+					<Button onClick={() => setShowCreate(true)} className="gap-1.5">
+						<Icon icon={Add01Icon} size={14} />
+						Buat API Key Baru
+					</Button>
+				</>
 			}
 		>
 			<div className="space-y-6">
-				{/* Key created - show raw key ONCE */}
-				{showCreatedKey && createdKey && (
+				{createdKey && (
 					<div className="rounded-lg border border-emerald/30 bg-emerald/10 p-4">
 						<div className="flex items-center gap-2 text-sm font-[510] text-emerald mb-2">
 							<Icon icon={Tick01Icon} size={16} />
@@ -145,15 +142,18 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 						</p>
 						<div className="flex items-center gap-2">
 							<code className="flex-1 rounded bg-onyx px-3 py-2 font-mono text-xs text-snow break-all">
-								{showCreatedKey ? createdKey : "••••••••••••••••"}
+								{revealCreatedKey ? createdKey : "••••••••••••••••"}
 							</code>
 							<Button
 								variant="ghost"
 								size="sm"
-								onClick={() => setShowCreatedKey(!showCreatedKey)}
+								aria-label={
+									revealCreatedKey ? "Sembunyikan API key" : "Tampilkan API key"
+								}
+								onClick={() => setRevealCreatedKey(!revealCreatedKey)}
 								className="shrink-0"
 							>
-								{showCreatedKey ? (
+								{revealCreatedKey ? (
 									<Icon icon={ViewOffSlashIcon} size={14} />
 								) : (
 									<Icon icon={ViewIcon} size={14} />
@@ -162,6 +162,7 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 							<Button
 								variant="ghost"
 								size="sm"
+								aria-label="Salin API key"
 								onClick={handleCopy}
 								className="shrink-0"
 							>
@@ -175,7 +176,6 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 					</div>
 				)}
 
-				{/* Keys Table / Empty State */}
 				{keys.length === 0 ? (
 					<div className="rounded-lg border border-(--border-subtle) bg-(--bg-surface) p-8 sm:p-12 text-center">
 						<div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-(--bg-card) border border-(--border-subtle) text-fog mb-3">
@@ -197,66 +197,7 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 						</Button>
 					</div>
 				) : (
-					<div className="overflow-x-auto rounded-lg border border-(--border-subtle)">
-						<table className="w-full text-sm">
-							<thead>
-								<tr className="border-b border-(--border-subtle) bg-(--bg-surface) text-left text-xs text-fog">
-									<th className="px-4 py-3 font-medium">Nama</th>
-									<th className="px-4 py-3 font-medium">Prefix</th>
-									<th className="px-4 py-3 font-medium">Scopes</th>
-									<th className="px-4 py-3 font-medium">Last Used</th>
-									<th className="px-4 py-3 font-medium">Created</th>
-									<th className="px-4 py-3 text-right font-medium">Aksi</th>
-								</tr>
-							</thead>
-							<tbody className="divide-y divide-(--border-subtle)">
-								{keys.map((key) => (
-									<tr
-										key={key.id}
-										className="hover:bg-(--bg-surface)/50 transition-colors"
-									>
-										<td className="px-4 py-3 font-[510] text-snow">
-											{key.name}
-										</td>
-										<td className="px-4 py-3 font-mono text-xs text-fog">
-											{key.key_prefix}...
-										</td>
-										<td className="px-4 py-3">
-											<div className="flex flex-wrap gap-1">
-												{(key.scopes || []).map((s) => (
-													<span
-														key={s}
-														className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-fog"
-													>
-														{s}
-													</span>
-												))}
-											</div>
-										</td>
-										<td className="px-4 py-3 text-xs text-fog">
-											{key.last_used_at
-												? formatTime(key.last_used_at)
-												: "Never"}
-										</td>
-										<td className="px-4 py-3 text-xs text-fog">
-											{formatDate(key.created_at)}
-										</td>
-										<td className="px-4 py-3 text-right">
-											<Button
-												variant="ghost"
-												size="sm"
-												aria-label={`Hapus key ${key.name}`}
-												onClick={() => setRevokeId(key.id)}
-												className="text-crimson hover:bg-crimson/10"
-											>
-												<Icon icon={Delete02Icon} size={14} />
-											</Button>
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
+					<ApiKeysTable keys={keys} onRevoke={setRevokeId} />
 				)}
 
 				<p className="text-[11px] text-fog/60">
@@ -265,76 +206,41 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 				</p>
 			</div>
 
-			{/* Create Modal */}
-			<Dialog open={showCreate} onOpenChange={setShowCreate}>
+			<ApiKeyCreateDialog
+				open={showCreate}
+				onOpenChange={setShowCreate}
+				onCreated={(rawKey) => {
+					setCreatedKey(rawKey);
+					setRevealCreatedKey(true);
+				}}
+			/>
+
+			<Dialog open={showCleanup} onOpenChange={setShowCleanup}>
 				<DialogContent className="max-w-md">
 					<DialogHeader>
-						<DialogTitle>Buat API Key Baru</DialogTitle>
+						<DialogTitle>Bersihkan akses usang?</DialogTitle>
 						<DialogDescription>
-							Buat key untuk menghubungkan MCP server atau CLI.
+							Key otomatis warisan tanpa batas waktu diberi batas waktu (grace)
+							supaya agen yang sedang berjalan tidak langsung terputus, dan key
+							yang sudah kedaluwarsa dihapus dari daftar. Key manual yang masih
+							berlaku tidak disentuh.
 						</DialogDescription>
 					</DialogHeader>
-					<div className="space-y-4">
-						<div>
-							<label
-								htmlFor="api-key-name"
-								className="text-xs font-[510] text-snow mb-1 block"
-							>
-								Nama
-							</label>
-							<input
-								id="api-key-name"
-								value={newKeyName}
-								onChange={(e) => setNewKeyName(e.target.value)}
-								placeholder="Claude Code, Cursor, dll"
-								className="w-full rounded-md border border-graphite bg-onyx px-3 py-2 text-sm text-snow focus:border-indigo focus:outline-none"
-							/>
-						</div>
-						<fieldset>
-							<legend className="text-xs font-[510] text-snow mb-1 block">
-								Scope
-							</legend>
-							<div className="space-y-2">
-								{SCOPE_OPTIONS.map((opt) => (
-									<label
-										key={opt.value}
-										className="flex items-center gap-2 text-sm text-fog cursor-pointer"
-									>
-										<input
-											type="checkbox"
-											checked={newKeyScopes.includes(opt.value)}
-											onChange={(e) => {
-												if (e.target.checked)
-													setNewKeyScopes((prev) => [...prev, opt.value]);
-												else
-													setNewKeyScopes((prev) =>
-														prev.filter((s) => s !== opt.value),
-													);
-											}}
-											className="rounded border-graphite"
-										/>
-										{opt.label}
-									</label>
-								))}
-							</div>
-						</fieldset>
-					</div>
 					<DialogFooter>
-						<Button variant="ghost" onClick={() => setShowCreate(false)}>
+						<Button
+							variant="ghost"
+							onClick={() => setShowCleanup(false)}
+							disabled={isCleaning}
+						>
 							Batal
 						</Button>
-						<Button
-							onClick={handleCreate}
-							disabled={!newKeyName.trim() || isCreating}
-							isLoading={isCreating}
-						>
-							Buat Key
+						<Button onClick={() => void handleCleanup()} disabled={isCleaning}>
+							{isCleaning ? "Membersihkan..." : "Bersihkan"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 
-			{/* Revoke Confirmation */}
 			<Dialog open={!!revokeId} onOpenChange={() => setRevokeId(null)}>
 				<DialogContent className="max-w-sm">
 					<DialogHeader>

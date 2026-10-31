@@ -108,6 +108,8 @@ describe("settings loaders", () => {
 					last_used_at: "2026-01-01T00:00:00.000Z",
 					created_at: "2026-01-02T00:00:00.000Z",
 					expires_at: null,
+					source: "manual",
+					state: "no-expiry",
 				},
 			],
 		});
@@ -119,6 +121,40 @@ describe("settings loaders", () => {
 			"lastUsedAt",
 			"createdAt",
 			"expiresAt",
+		]);
+	});
+
+	// The expiry label must be decided by the server clock that also gates
+	// bearer authentication, and it must separate an automatic handoff key from
+	// a hand-written one so cleanup can never claim a manual credential.
+	it("labels source and expiry state per credential from the server clock", async () => {
+		state.rows = [
+			{
+				id: "key-live",
+				name: "auto-cli-1",
+				keyPrefix: "vibe_live",
+				scopes: ["read:project"],
+				lastUsedAt: null,
+				createdAt: new Date("2020-01-01T00:00:00.000Z"),
+				expiresAt: new Date("2999-01-01T00:00:00.000Z"),
+			},
+			{
+				id: "key-dead",
+				name: "auto-cli-2",
+				keyPrefix: "vibe_dead",
+				scopes: ["read:project"],
+				lastUsedAt: null,
+				createdAt: new Date("2020-01-01T00:00:00.000Z"),
+				expiresAt: new Date("2000-01-01T00:00:00.000Z"),
+			},
+		];
+		const { keys } = await loadApiKeys();
+
+		expect(
+			keys.map((key) => [key.id, key.source, key.state, key.expires_at]),
+		).toEqual([
+			["key-live", "automatic", "active", "2999-01-01T00:00:00.000Z"],
+			["key-dead", "automatic", "expired", "2000-01-01T00:00:00.000Z"],
 		]);
 	});
 });

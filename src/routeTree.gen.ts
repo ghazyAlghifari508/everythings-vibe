@@ -99,6 +99,7 @@ import { Route as ApiProjectsIdVersionsRouteImport } from './routes/api/projects
 import { Route as ApiSettingsApiKeysIndexRouteImport } from './routes/api/settings/api-keys/index'
 import { Route as ApiSettingsApiKeysIdRouteImport } from './routes/api/settings/api-keys/$id'
 import { Route as ApiSettingsApiKeysAutoRouteImport } from './routes/api/settings/api-keys/auto'
+import { Route as ApiSettingsApiKeysCleanupRouteImport } from './routes/api/settings/api-keys/cleanup'
 import { Route as ApiV1ProjectsIdRouteImport } from './routes/api/v1/projects/$id'
 import { Route as CodebasesKanbanCodebaseIdProjectIdRouteImport } from './routes/codebases/kanban/$codebaseId/$projectId'
 import { Route as ApiV1ProjectsIdAcRouteImport } from './routes/api/v1/projects/$id/ac'
@@ -572,6 +573,12 @@ const ApiSettingsApiKeysAutoRoute = ApiSettingsApiKeysAutoRouteImport.update({
   path: '/api/settings/api-keys/auto',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSettingsApiKeysCleanupRoute =
+  ApiSettingsApiKeysCleanupRouteImport.update({
+    id: '/api/settings/api-keys/cleanup',
+    path: '/api/settings/api-keys/cleanup',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiV1ProjectsIdRoute = ApiV1ProjectsIdRouteImport.update({
   id: '/api/v1/projects/$id',
   path: '/api/v1/projects/$id',
@@ -764,6 +771,7 @@ export interface FileRoutesByFullPath {
   '/api/projects/$id/versions': typeof ApiProjectsIdVersionsRoute
   '/api/settings/api-keys/$id': typeof ApiSettingsApiKeysIdRoute
   '/api/settings/api-keys/auto': typeof ApiSettingsApiKeysAutoRoute
+  '/api/settings/api-keys/cleanup': typeof ApiSettingsApiKeysCleanupRoute
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
   '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys/': typeof ApiSettingsApiKeysIndexRoute
@@ -869,6 +877,7 @@ export interface FileRoutesByTo {
   '/api/projects/$id/versions': typeof ApiProjectsIdVersionsRoute
   '/api/settings/api-keys/$id': typeof ApiSettingsApiKeysIdRoute
   '/api/settings/api-keys/auto': typeof ApiSettingsApiKeysAutoRoute
+  '/api/settings/api-keys/cleanup': typeof ApiSettingsApiKeysCleanupRoute
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
   '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys': typeof ApiSettingsApiKeysIndexRoute
@@ -980,6 +989,7 @@ export interface FileRoutesById {
   '/api/projects/$id/versions': typeof ApiProjectsIdVersionsRoute
   '/api/settings/api-keys/$id': typeof ApiSettingsApiKeysIdRoute
   '/api/settings/api-keys/auto': typeof ApiSettingsApiKeysAutoRoute
+  '/api/settings/api-keys/cleanup': typeof ApiSettingsApiKeysCleanupRoute
   '/api/v1/projects/$id': typeof ApiV1ProjectsIdRouteWithChildren
   '/codebases/kanban/$codebaseId/$projectId': typeof CodebasesKanbanCodebaseIdProjectIdRoute
   '/api/settings/api-keys/': typeof ApiSettingsApiKeysIndexRoute
@@ -1092,6 +1102,7 @@ export interface FileRouteTypes {
     | '/api/projects/$id/versions'
     | '/api/settings/api-keys/$id'
     | '/api/settings/api-keys/auto'
+    | '/api/settings/api-keys/cleanup'
     | '/api/v1/projects/$id'
     | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys/'
@@ -1197,6 +1208,7 @@ export interface FileRouteTypes {
     | '/api/projects/$id/versions'
     | '/api/settings/api-keys/$id'
     | '/api/settings/api-keys/auto'
+    | '/api/settings/api-keys/cleanup'
     | '/api/v1/projects/$id'
     | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys'
@@ -1307,6 +1319,7 @@ export interface FileRouteTypes {
     | '/api/projects/$id/versions'
     | '/api/settings/api-keys/$id'
     | '/api/settings/api-keys/auto'
+    | '/api/settings/api-keys/cleanup'
     | '/api/v1/projects/$id'
     | '/codebases/kanban/$codebaseId/$projectId'
     | '/api/settings/api-keys/'
@@ -1388,6 +1401,7 @@ export interface RootRouteChildren {
   ApiProjectsIndexRoute: typeof ApiProjectsIndexRoute
   ApiSettingsApiKeysIdRoute: typeof ApiSettingsApiKeysIdRoute
   ApiSettingsApiKeysAutoRoute: typeof ApiSettingsApiKeysAutoRoute
+  ApiSettingsApiKeysCleanupRoute: typeof ApiSettingsApiKeysCleanupRoute
   ApiV1ProjectsIdRoute: typeof ApiV1ProjectsIdRouteWithChildren
   ApiSettingsApiKeysIndexRoute: typeof ApiSettingsApiKeysIndexRoute
   ApiV1SubtasksIdStatusRoute: typeof ApiV1SubtasksIdStatusRoute
@@ -2031,6 +2045,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSettingsApiKeysAutoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/settings/api-keys/cleanup': {
+      id: '/api/settings/api-keys/cleanup'
+      path: '/api/settings/api-keys/cleanup'
+      fullPath: '/api/settings/api-keys/cleanup'
+      preLoaderRoute: typeof ApiSettingsApiKeysCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/projects/$id': {
       id: '/api/v1/projects/$id'
       path: '/api/v1/projects/$id'
@@ -2390,6 +2411,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProjectsIndexRoute: ApiProjectsIndexRoute,
   ApiSettingsApiKeysIdRoute: ApiSettingsApiKeysIdRoute,
   ApiSettingsApiKeysAutoRoute: ApiSettingsApiKeysAutoRoute,
+  ApiSettingsApiKeysCleanupRoute: ApiSettingsApiKeysCleanupRoute,
   ApiV1ProjectsIdRoute: ApiV1ProjectsIdRouteWithChildren,
   ApiSettingsApiKeysIndexRoute: ApiSettingsApiKeysIndexRoute,
   ApiV1SubtasksIdStatusRoute: ApiV1SubtasksIdStatusRoute,
