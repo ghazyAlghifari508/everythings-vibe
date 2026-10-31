@@ -35,6 +35,8 @@ export interface StreamOutcome {
 	finishReason?: string;
 	inputTokens?: number;
 	outputTokens?: number;
+	textTokens?: number;
+	reasoningTokens?: number;
 	providerRetries?: number;
 	providerFallbacks?: number;
 }
@@ -185,6 +187,9 @@ export async function* streamChat(
 				if (outcome) {
 					outcome.inputTokens = part.totalUsage.inputTokens;
 					outcome.outputTokens = part.totalUsage.outputTokens;
+					outcome.textTokens = part.totalUsage.outputTokenDetails?.textTokens;
+					outcome.reasoningTokens =
+						part.totalUsage.outputTokenDetails?.reasoningTokens;
 				}
 				// Capture the provider's terminal reason while consuming so
 				// an early consumer exit still leaves an observable outcome.

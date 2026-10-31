@@ -192,7 +192,17 @@ export async function generateStudioHtml(
 		for await (const chunk of generator) raw += chunk;
 		completed = true;
 	} finally {
-		if (timing)
+		if (timing) {
+			const isTruncatedFinish =
+				outcome?.finishReason === "length" ||
+				outcome?.finishReason === "max_tokens" ||
+				outcome?.finishReason === "max_output_tokens";
+			const tokenLimitExceeded = isTruncatedFinish
+				? true
+				: outcome?.textTokens !== undefined
+					? outcome.textTokens > maxTokens
+					: outcome?.outputTokens !== undefined &&
+						outcome.outputTokens > maxTokens;
 			studioJobTiming("frame-output", outputStartedAt, {
 				...timing,
 				outputChars: raw.length,
@@ -200,11 +210,10 @@ export async function generateStudioHtml(
 				// The applied ceiling travels with the usage so a gateway that
 				// ignores or reinterprets maxOutputTokens is visible in the log.
 				maxTokens,
-				tokenLimitExceeded:
-					outcome?.outputTokens !== undefined &&
-					outcome.outputTokens > maxTokens,
+				tokenLimitExceeded,
 				code: classifyStudioStreamCompletion(outcome?.finishReason, completed),
 			});
+		}
 	}
 	signal?.throwIfAborted();
 	const cleaned = extractCleanHtml(raw);

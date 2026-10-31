@@ -27,6 +27,8 @@ export function studioJobTiming(
 		outputChars?: number;
 		inputTokens?: number;
 		outputTokens?: number;
+		textTokens?: number;
+		reasoningTokens?: number;
 		maxTokens?: number;
 		tokenLimitExceeded?: boolean;
 		providerRetries?: number;

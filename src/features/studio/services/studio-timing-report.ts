@@ -12,6 +12,8 @@ const eventSchema = z.object({
 	skillId: z.string().optional(),
 	skillChars: z.number().nonnegative().optional(),
 	outputTokens: z.number().nonnegative().optional(),
+	textTokens: z.number().nonnegative().optional(),
+	reasoningTokens: z.number().nonnegative().optional(),
 	maxTokens: z.number().nonnegative().optional(),
 	tokenLimitExceeded: z.boolean().optional(),
 	providerRetries: z.number().nonnegative().optional(),
@@ -25,14 +27,13 @@ function frameMeasurementKey(event: { jobId?: string; frameId?: string }) {
 function summarize(values: number[]) {
 	const sorted = [...values].sort((a, b) => a - b);
 	const mean = sorted.reduce((sum, value) => sum + value, 0) / sorted.length;
-	// ponytail: twenty observations is a descriptive floor, not a confidence interval; use a larger controlled cohort for provider decisions.
+	// ponytail: three observations is a minimal sample floor for descriptive p50/p95 reporting; larger cohorts are preferred when available.
 	return {
 		count: sorted.length,
 		mean,
-		p50:
-			sorted.length >= 20 ? sorted[Math.ceil(sorted.length * 0.5) - 1] : null,
+		p50: sorted.length >= 3 ? sorted[Math.ceil(sorted.length * 0.5) - 1] : null,
 		p95:
-			sorted.length >= 20 ? sorted[Math.ceil(sorted.length * 0.95) - 1] : null,
+			sorted.length >= 3 ? sorted[Math.ceil(sorted.length * 0.95) - 1] : null,
 	};
 }
 

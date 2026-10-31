@@ -105,6 +105,16 @@ export async function planStudioScreens(
 		const outputStartedAt = Date.now();
 		let planRaw = firstChunk;
 		for await (const chunk of generator) planRaw += chunk;
+		const isTruncatedPlan =
+			outcome?.finishReason === "length" ||
+			outcome?.finishReason === "max_tokens" ||
+			outcome?.finishReason === "max_output_tokens";
+		const tokenLimitExceeded = isTruncatedPlan
+			? true
+			: outcome?.textTokens !== undefined
+				? outcome.textTokens > STUDIO_PLANNING_MAX_TOKENS
+				: outcome?.outputTokens !== undefined &&
+					outcome.outputTokens > STUDIO_PLANNING_MAX_TOKENS;
 		studioJobTiming("planning-output", outputStartedAt, {
 			jobId: job.id,
 			projectId: project.id,
@@ -112,9 +122,7 @@ export async function planStudioScreens(
 			outputChars: planRaw.length,
 			...outcome,
 			maxTokens: STUDIO_PLANNING_MAX_TOKENS,
-			tokenLimitExceeded:
-				outcome?.outputTokens !== undefined &&
-				outcome.outputTokens > STUDIO_PLANNING_MAX_TOKENS,
+			tokenLimitExceeded,
 		});
 		signal.throwIfAborted();
 		const parsed = parseStudioPlanningWithBlueprint(

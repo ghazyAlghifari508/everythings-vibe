@@ -129,6 +129,26 @@ describe("classifyStudioStreamCompletion", () => {
 });
 
 describe("structured output diagnostics", () => {
+	it("avoids a correction request when an image supplies the button label", async () => {
+		const mocked = mockSequence([
+			{
+				html: '<html><body><main><p>Content</p><button><img alt="Open menu" src="https://example.com/menu.png"></button></main></body></html>',
+				finishReason: "stop",
+			},
+		]);
+		const html = await generateValidatedFrameHtml({
+			framePrompt: "Screen",
+			activeScreen: "Screen",
+			blueprint: null,
+			viewport: "web",
+			expectTokens: false,
+			designSkillId: "none",
+			dsTokens: null,
+			logoUrl: null,
+		});
+		expect(html).toContain('aria-label="Open menu"');
+		expect(mocked).toHaveBeenCalledTimes(1);
+	});
 	it("separates validation complaints into coded events instead of one string", async () => {
 		await mockSequence([{ html: "<html><body>   </body></html>" }]);
 		const log = vi.spyOn(console, "info").mockImplementation(() => {});
