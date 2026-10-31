@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { and, desc, eq, ne } from "drizzle-orm";
-import { requireUserServer } from "@/lib/session";
 import type { CreditOperationItem } from "../components/credit-usage";
 
 export interface BillingSubscription {
@@ -40,6 +39,7 @@ export interface BillingCreditUsage {
 
 export const loadBilling = createServerFn({ method: "GET" }).handler(
 	async () => {
+		const { requireUserServer } = await import("@/lib/session");
 		const user = await requireUserServer();
 		const { db } = await import("@/db");
 		const { creditOperations, payments, projects, subscriptions } =

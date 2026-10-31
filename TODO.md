@@ -123,7 +123,7 @@ Dokumen ini merupakan **backlog aktif tunggal (Single Source of Truth)** untuk p
 
 - [ ] **Settings Pages (`src/routes/settings/*`):**
   - [ ] Sidebar navigasi Settings (`profile.tsx`, `account.tsx`, `billing.tsx`, `api-keys.tsx`, `notifications.tsx`, `feedback.tsx`) berubah menjadi horizontal tab atau dropdown select di mobile.
-  - [ ] Tabel riwayat transaksi invoice Midtrans di `billing.tsx` responsif dengan card list fallback di mobile.
+  - [x] Tabel riwayat transaksi invoice Midtrans di `billing.tsx` responsif dengan card list fallback di mobile.
 - [ ] **Admin Dashboard (`src/routes/admin/*`):**
   - [ ] Metric cards di `admin/index.tsx` stack menjadi 1 kolom (mobile) dan 2 kolom (tablet).
   - [ ] Tabel pengguna, proyek, feedback, dan transaksi menggunakan responsive table layout (card view pada viewport kecil).
