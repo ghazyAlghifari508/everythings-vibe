@@ -256,7 +256,12 @@ export async function handleCodebaseSessionCreate({
 		syncCommand: buildSyncCommand(codebaseId),
 		expiresAt: inserted.expiresAt.toISOString(),
 	};
-	return Response.json(payload);
+	// One-time sync credential: the raw token leaves the server here and is
+	// never readable again, so the response must not be cached by a browser,
+	// proxy, or history entry.
+	return Response.json(payload, {
+		headers: { "Cache-Control": "no-store", Pragma: "no-cache" },
+	});
 }
 
 // Browser revoke: expires usable credentials for this codebase.
