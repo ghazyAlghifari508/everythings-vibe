@@ -4,7 +4,7 @@ import { resolveScrapeErrorPresentation } from "@/features/scrape/utils/scrape-e
 import type { imageResultCounts } from "@/features/scrape/utils/scrape-images";
 import { displaySiteName } from "@/features/scrape/utils/site-name";
 import { ScrapeErrorCard } from "./scrape-error-card";
-import { ElapsedTimer } from "./scrape-progress-elapsed";
+import { ScrapeActivityLine } from "./scrape-progress-activity";
 import { ScrapeImagesProgress } from "./scrape-progress-images";
 import {
 	getScrapeStagesForMode,
@@ -94,7 +94,6 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 	const headerState = isFailed ? "Gagal" : isDone ? "Selesai" : "Berjalan";
 	const activityText = resolveScrapeActivity({ activity, mode });
 	const stalledMessage = active ? (workerHealth ?? null) : null;
-	const startTimestamp = stageStartedAt ?? activityStartedAt ?? null;
 	// Each mode keeps the column arrangement it had before the modes were
 	// collapsed into one card: HTML reads as one column, DESIGN.md and Crawl
 	// Website keep the identity/activity column beside the stage card.
@@ -121,7 +120,8 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 				operation={operation}
 				headerState={headerState}
 				activityText={activityText}
-				startTimestamp={startTimestamp}
+				stageStartedAt={stageStartedAt ?? null}
+				activityStartedAt={activityStartedAt ?? null}
 				stalledMessage={stalledMessage}
 				presentation={presentation}
 			/>
@@ -155,33 +155,16 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 							Pemrosesan berhenti. Lihat alasan dan opsi pemulihan di panel
 							progres.
 						</p>
-					) : stalledMessage ? (
-						<p
-							data-activity-line
-							data-activity-state="stalled"
-							className="mt-2 break-words text-sm text-fog"
-						>
-							{stalledMessage}
-						</p>
-					) : active && activityText ? (
-						<div
-							data-activity-line
-							className="mt-2 flex min-w-0 items-baseline gap-2"
-						>
-							<output
-								aria-live="polite"
-								className="min-w-0 flex-1 break-words text-sm text-snow"
-							>
-								{activityText}
-							</output>
-							{startTimestamp ? <ElapsedTimer start={startTimestamp} /> : null}
-						</div>
 					) : (
-						<p data-activity-line className="mt-2 break-words text-sm text-fog">
-							{status === "queued"
-								? "Menunggu giliran pemrosesan."
-								: LABELS[status]}
-						</p>
+						<ScrapeActivityLine
+							className="mt-2"
+							status={status}
+							activity={activityText}
+							fallbackLabel={LABELS[status]}
+							stageStartedAt={stageStartedAt ?? null}
+							activityStartedAt={activityStartedAt ?? null}
+							stalledMessage={stalledMessage}
+						/>
 					)}
 				</div>
 
