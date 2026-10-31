@@ -20,6 +20,9 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("@tanstack/react-start", () => ({
 	createServerFn: () => ({
+		validator: () => ({
+			handler: (handler: () => Promise<unknown>) => handler,
+		}),
 		handler: (handler: () => Promise<unknown>) => handler,
 	}),
 }));
