@@ -59,5 +59,12 @@ live PostgreSQL concurrency stress test. Concurrent dynamic-import execution in
 the current Vitest mock harness escaped the DB mock; the attempted inserts failed
 on the fixture owner's foreign-key constraint. No fixture user was created and
 no successful credential insert was observed. A properly isolated database test
-is still needed before claiming concurrent execution verification. CLI config/client/task/export and sync
-handshake/upload suites provide compatibility evidence. No browser QA is used.
+is still needed before claiming concurrent execution verification. A temporary
+PostgreSQL cluster subsequently accepted concurrent issuance, but its raw `pg`
+verification query parsed timezone-less timestamps in local time. That comparison
+is not evidence of a production expiry defect: Drizzle's timestamp mapper reads
+those values as UTC. `api-key-timestamp.test.ts` verifies that mapping without a
+schema change or invalidating legacy credentials. The isolated concurrency test
+still needs a retained, safe harness with ORM-based verification.
+CLI config/client/task/export and sync handshake/upload suites provide
+compatibility evidence. No browser QA is used.
