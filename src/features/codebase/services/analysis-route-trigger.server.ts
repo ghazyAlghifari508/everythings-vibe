@@ -262,7 +262,7 @@ export async function triggerCodebaseAnalysis(
 	} else {
 		const decision = decideAnalysisRequest(
 			{ id: snapshot.id, status: snapshot.status },
-			existing,
+			existing.map((row) => ({ id: row.id, status: row.status })),
 		);
 		if (decision.action === "reject")
 			return Response.json(
