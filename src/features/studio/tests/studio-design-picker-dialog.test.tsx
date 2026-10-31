@@ -350,7 +350,7 @@ describe("StudioDesignPickerDialog", () => {
 		expect(panel.className).not.toContain("mx-auto");
 	});
 
-	it("centers header title, description, and tab controls horizontally while keeping top alignment", () => {
+	it("left-aligns header title and description inside centered column while tabs remain centered and top-aligned", () => {
 		renderDialog();
 		const title = screen.getByText("Pilih tampilan");
 		const description = screen.getByText(
@@ -359,14 +359,15 @@ describe("StudioDesignPickerDialog", () => {
 		const tablist = screen.getByRole("tablist");
 		const tablistWrapper = tablist.parentElement;
 
-		// Centered copy & tabs
-		expect(title.className).toContain("text-center");
-		expect(description.className).toContain("text-center");
+		// Left-aligned copy & centered tabs
+		expect(title.className).toContain("text-left");
+		expect(description.className).toContain("text-left");
 		expect(tablistWrapper?.className).toContain("justify-center");
 
-		// Header row container retains relative centering without viewport edge pinning
+		// Header row container aligns elements at top with space between
 		const headerRow = title.parentElement?.parentElement;
-		expect(headerRow?.className).toContain("items-center");
+		expect(headerRow?.className).toContain("items-start");
+		expect(headerRow?.className).toContain("justify-between");
 
 		// Dialog content remains top-aligned (no vertical centering)
 		const scroller = screen
@@ -389,13 +390,21 @@ describe("StudioDesignPickerDialog", () => {
 		expect(screen.getByLabelText("Terpilih")).toBeDefined();
 	});
 
-	it("renders informative miniature silhouettes with consistent aspect ratio across all themes", () => {
+	it("renders informative miniature silhouettes with consistent aspect ratio across all nine themes", () => {
 		renderDialog();
 		const themeButtons = [
 			screen.getByRole("button", { name: /Workspace/i }),
 			screen.getByRole("button", { name: /Editorial/i }),
 			screen.getByRole("button", { name: /Midnight/i }),
+			screen.getByRole("button", { name: /Jade/i }),
+			screen.getByRole("button", { name: /Orchid/i }),
+			screen.getByRole("button", { name: /Rose/i }),
+			screen.getByRole("button", { name: /Amber/i }),
+			screen.getByRole("button", { name: /Arctic/i }),
+			screen.getByRole("button", { name: /Graphite/i }),
 		];
+
+		expect(themeButtons).toHaveLength(9);
 
 		for (const button of themeButtons) {
 			const silhouette = button.querySelector('[aria-hidden="true"]');
