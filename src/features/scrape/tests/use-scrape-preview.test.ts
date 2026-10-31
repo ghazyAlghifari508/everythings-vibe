@@ -189,6 +189,34 @@ describe("useScrapePreview", () => {
 		expect(result.current.preview?.srcDoc).toBe(SIGNED_DOC);
 	});
 
+	it("ignores an old scrape response after switching ids", async () => {
+		const pending: Array<(value: unknown) => void> = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => new Promise((resolve) => pending.push(resolve))),
+		);
+		const { result, rerender } = renderHook(
+			({ id }: { id: string }) =>
+				useScrapePreview(id, { status: "completed", enabled: true }),
+			{ initialProps: { id: "scrape-1" } },
+		);
+		await waitFor(() => expect(pending).toHaveLength(1));
+		rerender({ id: "scrape-2" });
+		await waitFor(() => expect(pending).toHaveLength(2));
+		await act(async () =>
+			pending[0]?.(
+				previewResponse({ srcDoc: "old", expiresAt: Date.now() + 600_000 }),
+			),
+		);
+		expect(result.current.preview).toBeNull();
+		await act(async () =>
+			pending[1]?.(
+				previewResponse({ srcDoc: "new", expiresAt: Date.now() + 600_000 }),
+			),
+		);
+		expect(result.current.preview?.srcDoc).toBe("new");
+	});
+
 	it("drops state when switching to a different scrape id", async () => {
 		const fetchMock = vi.fn(async (input: string) =>
 			previewResponse({
