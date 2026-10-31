@@ -75,7 +75,6 @@ function documentBase(html: string, base: string): string {
 // Drops executable schemes while resolving relative links against the captured site.
 function rewriteNavigationUrl(value: string, base: string): string | null {
 	const decoded = decodeEntities(value).trim();
-	if (!decoded) return decoded;
 	if (decoded.startsWith("#")) return decoded;
 	if (SCRIPT_SCHEME.test(decoded)) return null;
 	if (URL_SCHEME.test(decoded)) return decoded;
@@ -298,7 +297,7 @@ function previewLoadReporter(nonce?: string): string {
 
 // Prevents non-hash link navigation and form submission inside the read-only snapshot frame.
 function previewNavigationGuard(nonce?: string): string {
-	return `<script${nonceAttr(nonce)}>(()=>{const VIBE_NAV_GUARD="vibedesign-preview-navigation";if(window.parent===window)return;const sameDocument=v=>typeof v==="string"&&v.trim().startsWith("#");document.addEventListener("click",e=>{const node=e.target;if(!(node instanceof Element))return;const link=node.closest("a[href],area[href]");if(!link)return;if(sameDocument(link.getAttribute("href")))return;e.preventDefault()},true);document.addEventListener("submit",e=>{e.preventDefault()},true)})();</script>`;
+	return `<script${nonceAttr(nonce)}>(()=>{const VIBE_NAV_GUARD="vibedesign-preview-navigation";if(window.parent===window)return;const sameDocument=v=>typeof v==="string"&&v.trim().startsWith("#");document.addEventListener("click",e=>{const node=e.target;if(!(node instanceof Element))return;const link=node.closest("a,area");if(!link)return;const href=link.getAttribute("href")||link.getAttribute("xlink:href");if(sameDocument(href))return;e.preventDefault()},true);document.addEventListener("submit",e=>{e.preventDefault()},true);try{window.open=()=>null}catch{}try{window.location.assign=()=>{}}catch{}try{window.location.replace=()=>{}}catch{}})();</script>`;
 }
 
 // Restores html/body scrolling when captured pages lock the root scroller for JS animations.

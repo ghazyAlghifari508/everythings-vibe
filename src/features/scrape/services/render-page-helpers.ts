@@ -313,3 +313,76 @@ export async function inlineIframes(
 	}
 	return output;
 }
+
+// ponytail: serializes live CSSOM rules, canvas snapshots, and active form states before page.content() to preserve JS-rendered UI.
+export async function prepareRenderedDom(page: Page): Promise<void> {
+	await page
+		.evaluate(() => {
+			for (const style of document.querySelectorAll("style")) {
+				try {
+					if (
+						!style.textContent?.trim() &&
+						style.sheet &&
+						style.sheet.cssRules.length > 0
+					) {
+						const rules = Array.from(style.sheet.cssRules)
+							.map((r) => r.cssText)
+							.join("\n");
+						if (rules) style.textContent = rules;
+					}
+				} catch {}
+			}
+			for (const canvas of document.querySelectorAll("canvas")) {
+				try {
+					if (
+						canvas.width > 0 &&
+						canvas.height > 0 &&
+						!canvas.style.backgroundImage
+					) {
+						const dataUrl = canvas.toDataURL("image/png");
+						if (dataUrl && dataUrl.length > 64 && dataUrl !== "data:,") {
+							canvas.setAttribute("data-vibe-canvas", "snapshot");
+							canvas.style.backgroundImage = `url("${dataUrl}")`;
+							canvas.style.backgroundSize =
+								canvas.style.backgroundSize || "contain";
+							canvas.style.backgroundPosition =
+								canvas.style.backgroundPosition || "center";
+							canvas.style.backgroundRepeat = "no-repeat";
+						}
+					}
+				} catch {}
+			}
+			for (const input of document.querySelectorAll("input")) {
+				try {
+					const type = (input.type || "text").toLowerCase();
+					if (type === "radio" || type === "checkbox") {
+						if (input.checked) input.setAttribute("checked", "");
+						else input.removeAttribute("checked");
+					} else if (input.value !== undefined && input.value !== null) {
+						input.setAttribute("value", input.value);
+					}
+				} catch {}
+			}
+			for (const select of document.querySelectorAll("select")) {
+				try {
+					for (const option of select.options) {
+						if (option.selected) option.setAttribute("selected", "");
+						else option.removeAttribute("selected");
+					}
+				} catch {}
+			}
+			for (const textarea of document.querySelectorAll("textarea")) {
+				try {
+					if (textarea.value) textarea.textContent = textarea.value;
+				} catch {}
+			}
+			for (const img of document.querySelectorAll("img")) {
+				try {
+					if (img.currentSrc && img.getAttribute("src") !== img.currentSrc) {
+						img.setAttribute("src", img.currentSrc);
+					}
+				} catch {}
+			}
+		})
+		.catch(() => {});
+}

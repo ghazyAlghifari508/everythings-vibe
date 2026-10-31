@@ -36,6 +36,7 @@ import {
 	autoScroll,
 	collectPageImages,
 	inlineIframes,
+	prepareRenderedDom,
 	type RenderedImage,
 } from "./render-page-helpers";
 
@@ -235,6 +236,7 @@ export async function renderPage(
 			mode,
 			measureResolution: options.measureResolution,
 		});
+		await prepareRenderedDom(page);
 		let html: string;
 		try {
 			html = await page.content();

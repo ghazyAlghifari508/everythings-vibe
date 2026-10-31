@@ -4,6 +4,7 @@ import {
 	SCRAPE_MAX_INLINE_CSS_BYTES,
 	SCRAPE_MAX_STYLESHEETS,
 } from "@/features/scrape/types/scrape-constants";
+import { rewriteCssUrls } from "@/features/scrape/utils/preview-html";
 
 function htmlAttr(tag: string, name: string): string {
 	const match = tag.match(
@@ -43,13 +44,23 @@ export async function inlineStyles(
 					.replace(/&/g, "&amp;")
 					.replace(/"/g, "&quot;")
 					.replace(/</g, "&lt;");
-				return `<style data-vibe-inline="${safeHref}">${css.html.slice(0, SCRAPE_MAX_INLINE_CSS_BYTES)}</style>`;
+				// ponytail: rewrite relative CSS URLs to absolute so inlined styles in downloaded HTML resolve fonts/assets accurately.
+				const rewritten = rewriteCssUrls(css.html, href, (target) => target);
+				return `<style data-vibe-inline="${safeHref}">${rewritten.slice(0, SCRAPE_MAX_INLINE_CSS_BYTES)}</style>`;
 			} catch {
 				return "";
 			}
 		}),
 	);
-	return html.replace("</head>", `${styles.join("\n")}</head>`);
+	const inlined = styles.filter(Boolean).join("\n");
+	if (!inlined) return html;
+	if (/<\/head>/i.test(html)) {
+		return html.replace(/<\/head>/i, (m) => `${inlined}\n${m}`);
+	}
+	if (/<head[^>]*>/i.test(html)) {
+		return html.replace(/<head[^>]*>/i, (m) => `${m}\n${inlined}`);
+	}
+	return `${inlined}\n${html}`;
 }
 
 export function forceDesktopViewport(html: string): string {
