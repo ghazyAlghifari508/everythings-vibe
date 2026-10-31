@@ -68,15 +68,21 @@ export function useCodebaseOnboarding({
 	// and two sync sessions for one onboarding attempt. State updates are async,
 	// so a ref is what actually closes the window.
 	const createInFlight = useRef(false);
+	// Atomic session identity: the poller, prompt, expiry, error, and progress
+	// list all follow this one id. A new session is a reset, not a migration.
+	const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
 	// One canonical reconciliation loop for the whole onboarding flow. The
 	// prompt screen needs the CLI handshake, the sync screen needs the transport
 	// stages, and the conclusion screen needs the persisted analysis status — all
 	// three read this single snapshot, so no two screens can disagree and no
-	// second poller races this one.
+	// second poller races this one. The loop is pinned to `activeSessionId`:
+	// when the user requests a new token, the id changes and the poller drops
+	// the old snapshot before its first request for the new session.
 	const { status: lastStatus, error: statusPollError } = useCodebaseSyncStatus({
 		codebaseId: codebase?.id ?? null,
 		analysisProjectId: analysisState.featureProjectId,
+		sessionId: activeSessionId,
 		initialStatus: recoveredStatus,
 		enabled: codebase !== null,
 	});
@@ -92,6 +98,21 @@ export function useCodebaseOnboarding({
 		if (!codebase) return;
 		storePlanCodebaseStepPointer(step);
 	}, [codebase, step]);
+
+	const adoptPayload = useCallback(
+		(next: SyncPromptPayload | null, seed: SyncStatusResponse | null) => {
+			// One atomic reset: every surface (prompt, expiry, poller, error,
+			// progress, analysis) follows the new session identity together.
+			setPayload(next);
+			setActiveSessionId(next?.sessionId ?? null);
+			setRecoveredStatus(seed);
+			setAnalysis(null);
+			setAnalysisError(null);
+			analysisAttemptedFor.current = null;
+			setError(null);
+		},
+		[setAnalysis, setAnalysisError, analysisAttemptedFor],
+	);
 
 	const createCodebase = useCallback(async () => {
 		if (createInFlight.current) return;
@@ -119,13 +140,9 @@ export function useCodebaseOnboarding({
 			setCodebase(outcome.codebase);
 			clearPlanCodebaseProjectPointer();
 			setFeatureProjectId(null);
-			setAnalysis(null);
-			setAnalysisError(null);
-			analysisAttemptedFor.current = null;
-			setPayload(outcome.payload);
-			// A brand new session has no server history: clear the seed so the
-			// poller cannot paint the previous attempt's state onto this one.
-			setRecoveredStatus(null);
+			// A brand new session has no server history: adopt its identity so
+			// the poller cannot paint the previous attempt's state onto this one.
+			adoptPayload(outcome.payload, null);
 			setStep("sync");
 		} catch {
 			setError("Server tidak dapat dihubungi.");
@@ -133,22 +150,16 @@ export function useCodebaseOnboarding({
 			createInFlight.current = false;
 			setIsStarting(false);
 		}
-	}, [
-		creditStatus,
-		setStep,
-		setFeatureProjectId,
-		setAnalysis,
-		setAnalysisError,
-		analysisAttemptedFor,
-	]);
+	}, [creditStatus, setStep, setFeatureProjectId, adoptPayload]);
 
 	const recoverCodebase = useOnboardingRecovery({
 		analysisState,
+		adoptSession: adoptPayload,
 		setError,
 		setIsStarting,
 		setCodebase,
 		setRecoveredStatus,
-		setPayload,
+		setActiveSessionId,
 		setStep,
 	});
 
@@ -191,11 +202,7 @@ export function useCodebaseOnboarding({
 				setError("Sesi sync gagal dibuat. Coba lagi.");
 				return;
 			}
-			setPayload(outcome.payload);
-			setRecoveredStatus(null);
-			setAnalysis(null);
-			setAnalysisError(null);
-			analysisAttemptedFor.current = null;
+			adoptPayload(outcome.payload, null);
 			setStep("sync");
 		} catch (error) {
 			setError(

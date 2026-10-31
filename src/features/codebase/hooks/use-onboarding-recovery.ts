@@ -80,28 +80,28 @@ function resolveRecoveredStep(
  */
 export function useOnboardingRecovery({
 	analysisState,
+	adoptSession,
 	setError,
 	setIsStarting,
 	setCodebase,
 	setRecoveredStatus,
-	setPayload,
+	setActiveSessionId,
 	setStep,
 }: {
 	analysisState: OnboardingAnalysisState;
+	adoptSession: (
+		payload: SyncPromptPayload | null,
+		seed: SyncStatusResponse | null,
+	) => void;
 	setError: (error: string | null) => void;
 	setIsStarting: (starting: boolean) => void;
 	setCodebase: (codebase: { id: string; name: string }) => void;
 	setRecoveredStatus: (status: SyncStatusResponse | null) => void;
-	setPayload: (payload: SyncPromptPayload | null) => void;
+	setActiveSessionId: (sessionId: string | null) => void;
 	setStep: (step: PlanCodebaseStep) => void;
 }) {
-	const {
-		setFeatureProjectId,
-		setAnalysis,
-		setAnalysisError,
-		analysisAttemptedFor,
-		fetchAnalysisOutput,
-	} = analysisState;
+	const { analysisAttemptedFor, setFeatureProjectId, fetchAnalysisOutput } =
+		analysisState;
 
 	return useCallback(async (): Promise<boolean> => {
 		const stored = readPlanCodebasePointer();
@@ -122,14 +122,18 @@ export function useOnboardingRecovery({
 				return false;
 			}
 			setCodebase({ id: stored.id, name: recoveredName });
-			setRecoveredStatus(recovered);
-			const storedStep = readPlanCodebaseStepPointer();
-			// A usable snapshot is the precondition for the conclusion step, so the
-			// onboarding analysis context is restored only here. Which of the two
-			// steps the user lands on is then decided by `resolveRecoveredStep`,
-			// which keeps the stored intent from overriding this evidence.
+			// Pin the poller to the recovered attempt: without this, the first
+			// poll asks for the latest session unscoped and can report a
+			// sibling attempt's state before settling on this one.
 			const recoveredSnapshotId = recovered.snapshotId;
 			if (hasRecoveredSnapshot(recovered) && recoveredSnapshotId) {
+				setRecoveredStatus(recovered);
+				setActiveSessionId(recovered.sessionId);
+				const storedStep = readPlanCodebaseStepPointer();
+				// A usable snapshot is the precondition for the conclusion step, so the
+				// onboarding analysis context is restored only here. Which of the two
+				// steps the user lands on is then decided by `resolveRecoveredStep`,
+				// which keeps the stored intent from overriding this evidence.
 				const storedProject = readPlanCodebaseProjectPointer();
 				let existingAnalysis: AnalysisResponse | null = null;
 				if (storedProject) {
@@ -155,7 +159,9 @@ export function useOnboardingRecovery({
 					codebaseId: stored.id,
 					analysisProjectId: storedProject,
 				});
-				setPayload(null);
+				setActiveSessionId(recovered.sessionId);
+				setRecoveredStatus(null);
+				setCodebase({ id: stored.id, name: recoveredName });
 				setStep(resolveRecoveredStep(recovered, storedStep, isAnalysisReady));
 				return true;
 			}
@@ -170,13 +176,7 @@ export function useOnboardingRecovery({
 					return true;
 				}
 				if (retryOutcome.kind === "minted") {
-					setPayload(retryOutcome.payload);
-					// The fresh session starts from scratch: drop the previous
-					// attempt's state so the poller cannot resurrect it.
-					setRecoveredStatus(null);
-					setAnalysis(null);
-					setAnalysisError(null);
-					analysisAttemptedFor.current = null;
+					adoptSession(retryOutcome.payload, null);
 					setStep("sync");
 					return true;
 				}
@@ -186,6 +186,9 @@ export function useOnboardingRecovery({
 			// The CLI is mid-attempt. Return the user to the screen they left, and
 			// let the prompt screen report the handshake rather than assuming the
 			// transport is what they came back to check.
+			const storedStep = readPlanCodebaseStepPointer();
+			setRecoveredStatus(recovered);
+			setActiveSessionId(recovered.sessionId);
 			setStep(resolveRecoveredStep(recovered, storedStep));
 			return true;
 		} catch {
@@ -195,15 +198,14 @@ export function useOnboardingRecovery({
 			setIsStarting(false);
 		}
 	}, [
+		adoptSession,
+		setActiveSessionId,
 		setStep,
 		setError,
 		setIsStarting,
 		setCodebase,
 		setRecoveredStatus,
-		setPayload,
 		setFeatureProjectId,
-		setAnalysis,
-		setAnalysisError,
 		analysisAttemptedFor,
 		fetchAnalysisOutput,
 	]);
