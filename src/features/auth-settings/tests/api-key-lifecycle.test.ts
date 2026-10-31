@@ -11,7 +11,6 @@ import {
 	describeKeyLifecycle,
 	isAutomaticKey,
 	isExpiredKey,
-	isSupersedeTarget,
 	nextAutoKeyExpiry,
 	resolveAutoApiKeyPolicy,
 	supersedeCutoff,
@@ -144,10 +143,7 @@ describe("handoff credential timestamps", () => {
 	});
 });
 
-describe("expiry and supersede predicates", () => {
-	const policy = resolveAutoApiKeyPolicy({});
-	const cutoff = supersedeCutoff(NOW, policy);
-
+describe("expiry predicates", () => {
 	it.each([
 		{ expiresAt: null, expired: false },
 		{ expiresAt: undefined, expired: false },
@@ -160,18 +156,6 @@ describe("expiry and supersede predicates", () => {
 		{ expiresAt: "not-a-date", expired: true },
 	])("isExpiredKey(%j) -> $expired", ({ expiresAt, expired }) => {
 		expect(isExpiredKey(expiresAt, NOW)).toBe(expired);
-	});
-
-	// A supersede write only ever shortens a deadline, and never reaches a row
-	// without one, so it cannot silently kill a manual or pre-policy credential.
-	it.each([
-		{ expiresAt: null, targeted: false },
-		{ expiresAt: new Date(cutoff.getTime() - 1), targeted: false },
-		{ expiresAt: cutoff, targeted: false },
-		{ expiresAt: new Date(cutoff.getTime() + 1), targeted: true },
-		{ expiresAt: "not-a-date", targeted: false },
-	])("isSupersedeTarget(%j) -> $targeted", ({ expiresAt, targeted }) => {
-		expect(isSupersedeTarget(expiresAt, cutoff)).toBe(targeted);
 	});
 
 	it.each([

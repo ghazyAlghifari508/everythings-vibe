@@ -42,7 +42,7 @@ vi.mock("@/lib/rate-limit", () => ({
 			: { allowed: true, remaining: 10, resetAt: 0 },
 }));
 
-import { apiKeyAuth, hasScope } from "./api-key-auth";
+import { apiKeyAuth, hasScope, verifyProjectOwnership } from "./api-key-auth";
 
 function bearerRequest(rawKey: string): Request {
 	return new Request("https://example.test/api/v1/projects/p-1", {
@@ -225,6 +225,23 @@ describe("apiKeyAuth bearer decisions", () => {
 			error: "Too many authentication attempts",
 			status: 429,
 		});
+	});
+});
+
+describe("project ownership", () => {
+	it("binds authorization to the requested project, owner, and non-deleted state", async () => {
+		state.rows = [{ id: "project-one" }];
+		expect(await verifyProjectOwnership("tenant-a", "project-one")).toBe(true);
+		const filter = state.filters[0];
+		if (!(filter instanceof SQL))
+			throw new Error("Missing ownership predicate");
+		const query = new PgDialect().sqlToQuery(filter);
+		expect(query.params).toEqual(["project-one", "tenant-a"]);
+		expect(query.sql).toContain('"projects"."deleted_at" is null');
+		expect(query.sql).toContain('"projects"."user_id"');
+		expect(query.sql).toContain('"projects"."id"');
+		state.rows = [];
+		expect(await verifyProjectOwnership("tenant-b", "project-one")).toBe(false);
 	});
 });
 

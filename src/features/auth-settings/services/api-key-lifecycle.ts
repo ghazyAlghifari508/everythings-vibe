@@ -118,20 +118,6 @@ export function isExpiredKey(expiresAt: TimestampInput, now: Date): boolean {
 	return expiry === null || expiry.getTime() <= now.getTime();
 }
 
-/**
- * Rows a supersede write may touch. `expiry > cutoff` makes the statement
- * strictly shortening, and rows without an explicit expiry — the pre-policy
- * pile and manual keys — are excluded so no handoff or deploy silently
- * invalidates access somebody is still using.
- */
-export function isSupersedeTarget(
-	expiresAt: TimestampInput,
-	cutoff: Date,
-): boolean {
-	const expiry = toTimestamp(expiresAt);
-	return expiry !== null && expiry.getTime() > cutoff.getTime();
-}
-
 export type KeyLifecycleState = "no-expiry" | "active" | "expired";
 
 export interface KeyLifecycle {
