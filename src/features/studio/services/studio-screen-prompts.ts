@@ -53,7 +53,7 @@ CONTROLLED ASSEMBLY CONTRACT:
 - Put ALL screen-specific body content in exactly one <main data-studio-content>. Do not place visible content outside it.
 - Do not put app navigation/header inside that region; contextual tabs and section headings remain screen-specific.
 - Canonical labels ${JSON.stringify(labels)}, destinations ${JSON.stringify(destinations)}, icons ${JSON.stringify(iconMapping)} and active screen ${JSON.stringify(activeScreen)} are supplied by assembly, not independently rendered by you.
-- Use --app-primary, --app-canvas, --app-surface, --app-ink, --app-muted, --app-font, --app-gutter and --app-radius for shared identity. Use data-primary on primary actions and data-card on common surfaces.
+- Use --app-primary, --app-secondary, --app-on-primary, --app-canvas, --app-surface, --app-ink, --app-muted, --app-font, --app-gutter and --app-radius for shared identity. Secondary is an accent; muted is readable text. Never reselect the project palette for this screen. Use data-primary on primary actions and data-card on common surfaces.
 - Preserve the selected skill for content composition, not for redesigning the shared shell. No autofocus, decorative cursor, stray separators after numeric amounts or fixed/sticky decorations.
 </SHARED_DESIGN_BLUEPRINT>`,
 		);

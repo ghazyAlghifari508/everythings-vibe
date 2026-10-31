@@ -79,6 +79,12 @@ Product Requirements Planning Directives:
 		);
 	}
 
+	if (!designMd?.trim()) {
+		sections.push(`AUTOMATIC PROJECT VISUAL DIRECTION:
+Infer the product domain, audience, main task and intended mood from the brief and PRD before choosing a palette. In productIdentity.visualDirection explain the mood, composition, typography, radius/density and why they fit this specific product. Do not treat industry as a fixed palette template, choose a built-in theme at random, or default to a familiar accent. Different briefs in the same industry can require different identities. Explicit user colors (including green) remain authoritative.
+Choose one coherent project-wide designTokens set: primary accent, secondary accent, background, surface, ink, muted, onPrimary, fontFamily, radius, border and elevation. Secondary is an accent, NOT muted text. Use opaque hex colors and ensure ink/muted contrast >= 4.5:1 on both background and surface, and onPrimary >= 4.5:1 on primary. Keep accent usage restrained. canonicalShell.density must fit the audience and task. All screens and later additions reuse this approved identity; do not reselect per frame.`);
+	}
+
 	sections.push(
 		`Plan the necessary screens for this application. Output strict JSON with "projectTitle", "screens" array (each with "name", "description", "viewport": "${designMode}", "order": 0..N), and a "blueprint" object (productIdentity, designTokens, sharedComponents, navigationContract, screenPlan) shared by all screens. The blueprint navigation contract and tokens apply identically to every screen. Plan only relevant screens for the user's specific application domain.`,
 	);

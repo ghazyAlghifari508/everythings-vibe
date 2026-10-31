@@ -129,6 +129,7 @@ export async function planStudioScreens(
 			planRaw,
 			designMode,
 			project.initialPageCount,
+			!project.designMd?.trim(),
 		);
 		if (parsed.ok) {
 			screenPlan = parsed.plan;
@@ -181,6 +182,7 @@ export async function planStudioScreens(
 				planRaw,
 				designMode,
 				project.initialPageCount,
+				!project.designMd?.trim(),
 			);
 			if (parsed.ok) {
 				screenPlan = parsed.plan;

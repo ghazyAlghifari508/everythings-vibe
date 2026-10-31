@@ -25,9 +25,27 @@ const safeCss = z
 	.max(200)
 	.regex(/^[^;{}<>\\\\]*$/)
 	.refine((value) => !/url\s*\(|expression\s*\(/i.test(value));
-const color = z
-	.string()
-	.regex(/^#[0-9a-f]{3}(?:[0-9a-f]{3})?(?:[0-9a-f]{2})?$/i);
+const color = z.string().regex(/^#(?:[0-9a-f]{3}|[0-9a-f]{6}(?:ff)?)$/i);
+
+export function studioColorContrast(
+	foreground: string,
+	background: string,
+): number {
+	const luminance = (hex: string) => {
+		const raw = hex.slice(1);
+		const full = raw.length === 3 ? [...raw].map((c) => c + c).join("") : raw;
+		const channels = [0, 2, 4].map((offset) => {
+			const value = Number.parseInt(full.slice(offset, offset + 2), 16) / 255;
+			return value <= 0.04045
+				? value / 12.92
+				: ((value + 0.055) / 1.055) ** 2.4;
+		});
+		return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+	};
+	const a = luminance(foreground);
+	const b = luminance(background);
+	return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
 
 export const studioCanonicalShellSchema = z.object({
 	version: z.literal(1),
@@ -52,16 +70,36 @@ export const studioDesignBlueprintSchema = z.object({
 		platform: z.enum(["web", "mobile"]),
 		visualDirection: z.string().min(1).max(500),
 	}),
-	designTokens: z.object({
-		primary: color,
-		secondary: color,
-		background: color,
-		surface: color,
-		fontFamily: safeCss,
-		radius: z.number().min(0).max(32),
-		border: safeCss,
-		elevation: safeCss,
-	}),
+	designTokens: z
+		.object({
+			primary: color,
+			secondary: color,
+			background: color,
+			surface: color,
+			// ponytail: optional for persisted legacy blueprints; new planning requests require these tokens.
+			ink: color.optional(),
+			muted: color.optional(),
+			onPrimary: color.optional(),
+			fontFamily: safeCss,
+			radius: z.number().min(0).max(32),
+			border: safeCss,
+			elevation: safeCss,
+		})
+		.refine((tokens) => {
+			const readable = (
+				foreground: string | undefined,
+				backgrounds: string[],
+			) =>
+				!foreground ||
+				backgrounds.every(
+					(background) => studioColorContrast(foreground, background) >= 4.5,
+				);
+			return (
+				readable(tokens.ink, [tokens.background, tokens.surface]) &&
+				readable(tokens.muted, [tokens.background, tokens.surface]) &&
+				readable(tokens.onPrimary, [tokens.primary])
+			);
+		}, "Text contrast must reach WCAG AA (4.5:1)."),
 	sharedComponents: z.object({
 		header: z.string().min(1).max(500),
 		navigation: z.string().min(1).max(500),

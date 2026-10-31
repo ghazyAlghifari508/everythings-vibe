@@ -94,7 +94,10 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "secondary": "Secondary color hex",
       "background": "Page background hex",
       "surface": "Card surface hex",
-      "fontFamily": "Font stack",
+      "ink": "Readable primary text hex",
+      "muted": "Readable secondary text hex, not the secondary accent",
+      "onPrimary": "Readable foreground on primary action hex",
+      "fontFamily": "Font stack chosen for the product's audience",
       "radius": 12,
       "border": "Border treatment",
       "elevation": "Shadow model"

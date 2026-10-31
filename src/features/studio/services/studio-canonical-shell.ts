@@ -2,6 +2,7 @@ import { JSDOM } from "jsdom";
 import { renderCanonicalIcon } from "./studio-canonical-icons";
 import {
 	type StudioDesignBlueprint,
+	studioColorContrast,
 	validateBlueprint,
 } from "./studio-design-blueprint";
 import type { CanonicalDesignSystem } from "./studio-design-tokens";
@@ -40,8 +41,15 @@ function shellStyle(
 	const primary = tokens?.colors.primary ?? bp.primary;
 	const canvas = tokens?.colors.canvas ?? bp.background;
 	const surface = tokens?.colors.surface ?? bp.surface;
-	const ink = tokens?.colors.ink ?? "#171717";
-	const muted = tokens?.colors.muted ?? bp.secondary;
+	const ink = tokens?.colors.ink ?? bp.ink ?? "#171717";
+	const muted = tokens?.colors.muted ?? bp.muted ?? bp.secondary;
+	const onPrimary =
+		bp.onPrimary && studioColorContrast(bp.onPrimary, primary) >= 4.5
+			? bp.onPrimary
+			: studioColorContrast("#ffffff", primary) >=
+					studioColorContrast("#000000", primary)
+				? "#ffffff"
+				: "#000000";
 	const border = tokens?.colors.border
 		? `1px solid ${tokens.colors.border}`
 		: bp.border;
@@ -50,9 +58,9 @@ function shellStyle(
 	return `<style id="studio-canonical-style">
 html{box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}
 body{margin:0}
-[data-studio-shell]{--app-primary:${primary};--app-canvas:${canvas};--app-surface:${surface};--app-ink:${ink};--app-muted:${muted};--app-border:${border};--app-font:${font};--app-gutter:${gutter}px;--app-radius:${bp.radius}px;min-width:0;width:100%;background:var(--app-canvas);color:var(--app-ink);font:400 16px/1.5 var(--app-font);overflow-wrap:break-word}
+[data-studio-shell]{--app-primary:${primary};--app-secondary:${bp.secondary};--app-on-primary:${onPrimary};--app-canvas:${canvas};--app-surface:${surface};--app-ink:${ink};--app-muted:${muted};--app-border:${border};--app-font:${font};--app-gutter:${gutter}px;--app-radius:${bp.radius}px;min-width:0;width:100%;background:var(--app-canvas);color:var(--app-ink);font:400 16px/1.5 var(--app-font);overflow-wrap:break-word}
 [data-studio-shell] :where(button,input,select,textarea){font:inherit;min-height:44px;max-width:100%;border:var(--app-border);border-radius:${tokens?.shapes.borderRadius.buttons ?? "var(--app-radius)"};padding:10px 14px}
-[data-studio-shell] :where(button[type=submit],[data-primary]){background:var(--app-primary);color:var(--app-surface)}
+[data-studio-shell] :where(button[type=submit],[data-primary]){background:var(--app-primary);color:var(--app-on-primary)}
 [data-studio-shell] :where(.card,[data-card]){border:var(--app-border);border-radius:${tokens?.shapes.borderRadius.cards ?? "var(--app-radius)"};background:var(--app-surface);min-width:0;max-width:100%;overflow-wrap:break-word}
 [data-studio-shell] :where(table){width:100%;border-collapse:collapse;text-align:left;font-size:14px}
 [data-studio-shell] :where(th){padding:10px 12px;font-weight:600;border-bottom:var(--app-border);white-space:nowrap}

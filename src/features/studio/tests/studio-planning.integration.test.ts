@@ -47,6 +47,9 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 							designTokens: {
 								primary: "#0f0f0f",
 								secondary: "#606060",
+								ink: "#111111",
+								muted: "#555555",
+								onPrimary: "#ffffff",
 								background: "#ffffff",
 								surface: "#f8f8f8",
 								fontFamily: "Arial",
