@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
 import {
 	ANALYSIS_VALIDATION_MESSAGE,
 	AnalysisValidationError,
@@ -88,6 +89,24 @@ describe("analysis failure classification", () => {
 		expect(classifyAnalysisFailure(new Error("boom"), "persist")).toBe(
 			"persistence",
 		);
+	});
+
+	it("maps credit lifecycle failures to persistence for operator triage", () => {
+		expect(
+			classifyAnalysisFailure(
+				new Error("Credit operation is not active"),
+				"generate",
+			),
+		).toBe("persistence");
+		expect(
+			classifyAnalysisFailure(new Error("Analysis reservation expired")),
+		).toBe("persistence");
+		expect(
+			classifyAnalysisFailure(
+				new CreditSubscriptionOriginError("missing"),
+				"persist",
+			),
+		).toBe("persistence");
 	});
 
 	it("maps anything else to unknown", () => {

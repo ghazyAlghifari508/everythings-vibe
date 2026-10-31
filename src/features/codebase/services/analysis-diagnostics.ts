@@ -1,3 +1,4 @@
+import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
 import { AnalysisValidationError } from "./analysis-validation";
 
 // Fixed user-facing message. Never echoes model text, stack traces, tokens,
@@ -49,6 +50,18 @@ export function classifyAnalysisFailure(
 		return "snapshot";
 	}
 	const message = error instanceof Error ? error.message : String(error);
+	// Credit lifecycle failures that abort persistence are triaged as
+	// persistence, not provider: the model output existed, only finalization
+	// failed, so the correct action is safe retry of finalization — not
+	// treating the provider as down.
+	if (
+		error instanceof CreditSubscriptionOriginError ||
+		/credit operation|reservation expired|credit subscription|subscription origin/i.test(
+			message,
+		)
+	) {
+		return "persistence";
+	}
 	if (/aborted|aborterror/i.test(message)) return "aborted";
 	if (
 		/tidak merespons dalam 2 menit|melebihi batas waktu|timeout|timed out|etimedout|stall/i.test(
