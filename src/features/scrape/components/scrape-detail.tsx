@@ -74,12 +74,10 @@ export function ScrapeDetail({
 		setFrameReport(next);
 	}, []);
 
-	const [frameSrcDoc, setFrameSrcDoc] = useState(previewSrcDoc);
 	const prevSrcDocRef = useRef(previewSrcDoc);
 	useEffect(() => {
 		if (prevSrcDocRef.current !== previewSrcDoc) {
 			prevSrcDocRef.current = previewSrcDoc;
-			setFrameSrcDoc(previewSrcDoc);
 			setFrameReport("preparing");
 		}
 	}, [previewSrcDoc]);
@@ -192,8 +190,12 @@ export function ScrapeDetail({
 					previewState={previewState}
 					previewError={previewError}
 					visualSubView={visualSubView}
-					onVisualSubView={setVisualSubView}
-					frameSrcDoc={frameSrcDoc}
+					onVisualSubView={(view) => {
+						if (view === "dom" && visualSubView !== "dom")
+							setFrameReport("preparing");
+						setVisualSubView(view);
+					}}
+					frameSrcDoc={previewSrcDoc}
 					frameReport={frameReport}
 					previewAttempt={previewAttempt}
 					onFrameReport={handleFrameReport}

@@ -139,6 +139,7 @@ describe("ScrapeDetail preview readiness", () => {
 	});
 
 	it("settles as empty only after the frame keeps reporting empty", () => {
+		vi.useFakeTimers();
 		render(
 			<ScrapeDetail
 				domain="example.com"
@@ -151,7 +152,11 @@ describe("ScrapeDetail preview readiness", () => {
 			for (let i = 0; i < SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS; i += 1)
 				report("empty", 0);
 		});
+		expect(screen.getByRole("status").textContent).toMatch(/menyiapkan/i);
+		act(() => vi.advanceTimersByTime(5000));
+		act(() => report("empty", 0));
 		expect(screen.getByRole("status").textContent).toMatch(/tidak berisi/i);
+		vi.useRealTimers();
 	});
 
 	it("upgrades a provisional empty report once the frame renders content", () => {

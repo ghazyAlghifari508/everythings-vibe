@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	SCRAPE_DESKTOP_HEIGHT,
+	SCRAPE_PREVIEW_EMPTY_WINDOW_MS,
 	SCRAPE_PREVIEW_FRAME_HEIGHT_STEP,
 	SCRAPE_PREVIEW_FRAME_LOAD_TIMEOUT_MS,
 	SCRAPE_PREVIEW_FRAME_MAX_HEIGHT,
 	SCRAPE_PREVIEW_FRAME_MIN_HEIGHT,
+	SCRAPE_PREVIEW_READY_MAX_PINGS,
 	SCRAPE_PREVIEW_READY_PING_INTERVAL_MS,
 } from "@/features/scrape/types/scrape-constants";
 import {
 	INITIAL_PREVIEW_READINESS,
 	type PreviewReadinessState,
 	previewDisplayReport,
-	previewFrameResponded,
-	previewShouldKeepPolling,
 	reducePreviewReport,
 } from "@/features/scrape/utils/preview-readiness";
 import {
@@ -79,6 +79,8 @@ export function DesktopPreview({
 	// Every frame report is folded through one reducer, so a provisional empty
 	// verdict can be upgraded by a later ready report instead of sticking.
 	const readinessRef = useRef<PreviewReadinessState>(INITIAL_PREVIEW_READINESS);
+	const emptySettled = useRef(false);
+	const emptyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const applyHeight = useCallback((reported: unknown) => {
 		if (
@@ -104,7 +106,34 @@ export function DesktopPreview({
 		(incoming: FrameReport) => {
 			const next = reducePreviewReport(readinessRef.current, incoming);
 			readinessRef.current = next;
-			onReport?.(previewDisplayReport(next));
+			if (next.report !== "empty") {
+				emptySettled.current = false;
+				if (emptyTimer.current) clearTimeout(emptyTimer.current);
+				emptyTimer.current = null;
+				onReport?.(previewDisplayReport(next));
+				return;
+			}
+			if (emptySettled.current) {
+				onReport?.("empty");
+				return;
+			}
+			if (!emptyTimer.current) {
+				emptyTimer.current = setTimeout(() => {
+					emptyTimer.current = null;
+					if (readinessRef.current.report === "empty") {
+						emptySettled.current = true;
+						try {
+							frameRef.current?.contentWindow?.postMessage(
+								{ type: "vibedesign-preview-ping" },
+								"*",
+							);
+						} catch {
+							// The deadline still handles an unreachable document.
+						}
+					}
+				}, SCRAPE_PREVIEW_EMPTY_WINDOW_MS);
+			}
+			onReport?.("preparing");
 		},
 		[onReport],
 	);
@@ -117,10 +146,20 @@ export function DesktopPreview({
 		if (measuredDocRef.current === srcDoc) return;
 		measuredDocRef.current = srcDoc;
 		readinessRef.current = INITIAL_PREVIEW_READINESS;
+		emptySettled.current = false;
+		if (emptyTimer.current) clearTimeout(emptyTimer.current);
+		emptyTimer.current = null;
 		setFrameLoaded(false);
 		setFrameHeight(initialFrameHeight());
 		onReport?.("preparing");
 	}, [srcDoc, onReport]);
+
+	useEffect(
+		() => () => {
+			if (emptyTimer.current) clearTimeout(emptyTimer.current);
+		},
+		[],
+	);
 
 	useEffect(() => {
 		if (!onReport) return;
@@ -173,11 +212,10 @@ export function DesktopPreview({
 	// forever.
 	useEffect(() => {
 		if (!onReport || !srcDoc || !active) return;
-		// A frame that answered is alive, even if it is slow or still loading its
-		// subresources, so its own report stands instead of a fabricated failure.
 		const failOnSilence = () => {
-			if (previewFrameResponded(readinessRef.current)) return;
-			onReport("failed");
+			if (readinessRef.current.report !== "preparing" && !emptySettled.current)
+				return;
+			applyReport("failed");
 		};
 		if (!frameLoaded) {
 			const timeout = setTimeout(
@@ -186,19 +224,22 @@ export function DesktopPreview({
 			);
 			return () => clearTimeout(timeout);
 		}
+		const timeout = setTimeout(
+			failOnSilence,
+			SCRAPE_PREVIEW_FRAME_LOAD_TIMEOUT_MS,
+		);
+		let pings = 0;
 		const ask = () => {
-			if (!previewShouldKeepPolling(readinessRef.current)) {
+			if (
+				pings >= SCRAPE_PREVIEW_READY_MAX_PINGS ||
+				readinessRef.current.report === "ready" ||
+				readinessRef.current.report === "degraded" ||
+				readinessRef.current.report === "failed"
+			) {
 				pingTimer.current = null;
-				// The budget ran out with no verdict. A frame that answered at least
-				// once is alive and slow, so its last report stands; a frame that
-				// never answered at all is a real failure to report.
-				if (
-					readinessRef.current.report === "preparing" &&
-					!previewFrameResponded(readinessRef.current)
-				)
-					onReport("failed");
 				return;
 			}
+			pings += 1;
 			const frame = frameRef.current?.contentWindow;
 			if (frame) {
 				try {
@@ -214,12 +255,13 @@ export function DesktopPreview({
 		};
 		ask();
 		return () => {
+			clearTimeout(timeout);
 			if (pingTimer.current) {
 				clearTimeout(pingTimer.current);
 				pingTimer.current = null;
 			}
 		};
-	}, [onReport, srcDoc, active, frameLoaded]);
+	}, [onReport, srcDoc, active, frameLoaded, applyReport]);
 
 	const canvasWidth = Math.max(1, Math.round(PREVIEW_WIDTH * scale));
 	const canvasHeight = Math.max(1, Math.round(frameHeight * scale));

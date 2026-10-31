@@ -34,6 +34,9 @@ export const SCRAPE_PREVIEW_ASSET_CAPABILITY_TTL_MS = 60 * 60 * 1000;
 export const SCRAPE_PREVIEW_ASSET_MAX_URL_CHARS = 4096;
 export const SCRAPE_PREVIEW_READY_PING_INTERVAL_MS = 250;
 export const SCRAPE_PREVIEW_READY_MAX_PINGS = 20;
+// ponytail: five seconds bounds snapshot observation; increase only with measured delayed-resource evidence.
+export const SCRAPE_PREVIEW_EMPTY_WINDOW_MS =
+	SCRAPE_PREVIEW_READY_PING_INTERVAL_MS * SCRAPE_PREVIEW_READY_MAX_PINGS;
 // The framed preview grows to the height the captured document reports, so the
 // reader scrolls the page instead of hunting for a nested viewport. Past the
 // ceiling the frame keeps its own scrollbar, which bounds the element without
