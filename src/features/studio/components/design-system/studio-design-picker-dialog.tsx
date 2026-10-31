@@ -116,19 +116,19 @@ export function StudioDesignPickerDialog({
 			>
 				<div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-10 pb-16 sm:px-6 sm:pt-14 sm:pb-20">
 					<div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-						<div className="relative flex flex-col items-center">
-							<DialogHeader className="w-full items-center gap-1.5 px-8 text-center sm:px-0 sm:text-center">
-								<DialogTitle className="text-center text-xl font-bold tracking-tight text-snow sm:text-2xl">
+						<div className="flex items-start justify-between gap-4">
+							<DialogHeader className="gap-1.5 text-left sm:text-left">
+								<DialogTitle className="text-left text-xl font-bold tracking-tight text-snow sm:text-2xl">
 									Pilih tampilan
 								</DialogTitle>
-								<DialogDescription className="max-w-xl text-center text-sm text-fog">
+								<DialogDescription className="max-w-xl text-left text-sm text-fog">
 									Pilih referensi visual untuk proyek desainmu. Referensi
 									tersimpan sebagai draf dan baru dipakai saat kamu menekan
 									kirim.
 								</DialogDescription>
 							</DialogHeader>
 							<DialogClose
-								className="absolute right-0 top-0 rounded-lg p-2 text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo shrink-0"
+								className="rounded-lg p-2 text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo shrink-0"
 								aria-label="Close"
 							>
 								<Icon icon={Cancel01Icon} size={18} />
