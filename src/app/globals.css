@@ -908,6 +908,15 @@ input.bg-steel:autofill:active {
 }
 
 @media (prefers-reduced-motion: reduce) {
+	/* The server-rendered frame cannot read the preference, so the sweep is
+	   neutralised in CSS as well as through the shimmer prop. */
+	.thought-line[data-working] .thought-line__breath[data-shimmer] {
+		background: none;
+		color: var(--tl-color);
+		-webkit-text-fill-color: currentColor;
+		animation: none;
+	}
+
 	.thought-line__text {
 		filter: none;
 		transition: opacity var(--tl-settle) ease;
