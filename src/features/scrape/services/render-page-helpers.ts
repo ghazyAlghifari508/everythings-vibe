@@ -4,10 +4,12 @@ import { SCRAPE_MAX_HTML_BYTES } from "@/features/scrape/types/scrape-constants"
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 
-const AUTO_SCROLL_STEP_PX = 600;
-const AUTO_SCROLL_DELAY_MS = 100;
-const AUTO_SCROLL_MAX_STEPS = 60;
+// ponytail: 16 steps x 800px bounds lazy-scroll to 12800px within ~1s; increase only with measured deep-infinite-page evidence.
+const AUTO_SCROLL_STEP_PX = 800;
+const AUTO_SCROLL_DELAY_MS = 60;
+const AUTO_SCROLL_MAX_STEPS = 16;
 const AUTO_SCROLL_STABLE_STEPS = 2;
+const AUTO_SCROLL_MAX_DURATION_MS = 3_000;
 
 export interface RenderedImage {
 	url: string;
@@ -21,21 +23,43 @@ export async function autoScroll(
 	page: import("playwright").Page,
 ): Promise<void> {
 	await page.evaluate(
-		async ({ step, delay, maxSteps, stableSteps }) => {
+		async ({ step, delay, maxSteps, stableSteps, maxDurationMs }) => {
 			await new Promise<void>((resolve) => {
+				const doc = document.documentElement;
+				const body = document.body;
+				const initialHeight = Math.max(
+					doc ? doc.scrollHeight : 0,
+					body ? body.scrollHeight : 0,
+				);
+				// A page that fits the viewport or is a full-screen canvas game
+				// has no lazy-loaded scrollable sections; skip scrolling immediately.
+				if (initialHeight <= window.innerHeight + 20) {
+					resolve();
+					return;
+				}
+				const canvas = document.querySelector("canvas");
+				if (canvas && initialHeight <= window.innerHeight * 1.25) {
+					resolve();
+					return;
+				}
+
 				let steps = 0;
 				let stableHeightSteps = 0;
-				let previousHeight = Math.max(
-					document.documentElement.scrollHeight,
-					document.body.scrollHeight,
-				);
-				const timer = setInterval(() => {
+				let previousHeight = initialHeight;
+				let timer: ReturnType<typeof setInterval> | undefined;
+				const finish = () => {
+					if (timer !== undefined) clearInterval(timer);
+					window.scrollTo(0, 0);
+					resolve();
+				};
+				const watchdog = setTimeout(finish, maxDurationMs);
+				timer = setInterval(() => {
 					window.scrollBy(0, step);
 					steps += 1;
 					requestAnimationFrame(() => {
 						const height = Math.max(
-							document.documentElement.scrollHeight,
-							document.body.scrollHeight,
+							doc ? doc.scrollHeight : 0,
+							body ? body.scrollHeight : 0,
 						);
 						const atBottom = window.scrollY + window.innerHeight >= height;
 						stableHeightSteps =
@@ -45,11 +69,8 @@ export async function autoScroll(
 							steps >= maxSteps ||
 							(atBottom && stableHeightSteps >= stableSteps)
 						) {
-							clearInterval(timer);
-							requestAnimationFrame(() => {
-								window.scrollTo(0, 0);
-								resolve();
-							});
+							clearTimeout(watchdog);
+							finish();
 						}
 					});
 				}, delay);
@@ -60,6 +81,7 @@ export async function autoScroll(
 			delay: AUTO_SCROLL_DELAY_MS,
 			maxSteps: AUTO_SCROLL_MAX_STEPS,
 			stableSteps: AUTO_SCROLL_STABLE_STEPS,
+			maxDurationMs: AUTO_SCROLL_MAX_DURATION_MS,
 		},
 	);
 }
@@ -161,45 +183,55 @@ export async function collectPageImages(
 	);
 
 	if (images && options.measureResolution !== false) {
-		for (const image of images
+		const pending = images
 			.filter((candidate) => !candidate.width)
-			.slice(0, SCRAPE_LIMITS.imageMeasurementCount)) {
-			const dimensions = await page.evaluate(
-				async ({ url, timeoutMs }) => {
-					const image = new Image();
-					return new Promise<{ width: number; height: number } | null>(
-						(resolve) => {
-							const timer = setTimeout(() => {
-								image.src = "";
-								resolve(null);
-							}, timeoutMs);
-							image.onload = () => {
-								clearTimeout(timer);
-								resolve(
-									image.naturalWidth && image.naturalHeight
-										? {
-												width: image.naturalWidth,
-												height: image.naturalHeight,
-											}
-										: null,
-								);
-							};
-							image.onerror = () => {
-								clearTimeout(timer);
-								resolve(null);
-							};
-							image.src = url;
+			.slice(0, SCRAPE_LIMITS.imageMeasurementCount);
+		// Resolution probes are independent per URL, so they share one timeout
+		// ceiling instead of stacking serial browser round-trips.
+		const measured = await Promise.all(
+			pending.map((image) =>
+				page
+					.evaluate(
+						async ({ url, timeoutMs }) => {
+							const image = new Image();
+							return new Promise<{ width: number; height: number } | null>(
+								(resolve) => {
+									const timer = setTimeout(() => {
+										image.src = "";
+										resolve(null);
+									}, timeoutMs);
+									image.onload = () => {
+										clearTimeout(timer);
+										resolve(
+											image.naturalWidth && image.naturalHeight
+												? {
+														width: image.naturalWidth,
+														height: image.naturalHeight,
+													}
+												: null,
+										);
+									};
+									image.onerror = () => {
+										clearTimeout(timer);
+										resolve(null);
+									};
+									image.src = url;
+								},
+							);
 						},
-					);
-				},
-				{
-					url: image.url,
-					timeoutMs: SCRAPE_LIMITS.imageMeasurementTimeoutMs,
-				},
-			);
-			if (dimensions) {
-				image.width = dimensions.width;
-				image.height = dimensions.height;
+						{
+							url: image.url,
+							timeoutMs: SCRAPE_LIMITS.imageMeasurementTimeoutMs,
+						},
+					)
+					.catch(() => null),
+			),
+		);
+		for (const [index, dimensions] of measured.entries()) {
+			const target = pending[index];
+			if (dimensions && target) {
+				target.width = dimensions.width;
+				target.height = dimensions.height;
 			}
 		}
 	}

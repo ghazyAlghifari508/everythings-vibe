@@ -64,9 +64,10 @@ export const DESKTOP_VIEWPORT = {
 } as const;
 
 const NAV_TIMEOUT_MS = 35_000;
-const IDLE_TIMEOUT_MS = 8_000;
-const POST_SCROLL_IDLE_TIMEOUT_MS = 3_000;
-const SETTLE_MS = 600;
+// ponytail: 6s network-idle ceiling bounds background analytics and continuous asset streams.
+const IDLE_TIMEOUT_MS = 6_000;
+const POST_SCROLL_IDLE_TIMEOUT_MS = 2_500;
+const SETTLE_MS = 300;
 
 export interface RenderedPage {
 	html: string;
@@ -168,21 +169,25 @@ export async function renderPage(
 					() => true,
 				);
 			onTiming?.("firstNetworkIdle", Date.now() - t);
-			await onActivity?.("Memuat konten lazy-load");
-			t = Date.now();
-			await autoScroll(page).catch(() => {});
-			onTiming?.("autoScroll", Date.now() - t);
-			t = Date.now();
-			resourceLoadTimedOut =
-				(await page
-					.waitForLoadState("networkidle", {
-						timeout: POST_SCROLL_IDLE_TIMEOUT_MS,
-					})
-					.then(
-						() => false,
-						() => true,
-					)) || resourceLoadTimedOut;
-			onTiming?.("secondNetworkIdle", Date.now() - t);
+			// Images mode already scans the full DOM with its own discovery pass,
+			// so the scroll sweep only serves design and html captures.
+			if (mode === "design" || mode === "html") {
+				await onActivity?.("Memuat konten lazy-load");
+				t = Date.now();
+				await autoScroll(page).catch(() => {});
+				onTiming?.("autoScroll", Date.now() - t);
+				t = Date.now();
+				resourceLoadTimedOut =
+					(await page
+						.waitForLoadState("networkidle", {
+							timeout: POST_SCROLL_IDLE_TIMEOUT_MS,
+						})
+						.then(
+							() => false,
+							() => true,
+						)) || resourceLoadTimedOut;
+				onTiming?.("secondNetworkIdle", Date.now() - t);
+			}
 			t = Date.now();
 			await page.waitForTimeout(SETTLE_MS);
 			onTiming?.("settle", Date.now() - t);
