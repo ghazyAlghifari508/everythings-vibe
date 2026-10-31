@@ -91,8 +91,24 @@ export function extractStudioRequestedScreenNames(
 	const hasColon = /^\s*:/.test(clause);
 	let segment = clause.replace(/^[\s:,;–—-]+/, "").trim();
 	if (!segment) return [];
-	const boundary = segment.search(CLAUSE_BOUNDARY);
-	if (boundary > 0) segment = segment.slice(0, boundary).trim();
+	const boundaryMatch = CLAUSE_BOUNDARY.exec(segment);
+	if (boundaryMatch && boundaryMatch.index > 0) {
+		const head = segment.slice(0, boundaryMatch.index).trim();
+		if (NO_NAME_SEGMENT.test(head)) {
+			// e.g. "baru untuk Catat Transaksi" -> the name follows "untuk"
+			const remainder = segment
+				.slice(boundaryMatch.index + boundaryMatch[0].length)
+				.trim();
+			const nextBoundary = remainder.search(CLAUSE_BOUNDARY);
+			segment =
+				nextBoundary > 0 ? remainder.slice(0, nextBoundary).trim() : remainder;
+		} else {
+			segment = head;
+		}
+	} else {
+		const boundary = segment.search(CLAUSE_BOUNDARY);
+		if (boundary > 0) segment = segment.slice(0, boundary).trim();
+	}
 	if (!segment) return [];
 	if (NO_NAME_SEGMENT.test(segment)) return [];
 	if (MODIFIER_START.test(segment)) return null;

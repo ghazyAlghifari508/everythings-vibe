@@ -73,6 +73,7 @@ export const studioDesignBlueprintSchema = z.object({
 	}),
 	navigationContract: studioNavigationContractSchema,
 	canonicalShell: studioCanonicalShellSchema.optional(),
+	// ponytail: max 12 screens covers Studio canvas add-screen growth; upgrade when canvas pagination is introduced.
 	screenPlan: z
 		.array(
 			z.object({
@@ -82,7 +83,7 @@ export const studioDesignBlueprintSchema = z.object({
 			}),
 		)
 		.min(1)
-		.max(5),
+		.max(12),
 });
 
 export type StudioDesignBlueprint = z.infer<typeof studioDesignBlueprintSchema>;
