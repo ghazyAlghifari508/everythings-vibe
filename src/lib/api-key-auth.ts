@@ -57,8 +57,17 @@ export async function apiKeyAuth(
 		.limit(1);
 
 	if (!keyRecord) return { error: "Invalid API key", status: 401 };
-	if (keyRecord.expiresAt && new Date(keyRecord.expiresAt) < new Date()) {
-		return { error: "API key expired", status: 401 };
+	// Fail closed on the deadline: an unparseable expiry is treated as expired
+	// rather than as "no expiry", so corrupted or hand-edited rows cannot turn a
+	// bounded handoff credential into permanent access. A null deadline is the
+	// only long-lived case, and minting a handoff key always sets one.
+	if (keyRecord.expiresAt !== null && keyRecord.expiresAt !== undefined) {
+		const expiresAt = new Date(keyRecord.expiresAt);
+		if (
+			!Number.isFinite(expiresAt.getTime()) ||
+			expiresAt.getTime() <= Date.now()
+		)
+			return { error: "API key expired", status: 401 };
 	}
 
 	const scopes = keyRecord.scopes ?? [];
