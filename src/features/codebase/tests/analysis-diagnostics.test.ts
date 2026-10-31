@@ -328,5 +328,34 @@ describe("diagnostic log record", () => {
 		});
 		expect("issuePaths" in record).toBe(false);
 		expect("rawLength" in record).toBe(false);
+		expect("creditOperationId" in record).toBe(false);
+		expect("operationState" in record).toBe(false);
+		expect("operationExpiresAt" in record).toBe(false);
+		expect("stage" in record).toBe(false);
+		expect("errorCode" in record).toBe(false);
+	});
+
+	it("carries safe credit identity without secrets or model output", () => {
+		const record = formatAnalysisDiagnosticLog({
+			attemptId: "attempt_3",
+			projectId: "proj_diag",
+			snapshotId: "snap_diag",
+			category: "persistence",
+			durationMs: 54807,
+			stage: "persist",
+			creditOperationId: "op_123",
+			operationState: "running",
+			operationExpiresAt: "2026-10-31T00:00:00.000Z",
+			errorCode: "ANALYSIS_FAILED",
+		});
+		expect(record.creditOperationId).toBe("op_123");
+		expect(record.operationState).toBe("running");
+		expect(record.operationExpiresAt).toBe("2026-10-31T00:00:00.000Z");
+		expect(record.stage).toBe("persist");
+		expect(record.errorCode).toBe("ANALYSIS_FAILED");
+		const serialized = JSON.stringify(record);
+		for (const secret of ["sk-", "token", "api key", "prompt"]) {
+			expect(serialized.toLowerCase()).not.toContain(secret);
+		}
 	});
 });

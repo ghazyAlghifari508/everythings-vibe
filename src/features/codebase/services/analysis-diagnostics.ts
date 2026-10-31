@@ -158,6 +158,11 @@ export interface AnalysisDiagnosticRecord {
 	snapshotId: string;
 	category: AnalysisFailureCategory;
 	durationMs: number;
+	creditOperationId?: string;
+	operationState?: string;
+	operationExpiresAt?: string;
+	stage?: AnalysisAttemptStage;
+	errorCode?: string;
 	issuePaths?: readonly string[];
 	rawLength?: number;
 }
@@ -165,6 +170,10 @@ export interface AnalysisDiagnosticRecord {
 export function formatAnalysisDiagnosticLog(
 	record: AnalysisDiagnosticRecord,
 ): Record<string, string | number | readonly string[]> {
+	const errorCode =
+		typeof record.errorCode === "string"
+			? record.errorCode.slice(0, 80)
+			: undefined;
 	const shaped: Record<string, string | number | readonly string[]> = {
 		attemptId: record.attemptId,
 		projectId: record.projectId,
@@ -172,6 +181,16 @@ export function formatAnalysisDiagnosticLog(
 		category: record.category,
 		durationMs: record.durationMs,
 	};
+	// Credit operation identity is safe internal metadata (ids + state +
+	// expiry only): no CLI tokens, API keys, source content, or model
+	// output ever enters this record.
+	if (record.creditOperationId)
+		shaped.creditOperationId = record.creditOperationId;
+	if (record.operationState) shaped.operationState = record.operationState;
+	if (record.operationExpiresAt)
+		shaped.operationExpiresAt = record.operationExpiresAt;
+	if (record.stage) shaped.stage = record.stage;
+	if (errorCode) shaped.errorCode = errorCode;
 	if (record.issuePaths && record.issuePaths.length > 0) {
 		shaped.issuePaths = record.issuePaths;
 	}
