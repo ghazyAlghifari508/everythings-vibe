@@ -18,7 +18,6 @@ import {
 	Layers01Icon,
 	LinkSquare02Icon,
 	Search01Icon,
-	Settings02Icon,
 	Shield01Icon,
 	ShieldCheckIcon,
 	SparklesIcon,
@@ -72,12 +71,11 @@ describe("TASK 10F: Admin domain icon system verification", () => {
 				<Icon icon={BubbleChatIcon} size={14} />
 				<Icon icon={GitBranchIcon} size={14} />
 				<Icon icon={CreditCardIcon} size={14} />
-				<Icon icon={Settings02Icon} size={14} />
 			</div>,
 		);
 
 		const svgs = container.querySelectorAll("svg");
-		expect(svgs.length).toBe(6);
+		expect(svgs.length).toBe(5);
 		for (const svg of svgs) {
 			expect(svg.getAttribute("aria-hidden")).toBe("true");
 		}

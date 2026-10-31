@@ -5,7 +5,6 @@ import {
 	CreditCardIcon,
 	DashboardSquare01Icon,
 	GitBranchIcon,
-	Settings02Icon,
 	UserGroupIcon,
 } from "@hugeicons/core-free-icons";
 import { Link, useLocation } from "@tanstack/react-router";
@@ -56,13 +55,6 @@ const NAV_ITEMS: NavItem[] = [
 		icon: CreditCardIcon,
 		isActive: (p: string) =>
 			p === "/admin/transactions" || p.startsWith("/admin/transactions/"),
-	},
-	{
-		href: "/settings/profile",
-		label: "Pengaturan",
-		icon: Settings02Icon,
-		isActive: (p: string) =>
-			p.startsWith("/admin/settings") || p.startsWith("/settings"),
 	},
 ];
 

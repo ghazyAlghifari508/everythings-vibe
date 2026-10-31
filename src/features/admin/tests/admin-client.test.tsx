@@ -56,7 +56,7 @@ describe("AdminClient Top-Nav Shell", () => {
 		container?.remove();
 	});
 
-	it("renders a single navigation landmark with compact Admin label, all 6 tabs, theme toggle, and exit link", () => {
+	it("renders a single navigation landmark with compact Admin label, exactly 5 tabs, theme toggle, and exit link", () => {
 		act(() => {
 			root?.render(
 				<AdminClient>
@@ -76,13 +76,25 @@ describe("AdminClient Top-Nav Shell", () => {
 		expect(container.textContent).toContain("Admin");
 		expect(container.textContent).not.toContain("Admin Panel");
 
-		// All 6 navigation tabs
+		// Exactly 5 navigation tabs (Pengaturan removed)
+		const navLinks = Array.from(container.querySelectorAll("nav a"));
+		expect(navLinks.length).toBe(5);
 		expect(container.textContent).toContain("Ringkasan");
 		expect(container.textContent).toContain("Pengguna");
 		expect(container.textContent).toContain("Tiket");
 		expect(container.textContent).toContain("Proyek");
 		expect(container.textContent).toContain("Transaksi");
-		expect(container.textContent).toContain("Pengaturan");
+		expect(container.textContent).not.toContain("Pengaturan");
+
+		// Target destinations intact
+		const hrefs = navLinks.map((l) => l.getAttribute("href"));
+		expect(hrefs).toEqual([
+			"/admin",
+			"/admin/users",
+			"/admin/feedback",
+			"/admin/projects",
+			"/admin/transactions",
+		]);
 
 		// No exit link in header shell
 		const exitLink = container.querySelector('a[href="/"]');
