@@ -64,6 +64,12 @@ export const studioNavigationContractSchema = z.object({
 });
 
 export const studioDesignBlueprintSchema = z.object({
+	explicitColorOverrides: z
+		.array(
+			z.enum(["primary", "background", "surface", "ink", "muted", "border"]),
+		)
+		.max(6)
+		.optional(),
 	productIdentity: z.object({
 		productName: z.string().min(1).max(200),
 		targetAudience: z.string().min(1).max(300),

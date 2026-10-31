@@ -141,6 +141,24 @@ describe("mocked project identity remains project-scoped", () => {
 });
 
 describe("visual direction token boundaries", () => {
+	it("preserves explicit user primary over a conflicting reference", () => {
+		const raw = planningOutput("Sample", "#166534").replace(
+			'"blueprint":{',
+			'"blueprint":{"explicitColorOverrides":["primary"],',
+		);
+		const parsed = parseStudioPlanningWithBlueprint(raw, "web", 1);
+		if (!parsed.ok) throw new Error(parsed.error);
+		const reference = extractDesignSystemTokens(
+			"## Colors\n| Primary | #9a3412 | Brand accent |",
+		);
+		const html = assembleCanonicalShell(
+			"<html><head></head><body><main>Content</main></body></html>",
+			parsed.blueprint,
+			"Overview",
+			reference,
+		);
+		expect(html).toContain("--app-primary:#166534;");
+	});
 	it("requires complete new automatic direction but reads legacy persisted blueprints", () => {
 		const raw = planningOutput("Sample", valid.primary);
 		const legacy = raw.replace(

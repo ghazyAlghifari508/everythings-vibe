@@ -90,6 +90,10 @@ Choose one coherent project-wide designTokens set: primary accent, secondary acc
 	);
 
 	sections.push(
+		`If the user explicitly requests color changes that conflict with the reference, put ONLY the affected token names in blueprint.explicitColorOverrides (primary, background, surface, ink, muted, border) and put the requested accessible values in designTokens. Leave this list empty when the user has not explicitly requested an override. Preserve all other reference rules. Never infer an override from industry or skill advice.`,
+	);
+
+	sections.push(
 		`Design precedence, highest to lowest: safety and platform validity > explicit user requirements > authoritative PRD requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override safety, platform validity, explicit user colors, or brand requirements. Resolve conflicts deterministically in that order.`,
 	);
 

@@ -38,11 +38,23 @@ function shellStyle(
 ): string {
 	const bp = blueprint.designTokens;
 	const shell = blueprint.canonicalShell;
-	const primary = tokens?.colors.primary ?? bp.primary;
-	const canvas = tokens?.colors.canvas ?? bp.background;
-	const surface = tokens?.colors.surface ?? bp.surface;
-	const ink = tokens?.colors.ink ?? bp.ink ?? "#171717";
-	const muted = tokens?.colors.muted ?? bp.muted ?? bp.secondary;
+	const overrides = blueprint.explicitColorOverrides ?? [];
+	const primary = overrides.includes("primary")
+		? bp.primary
+		: (tokens?.colors.primary ?? bp.primary);
+	const canvas = overrides.includes("background")
+		? bp.background
+		: (tokens?.colors.canvas ?? bp.background);
+	const surface = overrides.includes("surface")
+		? bp.surface
+		: (tokens?.colors.surface ?? bp.surface);
+	const ink =
+		(overrides.includes("ink") ? bp.ink : (tokens?.colors.ink ?? bp.ink)) ??
+		"#171717";
+	const muted =
+		(overrides.includes("muted")
+			? bp.muted
+			: (tokens?.colors.muted ?? bp.muted)) ?? bp.secondary;
 	const onPrimary =
 		bp.onPrimary && studioColorContrast(bp.onPrimary, primary) >= 4.5
 			? bp.onPrimary
@@ -50,9 +62,10 @@ function shellStyle(
 					studioColorContrast("#000000", primary)
 				? "#ffffff"
 				: "#000000";
-	const border = tokens?.colors.border
-		? `1px solid ${tokens.colors.border}`
-		: bp.border;
+	const border =
+		!overrides.includes("border") && tokens?.colors.border
+			? `1px solid ${tokens.colors.border}`
+			: bp.border;
 	const font = tokens?.typography.fontFamily ?? bp.fontFamily;
 	const gutter = shell?.density === "compact" ? 16 : 24;
 	return `<style id="studio-canonical-style">
