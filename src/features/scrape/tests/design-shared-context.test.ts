@@ -62,3 +62,52 @@ it("never labels a value missing in another view as shared", () => {
 		),
 	).toBe(false);
 });
+
+it("partitions guidelines and limitations only when their complete evidence is shared", () => {
+	const model = buildDesignModel({
+		...FIXTURE,
+		additionalViews: [structuredClone(FIXTURE)],
+	});
+	const views = model.views ?? [];
+	const first = views[0];
+	const second = views[1];
+	if (!first || !second) throw new Error("Expected two captures");
+	first.model.guidelines = {
+		dos: [
+			{ rule: "shared", evidence: "same" },
+			{ rule: "scoped", evidence: "first" },
+		],
+		donts: [],
+		limitations: [],
+	};
+	second.model.guidelines = {
+		dos: [
+			{ rule: "shared", evidence: "same" },
+			{ rule: "scoped", evidence: "second" },
+		],
+		donts: [],
+		limitations: [],
+	};
+	first.model.limitations = ["shared", "first"];
+	second.model.limitations = ["shared", "second"];
+	const original = structuredClone(views);
+	const { shared, specific } = partitionDesignViews(views);
+	expect(shared.guidelines.dos).toEqual([{ rule: "shared", evidence: "same" }]);
+	expect(specific.map((view) => view.model.guidelines.dos)).toEqual([
+		[{ rule: "scoped", evidence: "first" }],
+		[{ rule: "scoped", evidence: "second" }],
+	]);
+	expect(shared.limitations).toEqual(["shared"]);
+	expect(specific.map((view) => view.model.limitations)).toEqual([
+		["first"],
+		["second"],
+	]);
+	expect(views).toEqual(original);
+	const document = renderDesignMd(model);
+	const limitations =
+		document.split("## Limitations & Confidence Notes")[1]?.split("\n## ")[0] ??
+		"";
+	expect(limitations).toContain("- shared");
+	expect(limitations).toContain("first");
+	expect(limitations).toContain("second");
+});

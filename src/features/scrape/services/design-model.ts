@@ -23,6 +23,7 @@ import {
 import {
 	groupTypeSpecimens,
 	normalizeTypefaces,
+	parsePx,
 } from "../utils/design-normalize-typography";
 import { compareCaptures } from "./design-capture-comparison";
 import { deriveModelGuidelines } from "./design-model-guidance";
@@ -223,6 +224,18 @@ export function buildDesignModel(
 		limitations.push(
 			`${unsupportedColors.length} measured colour value${unsupportedColors.length === 1 ? "" : "s"} use${unsupportedColors.length === 1 ? "s" : ""} a modern colour space the parser cannot reduce to sRGB (${unsupportedColors.slice(0, 3).join(", ")}); ${unsupportedColors.length === 1 ? "it is" : "they are"} omitted from tokens rather than guessed.`,
 		);
+	// Text measured at a non-positive size cannot describe a type scale, but the
+	// measurement is evidence and stays in the capture instead of being deleted.
+	const unreadableSizeText = evidence.elements.filter((element) => {
+		if (element.role === "canvas") return false;
+		if (!(element.directText ?? element.text).trim()) return false;
+		const size = parsePx(element.properties["font-size"] ?? "");
+		return !Number.isFinite(size) || size <= 0;
+	}).length;
+	if (unreadableSizeText)
+		limitations.push(
+			`${unreadableSizeText} text element${unreadableSizeText === 1 ? "" : "s"} reported a non-positive computed font size and ${unreadableSizeText === 1 ? "is" : "are"} excluded from the type scale; the raw measurements remain in the capture evidence.`,
+		);
 	for (const view of views) {
 		const appearance = inferTheme(view);
 		if (
@@ -231,7 +244,9 @@ export function buildDesignModel(
 			appearance !== view.colorScheme
 		)
 			limitations.push(
-				`Requested browser preference ${view.colorScheme} at ${view.viewport.width}px; measured canvas appearance ${appearance}. The requested site theme was not verified.`,
+				appearance === "unknown"
+					? `A ${view.colorScheme} browser preference was requested but the measured canvas appearance could not be established, so no ${view.colorScheme} tokens are claimed.`
+					: `A ${view.colorScheme} browser preference was requested but the measured canvas rendered ${appearance}, so no ${view.colorScheme} tokens are claimed.`,
 			);
 	}
 	if ((options.theme ?? inferredTheme) === "unknown")

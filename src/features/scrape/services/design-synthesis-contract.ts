@@ -222,8 +222,8 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 			),
 			radii: view.model.radii.map(({ purpose, value }) => ({ purpose, value })),
 		})),
-		comparisons: model.comparisons,
-		capturedViews: model.capturedViews,
+		comparisons: model.comparisons?.slice(),
+		capturedViews: model.capturedViews?.slice(),
 		analysisScope:
 			model.settings?.focus === "visual-tokens"
 				? "Analyze visual tokens only; return no componentPatterns."
@@ -304,22 +304,39 @@ export function buildSynthesisPayload(model: DesignTokenModel): string {
 			roles: surface.roles,
 		})),
 		measuredGuidelines: {
-			dos: model.guidelines.dos,
-			donts: model.guidelines.donts,
+			dos: model.guidelines.dos.slice(),
+			donts: model.guidelines.donts.slice(),
 		},
-		limitations: model.limitations,
+		limitations: model.limitations.slice(),
 	};
-	// The payload must fit the provider budget. Component text carries the
-	// longest free-form strings, so it is what gives way first, and the cut is
-	// reported rather than hidden.
 	let serialized = JSON.stringify(payload);
-	while (
-		serialized.length > DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS &&
-		payload.observedComponents.length > 0
-	) {
-		payload.observedComponents.pop();
-		payload.payloadTruncated = true;
-		serialized = JSON.stringify(payload);
+	const optionalEvidence = [
+		payload.observedComponents,
+		payload.comparisons,
+		payload.viewContexts,
+		payload.capturedViews,
+		payload.measuredGuidelines.dos,
+		payload.measuredGuidelines.donts,
+		payload.limitations,
+		payload.elevation,
+		payload.surfaces,
+		payload.colors,
+		payload.typography,
+		payload.typefaces,
+		payload.spacing,
+		payload.radii,
+	];
+	for (const entries of optionalEvidence) {
+		while (
+			serialized.length > DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS &&
+			entries?.length
+		) {
+			entries.pop();
+			payload.payloadTruncated = true;
+			serialized = JSON.stringify(payload);
+		}
 	}
+	if (serialized.length > DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS)
+		throw new Error("Synthesis payload metadata exceeds the provider budget");
 	return serialized;
 }

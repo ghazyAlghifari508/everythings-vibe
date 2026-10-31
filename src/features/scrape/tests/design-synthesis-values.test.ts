@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	designSynthesisSchema,
+	parseSynthesisResponse,
 	validateSynthesis,
 } from "@/features/scrape/services/design-synthesis";
 import { buildFixtureModel } from "@/lib/design-fixture";
@@ -58,6 +59,37 @@ describe("synthesis value validation", () => {
 			implementationGuidance: ["Set headings in Inter."],
 		});
 		expect(issues).toEqual([]);
+	});
+
+	it.each([
+		"The font size follows the measured scale.",
+		"Use font family: Inter for headings.",
+		"Use the font Inter for body text.",
+	])("accepts measured font references and ordinary typography prose: %s", (overview) => {
+		expect(issuesFor({ overview })).toEqual([]);
+	});
+
+	it("rejects an unmeasured explicit font family followed by prose", () => {
+		const issues = issuesFor({
+			overview: "Use font family: Garamond for headings.",
+		});
+		expect(issues.some((issue) => issue.code === "unknown-value")).toBe(true);
+	});
+
+	it("does not ignore an unmeasured family after a measured family", () => {
+		const issues = issuesFor({ overview: "Use font Inter and Garamond." });
+		expect(issues.some((issue) => issue.code === "unknown-value")).toBe(true);
+	});
+
+	it("reports an unmeasured value as its own cause and rejects synthesis", () => {
+		const outcome = parseSynthesisResponse(
+			JSON.stringify(synthesis({ overview: "Use font family: Garamond." })),
+			model,
+			(text) => text,
+		);
+		expect(outcome.status).toBe("unavailable");
+		expect(outcome.synthesis).toBeNull();
+		expect(outcome.cause).toBe("unknown_value");
 	});
 
 	it("rejects a percentage that was never measured", () => {

@@ -41,29 +41,19 @@ export function isValidCssLength(value: string): boolean {
 	return CSS_LENGTH.test(trimmed);
 }
 
-// A border-radius accepts one to four corner values and an optional slash
-// syntax for elliptical corners. These are valid CSS radius values even though
-// they are not a single length, so they get their own validation instead of
-// being dropped by the scalar length rule.
-const RADIUS_VALUE =
-	/^-?(?:\d+(?:\.\d+)?|\.\d+)(px|rem|em|%|vw|vh|vmin|vmax|dvh|dvw|ch|ex|cap|lh)$/;
-
 export function isValidCssRadius(value: string): boolean {
-	const trimmed = value.trim();
-	if (isValidCssLength(trimmed)) return true;
-	const [corners, ...extra] = trimmed.split("/");
-	if (extra.length > 1) return false;
-	const parts = (corners ?? "").trim().split(/\s+/).filter(Boolean);
-	if (parts.length < 1 || parts.length > 4) return false;
-	if (!parts.every((part) => RADIUS_VALUE.test(part))) return false;
-	// The slash form carries a horizontal and a vertical radius, so it needs
-	// exactly two values on the right-hand side.
-	if (extra.length === 1) {
-		const ellipse = extra[0]?.trim().split(/\s+/).filter(Boolean) ?? [];
-		if (ellipse.length < 1 || ellipse.length > 2) return false;
-		if (!ellipse.every((part) => RADIUS_VALUE.test(part))) return false;
-	}
-	return true;
+	const axes = value.split("/");
+	return (
+		axes.length <= 2 &&
+		axes.every((axis) => {
+			const parts = axis.trim().split(/\s+/).filter(Boolean);
+			return (
+				parts.length >= 1 &&
+				parts.length <= 4 &&
+				parts.every((part) => !part.startsWith("-") && isValidCssLength(part))
+			);
+		})
+	);
 }
 
 // A CSS custom property name must be a valid identifier. Names derived from a
@@ -106,100 +96,153 @@ export interface TokenDeclarations {
 	radius: string[];
 }
 
+export interface TokenEntry {
+	group: keyof TokenDeclarations;
+	name: string;
+	value: string;
+}
+
+const GROUP_ORDER: (keyof TokenDeclarations)[] = [
+	"color",
+	"font",
+	"type",
+	"spacing",
+	"container",
+	"radius",
+];
+
+// The radius alias says which component class the rounding belongs to. A pill
+// treatment keeps its own alias instead of becoming an unexplained `-2` suffix,
+// and a capture scope never leaks into a property name because scoped values are
+// emitted as overrides instead of extra global aliases.
+export function radiusAliasLabel(token: DesignTokenModel["radii"][number]): string {
+	const base =
+		token.purpose === "Measured radius"
+			? (token.roles[0] ?? "measured")
+			: token.purpose;
+	return token.pill ? `${base} pill` : base;
+}
+
 // Only tokens that pass validation reach the stylesheet, and generated
 // implementation aliases are labelled as generated rather than presented as
 // the website's own variables.
 // Semantic names reflect validated meaning: unknown or unproven roles use
 // measured-N aliases instead of brand/accent claims.
-export function buildTokenDeclarations(
-	model: DesignTokenModel,
-): TokenDeclarations {
-	const colorEntries = uniqueTokenNames(
-		model.colors.flatMap((color, index) => {
-			if (!isValidCssColor(color.value)) return [];
+export function tokenEntries(model: DesignTokenModel): TokenEntry[] {
+	const entries: TokenEntry[] = [];
+	const add = (
+		group: keyof TokenDeclarations,
+		candidates: { name: string | null; value: string }[],
+	) => {
+		const named = candidates.filter(
+			(candidate): candidate is { name: string; value: string } =>
+				candidate.name !== null && candidate.value.trim().length > 0,
+		);
+		for (const entry of uniqueTokenNames(named))
+			entries.push({ group, name: entry.name, value: entry.value });
+	};
+	add(
+		"color",
+		model.colors.map((color, index) => {
+			if (!isValidCssColor(color.value)) return { name: null, value: "" };
 			const label =
 				color.roleClass === "unknown" || color.confidence === "unknown"
 					? `measured ${index + 1}`
 					: color.role;
-			const name = tokenName("--color", label);
-			return name ? [{ name, value: color.value }] : [];
+			return { name: tokenName("--color", label), value: color.value };
 		}),
 	);
-	const spacingEntries = uniqueTokenNames(
-		model.spacing.flatMap((token) => {
-			// Container widths are not spacing steps: they live under the
-			// Tailwind v4 container scale instead of the spacing namespace.
-			if (token.purpose === "Container max-width") return [];
-			if (!isValidCssLength(token.value)) return [];
-			const name = tokenName("--spacing", token.purpose);
-			return name ? [{ name, value: token.value }] : [];
-		}),
+	add(
+		"font",
+		model.typefaces.map((typeface) => ({
+			name: tokenName("--font", typeface.family),
+			// A family name can only enter a declaration when it cannot break the
+			// CSS syntax. Unicode letters are allowed for CJK families.
+			value: /^[\w\s,'"\-\p{L}\p{M}]+$/u.test(typeface.stack)
+				? typeface.stack
+				: "",
+		})),
+	);
+	const type: { name: string | null; value: string }[] = [];
+	for (const entry of model.typography) {
+		const sizeName = tokenName("--text", entry.role);
+		if (sizeName && isValidCssLength(entry.fontSize))
+			type.push({ name: sizeName, value: entry.fontSize });
+		const leadingName = tokenName("--leading", entry.role);
+		if (
+			leadingName &&
+			(CSS_NUMBER.test(entry.lineHeight.trim()) ||
+				isValidCssLength(entry.lineHeight))
+		)
+			type.push({ name: leadingName, value: entry.lineHeight });
+		const trackingName = tokenName("--tracking", entry.role);
+		// `normal` is a reset, not a measured tracking decision, so it would ship
+		// a token with no implementation meaning.
+		if (
+			trackingName &&
+			entry.letterSpacing.trim() !== "normal" &&
+			isValidCssLength(entry.letterSpacing)
+		)
+			type.push({ name: trackingName, value: entry.letterSpacing });
+	}
+	add("type", type);
+	add(
+		"spacing",
+		// Container widths are not spacing steps: they live under the Tailwind v4
+		// container scale instead of the spacing namespace.
+		model.spacing.map((token) => ({
+			name:
+				token.purpose === "Container max-width" ||
+				!isValidCssLength(token.value)
+					? null
+					: tokenName("--spacing", token.purpose),
+			value: token.value,
+		})),
 	);
 	// Measured max-widths map to the Tailwind v4 container scale, so they
 	// generate max-width utilities instead of corrupting the spacing scale.
-	const containerEntries = uniqueTokenNames(
-		model.spacing.flatMap((token) => {
-			if (token.purpose !== "Container max-width") return [];
-			if (!isValidCssLength(token.value)) return [];
-			const name = tokenName("--container", "max-width");
-			return name ? [{ name, value: token.value }] : [];
-		}),
+	add(
+		"container",
+		model.spacing.map((token) => ({
+			name:
+				token.purpose === "Container max-width" &&
+				isValidCssLength(token.value)
+					? tokenName("--container", "max-width")
+					: null,
+			value: token.value,
+		})),
 	);
-	const radiusEntries = uniqueTokenNames(
-		model.radii.flatMap((token) => {
-			if (!isValidCssRadius(token.value)) return [];
-			// A value measured in more than one capture keeps its capture in the
-			// alias name, so two scoped facts never collapse into one property.
-			const label = token.scope
-				? `${token.purpose} ${token.scope}`
-				: token.purpose;
-			const name = tokenName("--radius", label);
-			return name ? [{ name, value: token.value }] : [];
-		}),
+	add(
+		"radius",
+		model.radii.map((token) => ({
+			name: isValidCssRadius(token.value)
+				? tokenName("--radius", radiusAliasLabel(token))
+				: null,
+			value: token.value,
+		})),
 	);
-	const typeEntries = uniqueTokenNames(
-		model.typography.flatMap((entry) => {
-			const entries: { name: string; value: string }[] = [];
-			const sizeName = tokenName("--text", entry.role);
-			if (sizeName && isValidCssLength(entry.fontSize))
-				entries.push({ name: sizeName, value: entry.fontSize });
-			const leadingName = tokenName("--leading", entry.role);
-			if (
-				leadingName &&
-				(CSS_NUMBER.test(entry.lineHeight.trim()) ||
-					isValidCssLength(entry.lineHeight))
-			)
-				entries.push({ name: leadingName, value: entry.lineHeight });
-			const trackingName = tokenName("--tracking", entry.role);
-			if (
-				trackingName &&
-				(entry.letterSpacing.trim() === "normal" ||
-					isValidCssLength(entry.letterSpacing))
-			)
-				entries.push({ name: trackingName, value: entry.letterSpacing });
-			return entries;
-		}),
+	return entries.sort(
+		(a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group),
 	);
-	const fontEntries = uniqueTokenNames(
-		model.typefaces.flatMap((typeface) => {
-			const name = tokenName("--font", typeface.family);
-			// A family name can only enter a declaration when it cannot break the
-			// CSS syntax. Unicode letters are allowed for CJK families.
-			return name && /^[\w\s,'"\-\p{L}\p{M}]+$/u.test(typeface.stack)
-				? [{ name, value: typeface.stack }]
-				: [];
-		}),
-	);
-	const declaration = (entry: { name: string; value: string }) =>
-		`  ${entry.name}: ${entry.value};`;
-	return {
-		color: colorEntries.map(declaration),
-		font: fontEntries.map(declaration),
-		type: typeEntries.map(declaration),
-		spacing: spacingEntries.map(declaration),
-		container: containerEntries.map(declaration),
-		radius: radiusEntries.map(declaration),
+}
+
+// Only tokens that pass validation reach the stylesheet, and generated
+// implementation aliases are labelled as generated rather than presented as
+// the website's own variables.
+export function buildTokenDeclarations(
+	model: DesignTokenModel,
+): TokenDeclarations {
+	const declarations: TokenDeclarations = {
+		color: [],
+		font: [],
+		type: [],
+		spacing: [],
+		container: [],
+		radius: [],
 	};
+	for (const entry of tokenEntries(model))
+		declarations[entry.group].push(`  ${entry.name}: ${entry.value};`);
+	return declarations;
 }
 
 // The CSS and Tailwind outputs group the same declarations in the same order,

@@ -112,7 +112,7 @@ export function normalizeRadii(
 		if (context) context.push(element);
 		else contexts.set(key, [element]);
 	}
-	return [...contexts.values()]
+	const measured = [...contexts.values()]
 		.flatMap((context) =>
 			groupMeasurements(context, ["border-radius"]).map((group) =>
 				classifyRadiusToken(group, context),
@@ -120,19 +120,39 @@ export function normalizeRadii(
 		)
 		.filter((token) => {
 			if (!token.contextual) return false;
-			// Zero rounding on ordinary containers is the absence of a decision,
-			// not a radius token. It only counts when a real component class was
-			// measured square on purpose.
-			if (token.valuePx === 0)
-				return token.roles.some((role) => role !== "element");
+			// Zero rounding is the absence of a rounding decision, so it is not a
+			// design token. It only survives when a real component class was measured
+			// square on purpose, which the component section already states.
+			if (token.valuePx === 0) return token.purpose !== "Measured radius";
 			return true;
-		})
-		.sort(
-			(a, b) =>
-				b.frequency - a.frequency ||
-				(Number.isFinite(b.valuePx) ? b.valuePx : 0) -
-					(Number.isFinite(a.valuePx) ? a.valuePx : 0),
+		});
+	// Two element classes can resolve to the same component purpose at the same
+	// value in the same capture. That is one component fact, not two tokens.
+	const merged = new Map<string, RadiusToken>();
+	for (const token of measured) {
+		const key = [token.scope, token.purpose, token.value, token.pill].join(
+			"\u0000",
 		);
+		const existing = merged.get(key);
+		if (existing) {
+			existing.frequency += token.frequency;
+			existing.roles = [
+				...new Set([...existing.roles, ...token.roles]),
+			].slice(0, 6);
+			existing.selectors = [
+				...new Set([...existing.selectors, ...token.selectors]),
+			].slice(0, AUDIT_LIMIT);
+			continue;
+		}
+		merged.set(key, token);
+	}
+	return [...merged.values()].sort(
+		(a, b) =>
+			a.purpose.localeCompare(b.purpose) ||
+			b.frequency - a.frequency ||
+			(Number.isFinite(b.valuePx) ? b.valuePx : 0) -
+				(Number.isFinite(a.valuePx) ? a.valuePx : 0),
+	);
 }
 
 // Pill and fully-rounded shapes come from very large radii. The original value

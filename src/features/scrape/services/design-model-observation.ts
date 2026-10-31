@@ -4,7 +4,6 @@ import type {
 	ModelComponentTreatment,
 } from "@/features/scrape/types/design-model";
 import { normalizeColor } from "../utils/design-color-parse";
-import { isPillRadius } from "../utils/design-normalize-shape";
 import {
 	parsePx,
 	primaryFontFamily,
@@ -93,6 +92,7 @@ export function curateComponentProperties(
 // reader can apply directly. Measured values only; nothing is inferred here.
 export function describeComponentProperties(
 	properties: Record<string, string>,
+	elements: VisualElementEvidence[] = [],
 ): ModelComponentCharacteristic[] {
 	const characteristics: ModelComponentCharacteristic[] = [];
 	const push = (label: string, value: string) => {
@@ -124,7 +124,21 @@ export function describeComponentProperties(
 	}
 	const radius = properties["border-radius"];
 	if (radius) {
-		const pill = isPillRadius(parsePx(radius));
+		const scalar = radius.trim();
+		const value = /^(?:\d+(?:\.\d+)?|\.\d+)px$/.test(scalar)
+			? Number(scalar.slice(0, -2))
+			: 0;
+		const pill =
+			value > 0 &&
+			elements.length > 0 &&
+			elements.every(
+				(element) =>
+					Number.isFinite(element.width) &&
+					Number.isFinite(element.height) &&
+					element.width > 0 &&
+					element.height > 0 &&
+					value >= Math.min(element.width, element.height) / 2,
+			);
 		push("Corner radius", pill ? `${radius} (pill)` : radius);
 	}
 	push("Padding", properties.padding ?? "");
@@ -150,11 +164,7 @@ function sharedCharacteristics(
 	);
 }
 
-// Infers light/dark from the measured background luminance. A transparent
-// canvas contributes nothing visible, so transparent and unparsable paints are
-// skipped until the first opaque background: canvas first, then the remaining
-// elements in capture order. Returns unknown when no opaque background was
-// measured, so callers never present a guessed theme as measured.
+// Non-canvas backgrounds cannot establish the page's overall appearance.
 export function inferTheme(
 	evidence: VisualEvidence,
 ): "light" | "dark" | "unknown" {
@@ -162,11 +172,7 @@ export function inferTheme(
 		(element) =>
 			element.role === "canvas" && element.properties["background-color"],
 	);
-	const rest = evidence.elements.filter(
-		(element) =>
-			element.role !== "canvas" && element.properties["background-color"],
-	);
-	for (const element of [...canvas, ...rest]) {
+	for (const element of canvas) {
 		const normalized = normalizeColor(
 			element.properties["background-color"] ?? "",
 		);
@@ -258,7 +264,7 @@ export function deriveObservedComponents(
 				return {
 					label: `Variant ${index + 1}`,
 					properties: curated,
-					characteristics: describeComponentProperties(curated),
+					characteristics: describeComponentProperties(curated, group),
 					width: sample?.width ?? 0,
 					height: sample?.height ?? 0,
 					samples: group.length,

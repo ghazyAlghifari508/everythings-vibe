@@ -36,7 +36,7 @@ describe("inferTheme", () => {
 			}),
 		).toBe("unknown");
 	});
-	it("looks past a transparent canvas to the first opaque background", () => {
+	it("does not infer a canvas theme from a non-canvas background", () => {
 		const theme = inferTheme({
 			...FIXTURE,
 			elements: [
@@ -44,7 +44,7 @@ describe("inferTheme", () => {
 				element({ "background-color": "rgb(255, 255, 255)" }, { role: "body" }),
 			],
 		});
-		expect(theme).toBe("light");
+		expect(theme).toBe("unknown");
 	});
 
 	it("still reports unknown when every measured background is transparent", () => {
