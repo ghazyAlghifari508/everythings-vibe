@@ -64,10 +64,14 @@ export function PlanCodebasePage() {
 	});
 	const canOpenWorkspace = readiness === "planning_ready";
 	const analysisCreditCode = analysisState.creditStatus?.code ?? null;
+	const isExempt = Boolean(
+		analysisState.creditStatus?.billingExempt || creditStatus?.billingExempt,
+	);
 	const analysisBlocked =
-		analysisCreditCode === "INSUFFICIENT_CREDITS" ||
-		analysisCreditCode === "SUBSCRIPTION_PAUSED" ||
-		lastStatus?.errorCode === "INSUFFICIENT_CREDITS";
+		!isExempt &&
+		(analysisCreditCode === "INSUFFICIENT_CREDITS" ||
+			analysisCreditCode === "SUBSCRIPTION_PAUSED" ||
+			lastStatus?.errorCode === "INSUFFICIENT_CREDITS");
 	const reviewReady = hasReadyAnalysisForSnapshot(
 		analysis,
 		lastStatus?.snapshotId ?? null,
@@ -191,7 +195,8 @@ export function PlanCodebasePage() {
 					)}
 				</>
 			)}
-			{creditStatus &&
+			{!creditStatus?.billingExempt &&
+				creditStatus &&
 				(creditStatus.code === "FREE_ALLOWANCE_AVAILABLE" ||
 					creditStatus.code === "CREDIT_REQUIRED") && (
 					<CreditConsentDialog

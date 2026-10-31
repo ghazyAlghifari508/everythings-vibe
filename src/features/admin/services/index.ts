@@ -11,5 +11,6 @@ export {
 	resetUserCredit,
 	setUserAdmin,
 	setUserBanned,
+	setUserBillingExempt,
 	updateUserPlan,
 } from "./admin-users-service";

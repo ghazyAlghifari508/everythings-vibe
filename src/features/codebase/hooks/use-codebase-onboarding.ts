@@ -119,6 +119,7 @@ export function useCodebaseOnboarding({
 	);
 
 	const blocked =
+		!creditStatus?.billingExempt &&
 		creditStatus !== null &&
 		(creditStatus.code === "INSUFFICIENT_CREDITS" ||
 			creditStatus.code === "SUBSCRIPTION_PAUSED" ||
@@ -142,7 +143,10 @@ export function useCodebaseOnboarding({
 
 	const requestConsent = useCallback(() => {
 		if (!creditStatus) return;
-		if (creditStatus.code === "FREE_ALLOWANCE_AVAILABLE") {
+		if (
+			creditStatus.billingExempt ||
+			creditStatus.code === "FREE_ALLOWANCE_AVAILABLE"
+		) {
 			setConsentAgreed(true);
 			setConsentOpen(false);
 			return;
@@ -173,6 +177,7 @@ export function useCodebaseOnboarding({
 	}, [consentAgreed]);
 
 	const confirmed =
+		Boolean(creditStatus?.billingExempt) ||
 		creditStatus?.code === "FREE_ALLOWANCE_AVAILABLE" ||
 		(creditStatus?.code === "CREDIT_REQUIRED" && consentAgreed);
 
@@ -183,6 +188,7 @@ export function useCodebaseOnboarding({
 			return;
 		}
 		if (
+			!creditStatus.billingExempt &&
 			creditStatus.code !== "FREE_ALLOWANCE_AVAILABLE" &&
 			creditStatus.code !== "CREDIT_REQUIRED"
 		)

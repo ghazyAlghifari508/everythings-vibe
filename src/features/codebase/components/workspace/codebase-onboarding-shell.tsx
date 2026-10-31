@@ -21,11 +21,13 @@ export function CodebaseOnboardingShell({
 	onStart?: () => void;
 	onTopUp?: () => void;
 }) {
+	const isExempt = Boolean(creditStatus?.billingExempt);
 	const blocked =
+		!isExempt &&
 		creditStatus !== null &&
 		(creditStatus.code === "INSUFFICIENT_CREDITS" ||
 			creditStatus.code === "SUBSCRIPTION_PAUSED");
-	const free = creditStatus?.code === "FREE_ALLOWANCE_AVAILABLE";
+	const free = isExempt || creditStatus?.code === "FREE_ALLOWANCE_AVAILABLE";
 	return (
 		<div className="w-full animate-enter">
 			<div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-iron bg-obsidian">
@@ -80,9 +82,11 @@ export function CodebaseOnboardingShell({
 									) : (
 										<>
 											<p className="text-[11px] leading-relaxed text-fog">
-												{free
-													? "Analisis awal gratis, sekali per akun."
-													: `Analisis: maksimal ${creditStatus.maximumCredits} kredit`}
+												{isExempt
+													? "Akun internal — bebas biaya kredit aplikasi."
+													: free
+														? "Analisis awal gratis, sekali per akun."
+														: `Analisis: maksimal ${creditStatus.maximumCredits} kredit`}
 											</p>
 											<button
 												type="button"

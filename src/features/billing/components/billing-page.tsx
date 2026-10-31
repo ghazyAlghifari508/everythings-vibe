@@ -6,6 +6,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import { cancelSubscription } from "@/features/billing/services/payment.functions";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { useUIStore } from "@/store";
@@ -30,6 +31,7 @@ export function BillingPage({
 	const [deleteId, setDeleteId] = useState<string | null>(null);
 	const [cancelOpen, setCancelOpen] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
+	const { data: userPlan } = useUserPlan();
 
 	const handleCancel = async () => {
 		setCancelling(true);
@@ -95,7 +97,11 @@ export function BillingPage({
 						<div>
 							<span className="text-3xl font-bold capitalize">
 								{planLabel}
-								{isPaidPlan && !periodEndDate ? (
+								{userPlan?.billingExempt ? (
+									<span className="ml-2 align-middle inline-flex items-center rounded-full bg-teal-400/10 px-2.5 py-0.5 text-xs font-semibold text-teal-300 border border-teal-400/20">
+										Internal Exempt
+									</span>
+								) : isPaidPlan && !periodEndDate ? (
 									<span className="ml-2 align-middle rounded-full bg-(--bg-surface) px-2 py-0.5 text-xs font-medium text-(--text-secondary)">
 										legacy
 									</span>

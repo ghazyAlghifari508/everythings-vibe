@@ -21,8 +21,19 @@ export const Route = createFileRoute("/api/user/plan")({
 						creditsExhausted: false,
 					});
 
-				const balance = await getCreditBalance(session.user.id);
-				return Response.json({ authenticated: true, ...balance });
+				const { getUserBillingEntitlement } = await import(
+					"@/features/billing/services/billing-entitlement"
+				);
+				const [balance, entitlement] = await Promise.all([
+					getCreditBalance(session.user.id),
+					getUserBillingEntitlement(session.user.id),
+				]);
+				return Response.json({
+					authenticated: true,
+					...balance,
+					billingExempt: entitlement.billingExempt,
+					billingExemptionReason: entitlement.reason,
+				});
 			},
 		},
 	},
