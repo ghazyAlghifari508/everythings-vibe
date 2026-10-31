@@ -3,7 +3,8 @@
 // modelled; the DOM types come from the compiler DOM library.
 declare module "jsdom" {
 	export class JSDOM {
-		constructor(html?: string);
+		constructor(html?: string, options?: { includeNodeLocations?: boolean });
 		readonly window: Window;
+		nodeLocation(node: Node): { startTag?: { endOffset: number } } | null;
 	}
 }
