@@ -3,7 +3,10 @@ import { FIXTURE } from "@/lib/design-fixture";
 import { buildDesignModel } from "../services/design-model";
 import { buildSynthesisPayload } from "../services/design-synthesis";
 import { designSettingsSchema } from "../types/scrape-contract";
-import { inspectorFromEvidence } from "../utils/design-md-inspector";
+import {
+	inspectorFromEvidence,
+	resolveThemeDocuments,
+} from "../utils/design-md-inspector";
 import { renderDesignMd, validateDesignMd } from "../utils/design-md-render";
 
 function captures() {
@@ -209,5 +212,27 @@ describe("semantic multi-capture normalization", () => {
 			"light",
 			"light",
 		]);
+		expect(
+			resolveThemeDocuments(
+				evidence,
+				renderDesignMd(buildDesignModel(evidence)),
+			),
+		).toBeUndefined();
+	});
+
+	it("resolves per-theme viewer documents only when both themes are verified", () => {
+		const evidence = captures();
+		const dark = structuredClone(FIXTURE);
+		dark.colorScheme = "dark";
+		for (const element of dark.elements) {
+			element.properties["background-color"] = "rgb(0, 0, 0)";
+			element.properties.color = "rgb(255, 255, 255)";
+		}
+		evidence.additionalViews = [dark];
+		const themes = resolveThemeDocuments(
+			evidence,
+			renderDesignMd(buildDesignModel(evidence)),
+		);
+		expect(themes?.map((entry) => entry.theme)).toEqual(["light", "dark"]);
 	});
 });
