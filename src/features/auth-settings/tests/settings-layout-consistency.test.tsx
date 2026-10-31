@@ -44,10 +44,6 @@ vi.mock("@/features/billing/services/payment.functions", () => ({
 	cancelSubscription: vi.fn(),
 }));
 
-vi.mock("@/features/billing/services/billing-settings.functions", () => ({
-	deletePayment: vi.fn(),
-}));
-
 vi.mock("@/features/billing/components/credit-usage", () => ({
 	CreditUsageSection: () => <div data-testid="mock-credit-usage" />,
 }));

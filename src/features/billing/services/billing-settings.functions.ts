@@ -60,8 +60,7 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 				.where(
 					and(eq(payments.userId, user.id), ne(payments.status, "pending")),
 				)
-				.orderBy(desc(payments.createdAt))
-				.limit(10),
+				.orderBy(desc(payments.createdAt)),
 			db
 				.select({
 					id: creditOperations.id,
@@ -118,7 +117,13 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 			id: p.id,
 			userId: p.userId,
 			amount: p.amount ?? 0,
-			status: p.status ?? "pending",
+			status:
+				p.midtransResponse !== null &&
+				typeof p.midtransResponse === "object" &&
+				"reversal" in p.midtransResponse &&
+				typeof p.midtransResponse.reversal === "string"
+					? p.midtransResponse.reversal
+					: (p.status ?? "pending"),
 			plan: p.plan ?? "pro",
 			snapToken: null,
 			createdAt: p.createdAt?.toISOString() ?? null,
@@ -161,22 +166,3 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 		return { subscription, payments: paymentsList, creditUsage };
 	},
 );
-
-export const deletePayment = createServerFn({ method: "POST" })
-	.validator((paymentId: string) => paymentId)
-	.handler(async ({ data: paymentId }) => {
-		const user = await requireUserServer();
-		const { db } = await import("@/db");
-		const { payments } = await import("@/db/schema");
-		const deleted = await db
-			.delete(payments)
-			.where(
-				and(
-					eq(payments.id, paymentId),
-					eq(payments.userId, user.id),
-					ne(payments.status, "success"),
-				),
-			)
-			.returning({ id: payments.id });
-		return { success: deleted.length === 1 };
-	});

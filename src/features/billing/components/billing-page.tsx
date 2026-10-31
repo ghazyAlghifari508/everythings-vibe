@@ -1,33 +1,26 @@
-import {
-	Alert01Icon,
-	CalendarClockIcon,
-	Delete02Icon,
-} from "@hugeicons/core-free-icons";
+import { Alert01Icon, CalendarClockIcon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { cancelSubscription } from "@/features/billing/services/payment.functions";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { useUIStore } from "@/store";
-import {
-	type BillingCreditUsage,
-	type BillingPaymentItem,
-	type BillingSubscription,
-	deletePayment,
+import type {
+	BillingCreditUsage,
+	BillingPaymentItem,
+	BillingSubscription,
 } from "../services/billing-settings.functions";
 import { CreditUsageSection } from "./credit-usage";
 
 export function BillingPage({
 	subscription,
-	payments: initialPayments,
+	payments: paymentsList,
 	creditUsage,
 }: {
 	subscription: BillingSubscription | undefined;
 	payments: BillingPaymentItem[];
 	creditUsage: BillingCreditUsage;
 }) {
-	const [paymentsList, setPaymentsList] = useState(initialPayments);
-	const [deleteId, setDeleteId] = useState<string | null>(null);
 	const [cancelOpen, setCancelOpen] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
 
@@ -67,22 +60,6 @@ export function BillingPage({
 	const creditsUsed = subscription?.creditsUsed ?? 0;
 	const creditsReserved = subscription?.creditsReserved ?? 0;
 	const remaining = Math.max(0, credits - creditsUsed - creditsReserved);
-
-	const handleDelete = async (id: string) => {
-		try {
-			const res = await deletePayment({ data: id });
-			if (res.success) {
-				setPaymentsList((prev) => prev.filter((p) => p.id !== id));
-				showToast("Riwayat pembayaran berhasil dihapus", "success");
-			} else {
-				showToast("Riwayat pembayaran berhasil tidak dapat dihapus", "error");
-			}
-		} catch {
-			showToast("Gagal menghapus riwayat pembayaran", "error");
-		} finally {
-			setDeleteId(null);
-		}
-	};
 
 	return (
 		<div className="w-full flex flex-col gap-6">
@@ -212,18 +189,19 @@ export function BillingPage({
 													: "bg-red-100 text-red-800"
 											}`}
 										>
-											{p.status === "success" ? "Berhasil" : "Gagal"}
+											{p.status === "success"
+												? "Berhasil"
+												: p.status === "refund"
+													? "Dikembalikan"
+													: p.status === "partial_refund"
+														? "Dikembalikan sebagian"
+														: p.status === "chargeback" ||
+																p.status === "partial_chargeback"
+															? "Sengketa pembayaran"
+															: p.status === "failed"
+																? "Gagal"
+																: p.status}
 										</span>
-										{p.status !== "success" && (
-											<button
-												type="button"
-												onClick={() => setDeleteId(p.id)}
-												className="rounded p-1.5 text-fog hover:bg-red-500/10 hover:text-red-400 transition-colors"
-												aria-label="Hapus riwayat"
-											>
-												<Icon icon={Delete02Icon} size={14} />
-											</button>
-										)}
 									</div>
 								</div>
 							))}
@@ -262,37 +240,6 @@ export function BillingPage({
 								className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
 							>
 								{cancelling ? "Memproses..." : "Ya, Batalkan"}
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
-
-			{/* Delete confirmation dialog */}
-			{deleteId && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-					<div className="rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6 max-w-sm w-full mx-4">
-						<h3 className="font-inter font-[510] text-lg mb-2">
-							Hapus Riwayat?
-						</h3>
-						<p className="text-sm text-(--text-secondary) mb-6">
-							Riwayat pembayaran ini akan dihapus permanen. Tindakan ini tidak
-							dapat dibatalkan.
-						</p>
-						<div className="flex justify-end gap-3">
-							<button
-								type="button"
-								onClick={() => setDeleteId(null)}
-								className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-(--bg-surface)"
-							>
-								Batal
-							</button>
-							<button
-								type="button"
-								onClick={() => handleDelete(deleteId)}
-								className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
-							>
-								Hapus
 							</button>
 						</div>
 					</div>
