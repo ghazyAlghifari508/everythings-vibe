@@ -224,6 +224,29 @@ describe("payment service grant lifecycle (in-memory)", () => {
 		expect(store.ledger).toHaveLength(1);
 	});
 
+	it("does not grant a top-up after a terminal failure", () => {
+		const store = makePaymentStore();
+		const payment = store.payments.get("order-topup-1");
+		if (!payment) throw new Error("Missing payment");
+		payment.status = "failed";
+		payment.midtransResponse = { reversal: "refund" };
+		expect(
+			createPaymentService(store).applyTopUpSuccess("order-topup-1"),
+		).toBeNull();
+		expect(store.ledger).toHaveLength(0);
+	});
+
+	it("allows a verified top-up after a local stale-checkout failure", () => {
+		const store = makePaymentStore();
+		const payment = store.payments.get("order-topup-1");
+		if (!payment) throw new Error("Missing payment");
+		payment.status = "failed";
+		expect(
+			createPaymentService(store).applyTopUpSuccess("order-topup-1"),
+		).toEqual({ plan: "pro" });
+		expect(store.ledger).toHaveLength(1);
+	});
+
 	it("top-up grant rejects when subscription state is not active_paid", () => {
 		const store = makePaymentStore();
 		const service = createPaymentService(store);

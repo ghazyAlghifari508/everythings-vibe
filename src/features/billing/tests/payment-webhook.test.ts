@@ -124,17 +124,28 @@ describe("payment webhook boundary", () => {
 	});
 
 	it.each([
-		"expire",
-		"cancel",
-		"deny",
 		"refund",
 		"chargeback",
 		"partial_refund",
 		"partial_chargeback",
+	])("retains settled status and records %s for history", async (transaction_status) => {
+		expect((await notify({ transaction_status })).status).toBe(200);
+		expect(state.updates).toHaveLength(1);
+		expect(state.updates[0]).toHaveProperty("midtransResponse");
+		const filter = state.filters[0];
+		if (!(filter instanceof SQL))
+			throw new Error("Missing settled payment guard");
+		expect(new PgDialect().sqlToQuery(filter).params).toEqual(["order-a"]);
+	});
+
+	it.each([
+		"expire",
+		"cancel",
+		"deny",
 	])("preserves settled success when receiving %s", async (transaction_status) => {
 		expect((await notify({ transaction_status })).status).toBe(200);
 		expect(state.apply).not.toHaveBeenCalled();
-		expect(state.updates).toEqual([{ status: "failed" }]);
+		expect(state.updates[0]).toEqual({ status: "failed" });
 		const filter = state.filters[0];
 		if (!(filter instanceof SQL)) throw new Error("Missing payment guard");
 		const query = new PgDialect().sqlToQuery(filter);
