@@ -70,7 +70,7 @@ Re-evaluated for the activity-line animation task, against the same local-first 
 | repo `src/components/ui/thought-line.tsx` (ReactBits ThoughtLine port) | **selected** — already ships the shimmer sweep, label cross-fade, reduced-motion handling and a single polite live region |
 | repo `src/components/ui/agent-thinking.tsx`, `src/components/ui/orb.tsx` | rejected — they model AI reasoning traces / thinking orbs, which would invent a pipeline stage the scrape worker never reports |
 | HeroUI `Spinner` / `ProgressCircle` | rejected — `@heroui/styles` still does not resolve from the project root (section 2), so the component ships unstyled |
-| Magic UI `AnimatedShinyText` / `Spinner`, ReactBits `ShinyText`, shadcn `Skeleton` | rejected — not present in the repository and each would add a dependency for a single existing behaviour; no installation without a real need |
+| Magic UI `AnimatedShinyText` (registry docs reviewed via Context7 `/magicuidesign/magicui`), Magic UI `Spinner`, shadcn `Skeleton` + `animate-pulse`, ReactBits `ShinyText`, Thinking Orbs, Affect UI | rejected — none are present in the repository. Magic UI ships `AnimatedShinyText` as a copy-in file over the same framer-motion shimmer this repo already has in `ThoughtLine`, so taking it would duplicate the effect and add a second animation surface. Thinking Orbs / Affect UI ship ornamental AI-thinking visuals, which the task explicitly forbids (no simulated AI reasoning). shadcn has no shimmer primitive beyond `Skeleton`. No dependency is added for behaviour that already exists. |
 
 Implementation notes that shaped the choice:
 
