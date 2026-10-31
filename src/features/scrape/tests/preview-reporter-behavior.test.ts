@@ -8,7 +8,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-function reporter() {
+function reporter(source = "<html><head></head><body></body></html>") {
 	frame = document.createElement("iframe");
 	document.body.append(frame);
 	const win = frame.contentWindow as (Window & typeof globalThis) | null;
@@ -32,7 +32,7 @@ function reporter() {
 	});
 	const post = vi.spyOn(window, "postMessage").mockImplementation(() => {});
 	const html = rewritePreviewAssets(
-		"<html><head></head><body></body></html>",
+		source,
 		"https://example.com/",
 		undefined,
 		undefined,
@@ -73,8 +73,10 @@ describe("preview frame reporter behavior", () => {
 		});
 	});
 
-	it("reports delayed content after an initially empty document", () => {
-		const { win, doc, post } = reporter();
+	it("reports delayed captured content for a script-heavy source without executing its scripts", () => {
+		const { win, doc, post } = reporter(
+			'<html><head><script src="/app.js"></script></head><body><main id="root"></main><script>throw new Error("must not execute")</script></body></html>',
+		);
 		doc.body.innerHTML = "";
 		win.dispatchEvent(
 			new win.MessageEvent("message", {
