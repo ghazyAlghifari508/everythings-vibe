@@ -53,18 +53,21 @@ response also uses no-store.
 Focused tests cover hashing, one-time response projections, expiry (including the
 exact boundary and corrupt dates), missing/revoked keys, scopes, ownership SQL,
 legacy compatibility, repeated handler issuance, no-store headers,
-Settings secret visibility, and literal handoff substitution. Issuance tests use
-a mocked database boundary and assert transaction/lock SQL; they are **not** a
-live PostgreSQL concurrency stress test. Concurrent dynamic-import execution in
-the current Vitest mock harness escaped the DB mock; the attempted inserts failed
-on the fixture owner's foreign-key constraint. No fixture user was created and
-no successful credential insert was observed. A properly isolated database test
-is still needed before claiming concurrent execution verification. A temporary
-PostgreSQL cluster subsequently accepted concurrent issuance, but its raw `pg`
-verification query parsed timezone-less timestamps in local time. That comparison
-is not evidence of a production expiry defect: Drizzle's timestamp mapper reads
-those values as UTC. `api-key-timestamp.test.ts` verifies that mapping without a
-schema change or invalidating legacy credentials. The isolated concurrency test
-still needs a retained, safe harness with ORM-based verification.
+Settings secret visibility, and literal handoff substitution. Unit tests assert
+transaction/lock SQL. `auto-key-concurrency.test.ts` additionally runs eight real
+parallel issuance transactions against an explicitly supplied isolated PostgreSQL
+URL, verifies distinct hash-only credentials and ORM expiry round-trips, and
+preserves active/legacy deadlines. It redirects every pg Pool away from the
+application database, including dynamic imports that escape Vitest DB mocks.
+Run only against a throwaway cluster:
+
+```sh
+API_KEY_ISOLATED_TEST_DATABASE_URL=<throwaway-postgres-url> pnpm vitest run src/features/auth-settings/tests/auto-key-concurrency.test.ts
+```
+
+The test creates and drops its own `credential_concurrency` schema. It is skipped
+without the explicit URL. `api-key-timestamp.test.ts` separately verifies UTC
+mapping: raw pg timestamp parsing is local-time based, unlike Drizzle's UTC
+mapping. No schema migration is needed.
 CLI config/client/task/export and sync handshake/upload suites provide
 compatibility evidence. No browser QA is used.
