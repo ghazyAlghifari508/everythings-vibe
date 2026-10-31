@@ -49,6 +49,11 @@ export function useOnboardingAnalysis({
 		fetchAnalysisOutput,
 	} = state;
 	const analysisRequestGeneration = useRef(0);
+	// The working flag lives in shared state, but the retry guard runs inside
+	// a callback: a ref mirror keeps the guard synchronous so a double click
+	// in the same tick still resolves to one attempt.
+	const analysisWorkingRef = useRef(state.analysisWorking);
+	analysisWorkingRef.current = state.analysisWorking;
 
 	// Ensure the single onboarding analysis project for this codebase via the
 	// existing features boundary. The stored pointer is reused so refresh and
@@ -116,16 +121,24 @@ export function useOnboardingAnalysis({
 				});
 				if (generation !== analysisRequestGeneration.current) return;
 				if (outcome.kind === "unauthorized") {
+					setAnalysisWorking(false);
 					redirectToLogin();
 					return;
 				}
-				if (outcome.kind === "mismatch") return;
+				if (outcome.kind === "mismatch") {
+					setAnalysisWorking(false);
+					return;
+				}
 				if (outcome.kind === "credit") {
+					// A credit block is definitive, not pending: clear the local
+					// working and retry paint so the billing action owns the row.
+					setAnalysisWorking(false);
 					setCreditStatus(outcome.status ?? null);
 					if (!outcome.status) setAnalysisError(outcome.message);
 					return;
 				}
 				if (outcome.kind === "failed") {
+					setAnalysisWorking(false);
 					setAnalysisError(outcome.message);
 					return;
 				}
@@ -144,10 +157,17 @@ export function useOnboardingAnalysis({
 	);
 
 	// Retry resets the per-snapshot guard and clears the previous attempt, then
-	// triggers analysis directly.
+	// triggers analysis directly. The retry flag (not a timeout) owns the
+	// immediate running paint, and it is cleared by the real resolution:
+	// ready output, a new failure, or a definitive trigger error.
+	// Double click is a no-op: the generation guard plus the in-flight working
+	// flag make the second click resolve to the same attempt.
 	const retryAnalysis = useCallback(() => {
 		if (!featureProjectId || !lastStatus?.snapshotId) return;
+		if (analysisWorkingRef.current) return;
 		analysisAttemptedFor.current = lastStatus.snapshotId;
+		setCreditStatus(null);
+		setAnalysisWorking(true, { retrying: true });
 		setAnalysis(null);
 		setAnalysisError(null);
 		void triggerOnboardingAnalysis(
@@ -159,9 +179,11 @@ export function useOnboardingAnalysis({
 	}, [
 		featureProjectId,
 		lastStatus,
+		setAnalysisWorking,
 		triggerOnboardingAnalysis,
 		analysisAttemptedFor,
 		setAnalysis,
+		setCreditStatus,
 		setAnalysisError,
 	]);
 	const refreshLegacySuggestions = useCallback(() => {
