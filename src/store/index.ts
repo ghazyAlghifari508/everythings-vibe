@@ -100,6 +100,7 @@ interface UIState {
 	isPRDLoading: boolean;
 	toastMessage: string | null;
 	toastType: "success" | "error" | "info" | null;
+	toastId: number;
 	isProjectDrawerOpen: boolean;
 	activeReviewModal: "prd" | "ac" | null;
 	isPaywallOpen: boolean;
@@ -107,7 +108,7 @@ interface UIState {
 	codebasePlanStep: "sync" | "summary";
 	toggleChatPanel: () => void;
 	setPRDLoading: (loading: boolean) => void;
-	showToast: (message: string, type: "success" | "error" | "info") => void;
+	showToast: (message: string, type?: "success" | "error" | "info") => void;
 	hideToast: () => void;
 	setProjectDrawerOpen: (open: boolean) => void;
 	setActiveReviewModal: (modal: "prd" | "ac" | null) => void;
@@ -121,6 +122,7 @@ export const useUIStore = create<UIState>((set) => ({
 	isPRDLoading: false,
 	toastMessage: null,
 	toastType: null,
+	toastId: 0,
 	isProjectDrawerOpen: false,
 	activeReviewModal: null,
 	isPaywallOpen: false,
@@ -129,7 +131,12 @@ export const useUIStore = create<UIState>((set) => ({
 	toggleChatPanel: () =>
 		set((state) => ({ isChatPanelOpen: !state.isChatPanelOpen })),
 	setPRDLoading: (loading) => set({ isPRDLoading: loading }),
-	showToast: (message, type) => set({ toastMessage: message, toastType: type }),
+	showToast: (message, type = "info") =>
+		set((state) => ({
+			toastMessage: message,
+			toastType: type,
+			toastId: state.toastId + 1,
+		})),
 	hideToast: () => set({ toastMessage: null, toastType: null }),
 	setProjectDrawerOpen: (isProjectDrawerOpen) => set({ isProjectDrawerOpen }),
 	setActiveReviewModal: (activeReviewModal) => set({ activeReviewModal }),
