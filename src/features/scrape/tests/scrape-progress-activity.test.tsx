@@ -71,6 +71,28 @@ describe("running runs report the backend activity", () => {
 		expect(done.container.querySelector("[data-working]")).toBeNull();
 	});
 
+	it("swaps the copy on the next report without adding indicators", () => {
+		const { container, rerender } = render(
+			<ScrapeActivityLine
+				status="extracting"
+				activity="Mengambil tampilan halaman"
+			/>,
+		);
+		expect(container.textContent).toContain("Mengambil tampilan halaman");
+
+		rerender(
+			<ScrapeActivityLine
+				status="extracting"
+				activity="Memeriksa gaya dan komponen"
+			/>,
+		);
+		expect(container.textContent).toContain("Memeriksa gaya dan komponen");
+		expect(container.textContent).not.toContain("Mengambil tampilan halaman");
+		expect(container.querySelectorAll("[data-activity-spinner]")).toHaveLength(
+			1,
+		);
+	});
+
 	it("falls back to the reported stage label when no activity arrived", () => {
 		const { container } = render(
 			<ScrapeActivityLine
