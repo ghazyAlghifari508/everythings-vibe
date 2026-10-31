@@ -113,6 +113,8 @@ export const creditOperations = pgTable(
 		initialAnalysisAllowance: boolean("initial_analysis_allowance")
 			.notNull()
 			.default(false),
+		isExempt: boolean("is_exempt").notNull().default(false),
+		exemptionReason: text("exemption_reason"),
 		kind: text("kind").$type<CreditOperationKind>().notNull(),
 		stage: text("stage").$type<CreditOperationStage>().notNull(),
 		idempotencyKey: text("idempotency_key").notNull(),
@@ -252,4 +254,27 @@ export const payments = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 	},
 	(t) => [index("payments_user_id_idx").on(t.userId)],
+);
+
+export const billingExemptionAuditLogs = pgTable(
+	"billing_exemption_audit_logs",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		actorId: text("actor_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		action: text("action").$type<"granted" | "revoked">().notNull(),
+		reason: text("reason"),
+		metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [
+		index("billing_exemption_audit_logs_user_id_idx").on(t.userId),
+		index("billing_exemption_audit_logs_actor_id_idx").on(t.actorId),
+	],
 );
