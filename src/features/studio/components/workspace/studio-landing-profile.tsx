@@ -12,10 +12,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { authClient } from "@/lib/auth-client";
+import { useHydratedSession } from "@/features/studio/hooks/use-hydrated-session";
 
 export function StudioLandingProfile() {
-	const { data: session } = authClient.useSession();
+	const session = useHydratedSession();
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
