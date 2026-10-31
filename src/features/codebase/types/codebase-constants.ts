@@ -1,4 +1,10 @@
 export const CODEBASE_LIBRARY_PAGE_SIZE = 10;
+// One bulk-delete request carries a bounded id list so a single statement can
+// never become an unbounded destructive payload.
+export const CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS = 1000;
+export const CODEBASE_LIBRARY_ID_MAX_CHARS = 64;
+export const CODEBASE_LIBRARY_BULK_DELETE_LIMIT_ERROR =
+	"Terlalu banyak repository untuk dihapus sekaligus.";
 export const CODEBASE_NAME_MIN_CHARS = 3;
 export const CODEBASE_NAME_MAX_CHARS = 100;
 
