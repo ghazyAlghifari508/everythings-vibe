@@ -119,8 +119,7 @@ const CRAWL_GROUP: AdvancedParameterGroup = {
 			key: "maxDepth",
 			label: "Kedalaman penelusuran",
 			unit: "level",
-			helper:
-				"0 hanya mengambil halaman awal. Naikkan untuk mengikuti link lebih dalam.",
+			helper: "Atur seberapa jauh crawler mengikuti tautan dari halaman awal.",
 			min: 0,
 			max: SCRAPE_LIMITS.maxDepth,
 		},
