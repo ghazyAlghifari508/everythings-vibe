@@ -87,7 +87,7 @@ const STAGE_TAG_WEIGHTS: Record<StudioSkillStage, Record<SkillTag, number>> = {
 		quality: 4,
 		layout: 2,
 		implementation: 1,
-		meta: 1,
+		meta: 0,
 	},
 	frame: {
 		product: 1,
@@ -378,6 +378,9 @@ function scoreSection(
 	tokens: string[],
 ): { score: number; rationale: string } {
 	const tags = classifySection(section.heading, section.text);
+	if (tags.includes("meta")) {
+		return { score: 0, rationale: `stage=${stage} tags=meta score=0` };
+	}
 	let base = 0;
 	for (const tag of tags) base = Math.max(base, STAGE_TAG_WEIGHTS[stage][tag]);
 	let bonus = 0;
@@ -400,9 +403,19 @@ function scoreSection(
 function isCoreSection(
 	id: Exclude<StudioDesignSkillId, "none">,
 	section: StudioSkillSection,
+	stage: StudioSkillStage,
 ): boolean {
-	if (section.level <= 1) return true;
-	if (!section.heading) return true;
+	const tags = classifySection(section.heading, section.text);
+	if (tags.includes("meta")) return false;
+	if (section.level <= 1 && section.heading === null) return true;
+	if (!section.heading) return false;
+	if (
+		stage === "planning" &&
+		id === "anti-slop" &&
+		/delivery gate/i.test(section.heading)
+	) {
+		return false;
+	}
 	return CORE_SECTION_PATTERNS[id].some((pattern) =>
 		pattern.test(section.heading ?? ""),
 	);
@@ -559,12 +572,15 @@ export function buildStudioSkillContext(
 
 	for (const section of allSections) {
 		if (section.docPath !== primary.path) continue;
+		const tags = classifySection(section.heading, section.text);
+		if (tags.includes("meta")) continue;
 		if (section.level <= 1) consider(section, "core-identity", true);
 	}
 	for (const section of allSections) {
 		if (section.docPath !== primary.path || selectedKeys.has(section.key))
 			continue;
-		if (isCoreSection(id, section)) consider(section, "core-identity", false);
+		if (isCoreSection(id, section, stage))
+			consider(section, "core-identity", false);
 	}
 	for (const entry of ranked) consider(entry.section, entry.rationale, false);
 
