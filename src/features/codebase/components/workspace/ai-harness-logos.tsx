@@ -1,4 +1,7 @@
 import type React from "react";
+import { AntigravityIcon } from "./antigravity-icon";
+
+export { AntigravityIcon };
 
 export interface HarnessItem {
 	name: string;
@@ -49,37 +52,6 @@ function OpenCodeIcon({ className = "w-5 h-5" }: { className?: string }) {
 				clipRule="evenodd"
 				d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z"
 				fill="white"
-			/>
-		</svg>
-	);
-}
-
-function AntigravityIcon({ className = "w-5 h-5" }: { className?: string }) {
-	return (
-		<svg
-			viewBox="10 16 92 82"
-			fill="none"
-			className={className}
-			aria-hidden="true"
-		>
-			<defs>
-				<linearGradient
-					id="antigravity-grad"
-					x1="16"
-					y1="18"
-					x2="95"
-					y2="94"
-					gradientUnits="userSpaceOnUse"
-				>
-					<stop offset="0%" stopColor="#3186FF" />
-					<stop offset="35%" stopColor="#00B95C" />
-					<stop offset="70%" stopColor="#FFE432" />
-					<stop offset="100%" stopColor="#FC413D" />
-				</linearGradient>
-			</defs>
-			<path
-				d="M89.6992 93.695C94.3659 97.195 101.366 94.8617 94.9492 88.445C75.6992 69.7783 79.7825 18.445 55.8659 18.445C31.9492 18.445 36.0325 69.7783 16.7825 88.445C9.78251 95.445 17.3658 97.195 22.0325 93.695C40.1159 81.445 38.9492 59.8617 55.8659 59.8617C72.7825 59.8617 71.6159 81.445 89.6992 93.695Z"
-				fill="url(#antigravity-grad)"
 			/>
 		</svg>
 	);
