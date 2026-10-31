@@ -102,6 +102,12 @@ export function normalizeFontWeight(value: string): string {
 
 const MONOSPACE_HINT = /mono|code|consolas|menlo|courier/i;
 
+// Display-scale text is a measurable size band, not a claim about the element's
+// semantics: a statistic number and a hero heading share it, and neither is
+// body copy. Body roles stop below this threshold so an 88px figure is never
+// published as a paragraph size.
+const DISPLAY_MIN_PX = 40;
+
 // Assigns the scale role from the measured size plus the element's own role.
 // Names are a classification of the measurement, never a claim about the site's
 // own naming.
@@ -115,12 +121,12 @@ export function classifyTypeRole(
 	const isH1 = elementRoles.includes("h1");
 	const isH2 = elementRoles.includes("h2");
 	if (heading) {
-		if (isH1 && fontSizePx >= 40) return "Display";
-		if (fontSizePx >= 40) return "Display";
+		if (fontSizePx >= DISPLAY_MIN_PX) return "Display";
 		if (fontSizePx >= 28) return isH1 || isH2 ? "Large heading" : "Heading";
 		if (fontSizePx >= 22) return "Heading";
 		return "Subheading";
 	}
+	if (fontSizePx >= DISPLAY_MIN_PX) return "Display";
 	const interactive = elementRoles.some((role) =>
 		["cta", "nav", "a", "button"].includes(role),
 	);
@@ -128,7 +134,7 @@ export function classifyTypeRole(
 	if (fontSizePx >= 20) return "Body large";
 	if (fontSizePx >= 15) return "Body";
 	if (fontSizePx >= 13) return "Body small";
-	if (fontSizePx >= 1) return "Caption";
+	if (fontSizePx > 0) return "Caption";
 	return "Unknown";
 }
 
@@ -162,12 +168,16 @@ export function groupTypeSpecimens(
 		// Canvas elements carry the document default, not a design decision, and
 		// elements without measured text cannot demonstrate a type style.
 		if (element.role === "canvas") continue;
-		if (!element.text.trim()) continue;
+		const text = element.directText ?? element.text;
+		if (!text.trim()) continue;
 		const properties = element.properties;
 		const family = properties["font-family"] ?? "";
 		const size = properties["font-size"] ?? "";
 		const sizePx = parsePx(size);
-		if (!family || !Number.isFinite(sizePx)) continue;
+		// A zero or negative computed size means the text is not rendered at a
+		// readable scale (icon-font ligatures, collapsed placeholders). It stays in
+		// the raw capture but never becomes a published type token.
+		if (!family || !Number.isFinite(sizePx) || sizePx <= 0) continue;
 		const weight = normalizeFontWeight(properties["font-weight"] ?? "");
 		const lineHeight = properties["line-height"] ?? "";
 		const letterSpacing = properties["letter-spacing"] ?? "";
@@ -189,8 +199,8 @@ export function groupTypeSpecimens(
 			)
 				existing.selectors.push(element.selector);
 			// Keep the longest raw sample for validation, not for display.
-			if (element.text.length > existing.sample.length)
-				existing.sample = element.text.slice(0, SAMPLE_CHARS);
+			if (text.length > existing.sample.length)
+				existing.sample = text.slice(0, SAMPLE_CHARS);
 			// Re-classify with the full set of element roles now that more elements
 			// share this style.
 			existing.role = classifyTypeRole(sizePx, existing.elementRoles, family);
@@ -206,7 +216,7 @@ export function groupTypeSpecimens(
 			letterSpacing,
 			frequency: 1,
 			elementRoles: [element.role],
-			sample: element.text.slice(0, SAMPLE_CHARS),
+			sample: text.slice(0, SAMPLE_CHARS),
 			selectors: [element.selector],
 		});
 	}

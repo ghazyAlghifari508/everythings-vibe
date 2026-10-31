@@ -61,8 +61,8 @@ describe("component-scoped radius evidence", () => {
 				roles,
 			})),
 		).toEqual([
-			{ purpose: "Inputs", frequency: 2, pill: true, roles: ["input"] },
 			{ purpose: "Buttons", frequency: 1, pill: false, roles: ["cta"] },
+			{ purpose: "Inputs", frequency: 2, pill: true, roles: ["input"] },
 			{
 				purpose: "Measured radius",
 				frequency: 1,

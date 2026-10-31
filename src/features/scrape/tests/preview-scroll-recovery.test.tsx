@@ -201,16 +201,15 @@ describe("scrape preview recovery", () => {
 		expect(screen.queryByRole("button", { name: /coba lagi/i })).toBeNull();
 	});
 
-	it("shows the fallback without a retry while the interactive preview loads", () => {
+	it("waits for the interactive preview instead of falling back while it loads", () => {
 		renderDetail({
 			previewSrcDoc: "",
 			previewState: "loading",
 			screenshot: SCREENSHOT,
 		});
 
-		expect(screen.getByTestId("scrape-visual-notice").textContent).toMatch(
-			/menyiapkan preview interaktif/i,
-		);
+		expect(screen.queryByTestId("scrape-visual-screenshot")).toBeNull();
+		expect(screen.getByRole("status")).toBeDefined();
 		expect(screen.queryByRole("button", { name: /coba lagi/i })).toBeNull();
 	});
 

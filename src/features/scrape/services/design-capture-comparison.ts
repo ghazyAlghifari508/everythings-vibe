@@ -37,15 +37,30 @@ export function compareCaptures(views: VisualEvidence[]): DesignComparison[] {
 			const kind = sameViewport ? "theme" : "responsive";
 			for (const [elementIndex, element] of left.elements.entries()) {
 				if (
-					(!element.text.trim() && element.role !== "canvas") ||
+					(!element.text.trim() &&
+						element.role !== "canvas" &&
+						!(element.role === "input" && element.elementId?.trim())) ||
 					element.role === "element"
 				)
 					continue;
-				// ponytail: exact identity and content only; add stable element IDs before matching dynamic content.
+				if (!element.text.trim() && element.role === "input") {
+					const id = element.elementId;
+					if (
+						left.elements.filter((entry) => entry.elementId === id).length !==
+							1 ||
+						right.elements.filter((entry) => entry.elementId === id).length !==
+							1
+					)
+						continue;
+				}
+				// ponytail: exact selector and content only; match moved elements when stronger identity is available.
 				const matches = right.elements.filter(
 					(candidate) =>
 						candidate.selector === element.selector &&
 						candidate.role === element.role &&
+						(element.role !== "input" ||
+							!!element.text.trim() ||
+							candidate.elementId === element.elementId) &&
 						candidate.text === element.text,
 				);
 				if (matches.length !== 1) continue;

@@ -5,6 +5,7 @@ import {
 	SCRAPE_HISTORY_ID_MAX_CHARS,
 	SCRAPE_HISTORY_SEARCH_MAX_CHARS,
 } from "@/features/scrape/types/scrape-constants";
+import { resolveActiveScrapeMode } from "@/features/scrape/utils/scrape-mode-session";
 
 export const SCRAPE_LIMITS = {
 	urlChars: 4096,
@@ -275,5 +276,5 @@ export function parseScrapeWorkspaceSearch(
 export function resolveScrapeWorkspaceMode(
 	search: ScrapeWorkspaceSearch,
 ): ScrapeRequest["mode"] {
-	return search.mode ?? "design";
+	return resolveActiveScrapeMode(search.mode);
 }

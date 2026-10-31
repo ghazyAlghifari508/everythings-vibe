@@ -26,7 +26,6 @@ function renderPanel(onImplementAgent: () => void = vi.fn()) {
 	return render(
 		<DesignMdSourcePanel
 			designMd={DESIGN_MD}
-			domain="acme.example"
 			onImplementAgent={onImplementAgent}
 		/>,
 	);
@@ -69,11 +68,7 @@ describe("DesignMdSourcePanel", () => {
 	it("uses unique tab and panel ids per instance", () => {
 		const first = renderPanel();
 		const second = render(
-			<DesignMdSourcePanel
-				designMd={DESIGN_MD}
-				domain="acme.example"
-				onImplementAgent={vi.fn()}
-			/>,
+			<DesignMdSourcePanel designMd={DESIGN_MD} onImplementAgent={vi.fn()} />,
 		);
 		const tabs = screen.getAllByRole("tab", { name: /rendered|source/i });
 		expect(tabs.length).toBeGreaterThanOrEqual(4);
@@ -124,7 +119,6 @@ describe("DesignMdSourcePanel", () => {
 		const { rerender } = render(
 			<DesignMdSourcePanel
 				designMd={DESIGN_MD}
-				domain="acme.example"
 				onImplementAgent={vi.fn()}
 				inspectorSource="observed"
 				enrichment="unavailable"
@@ -156,7 +150,6 @@ describe("DesignMdSourcePanel", () => {
 		rerender(
 			<DesignMdSourcePanel
 				designMd={DESIGN_MD}
-				domain="acme.example"
 				onImplementAgent={vi.fn()}
 				inspectorSource="observed"
 				enrichment="applied"
@@ -211,5 +204,99 @@ describe("DesignMdSourcePanel", () => {
 		expect(document.activeElement).toBe(sourceTab);
 		fireEvent.keyDown(sourceTab, { key: "ArrowLeft" });
 		expect(document.activeElement).toBe(renderedTab);
+	});
+
+	it("downloads the canonical DESIGN.md filename without domain coupling", async () => {
+		const seen: string[] = [];
+		renderPanel();
+		const appendChild = vi
+			.spyOn(document.body, "appendChild")
+			.mockImplementation(((node: Node) => {
+				if (node instanceof HTMLAnchorElement) seen.push(node.download);
+				return node;
+			}) as typeof document.body.appendChild);
+		renderPanel();
+		fireEvent.click(screen.getByRole("button", { name: "Download DESIGN.md" }));
+		expect(seen).toEqual(["DESIGN.md"]);
+		appendChild.mockRestore();
+	});
+
+	it("shows no theme switcher when only one verified theme is available", () => {
+		renderPanel();
+		expect(screen.queryByRole("tab", { name: /^light$/i })).toBeNull();
+		expect(screen.queryByRole("tab", { name: /^dark$/i })).toBeNull();
+	});
+
+	it("filters rendered and source views when both themes are verified", () => {
+		const lightMd = `${"# Acme - Style Reference\n\n## Tokens - Colors\n\nBase light.\n\n### Capture 1: 1440x900, browser preference light (theme light)\n\nLight tokens.\n"}`;
+		const darkMd = `${"# Acme - Style Reference\n\n## Tokens - Colors\n\nBase dark.\n\n### Capture 2: 1440x900, browser preference dark (theme dark)\n\nDark tokens.\n"}`;
+		render(
+			<DesignMdSourcePanel
+				designMd={DESIGN_MD}
+				onImplementAgent={vi.fn()}
+				themeDocuments={[
+					{ theme: "light", designMd: lightMd },
+					{ theme: "dark", designMd: darkMd },
+				]}
+			/>,
+		);
+		const lightTab = screen.getByRole("tab", { name: /^light$/i });
+		const darkTab = screen.getByRole("tab", { name: /^dark$/i });
+		expect(lightTab.getAttribute("aria-selected")).toBe("true");
+		fireEvent.click(screen.getByRole("tab", { name: /source/i }));
+		expect(
+			document.getElementById(
+				screen
+					.getByRole("tab", { name: /source/i })
+					.getAttribute("aria-controls") ?? "",
+			)?.textContent,
+		).toBe(lightMd);
+		fireEvent.click(darkTab);
+		expect(darkTab.getAttribute("aria-selected")).toBe("true");
+		expect(
+			document.getElementById(
+				screen
+					.getByRole("tab", { name: /source/i })
+					.getAttribute("aria-controls") ?? "",
+			)?.textContent,
+		).toBe(darkMd);
+		fireEvent.click(screen.getByRole("tab", { name: /rendered/i }));
+		lightTab.focus();
+		fireEvent.keyDown(lightTab, { key: "ArrowRight" });
+		expect(document.activeElement).toBe(darkTab);
+	});
+
+	it("copies and downloads the full canonical document when a theme filter is active", async () => {
+		const { unmount } = renderPanel();
+		unmount();
+		const writeText = vi.fn(async () => {});
+		vi.stubGlobal("navigator", { clipboard: { writeText } });
+		vi.stubGlobal("URL", {
+			createObjectURL: vi.fn(() => "blob:mock"),
+			revokeObjectURL: vi.fn(),
+		});
+		const blobSpy = vi.spyOn(globalThis, "Blob");
+		const lightMd = `# Acme\n\n### Capture 1: light theme\n\nLight.`;
+		render(
+			<DesignMdSourcePanel
+				designMd={DESIGN_MD}
+				onImplementAgent={vi.fn()}
+				themeDocuments={[
+					{ theme: "light", designMd: lightMd },
+					{
+						theme: "dark",
+						designMd: `# Acme\n\n### Capture 2: dark theme\n\nDark.`,
+					},
+				]}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("tab", { name: /^dark$/i }));
+		fireEvent.click(screen.getByRole("button", { name: "Salin DESIGN.md" }));
+		expect(writeText).toHaveBeenCalledWith(DESIGN_MD);
+		expect(await screen.findByText(/tersalin ke clipboard/i)).toBeDefined();
+		fireEvent.click(screen.getByRole("button", { name: "Download DESIGN.md" }));
+		expect(blobSpy).toHaveBeenCalledWith([DESIGN_MD], {
+			type: "text/markdown;charset=utf-8",
+		});
 	});
 });

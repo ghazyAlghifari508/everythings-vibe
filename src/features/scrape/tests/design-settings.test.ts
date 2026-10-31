@@ -11,7 +11,7 @@ describe("design output scope", () => {
 		const result = await generateDesignMd({ ...FIXTURE, colorScheme: "dark" });
 		expect(result.model.theme).toBe("light");
 		expect(result.model.limitations.join(" ")).toMatch(
-			/dark.*light.*not verified/,
+			/dark.*light canvas|dark.*light, so no dark/,
 		);
 	});
 	it("uses additional views without losing their viewport and theme evidence", async () => {

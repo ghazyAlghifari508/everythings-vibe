@@ -36,6 +36,12 @@ const visualViewSchema = z.strictObject({
 				selector: z.string().min(1).max(DESIGN_EVIDENCE_LIMITS.selectorChars),
 				role: z.string().max(40),
 				text: z.string().max(120),
+				directText: z.string().max(120).optional(),
+				elementId: z
+					.string()
+					.min(1)
+					.max(DESIGN_EVIDENCE_LIMITS.valueChars)
+					.optional(),
 				width: z.number().positive(),
 				height: z.number().positive(),
 				properties: z.record(

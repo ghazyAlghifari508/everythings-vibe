@@ -5,6 +5,7 @@ import {
 	type DesignInspectorModel,
 	inspectorFromEvidence,
 	parseDesignMd,
+	resolveThemeDocuments,
 } from "@/features/scrape/utils/design-md-inspector";
 import { displaySiteName } from "@/features/scrape/utils/site-name";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,11 @@ export interface ResolvedInspector {
 	// markdown could be parsed, so values are shown as parsed text, never as
 	// capture-verified measurements.
 	source: "observed" | "unverified";
+}
+
+export interface DesignThemeView {
+	theme: "light" | "dark";
+	designMd: string;
 }
 
 // Single decision point for what the inspector shows. The archive fallback is
@@ -76,6 +82,13 @@ export function DesignResult({
 	const { model, source } = useMemo(
 		() => resolveInspector(visualEvidence, designMd),
 		[designMd, visualEvidence],
+	);
+	const themeDocuments = useMemo<DesignThemeView[] | undefined>(
+		() =>
+			source === "observed"
+				? resolveThemeDocuments(visualEvidence, designMd)
+				: undefined,
+		[designMd, source, visualEvidence],
 	);
 
 	const navItems = SECTION_NAV.filter((item) => {
@@ -205,7 +218,7 @@ export function DesignResult({
 				>
 					<DesignMdSourcePanel
 						designMd={designMd}
-						domain={domain}
+						themeDocuments={themeDocuments}
 						inspectorSource={source}
 						enrichment={enrichment}
 						enrichmentDetail={enrichmentDetail}

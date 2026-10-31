@@ -62,8 +62,36 @@ export function renderComponentSections(
 		}),
 	);
 	const mergedComponents = [...observedComponents, ...aiComponents];
+	// The same measured caveat and the same handoff rule apply to every measured
+	// component, so they are stated once for the section instead of repeated
+	// under each one.
+	const observedGuidance = observedComponents.map(
+		(component) => component.guidance,
+	);
+	const commonGuidance = (observedGuidance[0] ?? []).filter((line) =>
+		observedGuidance.every((list) => list.includes(line)),
+	);
+	const observedDescriptions = observedComponents.map(
+		(component) => component.description,
+	);
+	const commonDescription =
+		observedDescriptions.length > 1 &&
+		observedDescriptions.every(
+			(description) => description === observedDescriptions[0],
+		)
+			? observedDescriptions[0]
+			: undefined;
 	if (focus !== "visual-tokens" && mergedComponents.length) {
 		lines.push("", heading(2, "Components"), "");
+		if (commonDescription)
+			for (const line of commonDescription.split("\n").filter(Boolean))
+				lines.push(escapeCell(line), "");
+		if (commonGuidance.length && observedComponents.length > 1) {
+			lines.push("**Applies to every measured component:**");
+			for (const rule of commonGuidance)
+				lines.push(`- ${escapeCell(rule)}`);
+			lines.push("");
+		}
 		for (const component of mergedComponents) {
 			lines.push(heading(3, escapeCell(component.name)), "");
 			if (component.purpose)
@@ -84,14 +112,19 @@ export function renderComponentSections(
 						"",
 					);
 				}
-			for (const line of component.description.split("\n").filter(Boolean))
-				lines.push(escapeCell(line), "");
+			if (component.description !== commonDescription)
+				for (const line of component.description
+					.split("\n")
+					.filter(Boolean))
+					lines.push(escapeCell(line), "");
 			lines.push(`**Evidence:** ${escapeCell(component.evidence)}`);
-			if (component.guidance.length) {
+			const ownGuidance = component.guidance.filter(
+				(line) => !commonGuidance.includes(line),
+			);
+			if (ownGuidance.length) {
 				lines.push("", "**Implementation guidance:**");
-				for (const rule of component.guidance)
-					lines.push(`- ${escapeCell(rule)}`);
-			} else {
+				for (const rule of ownGuidance) lines.push(`- ${escapeCell(rule)}`);
+			} else if (!commonGuidance.length) {
 				lines.push(
 					"",
 					"Map this treatment only to matching components and the cited capture scope. Component roles and hierarchy are inferred; measurements do not establish unseen variants or interaction states.",

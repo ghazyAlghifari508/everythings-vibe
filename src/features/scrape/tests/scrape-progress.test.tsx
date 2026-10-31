@@ -281,7 +281,7 @@ describe("truthful activity", () => {
 		);
 	});
 
-	it("keeps exactly one spinner: the current stage in the ladder", () => {
+	it("keeps one stage spinner and one activity accent, never a third", () => {
 		const { container } = render(
 			<ScrapeProgress
 				mode="html"
@@ -292,8 +292,10 @@ describe("truthful activity", () => {
 		expect(
 			container.querySelectorAll("[data-active-stage-spinner]"),
 		).toHaveLength(1);
+		// The live activity line carries its own circular accent (p1 target); the
+		// ladder spinner is untouched and nothing else claims to be loading.
 		expect(container.querySelectorAll("[data-activity-spinner]")).toHaveLength(
-			0,
+			1,
 		);
 		expect(activityArea(container)?.textContent).toContain(
 			"Menyiapkan hasil HTML",
@@ -581,5 +583,56 @@ describe("queued → active → terminal regression", () => {
 		).not.toBeNull();
 		expect(screen.getAllByRole("alert")).toHaveLength(1);
 		expect(screen.getByRole("button", { name: "Coba lagi" })).toBeDefined();
+	});
+});
+
+describe("activity presentation per mode", () => {
+	it("keeps the images activity accent inside the images card", () => {
+		const { container } = render(
+			<ScrapeProgress
+				mode="images"
+				status="extracting"
+				activity="Mengambil tampilan"
+				stageStartedAt={new Date().toISOString()}
+			/>,
+		);
+		const card = container.querySelector('[data-scrape-progress="images"]');
+		expect(card?.querySelectorAll("[data-activity-spinner]")).toHaveLength(1);
+		expect(card?.querySelector("[data-activity-line]")?.textContent).toContain(
+			"Mengambil tampilan halaman",
+		);
+		expect(screen.getAllByRole("timer")).toHaveLength(1);
+	});
+
+	it("settles the activity line once the design run completes", () => {
+		const { container } = render(
+			<ScrapeProgress
+				mode="design"
+				status="completed"
+				activity="Menyimpan hasil"
+				stageStartedAt={new Date().toISOString()}
+			/>,
+		);
+		const activity = activityArea(container);
+		expect(activity?.getAttribute("data-activity-state")).toBe("completed");
+		expect(activity?.textContent).toContain("Proses selesai");
+		expect(container.querySelector("[data-activity-spinner]")).toBeNull();
+		expect(
+			container.querySelectorAll("[data-active-stage-spinner]"),
+		).toHaveLength(0);
+		expect(screen.queryByRole("timer")).toBeNull();
+	});
+
+	it("leaves the images card activity-free once it completes", () => {
+		render(
+			<ScrapeProgress
+				mode="images"
+				status="completed"
+				activity="Menyimpan hasil"
+				stageStartedAt={new Date().toISOString()}
+			/>,
+		);
+		expect(document.querySelector("[data-activity-line]")).toBeNull();
+		expect(screen.queryByRole("timer")).toBeNull();
 	});
 });

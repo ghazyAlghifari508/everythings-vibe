@@ -73,15 +73,10 @@ export function ScrapeHtmlPreviewPanel({
 				text: "Preview interaktif belum tersedia. Menampilkan tangkapan layar statis.",
 				onRetry: retryAction,
 			}
-		: previewState === "loading"
-			? {
-					text: "Menyiapkan preview interaktif. Sementara ini tangkapan layar statis.",
-					onRetry: undefined,
-				}
-			: {
-					text: "Tangkapan layar statis, bukan preview interaktif.",
-					onRetry: undefined,
-				};
+		: {
+				text: "Tangkapan layar statis, bukan preview interaktif.",
+				onRetry: undefined,
+			};
 
 	return (
 		<div role="tabpanel" aria-label="Preview index.html" hidden={!active}>
@@ -121,7 +116,7 @@ export function ScrapeHtmlPreviewPanel({
 
 			{showDom ? (
 				<DesktopPreview
-					key={previewAttempt}
+					key={`${previewAttempt}:${frameSrcDoc}`}
 					title={`Preview ${domain}`}
 					srcDoc={frameSrcDoc}
 					report={frameReport}
@@ -129,7 +124,9 @@ export function ScrapeHtmlPreviewPanel({
 					onReport={onFrameReport}
 					onRetry={onRetryFrame}
 				/>
-			) : hasScreenshot && screenshot ? (
+			) : hasScreenshot &&
+				screenshot &&
+				(previewState !== "loading" || domFailed) ? (
 				<>
 					<div
 						data-testid="scrape-visual-notice"

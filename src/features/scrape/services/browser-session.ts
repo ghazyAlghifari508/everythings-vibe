@@ -112,10 +112,14 @@ export async function guardContext(
 			transferredBytes += body.byteLength;
 			if (transferredBytes > SCRAPE_LIMITS.captureMaxBytes)
 				return route.abort();
+			// ponytail: permissive CORS header during headless capture ensures cross-origin webfonts and module assets load.
 			return route.fulfill({
 				status,
 				body: method === "HEAD" ? undefined : body,
-				headers: { "Content-Type": contentType },
+				headers: {
+					"Content-Type": contentType,
+					"Access-Control-Allow-Origin": "*",
+				},
 			});
 		} catch {
 			if (stats) stats.assetFetchFailures += 1;

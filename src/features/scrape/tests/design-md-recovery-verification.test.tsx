@@ -340,7 +340,6 @@ describe("Section 10 Automated Verification — p2.md", () => {
 		const { container } = render(
 			<DesignMdSourcePanel
 				designMd={COMPLETE_USABLE_DESIGN_MD}
-				domain="acme.test"
 				onImplementAgent={vi.fn()}
 				enrichment="applied"
 			/>,
@@ -383,7 +382,6 @@ describe("Section 10 Automated Verification — p2.md", () => {
 		render(
 			<DesignMdSourcePanel
 				designMd={MEASURED_FALLBACK_MD}
-				domain="archive.test"
 				onImplementAgent={vi.fn()}
 				inspectorSource="unverified"
 			/>,
@@ -560,7 +558,6 @@ describe("Section 10 Automated Verification — p2.md", () => {
 		render(
 			<DesignMdSourcePanel
 				designMd={COMPLETE_USABLE_DESIGN_MD}
-				domain="acme.test"
 				onImplementAgent={vi.fn()}
 			/>,
 		);
@@ -603,7 +600,6 @@ describe("Section 10 Automated Verification — p2.md", () => {
 		const { container } = render(
 			<DesignMdSourcePanel
 				designMd={MEASURED_FALLBACK_MD}
-				domain="acme.test"
 				onImplementAgent={vi.fn()}
 				enrichment="unavailable"
 				enrichmentDetail="Format sintesis tidak sesuai pada root: required key missing."

@@ -36,6 +36,13 @@ export function validateSynthesis(
 	model: DesignTokenModel,
 ): SynthesisValidationIssue[] {
 	const issues: SynthesisValidationIssue[] = [];
+	// The measured canvas appearance is the only theme evidence. A narrative that
+	// claims the other one would turn a requested preference into a fake token set.
+	if (synthesis.theme !== "unknown" && synthesis.theme !== model.theme)
+		issues.push({
+			code: "unsupported-claim",
+			detail: `Synthesis reports a ${synthesis.theme} theme, but the measured appearance is ${model.theme}.`,
+		});
 	const sizes: Record<EvidenceReference["kind"], number> = {
 		color: model.colors.length,
 		typography: model.typography.length,
@@ -145,6 +152,7 @@ export type SynthesisCause =
 	| "invalid_json"
 	| "schema"
 	| "unknown_reference"
+	| "unknown_value"
 	| "unsupported_claim"
 	| "provider"
 	| "timeout"
@@ -186,6 +194,8 @@ export function enrichmentDetailForCause(
 			return safeDetail ?? "Format sintesis AI tidak sesuai skema analisis.";
 		case "unknown_reference":
 			return safeDetail ?? "AI merujuk evidence yang tidak tersedia.";
+		case "unknown_value":
+			return safeDetail ?? "AI menyebut nilai yang tidak terukur.";
 		case "unsupported_claim":
 			return (
 				safeDetail ??
@@ -274,7 +284,9 @@ export function parseSynthesisResponse(
 			cause:
 				issues[0]?.code === "unsupported-claim"
 					? "unsupported_claim"
-					: "unknown_reference",
+					: issues[0]?.code === "unknown-value"
+						? "unknown_value"
+						: "unknown_reference",
 		};
 	return { synthesis: result.data, status: "applied" };
 }

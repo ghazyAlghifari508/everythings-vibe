@@ -3,8 +3,8 @@ import type { resolveScrapeErrorPresentation } from "@/features/scrape/utils/scr
 import { displaySiteName } from "@/features/scrape/utils/site-name";
 import { ScrapeErrorCard } from "./scrape-error-card";
 import type { ScrapeProgressProps } from "./scrape-progress";
-import { ElapsedTimer } from "./scrape-progress-elapsed";
-import { ScrapeStepper } from "./scrape-progress-steps";
+import { ScrapeActivityLine } from "./scrape-progress-activity";
+import { LABELS, ScrapeStepper } from "./scrape-progress-steps";
 
 // Images keep their own single-column presentation: identity, then one card
 // whose header reports image status, the image stage ladder, live counters and
@@ -15,7 +15,8 @@ export function ScrapeImagesProgress({
 	operation,
 	headerState,
 	activityText,
-	startTimestamp,
+	stageStartedAt,
+	activityStartedAt,
 	stalledMessage,
 	presentation,
 }: {
@@ -24,7 +25,8 @@ export function ScrapeImagesProgress({
 	operation: string;
 	headerState: string;
 	activityText: string | null;
-	startTimestamp: string | null;
+	stageStartedAt: string | null;
+	activityStartedAt: string | null;
 	stalledMessage: string | null;
 	presentation: ReturnType<typeof resolveScrapeErrorPresentation>;
 }) {
@@ -99,40 +101,16 @@ export function ScrapeImagesProgress({
 						/>
 					</div>
 				) : null}
-				{!isFailed && active && stalledMessage ? (
-					<p
-						data-activity-line
-						data-activity-state="stalled"
-						className="mt-5 break-words border-t border-graphite pt-4 text-sm text-fog"
-					>
-						{stalledMessage}
-					</p>
-				) : null}
-				{!isFailed && active && !stalledMessage && activityText ? (
-					<div
-						data-activity-line
-						className="mt-5 flex min-w-0 items-baseline gap-2 border-t border-graphite pt-4"
-					>
-						<output
-							aria-live="polite"
-							className="min-w-0 flex-1 break-words text-sm text-snow"
-						>
-							{activityText}
-						</output>
-						{startTimestamp ? <ElapsedTimer start={startTimestamp} /> : null}
-					</div>
-				) : null}
-				{!isFailed &&
-				active &&
-				!stalledMessage &&
-				!activityText &&
-				status === "queued" ? (
-					<p
-						data-activity-line
-						className="mt-5 break-words border-t border-graphite pt-4 text-sm text-fog"
-					>
-						Menunggu giliran pemrosesan.
-					</p>
+				{!isFailed && active ? (
+					<ScrapeActivityLine
+						className="mt-5 border-t border-graphite pt-4"
+						status={status}
+						activity={activityText}
+						fallbackLabel={LABELS[status]}
+						stageStartedAt={stageStartedAt}
+						activityStartedAt={activityStartedAt}
+						stalledMessage={stalledMessage}
+					/>
 				) : null}
 				{visibleCounters.length > 0 && !isFailed && (
 					<dl className="mt-6 grid grid-cols-2 gap-4 border-t border-graphite pt-5 sm:grid-cols-4">

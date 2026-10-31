@@ -144,8 +144,15 @@ export function validateSynthesisValues(
 			});
 		}
 		for (const match of segment.matchAll(FAMILY_CONTEXT)) {
-			const named = (match[1] ?? "").trim();
+			const named = (match[1] ?? "")
+				.split(/\s+(?:for|with|in|on|at|is|are|to)\b/i)[0]
+				?.trim();
 			if (!named) continue;
+			if (
+				/^font\s/i.test(match[0]) &&
+				/^(?:size|weight|style|stretch|smoothing|loading|scale)\b/i.test(named)
+			)
+				continue;
 			for (const part of named.split(",")) {
 				const family = part
 					.trim()
