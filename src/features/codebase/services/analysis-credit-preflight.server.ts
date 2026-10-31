@@ -17,9 +17,13 @@ export async function getAnalysisCreditPreflight(
 	} = {},
 ) {
 	await reconcileExpiredCreditOperations({ userId });
-	const [balance, allowance] = await Promise.all([
+	const { getUserBillingEntitlement } = await import(
+		"@/features/billing/services/billing-entitlement"
+	);
+	const [balance, allowance, entitlement] = await Promise.all([
 		getCreditBalance(userId),
 		readInitialAnalysisAllowance(db, userId),
+		getUserBillingEntitlement(userId),
 	]);
 	const consent = analysisCreditConsentSchema.safeParse(options.consent);
 	return resolveAnalysisCreditPolicy({
@@ -29,6 +33,7 @@ export async function getAnalysisCreditPreflight(
 		availableCredits: balance.remaining,
 		isInitial: options.isInitial ?? true,
 		consentMaximum: consent.success ? consent.data.maximumCredits : undefined,
+		billingExempt: entitlement.billingExempt,
 	});
 }
 

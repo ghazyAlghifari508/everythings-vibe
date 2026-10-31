@@ -151,7 +151,9 @@ export async function runCodebaseAnalysisAttempt(
 			idempotencyKey,
 			quote,
 			analysisReference: analysisId,
+			isExempt: creditStatus.billingExempt,
 			initialAnalysisAllowance:
+				!creditStatus.billingExempt &&
 				creditStatus.code === "FREE_ALLOWANCE_AVAILABLE",
 			expiresAt: new Date(
 				Date.now() + ANALYSIS_ALLOWANCE_POLICY.reservationLifetimeMs,
