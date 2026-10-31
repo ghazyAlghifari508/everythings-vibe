@@ -6,6 +6,9 @@ export const CODEBASE_SYNC_POLL_INTERVAL_MS = 2_000;
 export const CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS = 500;
 export const CODEBASE_SYNC_REQUEST_TIMEOUT_MS = 10_000;
 export const CODEBASE_SYNC_SESSION_EXPIRY_MS = 30 * 60 * 1000;
+// A token inside this window still works, but the prompt screen warns the
+// user instead of letting them copy a credential that dies mid-upload.
+export const CODEBASE_SYNC_EXPIRY_SOON_MS = 5 * 60 * 1000;
 export const CODEBASE_MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
 export const CODEBASE_MAX_FILE_BYTES = 1024 * 1024;
 export const CODEBASE_MAX_CHUNK_BYTES = 256 * 1024;

@@ -19,9 +19,9 @@ export interface UseCodebaseSyncStatusOptions {
 	/** Explicit endpoint. Defaults to the codebase-scoped status route. */
 	statusPath?: string;
 	/**
-	 * Session to pin every request to. Combined with the last observed session
-	 * id so a concurrent retry (new latest session) cannot silently retarget
-	 * polling at a different attempt.
+	 * Session to pin every request to. The onboarding machine passes the id
+	 * from its one-time payload; when it changes, the loop drops the old
+	 * snapshot so a new attempt never paints behind stale progress.
 	 */
 	sessionId?: string | null;
 	/**
@@ -98,26 +98,52 @@ export function useCodebaseSyncStatus({
 	const inFlightRef = useRef(false);
 	const abortRef = useRef<AbortController | null>(null);
 	const seqRef = useRef(0);
-	// A ref, not state, so the very next tick inside the same effect run already
-	// uses the pinned id without waiting for a restart.
+	// The pinned identity always wins: a session prop change is an explicit new
+	// attempt, so the loop adopts it synchronously inside this render. On the
+	// first mount it falls back to the recovered seed so the first paint
+	// already reflects persisted server state instead of an empty card.
 	const pinnedSessionRef = useRef<string | null>(
 		sessionId ?? initialStatus?.sessionId ?? null,
 	);
-	if (sessionId) pinnedSessionRef.current = sessionId;
+	// The pinned identity always wins: a session prop change is an explicit new
+	// attempt, so the loop adopts it synchronously inside this render.
+	if (sessionId !== undefined) pinnedSessionRef.current = sessionId;
 
-	// A recovered status can arrive after the first render (refresh recovery
-	// resolves the codebase asynchronously), so adopt it as the seed whenever it
-	// appears. Only fills an empty state: once a poll has landed, the live
-	// snapshot always wins, so a late recovery read can never rewind the screen.
+	// The recovered seed fills an empty state only: once a live poll has
+	// landed, the live snapshot wins, so a late recovery read can never
+	// rewind the screen. A session prop change is an explicit new attempt
+	// and always resets through the effect below, whatever the seed holds.
 	useEffect(() => {
 		if (!initialStatus) return;
 		activeRef.current = isSyncStatusInFlight(initialStatus.status);
 		setStatus((current) => (current === null ? initialStatus : current));
 	}, [initialStatus]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the session id is the only trigger; initialStatus is read as the mount seed and must not restart the loop
 	useEffect(() => {
+		// A session prop change is an explicit new attempt: the old snapshot
+		// must go in the same commit that starts polling the new session,
+		// so stale progress can never paint as the new attempt's. On the
+		// first mount there is no previous session, so the recovered seed
+		// (when present) is kept as the first paint instead.
+		if (sessionId !== undefined) {
+			setStatus((current) => {
+				if (current !== null && current.sessionId === sessionId) return current;
+				if (
+					current === null &&
+					initialStatus !== null &&
+					initialStatus.sessionId === sessionId
+				)
+					return initialStatus;
+				return null;
+			});
+			activeRef.current =
+				initialStatus !== null && initialStatus.sessionId === sessionId
+					? isSyncStatusInFlight(initialStatus.status)
+					: false;
+			setError(null);
+		}
 		if (!enabled || !codebaseId) return;
-		seqRef.current += 1;
 		const seq = seqRef.current;
 		let cancelled = false;
 
@@ -178,6 +204,11 @@ export function useCodebaseSyncStatus({
 					return;
 				}
 				if (cancelled || seq !== seqRef.current) return;
+				// Stale response protection: a poll issued before the session
+				// switch only ever resolves after the reset above, so an old
+				// attempt must never repaint the new one.
+				const expectsSession = sessionId ?? pinnedSessionRef.current;
+				if (expectsSession && parsed.data.sessionId !== expectsSession) return;
 				pinnedSessionRef.current = parsed.data.sessionId;
 				activeRef.current = isSyncStatusInFlight(parsed.data.status);
 				setStatus(parsed.data);
