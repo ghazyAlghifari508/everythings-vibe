@@ -7,8 +7,6 @@ type Handler = (args: {
 	params: { id: string };
 }) => Promise<Response>;
 
-/** One statement the code under test asked the driver to run, recorded with
- * the exact SQL text so assertions can check WHICH rows a write may reach. */
 interface Statement {
 	op: "insert" | "update" | "delete" | "execute";
 	withinTransaction: boolean;
@@ -25,7 +23,6 @@ const state = vi.hoisted(() => ({
 	filters: [] as unknown[],
 	projections: [] as unknown[],
 	statements: [] as Statement[],
-	inTransaction: false,
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -65,8 +62,6 @@ function repository(withinTransaction: boolean) {
 		} satisfies Statement);
 		return state.rows;
 	};
-	// A drizzle write builder is either awaited directly (`update().set().where()`)
-	// or chained into `.returning()`; both shapes must report one statement.
 	const writeResult = (
 		op: Statement["op"],
 		filter: unknown,
@@ -143,12 +138,7 @@ vi.mock("@/db", () => ({
 		transaction: async (
 			work: (tx: ReturnType<typeof repository>) => Promise<unknown>,
 		) => {
-			state.inTransaction = true;
-			try {
-				return await work(repository(true));
-			} finally {
-				state.inTransaction = false;
-			}
+			return work(repository(true));
 		},
 	},
 }));
@@ -225,8 +215,6 @@ describe("API-key management boundaries", () => {
 		{ name: "", scopes: ["read:project"] },
 		{ name: "Agent", scopes: [] },
 		{ name: "Agent", scopes: ["admin"] },
-		// The automatic namespace is server-owned; a hand-written name wearing it
-		// would hide a manual credential from the lifecycle controls.
 		{ name: "auto-cli-disguise", scopes: ["read:project"] },
 	])("rejects invalid creation input without writing", async (body) => {
 		expect((await call("/api/settings/api-keys/", "POST", body)).status).toBe(
@@ -247,8 +235,6 @@ describe("API-key management boundaries", () => {
 			name: expect.stringMatching(/^auto-cli-/),
 			scopes: ["read:project", "write:task:status", "write:subtask:status"],
 		});
-		// Every handoff credential is bounded; a null deadline here would make a
-		// lost prompt a permanent bearer token.
 		expect(state.writes[0]?.values.expiresAt).toBeInstanceOf(Date);
 		expect(String(state.writes[0]?.values.key)).toMatch(/^[a-f0-9]{64}$/);
 		expect(state.writes[0]?.values).not.toHaveProperty("rawKey");
@@ -305,16 +291,12 @@ function statements(op: Statement["op"]): Statement[] {
 }
 
 describe("automatic credential lifecycle", () => {
-	// Every issuance must serialize behind the lock, otherwise parallel handoffs
-	// each see an empty namespace and mint independent long-lived credentials.
 	it("locks per user before writing, on every issuance", async () => {
 		for (const _attempt of [0, 1]) {
 			state.statements = [];
 			const res = await call("/api/settings/api-keys/auto", "POST");
 			expect(res.status).toBe(200);
 
-			// The lock is the first statement of the transaction, ahead of any read
-			// or write, so a parallel handoff cannot interleave with this one.
 			expect(state.statements.map((entry) => entry.op)).toEqual([
 				"execute",
 				"delete",
@@ -330,12 +312,9 @@ describe("automatic credential lifecycle", () => {
 
 	it("issues distinct bounded secrets across multiple handoff requests", async () => {
 		const responses: Response[] = [];
-		for (let attempt = 0; attempt < 8; attempt++) {
+		for (let attempt = 0; attempt < 8; attempt++)
 			responses.push(await call("/api/settings/api-keys/auto", "POST"));
-		}
-		const payloads = await Promise.all(
-			responses.map((response) => response.json()),
-		);
+		const payloads = await Promise.all(responses.map((res) => res.json()));
 		expect(responses.every((response) => response.status === 200)).toBe(true);
 		expect(new Set(payloads.map((payload) => payload.rawKey)).size).toBe(8);
 		expect(statements("execute")).toHaveLength(8);
@@ -358,7 +337,6 @@ describe("automatic credential lifecycle", () => {
 	it("expires expired rows and gives the new key the full TTL", async () => {
 		const before = Date.now();
 		const res = await call("/api/settings/api-keys/auto", "POST");
-
 		const reap = statements("delete")[0];
 		expect(reap?.sql).toContain('"api_keys"."expires_at" is not null');
 		expect(reap?.sql).toContain('"api_keys"."expires_at" <');
@@ -373,11 +351,8 @@ describe("automatic credential lifecycle", () => {
 		expect(ttl).toBeLessThanOrEqual(30 * DAY_MS + 1000);
 	});
 
-	// Cleanup bounds a legacy key that predates the expiry policy instead of
-	// deleting it: one may belong to an agent running right now.
 	it("bounds unbounded handoff keys and drops only expired ones", async () => {
 		const res = await call("/api/settings/api-keys/cleanup", "POST");
-
 		expect(await res.json()).toEqual({
 			revoked: 1,
 			deleted: 1,
@@ -393,8 +368,6 @@ describe("automatic credential lifecycle", () => {
 		expect(dropExpired?.sql).toContain('"api_keys"."expires_at" is not null');
 		expect(dropExpired?.sql).toContain('"api_keys"."expires_at" <');
 		expect(dropExpired?.params).toContain("tenant-a");
-		// A manual key without a deadline is never matched: only its owner decides
-		// when it is obsolete.
 		expect(dropExpired?.sql).not.toContain("like");
 	});
 });
