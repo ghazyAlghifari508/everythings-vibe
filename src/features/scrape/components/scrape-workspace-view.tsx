@@ -4,9 +4,15 @@ import { ScrapModeSwitcher } from "./scrap-mode-switcher";
 
 export interface ScrapeWorkspaceViewProps {
 	initialMode: ScrapeMode;
+	mode?: ScrapeMode;
+	onModeChange?: (mode: ScrapeMode) => void;
 }
 
-export function ScrapeWorkspaceView({ initialMode }: ScrapeWorkspaceViewProps) {
+export function ScrapeWorkspaceView({
+	initialMode,
+	mode,
+	onModeChange,
+}: ScrapeWorkspaceViewProps) {
 	return (
 		<main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
 			{/* The breadcrumb shares the max-w-3xl column with the form so its left edge lines up with the form, not the wider page shell. */}
@@ -25,7 +31,11 @@ export function ScrapeWorkspaceView({ initialMode }: ScrapeWorkspaceViewProps) {
 					</header>
 
 					<div className="mt-6 w-full sm:mt-8">
-						<ScrapModeSwitcher initialMode={initialMode} />
+						<ScrapModeSwitcher
+							initialMode={initialMode}
+							mode={mode}
+							onModeChange={onModeChange}
+						/>
 					</div>
 				</div>
 			</div>
