@@ -60,3 +60,27 @@ proposal and approval, so HeroUI is rejected on compatibility grounds — not to
 2. **Advanced Parameters disclosure.** HeroUI is not installable and Radix Collapsible is not
    present. The in-repo controlled disclosure pattern is reused rather than invented.
 3. **Inspector sections.** They are project-specific renderers over the validated design model.
+
+## 5. Live activity feedback (VibeScrape activity line)
+
+Re-evaluated for the activity-line animation task, against the same local-first order.
+
+| Candidate | Verdict |
+|---|---|
+| repo `src/components/ui/thought-line.tsx` (ReactBits ThoughtLine port) | **selected** — already ships the shimmer sweep, label cross-fade, reduced-motion handling and a single polite live region |
+| repo `src/components/ui/agent-thinking.tsx`, `src/components/ui/orb.tsx` | rejected — they model AI reasoning traces / thinking orbs, which would invent a pipeline stage the scrape worker never reports |
+| HeroUI `Spinner` / `ProgressCircle` | rejected — `@heroui/styles` still does not resolve from the project root (section 2), so the component ships unstyled |
+| Magic UI `AnimatedShinyText` / `Spinner`, ReactBits `ShinyText`, shadcn `Skeleton` | rejected — not present in the repository and each would add a dependency for a single existing behaviour; no installation without a real need |
+
+Implementation notes that shaped the choice:
+
+- `ThoughtLine` is used in `bare` + `wrap` mode with `showTimer={false}`; the persisted clock stays
+  with the existing `ElapsedTimer`, so the timer keeps its place at the right edge of the row and the
+  activity column keeps its previous flex layout.
+- The circular accent is the same `Loading02Icon` the stage ladder already uses, so the line reads as
+  one design language instead of a second loading style. `breathDepth={0}` removes the glyph breathing
+  loop, leaving exactly one spinner and one shimmer per area.
+- The clock is anchored to the persisted stage (`stageStartedAt`, falling back to a stage-keyed
+  `activityStartedAt` anchor) so an activity write cannot restart it while the stage is unchanged.
+- Reduced motion is honoured twice: a synchronous `prefers-reduced-motion` read disables the shimmer
+  and the fade, and `globals.css` neutralises the shimmer for the server-rendered frame.
