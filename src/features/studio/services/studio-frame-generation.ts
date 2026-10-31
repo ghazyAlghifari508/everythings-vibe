@@ -11,6 +11,7 @@ import type {
 	InitialFrameContext,
 	ValidatedFrameInput,
 } from "../types/studio-service";
+import { repairStudioAccessibleLabels } from "./studio-accessible-repair";
 import {
 	assembleCanonicalShell,
 	validateCanonicalShell,
@@ -175,6 +176,7 @@ export async function generateValidatedFrameHtml(
 				);
 			}
 		}
+		if (input.activeScreen) htmlCode = repairStudioAccessibleLabels(htmlCode);
 		const diagnostics = input.activeScreen
 			? inspectStudioHtml(htmlCode)
 			: { hard: [], warnings: [] };
