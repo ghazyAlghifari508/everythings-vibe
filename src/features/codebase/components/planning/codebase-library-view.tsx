@@ -106,7 +106,10 @@ export function CodebaseLibraryView({
 			if (!response.ok) {
 				setLocalItems(previous);
 				showToast(
-					readServerErrorMessage(body, "Gagal menghapus project."),
+					readServerErrorMessage(
+						body,
+						"Project tidak dapat dihapus\nCoba lagi.",
+					),
 					"error",
 				);
 				return;
@@ -115,11 +118,11 @@ export function CodebaseLibraryView({
 			if (selection.ids.has(item.id)) {
 				selection.toggle(item.id);
 			}
-			showToast("Project dihapus.", "success");
+			showToast("Project berhasil dihapus", "success");
 			router.invalidate();
 		} catch {
 			setLocalItems(previous);
-			showToast("Server tidak dapat dihubungi.", "error");
+			showToast("Project tidak dapat dihapus\nCoba lagi.", "error");
 		}
 	};
 
