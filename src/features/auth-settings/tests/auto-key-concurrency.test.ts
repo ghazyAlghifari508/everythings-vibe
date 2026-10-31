@@ -29,6 +29,7 @@ vi.mock("@/lib/session", () => ({
 	requireUser: async () => ({ id: "test-owner" }),
 }));
 
+import { cleanupObsoleteApiKeys } from "../services/api-keys.server";
 import { createAutoApiKey } from "../services/auto-api-key.server";
 
 it.skipIf(!process.env.API_KEY_ISOLATED_TEST_DATABASE_URL)(
@@ -77,6 +78,27 @@ it.skipIf(!process.env.API_KEY_ISOLATED_TEST_DATABASE_URL)(
 					rows.find((row) => row.key === hash)?.expiresAt?.toISOString(),
 				).toBe(payload.expiresAt);
 			}
+			await database.insert(apiKeys).values({
+				id: "expired",
+				userId: "test-owner",
+				name: "auto-cli-expired",
+				key: "expired-hash",
+				expiresAt: new Date(Date.now() - 60_000),
+			});
+			const firstCleanup = await cleanupObsoleteApiKeys();
+			expect(await firstCleanup.json()).toMatchObject({
+				revoked: 1,
+				deleted: 1,
+			});
+			const secondCleanup = await cleanupObsoleteApiKeys();
+			expect(await secondCleanup.json()).toMatchObject({
+				revoked: 0,
+				deleted: 0,
+			});
+			const remaining = await database.select().from(apiKeys);
+			expect(remaining.find((row) => row.id === "active")?.expiresAt).toEqual(
+				expiry,
+			);
 		} finally {
 			await pool.query("DROP SCHEMA IF EXISTS credential_concurrency CASCADE");
 			await pool.end();
