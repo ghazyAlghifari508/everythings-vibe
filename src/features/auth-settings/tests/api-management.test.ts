@@ -320,6 +320,26 @@ describe("automatic credential lifecycle", () => {
 		}
 	});
 
+	it("issues distinct bounded secrets across multiple handoff requests", async () => {
+		const responses: Response[] = [];
+		for (let attempt = 0; attempt < 8; attempt++) {
+			responses.push(await call("/api/settings/api-keys/auto", "POST"));
+		}
+		const payloads = await Promise.all(
+			responses.map((response) => response.json()),
+		);
+		expect(responses.every((response) => response.status === 200)).toBe(true);
+		expect(new Set(payloads.map((payload) => payload.rawKey)).size).toBe(8);
+		expect(statements("execute")).toHaveLength(8);
+		expect(statements("update")).toEqual([]);
+		for (const write of state.writes) {
+			expect(write.values.expiresAt).toBeInstanceOf(Date);
+			expect(
+				payloads.some((payload) => payload.rawKey === write.values.key),
+			).toBe(false);
+		}
+	});
+
 	it("preserves existing deadlines across repeated handoffs", async () => {
 		await call("/api/settings/api-keys/auto", "POST");
 		await call("/api/settings/api-keys/auto", "POST");
