@@ -50,6 +50,7 @@ interface ScreenConnectProps {
 	/** Billing/eligibility blocked the analysis; the snapshot is still usable. */
 	analysisBlocked?: boolean;
 	isAnalyzing?: boolean;
+	isRetrying?: boolean;
 	onRetryAnalysis?: () => void;
 	isLegacyAnalysisMissingSuggestions?: boolean;
 	onRefreshLegacySuggestions?: () => void;
@@ -69,6 +70,7 @@ export function ScreenConnect({
 	analysisError = null,
 	analysisBlocked = false,
 	isAnalyzing = false,
+	isRetrying = false,
 	onRetryAnalysis,
 	isLegacyAnalysisMissingSuggestions = false,
 	onRefreshLegacySuggestions,
@@ -103,9 +105,11 @@ export function ScreenConnect({
 
 				<div className="flex flex-col gap-6 p-5 sm:p-6">
 					<ScreenConnectPromptStep
+						key={payload?.sessionId ?? "no-session"}
 						projectName={projectName}
 						payload={payload}
 						isStarting={isStarting}
+						status={status}
 						onRequestNewToken={onRequestNewToken}
 					/>
 
@@ -123,6 +127,7 @@ export function ScreenConnect({
 						analysisError={analysisError}
 						analysisBlocked={analysisBlocked}
 						isAnalyzing={isAnalyzing}
+						isRetrying={isRetrying}
 						onRetryAnalysis={onRetryAnalysis}
 						isLegacyAnalysisMissingSuggestions={
 							isLegacyAnalysisMissingSuggestions

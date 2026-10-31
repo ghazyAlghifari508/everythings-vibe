@@ -32,6 +32,7 @@ interface ScreenConnectSyncStepProps {
 	analysisError: string | null;
 	analysisBlocked?: boolean;
 	isAnalyzing: boolean;
+	isRetrying?: boolean;
 	onRetryAnalysis?: () => void;
 	isLegacyAnalysisMissingSuggestions: boolean;
 	onRefreshLegacySuggestions?: () => void;
@@ -49,6 +50,7 @@ export function ScreenConnectSyncStep({
 	analysisError,
 	analysisBlocked = false,
 	isAnalyzing,
+	isRetrying = false,
 	onRetryAnalysis,
 	isLegacyAnalysisMissingSuggestions,
 	onRefreshLegacySuggestions,
@@ -97,6 +99,9 @@ export function ScreenConnectSyncStep({
 					analysisBlocked={analysisBlocked}
 					showAnalysisFailure={
 						!isLegacyAnalysisMissingSuggestions &&
+						!isRetrying &&
+						!isAnalyzing &&
+						status?.analysisAttemptStatus !== "pending" &&
 						(Boolean(analysisError) ||
 							status?.analysisAttemptStatus === "failed" ||
 							status?.analysisStatus === "failed" ||
@@ -106,6 +111,7 @@ export function ScreenConnectSyncStep({
 					analysisError={analysisError}
 					onRetryAnalysis={onRetryAnalysis}
 					isAnalyzing={isAnalyzing}
+					isRetrying={isRetrying}
 				/>
 
 				{statusError && (

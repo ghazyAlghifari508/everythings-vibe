@@ -1,19 +1,29 @@
 "use client";
 
 import { Copy01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
+import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Spinner } from "@/components/ui/spinner";
 import { useCopyFeedback } from "@/features/codebase/hooks/use-copy-feedback";
 import {
 	buildAgentPrompt,
 	type SyncPromptPayload,
+	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
+import { CODEBASE_SYNC_EXPIRY_SOON_MS } from "@/features/codebase/types/codebase-constants";
+
+function resolveExpiryMs(value: string | undefined): number | null {
+	if (!value) return null;
+	const ms = Date.parse(value);
+	if (!Number.isFinite(ms)) return null;
+	return ms - Date.now();
+}
 
 interface ScreenConnectPromptStepProps {
 	projectName: string;
 	payload: SyncPromptPayload | null;
 	isStarting: boolean;
-	/** Mints a fresh one-time sync credential for a new attempt. */
+	status?: SyncStatusResponse | null;
 	onRequestNewToken?: () => void;
 }
 
@@ -21,14 +31,32 @@ export function ScreenConnectPromptStep({
 	projectName,
 	payload,
 	isStarting,
+	status,
 	onRequestNewToken,
 }: ScreenConnectPromptStepProps) {
 	const { copied, copyError, copy } = useCopyFeedback();
 	const promptText = payload ? buildAgentPrompt(payload, { projectName }) : "";
+	const sessionStatus = status?.status ?? null;
+	const expiryMs = resolveExpiryMs(payload?.expiresAt ?? status?.expiresAt);
+	const expiryState =
+		sessionStatus === "expired" || expiryMs === null || expiryMs <= 0
+			? "expired"
+			: expiryMs <= CODEBASE_SYNC_EXPIRY_SOON_MS
+				? "soon"
+				: "valid";
+	const [, forceTick] = useState(0);
+	useEffect(() => {
+		if (expiryState !== "soon" && expiryState !== "valid") return;
+		const timer = setInterval(() => forceTick((n) => n + 1), 15000);
+		return () => clearInterval(timer);
+	}, [expiryState]);
 
 	const handleCopy = async () => {
 		await copy(promptText);
 	};
+
+	const showRenewal =
+		expiryState === "expired" || expiryState === "soon" || !payload;
 
 	return (
 		<div className="flex items-start gap-3.5">
@@ -76,6 +104,17 @@ export function ScreenConnectPromptStep({
 									{copyError}
 								</p>
 							)}
+							{expiryState === "soon" && (
+								<p className="mt-2 font-sans text-[11px] text-amber-400">
+									Sesi segera berakhir. Salin dan jalankan prompt sekarang, atau
+									perbarui sesi.
+								</p>
+							)}
+							{expiryState === "expired" && (
+								<p className="mt-2 font-sans text-[11px] text-crimson">
+									Sesi telah berakhir. Buat sesi baru untuk melanjutkan.
+								</p>
+							)}
 						</>
 					) : isStarting ? (
 						<div className="flex items-center justify-center gap-2 py-6 font-sans text-xs text-fog">
@@ -83,22 +122,24 @@ export function ScreenConnectPromptStep({
 							<span>Menyiapkan token sesi...</span>
 						</div>
 					) : (
-						/* The sync credential is deliberately never persisted, so a
-						   refresh mid-attempt cannot restore the prompt text. The
-						   attempt itself is still tracked below — only the token is
-						   missing, and a new one mints a new attempt. */
 						<div className="flex flex-col items-center justify-center gap-3 py-6 text-center font-sans">
 							<p className="text-xs text-fog">
-								Token sync hanya berlaku sekali dan tidak disimpan di browser.
+								{sessionStatus === "expired" || expiryState === "expired"
+									? "Sesi telah berakhir."
+									: "Token sync hanya berlaku sekali dan tidak disimpan di browser."}
 							</p>
-							{onRequestNewToken && (
+							{showRenewal && onRequestNewToken && (
 								<button
 									type="button"
 									onClick={onRequestNewToken}
 									disabled={isStarting}
 									className="inline-flex min-h-9 items-center rounded-md border border-iron bg-obsidian px-3.5 font-sans text-[11px] font-medium text-mist transition hover:bg-steel hover:text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 								>
-									Dapatkan token baru
+									{expiryState === "expired" || !payload
+										? "Buat sesi baru"
+										: expiryState === "soon"
+											? "Perbarui sesi"
+											: "Dapatkan token baru"}
 								</button>
 							)}
 						</div>

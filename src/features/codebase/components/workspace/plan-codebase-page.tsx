@@ -29,7 +29,8 @@ export function PlanCodebasePage() {
 	const step = useUIStore((s) => s.codebasePlanStep);
 	const setStep = useUIStore((s) => s.setCodebasePlanStep);
 	const analysisState = useOnboardingAnalysisState();
-	const { analysis, analysisWorking, analysisError } = analysisState;
+	const { analysis, analysisWorking, analysisError, isAnalysisRetrying } =
+		analysisState;
 	const {
 		error,
 		isStarting,
@@ -174,6 +175,7 @@ export function PlanCodebasePage() {
 							analysisError={analysisError}
 							analysisBlocked={analysisBlocked}
 							isAnalyzing={analysisWorking}
+							isRetrying={isAnalysisRetrying}
 							onRetryAnalysis={retryAnalysis}
 							isLegacyAnalysisMissingSuggestions={
 								isLegacyAnalysisMissingSuggestions
