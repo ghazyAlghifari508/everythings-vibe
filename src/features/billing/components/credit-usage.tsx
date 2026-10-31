@@ -2,163 +2,75 @@
 
 import {
 	Alert01Icon,
-	CancelCircleIcon,
-	CheckmarkCircle01Icon,
-	Clock01Icon,
+	ArrowLeft01Icon,
+	ArrowRight01Icon,
 	RefreshIcon,
-	ShieldAlertIcon,
-	Undo02Icon,
 } from "@hugeicons/core-free-icons";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { CreditOperationStage } from "@/db/schema";
+import {
+	type StageFilter,
+	type StatusFilter,
+	useCreditUsage,
+} from "@/features/billing/hooks/use-credit-usage";
 import type {
-	CreditOperationKind,
-	CreditOperationState,
-} from "@/features/billing/services/adaptive-credit";
-import type { CreditOperationItem } from "@/features/billing/types/credit-usage";
+	CreditOperationItem,
+	CreditUsagePagination,
+	PaginatedCreditUsageResult,
+} from "@/features/billing/types/credit-usage";
+import {
+	getActivityLabel,
+	getStatusBadge,
+	getStatusLabel,
+} from "@/features/billing/utils/credit-usage-status";
 import { cn, formatDate } from "@/lib/utils";
 import { CreditUsageDetail } from "./credit-usage-detail";
 
-export type { CreditOperationItem };
+export type { CreditOperationItem, StageFilter, StatusFilter };
+export { getActivityLabel, getStatusBadge, getStatusLabel };
 
 export interface CreditUsageProps {
 	availableCredits?: number;
 	reservedCredits?: number;
 	totalCreditsUsed?: number;
-	operations: CreditOperationItem[];
+	operations?: CreditOperationItem[];
+	initialPagination?: CreditUsagePagination;
 	stageBreakdown?: Record<CreditOperationStage, number>;
+	onFetch?: (params: {
+		page: number;
+		pageSize: number;
+		stage: StageFilter;
+		status: StatusFilter;
+	}) => Promise<PaginatedCreditUsageResult>;
 }
 
-type StageFilter = "all" | CreditOperationStage;
-type StatusFilter = "all" | CreditOperationState;
+export function CreditUsageSection(props: CreditUsageProps) {
+	const {
+		stageFilter,
+		statusFilter,
+		pageSize,
+		currentPage,
+		totalPages,
+		total,
+		items,
+		loading,
+		error,
+		hasActiveFilter,
+		handleStageChange,
+		handleStatusChange,
+		handleResetFilter,
+		handleRetry,
+		handlePageChange,
+	} = useCreditUsage(props);
 
-export function getActivityLabel(kind: CreditOperationKind): string {
-	switch (kind) {
-		case "codebase_analysis":
-			return "Codebase analysis";
-		case "prd_generation":
-			return "Generate PRD";
-		case "ac_generation":
-			return "Generate AC";
-		case "task_generation":
-			return "Generate Task";
-		default:
-			return kind;
-	}
-}
-
-export function getStatusLabel(state: CreditOperationState): string {
-	switch (state) {
-		case "settled":
-			return "Berhasil";
-		case "released":
-			return "Dilepas";
-		case "failed":
-			return "Gagal";
-		case "reserved":
-			return "Direservasi";
-		case "running":
-			return "Diproses";
-		case "settling":
-			return "Menyelesaikan";
-		case "quarantined":
-			return "Dikarantina";
-		case "refunded":
-			return "Dikembalikan";
-		case "quoted":
-			return "Dikutip";
-		default:
-			return state;
-	}
-}
-
-export function getStatusBadge(state: CreditOperationState) {
-	switch (state) {
-		case "settled":
-			return {
-				label: "Berhasil",
-				className: "bg-emerald/10 text-emerald border-emerald/20",
-				icon: (
-					<Icon icon={CheckmarkCircle01Icon} size={12} className="h-3 w-3" />
-				),
-			};
-		case "released":
-			return {
-				label: "Dilepas",
-				className: "bg-steel/20 text-fog border-steel/30",
-				icon: <Icon icon={Undo02Icon} size={12} className="h-3 w-3" />,
-			};
-		case "failed":
-			return {
-				label: "Gagal",
-				className: "bg-crimson/10 text-crimson border-crimson/20",
-				icon: <Icon icon={CancelCircleIcon} size={12} className="h-3 w-3" />,
-			};
-		case "reserved":
-			return {
-				label: "Direservasi",
-				className: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-				icon: <Icon icon={Clock01Icon} size={12} className="h-3 w-3" />,
-			};
-		case "running":
-		case "settling":
-			return {
-				label: "Diproses",
-				className: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-				icon: (
-					<Icon icon={RefreshIcon} size={12} className="h-3 w-3 animate-spin" />
-				),
-			};
-		case "quarantined":
-			return {
-				label: "Dikarantina",
-				className: "bg-indigo/10 text-indigo border-indigo/20",
-				icon: <Icon icon={ShieldAlertIcon} size={12} className="h-3 w-3" />,
-			};
-		case "refunded":
-			return {
-				label: "Dikembalikan",
-				className: "bg-indigo/10 text-indigo border-indigo/20",
-				icon: <Icon icon={Undo02Icon} size={12} className="h-3 w-3" />,
-			};
-		case "quoted":
-			return {
-				label: "Dikutip",
-				className: "bg-steel/10 text-fog border-steel/20",
-				icon: <Icon icon={Clock01Icon} size={12} className="h-3 w-3" />,
-			};
-		default:
-			return {
-				label: state,
-				className: "bg-steel/10 text-fog border-steel/20",
-				icon: <Icon icon={Alert01Icon} size={12} className="h-3 w-3" />,
-			};
-	}
-}
-
-export function CreditUsageSection({ operations }: CreditUsageProps) {
-	const [stageFilter, setStageFilter] = useState<StageFilter>("all");
-	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 	const [selectedOp, setSelectedOp] = useState<CreditOperationItem | null>(
 		null,
 	);
 
-	const filteredOperations = useMemo(() => {
-		return operations.filter((op) => {
-			if (stageFilter !== "all" && op.stage !== stageFilter) {
-				return false;
-			}
-			if (statusFilter !== "all" && op.state !== statusFilter) {
-				return false;
-			}
-			return true;
-		});
-	}, [operations, stageFilter, statusFilter]);
-
 	return (
 		<div className="flex flex-col gap-6">
-			{/* Usage History Table */}
+			{/* Usage History Card */}
 			<div className="rounded-xl border border-(--border-subtle) bg-(--bg-card) overflow-hidden">
 				<div className="p-5 pb-4 flex flex-wrap items-center justify-between gap-4 border-b border-(--border-subtle)">
 					<div>
@@ -183,7 +95,9 @@ export function CreditUsageSection({ operations }: CreditUsageProps) {
 								id="filter-stage-select"
 								data-testid="filter-stage"
 								value={stageFilter}
-								onChange={(e) => setStageFilter(e.target.value as StageFilter)}
+								onChange={(e) =>
+									handleStageChange(e.target.value as StageFilter)
+								}
 								className="rounded-lg border border-(--border-subtle) bg-(--bg-surface) px-3 py-1.5 text-xs font-medium text-snow focus:border-indigo focus:outline-none"
 							>
 								<option value="all">Semua Tahap</option>
@@ -206,7 +120,7 @@ export function CreditUsageSection({ operations }: CreditUsageProps) {
 								data-testid="filter-status"
 								value={statusFilter}
 								onChange={(e) =>
-									setStatusFilter(e.target.value as StatusFilter)
+									handleStatusChange(e.target.value as StatusFilter)
 								}
 								className="rounded-lg border border-(--border-subtle) bg-(--bg-surface) px-3 py-1.5 text-xs font-medium text-snow focus:border-indigo focus:outline-none"
 							>
@@ -221,13 +135,10 @@ export function CreditUsageSection({ operations }: CreditUsageProps) {
 							</select>
 						</div>
 
-						{(stageFilter !== "all" || statusFilter !== "all") && (
+						{hasActiveFilter && (
 							<button
 								type="button"
-								onClick={() => {
-									setStageFilter("all");
-									setStatusFilter("all");
-								}}
+								onClick={handleResetFilter}
 								className="text-xs text-indigo hover:underline"
 							>
 								Reset Filter
@@ -236,14 +147,48 @@ export function CreditUsageSection({ operations }: CreditUsageProps) {
 					</div>
 				</div>
 
-				{operations.length === 0 ? (
-					<div className="flex flex-col items-center justify-center p-12 text-center">
+				{/* State Presentation */}
+				{loading ? (
+					<div
+						data-testid="credit-usage-loading"
+						className="py-16 flex flex-col items-center justify-center gap-2 text-sm text-(--text-secondary)"
+					>
+						<Icon
+							icon={RefreshIcon}
+							size={20}
+							className="animate-spin text-mist"
+						/>
+						<span>Memuat riwayat penggunaan kredit...</span>
+					</div>
+				) : error ? (
+					<div
+						data-testid="credit-usage-error"
+						className="py-12 flex flex-col items-center justify-center gap-3 text-center"
+					>
+						<Icon icon={Alert01Icon} size={28} className="text-rose-400" />
+						<p className="text-sm text-(--text-secondary) max-w-sm">{error}</p>
+						<button
+							type="button"
+							onClick={handleRetry}
+							className="min-h-9 rounded-lg border border-(--border-subtle) bg-(--bg-surface) px-4 py-1.5 text-xs font-medium text-snow hover:bg-white/5 transition-colors"
+						>
+							Coba Lagi
+						</button>
+					</div>
+				) : total === 0 && !hasActiveFilter ? (
+					<div
+						data-testid="credit-usage-empty"
+						className="flex flex-col items-center justify-center p-12 text-center"
+					>
 						<p className="text-sm text-(--text-secondary)">
 							Belum ada riwayat penggunaan kredit.
 						</p>
 					</div>
-				) : filteredOperations.length === 0 ? (
-					<div className="flex flex-col items-center justify-center p-12 text-center">
+				) : items.length === 0 ? (
+					<div
+						data-testid="credit-usage-filtered-empty"
+						className="flex flex-col items-center justify-center p-12 text-center"
+					>
 						<p className="text-sm text-(--text-secondary)">
 							Tidak ada riwayat penggunaan kredit yang sesuai dengan filter yang
 							dipilih.
@@ -264,7 +209,7 @@ export function CreditUsageSection({ operations }: CreditUsageProps) {
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-(--border-subtle)">
-								{filteredOperations.map((op) => {
+								{items.map((op) => {
 									const badge = getStatusBadge(op.state);
 									return (
 										<tr
@@ -315,6 +260,44 @@ export function CreditUsageSection({ operations }: CreditUsageProps) {
 								})}
 							</tbody>
 						</table>
+					</div>
+				)}
+
+				{/* Bounded pagination footer */}
+				{total > 0 && !loading && !error && (
+					<div className="p-4 border-t border-(--border-subtle) flex flex-wrap items-center justify-between gap-3 bg-(--bg-surface)/30">
+						<div className="flex items-center gap-2 text-xs text-(--text-secondary)">
+							<span>{pageSize} baris per halaman</span>
+							<span className="hidden sm:inline text-fog/40">•</span>
+							<span className="tabular-nums">
+								Halaman {currentPage} dari {totalPages}
+							</span>
+						</div>
+
+						<div className="flex items-center gap-2">
+							<button
+								type="button"
+								data-testid="prev-page-btn"
+								onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+								disabled={currentPage <= 1 || loading}
+								className="min-h-9 inline-flex items-center gap-1.5 rounded-lg border border-(--border-subtle) bg-(--bg-card) px-3 py-1.5 text-xs font-medium text-snow hover:bg-(--bg-surface) transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								<Icon icon={ArrowLeft01Icon} size={14} />
+								<span>Sebelumnya</span>
+							</button>
+							<button
+								type="button"
+								data-testid="next-page-btn"
+								onClick={() =>
+									handlePageChange(Math.min(totalPages, currentPage + 1))
+								}
+								disabled={currentPage >= totalPages || loading}
+								className="min-h-9 inline-flex items-center gap-1.5 rounded-lg border border-(--border-subtle) bg-(--bg-card) px-3 py-1.5 text-xs font-medium text-snow hover:bg-(--bg-surface) transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							>
+								<span>Berikutnya</span>
+								<Icon icon={ArrowRight01Icon} size={14} />
+							</button>
+						</div>
 					</div>
 				)}
 			</div>

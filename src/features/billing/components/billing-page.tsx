@@ -221,7 +221,10 @@ export function BillingPage({
 			</div>
 
 			{/* Credit Usage Section */}
-			<CreditUsageSection operations={creditUsage.operations} />
+			<CreditUsageSection
+				operations={creditUsage.operations}
+				initialPagination={creditUsage.pagination}
+			/>
 
 			{/* Cancel subscription confirmation */}
 			{cancelOpen && (
