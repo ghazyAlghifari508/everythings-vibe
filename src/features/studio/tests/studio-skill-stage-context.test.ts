@@ -285,6 +285,7 @@ describe("Stage-aware Studio skill context (Task 02)", () => {
 		const runtimeModules = [
 			"src/features/studio/services/studio-design-skill-registry.server.ts",
 			"src/features/studio/services/studio-skill-context.server.ts",
+			"src/features/studio/services/studio-skill-selection.server.ts",
 			"src/features/studio/services/ui-ux-pro-max-lookup.ts",
 		];
 		for (const modulePath of runtimeModules) {
