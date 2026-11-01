@@ -87,8 +87,8 @@ describe("Settings layout consistency across child pages", () => {
 			{ title: "Edit Profil", desc: undefined },
 			{ title: "Pengaturan Akun", desc: undefined },
 			{
-				title: "API Keys",
-				desc: "Kelola API key untuk MCP server dan CLI tool.",
+				title: "Akses Integrasi",
+				desc: "Kelola koneksi AI Agent dan CLI.",
 			},
 			{ title: "Preferensi Notifikasi", desc: undefined },
 			{
