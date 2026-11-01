@@ -265,7 +265,7 @@ describe("analysis refresh POST route", () => {
 			}),
 			params: { id: "project-1" },
 		});
-		expect(response.status).toBe(502);
+		expect(response.status).toBe(500);
 		expect(state.release).toHaveBeenCalledWith(
 			expect.objectContaining({
 				operationId: "credit-op-1",
@@ -288,7 +288,7 @@ describe("analysis refresh POST route", () => {
 			}),
 			params: { id: "project-1" },
 		});
-		expect(response.status).toBe(502);
+		expect(response.status).toBe(500);
 		expect(state.release).not.toHaveBeenCalled();
 	});
 

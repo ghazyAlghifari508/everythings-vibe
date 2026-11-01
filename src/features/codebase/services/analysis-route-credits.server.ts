@@ -36,6 +36,7 @@ import {
 import { buildAnalysisIdempotencyKey } from "./analysis-diagnostics";
 import type { AnalysisRefreshRequest } from "./analysis-refresh";
 import { failRefreshClaim, toResponse } from "./analysis-route-scope.server";
+import { analysisFailureHttpStatus } from "./analysis-server-errors";
 
 type AnalysisAttemptInput = {
 	userId: string;
@@ -316,13 +317,13 @@ export async function runCodebaseAnalysisAttempt(
 					// ready record. The failed-only query is fallback.
 					analysisId: error.analysisId ?? failed?.id,
 				},
-				{ status: 502 },
+				{ status: analysisFailureHttpStatus(error) },
 			);
 		}
 		console.error("Codebase analysis trigger error:", error);
 		return Response.json(
 			{ error: "Analisis codebase gagal", code: "ANALYSIS_FAILED" },
-			{ status: 502 },
+			{ status: analysisFailureHttpStatus(error) },
 		);
 	}
 }

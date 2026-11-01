@@ -8,6 +8,15 @@ export type AnalysisServiceCode =
 	| "ANALYSIS_FAILED"
 	| "ANALYSIS_REFRESH_NOT_ALLOWED";
 
+export function analysisFailureHttpStatus(error: unknown): 409 | 500 | 502 {
+	if (!(error instanceof AnalysisServiceError)) return 500;
+	if (error.code === "SNAPSHOT_NOT_UPLOADED") return 409;
+	return error.recoveryCode === "PROVIDER_UNAVAILABLE" ||
+		error.recoveryCode === "ANALYSIS_OUTPUT_INVALID"
+		? 502
+		: 500;
+}
+
 export class AnalysisServiceError extends Error {
 	readonly code: AnalysisServiceCode;
 	/** Failed-attempt analysis row id (Task 9): lets the route attach the
