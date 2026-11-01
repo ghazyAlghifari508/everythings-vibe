@@ -1,13 +1,6 @@
 import { z } from "zod";
-import {
-	DESIGN_SYNTHESIS_MAX_COLORS,
-	DESIGN_SYNTHESIS_MAX_OBSERVED_COMPONENTS,
-	DESIGN_SYNTHESIS_MAX_RADII,
-	DESIGN_SYNTHESIS_MAX_SPACING,
-	DESIGN_SYNTHESIS_MAX_TYPOGRAPHY,
-	DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS,
-} from "@/features/scrape/types/scrape-constants";
-import type { DesignTokenModel } from "./design-model";
+
+export { buildSynthesisPayload } from "./design-synthesis-payload";
 
 // Evidence-grounded AI synthesis.
 //
@@ -70,9 +63,86 @@ const boundedText = (max: number) =>
 		return val;
 	}, z.string().min(1).max(max));
 
+// Every text ceiling in the response contract, named so the output token
+// budget can be derived from the contract instead of guessed next to it.
+export const SYNTHESIS_LIMITS = {
+	essence: 320,
+	overview: 1200,
+	identityNarrative: 1200,
+	patternName: 80,
+	patternDescription: 400,
+	patterns: 12,
+	principle: 300,
+	principles: 10,
+	imageryNote: 300,
+	imageryNotes: 8,
+	guidance: 300,
+	guidanceItems: 10,
+	rule: 300,
+	rules: 12,
+	limitation: 300,
+	limitations: 12,
+	references: 6,
+} as const;
+
+// Widest legal citation spelling; the index bound only inflates the estimate,
+// the budget must stay an under-estimate of the worst-case response.
+const WIDEST_REFERENCE = { kind: "typeface", index: 999999 };
+
+// Serialized size of a response that fills every field of the contract. A
+// budget below this number guarantees finishReason "length" for a model that
+// answers the contract completely, which previously dropped every deep
+// analysis narrative.
+export function synthesisResponseMaxChars(): number {
+	const L = SYNTHESIS_LIMITS;
+	const text = (length: number) => "x".repeat(length);
+	const references = Array.from({ length: L.references }, () => ({
+		...WIDEST_REFERENCE,
+	}));
+	return JSON.stringify({
+		essence: text(L.essence),
+		overview: text(L.overview),
+		theme: "unknown",
+		identityNarrative: text(L.identityNarrative),
+		componentPatterns: Array.from({ length: L.patterns }, () => ({
+			name: text(L.patternName),
+			description: text(L.patternDescription),
+			references,
+		})),
+		layoutPrinciples: Array.from({ length: L.principles }, () =>
+			text(L.principle),
+		),
+		imageryNotes: Array.from({ length: L.imageryNotes }, () =>
+			text(L.imageryNote),
+		),
+		implementationGuidance: Array.from({ length: L.guidanceItems }, () =>
+			text(L.guidance),
+		),
+		dos: Array.from({ length: L.rules }, () => ({
+			rule: text(L.rule),
+			references,
+		})),
+		donts: Array.from({ length: L.rules }, () => ({
+			rule: text(L.rule),
+			references,
+		})),
+		limitations: Array.from({ length: L.limitations }, () =>
+			text(L.limitation),
+		),
+	}).length;
+}
+
+// Mixed prose+JSON output is closer to four characters per token; three is the
+// floor, so the derived token count is an under-estimate, never a guess.
+export const SYNTHESIS_TOKEN_MIN_CHARS = 3;
+
+export function synthesisMaxOutputTokens(): number {
+	return Math.ceil(synthesisResponseMaxChars() / SYNTHESIS_TOKEN_MIN_CHARS);
+}
+
 export const designSynthesisSchema = z.strictObject({
-	essence: boundedText(320),
-	overview: boundedText(1200),
+	essence: boundedText(SYNTHESIS_LIMITS.essence),
+	overview: boundedText(SYNTHESIS_LIMITS.overview),
 	theme: z.preprocess(
 		(val) => {
 			if (typeof val === "string") {
@@ -84,68 +154,91 @@ export const designSynthesisSchema = z.strictObject({
 		},
 		z.enum(["light", "dark", "unknown"]),
 	),
-	identityNarrative: boundedText(1200),
+	identityNarrative: boundedText(SYNTHESIS_LIMITS.identityNarrative),
 	componentPatterns: z.preprocess(
 		(val) => (val == null ? [] : val),
 		z
 			.array(
 				z.strictObject({
-					name: boundedText(80),
-					description: boundedText(400),
+					name: boundedText(SYNTHESIS_LIMITS.patternName),
+					description: boundedText(SYNTHESIS_LIMITS.patternDescription),
 					references: z.preprocess(
 						(refs) =>
-							Array.isArray(refs) && refs.length > 6 ? refs.slice(0, 6) : refs,
-						z.array(evidenceReferenceSchema).min(1).max(6),
+							Array.isArray(refs) && refs.length > SYNTHESIS_LIMITS.references
+								? refs.slice(0, SYNTHESIS_LIMITS.references)
+								: refs,
+						z
+							.array(evidenceReferenceSchema)
+							.min(1)
+							.max(SYNTHESIS_LIMITS.references),
 					),
 				}),
 			)
-			.max(12),
+			.max(SYNTHESIS_LIMITS.patterns),
 	),
 	layoutPrinciples: z.preprocess(
 		(val) => (val == null ? [] : val),
-		z.array(boundedText(300)).max(10),
+		z
+			.array(boundedText(SYNTHESIS_LIMITS.principle))
+			.max(SYNTHESIS_LIMITS.principles),
 	),
 	imageryNotes: z.preprocess(
 		(val) => (val == null ? [] : val),
-		z.array(boundedText(300)).max(8),
+		z
+			.array(boundedText(SYNTHESIS_LIMITS.imageryNote))
+			.max(SYNTHESIS_LIMITS.imageryNotes),
 	),
 	implementationGuidance: z.preprocess(
 		(val) => (val == null ? [] : val),
-		z.array(boundedText(300)).max(10),
+		z
+			.array(boundedText(SYNTHESIS_LIMITS.guidance))
+			.max(SYNTHESIS_LIMITS.guidanceItems),
 	),
 	dos: z.preprocess(
 		(val) => (val == null ? [] : val),
 		z
 			.array(
 				z.strictObject({
-					rule: boundedText(300),
+					rule: boundedText(SYNTHESIS_LIMITS.rule),
 					references: z.preprocess(
 						(refs) =>
-							Array.isArray(refs) && refs.length > 6 ? refs.slice(0, 6) : refs,
-						z.array(evidenceReferenceSchema).min(1).max(6),
+							Array.isArray(refs) && refs.length > SYNTHESIS_LIMITS.references
+								? refs.slice(0, SYNTHESIS_LIMITS.references)
+								: refs,
+						z
+							.array(evidenceReferenceSchema)
+							.min(1)
+							.max(SYNTHESIS_LIMITS.references),
 					),
 				}),
 			)
-			.max(12),
+			.max(SYNTHESIS_LIMITS.rules),
 	),
 	donts: z.preprocess(
 		(val) => (val == null ? [] : val),
 		z
 			.array(
 				z.strictObject({
-					rule: boundedText(300),
+					rule: boundedText(SYNTHESIS_LIMITS.rule),
 					references: z.preprocess(
 						(refs) =>
-							Array.isArray(refs) && refs.length > 6 ? refs.slice(0, 6) : refs,
-						z.array(evidenceReferenceSchema).min(1).max(6),
+							Array.isArray(refs) && refs.length > SYNTHESIS_LIMITS.references
+								? refs.slice(0, SYNTHESIS_LIMITS.references)
+								: refs,
+						z
+							.array(evidenceReferenceSchema)
+							.min(1)
+							.max(SYNTHESIS_LIMITS.references),
 					),
 				}),
 			)
-			.max(12),
+			.max(SYNTHESIS_LIMITS.rules),
 	),
 	limitations: z.preprocess(
 		(val) => (val == null ? [] : val),
-		z.array(boundedText(300)).max(12),
+		z
+			.array(boundedText(SYNTHESIS_LIMITS.limitation))
+			.max(SYNTHESIS_LIMITS.limitations),
 	),
 });
 
@@ -153,7 +246,13 @@ export type DesignSynthesis = z.infer<typeof designSynthesisSchema>;
 
 // The exact JSON contract handed to the model. Keeping it next to the schema
 // means the instruction and the validator can never drift apart.
-export function buildSynthesisInstruction(): string {
+// The detailed depth must raise the interpretation bar, not the raw-number
+// volume: deeper sampling is only useful if the analysis explains what the
+// wider inventory means for every quality axis the deep-analysis contract
+// promises.
+export function buildSynthesisInstruction(
+	depth: "standard" | "detailed" = "standard",
+): string {
 	return [
 		"You are given a structured design model measured from a rendered web page.",
 		"Write analysis grounded strictly in that model. Rules:",
@@ -166,6 +265,15 @@ export function buildSynthesisInstruction(): string {
 		'- Allowed "theme" values: "light", "dark", "unknown".',
 		"- Use English for all prose.",
 		'- Report what the evidence does not establish in "limitations" instead of guessing.',
+		...(depth === "detailed"
+			? [
+					"A detailed analysis was requested: the payload carries a wider measured inventory.",
+					"Explain what it means; never return more raw measurements or restated numbers.",
+					"Cover visual hierarchy from the measured type roles, the colour system by measured role (action, text, background, border, surfaces), spacing and radius patterns, and reusable component treatments.",
+					'- Report desktop/mobile and light/dark differences only where "comparisons" entries show a measured change; name any unmeasured difference in "limitations".',
+					'State confidence and uncertainty for every conclusion the inventory cannot settle in "limitations".',
+				]
+			: []),
 		"Return one JSON object with exactly these keys:",
 		'{"essence":string,"overview":string,"theme":"light"|"dark"|"unknown","identityNarrative":string,',
 		'"componentPatterns":[{"name":string,"description":string,"references":[{"kind":"color"|"typography"|"typeface"|"spacing"|"radius","index":number}]}],',
@@ -175,168 +283,4 @@ export function buildSynthesisInstruction(): string {
 		'"limitations":[string]}',
 		"No prose, no markdown fences, no commentary.",
 	].join("\n");
-}
-
-// A compact, deterministic view of the model. Sending the whole model would
-// waste context on fields the synthesis cannot cite anyway. Arrays are bounded
-// so a large capture cannot overflow the prompt without an explicit marker.
-export function buildSynthesisPayload(model: DesignTokenModel): string {
-	const truncate = <T>(
-		values: T[],
-		max: number,
-	): { slice: T[]; cut: boolean } =>
-		values.length > max
-			? { slice: values.slice(0, max), cut: true }
-			: { slice: values, cut: false };
-	const colors = truncate(model.colors, DESIGN_SYNTHESIS_MAX_COLORS);
-	const typography = truncate(
-		model.typography,
-		DESIGN_SYNTHESIS_MAX_TYPOGRAPHY,
-	);
-	const typefaces = truncate(model.typefaces, DESIGN_SYNTHESIS_MAX_TYPOGRAPHY);
-	const spacing = truncate(model.spacing, DESIGN_SYNTHESIS_MAX_SPACING);
-	const radii = truncate(model.radii, DESIGN_SYNTHESIS_MAX_RADII);
-	// The observed components carry measured properties and selectors, so their
-	// text is bounded like every other array. A cut component list is reported
-	// instead of being silently shortened.
-	const observedComponents = truncate(
-		model.observedComponents,
-		DESIGN_SYNTHESIS_MAX_OBSERVED_COMPONENTS,
-	);
-	const payloadTruncated =
-		colors.cut ||
-		typography.cut ||
-		typefaces.cut ||
-		spacing.cut ||
-		radii.cut ||
-		observedComponents.cut;
-	const payload = {
-		settings: model.settings,
-		viewContexts: model.views?.map((view) => ({
-			id: view.id,
-			label: view.label,
-			observedTheme: view.observedTheme,
-			colors: view.model.colors.map(({ value, role }) => ({ value, role })),
-			typography: view.model.typography.map(
-				({ role, fontSize, fontFamily }) => ({ role, fontSize, fontFamily }),
-			),
-			radii: view.model.radii.map(({ purpose, value }) => ({ purpose, value })),
-		})),
-		comparisons: model.comparisons?.slice(),
-		capturedViews: model.capturedViews?.slice(),
-		analysisScope:
-			model.settings?.focus === "visual-tokens"
-				? "Analyze visual tokens only; return no componentPatterns."
-				: model.settings?.focus === "components"
-					? "Analyze observed component treatments and their measured tokens only."
-					: "Analyze visual tokens and observed components.",
-		sourceUrl: model.sourceUrl,
-		viewport: model.viewport,
-		theme: model.theme,
-		baseUnitPx: Number.isFinite(model.baseUnitPx) ? model.baseUnitPx : null,
-		payloadTruncated,
-		observedComponents: observedComponents.slice.map((component) => ({
-			name: component.name,
-			purpose: component.purpose,
-			sharedCharacteristics: component.sharedCharacteristics,
-			description: component.description,
-			evidence: component.evidence,
-			treatments: component.treatments,
-			frequency: component.frequency,
-			roles: component.roles,
-			treatmentCount: component.treatmentCount,
-			guidance: component.guidance,
-		})),
-		colors: colors.slice.map((color, index) => ({
-			index,
-			role: color.role,
-			value: color.value,
-			roleClass: color.roleClass,
-			frequency: color.frequency,
-			confidence: color.confidence,
-			rationale: color.rationale,
-		})),
-		typography: typography.slice.map((entry, index) => ({
-			index,
-			role: entry.role,
-			family: entry.fontFamily,
-			size: entry.fontSize,
-			weight: entry.fontWeight,
-			lineHeight: entry.lineHeight,
-			frequency: entry.frequency,
-			confidence: entry.confidence,
-			elementRoles: entry.elementRoles,
-		})),
-		typefaces: typefaces.slice.map((typeface, index) => ({
-			index,
-			family: typeface.family,
-			roles: typeface.roles,
-			weights: typeface.measuredWeights,
-			sizes: typeface.measuredSizes,
-			loadedEvidence: typeface.loadedEvidence,
-		})),
-		spacing: spacing.slice.map((token, index) => ({
-			index,
-			purpose: token.purpose,
-			property: token.property,
-			value: token.value,
-			frequency: token.frequency,
-			roles: token.roles,
-			confidence: token.confidence,
-		})),
-		radii: radii.slice.map((token, index) => ({
-			index,
-			purpose: token.purpose,
-			value: token.value,
-			frequency: token.frequency,
-			roles: token.roles,
-			scope: token.scope,
-			confidence: token.confidence,
-		})),
-		elevation: model.elevation.map((token) => ({
-			value: token.value,
-			frequency: token.frequency,
-			note: token.usageNote,
-		})),
-		surfaces: model.surfaces.map((surface) => ({
-			value: surface.value,
-			frequency: surface.frequency,
-			roles: surface.roles,
-		})),
-		measuredGuidelines: {
-			dos: model.guidelines.dos.slice(),
-			donts: model.guidelines.donts.slice(),
-		},
-		limitations: model.limitations.slice(),
-	};
-	let serialized = JSON.stringify(payload);
-	const optionalEvidence = [
-		payload.observedComponents,
-		payload.comparisons,
-		payload.viewContexts,
-		payload.capturedViews,
-		payload.measuredGuidelines.dos,
-		payload.measuredGuidelines.donts,
-		payload.limitations,
-		payload.elevation,
-		payload.surfaces,
-		payload.colors,
-		payload.typography,
-		payload.typefaces,
-		payload.spacing,
-		payload.radii,
-	];
-	for (const entries of optionalEvidence) {
-		while (
-			serialized.length > DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS &&
-			entries?.length
-		) {
-			entries.pop();
-			payload.payloadTruncated = true;
-			serialized = JSON.stringify(payload);
-		}
-	}
-	if (serialized.length > DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS)
-		throw new Error("Synthesis payload metadata exceeds the provider budget");
-	return serialized;
 }

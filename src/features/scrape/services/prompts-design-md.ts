@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-	DESIGN_SYNTHESIS_DETAIL_MAX_CHARS,
-	DESIGN_SYNTHESIS_MAX_TOKENS,
-} from "@/features/scrape/types/scrape-constants";
+import { DESIGN_SYNTHESIS_DETAIL_MAX_CHARS } from "@/features/scrape/types/scrape-constants";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
 import { ScrapeError } from "@/lib/design-errors";
 import { extractJson } from "@/lib/services/json-extract";
@@ -25,6 +22,7 @@ import {
 	parseSynthesisResponse,
 	type SynthesisCause,
 	type SynthesisOutcome,
+	synthesisMaxOutputTokens,
 	synthesisToRenderOptions,
 } from "./design-synthesis";
 import type { VisualEvidence } from "./design-visual-evidence";
@@ -189,11 +187,16 @@ async function synthesizeWithEvidence(
 		const stream = await tryStreamWithFallback(
 			selectModels(),
 			[
-				{ role: "system", content: buildSynthesisInstruction() },
+				{
+					role: "system",
+					content: buildSynthesisInstruction(
+						model.settings?.depth ?? "standard",
+					),
+				},
 				{ role: "user", content: buildSynthesisPayload(model) },
 			],
 			signal,
-			DESIGN_SYNTHESIS_MAX_TOKENS,
+			synthesisMaxOutputTokens(),
 		);
 		let response = stream.firstChunk;
 		for await (const chunk of stream.generator) {

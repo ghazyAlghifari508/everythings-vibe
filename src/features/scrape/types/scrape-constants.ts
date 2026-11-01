@@ -65,7 +65,6 @@ export const SCRAPE_SOURCE_PREVIEW_MAX_LINES = 3_000;
 // and scrolls once the document outgrows the cap.
 export const SCRAPE_SOURCE_PREVIEW_MAX_HEIGHT = 560;
 
-export const DESIGN_SYNTHESIS_MAX_TOKENS = 2000;
 export const DESIGN_SYNTHESIS_DETAIL_MAX_CHARS = 500;
 export const DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS = 60_000;
 export const DESIGN_SYNTHESIS_MAX_COLORS = 40;
