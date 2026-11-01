@@ -255,7 +255,7 @@ export function assembleCanonicalShell(
 
 	document.head.insertAdjacentHTML(
 		"beforeend",
-		STUDIO_COMPONENT_STYLE + shellStyle(blueprint, tokens),
+		shellStyle(blueprint, tokens) + STUDIO_COMPONENT_STYLE,
 	);
 	return `<!DOCTYPE html>${document.documentElement.outerHTML}`;
 }

@@ -6,6 +6,22 @@ const page = (body: string, css = "") =>
 	`<!doctype html><html><head><style>${css}</style></head><body><main data-studio-content>${body}</main></body></html>`;
 
 describe("static layout quality boundaries", () => {
+	it("reports excessive nested spacing without deleting content", () => {
+		const result = inspectStudioHtml(
+			page(
+				'<section style="padding:120px"><article style="padding:120px">Sample content</article></section>',
+			),
+		);
+		expect(result.warnings).toContain(
+			"Inspect nested oversized padding; the canonical shell already supplies the outer gutter.",
+		);
+	});
+	it("rejects empty CSS declaration values", () => {
+		expect(
+			inspectStudioHtml(page("<p>Sample content</p>", "p{color:;padding:}"))
+				.hard,
+		).toContain("Invalid generated stylesheet.");
+	});
 	it("validates applicable element widths, not unrelated stylesheet literals", () => {
 		const options = {
 			blueprint: null,

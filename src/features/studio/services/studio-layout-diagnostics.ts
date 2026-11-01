@@ -24,11 +24,14 @@ function balancedCss(css: string): boolean {
 	return stack.length === 0 && !quote;
 }
 
+const OVERSIZED_GUTTER_PX = 96;
+
 export function inspectStudioLayout(document: Document) {
 	const hard: string[] = [];
 	const warnings: string[] = [];
 	for (const style of document.querySelectorAll("style")) {
-		if (!balancedCss(style.textContent ?? ""))
+		const css = style.textContent ?? "";
+		if (!balancedCss(css) || /(?:^|[;{])\s*(?!-)[\w-]+\s*:\s*(?:;|})/.test(css))
 			hard.push("Invalid generated stylesheet.");
 	}
 	if (
@@ -39,6 +42,30 @@ export function inspectStudioLayout(document: Document) {
 		warnings.push(
 			"Loading placeholder in a static screen; render content unless a loading state was requested.",
 		);
+	const oversized = new Set<Element>();
+	for (const element of document.querySelectorAll("[style]")) {
+		const style = element.getAttribute("style") ?? "";
+		if (
+			[
+				...style.matchAll(
+					/(?:^|;)\s*padding(?:-[\w-]+)?\s*:\s*(\d+(?:\.\d+)?)px/gi,
+				),
+			].some((match) => Number(match[1]) >= OVERSIZED_GUTTER_PX)
+		) {
+			oversized.add(element);
+			for (
+				let parent = element.parentElement;
+				parent;
+				parent = parent.parentElement
+			)
+				if (oversized.has(parent)) {
+					warnings.push(
+						"Inspect nested oversized padding; the canonical shell already supplies the outer gutter.",
+					);
+					break;
+				}
+		}
+	}
 	const statuses = new Map<Element, Set<string>>();
 	for (const status of document.querySelectorAll(
 		'[role="status"],[data-badge],.badge',

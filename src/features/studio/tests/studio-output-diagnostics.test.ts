@@ -129,6 +129,25 @@ describe("classifyStudioStreamCompletion", () => {
 });
 
 describe("structured output diagnostics", () => {
+	it("bounds semantic quality correction without rejecting a still-usable screen", async () => {
+		const response = {
+			html: "<html><body><main><div data-skeleton></div><p>Sample content</p></main></body></html>",
+			finishReason: "stop",
+		};
+		const mocked = mockSequence([response, response]);
+		const html = await generateValidatedFrameHtml({
+			framePrompt: "Screen",
+			activeScreen: "Screen",
+			blueprint: null,
+			viewport: "web",
+			expectTokens: false,
+			designSkillId: "none",
+			dsTokens: null,
+			logoUrl: null,
+		});
+		expect(mocked).toHaveBeenCalledTimes(2);
+		expect(html).toContain("Sample content");
+	});
 	it("avoids a correction request when an image supplies the button label", async () => {
 		const mocked = mockSequence([
 			{
