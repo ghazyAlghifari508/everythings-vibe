@@ -77,11 +77,31 @@ test("validated analysis commits READY with settlement and rolls both back on pe
 			expiresAt: new Date(Date.now() + 600000),
 		});
 		await c.markCreditOperationRunning({ userId, operationId: operation.id });
+		await assert.rejects(
+			c.settleCreditOperation({
+				userId,
+				operationId: operation.id,
+				artifactId: crypto.randomUUID(),
+				actualMetrics: metrics,
+			}),
+			/Analysis reservation identity mismatch/,
+		);
 		const result = requestCodebaseAnalysis(projectId, snapshotId, {
 			analysisId,
 			generate: async () => {
 				const swept = await c.reconcileExpiredCreditOperations({ userId });
 				assert.deepEqual(swept.releasedOperationIds, []);
+				await assert.rejects(
+					requestCodebaseAnalysis(projectId, snapshotId, {
+						generate: async () => {
+							throw new Error("duplicate generation must not execute");
+						},
+					}),
+					(error: unknown) =>
+						error instanceof Error &&
+						"code" in error &&
+						error.code === "SNAPSHOT_NOT_UPLOADED",
+				);
 				return payload;
 			},
 			settle: async (tx, id) => {
@@ -115,7 +135,12 @@ test("validated analysis commits READY with settlement and rolls both back on pe
 				reason: "test failure",
 			});
 		} else {
-			assert.equal((await result).id, analysisId);
+			const [completed, sweep] = await Promise.all([
+				result,
+				c.reconcileExpiredCreditOperations({ userId }),
+			]);
+			assert.deepEqual(sweep.releasedOperationIds, []);
+			assert.equal(completed.id, analysisId);
 			const [op] = await db
 				.select()
 				.from(s.creditOperations)

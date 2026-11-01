@@ -46,6 +46,12 @@ export async function settleCreditOperation(
 
 		const { artifactReference, finalCharge, measuredUnits } =
 			resolveSettlementParameters(operation, input);
+		if (
+			operation.kind === "codebase_analysis" &&
+			operation.analysisReference &&
+			operation.analysisReference !== artifactReference
+		)
+			throw new Error("Analysis reservation identity mismatch");
 
 		if (operation.isExempt) {
 			const updated = await tx
