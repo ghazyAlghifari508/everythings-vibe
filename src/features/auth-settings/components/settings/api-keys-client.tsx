@@ -1,14 +1,7 @@
 "use client";
 
-import {
-	Add01Icon,
-	Copy01Icon,
-	Eraser01Icon,
-	Key01Icon,
-	Tick01Icon,
-	ViewIcon,
-	ViewOffSlashIcon,
-} from "@hugeicons/core-free-icons";
+import { Add01Icon } from "@hugeicons/core-free-icons";
+import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,49 +18,45 @@ import {
 	type ApiKeyRecord,
 	apiKeyCleanupSchema,
 } from "../../types/api-key-contracts";
+import { ApiAccessList, ApiAdvancedSection } from "./api-access-list";
 import { ApiKeyCreateDialog } from "./api-key-create-dialog";
-import { ApiKeysTable } from "./api-keys-table";
+import { ApiKeyCreatedPanel } from "./api-key-created-panel";
 import { SettingsContentPanel } from "./settings-content-panel";
 
 interface ApiKeysClientProps {
 	keys: ApiKeyRecord[];
 }
 
-/** A credential the lifecycle controls can still act on: already expired, or an
- * automatic handoff key that outlived the expiry policy. */
-export function isObsoleteKey(key: ApiKeyRecord): boolean {
-	return (
-		key.state === "expired" ||
-		(key.source === "automatic" && key.state === "no-expiry")
-	);
-}
-
 export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 	const showToast = useUIStore((s) => s.showToast);
+	const router = useRouter();
+	const [showAdvanced, setShowAdvanced] = useState(false);
 	const [showCreate, setShowCreate] = useState(false);
 	const [createdKey, setCreatedKey] = useState<string | null>(null);
-	const [revealCreatedKey, setRevealCreatedKey] = useState(true);
 	const [revokeId, setRevokeId] = useState<string | null>(null);
-	const [copied, setCopied] = useState(false);
+	const [isRevoking, setIsRevoking] = useState(false);
 	const [showCleanup, setShowCleanup] = useState(false);
 	const [isCleaning, setIsCleaning] = useState(false);
 
-	const obsoleteCount = keys.filter(isObsoleteKey).length;
+	const revokeTarget = keys.find((k) => k.id === revokeId) ?? null;
 
 	const handleRevoke = async (id: string) => {
+		setIsRevoking(true);
 		try {
 			const res = await fetch(`/api/settings/api-keys/${id}`, {
 				method: "DELETE",
 			});
-			if (!res.ok) throw new Error("Gagal menghapus");
-			showToast("API key berhasil dihapus", "success");
+			if (!res.ok) throw new Error("Gagal mencabut akses");
+			showToast("Akses dicabut", "success");
 			setRevokeId(null);
-			window.location.reload();
+			await router.invalidate();
 		} catch (err) {
 			showToast(
-				err instanceof Error ? err.message : "Gagal menghapus",
+				err instanceof Error ? err.message : "Gagal mencabut akses",
 				"error",
 			);
+		} finally {
+			setIsRevoking(false);
 		}
 	};
 
@@ -80,11 +69,11 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 			if (!res.ok) throw new Error("Gagal membersihkan API key");
 			const cleanup = apiKeyCleanupSchema.parse(await res.json());
 			showToast(
-				`${cleanup.revoked} key usang diberi batas waktu, ${cleanup.deleted} key kedaluwarsa dihapus.`,
+				`${cleanup.revoked} akses usang diberi batas waktu, ${cleanup.deleted} akses kedaluwarsa dihapus.`,
 				"success",
 			);
 			setShowCleanup(false);
-			window.location.reload();
+			await router.invalidate();
 		} catch (err) {
 			showToast(
 				err instanceof Error ? err.message : "Gagal membersihkan API key",
@@ -95,115 +84,46 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 		}
 	};
 
-	const handleCopy = async () => {
-		if (!createdKey) return;
-		try {
-			await navigator.clipboard.writeText(createdKey);
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-			showToast("API key disalin ke clipboard", "success");
-		} catch {
-			showToast("Gagal menyalin", "error");
-		}
-	};
-
 	return (
 		<SettingsContentPanel
-			title="API Keys"
-			description="Kelola API key untuk MCP server dan CLI tool."
-			actions={
-				<>
-					{obsoleteCount > 0 && (
-						<Button
-							variant="outline"
-							onClick={() => setShowCleanup(true)}
-							className="gap-1.5"
-						>
-							<Icon icon={Eraser01Icon} size={14} />
-							Bersihkan {obsoleteCount} key usang
-						</Button>
-					)}
-					<Button onClick={() => setShowCreate(true)} className="gap-1.5">
-						<Icon icon={Add01Icon} size={14} />
-						Buat API Key Baru
-					</Button>
-				</>
-			}
+			title="Akses Integrasi"
+			description="Kelola koneksi AI Agent dan CLI."
 		>
-			<div className="space-y-6">
+			<div className="space-y-8">
 				{createdKey && (
-					<div className="rounded-lg border border-emerald/30 bg-emerald/10 p-4">
-						<div className="flex items-center gap-2 text-sm font-[510] text-emerald mb-2">
-							<Icon icon={Tick01Icon} size={16} />
-							API Key Berhasil Dibuat
-						</div>
-						<p className="text-xs text-fog mb-3">
-							Simpan key ini sekarang. Tidak akan ditampilkan lagi.
-						</p>
-						<div className="flex items-center gap-2">
-							<code className="flex-1 rounded bg-onyx px-3 py-2 font-mono text-xs text-snow break-all">
-								{revealCreatedKey ? createdKey : "••••••••••••••••"}
-							</code>
-							<Button
-								variant="ghost"
-								size="sm"
-								aria-label={
-									revealCreatedKey ? "Sembunyikan API key" : "Tampilkan API key"
-								}
-								onClick={() => setRevealCreatedKey(!revealCreatedKey)}
-								className="shrink-0"
-							>
-								{revealCreatedKey ? (
-									<Icon icon={ViewOffSlashIcon} size={14} />
-								) : (
-									<Icon icon={ViewIcon} size={14} />
-								)}
-							</Button>
-							<Button
-								variant="ghost"
-								size="sm"
-								aria-label="Salin API key"
-								onClick={handleCopy}
-								className="shrink-0"
-							>
-								{copied ? (
-									<Icon icon={Tick01Icon} size={14} className="text-emerald" />
-								) : (
-									<Icon icon={Copy01Icon} size={14} />
-								)}
-							</Button>
-						</div>
-					</div>
+					<ApiKeyCreatedPanel
+						rawKey={createdKey}
+						onDismiss={() => setCreatedKey(null)}
+					/>
 				)}
 
-				{keys.length === 0 ? (
-					<div className="rounded-lg border border-(--border-subtle) bg-(--bg-surface) p-8 sm:p-12 text-center">
-						<div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-(--bg-card) border border-(--border-subtle) text-fog mb-3">
-							<Icon icon={Key01Icon} size={20} />
-						</div>
-						<p className="text-sm font-medium text-snow">Belum ada API key</p>
-						<p className="mt-1 text-xs text-fog max-w-sm mx-auto">
-							Buat API key baru untuk menghubungkan CLI tool atau MCP server ke
-							workspace kamu.
-						</p>
+				<ApiAccessList
+					keys={keys}
+					onRevoke={setRevokeId}
+					onCleanup={() => setShowCleanup(true)}
+				/>
+
+				<ApiAdvancedSection
+					open={showAdvanced}
+					onToggle={() => setShowAdvanced((v) => !v)}
+				>
+					<p className="text-xs leading-relaxed text-fog">
+						Hanya untuk integrasi yang tidak lewat serah-terima otomatis,
+						misalnya MCP server atau skrip CI milikmu. Key manual tidak punya
+						masa berlaku bawaan dan hanya ditampilkan sekali saat dibuat.
+					</p>
+					<div>
 						<Button
 							onClick={() => setShowCreate(true)}
 							variant="outline"
 							size="sm"
-							className="mt-4 gap-1.5"
+							className="gap-1.5"
 						>
 							<Icon icon={Add01Icon} size={14} />
-							Buat API Key
+							Buat API key manual
 						</Button>
 					</div>
-				) : (
-					<ApiKeysTable keys={keys} onRevoke={setRevokeId} />
-				)}
-
-				<p className="text-[11px] text-fog/60">
-					Note: API keys hanya ditampilkan sekali saat pembuatan. Simpan dengan
-					aman.
-				</p>
+				</ApiAdvancedSection>
 			</div>
 
 			<ApiKeyCreateDialog
@@ -211,7 +131,8 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 				onOpenChange={setShowCreate}
 				onCreated={(rawKey) => {
 					setCreatedKey(rawKey);
-					setRevealCreatedKey(true);
+					// The new row is now listable; the secret panel stays mounted above it.
+					void router.invalidate();
 				}}
 			/>
 
@@ -220,9 +141,9 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 					<DialogHeader>
 						<DialogTitle>Bersihkan akses usang?</DialogTitle>
 						<DialogDescription>
-							Key otomatis warisan tanpa batas waktu diberi batas waktu (grace)
-							supaya agen yang sedang berjalan tidak langsung terputus, dan key
-							yang sudah kedaluwarsa dihapus dari daftar. Key manual yang masih
+							Akses otomatis warisan tanpa batas waktu diberi batas waktu supaya
+							agen yang sedang berjalan tidak langsung terputus, dan akses yang
+							sudah kedaluwarsa dihapus dari daftar. Akses manual yang masih
 							berlaku tidak disentuh.
 						</DialogDescription>
 					</DialogHeader>
@@ -234,31 +155,45 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 						>
 							Batal
 						</Button>
-						<Button onClick={() => void handleCleanup()} disabled={isCleaning}>
-							{isCleaning ? "Membersihkan..." : "Bersihkan"}
+						<Button onClick={() => void handleCleanup()} isLoading={isCleaning}>
+							Bersihkan
 						</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 
-			<Dialog open={!!revokeId} onOpenChange={() => setRevokeId(null)}>
+			<Dialog
+				open={revokeTarget !== null}
+				onOpenChange={(open) => {
+					if (!open) setRevokeId(null);
+				}}
+			>
 				<DialogContent className="max-w-sm">
 					<DialogHeader>
-						<DialogTitle>Hapus API Key?</DialogTitle>
+						<DialogTitle>Cabut akses?</DialogTitle>
 						<DialogDescription>
-							Key ini akan langsung berhenti berfungsi. Tindakan ini tidak dapat
-							dibatalkan.
+							{revokeTarget
+								? `Akses "${revokeTarget.name}" akan langsung berhenti berfungsi.`
+								: "Akses ini akan langsung berhenti berfungsi."}{" "}
+							Integrasi CLI atau agent yang masih memakai kredensial ini akan
+							terputus dan perlu dihubungkan ulang. Akses lain tidak
+							terpengaruh. Tindakan ini tidak bisa dibatalkan.
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
-						<Button variant="ghost" onClick={() => setRevokeId(null)}>
+						<Button
+							variant="ghost"
+							onClick={() => setRevokeId(null)}
+							disabled={isRevoking}
+						>
 							Batal
 						</Button>
 						<Button
 							variant="destructive"
 							onClick={() => revokeId && handleRevoke(revokeId)}
+							isLoading={isRevoking}
 						>
-							Hapus
+							Cabut akses
 						</Button>
 					</DialogFooter>
 				</DialogContent>
