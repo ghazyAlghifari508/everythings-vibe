@@ -49,7 +49,7 @@ Every screen in this project uses this exact specification. Apply it verbatim:
 ${JSON.stringify(opts.blueprint)}
 
 CONTROLLED ASSEMBLY CONTRACT:
-- Studio inserts the canonical app header and navigation; do not generate them or simulated device status bars.
+- Studio inserts the platform-shaped canonical app bar and navigation; do not generate them or simulated device status bars. Web: brand lives only in the injected topbar; put the screen title and its actions in a content header, never beside the brand. Mobile: the injected app bar shows the screen title, and detail/edit/checkout screens receive a back affordance automatically.
 - Put ALL screen-specific body content in exactly one <main data-studio-content>. Do not place visible content outside it.
 - Do not put app navigation/header inside that region; contextual tabs and section headings remain screen-specific.
 - Canonical labels ${JSON.stringify(labels)}, destinations ${JSON.stringify(destinations)}, icons ${JSON.stringify(iconMapping)} and active screen ${JSON.stringify(activeScreen)} are supplied by assembly, not independently rendered by you.
@@ -76,7 +76,7 @@ Ensure features, forms, lists, metrics, terminology, and realistic Indonesian co
 	// Platform instructions
 	if (opts.blueprint)
 		sections.push(
-			"Assembly overrides shared component instructions below: Studio inserts the app header/navigation. Generate only marked main content; no independent app shell or device chrome.",
+			"Assembly overrides shared component instructions below: Studio inserts the platform app bar/navigation. Generate only marked main content; no independent app shell or device chrome.",
 		);
 	if (opts.designMode === "mobile") {
 		sections.push(MOBILE_PLATFORM_CONTRACT);

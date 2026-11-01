@@ -11,9 +11,8 @@ import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 export const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Experience (mobile-first UI/UX).
 - Design for a single mobile viewport width (${STUDIO_VISUAL_WIDTH.mobile}px) and let the document grow vertically as tall as the content needs. A long, scrollable page is correct; never compress or rescale sections to force everything into one screen height.
 - Include <meta name="viewport" content="width=device-width, initial-scale=1"> in <head>.
-- Provide a clean mobile top app bar with the screen title and relevant action buttons.
-- Provide a bottom navigation tab bar (with icons and labels) highlighting the active screen, placed in normal document flow at the end of the document so it renders at the bottom of the full page. This artboard is a static full-page preview: a bottom-anchored fixed or sticky bar would be painted at the viewport edge in the middle of the page, so do not use position: fixed or position: sticky for the tab bar.
-- Reserve space for the bottom navigation: main content needs padding-bottom so nothing hides behind the tab bar; account for env(safe-area-inset-bottom) where relevant.
+- Render a single-column mobile body: content flows top to bottom in one column; a contextual back affordance, screen title, and trailing actions are a compact app bar row, never a brand block.
+- Do not generate the app bar, the bottom navigation tab bar (icons + labels, active screen highlighted), or simulated device status bars yourself; Studio assembles them from the shared blueprint, placing the tab bar in normal document flow at the end of the page and adding the back button automatically on contextual screens such as detail, edit, or checkout. This artboard is a static full-page preview, so do not use position: fixed or position: sticky for any bar. Only when no shared blueprint assembly applies, render the bottom tab bar (icons + labels, active screen highlighted) yourself in normal document flow at the end of the document and pad the content bottom so nothing hides behind it.
 - Ensure all clickable touch targets have a minimum height/width of 44px.
 - Keep each control self-contained: a currency prefix, leading icon, value, and trailing chevron share one non-wrapping row; never let a prefix, value, or chevron wrap onto its own line.
 - Group a metric with its label, value, and supporting stats inside one card; do not emit loose label/value lines that stack as plain text.
@@ -25,7 +24,8 @@ export const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Exp
 - Size sections with padding, gaps, and min-height instead of fixed pixel heights, so the page never looks stretched or squashed when captured.
 - Preserve true document height: images keep aspect ratio with max-width: 100% and height auto.
 - Use the same navigation structure, icon family, and design tokens on every screen of this application.
-- Keep exactly one bottom tab <nav> containing every destination label in blueprint order; do not duplicate the full tab set in a second <nav>.`;
+- Keep exactly one bottom tab <nav> containing every destination label in blueprint order; do not duplicate the full tab set in a second <nav>.
+- Put every screen body inside one content region; the first visible block establishes the screen's own hierarchy (list, search, hero, cards), not a repeated title row.`;
 
 export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Web Application Experience.
 - Design for desktop browsers at a ${STUDIO_VISUAL_WIDTH.web}px wide viewport with clean, fluid responsive adaptation to tablet (768px-1023px) and mobile (<768px).
@@ -52,7 +52,9 @@ export const WEB_PLATFORM_CONTRACT = `Target platform: Responsive Web Applicatio
   * Truncate or wrap long customer names and descriptions gracefully (truncate with title attribute or break-words).
   * Provide a dedicated empty state box when tables or lists have no records.
 - Shared Shell Integration:
-  * Studio deterministically injects the global header and navigation; generate only screen-specific content inside <main data-studio-content>. Do not emit a second global sidebar or header.`;
+  * Studio deterministically injects the global topbar (product branding) and primary navigation; generate only screen-specific content inside <main data-studio-content>. Do not emit a second global sidebar, topbar, or header.
+  * The product name belongs to the injected topbar only. The screen title and its contextual actions belong to a content header as the first block inside <main data-studio-content>, e.g. <header data-studio-page-header><h1>Pelanggan</h1><div data-ui="actions">...</div></header>. Never place the brand and the screen title side by side in one row.
+  * On a detail/edit/confirmation screen, the content header starts with a back link to its parent destination (e.g. "< Back to Pelanggan") while the primary navigation keeps the parent item active.`;
 
 export const STUDIO_SYSTEM_PROMPT = `You are an expert front-end builder generating a complete, production-grade single-file HTML page.
 
@@ -103,7 +105,7 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
       "elevation": "Shadow model"
     },
     "sharedComponents": {
-      "header": "App header specification",
+      "header": "App bar specification: platform-shaped (web topbar branding vs mobile app bar title), never a repeated brand-plus-screen-title row",
       "navigation": "Navigation system specification",
       "buttons": "Button styling",
       "inputs": "Input styling",
