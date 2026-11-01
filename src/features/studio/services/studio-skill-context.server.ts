@@ -148,11 +148,7 @@ const CORE_SECTION_PATTERNS: Record<
 		/^group 1: hard gate/i,
 		/^delivery gate/i,
 	],
-	taste: [
-		/^0\. brief inference/i,
-		/^1\. the three dials/i,
-		/^4\. design engineering directives/i,
-	],
+	taste: [/^page or app screen/i, /^house rules$/i, /^laws of the craft$/i],
 };
 
 const PLAN_BLOCK_RESERVE_CHARS = 600;
@@ -357,6 +353,11 @@ const FOCUS_SYNONYMS: Record<string, string[]> = {
 	responsif: ["responsive"],
 	markdown: ["markdown", "artefak"],
 	viewport: ["viewport", "width"],
+	dashboard: ["dashboard", "admin", "overview"],
+	tabel: ["table", "list", "tabular"],
+	grafik: ["chart", "series"],
+	kpi: ["kpi", "metric", "delta"],
+	formulir: ["form", "settings", "input"],
 };
 
 function focusTokens(focus: string[] | undefined): string[] {
@@ -462,7 +463,7 @@ function adapterHeaderLines(
 		);
 	} else if (manifest.id === "taste") {
 		lines.push(
-			"[Scope Adapter Note]: Apply transferable aesthetic principles (typography scale, spatial rhythm, intentional contrast, content density). Landing-page-only quotas or motion prescriptions do not apply to multi-screen dashboard or mobile app frames.",
+			"[Scope Adapter Note]: Verbatim upstream Taste v2.1.5 guidelines. For operational screens, dashboards, settings, and mobile apps, apply the App Screen Guidelines (quiet borders, data-focused color, tabular numbers, no decorative hero or marketing photo quotas). For marketing or landing pages, apply the page art direction principles.",
 		);
 	}
 	lines.push(
@@ -573,7 +574,7 @@ export function buildStudioSkillContext(
 	for (const section of allSections) {
 		if (section.docPath !== primary.path) continue;
 		const tags = classifySection(section.heading, section.text);
-		if (tags.includes("meta")) continue;
+		if (section.heading !== null && tags.includes("meta")) continue;
 		if (section.level <= 1) consider(section, "core-identity", true);
 	}
 	for (const section of allSections) {
@@ -582,7 +583,10 @@ export function buildStudioSkillContext(
 		if (isCoreSection(id, section, stage))
 			consider(section, "core-identity", false);
 	}
-	for (const entry of ranked) consider(entry.section, entry.rationale, false);
+	for (const entry of ranked) {
+		if (entry.score <= 0) continue;
+		consider(entry.section, entry.rationale, false);
+	}
 
 	const selectedSections: StudioSkillSelectedSection[] = ordered.map(
 		(section) => ({
