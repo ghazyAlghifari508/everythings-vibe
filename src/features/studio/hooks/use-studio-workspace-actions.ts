@@ -10,21 +10,18 @@ import {
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { useUIStore } from "@/store";
 
-/** Reads what one composer request resolved to, so the UI explains clarify/add. */
+/** Reads what one composer request resolved to, so the UI explains clarify. */
 function readComposerOutcome(body: unknown): {
 	intent: string | null;
 	message: string | null;
-	addedCount: number;
 } {
 	if (typeof body !== "object" || body === null)
-		return { intent: null, message: null, addedCount: 0 };
+		return { intent: null, message: null };
 	const intent =
 		"intent" in body && typeof body.intent === "string" ? body.intent : null;
 	const message =
 		"message" in body && typeof body.message === "string" ? body.message : null;
-	const addedCount =
-		"frames" in body && Array.isArray(body.frames) ? body.frames.length : 0;
-	return { intent, message, addedCount };
+	return { intent, message };
 }
 
 export interface UseStudioWorkspaceActionsOptions {
@@ -165,13 +162,7 @@ export function useStudioWorkspaceActions({
 				pendingRequest.current = null;
 				if (outcome.intent === "clarify")
 					return { accepted: false, clarify: outcome.message ?? undefined };
-				if (outcome.intent === "add_screen" && outcome.addedCount > 0)
-					showToast(
-						outcome.addedCount === 1
-							? "Halaman baru sedang dibuat."
-							: `${outcome.addedCount} halaman baru sedang dibuat.`,
-						"info",
-					);
+				// ponytail: add_screen success toasts intentionally removed; progress is communicated via canvas frame shimmer states.
 				return { accepted: true };
 			} catch {
 				setError("Jaringan bermasalah. Coba lagi.");
@@ -180,7 +171,7 @@ export function useStudioWorkspaceActions({
 				setComposerLoading(false);
 			}
 		},
-		[project.id, selectedFrameIds, setError, showToast, syncProjectStatus],
+		[project.id, selectedFrameIds, setError, syncProjectStatus],
 	);
 
 	const handleSkillChange = useCallback(

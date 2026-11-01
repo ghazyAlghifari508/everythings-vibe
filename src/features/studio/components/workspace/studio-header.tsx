@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { authClient } from "@/lib/auth-client";
+import { useHydratedSession } from "@/features/studio/hooks/use-hydrated-session";
 
 export function StudioHeader({
 	title,
@@ -50,7 +50,7 @@ export function StudioHeader({
 	onExport: () => void;
 	onDelete?: () => Promise<void>;
 }) {
-	const { data: session } = authClient.useSession();
+	const session = useHydratedSession();
 	const [isDeleteOpen, setDeleteOpen] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 	// Each floating control carries its own restrained surface so it stays

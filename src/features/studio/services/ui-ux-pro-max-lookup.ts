@@ -228,6 +228,7 @@ export function formatUiUxProMaxPlanningAddendum(
 		`\n--- UI UX PRO MAX BOUNDED LOOKUP RECOMMENDATIONS (Planning Context) ---`,
 		`Matched Product Domain: ${rec.productType}`,
 		`Recommended Style: ${rec.primaryStyle}`,
+		`These dataset matches are optional starting signals, not industry templates. Choose colors, typography and composition from the actual brief and audience; explicit user requirements, validated references and the shared project blueprint take precedence. Never copy a recommendation solely because the industry matches.`,
 	];
 
 	if (rec.colorPalette) {
