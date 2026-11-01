@@ -100,10 +100,10 @@ export function ApiKeysTable({ keys, onRevoke }: ApiKeysTableProps) {
 										))}
 									</div>
 								</td>
-								<td className="hidden px-4 py-3 text-xs whitespace-nowrap text-fog md:table-cell">
+								<td className="px-4 py-3 text-xs whitespace-nowrap text-fog">
 									{formatCreated(key.created_at)}
 								</td>
-								<td className="hidden px-4 py-3 text-xs whitespace-nowrap text-fog md:table-cell">
+								<td className="px-4 py-3 text-xs whitespace-nowrap text-fog">
 									{formatTimestamp(key.last_used_at)}
 								</td>
 								<td
