@@ -167,6 +167,7 @@ export async function reconcileExpiredCreditOperations(input: {
 				userId: input.userId,
 				operationId: operation.id,
 				reason: "operation expired",
+				actor: "credit-reconciliation",
 			});
 			if (result.state === "released") releasedOperationIds.push(operation.id);
 		} catch (error) {

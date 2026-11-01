@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { cleanupPool } from "./analysis-credit-db-fixture";
+import "./analysis-credit-db-fixture";
 
 // P1 regression: retry after a terminal reservation must mint a fresh active
 // operation with a fresh analysis identity, never reuse a settled/released
@@ -68,6 +68,25 @@ test("codebase analysis retry never reuses a terminal credit operation", async (
 		reason: "persistence probe failure",
 	});
 
+	const [released] = await db
+		.select()
+		.from(schema.creditOperations)
+		.where(eq(schema.creditOperations.id, first.id));
+	assert.deepEqual(released.failure, {
+		message: "persistence probe failure",
+		occurredAt: released.releasedAt?.toISOString(),
+		previousState: "running",
+		nextState: "released",
+		actor: "credit-release",
+		correlationId: base.analysisReference,
+	});
+	await assert.rejects(
+		credits.releaseCreditOperation({
+			userId,
+			operationId: first.id,
+			reason: "duplicate",
+		}),
+	);
 	const retried = await credits.reserveActiveCreditOperation(base);
 	assert.notEqual(retried.id, first.id);
 	assert.equal(retried.state, "reserved");
