@@ -163,19 +163,24 @@ export function useCodebaseSync({
 		setIsResyncModalOpen(true);
 		setError(null);
 		try {
-			const { requestPreSyncPreflight, preSyncAcceptance } = await import(
-				"../services/analysis-credit-requests"
+			const { requestAnalysisCreditPreflight, preSyncAcceptance } =
+				await import("../services/analysis-credit-requests");
+			const status = await requestAnalysisCreditPreflight().catch(
+				(error: unknown) => {
+					setError(
+						error instanceof Error
+							? error.message
+							: "Kebutuhan kredit belum dapat diperiksa.",
+					);
+					return null;
+				},
 			);
-			const status = await requestPreSyncPreflight().catch((error: unknown) => {
-				setError(
-					error instanceof Error
-						? error.message
-						: "Kebutuhan kredit belum dapat diperiksa.",
-				);
-				return null;
-			});
 			if (!status) return;
 			setCreditPreflight(status);
+			// Mirrors the onboarding flow: an ineligible account gets a locked
+			// prompt with a top-up action, and no credential is ever minted for it.
+			// `requiresApproval` is the explicit approval action itself.
+			if (!status.canStart && !status.requiresApproval) return;
 			const acceptance = preSyncAcceptance(status);
 			const response = await fetch(
 				`/api/codebases/${encodeURIComponent(codebaseId)}/session`,

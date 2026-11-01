@@ -155,23 +155,19 @@ export function useHomeProjectCreation({
 			}
 
 			let acceptance: {
-				acceptAnalysisPolicy: true;
-				creditConsent: { maximumCredits: number; pricingVersion: string };
+				creditConsent?: { maximumCredits: number; pricingVersion: string };
 			} | null = null;
 			if (projectMode === "existing_codebase") {
-				const credit = await (
-					await import("@/features/codebase/services/analysis-credit-requests")
-				).requestPreSyncPreflight();
-				if (credit.code === "CREDIT_REQUIRED") {
-					setCreditsExhaustedMsg(
-						`Analisis membutuhkan hingga ${credit.maximumCredits} kredit. Buka halaman sync untuk menyetujui biaya.`,
-					);
+				const { requestAnalysisCreditPreflight, preSyncAcceptance } =
+					await import("@/features/codebase/services/analysis-credit-requests");
+				const credit = await requestAnalysisCreditPreflight();
+				// Anything the server will not start (no credits, paused, or a changed
+				// quote) belongs to the sync page, which owns the locked prompt, the
+				// top-up, and the single approval — never a modal in the composer.
+				if (!credit.canStart) {
 					navigate({ to: "/plan/codebase" });
 					return;
 				}
-				const { preSyncAcceptance } = await import(
-					"@/features/codebase/services/analysis-credit-requests"
-				);
 				acceptance = preSyncAcceptance(credit);
 			}
 			const endpoint =

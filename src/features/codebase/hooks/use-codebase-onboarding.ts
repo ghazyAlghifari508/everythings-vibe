@@ -60,14 +60,17 @@ export function useCodebaseOnboarding({
 	const [isStarting, setIsStarting] = useState(false);
 	const [codebase, setCodebase] = useState<CreatedCodebase | null>(null);
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
-	const [consentOpen, setConsentOpen] = useState(false);
-	const [consentAgreed, setConsentAgreed] = useState(false);
 	const queryInFlight = useRef(false);
 	// Recovered status is the poller's seed, so the first paint after a refresh
 	// already reflects persisted server state instead of an empty loading card.
 	const [recoveredStatus, setRecoveredStatus] =
 		useState<SyncStatusResponse | null>(null);
 	const autoInitAttempted = useRef(false);
+	// Entering `/plan/codebase` from an explicit "Hubungkan repository" action IS
+	// the start intent, so the flow prepares its own session instead of parking
+	// an intermediate button in front of the prompt. The ref keeps a rerender
+	// from minting a second session for the same intent.
+	const autoStartAttempted = useRef(false);
 	// and two sync sessions for one onboarding attempt. State updates are async,
 	// so a ref is what actually closes the window.
 	const createInFlight = useRef(false);
@@ -118,13 +121,6 @@ export function useCodebaseOnboarding({
 		[setAnalysis, setAnalysisError, analysisAttemptedFor],
 	);
 
-	const blocked =
-		!creditStatus?.billingExempt &&
-		creditStatus !== null &&
-		(creditStatus.code === "INSUFFICIENT_CREDITS" ||
-			creditStatus.code === "SUBSCRIPTION_PAUSED" ||
-			creditStatus.code === "ANALYSIS_IN_PROGRESS");
-
 	const refreshCreditStatus = useCallback(async () => {
 		if (queryInFlight.current) return;
 		queryInFlight.current = true;
@@ -141,62 +137,15 @@ export function useCodebaseOnboarding({
 		}
 	}, []);
 
-	const requestConsent = useCallback(() => {
-		if (!creditStatus) return;
-		if (
-			creditStatus.billingExempt ||
-			creditStatus.code === "FREE_ALLOWANCE_AVAILABLE"
-		) {
-			setConsentAgreed(true);
-			setConsentOpen(false);
-			return;
-		}
-		if (creditStatus.code !== "CREDIT_REQUIRED") {
-			setError(
-				creditStatus.code === "SUBSCRIPTION_PAUSED"
-					? "Perpanjang langganan di halaman Billing sebelum sinkronisasi."
-					: "Kredit tidak cukup untuk analisis. Tambahkan kredit dulu.",
-			);
-			return;
-		}
-		setConsentAgreed(false);
-		setConsentOpen(true);
-	}, [creditStatus]);
-
-	const closeConsent = useCallback(() => {
-		setConsentOpen(false);
-		setError(null);
-	}, []);
-
-	const confirmConsent = useCallback(() => {
-		if (!consentAgreed) {
-			setError("Centang persetujuan biaya sebelum melanjutkan.");
-			return;
-		}
-		setConsentOpen(false);
-	}, [consentAgreed]);
-
-	const confirmed =
-		Boolean(creditStatus?.billingExempt) ||
-		creditStatus?.code === "FREE_ALLOWANCE_AVAILABLE" ||
-		(creditStatus?.code === "CREDIT_REQUIRED" && consentAgreed);
-
 	const createCodebase = useCallback(async () => {
 		if (createInFlight.current) return;
 		if (!creditStatus) {
 			await refreshCreditStatus();
 			return;
 		}
-		if (
-			!creditStatus.billingExempt &&
-			creditStatus.code !== "FREE_ALLOWANCE_AVAILABLE" &&
-			creditStatus.code !== "CREDIT_REQUIRED"
-		)
-			return;
-		if (!confirmed) {
-			requestConsent();
-			return;
-		}
+		// `requiresApproval` only reaches here from the explicit approval action,
+		// so the consent in the request is the one the user just gave.
+		if (!creditStatus.canStart && !creditStatus.requiresApproval) return;
 		createInFlight.current = true;
 		setError(null);
 		setIsStarting(true);
@@ -225,8 +174,6 @@ export function useCodebaseOnboarding({
 		}
 	}, [
 		creditStatus,
-		confirmed,
-		requestConsent,
 		refreshCreditStatus,
 		setStep,
 		setFeatureProjectId,
@@ -246,7 +193,8 @@ export function useCodebaseOnboarding({
 	useEffect(() => {
 		if (autoInitAttempted.current) return;
 		autoInitAttempted.current = true;
-		// Recovery reads persisted work; fresh onboarding waits for cost consent.
+		// Recovery reads persisted work; a fresh start resolves eligibility first
+		// and then prepares its own session (see the auto-start effect below).
 		if (!readPlanCodebasePointer()) {
 			void refreshCreditStatus();
 			return;
@@ -259,14 +207,17 @@ export function useCodebaseOnboarding({
 		})();
 	}, [recoverCodebase, refreshCreditStatus]);
 
+	useEffect(() => {
+		if (codebase || isStarting || autoStartAttempted.current) return;
+		if (!creditStatus?.canStart) return;
+		autoStartAttempted.current = true;
+		void createCodebase();
+	}, [codebase, createCodebase, creditStatus, isStarting]);
+
 	const retrySession = async () => {
 		if (!codebase) return;
-		if (!creditStatus || blocked) {
+		if (!creditStatus?.canStart && !creditStatus?.requiresApproval) {
 			await refreshCreditStatus();
-			return;
-		}
-		if (!confirmed) {
-			requestConsent();
 			return;
 		}
 		setError(null);
@@ -324,12 +275,6 @@ export function useCodebaseOnboarding({
 		createCodebase,
 		creditStatus,
 		retrySession,
-		consentOpen,
-		consentAgreed,
-		setConsentAgreed,
-		closeConsent,
-		confirmConsent,
 		refreshCreditStatus,
-		blocked,
 	};
 }

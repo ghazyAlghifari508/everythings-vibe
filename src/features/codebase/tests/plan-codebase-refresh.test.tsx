@@ -273,7 +273,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 			{ timeout: 15000, interval: 100 },
 		);
 		// Existing Sync prompt and analysis stage pending
-		expect(screen.getByText("Copy prompt untuk AI agent")).toBeDefined();
+		expect(screen.getByText("Salin instruksi untuk AI agent")).toBeDefined();
 		const analysisStage = screen.getByTestId("sync-stage-analysis");
 		expect(analysisStage.getAttribute("data-stage-state")).toBe("active");
 		expect(analysisStage.textContent).toContain("Menganalisis repository");

@@ -129,7 +129,7 @@ describe("p3 recovery requirements", () => {
 		});
 		expect(blocked.code).toBe("INSUFFICIENT_CREDITS");
 		expect(blocked.canStart).toBe(false);
-		// Without the user's cost consent, even a fundable request stays blocked.
+		// Without a standing authorization, even a fundable request stays blocked.
 		expect(
 			resolveAnalysisCreditPolicy({
 				allowanceUsed: true,
@@ -148,7 +148,7 @@ describe("p3 recovery requirements", () => {
 			subscriptionPaused: false,
 			availableCredits: 50,
 			isInitial: false,
-			consentMaximum: 50,
+			approvedMaximum: 50,
 		});
 		expect(funded.code).toBe("CREDIT_REQUIRED");
 		expect(funded.canStart).toBe(true);

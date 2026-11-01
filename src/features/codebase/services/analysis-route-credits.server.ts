@@ -31,7 +31,6 @@ import { ANALYSIS_ALLOWANCE_POLICY } from "./analysis-credit-policy";
 import {
 	analysisCreditBlockedResponse,
 	getAnalysisCreditPreflight,
-	readSyncCreditConsent,
 } from "./analysis-credit-preflight.server";
 import { buildAnalysisIdempotencyKey } from "./analysis-diagnostics";
 import type { AnalysisRefreshRequest } from "./analysis-refresh";
@@ -74,15 +73,7 @@ export async function runCodebaseAnalysisAttempt(
 
 	const creditStatus = await getAnalysisCreditPreflight(userId, {
 		isInitial: !refreshRequest,
-		consent:
-			input.creditConsent ??
-			(refreshRequest
-				? undefined
-				: await readSyncCreditConsent(
-						userId,
-						snapshot.syncSessionId,
-						projectId,
-					)),
+		consent: input.creditConsent,
 	});
 	if (input.preflightOnly)
 		return Response.json({

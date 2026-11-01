@@ -1,14 +1,21 @@
 "use client";
 
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
-import { TopUpModal } from "@/features/billing/components/top-up-modal";
 import { CodebaseConclusion } from "@/features/codebase/components/planning/codebase-conclusion";
+import {
+	buildLockedPrompt,
+	type LockedPromptState,
+} from "@/features/codebase/components/workspace/locked-prompt-state";
 import { ScreenConnect } from "@/features/codebase/components/workspace/screen-connect";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
+import type { AnalysisCreditStatus } from "@/features/codebase/services/analysis-credit-policy";
 import { CODEBASE_ONBOARDING_LABEL } from "@/features/codebase/services/library";
-import type { PlanCodebaseStep } from "@/features/codebase/services/plan-storage";
+import {
+	type PlanCodebaseStep,
+	readPlanCodebasePointer,
+} from "@/features/codebase/services/plan-storage";
 import {
 	hasReadyAnalysisForSnapshot,
 	resolveOnboardingReadiness,
@@ -20,12 +27,17 @@ import {
 	useOnboardingSummaryGate,
 } from "../../hooks/use-onboarding-analysis";
 import { useOnboardingAnalysisState } from "../../hooks/use-onboarding-analysis-state";
-import { CodebaseOnboardingShell } from "./codebase-onboarding-shell";
-import { CreditConsentDialog } from "./credit-consent-dialog";
 import {
 	CodebaseOnboardingErrorCard,
 	CodebaseOnboardingLoadingCard,
 } from "./plan-codebase-states";
+
+function resolveCreditNote(status: AnalysisCreditStatus | null): string | null {
+	if (!status || status.billingExempt) return null;
+	if (status.code === "FREE_ALLOWANCE_AVAILABLE")
+		return "Analisis awal gratis, sekali per akun.";
+	return `Analisis hingga ${status.maximumCredits} kredit · ${status.availableCredits} kredit tersedia.`;
+}
 
 export function PlanCodebasePage() {
 	const navigate = useNavigate();
@@ -44,16 +56,8 @@ export function PlanCodebasePage() {
 		createCodebase,
 		creditStatus,
 		retrySession,
-		consentOpen,
-		consentAgreed,
-		setConsentAgreed,
-		closeConsent,
-		confirmConsent,
 		refreshCreditStatus,
-		blocked,
 	} = useCodebaseOnboarding({ analysisState, step, setStep });
-	const [consentError, setConsentError] = useState<string | null>(null);
-	const [topUpOpen, setTopUpOpen] = useState(false);
 
 	const readiness = resolveOnboardingReadiness({
 		snapshotId: lastStatus?.snapshotId ?? null,
@@ -101,12 +105,20 @@ export function PlanCodebasePage() {
 	const activeStep: PlanCodebaseStep =
 		step === "summary" && !canContinueToSummary ? "sync" : step;
 
+	const isRecovering = !codebase && Boolean(readPlanCodebasePointer());
 	const onboardingFailed = !codebase && !isStarting && error !== null;
 
-	const handleTopUpClose = (open: boolean) => {
-		setTopUpOpen(open);
-		if (!open) void refreshCreditStatus();
-	};
+	const lockedPrompt = useMemo<LockedPromptState | null>(
+		() =>
+			buildLockedPrompt(creditStatus, {
+				onApprove: () => void createCodebase(),
+				onTopUpClose: () => void refreshCreditStatus(),
+				isApproving: isStarting,
+			}),
+		[creditStatus, createCodebase, isStarting, refreshCreditStatus],
+	);
+
+	const creditNote = resolveCreditNote(creditStatus);
 
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
@@ -121,29 +133,20 @@ export function PlanCodebasePage() {
 						error={error}
 						onRetry={() => void createCodebase()}
 					/>
-				) : blocked && creditStatus ? (
-					<CodebaseOnboardingShell
-						projectName={null}
-						creditStatus={creditStatus}
-						isStarting={isStarting}
-						createError={error}
-						onTopUp={() => setTopUpOpen(true)}
-					/>
-				) : creditStatus &&
-					(creditStatus.code === "FREE_ALLOWANCE_AVAILABLE" ||
-						creditStatus.code === "CREDIT_REQUIRED") ? (
-					<CodebaseOnboardingShell
-						projectName={null}
-						creditStatus={creditStatus}
-						isStarting={isStarting}
-						createError={error}
-						onStart={() => void createCodebase()}
-					/>
-				) : (
+				) : isRecovering ? (
 					<CodebaseOnboardingLoadingCard
 						title={
 							isStarting ? "Menyiapkan sesi sync..." : "Menunggu sesi sync..."
 						}
+					/>
+				) : (
+					<ScreenConnect
+						projectName=""
+						payload={null}
+						isStarting={isStarting || creditStatus === null}
+						status={null}
+						lockedPrompt={lockedPrompt}
+						creditNote={creditNote}
 					/>
 				)
 			) : !payload && !lastStatus ? (
@@ -159,6 +162,8 @@ export function PlanCodebasePage() {
 							statusError={statusPollError}
 							onRequestNewToken={() => void retrySession()}
 							onRetrySync={() => void retrySession()}
+							lockedPrompt={lockedPrompt}
+							creditNote={creditNote}
 							canContinueToSummary={canContinueToSummary}
 							onContinueToSummary={() => setStep("summary")}
 							analysis={analysis}
@@ -195,34 +200,6 @@ export function PlanCodebasePage() {
 					)}
 				</>
 			)}
-			{!creditStatus?.billingExempt &&
-				creditStatus &&
-				(creditStatus.code === "FREE_ALLOWANCE_AVAILABLE" ||
-					creditStatus.code === "CREDIT_REQUIRED") && (
-					<CreditConsentDialog
-						open={consentOpen}
-						onOpenChange={(open) => {
-							if (!open) closeConsent();
-						}}
-						status={creditStatus}
-						agreed={consentAgreed}
-						onAgreedChange={setConsentAgreed}
-						error={consentError}
-						onConfirm={() => {
-							if (!consentAgreed) {
-								setConsentError(
-									"Centang persetujuan biaya sebelum melanjutkan.",
-								);
-								return;
-							}
-							setConsentError(null);
-							confirmConsent();
-							setTimeout(() => void createCodebase(), 0);
-						}}
-						isStarting={isStarting}
-					/>
-				)}
-			<TopUpModal open={topUpOpen} onOpenChange={handleTopUpClose} />
 		</main>
 	);
 }

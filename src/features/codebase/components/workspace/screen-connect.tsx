@@ -7,17 +7,19 @@ import {
 	type SyncPromptPayload,
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
+import type { LockedPromptState } from "./locked-prompt-state";
 import { ScreenConnectAgentStep } from "./screen-connect-agent-step";
-import { ScreenConnectPromptStep } from "./screen-connect-prompt-step";
-import { ScreenConnectSummaryFooter } from "./screen-connect-summary-footer";
+import { ScreenConnectPromptStep } from "./screen-connect-prompt-step";import { ScreenConnectSummaryFooter } from "./screen-connect-summary-footer";
 import { ScreenConnectSyncStep } from "./screen-connect-sync-step";
 
 interface ScreenConnectProps {
 	projectName: string;
 	payload: SyncPromptPayload | null;
 	isStarting?: boolean;
-	promptLocked?: boolean;
-	lockedPromptAction?: React.ReactNode;
+	/** Replaces the prompt with one centered state; never hides a real token. */
+	lockedPrompt?: LockedPromptState | null;
+	/** Non-secret rate/saldo disclosure; omitted for exempt accounts. */
+	creditNote?: string | null;
 	/**
 	 * The reconciled sync status for this attempt, owned by the screen that owns
 	 * the polling loop. `null` means the browser has not received any server
@@ -62,8 +64,8 @@ export function ScreenConnect({
 	projectName,
 	payload,
 	isStarting = false,
-	promptLocked = false,
-	lockedPromptAction,
+	lockedPrompt = null,
+	creditNote = null,
 	status,
 	statusError = null,
 	onRequestNewToken,
@@ -115,8 +117,8 @@ export function ScreenConnect({
 						isStarting={isStarting}
 						status={status}
 						onRequestNewToken={onRequestNewToken}
-						locked={promptLocked}
-						lockedAction={lockedPromptAction}
+						lockedPrompt={lockedPrompt}
+						creditNote={creditNote}
 					/>
 
 					<ScreenConnectAgentStep />
