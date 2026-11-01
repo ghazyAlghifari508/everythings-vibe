@@ -77,8 +77,18 @@ it("separates frame token totals from planning and groups skill latency", () => 
 			skillChars: 23457,
 			durationMs: 0,
 		},
-		{ stage: "frame-output", outputTokens: 100, durationMs: 20 },
-		{ stage: "frame-output", outputTokens: 50, durationMs: 30 },
+		{
+			stage: "frame-output",
+			outputTokens: 100,
+			inputTokens: 4000,
+			durationMs: 20,
+		},
+		{
+			stage: "frame-output",
+			outputTokens: 50,
+			inputTokens: 1000,
+			durationMs: 30,
+		},
 		{ stage: "frame-visible", durationMs: 500 },
 		{ stage: "frame-visible", durationMs: 600 },
 	]
@@ -93,6 +103,7 @@ it("separates frame token totals from planning and groups skill latency", () => 
 		.join("\n");
 	const report = summarizeStudioTimings(events);
 	expect(report.meanMeasuredOutputTokensPerFrame).toBe(150);
+	expect(report.meanMeasuredInputTokensPerRequest).toBe(2500);
 	expect(report.firstVisibleMs).toEqual([500]);
 	expect(report.perSkill.impeccable.outputLatency?.mean).toBe(25);
 	expect(report.perSkill.impeccable.guidanceChars).toEqual([23457]);

@@ -14,6 +14,7 @@ const eventSchema = z.object({
 	// CPU cost of assembling one frame's system prompt (skill selection +
 	// contract build). Kept separate from provider latency in the report.
 	promptAssemblyMs: z.number().nonnegative().optional(),
+	inputTokens: z.number().nonnegative().optional(),
 	outputTokens: z.number().nonnegative().optional(),
 	textTokens: z.number().nonnegative().optional(),
 	reasoningTokens: z.number().nonnegative().optional(),
@@ -54,6 +55,7 @@ export function summarizeStudioTimings(log: string) {
 	const validated = new Set<string>();
 	const corrected = new Set<string>();
 	const tokens: number[] = [];
+	const inputTokens: number[] = [];
 	const frameTokens = new Map<string, number>();
 	const firstVisible = new Map<string, number>();
 	const skills = new Map(
@@ -113,6 +115,7 @@ export function summarizeStudioTimings(log: string) {
 		}
 		if (event.stage.endsWith("-output")) {
 			if (event.outputTokens !== undefined) tokens.push(event.outputTokens);
+			if (event.inputTokens !== undefined) inputTokens.push(event.inputTokens);
 			providerRetries += event.providerRetries ?? 0;
 			providerFallbacks += event.providerFallbacks ?? 0;
 		}
@@ -160,6 +163,11 @@ export function summarizeStudioTimings(log: string) {
 			: null,
 		meanMeasuredOutputTokensPerRequest: tokens.length
 			? tokens.reduce((sum, value) => sum + value, 0) / tokens.length
+			: null,
+		// Provider-reported input tokens, the authoritative counterpart to the
+		// character-based estimate logged at frame-context.
+		meanMeasuredInputTokensPerRequest: inputTokens.length
+			? inputTokens.reduce((sum, value) => sum + value, 0) / inputTokens.length
 			: null,
 		framesRequiringCorrectionPercent: validated.size
 			? (corrected.size / validated.size) * 100
