@@ -4,7 +4,6 @@ import { PlanCodebasePage } from "../components/workspace/plan-codebase-page";
 
 export async function renderConnectedOnboarding() {
 	const fetch = globalThis.fetch;
-	vi.spyOn(window, "confirm").mockReturnValue(true);
 	vi.stubGlobal(
 		"fetch",
 		vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -24,7 +23,7 @@ export async function renderConnectedOnboarding() {
 	);
 	const rendered = render(<PlanCodebasePage />);
 	await waitFor(() => {
-		const start = screen.queryByRole("button", { name: "Mulai Sinkronisasi" });
+		const start = screen.queryByRole("button", { name: "Siapkan instruksi" });
 		if (start) {
 			fireEvent.click(start);
 			return;

@@ -47,6 +47,7 @@ import {
 	resolveAnalysisFeaturePrompt,
 	toSafeAnalysisErrorMessage,
 } from "./analysis";
+import { readPersistCreditIdentity } from "./analysis-persist-identity";
 import {
 	claimStarterSuggestionRefresh,
 	type RequestAnalysisScope,
@@ -329,6 +330,12 @@ export async function requestCodebaseAnalysis(
 		// category, actual duration, and validation issue paths. Never logs
 		// keys, tokens, repository content, or model output.
 		const category = classifyAnalysisFailure(error, stage);
+		// Post-mortem credit identity: read-only, best-effort, never throws
+		// out of the failure path. Settle already failed (or the row write
+		// failed), so these fields only explain which operation the attempt
+		// was finalizing against when it died.
+		const { creditOperationId, operationState, operationExpiresAt } =
+			await readPersistCreditIdentity(analysisId);
 		console.error(
 			"[codebase/analysis] attempt failed",
 			formatAnalysisDiagnosticLog({
@@ -336,6 +343,12 @@ export async function requestCodebaseAnalysis(
 				projectId,
 				snapshotId,
 				category,
+				stage,
+				creditOperationId,
+				operationState,
+				operationExpiresAt,
+				errorCode:
+					error instanceof AnalysisServiceError ? error.code : undefined,
 				durationMs: Date.now() - startedAt,
 				...(error instanceof AnalysisValidationError &&
 				error.issuePaths.length > 0

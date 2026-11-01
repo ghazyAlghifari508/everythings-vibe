@@ -18,7 +18,13 @@ export interface OnboardingAnalysisState {
 	analysis: AnalysisResponse | null;
 	setAnalysis: (analysis: AnalysisResponse | null) => void;
 	analysisWorking: boolean;
-	setAnalysisWorking: (working: boolean) => void;
+	setAnalysisWorking: (
+		working: boolean,
+		options?: { retrying?: boolean },
+	) => void;
+	/** True only for the window between an explicit user retry and the
+	 * server's real resolution. Drives the immediate running paint. */
+	isAnalysisRetrying: boolean;
 	analysisError: string | null;
 	creditStatus:
 		| import("../services/analysis-credit-policy").AnalysisCreditStatus
@@ -49,15 +55,32 @@ export interface OnboardingAnalysisState {
 export function useOnboardingAnalysisState(): OnboardingAnalysisState {
 	const [featureProjectId, setFeatureProjectId] = useState<string | null>(null);
 	const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
-	const [analysisWorking, setAnalysisWorking] = useState(false);
+	const [analysisWorking, setWorking] = useState(false);
+	const [analysisRetrying, setAnalysisRetrying] = useState(false);
 	const [analysisError, setAnalysisError] = useState<string | null>(null);
 	const analysisAttemptedFor = useRef<string | null>(null);
 	const [creditStatus, setCreditStatus] = useState<
 		import("../services/analysis-credit-policy").AnalysisCreditStatus | null
 	>(null);
 
+	// The working flag mirrors the in-flight trigger; the retry flag paints the
+	// immediate running row. Both clear on the same reset so a fresh attempt
+	// never inherits a stale running or failed presentation.
+	const setAnalysisWorking = useCallback(
+		(working: boolean, options?: { retrying?: boolean }) => {
+			setWorking(working);
+			if (options?.retrying) {
+				setAnalysisRetrying(working);
+				return;
+			}
+			if (!working) setAnalysisRetrying(false);
+		},
+		[],
+	);
 	// Read the validated analysis output through the existing read boundary.
 	// Returns null when no row exists yet (trigger effect owns creation).
+	// A validated row resolves any pending retry paint: only the newest server
+	// state may own the row, never the local retry flag.
 	const fetchAnalysisOutput = useCallback(
 		async (
 			projectId: string,
@@ -67,6 +90,10 @@ export function useOnboardingAnalysisState(): OnboardingAnalysisState {
 				const parsed = await requestAnalysisOutput(projectId, snapshotId);
 				if (!parsed) return null;
 				setAnalysis(parsed);
+				if (parsed.status === "ready" || parsed.status === "failed") {
+					setWorking(false);
+					setAnalysisRetrying(false);
+				}
 				return parsed;
 			} catch {
 				return null;
@@ -79,9 +106,18 @@ export function useOnboardingAnalysisState(): OnboardingAnalysisState {
 		featureProjectId,
 		setFeatureProjectId,
 		analysis,
-		setAnalysis,
+		setAnalysis: useCallback((next: AnalysisResponse | null) => {
+			setAnalysis(next);
+			// A ready row from any path (trigger or read) is the real
+			// resolution: the retry paint hands over to it immediately.
+			if (next?.status === "ready" || next?.status === "failed") {
+				setWorking(false);
+				setAnalysisRetrying(false);
+			}
+		}, []),
 		analysisWorking,
 		setAnalysisWorking,
+		isAnalysisRetrying: analysisRetrying,
 		analysisError,
 		setAnalysisError,
 		creditStatus,

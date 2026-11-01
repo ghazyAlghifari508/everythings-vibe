@@ -24,6 +24,7 @@ export const analysisCreditStatusSchema = z.object({
 	estimatedCredits: z.number().int().nonnegative().optional(),
 	pricingVersion: z.literal(ADAPTIVE_CREDIT_PRICING.version),
 	canStart: z.boolean(),
+	billingExempt: z.boolean().optional(),
 });
 export type AnalysisCreditStatus = z.infer<typeof analysisCreditStatusSchema>;
 
@@ -34,7 +35,18 @@ export function resolveAnalysisCreditPolicy(input: {
 	availableCredits: number;
 	isInitial: boolean;
 	consentMaximum?: number;
+	billingExempt?: boolean;
 }): AnalysisCreditStatus {
+	if (input.billingExempt) {
+		return {
+			code: "FREE_ALLOWANCE_AVAILABLE",
+			availableCredits: input.availableCredits,
+			maximumCredits: 0,
+			pricingVersion: ADAPTIVE_CREDIT_PRICING.version,
+			canStart: true,
+			billingExempt: true,
+		};
+	}
 	const free = input.isInitial && !input.allowanceUsed;
 	const maximumCredits = free
 		? 0

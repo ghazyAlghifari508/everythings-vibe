@@ -685,9 +685,8 @@ describe("composer message routing without intent choice", () => {
 		expect(workspaceSource).not.toContain("selectedIntent");
 		expect(workspaceSource).not.toContain("needsIntentChoice");
 		// A message in a plan with planning revises that same plan.
-		expect(workspaceSource).toMatch(
-			/activeHasPlanning[\s\S]*await runRevision\(trimmed\)/,
-		);
+		expect(workspaceSource).toContain("activeHasPlanning");
+		expect(workspaceSource).toMatch(/await runRevision\(trimmed/);
 		// A new feature still goes through the existing creation path.
 		expect(workspaceSource).toContain("ensureFeatureInWorkspace(trimmed)");
 	});

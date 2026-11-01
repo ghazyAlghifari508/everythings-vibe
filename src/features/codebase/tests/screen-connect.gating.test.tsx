@@ -575,9 +575,13 @@ describe("Step 1 continue gating", () => {
 describe("Step 1 recovery affordances", () => {
 	it("offers a fresh token when the one-time credential cannot be restored", () => {
 		const onRequestNewToken = vi.fn();
-		renderConnect({ payload: null, onRequestNewToken });
+		renderConnect({
+			payload: null,
+			status: status({ status: "expired" }),
+			onRequestNewToken,
+		});
 		const button = [...container.querySelectorAll("button")].find((b) =>
-			/Dapatkan token baru/i.test(b.textContent ?? ""),
+			/Buat sesi baru|Dapatkan token baru/i.test(b.textContent ?? ""),
 		);
 		expect(button).toBeDefined();
 		act(() => {
@@ -634,3 +638,7 @@ describe("Step 1 recovery affordances", () => {
 		);
 	});
 });
+
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({ data: undefined, refetch: vi.fn() }),
+}));

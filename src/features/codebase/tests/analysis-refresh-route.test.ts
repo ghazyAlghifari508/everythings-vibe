@@ -166,6 +166,7 @@ vi.mock("@/lib/services/credit-service", () => ({
 	markCreditOperationRunning: vi.fn(async () => ({ state: "running" })),
 	releaseCreditOperation: state.release,
 	reserveCreditOperation: state.reserve,
+	reserveActiveCreditOperation: state.reserve,
 	reconcileExpiredCreditOperations: vi.fn(async () => ({
 		releasedOperationIds: [],
 	})),

@@ -166,14 +166,31 @@ function StageRow({ testId, row }: { testId: string; row: SyncStageRow }) {
  * reported on its own row. Before a verified snapshot exists it can only be
  * waiting: the CLI upload is a different operation and does not tell us
  * anything about the model yet.
+ *
+ * Render priority is the whole contract:
+ * 1. a running attempt always beats a previous failure;
+ * 2. a ready row for the current snapshot always beats a stale failure;
+ * 3. a fresh failure is reported only when nothing running or ready
+ *    supersedes it;
+ * 4. the local retry flag (explicit user retry, cleared by the real
+ *    resolution) paints running before the first poll for the new attempt.
  */
 function buildAnalysisRow(input: {
 	status: SyncStatusResponse | null;
 	isAnalysisReady: boolean;
 	analysisBlocked: boolean;
 	syncStarted: boolean;
+	isRetrying?: boolean;
+	isWorking?: boolean;
 }): SyncStageRow | null {
-	const { status, isAnalysisReady, analysisBlocked, syncStarted } = input;
+	const {
+		status,
+		isAnalysisReady,
+		analysisBlocked,
+		syncStarted,
+		isRetrying,
+		isWorking,
+	} = input;
 	if (!status) return null;
 
 	if (analysisBlocked && status.snapshotId) {
@@ -191,7 +208,8 @@ function buildAnalysisRow(input: {
 	// the exact "conclusion appeared instantly" symptom. Ready content still
 	// wins whenever it exists, so a failed retry can never hide a usable result.
 	const liveStatus =
-		status.analysisStatus === "ready"
+		status.analysisStatus === "ready" ||
+		status.analysisAttemptStatus === "ready"
 			? "ready"
 			: (status.analysisAttemptStatus ?? status.analysisStatus);
 
@@ -199,24 +217,9 @@ function buildAnalysisRow(input: {
 		return syncStarted ? { state: "waiting", title: "Analisis AI" } : null;
 	}
 
-	if (liveStatus === "pending") {
-		// No narrative detail: the model's internal steps are not observable, so
-		// the row reports only that it is running and, from a persisted start,
-		// for how long.
-		return {
-			state: "active",
-			title: "Menganalisis repository...",
-			...(status.analysisAttemptCreatedAt
-				? { startedAt: status.analysisAttemptCreatedAt }
-				: {}),
-		};
-	}
-
-	if (liveStatus === "failed") {
-		return { state: "failed", title: "Analisis belum selesai" };
-	}
-
 	if (liveStatus === "ready") {
+		// Ready is terminal for the paint: it wins even while a stale local
+		// retry flag has not been cleared yet.
 		return {
 			state: "done",
 			title: "Analisis selesai",
@@ -229,6 +232,22 @@ function buildAnalysisRow(input: {
 				? { completedAt: status.analysisAttemptUpdatedAt }
 				: {}),
 		};
+	}
+
+	if (liveStatus === "pending" || isRetrying || isWorking) {
+		// A retry paints running immediately; the ready paint above wins on
+		// the server real next state.
+		return {
+			state: "active",
+			title: "Menganalisis repository...",
+			...(status.analysisAttemptCreatedAt
+				? { startedAt: status.analysisAttemptCreatedAt }
+				: {}),
+		};
+	}
+
+	if (liveStatus === "failed") {
+		return { state: "failed", title: "Analisis belum selesai" };
 	}
 
 	return syncStarted ? { state: "waiting", title: "Analisis AI" } : null;
@@ -271,6 +290,7 @@ export function SyncStageList({
 	analysisError = null,
 	onRetryAnalysis,
 	isAnalyzing = false,
+	isRetrying = false,
 }: {
 	status: SyncStatusResponse | null;
 	className?: string;
@@ -288,16 +308,26 @@ export function SyncStageList({
 	analysisError?: string | null;
 	onRetryAnalysis?: () => void;
 	isAnalyzing?: boolean;
+	/** Explicit user retry awaiting the server's real next state. */
+	isRetrying?: boolean;
 }) {
 	const view = resolveSyncStageView(status);
 
 	if (view.stages.length === 0) return null;
+
+	// Running beats failed: a retry replaces the failure row with honest
+	// progress in the same paint, so the old error can never linger under
+	// a disabled "Menganalisis..." button.
+	const runningOverridesFailure =
+		isRetrying || isAnalyzing || status?.analysisAttemptStatus === "pending";
 
 	const analysisRow = buildAnalysisRow({
 		status,
 		isAnalysisReady,
 		analysisBlocked,
 		syncStarted: view.hasStarted,
+		isRetrying,
+		isWorking: isAnalyzing,
 	});
 
 	const formatCount = (value: number): string => value.toLocaleString("id-ID");
@@ -319,7 +349,7 @@ export function SyncStageList({
 			})}
 			{analysisBlocked && status?.snapshotId ? (
 				<AnalysisBlockedRow />
-			) : showAnalysisFailure && onRetryAnalysis ? (
+			) : showAnalysisFailure && onRetryAnalysis && !runningOverridesFailure ? (
 				<div
 					data-testid={ANALYSIS_TEST_ID}
 					data-stage-state="failed"

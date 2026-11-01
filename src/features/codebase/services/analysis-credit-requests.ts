@@ -26,7 +26,7 @@ export function preSyncAcceptance(status: AnalysisCreditStatus) {
 	};
 }
 
-export async function confirmPreSyncCredit() {
+export async function requestPreSyncPreflight(): Promise<AnalysisCreditStatus> {
 	const status = await requestAnalysisCreditPreflight();
 	if (
 		status.code !== "FREE_ALLOWANCE_AVAILABLE" &&
@@ -38,15 +38,10 @@ export async function confirmPreSyncCredit() {
 				: `Sinkronisasi belum dapat dimulai. Saldo ${status.availableCredits} kredit, kebutuhan hingga ${status.maximumCredits} kredit. Buka Billing untuk melanjutkan.`,
 		);
 	}
-	const accepted = window.confirm(
-		status.code === "FREE_ALLOWANCE_AVAILABLE"
-			? "Satu analisis awal berhasil per akun gratis. Analisis ulang memerlukan kredit. Sinkronisasi tetap mengikuti batas ukuran repository. Mulai sinkronisasi?"
-			: `Saldo ${status.availableCredits} kredit. Analisis membutuhkan hingga ${status.maximumCredits} kredit sesuai ukuran repository. Biaya akhir dihitung setelah sync, tidak melebihi batas ini; kegagalan tidak ditagih. Setujui dan mulai sinkronisasi?`,
-	);
-	return accepted ? preSyncAcceptance(status) : null;
+	return status;
 }
 
-export async function confirmPaidAnalysis(
+export async function requestPaidAnalysisPreflight(
 	projectId: string,
 	snapshotId: string,
 	refreshId?: string,
@@ -67,10 +62,11 @@ export async function confirmPaidAnalysis(
 		const analysis = analysisResponseSchema.safeParse(raw);
 		if (!response.ok || !analysis.success)
 			throw new Error("Analisis belum dapat dimulai. Coba lagi.");
-		return { body, response, raw };
+		return { kind: "ready" as const, body, response, raw };
 	}
 	const status = parsed.data;
-	if (status.code === "FREE_ALLOWANCE_AVAILABLE") return { body };
+	if (status.code === "FREE_ALLOWANCE_AVAILABLE")
+		return { kind: "allowed" as const, status, body };
 	if (status.code !== "CREDIT_REQUIRED") {
 		throw new Error(
 			status.code === "SUBSCRIPTION_PAUSED"
@@ -78,19 +74,5 @@ export async function confirmPaidAnalysis(
 				: `Analisis belum dapat dimulai. Saldo ${status.availableCredits} kredit, kebutuhan hingga ${status.maximumCredits} kredit. Buka Billing untuk melanjutkan.`,
 		);
 	}
-	if (
-		!window.confirm(
-			`Analisis membutuhkan ${status.estimatedCredits === undefined ? "hingga" : `estimasi ${status.estimatedCredits} kredit, maksimal`} ${status.maximumCredits} kredit. Saldo ${status.availableCredits} kredit. Biaya akhir tidak melebihi batas ini; kegagalan tidak ditagih. Lanjutkan?`,
-		)
-	)
-		return null;
-	return {
-		body: {
-			...body,
-			creditConsent: {
-				maximumCredits: status.maximumCredits,
-				pricingVersion: status.pricingVersion,
-			},
-		},
-	};
+	return { kind: "consent" as const, status, body };
 }

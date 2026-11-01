@@ -3,8 +3,9 @@
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { HistorySelectAll } from "@/components/ui/history-select-all";
+import { HistorySelectionBar } from "@/components/ui/history-selection-bar";
 import { Icon } from "@/components/ui/icon";
-import type { ScrapeHistorySelectionController } from "@/features/scrape/hooks/use-scrape-history-selection";
 import type {
 	ScrapeHistoryBulkDeleteResult,
 	ScrapeHistoryBulkSelection,
@@ -17,6 +18,7 @@ import {
 	historyTotalPages,
 	isHistoryFiltered,
 } from "@/features/scrape/utils/scrape-history";
+import type { HistorySelectionController } from "@/lib/history-selection";
 import { useScrapeHistorySearchDraft } from "../hooks/use-scrape-history-search-draft";
 import {
 	ScrapeHistoryDeleteDialog,
@@ -28,8 +30,6 @@ import {
 } from "./scrape-history-list-item";
 import { ScrapeHistoryPagination } from "./scrape-history-list-pagination";
 import { ScrapeHistorySearchControls } from "./scrape-history-list-search";
-import { ScrapeHistorySelectAll } from "./scrape-history-select-all";
-import { ScrapeHistorySelectionBar } from "./scrape-history-selection-bar";
 
 export type { ScrapeHistoryItem } from "./scrape-history-list-item";
 export {
@@ -59,7 +59,7 @@ export function ScrapeHistoryList({
 	onDelete?: (id: string) => Promise<unknown>;
 	onDeleteMany: (ids: string[]) => Promise<ScrapeHistoryBulkDeleteResult>;
 	onPrepareSelection: () => Promise<ScrapeHistoryBulkSelection>;
-	selection: ScrapeHistorySelectionController;
+	selection: HistorySelectionController;
 }) {
 	const [draft, setDraft] = useScrapeHistorySearchDraft(search, onQueryChange);
 	const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -174,7 +174,8 @@ export function ScrapeHistoryList({
 			/>
 
 			{selection.count > 0 && items.length > 0 ? (
-				<ScrapeHistorySelectAll
+				<HistorySelectAll
+					noun="hasil"
 					pageIds={pageIds}
 					selectedIds={selection.ids}
 					total={total}
@@ -232,7 +233,8 @@ export function ScrapeHistoryList({
 			)}
 
 			{selection.count > 0 || selection.notice !== null ? (
-				<ScrapeHistorySelectionBar
+				<HistorySelectionBar
+					noun="hasil"
 					count={selection.count}
 					filteredTotal={selection.filteredTotal}
 					truncated={selection.truncated}

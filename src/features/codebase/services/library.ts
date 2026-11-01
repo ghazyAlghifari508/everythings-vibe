@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+	CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS,
+	CODEBASE_LIBRARY_ID_MAX_CHARS,
 	CODEBASE_NAME_MAX_CHARS,
 	CODEBASE_NAME_MIN_CHARS,
 } from "@/features/codebase/types/codebase-constants";
@@ -53,6 +55,63 @@ export type CodebaseRenameInput = z.infer<typeof codebaseRenameSchema>;
 export const CODEBASE_NAME_MIN_ERROR =
 	"Nama project minimal 3 karakter dan tidak boleh kosong.";
 export const CODEBASE_NAME_MAX_ERROR = "Nama project terlalu panjang.";
+
+export interface CodebaseBulkDeleteRequest {
+	ids: string[];
+}
+
+export interface CodebaseBulkDeleteResult {
+	deleted: number;
+	skipped: number;
+	deletedIds: string[];
+}
+
+const codebaseBulkDeleteSchema = z.object({
+	ids: z
+		.array(z.string().trim().min(1).max(CODEBASE_LIBRARY_ID_MAX_CHARS))
+		.min(1)
+		.max(CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS),
+});
+
+/**
+ * Validated payload for the batch delete. Throwing here keeps the route handler
+ * from touching the database with a shape the service cannot trust.
+ */
+export function parseCodebaseBulkDelete(
+	raw: unknown,
+): CodebaseBulkDeleteRequest {
+	const parsed = codebaseBulkDeleteSchema.safeParse(raw);
+	if (!parsed.success) throw new Error("Permintaan hapus tidak valid.");
+	return { ids: parsed.data.ids };
+}
+
+/**
+ * Normalize a client id list before it reaches the database. Repeated ids would
+ * otherwise multiply round trips without changing the outcome, and blank
+ * entries are not ids at all.
+ */
+export function dedupeCodebaseIds(ids: readonly string[]): string[] {
+	const unique = new Set<string>();
+	for (const id of ids) {
+		const trimmed = id.trim();
+		if (trimmed) unique.add(trimmed);
+	}
+	return [...unique];
+}
+
+/**
+ * Whether a repository may be deleted without an extra confirmation step.
+ * Both the single and batch paths rely on this so their decision cannot drift.
+ */
+export function decideCodebaseDeletion(input: {
+	featureCount: number;
+	confirm?: boolean;
+}): { allow: true } | { allow: false; code: "CODEBASE_HAS_FEATURES" } {
+	if (input.featureCount > 0 && input.confirm !== true) {
+		return { allow: false, code: "CODEBASE_HAS_FEATURES" };
+	}
+	return { allow: true };
+}
 
 interface LibrarySnapshotLike {
 	id: string;

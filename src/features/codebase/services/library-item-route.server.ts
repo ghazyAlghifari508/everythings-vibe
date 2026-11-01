@@ -6,7 +6,7 @@
 // from client code.
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { codebases, projects } from "@/db/schema";
+import { codebaseGenerationOperations, codebases, projects } from "@/db/schema";
 import { purgeProjectArtifacts } from "@/features/greenfield/services/project-delete.server";
 import { deletionTimestamp } from "@/lib/project-deletion";
 import { requireUser } from "@/lib/session";
@@ -118,6 +118,102 @@ export async function handleCodebaseRename({
 	}
 }
 
+type CodebaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export type CodebaseDeletionOutcome =
+	| { kind: "not_found" }
+	| { kind: "conflict"; featureCount: number }
+	| { kind: "deleted" };
+
+/**
+ * Delete one repository inside the caller's transaction.
+ *
+ * Scoped to userId, purges project artifacts, tombstones projects, and cascades
+ * codebase deletion. Reused by both single delete and bulk delete.
+ */
+export async function deleteOwnedCodebase(
+	tx: CodebaseTransaction,
+	input: { codebaseId: string; userId: string; confirm?: boolean },
+): Promise<CodebaseDeletionOutcome> {
+	const { codebaseId, userId, confirm } = input;
+	const [ownCodebase] = await tx
+		.select({ id: codebases.id })
+		.from(codebases)
+		.where(and(eq(codebases.id, codebaseId), eq(codebases.userId, userId)))
+		.limit(1)
+		.for("update");
+
+	if (!ownCodebase) return { kind: "not_found" };
+
+	const activeProjects = await tx
+		.select({ id: projects.id })
+		.from(projects)
+		.where(
+			and(
+				eq(projects.codebaseId, codebaseId),
+				eq(projects.userId, userId),
+				isNull(projects.deletedAt),
+			),
+		);
+
+	const decision = decideCodebaseDeletion({
+		featureCount: activeProjects.length,
+		confirm,
+	});
+
+	if (!decision.allow) {
+		return {
+			kind: "conflict",
+			featureCount: activeProjects.length,
+		};
+	}
+
+	// Clean up each feature project: purge user-facing artifacts and
+	// tombstone the project row (with codebaseId set to null so the
+	// subsequent codebase deletion FK cascade doesn't touch retained
+	// project accounting rows).
+	for (const proj of activeProjects) {
+		await purgeProjectArtifacts(tx, proj.id);
+		await tx
+			.delete(codebaseGenerationOperations)
+			.where(eq(codebaseGenerationOperations.projectId, proj.id));
+		await tx
+			.update(projects)
+			.set({
+				deletedAt: deletionTimestamp(),
+				shareToken: null,
+				lastUrl: null,
+				codebaseId: null,
+				updatedAt: deletionTimestamp(),
+			})
+			.where(
+				and(
+					eq(projects.id, proj.id),
+					eq(projects.userId, userId),
+					isNull(projects.deletedAt),
+				),
+			);
+	}
+
+	// Unlink any remaining projects (including previously tombstoned
+	// ones) so the codebase deletion cascade does not attempt to
+	// destroy retained accounting rows.
+	await tx
+		.update(projects)
+		.set({ codebaseId: null })
+		.where(
+			and(eq(projects.codebaseId, codebaseId), eq(projects.userId, userId)),
+		);
+
+	// Delete the codebase row. Sessions, snapshots, files, idempotency
+	// keys, and analyses cascade via the FKs added in Task 1.
+	await tx
+		.delete(codebases)
+		.where(and(eq(codebases.id, codebaseId), eq(codebases.userId, userId)));
+
+	return { kind: "deleted" };
+}
+
 export async function handleCodebaseDelete({
 	request,
 	params,
@@ -148,86 +244,9 @@ export async function handleCodebaseDelete({
 		body.confirm === true;
 
 	try {
-		const result = await db.transaction(async (tx) => {
-			const [ownCodebase] = await tx
-				.select({ id: codebases.id })
-				.from(codebases)
-				.where(and(eq(codebases.id, codebaseId), eq(codebases.userId, user.id)))
-				.limit(1)
-				.for("update");
-
-			if (!ownCodebase) return { kind: "not_found" as const };
-
-			const activeProjects = await tx
-				.select({ id: projects.id })
-				.from(projects)
-				.where(
-					and(
-						eq(projects.codebaseId, codebaseId),
-						eq(projects.userId, user.id),
-						isNull(projects.deletedAt),
-					),
-				);
-
-			const decision = decideCodebaseDeletion({
-				featureCount: activeProjects.length,
-				confirm,
-			});
-
-			if (!decision.allow) {
-				return {
-					kind: "conflict" as const,
-					featureCount: activeProjects.length,
-				};
-			}
-
-			// Clean up each feature project: purge user-facing artifacts and
-			// tombstone the project row (with codebaseId set to null so the
-			// subsequent codebase deletion FK cascade doesn't touch retained
-			// project accounting rows).
-			for (const proj of activeProjects) {
-				await purgeProjectArtifacts(tx, proj.id);
-				await tx
-					.update(projects)
-					.set({
-						deletedAt: deletionTimestamp(),
-						shareToken: null,
-						lastUrl: null,
-						codebaseId: null,
-						updatedAt: deletionTimestamp(),
-					})
-					.where(
-						and(
-							eq(projects.id, proj.id),
-							eq(projects.userId, user.id),
-							isNull(projects.deletedAt),
-						),
-					);
-			}
-
-			// Unlink any remaining projects (including previously tombstoned
-			// ones) so the codebase deletion cascade does not attempt to
-			// destroy retained accounting rows.
-			await tx
-				.update(projects)
-				.set({ codebaseId: null })
-				.where(
-					and(
-						eq(projects.codebaseId, codebaseId),
-						eq(projects.userId, user.id),
-					),
-				);
-
-			// Delete the codebase row. Sessions, snapshots, files, idempotency
-			// keys, and analyses cascade via the FKs added in Task 1.
-			await tx
-				.delete(codebases)
-				.where(
-					and(eq(codebases.id, codebaseId), eq(codebases.userId, user.id)),
-				);
-
-			return { kind: "deleted" as const };
-		});
+		const result = await db.transaction((tx) =>
+			deleteOwnedCodebase(tx, { codebaseId, userId: user.id, confirm }),
+		);
 
 		if (result.kind === "not_found") {
 			return Response.json(

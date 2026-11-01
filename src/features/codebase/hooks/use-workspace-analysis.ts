@@ -8,7 +8,6 @@ import {
 	shouldDiscardWorkspaceAnalysis,
 } from "@/features/codebase/services/analysis-selection";
 import { matchesWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
-import { confirmPaidAnalysis } from "../services/analysis-credit-requests";
 import { safeParseAnalysisResponse } from "../utils/analysis-response";
 
 export function useWorkspaceAnalysis({
@@ -54,23 +53,15 @@ export function useWorkspaceAnalysis({
 			setIsWorking(true);
 			setError(null);
 			try {
-				const confirmation = await confirmPaidAnalysis(projectId, snapshotId);
-				if (!confirmation) {
-					analysisAttemptedFor.current = null;
-					return;
-				}
-				const response =
-					confirmation.response ??
-					(await fetch(
-						`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
-						{
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify(confirmation.body),
-						},
-					));
-				const body: unknown =
-					confirmation.raw ?? (await response.json().catch(() => null));
+				const response = await fetch(
+					`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ snapshotId }),
+					},
+				);
+				const body: unknown = await response.json().catch(() => null);
 				const parsed = safeParseAnalysisResponse(body);
 				if (
 					!response.ok ||
@@ -150,24 +141,18 @@ export function useWorkspaceAnalysis({
 			setIsRefreshingStarterSuggestions(true);
 			setStarterRefreshError(null);
 			try {
-				const confirmation = await confirmPaidAnalysis(
-					projectId,
-					snapshotId,
-					analysisId,
+				const response = await fetch(
+					`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							snapshotId,
+							refreshStarterSuggestionsForAnalysisId: analysisId,
+						}),
+					},
 				);
-				if (!confirmation) return;
-				const response =
-					confirmation.response ??
-					(await fetch(
-						`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
-						{
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify(confirmation.body),
-						},
-					));
-				const body: unknown =
-					confirmation.raw ?? (await response.json().catch(() => null));
+				const body: unknown = await response.json().catch(() => null);
 				const parsed = safeParseAnalysisResponse(body);
 				const parsedSuggestions = codebaseStarterSuggestionsSchema.safeParse(
 					parsed?.output?.starterSuggestions,

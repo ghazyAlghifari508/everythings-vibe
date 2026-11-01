@@ -14,10 +14,11 @@ import type { CreditOperationResult } from "@/lib/services/credit-service";
 import {
 	buildCodebaseMetrics,
 	createCreditQuote,
+	getCreditOperation,
 	isReleasableReservation,
 	markCreditOperationRunning,
 	releaseCreditOperation,
-	reserveCreditOperation,
+	reserveActiveCreditOperation,
 	settleCreditOperation,
 } from "@/lib/services/credit-service";
 import type { AnalysisScope } from "./analysis";
@@ -150,20 +151,17 @@ export async function runCodebaseAnalysisAttempt(
 			idempotencyKey,
 			quote,
 			analysisReference: analysisId,
+			isExempt: creditStatus.billingExempt,
 			initialAnalysisAllowance:
+				!creditStatus.billingExempt &&
 				creditStatus.code === "FREE_ALLOWANCE_AVAILABLE",
 			expiresAt: new Date(
 				Date.now() + ANALYSIS_ALLOWANCE_POLICY.reservationLifetimeMs,
 			),
 		};
-		reservation = await reserveCreditOperation(reserveInput);
-		while (reservation.state === "released" || reservation.state === "failed") {
-			reservation = await reserveCreditOperation({
-				...reserveInput,
-				idempotencyKey: `${idempotencyKey}:retry:${reservation.id}`,
-			});
-		}
-		analysisId = reservation.analysisReference ?? analysisId;
+		reservation = await reserveActiveCreditOperation(reserveInput);
+		analysisId =
+			reservation.analysisReference ?? claimedAnalysisId ?? crypto.randomUUID();
 	} catch (err) {
 		console.error("[codebase/analysis] reserveCreditOperation failed:", err);
 		if (claimedAnalysisId) await failRefreshClaim(claimedAnalysisId);
@@ -238,14 +236,20 @@ export async function runCodebaseAnalysisAttempt(
 			.limit(1);
 		const response = row ? toResponse(row) : null;
 		if (!response || !analysis) {
-			if (isReleasableReservation(reservation.state)) {
-				await releaseCreditOperation({
+			try {
+				const current = await getCreditOperation({
 					userId,
 					operationId: reservation.id,
-					reason: "Hasil analisis rusak",
-				}).catch((error: unknown) =>
-					console.error("[codebase/analysis] release failed", error),
-				);
+				});
+				if (isReleasableReservation(current.state)) {
+					await releaseCreditOperation({
+						userId,
+						operationId: reservation.id,
+						reason: "Hasil analisis rusak",
+					});
+				}
+			} catch (error: unknown) {
+				console.error("[codebase/analysis] release failed", error);
 			}
 			return Response.json(
 				{ error: "Hasil analisis rusak", code: "SYNC_FAILED" },
@@ -256,16 +260,34 @@ export async function runCodebaseAnalysisAttempt(
 	} catch (error) {
 		const failureReason =
 			error instanceof Error ? error.message : "Analisis codebase gagal";
-		await releaseCreditOperation({
-			userId,
-			operationId: reservation.id,
-			reason: failureReason,
-		}).catch((relErr) => {
+		try {
+			// Re-read before cleanup: the state captured at reserve time is
+			// stale once generation ran (a concurrent sweep may have settled,
+			// released, or quarantined it). Only an operation that is still
+			// unstarted is safe to release; anything else is reported, not
+			// silently swallowed, so a terminal-state regression stays visible.
+			const current = await getCreditOperation({
+				userId,
+				operationId: reservation.id,
+			});
+			if (isReleasableReservation(current.state)) {
+				await releaseCreditOperation({
+					userId,
+					operationId: reservation.id,
+					reason: failureReason,
+				});
+			} else {
+				console.error(
+					"[codebase/analysis] skip release: reservation already terminal",
+					{ operationId: reservation.id, state: current.state },
+				);
+			}
+		} catch (relErr) {
 			console.error(
 				"[codebase/analysis] releaseCreditOperation failed:",
 				relErr,
 			);
-		});
+		}
 
 		if (error instanceof AnalysisServiceError) {
 			if (error.code === "SNAPSHOT_NOT_UPLOADED")

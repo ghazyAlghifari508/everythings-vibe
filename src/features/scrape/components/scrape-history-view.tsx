@@ -1,10 +1,10 @@
-import { useScrapeHistorySelection } from "@/features/scrape/hooks/use-scrape-history-selection";
 import type {
 	ScrapeHistoryBulkDeleteResult,
 	ScrapeHistoryBulkSelection,
 	ScrapeHistorySearch,
 } from "@/features/scrape/types/scrape-contract";
 import { historyFilterKey } from "@/features/scrape/utils/scrape-history";
+import { useHistorySelection } from "@/lib/history-selection";
 import type { ScrapeHistoryItem } from "./scrape-history-list";
 import { ScrapeHistoryList } from "./scrape-history-list";
 
@@ -27,7 +27,7 @@ export function ScrapeHistoryView({
 	onDeleteMany,
 	onPrepareSelection,
 }: ScrapeHistoryViewProps) {
-	const selection = useScrapeHistorySelection(historyFilterKey(search));
+	const selection = useHistorySelection(historyFilterKey(search));
 	return (
 		<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
 			<div className="flex w-full flex-col gap-6 py-4">

@@ -17,6 +17,8 @@ export const users = pgTable("users", {
 	initialAnalysisUsedAt: timestamp("initial_analysis_used_at", {
 		withTimezone: true,
 	}),
+	billingExempt: boolean("billing_exempt").notNull().default(false),
+	billingExemptionReason: text("billing_exemption_reason"),
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 	updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

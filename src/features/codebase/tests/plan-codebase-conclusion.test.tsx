@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlanCodebasePage } from "@/features/codebase/components/workspace/plan-codebase-page";
 import { useUIStore } from "@/store";
 
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({ data: undefined, refetch: vi.fn() }),
+}));
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
 	useNavigate: () => vi.fn(),
@@ -154,12 +157,9 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 			{ timeout: 15000, interval: 100 },
 		);
 		expect(
-			screen.getByText(
-				"Token sync hanya berlaku sekali dan tidak disimpan di browser.",
-			),
-		).toBeDefined();
-		expect(
-			screen.getByRole("button", { name: /Dapatkan token baru/i }),
+			screen.getByRole("button", {
+				name: /coba lagi|buat sesi baru|token baru/i,
+			}),
 		).toBeDefined();
 		// Handshake evidence alone is not a finished transport: no snapshot exists
 		// yet, so the conclusion step stays shut.

@@ -125,6 +125,28 @@ export const setUserAdmin = createServerFn({ method: "POST" })
 		});
 	});
 
+export const setUserBillingExempt = createServerFn({ method: "POST" })
+	.validator(
+		(data: {
+			userId: string;
+			billingExempt: boolean;
+			reason?: "internal" | "development" | "support";
+		}) => data,
+	)
+	.handler(async ({ data }) => {
+		const adminUser = await requireAdmin(await getRequestHeaders());
+		const { setUserBillingExemption } = await import(
+			"@/features/billing/services/billing-entitlement"
+		);
+		await setUserBillingExemption({
+			userId: data.userId,
+			exempt: data.billingExempt,
+			reason: data.reason ?? "internal",
+			actorId: adminUser.id,
+			metadata: { updatedVia: "admin-users-service" },
+		});
+	});
+
 export const countUsers = createServerFn({ method: "GET" }).handler(
 	async () => {
 		await requireAdmin(await getRequestHeaders());

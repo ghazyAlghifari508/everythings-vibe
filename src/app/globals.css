@@ -65,9 +65,12 @@
 	--color-platinum: #09090b;
 	--color-snow: #09090b;
 	--color-indigo: #52525b;
-	--color-emerald: #18181b;
+	--color-emerald: #16a34a;
 	--color-crimson: #dc2626;
 	--color-cyan: #27272a;
+
+	/* Safe area / widget offsets */
+	--toast-bottom-offset: 5.25rem;
 
 	/* Page backgrounds */
 	--bg-page: #ffffff;
@@ -123,9 +126,12 @@
 	--color-platinum: #e5e5e6;
 	--color-snow: #f7f8f8;
 	--color-indigo: #8a8f98;
-	--color-emerald: #d0d6e0;
+	--color-emerald: #27a644;
 	--color-crimson: #eb5757;
 	--color-cyan: #e5e5e6;
+
+	/* Safe area / widget offsets */
+	--toast-bottom-offset: 5.25rem;
 
 	/* Page backgrounds */
 	--bg-page: #08090a;

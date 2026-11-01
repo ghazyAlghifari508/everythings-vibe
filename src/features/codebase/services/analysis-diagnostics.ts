@@ -1,3 +1,4 @@
+import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
 import { AnalysisValidationError } from "./analysis-validation";
 
 // Fixed user-facing message. Never echoes model text, stack traces, tokens,
@@ -49,6 +50,18 @@ export function classifyAnalysisFailure(
 		return "snapshot";
 	}
 	const message = error instanceof Error ? error.message : String(error);
+	// Credit lifecycle failures that abort persistence are triaged as
+	// persistence, not provider: the model output existed, only finalization
+	// failed, so the correct action is safe retry of finalization — not
+	// treating the provider as down.
+	if (
+		error instanceof CreditSubscriptionOriginError ||
+		/credit operation|reservation expired|credit subscription|subscription origin/i.test(
+			message,
+		)
+	) {
+		return "persistence";
+	}
 	if (/aborted|aborterror/i.test(message)) return "aborted";
 	if (
 		/tidak merespons dalam 2 menit|melebihi batas waktu|timeout|timed out|etimedout|stall/i.test(
@@ -145,6 +158,11 @@ export interface AnalysisDiagnosticRecord {
 	snapshotId: string;
 	category: AnalysisFailureCategory;
 	durationMs: number;
+	creditOperationId?: string;
+	operationState?: string;
+	operationExpiresAt?: string;
+	stage?: AnalysisAttemptStage;
+	errorCode?: string;
 	issuePaths?: readonly string[];
 	rawLength?: number;
 }
@@ -152,6 +170,10 @@ export interface AnalysisDiagnosticRecord {
 export function formatAnalysisDiagnosticLog(
 	record: AnalysisDiagnosticRecord,
 ): Record<string, string | number | readonly string[]> {
+	const errorCode =
+		typeof record.errorCode === "string"
+			? record.errorCode.slice(0, 80)
+			: undefined;
 	const shaped: Record<string, string | number | readonly string[]> = {
 		attemptId: record.attemptId,
 		projectId: record.projectId,
@@ -159,6 +181,16 @@ export function formatAnalysisDiagnosticLog(
 		category: record.category,
 		durationMs: record.durationMs,
 	};
+	// Credit operation identity is safe internal metadata (ids + state +
+	// expiry only): no CLI tokens, API keys, source content, or model
+	// output ever enters this record.
+	if (record.creditOperationId)
+		shaped.creditOperationId = record.creditOperationId;
+	if (record.operationState) shaped.operationState = record.operationState;
+	if (record.operationExpiresAt)
+		shaped.operationExpiresAt = record.operationExpiresAt;
+	if (record.stage) shaped.stage = record.stage;
+	if (errorCode) shaped.errorCode = errorCode;
 	if (record.issuePaths && record.issuePaths.length > 0) {
 		shaped.issuePaths = record.issuePaths;
 	}

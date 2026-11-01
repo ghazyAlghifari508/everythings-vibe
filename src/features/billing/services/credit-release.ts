@@ -28,6 +28,36 @@ export async function releaseCreditOperation(input: {
 		if (!operation) throw new Error("Credit operation ownership mismatch");
 		if (!["reserved", "running", "settling"].includes(operation.state))
 			throw new Error("Credit operation is not active");
+
+		if (operation.isExempt || operation.reservedCredits === 0) {
+			const updated = await tx
+				.update(schema.creditOperations)
+				.set({
+					state: "released",
+					reservedCredits: 0,
+					releasedAt: new Date(),
+					failure: {
+						message: input.reason,
+						occurredAt: new Date().toISOString(),
+					},
+					updatedAt: new Date(),
+				})
+				.where(
+					and(
+						eq(schema.creditOperations.id, operation.id),
+						sql`${schema.creditOperations.state} IN ('reserved', 'running', 'settling')`,
+					),
+				)
+				.returning({
+					id: schema.creditOperations.id,
+					state: schema.creditOperations.state,
+					finalCharge: schema.creditOperations.finalCharge,
+				});
+			if (updated.length !== 1)
+				throw new Error("Credit operation release conflict");
+			return updated[0];
+		}
+
 		const subscriptionId = requireBoundSubscriptionId(operation.subscriptionId);
 		const [subscription] = await tx
 			.select({ id: schema.subscriptions.id })
