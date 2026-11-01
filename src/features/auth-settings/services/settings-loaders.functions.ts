@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { asc, eq } from "drizzle-orm";
 import { requireUserServer } from "@/lib/session";
+import { apiKeyViewFields } from "./api-key-lifecycle";
 
 export const loadSettings = createServerFn({ method: "GET" }).handler(
 	async () => {
@@ -71,7 +72,12 @@ export const loadApiKeys = createServerFn({ method: "GET" }).handler(
 			.from(apiKeys)
 			.where(eq(apiKeys.userId, user.id))
 			.orderBy(asc(apiKeys.createdAt));
+		// One clock reading for the whole page: `now` ships with the rows so the
+		// SSR HTML and the hydrated client cannot disagree about which credential
+		// is already expired.
+		const now = new Date();
 		const keys = rows.map((k) => ({
+			...apiKeyViewFields(k, now),
 			id: k.id,
 			name: k.name,
 			key_prefix: k.keyPrefix ?? "",

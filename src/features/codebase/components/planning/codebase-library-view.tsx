@@ -4,6 +4,7 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { PageHeading } from "@/components/ui";
 import { HistorySelectAll } from "@/components/ui/history-select-all";
 import { HistorySelectionBar } from "@/components/ui/history-selection-bar";
 import { Icon } from "@/components/ui/icon";
@@ -185,9 +186,9 @@ export function CodebaseLibraryView({
 						<p className="font-mono text-xs uppercase tracking-widest text-fog">
 							Existing Codebase
 						</p>
-						<h1 className="mt-2 text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
+						<PageHeading variant="workspace" className="mt-2">
 							Project Tersimpan
-						</h1>
+						</PageHeading>
 						<p className="mt-2 max-w-2xl text-sm leading-6 text-fog">
 							Repository yang pernah kamu hubungkan akan tersimpan di sini.
 							Lanjutkan dari konteks dan workspace sebelumnya.

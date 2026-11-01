@@ -24,9 +24,15 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { mintedApiKeySchema } from "@/features/auth-settings/types/api-key-contracts";
+import { buildAgentHandoffPrompt } from "@/features/greenfield/services/agent-handoff-prompt";
+import {
+	type ProjectExportPayload,
+	projectExportPayloadSchema,
+} from "@/features/greenfield/types/export-contracts";
 import { EXPORT_FILENAME_PREFIX } from "@/features/greenfield/types/greenfield-constants";
 import { useUIStore } from "@/store";
-import { AI_AGENT_PROMPT_TEMPLATE } from "./ai-agent-prompt-template";
+import { AgentHandoffDialog } from "./agent-handoff-dialog";
 
 type ImplementationChoice = "copy_prd" | "download_zip" | "prompt_ai" | null;
 
@@ -61,6 +67,9 @@ export function ImplementationOptions({
 	const [isLoading, setIsLoading] = useState(false);
 	const [showPromptModal, setShowPromptModal] = useState(false);
 	const [promptText, setPromptText] = useState("");
+	const [handoffKeyExpiresAt, setHandoffKeyExpiresAt] = useState<string | null>(
+		null,
+	);
 	const [resetDialogOpen, setResetDialogOpen] = useState(false);
 	const [isResetting, setIsResetting] = useState(false);
 
@@ -88,23 +97,22 @@ export function ImplementationOptions({
 		[projectId],
 	);
 
-	const fetchContent = useCallback(async () => {
+	const fetchContent = useCallback(async (): Promise<ProjectExportPayload> => {
 		const res = await fetch("/api/export/prd", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ projectId }),
 		});
 		if (!res.ok) throw new Error("Gagal mengambil data project");
-		return res.json();
+		return projectExportPayloadSchema.parse(await res.json());
 	}, [projectId]);
 
 	const handleCopyPrd = useCallback(async () => {
 		setIsLoading(true);
 		try {
 			const data = await fetchContent();
-			const text = data.prd || "";
 
-			await navigator.clipboard.writeText(text);
+			await navigator.clipboard.writeText(data.prd ?? "");
 			showToast("PRD berhasil disalin ke clipboard", "success");
 			setAndPersistChoice("copy_prd");
 		} catch {
@@ -158,22 +166,24 @@ export function ImplementationOptions({
 	const buildPromptAndOpen = useCallback(async () => {
 		setIsLoading(true);
 		try {
-			const [data, autoKeyData] = await Promise.all([
+			const [payload, minted] = await Promise.all([
 				fetchContent(),
 				fetch("/api/settings/api-keys/auto", { method: "POST" })
-					.then((r) => (r.ok ? r.json() : null))
+					.then(async (res) =>
+						res.ok ? mintedApiKeySchema.parse(await res.json()) : null,
+					)
 					.catch(() => null),
 			]);
-			const apiKey = autoKeyData?.rawKey || "<GANTI_DENGAN_API_KEY_KAMU>";
-			const prompt = AI_AGENT_PROMPT_TEMPLATE.replace(
-				/{projectName}/g,
-				data.projectName || projectName,
-			)
-				.replace(/{prdContent}/g, data.prd || "(Belum ada PRD)")
-				.replace(/{acContent}/g, data.ac || "(Belum ada AC)")
-				.replace(/{tasksContent}/g, data.tasks || "(Belum ada tasks)")
-				.replace(/{projectId}/g, projectId)
-				.replace(/{apiKey}/g, apiKey);
+			// A failed mint must not abort the handoff: the prompt keeps the
+			// fill-in-the-blank marker the user can complete by hand.
+			const expiresAt = minted?.expiresAt ?? null;
+			setHandoffKeyExpiresAt(expiresAt);
+			const prompt = buildAgentHandoffPrompt({
+				payload,
+				projectId,
+				projectNameFallback: projectName,
+				credential: { apiKey: minted?.rawKey ?? "", expiresAt },
+			});
 
 			setPromptText(prompt);
 			setShowPromptModal(true);
@@ -233,6 +243,8 @@ export function ImplementationOptions({
 			showToast("Prompt disalin. Buka AI coding agent untuk paste.", "success");
 			setAndPersistChoice("prompt_ai");
 			setShowPromptModal(false);
+			setPromptText("");
+			setHandoffKeyExpiresAt(null);
 		} catch {
 			showToast("Gagal menyalin prompt", "error");
 		}
@@ -272,64 +284,19 @@ export function ImplementationOptions({
 				</DropdownMenuContent>
 			</DropdownMenu>
 
-			{/* Prompt AI Agent Modal */}
-			<Dialog open={showPromptModal} onOpenChange={setShowPromptModal}>
-				<DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
-					<DialogHeader>
-						<DialogTitle className="flex items-center gap-2">
-							<Icon icon={BotIcon} size={20} />
-							Prompt AI Agent
-						</DialogTitle>
-						<DialogDescription>
-							Salin prompt berikut dan paste ke AI coding agent kamu.
-						</DialogDescription>
-					</DialogHeader>
-
-					<div className="space-y-4">
-						{/* Step 1 */}
-						<div>
-							<p className="mb-2 text-sm font-[510] text-snow">
-								Langkah 1: Copy prompt dibawah
-							</p>
-							<textarea
-								readOnly
-								aria-label="Salin prompt berikut"
-								value={promptText}
-								onFocus={(e) => e.target.select()}
-								className="h-48 w-full resize-none rounded-md border border-graphite bg-onyx p-3 font-mono text-xs text-fog focus:border-indigo focus:outline-none"
-							/>
-						</div>
-
-						{/* Step 2 */}
-						<div>
-							<p className="text-sm font-[510] text-snow">
-								Langkah 2: Buka AI coding agent kamu
-							</p>
-							<p className="text-xs text-fog">
-								Claude Code, Cursor, Copilot, Windsurf, atau AI agent lainnya.
-							</p>
-						</div>
-
-						{/* Step 3 */}
-						<div>
-							<p className="text-sm font-[510] text-snow">
-								Langkah 3: Paste prompt dan mulai implementasi
-							</p>
-						</div>
-					</div>
-
-					<DialogFooter>
-						<Button
-							variant="default"
-							onClick={handleCopyPrompt}
-							className="gap-1.5"
-						>
-							<Icon icon={Copy01Icon} size={14} />
-							Copy & Tutup
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			<AgentHandoffDialog
+				open={showPromptModal}
+				promptText={promptText}
+				keyExpiresAt={handoffKeyExpiresAt}
+				onOpenChange={(open) => {
+					setShowPromptModal(open);
+					if (!open) {
+						setPromptText("");
+						setHandoffKeyExpiresAt(null);
+					}
+				}}
+				onCopy={() => void handleCopyPrompt()}
+			/>
 
 			<Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
 				<DialogContent className="max-w-md">

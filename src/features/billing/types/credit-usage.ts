@@ -23,3 +23,26 @@ export interface CreditOperationItem {
 	createdAt: string | null;
 	settledAt?: string | null;
 }
+
+export interface CreditUsagePagination {
+	page: number;
+	pageSize: number;
+	total: number;
+	totalPages: number;
+}
+
+export interface PaginatedCreditUsageResult {
+	items: CreditOperationItem[];
+	total: number;
+	page: number;
+	pageSize: number;
+	totalPages: number;
+}
+
+export interface PaginatedCreditUsageInput {
+	page?: number;
+	pageSize?: number;
+	stage?: string;
+	status?: string;
+	projectId?: string;
+}

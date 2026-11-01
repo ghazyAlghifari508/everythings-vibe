@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/ui";
 import { CodebaseConclusion } from "@/features/codebase/components/planning/codebase-conclusion";
 import { ScreenConnect } from "@/features/codebase/components/workspace/screen-connect";
 import { ScreenIncompleteSync } from "@/features/codebase/components/workspace/screen-incomplete-sync";
@@ -49,9 +50,9 @@ export function WorkspaceConnectionScreen({
 				<p className="font-mono text-xs uppercase tracking-widest text-fog">
 					Codebase / {name}
 				</p>
-				<h1 className="mt-2 text-3xl font-semibold tracking-tight text-snow">
+				<PageHeading variant="workspace" className="mt-2">
 					Konteks repository
-				</h1>
+				</PageHeading>
 				<p className="mt-2 max-w-2xl text-sm leading-6 text-fog">
 					Hubungkan repository, tunggu snapshot terverifikasi, lalu rencanakan
 					fitur baru dengan konteks yang nyata.
