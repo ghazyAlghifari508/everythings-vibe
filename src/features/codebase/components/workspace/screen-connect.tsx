@@ -9,7 +9,8 @@ import {
 } from "@/features/codebase/services/sync";
 import type { LockedPromptState } from "./locked-prompt-state";
 import { ScreenConnectAgentStep } from "./screen-connect-agent-step";
-import { ScreenConnectPromptStep } from "./screen-connect-prompt-step";import { ScreenConnectSummaryFooter } from "./screen-connect-summary-footer";
+import { ScreenConnectPromptStep } from "./screen-connect-prompt-step";
+import { ScreenConnectSummaryFooter } from "./screen-connect-summary-footer";
 import { ScreenConnectSyncStep } from "./screen-connect-sync-step";
 
 interface ScreenConnectProps {
@@ -31,6 +32,8 @@ interface ScreenConnectProps {
 	status: SyncStatusResponse | null;
 	/** Reconciliation error from the owning loop. */
 	statusError?: string | null;
+	/** Update-channel notice; a dropped stream is not a failed sync. */
+	streamNotice?: string | null;
 	/** Mints a fresh one-time sync credential for a new attempt. */
 	onRequestNewToken?: () => void;
 	/** Mints a fresh credential in response to a failed or expired session. */
@@ -68,6 +71,7 @@ export function ScreenConnect({
 	creditNote = null,
 	status,
 	statusError = null,
+	streamNotice = null,
 	onRequestNewToken,
 	onRetrySync,
 	canContinueToSummary = false,
@@ -128,6 +132,7 @@ export function ScreenConnect({
 						stageView={stageView}
 						canRetry={canRetry}
 						statusError={statusError}
+						streamNotice={streamNotice}
 						isStarting={isStarting}
 						onRetrySync={onRetrySync}
 						canContinueToSummary={canContinueToSummary}

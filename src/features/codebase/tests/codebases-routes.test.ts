@@ -122,29 +122,38 @@ describe("codebase name provenance persistence contract", () => {
 });
 
 describe("codebase status route contract", () => {
-	const source = readFileSync(
+	const handlerSource = readFileSync(
 		"src/features/codebase/services/sync-status.server.ts",
+		"utf8",
+	);
+	// The projection lives in its own module so the polling route and the live
+	// progress stream read the same snapshot; the contract assertions below
+	// follow the code they describe instead of assuming one file.
+	const snapshotSource = readFileSync(
+		"src/features/codebase/services/sync-status-snapshot.server.ts",
 		"utf8",
 	);
 
 	it("serves the canonical persisted name so an open page drops the placeholder", () => {
-		expect(source).toContain("codebaseName: codebase.name");
+		expect(snapshotSource).toContain("codebaseName: codebase.name");
 	});
 
 	it("reads the name from the ownership-scoped codebase lookup", () => {
-		expect(source).toContain("name: codebases.name");
-		expect(source).toContain("eq(codebases.userId, user.id)");
+		expect(snapshotSource).toContain("name: codebases.name");
+		expect(snapshotSource).toContain("eq(codebases.userId, userId)");
 	});
 
 	it("budgets polling separately from the CLI transport it observes", () => {
 		// Polling and the upload transport drawing on one budget let the browser
 		// starve the very uploads it is reporting on.
-		expect(source).toContain("CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION");
-		expect(source).not.toContain("CODEBASE_SYNC_RATE_LIMIT_ACTION");
+		expect(handlerSource).toContain("CODEBASE_SYNC_STATUS_RATE_LIMIT_ACTION");
+		expect(handlerSource).not.toContain("CODEBASE_SYNC_RATE_LIMIT_ACTION");
 	});
 
 	it("reports a persisted CLI preparation failure to the browser", () => {
-		expect(source).toContain("readSyncFailureMetadata(session.metadata)");
+		expect(snapshotSource).toContain(
+			"readSyncFailureMetadata(session.metadata)",
+		);
 	});
 });
 

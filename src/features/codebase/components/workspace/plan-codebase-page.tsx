@@ -53,6 +53,7 @@ export function PlanCodebasePage() {
 		payload,
 		lastStatus,
 		statusPollError,
+		streamNotice,
 		createCodebase,
 		creditStatus,
 		retrySession,
@@ -160,6 +161,7 @@ export function PlanCodebasePage() {
 							isStarting={isStarting}
 							status={lastStatus}
 							statusError={statusPollError}
+							streamNotice={streamNotice}
 							onRequestNewToken={() => void retrySession()}
 							onRetrySync={() => void retrySession()}
 							lockedPrompt={lockedPrompt}

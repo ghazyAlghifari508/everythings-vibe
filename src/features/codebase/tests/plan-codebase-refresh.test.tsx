@@ -420,8 +420,14 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		expect(screen.queryByText("Menunggu agent")).toBeNull();
-		expect(document.querySelectorAll("[data-stage-state]")).toHaveLength(0);
+		// The stage list is live from the first paint, with the agent actively
+		// waiting — and nothing claimed as completed without server evidence.
+		expect(
+			document
+				.querySelector('[data-testid="sync-stage-agent"]')
+				?.getAttribute("data-stage-state"),
+		).toBe("active");
+		expect(screen.queryByText("Agent terhubung")).toBeNull();
 	}, 20000);
 
 	it("maps a retired three-step pointer onto the sync step", async () => {

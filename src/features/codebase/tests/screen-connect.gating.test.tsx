@@ -119,19 +119,21 @@ describe("Step 1 instruction copy", () => {
 });
 
 describe("Step 1 live sync status", () => {
-	it("shows only instruction copy and zero progress rows during waiting_for_cli", () => {
+	it("shows the waiting agent as the active stage as soon as a session exists", () => {
 		renderConnect({ status: status() });
 		expect(container.textContent).toContain("Pantau progres");
 		expect(container.textContent).toContain(
 			"Jalankan prompt dari root repository untuk mulai menyinkronkan codebase.",
 		);
-		expect(container.querySelectorAll("[data-stage-state]")).toHaveLength(0);
-		for (const testId of STAGE_TEST_IDS) {
-			expect(container.querySelector(`[data-testid="${testId}"]`)).toBeNull();
-		}
-		expect(container.textContent).not.toContain("Menunggu agent");
-		expect(container.textContent).not.toContain("Menyiapkan source code");
-		expect(container.textContent).not.toContain("Mengunggah repository");
+		// The first row is a real, current state of this attempt: the session exists
+		// and nothing has contacted the server yet.
+		expect(allStageStates()).toEqual(["active", "waiting", "waiting"]);
+		expect(container.textContent).toContain("Menunggu agent terhubung...");
+		expect(container.textContent).toContain("Menyiapkan source code");
+		expect(container.textContent).toContain("Mengunggah repository");
+		// Nothing is claimed as done before the handshake is persisted.
+		expect(container.textContent).not.toContain("Agent terhubung");
+		expect(allStageStates()).not.toContain("done");
 		expect(container.textContent).not.toContain("Sync ID");
 		expect(container.textContent).not.toContain("Menghubungkan server...");
 	});
@@ -157,7 +159,6 @@ describe("Step 1 live sync status", () => {
 				"Memeriksa file project yang akan disinkronkan.",
 			);
 			expect(container.textContent).toContain("Mengunggah repository");
-			expect(container.textContent).toContain("Sync ID: sess-connect...");
 		}
 	});
 
@@ -238,21 +239,13 @@ describe("Step 1 live sync status", () => {
 		expect(analysisRow?.textContent).not.toContain("Menganalisis repository");
 	});
 
-	it("keeps the attempt identifier as quiet metadata, outside the progress copy", () => {
+	it("never exposes a raw attempt identifier on the progress view", () => {
 		renderConnect({
 			status: status({ sessionId: "sess-abcdef012345", status: "uploading" }),
 		});
-		const syncIdLine = [...container.querySelectorAll("p")].find((p) =>
-			/Sync ID: sess-abcdef0/.test(p.textContent ?? ""),
-		);
-		expect(syncIdLine).toBeDefined();
-		expect(syncIdLine?.className).toContain("text-fog");
-		// It must not be mistaken for a stage description.
-		for (const testId of STAGE_TEST_IDS) {
-			expect(
-				container.querySelector(`[data-testid="${testId}"]`)?.textContent,
-			).not.toContain("Sync ID");
-		}
+		// Internal operation ids are support detail, not progress narrative.
+		expect(container.textContent).not.toContain("sess-abcdef012345");
+		expect(container.textContent).not.toContain("Sync ID");
 	});
 
 	it("renders analysis stage row when snapshot is uploaded and analysisStatus exists", () => {
@@ -406,7 +399,7 @@ describe("Step 1 continue gating", () => {
 			'[data-testid="analysis-failure-alert"]',
 		);
 		expect(alert).not.toBeNull();
-		expect(alert?.textContent).toContain("Analisis codebase belum berhasil");
+		expect(alert?.textContent).toContain("Analisis belum berhasil");
 		expect(alert?.textContent).toContain("Model timeout during analysis.");
 
 		const retryBtn = container.querySelector(

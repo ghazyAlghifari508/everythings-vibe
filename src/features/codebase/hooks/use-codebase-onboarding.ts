@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCodebaseSyncStatus } from "@/features/codebase/hooks/use-codebase-sync-status";
+import { useCodebaseSyncStream } from "@/features/codebase/hooks/use-codebase-sync-stream";
 import {
 	clearPlanCodebaseProjectPointer,
 	type PlanCodebaseStep,
@@ -82,17 +83,37 @@ export function useCodebaseOnboarding({
 	// prompt screen needs the CLI handshake, the sync screen needs the
 	// transport stages, and the conclusion screen needs the persisted
 	// analysis status — all three read this single snapshot, so no two
-	// screens can disagree and no second poller races this one. The loop is
-	// pinned to `activeSessionId`: when the user requests a new token, the id
-	// changes and the poller drops the old snapshot before its first request
-	// for the new session.
-	const { status: lastStatus, error: statusPollError } = useCodebaseSyncStatus({
+	// screens can disagree and no second poller races this one.
+	//
+	// Delivery has two channels that share one projection: the live stream pushes
+	// a real transition as it is persisted, and status polling takes over whenever
+	// the stream cannot be used. Only one of them is ever asked at a time, and
+	// both return the same server snapshot, so the choice can never change what is
+	// rendered — only how fast it arrives.
+	const stream = useCodebaseSyncStream({
 		codebaseId: codebase?.id ?? null,
-		analysisProjectId: analysisState.featureProjectId,
 		sessionId: activeSessionId,
-		initialStatus: recoveredStatus,
+		analysisProjectId: analysisState.featureProjectId,
 		enabled: codebase !== null,
 	});
+	// Polling only stands down once a real frame has landed, so a stream that opens
+	// but never delivers cannot leave the screen without a source.
+	const streamDelivers = stream.connection === "live" && stream.status !== null;
+	const { status: polledStatus, error: statusPollError } =
+		useCodebaseSyncStatus({
+			codebaseId: codebase?.id ?? null,
+			analysisProjectId: analysisState.featureProjectId,
+			sessionId: activeSessionId,
+			initialStatus: recoveredStatus,
+			enabled: codebase !== null && !streamDelivers,
+		});
+	const lastStatus = (streamDelivers ? stream.status : null) ?? polledStatus;
+	// A dropped update channel is reported as a channel problem only. It must
+	// never read as a failed sync, because the persisted attempt is untouched.
+	const streamNotice =
+		stream.connection === "reconnecting"
+			? "Koneksi pembaruan terputus. Menghubungkan kembali..."
+			: null;
 
 	useEffect(() => {
 		setStep("sync");
@@ -272,6 +293,7 @@ export function useCodebaseOnboarding({
 		payload,
 		lastStatus,
 		statusPollError,
+		streamNotice,
 		createCodebase,
 		creditStatus,
 		retrySession,

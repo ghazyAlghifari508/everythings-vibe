@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useCodebaseSyncStream } from "@/features/codebase/hooks/use-codebase-sync-stream";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import {
 	resolveWorkspaceSnapshotIdentity,
@@ -156,6 +157,27 @@ export function useCodebaseSync({
 		);
 		return () => clearInterval(interval);
 	}, [readStatus]);
+
+	// The live stream is used here as an immediate reconcile trigger, not as a
+	// second source of truth: this surface owns its own analysis reconciliation, so
+	// a real transition asks it to reconcile now instead of waiting for the next
+	// poll. Polling keeps running as the reconciler, so a dropped channel cannot
+	// leave the screen stale.
+	const liveStatus = useCodebaseSyncStream({
+		codebaseId,
+		sessionId: activeSessionId,
+		analysisProjectId: projectId,
+	});
+	const lastLiveFrameRef = useRef<string | null>(null);
+	const readStatusRef = useRef(readStatus);
+	readStatusRef.current = readStatus;
+	useEffect(() => {
+		if (!liveStatus.status) return;
+		const fingerprint = JSON.stringify(liveStatus.status);
+		if (lastLiveFrameRef.current === fingerprint) return;
+		lastLiveFrameRef.current = fingerprint;
+		void readStatusRef.current();
+	}, [liveStatus.status]);
 	const startSession = async (
 		action: CodebaseSessionStartAction = "initial",
 	) => {
