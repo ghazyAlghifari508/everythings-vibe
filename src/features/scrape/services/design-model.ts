@@ -127,7 +127,10 @@ export function buildDesignModel(
 		roleClass: entry.roleClass,
 		frequency: entry.token.usage.frequency,
 		rationale: entry.rationale,
-		confidence: entry.userAgentDefault ? "unknown" : "inferred",
+		confidence:
+			entry.userAgentDefault || entry.roleClass === "unknown"
+				? "unknown"
+				: "inferred",
 		userAgentDefault: entry.userAgentDefault,
 		variableNames: entry.token.usage.variableNames,
 		selectors: entry.token.usage.selectors,

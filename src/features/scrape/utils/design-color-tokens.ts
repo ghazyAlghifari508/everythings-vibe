@@ -117,7 +117,7 @@ export function normalizeColors(
 		if (!normalized || normalized.isNoOp) continue;
 		// Key on the opaque identity plus the alpha bucket, so #fff and
 		// rgb(255,255,255) merge while a 50% variant stays distinct.
-		const key = `${normalized.hex}@${normalized.a.toFixed(3)}`;
+		const key = `${normalized.hex}@${normalized.a}`;
 		const context = colorContext(
 			measurement.element.role,
 			measurement.property,
