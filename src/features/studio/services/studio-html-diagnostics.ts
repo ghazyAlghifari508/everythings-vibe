@@ -127,3 +127,64 @@ export function inspectStudioHtml(html: string): {
 		);
 	return { hard: [...new Set(hard)], warnings: [...new Set(warnings)] };
 }
+
+/**
+ * Counts the renderable children of the canonical content region. A nonzero
+ * count before assembly that becomes zero after is a transformation defect,
+ * not an empty screen: the assembly must never discard valid content.
+ */
+export function studioContentNodeCount(html: string): number {
+	const content = new JSDOM(html).window.document.querySelector(
+		"[data-studio-content]",
+	);
+	if (!content) return 0;
+	if (content.children.length > 0) return content.children.length;
+	// A text-only content region is still meaningful content; it must not be
+	// reported as emptied by assembly.
+	return (content.textContent ?? "").trim().length > 0 ? 1 : 0;
+}
+
+const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
+	[/shell must occur exactly once/i, "SHELL_NOT_SINGULAR"],
+	[
+		/navigation identity\/order\/icons\/active state/i,
+		"NAVIGATION_CONTRACT_MISMATCH",
+	],
+	[/app header missing or duplicated/i, "HEADER_INVALID"],
+	[/content region missing or duplicated/i, "CONTENT_REGION_INVALID"],
+	[/canonical shared styling missing or modified/i, "SHELL_STYLE_MODIFIED"],
+	[/status bar/i, "UNEXPECTED_STATUS_BAR"],
+	[/Konten layar kosong setelah/i, "EMPTY_CONTENT_AFTER_ASSEMBLY"],
+	[/Duplicate id:/, "DUPLICATE_ID"],
+	[/Unintended event handler/, "UNSAFE_EVENT_HANDLER"],
+	[/Unintended executable script/, "UNSAFE_SCRIPT"],
+	[/Unsafe embedded document/, "UNSAFE_EMBED"],
+	[/Accessible label missing/, "MISSING_ACCESSIBLE_LABEL"],
+	[/Unexpected autofocus/, "UNEXPECTED_AUTOFOCUS"],
+	[/Unresolved component image asset/, "UNRESOLVED_IMAGE_ASSET"],
+	[/Unresolved SVG component asset/, "UNRESOLVED_SVG_ASSET"],
+	[/Invalid interactive or paragraph nesting/, "INVALID_INTERACTIVE_NESTING"],
+	[/HTML tidak lengkap/, "HTML_INCOMPLETE"],
+	[/Viewport meta hilang/, "VIEWPORT_META_MISSING"],
+	[/Token blueprint bersama hilang/, "BLUEPRINT_TOKENS_MISSING"],
+	[/Token design system hilang/, "DESIGN_TOKENS_MISSING"],
+	[/Label navigasi hilang/, "NAVIGATION_LABEL_MISSING"],
+	[/Urutan navigasi tidak sesuai/, "NAVIGATION_ORDER_MISMATCH"],
+	[/Navigasi ganda/, "DUPLICATE_NAVIGATION"],
+	[/Artefak markdown/, "MARKDOWN_ARTIFACT"],
+	[/Body HTML tidak lengkap/, "HTML_BODY_INCOMPLETE"],
+	[/Body HTML kosong/, "EMPTY_BODY"],
+	[/Lebar tetap melebihi viewport/, "FIXED_WIDTH_OVERFLOW"],
+	[/Posisi fixed tidak diizinkan/, "DISALLOWED_FIXED_POSITION"],
+	[/Posisi sticky tidak diizinkan/, "DISALLOWED_STICKY_POSITION"],
+];
+
+/**
+ * Stable machine code for a validation complaint, so structured logs can
+ * aggregate failures without embedding the (potentially long) message text.
+ */
+export function studioIssueCode(message: string): string {
+	for (const [pattern, code] of ISSUE_CODE_PATTERNS)
+		if (pattern.test(message)) return code;
+	return "UNCLASSIFIED";
+}

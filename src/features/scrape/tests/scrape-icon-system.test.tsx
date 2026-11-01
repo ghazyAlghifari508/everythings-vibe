@@ -17,7 +17,7 @@ import {
 	Image01Icon,
 	InformationCircleIcon,
 	LinkSquare01Icon,
-	Loading03Icon,
+	Loading02Icon,
 	Maximize01Icon,
 	Minimize01Icon,
 	RefreshIcon,
@@ -87,7 +87,11 @@ describe("TASK 10E: Scrape icon system verification", () => {
 	it("renders Scrape progress, status, and preview icons correctly", () => {
 		const { container } = render(
 			<div>
-				<Icon icon={Loading03Icon} size={16} className="animate-spin" />
+				<Icon
+					icon={Loading02Icon}
+					size={16}
+					className="motion-safe:animate-spin"
+				/>
 				<Icon icon={Alert02Icon} size={16} />
 				<Icon icon={Tick01Icon} size={16} />
 				<Icon icon={ViewIcon} size={16} />

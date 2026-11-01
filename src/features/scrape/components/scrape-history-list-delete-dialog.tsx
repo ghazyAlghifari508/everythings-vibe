@@ -1,4 +1,4 @@
-import { Loading03Icon } from "@hugeicons/core-free-icons";
+import { Loading02Icon } from "@hugeicons/core-free-icons";
 import {
 	Dialog,
 	DialogContent,
@@ -66,7 +66,11 @@ export function ScrapeHistoryDeleteDialog({
 						className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-500 disabled:opacity-50"
 					>
 						{deleting ? (
-							<Icon icon={Loading03Icon} size={12} className="animate-spin" />
+							<Icon
+								icon={Loading02Icon}
+								size={12}
+								className="motion-safe:animate-spin"
+							/>
 						) : null}
 						{confirmLabel}
 					</button>

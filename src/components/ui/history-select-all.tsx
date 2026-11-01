@@ -1,4 +1,6 @@
+import { Loading02Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef } from "react";
+import { Icon } from "@/components/ui/icon";
 
 /**
  * Page-level "select all" affordance shared by History surfaces.
@@ -65,9 +67,11 @@ export function HistorySelectAll({
 					className="inline-flex min-h-11 w-fit items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-3 text-xs font-medium text-snow transition-colors hover:border-fog/40 hover:text-snow disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				>
 					{preparing ? (
-						<span
+						<Icon
+							icon={Loading02Icon}
+							size={12}
 							aria-hidden="true"
-							className="size-3 animate-spin rounded-full border border-fog border-t-transparent"
+							className="motion-safe:animate-spin"
 						/>
 					) : null}
 					{preparing

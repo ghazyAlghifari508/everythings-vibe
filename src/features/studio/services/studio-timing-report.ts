@@ -12,6 +12,8 @@ const eventSchema = z.object({
 	skillId: z.string().optional(),
 	skillChars: z.number().nonnegative().optional(),
 	outputTokens: z.number().nonnegative().optional(),
+	maxTokens: z.number().nonnegative().optional(),
+	tokenLimitExceeded: z.boolean().optional(),
 	providerRetries: z.number().nonnegative().optional(),
 	providerFallbacks: z.number().nonnegative().optional(),
 });
@@ -156,6 +158,9 @@ export function summarizeStudioTimings(log: string) {
 			: null,
 		providerRetries,
 		providerFallbacks,
+		tokenLimitExceededCount: events.filter(
+			(event) => event.tokenLimitExceeded === true,
+		).length,
 		gatewayInternalFallbacks: null,
 	};
 }

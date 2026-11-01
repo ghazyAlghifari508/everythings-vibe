@@ -52,7 +52,7 @@ export function resolveScrapePartialResult(input: {
 	const failedLabel =
 		typeof failed === "number" && Number.isFinite(failed) && failed > 0
 			? kind === "images"
-				? `${failed} resource gagal diambil`
+				? `${failed} gambar tidak berhasil diambil`
 				: `${failed} ${unit} gagal diambil`
 			: null;
 	return {

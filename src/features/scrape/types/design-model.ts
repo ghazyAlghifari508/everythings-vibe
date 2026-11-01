@@ -51,6 +51,7 @@ export interface ModelTypeEntry {
 	letterSpacing: string;
 	frequency: number;
 	elementRoles: string[];
+	/** Raw page text for validation only; the displayed specimen is role-based. */
 	sample: string;
 	confidence: Confidence;
 }
@@ -67,7 +68,7 @@ export interface ModelTypeface {
 	declaredFaces: { family: string; weight: string; status: string }[];
 	confidence: Confidence;
 	uncertainty: string | null;
-	/** A real sample rendered in this family, when the capture recorded one. */
+	/** Raw page text for this family; validation only, never a public specimen. */
 	sample: string;
 }
 
@@ -117,21 +118,40 @@ export interface ModelGuideline {
 	evidence: string;
 }
 
+export interface ModelComponentCharacteristic {
+	label: string;
+	value: string;
+}
+
+export interface ModelComponentTreatment {
+	/** Human label for the measured variant, ordered by measured support. */
+	label: string;
+	/** Curated measured properties; noise defaults are already removed. */
+	properties: Record<string, string>;
+	/** Characteristics this variant does not share with the other variants. */
+	characteristics: ModelComponentCharacteristic[];
+	width: number;
+	height: number;
+	samples: number;
+	selectors: string[];
+}
+
 export interface ModelComponent {
-	treatments?: {
-		properties: Record<string, string>;
-		width: number;
-		height: number;
-		samples: number;
-		selectors: string[];
-	}[];
+	treatments?: ModelComponentTreatment[];
 	name: string;
+	/** Semantic purpose of the component class, inferred from its DOM role. */
+	purpose: string;
+	/** Characteristics every measured variant shares. */
+	sharedCharacteristics: ModelComponentCharacteristic[];
+	/** Honest statement of what this component class does not establish. */
 	description: string;
 	evidence: string;
 	frequency: number;
 	roles: string[];
 	/** How many distinct measured treatments this component describes. */
 	treatmentCount: number;
+	/** Evidence-grounded implementation guidance for the component class. */
+	guidance: string[];
 }
 
 export interface ModelGuidelines {

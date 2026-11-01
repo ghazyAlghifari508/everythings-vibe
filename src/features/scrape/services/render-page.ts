@@ -14,6 +14,7 @@ import {
 	SCRAPE_DESKTOP_HEIGHT,
 	SCRAPE_DESKTOP_WIDTH,
 	SCRAPE_MAX_HTML_BYTES,
+	SCRAPE_SCREENSHOT_FULL_PAGE_MAX_HEIGHT,
 } from "@/features/scrape/types/scrape-constants";
 import { SCRAPE_LIMITS } from "@/features/scrape/types/scrape-contract";
 import type { ScrapeInstrumentation } from "@/features/scrape/types/scrape-instrumentation";
@@ -35,6 +36,7 @@ import {
 	autoScroll,
 	collectPageImages,
 	inlineIframes,
+	prepareRenderedDom,
 	type RenderedImage,
 } from "./render-page-helpers";
 
@@ -63,9 +65,10 @@ export const DESKTOP_VIEWPORT = {
 } as const;
 
 const NAV_TIMEOUT_MS = 35_000;
-const IDLE_TIMEOUT_MS = 8_000;
-const POST_SCROLL_IDLE_TIMEOUT_MS = 3_000;
-const SETTLE_MS = 600;
+// ponytail: 6s network-idle ceiling bounds background analytics and continuous asset streams.
+const IDLE_TIMEOUT_MS = 6_000;
+const POST_SCROLL_IDLE_TIMEOUT_MS = 2_500;
+const SETTLE_MS = 300;
 
 export interface RenderedPage {
 	html: string;
@@ -167,21 +170,25 @@ export async function renderPage(
 					() => true,
 				);
 			onTiming?.("firstNetworkIdle", Date.now() - t);
-			await onActivity?.("Memuat konten lazy-load");
-			t = Date.now();
-			await autoScroll(page).catch(() => {});
-			onTiming?.("autoScroll", Date.now() - t);
-			t = Date.now();
-			resourceLoadTimedOut =
-				(await page
-					.waitForLoadState("networkidle", {
-						timeout: POST_SCROLL_IDLE_TIMEOUT_MS,
-					})
-					.then(
-						() => false,
-						() => true,
-					)) || resourceLoadTimedOut;
-			onTiming?.("secondNetworkIdle", Date.now() - t);
+			// Images mode already scans the full DOM with its own discovery pass,
+			// so the scroll sweep only serves design and html captures.
+			if (mode === "design" || mode === "html") {
+				await onActivity?.("Memuat konten lazy-load");
+				t = Date.now();
+				await autoScroll(page).catch(() => {});
+				onTiming?.("autoScroll", Date.now() - t);
+				t = Date.now();
+				resourceLoadTimedOut =
+					(await page
+						.waitForLoadState("networkidle", {
+							timeout: POST_SCROLL_IDLE_TIMEOUT_MS,
+						})
+						.then(
+							() => false,
+							() => true,
+						)) || resourceLoadTimedOut;
+				onTiming?.("secondNetworkIdle", Date.now() - t);
+			}
 			t = Date.now();
 			await page.waitForTimeout(SETTLE_MS);
 			onTiming?.("settle", Date.now() - t);
@@ -229,6 +236,7 @@ export async function renderPage(
 			mode,
 			measureResolution: options.measureResolution,
 		});
+		await prepareRenderedDom(page);
 		let html: string;
 		try {
 			html = await page.content();
@@ -286,9 +294,27 @@ export async function renderPage(
 			(mode === "html" || mode === "design")
 		) {
 			try {
+				// The fallback is the whole page when that stays affordable: a tall page
+				// would otherwise be cropped to its first viewport. Beyond the ceiling a
+				// stitched bitmap would be unreasonably large, so the bounded viewport
+				// shot is kept instead.
+				const pageHeight = await page
+					.evaluate(() =>
+						Math.ceil(
+							Math.max(
+								document.documentElement.scrollHeight,
+								document.body ? document.body.scrollHeight : 0,
+							),
+						),
+					)
+					.catch(() => 0);
+				const fullPage =
+					pageHeight > 0 &&
+					pageHeight <= SCRAPE_SCREENSHOT_FULL_PAGE_MAX_HEIGHT;
 				const buffer = await page.screenshot({
 					type: "jpeg",
-					quality: 85,
+					quality: fullPage ? 80 : 85,
+					...(fullPage ? { fullPage: true } : {}),
 				});
 				screenshot = `data:image/jpeg;base64,${buffer.toString("base64")}`;
 			} catch {

@@ -96,7 +96,7 @@ vi.mock("@/lib/services/ai-orchestrator", () => ({
 		tracker.inFlight--;
 		return {
 			firstChunk:
-				'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><nav>Screen 0 Screen 1 Screen 2</nav></body></html>',
+				'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content><h1>Konten layar</h1><p>Rp 1.000.000</p></main></body></html>',
 			generator: (async function* () {})(),
 		};
 	},

@@ -50,8 +50,12 @@ describe("StudioDesignPickerDialog", () => {
 		expect(
 			screen.getByRole("tab", { name: "Tema" }).getAttribute("aria-selected"),
 		).toBe("true");
-		fireEvent.click(screen.getByRole("button", { name: /Editorial/i }));
-		expect(screen.getByText("Dipilih:")).toBeDefined();
+		const editorialBtn = screen.getByRole("button", { name: /Editorial/i });
+		fireEvent.click(editorialBtn);
+		expect(editorialBtn.getAttribute("aria-pressed")).toBe("true");
+		expect(screen.getByLabelText("Terpilih")).toBeDefined();
+		expect(screen.queryByText("Dipilih:")).toBeNull();
+		expect(screen.queryByText(/Referensi terpilih:/)).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Gunakan Tema" }));
 		expect(onSelectTheme).toHaveBeenCalledWith("editorial");
 		expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -344,5 +348,62 @@ describe("StudioDesignPickerDialog", () => {
 		expect(panel.className).toContain("w-full");
 		expect(panel.className).not.toContain("max-w-2xl");
 		expect(panel.className).not.toContain("mx-auto");
+	});
+
+	it("centers header title, description, and tab controls horizontally while keeping top alignment", () => {
+		renderDialog();
+		const title = screen.getByText("Pilih tampilan");
+		const description = screen.getByText(
+			/Pilih referensi visual untuk proyek desainmu/,
+		);
+		const tablist = screen.getByRole("tablist");
+		const tablistWrapper = tablist.parentElement;
+
+		// Centered copy & tabs
+		expect(title.className).toContain("text-center");
+		expect(description.className).toContain("text-center");
+		expect(tablistWrapper?.className).toContain("justify-center");
+
+		// Header row container retains relative centering without viewport edge pinning
+		const headerRow = title.parentElement?.parentElement;
+		expect(headerRow?.className).toContain("items-center");
+
+		// Dialog content remains top-aligned (no vertical centering)
+		const scroller = screen
+			.getByRole("dialog")
+			.querySelector(".overflow-y-auto");
+		const contentContainer = scroller?.firstElementChild as HTMLElement;
+		expect(contentContainer.className).not.toContain("my-auto");
+		expect(contentContainer.className).not.toContain("justify-center");
+	});
+
+	it("removes redundant selected-reference and Dipilih copy while keeping selection indicator", () => {
+		renderDialog({ selectedThemeId: "midnight" });
+		// No redundant footer or panel summary
+		expect(screen.queryByText(/Referensi terpilih:/)).toBeNull();
+		expect(screen.queryByText(/Dipilih:/)).toBeNull();
+
+		// Selection is visible via check icon and aria-pressed
+		const midnightBtn = screen.getByRole("button", { name: /Midnight/i });
+		expect(midnightBtn.getAttribute("aria-pressed")).toBe("true");
+		expect(screen.getByLabelText("Terpilih")).toBeDefined();
+	});
+
+	it("renders informative miniature silhouettes with consistent aspect ratio across all themes", () => {
+		renderDialog();
+		const themeButtons = [
+			screen.getByRole("button", { name: /Workspace/i }),
+			screen.getByRole("button", { name: /Editorial/i }),
+			screen.getByRole("button", { name: /Midnight/i }),
+		];
+
+		for (const button of themeButtons) {
+			const silhouette = button.querySelector('[aria-hidden="true"]');
+			expect(silhouette).not.toBeNull();
+			// Same aspect ratio across all themes
+			expect(silhouette?.className).toContain("aspect-[16/10]");
+			expect(silhouette?.className).toContain("w-full");
+			expect(silhouette?.className).toContain("overflow-hidden");
+		}
 	});
 });

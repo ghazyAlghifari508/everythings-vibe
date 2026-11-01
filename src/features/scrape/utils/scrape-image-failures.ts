@@ -21,13 +21,13 @@ export const IMAGE_FAILURE_CATEGORIES: Record<
 > = {
 	access_restricted: {
 		key: "access_restricted",
-		label: "Website membatasi akses",
+		label: "Akses tidak tersedia",
 		description: "Website tujuan membatasi atau menolak akses otomatis.",
 		actionHint: "Gunakan URL yang mengizinkan pengambilan aset.",
 	},
 	connection_failed: {
 		key: "connection_failed",
-		label: "Gagal karena gangguan sementara",
+		label: "Gangguan sementara",
 		description: "Koneksi terputus atau website terlalu lama merespons.",
 		actionHint: "Coba lagi beberapa saat lagi.",
 	},
@@ -65,51 +65,10 @@ export function classifyImageFailureCode(
 	code: string | null | undefined,
 	httpStatus: number | null | undefined,
 ): ImageFailureCategoryKey {
-	if (typeof httpStatus === "number" && httpStatus > 0) {
-		if (httpStatus === 429 || httpStatus === 401 || httpStatus === 403) {
-			return "access_restricted";
-		}
-		if (httpStatus === 404 || httpStatus === 410 || httpStatus >= 500) {
-			return "connection_failed";
-		}
-	}
-
-	if (!code) {
-		return "unspecified";
-	}
-
-	const normalized = code.trim().toUpperCase();
+	const normalized = code?.trim().toUpperCase();
 
 	if (
-		[
-			"WEBSITE_RATE_LIMITED",
-			"RATE_LIMITED",
-			"PROXY_RATE_LIMITED",
-			"REMOTE_RATE_LIMITED",
-			"WEBSITE_ACCESS_DENIED",
-			"REMOTE_ACCESS_DENIED",
-		].includes(normalized)
-	) {
-		return "access_restricted";
-	}
-
-	if (
-		["UNSUPPORTED_FORMAT", "UNSUPPORTED_MIME", "INVALID_IMAGE"].includes(
-			normalized,
-		)
-	) {
-		return "format_unsupported";
-	}
-
-	if (
-		["PRIVATE_URL_BLOCKED", "URL_BLOCKED", "REMOTE_REDIRECT_BLOCKED"].includes(
-			normalized,
-		)
-	) {
-		return "security_rejected";
-	}
-
-	if (
+		normalized &&
 		[
 			"STORAGE_FAILED",
 			"SCRAPE_STORAGE_QUOTA",
@@ -122,6 +81,53 @@ export function classifyImageFailureCode(
 		].includes(normalized)
 	) {
 		return "storage_failed";
+	}
+
+	if (
+		normalized &&
+		[
+			"PRIVATE_URL_BLOCKED",
+			"URL_BLOCKED",
+			"REMOTE_REDIRECT_BLOCKED",
+			"UNSAFE_SVG",
+		].includes(normalized)
+	) {
+		return "security_rejected";
+	}
+
+	if (
+		normalized &&
+		["UNSUPPORTED_FORMAT", "UNSUPPORTED_MIME", "INVALID_IMAGE"].includes(
+			normalized,
+		)
+	) {
+		return "format_unsupported";
+	}
+
+	if (typeof httpStatus === "number" && httpStatus > 0) {
+		if (httpStatus === 429 || httpStatus === 401 || httpStatus === 403) {
+			return "access_restricted";
+		}
+		if (httpStatus === 404 || httpStatus === 410 || httpStatus >= 500) {
+			return "connection_failed";
+		}
+	}
+
+	if (!normalized) {
+		return "unspecified";
+	}
+
+	if (
+		[
+			"WEBSITE_RATE_LIMITED",
+			"RATE_LIMITED",
+			"PROXY_RATE_LIMITED",
+			"REMOTE_RATE_LIMITED",
+			"WEBSITE_ACCESS_DENIED",
+			"REMOTE_ACCESS_DENIED",
+		].includes(normalized)
+	) {
+		return "access_restricted";
 	}
 
 	if (

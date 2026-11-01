@@ -13,6 +13,7 @@ import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
+import { STUDIO_ADD_FRAME_PLACEHOLDER_NAME } from "./studio-composer-intent";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import { generateValidatedFrameHtml } from "./studio-frame-generation";
 import { type StudioJobClaim, withStudioJobWrite } from "./studio-job-lease";
@@ -79,7 +80,12 @@ export async function runStudioFrameOperation(
 		.orderBy(asc(studioJobs.createdAt))
 		.limit(1);
 	let name = frame.name;
-	if (job.jobType === "add") {
+	// Only an unnamed add asks the model to name it; a name the composer already
+	// resolved from the instruction stays untouched.
+	if (
+		job.jobType === "add" &&
+		frame.name === STUDIO_ADD_FRAME_PLACEHOLDER_NAME
+	) {
 		const namingStartedAt = Date.now();
 		const { generator, firstChunk } = await tryStreamWithFallback(
 			selectModels(),

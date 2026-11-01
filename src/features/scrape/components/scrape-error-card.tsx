@@ -1,6 +1,10 @@
 "use client";
 
-import { Alert02Icon, RefreshIcon } from "@hugeicons/core-free-icons";
+import {
+	Alert02Icon,
+	Loading02Icon,
+	RefreshIcon,
+} from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/icon";
@@ -131,10 +135,14 @@ export function ScrapeErrorCard({
 						className="inline-flex min-h-11 items-center gap-2 rounded-full border border-graphite px-4 text-sm text-snow transition-colors hover:border-steel hover:bg-onyx focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-graphite disabled:hover:bg-transparent"
 					>
 						<Icon
-							icon={RefreshIcon}
+							icon={isRetrying ? Loading02Icon : RefreshIcon}
 							size={16}
 							aria-hidden
-							className={isRetrying ? "motion-safe:animate-spin" : undefined}
+							className={
+								isRetrying
+									? "motion-safe:animate-spin motion-reduce:animate-none"
+									: undefined
+							}
 						/>
 						{isRetrying ? "Mencoba lagi..." : "Coba lagi"}
 					</button>

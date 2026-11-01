@@ -80,14 +80,44 @@ export function safeMime(
 		return mime;
 	if (mime === "text/css") return mime;
 	if (JS_MIME.test(mime)) return "text/javascript";
-	if (mime === "application/octet-stream") {
+	// ponytail: sniff binary/octet-stream by signature and URL extension to classify CDN fonts, images, and modules accurately.
+	if (
+		mime === "application/octet-stream" ||
+		mime === "binary/octet-stream" ||
+		mime === "application/x-download"
+	) {
 		const signature = body.toString("ascii", 0, 4);
 		if (signature === "wOF2") return "font/woff2";
 		if (signature === "wOFF") return "font/woff";
 		if (signature === "OTTO") return "font/otf";
 		if (body[0] === 0 && body[1] === 1 && body[2] === 0 && body[3] === 0)
 			return "font/ttf";
+		if (signature === "ttcf") return "font/collection";
+		if (
+			body[0] === 0x89 &&
+			body[1] === 0x50 &&
+			body[2] === 0x4e &&
+			body[3] === 0x47
+		)
+			return "image/png";
+		if (body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff)
+			return "image/jpeg";
+		if (body.toString("ascii", 0, 3) === "GIF") return "image/gif";
+		if (
+			body.toString("ascii", 0, 4) === "RIFF" &&
+			body.toString("ascii", 8, 12) === "WEBP"
+		)
+			return "image/webp";
 		if (/\.(?:mjs|js)(?:$|[?#])/i.test(target)) return "text/javascript";
+		if (/\.woff2(?:$|[?#])/i.test(target)) return "font/woff2";
+		if (/\.woff(?:$|[?#])/i.test(target)) return "font/woff";
+		if (/\.ttf(?:$|[?#])/i.test(target)) return "font/ttf";
+		if (/\.otf(?:$|[?#])/i.test(target)) return "font/otf";
+		if (/\.svg(?:$|[?#])/i.test(target)) return "image/svg+xml";
+		if (/\.png(?:$|[?#])/i.test(target)) return "image/png";
+		if (/\.jpe?g(?:$|[?#])/i.test(target)) return "image/jpeg";
+		if (/\.webp(?:$|[?#])/i.test(target)) return "image/webp";
+		if (/\.css(?:$|[?#])/i.test(target)) return "text/css";
 	}
 	return null;
 }

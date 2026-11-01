@@ -262,16 +262,16 @@ describe("DesignSystemInspector", () => {
 
 	it("renders a display specimen at its measured size instead of flattening it", () => {
 		renderInspector();
-		const specimens = screen.getAllByText("Pricing that scales with your team");
+		const specimens = screen.getAllByText("Design starts here");
 		// The type scale row carries the measured size and weight; the typeface
-		// card carries the family. Both show the real page sample.
+		// card carries the family. Both use the neutral Display specimen.
 		const scaleSpecimen = specimens.find(
 			(node) => (node as HTMLElement).style.fontWeight === "700",
 		);
 		expect(scaleSpecimen).toBeDefined();
 		expect((scaleSpecimen as HTMLElement).style.fontSize).toBe("48px");
 		const bodySpecimen = screen.getByText(
-			"Start free and upgrade when the team is ready.",
+			"The quick brown fox jumps over the lazy dog.",
 		);
 		expect(bodySpecimen.style.fontSize).toBe("16px");
 	});
@@ -286,19 +286,18 @@ describe("DesignSystemInspector", () => {
 				{ ...displayEntry, role: "Display", size: "96px", sizePx: 96 },
 			],
 		});
-		const specimen = screen.getByText("Pricing that scales with your team");
+		const specimen = screen.getByText("Design starts here");
 		expect(specimen.style.fontSize).toBe("48px");
 		expect(screen.getByText(/ukuran terukur 96px/i)).toBeDefined();
 	});
 
-	it("uses the real page sample rather than a fabricated sentence", () => {
+	it("keeps the captured page copy out of the rendered specimens", () => {
 		renderInspector();
+		expect(screen.queryByText("Pricing that scales with your team")).toBeNull();
 		expect(
-			screen.getAllByText("Pricing that scales with your team").length,
-		).toBeGreaterThan(0);
-		expect(
-			screen.queryByText("The quick brown fox jumps over the lazy dog"),
+			screen.queryByText("Start free and upgrade when the team is ready."),
 		).toBeNull();
+		expect(screen.getAllByText("Design starts here").length).toBeGreaterThan(0);
 	});
 
 	it("renders a typeface inspector with real measured metrics", () => {
@@ -688,7 +687,7 @@ describe("task E inspector composition", () => {
 	it("displays letter-spacing without claiming it is applied", () => {
 		renderInspector();
 		const specimen = screen.getByText(
-			"Start free and upgrade when the team is ready.",
+			"The quick brown fox jumps over the lazy dog.",
 		);
 		expect((specimen as HTMLElement).style.letterSpacing).toBe("");
 		expect(screen.getByText("48px · w700 · lh 1.1 · ls -2px")).toBeDefined();
@@ -796,9 +795,13 @@ describe("phase 6 inspector overhaul", () => {
 			components: [
 				{
 					name: "Navigasi",
+					purpose: "Navigasi utama situs.",
 					description: "Bar atas dengan tautan primer.",
 					evidence: "Terukur pada 3 elemen.",
 					frequency: 3,
+					sharedCharacteristics: [],
+					variants: [],
+					guidance: [],
 				},
 			],
 		});

@@ -2,11 +2,11 @@ import {
 	AlertCircleIcon,
 	Cursor01Icon,
 	HandIcon,
-	RotateLeft01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import { ZoomControls } from "@/components/ui/zoom-controls";
 import type { StudioJobRow } from "@/db/schema";
+import { StudioFrameRetryButton } from "@/features/studio/components/canvas/studio-frame-error";
 import { resolveStudioQueueHealth } from "@/features/studio/types/studio-status";
 import { canvasZoomRowBottomCss } from "@/features/studio/utils/studio-canvas-layout";
 
@@ -84,7 +84,7 @@ export function StudioCanvasZoomCorner({
 				onZoomIn={onZoomIn}
 				onZoomOut={onZoomOut}
 				onReset={onFit}
-				resetLabel="Sesuaikan tampilan"
+				resetLabel="Tampilkan semua frame"
 			/>
 		</div>
 	);
@@ -163,14 +163,7 @@ export function StudioCanvasPlanningFailure({
 				{error || "AI tidak dapat menyusun rencana layar untuk topik ini."}
 			</p>
 			{onRetryPlanning && (
-				<button
-					type="button"
-					onClick={onRetryPlanning}
-					className="inline-flex items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-3 py-1.5 text-xs font-semibold text-snow transition-colors hover:bg-steel"
-				>
-					<Icon icon={RotateLeft01Icon} size={13} />
-					<span>Coba lagi</span>
-				</button>
+				<StudioFrameRetryButton label="Coba lagi" onRetry={onRetryPlanning} />
 			)}
 		</div>
 	);

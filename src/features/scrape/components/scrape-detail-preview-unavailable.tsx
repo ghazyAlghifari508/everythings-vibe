@@ -1,6 +1,6 @@
 import {
 	Alert02Icon,
-	Loading01Icon,
+	Loading02Icon,
 	RefreshIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
@@ -29,7 +29,7 @@ export function PreviewUnavailable({
 		>
 			{isLoading ? (
 				<Icon
-					icon={Loading01Icon}
+					icon={Loading02Icon}
 					size={20}
 					aria-hidden
 					className="text-fog motion-safe:animate-spin motion-reduce:animate-none"

@@ -48,13 +48,14 @@ export async function retryDesignSynthesis(
 	scrapeId: string,
 	userId: string,
 ): Promise<ScrapeDocumentRow> {
-	const running = enrichmentRetryInflight.get(scrapeId);
+	const key = JSON.stringify([userId, scrapeId]);
+	const running = enrichmentRetryInflight.get(key);
 	if (running) return running;
 	const task = runEnrichmentRetry(scrapeId, userId).finally(() => {
-		if (enrichmentRetryInflight.get(scrapeId) === task)
-			enrichmentRetryInflight.delete(scrapeId);
+		if (enrichmentRetryInflight.get(key) === task)
+			enrichmentRetryInflight.delete(key);
 	});
-	enrichmentRetryInflight.set(scrapeId, task);
+	enrichmentRetryInflight.set(key, task);
 	return task;
 }
 

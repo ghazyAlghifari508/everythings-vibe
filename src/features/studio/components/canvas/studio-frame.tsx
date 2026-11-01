@@ -2,12 +2,15 @@ import {
 	AlertCircleIcon,
 	ComputerIcon,
 	Loading03Icon,
-	RotateLeft01Icon,
 	SmartPhone01Icon,
 } from "@hugeicons/core-free-icons";
 import { memo, useRef } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { StudioFrameRow } from "@/db/schema";
+import {
+	StudioFrameErrorPanel,
+	StudioFrameStatusStrip,
+} from "@/features/studio/components/canvas/studio-frame-error";
 import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
 import { useStudioFrameVisual } from "@/features/studio/hooks/use-studio-frame-visual";
 import { studioJobTiming } from "@/features/studio/services/studio-timing";
@@ -27,9 +30,20 @@ export interface StudioFrameProps {
 	isSelected?: boolean;
 	onSelect?: (frameId: string, additive?: boolean) => void;
 	onRetry?: (frameId: string) => void;
+	/** A retry request for this frame is in flight; the button is disabled. */
+	isRetryPending?: boolean;
+	/** The last retry request was rejected; shown inside this frame only. */
+	retryError?: string;
 	isCanvasPanning?: boolean;
 	className?: string;
 	onMeasure?: (id: string, width: number, height: number) => void;
+}
+
+function frameStatusMessage(status: string, retryError?: string): string {
+	if (status === "failed")
+		return retryError || "Perubahan belum berhasil diterapkan.";
+	if (status === "queued") return "Menunggu antrean pembaruan.";
+	return "Sedang menerapkan perubahan.";
 }
 
 /**
@@ -38,6 +52,10 @@ export interface StudioFrameProps {
  * generating, a quiet static dot while it waits in the queue, and a small
  * error affordance when generation failed. Queued and generating stay
  * distinguishable for assistive technology through their text alternatives.
+ *
+ * Recovery lives inside the failed artboard instead of the header, so the frame
+ * keeps exactly one retry control. A frame that already has HTML keeps that
+ * preview while a new version is built or after it failed.
  *
  * Memoized: status polling replaces the frame array every tick, so without a
  * stable render boundary every artboard would re-render (and re-run its HTML
@@ -49,6 +67,8 @@ export const StudioFrame = memo(function StudioFrame({
 	isSelected = false,
 	onSelect,
 	onRetry,
+	isRetryPending = false,
+	retryError,
 	isCanvasPanning = false,
 	className = "",
 	onMeasure,
@@ -78,6 +98,10 @@ export const StudioFrame = memo(function StudioFrame({
 		hasVisual: visual !== null,
 		hasVisualError: Boolean(visualError),
 	});
+	const retry = onRetry ? () => onRetry(frame.id) : undefined;
+	const showsPreview =
+		(artboardMode === "preview" || artboardMode === "last-good") &&
+		visual !== null;
 
 	return (
 		<article
@@ -129,22 +153,6 @@ export const StudioFrame = memo(function StudioFrame({
 						/>
 					) : null}
 				</div>
-
-				{frame.status === "failed" && onRetry ? (
-					<button
-						type="button"
-						onClick={(event) => {
-							event.stopPropagation();
-							onRetry(frame.id);
-						}}
-						aria-label={`Coba lagi generate ${frame.name}`}
-						title={`Coba lagi generate ${frame.name}`}
-						className="inline-flex shrink-0 items-center gap-1 rounded-md border border-crimson/40 px-1.5 py-0.5 text-xs font-medium text-crimson transition-colors hover:bg-crimson/10"
-					>
-						<Icon icon={RotateLeft01Icon} size={11} />
-						<span>Coba lagi</span>
-					</button>
-				) : null}
 			</div>
 
 			{/* Frame Content Box */}
@@ -158,7 +166,7 @@ export const StudioFrame = memo(function StudioFrame({
 				} bg-obsidian`}
 				style={{ width: visual?.width ?? frameWidth, height: frameHeight }}
 			>
-				{artboardMode === "preview" && visual ? (
+				{showsPreview && visual ? (
 					<button
 						type="button"
 						aria-label={`Pilih frame ${frame.name}`}
@@ -193,72 +201,50 @@ export const StudioFrame = memo(function StudioFrame({
 						/>
 					</button>
 				) : artboardMode === "visual-error" ? (
-					<div className="flex size-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-fog">
-						<p role="alert">{visualError}</p>
-						<button
-							type="button"
-							onClick={retryVisual}
-							className="rounded-lg border border-iron px-3 py-2 text-snow"
-						>
-							Coba lagi visual
-						</button>
-					</div>
+					<StudioFrameErrorPanel
+						title="Pratinjau belum muncul"
+						description={visualError}
+						actionLabel="Muat ulang pratinjau"
+						onAction={retryVisual}
+					/>
 				) : artboardMode === "generation-failed" ? (
-					<div className="flex size-full flex-col items-center justify-center gap-3 p-6 text-center">
-						<Icon icon={AlertCircleIcon} size={20} className="text-crimson" />
-						<div className="space-y-1">
-							<p className="text-sm font-semibold text-snow">
-								Gagal menggenerate layar
-							</p>
-							<p className="max-w-xs text-xs text-fog">
-								{frame.error || "Terjadi kesalahan saat memproses prompt."}
-							</p>
-						</div>
-						{onRetry ? (
-							<button
-								type="button"
-								onClick={(event) => {
-									event.stopPropagation();
-									onRetry(frame.id);
-								}}
-								className="inline-flex items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-4 py-1.5 text-xs font-semibold text-snow hover:bg-onyx"
-							>
-								<Icon icon={RotateLeft01Icon} size={13} />
-								<span>Coba lagi</span>
-							</button>
-						) : null}
-					</div>
+					<StudioFrameErrorPanel
+						title="Halaman belum berhasil dibuat"
+						description={
+							retryError ||
+							frame.error ||
+							"Ada kendala saat membuat halaman ini."
+						}
+						actionLabel="Coba lagi"
+						onAction={retry}
+						actionPending={isRetryPending}
+					/>
 				) : artboardMode === "preview-unavailable" ? (
 					// Ready but no renderable HTML: a real terminal failure, never
 					// an endless shimmer.
-					<div className="flex size-full flex-col items-center justify-center gap-3 p-6 text-center">
-						<Icon icon={AlertCircleIcon} size={20} className="text-crimson" />
-						<div className="space-y-1">
-							<p className="text-sm font-semibold text-snow">
-								Pratinjau tidak tersedia
-							</p>
-							<p className="max-w-xs text-xs text-fog">
-								HTML layar ini tidak tersimpan, jadi pratinjau tidak bisa
-								ditampilkan.
-							</p>
-						</div>
-						{onRetry ? (
-							<button
-								type="button"
-								onClick={(event) => {
-									event.stopPropagation();
-									onRetry(frame.id);
-								}}
-								className="inline-flex items-center gap-1.5 rounded-lg border border-graphite bg-charcoal px-4 py-1.5 text-xs font-semibold text-snow hover:bg-onyx"
-							>
-								<Icon icon={RotateLeft01Icon} size={13} />
-								<span>Generate ulang</span>
-							</button>
-						) : null}
-					</div>
+					<StudioFrameErrorPanel
+						title="Pratinjau tidak tersedia"
+						description={
+							retryError ||
+							"HTML layar ini tidak tersimpan, jadi pratinjau tidak bisa ditampilkan."
+						}
+						actionLabel="Generate ulang"
+						onAction={retry}
+						actionPending={isRetryPending}
+					/>
 				) : (
 					<StudioFrameShimmer viewport={frame.viewport} status={frame.status} />
 				)}
+
+				{artboardMode === "last-good" ? (
+					<StudioFrameStatusStrip
+						message={frameStatusMessage(frame.status, retryError)}
+						tone={frame.status === "failed" ? "danger" : "progress"}
+						actionLabel={frame.status === "failed" ? "Coba lagi" : undefined}
+						onAction={frame.status === "failed" ? retry : undefined}
+						actionPending={isRetryPending}
+					/>
+				) : null}
 			</div>
 		</article>
 	);

@@ -52,6 +52,15 @@ describe("renderDesignMd", () => {
 		expect(bodyRows.length).toBeLessThanOrEqual(1);
 	});
 
+	it("never writes the captured page copy into the document", () => {
+		for (const text of [
+			"Pricing that scales with your team",
+			"Every plan includes the full component library.",
+			"Trusted by product teams",
+		])
+			expect(markdown).not.toContain(text);
+	});
+
 	it("keeps every colour value a valid CSS colour", () => {
 		for (const color of model.colors)
 			expect(isValidCssColor(color.value)).toBe(true);

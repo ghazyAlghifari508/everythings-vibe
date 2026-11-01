@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	isFrameVisualPending,
@@ -8,6 +14,32 @@ import {
 } from "@/features/studio/components/canvas/studio-frame";
 import { StudioFrameShimmer } from "@/features/studio/components/canvas/studio-frame-shimmer";
 import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
+
+/**
+ * Serves the preview endpoint so a frame with stored HTML reaches its captured
+ * visual in jsdom. Without a capture the artboard stays on the pending state,
+ * which is not what these assertions are about.
+ */
+function stubFrameVisual(frameId?: string) {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (input: RequestInfo | URL) => {
+			const url = String(input);
+			if (frameId && !url.includes(`frameId=${frameId}`))
+				return new Response("not found", { status: 404 });
+			return Response.json({
+				url: "/api/studio/asset?id=preview",
+				width: STUDIO_VISUAL_WIDTH.mobile,
+				height: 800,
+			});
+		}),
+	);
+}
+
+afterEach(() => {
+	cleanup();
+	vi.unstubAllGlobals();
+});
 
 describe("StudioFrameShimmer", () => {
 	afterEach(() => cleanup());
@@ -131,6 +163,47 @@ describe("resolveFrameArtboardMode", () => {
 				hasVisualError: false,
 			}),
 		).toBe("generation-failed");
+	});
+
+	it("keeps the last good preview after a failed revision", () => {
+		expect(
+			resolveFrameArtboardMode({
+				status: "failed",
+				hasRenderableHtml: true,
+				hasVisual: true,
+				hasVisualError: false,
+			}),
+		).toBe("last-good");
+	});
+
+	it("keeps the last good preview while the new version is still building", () => {
+		expect(
+			resolveFrameArtboardMode({
+				status: "queued",
+				hasRenderableHtml: true,
+				hasVisual: true,
+				hasVisualError: false,
+			}),
+		).toBe("last-good");
+		expect(
+			resolveFrameArtboardMode({
+				status: "generating",
+				hasRenderableHtml: true,
+				hasVisual: true,
+				hasVisualError: false,
+			}),
+		).toBe("last-good");
+	});
+
+	it("never hides a failed revision behind a missing capture", () => {
+		expect(
+			resolveFrameArtboardMode({
+				status: "failed",
+				hasRenderableHtml: true,
+				hasVisual: false,
+				hasVisualError: true,
+			}),
+		).toBe("visual-error");
 	});
 });
 
@@ -350,7 +423,7 @@ describe("StudioFrame", () => {
 		expect(onSelect).toHaveBeenCalledWith("f-3", false);
 	});
 
-	it("renders failed state with retry button and no shimmer", () => {
+	it("renders a frame-local failure with a circular retry arrow", () => {
 		const onRetry = vi.fn();
 		const { container } = render(
 			<StudioFrame
@@ -358,7 +431,7 @@ describe("StudioFrame", () => {
 					id: "f-4",
 					name: "Failed Frame",
 					status: "failed",
-					error: "AI limit",
+					error: "Permintaan sedang padat. Coba lagi sebentar lagi.",
 				})}
 				isSelected={false}
 				onSelect={vi.fn()}
@@ -367,12 +440,132 @@ describe("StudioFrame", () => {
 			/>,
 		);
 
-		expect(screen.getAllByText(/Gagal/i).length).toBeGreaterThanOrEqual(1);
+		expect(screen.getByRole("alert")).toBeDefined();
+		expect(screen.getByText("Halaman belum berhasil dibuat")).toBeDefined();
+		expect(
+			screen.getByText("Permintaan sedang padat. Coba lagi sebentar lagi."),
+		).toBeDefined();
 		expect(
 			container.querySelector('[data-testid="mobile-shimmer"]'),
 		).toBeNull();
-		const retryBtn = screen.getAllByRole("button", { name: /Coba lagi/i })[0];
+		const retryBtn = screen.getByRole("button", { name: /Coba lagi/i });
+		expect(retryBtn.getAttribute("aria-busy")).toBe("false");
 		fireEvent.click(retryBtn);
 		expect(onRetry).toHaveBeenCalledWith("f-4");
+	});
+
+	it("disables the retry control and reports pending while a retry is in flight", () => {
+		const onRetry = vi.fn();
+		render(
+			<StudioFrame
+				frame={frame({ id: "f-5", status: "failed" })}
+				isSelected={false}
+				onSelect={vi.fn()}
+				onRetry={onRetry}
+				isRetryPending
+				isCanvasPanning={false}
+			/>,
+		);
+
+		const retryBtn = screen.getByRole("button", { name: /Memproses/i });
+		expect(retryBtn.getAttribute("aria-busy")).toBe("true");
+		expect((retryBtn as HTMLButtonElement).disabled).toBe(true);
+		fireEvent.click(retryBtn);
+		expect(onRetry).not.toHaveBeenCalled();
+	});
+
+	it("keeps the last good preview and reports the rejected retry inside the frame", async () => {
+		stubFrameVisual("f-6");
+		const onRetry = vi.fn();
+		const { container } = render(
+			<StudioFrame
+				frame={frame({
+					id: "f-6",
+					status: "failed",
+					htmlCode: "<html><body>Last good</body></html>",
+				})}
+				isSelected={false}
+				onSelect={vi.fn()}
+				onRetry={onRetry}
+				retryError="Permintaan sedang padat. Coba lagi sebentar lagi."
+				isCanvasPanning={false}
+			/>,
+		);
+
+		await waitFor(() => expect(screen.getByRole("img")).toBeDefined());
+		expect(
+			container.querySelector('[data-testid="mobile-shimmer"]'),
+		).toBeNull();
+		expect(screen.getByRole("alert").textContent).toContain(
+			"Permintaan sedang padat. Coba lagi sebentar lagi.",
+		);
+		fireEvent.click(screen.getByRole("button", { name: /Coba lagi/i }));
+		expect(onRetry).toHaveBeenCalledWith("f-6");
+	});
+
+	it("keeps the last good preview while the revision is still generating", async () => {
+		stubFrameVisual("f-7");
+		const { container } = render(
+			<StudioFrame
+				frame={frame({
+					id: "f-7",
+					status: "generating",
+					htmlCode: "<html><body>Last good</body></html>",
+				})}
+				isSelected={false}
+				onSelect={vi.fn()}
+				onRetry={vi.fn()}
+				isCanvasPanning={false}
+			/>,
+		);
+
+		await waitFor(() => expect(screen.getByRole("img")).toBeDefined());
+		expect(
+			container.querySelector('[data-testid="mobile-shimmer"]'),
+		).toBeNull();
+		expect(screen.getByText("Sedang menerapkan perubahan.")).toBeDefined();
+		expect(screen.queryByRole("button", { name: /Coba lagi/i })).toBeNull();
+	});
+
+	it("leaves an unrelated ready frame untouched while another frame retries", async () => {
+		stubFrameVisual();
+		render(
+			<>
+				<StudioFrame
+					frame={frame({
+						id: "retrying",
+						name: "Profile",
+						status: "queued",
+						htmlCode: "<html><body>Profile</body></html>",
+					})}
+					isSelected={false}
+					onSelect={vi.fn()}
+					onRetry={vi.fn()}
+					isCanvasPanning={false}
+				/>
+				<StudioFrame
+					frame={frame({
+						id: "ready",
+						name: "Dashboard",
+						status: "ready",
+						htmlCode: "<html><body>Dashboard</body></html>",
+					})}
+					isSelected={false}
+					onSelect={vi.fn()}
+					isCanvasPanning={false}
+				/>
+			</>,
+		);
+
+		await waitFor(() =>
+			expect(screen.getAllByRole("img").length).toBeGreaterThanOrEqual(2),
+		);
+		// Only the frame with work in flight reports status; the ready frame keeps
+		// its preview without a strip.
+		expect(screen.getAllByText("Menunggu antrean pembaruan.").length).toBe(1);
+		expect(screen.queryByText("Sedang menerapkan perubahan.")).toBeNull();
+		expect(
+			screen.queryByText("Perubahan belum berhasil diterapkan."),
+		).toBeNull();
 	});
 });

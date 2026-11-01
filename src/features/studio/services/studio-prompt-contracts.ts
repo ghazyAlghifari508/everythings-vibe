@@ -15,6 +15,9 @@ export const MOBILE_PLATFORM_CONTRACT = `Target platform: Mobile Application Exp
 - Provide a bottom navigation tab bar (with icons and labels) highlighting the active screen, placed in normal document flow at the end of the document so it renders at the bottom of the full page. This artboard is a static full-page preview: a bottom-anchored fixed or sticky bar would be painted at the viewport edge in the middle of the page, so do not use position: fixed or position: sticky for the tab bar.
 - Reserve space for the bottom navigation: main content needs padding-bottom so nothing hides behind the tab bar; account for env(safe-area-inset-bottom) where relevant.
 - Ensure all clickable touch targets have a minimum height/width of 44px.
+- Keep each control self-contained: a currency prefix, leading icon, value, and trailing chevron share one non-wrapping row; never let a prefix, value, or chevron wrap onto its own line.
+- Group a metric with its label, value, and supporting stats inside one card; do not emit loose label/value lines that stack as plain text.
+- A task screen must be complete: include every field, any step context, and the primary action the task needs. One lone form row is not a finished screen.
 - Use mobile-first interaction patterns: card stacks, segmented switchers, and compact stat rows.
 - Use fluid sizing: max-width: 100% on all sections, images, and tables; never use fixed pixel widths larger than the viewport; avoid unintended horizontal overflow (no overflow-x scroll on the page).
 - Keep the layout free of overlapping layers: reserve vertical space instead of stacking elements on top of each other.

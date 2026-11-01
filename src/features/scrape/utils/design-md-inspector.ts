@@ -3,6 +3,7 @@ import {
 	type DesignTokenModel,
 	MODEL_VERSION,
 } from "../services/design-model";
+import { inferTheme } from "../services/design-model-observation";
 import {
 	designIssues,
 	designMdVersionOf,
@@ -41,7 +42,7 @@ export interface InspectorTypeEntry {
 	lineHeight: string;
 	letterSpacing: string;
 	frequency: number;
-	/** A real sample taken from the measured page. */
+	/** Raw page text for validation only; the displayed specimen is role-based. */
 	sample: string;
 }
 
@@ -56,7 +57,7 @@ export interface InspectorTypeface {
 	loadedEvidence: boolean;
 	declaredFaces: { family: string; weight: string; status: string }[];
 	uncertainty: string | null;
-	/** A real sample rendered in this family, when the capture recorded one. */
+	/** Raw page text for this family; validation only, never a public specimen. */
 	sample: string;
 }
 
@@ -94,11 +95,29 @@ export interface InspectorGuideline {
 	evidence: string;
 }
 
+export interface InspectorComponentCharacteristic {
+	label: string;
+	value: string;
+}
+
+export interface InspectorComponentVariant {
+	label: string;
+	samples: number;
+	characteristics: InspectorComponentCharacteristic[];
+}
+
 export interface InspectorComponent {
 	name: string;
+	/** Semantic purpose inferred from the measured DOM role. */
+	purpose: string;
+	/** What this component class does not establish. */
 	description: string;
 	evidence: string;
 	frequency: number;
+	/** Characteristics every measured variant shares. */
+	sharedCharacteristics: InspectorComponentCharacteristic[];
+	variants: InspectorComponentVariant[];
+	guidance: string[];
 }
 
 export interface DesignInspectorModel {
@@ -298,15 +317,102 @@ export function inspectorFromModel(
 		})),
 		components: (model.observedComponents ?? []).map((component) => ({
 			name: component.name,
+			purpose: component.purpose,
 			description: component.description,
 			evidence: component.evidence,
 			frequency: component.frequency,
+			sharedCharacteristics: component.sharedCharacteristics,
+			variants: (component.treatments ?? []).map((treatment) => ({
+				label: treatment.label,
+				samples: treatment.samples,
+				characteristics: treatment.characteristics,
+			})),
+			guidance: component.guidance,
 		})),
 		baseUnitPx: model.baseUnitPx,
 		dos: model.guidelines.dos,
 		donts: model.guidelines.donts,
 		limitations: model.limitations,
 	};
+}
+
+export interface DesignThemeDocument {
+	theme: "light" | "dark";
+	designMd: string;
+}
+
+// Viewer-only per-theme documents, derived from the same verified captures as
+// the canonical document. A theme is listed only when its capture rendered
+// that appearance; a requested preference that rendered the other appearance
+// stays a limitation in the combined document and never becomes a tab.
+// The filtered text keeps shared sections plus the matching theme scope, so
+// responsive scope labels inside the active theme are preserved.
+export function resolveThemeDocuments(
+	value: unknown,
+	document?: string,
+): DesignThemeDocument[] | undefined {
+	const evidence = parseVisualEvidence(value);
+	if (!evidence || !evidence.additionalViews?.length) return undefined;
+	if (document !== undefined) {
+		if (isCurrentModelDocument(document)) {
+			if (!documentMatchesEvidence(document, evidence)) return undefined;
+		} else if (designIssues(document, evidence).length) {
+			return undefined;
+		}
+	}
+	const observedByCapture = [evidence, ...evidence.additionalViews].map(
+		(view) => inferTheme(view),
+	);
+	const hasLight = observedByCapture.includes("light");
+	const hasDark = observedByCapture.includes("dark");
+	if (!hasLight || !hasDark) return undefined;
+	const light = filterDesignMdByTheme(document ?? "", "light");
+	const dark = filterDesignMdByTheme(document ?? "", "dark");
+	if (!light || !dark) return undefined;
+	return [
+		{ theme: "light", designMd: light },
+		{ theme: "dark", designMd: dark },
+	];
+}
+
+export function filterDesignMdByTheme(
+	document: string,
+	theme: "light" | "dark",
+): string | undefined {
+	const lines = document.split("\n");
+	const out: string[] = [];
+	let currentScope: "shared" | "light" | "dark" | null = null;
+	let sawThemeScope = false;
+	for (const line of lines) {
+		const heading = line.match(/^#{2,4}\s+(.*)$/);
+		if (heading) {
+			const title = (heading[1] ?? "").toLowerCase();
+			if (/^capture \d+/.test(title)) {
+				const scope = themeScopeForLabel(title);
+				currentScope = scope;
+				if (scope === theme) {
+					sawThemeScope = true;
+					out.push(line);
+				}
+				continue;
+			}
+			currentScope = null;
+			out.push(line);
+			continue;
+		}
+		if (currentScope === null || currentScope === "shared") {
+			out.push(line);
+			continue;
+		}
+		if (currentScope === theme) out.push(line);
+	}
+	return sawThemeScope ? out.join("\n").trim() || undefined : undefined;
+}
+
+function themeScopeForLabel(label: string): "shared" | "light" | "dark" {
+	if (label.includes("dark")) return "dark";
+	if (label.includes("light")) return "light";
+	return "shared";
 }
 
 export { parseDesignMd } from "./design-md-parse";

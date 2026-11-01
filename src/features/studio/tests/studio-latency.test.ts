@@ -11,6 +11,7 @@ import {
 import type { StudioDesignSkillId } from "../services/studio-generation-options";
 import { buildStudioPlanningPrompt } from "../services/studio-planning-prompt";
 import { buildStudioFramePrompt } from "../services/studio-screen-prompts";
+import { buildStudioSkillContext } from "../services/studio-skill-context.server";
 import { STUDIO_FRAME_CONCURRENCY } from "../types/studio-constants";
 
 vi.mock("@/lib/services/ai-orchestrator", () => ({
@@ -111,6 +112,12 @@ it("measures real prompt sizes for the fixture matrix without invoking a provide
 	];
 	const rows = scenarios.map((scenario) => {
 		const skill = resolveStudioDesignSkill(scenario.skill);
+		const planContext = buildStudioSkillContext(scenario.skill, {
+			stage: "planning",
+		});
+		const frameContext = buildStudioSkillContext(scenario.skill, {
+			stage: "frame",
+		});
 		const planning =
 			resolveStudioPlanningSystemPrompt(scenario.skill, brief, scenario.mode) +
 			buildStudioPlanningPrompt(
@@ -130,10 +137,12 @@ it("measures real prompt sizes for the fixture matrix without invoking a provide
 				prdContent: scenario.prd,
 			});
 		expect(planning.length).toBeGreaterThan(0);
-		expect(frame.length).toBeGreaterThan(skill.guidance.length);
+		expect(frame.length).toBeGreaterThan(frameContext.guidance.length);
 		return {
 			name: scenario.name,
-			skillChars: skill.guidance.length,
+			legacySkillChars: skill.guidance.length,
+			planningSkillChars: planContext.plan.characterCount,
+			frameSkillChars: frameContext.plan.characterCount,
 			planningChars: planning.length,
 			frameChars: frame.length,
 			omittedDocuments: skill.omittedDocuments,

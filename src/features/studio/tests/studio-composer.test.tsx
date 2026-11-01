@@ -7,35 +7,17 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	resolveComposerScope,
-	StudioComposer,
-} from "@/features/studio/components/composer/studio-composer";
-
-describe("resolveComposerScope", () => {
-	it("targets the whole project when no frame is selected", () => {
-		expect(resolveComposerScope(0)).toBe("project");
-	});
-
-	it("targets exactly the selected frames when one is selected", () => {
-		expect(resolveComposerScope(1)).toBe("revise");
-	});
-
-	it("targets exactly the selected frames when several are selected", () => {
-		expect(resolveComposerScope(4)).toBe("revise");
-	});
-});
+import { StudioComposer } from "@/features/studio/components/composer/studio-composer";
 
 describe("StudioComposer", () => {
 	afterEach(() => cleanup());
 
-	it("shows the project scope when no frame is selected", () => {
+	it("prompts for either a revision or a new screen when nothing is selected", () => {
 		render(<StudioComposer onSubmit={vi.fn()} loading={false} />);
 
-		// Scope is communicated by the placeholder, not a static control label.
-		expect(
-			screen.getByPlaceholderText(/Minta revisi untuk seluruh project/i),
-		).toBeDefined();
+		// The composer no longer implies a project-wide revision from an empty
+		// selection; it asks for the intent instead.
+		expect(screen.getByPlaceholderText(/sebutkan halaman baru/i)).toBeDefined();
 		expect(screen.queryByText("Seluruh project")).toBeNull();
 	});
 
@@ -72,8 +54,8 @@ describe("StudioComposer", () => {
 		expect(onRemoveFrame).toHaveBeenCalledWith("f-1");
 	});
 
-	it("submits a revise request scoped to the selected frame", () => {
-		const onSubmit = vi.fn();
+	it("submits the raw prompt and lets the server resolve the intent", () => {
+		const onSubmit = vi.fn(() => ({ accepted: true }));
 		render(
 			<StudioComposer
 				onSubmit={onSubmit}
@@ -87,29 +69,11 @@ describe("StudioComposer", () => {
 		});
 		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
 
-		expect(onSubmit).toHaveBeenCalledWith(
-			"Ubah warna header jadi biru",
-			"revise",
-		);
+		expect(onSubmit).toHaveBeenCalledWith("Ubah warna header jadi biru");
 	});
 
-	it("submits a project-scoped request when nothing is selected", () => {
-		const onSubmit = vi.fn();
-		render(<StudioComposer onSubmit={onSubmit} loading={false} />);
-
-		fireEvent.change(screen.getByRole("textbox"), {
-			target: { value: "Samakan radius kartu di semua layar" },
-		});
-		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
-
-		expect(onSubmit).toHaveBeenCalledWith(
-			"Samakan radius kartu di semua layar",
-			"project",
-		);
-	});
-
-	it("reports the multi-frame count and targets all selected frames", () => {
-		const onSubmit = vi.fn();
+	it("reports the multi-frame count and submits the shared prompt", () => {
+		const onSubmit = vi.fn(() => ({ accepted: true }));
 		render(
 			<StudioComposer
 				onSubmit={onSubmit}
@@ -127,23 +91,20 @@ describe("StudioComposer", () => {
 		});
 		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
 
-		expect(onSubmit).toHaveBeenCalledWith(
-			"Rapatkan spacing kartu metrik",
-			"revise",
-		);
+		expect(onSubmit).toHaveBeenCalledWith("Rapatkan spacing kartu metrik");
 	});
 
 	it("submits on Enter and keeps Shift+Enter for new lines", () => {
-		const onSubmit = vi.fn(() => true);
+		const onSubmit = vi.fn(() => ({ accepted: true }));
 		render(<StudioComposer onSubmit={onSubmit} loading={false} />);
 
 		const input = screen.getByRole("textbox");
-		fireEvent.change(input, { target: { value: "Revisi seluruh project" } });
+		fireEvent.change(input, { target: { value: "Tambah halaman Profil" } });
 		fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
 		expect(onSubmit).not.toHaveBeenCalled();
 
 		fireEvent.keyDown(input, { key: "Enter" });
-		expect(onSubmit).toHaveBeenCalledWith("Revisi seluruh project", "project");
+		expect(onSubmit).toHaveBeenCalledWith("Tambah halaman Profil");
 	});
 
 	it("does not submit while an IME composition is active", () => {
@@ -186,10 +147,10 @@ describe("StudioComposer", () => {
 	});
 
 	it("preserves rejected drafts and prevents repeated pending submissions", async () => {
-		let settle: (accepted: boolean) => void = () => {};
+		let settle: (result: { accepted: boolean }) => void = () => {};
 		const onSubmit = vi.fn(
 			() =>
-				new Promise<boolean>((resolve) => {
+				new Promise<{ accepted: boolean }>((resolve) => {
 					settle = resolve;
 				}),
 		);
@@ -201,7 +162,7 @@ describe("StudioComposer", () => {
 		fireEvent.keyDown(input, { key: "Enter" });
 		fireEvent.keyDown(input, { key: "Enter" });
 		expect(onSubmit).toHaveBeenCalledTimes(1);
-		settle(false);
+		settle({ accepted: false });
 		await waitFor(() =>
 			expect(screen.getByRole("textbox")).toHaveProperty(
 				"value",
@@ -211,7 +172,7 @@ describe("StudioComposer", () => {
 	});
 
 	it("clears the draft only after the request is accepted", async () => {
-		const onSubmit = vi.fn(async () => true);
+		const onSubmit = vi.fn(async () => ({ accepted: true }));
 		render(<StudioComposer onSubmit={onSubmit} />);
 		const input = screen.getByRole("textbox");
 		fireEvent.change(input, { target: { value: "Ganti tipografi judul" } });
@@ -219,6 +180,25 @@ describe("StudioComposer", () => {
 
 		await waitFor(() =>
 			expect(screen.getByRole("textbox")).toHaveProperty("value", ""),
+		);
+	});
+
+	it("keeps the draft and asks for detail when the server clarifies", async () => {
+		const onSubmit = vi.fn(async () => ({
+			accepted: false,
+			clarify: "Pilih layar yang ingin diubah.",
+		}));
+		render(<StudioComposer onSubmit={onSubmit} />);
+		const input = screen.getByRole("textbox");
+		fireEvent.change(input, { target: { value: "Bikin lebih bagus" } });
+		fireEvent.click(screen.getByRole("button", { name: /Kirim prompt/i }));
+
+		await waitFor(() =>
+			expect(screen.getByText("Pilih layar yang ingin diubah.")).toBeDefined(),
+		);
+		expect(screen.getByRole("textbox")).toHaveProperty(
+			"value",
+			"Bikin lebih bagus",
 		);
 	});
 

@@ -26,29 +26,24 @@ export interface ClaimIssue {
 const UNMEASURED_SCOPE =
 	/\b(?:every|all|each|any)\s+(?:viewport|viewports|breakpoint|breakpoints|screen|screens|device|devices|state|states)\b|\bat\s+every\s+(?:viewport|breakpoint|screen|size)\b|\bincluding\s+hover\b|\bhover\s+(?:state|states|style|styles)\b|\bfocus\s+(?:state|states|style|styles)\b|\bresponsive\s+(?:behaviou?r|layout|rule|rules)\b/gi;
 
-// A rule that binds a measured value to a component class. The value has to
-// match what that class was measured at.
-const CLASS_VALUE_CLAIM =
-	/\b(all|every|each)\s+(buttons?|ctas?|inputs?|cards?|nav(?:igation)?|links?|badges?|chips?|pill buttons?)\b[^.\n]*?(\d+(?:\.\d+)?(?:px|rem|em|%))/gi;
-
-// A rule that names one component class together with a measured value. The
-// class has to have been measured at that value.
-const SINGLE_CLASS_VALUE_CLAIM =
-	/\b(buttons?|ctas?|inputs?|cards?|navigation|links?|badges?|chips?)\b[^.\n]{0,40}?(\d+(?:\.\d+)?(?:px|rem|em|%))/gi;
+const COMPONENT_CLAIM =
+	/\b(?:(all|every|each)\s+)?(buttons?|ctas?|inputs?|cards?|nav(?:igation)?|links?|badges?|chips?)\b[^.\n]{0,40}?(?:(\d+(?:\.\d+)?(?:px|rem|em|%))\s+(radius|padding|margin|gap)\b|(radius|padding|margin|gap)\s*(?:of|:|is|uses?)?\s*(\d+(?:\.\d+)?(?:px|rem|em|%)))/gi;
 
 // The measured values of one component class.
-function classValues(model: DesignTokenModel, className: string): Set<string> {
+function classValues(
+	model: DesignTokenModel,
+	className: string,
+	property: string,
+): Set<string> {
 	const role = CLASS_ROLES[className];
 	if (!role) return new Set();
 	const values = new Set<string>();
-	for (const token of model.radii) {
-		if (!token.roles.includes(role)) continue;
-		values.add(token.value.toLowerCase());
-	}
-	for (const token of model.spacing) {
-		if (!token.roles.includes(role)) continue;
-		values.add(token.value.toLowerCase());
-	}
+	const tokens =
+		property === "radius"
+			? model.radii
+			: model.spacing.filter((token) => token.property === property);
+	for (const token of tokens)
+		if (token.roles.includes(role)) values.add(token.value.toLowerCase());
 	return values;
 }
 
@@ -77,42 +72,33 @@ export function validateSynthesisClaims(
 	model: DesignTokenModel,
 ): ClaimIssue[] {
 	const issues: ClaimIssue[] = [];
-	const measuredValues = new Set<string>();
-	for (const token of model.radii)
-		measuredValues.add(token.value.toLowerCase());
-	for (const token of model.spacing)
-		measuredValues.add(token.value.toLowerCase());
-	for (const entry of model.typography) {
-		measuredValues.add(entry.fontSize.toLowerCase());
-		measuredValues.add(entry.lineHeight.toLowerCase());
-	}
-
 	for (const claim of claims) {
 		for (const match of claim.matchAll(UNMEASURED_SCOPE))
 			issues.push({
 				code: "unsupported-claim",
 				detail: `Claim "${match[0]}" generalises the capture beyond the measured states and viewports.`,
 			});
-		for (const match of claim.matchAll(CLASS_VALUE_CLAIM)) {
-			const value = (match[3] ?? "").toLowerCase();
-			if (measuredValues.has(value)) continue;
-			issues.push({
-				code: "unsupported-claim",
-				detail: `Claim binds ${match[1]} to ${value}, which was not measured.`,
-			});
-		}
-		// A rule that names one component class and a value has to agree with
-		// what that class was measured at. A button measured at 8px and 16px
-		// in two captures cannot be reduced to a single radius.
-		for (const match of claim.matchAll(SINGLE_CLASS_VALUE_CLAIM)) {
-			const className = (match[1] ?? "").toLowerCase();
-			const value = (match[2] ?? "").toLowerCase();
-			const values = classValues(model, className);
+		for (const match of claim.matchAll(COMPONENT_CLAIM)) {
+			const sentenceStart = Math.max(
+				claim.lastIndexOf(".", match.index - 1),
+				claim.lastIndexOf(";", match.index - 1),
+				claim.lastIndexOf("\n", match.index - 1),
+			);
+			if (
+				/\b(?:don't|do not|never|avoid)\b/i.test(
+					claim.slice(sentenceStart + 1, match.index),
+				)
+			)
+				continue;
+			const className = (match[2] ?? "").toLowerCase();
+			const value = (match[3] ?? match[6] ?? "").toLowerCase();
+			const property = (match[4] ?? match[5] ?? "").toLowerCase();
+			const values = classValues(model, className, property);
 			if (!values.size) continue;
-			if (values.has(value)) continue;
+			if (values.has(value) && (!match[1] || values.size === 1)) continue;
 			issues.push({
 				code: "unsupported-claim",
-				detail: `Claim binds ${className} to ${value}, which was not measured for that component class.`,
+				detail: `Claim binds ${className} ${property} to ${value}, contrary to the measured component values.`,
 			});
 		}
 	}
