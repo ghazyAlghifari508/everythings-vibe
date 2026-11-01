@@ -222,7 +222,7 @@ const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
 		/navigation identity\/order\/icons\/active state/i,
 		"NAVIGATION_CONTRACT_MISMATCH",
 	],
-	[/app header missing or duplicated/i, "HEADER_INVALID"],
+	[/app header missing, duplicated, or modified/i, "HEADER_INVALID"],
 	[/content region missing or duplicated/i, "CONTENT_REGION_INVALID"],
 	[/canonical shared styling missing or modified/i, "SHELL_STYLE_MODIFIED"],
 	[/status bar/i, "UNEXPECTED_STATUS_BAR"],

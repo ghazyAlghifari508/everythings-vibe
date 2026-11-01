@@ -1,5 +1,8 @@
 import { JSDOM } from "jsdom";
-import { renderCanonicalIcon } from "./studio-canonical-icons";
+import {
+	studioCanonicalHeader,
+	studioCanonicalNavigation,
+} from "./studio-canonical-chrome";
 import { STUDIO_COMPONENT_STYLE } from "./studio-component-patterns";
 import {
 	type StudioDesignBlueprint,
@@ -8,29 +11,10 @@ import {
 } from "./studio-design-blueprint";
 import type { CanonicalDesignSystem } from "./studio-design-tokens";
 
-function escapeHtml(value: string): string {
-	return value
-		.replaceAll("&", "&amp;")
-		.replaceAll('"', "&quot;")
-		.replaceAll("<", "&lt;")
-		.replaceAll(">", "&gt;");
-}
-
 function normalized(blueprint: StudioDesignBlueprint) {
 	const result = validateBlueprint(blueprint);
 	if (!result.ok) throw new Error(result.error);
 	return result.blueprint;
-}
-
-function navigation(blueprint: StudioDesignBlueprint, screen: string): string {
-	const contract = blueprint.navigationContract;
-	const active = blueprint.canonicalShell?.activeDestinations[screen] ?? null;
-	return `<nav data-studio-navigation aria-label="Navigasi utama">${contract.ordering
-		.map((id) => {
-			const index = contract.destinations.indexOf(id);
-			return `<a href="#" data-destination="${escapeHtml(id)}"${id === active ? ' aria-current="page"' : ""}>${renderCanonicalIcon(contract.iconMapping[id] ?? "circle")}<span>${escapeHtml(contract.labels[index] ?? id)}</span></a>`;
-		})
-		.join("")}</nav>`;
 }
 
 function shellStyle(
@@ -89,14 +73,26 @@ body{margin:0}
 [data-studio-shell] :where(h3){font-size:18px;line-height:1.4}
 [data-studio-shell] :where(input,textarea,select):focus-visible{outline:2px solid var(--app-primary);outline-offset:2px}
 [data-studio-content]{min-width:0;padding:var(--app-gutter)}
-[data-studio-header]{display:flex;align-items:center;gap:16px;min-height:72px;padding:16px var(--app-gutter);border-bottom:var(--app-border);background:var(--app-surface)}
-[data-studio-header] strong{font-size:16px;font-weight:600}[data-studio-header] h1{margin:0;font-size:22px;line-height:1.3}
+[data-studio-header]{display:flex;align-items:center;gap:12px;min-width:0;padding:12px var(--app-gutter);border-bottom:var(--app-border);background:var(--app-surface)}
+[data-studio-appbar=web]{justify-content:space-between;min-height:64px;padding-top:calc(12px + env(safe-area-inset-top))}
+[data-studio-brand]{display:flex;align-items:center;gap:10px;min-width:0}
+[data-studio-brand] strong{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-studio-brand] img{width:32px;height:32px;flex-shrink:0;object-fit:contain;border-radius:calc(var(--app-radius)/2)}
+[data-studio-user]{display:flex;align-items:center;justify-content:center;flex:0 0 36px;width:36px;height:36px;border:var(--app-border);border-radius:50%;background:var(--app-canvas);color:var(--app-muted)}
+[data-studio-user] svg{width:18px;height:18px}
+[data-studio-appbar=mobile]{min-height:56px;padding-top:calc(10px + env(safe-area-inset-top))}
+[data-studio-appbar=mobile] h1{margin:0;flex:1;min-width:0;font-size:17px;line-height:1.3;font-weight:600}
+[data-studio-back]{display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;min-height:44px;margin-left:-10px;color:var(--app-ink);text-decoration:none}
+[data-studio-back] svg{width:20px;height:20px}
+[data-studio-page-header]{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0;margin-bottom:16px}
+[data-studio-page-header] h1{margin:0;font-size:28px;line-height:1.2}
 [data-studio-navigation]{display:flex;gap:4px;padding:8px;border-top:var(--app-border);background:var(--app-surface)}
 [data-studio-navigation]>[data-destination]{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:56px;padding:8px 4px;color:var(--app-muted);font-size:12px;line-height:1.3;text-align:center;text-decoration:none}
 [data-studio-navigation]>[aria-current=page]{color:var(--app-primary);font-weight:700;box-shadow:inset 0 -2px var(--app-primary)}
 [data-studio-navigation] svg{width:20px;height:20px;flex-shrink:0}
 ${shell?.navigation === "sidebar" ? `[data-studio-shell]{display:grid;grid-template-columns:minmax(160px,220px) minmax(0,1fr)}[data-studio-header]{grid-column:1/-1}[data-studio-navigation]{grid-column:1;grid-row:2;flex-direction:column;justify-content:flex-start;border-top:0;border-right:var(--app-border)}[data-studio-navigation]>[data-destination]{flex:0;flex-direction:row;justify-content:flex-start;gap:12px;padding:12px;font-size:14px;text-align:left}[data-studio-content]{grid-column:2;grid-row:2}@media(max-width:640px){[data-studio-shell]{display:block}[data-studio-navigation]{flex-direction:row;flex-wrap:wrap}[data-studio-navigation]>[data-destination]{flex:1}}` : ""}
 ${shell?.navigation === "top" ? `[data-studio-navigation]{border-top:0;border-bottom:var(--app-border);flex-wrap:wrap}[data-studio-navigation]>[data-destination]{flex-direction:row;gap:8px;font-size:14px}` : ""}
+${shell?.navigation === "bottom" ? `[data-studio-navigation]{padding-bottom:max(8px,env(safe-area-inset-bottom))}` : ""}
 </style>`;
 }
 
@@ -234,8 +230,8 @@ export function assembleCanonicalShell(
 	const oldShell = document.querySelector("[data-studio-shell]");
 	const wrapper = document.createElement("div");
 	wrapper.setAttribute("data-studio-shell", "1");
-	const header = `<header data-studio-header>${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="Logo" width="32" height="32">` : ""}<strong>${escapeHtml(blueprint.productIdentity.productName)}</strong><h1>${escapeHtml(screen)}</h1></header>`;
-	const nav = navigation(blueprint, screen);
+	const header = studioCanonicalHeader(blueprint, screen, logoUrl);
+	const nav = studioCanonicalNavigation(blueprint, screen);
 	wrapper.innerHTML =
 		blueprint.canonicalShell?.navigation === "bottom"
 			? `${header}${content.outerHTML}${nav}`
@@ -265,6 +261,7 @@ export function validateCanonicalShell(
 	input: StudioDesignBlueprint,
 	screen: string,
 	tokens: CanonicalDesignSystem | null,
+	logoUrl?: string | null,
 ): string[] {
 	const blueprint = normalized(input);
 	const document = new JSDOM(html).window.document;
@@ -277,7 +274,7 @@ export function validateCanonicalShell(
 			!nav.closest("[data-studio-content]"),
 	);
 	const expectedNav = document.createElement("div");
-	expectedNav.innerHTML = navigation(blueprint, screen);
+	expectedNav.innerHTML = studioCanonicalNavigation(blueprint, screen);
 	if (
 		navs.length !== 1 ||
 		navs[0]?.outerHTML !== expectedNav.firstElementChild?.outerHTML
@@ -285,8 +282,14 @@ export function validateCanonicalShell(
 		issues.push(
 			"Canonical navigation identity/order/icons/active state mismatch.",
 		);
-	if (document.querySelectorAll("[data-studio-header]").length !== 1)
-		issues.push("Required app header missing or duplicated.");
+	const expectedHeader = document.createElement("div");
+	expectedHeader.innerHTML = studioCanonicalHeader(blueprint, screen, logoUrl);
+	const headers = document.querySelectorAll("[data-studio-header]");
+	if (
+		headers.length !== 1 ||
+		headers[0]?.outerHTML !== expectedHeader.firstElementChild?.outerHTML
+	)
+		issues.push("Required app header missing, duplicated, or modified.");
 	if (document.querySelectorAll("[data-studio-content]").length !== 1)
 		issues.push("Required content region missing or duplicated.");
 	if (

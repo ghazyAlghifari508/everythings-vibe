@@ -2,6 +2,7 @@ import {
 	Add01Icon,
 	Airplane01Icon,
 	Analytics01Icon,
+	ArrowLeft01Icon,
 	Calendar01Icon,
 	ChartHistogramIcon,
 	Home01Icon,
@@ -17,6 +18,7 @@ import { Icon } from "@/components/ui/icon";
 
 // Inline static SVG reuses the installed, licensed assets without a frame runtime.
 const icons = {
+	back: ArrowLeft01Icon,
 	home: Home01Icon,
 	plus: Add01Icon,
 	search: Search01Icon,

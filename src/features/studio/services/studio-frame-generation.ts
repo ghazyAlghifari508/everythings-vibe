@@ -166,6 +166,7 @@ export async function generateValidatedFrameHtml(
 						input.blueprint,
 						input.activeScreen,
 						input.dsTokens,
+						input.logoUrl,
 					),
 				);
 			} catch (error) {
