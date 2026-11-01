@@ -66,7 +66,6 @@ vi.mock("@/db", () => ({
 	db: {
 		select: () => {
 			const selectIndex = state.selectCalls++;
-
 			const rows = state.selects[selectIndex] ?? [];
 			const chain: Record<string, unknown> = {};
 			chain.from = () => chain;
