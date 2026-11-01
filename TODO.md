@@ -118,6 +118,11 @@ Dokumen ini merupakan **backlog aktif tunggal (Single Source of Truth)** untuk p
 - [ ] **VibeDesign Studio (`src/routes/design/index.tsx` & `$id.tsx`):**
   - [ ] Layout editor desain responsif: panel tools, multi-screen canvas preview, dan inspect panel beradaptasi pada viewport tablet.
   - [ ] Di layar mobile, berikan tampilan preview yang optimal atau notifikasi visual bahwa mode canvas editing lebih disarankan di tablet/desktop.
+  - [x] **Pipeline Generasi HTML & Spatial Layout Contracts (`docs/prompt-design-studio/p1.md`):** $\checkmark$ Selesai 2026-11-01.
+    - [x] Perbaikan perakitan shell kanonik: melestarikan header dan navigasi kontekstual di dalam konten layar tanpa membuangnya.
+    - [x] Standalone component patterns: Search input trailing button, segmented control contained scroll, dropdown spacing, table scroller, metric cards, action groups di `src/features/studio/services/studio-component-patterns.ts`.
+    - [x] Quality gate & diagnostics: validasi CSS seimbang, deteksi skeleton tidak diminta, duplicate badge dalam satu kartu, nested padding berlebih di `src/features/studio/services/studio-layout-diagnostics.ts` dengan bounded correction di `studio-frame-generation.ts`.
+    - [x] 15 skenario fixture deterministik web & mobile di `src/features/studio/tests/studio-spatial-fixtures.test.ts` dan boundary test di `studio-layout-quality.test.ts`.
 
 ##### D. Settings & Admin Dashboard
 
