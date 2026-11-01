@@ -56,9 +56,9 @@ Agen **DILARANG KERAS** langsung menulis JSX atau CSS baru tanpa melakukan inspe
   - Halaman berbasis kartu katalog/pricing: `mx-auto w-full max-w-6xl` atau `max-w-[1200px]`.
 - **Header Alignment & Hierarchy:**
   - FAQ / Bantuan / Templates: Heading kiri atau tengah terpusat proporsional.
-  - Judul: `text-2xl sm:text-3xl` font `font-[620]` atau `text-3xl sm:text-4xl` font `font-semibold` tracking `tracking-tight text-snow`.
+  - Judul: Mematuhi kontrak tipografi canonical (`PageHeading variant="workspace"` atau `font-inter font-light leading-tight tracking-tight text-snow text-2xl sm:text-3xl`).
   - Deskripsi/Subjudul: `mt-2.5 sm:mt-3 text-sm sm:text-base leading-relaxed text-fog`.
-  - Section Heading: `font-mono text-xs uppercase tracking-widest text-fog` atau `text-lg font-semibold text-snow`.
+  - Section Heading: `font-mono text-xs uppercase tracking-widest text-fog` atau `PageHeading variant="section"` (`text-xl sm:text-2xl font-medium text-snow`).
 - **Spacing Scale:**
   - Page wrapper: `px-4 py-10 sm:px-6 sm:py-14 lg:py-16`.
   - Gap antar seksi utama: `gap-8` sampai `gap-12`.
@@ -229,4 +229,35 @@ Sebelum menyatakan pekerjaan UI selesai (*Done*), agen **WAJIB** memeriksa dan m
 - [ ] **Responsive Verification:** Apakah tampilan sudah terverifikasi bebas dari horizontal overflow pada mobile (360px), tablet (768px), dan desktop (1280px)?
 - [ ] **Touch Target Check:** Apakah seluruh tombol dan elemen interaktif memiliki target sentuh $\ge$ 44px?
 - [ ] **Clean Code & Imports:** Apakah import yang tidak terpakai (*unused imports*) dan artefak coba-coba sudah dibersihkan?
+- [ ] **Typography System Check:** Apakah heading utama mematuhi kontrak tipografi canonical (`PageHeading` variant `display`/`workspace` atau `font-inter font-light`) mengacu pada Pricing dan tidak menggunakan `font-bold` generik secara berlebihan?
 - [ ] **Deterministic Checks Pass:** Apakah `pnpm biome check <files>` dan `pnpm exec tsc --noEmit` lolos tanpa error?
+
+---
+
+## 12. Bagian K: Sistem Tipografi Premium SaaS (*Canonical Typography Contract*)
+
+Repositori ini menetapkan sistem tipografi heading yang terstandarisasi dengan **halaman Pricing sebagai referensi visual kanonikal** (`Pilih Paket yang Sesuai`: `font-inter font-light leading-tight text-snow text-[40px] max-md:text-[36px] md:text-[48px]`).
+
+Tujuannya adalah estetika SaaS premium yang elegan, ringan (*light-weight*), dan tajam—menghindari heading tebal (*bold/semibold*) generik ala AI-slop pada layar utama.
+
+### 1. Hierarki Tipografi Semantik:
+
+| Role | Desktop size | Weight | Penggunaan | Token / Primitif Resmi |
+| :--- | :--- | :--- | :--- | :--- |
+| **Display / Hero** | 40–48px | 300 (`font-light`) | Homepage dan public hero headings | `<PageHeading variant="display">` (`font-inter font-light leading-tight tracking-tight text-snow text-3xl sm:text-[40px] lg:text-[48px]`) |
+| **Page / Workspace** | 28–36px | 300–400 (`font-light`) | Heading utama workspace & header halaman publik | `<PageHeading variant="workspace">` (`font-inter font-light leading-tight tracking-tight text-snow text-2xl sm:text-3xl`) |
+| **Section** | 20–24px | 500 (`font-medium`) | Sub-judul seksi dan pembagi konten | `<PageHeading variant="section">` (`font-inter font-medium leading-snug tracking-tight text-snow text-xl sm:text-2xl`) |
+| **Card Title** | 16–20px | 500 (`font-[510]`) | Judul kartu dan bento box | `CardTitle` / `font-inter text-base sm:text-lg font-[510] text-snow` |
+| **Body** | 14–16px | 400 (`font-normal`) | Deskripsi, paragraf, dan instruksi | `font-inter text-sm sm:text-base font-normal leading-relaxed text-fog` |
+| **Label / Button** | 12–14px | 500 (`font-[510]`) | Aksi, kontrol, dan tab label | `font-inter text-xs sm:text-sm font-[510] leading-none` |
+
+### 2. Aturan Komponen Primitif `<PageHeading>`:
+- Terletak di `src/components/ui/page-heading.tsx` dan diekspor melalui `@/components/ui`.
+- Mendukung varian `variant="display"`, `variant="workspace"` (default), dan `variant="section"`.
+- Mendukung polimorfisme tag melalui prop `as` (default `h1` untuk display/workspace, `h2` untuk section).
+- Agen AI yang menambahkan atau merombak judul halaman **WAJIB** memanfaatkan `<PageHeading>` alih-alih meracik kombinasi kelas Tailwind baru secara sembarangan.
+
+### 3. Batas Pengecualian yang Sah (*Justified Exceptions*):
+- **Settings & Admin:** Kartu metrik KPI, label tabel transaksi, dan panel pengaturan tetap menggunakan bobot Medium terkontrol (`font-[510]`) demi densitas informasi dan keterbacaan data (*information density*).
+- **Workspace Toolbars & Compact Subheadings:** Judul file/proyek di dalam toolbar compact (seperti `StudioHeader` atau `KanbanHeader`) tetap mempertahankan ukuran compact yang terpotong rapi (*truncate*) dengan bobot semi-bold/medium untuk keterbacaan operasional.
+
