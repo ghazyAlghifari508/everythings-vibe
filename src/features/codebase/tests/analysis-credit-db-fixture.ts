@@ -17,6 +17,11 @@ beforeAll(async () => {
 		"users",
 		"projects",
 		"subscriptions",
+		"codebases",
+		"codebase_sync_sessions",
+		"codebase_snapshots",
+		"codebase_snapshot_files",
+		"codebase_ask_handoffs",
 		"codebase_analyses",
 		"credit_operations",
 		"credit_ledger_entries",
@@ -26,7 +31,10 @@ beforeAll(async () => {
 		);
 	}
 	const url = new URL(originalUrl);
-	url.searchParams.set("options", `-c search_path=${schemaName}`);
+	url.searchParams.set(
+		"options",
+		`-c search_path=${schemaName} -c timezone=Asia/Jakarta`,
+	);
 	process.env.DATABASE_URL = url.toString();
 	cleanupPool = new Pool({ connectionString: url.toString() });
 	const migration = await readFile(
