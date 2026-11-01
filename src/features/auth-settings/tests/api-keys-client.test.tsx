@@ -236,6 +236,16 @@ describe("ApiKeysClient layout and presentation", () => {
 		expect(document.getElementById("api-keys-advanced-panel")).toBeNull();
 	});
 
+	it("activates the advanced disclosure from the keyboard", () => {
+		render(<ApiKeysClient keys={[]} />);
+		const toggle = advancedToggle();
+		toggle.focus();
+		expect(document.activeElement).toBe(toggle);
+		// A native button, so Enter/Space activation is the platform's job.
+		expect(toggle.tagName).toBe("BUTTON");
+		expect(toggle.getAttribute("type")).toBe("button");
+	});
+
 	it("opens the manual creation dialog from the advanced section", () => {
 		render(<ApiKeysClient keys={[]} />);
 		openAdvanced();
