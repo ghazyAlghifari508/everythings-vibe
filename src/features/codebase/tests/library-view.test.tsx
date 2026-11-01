@@ -155,7 +155,7 @@ function installRadixDomPolyfills() {
 }
 
 function openActionsMenu(index = 0) {
-	const triggers = screen.getAllByRole("button", { name: /Aksi project/i });
+	const triggers = screen.getAllByRole("button", { name: /Opsi repository/i });
 	fireEvent.pointerDown(triggers[index], {
 		button: 0,
 		ctrlKey: false,
@@ -225,7 +225,7 @@ describe("CodebaseLibraryView", () => {
 		expect(
 			screen.getByRole("heading", { name: "Project Tersimpan" }),
 		).toBeDefined();
-		expect(screen.getByText("Existing Codebase")).toBeDefined();
+		expect(screen.queryByText("Existing Codebase")).toBeNull();
 		expect(
 			screen.getByText(
 				/Repository yang pernah kamu hubungkan akan tersimpan di sini/i,
@@ -357,7 +357,7 @@ describe("CodebaseLibraryView", () => {
 
 	it("keeps the action menu outside the card link", () => {
 		render(<CodebaseLibraryView items={[makeItem({ id: "cb-1" })]} />);
-		const trigger = screen.getByRole("button", { name: /Aksi project/i });
+		const trigger = screen.getByRole("button", { name: /Opsi repository/i });
 		expect(trigger.closest("a")).toBeNull();
 	});
 
@@ -750,7 +750,7 @@ describe("CodebaseLibraryView delete", () => {
 		expect(
 			screen.getByRole("heading", { name: "Project Tersimpan" }),
 		).toBeDefined();
-		expect(screen.getByText("Existing Codebase")).toBeDefined();
+		expect(screen.queryByText("Existing Codebase")).toBeNull();
 		expect(
 			screen.getByRole("link", { name: /\+ Hubungkan repository/i }),
 		).toBeDefined();
@@ -882,7 +882,7 @@ describe("CodebaseLibraryView pagination", () => {
 		expect(
 			screen.getByRole("heading", { name: "Project Tersimpan" }),
 		).toBeDefined();
-		expect(screen.getByText("Existing Codebase")).toBeDefined();
+		expect(screen.queryByText("Existing Codebase")).toBeNull();
 		expect(
 			screen.getByText(
 				/Repository yang pernah kamu hubungkan akan tersimpan di sini/i,
