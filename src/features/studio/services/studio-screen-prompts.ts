@@ -16,6 +16,7 @@ import {
 	WEB_PLATFORM_CONTRACT,
 } from "./studio-prompt-contracts";
 import { sanitizeStudioDesignMd } from "./studio-prompt-validation";
+import { STUDIO_BASE_QUALITY_PROMPT } from "./studio-quality-rules";
 
 export function buildStudioFramePrompt(opts: StudioFramePromptOptions): string {
 	const sections: string[] = [];
@@ -89,6 +90,7 @@ Ensure features, forms, lists, metrics, terminology, and realistic Indonesian co
 		`${opts.projectPrompt} ${opts.screenName} ${opts.screenDescription ?? ""}`,
 	);
 	sections.push(
+		STUDIO_BASE_QUALITY_PROMPT,
 		`<DOMAIN_AWARE_QUALITY_CONTRACT>
 ${domainContract}
 
@@ -152,7 +154,7 @@ Return the FULL revised single-file HTML document for "${opts.screenName}".`,
 	}
 
 	sections.push(
-		`Design precedence, highest to lowest: safety and platform validity > explicit user requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override safety, platform validity, explicit user colors, or brand requirements. Resolve conflicts deterministically in that order.`,
+		`Design precedence, highest to lowest: security and HTML safety > explicit user requirements > valid PRD / product constraints > selected DESIGN.md / theme reference > existing shared project blueprint > selected design skill guidance > default product guidance. A design skill must never override security, HTML safety, explicit user requirements, PRD constraints, or validated design tokens. Resolve conflicts deterministically in that order.`,
 	);
 
 	return sections.join("\n\n");
@@ -177,6 +179,7 @@ export function buildStudioUserPrompt(
 	// Domain-aware quality contract & component-first guidance
 	const domainContract = getDomainQualityContract(prompt);
 	sections.push(
+		STUDIO_BASE_QUALITY_PROMPT,
 		`<DOMAIN_AWARE_QUALITY_CONTRACT>
 ${domainContract}
 

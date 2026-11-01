@@ -6,7 +6,7 @@ import {
 	sanitizeStudioPrd,
 } from "./studio-prd-helpers";
 import { sanitizeStudioDesignMd } from "./studio-prompt-validation";
-
+import { STUDIO_BASE_QUALITY_PROMPT } from "./studio-quality-rules";
 export function buildStudioPlanningPrompt(
 	prompt: string,
 	designMode: StudioDesignMode,
@@ -94,7 +94,8 @@ Choose one coherent project-wide designTokens set: primary accent, secondary acc
 	);
 
 	sections.push(
-		`Design precedence, highest to lowest: safety and platform validity > explicit user requirements > authoritative PRD requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override safety, platform validity, explicit user colors, or brand requirements. Resolve conflicts deterministically in that order.`,
+		STUDIO_BASE_QUALITY_PROMPT,
+		`Design precedence, highest to lowest: security and HTML safety > explicit user requirements > valid PRD / product constraints > selected DESIGN.md / theme reference > existing shared project blueprint > selected design skill guidance > default product guidance. A design skill must never override security, HTML safety, explicit user requirements, PRD constraints, or validated design tokens. Resolve conflicts deterministically in that order.`,
 	);
 
 	return sections.join("\n\n");
