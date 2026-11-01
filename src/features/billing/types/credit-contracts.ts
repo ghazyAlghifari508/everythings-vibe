@@ -59,6 +59,8 @@ export interface CreditOperation {
 	};
 	artifactReference: string | null;
 	failureReason: string | null;
+	isExempt?: boolean;
+	exemptionReason?: string | null;
 	expiresAt: Date | null;
 	createdAt: Date;
 	updatedAt: Date;
@@ -103,6 +105,10 @@ export interface ReserveCreditOperationInput {
 	idempotencyKey: string;
 	quote: CreditQuote;
 	expiresAt?: Date;
+	initialAnalysisAllowance?: boolean;
+	analysisReference?: string;
+	isExempt?: boolean;
+	exemptionReason?: string | null;
 }
 
 export interface SettleCreditOperationInput {
@@ -117,6 +123,7 @@ export interface SettleCreditOperationInput {
 
 export interface CreditOperationResult {
 	id: string;
+	analysisReference?: string | null;
 	state: CreditOperationState;
 	finalCharge: number | null;
 }

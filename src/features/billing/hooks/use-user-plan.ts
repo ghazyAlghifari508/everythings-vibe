@@ -28,6 +28,10 @@ export interface UserPlan {
 	topUpEligible?: boolean;
 	/** Paid plan fully spent: offer a top-up, never another subscription. */
 	creditsExhausted?: boolean;
+	/** Whether this account is an internal authorized billing exempt account. */
+	billingExempt?: boolean;
+	/** Reason for billing exemption if exempt. */
+	billingExemptionReason?: string | null;
 }
 
 export function useUserPlan() {

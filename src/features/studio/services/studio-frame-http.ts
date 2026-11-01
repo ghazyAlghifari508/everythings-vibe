@@ -5,7 +5,6 @@ import {
 	STUDIO_FRAME_ERRORS,
 	studioFrameErrorReport,
 } from "./studio-frame-errors";
-import { addStudioFrame, reviseStudioFrame } from "./studio-frame-service";
 import { getStudioFrameVisual } from "./studio-frame-visual";
 import { enqueueStudioOperation } from "./studio-operation-enqueue";
 import { retryStudioFrame, retryStudioPlanning } from "./studio-retry-service";
@@ -73,23 +72,9 @@ export const studioFrameBodySchema = z.discriminatedUnion("action", [
 	z.object({
 		action: z.literal("operation"),
 		projectId: z.string().min(1),
-		scope: z.enum(["add", "revise", "project"]),
 		prompt: z.string().min(10).max(4000),
 		frameIds: z.array(z.string().min(1)).max(100).optional(),
 		requestId: z.string().uuid(),
-	}),
-	z.object({
-		action: z.literal("add"),
-		projectId: z.string().min(1),
-		name: z.string().min(1).max(100),
-		prompt: z.string().min(1),
-		viewport: z.enum(["web", "mobile"]).optional(),
-	}),
-	z.object({
-		action: z.literal("revise"),
-		projectId: z.string().min(1),
-		frameId: z.string().min(1),
-		prompt: z.string().min(1),
 	}),
 	z.object({
 		action: z.literal("retry"),
@@ -123,31 +108,13 @@ export async function POST({
 		const body = parseRes.data;
 		if (body.action === "operation") {
 			const accepted = await enqueueStudioOperation(body.projectId, user.id, {
-				action: body.scope,
 				prompt: body.prompt,
 				frameIds: body.frameIds,
 				requestId: body.requestId,
 			});
-			return Response.json(accepted, { status: 202 });
-		}
-
-		if (body.action === "add") {
-			const frame = await addStudioFrame(body.projectId, user.id, {
-				name: body.name,
-				prompt: body.prompt,
-				viewport: body.viewport,
+			return Response.json(accepted, {
+				status: accepted.intent === "clarify" ? 200 : 202,
 			});
-			return Response.json({ frame }, { status: 201 });
-		}
-
-		if (body.action === "revise") {
-			const frame = await reviseStudioFrame(
-				body.projectId,
-				user.id,
-				body.frameId,
-				body.prompt,
-			);
-			return Response.json({ frame }, { status: 200 });
 		}
 
 		if (body.action === "retry") {

@@ -56,6 +56,16 @@ export function parseThemeOverview(
 
 export function parseComponents(lines: string[]): InspectorComponent[] {
 	const components: InspectorComponent[] = [];
+	const archive = (name: string, description: string, evidence: string) => ({
+		name,
+		purpose: "",
+		description,
+		evidence,
+		frequency: 0,
+		sharedCharacteristics: [],
+		variants: [],
+		guidance: [],
+	});
 	let current: {
 		name: string;
 		description: string[];
@@ -65,12 +75,13 @@ export function parseComponents(lines: string[]): InspectorComponent[] {
 		const heading = rawLine.match(/^###\s+(.*)$/);
 		if (heading) {
 			if (current?.name)
-				components.push({
-					name: current.name,
-					description: current.description.join(" ").trim(),
-					evidence: current.evidence,
-					frequency: 0,
-				});
+				components.push(
+					archive(
+						current.name,
+						current.description.join(" ").trim(),
+						current.evidence,
+					),
+				);
 			current = {
 				name: (heading[1] ?? "").trim(),
 				description: [],
@@ -91,12 +102,13 @@ export function parseComponents(lines: string[]): InspectorComponent[] {
 		current.description.push(line.replace(/\*\*/g, ""));
 	}
 	if (current?.name)
-		components.push({
-			name: current.name,
-			description: current.description.join(" ").trim(),
-			evidence: current.evidence,
-			frequency: 0,
-		});
+		components.push(
+			archive(
+				current.name,
+				current.description.join(" ").trim(),
+				current.evidence,
+			),
+		);
 	return components.filter(
 		(component) => component.name || component.description,
 	);

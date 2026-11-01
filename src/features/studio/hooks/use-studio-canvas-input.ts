@@ -7,8 +7,6 @@ import { normalizeWheelDelta } from "@/hooks/use-canvas-zoom";
 
 interface UseStudioCanvasInputInput {
 	canvasRef: RefObject<HTMLElement | null>;
-	/** Marks the view as user-owned so automatic re-fitting stops. */
-	userPositioned: RefObject<boolean>;
 	onWheel: (event: WheelEvent) => void;
 	setPan: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
 	nudgePan: (key: string) => void;
@@ -33,7 +31,6 @@ interface UseStudioCanvasInputInput {
  */
 export function useStudioCanvasInput({
 	canvasRef,
-	userPositioned,
 	onWheel,
 	setPan,
 	nudgePan,
@@ -63,7 +60,6 @@ export function useStudioCanvasInput({
 				return;
 			}
 			event.preventDefault();
-			userPositioned.current = true;
 
 			const gesture = classifyWheelGesture(event);
 			if (gesture === "zoom") {
@@ -84,7 +80,7 @@ export function useStudioCanvasInput({
 		}
 		canvas.addEventListener("wheel", handleWheel, { passive: false });
 		return () => canvas.removeEventListener("wheel", handleWheel);
-	}, [canvasRef, onWheel, setPan, userPositioned]);
+	}, [canvasRef, onWheel, setPan]);
 
 	useEffect(() => {
 		// Arrow-key panning is a window-level affordance because the canvas

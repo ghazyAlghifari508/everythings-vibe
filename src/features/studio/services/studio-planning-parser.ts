@@ -120,6 +120,7 @@ export function parseStudioPlanningWithBlueprint(
 	raw: string,
 	fallbackViewport: StudioDesignMode = "web",
 	expectedCount?: number | null,
+	requireVisualDirection = false,
 ):
 	| { ok: true; plan: StudioScreenPlan; blueprint: StudioDesignBlueprint }
 	| { ok: false; error: string } {
@@ -160,6 +161,16 @@ export function parseStudioPlanningWithBlueprint(
 		};
 	const validated = validateBlueprint(record.data.blueprint);
 	if (!validated.ok) return validated;
+	const tokens = validated.blueprint.designTokens;
+	if (
+		requireVisualDirection &&
+		(!tokens.ink || !tokens.muted || !tokens.onPrimary)
+	)
+		return {
+			ok: false,
+			error:
+				"Visual direction requires ink, muted and onPrimary tokens with WCAG AA contrast.",
+		};
 	if (validated.blueprint.productIdentity.platform !== fallbackViewport)
 		return {
 			ok: false,

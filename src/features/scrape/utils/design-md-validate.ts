@@ -77,17 +77,29 @@ export function validateDesignMd(markdown: string): DesignMdIssue[] {
 					detail: `Invalid CSS colour value ${value}.`,
 				});
 		}
-		const names = [...body.matchAll(/^\s*(--[\w-]+)\s*:/gm)].map(
-			(match) => match[1] ?? "",
-		);
-		const seen = new Set<string>();
-		for (const name of names) {
-			if (seen.has(name))
+		// Duplicate detection is scoped to the declaration's CSS block: a scoped
+		// override under @media may legitimately re-declare a :root name, but two
+		// declarations of one name inside the same block are ambiguous.
+		const scopeStack: string[] = [];
+		const seen = new Map<string, string>();
+		for (const line of body.split("\n")) {
+			if (line.trimEnd().endsWith("{")) {
+				scopeStack.push(line.trim().slice(0, 60));
+				continue;
+			}
+			if (line.trim().startsWith("}")) {
+				scopeStack.pop();
+				continue;
+			}
+			const match = line.match(/^\s*(--[\w-]+)\s*:/);
+			if (!match?.[1]) continue;
+			const key = `${scopeStack.join(">")}|${match[1]}`;
+			if (seen.has(key))
 				issues.push({
 					code: "duplicate-token",
-					detail: `Duplicate custom property ${name}.`,
+					detail: `Duplicate custom property ${match[1]}.`,
 				});
-			else seen.add(name);
+			else seen.set(key, match[1]);
 		}
 	}
 

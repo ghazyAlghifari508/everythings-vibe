@@ -19,7 +19,10 @@ import type {
 	StudioScreenPlan,
 } from "../types/studio-prompts";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
-import { resolveStudioPlanningSystemPrompt } from "./studio-design-skill-registry.server";
+import {
+	resolveStudioPlanningSystemPrompt,
+	resolveStudioSkillContext,
+} from "./studio-design-skill-registry.server";
 import { isTemporarySlot } from "./studio-frame-generation";
 import {
 	type StudioJobClaim,
@@ -60,10 +63,19 @@ export async function planStudioScreens(
 		job.prompt,
 		designMode,
 	);
+	const skillPlan = resolveStudioSkillContext(project.designSkillId ?? "none", {
+		stage: "planning",
+		focus: [job.prompt],
+	}).plan;
 	studioJobTiming("planning-context", Date.now(), {
 		jobId: job.id,
 		projectId: project.id,
 		skillId: project.designSkillId,
+		skillStage: "planning",
+		skillChars: skillPlan.characterCount,
+		selectedSectionCount: skillPlan.selectedSections.length,
+		omittedSectionCount: skillPlan.omittedSections.length,
+		estimatedTokens: skillPlan.estimatedTokens,
 		systemChars: systemPrompt.length,
 		promptChars: planPrompt.length,
 	});
@@ -93,18 +105,31 @@ export async function planStudioScreens(
 		const outputStartedAt = Date.now();
 		let planRaw = firstChunk;
 		for await (const chunk of generator) planRaw += chunk;
+		const isTruncatedPlan =
+			outcome?.finishReason === "length" ||
+			outcome?.finishReason === "max_tokens" ||
+			outcome?.finishReason === "max_output_tokens";
+		const tokenLimitExceeded = isTruncatedPlan
+			? true
+			: outcome?.textTokens !== undefined
+				? outcome.textTokens > STUDIO_PLANNING_MAX_TOKENS
+				: outcome?.outputTokens !== undefined &&
+					outcome.outputTokens > STUDIO_PLANNING_MAX_TOKENS;
 		studioJobTiming("planning-output", outputStartedAt, {
 			jobId: job.id,
 			projectId: project.id,
 			attempt: 1,
 			outputChars: planRaw.length,
 			...outcome,
+			maxTokens: STUDIO_PLANNING_MAX_TOKENS,
+			tokenLimitExceeded,
 		});
 		signal.throwIfAborted();
 		const parsed = parseStudioPlanningWithBlueprint(
 			planRaw,
 			designMode,
 			project.initialPageCount,
+			!project.designMd?.trim(),
 		);
 		if (parsed.ok) {
 			screenPlan = parsed.plan;
@@ -147,12 +172,17 @@ export async function planStudioScreens(
 				attempt: 2,
 				outputChars: planRaw.length,
 				...outcome,
+				maxTokens: STUDIO_PLANNING_MAX_TOKENS,
+				tokenLimitExceeded:
+					outcome?.outputTokens !== undefined &&
+					outcome.outputTokens > STUDIO_PLANNING_MAX_TOKENS,
 			});
 			signal.throwIfAborted();
 			const parsed = parseStudioPlanningWithBlueprint(
 				planRaw,
 				designMode,
 				project.initialPageCount,
+				!project.designMd?.trim(),
 			);
 			if (parsed.ok) {
 				screenPlan = parsed.plan;

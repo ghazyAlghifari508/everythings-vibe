@@ -6,11 +6,10 @@ import {
 	Download01Icon,
 	Loading01Icon,
 	Menu01Icon,
-	PlusSignIcon,
 	UserIcon,
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -30,7 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { authClient } from "@/lib/auth-client";
+import { useHydratedSession } from "@/features/studio/hooks/use-hydrated-session";
 
 export function StudioHeader({
 	title,
@@ -41,8 +40,6 @@ export function StudioHeader({
 	onDuplicate,
 	onExport,
 	onDelete,
-	onAddFrame,
-	designSystemControl,
 }: {
 	title: string;
 	duplicating: boolean;
@@ -52,10 +49,8 @@ export function StudioHeader({
 	onDuplicate: () => void;
 	onExport: () => void;
 	onDelete?: () => Promise<void>;
-	onAddFrame?: () => void;
-	designSystemControl?: ReactNode;
 }) {
-	const { data: session } = authClient.useSession();
+	const session = useHydratedSession();
 	const [isDeleteOpen, setDeleteOpen] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 	// Each floating control carries its own restrained surface so it stays
@@ -109,13 +104,6 @@ export function StudioHeader({
 								Kembali ke Semua Project
 							</Link>
 						</DropdownMenuItem>
-						{onAddFrame ? (
-							<DropdownMenuItem className={item} onSelect={onAddFrame}>
-								<Icon icon={PlusSignIcon} size={16} />
-								Tambah Halaman
-							</DropdownMenuItem>
-						) : null}
-						{designSystemControl}
 						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							className={item}

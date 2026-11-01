@@ -38,6 +38,9 @@ export async function reviseStudioProject(
 		userPrompt,
 		undefined,
 		detail.designSkillId,
+		undefined,
+		undefined,
+		{ stage: "revision", focus: [checked.prompt] },
 	);
 	const nextVersion = (detail.latest?.version ?? 0) + 1;
 

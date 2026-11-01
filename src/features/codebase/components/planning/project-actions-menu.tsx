@@ -175,11 +175,11 @@ export function ProjectActionsMenu({
 			</Dialog>
 
 			<Dialog open={isDeleteOpen} onOpenChange={setDeleteOpen}>
-				<DialogContent className="max-w-sm">
+				<DialogContent className="max-w-sm" hideCloseButton>
 					<DialogHeader>
 						<DialogTitle>Hapus project?</DialogTitle>
 						<DialogDescription>
-							{`Project "${item.name}" akan dihapus dari Project Tersimpan beserta fitur, PRD, AC, dan task yang dibuat dari repository ini. Tindakan ini tidak dapat dibatalkan.`}
+							Project dan planning terkait akan dihapus permanen.
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>

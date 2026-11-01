@@ -1,14 +1,17 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PlanCodebasePage } from "@/features/codebase/components/workspace/plan-codebase-page";
 import {
 	PLAN_CODEBASE_ID_STORAGE_KEY,
 	PLAN_CODEBASE_NAME_STORAGE_KEY,
 	PLAN_CODEBASE_PROJECT_STORAGE_KEY,
 } from "@/features/codebase/services/sync";
 import { useUIStore } from "@/store";
+import { renderConnectedOnboarding } from "./render-connected-onboarding";
 
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({ data: undefined, refetch: vi.fn() }),
+}));
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
 	useNavigate: () => vi.fn(),
@@ -92,7 +95,7 @@ describe("PlanCodebasePage create failure state", () => {
 			}),
 		);
 
-		const { container } = render(<PlanCodebasePage />);
+		const { container } = await renderConnectedOnboarding();
 
 		await waitFor(() => {
 			expect(screen.getByText(ERROR_TITLE)).toBeDefined();
@@ -120,7 +123,7 @@ describe("PlanCodebasePage create failure state", () => {
 			}),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		await waitFor(() => {
 			expect(screen.getByText("Nama codebase harus diisi")).toBeDefined();
@@ -146,7 +149,7 @@ describe("PlanCodebasePage create failure state", () => {
 			}),
 		);
 
-		const { container } = render(<PlanCodebasePage />);
+		const { container } = await renderConnectedOnboarding();
 
 		await waitFor(() => {
 			expect(screen.getByText(ERROR_TITLE)).toBeDefined();
@@ -179,7 +182,7 @@ describe("PlanCodebasePage create failure state", () => {
 			}),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		await waitFor(() => {
 			expect(screen.getByText(ERROR_TITLE)).toBeDefined();
@@ -218,7 +221,7 @@ describe("PlanCodebasePage create failure state", () => {
 			}),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		await waitFor(() => {
 			expect(screen.getByText(ERROR_TITLE)).toBeDefined();
@@ -247,7 +250,7 @@ describe("PlanCodebasePage breadcrumb hierarchy", () => {
 			}),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		await waitFor(
 			() => {
@@ -296,7 +299,7 @@ describe("PlanCodebasePage stale pointer recovery", () => {
 			}),
 		);
 
-		const { container } = render(<PlanCodebasePage />);
+		const { container } = await renderConnectedOnboarding();
 
 		await waitFor(
 			() => {
@@ -339,7 +342,7 @@ describe("PlanCodebasePage stale pointer recovery", () => {
 			}),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		await waitFor(
 			() => {

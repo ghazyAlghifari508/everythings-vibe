@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PlanCodebasePage } from "@/features/codebase/components/workspace/plan-codebase-page";
 import { useUIStore } from "@/store";
+import { renderConnectedOnboarding } from "./render-connected-onboarding";
 
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({ data: undefined, refetch: vi.fn() }),
+}));
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
 	useNavigate: () => vi.fn(),
@@ -96,7 +99,7 @@ describe("PlanCodebasePage repository name", () => {
 			}),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		// The prompt carries no repository identity yet, because the server only
 		// knows the provisional creation placeholder before the agent runs —
@@ -158,7 +161,7 @@ describe("PlanCodebasePage repository name", () => {
 			}),
 		);
 
-		render(<PlanCodebasePage />);
+		await renderConnectedOnboarding();
 
 		await waitFor(() => {
 			expect(

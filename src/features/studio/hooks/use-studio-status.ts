@@ -64,6 +64,7 @@ class StatusFailure extends Error {
 export function useStudioStatus(initialData: StudioStatus) {
 	const [status, setStatus] = useState<StudioStatus>(initialData);
 	const [error, setError] = useState("");
+	const latestStatus = useRef(initialData);
 	const refresh = useRef<() => Promise<void>>(async () => {});
 	const syncProjectStatus = useCallback(() => refresh.current(), []);
 	const clearError = useCallback(() => setError(""), []);
@@ -73,12 +74,16 @@ export function useStudioStatus(initialData: StudioStatus) {
 		let sequence = 0;
 		let failures = 0;
 		let permanent = false;
-		let current = initialData;
+		let current =
+			latestStatus.current.project.id === initialData.project.id
+				? reconcile(latestStatus.current, initialData)
+				: initialData;
 		let controller: AbortController | undefined;
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		let requestTimer: ReturnType<typeof setTimeout> | undefined;
 		let rejectRequest: ((reason: Error) => void) | undefined;
-		setStatus(initialData);
+		latestStatus.current = current;
+		setStatus(current);
 		setError("");
 
 		const available = () =>
@@ -95,7 +100,6 @@ export function useStudioStatus(initialData: StudioStatus) {
 			if (
 				!disposed &&
 				!permanent &&
-				failures < STUDIO_STATUS_MAX_FAILURES &&
 				available() &&
 				(isStudioProcessing(current) || failures > 0)
 			)
@@ -108,6 +112,7 @@ export function useStudioStatus(initialData: StudioStatus) {
 			if (disposed || !available()) return;
 			const token = sequence;
 			const abort = new AbortController();
+			const startedAt = Date.now();
 			controller = abort;
 			try {
 				const data = await Promise.race([
@@ -159,10 +164,18 @@ export function useStudioStatus(initialData: StudioStatus) {
 					}),
 				]);
 				if (disposed || token !== sequence) return;
+				studioJobTiming("status-response-received", startedAt, {
+					projectId: initialData.project.id,
+				});
+				if (failures > 0)
+					studioJobTiming("sync-recovered", startedAt, {
+						projectId: initialData.project.id,
+					});
 				const previousFrames = new Map(
 					current.frames.map((frame) => [frame.id, frame]),
 				);
 				current = reconcile(current, data);
+				latestStatus.current = current;
 				for (const frame of current.frames)
 					if (
 						frame.status === "ready" &&
@@ -183,11 +196,16 @@ export function useStudioStatus(initialData: StudioStatus) {
 				failures = 0;
 			} catch (failure) {
 				if (disposed || token !== sequence) return;
-				failures++;
+				failures = Math.min(failures + 1, STUDIO_STATUS_MAX_FAILURES);
 				permanent = failure instanceof StatusFailure && failure.permanent;
+				if (failures === 1 || permanent)
+					studioJobTiming("sync-stopped", startedAt, {
+						projectId: initialData.project.id,
+						category: permanent ? "permanent" : "transient",
+					});
 				setError(
 					failures >= STUDIO_STATUS_MAX_FAILURES
-						? "Sinkronisasi desain terhenti. Periksa koneksi, lalu muat ulang halaman untuk mencoba lagi."
+						? "Koneksi bermasalah. Sinkronisasi desain akan terus dicoba."
 						: failure instanceof StatusFailure
 							? failure.message
 							: "Koneksi terputus. Sinkronisasi desain akan dicoba lagi.",

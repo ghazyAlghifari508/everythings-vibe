@@ -24,10 +24,7 @@ import {
 } from "@/features/studio/components/design-system/studio-design-picker-panels";
 import { StudioScrapeDesignSources } from "@/features/studio/components/design-system/studio-scrape-design-sources";
 import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
-import {
-	getStudioPresetDesignMd,
-	STUDIO_DESIGN_PRESETS,
-} from "@/features/studio/services/studio-presets";
+import { getStudioPresetDesignMd } from "@/features/studio/services/studio-presets";
 import type { AttachedLogo } from "@/features/studio/types/studio";
 
 export type DesignPickerTab = "tema" | "template" | "milik";
@@ -82,12 +79,6 @@ export function StudioDesignPickerDialog({
 	const [custom, setCustom] = useState<StudioDesignCustomState>(EMPTY_CUSTOM);
 
 	const activeThemeId = pendingThemeId ?? selectedThemeId;
-	const activeTheme = STUDIO_DESIGN_PRESETS.find(
-		(preset) => preset.id === activeThemeId,
-	);
-	const selectedScrape = scrapeSources.find(
-		(source) => source.id === selectedScrapeId,
-	);
 	const customTokens = custom.mdText
 		? extractDesignSystemTokens(custom.mdText)
 		: null;
@@ -127,7 +118,7 @@ export function StudioDesignPickerDialog({
 					<div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
 						<div className="flex items-start justify-between gap-4">
 							<DialogHeader className="gap-1.5 text-left sm:text-left">
-								<DialogTitle className="text-xl font-bold tracking-tight text-snow sm:text-2xl">
+								<DialogTitle className="text-left text-xl font-bold tracking-tight text-snow sm:text-2xl">
 									Pilih tampilan
 								</DialogTitle>
 								<DialogDescription className="max-w-xl text-left text-sm text-fog">
@@ -145,7 +136,7 @@ export function StudioDesignPickerDialog({
 							</DialogClose>
 						</div>
 
-						<div className="flex justify-start">
+						<div className="flex justify-center">
 							<div
 								role="tablist"
 								aria-label="Sumber referensi desain"
@@ -233,17 +224,6 @@ export function StudioDesignPickerDialog({
 								<span />
 							)}
 							<span className="flex items-center gap-2">
-								<span className="mr-2 hidden text-xs text-fog sm:inline">
-									Referensi terpilih:{" "}
-									<span className="font-semibold text-mist">
-										{activeTheme
-											? activeTheme.name
-											: (selectedScrape?.title ??
-												selectedScrape?.domain ??
-												customFilename ??
-												"belum ada")}
-									</span>
-								</span>
 								<Button
 									type="button"
 									variant="secondary"

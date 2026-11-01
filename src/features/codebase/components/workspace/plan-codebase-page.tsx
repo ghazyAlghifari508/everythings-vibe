@@ -1,16 +1,18 @@
 "use client";
 
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { TopUpModal } from "@/features/billing/components/top-up-modal";
 import { CodebaseConclusion } from "@/features/codebase/components/planning/codebase-conclusion";
 import { ScreenConnect } from "@/features/codebase/components/workspace/screen-connect";
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
 import { CODEBASE_ONBOARDING_LABEL } from "@/features/codebase/services/library";
 import type { PlanCodebaseStep } from "@/features/codebase/services/plan-storage";
 import {
-	isSyncStatusComplete,
-	SNAPSHOT_CONTEXT_STATUSES,
-} from "@/features/codebase/services/sync";
+	hasReadyAnalysisForSnapshot,
+	resolveOnboardingReadiness,
+} from "@/features/codebase/services/workspace-readiness";
 import { useUIStore } from "@/store";
 import { useCodebaseOnboarding } from "../../hooks/use-codebase-onboarding";
 import {
@@ -18,6 +20,8 @@ import {
 	useOnboardingSummaryGate,
 } from "../../hooks/use-onboarding-analysis";
 import { useOnboardingAnalysisState } from "../../hooks/use-onboarding-analysis-state";
+import { CodebaseOnboardingShell } from "./codebase-onboarding-shell";
+import { CreditConsentDialog } from "./credit-consent-dialog";
 import {
 	CodebaseOnboardingErrorCard,
 	CodebaseOnboardingLoadingCard,
@@ -28,7 +32,8 @@ export function PlanCodebasePage() {
 	const step = useUIStore((s) => s.codebasePlanStep);
 	const setStep = useUIStore((s) => s.setCodebasePlanStep);
 	const analysisState = useOnboardingAnalysisState();
-	const { analysis, analysisWorking, analysisError } = analysisState;
+	const { analysis, analysisWorking, analysisError, isAnalysisRetrying } =
+		analysisState;
 	const {
 		error,
 		isStarting,
@@ -37,22 +42,39 @@ export function PlanCodebasePage() {
 		lastStatus,
 		statusPollError,
 		createCodebase,
+		creditStatus,
 		retrySession,
+		consentOpen,
+		consentAgreed,
+		setConsentAgreed,
+		closeConsent,
+		confirmConsent,
+		refreshCreditStatus,
+		blocked,
 	} = useCodebaseOnboarding({ analysisState, step, setStep });
+	const [consentError, setConsentError] = useState<string | null>(null);
+	const [topUpOpen, setTopUpOpen] = useState(false);
 
-	// Two independent capabilities, deliberately not collapsed into one
-	// `isReady`: the workspace opens as soon as sync produced a usable
-	// snapshot, while the review conclusion additionally requires validated
-	// analysis output for that exact snapshot.
-	//
-	// `reviewReady` mirrors the workspace canRenderCodebaseReview predicate; a
-	// snapshot alone never counts as a review.
-	const canOpenWorkspace = isSyncStatusComplete(lastStatus);
-	const reviewReady = Boolean(
-		analysis?.output &&
-			lastStatus?.snapshotId &&
-			analysis.snapshotId === lastStatus.snapshotId &&
-			SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status),
+	const readiness = resolveOnboardingReadiness({
+		snapshotId: lastStatus?.snapshotId ?? null,
+		snapshotStatus: lastStatus?.status ?? null,
+		analysis,
+		analysisAttemptStatus: lastStatus?.analysisAttemptStatus ?? null,
+		creditBlocked: Boolean(analysisState.creditStatus),
+	});
+	const canOpenWorkspace = readiness === "planning_ready";
+	const analysisCreditCode = analysisState.creditStatus?.code ?? null;
+	const isExempt = Boolean(
+		analysisState.creditStatus?.billingExempt || creditStatus?.billingExempt,
+	);
+	const analysisBlocked =
+		!isExempt &&
+		(analysisCreditCode === "INSUFFICIENT_CREDITS" ||
+			analysisCreditCode === "SUBSCRIPTION_PAUSED" ||
+			lastStatus?.errorCode === "INSUFFICIENT_CREDITS");
+	const reviewReady = hasReadyAnalysisForSnapshot(
+		analysis,
+		lastStatus?.snapshotId ?? null,
 	);
 	const isLegacyAnalysisMissingSuggestions = Boolean(
 		analysis?.output &&
@@ -76,19 +98,15 @@ export function PlanCodebasePage() {
 		reviewReady,
 	});
 
-	// The conclusion step is never rendered without a usable current snapshot for
-	// this attempt. Without this guard a stale step pointer or a direct jump
-	// would show a summary for work that cannot start; the user is returned to
-	// the sync step, which reports the real state instead.
 	const activeStep: PlanCodebaseStep =
 		step === "summary" && !canContinueToSummary ? "sync" : step;
 
-	// Onboarding states are mutually exclusive. A terminal create failure must
-	// never render beside a "waiting for session" spinner: the spinner claims a
-	// request is still in flight after it has already failed, which is exactly
-	// the state the user cannot act on. Derived from `codebase` first so the
-	// ready branch keeps its non-null narrowing.
 	const onboardingFailed = !codebase && !isStarting && error !== null;
+
+	const handleTopUpClose = (open: boolean) => {
+		setTopUpOpen(open);
+		if (!open) void refreshCreditStatus();
+	};
 
 	return (
 		<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
@@ -103,6 +121,24 @@ export function PlanCodebasePage() {
 						error={error}
 						onRetry={() => void createCodebase()}
 					/>
+				) : blocked && creditStatus ? (
+					<CodebaseOnboardingShell
+						projectName={null}
+						creditStatus={creditStatus}
+						isStarting={isStarting}
+						createError={error}
+						onTopUp={() => setTopUpOpen(true)}
+					/>
+				) : creditStatus &&
+					(creditStatus.code === "FREE_ALLOWANCE_AVAILABLE" ||
+						creditStatus.code === "CREDIT_REQUIRED") ? (
+					<CodebaseOnboardingShell
+						projectName={null}
+						creditStatus={creditStatus}
+						isStarting={isStarting}
+						createError={error}
+						onStart={() => void createCodebase()}
+					/>
 				) : (
 					<CodebaseOnboardingLoadingCard
 						title={
@@ -111,14 +147,9 @@ export function PlanCodebasePage() {
 					/>
 				)
 			) : !payload && !lastStatus ? (
-				// A codebase exists but neither its prompt payload nor a polled
-				// status has landed yet. Still initializing, not an error.
 				<CodebaseOnboardingLoadingCard title="Menyiapkan instruksi CLI..." />
 			) : (
 				<>
-					{/* Step 1 owns the whole sync lifecycle: the prompt, the agent, and
-					the live server status of the upload it started. There is no second
-					screen to navigate to in order to see the same progress. */}
 					{activeStep === "sync" && (
 						<ScreenConnect
 							projectName={codebase.name}
@@ -132,7 +163,9 @@ export function PlanCodebasePage() {
 							onContinueToSummary={() => setStep("summary")}
 							analysis={analysis}
 							analysisError={analysisError}
+							analysisBlocked={analysisBlocked}
 							isAnalyzing={analysisWorking}
+							isRetrying={isAnalysisRetrying}
 							onRetryAnalysis={retryAnalysis}
 							isLegacyAnalysisMissingSuggestions={
 								isLegacyAnalysisMissingSuggestions
@@ -140,9 +173,6 @@ export function PlanCodebasePage() {
 							onRefreshLegacySuggestions={refreshLegacySuggestions}
 						/>
 					)}
-					{/* Step 2 owns every analysis state. Pending becomes the canonical
-					review in this same region once the server reports it, so there is
-					no manual step between the two. */}
 					{activeStep === "summary" && lastStatus && (
 						<section data-testid="codebase-sync-summary">
 							<CodebaseConclusion
@@ -165,6 +195,34 @@ export function PlanCodebasePage() {
 					)}
 				</>
 			)}
+			{!creditStatus?.billingExempt &&
+				creditStatus &&
+				(creditStatus.code === "FREE_ALLOWANCE_AVAILABLE" ||
+					creditStatus.code === "CREDIT_REQUIRED") && (
+					<CreditConsentDialog
+						open={consentOpen}
+						onOpenChange={(open) => {
+							if (!open) closeConsent();
+						}}
+						status={creditStatus}
+						agreed={consentAgreed}
+						onAgreedChange={setConsentAgreed}
+						error={consentError}
+						onConfirm={() => {
+							if (!consentAgreed) {
+								setConsentError(
+									"Centang persetujuan biaya sebelum melanjutkan.",
+								);
+								return;
+							}
+							setConsentError(null);
+							confirmConsent();
+							setTimeout(() => void createCodebase(), 0);
+						}}
+						isStarting={isStarting}
+					/>
+				)}
+			<TopUpModal open={topUpOpen} onOpenChange={handleTopUpClose} />
 		</main>
 	);
 }

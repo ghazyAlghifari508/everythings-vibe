@@ -161,7 +161,7 @@ describe("waiting_for_cli", () => {
 		expect(view.canRetry).toBe(false);
 		expect(userFacingCopy(view)).not.toContain("Menunggu agent");
 		expect(userFacingCopy(view)).not.toContain("Menyiapkan source code");
-		expect(userFacingCopy(view)).not.toContain("Menyinkronkan codebase");
+		expect(userFacingCopy(view)).not.toContain("Mengunggah repository");
 	});
 });
 
@@ -175,7 +175,7 @@ describe("connected, scanning and filtering", () => {
 			expect(stage(view, 1).detail).toBe(
 				"Memeriksa file project yang akan disinkronkan.",
 			);
-			expect(stage(view, 2).title).toBe("Menyinkronkan codebase");
+			expect(stage(view, 2).title).toBe("Mengunggah repository");
 			expect(view.syncComplete).toBe(false);
 		}
 	});
@@ -196,7 +196,7 @@ describe("uploading", () => {
 		expect(stage(view, 1).detail).toBe(
 			"File project yang relevan sudah disiapkan.",
 		);
-		expect(stage(view, 2).title).toBe("Menyinkronkan codebase...");
+		expect(stage(view, 2).title).toBe("Mengunggah repository...");
 		expect(stage(view, 2).detail).toBe(
 			"Mengirim source code ke everythings-vibe.",
 		);
@@ -275,7 +275,7 @@ describe("fast transition", () => {
 		expect(stage(after, 2).title).toBe("Sinkronisasi selesai");
 		// Nothing from an intermediate stage survives in the finished copy.
 		expect(userFacingCopy(after)).not.toMatch(/Menyiapkan source code\.\.\./);
-		expect(userFacingCopy(after)).not.toMatch(/Menyinkronkan codebase\.\.\./);
+		expect(userFacingCopy(after)).not.toMatch(/Mengunggah repository\.\.\./);
 	});
 });
 

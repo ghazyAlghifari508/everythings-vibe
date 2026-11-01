@@ -76,6 +76,8 @@ export async function runScrapePipeline(
 	};
 
 	const timings: Record<string, number> = {};
+	const pipelineStart = Date.now();
+	timings.queueWait = pipelineStart - scrape.createdAt.getTime();
 	const instrumentation: ScrapeInstrumentation = {
 		onActivity: async (activity) => {
 			meta = { ...meta, activity, activityStartedAt: new Date().toISOString() };
@@ -176,13 +178,14 @@ export async function runScrapePipeline(
 				},
 			);
 			instrumentation.onTiming?.("save", Date.now() - saveStart);
+			timings.pipelineTotal = Date.now() - pipelineStart;
 			await persist("completed");
 			console.info(
 				JSON.stringify({
 					scrapeTimings: true,
 					scrapeId,
 					mode,
-					totalMs: Object.values(timings).reduce((a, b) => a + b, 0),
+					totalMs: timings.pipelineTotal,
 					timings,
 				}),
 			);
@@ -212,6 +215,7 @@ export async function runScrapePipeline(
 
 		await persist("generating");
 		await instrumentation.onActivity?.("Menyusun tabel dari evidence visual");
+		const aiStart = Date.now();
 		const generated = await generateDesignMd(
 			captured.metadata.visualEvidence,
 			instrumentation,
@@ -219,6 +223,7 @@ export async function runScrapePipeline(
 			{ title: captured.title ?? undefined },
 		);
 		const designMd = generated.document;
+		instrumentation.onTiming?.("aiSynthesis", Date.now() - aiStart);
 		if (generated.enrichment.status === "unavailable")
 			await instrumentation.onActivity?.(
 				"DESIGN.md dari evidence tersimpan; AI enrichment tidak tersedia",
@@ -238,14 +243,14 @@ export async function runScrapePipeline(
 		);
 		await saveScrapeDocument(scrapeId, designMd, userId, claim);
 		instrumentation.onTiming?.("save", Date.now() - saveStart);
-
+		timings.pipelineTotal = Date.now() - pipelineStart;
 		await persist("completed");
 		console.info(
 			JSON.stringify({
 				scrapeTimings: true,
 				scrapeId,
 				mode,
-				totalMs: Object.values(timings).reduce((a, b) => a + b, 0),
+				totalMs: timings.pipelineTotal,
 				timings,
 			}),
 		);

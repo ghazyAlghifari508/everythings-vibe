@@ -34,7 +34,26 @@ describe("resolveScrapeWorkspaceMode", () => {
 		expect(resolveScrapeWorkspaceMode({ mode: "images" })).toBe("images");
 	});
 
-	it("defaults to design mode when no mode was requested", () => {
+	it("defaults to design mode when no mode was requested and session is empty", () => {
+		if (typeof window !== "undefined") {
+			window.sessionStorage.clear();
+		}
 		expect(resolveScrapeWorkspaceMode({})).toBe("design");
+	});
+
+	it("uses remembered session mode when no mode was requested in URL", () => {
+		if (typeof window !== "undefined") {
+			window.sessionStorage.setItem("vibescrape:mode", "html");
+			expect(resolveScrapeWorkspaceMode({})).toBe("html");
+			window.sessionStorage.clear();
+		}
+	});
+
+	it("prioritizes explicit valid URL mode over session mode", () => {
+		if (typeof window !== "undefined") {
+			window.sessionStorage.setItem("vibescrape:mode", "html");
+			expect(resolveScrapeWorkspaceMode({ mode: "images" })).toBe("images");
+			window.sessionStorage.clear();
+		}
 	});
 });

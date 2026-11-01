@@ -11,29 +11,37 @@ import type { CodebaseLibraryItem } from "@/features/codebase/services/library";
 import {
 	readPlanCodebasePointer,
 	readPlanCodebaseProjectPointer,
+	readPlanCodebaseStepPointer,
 	storePlanCodebasePointer,
 	storePlanCodebaseProjectPointer,
 } from "@/features/codebase/services/plan-storage";
-import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/features/codebase/types/codebase-constants";
+import {
+	CODEBASE_LIBRARY_PAGE_SIZE,
+	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
+} from "@/features/codebase/types/codebase-constants";
 import { useUIStore } from "@/store";
 import { CodebaseLibraryView } from "../components/planning/codebase-library-view";
 
+const { invalidateMock } = vi.hoisted(() => ({ invalidateMock: vi.fn() }));
+
 vi.mock("@tanstack/react-router", () => ({
-	useRouter: () => ({ invalidate: vi.fn() }),
+	useRouter: () => ({ invalidate: invalidateMock }),
 	Link: ({
 		children,
 		to,
 		params,
 		className,
+		onClick,
 	}: {
 		children: React.ReactNode;
 		to: string;
 		params?: { id: string };
 		className?: string;
+		onClick?: () => void;
 	}) => {
 		const href = params?.id ? `${to.replace("$id", params.id)}` : to;
 		return (
-			<a href={href} className={className}>
+			<a href={href} className={className} onClick={onClick}>
 				{children}
 			</a>
 		);
@@ -85,6 +93,9 @@ function makeItem(
 		packageManager: null,
 		hasReadyAnalysis: false,
 		hasUsableSnapshot: true,
+		analysisAttemptStatus: null,
+		onboardingProjectId: null,
+		readiness: "recovery_required",
 		planCount: 0,
 		...overrides,
 	};
@@ -156,6 +167,7 @@ beforeEach(() => {
 	mockCodebaseApi();
 	installRadixDomPolyfills();
 	sessionStorage.clear();
+	invalidateMock.mockClear();
 });
 
 afterEach(() => {
@@ -235,7 +247,13 @@ describe("CodebaseLibraryView", () => {
 	it("links each existing project card to its workspace", () => {
 		render(
 			<CodebaseLibraryView
-				items={[makeItem({ id: "cb-react", name: "<sample react>" })]}
+				items={[
+					makeItem({
+						id: "cb-react",
+						name: "<sample react>",
+						readiness: "planning_ready",
+					}),
+				]}
 			/>,
 		);
 		const card = screen.getByText("<sample react>").closest("a");
@@ -265,33 +283,50 @@ describe("CodebaseLibraryView", () => {
 						framework: "React",
 						snapshotStatus: "uploaded",
 						hasReadyAnalysis: false,
+						readiness: "recovery_required",
+						analysisAttemptStatus: "failed",
 					}),
 				]}
 			/>,
 		);
 		expect(screen.queryByText("Siap")).toBeNull();
-		expect(screen.getByText("Tersinkron")).toBeDefined();
+		expect(screen.getByText("Perlu analisis")).toBeDefined();
 	});
 
-	it("maps snapshot status to product language", () => {
+	it("maps readiness to the four public status labels", () => {
 		render(
 			<CodebaseLibraryView
 				items={[
 					makeItem({
 						id: "cb-ready",
 						name: "<sample ready>",
-						snapshotStatus: "ready",
+						readiness: "planning_ready",
 					}),
 					makeItem({
-						id: "cb-failed",
-						name: "<sample failed>",
-						snapshotStatus: "failed",
+						id: "cb-analyzing",
+						name: "<sample analyzing>",
+						readiness: "analysis_pending",
+						analysisAttemptStatus: "pending",
+					}),
+					makeItem({
+						id: "cb-needs",
+						name: "<sample needs>",
+						readiness: "recovery_required",
+						analysisAttemptStatus: "failed",
+					}),
+					makeItem({
+						id: "cb-sync",
+						name: "<sample sync>",
+						readiness: "onboarding",
+						hasUsableSnapshot: false,
 					}),
 				]}
 			/>,
 		);
 		expect(screen.getByText("Siap")).toBeDefined();
-		expect(screen.getByText("Perlu perhatian")).toBeDefined();
+		expect(screen.getByText("Menganalisis")).toBeDefined();
+		expect(screen.getByText("Perlu analisis")).toBeDefined();
+		expect(screen.getByText("Sinkronisasi belum selesai")).toBeDefined();
 	});
 
 	it("filters cards by search query", () => {
@@ -351,6 +386,183 @@ describe("CodebaseLibraryView", () => {
 		const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
 		expect(crumbs.textContent).not.toContain("Hubungkan Repository");
 		expect(crumbs.querySelectorAll("a")).toHaveLength(2);
+	});
+});
+
+describe("CodebaseLibraryView primary actions", () => {
+	it("opens the workspace for a ready repository", () => {
+		render(
+			<CodebaseLibraryView
+				items={[
+					makeItem({
+						id: "cb-ready",
+						name: "<sample ready>",
+						readiness: "planning_ready",
+					}),
+				]}
+			/>,
+		);
+		expect(
+			screen.getByText("<sample ready>").closest("a")?.getAttribute("href"),
+		).toBe("/codebases/cb-ready");
+		expect(screen.getByText("Buka Workspace")).toBeDefined();
+	});
+
+	it("sends a running analysis to progress and prepares resume pointers", () => {
+		render(
+			<CodebaseLibraryView
+				items={[
+					makeItem({
+						id: "cb-run",
+						name: "<sample run>",
+						readiness: "analysis_pending",
+						analysisAttemptStatus: "pending",
+						onboardingProjectId: "proj-anchor",
+					}),
+				]}
+			/>,
+		);
+		const card = screen.getByText("<sample run>").closest("a");
+		expect(card?.getAttribute("href")).toBe("/plan/codebase");
+		expect(screen.getByText("Lihat Progres")).toBeDefined();
+		fireEvent.click(card as Element);
+		expect(readPlanCodebasePointer()).toEqual({
+			id: "cb-run",
+			name: "<sample run>",
+		});
+		expect(readPlanCodebaseProjectPointer()).toBe("proj-anchor");
+		expect(readPlanCodebaseStepPointer()).toBe("sync");
+	});
+
+	it("offers retry for a failed analysis without minting a new repository", () => {
+		render(
+			<CodebaseLibraryView
+				items={[
+					makeItem({
+						id: "cb-fail",
+						name: "<sample fail>",
+						readiness: "recovery_required",
+						analysisAttemptStatus: "failed",
+					}),
+				]}
+			/>,
+		);
+		const card = screen.getByText("<sample fail>").closest("a");
+		expect(card?.getAttribute("href")).toBe("/plan/codebase");
+		expect(screen.getByText("Coba Analisis Lagi")).toBeDefined();
+		fireEvent.click(card as Element);
+		// A recovery resume points at the canonical codebase id, and clears a
+		// project pointer that belonged to a different repository.
+		expect(readPlanCodebasePointer()?.id).toBe("cb-fail");
+		expect(readPlanCodebaseProjectPointer()).toBeNull();
+	});
+
+	it("clears a stale project pointer when the repository has no anchor", () => {
+		storePlanCodebaseProjectPointer("proj-other");
+		render(
+			<CodebaseLibraryView
+				items={[
+					makeItem({
+						id: "cb-sync",
+						name: "<sample sync>",
+						readiness: "onboarding",
+						hasUsableSnapshot: false,
+					}),
+				]}
+			/>,
+		);
+		fireEvent.click(screen.getByText("<sample sync>").closest("a") as Element);
+		expect(screen.getByText("Lanjutkan Sinkronisasi")).toBeDefined();
+		expect(readPlanCodebaseProjectPointer()).toBeNull();
+	});
+
+	it("never creates a repository or project while resuming", () => {
+		render(
+			<CodebaseLibraryView
+				items={[
+					makeItem({
+						id: "cb-resume",
+						name: "<sample resume>",
+						readiness: "recovery_required",
+						analysisAttemptStatus: "failed",
+					}),
+				]}
+			/>,
+		);
+		vi.stubGlobal("fetch", vi.fn());
+		fireEvent.click(
+			screen.getByText("<sample resume>").closest("a") as Element,
+		);
+		// Resume is pure navigation: it points the onboarding flow at the existing
+		// codebase instead of minting a second history record.
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
+	it("keeps a stored plan reachable when the latest analysis is broken", () => {
+		render(
+			<CodebaseLibraryView
+				items={[
+					makeItem({
+						id: "cb-old-plan",
+						name: "<sample old plan>",
+						readiness: "existing_plan_readonly",
+						analysisAttemptStatus: "failed",
+					}),
+				]}
+			/>,
+		);
+		expect(
+			screen.getByText("<sample old plan>").closest("a")?.getAttribute("href"),
+		).toBe("/codebases/cb-old-plan");
+		expect(screen.getByText("Buka Workspace")).toBeDefined();
+	});
+
+	it("updates the card when analysis becomes ready without a full reload", () => {
+		const { rerender } = render(
+			<CodebaseLibraryView
+				items={[
+					makeItem({
+						id: "cb-run",
+						name: "<sample run>",
+						readiness: "analysis_pending",
+						analysisAttemptStatus: "pending",
+					}),
+				]}
+			/>,
+		);
+		expect(screen.getByText("Menganalisis")).toBeDefined();
+
+		rerender(
+			<CodebaseLibraryView
+				items={[
+					makeItem({
+						id: "cb-run",
+						name: "<sample run>",
+						readiness: "planning_ready",
+						hasReadyAnalysis: true,
+					}),
+				]}
+			/>,
+		);
+		expect(screen.getByText("Siap")).toBeDefined();
+		expect(screen.getByText("Buka Workspace")).toBeDefined();
+		expect(screen.queryByText("Menganalisis")).toBeNull();
+	});
+
+	it("re-runs the library loader while a row is still analyzing", async () => {
+		render(
+			<CodebaseLibraryView
+				items={[
+					makeItem({
+						readiness: "analysis_pending",
+						analysisAttemptStatus: "pending",
+					}),
+				]}
+			/>,
+		);
+		await waitFor(() => expect(invalidateMock).toHaveBeenCalled(), {
+			timeout: CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS * 4,
+		});
 	});
 });
 

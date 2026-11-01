@@ -13,6 +13,7 @@ import {
 } from "@/features/codebase/services/sync";
 import { shouldFetchWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/features/codebase/types/codebase-constants";
+import type { AnalysisCreditStatus } from "../services/analysis-credit-policy";
 import {
 	type CodebaseSessionStartAction,
 	getCodebaseSessionRequestBody,
@@ -40,6 +41,8 @@ export function useCodebaseSync({
 	const [error, setError] = useState<string | null>(null);
 	const [isStarting, setIsStarting] = useState(false);
 	const [isWorking, setIsWorking] = useState(false);
+	const [creditPreflight, setCreditPreflight] =
+		useState<AnalysisCreditStatus | null>(null);
 	const inFlight = useRef(false);
 	const analysisState = useWorkspaceAnalysis({
 		projectId,
@@ -160,12 +163,29 @@ export function useCodebaseSync({
 		setIsResyncModalOpen(true);
 		setError(null);
 		try {
+			const { requestPreSyncPreflight, preSyncAcceptance } = await import(
+				"../services/analysis-credit-requests"
+			);
+			const status = await requestPreSyncPreflight().catch((error: unknown) => {
+				setError(
+					error instanceof Error
+						? error.message
+						: "Kebutuhan kredit belum dapat diperiksa.",
+				);
+				return null;
+			});
+			if (!status) return;
+			setCreditPreflight(status);
+			const acceptance = preSyncAcceptance(status);
 			const response = await fetch(
 				`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(getCodebaseSessionRequestBody(action)),
+					body: JSON.stringify({
+						...getCodebaseSessionRequestBody(action),
+						...acceptance,
+					}),
 				},
 			);
 			const parsed = syncPromptPayloadSchema.safeParse(
@@ -182,8 +202,12 @@ export function useCodebaseSync({
 			setStatus(null);
 			setAnalysis(null);
 			analysisAttemptedFor.current = null;
-		} catch {
-			setError("Server tidak dapat dihubungi.");
+		} catch (error) {
+			setError(
+				error instanceof Error
+					? error.message
+					: "Server tidak dapat dihubungi.",
+			);
 		} finally {
 			setIsStarting(false);
 		}
@@ -208,6 +232,7 @@ export function useCodebaseSync({
 		setIsWorking,
 		readStatus,
 		startSession,
+		creditPreflight,
 		snapshotReady,
 	};
 }

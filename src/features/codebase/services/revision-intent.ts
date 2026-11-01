@@ -1,12 +1,17 @@
 /**
  * How the workspace directs a new chat message.
  *
- * There is no per-message choice: a message sent while a user-facing feature
- * plan is active revises that plan, and a new plan is only ever created from
- * the explicit "Buat fitur baru" action. The two change different persisted
- * artifacts, so the explicit action is the only thing that may create one.
+ * Explicit composer mode: "plan" starts or clarifies feature planning, while
+ * "revise" submits a revision proposal against an explicit target artifact.
+ * Legacy aliases ("create", "clarify") normalize to "plan".
  */
-export type CodebaseComposerMode = "create" | "clarify" | "revise";
+export type CodebaseComposerMode = "plan" | "create" | "clarify" | "revise";
+
+export function normalizeComposerMode(
+	mode?: CodebaseComposerMode | null,
+): "plan" | "revise" {
+	return mode === "revise" ? "revise" : "plan";
+}
 
 export interface RevisionContextInput {
 	/** The feature name the user is revising. */

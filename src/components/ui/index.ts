@@ -8,5 +8,6 @@ export {
 	type PageHeadingProps,
 	type PageHeadingVariant,
 } from "./page-heading";
+export { Spinner, type SpinnerProps } from "./spinner";
 export { ThoughtLine } from "./thought-line";
 export { Toast } from "./toast";

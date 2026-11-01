@@ -54,6 +54,8 @@ export function reducePreviewReport(
 	incoming: PreviewFrameReport,
 ): PreviewReadinessState {
 	const observations = state.observations + 1;
+	if (isContentReport(state.report) && !isContentReport(incoming))
+		return { ...state, observations };
 	if (isContentReport(incoming))
 		return { report: incoming, emptyObservations: 0, observations };
 	if (incoming === "failed")

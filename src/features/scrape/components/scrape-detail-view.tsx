@@ -243,15 +243,14 @@ export function ScrapeDetailView({
 							mode === "crawl"
 								? pages.filter((page) => page.status === "completed").length
 								: mode === "images"
-									? images.filter((image) => image.status === "completed")
-											.length
+									? undefined
 									: 1
 						}
 						partialFailed={
 							mode === "crawl"
 								? pages.filter((page) => page.status === "failed").length
 								: mode === "images"
-									? images.filter((image) => image.status === "failed").length
+									? undefined
 									: 0
 						}
 					/>

@@ -714,4 +714,27 @@ describe("collectTreeFolderPaths", () => {
 			[...collectTreeFolderPaths(buildTree(nestedTreeFiles))].sort(),
 		).toEqual(["docs", "src", "src/components", "src/pages"]);
 	});
+
+	it("renders multi-tech stack badges cleanly without regression", () => {
+		const sampleFiles = [{ path: "astro.config.mjs" }];
+		act(() => {
+			root?.render(
+				<CodebaseExplorerSidebar
+					files={sampleFiles}
+					stack={["Astro", "Tailwind CSS", "TypeScript"]}
+				/>,
+			);
+		});
+
+		expect(container.textContent).toContain("Stack codebase terdeteksi");
+		expect(container.textContent).toContain("Astro");
+		expect(container.textContent).toContain("Tailwind CSS");
+		expect(container.textContent).toContain("TypeScript");
+
+		// When stack is empty, shows "Tidak terdeteksi"
+		act(() => {
+			root?.render(<CodebaseExplorerSidebar files={sampleFiles} stack={[]} />);
+		});
+		expect(container.textContent).toContain("Tidak terdeteksi");
+	});
 });

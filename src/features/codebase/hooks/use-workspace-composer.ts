@@ -1,12 +1,24 @@
 import { type Dispatch, type SetStateAction, useCallback, useRef } from "react";
 import type { ChatStreamMessage } from "@/features/codebase/components/chat/codebase-chat-workspace";
 import type { CodebasePipelineStage } from "@/features/codebase/services/chat-flow";
+import type {
+	ComposerOperationMode,
+	ComposerSubmissionPayload,
+} from "@/features/codebase/services/composer-interactions";
+import type { RevisionTargetKind } from "@/features/codebase/services/revision-base-version.server";
+import {
+	type CodebaseComposerMode,
+	normalizeComposerMode,
+} from "@/features/codebase/services/revision-intent";
+import type { ComposerReferenceBinding } from "../types/revision";
 import type { useWorkspaceArtifacts } from "./use-workspace-artifacts";
 import type { useWorkspacePlan } from "./use-workspace-plan";
 
 export function useWorkspaceComposer({
 	codebase,
 	composerAvailable = true,
+	composerMode = "plan",
+	setComposerMode,
 	snapshotReady,
 	isWorking,
 	setIsWorking,
@@ -32,6 +44,8 @@ export function useWorkspaceComposer({
 }: {
 	codebase: { id: string; name: string };
 	composerAvailable?: boolean;
+	composerMode?: CodebaseComposerMode;
+	setComposerMode?: (mode: ComposerOperationMode) => void;
 	snapshotReady: boolean;
 	isWorking: boolean;
 	setIsWorking: (working: boolean) => void;
@@ -51,7 +65,14 @@ export function useWorkspaceComposer({
 	setIsCreatingNew: (creating: boolean) => void;
 	setLastFeaturePrompt: (prompt: string) => void;
 	fetchAiQuestions: (id: string, prompt: string) => Promise<void>;
-	runRevision: (instruction: string) => Promise<void>;
+	runRevision: (
+		instruction: string,
+		options?: {
+			targetKind?: RevisionTargetKind;
+			optionalReferences?: readonly string[];
+			referenceBindings?: readonly ComposerReferenceBinding[];
+		},
+	) => Promise<void>;
 	resetFeatureWorkspace: () => void;
 	registerCreatedPlan: (plan: { id: string; name: string }) => void;
 }) {
@@ -149,18 +170,50 @@ export function useWorkspaceComposer({
 		resetFeatureWorkspace();
 		setActiveFeature(null);
 		setIsCreatingNew(true);
-	}, [resetFeatureWorkspace, setActiveFeature, setIsCreatingNew]);
+		setComposerMode?.("plan");
+	}, [
+		resetFeatureWorkspace,
+		setActiveFeature,
+		setIsCreatingNew,
+		setComposerMode,
+	]);
 	const handleSendMessage = useCallback(
-		async (message: string) => {
+		async (
+			message: string,
+			submission?: Partial<ComposerSubmissionPayload>,
+		) => {
 			const trimmed = message.trim();
+			const effectiveMode = normalizeComposerMode(
+				submission?.mode ?? composerMode,
+			);
+			const canRunExplicitCompletedRevision =
+				effectiveMode === "revise" && submission?.mode === "revise";
 			if (
-				!composerAvailable ||
+				(!composerAvailable && !canRunExplicitCompletedRevision) ||
 				!trimmed ||
 				trimmed.length < 3 ||
 				creationInFlight.current ||
 				isWorking
 			)
 				return false;
+
+			if (effectiveMode === "revise") {
+				if (!effectiveFeatureId || artifactCount === 0) {
+					setError("Belum ada dokumen yang bisa direvisi pada fitur ini.");
+					return false;
+				}
+				setChatMessages((current) => [
+					...current,
+					{ id: `user-${Date.now()}`, role: "user", content: trimmed },
+				]);
+				await runRevision(trimmed, {
+					targetKind: submission?.targetKind,
+					optionalReferences: submission?.optionalReferences,
+					referenceBindings: submission?.referenceBindings,
+				});
+				return true;
+			}
+
 			setChatMessages((current) => [
 				...current,
 				{ id: `user-${Date.now()}`, role: "user", content: trimmed },
@@ -182,10 +235,6 @@ export function useWorkspaceComposer({
 				}
 				return projectId !== null;
 			}
-			if (activeHasPlanning) {
-				await runRevision(trimmed);
-				return true;
-			}
 			setLastFeaturePrompt(trimmed);
 			void fetchAiQuestions(effectiveFeatureId, trimmed);
 			return true;
@@ -193,6 +242,7 @@ export function useWorkspaceComposer({
 		[
 			artifactCount,
 			composerAvailable,
+			composerMode,
 			effectiveFeatureId,
 			ensureFeatureInWorkspace,
 			fetchAiQuestions,
@@ -200,14 +250,21 @@ export function useWorkspaceComposer({
 			isWorking,
 			onboardingFeatureId,
 			runRevision,
+			setError,
 			setLastFeaturePrompt,
 			setIsCreatingNew,
 			setChatMessages,
 		],
 	);
+	const handleSubmitComposer = useCallback(
+		(payload: ComposerSubmissionPayload) =>
+			handleSendMessage(payload.message, payload),
+		[handleSendMessage],
+	);
 	return {
 		handleCreateFeature,
 		handleSendMessage,
+		handleSubmitComposer,
 		invalidateCreation: () => {
 			workspaceEpoch.current += 1;
 			creationId.current = null;

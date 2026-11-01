@@ -50,7 +50,7 @@ export function useScrapePreview(
 
 	if (activeScrapeId !== scrapeId) {
 		setActiveScrapeId(scrapeId);
-		requestRef.current = 0;
+		requestRef.current += 1;
 		setPreview(initialPreview);
 		setState(initialPreview ? "ready" : "idle");
 		setError(null);

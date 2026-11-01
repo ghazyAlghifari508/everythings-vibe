@@ -31,7 +31,10 @@ try {
 		const stdout = child.stdout;
 		let output = "";
 		const exited = once(child, "exit");
-		const timeout = setTimeout(() => child.kill(), 15000);
+		// tsx transpiles the whole worker import graph on a cold start; on a loaded
+		// machine this exceeds 15s. The smoke verifies readiness + signal handling,
+		// not a startup SLA.
+		const timeout = setTimeout(() => child.kill(), 60_000);
 		try {
 			await new Promise<void>((resolve, reject) => {
 				stdout.on("data", (data) => {

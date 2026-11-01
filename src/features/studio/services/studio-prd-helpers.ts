@@ -145,7 +145,8 @@ export function sanitizeStudioPrd(content: string): string {
 			"",
 		)
 		.replace(/<\/?SHARED_DESIGN_BLUEPRINT>/gi, "")
-		.trim();
+		.trim()
+		.slice(0, STUDIO_PRD_MAX_CHARS);
 }
 
 export interface StudioPrdSummary {

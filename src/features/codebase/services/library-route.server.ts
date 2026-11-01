@@ -14,14 +14,22 @@ import {
 } from "@/db/schema";
 import {
 	CODEBASE_CLI_MIN_VERSION,
+	CODEBASE_LIBRARY_BULK_DELETE_LIMIT_ERROR,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
 } from "@/features/codebase/types/codebase-constants";
 import { requireUser } from "@/lib/session";
+import { analysisCreditConsentSchema } from "./analysis-credit-policy";
+import {
+	checkPreSyncCredit,
+	getAnalysisCreditPreflight,
+} from "./analysis-credit-preflight.server";
 import {
 	type CodebaseNameSource,
 	normalizeRepositoryName,
 	PROVISIONAL_CODEBASE_NAME,
+	parseCodebaseBulkDelete,
 } from "./library";
+import { deleteOwnedCodebases } from "./library-delete.server";
 import { buildSyncCommand, type SyncPromptPayload } from "./sync";
 import { generateSyncToken, hashSyncToken } from "./sync.server";
 
@@ -71,6 +79,9 @@ export async function handleCodebaseList({
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
 
+	if (new URL(request.url).searchParams.get("preflight") === "analysis") {
+		return Response.json(await getAnalysisCreditPreflight(user.id));
+	}
 	const rows = await db
 		.select({
 			id: codebases.id,
@@ -133,6 +144,59 @@ export async function handleCodebaseList({
 	});
 }
 
+// Browser batch delete: the ids are validated here and then deleted inside a
+// single ownership-scoped transaction, so the browser never receives a
+// per-row outcome it would have to stitch together.
+export async function handleCodebaseBulkDelete({
+	request,
+}: {
+	request: Request;
+}): Promise<Response> {
+	let user: { id: string };
+	try {
+		user = await requireUser(request.headers);
+	} catch {
+		return Response.json({ error: "Unauthorized" }, { status: 401 });
+	}
+
+	const body: unknown = await request.json().catch(() => null);
+	let ids: string[];
+	try {
+		ids = parseCodebaseBulkDelete(body).ids;
+	} catch {
+		return Response.json(
+			{ error: "Permintaan hapus tidak valid.", code: "CODEBASE_IDS_INVALID" },
+			{ status: 400 },
+		);
+	}
+
+	try {
+		const result = await deleteOwnedCodebases(ids, user.id);
+		return Response.json({ success: true, ...result });
+	} catch (error) {
+		if (
+			error instanceof Error &&
+			error.message === CODEBASE_LIBRARY_BULK_DELETE_LIMIT_ERROR
+		) {
+			return Response.json(
+				{
+					error: error.message,
+					code: "CODEBASE_LIMIT_EXCEEDED",
+				},
+				{ status: 400 },
+			);
+		}
+		console.error(`[codebases/bulk-delete] failed for user ${user.id}:`, error);
+		return Response.json(
+			{
+				error: "Gagal menghapus repository.",
+				code: "CODEBASE_DELETE_FAILED",
+			},
+			{ status: 500 },
+		);
+	}
+}
+
 // Browser create: the codebase and its first short-lived sync session are
 // created atomically. The raw credential is returned once inside the sync
 // payload; only its hash is persisted. Accepts either an explicit `name`
@@ -150,6 +214,12 @@ export async function handleCodebaseCreate({
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
 	const body: unknown = await request.json().catch(() => null);
+	const preflight = await checkPreSyncCredit(user.id, body);
+	if (preflight.response) return preflight.response;
+	const consent = analysisCreditConsentSchema.parse({
+		maximumCredits: preflight.status.maximumCredits,
+		pricingVersion: preflight.status.pricingVersion,
+	});
 	const nameCheck = validateCodebaseNameInput(body);
 	if (!nameCheck.ok) {
 		return Response.json({ error: nameCheck.error }, { status: 400 });
@@ -186,6 +256,7 @@ export async function handleCodebaseCreate({
 					expiresAt,
 					cliMinVersion: CODEBASE_CLI_MIN_VERSION,
 					attempt: 1,
+					metadata: { analysisCreditConsent: consent },
 				})
 				.returning({
 					expiresAt: codebaseSyncSessions.expiresAt,

@@ -1,7 +1,22 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioHeader } from "@/features/studio/components/workspace/studio-header";
+
+vi.mock("@tanstack/react-router", () => ({
+	Link: ({
+		children,
+		to,
+		...props
+	}: {
+		children: React.ReactNode;
+		to: string;
+	}) => (
+		<a href={to} {...props}>
+			{children}
+		</a>
+	),
+}));
 
 vi.mock("@/lib/auth-client", () => ({
 	authClient: {
@@ -45,7 +60,7 @@ describe("StudioHeader", () => {
 	});
 
 	it("keeps project menu, title, export and account controls reachable", () => {
-		renderHeader({ onAddFrame: vi.fn(), onDelete: vi.fn() });
+		renderHeader({ onDelete: vi.fn() });
 		expect(screen.getByRole("button", { name: "Menu project" })).toBeDefined();
 		expect(
 			screen.getByRole("button", { name: "Export project" }),
@@ -56,6 +71,31 @@ describe("StudioHeader", () => {
 		expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
 			"KopiKultur Coffee Shop App",
 		);
+	});
+
+	it("has no manual add-page or project design-system action in the project dropdown", async () => {
+		renderHeader({ onDelete: vi.fn() });
+		fireEvent.pointerDown(
+			screen.getByRole("button", { name: "Menu project" }),
+			{ button: 0, ctrlKey: false, pointerType: "mouse" },
+		);
+		expect(
+			await screen.findByRole("menuitem", {
+				name: /Kembali ke Semua Project/i,
+			}),
+		).toBeDefined();
+		expect(
+			screen.getByRole("menuitem", { name: /Duplicate Project/i }),
+		).toBeDefined();
+		expect(
+			screen.getByRole("menuitem", { name: /Hapus project/i }),
+		).toBeDefined();
+		expect(
+			screen.queryByRole("menuitem", { name: /Tambah Halaman/i }),
+		).toBeNull();
+		expect(
+			screen.queryByRole("menuitem", { name: /Design system/i }),
+		).toBeNull();
 	});
 
 	it("gives every interactive control a pointer-enabled surface", () => {

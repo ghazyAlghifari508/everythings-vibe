@@ -111,8 +111,12 @@ export async function generateDesignMd(
 		outcomes.find(({ outcome }) => outcome.status === "unavailable")?.outcome ??
 		outcomes[0]?.outcome;
 	if (!synthesis) throw new ScrapeError("AI_GENERATION_FAILED");
+	const applied = outcomes.find(({ outcome }) => outcome.synthesis);
 	const renderOptions: RenderDesignMdOptions = model.views?.length
 		? {
+				...(applied?.outcome.synthesis
+					? synthesisToRenderOptions(applied.outcome.synthesis, applied.model)
+					: {}),
 				viewOptions: Object.fromEntries(
 					outcomes.map(({ id, model: scoped, outcome }) => [
 						id,

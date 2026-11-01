@@ -9,14 +9,12 @@
 
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { codebaseAnalyses, subscriptions } from "@/db/schema";
-import { resolveSubscriptionState } from "@/features/billing/services/billing";
+import { codebaseAnalyses } from "@/db/schema";
 import type { CreditOperationResult } from "@/lib/services/credit-service";
 import {
 	buildCodebaseMetrics,
 	createCreditQuote,
-	formatInsufficientCreditsError,
-	formatSubscriptionPausedError,
+	getCreditOperation,
 	isReleasableReservation,
 	markCreditOperationRunning,
 	releaseCreditOperation,
@@ -29,6 +27,13 @@ import {
 	claimStarterSuggestionRefresh,
 	requestCodebaseAnalysis,
 } from "./analysis.server";
+import { ANALYSIS_ALLOWANCE_POLICY } from "./analysis-credit-policy";
+import {
+	analysisCreditBlockedResponse,
+	getAnalysisCreditPreflight,
+	readSyncCreditConsent,
+} from "./analysis-credit-preflight.server";
+import { buildAnalysisIdempotencyKey } from "./analysis-diagnostics";
 import type { AnalysisRefreshRequest } from "./analysis-refresh";
 import { failRefreshClaim, toResponse } from "./analysis-route-scope.server";
 
@@ -41,38 +46,17 @@ type AnalysisAttemptInput = {
 		status: string;
 		fileCount: number;
 		contentSize: number;
+		syncSessionId: string;
 	};
-	existingCount: number;
+	preflightOnly?: boolean;
+	creditConsent?: unknown;
 	refreshRequest: AnalysisRefreshRequest | null;
 };
 
 export async function runCodebaseAnalysisAttempt(
 	input: AnalysisAttemptInput,
 ): Promise<Response> {
-	const { userId, projectId, scope, snapshot, existingCount, refreshRequest } =
-		input;
-
-	const [sub] = await db
-		.select({
-			plan: subscriptions.plan,
-			status: subscriptions.status,
-			credits: subscriptions.credits,
-			creditsUsed: subscriptions.creditsUsed,
-			creditsReserved: subscriptions.creditsReserved,
-			currentPeriodStart: subscriptions.currentPeriodStart,
-			currentPeriodEnd: subscriptions.currentPeriodEnd,
-			cancelledAt: subscriptions.cancelledAt,
-		})
-		.from(subscriptions)
-		.where(eq(subscriptions.userId, userId))
-		.orderBy(desc(subscriptions.createdAt))
-		.limit(1);
-
-	const eff = resolveSubscriptionState(sub, new Date());
-	const availableCredits = Math.max(
-		0,
-		(sub?.credits ?? 0) - (sub?.creditsUsed ?? 0) - (sub?.creditsReserved ?? 0),
-	);
+	const { userId, projectId, scope, snapshot, refreshRequest } = input;
 
 	const metrics = buildCodebaseMetrics({
 		fileCount: snapshot.fileCount,
@@ -87,27 +71,27 @@ export async function runCodebaseAnalysisAttempt(
 		metrics,
 	});
 
-	if (eff.state === "paused") {
-		return Response.json(
-			formatSubscriptionPausedError({
-				quote,
-				availableCredits,
-				stageLabel: "analisis codebase",
-			}),
-			{ status: 403 },
-		);
-	}
-
-	if (availableCredits < quote.maximumCredits) {
-		return Response.json(
-			formatInsufficientCreditsError({
-				quote,
-				availableCredits,
-				stageLabel: "analisis codebase",
-			}),
-			{ status: 403 },
-		);
-	}
+	const creditStatus = await getAnalysisCreditPreflight(userId, {
+		isInitial: !refreshRequest,
+		consent:
+			input.creditConsent ??
+			(refreshRequest
+				? undefined
+				: await readSyncCreditConsent(
+						userId,
+						snapshot.syncSessionId,
+						projectId,
+					)),
+	});
+	if (input.preflightOnly)
+		return Response.json({
+			...creditStatus,
+			estimatedCredits:
+				creditStatus.maximumCredits === 0 ? 0 : quote.estimatedCredits,
+			quote,
+		});
+	if (!creditStatus.canStart)
+		return analysisCreditBlockedResponse(creditStatus);
 	let claimedAnalysisId: string | undefined;
 	if (refreshRequest) {
 		try {
@@ -148,33 +132,53 @@ export async function runCodebaseAnalysisAttempt(
 		}
 	}
 
-	const idempotencyKey = `${projectId}:codebase_analysis:${snapshot.id}:${existingCount + 1}`;
+	const idempotencyKey = buildAnalysisIdempotencyKey({
+		projectId,
+		snapshotId: snapshot.id,
+		refreshAnalysisId:
+			refreshRequest?.refreshStarterSuggestionsForAnalysisId ?? null,
+	});
 
 	let reservation: CreditOperationResult;
+	let analysisId = claimedAnalysisId ?? crypto.randomUUID();
 	try {
-		// A reused key whose operation already terminated cannot
-		// analyze again: mint a fresh attempt instead of running
-		// the model for free (settled) or against a dead
-		// reservation. Genuine in-flight retries keep joining.
-		reservation = await reserveActiveCreditOperation({
+		const reserveInput = {
 			userId,
 			projectId,
-			stage: "codebase",
-			operation: "codebase_analysis",
+			stage: "codebase" as const,
+			operation: "codebase_analysis" as const,
 			metrics,
 			idempotencyKey,
 			quote,
-		});
+			analysisReference: analysisId,
+			isExempt: creditStatus.billingExempt,
+			initialAnalysisAllowance:
+				!creditStatus.billingExempt &&
+				creditStatus.code === "FREE_ALLOWANCE_AVAILABLE",
+			expiresAt: new Date(
+				Date.now() + ANALYSIS_ALLOWANCE_POLICY.reservationLifetimeMs,
+			),
+		};
+		reservation = await reserveActiveCreditOperation(reserveInput);
+		analysisId =
+			reservation.analysisReference ?? claimedAnalysisId ?? crypto.randomUUID();
 	} catch (err) {
 		console.error("[codebase/analysis] reserveCreditOperation failed:", err);
 		if (claimedAnalysisId) await failRefreshClaim(claimedAnalysisId);
+		const current = await getAnalysisCreditPreflight(userId, {
+			isInitial: !refreshRequest,
+		});
+		if (
+			current.code !== "FREE_ALLOWANCE_AVAILABLE" &&
+			current.code !== "CREDIT_REQUIRED"
+		)
+			return analysisCreditBlockedResponse(current);
 		return Response.json(
-			formatInsufficientCreditsError({
-				quote,
-				availableCredits,
-				stageLabel: "analisis codebase",
-			}),
-			{ status: 403 },
+			{
+				error: "Analisis belum dapat dimulai. Coba lagi.",
+				code: "ANALYSIS_UNAVAILABLE",
+			},
+			{ status: 503 },
 		);
 	}
 
@@ -191,16 +195,13 @@ export async function runCodebaseAnalysisAttempt(
 			"[codebase/analysis] markCreditOperationRunning failed:",
 			err,
 		);
-		if (isReleasableReservation(reservation.state)) {
-			await releaseCreditOperation({
-				userId,
-				operationId: reservation.id,
-				reason: "Analysis reservation not runnable",
-			}).catch(() => {});
-		}
+
 		if (claimedAnalysisId) await failRefreshClaim(claimedAnalysisId);
 		return Response.json(
-			{ error: "Analisis sedang berjalan. Tunggu hingga selesai." },
+			{
+				error: "Analisis sedang berjalan. Tunggu hingga selesai.",
+				code: "ANALYSIS_IN_PROGRESS",
+			},
 			{ status: 409 },
 		);
 	}
@@ -209,7 +210,20 @@ export async function runCodebaseAnalysisAttempt(
 		const analysis = await requestCodebaseAnalysis(
 			projectId,
 			snapshot.id,
-			{},
+			{
+				analysisId,
+				settle: async (tx, analysisId) => {
+					await settleCreditOperation(
+						{
+							userId,
+							operationId: reservation.id,
+							artifactId: analysisId,
+							actualMetrics: metrics,
+						},
+						tx,
+					);
+				},
+			},
 			{
 				...(scope.kind === "codebase" ? { codebaseId: scope.codebaseId } : {}),
 				...(claimedAnalysisId ? { claimedAnalysisId } : {}),
@@ -222,38 +236,58 @@ export async function runCodebaseAnalysisAttempt(
 			.limit(1);
 		const response = row ? toResponse(row) : null;
 		if (!response || !analysis) {
-			if (isReleasableReservation(reservation.state)) {
-				await releaseCreditOperation({
+			try {
+				const current = await getCreditOperation({
 					userId,
 					operationId: reservation.id,
-					reason: "Hasil analisis rusak",
-				}).catch(() => {});
+				});
+				if (isReleasableReservation(current.state)) {
+					await releaseCreditOperation({
+						userId,
+						operationId: reservation.id,
+						reason: "Hasil analisis rusak",
+					});
+				}
+			} catch (error: unknown) {
+				console.error("[codebase/analysis] release failed", error);
 			}
 			return Response.json(
 				{ error: "Hasil analisis rusak", code: "SYNC_FAILED" },
 				{ status: 500 },
 			);
 		}
-		await settleCreditOperation({
-			userId,
-			operationId: reservation.id,
-			artifactId: analysis.id,
-			actualMetrics: metrics,
-		});
 		return Response.json(response);
 	} catch (error) {
 		const failureReason =
 			error instanceof Error ? error.message : "Analisis codebase gagal";
-		await releaseCreditOperation({
-			userId,
-			operationId: reservation.id,
-			reason: failureReason,
-		}).catch((relErr) => {
+		try {
+			// Re-read before cleanup: the state captured at reserve time is
+			// stale once generation ran (a concurrent sweep may have settled,
+			// released, or quarantined it). Only an operation that is still
+			// unstarted is safe to release; anything else is reported, not
+			// silently swallowed, so a terminal-state regression stays visible.
+			const current = await getCreditOperation({
+				userId,
+				operationId: reservation.id,
+			});
+			if (isReleasableReservation(current.state)) {
+				await releaseCreditOperation({
+					userId,
+					operationId: reservation.id,
+					reason: failureReason,
+				});
+			} else {
+				console.error(
+					"[codebase/analysis] skip release: reservation already terminal",
+					{ operationId: reservation.id, state: current.state },
+				);
+			}
+		} catch (relErr) {
 			console.error(
 				"[codebase/analysis] releaseCreditOperation failed:",
 				relErr,
 			);
-		});
+		}
 
 		if (error instanceof AnalysisServiceError) {
 			if (error.code === "SNAPSHOT_NOT_UPLOADED")
@@ -276,7 +310,7 @@ export async function runCodebaseAnalysisAttempt(
 			return Response.json(
 				{
 					error: error.message,
-					code: "ANALYSIS_FAILED",
+					code: error.recoveryCode ?? "ANALYSIS_FAILED",
 					// Prefer the exact failed attempt carried by the
 					// service (Task 9): under a concurrent duplicate
 					// trigger the latest row could be the sibling's

@@ -125,5 +125,141 @@ export function inspectStudioHtml(html: string): {
 		warnings.push(
 			"Inspect decorative cursor/pseudo-element animation in static presentation.",
 		);
+	if (
+		document.querySelector(
+			"[data-studio-content] [data-studio-shell], [data-studio-content] [data-studio-header]",
+		)
+	) {
+		hard.push("Duplicate global shell inside screen content.");
+	}
+	if (document.querySelectorAll("nav[data-studio-navigation]").length > 1) {
+		hard.push("Duplicate global navigation detected.");
+	}
+	if (
+		/\[data-studio-shell\]|#studio-canonical-style|\[data-studio-header\]/i.test(
+			css,
+		)
+	) {
+		warnings.push("Inspect CSS for collisions with canonical shell selectors.");
+	}
+	for (const section of document.querySelectorAll(
+		"section, article, [data-card]",
+	)) {
+		const text = (section.textContent ?? "").trim();
+		const hasMediaOrInput = section.querySelector(
+			"img, svg, input, select, textarea, button, canvas, table",
+		);
+		if (text.length === 0 && !hasMediaOrInput) {
+			warnings.push("Empty content section or card detected.");
+			break;
+		}
+	}
+	const mainContent =
+		document.querySelector("[data-studio-content]") ?? document.body;
+	const mainText = (mainContent?.textContent ?? "").replace(/\s+/g, " ").trim();
+	const hasInteractive = mainContent?.querySelector(
+		"input, button, select, textarea, table, img, svg",
+	);
+	if (mainText.length > 0 && mainText.length < 20 && !hasInteractive) {
+		warnings.push("Suspiciously sparse screen body content.");
+	}
+	for (const table of document.querySelectorAll("table")) {
+		const cols = table.querySelectorAll(
+			"tr:first-child th, tr:first-child td",
+		).length;
+		if (cols >= 4) {
+			const parent = table.parentElement;
+			const isWrapped =
+				parent &&
+				(parent.hasAttribute("data-table-container") ||
+					parent.classList.contains("table-container") ||
+					parent.classList.contains("overflow-x-auto") ||
+					/overflow(-x)?\s*:\s*(?:auto|scroll)/i.test(
+						parent.getAttribute("style") ?? "",
+					));
+			if (!isWrapped) {
+				warnings.push(
+					"Wide data table without contained horizontal scrolling.",
+				);
+				break;
+			}
+		}
+	}
+	for (const el of document.querySelectorAll("[style*='width']")) {
+		const style = el.getAttribute("style") ?? "";
+		const match =
+			/(?<![-\w])(min-width|width)\s*:\s*(\d+(?:\.\d+)?)(px)\b/i.exec(style);
+		if (match && Number(match[2]) > 1440) {
+			hard.push("Lebar tetap melebihi viewport.");
+			break;
+		}
+	}
 	return { hard: [...new Set(hard)], warnings: [...new Set(warnings)] };
+}
+
+/**
+ * Counts the renderable children of the canonical content region. A nonzero
+ * count before assembly that becomes zero after is a transformation defect,
+ * not an empty screen: the assembly must never discard valid content.
+ */
+export function studioContentNodeCount(html: string): number {
+	const content = new JSDOM(html).window.document.querySelector(
+		"[data-studio-content]",
+	);
+	if (!content) return 0;
+	if (content.children.length > 0) return content.children.length;
+	// A text-only content region is still meaningful content; it must not be
+	// reported as emptied by assembly.
+	return (content.textContent ?? "").trim().length > 0 ? 1 : 0;
+}
+
+const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
+	[/shell must occur exactly once/i, "SHELL_NOT_SINGULAR"],
+	[
+		/navigation identity\/order\/icons\/active state/i,
+		"NAVIGATION_CONTRACT_MISMATCH",
+	],
+	[/app header missing or duplicated/i, "HEADER_INVALID"],
+	[/content region missing or duplicated/i, "CONTENT_REGION_INVALID"],
+	[/canonical shared styling missing or modified/i, "SHELL_STYLE_MODIFIED"],
+	[/status bar/i, "UNEXPECTED_STATUS_BAR"],
+	[/Konten layar kosong setelah/i, "EMPTY_CONTENT_AFTER_ASSEMBLY"],
+	[/Duplicate id:/, "DUPLICATE_ID"],
+	[/Unintended event handler/, "UNSAFE_EVENT_HANDLER"],
+	[/Unintended executable script/, "UNSAFE_SCRIPT"],
+	[/Unsafe embedded document/, "UNSAFE_EMBED"],
+	[/Accessible label missing/, "MISSING_ACCESSIBLE_LABEL"],
+	[/Unexpected autofocus/, "UNEXPECTED_AUTOFOCUS"],
+	[/Unresolved component image asset/, "UNRESOLVED_IMAGE_ASSET"],
+	[/Unresolved SVG component asset/, "UNRESOLVED_SVG_ASSET"],
+	[/Invalid interactive or paragraph nesting/, "INVALID_INTERACTIVE_NESTING"],
+	[/HTML tidak lengkap/, "HTML_INCOMPLETE"],
+	[/Viewport meta hilang/, "VIEWPORT_META_MISSING"],
+	[/Token blueprint bersama hilang/, "BLUEPRINT_TOKENS_MISSING"],
+	[/Token design system hilang/, "DESIGN_TOKENS_MISSING"],
+	[/Label navigasi hilang/, "NAVIGATION_LABEL_MISSING"],
+	[/Urutan navigasi tidak sesuai/, "NAVIGATION_ORDER_MISMATCH"],
+	[/Navigasi ganda/, "DUPLICATE_NAVIGATION"],
+	[/Artefak markdown/, "MARKDOWN_ARTIFACT"],
+	[/Body HTML tidak lengkap/, "HTML_BODY_INCOMPLETE"],
+	[/Body HTML kosong/, "EMPTY_BODY"],
+	[/Lebar tetap melebihi viewport/, "FIXED_WIDTH_OVERFLOW"],
+	[/duplicate global shell/i, "DUPLICATE_GLOBAL_SHELL"],
+	[/duplicate global navigation/i, "DUPLICATE_GLOBAL_NAVIGATION"],
+	[/collisions with canonical shell/i, "SHELL_COLLISION"],
+	[/empty content section/i, "EMPTY_SECTION"],
+	[/suspiciously sparse/i, "SPARSE_CONTENT"],
+	[/wide data table without/i, "UNCONTAINED_WIDE_TABLE"],
+	[/Posisi fixed tidak diizinkan/, "DISALLOWED_FIXED_POSITION"],
+	[/Posisi sticky tidak diizinkan/, "DISALLOWED_STICKY_POSITION"],
+];
+
+/**
+ * Stable machine code for a validation complaint, so structured logs can
+ * aggregate failures without embedding the (potentially long) message text.
+ */
+export function studioIssueCode(message: string): string {
+	for (const [pattern, code] of ISSUE_CODE_PATTERNS)
+		if (pattern.test(message)) return code;
+	return "UNCLASSIFIED";
 }
