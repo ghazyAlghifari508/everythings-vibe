@@ -61,6 +61,7 @@ export function CodebaseLibraryView({
 	const clampedPage = Math.min(page, totalPages);
 	const paged = paginate(filtered, clampedPage, CODEBASE_LIBRARY_PAGE_SIZE);
 	const pageIds = paged.map((item) => item.id);
+	const selectionActive = selection.count > 0;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: reset to the first page whenever the query changes; the dependency is the trigger, not a read
 	useEffect(() => {
@@ -130,12 +131,7 @@ export function CodebaseLibraryView({
 		if (!deleteRequest) return;
 		setDeleting(true);
 		try {
-			const ids =
-				deleteRequest.kind === "bulk"
-					? [...selection.ids]
-					: deleteRequest.kind === "all_filtered"
-						? filtered.map((row) => row.id)
-						: localItems.map((row) => row.id);
+			const ids = [...selection.ids];
 
 			const result = await requestCodebaseBulkDelete(ids);
 			setDeleteRequest(null);
@@ -182,10 +178,7 @@ export function CodebaseLibraryView({
 			{hasProjects && (
 				<header className="flex flex-col gap-4 border-b border-graphite pb-6 sm:flex-row sm:items-end sm:justify-between">
 					<div>
-						<p className="font-mono text-xs uppercase tracking-widest text-fog">
-							Existing Codebase
-						</p>
-						<h1 className="mt-2 text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
+						<h1 className="text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
 							Project Tersimpan
 						</h1>
 						<p className="mt-2 max-w-2xl text-sm leading-6 text-fog">
@@ -221,71 +214,42 @@ export function CodebaseLibraryView({
 				</div>
 			)}
 
-			{hasProjects && filtered.length > 0 && selection.count === 0 && (
-				<div className="flex items-center justify-between py-1">
-					<label className="inline-flex min-h-6 items-center gap-2 text-xs text-fog cursor-pointer">
-						<input
-							type="checkbox"
-							checked={false}
-							onChange={() => selection.setPageSelection(pageIds, true)}
-							aria-label="Pilih semua di halaman ini"
-							className="size-4 shrink-0 accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-						/>
-						<span>Pilih semua</span>
-					</label>
-					<button
-						type="button"
-						onClick={() =>
-							setDeleteRequest(
-								query.trim()
-									? { kind: "all_filtered", count: filtered.length }
-									: { kind: "all", count: localItems.length },
-							)
-						}
-						className="text-xs text-fog transition-colors hover:text-crimson focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						{query.trim() ? "Hapus semua hasil pencarian" : "Hapus semua"}
-					</button>
-				</div>
+			{selectionActive && paged.length > 0 && (
+				<HistorySelectAll
+					noun="repository"
+					pageIds={pageIds}
+					selectedIds={selection.ids}
+					total={filtered.length}
+					filteredScopeActive={selection.scope === "filtered"}
+					preparing={false}
+					onTogglePage={(selected) =>
+						selection.setPageSelection(pageIds, selected)
+					}
+					onSelectAllFiltered={() =>
+						selection.applyFiltered({
+							ids: filtered.map((r) => r.id),
+							total: filtered.length,
+							truncated: false,
+						})
+					}
+				/>
 			)}
 
-			{(selection.count > 0 || selection.notice !== null) && (
-				<div className="flex flex-col gap-3">
-					{selection.count > 0 && (
-						<HistorySelectAll
-							noun="repository"
-							pageIds={pageIds}
-							selectedIds={selection.ids}
-							total={filtered.length}
-							filteredScopeActive={selection.scope === "filtered"}
-							preparing={false}
-							onTogglePage={(selected) =>
-								selection.setPageSelection(pageIds, selected)
-							}
-							onSelectAllFiltered={() =>
-								selection.applyFiltered({
-									ids: filtered.map((r) => r.id),
-									total: filtered.length,
-									truncated: false,
-								})
-							}
-						/>
-					)}
-					<HistorySelectionBar
-						noun="repository"
-						count={selection.count}
-						filteredTotal={selection.filteredTotal}
-						truncated={selection.truncated}
-						notice={selection.notice}
-						deleting={deleting}
-						cancelLabel="Batalkan Pilihan"
-						deleteLabel="Hapus Terpilih"
-						onClear={selection.clear}
-						onDelete={() =>
-							setDeleteRequest({ kind: "bulk", count: selection.count })
-						}
-					/>
-				</div>
+			{(selectionActive || selection.notice !== null) && (
+				<HistorySelectionBar
+					noun="repository"
+					count={selection.count}
+					filteredTotal={selection.filteredTotal}
+					truncated={selection.truncated}
+					notice={selection.notice}
+					deleting={deleting}
+					cancelLabel="Batalkan Pilihan"
+					deleteLabel="Hapus Terpilih"
+					onClear={selection.clear}
+					onDelete={() =>
+						setDeleteRequest({ kind: "bulk", count: selection.count })
+					}
+				/>
 			)}
 
 			{!hasProjects ? (
@@ -301,6 +265,7 @@ export function CodebaseLibraryView({
 							key={item.id}
 							item={item}
 							selected={selection.ids.has(item.id)}
+							selectionActive={selectionActive}
 							onToggleSelect={selection.toggle}
 							onRename={applyRename}
 							onDelete={removeProject}
