@@ -177,14 +177,15 @@ export async function generateValidatedFrameHtml(
 			}
 		}
 		if (input.activeScreen) htmlCode = repairStudioAccessibleLabels(htmlCode);
-		const diagnostics = input.activeScreen
-			? inspectStudioHtml(htmlCode)
-			: { hard: [], warnings: [] };
+		const diagnostics = inspectStudioHtml(htmlCode);
 		if (diagnostics.warnings.length)
-			console.info("[studio.output.quality]", {
-				...input.timing,
-				warnings: diagnostics.warnings,
-			});
+			console.info(
+				JSON.stringify({
+					stage: "output-quality",
+					...input.timing,
+					warnings: diagnostics.warnings,
+				}),
+			);
 		const issues: StudioOutputIssue[] = [
 			...assemblyIssues.map((message) => ({
 				stage: "canonical-assembly",

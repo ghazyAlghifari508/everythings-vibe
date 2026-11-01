@@ -1,5 +1,6 @@
 import { JSDOM } from "jsdom";
 import { renderCanonicalIcon } from "./studio-canonical-icons";
+import { STUDIO_COMPONENT_STYLE } from "./studio-component-patterns";
 import {
 	type StudioDesignBlueprint,
 	studioColorContrast,
@@ -72,7 +73,7 @@ function shellStyle(
 html{box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}
 body{margin:0}
 [data-studio-shell]{--app-primary:${primary};--app-secondary:${bp.secondary};--app-on-primary:${onPrimary};--app-canvas:${canvas};--app-surface:${surface};--app-ink:${ink};--app-muted:${muted};--app-border:${border};--app-font:${font};--app-gutter:${gutter}px;--app-radius:${bp.radius}px;min-width:0;width:100%;background:var(--app-canvas);color:var(--app-ink);font:400 16px/1.5 var(--app-font);overflow-wrap:break-word}
-[data-studio-shell] :where(button,input,select,textarea){font:inherit;min-height:44px;max-width:100%;border:var(--app-border);border-radius:${tokens?.shapes.borderRadius.buttons ?? "var(--app-radius)"};padding:10px 14px}
+:where([data-studio-shell] button,[data-studio-shell] input,[data-studio-shell] select,[data-studio-shell] textarea){font:inherit;min-height:44px;max-width:100%;border:var(--app-border);border-radius:${tokens?.shapes.borderRadius.buttons ?? "var(--app-radius)"};padding:10px 14px}
 [data-studio-shell] :where(button[type=submit],[data-primary]){background:var(--app-primary);color:var(--app-on-primary)}
 [data-studio-shell] :where(.card,[data-card]){border:var(--app-border);border-radius:${tokens?.shapes.borderRadius.cards ?? "var(--app-radius)"};background:var(--app-surface);min-width:0;max-width:100%;overflow-wrap:break-word}
 [data-studio-shell] :where(table){width:100%;border-collapse:collapse;text-align:left;font-size:14px}
@@ -155,7 +156,7 @@ export function assembleCanonicalShell(
 		}
 	}
 
-	// Remove independently generated or duplicate nav / header / status bar outside content
+	// Contextual headings and tabs belong to the screen, not the shared shell.
 	for (const el of Array.from(
 		document.body.querySelectorAll(
 			"nav, header, [data-studio-status-bar], [data-status-bar], .status-bar, .system-status-bar",
@@ -164,10 +165,8 @@ export function assembleCanonicalShell(
 		if (
 			el !== content &&
 			(!content.contains(el) ||
-				el.tagName === "NAV" ||
-				el.tagName === "HEADER" ||
 				el.matches?.(
-					"[data-studio-status-bar], [data-status-bar], .status-bar, .system-status-bar",
+					"[data-studio-header], [data-studio-navigation], [data-studio-status-bar], [data-status-bar], .status-bar, .system-status-bar",
 				))
 		) {
 			el.remove();
@@ -231,6 +230,7 @@ export function assembleCanonicalShell(
 	}
 
 	document.querySelector("#studio-canonical-style")?.remove();
+	document.querySelector("#studio-component-patterns")?.remove();
 	const oldShell = document.querySelector("[data-studio-shell]");
 	const wrapper = document.createElement("div");
 	wrapper.setAttribute("data-studio-shell", "1");
@@ -253,7 +253,10 @@ export function assembleCanonicalShell(
 		}
 	}
 
-	document.head.insertAdjacentHTML("beforeend", shellStyle(blueprint, tokens));
+	document.head.insertAdjacentHTML(
+		"beforeend",
+		STUDIO_COMPONENT_STYLE + shellStyle(blueprint, tokens),
+	);
 	return `<!DOCTYPE html>${document.documentElement.outerHTML}`;
 }
 
@@ -268,7 +271,11 @@ export function validateCanonicalShell(
 	const issues: string[] = [];
 	const shells = document.querySelectorAll("[data-studio-shell]");
 	if (shells.length !== 1) issues.push("Shared shell must occur exactly once.");
-	const navs = document.querySelectorAll("nav");
+	const navs = Array.from(document.querySelectorAll("nav")).filter(
+		(nav) =>
+			nav.hasAttribute("data-studio-navigation") ||
+			!nav.closest("[data-studio-content]"),
+	);
 	const expectedNav = document.createElement("div");
 	expectedNav.innerHTML = navigation(blueprint, screen);
 	if (

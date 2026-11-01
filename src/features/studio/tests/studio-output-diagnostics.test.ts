@@ -182,7 +182,7 @@ describe("structured output diagnostics", () => {
 	it("reports content emptied by canonical assembly with node counts", async () => {
 		await mockSequence([
 			{
-				html: '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content><nav>Menu lama</nav></main></body></html>',
+				html: '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content><nav data-studio-navigation>Menu lama</nav></main></body></html>',
 			},
 			{
 				html: '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content><p>Konten asli</p></main></body></html>',
@@ -202,7 +202,9 @@ describe("structured output diagnostics", () => {
 				timing: timing(),
 			});
 			expect(html).toContain("Konten asli");
-			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			const events = log.mock.calls
+				.filter(([line]) => String(line).startsWith("{"))
+				.map(([line]) => JSON.parse(String(line)));
 			expect(events).toEqual(
 				expect.arrayContaining([
 					expect.objectContaining({

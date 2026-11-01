@@ -1,12 +1,12 @@
 import { JSDOM } from "jsdom";
+import { inspectStudioLayout } from "./studio-layout-diagnostics";
 
 export function inspectStudioHtml(html: string): {
 	hard: string[];
 	warnings: string[];
 } {
 	const document = new JSDOM(html).window.document;
-	const hard: string[] = [];
-	const warnings: string[] = [];
+	const { hard, warnings } = inspectStudioLayout(document);
 	const ids = new Set<string>();
 	for (const element of document.querySelectorAll("[id]")) {
 		if (ids.has(element.id)) hard.push(`Duplicate id: ${element.id}.`);
@@ -189,7 +189,10 @@ export function inspectStudioHtml(html: string): {
 		const style = el.getAttribute("style") ?? "";
 		const match =
 			/(?<![-\w])(min-width|width)\s*:\s*(\d+(?:\.\d+)?)(px)\b/i.exec(style);
-		if (match && Number(match[2]) > 1440) {
+		const scroller = el.parentElement?.closest(
+			'[data-table-container],.table-container,.overflow-x-auto,[style*="overflow-x:auto"],[style*="overflow-x: auto"]',
+		);
+		if (match && Number(match[2]) > 1440 && !scroller) {
 			hard.push("Lebar tetap melebihi viewport.");
 			break;
 		}
