@@ -152,6 +152,37 @@ export function buildAnalysisIdempotencyKey(input: {
 	return `${input.projectId}:codebase_analysis:${input.snapshotId}:${input.refreshAnalysisId ?? "initial"}`;
 }
 
+export function serializeAnalysisError(error: unknown): {
+	errorName: string;
+	errorCode?: string;
+	databaseErrorCode?: string;
+	causeNames: string[];
+} {
+	const result: ReturnType<typeof serializeAnalysisError> = {
+		errorName: error instanceof Error ? "Error" : "NonError",
+		causeNames: [],
+	};
+	const seen = new Set<Error>();
+	let current = error;
+	while (current instanceof Error && !seen.has(current)) {
+		seen.add(current);
+		// Only identifiers are retained; messages, SQL, detail and stacks may contain source or secrets.
+		const name = /^[A-Za-z][A-Za-z0-9]*Error$|^Error$/.test(current.name)
+			? current.name
+			: "Error";
+		if (seen.size === 1) result.errorName = name;
+		result.causeNames.push(name);
+		if ("code" in current && typeof current.code === "string") {
+			if (/^[0-9A-Z]{5}$/.test(current.code))
+				result.databaseErrorCode = current.code;
+			else if (/^[A-Z][A-Z0-9_]{0,79}$/.test(current.code))
+				result.errorCode = current.code;
+		}
+		current = current.cause;
+	}
+	return result;
+}
+
 export interface AnalysisDiagnosticRecord {
 	attemptId: string;
 	projectId: string;

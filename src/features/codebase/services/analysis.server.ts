@@ -1,26 +1,4 @@
-// Server-only codebase analysis orchestration (Task 6).
-//
-// Never import this module from client/isomorphic code: it imports the
-// database client and the AI orchestration chain. Route handlers import it
-// directly, following the neighboring `/api/codebase` top-level `{ db }`
-// pattern. Pure prompt/validation helpers live in `codebase-analysis.ts`.
-//
-// Flow per attempt (one fresh `codebase_analyses` row each):
-// 1. Snapshot must be `uploaded` and its session must be `uploaded` —
-//    analysis is requested ONLY from uploaded state (Task 5 known limitation:
-//    completion-replay-after-terminal is never assumed).
-// 2. Legacy project sessions move uploaded → analyzing; codebase-scoped
-//    sessions stay uploaded while a per-feature `pending` row is stored.
-// 3. The model chain (same selectModels/tryStreamWithFallback boundary as
-//    /api/chat and /api/ask/options) generates strict JSON over the bounded
-//    snapshot context. Output is validated with the Task 1 Zod schema before
-//    persistence; uncertainty stays labeled, paths are never invented.
-// 4. Success: analysis → ready. Legacy project sessions also move to ready;
-//    codebase-scoped sessions stay uploaded because the snapshot is shared by
-//    every feature.
-// 5. Failure: analysis → failed with a fixed safe message. Legacy project
-//    sessions roll back analyzing → uploaded; codebase sessions are unchanged.
-//    No credit is consumed either way.
+// Server-only: READY and credit settlement commit together; shared snapshots stay uploaded.
 
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -47,6 +25,7 @@ import {
 	resolveAnalysisFeaturePrompt,
 	toSafeAnalysisErrorMessage,
 } from "./analysis";
+import { serializeAnalysisError } from "./analysis-diagnostics";
 import { readPersistCreditIdentity } from "./analysis-persist-identity";
 import {
 	claimStarterSuggestionRefresh,
@@ -336,9 +315,9 @@ export async function requestCodebaseAnalysis(
 		// was finalizing against when it died.
 		const { creditOperationId, operationState, operationExpiresAt } =
 			await readPersistCreditIdentity(analysisId);
-		console.error(
-			"[codebase/analysis] attempt failed",
-			formatAnalysisDiagnosticLog({
+		console.error("[codebase/analysis] attempt failed", {
+			...serializeAnalysisError(error),
+			...formatAnalysisDiagnosticLog({
 				attemptId: analysisId,
 				projectId,
 				snapshotId,
@@ -358,7 +337,7 @@ export async function requestCodebaseAnalysis(
 					? { rawLength: error.rawLength }
 					: {}),
 			}),
-		);
+		});
 		// Defense-in-depth: writers store only the fixed safe string; the
 		// sanitizer additionally guarantees no token/source content passes.
 		const safe =
