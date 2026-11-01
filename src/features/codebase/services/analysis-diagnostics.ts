@@ -49,6 +49,11 @@ export function classifyAnalysisFailure(
 	if (readServiceErrorCode(error) === "SNAPSHOT_NOT_UPLOADED") {
 		return "snapshot";
 	}
+	// Everything thrown after `stage` flips to persist comes from the
+	// finalization transaction (settlement, ledger, row write). Provider
+	// wording cannot legitimately appear there, so message patterns must not
+	// reclassify a database failure as an upstream one.
+	if (stage === "persist") return "persistence";
 	const message = error instanceof Error ? error.message : String(error);
 	// Credit lifecycle failures that abort persistence are triaged as
 	// persistence, not provider: the model output existed, only finalization
@@ -77,7 +82,6 @@ export function classifyAnalysisFailure(
 	) {
 		return "provider";
 	}
-	if (stage === "persist") return "persistence";
 	return "unknown";
 }
 

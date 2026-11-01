@@ -116,6 +116,7 @@ test("codebase analysis retry never reuses a terminal credit operation", async (
 			artifactId: expired.analysisReference ?? "missing",
 			actualMetrics: metrics,
 		}),
+		/already terminal|reservation expired/,
 	);
 	const releasedAgain = await credits.getCreditOperation({
 		userId,
