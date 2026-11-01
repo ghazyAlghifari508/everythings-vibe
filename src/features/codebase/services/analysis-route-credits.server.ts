@@ -258,23 +258,22 @@ export async function runCodebaseAnalysisAttempt(
 		}
 		return Response.json(response);
 	} catch (error) {
-		const failureReason =
-			error instanceof Error ? error.message : "Analisis codebase gagal";
 		try {
-			// Re-read before cleanup: the state captured at reserve time is
-			// stale once generation ran (a concurrent sweep may have settled,
-			// released, or quarantined it). Only an operation that is still
-			// unstarted is safe to release; anything else is reported, not
-			// silently swallowed, so a terminal-state regression stays visible.
+			// This request won the running claim; release only its exact attempt, never a sibling.
 			const current = await getCreditOperation({
 				userId,
 				operationId: reservation.id,
 			});
-			if (isReleasableReservation(current.state)) {
+			if (
+				isReleasableReservation(current.state) ||
+				(current.state === "running" &&
+					current.analysisReference === analysisId)
+			) {
 				await releaseCreditOperation({
 					userId,
 					operationId: reservation.id,
-					reason: failureReason,
+					reason: "Analisis codebase gagal",
+					actor: "codebase-analysis-failure",
 				});
 			} else {
 				console.error(
