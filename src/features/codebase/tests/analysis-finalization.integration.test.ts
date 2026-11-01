@@ -63,7 +63,7 @@ test("validated analysis commits READY with settlement and rolls both back on pe
 			relevantPaths: [],
 		})),
 	});
-	async function attempt(fail: boolean) {
+	async function attempt(fail: false | "persist" | "timeout") {
 		const analysisId = crypto.randomUUID();
 		const operation = await c.reserveActiveCreditOperation({
 			userId,
@@ -102,6 +102,7 @@ test("validated analysis commits READY with settlement and rolls both back on pe
 						"code" in error &&
 						error.code === "SNAPSHOT_NOT_UPLOADED",
 				);
+				if (fail === "timeout") throw new Error("provider timeout");
 				return payload;
 			},
 			settle: async (tx, id) => {
@@ -114,7 +115,8 @@ test("validated analysis commits READY with settlement and rolls both back on pe
 					},
 					tx,
 				);
-				if (fail) throw new Error("synthetic persistence failure");
+				if (fail === "persist")
+					throw new Error("synthetic persistence failure");
 			},
 		});
 		if (fail) {
@@ -160,7 +162,8 @@ test("validated analysis commits READY with settlement and rolls both back on pe
 			assert.equal(parsed.snapshotId, snapshotId);
 		} else assert.equal(analysis.output, null);
 	}
-	await attempt(true);
+	await attempt("timeout");
+	await attempt("persist");
 	await attempt(false);
 	const [snapshot] = await db
 		.select()
