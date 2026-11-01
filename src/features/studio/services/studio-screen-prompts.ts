@@ -115,14 +115,24 @@ Strict styling integration rules:
 
 	// Logo
 	if (opts.logoUrl && opts.logoUrl.trim().length > 0) {
-		sections.push(
-			`<APPLICATION_LOGO_REFERENCE>
+		if (opts.blueprint) {
+			// Assembly injects the logo into the platform app bar; asking the model
+			// to render it again duplicates brand chrome inside the screen body.
+			sections.push(
+				`<APPLICATION_LOGO_REFERENCE>
+Studio renders the official application logo "${opts.logoUrl.trim()}" in the assembled app bar. Do not render the logo yourself anywhere in the screen content.
+</APPLICATION_LOGO_REFERENCE>`,
+			);
+		} else {
+			sections.push(
+				`<APPLICATION_LOGO_REFERENCE>
 The user has provided an official application brand logo at: "${opts.logoUrl.trim()}".
 You MUST include this exact logo in the top navigation bar or app header:
 <img src="${opts.logoUrl.trim()}" alt="Logo" class="h-8 w-auto object-contain" />
 Do NOT replace this logo with text initials or placeholder shapes.
 </APPLICATION_LOGO_REFERENCE>`,
-		);
+			);
+		}
 	}
 
 	// Revision vs Initial

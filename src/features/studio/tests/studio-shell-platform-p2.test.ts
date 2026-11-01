@@ -11,6 +11,7 @@ import {
 import type { StudioDesignBlueprint } from "../services/studio-design-blueprint";
 import { enforceDesignSystemOnHtml } from "../services/studio-design-system-html";
 import { inspectStudioHtml } from "../services/studio-html-diagnostics";
+import { buildStudioFramePrompt } from "../services/studio-screen-prompts";
 import { extractCleanHtml } from "../utils/clean-html";
 import {
 	financeBlueprint,
@@ -277,6 +278,28 @@ describe("Task 02 — platform-shaped canonical app bar", () => {
 		expect(
 			validateCanonicalShell(html, financeBlueprint, "Beranda", null),
 		).toEqual([]);
+	});
+
+	it("frame prompt keeps logo rendering with the shell, not the model, once a blueprint exists", () => {
+		const logoUrl = "/api/studio/asset?id=logo-1&cap=s";
+		const withBlueprint = buildStudioFramePrompt({
+			screenName: "Eksplorasi",
+			projectPrompt: "Aplikasi travel",
+			designMode: "mobile",
+			logoUrl,
+			blueprint: travelBlueprint,
+			activeScreen: "Eksplorasi",
+		});
+		expect(withBlueprint).toContain(logoUrl);
+		expect(withBlueprint).toContain("assembled app bar");
+		expect(withBlueprint).not.toContain("<img");
+		const withoutBlueprint = buildStudioFramePrompt({
+			screenName: "Eksplorasi",
+			projectPrompt: "Aplikasi travel",
+			designMode: "mobile",
+			logoUrl,
+		});
+		expect(withoutBlueprint).toContain(`<img src="${logoUrl}" alt="Logo"`);
 	});
 
 	it("web and mobile projects sharing a blueprint diverge by platform, one project stays identical", () => {
