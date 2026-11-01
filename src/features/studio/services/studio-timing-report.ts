@@ -11,6 +11,9 @@ const eventSchema = z.object({
 	code: z.string().optional(),
 	skillId: z.string().optional(),
 	skillChars: z.number().nonnegative().optional(),
+	// CPU cost of assembling one frame's system prompt (skill selection +
+	// contract build). Kept separate from provider latency in the report.
+	promptAssemblyMs: z.number().nonnegative().optional(),
 	outputTokens: z.number().nonnegative().optional(),
 	textTokens: z.number().nonnegative().optional(),
 	reasoningTokens: z.number().nonnegative().optional(),
@@ -119,6 +122,9 @@ export function summarizeStudioTimings(log: string) {
 		(event) =>
 			event.stage.endsWith("-output") && event.providerRetries !== undefined,
 	);
+	const promptAssembly = events
+		.map((event) => event.promptAssemblyMs)
+		.filter((value): value is number => value !== undefined);
 	return {
 		validationRejectionPercent: validations.length
 			? (validations.filter((event) => event.code === "INVALID_OUTPUT").length /
@@ -134,6 +140,7 @@ export function summarizeStudioTimings(log: string) {
 		stages: Object.fromEntries(
 			[...buckets].map(([stage, values]) => [stage, summarize(values)]),
 		),
+		promptAssemblyMs: promptAssembly.length ? summarize(promptAssembly) : null,
 		firstReadyMs: [...firstReady.values()],
 		firstVisibleMs: [...firstVisible.values()],
 		perSkill: Object.fromEntries(

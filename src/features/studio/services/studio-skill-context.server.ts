@@ -394,6 +394,15 @@ function scoreSection(
 	if (tokens.length > 0) {
 		const body = section.text.toLowerCase();
 		for (const token of tokens) if (body.includes(token)) bonus += 1;
+		// Heading matches are worth more than body matches: a section titled
+		// "Overflow" is directly about the failure, while a section that merely
+		// mentions "overflow" in passing may be about something else entirely.
+		// This ensures focus-relevant sections from reference docs compete with
+		// high-tag-score sections from the primary doc in tight correction budgets.
+		if (section.heading) {
+			const lowerHeading = section.heading.toLowerCase();
+			for (const token of tokens) if (lowerHeading.includes(token)) bonus += 8;
+		}
 	}
 	return {
 		score: base + bonus,
@@ -553,10 +562,13 @@ export function buildStudioSkillContext(
 	// Greedy whole-section selection under a hard character cap. Identity
 	// sections (preamble and top-level headings) are preferred but still bounded;
 	// a section that does not fit is omitted in full, never cut mid-sentence.
+	// In correction stage with focus tokens, prioritize failure-relevant sections
+	// over generic identity to keep the repair prompt focused and small.
 	const ordered: StudioSkillSection[] = [];
 	const rationaleByKey = new Map<string, string>();
 	const selectedKeys = new Set<string>();
 	let used = 0;
+	const hasFocus = tokens.length > 0;
 	const consider = (
 		section: StudioSkillSection,
 		rationale: string,
@@ -571,17 +583,23 @@ export function buildStudioSkillContext(
 		used += cost;
 	};
 
-	for (const section of allSections) {
-		if (section.docPath !== primary.path) continue;
-		const tags = classifySection(section.heading, section.text);
-		if (section.heading !== null && tags.includes("meta")) continue;
-		if (section.level <= 1) consider(section, "core-identity", true);
-	}
-	for (const section of allSections) {
-		if (section.docPath !== primary.path || selectedKeys.has(section.key))
-			continue;
-		if (isCoreSection(id, section, stage))
-			consider(section, "core-identity", false);
+	// When focus tokens exist in correction stage, skip ALL core identity
+	// selection so focus-matched sections from any doc fill the budget first.
+	// This ensures failure-relevant guidance (e.g. overflow, contrast) is
+	// delivered instead of generic identity sections that don't help repair.
+	if (!(stage === "correction" && hasFocus)) {
+		for (const section of allSections) {
+			if (section.docPath !== primary.path) continue;
+			const tags = classifySection(section.heading, section.text);
+			if (section.heading !== null && tags.includes("meta")) continue;
+			if (section.level <= 1) consider(section, "core-identity", true);
+		}
+		for (const section of allSections) {
+			if (section.docPath !== primary.path || selectedKeys.has(section.key))
+				continue;
+			if (isCoreSection(id, section, stage))
+				consider(section, "core-identity", false);
+		}
 	}
 	for (const entry of ranked) {
 		if (entry.score <= 0) continue;

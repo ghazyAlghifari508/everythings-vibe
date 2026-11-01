@@ -9,12 +9,13 @@ export const STUDIO_SKILL_DOCUMENT_BUDGET_CHARS = 100_000;
 // Stage-aware delivery budgets. Selection is greedy + deterministic and only ever
 // drops or keeps whole upstream sections, so these never cut a document
 // mid-sentence. They exist to stop one stage from resending catalogs another
-// stage already needed.
+// stage already needed. Tighter frame/correction caps reduce token overhead
+// without dropping core identity sections (always included regardless of budget).
 export const STUDIO_SKILL_STAGE_BUDGET_CHARS = {
 	planning: 20_000,
-	frame: 28_000,
-	revision: 20_000,
-	correction: 12_000,
+	frame: 20_000,
+	revision: 16_000,
+	correction: 8_000,
 } as const;
 
 export const STUDIO_VISUAL_WIDTH = {
