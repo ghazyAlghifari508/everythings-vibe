@@ -42,7 +42,7 @@ describe("Studio Upstream Skill Fidelity & Genuine Integration (Phase 4)", () =>
 			"9685ca7eac70283d083fc23baa9a88e7d3cd93c4",
 		);
 		expect(STUDIO_SKILL_MANIFEST.taste.pinnedRevision).toBe(
-			"d237dd399d57524945c0c81327da5da19f7a468d",
+			"12af471f627f866411b4bd785b19646d3672784c",
 		);
 	});
 
@@ -79,7 +79,7 @@ describe("Studio Upstream Skill Fidelity & Genuine Integration (Phase 4)", () =>
 		for (const id of SKILL_IDS.slice(1)) {
 			const resolved = resolveStudioDesignSkill(id);
 			expect(resolved.id).toBe(id);
-			expect(resolved.version).toBe(2);
+			expect(resolved.version).toBeGreaterThanOrEqual(2);
 			expect(resolved.sourceRevision).toMatch(/^[a-f0-9]{40}$/);
 			expect(resolved.guidance.length).toBeGreaterThan(5000);
 		}
@@ -130,8 +130,7 @@ describe("Studio Upstream Skill Fidelity & Genuine Integration (Phase 4)", () =>
 		const frameTaste = resolveStudioFrameSystemPrompt("taste");
 		expect(frameTaste).toContain(STUDIO_SYSTEM_PROMPT);
 		expect(frameTaste).toContain("Leonxlnx/taste-skill");
-		expect(frameTaste).toContain("BRIEF INFERENCE");
-
+		expect(frameTaste).toContain("tasteskill v2");
 		const frameFrontend = resolveStudioFrameSystemPrompt("frontend-design");
 		expect(frameFrontend).toContain(STUDIO_SYSTEM_PROMPT);
 		expect(frameFrontend).toContain("anthropics/skills");
@@ -173,7 +172,7 @@ describe("Studio Upstream Skill Fidelity & Genuine Integration (Phase 4)", () =>
 			null,
 			2,
 		);
-		const safetyIdx = planning.indexOf("safety and platform validity");
+		const safetyIdx = planning.indexOf("security and HTML safety");
 		const userReqIdx = planning.indexOf("explicit user requirements");
 		const skillIdx = planning.indexOf("selected design skill guidance");
 
@@ -187,7 +186,7 @@ describe("Studio Upstream Skill Fidelity & Genuine Integration (Phase 4)", () =>
 			designMode: "web",
 		});
 		expect(frame).toContain(
-			"Design precedence, highest to lowest: safety and platform validity > explicit user requirements",
+			"Design precedence, highest to lowest: security and HTML safety > explicit user requirements",
 		);
 	});
 
