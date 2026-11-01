@@ -1,3 +1,4 @@
+import { PageHeading } from "@/components/ui";
 import { useScrapeHistorySelection } from "@/features/scrape/hooks/use-scrape-history-selection";
 import type {
 	ScrapeHistoryBulkDeleteResult,
@@ -33,9 +34,7 @@ export function ScrapeHistoryView({
 			<div className="flex w-full flex-col gap-6 py-4">
 				<header className="flex flex-wrap items-start justify-between gap-4">
 					<div className="max-w-2xl">
-						<h1 className="text-2xl font-semibold tracking-tight text-snow sm:text-3xl">
-							Riwayat VibeScrape
-						</h1>
+						<PageHeading variant="workspace">Riwayat VibeScrape</PageHeading>
 						<p className="mt-2 text-sm leading-6 text-fog">
 							Temukan dan kelola hasil ekstraksi website.
 						</p>

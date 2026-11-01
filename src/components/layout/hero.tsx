@@ -5,6 +5,7 @@ import {
 	ChatInput,
 	type HomeProjectMode,
 } from "@/components/layout/chat-input";
+import { PageHeading } from "@/components/ui";
 import { CodebaseFeatureGallery } from "@/features/templates/components/codebase-feature-gallery";
 import { TemplateGallery } from "@/features/templates/components/template-gallery";
 
@@ -29,9 +30,9 @@ export function HeroContent({
 	return (
 		<div className="relative z-10 flex w-full flex-col items-center px-6 text-center">
 			<div className="flex w-full max-w-[1200px] flex-col items-center gap-4 sm:gap-6 pt-2 sm:pt-4">
-				<h1 className="max-w-[860px] font-inter text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-snow">
+				<PageHeading variant="display" className="max-w-[860px]">
 					Dari ide produk ke PRD yang siap dieksekusi
-				</h1>
+				</PageHeading>
 
 				<p className="max-w-[650px] font-inter text-[17px] font-normal leading-[1.6] text-fog">
 					Describe produk kamu secara natural dan AI akan generate Product
