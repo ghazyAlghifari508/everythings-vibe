@@ -142,10 +142,7 @@ export const StudioFrame = memo(function StudioFrame({
 						/>
 					) : null}
 					{frame.status === "queued" ? (
-						<output
-							aria-label="Menunggu antrean"
-							className="block size-1.5 shrink-0 rounded-full bg-fog"
-						/>
+						<output aria-label="Menunggu antrean" className="sr-only" />
 					) : null}
 					{frame.status === "failed" ? (
 						<Icon

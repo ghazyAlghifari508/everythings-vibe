@@ -65,6 +65,7 @@ export function StudioWorkspace({
 					designSkillId={workspace.project.designSkillId}
 					onDesignSkillChange={workspace.handleSkillChange}
 					referenceLabel={workspace.storedReferenceLabel}
+					referenceColors={workspace.storedReferenceColors}
 				/>
 			</div>
 

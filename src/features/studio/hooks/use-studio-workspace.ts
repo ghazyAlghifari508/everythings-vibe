@@ -8,6 +8,7 @@ import type { StudioComposerSubmitResult } from "@/features/studio/components/co
 import { useStudioScreenSuggestions } from "@/features/studio/hooks/use-studio-screen-suggestions";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
+import { extractDesignSystemTokens } from "@/features/studio/services/studio-design-tokens";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
@@ -34,6 +35,7 @@ export interface StudioWorkspaceState {
 	isProcessing: boolean;
 	readyFramesCount: number;
 	storedReferenceLabel: string | null;
+	storedReferenceColors: readonly string[] | null;
 	/** Empty while work is in flight; a new screen is already on its way. */
 	suggestions: readonly StudioScreenSuggestion[];
 	selectFrame: (id: string | null, additive?: boolean) => void;
@@ -153,6 +155,37 @@ export function useStudioWorkspace(
 		return null;
 	}, [project.designReference, project.designMd]);
 
+	const storedReferenceColors = useMemo(() => {
+		const reference = project.designReference;
+		if (reference?.kind === "theme") {
+			const preset = STUDIO_DESIGN_PRESETS.find(
+				(entry) => entry.id === reference.id,
+			);
+			if (preset) {
+				return [preset.tokens.canvas, preset.tokens.primary, preset.tokens.ink];
+			}
+		}
+		if (project.designMd) {
+			const tokens = extractDesignSystemTokens(project.designMd);
+			if (tokens) {
+				const candidateColors = [
+					tokens.colors.canvas,
+					tokens.colors.primary,
+					tokens.colors.ink,
+				].filter(
+					(color): color is string =>
+						typeof color === "string" &&
+						/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(
+							color.trim(),
+						),
+				);
+				if (candidateColors.length > 0) {
+					return candidateColors;
+				}
+			}
+		}
+		return null;
+	}, [project.designReference, project.designMd]);
 	return {
 		project,
 		frames,
@@ -170,6 +203,7 @@ export function useStudioWorkspace(
 		isProcessing,
 		readyFramesCount,
 		storedReferenceLabel,
+		storedReferenceColors,
 		suggestions,
 		selectFrame,
 		selectFrames,

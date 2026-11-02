@@ -1,12 +1,13 @@
 import {
 	ArrowUp01Icon,
 	Cancel01Icon,
-	FileCodeIcon,
 	Loading01Icon,
+	PaintBoardIcon,
 } from "@hugeicons/core-free-icons";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
+import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
 import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
@@ -16,6 +17,8 @@ import {
 } from "@/features/studio/utils/studio-canvas-layout";
 import { StudioSkillSelect } from "./studio-skill-select";
 import { StudioSuggestionRow } from "./studio-suggestion-row";
+
+const SWATCH_ROLES = ["canvas", "primary", "ink"] as const;
 
 /**
  * The server resolves the operation, so the composer only reports whether the
@@ -38,6 +41,7 @@ export interface StudioComposerProps {
 	designSkillId?: StudioDesignSkillId;
 	onDesignSkillChange?: (skillId: StudioDesignSkillId) => void;
 	referenceLabel?: string | null;
+	referenceColors?: readonly string[] | null;
 	/** Next-screen bubbles derived from the project's own structure. */
 	suggestions?: readonly StudioScreenSuggestion[];
 }
@@ -51,6 +55,7 @@ export function StudioComposer({
 	designSkillId,
 	onDesignSkillChange,
 	referenceLabel,
+	referenceColors,
 	suggestions = [],
 }: StudioComposerProps) {
 	const [prompt, setPrompt] = useState("");
@@ -60,6 +65,23 @@ export function StudioComposer({
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const pending = useRef(false);
 	const singleFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
+
+	const resolvedColors = useMemo(() => {
+		if (referenceColors && referenceColors.length > 0) {
+			return referenceColors;
+		}
+		if (!referenceLabel) return null;
+		const preset = STUDIO_DESIGN_PRESETS.find(
+			(entry) =>
+				entry.name.toLowerCase() === referenceLabel.toLowerCase() ||
+				entry.id.toLowerCase() === referenceLabel.toLowerCase(),
+		);
+		if (preset) {
+			return [preset.tokens.canvas, preset.tokens.primary, preset.tokens.ink];
+		}
+		return null;
+	}, [referenceColors, referenceLabel]);
+
 	// The server rejects prompts shorter than the shared minimum, so the
 	// composer applies the same rule client-side and explains it instead of
 	// letting the request fail with a generic payload error.
@@ -173,8 +195,36 @@ export function StudioComposer({
 							/>
 						) : null}
 						{referenceLabel ? (
-							<span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-1 text-xs text-mist">
-								<Icon icon={FileCodeIcon} size={12} className="shrink-0" />
+							<span
+								data-testid="studio-reference-chip"
+								className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-iron px-1.5 py-1 text-xs text-mist"
+							>
+								{resolvedColors && resolvedColors.length > 0 ? (
+									<span
+										data-testid="studio-palette-swatches"
+										className="flex items-center gap-1 shrink-0"
+										aria-hidden="true"
+									>
+										{resolvedColors.slice(0, 3).map((color, index) => {
+											const role = SWATCH_ROLES[index] ?? color;
+											return (
+												<span
+													key={role}
+													className="size-2 rounded-full border border-white/20 shrink-0"
+													style={{ backgroundColor: color }}
+													data-color={color}
+												/>
+											);
+										})}
+									</span>
+								) : (
+									<Icon
+										icon={PaintBoardIcon}
+										size={12}
+										className="shrink-0 text-mist"
+										aria-hidden="true"
+									/>
+								)}
 								<span className="truncate">{referenceLabel}</span>
 							</span>
 						) : null}

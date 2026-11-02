@@ -283,8 +283,8 @@ export function StudioLandingPage({
 									What will you design?
 								</h1>
 								<p className="max-w-2xl font-inter text-sm leading-relaxed text-fog sm:text-base">
-									Ubah idemu menjadi rancangan aplikasi yang bisa kamu lihat,
-									sesuaikan, dan kembangkan.
+									Jelaskan aplikasi yang ingin dibuat, lalu lihat hasil
+									desainnya.
 								</p>
 							</div>
 						</div>
