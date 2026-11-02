@@ -75,7 +75,7 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
 - Return ONLY a valid JSON object. No explanations, no markdown backticks, no commentary.
 - JSON structure must match:
 {
-  "projectTitle": "Short descriptive title of the application",
+  "projectTitle": "Short product name, 2-4 words, max 60 characters",
   "screens": [
     {
       "name": "Screen Name (e.g. Dashboard, Transactions, Analytics, Settings)",
@@ -135,4 +135,7 @@ OUTPUT CONTRACT (NON-NEGOTIABLE):
 - The screens array and blueprint.screenPlan must each contain exactly the requested count, ordered 0..N, using the requested viewport platform.
 - The navigation contract (destinations, labels, ordering, icons) is shared by every screen; only the active item changes per screen.
 - canonicalShell uses literal enum values: navigation bottom on mobile, sidebar or top on web; density compact or comfortable; statusBar none. Map EVERY screen name to its active destination id (or null only for contextual screens). Icon ids: home, plus, search, user, wallet, chart, analytics, calendar, location, plane, settings, circle. Studio renders these components deterministically.
-- Names must be standard, clean UI titles matching the user domain.`;
+- Names must be standard, clean UI titles matching the user domain.
+- projectTitle is a product name, not the brief. Keep it 2-4 words and under 60 characters. Never return a sentence, a paragraph, a copy of the user's request, or a description of the work to be done.
+- Use the brand or product name the user wrote, spelled exactly as they wrote it. If the user named no brand, name the product after its domain, audience, and main purpose, for example "Analytics Dashboard" or "Inventory Console". Never invent a brand that contradicts the user.
+- Never fall back to a generic placeholder such as "My Project", "Untitled App", "New Design", or "Aplikasi Prototipe". No marketing superlatives, and no technical requirements: those belong in the blueprint, not in the title.`;

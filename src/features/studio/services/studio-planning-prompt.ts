@@ -86,7 +86,13 @@ Choose one coherent project-wide designTokens set: primary accent, secondary acc
 	}
 
 	sections.push(
-		`Plan the necessary screens for this application. Output strict JSON with "projectTitle", "screens" array (each with "name", "description", "viewport": "${designMode}", "order": 0..N), and a "blueprint" object (productIdentity, designTokens, sharedComponents, navigationContract, screenPlan) shared by all screens. The blueprint navigation contract and tokens apply identically to every screen. Plan only relevant screens for the user's specific application domain.`,
+		`Plan the necessary screens for this application. Output strict JSON with "projectTitle", "screens" array (each with "name", "description", "viewport": "${designMode}", "order": 0..N), and a "blueprint" object (productIdentity, designTokens, sharedComponents, navigationContract, screenPlan) shared by all screens. The blueprint navigation contract and tokens apply identically to every screen. Plan only relevant screens for the user's specific application domain.
+
+Project title contract:
+- projectTitle names the product, not the task: 2-4 words, under 60 characters, no sentence punctuation.
+- Never copy the user request, describe the work, or exceed one short phrase.
+- Reuse the exact brand or product name the user wrote; invent no competing brand. When the user named no brand, derive the name from the product domain and audience.
+- No generic placeholder ("My Project", "Untitled App", "New Design") and no marketing superlatives or technical requirements.`,
 	);
 
 	sections.push(
