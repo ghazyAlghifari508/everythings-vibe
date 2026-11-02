@@ -10,18 +10,23 @@ import {
 import { memo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import {
+	FEEDBACK_DEFAULT_ERROR_MESSAGE,
+	type FeedbackType,
+	getFeedbackSuccessMessage,
+} from "@/features/auth-settings/services/feedback";
 import { useUIStore } from "@/store";
 
 export const FeedbackForm = memo(function FeedbackForm() {
 	const [message, setMessage] = useState("");
-	const [type, setType] = useState<"bug" | "feature" | "general">("general");
+	const [type, setType] = useState<FeedbackType>("general");
 	const [sending, setSending] = useState(false);
 	const [sent, setSent] = useState(false);
 	const showToast = useUIStore((s) => s.showToast);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!message.trim()) return;
+		if (sending || !message.trim()) return;
 
 		setSending(true);
 		try {
@@ -34,13 +39,30 @@ export const FeedbackForm = memo(function FeedbackForm() {
 			if (res.ok) {
 				setSent(true);
 				setMessage("");
-				showToast("Feedback terkirim! Terima kasih.", "success");
+				showToast(getFeedbackSuccessMessage(type), "success");
 				setTimeout(() => setSent(false), 3000);
 			} else {
-				showToast("Gagal mengirim feedback", "error");
+				let errorMessage = FEEDBACK_DEFAULT_ERROR_MESSAGE;
+				try {
+					const data = (await res.json()) as {
+						error?: unknown;
+						message?: unknown;
+					};
+					if (typeof data?.error === "string" && data.error.trim().length > 0) {
+						errorMessage = data.error.trim();
+					} else if (
+						typeof data?.message === "string" &&
+						data.message.trim().length > 0
+					) {
+						errorMessage = data.message.trim();
+					}
+				} catch {
+					// Response is not JSON, fallback to default error message
+				}
+				showToast(errorMessage, "error");
 			}
 		} catch {
-			showToast("Gagal mengirim feedback", "error");
+			showToast(FEEDBACK_DEFAULT_ERROR_MESSAGE, "error");
 		} finally {
 			setSending(false);
 		}
@@ -57,6 +79,7 @@ export const FeedbackForm = memo(function FeedbackForm() {
 						<button
 							key={t}
 							type="button"
+							disabled={sending}
 							onClick={() => setType(t)}
 							className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors flex items-center gap-1.5 ${
 								type === t
@@ -101,7 +124,8 @@ export const FeedbackForm = memo(function FeedbackForm() {
 								: "Ceritakan pengalamanmu menggunakan everythings-vibe..."
 					}
 					rows={4}
-					className="w-full rounded-lg border border-(--border-subtle) bg-(--bg-card) px-4 py-3 text-sm placeholder:text-(--text-secondary)/50 focus:border-primary-black focus:outline-none focus:ring-2 focus:ring-primary-black/5"
+					disabled={sending}
+					className="w-full rounded-lg border border-(--border-subtle) bg-(--bg-card) px-4 py-3 text-sm placeholder:text-(--text-secondary)/50 focus:border-primary-black focus:outline-none focus:ring-2 focus:ring-primary-black/5 disabled:opacity-60"
 				/>
 			</div>
 
