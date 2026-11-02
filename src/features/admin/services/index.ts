@@ -8,6 +8,12 @@ export {
 	listFeedback,
 } from "./admin-feedback-service";
 export {
+	setErrorReportArchived,
+	setFeedbackArchived,
+	updateErrorReportStatus,
+	updateFeedbackStatus,
+} from "./admin-feedback-mutations";
+export {
 	getAdminProjectStats,
 	listAdminProjects,
 } from "./admin-projects-service";

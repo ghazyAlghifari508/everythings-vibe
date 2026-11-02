@@ -1,6 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { and, desc, eq, ilike, isNull, or, type SQL, sql } from "drizzle-orm";
+import {
+	and,
+	desc,
+	eq,
+	ilike,
+	isNotNull,
+	isNull,
+	or,
+	type SQL,
+	sql,
+} from "drizzle-orm";
 import { requireAdmin } from "@/lib/session";
 import type {
 	AdminErrorReportItem,
@@ -8,6 +18,8 @@ import type {
 	AdminFeedbackItem,
 	AdminFeedbackListResult,
 	AdminFeedbackStats,
+	FeedbackArchiveFilter,
+	FeedbackHandlingStatus,
 	ListAdminErrorReportsParams,
 	ListAdminFeedbackParams,
 } from "../types";
@@ -45,13 +57,39 @@ export const listFeedback = createServerFn({ method: "GET" })
 				? rawType
 				: "all";
 
-		return { page, pageSize, search, type };
+		const rawStatus =
+			typeof raw.status === "string" ? raw.status.trim().toLowerCase() : "all";
+		const status: "all" | FeedbackHandlingStatus =
+			rawStatus === "new" ||
+			rawStatus === "in_progress" ||
+			rawStatus === "resolved"
+				? rawStatus
+				: "all";
+
+		const rawArchive =
+			typeof raw.archiveFilter === "string"
+				? raw.archiveFilter.trim().toLowerCase()
+				: "active";
+		const archiveFilter: FeedbackArchiveFilter =
+			rawArchive === "archived" || rawArchive === "all" ? rawArchive : "active";
+
+		return { page, pageSize, search, type, status, archiveFilter };
 	})
 	.handler(async ({ data }): Promise<AdminFeedbackListResult> => {
 		await requireAdmin(await getRequestHeaders());
 		const { db, feedback, users } = await adminDb();
 
 		const conditions: (SQL | undefined)[] = [];
+
+		if (data.archiveFilter === "active") {
+			conditions.push(isNull(feedback.archivedAt));
+		} else if (data.archiveFilter === "archived") {
+			conditions.push(isNotNull(feedback.archivedAt));
+		}
+
+		if (data.status && data.status !== "all") {
+			conditions.push(eq(feedback.handlingStatus, data.status));
+		}
 
 		if (data.type && data.type !== "all") {
 			if (data.type === "general") {
@@ -83,6 +121,8 @@ export const listFeedback = createServerFn({ method: "GET" })
 					id: feedback.id,
 					message: feedback.message,
 					type: feedback.type,
+					handlingStatus: feedback.handlingStatus,
+					archivedAt: feedback.archivedAt,
 					createdAt: feedback.createdAt,
 					userEmail: users.email,
 					userName: users.name,
@@ -137,14 +177,39 @@ export const listErrorReports = createServerFn({ method: "GET" })
 
 		const search =
 			typeof raw.search === "string" ? raw.search.trim().slice(0, 128) : "";
+		const rawStatus =
+			typeof raw.status === "string" ? raw.status.trim().toLowerCase() : "all";
+		const status: "all" | FeedbackHandlingStatus =
+			rawStatus === "new" ||
+			rawStatus === "in_progress" ||
+			rawStatus === "resolved"
+				? rawStatus
+				: "all";
 
-		return { page, pageSize, search };
+		const rawArchive =
+			typeof raw.archiveFilter === "string"
+				? raw.archiveFilter.trim().toLowerCase()
+				: "active";
+		const archiveFilter: FeedbackArchiveFilter =
+			rawArchive === "archived" || rawArchive === "all" ? rawArchive : "active";
+
+		return { page, pageSize, search, status, archiveFilter };
 	})
 	.handler(async ({ data }): Promise<AdminErrorReportsListResult> => {
 		await requireAdmin(await getRequestHeaders());
 		const { db, errorReports, users } = await adminDb();
 
 		const conditions: (SQL | undefined)[] = [];
+
+		if (data.archiveFilter === "active") {
+			conditions.push(isNull(errorReports.archivedAt));
+		} else if (data.archiveFilter === "archived") {
+			conditions.push(isNotNull(errorReports.archivedAt));
+		}
+
+		if (data.status && data.status !== "all") {
+			conditions.push(eq(errorReports.handlingStatus, data.status));
+		}
 
 		if (data.search) {
 			const pattern = `%${data.search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
@@ -167,6 +232,8 @@ export const listErrorReports = createServerFn({ method: "GET" })
 					id: errorReports.id,
 					errorMessage: errorReports.errorMessage,
 					context: errorReports.context,
+					handlingStatus: errorReports.handlingStatus,
+					archivedAt: errorReports.archivedAt,
 					createdAt: errorReports.createdAt,
 					userEmail: users.email,
 					userName: users.name,
@@ -208,11 +275,15 @@ export const getAdminFeedbackStats = createServerFn({ method: "GET" }).handler(
 					generalCount: sql<number>`count(case when coalesce(${feedback.type}, 'general') = 'general' then 1 end)`,
 					featureCount: sql<number>`count(case when ${feedback.type} = 'feature' then 1 end)`,
 					bugCount: sql<number>`count(case when ${feedback.type} = 'bug' then 1 end)`,
+					activeCount: sql<number>`count(case when ${feedback.archivedAt} is null then 1 end)`,
+					archivedCount: sql<number>`count(case when ${feedback.archivedAt} is not null then 1 end)`,
 				})
 				.from(feedback),
 			db
 				.select({
 					total: sql<number>`count(*)`,
+					activeCount: sql<number>`count(case when ${errorReports.archivedAt} is null then 1 end)`,
+					archivedCount: sql<number>`count(case when ${errorReports.archivedAt} is not null then 1 end)`,
 				})
 				.from(errorReports),
 		]);
@@ -221,9 +292,17 @@ export const getAdminFeedbackStats = createServerFn({ method: "GET" }).handler(
 		const generalCount = Number(feedbackStats[0]?.generalCount ?? 0);
 		const featureCount = Number(feedbackStats[0]?.featureCount ?? 0);
 		const fbBugCount = Number(feedbackStats[0]?.bugCount ?? 0);
+		const fbActiveCount = Number(feedbackStats[0]?.activeCount ?? 0);
+		const fbArchivedCount = Number(feedbackStats[0]?.archivedCount ?? 0);
+
 		const errorTotal = Number(errorStats[0]?.total ?? 0);
+		const errActiveCount = Number(errorStats[0]?.activeCount ?? 0);
+		const errArchivedCount = Number(errorStats[0]?.archivedCount ?? 0);
+
 		const bugCount = fbBugCount + errorTotal;
 		const totalItems = feedbackTotal + errorTotal;
+		const activeTotal = fbActiveCount + errActiveCount;
+		const archivedTotal = fbArchivedCount + errArchivedCount;
 
 		return {
 			totalItems,
@@ -232,6 +311,12 @@ export const getAdminFeedbackStats = createServerFn({ method: "GET" }).handler(
 			bugCount,
 			feedbackTotal,
 			errorTotal,
+			activeTotal,
+			archivedTotal,
+			feedbackActiveTotal: fbActiveCount,
+			feedbackArchivedTotal: fbArchivedCount,
+			errorActiveTotal: errActiveCount,
+			errorArchivedTotal: errArchivedCount,
 		};
 	},
 );

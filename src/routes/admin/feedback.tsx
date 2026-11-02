@@ -23,13 +23,19 @@ export const Route = createFileRoute("/admin/feedback")({
 		pageSize: search.pageSize ?? 20,
 		search: search.search ?? "",
 		type: search.type ?? "all",
+		status: search.status ?? "all",
+		archiveFilter: search.archiveFilter ?? "active",
 		errorPage: search.errorPage,
 		errorPageSize: search.errorPageSize,
 		errorSearch: search.errorSearch,
+		errorStatus: search.errorStatus,
+		errorArchiveFilter: search.errorArchiveFilter,
 		feedbackPage: search.feedbackPage,
 		feedbackPageSize: search.feedbackPageSize,
 		feedbackSearch: search.feedbackSearch,
 		feedbackType: search.feedbackType,
+		feedbackStatus: search.feedbackStatus,
+		feedbackArchiveFilter: search.feedbackArchiveFilter,
 	}),
 	loader: async ({ deps }) => {
 		const [stats, adminUser] = await Promise.all([
@@ -46,6 +52,8 @@ export const Route = createFileRoute("/admin/feedback")({
 					page: deps.page,
 					pageSize: deps.pageSize,
 					search: deps.search,
+					status: deps.status,
+					archiveFilter: deps.archiveFilter,
 				},
 			});
 
@@ -66,6 +74,8 @@ export const Route = createFileRoute("/admin/feedback")({
 					pageSize: deps.pageSize,
 					search: deps.search,
 					type: deps.type,
+					status: deps.status,
+					archiveFilter: deps.archiveFilter,
 				},
 			});
 

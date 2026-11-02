@@ -85,10 +85,15 @@ export interface ListAdminProjectsParams {
 	statusFilter?: "active" | "deleted" | "all" | string;
 }
 
+export type FeedbackHandlingStatus = "new" | "in_progress" | "resolved";
+export type FeedbackArchiveFilter = "active" | "archived" | "all";
+
 export interface AdminFeedbackItem {
 	id: string;
 	message: string;
 	type: string | null;
+	handlingStatus?: FeedbackHandlingStatus;
+	archivedAt?: Date | null;
 	createdAt: Date | null;
 	userEmail: string | null;
 	userName: string | null;
@@ -98,6 +103,8 @@ export interface AdminErrorReportItem {
 	id: string;
 	errorMessage: string;
 	context: string | null;
+	handlingStatus?: FeedbackHandlingStatus;
+	archivedAt?: Date | null;
 	createdAt: Date | null;
 	userEmail: string | null;
 	userName: string | null;
@@ -126,6 +133,12 @@ export interface AdminFeedbackStats {
 	bugCount: number;
 	feedbackTotal: number;
 	errorTotal: number;
+	activeTotal?: number;
+	archivedTotal?: number;
+	feedbackActiveTotal?: number;
+	feedbackArchivedTotal?: number;
+	errorActiveTotal?: number;
+	errorArchivedTotal?: number;
 }
 
 export interface ListAdminFeedbackParams {
@@ -135,6 +148,8 @@ export interface ListAdminFeedbackParams {
 	offset?: number;
 	search?: string;
 	type?: "all" | "bug" | "feature" | "general" | string;
+	status?: "all" | FeedbackHandlingStatus | string;
+	archiveFilter?: FeedbackArchiveFilter | string;
 }
 
 export interface ListAdminErrorReportsParams {
@@ -143,6 +158,8 @@ export interface ListAdminErrorReportsParams {
 	limit?: number;
 	offset?: number;
 	search?: string;
+	status?: "all" | FeedbackHandlingStatus | string;
+	archiveFilter?: FeedbackArchiveFilter | string;
 }
 
 export const adminFeedbackSearchSchema = z.object({
@@ -154,6 +171,14 @@ export const adminFeedbackSearchSchema = z.object({
 		.enum(["all", "bug", "feature", "general"])
 		.default("all")
 		.catch("all"),
+	status: z
+		.enum(["all", "new", "in_progress", "resolved"])
+		.default("all")
+		.catch("all"),
+	archiveFilter: z
+		.enum(["active", "archived", "all"])
+		.default("active")
+		.catch("active"),
 	errorPage: z.coerce.number().int().positive().optional().catch(undefined),
 	errorPageSize: z.coerce
 		.number()
@@ -163,6 +188,14 @@ export const adminFeedbackSearchSchema = z.object({
 		.optional()
 		.catch(undefined),
 	errorSearch: z.string().max(128).optional().catch(undefined),
+	errorStatus: z
+		.enum(["all", "new", "in_progress", "resolved"])
+		.optional()
+		.catch(undefined),
+	errorArchiveFilter: z
+		.enum(["active", "archived", "all"])
+		.optional()
+		.catch(undefined),
 	feedbackPage: z.coerce.number().int().positive().optional().catch(undefined),
 	feedbackPageSize: z.coerce
 		.number()
@@ -174,6 +207,14 @@ export const adminFeedbackSearchSchema = z.object({
 	feedbackSearch: z.string().max(128).optional().catch(undefined),
 	feedbackType: z
 		.enum(["all", "bug", "feature", "general"])
+		.optional()
+		.catch(undefined),
+	feedbackStatus: z
+		.enum(["all", "new", "in_progress", "resolved"])
+		.optional()
+		.catch(undefined),
+	feedbackArchiveFilter: z
+		.enum(["active", "archived", "all"])
 		.optional()
 		.catch(undefined),
 });
