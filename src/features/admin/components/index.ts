@@ -5,6 +5,7 @@ export * from "./admin-metric-card";
 export * from "./admin-pagination";
 export * from "./admin-project-row";
 export * from "./admin-projects-view";
+export * from "./admin-transaction-row";
 export * from "./admin-transactions-view";
 export * from "./admin-user-row";
 export * from "./admin-users-view";

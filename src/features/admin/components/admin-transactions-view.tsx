@@ -7,56 +7,207 @@ import {
 	CreditCardIcon,
 	Search01Icon,
 } from "@hugeicons/core-free-icons";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import type { AdminTransactionItem } from "../types";
+import type {
+	AdminTransactionItem,
+	AdminTransactionStats,
+	AdminTransactionsListResult,
+	AdminTransactionsSearchParams,
+} from "../types";
+import {
+	calculateFallbackTransactionStats,
+	filterTransactionsClient,
+} from "../utils/admin-transaction-utils";
 import { AdminMetricCard } from "./admin-metric-card";
+import { AdminPagination } from "./admin-pagination";
+import { AdminTransactionRowItem } from "./admin-transaction-row";
+
+export interface AdminTransactionsViewProps {
+	transactionsResult?: AdminTransactionsListResult;
+	transactions?: AdminTransactionItem[];
+	stats?: AdminTransactionStats;
+	searchParams?: Partial<AdminTransactionsSearchParams>;
+}
 
 export function AdminTransactionsView({
-	transactions,
-}: {
-	transactions: AdminTransactionItem[];
-}) {
-	const [search, setSearch] = useState("");
-	const [statusFilter, setStatusFilter] = useState<string>("all");
-	const [planFilter, setPlanFilter] = useState<string>("all");
+	transactionsResult,
+	transactions: fallbackTransactions,
+	stats,
+	searchParams,
+}: AdminTransactionsViewProps) {
+	const navigate = useNavigate();
 
-	const filteredTransactions = transactions.filter(
-		(tx: AdminTransactionItem) => {
-			const q = search.toLowerCase();
-			const matchesSearch =
-				!search ||
-				tx.orderId.toLowerCase().includes(q) ||
-				tx.userName?.toLowerCase().includes(q) ||
-				tx.userEmail?.toLowerCase().includes(q);
-
-			const matchesStatus =
-				statusFilter === "all" ||
-				(statusFilter === "success" &&
-					(tx.status === "success" ||
-						tx.status === "settlement" ||
-						tx.status === "capture")) ||
-				(statusFilter === "expire" &&
-					(tx.status === "expire" ||
-						tx.status === "failed" ||
-						tx.status === "cancel")) ||
-				tx.status === statusFilter;
-			const matchesPlan = planFilter === "all" || tx.plan === planFilter;
-
-			return matchesSearch && matchesStatus && matchesPlan;
-		},
+	const initialSearch = searchParams?.search ?? "";
+	const [search, setSearch] = useState(initialSearch);
+	const [clientPage, setClientPage] = useState(1);
+	const [clientPageSize, setClientPageSize] = useState(20);
+	const [clientStatusFilter, setClientStatusFilter] = useState<string>(
+		searchParams?.status ?? "all",
+	);
+	const [clientPlanFilter, setClientPlanFilter] = useState<string>(
+		searchParams?.plan ?? "all",
 	);
 
-	const successCount = transactions.filter(
-		(t) => t.status === "success" || t.status === "settlement",
-	).length;
-	const pendingCount = transactions.filter(
-		(t) => t.status === "pending",
-	).length;
-	const totalRevenue = transactions
-		.filter((t) => t.status === "success" || t.status === "settlement")
-		.reduce((sum, t) => sum + (t.amount ?? 0), 0);
+	// Synchronize local search state when URL search param updates from navigation
+	const prevSearchParamRef = useRef(searchParams?.search);
+	useEffect(() => {
+		if (
+			searchParams?.search !== undefined &&
+			searchParams.search !== prevSearchParamRef.current
+		) {
+			prevSearchParamRef.current = searchParams.search;
+			setSearch(searchParams.search);
+		}
+	}, [searchParams?.search]);
+
+	// Debounce search update (300ms) to trigger server-side query without typing lag
+	const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	useEffect(() => {
+		if (!navigate) return;
+		const trimmed = search.trim();
+		if (trimmed === (searchParams?.search ?? "")) return;
+
+		clearTimeout(searchTimeoutRef.current ?? undefined);
+
+		searchTimeoutRef.current = setTimeout(() => {
+			void navigate({
+				to: "/admin/transactions",
+				search: {
+					page: 1,
+					pageSize: searchParams?.pageSize ?? 20,
+					search: trimmed,
+					status: (searchParams?.status ??
+						"all") as AdminTransactionsSearchParams["status"],
+					plan: (searchParams?.plan ??
+						"all") as AdminTransactionsSearchParams["plan"],
+				},
+			});
+		}, 300);
+
+		return () => {
+			clearTimeout(searchTimeoutRef.current ?? undefined);
+		};
+	}, [
+		search,
+		searchParams?.search,
+		searchParams?.pageSize,
+		searchParams?.status,
+		searchParams?.plan,
+		navigate,
+	]);
+
+	const activeStatus = searchParams?.status ?? clientStatusFilter;
+	const activePlan = searchParams?.plan ?? clientPlanFilter;
+
+	const handleStatusChange = (status: string) => {
+		setClientStatusFilter(status);
+		setClientPage(1);
+		if (navigate) {
+			void navigate({
+				to: "/admin/transactions",
+				search: {
+					page: 1,
+					pageSize: searchParams?.pageSize ?? 20,
+					search: search.trim(),
+					status: status as AdminTransactionsSearchParams["status"],
+					plan: activePlan as AdminTransactionsSearchParams["plan"],
+				},
+			});
+		}
+	};
+
+	const handlePlanChange = (plan: string) => {
+		setClientPlanFilter(plan);
+		setClientPage(1);
+		if (navigate) {
+			void navigate({
+				to: "/admin/transactions",
+				search: {
+					page: 1,
+					pageSize: searchParams?.pageSize ?? 20,
+					search: search.trim(),
+					status: activeStatus as AdminTransactionsSearchParams["status"],
+					plan: plan as AdminTransactionsSearchParams["plan"],
+				},
+			});
+		}
+	};
+
+	const handlePageChange = (newPage: number) => {
+		setClientPage(newPage);
+		if (navigate) {
+			void navigate({
+				to: "/admin/transactions",
+				search: {
+					page: newPage,
+					pageSize: searchParams?.pageSize ?? 20,
+					search: search.trim(),
+					status: activeStatus as AdminTransactionsSearchParams["status"],
+					plan: activePlan as AdminTransactionsSearchParams["plan"],
+				},
+			});
+		}
+	};
+
+	const handlePageSizeChange = (newPageSize: number) => {
+		setClientPageSize(newPageSize);
+		setClientPage(1);
+		if (navigate) {
+			void navigate({
+				to: "/admin/transactions",
+				search: {
+					page: 1,
+					pageSize: newPageSize,
+					search: search.trim(),
+					status: activeStatus as AdminTransactionsSearchParams["status"],
+					plan: activePlan as AdminTransactionsSearchParams["plan"],
+				},
+			});
+		}
+	};
+
+	// Determine rows, totalCount, and pagination data
+	let displayedTransactions: AdminTransactionItem[] = [];
+	let totalCount = 0;
+	let page = 1;
+	let pageSize = 20;
+	let totalPages = 1;
+
+	if (transactionsResult) {
+		displayedTransactions = transactionsResult.transactions;
+		totalCount = transactionsResult.totalCount;
+		page = transactionsResult.page;
+		pageSize = transactionsResult.pageSize;
+		totalPages = transactionsResult.totalPages;
+	} else {
+		const filtered = filterTransactionsClient(
+			fallbackTransactions ?? [],
+			search,
+			activeStatus,
+			activePlan,
+		);
+		totalCount = filtered.length;
+		page = clientPage;
+		pageSize = clientPageSize;
+		totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+		const offset = (page - 1) * pageSize;
+		displayedTransactions = filtered.slice(offset, offset + pageSize);
+	}
+
+	// Calculate accurate KPI values (preferring server aggregated stats)
+	const allFallbackRows =
+		fallbackTransactions ?? transactionsResult?.transactions ?? [];
+	const fallbackStats = calculateFallbackTransactionStats(
+		allFallbackRows,
+		totalCount,
+	);
+
+	const totalTransactionsCount = stats?.totalTransactions ?? totalCount;
+	const successCount = stats?.successCount ?? fallbackStats.successCount;
+	const pendingCount = stats?.pendingCount ?? fallbackStats.pendingCount;
+	const totalRevenue = stats?.totalRevenue ?? fallbackStats.totalRevenue;
 
 	return (
 		<div className="mx-auto max-w-7xl space-y-8 font-inter">
@@ -86,7 +237,7 @@ export function AdminTransactionsView({
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<AdminMetricCard
 					label="Total Transaksi"
-					value={transactions.length}
+					value={totalTransactionsCount}
 					subtext="Pesanan tercatat di sistem"
 					icon={CreditCardIcon}
 				/>
@@ -111,7 +262,7 @@ export function AdminTransactionsView({
 				/>
 			</div>
 
-			{/* Filters */}
+			{/* Filters & Page Controls Toolbar */}
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div className="relative flex-1 max-w-md">
 					<Icon
@@ -123,12 +274,13 @@ export function AdminTransactionsView({
 						type="text"
 						value={search}
 						onChange={(e) => setSearch(e.target.value)}
-						placeholder="Cari order ID, email, atau nama..."
+						placeholder="Cari order ID, email, atau nama pengguna..."
 						className="w-full rounded-lg border border-graphite bg-charcoal py-2 pl-9 pr-4 text-xs font-inter text-snow placeholder:text-fog/60 focus:border-fog/40 focus:outline-none"
 					/>
 				</div>
 
-				<div className="flex flex-wrap gap-1.5">
+				<div className="flex flex-wrap items-center gap-2">
+					{/* Status Selector */}
 					<div className="flex rounded-lg border border-graphite bg-charcoal p-0.5">
 						{(
 							[
@@ -141,9 +293,9 @@ export function AdminTransactionsView({
 							<button
 								key={tab.id}
 								type="button"
-								onClick={() => setStatusFilter(tab.id)}
+								onClick={() => handleStatusChange(tab.id)}
 								className={`rounded-md px-2.5 py-1 text-xs font-[510] transition-colors ${
-									statusFilter === tab.id
+									activeStatus === tab.id
 										? "bg-snow text-onyx shadow-sm"
 										: "text-fog hover:text-snow"
 								}`}
@@ -153,20 +305,22 @@ export function AdminTransactionsView({
 						))}
 					</div>
 
+					{/* Plan Selector */}
 					<div className="flex rounded-lg border border-graphite bg-charcoal p-0.5">
 						{(
 							[
 								{ id: "all", label: "Semua Paket" },
 								{ id: "hengker", label: "Hengker" },
 								{ id: "pro", label: "Pro" },
+								{ id: "topup", label: "Top-up" },
 							] as const
 						).map((tab) => (
 							<button
 								key={tab.id}
 								type="button"
-								onClick={() => setPlanFilter(tab.id)}
+								onClick={() => handlePlanChange(tab.id)}
 								className={`rounded-md px-2.5 py-1 text-xs font-[510] transition-colors ${
-									planFilter === tab.id
+									activePlan === tab.id
 										? "bg-snow text-onyx shadow-sm"
 										: "text-fog hover:text-snow"
 								}`}
@@ -175,13 +329,27 @@ export function AdminTransactionsView({
 							</button>
 						))}
 					</div>
+
+					{/* Page Size Selector */}
+					<select
+						value={pageSize}
+						onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+						aria-label="Baris per halaman"
+						className="rounded-lg border border-graphite bg-charcoal px-2.5 py-1.5 text-xs font-[510] text-snow focus:border-fog/40 focus:outline-none"
+					>
+						{[10, 20, 50, 100].map((size) => (
+							<option key={size} value={size}>
+								{size} / halaman
+							</option>
+						))}
+					</select>
 				</div>
 			</div>
 
 			{/* Transactions Table */}
 			<div className="overflow-hidden rounded-xl border border-graphite bg-charcoal shadow-sm">
 				<div className="overflow-x-auto">
-					<table className="w-full text-left text-xs font-inter">
+					<table className="w-full text-left text-xs font-inter min-w-[650px]">
 						<thead className="border-b border-graphite bg-obsidian/40 text-fog">
 							<tr>
 								<th className="px-5 py-3 font-semibold">Order ID</th>
@@ -193,7 +361,7 @@ export function AdminTransactionsView({
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-graphite">
-							{filteredTransactions.length === 0 ? (
+							{displayedTransactions.length === 0 ? (
 								<tr>
 									<td
 										colSpan={6}
@@ -203,80 +371,24 @@ export function AdminTransactionsView({
 									</td>
 								</tr>
 							) : (
-								filteredTransactions.map((tx: AdminTransactionItem) => {
-									const isSuccess =
-										tx.status === "success" || tx.status === "settlement";
-									const isPending = tx.status === "pending";
-
-									return (
-										<tr
-											key={tx.id}
-											className="transition-colors hover:bg-white/[0.02]"
-										>
-											<td className="px-5 py-3.5 font-mono text-[11px] text-snow">
-												{tx.orderId}
-											</td>
-											<td className="px-5 py-3.5">
-												<div className="font-medium text-snow">
-													{tx.userName ?? "Tanpa Nama"}
-												</div>
-												<div className="text-[11px] text-fog">
-													{tx.userEmail ?? "-"}
-												</div>
-											</td>
-											<td className="px-5 py-3.5">
-												<span
-													className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
-														tx.plan === "hengker"
-															? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
-															: "bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
-													}`}
-												>
-													{tx.plan}
-												</span>
-											</td>
-											<td className="px-5 py-3.5 font-mono font-medium text-snow">
-												{new Intl.NumberFormat("id-ID", {
-													style: "currency",
-													currency: "IDR",
-													maximumFractionDigits: 0,
-												}).format(tx.amount)}
-											</td>
-											<td className="px-5 py-3.5">
-												<span
-													className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-[11px] font-medium ${
-														isSuccess
-															? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-															: isPending
-																? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-																: "bg-crimson/10 text-crimson border border-crimson/20"
-													}`}
-												>
-													{isSuccess
-														? "Selesai"
-														: isPending
-															? "Pending"
-															: "Gagal / Expired"}
-												</span>
-											</td>
-											<td className="px-5 py-3.5 text-fog">
-												{tx.createdAt
-													? new Intl.DateTimeFormat("id-ID", {
-															day: "numeric",
-															month: "short",
-															year: "numeric",
-															hour: "2-digit",
-															minute: "2-digit",
-														}).format(new Date(tx.createdAt))
-													: "-"}
-											</td>
-										</tr>
-									);
-								})
+								displayedTransactions.map((tx: AdminTransactionItem) => (
+									<AdminTransactionRowItem key={tx.id} tx={tx} />
+								))
 							)}
 						</tbody>
 					</table>
 				</div>
+
+				{/* Shared Admin Pagination */}
+				<AdminPagination
+					page={page}
+					pageSize={pageSize}
+					totalCount={totalCount}
+					totalPages={totalPages}
+					onPageChange={handlePageChange}
+					onPageSizeChange={handlePageSizeChange}
+					entityName="transaksi"
+				/>
 			</div>
 		</div>
 	);
