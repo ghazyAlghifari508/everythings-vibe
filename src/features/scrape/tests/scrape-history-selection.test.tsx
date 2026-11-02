@@ -219,7 +219,9 @@ describe("VibeScrape history selection UX", () => {
 
 		selectAllPage();
 		expect(screen.getByText("2 hasil dipilih")).toBeDefined();
-		expect(screen.getByText("2 hasil dipilih di halaman ini.")).toBeDefined();
+		expect(
+			screen.getByText("Semua hasil di halaman ini dipilih"),
+		).toBeDefined();
 	});
 
 	it("extends the selection to every filtered result through the server snapshot", async () => {

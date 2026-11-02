@@ -1,6 +1,6 @@
 import { Loading02Icon } from "@hugeicons/core-free-icons";
+import { useEffect, useRef } from "react";
 import { Icon } from "@/components/ui/icon";
-
 export function ScrapeHistorySelectAll({
 	pageIds,
 	selectedIds,
@@ -18,25 +18,41 @@ export function ScrapeHistorySelectAll({
 	onTogglePage: (selected: boolean) => void;
 	onSelectAllFiltered: () => void;
 }) {
+	const checkboxRef = useRef<HTMLInputElement>(null);
 	const selectedOnPage = pageIds.filter((id) => selectedIds.has(id)).length;
-	const pageSelected = pageIds.length > 0 && selectedOnPage === pageIds.length;
+	const isAllSelected = pageIds.length > 0 && selectedOnPage === pageIds.length;
+	const isPartiallySelected =
+		pageIds.length > 0 && selectedOnPage > 0 && selectedOnPage < pageIds.length;
 	const scopeAvailable =
-		pageSelected && !filteredScopeActive && total > selectedIds.size;
+		isAllSelected && !filteredScopeActive && total > selectedIds.size;
+
+	useEffect(() => {
+		if (checkboxRef.current) {
+			checkboxRef.current.indeterminate = isPartiallySelected;
+		}
+	}, [isPartiallySelected]);
+
+	const labelText = isAllSelected
+		? "Semua hasil di halaman ini dipilih"
+		: "Pilih semua di halaman ini";
+
+	function handleCheckboxChange() {
+		onTogglePage(!isAllSelected);
+	}
 
 	return (
 		<div className="flex flex-col gap-2">
 			<label className="inline-flex items-center gap-2 text-xs text-fog">
 				<input
+					ref={checkboxRef}
 					type="checkbox"
-					checked={pageSelected}
-					onChange={(event) => onTogglePage(event.target.checked)}
+					checked={isAllSelected}
+					aria-checked={isPartiallySelected ? "mixed" : isAllSelected}
+					aria-label="Pilih semua di halaman ini"
+					onChange={handleCheckboxChange}
 					className="size-4 shrink-0 accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				/>
-				<span>
-					{pageSelected
-						? `${selectedOnPage} hasil dipilih di halaman ini.`
-						: "Pilih semua di halaman ini"}
-				</span>
+				<span>{labelText}</span>
 			</label>
 
 			{scopeAvailable ? (
