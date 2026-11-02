@@ -286,7 +286,8 @@ export const PricingComponent: React.FC<PricingComponentProps> = ({
 							compact ? "mt-1 text-xs" : "mt-3 text-[17px]",
 						)}
 					>
-						1 kredit = 1 tahap (PRD, AC, atau Task). Kredit tidak pernah hangus.
+						Setiap operasi menggunakan kredit sesuai jenis dan kebutuhan proses.
+						Estimasi ditampilkan sebelum penggunaan.
 					</p>
 				</header>
 			)}

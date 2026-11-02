@@ -11,6 +11,7 @@ export const AccountForm = memo(function AccountForm({
 }) {
 	const [confirmDelete, setConfirmDelete] = useState(false);
 	const [deleteText, setDeleteText] = useState("");
+	const [deleteError, setDeleteError] = useState("");
 
 	return (
 		<div className="space-y-10">
@@ -54,7 +55,21 @@ export const AccountForm = memo(function AccountForm({
 							placeholder="Ketik HAPUS"
 							className="max-w-xs border-red-300 dark:border-red-800/50 dark:bg-red-900/10 dark:text-white"
 						/>
-						<form action={deleteAccount}>
+						<form
+							action={async (data) => {
+								setDeleteError("");
+								try {
+									await deleteAccount(data);
+								} catch (error) {
+									setDeleteError(
+										error instanceof Error
+											? error.message
+											: "Penghapusan akun gagal. Coba lagi.",
+									);
+								}
+							}}
+						>
+							{deleteError && <p role="alert">{deleteError}</p>}
 							{/* Server-side re-check: hidden input prevents bypass via DOM manipulation */}
 							<input type="hidden" name="confirm" value={deleteText} />
 							<button

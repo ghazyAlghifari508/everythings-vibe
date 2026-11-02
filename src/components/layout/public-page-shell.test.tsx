@@ -54,9 +54,9 @@ describe("PublicPageHeader", () => {
 			name: "Judul Halaman Publik",
 		});
 		expect(heading).toBeDefined();
-		expect(heading.className).toContain("text-3xl");
-		expect(heading.className).toContain("sm:text-4xl");
-		expect(heading.className).toContain("font-semibold");
+		expect(heading.className).toContain("text-2xl");
+		expect(heading.className).toContain("sm:text-3xl");
+		expect(heading.className).toContain("font-light");
 		expect(heading.className).toContain("text-snow");
 
 		const desc = screen.getByText(

@@ -1,15 +1,12 @@
 // @vitest-environment jsdom
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PlanCodebasePage } from "@/features/codebase/components/workspace/plan-codebase-page";
 import { useUIStore } from "@/store";
+import { renderConnectedOnboarding } from "./render-connected-onboarding";
 
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({ data: undefined, refetch: vi.fn() }),
+}));
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
 	useNavigate: () => vi.fn(),
@@ -201,7 +198,7 @@ function mockPlanFlow(
 }
 
 async function startSyncStep() {
-	render(<PlanCodebasePage />);
+	await renderConnectedOnboarding();
 	await waitFor(() => {
 		expect(
 			screen.getByText("Sync codebase dengan everythings-vibe"),

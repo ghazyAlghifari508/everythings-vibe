@@ -47,9 +47,15 @@ describe("single-sample component evidence", () => {
 			component.roles.includes("cta"),
 		);
 		expect(observed).toBeDefined();
-		expect(observed?.description).toContain("border-radius: 8px");
-		expect(observed?.description).toContain("padding: 14px");
-		expect(observed?.evidence).toContain(
+		const treatment = observed?.treatments?.[0];
+		expect(treatment?.properties["border-radius"]).toBe("8px");
+		expect(treatment?.properties.padding).toBe("14px");
+		expect(
+			observed?.sharedCharacteristics.map(
+				(entry) => `${entry.label}: ${entry.value}`,
+			),
+		).toEqual(expect.arrayContaining(["Corner radius: 8px", "Padding: 14px"]));
+		expect(treatment?.selectors).toContain(
 			"body:nth-child(1) > button:nth-child(2)",
 		);
 	});
@@ -95,6 +101,63 @@ describe("synthesis payload bounds", () => {
 		expect(payload.length).toBeLessThanOrEqual(
 			DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS,
 		);
+	});
+
+	it("bounds oversized non-component evidence and preserves reference indices", () => {
+		const model = modelFor([button("button")]);
+		const oversized = {
+			...model,
+			observedComponents: [],
+			limitations: Array.from({ length: 100 }, () => '"\\'.repeat(1000)),
+			colors: Array.from({ length: 10 }, (_, index) => ({
+				...model.colors[0],
+				value: `color-${index}`,
+				rationale: "x".repeat(10000),
+			})),
+		};
+		const payload = buildSynthesisPayload(oversized);
+		const parsed = JSON.parse(payload);
+		expect(payload.length).toBeLessThanOrEqual(
+			DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS,
+		);
+		expect(parsed.payloadTruncated).toBe(true);
+		expect(parsed.colors.length).toBeGreaterThan(0);
+		for (const [index, color] of parsed.colors.entries()) {
+			expect(color.index).toBe(index);
+			expect(color.value).toBe(oversized.colors[index].value);
+		}
+		expect(parsed.sourceUrl).toBe(model.sourceUrl);
+	});
+
+	it("fails explicitly when essential metadata cannot fit", () => {
+		const model = modelFor([]);
+		expect(() =>
+			buildSynthesisPayload({
+				...model,
+				sourceUrl: "x".repeat(DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS),
+			}),
+		).toThrow();
+	});
+
+	it("truncates large view evidence without mutating the model", () => {
+		const model = modelFor([button("button")]);
+		const oversized = {
+			...model,
+			views: [
+				{
+					id: 0,
+					label: "x".repeat(DESIGN_SYNTHESIS_PAYLOAD_MAX_CHARS),
+					observedTheme: model.theme,
+					model,
+				},
+			],
+			limitations: ["retained limitation"],
+		};
+		const parsed = JSON.parse(buildSynthesisPayload(oversized));
+		expect(parsed.payloadTruncated).toBe(true);
+		expect(parsed.viewContexts).toEqual([]);
+		expect(parsed.limitations).toEqual(oversized.limitations);
+		expect(oversized.views).toHaveLength(1);
 	});
 
 	it("keeps the complete raw evidence available outside the payload", () => {

@@ -17,6 +17,8 @@ export interface VisualElementEvidence {
 	selector: string;
 	role: string;
 	text: string;
+	directText?: string;
+	elementId?: string;
 	width: number;
 	height: number;
 	properties: Record<string, string>;
@@ -87,6 +89,9 @@ export function collectVisualEvidence(
 		"grid-template-columns",
 	];
 	const candidates: HTMLElement[] = [];
+	const idCounts = new Map<string, number>();
+	for (const node of document.querySelectorAll("[id]"))
+		idCounts.set(node.id, (idCounts.get(node.id) ?? 0) + 1);
 	if (document.documentElement instanceof HTMLElement)
 		candidates.push(document.documentElement);
 	while (walker.nextNode() && scanned < limits.scanElements) {
@@ -182,6 +187,18 @@ export function collectVisualEvidence(
 			selector: path.join(" > "),
 			role,
 			text: (element.innerText ?? "").replace(/\s+/g, " ").slice(0, 120),
+			directText: Array.from(element.childNodes)
+				.filter((node) => node.nodeType === Node.TEXT_NODE)
+				.map((node) => node.textContent ?? "")
+				.join("")
+				.replace(/\s+/g, " ")
+				.slice(0, 120),
+			...(role === "input" &&
+			element.id &&
+			element.id.length <= limits.valueChars &&
+			idCounts.get(element.id) === 1
+				? { elementId: element.id }
+				: {}),
 			width: rect.width,
 			height: rect.height,
 			properties: values,
@@ -206,7 +223,9 @@ export function collectVisualEvidence(
 			"Computed font-family is a stack; selected glyph font is not verified.",
 			"Pseudo-elements, third-party overlays and glyph-level font selection are not verified.",
 			...(scanned >= limits.scanElements || elements.length >= limits.elements
-				? ["DOM sampling limit reached."]
+				? [
+						"Only the sampled portion of the DOM was measured; content beyond the sampling limit may contain styles this document does not describe.",
+					]
 				: []),
 		],
 	};

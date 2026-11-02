@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp01Icon, Loading01Icon } from "@hugeicons/core-free-icons";
+import { ArrowUp01Icon, Loading02Icon } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useId, useRef, useState } from "react";
 import { z } from "zod";
@@ -86,11 +86,13 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 		}, {});
 
 	function updateNumber(key: NumericParameterSpec["key"], value: number) {
+		if (error) setError("");
 		if (mode === "crawl") setCrawl({ ...crawl, [key]: value });
 		if (mode === "html") setHtml({ ...html, [key]: value });
 		if (mode === "images") setImages({ ...images, [key]: value });
 	}
 	function updateToggle(key: ToggleParameterSpec["key"], value: boolean) {
+		if (error) setError("");
 		if (mode === "crawl") setCrawl({ ...crawl, [key]: value });
 		if (mode === "html") setHtml({ ...html, [key]: value });
 		if (mode === "images") setImages({ ...images, [key]: value });
@@ -199,7 +201,7 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 						>
 							{pending ? (
 								<Icon
-									icon={Loading01Icon}
+									icon={Loading02Icon}
 									size={16}
 									aria-hidden
 									className="motion-safe:animate-spin"
@@ -221,12 +223,14 @@ export function ScrapeWorkspaceForm({ mode }: { mode: ScrapeMode }) {
 						settings={activeSettings}
 						issues={issues}
 						urlRegex={crawl.urlRegex}
-						onUrlRegexChange={(value) =>
-							setCrawl({ ...crawl, urlRegex: value })
-						}
+						onUrlRegexChange={(value) => {
+							if (error) setError("");
+							setCrawl({ ...crawl, urlRegex: value });
+						}}
 						onNumberChange={updateNumber}
 						onToggleChange={updateToggle}
 						onSelectChange={(key, value) => {
+							if (error) setError("");
 							const parsed = designSettingsSchema.safeParse({
 								...design,
 								[key]: value,

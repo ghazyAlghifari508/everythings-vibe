@@ -10,6 +10,96 @@ import { primaryFontFamily } from "./design-normalize-typography";
 
 // Identity, theme narrative and the measured token tables (sections 1-6).
 
+// The capture contexts are one table for the whole document: repeating a theme
+// paragraph per capture duplicated the same facts without adding any.
+export function themeOverviewBody(
+	model: DesignTokenModel,
+	options: RenderDesignMdOptions,
+): string[] {
+	const body: string[] = [];
+	const captures = model.capturedViews ?? [];
+	body.push(`**Theme:** ${model.theme || "unknown"}`);
+	const overview = options.overview?.trim() || model.overview?.trim();
+	if (overview) body.push("", overview);
+	body.push(
+		"",
+		`Measured from ${model.viewport.width}x${model.viewport.height} on ${model.sourceUrl}. Observed values are browser measurements; role names are classifications of measured usage.`,
+	);
+	if (model.settings)
+		body.push(
+			"",
+			`Analysis scope: ${model.settings.focus}; depth: ${model.settings.depth}; code reference: ${model.settings.codeReference}.`,
+		);
+	if (captures.length > 1) {
+		body.push(
+			"",
+			"Requested browser preference is not the same as a verified website theme; the appearance column is what the canvas actually rendered.",
+			"",
+			table(
+				["Capture", "Viewport", "Browser preference", "Observed appearance"],
+				captures.map((view, index) => [
+					String(index + 1),
+					`${view.width}x${view.height}`,
+					escapeCell(view.colorScheme),
+					escapeCell(
+						model.views?.[index]?.observedTheme ?? model.theme ?? "unknown",
+					),
+				]),
+			),
+		);
+	}
+	if (captures.length === 1)
+		for (const view of captures)
+			body.push(
+				`- Captured ${view.width}x${view.height}, browser preference ${view.colorScheme}: ${escapeCell(view.sourceUrl)}`,
+			);
+	return body;
+}
+
+interface RadiusRow {
+	label: string;
+	value: string;
+	scopes: Set<string>;
+	samples: number;
+}
+
+// One row per component treatment: the same value measured in two captures is
+// one component fact with two scopes, not two competing tokens.
+function radiusRows(
+	model: DesignTokenModel,
+	fallbackScope: string,
+): string[][] {
+	const rows = new Map<string, RadiusRow>();
+	for (const token of model.radii) {
+		const key = [token.purpose, token.value, token.pill ? "pill" : ""].join(
+			"\u0000",
+		);
+		const scope = token.scope || fallbackScope;
+		const existing = rows.get(key);
+		if (existing) {
+			existing.scopes.add(scope);
+			existing.samples += token.frequency;
+			continue;
+		}
+		rows.set(key, {
+			label: token.purpose,
+			// The shape annotation comes from measured geometry. A large number
+			// alone does not make a shape a pill.
+			value: token.pill
+				? `\`${escapeCell(token.value)}\` (fully rounded / pill)`
+				: `\`${escapeCell(token.value)}\``,
+			scopes: new Set([scope]),
+			samples: token.frequency,
+		});
+	}
+	return [...rows.values()].map((row) => [
+		escapeCell(row.label),
+		row.value,
+		[...row.scopes].map(escapeCell).join("; "),
+		String(row.samples),
+	]);
+}
+
 export function renderTokenSections(
 	lines: string[],
 	model: DesignTokenModel,
@@ -31,22 +121,7 @@ export function renderTokenSections(
 
 	// --- 2. Theme & overview -------------------------------------------------
 	lines.push(heading(2, "Theme & Overview"));
-	lines.push("", `**Theme:** ${model.theme || "light"}`);
-	if (options.overview?.trim() || model.overview?.trim())
-		lines.push("", options.overview?.trim() || model.overview?.trim() || "");
-	lines.push(
-		"",
-		`Measured from ${model.viewport.width}x${model.viewport.height} on ${model.sourceUrl}. Observed values are browser measurements; role names are classifications of measured usage.`,
-	);
-	if (model.settings)
-		lines.push(
-			"",
-			`Analysis scope: ${model.settings.focus}; depth: ${model.settings.depth}; code reference: ${model.settings.codeReference}.`,
-		);
-	for (const view of model.capturedViews ?? [])
-		lines.push(
-			`- Captured ${view.width}x${view.height}, browser preference ${view.colorScheme}: ${escapeCell(view.sourceUrl)}`,
-		);
+	lines.push("", ...themeOverviewBody(model, options));
 
 	// --- 3. Tokens - Colors --------------------------------------------------
 	if (tokens && model.colors.length) {
@@ -144,16 +219,7 @@ export function renderTokenSections(
 			lines.push(
 				table(
 					["Context", "Value", "Captured in", "Measured on"],
-					model.radii.map((token) => [
-						escapeCell(token.purpose),
-						// The shape annotation comes from the measured geometry. A
-						// large number alone does not make a shape a pill.
-						token.pill
-							? `\`${escapeCell(token.value)}\` (fully rounded / pill)`
-							: `\`${escapeCell(token.value)}\``,
-						escapeCell(token.scope || "single capture"),
-						String(token.frequency),
-					]),
+					radiusRows(model, options.captureScopeLabel ?? "single capture"),
 				),
 			);
 		}

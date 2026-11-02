@@ -285,8 +285,29 @@
     {
       "idx": 40,
       "version": "7",
-      "when": 1793583348743,
-      "tag": "0040_large_pixie",
+      "when": 1793251477010,
+      "tag": "0040_initial_analysis_allowance",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1793279593140,
+      "tag": "0041_codebase_revision_engine",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1793461000000,
+      "tag": "0042_billing_exemption",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1793592751672,
+      "tag": "0043_large_pixie",
       "breakpoints": true
     }
   ]

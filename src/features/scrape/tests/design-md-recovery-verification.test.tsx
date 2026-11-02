@@ -178,9 +178,13 @@ const SAMPLE_INSPECTOR_MODEL: DesignInspectorModel = {
 	components: [
 		{
 			name: "Action Button",
+			purpose: "Action control.",
 			description: "Button uses solid emerald fill",
 			evidence: "color #10b981",
 			frequency: 5,
+			sharedCharacteristics: [{ label: "Background", value: "#10b981" }],
+			variants: [],
+			guidance: ["Apply to matching action controls only."],
 		},
 	],
 	baseUnitPx: 4,
@@ -336,7 +340,6 @@ describe("Section 10 Automated Verification — p2.md", () => {
 		const { container } = render(
 			<DesignMdSourcePanel
 				designMd={COMPLETE_USABLE_DESIGN_MD}
-				domain="acme.test"
 				onImplementAgent={vi.fn()}
 				enrichment="applied"
 			/>,
@@ -379,7 +382,6 @@ describe("Section 10 Automated Verification — p2.md", () => {
 		render(
 			<DesignMdSourcePanel
 				designMd={MEASURED_FALLBACK_MD}
-				domain="archive.test"
 				onImplementAgent={vi.fn()}
 				inspectorSource="unverified"
 			/>,
@@ -556,7 +558,6 @@ describe("Section 10 Automated Verification — p2.md", () => {
 		render(
 			<DesignMdSourcePanel
 				designMd={COMPLETE_USABLE_DESIGN_MD}
-				domain="acme.test"
 				onImplementAgent={vi.fn()}
 			/>,
 		);
@@ -599,7 +600,6 @@ describe("Section 10 Automated Verification — p2.md", () => {
 		const { container } = render(
 			<DesignMdSourcePanel
 				designMd={MEASURED_FALLBACK_MD}
-				domain="acme.test"
 				onImplementAgent={vi.fn()}
 				enrichment="unavailable"
 				enrichmentDetail="Format sintesis tidak sesuai pada root: required key missing."

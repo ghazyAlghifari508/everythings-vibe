@@ -1,5 +1,5 @@
 {
-  "id": "d6440b13-cf40-4d4e-840c-b7bdef3e3ef1",
+  "id": "445ff9e7-c376-436a-bd90-b40ea1b4f7bb",
   "prevId": "b11b5f93-8d6d-4a65-a7be-983ffd22884b",
   "version": "7",
   "dialect": "postgresql",
@@ -774,6 +774,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "initial_analysis_used_at": {
+          "name": "initial_analysis_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1042,6 +1048,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "initial_analysis_allowance": {
+          "name": "initial_analysis_allowance",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "kind": {
           "name": "kind",
           "type": "text",
@@ -1273,6 +1286,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "credit_operations_active_initial_allowance_unique": {
+          "name": "credit_operations_active_initial_allowance_unique",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "initial_analysis_allowance = true AND state IN ('reserved', 'running', 'settling')",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -4932,13 +4961,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "title_source": {
-          "name": "title_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'user'"
         },
         "design_mode": {
           "name": "design_mode",

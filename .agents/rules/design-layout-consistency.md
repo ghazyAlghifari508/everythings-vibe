@@ -27,7 +27,7 @@ Sebelum mengimplementasikan atau mengubah halaman apa pun, agen **WAJIB** mengid
 | **1. Public Information** | `/pricing`, `/faq`, `/bantuan`, `/about`, `/templates` | Menggunakan global `Navbar` standar (`pt-14`). Kontainer terpusat (`mx-auto`). Prose dan FAQ: `max-w-3xl` / `max-w-4xl`; katalog dan pricing: `max-w-6xl` / `max-w-[1200px]`. Padding konsisten `px-4 py-10 sm:px-6 sm:py-14`. |
 | **2. Account Settings** | `/settings/profile`, `/settings/account`, `/settings/api-keys`, `/settings/notifications`, `/settings/billing`, `/settings/feedback` | Global `Navbar` **DISEMBUNYIKAN**. Shell mandiri `SettingsClient`: desktop memiliki sidebar kiri tetap (`md:fixed md:w-64 border-r border-graphite bg-charcoal`), mobile memiliki tab navigasi horizontal atas (`overflow-x-auto hide-scrollbar`). Konten utama: `md:ml-64 p-4 sm:p-8 lg:p-12 w-full max-w-[100vw] overflow-x-hidden`. Kartu konten: `w-full rounded-xl border border-[var(--border-subtle)] p-6 bg-[var(--bg-elevated)]`. |
 | **3. Product Workspace** | Studio (`/design`, `/design/$id`), VibeScrape (`/scrape`, `/scrape/$id`, `/scrape/history`), VibePlan Greenfield (`/ask/$id`, `/fitur/$id`, `/prd/$id`, `/ac/$id`, `/task/$id`, `/kanban/$id`), Existing Codebase (`/codebases/*`, `/plan/codebase`) | Mengambil alih viewport penuh (`h-dvh flex flex-col overflow-hidden`). Scroll body dikunci (`body { overflow: hidden }`). Memiliki toolbar/header kontekstual sendiri (bukan navbar global). Studio: floating header + canvas + floating prompt composer; VibePlan: `FlowStepNav` linier; Codebases: multi-pane explorer + chat. |
-| **4. Administrative Interface** | `/admin`, `/admin/users`, `/admin/feedback`, `/admin/projects`, `/admin/transactions` | Global `Navbar` **DISEMBUNYIKAN**. Shell mandiri `AdminClient`: single sticky header row `h-14` kohesif (label kompak "Admin", tab horizontal navigasi: Ringkasan, Pengguna, Tiket, Proyek, Transaksi, Pengaturan, dan ThemeToggle). Tanpa Streamer Mode. Kontainer utama: `mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8`. Tabel data responsif dan kartu metrik. |
+| **4. Administrative Interface** | `/admin`, `/admin/users`, `/admin/feedback`, `/admin/projects`, `/admin/transactions` | Global `Navbar` **DISEMBUNYIKAN**. Shell mandiri `AdminClient`: single sticky header row `h-14` kohesif (label kompak "Admin", tab horizontal navigasi: Ringkasan, Pengguna, Tiket, Proyek, Transaksi, dan ThemeToggle). Tanpa Streamer Mode. Kontainer utama: `mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8`. Tabel data responsif dan kartu metrik. |
 | **5. Shared UI Primitives** | Tombol, input formulir, dialog modal, dropdown menu, toast, status chip, kartu dasar (`src/components/ui/*`) | Primitives murni tanpa logika bisnis domain. Mengikuti token visual `src/app/globals.css`. Digunakan seragam oleh seluruh keluarga halaman tanpa duplikasi. |
 
 ---
@@ -56,9 +56,9 @@ Agen **DILARANG KERAS** langsung menulis JSX atau CSS baru tanpa melakukan inspe
   - Halaman berbasis kartu katalog/pricing: `mx-auto w-full max-w-6xl` atau `max-w-[1200px]`.
 - **Header Alignment & Hierarchy:**
   - FAQ / Bantuan / Templates: Heading kiri atau tengah terpusat proporsional.
-  - Judul: `text-2xl sm:text-3xl` font `font-[620]` atau `text-3xl sm:text-4xl` font `font-semibold` tracking `tracking-tight text-snow`.
+  - Judul: Mematuhi kontrak tipografi canonical (`PageHeading variant="workspace"` atau `font-inter font-light leading-tight tracking-tight text-snow text-2xl sm:text-3xl`).
   - Deskripsi/Subjudul: `mt-2.5 sm:mt-3 text-sm sm:text-base leading-relaxed text-fog`.
-  - Section Heading: `font-mono text-xs uppercase tracking-widest text-fog` atau `text-lg font-semibold text-snow`.
+  - Section Heading: `font-mono text-xs uppercase tracking-widest text-fog` atau `PageHeading variant="section"` (`text-xl sm:text-2xl font-medium text-snow`).
 - **Spacing Scale:**
   - Page wrapper: `px-4 py-10 sm:px-6 sm:py-14 lg:py-16`.
   - Gap antar seksi utama: `gap-8` sampai `gap-12`.
@@ -229,4 +229,35 @@ Sebelum menyatakan pekerjaan UI selesai (*Done*), agen **WAJIB** memeriksa dan m
 - [ ] **Responsive Verification:** Apakah tampilan sudah terverifikasi bebas dari horizontal overflow pada mobile (360px), tablet (768px), dan desktop (1280px)?
 - [ ] **Touch Target Check:** Apakah seluruh tombol dan elemen interaktif memiliki target sentuh $\ge$ 44px?
 - [ ] **Clean Code & Imports:** Apakah import yang tidak terpakai (*unused imports*) dan artefak coba-coba sudah dibersihkan?
+- [ ] **Typography System Check:** Apakah heading utama mematuhi kontrak tipografi canonical (`PageHeading` variant `display`/`workspace` atau `font-inter font-light`) mengacu pada Pricing dan tidak menggunakan `font-bold` generik secara berlebihan?
 - [ ] **Deterministic Checks Pass:** Apakah `pnpm biome check <files>` dan `pnpm exec tsc --noEmit` lolos tanpa error?
+
+---
+
+## 12. Bagian K: Sistem Tipografi Premium SaaS (*Canonical Typography Contract*)
+
+Repositori ini menetapkan sistem tipografi heading yang terstandarisasi dengan **halaman Pricing sebagai referensi visual kanonikal** (`Pilih Paket yang Sesuai`: `font-inter font-light leading-tight text-snow text-[40px] max-md:text-[36px] md:text-[48px]`).
+
+Tujuannya adalah estetika SaaS premium yang elegan, ringan (*light-weight*), dan tajam—menghindari heading tebal (*bold/semibold*) generik ala AI-slop pada layar utama.
+
+### 1. Hierarki Tipografi Semantik:
+
+| Role | Desktop size | Weight | Penggunaan | Token / Primitif Resmi |
+| :--- | :--- | :--- | :--- | :--- |
+| **Display / Hero** | 40–48px | 300 (`font-light`) | Homepage dan public hero headings | `<PageHeading variant="display">` (`font-inter font-light leading-tight tracking-tight text-snow text-3xl sm:text-[40px] lg:text-[48px]`) |
+| **Page / Workspace** | 28–36px | 300–400 (`font-light`) | Heading utama workspace & header halaman publik | `<PageHeading variant="workspace">` (`font-inter font-light leading-tight tracking-tight text-snow text-2xl sm:text-3xl`) |
+| **Section** | 20–24px | 500 (`font-medium`) | Sub-judul seksi dan pembagi konten | `<PageHeading variant="section">` (`font-inter font-medium leading-snug tracking-tight text-snow text-xl sm:text-2xl`) |
+| **Card Title** | 16–20px | 500 (`font-[510]`) | Judul kartu dan bento box | `CardTitle` / `font-inter text-base sm:text-lg font-[510] text-snow` |
+| **Body** | 14–16px | 400 (`font-normal`) | Deskripsi, paragraf, dan instruksi | `font-inter text-sm sm:text-base font-normal leading-relaxed text-fog` |
+| **Label / Button** | 12–14px | 500 (`font-[510]`) | Aksi, kontrol, dan tab label | `font-inter text-xs sm:text-sm font-[510] leading-none` |
+
+### 2. Aturan Komponen Primitif `<PageHeading>`:
+- Terletak di `src/components/ui/page-heading.tsx` dan diekspor melalui `@/components/ui`.
+- Mendukung varian `variant="display"`, `variant="workspace"` (default), dan `variant="section"`.
+- Mendukung polimorfisme tag melalui prop `as` (default `h1` untuk display/workspace, `h2` untuk section).
+- Agen AI yang menambahkan atau merombak judul halaman **WAJIB** memanfaatkan `<PageHeading>` alih-alih meracik kombinasi kelas Tailwind baru secara sembarangan.
+
+### 3. Batas Pengecualian yang Sah (*Justified Exceptions*):
+- **Settings & Admin:** Kartu metrik KPI, label tabel transaksi, dan panel pengaturan tetap menggunakan bobot Medium terkontrol (`font-[510]`) demi densitas informasi dan keterbacaan data (*information density*).
+- **Workspace Toolbars & Compact Subheadings:** Judul file/proyek di dalam toolbar compact (seperti `StudioHeader` atau `KanbanHeader`) tetap mempertahankan ukuran compact yang terpotong rapi (*truncate*) dengan bobot semi-bold/medium untuk keterbacaan operasional.
+

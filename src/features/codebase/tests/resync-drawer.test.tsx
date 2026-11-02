@@ -204,7 +204,7 @@ describe("CodebaseResyncDrawer", () => {
 		expect(document.body.textContent).toContain("Status sinkronisasi");
 		expect(document.body.textContent).toContain("Agent terhubung");
 		expect(document.body.textContent).toContain("Source code siap");
-		expect(document.body.textContent).toContain("Menyinkronkan codebase...");
+		expect(document.body.textContent).toContain("Mengunggah repository...");
 		expect(document.body.textContent).toContain("42 file sedang dikirim.");
 	});
 

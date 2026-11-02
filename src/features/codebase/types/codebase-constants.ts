@@ -1,4 +1,10 @@
 export const CODEBASE_LIBRARY_PAGE_SIZE = 10;
+// One bulk-delete request carries a bounded id list so a single statement can
+// never become an unbounded destructive payload.
+export const CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS = 1000;
+export const CODEBASE_LIBRARY_ID_MAX_CHARS = 64;
+export const CODEBASE_LIBRARY_BULK_DELETE_LIMIT_ERROR =
+	"Terlalu banyak repository untuk dihapus sekaligus.";
 export const CODEBASE_NAME_MIN_CHARS = 3;
 export const CODEBASE_NAME_MAX_CHARS = 100;
 
@@ -6,6 +12,9 @@ export const CODEBASE_SYNC_POLL_INTERVAL_MS = 2_000;
 export const CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS = 500;
 export const CODEBASE_SYNC_REQUEST_TIMEOUT_MS = 10_000;
 export const CODEBASE_SYNC_SESSION_EXPIRY_MS = 30 * 60 * 1000;
+// A token inside this window still works, but the prompt screen warns the
+// user instead of letting them copy a credential that dies mid-upload.
+export const CODEBASE_SYNC_EXPIRY_SOON_MS = 5 * 60 * 1000;
 export const CODEBASE_MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
 export const CODEBASE_MAX_FILE_BYTES = 1024 * 1024;
 export const CODEBASE_MAX_CHUNK_BYTES = 256 * 1024;

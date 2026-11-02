@@ -1,82 +1,129 @@
 "use client";
 
-import { Loading02Icon, PauseCircleIcon } from "@hugeicons/core-free-icons";
+import { Loading02Icon, Tick01Icon } from "@hugeicons/core-free-icons";
+import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { ThoughtLine } from "@/components/ui/thought-line";
 import type { ScrapeStatus } from "@/db/schema";
+import { cn } from "@/lib/utils";
 import { ElapsedTimer } from "./scrape-progress-elapsed";
-import { LABELS } from "./scrape-progress-steps";
+
+export const SCRAPE_ACTIVITY_WAITING_COPY = "Menunggu giliran pemrosesan.";
+export const SCRAPE_ACTIVITY_DONE_COPY = "Proses selesai";
 
 export interface ScrapeActivityLineProps {
 	status: ScrapeStatus;
-	/** Already humanised activity copy, or null when the stage label is honest. */
-	activity: string | null;
-	stageStartedAt: string | null;
-	/** Server-reported reason the current stage stopped making progress. */
-	stalledMessage: string | null;
+	/** Already humanised activity copy; null when the stage label is honest. */
+	activity?: string | null;
+	/** Stage label reported by the backend while no activity copy has arrived. */
+	fallbackLabel?: string;
+	/** Persisted start of the current stage, when the backend recorded one. */
+	stageStartedAt?: string | null;
+	/** Persisted start of the latest activity update; only a timer fallback. */
+	activityStartedAt?: string | null;
+	/** Server-reported stall reason; never inferred on the client. */
+	stalledMessage?: string | null;
+	className?: string;
 }
 
-// One activity line for every scrape mode. Running work gets the repository's
-// ReactBits-derived ThoughtLine (breathing glyph, soft shimmer, single polite
-// announcement) so the line is animated by a ready-made component rather than
-// a local imitation. Queued and stalled runs stay static: nothing is spinning
-// while the backend is not working.
+interface StageStartAnchor {
+	stage: ScrapeStatus;
+	start: string | null;
+}
+
+// The clock measures the current stage, not the current activity string. When
+// the row has no `stageStartedAt`, every activity write also rewrites
+// `activityStartedAt`, so anchoring straight to it would restart the timer
+// although the stage never moved.
+function useStageStart(
+	stage: ScrapeStatus,
+	stageStartedAt: string | null,
+	activityStartedAt: string | null,
+): string | null {
+	const reported = stageStartedAt ?? activityStartedAt;
+	const [anchor, setAnchor] = useState<StageStartAnchor>(() => ({
+		stage,
+		start: reported,
+	}));
+	if (anchor.stage !== stage || (anchor.start === null && reported !== null))
+		setAnchor({ stage, start: reported });
+	const anchored = anchor.stage === stage ? anchor.start : reported;
+	return stageStartedAt ?? anchored;
+}
+
+// The single live activity line for every scrape mode. Running work reuses the
+// repository ThoughtLine (ReactBits port): circular accent, evidence-backed
+// text with a soft shimmer, one short fade when the label actually changes, and
+// the persisted clock beside it. Nothing animates once the backend stops
+// reporting work, and reduced motion removes the shimmer and the fade.
 export function ScrapeActivityLine({
 	status,
-	activity,
-	stageStartedAt,
-	stalledMessage,
+	activity = null,
+	fallbackLabel = "",
+	stageStartedAt = null,
+	activityStartedAt = null,
+	stalledMessage = null,
+	className,
 }: ScrapeActivityLineProps) {
-	const isDone = status === "completed";
-	const isWorking = !isDone && status !== "failed";
+	const start = useStageStart(status, stageStartedAt, activityStartedAt);
+	// Read synchronously so the first paint already honours the preference; the
+	// shared stylesheet also disables the shimmer for the server-rendered frame.
+	const reduceMotion =
+		typeof window !== "undefined" &&
+		typeof window.matchMedia === "function" &&
+		window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+	// Failure keeps its own reason and recovery copy in the progress panel, so
+	// this line never dresses a stopped run up as an active one.
+	if (status === "failed") return null;
 
 	if (stalledMessage) {
 		return (
-			<div data-activity-state="stalled" className="flex items-start gap-2">
-				<Icon
-					icon={PauseCircleIcon}
-					size={16}
-					aria-hidden
-					data-activity-stalled-marker
-					className="mt-0.5 shrink-0 text-fog"
-				/>
-				<div className="min-w-0">
-					<p className="text-sm font-semibold text-snow">Pemrosesan tertunda</p>
-					<p className="mt-1 break-words text-xs leading-5 text-fog">
-						{stalledMessage}
-					</p>
-				</div>
-			</div>
+			<p
+				data-activity-line
+				data-activity-state="stalled"
+				className={cn("break-words text-sm text-fog", className)}
+			>
+				{stalledMessage}
+			</p>
 		);
 	}
 
 	if (status === "queued") {
 		return (
-			<div data-activity-state="queued" className="flex items-start gap-2">
-				<span
-					aria-hidden
-					className="mt-1.5 size-1.5 shrink-0 rounded-full border border-slate"
-				/>
-				<p className="text-sm text-fog">Menunggu giliran pemrosesan.</p>
-			</div>
+			<p
+				data-activity-line
+				data-activity-state="queued"
+				className={cn("break-words text-sm text-fog", className)}
+			>
+				{SCRAPE_ACTIVITY_WAITING_COPY}
+			</p>
 		);
 	}
 
+	const working = status !== "completed";
+
 	return (
-		<div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+		<div
+			data-activity-line
+			data-activity-state={working ? "running" : "completed"}
+			className={cn("flex min-w-0 items-baseline gap-2", className)}
+		>
 			<ThoughtLine
 				bare
 				wrap
-				fadeTextOnChange
+				fadeTextOnChange={!reduceMotion}
 				collapsible={false}
 				showTimer={false}
-				working={isWorking}
-				label={LABELS[status]}
-				doneLabel="Semua tahapan selesai"
+				shimmer={!reduceMotion}
+				breathDepth={0}
+				working={working}
 				activity={activity}
+				label={fallbackLabel}
+				doneLabel={SCRAPE_ACTIVITY_DONE_COPY}
 				className="min-w-0 flex-1"
 				glyph={
-					isWorking ? (
+					working ? (
 						<Icon
 							icon={Loading02Icon}
 							size="1em"
@@ -84,13 +131,16 @@ export function ScrapeActivityLine({
 							className="motion-safe:animate-spin motion-reduce:animate-none"
 						/>
 					) : (
-						"none"
+						<Icon
+							icon={Tick01Icon}
+							size="1em"
+							data-activity-done-marker
+							className="text-mist"
+						/>
 					)
 				}
 			/>
-			{isWorking && stageStartedAt ? (
-				<ElapsedTimer start={stageStartedAt} />
-			) : null}
+			{working && start ? <ElapsedTimer start={start} /> : null}
 		</div>
 	);
 }

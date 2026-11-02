@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CodebaseAnalysis } from "@/features/codebase/services/analysis";
 import {
-	detectStackFromPackageJsonText,
+	detectCodebaseStack,
 	manifestToExplorerFiles,
-	mergeStackWithFallback,
 } from "@/features/codebase/services/stack";
 import {
 	loadSnapshotFileContent,
@@ -36,6 +35,7 @@ export function useWorkspaceSource({
 		null,
 	);
 	const [packageJsonText, setPackageJsonText] = useState<string | null>(null);
+	const [packageJsonTexts, setPackageJsonTexts] = useState<string[]>([]);
 	const [manifestSnapshotId, setManifestSnapshotId] = useState<string | null>(
 		null,
 	);
@@ -43,7 +43,16 @@ export function useWorkspaceSource({
 		kind: "idle",
 	});
 	useEffect(() => {
-		if (!snapshotReady) return;
+		if (!snapshotReady) {
+			setManifestFiles([]);
+			setManifestSnapshotId(null);
+			setManifestFileCount(null);
+			setPackageJsonText(null);
+			setPackageJsonTexts([]);
+			return;
+		}
+		// polledSnapshotId trigger: reloads manifest when snapshot advances
+		void polledSnapshotId;
 		let cancelled = false;
 		void (async () => {
 			try {
@@ -55,19 +64,24 @@ export function useWorkspaceSource({
 					typeof data.fileCount === "number" ? data.fileCount : null,
 				);
 				setPackageJsonText(data.packageJsonText ?? null);
+				setPackageJsonTexts(
+					data.packageJsonTexts ??
+						(data.packageJsonText ? [data.packageJsonText] : []),
+				);
 			} catch {
 				if (!cancelled) {
 					setManifestFiles([]);
 					setManifestSnapshotId(null);
 					setManifestFileCount(null);
 					setPackageJsonText(null);
+					setPackageJsonTexts([]);
 				}
 			}
 		})();
 		return () => {
 			cancelled = true;
 		};
-	}, [snapshotReady, codebaseId]);
+	}, [snapshotReady, codebaseId, polledSnapshotId]);
 	const sourcePreviewRequestRef = useRef(0);
 	const activeSnapshotId = polledSnapshotId ?? manifestSnapshotId;
 	const appliedSnapshotRef = useRef<string | null | undefined>(undefined);
@@ -121,24 +135,46 @@ export function useWorkspaceSource({
 		return manifestToExplorerFiles(analysisOutput?.relevantFiles ?? []);
 	}, [manifestFiles, analysisOutput]);
 	const explorerStack = useMemo(() => {
-		const fromPackageJson = detectStackFromPackageJsonText(packageJsonText);
-		const raw = analysisOutput
-			? [
-					analysisOutput.framework,
-					analysisOutput.language,
-					analysisOutput.database,
-					analysisOutput.auth,
-					analysisOutput.packageManager,
-					...(analysisOutput.dependencies ?? []).slice(0, 5),
-				].filter(
-					(value): value is string =>
-						typeof value === "string" &&
-						value.trim().length > 0 &&
-						value.trim() !== "Tidak terdeteksi",
-				)
-			: [];
-		return mergeStackWithFallback(fromPackageJson, raw);
-	}, [packageJsonText, analysisOutput]);
+		// ponytail: do not merge stale analysis from an older snapshot
+		const isFreshAnalysis =
+			analysisOutput &&
+			(!analysisOutput.snapshotId ||
+				!activeSnapshotId ||
+				analysisOutput.snapshotId === activeSnapshotId);
+
+		const raw =
+			isFreshAnalysis && analysisOutput
+				? [
+						analysisOutput.framework,
+						analysisOutput.language,
+						analysisOutput.database,
+						analysisOutput.auth,
+						...(analysisOutput.dependencies ?? []).slice(0, 5),
+					].filter(
+						(value): value is string =>
+							typeof value === "string" &&
+							value.trim().length > 0 &&
+							value.trim() !== "Tidak terdeteksi",
+					)
+				: [];
+
+		return detectCodebaseStack({
+			packageJsonTexts:
+				packageJsonTexts.length > 0
+					? packageJsonTexts
+					: packageJsonText
+						? [packageJsonText]
+						: [],
+			files: explorerFiles,
+			supplementary: raw,
+		});
+	}, [
+		packageJsonTexts,
+		packageJsonText,
+		explorerFiles,
+		analysisOutput,
+		activeSnapshotId,
+	]);
 	const contextFiles = useMemo(
 		() => (analysisOutput?.relevantFiles ?? []).slice(0, 2),
 		[analysisOutput],

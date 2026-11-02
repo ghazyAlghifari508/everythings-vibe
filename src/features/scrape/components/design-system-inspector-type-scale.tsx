@@ -2,17 +2,16 @@ import {
 	firstCssLength,
 	type InspectorTypeEntry,
 } from "@/features/scrape/utils/design-md-inspector";
+import { specimenTextForRole } from "@/features/scrape/utils/design-normalize-typography";
 import {
-	FALLBACK_SAMPLE,
 	isSafeFontFamily,
 	isSafeLineHeight,
 } from "./design-system-inspector-css-values";
 
 // A display heading must read as a display heading. Capping the preview at a
 // fixed size made a 64px style look identical to body copy, so the specimen is
-// rendered at its measured size. Very large sizes are scaled down by a single
-// shared factor so the row stays inside the panel while every role keeps its
-// real proportion to the others.
+// rendered at its measured size up to a shared ceiling; roles above it are
+// clamped and the measured value is still stated, so nothing is invented.
 const SPECIMEN_MAX_PX = 48;
 
 function specimenFontSize(sizePx: number): string | null {
@@ -39,7 +38,9 @@ export function TypeSpecimenRow({ entry }: { entry: InspectorTypeEntry }) {
 	]
 		.filter((part) => part.length > 0)
 		.join(" · ");
-	const sample = entry.sample.trim() || FALLBACK_SAMPLE;
+	// Neutral copy per role. The captured page's own text is never used as a
+	// specimen: the document is a reference for other apps, not a replay.
+	const specimen = specimenTextForRole(entry.role);
 	const scaled =
 		Number.isFinite(entry.sizePx) && entry.sizePx > SPECIMEN_MAX_PX;
 	return (
@@ -51,7 +52,7 @@ export function TypeSpecimenRow({ entry }: { entry: InspectorTypeEntry }) {
 			{/* Full-width specimen at the measured scale, wrapping instead of
 			    truncating so the size is actually visible. */}
 			<p className="mt-2 break-words text-mist" style={style}>
-				{sample}
+				{specimen}
 			</p>
 			{scaled ? (
 				<p className="mt-1 text-[11px] leading-4 text-fog">

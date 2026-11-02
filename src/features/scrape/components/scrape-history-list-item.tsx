@@ -2,7 +2,7 @@ import {
 	Alert02Icon,
 	ArrowRight01Icon,
 	Delete02Icon,
-	Loading03Icon,
+	Loading02Icon,
 	MoreHorizontalIcon,
 	Tick01Icon,
 } from "@hugeicons/core-free-icons";
@@ -108,10 +108,10 @@ export function ScrapeHistoryRow({
 				>
 					{processing ? (
 						<Icon
-							icon={Loading03Icon}
+							icon={Loading02Icon}
 							size={12}
 							aria-hidden="true"
-							className="animate-spin"
+							className="motion-safe:animate-spin"
 						/>
 					) : failed ? (
 						<Icon icon={Alert02Icon} size={12} aria-hidden="true" />
@@ -189,9 +189,9 @@ export function ScrapeHistoryRow({
 							>
 								{deleting ? (
 									<Icon
-										icon={Loading03Icon}
+										icon={Loading02Icon}
 										size={14}
-										className="animate-spin"
+										className="motion-safe:animate-spin"
 									/>
 								) : (
 									<Icon

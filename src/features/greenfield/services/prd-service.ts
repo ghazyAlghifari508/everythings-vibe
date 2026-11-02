@@ -115,6 +115,7 @@ export async function savePrdVersion(
 			.select({
 				step: projects.step,
 				userId: projects.userId,
+				projectMode: projects.projectMode,
 				acStatus: projects.acStatus,
 				taskStatus: projects.taskStatus,
 			})
@@ -129,6 +130,7 @@ export async function savePrdVersion(
 			if (
 				!revisionGuard ||
 				project.userId !== revisionGuard.userId ||
+				project.projectMode === "existing_codebase" ||
 				isPrdLocked(project.step) ||
 				project.acStatus !== "pending" ||
 				project.taskStatus !== "pending"

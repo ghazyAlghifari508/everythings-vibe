@@ -101,7 +101,9 @@ describe("buildExportPlanCommand", () => {
 describe("buildPlanHandoffPrompt", () => {
 	test("uses the real project id and the CLI export command", () => {
 		const prompt = buildPlanHandoffPrompt("prj_123", "react-movie-app");
-		expect(prompt).toContain("npx everythings-vibe export plan prj_123 --root .");
+		expect(prompt).toContain(
+			"npx everythings-vibe export plan prj_123 --root .",
+		);
 		expect(prompt).toContain("Project ID: prj_123");
 		// The agent is pointed at the written documents, not handed the PRD.
 		expect(prompt).toContain("docs/vibeplan/");

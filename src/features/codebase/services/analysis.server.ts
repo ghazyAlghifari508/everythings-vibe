@@ -40,12 +40,14 @@ import {
 	buildAnalysisUserPrompt,
 	CODEBASE_ANALYSIS_SYSTEM_PROMPT,
 	type CodebaseAnalysis,
+	classifyAnalysisAttemptCode,
 	classifyAnalysisFailure,
 	formatAnalysisDiagnosticLog,
 	generateValidatedAnalysis,
 	resolveAnalysisFeaturePrompt,
 	toSafeAnalysisErrorMessage,
 } from "./analysis";
+import { readPersistCreditIdentity } from "./analysis-persist-identity";
 import {
 	claimStarterSuggestionRefresh,
 	type RequestAnalysisScope,
@@ -81,6 +83,11 @@ export { AnalysisServiceError, claimStarterSuggestionRefresh };
 
 export interface RequestAnalysisDeps {
 	generate?: AnalysisGenerator;
+	analysisId?: string;
+	settle?: (
+		tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+		analysisId: string,
+	) => Promise<void>;
 }
 
 export async function requestCodebaseAnalysis(
@@ -164,7 +171,8 @@ export async function requestCodebaseAnalysis(
 		repositoryName = resolveCodebaseDisplayName(codebase?.name);
 	}
 
-	const analysisId = scope.claimedAnalysisId ?? crypto.randomUUID();
+	const analysisId =
+		scope.claimedAnalysisId ?? deps.analysisId ?? crypto.randomUUID();
 	const isCodebaseScoped = Boolean(scope.codebaseId);
 	if (!isCodebaseScoped) assertSyncTransition("uploaded", "analyzing");
 
@@ -299,6 +307,7 @@ export async function requestCodebaseAnalysis(
 		stage = "persist";
 
 		await db.transaction(async (tx) => {
+			if (deps.settle) await deps.settle(tx, analysisId);
 			await tx
 				.update(codebaseAnalyses)
 				.set({ status: "ready", output: analysis, updatedAt: new Date() })
@@ -321,6 +330,12 @@ export async function requestCodebaseAnalysis(
 		// category, actual duration, and validation issue paths. Never logs
 		// keys, tokens, repository content, or model output.
 		const category = classifyAnalysisFailure(error, stage);
+		// Post-mortem credit identity: read-only, best-effort, never throws
+		// out of the failure path. Settle already failed (or the row write
+		// failed), so these fields only explain which operation the attempt
+		// was finalizing against when it died.
+		const { creditOperationId, operationState, operationExpiresAt } =
+			await readPersistCreditIdentity(analysisId);
 		console.error(
 			"[codebase/analysis] attempt failed",
 			formatAnalysisDiagnosticLog({
@@ -328,6 +343,12 @@ export async function requestCodebaseAnalysis(
 				projectId,
 				snapshotId,
 				category,
+				stage,
+				creditOperationId,
+				operationState,
+				operationExpiresAt,
+				errorCode:
+					error instanceof AnalysisServiceError ? error.code : undefined,
 				durationMs: Date.now() - startedAt,
 				...(error instanceof AnalysisValidationError &&
 				error.issuePaths.length > 0
@@ -350,7 +371,7 @@ export async function requestCodebaseAnalysis(
 			.update(codebaseAnalyses)
 			.set({
 				status: "failed",
-				errorCode: "ANALYSIS_FAILED",
+				errorCode: classifyAnalysisAttemptCode(error, stage),
 				errorMessage: safe,
 				updatedAt: new Date(),
 			})
@@ -378,6 +399,11 @@ export async function requestCodebaseAnalysis(
 			}
 		}
 		if (error instanceof AnalysisServiceError) throw error;
-		throw new AnalysisServiceError("ANALYSIS_FAILED", safe, analysisId);
+		throw new AnalysisServiceError(
+			"ANALYSIS_FAILED",
+			safe,
+			analysisId,
+			classifyAnalysisAttemptCode(error, stage),
+		);
 	}
 }

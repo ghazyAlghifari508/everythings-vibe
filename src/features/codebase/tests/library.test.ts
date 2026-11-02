@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildCodebaseLibraryItems,
+	CODEBASE_LIBRARY_STATUS_LABELS,
 	type CodebaseLibraryItem,
 	filterLibraryItems,
 	getLibraryItemHref,
 	hasReadyLibraryAnalysis,
 	libraryAnalysisLabels,
-	mapLibraryStatus,
 	NEW_REPOSITORY_HREF,
 	pickLibraryAnalysis,
+	resolveLibraryItemAction,
+	resolveLibraryItemStatus,
+	selectLatestUsableCodebaseSnapshots,
 } from "@/features/codebase/services/library";
 
 function makeItem(
@@ -27,46 +30,205 @@ function makeItem(
 		packageManager: null,
 		hasReadyAnalysis: false,
 		hasUsableSnapshot: true,
+		analysisAttemptStatus: null,
+		onboardingProjectId: null,
+		readiness: "recovery_required",
 		planCount: 0,
 		...overrides,
 	};
 }
 
-describe("mapLibraryStatus", () => {
-	it("maps ready snapshots to Siap", () => {
-		expect(mapLibraryStatus("ready", false)).toBe("Siap");
+describe("resolveLibraryItemStatus", () => {
+	it("uses the four public labels only", () => {
+		expect(Object.values(CODEBASE_LIBRARY_STATUS_LABELS).sort()).toEqual([
+			"Menganalisis",
+			"Perlu analisis",
+			"Siap",
+			"Sinkronisasi belum selesai",
+		]);
 	});
 
-	it("prefers Siap when validated analysis exists for the latest snapshot", () => {
-		expect(mapLibraryStatus("uploaded", true)).toBe("Siap");
+	it("reports a validated analysis as ready", () => {
+		expect(
+			resolveLibraryItemStatus(
+				makeItem({ readiness: "planning_ready", hasReadyAnalysis: true }),
+			),
+		).toBe("ready");
 	});
 
-	it("maps analyzing to Sedang dianalisis", () => {
-		expect(mapLibraryStatus("analyzing", false)).toBe("Sedang dianalisis");
+	it("reports a running attempt as analyzing", () => {
+		expect(
+			resolveLibraryItemStatus(
+				makeItem({
+					readiness: "analysis_pending",
+					analysisAttemptStatus: "pending",
+				}),
+			),
+		).toBe("analyzing");
 	});
 
-	it("maps uploading transport to Sedang disinkronkan", () => {
-		expect(mapLibraryStatus("uploading", false)).toBe("Sedang disinkronkan");
+	it("reports a synced repository with no attempt as needing analysis", () => {
+		expect(
+			resolveLibraryItemStatus(
+				makeItem({
+					readiness: "analysis_pending",
+					analysisAttemptStatus: null,
+				}),
+			),
+		).toBe("needs_analysis");
 	});
 
-	it("maps uploaded transport without analysis to Tersinkron, never Siap", () => {
-		expect(mapLibraryStatus("uploaded", false)).toBe("Tersinkron");
+	it("reports a failed attempt as needing analysis", () => {
+		expect(
+			resolveLibraryItemStatus(
+				makeItem({
+					readiness: "recovery_required",
+					analysisAttemptStatus: "failed",
+				}),
+			),
+		).toBe("needs_analysis");
 	});
 
-	it("maps failed to Perlu perhatian", () => {
-		expect(mapLibraryStatus("failed", false)).toBe("Perlu perhatian");
+	it("reports a repository that never synced as sync incomplete", () => {
+		expect(
+			resolveLibraryItemStatus(
+				makeItem({ readiness: "onboarding", hasUsableSnapshot: false }),
+			),
+		).toBe("sync_incomplete");
 	});
 
-	it("maps expired to Sesi berakhir", () => {
-		expect(mapLibraryStatus("expired", false)).toBe("Sesi berakhir");
+	it("keeps a repository with a stored plan readable while its analysis runs", () => {
+		expect(
+			resolveLibraryItemStatus(
+				makeItem({
+					readiness: "existing_plan_readonly",
+					analysisAttemptStatus: "pending",
+				}),
+			),
+		).toBe("analyzing");
+	});
+});
+
+describe("resolveLibraryItemAction", () => {
+	it("opens the workspace only when planning is ready", () => {
+		expect(
+			resolveLibraryItemAction(makeItem({ readiness: "planning_ready" })),
+		).toEqual({
+			kind: "open_workspace",
+			label: "Buka Workspace",
+			href: "/codebases/cb-1",
+			recovery: false,
+		});
 	});
 
-	it("maps missing snapshot to Belum ada sync", () => {
-		expect(mapLibraryStatus(null, false)).toBe("Belum ada sync");
+	it("opens the workspace for a stored plan whose latest analysis is broken", () => {
+		expect(
+			resolveLibraryItemAction(
+				makeItem({ readiness: "existing_plan_readonly" }),
+			),
+		).toMatchObject({ kind: "open_workspace", href: "/codebases/cb-1" });
 	});
 
-	it("falls back for unknown statuses", () => {
-		expect(mapLibraryStatus("migrating", false)).toBe("Status tidak dikenal");
+	it("sends a running analysis to progress", () => {
+		expect(
+			resolveLibraryItemAction(
+				makeItem({
+					readiness: "analysis_pending",
+					analysisAttemptStatus: "pending",
+				}),
+			),
+		).toMatchObject({
+			kind: "view_progress",
+			label: "Lihat Progres",
+			href: NEW_REPOSITORY_HREF,
+			recovery: true,
+		});
+	});
+
+	it("sends a credit-blocked / not-started repository to start analysis", () => {
+		expect(
+			resolveLibraryItemAction(
+				makeItem({
+					readiness: "analysis_pending",
+					analysisAttemptStatus: null,
+				}),
+			),
+		).toMatchObject({
+			kind: "complete_analysis",
+			label: "Selesaikan Analisis",
+			href: NEW_REPOSITORY_HREF,
+		});
+	});
+
+	it("sends a failed analysis to retry", () => {
+		expect(
+			resolveLibraryItemAction(
+				makeItem({
+					readiness: "recovery_required",
+					analysisAttemptStatus: "failed",
+				}),
+			),
+		).toMatchObject({
+			kind: "retry_analysis",
+			label: "Coba Analisis Lagi",
+			href: NEW_REPOSITORY_HREF,
+		});
+	});
+
+	it("sends an unfinished sync to sync recovery", () => {
+		expect(
+			resolveLibraryItemAction(
+				makeItem({ readiness: "onboarding", hasUsableSnapshot: false }),
+			),
+		).toMatchObject({
+			kind: "resume_sync",
+			label: "Lanjutkan Sinkronisasi",
+			href: NEW_REPOSITORY_HREF,
+		});
+	});
+
+	it("never routes a non-ready repository into the workspace", () => {
+		for (const readiness of [
+			"analysis_pending",
+			"recovery_required",
+			"onboarding",
+		] as const) {
+			expect(resolveLibraryItemAction(makeItem({ readiness })).href).toBe(
+				NEW_REPOSITORY_HREF,
+			);
+		}
+	});
+});
+
+describe("selectLatestUsableCodebaseSnapshots", () => {
+	it("picks the newest snapshot a feature can be planned against", () => {
+		const latest = selectLatestUsableCodebaseSnapshots([
+			{
+				id: "snap-old",
+				codebaseId: "cb-1",
+				createdAt: new Date("2026-10-01"),
+				status: "uploaded",
+			},
+			{
+				id: "snap-uploading",
+				codebaseId: "cb-1",
+				createdAt: new Date("2026-10-02"),
+				status: "uploading",
+			},
+		]);
+		expect(latest.get("cb-1")?.id).toBe("snap-old");
+	});
+
+	it("returns nothing for a codebase whose only snapshot is incomplete", () => {
+		const latest = selectLatestUsableCodebaseSnapshots([
+			{
+				id: "snap-uploading",
+				codebaseId: "cb-1",
+				createdAt: new Date("2026-10-02"),
+				status: "uploading",
+			},
+		]);
+		expect(latest.size).toBe(0);
 	});
 });
 
@@ -198,45 +360,6 @@ describe("hasReadyLibraryAnalysis", () => {
 					snapshotId: "snap-1",
 					status: "ready",
 					outputParsed: true,
-				},
-			}),
-		).toBe(false);
-	});
-
-	it("is false while analysis is pending", () => {
-		expect(
-			hasReadyLibraryAnalysis({
-				latestSnapshotId: "snap-1",
-				matchedAnalysis: {
-					snapshotId: "snap-1",
-					status: "pending",
-					outputParsed: true,
-				},
-			}),
-		).toBe(false);
-	});
-
-	it("is false when analysis failed", () => {
-		expect(
-			hasReadyLibraryAnalysis({
-				latestSnapshotId: "snap-1",
-				matchedAnalysis: {
-					snapshotId: "snap-1",
-					status: "failed",
-					outputParsed: true,
-				},
-			}),
-		).toBe(false);
-	});
-
-	it("is false when ready analysis output failed validation", () => {
-		expect(
-			hasReadyLibraryAnalysis({
-				latestSnapshotId: "snap-1",
-				matchedAnalysis: {
-					snapshotId: "snap-1",
-					status: "ready",
-					outputParsed: false,
 				},
 			}),
 		).toBe(false);
@@ -398,19 +521,12 @@ describe("buildCodebaseLibraryItems", () => {
 		} as const;
 	}
 
-	it("hides a freshly created codebase that never synced", () => {
-		const items = buildCodebaseLibraryItems(baseInput());
-		expect(items.map((item) => item.id)).not.toContain("cb-draft");
-	});
-
-	it("lists every codebase whose newest snapshot is usable for planning", () => {
-		// Readiness is a persistence question, not an analysis question: a
-		// repository with a usable snapshot stays reachable while its analysis is
-		// pending or failed, because the user's planning is attached to it.
+	it("lists every owned repository, including one that never synced", () => {
 		const items = buildCodebaseLibraryItems(baseInput());
 		expect(items.map((item) => item.id).sort()).toEqual(
 			[
 				"cb-bad-output",
+				"cb-draft",
 				"cb-failed",
 				"cb-pending",
 				"cb-ready",
@@ -437,32 +553,58 @@ describe("buildCodebaseLibraryItems", () => {
 		);
 		expect(byId.get("cb-stale")?.hasReadyAnalysis).toBe(false);
 		expect(byId.get("cb-stale")?.hasUsableSnapshot).toBe(true);
+		expect(byId.get("cb-stale")?.readiness).toBe("analysis_pending");
 	});
 
-	it("reports a usable snapshot without a ready analysis as synced, not analysed", () => {
+	it("surfaces the newest attempt status so running differs from needs-action", () => {
 		const byId = new Map(
 			buildCodebaseLibraryItems(baseInput()).map((item) => [item.id, item]),
 		);
-		const uploaded = byId.get("cb-uploaded-no-analysis");
-		expect(mapLibraryStatus(uploaded?.snapshotStatus, false)).toBe(
-			"Tersinkron",
-		);
-		expect(mapLibraryStatus(uploaded?.snapshotStatus, true)).toBe("Siap");
+		expect(byId.get("cb-pending")?.analysisAttemptStatus).toBe("pending");
+		expect(byId.get("cb-failed")?.analysisAttemptStatus).toBe("failed");
+		expect(byId.get("cb-stale")?.analysisAttemptStatus).toBeNull();
 	});
 
-	it("keeps the summary of the newest ready analysis", () => {
-		const items = buildCodebaseLibraryItems(baseInput());
+	it("keeps a repository with a stored plan readable even when its analysis is not ready", () => {
+		const input = baseInput();
+		const items = buildCodebaseLibraryItems({
+			...input,
+			projects: input.projects.map((project) =>
+				project.id === "proj-failed"
+					? { ...project, hasArtifacts: true }
+					: project,
+			),
+		});
+		const failed = items.find((item) => item.id === "cb-failed");
+		expect(failed?.readiness).toBe("existing_plan_readonly");
+		if (!failed) throw new Error("expected cb-failed to be listed");
+		expect(resolveLibraryItemAction(failed)).toMatchObject({
+			kind: "open_workspace",
+		});
+	});
+
+	it("keeps an older ready result visible after a newer failed attempt", () => {
+		const input = baseInput();
+		const items = buildCodebaseLibraryItems({
+			...input,
+			analyses: [
+				{
+					projectId: "proj-ready",
+					snapshotId: "snap-1",
+					status: "failed",
+					output: null,
+				},
+				{
+					projectId: "proj-ready",
+					snapshotId: "snap-1",
+					status: "ready",
+					output: readyOutput(),
+				},
+			],
+		});
 		const ready = items.find((item) => item.id === "cb-ready");
-		expect(ready?.summary === null || typeof ready?.summary === "string").toBe(
-			true,
-		);
-	});
-
-	it("scopes search and pagination only to visible repositories", () => {
-		const items = buildCodebaseLibraryItems(baseInput());
-		const matches = filterLibraryItems(items, "draft");
-		expect(matches).toEqual([]);
-		expect(items.length).toBe(6);
+		expect(ready?.hasReadyAnalysis).toBe(true);
+		expect(ready?.readiness).toBe("planning_ready");
 	});
 
 	it("counts the feature plans of each repository", () => {
@@ -472,11 +614,9 @@ describe("buildCodebaseLibraryItems", () => {
 		expect(byId.get("cb-ready")?.planCount).toBe(1);
 	});
 
-	it("treats a codebase with no ready items as an empty library state", () => {
+	it("reports an empty library only when the user owns no repositories", () => {
 		const items = buildCodebaseLibraryItems({
-			codebases: [
-				{ id: "cb-draft", name: "Draft", createdAt: null, updatedAt: null },
-			],
+			codebases: [],
 			snapshots: [],
 			projects: [],
 			analyses: [],

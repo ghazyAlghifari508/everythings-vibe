@@ -145,7 +145,6 @@ async function lock(status?: string) {
 describe("PRD revision fail-closed lifecycle", () => {
 	it.each([
 		"greenfield",
-		"existing_codebase",
 	])("allows pre-lock revisions and preserves history in %s", async (projectMode) => {
 		await db
 			.update(projects)
@@ -156,6 +155,33 @@ describe("PRD revision fail-closed lifecycle", () => {
 		const { prd } = await artifacts();
 		expect(prd.map((row) => row.version).sort()).toEqual([1, 2]);
 		expect(prd.find((row) => row.version === 1)?.content).toContain("Original");
+	});
+
+	it("rejects direct existing-codebase revisions before generation and persistence", async () => {
+		await db
+			.update(projects)
+			.set({ projectMode: "existing_codebase" })
+			.where(eq(projects.id, projectId));
+		const before = await artifacts();
+		const response = await context();
+		expect(response.ok).toBe(false);
+		if (!response.ok) expect(response.response.status).toBe(409);
+		const http = await revisionRequest({ projectId, confirmedImpact: true });
+		expect(http.status).toBe(409);
+		expect((await http.json()).code).toBe("REVISION_APPROVAL_REQUIRED");
+		expect((await persist()).result.stopped).toBe(true);
+		expect(await artifacts()).toEqual(before);
+	});
+
+	it("rechecks project mode when it changes during streaming", async () => {
+		expect((await context()).ok).toBe(true);
+		await db
+			.update(projects)
+			.set({ projectMode: "existing_codebase" })
+			.where(eq(projects.id, projectId));
+		const before = await artifacts();
+		expect((await persist()).result.stopped).toBe(true);
+		expect(await artifacts()).toEqual(before);
 	});
 
 	it.each([

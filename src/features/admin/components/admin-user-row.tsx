@@ -6,6 +6,7 @@ import {
 	resetUserCredit,
 	setUserAdmin,
 	setUserBanned,
+	setUserBillingExempt,
 	updateUserPlan,
 } from "../services";
 import type { AdminSubscriptionItem, AdminUserItem } from "../types";
@@ -65,8 +66,22 @@ export function AdminUserRowItem({
 
 			{/* Credits */}
 			<td className="px-4 py-3 text-fog">
-				<span className="text-snow font-medium">{sub?.creditsUsed ?? 0}</span>
-				<span className="text-[11px]"> / {sub?.credits ?? 0}</span>
+				<div className="flex flex-col gap-0.5">
+					<div>
+						<span className="text-snow font-medium">
+							{sub?.creditsUsed ?? 0}
+						</span>
+						<span className="text-[11px]"> / {sub?.credits ?? 0}</span>
+					</div>
+					{Boolean(user.billingExempt) && (
+						<span
+							title={`Bebas Biaya: ${user.billingExemptionReason ?? "internal"}`}
+							className="inline-flex w-fit items-center rounded bg-teal-400/10 px-1.5 py-0.2 text-[9px] font-semibold text-teal-300 border border-teal-400/20"
+						>
+							Exempt
+						</span>
+					)}
+				</div>
 			</td>
 
 			{/* Role */}
@@ -171,6 +186,31 @@ export function AdminUserRowItem({
 						}
 					>
 						{isAdmin ? "Cabut Admin" : "Jadikan Admin"}
+					</button>
+
+					{/* Toggle Billing Exemption */}
+					<button
+						type="button"
+						disabled={isMutating}
+						onClick={() =>
+							onAction(`exempt-${user.id}`, () =>
+								setUserBillingExempt({
+									data: {
+										userId: user.id,
+										billingExempt: !user.billingExempt,
+										reason: !user.billingExempt ? "internal" : undefined,
+									},
+								}),
+							)
+						}
+						className="rounded border border-graphite bg-obsidian px-2 py-1 text-[11px] text-fog hover:border-fog/40 hover:text-snow disabled:opacity-50"
+						title={
+							user.billingExempt
+								? "Cabut hak bebas biaya AI"
+								: "Beri hak bebas biaya AI untuk akun internal"
+						}
+					>
+						{user.billingExempt ? "Cabut Exempt" : "Set Exempt"}
 					</button>
 
 					{/* Ban / Unban */}

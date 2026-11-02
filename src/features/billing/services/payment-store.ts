@@ -142,6 +142,12 @@ export function createPaymentService(store: PaymentServiceStore) {
 			if (payment.status === "success") {
 				return { plan: (sub?.plan ?? "pro") as Plan };
 			}
+			if (
+				payment.midtransResponse &&
+				typeof payment.midtransResponse === "object" &&
+				"reversal" in payment.midtransResponse
+			)
+				return null;
 
 			if (
 				payment.plan !== TOPUP_SKU.id ||

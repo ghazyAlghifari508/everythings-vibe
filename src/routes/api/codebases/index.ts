@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
+	handleCodebaseBulkDelete,
 	handleCodebaseCreate,
 	handleCodebaseList,
 } from "@/features/codebase/services/library-route.server";
 
-// Browser codebase library boundary (list + create).
+// Browser codebase library boundary (list + create + bulk delete).
 //
 // Server-import exception: top-level `.server` imports are correct here — this
 // module registers server handlers only (no client component), following the
@@ -22,6 +23,8 @@ export const Route = createFileRoute("/api/codebases/")({
 				handleCodebaseList({ request }),
 			POST: ({ request }: { request: Request }) =>
 				handleCodebaseCreate({ request }),
+			DELETE: ({ request }: { request: Request }) =>
+				handleCodebaseBulkDelete({ request }),
 		},
 	},
 });

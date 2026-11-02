@@ -6,9 +6,11 @@ import {
 	File01Icon,
 	Image01Icon,
 } from "@hugeicons/core-free-icons";
+import { useNavigate } from "@tanstack/react-router";
 import { type KeyboardEvent, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { ScrapeMode } from "@/db/schema";
+import { saveRememberedScrapeMode } from "../utils/scrape-mode-session";
 import { ScrapeWorkspaceForm } from "./scrape-workspace-form";
 
 const modes: ScrapeMode[] = ["crawl", "design", "html", "images"];
@@ -37,14 +39,50 @@ const modeInfo = {
 	},
 };
 
+export interface ScrapModeSwitcherProps {
+	initialMode?: ScrapeMode;
+	mode?: ScrapeMode;
+	onModeChange?: (mode: ScrapeMode) => void;
+}
+
 export function ScrapModeSwitcher({
 	initialMode = "design",
-}: {
-	initialMode?: ScrapeMode;
-}) {
-	const [mode, setMode] = useState<ScrapeMode>(initialMode);
+	mode: controlledMode,
+	onModeChange,
+}: ScrapModeSwitcherProps = {}) {
+	const navigate = useNavigate();
+	const [localMode, setLocalMode] = useState<ScrapeMode>(
+		controlledMode ?? initialMode,
+	);
+	const [prevPropMode, setPrevPropMode] = useState<ScrapeMode>(
+		controlledMode ?? initialMode,
+	);
+
+	const propMode = controlledMode ?? initialMode;
+	if (propMode !== prevPropMode) {
+		setPrevPropMode(propMode);
+		setLocalMode(propMode);
+	}
+
+	const activeMode = controlledMode ?? localMode;
+
+	function selectMode(next: ScrapeMode) {
+		if (next === activeMode) return;
+		setLocalMode(next);
+		saveRememberedScrapeMode(next);
+		onModeChange?.(next);
+		try {
+			void navigate({
+				to: "/scrape",
+				search: { mode: next },
+			});
+		} catch {
+			// ponytail: outside Router context in tests, navigate may be mocked or throw.
+		}
+	}
+
 	function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-		const current = modes.indexOf(mode);
+		const current = modes.indexOf(activeMode);
 		const next =
 			event.key === "ArrowRight"
 				? modes[(current + 1) % modes.length]
@@ -57,7 +95,7 @@ export function ScrapModeSwitcher({
 							: null;
 		if (!next) return;
 		event.preventDefault();
-		setMode(next);
+		selectMode(next);
 		requestAnimationFrame(() =>
 			document.getElementById(`${next}-tab`)?.focus(),
 		);
@@ -77,12 +115,12 @@ export function ScrapModeSwitcher({
 							id={`${value}-tab`}
 							type="button"
 							role="tab"
-							aria-selected={mode === value}
+							aria-selected={activeMode === value}
 							aria-controls="extraction-panel"
-							tabIndex={mode === value ? 0 : -1}
-							onClick={() => setMode(value)}
+							tabIndex={activeMode === value ? 0 : -1}
+							onClick={() => selectMode(value)}
 							onKeyDown={onTabKeyDown}
-							className={`inline-flex min-h-11 flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-indigo ${mode === value ? "border-snow bg-snow text-obsidian" : "border-graphite text-fog hover:border-steel hover:text-snow"}`}
+							className={`inline-flex min-h-11 flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-indigo ${activeMode === value ? "border-snow bg-snow text-obsidian" : "border-graphite text-fog hover:border-steel hover:text-snow"}`}
 						>
 							<Icon icon={icon} size={16} aria-hidden />
 							{modeInfo[value].label}
@@ -93,13 +131,13 @@ export function ScrapModeSwitcher({
 			<div
 				id="extraction-panel"
 				role="tabpanel"
-				aria-labelledby={`${mode}-tab`}
+				aria-labelledby={`${activeMode}-tab`}
 				className="w-full"
 			>
 				<p className="mx-auto mb-6 max-w-2xl text-center text-sm leading-6 text-fog">
-					{modeInfo[mode].description}
+					{modeInfo[activeMode].description}
 				</p>
-				<ScrapeWorkspaceForm mode={mode} />
+				<ScrapeWorkspaceForm mode={activeMode} />
 			</div>
 		</div>
 	);

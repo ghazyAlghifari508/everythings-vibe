@@ -1,19 +1,17 @@
 "use client";
 
-import {
-	animate,
-	useMotionValue,
-	useMotionValueEvent,
-	useReducedMotion,
-} from "framer-motion";
+import { ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import {
 	type KeyboardEvent,
 	type MouseEvent,
+	type ReactNode,
 	useCallback,
 	useEffect,
 	useRef,
 	useState,
 } from "react";
+import { Icon } from "./icon";
+import { Spinner } from "./spinner";
 
 export type PromptBarSubmitAppearance = "label" | "icon";
 
@@ -25,10 +23,15 @@ export interface PromptBarProps {
 	placeholder?: string;
 	disabled?: boolean;
 	isSending?: boolean;
+	sendDisabled?: boolean;
 	minCharsToSend?: number;
 	minRows?: number;
 	maxRows?: number;
 	onSend?: (text: string) => void;
+	onKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+	headerSlot?: ReactNode;
+	footerStart?: ReactNode;
+	popoverSlot?: ReactNode;
 	className?: string;
 	ariaLabel?: string;
 	sendButtonLabel?: string;
@@ -42,16 +45,8 @@ export interface PromptBarProps {
 
 interface SendGlyphProps {
 	busy?: boolean;
-	morphDuration?: number;
-	squash?: number;
-	tilt?: number;
 }
 
-const ARROW_UP = [
-	12, 4.5, 18.5, 11, 14.25, 11, 14.25, 19.5, 9.75, 19.5, 9.75, 11, 5.5, 11,
-];
-const SQUARE = [12, 6, 18, 6, 18, 12, 18, 18, 6, 18, 6, 12, 6, 6];
-const EASE_IN_OUT: [number, number, number, number] = [0.77, 0, 0.175, 1];
 const LINE_HEIGHT_PX = 22;
 const ICON_SUBMIT_LABEL = "Kirim pesan";
 
@@ -59,72 +54,19 @@ const ICON_SUBMIT_LABEL = "Kirim pesan";
 // these must keep its native behavior instead of being forwarded to the
 // textarea.
 const INTERACTIVE_SELECTOR =
-	'a[href], button, input, select, textarea, [role="button"], [role="tab"], [role="checkbox"], [role="switch"], [role="slider"], [contenteditable="true"]';
+	'a[href], button, input, select, textarea, [role="button"], [role="tab"], [role="checkbox"], [role="switch"], [role="slider"], [role="menuitem"], [role="option"], [role="listbox"], [role="dialog"], [data-composer-interactive="true"], [contenteditable="true"]';
 
-const mix = (a: number, b: number, t: number) => a + (b - a) * t;
-
-const pathAt = (a: number[], b: number[], t: number) => {
-	let d = "";
-	for (let i = 0; i < a.length; i += 2) {
-		d += `${i ? "L" : "M"}${mix(a[i], b[i], t).toFixed(2)} ${mix(
-			a[i + 1],
-			b[i + 1],
-			t,
-		).toFixed(2)}`;
+export function SendGlyph({ busy = false }: SendGlyphProps) {
+	if (busy) {
+		return <Spinner size={14} className="text-current" />;
 	}
-	return `${d}Z`;
-};
-
-export function SendGlyph({
-	busy = false,
-	morphDuration = 240,
-	squash = 0.12,
-	tilt = 8,
-}: SendGlyphProps) {
-	const reduce = useReducedMotion();
-	const svgRef = useRef<SVGSVGElement>(null);
-	const pathRef = useRef<SVGPathElement>(null);
-	const dir = useRef(busy ? 1 : -1);
-	const t = useMotionValue(busy ? 1 : 0);
-
-	useEffect(() => {
-		const target = busy ? 1 : 0;
-		dir.current = busy ? 1 : -1;
-		if (t.get() === target) return undefined;
-		const controls = animate(
-			t,
-			target,
-			reduce
-				? { duration: 0 }
-				: { duration: morphDuration / 1000, ease: EASE_IN_OUT },
-		);
-		return () => controls.stop();
-	}, [busy, morphDuration, reduce, t]);
-
-	useMotionValueEvent(t, "change", (v) => {
-		pathRef.current?.setAttribute("d", pathAt(ARROW_UP, SQUARE, v));
-		const goo = reduce ? 0 : Math.sin(v * Math.PI);
-		const sx = 1 - squash * goo;
-		if (svgRef.current) {
-			svgRef.current.style.transform = goo
-				? `rotate(${dir.current * tilt * goo}deg) scale(${sx}, ${1 / sx})`
-				: "";
-		}
-	});
-
 	return (
-		<svg
-			ref={svgRef}
-			className="block h-3.5 w-3.5 shrink-0 origin-center"
-			viewBox="0 0 24 24"
-			aria-hidden="true"
-			fill="currentColor"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinejoin="round"
-		>
-			<path ref={pathRef} d={pathAt(ARROW_UP, SQUARE, t.get())} />
-		</svg>
+		<Icon
+			icon={ArrowUp02Icon}
+			size={16}
+			strokeWidth={2}
+			className="block shrink-0"
+		/>
 	);
 }
 
@@ -136,10 +78,15 @@ export function PromptBar({
 	placeholder = "Jelaskan fitur yang ingin kamu bangun di repositori ini...",
 	disabled = false,
 	isSending = false,
+	sendDisabled = false,
 	minCharsToSend = 3,
 	minRows = 1,
 	maxRows = 6,
 	onSend,
+	onKeyDown: onExternalKeyDown,
+	headerSlot,
+	footerStart,
+	popoverSlot,
 	className = "",
 	ariaLabel = "Jelaskan fitur yang ingin dibangun di repositori ini",
 	sendButtonLabel,
@@ -210,7 +157,10 @@ export function PromptBar({
 	// in-flight request, but the submit action is closed: Enter and the button
 	// both consult this one predicate, so the keyboard cannot bypass the guard.
 	const canSend =
-		!disabled && !isSending && draft.trim().length >= minCharsToSend;
+		!disabled &&
+		!isSending &&
+		!sendDisabled &&
+		draft.trim().length >= minCharsToSend;
 
 	const handleSend = () => {
 		if (!canSend) return;
@@ -226,6 +176,11 @@ export function PromptBar({
 		const isComposing =
 			Boolean(e.nativeEvent?.isComposing) ||
 			("isComposing" in e && Boolean(e.isComposing));
+
+		if (!isComposing) {
+			onExternalKeyDown?.(e);
+			if (e.defaultPrevented) return;
+		}
 
 		if (e.key === "Enter" && !e.shiftKey && !isComposing) {
 			e.preventDefault();
@@ -254,6 +209,15 @@ export function PromptBar({
 			<label htmlFor={id} className="sr-only">
 				{ariaLabel}
 			</label>
+			{popoverSlot}
+			{headerSlot ? (
+				<header
+					data-testid="prompt-bar-header"
+					className="mb-2 flex flex-wrap items-center gap-1.5"
+				>
+					{headerSlot}
+				</header>
+			) : null}
 			<textarea
 				ref={inputRef}
 				id={id}
@@ -266,7 +230,14 @@ export function PromptBar({
 				aria-label={ariaLabel}
 				className="block w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-[22px] text-snow outline-none placeholder:text-slate disabled:cursor-not-allowed disabled:opacity-50"
 			/>
-			<div className="flex items-center justify-end pt-2">
+			<div
+				className={`flex items-center ${footerStart ? "justify-between" : "justify-end"} gap-2 pt-2`}
+			>
+				{footerStart ? (
+					<div className="flex min-w-0 flex-wrap items-center gap-1.5">
+						{footerStart}
+					</div>
+				) : null}
 				<button
 					type="button"
 					onClick={handleSend}
