@@ -8,17 +8,24 @@ export interface AdminFeedbackFilterBarProps {
 	onTabChange: (tab: "feedback" | "errors") => void;
 	activeType: string;
 	onTypeChange: (type: string) => void;
+	activeStatus: string;
+	onStatusChange: (status: string) => void;
+	activeArchiveFilter: string;
+	onArchiveFilterChange: (filter: string) => void;
 	search: string;
 	onSearchChange: (search: string) => void;
 	feedbackTotal: number;
 	errorTotal: number;
 }
-
 export function AdminFeedbackFilterBar({
 	currentTab,
 	onTabChange,
 	activeType,
 	onTypeChange,
+	activeStatus,
+	onStatusChange,
+	activeArchiveFilter,
+	onArchiveFilterChange,
 	search,
 	onSearchChange,
 	feedbackTotal,
@@ -53,6 +60,31 @@ export function AdminFeedbackFilterBar({
 			</div>
 
 			<div className="flex flex-wrap items-center gap-2">
+				{/* Archive Visibility Filter */}
+				<select
+					value={activeArchiveFilter}
+					onChange={(e) => onArchiveFilterChange(e.target.value)}
+					aria-label="Filter arsip"
+					className="rounded-lg border border-graphite bg-charcoal px-2.5 py-1.5 text-xs font-[510] text-snow focus:border-fog/40 focus:outline-none"
+				>
+					<option value="active">Aktif</option>
+					<option value="archived">Diarsipkan</option>
+					<option value="all">Semua Arsip</option>
+				</select>
+
+				{/* Handling Status Filter */}
+				<select
+					value={activeStatus}
+					onChange={(e) => onStatusChange(e.target.value)}
+					aria-label="Filter status laporan"
+					className="rounded-lg border border-graphite bg-charcoal px-2.5 py-1.5 text-xs font-[510] text-snow focus:border-fog/40 focus:outline-none"
+				>
+					<option value="all">Semua Status</option>
+					<option value="new">Baru</option>
+					<option value="in_progress">Diproses</option>
+					<option value="resolved">Selesai</option>
+				</select>
+
 				{/* Type filter for feedback */}
 				{currentTab === "feedback" && (
 					<div className="flex gap-1">

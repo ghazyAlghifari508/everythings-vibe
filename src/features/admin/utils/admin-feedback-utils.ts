@@ -10,6 +10,11 @@ export function computeFallbackFeedbackStats(
 	feedback: AdminFeedbackItem[],
 	errors: AdminErrorReportItem[],
 ): AdminFeedbackStats {
+	const fbActive = feedback.filter((f) => !f.archivedAt).length;
+	const fbArchived = feedback.filter((f) => Boolean(f.archivedAt)).length;
+	const errActive = errors.filter((e) => !e.archivedAt).length;
+	const errArchived = errors.filter((e) => Boolean(e.archivedAt)).length;
+
 	return {
 		totalItems: feedback.length + errors.length,
 		generalCount: feedback.filter(
@@ -19,6 +24,12 @@ export function computeFallbackFeedbackStats(
 		bugCount: errors.length + feedback.filter((f) => f.type === "bug").length,
 		feedbackTotal: feedback.length,
 		errorTotal: errors.length,
+		activeTotal: fbActive + errActive,
+		archivedTotal: fbArchived + errArchived,
+		feedbackActiveTotal: fbActive,
+		feedbackArchivedTotal: fbArchived,
+		errorActiveTotal: errActive,
+		errorArchivedTotal: errArchived,
 	};
 }
 
@@ -30,6 +41,8 @@ export interface ResolveFeedbackDisplayArgs {
 	fallbackErrors: AdminErrorReportItem[];
 	search: string;
 	activeType: string;
+	activeStatus?: string;
+	activeArchiveFilter?: string;
 	clientPage: number;
 	clientPageSize: number;
 }
@@ -54,6 +67,8 @@ export function resolveFeedbackDisplay(
 		fallbackErrors,
 		search,
 		activeType,
+		activeStatus,
+		activeArchiveFilter = "active",
 		clientPage,
 		clientPageSize,
 	} = args;
@@ -77,7 +92,17 @@ export function resolveFeedbackDisplay(
 				f.userEmail?.toLowerCase().includes(search.toLowerCase()) ||
 				f.userName?.toLowerCase().includes(search.toLowerCase());
 			const matchesType = activeType === "all" || f.type === activeType;
-			return matchesSearch && matchesType;
+			const status = f.handlingStatus ?? "new";
+			const matchesStatus =
+				!activeStatus || activeStatus === "all" || status === activeStatus;
+			const isArchived = Boolean(f.archivedAt);
+			const matchesArchive =
+				activeArchiveFilter === "all"
+					? true
+					: activeArchiveFilter === "archived"
+						? isArchived
+						: !isArchived;
+			return matchesSearch && matchesType && matchesStatus && matchesArchive;
 		});
 
 		const currentTotalCount = filtered.length;
@@ -112,13 +137,23 @@ export function resolveFeedbackDisplay(
 	}
 
 	const filtered = fallbackErrors.filter((e) => {
-		return (
+		const matchesSearch =
 			!search ||
 			e.errorMessage.toLowerCase().includes(search.toLowerCase()) ||
 			e.context?.toLowerCase().includes(search.toLowerCase()) ||
 			e.userEmail?.toLowerCase().includes(search.toLowerCase()) ||
-			e.userName?.toLowerCase().includes(search.toLowerCase())
-		);
+			e.userName?.toLowerCase().includes(search.toLowerCase());
+		const status = e.handlingStatus ?? "new";
+		const matchesStatus =
+			!activeStatus || activeStatus === "all" || status === activeStatus;
+		const isArchived = Boolean(e.archivedAt);
+		const matchesArchive =
+			activeArchiveFilter === "all"
+				? true
+				: activeArchiveFilter === "archived"
+					? isArchived
+					: !isArchived;
+		return matchesSearch && matchesStatus && matchesArchive;
 	});
 
 	const currentTotalCount = filtered.length;

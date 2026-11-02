@@ -7,9 +7,11 @@ import {
 	InboxIcon,
 	SparklesIcon,
 } from "@hugeicons/core-free-icons";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { useAdminFeedbackFilters } from "../hooks/use-admin-feedback-filters";
+import { useAdminFeedbackMutations } from "../hooks/use-admin-feedback-mutations";
 import type {
 	AdminErrorReportItem,
 	AdminErrorReportsListResult,
@@ -45,194 +47,87 @@ export function AdminFeedbackView({
 	stats,
 	searchParams,
 }: AdminFeedbackViewProps) {
-	const navigate = useNavigate();
+	const {
+		currentTab,
+		handleTabChange,
+		search,
+		setSearch,
+		activeType,
+		handleTypeFilterChange,
+		activeStatus,
+		handleStatusChange,
+		activeArchiveFilter,
+		handleArchiveFilterChange,
+		clientPage,
+		clientPageSize,
+		handlePageChange,
+		handlePageSizeChange,
+	} = useAdminFeedbackFilters({ searchParams });
 
-	const activeTab = searchParams?.tab ?? "feedback";
-	const [clientTab, setClientTab] = useState<"feedback" | "errors">("feedback");
-	const currentTab = searchParams ? activeTab : clientTab;
+	const [localFeedback, setLocalFeedback] = useState<AdminFeedbackItem[]>(
+		feedbackResult?.feedback ?? fallbackFeedback ?? [],
+	);
+	const [localErrors, setLocalErrors] = useState<AdminErrorReportItem[]>(
+		errorsResult?.errors ?? fallbackErrors ?? [],
+	);
 
-	const initialSearch = searchParams?.search ?? "";
-	const [search, setSearch] = useState(initialSearch);
-	const [clientPage, setClientPage] = useState(1);
-	const [clientPageSize, setClientPageSize] = useState(20);
-	const [clientTypeFilter, setClientTypeFilter] = useState<string>("all");
-
-	// Synchronize local search input if search param changes from navigation or tab switch
 	useEffect(() => {
-		const targetSearch = searchParams?.search ?? "";
-		if (targetSearch !== search) {
-			setSearch(targetSearch);
+		if (feedbackResult?.feedback) {
+			setLocalFeedback(feedbackResult.feedback);
+		} else if (fallbackFeedback) {
+			setLocalFeedback(fallbackFeedback);
 		}
-	}, [searchParams?.search, search]);
+	}, [feedbackResult?.feedback, fallbackFeedback]);
 
-	// Debounce search update (300ms) to trigger server query
-	const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	useEffect(() => {
-		if (!navigate || !searchParams) return;
-		const trimmed = search.trim();
-		if (trimmed === (searchParams.search ?? "")) return;
-
-		clearTimeout(searchTimeoutRef.current ?? undefined);
-
-		searchTimeoutRef.current = setTimeout(() => {
-			if (currentTab === "feedback") {
-				void navigate({
-					to: "/admin/feedback",
-					search: {
-						...searchParams,
-						tab: "feedback",
-						page: 1,
-						search: trimmed,
-						feedbackPage: 1,
-						feedbackSearch: trimmed,
-					},
-				});
-			} else {
-				void navigate({
-					to: "/admin/feedback",
-					search: {
-						...searchParams,
-						tab: "errors",
-						page: 1,
-						search: trimmed,
-						errorPage: 1,
-						errorSearch: trimmed,
-					},
-				});
-			}
-		}, 300);
-
-		return () => {
-			clearTimeout(searchTimeoutRef.current ?? undefined);
-		};
-	}, [search, searchParams, currentTab, navigate]);
-
-	const handleTabChange = (newTab: "feedback" | "errors") => {
-		if (newTab === currentTab) return;
-
-		if (navigate && searchParams) {
-			if (newTab === "errors") {
-				void navigate({
-					to: "/admin/feedback",
-					search: {
-						...searchParams,
-						tab: "errors",
-						page: searchParams.errorPage ?? 1,
-						pageSize: searchParams.errorPageSize ?? 20,
-						search: searchParams.errorSearch ?? "",
-						type: "all",
-						feedbackPage: searchParams.page ?? 1,
-						feedbackPageSize: searchParams.pageSize ?? 20,
-						feedbackSearch: searchParams.search ?? "",
-						feedbackType: searchParams.type ?? "all",
-					},
-				});
-			} else {
-				void navigate({
-					to: "/admin/feedback",
-					search: {
-						...searchParams,
-						tab: "feedback",
-						page: searchParams.feedbackPage ?? 1,
-						pageSize: searchParams.feedbackPageSize ?? 20,
-						search: searchParams.feedbackSearch ?? "",
-						type: searchParams.feedbackType ?? "all",
-						errorPage: searchParams.page ?? 1,
-						errorPageSize: searchParams.pageSize ?? 20,
-						errorSearch: searchParams.search ?? "",
-					},
-				});
-			}
-		} else {
-			setClientTab(newTab);
-			setSearch("");
-			setClientPage(1);
-			setClientTypeFilter("all");
+		if (errorsResult?.errors) {
+			setLocalErrors(errorsResult.errors);
+		} else if (fallbackErrors) {
+			setLocalErrors(fallbackErrors);
 		}
-	};
+	}, [errorsResult?.errors, fallbackErrors]);
 
-	const handleTypeFilterChange = (newType: string) => {
-		if (navigate && searchParams) {
-			void navigate({
-				to: "/admin/feedback",
-				search: {
-					...searchParams,
-					tab: "feedback",
-					page: 1,
-					type: newType as "all" | "bug" | "feature" | "general",
-					feedbackPage: 1,
-					feedbackType: newType as "all" | "bug" | "feature" | "general",
-				},
-			});
-		} else {
-			setClientTypeFilter(newType);
-			setClientPage(1);
-		}
-	};
+	const {
+		loadingActionId,
+		handleFeedbackStatusChange,
+		handleFeedbackArchiveChange,
+		handleErrorReportStatusChange,
+		handleErrorReportArchiveChange,
+	} = useAdminFeedbackMutations({
+		onOptimisticFeedbackStatus: (id, newStatus) => {
+			setLocalFeedback((prev) =>
+				prev.map((f) =>
+					f.id === id ? { ...f, handlingStatus: newStatus } : f,
+				),
+			);
+		},
+		onOptimisticFeedbackArchive: (id, archived) => {
+			setLocalFeedback((prev) =>
+				prev.map((f) =>
+					f.id === id ? { ...f, archivedAt: archived ? new Date() : null } : f,
+				),
+			);
+		},
+		onOptimisticErrorStatus: (id, newStatus) => {
+			setLocalErrors((prev) =>
+				prev.map((e) =>
+					e.id === id ? { ...e, handlingStatus: newStatus } : e,
+				),
+			);
+		},
+		onOptimisticErrorArchive: (id, archived) => {
+			setLocalErrors((prev) =>
+				prev.map((e) =>
+					e.id === id ? { ...e, archivedAt: archived ? new Date() : null } : e,
+				),
+			);
+		},
+	});
 
-	const handlePageChange = (newPage: number) => {
-		if (navigate && searchParams) {
-			if (currentTab === "feedback") {
-				void navigate({
-					to: "/admin/feedback",
-					search: {
-						...searchParams,
-						page: newPage,
-						feedbackPage: newPage,
-					},
-				});
-			} else {
-				void navigate({
-					to: "/admin/feedback",
-					search: {
-						...searchParams,
-						page: newPage,
-						errorPage: newPage,
-					},
-				});
-			}
-		} else {
-			setClientPage(newPage);
-		}
-	};
-
-	const handlePageSizeChange = (newPageSize: number) => {
-		if (navigate && searchParams) {
-			if (currentTab === "feedback") {
-				void navigate({
-					to: "/admin/feedback",
-					search: {
-						...searchParams,
-						page: 1,
-						pageSize: newPageSize,
-						feedbackPage: 1,
-						feedbackPageSize: newPageSize,
-					},
-				});
-			} else {
-				void navigate({
-					to: "/admin/feedback",
-					search: {
-						...searchParams,
-						page: 1,
-						pageSize: newPageSize,
-						errorPage: 1,
-						errorPageSize: newPageSize,
-					},
-				});
-			}
-		} else {
-			setClientPageSize(newPageSize);
-			setClientPage(1);
-		}
-	};
-
-	const allFeedback = feedbackResult?.feedback ?? fallbackFeedback ?? [];
-	const allErrors = errorsResult?.errors ?? fallbackErrors ?? [];
+	const allFeedback = localFeedback;
+	const allErrors = localErrors;
 	const computedStats: AdminFeedbackStats =
 		stats ?? computeFallbackFeedbackStats(allFeedback, allErrors);
-
-	const activeType = searchParams?.type ?? clientTypeFilter;
 
 	const {
 		displayedFeedback,
@@ -249,12 +144,21 @@ export function AdminFeedbackView({
 		fallbackErrors: allErrors,
 		search,
 		activeType,
+		activeStatus,
+		activeArchiveFilter,
 		clientPage,
 		clientPageSize,
 	});
 
-	const hasFeedbackFilter = Boolean(search || activeType !== "all");
-	const hasErrorFilter = Boolean(search);
+	const hasFeedbackFilter = Boolean(
+		search ||
+			activeType !== "all" ||
+			activeStatus !== "all" ||
+			activeArchiveFilter !== "active",
+	);
+	const hasErrorFilter = Boolean(
+		search || activeStatus !== "all" || activeArchiveFilter !== "active",
+	);
 
 	return (
 		<div className="mx-auto max-w-7xl space-y-8 font-inter">
@@ -313,6 +217,10 @@ export function AdminFeedbackView({
 				onTabChange={handleTabChange}
 				activeType={activeType}
 				onTypeChange={handleTypeFilterChange}
+				activeStatus={activeStatus}
+				onStatusChange={handleStatusChange}
+				activeArchiveFilter={activeArchiveFilter}
+				onArchiveFilterChange={handleArchiveFilterChange}
 				search={search}
 				onSearchChange={setSearch}
 				feedbackTotal={computedStats.feedbackTotal}
@@ -328,6 +236,9 @@ export function AdminFeedbackView({
 					pageSize={currentPageSize}
 					totalPages={currentTotalPages}
 					hasFilter={hasFeedbackFilter}
+					isMutating={loadingActionId !== null}
+					onStatusChange={handleFeedbackStatusChange}
+					onArchiveChange={handleFeedbackArchiveChange}
 					onPageChange={handlePageChange}
 					onPageSizeChange={handlePageSizeChange}
 				/>
@@ -339,6 +250,9 @@ export function AdminFeedbackView({
 					pageSize={currentPageSize}
 					totalPages={currentTotalPages}
 					hasFilter={hasErrorFilter}
+					isMutating={loadingActionId !== null}
+					onStatusChange={handleErrorReportStatusChange}
+					onArchiveChange={handleErrorReportArchiveChange}
 					onPageChange={handlePageChange}
 					onPageSizeChange={handlePageSizeChange}
 				/>

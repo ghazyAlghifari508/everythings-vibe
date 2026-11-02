@@ -2,7 +2,7 @@
 
 import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
-import type { AdminErrorReportItem } from "../types";
+import type { AdminErrorReportItem, FeedbackHandlingStatus } from "../types";
 import { AdminErrorReportRowItem } from "./admin-feedback-row";
 import { AdminPagination } from "./admin-pagination";
 
@@ -13,10 +13,15 @@ export interface AdminErrorReportTableProps {
 	pageSize: number;
 	totalPages: number;
 	hasFilter: boolean;
+	isMutating?: boolean;
+	onStatusChange?: (
+		id: string,
+		status: FeedbackHandlingStatus,
+	) => Promise<void>;
+	onArchiveChange?: (id: string, archived: boolean) => Promise<void>;
 	onPageChange: (page: number) => void;
 	onPageSizeChange: (pageSize: number) => void;
 }
-
 export function AdminErrorReportTable({
 	errors,
 	totalCount,
@@ -24,6 +29,9 @@ export function AdminErrorReportTable({
 	pageSize,
 	totalPages,
 	hasFilter,
+	isMutating = false,
+	onStatusChange,
+	onArchiveChange,
 	onPageChange,
 	onPageSizeChange,
 }: AdminErrorReportTableProps) {
@@ -56,12 +64,20 @@ export function AdminErrorReportTable({
 							<th className="px-4 py-3 font-[510]">Error Message</th>
 							<th className="px-4 py-3 font-[510]">Konteks / Stack</th>
 							<th className="px-4 py-3 font-[510]">User</th>
+							<th className="px-4 py-3 font-[510]">Status</th>
+							<th className="px-4 py-3 font-[510] text-center">Aksi</th>
 							<th className="px-4 py-3 font-[510] text-right">Waktu</th>
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-graphite">
 						{errors.map((e) => (
-							<AdminErrorReportRowItem key={e.id} error={e} />
+							<AdminErrorReportRowItem
+								key={e.id}
+								error={e}
+								isMutating={isMutating}
+								onStatusChange={onStatusChange}
+								onArchiveChange={onArchiveChange}
+							/>
 						))}
 					</tbody>
 				</table>

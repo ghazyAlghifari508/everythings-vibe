@@ -2,7 +2,7 @@
 
 import { InboxIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
-import type { AdminFeedbackItem } from "../types";
+import type { AdminFeedbackItem, FeedbackHandlingStatus } from "../types";
 import { AdminFeedbackRowItem } from "./admin-feedback-row";
 import { AdminPagination } from "./admin-pagination";
 
@@ -13,10 +13,15 @@ export interface AdminFeedbackTableProps {
 	pageSize: number;
 	totalPages: number;
 	hasFilter: boolean;
+	isMutating?: boolean;
+	onStatusChange?: (
+		id: string,
+		status: FeedbackHandlingStatus,
+	) => Promise<void>;
+	onArchiveChange?: (id: string, archived: boolean) => Promise<void>;
 	onPageChange: (page: number) => void;
 	onPageSizeChange: (pageSize: number) => void;
 }
-
 export function AdminFeedbackTable({
 	feedback,
 	totalCount,
@@ -24,6 +29,9 @@ export function AdminFeedbackTable({
 	pageSize,
 	totalPages,
 	hasFilter,
+	isMutating = false,
+	onStatusChange,
+	onArchiveChange,
 	onPageChange,
 	onPageSizeChange,
 }: AdminFeedbackTableProps) {
@@ -56,12 +64,20 @@ export function AdminFeedbackTable({
 							<th className="px-4 py-3 font-[510]">Tipe</th>
 							<th className="px-4 py-3 font-[510]">Pesan Feedback</th>
 							<th className="px-4 py-3 font-[510]">Pengirim</th>
+							<th className="px-4 py-3 font-[510]">Status</th>
+							<th className="px-4 py-3 font-[510] text-center">Aksi</th>
 							<th className="px-4 py-3 font-[510] text-right">Waktu</th>
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-graphite">
 						{feedback.map((f) => (
-							<AdminFeedbackRowItem key={f.id} feedback={f} />
+							<AdminFeedbackRowItem
+								key={f.id}
+								feedback={f}
+								isMutating={isMutating}
+								onStatusChange={onStatusChange}
+								onArchiveChange={onArchiveChange}
+							/>
 						))}
 					</tbody>
 				</table>
