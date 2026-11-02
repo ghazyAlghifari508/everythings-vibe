@@ -24,6 +24,7 @@ const project = {
 	id: "p-1",
 	userId: "u-1",
 	title: "Finance App",
+	titleSource: "auto" as const,
 	designMode: "mobile",
 	designMd: null,
 	designSkillId: "none" as const,
