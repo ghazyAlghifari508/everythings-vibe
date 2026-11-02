@@ -221,6 +221,7 @@ const SAMPLE_TOKEN_MODEL: DesignTokenModel = {
 			frequency: 45,
 			role: "surface",
 			roleClass: "neutral",
+			group: "surface",
 			rationale: "Dominant surface background",
 			confidence: "observed",
 			userAgentDefault: false,
@@ -234,6 +235,7 @@ const SAMPLE_TOKEN_MODEL: DesignTokenModel = {
 			frequency: 18,
 			role: "accent",
 			roleClass: "accent",
+			group: "brand",
 			rationale: "Action button fill",
 			confidence: "observed",
 			userAgentDefault: false,
@@ -536,8 +538,8 @@ describe("Section 10 Automated Verification — p2.md", () => {
 		});
 
 		expect(fallbackDoc).toContain("Style Reference");
-		expect(fallbackDoc).toContain("## Tokens - Colors");
-		expect(fallbackDoc).toContain("## Tokens - Typography");
+		expect(fallbackDoc).toContain("### Colors & Semantic Roles");
+		expect(fallbackDoc).toContain("### Typography Scale");
 
 		const parsed = parseDesignMd(fallbackDoc);
 		expect(parsed.colors.length).toBeGreaterThan(0);

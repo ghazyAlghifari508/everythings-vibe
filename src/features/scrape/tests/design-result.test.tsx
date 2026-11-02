@@ -1,13 +1,37 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	within,
+} from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { FIXTURE } from "@/lib/design-fixture";
 import { DesignResult } from "../components/design-result";
+import { buildDesignModel } from "../services/design-model";
+import type { VisualEvidence } from "../services/design-visual-evidence";
+import { renderDesignMd } from "../utils/design-md-render";
 
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
+
+// Desktop plus a real phone capture: the viewer must offer both contexts and
+// never treat the phone as a tablet.
+function multiCapture(): VisualEvidence {
+	const mobile = structuredClone(FIXTURE);
+	mobile.viewport = { width: 390, height: 844 };
+	mobile.colorScheme = "light";
+	for (const element of mobile.elements) {
+		if (element.role === "cta") element.properties["border-radius"] = "16px";
+		if (element.role === "h1") element.properties["font-size"] = "32px";
+	}
+	return { ...FIXTURE, colorScheme: "light", additionalViews: [mobile] };
+}
 
 const DESIGN_MD = `# Acme - Style Reference
 > A crisp ledger console under morning light.
@@ -301,5 +325,105 @@ describe("DesignResult", () => {
 		expect(
 			screen.queryByRole("button", { name: /lengkapi panduan komponen/i }),
 		).toBeNull();
+	});
+
+	it("keeps the inspector and the document on the same measured context", () => {
+		const evidence = multiCapture();
+		const document = renderDesignMd(buildDesignModel(evidence));
+		render(
+			<DesignResult
+				sourceUrl="https://acme.example/pricing"
+				domain="acme.example"
+				designMd={document}
+				visualEvidence={evidence}
+			/>,
+		);
+		const inspector = () => screen.getByRole("tabpanel", { name: "Inspector" });
+		const panel = () => screen.getByRole("tabpanel", { name: "DESIGN.md" });
+		const panelScopes = () =>
+			within(panel())
+				.queryAllByRole("heading", { level: 3 })
+				.map((heading) => heading.textContent ?? "");
+		// The first measured viewport is the default, and both panes describe it.
+		expect(within(inspector()).getAllByText(/64px/).length).toBeGreaterThan(0);
+		expect(inspector().textContent).toContain("Desktop 1440x900");
+		expect(panelScopes()).toContain(
+			"Capture 1: 1440x900, browser preference light",
+		);
+		expect(panelScopes()).not.toContain(
+			"Capture 2: 390x844, browser preference light",
+		);
+
+		const group = screen.getByRole("radiogroup", {
+			name: /konteks viewport/i,
+		});
+		fireEvent.click(within(group).getByRole("radio", { name: "Mobile" }));
+		// The inspector follows the document into the mobile capture.
+		expect(inspector().textContent).toContain("Mobile 390x844");
+		expect(within(inspector()).queryAllByText(/64px/)).toHaveLength(0);
+		expect(within(inspector()).getAllByText(/32px/).length).toBeGreaterThan(0);
+		expect(panelScopes()).toContain(
+			"Capture 2: 390x844, browser preference light",
+		);
+		expect(panelScopes()).not.toContain(
+			"Capture 1: 1440x900, browser preference light",
+		);
+		// The canonical document is untouched, so its actions keep every capture.
+		expect(
+			screen.getByRole("button", { name: "Salin DESIGN.md" }),
+		).toBeDefined();
+		expect(screen.getByText(/pratinjau terfilter ke mobile/i)).toBeDefined();
+	});
+
+	it("offers no measured-context control for a single capture or an archive", () => {
+		const evidence = multiCapture();
+		const document = renderDesignMd(buildDesignModel(evidence));
+		const { unmount } = render(
+			<DesignResult
+				sourceUrl="https://acme.example/"
+				domain="acme.example"
+				designMd={renderDesignMd(buildDesignModel(FIXTURE))}
+				visualEvidence={FIXTURE}
+			/>,
+		);
+		expect(
+			screen.queryByRole("radiogroup", { name: /konteks viewport/i }),
+		).toBeNull();
+		expect(screen.queryByRole("tab", { name: /^dark$/i })).toBeNull();
+		unmount();
+		render(
+			<DesignResult
+				sourceUrl="https://acme.example/"
+				domain="acme.example"
+				designMd="# Legacy - Style Reference\n"
+			/>,
+		);
+		expect(
+			screen.queryByRole("radiogroup", { name: /konteks viewport/i }),
+		).toBeNull();
+		expect(screen.queryByRole("tab", { name: /^light$/i })).toBeNull();
+		expect(
+			screen.getByRole("tabpanel", { name: "DESIGN.md" }).textContent,
+		).toContain("Legacy - Style Reference");
+		// An archive whose document no longer matches its capture is never
+		// presented as measured evidence.
+		expect(document).toContain("Capture 2");
+	});
+
+	it("renders the same measured-context controls on every render", () => {
+		const evidence = multiCapture();
+		const props = {
+			sourceUrl: "https://acme.example/pricing",
+			domain: "acme.example",
+			designMd: renderDesignMd(buildDesignModel(evidence)),
+			visualEvidence: evidence,
+		};
+		const first = renderToString(<DesignResult {...props} />);
+		const second = renderToString(<DesignResult {...props} />);
+		expect(first).toBe(second);
+		expect(first).toContain("Konteks viewport DESIGN.md");
+		// Exactly one measured viewport is preselected, and the default comes from
+		// the capture model rather than from a client-only effect.
+		expect(first.match(/aria-checked="true"/g)).toHaveLength(1);
 	});
 });

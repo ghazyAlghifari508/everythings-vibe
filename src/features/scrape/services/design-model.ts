@@ -125,6 +125,7 @@ export function buildDesignModel(
 		token: entry.token.usage.variableNames[0] ?? "",
 		role: entry.roleLabel,
 		roleClass: entry.roleClass,
+		group: entry.group,
 		frequency: entry.token.usage.frequency,
 		rationale: entry.rationale,
 		confidence:

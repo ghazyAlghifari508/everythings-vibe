@@ -1,12 +1,21 @@
 "use client";
 
 import { useId, useMemo, useRef, useState } from "react";
+import type { DesignTokenModel } from "@/features/scrape/services/design-model";
 import {
 	type DesignInspectorModel,
-	inspectorFromEvidence,
+	designModelFromEvidence,
+	inspectorFromModel,
 	parseDesignMd,
-	resolveThemeDocuments,
 } from "@/features/scrape/utils/design-md-inspector";
+import {
+	type DesignThemeKey,
+	designCaptureScopes,
+	designThemeOptions,
+	designViewportOptions,
+	scopedDesignMd,
+	selectedViewIds,
+} from "@/features/scrape/utils/design-view-contexts";
 import { displaySiteName } from "@/features/scrape/utils/site-name";
 import { cn } from "@/lib/utils";
 import { DesignAgentPromptDialog } from "./design-agent-prompt-dialog";
@@ -31,11 +40,8 @@ export interface ResolvedInspector {
 	// markdown could be parsed, so values are shown as parsed text, never as
 	// capture-verified measurements.
 	source: "observed" | "unverified";
-}
-
-export interface DesignThemeView {
-	theme: "light" | "dark";
-	designMd: string;
+	/** The verified structured model; null when only an archive is available. */
+	designModel: DesignTokenModel | null;
 }
 
 // Single decision point for what the inspector shows. The archive fallback is
@@ -44,11 +50,17 @@ export function resolveInspector(
 	visualEvidence: unknown,
 	designMd: string,
 ): ResolvedInspector {
-	const observed = inspectorFromEvidence(visualEvidence, designMd);
-	if (observed) return { model: observed, source: "observed" };
+	const designModel = designModelFromEvidence(visualEvidence, designMd);
+	if (designModel)
+		return {
+			model: inspectorFromModel(designModel, "observed"),
+			source: "observed",
+			designModel,
+		};
 	return {
 		model: { ...parseDesignMd(designMd), verification: "unverified" },
 		source: "unverified",
+		designModel: null,
 	};
 }
 
@@ -78,31 +90,83 @@ export function DesignResult({
 }: DesignResultProps) {
 	const [agentOpen, setAgentOpen] = useState(false);
 	const [mobileTab, setMobileTab] = useState<MobileTab>("inspector");
+	const [viewportKey, setViewportKey] = useState<string | null>(null);
+	const [themeKey, setThemeKey] = useState<DesignThemeKey | null>(null);
 	const siteName = displaySiteName(domain);
-	const { model, source } = useMemo(
+	const { model, source, designModel } = useMemo(
 		() => resolveInspector(visualEvidence, designMd),
 		[designMd, visualEvidence],
 	);
-	const themeDocuments = useMemo<DesignThemeView[] | undefined>(
+	// One selection drives the inspector and the document panel. Both are derived
+	// from the verified capture model, so the two panes cannot describe different
+	// contexts, and a selection that no longer exists falls back to the first
+	// measured option instead of leaving an empty view.
+	const viewports = useMemo(
+		() => designViewportOptions(designModel),
+		[designModel],
+	);
+	const activeViewport = viewports.some((option) => option.key === viewportKey)
+		? viewportKey
+		: (viewports[0]?.key ?? null);
+	const themes = useMemo(
+		() => designThemeOptions(designModel, activeViewport),
+		[designModel, activeViewport],
+	);
+	const activeTheme =
+		themeKey && themes.includes(themeKey) ? themeKey : (themes[0] ?? null);
+	const viewIds = useMemo(
+		() =>
+			selectedViewIds(designModel, {
+				viewport: activeViewport,
+				theme: activeTheme,
+			}),
+		[designModel, activeViewport, activeTheme],
+	);
+	const contextModel = useMemo(
+		() =>
+			source === "observed" &&
+			designModel &&
+			viewIds.length < (designModel.views?.length ?? 0)
+				? inspectorFromModel(designModel, "observed", { viewIds })
+				: model,
+		[designModel, model, source, viewIds],
+	);
+	const scopes = useMemo(() => designCaptureScopes(designModel), [designModel]);
+	// View-only scope: the canonical document, its copy action and its download
+	// always keep every capture.
+	const previewMd = useMemo(
 		() =>
 			source === "observed"
-				? resolveThemeDocuments(visualEvidence, designMd)
+				? scopedDesignMd(designMd, scopes, {
+						viewport: activeViewport,
+						theme: activeTheme,
+					})
 				: undefined,
-		[designMd, source, visualEvidence],
+		[activeTheme, activeViewport, designMd, scopes, source],
 	);
+	const contextLabel = useMemo(() => {
+		const parts: string[] = [];
+		const option = viewports.find((entry) => entry.key === activeViewport);
+		if (option) parts.push(`${option.label} ${option.detail}`);
+		if (activeTheme)
+			parts.push(activeTheme === "light" ? "tema terang" : "tema gelap");
+		return parts.join(" · ");
+	}, [activeTheme, activeViewport, viewports]);
 
 	const navItems = SECTION_NAV.filter((item) => {
-		if (item.key === "colors") return model.colors.length > 0;
+		if (item.key === "colors") return contextModel.colors.length > 0;
 		if (item.key === "typography")
-			return model.typography.length > 0 || model.typefaces.length > 0;
+			return (
+				contextModel.typography.length > 0 || contextModel.typefaces.length > 0
+			);
 		if (item.key === "spacing")
-			return model.spacing.length > 0 || model.radii.length > 0;
-		if (item.key === "components") return model.components.length > 0;
-		if (item.key === "surfaces") return model.surfaces.length > 0;
-		if (item.key === "elevation") return model.elevation.length > 0;
+			return contextModel.spacing.length > 0 || contextModel.radii.length > 0;
+		if (item.key === "components") return contextModel.components.length > 0;
+		if (item.key === "surfaces") return contextModel.surfaces.length > 0;
+		if (item.key === "elevation") return contextModel.elevation.length > 0;
 		if (item.key === "guidelines")
-			return model.dos.length > 0 || model.donts.length > 0;
-		if (item.key === "limitations") return model.limitations.length > 0;
+			return contextModel.dos.length > 0 || contextModel.donts.length > 0;
+		if (item.key === "limitations") return contextModel.limitations.length > 0;
 		return true;
 	});
 	const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
@@ -204,7 +268,8 @@ export function DesignResult({
 					<DesignSystemInspector
 						siteName={siteName}
 						sourceUrl={sourceUrl}
-						model={model}
+						model={contextModel}
+						contextLabel={contextLabel || undefined}
 					/>
 				</div>
 				<div
@@ -218,7 +283,13 @@ export function DesignResult({
 				>
 					<DesignMdSourcePanel
 						designMd={designMd}
-						themeDocuments={themeDocuments}
+						previewMd={previewMd}
+						viewports={viewports}
+						viewport={activeViewport}
+						onViewportChange={setViewportKey}
+						themes={themes}
+						theme={activeTheme}
+						onThemeChange={setThemeKey}
 						inspectorSource={source}
 						enrichment={enrichment}
 						enrichmentDetail={enrichmentDetail}

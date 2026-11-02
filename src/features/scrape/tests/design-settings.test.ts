@@ -83,8 +83,8 @@ describe("design output scope", () => {
 			},
 		});
 		expect(result.model.observedComponents).toEqual([]);
-		expect(result.document).not.toMatch(/^## Components$/m);
-		expect(result.document).toMatch(/^## CSS Custom Properties$/m);
+		expect(result.document).not.toMatch(/^## Component Specifications$/m);
+		expect(result.document).toMatch(/^### CSS Custom Properties$/m);
 		expect(result.document).not.toContain("@theme {");
 		expect(validateDesignMd(result.document)).toEqual([]);
 		expect(
@@ -109,8 +109,8 @@ describe("design output scope", () => {
 			},
 		});
 		expect(result.model.observedComponents.length).toBeGreaterThan(0);
-		expect(result.document).toMatch(/^## Components$/m);
-		expect(result.document).not.toMatch(/^## Tokens - Colors$/m);
+		expect(result.document).toMatch(/^## Component Specifications$/m);
+		expect(result.document).not.toMatch(/^### Colors & Semantic Roles$/m);
 		expect(result.document).not.toContain(":root {");
 		expect(result.document).toContain("@theme {");
 		expect(validateDesignMd(result.document)).toEqual([]);

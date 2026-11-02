@@ -107,6 +107,32 @@ export function sectionBody(sections: DocSection[], heading: string): string[] {
 	return sections.find((section) => section.heading === heading)?.lines ?? [];
 }
 
+// The theme block sits at the top of a parent section, before its first
+// subsection, so it is read separately from the nested token tables.
+export function untilSubheading(lines: string[]): string[] {
+	const out: string[] = [];
+	for (const rawLine of lines) {
+		if (/^###\s+/.test(rawLine)) break;
+		out.push(rawLine);
+	}
+	return out;
+}
+
+// Nested token tables live under `### ` subheadings inside their parent section.
+export function subsectionBody(lines: string[], heading: string): string[] {
+	const out: string[] = [];
+	let active = false;
+	for (const rawLine of lines) {
+		const match = rawLine.match(/^###\s+(.*)$/);
+		if (match) {
+			active = (match[1] ?? "").trim() === heading;
+			continue;
+		}
+		if (active) out.push(rawLine);
+	}
+	return out;
+}
+
 export function headerIndex(headers: string[], pattern: RegExp): number {
 	return headers.findIndex((header) => pattern.test(header.toLowerCase()));
 }

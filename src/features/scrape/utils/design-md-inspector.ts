@@ -3,14 +3,17 @@ import {
 	type DesignTokenModel,
 	MODEL_VERSION,
 } from "../services/design-model";
-import { inferTheme } from "../services/design-model-observation";
 import {
 	designIssues,
 	designMdVersionOf,
 	isCurrentModelDocument,
 } from "../services/prompts-design-md";
 import { parseVisualEvidence } from "../types/design-evidence-contract";
-import { inspectorFromViews } from "./design-md-inspector-views";
+import {
+	type InspectorViewScope,
+	inspectorFromViews,
+} from "./design-md-inspector-views";
+import type { PaletteGroupKey } from "./design-normalize-color";
 
 // The Style Inspector reads the same validated structured model the document is
 // rendered from, so the two cannot disagree about a measured value.
@@ -27,6 +30,10 @@ export interface InspectorColorToken {
 	token: string;
 	role: string;
 	roleClass: string;
+	/** Palette section derived from measured usage. Absent for archived text. */
+	group?: PaletteGroupKey;
+	/** How many measured captures contain this exact value and role. */
+	captures?: number;
 	frequency: number;
 	/** Why the role was assigned, and what evidence supports it. */
 	rationale: string;
@@ -114,6 +121,8 @@ export interface InspectorComponent {
 	description: string;
 	evidence: string;
 	frequency: number;
+	/** How many measured captures contain this component class. */
+	captures?: number;
 	/** Characteristics every measured variant shares. */
 	sharedCharacteristics: InspectorComponentCharacteristic[];
 	variants: InspectorComponentVariant[];
@@ -144,10 +153,10 @@ export interface DesignInspectorModel {
 // Builds the inspector view from a verified capture. The document, when given,
 // must still match that capture, otherwise the model is refused so a stale
 // archive is never shown as observed.
-export function inspectorFromEvidence(
+export function designModelFromEvidence(
 	value: unknown,
 	document?: string,
-): DesignInspectorModel | null {
+): DesignTokenModel | null {
 	const evidence = parseVisualEvidence(value);
 	if (!evidence) return null;
 	// A current-model document is checked structurally; a legacy archive is
@@ -159,8 +168,17 @@ export function inspectorFromEvidence(
 			return null;
 		}
 	}
-	const model = buildDesignModel(evidence);
-	return inspectorFromModel(model, "observed");
+	return buildDesignModel(evidence);
+}
+
+export function inspectorFromEvidence(
+	value: unknown,
+	document?: string,
+	scope?: InspectorViewScope,
+): DesignInspectorModel | null {
+	const model = designModelFromEvidence(value, document);
+	if (!model) return null;
+	return inspectorFromModel(model, "observed", scope);
 }
 
 // A rendered document is consistent with its evidence when the measured values
@@ -240,9 +258,16 @@ function fallbackStringMatch(
 export function inspectorFromModel(
 	model: DesignTokenModel,
 	verification: InspectorVerification,
+	scope?: InspectorViewScope,
 ): DesignInspectorModel {
 	if (model.views?.length) {
-		const scoped = inspectorFromViews(model, verification, inspectorFromModel);
+		const scoped = inspectorFromViews(
+			model,
+			verification,
+			(scopedModel, scopedVerification) =>
+				inspectorFromModel(scopedModel, scopedVerification),
+			scope,
+		);
 		if (scoped) return scoped;
 	}
 	return {
@@ -258,6 +283,7 @@ export function inspectorFromModel(
 			token: color.token,
 			role: color.role,
 			roleClass: color.roleClass,
+			group: color.group,
 			frequency: color.frequency,
 			rationale: color.rationale,
 			confidence: color.confidence,
@@ -334,85 +360,6 @@ export function inspectorFromModel(
 		donts: model.guidelines.donts,
 		limitations: model.limitations,
 	};
-}
-
-export interface DesignThemeDocument {
-	theme: "light" | "dark";
-	designMd: string;
-}
-
-// Viewer-only per-theme documents, derived from the same verified captures as
-// the canonical document. A theme is listed only when its capture rendered
-// that appearance; a requested preference that rendered the other appearance
-// stays a limitation in the combined document and never becomes a tab.
-// The filtered text keeps shared sections plus the matching theme scope, so
-// responsive scope labels inside the active theme are preserved.
-export function resolveThemeDocuments(
-	value: unknown,
-	document?: string,
-): DesignThemeDocument[] | undefined {
-	const evidence = parseVisualEvidence(value);
-	if (!evidence || !evidence.additionalViews?.length) return undefined;
-	if (document !== undefined) {
-		if (isCurrentModelDocument(document)) {
-			if (!documentMatchesEvidence(document, evidence)) return undefined;
-		} else if (designIssues(document, evidence).length) {
-			return undefined;
-		}
-	}
-	const observedByCapture = [evidence, ...evidence.additionalViews].map(
-		(view) => inferTheme(view),
-	);
-	const hasLight = observedByCapture.includes("light");
-	const hasDark = observedByCapture.includes("dark");
-	if (!hasLight || !hasDark) return undefined;
-	const light = filterDesignMdByTheme(document ?? "", "light");
-	const dark = filterDesignMdByTheme(document ?? "", "dark");
-	if (!light || !dark) return undefined;
-	return [
-		{ theme: "light", designMd: light },
-		{ theme: "dark", designMd: dark },
-	];
-}
-
-export function filterDesignMdByTheme(
-	document: string,
-	theme: "light" | "dark",
-): string | undefined {
-	const lines = document.split("\n");
-	const out: string[] = [];
-	let currentScope: "shared" | "light" | "dark" | null = null;
-	let sawThemeScope = false;
-	for (const line of lines) {
-		const heading = line.match(/^#{2,4}\s+(.*)$/);
-		if (heading) {
-			const title = (heading[1] ?? "").toLowerCase();
-			if (/^capture \d+/.test(title)) {
-				const scope = themeScopeForLabel(title);
-				currentScope = scope;
-				if (scope === theme) {
-					sawThemeScope = true;
-					out.push(line);
-				}
-				continue;
-			}
-			currentScope = null;
-			out.push(line);
-			continue;
-		}
-		if (currentScope === null || currentScope === "shared") {
-			out.push(line);
-			continue;
-		}
-		if (currentScope === theme) out.push(line);
-	}
-	return sawThemeScope ? out.join("\n").trim() || undefined : undefined;
-}
-
-function themeScopeForLabel(label: string): "shared" | "light" | "dark" {
-	if (label.includes("dark")) return "dark";
-	if (label.includes("light")) return "light";
-	return "shared";
 }
 
 export { parseDesignMd } from "./design-md-parse";

@@ -12,11 +12,11 @@ import {
 	renderCodeSections,
 	renderScopedCodeSections,
 } from "./design-md-render-code";
-import { renderComponentSections } from "./design-md-render-components";
 import {
-	renderTokenSections,
-	themeOverviewBody,
-} from "./design-md-render-tokens";
+	renderComponentSections,
+	renderMergedComponentSections,
+} from "./design-md-render-components";
+import { renderTokenSections } from "./design-md-render-tokens";
 
 // Renders the canonical DESIGN.md from the validated structured model. Both the
 // document and the Style Inspector read the same model, so they cannot disagree,
@@ -45,6 +45,11 @@ export interface RenderDesignMdOptions {
 	enrichmentDetail?: string;
 	/** Labels the measured values of one capture inside a combined document. */
 	captureScopeLabel?: string;
+	/**
+	 * True for a capture scope inside a combined document: the theme overview is
+	 * stated once by the shared block, not repeated under every capture.
+	 */
+	omitThemeOverview?: boolean;
 }
 
 interface SectionEntry {
@@ -80,13 +85,27 @@ export function renderDesignMd(
 	if (model.views?.length) {
 		renderCombinedDocument(lines, model, options);
 	} else {
+		// A document always opens with its own title, then the one-line essence.
+		// Never append the suffix to a title that already carries it.
+		const title = model.title?.trim() || "Design";
+		lines.push(
+			heading(
+				1,
+				/style reference/i.test(title) ? title : `${title} - Style Reference`,
+			),
+		);
+		const essence =
+			options.essence?.trim() ||
+			model.essence?.trim() ||
+			options.identityNarrative?.trim();
+		if (essence) lines.push("", `> ${essence}`);
 		renderTokenSections(lines, model, options);
 		renderComponentSections(lines, model, options);
 		renderCodeSections(lines, model, options);
 	}
 
-	// --- 16. Limitations & confidence notes ---------------------------------
-	lines.push("", heading(2, "Limitations & Confidence Notes"));
+	// --- Coverage & Important Limitations -----------------------------------
+	lines.push("", heading(2, "Coverage & Important Limitations"));
 	lines.push(
 		"",
 		"Measurements are observed; semantic classifications are inferred from measured usage. Missing evidence is reported as unknown rather than estimated.",
@@ -107,43 +126,24 @@ export function renderDesignMd(
 	for (const limitation of documentLimitations(model, options))
 		lines.push(`- ${escapeCell(limitation)}`);
 
-	// --- 17. Measurement provenance -----------------------------------------
-	lines.push("", heading(2, "Measurement Provenance"), "");
-	lines.push(
-		table(
-			["Measurement", "Count"],
-			[
-				[
-					"Visible elements sampled",
-					String(model.measurementProvenance.elements),
-				],
-				[
-					"Colour observations",
-					String(model.measurementProvenance.colorObservations),
-				],
-				[
-					"Distinct colour values",
-					String(model.measurementProvenance.distinctColorValues),
-				],
-				["Type styles grouped", String(model.measurementProvenance.typeStyles)],
-				[
-					"Spacing observations",
-					String(model.measurementProvenance.spacingObservations),
-				],
-				[
-					"Radius observations",
-					String(model.measurementProvenance.radiusObservations),
-				],
-				[
-					"Shadow observations",
-					String(model.measurementProvenance.shadowObservations),
-				],
-			],
-		),
-	);
+	// A combined document omits the per-capture elevation note, so an absence of
+	// measured shadow is stated once here instead of once per capture.
+	if (model.views?.length) {
+		const hasElevation = model.views.some(
+			(view) => view.model.elevation.length > 0,
+		);
+		if (!hasElevation)
+			lines.push(
+				"- No box-shadow was measured on visible elements, so elevation is not defined by shadows.",
+			);
+	}
+
+	// One compact line keeps the sampling evidence without a diagnostic table
+	// dominating the document.
+	const provenance = model.measurementProvenance;
 	lines.push(
 		"",
-		"Per-capture selectors, property values and sampling diagnostics stay in the stored capture evidence; this document keeps only what changes a design decision.",
+		`**Coverage:** ${provenance.elements} visible elements sampled from ${provenance.colorObservations} colour observations (${provenance.distinctColorValues} distinct values), ${provenance.typeStyles} type styles, ${provenance.spacingObservations} spacing and ${provenance.radiusObservations} radius observations, ${provenance.shadowObservations} shadow observations.`,
 		"",
 		`Document model version ${MODEL_VERSION}. Captured ${model.capturedAt}.`,
 	);
@@ -168,8 +168,10 @@ function renderCombinedDocument(
 	renderTokenSections(sharedLines, shared, {
 		...options,
 		captureScopeLabel: "all captures",
+		omitUnmeasuredElevation: true,
 	});
-	renderComponentSections(sharedLines, shared, {
+	// One merged component specification and one rule list for the document.
+	renderMergedComponentSections(sharedLines, views, {
 		...options,
 		omitUnmeasuredElevation: true,
 	});
@@ -186,9 +188,9 @@ function renderCombinedDocument(
 			...options.viewOptions?.[view.id],
 			captureScopeLabel: view.label,
 		};
-		renderTokenSections(scoped, view.model, viewOptions);
-		renderComponentSections(scoped, view.model, {
+		renderTokenSections(scoped, view.model, {
 			...viewOptions,
+			omitThemeOverview: true,
 			omitUnmeasuredElevation: true,
 		});
 		collectSections(sections, scoped, view.label, false);
@@ -205,58 +207,69 @@ function renderCombinedDocument(
 	);
 	collectSections(sections, codeLines, "Shared", true);
 
-	lines.push(heading(1, `${model.title} - Style Reference`));
+	// Endpoint comparisons are their own sections, added to the ordered map so
+	// they never land after later sections.
+	for (const kind of ["responsive", "theme"] as const) {
+		const changes =
+			model.comparisons?.filter((entry) => entry.kind === kind) ?? [];
+		if (!changes.length) continue;
+		const title =
+			kind === "responsive" ? "Responsive Differences" : "Theme Differences";
+		const entries = sections.get(title) ?? [];
+		entries.push({
+			label: "all captures",
+			shared: true,
+			body: [
+				"Matched samples with unchanged content only. These are endpoint observations, not original CSS breakpoints or proof of a website theme switch.",
+				"",
+				table(
+					["Component", "Property", "Measured difference"],
+					changes.map((entry) => [
+						entry.role,
+						entry.property,
+						entry.values
+							.map(
+								(value) =>
+									`Capture ${value.capture}: ${escapeCell(value.value)}`,
+							)
+							.join("; "),
+					]),
+				),
+			].join("\n"),
+		});
+		sections.set(title, entries);
+	}
+
+	const combinedTitle = model.title?.trim() || "Design";
+	lines.push(
+		heading(
+			1,
+			/style reference/i.test(combinedTitle)
+				? combinedTitle
+				: `${combinedTitle} - Style Reference`,
+		),
+	);
 	const essence =
 		options.essence?.trim() ||
 		model.essence?.trim() ||
 		options.identityNarrative?.trim();
 	if (essence) lines.push("", `> ${essence}`);
-	const theme = themeOverviewBody(model, options).join("\n");
+
+	// Render strictly in the canonical section order. Shared facts come first and
+	// each capture contributes only its measured differences beneath them.
 	for (const title of DESIGN_MD_SECTIONS) {
-		const entries =
-			title === "Theme & Overview"
-				? [{ label: "Shared", body: theme, shared: true }]
-				: sections.get(title);
+		const entries = sections.get(title);
 		if (!entries?.length) continue;
 		lines.push("", heading(2, title));
-		const sharedEntries = entries.filter((entry) => entry.shared);
-		const scopedEntries = entries.filter((entry) => !entry.shared);
-		for (const entry of sharedEntries) lines.push("", entry.body);
-		for (const entry of scopedEntries)
+		for (const entry of entries.filter((entry) => entry.shared))
+			lines.push("", entry.body);
+		for (const entry of entries.filter((entry) => !entry.shared))
 			lines.push(
 				"",
 				heading(3, entry.label),
 				"",
 				entry.body.replace(/^### /gm, "#### "),
 			);
-	}
-
-	for (const kind of ["responsive", "theme"] as const) {
-		const changes =
-			model.comparisons?.filter((entry) => entry.kind === kind) ?? [];
-		if (!changes.length) continue;
-		lines.push(
-			"",
-			heading(
-				2,
-				kind === "responsive" ? "Responsive Guidelines" : "Theme Variations",
-			),
-			"",
-			"Matched samples with unchanged content only. These are endpoint observations, not original CSS breakpoints or proof of a website theme switch.",
-			"",
-			table(
-				["Component", "Property", "Measured difference"],
-				changes.map((entry) => [
-					entry.role,
-					entry.property,
-					entry.values
-						.map(
-							(value) => `Capture ${value.capture}: ${escapeCell(value.value)}`,
-						)
-						.join("; "),
-				]),
-			),
-		);
 	}
 }
 

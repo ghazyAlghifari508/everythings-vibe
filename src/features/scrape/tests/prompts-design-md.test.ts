@@ -165,9 +165,9 @@ it("propagates a midstream abort instead of degrading it", async () => {
 
 it("renders a measured document from the structured model without any AI step", async () => {
 	const { document, model } = await generateDesignMd(evidence);
-	expect(document).toContain("## Tokens - Colors");
-	expect(document).toContain("## Tokens - Typography");
-	expect(document).toContain("## Measurement Provenance");
+	expect(document).toContain("### Colors & Semantic Roles");
+	expect(document).toContain("### Typography Scale");
+	expect(document).toContain("**Coverage:**");
 	expect(model.colors.length).toBeGreaterThan(0);
 });
 
@@ -213,7 +213,7 @@ it("keeps the measured model when AI synthesis fails", async () => {
 		mocks.tryStreamWithFallback.mockImplementation(failure);
 		const result = await generateDesignMd(evidence, instrumentation);
 		expect(result.enrichment.status).toBe("unavailable");
-		expect(result.document).toContain("## Tokens - Colors");
+		expect(result.document).toContain("### Colors & Semantic Roles");
 		expect(result.model.colors.length).toBeGreaterThan(0);
 	}
 });
@@ -270,7 +270,7 @@ it("applies enrichment only when the synthesis validates against the model", asy
 	stubStream(validSynthesis());
 	const result = await generateDesignMd(evidence, instrumentation);
 	expect(result.enrichment.status).toBe("applied");
-	expect(result.document).toContain("## Components");
+	expect(result.document).toContain("## Component Specifications");
 	expect(result.document).toContain("Action button");
 	expect(result.document).toContain("A measured, restrained interface.");
 });

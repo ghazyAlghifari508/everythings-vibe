@@ -2,14 +2,10 @@ import { Copy01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { InspectorColorToken } from "@/features/scrape/utils/design-md-inspector";
+import type { PaletteGroupKey as MeasuredPaletteGroup } from "@/features/scrape/utils/design-normalize-color";
 import { cn } from "@/lib/utils";
 
-export type PaletteGroupKey =
-	| "brand"
-	| "accent"
-	| "neutral"
-	| "semantic"
-	| "other";
+export type PaletteGroupKey = MeasuredPaletteGroup | "other";
 
 export interface PaletteGroup {
 	key: PaletteGroupKey;
@@ -19,27 +15,33 @@ export interface PaletteGroup {
 
 const PALETTE_GROUP_LABELS: Record<PaletteGroupKey, string> = {
 	brand: "Brand",
-	accent: "Aksen",
-	neutral: "Netral",
+	text: "Teks",
+	surface: "Latar",
+	border: "Border",
 	semantic: "Semantik",
+	neutral: "Netral",
 	other: "Warna lainnya",
 };
 
 const PALETTE_GROUP_ORDER: PaletteGroupKey[] = [
 	"brand",
-	"accent",
-	"neutral",
+	"text",
+	"surface",
+	"border",
 	"semantic",
+	"neutral",
 	"other",
 ];
 
-// The inspector reads the role class the model already assigned from measured
-// usage, so the grouping cannot disagree with the document.
+// The inspector reads the palette section the model already derived from
+// measured usage, so a colour that paints text is never filed under surfaces.
+// An archived document carries no measured context and stays unclassified.
 export function classifyPaletteGroup(
 	color: InspectorColorToken,
 ): PaletteGroupKey {
-	if (color.roleClass === "brand") return "brand";
-	if (color.roleClass === "accent") return "accent";
+	if (color.group) return color.group;
+	if (color.roleClass === "brand" || color.roleClass === "accent")
+		return "brand";
 	if (color.roleClass === "semantic") return "semantic";
 	if (color.roleClass === "neutral") return "neutral";
 	return "other";
@@ -137,6 +139,11 @@ function PaletteColorCard({
 				{copyFailed ? (
 					<p className="mt-1 text-[11px] leading-4 text-fog">
 						Gagal menyalin. Salin manual nilainya.
+					</p>
+				) : null}
+				{color.captures && color.captures > 1 ? (
+					<p className="mt-1 text-[11px] leading-4 text-fog">
+						Dipakai di {color.captures} capture
 					</p>
 				) : null}
 				{color.rationale || color.frequency > 0 ? (

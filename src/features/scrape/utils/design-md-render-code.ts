@@ -7,7 +7,8 @@ import {
 import { codeFence, escapeCell, heading } from "./design-md-markdown";
 import type { RenderDesignMdOptions } from "./design-md-render";
 
-// Agent prompt guide and the two generated stylesheet outputs (Agent Prompt Guide, CSS Custom Properties, Tailwind v4).
+// The AI agent guide and the two generated stylesheet outputs (AI Agent
+// Implementation Guide, CSS / Tailwind Reference).
 
 export function renderAgentPromptGuide(
 	lines: string[],
@@ -27,7 +28,7 @@ export function renderAgentPromptGuide(
 		model.colors.find((color) => color.role === "Base text") ??
 		model.colors.find((color) => color.role === "Text");
 	const surfaceColor = model.surfaces[0];
-	lines.push("", heading(2, "Agent Prompt Guide"));
+	lines.push("", heading(2, "AI Agent Implementation Guide"));
 	lines.push("", "**Quick reference**");
 	lines.push(
 		`- text: ${textColor ? `\`${textColor.value}\`` : "not measured"}`,
@@ -40,18 +41,26 @@ export function renderAgentPromptGuide(
 		}`,
 		`- base spacing unit: ${Number.isFinite(model.baseUnitPx) ? `${model.baseUnitPx}px` : "not measured"}`,
 	);
+
+	lines.push(
+		"",
+		"**Operational Guidelines**",
+		"1. **Understand the product first:** decide what the application must do before styling it.",
+		"2. **Treat this document as a style reference:** it describes visual language, not features or content.",
+		"3. **Map styles to existing components:** reuse the application's own component classes instead of inventing equivalents.",
+		"4. **Preserve hierarchy and semantic roles:** keep the measured role of each colour and type step; never promote an inferred role to a measurement.",
+		"5. **Apply only proven responsive differences:** use the values recorded for desktop and mobile, and treat the endpoint widths as observations, not breakpoints.",
+		"6. **Invent no unseen variants:** hover, focus, disabled and intermediate breakpoints were not captured unless stated.",
+		"7. **Copy no proprietary assets:** do not reuse the source site's text, logos, images or brand assets as product content.",
+		"8. **Build the product, not a design showcase:** no palette galleries, token inspectors or design-documentation pages unless the user asks for them.",
+		"9. **Report what this document cannot establish:** treat an uncovered requirement as a new product decision and say it is unknown.",
+	);
+
 	if (options.implementationGuidance?.length) {
-		lines.push("", "**Implementation guidance**");
+		lines.push("", "**Additional Guidance**");
 		for (const note of options.implementationGuidance)
 			lines.push(`- ${escapeCell(note)}`);
 	}
-	lines.push(
-		"",
-		"Use the observed values exactly as written. Inferred roles describe measured usage and must not be promoted to measurements. If a new requirement is not covered here, treat it as a new product decision rather than an extraction result.",
-		"This is an internal styling reference, not product content or permission to copy the source site's structure, logos or proprietary assets. Do not add palette galleries, token inspectors or documentation sections unless the product requirements explicitly request them.",
-		"Preserve each applicable component's measured radius; never substitute a global radius for buttons, inputs or cards. This document is a design specification, not a request for a design-system showcase. Build the user's application, not Color Palette, Typography Specimen or UI Documentation pages.",
-		"Map component measurements to existing components before editing. Preserve content and flows. After editing, report each applicable rule with its code location and token/value mapping, or explain why it remains unknown or unapplied. Do not claim a perfect visual match from limited captures.",
-	);
 }
 
 const CSS_INTRO =
@@ -61,7 +70,7 @@ function renderCssSection(lines: string[], sheet: string | null): void {
 	if (!sheet) return;
 	lines.push(
 		"",
-		heading(2, "CSS Custom Properties"),
+		heading(3, "CSS Custom Properties"),
 		"",
 		CSS_INTRO,
 		"",
@@ -71,7 +80,7 @@ function renderCssSection(lines: string[], sheet: string | null): void {
 
 function renderTailwindSection(lines: string[], sheet: string | null): void {
 	if (!sheet) return;
-	lines.push("", heading(2, "Tailwind v4"), "", codeFence("css", sheet));
+	lines.push("", heading(3, "Tailwind v4"), "", codeFence("css", sheet));
 }
 
 function tailwindNote(scoped: boolean): string[] {
@@ -101,16 +110,15 @@ export function renderCodeSections(
 		["Radius", declarations.radius],
 	]);
 	const hasBlocks = blocks.length > 0;
-	if (codeReference !== "tailwind-v4")
-		renderCssSection(
-			lines,
-			hasBlocks ? [":root {", ...blocks].join("\n\n") + "\n}" : null,
-		);
-	if (codeReference !== "css")
-		renderTailwindSection(
-			lines,
-			hasBlocks ? ["@theme {", ...blocks].join("\n\n") + "\n}" : null,
-		);
+	const cssSheet =
+		codeReference !== "tailwind-v4" && hasBlocks
+			? `${[":root {", ...blocks].join("\n\n")}\n}`
+			: null;
+	const tailwindSheet =
+		codeReference !== "css" && hasBlocks
+			? `${["@theme {", ...blocks].join("\n\n")}\n}`
+			: null;
+	renderCodeReference(lines, cssSheet, tailwindSheet);
 }
 
 // Multiple captures: shared tokens are declared once, and each other capture
@@ -123,11 +131,26 @@ export function renderScopedCodeSections(
 ): void {
 	const codeReference = base.settings?.codeReference ?? "both";
 	renderAgentPromptGuide(lines, base, options);
-	if (codeReference !== "tailwind-v4")
-		renderCssSection(lines, scopedStylesheet(base, scopes, "root"));
-	const tailwind = scopedStylesheet(base, scopes, "theme");
-	if (codeReference !== "css") {
-		renderTailwindSection(lines, tailwind);
-		if (tailwind) lines.push(...tailwindNote(scopes.length > 0));
-	}
+	const cssSheet =
+		codeReference !== "tailwind-v4"
+			? scopedStylesheet(base, scopes, "root")
+			: null;
+	const tailwindSheet =
+		codeReference !== "css" ? scopedStylesheet(base, scopes, "theme") : null;
+	renderCodeReference(lines, cssSheet, tailwindSheet, scopes.length > 0);
+}
+
+// One wrapper section so CSS and Tailwind never appear as separate top-level
+// sections, and an omitted format leaves no empty heading behind.
+function renderCodeReference(
+	lines: string[],
+	cssSheet: string | null,
+	tailwindSheet: string | null,
+	scoped = false,
+): void {
+	if (!cssSheet && !tailwindSheet) return;
+	lines.push("", heading(2, "CSS / Tailwind Reference"));
+	renderCssSection(lines, cssSheet);
+	renderTailwindSection(lines, tailwindSheet);
+	if (tailwindSheet) lines.push(...tailwindNote(scoped));
 }

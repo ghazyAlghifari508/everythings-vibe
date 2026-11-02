@@ -54,6 +54,7 @@ const MODEL: DesignInspectorModel = {
 			token: "--color-canvas",
 			role: "Surface",
 			roleClass: "neutral",
+			group: "surface",
 			rationale: "Repeated on 4 measured surfaces.",
 		}),
 		color({
@@ -62,6 +63,8 @@ const MODEL: DesignInspectorModel = {
 			token: "--color-primary",
 			role: "Primary action",
 			roleClass: "brand",
+			group: "brand",
+			captures: 4,
 			frequency: 2,
 			rationale: "Painted the background of 2 measured action elements.",
 		}),
@@ -253,6 +256,26 @@ describe("DesignSystemInspector", () => {
 		).toBeDefined();
 	});
 
+	it("states how many captures a repeated colour was measured in", () => {
+		renderInspector();
+		expect(screen.getByText(/dipakai di 4 capture/i)).toBeDefined();
+	});
+
+	it("states the measured context the inspector is showing", () => {
+		const { rerender } = renderInspector();
+		expect(screen.getByText(/tema: terang/i)).toBeDefined();
+		rerender(
+			<DesignSystemInspector
+				siteName="Acme"
+				sourceUrl="https://acme.example/"
+				model={MODEL}
+				contextLabel="Mobile 390x844 · tema terang"
+			/>,
+		);
+		expect(screen.getByText(/konteks terukur: mobile 390x844/i)).toBeDefined();
+		expect(screen.queryByText(/tema: terang/i)).toBeNull();
+	});
+
 	it("renders the type scale with size, weight and line-height metadata", () => {
 		renderInspector();
 		expect(screen.getByRole("heading", { name: /type scale/i })).toBeDefined();
@@ -389,6 +412,7 @@ const BRAND_COLOR = color({
 	token: "--color-primary",
 	role: "Primary action",
 	roleClass: "brand",
+	group: "brand",
 });
 
 const ACCENT_COLOR = color({
@@ -397,6 +421,7 @@ const ACCENT_COLOR = color({
 	token: "--color-accent",
 	role: "Accent",
 	roleClass: "accent",
+	group: "brand",
 });
 
 const NEUTRAL_COLOR = color({
@@ -405,6 +430,25 @@ const NEUTRAL_COLOR = color({
 	token: "--color-surface",
 	role: "Surface",
 	roleClass: "neutral",
+	group: "surface",
+});
+
+const TEXT_COLOR = color({
+	name: "Ink 6",
+	value: "#0f0f0f",
+	token: "--color-ink",
+	role: "Base text",
+	roleClass: "neutral",
+	group: "text",
+});
+
+const BORDER_COLOR = color({
+	name: "Hairline 7",
+	value: "#d3d3d3",
+	token: "--color-border",
+	role: "Border",
+	roleClass: "neutral",
+	group: "border",
 });
 
 const SEMANTIC_COLOR = color({
@@ -413,6 +457,7 @@ const SEMANTIC_COLOR = color({
 	token: "--color-semantic",
 	role: "Semantic state",
 	roleClass: "semantic",
+	group: "semantic",
 });
 
 const AMBIGUOUS_COLOR = color({
@@ -427,10 +472,14 @@ function paletteModel(colors: InspectorColorToken[]): DesignInspectorModel {
 }
 
 describe("classifyPaletteGroup", () => {
-	it("uses the role class the model already derived from measured usage", () => {
+	it("files colours under the measured usage group", () => {
 		expect(classifyPaletteGroup(BRAND_COLOR)).toBe("brand");
-		expect(classifyPaletteGroup(ACCENT_COLOR)).toBe("accent");
-		expect(classifyPaletteGroup(NEUTRAL_COLOR)).toBe("neutral");
+		// An action accent belongs to the same brand family the example groups;
+		// the card still carries its precise role label.
+		expect(classifyPaletteGroup(ACCENT_COLOR)).toBe("brand");
+		expect(classifyPaletteGroup(NEUTRAL_COLOR)).toBe("surface");
+		expect(classifyPaletteGroup(TEXT_COLOR)).toBe("text");
+		expect(classifyPaletteGroup(BORDER_COLOR)).toBe("border");
 		expect(classifyPaletteGroup(SEMANTIC_COLOR)).toBe("semantic");
 	});
 
@@ -439,13 +488,15 @@ describe("classifyPaletteGroup", () => {
 			BRAND_COLOR,
 			ACCENT_COLOR,
 			NEUTRAL_COLOR,
+			TEXT_COLOR,
+			BORDER_COLOR,
 			SEMANTIC_COLOR,
 			AMBIGUOUS_COLOR,
 		];
 		expect(groupPaletteColors(colors)).toEqual(groupPaletteColors(colors));
 	});
 
-	it("falls back to other for unclassified colors", () => {
+	it("falls back to other for colors with no measured context", () => {
 		expect(classifyPaletteGroup(AMBIGUOUS_COLOR)).toBe("other");
 		const groups = groupPaletteColors([AMBIGUOUS_COLOR]);
 		expect(groups).toHaveLength(1);
@@ -453,18 +504,17 @@ describe("classifyPaletteGroup", () => {
 		expect(groups[0]?.colors).toEqual([AMBIGUOUS_COLOR]);
 	});
 
-	it("keeps a text colour neutral even when its label says primary", () => {
+	it("keeps an archived colour without measured usage unclassified", () => {
 		expect(
 			classifyPaletteGroup(
 				color({
-					name: "Ink",
+					name: "Arsip",
 					value: "#0f0f0f",
-					token: "--color-ink",
-					role: "Base text",
-					roleClass: "neutral",
+					role: "Border",
+					roleClass: "unknown",
 				}),
 			),
-		).toBe("neutral");
+		).toBe("other");
 	});
 });
 
@@ -480,14 +530,36 @@ describe("palette gallery", () => {
 		);
 		const brand = screen.getByRole("region", { name: "Brand" });
 		expect(within(brand).getByText("Primary action")).toBeDefined();
-		const neutral = screen.getByRole("region", { name: "Netral" });
-		expect(within(neutral).getByText("Surface")).toBeDefined();
+		const surface = screen.getByRole("region", { name: "Latar" });
+		expect(within(surface).getByText("Surface")).toBeDefined();
 		const semantic = screen.getByRole("region", { name: "Semantik" });
 		expect(within(semantic).getByText("Semantic state")).toBeDefined();
 		const other = screen.getByRole("region", {
 			name: "Warna lainnya",
 		});
 		expect(within(other).getByText("Neutral")).toBeDefined();
+	});
+
+	it("separates measured text, surface and border sections", () => {
+		renderInspector(paletteModel([TEXT_COLOR, NEUTRAL_COLOR, BORDER_COLOR]));
+		const text = screen.getByRole("region", { name: "Teks" });
+		expect(
+			within(text).getByRole("img", { name: `Swatch warna Base text #0f0f0f` }),
+		).toBeDefined();
+		const surface = screen.getByRole("region", { name: "Latar" });
+		expect(
+			within(surface).getByRole("img", {
+				name: `Swatch warna Surface #ffffff`,
+			}),
+		).toBeDefined();
+		const border = screen.getByRole("region", { name: "Border" });
+		expect(
+			within(border).getByRole("img", {
+				name: `Swatch warna Border #d3d3d3`,
+			}),
+		).toBeDefined();
+		expect(within(text).queryByText("#d3d3d3")).toBeNull();
+		expect(within(surface).queryByText("#0f0f0f")).toBeNull();
 	});
 
 	it("keeps the measured color value unchanged on the swatch", () => {
@@ -521,7 +593,7 @@ describe("palette gallery", () => {
 	it("never promotes the first item to brand without evidence", () => {
 		renderInspector(paletteModel([NEUTRAL_COLOR, SEMANTIC_COLOR]));
 		expect(screen.queryByRole("region", { name: "Brand" })).toBeNull();
-		expect(screen.getByRole("region", { name: "Netral" })).toBeDefined();
+		expect(screen.getByRole("region", { name: "Latar" })).toBeDefined();
 	});
 
 	it("renders no hardcoded site-specific palette content", () => {

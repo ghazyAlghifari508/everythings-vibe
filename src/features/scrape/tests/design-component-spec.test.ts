@@ -65,7 +65,7 @@ const BUTTON = {
 };
 
 const componentText = (document: string) =>
-	document.split("## Components")[1]?.split("\n## ")[0] ?? "";
+	document.split("## Component Specifications")[1]?.split("\n## ")[0] ?? "";
 
 describe("component treatment normalization", () => {
 	it("collapses duplicate measurements into one variant", () => {
@@ -135,7 +135,7 @@ describe("component treatment normalization", () => {
 	it("omits a component when the evidence holds no meaningful property", () => {
 		const model = buildDesignModel(captureOf([element({ ...NOISE })]));
 		expect(model.observedComponents).toEqual([]);
-		expect(renderDesignMd(model)).not.toContain("## Components");
+		expect(renderDesignMd(model)).not.toContain("## Component Specifications");
 	});
 
 	it("bounds how many variants and properties reach the document", () => {
@@ -223,18 +223,35 @@ describe("multi-capture component scoping", () => {
 			{ ...desktop(), additionalViews: [mobile()] },
 			document,
 		);
-		const radiusFor = (label: string) =>
+		// One component class, one shared base, and one variant per measured
+		// difference: the variant names the capture that produced its value.
+		const radiusFor = (scope: string) =>
 			inspector?.components
-				.filter((component) => component.name.includes(label))
-				.flatMap((component) => [
-					...component.sharedCharacteristics,
-					...component.variants.flatMap((variant) => variant.characteristics),
-				])
+				.flatMap((component) => component.variants)
+				.filter((variant) => variant.label.includes(scope))
+				.flatMap((variant) => variant.characteristics)
 				.filter((entry) => entry.label === "Corner radius")
 				.map((entry) => entry.value);
-		expect(radiusFor("1440x900")).toContain("8px");
-		expect(radiusFor("390x844")).toContain("16px");
-		expect(radiusFor("1440x900")).not.toContain("16px");
+		expect(
+			inspector?.components.filter(
+				(component) => component.name === "Buttons and CTAs",
+			),
+		).toHaveLength(1);
+		expect(radiusFor("1440x900")).toEqual(["8px"]);
+		expect(radiusFor("390x844")).toEqual(["16px"]);
+
+		const mobileOnly = inspectorFromEvidence(
+			{ ...desktop(), additionalViews: [mobile()] },
+			document,
+			{ viewIds: [2] },
+		);
+		expect(
+			mobileOnly?.components
+				.filter((component) => component.name === "Buttons and CTAs")
+				.flatMap((component) => component.sharedCharacteristics)
+				.filter((entry) => entry.label === "Corner radius")
+				.map((entry) => entry.value),
+		).toEqual(["16px"]);
 	});
 
 	it("scopes theme captures without inventing a dark override", () => {

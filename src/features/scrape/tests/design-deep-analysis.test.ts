@@ -182,7 +182,7 @@ describe("Section 8: Deep Analysis Automated Verification (p2.md)", () => {
 		expect(result.enrichment.status).toBe("unavailable");
 		expect(result.enrichment.cause).toBe("provider");
 		expect(result.enrichment.detail).not.toMatch(/bearer-token/i);
-		expect(result.document).toContain("## Tokens - Colors");
+		expect(result.document).toContain("### Colors & Semantic Roles");
 		expect(result.document).not.toMatch(/bearer-token/i);
 		expect(validateDesignMd(result.document)).toEqual([]);
 	});
@@ -200,7 +200,7 @@ describe("Section 8: Deep Analysis Automated Verification (p2.md)", () => {
 		expect(result.enrichment.detail).toBe(
 			"AI synthesis melampaui batas waktu.",
 		);
-		expect(result.document).toContain("## Tokens - Colors");
+		expect(result.document).toContain("### Colors & Semantic Roles");
 	});
 
 	it("4. rejects invalid schema from being silently inserted", async () => {
@@ -212,7 +212,7 @@ describe("Section 8: Deep Analysis Automated Verification (p2.md)", () => {
 		expect(result.enrichment.status).toBe("unavailable");
 		expect(result.enrichment.cause).toBe("schema");
 		expect(result.document).not.toContain("badField");
-		expect(result.document).toContain("## Tokens - Colors");
+		expect(result.document).toContain("### Colors & Semantic Roles");
 	});
 
 	it("5. classifies partial / truncated AI response explicitly from finishReason length", async () => {
@@ -227,7 +227,7 @@ describe("Section 8: Deep Analysis Automated Verification (p2.md)", () => {
 		expect(result.enrichment.status).toBe("unavailable");
 		expect(result.enrichment.cause).toBe("truncated");
 		expect(result.enrichment.detail).toMatch(/batas token/i);
-		expect(result.document).toContain("## Tokens - Colors");
+		expect(result.document).toContain("### Colors & Semantic Roles");
 	});
 
 	it("6. fails closed when no visual evidence exists", async () => {
@@ -269,7 +269,7 @@ describe("Section 8: Deep Analysis Automated Verification (p2.md)", () => {
 		expect(result.enrichment.status).toBe("applied");
 		expect(mocks.tryStreamWithFallback).toHaveBeenCalledTimes(2);
 		expect(result.document).toContain("This document combines 2 captures.");
-		expect(result.document).toContain("Responsive Guidelines");
+		expect(result.document).toContain("Responsive Differences");
 		expect(result.document).toContain(
 			"Capture 1: 1440x900, browser preference auto",
 		);
@@ -282,8 +282,8 @@ describe("Section 8: Deep Analysis Automated Verification (p2.md)", () => {
 		const result = await generateDesignMd(detailedEvidence);
 
 		expect(result.enrichment.status).toBe("unavailable");
-		expect(result.document).toContain("## Tokens - Colors");
-		expect(result.document).toContain("## Measurement Provenance");
+		expect(result.document).toContain("### Colors & Semantic Roles");
+		expect(result.document).toContain("**Coverage:**");
 		expect(validateDesignMd(result.document)).toEqual([]);
 	});
 

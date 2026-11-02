@@ -1,4 +1,7 @@
-import type { ColorRoleClass } from "../utils/design-normalize-color";
+import type {
+	ColorRoleClass,
+	PaletteGroupKey,
+} from "../utils/design-normalize-color";
 import type {
 	RadiusPurpose,
 	SpacingPurpose,
@@ -32,6 +35,8 @@ export interface ModelColorToken {
 	token: string;
 	role: string;
 	roleClass: ColorRoleClass;
+	/** Palette section derived from the measured usage contexts. */
+	group: PaletteGroupKey;
 	frequency: number;
 	/** Why this role was assigned, and what evidence supports it. */
 	rationale: string;
