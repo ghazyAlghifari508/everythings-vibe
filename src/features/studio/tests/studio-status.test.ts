@@ -328,6 +328,26 @@ describe("Studio authoritative synchronization", () => {
 		expect(lastSignal?.aborted).toBe(true);
 	});
 
+	it("does not regress a ready frame when an older loader snapshot replaces the same project", async () => {
+		const initial = statusFixture();
+		const ready = statusFixture();
+		ready.frames[1].status = "ready";
+		ready.frames[1].updatedAt = new Date(
+			initial.frames[1].updatedAt.getTime() + 1000,
+		);
+		fetchMock.mockResolvedValue(reply(ready));
+		const { result, rerender } = renderHook(
+			({ data }) => useStudioStatus(data),
+			{
+				initialProps: { data: initial },
+			},
+		);
+		await tick();
+		expect(result.current.frames[1].status).toBe("ready");
+		rerender({ data: structuredClone(initial) });
+		expect(result.current.frames[1].status).toBe("ready");
+	});
+
 	it("surfaces network failure without changing generation state, backs off and recovers", async () => {
 		const initial = statusFixture();
 		fetchMock
@@ -345,23 +365,54 @@ describe("Studio authoritative synchronization", () => {
 		expect(result.current.error).toBe("");
 	});
 
-	it("bounds retries and resumes on network reconnection or tab visibility", async () => {
+	it("continues bounded retries after five transient failures and recovers", async () => {
 		const initial = statusFixture();
 		fetchMock.mockRejectedValue(new TypeError("offline"));
 		const { result } = renderHook(() => useStudioStatus(initial));
-		await tick(120_000);
+		await tick(46_500);
 		expect(fetchMock).toHaveBeenCalledTimes(5);
 		expect(result.current.error).not.toBe("");
 		fetchMock.mockResolvedValue(reply(initial));
-		await act(async () => {
-			window.dispatchEvent(new Event("online"));
-		});
+		await tick(30_000);
 		expect(fetchMock).toHaveBeenCalledTimes(6);
 		expect(result.current.error).toBe("");
 		await act(async () => {
 			document.dispatchEvent(new Event("visibilitychange"));
 		});
 		expect(fetchMock).toHaveBeenCalledTimes(7);
+	});
+
+	it("records sync failure and recovery with safe structured timing", async () => {
+		const initial = statusFixture();
+		fetchMock
+			.mockRejectedValueOnce(new TypeError("offline"))
+			.mockResolvedValueOnce(reply(initial));
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			renderHook(() => useStudioStatus(initial));
+			await tick();
+			await tick(3000);
+			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			expect(events).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						stage: "sync-stopped",
+						category: "transient",
+						timestamp: expect.any(String),
+					}),
+					expect.objectContaining({
+						stage: "sync-recovered",
+						timestamp: expect.any(String),
+					}),
+					expect.objectContaining({
+						stage: "status-response-received",
+						durationMs: expect.any(Number),
+					}),
+				]),
+			);
+		} finally {
+			log.mockRestore();
+		}
 	});
 
 	it.each([

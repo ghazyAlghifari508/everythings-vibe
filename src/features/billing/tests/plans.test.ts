@@ -1,4 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { prdFyPlans } from "@/features/billing/data/pricing-data";
 import {
 	FEATURES,
 	PLAN_CREDITS,
@@ -41,5 +43,31 @@ describe("FEATURES", () => {
 	it("hengker adds priority queue", () => {
 		expect(FEATURES.hengker.fullWorkflow).toBe(true);
 		expect(FEATURES.hengker.priorityQueue).toBe(true);
+	});
+});
+
+describe("pricing copy and contract", () => {
+	it("all plan tiers include 30-day reset feature", () => {
+		for (const plan of prdFyPlans) {
+			const resetFeature = plan.features.find((f) => f.key === "monthly-reset");
+			expect(resetFeature?.isIncluded).toBe(true);
+			expect(resetFeature?.name).toBe("Kredit reset setiap 30 hari");
+		}
+	});
+
+	it("pricing card copy contains accurate adaptive billing explanation and no false promises", async () => {
+		const pricingCardSource = await readFile(
+			new URL("../components/pricing-card.tsx", import.meta.url),
+			"utf8",
+		);
+
+		expect(pricingCardSource).not.toContain("1 kredit = 1 tahap");
+		expect(pricingCardSource).not.toContain("tidak pernah hangus");
+		expect(pricingCardSource).toContain(
+			"Setiap operasi menggunakan kredit sesuai jenis dan kebutuhan proses.",
+		);
+		expect(pricingCardSource).toContain(
+			"Estimasi ditampilkan sebelum penggunaan.",
+		);
 	});
 });

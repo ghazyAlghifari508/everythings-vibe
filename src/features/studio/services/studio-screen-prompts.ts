@@ -4,6 +4,10 @@ import type {
 	StudioPromptOptions,
 } from "@/features/studio/types/studio-prompts";
 import {
+	getDomainQualityContract,
+	STUDIO_COMPONENT_FIRST_GUIDANCE,
+} from "./studio-component-guidance";
+import {
 	extractStudioPrdSummary,
 	sanitizeStudioPrd,
 } from "./studio-prd-helpers";
@@ -49,7 +53,7 @@ CONTROLLED ASSEMBLY CONTRACT:
 - Put ALL screen-specific body content in exactly one <main data-studio-content>. Do not place visible content outside it.
 - Do not put app navigation/header inside that region; contextual tabs and section headings remain screen-specific.
 - Canonical labels ${JSON.stringify(labels)}, destinations ${JSON.stringify(destinations)}, icons ${JSON.stringify(iconMapping)} and active screen ${JSON.stringify(activeScreen)} are supplied by assembly, not independently rendered by you.
-- Use --app-primary, --app-canvas, --app-surface, --app-ink, --app-muted, --app-font, --app-gutter and --app-radius for shared identity. Use data-primary on primary actions and data-card on common surfaces.
+- Use --app-primary, --app-secondary, --app-on-primary, --app-canvas, --app-surface, --app-ink, --app-muted, --app-font, --app-gutter and --app-radius for shared identity. Secondary is an accent; muted is readable text. Never reselect the project palette for this screen. Use data-primary on primary actions and data-card on common surfaces.
 - Preserve the selected skill for content composition, not for redesigning the shared shell. No autofocus, decorative cursor, stray separators after numeric amounts or fixed/sticky decorations.
 </SHARED_DESIGN_BLUEPRINT>`,
 		);
@@ -79,6 +83,18 @@ Ensure features, forms, lists, metrics, terminology, and realistic Indonesian co
 	} else {
 		sections.push(WEB_PLATFORM_CONTRACT);
 	}
+
+	// Domain-aware quality contract & component-first guidance
+	const domainContract = getDomainQualityContract(
+		`${opts.projectPrompt} ${opts.screenName} ${opts.screenDescription ?? ""}`,
+	);
+	sections.push(
+		`<DOMAIN_AWARE_QUALITY_CONTRACT>
+${domainContract}
+
+${STUDIO_COMPONENT_FIRST_GUIDANCE}
+</DOMAIN_AWARE_QUALITY_CONTRACT>`,
+	);
 
 	// Design tokens
 	if (opts.designMd && opts.designMd.trim().length > 0) {
@@ -147,6 +163,16 @@ export function buildStudioUserPrompt(
 	} else {
 		sections.push(WEB_PLATFORM_CONTRACT);
 	}
+
+	// Domain-aware quality contract & component-first guidance
+	const domainContract = getDomainQualityContract(prompt);
+	sections.push(
+		`<DOMAIN_AWARE_QUALITY_CONTRACT>
+${domainContract}
+
+${STUDIO_COMPONENT_FIRST_GUIDANCE}
+</DOMAIN_AWARE_QUALITY_CONTRACT>`,
+	);
 
 	// PRD context
 	if (opts.prdContent && opts.prdContent.trim().length > 0) {

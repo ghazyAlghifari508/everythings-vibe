@@ -13,6 +13,12 @@ import {
 	selectModels,
 	tryStreamWithFallback,
 } from "@/lib/services/ai-orchestrator";
+import {
+	classifyStudioScreenRole,
+	extendStudioBlueprintWithScreen,
+	type StudioScreenClassification,
+} from "./studio-blueprint-navigation";
+import { assembleCanonicalShell } from "./studio-canonical-shell";
 import { STUDIO_ADD_FRAME_PLACEHOLDER_NAME } from "./studio-composer-intent";
 import { extractDesignSystemTokens } from "./studio-design-tokens";
 import { generateValidatedFrameHtml } from "./studio-frame-generation";
@@ -141,6 +147,26 @@ export async function runStudioFrameOperation(
 	const logoUrl = project.logoAssetId
 		? buildStudioAssetUrl(project.logoAssetId, job.userId)
 		: null;
+
+	let activeBlueprint = project.designBlueprint;
+	let screenRoleClassification: StudioScreenClassification | null = null;
+	if (job.jobType === "add" && activeBlueprint) {
+		screenRoleClassification = classifyStudioScreenRole({
+			screenName: name,
+			screenDescription: frame.description,
+			prompt: job.prompt,
+			blueprint: activeBlueprint,
+			existingFrames: frames.filter((entry) => entry.id !== frame.id),
+			designMode: validateStudioDesignMode(project.designMode),
+		});
+		activeBlueprint = extendStudioBlueprintWithScreen({
+			blueprint: activeBlueprint,
+			screenName: name,
+			screenRole: screenRoleClassification,
+			screenDescription: frame.description,
+		});
+	}
+
 	const prompt = buildStudioFramePrompt({
 		screenName: name,
 		screenDescription: frame.description ?? undefined,
@@ -155,7 +181,7 @@ export async function runStudioFrameOperation(
 		// last-good content instead of restarting from nothing.
 		previousHtml:
 			job.jobType === "add" ? undefined : (frame.htmlCode ?? undefined),
-		blueprint: project.designBlueprint,
+		blueprint: activeBlueprint,
 		activeScreen: name,
 		prdContent: project.prdContent,
 	});
@@ -167,7 +193,7 @@ export async function runStudioFrameOperation(
 	const htmlCode = await generateValidatedFrameHtml({
 		framePrompt: `${prompt}\n\nUSER CHANGE INSTRUCTION: ${changeInstruction}\nPreserve unaffected content, layout and identity. Modify only the requested screen.`,
 		activeScreen: name,
-		blueprint: project.designBlueprint,
+		blueprint: activeBlueprint,
 		viewport: validateStudioDesignMode(frame.viewport),
 		expectTokens: dsTokens !== null,
 		designSkillId: project.designSkillId,
@@ -194,6 +220,51 @@ export async function runStudioFrameOperation(
 					eq(studioFrames.projectId, project.id),
 				),
 			);
+		if (activeBlueprint && activeBlueprint !== project.designBlueprint) {
+			await tx
+				.update(studioProjects)
+				.set({
+					designBlueprint: activeBlueprint,
+					updatedAt: new Date(),
+				})
+				.where(eq(studioProjects.id, project.id));
+
+			if (screenRoleClassification?.role === "primary") {
+				for (const existingFrame of frames) {
+					if (
+						existingFrame.id !== frame.id &&
+						existingFrame.status === "ready" &&
+						existingFrame.htmlCode &&
+						(existingFrame.htmlCode.includes("data-studio-shell") ||
+							existingFrame.htmlCode.includes("data-studio-navigation"))
+					) {
+						try {
+							const updatedHtml = assembleCanonicalShell(
+								existingFrame.htmlCode,
+								activeBlueprint,
+								existingFrame.name,
+								dsTokens,
+								logoUrl,
+							);
+							await tx
+								.update(studioFrames)
+								.set({
+									htmlCode: updatedHtml,
+									updatedAt: new Date(),
+								})
+								.where(
+									and(
+										eq(studioFrames.id, existingFrame.id),
+										eq(studioFrames.projectId, project.id),
+									),
+								);
+						} catch {
+							// ponytail: keep existing static HTML if canonical reassembly encounters unexpected markup.
+						}
+					}
+				}
+			}
+		}
 		const [latest] = await tx
 			.select()
 			.from(studioRevisions)

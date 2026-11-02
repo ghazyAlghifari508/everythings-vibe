@@ -27,6 +27,8 @@ export function studioJobTiming(
 		outputChars?: number;
 		inputTokens?: number;
 		outputTokens?: number;
+		textTokens?: number;
+		reasoningTokens?: number;
 		maxTokens?: number;
 		tokenLimitExceeded?: boolean;
 		providerRetries?: number;
@@ -39,6 +41,7 @@ export function studioJobTiming(
 		JSON.stringify({
 			scope: "studio",
 			stage,
+			timestamp: new Date().toISOString(),
 			durationMs: Date.now() - startedAt,
 			...context,
 		}),

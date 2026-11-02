@@ -125,6 +125,75 @@ export function inspectStudioHtml(html: string): {
 		warnings.push(
 			"Inspect decorative cursor/pseudo-element animation in static presentation.",
 		);
+	if (
+		document.querySelector(
+			"[data-studio-content] [data-studio-shell], [data-studio-content] [data-studio-header]",
+		)
+	) {
+		hard.push("Duplicate global shell inside screen content.");
+	}
+	if (document.querySelectorAll("nav[data-studio-navigation]").length > 1) {
+		hard.push("Duplicate global navigation detected.");
+	}
+	if (
+		/\[data-studio-shell\]|#studio-canonical-style|\[data-studio-header\]/i.test(
+			css,
+		)
+	) {
+		warnings.push("Inspect CSS for collisions with canonical shell selectors.");
+	}
+	for (const section of document.querySelectorAll(
+		"section, article, [data-card]",
+	)) {
+		const text = (section.textContent ?? "").trim();
+		const hasMediaOrInput = section.querySelector(
+			"img, svg, input, select, textarea, button, canvas, table",
+		);
+		if (text.length === 0 && !hasMediaOrInput) {
+			warnings.push("Empty content section or card detected.");
+			break;
+		}
+	}
+	const mainContent =
+		document.querySelector("[data-studio-content]") ?? document.body;
+	const mainText = (mainContent?.textContent ?? "").replace(/\s+/g, " ").trim();
+	const hasInteractive = mainContent?.querySelector(
+		"input, button, select, textarea, table, img, svg",
+	);
+	if (mainText.length > 0 && mainText.length < 20 && !hasInteractive) {
+		warnings.push("Suspiciously sparse screen body content.");
+	}
+	for (const table of document.querySelectorAll("table")) {
+		const cols = table.querySelectorAll(
+			"tr:first-child th, tr:first-child td",
+		).length;
+		if (cols >= 4) {
+			const parent = table.parentElement;
+			const isWrapped =
+				parent &&
+				(parent.hasAttribute("data-table-container") ||
+					parent.classList.contains("table-container") ||
+					parent.classList.contains("overflow-x-auto") ||
+					/overflow(-x)?\s*:\s*(?:auto|scroll)/i.test(
+						parent.getAttribute("style") ?? "",
+					));
+			if (!isWrapped) {
+				warnings.push(
+					"Wide data table without contained horizontal scrolling.",
+				);
+				break;
+			}
+		}
+	}
+	for (const el of document.querySelectorAll("[style*='width']")) {
+		const style = el.getAttribute("style") ?? "";
+		const match =
+			/(?<![-\w])(min-width|width)\s*:\s*(\d+(?:\.\d+)?)(px)\b/i.exec(style);
+		if (match && Number(match[2]) > 1440) {
+			hard.push("Lebar tetap melebihi viewport.");
+			break;
+		}
+	}
 	return { hard: [...new Set(hard)], warnings: [...new Set(warnings)] };
 }
 
@@ -175,6 +244,12 @@ const ISSUE_CODE_PATTERNS: Array<[RegExp, string]> = [
 	[/Body HTML tidak lengkap/, "HTML_BODY_INCOMPLETE"],
 	[/Body HTML kosong/, "EMPTY_BODY"],
 	[/Lebar tetap melebihi viewport/, "FIXED_WIDTH_OVERFLOW"],
+	[/duplicate global shell/i, "DUPLICATE_GLOBAL_SHELL"],
+	[/duplicate global navigation/i, "DUPLICATE_GLOBAL_NAVIGATION"],
+	[/collisions with canonical shell/i, "SHELL_COLLISION"],
+	[/empty content section/i, "EMPTY_SECTION"],
+	[/suspiciously sparse/i, "SPARSE_CONTENT"],
+	[/wide data table without/i, "UNCONTAINED_WIDE_TABLE"],
 	[/Posisi fixed tidak diizinkan/, "DISALLOWED_FIXED_POSITION"],
 	[/Posisi sticky tidak diizinkan/, "DISALLOWED_STICKY_POSITION"],
 ];

@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { PageHeading } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 
 export interface NotFoundComponentProps {
@@ -22,9 +23,7 @@ export function NotFoundComponent(_props?: NotFoundComponentProps) {
 				<p className="mb-2 font-mono text-xs font-semibold uppercase tracking-widest text-fog">
 					404
 				</p>
-				<h1 className="text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
-					Halaman tidak ditemukan
-				</h1>
+				<PageHeading variant="workspace">Halaman tidak ditemukan</PageHeading>
 				<p className="mt-3 text-sm leading-6 text-fog">
 					Alamat yang kamu tuju tidak terdaftar.
 				</p>
