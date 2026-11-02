@@ -83,6 +83,7 @@ export const StudioFrame = memo(function StudioFrame({
 	const {
 		visual,
 		visualError,
+		markVisualLoaded,
 		setVisualError,
 		retryVisual,
 		artboardRef,
@@ -189,6 +190,7 @@ export const StudioFrame = memo(function StudioFrame({
 							decoding="async"
 							className="size-full object-contain pointer-events-none"
 							onLoad={() => {
+								markVisualLoaded(visual);
 								if (visibleUrl.current === visual.url) return;
 								visibleUrl.current = visual.url;
 								studioJobTiming("preview-image-loaded", Date.now(), {
