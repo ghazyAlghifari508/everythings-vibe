@@ -74,8 +74,8 @@ export function BillingPage({
 
 	return (
 		<div className="w-full flex flex-col gap-6">
-			<div className="grid gap-6 lg:grid-cols-2 items-start">
-				<div className="rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6">
+			<div className="grid gap-6 lg:grid-cols-2">
+				<div className="flex flex-col rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6">
 					<h2 className="mb-6 font-inter font-[510] text-xl font-bold">
 						Billing & Kredit
 					</h2>
@@ -170,7 +170,7 @@ export function BillingPage({
 					</div>
 				</div>
 
-				<div className="rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6">
+				<div className="flex flex-col rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6">
 					<h2 className="mb-4 font-inter font-[510] text-xl font-bold">
 						Riwayat Pembayaran
 					</h2>
@@ -179,7 +179,7 @@ export function BillingPage({
 							Belum ada pembayaran
 						</p>
 					) : (
-						<div className="flex flex-col">
+						<div className="flex flex-1 flex-col justify-between">
 							<div className="divide-y divide-(--border-subtle)">
 								{previewPayments.map((p) => {
 									const statusInfo = getPaymentStatusInfo(p.status);

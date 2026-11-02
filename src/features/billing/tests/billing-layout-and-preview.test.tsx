@@ -35,6 +35,15 @@ vi.mock("../components/credit-usage", () => ({
 vi.mock("../services/payment.functions", () => ({
 	cancelSubscription: vi.fn(),
 }));
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({
+		data: {
+			plan: "free",
+			subscriptionState: "free_active",
+			billingExempt: false,
+		},
+	}),
+}));
 
 import { BillingPage } from "../components/billing-page";
 import type { BillingPaymentItem } from "../services/billing-settings.functions";
@@ -59,7 +68,7 @@ describe("Billing layout and payment history preview", () => {
 		updatedAt: "2026-10-25T10:00:00Z",
 	});
 
-	it("uses items-start on desktop grid without h-full for independent card heights", () => {
+	it("uses CSS grid row stretching on desktop without items-start to match card heights", () => {
 		const { container } = render(
 			<BillingPage
 				subscription={undefined}
@@ -75,9 +84,13 @@ describe("Billing layout and payment history preview", () => {
 
 		const grid = container.querySelector(".grid");
 		expect(grid).not.toBeNull();
-		expect(grid?.className).toContain("items-start");
+		expect(grid?.className).not.toContain("items-start");
 		expect(grid?.className).toContain("lg:grid-cols-2");
-		expect(grid?.className).not.toContain("h-full");
+
+		const cards = grid?.children;
+		expect(cards?.length).toBe(2);
+		expect(cards?.[0]?.className).toContain("flex-col");
+		expect(cards?.[1]?.className).toContain("flex-col");
 	});
 
 	it("renders at most 5 latest payments in a divided preview list", () => {
@@ -171,7 +184,9 @@ describe("Billing layout and payment history preview", () => {
 					status: "active",
 					midtransOrderId: null,
 					currentPeriodStart: "2026-10-01T00:00:00Z",
-					currentPeriodEnd: "2026-11-01T00:00:00Z",
+					currentPeriodEnd: new Date(
+						Date.now() + 30 * 24 * 60 * 60 * 1000,
+					).toISOString(),
 					cancelledAt: null,
 					reminderCount: 0,
 					credits: 105,
