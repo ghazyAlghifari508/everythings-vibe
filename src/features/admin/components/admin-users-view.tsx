@@ -8,34 +8,147 @@ import {
 	UserCheck01Icon,
 	UserGroupIcon,
 } from "@hugeicons/core-free-icons";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useUIStore } from "@/store";
-import type { AdminUserRow } from "../types";
+import type {
+	AdminUserRow,
+	AdminUserStats,
+	AdminUsersListResult,
+	AdminUsersSearchParams,
+} from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
+import { AdminPagination } from "./admin-pagination";
 import { AdminUserRowItem } from "./admin-user-row";
 
-export function AdminUsersView({
-	rows,
-	currentUserId,
-}: {
-	rows: AdminUserRow[];
+export interface AdminUsersViewProps {
+	usersResult?: AdminUsersListResult;
+	rows?: AdminUserRow[];
+	stats?: AdminUserStats;
 	currentUserId: string;
-}) {
-	const [search, setSearch] = useState("");
-	const [planFilter, setPlanFilter] = useState<string>("all");
+	searchParams?: AdminUsersSearchParams;
+}
+
+export function AdminUsersView({
+	usersResult,
+	rows: fallbackRows,
+	stats,
+	currentUserId,
+	searchParams,
+}: AdminUsersViewProps) {
+	const navigate = useNavigate();
+	const router = useRouter();
+
+	const initialSearch = searchParams?.search ?? "";
+	const [search, setSearch] = useState(initialSearch);
+	const [clientPage, setClientPage] = useState(1);
+	const [clientPageSize, setClientPageSize] = useState(20);
+	const [clientPlan, setClientPlan] = useState<string>("all");
 	const [loadingAction, setLoadingAction] = useState<string | null>(null);
 	const showToast = useUIStore((s) => s.showToast);
 
 	const isMutating = loadingAction !== null;
+
+	// Synchronize local search if URL search param updates from outside
+	useEffect(() => {
+		if (searchParams?.search !== undefined && searchParams.search !== search) {
+			setSearch(searchParams.search);
+		}
+	}, [searchParams?.search, search]);
+
+	// Debounce search update (300ms) to trigger server-side query without typing lag
+	const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	useEffect(() => {
+		if (!navigate) return;
+		const trimmed = search.trim();
+		if (trimmed === (searchParams?.search ?? "")) return;
+
+		clearTimeout(searchTimeoutRef.current ?? undefined);
+
+		searchTimeoutRef.current = setTimeout(() => {
+			void navigate({
+				to: "/admin/users",
+				search: {
+					page: 1,
+					pageSize: searchParams?.pageSize ?? 20,
+					search: trimmed,
+					plan: searchParams?.plan ?? "all",
+				},
+			});
+		}, 300);
+
+		return () => {
+			clearTimeout(searchTimeoutRef.current ?? undefined);
+		};
+	}, [
+		search,
+		searchParams?.search,
+		searchParams?.pageSize,
+		searchParams?.plan,
+		navigate,
+	]);
+
+	const activePlan = searchParams?.plan ?? clientPlan;
+
+	const handlePlanChange = (p: "all" | "free" | "pro" | "hengker") => {
+		if (navigate) {
+			void navigate({
+				to: "/admin/users",
+				search: {
+					page: 1,
+					pageSize: searchParams?.pageSize ?? 20,
+					search: searchParams?.search ?? "",
+					plan: p,
+				},
+			});
+		} else {
+			setClientPlan(p);
+			setClientPage(1);
+		}
+	};
+
+	const handlePageChange = (nextPage: number) => {
+		if (navigate) {
+			void navigate({
+				to: "/admin/users",
+				search: {
+					page: nextPage,
+					pageSize: searchParams?.pageSize ?? 20,
+					search: searchParams?.search ?? "",
+					plan: searchParams?.plan ?? "all",
+				},
+			});
+		} else {
+			setClientPage(nextPage);
+		}
+	};
+
+	const handlePageSizeChange = (nextPageSize: number) => {
+		if (navigate) {
+			void navigate({
+				to: "/admin/users",
+				search: {
+					page: 1,
+					pageSize: nextPageSize,
+					search: searchParams?.search ?? "",
+					plan: searchParams?.plan ?? "all",
+				},
+			});
+		} else {
+			setClientPageSize(nextPageSize);
+			setClientPage(1);
+		}
+	};
 
 	const handleAction = async (actionName: string, fn: () => Promise<void>) => {
 		setLoadingAction(actionName);
 		try {
 			await fn();
 			showToast("Aksi berhasil dijalankan", "success");
-			window.location.reload();
+			if (router) {
+				await router.invalidate();
+			}
 		} catch (err) {
 			console.error(err);
 			showToast("Gagal menjalankan aksi", "error");
@@ -44,25 +157,57 @@ export function AdminUsersView({
 		}
 	};
 
-	const filteredRows = rows.filter(({ user, sub }) => {
-		const matchesSearch =
-			!search ||
-			user.email.toLowerCase().includes(search.toLowerCase()) ||
-			user.name?.toLowerCase().includes(search.toLowerCase());
-		const matchesPlan =
-			planFilter === "all" || (sub?.plan ?? "free") === planFilter;
-		return matchesSearch && matchesPlan;
-	});
+	// Determine rows, totalCount, and pagination data
+	let displayedRows: AdminUserRow[] = [];
+	let totalCount = 0;
+	let page = 1;
+	let pageSize = 20;
+	let totalPages = 1;
 
-	const freeCount = rows.filter(
-		(r) => (r.sub?.plan ?? "free") === "free",
-	).length;
-	const proCount = rows.filter((r) => r.sub?.plan === "pro").length;
-	const hengkerCount = rows.filter((r) => r.sub?.plan === "hengker").length;
-	const adminCount = rows.filter(
-		(r) =>
-			Boolean(r.user.isAdmin) || (r.user as { role?: string }).role === "admin",
-	).length;
+	if (usersResult) {
+		displayedRows = usersResult.rows;
+		totalCount = usersResult.totalCount;
+		page = usersResult.page;
+		pageSize = usersResult.pageSize;
+		totalPages = usersResult.totalPages;
+	} else {
+		// Client-side fallback if rendered without server usersResult
+		const sourceRows = fallbackRows ?? [];
+		const filtered = sourceRows.filter(({ user, sub }) => {
+			const q = search.toLowerCase();
+			const matchesSearch =
+				!search ||
+				user.email.toLowerCase().includes(q) ||
+				user.name?.toLowerCase().includes(q);
+			const matchesPlan =
+				activePlan === "all" || (sub?.plan ?? "free") === activePlan;
+			return matchesSearch && matchesPlan;
+		});
+		totalCount = filtered.length;
+		page = clientPage;
+		pageSize = clientPageSize;
+		totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+		const offset = (page - 1) * pageSize;
+		displayedRows = filtered.slice(offset, offset + pageSize);
+	}
+
+	// Calculate accurate KPI values (preferring server aggregated stats)
+	const allFallbackRows = fallbackRows ?? usersResult?.rows ?? [];
+	const freeCount =
+		stats?.freeCount ??
+		allFallbackRows.filter((r) => (r.sub?.plan ?? "free") === "free").length;
+	const proCount =
+		stats?.proCount ??
+		allFallbackRows.filter((r) => r.sub?.plan === "pro").length;
+	const hengkerCount =
+		stats?.hengkerCount ??
+		allFallbackRows.filter((r) => r.sub?.plan === "hengker").length;
+	const adminCount =
+		stats?.adminCount ??
+		allFallbackRows.filter(
+			(r) => Boolean(r.user.isAdmin) || r.user.role === "admin",
+		).length;
+	const totalUsers = stats?.totalUsers ?? totalCount;
 
 	return (
 		<div className="mx-auto max-w-7xl space-y-8 font-inter">
@@ -85,11 +230,11 @@ export function AdminUsersView({
 				</p>
 			</header>
 
-			{/* Metric Summary Bar */}
+			{/* Accurate Metric Summary Bar */}
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
 				<AdminMetricCard
 					label="Total Pengguna"
-					value={rows.length}
+					value={totalUsers}
 					subtext="Akun pengguna terdaftar"
 					icon={UserGroupIcon}
 				/>
@@ -119,7 +264,7 @@ export function AdminUsersView({
 				/>
 			</div>
 
-			{/* Filters */}
+			{/* Filters & Page Size Controls */}
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div className="relative flex-1 max-w-md">
 					<Icon
@@ -136,21 +281,38 @@ export function AdminUsersView({
 					/>
 				</div>
 
-				<div className="flex gap-1.5 overflow-x-auto">
-					{(["all", "free", "pro", "hengker"] as const).map((p) => (
-						<button
-							key={p}
-							type="button"
-							onClick={() => setPlanFilter(p)}
-							className={`rounded-md px-3 py-1.5 text-xs font-[510] capitalize transition-colors ${
-								planFilter === p
-									? "bg-snow text-onyx"
-									: "border border-graphite bg-charcoal text-fog hover:border-fog/40 hover:text-snow"
-							}`}
+				<div className="flex flex-wrap items-center gap-2">
+					<div className="flex gap-1.5 overflow-x-auto">
+						{(["all", "free", "pro", "hengker"] as const).map((p) => (
+							<button
+								key={p}
+								type="button"
+								onClick={() => handlePlanChange(p)}
+								className={`rounded-md px-3 py-1.5 text-xs font-[510] capitalize transition-colors ${
+									activePlan === p
+										? "bg-snow text-onyx font-semibold"
+										: "border border-graphite bg-charcoal text-fog hover:border-fog/40 hover:text-snow"
+								}`}
+							>
+								{p === "all" ? "Semua Paket" : p}
+							</button>
+						))}
+					</div>
+
+					<div className="flex items-center gap-1.5">
+						<select
+							value={pageSize}
+							onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+							aria-label="Baris per halaman"
+							className="rounded-md border border-graphite bg-charcoal px-2.5 py-1.5 text-xs font-[510] text-snow focus:border-fog/40 focus:outline-none"
 						>
-							{p === "all" ? "Semua Paket" : p}
-						</button>
-					))}
+							{[10, 20, 50, 100].map((size) => (
+								<option key={size} value={size}>
+									{size} / halaman
+								</option>
+							))}
+						</select>
+					</div>
 				</div>
 			</div>
 
@@ -168,14 +330,14 @@ export function AdminUsersView({
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-graphite">
-						{filteredRows.length === 0 ? (
+						{displayedRows.length === 0 ? (
 							<tr>
 								<td colSpan={6} className="py-12 text-center text-fog">
 									Tidak ada pengguna yang ditemukan.
 								</td>
 							</tr>
 						) : (
-							filteredRows.map(({ user, sub }) => (
+							displayedRows.map(({ user, sub }) => (
 								<AdminUserRowItem
 									key={user.id}
 									user={user}
@@ -188,6 +350,16 @@ export function AdminUsersView({
 						)}
 					</tbody>
 				</table>
+
+				<AdminPagination
+					page={page}
+					pageSize={pageSize}
+					totalCount={totalCount}
+					totalPages={totalPages}
+					onPageChange={handlePageChange}
+					onPageSizeChange={handlePageSizeChange}
+					entityName="pengguna"
+				/>
 			</div>
 		</div>
 	);

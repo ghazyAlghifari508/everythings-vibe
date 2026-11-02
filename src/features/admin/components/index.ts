@@ -2,6 +2,7 @@ export * from "./admin-client";
 export * from "./admin-dashboard-view";
 export * from "./admin-feedback-view";
 export * from "./admin-metric-card";
+export * from "./admin-pagination";
 export * from "./admin-projects-view";
 export * from "./admin-transactions-view";
 export * from "./admin-user-row";

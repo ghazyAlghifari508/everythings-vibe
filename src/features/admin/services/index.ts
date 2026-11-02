@@ -7,6 +7,7 @@ export { listAdminProjects } from "./admin-projects-service";
 export { listAdminTransactions } from "./admin-transactions-service";
 export {
 	countUsers,
+	getAdminUserStats,
 	listUsers,
 	resetUserCredit,
 	setUserAdmin,
