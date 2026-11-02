@@ -117,6 +117,7 @@ export const StudioFrame = memo(function StudioFrame({
 				<div className="flex min-w-0 items-center gap-2">
 					<button
 						type="button"
+						data-canvas-gesture-surface=""
 						onClick={(event) => {
 							if (!isCanvasPanning) onSelect?.(frame.id, event.shiftKey);
 						}}
@@ -171,6 +172,7 @@ export const StudioFrame = memo(function StudioFrame({
 				{showsPreview && visual ? (
 					<button
 						type="button"
+						data-canvas-gesture-surface=""
 						aria-label={`Pilih frame ${frame.name}`}
 						aria-pressed={isSelected}
 						onClick={(event) => {
