@@ -470,6 +470,48 @@ describe("per-mode loading presentation", () => {
 			cleanup();
 		}
 	});
+	it("omits the redundant DESIGN.md kicker above website title in design mode", () => {
+		render(
+			<ScrapeProgress
+				mode="design"
+				status="capturing"
+				domain="www.notion.com"
+				sourceUrl="https://www.notion.com/"
+			/>,
+		);
+		expect(
+			screen.getByRole("heading", { name: "Notion", level: 2 }),
+		).toBeDefined();
+		expect(screen.getByText("https://www.notion.com/")).toBeDefined();
+		const occurrences = screen.getAllByText("DESIGN.md");
+		expect(occurrences).toHaveLength(1);
+		expect(occurrences[0].tagName).toBe("H3");
+		cleanup();
+	});
+
+	it("keeps the mode kicker above the website title for crawl, html, and images modes", () => {
+		const cases = [
+			{ mode: "crawl" as const, kicker: "Crawl Website" },
+			{ mode: "html" as const, kicker: "Scrape HTML" },
+			{ mode: "images" as const, kicker: "Scrape Images" },
+		];
+		for (const { mode, kicker } of cases) {
+			render(
+				<ScrapeProgress
+					mode={mode}
+					status="capturing"
+					domain="www.notion.com"
+					sourceUrl="https://www.notion.com/"
+				/>,
+			);
+			const kickerEl = screen.getByText(kicker, { selector: "p" });
+			expect(kickerEl).toBeDefined();
+			expect(
+				screen.getByRole("heading", { name: "Notion", level: 2 }),
+			).toBeDefined();
+			cleanup();
+		}
+	});
 
 	it("keeps HTML in the single-column layout", () => {
 		const { container } = render(

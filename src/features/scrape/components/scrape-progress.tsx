@@ -138,8 +138,14 @@ export function ScrapeProgress(props: ScrapeProgressProps) {
 			}
 		>
 			<div className="min-w-0">
-				<p className="text-sm text-fog">{operation}</p>
-				<h2 className="mt-1 text-2xl font-bold text-snow">
+				{mode !== "design" && <p className="text-sm text-fog">{operation}</p>}
+				<h2
+					className={
+						mode !== "design"
+							? "mt-1 text-2xl font-bold text-snow"
+							: "text-2xl font-bold text-snow"
+					}
+				>
 					{domain ? displaySiteName(domain) : "Website"}
 				</h2>
 				{sourceUrl ? (
