@@ -4,51 +4,257 @@ import {
 	ArrowLeft01Icon,
 	BubbleChatIcon,
 	Bug02Icon,
-	CheckmarkCircle02Icon,
 	InboxIcon,
-	Search01Icon,
 	SparklesIcon,
 } from "@hugeicons/core-free-icons";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import type { AdminErrorReportItem, AdminFeedbackItem } from "../types";
+import type {
+	AdminErrorReportItem,
+	AdminErrorReportsListResult,
+	AdminFeedbackItem,
+	AdminFeedbackListResult,
+	AdminFeedbackSearchParams,
+	AdminFeedbackStats,
+} from "../types";
+import {
+	computeFallbackFeedbackStats,
+	resolveFeedbackDisplay,
+} from "../utils/admin-feedback-utils";
+import { AdminErrorReportTable } from "./admin-error-report-table";
+import { AdminFeedbackFilterBar } from "./admin-feedback-filter-bar";
+import { AdminFeedbackTable } from "./admin-feedback-table";
 import { AdminMetricCard } from "./admin-metric-card";
 
+export interface AdminFeedbackViewProps {
+	feedbackResult?: AdminFeedbackListResult;
+	errorsResult?: AdminErrorReportsListResult;
+	feedback?: AdminFeedbackItem[];
+	errors?: AdminErrorReportItem[];
+	stats?: AdminFeedbackStats;
+	currentUserId?: string;
+	searchParams?: Partial<AdminFeedbackSearchParams>;
+}
+
 export function AdminFeedbackView({
-	feedback,
-	errors,
-}: {
-	feedback: AdminFeedbackItem[];
-	errors: AdminErrorReportItem[];
-}) {
-	const [activeTab, setActiveTab] = useState<"feedback" | "errors">("feedback");
-	const [typeFilter, setTypeFilter] = useState<string>("all");
-	const [search, setSearch] = useState("");
+	feedbackResult,
+	errorsResult,
+	feedback: fallbackFeedback,
+	errors: fallbackErrors,
+	stats,
+	searchParams,
+}: AdminFeedbackViewProps) {
+	const navigate = useNavigate();
 
-	const filteredFeedback = feedback.filter((f) => {
-		const matchesSearch =
-			!search ||
-			f.message.toLowerCase().includes(search.toLowerCase()) ||
-			f.userEmail?.toLowerCase().includes(search.toLowerCase()) ||
-			f.userName?.toLowerCase().includes(search.toLowerCase());
-		const matchesType = typeFilter === "all" || f.type === typeFilter;
-		return matchesSearch && matchesType;
+	const activeTab = searchParams?.tab ?? "feedback";
+	const [clientTab, setClientTab] = useState<"feedback" | "errors">("feedback");
+	const currentTab = searchParams ? activeTab : clientTab;
+
+	const initialSearch = searchParams?.search ?? "";
+	const [search, setSearch] = useState(initialSearch);
+	const [clientPage, setClientPage] = useState(1);
+	const [clientPageSize, setClientPageSize] = useState(20);
+	const [clientTypeFilter, setClientTypeFilter] = useState<string>("all");
+
+	// Synchronize local search input if search param changes from navigation or tab switch
+	useEffect(() => {
+		const targetSearch = searchParams?.search ?? "";
+		if (targetSearch !== search) {
+			setSearch(targetSearch);
+		}
+	}, [searchParams?.search, search]);
+
+	// Debounce search update (300ms) to trigger server query
+	const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	useEffect(() => {
+		if (!navigate || !searchParams) return;
+		const trimmed = search.trim();
+		if (trimmed === (searchParams.search ?? "")) return;
+
+		clearTimeout(searchTimeoutRef.current ?? undefined);
+
+		searchTimeoutRef.current = setTimeout(() => {
+			if (currentTab === "feedback") {
+				void navigate({
+					to: "/admin/feedback",
+					search: {
+						...searchParams,
+						tab: "feedback",
+						page: 1,
+						search: trimmed,
+						feedbackPage: 1,
+						feedbackSearch: trimmed,
+					},
+				});
+			} else {
+				void navigate({
+					to: "/admin/feedback",
+					search: {
+						...searchParams,
+						tab: "errors",
+						page: 1,
+						search: trimmed,
+						errorPage: 1,
+						errorSearch: trimmed,
+					},
+				});
+			}
+		}, 300);
+
+		return () => {
+			clearTimeout(searchTimeoutRef.current ?? undefined);
+		};
+	}, [search, searchParams, currentTab, navigate]);
+
+	const handleTabChange = (newTab: "feedback" | "errors") => {
+		if (newTab === currentTab) return;
+
+		if (navigate && searchParams) {
+			if (newTab === "errors") {
+				void navigate({
+					to: "/admin/feedback",
+					search: {
+						...searchParams,
+						tab: "errors",
+						page: searchParams.errorPage ?? 1,
+						pageSize: searchParams.errorPageSize ?? 20,
+						search: searchParams.errorSearch ?? "",
+						type: "all",
+						feedbackPage: searchParams.page ?? 1,
+						feedbackPageSize: searchParams.pageSize ?? 20,
+						feedbackSearch: searchParams.search ?? "",
+						feedbackType: searchParams.type ?? "all",
+					},
+				});
+			} else {
+				void navigate({
+					to: "/admin/feedback",
+					search: {
+						...searchParams,
+						tab: "feedback",
+						page: searchParams.feedbackPage ?? 1,
+						pageSize: searchParams.feedbackPageSize ?? 20,
+						search: searchParams.feedbackSearch ?? "",
+						type: searchParams.feedbackType ?? "all",
+						errorPage: searchParams.page ?? 1,
+						errorPageSize: searchParams.pageSize ?? 20,
+						errorSearch: searchParams.search ?? "",
+					},
+				});
+			}
+		} else {
+			setClientTab(newTab);
+			setSearch("");
+			setClientPage(1);
+			setClientTypeFilter("all");
+		}
+	};
+
+	const handleTypeFilterChange = (newType: string) => {
+		if (navigate && searchParams) {
+			void navigate({
+				to: "/admin/feedback",
+				search: {
+					...searchParams,
+					tab: "feedback",
+					page: 1,
+					type: newType as "all" | "bug" | "feature" | "general",
+					feedbackPage: 1,
+					feedbackType: newType as "all" | "bug" | "feature" | "general",
+				},
+			});
+		} else {
+			setClientTypeFilter(newType);
+			setClientPage(1);
+		}
+	};
+
+	const handlePageChange = (newPage: number) => {
+		if (navigate && searchParams) {
+			if (currentTab === "feedback") {
+				void navigate({
+					to: "/admin/feedback",
+					search: {
+						...searchParams,
+						page: newPage,
+						feedbackPage: newPage,
+					},
+				});
+			} else {
+				void navigate({
+					to: "/admin/feedback",
+					search: {
+						...searchParams,
+						page: newPage,
+						errorPage: newPage,
+					},
+				});
+			}
+		} else {
+			setClientPage(newPage);
+		}
+	};
+
+	const handlePageSizeChange = (newPageSize: number) => {
+		if (navigate && searchParams) {
+			if (currentTab === "feedback") {
+				void navigate({
+					to: "/admin/feedback",
+					search: {
+						...searchParams,
+						page: 1,
+						pageSize: newPageSize,
+						feedbackPage: 1,
+						feedbackPageSize: newPageSize,
+					},
+				});
+			} else {
+				void navigate({
+					to: "/admin/feedback",
+					search: {
+						...searchParams,
+						page: 1,
+						pageSize: newPageSize,
+						errorPage: 1,
+						errorPageSize: newPageSize,
+					},
+				});
+			}
+		} else {
+			setClientPageSize(newPageSize);
+			setClientPage(1);
+		}
+	};
+
+	const allFeedback = feedbackResult?.feedback ?? fallbackFeedback ?? [];
+	const allErrors = errorsResult?.errors ?? fallbackErrors ?? [];
+	const computedStats: AdminFeedbackStats =
+		stats ?? computeFallbackFeedbackStats(allFeedback, allErrors);
+
+	const activeType = searchParams?.type ?? clientTypeFilter;
+
+	const {
+		displayedFeedback,
+		displayedErrors,
+		currentPage,
+		currentPageSize,
+		currentTotalCount,
+		currentTotalPages,
+	} = resolveFeedbackDisplay({
+		currentTab,
+		feedbackResult,
+		errorsResult,
+		fallbackFeedback: allFeedback,
+		fallbackErrors: allErrors,
+		search,
+		activeType,
+		clientPage,
+		clientPageSize,
 	});
 
-	const filteredErrors = errors.filter((e) => {
-		return (
-			!search ||
-			e.errorMessage.toLowerCase().includes(search.toLowerCase()) ||
-			e.context?.toLowerCase().includes(search.toLowerCase()) ||
-			e.userEmail?.toLowerCase().includes(search.toLowerCase())
-		);
-	});
-
-	const generalCount = feedback.filter((f) => f.type === "general").length;
-	const featureCount = feedback.filter((f) => f.type === "feature").length;
-	const bugCount =
-		errors.length + feedback.filter((f) => f.type === "bug").length;
+	const hasFeedbackFilter = Boolean(search || activeType !== "all");
+	const hasErrorFilter = Boolean(search);
 
 	return (
 		<div className="mx-auto max-w-7xl space-y-8 font-inter">
@@ -77,245 +283,65 @@ export function AdminFeedbackView({
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<AdminMetricCard
 					label="Total Masukan"
-					value={feedback.length + errors.length}
+					value={computedStats.totalItems}
 					subtext="Feedback & log error"
 					icon={InboxIcon}
 				/>
 				<AdminMetricCard
 					label="Feedback Umum"
-					value={generalCount}
+					value={computedStats.generalCount}
 					subtext="Masukan & saran pengguna"
 					icon={BubbleChatIcon}
 				/>
 				<AdminMetricCard
 					label="Permintaan Fitur"
-					value={featureCount}
+					value={computedStats.featureCount}
 					subtext="Ide & wishlist pengguna"
 					icon={SparklesIcon}
 				/>
 				<AdminMetricCard
 					label="Bug & Crash"
-					value={bugCount}
+					value={computedStats.bugCount}
 					subtext="Tiket bug & error sistem"
 					icon={Bug02Icon}
 				/>
 			</div>
 
 			{/* Filters and Tabs Bar */}
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-				<div className="flex gap-1.5 overflow-x-auto">
-					<button
-						type="button"
-						onClick={() => {
-							setActiveTab("feedback");
-							setTypeFilter("all");
-						}}
-						className={`rounded-md px-3 py-1.5 text-xs font-[510] transition-colors ${
-							activeTab === "feedback"
-								? "bg-snow text-onyx"
-								: "border border-graphite bg-charcoal text-fog hover:border-fog/40 hover:text-snow"
-						}`}
-					>
-						Feedback Pengguna ({feedback.length})
-					</button>
+			<AdminFeedbackFilterBar
+				currentTab={currentTab}
+				onTabChange={handleTabChange}
+				activeType={activeType}
+				onTypeChange={handleTypeFilterChange}
+				search={search}
+				onSearchChange={setSearch}
+				feedbackTotal={computedStats.feedbackTotal}
+				errorTotal={computedStats.errorTotal}
+			/>
 
-					<button
-						type="button"
-						onClick={() => {
-							setActiveTab("errors");
-							setTypeFilter("all");
-						}}
-						className={`rounded-md px-3 py-1.5 text-xs font-[510] transition-colors ${
-							activeTab === "errors"
-								? "bg-snow text-onyx"
-								: "border border-graphite bg-charcoal text-fog hover:border-fog/40 hover:text-snow"
-						}`}
-					>
-						Laporan Error ({errors.length})
-					</button>
-				</div>
-
-				<div className="flex items-center gap-2">
-					{/* Type filter for feedback */}
-					{activeTab === "feedback" && (
-						<div className="flex gap-1">
-							{(["all", "bug", "feature", "general"] as const).map((t) => (
-								<button
-									key={t}
-									type="button"
-									onClick={() => setTypeFilter(t)}
-									className={`rounded px-2 py-1 text-[11px] font-[510] capitalize transition-colors ${
-										typeFilter === t
-											? "bg-white/15 text-snow border border-graphite"
-											: "text-fog hover:text-snow"
-									}`}
-								>
-									{t === "all" ? "Semua" : t}
-								</button>
-							))}
-						</div>
-					)}
-
-					<div className="relative w-48 sm:w-64">
-						<Icon
-							icon={Search01Icon}
-							size={14}
-							className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fog"
-						/>
-						<input
-							type="text"
-							value={search}
-							onChange={(e) => setSearch(e.target.value)}
-							placeholder="Cari..."
-							className="w-full rounded-lg border border-graphite bg-charcoal py-1.5 pl-8 pr-3 text-xs text-snow placeholder:text-fog/60 focus:border-fog/40 focus:outline-none"
-						/>
-					</div>
-				</div>
-			</div>
-
-			{/* Main Content List */}
-			{activeTab === "feedback" ? (
-				<div className="space-y-3">
-					{filteredFeedback.length === 0 ? (
-						<div className="flex flex-col items-center justify-center rounded-xl border border-graphite bg-charcoal/40 py-16 text-center">
-							<div className="flex h-10 w-10 items-center justify-center rounded-full bg-obsidian border border-graphite text-fog mb-3">
-								<Icon icon={InboxIcon} size={18} />
-							</div>
-							<p className="text-sm font-[510] text-snow">Belum ada feedback</p>
-							<p className="mt-1 text-xs text-fog max-w-sm">
-								Feedback dan bug report yang dikirimkan user dari halaman
-								Settings akan tercatat di sini.
-							</p>
-						</div>
-					) : (
-						<div className="overflow-x-auto rounded-xl border border-graphite bg-charcoal shadow-[var(--shadow-inset)]">
-							<table className="w-full text-left text-xs">
-								<thead>
-									<tr className="border-b border-graphite bg-obsidian text-fog">
-										<th className="px-4 py-3 font-[510]">Tipe</th>
-										<th className="px-4 py-3 font-[510]">Pesan Feedback</th>
-										<th className="px-4 py-3 font-[510]">Pengirim</th>
-										<th className="px-4 py-3 font-[510] text-right">Waktu</th>
-									</tr>
-								</thead>
-								<tbody className="divide-y divide-graphite">
-									{filteredFeedback.map((f) => (
-										<tr
-											key={f.id}
-											className="transition-colors hover:bg-white/[0.02]"
-										>
-											<td className="px-4 py-3 whitespace-nowrap">
-												<span
-													className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-														f.type === "bug"
-															? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
-															: f.type === "feature"
-																? "bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
-																: "bg-white/5 text-fog border border-graphite"
-													}`}
-												>
-													{f.type === "bug" ? (
-														<Icon icon={Bug02Icon} size={10} />
-													) : f.type === "feature" ? (
-														<Icon icon={SparklesIcon} size={10} />
-													) : (
-														<Icon icon={BubbleChatIcon} size={10} />
-													)}
-													{f.type}
-												</span>
-											</td>
-
-											<td className="px-4 py-3">
-												<p className="font-normal text-snow whitespace-pre-wrap max-w-xl">
-													{f.message}
-												</p>
-											</td>
-
-											<td className="px-4 py-3 whitespace-nowrap">
-												<p className="font-[510] text-snow">
-													{f.userName || "Tanpa Nama"}
-												</p>
-												<p className="text-[11px] text-fog">
-													{f.userEmail || "Anonymous"}
-												</p>
-											</td>
-
-											<td className="px-4 py-3 text-right text-fog whitespace-nowrap">
-												{f.createdAt
-													? new Date(f.createdAt).toLocaleDateString("id-ID", {
-															day: "numeric",
-															month: "short",
-															year: "numeric",
-															hour: "2-digit",
-															minute: "2-digit",
-														})
-													: "-"}
-											</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-						</div>
-					)}
-				</div>
+			{/* Main Content List & Tables */}
+			{currentTab === "feedback" ? (
+				<AdminFeedbackTable
+					feedback={displayedFeedback}
+					totalCount={currentTotalCount}
+					page={currentPage}
+					pageSize={currentPageSize}
+					totalPages={currentTotalPages}
+					hasFilter={hasFeedbackFilter}
+					onPageChange={handlePageChange}
+					onPageSizeChange={handlePageSizeChange}
+				/>
 			) : (
-				<div className="space-y-3">
-					{filteredErrors.length === 0 ? (
-						<div className="flex flex-col items-center justify-center rounded-xl border border-graphite bg-charcoal/40 py-16 text-center">
-							<div className="flex h-10 w-10 items-center justify-center rounded-full bg-obsidian border border-graphite text-emerald-400 mb-3">
-								<Icon icon={CheckmarkCircle02Icon} size={18} />
-							</div>
-							<p className="text-sm font-[510] text-snow">
-								Semua sistem berjalan normal
-							</p>
-							<p className="mt-1 text-xs text-fog max-w-sm">
-								Tidak ada error client-side yang dilaporkan saat ini.
-							</p>
-						</div>
-					) : (
-						<div className="overflow-x-auto rounded-xl border border-graphite bg-charcoal shadow-[var(--shadow-inset)]">
-							<table className="w-full text-left text-xs">
-								<thead>
-									<tr className="border-b border-graphite bg-obsidian text-fog">
-										<th className="px-4 py-3 font-[510]">Error Message</th>
-										<th className="px-4 py-3 font-[510]">Konteks / Stack</th>
-										<th className="px-4 py-3 font-[510]">User</th>
-										<th className="px-4 py-3 font-[510] text-right">Waktu</th>
-									</tr>
-								</thead>
-								<tbody className="divide-y divide-graphite">
-									{filteredErrors.map((e) => (
-										<tr
-											key={e.id}
-											className="transition-colors hover:bg-white/[0.02]"
-										>
-											<td className="px-4 py-3 font-mono text-rose-300 max-w-xs truncate">
-												{e.errorMessage}
-											</td>
-											<td className="px-4 py-3 font-mono text-fog max-w-md truncate">
-												{e.context || "-"}
-											</td>
-											<td className="px-4 py-3 text-fog whitespace-nowrap">
-												{e.userEmail || "-"}
-											</td>
-											<td className="px-4 py-3 text-right text-fog whitespace-nowrap">
-												{e.createdAt
-													? new Date(e.createdAt).toLocaleDateString("id-ID", {
-															day: "numeric",
-															month: "short",
-															year: "numeric",
-															hour: "2-digit",
-															minute: "2-digit",
-														})
-													: "-"}
-											</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-						</div>
-					)}
-				</div>
+				<AdminErrorReportTable
+					errors={displayedErrors}
+					totalCount={currentTotalCount}
+					page={currentPage}
+					pageSize={currentPageSize}
+					totalPages={currentTotalPages}
+					hasFilter={hasErrorFilter}
+					onPageChange={handlePageChange}
+					onPageSizeChange={handlePageSizeChange}
+				/>
 			)}
 		</div>
 	);
