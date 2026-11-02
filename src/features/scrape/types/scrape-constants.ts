@@ -53,6 +53,22 @@ export const SCRAPE_SCREENSHOT_FULL_PAGE_MAX_HEIGHT = 6_000;
 export const CRAWL_DESCRIPTION_MAX_CHARS = 2000;
 export const CRAWL_HEADING_MAX_CHARS = 500;
 export const CRAWL_SECTION_TEXT_MAX_CHARS = 8000;
+// Blueprint-level presentation bounds. The stored crawl content keeps its own
+// wider caps; these only shape how the exported document reads.
+export const CRAWL_BLUEPRINT_DESCRIPTION_MAX_CHARS = 240;
+// A section longer than this is broken into sentences so the exported document
+// stays scannable instead of collapsing into one paragraph.
+export const CRAWL_BLUEPRINT_SECTION_SENTENCE_MIN_CHARS = 240;
+// A run of at least this many single-digit tokens in ascending order is an
+// animated counter, not content. Shorter runs stay because an ordered list
+// extracts to the same shape.
+export const CRAWL_BLUEPRINT_DIGIT_LADDER_MIN_TOKENS = 6;
+// A run this long where every digit 0-9 repeats is a counter cycling through
+// its whole range, regardless of order.
+export const CRAWL_BLUEPRINT_DIGIT_CYCLE_MIN_TOKENS = 20;
+// Link and asset lists are bounded in the readable sections; the raw evidence
+// appendix carries the complete set so nothing is dropped from the export.
+export const CRAWL_BLUEPRINT_LIST_MAX_ITEMS = 50;
 // Consecutive empty observations distinguish settled layout from a slow render.
 export const SCRAPE_PREVIEW_EMPTY_GRACE_OBSERVATIONS = 3;
 // The source preview renders a bounded number of rows; the complete document
