@@ -12,7 +12,7 @@ export const Route = createFileRoute("/settings/api-keys")({
 			throw e;
 		}
 	},
-	head: () => ({ meta: [{ title: "Akses Integrasi - Settings" }] }),
+	head: () => ({ meta: [{ title: "API Keys - Settings" }] }),
 	component: ApiKeysPage,
 });
 

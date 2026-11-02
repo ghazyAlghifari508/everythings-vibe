@@ -86,8 +86,8 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 
 	return (
 		<SettingsContentPanel
-			title="Akses Integrasi"
-			description="Kelola koneksi AI Agent dan CLI."
+			title="API Keys"
+			description="Kelola API key yang digunakan untuk menghubungkan AI Agent dan tool lainnya."
 		>
 			<div className="space-y-8">
 				{createdKey && (
@@ -120,7 +120,7 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 							className="gap-1.5"
 						>
 							<Icon icon={Add01Icon} size={14} />
-							Buat API key manual
+							Buat API key
 						</Button>
 					</div>
 				</ApiAdvancedSection>
@@ -139,11 +139,10 @@ export function ApiKeysClient({ keys }: ApiKeysClientProps) {
 			<Dialog open={showCleanup} onOpenChange={setShowCleanup}>
 				<DialogContent className="max-w-md">
 					<DialogHeader>
-						<DialogTitle>Bersihkan akses usang?</DialogTitle>
+						<DialogTitle>Bersihkan API key usang?</DialogTitle>
 						<DialogDescription>
-							Akses otomatis warisan tanpa batas waktu diberi batas waktu supaya
-							agen yang sedang berjalan tidak langsung terputus, dan akses yang
-							sudah kedaluwarsa dihapus dari daftar. Akses manual yang masih
+							Key otomatis tanpa batas waktu akan diberi batas waktu, dan key
+							yang sudah kedaluwarsa dihapus dari daftar. Key manual yang masih
 							berlaku tidak disentuh.
 						</DialogDescription>
 					</DialogHeader>

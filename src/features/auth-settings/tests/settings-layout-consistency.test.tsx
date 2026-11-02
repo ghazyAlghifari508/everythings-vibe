@@ -48,6 +48,10 @@ vi.mock("@/features/billing/components/credit-usage", () => ({
 	CreditUsageSection: () => <div data-testid="mock-credit-usage" />,
 }));
 
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({ userPlan: "free", isLoading: false }),
+}));
+
 import { BillingPage } from "@/features/billing/components/billing-page";
 
 describe("Settings layout consistency across child pages", () => {
@@ -87,8 +91,8 @@ describe("Settings layout consistency across child pages", () => {
 			{ title: "Edit Profil", desc: undefined },
 			{ title: "Pengaturan Akun", desc: undefined },
 			{
-				title: "Akses Integrasi",
-				desc: "Kelola koneksi AI Agent dan CLI.",
+				title: "API Keys",
+				desc: "Kelola API key yang digunakan untuk menghubungkan AI Agent dan tool lainnya.",
 			},
 			{ title: "Preferensi Notifikasi", desc: undefined },
 			{

@@ -22,7 +22,7 @@ interface SettingsClientProps {
 const NAV_ITEMS = [
 	{ href: "/settings/profile", label: "Profil", icon: UserIcon },
 	{ href: "/settings/account", label: "Akun", icon: Shield01Icon },
-	{ href: "/settings/api-keys", label: "Akses Integrasi", icon: Key01Icon },
+	{ href: "/settings/api-keys", label: "API Keys", icon: Key01Icon },
 	{
 		href: "/settings/notifications",
 		label: "Notifikasi",

@@ -60,11 +60,11 @@ const expiredKey: ApiKeyRecord = {
 };
 
 function advancedToggle() {
-	return screen.getByRole("button", { name: /^pengaturan lanjutan/i });
+	return screen.getByRole("button", { name: /^buat api key manual/i });
 }
 
 function manualCreateButton() {
-	return screen.getByRole("button", { name: /^buat api key manual$/i });
+	return screen.getByRole("button", { name: /^buat api key$/i });
 }
 
 function openAdvanced() {
@@ -77,17 +77,18 @@ describe("ApiKeysClient layout and presentation", () => {
 		vi.unstubAllGlobals();
 	});
 
-	it("frames the page as integration access, not credential generation", () => {
+	it("frames the page as API Keys management with automatic provisioning context", () => {
 		render(<ApiKeysClient keys={[automaticKey]} />);
 
+		expect(screen.getByRole("heading", { name: "API Keys" })).toBeDefined();
 		expect(
-			screen.getByRole("heading", { name: "Akses Integrasi" }),
+			screen.getByText(
+				"Kelola API key yang digunakan untuk menghubungkan AI Agent dan tool lainnya.",
+			),
 		).toBeDefined();
-		expect(screen.getByText("Kelola koneksi AI Agent dan CLI.")).toBeDefined();
 		expect(
-			screen.getByRole("heading", { name: /akses yang terdaftar/i }),
+			screen.getByRole("heading", { name: /daftar api key/i }),
 		).toBeDefined();
-
 		// Manual creation must not be the panel-level primary action.
 		const panel = screen.getByTestId("settings-content-panel");
 		expect(
@@ -99,9 +100,11 @@ describe("ApiKeysClient layout and presentation", () => {
 	it("explains automatic provisioning in the empty state without a create CTA", () => {
 		render(<ApiKeysClient keys={[]} />);
 
-		expect(screen.getByText("Belum ada akses terdaftar")).toBeDefined();
+		expect(screen.getByText("Belum ada API key")).toBeDefined();
 		expect(
-			screen.getByText(/Akses untuk AI Agent dibuat otomatis/i),
+			screen.getByText(
+				/API key akan dibuat otomatis saat kamu menggunakan fitur handoff AI Agent/i,
+			),
 		).toBeDefined();
 		expect(
 			screen.queryByRole("button", { name: /^buat api key$/i }),
@@ -112,7 +115,7 @@ describe("ApiKeysClient layout and presentation", () => {
 		// Advanced entry stays discoverable and collapsed by default.
 		expect(advancedToggle()).toBeDefined();
 		expect(
-			screen.queryByRole("button", { name: /^buat api key manual$/i }),
+			screen.queryByRole("button", { name: /^buat api key$/i }),
 		).toBeNull();
 	});
 
@@ -128,7 +131,7 @@ describe("ApiKeysClient layout and presentation", () => {
 		expect(screen.getByText("Belum pernah")).toBeDefined();
 		expect(screen.getByText(/Aktif sampai/)).toBeDefined();
 		expect(screen.getByText("Aktif, tanpa batas waktu")).toBeDefined();
-		expect(screen.getByText(/1 dari 2 akses berasal/i)).toBeDefined();
+		expect(screen.getByText(/1 dari 2 key dibuat otomatis/i)).toBeDefined();
 
 		expect(screen.getByRole("columnheader", { name: "Nama" })).toBeDefined();
 		expect(screen.getByRole("columnheader", { name: "Akses" })).toBeDefined();
@@ -159,7 +162,7 @@ describe("ApiKeysClient layout and presentation", () => {
 		expect(screen.getByText("Usang, tanpa batas waktu")).toBeDefined();
 		expect(isObsoleteKey(unboundedAutoKey)).toBe(true);
 		expect(
-			screen.getByRole("button", { name: /bersihkan 1 akses usang/i }),
+			screen.getByRole("button", { name: /bersihkan 1 key usang/i }),
 		).toBeDefined();
 	});
 
