@@ -24,8 +24,8 @@ export interface StudioWorkspaceState {
 	selectedFrames: StudioFrameRow[];
 	composerLoading: boolean;
 	exportingZip: boolean;
-	deleting: boolean;
 	duplicating: boolean;
+	renaming: boolean;
 	/** Frames with a retry request in flight; their retry control is disabled. */
 	retryingFrameIds: string[];
 	/** Per-frame retry rejections, rendered inside that frame only. */
@@ -42,6 +42,7 @@ export interface StudioWorkspaceState {
 	setError: (message: string) => void;
 	handleDuplicate: () => Promise<void>;
 	handleDelete: () => Promise<void>;
+	handleRename: (name: string) => Promise<void>;
 	handleComposerSubmit: (
 		promptText: string,
 	) => Promise<StudioComposerSubmitResult>;
@@ -161,8 +162,8 @@ export function useStudioWorkspace(
 		selectedFrames,
 		composerLoading: actions.composerLoading,
 		exportingZip: actions.exportingZip,
-		deleting: actions.deleting,
 		duplicating: actions.duplicating,
+		renaming: actions.renaming,
 		retryingFrameIds: actions.retryingFrameIds,
 		frameRetryErrors: actions.frameRetryErrors,
 		error: error || syncError,
@@ -176,6 +177,7 @@ export function useStudioWorkspace(
 		setError,
 		handleDuplicate: actions.handleDuplicate,
 		handleDelete: actions.handleDelete,
+		handleRename: actions.handleRename,
 		handleComposerSubmit: actions.handleComposerSubmit,
 		handleSkillChange: actions.handleSkillChange,
 		handleRetryFrame: actions.handleRetryFrame,

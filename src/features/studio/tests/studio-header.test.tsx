@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioHeader } from "@/features/studio/components/workspace/studio-header";
 
@@ -35,6 +41,7 @@ describe("StudioHeader", () => {
 				exporting={false}
 				canExport
 				onDuplicate={vi.fn()}
+				onRename={async () => {}}
 				onExport={vi.fn()}
 				{...overrides}
 			/>,
@@ -96,6 +103,29 @@ describe("StudioHeader", () => {
 		expect(
 			screen.queryByRole("menuitem", { name: /Design system/i }),
 		).toBeNull();
+	});
+
+	it("renames the project through the project menu dialog", async () => {
+		const onRename = vi.fn(async () => {});
+		renderHeader({ onRename });
+		fireEvent.pointerDown(
+			screen.getByRole("button", { name: "Menu project" }),
+			{ button: 0, ctrlKey: false, pointerType: "mouse" },
+		);
+		fireEvent.click(
+			await screen.findByRole("menuitem", { name: /Ganti nama project/i }),
+		);
+
+		const input =
+			await screen.findByLabelText<HTMLInputElement>("Nama project");
+		expect(input.value).toBe("KopiKultur Coffee Shop App");
+		fireEvent.change(input, { target: { value: "KopiKultur POS" } });
+		fireEvent.click(screen.getByRole("button", { name: "Simpan" }));
+
+		await waitFor(() =>
+			expect(onRename).toHaveBeenCalledWith("KopiKultur POS"),
+		);
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 	});
 
 	it("gives every interactive control a pointer-enabled surface", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Folder02Icon } from "@hugeicons/core-free-icons";
-import { useNavigate, useRouter } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
 import { Icon } from "@/components/ui/icon";
@@ -17,6 +17,7 @@ import { StudioShortcutCarousel } from "@/features/studio/components/studio-shor
 import { StudioLandingProfile } from "@/features/studio/components/workspace/studio-landing-profile";
 import { StudioMobileHistoryDrawer } from "@/features/studio/components/workspace/studio-mobile-history-drawer";
 import { StudioSidebar } from "@/features/studio/components/workspace/studio-sidebar";
+import { useStudioHistoryActions } from "@/features/studio/hooks/use-studio-history-actions";
 import {
 	STUDIO_DEFAULT_PAGE_COUNT,
 	type StudioDesignSkillId,
@@ -33,7 +34,6 @@ import type {
 	AttachedLogo,
 	StudioHistoryItem,
 } from "@/features/studio/types/studio";
-import { useUIStore } from "@/store";
 
 /** A design reference staged on the landing screen, not yet sent. */
 export type StagedReference =
@@ -63,8 +63,6 @@ export function StudioLandingPage({
 	search: { prompt?: string; from?: string };
 }) {
 	const navigate = useNavigate();
-	const router = useRouter();
-	const showToast = useUIStore((state) => state.showToast);
 
 	const [prompt, setPrompt] = useState(search.prompt ?? "");
 	const [config, setConfig] = useState<LaunchComposerConfig>({
@@ -100,29 +98,8 @@ export function StudioLandingPage({
 		});
 	};
 
-	// Deletion goes through the authoritative server action, then the loader is
-	// revalidated so the list, the count badge, and the filter all reconcile
-	// from persisted state instead of an optimistic guess.
-	async function handleDeleteProject(id: string) {
-		const response = await fetch("/api/studio/project", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ action: "delete", projectId: id }),
-		});
-		if (!response.ok) {
-			const body: unknown = await response.json().catch(() => null);
-			throw new Error(
-				typeof body === "object" &&
-					body !== null &&
-					"error" in body &&
-					typeof body.error === "string"
-					? body.error
-					: "Gagal menghapus project. Coba lagi.",
-			);
-		}
-		await router.invalidate();
-		showToast("Project dihapus.", "success");
-	}
+	const { deleteProject, renameProject, duplicateProject } =
+		useStudioHistoryActions();
 
 	function applyShortcut(shortcut: StudioPromptShortcut) {
 		setPrompt(shortcut.prompt);
@@ -279,7 +256,9 @@ export function StudioLandingPage({
 				<StudioSidebar
 					history={history}
 					onSelectProject={handleOpenProject}
-					onDeleteProject={handleDeleteProject}
+					onDeleteProject={deleteProject}
+					onRenameProject={renameProject}
+					onDuplicateProject={duplicateProject}
 					className="sticky top-4 hidden h-[calc(100dvh-5.5rem)] min-h-[480px] max-h-[calc(100dvh-5.5rem)] w-72 shrink-0 overflow-hidden md:flex lg:w-80"
 				/>
 
@@ -288,7 +267,9 @@ export function StudioLandingPage({
 					onOpenChange={setIsMobileDrawerOpen}
 					history={history}
 					onSelectProject={handleOpenProject}
-					onDeleteProject={handleDeleteProject}
+					onDeleteProject={deleteProject}
+					onRenameProject={renameProject}
+					onDuplicateProject={duplicateProject}
 				/>
 
 				<main className="flex min-w-0 flex-1 self-stretch flex-col justify-center py-4 md:py-6">
