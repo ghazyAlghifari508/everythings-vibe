@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { STUDIO_PROJECT_TITLE_MAX_CHARS } from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
 import { GET, POST } from "@/routes/api/studio.project";
 
@@ -13,9 +14,19 @@ const remove = vi.hoisted(() =>
 const updatePreferences = vi.hoisted(() =>
 	vi.fn(async (projectId: string) => ({ id: projectId })),
 );
+const renameProject = vi.hoisted(() =>
+	vi.fn(async (projectId: string, _userId: string, title: string) => ({
+		id: projectId,
+		title,
+	})),
+);
+const session = vi.hoisted(() => ({ failure: null as Error | null }));
 
 vi.mock("@/lib/session", () => ({
-	requireUser: async () => ({ id: "user-123", email: "test@example.com" }),
+	requireUser: async () => {
+		if (session.failure) throw session.failure;
+		return { id: "user-123", email: "test@example.com" };
+	},
 }));
 
 vi.mock("@tanstack/react-start/server", () => ({
@@ -25,6 +36,7 @@ vi.mock("@tanstack/react-start/server", () => ({
 vi.mock("@/features/studio/services/studio-project-lifecycle", () => ({
 	duplicateStudioProject: duplicate,
 	deleteStudioProject: remove,
+	renameStudioProject: renameProject,
 }));
 
 vi.mock("@/features/studio/services/studio-preferences-service", () => ({
@@ -126,6 +138,80 @@ describe("GET /api/studio/project", () => {
 			error: "Aksi project tidak valid.",
 		});
 		expect(updatePreferences).not.toHaveBeenCalled();
+	});
+
+	it("renames through the authenticated owner and returns the persisted project", async () => {
+		renameProject.mockClear();
+		const response = await POST({
+			request: new Request("https://app.test/api/studio/project", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "rename",
+					projectId: "owned-project",
+					title: "Metriq Analytics",
+				}),
+			}),
+		});
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({
+			project: { id: "owned-project", title: "Metriq Analytics" },
+		});
+		expect(renameProject).toHaveBeenCalledWith(
+			"owned-project",
+			"user-123",
+			"Metriq Analytics",
+		);
+	});
+
+	it("rejects a rename with a blank or oversized name before any write", async () => {
+		renameProject.mockClear();
+		for (const title of [
+			"   ",
+			"x".repeat(STUDIO_PROJECT_TITLE_MAX_CHARS + 1),
+		]) {
+			const response = await POST({
+				request: new Request("https://app.test/api/studio/project", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						action: "rename",
+						projectId: "owned-project",
+						title,
+					}),
+				}),
+			});
+			expect(response.status).toBe(400);
+			expect(await response.json()).toEqual({
+				error: "Aksi project tidak valid.",
+			});
+		}
+		expect(renameProject).not.toHaveBeenCalled();
+	});
+
+	it("rejects an unauthorized rename without touching the project", async () => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		renameProject.mockClear();
+		session.failure = new Error("Unauthorized");
+		try {
+			const response = await POST({
+				request: new Request("https://app.test/api/studio/project", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						action: "rename",
+						projectId: "owned-project",
+						title: "Metriq Analytics",
+					}),
+				}),
+			});
+			expect(response.status).toBe(401);
+			expect(await response.json()).toMatchObject({ code: "UNAUTHORIZED" });
+			expect(renameProject).not.toHaveBeenCalled();
+		} finally {
+			session.failure = null;
+			log.mockRestore();
+		}
 	});
 
 	it("persists skill preference updates for the authenticated owner", async () => {
