@@ -19,6 +19,31 @@ export interface AdminTransactionItem {
 	createdAt: Date | null;
 }
 
+export interface AdminTransactionsListResult {
+	transactions: AdminTransactionItem[];
+	totalCount: number;
+	page: number;
+	pageSize: number;
+	totalPages: number;
+}
+
+export interface AdminTransactionStats {
+	totalTransactions: number;
+	successCount: number;
+	pendingCount: number;
+	totalRevenue: number;
+}
+
+export interface ListAdminTransactionsParams {
+	page?: number;
+	pageSize?: number;
+	limit?: number;
+	offset?: number;
+	search?: string;
+	status?: string;
+	plan?: string;
+}
+
 export interface AdminProjectItem {
 	id: string;
 	name: string;
@@ -143,6 +168,47 @@ export const adminProjectsSearchSchema = z.object({
 
 export type AdminProjectsSearchParams = z.infer<
 	typeof adminProjectsSearchSchema
+>;
+
+export const adminTransactionsSearchSchema = z.object({
+	page: z.coerce.number().int().min(1).default(1).catch(1),
+	pageSize: z.coerce
+		.number()
+		.int()
+		.refine((v) => [10, 20, 50, 100].includes(v))
+		.default(20)
+		.catch(20),
+	search: z.string().trim().max(128).default("").catch(""),
+	status: z
+		.enum([
+			"all",
+			"success",
+			"settlement",
+			"capture",
+			"pending",
+			"expire",
+			"failed",
+			"cancel",
+			"refund",
+		])
+		.default("all")
+		.catch("all"),
+	plan: z
+		.enum([
+			"all",
+			"hengker",
+			"pro",
+			"topup",
+			"topup-15",
+			"topup-40",
+			"topup-90",
+		])
+		.default("all")
+		.catch("all"),
+});
+
+export type AdminTransactionsSearchParams = z.infer<
+	typeof adminTransactionsSearchSchema
 >;
 
 export interface AdminDashboardMetrics {
