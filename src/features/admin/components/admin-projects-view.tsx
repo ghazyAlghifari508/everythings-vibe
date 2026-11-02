@@ -4,40 +4,181 @@ import {
 	ArrowLeft01Icon,
 	File02Icon,
 	GitBranchIcon,
-	LinkSquare02Icon,
 	Search01Icon,
 	ShieldCheckIcon,
 	Task01Icon,
 } from "@hugeicons/core-free-icons";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import type { AdminProjectItem } from "../types";
+import type {
+	AdminProjectItem,
+	AdminProjectStats,
+	AdminProjectsListResult,
+	AdminProjectsSearchParams,
+} from "../types";
 import { AdminMetricCard } from "./admin-metric-card";
+import { AdminPagination } from "./admin-pagination";
+import { AdminProjectRowItem } from "./admin-project-row";
 
-function getProjectTargetRoute(
-	step: string | null | undefined,
-): "/prd/$id" | "/ac/$id" | "/task/$id" {
-	if (step === "task") return "/task/$id";
-	if (step === "ac") return "/ac/$id";
-	return "/prd/$id";
+export interface AdminProjectsViewProps {
+	projectsResult?: AdminProjectsListResult;
+	projects?: AdminProjectItem[];
+	stats?: AdminProjectStats;
+	searchParams?: Partial<AdminProjectsSearchParams>;
 }
 
 export function AdminProjectsView({
+	projectsResult,
 	projects,
-}: {
-	projects: AdminProjectItem[];
-}) {
-	const [search, setSearch] = useState("");
-	const [stepFilter, setStepFilter] = useState<string>("all");
+	stats,
+	searchParams,
+}: AdminProjectsViewProps) {
+	const navigate = useNavigate();
 
-	const normalizedProjects = projects.map((p) => ({
-		...p,
-		step: p.step ?? "prd",
-	}));
+	const initialSearch = searchParams?.search ?? "";
+	const [search, setSearch] = useState(initialSearch);
+	const [clientPage, setClientPage] = useState(1);
+	const [clientPageSize, setClientPageSize] = useState(20);
+	const [clientStep, setClientStep] = useState<string>("all");
+	const [clientStatusFilter, setClientStatusFilter] = useState<
+		"active" | "deleted" | "all"
+	>("active");
 
-	const filteredProjects = normalizedProjects.filter(
-		(proj: AdminProjectItem) => {
+	// Synchronize local search state when URL search param updates from navigation
+	useEffect(() => {
+		if (searchParams?.search !== undefined && searchParams.search !== search) {
+			setSearch(searchParams.search);
+		}
+	}, [searchParams?.search, search]);
+
+	// Debounce search update (300ms) to trigger server query without input lag
+	const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	useEffect(() => {
+		if (!navigate) return;
+		const trimmed = search.trim();
+		if (trimmed === (searchParams?.search ?? "")) return;
+
+		clearTimeout(searchTimeoutRef.current ?? undefined);
+
+		searchTimeoutRef.current = setTimeout(() => {
+			void navigate({
+				to: "/admin/projects",
+				search: {
+					page: 1,
+					pageSize: searchParams?.pageSize ?? 20,
+					search: trimmed,
+					step: searchParams?.step ?? "all",
+					statusFilter: searchParams?.statusFilter ?? "active",
+				},
+			});
+		}, 300);
+
+		return () => {
+			clearTimeout(searchTimeoutRef.current ?? undefined);
+		};
+	}, [
+		search,
+		searchParams?.search,
+		searchParams?.pageSize,
+		searchParams?.step,
+		searchParams?.statusFilter,
+		navigate,
+	]);
+
+	const activeStep = searchParams?.step ?? clientStep;
+	const activeStatusFilter = searchParams?.statusFilter ?? clientStatusFilter;
+
+	const handleStepChange = (newStep: string) => {
+		if (navigate && searchParams) {
+			void navigate({
+				to: "/admin/projects",
+				search: {
+					page: 1,
+					pageSize: searchParams.pageSize,
+					search: searchParams.search,
+					step: newStep,
+					statusFilter: searchParams.statusFilter,
+				},
+			});
+		} else {
+			setClientStep(newStep);
+			setClientPage(1);
+		}
+	};
+
+	const handleStatusFilterChange = (
+		newStatus: "active" | "deleted" | "all",
+	) => {
+		if (navigate && searchParams) {
+			void navigate({
+				to: "/admin/projects",
+				search: {
+					page: 1,
+					pageSize: searchParams.pageSize,
+					search: searchParams.search,
+					step: searchParams.step,
+					statusFilter: newStatus,
+				},
+			});
+		} else {
+			setClientStatusFilter(newStatus);
+			setClientPage(1);
+		}
+	};
+
+	const handlePageChange = (newPage: number) => {
+		if (navigate && searchParams) {
+			void navigate({
+				to: "/admin/projects",
+				search: {
+					page: newPage,
+					pageSize: searchParams.pageSize,
+					search: searchParams.search,
+					step: searchParams.step,
+					statusFilter: searchParams.statusFilter,
+				},
+			});
+		} else {
+			setClientPage(newPage);
+		}
+	};
+
+	const handlePageSizeChange = (newPageSize: number) => {
+		if (navigate && searchParams) {
+			void navigate({
+				to: "/admin/projects",
+				search: {
+					page: 1,
+					pageSize: newPageSize,
+					search: searchParams.search,
+					step: searchParams.step,
+					statusFilter: searchParams.statusFilter,
+				},
+			});
+		} else {
+			setClientPageSize(newPageSize);
+			setClientPage(1);
+		}
+	};
+
+	// Determine displayed rows, totalCount, and pagination data
+	let displayedProjects: AdminProjectItem[] = [];
+	let totalCount = 0;
+	let page = 1;
+	let pageSize = 20;
+	let totalPages = 1;
+
+	if (projectsResult) {
+		displayedProjects = projectsResult.projects;
+		totalCount = projectsResult.totalCount;
+		page = projectsResult.page;
+		pageSize = projectsResult.pageSize;
+		totalPages = projectsResult.totalPages;
+	} else {
+		// Client-side fallback if rendered without server projectsResult
+		const source = projects ?? [];
+		const filtered = source.filter((proj) => {
 			const q = search.toLowerCase();
 			const matchesSearch =
 				!search ||
@@ -46,15 +187,44 @@ export function AdminProjectsView({
 				proj.userName?.toLowerCase().includes(q) ||
 				proj.userEmail?.toLowerCase().includes(q);
 
-			const matchesStep = stepFilter === "all" || proj.step === stepFilter;
+			const projStep = proj.step ?? "prd";
+			const matchesStep = activeStep === "all" || projStep === activeStep;
 
-			return matchesSearch && matchesStep;
-		},
+			const isDeleted = proj.deletedAt !== null && proj.deletedAt !== undefined;
+			const matchesStatus =
+				activeStatusFilter === "all"
+					? true
+					: activeStatusFilter === "deleted"
+						? isDeleted
+						: !isDeleted;
+
+			return matchesSearch && matchesStep && matchesStatus;
+		});
+
+		totalCount = filtered.length;
+		page = clientPage;
+		pageSize = clientPageSize;
+		totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+		const offset = (page - 1) * pageSize;
+		displayedProjects = filtered.slice(offset, offset + pageSize);
+	}
+
+	// Calculate accurate KPI values (preferring server aggregated stats)
+	const allFallbackProjects = projects ?? projectsResult?.projects ?? [];
+	const activeFallbackProjects = allFallbackProjects.filter(
+		(p) => !p.deletedAt,
 	);
-
-	const prdCount = normalizedProjects.filter((p) => p.step === "prd").length;
-	const acCount = normalizedProjects.filter((p) => p.step === "ac").length;
-	const taskCount = normalizedProjects.filter((p) => p.step === "task").length;
+	const totalProjectsCount =
+		stats?.totalProjects ?? activeFallbackProjects.length;
+	const prdCount =
+		stats?.prdCount ??
+		activeFallbackProjects.filter((p) => (p.step ?? "prd") === "prd").length;
+	const acCount =
+		stats?.acCount ??
+		activeFallbackProjects.filter((p) => p.step === "ac").length;
+	const taskCount =
+		stats?.taskCount ??
+		activeFallbackProjects.filter((p) => p.step === "task").length;
 
 	return (
 		<div className="mx-auto max-w-7xl space-y-8 font-inter">
@@ -84,8 +254,8 @@ export function AdminProjectsView({
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<AdminMetricCard
 					label="Total Proyek"
-					value={projects.length}
-					subtext="Proyek dibuat di workspace"
+					value={totalProjectsCount}
+					subtext="Proyek aktif di workspace"
 					icon={GitBranchIcon}
 				/>
 				<AdminMetricCard
@@ -108,7 +278,7 @@ export function AdminProjectsView({
 				/>
 			</div>
 
-			{/* Filters */}
+			{/* Filters & Search Toolbar */}
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div className="relative flex-1 max-w-md">
 					<Icon
@@ -125,28 +295,61 @@ export function AdminProjectsView({
 					/>
 				</div>
 
-				<div className="flex rounded-lg border border-graphite bg-charcoal p-0.5">
-					{(
-						[
-							{ id: "all", label: "Semua Tahap" },
-							{ id: "prd", label: "PRD" },
-							{ id: "ac", label: "AC" },
-							{ id: "task", label: "Task" },
-						] as const
-					).map((tab) => (
-						<button
-							key={tab.id}
-							type="button"
-							onClick={() => setStepFilter(tab.id)}
-							className={`rounded-md px-3 py-1.5 text-xs font-[510] transition-colors ${
-								stepFilter === tab.id
-									? "bg-snow text-onyx shadow-sm"
-									: "text-fog hover:text-snow"
-							}`}
-						>
-							{tab.label}
-						</button>
-					))}
+				<div className="flex flex-wrap items-center gap-2">
+					{/* Stage Selector */}
+					<div className="flex rounded-lg border border-graphite bg-charcoal p-0.5">
+						{(
+							[
+								{ id: "all", label: "Semua Tahap" },
+								{ id: "prd", label: "PRD" },
+								{ id: "ac", label: "AC" },
+								{ id: "task", label: "Task" },
+							] as const
+						).map((tab) => (
+							<button
+								key={tab.id}
+								type="button"
+								onClick={() => handleStepChange(tab.id)}
+								className={`rounded-md px-3 py-1.5 text-xs font-[510] transition-colors ${
+									activeStep === tab.id
+										? "bg-snow text-onyx shadow-sm"
+										: "text-fog hover:text-snow"
+								}`}
+							>
+								{tab.label}
+							</button>
+						))}
+					</div>
+
+					{/* Deletion Audit Filter */}
+					<select
+						value={activeStatusFilter}
+						onChange={(e) =>
+							handleStatusFilterChange(
+								e.target.value as "active" | "deleted" | "all",
+							)
+						}
+						aria-label="Filter status proyek"
+						className="rounded-lg border border-graphite bg-charcoal px-2.5 py-1.5 text-xs font-[510] text-snow focus:border-fog/40 focus:outline-none"
+					>
+						<option value="active">Aktif</option>
+						<option value="deleted">Terhapus</option>
+						<option value="all">Semua Status</option>
+					</select>
+
+					{/* Page Size Selector */}
+					<select
+						value={pageSize}
+						onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+						aria-label="Baris per halaman"
+						className="rounded-lg border border-graphite bg-charcoal px-2.5 py-1.5 text-xs font-[510] text-snow focus:border-fog/40 focus:outline-none"
+					>
+						{[10, 20, 50, 100].map((size) => (
+							<option key={size} value={size}>
+								{size} / halaman
+							</option>
+						))}
+					</select>
 				</div>
 			</div>
 
@@ -165,7 +368,7 @@ export function AdminProjectsView({
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-graphite">
-							{filteredProjects.length === 0 ? (
+							{displayedProjects.length === 0 ? (
 								<tr>
 									<td
 										colSpan={6}
@@ -175,77 +378,24 @@ export function AdminProjectsView({
 									</td>
 								</tr>
 							) : (
-								filteredProjects.map((proj: AdminProjectItem) => {
-									const stepBadgeColor =
-										proj.step === "task"
-											? "bg-indigo-500/10 text-indigo-300 border-indigo-500/20"
-											: proj.step === "ac"
-												? "bg-purple-500/10 text-purple-300 border-purple-500/20"
-												: "bg-blue-500/10 text-blue-300 border-blue-500/20";
-
-									return (
-										<tr
-											key={proj.id}
-											className="transition-colors hover:bg-white/[0.02]"
-										>
-											<td className="px-5 py-3.5">
-												<div className="font-medium text-snow">{proj.name}</div>
-												{proj.description && (
-													<div className="mt-0.5 line-clamp-1 max-w-xs text-[11px] text-fog">
-														{proj.description}
-													</div>
-												)}
-											</td>
-											<td className="px-5 py-3.5">
-												<div className="font-medium text-snow">
-													{proj.userName ?? "Tanpa Nama"}
-												</div>
-												<div className="text-[11px] text-fog">
-													{proj.userEmail ?? "-"}
-												</div>
-											</td>
-											<td className="px-5 py-3.5">
-												<span
-													className={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-semibold uppercase ${stepBadgeColor}`}
-												>
-													{proj.step ?? "PRD"}
-												</span>
-											</td>
-											<td className="px-5 py-3.5">
-												<span className="inline-flex items-center rounded bg-white/5 px-2 py-0.5 text-[10px] font-medium text-mist capitalize">
-													{proj.status ?? "draft"}
-												</span>
-											</td>
-											<td className="px-5 py-3.5 text-fog">
-												{proj.createdAt
-													? new Intl.DateTimeFormat("id-ID", {
-															day: "numeric",
-															month: "short",
-															year: "numeric",
-														}).format(new Date(proj.createdAt))
-													: "-"}
-											</td>
-											<td className="px-5 py-3.5 text-right">
-												<Link
-													to={getProjectTargetRoute(proj.step)}
-													params={{ id: proj.id }}
-													className="inline-flex items-center gap-1.5 rounded-md border border-graphite bg-white/5 px-2.5 py-1 text-[11px] font-medium text-snow transition-colors hover:bg-white/10 hover:border-fog/40"
-												>
-													<span>Buka</span>
-													<Icon
-														icon={LinkSquare02Icon}
-														size={12}
-														className="text-fog"
-													/>
-												</Link>
-											</td>
-										</tr>
-									);
-								})
+								displayedProjects.map((proj: AdminProjectItem) => (
+									<AdminProjectRowItem key={proj.id} proj={proj} />
+								))
 							)}
 						</tbody>
 					</table>
 				</div>
+
+				{/* Shared Admin Pagination */}
+				<AdminPagination
+					page={page}
+					pageSize={pageSize}
+					totalCount={totalCount}
+					totalPages={totalPages}
+					onPageChange={handlePageChange}
+					onPageSizeChange={handlePageSizeChange}
+					entityName="proyek"
+				/>
 			</div>
 		</div>
 	);
