@@ -19,10 +19,10 @@ import {
 	CODEBASE_LIBRARY_LABEL,
 	type CodebaseLibraryItem,
 	filterLibraryItems,
-	NEW_REPOSITORY_HREF,
 	resolveLibraryItemStatus,
 } from "@/features/codebase/services/library";
 import { requestCodebaseBulkDelete } from "@/features/codebase/services/library-delete-client";
+import { NEW_REPOSITORY_START_SEARCH } from "@/features/codebase/services/onboarding-intent";
 import { clearPlanCodebasePointerIfMatches } from "@/features/codebase/services/plan-storage";
 import {
 	CODEBASE_LIBRARY_PAGE_SIZE,
@@ -187,7 +187,8 @@ export function CodebaseLibraryView({
 						</p>
 					</div>
 					<Link
-						to={NEW_REPOSITORY_HREF}
+						to="/plan/codebase"
+						search={NEW_REPOSITORY_START_SEARCH}
 						className="btn-primary inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
 						+ Hubungkan repository

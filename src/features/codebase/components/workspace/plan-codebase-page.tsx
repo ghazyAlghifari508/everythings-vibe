@@ -12,6 +12,7 @@ import { ScreenConnect } from "@/features/codebase/components/workspace/screen-c
 import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/analysis";
 import type { AnalysisCreditStatus } from "@/features/codebase/services/analysis-credit-policy";
 import { CODEBASE_ONBOARDING_LABEL } from "@/features/codebase/services/library";
+import type { PlanCodebaseIntent } from "@/features/codebase/services/onboarding-intent";
 import {
 	type PlanCodebaseStep,
 	readPlanCodebasePointer,
@@ -39,7 +40,12 @@ function resolveCreditNote(status: AnalysisCreditStatus | null): string | null {
 	return `Analisis hingga ${status.maximumCredits} kredit · ${status.availableCredits} kredit tersedia.`;
 }
 
-export function PlanCodebasePage() {
+export function PlanCodebasePage({
+	intent,
+}: {
+	/** Navigation intent from the route search param; absent on a bare visit. */
+	intent?: PlanCodebaseIntent;
+}) {
 	const navigate = useNavigate();
 	const step = useUIStore((s) => s.codebasePlanStep);
 	const setStep = useUIStore((s) => s.setCodebasePlanStep);
@@ -58,7 +64,7 @@ export function PlanCodebasePage() {
 		creditStatus,
 		retrySession,
 		refreshCreditStatus,
-	} = useCodebaseOnboarding({ analysisState, step, setStep });
+	} = useCodebaseOnboarding({ analysisState, step, setStep, intent });
 
 	const readiness = resolveOnboardingReadiness({
 		snapshotId: lastStatus?.snapshotId ?? null,
@@ -106,7 +112,10 @@ export function PlanCodebasePage() {
 	const activeStep: PlanCodebaseStep =
 		step === "summary" && !canContinueToSummary ? "sync" : step;
 
-	const isRecovering = !codebase && Boolean(readPlanCodebasePointer());
+	// A fresh-start intent never shows the recovery loading card: there is no
+	// attempt to recover, so the screen must not imply one.
+	const isRecovering =
+		intent !== "new" && !codebase && Boolean(readPlanCodebasePointer());
 	const onboardingFailed = !codebase && !isStarting && error !== null;
 
 	const lockedPrompt = useMemo<LockedPromptState | null>(

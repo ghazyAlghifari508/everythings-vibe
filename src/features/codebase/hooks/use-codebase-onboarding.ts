@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCodebaseSyncStatus } from "@/features/codebase/hooks/use-codebase-sync-status";
 import { useCodebaseSyncStream } from "@/features/codebase/hooks/use-codebase-sync-stream";
+import type { PlanCodebaseIntent } from "@/features/codebase/services/onboarding-intent";
 import {
 	clearPlanCodebaseProjectPointer,
+	clearPlanOnboardingPointers,
 	type PlanCodebaseStep,
 	readPlanCodebasePointer,
 	storePlanCodebasePointer,
@@ -43,10 +45,17 @@ export function useCodebaseOnboarding({
 	analysisState,
 	step,
 	setStep,
+	intent,
 }: {
 	analysisState: OnboardingAnalysisState;
 	step: PlanCodebaseStep;
 	setStep: (step: PlanCodebaseStep) => void;
+	/**
+	 * Navigation intent from the route search param. `"new"` is an explicit
+	 * fresh start and never inherits a previous attempt's visible state;
+	 * `"resume"` and an absent intent both recover from the stored pointer.
+	 */
+	intent?: PlanCodebaseIntent;
 }) {
 	const {
 		setFeatureProjectId,
@@ -119,9 +128,9 @@ export function useCodebaseOnboarding({
 		setStep("sync");
 	}, [setStep]);
 
-	// Persist the navigation intent, never the domain state: a refresh returns
-	// the user to the screen they were reading, and recovery re-validates it
-	// against the server snapshot instead of trusting it.
+	// Persist the step, never the domain state: a refresh returns the user to
+	// the screen they were reading, and recovery re-validates it against the
+	// server snapshot instead of trusting it.
 	useEffect(() => {
 		if (!codebase) return;
 		storePlanCodebaseStepPointer(step);
@@ -141,6 +150,27 @@ export function useCodebaseOnboarding({
 		},
 		[setAnalysis, setAnalysisError, analysisAttemptedFor],
 	);
+
+	// Explicit fresh start: drop the browser pointers to any previous attempt and
+	// every piece of visible state derived from it, so nothing from the old
+	// repository can paint onto the new session. The backend keeps the old
+	// session and snapshot untouched for History — only the browser's pointer to
+	// it is forgotten.
+	const resetForFreshStart = useCallback(() => {
+		clearPlanOnboardingPointers();
+		setRecoveredStatus(null);
+		setActiveSessionId(null);
+		setFeatureProjectId(null);
+		setAnalysis(null);
+		setAnalysisError(null);
+		analysisAttemptedFor.current = null;
+		setError(null);
+	}, [
+		setAnalysis,
+		setAnalysisError,
+		setFeatureProjectId,
+		analysisAttemptedFor,
+	]);
 
 	const refreshCreditStatus = useCallback(async () => {
 		if (queryInFlight.current) return;
@@ -214,6 +244,15 @@ export function useCodebaseOnboarding({
 	useEffect(() => {
 		if (autoInitAttempted.current) return;
 		autoInitAttempted.current = true;
+		// An explicit "Hubungkan repository" visit is a fresh start: there is
+		// nothing to recover, and inheriting the previous attempt is exactly the
+		// mixed old/new state this flow must never render. The eligibility check
+		// then prepares a brand new session (see the auto-start effect below).
+		if (intent === "new") {
+			resetForFreshStart();
+			void refreshCreditStatus();
+			return;
+		}
 		// Recovery reads persisted work; a fresh start resolves eligibility first
 		// and then prepares its own session (see the auto-start effect below).
 		if (!readPlanCodebasePointer()) {
@@ -226,7 +265,7 @@ export function useCodebaseOnboarding({
 				await refreshCreditStatus();
 			}
 		})();
-	}, [recoverCodebase, refreshCreditStatus]);
+	}, [intent, recoverCodebase, refreshCreditStatus, resetForFreshStart]);
 
 	useEffect(() => {
 		if (codebase || isStarting || autoStartAttempted.current) return;
@@ -241,6 +280,7 @@ export function useCodebaseOnboarding({
 			await refreshCreditStatus();
 			return;
 		}
+		// A retry continues an existing repository context, not a fresh start.
 		setError(null);
 		setIsStarting(true);
 		try {

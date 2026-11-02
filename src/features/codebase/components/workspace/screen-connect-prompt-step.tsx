@@ -1,9 +1,6 @@
 "use client";
 
-import {
-	Copy01Icon,
-	Tick01Icon,
-} from "@hugeicons/core-free-icons";
+import { Copy01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Spinner } from "@/components/ui/spinner";
@@ -31,6 +28,13 @@ interface ScreenConnectPromptStepProps {
 	payload: SyncPromptPayload | null;
 	isStarting: boolean;
 	status?: SyncStatusResponse | null;
+	/**
+	 * The server persisted a snapshot, so the CLI already ran. A replacement
+	 * credential would be a second upload for an upload that already succeeded —
+	 * exactly the mixed state the user reported — so the prompt row states the
+	 * transport is done instead of offering a new session.
+	 */
+	transportComplete?: boolean;
 	onRequestNewToken?: () => void;
 	lockedPrompt?: LockedPromptState | null;
 	/** Non-secret rate/saldo disclosure rendered outside the prompt box. */
@@ -42,6 +46,7 @@ export function ScreenConnectPromptStep({
 	payload,
 	isStarting,
 	status,
+	transportComplete = false,
 	onRequestNewToken,
 	lockedPrompt = null,
 	creditNote = null,
@@ -130,6 +135,17 @@ export function ScreenConnectPromptStep({
 								</p>
 							)}
 						</>
+					) : transportComplete ? (
+						<div
+							data-testid="prompt-transport-done"
+							className="flex min-h-[190px] flex-col items-center justify-center gap-2 py-6 text-center font-sans"
+						>
+							<Icon icon={Tick01Icon} size={14} className="text-emerald-400" />
+							<p className="max-w-[38ch] text-xs leading-relaxed text-fog">
+								Prompt sudah dijalankan dan source code tersimpan. Tidak ada
+								instruksi baru yang perlu dijalankan.
+							</p>
+						</div>
 					) : isStarting ? (
 						<div className="flex min-h-[190px] items-center justify-center gap-2 py-6 font-sans text-xs text-fog">
 							<Spinner size={14} className="text-blue-400" />

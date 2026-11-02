@@ -120,6 +120,7 @@ export function ScreenConnect({
 						payload={payload}
 						isStarting={isStarting}
 						status={status}
+						transportComplete={stageView.syncComplete}
 						onRequestNewToken={onRequestNewToken}
 						lockedPrompt={lockedPrompt}
 						creditNote={creditNote}

@@ -583,6 +583,38 @@ describe("Step 1 recovery affordances", () => {
 		expect(onRequestNewToken).toHaveBeenCalledTimes(1);
 	});
 
+	it("never offers a new session once the upload already completed", () => {
+		// The reported defect: the one-time credential cannot be restored after a
+		// refresh, so step 1 offered "Buat sesi baru" while step 3 reported the
+		// uploaded snapshot. Minting another session would re-upload a repository
+		// that already uploaded.
+		const onRequestNewToken = vi.fn();
+		const onRetryAnalysis = vi.fn();
+		renderConnect({
+			payload: null,
+			status: status({
+				status: "uploaded",
+				snapshotId: "snap_done",
+				fileCount: 4,
+				analysisAttemptStatus: "failed",
+			}),
+			onRequestNewToken,
+			onRetryAnalysis,
+		});
+		const renewal = [...container.querySelectorAll("button")].find((b) =>
+			/Buat sesi baru|Dapatkan token baru/i.test(b.textContent ?? ""),
+		);
+		expect(renewal).toBeUndefined();
+		expect(container.textContent).toContain("Prompt sudah dijalankan");
+		expect(onRequestNewToken).not.toHaveBeenCalled();
+		// The absent one-time token must not block analysis recovery: the failed
+		// attempt is still retryable against the snapshot that already uploaded.
+		const retryAnalysis = container.querySelector(
+			'[data-testid="retry-analysis-button"]',
+		);
+		expect(retryAnalysis).not.toBeNull();
+	});
+
 	it("reports a failed attempt once, with the way out, and no invented stages", () => {
 		const onRetrySync = vi.fn();
 		renderConnect({
