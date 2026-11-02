@@ -139,7 +139,6 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 				onOpenChange={onOpenChange}
 				selectedThemeId={null}
 				selectedScrapeId={null}
-				customFilename={null}
 				scrapeSources={[]}
 				onSelectTheme={onSelectTheme}
 				onSelectCustom={vi.fn()}
@@ -194,7 +193,6 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 				onOpenChange={onOpenChange}
 				selectedThemeId="workspace"
 				selectedScrapeId={null}
-				customFilename={null}
 				scrapeSources={[]}
 				onSelectTheme={onSelectTheme}
 				onSelectCustom={vi.fn()}
@@ -242,7 +240,6 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 				onOpenChange={vi.fn()}
 				selectedThemeId={null}
 				selectedScrapeId={null}
-				customFilename={null}
 				scrapeSources={[]}
 				onSelectTheme={vi.fn()}
 				onSelectCustom={vi.fn()}
@@ -271,7 +268,6 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 				onOpenChange={vi.fn()}
 				selectedThemeId={null}
 				selectedScrapeId={null}
-				customFilename={null}
 				scrapeSources={[]}
 				onSelectTheme={vi.fn()}
 				onSelectCustom={vi.fn()}
@@ -297,7 +293,7 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 	// 12. Mobile grid rules exist
 	it("12. Theme grid enforces responsive columns (1 on mobile, 2 on tablet, 3 on desktop)", () => {
 		const { container } = render(
-			<StudioDesignThemePanel activeThemeId={null} onSelectTheme={vi.fn()} />,
+			<StudioDesignThemePanel activeThemeId={null} onToggleTheme={vi.fn()} />,
 		);
 
 		const grid = container.querySelector(".grid");
@@ -311,7 +307,7 @@ describe("TASK 07 — Nine Themes, Standardized Previews, and Fullscreen Picker"
 	it("13. No duplicate preview components remain; all presets use the unified dashboard preview", () => {
 		const onSelect = vi.fn();
 		render(
-			<StudioDesignThemePanel activeThemeId={null} onSelectTheme={onSelect} />,
+			<StudioDesignThemePanel activeThemeId={null} onToggleTheme={onSelect} />,
 		);
 
 		// Exactly 9 theme buttons

@@ -331,7 +331,6 @@ export function StudioLandingPage({
 									: null
 							}
 							onOpenDesignPicker={() => setIsPickerOpen(true)}
-							onRemoveReference={() => setStagedReference(null)}
 							prd={stagedPrd}
 							onPrdChange={setStagedPrd}
 							loading={loading}
@@ -358,9 +357,6 @@ export function StudioLandingPage({
 				}
 				selectedScrapeId={
 					stagedReference?.kind === "scrape" ? stagedReference.id : null
-				}
-				customFilename={
-					stagedReference?.kind === "custom" ? stagedReference.filename : null
 				}
 				scrapeSources={scrapeSources}
 				onSelectTheme={handleSelectTheme}

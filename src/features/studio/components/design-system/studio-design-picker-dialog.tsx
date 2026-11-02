@@ -1,7 +1,7 @@
 "use client";
 
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -44,6 +44,12 @@ const EMPTY_CUSTOM: StudioDesignCustomState = {
 	logoError: null,
 };
 
+// ponytail: discriminated 3-state draft (pristine/selected/cleared) covers single-theme toggle; upgrade to full draft record when multiple tabs share uncommitted state.
+type DraftThemeState =
+	| { status: "pristine" }
+	| { status: "selected"; themeId: string }
+	| { status: "cleared" };
+
 // Visual design picker: curated themes, coming-soon templates, and a compact
 // custom DESIGN.md upload. Selecting never generates; the parent stages the
 // reference and only sends it on explicit submit.
@@ -52,7 +58,6 @@ export function StudioDesignPickerDialog({
 	onOpenChange,
 	selectedThemeId,
 	selectedScrapeId,
-	customFilename,
 	scrapeSources,
 	onSelectTheme,
 	onSelectCustom,
@@ -63,7 +68,6 @@ export function StudioDesignPickerDialog({
 	onOpenChange: (open: boolean) => void;
 	selectedThemeId: string | null;
 	selectedScrapeId: string | null;
-	customFilename: string | null;
 	scrapeSources: ScrapeDesignSource[];
 	onSelectTheme: (presetId: string) => void;
 	onSelectCustom: (input: {
@@ -75,10 +79,24 @@ export function StudioDesignPickerDialog({
 	onClear: () => void;
 }) {
 	const [tab, setTab] = useState<DesignPickerTab>("tema");
-	const [pendingThemeId, setPendingThemeId] = useState<string | null>(null);
+	const [draftThemeState, setDraftThemeState] = useState<DraftThemeState>({
+		status: "pristine",
+	});
 	const [custom, setCustom] = useState<StudioDesignCustomState>(EMPTY_CUSTOM);
 
-	const activeThemeId = pendingThemeId ?? selectedThemeId;
+	const activeThemeId =
+		draftThemeState.status === "pristine"
+			? selectedThemeId
+			: draftThemeState.status === "selected"
+				? draftThemeState.themeId
+				: null;
+
+	useEffect(() => {
+		if (open) {
+			setDraftThemeState({ status: "pristine" });
+			setCustom(EMPTY_CUSTOM);
+		}
+	}, [open]);
 	const customTokens = custom.mdText
 		? extractDesignSystemTokens(custom.mdText)
 		: null;
@@ -101,6 +119,41 @@ export function StudioDesignPickerDialog({
 		setCustom(EMPTY_CUSTOM);
 	}
 
+	function handleOpenChange(nextOpen: boolean) {
+		if (!nextOpen) {
+			setDraftThemeState({ status: "pristine" });
+			resetCustom();
+		}
+		onOpenChange(nextOpen);
+	}
+
+	function handleToggleTheme(presetId: string) {
+		if (activeThemeId === presetId) {
+			setDraftThemeState({ status: "cleared" });
+		} else {
+			setDraftThemeState({ status: "selected", themeId: presetId });
+		}
+	}
+
+	function handleCancel() {
+		setDraftThemeState({ status: "pristine" });
+		resetCustom();
+		onOpenChange(false);
+	}
+
+	function handleApplyTheme() {
+		if (activeThemeId) {
+			const md = getStudioPresetDesignMd(activeThemeId);
+			if (!md) return;
+			onSelectTheme(activeThemeId);
+		} else {
+			onClear();
+		}
+		setDraftThemeState({ status: "pristine" });
+		resetCustom();
+		onOpenChange(false);
+	}
+
 	function moveTab(delta: number) {
 		const nextIdx =
 			(TABS.findIndex((entry) => entry.id === tab) + delta + TABS.length) %
@@ -109,7 +162,7 @@ export function StudioDesignPickerDialog({
 	}
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
+		<Dialog open={open} onOpenChange={handleOpenChange}>
 			<DialogContent
 				hideCloseButton
 				className="fixed inset-0 !inset-0 left-0 top-0 !left-0 !top-0 !translate-none !translate-x-0 !translate-y-0 w-screen h-dvh max-h-dvh max-w-none !m-0 rounded-none sm:rounded-none !rounded-none border-0 !border-0 shadow-none !shadow-none flex flex-col gap-0 !gap-0 overflow-hidden p-0 !p-0 bg-obsidian"
@@ -168,7 +221,7 @@ export function StudioDesignPickerDialog({
 						{tab === "tema" ? (
 							<StudioDesignThemePanel
 								activeThemeId={activeThemeId}
-								onSelectTheme={setPendingThemeId}
+								onToggleTheme={handleToggleTheme}
 							/>
 						) : null}
 
@@ -181,6 +234,10 @@ export function StudioDesignPickerDialog({
 									selectedId={selectedScrapeId}
 									onSelect={(source) => {
 										onSelectScrape(source);
+										onOpenChange(false);
+									}}
+									onDeselect={() => {
+										onClear();
 										onOpenChange(false);
 									}}
 								/>
@@ -207,65 +264,33 @@ export function StudioDesignPickerDialog({
 							</div>
 						) : null}
 
-						<DialogFooter className="mt-4 flex flex-row items-center justify-between gap-2 border-t border-graphite/40 pt-4 sm:flex-row sm:justify-between">
-							{selectedThemeId || customFilename || selectedScrapeId ? (
-								<button
-									type="button"
-									onClick={() => {
-										resetCustom();
-										onClear();
-										onOpenChange(false);
-									}}
-									className="rounded-lg px-3 py-2 text-xs font-semibold text-fog hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									Lepas referensi
-								</button>
-							) : (
-								<span />
-							)}
-							<span className="flex items-center gap-2">
+						<DialogFooter className="mt-4 flex flex-row items-center justify-end gap-2 border-t border-graphite/40 pt-4 sm:flex-row sm:justify-end">
+							<Button type="button" variant="secondary" onClick={handleCancel}>
+								Batal
+							</Button>
+							{tab === "tema" ? (
+								<Button type="button" onClick={handleApplyTheme}>
+									{activeThemeId ? "Gunakan Tema" : "Gunakan tanpa tema"}
+								</Button>
+							) : null}
+							{tab === "milik" ? (
 								<Button
 									type="button"
-									variant="secondary"
-									onClick={() => onOpenChange(false)}
+									disabled={!customValid}
+									onClick={() => {
+										if (!customValid || !custom.mdName) return;
+										onSelectCustom({
+											filename: custom.mdName,
+											designMd: custom.mdText,
+											logo: custom.logo,
+										});
+										resetCustom();
+										onOpenChange(false);
+									}}
 								>
-									Batal
+									Gunakan Desain Ini
 								</Button>
-								{tab === "tema" ? (
-									<Button
-										type="button"
-										disabled={!activeThemeId}
-										onClick={() => {
-											if (!activeThemeId) return;
-											const md = getStudioPresetDesignMd(activeThemeId);
-											if (!md) return;
-											onSelectTheme(activeThemeId);
-											setPendingThemeId(null);
-											onOpenChange(false);
-										}}
-									>
-										Gunakan Tema
-									</Button>
-								) : null}
-								{tab === "milik" ? (
-									<Button
-										type="button"
-										disabled={!customValid}
-										onClick={() => {
-											if (!customValid || !custom.mdName) return;
-											onSelectCustom({
-												filename: custom.mdName,
-												designMd: custom.mdText,
-												logo: custom.logo,
-											});
-											resetCustom();
-											onOpenChange(false);
-										}}
-									>
-										Gunakan Desain Ini
-									</Button>
-								) : null}
-							</span>
+							) : null}
 						</DialogFooter>
 					</div>
 				</div>
