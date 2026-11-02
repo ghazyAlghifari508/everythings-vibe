@@ -17,7 +17,11 @@ export const feedback = pgTable(
 		type: text("type").default("general"),
 		createdAt: timestamp("created_at").defaultNow(),
 	},
-	(t) => [index("feedback_user_id_idx").on(t.userId)],
+	(t) => [
+		index("feedback_user_id_idx").on(t.userId),
+		index("feedback_created_at_idx").on(t.createdAt),
+		index("feedback_type_idx").on(t.type),
+	],
 );
 
 // Error Reports
@@ -30,7 +34,10 @@ export const errorReports = pgTable(
 		context: text("context"),
 		createdAt: timestamp("created_at").defaultNow(),
 	},
-	(t) => [index("error_reports_user_id_idx").on(t.userId)],
+	(t) => [
+		index("error_reports_user_id_idx").on(t.userId),
+		index("error_reports_created_at_idx").on(t.createdAt),
+	],
 );
 
 // Rate Limits (kustom selain Better Auth)

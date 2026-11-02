@@ -103,6 +103,85 @@ export interface AdminErrorReportItem {
 	userName: string | null;
 }
 
+export interface AdminFeedbackListResult {
+	feedback: AdminFeedbackItem[];
+	totalCount: number;
+	page: number;
+	pageSize: number;
+	totalPages: number;
+}
+
+export interface AdminErrorReportsListResult {
+	errors: AdminErrorReportItem[];
+	totalCount: number;
+	page: number;
+	pageSize: number;
+	totalPages: number;
+}
+
+export interface AdminFeedbackStats {
+	totalItems: number;
+	generalCount: number;
+	featureCount: number;
+	bugCount: number;
+	feedbackTotal: number;
+	errorTotal: number;
+}
+
+export interface ListAdminFeedbackParams {
+	page?: number;
+	pageSize?: number;
+	limit?: number;
+	offset?: number;
+	search?: string;
+	type?: "all" | "bug" | "feature" | "general" | string;
+}
+
+export interface ListAdminErrorReportsParams {
+	page?: number;
+	pageSize?: number;
+	limit?: number;
+	offset?: number;
+	search?: string;
+}
+
+export const adminFeedbackSearchSchema = z.object({
+	tab: z.enum(["feedback", "errors"]).default("feedback").catch("feedback"),
+	page: z.coerce.number().int().positive().default(1).catch(1),
+	pageSize: z.coerce.number().int().positive().max(100).default(20).catch(20),
+	search: z.string().max(128).default("").catch(""),
+	type: z
+		.enum(["all", "bug", "feature", "general"])
+		.default("all")
+		.catch("all"),
+	errorPage: z.coerce.number().int().positive().optional().catch(undefined),
+	errorPageSize: z.coerce
+		.number()
+		.int()
+		.positive()
+		.max(100)
+		.optional()
+		.catch(undefined),
+	errorSearch: z.string().max(128).optional().catch(undefined),
+	feedbackPage: z.coerce.number().int().positive().optional().catch(undefined),
+	feedbackPageSize: z.coerce
+		.number()
+		.int()
+		.positive()
+		.max(100)
+		.optional()
+		.catch(undefined),
+	feedbackSearch: z.string().max(128).optional().catch(undefined),
+	feedbackType: z
+		.enum(["all", "bug", "feature", "general"])
+		.optional()
+		.catch(undefined),
+});
+
+export type AdminFeedbackSearchParams = z.infer<
+	typeof adminFeedbackSearchSchema
+>;
+
 export type AdminUserItem = typeof users.$inferSelect;
 export type AdminSubscriptionItem = typeof subscriptions.$inferSelect;
 
