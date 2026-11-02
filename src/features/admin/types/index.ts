@@ -31,6 +31,33 @@ export interface AdminProjectItem {
 	userName: string | null;
 	userEmail: string | null;
 	createdAt: Date | null;
+	deletedAt: Date | null;
+}
+
+export interface AdminProjectsListResult {
+	projects: AdminProjectItem[];
+	totalCount: number;
+	page: number;
+	pageSize: number;
+	totalPages: number;
+}
+
+export interface AdminProjectStats {
+	totalProjects: number;
+	prdCount: number;
+	acCount: number;
+	taskCount: number;
+	deletedCount?: number;
+}
+
+export interface ListAdminProjectsParams {
+	page?: number;
+	pageSize?: number;
+	limit?: number;
+	offset?: number;
+	search?: string;
+	step?: string;
+	statusFilter?: "active" | "deleted" | "all" | string;
 }
 
 export interface AdminFeedbackItem {
@@ -97,6 +124,26 @@ export const adminUsersSearchSchema = z.object({
 });
 
 export type AdminUsersSearchParams = z.infer<typeof adminUsersSearchSchema>;
+
+export const adminProjectsSearchSchema = z.object({
+	page: z.coerce.number().int().min(1).default(1).catch(1),
+	pageSize: z.coerce
+		.number()
+		.int()
+		.refine((v) => [10, 20, 50, 100].includes(v))
+		.default(20)
+		.catch(20),
+	search: z.string().trim().max(128).default("").catch(""),
+	step: z.string().trim().max(32).default("all").catch("all"),
+	statusFilter: z
+		.enum(["active", "deleted", "all"])
+		.default("active")
+		.catch("active"),
+});
+
+export type AdminProjectsSearchParams = z.infer<
+	typeof adminProjectsSearchSchema
+>;
 
 export interface AdminDashboardMetrics {
 	usersCount: number;
