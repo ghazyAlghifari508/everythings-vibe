@@ -2,15 +2,27 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	resolveScrapeOrbState,
 	SCRAPE_ACTIVITY_DONE_COPY,
 	SCRAPE_ACTIVITY_WAITING_COPY,
 	ScrapeActivityLine,
 } from "../components/scrape-progress-activity";
+import { installScrapeOrbEnvironment } from "./scrape-activity-orb-env";
+
+installScrapeOrbEnvironment();
 
 afterEach(() => {
 	cleanup();
 	vi.useRealTimers();
 });
+
+function orbState(container: HTMLElement): string | null {
+	return (
+		container
+			.querySelector("[data-activity-orb]")
+			?.getAttribute("data-activity-orb") ?? null
+	);
+}
 
 function timerText(container: HTMLElement): string | null {
 	return container.querySelector('[role="timer"]')?.textContent ?? null;
@@ -23,7 +35,7 @@ function advance(ms: number) {
 }
 
 describe("queued runs stay honest and still", () => {
-	it("waits with copy and no loading accent or clock", () => {
+	it("waits with honest copy and a waiting orb, no spinner and no clock", () => {
 		const { container } = render(
 			<ScrapeActivityLine
 				status="queued"
@@ -33,6 +45,8 @@ describe("queued runs stay honest and still", () => {
 		const line = container.querySelector("[data-activity-line]");
 		expect(line?.getAttribute("data-activity-state")).toBe("queued");
 		expect(line?.textContent).toContain(SCRAPE_ACTIVITY_WAITING_COPY);
+		expect(orbState(container)).toBe("waiting");
+		expect(container.querySelector("[data-activity-orb] > svg")).not.toBeNull();
 		expect(container.querySelector("[data-activity-spinner]")).toBeNull();
 		expect(container.querySelector("[data-working]")).toBeNull();
 		expect(container.querySelector('[role="timer"]')).toBeNull();
@@ -40,7 +54,7 @@ describe("queued runs stay honest and still", () => {
 });
 
 describe("running runs report the backend activity", () => {
-	it("shows one circular accent beside the reported activity", () => {
+	it("shows one orb beside the reported activity and no spinner", () => {
 		const { container } = render(
 			<ScrapeActivityLine
 				status="extracting"
@@ -53,10 +67,26 @@ describe("running runs report the backend activity", () => {
 				.querySelector("[data-activity-state]")
 				?.getAttribute("data-activity-state"),
 		).toBe("running");
+		expect(container.querySelectorAll("[data-activity-orb]")).toHaveLength(1);
+		expect(orbState(container)).toBe("working");
+		expect(container.querySelector("[data-activity-orb] > svg")).not.toBeNull();
 		expect(container.querySelectorAll("[data-activity-spinner]")).toHaveLength(
-			1,
+			0,
 		);
 		expect(container.textContent).toContain("Menyusun analisis desain");
+	});
+
+	it("keeps every spinner out of the activity line", () => {
+		const { container } = render(
+			<ScrapeActivityLine
+				status="generating"
+				activity="Menyusun analisis desain"
+			/>,
+		);
+		const line = container.querySelector("[data-activity-line]");
+		expect(line?.querySelector('[class*="animate-spin"]')).toBeNull();
+		expect(line?.querySelector("[data-activity-spinner]")).toBeNull();
+		expect(line?.querySelector("[data-activity-orb]")).not.toBeNull();
 	});
 
 	it("shimmers the activity text only while the stage is running", () => {
@@ -88,8 +118,10 @@ describe("running runs report the backend activity", () => {
 		);
 		expect(container.textContent).toContain("Memeriksa gaya dan komponen");
 		expect(container.textContent).not.toContain("Mengambil tampilan halaman");
+		// A new activity string must not spawn a second indicator.
+		expect(container.querySelectorAll("[data-activity-orb]")).toHaveLength(1);
 		expect(container.querySelectorAll("[data-activity-spinner]")).toHaveLength(
-			1,
+			0,
 		);
 	});
 
@@ -240,6 +272,7 @@ describe("terminal and stalled runs stop animating", () => {
 		expect(line?.getAttribute("data-activity-state")).toBe("completed");
 		expect(line?.textContent).toContain(SCRAPE_ACTIVITY_DONE_COPY);
 		expect(container.querySelector("[data-activity-spinner]")).toBeNull();
+		expect(container.querySelector("[data-activity-orb]")).toBeNull();
 		expect(
 			container.querySelector("[data-activity-done-marker]"),
 		).not.toBeNull();
@@ -253,6 +286,7 @@ describe("terminal and stalled runs stop animating", () => {
 		);
 		expect(container.querySelector("[data-activity-line]")).toBeNull();
 		expect(container.querySelector("[data-activity-spinner]")).toBeNull();
+		expect(container.querySelector("[data-activity-orb]")).toBeNull();
 	});
 
 	it("reports the server stall instead of shimmering", () => {
@@ -270,7 +304,68 @@ describe("terminal and stalled runs stop animating", () => {
 		expect(line?.getAttribute("data-activity-state")).toBe("stalled");
 		expect(line?.textContent).toBe(stall);
 		expect(container.querySelector("[data-activity-spinner]")).toBeNull();
+		// A stalled run is never dressed up as healthy reasoning.
+		expect(container.querySelector("[data-activity-orb]")).toBeNull();
 		expect(container.querySelector("[data-working]")).toBeNull();
 		expect(container.querySelector('[role="timer"]')).toBeNull();
+	});
+});
+
+describe("status to orb state mapping", () => {
+	it("maps each stage to the work that stage really does", () => {
+		expect(resolveScrapeOrbState("queued")).toBe("waiting");
+		expect(resolveScrapeOrbState("capturing")).toBe("using");
+		expect(resolveScrapeOrbState("extracting")).toBe("working");
+		expect(resolveScrapeOrbState("generating")).toBe("reasoning");
+		expect(resolveScrapeOrbState("saving")).toBe("working");
+	});
+
+	it("claims reasoning only for the AI synthesis stage", () => {
+		const reasoning = (
+			["queued", "capturing", "extracting", "generating", "saving"] as const
+		).filter((status) => resolveScrapeOrbState(status) === "reasoning");
+		expect(reasoning).toEqual(["generating"]);
+	});
+
+	it("leaves completed and failed without an orb", () => {
+		expect(resolveScrapeOrbState("completed")).toBeNull();
+		expect(resolveScrapeOrbState("failed")).toBeNull();
+	});
+
+	it("renders the mapped orb for every running stage", () => {
+		for (const [status, expected] of [
+			["capturing", "using"],
+			["extracting", "working"],
+			["generating", "reasoning"],
+			["saving", "working"],
+		] as const) {
+			const { container } = render(
+				<ScrapeActivityLine status={status} activity="Aktivitas" />,
+			);
+			expect(orbState(container)).toBe(expected);
+			cleanup();
+		}
+	});
+});
+
+describe("long-running work stays honest", () => {
+	it("keeps one real label and one clock for two minutes of synthesis", () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+		const { container } = render(
+			<ScrapeActivityLine
+				status="generating"
+				activity="Menyusun analisis desain"
+				stageStartedAt="2026-01-01T00:00:00.000Z"
+			/>,
+		);
+		advance(120_000);
+
+		// The label is the backend's own activity: it neither rotates on a timer
+		// nor drifts into invented sub-steps, and the orb keeps the same state.
+		expect(container.textContent).toContain("Menyusun analisis desain");
+		expect(container.querySelectorAll("[data-activity-orb]")).toHaveLength(1);
+		expect(orbState(container)).toBe("reasoning");
+		expect(timerText(container)).toBe("120.0s");
 	});
 });

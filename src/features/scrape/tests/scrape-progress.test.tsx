@@ -10,6 +10,9 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { imageResultCounts } from "@/features/scrape/utils/scrape-images";
 import { ScrapeProgress } from "../components/scrape-progress";
+import { installScrapeOrbEnvironment } from "./scrape-activity-orb-env";
+
+installScrapeOrbEnvironment();
 
 afterEach(() => {
 	cleanup();
@@ -281,7 +284,7 @@ describe("truthful activity", () => {
 		);
 	});
 
-	it("keeps one stage spinner and one activity accent, never a third", () => {
+	it("keeps one stage spinner and one activity orb, never a third", () => {
 		const { container } = render(
 			<ScrapeProgress
 				mode="html"
@@ -292,10 +295,11 @@ describe("truthful activity", () => {
 		expect(
 			container.querySelectorAll("[data-active-stage-spinner]"),
 		).toHaveLength(1);
-		// The live activity line carries its own circular accent (p1 target); the
-		// ladder spinner is untouched and nothing else claims to be loading.
+		// The live activity line carries its own orb (p6 target); the ladder
+		// spinner is untouched and nothing else claims to be loading.
+		expect(container.querySelectorAll("[data-activity-orb]")).toHaveLength(1);
 		expect(container.querySelectorAll("[data-activity-spinner]")).toHaveLength(
-			1,
+			0,
 		);
 		expect(activityArea(container)?.textContent).toContain(
 			"Menyiapkan hasil HTML",
@@ -597,7 +601,8 @@ describe("activity presentation per mode", () => {
 			/>,
 		);
 		const card = container.querySelector('[data-scrape-progress="images"]');
-		expect(card?.querySelectorAll("[data-activity-spinner]")).toHaveLength(1);
+		expect(card?.querySelectorAll("[data-activity-orb]")).toHaveLength(1);
+		expect(card?.querySelectorAll("[data-activity-spinner]")).toHaveLength(0);
 		expect(card?.querySelector("[data-activity-line]")?.textContent).toContain(
 			"Mengambil tampilan halaman",
 		);
@@ -617,6 +622,7 @@ describe("activity presentation per mode", () => {
 		expect(activity?.getAttribute("data-activity-state")).toBe("completed");
 		expect(activity?.textContent).toContain("Proses selesai");
 		expect(container.querySelector("[data-activity-spinner]")).toBeNull();
+		expect(container.querySelector("[data-activity-orb]")).toBeNull();
 		expect(
 			container.querySelectorAll("[data-active-stage-spinner]"),
 		).toHaveLength(0);
