@@ -2,7 +2,11 @@ export {
 	getAdminDashboardMetrics,
 	getAdminTrendMetrics,
 } from "./admin-dashboard-service";
-export { listErrorReports, listFeedback } from "./admin-feedback-service";
+export {
+	getAdminFeedbackStats,
+	listErrorReports,
+	listFeedback,
+} from "./admin-feedback-service";
 export {
 	getAdminProjectStats,
 	listAdminProjects,
