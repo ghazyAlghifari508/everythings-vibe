@@ -27,6 +27,7 @@ vi.mock("@tanstack/react-router", () => ({
 		</a>
 	),
 	useNavigate: () => mockNavigate,
+	useRouter: () => ({ invalidate: vi.fn() }),
 }));
 
 function makeMockFeedback(
@@ -430,5 +431,128 @@ describe("AdminFeedbackView Component", () => {
 		expect(container.textContent).toContain("1");
 		// 1 feedback bug + 1 error = 2 Bug & Crash
 		expect(container.textContent).toContain("2");
+	});
+
+	it("10. renders status badges and action menus in table rows", () => {
+		const items: AdminFeedbackItem[] = [
+			{
+				...makeMockFeedback(1, "general"),
+				handlingStatus: "new",
+				archivedAt: null,
+			},
+			{
+				...makeMockFeedback(2, "feature"),
+				handlingStatus: "in_progress",
+				archivedAt: null,
+			},
+			{
+				...makeMockFeedback(3, "bug"),
+				handlingStatus: "resolved",
+				archivedAt: null,
+			},
+			{
+				...makeMockFeedback(4, "general"),
+				handlingStatus: "resolved",
+				archivedAt: new Date("2026-03-01T12:00:00Z"),
+			},
+		];
+
+		act(() => {
+			root?.render(
+				<AdminFeedbackView
+					feedbackResult={{
+						feedback: items,
+						totalCount: 4,
+						page: 1,
+						pageSize: 20,
+						totalPages: 1,
+					}}
+					searchParams={{
+						tab: "feedback",
+						page: 1,
+						pageSize: 20,
+						search: "",
+						type: "all",
+						status: "all",
+						archiveFilter: "all",
+					}}
+				/>,
+			);
+		});
+
+		expect(container.textContent).toContain("Baru");
+		expect(container.textContent).toContain("Diproses");
+		expect(container.textContent).toContain("Selesai");
+		expect(container.textContent).toContain("Diarsipkan");
+		expect(container.textContent).toContain("Kelola");
+	});
+
+	it("11. navigating status and archive filter dropdowns calls navigate with expected search params", () => {
+		mockNavigate.mockClear();
+
+		act(() => {
+			root?.render(
+				<AdminFeedbackView
+					feedbackResult={{
+						feedback: [makeMockFeedback(1)],
+						totalCount: 1,
+						page: 1,
+						pageSize: 20,
+						totalPages: 1,
+					}}
+					searchParams={{
+						tab: "feedback",
+						page: 1,
+						pageSize: 20,
+						search: "",
+						type: "all",
+						status: "all",
+						archiveFilter: "active",
+					}}
+				/>,
+			);
+		});
+
+		const archiveSelect = container.querySelector(
+			'select[aria-label="Filter arsip"]',
+		) as HTMLSelectElement | null;
+		expect(archiveSelect).not.toBeNull();
+		if (archiveSelect) {
+			act(() => {
+				archiveSelect.value = "archived";
+				archiveSelect.dispatchEvent(new Event("change", { bubbles: true }));
+			});
+			expect(mockNavigate).toHaveBeenCalledWith(
+				expect.objectContaining({
+					search: expect.objectContaining({
+						archiveFilter: "archived",
+						feedbackArchiveFilter: "archived",
+						page: 1,
+					}),
+				}),
+			);
+		}
+
+		mockNavigate.mockClear();
+
+		const statusSelect = container.querySelector(
+			'select[aria-label="Filter status laporan"]',
+		) as HTMLSelectElement | null;
+		expect(statusSelect).not.toBeNull();
+		if (statusSelect) {
+			act(() => {
+				statusSelect.value = "resolved";
+				statusSelect.dispatchEvent(new Event("change", { bubbles: true }));
+			});
+			expect(mockNavigate).toHaveBeenCalledWith(
+				expect.objectContaining({
+					search: expect.objectContaining({
+						status: "resolved",
+						feedbackStatus: "resolved",
+						page: 1,
+					}),
+				}),
+			);
+		}
 	});
 });

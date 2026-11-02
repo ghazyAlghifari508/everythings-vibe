@@ -94,6 +94,8 @@ function createFeedbackTestDataset(): RawFeedbackRow[] {
 			userId,
 			message,
 			type,
+			handlingStatus: "new",
+			archivedAt: null,
 			createdAt,
 			userName,
 			userEmail,
@@ -132,6 +134,8 @@ function createErrorTestDataset(): RawErrorRow[] {
 			userId,
 			errorMessage,
 			context,
+			handlingStatus: "new",
+			archivedAt: null,
 			createdAt,
 			userName,
 			userEmail,
@@ -159,10 +163,37 @@ function filterErrors(predicate: unknown): RawErrorRow[] {
 }
 
 const mockDb = {
+	update: vi.fn((table: unknown) => ({
+		set: vi.fn((values: Record<string, unknown>) => ({
+			where: vi.fn((whereClause: unknown) => ({
+				returning: vi.fn(() => {
+					const isFeedback =
+						table === "feedback" ||
+						(typeof table === "object" &&
+							table !== null &&
+							"id" in table &&
+							(table as { id: string }).id === "feedback.id");
+					const targetList = isFeedback ? testFeedback : testErrors;
+					const index = targetList.findIndex(
+						whereClause as (r: unknown) => boolean,
+					);
+					const item = targetList[index];
+					if (!item) return Promise.resolve([]);
+					if ("handlingStatus" in values) {
+						item.handlingStatus =
+							values.handlingStatus as RawFeedbackRow["handlingStatus"];
+					}
+					if ("archivedAt" in values) {
+						item.archivedAt = values.archivedAt as Date | null;
+					}
+					return Promise.resolve([item]);
+				}),
+			})),
+		})),
+	})),
 	select: vi.fn((selection: Record<string, unknown>) => {
 		const isCountOnly = selection && "count" in selection;
 		const isFeedbackStats = selection && "generalCount" in selection;
-
 		return {
 			from: vi.fn((table: unknown) => {
 				const isFeedbackTable =
@@ -252,6 +283,8 @@ vi.mock("@/features/admin/services/admin-db", () => ({
 			userId: "feedback.user_id",
 			message: "feedback.message",
 			type: "feedback.type",
+			handlingStatus: "feedback.handling_status",
+			archivedAt: "feedback.archived_at",
 			createdAt: "feedback.created_at",
 		},
 		errorReports: {
@@ -259,6 +292,8 @@ vi.mock("@/features/admin/services/admin-db", () => ({
 			userId: "error_reports.user_id",
 			errorMessage: "error_reports.error_message",
 			context: "error_reports.context",
+			handlingStatus: "error_reports.handling_status",
+			archivedAt: "error_reports.archived_at",
 			createdAt: "error_reports.created_at",
 		},
 		users: {
@@ -289,11 +324,29 @@ vi.mock("drizzle-orm", () => ({
 	eq: (col: unknown, val: unknown) => (row: unknown) => {
 		const r = row as Record<string, unknown>;
 		if (col === "feedback.type") return r.type === val;
+		if (col === "feedback.handling_status")
+			return (r.handlingStatus ?? "new") === val;
+		if (col === "error_reports.handling_status")
+			return (r.handlingStatus ?? "new") === val;
+		if (col === "feedback.id") return r.id === val;
+		if (col === "error_reports.id") return r.id === val;
 		return false;
 	},
 	isNull: (col: unknown) => (row: unknown) => {
 		const r = row as Record<string, unknown>;
 		if (col === "feedback.type") return r.type === null || r.type === undefined;
+		if (col === "feedback.archived_at")
+			return r.archivedAt === null || r.archivedAt === undefined;
+		if (col === "error_reports.archived_at")
+			return r.archivedAt === null || r.archivedAt === undefined;
+		return false;
+	},
+	isNotNull: (col: unknown) => (row: unknown) => {
+		const r = row as Record<string, unknown>;
+		if (col === "feedback.archived_at")
+			return r.archivedAt !== null && r.archivedAt !== undefined;
+		if (col === "error_reports.archived_at")
+			return r.archivedAt !== null && r.archivedAt !== undefined;
 		return false;
 	},
 	ilike: (col: unknown, pattern: string) => (row: unknown) => {
