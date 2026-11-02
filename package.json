@@ -49,6 +49,7 @@
     "@tanstack/react-router-devtools": "latest",
     "@tanstack/react-router-ssr-query": "latest",
     "@tanstack/react-start": "latest",
+    "@yogesharc/thinking-orbs": "^0.1.2",
     "ai": "^7.0.37",
     "better-auth": "^1.6.25",
     "class-variance-authority": "^0.7.1",
