@@ -3,7 +3,8 @@
 import {
 	Delete02Icon,
 	Edit02Icon,
-	MoreHorizontalIcon,
+	MoreVerticalIcon,
+	Tick01Icon,
 } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -41,10 +42,12 @@ export function ProjectActionsMenu({
 	item,
 	onRename,
 	onDelete,
+	onSelect,
 }: {
 	item: CodebaseLibraryItem;
 	onRename: (id: string, name: string) => void;
 	onDelete: (item: CodebaseLibraryItem) => Promise<void>;
+	onSelect: (id: string) => void;
 }) {
 	const [isRenameOpen, setRenameOpen] = useState(false);
 	const [isDeleteOpen, setDeleteOpen] = useState(false);
@@ -106,10 +109,10 @@ export function ProjectActionsMenu({
 				<DropdownMenuTrigger asChild>
 					<button
 						type="button"
-						aria-label={`Aksi project ${item.name}`}
-						className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						aria-label={`Opsi repository ${item.name}`}
+						className="inline-flex size-10 shrink-0 items-center justify-center rounded-md text-fog transition-colors hover:bg-white/5 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 					>
-						<Icon icon={MoreHorizontalIcon} size={16} aria-hidden />
+						<Icon icon={MoreVerticalIcon} size={16} aria-hidden />
 					</button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end">
@@ -121,6 +124,15 @@ export function ProjectActionsMenu({
 							className="mr-2 text-fog"
 						/>
 						Ganti nama
+					</DropdownMenuItem>
+					<DropdownMenuItem onSelect={() => onSelect(item.id)}>
+						<Icon
+							icon={Tick01Icon}
+							size={14}
+							aria-hidden
+							className="mr-2 text-fog"
+						/>
+						Pilih
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						onSelect={() => setDeleteOpen(true)}

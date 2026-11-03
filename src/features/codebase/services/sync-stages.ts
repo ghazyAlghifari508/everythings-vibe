@@ -4,6 +4,11 @@ import type {
 	SyncStatusResponse,
 } from "../types/sync-schemas";
 import { isSyncStatusComplete } from "./sync-lifecycle";
+import {
+	buildAgentRow,
+	buildPreparingRow,
+	buildSyncingRow,
+} from "./sync-stage-rows";
 
 // === User-facing sync stage mapping ===
 // The three sync stages the user can actually observe are the CLI handshake,
@@ -139,92 +144,6 @@ export const SYNC_STAGE_TEST_IDS: Readonly<Record<SyncStageKey, string>> = {
 	syncing: "sync-stage-sync",
 };
 
-const AGENT_TITLE = "Menunggu agent";
-const AGENT_HINT = "Jalankan prompt dari root repository.";
-const PREPARE_TITLE = "Menyiapkan source code";
-const SYNC_TITLE = "Mengunggah repository";
-
-function buildAgentRow(
-	progress: SyncStageProgress,
-	agentConnectedAt: string | null,
-): SyncStageRow {
-	if (progress === "waiting") {
-		return { state: "waiting", title: AGENT_TITLE, detail: AGENT_HINT };
-	}
-	return {
-		state: "done",
-		title: "Agent terhubung",
-		detail: "Agent berhasil tersambung ke everythings-vibe.",
-		...(agentConnectedAt ? { completedAt: agentConnectedAt } : {}),
-	};
-}
-
-function buildPreparingRow(
-	progress: SyncStageProgress,
-	preparationStartedAt: string | null,
-): SyncStageRow {
-	if (progress === "preparing") {
-		return {
-			state: "active",
-			title: `${PREPARE_TITLE}...`,
-			detail: "Memeriksa file project yang akan disinkronkan.",
-			// The handshake is when preparation really began: the CLI handshakes
-			// BEFORE it walks the repository, so this elapsed window is measured
-			// from a persisted fact.
-			...(preparationStartedAt ? { startedAt: preparationStartedAt } : {}),
-		};
-	}
-	if (progress === "syncing" || progress === "done") {
-		return {
-			state: "done",
-			title: "Source code siap",
-			detail: "File project yang relevan sudah disiapkan.",
-		};
-	}
-	return { state: "waiting", title: PREPARE_TITLE };
-}
-
-function buildSyncingRow(
-	progress: SyncStageProgress,
-	fileCount: number | undefined,
-	uploadStartedAt: string | null,
-	snapshotPersistedAt: string | null,
-	snapshotPersistedCount: number | undefined,
-): SyncStageRow {
-	if (progress === "done") {
-		const verifiedCount =
-			typeof snapshotPersistedCount === "number"
-				? snapshotPersistedCount
-				: fileCount;
-		return {
-			state: "done",
-			title: "Sinkronisasi selesai",
-			detail:
-				typeof verifiedCount === "number"
-					? `${verifiedCount} file berhasil diterima.`
-					: "Source code berhasil diterima.",
-			...(snapshotPersistedAt ? { completedAt: snapshotPersistedAt } : {}),
-		};
-	}
-	if (progress === "syncing") {
-		const row: SyncStageRow = {
-			state: "active",
-			title: `${SYNC_TITLE}...`,
-			detail: "Mengirim source code ke everythings-vibe.",
-			// Upload start is the persisted moment transport actually began, so
-			// the elapsed timer measures real transfer time.
-			...(uploadStartedAt ? { startedAt: uploadStartedAt } : {}),
-		};
-		// The count is real server data, so it is shown as soon as there is one
-		// rather than inventing a percentage the server never reports.
-		if (typeof fileCount === "number") {
-			row.meta = `${fileCount} file sedang dikirim.`;
-		}
-		return row;
-	}
-	return { state: "waiting", title: SYNC_TITLE };
-}
-
 const EXPIRED_RETRY_HINT =
 	"Sesi sync sudah kedaluwarsa. Buat token baru untuk melanjutkan.";
 const FAILED_RETRY_HINT =
@@ -238,6 +157,8 @@ export function resolveSyncStageView(
 				| "snapshotId"
 				| "fileCount"
 				| "excludedCount"
+				| "manifestCount"
+				| "uploadedCount"
 				| "errorMessage"
 				| "cliConnectedAt"
 				| "snapshotCreatedAt"
@@ -284,14 +205,20 @@ export function resolveSyncStageView(
 	}
 
 	if (status.status === "waiting_for_cli") {
-		// Pre-start standby: the user is copying the prompt into their terminal
-		// or agent. No real sync activity has started, so rendering stages would
-		// fake a running progress timeline before any work exists.
+		// Standby is still a live attempt: the session exists and the CLI has not
+		// reported in yet. Rendering the real stage list from the first paint — with
+		// the agent row actively waiting — is what makes the later `Agent terhubung`
+		// state a visible transition instead of an already-checked row that appeared
+		// out of nowhere. Nothing is claimed as done and no timestamp is invented.
 		return {
 			hasStatus: true,
 			hasStarted: false,
 			failed: false,
-			stages: [],
+			stages: [
+				buildAgentRow("waiting", null),
+				buildPreparingRow("waiting", null),
+				buildSyncingRow("waiting", undefined, null, null, undefined, {}),
+			],
 			errorMessage: null,
 			retryHint: "",
 			canRetry: false,
@@ -336,6 +263,10 @@ export function resolveSyncStageView(
 				uploadStartedAt,
 				snapshotPersistedAt,
 				snapshotPersistedCount,
+				{
+					manifestCount: status.manifestCount,
+					uploadedCount: status.uploadedCount,
+				},
 			),
 		],
 		...(status.excludedCount !== undefined

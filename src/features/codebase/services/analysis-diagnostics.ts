@@ -49,6 +49,11 @@ export function classifyAnalysisFailure(
 	if (readServiceErrorCode(error) === "SNAPSHOT_NOT_UPLOADED") {
 		return "snapshot";
 	}
+	// Everything thrown after `stage` flips to persist comes from the
+	// finalization transaction (settlement, ledger, row write). Provider
+	// wording cannot legitimately appear there, so message patterns must not
+	// reclassify a database failure as an upstream one.
+	if (stage === "persist") return "persistence";
 	const message = error instanceof Error ? error.message : String(error);
 	// Credit lifecycle failures that abort persistence are triaged as
 	// persistence, not provider: the model output existed, only finalization
@@ -77,7 +82,6 @@ export function classifyAnalysisFailure(
 	) {
 		return "provider";
 	}
-	if (stage === "persist") return "persistence";
 	return "unknown";
 }
 
@@ -150,6 +154,37 @@ export function buildAnalysisIdempotencyKey(input: {
 	refreshAnalysisId?: string | null;
 }): string {
 	return `${input.projectId}:codebase_analysis:${input.snapshotId}:${input.refreshAnalysisId ?? "initial"}`;
+}
+
+export function serializeAnalysisError(error: unknown): {
+	errorName: string;
+	errorCode?: string;
+	databaseErrorCode?: string;
+	causeNames: string[];
+} {
+	const result: ReturnType<typeof serializeAnalysisError> = {
+		errorName: error instanceof Error ? "Error" : "NonError",
+		causeNames: [],
+	};
+	const seen = new Set<Error>();
+	let current = error;
+	while (current instanceof Error && !seen.has(current)) {
+		seen.add(current);
+		// Only identifiers are retained; messages, SQL, detail and stacks may contain source or secrets.
+		const name = /^[A-Za-z][A-Za-z0-9]*Error$|^Error$/.test(current.name)
+			? current.name
+			: "Error";
+		if (seen.size === 1) result.errorName = name;
+		result.causeNames.push(name);
+		if ("code" in current && typeof current.code === "string") {
+			if (/^[0-9A-Z]{5}$/.test(current.code))
+				result.databaseErrorCode = current.code;
+			else if (/^[A-Z][A-Z0-9_]{0,79}$/.test(current.code))
+				result.errorCode = current.code;
+		}
+		current = current.cause;
+	}
+	return result;
 }
 
 export interface AnalysisDiagnosticRecord {

@@ -7,6 +7,7 @@ import {
 	timestamp,
 	unique,
 } from "drizzle-orm/pg-core";
+import type { StudioTitleSource } from "@/features/studio/services/studio-project-title";
 import type { StudioDesignBlueprint } from "@/lib/studio-design-blueprint";
 import type {
 	StudioDesignReferenceMetadata,
@@ -24,6 +25,15 @@ export const studioProjects = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		title: text("title").notNull(),
+		// Provenance of `title`: "auto" is a system-chosen name (the provisional
+		// title cut from the brief, then the planner's product name), "user" is a
+		// name a person typed through the rename dialog. Planning only replaces a
+		// title still marked "auto", so a rename is never overwritten. Defaults to
+		// "user" so a writer that forgets the column is protected.
+		titleSource: text("title_source")
+			.$type<StudioTitleSource>()
+			.notNull()
+			.default("user"),
 		designMode: text("design_mode").notNull().default("web"),
 		designMd: text("design_md"),
 		designSkillId: text("design_skill_id")

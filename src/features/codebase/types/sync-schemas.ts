@@ -156,6 +156,13 @@ export const syncStatusResponseSchema = z.object({
 	codebaseName: z.string().min(1).optional(),
 	fileCount: z.number().int().nonnegative().optional(),
 	excludedCount: z.number().int().nonnegative().optional(),
+	// Determinate upload progress, reported only while the transport is genuinely
+	// running. `manifestCount` is the number of entries the CLI announced in the
+	// merged manifest; `uploadedCount` counts only files whose every chunk has
+	// landed. Both come from persisted rows — never from a timer or a guess — and
+	// are omitted once the snapshot is verified.
+	manifestCount: z.number().int().nonnegative().optional(),
+	uploadedCount: z.number().int().nonnegative().optional(),
 	errorCode: z.string().min(1).nullable().optional(),
 	errorMessage: z.string().min(1).nullable().optional(),
 	// Latest snapshot bound to the polled session, when one exists. Lets the

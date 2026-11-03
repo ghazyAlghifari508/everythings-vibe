@@ -141,10 +141,8 @@ describe("FIX02 sync session reset and analysis retry lifecycle", () => {
 			}),
 			{ isAnalysisReady: false },
 		);
-		expect(rowState("sync-stage-analysis")).toBeNull();
-		expect(container?.textContent).not.toContain(
-			"Analisis codebase belum berhasil",
-		);
+		expect(rowState("sync-stage-analysis")).toBe("waiting");
+		expect(container?.textContent).not.toContain("Analisis belum berhasil");
 	});
 
 	it("keeps the billing row when credits block the analysis", () => {

@@ -116,6 +116,18 @@ describe("TASK 10D: Codebase icon system verification", () => {
 		expect(svgs.length).toBe(3);
 	});
 
+	it("uses the vertical ellipsis icon for the repository row menu", () => {
+		const source = fs.readFileSync(
+			path.resolve(
+				__dirname,
+				"../components/planning/project-actions-menu.tsx",
+			),
+			"utf-8",
+		);
+		expect(source).toContain("MoreVerticalIcon");
+		expect(source).not.toContain("MoreHorizontalIcon");
+	});
+
 	it("renders planning, kanban, library, and review action icons without regression", () => {
 		const { container } = render(
 			<div>

@@ -54,7 +54,6 @@ export function StudioLaunchComposer({
 	onConfigChange,
 	reference,
 	onOpenDesignPicker,
-	onRemoveReference,
 	prd,
 	onPrdChange,
 	loading,
@@ -69,7 +68,6 @@ export function StudioLaunchComposer({
 	onConfigChange: (patch: Partial<LaunchComposerConfig>) => void;
 	reference: LaunchComposerReference | null;
 	onOpenDesignPicker: () => void;
-	onRemoveReference: () => void;
 	prd?: StudioPrdAttachmentState | null;
 	onPrdChange?: (prd: StudioPrdAttachmentState | null) => void;
 	loading: boolean;
@@ -247,15 +245,6 @@ export function StudioLaunchComposer({
 									className="rounded px-1.5 py-0.5 font-semibold text-mist underline underline-offset-2 hover:text-snow"
 								>
 									Ganti
-								</button>
-								<button
-									type="button"
-									onClick={onRemoveReference}
-									aria-label="Lepas referensi desain"
-									title="Lepas referensi desain"
-									className="rounded p-0.5 text-fog hover:text-snow"
-								>
-									<Icon icon={Cancel01Icon} size={13} />
 								</button>
 							</span>
 						</section>

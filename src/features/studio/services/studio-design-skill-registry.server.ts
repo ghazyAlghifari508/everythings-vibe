@@ -20,6 +20,8 @@ const impeccableSkill =
 	STUDIO_SKILL_ASSETS["src/features/studio/skills/impeccable/SKILL.md"];
 const tasteSkill =
 	STUDIO_SKILL_ASSETS["src/features/studio/skills/taste/SKILL.md"];
+const tasteAppScreens =
+	STUDIO_SKILL_ASSETS["src/features/studio/skills/taste/app-screens.md"];
 const uiUxProMaxProRules =
 	STUDIO_SKILL_ASSETS["src/features/studio/skills/ui-ux-pro-max/pro-rules.md"];
 const uiUxProMaxQuickRef =
@@ -165,16 +167,21 @@ const CAPABILITIES: Record<StudioDesignSkillId, StudioSkillCapability> = {
 	},
 	taste: {
 		promptCompatible: [
-			"Full upstream SKILL.md (Leonxlnx, 89KB)",
-			"Brief inference engine & brand personality",
-			"Typography scale & spatial harmony",
-			"Anti-template rules and deliberate density",
+			"Full upstream SKILL.md v2.1.5 & App Screen Guidelines (app-screens.md)",
+			"App screen design: data-focused color, KPI typography, flat surfaces, tabular alignment",
+			"Dashboard, analytics, admin, settings, and mobile application patterns",
+			"Brief inference, brand personality, and non-generic composition",
 		],
-		requiresAgentTools: ["image diffusion models (Flux/Midjourney)"],
+		requiresAgentTools: [
+			"Node/browser inspector (scripts/inspect.mjs via Chrome DevTools Protocol)",
+			"Direction drawer CLI (scripts/draw.mjs)",
+			"Open-collection asset downloader (scripts/assets.mjs)",
+		],
 		searchableDatasets: false,
 		limitations: [
-			"Upstream explicitly targets marketing/landing pages and excludes dashboards/mobile; Studio adapter scopes transferable aesthetic principles to all screens",
-			"No generative photography pipelines inside Studio generation worker",
+			"Studio is an automated HTML generator; upstream CLI scripts and CDP browser inspector are not run in worker runtime",
+			"Browser-based visual inspection is replaced with deterministic TypeScript HTML contract and diagnostic validation",
+			"External photo downloading and generative photography / diffusion are not available in generation worker",
 		],
 		fidelity: {
 			guidance: "A",
@@ -219,11 +226,13 @@ function assembleSkillGuidance(
 		`[Studio Compatibility Adapter Note]:`,
 		`The following instructions are verbatim upstream guidance from ${manifest.upstreamRepo}@${manifest.pinnedRevision}.`,
 		`Apply this guidance strictly within Studio's precedence hierarchy:`,
-		`  1. Safety & platform validity (clean valid HTML, Tailwind CDN, script rules)`,
+		`  1. Security and HTML safety (clean valid HTML, script-free, responsive)`,
 		`  2. Explicit user prompt & requirements`,
-		`  3. Active design reference (DESIGN.md / brand tokens)`,
-		`  4. Selected upstream design skill guidance (below)`,
-		`  5. Studio baseline defaults`,
+		`  3. Valid PRD and product constraints`,
+		`  4. Selected DESIGN.md and theme tokens`,
+		`  5. Existing shared project blueprint`,
+		`  6. Selected upstream design skill guidance (below)`,
+		`  7. Default product guidance`,
 		`Generate pure HTML with Tailwind CSS and standard inline SVG icons. Do not execute scripts or create external files.`,
 	];
 
@@ -245,7 +254,7 @@ function assembleSkillGuidance(
 		);
 	} else if (id === "taste") {
 		adapterHeader.push(
-			`[Scope Adapter Note]: Apply transferable aesthetic principles (typography scale, spatial rhythm, intentional contrast, content density). Landing-page-only quotas or motion prescriptions do not apply to multi-screen dashboard or mobile app frames.`,
+			`[Scope Adapter Note]: Verbatim upstream Taste v2.1.5 guidelines. For operational screens, dashboards, settings, and mobile apps, apply the App Screen Guidelines (quiet borders, data-focused color, tabular numbers, no decorative hero or marketing photo quotas). For marketing or landing pages, apply the page art direction principles.`,
 		);
 	}
 	adapterHeader.push(
@@ -306,6 +315,12 @@ function assembleSkillGuidance(
 				text: antiSlopHuman,
 			},
 		);
+	} else if (id === "taste") {
+		refDocs.push({
+			title: "App Screen Guidelines",
+			path: "app-screens.md",
+			text: tasteAppScreens,
+		});
 	}
 
 	for (const doc of refDocs) {

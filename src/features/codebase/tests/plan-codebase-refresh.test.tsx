@@ -273,7 +273,7 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 			{ timeout: 15000, interval: 100 },
 		);
 		// Existing Sync prompt and analysis stage pending
-		expect(screen.getByText("Copy prompt untuk AI agent")).toBeDefined();
+		expect(screen.getByText("Salin instruksi untuk AI agent")).toBeDefined();
 		const analysisStage = screen.getByTestId("sync-stage-analysis");
 		expect(analysisStage.getAttribute("data-stage-state")).toBe("active");
 		expect(analysisStage.textContent).toContain("Menganalisis repository");
@@ -420,8 +420,14 @@ describe("PlanCodebasePage refresh recovery matrix", () => {
 			},
 			{ timeout: 15000, interval: 100 },
 		);
-		expect(screen.queryByText("Menunggu agent")).toBeNull();
-		expect(document.querySelectorAll("[data-stage-state]")).toHaveLength(0);
+		// The stage list is live from the first paint, with the agent actively
+		// waiting — and nothing claimed as completed without server evidence.
+		expect(
+			document
+				.querySelector('[data-testid="sync-stage-agent"]')
+				?.getAttribute("data-stage-state"),
+		).toBe("active");
+		expect(screen.queryByText("Agent terhubung")).toBeNull();
 	}, 20000);
 
 	it("maps a retired three-step pointer onto the sync step", async () => {

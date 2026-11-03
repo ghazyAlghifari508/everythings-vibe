@@ -11,6 +11,7 @@ export async function releaseCreditOperation(input: {
 	userId: string;
 	operationId: string;
 	reason: string;
+	actor?: string;
 }): Promise<CreditOperationResult> {
 	const { db, schema } = await getDatabase();
 	return db.transaction(async (tx) => {
@@ -29,17 +30,23 @@ export async function releaseCreditOperation(input: {
 		if (!["reserved", "running", "settling"].includes(operation.state))
 			throw new Error("Credit operation is not active");
 
+		const releasedAt = new Date();
+		const failure = {
+			message: input.reason,
+			occurredAt: releasedAt.toISOString(),
+			previousState: operation.state,
+			nextState: "released" as const,
+			actor: input.actor ?? "credit-release",
+			correlationId: operation.analysisReference ?? operation.id,
+		};
 		if (operation.isExempt || operation.reservedCredits === 0) {
 			const updated = await tx
 				.update(schema.creditOperations)
 				.set({
 					state: "released",
 					reservedCredits: 0,
-					releasedAt: new Date(),
-					failure: {
-						message: input.reason,
-						occurredAt: new Date().toISOString(),
-					},
+					releasedAt,
+					failure,
 					updatedAt: new Date(),
 				})
 				.where(
@@ -101,11 +108,8 @@ export async function releaseCreditOperation(input: {
 			.set({
 				state: "released",
 				reservedCredits: 0,
-				releasedAt: new Date(),
-				failure: {
-					message: input.reason,
-					occurredAt: new Date().toISOString(),
-				},
+				releasedAt,
+				failure,
 				updatedAt: new Date(),
 			})
 			.where(

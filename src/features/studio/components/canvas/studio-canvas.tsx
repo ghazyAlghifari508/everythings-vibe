@@ -21,6 +21,7 @@ import {
 	STUDIO_CANVAS_MAX_ZOOM,
 	STUDIO_CANVAS_MIN_ZOOM,
 } from "@/features/studio/types/studio-constants";
+import { isCanvasControlTarget } from "@/features/studio/utils/studio-canvas-gesture";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 
 export type {
@@ -90,6 +91,9 @@ export const StudioCanvas = memo(function StudioCanvas({
 		minZoom: STUDIO_CANVAS_MIN_ZOOM,
 		maxZoom: STUDIO_CANVAS_MAX_ZOOM,
 		initialZoom: preferredZoom,
+		// The pointer-anchored zoom is expressed in canvas-local space, the same
+		// space the surface transform uses.
+		containerRef: canvasRef,
 	});
 
 	const [tool, setTool] = useState<StudioCanvasTool>("select");
@@ -173,6 +177,9 @@ export const StudioCanvas = memo(function StudioCanvas({
 			aria-label={`Canvas Desain ${project.title}`}
 			onPointerDown={(event) => {
 				if (panMode) {
+					// A real control overlay owns its own press; only the canvas
+					// background and the frame gesture surfaces start a pan.
+					if (isCanvasControlTarget(event.target)) return;
 					if (startPan(event)) setIsPanning(true);
 					return;
 				}

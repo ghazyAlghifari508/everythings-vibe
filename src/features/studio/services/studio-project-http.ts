@@ -2,12 +2,14 @@ import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
+import { STUDIO_PROJECT_TITLE_MAX_CHARS } from "../types/studio-constants";
 import { studioDesignSkillIdSchema } from "./studio-generation-options";
 import { updateStudioPreferences } from "./studio-preferences-service";
 import { getStudioProjectDetail } from "./studio-project-detail";
 import {
 	deleteStudioProject,
 	duplicateStudioProject,
+	renameStudioProject,
 } from "./studio-project-lifecycle";
 
 // Nothing raw is ever logged: unknown provider, scrape or database failures are
@@ -73,6 +75,11 @@ const projectActionSchema = z.discriminatedUnion("action", [
 		projectId: z.string().trim().min(1).max(200),
 		designSkillId: studioDesignSkillIdSchema,
 	}),
+	z.object({
+		action: z.literal("rename"),
+		projectId: z.string().trim().min(1).max(200),
+		title: z.string().trim().min(1).max(STUDIO_PROJECT_TITLE_MAX_CHARS),
+	}),
 ]);
 
 export async function POST({
@@ -95,6 +102,14 @@ export async function POST({
 				parsed.data.projectId,
 				user.id,
 				parsed.data,
+			);
+			return Response.json({ project });
+		}
+		if (parsed.data.action === "rename") {
+			const project = await renameStudioProject(
+				parsed.data.projectId,
+				user.id,
+				parsed.data.title,
 			);
 			return Response.json({ project });
 		}

@@ -23,6 +23,7 @@ interface UseStudioFrameVisualInput {
 export interface StudioFrameVisualState {
 	visual: StudioFrameVisual | null;
 	visualError: string;
+	markVisualLoaded: (visual: StudioFrameVisual) => void;
 	setVisualError: (message: string) => void;
 	/** Re-requests the capture, e.g. after the image itself failed to load. */
 	retryVisual: () => void;
@@ -65,6 +66,10 @@ export function useStudioFrameVisual({
 		input: typeof input;
 		visual: StudioFrameVisual;
 	} | null>(null);
+	const loadedVisual = useRef<{
+		input: typeof input;
+		visual: StudioFrameVisual;
+	} | null>(null);
 	const current =
 		result?.input === input && result.attempt === visualAttempt ? result : null;
 	const previous =
@@ -80,6 +85,7 @@ export function useStudioFrameVisual({
 	);
 	const artboardRef = useRef<HTMLElement>(null);
 	const frameHeight =
+		visual?.height ??
 		measuredHeight ??
 		(isMobile
 			? STUDIO_VISUAL_FALLBACK_HEIGHT.mobile
@@ -173,8 +179,20 @@ export function useStudioFrameVisual({
 	return {
 		visual,
 		visualError,
+		markVisualLoaded: (loaded) => {
+			loadedVisual.current = { input, visual: loaded };
+		},
 		setVisualError: (error) => {
-			setLastGood(null);
+			const loaded = loadedVisual.current;
+			const fallback =
+				loaded &&
+				loaded.input.id === input.id &&
+				loaded.input.projectId === input.projectId &&
+				loaded.input.viewport === input.viewport &&
+				loaded.visual.url !== visual?.url
+					? loaded
+					: null;
+			setLastGood(fallback);
 			setResult({ input, attempt: visualAttempt, visual: null, error });
 		},
 		retryVisual: () => setVisualAttempt((attempt) => attempt + 1),

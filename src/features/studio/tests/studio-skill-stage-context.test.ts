@@ -213,6 +213,33 @@ describe("Stage-aware Studio skill context (Task 02)", () => {
 		}
 	});
 
+	it("keeps the cacheable system prefix free of any project-specific content", () => {
+		// The system prompt is the stable, cacheable prefix. It must be built
+		// only from the pinned upstream skill text and Studio's own contract, so a
+		// gateway prefix cache can never serve one project's data to another.
+		const markers = [
+			"AcmeCorp Internal",
+			"prd-only-sentinel",
+			"design-md-only-sentinel",
+			"user-prompt-sentinel",
+		];
+		for (const id of [...SKILLS, "none"] as const) {
+			for (const stage of [
+				"planning",
+				"frame",
+				"revision",
+				"correction",
+			] as const) {
+				const system =
+					stage === "planning"
+						? resolveStudioPlanningSystemPrompt(id)
+						: resolveStudioFrameSystemPrompt(id, { stage });
+				for (const marker of markers)
+					expect(system, `${id}/${stage}`).not.toContain(marker);
+			}
+		}
+	});
+
 	it("appends nothing beyond the base contract and the selected sections", () => {
 		for (const id of [...SKILLS, "none"] as const) {
 			const frameContext = buildStudioSkillContext(id, { stage: "frame" });
@@ -258,6 +285,7 @@ describe("Stage-aware Studio skill context (Task 02)", () => {
 		const runtimeModules = [
 			"src/features/studio/services/studio-design-skill-registry.server.ts",
 			"src/features/studio/services/studio-skill-context.server.ts",
+			"src/features/studio/services/studio-skill-selection.server.ts",
 			"src/features/studio/services/ui-ux-pro-max-lookup.ts",
 		];
 		for (const modulePath of runtimeModules) {

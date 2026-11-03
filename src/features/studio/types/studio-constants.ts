@@ -1,3 +1,57 @@
+// A project name is a product name, not the brief. The character budget keeps a
+// header readable; the word budget rejects a paragraph that happens to be short.
+export const STUDIO_PROJECT_TITLE_MAX_CHARS = 60;
+export const STUDIO_PROJECT_TITLE_MAX_WORDS = 8;
+export const STUDIO_PROJECT_TITLE_FALLBACK = "Project Studio";
+
+// Generic placeholders an AI model reaches for when it did not read the brief.
+// A title equal to one of these is treated as no title at all.
+export const STUDIO_PROJECT_TITLE_PLACEHOLDERS = [
+	"my project",
+	"untitled",
+	"untitled app",
+	"untitled project",
+	"untitled design",
+	"new design",
+	"new project",
+	"project",
+	"app",
+	"design",
+	"aplikasi prototipe",
+	"project studio",
+	"studio tanpa judul",
+];
+
+// Words that introduce the audience or a clause ("untuk Nadia", "yang dipakai
+// tim growth"). Everything from the first one onward is brief context, not the
+// product name.
+export const STUDIO_PROJECT_TITLE_TRAILING_CONNECTORS = [
+	"untuk",
+	"buat",
+	"bagi",
+	"milik",
+	"punya",
+	"yang",
+	"dengan",
+	"beserta",
+	"agar",
+	"supaya",
+	"where",
+	"which",
+	"that",
+	"for",
+	"with",
+];
+
+/** Connectors that introduce a person or brand the brief names explicitly. */
+export const STUDIO_PROJECT_TITLE_OWNER_CONNECTORS = [
+	"untuk",
+	"bagi",
+	"milik",
+	"punya",
+	"for",
+];
+
 export const STUDIO_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 export const STUDIO_DESIGN_MD_MAX_CHARS = 100_000;
 export const STUDIO_PRD_FILE_MAX_BYTES = 500 * 1024;
@@ -9,12 +63,13 @@ export const STUDIO_SKILL_DOCUMENT_BUDGET_CHARS = 100_000;
 // Stage-aware delivery budgets. Selection is greedy + deterministic and only ever
 // drops or keeps whole upstream sections, so these never cut a document
 // mid-sentence. They exist to stop one stage from resending catalogs another
-// stage already needed.
+// stage already needed. Tighter frame/correction caps reduce token overhead
+// without dropping core identity sections (always included regardless of budget).
 export const STUDIO_SKILL_STAGE_BUDGET_CHARS = {
 	planning: 20_000,
-	frame: 28_000,
-	revision: 20_000,
-	correction: 12_000,
+	frame: 20_000,
+	revision: 16_000,
+	correction: 8_000,
 } as const;
 
 export const STUDIO_VISUAL_WIDTH = {
@@ -83,7 +138,7 @@ export const STUDIO_CHARS_PER_TOKEN_ESTIMATE = 4;
 export const STUDIO_PREVIOUS_HTML_MAX_CHARS = 60000;
 export const STUDIO_CAPTURE_TIMEOUT_MS = 30000;
 export const STUDIO_CAPTURE_MAX_HEIGHT = 30000;
-export const STUDIO_CAPTURE_QUALITY = 90;
+export const STUDIO_CAPTURE_QUALITY = 95;
 export const STUDIO_CAPTURE_DSF = 2;
 export const STUDIO_JOB_CLAIM_TTL_MS = 150000;
 export const STUDIO_JOB_QUEUE_HEALTH_MS = 60_000;

@@ -152,16 +152,21 @@ describe("sync stage vocabulary", () => {
 });
 
 describe("waiting_for_cli", () => {
-	it("treats waiting_for_cli as pre-start and yields no stages", () => {
+	it("shows the agent wait as the active stage before the CLI reports in", () => {
 		const view = resolveSyncStageView(status());
-		expect(view.stages).toEqual([]);
+		// Standby is a real, current state of this attempt, so the first row is an
+		// active waiting indicator and the later `Agent terhubung` checkmark is a
+		// visible transition instead of a row that already looked done.
+		expect(states(view)).toEqual(["active", "waiting", "waiting"]);
+		expect(stage(view, 0).title).toBe("Menunggu agent terhubung...");
+		expect(stage(view, 0).state).not.toBe("done");
+		expect(stage(view, 0).completedAt).toBeUndefined();
 		expect(view.hasStatus).toBe(true);
 		expect(view.hasStarted).toBe(false);
 		expect(view.syncComplete).toBe(false);
 		expect(view.canRetry).toBe(false);
-		expect(userFacingCopy(view)).not.toContain("Menunggu agent");
-		expect(userFacingCopy(view)).not.toContain("Menyiapkan source code");
-		expect(userFacingCopy(view)).not.toContain("Mengunggah repository");
+		expect(userFacingCopy(view)).toContain("Menyiapkan source code");
+		expect(userFacingCopy(view)).toContain("Mengunggah repository");
 	});
 });
 
@@ -267,7 +272,9 @@ describe("fast transition", () => {
 		const after = resolveSyncStageView(
 			status({ status: "uploaded", snapshotId: "snap_fast", fileCount: 12 }),
 		);
-		expect(before.stages).toEqual([]);
+		// Before the CLI reports in, only the agent row is active: nothing is claimed
+		// as completed without evidence.
+		expect(states(before)).toEqual(["active", "waiting", "waiting"]);
 		expect(before.hasStarted).toBe(false);
 		expect(states(after)).toEqual(["done", "done", "done"]);
 		expect(stage(after, 0).title).toBe("Agent terhubung");

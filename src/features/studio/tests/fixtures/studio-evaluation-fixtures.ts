@@ -226,3 +226,263 @@ export const webSaaSBlueprint: StudioDesignBlueprint = {
 		},
 	],
 };
+
+export const customerDirectoryBlueprint: StudioDesignBlueprint = {
+	productIdentity: {
+		productName: "ClientHub CRM",
+		targetAudience: "Sales & Account Managers",
+		platform: "web",
+		visualDirection: "Structured relational client directory",
+	},
+	designTokens: {
+		primary: "#0f172a",
+		secondary: "#334155",
+		background: "#f8fafc",
+		surface: "#ffffff",
+		fontFamily: "Inter, sans-serif",
+		radius: 8,
+		border: "1px solid #e2e8f0",
+		elevation: "none",
+	},
+	sharedComponents: {
+		header: "Desktop top navigation bar with directory scope",
+		navigation: "Left sidebar with client navigation",
+		buttons: "Neutral compact buttons",
+		inputs: "Search and filter inputs with accessible labels",
+		cards: "Structured directory list cards",
+		tabs: "Status filter tab strip",
+		icons: "Stroke icons",
+	},
+	navigationContract: {
+		destinations: ["home", "search", "settings"],
+		labels: ["Direktori", "Pencarian Klien", "Pengaturan Akun"],
+		iconMapping: {
+			home: "home",
+			search: "search",
+			settings: "settings",
+		},
+		ordering: ["home", "search", "settings"],
+		activeItemRule: "Highlight active navigation item",
+	},
+	canonicalShell: {
+		version: 1,
+		navigation: "sidebar",
+		statusBar: "none",
+		density: "compact",
+		activeDestinations: {
+			Direktori: "home",
+			"Pencarian Klien": "search",
+			"Pengaturan Akun": "settings",
+		},
+	},
+	screenPlan: [
+		{ name: "Direktori", role: "Daftar klien aktif dan kontak", order: 0 },
+		{
+			name: "Pencarian Klien",
+			role: "Filter dan pencarian terperinci",
+			order: 1,
+		},
+		{ name: "Pengaturan Akun", role: "Konfigurasi tim direktori", order: 2 },
+	],
+};
+
+export const ecommerceBlueprint: StudioDesignBlueprint = {
+	productIdentity: {
+		productName: "Lumina Store",
+		targetAudience: "Modern Retail Shoppers",
+		platform: "web",
+		visualDirection: "Clean editorial commerce catalog",
+	},
+	designTokens: {
+		primary: "#18181b",
+		secondary: "#71717a",
+		background: "#fafafa",
+		surface: "#ffffff",
+		fontFamily: "Inter, sans-serif",
+		radius: 10,
+		border: "1px solid #e4e4e7",
+		elevation: "none",
+	},
+	sharedComponents: {
+		header: "Branded retail top navigation bar",
+		navigation: "Top horizontal navigation",
+		buttons: "Solid primary action buttons",
+		inputs: "Product search bar with icon",
+		cards: "Product showcase cards with price and action",
+		tabs: "Product category pills",
+		icons: "Stroke commerce icons",
+	},
+	navigationContract: {
+		destinations: ["home", "search", "wallet"],
+		labels: ["Katalog Produk", "Detail Belanja", "Keranjang & Checkout"],
+		iconMapping: {
+			home: "home",
+			search: "search",
+			wallet: "wallet",
+		},
+		ordering: ["home", "search", "wallet"],
+		activeItemRule: "Highlight current shopping section",
+	},
+	canonicalShell: {
+		version: 1,
+		navigation: "top",
+		statusBar: "none",
+		density: "comfortable",
+		activeDestinations: {
+			"Katalog Produk": "home",
+			"Detail Belanja": "search",
+			"Keranjang & Checkout": "wallet",
+		},
+	},
+	screenPlan: [
+		{
+			name: "Katalog Produk",
+			role: "Grid produk dan filter kategori",
+			order: 0,
+		},
+		{
+			name: "Detail Belanja",
+			role: "Deskripsi dan spesifikasi produk",
+			order: 1,
+		},
+		{
+			name: "Keranjang & Checkout",
+			role: "Ringkasan pesanan dan pembayaran",
+			order: 2,
+		},
+	],
+};
+
+export const portfolioBlueprint: StudioDesignBlueprint = {
+	productIdentity: {
+		productName: "Alex Pratama Portfolio",
+		targetAudience: "Engineering Leads & Clients",
+		platform: "web",
+		visualDirection: "Monochrome technical craft showcase",
+	},
+	designTokens: {
+		primary: "#171717",
+		secondary: "#525252",
+		background: "#0a0a0a",
+		surface: "#171717",
+		fontFamily: "Inter, sans-serif",
+		radius: 6,
+		border: "1px solid #262626",
+		elevation: "none",
+	},
+	sharedComponents: {
+		header: "Minimalist portfolio top header",
+		navigation: "Clean horizontal text navigation",
+		buttons: "Outlined minimalist buttons",
+		inputs: "Contact form fields",
+		cards: "Project showcase cards with tags",
+		tabs: "Project type filter",
+		icons: "Hairline stroke icons",
+	},
+	navigationContract: {
+		destinations: ["home", "chart", "user"],
+		labels: ["Karya & Proyek", "Studi Kasus", "Tentang & Kontak"],
+		iconMapping: {
+			home: "home",
+			chart: "chart",
+			user: "user",
+		},
+		ordering: ["home", "chart", "user"],
+		activeItemRule: "Highlight active section label",
+	},
+	canonicalShell: {
+		version: 1,
+		navigation: "top",
+		statusBar: "none",
+		density: "comfortable",
+		activeDestinations: {
+			"Karya & Proyek": "home",
+			"Studi Kasus": "chart",
+			"Tentang & Kontak": "user",
+		},
+	},
+	screenPlan: [
+		{
+			name: "Karya & Proyek",
+			role: "Galeri karya dan proyek pilihan",
+			order: 0,
+		},
+		{
+			name: "Studi Kasus",
+			role: "Dokumentasi arsitektur dan dampak teknis",
+			order: 1,
+		},
+		{
+			name: "Tentang & Kontak",
+			role: "Biografi ringkas dan jalur kontak",
+			order: 2,
+		},
+	],
+};
+
+export const marketingLandingBlueprint: StudioDesignBlueprint = {
+	productIdentity: {
+		productName: "NovaFlow AI",
+		targetAudience: "Creative Product Teams",
+		platform: "web",
+		visualDirection: "Confident bold product launch",
+	},
+	designTokens: {
+		primary: "#4f46e5",
+		secondary: "#475569",
+		background: "#ffffff",
+		surface: "#f8fafc",
+		fontFamily: "Inter, sans-serif",
+		radius: 12,
+		border: "1px solid #e2e8f0",
+		elevation: "0 1px 3px rgba(0,0,0,0.05)",
+	},
+	sharedComponents: {
+		header: "Marketing topbar with primary call-to-action",
+		navigation: "Marketing product navigation links",
+		buttons: "High-contrast primary CTA buttons",
+		inputs: "Newsletter and early access email input",
+		cards: "Feature demonstration and proof cards",
+		tabs: "Feature category switcher",
+		icons: "Precise inline SVG icons",
+	},
+	navigationContract: {
+		destinations: ["home", "plus", "analytics"],
+		labels: ["Fitur Utama", "Uji Coba Produk", "Paket & Harga"],
+		iconMapping: {
+			home: "home",
+			plus: "plus",
+			analytics: "analytics",
+		},
+		ordering: ["home", "plus", "analytics"],
+		activeItemRule: "Underline or indicator on active page",
+	},
+	canonicalShell: {
+		version: 1,
+		navigation: "top",
+		statusBar: "none",
+		density: "comfortable",
+		activeDestinations: {
+			"Fitur Utama": "home",
+			"Uji Coba Produk": "plus",
+			"Paket & Harga": "analytics",
+		},
+	},
+	screenPlan: [
+		{
+			name: "Fitur Utama",
+			role: "Hero dan demonstrasi kemampuan produk",
+			order: 0,
+		},
+		{
+			name: "Uji Coba Produk",
+			role: "Alur interaktif dan pratinjau live",
+			order: 1,
+		},
+		{
+			name: "Paket & Harga",
+			role: "Struktur harga transparan dan FAQ",
+			order: 2,
+		},
+	],
+};

@@ -129,6 +129,25 @@ describe("classifyStudioStreamCompletion", () => {
 });
 
 describe("structured output diagnostics", () => {
+	it("bounds semantic quality correction without rejecting a still-usable screen", async () => {
+		const response = {
+			html: "<html><body><main><div data-skeleton></div><p>Sample content</p></main></body></html>",
+			finishReason: "stop",
+		};
+		const mocked = mockSequence([response, response]);
+		const html = await generateValidatedFrameHtml({
+			framePrompt: "Screen",
+			activeScreen: "Screen",
+			blueprint: null,
+			viewport: "web",
+			expectTokens: false,
+			designSkillId: "none",
+			dsTokens: null,
+			logoUrl: null,
+		});
+		expect(mocked).toHaveBeenCalledTimes(2);
+		expect(html).toContain("Sample content");
+	});
 	it("avoids a correction request when an image supplies the button label", async () => {
 		const mocked = mockSequence([
 			{
@@ -182,7 +201,7 @@ describe("structured output diagnostics", () => {
 	it("reports content emptied by canonical assembly with node counts", async () => {
 		await mockSequence([
 			{
-				html: '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content><nav>Menu lama</nav></main></body></html>',
+				html: '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content><nav data-studio-navigation>Menu lama</nav></main></body></html>',
 			},
 			{
 				html: '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main data-studio-content><p>Konten asli</p></main></body></html>',
@@ -202,7 +221,9 @@ describe("structured output diagnostics", () => {
 				timing: timing(),
 			});
 			expect(html).toContain("Konten asli");
-			const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			const events = log.mock.calls
+				.filter(([line]) => String(line).startsWith("{"))
+				.map(([line]) => JSON.parse(String(line)));
 			expect(events).toEqual(
 				expect.arrayContaining([
 					expect.objectContaining({

@@ -47,12 +47,78 @@ test("real PostgreSQL allowance, concurrency, release, isolation, and paid accou
 			currentPeriodEnd: null,
 		},
 	]);
-	assert.equal((await checkPreSyncCredit(otherUser, {})).response?.status, 403);
+	// The free initial allowance needs no approval: it is priced at zero.
+	assert.equal((await checkPreSyncCredit(otherUser, {})).response, null);
+	assert.equal(
+		(await checkPreSyncCredit(otherUser, {
+			creditConsent: { maximumCredits: 0, pricingVersion: "adaptive-v1" },
+		})).response,
+		null,
+	);
+
+	// A standing authorization recorded by an earlier sync covers later starts;
+	// only a changed pricing version asks again, and one explicit approval fixes it.
+	const authorizedUser = crypto.randomUUID();
+	const authorizedCodebase = crypto.randomUUID();
+	await db.insert(schema.users).values({
+		id: authorizedUser,
+		email: `${authorizedUser}@example.test`,
+		name: "Authorized",
+		initialAnalysisUsedAt: new Date(),
+	});
+	await db.insert(schema.subscriptions).values({
+		id: crypto.randomUUID(),
+		userId: authorizedUser,
+		plan: "pro",
+		credits: 100,
+		currentPeriodEnd: null,
+	});
+	await db.insert(schema.codebases).values({
+		id: authorizedCodebase,
+		userId: authorizedUser,
+		name: "authorized-repo",
+	});
+	const [authorizedSession] = await db
+		.insert(schema.codebaseSyncSessions)
+		.values({
+			id: crypto.randomUUID(),
+			codebaseId: authorizedCodebase,
+			userId: authorizedUser,
+			credentialHash: "unused-hash",
+			status: "waiting_for_cli",
+			expiresAt: new Date(Date.now() + 600000),
+			metadata: {
+				analysisCreditConsent: {
+					maximumCredits: 12,
+					pricingVersion: "adaptive-v1",
+				},
+			},
+		})
+		.returning({ id: schema.codebaseSyncSessions.id });
+	const standing = await checkPreSyncCredit(authorizedUser, {});
+	assert.equal(standing.response, null);
+	assert.equal(standing.status.requiresApproval, false);
+	await db
+		.update(schema.codebaseSyncSessions)
+		.set({
+			metadata: {
+				analysisCreditConsent: {
+					maximumCredits: 12,
+					pricingVersion: "adaptive-v0",
+				},
+			},
+		})
+		.where(eq(schema.codebaseSyncSessions.id, authorizedSession.id));
+	const stale = await checkPreSyncCredit(authorizedUser, {});
+	assert.equal(stale.response?.status, 403);
+	assert.equal(stale.status.requiresApproval, true);
 	assert.equal(
 		(
-			await checkPreSyncCredit(otherUser, {
-				acceptAnalysisPolicy: true,
-				creditConsent: { maximumCredits: 0, pricingVersion: "adaptive-v1" },
+			await checkPreSyncCredit(authorizedUser, {
+				creditConsent: {
+					maximumCredits: stale.status.maximumCredits,
+					pricingVersion: "adaptive-v1",
+				},
 			})
 		).response,
 		null,

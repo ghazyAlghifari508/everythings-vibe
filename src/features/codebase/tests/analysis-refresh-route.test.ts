@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
 	reserve: vi.fn(),
 	release: vi.fn(),
 	settle: vi.fn(),
+	getOperation: vi.fn(),
 	effectiveState: "active_paid",
 	updates: [] as Array<{ values: unknown; condition: unknown }>,
 }));
@@ -36,56 +37,35 @@ vi.mock("@/db/schema", () => {
 	const cols = (table: string, names: string[]) =>
 		Object.fromEntries(names.map((name) => [name, `${table}.${name}`]));
 	return {
-		codebaseAnalyses: cols("analyses", [
-			"id",
-			"projectId",
-			"snapshotId",
-			"status",
-			"output",
-			"createdAt",
-		]),
-		codebaseSnapshots: cols("snapshots", [
-			"id",
-			"syncSessionId",
-			"status",
-			"fileCount",
-			"contentSize",
-			"createdAt",
-		]),
-		codebaseSyncSessions: cols("sessions", [
-			"id",
-			"projectId",
-			"codebaseId",
-			"userId",
-			"createdAt",
-		]),
+		codebaseAnalyses: cols(
+			"analyses",
+			"id projectId snapshotId status output createdAt".split(" "),
+		),
+		codebaseSnapshots: cols(
+			"snapshots",
+			"id syncSessionId status fileCount contentSize createdAt".split(" "),
+		),
+		codebaseSyncSessions: cols(
+			"sessions",
+			"id projectId codebaseId userId createdAt".split(" "),
+		),
 		codebases: cols("codebases", ["id", "userId"]),
-		projects: cols("projects", [
-			"id",
-			"projectMode",
-			"codebaseId",
-			"userId",
-			"deletedAt",
-		]),
-		subscriptions: cols("subscriptions", [
-			"plan",
-			"status",
-			"credits",
-			"creditsUsed",
-			"creditsReserved",
-			"currentPeriodStart",
-			"currentPeriodEnd",
-			"cancelledAt",
-			"createdAt",
-			"userId",
-		]),
+		projects: cols(
+			"projects",
+			"id projectMode codebaseId userId deletedAt".split(" "),
+		),
+		subscriptions: cols(
+			"subscriptions",
+			"plan status credits creditsUsed creditsReserved currentPeriodStart currentPeriodEnd cancelledAt createdAt userId".split(
+				" ",
+			),
+		),
 	};
 });
 vi.mock("@/db", () => ({
 	db: {
 		select: () => {
 			const selectIndex = state.selectCalls++;
-
 			const rows = state.selects[selectIndex] ?? [];
 			const chain: Record<string, unknown> = {};
 			chain.from = () => chain;
@@ -158,6 +138,7 @@ vi.mock("@/features/codebase/services/analysis.server", () => ({
 	requestCodebaseAnalysis: state.requestAnalysis,
 }));
 vi.mock("@/lib/services/credit-service", () => ({
+	getCreditOperation: state.getOperation,
 	buildCodebaseMetrics: vi.fn(() => ({ units: 1 })),
 	createCreditQuote: vi.fn(() => ({ maximumCredits: 1 })),
 	formatInsufficientCreditsError: vi.fn(() => ({ error: "insufficient" })),
@@ -173,27 +154,12 @@ vi.mock("@/lib/services/credit-service", () => ({
 	settleCreditOperation: state.settle,
 }));
 
-const suggestions = [
-	{
-		id: "feature",
-		title: "Feature",
-		description: "Add a feature",
-		prompt: "Build it",
-	},
-	{
-		id: "bugfix",
-		title: "Bug fix",
-		description: "Fix a bug",
-		prompt: "Fix it",
-	},
-	{
-		id: "refactor",
-		title: "Refactor",
-		description: "Refactor code",
-		prompt: "Refactor it",
-	},
-	{ id: "ui", title: "UI", description: "Improve UI", prompt: "Improve it" },
-];
+const suggestions = ["feature", "bugfix", "refactor", "ui"].map((id) => ({
+	id,
+	title: `Task ${id}`,
+	description: "Inspect existing behavior",
+	prompt: "Inspect it",
+}));
 const legacy = {
 	id: "analysis-legacy",
 	projectId: "project-1",
@@ -259,6 +225,10 @@ function setup(analyses: unknown[] = [legacy], ordinary = false) {
 	});
 	state.requestAnalysis.mockResolvedValue({ id: "analysis-new" });
 	state.reserve.mockResolvedValue({ id: "credit-op-1", state: "reserved" });
+	state.getOperation.mockResolvedValue({
+		state: "running",
+		analysisReference: "analysis-new",
+	});
 	state.release.mockResolvedValue({ state: "released" });
 	state.settle.mockResolvedValue({ state: "settled" });
 }
@@ -280,6 +250,48 @@ beforeEach(() => {
 });
 
 describe("analysis refresh POST route", () => {
+	it("releases its own running reservation after generation failure, not another attempt", async () => {
+		setup();
+		state.reserve.mockResolvedValueOnce({
+			id: "credit-op-1",
+			state: "reserved",
+			analysisReference: "analysis-new",
+		});
+		state.requestAnalysis.mockRejectedValueOnce(new Error("provider timeout"));
+		const response = await post()({
+			request: request({
+				snapshotId: "snapshot-1",
+				refreshStarterSuggestionsForAnalysisId: "analysis-legacy",
+			}),
+			params: { id: "project-1" },
+		});
+		expect(response.status).toBe(500);
+		expect(state.release).toHaveBeenCalledWith(
+			expect.objectContaining({
+				operationId: "credit-op-1",
+				actor: "codebase-analysis-failure",
+			}),
+		);
+	});
+
+	it("does not release a running reservation with a different analysis identity", async () => {
+		setup();
+		state.getOperation.mockResolvedValueOnce({
+			state: "running",
+			analysisReference: "another-attempt",
+		});
+		state.requestAnalysis.mockRejectedValueOnce(new Error("provider timeout"));
+		const response = await post()({
+			request: request({
+				snapshotId: "snapshot-1",
+				refreshStarterSuggestionsForAnalysisId: "analysis-legacy",
+			}),
+			params: { id: "project-1" },
+		});
+		expect(response.status).toBe(500);
+		expect(state.release).not.toHaveBeenCalled();
+	});
+
 	it("creates an appended attempt only for the pinned legacy analysis", async () => {
 		setup();
 		const response = await post()({

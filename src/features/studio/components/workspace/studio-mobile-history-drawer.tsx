@@ -12,6 +12,8 @@ export interface StudioMobileHistoryDrawerProps {
 	history: StudioHistoryItem[];
 	onSelectProject: (id: string) => void;
 	onDeleteProject: (id: string) => Promise<void>;
+	onRenameProject: (id: string, name: string) => Promise<void>;
+	onDuplicateProject: (id: string) => Promise<void>;
 }
 
 export function StudioMobileHistoryDrawer({
@@ -20,6 +22,8 @@ export function StudioMobileHistoryDrawer({
 	history,
 	onSelectProject,
 	onDeleteProject,
+	onRenameProject,
+	onDuplicateProject,
 }: StudioMobileHistoryDrawerProps) {
 	return (
 		<DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -54,6 +58,8 @@ export function StudioMobileHistoryDrawer({
 							history={history}
 							onSelectProject={onSelectProject}
 							onDeleteProject={onDeleteProject}
+							onRenameProject={onRenameProject}
+							onDuplicateProject={onDuplicateProject}
 							className="h-full w-full rounded-none border-0"
 						/>
 					</div>

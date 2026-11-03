@@ -149,6 +149,56 @@ describe("stage view reports real history for a fast sync", () => {
 		expect(view.stages.some((row) => row.state === "active")).toBe(false);
 	});
 
+	it("reconciles a log whose entries are not in chronological order", () => {
+		// Entries are looked up by kind, so storage order cannot change which stage
+		// owns a timestamp — and the furthest persisted status still wins.
+		const view = resolveSyncStageView(
+			status({
+				status: "uploaded",
+				snapshotId: "snap_1",
+				fileCount: 12,
+				lifecycle: [
+					{
+						kind: "snapshot_persisted",
+						at: T2.toISOString(),
+						count: 12,
+					},
+					{ kind: "upload_started", at: T1.toISOString() },
+					{ kind: "agent_connected", at: T0.toISOString() },
+				],
+			}),
+		);
+		expect(view.stages.map((row) => row.state)).toEqual([
+			"done",
+			"done",
+			"done",
+		]);
+		expect(view.stages[0].completedAt).toBe(T0.toISOString());
+		expect(view.stages[2].completedAt).toBe(T2.toISOString());
+		expect(view.stages[2].detail).toBe("12 file berhasil diterima.");
+	});
+
+	it("does not replay a transition recorded twice", () => {
+		const view = resolveSyncStageView(
+			status({
+				status: "connected",
+				snapshotId: "snap_1",
+				lifecycle: [
+					{ kind: "agent_connected", at: T0.toISOString() },
+					{ kind: "agent_connected", at: T2.toISOString() },
+				],
+			}),
+		);
+		// The first recorded transition wins, so a repeated handshake cannot move the
+		// finished stage forward or produce a second completion.
+		expect(view.stages[0].completedAt).toBe(T0.toISOString());
+		expect(view.stages.map((row) => row.state)).toEqual([
+			"done",
+			"active",
+			"waiting",
+		]);
+	});
+
 	it("measures the active stage from the recorded start, not from mount", () => {
 		const view = resolveSyncStageView(
 			status({

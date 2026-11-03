@@ -5,13 +5,13 @@ import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets
 
 interface StudioDesignThemePanelProps {
 	activeThemeId: string | null;
-	onSelectTheme: (presetId: string) => void;
+	onToggleTheme: (presetId: string) => void;
 }
 
-/** Curated theme grid; selecting only stages a pending theme id. */
+/** Curated theme grid; clicking the selected card again toggles it off. */
 export function StudioDesignThemePanel({
 	activeThemeId,
-	onSelectTheme,
+	onToggleTheme,
 }: StudioDesignThemePanelProps) {
 	return (
 		<div role="tabpanel" aria-label="Tema" className="flex flex-col gap-3">
@@ -23,7 +23,7 @@ export function StudioDesignThemePanel({
 							key={preset.id}
 							type="button"
 							aria-pressed={selected}
-							onClick={() => onSelectTheme(preset.id)}
+							onClick={() => onToggleTheme(preset.id)}
 							className={`flex flex-col gap-2.5 rounded-xl border bg-onyx p-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo ${
 								selected
 									? "border-snow/60 shadow-xs"

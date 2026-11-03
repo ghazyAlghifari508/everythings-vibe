@@ -11,6 +11,14 @@ export const CODEBASE_NAME_MAX_CHARS = 100;
 export const CODEBASE_SYNC_POLL_INTERVAL_MS = 2_000;
 export const CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS = 500;
 export const CODEBASE_SYNC_REQUEST_TIMEOUT_MS = 10_000;
+// Live progress channel: the server tails the persisted session state and pushes
+// a status frame only when it actually changed, so the browser never waits for
+// the next poll to see a real transition.
+export const CODEBASE_SYNC_STREAM_INTERVAL_MS = 1_000;
+export const CODEBASE_SYNC_STREAM_HEARTBEAT_MS = 15_000;
+// A stream is re-opened after this window instead of living forever: retention
+// stays bounded and a long-idle tab cannot hold a server tail open indefinitely.
+export const CODEBASE_SYNC_STREAM_MAX_DURATION_MS = 10 * 60 * 1_000;
 export const CODEBASE_SYNC_SESSION_EXPIRY_MS = 30 * 60 * 1000;
 // A token inside this window still works, but the prompt screen warns the
 // user instead of letting them copy a credential that dies mid-upload.
@@ -25,6 +33,10 @@ export const CODEBASE_FILE_PREVIEW_MAX_LINES = 3_000;
 export const CODEBASE_CLI_MIN_VERSION = "2.0.0";
 // Two CLI request timeouts allow recovery without stealing a live claim.
 export const CODEBASE_SYNC_CLAIM_STALE_MS = 2 * 30_000;
+// Reconnect attempts before the browser stops trusting the live channel and
+// falls back to status polling. The stream carries no progress of its own, so a
+// lost stream is a transport fact, never a sync failure.
+export const CODEBASE_SYNC_STREAM_MAX_RECONNECT_ATTEMPTS = 3;
 export const CODEBASE_MAX_ERROR_MESSAGE_CHARS = 500;
 
 export const CODEBASE_ANALYSIS_MAX_CONTEXT_CHARS = 60_000;

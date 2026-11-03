@@ -24,7 +24,6 @@ function renderDialog(
 			onOpenChange={onOpenChange}
 			selectedThemeId={null}
 			selectedScrapeId={null}
-			customFilename={null}
 			scrapeSources={[]}
 			onSelectTheme={onSelectTheme}
 			onSelectCustom={onSelectCustom}
