@@ -6,6 +6,7 @@ import {
 	SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
+import { PageHeading } from "@/components/ui";
 import { Icon, type IconProps } from "@/components/ui/icon";
 
 type HubDestination = "/plan" | "/design" | "/scrape" | "/templates";
@@ -57,9 +58,7 @@ export function BentoHub() {
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6">
 			<div className="mx-auto mb-10 max-w-2xl text-center sm:mb-12">
-				<h1 className="text-4xl font-bold tracking-tight text-snow sm:text-5xl lg:text-6xl">
-					Mau ngapain hari ini?
-				</h1>
+				<PageHeading variant="display">Mau ngapain hari ini?</PageHeading>
 				<p className="mt-3 text-sm leading-6 text-fog md:text-base">
 					Pilih workspace untuk mulai menyusun requirements produk, merancang
 					antarmuka UI, mengekstrak website, atau memilih template proyek.

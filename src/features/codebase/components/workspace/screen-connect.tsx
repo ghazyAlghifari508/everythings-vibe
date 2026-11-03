@@ -16,6 +16,8 @@ interface ScreenConnectProps {
 	projectName: string;
 	payload: SyncPromptPayload | null;
 	isStarting?: boolean;
+	promptLocked?: boolean;
+	lockedPromptAction?: React.ReactNode;
 	/**
 	 * The reconciled sync status for this attempt, owned by the screen that owns
 	 * the polling loop. `null` means the browser has not received any server
@@ -47,7 +49,10 @@ interface ScreenConnectProps {
 	onContinueToSummary?: () => void;
 	analysis?: AnalysisResponse | null;
 	analysisError?: string | null;
+	/** Billing/eligibility blocked the analysis; the snapshot is still usable. */
+	analysisBlocked?: boolean;
 	isAnalyzing?: boolean;
+	isRetrying?: boolean;
 	onRetryAnalysis?: () => void;
 	isLegacyAnalysisMissingSuggestions?: boolean;
 	onRefreshLegacySuggestions?: () => void;
@@ -57,6 +62,8 @@ export function ScreenConnect({
 	projectName,
 	payload,
 	isStarting = false,
+	promptLocked = false,
+	lockedPromptAction,
 	status,
 	statusError = null,
 	onRequestNewToken,
@@ -65,7 +72,9 @@ export function ScreenConnect({
 	onContinueToSummary,
 	analysis = null,
 	analysisError = null,
+	analysisBlocked = false,
 	isAnalyzing = false,
+	isRetrying = false,
 	onRetryAnalysis,
 	isLegacyAnalysisMissingSuggestions = false,
 	onRefreshLegacySuggestions,
@@ -81,7 +90,7 @@ export function ScreenConnect({
 
 	return (
 		<div className="w-full animate-enter">
-			<div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-iron bg-obsidian/90 shadow-2xl backdrop-blur-xl">
+			<div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-iron bg-obsidian">
 				<div className="border-b border-graphite p-5 sm:p-6">
 					{/* The server owns this name once the CLI has handshaken, so the
 					eyebrow drops the creation placeholder and shows the detected
@@ -100,10 +109,14 @@ export function ScreenConnect({
 
 				<div className="flex flex-col gap-6 p-5 sm:p-6">
 					<ScreenConnectPromptStep
+						key={payload?.sessionId ?? "no-session"}
 						projectName={projectName}
 						payload={payload}
 						isStarting={isStarting}
+						status={status}
 						onRequestNewToken={onRequestNewToken}
+						locked={promptLocked}
+						lockedAction={lockedPromptAction}
 					/>
 
 					<ScreenConnectAgentStep />
@@ -118,7 +131,9 @@ export function ScreenConnect({
 						canContinueToSummary={canContinueToSummary}
 						analysis={analysis}
 						analysisError={analysisError}
+						analysisBlocked={analysisBlocked}
 						isAnalyzing={isAnalyzing}
+						isRetrying={isRetrying}
 						onRetryAnalysis={onRetryAnalysis}
 						isLegacyAnalysisMissingSuggestions={
 							isLegacyAnalysisMissingSuggestions

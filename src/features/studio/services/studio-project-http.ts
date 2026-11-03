@@ -1,17 +1,9 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { STUDIO_DESIGN_MD_MAX_CHARS } from "@/features/studio/types/studio-constants";
 import { ScrapeError } from "@/lib/design-errors";
 import { requireUser } from "@/lib/session";
-import { StudioReferenceError } from "./studio-design-reference.server";
-import {
-	studioDesignReferenceSchema,
-	studioDesignSkillIdSchema,
-} from "./studio-generation-options";
-import {
-	updateStudioDesignSystem,
-	updateStudioPreferences,
-} from "./studio-preferences-service";
+import { studioDesignSkillIdSchema } from "./studio-generation-options";
+import { updateStudioPreferences } from "./studio-preferences-service";
 import { getStudioProjectDetail } from "./studio-project-detail";
 import {
 	deleteStudioProject,
@@ -22,21 +14,6 @@ import {
 // only ever observed as a category, so a user document cannot reach the log.
 function studioErrorResponse(error: unknown, operation: string): Response {
 	const correlationId = crypto.randomUUID();
-	if (error instanceof StudioReferenceError) {
-		console.error("[studio.project]", {
-			operation,
-			correlationId,
-			category: error.failure,
-			// Curated validation copy, never the user's own DESIGN.md content.
-			diagnostic: error.diagnostic,
-		});
-		// 400, never 404: the client reads 404 as "project deleted" and would drop
-		// a live project because its reference went stale.
-		return Response.json(
-			{ error: error.message, code: "STUDIO_REFERENCE_REJECTED" },
-			{ status: 400 },
-		);
-	}
 	const unauthorized =
 		error instanceof Error && /Unauthorized|Forbidden/.test(error.message);
 	const code = unauthorized
@@ -92,34 +69,9 @@ const projectActionSchema = z.discriminatedUnion("action", [
 		projectId: z.string().trim().min(1).max(200),
 	}),
 	z.object({
-		action: z.literal("design-system"),
-		projectId: z.string().trim().min(1).max(200),
-		designMd: z.string().max(STUDIO_DESIGN_MD_MAX_CHARS).nullable().optional(),
-		designReference: studioDesignReferenceSchema.nullable().optional(),
-		designSkillId: studioDesignSkillIdSchema.optional(),
-		logo: z
-			.object({
-				filename: z.string().min(1).max(200),
-				mimeType: z.string().min(1),
-				data: z.string().min(1),
-			})
-			.nullable()
-			.optional(),
-	}),
-	z.object({
 		action: z.literal("preferences"),
 		projectId: z.string().trim().min(1).max(200),
-		designSkillId: studioDesignSkillIdSchema.optional(),
-		designReference: studioDesignReferenceSchema.nullable().optional(),
-		designMd: z.string().max(STUDIO_DESIGN_MD_MAX_CHARS).nullable().optional(),
-		logo: z
-			.object({
-				filename: z.string().min(1).max(200),
-				mimeType: z.string().min(1),
-				data: z.string().min(1),
-			})
-			.nullable()
-			.optional(),
+		designSkillId: studioDesignSkillIdSchema,
 	}),
 ]);
 
@@ -138,14 +90,6 @@ export async function POST({
 				{ error: "Aksi project tidak valid." },
 				{ status: 400 },
 			);
-		if (parsed.data.action === "design-system") {
-			const project = await updateStudioDesignSystem(
-				parsed.data.projectId,
-				user.id,
-				parsed.data,
-			);
-			return Response.json({ project });
-		}
 		if (parsed.data.action === "preferences") {
 			const project = await updateStudioPreferences(
 				parsed.data.projectId,

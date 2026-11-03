@@ -38,6 +38,11 @@ export const SYNC_SAFE_ERROR_CODES = [
 	"SNAPSHOT_CONFLICT",
 	"SNAPSHOT_HASH_MISMATCH",
 	"ANALYSIS_FAILED",
+	// Persisted on `codebase_analyses.errorCode` by the analysis writer, so the
+	// status projection can tell a provider outage from unusable model output
+	// instead of collapsing both into ANALYSIS_FAILED.
+	"ANALYSIS_OUTPUT_INVALID",
+	"PROVIDER_UNAVAILABLE",
 	// The CLI handshakes BEFORE it prepares source code, so these two describe
 	// a real window that begins only after the server already persisted
 	// `connected`. Without them the browser would sit on a stale "preparing"

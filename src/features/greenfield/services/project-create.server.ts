@@ -187,6 +187,11 @@ export async function handleProjectCreateRequest(
 		});
 	}
 
+	const { checkPreSyncCredit } = await import(
+		"@/features/codebase/services/analysis-credit-preflight.server"
+	);
+	const preflight = await checkPreSyncCredit(user.id, body);
+	if (preflight.response) return preflight.response;
 	// Existing-codebase: the project and its first short-lived sync
 	// session are created atomically. The raw credential is returned
 	// once inside the sync payload; only its hash is persisted.
@@ -217,6 +222,12 @@ export async function handleProjectCreateRequest(
 				expiresAt,
 				cliMinVersion: CODEBASE_CLI_MIN_VERSION,
 				attempt: 1,
+				metadata: {
+					analysisCreditConsent: {
+						maximumCredits: preflight.status.maximumCredits,
+						pricingVersion: preflight.status.pricingVersion,
+					},
+				},
 			})
 			.returning({
 				expiresAt: codebaseSyncSessions.expiresAt,

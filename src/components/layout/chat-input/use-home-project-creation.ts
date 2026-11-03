@@ -141,7 +141,10 @@ export function useHomeProjectCreation({
 			// not after redirect to empty PRD/question page.
 			try {
 				const freshPlan = await refetchPlan();
-				if (shouldBlockProjectCreationOnCredits(freshPlan.data?.remaining)) {
+				if (
+					projectMode !== "existing_codebase" &&
+					shouldBlockProjectCreationOnCredits(freshPlan.data?.remaining)
+				) {
 					setCreditsExhaustedMsg(
 						"Kredit kamu sudah habis. Beli kredit untuk membuat proyek baru.",
 					);
@@ -151,13 +154,33 @@ export function useHomeProjectCreation({
 				// If plan check fails, allow flow — server will block with 403 anyway
 			}
 
+			let acceptance: {
+				acceptAnalysisPolicy: true;
+				creditConsent: { maximumCredits: number; pricingVersion: string };
+			} | null = null;
+			if (projectMode === "existing_codebase") {
+				const credit = await (
+					await import("@/features/codebase/services/analysis-credit-requests")
+				).requestPreSyncPreflight();
+				if (credit.code === "CREDIT_REQUIRED") {
+					setCreditsExhaustedMsg(
+						`Analisis membutuhkan hingga ${credit.maximumCredits} kredit. Buka halaman sync untuk menyetujui biaya.`,
+					);
+					navigate({ to: "/plan/codebase" });
+					return;
+				}
+				const { preSyncAcceptance } = await import(
+					"@/features/codebase/services/analysis-credit-requests"
+				);
+				acceptance = preSyncAcceptance(credit);
+			}
 			const endpoint =
 				projectMode === "existing_codebase"
 					? "/api/codebases"
 					: "/api/projects";
 			const requestBody =
 				projectMode === "existing_codebase"
-					? { message: enrichedPrompt }
+					? { message: enrichedPrompt, ...acceptance }
 					: {
 							message: enrichedPrompt,
 							language,
@@ -216,7 +239,9 @@ export function useHomeProjectCreation({
 			navigate({ to: target.to, params: target.params });
 		} catch (err) {
 			console.error("Create project error:", err);
-			setPromptError("Gagal membuat proyek. Coba lagi.");
+			setPromptError(
+				err instanceof Error ? err.message : "Gagal membuat proyek. Coba lagi.",
+			);
 		} finally {
 			isSendingRef.current = false;
 			setIsSending(false);

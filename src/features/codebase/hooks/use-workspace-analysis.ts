@@ -74,9 +74,13 @@ export function useWorkspaceAnalysis({
 				}
 				if (analysisIdentityRef.current === requestIdentity)
 					setAnalysis(parsed);
-			} catch {
+			} catch (error) {
 				if (analysisIdentityRef.current === requestIdentity)
-					setError("Server tidak dapat dihubungi.");
+					setError(
+						error instanceof Error
+							? error.message
+							: "Server tidak dapat dihubungi.",
+					);
 			} finally {
 				setIsWorking(false);
 			}
@@ -164,9 +168,13 @@ export function useWorkspaceAnalysis({
 				}
 				if (analysisIdentityRef.current === `${projectId}:${snapshotId}`)
 					setAnalysis(parsed);
-			} catch {
+			} catch (error) {
 				if (analysisIdentityRef.current === `${projectId}:${snapshotId}`)
-					setStarterRefreshError("Server tidak dapat dihubungi. Coba lagi.");
+					setStarterRefreshError(
+						error instanceof Error
+							? error.message
+							: "Server tidak dapat dihubungi. Coba lagi.",
+					);
 			} finally {
 				analysisRefreshInFlight.current = false;
 				setIsRefreshingStarterSuggestions(false);

@@ -1,3 +1,4 @@
+import { CreditSubscriptionOriginError } from "@/features/billing/types/credit-contracts";
 import { AnalysisValidationError } from "./analysis-validation";
 
 // Fixed user-facing message. Never echoes model text, stack traces, tokens,
@@ -49,6 +50,18 @@ export function classifyAnalysisFailure(
 		return "snapshot";
 	}
 	const message = error instanceof Error ? error.message : String(error);
+	// Credit lifecycle failures that abort persistence are triaged as
+	// persistence, not provider: the model output existed, only finalization
+	// failed, so the correct action is safe retry of finalization — not
+	// treating the provider as down.
+	if (
+		error instanceof CreditSubscriptionOriginError ||
+		/credit operation|reservation expired|credit subscription|subscription origin/i.test(
+			message,
+		)
+	) {
+		return "persistence";
+	}
 	if (/aborted|aborterror/i.test(message)) return "aborted";
 	if (
 		/tidak merespons dalam 2 menit|melebihi batas waktu|timeout|timed out|etimedout|stall/i.test(
@@ -68,12 +81,88 @@ export function classifyAnalysisFailure(
 	return "unknown";
 }
 
+// === Canonical recovery codes (Phase 03 Section E) ===
+// One vocabulary shared by the persisted `codebase_analyses.errorCode`, the
+// route failure envelope, and the readiness projection. The frontend never
+// renders these strings; it maps them to copy and actions.
+export const ANALYSIS_RECOVERY_CODES = [
+	"ANALYSIS_NOT_STARTED",
+	"ANALYSIS_PENDING",
+	"ANALYSIS_FAILED",
+	"ANALYSIS_OUTPUT_INVALID",
+	"CREDIT_REQUIRED",
+	"PROVIDER_UNAVAILABLE",
+	"SNAPSHOT_INCOMPLETE",
+] as const;
+
+export type AnalysisRecoveryCode = (typeof ANALYSIS_RECOVERY_CODES)[number];
+
+const CATEGORY_RECOVERY_CODE: Readonly<
+	Record<AnalysisFailureCategory, AnalysisRecoveryCode>
+> = {
+	provider: "PROVIDER_UNAVAILABLE",
+	timeout: "PROVIDER_UNAVAILABLE",
+	aborted: "PROVIDER_UNAVAILABLE",
+	snapshot: "SNAPSHOT_INCOMPLETE",
+	invalid_json: "ANALYSIS_OUTPUT_INVALID",
+	schema: "ANALYSIS_OUTPUT_INVALID",
+	untrusted_paths: "ANALYSIS_OUTPUT_INVALID",
+	technical_leak: "ANALYSIS_OUTPUT_INVALID",
+	persistence: "ANALYSIS_FAILED",
+	unknown: "ANALYSIS_FAILED",
+};
+
+/** Map a classified failure category onto the public recovery vocabulary. */
+export function toAnalysisRecoveryCode(
+	category: AnalysisFailureCategory,
+): AnalysisRecoveryCode {
+	return CATEGORY_RECOVERY_CODE[category];
+}
+
+/** Classify a thrown attempt failure into the code stored on the failed row. */
+export function classifyAnalysisAttemptCode(
+	error: unknown,
+	stage?: AnalysisAttemptStage,
+): AnalysisRecoveryCode {
+	return toAnalysisRecoveryCode(classifyAnalysisFailure(error, stage));
+}
+
+/** Unknown stored values are dropped so status polling never echoes garbage. */
+export function isAnalysisRecoveryCode(
+	value: unknown,
+): value is AnalysisRecoveryCode {
+	return (
+		typeof value === "string" &&
+		(ANALYSIS_RECOVERY_CODES as readonly string[]).includes(value)
+	);
+}
+
+/**
+ * Operation identity for one analysis attempt. Stable for the same
+ * project + snapshot + refresh target, so a duplicate trigger (double click,
+ * retry of a lost response) resolves to the same reservation instead of
+ * charging twice, while a refresh of a different target stays a distinct,
+ * explicitly-priced operation.
+ */
+export function buildAnalysisIdempotencyKey(input: {
+	projectId: string;
+	snapshotId: string;
+	refreshAnalysisId?: string | null;
+}): string {
+	return `${input.projectId}:codebase_analysis:${input.snapshotId}:${input.refreshAnalysisId ?? "initial"}`;
+}
+
 export interface AnalysisDiagnosticRecord {
 	attemptId: string;
 	projectId: string;
 	snapshotId: string;
 	category: AnalysisFailureCategory;
 	durationMs: number;
+	creditOperationId?: string;
+	operationState?: string;
+	operationExpiresAt?: string;
+	stage?: AnalysisAttemptStage;
+	errorCode?: string;
 	issuePaths?: readonly string[];
 	rawLength?: number;
 }
@@ -81,6 +170,10 @@ export interface AnalysisDiagnosticRecord {
 export function formatAnalysisDiagnosticLog(
 	record: AnalysisDiagnosticRecord,
 ): Record<string, string | number | readonly string[]> {
+	const errorCode =
+		typeof record.errorCode === "string"
+			? record.errorCode.slice(0, 80)
+			: undefined;
 	const shaped: Record<string, string | number | readonly string[]> = {
 		attemptId: record.attemptId,
 		projectId: record.projectId,
@@ -88,6 +181,16 @@ export function formatAnalysisDiagnosticLog(
 		category: record.category,
 		durationMs: record.durationMs,
 	};
+	// Credit operation identity is safe internal metadata (ids + state +
+	// expiry only): no CLI tokens, API keys, source content, or model
+	// output ever enters this record.
+	if (record.creditOperationId)
+		shaped.creditOperationId = record.creditOperationId;
+	if (record.operationState) shaped.operationState = record.operationState;
+	if (record.operationExpiresAt)
+		shaped.operationExpiresAt = record.operationExpiresAt;
+	if (record.stage) shaped.stage = record.stage;
+	if (errorCode) shaped.errorCode = errorCode;
 	if (record.issuePaths && record.issuePaths.length > 0) {
 		shaped.issuePaths = record.issuePaths;
 	}

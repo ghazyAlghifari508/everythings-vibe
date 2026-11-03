@@ -3,12 +3,14 @@ import { studioWorkerFailure } from "./studio-worker-diagnostics";
 
 config({ path: [".env.local", ".env"] });
 let stopping = false;
-process.on("SIGINT", () => {
+// Signals stop in-flight generation so a restart does not wait out a 30-minute job.
+const shutdown = new AbortController();
+function stop() {
 	stopping = true;
-});
-process.on("SIGTERM", () => {
-	stopping = true;
-});
+	shutdown.abort();
+}
+process.on("SIGINT", stop);
+process.on("SIGTERM", stop);
 
 const startupStartedAt = Date.now();
 let stage = "module-load";
@@ -33,7 +35,7 @@ async function run() {
 		console.info("Studio worker ready");
 		stage = "dispatch";
 		while (!stopping) {
-			const processed = await dispatchStudioWorkerBatch();
+			const processed = await dispatchStudioWorkerBatch(shutdown.signal);
 			if (!stopping && processed === 0)
 				await new Promise((resolve) =>
 					setTimeout(resolve, STUDIO_WORKER_POLL_MS),

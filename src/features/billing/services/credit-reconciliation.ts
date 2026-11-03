@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDatabase } from "@/features/billing/services/credit-db";
 import { releaseCreditOperation } from "@/features/billing/services/credit-release";
 import type { CreditOperationResult } from "@/features/billing/types/credit-contracts";
@@ -128,6 +128,40 @@ export async function reconcileExpiredCreditOperations(input: {
 	});
 	const releasedOperationIds: string[] = [];
 	for (const operation of claimed) {
+		const [analysisOperation] = await db
+			.select()
+			.from(schema.creditOperations)
+			.where(
+				and(
+					eq(schema.creditOperations.id, operation.id),
+					eq(schema.creditOperations.userId, input.userId),
+				),
+			)
+			.limit(1);
+		if (
+			analysisOperation?.kind === "codebase_analysis" &&
+			analysisOperation.analysisReference
+		) {
+			const ownedProjects = db
+				.select({ id: schema.projects.id })
+				.from(schema.projects)
+				.where(eq(schema.projects.userId, input.userId));
+			await db
+				.update(schema.codebaseAnalyses)
+				.set({
+					status: "failed",
+					errorCode: "ANALYSIS_FAILED",
+					errorMessage: "Analisis terhenti. Silakan coba lagi.",
+					updatedAt: nowValue,
+				})
+				.where(
+					and(
+						eq(schema.codebaseAnalyses.id, analysisOperation.analysisReference),
+						eq(schema.codebaseAnalyses.status, "pending"),
+						inArray(schema.codebaseAnalyses.projectId, ownedProjects),
+					),
+				);
+		}
 		try {
 			const result = await releaseCreditOperation({
 				userId: input.userId,

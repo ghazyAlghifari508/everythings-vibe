@@ -37,6 +37,9 @@ describe("PROJECT_SYNC_CHILD_TABLES", () => {
 				"codebase_analyses",
 				"codebase_ask_handoffs",
 				"codebase_generation_contexts",
+				"codebase_revision_proposals",
+				"feature_versions",
+				"task_versions",
 			].sort(),
 		);
 	});

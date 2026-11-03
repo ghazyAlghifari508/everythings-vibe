@@ -5,6 +5,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { PageHeading } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 
 export const Route = createFileRoute("/plan/")({
@@ -48,9 +49,7 @@ export function PlanOptionsPage() {
 			<HubBreadcrumb current="VibePlan" />
 
 			<header className="mx-auto max-w-xl text-center">
-				<h1 className="text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
-					Pilih Metode Perencanaan
-				</h1>
+				<PageHeading variant="workspace">Pilih Metode Perencanaan</PageHeading>
 				<p className="mt-3 text-sm leading-6 text-fog">
 					Apakah Anda ingin merancang produk baru dari awal atau menyambungkan
 					proyek yang sudah ada?

@@ -4,15 +4,16 @@ import type {
 	StudioJobRow,
 	StudioProjectRow,
 } from "@/db/schema";
-import type { StudioComposerScope } from "@/features/studio/components/composer/studio-composer";
+import type { StudioComposerSubmitResult } from "@/features/studio/components/composer/studio-composer";
+import { useStudioScreenSuggestions } from "@/features/studio/hooks/use-studio-screen-suggestions";
 import { useStudioStatus } from "@/features/studio/hooks/use-studio-status";
 import { useStudioWorkspaceActions } from "@/features/studio/hooks/use-studio-workspace-actions";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_DESIGN_PRESETS } from "@/features/studio/services/studio-presets";
-import type {
-	AttachedDesignReference,
-	StudioDetailLoaderData,
-} from "@/features/studio/types/studio";
+import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
+import type { StudioDetailLoaderData } from "@/features/studio/types/studio";
+
+const NO_SUGGESTIONS: readonly StudioScreenSuggestion[] = [];
 
 export interface StudioWorkspaceState {
 	project: StudioProjectRow;
@@ -22,30 +23,28 @@ export interface StudioWorkspaceState {
 	selectedFrameIds: string[];
 	selectedFrames: StudioFrameRow[];
 	composerLoading: boolean;
-	preferenceSaving: boolean;
 	exportingZip: boolean;
 	deleting: boolean;
 	duplicating: boolean;
-	isAddFrameOpen: boolean;
+	/** Frames with a retry request in flight; their retry control is disabled. */
+	retryingFrameIds: string[];
+	/** Per-frame retry rejections, rendered inside that frame only. */
+	frameRetryErrors: Record<string, string>;
 	error: string;
 	isProcessing: boolean;
 	readyFramesCount: number;
 	storedReferenceLabel: string | null;
+	/** Empty while work is in flight; a new screen is already on its way. */
+	suggestions: readonly StudioScreenSuggestion[];
 	selectFrame: (id: string | null, additive?: boolean) => void;
 	selectFrames: (ids: string[]) => void;
 	removeSelectedFrame: (id: string) => void;
-	setIsAddFrameOpen: (open: boolean) => void;
 	setError: (message: string) => void;
 	handleDuplicate: () => Promise<void>;
 	handleDelete: () => Promise<void>;
 	handleComposerSubmit: (
 		promptText: string,
-		scope: StudioComposerScope,
-	) => Promise<boolean>;
-	handleAddFrame: (input: { name: string; prompt: string }) => Promise<void>;
-	handleApplyDesignSystem: (
-		reference: AttachedDesignReference,
-	) => Promise<boolean>;
+	) => Promise<StudioComposerSubmitResult>;
 	handleSkillChange: (skillId: StudioDesignSkillId) => Promise<void>;
 	handleRetryFrame: (frameId: string) => Promise<void>;
 	handleRetryPlanning: () => Promise<void>;
@@ -66,7 +65,6 @@ export function useStudioWorkspace(
 	} = useStudioStatus(initialData);
 	const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 	const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
-	const [isAddFrameOpen, setIsAddFrameOpen] = useState(false);
 	const [error, setActionError] = useState("");
 	const setError = useCallback(
 		(message: string) => {
@@ -81,7 +79,6 @@ export function useStudioWorkspace(
 		if (loader.current.project.id !== initialData.project.id) {
 			setSelectedFrameId(null);
 			setSelectedFrameIds([]);
-			setIsAddFrameOpen(false);
 		}
 		loader.current = initialData;
 		setActionError("");
@@ -114,6 +111,12 @@ export function useStudioWorkspace(
 		[frames],
 	);
 
+	const projectSuggestions = useStudioScreenSuggestions(project, frames);
+	// While a job is running the project is mid-plan, and a next-screen request
+	// would race the planning step that rewrites the frame list. Suggestions
+	// come back as soon as the canvas is idle again.
+	const suggestions = isProcessing ? NO_SUGGESTIONS : projectSuggestions;
+
 	// Derived selection state must keep a stable identity: a fresh array on
 	// every poll tick would re-render the composer even when nothing changed.
 	const selectedFrames = useMemo(
@@ -133,7 +136,6 @@ export function useStudioWorkspace(
 		isProcessing,
 		syncProjectStatus,
 		setError,
-		setIsAddFrameOpen,
 	});
 
 	const storedReferenceLabel = useMemo(() => {
@@ -158,25 +160,23 @@ export function useStudioWorkspace(
 		selectedFrameIds,
 		selectedFrames,
 		composerLoading: actions.composerLoading,
-		preferenceSaving: actions.preferenceSaving,
 		exportingZip: actions.exportingZip,
 		deleting: actions.deleting,
 		duplicating: actions.duplicating,
-		isAddFrameOpen,
+		retryingFrameIds: actions.retryingFrameIds,
+		frameRetryErrors: actions.frameRetryErrors,
 		error: error || syncError,
 		isProcessing,
 		readyFramesCount,
 		storedReferenceLabel,
+		suggestions,
 		selectFrame,
 		selectFrames,
 		removeSelectedFrame,
-		setIsAddFrameOpen,
 		setError,
 		handleDuplicate: actions.handleDuplicate,
 		handleDelete: actions.handleDelete,
 		handleComposerSubmit: actions.handleComposerSubmit,
-		handleAddFrame: actions.handleAddFrame,
-		handleApplyDesignSystem: actions.handleApplyDesignSystem,
 		handleSkillChange: actions.handleSkillChange,
 		handleRetryFrame: actions.handleRetryFrame,
 		handleRetryPlanning: actions.handleRetryPlanning,

@@ -11,7 +11,9 @@ const ERROR_FEEDBACK_MS = 4000;
  *
  * Only one message is ever pending, so a second copy replaces the first
  * timer instead of stacking another one. The pending timer is cleared on
- * unmount so a copy cannot write state after its screen has closed.
+ * unmount so a copy cannot write state after its screen has closed. The
+ * caller remounts (via `key`) when the copied content identity changes, so
+ * a success badge can never survive a token rotation.
  */
 export function useCopyFeedback() {
 	const [copied, setCopied] = useState(false);

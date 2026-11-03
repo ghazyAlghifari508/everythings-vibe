@@ -1,3 +1,27 @@
+import type { StudioLeaseRefresh } from "./studio-job-lease";
+
+export interface StudioHeartbeatDiagnostics {
+	jobId: string;
+	workerId: string;
+	heartbeatAttempt: number;
+	heartbeatStartedAt: number;
+	heartbeatDurationMs: number;
+	leaseExpiresAt: number | null;
+	databaseErrorCategory: string | null;
+	leaseRefreshResult: StudioLeaseRefresh["outcome"] | "skipped";
+	jobStatus: string | null;
+	claimedByMatches: boolean;
+	abortReason: string | null;
+}
+
+// Internal reliability telemetry: identifiers, counters, and safe error codes
+// only. Provider messages, prompts, and credentials never reach this event.
+export function studioHeartbeatDiagnostics(event: StudioHeartbeatDiagnostics) {
+	console.info(
+		JSON.stringify({ scope: "studio", stage: "heartbeat", ...event }),
+	);
+}
+
 export function studioWorkerFailure(error: unknown, stage: string) {
 	const cause =
 		error instanceof Error &&

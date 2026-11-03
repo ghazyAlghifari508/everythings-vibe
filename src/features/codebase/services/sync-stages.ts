@@ -6,9 +6,12 @@ import type {
 import { isSyncStatusComplete } from "./sync-lifecycle";
 
 // === User-facing sync stage mapping ===
-// The two sync stages the user can actually observe are the CLI handshake and
-// the source upload. AI analysis is a separate capability owned by the summary
-// step, so it never becomes a third stage here.
+// The three sync stages the user can actually observe are the CLI handshake,
+// source preparation, and the upload. AI analysis is a separate capability with
+// its own persisted attempt, so it is rendered as its own row by the status
+// list instead of being folded into a sync stage: an upload can finish while
+// the analysis is still pending, and an analysis failure must never read as a
+// failed upload.
 //
 // This is the ONE mapping from domain status to user-facing stage copy. It lives
 // next to the status vocabulary rather than inside a component so the surfaces
@@ -58,7 +61,12 @@ const SYNC_STAGE_PROGRESS: Readonly<
 	expired: "waiting",
 };
 
-export type SyncStageState = "done" | "active" | "waiting" | "failed";
+export type SyncStageState =
+	| "done"
+	| "active"
+	| "waiting"
+	| "failed"
+	| "blocked";
 
 export interface SyncStageRow {
 	state: SyncStageState;
@@ -134,7 +142,7 @@ export const SYNC_STAGE_TEST_IDS: Readonly<Record<SyncStageKey, string>> = {
 const AGENT_TITLE = "Menunggu agent";
 const AGENT_HINT = "Jalankan prompt dari root repository.";
 const PREPARE_TITLE = "Menyiapkan source code";
-const SYNC_TITLE = "Menyinkronkan codebase";
+const SYNC_TITLE = "Mengunggah repository";
 
 function buildAgentRow(
 	progress: SyncStageProgress,

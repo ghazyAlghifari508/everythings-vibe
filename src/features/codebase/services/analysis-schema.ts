@@ -5,6 +5,7 @@ import {
 	CODEBASE_STARTER_PROMPT_MAX_CHARS,
 	CODEBASE_STARTER_TITLE_MAX_CHARS,
 } from "@/features/codebase/types/codebase-constants";
+import { analysisCreditConsentSchema } from "./analysis-credit-policy";
 import { codebaseAnalysisStatusSchema } from "./sync";
 
 // === Codebase analysis (validated advisory output) ===
@@ -107,6 +108,8 @@ export const ANALYSIS_VALIDATION_MESSAGE =
 
 export const analysisRequestSchema = z.object({
 	snapshotId: z.string().min(1).optional(),
+	preflight: z.boolean().optional(),
+	creditConsent: analysisCreditConsentSchema.optional(),
 });
 
 export type AnalysisRequest = z.infer<typeof analysisRequestSchema>;

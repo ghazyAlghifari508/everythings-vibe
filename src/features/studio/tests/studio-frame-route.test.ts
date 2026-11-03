@@ -7,7 +7,10 @@ const requireUser = vi.fn(async () => ({
 	id: "user-123",
 	email: "test@example.com",
 }));
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+	vi.restoreAllMocks();
+	enqueueStudioOperation.mockReset();
+});
 
 const getStudioFrameVisual = vi.fn(
 	async (
@@ -41,32 +44,9 @@ vi.mock("@/features/studio/services/studio-frame-visual", () => ({
 	) => getStudioFrameVisual(projectId, frameId, userId, options),
 }));
 
-vi.mock("@/features/studio/services/studio-frame-service", () => ({
-	addStudioFrame: async (
-		projectId: string,
-		_userId: string,
-		input: unknown,
-	) => ({
-		id: "f-new",
-		projectId,
-		name: (input as { name: string }).name,
-		status: "ready",
-		order: 2,
-		htmlCode: "<html>new</html>",
-	}),
-	reviseStudioFrame: async (
-		projectId: string,
-		_userId: string,
-		frameId: string,
-		_prompt: string,
-	) => ({
-		id: frameId,
-		projectId,
-		name: "Dashboard",
-		status: "ready",
-		order: 0,
-		htmlCode: "<html>revised</html>",
-	}),
+const enqueueStudioOperation = vi.hoisted(() => vi.fn());
+vi.mock("@/features/studio/services/studio-operation-enqueue", () => ({
+	enqueueStudioOperation,
 }));
 
 vi.mock("@/features/studio/services/studio-retry-service", () => ({
@@ -92,52 +72,73 @@ vi.mock("@/features/studio/services/studio-retry-service", () => ({
 	}),
 }));
 
+function operationRequest(body: Record<string, unknown>, method = "POST") {
+	return new Request("https://app.test/api/studio/frame", {
+		method,
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(body),
+	});
+}
+
 describe("POST /api/studio/frame", () => {
-	it("adds new frame to project", async () => {
-		const req = new Request("https://app.test/api/studio/frame", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				action: "add",
+	it("acknowledges a resolved canvas operation", async () => {
+		enqueueStudioOperation.mockResolvedValueOnce({
+			intent: "add_screen",
+			jobs: [{ id: "job-1", projectId: "proj-1", status: "queued" }],
+			frames: [{ id: "f-new", projectId: "proj-1", name: "Profile" }],
+		});
+		const res = await POST({
+			request: operationRequest({
+				action: "operation",
 				projectId: "proj-1",
-				name: "Budget Planning",
-				prompt: "Buatkan halaman perencanaan budget bulanan",
+				prompt: "Buat halaman Profile",
+				frameIds: [],
+				requestId: "11111111-1111-4111-8111-111111111111",
 			}),
 		});
-
-		const res = await POST({ request: req });
-		expect(res.status).toBe(201);
-		const data = await res.json();
-		expect(data.frame.name).toBe("Budget Planning");
+		expect(res.status).toBe(202);
+		expect(await res.json()).toMatchObject({ intent: "add_screen" });
 	});
 
-	it("revises specific frame", async () => {
-		const req = new Request("https://app.test/api/studio/frame", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				action: "revise",
+	it("returns a clarifying question instead of guessing", async () => {
+		enqueueStudioOperation.mockResolvedValueOnce({
+			intent: "clarify",
+			message: "Pilih layar yang ingin diubah.",
+		});
+		const res = await POST({
+			request: operationRequest({
+				action: "operation",
 				projectId: "proj-1",
-				frameId: "f-1",
-				prompt: "Ubah tema jadi gelap",
+				prompt: "Bikin lebih bagus",
+				requestId: "11111111-1111-4111-8111-111111111111",
 			}),
 		});
-
-		const res = await POST({ request: req });
 		expect(res.status).toBe(200);
-		const data = await res.json();
-		expect(data.frame.htmlCode).toBe("<html>revised</html>");
+		expect(await res.json()).toEqual({
+			intent: "clarify",
+			message: "Pilih layar yang ingin diubah.",
+		});
+	});
+
+	it("rejects the removed manual add and revise actions", async () => {
+		for (const action of ["add", "revise"]) {
+			const res = await POST({
+				request: operationRequest({
+					action,
+					projectId: "proj-1",
+					prompt: "Buat halaman Profile",
+				}),
+			});
+			expect(res.status).toBe(400);
+			expect(enqueueStudioOperation).not.toHaveBeenCalled();
+		}
 	});
 
 	it("returns the retry outcome so the client can explain the state", async () => {
-		const req = new Request("https://app.test/api/studio/frame", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				action: "retry",
-				projectId: "proj-1",
-				frameId: "f-2",
-			}),
+		const req = operationRequest({
+			action: "retry",
+			projectId: "proj-1",
+			frameId: "f-2",
 		});
 
 		const res = await POST({ request: req });
@@ -169,13 +170,10 @@ describe("POST /api/studio/frame", () => {
 			retry: "already-running",
 		});
 		const res = await POST({
-			request: new Request("https://app.test/api/studio/frame", {
-				method: "POST",
-				body: JSON.stringify({
-					action: "retry",
-					projectId: "proj-1",
-					frameId: "f-2",
-				}),
+			request: operationRequest({
+				action: "retry",
+				projectId: "proj-1",
+				frameId: "f-2",
 			}),
 		});
 		expect(res.status).toBe(200);
@@ -189,13 +187,10 @@ describe("POST /api/studio/frame", () => {
 			new StudioFrameError("STUDIO_RETRY_RUNNING", "private lease detail"),
 		);
 		const res = await POST({
-			request: new Request("https://app.test/api/studio/frame", {
-				method: "POST",
-				body: JSON.stringify({
-					action: "retry",
-					projectId: "proj-1",
-					frameId: "f-2",
-				}),
+			request: operationRequest({
+				action: "retry",
+				projectId: "proj-1",
+				frameId: "f-2",
 			}),
 		});
 		expect(res.status).toBe(409);
@@ -217,13 +212,9 @@ describe("POST /api/studio/frame", () => {
 	});
 
 	it("retries failed planning job", async () => {
-		const req = new Request("https://app.test/api/studio/frame", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				action: "retry-planning",
-				projectId: "proj-1",
-			}),
+		const req = operationRequest({
+			action: "retry-planning",
+			projectId: "proj-1",
 		});
 
 		const res = await POST({ request: req });
@@ -346,6 +337,14 @@ describe("GET /api/studio/frame", () => {
 describe("safe frame POST errors", () => {
 	it.each([
 		{
+			failure: new StudioFrameError(
+				"STUDIO_FRAME_FAILED",
+				"private provider payload",
+			),
+			code: "STUDIO_FRAME_FAILED",
+			status: 500,
+		},
+		{
 			failure: new ScrapeError(
 				"AI_GENERATION_FAILED",
 				"private provider payload",
@@ -370,19 +369,13 @@ describe("safe frame POST errors", () => {
 	}) => {
 		const log = vi.spyOn(console, "error").mockImplementation(() => {});
 		if (status === 401) requireUser.mockRejectedValueOnce(failure);
-		else {
-			const service = await import("../services/studio-frame-service");
-			vi.spyOn(service, "reviseStudioFrame").mockRejectedValueOnce(failure);
-		}
+		else enqueueStudioOperation.mockRejectedValueOnce(failure);
 		const res = await POST({
-			request: new Request("https://app.test/api/studio/frame", {
-				method: "POST",
-				body: JSON.stringify({
-					action: "revise",
-					projectId: "proj-1",
-					frameId: "f-1",
-					prompt: "Sample revision",
-				}),
+			request: operationRequest({
+				action: "operation",
+				projectId: "proj-1",
+				prompt: "Revisi seluruh halaman",
+				requestId: "11111111-1111-4111-8111-111111111111",
 			}),
 		});
 		expect(res.status).toBe(status);

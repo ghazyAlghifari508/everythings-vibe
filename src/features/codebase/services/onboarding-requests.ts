@@ -47,11 +47,14 @@ export type CreateCodebaseOutcome =
 	| { kind: "unauthorized" }
 	| { kind: "rejected"; message: string };
 
-export async function requestCreateCodebase(): Promise<CreateCodebaseOutcome> {
+export async function requestCreateCodebase(acceptance: {
+	acceptAnalysisPolicy: true;
+	creditConsent: { maximumCredits: number; pricingVersion: string };
+}): Promise<CreateCodebaseOutcome> {
 	const response = await fetch("/api/codebases", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({}),
+		body: JSON.stringify(acceptance),
 	});
 	if (response.status === 401) {
 		redirectToLogin();
@@ -116,17 +119,22 @@ export async function requestCodebaseStatus(
 
 export type RetrySessionOutcome =
 	| { kind: "minted"; payload: SyncPromptPayload }
+	| { kind: "cancelled" }
 	| { kind: "failed" };
 
 export async function requestRetrySession(
 	codebaseId: string,
+	acceptance: {
+		acceptAnalysisPolicy: true;
+		creditConsent: { maximumCredits: number; pricingVersion: string };
+	},
 ): Promise<RetrySessionOutcome> {
 	const response = await fetch(
 		`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ action: "retry" }),
+			body: JSON.stringify({ action: "retry", ...acceptance }),
 		},
 	);
 	const parsed = syncPromptPayloadSchema.safeParse(
@@ -178,7 +186,11 @@ export async function requestFeatureProject(
 export type AnalysisTriggerOutcome =
 	| { kind: "ready"; analysis: AnalysisResponse }
 	| { kind: "unauthorized" }
-	| { kind: "credit"; message: string }
+	| {
+			kind: "credit";
+			message: string;
+			status?: import("./analysis-credit-policy").AnalysisCreditStatus;
+	  }
 	| { kind: "failed"; message: string }
 	| { kind: "mismatch" };
 
@@ -186,25 +198,31 @@ export async function requestOnboardingAnalysis({
 	projectId,
 	snapshotId,
 	refreshStarterSuggestionsForAnalysisId,
+	creditConsent,
 }: {
 	projectId: string;
 	snapshotId: string;
 	refreshStarterSuggestionsForAnalysisId?: string;
+	creditConsent?: { maximumCredits: number; pricingVersion: string };
 }): Promise<AnalysisTriggerOutcome> {
 	const bodyPayload: {
 		snapshotId: string;
 		refreshStarterSuggestionsForAnalysisId?: string;
+		creditConsent?: { maximumCredits: number; pricingVersion: string };
 	} = { snapshotId };
 	if (refreshStarterSuggestionsForAnalysisId) {
 		bodyPayload.refreshStarterSuggestionsForAnalysisId =
 			refreshStarterSuggestionsForAnalysisId;
 	}
+	const confirmedPayload: unknown = creditConsent
+		? { ...bodyPayload, creditConsent }
+		: bodyPayload;
 	const response = await fetch(
 		`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(bodyPayload),
+			body: JSON.stringify(confirmedPayload),
 		},
 	);
 	// The caller owns the redirect here: the analysis trigger discards a
@@ -213,10 +231,15 @@ export async function requestOnboardingAnalysis({
 	if (response.status === 401) return { kind: "unauthorized" };
 	const body: unknown = await response.json().catch(() => null);
 	const serverError = readServerError(body);
-	if (response.status === 403) {
+	const { analysisCreditStatusSchema } = await import(
+		"./analysis-credit-policy"
+	);
+	const creditStatus = analysisCreditStatusSchema.safeParse(body);
+	if (response.status === 403 || creditStatus.success) {
 		return {
 			kind: "credit",
 			message: serverError ?? "Kredit tidak mencukupi untuk analisis codebase.",
+			status: creditStatus.success ? creditStatus.data : undefined,
 		};
 	}
 	const parsed = analysisResponseSchema.safeParse(body);

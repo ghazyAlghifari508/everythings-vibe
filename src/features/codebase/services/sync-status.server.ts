@@ -222,6 +222,10 @@ export async function handleCodebaseSyncStatus(input: {
 		// otherwise the browser would show a retry with no reason.
 		const syncFailure = readSyncFailureMetadata(session.metadata);
 
+		const { reconcileExpiredCreditOperations } = await import(
+			"@/lib/services/credit-service"
+		);
+		await reconcileExpiredCreditOperations({ userId: user.id });
 		const analysis = await readSyncStatusAnalysis({
 			snapshotId: snapshot?.id ?? null,
 			projectId: analysisProjectId,

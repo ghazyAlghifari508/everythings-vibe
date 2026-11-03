@@ -8,20 +8,29 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { StudioDesignSkillId } from "@/features/studio/services/studio-generation-options";
 import { STUDIO_MIN_PROMPT_CHARS } from "@/features/studio/services/studio-prompt-validation";
+import type { StudioScreenSuggestion } from "@/features/studio/services/studio-screen-suggestions";
 import { shouldSubmitComposerEvent } from "@/features/studio/utils/composer-keyboard";
 import {
 	canvasComposerBottomCss,
 	canvasComposerWidthCss,
 } from "@/features/studio/utils/studio-canvas-layout";
 import { StudioSkillSelect } from "./studio-skill-select";
+import { StudioSuggestionRow } from "./studio-suggestion-row";
 
-export type StudioComposerScope = "add" | "revise" | "project";
+/**
+ * The server resolves the operation, so the composer only reports whether the
+ * request was accepted and, when it was not, what the user still has to decide.
+ */
+export interface StudioComposerSubmitResult {
+	accepted: boolean;
+	/** Set when the server needs the user to be more specific. */
+	clarify?: string;
+}
 
 export interface StudioComposerProps {
 	onSubmit: (
 		prompt: string,
-		scope: StudioComposerScope,
-	) => Promise<boolean> | boolean;
+	) => Promise<StudioComposerSubmitResult> | StudioComposerSubmitResult;
 	loading?: boolean;
 	className?: string;
 	selectedFrames?: { id: string; name: string }[];
@@ -29,18 +38,8 @@ export interface StudioComposerProps {
 	designSkillId?: StudioDesignSkillId;
 	onDesignSkillChange?: (skillId: StudioDesignSkillId) => void;
 	referenceLabel?: string | null;
-}
-
-/**
- * Operation scope is derived from real selection state only: with frames
- * selected the request revises exactly those frames, and with nothing selected
- * it applies to the whole project. Adding a screen is an explicit project-level
- * action in the workspace menu, so it is never inferred from prompt wording.
- */
-export function resolveComposerScope(
-	selectedFrameCount: number,
-): StudioComposerScope {
-	return selectedFrameCount > 0 ? "revise" : "project";
+	/** Next-screen bubbles derived from the project's own structure. */
+	suggestions?: readonly StudioScreenSuggestion[];
 }
 
 export function StudioComposer({
@@ -52,13 +51,14 @@ export function StudioComposer({
 	designSkillId,
 	onDesignSkillChange,
 	referenceLabel,
+	suggestions = [],
 }: StudioComposerProps) {
 	const [prompt, setPrompt] = useState("");
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState("");
+	const [clarify, setClarify] = useState("");
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const pending = useRef(false);
-	const scope = resolveComposerScope(selectedFrames.length);
 	const singleFrame = selectedFrames.length === 1 ? selectedFrames[0] : null;
 	// The server rejects prompts shorter than the shared minimum, so the
 	// composer applies the same rule client-side and explains it instead of
@@ -83,9 +83,11 @@ export function StudioComposer({
 		pending.current = true;
 		setSending(true);
 		setError("");
+		setClarify("");
 		try {
-			const accepted = await onSubmit(trimmed, scope);
-			if (accepted === true) setPrompt("");
+			const result = await onSubmit(trimmed);
+			if (result.accepted) setPrompt("");
+			else if (result.clarify) setClarify(result.clarify);
 		} catch (failure) {
 			setError(
 				failure instanceof Error
@@ -100,6 +102,14 @@ export function StudioComposer({
 	function handleSubmit(event: FormEvent) {
 		event.preventDefault();
 		void submit();
+	}
+
+	// A suggestion only fills the composer: the user still reviews and submits,
+	// so clicking a bubble never spends a generation credit on its own.
+	function insertSuggestion(suggestion: StudioScreenSuggestion) {
+		setPrompt(suggestion.prompt);
+		setClarify("");
+		inputRef.current?.focus();
 	}
 
 	return (
@@ -117,6 +127,13 @@ export function StudioComposer({
 			onPointerDown={(event) => event.stopPropagation()}
 			onWheel={(event) => event.stopPropagation()}
 		>
+			{suggestions.length > 0 ? (
+				<StudioSuggestionRow
+					suggestions={suggestions}
+					disabled={loading || sending}
+					onSelect={insertSuggestion}
+				/>
+			) : null}
 			<form
 				onSubmit={handleSubmit}
 				className="flex flex-col gap-3 rounded-xl border border-iron bg-obsidian p-3 text-snow focus-within:border-snow"
@@ -182,7 +199,7 @@ export function StudioComposer({
 								? `Minta perubahan khusus untuk layar ${singleFrame.name}...`
 								: selectedFrames.length > 1
 									? `Minta perubahan untuk ${selectedFrames.length} layar terpilih...`
-									: "Minta revisi untuk seluruh project..."
+									: "Minta revisi, atau sebutkan halaman baru yang ingin dibuat..."
 						}
 						disabled={loading || sending}
 						className="max-h-40 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-1 text-sm leading-6 text-snow placeholder:text-fog focus:outline-none disabled:opacity-60"
@@ -210,6 +227,9 @@ export function StudioComposer({
 					<p role="alert" className="text-xs text-crimson">
 						{error}
 					</p>
+				) : null}
+				{!error && clarify ? (
+					<output className="text-xs text-mist">{clarify}</output>
 				) : null}
 				{isTooShort ? (
 					<p id="studio-composer-hint" className="text-xs text-fog">

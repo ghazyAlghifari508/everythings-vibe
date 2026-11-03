@@ -1,47 +1,37 @@
 "use client";
 
-import {
-	ArrowRight01Icon,
-	DatabaseIcon,
-	FileCodeIcon,
-	FolderGitIcon,
-	Search01Icon,
-	TerminalIcon,
-} from "@hugeicons/core-free-icons";
+import { Search01Icon } from "@hugeicons/core-free-icons";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { PageHeading } from "@/components/ui";
+import { HistorySelectAll } from "@/components/ui/history-select-all";
+import { HistorySelectionBar } from "@/components/ui/history-selection-bar";
 import { Icon } from "@/components/ui/icon";
-import { LibraryPagination } from "@/features/codebase/components/planning/library-pagination";
 import {
-	ProjectActionsMenu,
-	readServerErrorMessage,
-} from "@/features/codebase/components/planning/project-actions-menu";
+	CodebaseLibraryDeleteDialog,
+	type CodebaseLibraryDeleteRequest,
+} from "@/features/codebase/components/planning/codebase-library-delete-dialog";
+import { CodebaseLibraryEmptyState } from "@/features/codebase/components/planning/codebase-library-empty-state";
+import { CodebaseLibraryItemCard } from "@/features/codebase/components/planning/codebase-library-item-card";
+import { LibraryPagination } from "@/features/codebase/components/planning/library-pagination";
+import { readServerErrorMessage } from "@/features/codebase/components/planning/project-actions-menu";
 import {
 	CODEBASE_LIBRARY_LABEL,
 	type CodebaseLibraryItem,
 	filterLibraryItems,
-	libraryAnalysisLabels,
-	mapLibraryStatus,
 	NEW_REPOSITORY_HREF,
+	resolveLibraryItemStatus,
 } from "@/features/codebase/services/library";
+import { requestCodebaseBulkDelete } from "@/features/codebase/services/library-delete-client";
 import { clearPlanCodebasePointerIfMatches } from "@/features/codebase/services/plan-storage";
-import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/features/codebase/types/codebase-constants";
+import {
+	CODEBASE_LIBRARY_PAGE_SIZE,
+	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
+} from "@/features/codebase/types/codebase-constants";
 import { paginate } from "@/lib/history-filter";
+import { useHistorySelection } from "@/lib/history-selection";
 import { useUIStore } from "@/store";
-
-function formatLibraryDate(value: string | null): string | null {
-	if (!value) return null;
-	const date = new Date(value);
-	if (Number.isNaN(date.getTime())) return null;
-	return new Intl.DateTimeFormat("id-ID", {
-		day: "numeric",
-		month: "short",
-		year: "numeric",
-		hour: "2-digit",
-		minute: "2-digit",
-	}).format(date);
-}
 
 export function CodebaseLibraryView({
 	items,
@@ -53,6 +43,11 @@ export function CodebaseLibraryView({
 	const [localItems, setLocalItems] = useState(items);
 	const [query, setQuery] = useState("");
 	const [page, setPage] = useState(1);
+	const [deleteRequest, setDeleteRequest] =
+		useState<CodebaseLibraryDeleteRequest | null>(null);
+	const [deleting, setDeleting] = useState(false);
+
+	const selection = useHistorySelection(query);
 
 	useEffect(() => {
 		setLocalItems(items);
@@ -66,6 +61,7 @@ export function CodebaseLibraryView({
 	);
 	const clampedPage = Math.min(page, totalPages);
 	const paged = paginate(filtered, clampedPage, CODEBASE_LIBRARY_PAGE_SIZE);
+	const pageIds = paged.map((item) => item.id);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: reset to the first page whenever the query changes; the dependency is the trigger, not a read
 	useEffect(() => {
@@ -75,6 +71,17 @@ export function CodebaseLibraryView({
 	useEffect(() => {
 		if (page > totalPages) setPage(totalPages);
 	}, [page, totalPages]);
+
+	const hasAnalyzingItems = localItems.some(
+		(item) => resolveLibraryItemStatus(item) === "analyzing",
+	);
+	useEffect(() => {
+		if (!hasAnalyzingItems) return;
+		const timer = setInterval(() => {
+			void router.invalidate();
+		}, CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS);
+		return () => clearInterval(timer);
+	}, [hasAnalyzingItems, router]);
 
 	const applyRename = (id: string, name: string) => {
 		setLocalItems((current) =>
@@ -100,21 +107,69 @@ export function CodebaseLibraryView({
 			if (!response.ok) {
 				setLocalItems(previous);
 				showToast(
-					readServerErrorMessage(body, "Gagal menghapus project."),
+					readServerErrorMessage(
+						body,
+						"Project tidak dapat dihapus\nCoba lagi.",
+					),
 					"error",
 				);
 				return;
 			}
-			// The row is gone server-side, so an onboarding pointer to THIS
-			// codebase is now stale and must not survive: the next /plan/codebase
-			// visit would otherwise poll a status endpoint that 404s. A pointer to
-			// a different codebase, and every unrelated storage key, are untouched.
 			clearPlanCodebasePointerIfMatches(item.id);
-			showToast("Project dihapus.", "success");
+			if (selection.ids.has(item.id)) {
+				selection.toggle(item.id);
+			}
+			showToast("Project berhasil dihapus", "success");
 			router.invalidate();
 		} catch {
 			setLocalItems(previous);
-			showToast("Server tidak dapat dihubungi.", "error");
+			showToast("Project tidak dapat dihapus\nCoba lagi.", "error");
+		}
+	};
+
+	const confirmBulkDelete = async () => {
+		if (!deleteRequest) return;
+		setDeleting(true);
+		try {
+			const ids =
+				deleteRequest.kind === "bulk"
+					? [...selection.ids]
+					: deleteRequest.kind === "all_filtered"
+						? filtered.map((row) => row.id)
+						: localItems.map((row) => row.id);
+
+			const result = await requestCodebaseBulkDelete(ids);
+			setDeleteRequest(null);
+			const deletedSet = new Set(result.deletedIds);
+			setLocalItems((current) =>
+				current.filter((row) => !deletedSet.has(row.id)),
+			);
+			for (const id of result.deletedIds) {
+				clearPlanCodebasePointerIfMatches(id);
+			}
+
+			const remaining = ids.filter((id) => !deletedSet.has(id));
+			if (remaining.length > 0) {
+				selection.replace(remaining);
+				showToast(
+					`${result.deleted} dari ${ids.length} repository dihapus. ${result.skipped} repository sudah tidak ada.`,
+					"info",
+				);
+			} else {
+				selection.clear();
+				showToast(`${result.deleted} repository dihapus.`, "success");
+			}
+			router.invalidate();
+		} catch (error) {
+			setDeleteRequest(null);
+			showToast(
+				error instanceof Error
+					? error.message
+					: "Gagal menghapus repository. Coba lagi.",
+				"error",
+			);
+		} finally {
+			setDeleting(false);
 		}
 	};
 
@@ -131,9 +186,9 @@ export function CodebaseLibraryView({
 						<p className="font-mono text-xs uppercase tracking-widest text-fog">
 							Existing Codebase
 						</p>
-						<h1 className="mt-2 text-3xl font-semibold tracking-tight text-snow sm:text-4xl">
+						<PageHeading variant="workspace" className="mt-2">
 							Project Tersimpan
-						</h1>
+						</PageHeading>
 						<p className="mt-2 max-w-2xl text-sm leading-6 text-fog">
 							Repository yang pernah kamu hubungkan akan tersimpan di sini.
 							Lanjutkan dari konteks dan workspace sebelumnya.
@@ -167,138 +222,91 @@ export function CodebaseLibraryView({
 				</div>
 			)}
 
+			{hasProjects && filtered.length > 0 && selection.count === 0 && (
+				<div className="flex items-center justify-between py-1">
+					<label className="inline-flex min-h-6 items-center gap-2 text-xs text-fog cursor-pointer">
+						<input
+							type="checkbox"
+							checked={false}
+							onChange={() => selection.setPageSelection(pageIds, true)}
+							aria-label="Pilih semua di halaman ini"
+							className="size-4 shrink-0 accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+						/>
+						<span>Pilih semua</span>
+					</label>
+					<button
+						type="button"
+						onClick={() =>
+							setDeleteRequest(
+								query.trim()
+									? { kind: "all_filtered", count: filtered.length }
+									: { kind: "all", count: localItems.length },
+							)
+						}
+						className="text-xs text-fog transition-colors hover:text-crimson focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					>
+						{query.trim() ? "Hapus semua hasil pencarian" : "Hapus semua"}
+					</button>
+				</div>
+			)}
+
+			{(selection.count > 0 || selection.notice !== null) && (
+				<div className="flex flex-col gap-3">
+					{selection.count > 0 && (
+						<HistorySelectAll
+							noun="repository"
+							pageIds={pageIds}
+							selectedIds={selection.ids}
+							total={filtered.length}
+							filteredScopeActive={selection.scope === "filtered"}
+							preparing={false}
+							onTogglePage={(selected) =>
+								selection.setPageSelection(pageIds, selected)
+							}
+							onSelectAllFiltered={() =>
+								selection.applyFiltered({
+									ids: filtered.map((r) => r.id),
+									total: filtered.length,
+									truncated: false,
+								})
+							}
+						/>
+					)}
+					<HistorySelectionBar
+						noun="repository"
+						count={selection.count}
+						filteredTotal={selection.filteredTotal}
+						truncated={selection.truncated}
+						notice={selection.notice}
+						deleting={deleting}
+						cancelLabel="Batalkan Pilihan"
+						deleteLabel="Hapus Terpilih"
+						onClear={selection.clear}
+						onDelete={() =>
+							setDeleteRequest({ kind: "bulk", count: selection.count })
+						}
+					/>
+				</div>
+			)}
+
 			{!hasProjects ? (
-				<section
-					aria-labelledby="empty-codebase-heading"
-					className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center py-6 text-center"
-				>
-					<div
-						className="flex h-12 w-12 items-center justify-center rounded-xl border border-graphite bg-charcoal/60 text-snow"
-						aria-hidden
-					>
-						<Icon icon={FolderGitIcon} size={24} className="text-fog" />
-					</div>
-					<h2
-						id="empty-codebase-heading"
-						className="mt-5 text-xl font-semibold tracking-tight text-snow sm:text-2xl"
-					>
-						Belum ada repository terhubung
-					</h2>
-					<p className="mt-2.5 text-sm leading-6 text-fog">
-						Hubungkan repository lokal untuk membaca struktur codebase dan
-						menyiapkan workspace perencanaan yang bisa kamu lanjutkan kapan
-						saja.
-					</p>
-					<Link
-						to={NEW_REPOSITORY_HREF}
-						className="btn-primary mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-					>
-						Hubungkan repository
-						<Icon icon={ArrowRight01Icon} size={16} aria-hidden />
-					</Link>
-					<div className="mt-10 flex w-full flex-col items-center justify-center gap-4 border-t border-graphite/40 pt-8 sm:mt-12 sm:flex-row sm:gap-8">
-						<div className="flex items-center gap-2 text-xs text-fog">
-							<Icon
-								icon={FileCodeIcon}
-								size={16}
-								className="text-slate"
-								aria-hidden
-							/>
-							<span>Codebase terbaca</span>
-						</div>
-						<div className="flex items-center gap-2 text-xs text-fog">
-							<Icon
-								icon={DatabaseIcon}
-								size={16}
-								className="text-slate"
-								aria-hidden
-							/>
-							<span>Konteks tersimpan</span>
-						</div>
-						<div className="flex items-center gap-2 text-xs text-fog">
-							<Icon
-								icon={TerminalIcon}
-								size={16}
-								className="text-slate"
-								aria-hidden
-							/>
-							<span>Workspace siap</span>
-						</div>
-					</div>
-				</section>
+				<CodebaseLibraryEmptyState />
 			) : filtered.length === 0 ? (
 				<p className="py-12 text-center text-sm text-fog">
 					Tidak ada project yang cocok dengan pencarian.
 				</p>
 			) : (
 				<ul data-testid="codebase-library-list" className="flex flex-col gap-3">
-					{paged.map((item) => {
-						const stack = libraryAnalysisLabels(item);
-						const displayDate =
-							formatLibraryDate(item.snapshotCreatedAt) ??
-							formatLibraryDate(item.updatedAt);
-						const status = mapLibraryStatus(
-							item.snapshotStatus,
-							item.hasReadyAnalysis,
-						);
-						const isAttention = status === "Perlu perhatian";
-						return (
-							<li
-								key={item.id}
-								className="group flex items-start gap-1 rounded-xl border border-graphite bg-charcoal/60 transition-colors hover:border-fog/40 hover:bg-charcoal"
-							>
-								<Link
-									to="/codebases/$id"
-									params={{ id: item.id }}
-									className="flex min-w-0 flex-1 flex-col gap-2 rounded-xl p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-								>
-									<span className="flex items-center justify-between gap-3">
-										<span className="truncate text-base font-medium text-snow">
-											{item.name}
-										</span>
-										<span
-											className={`shrink-0 text-xs ${isAttention ? "text-crimson" : "text-fog"}`}
-										>
-											{status}
-										</span>
-									</span>
-									{item.summary ? (
-										<span className="line-clamp-2 text-sm leading-6 text-fog">
-											{item.summary}
-										</span>
-									) : null}
-									{stack.length > 0 ? (
-										<span className="text-xs text-slate">
-											{stack.join(" · ")}
-										</span>
-									) : null}
-									<span className="text-[11px] text-slate">
-										{item.fileCount !== null
-											? `${item.fileCount} file`
-											: "Belum ada sync"}
-										{item.planCount > 0
-											? ` · ${item.planCount} fitur plan`
-											: ""}
-										{displayDate ? ` · Terakhir diperbarui ${displayDate}` : ""}
-									</span>
-									<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
-										Buka Workspace
-										<Icon
-											icon={ArrowRight01Icon}
-											size={14}
-											aria-hidden
-											className="transition-transform group-hover:translate-x-0.5"
-										/>
-									</span>
-								</Link>
-								<ProjectActionsMenu
-									item={item}
-									onRename={applyRename}
-									onDelete={removeProject}
-								/>
-							</li>
-						);
-					})}
+					{paged.map((item) => (
+						<CodebaseLibraryItemCard
+							key={item.id}
+							item={item}
+							selected={selection.ids.has(item.id)}
+							onToggleSelect={selection.toggle}
+							onRename={applyRename}
+							onDelete={removeProject}
+						/>
+					))}
 				</ul>
 			)}
 
@@ -310,6 +318,13 @@ export function CodebaseLibraryView({
 					onPageChange={setPage}
 				/>
 			)}
+
+			<CodebaseLibraryDeleteDialog
+				request={deleteRequest}
+				deleting={deleting}
+				onCancel={() => setDeleteRequest(null)}
+				onConfirm={() => void confirmBulkDelete()}
+			/>
 		</div>
 	);
 }

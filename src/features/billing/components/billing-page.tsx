@@ -1,35 +1,37 @@
 import {
 	Alert01Icon,
+	ArrowRight01Icon,
 	CalendarClockIcon,
-	Delete02Icon,
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
 import { cancelSubscription } from "@/features/billing/services/payment.functions";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { useUIStore } from "@/store";
-import {
-	type BillingCreditUsage,
-	type BillingPaymentItem,
-	type BillingSubscription,
-	deletePayment,
+import type {
+	BillingCreditUsage,
+	BillingPaymentItem,
+	BillingSubscription,
 } from "../services/billing-settings.functions";
+import { getPaymentStatusInfo } from "../utils/payment-status";
 import { CreditUsageSection } from "./credit-usage";
+import { PaymentHistoryDialog } from "./payment-history-dialog";
 
 export function BillingPage({
 	subscription,
-	payments: initialPayments,
+	payments: paymentsList,
 	creditUsage,
 }: {
 	subscription: BillingSubscription | undefined;
 	payments: BillingPaymentItem[];
 	creditUsage: BillingCreditUsage;
 }) {
-	const [paymentsList, setPaymentsList] = useState(initialPayments);
-	const [deleteId, setDeleteId] = useState<string | null>(null);
 	const [cancelOpen, setCancelOpen] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
+	const [historyOpen, setHistoryOpen] = useState(false);
+	const { data: userPlan } = useUserPlan();
 
 	const handleCancel = async () => {
 		setCancelling(true);
@@ -67,35 +69,25 @@ export function BillingPage({
 	const creditsUsed = subscription?.creditsUsed ?? 0;
 	const creditsReserved = subscription?.creditsReserved ?? 0;
 	const remaining = Math.max(0, credits - creditsUsed - creditsReserved);
-
-	const handleDelete = async (id: string) => {
-		try {
-			const res = await deletePayment({ data: id });
-			if (res.success) {
-				setPaymentsList((prev) => prev.filter((p) => p.id !== id));
-				showToast("Riwayat pembayaran berhasil dihapus", "success");
-			} else {
-				showToast("Riwayat pembayaran berhasil tidak dapat dihapus", "error");
-			}
-		} catch {
-			showToast("Gagal menghapus riwayat pembayaran", "error");
-		} finally {
-			setDeleteId(null);
-		}
-	};
+	// ponytail: preview shows latest 4-5 transactions to prevent card height stretching.
+	const previewPayments = paymentsList.slice(0, 5);
 
 	return (
 		<div className="w-full flex flex-col gap-6">
-			<div className="grid gap-6 lg:grid-cols-2 h-full">
+			<div className="grid gap-6 lg:grid-cols-2 items-start">
 				<div className="rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6">
 					<h2 className="mb-6 font-inter font-[510] text-xl font-bold">
 						Billing & Kredit
 					</h2>
-					<div className="flex items-center justify-between">
+					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 						<div>
 							<span className="text-3xl font-bold capitalize">
 								{planLabel}
-								{isPaidPlan && !periodEndDate ? (
+								{userPlan?.billingExempt ? (
+									<span className="ml-2 align-middle inline-flex items-center rounded-full bg-teal-400/10 px-2.5 py-0.5 text-xs font-semibold text-teal-300 border border-teal-400/20">
+										Internal Exempt
+									</span>
+								) : isPaidPlan && !periodEndDate ? (
 									<span className="ml-2 align-middle rounded-full bg-(--bg-surface) px-2 py-0.5 text-xs font-medium text-(--text-secondary)">
 										legacy
 									</span>
@@ -116,7 +108,7 @@ export function BillingPage({
 								{statusText}
 							</p>
 						</div>
-						<div className="flex items-center gap-2">
+						<div className="flex flex-wrap items-center gap-2">
 							{isPaidPlan && !isPaused && (
 								<button
 									type="button"
@@ -179,7 +171,7 @@ export function BillingPage({
 				</div>
 
 				<div className="rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6">
-					<h2 className="mb-6 font-inter font-[510] text-xl font-bold">
+					<h2 className="mb-4 font-inter font-[510] text-xl font-bold">
 						Riwayat Pembayaran
 					</h2>
 					{paymentsList.length === 0 ? (
@@ -187,53 +179,58 @@ export function BillingPage({
 							Belum ada pembayaran
 						</p>
 					) : (
-						<div className="space-y-3">
-							{paymentsList.map((p) => (
-								<div
-									key={p.id}
-									className="flex items-center justify-between rounded-lg border border-(--border-subtle) p-4 text-sm"
-								>
-									<div>
-										<div className="font-medium">
-											{formatCurrency(p.amount ?? 0)}
-										</div>
-										{/* Time included: payment history is a ledger of instants,
-										    and the date alone hid which day a late-evening
-										    transaction belonged to. */}
-										<div className="mt-1 text-xs text-(--text-secondary)">
-											{p.createdAt ? formatDateTime(p.createdAt) : "—"}
-										</div>
-									</div>
-									<div className="flex items-center gap-2">
-										<span
-											className={`rounded-full px-3 py-1 text-xs font-medium ${
-												p.status === "success"
-													? "bg-green-100 text-green-800"
-													: "bg-red-100 text-red-800"
-											}`}
+						<div className="flex flex-col">
+							<div className="divide-y divide-(--border-subtle)">
+								{previewPayments.map((p) => {
+									const statusInfo = getPaymentStatusInfo(p.status);
+									return (
+										<div
+											key={p.id}
+											className="flex items-center justify-between py-3 text-sm first:pt-0 last:pb-0"
 										>
-											{p.status === "success" ? "Berhasil" : "Gagal"}
-										</span>
-										{p.status !== "success" && (
-											<button
-												type="button"
-												onClick={() => setDeleteId(p.id)}
-												className="rounded p-1.5 text-fog hover:bg-red-500/10 hover:text-red-400 transition-colors"
-												aria-label="Hapus riwayat"
-											>
-												<Icon icon={Delete02Icon} size={14} />
-											</button>
-										)}
-									</div>
-								</div>
-							))}
+											<div className="min-w-0 pr-3">
+												<div className="font-medium text-snow truncate">
+													{formatCurrency(p.amount ?? 0)}
+												</div>
+												<div className="mt-0.5 text-xs text-(--text-secondary)">
+													{p.createdAt ? formatDateTime(p.createdAt) : "—"}
+												</div>
+											</div>
+											<div className="shrink-0">
+												<span
+													className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusInfo.className}`}
+												>
+													{statusInfo.label}
+												</span>
+											</div>
+										</div>
+									);
+								})}
+							</div>
+							<div className="mt-4 pt-3 border-t border-(--border-subtle) flex items-center justify-end">
+								<button
+									type="button"
+									onClick={() => setHistoryOpen(true)}
+									className="group inline-flex items-center gap-1.5 text-xs font-medium text-mist hover:text-snow transition-colors"
+								>
+									<span>Lihat semua transaksi</span>
+									<Icon
+										icon={ArrowRight01Icon}
+										size={14}
+										className="transition-transform group-hover:translate-x-0.5"
+									/>
+								</button>
+							</div>
 						</div>
 					)}
 				</div>
 			</div>
 
 			{/* Credit Usage Section */}
-			<CreditUsageSection operations={creditUsage.operations} />
+			<CreditUsageSection
+				operations={creditUsage.operations}
+				initialPagination={creditUsage.pagination}
+			/>
 
 			{/* Cancel subscription confirmation */}
 			{cancelOpen && (
@@ -267,37 +264,8 @@ export function BillingPage({
 					</div>
 				</div>
 			)}
-
-			{/* Delete confirmation dialog */}
-			{deleteId && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-					<div className="rounded-xl border border-(--border-subtle) bg-(--bg-card) p-6 max-w-sm w-full mx-4">
-						<h3 className="font-inter font-[510] text-lg mb-2">
-							Hapus Riwayat?
-						</h3>
-						<p className="text-sm text-(--text-secondary) mb-6">
-							Riwayat pembayaran ini akan dihapus permanen. Tindakan ini tidak
-							dapat dibatalkan.
-						</p>
-						<div className="flex justify-end gap-3">
-							<button
-								type="button"
-								onClick={() => setDeleteId(null)}
-								className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-(--bg-surface)"
-							>
-								Batal
-							</button>
-							<button
-								type="button"
-								onClick={() => handleDelete(deleteId)}
-								className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
-							>
-								Hapus
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
+			{/* Full payment history dialog */}
+			<PaymentHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
 		</div>
 	);
 }

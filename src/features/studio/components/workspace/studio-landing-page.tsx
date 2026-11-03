@@ -4,6 +4,7 @@ import { Folder02Icon } from "@hugeicons/core-free-icons";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { HubBreadcrumb } from "@/components/home/hub-breadcrumb";
+import { PageHeading } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import { getCanvasDotStyle } from "@/features/greenfield/components/whiteboard/canvas-connectors";
@@ -30,7 +31,7 @@ import {
 	type StudioPromptShortcut,
 } from "@/features/studio/services/studio-prompt-shortcuts";
 import type {
-	AttachedDesignReference,
+	AttachedLogo,
 	StudioHistoryItem,
 } from "@/features/studio/types/studio";
 import { useUIStore } from "@/store";
@@ -43,7 +44,7 @@ export type StagedReference =
 			kind: "custom";
 			filename: string;
 			designMd: string;
-			logo: AttachedDesignReference["logo"];
+			logo: AttachedLogo | null;
 	  };
 
 /**
@@ -150,7 +151,7 @@ export function StudioLandingPage({
 	function handleSelectCustom(input: {
 		filename: string;
 		designMd: string;
-		logo: AttachedDesignReference["logo"];
+		logo: AttachedLogo | null;
 	}) {
 		setStagedReference({
 			kind: "custom",
@@ -298,9 +299,9 @@ export function StudioLandingPage({
 								<HubBreadcrumb current="VibeDesign" />
 							</div>
 							<div className="space-y-2">
-								<h1 className="font-inter text-3xl font-light leading-tight tracking-tight text-snow sm:text-[40px] lg:text-[48px]">
+								<PageHeading variant="display">
 									What will you design?
-								</h1>
+								</PageHeading>
 								<p className="max-w-2xl font-inter text-sm leading-relaxed text-fog sm:text-base">
 									Ubah idemu menjadi rancangan aplikasi yang bisa kamu lihat,
 									sesuaikan, dan kembangkan.

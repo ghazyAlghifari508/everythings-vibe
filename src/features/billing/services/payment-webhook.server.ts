@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { payments } from "@/db/schema";
 import { getMidtransConfig } from "@/features/billing/services/midtrans";
@@ -59,27 +59,28 @@ export async function handlePaymentWebhook({ request }: { request: Request }) {
 		}
 	}
 
-	// Terminal non-success states, including post-settlement
-	// reversals (deny/refund/chargeback). Only non-success rows move,
-	// so a delayed reversal can never overwrite a settled grant's
-	// success marker; grant compensation stays a manual step.
-	if (
-		[
-			"expire",
-			"cancel",
-			"deny",
-			"refund",
-			"chargeback",
-			"partial_refund",
-			"partial_chargeback",
-		].includes(transaction_status)
-	) {
+	// Preserve the settled marker for idempotency; reversals require manual credit reconciliation.
+	if (["expire", "cancel", "deny"].includes(transaction_status)) {
 		await db
 			.update(payments)
 			.set({ status: "failed" })
 			.where(
 				and(eq(payments.orderId, order_id), ne(payments.status, "success")),
 			);
+	}
+
+	if (
+		["refund", "chargeback", "partial_refund", "partial_chargeback"].includes(
+			transaction_status,
+		)
+	) {
+		await db
+			.update(payments)
+			.set({
+				status: sql`case when ${payments.status} = 'success' then 'success' else 'failed' end`,
+				midtransResponse: sql`(case when jsonb_typeof(${payments.midtransResponse}) = 'object' then ${payments.midtransResponse} else '{}'::jsonb end) || jsonb_build_object('reversal', case when ${payments.midtransResponse}->>'reversal' = 'chargeback' then 'chargeback' when ${transaction_status} = 'chargeback' then 'chargeback' when ${payments.midtransResponse}->>'reversal' = 'partial_chargeback' and ${transaction_status} <> 'chargeback' then 'partial_chargeback' when ${transaction_status} = 'partial_chargeback' then 'partial_chargeback' when ${payments.midtransResponse}->>'reversal' = 'refund' then 'refund' else ${transaction_status}::text end)`,
+			})
+			.where(eq(payments.orderId, order_id));
 	}
 
 	return Response.json({ status: "ok" });

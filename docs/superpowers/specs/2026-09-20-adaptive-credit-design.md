@@ -124,6 +124,8 @@ Network disconnects do not automatically cancel a server-side operation. The ope
 
 ## Codebase Analysis Policy
 
+The initial-analysis exception and pre-sync consent requirements are defined in [Existing Codebase credit policy](../../analysis-credit-policy.md). They supersede the blanket new-analysis charge below for eligible initial attempts only.
+
 Sync and upload remain free. A new analysis that processes a new snapshot or explicitly starts a new analysis attempt is billable using the analysis estimator. A ready analysis for the same snapshot and compatible context is reused without a new charge.
 
 Analysis failure releases its reservation. A retry of a failed analysis gets a new operation identity and a fresh estimate. A successful analysis remains linked to its snapshot and operation so its usage can be audited.

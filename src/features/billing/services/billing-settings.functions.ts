@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { and, desc, eq, ne } from "drizzle-orm";
-import { requireUserServer } from "@/lib/session";
 import type { CreditOperationItem } from "../components/credit-usage";
+import { queryCreditUsageHistory } from "./credit-usage.functions";
 
 export interface BillingSubscription {
 	id: string;
@@ -36,16 +36,22 @@ export interface BillingCreditUsage {
 	reservedCredits: number;
 	totalCreditsUsed: number;
 	operations: CreditOperationItem[];
+	pagination?: {
+		page: number;
+		pageSize: number;
+		total: number;
+		totalPages: number;
+	};
 }
 
 export const loadBilling = createServerFn({ method: "GET" }).handler(
 	async () => {
+		const { requireUserServer } = await import("@/lib/session");
 		const user = await requireUserServer();
 		const { db } = await import("@/db");
-		const { creditOperations, payments, projects, subscriptions } =
-			await import("@/db/schema");
+		const { payments, subscriptions } = await import("@/db/schema");
 
-		const [subRows, paymentRows, operationRows] = await Promise.all([
+		const [subRows, paymentRows, initialUsage] = await Promise.all([
 			db
 				.select()
 				.from(subscriptions)
@@ -60,37 +66,8 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 				.where(
 					and(eq(payments.userId, user.id), ne(payments.status, "pending")),
 				)
-				.orderBy(desc(payments.createdAt))
-				.limit(10),
-			db
-				.select({
-					id: creditOperations.id,
-					projectId: creditOperations.projectId,
-					projectName: projects.name,
-					kind: creditOperations.kind,
-					stage: creditOperations.stage,
-					state: creditOperations.state,
-					estimatedCredits: creditOperations.estimatedCredits,
-					reservedCredits: creditOperations.reservedCredits,
-					maximumCredits: creditOperations.maximumCredits,
-					finalCharge: creditOperations.finalCharge,
-					pricingVersion: creditOperations.pricingVersion,
-					metrics: creditOperations.metrics,
-					capApplied: creditOperations.capApplied,
-					createdAt: creditOperations.createdAt,
-					settledAt: creditOperations.settledAt,
-				})
-				.from(creditOperations)
-				.leftJoin(
-					projects,
-					and(
-						eq(projects.id, creditOperations.projectId),
-						eq(projects.userId, user.id),
-					),
-				)
-				.where(eq(creditOperations.userId, user.id))
-				.orderBy(desc(creditOperations.createdAt))
-				.limit(50),
+				.orderBy(desc(payments.createdAt)),
+			queryCreditUsageHistory(user.id, { page: 1, pageSize: 10 }),
 		]);
 
 		// ponytail: server fn boundary rejects Date + unknown - coerce to plain JSON.
@@ -118,30 +95,20 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 			id: p.id,
 			userId: p.userId,
 			amount: p.amount ?? 0,
-			status: p.status ?? "pending",
+			status:
+				p.midtransResponse !== null &&
+				typeof p.midtransResponse === "object" &&
+				"reversal" in p.midtransResponse &&
+				typeof p.midtransResponse.reversal === "string"
+					? p.midtransResponse.reversal
+					: (p.status ?? "pending"),
 			plan: p.plan ?? "pro",
 			snapToken: null,
 			createdAt: p.createdAt?.toISOString() ?? null,
 			updatedAt: p.updatedAt?.toISOString() ?? null,
 		}));
 
-		const operationsList: CreditOperationItem[] = operationRows.map((op) => ({
-			id: op.id,
-			projectId: op.projectId,
-			projectName: op.projectName ?? null,
-			kind: op.kind,
-			stage: op.stage,
-			state: op.state,
-			estimatedCredits: op.estimatedCredits,
-			reservedCredits: op.reservedCredits,
-			maximumCredits: op.maximumCredits,
-			finalCharge: op.finalCharge,
-			pricingVersion: op.pricingVersion,
-			metrics: op.metrics,
-			capApplied: op.capApplied,
-			createdAt: op.createdAt?.toISOString() ?? null,
-			settledAt: op.settledAt?.toISOString() ?? null,
-		}));
+		const operationsList: CreditOperationItem[] = initialUsage.items;
 
 		const credits = subscription?.credits ?? 0;
 		const creditsUsed = subscription?.creditsUsed ?? 0;
@@ -156,27 +123,14 @@ export const loadBilling = createServerFn({ method: "GET" }).handler(
 			reservedCredits: creditsReserved,
 			totalCreditsUsed: creditsUsed,
 			operations: operationsList,
+			pagination: {
+				page: initialUsage.page,
+				pageSize: initialUsage.pageSize,
+				total: initialUsage.total,
+				totalPages: initialUsage.totalPages,
+			},
 		};
 
 		return { subscription, payments: paymentsList, creditUsage };
 	},
 );
-
-export const deletePayment = createServerFn({ method: "POST" })
-	.validator((paymentId: string) => paymentId)
-	.handler(async ({ data: paymentId }) => {
-		const user = await requireUserServer();
-		const { db } = await import("@/db");
-		const { payments } = await import("@/db/schema");
-		const deleted = await db
-			.delete(payments)
-			.where(
-				and(
-					eq(payments.id, paymentId),
-					eq(payments.userId, user.id),
-					ne(payments.status, "success"),
-				),
-			)
-			.returning({ id: payments.id });
-		return { success: deleted.length === 1 };
-	});
