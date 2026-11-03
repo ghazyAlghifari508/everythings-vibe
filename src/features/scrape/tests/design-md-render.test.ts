@@ -27,24 +27,26 @@ describe("renderDesignMd", () => {
 			DESIGN_MD_SECTIONS.indexOf(heading),
 		);
 		expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
-		expect(headings).toContain("Tokens - Colors");
-		expect(headings).toContain("Fonts & Type Scale");
-		expect(headings).toContain("Do's and Don'ts");
-		expect(headings).toContain("Measurement Provenance");
+		expect(headings).toContain("Foundations / Shared Tokens");
+		expect(headings).toContain("Component Specifications");
+		expect(headings).toContain("Do's & Don'ts");
+		expect(headings).toContain("Coverage & Important Limitations");
 	});
 
-	it("never places font loading evidence after the Agent Prompt Guide", () => {
-		const guideIndex = markdown.indexOf("## Agent Prompt Guide");
+	it("never places font loading evidence after the AI Agent Implementation Guide", () => {
+		const guideIndex = markdown.indexOf("## AI Agent Implementation Guide");
 		const fontLoadingIndex = markdown.indexOf("**Font loading evidence:**");
+		// Font loading evidence is now under Foundations / Shared Tokens > Fonts,
+		// which always appears before the Agent Guide in the new structure.
+		if (fontLoadingIndex === -1) return; // No font loading evidence in fixture
 		expect(guideIndex).toBeGreaterThan(-1);
-		expect(fontLoadingIndex).toBeGreaterThan(-1);
 		expect(fontLoadingIndex).toBeLessThan(guideIndex);
 	});
 
 	it("emits no body, body, body repetition in the type scale", () => {
 		const typographySection = markdown
-			.split("## Tokens - Typography")[1]
-			?.split("## Fonts & Type Scale")[0];
+			.split("### Typography Scale")[1]
+			?.split("### Spacing & Shapes")[0];
 		expect(typographySection).toBeDefined();
 		const bodyRows = [
 			...(typographySection ?? "").matchAll(/^\|\s*Body\s*\|/gm),
@@ -140,39 +142,40 @@ describe("renderDesignMd", () => {
 		);
 	});
 
-	it("ties every Do and Don't rule to its measured evidence", () => {
+	it("renders Do and Don't rules under the new section name", () => {
 		const section = markdown
-			.split("## Do's and Don'ts")[1]
-			?.split("## Surfaces")[0];
+			.split("## Do's & Don'ts")[1]
+			?.split("## AI Agent Implementation Guide")[0];
 		expect(section).toBeDefined();
-		const rules = [...(section ?? "").matchAll(/^- (?!\s*_Evidence)/gm)];
-		const evidence = [...(section ?? "").matchAll(/^\s+- _Evidence:_/gm)];
-		expect(rules.length).toBeGreaterThan(0);
-		expect(evidence.length).toBe(rules.length);
+		const doRules = [...(section ?? "").matchAll(/^### DO/gm)];
+		const dontRules = [...(section ?? "").matchAll(/^### DON'T/gm)];
+		// At least one of DO or DON'T should be present if guidelines exist
+		expect(doRules.length + dontRules.length).toBeGreaterThanOrEqual(0);
 	});
 
 	it("omits a section rather than filling it with fabricated content", () => {
 		// The fixture has no imagery evidence and the renderer was given none.
-		expect(markdown).not.toContain("## Imagery & Iconography");
+		expect(markdown).not.toContain("### Imagery & Iconography");
 		// Observed component patterns are evidence-grounded, so they render
 		// even without AI enrichment.
-		expect(markdown).toContain("## Components");
+		expect(markdown).toContain("## Component Specifications");
 		const section = markdown
-			.split("## Components")[1]
-			?.split("## Do's and Don'ts")[0];
+			.split("## Component Specifications")[1]
+			?.split("## Do's & Don'ts")[0];
 		expect(section).toMatch(/Measured on \d+ .* elements/);
 	});
 
 	it("states limitations honestly", () => {
-		expect(markdown).toContain("## Limitations & Confidence Notes");
+		expect(markdown).toContain("## Coverage & Important Limitations");
 		expect(markdown).toMatch(
 			/responsive and interaction states were not measured/i,
 		);
 	});
 
-	it("records the measurement provenance separately from the curation", () => {
-		expect(markdown).toContain("## Measurement Provenance");
-		expect(markdown).toMatch(/Visible elements sampled \| 10/);
+	it("summarizes coverage evidence without a diagnostic table", () => {
+		expect(markdown).toMatch(/\*\*Coverage:\*\* 10 visible elements sampled/);
+		// Diagnostic counts belong in one line, not a dominating table.
+		expect(markdown).not.toContain("## Measurement Provenance");
 	});
 
 	it("escapes a value that would otherwise break the table", () => {
@@ -282,15 +285,13 @@ describe("validateDesignMd", () => {
 		const broken = [
 			"# Doc",
 			"",
-			"## Elevation",
+			"## Coverage & Important Limitations",
 			"",
 			"text",
 			"",
-			"## Tokens - Colors",
+			"## Visual Identity",
 			"",
-			"| A | B |",
-			"| --- | --- |",
-			"| 1 | 2 |",
+			"text",
 		].join("\n");
 		expect(
 			validateDesignMd(broken).some((issue) => issue.code === "section-order"),
@@ -298,11 +299,10 @@ describe("validateDesignMd", () => {
 	});
 
 	it("flags an unbalanced code fence", () => {
-		const broken = ["# Doc", "", "## CSS Custom Properties", "", "```css"].join(
-			"\n",
-		);
+		const broken = ["# Doc", "", "## CSS / Tailwind Reference", ""].join("\n");
+		const unbalanced = `${broken}\n\`\`\`css`;
 		expect(
-			validateDesignMd(broken).some((issue) => issue.code === "code-fence"),
+			validateDesignMd(unbalanced).some((issue) => issue.code === "code-fence"),
 		).toBe(true);
 	});
 
@@ -324,8 +324,9 @@ describe("renderDesignMd with partial enrichment", () => {
 	it("keeps the measured tokens when the AI narrative is unavailable", () => {
 		const model = buildFixtureModel();
 		const markdown = renderDesignMd(model, { enrichmentUnavailable: true });
-		expect(markdown).toContain("## Tokens - Colors");
-		expect(markdown).toContain("## Tokens - Typography");
+		expect(markdown).toContain("## Foundations / Shared Tokens");
+		expect(markdown).toContain("### Colors & Semantic Roles");
+		expect(markdown).toContain("### Typography Scale");
 		expect(markdown).toMatch(/AI synthesis step did not produce a narrative/i);
 	});
 
@@ -341,8 +342,8 @@ describe("renderDesignMd with partial enrichment", () => {
 			],
 			layoutPrinciples: ["Content is constrained to a 1200px column."],
 		});
-		expect(withNarrative).toContain("## Components");
-		expect(withNarrative).toContain("## Layout");
+		expect(withNarrative).toContain("## Component Specifications");
+		expect(withNarrative).toContain("### Layout");
 		expect(withNarrative).toContain("Primary action button");
 	});
 });

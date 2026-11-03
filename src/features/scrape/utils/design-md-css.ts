@@ -115,7 +115,9 @@ const GROUP_ORDER: (keyof TokenDeclarations)[] = [
 // treatment keeps its own alias instead of becoming an unexplained `-2` suffix,
 // and a capture scope never leaks into a property name because scoped values are
 // emitted as overrides instead of extra global aliases.
-export function radiusAliasLabel(token: DesignTokenModel["radii"][number]): string {
+export function radiusAliasLabel(
+	token: DesignTokenModel["radii"][number],
+): string {
 	const base =
 		token.purpose === "Measured radius"
 			? (token.roles[0] ?? "measured")
@@ -141,14 +143,31 @@ export function tokenEntries(model: DesignTokenModel): TokenEntry[] {
 		for (const entry of uniqueTokenNames(named))
 			entries.push({ group, name: entry.name, value: entry.value });
 	};
+	const roleCounts = new Map<string, number>();
+	for (const color of model.colors) {
+		if (!isValidCssColor(color.value)) continue;
+		const isUnclassified =
+			color.roleClass === "unknown" || color.confidence === "unknown";
+		if (!isUnclassified) {
+			roleCounts.set(color.role, (roleCounts.get(color.role) ?? 0) + 1);
+		}
+	}
 	add(
 		"color",
-		model.colors.map((color, index) => {
+		model.colors.map((color) => {
 			if (!isValidCssColor(color.value)) return { name: null, value: "" };
-			const label =
-				color.roleClass === "unknown" || color.confidence === "unknown"
-					? `measured ${index + 1}`
-					: color.role;
+			const isUnclassified =
+				color.roleClass === "unknown" || color.confidence === "unknown";
+			if (isUnclassified) {
+				return {
+					name: tokenName("--color", `measured ${color.value}`),
+					value: color.value,
+				};
+			}
+			const isDuplicateRole = (roleCounts.get(color.role) ?? 0) > 1;
+			const label = isDuplicateRole
+				? `${color.role} ${color.value}`
+				: color.role;
 			return { name: tokenName("--color", label), value: color.value };
 		}),
 	);
@@ -205,8 +224,7 @@ export function tokenEntries(model: DesignTokenModel): TokenEntry[] {
 		"container",
 		model.spacing.map((token) => ({
 			name:
-				token.purpose === "Container max-width" &&
-				isValidCssLength(token.value)
+				token.purpose === "Container max-width" && isValidCssLength(token.value)
 					? tokenName("--container", "max-width")
 					: null,
 			value: token.value,

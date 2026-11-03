@@ -185,7 +185,7 @@ describe("phase 5 components", () => {
 			else expect(component.description).not.toMatch(/single measured/i);
 		}
 		const markdown = renderDesignMd(model);
-		expect(markdown).toContain("## Components");
+		expect(markdown).toContain("## Component Specifications");
 	});
 
 	it("keeps deterministic component derivation evidence-grounded", () => {

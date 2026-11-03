@@ -31,16 +31,25 @@ export function HistorySelectAll({
 }) {
 	const checkboxRef = useRef<HTMLInputElement>(null);
 	const selectedOnPage = pageIds.filter((id) => selectedIds.has(id)).length;
-	const pageSelected = pageIds.length > 0 && selectedOnPage === pageIds.length;
-	const partiallySelected = selectedOnPage > 0 && !pageSelected;
+	const isAllSelected = pageIds.length > 0 && selectedOnPage === pageIds.length;
+	const isPartiallySelected =
+		pageIds.length > 0 && selectedOnPage > 0 && selectedOnPage < pageIds.length;
 	const scopeAvailable =
-		pageSelected && !filteredScopeActive && total > selectedIds.size;
+		isAllSelected && !filteredScopeActive && total > selectedIds.size;
 
 	useEffect(() => {
 		if (checkboxRef.current) {
-			checkboxRef.current.indeterminate = partiallySelected;
+			checkboxRef.current.indeterminate = isPartiallySelected;
 		}
-	}, [partiallySelected]);
+	}, [isPartiallySelected]);
+
+	const labelText = isAllSelected
+		? `Semua ${noun} di halaman ini dipilih`
+		: "Pilih semua di halaman ini";
+
+	function handleCheckboxChange() {
+		onTogglePage(!isAllSelected);
+	}
 
 	return (
 		<div className="flex flex-col gap-2">
@@ -48,15 +57,13 @@ export function HistorySelectAll({
 				<input
 					ref={checkboxRef}
 					type="checkbox"
-					checked={pageSelected}
-					onChange={(event) => onTogglePage(event.target.checked)}
+					checked={isAllSelected}
+					aria-checked={isPartiallySelected ? "mixed" : isAllSelected}
+					aria-label="Pilih semua di halaman ini"
+					onChange={handleCheckboxChange}
 					className="size-4 shrink-0 accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 				/>
-				<span>
-					{pageSelected
-						? `${selectedOnPage} ${noun} dipilih di halaman ini.`
-						: "Pilih semua di halaman ini"}
-				</span>
+				<span>{labelText}</span>
 			</label>
 
 			{scopeAvailable ? (

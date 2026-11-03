@@ -1,7 +1,18 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	within,
+} from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DesignMdSourcePanel } from "../components/design-md-source-panel";
+import type {
+	DesignThemeKey,
+	DesignViewportOption,
+} from "../utils/design-view-contexts";
 
 afterEach(() => {
 	cleanup();
@@ -22,12 +33,43 @@ Body here.
 --source-url: url(${LONG_SOURCE_URL});
 \`\`\`  \n`;
 
+const VIEWPORTS: DesignViewportOption[] = [
+	{ key: "desktop", label: "Desktop", detail: "1440x900", viewIds: [1] },
+	{ key: "mobile", label: "Mobile", detail: "390x844", viewIds: [2] },
+];
+
 function renderPanel(onImplementAgent: () => void = vi.fn()) {
 	return render(
 		<DesignMdSourcePanel
 			designMd={DESIGN_MD}
 			onImplementAgent={onImplementAgent}
 		/>,
+	);
+}
+
+// The panel is a controlled view: the parent owns the measured context and hands
+// down the matching preview, which is what both tabs render.
+function PanelContextHarness({
+	viewports,
+	previewFor,
+}: {
+	viewports: DesignViewportOption[];
+	previewFor: (context: { theme: DesignThemeKey; viewport: string }) => string;
+}) {
+	const [theme, setTheme] = useState<DesignThemeKey>("light");
+	const [viewport, setViewport] = useState(viewports[0]?.key ?? "desktop");
+	return (
+		<DesignMdSourcePanel
+			designMd={DESIGN_MD}
+			previewMd={previewFor({ theme, viewport })}
+			viewports={viewports}
+			viewport={viewport}
+			onViewportChange={setViewport}
+			themes={["light", "dark"]}
+			theme={theme}
+			onThemeChange={setTheme}
+			onImplementAgent={vi.fn()}
+		/>
 	);
 }
 
@@ -231,13 +273,9 @@ describe("DesignMdSourcePanel", () => {
 		const lightMd = `${"# Acme - Style Reference\n\n## Tokens - Colors\n\nBase light.\n\n### Capture 1: 1440x900, browser preference light (theme light)\n\nLight tokens.\n"}`;
 		const darkMd = `${"# Acme - Style Reference\n\n## Tokens - Colors\n\nBase dark.\n\n### Capture 2: 1440x900, browser preference dark (theme dark)\n\nDark tokens.\n"}`;
 		render(
-			<DesignMdSourcePanel
-				designMd={DESIGN_MD}
-				onImplementAgent={vi.fn()}
-				themeDocuments={[
-					{ theme: "light", designMd: lightMd },
-					{ theme: "dark", designMd: darkMd },
-				]}
+			<PanelContextHarness
+				viewports={[]}
+				previewFor={({ theme }) => (theme === "light" ? lightMd : darkMd)}
 			/>,
 		);
 		const lightTab = screen.getByRole("tab", { name: /^light$/i });
@@ -278,16 +316,9 @@ describe("DesignMdSourcePanel", () => {
 		const blobSpy = vi.spyOn(globalThis, "Blob");
 		const lightMd = `# Acme\n\n### Capture 1: light theme\n\nLight.`;
 		render(
-			<DesignMdSourcePanel
-				designMd={DESIGN_MD}
-				onImplementAgent={vi.fn()}
-				themeDocuments={[
-					{ theme: "light", designMd: lightMd },
-					{
-						theme: "dark",
-						designMd: `# Acme\n\n### Capture 2: dark theme\n\nDark.`,
-					},
-				]}
+			<PanelContextHarness
+				viewports={[]}
+				previewFor={({ theme }) => (theme === "light" ? lightMd : "# Acme\n")}
 			/>,
 		);
 		fireEvent.click(screen.getByRole("tab", { name: /^dark$/i }));
@@ -298,5 +329,59 @@ describe("DesignMdSourcePanel", () => {
 		expect(blobSpy).toHaveBeenCalledWith([DESIGN_MD], {
 			type: "text/markdown;charset=utf-8",
 		});
+	});
+
+	it("switches the measured viewport context without touching the canonical document", () => {
+		const desktopMd = `# Acme\n\n### Capture 1: 1440x900\n\nDesktop tokens.`;
+		const mobileMd = `# Acme\n\n### Capture 2: 390x844\n\nMobile tokens.`;
+		render(
+			<PanelContextHarness
+				viewports={VIEWPORTS}
+				previewFor={({ viewport }) =>
+					viewport === "mobile" ? mobileMd : desktopMd
+				}
+			/>,
+		);
+		const group = screen.getByRole("radiogroup", {
+			name: /konteks viewport/i,
+		});
+		const desktopOption = within(group).getByRole("radio", { name: "Desktop" });
+		const mobileOption = within(group).getByRole("radio", { name: "Mobile" });
+		expect(desktopOption.getAttribute("aria-checked")).toBe("true");
+		expect(mobileOption.getAttribute("aria-checked")).toBe("false");
+		fireEvent.click(screen.getByRole("tab", { name: /source/i }));
+		const sourcePanel = () =>
+			document.getElementById(
+				screen
+					.getByRole("tab", { name: /source/i })
+					.getAttribute("aria-controls") ?? "",
+			)?.textContent;
+		expect(sourcePanel()).toBe(desktopMd);
+		fireEvent.click(mobileOption);
+		expect(mobileOption.getAttribute("aria-checked")).toBe("true");
+		expect(desktopOption.getAttribute("aria-checked")).toBe("false");
+		expect(sourcePanel()).toBe(mobileMd);
+		fireEvent.click(screen.getByRole("tab", { name: /rendered/i }));
+		expect(screen.getByText(/pratinjau terfilter ke mobile/i)).toBeDefined();
+		expect(screen.getByText(/salin dan download tetap/i)).toBeDefined();
+	});
+
+	it("shows no viewport switcher for a single measured viewport", () => {
+		render(
+			<PanelContextHarness
+				viewports={[
+					{
+						key: "desktop",
+						label: "Desktop",
+						detail: "1440x900",
+						viewIds: [1],
+					},
+				]}
+				previewFor={() => DESIGN_MD}
+			/>,
+		);
+		expect(
+			screen.queryByRole("radiogroup", { name: /konteks viewport/i }),
+		).toBeNull();
 	});
 });

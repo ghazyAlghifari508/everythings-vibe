@@ -693,6 +693,47 @@ describe("ScrapeHistory direct selection without selection mode", () => {
 			expect(onDeleteMany).toHaveBeenCalledWith(["item-1", "item-2"]);
 		});
 	});
+
+	it("renders select-all as unchecked (not indeterminate) when items are selected on another page", () => {
+		const page1Items = [sampleItems[0]];
+		const page2Items = [sampleItems[1], sampleItems[2]];
+		const { rerender } = renderList({
+			items: page1Items,
+			total: 3,
+			search: { ...baseSearch, page: 1, pageSize: 1 },
+		});
+
+		selectFirstItemViaMenu();
+		expect(screen.getByText("1 hasil dipilih")).toBeDefined();
+
+		const selectAllPage1 = screen.getByRole("checkbox", {
+			name: /pilih semua di halaman ini/i,
+		}) as HTMLInputElement;
+		expect(selectAllPage1.checked).toBe(true);
+		expect(selectAllPage1.indeterminate).toBe(false);
+
+		rerender(
+			<HistoryListHarness
+				items={page2Items}
+				total={3}
+				search={{ ...baseSearch, page: 2, pageSize: 1 }}
+				onQueryChange={vi.fn()}
+				onDeleteMany={vi
+					.fn()
+					.mockResolvedValue({ deleted: 0, skipped: 0, deletedIds: [] })}
+				onPrepareSelection={vi
+					.fn()
+					.mockResolvedValue({ ids: [], total: 0, truncated: false })}
+			/>,
+		);
+		const selectAllPage2 = screen.getByRole("checkbox", {
+			name: /pilih semua di halaman ini/i,
+		}) as HTMLInputElement;
+		expect(selectAllPage2.checked).toBe(false);
+		expect(selectAllPage2.indeterminate).toBe(false);
+		expect(selectAllPage2.getAttribute("aria-checked")).toBe("false");
+		expect(screen.getByText("Pilih semua di halaman ini")).toBeDefined();
+	});
 });
 
 describe("ScrapeHistoryView", () => {

@@ -33,6 +33,7 @@ function ScrapIndexComponent(): React.ComponentType {
 
 afterEach(() => {
 	cleanup();
+	sessionStorage.clear();
 });
 
 describe("scrap index heading stability & contextual navigation", () => {

@@ -122,8 +122,6 @@ export function normalizeColor(raw: string): NormalizedColor | null {
 		.map((channelValue) => channelValue.toString(16).padStart(2, "0"))
 		.join("")}`;
 	const hasAlpha = a < 1;
-	const css = hasAlpha
-		? `rgba(${r}, ${g}, ${b}, ${Number(a.toFixed(3))})`
-		: hex;
+	const css = hasAlpha ? `rgba(${r}, ${g}, ${b}, ${a})` : hex;
 	return { r, g, b, a, hex, css, hasAlpha, isNoOp: a === 0 };
 }

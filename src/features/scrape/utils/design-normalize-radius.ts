@@ -136,9 +136,10 @@ export function normalizeRadii(
 		const existing = merged.get(key);
 		if (existing) {
 			existing.frequency += token.frequency;
-			existing.roles = [
-				...new Set([...existing.roles, ...token.roles]),
-			].slice(0, 6);
+			existing.roles = [...new Set([...existing.roles, ...token.roles])].slice(
+				0,
+				6,
+			);
 			existing.selectors = [
 				...new Set([...existing.selectors, ...token.selectors]),
 			].slice(0, AUDIT_LIMIT);

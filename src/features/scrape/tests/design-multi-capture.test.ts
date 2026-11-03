@@ -3,11 +3,14 @@ import { FIXTURE } from "@/lib/design-fixture";
 import { buildDesignModel } from "../services/design-model";
 import { buildSynthesisPayload } from "../services/design-synthesis";
 import { designSettingsSchema } from "../types/scrape-contract";
-import {
-	inspectorFromEvidence,
-	resolveThemeDocuments,
-} from "../utils/design-md-inspector";
+import { inspectorFromEvidence } from "../utils/design-md-inspector";
 import { renderDesignMd, validateDesignMd } from "../utils/design-md-render";
+import {
+	designCaptureScopes,
+	designThemeOptions,
+	designViewportOptions,
+	scopedDesignMd,
+} from "../utils/design-view-contexts";
 
 function captures() {
 	const desktop = structuredClone(FIXTURE);
@@ -75,7 +78,7 @@ describe("semantic multi-capture normalization", () => {
 							expect(document.includes("@theme {")).toBe(
 								codeReference !== "css",
 							);
-							expect(document.includes("## Components")).toBe(
+							expect(document.includes("## Component Specifications")).toBe(
 								focus !== "visual-tokens",
 							);
 							expect(inspectorFromEvidence(input, document)?.verification).toBe(
@@ -123,23 +126,26 @@ describe("semantic multi-capture normalization", () => {
 		}
 		const document = renderDesignMd(model);
 		const inspector = inspectorFromEvidence(captures(), document);
+		// The mobile capture is one capture scope, not a suffix on every entry:
+		// its 32px heading and 16px button radius stay attributable through the
+		// context selectors and the variant that names its capture.
 		expect(
-			inspector?.typography.some(
-				(entry) => entry.role.includes("390x844") && entry.size === "32px",
-			),
-		).toBe(true);
+			inspector?.typography.filter((entry) => entry.size === "32px"),
+		).toHaveLength(1);
 		expect(
 			inspector?.components.some(
 				(entry) =>
-					entry.name.includes("390x844") &&
-					[
-						...entry.sharedCharacteristics,
-						...entry.variants.flatMap((variant) => variant.characteristics),
-					].some((characteristic) => characteristic.value.includes("16px")),
+					entry.name === "Buttons and CTAs" &&
+					entry.variants.some((variant) =>
+						variant.characteristics.some(
+							(characteristic) => characteristic.value === "16px",
+						),
+					),
 			),
 		).toBe(true);
+		expect(inspector?.colors.every((color) => color.captures === 2)).toBe(true);
 		expect(document).not.toMatch(/nth-child\(|html\s*>|\[capture \d/);
-		expect(document).toContain("Responsive Guidelines");
+		expect(document).toContain("Responsive Differences");
 	});
 	it("does not compare changed content or unrelated themes as responsive overrides", () => {
 		const evidence = captures();
@@ -212,11 +218,12 @@ describe("semantic multi-capture normalization", () => {
 			"light",
 			"light",
 		]);
+		expect(designThemeOptions(model, "desktop")).toEqual([]);
 		expect(
-			resolveThemeDocuments(
-				evidence,
-				renderDesignMd(buildDesignModel(evidence)),
-			),
+			scopedDesignMd(renderDesignMd(model), designCaptureScopes(model), {
+				viewport: null,
+				theme: "dark",
+			}),
 		).toBeUndefined();
 	});
 
@@ -229,10 +236,37 @@ describe("semantic multi-capture normalization", () => {
 			element.properties.color = "rgb(255, 255, 255)";
 		}
 		evidence.additionalViews = [dark];
-		const themes = resolveThemeDocuments(
-			evidence,
-			renderDesignMd(buildDesignModel(evidence)),
+		const model = buildDesignModel(evidence);
+		const document = renderDesignMd(model);
+		expect(designThemeOptions(model, "desktop")).toEqual(["light", "dark"]);
+		expect(designViewportOptions(model)).toEqual([]);
+		const scopes = designCaptureScopes(model);
+		const light = scopedDesignMd(document, scopes, {
+			viewport: null,
+			theme: "light",
+		});
+		const darkView = scopedDesignMd(document, scopes, {
+			viewport: null,
+			theme: "dark",
+		});
+		expect(light).toContain(
+			"### Capture 1: 1440x900, browser preference light",
 		);
-		expect(themes?.map((entry) => entry.theme)).toEqual(["light", "dark"]);
+		expect(light).not.toContain(
+			"### Capture 2: 1440x900, browser preference dark",
+		);
+		expect(darkView).toContain(
+			"### Capture 2: 1440x900, browser preference dark",
+		);
+		expect(darkView).not.toContain(
+			"### Capture 1: 1440x900, browser preference light",
+		);
+		// The canonical document keeps both capture scopes.
+		expect(document).toContain(
+			"### Capture 1: 1440x900, browser preference light",
+		);
+		expect(document).toContain(
+			"### Capture 2: 1440x900, browser preference dark",
+		);
 	});
 });

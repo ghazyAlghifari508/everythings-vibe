@@ -12,7 +12,7 @@ import { primaryFontFamily } from "./design-normalize-typography";
 
 // The capture contexts are one table for the whole document: repeating a theme
 // paragraph per capture duplicated the same facts without adding any.
-export function themeOverviewBody(
+function themeOverviewBody(
 	model: DesignTokenModel,
 	options: RenderDesignMdOptions,
 ): string[] {
@@ -108,52 +108,49 @@ export function renderTokenSections(
 	const focus = model.settings?.focus ?? "complete";
 	const tokens = focus !== "components";
 
-	// --- 1. Website identity & visual essence --------------------------------
-	const essence =
-		options.essence?.trim() ||
-		model.essence?.trim() ||
-		options.identityNarrative?.trim();
-	lines.push(heading(1, `${model.title || "Design"} - Style Reference`));
-	if (essence) {
-		lines.push("", `> ${essence}`);
+	// --- 1. Visual Identity --------------------------------------------------
+	const identity = options.identityNarrative?.trim();
+	if (identity) {
+		lines.push("", heading(2, "Visual Identity"));
+		lines.push("", identity);
 	}
-	lines.push("");
 
-	// --- 2. Theme & overview -------------------------------------------------
-	lines.push(heading(2, "Theme & Overview"));
-	lines.push("", ...themeOverviewBody(model, options));
+	// --- 2. Foundations / Shared Tokens --------------------------------------
+	// The block is assembled first so a capture scope that contributes no
+	// measured difference adds no empty heading, and the theme overview is only
+	// stated once for the document.
+	const foundation: string[] = [];
+	if (!options.omitThemeOverview)
+		foundation.push("", ...themeOverviewBody(model, options));
 
-	// --- 3. Tokens - Colors --------------------------------------------------
+	// Colors: Semantic deduplication
 	if (tokens && model.colors.length) {
-		lines.push("", heading(2, "Tokens - Colors"), "");
-		lines.push(
+		foundation.push("", heading(3, "Colors & Semantic Roles"));
+		const uniqueColors = new Map<string, (typeof model.colors)[0]>();
+		for (const color of model.colors) {
+			const key = `${color.value}-${color.role}`;
+			if (!uniqueColors.has(key)) uniqueColors.set(key, color);
+		}
+		foundation.push(
+			"",
 			table(
-				["Name", "Value", "Token", "Role", "Confidence"],
-				model.colors.map((color) => [
-					escapeCell(color.name),
-					`\`${escapeCell(color.value)}\``,
-					color.token ? `\`${escapeCell(color.token)}\`` : "",
-					escapeCell(color.role),
+				["Semantic Role", "Value", "Confidence"],
+				[...uniqueColors.values()].map((color) => [
+					color.role,
+					color.value,
 					color.confidence,
 				]),
 			),
 		);
 	}
 
-	// --- 4. Tokens - Typography ---------------------------------------------
+	// Typography
 	if (tokens && model.typography.length) {
-		lines.push("", heading(2, "Tokens - Typography"), "");
-		lines.push(
+		foundation.push("", heading(3, "Typography Scale"));
+		foundation.push(
+			"",
 			table(
-				[
-					"Role",
-					"Family",
-					"Size",
-					"Weight",
-					"Line height",
-					"Letter spacing",
-					"Measured on",
-				],
+				["Role", "Family", "Size", "Weight", "Line height", "Letter spacing"],
 				model.typography.map((entry) => [
 					escapeCell(entry.role),
 					escapeCell(primaryFontFamily(entry.fontFamily)),
@@ -161,47 +158,44 @@ export function renderTokenSections(
 					escapeCell(entry.fontWeight),
 					escapeCell(entry.lineHeight),
 					escapeCell(entry.letterSpacing),
-					String(entry.frequency),
 				]),
 			),
 		);
 	}
 
-	// --- 5. Fonts & Type Scale ----------------------------------------------
+	// Typefaces: family-level evidence (roles, measured sizes, CSS stack).
 	if (tokens && model.typefaces.length) {
-		lines.push("", heading(2, "Fonts & Type Scale"), "");
+		foundation.push("", heading(3, "Fonts & Type Faces"));
 		for (const typeface of model.typefaces) {
-			lines.push(heading(3, escapeCell(typeface.family)));
-			lines.push(
-				"",
-				`- **Roles:** ${typeface.roles.join(", ") || "not classified"}`,
-				`- **Measured weights:** ${typeface.measuredWeights.join(", ") || "none measured"}`,
-				`- **Measured sizes:** ${typeface.measuredSizes.join(", ") || "none measured"}`,
-				`- **Line heights:** ${distinctNonEmpty(typeface.lineHeights).join(", ") || "not measured"}`,
-				`- **Letter spacing:** ${distinctNonEmpty(typeface.letterSpacings).join(", ") || "not measured"}`,
-				`- **CSS stack:** \`${escapeCell(typeface.stack)}\``,
+			foundation.push("", `**${escapeCell(typeface.family)}**`);
+			foundation.push(
+				`- Roles: ${typeface.roles.join(", ") || "not classified"}`,
+				`- Weights: ${typeface.measuredWeights.join(", ") || "none measured"}`,
+				`- Sizes: ${typeface.measuredSizes.join(", ") || "none measured"}`,
+				`- Line heights: ${distinctNonEmpty(typeface.lineHeights).join(", ") || "not measured"}`,
+				`- Letter spacing: ${distinctNonEmpty(typeface.letterSpacings).join(", ") || "not measured"}`,
+				`- CSS stack: \`${escapeCell(typeface.stack)}\``,
 			);
 			// Loaded status is only claimed when a declared resource reported it.
-			if (typeface.declaredFaces.length) {
-				lines.push(
-					`- **Font loading evidence:** ${typeface.declaredFaces
+			if (typeface.declaredFaces.length)
+				foundation.push(
+					`- Font loading evidence: ${typeface.declaredFaces
 						.map((face) => `${escapeCell(face.weight)} ${face.status}`)
 						.join(", ")}`,
 				);
-			}
 			if (typeface.uncertainty)
-				lines.push(`- **Uncertainty:** ${escapeCell(typeface.uncertainty)}`);
+				foundation.push(`- Uncertainty: ${escapeCell(typeface.uncertainty)}`);
 		}
 	}
 
-	// --- 6. Tokens - Spacing & Shapes ---------------------------------------
+	// Spacing & Radius
 	if (tokens && (model.spacing.length || model.radii.length)) {
-		lines.push("", heading(2, "Tokens - Spacing & Shapes"));
+		foundation.push("", heading(3, "Spacing & Shapes"));
 		if (Number.isFinite(model.baseUnitPx))
-			lines.push("", `**Base unit:** ${model.baseUnitPx}px`);
+			foundation.push("", `**Base unit:** ${model.baseUnitPx}px`);
 		if (model.spacing.length) {
-			lines.push("", heading(3, "Spacing"), "");
-			lines.push(
+			foundation.push(
+				"",
 				table(
 					["Purpose", "Property", "Value", "Measured on", "On scale"],
 					model.spacing.map((token) => [
@@ -215,8 +209,8 @@ export function renderTokenSections(
 			);
 		}
 		if (model.radii.length) {
-			lines.push("", heading(3, "Border Radius"), "");
-			lines.push(
+			foundation.push(
+				"",
 				table(
 					["Context", "Value", "Captured in", "Measured on"],
 					radiusRows(model, options.captureScopeLabel ?? "single capture"),
@@ -224,4 +218,45 @@ export function renderTokenSections(
 			);
 		}
 	}
+
+	// Surfaces & elevation: measured planes and shadows a reader can apply.
+	if (tokens && model.surfaces.length) {
+		foundation.push("", heading(3, "Surfaces"));
+		foundation.push(
+			"",
+			table(
+				["Value", "Roles", "Measured on"],
+				model.surfaces.map((surface) => [
+					`\`${escapeCell(surface.value)}\``,
+					escapeCell(surface.roles.join(", ")),
+					String(surface.frequency),
+				]),
+			),
+		);
+	}
+	if (tokens && (model.elevation.length || !options.omitUnmeasuredElevation)) {
+		foundation.push("", heading(3, "Elevation"));
+		if (model.elevation.length) {
+			foundation.push(
+				"",
+				table(
+					["Shadow", "Roles", "Measured on", "Notes"],
+					model.elevation.map((token) => [
+						`\`${escapeCell(token.value)}\``,
+						escapeCell(token.roles.join(", ")),
+						String(token.frequency),
+						escapeCell(token.usageNote),
+					]),
+				),
+			);
+		} else {
+			foundation.push(
+				"",
+				"No box-shadow was measured on visible elements, so elevation is not defined by shadows in this capture.",
+			);
+		}
+	}
+
+	if (foundation.length)
+		lines.push("", heading(2, "Foundations / Shared Tokens"), ...foundation);
 }

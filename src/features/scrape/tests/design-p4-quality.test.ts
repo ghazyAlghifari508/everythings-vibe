@@ -93,7 +93,7 @@ describe("p4 §2/§8 multi-capture normalization keeps shared facts once", () =>
 		});
 		const document = renderDesignMd(model, { enrichmentUnavailable: true });
 		expect(validateDesignMd(document)).toEqual([]);
-		expect(document.match(/## Theme & Overview/g)).toHaveLength(1);
+		expect(document.match(/## Foundations \/ Shared Tokens/g)).toHaveLength(1);
 		expect(document).not.toContain("--radius-measured-radius-2");
 	});
 
@@ -110,8 +110,9 @@ describe("p4 §2/§8 multi-capture normalization keeps shared facts once", () =>
 			},
 		);
 		const section =
-			document.split("## Limitations & Confidence Notes")[1]?.split("## ")[0] ??
-			"";
+			document
+				.split("## Coverage & Important Limitations")[1]
+				?.split("## ")[0] ?? "";
 		expect(
 			section.match(/requested but the measured canvas rendered/g),
 		).toHaveLength(1);

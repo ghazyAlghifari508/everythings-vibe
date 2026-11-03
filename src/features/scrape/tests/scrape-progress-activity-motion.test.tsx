@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { installScrapeOrbEnvironment } from "./scrape-activity-orb-env";
 
 // The reduced-motion preference is read once per module registry by the shared
 // activity line, so this file owns the reduced-motion variant end to end.
@@ -19,6 +20,8 @@ const { ScrapeActivityLine } = await import(
 	"../components/scrape-progress-activity"
 );
 
+installScrapeOrbEnvironment();
+
 afterEach(() => {
 	cleanup();
 });
@@ -34,8 +37,15 @@ describe("prefers-reduced-motion", () => {
 		);
 		expect(container.textContent).toContain("Menyusun analisis desain");
 		expect(container.querySelector("[data-shimmer]")).toBeNull();
-		// The state contract stays intact: the line is still reported as running.
+		// The state contract stays intact: the line is still reported as running
+		// and still carries its orb, which the library holds still instead of
+		// dropping the indicator.
 		expect(container.querySelector("[data-working]")).not.toBeNull();
+		expect(
+			container
+				.querySelector("[data-activity-orb]")
+				?.getAttribute("data-activity-orb"),
+		).toBe("working");
 		expect(container.querySelectorAll('[role="timer"]')).toHaveLength(1);
 	});
 
@@ -50,6 +60,7 @@ describe("prefers-reduced-motion", () => {
 		expect(container.textContent).toContain("Proses selesai");
 		expect(container.querySelector("[data-shimmer]")).toBeNull();
 		expect(container.querySelector("[data-activity-spinner]")).toBeNull();
+		expect(container.querySelector("[data-activity-orb]")).toBeNull();
 		expect(container.querySelector('[role="timer"]')).toBeNull();
 	});
 });

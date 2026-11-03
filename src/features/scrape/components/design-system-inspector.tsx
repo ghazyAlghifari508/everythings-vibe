@@ -28,6 +28,11 @@ export interface DesignSystemInspectorProps {
 	siteName: string;
 	sourceUrl: string;
 	model: DesignInspectorModel;
+	/**
+	 * The measured context shown right now, e.g. "Mobile 390x844 · tema terang".
+	 * The panel resolves it once, so both panes describe the same context.
+	 */
+	contextLabel?: string;
 }
 
 export type {
@@ -43,6 +48,7 @@ export function DesignSystemInspector({
 	siteName,
 	sourceUrl,
 	model,
+	contextLabel,
 }: DesignSystemInspectorProps) {
 	const theme = themeLabel(model.theme);
 	let canonicalSourceUrl: string | null = null;
@@ -99,7 +105,11 @@ export function DesignSystemInspector({
 						{model.overview}
 					</p>
 				) : null}
-				{theme ? (
+				{contextLabel ? (
+					<p className="mt-2 font-mono text-xs text-fog">
+						Konteks terukur: {contextLabel}
+					</p>
+				) : theme ? (
 					<p className="mt-2 font-mono text-xs text-fog">Tema: {theme}</p>
 				) : null}
 				{model.verification === "unverified" ? (

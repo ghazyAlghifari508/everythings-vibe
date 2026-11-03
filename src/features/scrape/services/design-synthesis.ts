@@ -20,6 +20,8 @@ export {
 	buildSynthesisPayload,
 	designSynthesisSchema,
 	evidenceReferenceSchema,
+	synthesisMaxOutputTokens,
+	synthesisResponseMaxChars,
 } from "./design-synthesis-contract";
 
 export interface SynthesisValidationIssue {

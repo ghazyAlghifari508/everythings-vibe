@@ -17,7 +17,14 @@ export function parseGuidelines(lines: string[]): {
 		if (!bullet?.[1]) continue;
 		const raw = bullet[1].trim();
 		if (!raw || /^_?evidence/i.test(raw)) continue;
-		const text = raw.replace(/\*\*/g, "").replace(/^_|_$/g, "").trim();
+		// Current documents attach the measured basis inline; older archives
+		// used a sibling bullet, which is skipped above.
+		const inline = raw.match(/\s*_?\(evidence:\s*([\s\S]*)\)_?\s*$/i);
+		const withoutEvidence = inline ? raw.slice(0, inline.index).trim() : raw;
+		const text = withoutEvidence
+			.replace(/\*\*/g, "")
+			.replace(/^_|_$/g, "")
+			.trim();
 		const negative = /^(don't|dont|do\s+not)\b/i.test(text);
 		// The canonical document labels each rule so the raw markdown stays
 		// readable; the label is redundant once grouped, so it is not shown twice.
@@ -25,8 +32,9 @@ export function parseGuidelines(lines: string[]): {
 			.replace(/^(?:don't|dont|do\s+not|do)\s*:\s*/i, "")
 			.trim();
 		if (!display) continue;
-		if (negative) donts.push({ rule: display, evidence: "" });
-		else dos.push({ rule: display, evidence: "" });
+		const evidence = (inline?.[1] ?? "").trim();
+		if (negative) donts.push({ rule: display, evidence });
+		else dos.push({ rule: display, evidence });
 	}
 	return { dos, donts };
 }

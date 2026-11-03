@@ -10,6 +10,9 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { imageResultCounts } from "@/features/scrape/utils/scrape-images";
 import { ScrapeProgress } from "../components/scrape-progress";
+import { installScrapeOrbEnvironment } from "./scrape-activity-orb-env";
+
+installScrapeOrbEnvironment();
 
 afterEach(() => {
 	cleanup();
@@ -281,7 +284,7 @@ describe("truthful activity", () => {
 		);
 	});
 
-	it("keeps one stage spinner and one activity accent, never a third", () => {
+	it("keeps one stage spinner and one activity orb, never a third", () => {
 		const { container } = render(
 			<ScrapeProgress
 				mode="html"
@@ -292,10 +295,11 @@ describe("truthful activity", () => {
 		expect(
 			container.querySelectorAll("[data-active-stage-spinner]"),
 		).toHaveLength(1);
-		// The live activity line carries its own circular accent (p1 target); the
-		// ladder spinner is untouched and nothing else claims to be loading.
+		// The live activity line carries its own orb (p6 target); the ladder
+		// spinner is untouched and nothing else claims to be loading.
+		expect(container.querySelectorAll("[data-activity-orb]")).toHaveLength(1);
 		expect(container.querySelectorAll("[data-activity-spinner]")).toHaveLength(
-			1,
+			0,
 		);
 		expect(activityArea(container)?.textContent).toContain(
 			"Menyiapkan hasil HTML",
@@ -466,6 +470,48 @@ describe("per-mode loading presentation", () => {
 			cleanup();
 		}
 	});
+	it("omits the redundant DESIGN.md kicker above website title in design mode", () => {
+		render(
+			<ScrapeProgress
+				mode="design"
+				status="capturing"
+				domain="www.notion.com"
+				sourceUrl="https://www.notion.com/"
+			/>,
+		);
+		expect(
+			screen.getByRole("heading", { name: "Notion", level: 2 }),
+		).toBeDefined();
+		expect(screen.getByText("https://www.notion.com/")).toBeDefined();
+		const occurrences = screen.getAllByText("DESIGN.md");
+		expect(occurrences).toHaveLength(1);
+		expect(occurrences[0].tagName).toBe("H3");
+		cleanup();
+	});
+
+	it("keeps the mode kicker above the website title for crawl, html, and images modes", () => {
+		const cases = [
+			{ mode: "crawl" as const, kicker: "Crawl Website" },
+			{ mode: "html" as const, kicker: "Scrape HTML" },
+			{ mode: "images" as const, kicker: "Scrape Images" },
+		];
+		for (const { mode, kicker } of cases) {
+			render(
+				<ScrapeProgress
+					mode={mode}
+					status="capturing"
+					domain="www.notion.com"
+					sourceUrl="https://www.notion.com/"
+				/>,
+			);
+			const kickerEl = screen.getByText(kicker, { selector: "p" });
+			expect(kickerEl).toBeDefined();
+			expect(
+				screen.getByRole("heading", { name: "Notion", level: 2 }),
+			).toBeDefined();
+			cleanup();
+		}
+	});
 
 	it("keeps HTML in the single-column layout", () => {
 		const { container } = render(
@@ -597,7 +643,8 @@ describe("activity presentation per mode", () => {
 			/>,
 		);
 		const card = container.querySelector('[data-scrape-progress="images"]');
-		expect(card?.querySelectorAll("[data-activity-spinner]")).toHaveLength(1);
+		expect(card?.querySelectorAll("[data-activity-orb]")).toHaveLength(1);
+		expect(card?.querySelectorAll("[data-activity-spinner]")).toHaveLength(0);
 		expect(card?.querySelector("[data-activity-line]")?.textContent).toContain(
 			"Mengambil tampilan halaman",
 		);
@@ -617,6 +664,7 @@ describe("activity presentation per mode", () => {
 		expect(activity?.getAttribute("data-activity-state")).toBe("completed");
 		expect(activity?.textContent).toContain("Proses selesai");
 		expect(container.querySelector("[data-activity-spinner]")).toBeNull();
+		expect(container.querySelector("[data-activity-orb]")).toBeNull();
 		expect(
 			container.querySelectorAll("[data-active-stage-spinner]"),
 		).toHaveLength(0);

@@ -50,14 +50,21 @@ export function scopedDeclarations(
 		tokenEntries(base).map((entry) => [entry.name, entry.value]),
 	);
 	const entries = tokenEntries(view).filter(
-		(entry) => baseValues.get(entry.name) !== entry.value,
+		(entry) =>
+			baseValues.has(entry.name) && baseValues.get(entry.name) !== entry.value,
 	);
 	const clauses: string[] = [];
 	if (view.viewport.width !== base.viewport.width)
 		clauses.push(`(max-width: ${view.viewport.width}px)`);
 	const baseScheme = base.capturedViews?.[0]?.colorScheme ?? "auto";
 	const scheme = view.capturedViews?.[0]?.colorScheme ?? "auto";
-	if (scheme !== "auto" && scheme !== baseScheme)
+	if (
+		scheme !== "auto" &&
+		scheme !== baseScheme &&
+		view.theme === scheme &&
+		base.theme !== "unknown" &&
+		base.theme !== view.theme
+	)
 		clauses.push(`(prefers-color-scheme: ${scheme})`);
 	return {
 		label,

@@ -8,6 +8,8 @@ import {
 	parseHeaderBlock,
 	sectionBody,
 	splitSections,
+	subsectionBody,
+	untilSubheading,
 } from "./design-md-parse-markdown";
 import {
 	parseComponents,
@@ -53,41 +55,66 @@ export function parseDesignMd(designMd: string): DesignInspectorModel {
 	const { prelude, sections } = splitSections(normalized);
 	const version = designMdVersionOf(designMd);
 	const header = parseHeaderBlock(prelude);
+	// The canonical layout nests foundations and component tables under `### `
+	// subheadings; archived documents use one flat section per topic. Both are
+	// read here so an old archive never loses its evidence.
+	const foundations = sectionBody(sections, "Foundations / Shared Tokens");
+	const nested = (heading: string, legacy: string): string[] => {
+		const sub = foundations.length ? subsectionBody(foundations, heading) : [];
+		return sub.length ? sub : sectionBody(sections, legacy);
+	};
+	const topLevel = (heading: string, legacy: string): string[] => {
+		const body = sectionBody(sections, heading);
+		return body.length ? body : sectionBody(sections, legacy);
+	};
 	const themeOverview = parseThemeOverview(
-		sectionBody(sections, "Theme & Overview"),
+		foundations.length
+			? untilSubheading(foundations)
+			: sectionBody(sections, "Theme & Overview"),
 		{ theme: header.theme, overview: header.overview },
 	);
 	const typography = parseTypography(
-		sectionBody(sections, "Tokens - Typography"),
+		nested("Typography Scale", "Tokens - Typography"),
 	);
 	const parsedShapes = parseSpacingShapes(
-		sectionBody(sections, "Tokens - Spacing & Shapes"),
+		nested("Spacing & Shapes", "Tokens - Spacing & Shapes"),
 	);
 	const elevation = [
 		...parsedShapes.elevation,
-		...parseElevation(sectionBody(sections, "Elevation")),
+		...parseElevation(nested("Elevation", "Elevation")),
 	];
 	const { dos, donts } = parseGuidelines(
-		sectionBody(sections, "Do's and Don'ts"),
+		topLevel("Do's & Don'ts", "Do's and Don'ts"),
 	);
 	const limitations = parseLimitations(
-		sectionBody(sections, "Limitations & Confidence Notes"),
+		topLevel(
+			"Coverage & Important Limitations",
+			"Limitations & Confidence Notes",
+		),
 		version,
 	);
+	// These subheadings share the component section but are not components.
+	const nonComponentHeadings: Record<string, true> = {
+		"Imagery & Iconography": true,
+		Layout: true,
+	};
+	const components = parseComponents(
+		topLevel("Component Specifications", "Components"),
+	).filter((component) => !nonComponentHeadings[component.name]);
 	return {
 		...EMPTY_MODEL,
 		...header,
 		theme: themeOverview.theme,
 		overview: themeOverview.overview,
 		modelVersion: version,
-		colors: parseColors(sectionBody(sections, "Tokens - Colors")),
+		colors: parseColors(nested("Colors & Semantic Roles", "Tokens - Colors")),
 		typography,
 		typefaces: deriveTypefaces(typography),
 		spacing: parsedShapes.spacing,
 		radii: parsedShapes.radii,
 		elevation,
-		surfaces: parseSurfaces(sectionBody(sections, "Surfaces")),
-		components: parseComponents(sectionBody(sections, "Components")),
+		surfaces: parseSurfaces(nested("Surfaces", "Surfaces")),
+		components,
 		baseUnitPx: parsedShapes.baseUnitPx,
 		dos,
 		donts,

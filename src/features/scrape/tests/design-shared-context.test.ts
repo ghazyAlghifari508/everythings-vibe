@@ -36,7 +36,9 @@ it("partitions identical semantic facts without pooling frequencies or losing so
 	expect(model).toEqual(original);
 	const document = renderDesignMd(model);
 	expect(validateDesignMd(document)).toEqual([]);
-	const colors = document.split("## Tokens - Colors")[1]?.split("\n## ")[0];
+	const colors = document
+		.split("### Colors & Semantic Roles")[1]
+		?.split("\n### ")[0];
 	expect(colors?.match(/#155eef/g)).toHaveLength(1);
 });
 
@@ -105,8 +107,9 @@ it("partitions guidelines and limitations only when their complete evidence is s
 	expect(views).toEqual(original);
 	const document = renderDesignMd(model);
 	const limitations =
-		document.split("## Limitations & Confidence Notes")[1]?.split("\n## ")[0] ??
-		"";
+		document
+			.split("## Coverage & Important Limitations")[1]
+			?.split("\n## ")[0] ?? "";
 	expect(limitations).toContain("- shared");
 	expect(limitations).toContain("first");
 	expect(limitations).toContain("second");

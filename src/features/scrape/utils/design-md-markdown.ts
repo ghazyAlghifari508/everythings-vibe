@@ -4,25 +4,15 @@
 // cannot support are omitted rather than filled with placeholders, so a reader
 // can trust that every present section is backed by measurement.
 export const DESIGN_MD_SECTIONS = [
-	"Website Identity & Visual Essence",
-	"Theme & Overview",
-	"Tokens - Colors",
-	"Tokens - Typography",
-	"Fonts & Type Scale",
-	"Tokens - Spacing & Shapes",
-	"Components",
-	"Do's and Don'ts",
-	"Surfaces",
-	"Elevation",
-	"Imagery & Iconography",
-	"Layout",
-	"Agent Prompt Guide",
-	"CSS Custom Properties",
-	"Tailwind v4",
-	"Responsive Guidelines",
-	"Theme Variations",
-	"Limitations & Confidence Notes",
-	"Measurement Provenance",
+	"Visual Identity",
+	"Foundations / Shared Tokens",
+	"Component Specifications",
+	"Responsive Differences",
+	"Theme Differences",
+	"Do's & Don'ts",
+	"AI Agent Implementation Guide",
+	"CSS / Tailwind Reference",
+	"Coverage & Important Limitations",
 ] as const;
 
 export type DesignMdSection = (typeof DESIGN_MD_SECTIONS)[number];

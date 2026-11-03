@@ -276,6 +276,7 @@ describe("radius guidance boundaries", () => {
 			(token) => ({
 				token,
 				roleClass: "brand",
+				group: "brand",
 				roleLabel: "Brand accent",
 				rationale:
 					"A measured brand association does not establish action hierarchy.",
