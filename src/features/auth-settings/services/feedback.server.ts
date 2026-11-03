@@ -8,8 +8,12 @@ export async function submitFeedback({ request }: { request: Request }) {
 	let payload: FeedbackPayload;
 	try {
 		payload = parseFeedbackBody(body);
-	} catch {
-		return Response.json({ error: "Message required" }, { status: 400 });
+	} catch (error) {
+		const errorMessage =
+			error instanceof Error && error.message
+				? error.message
+				: "Message required";
+		return Response.json({ error: errorMessage }, { status: 400 });
 	}
 
 	const { db } = await import("@/db");

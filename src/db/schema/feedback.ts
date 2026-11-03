@@ -15,9 +15,17 @@ export const feedback = pgTable(
 		userId: text("user_id").references(() => users.id),
 		message: text("message").notNull(),
 		type: text("type").default("general"),
+		handlingStatus: text("handling_status").default("new").notNull(),
+		archivedAt: timestamp("archived_at"),
 		createdAt: timestamp("created_at").defaultNow(),
 	},
-	(t) => [index("feedback_user_id_idx").on(t.userId)],
+	(t) => [
+		index("feedback_user_id_idx").on(t.userId),
+		index("feedback_created_at_idx").on(t.createdAt),
+		index("feedback_type_idx").on(t.type),
+		index("feedback_handling_status_idx").on(t.handlingStatus),
+		index("feedback_archived_at_idx").on(t.archivedAt),
+	],
 );
 
 // Error Reports
@@ -28,9 +36,16 @@ export const errorReports = pgTable(
 		userId: text("user_id").references(() => users.id),
 		errorMessage: text("error_message").notNull(),
 		context: text("context"),
+		handlingStatus: text("handling_status").default("new").notNull(),
+		archivedAt: timestamp("archived_at"),
 		createdAt: timestamp("created_at").defaultNow(),
 	},
-	(t) => [index("error_reports_user_id_idx").on(t.userId)],
+	(t) => [
+		index("error_reports_user_id_idx").on(t.userId),
+		index("error_reports_created_at_idx").on(t.createdAt),
+		index("error_reports_handling_status_idx").on(t.handlingStatus),
+		index("error_reports_archived_at_idx").on(t.archivedAt),
+	],
 );
 
 // Rate Limits (kustom selain Better Auth)

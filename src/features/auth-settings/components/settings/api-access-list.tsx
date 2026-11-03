@@ -29,11 +29,8 @@ export function ApiAccessList({
 	return (
 		<section aria-labelledby="access-list-heading" className="space-y-3">
 			<div className="flex flex-wrap items-baseline justify-between gap-2">
-				<h3
-					id="access-list-heading"
-					className="font-mono text-xs uppercase tracking-widest text-fog"
-				>
-					Akses yang terdaftar
+				<h3 id="access-list-heading" className="text-sm font-medium text-snow">
+					Daftar API key
 				</h3>
 				{obsoleteCount > 0 && (
 					<Button
@@ -43,7 +40,7 @@ export function ApiAccessList({
 						className="gap-1.5"
 					>
 						<Icon icon={Eraser01Icon} size={14} />
-						Bersihkan {obsoleteCount} akses usang
+						Bersihkan {obsoleteCount} key usang
 					</Button>
 				)}
 			</div>
@@ -57,17 +54,11 @@ export function ApiAccessList({
 							className="mt-0.5 shrink-0 text-fog"
 						/>
 						<div className="space-y-1.5">
-							<p className="text-sm font-medium text-snow">
-								Belum ada akses terdaftar
-							</p>
+							<p className="text-sm font-medium text-snow">Belum ada API key</p>
 							<p className="max-w-prose text-xs leading-relaxed text-fog">
-								Akses untuk AI Agent dibuat otomatis saat kamu memilih opsi
-								serah-terima prompt agent di halaman Task. Akses muncul di sini
-								setelah dibuat, tanpa perlu menyiapkan kredensial manual.
-							</p>
-							<p className="text-xs text-fog/70">
-								Butuh kredensial khusus untuk integrasi sendiri? Buka pengaturan
-								lanjutan di bawah.
+								API key akan dibuat otomatis saat kamu menggunakan fitur handoff
+								AI Agent. Key yang sudah dibuat bisa dilihat dan dikelola di
+								sini.
 							</p>
 						</div>
 					</div>
@@ -75,10 +66,10 @@ export function ApiAccessList({
 			) : (
 				<>
 					<p className="text-xs leading-relaxed text-fog">
-						Akses untuk AI Agent dibuat otomatis saat kamu menghubungkan
-						integrasi. Kamu bisa memeriksa dan mencabut akses di sini.
+						API key untuk AI Agent dibuat otomatis saat kamu menggunakan fitur
+						handoff. Kamu bisa melihat dan mengelola key di sini.
 						{automaticCount > 0 &&
-							` ${automaticCount} dari ${keys.length} akses berasal dari serah-terima otomatis.`}
+							` ${automaticCount} dari ${keys.length} key dibuat otomatis.`}
 					</p>
 					<ApiKeysTable keys={keys} onRevoke={onRevoke} />
 				</>
@@ -110,10 +101,10 @@ export function ApiAdvancedSection({
 				>
 					<span className="min-w-0">
 						<span className="block text-sm font-semibold text-snow">
-							Pengaturan lanjutan
+							Buat API key manual
 						</span>
 						<span className="mt-0.5 block text-xs text-fog">
-							Buat API key manual untuk integrasi khusus.
+							Untuk menghubungkan tool lain secara manual.
 						</span>
 					</span>
 					<Icon

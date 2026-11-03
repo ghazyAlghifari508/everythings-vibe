@@ -1,20 +1,45 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AdminUsersView, listUsers } from "@/features/admin";
+import {
+	AdminUsersView,
+	adminUsersSearchSchema,
+	getAdminUserStats,
+	listUsers,
+} from "@/features/admin";
 import { requireAdminServer } from "@/lib/session";
 
 export const Route = createFileRoute("/admin/users")({
 	staleTime: 30_000,
-	loader: async () => {
-		const [rows, adminUser] = await Promise.all([
-			listUsers({ data: { limit: 100 } }),
+	validateSearch: (search) => adminUsersSearchSchema.parse(search),
+	loaderDeps: ({ search }) => ({
+		page: search.page,
+		pageSize: search.pageSize,
+		search: search.search,
+		plan: search.plan,
+	}),
+	loader: async ({ deps }) => {
+		const [usersResult, stats, adminUser] = await Promise.all([
+			listUsers({ data: deps }),
+			getAdminUserStats(),
 			requireAdminServer(),
 		]);
-		return { rows, currentUserId: adminUser.id };
+		return {
+			usersResult,
+			stats,
+			currentUserId: adminUser.id,
+		};
 	},
 	component: AdminUsersPage,
 });
 
 function AdminUsersPage() {
-	const { rows, currentUserId } = Route.useLoaderData();
-	return <AdminUsersView rows={rows} currentUserId={currentUserId} />;
+	const { usersResult, stats, currentUserId } = Route.useLoaderData();
+	const search = Route.useSearch();
+	return (
+		<AdminUsersView
+			usersResult={usersResult}
+			stats={stats}
+			currentUserId={currentUserId}
+			searchParams={search}
+		/>
+	);
 }

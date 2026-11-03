@@ -10,6 +10,15 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("../components/credit-usage", () => ({
 	CreditUsageSection: () => null,
 }));
+vi.mock("@/features/billing/hooks/use-user-plan", () => ({
+	useUserPlan: () => ({
+		data: {
+			plan: "free",
+			subscriptionState: "free_active",
+			billingExempt: false,
+		},
+	}),
+}));
 
 afterEach(cleanup);
 

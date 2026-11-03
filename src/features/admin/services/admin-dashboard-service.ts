@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/session";
 import type { AdminDashboardMetrics, DailyTrendPoint } from "../types";
 import {
@@ -8,6 +8,7 @@ import {
 	mergeTrendData,
 } from "../utils/admin-trend-utils";
 import { adminDb } from "./admin-db";
+import { SUCCESS_PAYMENT_STATUSES } from "./admin-transactions-service";
 
 export const getAdminDashboardMetrics = createServerFn({
 	method: "GET",
@@ -62,7 +63,7 @@ export const getAdminDashboardMetrics = createServerFn({
 				total: sql<number>`coalesce(sum(${payments.amount}), 0)`,
 			})
 			.from(payments)
-			.where(eq(payments.status, "success")),
+			.where(inArray(payments.status, SUCCESS_PAYMENT_STATUSES)),
 		db
 			.select({
 				total: sql<number>`coalesce(sum(${payments.amount}), 0)`,
@@ -70,7 +71,7 @@ export const getAdminDashboardMetrics = createServerFn({
 			.from(payments)
 			.where(
 				and(
-					eq(payments.status, "success"),
+					inArray(payments.status, SUCCESS_PAYMENT_STATUSES),
 					gte(payments.createdAt, currentMonthStart),
 				),
 			),
@@ -117,7 +118,7 @@ export const getAdminDashboardMetrics = createServerFn({
 			.from(payments)
 			.where(
 				and(
-					eq(payments.status, "success"),
+					inArray(payments.status, SUCCESS_PAYMENT_STATUSES),
 					gte(payments.createdAt, trendStartDate),
 				),
 			)
@@ -192,7 +193,7 @@ export const getAdminTrendMetrics = createServerFn({ method: "GET" })
 				.from(payments)
 				.where(
 					and(
-						eq(payments.status, "success"),
+						inArray(payments.status, SUCCESS_PAYMENT_STATUSES),
 						gte(payments.createdAt, startDate),
 					),
 				)
