@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => {
 			id: "frame-a",
 			htmlCode: "<main>Sample</main>",
 			viewport: "mobile",
-			visualHash: null,
+			visualHash: null as string | null,
 		},
 	};
 });
@@ -117,6 +117,25 @@ describe("frame preview capture isolation and telemetry", () => {
 		expect(log.mock.calls).toEqual([
 			["[studio.preview.capture]", { outcome: "cached", assetCount: 1 }],
 		]);
+	});
+	it("preserves compatibility by serving legacy cached JPEG for existing project frames", async () => {
+		const log = vi.spyOn(console, "info").mockImplementation(() => {});
+		mocks.frame.visualHash = "legacy-hash-123";
+		mocks.select.mockResolvedValueOnce([
+			{
+				id: "asset-legacy",
+				filename: "visual-legacy-hash-123-390x844.jpg",
+				createdAt: new Date(),
+			},
+		]);
+		await expect(
+			getStudioFrameVisual("project-a", "frame-a", "user-a"),
+		).resolves.toMatchObject({ width: 390, height: 844 });
+		expect(mocks.capture).not.toHaveBeenCalled();
+		expect(log.mock.calls).toEqual([
+			["[studio.preview.capture]", { outcome: "cached", assetCount: 1 }],
+		]);
+		mocks.frame.visualHash = null;
 	});
 
 	it("records capture and storage timing through the shared Studio timing contract", async () => {

@@ -16,6 +16,7 @@ import {
 	WEB_PLATFORM_CONTRACT,
 } from "./studio-prompt-contracts";
 import { sanitizeStudioDesignMd } from "./studio-prompt-validation";
+import { STUDIO_BASE_QUALITY_PROMPT } from "./studio-quality-rules";
 
 export function buildStudioFramePrompt(opts: StudioFramePromptOptions): string {
 	const sections: string[] = [];
@@ -49,7 +50,7 @@ Every screen in this project uses this exact specification. Apply it verbatim:
 ${JSON.stringify(opts.blueprint)}
 
 CONTROLLED ASSEMBLY CONTRACT:
-- Studio inserts the canonical app header and navigation; do not generate them or simulated device status bars.
+- Studio inserts the platform-shaped canonical app bar and navigation; do not generate them or simulated device status bars. Web: brand lives only in the injected topbar; put the screen title and its actions in a content header, never beside the brand. Mobile: the injected app bar shows the screen title, and detail/edit/checkout screens receive a back affordance automatically.
 - Put ALL screen-specific body content in exactly one <main data-studio-content>. Do not place visible content outside it.
 - Do not put app navigation/header inside that region; contextual tabs and section headings remain screen-specific.
 - Canonical labels ${JSON.stringify(labels)}, destinations ${JSON.stringify(destinations)}, icons ${JSON.stringify(iconMapping)} and active screen ${JSON.stringify(activeScreen)} are supplied by assembly, not independently rendered by you.
@@ -76,7 +77,7 @@ Ensure features, forms, lists, metrics, terminology, and realistic Indonesian co
 	// Platform instructions
 	if (opts.blueprint)
 		sections.push(
-			"Assembly overrides shared component instructions below: Studio inserts the app header/navigation. Generate only marked main content; no independent app shell or device chrome.",
+			"Assembly overrides shared component instructions below: Studio inserts the platform app bar/navigation. Generate only marked main content; no independent app shell or device chrome.",
 		);
 	if (opts.designMode === "mobile") {
 		sections.push(MOBILE_PLATFORM_CONTRACT);
@@ -89,6 +90,7 @@ Ensure features, forms, lists, metrics, terminology, and realistic Indonesian co
 		`${opts.projectPrompt} ${opts.screenName} ${opts.screenDescription ?? ""}`,
 	);
 	sections.push(
+		STUDIO_BASE_QUALITY_PROMPT,
 		`<DOMAIN_AWARE_QUALITY_CONTRACT>
 ${domainContract}
 
@@ -115,14 +117,24 @@ Strict styling integration rules:
 
 	// Logo
 	if (opts.logoUrl && opts.logoUrl.trim().length > 0) {
-		sections.push(
-			`<APPLICATION_LOGO_REFERENCE>
+		if (opts.blueprint) {
+			// Assembly injects the logo into the platform app bar; asking the model
+			// to render it again duplicates brand chrome inside the screen body.
+			sections.push(
+				`<APPLICATION_LOGO_REFERENCE>
+Studio renders the official application logo "${opts.logoUrl.trim()}" in the assembled app bar. Do not render the logo yourself anywhere in the screen content.
+</APPLICATION_LOGO_REFERENCE>`,
+			);
+		} else {
+			sections.push(
+				`<APPLICATION_LOGO_REFERENCE>
 The user has provided an official application brand logo at: "${opts.logoUrl.trim()}".
 You MUST include this exact logo in the top navigation bar or app header:
 <img src="${opts.logoUrl.trim()}" alt="Logo" class="h-8 w-auto object-contain" />
 Do NOT replace this logo with text initials or placeholder shapes.
 </APPLICATION_LOGO_REFERENCE>`,
-		);
+			);
+		}
 	}
 
 	// Revision vs Initial
@@ -142,7 +154,7 @@ Return the FULL revised single-file HTML document for "${opts.screenName}".`,
 	}
 
 	sections.push(
-		`Design precedence, highest to lowest: safety and platform validity > explicit user requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override safety, platform validity, explicit user colors, or brand requirements. Resolve conflicts deterministically in that order.`,
+		`Design precedence, highest to lowest: security and HTML safety > explicit user requirements > valid PRD / product constraints > selected DESIGN.md / theme reference > existing shared project blueprint > selected design skill guidance > default product guidance. A design skill must never override security, HTML safety, explicit user requirements, PRD constraints, or validated design tokens. Resolve conflicts deterministically in that order.`,
 	);
 
 	return sections.join("\n\n");
@@ -167,6 +179,7 @@ export function buildStudioUserPrompt(
 	// Domain-aware quality contract & component-first guidance
 	const domainContract = getDomainQualityContract(prompt);
 	sections.push(
+		STUDIO_BASE_QUALITY_PROMPT,
 		`<DOMAIN_AWARE_QUALITY_CONTRACT>
 ${domainContract}
 

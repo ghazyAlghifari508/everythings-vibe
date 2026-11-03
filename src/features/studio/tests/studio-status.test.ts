@@ -18,6 +18,7 @@ function statusFixture() {
 		id: "project-1",
 		userId: "user-1",
 		title: "Sample",
+		titleSource: "user",
 		designMode: "web",
 		designMd: null,
 		designSkillId: "none",

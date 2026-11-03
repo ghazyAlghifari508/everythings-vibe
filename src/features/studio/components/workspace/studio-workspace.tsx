@@ -30,9 +30,10 @@ export function StudioWorkspace({
 				title={workspace.project.title}
 				duplicating={workspace.duplicating}
 				exporting={workspace.exportingZip}
-				deleting={workspace.deleting}
+				renaming={workspace.renaming}
 				canExport={workspace.readyFramesCount > 0}
 				onDuplicate={() => void workspace.handleDuplicate()}
+				onRename={workspace.handleRename}
 				onExport={() => void workspace.handleDownloadAllZip()}
 				onDelete={workspace.handleDelete}
 			/>
@@ -64,6 +65,7 @@ export function StudioWorkspace({
 					designSkillId={workspace.project.designSkillId}
 					onDesignSkillChange={workspace.handleSkillChange}
 					referenceLabel={workspace.storedReferenceLabel}
+					referenceColors={workspace.storedReferenceColors}
 				/>
 			</div>
 

@@ -3,31 +3,27 @@
 import {
 	Cancel01Icon,
 	ComputerIcon,
+	Copy01Icon,
 	Delete02Icon,
 	File01Icon,
 	Image01Icon,
 	Loading01Icon,
 	MoreVerticalIcon,
+	PencilEdit01Icon,
 	Search01Icon,
 	SmartPhone01Icon,
 } from "@hugeicons/core-free-icons";
-import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { useEffect, useMemo, useState } from "react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { StudioDeleteProjectDialog } from "@/features/studio/components/workspace/studio-delete-project-dialog";
+import { StudioRenameProjectDialog } from "@/features/studio/components/workspace/studio-rename-project-dialog";
 import type { StudioHistoryItem } from "@/features/studio/types/studio";
 
 export type { StudioHistoryItem } from "@/features/studio/types/studio";
@@ -36,6 +32,8 @@ export interface StudioSidebarProps {
 	history: StudioHistoryItem[];
 	onSelectProject: (id: string) => void;
 	onDeleteProject: (id: string) => Promise<void>;
+	onRenameProject: (id: string, name: string) => Promise<void>;
+	onDuplicateProject: (id: string) => Promise<void>;
 	className?: string;
 }
 
@@ -43,15 +41,19 @@ export function StudioSidebar({
 	history,
 	onSelectProject,
 	onDeleteProject,
+	onRenameProject,
+	onDuplicateProject,
 	className = "",
 }: StudioSidebarProps) {
 	const [query, setQuery] = useState("");
 	const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-	const [confirmTarget, setConfirmTarget] = useState<StudioHistoryItem | null>(
+	const [renameTarget, setRenameTarget] = useState<StudioHistoryItem | null>(
 		null,
 	);
-	const [deletingId, setDeletingId] = useState<string | null>(null);
-	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const [deleteTarget, setDeleteTarget] = useState<StudioHistoryItem | null>(
+		null,
+	);
+	const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
 	const filtered = useMemo(() => {
 		const trimmed = query.trim().toLowerCase();
@@ -59,22 +61,24 @@ export function StudioSidebar({
 		return history.filter((item) => item.title.toLowerCase().includes(trimmed));
 	}, [history, query]);
 
-	async function confirmDelete() {
-		if (!confirmTarget || deletingId) return;
-		const id = confirmTarget.id;
-		setDeletingId(id);
-		setDeleteError(null);
+	// A project can disappear from the list while its dialog is open (deleted in
+	// another tab, or by this very confirmation). Closing keeps the dialog from
+	// writing against a row that no longer exists.
+	useEffect(() => {
+		const ids = new Set(history.map((item) => item.id));
+		if (renameTarget && !ids.has(renameTarget.id)) setRenameTarget(null);
+		if (deleteTarget && !ids.has(deleteTarget.id)) setDeleteTarget(null);
+	}, [history, renameTarget, deleteTarget]);
+
+	// Failures are reported by the caller as a toast, so this only prevents a
+	// second request while the first copy is still being created.
+	async function duplicateProject(item: StudioHistoryItem) {
+		if (duplicatingId) return;
+		setDuplicatingId(item.id);
 		try {
-			await onDeleteProject(id);
-			setConfirmTarget(null);
-		} catch (failure) {
-			setDeleteError(
-				failure instanceof Error
-					? failure.message
-					: "Gagal menghapus project. Coba lagi.",
-			);
+			await onDuplicateProject(item.id);
 		} finally {
-			setDeletingId(null);
+			setDuplicatingId(null);
 		}
 	}
 
@@ -147,20 +151,20 @@ export function StudioSidebar({
 					<ul className="space-y-1">
 						{filtered.map((item) => {
 							const isMobile = item.designMode === "mobile";
-							const isDeleting = deletingId === item.id;
+							const isDuplicating = duplicatingId === item.id;
 							const isMenuOpen = openMenuId === item.id;
 							return (
 								<li key={item.id}>
 									<div
 										data-state={
-											isDeleting
-												? "deleting"
+											isDuplicating
+												? "duplicating"
 												: isMenuOpen
 													? "menu-open"
 													: "idle"
 										}
 										className={`group flex items-start justify-between rounded-lg border transition-colors ${
-											isDeleting
+											isDuplicating
 												? "border-transparent opacity-60"
 												: isMenuOpen
 													? "border-iron bg-steel"
@@ -170,7 +174,7 @@ export function StudioSidebar({
 										<button
 											type="button"
 											onClick={() => onSelectProject(item.id)}
-											disabled={isDeleting}
+											disabled={isDuplicating}
 											className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-lg p-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed"
 										>
 											<span className="line-clamp-2 text-xs font-semibold text-snow">
@@ -233,11 +237,11 @@ export function StudioSidebar({
 												<DropdownMenuTrigger asChild>
 													<button
 														type="button"
-														disabled={isDeleting}
+														disabled={isDuplicating}
 														aria-label={`Aksi project ${item.title}`}
 														className="flex size-7 items-center justify-center rounded-md text-fog transition-colors hover:bg-white/10 hover:text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:cursor-not-allowed disabled:opacity-50"
 													>
-														{isDeleting ? (
+														{isDuplicating ? (
 															<Icon
 																icon={Loading01Icon}
 																size={14}
@@ -255,18 +259,30 @@ export function StudioSidebar({
 												</DropdownMenuTrigger>
 												<DropdownMenuContent align="end">
 													<DropdownMenuItem
-														className="text-crimson focus:text-crimson"
-														onSelect={() => {
-															setDeleteError(null);
-															setConfirmTarget(item);
-														}}
+														className="gap-2"
+														onSelect={() => setRenameTarget(item)}
 													>
 														<Icon
-															icon={Delete02Icon}
+															icon={PencilEdit01Icon}
 															size={14}
 															aria-hidden
-															className="mr-2"
 														/>
+														Ganti nama
+													</DropdownMenuItem>
+													<DropdownMenuItem
+														className="gap-2"
+														disabled={duplicatingId !== null}
+														onSelect={() => void duplicateProject(item)}
+													>
+														<Icon icon={Copy01Icon} size={14} aria-hidden />
+														Duplikat project
+													</DropdownMenuItem>
+													<DropdownMenuSeparator />
+													<DropdownMenuItem
+														className="gap-2 text-crimson focus:text-crimson"
+														onSelect={() => setDeleteTarget(item)}
+													>
+														<Icon icon={Delete02Icon} size={14} aria-hidden />
 														Hapus project
 													</DropdownMenuItem>
 												</DropdownMenuContent>
@@ -280,52 +296,29 @@ export function StudioSidebar({
 				)}
 			</div>
 
-			<Dialog
-				open={confirmTarget !== null}
+			<StudioRenameProjectDialog
+				open={renameTarget !== null}
 				onOpenChange={(open) => {
-					if (!open && !deletingId) {
-						setConfirmTarget(null);
-						setDeleteError(null);
-					}
+					if (!open) setRenameTarget(null);
 				}}
-			>
-				<DialogContent className="max-w-sm">
-					<DialogHeader>
-						<DialogTitle>Hapus project?</DialogTitle>
-						<DialogDescription>
-							{confirmTarget
-								? `Project "${confirmTarget.title}" akan dihapus permanen beserta seluruh layar, riwayat revisi, dan asetnya. Tindakan ini tidak dapat dibatalkan.`
-								: ""}
-						</DialogDescription>
-					</DialogHeader>
-					{deleteError ? (
-						<p role="alert" className="text-sm text-crimson">
-							{deleteError}
-						</p>
-					) : null}
-					<DialogFooter>
-						<Button
-							type="button"
-							variant="secondary"
-							onClick={() => {
-								setConfirmTarget(null);
-								setDeleteError(null);
-							}}
-							disabled={deletingId !== null}
-						>
-							Batal
-						</Button>
-						<Button
-							type="button"
-							variant="destructive"
-							onClick={() => void confirmDelete()}
-							disabled={deletingId !== null}
-						>
-							{deletingId ? "Menghapus..." : "Hapus project"}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+				name={renameTarget?.title ?? ""}
+				onRename={(title) =>
+					renameTarget
+						? onRenameProject(renameTarget.id, title)
+						: Promise.resolve()
+				}
+			/>
+
+			<StudioDeleteProjectDialog
+				open={deleteTarget !== null}
+				onOpenChange={(open) => {
+					if (!open) setDeleteTarget(null);
+				}}
+				name={deleteTarget?.title ?? ""}
+				onDelete={() =>
+					deleteTarget ? onDeleteProject(deleteTarget.id) : Promise.resolve()
+				}
+			/>
 		</aside>
 	);
 }

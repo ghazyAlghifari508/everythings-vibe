@@ -31,6 +31,8 @@ describe("StudioMobileHistoryDrawer", () => {
 				history={mockProjects}
 				onSelectProject={onSelectProject}
 				onDeleteProject={onDeleteProject}
+				onRenameProject={vi.fn()}
+				onDuplicateProject={vi.fn()}
 			/>,
 		);
 
@@ -51,6 +53,8 @@ describe("StudioMobileHistoryDrawer", () => {
 				history={mockProjects}
 				onSelectProject={onSelectProject}
 				onDeleteProject={onDeleteProject}
+				onRenameProject={vi.fn()}
+				onDuplicateProject={vi.fn()}
 			/>,
 		);
 
@@ -72,6 +76,8 @@ describe("StudioMobileHistoryDrawer", () => {
 				history={mockProjects}
 				onSelectProject={onSelectProject}
 				onDeleteProject={onDeleteProject}
+				onRenameProject={vi.fn()}
+				onDuplicateProject={vi.fn()}
 			/>,
 		);
 

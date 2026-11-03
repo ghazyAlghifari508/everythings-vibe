@@ -433,6 +433,37 @@ describe("preview recovery", () => {
 		).toBeDefined();
 	});
 
+	it("retains a loaded preview when the replacement image fails to decode", async () => {
+		fetchMock
+			.mockResolvedValueOnce(Response.json(preview))
+			.mockResolvedValueOnce(
+				Response.json({ ...preview, url: "/api/studio/asset?id=asset-b" }),
+			);
+		const first = frame();
+		const { rerender } = render(<StudioFrame frame={first} priorityPreview />);
+		await act(async () => {});
+		fireEvent.load(screen.getByRole("img", { name: "Desain Sample" }));
+		rerender(
+			<StudioFrame
+				frame={{ ...first, htmlCode: "<main>Updated</main>" }}
+				priorityPreview
+			/>,
+		);
+		await act(async () => {});
+		const replacement = document.querySelector(
+			'img[src="/api/studio/asset?id=asset-b"]',
+		);
+		expect(replacement).not.toBeNull();
+		if (!replacement) throw new Error("Replacement image missing");
+		fireEvent.error(replacement);
+		expect(
+			screen.getByRole("img", { name: "Desain Sample" }).getAttribute("src"),
+		).toBe(preview.url);
+		expect(
+			screen.getByRole("button", { name: "Muat ulang pratinjau" }),
+		).toBeDefined();
+	});
+
 	it("shows image decode failure and replaces the broken image after recapture", async () => {
 		fetchMock
 			.mockResolvedValueOnce(Response.json(preview))

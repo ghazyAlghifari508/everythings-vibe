@@ -24,6 +24,7 @@ export function studioJobTiming(
 		estimatedTokens?: number;
 		promptChars?: number;
 		systemChars?: number;
+		promptAssemblyMs?: number;
 		outputChars?: number;
 		inputTokens?: number;
 		outputTokens?: number;

@@ -46,6 +46,7 @@ function renderHeader(overrides: Record<string, unknown> = {}) {
 			exporting={false}
 			canExport
 			onDuplicate={vi.fn()}
+			onRename={async () => {}}
 			onExport={vi.fn()}
 			{...overrides}
 		/>,
@@ -60,6 +61,7 @@ function renderServerMarkup(): string {
 			exporting={false}
 			canExport
 			onDuplicate={() => {}}
+			onRename={async () => {}}
 			onExport={() => {}}
 		/>,
 	);
@@ -87,6 +89,7 @@ function hydrateMarkup(markup: string): { errors: unknown[][]; root: Root } {
 				exporting={false}
 				canExport
 				onDuplicate={() => {}}
+				onRename={async () => {}}
 				onExport={() => {}}
 			/>,
 		);
@@ -140,6 +143,7 @@ describe("StudioHeader session hydration", () => {
 					exporting={false}
 					canExport
 					onDuplicate={() => {}}
+					onRename={async () => {}}
 					onExport={() => {}}
 				/>,
 			);

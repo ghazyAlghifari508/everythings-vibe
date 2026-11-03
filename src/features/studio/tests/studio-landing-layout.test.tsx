@@ -86,7 +86,7 @@ describe("StudioLandingPage Layout Geometry", () => {
 		expect(contentWrapper?.className).not.toContain("lg:max-w-4xl");
 
 		// Subtitle retains bounded line-length
-		const subtitle = screen.getByText(/Ubah idemu menjadi rancangan aplikasi/i);
+		const subtitle = screen.getByText(/Jelaskan aplikasi yang ingin dibuat/i);
 		expect(subtitle.className).toContain("max-w-2xl");
 	});
 

@@ -21,6 +21,11 @@ import {
 } from "./studio-logo-service";
 import { validateStudioPrdFilename } from "./studio-prd-helpers";
 import { validateStudioPrdContent } from "./studio-prd-validation.server";
+import {
+	deriveProvisionalStudioTitle,
+	normalizeStudioRenameTitle,
+	type StudioTitleSource,
+} from "./studio-project-title";
 import { validateStudioPrompt } from "./studio-prompt-validation";
 import { buildStudioUserPrompt } from "./studio-screen-prompts";
 
@@ -86,10 +91,10 @@ export async function createStudioProject(
 		prdContentHash = validContent.contentHash;
 	}
 
+	const suppliedTitle = normalizeStudioRenameTitle(input.title ?? "");
 	const cleanTitle =
-		(input.title ?? "").trim().slice(0, 200) ||
-		checked.prompt.slice(0, 80) ||
-		"Studio tanpa judul";
+		suppliedTitle ?? deriveProvisionalStudioTitle(checked.prompt);
+	const titleSource: StudioTitleSource = suppliedTitle ? "user" : "auto";
 
 	const userPrompt = buildStudioUserPrompt(checked.prompt, {
 		designMode,
@@ -108,6 +113,7 @@ export async function createStudioProject(
 		.values({
 			userId,
 			title: cleanTitle,
+			titleSource,
 			designMode,
 			designMd: cleanDesignMd,
 			logoAssetId,

@@ -6,9 +6,12 @@ import {
 } from "../services/studio-canonical-shell";
 import { enforceDesignSystemOnHtml } from "../services/studio-design-system-html";
 import {
+	customerDirectoryBlueprint,
+	ecommerceBlueprint,
 	financeBlueprint,
+	marketingLandingBlueprint,
+	portfolioBlueprint,
 	travelBlueprint,
-	webSaaSBlueprint,
 } from "./fixtures/studio-evaluation-fixtures";
 
 // Component-first review outcome for standalone HTML frames:
@@ -27,10 +30,13 @@ const RAW_HTML =
 describe("Standalone-HTML component compatibility (Task 02)", () => {
 	for (const blueprint of [
 		financeBlueprint,
+		customerDirectoryBlueprint,
 		travelBlueprint,
-		webSaaSBlueprint,
+		ecommerceBlueprint,
+		portfolioBlueprint,
+		marketingLandingBlueprint,
 	]) {
-		it(`keeps ${blueprint.productIdentity.platform} component guidance renderable without a framework runtime`, () => {
+		it(`keeps ${blueprint.productIdentity.platform} (${blueprint.productIdentity.productName}) component guidance renderable without a framework runtime`, () => {
 			const screen = blueprint.screenPlan[0]?.name ?? "Screen";
 			const enforced = enforceDesignSystemOnHtml(
 				RAW_HTML,

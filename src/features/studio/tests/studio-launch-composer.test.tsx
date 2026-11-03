@@ -27,7 +27,6 @@ function renderComposer(
 			onConfigChange={onConfigChange}
 			reference={null}
 			onOpenDesignPicker={vi.fn()}
-			onRemoveReference={vi.fn()}
 			loading={false}
 			error=""
 			onSubmit={onSubmit}
@@ -67,22 +66,19 @@ describe("StudioLaunchComposer", () => {
 		expect(onSubmit).toHaveBeenCalledTimes(1);
 	});
 
-	it("shows the active reference with replace and remove actions", () => {
+	it("shows the active reference with a replace action and no remove action", () => {
 		const onOpenDesignPicker = vi.fn();
-		const onRemoveReference = vi.fn();
 		renderComposer({
 			reference: { label: "Workspace", logoFilename: "logo.svg" },
 			onOpenDesignPicker,
-			onRemoveReference,
 		});
 		expect(screen.getByText("Workspace")).toBeDefined();
 		expect(screen.getByText(/logo\.svg/)).toBeDefined();
 		fireEvent.click(screen.getByRole("button", { name: "Ganti" }));
 		expect(onOpenDesignPicker).toHaveBeenCalledTimes(1);
-		fireEvent.click(
-			screen.getByRole("button", { name: "Lepas referensi desain" }),
-		);
-		expect(onRemoveReference).toHaveBeenCalledTimes(1);
+		expect(
+			screen.queryByRole("button", { name: /Lepas referensi/i }),
+		).toBeNull();
 	});
 
 	it("renders active reference as a compact contextual chip with palette icon", () => {
@@ -181,7 +177,6 @@ describe("StudioLaunchComposer", () => {
 				onConfigChange={vi.fn()}
 				reference={null}
 				onOpenDesignPicker={vi.fn()}
-				onRemoveReference={vi.fn()}
 				onPrdChange={onPrdChange}
 				onError={onError}
 				loading={false}
@@ -223,7 +218,6 @@ describe("StudioLaunchComposer", () => {
 				onConfigChange={vi.fn()}
 				reference={null}
 				onOpenDesignPicker={vi.fn()}
-				onRemoveReference={vi.fn()}
 				onPrdChange={onPrdChange}
 				onError={onError}
 				loading={false}
@@ -272,7 +266,6 @@ describe("StudioLaunchComposer", () => {
 				onConfigChange={vi.fn()}
 				reference={null}
 				onOpenDesignPicker={vi.fn()}
-				onRemoveReference={vi.fn()}
 				onPrdChange={onPrdChange}
 				onError={onError}
 				loading={false}

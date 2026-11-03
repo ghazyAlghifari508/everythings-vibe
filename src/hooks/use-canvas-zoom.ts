@@ -12,7 +12,13 @@
  * per input event (see vercel-react-best-practices rerender-use-ref-transient-values).
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	type RefObject,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import {
 	CANVAS_MAX_ZOOM,
 	CANVAS_MIN_ZOOM,
@@ -26,6 +32,14 @@ interface UseCanvasZoomOptions {
 	minZoom?: number;
 	maxZoom?: number;
 	initialZoom?: number;
+	/**
+	 * The transformed container that `pan` is expressed against. When given, a
+	 * wheel event's viewport coordinates are converted into that container's
+	 * local space before they become a zoom anchor, so the content point under
+	 * the pointer stays under the pointer regardless of where the canvas sits
+	 * on the page.
+	 */
+	containerRef?: RefObject<HTMLElement | null>;
 }
 
 /** The subset of a wheel event that zoom/pan math actually reads. */
@@ -79,6 +93,7 @@ export function useCanvasZoom({
 	minZoom = CANVAS_MIN_ZOOM,
 	maxZoom = CANVAS_MAX_ZOOM,
 	initialZoom = 1,
+	containerRef,
 }: UseCanvasZoomOptions = {}) {
 	const clampZoom = useCallback(
 		(value: number) =>
@@ -240,15 +255,22 @@ export function useCanvasZoom({
 				pendingZoomFactorRef.current = 1;
 				return;
 			}
-			// Anchor at the pointer position when the event carries one.
+			// Anchor at the pointer position when the event carries one. The
+			// anchor lives in the same space as `pan`, so viewport coordinates
+			// are rebased onto the transformed container.
 			if (Number.isFinite(e.clientX) && Number.isFinite(e.clientY)) {
-				zoomAnchorRef.current = { x: e.clientX, y: e.clientY };
+				const container = containerRef?.current ?? null;
+				const rect = container?.getBoundingClientRect();
+				zoomAnchorRef.current = {
+					x: rect ? e.clientX - rect.left : e.clientX,
+					y: rect ? e.clientY - rect.top : e.clientY,
+				};
 			}
 			if (zoomRafRef.current === null) {
 				zoomRafRef.current = requestAnimationFrame(flushZoom);
 			}
 		},
-		[flushZoom],
+		[containerRef, flushZoom],
 	);
 
 	/**

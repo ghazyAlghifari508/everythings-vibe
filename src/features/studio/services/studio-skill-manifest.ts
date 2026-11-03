@@ -249,18 +249,27 @@ export const STUDIO_SKILL_MANIFEST: Record<
 		id: "taste",
 		name: "Taste",
 		upstreamRepo: "Leonxlnx/taste-skill",
-		pinnedRevision: "d237dd399d57524945c0c81327da5da19f7a468d",
-		upstreamVersion: null,
-		adapterVersion: 2,
+		pinnedRevision: "12af471f627f866411b4bd785b19646d3672784c",
+		upstreamVersion: "2.1.5",
+		adapterVersion: 3,
 		license: "MIT",
 		licenseFile: "docs/studio-skills/taste-LICENSE.txt",
 		primaryDocument: {
 			path: "src/features/studio/skills/taste/SKILL.md",
 			sha256:
-				"2136ed83016bfada39f7b8013b2aafd9f78fcbd9799110ed222a79c6419ba5fb",
-			sizeBytes: 89478,
+				"3435ed963b15a1b6447746ec8844ab2cd38d8d2e8ead3451937f42df01e408c4",
+			sizeBytes: 39537,
 		},
-		referenceDocuments: [],
+		referenceDocuments: [
+			{
+				path: "src/features/studio/skills/taste/app-screens.md",
+				title: "App Screen Guidelines",
+				priority: 1,
+				sha256:
+					"55e937ec30de605b53a11310b446f328a3ce7403de24fff008920a00be1a5ed4",
+				sizeBytes: 85358,
+			},
+		],
 		datasets: [],
 	},
 };

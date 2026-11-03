@@ -31,6 +31,7 @@ import {
 	persistStudioPlannedFrames,
 	planStudioScreens,
 } from "./studio-planning";
+import { resolveStudioProjectTitle } from "./studio-project-title";
 import { validateStudioDesignMode } from "./studio-prompt-validation";
 
 export async function runStudioJobPipeline(
@@ -99,13 +100,15 @@ export async function runStudioJobPipeline(
 					);
 					signal.throwIfAborted();
 					blueprint = planning.designBlueprint;
+					const plannedTitle = resolveStudioProjectTitle({
+						candidate: planning.screenPlan.projectTitle,
+						productName: planning.designBlueprint.productIdentity.productName,
+						prompt: job.prompt,
+					});
 					frames = await withStudioJobWrite(claim, async (tx) => {
 						await tx
 							.update(studioProjects)
 							.set({
-								...(planning.screenPlan.projectTitle
-									? { title: planning.screenPlan.projectTitle.slice(0, 200) }
-									: {}),
 								designBlueprint: planning.designBlueprint,
 								updatedAt: new Date(),
 							})
@@ -113,6 +116,20 @@ export async function runStudioJobPipeline(
 								and(
 									eq(studioProjects.id, projectId),
 									eq(studioProjects.userId, userId),
+								),
+							);
+						// Planning names only the projects the system still owns. A rename
+						// that landed while this job was planning keeps its name because the
+						// provenance check runs in the same statement, not against a value
+						// read before the plan was produced.
+						await tx
+							.update(studioProjects)
+							.set({ title: plannedTitle, updatedAt: new Date() })
+							.where(
+								and(
+									eq(studioProjects.id, projectId),
+									eq(studioProjects.userId, userId),
+									eq(studioProjects.titleSource, "auto"),
 								),
 							);
 						return persistStudioPlannedFrames(

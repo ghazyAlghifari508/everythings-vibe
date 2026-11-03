@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	classifyWheelGesture,
+	isCanvasControlTarget,
 	isScrollableOrEditableTarget,
 	WHEEL_DISCRETE_NOTCH_THRESHOLD_PX,
 } from "@/features/studio/utils/studio-canvas-gesture";
@@ -187,5 +188,49 @@ describe("isScrollableOrEditableTarget", () => {
 
 		expect(isScrollableOrEditableTarget(child, document.body)).toBe(true);
 		container.remove();
+	});
+
+	it("treats a marked frame surface as canvas background, not as a button", () => {
+		const article = document.createElement("article");
+		const select = document.createElement("button");
+		select.setAttribute("data-canvas-gesture-surface", "");
+		const label = document.createElement("span");
+		select.appendChild(label);
+		article.appendChild(select);
+		document.body.appendChild(article);
+
+		expect(select.getAttribute("data-canvas-gesture-surface")).not.toBeNull();
+		// The wheel over a frame artboard belongs to the canvas.
+		expect(isScrollableOrEditableTarget(select, document.body)).toBe(false);
+		expect(isScrollableOrEditableTarget(label, document.body)).toBe(false);
+
+		// A real control is still left alone.
+		const control = document.createElement("button");
+		article.appendChild(control);
+		expect(isScrollableOrEditableTarget(control, document.body)).toBe(true);
+
+		article.remove();
+	});
+
+	it("lets a hand drag start on a frame surface but not on a real control", () => {
+		const canvas = document.createElement("section");
+		const frameSurface = document.createElement("button");
+		frameSurface.setAttribute("data-canvas-gesture-surface", "");
+		canvas.appendChild(frameSurface);
+
+		const zoomButton = document.createElement("button");
+		canvas.appendChild(zoomButton);
+		const overlay = document.createElement("div");
+		overlay.setAttribute("data-canvas-marquee-ignore", "");
+		canvas.appendChild(overlay);
+		document.body.appendChild(canvas);
+
+		expect(isCanvasControlTarget(frameSurface)).toBe(false);
+		expect(isCanvasControlTarget(zoomButton)).toBe(true);
+		expect(isCanvasControlTarget(overlay)).toBe(true);
+		expect(isCanvasControlTarget(canvas)).toBe(false);
+		expect(isCanvasControlTarget(null)).toBe(false);
+
+		canvas.remove();
 	});
 });

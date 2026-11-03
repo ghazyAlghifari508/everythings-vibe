@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { ScrapeError } from "@/lib/design-errors";
 import { buildStudioAssetUrl } from "./studio-logo-service";
+import { normalizeStudioRenameTitle } from "./studio-project-title";
 
 export async function listStudioProjects(
 	userId: string,
@@ -81,6 +82,32 @@ export async function deleteStudioProject(
 			throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
 		return { id: deleted[0].id };
 	});
+}
+
+/**
+ * Renames a project in place. This never touches frames, revisions, assets or
+ * the shared blueprint, and it never starts generation: only the label changes.
+ * Marking the new name `titleSource: "user"` is what stops a planning step that
+ * is still running from overwriting the person's choice.
+ */
+export async function renameStudioProject(
+	projectId: string,
+	userId: string,
+	title: string,
+): Promise<StudioProjectRow> {
+	const normalized = normalizeStudioRenameTitle(title);
+	if (!normalized)
+		throw new ScrapeError("INVALID_URL", "Nama project tidak boleh kosong.");
+	const [updated] = await db
+		.update(studioProjects)
+		.set({ title: normalized, titleSource: "user", updatedAt: new Date() })
+		.where(
+			and(eq(studioProjects.id, projectId), eq(studioProjects.userId, userId)),
+		)
+		.returning();
+	if (!updated)
+		throw new ScrapeError("WEBSITE_BLOCKED", "Studio tidak ditemukan.");
+	return updated;
 }
 
 export async function duplicateStudioProject(

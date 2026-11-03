@@ -89,6 +89,13 @@ export function inferCanonicalIconId(
 	return canonicalIconId("circle");
 }
 
+export function isContextualScreenName(name: string): boolean {
+	return (
+		CONTEXTUAL_PREFIX_PATTERN.test(name) ||
+		CONTEXTUAL_KEYWORD_PATTERN.test(name)
+	);
+}
+
 function findParentDestinationId(
 	screenName: string,
 	blueprint: StudioDesignBlueprint,

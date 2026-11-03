@@ -127,6 +127,31 @@ describe("canonical assembly", () => {
 		).toEqual([]);
 	});
 
+	it("preserves contextual headings and navigation content during assembly", () => {
+		const source = html.replace(
+			"<p>Screen content</p>",
+			'<header><h2>Record details</h2><button>Download</button></header><nav aria-label="Record sections"><a href="#history">History</a></nav><section id="history">Recorded activity</section>',
+		);
+		const assembled = assembleCanonicalShell(
+			source,
+			blueprint,
+			"Summary",
+			null,
+		);
+		const document = doc(assembled);
+		const content = document.querySelector("[data-studio-content]");
+		expect(content?.textContent).toContain("Record details");
+		expect(content?.textContent).toContain("Download");
+		expect(content?.textContent).toContain("History");
+		expect(content?.querySelector('a[href="#history"]')).not.toBeNull();
+		expect(
+			validateCanonicalShell(assembled, blueprint, "Summary", null),
+		).toEqual([]);
+		expect(assembleCanonicalShell(assembled, blueprint, "Summary", null)).toBe(
+			assembled,
+		);
+	});
+
 	it("detects shell tampering, duplicates and unexpected status chrome", () => {
 		const valid = assembleCanonicalShell(html, blueprint, "Summary", null);
 		for (const modify of [
