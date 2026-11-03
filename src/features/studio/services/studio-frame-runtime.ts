@@ -151,11 +151,14 @@ export async function generateStudioHtml(
 	signal?.throwIfAborted();
 	const startedAt = Date.now();
 	const stage = context.stage ?? "frame";
+	const promptAssemblyStartedAt = Date.now();
 	const system = resolveStudioFrameSystemPrompt(designSkillId, {
 		stage,
 		focus: context.focus,
 	});
 	if (timing) {
+		// frame-context is the per-frame skill/context measurement the timing
+		// report keys on for skill attribution; keep its name and fields stable.
 		const plan = resolveStudioSkillContext(designSkillId, {
 			stage,
 			focus: context.focus,
@@ -170,6 +173,9 @@ export async function generateStudioHtml(
 			estimatedTokens: plan.estimatedTokens,
 			systemChars: system.length,
 			promptChars: prompt.length,
+			// Prompt assembly (skill selection + system prompt build) is a pure
+			// CPU cost worth separating from provider latency in the timing report.
+			promptAssemblyMs: Date.now() - promptAssemblyStartedAt,
 		});
 	}
 	const { generator, firstChunk, outcome } = await tryStreamWithFallback(

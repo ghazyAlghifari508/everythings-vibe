@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe02Icon } from "@hugeicons/core-free-icons";
+import { Globe02Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
 import type { ScrapeDesignSource } from "@/features/scrape/services/scrape-design-md-service";
 
@@ -13,11 +13,13 @@ export function StudioScrapeDesignSources({
 	sources,
 	selectedId,
 	onSelect,
+	onDeselect,
 	disabled = false,
 }: {
 	sources: ScrapeDesignSource[];
 	selectedId: string | null;
 	onSelect: (source: ScrapeDesignSource) => void;
+	onDeselect?: (source: ScrapeDesignSource) => void;
 	disabled?: boolean;
 }) {
 	if (sources.length === 0)
@@ -33,6 +35,14 @@ export function StudioScrapeDesignSources({
 			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 				{sources.map((source) => {
 					const selected = selectedId === source.id;
+					const handleToggle = () => {
+						if (disabled) return;
+						if (selected && onDeselect) {
+							onDeselect(source);
+						} else {
+							onSelect(source);
+						}
+					};
 					return (
 						<div
 							key={source.id}
@@ -52,6 +62,14 @@ export function StudioScrapeDesignSources({
 									<span className="truncate text-sm font-semibold text-snow">
 										{source.title ?? source.domain}
 									</span>
+									{selected ? (
+										<Icon
+											icon={Tick01Icon}
+											size={14}
+											aria-label="Terpilih"
+											className="ml-auto text-snow"
+										/>
+									) : null}
 								</span>
 								<span
 									className="truncate text-xs text-fog"
@@ -64,7 +82,7 @@ export function StudioScrapeDesignSources({
 								type="button"
 								disabled={disabled}
 								aria-pressed={selected}
-								onClick={() => onSelect(source)}
+								onClick={handleToggle}
 								className={`inline-flex min-h-9 w-full items-center justify-center rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo disabled:opacity-50 ${
 									selected
 										? "border-snow bg-snow text-obsidian"

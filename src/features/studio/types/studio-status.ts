@@ -9,6 +9,7 @@ import {
 	studioDesignReferenceMetadataSchema,
 	studioDesignSkillIdSchema,
 } from "../services/studio-generation-options";
+import { studioTitleSourceSchema } from "../services/studio-project-title";
 import { STUDIO_JOB_QUEUE_HEALTH_MS } from "./studio-constants";
 
 const date = z.union([
@@ -22,6 +23,7 @@ const projectSchema = z.object({
 	id: z.string().min(1),
 	userId: z.string().min(1),
 	title: z.string(),
+	titleSource: studioTitleSourceSchema,
 	designMode: z.enum(["web", "mobile"]),
 	designMd: nullableText,
 	designSkillId: studioDesignSkillIdSchema,

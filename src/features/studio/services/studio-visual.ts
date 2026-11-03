@@ -56,7 +56,7 @@ export function studioVisualCacheKey(
 ) {
 	return createHash("sha256")
 		.update(
-			`visual-v2:${viewport}:${config.width}x${config.height}@${config.deviceScaleFactor}:${html}`,
+			`visual-v3:jpeg-q${STUDIO_CAPTURE_QUALITY}:${viewport}:${config.width}x${config.height}@${config.deviceScaleFactor}:${html}`,
 		)
 		.digest("hex");
 }

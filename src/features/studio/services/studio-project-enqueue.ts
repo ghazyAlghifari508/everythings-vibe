@@ -20,6 +20,11 @@ import { studioGenerationOptionsSchema } from "./studio-generation-options";
 import { validateAndProcessLogo } from "./studio-logo-service";
 import { validateStudioPrdFilename } from "./studio-prd-helpers";
 import { validateStudioPrdContent } from "./studio-prd-validation.server";
+import {
+	deriveProvisionalStudioTitle,
+	normalizeStudioRenameTitle,
+	type StudioTitleSource,
+} from "./studio-project-title";
 import { validateStudioPrompt } from "./studio-prompt-validation";
 
 export async function createStudioProjectWithJob(
@@ -52,10 +57,13 @@ export async function createStudioProjectWithJob(
 	);
 	const cleanDesignMd = resolved.designMd;
 
+	// A caller-supplied title is a person's choice and outranks anything the
+	// planner later proposes; otherwise the project starts on a short name cut
+	// from the brief instead of a 80-character prefix of the prompt.
+	const suppliedTitle = normalizeStudioRenameTitle(input.title ?? "");
 	const cleanTitle =
-		(input.title ?? "").trim().slice(0, 200) ||
-		checked.prompt.slice(0, 80) ||
-		"Studio tanpa judul";
+		suppliedTitle ?? deriveProvisionalStudioTitle(checked.prompt);
+	const titleSource: StudioTitleSource = suppliedTitle ? "user" : "auto";
 
 	const validatedLogo = input.logo ? validateAndProcessLogo(input.logo) : null;
 
@@ -141,6 +149,7 @@ export async function createStudioProjectWithJob(
 			.values({
 				userId,
 				title: cleanTitle,
+				titleSource,
 				designMode,
 				designMd: cleanDesignMd,
 				logoAssetId,

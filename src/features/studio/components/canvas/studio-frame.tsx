@@ -83,6 +83,7 @@ export const StudioFrame = memo(function StudioFrame({
 	const {
 		visual,
 		visualError,
+		markVisualLoaded,
 		setVisualError,
 		retryVisual,
 		artboardRef,
@@ -117,6 +118,7 @@ export const StudioFrame = memo(function StudioFrame({
 				<div className="flex min-w-0 items-center gap-2">
 					<button
 						type="button"
+						data-canvas-gesture-surface=""
 						onClick={(event) => {
 							if (!isCanvasPanning) onSelect?.(frame.id, event.shiftKey);
 						}}
@@ -140,10 +142,7 @@ export const StudioFrame = memo(function StudioFrame({
 						/>
 					) : null}
 					{frame.status === "queued" ? (
-						<output
-							aria-label="Menunggu antrean"
-							className="block size-1.5 shrink-0 rounded-full bg-fog"
-						/>
+						<output aria-label="Menunggu antrean" className="sr-only" />
 					) : null}
 					{frame.status === "failed" ? (
 						<Icon
@@ -171,6 +170,7 @@ export const StudioFrame = memo(function StudioFrame({
 				{showsPreview && visual ? (
 					<button
 						type="button"
+						data-canvas-gesture-surface=""
 						aria-label={`Pilih frame ${frame.name}`}
 						aria-pressed={isSelected}
 						onClick={(event) => {
@@ -187,6 +187,7 @@ export const StudioFrame = memo(function StudioFrame({
 							decoding="async"
 							className="size-full object-contain pointer-events-none"
 							onLoad={() => {
+								markVisualLoaded(visual);
 								if (visibleUrl.current === visual.url) return;
 								visibleUrl.current = visual.url;
 								studioJobTiming("preview-image-loaded", Date.now(), {

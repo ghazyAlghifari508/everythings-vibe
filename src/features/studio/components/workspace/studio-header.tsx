@@ -6,19 +6,11 @@ import {
 	Download01Icon,
 	Loading01Icon,
 	Menu01Icon,
+	PencilEdit01Icon,
 	UserIcon,
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -29,50 +21,40 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { StudioDeleteProjectDialog } from "@/features/studio/components/workspace/studio-delete-project-dialog";
+import { StudioRenameProjectDialog } from "@/features/studio/components/workspace/studio-rename-project-dialog";
 import { useHydratedSession } from "@/features/studio/hooks/use-hydrated-session";
 
 export function StudioHeader({
 	title,
 	duplicating,
 	exporting,
-	deleting,
+	renaming,
 	canExport,
 	onDuplicate,
+	onRename,
 	onExport,
 	onDelete,
 }: {
 	title: string;
 	duplicating: boolean;
 	exporting: boolean;
-	deleting?: boolean;
+	renaming?: boolean;
 	canExport: boolean;
 	onDuplicate: () => void;
+	onRename: (name: string) => Promise<void>;
 	onExport: () => void;
 	onDelete?: () => Promise<void>;
 }) {
 	const session = useHydratedSession();
 	const [isDeleteOpen, setDeleteOpen] = useState(false);
-	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const [isRenameOpen, setRenameOpen] = useState(false);
 	// Each floating control carries its own restrained surface so it stays
 	// legible over the dotted canvas without a full-width navbar background.
 	const surface =
 		"border border-iron/70 bg-charcoal/85 backdrop-blur-sm supports-[backdrop-filter]:bg-charcoal/70";
 	const control = `inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm text-snow hover:bg-steel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-snow disabled:opacity-50 ${surface}`;
 	const item = "gap-2 focus:bg-steel";
-	async function confirmDelete() {
-		if (!onDelete || deleting) return;
-		setDeleteError(null);
-		try {
-			await onDelete();
-			setDeleteOpen(false);
-		} catch (failure) {
-			setDeleteError(
-				failure instanceof Error
-					? failure.message
-					: "Gagal menghapus project. Coba lagi.",
-			);
-		}
-	}
 	return (
 		// Floating canvas header: the dotted canvas shows through behind it, so
 		// there is no full-width navbar surface and no divider line. Only the
@@ -107,6 +89,14 @@ export function StudioHeader({
 						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							className={item}
+							disabled={renaming}
+							onSelect={() => setRenameOpen(true)}
+						>
+							<Icon icon={PencilEdit01Icon} size={16} />
+							Ganti nama project
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							className={item}
 							disabled={duplicating}
 							onSelect={onDuplicate}
 						>
@@ -126,11 +116,7 @@ export function StudioHeader({
 								<DropdownMenuSeparator />
 								<DropdownMenuItem
 									className="gap-2 text-crimson focus:text-crimson"
-									disabled={deleting}
-									onSelect={() => {
-										setDeleteError(null);
-										setDeleteOpen(true);
-									}}
+									onSelect={() => setDeleteOpen(true)}
 								>
 									<Icon icon={Delete02Icon} size={16} />
 									Hapus project
@@ -216,39 +202,21 @@ export function StudioHeader({
 				</DropdownMenu>
 			</div>
 
-			<Dialog open={isDeleteOpen} onOpenChange={setDeleteOpen}>
-				<DialogContent className="max-w-sm">
-					<DialogHeader>
-						<DialogTitle>Hapus project?</DialogTitle>
-						<DialogDescription>
-							{`Project "${title}" akan dihapus permanen beserta seluruh layar, riwayat revisi, dan asetnya. Tindakan ini tidak dapat dibatalkan.`}
-						</DialogDescription>
-					</DialogHeader>
-					{deleteError ? (
-						<p role="alert" className="text-sm text-crimson">
-							{deleteError}
-						</p>
-					) : null}
-					<DialogFooter>
-						<Button
-							type="button"
-							variant="secondary"
-							onClick={() => setDeleteOpen(false)}
-							disabled={deleting}
-						>
-							Batal
-						</Button>
-						<Button
-							type="button"
-							variant="destructive"
-							onClick={() => void confirmDelete()}
-							disabled={deleting}
-						>
-							{deleting ? "Menghapus..." : "Hapus project"}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			<StudioRenameProjectDialog
+				open={isRenameOpen}
+				onOpenChange={setRenameOpen}
+				name={title}
+				onRename={onRename}
+			/>
+
+			{onDelete ? (
+				<StudioDeleteProjectDialog
+					open={isDeleteOpen}
+					onOpenChange={setDeleteOpen}
+					name={title}
+					onDelete={onDelete}
+				/>
+			) : null}
 		</header>
 	);
 }

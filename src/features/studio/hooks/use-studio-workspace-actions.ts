@@ -45,6 +45,7 @@ export function useStudioWorkspaceActions({
 	const [preferenceSaving, setPreferenceSaving] = useState(false);
 	const [exportingZip, setExportingZip] = useState(false);
 	const [deleting, setDeleting] = useState(false);
+	const [renaming, setRenaming] = useState(false);
 	const [duplicating, setDuplicating] = useState(false);
 	const [retryingFrameIds, setRetryingFrameIds] = useState<string[]>([]);
 	const [frameRetryErrors, setFrameRetryErrors] = useState<
@@ -102,6 +103,39 @@ export function useStudioWorkspaceActions({
 			setDuplicating(false);
 		}
 	}, [duplicating, navigate, project.id, setError]);
+
+	// A rename only writes the label, so the workspace re-reads the project
+	// through its existing status sync instead of a rename-specific poll. The
+	// dialog owns the failure message: throwing lets it stay open with the error.
+	const handleRename = useCallback(
+		async (name: string) => {
+			if (renaming) return;
+			setRenaming(true);
+			try {
+				const response = await fetch("/api/studio/project", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						action: "rename",
+						projectId: project.id,
+						title: name,
+					}),
+				});
+				if (!response.ok) {
+					throw new Error(
+						await readStudioApiError(
+							response,
+							"Gagal mengganti nama project. Coba lagi.",
+						),
+					);
+				}
+				await syncProjectStatus();
+			} finally {
+				setRenaming(false);
+			}
+		},
+		[project.id, renaming, syncProjectStatus],
+	);
 
 	const handleDelete = useCallback(async () => {
 		if (deleting) return;
@@ -284,12 +318,13 @@ export function useStudioWorkspaceActions({
 	return {
 		composerLoading,
 		exportingZip,
-		deleting,
 		duplicating,
+		renaming,
 		retryingFrameIds,
 		frameRetryErrors,
 		handleDuplicate,
 		handleDelete,
+		handleRename,
 		handleComposerSubmit,
 		handleSkillChange,
 		handleRetryFrame,

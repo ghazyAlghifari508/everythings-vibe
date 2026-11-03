@@ -10,12 +10,11 @@ Upstream skill instructions refine visual hierarchy, typography, composition, an
 
 | Skill ID | Upstream Repository | Pinned Revision (40-hex) | Bundled Files | Upstream Version & License |
 | :--- | :--- | :--- | :--- | :--- |
-| `impeccable` | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `245ad82def45831dc56a21b683c7a1ff530b06cc` | `SKILL.md`, `craft-floor.md`, `operate.md` | v4.5.2, Apache-2.0 (`Apache-2.0.txt`), Copyright 2025 Paul Bakaus |
-| `frontend-design` | [anthropics/skills](https://github.com/anthropics/skills) | `dbd4588f9e1033efb41dad4bef2f7947c8993d44` | `SKILL.md` | Apache-2.0 (`Apache-2.0.txt`), Copyright Anthropic |
-| `ui-ux-pro-max` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | `7246805992a42b7bba37d4cac83b01416f0c6c44` | `SKILL.md`, `quick-reference.md`, `pro-rules.md`, 9 curated CSVs | MIT (`ui-ux-pro-max-LICENSE.txt`), Copyright (c) 2024 Next Level Builder |
-| `anti-slop` | [miqdadbadjuber/anti-slop](https://github.com/miqdadbadjuber/anti-slop) | `9685ca7eac70283d083fc23baa9a88e7d3cd93c4` | `SKILL.md`, `antislop-ui.md`, `antislop-layoutmobile.md`, `antislop-human.md` | MIT (`anti-slop-LICENSE.txt`), Copyright (c) 2026 Miqdad Badjuber |
-| `taste` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | `d237dd399d57524945c0c81327da5da19f7a468d` | `SKILL.md` | MIT (`taste-LICENSE.txt`), Copyright (c) 2026 Leonxlnx |
-
+| `impeccable` | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `245ad82def45831dc56a21b683c7a1ff530b06cc` | `SKILL.md`, `craft-floor.md`, `operate.md` | v4.5.2 (verified latest tag: `skill-v4.8.0`), Apache-2.0 (`Apache-2.0.txt`), Copyright 2025 Paul Bakaus |
+| `frontend-design` | [anthropics/skills](https://github.com/anthropics/skills) | `dbd4588f9e1033efb41dad4bef2f7947c8993d44` | `SKILL.md` | Apache-2.0 (`Apache-2.0.txt`), Copyright Anthropic (verified upstream commit: `41bbe19d1a1a7eaab5e7bb9050a417e5c6cffc8f`) |
+| `ui-ux-pro-max` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | `7246805992a42b7bba37d4cac83b01416f0c6c44` | `SKILL.md`, `quick-reference.md`, `pro-rules.md`, 9 curated CSVs | MIT (`ui-ux-pro-max-LICENSE.txt`), Copyright (c) 2024 Next Level Builder (verified latest release: `v2.15.0`) |
+| `anti-slop` | [miqdadbadjuber/anti-slop](https://github.com/miqdadbadjuber/anti-slop) | `9685ca7eac70283d083fc23baa9a88e7d3cd93c4` | `SKILL.md`, `antislop-ui.md`, `antislop-layoutmobile.md`, `antislop-human.md` | MIT (`anti-slop-LICENSE.txt`), Copyright (c) 2026 Miqdad Badjuber (verified latest release: `v3.2.25`) |
+| `taste` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | `12af471f627f866411b4bd785b19646d3672784c` | `SKILL.md`, `app-screens.md` | v2.1.5 (official release: 2026-10-24), MIT (`taste-LICENSE.txt`), Copyright (c) 2026 Leonxlnx |
 ---
 
 ## 2. Upstream Capability Matrix
@@ -32,7 +31,7 @@ Capabilities are classified into four strict categories:
 | **Frontend Design** | **A** (Full verbatim text) | **A** (Self-contained in SKILL.md) | **A** (No external dataset needed) | **C** (Screenshot vision self-critique loop not run during frame generation) |
 | **UI UX Pro Max** | **A** (Full verbatim text) | **A** (`quick-reference.md`, `pro-rules.md`) | **B** (Bounded TypeScript dataset lookup for style, color, font, UX, tailwind) | **D** (Interactive CLI `search.py` replaced by planning-phase bounded lookup) |
 | **Anti-Slop** | **A** (Full verbatim text) | **A** (`antislop-ui.md`, `layoutmobile.md`, `human.md`) | **A** (Contrast & touch target rules) | **C** / **D** (Delivery Gate interactive click-through not supported during automated worker) |
-| **Taste** | **A** (Verbatim text with scope adapter) | **A** (Self-contained in SKILL.md) | **C** (Flux/Midjourney image generation not supported) | **D** (Upstream landing-page-only restriction scoped; transferable composition used) |
+| **Taste** | **A** (Verbatim v2.1.5 SKILL.md) | **A** (`app-screens.md` guidelines) | **C** (CDP real-browser inspector and asset downloader scripts not executed in worker) | **D** (Page-specific quotas omitted on app screens; app screen rules applied) |
 
 ---
 
@@ -61,38 +60,68 @@ Capabilities are classified into four strict categories:
 - **Integrated (A):** Core `SKILL.md`, `antislop-ui.md`, `antislop-layoutmobile.md`, and `antislop-human.md` are bundled verbatim and loaded into prompt guidance within budget.
 - **Unsupported (C, D):** The upstream "Delivery Gate" asks developers to click through the live running app in a browser to test focus rings and contrast. In Studio, contract validation runs server-side; browser QA is not performed during automated generation.
 
-### 3.5. Taste
-- **Upstream Scope:** 89 KB comprehensive agency design skill, brief inference engine, typography pairings, spatial harmony, and anti-template rules. Upstream explicitly states: *"Designed specifically for landing pages and marketing websites. DO NOT use for: complex dashboards, data-dense interfaces, web applications, multi-step flows, native mobile apps."*
-- **Integrated (A):** Bundled verbatim. Studio's compatibility adapter explicitly instructs the LLM to apply the transferable aesthetic principles (typography scale, spatial rhythm, intentional color contrast, card grouping) to all screen types, while exempting dashboards and mobile app screens from landing-page-specific section quotas and complex hero animations.
-- **Unsupported (C):** Image generation prompts for Flux/Midjourney mentioned in upstream. Studio generates clean HTML/Tailwind with SVG icons and curated Unsplash imagery.
-
+### 3.5. Taste (Upgraded to v2.1.5)
+- **Upstream Scope:** Originally landing-page-focused in early v2; official verified release `v2.1.5` (commit `12af471f627f866411b4bd785b19646d3672784c`, 24 October 2026) added full first-class coverage for app screens, dashboards, admin views, analytics, settings, and tables via `references/app-screens.md`.
+- **Integrated (A):**
+  - Primary `SKILL.md` (39.5 KB) and reference document `app-screens.md` (85.4 KB) are bundled verbatim.
+  - Studio adapter v3 differentiates app screens from landing pages: for dashboards, settings, and mobile apps, app-screen rules (quiet 1px borders, data-focused color, KPI typography, flat surfaces, tabular numbers) are prioritized.
+  - Landing page photo quotas (min 4-12 real photos) and hero marketing requirements are not forced on operational forms or transactional dashboards.
+- **Unsupported (C, D):**
+  - Node 22+ Chrome DevTools Protocol inspector script (`scripts/inspect.mjs`) is not executable inside Studio's headless worker; Studio provides native TypeScript DOM and HTML contract validation.
+  - Open collection download script (`scripts/assets.mjs`) and local draw CLI (`scripts/draw.mjs`) are not run in worker runtime.
 ---
 
 ## 4. Precedence Model
 
-When generating or planning screens, instructions resolve in this strict order:
+When generating or planning screens, instructions resolve in this strict 7-level hierarchy:
 
 ```
-1. Safety & Platform Validity (clean valid HTML, Tailwind CDN, script rules)
-             │
-             ▼
+1. Security & HTML Safety (valid standalone HTML, script-free, responsive)
+              │
+              ▼
 2. Explicit User Prompt & Requirements
-             │
-             ▼
-3. Selected Design Reference (DESIGN.md tokens, active color palette, brand font)
-             │
-             ▼
-4. Selected Upstream Design Skill Guidance (Impeccable, Frontend Design, etc.)
-             │
-             ▼
-5. Studio Baseline System Defaults
+              │
+              ▼
+3. Valid PRD & Product Constraints
+              │
+              ▼
+4. Selected DESIGN.md & Theme Tokens
+              │
+              ▼
+5. Existing Shared Project Blueprint
+              │
+              ▼
+6. Selected Design Skill Guidance (Impeccable, Frontend Design, etc.)
+              │
+              ▼
+7. Default Product Guidance
 ```
 
-A selected skill never overrides an explicit user brand identity or violates the clean HTML contract.
+A selected skill never overrides an explicit user requirement, PRD constraint, or validated brand tokens.
 
 ---
 
-## 5. Token & Context Budget
+## 5. Universal Base Quality Rules (Independent of Skill Selection)
+
+Studio enforces 13 universal quality invariants across all generation, revision, and correction stages:
+1. No horizontal overflow (fluid container widths, min-w-0 on flex/grid, table container scroll).
+2. No controls overlapping (distinct layout tracks and non-wrapping control rows).
+3. Correct responsive behavior (mobile single-column reflow, touch targets >= 44px).
+4. Appropriate content hierarchy (clear typographic scale, one focal action per screen).
+5. Consistent spacing (disciplined padding and gutter rhythm).
+6. Proper accessible names (form labels, button names, ARIA landmarks).
+7. No duplicated shell (canonical app bar and navigation handled by Studio assembly).
+8. No pointless skeleton (skeleton loaders used only for explicit loading states).
+9. No redundant badges (status chips communicate actual status, no capsule spam).
+10. No broken component structure (data grouped logically in cards).
+11. No randomly detached icons (icons accompany text or serve as accessible standalone controls).
+12. No arbitrary text splitting (natural sentence flow, no forced break-all).
+13. Shared design tokens respected (consistent CSS variables across all frames).
+
+These universal rules are Studio's own product standard and apply equally to `No Skill` and all selected skills without conflating provenance.
+---
+
+## 6. Token & Context Budget
 
 To prevent context exhaustion and latency spikes, Studio enforces a strict character budget for skill documents:
 `STUDIO_SKILL_DOCUMENT_BUDGET_CHARS = 100_000` (matching the precedent set by `STUDIO_DESIGN_MD_MAX_CHARS`).

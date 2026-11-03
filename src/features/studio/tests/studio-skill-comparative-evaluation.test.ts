@@ -20,9 +20,12 @@ import {
 } from "../services/studio-skill-context.server";
 import { STUDIO_SKILL_STAGE_BUDGET_CHARS } from "../types/studio-constants";
 import {
+	customerDirectoryBlueprint,
+	ecommerceBlueprint,
 	financeBlueprint,
+	marketingLandingBlueprint,
+	portfolioBlueprint,
 	travelBlueprint,
-	webSaaSBlueprint,
 } from "./fixtures/studio-evaluation-fixtures";
 
 const provider = vi.hoisted(() => ({
@@ -71,7 +74,7 @@ interface Brief {
 
 const BRIEFS: Brief[] = [
 	{
-		id: "finance-mobile",
+		id: "finance-dashboard",
 		prompt:
 			"Aplikasi keuangan pribadi untuk mencatat pemasukan, pengeluaran, anggaran bulanan, dan laporan arus kas.",
 		mode: "mobile",
@@ -80,7 +83,16 @@ const BRIEFS: Brief[] = [
 		requiredTerms: ["pemasukan", "anggaran", "arus kas"],
 	},
 	{
-		id: "travel-mobile",
+		id: "customer-directory",
+		prompt:
+			"Aplikasi direktori pelanggan dan manajemen relasi klien untuk tim penjualan.",
+		mode: "web",
+		blueprint: customerDirectoryBlueprint,
+		screen: "Direktori",
+		requiredTerms: ["direktori", "pelanggan", "klien"],
+	},
+	{
+		id: "travel-booking-mobile",
 		prompt:
 			"Aplikasi travel untuk mencari tiket pesawat, hotel, dan menyusun itinerary perjalanan.",
 		mode: "mobile",
@@ -89,22 +101,31 @@ const BRIEFS: Brief[] = [
 		requiredTerms: ["tiket pesawat", "hotel", "itinerary"],
 	},
 	{
-		id: "saas-analytics-web",
+		id: "ecommerce",
 		prompt:
-			"SaaS analytics dashboard untuk memantau metrik produk, retensi, dan performa tim secara real-time.",
+			"Toko online modern dengan katalog produk, ulasan, keranjang, dan proses checkout.",
 		mode: "web",
-		blueprint: webSaaSBlueprint,
-		screen: "Dashboard",
-		requiredTerms: ["metrik produk", "retensi", "real-time"],
+		blueprint: ecommerceBlueprint,
+		screen: "Katalog Produk",
+		requiredTerms: ["katalog", "produk", "checkout"],
 	},
 	{
-		id: "developer-portfolio",
+		id: "portfolio",
 		prompt:
 			"Developer portfolio untuk menampilkan proyek, keahlian teknis, dan pengalaman kerja.",
 		mode: "web",
-		blueprint: webSaaSBlueprint,
-		screen: "Dashboard",
-		requiredTerms: ["proyek", "keahlian teknis", "pengalaman kerja"],
+		blueprint: portfolioBlueprint,
+		screen: "Karya & Proyek",
+		requiredTerms: ["proyek", "keahlian", "portfolio"],
+	},
+	{
+		id: "marketing-landing",
+		prompt:
+			"Landing page pemasaran SaaS untuk peluncuran produk AI kolaborasi tim dengan CTA dan pricing.",
+		mode: "web",
+		blueprint: marketingLandingBlueprint,
+		screen: "Fitur Utama",
+		requiredTerms: ["fitur", "produk", "harga"],
 	},
 ];
 
@@ -142,7 +163,7 @@ describe("Comparative skill evaluation on four representative briefs (Task 02)",
 					});
 				expect(frame).toContain(brief.prompt);
 				expect(frame).toContain(
-					"Design precedence, highest to lowest: safety and platform validity",
+					"Design precedence, highest to lowest: security and HTML safety",
 				);
 				return {
 					brief: brief.id,
@@ -297,7 +318,7 @@ describe("Comparative skill evaluation on four representative briefs (Task 02)",
 				expect(planning).toContain("OUTPUT CONTRACT");
 				expect(frame).toContain(brief.prompt);
 				expect(frame).toContain(`SCREEN TO BUILD: "${brief.screen}"`);
-				expect(frame).toContain("safety and platform validity");
+				expect(frame).toContain("security and HTML safety");
 				for (const term of brief.requiredTerms) {
 					expect(`${planning}\n${frame}`.toLowerCase()).toContain(
 						term.toLowerCase(),

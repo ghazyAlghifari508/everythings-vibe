@@ -15,17 +15,14 @@ import type { CodebaseLibraryItem } from "@/features/codebase/services/library";
 
 export type CodebaseLibraryDeleteRequest =
 	| { kind: "single"; item: CodebaseLibraryItem }
-	| { kind: "bulk"; count: number }
-	| { kind: "all"; count: number }
-	| { kind: "all_filtered"; count: number };
+	| { kind: "bulk"; count: number };
 
 /**
  * Confirmation dialog for saved-repository deletion.
  *
- * Scoped to real confirmed item counts: single item names the repository, bulk
- * selection names the selected count, and delete all names the entire owned
- * history (or all matching filter results) so destructive operations are
- * unambiguous.
+ * Scoped to real confirmed item counts: single item names the repository and
+ * bulk selection names the selected count, so a destructive operation is never
+ * ambiguous about how many repositories it removes.
  */
 export function CodebaseLibraryDeleteDialog({
 	request,
@@ -48,19 +45,10 @@ export function CodebaseLibraryDeleteDialog({
 		title = "Hapus project?";
 		description = "Project dan planning terkait akan dihapus permanen.";
 		confirmLabel = "Hapus project";
-	} else if (request.kind === "bulk") {
-		title = `Hapus ${request.count} repository?`;
-		description =
-			"Repository dan planning terkait akan dihapus. Tindakan ini tidak dapat dibatalkan.";
-		confirmLabel = `Hapus ${request.count}`;
-	} else if (request.kind === "all") {
-		title = "Hapus seluruh History?";
-		description = `${request.count} repository beserta planning terkait akan dihapus permanen.`;
-		confirmLabel = "Hapus Semua";
 	} else {
-		title = `Hapus ${request.count} repository hasil filter?`;
-		description = `${request.count} repository beserta planning terkait akan dihapus permanen.`;
-		confirmLabel = "Hapus Semua";
+		title = `Hapus ${request.count} repository?`;
+		description = "Repository dan planning terkait akan dihapus permanen.";
+		confirmLabel = `Hapus ${request.count}`;
 	}
 
 	return (

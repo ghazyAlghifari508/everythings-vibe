@@ -1,5 +1,5 @@
 {
-  "id": "5c8ebe83-e922-4f23-8261-0bdd7b725795",
+  "id": "ea82dca7-20f3-48dd-8da0-b5edc0fd872a",
   "prevId": "39dab5d1-77e0-4c47-88b0-406a2ebb1e80",
   "version": "7",
   "dialect": "postgresql",
@@ -3373,19 +3373,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "handling_status": {
-          "name": "handling_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'new'"
-        },
-        "archived_at": {
-          "name": "archived_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -3400,51 +3387,6 @@
           "columns": [
             {
               "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "error_reports_created_at_idx": {
-          "name": "error_reports_created_at_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "error_reports_handling_status_idx": {
-          "name": "error_reports_handling_status_idx",
-          "columns": [
-            {
-              "expression": "handling_status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "error_reports_archived_at_idx": {
-          "name": "error_reports_archived_at_idx",
-          "columns": [
-            {
-              "expression": "archived_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -3506,19 +3448,6 @@
           "notNull": false,
           "default": "'general'"
         },
-        "handling_status": {
-          "name": "handling_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'new'"
-        },
-        "archived_at": {
-          "name": "archived_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -3533,66 +3462,6 @@
           "columns": [
             {
               "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "feedback_created_at_idx": {
-          "name": "feedback_created_at_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "feedback_type_idx": {
-          "name": "feedback_type_idx",
-          "columns": [
-            {
-              "expression": "type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "feedback_handling_status_idx": {
-          "name": "feedback_handling_status_idx",
-          "columns": [
-            {
-              "expression": "handling_status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "feedback_archived_at_idx": {
-          "name": "feedback_archived_at_idx",
-          "columns": [
-            {
-              "expression": "archived_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5630,6 +5499,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "title_source": {
+          "name": "title_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'user'"
         },
         "design_mode": {
           "name": "design_mode",

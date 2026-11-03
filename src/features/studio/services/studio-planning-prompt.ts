@@ -6,7 +6,7 @@ import {
 	sanitizeStudioPrd,
 } from "./studio-prd-helpers";
 import { sanitizeStudioDesignMd } from "./studio-prompt-validation";
-
+import { STUDIO_BASE_QUALITY_PROMPT } from "./studio-quality-rules";
 export function buildStudioPlanningPrompt(
 	prompt: string,
 	designMode: StudioDesignMode,
@@ -86,7 +86,13 @@ Choose one coherent project-wide designTokens set: primary accent, secondary acc
 	}
 
 	sections.push(
-		`Plan the necessary screens for this application. Output strict JSON with "projectTitle", "screens" array (each with "name", "description", "viewport": "${designMode}", "order": 0..N), and a "blueprint" object (productIdentity, designTokens, sharedComponents, navigationContract, screenPlan) shared by all screens. The blueprint navigation contract and tokens apply identically to every screen. Plan only relevant screens for the user's specific application domain.`,
+		`Plan the necessary screens for this application. Output strict JSON with "projectTitle", "screens" array (each with "name", "description", "viewport": "${designMode}", "order": 0..N), and a "blueprint" object (productIdentity, designTokens, sharedComponents, navigationContract, screenPlan) shared by all screens. The blueprint navigation contract and tokens apply identically to every screen. Plan only relevant screens for the user's specific application domain.
+
+Project title contract:
+- projectTitle names the product, not the task: 2-4 words, under 60 characters, no sentence punctuation.
+- Never copy the user request, describe the work, or exceed one short phrase.
+- Reuse the exact brand or product name the user wrote; invent no competing brand. When the user named no brand, derive the name from the product domain and audience.
+- No generic placeholder ("My Project", "Untitled App", "New Design") and no marketing superlatives or technical requirements.`,
 	);
 
 	sections.push(
@@ -94,7 +100,8 @@ Choose one coherent project-wide designTokens set: primary accent, secondary acc
 	);
 
 	sections.push(
-		`Design precedence, highest to lowest: safety and platform validity > explicit user requirements > authoritative PRD requirements > validated DESIGN.md/theme reference > shared project blueprint > selected design skill guidance > generic Studio defaults. A design skill must never override safety, platform validity, explicit user colors, or brand requirements. Resolve conflicts deterministically in that order.`,
+		STUDIO_BASE_QUALITY_PROMPT,
+		`Design precedence, highest to lowest: security and HTML safety > explicit user requirements > valid PRD / product constraints > selected DESIGN.md / theme reference > existing shared project blueprint > selected design skill guidance > default product guidance. A design skill must never override security, HTML safety, explicit user requirements, PRD constraints, or validated design tokens. Resolve conflicts deterministically in that order.`,
 	);
 
 	return sections.join("\n\n");

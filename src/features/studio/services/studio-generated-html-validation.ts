@@ -1,3 +1,4 @@
+import { JSDOM } from "jsdom";
 import { STUDIO_VISUAL_WIDTH } from "@/features/studio/types/studio-constants";
 import type { StudioDesignBlueprint } from "./studio-design-blueprint";
 
@@ -209,25 +210,54 @@ function stripInapplicableAtRules(css: string, viewportWidth: number): string {
 	}
 }
 
-// Property-exact declarations only: `max-width` never overflows, and a bare
-// `width="1200"` attribute on an image is constrained by the responsive
-// container rather than by the viewport, so neither is flagged.
-// ponytail: ignores intrinsic table/image sizing; add a wrapper check if
-// generated tables start overflowing in practice.
-const FIXED_WIDTH_DECLARATION =
-	/(?<![-\w])(min-width|width)\s*:\s*(\d+(?:\.\d+)?)(px|rem|em)\b/gi;
+const FIXED_WIDTH_VALUE = /^(\d+(?:\.\d+)?)(px|rem|em)$/i;
 
 function hasOverflowingFixedWidth(
 	html: string,
 	viewportWidth: number,
 ): boolean {
-	const withoutComments = html.replace(/\/\*[\s\S]*?\*\//g, "");
-	const applicable = stripInapplicableAtRules(withoutComments, viewportWidth);
-	for (const match of applicable.matchAll(FIXED_WIDTH_DECLARATION)) {
-		if (toPixels(Number(match[2]), match[3] ?? "px") > viewportWidth)
-			return true;
+	const dom = new JSDOM(html);
+	try {
+		const { document } = dom.window;
+		for (const style of document.querySelectorAll("style"))
+			style.textContent = stripInapplicableAtRules(
+				style.textContent ?? "",
+				viewportWidth,
+			);
+		for (const element of document.body.querySelectorAll("*")) {
+			let contained = false;
+			for (
+				let parent = element.parentElement;
+				parent;
+				parent = parent.parentElement
+			) {
+				const style = dom.window.getComputedStyle(parent);
+				if (/^(auto|scroll)$/.test(style.overflowX || style.overflow)) {
+					contained = true;
+					break;
+				}
+			}
+			if (contained) continue;
+			const style = dom.window.getComputedStyle(element);
+			const maximum = FIXED_WIDTH_VALUE.exec(style.maxWidth);
+			for (const property of ["width", "min-width"]) {
+				const match = FIXED_WIDTH_VALUE.exec(style.getPropertyValue(property));
+				if (!match) continue;
+				const width = toPixels(Number(match[1]), match[2]);
+				if (
+					property === "width" &&
+					(style.maxWidth === "100%" ||
+						(maximum &&
+							toPixels(Number(maximum[1]), maximum[2]) <= viewportWidth))
+				)
+					continue;
+				if (width > viewportWidth) return true;
+			}
+		}
+		return false;
+	} finally {
+		dom.window.close();
 	}
-	return false;
 }
 
 // Deterministic structural validation for generated HTML. String checks

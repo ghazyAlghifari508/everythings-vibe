@@ -45,15 +45,24 @@ export async function getStudioFrameVisual(
 			),
 		);
 	// A forced retry replaces broken cached renders; the newest capture wins.
+	// For existing projects with legacy JPEG captures, fall back to assets matching
+	// the frame's previously recorded visualHash when a visual-v3 match is absent.
 	const cached = options.forceRecapture
 		? undefined
 		: assets
-				.filter((asset) => asset.filename.startsWith(`visual-${hash}-`))
+				.filter(
+					(asset) =>
+						asset.filename.startsWith(`visual-${hash}-`) ||
+						(Boolean(frame.visualHash) &&
+							asset.filename.startsWith(`visual-${frame.visualHash}-`)),
+				)
 				.sort(
 					(left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
 				)[0];
 	if (cached) {
-		const bounds = /-(\d+)x(\d+)\.jpg$/.exec(cached.filename);
+		const bounds = /-(\d+)x(\d+)\.(?:jpg|jpeg|png|webp)$/i.exec(
+			cached.filename,
+		);
 		if (bounds) {
 			console.info("[studio.preview.capture]", {
 				outcome: "cached",

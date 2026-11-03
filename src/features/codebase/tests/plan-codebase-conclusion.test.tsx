@@ -227,10 +227,14 @@ describe("PlanCodebasePage conclusion step recovery and retry", () => {
 			},
 			{ timeout: 15000, interval: 100 },
 		);
+		// The agent row is the real current state: actively waiting for the CLI, with
+		// no completed claim before the handshake is persisted.
 		expect(
-			document.querySelector('[data-testid="sync-stage-agent"]'),
-		).toBeNull();
-		expect(document.querySelectorAll("[data-stage-state]")).toHaveLength(0);
+			document
+				.querySelector('[data-testid="sync-stage-agent"]')
+				?.getAttribute("data-stage-state"),
+		).toBe("active");
+		expect(screen.queryByText("Agent terhubung")).toBeNull();
 	}, 20000);
 
 	it("retries a failed analysis through the real boundary and shows the result", async () => {

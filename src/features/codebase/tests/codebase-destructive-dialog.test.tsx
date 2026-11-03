@@ -109,18 +109,20 @@ describe("Destructive dialog consistency (FIX 06)", () => {
 	it("renders ProjectActionsMenu delete dialog with matching copy and no duplicate close button", async () => {
 		const onDelete = vi.fn().mockResolvedValue(undefined);
 		const onRename = vi.fn();
+		const onSelect = vi.fn();
 
 		render(
 			<ProjectActionsMenu
 				item={sampleItem}
 				onRename={onRename}
 				onDelete={onDelete}
+				onSelect={onSelect}
 			/>,
 		);
 
 		// Open menu via pointerDown for Radix DropdownMenu
 		const trigger = screen.getByRole("button", {
-			name: `Aksi project ${sampleItem.name}`,
+			name: `Opsi repository ${sampleItem.name}`,
 		});
 		fireEvent.pointerDown(trigger, {
 			button: 0,

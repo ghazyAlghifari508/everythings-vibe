@@ -47,10 +47,14 @@ export type CreateCodebaseOutcome =
 	| { kind: "unauthorized" }
 	| { kind: "rejected"; message: string };
 
-export async function requestCreateCodebase(acceptance: {
-	acceptAnalysisPolicy: true;
-	creditConsent: { maximumCredits: number; pricingVersion: string };
-}): Promise<CreateCodebaseOutcome> {
+/** Approval payload for a start request; empty while the account already holds one. */
+type StartApproval = {
+	creditConsent?: { maximumCredits: number; pricingVersion: string };
+};
+
+export async function requestCreateCodebase(
+	acceptance: StartApproval,
+): Promise<CreateCodebaseOutcome> {
 	const response = await fetch("/api/codebases", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -124,10 +128,7 @@ export type RetrySessionOutcome =
 
 export async function requestRetrySession(
 	codebaseId: string,
-	acceptance: {
-		acceptAnalysisPolicy: true;
-		creditConsent: { maximumCredits: number; pricingVersion: string };
-	},
+	acceptance: StartApproval,
 ): Promise<RetrySessionOutcome> {
 	const response = await fetch(
 		`/api/codebases/${encodeURIComponent(codebaseId)}/session`,

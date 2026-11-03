@@ -34,14 +34,14 @@ test("initial allowance, paid eligibility, consent, and legacy policy", () => {
 	const paid = { ...base, allowanceUsed: true, availableCredits: 100 };
 	assert.equal(resolveAnalysisCreditPolicy(paid).code, "CREDIT_REQUIRED");
 	assert.equal(
-		resolveAnalysisCreditPolicy({ ...paid, consentMaximum: 1 }).canStart,
+		resolveAnalysisCreditPolicy({ ...paid, approvedMaximum: 1 }).canStart,
 		false,
 	);
 	const quote = resolveAnalysisCreditPolicy(paid);
 	assert.equal(
 		resolveAnalysisCreditPolicy({
 			...paid,
-			consentMaximum: quote.maximumCredits,
+			approvedMaximum: quote.maximumCredits,
 		}).canStart,
 		true,
 	);

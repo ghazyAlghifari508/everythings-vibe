@@ -50,12 +50,14 @@ function beginRecoveryNavigation(item: CodebaseLibraryItem) {
 export function CodebaseLibraryItemCard({
 	item,
 	selected,
+	selectionActive,
 	onToggleSelect,
 	onRename,
 	onDelete,
 }: {
 	item: CodebaseLibraryItem;
 	selected: boolean;
+	selectionActive: boolean;
 	onToggleSelect: (id: string) => void;
 	onRename: (id: string, name: string) => void;
 	onDelete: (item: CodebaseLibraryItem) => Promise<void>;
@@ -97,15 +99,17 @@ export function CodebaseLibraryItemCard({
 				<span className="text-xs text-slate">{stack.join(" · ")}</span>
 			) : null}
 			<span className="text-[11px] text-slate">{metaParts.join(" · ")}</span>
-			<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
-				{action.label}
-				<Icon
-					icon={ArrowRight01Icon}
-					size={14}
-					aria-hidden
-					className="transition-transform group-hover:translate-x-0.5"
-				/>
-			</span>
+			{selectionActive ? null : (
+				<span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-snow">
+					{action.label}
+					<Icon
+						icon={ArrowRight01Icon}
+						size={14}
+						aria-hidden
+						className="transition-transform group-hover:translate-x-0.5"
+					/>
+				</span>
+			)}
 		</>
 	);
 
@@ -115,17 +119,26 @@ export function CodebaseLibraryItemCard({
 				selected ? "border-fog/40" : "border-graphite hover:border-fog/40"
 			}`}
 		>
-			<span className="flex shrink-0 items-start pl-4 pt-5">
-				<input
-					type="checkbox"
-					checked={selected}
-					onChange={() => onToggleSelect(item.id)}
-					onClick={(e) => e.stopPropagation()}
-					aria-label={`Pilih repository ${item.name}`}
-					className="size-4 cursor-pointer accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
-				/>
-			</span>
-			{action.recovery ? (
+			{selectionActive ? (
+				<label className="flex shrink-0 cursor-pointer items-start pl-4 pt-5">
+					<input
+						type="checkbox"
+						checked={selected}
+						onChange={() => onToggleSelect(item.id)}
+						aria-label={`Pilih repository ${item.name}`}
+						className="size-4 cursor-pointer accent-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+					/>
+				</label>
+			) : null}
+			{selectionActive ? (
+				<button
+					type="button"
+					onClick={() => onToggleSelect(item.id)}
+					className={`${cardClassName} text-left`}
+				>
+					{cardBody}
+				</button>
+			) : action.recovery ? (
 				<Link
 					to={NEW_REPOSITORY_HREF}
 					onClick={() => beginRecoveryNavigation(item)}
@@ -142,7 +155,14 @@ export function CodebaseLibraryItemCard({
 					{cardBody}
 				</Link>
 			)}
-			<ProjectActionsMenu item={item} onRename={onRename} onDelete={onDelete} />
+			{selectionActive ? null : (
+				<ProjectActionsMenu
+					item={item}
+					onRename={onRename}
+					onDelete={onDelete}
+					onSelect={onToggleSelect}
+				/>
+			)}
 		</li>
 	);
 }

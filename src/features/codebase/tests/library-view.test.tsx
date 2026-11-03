@@ -30,18 +30,21 @@ vi.mock("@tanstack/react-router", () => ({
 		children,
 		to,
 		params,
+		search,
 		className,
 		onClick,
 	}: {
 		children: React.ReactNode;
 		to: string;
 		params?: { id: string };
+		search?: Record<string, string>;
 		className?: string;
 		onClick?: () => void;
 	}) => {
-		const href = params?.id ? `${to.replace("$id", params.id)}` : to;
+		const base = params?.id ? `${to.replace("$id", params.id)}` : to;
+		const query = search ? `?${new URLSearchParams(search).toString()}` : "";
 		return (
-			<a href={href} className={className} onClick={onClick}>
+			<a href={`${base}${query}`} className={className} onClick={onClick}>
 				{children}
 			</a>
 		);
@@ -155,7 +158,7 @@ function installRadixDomPolyfills() {
 }
 
 function openActionsMenu(index = 0) {
-	const triggers = screen.getAllByRole("button", { name: /Aksi project/i });
+	const triggers = screen.getAllByRole("button", { name: /Opsi repository/i });
 	fireEvent.pointerDown(triggers[index], {
 		button: 0,
 		ctrlKey: false,
@@ -178,13 +181,15 @@ afterEach(() => {
 });
 
 describe("CodebaseLibraryView", () => {
-	it("links Hubungkan repository to the new sync wizard", () => {
+	it("links Hubungkan repository to the new sync wizard with a fresh-start intent", () => {
 		render(<CodebaseLibraryView items={[]} />);
 		const ctas = screen.getAllByRole("link", {
 			name: /Hubungkan repository/i,
 		});
 		expect(ctas).toHaveLength(1);
-		expect(ctas[0].getAttribute("href")).toBe("/plan/codebase");
+		// The explicit intent is what keeps a leftover recovery pointer from
+		// turning a brand new connection into a resume of the old attempt.
+		expect(ctas[0].getAttribute("href")).toBe("/plan/codebase?intent=new");
 	});
 
 	it("renders dedicated onboarding empty state with single CTA and capabilities when there are zero projects", () => {
@@ -225,7 +230,7 @@ describe("CodebaseLibraryView", () => {
 		expect(
 			screen.getByRole("heading", { name: "Project Tersimpan" }),
 		).toBeDefined();
-		expect(screen.getByText("Existing Codebase")).toBeDefined();
+		expect(screen.queryByText("Existing Codebase")).toBeNull();
 		expect(
 			screen.getByText(
 				/Repository yang pernah kamu hubungkan akan tersimpan di sini/i,
@@ -357,7 +362,7 @@ describe("CodebaseLibraryView", () => {
 
 	it("keeps the action menu outside the card link", () => {
 		render(<CodebaseLibraryView items={[makeItem({ id: "cb-1" })]} />);
-		const trigger = screen.getByRole("button", { name: /Aksi project/i });
+		const trigger = screen.getByRole("button", { name: /Opsi repository/i });
 		expect(trigger.closest("a")).toBeNull();
 	});
 
@@ -750,7 +755,7 @@ describe("CodebaseLibraryView delete", () => {
 		expect(
 			screen.getByRole("heading", { name: "Project Tersimpan" }),
 		).toBeDefined();
-		expect(screen.getByText("Existing Codebase")).toBeDefined();
+		expect(screen.queryByText("Existing Codebase")).toBeNull();
 		expect(
 			screen.getByRole("link", { name: /\+ Hubungkan repository/i }),
 		).toBeDefined();
@@ -882,7 +887,7 @@ describe("CodebaseLibraryView pagination", () => {
 		expect(
 			screen.getByRole("heading", { name: "Project Tersimpan" }),
 		).toBeDefined();
-		expect(screen.getByText("Existing Codebase")).toBeDefined();
+		expect(screen.queryByText("Existing Codebase")).toBeNull();
 		expect(
 			screen.getByText(
 				/Repository yang pernah kamu hubungkan akan tersimpan di sini/i,

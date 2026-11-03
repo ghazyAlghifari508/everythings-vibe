@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCodebaseSyncStatus } from "@/features/codebase/hooks/use-codebase-sync-status";
+import { useCodebaseSyncStream } from "@/features/codebase/hooks/use-codebase-sync-stream";
+import type { PlanCodebaseIntent } from "@/features/codebase/services/onboarding-intent";
 import {
 	clearPlanCodebaseProjectPointer,
+	clearPlanOnboardingPointers,
 	type PlanCodebaseStep,
 	readPlanCodebasePointer,
 	storePlanCodebasePointer,
@@ -42,10 +45,17 @@ export function useCodebaseOnboarding({
 	analysisState,
 	step,
 	setStep,
+	intent,
 }: {
 	analysisState: OnboardingAnalysisState;
 	step: PlanCodebaseStep;
 	setStep: (step: PlanCodebaseStep) => void;
+	/**
+	 * Navigation intent from the route search param. `"new"` is an explicit
+	 * fresh start and never inherits a previous attempt's visible state;
+	 * `"resume"` and an absent intent both recover from the stored pointer.
+	 */
+	intent?: PlanCodebaseIntent;
 }) {
 	const {
 		setFeatureProjectId,
@@ -60,14 +70,17 @@ export function useCodebaseOnboarding({
 	const [isStarting, setIsStarting] = useState(false);
 	const [codebase, setCodebase] = useState<CreatedCodebase | null>(null);
 	const [payload, setPayload] = useState<SyncPromptPayload | null>(null);
-	const [consentOpen, setConsentOpen] = useState(false);
-	const [consentAgreed, setConsentAgreed] = useState(false);
 	const queryInFlight = useRef(false);
 	// Recovered status is the poller's seed, so the first paint after a refresh
 	// already reflects persisted server state instead of an empty loading card.
 	const [recoveredStatus, setRecoveredStatus] =
 		useState<SyncStatusResponse | null>(null);
 	const autoInitAttempted = useRef(false);
+	// Entering `/plan/codebase` from an explicit "Hubungkan repository" action IS
+	// the start intent, so the flow prepares its own session instead of parking
+	// an intermediate button in front of the prompt. The ref keeps a rerender
+	// from minting a second session for the same intent.
+	const autoStartAttempted = useRef(false);
 	// and two sync sessions for one onboarding attempt. State updates are async,
 	// so a ref is what actually closes the window.
 	const createInFlight = useRef(false);
@@ -79,25 +92,45 @@ export function useCodebaseOnboarding({
 	// prompt screen needs the CLI handshake, the sync screen needs the
 	// transport stages, and the conclusion screen needs the persisted
 	// analysis status — all three read this single snapshot, so no two
-	// screens can disagree and no second poller races this one. The loop is
-	// pinned to `activeSessionId`: when the user requests a new token, the id
-	// changes and the poller drops the old snapshot before its first request
-	// for the new session.
-	const { status: lastStatus, error: statusPollError } = useCodebaseSyncStatus({
+	// screens can disagree and no second poller races this one.
+	//
+	// Delivery has two channels that share one projection: the live stream pushes
+	// a real transition as it is persisted, and status polling takes over whenever
+	// the stream cannot be used. Only one of them is ever asked at a time, and
+	// both return the same server snapshot, so the choice can never change what is
+	// rendered — only how fast it arrives.
+	const stream = useCodebaseSyncStream({
 		codebaseId: codebase?.id ?? null,
-		analysisProjectId: analysisState.featureProjectId,
 		sessionId: activeSessionId,
-		initialStatus: recoveredStatus,
+		analysisProjectId: analysisState.featureProjectId,
 		enabled: codebase !== null,
 	});
+	// Polling only stands down once a real frame has landed, so a stream that opens
+	// but never delivers cannot leave the screen without a source.
+	const streamDelivers = stream.connection === "live" && stream.status !== null;
+	const { status: polledStatus, error: statusPollError } =
+		useCodebaseSyncStatus({
+			codebaseId: codebase?.id ?? null,
+			analysisProjectId: analysisState.featureProjectId,
+			sessionId: activeSessionId,
+			initialStatus: recoveredStatus,
+			enabled: codebase !== null && !streamDelivers,
+		});
+	const lastStatus = (streamDelivers ? stream.status : null) ?? polledStatus;
+	// A dropped update channel is reported as a channel problem only. It must
+	// never read as a failed sync, because the persisted attempt is untouched.
+	const streamNotice =
+		stream.connection === "reconnecting"
+			? "Koneksi pembaruan terputus. Menghubungkan kembali..."
+			: null;
 
 	useEffect(() => {
 		setStep("sync");
 	}, [setStep]);
 
-	// Persist the navigation intent, never the domain state: a refresh returns
-	// the user to the screen they were reading, and recovery re-validates it
-	// against the server snapshot instead of trusting it.
+	// Persist the step, never the domain state: a refresh returns the user to
+	// the screen they were reading, and recovery re-validates it against the
+	// server snapshot instead of trusting it.
 	useEffect(() => {
 		if (!codebase) return;
 		storePlanCodebaseStepPointer(step);
@@ -118,12 +151,26 @@ export function useCodebaseOnboarding({
 		[setAnalysis, setAnalysisError, analysisAttemptedFor],
 	);
 
-	const blocked =
-		!creditStatus?.billingExempt &&
-		creditStatus !== null &&
-		(creditStatus.code === "INSUFFICIENT_CREDITS" ||
-			creditStatus.code === "SUBSCRIPTION_PAUSED" ||
-			creditStatus.code === "ANALYSIS_IN_PROGRESS");
+	// Explicit fresh start: drop the browser pointers to any previous attempt and
+	// every piece of visible state derived from it, so nothing from the old
+	// repository can paint onto the new session. The backend keeps the old
+	// session and snapshot untouched for History — only the browser's pointer to
+	// it is forgotten.
+	const resetForFreshStart = useCallback(() => {
+		clearPlanOnboardingPointers();
+		setRecoveredStatus(null);
+		setActiveSessionId(null);
+		setFeatureProjectId(null);
+		setAnalysis(null);
+		setAnalysisError(null);
+		analysisAttemptedFor.current = null;
+		setError(null);
+	}, [
+		setAnalysis,
+		setAnalysisError,
+		setFeatureProjectId,
+		analysisAttemptedFor,
+	]);
 
 	const refreshCreditStatus = useCallback(async () => {
 		if (queryInFlight.current) return;
@@ -141,62 +188,15 @@ export function useCodebaseOnboarding({
 		}
 	}, []);
 
-	const requestConsent = useCallback(() => {
-		if (!creditStatus) return;
-		if (
-			creditStatus.billingExempt ||
-			creditStatus.code === "FREE_ALLOWANCE_AVAILABLE"
-		) {
-			setConsentAgreed(true);
-			setConsentOpen(false);
-			return;
-		}
-		if (creditStatus.code !== "CREDIT_REQUIRED") {
-			setError(
-				creditStatus.code === "SUBSCRIPTION_PAUSED"
-					? "Perpanjang langganan di halaman Billing sebelum sinkronisasi."
-					: "Kredit tidak cukup untuk analisis. Tambahkan kredit dulu.",
-			);
-			return;
-		}
-		setConsentAgreed(false);
-		setConsentOpen(true);
-	}, [creditStatus]);
-
-	const closeConsent = useCallback(() => {
-		setConsentOpen(false);
-		setError(null);
-	}, []);
-
-	const confirmConsent = useCallback(() => {
-		if (!consentAgreed) {
-			setError("Centang persetujuan biaya sebelum melanjutkan.");
-			return;
-		}
-		setConsentOpen(false);
-	}, [consentAgreed]);
-
-	const confirmed =
-		Boolean(creditStatus?.billingExempt) ||
-		creditStatus?.code === "FREE_ALLOWANCE_AVAILABLE" ||
-		(creditStatus?.code === "CREDIT_REQUIRED" && consentAgreed);
-
 	const createCodebase = useCallback(async () => {
 		if (createInFlight.current) return;
 		if (!creditStatus) {
 			await refreshCreditStatus();
 			return;
 		}
-		if (
-			!creditStatus.billingExempt &&
-			creditStatus.code !== "FREE_ALLOWANCE_AVAILABLE" &&
-			creditStatus.code !== "CREDIT_REQUIRED"
-		)
-			return;
-		if (!confirmed) {
-			requestConsent();
-			return;
-		}
+		// `requiresApproval` only reaches here from the explicit approval action,
+		// so the consent in the request is the one the user just gave.
+		if (!creditStatus.canStart && !creditStatus.requiresApproval) return;
 		createInFlight.current = true;
 		setError(null);
 		setIsStarting(true);
@@ -225,8 +225,6 @@ export function useCodebaseOnboarding({
 		}
 	}, [
 		creditStatus,
-		confirmed,
-		requestConsent,
 		refreshCreditStatus,
 		setStep,
 		setFeatureProjectId,
@@ -246,7 +244,17 @@ export function useCodebaseOnboarding({
 	useEffect(() => {
 		if (autoInitAttempted.current) return;
 		autoInitAttempted.current = true;
-		// Recovery reads persisted work; fresh onboarding waits for cost consent.
+		// An explicit "Hubungkan repository" visit is a fresh start: there is
+		// nothing to recover, and inheriting the previous attempt is exactly the
+		// mixed old/new state this flow must never render. The eligibility check
+		// then prepares a brand new session (see the auto-start effect below).
+		if (intent === "new") {
+			resetForFreshStart();
+			void refreshCreditStatus();
+			return;
+		}
+		// Recovery reads persisted work; a fresh start resolves eligibility first
+		// and then prepares its own session (see the auto-start effect below).
 		if (!readPlanCodebasePointer()) {
 			void refreshCreditStatus();
 			return;
@@ -257,18 +265,22 @@ export function useCodebaseOnboarding({
 				await refreshCreditStatus();
 			}
 		})();
-	}, [recoverCodebase, refreshCreditStatus]);
+	}, [intent, recoverCodebase, refreshCreditStatus, resetForFreshStart]);
+
+	useEffect(() => {
+		if (codebase || isStarting || autoStartAttempted.current) return;
+		if (!creditStatus?.canStart) return;
+		autoStartAttempted.current = true;
+		void createCodebase();
+	}, [codebase, createCodebase, creditStatus, isStarting]);
 
 	const retrySession = async () => {
 		if (!codebase) return;
-		if (!creditStatus || blocked) {
+		if (!creditStatus?.canStart && !creditStatus?.requiresApproval) {
 			await refreshCreditStatus();
 			return;
 		}
-		if (!confirmed) {
-			requestConsent();
-			return;
-		}
+		// A retry continues an existing repository context, not a fresh start.
 		setError(null);
 		setIsStarting(true);
 		try {
@@ -321,15 +333,10 @@ export function useCodebaseOnboarding({
 		payload,
 		lastStatus,
 		statusPollError,
+		streamNotice,
 		createCodebase,
 		creditStatus,
 		retrySession,
-		consentOpen,
-		consentAgreed,
-		setConsentAgreed,
-		closeConsent,
-		confirmConsent,
 		refreshCreditStatus,
-		blocked,
 	};
 }

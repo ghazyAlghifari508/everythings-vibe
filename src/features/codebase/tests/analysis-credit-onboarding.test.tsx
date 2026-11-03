@@ -25,143 +25,242 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-test("sufficient credits show the normal sync layout with inline cost and app-owned consent", async () => {
-	const calls: string[] = [];
+const SYNC_TOKEN = "sync-token-secret-value";
+const PREFLIGHT = "/api/codebases?preflight=analysis";
+
+type Status = Record<string, unknown>;
+
+function creditStatus(overrides: Status): Status {
+	return {
+		code: "CREDIT_REQUIRED",
+		availableCredits: 30,
+		maximumCredits: 12,
+		pricingVersion: "adaptive-v1",
+		canStart: true,
+		requiresApproval: false,
+		...overrides,
+	};
+}
+
+function syncPayload() {
+	return {
+		projectId: "cb-1",
+		sessionId: "sess-1",
+		apiBaseUrl: "http://localhost:3000",
+		syncToken: SYNC_TOKEN,
+		syncCommand: `everythings-vibe codebase sync --project-id cb-1 --sync-token ${SYNC_TOKEN}`,
+		cliMinVersion: "0.1.0",
+		expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+	};
+}
+
+function createdCodebase() {
+	return { id: "cb-1", name: "Repo Lokal", sync: syncPayload() };
+}
+
+function statusResponse(): Status {
+	return {
+		projectId: "cb-1",
+		sessionId: "sess-1",
+		status: "waiting_for_cli",
+		snapshotId: null,
+	};
+}
+
+/**
+ * Stubs the three endpoints this page owns and records what it asked for, so a
+ * test can prove a credential was never minted and no analysis was started.
+ */
+function stubBackend(handler: (input: string, init?: RequestInit) => Status) {
+	const calls: { method: string; url: string; body?: string }[] = [];
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(async (input: string, init?: RequestInit) => {
-			calls.push(`${init?.method ?? "GET"} ${input}`);
-			if (input === "/api/codebases?preflight=analysis")
-				return Response.json({
-					code: "CREDIT_REQUIRED",
-					availableCredits: 30,
-					maximumCredits: 12,
-					pricingVersion: "adaptive-v1",
-					canStart: false,
-				});
-			if (input === "/api/codebases" && init?.method === "POST") {
-				assert.deepEqual(JSON.parse(String(init.body)), {
-					acceptAnalysisPolicy: true,
-					creditConsent: { maximumCredits: 12, pricingVersion: "adaptive-v1" },
-				});
-				return Response.json({ error: "Create unavailable" }, { status: 503 });
-			}
-			throw new Error(`Unexpected request ${input}`);
+			calls.push({
+				method: init?.method ?? "GET",
+				url: input,
+				body: typeof init?.body === "string" ? init.body : undefined,
+			});
+			return Response.json(handler(input, init));
 		}),
 	);
+	return calls;
+}
+
+test("sufficient credits land straight on the prompt with no approval step", async () => {
+	const calls = stubBackend((input) => {
+		if (input === PREFLIGHT) return creditStatus({});
+		if (input === "/api/codebases") return createdCodebase();
+		if (input.includes("/status")) return statusResponse();
+		throw new Error(`Unexpected request ${input}`);
+	});
 	render(<PlanCodebasePage />);
-	await screen.findByText("Sync codebase dengan everythings-vibe");
-	assert.deepEqual(calls, ["GET /api/codebases?preflight=analysis"]);
-	assert.equal(screen.queryByText("Hubungkan repository"), null);
-	assert.ok(screen.queryByText(/Analisis: maksimal 12 kredit/));
-	const start = await screen.findByRole("button", {
-		name: "Siapkan instruksi",
-	});
-	fireEvent.click(start);
-	const checkbox = (await screen.findByLabelText(
-		/Saya setuju analisis/,
-	)) as HTMLInputElement;
-	assert.equal(checkbox.checked, false);
-	fireEvent.click(checkbox);
-	const confirm = await screen.findByRole("button", {
-		name: "Setuju dan lanjutkan",
-	});
-	fireEvent.click(confirm);
-	await waitFor(() =>
-		assert.equal(calls.filter((call) => call.startsWith("POST")).length, 1),
+
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	assert.ok(screen.getByText(new RegExp(SYNC_TOKEN)));
+	assert.equal(screen.queryByText("Siapkan instruksi"), null);
+	assert.equal(screen.queryByTestId("credit-consent-dialog"), null);
+	assert.equal(screen.queryByRole("checkbox"), null);
+	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
+	// Rate transparency survives as one muted line, not a card or a modal.
+	assert.ok(screen.getByText(/Analisis hingga 12 kredit/));
+
+	// A standing authorization means the start request carries no fresh consent.
+	const create = calls.find((call) => call.url === "/api/codebases");
+	assert.ok(create?.body);
+	assert.equal(
+		Object.hasOwn(JSON.parse(String(create.body)), "creditConsent"),
+		false,
 	);
 });
 
-test("insufficient credits keep the sync layout with a locked prompt and no raw token", async () => {
-	vi.stubGlobal(
-		"fetch",
-		vi.fn(async () =>
-			Response.json({
+test("insufficient credits lock the prompt and never mint a credential", async () => {
+	const calls = stubBackend((input) => {
+		if (input === PREFLIGHT)
+			return creditStatus({
 				code: "INSUFFICIENT_CREDITS",
 				availableCredits: 2,
-				maximumCredits: 12,
-				pricingVersion: "adaptive-v1",
 				canStart: false,
-			}),
-		),
-	);
-	render(<PlanCodebasePage />);
-	await screen.findByText("Sync codebase dengan everythings-vibe");
-	const locked = await screen.findByTestId("locked-prompt-region");
-	assert.ok(locked.textContent?.includes("Kredit belum cukup"));
-	assert.equal(document.body.innerHTML.includes("tok_"), false);
-	assert.equal(document.body.innerHTML.includes("sync-token"), false);
-	const topupBtn = await screen.findByRole("button", {
-		name: "Tambahkan Kredit",
+			});
+		throw new Error(`Unexpected request ${input}`);
 	});
-	assert.ok(topupBtn);
-	assert.equal(
-		screen.queryByRole("button", { name: /Sinkronisasi|Setujui/ }),
-		null,
+	render(<PlanCodebasePage />);
+
+	const locked = await screen.findByTestId("locked-prompt-region");
+	assert.equal(locked.getAttribute("data-locked-variant"), "insufficient");
+	assert.ok(locked.textContent?.includes("Kredit tidak mencukupi"));
+	assert.ok(locked.textContent?.includes("Tambahkan kredit untuk melanjutkan"));
+	assert.ok(
+		await screen.findByRole("button", { name: "Tambahkan Kredit" }),
+		"the locked prompt must offer the top-up action",
 	);
+	assert.equal(document.body.innerHTML.includes(SYNC_TOKEN), false);
+	assert.equal(
+		calls.some((call) => call.method === "POST"),
+		false,
+		"an ineligible account must not mint a session",
+	);
+	assert.equal(screen.queryByRole("checkbox"), null);
 });
 
-test("top-up action in locked prompt opens TopUpModal and can refresh eligibility", async () => {
+test("top-up opens the real billing flow and unlocks from server state", async () => {
 	let preflightCount = 0;
-	vi.stubGlobal(
-		"fetch",
-		vi.fn(async (input: string) => {
-			if (input === "/api/codebases?preflight=analysis") {
-				preflightCount += 1;
-				if (preflightCount === 1) {
-					return Response.json({
+	const calls = stubBackend((input) => {
+		if (input === PREFLIGHT) {
+			preflightCount += 1;
+			return preflightCount === 1
+				? creditStatus({
 						code: "INSUFFICIENT_CREDITS",
 						availableCredits: 2,
-						maximumCredits: 12,
-						pricingVersion: "adaptive-v1",
 						canStart: false,
-					});
-				}
-				return Response.json({
-					code: "CREDIT_REQUIRED",
-					availableCredits: 30,
-					maximumCredits: 12,
-					pricingVersion: "adaptive-v1",
-					canStart: false,
-				});
-			}
-			throw new Error(`Unexpected request ${input}`);
-		}),
-	);
-	render(<PlanCodebasePage />);
-	const topupBtn = await screen.findByRole("button", {
-		name: "Tambahkan Kredit",
+					})
+				: creditStatus({});
+		}
+		if (input === "/api/codebases") return createdCodebase();
+		if (input.includes("/status")) return statusResponse();
+		throw new Error(`Unexpected request ${input}`);
 	});
-	fireEvent.click(topupBtn);
-	const modalTitle = await screen.findByText("Isi Ulang Kredit");
-	assert.ok(modalTitle);
-	const closeBtn = screen.getByRole("button", { name: /Tutup modal/i });
-	fireEvent.click(closeBtn);
-	await waitFor(() => assert.equal(preflightCount, 2));
+	render(<PlanCodebasePage />);
+
+	fireEvent.click(await screen.findByRole("button", { name: "Tambahkan Kredit" }));
+	assert.ok(await screen.findByText("Isi Ulang Kredit"));
+	fireEvent.click(screen.getByRole("button", { name: /Tutup modal/i }));
+
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	assert.equal(preflightCount, 2);
+	assert.equal(
+		calls.filter((call) => call.method === "POST" && call.url === "/api/codebases")
+			.length,
+		1,
+	);
 });
 
-test("free allowance follows the normal sync flow with no billing warning", async () => {
-	vi.stubGlobal(
-		"fetch",
-		vi.fn(async () =>
-			Response.json({
+test("billing-exempt accounts run the normal sync without a credit gate", async () => {
+	stubBackend((input) => {
+		if (input === PREFLIGHT)
+			return creditStatus({
 				code: "FREE_ALLOWANCE_AVAILABLE",
-				availableCredits: 2,
 				maximumCredits: 0,
-				pricingVersion: "adaptive-v1",
-				canStart: true,
-			}),
+				availableCredits: 0,
+				billingExempt: true,
+			});
+		if (input === "/api/codebases") return createdCodebase();
+		if (input.includes("/status")) return statusResponse();
+		throw new Error(`Unexpected request ${input}`);
+	});
+	render(<PlanCodebasePage />);
+
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
+	assert.equal(screen.queryByText("Tambahkan Kredit"), null);
+	assert.equal(screen.queryByText(/Analisis hingga/), null);
+});
+
+test("a changed quote asks for one approval and records the ceiling", async () => {
+	const calls = stubBackend((input) => {
+		if (input === PREFLIGHT)
+			return creditStatus({ canStart: false, requiresApproval: true });
+		if (input === "/api/codebases") return createdCodebase();
+		if (input.includes("/status")) return statusResponse();
+		throw new Error(`Unexpected request ${input}`);
+	});
+	render(<PlanCodebasePage />);
+
+	const locked = await screen.findByTestId("locked-prompt-region");
+	assert.equal(locked.getAttribute("data-locked-variant"), "approval");
+	assert.ok(locked.textContent?.includes("Tarif analisis diperbarui"));
+	fireEvent.click(
+		await screen.findByRole("button", { name: "Setujui dan lanjutkan" }),
+	);
+
+	await waitFor(() =>
+		assert.equal(
+			calls.filter((call) => call.method === "POST").length,
+			1,
+			"the approval must start exactly one session",
 		),
 	);
-	render(<PlanCodebasePage />);
-	await screen.findByText("Sync codebase dengan everythings-vibe");
-	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
-	assert.ok(screen.queryByText(/Analisis awal gratis/));
-	assert.equal(screen.queryByText(/Tambahkan Kredit/), null);
-	const start = await screen.findByRole("button", {
-		name: "Siapkan instruksi",
+	const create = calls.find((call) => call.url === "/api/codebases");
+	assert.deepEqual(JSON.parse(String(create?.body)).creditConsent, {
+		maximumCredits: 12,
+		pricingVersion: "adaptive-v1",
 	});
-	assert.ok(start);
+});
+
+test("a rerender does not mint a second sync session", async () => {
+	const calls = stubBackend((input) => {
+		if (input === PREFLIGHT) return creditStatus({});
+		if (input === "/api/codebases") return createdCodebase();
+		if (input.includes("/status")) return statusResponse();
+		throw new Error(`Unexpected request ${input}`);
+	});
+	const rendered = render(<PlanCodebasePage />);
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	rendered.rerender(<PlanCodebasePage />);
+	rendered.rerender(<PlanCodebasePage />);
+	await waitFor(() =>
+		assert.equal(
+			calls.filter(
+				(call) => call.method === "POST" && call.url === "/api/codebases",
+			).length,
+			1,
+		),
+	);
+});
+
+test("opening the screen never starts a billable analysis", async () => {
+	const calls = stubBackend((input) => {
+		if (input === PREFLIGHT) return creditStatus({});
+		if (input === "/api/codebases") return createdCodebase();
+		if (input.includes("/status")) return statusResponse();
+		throw new Error(`Unexpected request ${input}`);
+	});
+	render(<PlanCodebasePage />);
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	assert.equal(
+		calls.some((call) => call.url.includes("/codebase/analysis")),
+		false,
+	);
 });
 
 test("no native browser confirm or alert remain in codebase feature source", async () => {

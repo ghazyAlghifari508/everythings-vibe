@@ -1,3 +1,5 @@
+import { STUDIO_COMPONENT_PATTERNS } from "./studio-component-patterns";
+
 /**
  * Component-first design patterns adapted for standalone HTML/Tailwind prototypes.
  * Derived from shadcn/ui, HeroUI, and Affect UI architectures.
@@ -6,7 +8,18 @@
  * consistent visual density, and domain-appropriate layout composition.
  */
 
-export const STUDIO_COMPONENT_FIRST_GUIDANCE = `COMPONENT-FIRST DESIGN PATTERNS (STANDALONE HTML/TAILWIND):
+export const STUDIO_COMPONENT_FIRST_GUIDANCE = `COMPONENT-FIRST DESIGN PATTERNS (STANDALONE HTML/CSS):
+- The following data-ui patterns receive shared inline CSS from Studio. Adapt content to the brief; do not copy sample records or add controls without a user need:
+${STUDIO_COMPONENT_PATTERNS.map((pattern) => `${pattern.name}: ${pattern.html}`).join("\n")}
+- Search: keep clear action in its own 44px flex track, never absolute over input text. The visible glyph stays small.
+- Segments: preserve full labels in nonshrinking buttons with contained horizontal scrolling; never squeeze them into narrow tracks.
+- Dropdown: prefer a labeled native select; custom chevrons need a separate nonshrinking track and right inset.
+- Group contextual actions together near the section heading; allow wrapping or stacking on narrow screens.
+- Short control labels and badges stay unbroken; descriptions wrap naturally. Long values use a contained scroll region or responsive type, not forced break-all.
+- Studio owns body margin, outer gutter, app header and navigation. Mark exactly one content region without another outer padding, fixed-width app wrapper or viewport-height spacer. Contextual headings/tabs remain inside it.
+- Cards need meaningful grouping and consistent gaps, not decorative nested boxes. No skeletons unless the requested screen represents loading; no redundant badges, placeholder prose or decorative cursor.
+- Use product-specific hierarchy, not an obligatory KPI/card count or two-column template. Mobile payment details may use stacked definition lists; complex desktop tables use contained scrolling.
+
 - Bounded Data Table: ALWAYS wrap any <table> in an overflow container:
   <div class="overflow-x-auto w-full max-w-full" data-table-container="1">
     <table class="w-full text-left text-sm border-collapse min-w-[560px]">

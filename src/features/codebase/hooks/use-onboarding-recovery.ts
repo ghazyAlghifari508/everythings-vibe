@@ -91,8 +91,13 @@ export function useOnboardingRecovery({
 	setActiveSessionId: (sessionId: string | null) => void;
 	setStep: (step: PlanCodebaseStep) => void;
 }) {
-	const { analysisAttemptedFor, setFeatureProjectId, fetchAnalysisOutput } =
-		analysisState;
+	const {
+		analysisAttemptedFor,
+		setAnalysis,
+		setAnalysisError,
+		setFeatureProjectId,
+		fetchAnalysisOutput,
+	} = analysisState;
 
 	return useCallback(async (): Promise<boolean> => {
 		const stored = readPlanCodebasePointer();
@@ -103,7 +108,14 @@ export function useOnboardingRecovery({
 			const statusOutcome = await requestCodebaseStatus(stored.id);
 			if (statusOutcome.kind === "unauthorized") return true;
 			if (statusOutcome.kind === "stale") {
+				// Stale pointer: clear all onboarding state so a subsequent fresh
+				// start cannot inherit the previous attempt's analysis or error.
 				clearPlanOnboardingPointers();
+				setRecoveredStatus(null);
+				setActiveSessionId(null);
+				setAnalysis(null);
+				setAnalysisError(null);
+				analysisAttemptedFor.current = null;
 				return false;
 			}
 			const recovered = statusOutcome.status;
@@ -173,7 +185,13 @@ export function useOnboardingRecovery({
 			setStep(resolveRecoveredStep(recovered, storedStep));
 			return true;
 		} catch {
+			// Recovery failure: clear all stale state so a fresh start is clean.
 			clearPlanOnboardingPointers();
+			setRecoveredStatus(null);
+			setActiveSessionId(null);
+			setAnalysis(null);
+			setAnalysisError(null);
+			analysisAttemptedFor.current = null;
 			return false;
 		} finally {
 			setIsStarting(false);
@@ -187,6 +205,8 @@ export function useOnboardingRecovery({
 		setRecoveredStatus,
 		setFeatureProjectId,
 		analysisAttemptedFor,
+		setAnalysis,
+		setAnalysisError,
 		fetchAnalysisOutput,
 	]);
 }

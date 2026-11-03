@@ -55,14 +55,17 @@ export function useStudioCanvasInput({
 		if (!canvas) return;
 		function handleWheel(event: WheelEvent) {
 			// Do not intercept scrolling inside active textareas, dropdowns,
-			// or other scrollable overlays.
+			// real controls, or other scrollable overlays. Frame artboards are
+			// gesture surfaces and are excluded from that guard.
 			if (isScrollableOrEditableTarget(event.target, canvas)) {
 				return;
 			}
-			event.preventDefault();
 
 			const gesture = classifyWheelGesture(event);
 			if (gesture === "zoom") {
+				// preventDefault only for a gesture the canvas actually
+				// consumes, so the page never scrolls behind a zoom.
+				event.preventDefault();
 				onWheel(event);
 				return;
 			}
@@ -72,7 +75,9 @@ export function useStudioCanvasInput({
 				deltaMode: event.deltaMode,
 			});
 			const deltaY = normalizeWheelDelta(event);
+			if (deltaX === 0 && deltaY === 0) return;
 			// Two-axis trackpad scrolling pans the board.
+			event.preventDefault();
 			setPan((previous) => ({
 				x: previous.x - deltaX,
 				y: previous.y - deltaY,

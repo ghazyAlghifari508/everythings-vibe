@@ -7,7 +7,27 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StudioSidebar } from "@/features/studio/components/workspace/studio-sidebar";
+import {
+	StudioSidebar as StudioSidebarComponent,
+	type StudioSidebarProps,
+} from "@/features/studio/components/workspace/studio-sidebar";
+
+// Rename and duplicate have their own suite; this file covers the history list,
+// so the two handlers are stubbed here to keep the call sites about the list.
+type TestSidebarProps = Omit<
+	StudioSidebarProps,
+	"onRenameProject" | "onDuplicateProject"
+>;
+
+function TestSidebar(props: TestSidebarProps) {
+	return (
+		<StudioSidebarComponent
+			onRenameProject={vi.fn(async () => {})}
+			onDuplicateProject={vi.fn(async () => {})}
+			{...props}
+		/>
+	);
+}
 
 const mockProjects = [
 	{
@@ -76,7 +96,7 @@ describe("StudioSidebar", () => {
 
 	it("renders project history list with title and badges", () => {
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={vi.fn(async () => {})}
@@ -92,7 +112,7 @@ describe("StudioSidebar", () => {
 
 	it("filters projects case-insensitively while typing", () => {
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={vi.fn(async () => {})}
@@ -109,7 +129,7 @@ describe("StudioSidebar", () => {
 
 	it("displays no-results state when search does not match", () => {
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={vi.fn(async () => {})}
@@ -124,7 +144,7 @@ describe("StudioSidebar", () => {
 
 	it("displays empty state when history is empty", () => {
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={[]}
 				onSelectProject={vi.fn()}
 				onDeleteProject={vi.fn(async () => {})}
@@ -137,7 +157,7 @@ describe("StudioSidebar", () => {
 	it("calls onSelectProject when clicking a project item", () => {
 		const onSelectProject = vi.fn();
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={onSelectProject}
 				onDeleteProject={vi.fn(async () => {})}
@@ -150,7 +170,7 @@ describe("StudioSidebar", () => {
 
 	it("does NOT contain Shared with me UI", () => {
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={vi.fn(async () => {})}
@@ -163,7 +183,7 @@ describe("StudioSidebar", () => {
 
 	it("offers a discreet per-project action menu with a destructive delete action", async () => {
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={vi.fn(async () => {})}
@@ -185,7 +205,7 @@ describe("StudioSidebar", () => {
 	it("confirms deletion in an accessible dialog before calling the server action", async () => {
 		const onDeleteProject = vi.fn(async () => {});
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={onDeleteProject}
@@ -210,7 +230,7 @@ describe("StudioSidebar", () => {
 	it("cancels deletion without calling the server action", async () => {
 		const onDeleteProject = vi.fn(async () => {});
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={onDeleteProject}
@@ -233,7 +253,7 @@ describe("StudioSidebar", () => {
 			throw new Error("Gagal menghapus project. Coba lagi.");
 		});
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={onDeleteProject}
@@ -257,7 +277,7 @@ describe("StudioSidebar", () => {
 
 	it("aligns the platform icon and vertical ellipsis menu in one action area", () => {
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={vi.fn(async () => {})}
@@ -275,7 +295,7 @@ describe("StudioSidebar", () => {
 
 	it("renders platform indicators correctly for web and mobile projects", () => {
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={vi.fn(async () => {})}
@@ -298,7 +318,7 @@ describe("StudioSidebar", () => {
 			},
 		];
 		render(
-			<StudioSidebar
+			<TestSidebar
 				history={projectsWithEmDash}
 				onSelectProject={vi.fn()}
 				onDeleteProject={vi.fn(async () => {})}
@@ -312,7 +332,7 @@ describe("StudioSidebar", () => {
 
 	it("ensures public-facing UI labels and copy do not contain em dashes", () => {
 		const { container } = render(
-			<StudioSidebar
+			<TestSidebar
 				history={mockProjects}
 				onSelectProject={vi.fn()}
 				onDeleteProject={vi.fn(async () => {})}

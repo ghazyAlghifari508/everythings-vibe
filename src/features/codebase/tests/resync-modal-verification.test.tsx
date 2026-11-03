@@ -647,7 +647,7 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 			expect(document.body.textContent).toContain(
 				"Sync codebase dengan everythings-vibe",
 			);
-			expect(document.body.textContent).toContain("Copy prompt untuk AI agent");
+			expect(document.body.textContent).toContain("Salin instruksi untuk AI agent");
 			expect(document.body.textContent).toContain(
 				"Buka AI coding agent di repository kamu",
 			);
