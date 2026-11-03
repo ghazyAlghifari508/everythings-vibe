@@ -11,6 +11,10 @@ import {
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
 import { CODEBASE_SYNC_EXPIRY_SOON_MS } from "@/features/codebase/types/codebase-constants";
+import {
+	type LockedPromptState,
+	LockedPromptStateView,
+} from "./locked-prompt-state";
 
 function resolveExpiryMs(value: string | undefined): number | null {
 	if (!value) return null;
@@ -24,9 +28,17 @@ interface ScreenConnectPromptStepProps {
 	payload: SyncPromptPayload | null;
 	isStarting: boolean;
 	status?: SyncStatusResponse | null;
+	/**
+	 * The server persisted a snapshot, so the CLI already ran. A replacement
+	 * credential would be a second upload for an upload that already succeeded —
+	 * exactly the mixed state the user reported — so the prompt row states the
+	 * transport is done instead of offering a new session.
+	 */
+	transportComplete?: boolean;
 	onRequestNewToken?: () => void;
-	locked?: boolean;
-	lockedAction?: React.ReactNode;
+	lockedPrompt?: LockedPromptState | null;
+	/** Non-secret rate/saldo disclosure rendered outside the prompt box. */
+	creditNote?: string | null;
 }
 
 export function ScreenConnectPromptStep({
@@ -34,9 +46,10 @@ export function ScreenConnectPromptStep({
 	payload,
 	isStarting,
 	status,
+	transportComplete = false,
 	onRequestNewToken,
-	locked = false,
-	lockedAction,
+	lockedPrompt = null,
+	creditNote = null,
 }: ScreenConnectPromptStepProps) {
 	const { copied, copyError, copy } = useCopyFeedback();
 	const promptText = payload ? buildAgentPrompt(payload, { projectName }) : "";
@@ -67,17 +80,17 @@ export function ScreenConnectPromptStep({
 			<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron font-mono text-xs text-mist">
 				1
 			</span>
-			<div className="flex flex-1 flex-col gap-2">
-				<div className="flex items-center justify-between">
+			<div className="flex min-w-0 flex-1 flex-col gap-2">
+				<div className="flex items-center justify-between gap-3">
 					<div className="text-xs font-semibold text-mist">
-						Copy prompt untuk AI agent
+						Salin instruksi untuk AI agent
 					</div>
-					{payload && (
+					{payload && !lockedPrompt && (
 						<button
 							type="button"
 							onClick={handleCopy}
 							aria-label="Salin prompt untuk AI agent"
-							className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-iron bg-charcoal px-3 py-1 font-sans text-xs font-semibold text-snow transition hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
+							className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-iron bg-charcoal px-3 py-1 font-sans text-xs font-semibold text-snow transition hover:bg-steel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 						>
 							{copied ? (
 								<>
@@ -97,17 +110,9 @@ export function ScreenConnectPromptStep({
 						</button>
 					)}
 				</div>
-				<div className="relative min-h-[90px] rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4">
-					{locked ? (
-						<div
-							data-testid="locked-prompt-region"
-							className="flex flex-col items-center justify-center gap-3 py-6 text-center font-sans"
-						>
-							<p className="text-xs text-fog">
-								Kredit belum cukup untuk analisis.
-							</p>
-							{lockedAction}
-						</div>
+				<div className="relative rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4">
+					{lockedPrompt ? (
+						<LockedPromptStateView {...lockedPrompt} />
 					) : payload ? (
 						<>
 							<div className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow">
@@ -130,14 +135,25 @@ export function ScreenConnectPromptStep({
 								</p>
 							)}
 						</>
+					) : transportComplete ? (
+						<div
+							data-testid="prompt-transport-done"
+							className="flex min-h-[190px] flex-col items-center justify-center gap-2 py-6 text-center font-sans"
+						>
+							<Icon icon={Tick01Icon} size={14} className="text-emerald-400" />
+							<p className="max-w-[38ch] text-xs leading-relaxed text-fog">
+								Prompt sudah dijalankan dan source code tersimpan. Tidak ada
+								instruksi baru yang perlu dijalankan.
+							</p>
+						</div>
 					) : isStarting ? (
-						<div className="flex items-center justify-center gap-2 py-6 font-sans text-xs text-fog">
+						<div className="flex min-h-[190px] items-center justify-center gap-2 py-6 font-sans text-xs text-fog">
 							<Spinner size={14} className="text-blue-400" />
 							<span>Menyiapkan token sesi...</span>
 						</div>
 					) : (
-						<div className="flex flex-col items-center justify-center gap-3 py-6 text-center font-sans">
-							<p className="text-xs text-fog">
+						<div className="flex min-h-[190px] flex-col items-center justify-center gap-3 py-6 text-center font-sans">
+							<p className="max-w-[38ch] text-xs text-fog">
 								{sessionStatus === "expired" || expiryState === "expired"
 									? "Sesi telah berakhir."
 									: "Token sync hanya berlaku sekali dan tidak disimpan di browser."}
@@ -159,6 +175,9 @@ export function ScreenConnectPromptStep({
 						</div>
 					)}
 				</div>
+				{creditNote && !lockedPrompt && (
+					<p className="text-[11px] leading-relaxed text-fog">{creditNote}</p>
+				)}
 			</div>
 		</div>
 	);

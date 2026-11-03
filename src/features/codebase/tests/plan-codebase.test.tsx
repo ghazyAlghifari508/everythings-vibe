@@ -101,7 +101,7 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 		}
 	});
 
-	it("renders vertically and horizontally centered loading spinner before prompt sync arrives", () => {
+	it("renders the sync frame with a centred spinner while eligibility is unresolved", () => {
 		// Mock fetch that hangs to inspect the initial loading state
 		vi.stubGlobal(
 			"fetch",
@@ -110,21 +110,16 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 
 		const { container } = render(<PlanCodebasePage />);
 
-		// Spinner and text exist
-		expect(screen.getByText("Menunggu sesi sync...")).toBeDefined();
+		// The same sync frame the ready state uses, so nothing jumps on arrival.
 		expect(
-			screen.getByText(
-				"Menghubungkan repository dan menginisialisasi instruksi CLI",
-			),
+			screen.getByText("Sync codebase dengan everythings-vibe"),
 		).toBeDefined();
+		expect(screen.getByText("Menyiapkan token sesi...")).toBeDefined();
+		expect(
+			screen.queryByRole("button", { name: "Siapkan instruksi" }),
+		).toBeNull();
 
-		// Check centering layout classes on container
-		const centeringWrapper = container.querySelector(
-			".flex.flex-1.items-center.justify-center.min-h-\\[50vh\\]",
-		);
-		expect(centeringWrapper).not.toBeNull();
-
-		// Check the shared spinner primitive renders with the motion-safe gate.
+		// The shared spinner primitive renders with the motion-safe gate.
 		const spinner = container.querySelector('[data-testid="spinner"]');
 		expect(spinner).not.toBeNull();
 		expect(spinner?.getAttribute("class")).toContain(

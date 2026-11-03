@@ -22,6 +22,7 @@ import {
 } from "@/features/codebase/services/sync";
 import { copyToClipboard } from "@/features/codebase/utils/clipboard";
 import { cn } from "@/lib/utils";
+import type { LockedPromptState } from "../workspace/locked-prompt-state";
 import {
 	ResyncStep1Prompt,
 	ResyncStep2Agent,
@@ -37,6 +38,7 @@ export interface CodebaseResyncModalProps {
 	isStarting?: boolean;
 	creditMaximum?: number | null;
 	creditFree?: boolean;
+	lockedPrompt?: LockedPromptState | null;
 	status: SyncStatusResponse | null;
 	statusError?: string | null;
 	onRequestNewToken?: () => void;
@@ -56,6 +58,7 @@ export function CodebaseResyncModal({
 	isStarting = false,
 	creditMaximum = null,
 	creditFree = false,
+	lockedPrompt = null,
 	status,
 	statusError = null,
 	onRequestNewToken,
@@ -93,11 +96,13 @@ export function CodebaseResyncModal({
 		activeSessionId: targetSessionId,
 	});
 
-	const step1State: StepState = isStarting
-		? "active"
-		: payload
-			? "done"
-			: "failed";
+	const step1State: StepState = lockedPrompt
+		? "failed"
+		: isStarting
+			? "active"
+			: payload
+				? "done"
+				: "failed";
 
 	const step2State: StepState = stageView.hasStarted
 		? "done"
@@ -165,6 +170,7 @@ export function CodebaseResyncModal({
 						copied={copied}
 						onRequestNewToken={onRequestNewToken}
 						onCopy={() => void handleCopy()}
+						lockedPrompt={lockedPrompt}
 					/>
 
 					<ResyncStep2Agent stepState={step2State} />

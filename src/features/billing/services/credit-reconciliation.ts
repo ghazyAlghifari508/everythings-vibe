@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, lte, sql } from "drizzle-orm";
 import { getDatabase } from "@/features/billing/services/credit-db";
 import { releaseCreditOperation } from "@/features/billing/services/credit-release";
 import type { CreditOperationResult } from "@/features/billing/types/credit-contracts";
@@ -108,7 +108,7 @@ export async function reconcileExpiredCreditOperations(input: {
 			.where(
 				and(
 					eq(schema.creditOperations.userId, input.userId),
-					sql`${schema.creditOperations.expiresAt} <= ${nowValue}`,
+					lte(schema.creditOperations.expiresAt, nowValue),
 					eq(schema.creditOperations.state, "settling"),
 				),
 			)
@@ -119,7 +119,7 @@ export async function reconcileExpiredCreditOperations(input: {
 			.where(
 				and(
 					eq(schema.creditOperations.userId, input.userId),
-					sql`${schema.creditOperations.expiresAt} <= ${nowValue}`,
+					lte(schema.creditOperations.expiresAt, nowValue),
 					sql`${schema.creditOperations.state} IN ('reserved', 'running')`,
 				),
 			)
@@ -167,6 +167,7 @@ export async function reconcileExpiredCreditOperations(input: {
 				userId: input.userId,
 				operationId: operation.id,
 				reason: "operation expired",
+				actor: "credit-reconciliation",
 			});
 			if (result.state === "released") releasedOperationIds.push(operation.id);
 		} catch (error) {

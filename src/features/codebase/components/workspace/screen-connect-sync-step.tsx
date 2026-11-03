@@ -18,6 +18,11 @@ interface ScreenConnectSyncStepProps {
 	canRetry: boolean;
 	/** Reconciliation error from the owning loop. */
 	statusError: string | null;
+	/**
+	 * Update-channel notice (stream dropped and reconnecting). Deliberately
+	 * separate from `statusError`: losing the channel is not a failed sync.
+	 */
+	streamNotice?: string | null;
 	isStarting: boolean;
 	onRetrySync?: () => void;
 	/**
@@ -43,6 +48,7 @@ export function ScreenConnectSyncStep({
 	stageView,
 	canRetry,
 	statusError,
+	streamNotice = null,
 	isStarting,
 	onRetrySync,
 	canContinueToSummary,
@@ -66,19 +72,6 @@ export function ScreenConnectSyncStep({
 					Jalankan prompt dari root repository untuk mulai menyinkronkan
 					codebase.
 				</p>
-
-				{/* Attempt identity, so a reported status can be tied to the
-				session the user actually started. Kept as quiet metadata and
-				out of the progress narrative. Only shown once real sync
-				activity has started. */}
-				{stageView.hasStarted && status?.sessionId && (
-					<p className="font-mono text-[11px] text-fog">
-						Sync ID: {status.sessionId.slice(0, 12)}...
-						{status.updatedAt
-							? ` · ${new Date(status.updatedAt).toLocaleTimeString("id-ID")}`
-							: null}
-					</p>
-				)}
 
 				{/* The browser has not heard from the server yet, so no stage
 				can honestly be claimed. */}
@@ -113,6 +106,12 @@ export function ScreenConnectSyncStep({
 					isAnalyzing={isAnalyzing}
 					isRetrying={isRetrying}
 				/>
+
+				{streamNotice && (
+					<output className="block text-[11px] leading-relaxed text-fog">
+						{streamNotice}
+					</output>
+				)}
 
 				{statusError && (
 					<p

@@ -7,6 +7,7 @@ import {
 	type SyncPromptPayload,
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
+import type { LockedPromptState } from "./locked-prompt-state";
 import { ScreenConnectAgentStep } from "./screen-connect-agent-step";
 import { ScreenConnectPromptStep } from "./screen-connect-prompt-step";
 import { ScreenConnectSummaryFooter } from "./screen-connect-summary-footer";
@@ -16,8 +17,10 @@ interface ScreenConnectProps {
 	projectName: string;
 	payload: SyncPromptPayload | null;
 	isStarting?: boolean;
-	promptLocked?: boolean;
-	lockedPromptAction?: React.ReactNode;
+	/** Replaces the prompt with one centered state; never hides a real token. */
+	lockedPrompt?: LockedPromptState | null;
+	/** Non-secret rate/saldo disclosure; omitted for exempt accounts. */
+	creditNote?: string | null;
 	/**
 	 * The reconciled sync status for this attempt, owned by the screen that owns
 	 * the polling loop. `null` means the browser has not received any server
@@ -29,6 +32,8 @@ interface ScreenConnectProps {
 	status: SyncStatusResponse | null;
 	/** Reconciliation error from the owning loop. */
 	statusError?: string | null;
+	/** Update-channel notice; a dropped stream is not a failed sync. */
+	streamNotice?: string | null;
 	/** Mints a fresh one-time sync credential for a new attempt. */
 	onRequestNewToken?: () => void;
 	/** Mints a fresh credential in response to a failed or expired session. */
@@ -62,10 +67,11 @@ export function ScreenConnect({
 	projectName,
 	payload,
 	isStarting = false,
-	promptLocked = false,
-	lockedPromptAction,
+	lockedPrompt = null,
+	creditNote = null,
 	status,
 	statusError = null,
+	streamNotice = null,
 	onRequestNewToken,
 	onRetrySync,
 	canContinueToSummary = false,
@@ -114,9 +120,10 @@ export function ScreenConnect({
 						payload={payload}
 						isStarting={isStarting}
 						status={status}
+						transportComplete={stageView.syncComplete}
 						onRequestNewToken={onRequestNewToken}
-						locked={promptLocked}
-						lockedAction={lockedPromptAction}
+						lockedPrompt={lockedPrompt}
+						creditNote={creditNote}
 					/>
 
 					<ScreenConnectAgentStep />
@@ -126,6 +133,7 @@ export function ScreenConnect({
 						stageView={stageView}
 						canRetry={canRetry}
 						statusError={statusError}
+						streamNotice={streamNotice}
 						isStarting={isStarting}
 						onRetrySync={onRetrySync}
 						canContinueToSummary={canContinueToSummary}

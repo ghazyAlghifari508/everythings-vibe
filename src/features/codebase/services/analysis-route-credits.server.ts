@@ -31,11 +31,11 @@ import { ANALYSIS_ALLOWANCE_POLICY } from "./analysis-credit-policy";
 import {
 	analysisCreditBlockedResponse,
 	getAnalysisCreditPreflight,
-	readSyncCreditConsent,
 } from "./analysis-credit-preflight.server";
 import { buildAnalysisIdempotencyKey } from "./analysis-diagnostics";
 import type { AnalysisRefreshRequest } from "./analysis-refresh";
 import { failRefreshClaim, toResponse } from "./analysis-route-scope.server";
+import { analysisFailureHttpStatus } from "./analysis-server-errors";
 
 type AnalysisAttemptInput = {
 	userId: string;
@@ -73,15 +73,7 @@ export async function runCodebaseAnalysisAttempt(
 
 	const creditStatus = await getAnalysisCreditPreflight(userId, {
 		isInitial: !refreshRequest,
-		consent:
-			input.creditConsent ??
-			(refreshRequest
-				? undefined
-				: await readSyncCreditConsent(
-						userId,
-						snapshot.syncSessionId,
-						projectId,
-					)),
+		consent: input.creditConsent,
 	});
 	if (input.preflightOnly)
 		return Response.json({
@@ -258,23 +250,22 @@ export async function runCodebaseAnalysisAttempt(
 		}
 		return Response.json(response);
 	} catch (error) {
-		const failureReason =
-			error instanceof Error ? error.message : "Analisis codebase gagal";
 		try {
-			// Re-read before cleanup: the state captured at reserve time is
-			// stale once generation ran (a concurrent sweep may have settled,
-			// released, or quarantined it). Only an operation that is still
-			// unstarted is safe to release; anything else is reported, not
-			// silently swallowed, so a terminal-state regression stays visible.
+			// This request won the running claim; release only its exact attempt, never a sibling.
 			const current = await getCreditOperation({
 				userId,
 				operationId: reservation.id,
 			});
-			if (isReleasableReservation(current.state)) {
+			if (
+				isReleasableReservation(current.state) ||
+				(current.state === "running" &&
+					current.analysisReference === analysisId)
+			) {
 				await releaseCreditOperation({
 					userId,
 					operationId: reservation.id,
-					reason: failureReason,
+					reason: "Analisis codebase gagal",
+					actor: "codebase-analysis-failure",
 				});
 			} else {
 				console.error(
@@ -317,13 +308,13 @@ export async function runCodebaseAnalysisAttempt(
 					// ready record. The failed-only query is fallback.
 					analysisId: error.analysisId ?? failed?.id,
 				},
-				{ status: 502 },
+				{ status: analysisFailureHttpStatus(error) },
 			);
 		}
 		console.error("Codebase analysis trigger error:", error);
 		return Response.json(
 			{ error: "Analisis codebase gagal", code: "ANALYSIS_FAILED" },
-			{ status: 502 },
+			{ status: analysisFailureHttpStatus(error) },
 		);
 	}
 }

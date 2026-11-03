@@ -14,6 +14,7 @@ import type {
 	SyncStageView,
 	SyncStatusResponse,
 } from "@/features/codebase/services/sync";
+import { LockedPromptStateView } from "../workspace/locked-prompt-state";
 import { SyncStageList } from "../workspace/sync-stage-list";
 
 export type StepState = "pending" | "active" | "done" | "failed";
@@ -87,6 +88,7 @@ export function ResyncStep1Prompt({
 	copied,
 	onRequestNewToken,
 	onCopy,
+	lockedPrompt = null,
 }: {
 	stepState: StepState;
 	payload: SyncPromptPayload | null;
@@ -96,6 +98,8 @@ export function ResyncStep1Prompt({
 	copied: boolean;
 	onRequestNewToken?: () => void;
 	onCopy: () => void;
+	/** Replaces the prompt when the account cannot start a billed sync. */
+	lockedPrompt?: import("../workspace/locked-prompt-state").LockedPromptState | null;
 }) {
 	return (
 		<div
@@ -109,7 +113,9 @@ export function ResyncStep1Prompt({
 					Salin instruksi sync ulang
 				</h3>
 				<div className="relative rounded-lg border border-graphite bg-onyx p-3 sm:p-4">
-					{payload ? (
+					{lockedPrompt ? (
+						<LockedPromptStateView {...lockedPrompt} />
+					) : payload ? (
 						<>
 							<div className="mb-1 text-[11px] font-medium text-fog">
 								Prompt sync ulang
@@ -150,7 +156,7 @@ export function ResyncStep1Prompt({
 						</div>
 					)}
 				</div>
-				{payload && (
+				{payload && !lockedPrompt && (
 					<div className="flex justify-end">
 						<button
 							type="button"

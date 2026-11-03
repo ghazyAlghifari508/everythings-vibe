@@ -24,6 +24,10 @@ export const analysisCreditStatusSchema = z.object({
 	estimatedCredits: z.number().int().nonnegative().optional(),
 	pricingVersion: z.literal(ADAPTIVE_CREDIT_PRICING.version),
 	canStart: z.boolean(),
+	// Defaulted so a persisted status written before the field existed still
+	// parses; a missing flag must never read as "needs approval" (that would
+	// resurrect the per-sync modal this policy exists to remove).
+	requiresApproval: z.boolean().default(false),
 	billingExempt: z.boolean().optional(),
 });
 export type AnalysisCreditStatus = z.infer<typeof analysisCreditStatusSchema>;
@@ -34,7 +38,8 @@ export function resolveAnalysisCreditPolicy(input: {
 	subscriptionPaused: boolean;
 	availableCredits: number;
 	isInitial: boolean;
-	consentMaximum?: number;
+	/** Ceiling the account already authorized for the current pricing version. */
+	approvedMaximum?: number;
 	billingExempt?: boolean;
 }): AnalysisCreditStatus {
 	if (input.billingExempt) {
@@ -44,6 +49,7 @@ export function resolveAnalysisCreditPolicy(input: {
 			maximumCredits: 0,
 			pricingVersion: ADAPTIVE_CREDIT_PRICING.version,
 			canStart: true,
+			requiresApproval: false,
 			billingExempt: true,
 		};
 	}
@@ -60,6 +66,9 @@ export function resolveAnalysisCreditPolicy(input: {
 				: input.availableCredits < maximumCredits
 					? "INSUFFICIENT_CREDITS"
 					: "CREDIT_REQUIRED";
+	// A standing authorization covers the quoted ceiling; a rate change is
+	// exactly the case where it stops covering it and one fresh approval is due.
+	const approved = (input.approvedMaximum ?? -1) >= maximumCredits;
 	return {
 		code,
 		availableCredits: input.availableCredits,
@@ -67,7 +76,7 @@ export function resolveAnalysisCreditPolicy(input: {
 		pricingVersion: ADAPTIVE_CREDIT_PRICING.version,
 		canStart:
 			code === "FREE_ALLOWANCE_AVAILABLE" ||
-			(code === "CREDIT_REQUIRED" &&
-				(input.consentMaximum ?? -1) >= maximumCredits),
+			(code === "CREDIT_REQUIRED" && approved),
+		requiresApproval: code === "CREDIT_REQUIRED" && !approved,
 	};
 }

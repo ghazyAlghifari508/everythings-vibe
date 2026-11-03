@@ -85,10 +85,21 @@ describe("analysis failure classification", () => {
 		expect(classifyAnalysisFailure(error)).toBe("snapshot");
 	});
 
-	it("maps persistence-stage failures without another signal to persistence", () => {
+	it("maps persistence-stage failures to persistence regardless of wording", () => {
 		expect(classifyAnalysisFailure(new Error("boom"), "persist")).toBe(
 			"persistence",
 		);
+		// A database statement timeout or dropped connection happens inside
+		// finalization; it must not be reported as an upstream provider 502.
+		expect(
+			classifyAnalysisFailure(
+				new Error("canceling statement due to statement timeout"),
+				"persist",
+			),
+		).toBe("persistence");
+		expect(
+			classifyAnalysisFailure(new Error("fetch failed: ECONNRESET"), "persist"),
+		).toBe("persistence");
 	});
 
 	it("maps credit lifecycle failures to persistence for operator triage", () => {

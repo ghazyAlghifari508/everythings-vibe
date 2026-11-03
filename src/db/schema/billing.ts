@@ -71,6 +71,10 @@ export interface CreditOperationFailure {
 	code?: string;
 	message?: string;
 	occurredAt?: string;
+	previousState?: CreditOperationState;
+	nextState?: "released";
+	actor?: string;
+	correlationId?: string;
 }
 
 export interface CreditOperationReconciliation {

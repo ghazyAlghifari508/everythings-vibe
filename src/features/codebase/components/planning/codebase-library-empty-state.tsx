@@ -9,7 +9,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { Icon } from "@/components/ui/icon";
-import { NEW_REPOSITORY_HREF } from "@/features/codebase/services/library";
+import { NEW_REPOSITORY_START_SEARCH } from "@/features/codebase/services/onboarding-intent";
 
 /**
  * Empty state rendered when the user has zero connected repositories.
@@ -37,7 +37,8 @@ export function CodebaseLibraryEmptyState() {
 				menyiapkan workspace perencanaan yang bisa kamu lanjutkan kapan saja.
 			</p>
 			<Link
-				to={NEW_REPOSITORY_HREF}
+				to="/plan/codebase"
+				search={NEW_REPOSITORY_START_SEARCH}
 				className="btn-primary mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo"
 			>
 				Hubungkan repository
