@@ -108,10 +108,12 @@ export async function requestCodebaseStatus(
 		redirectToLogin();
 		return { kind: "unauthorized" };
 	}
+	if (response.status === 404) return { kind: "stale" };
 	const parsed = syncStatusResponseSchema.safeParse(
 		await response.json().catch(() => null),
 	);
-	if (!response.ok || !parsed.success) return { kind: "stale" };
+	if (!response.ok || !parsed.success || parsed.data.projectId !== codebaseId)
+		throw new Error("Status repository belum dapat dibaca. Coba lagi.");
 	return { kind: "recovered", status: parsed.data };
 }
 
@@ -122,13 +124,16 @@ export type RetrySessionOutcome =
 
 export async function requestRetrySession(
 	codebaseId: string,
+	sessionId?: string,
 ): Promise<RetrySessionOutcome> {
 	const response = await fetch(
 		`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ action: "recover" }),
+			body: JSON.stringify(
+				sessionId ? { action: "retry", sessionId } : { action: "recover" },
+			),
 		},
 	);
 	const parsed = syncPromptPayloadSchema.safeParse(
@@ -180,6 +185,7 @@ export async function requestFeatureProject(
 export type AnalysisTriggerOutcome =
 	| { kind: "ready"; analysis: AnalysisResponse }
 	| { kind: "unauthorized" }
+	| { kind: "pending" }
 	| {
 			kind: "credit";
 			message: string;
@@ -218,6 +224,14 @@ export async function requestOnboardingAnalysis({
 	// to stay in front of the navigation.
 	if (response.status === 401) return { kind: "unauthorized" };
 	const body: unknown = await response.json().catch(() => null);
+	if (
+		response.status === 409 &&
+		typeof body === "object" &&
+		body !== null &&
+		"code" in body &&
+		body.code === "ANALYSIS_IN_PROGRESS"
+	)
+		return { kind: "pending" };
 	const serverError = readServerError(body);
 	const { analysisCreditStatusSchema } = await import(
 		"./analysis-credit-policy"

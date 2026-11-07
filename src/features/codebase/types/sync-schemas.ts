@@ -154,6 +154,7 @@ export const syncStatusResponseSchema = z.object({
 	// screen. Omitted only when a caller reads a status for a codebase whose
 	// name it could not resolve.
 	codebaseName: z.string().min(1).optional(),
+	analysisProjectId: z.string().min(1).optional(),
 	fileCount: z.number().int().nonnegative().optional(),
 	excludedCount: z.number().int().nonnegative().optional(),
 	// Determinate upload progress, reported only while the transport is genuinely

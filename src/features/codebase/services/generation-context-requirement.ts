@@ -52,10 +52,16 @@ export async function requireProjectGenerationContext(
 > {
 	try {
 		const { db } = await import("@/db");
-		const { projects } = await import("@/db/schema");
-		const { and, eq, isNull } = await import("drizzle-orm");
+		const { projects, codebaseSnapshots, codebases } = await import(
+			"@/db/schema"
+		);
+		const { and, eq, isNull, desc } = await import("drizzle-orm");
 		const [project] = await db
-			.select({ projectMode: projects.projectMode })
+			.select({
+				projectMode: projects.projectMode,
+				codebaseId: projects.codebaseId,
+				userId: projects.userId,
+			})
 			.from(projects)
 			.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
 			.limit(1);
@@ -63,6 +69,26 @@ export async function requireProjectGenerationContext(
 			return { context: null };
 		}
 		const context = await getProjectGenerationContext(projectId);
+		if (project.codebaseId) {
+			const [latest] = await db
+				.select({ id: codebaseSnapshots.id, status: codebaseSnapshots.status })
+				.from(codebaseSnapshots)
+				.innerJoin(codebases, eq(codebases.id, codebaseSnapshots.codebaseId))
+				.where(
+					and(
+						eq(codebases.id, project.codebaseId),
+						eq(codebases.userId, project.userId),
+					),
+				)
+				.orderBy(desc(codebaseSnapshots.createdAt))
+				.limit(1);
+			if (
+				!latest ||
+				!["uploaded", "ready"].includes(latest.status) ||
+				context?.snapshotId !== latest.id
+			)
+				return GENERATION_CONTEXT_UNAVAILABLE;
+		}
 		return decideContextRequirement(project.projectMode, context);
 	} catch (error) {
 		// A repository-aware project must never silently continue on a context

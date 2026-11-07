@@ -92,11 +92,29 @@ export async function handleCodebaseSessionRead({
 		...session,
 		projectId: codebaseId,
 	});
-	if (!usability.usable && usability.code === "SYNC_SESSION_EXPIRED") {
+	if (
+		!usability.usable &&
+		usability.code === "SYNC_SESSION_EXPIRED" &&
+		!["uploaded", "analyzing", "ready", "failed", "expired"].includes(
+			session.status,
+		)
+	) {
 		await db
 			.update(codebaseSyncSessions)
 			.set({ status: "expired", updatedAt: new Date() })
-			.where(eq(codebaseSyncSessions.id, session.id));
+			.where(
+				and(
+					eq(codebaseSyncSessions.id, session.id),
+					eq(codebaseSyncSessions.userId, user.id),
+					notInArray(codebaseSyncSessions.status, [
+						"uploaded",
+						"analyzing",
+						"ready",
+						"failed",
+						"expired",
+					]),
+				),
+			);
 		return Response.json(
 			toSessionMetadata({
 				...session,
@@ -171,6 +189,7 @@ export async function handleCodebaseSessionCreate({
 				user.id,
 				codebaseId,
 				parsed.data.action === "retry" ? parsed.data.sessionId : undefined,
+				parsed.data.action === "recover",
 			),
 		);
 	} catch (error) {
@@ -183,8 +202,14 @@ export async function handleCodebaseSessionCreate({
 	if (!result.token)
 		return Response.json(
 			{
-				code: "SYNC_SESSION_ACTIVE",
-				error: "Agent masih melakukan sinkronisasi.",
+				code: ["uploaded", "analyzing", "ready"].includes(result.session.status)
+					? "SYNC_SNAPSHOT_UPLOADED"
+					: "SYNC_SESSION_ACTIVE",
+				error: ["uploaded", "analyzing", "ready"].includes(
+					result.session.status,
+				)
+					? "Snapshot tersimpan. Lanjutkan analisis tanpa upload ulang."
+					: "Agent masih melakukan sinkronisasi.",
 				sessionId: result.session.id,
 			},
 			{ status: 409 },

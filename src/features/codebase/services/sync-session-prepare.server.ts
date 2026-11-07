@@ -20,6 +20,7 @@ export async function prepareSyncSession(
 	userId: string,
 	codebaseId: string,
 	replaceSessionId?: string,
+	recoveryOnly = false,
 ): Promise<PreparedSyncSession> {
 	await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${codebaseId}))`);
 	const rows = await tx
@@ -32,6 +33,24 @@ export async function prepareSyncSession(
 			),
 		)
 		.orderBy(desc(codebaseSyncSessions.createdAt));
+	const latest = rows[0];
+	if (recoveryOnly && latest) {
+		// Recovery never mutates: it returns the attempt the browser must resume.
+		// A completed upload has nothing left to authorize, and any credential a
+		// waiting agent may already hold must not be rotated behind its back.
+		const completed = ["uploaded", "analyzing", "ready"].includes(
+			latest.status,
+		);
+		const token = deriveSyncToken(userId, latest.id);
+		const recoverable =
+			latest.status === "waiting_for_cli" &&
+			getSessionUsability({ ...latest, projectId: codebaseId }).usable &&
+			hashSyncToken(token) === latest.credentialHash;
+		return {
+			session: latest,
+			token: completed || !recoverable ? null : token,
+		};
+	}
 	const active = rows.find(
 		(row) => getSessionUsability({ ...row, projectId: codebaseId }).usable,
 	);
@@ -54,8 +73,8 @@ export async function prepareSyncSession(
 			const token = deriveSyncToken(userId, active.id);
 			if (hashSyncToken(token) === active.credentialHash)
 				return { session: active, token };
-			// Legacy random credentials cannot be recovered; never interrupt an uploading CLI.
-			if (active.status !== "waiting_for_cli")
+			// An unrecoverable credential may already be held by an agent.
+			if (recoveryOnly || active.status !== "waiting_for_cli")
 				return { session: active, token: null };
 			await tx
 				.update(codebaseSyncSessions)
