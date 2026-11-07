@@ -65,6 +65,7 @@ export function PlanCodebasePage({
 		creditStatus,
 		retrySession,
 		refreshCreditStatus,
+		recoverCodebase,
 	} = useCodebaseOnboarding({ analysisState, step, setStep, intent });
 
 	const readiness = resolveOnboardingReadiness({
@@ -151,11 +152,16 @@ export function PlanCodebasePage({
 			{!codebase ? (
 				phase === "session_creation_failed" ? (
 					<CodebaseOnboardingErrorCard
+						title={
+							isRecovering ? "Status repository belum dapat dibaca" : undefined
+						}
 						error={error ?? "Gagal menyiapkan repository."}
 						onRetry={() =>
-							void (creditStatus?.canStart
-								? createCodebase()
-								: refreshCreditStatus())
+							void (readPlanCodebasePointer()
+								? recoverCodebase()
+								: creditStatus?.canStart
+									? createCodebase()
+									: refreshCreditStatus())
 						}
 					/>
 				) : isRecovering ? (

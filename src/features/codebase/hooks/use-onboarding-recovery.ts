@@ -111,11 +111,13 @@ export function useOnboardingRecovery({
 
 	return useCallback(async (): Promise<boolean> => {
 		const stored = readPlanCodebasePointer();
+		const isCurrent = () => readPlanCodebasePointer()?.id === stored?.id;
 		if (!stored) return false;
 		setError(null);
 		setIsStarting(true);
 		try {
 			const statusOutcome = await requestCodebaseStatus(stored.id);
+			if (!isCurrent()) return true;
 			if (statusOutcome.kind === "unauthorized") return true;
 			if (statusOutcome.kind === "stale") {
 				// Stale pointer: clear all onboarding state so a subsequent fresh
@@ -147,7 +149,8 @@ export function useOnboardingRecovery({
 				// onboarding analysis context is restored only here. Which of the two
 				// steps the user lands on is then decided by `resolveRecoveredStep`,
 				// which keeps the stored intent from overriding this evidence.
-				const storedProject = readPlanCodebaseProjectPointer();
+				const storedProject =
+					recovered.analysisProjectId ?? readPlanCodebaseProjectPointer();
 				let existingAnalysis: AnalysisResponse | null = null;
 				if (storedProject) {
 					setFeatureProjectId(storedProject);
@@ -155,6 +158,7 @@ export function useOnboardingRecovery({
 						storedProject,
 						recoveredSnapshotId,
 					);
+					if (!isCurrent()) return true;
 					if (
 						(existingAnalysis?.output &&
 							existingAnalysis.snapshotId === recoveredSnapshotId &&
@@ -173,22 +177,20 @@ export function useOnboardingRecovery({
 					analysisProjectId: storedProject,
 				});
 				setActiveSessionId(recovered.sessionId);
-				setRecoveredStatus(null);
+				setRecoveredStatus(recovered);
 				setCodebase({ id: stored.id, name: recoveredName });
 				setStep(resolveRecoveredStep(recovered, storedStep, isAnalysisReady));
 				return true;
 			}
-			if (
-				recovered.status === "waiting_for_cli" ||
-				recovered.status === "failed" ||
-				recovered.status === "expired"
-			) {
+			if (recovered.status === "waiting_for_cli") {
 				setRecoveredStatus(recovered);
 				setActiveSessionId(recovered.sessionId);
 				const credit = await requestAnalysisCreditPreflight();
 				setCreditStatus(credit);
+				if (!isCurrent()) return true;
 				if (credit.canStart) {
 					const result = await requestRetrySession(stored.id);
+					if (!isCurrent()) return true;
 					if (result.kind === "minted") {
 						setPayload(result.payload);
 						setActiveSessionId(result.payload.sessionId ?? null);
@@ -207,14 +209,9 @@ export function useOnboardingRecovery({
 			setStep(resolveRecoveredStep(recovered, storedStep));
 			return true;
 		} catch {
-			// Recovery failure: clear all stale state so a fresh start is clean.
-			clearPlanOnboardingPointers();
-			setRecoveredStatus(null);
-			setActiveSessionId(null);
-			setAnalysis(null);
-			setAnalysisError(null);
-			analysisAttemptedFor.current = null;
-			return false;
+			if (!isCurrent()) return true;
+			setError("Status repository belum dapat dibaca. Coba lagi.");
+			return true;
 		} finally {
 			setIsStarting(false);
 		}

@@ -62,6 +62,7 @@ export function useOnboardingAnalysisState(): OnboardingAnalysisState {
 	const [creditStatus, setCreditStatus] = useState<
 		import("../services/analysis-credit-policy").AnalysisCreditStatus | null
 	>(null);
+	const readGeneration = useRef(0);
 
 	// The working flag mirrors the in-flight trigger; the retry flag paints the
 	// immediate running row. Both clear on the same reset so a fresh attempt
@@ -86,9 +87,10 @@ export function useOnboardingAnalysisState(): OnboardingAnalysisState {
 			projectId: string,
 			snapshotId: string,
 		): Promise<AnalysisResponse | null> => {
+			const generation = ++readGeneration.current;
 			try {
 				const parsed = await requestAnalysisOutput(projectId, snapshotId);
-				if (!parsed) return null;
+				if (!parsed || generation !== readGeneration.current) return null;
 				setAnalysis(parsed);
 				if (parsed.status === "ready" || parsed.status === "failed") {
 					setWorking(false);
@@ -107,6 +109,11 @@ export function useOnboardingAnalysisState(): OnboardingAnalysisState {
 		setFeatureProjectId,
 		analysis,
 		setAnalysis: useCallback((next: AnalysisResponse | null) => {
+			readGeneration.current += 1;
+			if (!next) {
+				setWorking(false);
+				setAnalysisRetrying(false);
+			}
 			setAnalysis(next);
 			// A ready row from any path (trigger or read) is the real
 			// resolution: the retry paint hands over to it immediately.

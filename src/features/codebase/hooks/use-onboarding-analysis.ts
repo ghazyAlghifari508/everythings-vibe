@@ -9,7 +9,7 @@ import {
 	storePlanCodebaseProjectPointer,
 } from "@/features/codebase/services/plan-storage";
 import {
-	SNAPSHOT_CONTEXT_STATUSES,
+	CODEBASE_SYNC_COMPLETE_STATUSES,
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
 import {
@@ -54,6 +54,19 @@ export function useOnboardingAnalysis({
 	// in the same tick still resolves to one attempt.
 	const analysisWorkingRef = useRef(state.analysisWorking);
 	analysisWorkingRef.current = state.analysisWorking;
+	const identity = `${codebase?.id}:${lastStatus?.sessionId}:${lastStatus?.snapshotId}`;
+	const identityRef = useRef(identity);
+	if (identityRef.current !== identity) {
+		identityRef.current = identity;
+		analysisRequestGeneration.current += 1;
+		analysisWorkingRef.current = false;
+	}
+	useEffect(
+		() => () => {
+			analysisRequestGeneration.current += 1;
+		},
+		[],
+	);
 
 	// Ensure the single onboarding analysis project for this codebase via the
 	// existing features boundary. The stored pointer is reused so refresh and
@@ -65,6 +78,7 @@ export function useOnboardingAnalysis({
 			fallbackName: string,
 		): Promise<string | null> => {
 			const stored = readPlanCodebaseProjectPointer();
+			const owner = identityRef.current;
 			if (stored) {
 				setFeatureProjectId(stored);
 				return stored;
@@ -80,6 +94,7 @@ export function useOnboardingAnalysis({
 					: ONBOARDING_FEATURE_MESSAGE;
 			try {
 				const outcome = await requestFeatureProject(codebaseId, message);
+				if (owner !== identityRef.current) return null;
 				if (outcome.kind === "unauthorized") return null;
 				if (outcome.kind === "rejected") {
 					setAnalysisError(outcome.message);
@@ -89,6 +104,7 @@ export function useOnboardingAnalysis({
 				setFeatureProjectId(outcome.projectId);
 				return outcome.projectId;
 			} catch {
+				if (owner !== identityRef.current) return null;
 				setAnalysisError("Server tidak dapat dihubungi.");
 				return null;
 			}
@@ -108,6 +124,7 @@ export function useOnboardingAnalysis({
 			refreshStarterSuggestionsForAnalysisId?: string,
 		): Promise<void> => {
 			const generation = ++analysisRequestGeneration.current;
+			analysisWorkingRef.current = true;
 			setAnalysisWorking(true);
 			setAnalysisError(null);
 			setCreditStatus(null);
@@ -127,6 +144,7 @@ export function useOnboardingAnalysis({
 					setAnalysisWorking(false);
 					return;
 				}
+				if (outcome.kind === "pending") return;
 				if (outcome.kind === "credit") {
 					// A credit block is definitive, not pending: clear the local
 					// working and retry paint so the billing action owns the row.
@@ -142,16 +160,27 @@ export function useOnboardingAnalysis({
 				}
 				setAnalysis(outcome.analysis);
 			} catch {
+				// Delivery failure does not prove the server attempt failed, so no
+				// error is painted. Releasing the per-snapshot guard lets the next
+				// successful status read ask again; the server reuses a pending row
+				// instead of stacking a second attempt.
 				if (generation === analysisRequestGeneration.current) {
-					setAnalysisError("Server tidak dapat dihubungi.");
+					analysisAttemptedFor.current = null;
 				}
 			} finally {
 				if (generation === analysisRequestGeneration.current) {
 					setAnalysisWorking(false);
+					analysisWorkingRef.current = false;
 				}
 			}
 		},
-		[setAnalysis, setAnalysisError, setAnalysisWorking, setCreditStatus],
+		[
+			setAnalysis,
+			setAnalysisError,
+			setAnalysisWorking,
+			setCreditStatus,
+			analysisAttemptedFor,
+		],
 	);
 
 	// Retry resets the per-snapshot guard and clears the previous attempt, then
@@ -163,10 +192,11 @@ export function useOnboardingAnalysis({
 	const retryAnalysis = useCallback(() => {
 		if (!featureProjectId || !lastStatus?.snapshotId) return;
 		if (analysisWorkingRef.current) return;
+		analysisWorkingRef.current = true;
 		analysisAttemptedFor.current = lastStatus.snapshotId;
 		setCreditStatus(null);
-		setAnalysisWorking(true, { retrying: true });
 		setAnalysis(null);
+		setAnalysisWorking(true, { retrying: true });
 		setAnalysisError(null);
 		void triggerOnboardingAnalysis(featureProjectId, lastStatus.snapshotId);
 	}, [
@@ -204,7 +234,12 @@ export function useOnboardingAnalysis({
 	useEffect(() => {
 		const snapshotId = lastStatus?.snapshotId;
 		if (!codebase || !lastStatus || !snapshotId) return;
-		if (!SNAPSHOT_CONTEXT_STATUSES.includes(lastStatus.status)) return;
+		if (!CODEBASE_SYNC_COMPLETE_STATUSES.includes(lastStatus.status)) return;
+		if (
+			lastStatus.analysisAttemptStatus === "failed" ||
+			lastStatus.analysisStatus === "failed"
+		)
+			return;
 		if (reviewReady) return;
 		if (
 			lastStatus.analysisStatus === "pending" ||
@@ -216,11 +251,13 @@ export function useOnboardingAnalysis({
 			return;
 		}
 		analysisAttemptedFor.current = snapshotId;
+		const owner = identityRef.current;
 		void (async () => {
 			const projectId =
 				featureProjectId ??
 				(await ensureFeatureProject(codebase.id, codebase.name));
 			if (!projectId) return;
+			if (owner !== identityRef.current) return;
 			await triggerOnboardingAnalysis(projectId, snapshotId);
 		})();
 	}, [
@@ -241,6 +278,8 @@ export function useOnboardingAnalysis({
 	useEffect(() => {
 		const snapshotId = lastStatus?.snapshotId;
 		if (!featureProjectId || !snapshotId) return;
+		if (state.analysisWorking || lastStatus.analysisAttemptStatus === "pending")
+			return;
 		if (
 			lastStatus.analysisStatus !== "ready" &&
 			lastStatus.analysisStatus !== "failed"
@@ -252,7 +291,13 @@ export function useOnboardingAnalysis({
 		)
 			return;
 		void fetchAnalysisOutput(featureProjectId, snapshotId);
-	}, [featureProjectId, lastStatus, analysis, fetchAnalysisOutput]);
+	}, [
+		featureProjectId,
+		lastStatus,
+		analysis,
+		fetchAnalysisOutput,
+		state.analysisWorking,
+	]);
 
 	return { retryAnalysis, refreshLegacySuggestions };
 }

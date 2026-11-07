@@ -57,6 +57,12 @@ export function ScreenConnectPromptStep({
 	const { copied, copyError, copy } = useCopyFeedback();
 	const promptText = payload ? buildAgentPrompt(payload, { projectName }) : "";
 	const sessionStatus = status?.status ?? null;
+	const cliActive = [
+		"connected",
+		"scanning",
+		"filtering",
+		"uploading",
+	].includes(sessionStatus ?? "");
 	const expiryMs = resolveExpiryMs(payload?.expiresAt ?? status?.expiresAt);
 	const expiryState =
 		sessionStatus === "expired" || expiryMs === null || expiryMs <= 0
@@ -82,8 +88,13 @@ export function ScreenConnectPromptStep({
 	// it always wins. A credit read taken before (or after) it landed is stale by
 	// definition and must never replace a live prompt with the lock that caused
 	// the reported "locked prompt stays visible" blocker.
-	const promptUsable = payload !== null && expiryState !== "expired";
-	const activeLock = promptUsable ? null : lockedPrompt;
+	const promptUsable =
+		payload !== null &&
+		expiryState !== "expired" &&
+		!transportComplete &&
+		!cliActive;
+	const activeLock =
+		promptUsable || transportComplete || cliActive ? null : lockedPrompt;
 
 	return (
 		<div className="flex items-start gap-3.5">
@@ -95,7 +106,7 @@ export function ScreenConnectPromptStep({
 					<div className="text-xs font-semibold text-mist">
 						Salin instruksi untuk AI agent
 					</div>
-					{payload && expiryState !== "expired" && !activeLock && (
+					{promptUsable && !activeLock && (
 						<Button
 							type="button"
 							onClick={handleCopy}
@@ -124,7 +135,7 @@ export function ScreenConnectPromptStep({
 				<div className="relative rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4">
 					{activeLock ? (
 						<LockedPromptStateView {...activeLock} />
-					) : payload && expiryState !== "expired" ? (
+					) : promptUsable ? (
 						<>
 							<div className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow">
 								{promptText}
@@ -152,6 +163,10 @@ export function ScreenConnectPromptStep({
 								instruksi baru yang perlu dijalankan.
 							</p>
 						</div>
+					) : cliActive ? (
+						<output className="block py-6 font-sans text-xs text-fog">
+							Agent terhubung. Sinkronisasi sedang berlangsung.
+						</output>
 					) : isStarting ? (
 						<div className="flex min-h-[190px] items-center justify-center gap-2 py-6 font-sans text-xs text-fog">
 							<Spinner size={14} className="text-blue-400" />
@@ -162,7 +177,7 @@ export function ScreenConnectPromptStep({
 							<p className="max-w-[38ch] text-xs text-fog">
 								{error ??
 									(sessionStatus === "expired" || expiryState === "expired"
-										? "Sesi telah berakhir."
+										? "Sesi sinkronisasi berakhir."
 										: "Token sync hanya berlaku sekali dan tidak disimpan di browser.")}
 							</p>
 							{showRenewal && onRequestNewToken && (

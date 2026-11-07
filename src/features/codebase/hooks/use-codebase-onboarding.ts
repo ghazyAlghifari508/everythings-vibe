@@ -114,7 +114,14 @@ export function useCodebaseOnboarding({
 			initialStatus: recoveredStatus,
 			enabled: codebase !== null && !streamDelivers,
 		});
-	const lastStatus = (streamDelivers ? stream.status : null) ?? polledStatus;
+	const candidate =
+		(streamDelivers ? stream.status : null) ?? polledStatus ?? recoveredStatus;
+	const lastStatus =
+		candidate !== null &&
+		candidate.projectId === codebase?.id &&
+		(!activeSessionId || candidate.sessionId === activeSessionId)
+			? candidate
+			: null;
 	// A dropped update channel is reported as a channel problem only. It must
 	// never read as a failed sync, because the persisted attempt is untouched.
 	const streamNotice =
@@ -163,11 +170,17 @@ export function useCodebaseOnboarding({
 		setAnalysisError(null);
 		analysisAttemptedFor.current = null;
 		setError(null);
+		setPayload(null);
+		setCodebase(null);
+		analysisState.setAnalysisWorking(false);
+		analysisState.setCreditStatus(null);
 	}, [
 		setAnalysis,
 		setAnalysisError,
 		setFeatureProjectId,
 		analysisAttemptedFor,
+		analysisState.setAnalysisWorking,
+		analysisState.setCreditStatus,
 	]);
 
 	const refreshCreditStatus = useCallback(async () => {
@@ -280,14 +293,19 @@ export function useCodebaseOnboarding({
 		void createCodebase();
 	}, [codebase, createCodebase, creditStatus, isStarting]);
 
+	// Renewal cannot replace an uploaded snapshot with a new transport attempt.
 	const retrySession = useCallback(async () => {
-		if (!codebase || createInFlight.current) return;
+		if (!codebase || createInFlight.current || lastStatus?.snapshotId) return;
 		createInFlight.current = true;
 		// A retry continues an existing repository context, not a fresh start.
 		setError(null);
 		setIsStarting(true);
 		try {
-			const outcome = await requestRetrySession(codebase.id);
+			const outcome = await requestRetrySession(
+				codebase.id,
+				activeSessionId ?? undefined,
+			);
+			if (readPlanCodebasePointer()?.id !== codebase.id) return;
 			if (outcome.kind === "cancelled") return;
 			if (outcome.kind === "failed") {
 				setError("Sesi sync gagal dibuat. Coba lagi.");
@@ -305,7 +323,13 @@ export function useCodebaseOnboarding({
 			createInFlight.current = false;
 			setIsStarting(false);
 		}
-	}, [codebase, adoptPayload, setStep]);
+	}, [
+		codebase,
+		adoptPayload,
+		setStep,
+		lastStatus?.snapshotId,
+		activeSessionId,
+	]);
 
 	// The server owns the name: once the CLI has handshaken it holds the
 	// repository folder name, so the open onboarding page must not keep showing
@@ -339,5 +363,6 @@ export function useCodebaseOnboarding({
 		creditStatus,
 		retrySession,
 		refreshCreditStatus,
+		recoverCodebase,
 	};
 }

@@ -126,7 +126,11 @@ export function useCodebaseSyncStream({
 				if (!parsed.success) return;
 				// Late frame from a previous attempt: drop it instead of repainting.
 				const expected = pinnedSessionRef.current;
-				if (expected && parsed.data.sessionId !== expected) return;
+				if (
+					parsed.data.projectId !== codebaseId ||
+					(expected && parsed.data.sessionId !== expected)
+				)
+					return;
 				failures = 0;
 				hasReceivedFrame = true;
 				hasBeenLive = true;

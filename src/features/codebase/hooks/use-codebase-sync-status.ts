@@ -208,7 +208,11 @@ export function useCodebaseSyncStatus({
 				// switch only ever resolves after the reset above, so an old
 				// attempt must never repaint the new one.
 				const expectsSession = sessionId ?? pinnedSessionRef.current;
-				if (expectsSession && parsed.data.sessionId !== expectsSession) return;
+				if (
+					parsed.data.projectId !== codebaseId ||
+					(expectsSession && parsed.data.sessionId !== expectsSession)
+				)
+					return;
 				pinnedSessionRef.current = parsed.data.sessionId;
 				activeRef.current = isSyncStatusInFlight(parsed.data.status);
 				setStatus(parsed.data);
@@ -234,6 +238,7 @@ export function useCodebaseSyncStatus({
 
 		void fetchStatus();
 		return () => {
+			seqRef.current += 1;
 			cancelled = true;
 			abortRef.current?.abort();
 			abortRef.current = null;
