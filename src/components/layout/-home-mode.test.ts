@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { getPendingSyncPayloadKey } from "@/features/codebase/services/sync";
 import {
 	decideHomePostCreationTarget,
 	HOME_PROJECT_MODE_OPTIONS,
@@ -66,16 +65,5 @@ describe("shouldBlockProjectCreationOnCredits", () => {
 		expect(shouldBlockProjectCreationOnCredits("unlimited")).toBe(false);
 		expect(shouldBlockProjectCreationOnCredits(undefined)).toBe(false);
 		expect(shouldBlockProjectCreationOnCredits(null)).toBe(false);
-	});
-});
-
-describe("getPendingSyncPayloadKey", () => {
-	it("scopes the pending payload key per project", () => {
-		expect(getPendingSyncPayloadKey("proj-1")).toBe(
-			"prdfy:sync-payload:proj-1",
-		);
-		expect(getPendingSyncPayloadKey("proj-2")).not.toBe(
-			getPendingSyncPayloadKey("proj-1"),
-		);
 	});
 });

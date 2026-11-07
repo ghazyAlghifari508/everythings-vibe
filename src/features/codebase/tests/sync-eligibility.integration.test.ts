@@ -55,11 +55,22 @@ test("eligible session APIs are idempotent, tenant scoped, free to open and expi
 	const requestId = crypto.randomUUID();
 	const responses = await Promise.all([create(requestId), create(requestId)]);
 	expect(responses.map((r) => r.status)).toEqual([200, 200]);
-	const [first, duplicate] = await Promise.all(responses.map((r) => r.json()));
-	expect(duplicate).toEqual(first);
+	const creationBodies = await Promise.all(responses.map((r) => r.json()));
+	const first = creationBodies.find((body) => "sync" in body);
+	const duplicate = creationBodies.find((body) => !("sync" in body));
+	expect(duplicate).toMatchObject({
+		id: first.id,
+		sessionId: first.sync.sessionId,
+		code: "CODEBASE_SESSION_RECOVERY_REQUIRED",
+	});
+	expect(duplicate).not.toHaveProperty("sync");
 	expect(responses[0].headers.get("Cache-Control")).toBe("no-store");
 	const recovered = await session(first.id, { action: "recover" });
-	expect(await recovered.json()).toEqual(first.sync);
+	expect(recovered.status).toBe(409);
+	expect(await recovered.json()).toMatchObject({
+		code: "CODEBASE_SESSION_RECOVERY_REQUIRED",
+		sessionId: first.sync.sessionId,
+	});
 	const rows = await db
 		.select()
 		.from(schema.codebaseSyncSessions)
@@ -71,10 +82,18 @@ test("eligible session APIs are idempotent, tenant scoped, free to open and expi
 		session(first.id, { action: "retry", sessionId: first.sync.sessionId }),
 		session(first.id, { action: "retry", sessionId: first.sync.sessionId }),
 	]);
-	const [rotated, repeated] = await Promise.all(
+	const replacementBodies = await Promise.all(
 		replacements.map((r) => r.json()),
 	);
+	const rotated =
+		replacementBodies[replacements.findIndex((r) => r.status === 200)];
+	const repeated =
+		replacementBodies[replacements.findIndex((r) => r.status === 409)];
 	expect(rotated.sessionId).toBe(repeated.sessionId);
+	expect(replacements.map((response) => response.status).sort()).toEqual([
+		200, 409,
+	]);
+	expect(repeated).not.toHaveProperty("syncToken");
 	expect(rotated.syncToken).not.toBe(first.sync.syncToken);
 	await db
 		.update(schema.codebaseSyncSessions)

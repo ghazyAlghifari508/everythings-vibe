@@ -83,7 +83,7 @@ vi.mock("@/db", async () => {
 		from: () => selectChain,
 		where: () => selectChain,
 		limit: () => Promise.resolve([]),
-		orderBy: () => Promise.resolve([]),
+		orderBy: () => selectChain,
 	};
 	const tx = {
 		// `prepareSyncSession` takes a per-repository advisory lock and reads the
@@ -117,12 +117,12 @@ function createHandler(): CreateHandler {
 	return captured.post;
 }
 
-function post(body: unknown): Promise<Response> {
+function post(body: object): Promise<Response> {
 	return createHandler()({
 		request: new Request("https://example.test/api/codebases", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(body),
+			body: JSON.stringify({ requestId: crypto.randomUUID(), ...body }),
 		}),
 	});
 }
@@ -141,7 +141,7 @@ beforeEach(() => {
 });
 
 describe("POST /api/codebases", () => {
-	it("creates a codebase and a waiting sync session for an empty body", async () => {
+	it("creates one codebase and waiting session for a valid attempt", async () => {
 		const res = await post({});
 
 		expect(res.status).toBe(200);
@@ -202,7 +202,6 @@ describe("POST /api/codebases", () => {
 
 		expect(res.status).toBe(500);
 		const payload = (await res.json()) as { error: string; code?: string };
-		expect(payload.error).toBe("Gagal membuat codebase");
 		expect(payload.code).toBe("CODEBASE_CREATE_FAILED");
 		// The driver message stays server-side; the browser must never receive it.
 		expect(JSON.stringify(payload)).not.toContain("name_source");

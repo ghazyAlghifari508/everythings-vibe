@@ -43,6 +43,12 @@ beforeAll(async () => {
 	);
 	await cleanupPool.query(migration);
 	await cleanupPool.query(migration);
+	await cleanupPool.query(
+		await readFile("drizzle/0045_codebase_onboarding_idempotency.sql", "utf8"),
+	);
+	await cleanupPool.query(
+		await readFile("drizzle/0045_codebase_onboarding_idempotency.sql", "utf8"),
+	);
 });
 
 afterAll(async () => {
