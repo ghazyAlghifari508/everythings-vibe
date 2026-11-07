@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
+import { EventEmitter, once } from "node:events";
+import { setTimeout as delay } from "node:timers/promises";
 import {
 	cleanup,
 	fireEvent,
@@ -302,7 +304,8 @@ test("failed session preparation offers a working retry", async () => {
 });
 
 test("a delayed create response cannot overwrite a newer navigation", async () => {
-	const pending = Promise.withResolvers<Response>();
+	const events = new EventEmitter();
+	const pending = once(events, "response");
 	let requested = false;
 	vi.stubGlobal(
 		"fetch",
@@ -310,7 +313,8 @@ test("a delayed create response cannot overwrite a newer navigation", async () =
 			if (input === PREFLIGHT) return Response.json(creditStatus({}));
 			if (input === "/api/codebases") {
 				requested = true;
-				return pending.promise;
+				await pending;
+				return Response.json(createdCodebase());
 			}
 			throw new Error(`Unexpected request ${input}`);
 		}),
@@ -322,10 +326,8 @@ test("a delayed create response cannot overwrite a newer navigation", async () =
 		{ codebaseStartRequest: crypto.randomUUID() },
 		"",
 	);
-	pending.resolve(Response.json(createdCodebase()));
-	await pending.promise;
-	const settled = Promise.withResolvers<void>();
-	setTimeout(settled.resolve, 0);
-	await settled.promise;
+	events.emit("response");
+	await pending;
+	await delay(0);
 	assert.equal(sessionStorage.getItem("prdfy:plan-codebase-id"), null);
 });
