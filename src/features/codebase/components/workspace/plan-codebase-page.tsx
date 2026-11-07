@@ -13,6 +13,7 @@ import { codebaseStarterSuggestionsSchema } from "@/features/codebase/services/a
 import type { AnalysisCreditStatus } from "@/features/codebase/services/analysis-credit-policy";
 import { CODEBASE_ONBOARDING_LABEL } from "@/features/codebase/services/library";
 import type { PlanCodebaseIntent } from "@/features/codebase/services/onboarding-intent";
+import { resolveCodebaseOnboardingPhase } from "@/features/codebase/services/onboarding-phase";
 import {
 	type PlanCodebaseStep,
 	readPlanCodebasePointer,
@@ -116,7 +117,15 @@ export function PlanCodebasePage({
 	// attempt to recover, so the screen must not imply one.
 	const isRecovering =
 		intent !== "new" && !codebase && Boolean(readPlanCodebasePointer());
-	const onboardingFailed = !codebase && !isStarting && error !== null;
+
+	// One mutually exclusive entry phase, so a stale credit read can never be
+	// rendered next to a session that actually exists (see `onboarding-phase`).
+	const phase = resolveCodebaseOnboardingPhase({
+		hasPrompt: payload !== null,
+		isStarting,
+		creditStatus,
+		error,
+	});
 
 	const lockedPrompt = useMemo<LockedPromptState | null>(
 		() =>
@@ -140,9 +149,9 @@ export function PlanCodebasePage({
 			/>
 
 			{!codebase ? (
-				onboardingFailed ? (
+				phase === "session_creation_failed" ? (
 					<CodebaseOnboardingErrorCard
-						error={error}
+						error={error ?? "Gagal menyiapkan repository."}
 						onRetry={() =>
 							void (creditStatus?.canStart
 								? createCodebase()
@@ -159,7 +168,12 @@ export function PlanCodebasePage({
 					<ScreenConnect
 						projectName=""
 						payload={null}
-						isStarting={isStarting || creditStatus === null}
+						// A real request is in flight while eligibility is unresolved or
+						// the session is being created; a blocked account runs no request,
+						// so its progress line reads "Belum dimulai".
+						isStarting={
+							phase === "checking_eligibility" || phase === "creating_session"
+						}
 						status={null}
 						lockedPrompt={lockedPrompt}
 						creditNote={creditNote}

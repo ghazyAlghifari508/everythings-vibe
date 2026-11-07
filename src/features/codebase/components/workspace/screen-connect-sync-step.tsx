@@ -2,6 +2,7 @@
 
 import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/ui/icon";
+import { Spinner } from "@/components/ui/spinner";
 import type { AnalysisResponse } from "@/features/codebase/services/analysis";
 import type {
 	SyncStageView,
@@ -24,6 +25,13 @@ interface ScreenConnectSyncStepProps {
 	 */
 	streamNotice?: string | null;
 	isStarting: boolean;
+	/**
+	 * A validated session payload exists, so a status request is genuinely in
+	 * flight even before the first frame lands. Without it (and without a
+	 * request being started) the progress line must read "Belum dimulai"
+	 * instead of claiming a connection that nobody is making.
+	 */
+	hasSession: boolean;
 	onRetrySync?: () => void;
 	/**
 	 * Whether the server produced a usable current snapshot, which is the only
@@ -50,6 +58,7 @@ export function ScreenConnectSyncStep({
 	statusError,
 	streamNotice = null,
 	isStarting,
+	hasSession,
 	onRetrySync,
 	canContinueToSummary,
 	analysis,
@@ -73,11 +82,21 @@ export function ScreenConnectSyncStep({
 					codebase.
 				</p>
 
-				{/* The browser has not heard from the server yet, so no stage
-				can honestly be claimed. */}
+				{/* The browser has not heard from the server yet, so no stage can
+				honestly be claimed. A request that is genuinely in flight reads as
+				connecting; with no session and no request (blocked credits, nothing
+				being created) the line says the sync has not started instead of
+				implying a connection that is not happening. */}
 				{!stageView.hasStatus && !stageView.failed && (
-					<p className="text-[11px] leading-relaxed text-fog">
-						Menghubungkan server...
+					<p className="flex items-center gap-2 text-[11px] leading-relaxed text-fog">
+						{(isStarting || hasSession) && (
+							<Spinner size={12} className="text-blue-400" />
+						)}
+						<span>
+							{isStarting || hasSession
+								? "Menghubungkan server..."
+								: "Belum dimulai"}
+						</span>
 					</p>
 				)}
 

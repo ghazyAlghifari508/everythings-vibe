@@ -138,6 +138,7 @@ export function ScreenConnect({
 						statusError={statusError}
 						streamNotice={streamNotice}
 						isStarting={isStarting}
+						hasSession={payload !== null}
 						onRetrySync={onRetrySync}
 						canContinueToSummary={canContinueToSummary}
 						analysis={analysis}

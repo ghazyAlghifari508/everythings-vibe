@@ -78,6 +78,13 @@ export function ScreenConnectPromptStep({
 	const showRenewal =
 		expiryState === "expired" || expiryState === "soon" || !payload;
 
+	// A schema-validated payload is the only proof that this session exists, so
+	// it always wins. A credit read taken before (or after) it landed is stale by
+	// definition and must never replace a live prompt with the lock that caused
+	// the reported "locked prompt stays visible" blocker.
+	const promptUsable = payload !== null && expiryState !== "expired";
+	const activeLock = promptUsable ? null : lockedPrompt;
+
 	return (
 		<div className="flex items-start gap-3.5">
 			<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-iron font-mono text-xs text-mist">
@@ -88,7 +95,7 @@ export function ScreenConnectPromptStep({
 					<div className="text-xs font-semibold text-mist">
 						Salin instruksi untuk AI agent
 					</div>
-					{payload && expiryState !== "expired" && !lockedPrompt && (
+					{payload && expiryState !== "expired" && !activeLock && (
 						<Button
 							type="button"
 							onClick={handleCopy}
@@ -115,8 +122,8 @@ export function ScreenConnectPromptStep({
 					)}
 				</div>
 				<div className="relative rounded-lg border border-graphite bg-onyx p-3.5 font-mono text-xs leading-relaxed text-mist sm:p-4">
-					{lockedPrompt ? (
-						<LockedPromptStateView {...lockedPrompt} />
+					{activeLock ? (
+						<LockedPromptStateView {...activeLock} />
 					) : payload && expiryState !== "expired" ? (
 						<>
 							<div className="hide-scrollbar max-h-56 select-all overflow-x-auto overflow-y-auto whitespace-pre-wrap text-snow">
@@ -148,7 +155,7 @@ export function ScreenConnectPromptStep({
 					) : isStarting ? (
 						<div className="flex min-h-[190px] items-center justify-center gap-2 py-6 font-sans text-xs text-fog">
 							<Spinner size={14} className="text-blue-400" />
-							<span>Menyiapkan token sesi...</span>
+							<span>Menghubungkan repository...</span>
 						</div>
 					) : (
 						<div className="flex min-h-[190px] flex-col items-center justify-center gap-3 py-6 text-center font-sans">
@@ -178,7 +185,7 @@ export function ScreenConnectPromptStep({
 						</div>
 					)}
 				</div>
-				{creditNote && !lockedPrompt && (
+				{creditNote && !activeLock && (
 					<p className="text-[11px] leading-relaxed text-fog">{creditNote}</p>
 				)}
 			</div>
