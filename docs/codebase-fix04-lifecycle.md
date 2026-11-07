@@ -44,7 +44,7 @@ NEW → RESUME remounts the machine instead of migrating old state into it.
 
 | State | Shown | Never shown |
 | --- | --- | --- |
-| A waiting for CLI | `Menunggu agent terhubung...` | analysis rows, new-session offer |
+| A waiting for CLI | `Menunggu agent` with three idle rows (no spinner, no timer) | any running indicator, analysis rows, new-session offer |
 | B CLI syncing | `Agent terhubung` → `Mengunggah repository...` | analysis progress, new-session offer |
 | C uploaded, analysis pending | `Sinkronisasi selesai` + `Menganalisis repository...` | new-session offer |
 | D uploaded, analysis failed | `Sinkronisasi selesai` + `Analisis belum berhasil` + `Coba Analisis Lagi` | new-session offer |
@@ -55,6 +55,27 @@ The prompt row is a single precedence chain: live prompt → transport done → 
 active → starting → renewal. A completed snapshot therefore can never render a
 credential or a billing lock, and an active upload can never offer a replacement
 token.
+
+### 3.1 Progress honesty (waiting is not activity)
+
+Every stage row comes from persisted server status through one mapping
+(`resolveSyncStageView` in `services/sync-stages.ts`):
+
+- `waiting_for_cli` → three idle rows. Waiting for the user is not system
+  activity: no spinner, no elapsed timer, and copying the prompt changes nothing
+  (the clipboard is browser-local feedback, not evidence the CLI ran).
+- `connected` / `scanning` / `filtering` → the handshake checkmark plus the
+  source-preparation row running, because the CLI handshakes before it walks the
+  repository.
+- `uploading` → running upload row with a count only from persisted rows.
+- `uploaded` / `ready` → completed rows.
+- `failed` / `expired` → the stage list is withheld (the status does not record
+  which step broke) and one recovery card is shown instead.
+
+There is deliberately no `connecting` state. The handshake is the CLI's first
+contact with the server and commits `waiting_for_cli → connected` in a single
+transaction, so a connection-in-progress window is not observable; a fast
+handshake is rendered as already connected instead of a fabricated spinner.
 
 ## 4. Token lifecycle
 
