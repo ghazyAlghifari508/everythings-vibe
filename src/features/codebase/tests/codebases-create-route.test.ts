@@ -74,7 +74,24 @@ vi.mock("@/db", async () => {
 		};
 		return { chain, record };
 	}
+	/**
+	 * Read side of the recorded transaction. The create handler looks up an
+	 * existing codebase and `prepareSyncSession` lists the repository's sessions;
+	 * an empty result keeps both on the create path this suite asserts.
+	 */
+	const selectChain: Record<string, unknown> = {
+		from: () => selectChain,
+		where: () => selectChain,
+		limit: () => Promise.resolve([]),
+		orderBy: () => Promise.resolve([]),
+	};
 	const tx = {
+		// `prepareSyncSession` takes a per-repository advisory lock and reads the
+		// existing sessions before minting one, so the recorded transaction needs
+		// the same surface as the real one. Returning no rows keeps the handler on
+		// the create path this suite asserts.
+		execute: () => Promise.resolve(undefined),
+		select: () => selectChain,
 		insert: (table: unknown) => {
 			const { chain, record } = fakeInsert(table);
 			recorder.inserts.push(record);
