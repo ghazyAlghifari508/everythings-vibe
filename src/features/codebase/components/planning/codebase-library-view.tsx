@@ -26,7 +26,6 @@ import { requestCodebaseBulkDelete } from "@/features/codebase/services/library-
 import { NEW_REPOSITORY_START_SEARCH } from "@/features/codebase/services/onboarding-intent";
 import { clearPlanCodebasePointerIfMatches } from "@/features/codebase/services/plan-storage";
 import {
-	CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS,
 	CODEBASE_LIBRARY_PAGE_SIZE,
 	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
 } from "@/features/codebase/types/codebase-constants";
@@ -65,10 +64,19 @@ export function CodebaseLibraryView({
 	const pageIds = paged.map((item) => item.id);
 	const selectionActive = selection.count > 0;
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: reset to the first page whenever the query changes; the dependency is the trigger, not a read
-	useEffect(() => {
+	// Existing Codebase keeps the selection page-scoped: an id stays selected
+	// only while the rows that produced it are on screen, so a later delete can
+	// never target repositories the user can no longer see.
+	function changeQuery(next: string) {
+		setQuery(next);
 		setPage(1);
-	}, [query]);
+		selection.clear();
+	}
+
+	function changePage(next: number) {
+		setPage(next);
+		selection.clear();
+	}
 
 	useEffect(() => {
 		if (page > totalPages) setPage(totalPages);
@@ -210,7 +218,7 @@ export function CodebaseLibraryView({
 						type="text"
 						placeholder="Cari project..."
 						value={query}
-						onChange={(e) => setQuery(e.target.value)}
+						onChange={(e) => changeQuery(e.target.value)}
 						aria-label="Cari project tersimpan"
 						className="w-full rounded-lg border border-graphite bg-charcoal py-2.5 pl-10 pr-4 text-sm text-snow placeholder:text-fog/60 focus:border-fog/40 focus:outline-none"
 					/>
@@ -219,43 +227,12 @@ export function CodebaseLibraryView({
 
 			{selectionActive && paged.length > 0 && (
 				<HistorySelectAll
+					mode="binary"
 					noun="repository"
 					pageIds={pageIds}
 					selectedIds={selection.ids}
-					total={filtered.length}
-					filteredScopeActive={selection.scope === "filtered"}
-					preparing={false}
 					onTogglePage={(selected) =>
 						selection.setPageSelection(pageIds, selected)
-					}
-					onSelectAllFiltered={() => {
-						// The batch-delete endpoint rejects more than this many ids, so a
-						// "select all" snapshot is capped here and the toolbar says so.
-						const ids = filtered
-							.slice(0, CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS)
-							.map((row) => row.id);
-						selection.applyFiltered({
-							ids,
-							total: filtered.length,
-							truncated: filtered.length > ids.length,
-						});
-					}}
-				/>
-			)}
-
-			{(selectionActive || selection.notice !== null) && (
-				<HistorySelectionBar
-					noun="repository"
-					count={selection.count}
-					filteredTotal={selection.filteredTotal}
-					truncated={selection.truncated}
-					notice={selection.notice}
-					deleting={deleting}
-					cancelLabel="Batalkan Pilihan"
-					deleteLabel="Hapus Terpilih"
-					onClear={selection.clear}
-					onDelete={() =>
-						setDeleteRequest({ kind: "bulk", count: selection.count })
 					}
 				/>
 			)}
@@ -282,12 +259,27 @@ export function CodebaseLibraryView({
 				</ul>
 			)}
 
+			{(selectionActive || selection.notice !== null) && (
+				<HistorySelectionBar
+					noun="repository"
+					count={selection.count}
+					notice={selection.notice}
+					deleting={deleting}
+					cancelLabel="Batalkan Pilihan"
+					deleteLabel="Hapus Terpilih"
+					onClear={selection.clear}
+					onDelete={() =>
+						setDeleteRequest({ kind: "bulk", count: selection.count })
+					}
+				/>
+			)}
+
 			{filtered.length > 0 && (
 				<LibraryPagination
 					clampedPage={clampedPage}
 					totalPages={totalPages}
 					totalItems={filtered.length}
-					onPageChange={setPage}
+					onPageChange={changePage}
 				/>
 			)}
 
