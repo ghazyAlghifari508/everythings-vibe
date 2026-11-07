@@ -26,6 +26,7 @@ import { requestCodebaseBulkDelete } from "@/features/codebase/services/library-
 import { NEW_REPOSITORY_START_SEARCH } from "@/features/codebase/services/onboarding-intent";
 import { clearPlanCodebasePointerIfMatches } from "@/features/codebase/services/plan-storage";
 import {
+	CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS,
 	CODEBASE_LIBRARY_PAGE_SIZE,
 	CODEBASE_SYNC_ACTIVE_POLL_INTERVAL_MS,
 } from "@/features/codebase/types/codebase-constants";
@@ -227,13 +228,18 @@ export function CodebaseLibraryView({
 					onTogglePage={(selected) =>
 						selection.setPageSelection(pageIds, selected)
 					}
-					onSelectAllFiltered={() =>
+					onSelectAllFiltered={() => {
+						// The batch-delete endpoint rejects more than this many ids, so a
+						// "select all" snapshot is capped here and the toolbar says so.
+						const ids = filtered
+							.slice(0, CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS)
+							.map((row) => row.id);
 						selection.applyFiltered({
-							ids: filtered.map((r) => r.id),
+							ids,
 							total: filtered.length,
-							truncated: false,
-						})
-					}
+							truncated: filtered.length > ids.length,
+						});
+					}}
 				/>
 			)}
 

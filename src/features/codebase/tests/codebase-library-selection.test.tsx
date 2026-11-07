@@ -10,7 +10,10 @@ import {
 	mockCodebaseBulkApi,
 	openActionsMenu,
 } from "@/features/codebase/tests/codebase-library-selection-fixture";
-import { CODEBASE_LIBRARY_PAGE_SIZE } from "@/features/codebase/types/codebase-constants";
+import {
+	CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS,
+	CODEBASE_LIBRARY_PAGE_SIZE,
+} from "@/features/codebase/types/codebase-constants";
 
 vi.mock("@tanstack/react-router", () => ({
 	useRouter: () => ({ invalidate: vi.fn() }),
@@ -252,5 +255,37 @@ describe("CodebaseLibraryView selection mode", () => {
 			screen.getByText(/Filter berubah, pilihan dibersihkan/i),
 		).toBeDefined();
 		expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+	});
+
+	it("caps select-all at the batch delete limit and reports the truncation", () => {
+		const items = makeProjects(CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS + 1);
+		render(<CodebaseLibraryView items={items} />);
+
+		enterSelectionMode();
+		fireEvent.click(
+			screen.getByRole("checkbox", { name: /Pilih semua di halaman ini/i }),
+		);
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: new RegExp(
+					`Pilih semua ${items.length} repository sesuai filter`,
+					"i",
+				),
+			}),
+		);
+
+		expect(
+			screen.getByText(
+				`${CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS} repository dipilih`,
+			),
+		).toBeDefined();
+		expect(
+			screen.getByText(
+				new RegExp(
+					`${CODEBASE_LIBRARY_BULK_DELETE_MAX_IDS} dari ${items.length} repository bisa dipilih sekaligus`,
+					"i",
+				),
+			),
+		).toBeDefined();
 	});
 });
