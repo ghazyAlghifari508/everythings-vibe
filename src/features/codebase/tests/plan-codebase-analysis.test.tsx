@@ -504,7 +504,12 @@ describe("PlanCodebasePage onboarding analysis", () => {
 						status: 200,
 						json: async () => ({
 							...uploadedStatus(),
-							analysisStatus: analysisPostCount >= 2 ? "ready" : "failed",
+							analysisStatus:
+								analysisPostCount >= 2
+									? "ready"
+									: analysisPostCount === 1
+										? "failed"
+										: undefined,
 							analysisId: analysisPostCount >= 2 ? "ana-onboard-1" : null,
 						}),
 					};

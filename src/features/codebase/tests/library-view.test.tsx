@@ -428,7 +428,7 @@ describe("CodebaseLibraryView primary actions", () => {
 			/>,
 		);
 		const card = screen.getByText("<sample run>").closest("a");
-		expect(card?.getAttribute("href")).toBe("/plan/codebase");
+		expect(card?.getAttribute("href")).toBe("/plan/codebase?intent=resume");
 		expect(screen.getByText("Lihat Progres")).toBeDefined();
 		fireEvent.click(card as Element);
 		expect(readPlanCodebasePointer()).toEqual({
@@ -453,7 +453,7 @@ describe("CodebaseLibraryView primary actions", () => {
 			/>,
 		);
 		const card = screen.getByText("<sample fail>").closest("a");
-		expect(card?.getAttribute("href")).toBe("/plan/codebase");
+		expect(card?.getAttribute("href")).toBe("/plan/codebase?intent=resume");
 		expect(screen.getByText("Coba Analisis Lagi")).toBeDefined();
 		fireEvent.click(card as Element);
 		// A recovery resume points at the canonical codebase id, and clears a

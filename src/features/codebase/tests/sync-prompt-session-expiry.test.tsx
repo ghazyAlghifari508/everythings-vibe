@@ -77,7 +77,7 @@ describe("FIX02 prompt credential follows the active session", () => {
 			},
 			onRequestNewToken: () => {},
 		});
-		expect(container?.textContent).toContain("Sesi telah berakhir");
+		expect(container?.textContent).toContain("Sesi sinkronisasi berakhir");
 		expect(container?.textContent).toContain("Buat sesi baru");
 	});
 
