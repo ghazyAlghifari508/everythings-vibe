@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
 	type AnalysisResponse,
 	canContinueToCodebaseConclusion,
@@ -72,9 +72,8 @@ function resolveRecoveredStep(
  * Refresh recovery for `/plan/codebase`.
  *
  * The stored id is only a pointer. Authoritative sync state comes from GET
- * status. A missing token after refresh is never restored from storage; waiting
- * sessions mint a fresh credential via retry, while in-flight/uploaded sessions
- * resume polling without disturbing the active attempt.
+ * status. A missing token is never restored from storage. Recovery retains the
+ * original session; explicit replacement revokes its waiting credential.
  *
  * Kept apart from the create/retry session machine because it is the one branch
  * that has to read persisted analysis output before it can decide which step to
@@ -108,10 +107,18 @@ export function useOnboardingRecovery({
 		setFeatureProjectId,
 		fetchAnalysisOutput,
 	} = analysisState;
+	const mounted = useRef(false);
+	useEffect(() => {
+		mounted.current = true;
+		return () => {
+			mounted.current = false;
+		};
+	}, []);
 
 	return useCallback(async (): Promise<boolean> => {
 		const stored = readPlanCodebasePointer();
-		const isCurrent = () => readPlanCodebasePointer()?.id === stored?.id;
+		const isCurrent = () =>
+			mounted.current && readPlanCodebasePointer()?.id === stored?.id;
 		if (!stored) return false;
 		setError(null);
 		setIsStarting(true);
@@ -122,6 +129,7 @@ export function useOnboardingRecovery({
 			if (statusOutcome.kind === "stale") {
 				// Stale pointer: clear all onboarding state so a subsequent fresh
 				// start cannot inherit the previous attempt's analysis or error.
+				setIsStarting(false);
 				clearPlanOnboardingPointers();
 				setRecoveredStatus(null);
 				setActiveSessionId(null);
@@ -133,6 +141,7 @@ export function useOnboardingRecovery({
 			const recovered = statusOutcome.status;
 			const recoveredName = recovered.codebaseName ?? stored.name;
 			if (!recoveredName) {
+				setIsStarting(false);
 				clearPlanOnboardingPointers();
 				return false;
 			}
@@ -186,8 +195,8 @@ export function useOnboardingRecovery({
 				setRecoveredStatus(recovered);
 				setActiveSessionId(recovered.sessionId);
 				const credit = await requestAnalysisCreditPreflight();
-				setCreditStatus(credit);
 				if (!isCurrent()) return true;
+				setCreditStatus(credit);
 				if (credit.canStart) {
 					const result = await requestRetrySession(stored.id);
 					if (!isCurrent()) return true;
@@ -195,6 +204,9 @@ export function useOnboardingRecovery({
 						setPayload(result.payload);
 						setActiveSessionId(result.payload.sessionId ?? null);
 						setRecoveredStatus(null);
+					} else if (result.kind === "recovery") {
+						setActiveSessionId(result.sessionId);
+						setError(result.message);
 					} else setError("Sesi sync gagal dibuat. Coba lagi.");
 				}
 				setStep("sync");
@@ -213,7 +225,7 @@ export function useOnboardingRecovery({
 			setError("Status repository belum dapat dibaca. Coba lagi.");
 			return true;
 		} finally {
-			setIsStarting(false);
+			if (isCurrent()) setIsStarting(false);
 		}
 	}, [
 		setActiveSessionId,

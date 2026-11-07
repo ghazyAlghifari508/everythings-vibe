@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 let fallbackRequestId: string | undefined;
 
 export function readOnboardingRequestId(): string {
@@ -7,9 +9,9 @@ export function readOnboardingRequestId(): string {
 			typeof state === "object" &&
 			state !== null &&
 			"codebaseStartRequest" in state &&
-			typeof state.codebaseStartRequest === "string"
+			z.uuid().safeParse(state.codebaseStartRequest).success
 		)
-			return state.codebaseStartRequest;
+			return z.uuid().parse(state.codebaseStartRequest);
 		const id = crypto.randomUUID();
 		window.history.replaceState(
 			{

@@ -88,15 +88,6 @@ export function isSyncCapableProject(project: {
 	return project?.projectMode === "existing_codebase";
 }
 
-// Browser handoff for Home-created existing-codebase projects: the creation
-// response carries the one-time sync payload, the Home composer stashes it
-// under this per-project sessionStorage key, and the /codebase/$id page
-// consumes it once to open the agent modal. The key carries only the project
-// id — never credential material.
-export function getPendingSyncPayloadKey(projectId: string): string {
-	return `prdfy:sync-payload:${projectId}`;
-}
-
 // Plan-page recovery pointer: /plan/codebase creates a codebase without a
 // route param, so a refresh would otherwise orphan the in-flight sync and mint
 // a new codebase. The stored value is only the codebase id/name pointer —

@@ -186,7 +186,14 @@ export function PlanCodebasePage({
 					/>
 				)
 			) : !payload && !lastStatus ? (
-				<CodebaseOnboardingLoadingCard title="Menyiapkan instruksi CLI..." />
+				error ? (
+					<CodebaseOnboardingErrorCard
+						error={error}
+						onRetry={() => void recoverCodebase()}
+					/>
+				) : (
+					<CodebaseOnboardingLoadingCard title="Menyiapkan instruksi CLI..." />
+				)
 			) : (
 				<>
 					{activeStep === "sync" && (

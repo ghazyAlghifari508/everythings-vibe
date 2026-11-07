@@ -1,12 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
-import { requestAnalysisCreditPreflight } from "@/features/codebase/services/analysis-credit-requests";
 import { NEW_REPOSITORY_START_SEARCH } from "@/features/codebase/services/onboarding-intent";
-import {
-	getPendingSyncPayloadKey,
-	syncPromptPayloadSchema,
-} from "@/features/codebase/services/sync";
 import { HOME_DRAFT_DEBOUNCE_MS } from "@/features/greenfield/types/greenfield-constants";
 import { authClient } from "@/lib/auth-client";
 import { MAX_PROMPT_LENGTH, MIN_PROMPT_LENGTH } from "@/lib/constants";
@@ -138,15 +133,16 @@ export function useHomeProjectCreation({
 				navigate({ to: "/login", search: { redirect: "/" } });
 				return;
 			}
+			if (projectMode === "existing_codebase") {
+				navigate({ to: "/plan/codebase", search: NEW_REPOSITORY_START_SEARCH });
+				return;
+			}
 
 			// Pre-check credits before creating project — blocks at home page,
 			// not after redirect to empty PRD/question page.
 			try {
 				const freshPlan = await refetchPlan();
-				if (
-					projectMode !== "existing_codebase" &&
-					shouldBlockProjectCreationOnCredits(freshPlan.data?.remaining)
-				) {
+				if (shouldBlockProjectCreationOnCredits(freshPlan.data?.remaining)) {
 					setCreditsExhaustedMsg(
 						"Kredit kamu sudah habis. Beli kredit untuk membuat proyek baru.",
 					);
@@ -156,33 +152,15 @@ export function useHomeProjectCreation({
 				// If plan check fails, allow flow — server will block with 403 anyway
 			}
 
-			if (projectMode === "existing_codebase") {
-				const credit = await requestAnalysisCreditPreflight();
-				if (!credit.canStart) {
-					navigate({
-						to: "/plan/codebase",
-						search: NEW_REPOSITORY_START_SEARCH,
-					});
-					return;
-				}
-			}
-			const endpoint =
-				projectMode === "existing_codebase"
-					? "/api/codebases"
-					: "/api/projects";
-			const requestBody =
-				projectMode === "existing_codebase"
-					? { message: enrichedPrompt }
-					: {
-							message: enrichedPrompt,
-							language,
-							projectMode,
-							platform: isMobileMode ? "mobile" : "web",
-						};
-			const res = await fetch(endpoint, {
+			const res = await fetch("/api/projects", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(requestBody),
+				body: JSON.stringify({
+					message: enrichedPrompt,
+					language,
+					projectMode,
+					platform: isMobileMode ? "mobile" : "web",
+				}),
 			});
 			const body: unknown = await res.json().catch(() => null);
 			if (!res.ok || typeof body !== "object" || body === null) {
@@ -205,29 +183,11 @@ export function useHomeProjectCreation({
 				"projectMode" in body && typeof body.projectMode === "string"
 					? body.projectMode
 					: null;
-			const syncPayload =
-				"sync" in body ? syncPromptPayloadSchema.safeParse(body.sync) : null;
 			clearHomeDraft();
-			// Existing-codebase enters the sync flow: stash the one-time sync
-			// payload for /codebases/$id (consumed once to open the agent
-			// modal). Greenfield keeps the exact /ask/$id navigation.
 			const target = decideHomePostCreationTarget({
 				id: body.id,
 				projectMode: responseProjectMode ?? projectMode,
 			});
-			if (target.to === "/codebases/$id") {
-				if (!syncPayload?.success)
-					throw new Error("Respons sync codebase tidak valid");
-				try {
-					sessionStorage.setItem(
-						getPendingSyncPayloadKey(body.id),
-						JSON.stringify(syncPayload.data),
-					);
-				} catch {
-					// Storage blocked/full — the codebase page falls back to
-					// manual "Mulai sync", so creation still succeeds.
-				}
-			}
 			navigate({ to: target.to, params: target.params });
 		} catch (err) {
 			console.error("Create project error:", err);

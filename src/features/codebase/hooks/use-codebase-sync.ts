@@ -6,7 +6,6 @@ import {
 	shouldDiscardWorkspaceAnalysis,
 } from "@/features/codebase/services/analysis-selection";
 import {
-	getPendingSyncPayloadKey,
 	type SyncPromptPayload,
 	type SyncStatusResponse,
 	syncPromptPayloadSchema,
@@ -134,23 +133,6 @@ export function useCodebaseSync({
 		analysisIdentityRef,
 		setAnalysis,
 	]);
-	useEffect(() => {
-		try {
-			const raw = sessionStorage.getItem(getPendingSyncPayloadKey(codebaseId));
-			if (!raw) return;
-			const parsed = syncPromptPayloadSchema.safeParse(JSON.parse(raw));
-			if (parsed.success && parsed.data.projectId === codebaseId) {
-				setPayload(parsed.data);
-				if (parsed.data.sessionId) {
-					setActiveSessionId(parsed.data.sessionId);
-				}
-				setIsResyncModalOpen(true);
-			}
-			sessionStorage.removeItem(getPendingSyncPayloadKey(codebaseId));
-		} catch {
-			setError("Instruksi sync tidak dapat dibaca dari browser.");
-		}
-	}, [codebaseId]);
 	useEffect(() => {
 		void readStatus();
 		const interval = setInterval(
