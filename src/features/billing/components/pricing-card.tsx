@@ -13,7 +13,10 @@ import {
 } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import type { Feature, PriceTier } from "@/features/billing/data/pricing-data";
-import { TOPUP_SKU } from "@/features/billing/types/billing-constants";
+import {
+	ADAPTIVE_CREDIT_PRICING,
+	TOPUP_SKU,
+} from "@/features/billing/types/billing-constants";
 import { cn } from "@/lib/utils";
 
 // --- Utility Components ---
@@ -286,8 +289,14 @@ export const PricingComponent: React.FC<PricingComponentProps> = ({
 							compact ? "mt-1 text-xs" : "mt-3 text-[17px]",
 						)}
 					>
-						Setiap operasi menggunakan kredit sesuai jenis dan kebutuhan proses.
-						Estimasi ditampilkan sebelum penggunaan.
+						Analisis awal gratis sekali per akun. Analisis berikutnya memakai
+						hingga{" "}
+						{
+							ADAPTIVE_CREDIT_PRICING.operations.codebase_analysis
+								.maximumCredits
+						}{" "}
+						kredit sesuai ukuran repository. Membuka sesi sync gratis; kredit
+						hanya ditagih untuk analisis yang berhasil.
 					</p>
 				</header>
 			)}
