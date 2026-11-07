@@ -115,8 +115,10 @@ describe("PlanCodebasePage Loading Spinner & Flow Contract", () => {
 			screen.getByText("Sync codebase dengan everythings-vibe"),
 		).toBeDefined();
 		expect(screen.getByText("Menghubungkan repository...")).toBeDefined();
-		// The progress line describes the request that is genuinely in flight.
-		expect(screen.getByText("Menghubungkan server...")).toBeDefined();
+		// The progress line describes the request that is genuinely in flight, and
+		// does not claim a sync connection before a session exists.
+		expect(screen.getByText("Menyiapkan sesi sync...")).toBeDefined();
+		expect(screen.queryByText("Menghubungkan server...")).toBeNull();
 		expect(screen.queryByText("Belum dimulai")).toBeNull();
 		expect(
 			screen.queryByRole("button", { name: "Siapkan instruksi" }),

@@ -382,8 +382,10 @@ test("a pending create request shows loading in both the prompt and the progress
 
 	await waitFor(() => assert.ok(requested));
 	// A real request is in flight: loading is honest here, and the lock is not.
+	// No sync connection can be claimed before the session exists.
 	assert.ok(screen.getByText("Menghubungkan repository..."));
-	assert.ok(screen.getByText("Menghubungkan server..."));
+	assert.ok(screen.getByText("Menyiapkan sesi sync..."));
+	assert.equal(screen.queryByText("Menghubungkan server..."), null);
 	assert.equal(screen.queryByText("Belum dimulai"), null);
 	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
 

@@ -83,19 +83,21 @@ export function ScreenConnectSyncStep({
 				</p>
 
 				{/* The browser has not heard from the server yet, so no stage can
-				honestly be claimed. A request that is genuinely in flight reads as
-				connecting; with no session and no request (blocked credits, nothing
-				being created) the line says the sync has not started instead of
-				implying a connection that is not happening. */}
+				honestly be claimed. A validated session that is being read reads as
+				connecting; a request that is still creating the session must not claim
+				a sync connection that does not exist yet, and with nothing in flight
+				(blocked credits) the line says the sync has not started. */}
 				{!stageView.hasStatus && !stageView.failed && (
 					<p className="flex items-center gap-2 text-[11px] leading-relaxed text-fog">
 						{(isStarting || hasSession) && (
 							<Spinner size={12} className="text-blue-400" />
 						)}
 						<span>
-							{isStarting || hasSession
+							{hasSession
 								? "Menghubungkan server..."
-								: "Belum dimulai"}
+								: isStarting
+									? "Menyiapkan sesi sync..."
+									: "Belum dimulai"}
 						</span>
 					</p>
 				)}
