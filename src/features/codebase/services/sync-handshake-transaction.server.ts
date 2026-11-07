@@ -20,6 +20,8 @@ import {
 	buildHandshakeMetadata,
 	buildRepositoryIdentityMetadata,
 } from "./sync";
+import { getSessionUsability } from "./sync-session";
+import { SyncBindingError } from "./sync-transport";
 
 export interface SyncHandshakeTransactionInput {
 	sessionId: string;
@@ -34,9 +36,14 @@ export interface SyncHandshakeTransactionInput {
 	identityComparison: ReturnType<typeof compareRepositoryIdentity>;
 }
 
+export interface SyncHandshakeResult {
+	status: CodebaseSyncStatus;
+	snapshotId?: string;
+}
+
 export async function runSyncHandshakeTransaction(
 	input: SyncHandshakeTransactionInput,
-): Promise<{ status: CodebaseSyncStatus; snapshotId?: string }> {
+): Promise<SyncHandshakeResult> {
 	const {
 		sessionId,
 		codebaseId,
@@ -50,13 +57,18 @@ export async function runSyncHandshakeTransaction(
 		await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${sessionId}))`);
 
 		const [currentSession] = await tx
-			.select({
-				status: codebaseSyncSessions.status,
-				metadata: codebaseSyncSessions.metadata,
-			})
+			.select()
 			.from(codebaseSyncSessions)
-			.where(eq(codebaseSyncSessions.id, sessionId))
+			.where(
+				and(
+					eq(codebaseSyncSessions.id, sessionId),
+					eq(codebaseSyncSessions.userId, userId),
+					eq(codebaseSyncSessions.codebaseId, codebaseId),
+				),
+			)
 			.limit(1);
+		if (!currentSession || !getSessionUsability(currentSession).usable)
+			throw new SyncBindingError();
 
 		// cast boundary: `codebase_sync_sessions.status` is a text column; every
 		// writer stores a `CodebaseSyncStatus`, the transition map below rejects
@@ -102,7 +114,12 @@ export async function runSyncHandshakeTransaction(
 				metadata,
 				updatedAt: new Date(),
 			})
-			.where(eq(codebaseSyncSessions.id, sessionId));
+			.where(
+				and(
+					eq(codebaseSyncSessions.id, sessionId),
+					eq(codebaseSyncSessions.userId, userId),
+				),
+			);
 
 		// Auto-name the codebase from the repository folder name, but only while
 		// the stored name is still one the system chose. A name the user picked

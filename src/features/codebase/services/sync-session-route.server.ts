@@ -128,11 +128,7 @@ export async function handleCodebaseSessionRead({
 	);
 }
 
-// Browser create/retry: mints one codebase-scoped credential and returns the
-// SyncPromptPayload ONCE with the raw credential. POST {} creates;
-// POST { action: "retry" } revokes the usable credential and mints a
-// replacement (terminal rows are never mutated — a retry is a new
-// session/attempt).
+// Recovery reads metadata only. Retry explicitly names the credential to replace.
 export async function handleCodebaseSessionCreate({
 	request,
 	params,
@@ -181,6 +177,22 @@ export async function handleCodebaseSessionCreate({
 			{ error: "Permintaan sesi tidak valid." },
 			{ status: 400 },
 		);
+	const startedAt = Date.now();
+	const diagnose = (
+		result: string,
+		safeErrorCode: string | null,
+		syncSessionId: string | null,
+	) =>
+		console.info("[codebase/onboarding]", {
+			onboardingAttemptId: null,
+			userId: user.id,
+			codebaseId,
+			syncSessionId,
+			operation: parsed.data.action === "retry" ? "replaced" : "recovered",
+			result,
+			durationMs: Date.now() - startedAt,
+			safeErrorCode,
+		});
 	let result: PreparedSyncSession;
 	try {
 		result = await db.transaction((tx) =>
@@ -193,27 +205,55 @@ export async function handleCodebaseSessionCreate({
 			),
 		);
 	} catch (error) {
-		console.error("[codebase/session] preparation failed", error);
+		diagnose(
+			"failed",
+			"CODEBASE_SESSION_REPLACEMENT_FAILED",
+			parsed.data.sessionId ?? null,
+		);
+		console.error(
+			"[codebase/session] preparation failed",
+			error instanceof Error ? error.name : "UnknownError",
+		);
 		return Response.json(
-			{ error: "Sesi sync gagal dibuat. Coba lagi.", code: "SYNC_FAILED" },
+			{
+				error: "Sesi sync gagal dibuat. Coba lagi.",
+				code: "CODEBASE_SESSION_REPLACEMENT_FAILED",
+			},
 			{ status: 503 },
 		);
 	}
-	if (!result.token)
+	if (!result.token) {
+		const uploaded = ["uploaded", "analyzing", "ready"].includes(
+			result.session.status,
+		);
+		const active =
+			["connected", "scanning", "filtering", "uploading"].includes(
+				result.session.status,
+			) && getSessionUsability(result.session).usable;
+		const code = uploaded
+			? "SYNC_SNAPSHOT_UPLOADED"
+			: active
+				? "SYNC_SESSION_ACTIVE"
+				: result.session.expiresAt.getTime() <= Date.now()
+					? "SYNC_SESSION_EXPIRED"
+					: "CODEBASE_SESSION_RECOVERY_REQUIRED";
+		diagnose("recovered", code, result.session.id);
 		return Response.json(
 			{
-				code: ["uploaded", "analyzing", "ready"].includes(result.session.status)
-					? "SYNC_SNAPSHOT_UPLOADED"
-					: "SYNC_SESSION_ACTIVE",
-				error: ["uploaded", "analyzing", "ready"].includes(
-					result.session.status,
-				)
-					? "Snapshot tersimpan. Lanjutkan analisis tanpa upload ulang."
-					: "Agent masih melakukan sinkronisasi.",
+				code,
 				sessionId: result.session.id,
+				error: uploaded
+					? "Snapshot tersimpan. Lanjutkan analisis tanpa upload ulang."
+					: active
+						? "Agent masih melakukan sinkronisasi."
+						: code === "SYNC_SESSION_EXPIRED"
+							? "Sesi sinkronisasi berakhir. Buat sesi pengganti untuk repository ini."
+							: "Token sebelumnya hanya dikirim sekali. Buat sesi pengganti; token sebelumnya akan dinonaktifkan.",
 			},
-			{ status: 409 },
+			{ status: 409, headers: { "Cache-Control": "no-store" } },
 		);
+	}
+	diagnose("success", null, result.session.id);
 	const inserted = result.session;
 
 	const payload: SyncPromptPayload = {

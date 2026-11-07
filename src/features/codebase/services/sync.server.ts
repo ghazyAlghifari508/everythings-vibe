@@ -4,16 +4,10 @@
 // stays bundle-safe (Zod + pure helpers only) while credential hashing lives
 // here. Route handlers import this file directly.
 
-import {
-	createHash,
-	createHmac,
-	randomBytes,
-	timingSafeEqual,
-} from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 // === Credential hashing ===
-// Only the SHA-256 hash is persisted. Authenticated recovery can rederive an
-// active session credential; raw credentials never enter database metadata.
+// Only the SHA-256 hash is persisted. Raw credentials are delivered once.
 
 export function hashSyncToken(token: string): string {
 	return createHash("sha256").update(token, "utf8").digest("hex");
@@ -26,18 +20,6 @@ export function hashSyncToken(token: string): string {
 
 export function generateSyncToken(): string {
 	return randomBytes(32).toString("hex");
-}
-
-export function deriveSyncToken(
-	userId: string,
-	sessionId: string,
-	secret = process.env.BETTER_AUTH_SECRET,
-): string {
-	if (!secret)
-		throw new Error("BETTER_AUTH_SECRET is required for sync credentials");
-	return createHmac("sha256", secret)
-		.update(JSON.stringify(["codebase-sync", userId, sessionId]))
-		.digest("hex");
 }
 
 // === Uploaded content verification (Task 5) ===

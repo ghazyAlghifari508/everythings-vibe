@@ -24,7 +24,10 @@ import {
 import { deleteOwnedCodebases } from "./library-delete.server";
 import { buildSyncCommand, type SyncPromptPayload } from "./sync";
 import { hashSyncToken } from "./sync.server";
-import { prepareSyncSession } from "./sync-session-prepare.server";
+import {
+	type PreparedSyncSession,
+	prepareSyncSession,
+} from "./sync-session-prepare.server";
 
 /**
  * Decide a codebase's display name and where that name came from.
@@ -190,11 +193,8 @@ export async function handleCodebaseBulkDelete({
 	}
 }
 
-// Browser create: the codebase and its first short-lived sync session are
-// created atomically. The raw credential is returned once inside the sync
-// payload; only its hash is persisted. Accepts either an explicit `name`
-// (codebase list input) or a `message` (Home composer input, name derived the
-// same way the project branch derives it).
+// One repository per authenticated user + request identity. Replay never
+// reissues credentials or creates transport attempts; replacement is explicit.
 export async function handleCodebaseCreate({
 	request,
 }: {
@@ -206,61 +206,106 @@ export async function handleCodebaseCreate({
 	} catch {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
+	const startedAt = Date.now();
 	const body: unknown = await request.json().catch(() => null);
-	const preflight = await checkPreSyncCredit(user.id);
-	if (preflight.response) return preflight.response;
-	const nameCheck = validateCodebaseNameInput(body);
-	if (!nameCheck.ok) {
-		return Response.json({ error: nameCheck.error }, { status: 400 });
-	}
-	const codebaseName = nameCheck.name;
-
 	const parsed = z
-		.object({ requestId: z.uuid().optional() })
-		.safeParse(body ?? {});
+		.object({
+			requestId: z.uuid(),
+			name: z.string().optional(),
+			message: z.string().optional(),
+		})
+		.safeParse(body);
 	if (!parsed.success)
 		return Response.json(
-			{ error: "Permintaan sesi tidak valid." },
+			{
+				error: "Permintaan onboarding tidak valid.",
+				code: "CODEBASE_ATTEMPT_INVALID",
+			},
 			{ status: 400 },
 		);
-	const id = parsed.data.requestId
-		? hashSyncToken(JSON.stringify([user.id, parsed.data.requestId]))
-		: crypto.randomUUID();
-	let created: {
-		codebase: { id: string; name: string };
-		session: { id: string; expiresAt: Date; cliMinVersion: string };
-		token: string | null;
-	} | null;
+	const nameCheck = validateCodebaseNameInput(parsed.data);
+	if (!nameCheck.ok)
+		return Response.json({ error: nameCheck.error }, { status: 400 });
+	const id = hashSyncToken(JSON.stringify([user.id, parsed.data.requestId]));
+	const requestHash = hashSyncToken(
+		JSON.stringify([
+			"create-codebase",
+			nameCheck.name,
+			nameCheck.nameSource,
+			parsed.data.message ?? null,
+		]),
+	);
+	let operation: "created" | "reused" = "reused";
+	const diagnose = (
+		result: string,
+		safeErrorCode: string | null,
+		syncSessionId: string | null = null,
+	) =>
+		console.info("[codebase/onboarding]", {
+			onboardingAttemptId: parsed.data.requestId,
+			userId: user.id,
+			codebaseId: id,
+			syncSessionId,
+			operation,
+			result,
+			durationMs: Date.now() - startedAt,
+			safeErrorCode,
+		});
+	let created:
+		| { kind: "conflict" }
+		| { kind: "blocked"; response: Response }
+		| (PreparedSyncSession & {
+				kind: "session";
+				codebase: { id: string; name: string };
+		  });
+	const preflight = await checkPreSyncCredit(user.id);
 	try {
 		created = await db.transaction(async (tx) => {
 			await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${id}))`);
 			const [existing] = await tx
-				.select({ id: codebases.id, name: codebases.name })
+				.select({
+					id: codebases.id,
+					name: codebases.name,
+					requestHash: codebases.onboardingRequestHash,
+				})
 				.from(codebases)
 				.where(and(eq(codebases.id, id), eq(codebases.userId, user.id)))
 				.limit(1);
-			const codebase =
-				existing ??
-				(
-					await tx
-						.insert(codebases)
-						.values({
-							id,
-							userId: user.id,
-							name: codebaseName,
-							nameSource: nameCheck.nameSource,
-						})
-						.returning({ id: codebases.id, name: codebases.name })
-				)[0];
+			if (existing) {
+				if (existing.requestHash !== requestHash)
+					return { kind: "conflict" as const };
+				return {
+					kind: "session" as const,
+					codebase: existing,
+					...(await prepareSyncSession(tx, user.id, id, undefined, true)),
+				};
+			}
+			if (preflight.response)
+				return { kind: "blocked" as const, response: preflight.response };
+			const [codebase] = await tx
+				.insert(codebases)
+				.values({
+					id,
+					userId: user.id,
+					name: nameCheck.name,
+					nameSource: nameCheck.nameSource,
+					onboardingRequestHash: requestHash,
+				})
+				.returning({ id: codebases.id, name: codebases.name });
 			if (!codebase) throw new Error("Codebase insert returned no row");
-			return { codebase, ...(await prepareSyncSession(tx, user.id, id)) };
+			operation = "created";
+			return {
+				kind: "session" as const,
+				codebase,
+				...(await prepareSyncSession(tx, user.id, id)),
+			};
 		});
 	} catch (error) {
-		// A storage failure must not surface SQL, column names, or the
-		// driver message to the browser. The technical cause is logged
-		// server-side; the client gets the same safe message it gets for
-		// any other failed create, and the sync protocol is untouched.
-		console.error(`[codebases/create] failed for user ${user.id}:`, error);
+		diagnose("failed", "CODEBASE_CREATE_FAILED");
+		console.error(
+			"[codebases/create] persistence failed",
+			error instanceof Error ? error.name : "UnknownError",
+		);
 		return Response.json(
 			{
 				error: "Gagal membuat codebase",
@@ -270,15 +315,31 @@ export async function handleCodebaseCreate({
 		);
 	}
 
-	if (!created)
-		return Response.json({ error: "Gagal membuat codebase" }, { status: 500 });
+	if (created.kind === "blocked") {
+		diagnose("blocked", "CREDIT_REQUIRED");
+		return created.response;
+	}
+	if (created.kind === "conflict") {
+		diagnose("conflict", "CODEBASE_ATTEMPT_CONFLICT");
+		return Response.json(
+			{
+				error: "Identitas percobaan sudah digunakan untuk permintaan berbeda.",
+				code: "CODEBASE_ATTEMPT_CONFLICT",
+			},
+			{ status: 409 },
+		);
+	}
+	diagnose("success", null, created.session.id);
 	if (!created.token)
 		return Response.json(
 			{
-				code: "SYNC_SESSION_ACTIVE",
-				error: "Agent masih melakukan sinkronisasi.",
+				id: created.codebase.id,
+				name: created.codebase.name,
+				sessionId: created.session.id,
+				code: "CODEBASE_SESSION_RECOVERY_REQUIRED",
+				operation,
 			},
-			{ status: 409 },
+			{ headers: { "Cache-Control": "no-store", Pragma: "no-cache" } },
 		);
 	const sync: SyncPromptPayload = {
 		projectId: id,

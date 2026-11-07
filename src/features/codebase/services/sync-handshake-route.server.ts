@@ -24,7 +24,11 @@ import {
 	requireSupportedCliVersion,
 } from "./sync";
 import { hashSyncToken } from "./sync.server";
-import { runSyncHandshakeTransaction } from "./sync-handshake-transaction.server";
+import {
+	runSyncHandshakeTransaction,
+	type SyncHandshakeResult,
+} from "./sync-handshake-transaction.server";
+import { SyncBindingError } from "./sync-transport";
 
 function bearerToken(request: Request): string | null {
 	const header = request.headers.get("Authorization");
@@ -195,19 +199,29 @@ export async function handleCodebaseSyncHandshake(input: {
 		codebase.repositoryIdentity,
 		repositoryIdentity,
 	);
-	const handshakeResult = await runSyncHandshakeTransaction({
-		sessionId: session.id,
-		// The stored status is a text column; the handshake transaction narrows it
-		// and fails closed on unreachable moves.
-		sessionStatus: session.status,
-		sessionMetadata: session.metadata,
-		codebaseId,
-		userId: session.userId,
-		cliVersion: parsedBody.data.cliVersion,
-		repositoryName,
-		repositoryIdentity,
-		identityComparison,
-	});
+	let handshakeResult: SyncHandshakeResult;
+	try {
+		handshakeResult = await runSyncHandshakeTransaction({
+			sessionId: session.id,
+			// The stored status is a text column; the handshake transaction narrows it
+			// and fails closed on unreachable moves.
+			sessionStatus: session.status,
+			sessionMetadata: session.metadata,
+			codebaseId,
+			userId: session.userId,
+			cliVersion: parsedBody.data.cliVersion,
+			repositoryName,
+			repositoryIdentity,
+			identityComparison,
+		});
+	} catch (error) {
+		if (error instanceof SyncBindingError)
+			return Response.json(
+				{ error: error.message, code: error.code },
+				{ status: 401 },
+			);
+		throw error;
+	}
 
 	if (!handshakeResult.snapshotId) {
 		return Response.json(

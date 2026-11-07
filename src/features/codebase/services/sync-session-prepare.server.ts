@@ -1,12 +1,12 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { db } from "@/db";
-import { codebaseSyncSessions } from "@/db/schema";
+import { codebaseSnapshots, codebaseSyncSessions } from "@/db/schema";
 import {
 	CODEBASE_CLI_MIN_VERSION,
 	CODEBASE_SYNC_SESSION_EXPIRY_MS,
 } from "../types/codebase-constants";
 import { getSessionUsability } from "./sync";
-import { deriveSyncToken, hashSyncToken } from "./sync.server";
+import { generateSyncToken, hashSyncToken } from "./sync.server";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -23,7 +23,7 @@ export async function prepareSyncSession(
 	recoveryOnly = false,
 ): Promise<PreparedSyncSession> {
 	await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${codebaseId}))`);
-	const rows = await tx
+	let [latest] = await tx
 		.select()
 		.from(codebaseSyncSessions)
 		.where(
@@ -32,30 +32,61 @@ export async function prepareSyncSession(
 				eq(codebaseSyncSessions.userId, userId),
 			),
 		)
-		.orderBy(desc(codebaseSyncSessions.createdAt));
-	const latest = rows[0];
-	if (recoveryOnly && latest) {
-		// Recovery never mutates: it returns the attempt the browser must resume.
-		// A completed upload has nothing left to authorize, and any credential a
-		// waiting agent may already hold must not be rotated behind its back.
-		const completed = ["uploaded", "analyzing", "ready"].includes(
-			latest.status,
-		);
-		const token = deriveSyncToken(userId, latest.id);
-		const recoverable =
-			latest.status === "waiting_for_cli" &&
-			getSessionUsability({ ...latest, projectId: codebaseId }).usable &&
-			hashSyncToken(token) === latest.credentialHash;
-		return {
-			session: latest,
-			token: completed || !recoverable ? null : token,
-		};
+		.orderBy(
+			desc(codebaseSyncSessions.attempt),
+			desc(codebaseSyncSessions.createdAt),
+		)
+		.limit(1);
+	if (latest) {
+		// Share the handshake lock, then reread: a CLI may connect while we wait.
+		await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${latest.id}))`);
+		[latest] = await tx
+			.select()
+			.from(codebaseSyncSessions)
+			.where(
+				and(
+					eq(codebaseSyncSessions.id, latest.id),
+					eq(codebaseSyncSessions.userId, userId),
+				),
+			)
+			.limit(1);
 	}
-	const active = rows.find(
-		(row) => getSessionUsability({ ...row, projectId: codebaseId }).usable,
-	);
-	if (active) {
-		if (replaceSessionId === active.id) {
+	if (latest) {
+		if (recoveryOnly) return { session: latest, token: null };
+		const uploaded = ["uploaded", "analyzing", "ready"].includes(latest.status);
+		const cliActive = [
+			"connected",
+			"scanning",
+			"filtering",
+			"uploading",
+		].includes(latest.status);
+		const usable = getSessionUsability({
+			...latest,
+			projectId: codebaseId,
+		}).usable;
+		if (replaceSessionId) {
+			const [snapshot] = await tx
+				.select({ id: codebaseSnapshots.id })
+				.from(codebaseSnapshots)
+				.innerJoin(
+					codebaseSyncSessions,
+					eq(codebaseSnapshots.syncSessionId, codebaseSyncSessions.id),
+				)
+				.where(
+					and(
+						eq(codebaseSyncSessions.id, latest.id),
+						eq(codebaseSyncSessions.userId, userId),
+						sql`${codebaseSnapshots.status} in ('uploaded', 'ready')`,
+					),
+				)
+				.limit(1);
+			if (
+				replaceSessionId !== latest.id ||
+				uploaded ||
+				snapshot ||
+				(cliActive && usable)
+			)
+				return { session: latest, token: null };
 			await tx
 				.update(codebaseSyncSessions)
 				.set({
@@ -65,34 +96,15 @@ export async function prepareSyncSession(
 				})
 				.where(
 					and(
-						eq(codebaseSyncSessions.id, active.id),
+						eq(codebaseSyncSessions.id, latest.id),
 						eq(codebaseSyncSessions.userId, userId),
 					),
 				);
-		} else {
-			const token = deriveSyncToken(userId, active.id);
-			if (hashSyncToken(token) === active.credentialHash)
-				return { session: active, token };
-			// An unrecoverable credential may already be held by an agent.
-			if (recoveryOnly || active.status !== "waiting_for_cli")
-				return { session: active, token: null };
-			await tx
-				.update(codebaseSyncSessions)
-				.set({
-					status: "expired",
-					consumedAt: new Date(),
-					updatedAt: new Date(),
-				})
-				.where(
-					and(
-						eq(codebaseSyncSessions.id, active.id),
-						eq(codebaseSyncSessions.userId, userId),
-					),
-				);
-		}
+		} else if (usable) return { session: latest, token: null };
 	}
+	if (recoveryOnly) throw new Error("No sync session exists for recovery");
 	const id = crypto.randomUUID();
-	const token = deriveSyncToken(userId, id);
+	const token = generateSyncToken();
 	const [session] = await tx
 		.insert(codebaseSyncSessions)
 		.values({
@@ -103,7 +115,7 @@ export async function prepareSyncSession(
 			status: "waiting_for_cli",
 			expiresAt: new Date(Date.now() + CODEBASE_SYNC_SESSION_EXPIRY_MS),
 			cliMinVersion: CODEBASE_CLI_MIN_VERSION,
-			attempt: rows.length + 1,
+			attempt: (latest?.attempt ?? 0) + 1,
 		})
 		.returning();
 	if (!session) throw new Error("Sync session insert returned no row");
