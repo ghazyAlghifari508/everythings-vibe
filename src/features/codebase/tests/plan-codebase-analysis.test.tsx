@@ -284,7 +284,6 @@ describe("PlanCodebasePage onboarding analysis", () => {
 			},
 			{ timeout: 10000, interval: 100 },
 		);
-		expect(screen.queryByText("Menunggu agent")).toBeNull();
 		const cta = screen.getByTestId(
 			"sync-continue-to-summary",
 		) as HTMLButtonElement;

@@ -439,7 +439,9 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 			const step3 = document.querySelector('[data-testid="resync-step-3"]');
 
 			expect(step1?.getAttribute("data-step-state")).toBe("done");
-			expect(step2?.getAttribute("data-step-state")).toBe("active");
+			// The agent step waits for the user; it must not spin before the CLI
+			// actually contacts the server.
+			expect(step2?.getAttribute("data-step-state")).toBe("pending");
 			expect(step3?.getAttribute("data-step-state")).toBe("pending");
 
 			// State 2: CLI connected and syncing
@@ -485,6 +487,36 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 					.querySelector('[data-testid="resync-step-3"]')
 					?.getAttribute("data-step-state"),
 			).toBe("failed");
+		});
+
+		it("4b. Waits passively for the user instead of spinning before the CLI runs", () => {
+			renderModal({ status: createStatus({ status: "waiting_for_cli" }) });
+			const panel = document.querySelector(
+				'[data-testid="codebase-resync-panel"]',
+			);
+			// Nothing is running: the prompt is on screen but has not been run, so no
+			// indicator — step badge or stage row — may spin.
+			expect(panel?.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+				0,
+			);
+			expect(panel?.querySelector("[role='timer']")).toBeNull();
+			expect(
+				document.querySelectorAll(
+					'[data-testid="resync-step-3"] [data-stage-state="waiting"]',
+				),
+			).toHaveLength(4);
+			for (const testId of [
+				"sync-stage-agent",
+				"sync-stage-preparing",
+				"sync-stage-sync",
+				"sync-stage-analysis",
+			]) {
+				expect(
+					document
+						.querySelector(`[data-testid="${testId}"]`)
+						?.getAttribute("data-stage-state"),
+				).toBe("waiting");
+			}
 		});
 
 		it("5. Copy button copies entire prompt", async () => {
@@ -647,7 +679,9 @@ describe("P4: Re-Sync Modal & Session-Verified Completion", () => {
 			expect(document.body.textContent).toContain(
 				"Sync codebase dengan everythings-vibe",
 			);
-			expect(document.body.textContent).toContain("Salin instruksi untuk AI agent");
+			expect(document.body.textContent).toContain(
+				"Salin instruksi untuk AI agent",
+			);
 			expect(document.body.textContent).toContain(
 				"Buka AI coding agent di repository kamu",
 			);

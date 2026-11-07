@@ -151,6 +151,62 @@ describe("SyncStageList fast-sync reporting", () => {
 		expect(analysis?.textContent).toContain("Analisis selesai");
 	});
 
+	it("repaints a persisted standby session as idle instead of starting motion", () => {
+		// Refresh and stream reconnect both replay the current persisted state. A
+		// waiting session must stay waiting — no spinner, no timer — rather than
+		// appearing to begin a connection the server never observed.
+		render(status());
+		expect(states()).toEqual(["waiting", "waiting", "waiting"]);
+		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+			0,
+		);
+		expect(container.querySelector("[role='timer']")).toBeNull();
+		render(status({ updatedAt: "2026-02-01T10:05:00.000Z" }));
+		expect(states()).toEqual(["waiting", "waiting", "waiting"]);
+		expect(container.querySelectorAll('[data-testid="spinner"]')).toHaveLength(
+			0,
+		);
+	});
+
+	it("keeps a persisted upload running after a repaint", () => {
+		const uploading = status({
+			status: "uploading",
+			snapshotId: "snap_ui",
+			fileCount: 12,
+			lifecycle: [
+				{ kind: "agent_connected", at: "2026-02-01T10:00:00.000Z" },
+				{ kind: "upload_started", at: "2026-02-01T10:00:20.000Z" },
+			],
+		});
+		render(uploading);
+		expect(states()).toEqual(["done", "done", "active"]);
+		// The replayed frame is the same persisted attempt: completed rows stay
+		// completed and the active row is still the one genuinely in flight.
+		render(uploading);
+		expect(states()).toEqual(["done", "done", "active"]);
+	});
+
+	it("does not reset completed stages when the finished state is re-delivered", () => {
+		const finished = status({
+			status: "uploaded",
+			snapshotId: "snap_ui",
+			fileCount: 12,
+			lifecycle: [
+				{ kind: "agent_connected", at: "2026-02-01T10:00:00.000Z" },
+				{
+					kind: "snapshot_persisted",
+					at: "2026-02-01T10:00:20.000Z",
+					count: 12,
+				},
+			],
+		});
+		render(finished);
+		expect(states()).toEqual(["done", "done", "done"]);
+		render(finished);
+		expect(states()).toEqual(["done", "done", "done"]);
+		expect(container.querySelectorAll(".animate-spin")).toHaveLength(0);
+	});
+
 	it("withholds the list entirely while the server has not answered", () => {
 		render(null);
 		expect(container.querySelectorAll("[data-stage-state]")).toHaveLength(0);

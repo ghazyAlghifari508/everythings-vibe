@@ -83,20 +83,21 @@ export function ScreenConnectSyncStep({
 				</p>
 
 				{/* The browser has not heard from the server yet, so no stage can
-				honestly be claimed. A validated session that is being read reads as
-				connecting; a request that is still creating the session must not claim
-				a sync connection that does not exist yet, and with nothing in flight
-				(blocked credits) the line says the sync has not started. */}
+				honestly be claimed. Loading is rendered for one thing only: the
+				server request that is genuinely in flight while this frame's session
+				and prompt are being prepared. A validated session that is merely
+				being polled reads as the passive wait it is — the user has not run
+				the prompt — and with nothing in flight (blocked credits) the line
+				says the sync has not started. Polling is not connection activity, so
+				it never spins. */}
 				{!stageView.hasStatus && !stageView.failed && (
 					<p className="flex items-center gap-2 text-[11px] leading-relaxed text-fog">
-						{(isStarting || hasSession) && (
-							<Spinner size={12} className="text-blue-400" />
-						)}
+						{isStarting && <Spinner size={12} className="text-blue-400" />}
 						<span>
-							{hasSession
-								? "Menghubungkan server..."
-								: isStarting
-									? "Menyiapkan sesi sync..."
+							{isStarting
+								? "Menyiapkan sesi sync..."
+								: hasSession
+									? "Menunggu agent"
 									: "Belum dimulai"}
 						</span>
 					</p>
