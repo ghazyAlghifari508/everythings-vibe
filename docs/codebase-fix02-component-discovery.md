@@ -26,3 +26,16 @@ sync progress line. Produced per the FIX 02 §10 "Component Exploration" mandate
 
 **None.** HeroUI is already installed; no external component library was added and
 no new status card, loader, modal, or animation was authored from scratch.
+
+## P9 lifecycle follow-up
+
+Rechecked the installed `@heroui/react` and `@yogesharc/thinking-orbs` dependencies and these upstream candidates without browser automation:
+
+- [shadcn Button](https://ui.shadcn.com/docs/components/base/button): existing project Button already covers retry/copy actions.
+- [HeroUI Spinner](https://heroui.com/en/docs/react/components/spinner): reused through the existing Spinner wrapper.
+- [Magic UI progress gauge](https://magicui.design/docs/components/animated-circular-progress-bar): not suitable without measured percentage progress.
+- [React Bits](https://reactbits.dev/): creative animation components are unrelated to persistence recovery.
+- [Thinking Orbs](https://www.thinkingorbs.com/#orbs): available, but sync recovery is not model reasoning.
+- [affectUI](https://www.affectui.com/components): agent components would add another state surface unnecessarily.
+
+No new component, dependency, approval gate, confirmation modal, or History redesign. The existing error card now also handles a known repository whose recovery read failed, instead of leaving an indefinite loading card. Prompt, lock, retry, top-up and actual-request loading remain the existing components. P9 verification uses React DOM tests, API/database integration tests and a temporary runtime smoke; browser QA remains prohibited.
