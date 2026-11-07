@@ -4,28 +4,26 @@
 // Server-import exception: top-level `@/db`, schema, and `.server` imports are
 // correct here — server handlers only, no client component. Never import this
 // module from client code.
-import { and, desc, eq, gt, isNull, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, notInArray } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db";
 import { codebaseSyncSessions, codebases } from "@/db/schema";
-import {
-	CODEBASE_CLI_MIN_VERSION,
-	CODEBASE_SYNC_SESSION_EXPIRY_MS,
-} from "@/features/codebase/types/codebase-constants";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/session";
 import { checkPreSyncCredit } from "./analysis-credit-preflight.server";
 import { resolvePlan } from "./analysis-route-scope.server";
 import {
 	buildSyncCommand,
-	CODEBASE_SYNC_COMPLETE_STATUSES,
 	CODEBASE_SYNC_RATE_LIMIT_ACTION,
 	CODEBASE_SYNC_TERMINAL_STATUSES,
 	getSessionUsability,
 	type SyncPromptPayload,
-	shouldCreateSyncSession,
 	toSessionMetadata,
 } from "./sync";
-import { generateSyncToken, hashSyncToken } from "./sync.server";
+import {
+	type PreparedSyncSession,
+	prepareSyncSession,
+} from "./sync-session-prepare.server";
 
 async function getGuardedCodebase(userId: string, codebaseId: string) {
 	const [codebase] = await db
@@ -152,122 +150,56 @@ export async function handleCodebaseSessionCreate({
 		);
 
 	const body: unknown = await request.json().catch(() => null);
-	const preflight = await checkPreSyncCredit(user.id, body);
+	const preflight = await checkPreSyncCredit(user.id);
 	if (preflight.response) return preflight.response;
-	const isRetry =
-		typeof body === "object" &&
-		body !== null &&
-		"action" in body &&
-		body.action === "retry";
-
-	const rawCredential = generateSyncToken();
-	const expiresAt = new Date(Date.now() + CODEBASE_SYNC_SESSION_EXPIRY_MS);
-	const result = await db.transaction(async (tx) => {
-		// Serialize session minting per codebase. Without this lock, two
-		// concurrent POSTs can both observe no active row and mint two
-		// usable credentials. The lock lasts only for this transaction.
-		await tx.execute(
-			sql`select pg_advisory_xact_lock(hashtext(${codebaseId}))`,
+	const parsed = z
+		.object({
+			action: z.enum(["retry", "recover"]).optional(),
+			sessionId: z.string().min(1).optional(),
+		})
+		.safeParse(body ?? {});
+	if (!parsed.success)
+		return Response.json(
+			{ error: "Permintaan sesi tidak valid." },
+			{ status: 400 },
 		);
-		const existing = await tx
-			.select()
-			.from(codebaseSyncSessions)
-			.where(
-				and(
-					eq(codebaseSyncSessions.codebaseId, codebaseId),
-					eq(codebaseSyncSessions.userId, user.id),
-				),
-			)
-			.orderBy(desc(codebaseSyncSessions.createdAt));
-
-		if (isRetry) {
-			const now = new Date();
-			for (const row of existing) {
-				if (
-					!(CODEBASE_SYNC_COMPLETE_STATUSES as readonly string[]).includes(
-						row.status,
-					) &&
-					getSessionUsability({ ...row, projectId: codebaseId }, now).usable
-				) {
-					await tx
-						.update(codebaseSyncSessions)
-						.set({
-							status: "expired",
-							consumedAt: now,
-							updatedAt: now,
-						})
-						.where(eq(codebaseSyncSessions.id, row.id));
-				}
-			}
-		} else if (
-			!shouldCreateSyncSession(
-				existing.map((row) => ({ ...row, projectId: codebaseId })),
-			)
-		) {
-			const active = existing.find(
-				(row) =>
-					!(CODEBASE_SYNC_COMPLETE_STATUSES as readonly string[]).includes(
-						row.status,
-					) && getSessionUsability({ ...row, projectId: codebaseId }).usable,
-			);
-			if (active) {
-				return { conflictSessionId: active.id, inserted: null };
-			}
-		}
-
-		const [inserted] = await tx
-			.insert(codebaseSyncSessions)
-			.values({
-				id: crypto.randomUUID(),
+	let result: PreparedSyncSession;
+	try {
+		result = await db.transaction((tx) =>
+			prepareSyncSession(
+				tx,
+				user.id,
 				codebaseId,
-				userId: user.id,
-				credentialHash: hashSyncToken(rawCredential),
-				status: "waiting_for_cli",
-				expiresAt,
-				cliMinVersion: CODEBASE_CLI_MIN_VERSION,
-				attempt: existing.length + 1,
-				metadata: {
-					analysisCreditConsent: {
-						maximumCredits: preflight.status.maximumCredits,
-						pricingVersion: preflight.status.pricingVersion,
-					},
-				},
-			})
-			.returning({
-				id: codebaseSyncSessions.id,
-				expiresAt: codebaseSyncSessions.expiresAt,
-				cliMinVersion: codebaseSyncSessions.cliMinVersion,
-			});
-		return { inserted, conflictSessionId: undefined };
-	});
-	if (result.conflictSessionId)
+				parsed.data.action === "retry" ? parsed.data.sessionId : undefined,
+			),
+		);
+	} catch (error) {
+		console.error("[codebase/session] preparation failed", error);
+		return Response.json(
+			{ error: "Sesi sync gagal dibuat. Coba lagi.", code: "SYNC_FAILED" },
+			{ status: 503 },
+		);
+	}
+	if (!result.token)
 		return Response.json(
 			{
-				error: "Masih ada sync session yang aktif",
 				code: "SYNC_SESSION_ACTIVE",
-				sessionId: result.conflictSessionId,
+				error: "Agent masih melakukan sinkronisasi.",
+				sessionId: result.session.id,
 			},
 			{ status: 409 },
 		);
-	const inserted = result.inserted;
-	if (!inserted)
-		return Response.json(
-			{ error: "Gagal membuat sync session", code: "SYNC_FAILED" },
-			{ status: 500 },
-		);
+	const inserted = result.session;
 
 	const payload: SyncPromptPayload = {
 		projectId: codebaseId,
 		sessionId: inserted.id,
 		apiBaseUrl: new URL(request.url).origin,
-		syncToken: rawCredential,
+		syncToken: result.token,
 		cliMinVersion: inserted.cliMinVersion,
 		syncCommand: buildSyncCommand(codebaseId),
 		expiresAt: inserted.expiresAt.toISOString(),
 	};
-	// One-time sync credential: the raw token leaves the server here and is
-	// never readable again, so the response must not be cached by a browser,
-	// proxy, or history entry.
 	return Response.json(payload, {
 		headers: { "Cache-Control": "no-store", Pragma: "no-cache" },
 	});

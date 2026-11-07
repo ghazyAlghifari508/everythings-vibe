@@ -121,11 +121,13 @@ export function PlanCodebasePage({
 	const lockedPrompt = useMemo<LockedPromptState | null>(
 		() =>
 			buildLockedPrompt(creditStatus, {
-				onApprove: () => void createCodebase(),
-				onTopUpClose: () => void refreshCreditStatus(),
-				isApproving: isStarting,
+				onTopUpClose: () =>
+					void (async () => {
+						await refreshCreditStatus();
+						if (codebase) await retrySession();
+					})(),
 			}),
-		[creditStatus, createCodebase, isStarting, refreshCreditStatus],
+		[creditStatus, refreshCreditStatus, codebase, retrySession],
 	);
 
 	const creditNote = resolveCreditNote(creditStatus);
@@ -141,7 +143,11 @@ export function PlanCodebasePage({
 				onboardingFailed ? (
 					<CodebaseOnboardingErrorCard
 						error={error}
-						onRetry={() => void createCodebase()}
+						onRetry={() =>
+							void (creditStatus?.canStart
+								? createCodebase()
+								: refreshCreditStatus())
+						}
 					/>
 				) : isRecovering ? (
 					<CodebaseOnboardingLoadingCard
@@ -169,6 +175,7 @@ export function PlanCodebasePage({
 							payload={payload}
 							isStarting={isStarting}
 							status={lastStatus}
+							promptError={error}
 							statusError={statusPollError}
 							streamNotice={streamNotice}
 							onRequestNewToken={() => void retrySession()}

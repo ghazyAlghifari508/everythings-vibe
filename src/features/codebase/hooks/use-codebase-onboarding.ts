@@ -15,10 +15,8 @@ import type {
 	SyncStatusResponse,
 } from "@/features/codebase/services/sync";
 import type { AnalysisCreditStatus } from "../services/analysis-credit-policy";
-import {
-	preSyncAcceptance,
-	requestAnalysisCreditPreflight,
-} from "../services/analysis-credit-requests";
+import { requestAnalysisCreditPreflight } from "../services/analysis-credit-requests";
+import { readOnboardingRequestId } from "../services/onboarding-request-identity";
 import {
 	type CreatedCodebase,
 	requestCreateCodebase,
@@ -176,6 +174,7 @@ export function useCodebaseOnboarding({
 		if (queryInFlight.current) return;
 		queryInFlight.current = true;
 		try {
+			setError(null);
 			setCreditStatus(await requestAnalysisCreditPreflight());
 		} catch (error: unknown) {
 			setError(
@@ -194,23 +193,26 @@ export function useCodebaseOnboarding({
 			await refreshCreditStatus();
 			return;
 		}
-		// `requiresApproval` only reaches here from the explicit approval action,
-		// so the consent in the request is the one the user just gave.
-		if (!creditStatus.canStart && !creditStatus.requiresApproval) return;
+		if (!creditStatus.canStart) return;
 		createInFlight.current = true;
 		setError(null);
 		setIsStarting(true);
+		const requestId = readOnboardingRequestId();
 		try {
-			const outcome = await requestCreateCodebase(
-				preSyncAcceptance(creditStatus),
-			);
+			const outcome = await requestCreateCodebase();
+			if (readOnboardingRequestId() !== requestId) return;
 			if (outcome.kind === "unauthorized") return;
 			if (outcome.kind === "rejected") {
+				await refreshCreditStatus();
 				setError(outcome.message);
-				void refreshCreditStatus();
 				return;
 			}
 			setCodebase(outcome.codebase);
+			storePlanCodebasePointer(outcome.codebase.id, outcome.codebase.name);
+			window.history.replaceState(
+				{ ...window.history.state, codebaseStartCodebase: outcome.codebase.id },
+				"",
+			);
 			clearPlanCodebaseProjectPointer();
 			setFeatureProjectId(null);
 			// A brand new session has no server history: adopt its identity so
@@ -239,6 +241,8 @@ export function useCodebaseOnboarding({
 		setRecoveredStatus,
 		setActiveSessionId,
 		setStep,
+		setPayload,
+		setCreditStatus,
 	});
 
 	useEffect(() => {
@@ -248,7 +252,12 @@ export function useCodebaseOnboarding({
 		// nothing to recover, and inheriting the previous attempt is exactly the
 		// mixed old/new state this flow must never render. The eligibility check
 		// then prepares a brand new session (see the auto-start effect below).
-		if (intent === "new") {
+		readOnboardingRequestId();
+		const currentPointer = readPlanCodebasePointer();
+		if (
+			intent === "new" &&
+			window.history.state?.codebaseStartCodebase !== currentPointer?.id
+		) {
 			resetForFreshStart();
 			void refreshCreditStatus();
 			return;
@@ -260,10 +269,7 @@ export function useCodebaseOnboarding({
 			return;
 		}
 		void (async () => {
-			const recovered = await recoverCodebase();
-			if (!recovered) {
-				await refreshCreditStatus();
-			}
+			if (!(await recoverCodebase())) await refreshCreditStatus();
 		})();
 	}, [intent, recoverCodebase, refreshCreditStatus, resetForFreshStart]);
 
@@ -274,20 +280,14 @@ export function useCodebaseOnboarding({
 		void createCodebase();
 	}, [codebase, createCodebase, creditStatus, isStarting]);
 
-	const retrySession = async () => {
-		if (!codebase) return;
-		if (!creditStatus?.canStart && !creditStatus?.requiresApproval) {
-			await refreshCreditStatus();
-			return;
-		}
+	const retrySession = useCallback(async () => {
+		if (!codebase || createInFlight.current) return;
+		createInFlight.current = true;
 		// A retry continues an existing repository context, not a fresh start.
 		setError(null);
 		setIsStarting(true);
 		try {
-			const outcome = await requestRetrySession(
-				codebase.id,
-				preSyncAcceptance(creditStatus),
-			);
+			const outcome = await requestRetrySession(codebase.id);
 			if (outcome.kind === "cancelled") return;
 			if (outcome.kind === "failed") {
 				setError("Sesi sync gagal dibuat. Coba lagi.");
@@ -302,9 +302,10 @@ export function useCodebaseOnboarding({
 					: "Server tidak dapat dihubungi.",
 			);
 		} finally {
+			createInFlight.current = false;
 			setIsStarting(false);
 		}
-	};
+	}, [codebase, adoptPayload, setStep]);
 
 	// The server owns the name: once the CLI has handshaken it holds the
 	// repository folder name, so the open onboarding page must not keep showing

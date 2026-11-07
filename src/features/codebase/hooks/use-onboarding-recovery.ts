@@ -14,7 +14,13 @@ import {
 	SNAPSHOT_CONTEXT_STATUSES,
 	type SyncStatusResponse,
 } from "@/features/codebase/services/sync";
-import { requestCodebaseStatus } from "../services/onboarding-requests";
+import type { AnalysisCreditStatus } from "../services/analysis-credit-policy";
+import { requestAnalysisCreditPreflight } from "../services/analysis-credit-requests";
+import {
+	requestCodebaseStatus,
+	requestRetrySession,
+} from "../services/onboarding-requests";
+import type { SyncPromptPayload } from "../services/sync";
 import type { OnboardingAnalysisState } from "./use-onboarding-analysis-state";
 
 /**
@@ -82,6 +88,8 @@ export function useOnboardingRecovery({
 	setRecoveredStatus,
 	setActiveSessionId,
 	setStep,
+	setPayload,
+	setCreditStatus,
 }: {
 	analysisState: OnboardingAnalysisState;
 	setError: (error: string | null) => void;
@@ -90,6 +98,8 @@ export function useOnboardingRecovery({
 	setRecoveredStatus: (status: SyncStatusResponse | null) => void;
 	setActiveSessionId: (sessionId: string | null) => void;
 	setStep: (step: PlanCodebaseStep) => void;
+	setPayload: (payload: SyncPromptPayload | null) => void;
+	setCreditStatus: (status: AnalysisCreditStatus | null) => void;
 }) {
 	const {
 		analysisAttemptedFor,
@@ -173,6 +183,18 @@ export function useOnboardingRecovery({
 				recovered.status === "failed" ||
 				recovered.status === "expired"
 			) {
+				setRecoveredStatus(recovered);
+				setActiveSessionId(recovered.sessionId);
+				const credit = await requestAnalysisCreditPreflight();
+				setCreditStatus(credit);
+				if (credit.canStart) {
+					const result = await requestRetrySession(stored.id);
+					if (result.kind === "minted") {
+						setPayload(result.payload);
+						setActiveSessionId(result.payload.sessionId ?? null);
+						setRecoveredStatus(null);
+					} else setError("Sesi sync gagal dibuat. Coba lagi.");
+				}
 				setStep("sync");
 				return true;
 			}
@@ -198,6 +220,8 @@ export function useOnboardingRecovery({
 		}
 	}, [
 		setActiveSessionId,
+		setPayload,
+		setCreditStatus,
 		setStep,
 		setError,
 		setIsStarting,

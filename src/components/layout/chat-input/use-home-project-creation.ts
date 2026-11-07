@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useUserPlan } from "@/features/billing/hooks/use-user-plan";
+import { requestAnalysisCreditPreflight } from "@/features/codebase/services/analysis-credit-requests";
 import { NEW_REPOSITORY_START_SEARCH } from "@/features/codebase/services/onboarding-intent";
 import {
 	getPendingSyncPayloadKey,
@@ -155,26 +156,15 @@ export function useHomeProjectCreation({
 				// If plan check fails, allow flow — server will block with 403 anyway
 			}
 
-			let acceptance: {
-				creditConsent?: { maximumCredits: number; pricingVersion: string };
-			} | null = null;
 			if (projectMode === "existing_codebase") {
-				const { requestAnalysisCreditPreflight, preSyncAcceptance } =
-					await import("@/features/codebase/services/analysis-credit-requests");
 				const credit = await requestAnalysisCreditPreflight();
-				// Anything the server will not start (no credits, paused, or a changed
-				// quote) belongs to the sync page, which owns the locked prompt, the
-				// top-up, and the single approval — never a modal in the composer.
 				if (!credit.canStart) {
-					// A new connection being started from the composer is a fresh
-					// start: it must not inherit an abandoned attempt's state.
 					navigate({
 						to: "/plan/codebase",
 						search: NEW_REPOSITORY_START_SEARCH,
 					});
 					return;
 				}
-				acceptance = preSyncAcceptance(credit);
 			}
 			const endpoint =
 				projectMode === "existing_codebase"
@@ -182,7 +172,7 @@ export function useHomeProjectCreation({
 					: "/api/projects";
 			const requestBody =
 				projectMode === "existing_codebase"
-					? { message: enrichedPrompt, ...acceptance }
+					? { message: enrichedPrompt }
 					: {
 							message: enrichedPrompt,
 							language,

@@ -5,20 +5,12 @@
 // Server-import exception: top-level `@/db`, schema, and `.server` imports are
 // correct here — server handlers only, no client component. Never import this
 // module from client code.
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db";
-import {
-	codebaseSnapshots,
-	codebaseSyncSessions,
-	codebases,
-} from "@/db/schema";
-import {
-	CODEBASE_CLI_MIN_VERSION,
-	CODEBASE_LIBRARY_BULK_DELETE_LIMIT_ERROR,
-	CODEBASE_SYNC_SESSION_EXPIRY_MS,
-} from "@/features/codebase/types/codebase-constants";
+import { codebaseSnapshots, codebases } from "@/db/schema";
+import { CODEBASE_LIBRARY_BULK_DELETE_LIMIT_ERROR } from "@/features/codebase/types/codebase-constants";
 import { requireUser } from "@/lib/session";
-import { analysisCreditConsentSchema } from "./analysis-credit-policy";
 import {
 	checkPreSyncCredit,
 	getAnalysisCreditPreflight,
@@ -31,7 +23,8 @@ import {
 } from "./library";
 import { deleteOwnedCodebases } from "./library-delete.server";
 import { buildSyncCommand, type SyncPromptPayload } from "./sync";
-import { generateSyncToken, hashSyncToken } from "./sync.server";
+import { hashSyncToken } from "./sync.server";
+import { prepareSyncSession } from "./sync-session-prepare.server";
 
 /**
  * Decide a codebase's display name and where that name came from.
@@ -214,56 +207,53 @@ export async function handleCodebaseCreate({
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
 	const body: unknown = await request.json().catch(() => null);
-	const preflight = await checkPreSyncCredit(user.id, body);
+	const preflight = await checkPreSyncCredit(user.id);
 	if (preflight.response) return preflight.response;
-	const consent = analysisCreditConsentSchema.parse({
-		maximumCredits: preflight.status.maximumCredits,
-		pricingVersion: preflight.status.pricingVersion,
-	});
 	const nameCheck = validateCodebaseNameInput(body);
 	if (!nameCheck.ok) {
 		return Response.json({ error: nameCheck.error }, { status: 400 });
 	}
 	const codebaseName = nameCheck.name;
 
-	const id = crypto.randomUUID();
-	const rawCredential = generateSyncToken();
-	const expiresAt = new Date(Date.now() + CODEBASE_SYNC_SESSION_EXPIRY_MS);
+	const parsed = z
+		.object({ requestId: z.uuid().optional() })
+		.safeParse(body ?? {});
+	if (!parsed.success)
+		return Response.json(
+			{ error: "Permintaan sesi tidak valid." },
+			{ status: 400 },
+		);
+	const id = parsed.data.requestId
+		? hashSyncToken(JSON.stringify([user.id, parsed.data.requestId]))
+		: crypto.randomUUID();
 	let created: {
 		codebase: { id: string; name: string };
-		session: { expiresAt: Date; cliMinVersion: string };
+		session: { id: string; expiresAt: Date; cliMinVersion: string };
+		token: string | null;
 	} | null;
 	try {
 		created = await db.transaction(async (tx) => {
-			const [codebase] = await tx
-				.insert(codebases)
-				.values({
-					id,
-					userId: user.id,
-					name: codebaseName,
-					nameSource: nameCheck.nameSource,
-				})
-				.returning({ id: codebases.id, name: codebases.name });
-			if (!codebase) return null;
-			const [session] = await tx
-				.insert(codebaseSyncSessions)
-				.values({
-					id: crypto.randomUUID(),
-					codebaseId: id,
-					userId: user.id,
-					credentialHash: hashSyncToken(rawCredential),
-					status: "waiting_for_cli",
-					expiresAt,
-					cliMinVersion: CODEBASE_CLI_MIN_VERSION,
-					attempt: 1,
-					metadata: { analysisCreditConsent: consent },
-				})
-				.returning({
-					expiresAt: codebaseSyncSessions.expiresAt,
-					cliMinVersion: codebaseSyncSessions.cliMinVersion,
-				});
-			if (!session) return null;
-			return { codebase, session };
+			await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${id}))`);
+			const [existing] = await tx
+				.select({ id: codebases.id, name: codebases.name })
+				.from(codebases)
+				.where(and(eq(codebases.id, id), eq(codebases.userId, user.id)))
+				.limit(1);
+			const codebase =
+				existing ??
+				(
+					await tx
+						.insert(codebases)
+						.values({
+							id,
+							userId: user.id,
+							name: codebaseName,
+							nameSource: nameCheck.nameSource,
+						})
+						.returning({ id: codebases.id, name: codebases.name })
+				)[0];
+			if (!codebase) throw new Error("Codebase insert returned no row");
+			return { codebase, ...(await prepareSyncSession(tx, user.id, id)) };
 		});
 	} catch (error) {
 		// A storage failure must not surface SQL, column names, or the
@@ -282,17 +272,29 @@ export async function handleCodebaseCreate({
 
 	if (!created)
 		return Response.json({ error: "Gagal membuat codebase" }, { status: 500 });
+	if (!created.token)
+		return Response.json(
+			{
+				code: "SYNC_SESSION_ACTIVE",
+				error: "Agent masih melakukan sinkronisasi.",
+			},
+			{ status: 409 },
+		);
 	const sync: SyncPromptPayload = {
 		projectId: id,
+		sessionId: created.session.id,
 		apiBaseUrl: new URL(request.url).origin,
-		syncToken: rawCredential,
+		syncToken: created.token,
 		cliMinVersion: created.session.cliMinVersion,
 		syncCommand: buildSyncCommand(id),
 		expiresAt: created.session.expiresAt.toISOString(),
 	};
-	return Response.json({
-		id: created.codebase.id,
-		name: created.codebase.name,
-		sync,
-	});
+	return Response.json(
+		{
+			id: created.codebase.id,
+			name: created.codebase.name,
+			sync,
+		},
+		{ headers: { "Cache-Control": "no-store", Pragma: "no-cache" } },
+	);
 }

@@ -1,12 +1,10 @@
 import { z } from "zod";
 import { codebaseAnalysisSchema } from "./analysis";
-import { analysisCreditConsentSchema } from "./analysis-credit-policy";
 
 export const analysisRefreshRequestSchema = z.object({
 	snapshotId: z.string().min(1),
 	refreshStarterSuggestionsForAnalysisId: z.string().min(1),
 	preflight: z.boolean().optional(),
-	creditConsent: analysisCreditConsentSchema.optional(),
 });
 
 export type AnalysisRefreshRequest = z.infer<

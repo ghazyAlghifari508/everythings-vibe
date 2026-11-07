@@ -15,6 +15,7 @@ import {
 import { shouldFetchWorkspaceAnalysis } from "@/features/codebase/services/workspace-analysis";
 import { CODEBASE_SYNC_POLL_INTERVAL_MS } from "@/features/codebase/types/codebase-constants";
 import type { AnalysisCreditStatus } from "../services/analysis-credit-policy";
+import { requestAnalysisCreditPreflight } from "../services/analysis-credit-requests";
 import {
 	type CodebaseSessionStartAction,
 	getCodebaseSessionRequestBody,
@@ -45,6 +46,7 @@ export function useCodebaseSync({
 	const [creditPreflight, setCreditPreflight] =
 		useState<AnalysisCreditStatus | null>(null);
 	const inFlight = useRef(false);
+	const sessionInFlight = useRef(false);
 	const analysisState = useWorkspaceAnalysis({
 		projectId,
 		currentSnapshotId,
@@ -181,12 +183,12 @@ export function useCodebaseSync({
 	const startSession = async (
 		action: CodebaseSessionStartAction = "initial",
 	) => {
+		if (sessionInFlight.current) return;
+		sessionInFlight.current = true;
 		setIsStarting(true);
 		setIsResyncModalOpen(true);
 		setError(null);
 		try {
-			const { requestAnalysisCreditPreflight, preSyncAcceptance } =
-				await import("../services/analysis-credit-requests");
 			const status = await requestAnalysisCreditPreflight().catch(
 				(error: unknown) => {
 					setError(
@@ -199,11 +201,10 @@ export function useCodebaseSync({
 			);
 			if (!status) return;
 			setCreditPreflight(status);
-			// Mirrors the onboarding flow: an ineligible account gets a locked
-			// prompt with a top-up action, and no credential is ever minted for it.
-			// `requiresApproval` is the explicit approval action itself.
-			if (!status.canStart && !status.requiresApproval) return;
-			const acceptance = preSyncAcceptance(status);
+			if (!status.canStart) {
+				setPayload(null);
+				return;
+			}
 			const response = await fetch(
 				`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
 				{
@@ -211,7 +212,7 @@ export function useCodebaseSync({
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						...getCodebaseSessionRequestBody(action),
-						...acceptance,
+						sessionId: activeSessionId,
 					}),
 				},
 			);
@@ -236,6 +237,7 @@ export function useCodebaseSync({
 					: "Server tidak dapat dihubungi.",
 			);
 		} finally {
+			sessionInFlight.current = false;
 			setIsStarting(false);
 		}
 	};

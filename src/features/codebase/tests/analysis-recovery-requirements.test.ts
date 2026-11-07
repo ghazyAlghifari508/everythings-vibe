@@ -138,7 +138,7 @@ describe("p3 recovery requirements", () => {
 				availableCredits: blocked.maximumCredits,
 				isInitial: false,
 			}).canStart,
-		).toBe(false);
+		).toBe(true);
 	});
 
 	it("7. restored credit resumes from the stored snapshot", () => {
@@ -148,7 +148,6 @@ describe("p3 recovery requirements", () => {
 			subscriptionPaused: false,
 			availableCredits: 50,
 			isInitial: false,
-			approvedMaximum: 50,
 		});
 		expect(funded.code).toBe("CREDIT_REQUIRED");
 		expect(funded.canStart).toBe(true);

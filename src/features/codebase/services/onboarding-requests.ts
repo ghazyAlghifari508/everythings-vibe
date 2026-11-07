@@ -18,6 +18,7 @@ import {
 	syncPromptPayloadSchema,
 	syncStatusResponseSchema,
 } from "@/features/codebase/services/sync";
+import { readOnboardingRequestId } from "./onboarding-request-identity";
 
 export type CreatedCodebase = {
 	id: string;
@@ -47,18 +48,11 @@ export type CreateCodebaseOutcome =
 	| { kind: "unauthorized" }
 	| { kind: "rejected"; message: string };
 
-/** Approval payload for a start request; empty while the account already holds one. */
-type StartApproval = {
-	creditConsent?: { maximumCredits: number; pricingVersion: string };
-};
-
-export async function requestCreateCodebase(
-	acceptance: StartApproval,
-): Promise<CreateCodebaseOutcome> {
+export async function requestCreateCodebase(): Promise<CreateCodebaseOutcome> {
 	const response = await fetch("/api/codebases", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(acceptance),
+		body: JSON.stringify({ requestId: readOnboardingRequestId() }),
 	});
 	if (response.status === 401) {
 		redirectToLogin();
@@ -128,14 +122,13 @@ export type RetrySessionOutcome =
 
 export async function requestRetrySession(
 	codebaseId: string,
-	acceptance: StartApproval,
 ): Promise<RetrySessionOutcome> {
 	const response = await fetch(
 		`/api/codebases/${encodeURIComponent(codebaseId)}/session`,
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ action: "retry", ...acceptance }),
+			body: JSON.stringify({ action: "recover" }),
 		},
 	);
 	const parsed = syncPromptPayloadSchema.safeParse(
@@ -199,31 +192,25 @@ export async function requestOnboardingAnalysis({
 	projectId,
 	snapshotId,
 	refreshStarterSuggestionsForAnalysisId,
-	creditConsent,
 }: {
 	projectId: string;
 	snapshotId: string;
 	refreshStarterSuggestionsForAnalysisId?: string;
-	creditConsent?: { maximumCredits: number; pricingVersion: string };
 }): Promise<AnalysisTriggerOutcome> {
 	const bodyPayload: {
 		snapshotId: string;
 		refreshStarterSuggestionsForAnalysisId?: string;
-		creditConsent?: { maximumCredits: number; pricingVersion: string };
 	} = { snapshotId };
 	if (refreshStarterSuggestionsForAnalysisId) {
 		bodyPayload.refreshStarterSuggestionsForAnalysisId =
 			refreshStarterSuggestionsForAnalysisId;
 	}
-	const confirmedPayload: unknown = creditConsent
-		? { ...bodyPayload, creditConsent }
-		: bodyPayload;
 	const response = await fetch(
 		`/api/v1/projects/${encodeURIComponent(projectId)}/codebase/analysis`,
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(confirmedPayload),
+			body: JSON.stringify(bodyPayload),
 		},
 	);
 	// The caller owns the redirect here: the analysis trigger discards a

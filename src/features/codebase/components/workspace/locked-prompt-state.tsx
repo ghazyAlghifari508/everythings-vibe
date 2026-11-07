@@ -6,13 +6,8 @@ import { Icon } from "@/components/ui/icon";
 import type { AnalysisCreditStatus } from "@/features/codebase/services/analysis-credit-policy";
 import { LockedPromptAction } from "./locked-prompt-action";
 
-/**
- * The whole prompt region replaced by one centered state. `approval` is a
- * changed quote, never a routine sync: the account already authorized the old
- * ceiling, so only a new rate asks again.
- */
 export interface LockedPromptState {
-	variant: "insufficient" | "approval";
+	variant: "insufficient" | "unavailable";
 	title: string;
 	description: string;
 	action?: React.ReactNode;
@@ -51,34 +46,32 @@ export function LockedPromptStateView({
 export function buildLockedPrompt(
 	status: AnalysisCreditStatus | null,
 	actions: {
-		onApprove: () => void;
 		onTopUpClose?: () => void;
-		isApproving?: boolean;
 	},
 ): LockedPromptState | null {
 	if (!status || status.canStart) return null;
-	if (!status.requiresApproval) {
+	const insufficient =
+		status.code === "INSUFFICIENT_CREDITS" ||
+		status.code === "SUBSCRIPTION_PAUSED";
+	if (status.code === "BILLING_UNAVAILABLE")
 		return {
-			variant: "insufficient",
-			title: "Kredit tidak mencukupi",
-			description: "Tambahkan kredit untuk melanjutkan.",
+			variant: "unavailable",
+			title: "Kebutuhan kredit belum dapat diperiksa",
+			description: "Coba lagi untuk memeriksa status billing akun.",
 			action: (
-				<LockedPromptAction onEligibilityRefresh={actions.onTopUpClose} />
+				<Button type="button" onClick={actions.onTopUpClose}>
+					Coba lagi
+				</Button>
 			),
 		};
-	}
 	return {
-		variant: "approval",
-		title: "Tarif analisis diperbarui",
-		description: `Setujui hingga ${status.maximumCredits} kredit sekali di sini. Sync berikutnya memakai otorisasi yang sama.`,
-		action: (
-			<Button
-				type="button"
-				onClick={actions.onApprove}
-				disabled={actions.isApproving}
-			>
-				{actions.isApproving ? "Menyiapkan sesi..." : "Setujui dan lanjutkan"}
-			</Button>
-		),
+		variant: insufficient ? "insufficient" : "unavailable",
+		title: insufficient ? "Kredit tidak mencukupi" : "Analisis belum tersedia",
+		description: insufficient
+			? "Tambahkan kredit untuk melanjutkan."
+			: "Tunggu hingga analisis berjalan selesai, lalu coba lagi.",
+		action: insufficient ? (
+			<LockedPromptAction onEligibilityRefresh={actions.onTopUpClose} />
+		) : null,
 	};
 }

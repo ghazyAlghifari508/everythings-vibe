@@ -32,6 +32,7 @@ interface ScreenConnectProps {
 	status: SyncStatusResponse | null;
 	/** Reconciliation error from the owning loop. */
 	statusError?: string | null;
+	promptError?: string | null;
 	/** Update-channel notice; a dropped stream is not a failed sync. */
 	streamNotice?: string | null;
 	/** Mints a fresh one-time sync credential for a new attempt. */
@@ -71,6 +72,7 @@ export function ScreenConnect({
 	creditNote = null,
 	status,
 	statusError = null,
+	promptError = null,
 	streamNotice = null,
 	onRequestNewToken,
 	onRetrySync,
@@ -119,6 +121,7 @@ export function ScreenConnect({
 						projectName={projectName}
 						payload={payload}
 						isStarting={isStarting}
+						error={promptError}
 						status={status}
 						transportComplete={stageView.syncComplete}
 						onRequestNewToken={onRequestNewToken}

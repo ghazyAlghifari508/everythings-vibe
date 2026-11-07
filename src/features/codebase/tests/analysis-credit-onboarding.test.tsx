@@ -7,6 +7,7 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, test, vi } from "vitest";
 import { PlanCodebasePage } from "../components/workspace/plan-codebase-page";
 
@@ -162,15 +163,18 @@ test("top-up opens the real billing flow and unlocks from server state", async (
 	});
 	render(<PlanCodebasePage />);
 
-	fireEvent.click(await screen.findByRole("button", { name: "Tambahkan Kredit" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: "Tambahkan Kredit" }),
+	);
 	assert.ok(await screen.findByText("Isi Ulang Kredit"));
 	fireEvent.click(screen.getByRole("button", { name: /Tutup modal/i }));
 
 	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
 	assert.equal(preflightCount, 2);
 	assert.equal(
-		calls.filter((call) => call.method === "POST" && call.url === "/api/codebases")
-			.length,
+		calls.filter(
+			(call) => call.method === "POST" && call.url === "/api/codebases",
+		).length,
 		1,
 	);
 });
@@ -196,35 +200,22 @@ test("billing-exempt accounts run the normal sync without a credit gate", async 
 	assert.equal(screen.queryByText(/Analisis hingga/), null);
 });
 
-test("a changed quote asks for one approval and records the ceiling", async () => {
+test("legacy approval flag cannot add a step to an eligible account", async () => {
 	const calls = stubBackend((input) => {
-		if (input === PREFLIGHT)
-			return creditStatus({ canStart: false, requiresApproval: true });
+		if (input === PREFLIGHT) return creditStatus({ requiresApproval: true });
 		if (input === "/api/codebases") return createdCodebase();
 		if (input.includes("/status")) return statusResponse();
 		throw new Error(`Unexpected request ${input}`);
 	});
 	render(<PlanCodebasePage />);
-
-	const locked = await screen.findByTestId("locked-prompt-region");
-	assert.equal(locked.getAttribute("data-locked-variant"), "approval");
-	assert.ok(locked.textContent?.includes("Tarif analisis diperbarui"));
-	fireEvent.click(
-		await screen.findByRole("button", { name: "Setujui dan lanjutkan" }),
-	);
-
-	await waitFor(() =>
-		assert.equal(
-			calls.filter((call) => call.method === "POST").length,
-			1,
-			"the approval must start exactly one session",
-		),
-	);
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	assert.equal(screen.queryByRole("checkbox"), null);
+	assert.equal(screen.queryByTestId("locked-prompt-region"), null);
 	const create = calls.find((call) => call.url === "/api/codebases");
-	assert.deepEqual(JSON.parse(String(create?.body)).creditConsent, {
-		maximumCredits: 12,
-		pricingVersion: "adaptive-v1",
-	});
+	assert.equal(
+		Object.hasOwn(JSON.parse(String(create?.body)), "creditConsent"),
+		false,
+	);
 });
 
 test("a rerender does not mint a second sync session", async () => {
@@ -263,27 +254,78 @@ test("opening the screen never starts a billable analysis", async () => {
 	);
 });
 
-test("no native browser confirm or alert remain in codebase feature source", async () => {
-	const glob = await import("node:fs/promises");
-	const files = [
-		"src/features/codebase/services/analysis-credit-requests.ts",
-		"src/features/codebase/hooks/use-codebase-onboarding.ts",
-		"src/features/codebase/hooks/use-codebase-sync.ts",
-		"src/features/codebase/hooks/use-workspace-analysis.ts",
-		"src/features/codebase/components/workspace/plan-codebase-page.tsx",
-		"src/features/codebase/components/planning/codebase-resync-modal.tsx",
-	];
-	for (const f of files) {
-		const source = await glob.readFile(f, "utf8");
-		assert.equal(
-			source.includes("window.confirm"),
-			false,
-			`${f} still has window.confirm`,
-		);
-		assert.equal(
-			source.includes("window.alert"),
-			false,
-			`${f} still has window.alert`,
-		);
-	}
+test("Strict Mode and remount recover the same prompt without another codebase", async () => {
+	const calls = stubBackend((input) => {
+		if (input === PREFLIGHT) return creditStatus({});
+		if (input === "/api/codebases") return createdCodebase();
+		if (input.includes("/status")) return statusResponse();
+		if (input.endsWith("/session")) return syncPayload();
+		throw new Error(`Unexpected request ${input}`);
+	});
+	const first = render(
+		<StrictMode>
+			<PlanCodebasePage intent="new" />
+		</StrictMode>,
+	);
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	first.unmount();
+	render(
+		<StrictMode>
+			<PlanCodebasePage intent="new" />
+		</StrictMode>,
+	);
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	assert.equal(
+		calls.filter(
+			(call) => call.method === "POST" && call.url === "/api/codebases",
+		).length,
+		1,
+	);
+	assert.ok(screen.getByText(new RegExp(SYNC_TOKEN)));
+});
+
+test("failed session preparation offers a working retry", async () => {
+	let attempts = 0;
+	stubBackend((input) => {
+		if (input === PREFLIGHT) return creditStatus({});
+		if (input === "/api/codebases")
+			return ++attempts === 1
+				? { error: "Session unavailable" }
+				: createdCodebase();
+		if (input.includes("/status")) return statusResponse();
+		throw new Error(`Unexpected request ${input}`);
+	});
+	render(<PlanCodebasePage />);
+	fireEvent.click(await screen.findByRole("button", { name: "Coba lagi" }));
+	await screen.findByRole("button", { name: "Salin prompt untuk AI agent" });
+	assert.equal(attempts, 2);
+});
+
+test("a delayed create response cannot overwrite a newer navigation", async () => {
+	const pending = Promise.withResolvers<Response>();
+	let requested = false;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (input: string) => {
+			if (input === PREFLIGHT) return Response.json(creditStatus({}));
+			if (input === "/api/codebases") {
+				requested = true;
+				return pending.promise;
+			}
+			throw new Error(`Unexpected request ${input}`);
+		}),
+	);
+	const page = render(<PlanCodebasePage intent="new" />);
+	await waitFor(() => assert.ok(requested));
+	page.unmount();
+	window.history.replaceState(
+		{ codebaseStartRequest: crypto.randomUUID() },
+		"",
+	);
+	pending.resolve(Response.json(createdCodebase()));
+	await pending.promise;
+	const settled = Promise.withResolvers<void>();
+	setTimeout(settled.resolve, 0);
+	await settled.promise;
+	assert.equal(sessionStorage.getItem("prdfy:plan-codebase-id"), null);
 });

@@ -10,7 +10,7 @@ const base = {
 	isInitial: true,
 };
 
-test("initial allowance, paid eligibility, consent, and legacy policy", () => {
+test("initial allowance and paid eligibility do not require sync approval", () => {
 	assert.equal(
 		resolveAnalysisCreditPolicy(base).code,
 		"FREE_ALLOWANCE_AVAILABLE",
@@ -33,17 +33,7 @@ test("initial allowance, paid eligibility, consent, and legacy policy", () => {
 	);
 	const paid = { ...base, allowanceUsed: true, availableCredits: 100 };
 	assert.equal(resolveAnalysisCreditPolicy(paid).code, "CREDIT_REQUIRED");
-	assert.equal(
-		resolveAnalysisCreditPolicy({ ...paid, approvedMaximum: 1 }).canStart,
-		false,
-	);
-	const quote = resolveAnalysisCreditPolicy(paid);
-	assert.equal(
-		resolveAnalysisCreditPolicy({
-			...paid,
-			approvedMaximum: quote.maximumCredits,
-		}).canStart,
-		true,
-	);
+	assert.equal(resolveAnalysisCreditPolicy(paid).canStart, true);
+	assert.equal(resolveAnalysisCreditPolicy(paid).requiresApproval, false);
 	assert.equal(resolveAnalysisCreditPolicy(base).maximumCredits, 0);
 });
